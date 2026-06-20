@@ -11,13 +11,11 @@ func TestTraceAttributesDoNotExposeUserIdentifiers(t *testing.T) {
 		"auth.go",
 		"admin_auth.go",
 		"admin_manage.go",
-		"user_admin.go",
 	}
 	forbiddenKeys := []string{
 		`"` + "auth.username" + `"`,
 		`"` + "admin_auth.username" + `"`,
 		`"` + "admin.username" + `"`,
-		`"` + "useradmin.search_username" + `"`,
 	}
 
 	for _, file := range files {

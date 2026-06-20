@@ -23,10 +23,8 @@ type JsonrpcService struct {
 func NewJsonrpcService(
 	c *conf.Data,
 	logger log.Logger,
-	authUC *biz.AuthUsecase,
 	adminAuthUC *biz.AdminAuthUsecase,
 	adminManageUC *biz.AdminManageUsecase,
-	userAdminUC *biz.UserAdminUsecase,
 	workflowUC *biz.WorkflowUsecase,
 	debugUC *biz.DebugUsecase,
 	masterDataUC *biz.MasterDataUsecase,
@@ -41,10 +39,8 @@ func NewJsonrpcService(
 		dispatcher: newJSONRPCDispatcher(
 			c,
 			logger,
-			authUC,
 			adminAuthUC,
 			adminManageUC,
-			userAdminUC,
 			workflowUC,
 			debugUC,
 			masterDataUC,

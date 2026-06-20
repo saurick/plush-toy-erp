@@ -11,6 +11,7 @@ import (
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/shipment"
+	"server/internal/data/model/ent/stockreservation"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
@@ -54,6 +55,260 @@ func TestOperationalFactRepo_ProductionFactPostAndCancelWritesInventoryReversal(
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ProductionFactSourceType)).CountX(ctx); count != 2 {
 		t.Fatalf("expected original + reversal production txns, got %d", count)
+	}
+}
+
+func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalActionsAllowed(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "operational_fact_inactive_refs")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		TxnType:        biz.InventoryTxnIn,
+		Direction:      1,
+		Quantity:       decimal.NewFromInt(5),
+		UnitID:         fixtures.unitID,
+		SourceType:     "TEST_INACTIVE_REFS",
+		IdempotencyKey: "TEST_INACTIVE_REFS:IN",
+	}); err != nil {
+		t.Fatalf("seed product inventory failed: %v", err)
+	}
+	fact, err := uc.CreateProductionFactDraft(ctx, &biz.OperationalFactMutation{
+		FactNo:         "PF-INACTIVE-HISTORY",
+		FactType:       biz.ProductionFactFinishedGoodsReceipt,
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       decimal.NewFromInt(1),
+		IdempotencyKey: "PF-INACTIVE-HISTORY",
+	})
+	if err != nil {
+		t.Fatalf("create production fact failed: %v", err)
+	}
+	if _, err := uc.PostProductionFact(ctx, fact.ID); err != nil {
+		t.Fatalf("post production fact failed: %v", err)
+	}
+	reservation, err := uc.CreateStockReservation(ctx, &biz.StockReservationCreate{
+		ReservationNo:  "RSV-INACTIVE-HISTORY",
+		ProductID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       decimal.NewFromInt(1),
+		IdempotencyKey: "RSV-INACTIVE-HISTORY",
+	})
+	if err != nil {
+		t.Fatalf("create stock reservation failed: %v", err)
+	}
+
+	if _, err := client.Product.UpdateOneID(fixtures.productID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable product failed: %v", err)
+	}
+	if cancelled, err := uc.CancelPostedProductionFact(ctx, fact.ID); err != nil {
+		t.Fatalf("cancel posted production fact should not be blocked by inactive product: %v", err)
+	} else if cancelled.Status != biz.OperationalFactStatusCancelled {
+		t.Fatalf("expected cancelled production fact, got %s", cancelled.Status)
+	}
+	if released, err := uc.ReleaseStockReservation(ctx, reservation.ID); err != nil {
+		t.Fatalf("release reservation should not be blocked by inactive product: %v", err)
+	} else if released.Status != biz.StockReservationStatusReleased {
+		t.Fatalf("expected released reservation, got %s", released.Status)
+	}
+	if _, err := uc.CreateProductionFactDraft(ctx, &biz.OperationalFactMutation{
+		FactNo:         "PF-INACTIVE-NEW",
+		FactType:       biz.ProductionFactFinishedGoodsReceipt,
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       decimal.NewFromInt(1),
+		IdempotencyKey: "PF-INACTIVE-NEW",
+	}); !errors.Is(err, biz.ErrProductInactive) {
+		t.Fatalf("expected inactive product rejected for new production fact, got %v", err)
+	}
+
+	activeProduct := createTestProduct(t, ctx, client, fixtures.unitID, "PRD-OP-ACTIVE")
+	if _, err := client.Warehouse.UpdateOneID(fixtures.warehouseID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable warehouse failed: %v", err)
+	}
+	if _, err := uc.CreateStockReservation(ctx, &biz.StockReservationCreate{
+		ReservationNo:  "RSV-INACTIVE-NEW",
+		ProductID:      activeProduct.ID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       decimal.NewFromInt(1),
+		IdempotencyKey: "RSV-INACTIVE-NEW",
+	}); !errors.Is(err, biz.ErrWarehouseInactive) {
+		t.Fatalf("expected inactive warehouse rejected for new reservation, got %v", err)
+	}
+}
+
+func TestOperationalFactUsecase_ShipmentRejectsInactiveManualReferences(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_inactive_refs")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+
+	customer, err := client.Customer.Create().SetCode("C-SHIP-INACTIVE").SetName("停用客户").SetIsActive(false).Save(ctx)
+	if err != nil {
+		t.Fatalf("create inactive customer failed: %v", err)
+	}
+	if _, err := uc.CreateShipmentDraft(ctx, &biz.ShipmentCreate{
+		ShipmentNo:     "SHP-INACTIVE-CUSTOMER",
+		CustomerID:     &customer.ID,
+		IdempotencyKey: "SHP-INACTIVE-CUSTOMER",
+	}); !errors.Is(err, biz.ErrCustomerInactive) {
+		t.Fatalf("expected inactive customer rejected for manual shipment, got %v", err)
+	}
+
+	shipment, err := uc.CreateShipmentDraft(ctx, &biz.ShipmentCreate{
+		ShipmentNo:     "SHP-INACTIVE-ITEM",
+		IdempotencyKey: "SHP-INACTIVE-ITEM",
+	})
+	if err != nil {
+		t.Fatalf("create shipment failed: %v", err)
+	}
+	if _, err := client.Product.UpdateOneID(fixtures.productID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable product failed: %v", err)
+	}
+	if _, err := uc.AddShipmentItem(ctx, &biz.ShipmentItemCreate{
+		ShipmentID:  shipment.ID,
+		ProductID:   fixtures.productID,
+		WarehouseID: fixtures.warehouseID,
+		UnitID:      fixtures.unitID,
+		Quantity:    decimal.NewFromInt(1),
+	}); !errors.Is(err, biz.ErrProductInactive) {
+		t.Fatalf("expected inactive product rejected for manual shipment item, got %v", err)
+	}
+
+	activeProduct := createTestProduct(t, ctx, client, fixtures.unitID, "PRD-SHIP-SKU-ACTIVE")
+	inactiveSKU, err := client.ProductSKU.Create().
+		SetProductID(activeProduct.ID).
+		SetSkuCode("SKU-SHIP-INACTIVE").
+		SetSkuName("停用 SKU").
+		SetDefaultUnitID(fixtures.unitID).
+		SetIsActive(false).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create inactive product SKU failed: %v", err)
+	}
+	if _, err := uc.AddShipmentItem(ctx, &biz.ShipmentItemCreate{
+		ShipmentID:   shipment.ID,
+		ProductID:    activeProduct.ID,
+		ProductSkuID: &inactiveSKU.ID,
+		WarehouseID:  fixtures.warehouseID,
+		UnitID:       fixtures.unitID,
+		Quantity:     decimal.NewFromInt(1),
+	}); !errors.Is(err, biz.ErrProductSKUInactive) {
+		t.Fatalf("expected inactive product SKU rejected for manual shipment item, got %v", err)
+	}
+}
+
+func TestOperationalFactUsecase_SourceLinkedShipmentAndReservationAllowInactiveOrderReferences(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "operational_fact_source_linked_inactive_refs")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
+	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+
+	customer := createSalesOrderTestCustomer(t, ctx, client, "C-SOURCE-INACTIVE", true)
+	productSKU, err := client.ProductSKU.Create().
+		SetProductID(fixtures.productID).
+		SetSkuCode("SKU-SOURCE-INACTIVE").
+		SetSkuName("来源 SKU").
+		SetDefaultUnitID(fixtures.unitID).
+		SetIsActive(true).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create source product SKU failed: %v", err)
+	}
+	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
+		OrderNo:    "SO-SOURCE-INACTIVE",
+		CustomerID: customer.ID,
+		OrderDate:  time.Date(2026, 6, 18, 0, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create sales order failed: %v", err)
+	}
+	item, err := salesUC.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
+		SalesOrderID:    order.ID,
+		LineNo:          1,
+		ProductID:       fixtures.productID,
+		ProductSkuID:    &productSKU.ID,
+		UnitID:          fixtures.unitID,
+		OrderedQuantity: decimal.NewFromInt(2),
+	})
+	if err != nil {
+		t.Fatalf("add sales order item failed: %v", err)
+	}
+
+	if _, err := client.Customer.UpdateOneID(customer.ID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable customer failed: %v", err)
+	}
+	if _, err := client.Product.UpdateOneID(fixtures.productID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable product failed: %v", err)
+	}
+	if _, err := client.ProductSKU.UpdateOneID(productSKU.ID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable product SKU failed: %v", err)
+	}
+	if _, err := client.Unit.UpdateOneID(fixtures.unitID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable unit failed: %v", err)
+	}
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		TxnType:        biz.InventoryTxnIn,
+		Direction:      1,
+		Quantity:       decimal.NewFromInt(5),
+		UnitID:         fixtures.unitID,
+		SourceType:     "TEST_SOURCE_LINKED_INACTIVE",
+		IdempotencyKey: "TEST_SOURCE_LINKED_INACTIVE:IN",
+	}); err != nil {
+		t.Fatalf("internal inventory source write should keep historical inactive references readable: %v", err)
+	}
+
+	shipment, err := uc.CreateShipmentDraft(ctx, &biz.ShipmentCreate{
+		ShipmentNo:     "SHP-SOURCE-INACTIVE",
+		SalesOrderID:   &order.ID,
+		CustomerID:     &customer.ID,
+		IdempotencyKey: "SHP-SOURCE-INACTIVE",
+	})
+	if err != nil {
+		t.Fatalf("source-linked shipment header should allow inactive historical customer: %v", err)
+	}
+	if _, err := uc.AddShipmentItem(ctx, &biz.ShipmentItemCreate{
+		ShipmentID:       shipment.ID,
+		SalesOrderItemID: &item.ID,
+		ProductID:        fixtures.productID,
+		ProductSkuID:     &productSKU.ID,
+		WarehouseID:      fixtures.warehouseID,
+		UnitID:           fixtures.unitID,
+		Quantity:         decimal.NewFromInt(1),
+	}); err != nil {
+		t.Fatalf("source-linked shipment item should allow inactive historical product/SKU/unit: %v", err)
+	}
+	reservation, err := uc.CreateStockReservation(ctx, &biz.StockReservationCreate{
+		ReservationNo:    "RSV-SOURCE-INACTIVE",
+		SalesOrderID:     &order.ID,
+		SalesOrderItemID: &item.ID,
+		ProductID:        fixtures.productID,
+		WarehouseID:      fixtures.warehouseID,
+		UnitID:           fixtures.unitID,
+		Quantity:         decimal.NewFromInt(1),
+		IdempotencyKey:   "RSV-SOURCE-INACTIVE",
+	})
+	if err != nil {
+		t.Fatalf("source-linked reservation should allow inactive historical product/unit: %v", err)
+	}
+	if count := client.StockReservation.Query().Where(stockreservation.ID(reservation.ID)).CountX(ctx); count != 1 {
+		t.Fatalf("expected source-linked reservation persisted, got %d rows", count)
 	}
 }
 
@@ -152,6 +407,136 @@ func TestOperationalFactRepo_OutsourcingMaterialIssueWithoutLotPostAndCancel(t *
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.OutsourcingFactSourceType)).CountX(ctx); count != 2 {
 		t.Fatalf("expected outbound + reversal outsourcing txns, got %d", count)
+	}
+}
+
+func TestOperationalFactUsecase_OutsourcingRejectsInactiveNewReferencesAndKeepsCancelAllowed(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "operational_fact_outsourcing_inactive_refs")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		TxnType:        biz.InventoryTxnIn,
+		Direction:      1,
+		Quantity:       decimal.NewFromInt(5),
+		UnitID:         fixtures.unitID,
+		SourceType:     "TEST_OUTSOURCING_INACTIVE",
+		IdempotencyKey: "TEST_OUTSOURCING_INACTIVE:IN",
+	}); err != nil {
+		t.Fatalf("seed product inventory failed: %v", err)
+	}
+	fact, err := uc.CreateOutsourcingFactDraft(ctx, &biz.OperationalFactMutation{
+		FactNo:         "OF-INACTIVE-HISTORY",
+		FactType:       biz.OutsourcingFactMaterialIssue,
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       decimal.NewFromInt(1),
+		IdempotencyKey: "OF-INACTIVE-HISTORY",
+	})
+	if err != nil {
+		t.Fatalf("create outsourcing fact failed: %v", err)
+	}
+	if _, err := uc.PostOutsourcingFact(ctx, fact.ID); err != nil {
+		t.Fatalf("post outsourcing fact failed: %v", err)
+	}
+	if _, err := client.Product.UpdateOneID(fixtures.productID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable product failed: %v", err)
+	}
+	if cancelled, err := uc.CancelPostedOutsourcingFact(ctx, fact.ID); err != nil {
+		t.Fatalf("cancel posted outsourcing fact should not be blocked by inactive product: %v", err)
+	} else if cancelled.Status != biz.OperationalFactStatusCancelled {
+		t.Fatalf("expected cancelled outsourcing fact, got %s", cancelled.Status)
+	}
+	if _, err := uc.CreateOutsourcingFactDraft(ctx, &biz.OperationalFactMutation{
+		FactNo:         "OF-INACTIVE-PRODUCT",
+		FactType:       biz.OutsourcingFactMaterialIssue,
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       decimal.NewFromInt(1),
+		IdempotencyKey: "OF-INACTIVE-PRODUCT",
+	}); !errors.Is(err, biz.ErrProductInactive) {
+		t.Fatalf("expected inactive product rejected for new outsourcing fact, got %v", err)
+	}
+
+	if _, err := client.Material.UpdateOneID(fixtures.materialID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable material failed: %v", err)
+	}
+	if _, err := uc.CreateOutsourcingFactDraft(ctx, &biz.OperationalFactMutation{
+		FactNo:         "OF-INACTIVE-MATERIAL",
+		FactType:       biz.OutsourcingFactReturnReceipt,
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       decimal.NewFromInt(1),
+		IdempotencyKey: "OF-INACTIVE-MATERIAL",
+	}); !errors.Is(err, biz.ErrMaterialInactive) {
+		t.Fatalf("expected inactive material rejected for new outsourcing fact, got %v", err)
+	}
+
+	activeProduct := createTestProduct(t, ctx, client, fixtures.unitID, "PRD-OF-ACTIVE")
+	inactiveSupplier, err := client.Supplier.Create().
+		SetCode("SUP-OF-INACTIVE").
+		SetName("停用委外供应商").
+		SetIsActive(false).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create inactive supplier failed: %v", err)
+	}
+	if _, err := uc.CreateOutsourcingFactDraft(ctx, &biz.OperationalFactMutation{
+		FactNo:         "OF-INACTIVE-SUPPLIER",
+		FactType:       biz.OutsourcingFactMaterialIssue,
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      activeProduct.ID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		SupplierID:     &inactiveSupplier.ID,
+		Quantity:       decimal.NewFromInt(1),
+		IdempotencyKey: "OF-INACTIVE-SUPPLIER",
+	}); !errors.Is(err, biz.ErrSupplierInactive) {
+		t.Fatalf("expected inactive supplier rejected for new outsourcing fact, got %v", err)
+	}
+	if _, err := client.Warehouse.UpdateOneID(fixtures.warehouseID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable warehouse failed: %v", err)
+	}
+	if _, err := uc.CreateOutsourcingFactDraft(ctx, &biz.OperationalFactMutation{
+		FactNo:         "OF-INACTIVE-WAREHOUSE",
+		FactType:       biz.OutsourcingFactMaterialIssue,
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      activeProduct.ID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       decimal.NewFromInt(1),
+		IdempotencyKey: "OF-INACTIVE-WAREHOUSE",
+	}); !errors.Is(err, biz.ErrWarehouseInactive) {
+		t.Fatalf("expected inactive warehouse rejected for new outsourcing fact, got %v", err)
+	}
+	if _, err := client.Warehouse.UpdateOneID(fixtures.warehouseID).SetIsActive(true).Save(ctx); err != nil {
+		t.Fatalf("reactivate warehouse failed: %v", err)
+	}
+	if _, err := client.Unit.UpdateOneID(fixtures.unitID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable unit failed: %v", err)
+	}
+	if _, err := uc.CreateOutsourcingFactDraft(ctx, &biz.OperationalFactMutation{
+		FactNo:         "OF-INACTIVE-UNIT",
+		FactType:       biz.OutsourcingFactMaterialIssue,
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      activeProduct.ID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       decimal.NewFromInt(1),
+		IdempotencyKey: "OF-INACTIVE-UNIT",
+	}); !errors.Is(err, biz.ErrUnitInactive) {
+		t.Fatalf("expected inactive unit rejected for new outsourcing fact, got %v", err)
 	}
 }
 
@@ -393,11 +778,23 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 	if shipped.Status != biz.ShipmentStatusShipped {
 		t.Fatalf("expected shipment SHIPPED, got %s", shipped.Status)
 	}
+	customer, err := client.Customer.Create().
+		SetCode("C-FIN-SOURCE-INACTIVE").
+		SetName("已停用来源客户").
+		SetIsActive(true).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create finance source customer failed: %v", err)
+	}
+	if _, err := client.Customer.UpdateOneID(customer.ID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable finance source customer failed: %v", err)
+	}
 
 	receivable, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
 		FactNo:           "AR-SHIPPED-001",
 		FactType:         biz.FinanceFactReceivable,
 		CounterpartyType: biz.FinanceCounterpartyCustomer,
+		CounterpartyID:   &customer.ID,
 		Amount:           decimal.NewFromInt(100),
 		FeeAmount:        decimal.NewFromFloat(2.5),
 		Currency:         biz.FinanceCurrencyUSD,
@@ -445,6 +842,7 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 		FactNo:           "INV-SHIPPED-001",
 		FactType:         biz.FinanceFactInvoice,
 		CounterpartyType: biz.FinanceCounterpartyCustomer,
+		CounterpartyID:   &customer.ID,
 		Amount:           decimal.NewFromInt(100),
 		SourceType:       &shipmentSourceType,
 		SourceID:         &shipment.ID,
@@ -458,5 +856,48 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 	}
 	if count := client.FinanceFact.Query().Where(financefact.SourceType(biz.ShipmentSourceType), financefact.SourceID(shipment.ID)).CountX(ctx); count != 2 {
 		t.Fatalf("expected two finance facts linked to shipped shipment, got %d", count)
+	}
+}
+
+func TestOperationalFactUsecase_FinanceRejectsInactiveManualCounterparties(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "operational_fact_finance_inactive_counterparty")
+	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+
+	customer, err := client.Customer.Create().
+		SetCode("C-FIN-INACTIVE").
+		SetName("停用客户").
+		SetIsActive(false).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create inactive customer failed: %v", err)
+	}
+	supplier, err := client.Supplier.Create().
+		SetCode("SUP-FIN-INACTIVE").
+		SetName("停用供应商").
+		SetIsActive(false).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create inactive supplier failed: %v", err)
+	}
+	if _, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
+		FactNo:           "FIN-INACTIVE-CUSTOMER",
+		FactType:         biz.FinanceFactPayment,
+		CounterpartyType: biz.FinanceCounterpartyCustomer,
+		CounterpartyID:   &customer.ID,
+		Amount:           decimal.NewFromInt(100),
+		IdempotencyKey:   "FIN-INACTIVE-CUSTOMER",
+	}); !errors.Is(err, biz.ErrCustomerInactive) {
+		t.Fatalf("expected inactive customer rejected for manual finance fact, got %v", err)
+	}
+	if _, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
+		FactNo:           "FIN-INACTIVE-SUPPLIER",
+		FactType:         biz.FinanceFactPayable,
+		CounterpartyType: biz.FinanceCounterpartySupplier,
+		CounterpartyID:   &supplier.ID,
+		Amount:           decimal.NewFromInt(100),
+		IdempotencyKey:   "FIN-INACTIVE-SUPPLIER",
+	}); !errors.Is(err, biz.ErrSupplierInactive) {
+		t.Fatalf("expected inactive supplier rejected for manual finance fact, got %v", err)
 	}
 }

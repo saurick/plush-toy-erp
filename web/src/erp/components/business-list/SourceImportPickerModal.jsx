@@ -182,10 +182,11 @@ export default function SourceImportPickerModal({
   }
 
   const tableColumns = useMemo(() => {
-    const baseColumns = columns.map((column) => ({
-      ...column,
-      ellipsis: column.ellipsis ?? false,
-    }))
+    const baseColumns = columns.map((column) => {
+      const nextColumn = { ...column }
+      delete nextColumn.ellipsis
+      return nextColumn
+    })
     if (typeof getRowDisabledReason !== 'function') {
       return baseColumns
     }

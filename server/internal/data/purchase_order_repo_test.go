@@ -25,8 +25,8 @@ func openPurchaseOrderRepoTest(t *testing.T, name string) (*biz.PurchaseOrderUse
 
 func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 	ctx := context.Background()
-	uc, client := openPurchaseOrderRepoTest(t, "purchase_order_repo_lifecycle")
-	defer mustCloseEntClient(t, client)
+	data, client := openInventoryRepoTestData(t, "purchase_order_repo_lifecycle")
+	uc := biz.NewPurchaseOrderUsecase(NewPurchaseOrderRepo(data, log.NewStdLogger(io.Discard)))
 
 	unit := createTestUnit(t, ctx, client, "PCS-PO")
 	material := createTestMaterial(t, ctx, client, unit.ID, "MAT-PO-001")
@@ -75,29 +75,35 @@ func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 		t.Fatalf("expected approved purchase order, got %#v", approved)
 	}
 
-	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard)))
-	receipt, err := inventoryUC.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
-		ReceiptNo:    "PR-PO-001",
-		SupplierName: supplier.Name,
-		ReceivedAt:   purchaseDate,
+	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	if _, err := client.Material.UpdateOneID(material.ID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable material after purchase order approval failed: %v", err)
+	}
+	if _, err := client.Unit.UpdateOneID(unit.ID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable unit after purchase order approval failed: %v", err)
+	}
+	receipt, err := inventoryUC.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		PurchaseOrderID: result.Order.ID,
+		ReceiptNo:       "PR-PO-001",
+		WarehouseID:     warehouse.ID,
+		ReceivedAt:      purchaseDate,
 	})
 	if err != nil {
-		t.Fatalf("create receipt failed: %v", err)
+		t.Fatalf("create receipt from historical purchase order should allow inactive material/unit: %v", err)
 	}
-	receiptLine, err := inventoryUC.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:           receipt.ID,
-		MaterialID:          material.ID,
-		WarehouseID:         warehouse.ID,
-		UnitID:              unit.ID,
-		PurchaseOrderItemID: &result.Items[0].ID,
-		Quantity:            qty,
-		UnitPrice:           &price,
-	})
-	if err != nil {
-		t.Fatalf("add receipt item linked to purchase order line failed: %v", err)
+	if len(receipt.Items) != 1 {
+		t.Fatalf("expected one receipt line from purchase order, got %d", len(receipt.Items))
 	}
+	receiptLine := receipt.Items[0]
 	if receiptLine.PurchaseOrderItemID == nil || *receiptLine.PurchaseOrderItemID != result.Items[0].ID {
 		t.Fatalf("expected receipt line linked to purchase order item, got %#v", receiptLine)
+	}
+	posted, err := inventoryUC.PostPurchaseReceipt(ctx, receipt.ID)
+	if err != nil {
+		t.Fatalf("post receipt linked to historical purchase order line should allow inactive material/unit: %v", err)
+	}
+	if posted.Status != biz.PurchaseReceiptStatusPosted {
+		t.Fatalf("expected posted purchase receipt, got %s", posted.Status)
 	}
 }
 

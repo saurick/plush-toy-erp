@@ -7,7 +7,7 @@
 | 路径 | 职责 |
 | --- | --- |
 | `web/` | Vite + React 前端，包含桌面后台统一入口、登录入口选择、生产单端口 `/m/<role>/tasks` 岗位任务端路径，以及本地开发用的按角色移动端调试入口，内部目录职责见 [`web/README.md`](web/README.md) |
-| `server/` | Kratos + Ent + Atlas 后端，当前承载账号、鉴权、错误码、工作流协同、领域 usecase、业务看板 `dashboard_stats`、采购订单 `purchase_order` JSON-RPC 域、采购入库 `purchase` JSON-RPC 域、库存台账只读 `inventory` JSON-RPC 域、来料质检 `quality` JSON-RPC 域、业务事实 `operational_fact` JSON-RPC 域、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
+| `server/` | Kratos + Ent + Atlas 后端，当前承载管理员账号、鉴权、错误码、工作流协同、领域 usecase、业务看板 `dashboard_stats`、采购订单 `purchase_order` JSON-RPC 域、采购入库 `purchase` JSON-RPC 域、库存台账只读 `inventory` JSON-RPC 域、来料质检 `quality` JSON-RPC 域、业务事实 `operational_fact` JSON-RPC 域、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
 | `scripts/` | 本地环境初始化、质量门禁和 Git hooks |
 | `.agents/skills/` | Codex 项目专属 skills，维护 plush 文档治理、页面治理和代码审查工作流；作为仓库内 canonical，不依赖个人本机 `~/.codex/skills` 副本 |
 | `docs/` | 仓库级约定、流程、数据模型、产品化架构、架构评审和部署文档 |
@@ -19,7 +19,7 @@
 - 当前唯一部署真源仍是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前后端统一走 `8300`
 - 本地开发数据库默认命中 `192.168.0.106:5432/plush_erp`；`192.168.0.133:5435/plush_erp` 是测试 / 目标环境，不作为本地开发默认库
-- 当前账号表、工作流协同表、库存 / 采购 / 质检 / 生产 / 委外 / 出货 / 预留 / 财务事实表、`product_skus`、`purchase_orders`、`processes`、`outsourcing_orders` 和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，普通 `business` JSON-RPC 不再提供旧记录查询或写入，只保留 `dashboard_stats`；采购订单已接入独立 `purchase_order` JSON-RPC / RBAC 和 V1 页面，BOM 管理已接入独立 `bom` JSON-RPC / RBAC 和 V1 页面，产品基础信息 / 产品规格已接入 `masterdata` JSON-RPC、`product.* / product_sku.*` RBAC 和 `/erp/master/products` V1 页面，销售订单行 UI/API 已支持从 SKU 选择带出产品 / 单位 / 快照并保存 `product_sku_id`；工序档案已接入 `masterdata` JSON-RPC / `process.*` RBAC 和 `/erp/engineering/processes` V1 页面，采购入库已接入独立 `purchase` JSON-RPC / RBAC、V1 页面和业务看板入库 projection，来料质检已接入独立 `quality` JSON-RPC / RBAC 和 `/erp/production/quality-inspections` V1 页面，库存台账已接入独立只读 `inventory` JSON-RPC / RBAC 和 `/erp/warehouse/inventory` V1 页面，委外订单已接入独立 `outsourcing_order` JSON-RPC / `outsourcing.order.*` RBAC 和 `/erp/purchase/processing-contracts` V1 加工合同源单页面，生产进度、出库管理、应收、应付、发票和对账仍按现有 `operational_fact` facts 接入收窄 V1 页面；余额视图已按 ACTIVE `stock_reservations` 返回已预留和可用量只读 read model；采购入库行可选关联采购订单行做来源追溯；`product_skus` 当前已具备基础维护和销售订单行选用能力，出货 / 库存 / 预留 SKU 校验、导入受控创建和 BOM SKU 粒度仍待后续闭环；具体目标库是否已 apply 仍以 `make migrate_status` 为准
+- 当前管理员账号 / RBAC 表、工作流协同表、库存 / 采购 / 质检 / 生产 / 委外 / 出货 / 预留 / 财务事实表、`product_skus`、`purchase_orders`、`processes`、`outsourcing_orders` 和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧普通 `users` 表和 `user` JSON-RPC 普通账号管理链路已退出，账号登录与岗位任务端统一使用 `admin_users`、角色和权限码；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，普通 `business` JSON-RPC 不再提供旧记录查询或写入，只保留 `dashboard_stats`；采购订单已接入独立 `purchase_order` JSON-RPC / RBAC 和 V1 页面，BOM 管理已接入独立 `bom` JSON-RPC / RBAC 和 V1 页面，产品基础信息 / 产品规格已接入 `masterdata` JSON-RPC、`product.* / product_sku.*` RBAC 和 `/erp/master/products` V1 页面，销售订单行 UI/API 已支持从 SKU 选择带出产品 / 单位 / 快照并保存 `product_sku_id`；工序档案已接入 `masterdata` JSON-RPC / `process.*` RBAC 和 `/erp/engineering/processes` V1 页面，采购入库已接入独立 `purchase` JSON-RPC / RBAC、V1 页面和业务看板入库 projection，来料质检已接入独立 `quality` JSON-RPC / RBAC 和 `/erp/production/quality-inspections` V1 页面，库存台账已接入独立只读 `inventory` JSON-RPC / RBAC 和 `/erp/warehouse/inventory` V1 页面，委外订单已接入独立 `outsourcing_order` JSON-RPC / `outsourcing.order.*` RBAC 和 `/erp/purchase/processing-contracts` V1 加工合同源单页面，生产进度、出库管理、应收、应付、发票和对账仍按现有 `operational_fact` facts 接入收窄 V1 页面；余额视图已按 ACTIVE `stock_reservations` 返回已预留和可用量只读 read model；采购入库行可选关联采购订单行做来源追溯；`product_skus` 当前已具备基础维护和销售订单行选用能力，出货 / 库存 / 预留 SKU 校验、导入受控创建和 BOM SKU 粒度仍待后续闭环；具体目标库是否已 apply 仍以 `make migrate_status` 为准
 - `出货单` 当前已作为 Shipment Fact V1 正式入口接入 `/erp/warehouse/shipments`，复用 `operational_fact` JSON-RPC 和 `shipment.*` RBAC；`出库管理` 已作为收窄的出货出库 / 库存预留 V1 入口复用 `shipments / stock_reservations`；`出货放行` 仍只表示可发货，只有出货单 `SHIPPED` 才是真实出货事实
 - 采购订单当前只表达采购承诺，不写库存、批次、应付、发票或付款事实；采购需求、采购订单余额、在途统计、采购合同审批、生产、委外、品质和财务后续仍按真实样本逐步拆；BOM Version 当前只维护工程版本、明细、复制、激活和归档，不生成采购需求、生产任务、库存事实或成本；加工环节 / processes 工序主数据只维护工序编号、名称、类别和可委外 / 可内制 / 需质检标记，不生成委外源单、生产任务、质检事实、库存流水或财务事实
 - 业务链路调试 seed / cleanup / 业务数据清空仅作为开发验收能力接入后端 `debug` JSON-RPC 域，默认面向当前 SQL 连接开启，可通过 `ERP_DEBUG_*` 环境变量显式关闭，并受管理员权限和业务链路调试菜单权限保护；业务数据清空按本项目当前业务表 allowlist 执行，覆盖工序档案和委外源单，不删除账号、权限、管理员偏好、配置和数据库结构；按 debugRunId 清理还会校验 debug 数据标记
@@ -58,7 +58,7 @@ pnpm start:desktop
 
 默认地址：`http://localhost:5175`
 
-桌面构建同时提供单端口任务端兼容路径，例如 `http://localhost:5175/m/warehouse/tasks`。统一登录页会按设备给默认入口，手机默认岗位任务端、电脑默认后台、平板优先使用上次选择；入口按钮由前端入口配置控制。用户不在登录前手选岗位角色，岗位任务端按账号已有 `mobile.<role>.access` 权限自动进入第一个可用岗位，最终访问仍由后端 RBAC 权限校验。
+桌面构建同时提供单端口任务端兼容路径，例如 `http://localhost:5175/m/warehouse/tasks`。统一登录页会按设备给默认入口，手机默认岗位任务端、电脑默认后台、平板优先使用上次选择；入口按钮由前端入口配置控制。用户不在登录前手选岗位角色，岗位任务端按管理员账号已有 `mobile.<role>.access` 权限自动进入第一个可用岗位，最终访问仍由后端 RBAC 权限校验。
 
 ### 岗位任务端
 

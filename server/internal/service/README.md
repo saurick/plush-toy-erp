@@ -16,7 +16,7 @@ JSON-RPC dispatcher 继续按职责拆文件维护：
 - `jsonrpc_dispatch.go`：dispatcher 构造、入口日志、URL 分发和 `system` 域。
 - `jsonrpc_dispatch_auth.go`：登录、短信登录、`auth.me` 和鉴权错误映射。
 - `jsonrpc_dispatch_guards.go`：登录态、管理员身份和当前管理员一致性校验。
-- `jsonrpc_dispatch_admin.go` / `jsonrpc_dispatch_user.go`：后台管理员与用户账号管理入口。
+- `jsonrpc_dispatch_admin.go`：后台管理员、角色、权限和控制面审计入口。
 - `jsonrpc_dispatch_helpers.go`：协议参数解析、敏感参数脱敏和 `structpb` 包装 helper。
 
 如果后续新增 gRPC / HTTP DTO 转换逻辑，也建议继续把协议细节留在 `service` 层，不要回灌到 `biz`。

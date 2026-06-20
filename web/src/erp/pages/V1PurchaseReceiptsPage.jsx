@@ -721,7 +721,7 @@ export default function V1PurchaseReceiptsPage() {
           title: '备注',
           exportTitle: '备注',
           dataIndex: 'note',
-          ellipsis: true,
+          width: 300,
           sortable: false,
         },
       ]),

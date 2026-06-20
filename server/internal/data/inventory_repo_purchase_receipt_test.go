@@ -185,6 +185,55 @@ func TestInventoryRepo_PurchaseReceiptLifecycle(t *testing.T) {
 	}
 }
 
+func TestInventoryUsecase_PurchaseReceiptRejectsInactiveNewReferencesAndKeepsCancelAllowed(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_repo_purchase_receipt_inactive_refs")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+
+	posted := createAndPostPurchaseReceipt(t, ctx, uc, "PR-INACTIVE-HISTORY", fixtures, stringPtr("PR-INACTIVE-LOT"), mustDecimal(t, "5"))
+	if _, err := client.Material.UpdateOneID(fixtures.materialID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable material failed: %v", err)
+	}
+	if cancelled, err := uc.CancelPostedPurchaseReceipt(ctx, posted.ID); err != nil {
+		t.Fatalf("cancel posted receipt should not be blocked by inactive material: %v", err)
+	} else if cancelled.Status != biz.PurchaseReceiptStatusCancelled {
+		t.Fatalf("expected cancelled receipt, got %s", cancelled.Status)
+	}
+
+	draft, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "PR-INACTIVE-NEW",
+		SupplierName: "采购供应商",
+		ReceivedAt:   time.Date(2026, 4, 27, 10, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create receipt draft failed: %v", err)
+	}
+	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
+		ReceiptID:   draft.ID,
+		MaterialID:  fixtures.materialID,
+		WarehouseID: fixtures.warehouseID,
+		UnitID:      fixtures.unitID,
+		Quantity:    mustDecimal(t, "1"),
+	}); !errors.Is(err, biz.ErrMaterialInactive) {
+		t.Fatalf("expected inactive material rejected for new receipt item, got %v", err)
+	}
+
+	activeMaterial := createTestMaterial(t, ctx, client, fixtures.unitID, "MAT-PR-ACTIVE")
+	if _, err := client.Warehouse.UpdateOneID(fixtures.warehouseID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable warehouse failed: %v", err)
+	}
+	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
+		ReceiptID:   draft.ID,
+		MaterialID:  activeMaterial.ID,
+		WarehouseID: fixtures.warehouseID,
+		UnitID:      fixtures.unitID,
+		Quantity:    mustDecimal(t, "1"),
+	}); !errors.Is(err, biz.ErrWarehouseInactive) {
+		t.Fatalf("expected inactive warehouse rejected for new receipt item, got %v", err)
+	}
+}
+
 func TestInventoryRepo_PurchaseReceiptTraceProtection(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "inventory_repo_purchase_trace_protection")

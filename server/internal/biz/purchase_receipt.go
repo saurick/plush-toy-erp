@@ -108,6 +108,9 @@ func (uc *InventoryUsecase) CreatePurchaseReceiptWithItems(ctx context.Context, 
 		if err != nil {
 			return nil, err
 		}
+		if err := uc.validatePurchaseReceiptItemActiveReferences(ctx, &normalizedItem); err != nil {
+			return nil, err
+		}
 		normalizedItems = append(normalizedItems, &normalizedItem)
 	}
 	return uc.repo.CreatePurchaseReceiptWithItems(ctx, &normalized, normalizedItems)
@@ -121,6 +124,9 @@ func (uc *InventoryUsecase) CreatePurchaseReceiptFromPurchaseOrder(ctx context.C
 	if err != nil {
 		return nil, err
 	}
+	if err := requireActiveReference(ctx, normalized.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
+		return nil, err
+	}
 	return uc.repo.CreatePurchaseReceiptFromPurchaseOrder(ctx, &normalized)
 }
 
@@ -130,6 +136,9 @@ func (uc *InventoryUsecase) AddPurchaseReceiptItem(ctx context.Context, in *Purc
 	}
 	normalized, err := normalizePurchaseReceiptItemCreate(*in)
 	if err != nil {
+		return nil, err
+	}
+	if err := uc.validatePurchaseReceiptItemActiveReferences(ctx, &normalized); err != nil {
 		return nil, err
 	}
 	return uc.repo.AddPurchaseReceiptItem(ctx, &normalized)
@@ -249,4 +258,19 @@ func normalizePurchaseReceiptFilter(in PurchaseReceiptFilter) (PurchaseReceiptFi
 		in.Offset = 0
 	}
 	return in, nil
+}
+
+func (uc *InventoryUsecase) validatePurchaseReceiptItemActiveReferences(ctx context.Context, item *PurchaseReceiptItemCreate) error {
+	if item == nil {
+		return ErrBadParam
+	}
+	if item.PurchaseOrderItemID == nil {
+		if err := requireActiveReference(ctx, item.MaterialID, uc.repo.MaterialIsActive, ErrMaterialInactive); err != nil {
+			return err
+		}
+		if err := requireActiveReference(ctx, item.UnitID, uc.repo.UnitIsActive, ErrUnitInactive); err != nil {
+			return err
+		}
+	}
+	return requireActiveReference(ctx, item.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive)
 }

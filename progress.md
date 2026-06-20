@@ -10,19 +10,20 @@
 
 ## 最近活跃事项
 
-- 库存台账筛选已收口为业务主筛选 + 内部引用高级筛选；后续若要显示物料 / 成品、仓库、批次的可读名称，应补后端 read model 或关联查询，不在前端伪造名称。
+- 库存台账筛选已移除业务用户不可理解的内部 ID 输入；后续若要显示物料 / 成品、仓库、批次的可读名称，应补后端 read model 或关联查询，不在前端伪造名称。
 - 加工环节页面已收口重复页头并恢复共享列顺序能力；后续同类工程页继续复用自包含页头和共享列表工具，不再按页面类型绕开列顺序。
 - 业务列表删除 / 回收站边界已写入仓库级规则和当前真源；后续若某对象确需删除，先补后端 usecase、RBAC、审计、引用检查和测试，再单独开放入口。
 - `.agents/skills/plush-docs-governance` 与 `.agents/skills/plush-page-design-governance` 已作为项目内 canonical，后续修改以仓库内 skill 为准。
 
 ## 2026-06-20 库存台账筛选摘要重构
 
-- 完成：库存台账页头摘要从表名说明改为余额、批次、流水三种只读追溯视图；统计区补充内部筛选启用状态，继续明确本页不写库存事实。
-- 完成：主筛选区保留关键词、对象类型、批次状态、流水类型和来源类型；`subject_id / warehouse_id / lot_id` 改为“内部引用筛选”展开项，并提供清空入口，避免让业务用户默认手输递增内部 ID。
+- 完成：库存台账页头摘要从表名说明改为余额、批次、流水三种只读追溯视图；统计区改为只读页面模式，继续明确本页不写库存事实。
+- 完成：主筛选区只保留业务用户可理解的对象类型、批次状态、流水类型和来源类型；余额视图隐藏主要落到内部引用的关键词搜索，批次 / 流水视图保留批次号、来源、备注、幂等键等可见文本搜索。
+- 完成：移除 `subject_id / warehouse_id / lot_id` 的页面筛选输入、清空入口、前端状态和请求参数；内部 ID 不再作为库存台账业务筛选控件暴露。
 - 完成：库存余额 / 批次 / 流水表格中的裸引用列改为“对象内部引用 / 仓库内部引用 / 批次内部引用”，保留审计追溯能力但不冒充业务名称。
-- 完成：同步 `business-formal-module-shells-desktop` L1 断言，覆盖新的库存台账摘要文案和默认搜索占位。
-- 下一步：若要进一步把筛选升级为真正业务选择器，应让后端库存 read model 返回或支持查询物料 / 成品编号名称、仓库名称和批次号，再替换内部 ID 输入。
-- 阻塞/风险：本轮不改后端 inventory JSON-RPC、schema、RBAC、菜单、库存流水 / 余额 / 批次事实写入，也不新增物料 / 仓库联查；当前仍只能对内部引用做精确筛选。
+- 完成：同步 `business-formal-module-shells-desktop` L1 断言，覆盖新的库存台账摘要文案和余额视图空态刷新路径。
+- 下一步：若要进一步把筛选升级为真正业务选择器，应让后端库存 read model 返回或支持查询物料 / 成品编号名称、仓库名称和批次号，再接入对应选择器。
+- 阻塞/风险：本轮不改后端 inventory JSON-RPC、schema、RBAC、菜单、库存流水 / 余额 / 批次事实写入，也不新增物料 / 仓库联查；当前不提供按内部引用精确筛选的用户入口。
 
 ## 2026-06-20 业务数据生命周期页面治理
 
@@ -56,6 +57,47 @@
 - 完成：保留 BOM 管理多选能力，因为当前存在“所选设为历史版本”的真实批量语义；来源导入选择器也保留按 `multiple` 控制的 checkbox/radio 行为。
 - 下一步：若后续某页新增真实批量动作，再按后端 usecase、RBAC、审计和测试评审是否恢复 checkbox 多选。
 - 阻塞/风险：本轮不改 schema、RBAC、菜单、Workflow / Fact 或删除 / 回收站能力；未把“请选择”类表单校验和来源选择器文案纳入本次“选择列表头”清理范围。
+
+## 2026-06-20 业务主表省略列收口
+
+- 完成：全局移除业务页主表列定义中的 `ellipsis: true`，覆盖出货单、Operational Fact、Workflow 协同页、入库管理、来料质检和库存台账；共享业务表格默认列宽从 132 提升到 160，最小列宽从 72 提升到 88。
+- 完成：出货单、Operational Fact、Workflow 原因 / 备注、库存幂等键 / 备注、质检判定备注、入库备注等长文本或长编号列补足列宽，改为通过业务表格横向滚动和完整文本展示承载，不再在单元格内裁成省略号。
+- 完成：共享业务表头的列设置标题文本不再 `text-overflow: ellipsis`，并在 `style:l1` 业务主表排序断言中新增表头不裁切、数据单元格不出现 `.ant-table-cell-ellipsis` 的守卫。
+- 下一步：若某个业务页仍因字段太多影响扫读，优先按业务语义合并列或缩短表头，不恢复 AntD 省略列。
+- 阻塞/风险：完整 `pnpm style:l1` 当前被无关的 `print-workspace-material-row-selection-reset` 场景阻塞在“删除当前行”按钮定位；本轮已补跑业务列表相关 7 个定向 L1 场景通过，未改 schema、RBAC、菜单、Workflow / Fact、客户配置或打印工作台逻辑。
+
+## 2026-06-20 业务表格省略号强制规则
+
+- 完成：共享 `BusinessDataTable` 和来源导入选择弹窗在运行时剥离列配置中的 `ellipsis`，避免后续页面私有列定义重新把业务列裁成省略号。
+- 完成：新增 `moduleTableColumns` 静态测试，扫描 `web/src/erp` 非测试源码中的列配置；出现 `ellipsis:` 即让 `pnpm test` 失败。
+- 完成：同步 `AGENTS.md` 和 `docs/product/自动化测试策略.md`，把业务主表、正式业务列表、导入选择弹窗和明细表格列禁止省略号写成项目规则和 T5 验收硬失败项。
+- 下一步：若后续发现某页字段过长，优先调整业务列宽、横向滚动、换行、语义合并或详情入口，不恢复 AntD 省略列。
+- 阻塞/风险：本轮不改变 schema、RBAC、菜单、Workflow / Fact、后端事实写入或文档清单分类；非表格列的小标签、导航项、下拉项仍可在不影响业务记录识别时使用省略。
+
+## 2026-06-20 停用主数据引用后端治理
+
+- 完成：新增 biz 层小型 active reference guard，并在采购入库手工新增行、BOM 新建 / 明细 / 激活、生产事实新建、手工出货 / 手工出货行和手工库存预留显式接入启用态校验；历史来源链路、取消、冲正、归档不按当前主数据启用态粗暴拦截。
+- 完成：Inventory / OperationalFact data repo 补充材料、产品、SKU、单位、仓库、客户的 `is_active` 查询；JSON-RPC 错误映射改为中文业务提示，不直接透传 Go error。
+- 完成：补充采购入库、BOM、OperationalFact 相关测试用例，覆盖停用主数据新增引用被拒绝，以及历史取消、释放、归档路径不被误伤；同步 `docs/当前真源与交接顺序.md` 的当前口径。
+- 下一步：采购退货、来料质检、采购入库调整继续按来源链路和事实状态治理；若后续要拦截无来源的手工退货 / 调整，应先单独评审业务语义和测试样本。
+- 阻塞/风险：当前工作区已有与本轮无关的 `server/internal/data/model/schema/user.go`、`server/internal/biz/user_admin.go` 等删除，导致 data/service 包构建被 Ent 旧生成物阻塞；本轮未恢复、未重生成 Ent、未跑 migration，也未改前端候选 helper。
+
+## 2026-06-20 普通 users 账号链路退出
+
+- 完成：移除旧 `/login` 普通用户登录页和 `/admin-accounts` / `/admin-users` 普通账号管理页入口；`/login` 兼容重定向到 `/admin-login`，旧账号管理 URL 兼容重定向到权限中心。
+- 完成：移除普通 `auth.login`、`sms_login scope=user`、`user` JSON-RPC 域、`AuthUsecase`、`UserAdminUsecase`、旧 data repo、旧 token generator 和相关测试隐藏真源；管理员登录、岗位任务端、RBAC 和审计继续走 `admin_users`。
+- 完成：删除 `User` Ent schema，执行 `make data` 生成 Ent 代码和 Atlas migration `20260620142942_migrate.sql`，并对当前 dev DB 执行 `make migrate_apply` drop `users`；`make migrate_status` 已 pending 0，`to_regclass('public.users')` 返回空。
+- 完成：同步 README、`docs/当前真源与交接顺序.md`、`server/docs/api.md`、`server/internal/service/README.md`、`web/README.md` 和前端 mock，明确旧普通账号链路已退出，账号和岗位任务端统一使用 `admin_users`、角色和权限码。
+- 下一步：若后续需要非管理员协作账号，必须重新评审账号模型、RBAC、审计、岗位入口和 schema，不复用旧 `users` / `user` JSON-RPC 隐藏链路。
+- 阻塞/风险：当前工作区仍有多处本轮之外的脏改动未归并，本轮未回退；已验证 `go test ./...`、`pnpm test -- --run src/common/utils/jsonRpc.test.mjs`、`pnpm build`、`make migrate_status`。
+
+## 2026-06-20 停用主数据引用 guard 续补
+
+- 完成：`OperationalFactUsecase` 补齐委外事实新建的材料 / 成品、仓库、单位、可选供应商启用态校验；已过账委外事实取消仍按历史事实链路处理，不因当前主数据停用被阻断。
+- 完成：手工财务事实新增客户 / 供应商 counterparty 启用态校验；从已出货 shipment 派生的应收 / 发票保留来源链路语义，不按当前 counterparty 启用态粗暴拦截。
+- 完成：补充采购订单来源入库、销售订单来源出货 / 预留、手工出货停用 SKU、inventory 内部写入原语等测试；同步当前真源文档说明 inventory 直接写 usecase 是内部事实 / 来源 / 冲正原语，不作为手工新增入口加 active guard。
+- 下一步：若后续开放库存写入、盘点调整、批次状态变更或无来源退货 / 调整的外部 JSON-RPC，必须在对应业务 usecase 单独评审 active guard、RBAC、审计和来源链路测试。
+- 阻塞/风险：本轮不改 schema、不跑 migration、不新增 tenant_id / 多租户 / license / 删除 / 回收站；当前工作区仍有其他会话的普通 users 退出和前端页面治理脏改动，本轮未回退也未归并。
 
 ## 2026-06-20 Codex 代码审查 skill 补充
 

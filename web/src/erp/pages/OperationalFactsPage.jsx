@@ -470,8 +470,7 @@ export function OperationalFactWorkspace({
           : activeKey === 'reservations'
             ? 'reservation_no'
             : 'fact_no',
-      width: 180,
-      ellipsis: true,
+      width: 260,
       sortType: 'text',
     },
     {
@@ -540,8 +539,7 @@ export function OperationalFactWorkspace({
     {
       title: '来源',
       exportTitle: '来源',
-      width: 180,
-      ellipsis: true,
+      width: 240,
       sortValue: (record) =>
         `${record.source_type || ''}-${record.source_id || ''}`,
       render: (_, record) =>
@@ -585,7 +583,7 @@ export function OperationalFactWorkspace({
     {
       title: '备注',
       dataIndex: 'note',
-      ellipsis: true,
+      width: 300,
       sortable: false,
     },
   ]
@@ -602,8 +600,7 @@ export function OperationalFactWorkspace({
       { title: '类型', dataIndex: 'fact_type', width: 160, sortType: 'text' },
       {
         title: '供应商',
-        width: 150,
-        ellipsis: true,
+        width: 220,
         sortValue: (record) => record.supplier_name || record.supplier_id || '',
         render: (_, record) =>
           record.supplier_name ||
@@ -625,8 +622,7 @@ export function OperationalFactWorkspace({
       {
         title: '客户',
         dataIndex: 'customer_id',
-        width: 140,
-        ellipsis: true,
+        width: 240,
         sortValue: (record) =>
           record.customer_snapshot || record.customer_id || '',
         render: (_, record) =>

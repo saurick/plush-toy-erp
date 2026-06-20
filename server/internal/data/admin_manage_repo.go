@@ -11,7 +11,6 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/runtimeauditevent"
-	"server/internal/data/model/ent/user"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -116,11 +115,6 @@ func (r *adminManageRepo) ListAdmins(ctx context.Context) ([]*biz.AdminUser, err
 func (r *adminManageRepo) CreateAdmin(ctx context.Context, in *biz.AdminCreate) (*biz.AdminUser, error) {
 	if in == nil || strings.TrimSpace(in.Username) == "" || strings.TrimSpace(in.PasswordHash) == "" {
 		return nil, biz.ErrBadParam
-	}
-	if exists, err := r.data.postgres.User.Query().Where(user.UsernameEQ(in.Username)).Exist(ctx); err != nil {
-		return nil, err
-	} else if exists {
-		return nil, biz.ErrAdminExists
 	}
 
 	row, err := r.data.postgres.AdminUser.Create().

@@ -284,6 +284,13 @@ type OperationalFactFilter struct {
 }
 
 type OperationalFactRepo interface {
+	CustomerIsActive(ctx context.Context, id int) (bool, error)
+	MaterialIsActive(ctx context.Context, id int) (bool, error)
+	ProductIsActive(ctx context.Context, id int) (bool, error)
+	ProductSKUIsActive(ctx context.Context, id int) (bool, error)
+	SupplierIsActive(ctx context.Context, id int) (bool, error)
+	UnitIsActive(ctx context.Context, id int) (bool, error)
+	WarehouseIsActive(ctx context.Context, id int) (bool, error)
 	CreateProductionFactDraft(ctx context.Context, in *OperationalFactMutation) (*ProductionFact, error)
 	PostProductionFact(ctx context.Context, id int) (*ProductionFact, error)
 	CancelPostedProductionFact(ctx context.Context, id int) (*ProductionFact, error)
@@ -323,8 +330,20 @@ func NewOperationalFactUsecase(repo OperationalFactRepo) *OperationalFactUsecase
 }
 
 func (uc *OperationalFactUsecase) CreateProductionFactDraft(ctx context.Context, in *OperationalFactMutation) (*ProductionFact, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
 	normalized, err := normalizeOperationalFactMutation(in, productionFactTypes)
 	if err != nil {
+		return nil, err
+	}
+	if err := uc.validateOperationalSubjectActive(ctx, normalized.SubjectType, normalized.SubjectID); err != nil {
+		return nil, err
+	}
+	if err := requireActiveReference(ctx, normalized.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
+		return nil, err
+	}
+	if err := requireActiveReference(ctx, normalized.UnitID, uc.repo.UnitIsActive, ErrUnitInactive); err != nil {
 		return nil, err
 	}
 	return uc.repo.CreateProductionFactDraft(ctx, normalized)
@@ -352,11 +371,26 @@ func (uc *OperationalFactUsecase) ListProductionFacts(ctx context.Context, filte
 }
 
 func (uc *OperationalFactUsecase) CreateOutsourcingFactDraft(ctx context.Context, in *OperationalFactMutation) (*OutsourcingFact, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
 	normalized, err := normalizeOperationalFactMutation(in, outsourcingFactTypes)
 	if err != nil {
 		return nil, err
 	}
 	normalized.SupplierName = normalizeOptionalString(normalized.SupplierName)
+	if err := uc.validateOperationalSubjectActive(ctx, normalized.SubjectType, normalized.SubjectID); err != nil {
+		return nil, err
+	}
+	if err := requireActiveReference(ctx, normalized.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
+		return nil, err
+	}
+	if err := requireActiveReference(ctx, normalized.UnitID, uc.repo.UnitIsActive, ErrUnitInactive); err != nil {
+		return nil, err
+	}
+	if err := requireOptionalActiveReference(ctx, normalized.SupplierID, uc.repo.SupplierIsActive, ErrSupplierInactive); err != nil {
+		return nil, err
+	}
 	return uc.repo.CreateOutsourcingFactDraft(ctx, normalized)
 }
 
@@ -382,16 +416,28 @@ func (uc *OperationalFactUsecase) ListOutsourcingFacts(ctx context.Context, filt
 }
 
 func (uc *OperationalFactUsecase) CreateShipmentDraft(ctx context.Context, in *ShipmentCreate) (*Shipment, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
 	normalized, err := normalizeShipmentCreate(in)
 	if err != nil {
+		return nil, err
+	}
+	if err := uc.validateShipmentHeaderActiveReferences(ctx, normalized); err != nil {
 		return nil, err
 	}
 	return uc.repo.CreateShipmentDraft(ctx, normalized)
 }
 
 func (uc *OperationalFactUsecase) AddShipmentItem(ctx context.Context, in *ShipmentItemCreate) (*ShipmentItem, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
 	normalized, err := normalizeShipmentItemCreate(in)
 	if err != nil {
+		return nil, err
+	}
+	if err := uc.validateShipmentItemActiveReferences(ctx, normalized); err != nil {
 		return nil, err
 	}
 	return uc.repo.AddShipmentItem(ctx, normalized)
@@ -404,6 +450,14 @@ func (uc *OperationalFactUsecase) CreateShipmentDraftWithItems(ctx context.Conte
 	normalized, err := normalizeShipmentCreateWithItems(in)
 	if err != nil {
 		return nil, err
+	}
+	if err := uc.validateShipmentHeaderActiveReferences(ctx, normalized.Shipment); err != nil {
+		return nil, err
+	}
+	for _, item := range normalized.Items {
+		if err := uc.validateShipmentItemActiveReferences(ctx, item); err != nil {
+			return nil, err
+		}
 	}
 	return uc.repo.CreateShipmentDraftWithItems(ctx, normalized)
 }
@@ -434,8 +488,14 @@ func (uc *OperationalFactUsecase) ListShipments(ctx context.Context, filter Oper
 }
 
 func (uc *OperationalFactUsecase) CreateStockReservation(ctx context.Context, in *StockReservationCreate) (*StockReservation, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
 	normalized, err := normalizeStockReservationCreate(in)
 	if err != nil {
+		return nil, err
+	}
+	if err := uc.validateStockReservationActiveReferences(ctx, normalized); err != nil {
 		return nil, err
 	}
 	return uc.repo.CreateStockReservation(ctx, normalized)
@@ -471,6 +531,9 @@ func (uc *OperationalFactUsecase) CreateFinanceFactDraft(ctx context.Context, in
 		return nil, err
 	}
 	if err := uc.validateFinanceFactSource(ctx, normalized); err != nil {
+		return nil, err
+	}
+	if err := uc.validateFinanceCounterpartyActiveReferences(ctx, normalized); err != nil {
 		return nil, err
 	}
 	return uc.repo.CreateFinanceFactDraft(ctx, normalized)
@@ -571,6 +634,9 @@ func normalizeOperationalFactMutation(in *OperationalFactMutation, allowedTypes 
 	out.IdempotencyKey = idempotencyKey.String()
 	if out.LotID != nil && *out.LotID <= 0 {
 		out.LotID = nil
+	}
+	if out.SupplierID != nil && *out.SupplierID <= 0 {
+		out.SupplierID = nil
 	}
 	if out.SourceID != nil && *out.SourceID <= 0 {
 		out.SourceID = nil
@@ -804,6 +870,28 @@ func (uc *OperationalFactUsecase) validateFinanceFactSource(ctx context.Context,
 	return nil
 }
 
+func (uc *OperationalFactUsecase) validateFinanceCounterpartyActiveReferences(ctx context.Context, in *FinanceFactCreate) error {
+	if in == nil {
+		return ErrBadParam
+	}
+	if in.FactType == FinanceFactReceivable || in.FactType == FinanceFactInvoice {
+		return nil
+	}
+	if in.CounterpartyID == nil {
+		return nil
+	}
+	switch in.CounterpartyType {
+	case FinanceCounterpartyCustomer:
+		return requireActiveReference(ctx, *in.CounterpartyID, uc.repo.CustomerIsActive, ErrCustomerInactive)
+	case FinanceCounterpartySupplier:
+		return requireActiveReference(ctx, *in.CounterpartyID, uc.repo.SupplierIsActive, ErrSupplierInactive)
+	case FinanceCounterpartyOther:
+		return nil
+	default:
+		return ErrBadParam
+	}
+}
+
 func normalizeOperationalFactFilter(in OperationalFactFilter) OperationalFactFilter {
 	in.Status = strings.ToUpper(strings.TrimSpace(in.Status))
 	in.FactType = strings.ToUpper(strings.TrimSpace(in.FactType))
@@ -843,4 +931,58 @@ func normalizeOptionalUpperString(value *string) *string {
 
 func OperationalFactInventoryIdempotencyKey(sourceType string, sourceID int, sourceLineID int, action string) string {
 	return fmt.Sprintf("%s:%d:%d:%s", sourceType, sourceID, sourceLineID, action)
+}
+
+func (uc *OperationalFactUsecase) validateOperationalSubjectActive(ctx context.Context, subjectType string, subjectID int) error {
+	switch subjectType {
+	case InventorySubjectMaterial:
+		return requireActiveReference(ctx, subjectID, uc.repo.MaterialIsActive, ErrMaterialInactive)
+	case InventorySubjectProduct:
+		return requireActiveReference(ctx, subjectID, uc.repo.ProductIsActive, ErrProductInactive)
+	default:
+		return ErrBadParam
+	}
+}
+
+func (uc *OperationalFactUsecase) validateShipmentHeaderActiveReferences(ctx context.Context, in *ShipmentCreate) error {
+	if in == nil {
+		return ErrBadParam
+	}
+	if in.SalesOrderID != nil {
+		return nil
+	}
+	return requireOptionalActiveReference(ctx, in.CustomerID, uc.repo.CustomerIsActive, ErrCustomerInactive)
+}
+
+func (uc *OperationalFactUsecase) validateShipmentItemActiveReferences(ctx context.Context, in *ShipmentItemCreate) error {
+	if in == nil {
+		return ErrBadParam
+	}
+	if in.SalesOrderItemID == nil {
+		if err := requireActiveReference(ctx, in.ProductID, uc.repo.ProductIsActive, ErrProductInactive); err != nil {
+			return err
+		}
+		if err := requireOptionalActiveReference(ctx, in.ProductSkuID, uc.repo.ProductSKUIsActive, ErrProductSKUInactive); err != nil {
+			return err
+		}
+		if err := requireActiveReference(ctx, in.UnitID, uc.repo.UnitIsActive, ErrUnitInactive); err != nil {
+			return err
+		}
+	}
+	return requireActiveReference(ctx, in.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive)
+}
+
+func (uc *OperationalFactUsecase) validateStockReservationActiveReferences(ctx context.Context, in *StockReservationCreate) error {
+	if in == nil {
+		return ErrBadParam
+	}
+	if in.SalesOrderItemID == nil {
+		if err := requireActiveReference(ctx, in.ProductID, uc.repo.ProductIsActive, ErrProductInactive); err != nil {
+			return err
+		}
+		if err := requireActiveReference(ctx, in.UnitID, uc.repo.UnitIsActive, ErrUnitInactive); err != nil {
+			return err
+		}
+	}
+	return requireActiveReference(ctx, in.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive)
 }

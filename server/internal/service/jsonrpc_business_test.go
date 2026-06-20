@@ -95,6 +95,34 @@ func TestJsonrpcDispatcher_BusinessRecordMethodsAreRetired(t *testing.T) {
 
 type stubBusinessDashboardOperationalFactRepo struct{}
 
+func (s *stubBusinessDashboardOperationalFactRepo) CustomerIsActive(context.Context, int) (bool, error) {
+	return false, biz.ErrCustomerNotFound
+}
+
+func (s *stubBusinessDashboardOperationalFactRepo) MaterialIsActive(context.Context, int) (bool, error) {
+	return false, biz.ErrMaterialNotFound
+}
+
+func (s *stubBusinessDashboardOperationalFactRepo) ProductIsActive(context.Context, int) (bool, error) {
+	return false, biz.ErrProductNotFound
+}
+
+func (s *stubBusinessDashboardOperationalFactRepo) ProductSKUIsActive(context.Context, int) (bool, error) {
+	return false, biz.ErrProductSKUNotFound
+}
+
+func (s *stubBusinessDashboardOperationalFactRepo) SupplierIsActive(context.Context, int) (bool, error) {
+	return false, biz.ErrSupplierNotFound
+}
+
+func (s *stubBusinessDashboardOperationalFactRepo) UnitIsActive(context.Context, int) (bool, error) {
+	return false, biz.ErrUnitNotFound
+}
+
+func (s *stubBusinessDashboardOperationalFactRepo) WarehouseIsActive(context.Context, int) (bool, error) {
+	return false, biz.ErrWarehouseNotFound
+}
+
 func (s *stubBusinessDashboardOperationalFactRepo) CreateProductionFactDraft(context.Context, *biz.OperationalFactMutation) (*biz.ProductionFact, error) {
 	return nil, biz.ErrBadParam
 }

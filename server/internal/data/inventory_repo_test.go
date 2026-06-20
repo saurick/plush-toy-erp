@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	stdsql "database/sql"
+	"io"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
+	"github.com/go-kratos/kratos/v2/log"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/shopspring/decimal"
 )
@@ -166,6 +168,62 @@ func createTestInventoryLot(t *testing.T, ctx context.Context, uc *biz.Inventory
 		t.Fatalf("create inventory lot %s failed: %v", lotNo, err)
 	}
 	return lot
+}
+
+func TestInventoryUsecase_DirectWritePrimitiveAllowsHistoricalInactiveReferences(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_direct_write_inactive_refs")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+
+	if _, err := client.Material.UpdateOneID(fixtures.materialID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable material failed: %v", err)
+	}
+	if _, err := client.Unit.UpdateOneID(fixtures.unitID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable unit failed: %v", err)
+	}
+	if _, err := client.Warehouse.UpdateOneID(fixtures.warehouseID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable warehouse failed: %v", err)
+	}
+	lot, err := uc.CreateInventoryLot(ctx, &biz.InventoryLotCreate{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		LotNo:       "LOT-HISTORICAL-INACTIVE",
+	})
+	if err != nil {
+		t.Fatalf("inventory lot source primitive should keep inactive historical subject references readable: %v", err)
+	}
+	applied, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		LotID:          &lot.ID,
+		TxnType:        biz.InventoryTxnIn,
+		Direction:      1,
+		Quantity:       decimal.NewFromInt(3),
+		UnitID:         fixtures.unitID,
+		SourceType:     "TEST_HISTORICAL_SOURCE",
+		IdempotencyKey: "TEST_HISTORICAL_SOURCE:IN",
+	})
+	if err != nil {
+		t.Fatalf("inventory txn source primitive should not active-guard historical references: %v", err)
+	}
+	reversalOf := applied.Txn.ID
+	if _, err := uc.CreateInventoryTxn(ctx, &biz.InventoryTxnCreate{
+		SubjectType:     biz.InventorySubjectMaterial,
+		SubjectID:       fixtures.materialID,
+		WarehouseID:     fixtures.warehouseID,
+		LotID:           &lot.ID,
+		TxnType:         biz.InventoryTxnReversal,
+		Direction:       -1,
+		Quantity:        decimal.NewFromInt(3),
+		UnitID:          fixtures.unitID,
+		SourceType:      "TEST_HISTORICAL_SOURCE",
+		IdempotencyKey:  "TEST_HISTORICAL_SOURCE:REVERSAL",
+		ReversalOfTxnID: &reversalOf,
+	}); err != nil {
+		t.Fatalf("inventory reversal primitive should not active-guard historical references: %v", err)
+	}
 }
 
 func createAndPostPurchaseReceipt(t *testing.T, ctx context.Context, uc *biz.InventoryUsecase, receiptNo string, fixtures inventoryTestFixtures, lotNo *string, quantity decimal.Decimal) *biz.PurchaseReceipt {

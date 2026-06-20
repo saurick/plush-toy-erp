@@ -5653,12 +5653,39 @@ async function assertBusinessMainTableSortableColumns(
           height: node.getBoundingClientRect().height,
         }))
       : []
+    const columnHeaderTexts = tableCard
+      ? Array.from(
+          tableCard.querySelectorAll('.erp-module-column-header-text')
+        ).map((node) => {
+          const style = window.getComputedStyle(node)
+          return {
+            text: String(node.textContent || '')
+              .replace(/\s+/g, ' ')
+              .trim(),
+            clientWidth: node.clientWidth,
+            scrollWidth: node.scrollWidth,
+            textOverflow: style.textOverflow,
+            overflow: style.overflow,
+            whiteSpace: style.whiteSpace,
+          }
+        })
+      : []
+    const ellipsisCells = tableCard
+      ? Array.from(tableCard.querySelectorAll('.ant-table-cell-ellipsis')).map(
+          (node) =>
+            String(node.textContent || '')
+              .replace(/\s+/g, ' ')
+              .trim()
+        )
+      : []
     const currentAction = document.querySelector(
       '.erp-business-module-current-action'
     )
     return {
       headers,
       columnHeaderTriggers,
+      columnHeaderTexts,
+      ellipsisCells,
       hasCurrentAction: Boolean(currentAction),
     }
   })
@@ -5692,6 +5719,13 @@ async function assertBusinessMainTableSortableColumns(
   )
   const oversizedColumnHeaderTriggers = metrics.columnHeaderTriggers.filter(
     (node) => node.width > 24 || node.height > 24
+  )
+  const ellipsisHeaderTexts = metrics.columnHeaderTexts.filter(
+    (node) =>
+      node.text &&
+      (node.textOverflow === 'ellipsis' ||
+        node.overflow === 'hidden' ||
+        node.scrollWidth > node.clientWidth + 1)
   )
 
   assert(
@@ -5737,6 +5771,16 @@ async function assertBusinessMainTableSortableColumns(
     oversizedColumnHeaderTriggers,
     [],
     `${scenarioName} 业务主表列设置快捷入口应保持紧凑尺寸: ${JSON.stringify(metrics)}`
+  )
+  assert.deepEqual(
+    ellipsisHeaderTexts,
+    [],
+    `${scenarioName} 业务主表列标题不应再省略或裁切: ${JSON.stringify(metrics)}`
+  )
+  assert.deepEqual(
+    metrics.ellipsisCells,
+    [],
+    `${scenarioName} 业务主表数据列不应使用 AntD 省略单元格: ${JSON.stringify(metrics)}`
   )
 }
 

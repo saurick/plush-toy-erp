@@ -85,7 +85,7 @@ func (d *jsonrpcDispatcher) isPublic(url, method string) bool {
 	if url == "system" && (method == "ping" || method == "version") {
 		return true
 	}
-	if url == "auth" && (method == "capabilities" || method == "login" || method == "admin_login" || method == "send_sms_code" || method == "sms_login" || method == "logout") {
+	if url == "auth" && (method == "capabilities" || method == "admin_login" || method == "send_sms_code" || method == "sms_login" || method == "logout") {
 		return true
 	}
 	return false

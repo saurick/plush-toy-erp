@@ -65,9 +65,9 @@ HTTP 路由：
 ## 鉴权规则
 
 - `system.*` 默认是公开方法
-- `auth.login`、`auth.admin_login`、`auth.send_sms_code`、`auth.sms_login`、`auth.logout` 是公开方法
+- `auth.admin_login`、`auth.send_sms_code`、`auth.sms_login`、`auth.logout` 是公开方法
 - 其他业务域默认要求已登录
-- `user.*` 额外要求管理员登录态
+- `user.*` 普通账号管理域已退出运行时，不再作为 JSON-RPC URL 提供
 - `admin.*` 管理操作要求管理员登录态，并按 `system.*` 权限码做动作级校验
 - super admin 不允许被普通管理员通过管理接口修改、禁用或重置密码
 
@@ -91,21 +91,18 @@ HTTP 路由：
 
 ## 当前默认保留的数据字段
 
-### `auth.login` / `auth.admin_login` / `auth.sms_login`
+### `auth.admin_login` / `auth.sms_login`
 
 返回最小登录态信息：
 
-- `user_id`
+- `id`
 - `username`
 - `access_token`
 - `expires_at`
 - `token_type`
 - `issued_at`
 
-`auth.sms_login` 通过 `scope` 区分登录目标：
-
-- `scope=user` 或省略：普通协作账号短信登录
-- `scope=admin`：管理员短信登录，按 `admin_users.phone` 查找管理员，返回字段额外包含 `is_super_admin`、`roles`、`permissions`、`menus`、`erp_preferences`
+`auth.sms_login` 只接受 `scope=admin`，按 `admin_users.phone` 查找管理员，返回字段额外包含 `is_super_admin`、`roles`、`permissions`、`menus`、`erp_preferences`。普通协作账号登录链路已停用，旧 `auth.login` 和 `scope=user` 不再是主路径。
 
 岗位任务端请求 `auth.send_sms_code` 和 `auth.sms_login` 时会额外携带 `mobile_role_key`；服务端会校验该手机号已绑定管理员账号，且该管理员具备当前岗位任务端角色或对应 `mobile.<role>.access` 权限。手机号未绑定返回 `AuthPhoneNotBound`，不返回“用户不存在”；手机号已绑定但未授权当前岗位任务端角色返回 `AuthMobileRoleDenied`。
 
@@ -114,7 +111,7 @@ HTTP 路由：
 请求字段：
 
 - `phone`：手机号，当前支持中国大陆手机号，允许 `+86`、`86` 前缀和空格 / 连字符
-- `scope`：`user` 或 `admin`，省略时按 `user`
+- `scope`：当前只接受 `admin`
 - `mobile_role_key`：岗位任务端登录时传当前端口角色；桌面短信登录可省略
 
 返回字段：
@@ -129,26 +126,7 @@ HTTP 路由：
 
 ### `auth.me`
 
-返回当前用户或当前管理员的最小信息，用于前端恢复登录态。
-
-### `user.list`
-
-返回后台账号目录所需的最小字段：
-
-- `id`
-- `username`
-- `disabled`
-- `created_at`
-- `last_login_at`
-
-### `user.reset_password`
-
-请求字段：
-
-- `user_id`
-- `password`：新密码，至少 6 位
-
-成功后覆盖该协作账号的 `password_hash`，旧密码立即失效；接口不返回明文密码。
+返回当前管理员的最小信息，用于前端恢复登录态。旧普通用户 token 会按未登录处理。
 
 ### `admin.reset_password`
 

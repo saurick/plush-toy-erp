@@ -478,6 +478,20 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存不足"}
 	case errors.Is(err, biz.ErrInventoryLotStatusBlocked):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "批次状态不允许扣减"}
+	case errors.Is(err, biz.ErrCustomerNotFound), errors.Is(err, biz.ErrCustomerInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该客户已停用，不能用于新业务；历史单据仍保留原引用"}
+	case errors.Is(err, biz.ErrMaterialNotFound), errors.Is(err, biz.ErrMaterialInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该材料已停用，不能新增引用；历史事实仍保留原引用"}
+	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该产品已停用，不能用于新业务；历史单据仍保留原引用"}
+	case errors.Is(err, biz.ErrProductSKUNotFound), errors.Is(err, biz.ErrProductSKUInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该 SKU 已停用，不能用于新业务；历史单据仍保留原引用"}
+	case errors.Is(err, biz.ErrSupplierNotFound), errors.Is(err, biz.ErrSupplierInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该供应商已停用，不能用于新业务；历史单据仍保留原引用"}
+	case errors.Is(err, biz.ErrUnitNotFound), errors.Is(err, biz.ErrUnitInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该单位已停用，不能新增引用；历史单据仍保留原引用"}
+	case errors.Is(err, biz.ErrWarehouseNotFound), errors.Is(err, biz.ErrWarehouseInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该仓库已停用，不能用于新业务"}
 	case errors.Is(err, biz.ErrProductionFactNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产事实不存在"}
 	case errors.Is(err, biz.ErrOutsourcingFactNotFound):

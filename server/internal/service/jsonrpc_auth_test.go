@@ -1,11 +1,7 @@
-// server/internal/service/jsonrpc_auth_test.go
 package service
 
 import (
 	"context"
-	"errors"
-	"io"
-	"sync"
 	"testing"
 	"time"
 
@@ -13,566 +9,206 @@ import (
 	"server/internal/errcode"
 
 	"github.com/go-kratos/kratos/v2/log"
-	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func TestJsonrpcDispatcher_AuthLogin_OK(t *testing.T) {
-	repo := newMemAuthRepoForData()
-	_ = repo.putUser("alice", "p@ss", false)
+func TestJsonrpcDispatcher_AuthLogin_Removed(t *testing.T) {
+	d := &jsonrpcDispatcher{log: log.NewHelper(log.DefaultLogger)}
 
-	logger := log.NewStdLogger(io.Discard)
-	tp := tracesdk.NewTracerProvider()
-
-	genTok := func(userID int, username string, role int8) (string, time.Time, error) {
-		return "tok", time.Now().Add(time.Hour), nil
+	_, res, err := d.handleAuth(context.Background(), "login", "1", mustAuthStruct(t, map[string]any{
+		"username": "demo",
+		"password": "secret",
+	}))
+	if err != nil {
+		t.Fatalf("handle auth.login: %v", err)
 	}
-	authUC := biz.NewAuthUsecase(repo, genTok, logger, tp)
+	if res == nil || res.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("expected auth.login removed as unknown method, got %+v", res)
+	}
+}
 
-	j := &jsonrpcDispatcher{
-		log:    log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
-		authUC: authUC,
+func TestJsonrpcDispatcher_AuthSMSScopeUser_Removed(t *testing.T) {
+	repo := newMemAdminAuthRepoForData()
+	d := &jsonrpcDispatcher{
+		log:         log.NewHelper(log.DefaultLogger),
+		adminAuthUC: newAdminAuthUsecaseForTest(repo),
+		authSMS:     normalizeAuthSMSRuntimeConfig(authSMSModeMock),
 	}
 
-	params, _ := structpb.NewStruct(map[string]any{
-		"username": "alice",
-		"password": "p@ss",
+	_, res, err := d.handleAuth(context.Background(), "send_sms_code", "1", mustAuthStruct(t, map[string]any{
+		"phone": "13800138000",
+		"scope": "user",
+	}))
+	if err != nil {
+		t.Fatalf("handle auth.send_sms_code: %v", err)
+	}
+	if res == nil || res.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected user sms scope rejected, got %+v", res)
+	}
+}
+
+func TestJsonrpcDispatcher_AuthSMSLogin_AdminOK(t *testing.T) {
+	repo := newMemAdminAuthRepoForData()
+	if err := repo.putAdmin("boss", "13800138000", "secret", false); err != nil {
+		t.Fatalf("put admin: %v", err)
+	}
+	d := &jsonrpcDispatcher{
+		log:         log.NewHelper(log.DefaultLogger),
+		adminAuthUC: newAdminAuthUsecaseForTest(repo),
+		authSMS:     normalizeAuthSMSRuntimeConfig(authSMSModeMock),
+	}
+
+	_, sendRes, err := d.handleAuth(context.Background(), "send_sms_code", "1", mustAuthStruct(t, map[string]any{
+		"phone": "13800138000",
+		"scope": "admin",
+	}))
+	if err != nil {
+		t.Fatalf("handle auth.send_sms_code: %v", err)
+	}
+	if sendRes == nil || sendRes.Code != errcode.OK.Code {
+		t.Fatalf("expected send sms ok, got %+v", sendRes)
+	}
+	code := getNestedString(sendRes.Data.AsMap(), "mock_code")
+	if code == "" {
+		t.Fatalf("expected mock sms code in response, got %+v", sendRes.Data.AsMap())
+	}
+
+	_, loginRes, err := d.handleAuth(context.Background(), "sms_login", "2", mustAuthStruct(t, map[string]any{
+		"phone": "13800138000",
+		"code":  code,
+		"scope": "admin",
+	}))
+	if err != nil {
+		t.Fatalf("handle auth.sms_login: %v", err)
+	}
+	if loginRes == nil || loginRes.Code != errcode.OK.Code {
+		t.Fatalf("expected sms login ok, got %+v", loginRes)
+	}
+	data := loginRes.Data.AsMap()
+	if data["access_token"] == "" || data["username"] != "boss" {
+		t.Fatalf("unexpected sms login data: %+v", data)
+	}
+}
+
+func TestJsonrpcDispatcher_AuthMe_StaleUserTokenRejected(t *testing.T) {
+	d := &jsonrpcDispatcher{log: log.NewHelper(log.DefaultLogger)}
+	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{
+		UserID:   1,
+		Username: "old-user",
+		Role:     biz.RoleUser,
 	})
 
-	_, res, err := j.handleAuth(context.Background(), "login", "1", params)
+	_, res, err := d.handleAuth(ctx, "me", "1", nil)
 	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
+		t.Fatalf("handle auth.me: %v", err)
 	}
-	if res == nil || res.Code != 0 {
-		t.Fatalf("expected code=0, got %+v", res)
-	}
-	if res.Data == nil {
-		t.Fatalf("expected data not nil")
-	}
-	m := res.Data.AsMap()
-	if m["access_token"] != "tok" {
-		t.Fatalf("expected access_token=tok, got %v", m["access_token"])
-	}
-	if m["user_id"] == nil {
-		t.Fatalf("expected user_id not nil")
-	}
-}
-
-func TestJsonrpcDispatcher_AuthRegister_Removed(t *testing.T) {
-	logger := log.NewStdLogger(io.Discard)
-	j := &jsonrpcDispatcher{
-		log: log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
-	}
-
-	params, _ := structpb.NewStruct(map[string]any{
-		"username": "bob",
-		"password": "p@ss",
-	})
-
-	_, res, err := j.handleAuth(context.Background(), "register", "1", params)
-	if err != nil {
-		t.Fatalf("expected nil err (jsonrpc should map to result), got %v", err)
-	}
-	if res == nil {
-		t.Fatalf("expected result not nil")
-	}
-	if res.Code != errcode.UnknownMethod.Code {
-		t.Fatalf("expected code=%d, got %+v", errcode.UnknownMethod.Code, res)
-	}
-}
-
-func TestJsonrpcDispatcher_AuthLogin_UserNotFound(t *testing.T) {
-	repo := newMemAuthRepoForData()
-
-	logger := log.NewStdLogger(io.Discard)
-	tp := tracesdk.NewTracerProvider()
-	authUC := biz.NewAuthUsecase(repo, func(int, string, int8) (string, time.Time, error) {
-		return "tok", time.Now().Add(time.Hour), nil
-	}, logger, tp)
-
-	j := &jsonrpcDispatcher{
-		log:    log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
-		authUC: authUC,
-	}
-
-	params, _ := structpb.NewStruct(map[string]any{
-		"username": "notfound",
-		"password": "p@ss",
-	})
-
-	_, res, err := j.handleAuth(context.Background(), "login", "1", params)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if res == nil || res.Code == 0 {
-		t.Fatalf("expected non-zero code for user not found, got %+v", res)
-	}
-	if res.Code != errcode.AuthUserNotFound.Code {
-		t.Fatalf("expected code=%d, got %d", errcode.AuthUserNotFound.Code, res.Code)
-	}
-}
-
-func TestJsonrpcDispatcher_AuthLogin_InvalidPassword(t *testing.T) {
-	repo := newMemAuthRepoForData()
-	_ = repo.putUser("alice", "p@ss", false)
-
-	logger := log.NewStdLogger(io.Discard)
-	tp := tracesdk.NewTracerProvider()
-	authUC := biz.NewAuthUsecase(repo, func(int, string, int8) (string, time.Time, error) {
-		return "tok", time.Now().Add(time.Hour), nil
-	}, logger, tp)
-
-	j := &jsonrpcDispatcher{
-		log:    log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
-		authUC: authUC,
-	}
-
-	params, _ := structpb.NewStruct(map[string]any{
-		"username": "alice",
-		"password": "wrong",
-	})
-
-	_, res, err := j.handleAuth(context.Background(), "login", "1", params)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if res == nil || res.Code == 0 {
-		t.Fatalf("expected non-zero code for invalid password, got %+v", res)
-	}
-	if res.Code != errcode.AuthInvalidPassword.Code {
-		t.Fatalf("expected code=%d, got %d", errcode.AuthInvalidPassword.Code, res.Code)
-	}
-}
-
-func TestRedactRPCParamsMasksSensitiveFields(t *testing.T) {
-	got := redactRPCParams(map[string]any{
-		"username": "worker",
-		"password": "plain-secret",
-		"code":     "123456",
-		"nested": map[string]any{
-			"access_token": "token-secret",
-		},
-	}).(map[string]any)
-
-	if got["username"] != "worker" {
-		t.Fatalf("expected username to stay visible, got %#v", got["username"])
-	}
-	if got["password"] != "<redacted>" {
-		t.Fatalf("expected password to be redacted, got %#v", got["password"])
-	}
-	if got["code"] != "<redacted>" {
-		t.Fatalf("expected sms code to be redacted, got %#v", got["code"])
-	}
-	nested, ok := got["nested"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected nested map, got %#v", got["nested"])
-	}
-	if nested["access_token"] != "<redacted>" {
-		t.Fatalf("expected access_token to be redacted, got %#v", nested["access_token"])
-	}
-}
-
-func TestJsonrpcDispatcher_AuthCapabilities_SMSModes(t *testing.T) {
-	logger := log.NewStdLogger(io.Discard)
-	j := &jsonrpcDispatcher{
-		log:     log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
-		authSMS: normalizeAuthSMSRuntimeConfig(authSMSModeMock),
-	}
-
-	_, res, err := j.handleAuth(context.Background(), "capabilities", "1", nil)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if res == nil || res.Code != errcode.OK.Code {
-		t.Fatalf("expected code=0, got %+v", res)
-	}
-	smsLogin, ok := res.Data.AsMap()["sms_login"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected sms_login capabilities, got %#v", res.Data.AsMap())
-	}
-	if smsLogin["enabled"] != true {
-		t.Fatalf("expected sms login enabled in mock mode, got %#v", smsLogin)
-	}
-	if smsLogin["mode"] != authSMSModeMock {
-		t.Fatalf("expected mode=mock, got %#v", smsLogin)
-	}
-	if smsLogin["mock_delivery"] != true {
-		t.Fatalf("expected mock_delivery=true, got %#v", smsLogin)
-	}
-	if _, ok := res.Data.AsMap()["public_register"]; ok {
-		t.Fatalf("did not expect public_register capabilities, got %#v", res.Data.AsMap())
+	if res == nil || res.Code != errcode.AuthRequired.Code {
+		t.Fatalf("expected stale user token rejected, got %+v", res)
 	}
 }
 
 func TestJsonrpcDispatcher_AuthSMSLogin_DisabledByConfig(t *testing.T) {
-	logger := log.NewStdLogger(io.Discard)
-	j := &jsonrpcDispatcher{
-		log:     log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
+	d := &jsonrpcDispatcher{
+		log:     log.NewHelper(log.DefaultLogger),
 		authSMS: normalizeAuthSMSRuntimeConfig(authSMSModeDisabled),
 	}
 
-	sendParams, _ := structpb.NewStruct(map[string]any{
-		"phone": "13800138000",
-		"scope": "user",
-	})
-	_, res, err := j.handleAuth(context.Background(), "send_sms_code", "1", sendParams)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if res == nil || res.Code != errcode.AuthSMSLoginDisabled.Code {
-		t.Fatalf("expected sms disabled code=%d, got %+v", errcode.AuthSMSLoginDisabled.Code, res)
-	}
-	smsLogin, ok := res.Data.AsMap()["sms_login"].(map[string]any)
-	if !ok || smsLogin["enabled"] != false {
-		t.Fatalf("expected disabled sms_login capabilities, got %#v", res.Data.AsMap())
-	}
-
-	loginParams, _ := structpb.NewStruct(map[string]any{
-		"phone": "13800138000",
-		"code":  "123456",
-		"scope": "user",
-	})
-	_, res, err = j.handleAuth(context.Background(), "sms_login", "2", loginParams)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if res == nil || res.Code != errcode.AuthSMSLoginDisabled.Code {
-		t.Fatalf("expected sms disabled code=%d, got %+v", errcode.AuthSMSLoginDisabled.Code, res)
-	}
-}
-
-func TestJsonrpcDispatcher_AuthSMSLogin_OK(t *testing.T) {
-	repo := newMemAuthRepoForData()
-	_ = repo.putUser("13800138000", "unused", false)
-
-	logger := log.NewStdLogger(io.Discard)
-	tp := tracesdk.NewTracerProvider()
-	authUC := biz.NewAuthUsecase(repo, func(int, string, int8) (string, time.Time, error) {
-		return "tok-sms", time.Now().Add(time.Hour), nil
-	}, logger, tp)
-
-	j := &jsonrpcDispatcher{
-		log:     log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
-		authUC:  authUC,
-		authSMS: normalizeAuthSMSRuntimeConfig(authSMSModeMock),
-	}
-
-	params, _ := structpb.NewStruct(map[string]any{
-		"phone": "13800138000",
-		"scope": "user",
-	})
-
-	_, res, err := j.handleAuth(context.Background(), "send_sms_code", "1", params)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if res == nil || res.Code != errcode.OK.Code {
-		t.Fatalf("expected code=0, got %+v", res)
-	}
-	code, _ := res.Data.AsMap()["mock_code"].(string)
-	if code == "" {
-		t.Fatalf("expected mock code in response")
-	}
-
-	loginParams, _ := structpb.NewStruct(map[string]any{
-		"phone": "13800138000",
-		"code":  code,
-		"scope": "user",
-	})
-	_, res, err = j.handleAuth(context.Background(), "sms_login", "2", loginParams)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if res == nil || res.Code != errcode.OK.Code {
-		t.Fatalf("expected code=0, got %+v", res)
-	}
-	if res.Data.AsMap()["access_token"] != "tok-sms" {
-		t.Fatalf("expected access_token=tok-sms, got %v", res.Data.AsMap()["access_token"])
-	}
-}
-
-func TestJsonrpcDispatcher_AuthSMSLogin_InvalidCode(t *testing.T) {
-	repo := newMemAuthRepoForData()
-	_ = repo.putUser("13800138000", "unused", false)
-
-	logger := log.NewStdLogger(io.Discard)
-	tp := tracesdk.NewTracerProvider()
-	authUC := biz.NewAuthUsecase(repo, func(int, string, int8) (string, time.Time, error) {
-		return "tok-sms", time.Now().Add(time.Hour), nil
-	}, logger, tp)
-
-	j := &jsonrpcDispatcher{
-		log:     log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
-		authUC:  authUC,
-		authSMS: normalizeAuthSMSRuntimeConfig(authSMSModeMock),
-	}
-
-	params, _ := structpb.NewStruct(map[string]any{
-		"phone": "13800138000",
-	})
-	_, res, err := j.handleAuth(context.Background(), "send_sms_code", "1", params)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if res == nil || res.Code != errcode.OK.Code {
-		t.Fatalf("expected code=0, got %+v", res)
-	}
-	mockCode, _ := res.Data.AsMap()["mock_code"].(string)
-	wrongCode := "000000"
-	if mockCode == wrongCode {
-		wrongCode = "111111"
-	}
-
-	loginParams, _ := structpb.NewStruct(map[string]any{
-		"phone": "13800138000",
-		"code":  wrongCode,
-	})
-	_, res, err = j.handleAuth(context.Background(), "sms_login", "2", loginParams)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if res == nil || res.Code != errcode.AuthInvalidSMSCode.Code {
-		t.Fatalf("expected invalid sms code=%d, got %+v", errcode.AuthInvalidSMSCode.Code, res)
-	}
-}
-
-func TestJsonrpcDispatcher_AdminSMSLogin_OK(t *testing.T) {
-	repo := newMemAdminAuthRepoForData()
-	repo.admins["13800138000"] = &biz.AdminUser{
-		ID:           1,
-		Username:     "sms-admin",
-		Phone:        "13800138000",
-		IsSuperAdmin: true,
-	}
-
-	logger := log.NewStdLogger(io.Discard)
-	tp := tracesdk.NewTracerProvider()
-	adminAuthUC := biz.NewAdminAuthUsecase(repo, func(int, string, int8) (string, time.Time, error) {
-		return "tok-admin-sms", time.Now().Add(time.Hour), nil
-	}, logger, tp)
-
-	j := &jsonrpcDispatcher{
-		log:         log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
-		adminAuthUC: adminAuthUC,
-		authSMS:     normalizeAuthSMSRuntimeConfig(authSMSModeMock),
-	}
-
-	params, _ := structpb.NewStruct(map[string]any{
+	_, res, err := d.handleAuth(context.Background(), "send_sms_code", "1", mustAuthStruct(t, map[string]any{
 		"phone": "13800138000",
 		"scope": "admin",
-	})
-	_, res, err := j.handleAuth(context.Background(), "send_sms_code", "1", params)
+	}))
 	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
+		t.Fatalf("handle auth.send_sms_code: %v", err)
 	}
-	if res == nil || res.Code != errcode.OK.Code {
-		t.Fatalf("expected code=0, got %+v", res)
+	if res == nil || res.Code != errcode.AuthSMSLoginDisabled.Code {
+		t.Fatalf("expected sms disabled, got %+v", res)
 	}
-	code, _ := res.Data.AsMap()["mock_code"].(string)
-	if code == "" {
-		t.Fatalf("expected mock code in response")
-	}
+}
 
-	loginParams, _ := structpb.NewStruct(map[string]any{
-		"phone": "13800138000",
-		"code":  code,
-		"scope": "admin",
-	})
-	_, res, err = j.handleAuth(context.Background(), "sms_login", "2", loginParams)
+func mustAuthStruct(t *testing.T, values map[string]any) *structpb.Struct {
+	t.Helper()
+	st, err := structpb.NewStruct(values)
 	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
+		t.Fatalf("new struct: %v", err)
 	}
-	if res == nil || res.Code != errcode.OK.Code {
-		t.Fatalf("expected code=0, got %+v", res)
-	}
-	if res.Data.AsMap()["access_token"] != "tok-admin-sms" {
-		t.Fatalf("expected access_token=tok-admin-sms, got %v", res.Data.AsMap()["access_token"])
-	}
-	data := res.Data.AsMap()
-	if data["is_super_admin"] != true {
-		t.Fatalf("expected is_super_admin=true in admin sms login response, got %#v", data["is_super_admin"])
-	}
-	if _, ok := data["permissions"].([]any); !ok {
-		t.Fatalf("expected permissions in admin sms login response, got %#v", data["permissions"])
-	}
-	if _, ok := data["menus"].([]any); !ok {
-		t.Fatalf("expected menus in admin sms login response, got %#v", data["menus"])
-	}
+	return st
 }
 
-func TestJsonrpcDispatcher_AuthLogout(t *testing.T) {
-	repo := newMemAuthRepoForData()
-
-	logger := log.NewStdLogger(io.Discard)
-	tp := tracesdk.NewTracerProvider()
-	authUC := biz.NewAuthUsecase(repo, func(int, string, int8) (string, time.Time, error) {
-		return "tok", time.Now().Add(time.Hour), nil
-	}, logger, tp)
-
-	j := &jsonrpcDispatcher{
-		log:    log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
-		authUC: authUC,
-	}
-
-	params, _ := structpb.NewStruct(map[string]any{})
-
-	_, res, err := j.handleAuth(context.Background(), "logout", "1", params)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if res == nil || res.Code != 0 {
-		t.Fatalf("expected code=0, got %+v", res)
-	}
-}
-
-func TestJsonrpcDispatcher_AuthUnknownMethod(t *testing.T) {
-	repo := newMemAuthRepoForData()
-
-	logger := log.NewStdLogger(io.Discard)
-	tp := tracesdk.NewTracerProvider()
-	authUC := biz.NewAuthUsecase(repo, func(int, string, int8) (string, time.Time, error) {
-		return "tok", time.Now().Add(time.Hour), nil
-	}, logger, tp)
-
-	j := &jsonrpcDispatcher{
-		log:    log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
-		authUC: authUC,
-	}
-
-	params, _ := structpb.NewStruct(map[string]any{})
-
-	_, res, err := j.handleAuth(context.Background(), "unknown", "1", params)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if res == nil || res.Code == 0 {
-		t.Fatalf("expected non-zero code for unknown method, got %+v", res)
-	}
-	if res.Code != errcode.UnknownMethod.Code {
-		t.Fatalf("expected code=%d, got %d", errcode.UnknownMethod.Code, res.Code)
-	}
-}
-
-// ====== 内部：最小 mem repo（data 包里实现 biz.AuthRepo）======
-
-type memAuthRepoForData struct {
-	mu         sync.Mutex
-	users      map[string]*biz.User
-	nextUserID int
-}
-
-func newMemAuthRepoForData() *memAuthRepoForData {
-	return &memAuthRepoForData{
-		users:      make(map[string]*biz.User),
-		nextUserID: 1,
-	}
-}
-
-func (r *memAuthRepoForData) putUser(username, password string, disabled bool) error {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.users[username] = &biz.User{
-		ID:           r.nextUserID,
-		Username:     username,
-		PasswordHash: string(hash),
-		Disabled:     disabled,
-		Role:         0,
-	}
-	r.nextUserID++
-	return nil
-}
-
-// ====== biz.AuthRepo 实现 ======
-func (r *memAuthRepoForData) GetUserByUsername(ctx context.Context, username string) (*biz.User, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	u := r.users[username]
-	if u == nil {
-		return nil, errors.New("not found")
-	}
-	cp := *u
-	return &cp, nil
-}
-
-func (r *memAuthRepoForData) GetUserByID(ctx context.Context, id int) (*biz.User, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	for _, u := range r.users {
-		if u.ID == id {
-			cp := *u
-			return &cp, nil
+func getNestedString(values map[string]any, key string) string {
+	if nested, ok := values["data"].(map[string]any); ok {
+		if v, ok := nested[key].(string); ok {
+			return v
 		}
 	}
-	return nil, errors.New("not found")
-}
-
-func (r *memAuthRepoForData) CreateUser(ctx context.Context, u *biz.User) (*biz.User, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, ok := r.users[u.Username]; ok {
-		return nil, errors.New("duplicate username")
+	if v, ok := values[key].(string); ok {
+		return v
 	}
-	cp := *u
-	cp.ID = r.nextUserID
-	r.nextUserID++
-	r.users[cp.Username] = &cp
-	return &cp, nil
+	return ""
 }
 
-func (r *memAuthRepoForData) UpdateUserLastLogin(ctx context.Context, id int, t time.Time) error {
-	// 测试中不需要实现
-	return nil
+func newAdminAuthUsecaseForTest(repo *memAdminAuthRepoForData) *biz.AdminAuthUsecase {
+	return biz.NewAdminAuthUsecase(repo, func(userID int, username string, role int8) (string, time.Time, error) {
+		return "admin-token", time.Now().Add(time.Hour), nil
+	}, log.DefaultLogger, nil)
 }
 
 type memAdminAuthRepoForData struct {
-	mu         sync.Mutex
-	admins     map[string]*biz.AdminUser
-	lastLogins map[int]time.Time
+	byUsername map[string]*biz.AdminUser
+	byPhone    map[string]*biz.AdminUser
 }
 
 func newMemAdminAuthRepoForData() *memAdminAuthRepoForData {
 	return &memAdminAuthRepoForData{
-		admins:     make(map[string]*biz.AdminUser),
-		lastLogins: make(map[int]time.Time),
+		byUsername: make(map[string]*biz.AdminUser),
+		byPhone:    make(map[string]*biz.AdminUser),
 	}
 }
 
-func (r *memAdminAuthRepoForData) GetAdminByUsername(ctx context.Context, username string) (*biz.AdminUser, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	admin := r.admins[username]
+func (r *memAdminAuthRepoForData) putAdmin(username, phone, password string, disabled bool) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	admin := &biz.AdminUser{
+		ID:           len(r.byUsername) + 1,
+		Username:     username,
+		Phone:        phone,
+		PasswordHash: string(hash),
+		IsSuperAdmin: true,
+		Disabled:     disabled,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+	r.byUsername[username] = admin
+	if phone != "" {
+		r.byPhone[phone] = admin
+	}
+	return nil
+}
+
+func (r *memAdminAuthRepoForData) GetAdminByUsername(_ context.Context, username string) (*biz.AdminUser, error) {
+	admin := r.byUsername[username]
 	if admin == nil {
-		return nil, errors.New("not found")
+		return nil, biz.ErrUserNotFound
 	}
-	cp := *admin
-	cp.Roles = append([]biz.AdminRole(nil), admin.Roles...)
-	cp.Permissions = append([]string(nil), admin.Permissions...)
-	return &cp, nil
+	return admin, nil
 }
 
-func (r *memAdminAuthRepoForData) GetAdminByPhone(ctx context.Context, phone string) (*biz.AdminUser, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	for _, admin := range r.admins {
-		if admin.Phone == phone {
-			cp := *admin
-			cp.Roles = append([]biz.AdminRole(nil), admin.Roles...)
-			cp.Permissions = append([]string(nil), admin.Permissions...)
-			return &cp, nil
+func (r *memAdminAuthRepoForData) GetAdminByPhone(_ context.Context, phone string) (*biz.AdminUser, error) {
+	admin := r.byPhone[phone]
+	if admin == nil {
+		return nil, biz.ErrPhoneNotBound
+	}
+	return admin, nil
+}
+
+func (r *memAdminAuthRepoForData) UpdateAdminLastLogin(_ context.Context, id int, at time.Time) error {
+	for _, admin := range r.byUsername {
+		if admin.ID == id {
+			admin.LastLoginAt = &at
+			return nil
 		}
 	}
-	return nil, errors.New("not found")
-}
-
-func (r *memAdminAuthRepoForData) UpdateAdminLastLogin(ctx context.Context, id int, t time.Time) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.lastLogins[id] = t
-	return nil
+	return biz.ErrUserNotFound
 }

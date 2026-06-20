@@ -42,7 +42,6 @@ import (
 	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
-	"server/internal/data/model/ent/user"
 	"server/internal/data/model/ent/warehouse"
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
@@ -2869,44 +2868,6 @@ func init() {
 	unit.DefaultUpdatedAt = unitDescUpdatedAt.Default.(func() time.Time)
 	// unit.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	unit.UpdateDefaultUpdatedAt = unitDescUpdatedAt.UpdateDefault.(func() time.Time)
-	userFields := schema.User{}.Fields()
-	_ = userFields
-	// userDescUsername is the schema descriptor for username field.
-	userDescUsername := userFields[0].Descriptor()
-	// user.UsernameValidator is a validator for the "username" field. It is called by the builders before save.
-	user.UsernameValidator = func() func(string) error {
-		validators := userDescUsername.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(username string) error {
-			for _, fn := range fns {
-				if err := fn(username); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
-	// userDescPasswordHash is the schema descriptor for password_hash field.
-	userDescPasswordHash := userFields[1].Descriptor()
-	// user.PasswordHashValidator is a validator for the "password_hash" field. It is called by the builders before save.
-	user.PasswordHashValidator = userDescPasswordHash.Validators[0].(func(string) error)
-	// userDescDisabled is the schema descriptor for disabled field.
-	userDescDisabled := userFields[2].Descriptor()
-	// user.DefaultDisabled holds the default value on creation for the disabled field.
-	user.DefaultDisabled = userDescDisabled.Default.(bool)
-	// userDescCreatedAt is the schema descriptor for created_at field.
-	userDescCreatedAt := userFields[4].Descriptor()
-	// user.DefaultCreatedAt holds the default value on creation for the created_at field.
-	user.DefaultCreatedAt = userDescCreatedAt.Default.(func() time.Time)
-	// userDescUpdatedAt is the schema descriptor for updated_at field.
-	userDescUpdatedAt := userFields[5].Descriptor()
-	// user.DefaultUpdatedAt holds the default value on creation for the updated_at field.
-	user.DefaultUpdatedAt = userDescUpdatedAt.Default.(func() time.Time)
-	// user.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
-	user.UpdateDefaultUpdatedAt = userDescUpdatedAt.UpdateDefault.(func() time.Time)
 	warehouseFields := schema.Warehouse{}.Fields()
 	_ = warehouseFields
 	// warehouseDescCode is the schema descriptor for code field.

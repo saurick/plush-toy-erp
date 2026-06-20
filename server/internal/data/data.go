@@ -25,11 +25,6 @@ import (
 var ProviderSet = wire.NewSet(
 	NewData,
 
-	// auth
-	NewAuthRepo,
-	wire.Bind(new(biz.AuthRepo), new(*authRepo)),
-	NewTokenGenerator,
-
 	// admin auth / manage
 	NewAdminAuthRepo,
 	wire.Bind(new(biz.AdminAuthRepo), new(*adminAuthRepo)),
@@ -37,10 +32,6 @@ var ProviderSet = wire.NewSet(
 	NewAdminTokenGenerator,
 	NewAdminManageRepo,
 	wire.Bind(new(biz.AdminManageRepo), new(*adminManageRepo)),
-
-	// user admin
-	NewUserAdminRepo,
-	wire.Bind(new(biz.UserAdminRepo), new(*userAdminRepo)),
 
 	// domain repos
 	NewWorkflowRepo,

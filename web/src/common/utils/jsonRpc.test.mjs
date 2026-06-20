@@ -90,8 +90,8 @@ function loadJsonRpcModule({ token = 'stored-token' } = {}) {
       logout(scope) {
         logoutCalls.push(scope)
       },
-      getLoginPath(scope) {
-        return scope === 'admin' ? '/admin-login' : '/login'
+      getLoginPath() {
+        return '/admin-login'
       },
     },
     __authBus__: {

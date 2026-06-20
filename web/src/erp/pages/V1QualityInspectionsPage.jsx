@@ -743,7 +743,7 @@ export default function V1QualityInspectionsPage() {
         title: '判定备注',
         exportTitle: '判定备注',
         dataIndex: 'decision_note',
-        ellipsis: true,
+        width: 300,
       },
     ],
     [
@@ -884,8 +884,7 @@ export default function V1QualityInspectionsPage() {
         title: '判定备注',
         exportTitle: '判定备注',
         dataIndex: 'decision_note',
-        width: 220,
-        ellipsis: true,
+        width: 300,
       },
     ],
     [

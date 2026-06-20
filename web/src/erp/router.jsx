@@ -30,9 +30,7 @@ import {
 import { getAllowedMobileRoleKeys } from './utils/mobileRolePermissions.mjs'
 import { canOpenPrintWorkspaceFromWindowState } from './utils/printWorkspace.js'
 
-const AdminUsersPage = lazy(() => import('@/pages/AdminUsers'))
 const AdminLoginPage = lazy(() => import('@/pages/AdminLogin'))
-const LoginPage = lazy(() => import('@/pages/Login'))
 const EntrySelectionPage = lazy(() => import('./pages/EntrySelectionPage'))
 const BusinessDashboardPage = lazy(
   () => import('./pages/BusinessDashboardPage')
@@ -249,7 +247,7 @@ export default function ERPRouter() {
           <Route path={DEV_TESTING_ROUTE} element={<DevTestingPage />} />
         ) : null}
         <Route path="/" element={<RootEntryRedirect />} />
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={<Navigate to="/admin-login" replace />} />
         <Route path="/admin-login" element={<AdminLoginPage />} />
         <Route
           path="/entry"
@@ -262,15 +260,11 @@ export default function ERPRouter() {
 
         <Route
           path="/admin-accounts"
-          element={
-            <AuthGuard requireAdmin>
-              <AdminUsersPage />
-            </AuthGuard>
-          }
+          element={<Navigate to="/erp/system/permissions" replace />}
         />
         <Route
           path="/admin-users"
-          element={<Navigate to="/admin-accounts" replace />}
+          element={<Navigate to="/erp/system/permissions" replace />}
         />
 
         <Route

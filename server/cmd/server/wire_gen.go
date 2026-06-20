@@ -29,16 +29,11 @@ func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger, tr
 	if err != nil {
 		return nil, nil, err
 	}
-	authRepo := data.NewAuthRepo(dataData, logger)
-	tokenGenerator := data.NewTokenGenerator(confData, logger)
-	authUsecase := biz.NewAuthUsecase(authRepo, tokenGenerator, logger, tracerProvider)
 	adminAuthRepo := data.NewAdminAuthRepo(dataData, logger)
 	adminTokenGenerator := data.NewAdminTokenGenerator(confData, logger)
 	adminAuthUsecase := biz.NewAdminAuthUsecase(adminAuthRepo, adminTokenGenerator, logger, tracerProvider)
 	adminManageRepo := data.NewAdminManageRepo(dataData, logger)
 	adminManageUsecase := biz.NewAdminManageUsecase(adminManageRepo, logger, tracerProvider)
-	userAdminRepo := data.NewUserAdminRepo(dataData, logger)
-	userAdminUsecase := biz.NewUserAdminUsecase(userAdminRepo, logger, tracerProvider)
 	workflowRepo := data.NewWorkflowRepo(dataData, logger)
 	workflowUsecase := biz.NewWorkflowUsecase(workflowRepo)
 	debugSeedRepo := data.NewDebugSeedRepo(dataData, logger)
@@ -56,7 +51,7 @@ func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger, tr
 	inventoryUsecase := biz.NewInventoryUsecase(inventoryRepo)
 	operationalFactRepo := data.NewOperationalFactRepo(dataData, logger)
 	operationalFactUsecase := biz.NewOperationalFactUsecase(operationalFactRepo)
-	jsonrpcService := service.NewJsonrpcService(confData, logger, authUsecase, adminAuthUsecase, adminManageUsecase, userAdminUsecase, workflowUsecase, debugUsecase, masterDataUsecase, salesOrderUsecase, purchaseOrderUsecase, outsourcingOrderUsecase, inventoryUsecase, operationalFactUsecase, adminAuthRepo)
+	jsonrpcService := service.NewJsonrpcService(confData, logger, adminAuthUsecase, adminManageUsecase, workflowUsecase, debugUsecase, masterDataUsecase, salesOrderUsecase, purchaseOrderUsecase, outsourcingOrderUsecase, inventoryUsecase, operationalFactUsecase, adminAuthRepo)
 	grpcServer := server.NewGRPCServer(confServer, logger, jsonrpcService, tracerProvider, dataData)
 	httpServer := server.NewHTTPServer(confServer, logger, jsonrpcService, tracerProvider, dataData, confData)
 	app := newApp(logger, grpcServer, httpServer)

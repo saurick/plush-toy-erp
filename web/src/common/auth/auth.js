@@ -150,8 +150,8 @@ export function getAuthMeta(scope, key) {
   return raw
 }
 
-export function getLoginPath(scope = AUTH_SCOPE.USER) {
-  return normalizeScope(scope) === AUTH_SCOPE.ADMIN ? '/admin-login' : '/login'
+export function getLoginPath(_scope = AUTH_SCOPE.USER) {
+  return '/admin-login'
 }
 
 export function logout(scope = AUTH_SCOPE.USER) {

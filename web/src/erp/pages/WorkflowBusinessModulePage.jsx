@@ -556,8 +556,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           exportTitle: '原因 / 备注',
           dataIndex: 'blocked_reason',
           key: 'reason',
-          width: 260,
-          ellipsis: true,
+          width: 340,
           render: (_, record) =>
             getWorkflowTaskReason(record) || '按 Workflow 任务上下文处理',
           exportValue: (record) => getWorkflowTaskReason(record),

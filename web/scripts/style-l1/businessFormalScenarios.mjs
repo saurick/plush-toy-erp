@@ -573,7 +573,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '库存台账')
         await expectText(page, '余额只读')
-        await expectText(page, '内部筛选')
+        await expectText(page, '页面模式')
         await expectText(page, '12.5')
         await expectText(page, '已预留')
         await expectText(page, '4')
@@ -592,8 +592,6 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-standard-inventory',
         })
         let forceEmptyInventoryBalances = false
-        const inventoryEmptySearchKeyword =
-          'NO-MATCH-business-standard-inventory-balances-empty-search'
         await page.route('**/rpc/inventory', async (route) => {
           const body = route.request().postDataJSON() || {}
           if (
@@ -626,19 +624,14 @@ export function createBusinessFormalScenarios(deps) {
         })
         await page.getByText('12.5', { exact: false }).first().click()
         forceEmptyInventoryBalances = true
-        await page
-          .getByPlaceholder('搜索对象类型 / 内部引用')
-          .first()
-          .fill(inventoryEmptySearchKeyword)
-        await page.keyboard.press('Enter')
+        await page.getByRole('button', { name: '刷新当前页' }).click()
         await assertBusinessTableEmptyState(page, {
           scenarioName: 'business-standard-inventory-balances-empty-search',
           emptyText: '暂无库存余额',
           staleText: '12.5',
         })
         forceEmptyInventoryBalances = false
-        await page.getByPlaceholder('搜索对象类型 / 内部引用').first().fill('')
-        await page.keyboard.press('Enter')
+        await page.getByRole('button', { name: '刷新当前页' }).click()
         await expectText(page, '12.5')
 
         await page.getByRole('tab', { name: '库存批次' }).click()

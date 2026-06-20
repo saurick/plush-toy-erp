@@ -1,15 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { DownOutlined, LinkOutlined } from '@ant-design/icons'
-import {
-  Button,
-  Card,
-  Dropdown,
-  Empty,
-  InputNumber,
-  Table,
-  Tabs,
-  Tag,
-} from 'antd'
+import { Button, Card, Dropdown, Empty, Table, Tabs, Tag } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -101,7 +92,6 @@ const SUBJECT_TYPE_LABELS = Object.freeze({
 })
 
 const SEARCH_PLACEHOLDERS = Object.freeze({
-  [VIEW_BALANCES]: '搜索对象类型 / 内部引用',
   [VIEW_LOTS]: '搜索批次号 / 供应商批次 / 色号',
   [VIEW_TXNS]: '搜索来源 / 备注 / 幂等键',
 })
@@ -148,13 +138,6 @@ const SOURCE_TYPE_LABELS = Object.freeze(
     ])
   )
 )
-
-function positiveInt(value) {
-  const numeric = Number(value || 0)
-  return Number.isFinite(numeric) && numeric > 0
-    ? Math.trunc(numeric)
-    : undefined
-}
 
 function dash(value) {
   return value === null || value === undefined || value === '' ? '-' : value
@@ -278,13 +261,9 @@ export default function V1InventoryLedgerPage() {
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
   const [subjectType, setSubjectType] = useState('')
-  const [subjectID, setSubjectID] = useState()
-  const [warehouseID, setWarehouseID] = useState()
-  const [lotID, setLotID] = useState()
   const [lotStatus, setLotStatus] = useState('')
   const [txnType, setTxnType] = useState('')
   const [sourceType, setSourceType] = useState('')
-  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false)
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [loading, setLoading] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
@@ -294,8 +273,8 @@ export default function V1InventoryLedgerPage() {
     try {
       const commonParams = compactParams({
         subject_type: subjectType,
-        subject_id: positiveInt(subjectID),
-        keyword: trimOptional(keyword),
+        keyword:
+          activeView === VIEW_BALANCES ? undefined : trimOptional(keyword),
         ...getBusinessPaginationParams(pagination),
       })
       let data
@@ -310,20 +289,12 @@ export default function V1InventoryLedgerPage() {
         data = await listInventoryTxns(
           compactParams({
             ...commonParams,
-            warehouse_id: positiveInt(warehouseID),
-            lot_id: positiveInt(lotID),
             txn_type: txnType,
             source_type: trimOptional(sourceType),
           })
         )
       } else {
-        data = await listInventoryBalances(
-          compactParams({
-            ...commonParams,
-            warehouse_id: positiveInt(warehouseID),
-            lot_id: positiveInt(lotID),
-          })
-        )
+        data = await listInventoryBalances(commonParams)
       }
       const nextRows = getRowsFromData(activeView, data)
       setRows(nextRows)
@@ -341,14 +312,11 @@ export default function V1InventoryLedgerPage() {
   }, [
     activeView,
     keyword,
-    lotID,
     lotStatus,
     pagination,
     sourceType,
-    subjectID,
     subjectType,
     txnType,
-    warehouseID,
   ])
 
   useEffect(() => {
@@ -363,13 +331,6 @@ export default function V1InventoryLedgerPage() {
     resetBusinessPaginationCurrent(setPagination)
   }, [])
 
-  const clearInternalFilters = useCallback(() => {
-    setSubjectID(undefined)
-    setWarehouseID(undefined)
-    setLotID(undefined)
-    resetCurrentPage()
-  }, [resetCurrentPage])
-
   const handleViewChange = useCallback(
     (nextView) => {
       setActiveView(nextView)
@@ -383,42 +344,16 @@ export default function V1InventoryLedgerPage() {
   const selectedRowKey = selectedRow
     ? `${activeView}-${selectedRow.id}`
     : undefined
-  const internalFilterCount = [subjectID, warehouseID, lotID].filter(
-    positiveInt
-  ).length
   const relatedMenuItems = useMemo(() => {
     if (!selectedRow) return []
-    const items = []
-    if (activeView !== VIEW_LOTS && selectedRow.lot_id) {
-      items.push({ key: 'lot', label: '库存批次' })
-    }
-    if (activeView !== VIEW_TXNS) {
-      items.push({ key: 'txns', label: '库存流水' })
-    }
     if (activeView === VIEW_TXNS && sourceRouteFor(selectedRow.source_type)) {
-      items.push({ key: 'source', label: '来源单据' })
+      return [{ key: 'source', label: '来源单据' }]
     }
-    return items
+    return []
   }, [activeView, selectedRow])
 
   const openRelatedTable = ({ key }) => {
     if (!selectedRow) return
-    if (key === 'lot' && selectedRow.lot_id) {
-      setLotID(selectedRow.lot_id)
-      setAdvancedFiltersOpen(true)
-      setActiveView(VIEW_LOTS)
-      resetCurrentPage()
-      return
-    }
-    if (key === 'txns') {
-      if (selectedRow.lot_id) {
-        setLotID(selectedRow.lot_id)
-        setAdvancedFiltersOpen(true)
-      }
-      setActiveView(VIEW_TXNS)
-      resetCurrentPage()
-      return
-    }
     if (key === 'source') {
       const targetPath = sourceRouteFor(selectedRow.source_type)
       if (targetPath) navigate(targetPath)
@@ -430,13 +365,9 @@ export default function V1InventoryLedgerPage() {
       { key: 'view', label: '当前视图', value: activeLabel },
       { key: 'total', label: '匹配记录', value: total },
       { key: 'current', label: '当前页', value: rows.length },
-      {
-        key: 'internal',
-        label: '内部筛选',
-        value: internalFilterCount ? `${internalFilterCount} 项` : '未启用',
-      },
+      { key: 'mode', label: '页面模式', value: '只读' },
     ],
-    [activeLabel, internalFilterCount, rows.length, total]
+    [activeLabel, rows.length, total]
   )
 
   const columns = useMemo(() => {
@@ -615,10 +546,9 @@ export default function V1InventoryLedgerPage() {
         {
           title: '幂等键',
           dataIndex: 'idempotency_key',
-          width: 190,
-          ellipsis: true,
+          width: 280,
         },
-        { title: '备注', dataIndex: 'note', width: 180, ellipsis: true },
+        { title: '备注', dataIndex: 'note', width: 300 },
       ]
     }
 
@@ -738,15 +668,17 @@ export default function V1InventoryLedgerPage() {
         compact
         filters={
           <>
-            <SearchInput
-              value={keyword}
-              placeholder={SEARCH_PLACEHOLDERS[activeView]}
-              onChange={(event) => {
-                setKeyword(event.target.value)
-                resetCurrentPage()
-              }}
-              onPressEnter={loadRows}
-            />
+            {activeView !== VIEW_BALANCES ? (
+              <SearchInput
+                value={keyword}
+                placeholder={SEARCH_PLACEHOLDERS[activeView]}
+                onChange={(event) => {
+                  setKeyword(event.target.value)
+                  resetCurrentPage()
+                }}
+                onPressEnter={loadRows}
+              />
+            ) : null}
             <SelectFilter
               className="erp-business-filter-control--status"
               value={subjectType}
@@ -787,58 +719,6 @@ export default function V1InventoryLedgerPage() {
                     resetCurrentPage()
                   }}
                 />
-              </>
-            ) : null}
-            <Button
-              size="small"
-              type={advancedFiltersOpen ? 'primary' : 'default'}
-              onClick={() => setAdvancedFiltersOpen((open) => !open)}
-            >
-              内部引用筛选
-              {internalFilterCount ? `（${internalFilterCount}）` : ''}
-            </Button>
-            {advancedFiltersOpen ? (
-              <>
-                <InputNumber
-                  className="erp-business-filter-control"
-                  min={1}
-                  precision={0}
-                  placeholder="对象内部 ID"
-                  value={subjectID}
-                  onChange={(nextValue) => {
-                    setSubjectID(nextValue)
-                    resetCurrentPage()
-                  }}
-                />
-                {activeView !== VIEW_LOTS ? (
-                  <>
-                    <InputNumber
-                      className="erp-business-filter-control"
-                      min={1}
-                      precision={0}
-                      placeholder="仓库内部 ID"
-                      value={warehouseID}
-                      onChange={(nextValue) => {
-                        setWarehouseID(nextValue)
-                        resetCurrentPage()
-                      }}
-                    />
-                    <InputNumber
-                      className="erp-business-filter-control"
-                      min={1}
-                      precision={0}
-                      placeholder="批次内部 ID"
-                      value={lotID}
-                      onChange={(nextValue) => {
-                        setLotID(nextValue)
-                        resetCurrentPage()
-                      }}
-                    />
-                  </>
-                ) : null}
-                <Button size="small" onClick={clearInternalFilters}>
-                  清空内部引用
-                </Button>
               </>
             ) : null}
           </>

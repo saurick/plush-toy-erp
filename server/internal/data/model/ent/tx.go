@@ -90,8 +90,6 @@ type Tx struct {
 	Supplier *SupplierClient
 	// Unit is the client for interacting with the Unit builders.
 	Unit *UnitClient
-	// User is the client for interacting with the User builders.
-	User *UserClient
 	// Warehouse is the client for interacting with the Warehouse builders.
 	Warehouse *WarehouseClient
 	// WorkflowBusinessState is the client for interacting with the WorkflowBusinessState builders.
@@ -270,7 +268,6 @@ func (tx *Tx) init() {
 	tx.StockReservation = NewStockReservationClient(tx.config)
 	tx.Supplier = NewSupplierClient(tx.config)
 	tx.Unit = NewUnitClient(tx.config)
-	tx.User = NewUserClient(tx.config)
 	tx.Warehouse = NewWarehouseClient(tx.config)
 	tx.WorkflowBusinessState = NewWorkflowBusinessStateClient(tx.config)
 	tx.WorkflowTask = NewWorkflowTaskClient(tx.config)

@@ -46,8 +46,8 @@ const COLLABORATION_PANEL_DEFAULT_HEIGHT = 260
 const COLLABORATION_PANEL_MIN_HEIGHT = 240
 const COLLABORATION_PANEL_MAX_HEIGHT = 560
 const BUSINESS_TABLE_DEFAULT_SCROLL_X = 960
-const BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH = 132
-const BUSINESS_TABLE_MIN_COLUMN_WIDTH = 72
+const BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH = 160
+const BUSINESS_TABLE_MIN_COLUMN_WIDTH = 88
 const BUSINESS_TABLE_SELECTION_COLUMN_WIDTH = 52
 const DATE_INPUT_VALUE_FORMAT = 'YYYY-MM-DD'
 const DATE_INPUT_DISPLAY_FORMAT = 'YYYY/MM/DD'
@@ -83,6 +83,26 @@ function resolveBusinessTableColumnWidth(column = {}) {
   }
 
   return BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH
+}
+
+function normalizeBusinessTableColumn(column) {
+  if (!column || typeof column !== 'object') {
+    return column
+  }
+
+  const nextColumn = { ...column }
+  delete nextColumn.ellipsis
+  if (Array.isArray(nextColumn.children)) {
+    nextColumn.children = nextColumn.children.map(normalizeBusinessTableColumn)
+  }
+
+  return nextColumn
+}
+
+function normalizeBusinessTableColumns(columns = []) {
+  return (Array.isArray(columns) ? columns : []).map(
+    normalizeBusinessTableColumn
+  )
 }
 
 function resolveBusinessTableScrollX({ columns = [], rowSelection, scrollX }) {
@@ -652,6 +672,10 @@ export function BusinessDataTable({
   pagination,
   emptyDescription = '暂无业务记录，点击“新建记录”开始落盘',
 }) {
+  const resolvedColumns = React.useMemo(
+    () => normalizeBusinessTableColumns(columns),
+    [columns]
+  )
   const resolvedRowSelection = React.useMemo(
     () => resolveBusinessTableRowSelection(rowSelection),
     [rowSelection]
@@ -664,12 +688,12 @@ export function BusinessDataTable({
     return {
       ...baseScroll,
       x: resolveBusinessTableScrollX({
-        columns,
+        columns: resolvedColumns,
         rowSelection: resolvedRowSelection,
         scrollX: baseScroll.x,
       }),
     }
-  }, [columns, resolvedRowSelection, scroll])
+  }, [resolvedColumns, resolvedRowSelection, scroll])
 
   return (
     <Card className="erp-business-data-table-card erp-business-module-table-card">
@@ -677,7 +701,7 @@ export function BusinessDataTable({
       <Table
         loading={loading}
         rowKey={rowKey}
-        columns={columns}
+        columns={resolvedColumns}
         dataSource={dataSource}
         expandable={expandable}
         scroll={resolvedScroll}

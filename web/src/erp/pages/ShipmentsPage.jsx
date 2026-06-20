@@ -850,15 +850,14 @@ export default function ShipmentsPage() {
           title: '出货单号',
           exportTitle: '出货单号',
           dataIndex: 'shipment_no',
-          width: 180,
-          ellipsis: true,
+          width: 280,
           sortType: 'text',
         },
         {
           title: '内部记录',
           exportTitle: '内部记录',
           dataIndex: 'id',
-          width: 72,
+          width: 112,
           sortType: 'number',
           render: (value) => (value ? `主键 ${value}` : '-'),
           exportValue: (record) => (record?.id ? `主键 ${record.id}` : ''),
@@ -883,7 +882,7 @@ export default function ShipmentsPage() {
         {
           title: '客户',
           exportTitle: '客户',
-          width: 160,
+          width: 260,
           sortValue: (record) =>
             record.customer_snapshot ||
             (record.customer_id ? `客户 #${record.customer_id}` : ''),
@@ -893,7 +892,6 @@ export default function ShipmentsPage() {
           exportValue: (record) =>
             record.customer_snapshot ||
             (record.customer_id ? `客户 #${record.customer_id}` : ''),
-          ellipsis: true,
         },
         {
           title: '明细行',
@@ -933,7 +931,7 @@ export default function ShipmentsPage() {
           title: '备注',
           exportTitle: '备注',
           dataIndex: 'note',
-          ellipsis: true,
+          width: 320,
           sortable: false,
         },
       ]),

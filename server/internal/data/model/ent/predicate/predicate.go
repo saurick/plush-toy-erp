@@ -123,9 +123,6 @@ type Supplier func(*sql.Selector)
 // Unit is the predicate function for unit builders.
 type Unit func(*sql.Selector)
 
-// User is the predicate function for user builders.
-type User func(*sql.Selector)
-
 // Warehouse is the predicate function for warehouse builders.
 type Warehouse func(*sql.Selector)
 

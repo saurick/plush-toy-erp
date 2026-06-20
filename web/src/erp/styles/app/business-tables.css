@@ -1033,9 +1033,9 @@
 
 .ant-table-wrapper .ant-table-thead > tr > th .ant-table-column-title {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .ant-table-wrapper
@@ -1088,9 +1088,9 @@
   > tr
   > th
   .ant-table-column-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .erp-module-column-header {
@@ -1102,13 +1102,13 @@
   max-width: 100%;
   align-items: center;
   justify-content: flex-start;
-  padding-right: 14px;
-  white-space: nowrap;
+  padding-right: 16px;
+  white-space: normal;
   pointer-events: none;
 }
 
 .erp-business-module-table-card .erp-module-column-header {
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .erp-module-column-header-text {
@@ -1116,9 +1116,9 @@
   flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
   word-break: normal;
   overflow-wrap: normal;
   line-height: 1.35;

@@ -19,10 +19,8 @@ import (
 type jsonrpcDispatcher struct {
 	log *log.Helper
 
-	authUC             *biz.AuthUsecase
 	adminAuthUC        *biz.AdminAuthUsecase
 	adminManageUC      *biz.AdminManageUsecase
-	userAdminUC        *biz.UserAdminUsecase
 	workflowUC         *biz.WorkflowUsecase
 	debugUC            *biz.DebugUsecase
 	masterDataUC       *biz.MasterDataUsecase
@@ -39,10 +37,8 @@ type jsonrpcDispatcher struct {
 func newJSONRPCDispatcher(
 	c *conf.Data,
 	logger log.Logger,
-	authUC *biz.AuthUsecase,
 	adminAuthUC *biz.AdminAuthUsecase,
 	adminManageUC *biz.AdminManageUsecase,
-	userAdminUC *biz.UserAdminUsecase,
 	workflowUC *biz.WorkflowUsecase,
 	debugUC *biz.DebugUsecase,
 	masterDataUC *biz.MasterDataUsecase,
@@ -55,17 +51,11 @@ func newJSONRPCDispatcher(
 ) *jsonrpcDispatcher {
 	helper := log.NewHelper(log.With(logger, "module", "service.jsonrpc"))
 
-	if authUC == nil {
-		panic("newJSONRPCDispatcher: authUC is nil")
-	}
 	if adminAuthUC == nil {
 		panic("newJSONRPCDispatcher: adminAuthUC is nil")
 	}
 	if adminManageUC == nil {
 		panic("newJSONRPCDispatcher: adminManageUC is nil")
-	}
-	if userAdminUC == nil {
-		panic("newJSONRPCDispatcher: userAdminUC is nil")
 	}
 	if workflowUC == nil {
 		panic("newJSONRPCDispatcher: workflowUC is nil")
@@ -100,10 +90,8 @@ func newJSONRPCDispatcher(
 
 	return &jsonrpcDispatcher{
 		log:                helper,
-		authUC:             authUC,
 		adminAuthUC:        adminAuthUC,
 		adminManageUC:      adminManageUC,
-		userAdminUC:        userAdminUC,
 		workflowUC:         workflowUC,
 		debugUC:            debugUC,
 		masterDataUC:       masterDataUC,
@@ -151,8 +139,6 @@ func (d *jsonrpcDispatcher) Handle(
 		return d.handleAuth(ctx, method, id, params)
 	case "admin":
 		return d.handleAdmin(ctx, method, id, params)
-	case "user":
-		return d.handleUser(ctx, method, id, params)
 	case "workflow":
 		return d.handleWorkflow(ctx, method, id, params)
 	case "business":

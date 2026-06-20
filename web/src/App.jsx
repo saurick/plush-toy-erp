@@ -34,7 +34,7 @@ function AppContent() {
         search: window.location.search,
         hash: window.location.hash,
       }
-      const targetLoginPath = loginPath || '/login'
+      const targetLoginPath = loginPath || '/admin-login'
 
       if (isMobileExperience) {
         navigate(targetLoginPath, {

@@ -485,17 +485,7 @@ export function setupJsonRpcMockServer() {
           },
         })
       } else if (method === 'login') {
-        // 模拟一个简单登录规则：username === 'error' 时返回业务错误
-        if (params.username === 'error') {
-          responseBody = makeJsonRpcBizError(id, 401, 'invalid username')
-        } else {
-          responseBody = makeJsonRpcSuccess(id, {
-            login: {
-              userId: 'mock-user-001',
-              nickname: params.username || 'mock-nickname',
-            },
-          })
-        }
+        responseBody = makeJsonRpcBizError(id, 404, 'auth: 未知方法=login')
       } else if (method === 'admin_login') {
         responseBody = {
           jsonrpc: '2.0',
@@ -510,37 +500,50 @@ export function setupJsonRpcMockServer() {
           error: '',
         }
       } else if (method === 'send_sms_code') {
-        responseBody = {
-          jsonrpc: '2.0',
-          id,
-          result: makeBizResult({
-            phone: params.phone || '13800138000',
-            expires_at: Math.floor(Date.now() / 1000) + 300,
-            resend_after: Math.floor(Date.now() / 1000) + 60,
-            mock_delivery: true,
-            mock_code: '123456',
-          }),
-          error: '',
+        if ((params.scope || '') !== 'admin') {
+          responseBody = makeJsonRpcBizError(id, 400, '普通用户短信登录已停用')
+        } else {
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({
+              phone: params.phone || '13800138000',
+              expires_at: Math.floor(Date.now() / 1000) + 300,
+              resend_after: Math.floor(Date.now() / 1000) + 60,
+              mock_delivery: true,
+              mock_code: '123456',
+            }),
+            error: '',
+          }
         }
       } else if (method === 'sms_login') {
+        if ((params.scope || '') !== 'admin') {
+          responseBody = makeJsonRpcBizError(id, 400, '普通用户短信登录已停用')
+        } else {
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({
+              ...mockSuperAdminProfile,
+              access_token: 'mock-admin-token',
+              expires_at: Math.floor(Date.now() / 1000) + 3600,
+              token_type: 'Bearer',
+              phone: params.phone || mockSuperAdminProfile.phone,
+            }),
+            error: '',
+          }
+        }
+      } else if (method === 'logout') {
         responseBody = {
           jsonrpc: '2.0',
           id,
           result: makeBizResult({
-            ...mockSuperAdminProfile,
-            access_token: 'mock-admin-token',
-            expires_at: Math.floor(Date.now() / 1000) + 3600,
-            token_type: 'Bearer',
-            phone: params.phone || mockSuperAdminProfile.phone,
+            logout: {
+              success: true,
+            },
           }),
           error: '',
         }
-      } else if (method === 'logout') {
-        responseBody = makeJsonRpcSuccess(id, {
-          logout: {
-            success: true,
-          },
-        })
       } else {
         responseBody = makeJsonRpcBizError(
           id,
@@ -625,42 +628,11 @@ export function setupJsonRpcMockServer() {
         )
       }
     } else if (domain === 'user') {
-      if (method === 'list') {
-        responseBody = {
-          jsonrpc: '2.0',
-          id,
-          result: makeBizResult({
-            users: [
-              {
-                id: 8,
-                username: 'mock-worker',
-                disabled: false,
-                created_at: nowUnix(),
-                last_login_at: nowUnix(),
-              },
-            ],
-            total: 1,
-          }),
-          error: '',
-        }
-      } else if (method === 'set_disabled' || method === 'reset_password') {
-        responseBody = {
-          jsonrpc: '2.0',
-          id,
-          result: makeBizResult({
-            success: true,
-            user_id: Number(params.user_id || 8),
-            disabled: Boolean(params.disabled),
-          }),
-          error: '',
-        }
-      } else {
-        responseBody = makeJsonRpcBizError(
-          id,
-          400,
-          `unknown user method: ${method}`
-        )
-      }
+      responseBody = makeJsonRpcBizError(
+        id,
+        404,
+        `unknown jsonrpc url=${domain}`
+      )
     } else if (domain === 'business') {
       if (method === 'dashboard_stats') {
         responseBody = {

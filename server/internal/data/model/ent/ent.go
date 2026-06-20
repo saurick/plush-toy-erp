@@ -46,7 +46,6 @@ import (
 	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
-	"server/internal/data/model/ent/user"
 	"server/internal/data/model/ent/warehouse"
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
@@ -155,7 +154,6 @@ func checkColumn(t, c string) error {
 			stockreservation.Table:              stockreservation.ValidColumn,
 			supplier.Table:                      supplier.ValidColumn,
 			unit.Table:                          unit.ValidColumn,
-			user.Table:                          user.ValidColumn,
 			warehouse.Table:                     warehouse.ValidColumn,
 			workflowbusinessstate.Table:         workflowbusinessstate.ValidColumn,
 			workflowtask.Table:                  workflowtask.ValidColumn,

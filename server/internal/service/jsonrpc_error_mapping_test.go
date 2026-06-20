@@ -37,20 +37,6 @@ func TestJsonrpcDispatcher_AuthMe_UnauthorizedUsesAuthRequired(t *testing.T) {
 	}
 }
 
-func TestJsonrpcDispatcher_ErrorMappers_NoPermissionUsesPermissionDenied(t *testing.T) {
-	j := &jsonrpcDispatcher{
-		log: log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
-	}
-
-	userRes := j.mapUserAdminError(context.Background(), biz.ErrNoPermission)
-	if userRes == nil {
-		t.Fatalf("expected user result not nil")
-	}
-	if userRes.Code != errcode.PermissionDenied.Code {
-		t.Fatalf("expected user code=%d, got %d", errcode.PermissionDenied.Code, userRes.Code)
-	}
-}
-
 func TestJsonrpcDispatcher_RequireAdmin_DisabledAdminUsesAdminDisabled(t *testing.T) {
 	j := &jsonrpcDispatcher{
 		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),

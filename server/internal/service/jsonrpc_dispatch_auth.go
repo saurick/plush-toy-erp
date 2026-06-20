@@ -32,32 +32,6 @@ func (d *jsonrpcDispatcher) handleAuth(
 			Data:    newDataStruct(d.authCapabilitiesToMap()),
 		}, nil
 
-	case "login":
-		username := getString(pm, "username")
-		password := getString(pm, "password")
-
-		if username == "" || password == "" {
-			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "缺少用户名或密码"}, nil
-		}
-
-		token, expireAt, user, err := d.authUC.Login(ctx, username, password)
-		if err != nil {
-			return id, d.mapAuthError(ctx, err), nil
-		}
-
-		return id, &v1.JsonrpcResult{
-			Code:    errcode.OK.Code,
-			Message: "登录成功",
-			Data: newDataStruct(map[string]any{
-				"user_id":      user.ID,
-				"username":     user.Username,
-				"access_token": token,
-				"expires_at":   expireAt.Unix(),
-				"token_type":   "Bearer",
-				"issued_at":    time.Now().Unix(),
-			}),
-		}, nil
-
 	case "send_sms_code":
 		if !d.authSMS.Enabled {
 			return id, &v1.JsonrpcResult{
@@ -72,19 +46,14 @@ func (d *jsonrpcDispatcher) handleAuth(
 		if scopeErr != nil {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "登录类型不合法"}, nil
 		}
+		if scope != "admin" {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "普通用户短信登录已停用"}, nil
+		}
 		if phone == "" {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "缺少手机号"}, nil
 		}
 
-		var (
-			challenge *biz.SMSLoginChallenge
-			err       error
-		)
-		if scope == "admin" {
-			challenge, err = d.adminAuthUC.RequestSMSLoginCode(ctx, phone, mobileRoleKey)
-		} else {
-			challenge, err = d.authUC.RequestSMSLoginCode(ctx, phone)
-		}
+		challenge, err := d.adminAuthUC.RequestSMSLoginCode(ctx, phone, mobileRoleKey)
 		if err != nil {
 			return id, d.mapAuthError(ctx, err), nil
 		}
@@ -116,29 +85,14 @@ func (d *jsonrpcDispatcher) handleAuth(
 		if scopeErr != nil {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "登录类型不合法"}, nil
 		}
+		if scope != "admin" {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "普通用户短信登录已停用"}, nil
+		}
 		if phone == "" || code == "" {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "缺少手机号或验证码"}, nil
 		}
 
-		if scope == "admin" {
-			token, expireAt, admin, err := d.adminAuthUC.LoginWithSMSCode(ctx, phone, code, mobileRoleKey)
-			if err != nil {
-				return id, d.mapAuthError(ctx, err), nil
-			}
-
-			return id, &v1.JsonrpcResult{
-				Code:    errcode.OK.Code,
-				Message: "登录成功",
-				Data: newDataStruct(adminProfileToMap(admin, map[string]any{
-					"access_token": token,
-					"expires_at":   expireAt.Unix(),
-					"token_type":   "Bearer",
-					"issued_at":    time.Now().Unix(),
-				})),
-			}, nil
-		}
-
-		token, expireAt, user, err := d.authUC.LoginWithSMSCode(ctx, phone, code)
+		token, expireAt, admin, err := d.adminAuthUC.LoginWithSMSCode(ctx, phone, code, mobileRoleKey)
 		if err != nil {
 			return id, d.mapAuthError(ctx, err), nil
 		}
@@ -146,14 +100,12 @@ func (d *jsonrpcDispatcher) handleAuth(
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.OK.Code,
 			Message: "登录成功",
-			Data: newDataStruct(map[string]any{
-				"user_id":      user.ID,
-				"username":     user.Username,
+			Data: newDataStruct(adminProfileToMap(admin, map[string]any{
 				"access_token": token,
 				"expires_at":   expireAt.Unix(),
 				"token_type":   "Bearer",
 				"issued_at":    time.Now().Unix(),
-			}),
+			})),
 		}, nil
 
 	case "admin_login":
@@ -219,28 +171,7 @@ func (d *jsonrpcDispatcher) handleAuth(
 			}, nil
 		}
 
-		u, err := d.authUC.GetCurrentUser(ctx, claims.UserID)
-		if err != nil {
-			d.log.WithContext(ctx).Warnf("auth.me GetCurrentUser failed uid=%d err=%v", claims.UserID, err)
-			return id, &v1.JsonrpcResult{Code: errcode.AuthCurrentUserFailed.Code, Message: errcode.AuthCurrentUserFailed.Message}, nil
-		}
-
-		data := map[string]any{
-			"id":         u.ID,
-			"username":   u.Username,
-			"role":       u.Role,
-			"disabled":   u.Disabled,
-			"created_at": u.CreatedAt.Unix(),
-		}
-		if u.LastLoginAt != nil {
-			data["last_login_at"] = u.LastLoginAt.Unix()
-		}
-
-		return id, &v1.JsonrpcResult{
-			Code:    errcode.OK.Code,
-			Message: errcode.OK.Message,
-			Data:    newDataStruct(data),
-		}, nil
+		return id, &v1.JsonrpcResult{Code: errcode.AuthRequired.Code, Message: errcode.AuthRequired.Message}, nil
 
 	default:
 		return id, &v1.JsonrpcResult{
@@ -283,12 +214,6 @@ func (d *jsonrpcDispatcher) mapAuthError(ctx context.Context, err error) *v1.Jso
 		return &v1.JsonrpcResult{
 			Code:    errcode.AuthUserDisabled.Code,
 			Message: errcode.AuthUserDisabled.Message,
-		}
-	case biz.ErrUserExists:
-		logger.Warn("[auth] user already exists")
-		return &v1.JsonrpcResult{
-			Code:    errcode.AuthUserExists.Code,
-			Message: errcode.AuthUserExists.Message,
 		}
 	case biz.ErrInvalidPhoneNumber:
 		logger.Warn("[auth] invalid phone number")

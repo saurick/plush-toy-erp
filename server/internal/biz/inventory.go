@@ -306,6 +306,10 @@ type InventoryTxnApplyResult struct {
 }
 
 type InventoryRepo interface {
+	MaterialIsActive(ctx context.Context, id int) (bool, error)
+	ProductIsActive(ctx context.Context, id int) (bool, error)
+	UnitIsActive(ctx context.Context, id int) (bool, error)
+	WarehouseIsActive(ctx context.Context, id int) (bool, error)
 	CreateInventoryLot(ctx context.Context, in *InventoryLotCreate) (*InventoryLot, error)
 	GetInventoryLot(ctx context.Context, id int) (*InventoryLot, error)
 	ChangeInventoryLotStatus(ctx context.Context, lotID int, newStatus string, reason string) (*InventoryLot, error)
@@ -467,6 +471,9 @@ func (uc *InventoryUsecase) CreateBOMHeader(ctx context.Context, in *BOMHeaderCr
 	if err != nil {
 		return nil, err
 	}
+	if err := requireActiveReference(ctx, normalized.ProductID, uc.repo.ProductIsActive, ErrProductInactive); err != nil {
+		return nil, err
+	}
 	return uc.repo.CreateBOMHeader(ctx, &normalized)
 }
 
@@ -476,6 +483,9 @@ func (uc *InventoryUsecase) CreateBOMItem(ctx context.Context, in *BOMItemCreate
 	}
 	normalized, err := normalizeBOMItemCreate(*in)
 	if err != nil {
+		return nil, err
+	}
+	if err := uc.validateBOMItemActiveReferences(ctx, normalized.MaterialID, normalized.UnitID); err != nil {
 		return nil, err
 	}
 	return uc.repo.CreateBOMItem(ctx, &normalized)
@@ -498,6 +508,9 @@ func (uc *InventoryUsecase) UpdateBOMDraftItem(ctx context.Context, id int, in *
 	}
 	normalized, err := normalizeBOMItemUpdate(*in)
 	if err != nil {
+		return nil, err
+	}
+	if err := uc.validateBOMItemActiveReferences(ctx, normalized.MaterialID, normalized.UnitID); err != nil {
 		return nil, err
 	}
 	return uc.repo.UpdateBOMDraftItem(ctx, id, &normalized)
@@ -565,6 +578,9 @@ func (uc *InventoryUsecase) CopyBOMVersion(ctx context.Context, sourceHeaderID i
 	if err != nil {
 		return nil, err
 	}
+	if err := requireActiveReference(ctx, normalized.ProductID, uc.repo.ProductIsActive, ErrProductInactive); err != nil {
+		return nil, err
+	}
 	normalized.Status = BOMStatusDraft
 	return uc.repo.CopyBOMVersion(ctx, sourceHeaderID, &normalized)
 }
@@ -572,6 +588,24 @@ func (uc *InventoryUsecase) CopyBOMVersion(ctx context.Context, sourceHeaderID i
 func (uc *InventoryUsecase) ActivateBOMVersion(ctx context.Context, id int) (*BOMVersionDetail, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
+	}
+	detail, err := uc.GetBOMVersion(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if detail == nil || detail.Header == nil || len(detail.Items) == 0 {
+		return nil, ErrBadParam
+	}
+	if err := requireActiveReference(ctx, detail.Header.ProductID, uc.repo.ProductIsActive, ErrProductInactive); err != nil {
+		return nil, err
+	}
+	for _, item := range detail.Items {
+		if item == nil {
+			return nil, ErrBadParam
+		}
+		if err := uc.validateBOMItemActiveReferences(ctx, item.MaterialID, item.UnitID); err != nil {
+			return nil, err
+		}
 	}
 	return uc.repo.ActivateBOMVersion(ctx, id)
 }
@@ -738,6 +772,13 @@ func IsInventoryLotStatusTransitionAllowed(currentStatus, newStatus string, hasP
 func IsValidBOMStatus(value string) bool {
 	_, ok := bomStatuses[strings.ToUpper(strings.TrimSpace(value))]
 	return ok
+}
+
+func (uc *InventoryUsecase) validateBOMItemActiveReferences(ctx context.Context, materialID int, unitID int) error {
+	if err := requireActiveReference(ctx, materialID, uc.repo.MaterialIsActive, ErrMaterialInactive); err != nil {
+		return err
+	}
+	return requireActiveReference(ctx, unitID, uc.repo.UnitIsActive, ErrUnitInactive)
 }
 
 func inventoryTxnDirectionMatchesType(txnType string, direction int) bool {

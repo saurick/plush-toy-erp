@@ -16,8 +16,12 @@ import (
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/stockreservation"
+	"server/internal/data/model/ent/unit"
+	"server/internal/data/model/ent/warehouse"
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
@@ -44,6 +48,58 @@ func NewInventoryRepo(d *Data, logger log.Logger) *inventoryRepo {
 }
 
 var _ biz.InventoryRepo = (*inventoryRepo)(nil)
+
+func (r *inventoryRepo) MaterialIsActive(ctx context.Context, id int) (bool, error) {
+	row, err := r.data.postgres.Material.Query().
+		Where(material.ID(id)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return false, biz.ErrMaterialNotFound
+		}
+		return false, err
+	}
+	return row.IsActive, nil
+}
+
+func (r *inventoryRepo) ProductIsActive(ctx context.Context, id int) (bool, error) {
+	row, err := r.data.postgres.Product.Query().
+		Where(product.ID(id)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return false, biz.ErrProductNotFound
+		}
+		return false, err
+	}
+	return row.IsActive, nil
+}
+
+func (r *inventoryRepo) UnitIsActive(ctx context.Context, id int) (bool, error) {
+	row, err := r.data.postgres.Unit.Query().
+		Where(unit.ID(id)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return false, biz.ErrUnitNotFound
+		}
+		return false, err
+	}
+	return row.IsActive, nil
+}
+
+func (r *inventoryRepo) WarehouseIsActive(ctx context.Context, id int) (bool, error) {
+	row, err := r.data.postgres.Warehouse.Query().
+		Where(warehouse.ID(id)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return false, biz.ErrWarehouseNotFound
+		}
+		return false, err
+	}
+	return row.IsActive, nil
+}
 
 func (r *inventoryRepo) CreateInventoryLot(ctx context.Context, in *biz.InventoryLotCreate) (*biz.InventoryLot, error) {
 	if err := validateInventoryLotSubject(ctx, r.data.postgres, in.SubjectType, in.SubjectID); err != nil {

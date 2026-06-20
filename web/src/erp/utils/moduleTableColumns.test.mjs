@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
@@ -24,6 +24,16 @@ const columns = [
   { label: '客户', key: 'customerName' },
   { label: '金额', key: 'amount' },
 ]
+
+function listFilesRecursively(rootDir) {
+  return readdirSync(rootDir, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = resolve(rootDir, entry.name)
+    if (entry.isDirectory()) {
+      return listFilesRecursively(fullPath)
+    }
+    return [fullPath]
+  })
+}
 
 test('moduleTableColumns: 会生成稳定列顺序 key', () => {
   assert.deepEqual(buildModuleColumnOrder(columns), [
@@ -157,6 +167,24 @@ test('moduleTableColumns: 业务主表排序可读取嵌套路径', () => {
     sorter({ customer: { name: '客户B' } }, { customer: { name: '客户A' } }),
     1
   )
+})
+
+test('moduleTableColumns: ERP 表格列禁止配置省略属性', () => {
+  const sourceFiles = listFilesRecursively(erpSourceRoot).filter(
+    (filePath) =>
+      /\.(mjs|js|jsx)$/u.test(filePath) && !/\.test\./u.test(filePath)
+  )
+  const offenders = sourceFiles.flatMap((filePath) => {
+    const content = readFileSync(filePath, 'utf8')
+    const lines = content.split('\n')
+    return lines.flatMap((line, index) =>
+      /\bellipsis\s*:/u.test(line)
+        ? [`${filePath.replace(`${erpSourceRoot}/`, '')}:${index + 1}`]
+        : []
+    )
+  })
+
+  assert.deepEqual(offenders, [])
 })
 
 test('moduleTableColumns: 主业务列表页使用共享排序入口', () => {
