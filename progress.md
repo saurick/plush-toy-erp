@@ -305,3 +305,11 @@
 - 验证：追加前 `progress.md` 为 298 行、64826 字节，未达到归档阈值；`cd web && node --test src/erp/utils/masterDataOrderView.test.mjs` 通过，11 项；`STYLE_L1_PORT=4313 STYLE_L1_SCENARIOS=business-module-dark-customers-desktop,business-formal-module-shells-desktop pnpm --dir web style:l1` 通过，2 个场景；`git diff --check` 通过。
 - 下一步：若后续把付款条件用于应收到期日、价格规则或客户信用控制，需单独评审 Finance Fact 和价格真源，不从客户默认建议直接派生事实。
 - 阻塞/风险：本轮未改 schema、migration、RBAC、菜单、Workflow / Fact usecase、供应商结算条件、打印导出或独立 payment_methods 字典表；旧 reference/prototype 中仍可能出现历史“默认付款方式”字样，不作为当前运行时口径。
+
+## 2026-06-20 Codex 项目 skills 迁入
+
+- 完成：将 plush 项目专属 `plush-docs-governance`、`plush-page-design-governance` 从个人 `~/.codex/skills` 迁入 `.agents/skills/`，作为仓库内 canonical，避免长期依赖本机副本。
+- 完成：同步更新根 `README.md` 目录结构，说明 `.agents/skills/` 只承载 Codex 项目专属文档治理和页面治理 workflow；本轮未更新 `docs/文档清单.md`，因为新增文件不属于 `docs/` 下长期维护 Markdown，也未改变产品文档入口或运行时帮助入口。
+- 验证：追加前 `progress.md` 为 362 行、78171 字节，未达到归档阈值；项目内两份 skill 已执行 `quick_validate.py` 均通过；对应 `SKILL.md` 已通过 Ruby YAML 解析；`.agents` 未被 gitignore 忽略。
+- 下一步：后续修改 plush 项目专属 skill 时以 `.agents/skills/` 为真源；个人全局同名 skill 只可作为临时入口，不再单独维护。
+- 阻塞/风险：本轮不改运行时代码、schema、migration、RBAC、菜单、Workflow / Fact usecase、客户配置、部署、原型状态或正式业务口径；当前工作树仍有大量并行未提交改动，提交时需按路径精确区分。

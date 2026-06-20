@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plush Page Design Governance"
+  short_description: "plush ERP 页面功能意义、原型同步和低密度治理清单"
+  default_prompt: "Use $plush-page-design-governance to review or implement a plush-toy-erp page with feature semantics, prototype sync, clear purpose, low information density, and project boundary checks."
