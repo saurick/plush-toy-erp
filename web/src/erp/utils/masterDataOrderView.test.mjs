@@ -29,6 +29,7 @@ import {
   formatUnixDateTime,
   hasActionPermission,
   inferDefaultUnitID,
+  paymentConditionCompleteness,
   resolvePaymentTermDays,
   statusText,
   unixToDateInputValue,
@@ -336,6 +337,32 @@ test('masterDataOrderView: payment condition options keep zero-day defaults and 
       payment_term_days: 30,
     }),
     '30天月结 / 30天'
+  )
+})
+
+test('masterDataOrderView: payment condition completeness requires method and cycle as a pair', () => {
+  assert.deepEqual(paymentConditionCompleteness({}), {
+    hasMethod: false,
+    hasTermDays: false,
+    methodRequired: false,
+    termDaysRequired: false,
+  })
+  assert.deepEqual(
+    paymentConditionCompleteness({ method: '现结', termDays: 0 }),
+    {
+      hasMethod: true,
+      hasTermDays: true,
+      methodRequired: false,
+      termDaysRequired: false,
+    }
+  )
+  assert.equal(
+    paymentConditionCompleteness({ method: '30天月结' }).termDaysRequired,
+    true
+  )
+  assert.equal(
+    paymentConditionCompleteness({ termDays: 30 }).methodRequired,
+    true
   )
 })
 

@@ -1283,6 +1283,7 @@ export default function V1SalesOrdersPage() {
           className="erp-business-action-form"
         >
           <SalesOrderFormFields
+            form={orderForm}
             customers={customers}
             paymentConditionOptions={paymentConditionOptions}
             onCustomerChange={applyCustomerPaymentDefaults}

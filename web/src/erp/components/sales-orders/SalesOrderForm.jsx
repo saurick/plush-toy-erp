@@ -16,6 +16,7 @@ import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
 import {
   deriveSalesOrderItemAmount,
+  paymentConditionCompleteness,
   unixToDateInputValue,
 } from '../../utils/masterDataOrderView.mjs'
 
@@ -165,7 +166,29 @@ function setOrderLineSourceFromSKU(form, lineIndex, sku) {
   form.setFieldsValue({ items: nextLines })
 }
 
+function paymentConditionRule({ form, methodField, termDaysField, field }) {
+  return {
+    validator: async (_, value) => {
+      if (!form) {
+        return
+      }
+      const completeness = paymentConditionCompleteness({
+        method: field === 'method' ? value : form.getFieldValue(methodField),
+        termDays:
+          field === 'termDays' ? value : form.getFieldValue(termDaysField),
+      })
+      if (field === 'method' && completeness.methodRequired) {
+        throw new Error('请填写付款方式')
+      }
+      if (field === 'termDays' && completeness.termDaysRequired) {
+        throw new Error('请填写付款周期(天)')
+      }
+    },
+  }
+}
+
 export function SalesOrderFormFields({
+  form,
   customers,
   paymentConditionOptions = [],
   onCustomerChange,
@@ -211,8 +234,17 @@ export function SalesOrderFormFields({
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="成交付款方式"
+        dependencies={['payment_term_days']}
+        label="付款方式"
         name="payment_method"
+        rules={[
+          paymentConditionRule({
+            form,
+            methodField: 'payment_method',
+            termDaysField: 'payment_term_days',
+            field: 'method',
+          }),
+        ]}
       >
         <AutoComplete
           allowClear
@@ -223,15 +255,24 @@ export function SalesOrderFormFields({
               .includes(String(inputValue || '').toLowerCase())
           }
           options={paymentConditionOptions}
-          placeholder="选择或输入本单成交付款方式"
+          placeholder="选择或输入本单付款方式"
           onBlur={onPaymentConditionBlur}
           onChange={onPaymentMethodChange}
         />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="成交账期天数"
+        dependencies={['payment_method']}
+        label="付款周期(天)"
         name="payment_term_days"
+        rules={[
+          paymentConditionRule({
+            form,
+            methodField: 'payment_method',
+            termDaysField: 'payment_term_days',
+            field: 'termDays',
+          }),
+        ]}
       >
         <InputNumber
           min={0}

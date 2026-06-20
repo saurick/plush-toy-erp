@@ -296,3 +296,12 @@
 - 验证：追加前 `progress.md` 为 289 行、62987 字节，未达到归档阈值；`pnpm --dir web exec eslint --ext .js --ext .jsx src/erp/pages/V1PurchaseReceiptsPage.jsx scripts/style-l1/purchaseReceiptScenarios.mjs` 通过；`pnpm --dir web css` 通过；`STYLE_L1_PORT=4175 STYLE_L1_SCENARIOS=purchase-receipts-table-control-columns-desktop,purchase-receipt-create-modal-dark-desktop pnpm --dir web style:l1` 通过，2 个场景；`pnpm --dir web test` 通过，361 项。
 - 下一步：如果其他页面也存在“展开区再塞一张宽表”的单据明细，应按相同口径迁移到可读明细卡片或结构化详情，不继续把横向滚动当成可读性验收。
 - 阻塞/风险：本轮未改 schema、migration、RBAC、菜单、Workflow / Fact usecase、客户配置、部署或正式文档清单；当前工作树仍有大量并行改动，后续提交必须按路径精确区分。
+
+## 2026-06-20 付款条件文案与成对校验
+
+- 完成：按 trade-erp 既有文案收口客户主数据和销售订单表单，用户可见字段统一为“付款方式”和“付款周期(天)”；客户列表搜索和付款条件列同步去掉“默认”前缀，字段名仍保留 `default_payment_method / default_payment_term_days` 表达客户主档默认建议。
+- 完成：付款条件采用成对完整校验而非全局必填；付款方式和付款周期都不填时允许保存，只填任一项时必须补齐另一项，`0` 天现结保持有效；销售订单沿用同一规则，仍不自动重算单价、不回写客户默认值。
+- 完成：同步 `docs/product/产品能力证据详情.md` 和 `docs/architecture/客户供应商主数据评审.md` 的当前口径；历史 reference / prototype 资料未改，保留为归档证据。
+- 验证：追加前 `progress.md` 为 298 行、64826 字节，未达到归档阈值；`cd web && node --test src/erp/utils/masterDataOrderView.test.mjs` 通过，11 项；`STYLE_L1_PORT=4313 STYLE_L1_SCENARIOS=business-module-dark-customers-desktop,business-formal-module-shells-desktop pnpm --dir web style:l1` 通过，2 个场景；`git diff --check` 通过。
+- 下一步：若后续把付款条件用于应收到期日、价格规则或客户信用控制，需单独评审 Finance Fact 和价格真源，不从客户默认建议直接派生事实。
+- 阻塞/风险：本轮未改 schema、migration、RBAC、菜单、Workflow / Fact usecase、供应商结算条件、打印导出或独立 payment_methods 字典表；旧 reference/prototype 中仍可能出现历史“默认付款方式”字样，不作为当前运行时口径。

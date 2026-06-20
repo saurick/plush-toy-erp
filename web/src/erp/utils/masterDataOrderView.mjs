@@ -398,6 +398,20 @@ export function resolvePaymentTermDays(method, options = []) {
   return normalizeOptionalNonNegativeInteger(matched?.payment_term_days)
 }
 
+export function paymentConditionCompleteness({ method, termDays } = {}) {
+  const hasMethod = Boolean(trimOptional(method))
+  const hasTermDays =
+    termDays !== undefined &&
+    termDays !== null &&
+    String(termDays).trim() !== ''
+  return {
+    hasMethod,
+    hasTermDays,
+    methodRequired: !hasMethod && hasTermDays,
+    termDaysRequired: hasMethod && !hasTermDays,
+  }
+}
+
 export function formatPaymentCondition(record = {}) {
   const method = trimOptional(record?.payment_method)
   const termDays = normalizeOptionalNonNegativeInteger(

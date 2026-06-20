@@ -11,6 +11,8 @@ import {
   Switch,
 } from 'antd'
 
+import { paymentConditionCompleteness } from '../../utils/masterDataOrderView.mjs'
+
 function DefaultUnitSelect({ required = false, unitOptions, unitLoading }) {
   return (
     <Form.Item
@@ -92,7 +94,29 @@ export function mergeTextSuggestionOptions(
     })
 }
 
+function paymentConditionRule({ form, methodField, termDaysField, field }) {
+  return {
+    validator: async (_, value) => {
+      if (!form) {
+        return
+      }
+      const completeness = paymentConditionCompleteness({
+        method: field === 'method' ? value : form.getFieldValue(methodField),
+        termDays:
+          field === 'termDays' ? value : form.getFieldValue(termDaysField),
+      })
+      if (field === 'method' && completeness.methodRequired) {
+        throw new Error('请填写付款方式')
+      }
+      if (field === 'termDays' && completeness.termDaysRequired) {
+        throw new Error('请填写付款周期(天)')
+      }
+    },
+  }
+}
+
 export function MasterDataFormFields({
+  form,
   type,
   productOptions = [],
   unitOptions = [],
@@ -366,8 +390,17 @@ export function MasterDataFormFields({
         <>
           <Form.Item
             className="erp-business-action-form__field"
-            label="默认付款方式"
+            dependencies={['default_payment_term_days']}
+            label="付款方式"
             name="default_payment_method"
+            rules={[
+              paymentConditionRule({
+                form,
+                methodField: 'default_payment_method',
+                termDaysField: 'default_payment_term_days',
+                field: 'method',
+              }),
+            ]}
           >
             <TextSuggestionInput
               className="erp-customer-payment-method-suggested-input"
@@ -378,8 +411,17 @@ export function MasterDataFormFields({
           </Form.Item>
           <Form.Item
             className="erp-business-action-form__field"
-            label="默认账期天数"
+            dependencies={['default_payment_method']}
+            label="付款周期(天)"
             name="default_payment_term_days"
+            rules={[
+              paymentConditionRule({
+                form,
+                methodField: 'default_payment_method',
+                termDaysField: 'default_payment_term_days',
+                field: 'termDays',
+              }),
+            ]}
           >
             <InputNumber min={0} precision={0} style={{ width: '100%' }} />
           </Form.Item>

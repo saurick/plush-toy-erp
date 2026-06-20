@@ -385,7 +385,7 @@ function getRecordSearchPlaceholder(type = '') {
     return '搜索 SKU、条码、客户 SKU、颜色、色号、尺码、包装版本'
   }
   if (type === 'customers') {
-    return '搜索编号、名称、简称、默认付款方式'
+    return '搜索编号、名称、简称、付款方式'
   }
   return '搜索编号、名称、简称'
 }
@@ -1114,8 +1114,8 @@ export default function V1MasterDataPage({ type }) {
       ...(effectiveType === 'customers'
         ? [
             {
-              title: '默认付款条件',
-              exportTitle: '默认付款条件',
+              title: '付款条件',
+              exportTitle: '付款条件',
               dataIndex: 'default_payment_method',
               width: 180,
               sorter: (a, b) =>
@@ -1518,6 +1518,7 @@ export default function V1MasterDataPage({ type }) {
           className="erp-business-action-form"
         >
           <MasterDataFormFields
+            form={recordForm}
             type={effectiveType}
             productOptions={productOptions}
             unitOptions={unitOptions}
