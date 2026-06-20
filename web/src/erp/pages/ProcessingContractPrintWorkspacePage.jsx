@@ -1035,7 +1035,7 @@ export default function ProcessingContractPrintWorkspacePage() {
               onClick={handleRemoveLine}
               disabled={selectedLineIndex === null}
             >
-              删除当前行
+              移除当前行
             </button>
             <button
               type="button"

@@ -68,6 +68,7 @@ import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
+import { suggestNextBOMVersion } from '../utils/bomVersionSuggestion.mjs'
 import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
@@ -87,14 +88,14 @@ const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
   { label: '草稿', value: 'DRAFT' },
   { label: '已激活', value: 'ACTIVE' },
-  { label: '已归档', value: 'ARCHIVED' },
+  { label: '历史版本', value: 'ARCHIVED' },
   { label: '已停用', value: 'DISABLED' },
 ]
 
 const STATUS_LABELS = {
   DRAFT: '草稿',
   ACTIVE: '已激活',
-  ARCHIVED: '已归档',
+  ARCHIVED: '历史版本',
   DISABLED: '已停用',
 }
 
@@ -233,7 +234,30 @@ function HeaderFormFields({
   includeProduct = true,
   disabled = false,
   productOptions = [],
+  versionSuggestion = '',
+  versionSuggestionLoading = false,
+  onUseVersionSuggestion,
 }) {
+  let versionHint = null
+  if (!disabled) {
+    if (versionSuggestionLoading) {
+      versionHint = '正在读取同产品已有 BOM 版本...'
+    } else if (versionSuggestion) {
+      versionHint = (
+        <Space size={4} wrap>
+          <span>建议使用下一个版本号</span>
+          <Button size="small" type="link" onClick={onUseVersionSuggestion}>
+            {versionSuggestion}
+          </Button>
+          <span>，也可手动填写。</span>
+        </Space>
+      )
+    } else {
+      versionHint =
+        '先选择产品，系统会建议下一个版本号；也可手动填写打样版 A 等自定义版本。'
+    }
+  }
+
   return (
     <>
       {includeProduct ? (
@@ -259,8 +283,20 @@ function HeaderFormFields({
         name="version"
         rules={[{ required: true, message: '请填写 BOM 版本' }]}
       >
-        <Input allowClear autoComplete="off" disabled={disabled} />
+        <Input
+          allowClear
+          autoComplete="off"
+          disabled={disabled}
+          placeholder="例如 V1、V2、打样版 A"
+        />
       </Form.Item>
+      {versionHint ? (
+        <div className="erp-business-action-form__field erp-business-action-form__field--full">
+          <span className="erp-business-selection-action-bar__hint">
+            {versionHint}
+          </span>
+        </div>
+      ) : null}
       <Form.Item
         className="erp-business-action-form__field"
         label="生效开始"
@@ -387,6 +423,14 @@ export default function BOMVersionsPage() {
   const [units, setUnits] = useState([])
   const [headerForm] = Form.useForm()
   const [itemForm] = Form.useForm()
+  const [headerProductIDForSuggestion, setHeaderProductIDForSuggestion] =
+    useState()
+  const [headerVersionCandidates, setHeaderVersionCandidates] = useState({
+    productID: undefined,
+    versions: [],
+    loading: false,
+    loaded: false,
+  })
 
   const canRead = hasActionPermission(adminProfile, 'bom.read')
   const canCreate = hasActionPermission(adminProfile, 'bom.create')
@@ -404,6 +448,21 @@ export default function BOMVersionsPage() {
     () => uniqueReferenceOptions(units, unitOption),
     [units]
   )
+  const headerVersionSuggestion = useMemo(() => {
+    if (!headerVersionCandidates.loaded) return ''
+    return suggestNextBOMVersion(
+      headerVersionCandidates.versions,
+      headerProductIDForSuggestion
+    )
+  }, [
+    headerVersionCandidates.loaded,
+    headerVersionCandidates.versions,
+    headerProductIDForSuggestion,
+  ])
+  const useHeaderVersionSuggestion = useCallback(() => {
+    if (!headerVersionSuggestion) return
+    headerForm.setFieldsValue({ version: headerVersionSuggestion })
+  }, [headerForm, headerVersionSuggestion])
 
   const applySelectedRowKeys = useCallback((nextKeys = []) => {
     const normalizedKeys = Array.isArray(nextKeys) ? nextKeys : []
@@ -503,6 +562,66 @@ export default function BOMVersionsPage() {
   }, [loadReferenceOptions])
 
   useEffect(() => {
+    const nextProductID = Number(headerProductIDForSuggestion || 0)
+    const shouldLoadSuggestions =
+      headerModalOpen &&
+      (headerMode === 'create' || headerMode === 'copy') &&
+      Number.isFinite(nextProductID) &&
+      nextProductID > 0
+
+    if (!shouldLoadSuggestions) {
+      setHeaderVersionCandidates((current) =>
+        current.productID ||
+        current.versions.length > 0 ||
+        current.loading ||
+        current.loaded
+          ? {
+              productID: undefined,
+              versions: [],
+              loading: false,
+              loaded: false,
+            }
+          : current
+      )
+      return undefined
+    }
+
+    let cancelled = false
+    setHeaderVersionCandidates({
+      productID: nextProductID,
+      versions: [],
+      loading: true,
+      loaded: false,
+    })
+    listBOMVersions({ product_id: nextProductID, limit: 200 })
+      .then((result) => {
+        if (cancelled) return
+        setHeaderVersionCandidates({
+          productID: nextProductID,
+          versions: Array.isArray(result?.bom_versions)
+            ? result.bom_versions
+            : [],
+          loading: false,
+          loaded: true,
+        })
+      })
+      .catch((error) => {
+        if (cancelled) return
+        setHeaderVersionCandidates({
+          productID: nextProductID,
+          versions: [],
+          loading: false,
+          loaded: false,
+        })
+        message.warning(getActionErrorMessage(error, '读取同产品 BOM 版本建议'))
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [headerModalOpen, headerMode, headerProductIDForSuggestion])
+
+  useEffect(() => {
     return outletContext?.registerPageRefresh?.(loadVersions)
   }, [loadVersions, outletContext])
 
@@ -545,6 +664,7 @@ export default function BOMVersionsPage() {
     setHeaderMode('create')
     headerForm.resetFields()
     headerForm.setFieldsValue({ effective_from: '', effective_to: '' })
+    setHeaderProductIDForSuggestion(undefined)
     setHeaderModalOpen(true)
   }
 
@@ -564,6 +684,7 @@ export default function BOMVersionsPage() {
     const detail = (await loadDetail(record.id)) || record
     setHeaderMode('view')
     fillHeaderForm(detail)
+    setHeaderProductIDForSuggestion(undefined)
     setHeaderModalOpen(true)
   }
 
@@ -572,20 +693,26 @@ export default function BOMVersionsPage() {
     const detail = (await loadDetail(record.id)) || record
     setHeaderMode('edit')
     fillHeaderForm(detail)
+    setHeaderProductIDForSuggestion(undefined)
     setHeaderModalOpen(true)
   }
 
   const openCopy = (record = selectedVersion) => {
     if (!record?.id) return
+    const nextVersionSuggestion = suggestNextBOMVersion(
+      versions,
+      record.product_id
+    )
     setHeaderMode('copy')
     headerForm.resetFields()
     headerForm.setFieldsValue({
       product_id: record.product_id,
-      version: `${record.version || 'V'}-COPY`,
+      version: nextVersionSuggestion || `${record.version || 'V'}-COPY`,
       effective_from: '',
       effective_to: '',
       note: '',
     })
+    setHeaderProductIDForSuggestion(record.product_id)
     setHeaderModalOpen(true)
   }
 
@@ -677,11 +804,11 @@ export default function BOMVersionsPage() {
       setSaving(true)
       try {
         await deleteBOMItem({ id: item.id })
-        message.success('BOM 明细已删除')
+        message.success('BOM 明细已移除')
         await loadDetail(activeActionVersion?.id)
         await loadVersions()
       } catch (error) {
-        message.error(getActionErrorMessage(error, '删除 BOM 明细'))
+        message.error(getActionErrorMessage(error, '移除 BOM 明细'))
       } finally {
         setSaving(false)
       }
@@ -694,7 +821,7 @@ export default function BOMVersionsPage() {
     setSaving(true)
     try {
       const next = await activateBOMVersion({ id: activeActionVersion.id })
-      message.success('BOM 版本已激活，旧激活版本已归档')
+      message.success('BOM 版本已激活，旧激活版本已设为历史版本')
       setSelectedVersion(next || activeActionVersion)
       await loadVersions()
     } catch (error) {
@@ -713,12 +840,12 @@ export default function BOMVersionsPage() {
       }
       message.success(
         archivableSelectedVersions.length > 1
-          ? `已归档 ${archivableSelectedVersions.length} 个 BOM 版本`
-          : 'BOM 版本已归档'
+          ? `已将 ${archivableSelectedVersions.length} 个 BOM 版本设为历史版本`
+          : 'BOM 版本已设为历史版本'
       )
       await loadVersions()
     } catch (error) {
-      message.error(getActionErrorMessage(error, '归档 BOM 版本'))
+      message.error(getActionErrorMessage(error, '设为历史版本'))
     } finally {
       setSaving(false)
     }
@@ -910,13 +1037,13 @@ export default function BOMVersionsPage() {
                 编辑
               </Button>
               <Popconfirm
-                title="删除这条 BOM 明细？"
-                okText="删除"
+                title="移除这条 BOM 明细？"
+                okText="移除"
                 cancelText="取消"
                 onConfirm={() => removeItem(item)}
               >
                 <Button size="small" danger icon={<DeleteOutlined />}>
-                  删除
+                  移除
                 </Button>
               </Popconfirm>
             </Space>
@@ -1070,7 +1197,7 @@ export default function BOMVersionsPage() {
             复制新版本
           </Button>
           <Popconfirm
-            title="激活该 BOM 版本？同产品旧 ACTIVE 版本会归档。"
+            title="激活该 BOM 版本？同产品当前生效版本会设为历史版本。"
             okText="激活"
             cancelText="取消"
             onConfirm={activateSelected}
@@ -1089,8 +1216,8 @@ export default function BOMVersionsPage() {
             </Button>
           </Popconfirm>
           <Popconfirm
-            title="归档该 BOM 版本？"
-            okText="归档"
+            title="将该 BOM 版本设为历史版本？后续仍可重新激活。"
+            okText="设为历史版本"
             cancelText="取消"
             onConfirm={archiveSelected}
           >
@@ -1103,7 +1230,7 @@ export default function BOMVersionsPage() {
                 archivableSelectedVersions.length === 0
               }
             >
-              {selectedRowKeys.length > 1 ? '归档所选' : '归档'}
+              {selectedRowKeys.length > 1 ? '所选设为历史版本' : '设为历史版本'}
             </Button>
           </Popconfirm>
         </SelectionActionBar>
@@ -1197,11 +1324,21 @@ export default function BOMVersionsPage() {
           form={headerForm}
           layout="vertical"
           className="erp-business-action-form"
+          onValuesChange={(changedValues) => {
+            if (
+              Object.prototype.hasOwnProperty.call(changedValues, 'product_id')
+            ) {
+              setHeaderProductIDForSuggestion(changedValues.product_id)
+            }
+          }}
         >
           <HeaderFormFields
             includeProduct={headerMode !== 'edit'}
             disabled={headerMode === 'view'}
             productOptions={productOptions}
+            versionSuggestion={headerVersionSuggestion}
+            versionSuggestionLoading={headerVersionCandidates.loading}
+            onUseVersionSuggestion={useHeaderVersionSuggestion}
           />
         </Form>
         {headerMode === 'create' ? (

@@ -430,7 +430,7 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
   },
   {
     caseId: 'FL_processing_contract_editor__clears_deleted_last_line',
-    title: '加工合同删除到只剩一行时会重置为空白行',
+    title: '加工合同移除到只剩一行时会重置为空白行',
     fieldKeys: ['productOrderNo', 'productNo', 'productNameColor'],
     scenarioKey: 'stale_value_cleared',
     layer: 'web',

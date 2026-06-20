@@ -94,6 +94,81 @@ export function createBusinessFormalScenarios(deps) {
     )
   }
 
+  const assertViewTabsInTableCard = async (
+    page,
+    { scenarioName, tabNames }
+  ) => {
+    await page
+      .locator('.erp-business-module-table-card .erp-business-view-tabs')
+      .waitFor({ state: 'visible', timeout: 10_000 })
+    const metrics = await page.evaluate((expectedTabNames) => {
+      const rectOf = (element) => {
+        if (!(element instanceof HTMLElement)) return null
+        const rect = element.getBoundingClientRect()
+        return {
+          top: rect.top,
+          bottom: rect.bottom,
+          height: rect.height,
+          width: rect.width,
+        }
+      }
+      const operationPanel = document.querySelector(
+        '.erp-business-operation-panel'
+      )
+      const tableCard = document.querySelector(
+        '.erp-business-module-table-card'
+      )
+      const tabs = document.querySelector('.erp-business-view-tabs')
+      const table = document.querySelector(
+        '.erp-business-module-table-card table'
+      )
+      const tabTexts =
+        tabs instanceof HTMLElement
+          ? Array.from(tabs.querySelectorAll('[role="tab"]')).map((node) =>
+              String(node.textContent || '')
+                .replace(/\s+/g, ' ')
+                .trim()
+            )
+          : []
+      return {
+        expectedTabNames,
+        tabTexts,
+        tabsInsideTableCard:
+          tableCard instanceof HTMLElement &&
+          tabs instanceof HTMLElement &&
+          tableCard.contains(tabs),
+        operationPanel: rectOf(operationPanel),
+        tableCard: rectOf(tableCard),
+        tabs: rectOf(tabs),
+        table: rectOf(table),
+      }
+    }, tabNames)
+
+    assert(
+      metrics.tabsInsideTableCard,
+      `${scenarioName} 视图 Tabs 应归属到表格卡片顶部: ${JSON.stringify(metrics)}`
+    )
+    for (const tabName of tabNames) {
+      assert(
+        metrics.tabTexts.some((text) => text.includes(tabName)),
+        `${scenarioName} 缺少视图 Tab “${tabName}”: ${JSON.stringify(metrics)}`
+      )
+    }
+    assert(
+      metrics.operationPanel &&
+        metrics.tableCard &&
+        metrics.operationPanel.bottom <= metrics.tableCard.top + 2,
+      `${scenarioName} 表格卡片应位于筛选/当前操作卡之后: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.tabs &&
+        metrics.table &&
+        metrics.tabs.top >= metrics.tableCard.top &&
+        metrics.tabs.bottom <= metrics.table.top + 2,
+      `${scenarioName} 视图 Tabs 应位于表格卡片内且在表格之前: ${JSON.stringify(metrics)}`
+    )
+  }
+
   const assertUnifiedListToolbarShell = async (
     page,
     {
@@ -479,17 +554,26 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-standard-bom',
         })
         await page.getByRole('button', { name: '新建草稿' }).click()
+        const bomDraftModal = page
+          .locator('.erp-business-action-modal--form.ant-modal:visible')
+          .last()
         await expectText(page, '新建 BOM 草稿')
         await expectText(page, 'BOM 版本')
         await expectText(page, '产品')
-        await page.keyboard.press('Escape')
+        await expectText(page, '先选择产品，系统会建议下一个版本号')
+        await bomDraftModal.getByLabel('产品').click()
+        await page.getByText('PROD-STYLE-L1').last().click()
+        await expectText(page, '建议使用下一个版本号')
+        await expectText(page, 'V1')
+        await closeBusinessFormModal(page, bomDraftModal)
         await assertNoHorizontalOverflow(page, 'business-standard-bom')
 
         await gotoScenarioPath(page, '/erp/warehouse/inventory', {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '库存台账')
-        await expectText(page, 'inventory_balances')
+        await expectText(page, '余额只读')
+        await expectText(page, '内部筛选')
         await expectText(page, '12.5')
         await expectText(page, '已预留')
         await expectText(page, '4')
@@ -543,7 +627,7 @@ export function createBusinessFormalScenarios(deps) {
         await page.getByText('12.5', { exact: false }).first().click()
         forceEmptyInventoryBalances = true
         await page
-          .getByPlaceholder('搜索批次号 / 来源 / 备注 / 内部引用')
+          .getByPlaceholder('搜索对象类型 / 内部引用')
           .first()
           .fill(inventoryEmptySearchKeyword)
         await page.keyboard.press('Enter')
@@ -553,10 +637,7 @@ export function createBusinessFormalScenarios(deps) {
           staleText: '12.5',
         })
         forceEmptyInventoryBalances = false
-        await page
-          .getByPlaceholder('搜索批次号 / 来源 / 备注 / 内部引用')
-          .first()
-          .fill('')
+        await page.getByPlaceholder('搜索对象类型 / 内部引用').first().fill('')
         await page.keyboard.press('Enter')
         await expectText(page, '12.5')
 
@@ -800,9 +881,18 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '维护出货明细')
         await expectText(page, '已保存出货明细')
         await expectText(page, '新增出货明细')
-        await page.keyboard.press('Escape')
+        const shipmentDetailModal = page
+          .locator('.erp-business-action-modal:visible')
+          .last()
+        await shipmentDetailModal.locator('.ant-modal-close').click()
+        await shipmentDetailModal.waitFor({ state: 'hidden', timeout: 10_000 })
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'business-v1-shipments',
+        })
+        await verifyBusinessModuleColumnOrderDialog(page, {
+          moduleKey: 'shipments',
+          heading: '出货单',
+          headerMenuTargetLabel: '客户',
         })
         await assertBusinessMainTableSortableColumns(page, {
           scenarioName: 'business-v1-shipments',
@@ -814,6 +904,17 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '加工环节')
+        const processOuterPageHeadCount = await page
+          .locator('.erp-admin-page-head')
+          .count()
+        assert.equal(
+          processOuterPageHeadCount,
+          0,
+          'business-v1-processes 不应同时显示外层页头和内容区页头'
+        )
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-v1-processes',
+        })
         await expectText(page, '查货')
         await expectText(page, '手工')
         await expectText(page, '车缝')
@@ -840,6 +941,11 @@ export function createBusinessFormalScenarios(deps) {
               scenarioName: 'business-v1-processes',
             })
           },
+        })
+        await verifyBusinessModuleColumnOrderDialog(page, {
+          moduleKey: 'processes',
+          heading: '加工环节',
+          headerMenuTargetLabel: '环节名称',
         })
         await assertNoHorizontalOverflow(page, 'business-v1-processes')
 
@@ -1265,6 +1371,10 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '出货出库')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-outbound-shipments',
+        })
+        await assertViewTabsInTableCard(page, {
+          scenarioName: 'business-v1-outbound-shipments',
+          tabNames: ['出货出库', '库存预留'],
         })
         await assertTextAbsent(page, '生成出库')
         await page.getByRole('tab', { name: '库存预留' }).click()

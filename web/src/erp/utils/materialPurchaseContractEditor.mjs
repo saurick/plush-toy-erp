@@ -444,7 +444,7 @@ export const deleteMaterialPurchaseLine = ({
       nextLines.length === 0 ? 0 : Math.min(deleteStart, nextLines.length - 1),
     message:
       deleteStart === deleteEnd
-        ? `已删除第 ${deleteStart + 1} 行。`
-        : `已删除第 ${deleteStart + 1} - ${deleteEnd + 1} 行合并块。`,
+        ? `已移除第 ${deleteStart + 1} 行。`
+        : `已移除第 ${deleteStart + 1} - ${deleteEnd + 1} 行合并块。`,
   }
 }

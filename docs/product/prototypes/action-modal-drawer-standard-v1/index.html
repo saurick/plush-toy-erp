@@ -180,7 +180,7 @@
 
       body[data-modal="form"] .switcher [data-target="form"],
       body[data-modal="import"] .switcher [data-target="import"],
-      body[data-modal="recycle"] .switcher [data-target="recycle"],
+      body[data-modal="lifecycle"] .switcher [data-target="lifecycle"],
       body[data-modal="columns"] .switcher [data-target="columns"],
       body[data-modal="confirm"] .switcher [data-target="confirm"] {
         background: var(--green);
@@ -204,7 +204,7 @@
 
       body[data-modal="form"] .modal.form,
       body[data-modal="import"] .modal.import,
-      body[data-modal="recycle"] .modal.recycle,
+      body[data-modal="lifecycle"] .modal.lifecycle,
       body[data-modal="columns"] .modal.columns,
       body[data-modal="confirm"] .popover.confirm {
         display: grid;
@@ -225,7 +225,7 @@
       }
 
       .modal.import,
-      .modal.recycle {
+      .modal.lifecycle {
         width: min(980px, calc(100vw - 64px));
         max-height: calc(100vh - 88px);
       }
@@ -658,7 +658,7 @@
 
         .modal.form,
         .modal.import,
-        .modal.recycle,
+        .modal.lifecycle,
         .modal.columns {
           width: 100%;
           max-height: none;
@@ -696,9 +696,9 @@
     <nav class="switcher" aria-label="弹窗状态">
       <button type="button" data-target="form">单据补录</button>
       <button type="button" data-target="import">来源选择器</button>
-      <button type="button" data-target="recycle">回收站</button>
+      <button type="button" data-target="lifecycle">生命周期动作</button>
       <button type="button" data-target="columns">列顺序</button>
-      <button type="button" data-target="confirm">删除确认</button>
+      <button type="button" data-target="confirm">危险动作确认</button>
     </nav>
 
     <main class="shell" aria-hidden="true">
@@ -711,7 +711,7 @@
           <div class="mock-actions">
             <button class="btn ghost">导出当前结果</button>
             <button class="btn">列顺序</button>
-            <button class="btn">回收站</button>
+            <button class="btn">生命周期规则</button>
             <button class="btn primary">新建记录</button>
           </div>
         </section>
@@ -722,7 +722,7 @@
             <button class="btn">流转</button>
             <button class="btn">生成出库</button>
             <button class="btn">打印商业发票</button>
-            <button class="btn danger">删除</button>
+            <button class="btn danger">取消 / 冲正</button>
           </div>
         </section>
         <section class="mock-panel mock-table"></section>
@@ -1018,52 +1018,47 @@
         </footer>
       </section>
 
-      <section class="modal recycle" role="dialog" aria-modal="true" aria-labelledby="recycleTitle">
+      <section class="modal lifecycle" role="dialog" aria-modal="true" aria-labelledby="lifecycleTitle">
         <header class="modal-head">
           <div>
-            <h2 class="modal-title" id="recycleTitle">回收站</h2>
+            <h2 class="modal-title" id="lifecycleTitle">生命周期动作说明</h2>
+            <p class="modal-subtitle">本样板不提供通用删除 / 回收站，只说明对象应使用的真实生命周期动作。</p>
           </div>
           <button class="close" type="button" aria-label="关闭">×</button>
         </header>
         <div class="modal-body">
           <div class="compact-toolbar" style="margin-bottom: 12px">
-            <button class="btn" disabled type="button">批量恢复</button>
-            <button class="btn danger" type="button">清空回收站</button>
-            <span class="source-note">已选择 0 条回收站记录</span>
+            <button class="btn" disabled type="button">查看引用</button>
+            <button class="btn danger" type="button">按对象专项评审后启用</button>
+            <span class="source-note">未完成后端 usecase / RBAC / 审计 / 引用检查时，不展示删除入口。</span>
           </div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th></th>
-                  <th>记录标识</th>
-                  <th>状态箱</th>
-                  <th>删除时间</th>
-                  <th>删除原因</th>
-                  <th>操作</th>
+                  <th>对象类型</th>
+                  <th>主动作</th>
+                  <th>替代删除动作</th>
+                  <th>页面提示</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>KSIN260419905</td>
-                  <td><span class="status-pill purple">免批</span></td>
-                  <td>2026-04-27 12:07</td>
-                  <td>-</td>
-                  <td><button class="btn" type="button">恢复</button> <button class="btn danger" type="button">彻底删除</button></td>
+                  <td>主数据</td>
+                  <td><span class="status-pill">启用</span></td>
+                  <td>停用</td>
+                  <td>历史引用继续可读，不进入回收站。</td>
                 </tr>
                 <tr>
-                  <td><input type="checkbox" /></td>
-                  <td>KSIN260419906</td>
-                  <td><span class="status-pill">草稿箱</span></td>
-                  <td>2026-04-27 12:07</td>
-                  <td>-</td>
-                  <td><button class="btn" type="button">恢复</button> <button class="btn danger" type="button">彻底删除</button></td>
+                  <td>事实单据</td>
+                  <td><span class="status-pill purple">已过账</span></td>
+                  <td>取消 / 冲正</td>
+                  <td>保留原事实和反向记录。</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div class="pagination">共 4 条  1</div>
+          <div class="pagination">删除 / 恢复只允许在对象专项闭环后另行设计。</div>
         </div>
       </section>
 
@@ -1126,10 +1121,10 @@
       </section>
 
       <div class="popover confirm" role="tooltip">
-        <p class="popover-title">确认删除该记录？</p>
+        <p class="popover-title">确认执行该危险动作？</p>
         <div class="popover-actions">
           <button class="btn" type="button">取消</button>
-          <button class="btn danger" type="button">删除</button>
+          <button class="btn danger" type="button">继续执行</button>
         </div>
       </div>
     </div>

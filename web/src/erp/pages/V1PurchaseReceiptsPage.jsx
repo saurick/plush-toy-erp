@@ -1048,7 +1048,7 @@ export default function V1PurchaseReceiptsPage() {
                             disabled={fields.length <= 1}
                             onClick={() => remove(field.name)}
                           >
-                            删除
+                            移除明细
                           </Button>
                         </div>
                         <div className="erp-master-contact-list__grid">

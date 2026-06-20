@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
+  ExclamationCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
   SendOutlined,
@@ -18,13 +19,15 @@ import {
 } from '../api/workflowApi.mjs'
 import {
   BusinessDataTable,
-  BusinessListToolbar,
   BusinessOperationPanel,
   BusinessPageLayout,
   CollaborationTaskPanel,
+  DateInput,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
+  SelectionActionBar,
+  ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
@@ -36,10 +39,21 @@ import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
 import { ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
 import {
   getTaskOwnerRoleKey,
+  getWorkflowTaskReadonlyReason,
   getWorkflowTaskDueLabel,
   getWorkflowTaskReason,
   getWorkflowTaskStatusMeta,
+  canRunWorkflowTaskAction,
 } from '../utils/workflowTaskBoard.mjs'
+
+function businessActionModalTitle(title, description) {
+  return (
+    <div className="erp-business-action-modal__title">
+      <span>{title}</span>
+      <small>{description}</small>
+    </div>
+  )
+}
 
 const WORKFLOW_ROLE_LABELS = new Map(Object.entries(ROLE_DISPLAY_NAMES))
 const TASK_STATUS_OPTIONS = Object.freeze([
@@ -168,6 +182,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [taskReasonModal, setTaskReasonModal] = useState(null)
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState('')
   const [ownerRoleKey, setOwnerRoleKey] = useState('')
@@ -264,6 +279,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     () => tasks.filter((task) => selectedTaskKeys.includes(task.id)),
     [selectedTaskKeys, tasks]
   )
+  const selectedTask = selectedTasks[0] || null
 
   const stats = useMemo(() => {
     const activeCount = tasks.filter(
@@ -279,6 +295,40 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       { key: 'shown', label: '当前结果', value: filteredTasks.length },
     ]
   }, [filteredTasks.length, tasks])
+
+  const selectedTaskLabel = selectedTask
+    ? `${selectedTask.task_code || `TASK-${selectedTask.id}`} / ${
+        selectedTask.task_name || '未填写任务名称'
+      }`
+    : `请先选择一条${moduleItem?.shortLabel || ''}协同任务`
+  const selectedTaskItems = selectedTask
+    ? [
+        {
+          key: selectedTask.id,
+          label: selectedTask.task_name || selectedTask.task_code,
+          title: selectedTask.task_code || '',
+        },
+      ]
+    : []
+  const selectedTaskStatusMeta = selectedTask
+    ? getWorkflowTaskStatusMeta(selectedTask)
+    : null
+  const selectedTaskReadonlyReason =
+    selectedTask && adminProfile
+      ? getWorkflowTaskReadonlyReason(adminProfile, selectedTask)
+      : ''
+  const canCompleteSelected =
+    Boolean(selectedTask) &&
+    canCompleteWorkflowTasks &&
+    canRunWorkflowTaskAction(adminProfile, selectedTask, 'complete')
+  const canBlockSelected =
+    Boolean(selectedTask) &&
+    canUpdateWorkflowTasks &&
+    canRunWorkflowTaskAction(adminProfile, selectedTask, 'block')
+  const canUrgeSelected =
+    Boolean(selectedTask) &&
+    canUpdateWorkflowTasks &&
+    canRunWorkflowTaskAction(adminProfile, selectedTask, 'urge')
 
   const openCreateModal = () => {
     form.setFieldsValue({
@@ -409,6 +459,35 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     [config, loadWorkflowTasks, moduleItem?.path]
   )
 
+  const openTaskReasonModal = useCallback((mode) => {
+    setTaskReasonModal({ mode, reason: '' })
+  }, [])
+
+  const closeTaskReasonModal = useCallback(() => {
+    setTaskReasonModal(null)
+  }, [])
+
+  const submitTaskReasonAction = useCallback(async () => {
+    if (!selectedTask || !taskReasonModal?.mode) return
+    const reason = String(taskReasonModal.reason || '').trim()
+    if (!reason) {
+      message.warning('请先填写原因')
+      return
+    }
+    if (taskReasonModal.mode === 'block') {
+      await blockWorkflowTask(selectedTask, { reason })
+    } else if (taskReasonModal.mode === 'urge') {
+      await urgeWorkflowTaskFromPage(selectedTask, { reason })
+    }
+    closeTaskReasonModal()
+  }, [
+    blockWorkflowTask,
+    closeTaskReasonModal,
+    selectedTask,
+    taskReasonModal,
+    urgeWorkflowTaskFromPage,
+  ])
+
   const columns = useMemo(
     () =>
       applyBusinessColumnSorters([
@@ -517,43 +596,19 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             <Tag color="gold">不写事实层</Tag>
           </Space>
         }
-        stats={[
-          { label: '主路径', value: 'workflow_tasks' },
-          { label: '责任边界', value: moduleItem.boundary },
-        ]}
+        stats={stats}
+        summary={
+          <Space size={6} wrap>
+            <Tag color="default">主路径 workflow_tasks</Tag>
+            <Tag color="green">只处理协同任务</Tag>
+            <span>{moduleItem.boundary}</span>
+          </Space>
+        }
         compact
       />
 
-      <BusinessListToolbar
-        stats={stats}
-        actions={
-          <Space size={8} wrap>
-            <BusinessListToolbarActions
-              moduleTitle={moduleItem.title}
-              exportDisabled
-              exportDisabledReason="当前 Workflow V1 只处理协同任务，不导出业务数据。"
-              onOpenColumnOrder={openColumnOrder}
-            />
-            <Button
-              icon={<ReloadOutlined />}
-              loading={loading}
-              onClick={loadWorkflowTasks}
-            >
-              刷新协同
-            </Button>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              disabled={!canCreateWorkflowTasks}
-              onClick={openCreateModal}
-            >
-              {config.createLabel}
-            </Button>
-          </Space>
-        }
-      />
-
       <BusinessOperationPanel
+        compact
         filters={
           <>
             <SearchInput
@@ -579,7 +634,105 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             />
           </>
         }
-      />
+        actions={
+          <>
+            <BusinessListToolbarActions
+              moduleTitle={moduleItem.title}
+              exportDisabled
+              exportDisabledReason="当前 Workflow V1 只处理协同任务，不导出业务数据。"
+              onOpenColumnOrder={openColumnOrder}
+            />
+            <ToolbarButton
+              icon={<ReloadOutlined />}
+              loading={loading}
+              onClick={loadWorkflowTasks}
+            >
+              刷新协同
+            </ToolbarButton>
+          </>
+        }
+        primaryAction={
+          <ToolbarButton
+            type="primary"
+            className="erp-business-list-toolbar__primary-action"
+            icon={<PlusOutlined />}
+            disabled={!canCreateWorkflowTasks}
+            onClick={openCreateModal}
+          >
+            {config.createLabel}
+          </ToolbarButton>
+        }
+      >
+        <SelectionActionBar
+          embedded
+          selectedCount={selectedTask ? 1 : 0}
+          selectedLabel={selectedTaskLabel}
+          selectedItems={selectedTaskItems}
+          collaborationItems={
+            selectedTaskStatusMeta
+              ? [
+                  {
+                    key: 'status',
+                    label: '状态',
+                    value: selectedTaskStatusMeta.label,
+                    color: selectedTaskStatusMeta.color,
+                  },
+                  {
+                    key: 'owner',
+                    label: '责任',
+                    value:
+                      WORKFLOW_ROLE_LABELS.get(
+                        getTaskOwnerRoleKey(selectedTask)
+                      ) ||
+                      getTaskOwnerRoleKey(selectedTask) ||
+                      '-',
+                  },
+                ]
+              : []
+          }
+          boundaryText={
+            selectedTaskReadonlyReason ||
+            '当前操作只调用 Workflow 后端 usecase；不写生产、库存、出货、财务、开票或收付款事实。'
+          }
+        >
+          <Button
+            type="link"
+            size="small"
+            disabled={!selectedTask}
+            onClick={() => setSelectedTaskKeys([])}
+          >
+            清空已选
+          </Button>
+          <Button
+            size="small"
+            type="primary"
+            icon={<CheckCircleOutlined />}
+            loading={taskActionLoadingID === selectedTask?.id}
+            disabled={!canCompleteSelected || taskActionLoadingID > 0}
+            onClick={() => completeWorkflowTask(selectedTask)}
+          >
+            完成协同
+          </Button>
+          <Button
+            size="small"
+            danger
+            icon={<ExclamationCircleOutlined />}
+            disabled={!canBlockSelected || taskActionLoadingID > 0}
+            onClick={() => openTaskReasonModal('block')}
+          >
+            标记阻塞
+          </Button>
+          <Button
+            size="small"
+            icon={<SendOutlined />}
+            loading={urgingTaskID === selectedTask?.id}
+            disabled={!canUrgeSelected || urgingTaskID > 0}
+            onClick={() => openTaskReasonModal('urge')}
+          >
+            催办
+          </Button>
+        </SelectionActionBar>
+      </BusinessOperationPanel>
 
       <BusinessDataTable
         rowKey="id"
@@ -593,8 +746,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             : '当前账号没有 Workflow 任务读取权限。'
         }
         rowSelection={{
+          type: 'radio',
           selectedRowKeys: selectedTaskKeys,
-          onChange: (nextKeys) => setSelectedTaskKeys(nextKeys),
+          onChange: (nextKeys) => setSelectedTaskKeys(nextKeys.slice(-1)),
         }}
         rowClassName={(record) =>
           selectedTaskKeys.includes(record.id) ? 'ant-table-row-selected' : ''
@@ -631,9 +785,12 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       />
 
       <Modal
-        className="erp-business-action-modal"
+        className="erp-business-action-modal erp-business-action-modal--form"
         width={620}
-        title={config.createTitle}
+        title={businessActionModalTitle(
+          config.createTitle,
+          '登记结果只进入 Workflow 协同任务；不会生成生产、库存、出货或财务事实。'
+        )}
         open={createModalOpen}
         onCancel={() => setCreateModalOpen(false)}
         maskClosable={false}
@@ -653,8 +810,14 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           </Space>
         }
       >
-        <Form form={form} layout="vertical" requiredMark={false}>
+        <Form
+          form={form}
+          layout="vertical"
+          requiredMark={false}
+          className="erp-business-action-form"
+        >
           <Form.Item
+            className="erp-business-action-form__field erp-business-action-form__field--full"
             label="任务名称"
             name="task_name"
             rules={[{ required: true, message: '请填写任务名称' }]}
@@ -662,6 +825,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             <Input placeholder="例如：核对某订单排程 / 处理延期异常 / 放行前复核" />
           </Form.Item>
           <Form.Item
+            className="erp-business-action-form__field"
             label="关联来源"
             name="source_id"
             rules={[
@@ -679,20 +843,33 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               placeholder="填写关联来源记录；有业务单号时优先补来源号"
             />
           </Form.Item>
-          <Form.Item label="来源号" name="source_no">
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="来源号"
+            name="source_no"
+          >
             <Input placeholder="可选，例如销售订单号或出货单号" />
           </Form.Item>
           <Form.Item
+            className="erp-business-action-form__field"
             label="责任角色"
             name="owner_role_key"
             rules={[{ required: true, message: '请选择责任角色' }]}
           >
             <Select options={config.ownerRoleOptions} />
           </Form.Item>
-          <Form.Item label="到期日期" name="due_at">
-            <Input placeholder="可选，格式 YYYY-MM-DD" />
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="到期日期"
+            name="due_at"
+          >
+            <DateInput placeholder="选择到期日期" />
           </Form.Item>
-          <Form.Item label="处理说明" name="note">
+          <Form.Item
+            className="erp-business-action-form__field erp-business-action-form__field--full"
+            label="处理说明"
+            name="note"
+          >
             <Input.TextArea
               rows={3}
               placeholder="只记录协同上下文；不会生成生产、库存、出货、财务事实。"
@@ -702,6 +879,39 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         <Tag icon={<CheckCircleOutlined />} color="blue">
           创建结果只进入 Workflow 协同任务，不写库存、出货、财务或生产事实。
         </Tag>
+      </Modal>
+
+      <Modal
+        className="erp-business-action-modal"
+        width={520}
+        title={businessActionModalTitle(
+          taskReasonModal?.mode === 'block' ? '标记阻塞' : '催办协同',
+          selectedTaskLabel
+        )}
+        open={Boolean(taskReasonModal)}
+        onCancel={closeTaskReasonModal}
+        onOk={submitTaskReasonAction}
+        okText={taskReasonModal?.mode === 'block' ? '确认阻塞' : '确认催办'}
+        confirmLoading={taskActionLoadingID > 0 || urgingTaskID > 0}
+        destroyOnHidden
+      >
+        <Input.TextArea
+          rows={4}
+          maxLength={240}
+          showCount
+          autoFocus
+          placeholder={
+            taskReasonModal?.mode === 'block'
+              ? '填写阻塞原因；只更新 Workflow 任务状态。'
+              : '填写催办原因；只记录协同事件。'
+          }
+          value={taskReasonModal?.reason || ''}
+          onChange={(event) =>
+            setTaskReasonModal((current) =>
+              current ? { ...current, reason: event.target.value } : current
+            )
+          }
+        />
       </Modal>
     </BusinessPageLayout>
   )

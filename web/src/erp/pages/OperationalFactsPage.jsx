@@ -475,14 +475,6 @@ export function OperationalFactWorkspace({
       sortType: 'text',
     },
     {
-      title: '内部记录',
-      dataIndex: 'id',
-      width: 92,
-      sortType: 'number',
-      render: (value) => internalRef('主键', value),
-      exportValue: (record) => internalRef('主键', record?.id),
-    },
-    {
       title: '状态',
       exportTitle: '状态',
       dataIndex: 'status',
@@ -494,8 +486,8 @@ export function OperationalFactWorkspace({
 
   const quantityColumns = [
     {
-      title: '对象',
-      exportTitle: '对象',
+      title: '对象内部引用',
+      exportTitle: '对象内部引用',
       width: 150,
       sortValue: (record) =>
         `${record.subject_type || 'PRODUCT'}-${
@@ -513,9 +505,9 @@ export function OperationalFactWorkspace({
         ),
     },
     {
-      title: '仓库/批次/单位',
-      exportTitle: '仓库/批次/单位',
-      width: 180,
+      title: '仓库/批次/单位内部引用',
+      exportTitle: '仓库/批次/单位内部引用',
+      width: 220,
       sortValue: (record) =>
         `${record.warehouse_id || ''}-${record.lot_id || ''}-${
           record.unit_id || ''
@@ -625,9 +617,9 @@ export function OperationalFactWorkspace({
     shipments: [
       ...baseColumns,
       {
-        title: '销售订单',
+        title: '销售订单内部引用',
         dataIndex: 'sales_order_id',
-        width: 120,
+        width: 150,
         sortType: 'number',
       },
       {
@@ -651,9 +643,9 @@ export function OperationalFactWorkspace({
     reservations: [
       ...baseColumns,
       {
-        title: '销售订单',
+        title: '销售订单内部引用',
         dataIndex: 'sales_order_id',
-        width: 120,
+        width: 150,
         sortType: 'number',
       },
       ...quantityColumns,
@@ -663,8 +655,8 @@ export function OperationalFactWorkspace({
       ...baseColumns,
       { title: '类型', dataIndex: 'fact_type', width: 150, sortType: 'text' },
       {
-        title: '往来方',
-        width: 150,
+        title: '往来方内部引用',
+        width: 170,
         sortValue: (record) =>
           `${record.counterparty_type || ''}-${record.counterparty_id || ''}`,
         render: (_, record) =>
@@ -836,15 +828,6 @@ export function OperationalFactWorkspace({
           { key: 'closed', label: '已取消/释放', value: activeCancelledCount },
         ]}
       />
-
-      {showTabs && tabItems.length > 1 ? (
-        <Tabs
-          className="erp-business-view-tabs"
-          activeKey={activeKey}
-          onChange={setActiveKey}
-          items={tabItems}
-        />
-      ) : null}
 
       <BusinessOperationPanel
         compact
@@ -1126,6 +1109,16 @@ export function OperationalFactWorkspace({
       </BusinessOperationPanel>
 
       <BusinessDataTable
+        tableHeader={
+          showTabs && tabItems.length > 1 ? (
+            <Tabs
+              className="erp-business-view-tabs"
+              activeKey={activeKey}
+              onChange={setActiveKey}
+              items={tabItems}
+            />
+          ) : null
+        }
         rowKey="id"
         columns={tableColumns}
         dataSource={activeRows}
@@ -1171,7 +1164,7 @@ export function OperationalFactWorkspace({
         confirmLoading={saving}
         centered
         forceRender
-        width={720}
+        width={820}
       >
         <Form
           form={createForm}

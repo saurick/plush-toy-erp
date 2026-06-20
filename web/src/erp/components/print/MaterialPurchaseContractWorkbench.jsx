@@ -906,7 +906,7 @@ export default function MaterialPurchaseContractWorkbench({
               onClick={handleDeleteRow}
               disabled={selectedRowIndex == null}
             >
-              删除当前行
+              移除当前行
             </button>
             <button
               type="button"
@@ -1175,7 +1175,7 @@ export default function MaterialPurchaseContractWorkbench({
                     event.preventDefault()
                     setSelectedRowIndex(rowIndex)
                     setToolbarStatus(
-                      `已选中第 ${rowIndex + 1} 行，可继续上插 / 下插 / 删除。`
+                      `已选中第 ${rowIndex + 1} 行，可继续上插 / 下插 / 移除。`
                     )
                   }}
                 >

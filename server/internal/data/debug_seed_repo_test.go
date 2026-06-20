@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
@@ -134,6 +135,7 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 		t.Fatalf("activate bom failed: %v", err)
 	}
 	createAndPostPurchaseReceipt(t, ctx, inventoryUC, "DBG-PR-CLEAR-001", fixtures, stringPtr("DBG-LOT-CLEAR-001"), mustDecimal(t, "8"))
+	createDebugOutsourcingOrderWithProcess(t, ctx, client, fixtures)
 
 	result, err := uc.ClearBusinessData(ctx)
 	if err != nil {
@@ -147,10 +149,64 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 	if result.DeletedTotal == 0 ||
 		result.DeletedCounts["inventory_txns"] == 0 ||
 		result.DeletedCounts["bom_headers"] == 0 ||
-		result.DeletedCounts["purchase_receipts"] == 0 {
+		result.DeletedCounts["purchase_receipts"] == 0 ||
+		result.DeletedCounts["outsourcing_order_items"] == 0 ||
+		result.DeletedCounts["outsourcing_orders"] == 0 ||
+		result.DeletedCounts["processes"] == 0 {
 		t.Fatalf("unexpected clear result %#v", result)
 	}
 	assertProjectBusinessTablesEmpty(t, ctx, client)
+}
+
+func createDebugOutsourcingOrderWithProcess(t *testing.T, ctx context.Context, client *ent.Client, fixtures inventoryTestFixtures) {
+	t.Helper()
+	supplier, err := client.Supplier.Create().
+		SetCode("DBG-OUT-SUP-CLEAR-001").
+		SetName("调试委外加工厂").
+		SetSupplierType("outsourcing").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create debug outsourcing supplier failed: %v", err)
+	}
+	process, err := client.Process.Create().
+		SetCode("DBG-PROC-CLEAR-001").
+		SetName("调试车缝").
+		SetCategory("委外").
+		SetOutsourcingEnabled(true).
+		SetInhouseEnabled(false).
+		SetQualityRequired(false).
+		SetSortOrder(1).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create debug process failed: %v", err)
+	}
+	order, err := client.OutsourcingOrder.Create().
+		SetOutsourcingOrderNo("DBG-OUT-CLEAR-001").
+		SetSupplierID(supplier.ID).
+		SetSupplierSnapshot(map[string]interface{}{
+			"code": supplier.Code,
+			"name": supplier.Name,
+		}).
+		SetOrderDate(time.Date(2026, 6, 20, 10, 0, 0, 0, time.UTC)).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create debug outsourcing order failed: %v", err)
+	}
+	if _, err := client.OutsourcingOrderItem.Create().
+		SetOutsourcingOrderID(order.ID).
+		SetLineNo(1).
+		SetProductID(fixtures.productID).
+		SetProcessID(process.ID).
+		SetUnitID(fixtures.unitID).
+		SetProductNoSnapshot("DBG-PRODUCT-CLEAR").
+		SetProductNameSnapshot("调试产品").
+		SetProcessNameSnapshot(process.Name).
+		SetProcessCategorySnapshot("委外").
+		SetUnitNameSnapshot("PCS单位").
+		SetOutsourcingQuantity(mustDecimal(t, "3")).
+		Save(ctx); err != nil {
+		t.Fatalf("create debug outsourcing order item failed: %v", err)
+	}
 }
 
 func assertProjectBusinessTablesEmpty(t *testing.T, ctx context.Context, client *ent.Client) {
@@ -166,6 +222,8 @@ func assertProjectBusinessTablesEmpty(t *testing.T, ctx context.Context, client 
 		{"stock_reservations", client.StockReservation.Query().Count},
 		{"shipment_items", client.ShipmentItem.Query().Count},
 		{"shipments", client.Shipment.Query().Count},
+		{"outsourcing_order_items", client.OutsourcingOrderItem.Query().Count},
+		{"outsourcing_orders", client.OutsourcingOrder.Query().Count},
 		{"outsourcing_facts", client.OutsourcingFact.Query().Count},
 		{"production_facts", client.ProductionFact.Query().Count},
 		{"quality_inspections", client.QualityInspection.Query().Count},
@@ -186,6 +244,7 @@ func assertProjectBusinessTablesEmpty(t *testing.T, ctx context.Context, client 
 		{"bom_headers", client.BOMHeader.Query().Count},
 		{"bom_items", client.BOMItem.Query().Count},
 		{"product_skus", client.ProductSKU.Query().Count},
+		{"processes", client.Process.Query().Count},
 		{"materials", client.Material.Query().Count},
 		{"products", client.Product.Query().Count},
 		{"suppliers", client.Supplier.Query().Count},

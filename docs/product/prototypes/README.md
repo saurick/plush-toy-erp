@@ -183,12 +183,12 @@
 | `core-menu-coverage-v1/index.html` | To Implement | Core | 产品核心菜单覆盖样板，把 20260611 参考规格中的 51 个二级菜单收口为可筛选内容矩阵，标注页面类型、事实源、关键字段、动作和边界。 |
 | `formal-menu-candidate-v1/index.html` | To Implement | Core | 正式菜单候选原型，把内部 51 项菜单覆盖压缩成 12 个高频主入口，说明哪些细项应进入 tab、筛选、动作或详情区。 |
 | `audit-log-page-v1/index.html` | To Implement | Core | 审计日志页原型，把系统控制面事件收敛为审计摘要、筛选分组、日志列表、事件详情、空态和风险事件态；只读追溯账号、角色、权限和初始化事件。 |
-| `business-module-page-standard-v1/index.html` | To Implement | Core | 业务模块标准页样板，参照 `trade-erp` 的紧凑工作台结构，把筛选、页面动作和当前操作压缩到同一卡片；表头保留列顺序入口和排序箭头，并内置回收站空态弹窗；页面只展示必要业务信息，协同 / 流转入口收口到当前操作行，架构边界说明收口到文档和轻提示。 |
+| `business-module-page-standard-v1/index.html` | To Implement | Core | 业务模块标准页样板，参照 `trade-erp` 的紧凑工作台结构，把筛选、页面动作和当前操作压缩到同一卡片；表头保留列顺序入口和排序箭头，不内置通用删除 / 回收站；页面只展示必要业务信息，协同 / 流转入口收口到当前操作行，架构边界说明收口到文档和轻提示。 |
 | `business-module-page-standard-v1/task-collab-entry-v2.html` | To Implement | Core | 业务页协同入口组件样板，用于表达“收起保留风险提示、展开处理本页任务”，不作为独立业务入口。 |
 | `print-template-center-v1/index.html` | To Implement | Core | 模板打印中心样板，覆盖模板导航、纸面预览和打印窗口入口；字段编辑和明细确认回到独立打印窗口。 |
 | `business-detail-page-standard-v1/index.html` | To Implement | Core | 业务详情页标准样板，覆盖基础信息、业务状态、关联单据、操作记录、附件区，并区分 Workflow 协同动作和 Fact 事实动作。 |
 | `business-form-page-standard-v1/index.html` | To Implement | Core | 新建 / 编辑业务弹窗标准样板，覆盖同一弹窗内上方主表字段、下方明细 items、来源选择器入口、首个落地对象、字段分组、必填校验、保存 / 取消 / 重置、来源带值、清值、新增 / 编辑 / 只读状态和缺值 / 残值防护。 |
-| `action-modal-drawer-standard-v1/index.html` | To Implement | Core | 局部动作弹窗标准样板，承接来源选择器、来源导入、回收站、列顺序、删除确认和危险确认；来源选择器最多作为第二层弹窗，并保留分页、已选摘要和清空已选，不替代业务对象新建 / 编辑弹窗主路径。目录名保留历史 `drawer` 字样仅为引用兼容，不代表业务编辑继续使用抽屉。 |
+| `action-modal-drawer-standard-v1/index.html` | To Implement | Core | 局部动作弹窗标准样板，承接来源选择器、来源导入、列顺序、生命周期动作说明和危险确认；来源选择器最多作为第二层弹窗，并保留分页、已选摘要和清空已选，不替代业务对象新建 / 编辑弹窗主路径。目录名保留历史 `drawer` 字样仅为引用兼容，不代表业务编辑继续使用抽屉。 |
 | `business-module-page-standard-v1/images/` | Reference | Exploration / Evidence | 早期三张协同入口方向图，用于追溯方案比较。 |
 | `mobile-role-tasks-v1/implemented-reference.html` | Current | Core | 岗位任务端当前实现参考，用于说明真实页面吸收早期 PNG 后的 as-built 形态。 |
 | `mobile-role-tasks-v1/images/` | Reference | Exploration / Evidence | 岗位任务端改版三张 PNG 原型图，作为早期视觉方向和历史参考。 |
@@ -212,9 +212,9 @@
 | 系统审计日志 | `audit-log-page-v1/index.html` | 系统管理下的审计日志页可参照，重点是审计摘要、系统控制面筛选、风险事件、日志表格、事件详情、空态和只读边界。 | 真实事件来源、payload 字段、保留周期、导出策略、API、RBAC 和菜单仍回到当前代码与正式文档；审计日志不替代业务事实表。 |
 | 业务模块列表页 / 标准业务页 | `business-module-page-standard-v1/index.html` | 客户档案、供应商档案、产品、销售订单、采购订单、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照；当前操作行按钮是出货 / 出库类动作示例，真实页面应按模块调整。 | 同类菜单复用样板即可；未实现菜单和模块动作进入运行时前按模块评审。 |
 | 业务详情页 | `business-detail-page-standard-v1/index.html` | 销售订单、客户 / 供应商、产品、采购入库、库存批次、质检、出货和财务等需要详情承载的页面可参照。 | 字段真源、状态机、关联单据和允许动作回到对应领域文档、API 和 usecase。 |
-| 新建 / 编辑业务弹窗 | `business-form-page-standard-v1/index.html` | 客户、供应商、联系人、销售订单、采购、BOM、出货、库存、质检和财务等业务对象新建 / 编辑可参照；上方放主表字段，下方放联系人、订单行、产品、BOM 或出货等必要 items，item 区只保留来源选择器入口和导入回填结果。业务对象创建、编辑和查看统一走 Modal，并保留打开焦点、Tab、Escape / 关闭和焦点返回路径。 | schema、API、RBAC、保存 usecase、字段默认值和残值 / 缺值防护规则回到对应领域主路径；来源选择器、回收站、列顺序和危险确认按局部动作弹窗收口。 |
+| 新建 / 编辑业务弹窗 | `business-form-page-standard-v1/index.html` | 客户、供应商、联系人、销售订单、采购、BOM、出货、库存、质检和财务等业务对象新建 / 编辑可参照；上方放主表字段，下方放联系人、订单行、产品、BOM 或出货等必要 items，item 区只保留来源选择器入口和导入回填结果。业务对象创建、编辑和查看统一走 Modal，并保留打开焦点、Tab、Escape / 关闭和焦点返回路径。 | schema、API、RBAC、保存 usecase、字段默认值和残值 / 缺值防护规则回到对应领域主路径；来源选择器、列顺序、生命周期动作说明和危险确认按局部动作弹窗收口。 |
 | 协同任务入口 / 处理组件 | `business-module-page-standard-v1/task-collab-entry-v2.html` | 嵌入有 Workflow 协同任务的业务页可参照。 | 作为业务页内组件吸收；独立菜单、路由和权限仍回到任务看板或正式菜单评审。 |
-| 局部动作弹窗 / 确认动作 | `action-modal-drawer-standard-v1/index.html` | 出货、采购、质检、库存、财务等需要在列表页内打开辅助浮层的场景可参照，重点是来源选择器、回收站、列顺序、删除确认和危险确认的宽度、密度、底部动作和信息边界；来源选择器必须包含分页、已选摘要和清空入口。 | 字段真源、后端权限、幂等、状态边界、来源导入门禁、保存 usecase、明细行校验、回收站规则和事实约束回到对应领域主路径；来源选择器只作为第二层选择来源，不编辑本单字段，不再弹第三层；完整新建 / 编辑统一回到业务表单弹窗样板。 |
+| 局部动作弹窗 / 确认动作 | `action-modal-drawer-standard-v1/index.html` | 出货、采购、质检、库存、财务等需要在列表页内打开辅助浮层的场景可参照，重点是来源选择器、列顺序、生命周期动作说明和危险确认的宽度、密度、底部动作和信息边界；来源选择器必须包含分页、已选摘要和清空入口。 | 字段真源、后端权限、幂等、状态边界、来源导入门禁、保存 usecase、明细行校验、生命周期规则和事实约束回到对应领域主路径；来源选择器只作为第二层选择来源，不编辑本单字段，不再弹第三层；完整新建 / 编辑统一回到业务表单弹窗样板。 |
 | 岗位任务端 | `mobile-role-tasks-v1/implemented-reference.html` | 岗位任务端 `/m/<role>/tasks` 当前实现参考。 | 岗位入口继续按 Workflow 任务和角色权限投影；桌面菜单树归桌面菜单配置。 |
 | 模板打印中心 | `print-template-center-v1/index.html` | 模板打印中心可参照，重点是模板导航、纸面预览和打印窗口入口。 | 正式打印模板、业务字段真源、独立打印窗口、后端 API、RBAC 和 Fact 写入回到打印与领域主路径。 |
 | 导入 / 导出 / 帮助 / 开发验收 | 暂无独立完整页面 | 本轮只写作辅助动作参照规则：入口弱化，不喧宾夺主；真实能力仍回到正式页面、工具或 dev-only 入口。 | 已有正式能力不因暂无原型而阻塞；dev-only 入口保持开发治理用途。 |

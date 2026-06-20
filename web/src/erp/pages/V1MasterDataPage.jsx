@@ -1259,13 +1259,10 @@ export default function V1MasterDataPage({ type }) {
     [adminProfile, columnOrder, moduleKey, recordColumns]
   )
   const orderedRecordColumns = useMemo(() => {
-    const nextColumns = isProcessDictionaryPage
-      ? recordColumns
-      : applyModuleColumnOrder(recordColumns, preferredRecordColumnOrder)
-
-    if (isProcessDictionaryPage) {
-      return nextColumns
-    }
+    const nextColumns = applyModuleColumnOrder(
+      recordColumns,
+      preferredRecordColumnOrder
+    )
 
     return nextColumns.map((column) => ({
       ...column,
@@ -1282,7 +1279,6 @@ export default function V1MasterDataPage({ type }) {
     }))
   }, [
     columnOrderSaving,
-    isProcessDictionaryPage,
     persistColumnOrder,
     preferredRecordColumnOrder,
     recordColumns,
@@ -1372,23 +1368,21 @@ export default function V1MasterDataPage({ type }) {
           </>
         }
         actions={
-          isProcessDictionaryPage ? null : (
-            <Space wrap>
-              <ToolbarButton
-                icon={<DownloadOutlined />}
-                disabled={records.length === 0}
-                onClick={exportRecords}
-              >
-                导出当前结果
-              </ToolbarButton>
-              <ToolbarButton
-                icon={<SettingOutlined />}
-                onClick={() => setColumnOrderOpen(true)}
-              >
-                列顺序
-              </ToolbarButton>
-            </Space>
-          )
+          <Space wrap>
+            <ToolbarButton
+              icon={<DownloadOutlined />}
+              disabled={records.length === 0}
+              onClick={exportRecords}
+            >
+              导出当前结果
+            </ToolbarButton>
+            <ToolbarButton
+              icon={<SettingOutlined />}
+              onClick={() => setColumnOrderOpen(true)}
+            >
+              列顺序
+            </ToolbarButton>
+          </Space>
         }
         primaryAction={
           canCreate ? (
@@ -1470,13 +1464,10 @@ export default function V1MasterDataPage({ type }) {
         })}
         emptyDescription={`暂无${entityLabel}记录`}
         rowSelection={{
+          type: 'radio',
           selectedRowKeys: selectedRecord?.id ? [selectedRecord.id] : [],
-          onSelect: (record, selected) => {
-            setSelectedRecord(selected ? record : null)
-          },
-          onSelectAll: (_selected, selectedRows) => {
-            setSelectedRecord(selectedRows[0] || null)
-          },
+          onChange: (_keys, selectedRows) =>
+            setSelectedRecord(selectedRows[0] || null),
         }}
         rowClassName={(record) =>
           record.id === selectedRecord?.id ? 'ant-table-row-selected' : ''
@@ -1537,17 +1528,15 @@ export default function V1MasterDataPage({ type }) {
         </Form>
       </BusinessFormModal>
 
-      {isProcessDictionaryPage ? null : (
-        <ColumnOrderModal
-          open={columnOrderOpen}
-          moduleTitle={config.title}
-          columns={recordColumns}
-          order={preferredRecordColumnOrder}
-          saving={columnOrderSaving}
-          onChange={(nextOrder) => persistColumnOrder(nextOrder, recordColumns)}
-          onClose={() => setColumnOrderOpen(false)}
-        />
-      )}
+      <ColumnOrderModal
+        open={columnOrderOpen}
+        moduleTitle={config.title}
+        columns={recordColumns}
+        order={preferredRecordColumnOrder}
+        saving={columnOrderSaving}
+        onChange={(nextOrder) => persistColumnOrder(nextOrder, recordColumns)}
+        onClose={() => setColumnOrderOpen(false)}
+      />
     </BusinessPageLayout>
   )
 }

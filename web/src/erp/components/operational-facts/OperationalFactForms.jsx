@@ -372,7 +372,7 @@ export function FactFormFields({ typeOptions, includeSupplier = false }) {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="对象引用"
+        label="对象内部引用"
         name="subject_id"
         rules={[{ required: true }]}
       >
@@ -380,7 +380,7 @@ export function FactFormFields({ typeOptions, includeSupplier = false }) {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="仓库引用"
+        label="仓库内部引用"
         name="warehouse_id"
         rules={[{ required: true }]}
       >
@@ -388,14 +388,14 @@ export function FactFormFields({ typeOptions, includeSupplier = false }) {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="批次引用"
+        label="批次内部引用"
         name="lot_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="单位引用"
+        label="单位内部引用"
         name="unit_id"
         rules={[{ required: true }]}
       >
@@ -413,7 +413,7 @@ export function FactFormFields({ typeOptions, includeSupplier = false }) {
         <>
           <Form.Item
             className={BUSINESS_FIELD_CLASS}
-            label="供应商引用"
+            label="供应商内部引用"
             name="supplier_id"
           >
             <InputNumber min={1} precision={0} style={{ width: '100%' }} />
@@ -436,14 +436,14 @@ export function FactFormFields({ typeOptions, includeSupplier = false }) {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="来源记录"
+        label="来源记录内部引用"
         name="source_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="来源行引用"
+        label="来源行内部引用"
         name="source_line_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
@@ -487,14 +487,14 @@ export function ShipmentFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="销售订单引用"
+        label="销售订单内部引用"
         name="sales_order_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="客户引用"
+        label="客户内部引用"
         name="customer_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
@@ -533,7 +533,7 @@ export function ShipmentItemFormFields() {
     <>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="出货单引用"
+        label="出货单内部引用"
         name="shipment_id"
         rules={[{ required: true }]}
       >
@@ -541,14 +541,14 @@ export function ShipmentItemFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="销售订单行引用"
+        label="销售订单行内部引用"
         name="sales_order_item_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="产品引用"
+        label="产品内部引用"
         name="product_id"
         rules={[{ required: true }]}
       >
@@ -556,7 +556,7 @@ export function ShipmentItemFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="仓库引用"
+        label="仓库内部引用"
         name="warehouse_id"
         rules={[{ required: true }]}
       >
@@ -564,14 +564,14 @@ export function ShipmentItemFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="批次引用"
+        label="批次内部引用"
         name="lot_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="单位引用"
+        label="单位内部引用"
         name="unit_id"
         rules={[{ required: true }]}
       >
@@ -609,21 +609,21 @@ export function ReservationFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="销售订单引用"
+        label="销售订单内部引用"
         name="sales_order_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="销售订单行引用"
+        label="销售订单行内部引用"
         name="sales_order_item_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="产品引用"
+        label="产品内部引用"
         name="product_id"
         rules={[{ required: true }]}
       >
@@ -631,7 +631,7 @@ export function ReservationFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="仓库引用"
+        label="仓库内部引用"
         name="warehouse_id"
         rules={[{ required: true }]}
       >
@@ -639,14 +639,14 @@ export function ReservationFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="批次引用"
+        label="批次内部引用"
         name="lot_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="单位引用"
+        label="单位内部引用"
         name="unit_id"
         rules={[{ required: true }]}
       >
@@ -719,7 +719,7 @@ export function FinanceFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="往来方引用"
+        label="往来方内部引用"
         name="counterparty_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
@@ -799,14 +799,14 @@ export function FinanceFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="来源记录"
+        label="来源记录内部引用"
         name="source_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="来源行引用"
+        label="来源行内部引用"
         name="source_line_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />

@@ -111,10 +111,15 @@ function resolveBusinessTableRowSelection(rowSelection) {
 
   if (rowSelection.type !== 'radio') return rowSelection
 
+  const columnTitle =
+    rowSelection.columnTitle && rowSelection.columnTitle !== '选择'
+      ? rowSelection.columnTitle
+      : null
+
   return {
-    columnTitle: '选择',
     columnWidth: BUSINESS_TABLE_SELECTION_COLUMN_WIDTH,
     ...rowSelection,
+    columnTitle,
   }
 }
 
@@ -633,6 +638,7 @@ export function SelectedItemsSummaryTag({
 }
 
 export function BusinessDataTable({
+  tableHeader,
   loading,
   rowKey,
   columns,
@@ -667,6 +673,7 @@ export function BusinessDataTable({
 
   return (
     <Card className="erp-business-data-table-card erp-business-module-table-card">
+      {tableHeader}
       <Table
         loading={loading}
         rowKey={rowKey}

@@ -151,3 +151,103 @@ test('workflow business modules: 三页不冒充事实写入', () => {
     'router should not expose the legacy formal shell page'
   )
 })
+
+test('business list toolbar: 不提供通用删除和回收站壳能力', () => {
+  const source = readFileSync(
+    new URL(
+      '../components/business-list/BusinessListToolbarActions.jsx',
+      import.meta.url
+    ),
+    'utf8'
+  )
+
+  for (const text of [
+    '批量删除',
+    '回收站',
+    'DeleteOutlined',
+    'InboxOutlined',
+  ]) {
+    assert.equal(
+      source.includes(text),
+      false,
+      `shared business list toolbar should not expose generic delete/trash: ${text}`
+    )
+  }
+
+  for (const text of ['导出当前结果', '列顺序']) {
+    assert.equal(
+      source.includes(text),
+      true,
+      `shared business list toolbar should keep supported action: ${text}`
+    )
+  }
+})
+
+test('business delete governance: 删除必须走引用检查和业务生命周期替代', () => {
+  const agentsSource = readFileSync(
+    new URL('../../../../AGENTS.md', import.meta.url),
+    'utf8'
+  )
+  const currentTruthSource = readFileSync(
+    new URL('../../../../docs/当前真源与交接顺序.md', import.meta.url),
+    'utf8'
+  )
+  const lifecycleUiPolicySource = readFileSync(
+    new URL(
+      '../../../../docs/product/业务数据生命周期与页面动作规则.md',
+      import.meta.url
+    ),
+    'utf8'
+  )
+
+  for (const text of [
+    '后端 usecase 做引用检查',
+    '前端调用后端 usecase',
+    '该记录已被采购订单 / 库存流水引用，不能删除',
+    '停用 / 禁用 / 归档',
+    '取消、关闭、冲正、作废、红冲或版本归档',
+    '数据修复 / 合并 / 迁移专项',
+    '归档不是回收站',
+    '已归档',
+    '不得用“还原删除”语义表达取消归档',
+  ]) {
+    assert.equal(
+      agentsSource.includes(text),
+      true,
+      `AGENTS should keep delete lifecycle governance: ${text}`
+    )
+  }
+
+  for (const text of [
+    '检查状态和引用关系',
+    '允许删除的草稿 / 误建记录',
+    '返回可读原因',
+    '筛选、状态过滤或归档视图',
+    '管理员级数据修复 / 合并 / 迁移专项',
+    '归档记录不进入回收站',
+    '已归档',
+    '不使用“回收站 / 还原删除”语义',
+    '当前业务模块不提供通用回收站',
+  ]) {
+    assert.equal(
+      currentTruthSource.includes(text),
+      true,
+      `current truth should keep delete lifecycle boundary: ${text}`
+    )
+  }
+
+  for (const text of [
+    '当前业务页面不提供通用删除、批量删除、回收站或还原删除入口',
+    'MasterData 主数据',
+    'Source Document 源单据',
+    'Fact / Ledger 事实与台账',
+    'Workflow 协同任务',
+    '尚未满足条件时，直接不展示删除 / 回收站入口',
+  ]) {
+    assert.equal(
+      lifecycleUiPolicySource.includes(text),
+      true,
+      `lifecycle UI policy should keep page action boundary: ${text}`
+    )
+  }
+})

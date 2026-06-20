@@ -320,6 +320,7 @@ export default function ERPLayout() {
     '/erp/master/',
     '/erp/sales/',
     '/erp/product/',
+    '/erp/engineering/',
     '/erp/purchase/',
     '/erp/quality/',
     '/erp/inventory/',

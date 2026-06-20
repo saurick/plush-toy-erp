@@ -1206,13 +1206,10 @@ export default function V1SalesOrdersPage() {
         })}
         emptyDescription="暂无销售订单"
         rowSelection={{
+          type: 'radio',
           selectedRowKeys: selectedOrder?.id ? [selectedOrder.id] : [],
-          onSelect: (record, selected) => {
-            setSelectedOrder(selected ? record : null)
-          },
-          onSelectAll: (_selected, selectedRows) => {
-            setSelectedOrder(selectedRows[0] || null)
-          },
+          onChange: (_keys, selectedRows) =>
+            setSelectedOrder(selectedRows[0] || null),
         }}
         rowClassName={(record) =>
           record.id === selectedOrder?.id ? 'ant-table-row-selected' : ''

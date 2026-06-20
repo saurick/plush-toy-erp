@@ -16,7 +16,7 @@
 | 纯计算器 | 已有库存可用量；后续候选 BOM 展开需求、收货状态、结算状态 | 公式只能有一处真源 |
 | 领域错误 | 已有 `ErrInvalidQuantity`、`ErrInvalidMoney`、`ErrInvalidIdempotencyKey`；后续候选 `ErrInvalidStatusTransition`、`ErrInsufficientInventory` | 表达领域规则失败，不负责 transport 映射 |
 | 领域事件定义 | `ShipmentShipped`、`InventoryReserved` | 只定义结构，不发布、不持久化 |
-| Policy 类型 | 超收、超发、负库存、自动归档旧 BOM | 由 `biz` 构造 policy，`core` 只消费参数 |
+| Policy 类型 | 超收、超发、负库存、旧 BOM 设为历史版本 | 由 `biz` 构造 policy，`core` 只消费参数 |
 
 ## 禁止放入
 

@@ -254,8 +254,8 @@ export function createPurchaseReceiptScenarios(deps) {
 
         assert.deepEqual(
           metrics.headers.map((header) => header.text),
-          ['明细', '选择', '入库单号'],
-          `入库表格前置控制列表头不应继续显示为空白块: ${JSON.stringify(metrics)}`
+          ['明细', '', '入库单号'],
+          `入库表格前置选择列不应显示“选择”二字: ${JSON.stringify(metrics)}`
         )
         for (const header of metrics.headers.slice(0, 2)) {
           assert(

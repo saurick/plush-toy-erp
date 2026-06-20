@@ -283,7 +283,7 @@ export function PurchaseOrderFormFields({
                         disabled={fields.length <= 1}
                         onClick={() => remove(field.name)}
                       >
-                        删除行
+                        移除行
                       </Button>
                     </div>
                     <div className="erp-sales-order-lines-form__grid">

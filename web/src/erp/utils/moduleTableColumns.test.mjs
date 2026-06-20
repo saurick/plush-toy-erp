@@ -12,6 +12,7 @@ import {
   createBusinessColumnSorter,
   moveModuleColumnOrder,
   repositionModuleColumnOrder,
+  resolveModuleColumnKey,
   sanitizeModuleColumnOrder,
 } from './moduleTableColumns.mjs'
 
@@ -86,6 +87,41 @@ test('moduleTableColumns: 支持把列移动到指定位置', () => {
       2
     ),
     ['customerName', 'amount', 'code']
+  )
+})
+
+test('moduleTableColumns: 无 dataIndex/key 的展示列按原始列位置解析顺序 key', () => {
+  const displayColumns = [
+    { title: '单号', dataIndex: 'order_no' },
+    {
+      title: '客户',
+      sortValue: (record) => record.customer_snapshot,
+      render: (_, record) => record.customer_snapshot || '-',
+    },
+    {
+      title: '计划 / 实际出货',
+      sortValue: (record) => record.shipped_at || record.planned_ship_at,
+      render: (_, record) => record.shipped_at || record.planned_ship_at || '-',
+    },
+  ]
+
+  assert.deepEqual(buildModuleColumnOrder(displayColumns), [
+    'order_no',
+    '__column__1',
+    '__column__2',
+  ])
+  assert.equal(
+    resolveModuleColumnKey(displayColumns[1], displayColumns),
+    '__column__1'
+  )
+  assert.deepEqual(
+    moveModuleColumnOrder(
+      buildModuleColumnOrder(displayColumns),
+      displayColumns,
+      resolveModuleColumnKey(displayColumns[1], displayColumns),
+      -1
+    ),
+    ['__column__1', 'order_no', '__column__2']
   )
 })
 

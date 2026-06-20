@@ -1204,6 +1204,7 @@ export default function V1PurchaseOrdersPage() {
         dataSource={orders}
         scroll={{ x: 1200 }}
         rowSelection={{
+          type: 'radio',
           selectedRowKeys,
           onChange: (nextKeys, nextRows) => {
             applySelectedRowKeys(nextKeys)
@@ -1222,7 +1223,7 @@ export default function V1PurchaseOrdersPage() {
           onClick: (event) => {
             if (
               event.target?.closest?.(
-                '.ant-checkbox-wrapper, .ant-checkbox, .ant-table-selection-column'
+                '.ant-checkbox-wrapper, .ant-checkbox, .ant-radio-wrapper, .ant-radio, .ant-table-selection-column'
               )
             ) {
               return

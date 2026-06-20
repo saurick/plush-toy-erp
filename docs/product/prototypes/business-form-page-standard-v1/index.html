@@ -661,7 +661,7 @@
                   <div class="crumb">ERP / 标准业务弹窗 / To Implement</div>
                   <h2>销售订单业务弹窗样板</h2>
                   <p class="summary">
-                    新建和编辑复用同一个业务弹窗：上方维护主表字段，下方维护订单行、联系人、BOM 明细或其他必要 items；item 区可以从对应业务库导入，回收站和危险确认回到局部动作弹窗。
+                    新建和编辑复用同一个业务弹窗：上方维护主表字段，下方维护订单行、联系人、BOM 明细或其他必要 items；item 区可以从对应业务库导入，列顺序、生命周期动作说明和危险确认回到局部动作弹窗。
                   </p>
                 </div>
                 <div class="tags">
@@ -762,7 +762,7 @@
                     <article class="item-card">
                       <div class="item-head">
                         <strong>条目 1</strong>
-                        <button class="btn text remove-item" type="button" disabled>删除</button>
+                        <button class="btn text remove-item" type="button" disabled>移除</button>
                       </div>
                       <div class="item-grid">
                         <div class="field" data-field="product">
@@ -1062,7 +1062,7 @@
         article.innerHTML = `
           <div class="item-head">
             <strong>条目 ${nextIndex}</strong>
-            <button class="btn text remove-item" type="button">删除</button>
+            <button class="btn text remove-item" type="button">移除</button>
           </div>
           <div class="item-grid">
             <div class="field"><label>产品</label><input value="毛绒钥匙扣 B" /></div>

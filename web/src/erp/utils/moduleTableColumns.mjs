@@ -9,6 +9,17 @@ export const getModuleColumnKey = (column = {}, index = 0) =>
     column?.dataIndex || column?.key || `${FALLBACK_COLUMN_KEY_PREFIX}${index}`
   )
 
+export const resolveModuleColumnKey = (column = {}, columns = []) => {
+  if (column?.dataIndex || column?.key) {
+    return getModuleColumnKey(column)
+  }
+
+  const matchedIndex = (Array.isArray(columns) ? columns : []).findIndex(
+    (item) => item === column
+  )
+  return getModuleColumnKey(column, matchedIndex >= 0 ? matchedIndex : 0)
+}
+
 export const buildModuleColumnOrder = (columns = []) =>
   (Array.isArray(columns) ? columns : []).map((column, index) =>
     getModuleColumnKey(column, index)

@@ -156,8 +156,8 @@ export const deleteProcessingContractLine = ({
         : 0,
     message:
       deleteStart === deleteEnd
-        ? `已删除第 ${deleteStart + 1} 行。`
-        : `已删除第 ${deleteStart + 1} - ${deleteEnd + 1} 行合并块。`,
+        ? `已移除第 ${deleteStart + 1} 行。`
+        : `已移除第 ${deleteStart + 1} - ${deleteEnd + 1} 行合并块。`,
   }
 }
 

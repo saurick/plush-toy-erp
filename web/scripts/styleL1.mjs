@@ -1516,13 +1516,20 @@ async function assertMobileTaskRefreshFeedback(page, { scenarioName }) {
 
 async function verifyBusinessModuleColumnOrderDialog(
   page,
-  { moduleKey = 'project-orders', heading = '订单/款式立项' } = {}
+  {
+    moduleKey = 'project-orders',
+    heading = '订单/款式立项',
+    headerMenuTargetLabel = '',
+  } = {}
 ) {
   const storageKey = `erp.module.column-order.${moduleKey}`
   await page.evaluate((key) => {
     window.localStorage.removeItem(key)
   }, storageKey)
-  await verifyBusinessModuleColumnOrderHeaderMenu(page, { storageKey })
+  await verifyBusinessModuleColumnOrderHeaderMenu(page, {
+    storageKey,
+    targetLabel: headerMenuTargetLabel,
+  })
   const primaryToolbarActions = page
     .locator('.erp-business-operation-panel__actions')
     .first()
@@ -1692,7 +1699,10 @@ async function verifyBusinessModuleColumnOrderDialog(
   await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
 }
 
-async function verifyBusinessModuleColumnOrderHeaderMenu(page, { storageKey }) {
+async function verifyBusinessModuleColumnOrderHeaderMenu(
+  page,
+  { storageKey, targetLabel = '' }
+) {
   const headerLabelsBefore = await readBusinessModuleHeaderLabels(page)
   assert(
     headerLabelsBefore.length >= 2,
@@ -1706,12 +1716,21 @@ async function verifyBusinessModuleColumnOrderHeaderMenu(page, { storageKey }) {
   const headerTriggers = page.locator(
     '.erp-business-data-table-card .erp-module-column-header-trigger'
   )
+  const requestedTargetIndex = targetLabel
+    ? headerLabelsBefore.indexOf(targetLabel)
+    : 1
+  const targetIndex = requestedTargetIndex > 0 ? requestedTargetIndex : 1
+  const expectedFirstLabel = headerLabelsBefore[targetIndex]
+  assert(
+    expectedFirstLabel,
+    `表头列顺序菜单未找到可移动目标列: ${JSON.stringify({ targetLabel, headerLabelsBefore })}`
+  )
   const clickHeaderTrigger = async (index) => {
     const trigger = headerTriggers.nth(index)
     await trigger.waitFor({ state: 'visible', timeout: 10_000 })
     await trigger.click()
   }
-  await clickHeaderTrigger(1)
+  await clickHeaderTrigger(targetIndex)
 
   const menu = page.locator('.ant-dropdown:not(.ant-dropdown-hidden)').last()
   await menu
@@ -1736,7 +1755,7 @@ async function verifyBusinessModuleColumnOrderHeaderMenu(page, { storageKey }) {
   )
 
   const headerColumnOrderSync = waitForAdminColumnOrderSync(page)
-  await menu.getByText('左移一列').click()
+  await menu.getByText('移到最前').click()
   await headerColumnOrderSync
   await page.waitForFunction(
     ({ expectedFirstLabel }) => {
@@ -1745,7 +1764,7 @@ async function verifyBusinessModuleColumnOrderHeaderMenu(page, { storageKey }) {
       )
       return String(firstLabel?.textContent || '').trim() === expectedFirstLabel
     },
-    { expectedFirstLabel: headerLabelsBefore[1] }
+    { expectedFirstLabel }
   )
 
   const storedOrder = await page.evaluate((key) => {
@@ -5646,8 +5665,8 @@ async function assertBusinessMainTableSortableColumns(
   const selectionHeaders = metrics.headers.filter(
     (header) => header.isSelectionColumn
   )
-  const selectionHeadersWithoutMeaning = selectionHeaders.filter(
-    (header) => !header.hasSelectionControl && header.text !== '选择'
+  const selectionHeadersWithChoiceText = selectionHeaders.filter(
+    (header) => header.text === '选择'
   )
   const skippedHeaders = new Set(unsortableHeaders)
   const sortableHeaders = metrics.headers.filter(
@@ -5685,9 +5704,9 @@ async function assertBusinessMainTableSortableColumns(
       `${scenarioName} 当前操作业务主表应保留选择列: ${JSON.stringify(metrics)}`
     )
     assert.deepEqual(
-      selectionHeadersWithoutMeaning,
+      selectionHeadersWithChoiceText,
       [],
-      `${scenarioName} 选择列表头不应为空白不可解释: ${JSON.stringify(metrics)}`
+      `${scenarioName} 选择控制列不应显示“选择”二字: ${JSON.stringify(metrics)}`
     )
   }
   assert.deepEqual(

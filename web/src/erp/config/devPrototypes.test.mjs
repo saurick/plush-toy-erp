@@ -146,6 +146,13 @@ test('devPrototypes: 登记当前原型与样板资产并区分类型和状态',
   const actionModal = DEV_PROTOTYPE_ASSETS.find(
     (item) => item.key === 'action-modal-drawer-standard'
   )
+  assert.doesNotMatch(
+    actionModal?.description || '',
+    /覆盖[^。；]*回收站|删除确认/,
+    '局部动作弹窗样板不应把回收站或删除确认登记成通用覆盖项'
+  )
+  assert.match(actionModal?.description || '', /生命周期动作说明/)
+  assert.match(actionModal?.description || '', /不承诺通用回收站/)
   assert.match(actionModal?.appliesTo || '', /后端 usecase \/ RBAC 决定/)
   assert.equal(
     DEV_PROTOTYPE_ASSETS.find(

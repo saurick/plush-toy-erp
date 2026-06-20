@@ -34,7 +34,7 @@ bash scripts/doctor.sh
 - `debug.capabilities`：返回当前环境、seed / cleanup / 业务数据清空是否允许和禁用原因
 - `debug.rebuild_business_chain_scenario`：生成带 debugRunId 标记的调试数据
 - `debug.clear_business_chain_scenario`：按 debugRunId 预览或清理调试数据
-- `debug.clear_business_data`：清空本项目当前 SQL 连接中的 V1 主数据 / 订单、Workflow、Operational Fact、采购入库、库存、BOM、物料、成品、仓库和单位业务表
+- `debug.clear_business_data`：清空本项目当前 SQL 连接中的 V1 主数据 / 订单、Workflow、Operational Fact、采购入库、库存、BOM、工序档案、委外源单、物料、成品、仓库和单位业务表
 
 这些接口默认面向当前 SQL 连接开启。可用 `ERP_DEBUG_SEED_ENABLED=false` 或 `ERP_DEBUG_CLEANUP_ENABLED=false` 显式关闭写操作；清理类能力仍要求 `ERP_DEBUG_CLEANUP_SCOPE=debug_run`。业务数据清空不删除账号、权限、管理员偏好、配置和数据库结构。后端还会校验管理员身份和 debug 权限。
 
@@ -59,7 +59,7 @@ bash scripts/doctor.sh
 
 `purchase_order` JSON-RPC 域承载采购订单 Source Document / Purchase Commitment 主路径。采购订单表单保存应优先使用 `save_purchase_order_with_items`，在一个后端事务中完成订单头创建 / 更新、订单行新增 / 更新以及缺失开放行取消；同时支持 `submit_purchase_order / approve_purchase_order / close_purchase_order / cancel_purchase_order / get_purchase_order / list_purchase_orders / list_purchase_order_items`。采购订单只表达供应商采购承诺，采购入库行可选关联 `purchase_order_item_id` 做来源追溯；它不写库存、批次、应付、发票或付款事实。
 
-`bom` JSON-RPC 域承载 BOM Version / 工程资料主路径。当前支持 `list_bom_versions / get_bom_version / create_bom_draft / update_bom_draft / add_bom_item / update_bom_item / delete_bom_item / copy_bom_version / activate_bom_version / archive_bom_version`。BOM 草稿可维护头信息和明细；激活会归档同产品旧 `ACTIVE` 版本，已激活 BOM 不允许直接改头或明细，改版应复制新草稿后再激活。该域只维护工程资料，不生成采购需求、采购订单、库存流水、生产任务、成本、应付、发票或付款事实。
+`bom` JSON-RPC 域承载 BOM Version / 工程资料主路径。当前支持 `list_bom_versions / get_bom_version / create_bom_draft / update_bom_draft / add_bom_item / update_bom_item / delete_bom_item / copy_bom_version / activate_bom_version / archive_bom_version`。BOM 草稿可维护头信息和明细；激活会把同产品旧 `ACTIVE` 版本设为历史版本（底层状态仍为 `ARCHIVED`），已激活 BOM 不允许直接改头或明细，改版应复制新草稿后再激活。该域只维护工程资料，不生成采购需求、采购订单、库存流水、生产任务、成本、应付、发票或付款事实。
 
 `admin` JSON-RPC 域承载后台管理员、角色和权限管理。当前系统控制面审计入口为 `audit_logs`，受 `system.audit.read` 权限控制，只读返回 `runtime_audit_events` 中的启动初始化和账号 / 角色 / 权限变更事件；支持按 `source / event_type / event_key / actor_key / target_type / target_key / keyword / created_from / created_to` 查询，并返回 `risk_level / action_label / summary / actor_key / target_type / target_key` 供前端定位。账号创建、角色绑定、账号启停、重置密码和角色权限变更会追加非敏感 before / after 摘要，不保存密码、token 或密码 hash。该审计表不是采购、库存、质检、出货、财务等业务动作的通用审计事实表。
 

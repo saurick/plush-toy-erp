@@ -254,7 +254,7 @@ test('materialPurchaseContractEditor: 插入和删除明细行会同步调整当
   assert.equal(deleted.selectedRowIndex, 1)
 })
 
-test('materialPurchaseContractEditor: 删除到只剩一行时会重置为空白行', () => {
+test('materialPurchaseContractEditor: 移除到只剩一行时会重置为空白行', () => {
   const deleted = deleteMaterialPurchaseLine({
     lines: [sampleDraft.lines[0]],
     merges: [],

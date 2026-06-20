@@ -585,7 +585,7 @@ export function ContactFormList({ form, entityLabel }) {
                       size="small"
                       danger
                       icon={<DeleteOutlined />}
-                      aria-label={`删除联系人条目 ${index + 1}`}
+                      aria-label={`移除联系人条目 ${index + 1}`}
                       disabled={fields.length <= 1}
                       onClick={() => remove(field.name)}
                     />

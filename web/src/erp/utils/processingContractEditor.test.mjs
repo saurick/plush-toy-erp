@@ -97,7 +97,7 @@ test('processingContractEditor: 达到 300 行后不允许继续插入', () => {
   assert.match(inserted.message, /最多支持 300 行/)
 })
 
-test('FL_processing_contract_editor__clears_deleted_last_line processingContractEditor: 删除到只剩一行时会重置为空白行', () => {
+test('FL_processing_contract_editor__clears_deleted_last_line processingContractEditor: 移除到只剩一行时会重置为空白行', () => {
   const deleted = deleteProcessingContractLine({
     lines: [sampleLines[0]],
     selectedLineIndex: 0,

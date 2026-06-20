@@ -876,8 +876,9 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         scroll={{ x: 1340 }}
         emptyDescription="暂无匹配记录"
         rowSelection={{
+          type: 'radio',
           selectedRowKeys,
-          onChange: (nextKeys) => setSelectedRowKeys(nextKeys),
+          onChange: (nextKeys) => setSelectedRowKeys(nextKeys.slice(-1)),
         }}
         rowClassName={(record) =>
           selectedRowKeys.includes(record.id) ? 'ant-table-row-selected' : ''

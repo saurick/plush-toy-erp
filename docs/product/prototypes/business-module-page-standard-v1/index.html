@@ -577,11 +577,11 @@
         padding: 24px;
       }
 
-      body.show-recycle .modal-layer {
+      body.show-lifecycle .modal-layer {
         display: flex;
       }
 
-      .recycle-modal {
+      .lifecycle-modal {
         display: grid;
         width: min(980px, calc(100vw - 48px));
         max-height: calc(100vh - 64px);
@@ -629,11 +629,11 @@
         padding: 0 22px 22px;
       }
 
-      .recycle-modal table {
+      .lifecycle-modal table {
         min-width: 860px;
       }
 
-      .empty-recycle {
+      .empty-lifecycle {
         display: grid;
         min-height: 220px;
         place-items: center;
@@ -726,7 +726,7 @@
           padding: 12px;
         }
 
-        .recycle-modal {
+        .lifecycle-modal {
           width: 100%;
           max-height: calc(100vh - 24px);
         }
@@ -822,8 +822,7 @@
             <div class="toolbar-actions">
               <button class="btn">导出当前结果</button>
               <button class="btn">⚙ 列顺序</button>
-              <button class="btn danger">♲ 批量删除</button>
-              <button class="btn" id="openRecycle" type="button">回收站</button>
+              <button class="btn" id="openLifecycle" type="button">生命周期规则</button>
             </div>
             <div class="create-actions">
               <button class="btn primary">+ 新建记录</button>
@@ -851,7 +850,7 @@
               <button class="btn small action-button">复制</button>
               <button class="btn small primary action-button">生成入库通知</button>
               <button class="btn small action-button">打印采购合同</button>
-              <button class="btn small danger action-button">删除</button>
+              <button class="btn small danger action-button">关闭 / 取消</button>
             </div>
           </div>
         </section>
@@ -937,32 +936,44 @@
     </main>
 
     <div class="modal-layer" role="presentation">
-      <section class="recycle-modal" role="dialog" aria-modal="true" aria-labelledby="recycleTitle">
+      <section class="lifecycle-modal" role="dialog" aria-modal="true" aria-labelledby="lifecycleTitle">
         <header class="modal-head">
-          <h2 class="modal-title" id="recycleTitle">回收站</h2>
-          <button class="modal-close" id="closeRecycle" type="button" aria-label="关闭">×</button>
+          <h2 class="modal-title" id="lifecycleTitle">生命周期动作说明</h2>
+          <button class="modal-close" id="closeLifecycle" type="button" aria-label="关闭">×</button>
         </header>
         <div class="modal-toolbar">
-          <button class="btn" disabled type="button">↩ 批量恢复</button>
-          <span class="muted">已选择 0 条回收站记录</span>
+          <span class="muted">本样板不提供通用删除 / 回收站；按对象类型展示真实状态动作。</span>
         </div>
         <div class="modal-body">
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th style="width: 52px">选中</th>
-                  <th style="width: 150px">单据编号</th>
-                  <th>标题</th>
-                  <th style="width: 150px">业务状态</th>
-                  <th style="width: 160px">删除时间</th>
-                  <th style="width: 150px">删除原因</th>
-                  <th style="width: 150px">操作</th>
+                  <th style="width: 160px">对象类型</th>
+                  <th>页面动作</th>
+                  <th style="width: 220px">不展示的动作</th>
                 </tr>
               </thead>
+              <tbody>
+                <tr>
+                  <td>主数据</td>
+                  <td>启用 / 停用，保留历史引用可读。</td>
+                  <td>通用删除、回收站</td>
+                </tr>
+                <tr>
+                  <td>源单据</td>
+                  <td>提交、取消、关闭、归档。</td>
+                  <td>提交后删除</td>
+                </tr>
+                <tr>
+                  <td>事实 / 台账</td>
+                  <td>取消、冲正、调整或只读。</td>
+                  <td>删除事实流水</td>
+                </tr>
+              </tbody>
             </table>
           </div>
-          <div class="empty-recycle">回收站暂无记录</div>
+          <div class="empty-lifecycle">只有完成后端 usecase、RBAC、审计和引用检查的对象，才可单独评审删除 / 恢复。</div>
         </div>
       </section>
     </div>
@@ -1009,8 +1020,8 @@
       const selectedSummary = document.querySelector("#selectedSummary");
       const clearSelection = document.querySelector("#clearSelection");
       const actionButtons = document.querySelectorAll(".action-button");
-      const openRecycle = document.querySelector("#openRecycle");
-      const closeRecycle = document.querySelector("#closeRecycle");
+      const openLifecycle = document.querySelector("#openLifecycle");
+      const closeLifecycle = document.querySelector("#closeLifecycle");
       let selectedIndex = 0;
 
       function renderRows() {
@@ -1063,12 +1074,12 @@
         syncSelection();
       });
 
-      openRecycle.addEventListener("click", () => {
-        document.body.classList.add("show-recycle");
+      openLifecycle.addEventListener("click", () => {
+        document.body.classList.add("show-lifecycle");
       });
 
-      closeRecycle.addEventListener("click", () => {
-        document.body.classList.remove("show-recycle");
+      closeLifecycle.addEventListener("click", () => {
+        document.body.classList.remove("show-lifecycle");
       });
 
       renderRows();

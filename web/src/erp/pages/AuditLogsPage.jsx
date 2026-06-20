@@ -24,6 +24,7 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import { DateInput } from '../components/business-list/BusinessListLayout.jsx'
+import { buildAuditLogParams } from '../utils/auditLogParams.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -377,15 +378,18 @@ export default function AuditLogsPage() {
     setLoading(true)
     try {
       const offset = (pagination.current - 1) * pagination.pageSize
-      const result = await adminRpc.call('audit_logs', {
-        source,
-        event_key: eventKey,
-        keyword,
-        created_from: createdFrom,
-        created_to: createdTo,
-        limit: pagination.pageSize,
-        offset,
-      })
+      const result = await adminRpc.call(
+        'audit_logs',
+        buildAuditLogParams({
+          source,
+          eventKey,
+          keyword,
+          createdFrom,
+          createdTo,
+          pageSize: pagination.pageSize,
+          offset,
+        })
+      )
       setEvents(normalizeAuditEvents(result?.data?.events))
       setTotal(Number(result?.data?.total || 0))
       return true

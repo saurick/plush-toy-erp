@@ -5,7 +5,6 @@ import {
   Card,
   Dropdown,
   Empty,
-  Input,
   InputNumber,
   Table,
   Tabs,
@@ -86,9 +85,25 @@ const TXN_TYPE_OPTIONS = [
   { label: '冲正', value: 'REVERSAL' },
 ]
 
+const SOURCE_TYPE_OPTIONS = [
+  { label: '全部来源', value: '' },
+  { label: '采购入库', value: 'PURCHASE_RECEIPT' },
+  { label: '采购退货', value: 'PURCHASE_RETURN' },
+  { label: '入库调整', value: 'PURCHASE_RECEIPT_ADJUSTMENT' },
+  { label: '出货单', value: 'SHIPMENT' },
+  { label: '生产事实', value: 'PRODUCTION_FACT' },
+  { label: '委外事实', value: 'OUTSOURCING_FACT' },
+]
+
 const SUBJECT_TYPE_LABELS = Object.freeze({
   MATERIAL: '材料',
   PRODUCT: '成品',
+})
+
+const SEARCH_PLACEHOLDERS = Object.freeze({
+  [VIEW_BALANCES]: '搜索对象类型 / 内部引用',
+  [VIEW_LOTS]: '搜索批次号 / 供应商批次 / 色号',
+  [VIEW_TXNS]: '搜索来源 / 备注 / 幂等键',
 })
 
 const LOT_STATUS_LABELS = Object.freeze({
@@ -124,6 +139,15 @@ const TXN_TYPE_COLORS = Object.freeze({
   TRANSFER_OUT: 'purple',
   REVERSAL: 'default',
 })
+
+const SOURCE_TYPE_LABELS = Object.freeze(
+  Object.fromEntries(
+    SOURCE_TYPE_OPTIONS.filter((item) => item.value).map((item) => [
+      item.value,
+      item.label,
+    ])
+  )
+)
 
 function positiveInt(value) {
   const numeric = Number(value || 0)
@@ -175,6 +199,13 @@ function txnTypeTag(value) {
 function txnTypeText(value) {
   const key = String(value || '').trim()
   return TXN_TYPE_LABELS[key] || key || ''
+}
+
+function sourceTypeText(value) {
+  const key = String(value || '')
+    .trim()
+    .toUpperCase()
+  return SOURCE_TYPE_LABELS[key] || key || ''
 }
 
 function directionTag(value) {
@@ -253,6 +284,7 @@ export default function V1InventoryLedgerPage() {
   const [lotStatus, setLotStatus] = useState('')
   const [txnType, setTxnType] = useState('')
   const [sourceType, setSourceType] = useState('')
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false)
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [loading, setLoading] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
@@ -331,6 +363,13 @@ export default function V1InventoryLedgerPage() {
     resetBusinessPaginationCurrent(setPagination)
   }, [])
 
+  const clearInternalFilters = useCallback(() => {
+    setSubjectID(undefined)
+    setWarehouseID(undefined)
+    setLotID(undefined)
+    resetCurrentPage()
+  }, [resetCurrentPage])
+
   const handleViewChange = useCallback(
     (nextView) => {
       setActiveView(nextView)
@@ -344,6 +383,9 @@ export default function V1InventoryLedgerPage() {
   const selectedRowKey = selectedRow
     ? `${activeView}-${selectedRow.id}`
     : undefined
+  const internalFilterCount = [subjectID, warehouseID, lotID].filter(
+    positiveInt
+  ).length
   const relatedMenuItems = useMemo(() => {
     if (!selectedRow) return []
     const items = []
@@ -363,12 +405,16 @@ export default function V1InventoryLedgerPage() {
     if (!selectedRow) return
     if (key === 'lot' && selectedRow.lot_id) {
       setLotID(selectedRow.lot_id)
+      setAdvancedFiltersOpen(true)
       setActiveView(VIEW_LOTS)
       resetCurrentPage()
       return
     }
     if (key === 'txns') {
-      if (selectedRow.lot_id) setLotID(selectedRow.lot_id)
+      if (selectedRow.lot_id) {
+        setLotID(selectedRow.lot_id)
+        setAdvancedFiltersOpen(true)
+      }
       setActiveView(VIEW_TXNS)
       resetCurrentPage()
       return
@@ -381,12 +427,16 @@ export default function V1InventoryLedgerPage() {
 
   const stats = useMemo(
     () => [
-      { key: 'total', label: '总记录', value: total },
-      { key: 'current', label: '当前页', value: rows.length },
       { key: 'view', label: '当前视图', value: activeLabel },
-      { key: 'mode', label: '页面模式', value: '只读' },
+      { key: 'total', label: '匹配记录', value: total },
+      { key: 'current', label: '当前页', value: rows.length },
+      {
+        key: 'internal',
+        label: '内部筛选',
+        value: internalFilterCount ? `${internalFilterCount} 项` : '未启用',
+      },
     ],
-    [activeLabel, rows.length, total]
+    [activeLabel, internalFilterCount, rows.length, total]
   )
 
   const columns = useMemo(() => {
@@ -415,9 +465,9 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => subjectTypeText(record?.subject_type),
         },
         {
-          title: '对象引用',
+          title: '对象内部引用',
           dataIndex: 'subject_id',
-          width: 120,
+          width: 140,
           render: (value, record) =>
             internalRef(subjectTypeText(record?.subject_type) || '对象', value),
         },
@@ -496,22 +546,22 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => subjectTypeText(record?.subject_type),
         },
         {
-          title: '对象引用',
+          title: '对象内部引用',
           dataIndex: 'subject_id',
-          width: 120,
+          width: 140,
           render: (value, record) =>
             internalRef(subjectTypeText(record?.subject_type) || '对象', value),
         },
         {
-          title: '仓库引用',
+          title: '仓库内部引用',
           dataIndex: 'warehouse_id',
-          width: 120,
+          width: 140,
           render: (value) => internalRef('仓库', value),
         },
         {
-          title: '批次引用',
+          title: '批次内部引用',
           dataIndex: 'lot_id',
-          width: 120,
+          width: 140,
           render: (value) => internalRef('批次', value),
         },
         {
@@ -528,7 +578,14 @@ export default function V1InventoryLedgerPage() {
           width: 120,
           render: (value) => internalRef('单位', value),
         },
-        { title: '来源', dataIndex: 'source_type', width: 170 },
+        {
+          title: '来源',
+          exportTitle: '来源',
+          dataIndex: 'source_type',
+          width: 170,
+          render: (value) => sourceTypeText(value) || '-',
+          exportValue: (record) => sourceTypeText(record?.source_type),
+        },
         {
           title: '来源单据',
           dataIndex: 'source_id',
@@ -582,22 +639,22 @@ export default function V1InventoryLedgerPage() {
         exportValue: (record) => subjectTypeText(record?.subject_type),
       },
       {
-        title: '对象引用',
+        title: '对象内部引用',
         dataIndex: 'subject_id',
-        width: 120,
+        width: 140,
         render: (value, record) =>
           internalRef(subjectTypeText(record?.subject_type) || '对象', value),
       },
       {
-        title: '仓库引用',
+        title: '仓库内部引用',
         dataIndex: 'warehouse_id',
-        width: 120,
+        width: 140,
         render: (value) => internalRef('仓库', value),
       },
       {
-        title: '批次引用',
+        title: '批次内部引用',
         dataIndex: 'lot_id',
-        width: 120,
+        width: 140,
         render: (value) => internalRef('批次', value),
       },
       {
@@ -661,17 +718,18 @@ export default function V1InventoryLedgerPage() {
       <PageHeaderCard
         compact
         title="库存台账"
-        description="库存台账读取 inventory_balances、inventory_lots、inventory_txns 和 ACTIVE stock_reservations；可用量只读计算，库存增减、批次状态和冲正仍由后端事实 usecase 写入。"
+        description="按余额、批次、流水三种视图追溯库存；可用量由后端按 ACTIVE 预留扣减后只读返回，历史流水通过冲正或调整修正，本页不写库存事实。"
         tags={[
           <Tag color="blue" key="balances">
-            inventory_balances
+            余额只读
           </Tag>,
           <Tag color="gold" key="lots">
-            inventory_lots
+            批次追溯
           </Tag>,
           <Tag color="green" key="txns">
-            inventory_txns
+            流水审计
           </Tag>,
+          <Tag key="mode">不写入库存</Tag>,
         ]}
         stats={stats}
       />
@@ -682,7 +740,7 @@ export default function V1InventoryLedgerPage() {
           <>
             <SearchInput
               value={keyword}
-              placeholder="搜索批次号 / 来源 / 备注 / 内部引用"
+              placeholder={SEARCH_PLACEHOLDERS[activeView]}
               onChange={(event) => {
                 setKeyword(event.target.value)
                 resetCurrentPage()
@@ -698,43 +756,6 @@ export default function V1InventoryLedgerPage() {
                 resetCurrentPage()
               }}
             />
-            <InputNumber
-              className="erp-business-filter-control"
-              min={1}
-              precision={0}
-              placeholder="对象引用"
-              value={subjectID}
-              onChange={(nextValue) => {
-                setSubjectID(nextValue)
-                resetCurrentPage()
-              }}
-            />
-            {activeView !== VIEW_LOTS ? (
-              <>
-                <InputNumber
-                  className="erp-business-filter-control"
-                  min={1}
-                  precision={0}
-                  placeholder="仓库引用"
-                  value={warehouseID}
-                  onChange={(nextValue) => {
-                    setWarehouseID(nextValue)
-                    resetCurrentPage()
-                  }}
-                />
-                <InputNumber
-                  className="erp-business-filter-control"
-                  min={1}
-                  precision={0}
-                  placeholder="批次引用"
-                  value={lotID}
-                  onChange={(nextValue) => {
-                    setLotID(nextValue)
-                    resetCurrentPage()
-                  }}
-                />
-              </>
-            ) : null}
             {activeView === VIEW_LOTS ? (
               <SelectFilter
                 className="erp-business-filter-control--status"
@@ -757,17 +778,67 @@ export default function V1InventoryLedgerPage() {
                     resetCurrentPage()
                   }}
                 />
-                <Input
-                  allowClear
-                  className="erp-business-filter-control"
-                  placeholder="来源类型"
+                <SelectFilter
+                  className="erp-business-filter-control--status"
                   value={sourceType}
-                  onChange={(event) => {
-                    setSourceType(event.target.value)
+                  options={SOURCE_TYPE_OPTIONS}
+                  onChange={(nextType) => {
+                    setSourceType(nextType)
                     resetCurrentPage()
                   }}
-                  onPressEnter={loadRows}
                 />
+              </>
+            ) : null}
+            <Button
+              size="small"
+              type={advancedFiltersOpen ? 'primary' : 'default'}
+              onClick={() => setAdvancedFiltersOpen((open) => !open)}
+            >
+              内部引用筛选
+              {internalFilterCount ? `（${internalFilterCount}）` : ''}
+            </Button>
+            {advancedFiltersOpen ? (
+              <>
+                <InputNumber
+                  className="erp-business-filter-control"
+                  min={1}
+                  precision={0}
+                  placeholder="对象内部 ID"
+                  value={subjectID}
+                  onChange={(nextValue) => {
+                    setSubjectID(nextValue)
+                    resetCurrentPage()
+                  }}
+                />
+                {activeView !== VIEW_LOTS ? (
+                  <>
+                    <InputNumber
+                      className="erp-business-filter-control"
+                      min={1}
+                      precision={0}
+                      placeholder="仓库内部 ID"
+                      value={warehouseID}
+                      onChange={(nextValue) => {
+                        setWarehouseID(nextValue)
+                        resetCurrentPage()
+                      }}
+                    />
+                    <InputNumber
+                      className="erp-business-filter-control"
+                      min={1}
+                      precision={0}
+                      placeholder="批次内部 ID"
+                      value={lotID}
+                      onChange={(nextValue) => {
+                        setLotID(nextValue)
+                        resetCurrentPage()
+                      }}
+                    />
+                  </>
+                ) : null}
+                <Button size="small" onClick={clearInternalFilters}>
+                  清空内部引用
+                </Button>
               </>
             ) : null}
           </>
@@ -835,7 +906,6 @@ export default function V1InventoryLedgerPage() {
           scroll={{ x: activeView === VIEW_TXNS ? 1900 : 1500 }}
           rowSelection={{
             type: 'radio',
-            columnTitle: '选择',
             columnWidth: 48,
             selectedRowKeys: selectedRowKey ? [selectedRowKey] : [],
             onChange: (_keys, selectedRows) =>

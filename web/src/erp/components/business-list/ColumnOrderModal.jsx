@@ -15,9 +15,9 @@ import { Button, Dropdown, Modal, Space } from 'antd'
 import {
   applyModuleColumnOrder,
   buildModuleColumnOrder,
-  getModuleColumnKey,
   moveModuleColumnOrder,
   repositionModuleColumnOrder,
+  resolveModuleColumnKey,
   sanitizeModuleColumnOrder,
 } from '../../utils/moduleTableColumns.mjs'
 import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
@@ -42,11 +42,7 @@ export function ColumnOrderHeaderMenu({
       : buildModuleColumnOrder(columns)
   }, [columns, order])
   const columnKey = useMemo(() => {
-    const directKey = getModuleColumnKey(column)
-    const matchedIndex = columns.findIndex(
-      (item, index) => getModuleColumnKey(item, index) === directKey
-    )
-    return getModuleColumnKey(column, matchedIndex >= 0 ? matchedIndex : 0)
+    return resolveModuleColumnKey(column, columns)
   }, [column, columns])
   const currentIndex = normalizedOrder.indexOf(columnKey)
   const isFirst = currentIndex <= 0
@@ -248,7 +244,7 @@ export function ColumnOrderModal({
         aria-label={`${moduleTitle || '列表'}列顺序`}
       >
         {orderedColumns.map((column, index) => {
-          const key = getModuleColumnKey(column, index)
+          const key = resolveModuleColumnKey(column, columns)
           const label = getColumnLabel(column)
           const isFirst = index === 0
           const isLast = index === orderedColumns.length - 1
