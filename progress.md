@@ -56,3 +56,18 @@
 - 完成：保留 BOM 管理多选能力，因为当前存在“所选设为历史版本”的真实批量语义；来源导入选择器也保留按 `multiple` 控制的 checkbox/radio 行为。
 - 下一步：若后续某页新增真实批量动作，再按后端 usecase、RBAC、审计和测试评审是否恢复 checkbox 多选。
 - 阻塞/风险：本轮不改 schema、RBAC、菜单、Workflow / Fact 或删除 / 回收站能力；未把“请选择”类表单校验和来源选择器文案纳入本次“选择列表头”清理范围。
+
+## 2026-06-20 Codex 代码审查 skill 补充
+
+- 完成：新增 `.agents/skills/plush-code-review-governance/`，作为 plush 项目独立代码审查入口，覆盖任意会话中的 worktree / staged diff / commit review；审查重点收口到 Workflow / Fact、RBAC、字段残值 / 缺值、删除 / 回收站、客户差异、文档漂移和验证盲区。
+- 完成：同步根 `README.md` 中 `.agents/skills/` 职责，从文档治理 / 页面治理扩展为文档治理、页面治理和代码审查；本轮未更新 docs 清单，因为未新增或调整 `docs/` 长期文档。
+- 验证：追加前 `progress.md` 为 100 行、14075 字节，未达到归档阈值；已执行 `quick_validate.py`（通过临时 PyYAML 路径）验证 `code-review-governance` 与 `plush-code-review-governance` 均通过；已执行 Ruby YAML 解析、TODO / 默认提示扫描、`git diff --check -- .agents/skills/plush-code-review-governance README.md progress.md`，通过。
+- 下一步：后续 review 可直接在独立会话或当前会话使用 `$plush-code-review-governance`；如同时涉及页面或文档治理，可再并用对应项目 skill。
+- 阻塞/风险：本轮只新增 Codex skill 和入口说明，不改运行时代码、schema、migration、RBAC、菜单、Workflow / Fact、部署或正式产品能力。
+
+## 2026-06-20 Codex skill UI 名称英文化
+
+- 完成：将 `.agents/skills/plush-code-review-governance/agents/openai.yaml` 的 `display_name` 改为英文 `Plush Code Review Governance`；项目内 docs/page governance 的 `display_name` 已是英文，无需改动。
+- 验证：追加前 `progress.md` 为 108 行、15407 字节，未达到归档阈值；已扫描相关 skills 的 `display_name`，确认无中文命中；后续以 skill 正文保持中英结合，UI chip 名称保持英文。
+- 下一步：如 Codex UI 仍显示旧名称，重新打开会话或等待 skill metadata 刷新。
+- 阻塞/风险：本轮只改 skill UI metadata，不改 `SKILL.md` 规则正文、运行时代码、schema、RBAC、菜单或文档真源。

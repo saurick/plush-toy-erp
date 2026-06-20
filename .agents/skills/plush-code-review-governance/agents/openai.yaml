@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plush Code Review Governance"
+  short_description: "plush ERP 独立代码审查与风险检查流程"
+  default_prompt: "Use $plush-code-review-governance to review plush-toy-erp changes without editing code."
