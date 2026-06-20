@@ -74,10 +74,16 @@ type PurchaseReceiptItemCreate struct {
 }
 
 type PurchaseReceiptFilter struct {
-	Status  string
-	Keyword string
-	Limit   int
-	Offset  int
+	Status              string
+	Keyword             string
+	DateFrom            *time.Time
+	DateTo              *time.Time
+	MaterialID          int
+	WarehouseID         int
+	LotID               int
+	PurchaseOrderItemID int
+	Limit               int
+	Offset              int
 }
 
 func (uc *InventoryUsecase) CreatePurchaseReceiptDraft(ctx context.Context, in *PurchaseReceiptCreate) (*PurchaseReceipt, error) {
@@ -249,6 +255,9 @@ func normalizePurchaseReceiptFilter(in PurchaseReceiptFilter) (PurchaseReceiptFi
 	in.Status = strings.ToUpper(strings.TrimSpace(in.Status))
 	in.Keyword = strings.TrimSpace(in.Keyword)
 	if in.Status != "" && !IsValidPurchaseReceiptStatus(in.Status) {
+		return PurchaseReceiptFilter{}, ErrBadParam
+	}
+	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
 		return PurchaseReceiptFilter{}, ErrBadParam
 	}
 	if in.Limit <= 0 || in.Limit > 200 {

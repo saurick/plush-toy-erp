@@ -113,3 +113,19 @@
 - 验证：追加前 `progress.md` 为 108 行、15407 字节，未达到归档阈值；已扫描相关 skills 的 `display_name`，确认无中文命中；后续以 skill 正文保持中英结合，UI chip 名称保持英文。
 - 下一步：如 Codex UI 仍显示旧名称，重新打开会话或等待 skill metadata 刷新。
 - 阻塞/风险：本轮只改 skill UI metadata，不改 `SKILL.md` 规则正文、运行时代码、schema、RBAC、菜单或文档真源。
+
+## 2026-06-20 业务列表筛选补齐
+
+- 完成：销售订单、采购订单、委外订单补齐客户 / 供应商等引用筛选；出货单补齐搜索、客户、产品、仓库筛选；采购入库、来料质检、库存台账和 Operational Fact 页补齐日期、状态、搜索或业务引用筛选，并统一走后端 JSON-RPC 参数和 repo 查询。
+- 完成：服务端为采购入库、来料质检、库存批次 / 流水、生产 / 委外 / 出货 / 库存预留 / 财务事实补齐筛选参数解析和 Ent 查询；新增日期上限归一化，避免 `date_to` 只命中当天 00:00 导致漏数据。
+- 验证：追加前 `progress.md` 为 115 行、16153 字节，未达到归档阈值；已执行 `go test ./...`、`pnpm lint`、`pnpm css`、`pnpm test`、目标 `STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,purchase-order-date-filter-desktop,shipment-date-filter-desktop,shipment-date-filter-mobile,purchase-receipts-table-control-columns-desktop,purchase-receipt-create-modal-desktop pnpm style:l1`、`git diff --check`，均通过。
+- 下一步：如要继续扩大筛选语义，应优先补后端真源字段和列表查询测试，再接页面控件；不要在前端做页面私有假过滤。
+- 阻塞/风险：完整 `pnpm style:l1` 仍被本轮无关的 `print-workspace-material-row-selection-reset` 场景阻塞在“删除当前行”按钮定位；本轮未改 schema、migration、RBAC、菜单、Workflow / Fact 写入语义、原型状态或 docs 清单。
+
+## 2026-06-21 权限中心主次 tab 收口
+
+- 完成：权限管理页改为“角色模板 / 管理员账号”页内 tab，默认打开“角色模板”，让角色权限维护成为首屏主路径；“管理员账号”承接账号搜索、创建管理员、分配角色和重置密码。
+- 完成：补齐权限中心 tab 浅色 / 暗色样式和窄屏 tab 宽度规则；L1 回归从旧的“管理员模块在前”改为默认角色模板、切换管理员账号后再验证搜索、刷新、创建弹窗和重置密码焦点。
+- 验证：追加前 `progress.md` 为 115 行、16153 字节，未达到归档阈值；已执行目标 ESLint（`PermissionCenterPage.jsx`、`styleL1.mjs`、`scenarios.mjs`）、`pnpm --dir web css`、权限工具定向单测、`STYLE_L1_SCENARIOS=permission-center-loading-state,permission-center-desktop pnpm --dir web style:l1`、`pnpm --dir web test`、目标 `git diff --check`，均通过。
+- 下一步：后续真正接客户角色模板 runtime loader 时，继续复用当前角色模板 tab，不新增前端本地权限真源。
+- 阻塞/风险：本轮只改权限中心前端信息架构、样式、L1 回归和过程记录；未改后端 RBAC、权限码、schema、migration、菜单入口、客户配置 loader、Workflow / Fact、部署或原型状态。当前工作区仍有其他会话 / 既有后端和业务页脏改动，本轮未回退、未归并。

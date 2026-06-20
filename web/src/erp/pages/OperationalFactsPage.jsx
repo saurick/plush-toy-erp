@@ -41,6 +41,7 @@ import {
   buildSequentialDraftCode,
   formatUnixDate,
   formatUnixDateTime,
+  trimOptional,
   V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
 import {
@@ -52,7 +53,9 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
+  DateRangeFilter,
   PageHeaderCard,
+  SearchInput,
   SelectFilter,
   SelectionActionBar,
   ToolbarButton,
@@ -112,6 +115,19 @@ const STATUS_OPTIONS = [
   { label: '已取消', value: 'CANCELLED' },
 ]
 
+const OCCURRED_DATE_FILTER_OPTIONS = [
+  { label: '发生日期', value: 'occurred_at' },
+]
+
+const SHIPMENT_DATE_FILTER_OPTIONS = [
+  { label: '计划出货', value: 'planned_ship_at' },
+  { label: '实际出货', value: 'shipped_at' },
+]
+
+const RESERVED_DATE_FILTER_OPTIONS = [
+  { label: '预留日期', value: 'reserved_at' },
+]
+
 const DEFAULT_OPERATIONAL_FACT_SUMMARY =
   '统一承接生产、委外、出货、库存预留和财务事实的最小运行入口。页面只提交动作，库存流水、冲正和状态边界由后端 usecase 处理。'
 const EMPTY_VIEW_OVERRIDES = Object.freeze({})
@@ -135,7 +151,10 @@ export function OperationalFactWorkspace({
   const navigate = useNavigate()
   const adminProfile = outletContext?.adminProfile || {}
   const [activeKey, setActiveKey] = useState(initialActiveKey)
+  const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [dateFieldByKey, setDateFieldByKey] = useState({})
+  const [dateRangeByKey, setDateRangeByKey] = useState({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [rowsByKey, setRowsByKey] = useState({})
@@ -162,6 +181,8 @@ export function OperationalFactWorkspace({
         cancel: cancelProductionFact,
         writePermissions: ACTION_PERMISSIONS.productionWrite,
         buildParams: buildFactParams,
+        dateOptions: OCCURRED_DATE_FILTER_OPTIONS,
+        defaultDateField: 'occurred_at',
         renderForm: () => (
           <FactFormFields typeOptions={PRODUCTION_FACT_TYPES} />
         ),
@@ -183,6 +204,8 @@ export function OperationalFactWorkspace({
         cancel: cancelOutsourcingFact,
         writePermissions: ACTION_PERMISSIONS.outsourcingWrite,
         buildParams: buildFactParams,
+        dateOptions: OCCURRED_DATE_FILTER_OPTIONS,
+        defaultDateField: 'occurred_at',
         renderForm: () => (
           <FactFormFields
             typeOptions={OUTSOURCING_FACT_TYPES}
@@ -208,6 +231,8 @@ export function OperationalFactWorkspace({
         writePermissions: ACTION_PERMISSIONS.shipmentWrite,
         confirmPermissions: ACTION_PERMISSIONS.shipmentConfirm,
         buildParams: buildShipmentParams,
+        dateOptions: SHIPMENT_DATE_FILTER_OPTIONS,
+        defaultDateField: 'planned_ship_at',
         renderForm: () => <ShipmentFormFields />,
         initialValues: {},
       },
@@ -225,6 +250,8 @@ export function OperationalFactWorkspace({
         writePermissions: ACTION_PERMISSIONS.reservationWrite,
         confirmPermissions: ACTION_PERMISSIONS.shipmentConfirm,
         buildParams: buildReservationParams,
+        dateOptions: RESERVED_DATE_FILTER_OPTIONS,
+        defaultDateField: 'reserved_at',
         renderForm: () => <ReservationFormFields />,
         initialValues: {},
       },
@@ -242,6 +269,8 @@ export function OperationalFactWorkspace({
         cancel: cancelFinanceFact,
         writePermissions: ACTION_PERMISSIONS.financeWrite,
         buildParams: buildFinanceParams,
+        dateOptions: OCCURRED_DATE_FILTER_OPTIONS,
+        defaultDateField: 'occurred_at',
         renderForm: () => <FinanceFormFields />,
         initialValues: {
           fact_type: 'RECEIVABLE',
@@ -299,9 +328,25 @@ export function OperationalFactWorkspace({
   const activeSelectedRow = selectedByKey[activeKey] || null
   const activePagination =
     paginationByKey[activeKey] || DEFAULT_OPERATIONAL_FACT_PAGINATION
+  const activeDateField =
+    dateFieldByKey[activeKey] || activeConfig.defaultDateField || 'occurred_at'
+  const activeDateRange = dateRangeByKey[activeKey] || ['', '']
   const canWriteActive = hasAnyPermission(
     adminProfile,
     activeConfig.writePermissions
+  )
+
+  const resetPaginationForKey = useCallback(
+    (key = activeKey) => {
+      setPaginationByKey((prev) => ({
+        ...prev,
+        [key]: {
+          ...(prev[key] || DEFAULT_OPERATIONAL_FACT_PAGINATION),
+          current: 1,
+        },
+      }))
+    },
+    [activeKey]
   )
 
   const loadRows = useCallback(
@@ -316,6 +361,10 @@ export function OperationalFactWorkspace({
         const data = await config.list(
           compactParams({
             status: statusFilter,
+            keyword: trimOptional(keyword),
+            date_field: dateFieldByKey[key] || config.defaultDateField,
+            date_from: dateRangeByKey[key]?.[0] || undefined,
+            date_to: dateRangeByKey[key]?.[1] || undefined,
             ...(config.listParams || {}),
             ...getBusinessPaginationParams(pagination),
           })
@@ -343,7 +392,16 @@ export function OperationalFactWorkspace({
         setLoading(false)
       }
     },
-    [activeKey, activePagination, configs, paginationByKey, statusFilter]
+    [
+      activeKey,
+      activePagination,
+      configs,
+      dateFieldByKey,
+      dateRangeByKey,
+      keyword,
+      paginationByKey,
+      statusFilter,
+    ]
   )
 
   useEffect(() => {
@@ -828,21 +886,53 @@ export function OperationalFactWorkspace({
       <BusinessOperationPanel
         compact
         filters={
-          <SelectFilter
-            className="erp-business-filter-control--status"
-            value={statusFilter}
-            options={STATUS_OPTIONS}
-            onChange={(nextStatus) => {
-              setStatusFilter(nextStatus)
-              setPaginationByKey((prev) => ({
-                ...prev,
-                [activeKey]: {
-                  ...(prev[activeKey] || activePagination),
-                  current: 1,
-                },
-              }))
-            }}
-          />
+          <>
+            <SearchInput
+              value={keyword}
+              placeholder="搜索单号、来源、备注或内部引用"
+              onChange={(event) => {
+                setKeyword(event.target.value)
+                resetPaginationForKey()
+              }}
+              onPressEnter={() => loadRows(activeKey)}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={statusFilter}
+              options={STATUS_OPTIONS}
+              onChange={(nextStatus) => {
+                setStatusFilter(nextStatus)
+                resetPaginationForKey()
+              }}
+            />
+            <DateRangeFilter
+              options={activeConfig.dateOptions || OCCURRED_DATE_FILTER_OPTIONS}
+              value={activeDateField}
+              onTypeChange={(nextField) => {
+                setDateFieldByKey((prev) => ({
+                  ...prev,
+                  [activeKey]: nextField || activeConfig.defaultDateField,
+                }))
+                resetPaginationForKey()
+              }}
+              startValue={activeDateRange[0] || ''}
+              endValue={activeDateRange[1] || ''}
+              onStartChange={(nextStart) => {
+                setDateRangeByKey((prev) => ({
+                  ...prev,
+                  [activeKey]: [nextStart, prev[activeKey]?.[1] || ''],
+                }))
+                resetPaginationForKey()
+              }}
+              onEndChange={(nextEnd) => {
+                setDateRangeByKey((prev) => ({
+                  ...prev,
+                  [activeKey]: [prev[activeKey]?.[0] || '', nextEnd],
+                }))
+                resetPaginationForKey()
+              }}
+            />
+          </>
         }
         actions={
           <BusinessListToolbarActions

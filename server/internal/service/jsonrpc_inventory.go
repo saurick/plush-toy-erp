@@ -89,17 +89,24 @@ func inventoryBalanceFilterFromParams(pm map[string]any) biz.InventoryBalanceFil
 }
 
 func inventoryLotFilterFromParams(pm map[string]any) biz.InventoryLotFilter {
+	dateFrom, _ := getOptionalJSONRPCTime(pm, "date_from")
+	dateTo, _ := getOptionalJSONRPCTime(pm, "date_to")
 	return biz.InventoryLotFilter{
 		SubjectType: getString(pm, "subject_type"),
 		SubjectID:   getInt(pm, "subject_id", 0),
+		WarehouseID: getInt(pm, "warehouse_id", 0),
 		Status:      getString(pm, "status"),
 		Keyword:     getString(pm, "keyword"),
+		DateFrom:    dateFrom,
+		DateTo:      dateTo,
 		Limit:       getInt(pm, "limit", 50),
 		Offset:      getInt(pm, "offset", 0),
 	}
 }
 
 func inventoryTxnFilterFromParams(pm map[string]any) biz.InventoryTxnFilter {
+	dateFrom, _ := getOptionalJSONRPCTime(pm, "date_from")
+	dateTo, _ := getOptionalJSONRPCTime(pm, "date_to")
 	return biz.InventoryTxnFilter{
 		SubjectType: getString(pm, "subject_type"),
 		SubjectID:   getInt(pm, "subject_id", 0),
@@ -109,6 +116,8 @@ func inventoryTxnFilterFromParams(pm map[string]any) biz.InventoryTxnFilter {
 		SourceType:  getString(pm, "source_type"),
 		SourceID:    getInt(pm, "source_id", 0),
 		Keyword:     getString(pm, "keyword"),
+		DateFrom:    dateFrom,
+		DateTo:      dateTo,
 		Limit:       getInt(pm, "limit", 50),
 		Offset:      getInt(pm, "offset", 0),
 	}

@@ -823,6 +823,16 @@
     width: 100%;
   }
 
+  .erp-permission-tabs > .ant-tabs-nav .ant-tabs-nav-wrap {
+    overflow-x: auto;
+  }
+
+  .erp-permission-tabs .ant-tabs-tab {
+    flex: 1 0 auto;
+    justify-content: center;
+    min-width: 138px;
+  }
+
   .erp-permission-modal .ant-modal-body,
   .erp-business-record-modal .ant-modal-body {
     max-height: calc(100vh - 190px);

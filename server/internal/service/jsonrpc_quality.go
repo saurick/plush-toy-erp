@@ -122,12 +122,21 @@ func qualityInspectionDecisionFromParams(pm map[string]any) (*biz.QualityInspect
 }
 
 func qualityInspectionFilterFromParams(pm map[string]any) biz.QualityInspectionFilter {
+	dateFrom, _ := getOptionalJSONRPCTime(pm, "date_from")
+	dateTo, _ := getOptionalJSONRPCTime(pm, "date_to")
 	return biz.QualityInspectionFilter{
-		Status:  getString(pm, "status"),
-		Result:  getString(pm, "result"),
-		Keyword: getString(pm, "keyword"),
-		Limit:   getInt(pm, "limit", 50),
-		Offset:  getInt(pm, "offset", 0),
+		Status:                getString(pm, "status"),
+		Result:                getString(pm, "result"),
+		Keyword:               getString(pm, "keyword"),
+		DateFrom:              dateFrom,
+		DateTo:                dateTo,
+		PurchaseReceiptID:     getInt(pm, "purchase_receipt_id", 0),
+		PurchaseReceiptItemID: getInt(pm, "purchase_receipt_item_id", 0),
+		InventoryLotID:        getInt(pm, "inventory_lot_id", 0),
+		MaterialID:            getInt(pm, "material_id", 0),
+		WarehouseID:           getInt(pm, "warehouse_id", 0),
+		Limit:                 getInt(pm, "limit", 50),
+		Offset:                getInt(pm, "offset", 0),
 	}
 }
 

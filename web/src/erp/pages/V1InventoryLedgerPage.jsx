@@ -10,8 +10,14 @@ import {
   listInventoryTxns,
 } from '../api/inventoryApi.mjs'
 import {
+  listMaterials,
+  listProducts,
+  listWarehouses,
+} from '../api/masterDataOrderApi.mjs'
+import {
   BusinessOperationPanel,
   BusinessPageLayout,
+  DateRangeFilter,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -34,6 +40,13 @@ import {
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
 } from '../utils/businessPagination.mjs'
+import {
+  inventoryLotOption,
+  materialOption,
+  productOption,
+  uniqueReferenceOptions,
+  warehouseOptionFromRecord,
+} from '../utils/referenceSelectOptions.mjs'
 
 const VIEW_BALANCES = 'balances'
 const VIEW_LOTS = 'lots'
@@ -85,6 +98,9 @@ const SOURCE_TYPE_OPTIONS = [
   { label: '生产事实', value: 'PRODUCTION_FACT' },
   { label: '委外事实', value: 'OUTSOURCING_FACT' },
 ]
+
+const LOT_DATE_FILTER_OPTIONS = [{ label: '接收日期', value: 'received_at' }]
+const TXN_DATE_FILTER_OPTIONS = [{ label: '发生时间', value: 'occurred_at' }]
 
 const SUBJECT_TYPE_LABELS = Object.freeze({
   MATERIAL: '材料',
@@ -261,9 +277,18 @@ export default function V1InventoryLedgerPage() {
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
   const [subjectType, setSubjectType] = useState('')
+  const [subjectID, setSubjectID] = useState('')
+  const [warehouseID, setWarehouseID] = useState('')
+  const [lotID, setLotID] = useState('')
   const [lotStatus, setLotStatus] = useState('')
   const [txnType, setTxnType] = useState('')
   const [sourceType, setSourceType] = useState('')
+  const [dateFilterStart, setDateFilterStart] = useState('')
+  const [dateFilterEnd, setDateFilterEnd] = useState('')
+  const [materials, setMaterials] = useState([])
+  const [products, setProducts] = useState([])
+  const [warehouses, setWarehouses] = useState([])
+  const [inventoryLots, setInventoryLots] = useState([])
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [loading, setLoading] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
@@ -273,8 +298,10 @@ export default function V1InventoryLedgerPage() {
     try {
       const commonParams = compactParams({
         subject_type: subjectType,
-        keyword:
-          activeView === VIEW_BALANCES ? undefined : trimOptional(keyword),
+        subject_id: subjectID || undefined,
+        warehouse_id: warehouseID || undefined,
+        lot_id: lotID || undefined,
+        keyword: trimOptional(keyword),
         ...getBusinessPaginationParams(pagination),
       })
       let data
@@ -283,6 +310,9 @@ export default function V1InventoryLedgerPage() {
           compactParams({
             ...commonParams,
             status: lotStatus,
+            date_field: 'received_at',
+            date_from: dateFilterStart || undefined,
+            date_to: dateFilterEnd || undefined,
           })
         )
       } else if (activeView === VIEW_TXNS) {
@@ -291,6 +321,9 @@ export default function V1InventoryLedgerPage() {
             ...commonParams,
             txn_type: txnType,
             source_type: trimOptional(sourceType),
+            date_field: 'occurred_at',
+            date_from: dateFilterStart || undefined,
+            date_to: dateFilterEnd || undefined,
           })
         )
       } else {
@@ -311,12 +344,17 @@ export default function V1InventoryLedgerPage() {
     }
   }, [
     activeView,
+    dateFilterEnd,
+    dateFilterStart,
     keyword,
     lotStatus,
+    lotID,
     pagination,
     sourceType,
+    subjectID,
     subjectType,
     txnType,
+    warehouseID,
   ])
 
   useEffect(() => {
@@ -335,6 +373,8 @@ export default function V1InventoryLedgerPage() {
     (nextView) => {
       setActiveView(nextView)
       setSelectedRow(null)
+      setDateFilterStart('')
+      setDateFilterEnd('')
       resetCurrentPage()
     },
     [resetCurrentPage]
@@ -359,6 +399,60 @@ export default function V1InventoryLedgerPage() {
       if (targetPath) navigate(targetPath)
     }
   }
+
+  const loadReferenceOptions = useCallback(async () => {
+    try {
+      const [materialResult, productResult, warehouseResult, lotResult] =
+        await Promise.all([
+          listMaterials({ limit: 500, active_only: true }),
+          listProducts({ limit: 500, active_only: true }),
+          listWarehouses({ limit: 500, active_only: true }),
+          listInventoryLots({ limit: 500 }),
+        ])
+      setMaterials(
+        Array.isArray(materialResult?.materials) ? materialResult.materials : []
+      )
+      setProducts(
+        Array.isArray(productResult?.products) ? productResult.products : []
+      )
+      setWarehouses(
+        Array.isArray(warehouseResult?.warehouses)
+          ? warehouseResult.warehouses
+          : []
+      )
+      setInventoryLots(
+        Array.isArray(lotResult?.inventory_lots) ? lotResult.inventory_lots : []
+      )
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '加载库存筛选引用数据'))
+      setMaterials([])
+      setProducts([])
+      setWarehouses([])
+      setInventoryLots([])
+    }
+  }, [])
+
+  useEffect(() => {
+    loadReferenceOptions()
+  }, [loadReferenceOptions])
+
+  const subjectOptions = useMemo(() => {
+    if (subjectType === 'PRODUCT') {
+      return uniqueReferenceOptions(products, productOption)
+    }
+    if (subjectType === 'MATERIAL') {
+      return uniqueReferenceOptions(materials, materialOption)
+    }
+    return []
+  }, [materials, products, subjectType])
+  const warehouseOptions = useMemo(
+    () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
+    [warehouses]
+  )
+  const inventoryLotOptions = useMemo(
+    () => uniqueReferenceOptions(inventoryLots, inventoryLotOption),
+    [inventoryLots]
+  )
 
   const stats = useMemo(
     () => [
@@ -668,23 +762,69 @@ export default function V1InventoryLedgerPage() {
         compact
         filters={
           <>
-            {activeView !== VIEW_BALANCES ? (
-              <SearchInput
-                value={keyword}
-                placeholder={SEARCH_PLACEHOLDERS[activeView]}
-                onChange={(event) => {
-                  setKeyword(event.target.value)
-                  resetCurrentPage()
-                }}
-                onPressEnter={loadRows}
-              />
-            ) : null}
+            <SearchInput
+              value={keyword}
+              placeholder={
+                activeView === VIEW_BALANCES
+                  ? '搜索对象、仓库、批次或内部引用'
+                  : SEARCH_PLACEHOLDERS[activeView]
+              }
+              onChange={(event) => {
+                setKeyword(event.target.value)
+                resetCurrentPage()
+              }}
+              onPressEnter={loadRows}
+            />
             <SelectFilter
               className="erp-business-filter-control--status"
               value={subjectType}
               options={SUBJECT_TYPE_OPTIONS}
               onChange={(nextType) => {
-                setSubjectType(nextType)
+                setSubjectType(nextType || '')
+                setSubjectID('')
+                resetCurrentPage()
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={subjectID}
+              options={[
+                { label: '全部具体对象', value: '' },
+                ...subjectOptions,
+              ]}
+              placeholder={subjectType ? '全部具体对象' : '先选对象类型'}
+              disabled={!subjectType}
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextID) => {
+                setSubjectID(nextID || '')
+                resetCurrentPage()
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={warehouseID}
+              options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
+              placeholder="全部仓库"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextID) => {
+                setWarehouseID(nextID || '')
+                resetCurrentPage()
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={lotID}
+              options={[
+                { label: '全部批次', value: '' },
+                ...inventoryLotOptions,
+              ]}
+              placeholder="全部批次"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextID) => {
+                setLotID(nextID || '')
                 resetCurrentPage()
               }}
             />
@@ -720,6 +860,27 @@ export default function V1InventoryLedgerPage() {
                   }}
                 />
               </>
+            ) : null}
+            {activeView !== VIEW_BALANCES ? (
+              <DateRangeFilter
+                options={
+                  activeView === VIEW_LOTS
+                    ? LOT_DATE_FILTER_OPTIONS
+                    : TXN_DATE_FILTER_OPTIONS
+                }
+                value={activeView === VIEW_LOTS ? 'received_at' : 'occurred_at'}
+                onTypeChange={() => {}}
+                startValue={dateFilterStart}
+                endValue={dateFilterEnd}
+                onStartChange={(nextStart) => {
+                  setDateFilterStart(nextStart)
+                  resetCurrentPage()
+                }}
+                onEndChange={(nextEnd) => {
+                  setDateFilterEnd(nextEnd)
+                  resetCurrentPage()
+                }}
+              />
             ) : null}
           </>
         }

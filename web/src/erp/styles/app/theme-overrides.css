@@ -885,6 +885,25 @@
   box-shadow: 0 16px 34px rgb(0 0 0 / 28%);
 }
 
+[data-erp-theme='dark'] .erp-permission-tabs > .ant-tabs-nav::before {
+  border-bottom-color: var(--erp-border);
+}
+
+[data-erp-theme='dark'] .erp-permission-tabs .ant-tabs-tab {
+  color: var(--erp-text-muted);
+}
+
+[data-erp-theme='dark'] .erp-permission-tabs .ant-tabs-tab-active {
+  background: rgb(96 165 250 / 10%);
+}
+
+[data-erp-theme='dark']
+  .erp-permission-tabs
+  .ant-tabs-tab-active
+  .ant-tabs-tab-btn {
+  color: var(--erp-text);
+}
+
 [data-erp-theme='dark'] .erp-permission-section--admins.ant-card {
   border-color: #2f6847;
   background: linear-gradient(180deg, #0f2119, #111827 34%);

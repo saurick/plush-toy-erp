@@ -3389,6 +3389,7 @@ async function assertAntdModalCenteredImpl(page, modalLocator, scenarioName) {
 
 async function assertPermissionSectionVisualSeparation(page, { scenarioName }) {
   const metrics = await page.evaluate(() => {
+    const tabNav = document.querySelector('.erp-permission-tabs .ant-tabs-nav')
     const adminSection = document.querySelector(
       '.erp-permission-section--admins'
     )
@@ -3405,27 +3406,18 @@ async function assertPermissionSectionVisualSeparation(page, { scenarioName }) {
       }
     }
     return {
+      hasTabNav: Boolean(tabNav),
       admin: read(adminSection),
       role: read(roleSection),
     }
   })
   assert(
-    metrics.admin && metrics.role,
-    `${scenarioName} 未找到权限管理两个主模块: ${JSON.stringify(metrics)}`
+    metrics.hasTabNav && metrics.role,
+    `${scenarioName} 未找到权限管理 tab 或默认角色模板模块: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.admin.top < metrics.role.top,
-    `${scenarioName} 管理员模块应在角色权限模块前: ${JSON.stringify(metrics)}`
-  )
-  assert.notEqual(
-    metrics.admin.borderColor,
-    metrics.role.borderColor,
-    `${scenarioName} 暗色下两个模块边框颜色不可相同: ${JSON.stringify(metrics)}`
-  )
-  assert.notEqual(
-    metrics.admin.background,
-    metrics.role.background,
-    `${scenarioName} 暗色下两个模块背景不可相同: ${JSON.stringify(metrics)}`
+    metrics.role.borderColor && metrics.role.background,
+    `${scenarioName} 默认角色模板模块缺少可读边框或背景: ${JSON.stringify(metrics)}`
   )
 }
 

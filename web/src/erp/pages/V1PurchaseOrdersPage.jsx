@@ -91,6 +91,7 @@ import {
 } from '../utils/moduleTableColumns.mjs'
 import { ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
 import {
+  supplierOption,
   uniqueReferenceOptions,
   unitOption,
   warehouseOptionFromRecord,
@@ -313,6 +314,7 @@ export default function V1PurchaseOrdersPage() {
   const [inventoryLots, setInventoryLots] = useState([])
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState('')
+  const [supplierFilter, setSupplierFilter] = useState('')
   const [dateFilterField, setDateFilterField] = useState('purchase_date')
   const [dateFilterStart, setDateFilterStart] = useState('')
   const [dateFilterEnd, setDateFilterEnd] = useState('')
@@ -321,6 +323,10 @@ export default function V1PurchaseOrdersPage() {
   const [editingOrder, setEditingOrder] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [inboundDraftModalOpen, setInboundDraftModalOpen] = useState(false)
+  const supplierOptions = useMemo(
+    () => uniqueReferenceOptions(suppliers, supplierOption),
+    [suppliers]
+  )
 
   const applySelectedRowKeys = useCallback((nextKeys = []) => {
     const normalizedKeys = Array.isArray(nextKeys) ? nextKeys : []
@@ -362,6 +368,7 @@ export default function V1PurchaseOrdersPage() {
       const { sortBy, sortDirection } = parseSortValue(sortValue)
       const data = await listPurchaseOrders({
         keyword,
+        supplier_id: supplierFilter || undefined,
         lifecycle_status: status,
         date_field: dateFilterField,
         date_from: dateFilterStart || undefined,
@@ -397,6 +404,7 @@ export default function V1PurchaseOrdersPage() {
     pagination,
     sortValue,
     status,
+    supplierFilter,
   ])
 
   const loadWorkflowTasks = useCallback(async () => {
@@ -1008,6 +1016,18 @@ export default function V1PurchaseOrdersPage() {
               onChange={(value) => {
                 setPagination((current) => ({ ...current, current: 1 }))
                 setStatus(value)
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={supplierFilter}
+              options={[{ label: '全部供应商', value: '' }, ...supplierOptions]}
+              placeholder="全部供应商"
+              showSearch
+              optionFilterProp="label"
+              onChange={(value) => {
+                setPagination((current) => ({ ...current, current: 1 }))
+                setSupplierFilter(value || '')
               }}
             />
             <DateRangeFilter

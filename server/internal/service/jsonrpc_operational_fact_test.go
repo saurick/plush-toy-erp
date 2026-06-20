@@ -180,12 +180,37 @@ func TestOperationalFactShipmentFilterFromParamsParsesDateRange(t *testing.T) {
 
 func TestOperationalFactFilterFromParamsParsesFactType(t *testing.T) {
 	filter := operationalFactFilterFromParams(mustJSONRPCStruct(t, map[string]any{
-		"status":    "posted",
-		"fact_type": "receivable",
-		"limit":     float64(20),
-		"offset":    float64(5),
+		"status":          "posted",
+		"fact_type":       "receivable",
+		"keyword":         "FIN-001",
+		"subject_type":    "product",
+		"subject_id":      float64(11),
+		"warehouse_id":    float64(12),
+		"lot_id":          float64(13),
+		"source_type":     "shipment",
+		"source_id":       float64(14),
+		"customer_id":     float64(15),
+		"product_id":      float64(16),
+		"product_sku_id":  float64(17),
+		"counterparty_id": float64(18),
+		"limit":           float64(20),
+		"offset":          float64(5),
 	}).AsMap())
-	if filter.Status != "posted" || filter.FactType != "receivable" || filter.Limit != 20 || filter.Offset != 5 {
+	if filter.Status != "posted" ||
+		filter.FactType != "receivable" ||
+		filter.Keyword != "FIN-001" ||
+		filter.SubjectType != "product" ||
+		filter.SubjectID != 11 ||
+		filter.WarehouseID != 12 ||
+		filter.LotID != 13 ||
+		filter.SourceType != "shipment" ||
+		filter.SourceID != 14 ||
+		filter.CustomerID != 15 ||
+		filter.ProductID != 16 ||
+		filter.ProductSkuID != 17 ||
+		filter.CounterpartyID != 18 ||
+		filter.Limit != 20 ||
+		filter.Offset != 5 {
 		t.Fatalf("unexpected filter %#v", filter)
 	}
 }

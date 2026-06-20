@@ -274,13 +274,24 @@ type FinanceFactCreate struct {
 }
 
 type OperationalFactFilter struct {
-	Status    string
-	FactType  string
-	DateField string
-	DateFrom  *time.Time
-	DateTo    *time.Time
-	Limit     int
-	Offset    int
+	Status         string
+	FactType       string
+	Keyword        string
+	DateField      string
+	DateFrom       *time.Time
+	DateTo         *time.Time
+	SubjectType    string
+	SubjectID      int
+	WarehouseID    int
+	LotID          int
+	SourceType     string
+	SourceID       int
+	CustomerID     int
+	ProductID      int
+	ProductSkuID   int
+	CounterpartyID int
+	Limit          int
+	Offset         int
 }
 
 type OperationalFactRepo interface {
@@ -895,6 +906,10 @@ func (uc *OperationalFactUsecase) validateFinanceCounterpartyActiveReferences(ct
 func normalizeOperationalFactFilter(in OperationalFactFilter) OperationalFactFilter {
 	in.Status = strings.ToUpper(strings.TrimSpace(in.Status))
 	in.FactType = strings.ToUpper(strings.TrimSpace(in.FactType))
+	in.Keyword = strings.TrimSpace(in.Keyword)
+	in.DateField = strings.ToLower(strings.TrimSpace(in.DateField))
+	in.SubjectType = strings.ToUpper(strings.TrimSpace(in.SubjectType))
+	in.SourceType = strings.ToUpper(strings.TrimSpace(in.SourceType))
 	if in.Limit <= 0 || in.Limit > 200 {
 		in.Limit = 50
 	}

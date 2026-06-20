@@ -16,6 +16,7 @@ import (
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingfact"
+	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
@@ -178,6 +179,46 @@ func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter bi
 	if filter.FactType != "" {
 		q = q.Where(productionfact.FactType(filter.FactType))
 	}
+	if filter.SubjectType != "" {
+		q = q.Where(productionfact.SubjectType(filter.SubjectType))
+	}
+	if filter.SubjectID > 0 {
+		q = q.Where(productionfact.SubjectID(filter.SubjectID))
+	}
+	if filter.WarehouseID > 0 {
+		q = q.Where(productionfact.WarehouseID(filter.WarehouseID))
+	}
+	if filter.LotID > 0 {
+		q = q.Where(productionfact.LotID(filter.LotID))
+	}
+	if filter.SourceType != "" {
+		q = q.Where(productionfact.SourceType(filter.SourceType))
+	}
+	if filter.SourceID > 0 {
+		q = q.Where(productionfact.SourceID(filter.SourceID))
+	}
+	if filter.Keyword != "" {
+		q = q.Where(productionfact.Or(
+			productionfact.FactNoContainsFold(filter.Keyword),
+			productionfact.FactTypeContainsFold(filter.Keyword),
+			productionfact.SubjectTypeContainsFold(filter.Keyword),
+			productionfact.SourceTypeContainsFold(filter.Keyword),
+			productionfact.IdempotencyKeyContainsFold(filter.Keyword),
+			productionfact.NoteContainsFold(filter.Keyword),
+			productionfact.IDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			productionfact.SubjectIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			productionfact.WarehouseIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			productionfact.LotIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			productionfact.SourceIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			productionfact.SourceLineIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+		))
+	}
+	if filter.DateFrom != nil {
+		q = q.Where(productionfact.OccurredAtGTE(*filter.DateFrom))
+	}
+	if filter.DateTo != nil {
+		q = q.Where(productionfact.OccurredAtLTE(endOfDateFilter(*filter.DateTo)))
+	}
 	total, err := q.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -234,6 +275,51 @@ func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter b
 	}
 	if filter.FactType != "" {
 		q = q.Where(outsourcingfact.FactType(filter.FactType))
+	}
+	if filter.SubjectType != "" {
+		q = q.Where(outsourcingfact.SubjectType(filter.SubjectType))
+	}
+	if filter.SubjectID > 0 {
+		q = q.Where(outsourcingfact.SubjectID(filter.SubjectID))
+	}
+	if filter.WarehouseID > 0 {
+		q = q.Where(outsourcingfact.WarehouseID(filter.WarehouseID))
+	}
+	if filter.LotID > 0 {
+		q = q.Where(outsourcingfact.LotID(filter.LotID))
+	}
+	if filter.SourceType != "" {
+		q = q.Where(outsourcingfact.SourceType(filter.SourceType))
+	}
+	if filter.SourceID > 0 {
+		q = q.Where(outsourcingfact.SourceID(filter.SourceID))
+	}
+	if filter.CounterpartyID > 0 {
+		q = q.Where(outsourcingfact.SupplierID(filter.CounterpartyID))
+	}
+	if filter.Keyword != "" {
+		q = q.Where(outsourcingfact.Or(
+			outsourcingfact.FactNoContainsFold(filter.Keyword),
+			outsourcingfact.FactTypeContainsFold(filter.Keyword),
+			outsourcingfact.SubjectTypeContainsFold(filter.Keyword),
+			outsourcingfact.SupplierNameContainsFold(filter.Keyword),
+			outsourcingfact.SourceTypeContainsFold(filter.Keyword),
+			outsourcingfact.IdempotencyKeyContainsFold(filter.Keyword),
+			outsourcingfact.NoteContainsFold(filter.Keyword),
+			outsourcingfact.IDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			outsourcingfact.SubjectIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			outsourcingfact.WarehouseIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			outsourcingfact.LotIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			outsourcingfact.SupplierIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			outsourcingfact.SourceIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			outsourcingfact.SourceLineIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+		))
+	}
+	if filter.DateFrom != nil {
+		q = q.Where(outsourcingfact.OccurredAtGTE(*filter.DateFrom))
+	}
+	if filter.DateTo != nil {
+		q = q.Where(outsourcingfact.OccurredAtLTE(endOfDateFilter(*filter.DateTo)))
 	}
 	total, err := q.Clone().Count(ctx)
 	if err != nil {
@@ -351,6 +437,40 @@ func (r *operationalFactRepo) ListShipments(ctx context.Context, filter biz.Oper
 	if filter.Status != "" {
 		q = q.Where(shipment.Status(filter.Status))
 	}
+	if filter.CustomerID > 0 {
+		q = q.Where(shipment.CustomerID(filter.CustomerID))
+	}
+	if filter.SourceID > 0 {
+		q = q.Where(shipment.SalesOrderID(filter.SourceID))
+	}
+	itemPredicates := []predicate.ShipmentItem{}
+	if filter.ProductID > 0 {
+		itemPredicates = append(itemPredicates, shipmentitem.ProductID(filter.ProductID))
+	}
+	if filter.ProductSkuID > 0 {
+		itemPredicates = append(itemPredicates, shipmentitem.ProductSkuID(filter.ProductSkuID))
+	}
+	if filter.WarehouseID > 0 {
+		itemPredicates = append(itemPredicates, shipmentitem.WarehouseID(filter.WarehouseID))
+	}
+	if filter.LotID > 0 {
+		itemPredicates = append(itemPredicates, shipmentitem.LotID(filter.LotID))
+	}
+	if len(itemPredicates) > 0 {
+		q = q.Where(shipment.HasItemsWith(itemPredicates...))
+	}
+	if filter.Keyword != "" {
+		q = q.Where(shipment.Or(
+			shipment.ShipmentNoContainsFold(filter.Keyword),
+			shipment.CustomerSnapshotContainsFold(filter.Keyword),
+			shipment.StatusContainsFold(filter.Keyword),
+			shipment.IdempotencyKeyContainsFold(filter.Keyword),
+			shipment.NoteContainsFold(filter.Keyword),
+			shipment.IDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			shipment.SalesOrderIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			shipment.CustomerIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+		))
+	}
 	q = applyShipmentDateRange(q, filter)
 	total, err := q.Clone().Count(ctx)
 	if err != nil {
@@ -378,14 +498,14 @@ func applyShipmentDateRange(query *ent.ShipmentQuery, filter biz.OperationalFact
 			query = query.Where(shipment.ShippedAtGTE(*filter.DateFrom))
 		}
 		if filter.DateTo != nil {
-			query = query.Where(shipment.ShippedAtLTE(*filter.DateTo))
+			query = query.Where(shipment.ShippedAtLTE(endOfDateFilter(*filter.DateTo)))
 		}
 	default:
 		if filter.DateFrom != nil {
 			query = query.Where(shipment.PlannedShipAtGTE(*filter.DateFrom))
 		}
 		if filter.DateTo != nil {
-			query = query.Where(shipment.PlannedShipAtLTE(*filter.DateTo))
+			query = query.Where(shipment.PlannedShipAtLTE(endOfDateFilter(*filter.DateTo)))
 		}
 	}
 	return query
@@ -436,6 +556,42 @@ func (r *operationalFactRepo) ListStockReservations(ctx context.Context, filter 
 	q := r.data.postgres.StockReservation.Query()
 	if filter.Status != "" {
 		q = q.Where(stockreservation.Status(filter.Status))
+	}
+	if filter.ProductID > 0 {
+		q = q.Where(stockreservation.ProductID(filter.ProductID))
+	}
+	if filter.ProductSkuID > 0 {
+		q = q.Where(stockreservation.ProductSkuID(filter.ProductSkuID))
+	}
+	if filter.WarehouseID > 0 {
+		q = q.Where(stockreservation.WarehouseID(filter.WarehouseID))
+	}
+	if filter.LotID > 0 {
+		q = q.Where(stockreservation.LotID(filter.LotID))
+	}
+	if filter.SourceID > 0 {
+		q = q.Where(stockreservation.SalesOrderID(filter.SourceID))
+	}
+	if filter.Keyword != "" {
+		q = q.Where(stockreservation.Or(
+			stockreservation.ReservationNoContainsFold(filter.Keyword),
+			stockreservation.StatusContainsFold(filter.Keyword),
+			stockreservation.IdempotencyKeyContainsFold(filter.Keyword),
+			stockreservation.NoteContainsFold(filter.Keyword),
+			stockreservation.IDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			stockreservation.SalesOrderIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			stockreservation.SalesOrderItemIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			stockreservation.ProductIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			stockreservation.ProductSkuIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			stockreservation.WarehouseIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			stockreservation.LotIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+		))
+	}
+	if filter.DateFrom != nil {
+		q = q.Where(stockreservation.ReservedAtGTE(*filter.DateFrom))
+	}
+	if filter.DateTo != nil {
+		q = q.Where(stockreservation.ReservedAtLTE(endOfDateFilter(*filter.DateTo)))
 	}
 	total, err := q.Clone().Count(ctx)
 	if err != nil {
@@ -498,6 +654,40 @@ func (r *operationalFactRepo) ListFinanceFacts(ctx context.Context, filter biz.O
 	}
 	if filter.FactType != "" {
 		q = q.Where(financefact.FactType(filter.FactType))
+	}
+	if filter.CounterpartyID > 0 {
+		q = q.Where(financefact.CounterpartyID(filter.CounterpartyID))
+	}
+	if filter.SourceType != "" {
+		q = q.Where(financefact.SourceType(filter.SourceType))
+	}
+	if filter.SourceID > 0 {
+		q = q.Where(financefact.SourceID(filter.SourceID))
+	}
+	if filter.Keyword != "" {
+		q = q.Where(financefact.Or(
+			financefact.FactNoContainsFold(filter.Keyword),
+			financefact.FactTypeContainsFold(filter.Keyword),
+			financefact.StatusContainsFold(filter.Keyword),
+			financefact.CounterpartyTypeContainsFold(filter.Keyword),
+			financefact.CurrencyContainsFold(filter.Keyword),
+			financefact.CollectionTypeContainsFold(filter.Keyword),
+			financefact.PaymentTermContainsFold(filter.Keyword),
+			financefact.InvoiceCategoryContainsFold(filter.Keyword),
+			financefact.SourceTypeContainsFold(filter.Keyword),
+			financefact.IdempotencyKeyContainsFold(filter.Keyword),
+			financefact.NoteContainsFold(filter.Keyword),
+			financefact.IDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			financefact.CounterpartyIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			financefact.SourceIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			financefact.SourceLineIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+		))
+	}
+	if filter.DateFrom != nil {
+		q = q.Where(financefact.OccurredAtGTE(*filter.DateFrom))
+	}
+	if filter.DateTo != nil {
+		q = q.Where(financefact.OccurredAtLTE(endOfDateFilter(*filter.DateTo)))
 	}
 	total, err := q.Clone().Count(ctx)
 	if err != nil {

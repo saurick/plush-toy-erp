@@ -41,6 +41,7 @@ import {
   DateInput,
   DateRangeFilter,
   PageHeaderCard,
+  SearchInput,
   SelectFilter,
   SelectionActionBar,
   ToolbarButton,
@@ -456,7 +457,11 @@ export default function ShipmentsPage() {
   const adminProfile = outletContext?.adminProfile || {}
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
+  const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [customerFilter, setCustomerFilter] = useState('')
+  const [productFilter, setProductFilter] = useState('')
+  const [warehouseFilter, setWarehouseFilter] = useState('')
   const [dateFilterField, setDateFilterField] = useState('planned_ship_at')
   const [dateFilterStart, setDateFilterStart] = useState('')
   const [dateFilterEnd, setDateFilterEnd] = useState('')
@@ -533,6 +538,10 @@ export default function ShipmentsPage() {
       const data = await listShipments(
         compactParams({
           status: statusFilter,
+          keyword: trimOptional(keyword),
+          customer_id: customerFilter || undefined,
+          product_id: productFilter || undefined,
+          warehouse_id: warehouseFilter || undefined,
           date_field: dateFilterField,
           date_from: dateFilterStart || undefined,
           date_to: dateFilterEnd || undefined,
@@ -556,8 +565,12 @@ export default function ShipmentsPage() {
     dateFilterEnd,
     dateFilterField,
     dateFilterStart,
+    customerFilter,
+    keyword,
     pagination,
+    productFilter,
     statusFilter,
+    warehouseFilter,
   ])
 
   useEffect(() => {
@@ -993,12 +1006,57 @@ export default function ShipmentsPage() {
         compact
         filters={
           <>
+            <SearchInput
+              value={keyword}
+              placeholder="搜索出货单号 / 客户 / 销售订单"
+              onChange={(event) => {
+                setKeyword(event.target.value)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+              onPressEnter={loadRows}
+            />
             <SelectFilter
               className="erp-business-filter-control--status"
               value={statusFilter}
               options={STATUS_OPTIONS}
               onChange={(nextStatus) => {
                 setStatusFilter(nextStatus)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={customerFilter}
+              options={[{ label: '全部客户', value: '' }, ...customerOptions]}
+              placeholder="全部客户"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextCustomer) => {
+                setCustomerFilter(nextCustomer || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={productFilter}
+              options={[{ label: '全部产品', value: '' }, ...productOptions]}
+              placeholder="全部产品"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextProduct) => {
+                setProductFilter(nextProduct || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={warehouseFilter}
+              options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
+              placeholder="全部仓库"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextWarehouse) => {
+                setWarehouseFilter(nextWarehouse || '')
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />

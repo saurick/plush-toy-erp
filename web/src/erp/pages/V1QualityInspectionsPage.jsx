@@ -38,6 +38,7 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
+  DateRangeFilter,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -107,6 +108,7 @@ const RESULT_FILTER_OPTIONS = [
   { label: '让步接收', value: 'CONCESSION' },
   { label: '不合格', value: 'REJECT' },
 ]
+const DATE_FILTER_OPTIONS = [{ label: '质检日期', value: 'inspected_at' }]
 
 const STATUS_LABELS = Object.freeze({
   DRAFT: '草稿',
@@ -267,6 +269,13 @@ export default function V1QualityInspectionsPage() {
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [resultFilter, setResultFilter] = useState('')
+  const [dateFilterField, setDateFilterField] = useState('inspected_at')
+  const [dateFilterStart, setDateFilterStart] = useState('')
+  const [dateFilterEnd, setDateFilterEnd] = useState('')
+  const [purchaseReceiptFilter, setPurchaseReceiptFilter] = useState('')
+  const [materialFilter, setMaterialFilter] = useState('')
+  const [warehouseFilter, setWarehouseFilter] = useState('')
+  const [lotFilter, setLotFilter] = useState('')
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -388,6 +397,13 @@ export default function V1QualityInspectionsPage() {
           status: statusFilter,
           result: resultFilter,
           keyword: trimOptional(keyword),
+          date_field: dateFilterField,
+          date_from: dateFilterStart || undefined,
+          date_to: dateFilterEnd || undefined,
+          purchase_receipt_id: purchaseReceiptFilter || undefined,
+          material_id: materialFilter || undefined,
+          warehouse_id: warehouseFilter || undefined,
+          inventory_lot_id: lotFilter || undefined,
           ...getBusinessPaginationParams(pagination),
         })
       )
@@ -406,7 +422,19 @@ export default function V1QualityInspectionsPage() {
     } finally {
       setLoading(false)
     }
-  }, [keyword, pagination, resultFilter, statusFilter])
+  }, [
+    dateFilterEnd,
+    dateFilterField,
+    dateFilterStart,
+    keyword,
+    lotFilter,
+    materialFilter,
+    pagination,
+    purchaseReceiptFilter,
+    resultFilter,
+    statusFilter,
+    warehouseFilter,
+  ])
 
   useEffect(() => {
     loadRows()
@@ -1013,6 +1041,78 @@ export default function V1QualityInspectionsPage() {
               options={RESULT_FILTER_OPTIONS}
               onChange={(nextResult) => {
                 setResultFilter(nextResult)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={purchaseReceiptFilter}
+              options={[
+                { label: '全部入库单', value: '' },
+                ...purchaseReceiptOptions,
+              ]}
+              placeholder="全部入库单"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextReceipt) => {
+                setPurchaseReceiptFilter(nextReceipt || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={materialFilter}
+              options={[{ label: '全部材料', value: '' }, ...materialOptions]}
+              placeholder="全部材料"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextMaterial) => {
+                setMaterialFilter(nextMaterial || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={warehouseFilter}
+              options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
+              placeholder="全部仓库"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextWarehouse) => {
+                setWarehouseFilter(nextWarehouse || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={lotFilter}
+              options={[
+                { label: '全部批次', value: '' },
+                ...inventoryLotOptions,
+              ]}
+              placeholder="全部批次"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextLot) => {
+                setLotFilter(nextLot || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <DateRangeFilter
+              options={DATE_FILTER_OPTIONS}
+              value={dateFilterField}
+              onTypeChange={(nextField) => {
+                setDateFilterField(nextField || 'inspected_at')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+              startValue={dateFilterStart}
+              endValue={dateFilterEnd}
+              onStartChange={(nextStart) => {
+                setDateFilterStart(nextStart)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+              onEndChange={(nextEnd) => {
+                setDateFilterEnd(nextEnd)
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />

@@ -207,8 +207,11 @@ type InventoryBalanceFilter struct {
 type InventoryLotFilter struct {
 	SubjectType string
 	SubjectID   int
+	WarehouseID int
 	Status      string
 	Keyword     string
+	DateFrom    *time.Time
+	DateTo      *time.Time
 	Limit       int
 	Offset      int
 }
@@ -222,6 +225,8 @@ type InventoryTxnFilter struct {
 	SourceType  string
 	SourceID    int
 	Keyword     string
+	DateFrom    *time.Time
+	DateTo      *time.Time
 	Limit       int
 	Offset      int
 }
@@ -723,6 +728,9 @@ func normalizeInventoryLotFilter(in InventoryLotFilter) (InventoryLotFilter, err
 	if in.Status != "" && !IsValidInventoryLotStatus(in.Status) {
 		return InventoryLotFilter{}, ErrBadParam
 	}
+	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
+		return InventoryLotFilter{}, ErrBadParam
+	}
 	normalizeInventoryListPagination(&in.Limit, &in.Offset)
 	return in, nil
 }
@@ -736,6 +744,9 @@ func normalizeInventoryTxnFilter(in InventoryTxnFilter) (InventoryTxnFilter, err
 		return InventoryTxnFilter{}, ErrBadParam
 	}
 	if in.TxnType != "" && !IsValidInventoryTxnType(in.TxnType) {
+		return InventoryTxnFilter{}, ErrBadParam
+	}
+	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
 		return InventoryTxnFilter{}, ErrBadParam
 	}
 	normalizeInventoryListPagination(&in.Limit, &in.Offset)

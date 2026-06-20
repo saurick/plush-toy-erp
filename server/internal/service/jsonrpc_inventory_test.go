@@ -30,6 +30,7 @@ func TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists(t *testing.T) {
 		LotNo:         "INV-LEDGER-LOT-001",
 		SupplierLotNo: inventoryStringPtr("SUP-LOT-001"),
 		Status:        biz.InventoryLotActive,
+		ReceivedAt:    inventoryTimePtr(time.Date(2026, 6, 17, 8, 0, 0, 0, time.UTC)),
 	})
 	if err != nil {
 		t.Fatalf("create inventory lot failed: %v", err)
@@ -87,8 +88,11 @@ func TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists(t *testing.T) {
 	}
 
 	_, lotRes, err := j.handleInventory(adminCtx, "list_inventory_lots", "2", mustJSONRPCStruct(t, map[string]any{
-		"status":  biz.InventoryLotActive,
-		"keyword": "INV-LEDGER-LOT",
+		"status":       biz.InventoryLotActive,
+		"keyword":      "INV-LEDGER-LOT",
+		"warehouse_id": float64(fixtures.warehouseID),
+		"date_from":    "2026-06-17",
+		"date_to":      "2026-06-17",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -106,9 +110,13 @@ func TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists(t *testing.T) {
 	}
 
 	_, txnRes, err := j.handleInventory(adminCtx, "list_inventory_txns", "3", mustJSONRPCStruct(t, map[string]any{
-		"txn_type":    biz.InventoryTxnIn,
-		"source_type": "MANUAL_SEED",
-		"keyword":     "ledger",
+		"txn_type":     biz.InventoryTxnIn,
+		"source_type":  "MANUAL_SEED",
+		"warehouse_id": float64(fixtures.warehouseID),
+		"lot_id":       float64(lot.ID),
+		"keyword":      "ledger",
+		"date_from":    "2026-06-17",
+		"date_to":      "2026-06-17",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -233,6 +241,10 @@ func jsonRPCList(t *testing.T, data map[string]any, key string) []any {
 }
 
 func inventoryStringPtr(value string) *string {
+	return &value
+}
+
+func inventoryTimePtr(value time.Time) *time.Time {
 	return &value
 }
 

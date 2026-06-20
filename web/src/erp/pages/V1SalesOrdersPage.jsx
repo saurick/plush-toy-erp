@@ -79,6 +79,10 @@ import {
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
 } from '../utils/businessPagination.mjs'
+import {
+  customerOption,
+  uniqueReferenceOptions,
+} from '../utils/referenceSelectOptions.mjs'
 
 const STATUS_FILTER_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -266,6 +270,7 @@ export default function V1SalesOrdersPage() {
   const [saving, setSaving] = useState(false)
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [customerFilter, setCustomerFilter] = useState('')
   const [dateFilterField, setDateFilterField] = useState('order_date')
   const [dateFilterStart, setDateFilterStart] = useState('')
   const [dateFilterEnd, setDateFilterEnd] = useState('')
@@ -302,6 +307,10 @@ export default function V1SalesOrdersPage() {
   const canCancelItem = hasActionPermission(
     adminProfile,
     'sales_order_item.cancel'
+  )
+  const customerOptions = useMemo(
+    () => uniqueReferenceOptions(customers, customerOption),
+    [customers]
   )
   const paymentConditionOptions = useMemo(
     () =>
@@ -447,6 +456,7 @@ export default function V1SalesOrdersPage() {
       const { sortBy, sortDirection } = parseSortFilterValue(sortFilter)
       const result = await listSalesOrders({
         keyword,
+        customer_id: customerFilter || undefined,
         lifecycle_status: statusFilter,
         date_field: dateFilterField,
         date_from: dateFilterStart || undefined,
@@ -472,6 +482,7 @@ export default function V1SalesOrdersPage() {
       setLoading(false)
     }
   }, [
+    customerFilter,
     dateFilterEnd,
     dateFilterField,
     dateFilterStart,
@@ -1037,6 +1048,18 @@ export default function V1SalesOrdersPage() {
               value={statusFilter}
               onChange={(nextStatus) => {
                 setStatusFilter(nextStatus)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              options={[{ label: '全部客户', value: '' }, ...customerOptions]}
+              value={customerFilter}
+              placeholder="全部客户"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextCustomer) => {
+                setCustomerFilter(nextCustomer || '')
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />

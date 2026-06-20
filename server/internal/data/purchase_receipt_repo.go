@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceipt"
@@ -418,6 +419,28 @@ func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.Pur
 			purchasereceipt.ReceiptNoContainsFold(filter.Keyword),
 			purchasereceipt.SupplierNameContainsFold(filter.Keyword),
 		))
+	}
+	if filter.DateFrom != nil {
+		query = query.Where(purchasereceipt.ReceivedAtGTE(*filter.DateFrom))
+	}
+	if filter.DateTo != nil {
+		query = query.Where(purchasereceipt.ReceivedAtLTE(endOfDateFilter(*filter.DateTo)))
+	}
+	itemPredicates := []predicate.PurchaseReceiptItem{}
+	if filter.MaterialID > 0 {
+		itemPredicates = append(itemPredicates, purchasereceiptitem.MaterialID(filter.MaterialID))
+	}
+	if filter.WarehouseID > 0 {
+		itemPredicates = append(itemPredicates, purchasereceiptitem.WarehouseID(filter.WarehouseID))
+	}
+	if filter.LotID > 0 {
+		itemPredicates = append(itemPredicates, purchasereceiptitem.LotID(filter.LotID))
+	}
+	if filter.PurchaseOrderItemID > 0 {
+		itemPredicates = append(itemPredicates, purchasereceiptitem.PurchaseOrderItemID(filter.PurchaseOrderItemID))
+	}
+	if len(itemPredicates) > 0 {
+		query = query.Where(purchasereceipt.HasItemsWith(itemPredicates...))
 	}
 	total, err := query.Clone().Count(ctx)
 	if err != nil {

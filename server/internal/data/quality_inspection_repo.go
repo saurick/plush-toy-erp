@@ -234,6 +234,27 @@ func (r *inventoryRepo) ListQualityInspections(ctx context.Context, filter biz.Q
 			qualityinspection.InventoryLotIDEQ(parsePositiveIntOrZero(filter.Keyword)),
 		))
 	}
+	if filter.DateFrom != nil {
+		query = query.Where(qualityinspection.InspectedAtGTE(*filter.DateFrom))
+	}
+	if filter.DateTo != nil {
+		query = query.Where(qualityinspection.InspectedAtLTE(endOfDateFilter(*filter.DateTo)))
+	}
+	if filter.PurchaseReceiptID > 0 {
+		query = query.Where(qualityinspection.PurchaseReceiptID(filter.PurchaseReceiptID))
+	}
+	if filter.PurchaseReceiptItemID > 0 {
+		query = query.Where(qualityinspection.PurchaseReceiptItemID(filter.PurchaseReceiptItemID))
+	}
+	if filter.InventoryLotID > 0 {
+		query = query.Where(qualityinspection.InventoryLotID(filter.InventoryLotID))
+	}
+	if filter.MaterialID > 0 {
+		query = query.Where(qualityinspection.MaterialID(filter.MaterialID))
+	}
+	if filter.WarehouseID > 0 {
+		query = query.Where(qualityinspection.WarehouseID(filter.WarehouseID))
+	}
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err

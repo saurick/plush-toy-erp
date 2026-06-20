@@ -2500,8 +2500,8 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '权限管理')
-        await expectText(page, '创建管理员')
-        await expectText(page, '超级管理员')
+        await expectText(page, '角色模板')
+        await expectText(page, '管理员账号')
         await expectText(page, '当前客户角色模板')
         await expectText(page, 'Product Core 权限码稳定')
         await expectText(page, '影响管理员')
@@ -2511,6 +2511,9 @@ export function createStyleL1Scenarios(deps) {
           scenarioName: 'permission-center-desktop',
         })
         const roleCenterMetrics = await page.evaluate(() => {
+          const activeTab = document.querySelector(
+            '.erp-permission-tabs .ant-tabs-tab-active'
+          )
           const adminSection = document.querySelector(
             '.erp-permission-section--admins'
           )
@@ -2518,13 +2521,9 @@ export function createStyleL1Scenarios(deps) {
             '.erp-permission-section--roles'
           )
           const layout = document.querySelector('.erp-role-center-layout')
-          const heroCreateButton = document.querySelector(
-            '.erp-permission-hero button'
-          )
           const sidebar = document.querySelector('.erp-role-center-sidebar')
           const detail = document.querySelector('.erp-role-center-detail')
           const checklist = document.querySelector('.erp-permission-checklist')
-          const createRect = heroCreateButton?.getBoundingClientRect()
           const adminRect = adminSection?.getBoundingClientRect()
           const roleRect = roleSection?.getBoundingClientRect()
           const layoutRect = layout?.getBoundingClientRect()
@@ -2533,11 +2532,11 @@ export function createStyleL1Scenarios(deps) {
           return {
             hasAdminSection: Boolean(adminSection),
             hasRoleSection: Boolean(roleSection),
+            activeTabText: String(activeTab?.textContent || '').trim(),
             adminTop: adminRect?.top || 0,
+            adminHeight: adminRect?.height || 0,
             roleTop: roleRect?.top || 0,
-            hasHeroCreateButton: Boolean(heroCreateButton),
-            createTop: createRect?.top || 0,
-            createBottom: createRect?.bottom || 0,
+            roleHeight: roleRect?.height || 0,
             hasLayout: Boolean(layout),
             layoutWidth: layoutRect?.width || 0,
             sidebarWidth: sidebarRect?.width || 0,
@@ -2549,15 +2548,10 @@ export function createStyleL1Scenarios(deps) {
           }
         })
         assert(
-          roleCenterMetrics.hasAdminSection &&
+          roleCenterMetrics.activeTabText.includes('角色模板') &&
             roleCenterMetrics.hasRoleSection &&
-            roleCenterMetrics.adminTop < roleCenterMetrics.roleTop,
-          `权限管理模块顺序异常，管理员模块应在角色权限模块前: ${JSON.stringify(roleCenterMetrics)}`
-        )
-        assert(
-          roleCenterMetrics.hasHeroCreateButton &&
-            roleCenterMetrics.createBottom < roleCenterMetrics.adminTop,
-          `创建管理员按钮应位于首屏 hero 操作区且早于管理员模块: ${JSON.stringify(roleCenterMetrics)}`
+            roleCenterMetrics.roleHeight > 0,
+          `权限管理默认应先显示角色模板 tab: ${JSON.stringify(roleCenterMetrics)}`
         )
         assert(
           roleCenterMetrics.hasLayout &&
@@ -2574,6 +2568,43 @@ export function createStyleL1Scenarios(deps) {
           roleCenterMetrics.checklistScrollWidth <=
             roleCenterMetrics.checklistClientWidth + 1,
           `权限管理权限矩阵出现横向溢出: ${JSON.stringify(roleCenterMetrics)}`
+        )
+        await page.getByRole('tab', { name: /管理员账号/ }).click()
+        await expectText(page, '管理员与角色')
+        await expectText(page, '创建管理员')
+        await expectText(page, '超级管理员')
+        const adminTabMetrics = await page.evaluate(() => {
+          const activeTab = document.querySelector(
+            '.erp-permission-tabs .ant-tabs-tab-active'
+          )
+          const adminSection = document.querySelector(
+            '.erp-permission-section--admins'
+          )
+          const table = document.querySelector(
+            '.erp-permission-section--admins .ant-table'
+          )
+          const adminRect = adminSection?.getBoundingClientRect()
+          const tableRect = table?.getBoundingClientRect()
+          return {
+            activeTabText: String(activeTab?.textContent || '').trim(),
+            hasAdminSection: Boolean(adminSection),
+            adminTop: adminRect?.top || 0,
+            adminHeight: adminRect?.height || 0,
+            tableWidth: tableRect?.width || 0,
+            documentScrollWidth: document.documentElement.scrollWidth,
+            documentClientWidth: document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          adminTabMetrics.activeTabText.includes('管理员账号') &&
+            adminTabMetrics.hasAdminSection &&
+            adminTabMetrics.adminHeight > 0,
+          `权限管理切换管理员账号 tab 后应显示账号表: ${JSON.stringify(adminTabMetrics)}`
+        )
+        assert(
+          adminTabMetrics.documentScrollWidth <=
+            adminTabMetrics.documentClientWidth + 1,
+          `权限管理管理员账号 tab 出现横向溢出: ${JSON.stringify(adminTabMetrics)}`
         )
         const adminSearch =
           page.getByPlaceholder('搜索管理员账号、手机号、角色或权限码')

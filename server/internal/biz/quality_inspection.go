@@ -66,11 +66,18 @@ type QualityInspectionDecision struct {
 }
 
 type QualityInspectionFilter struct {
-	Status  string
-	Result  string
-	Keyword string
-	Limit   int
-	Offset  int
+	Status                string
+	Result                string
+	Keyword               string
+	DateFrom              *time.Time
+	DateTo                *time.Time
+	PurchaseReceiptID     int
+	PurchaseReceiptItemID int
+	InventoryLotID        int
+	MaterialID            int
+	WarehouseID           int
+	Limit                 int
+	Offset                int
 }
 
 func (uc *InventoryUsecase) CreateQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error) {
@@ -199,6 +206,9 @@ func normalizeQualityInspectionFilter(in QualityInspectionFilter) (QualityInspec
 		return QualityInspectionFilter{}, ErrBadParam
 	}
 	if in.Result != "" && !IsValidQualityInspectionResult(in.Result) {
+		return QualityInspectionFilter{}, ErrBadParam
+	}
+	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
 		return QualityInspectionFilter{}, ErrBadParam
 	}
 	if in.Limit <= 0 || in.Limit > 200 {

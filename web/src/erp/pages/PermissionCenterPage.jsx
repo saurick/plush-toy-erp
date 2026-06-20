@@ -13,6 +13,7 @@ import {
   Space,
   Switch,
   Table,
+  Tabs,
   Tag,
   Typography,
 } from 'antd'
@@ -37,6 +38,10 @@ const PASSWORD_MIN_LENGTH = 6
 const MANAGE_ROLE_PERMISSION = 'system.permission.manage'
 const UPDATE_USER_PERMISSION = 'system.user.update'
 const CREATE_USER_PERMISSION = 'system.user.create'
+const PERMISSION_CENTER_TAB_KEYS = {
+  ROLES: 'roles',
+  ADMINS: 'admins',
+}
 
 const adminStatusOptions = [
   { label: '全部状态', value: ADMIN_STATUS_FILTERS.ALL },
@@ -304,6 +309,9 @@ export default function PermissionCenterPage() {
   const [selectedRoleKey, setSelectedRoleKey] = useState('')
   const [selectedRolePermissionKeys, setSelectedRolePermissionKeys] = useState(
     []
+  )
+  const [activeTabKey, setActiveTabKey] = useState(
+    PERMISSION_CENTER_TAB_KEYS.ROLES
   )
   const [editingPhone, setEditingPhone] = useState('')
   const [createForm] = Form.useForm()
@@ -758,6 +766,273 @@ export default function PermissionCenterPage() {
     )
   }
 
+  const roleTemplateTab = (
+    <Card
+      className="erp-permission-section erp-permission-section--roles"
+      variant="borderless"
+    >
+      <div className="erp-role-center-header">
+        <div>
+          <Text className="erp-permission-section__eyebrow">
+            Role Templates
+          </Text>
+          <Title level={5} style={{ margin: 0 }}>
+            当前客户角色模板
+          </Title>
+          <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
+            页面按角色模板维护权限；后续客户配置只替换角色模板和默认权限组合，不改变产品内核权限码。
+          </Paragraph>
+        </div>
+        <Tag color="blue">Product Core 权限码稳定</Tag>
+      </div>
+
+      <div className="erp-role-center-layout">
+        <aside className="erp-role-center-sidebar" aria-label="角色模板列表">
+          {roles.length === 0 ? (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="暂无角色模板"
+            />
+          ) : (
+            roles.map((role) => {
+              const roleKey = getRoleKey(role)
+              const summary =
+                roleSummaries.find((item) => item.key === roleKey) || {}
+              const selected = roleKey === selectedRoleKey
+              return (
+                <button
+                  key={roleKey}
+                  type="button"
+                  className={`erp-role-template-card${
+                    selected ? ' erp-role-template-card--active' : ''
+                  }`}
+                  onClick={() => setSelectedRoleKey(roleKey)}
+                >
+                  <span className="erp-role-template-card__main">
+                    <Text strong>{role.name || roleKey}</Text>
+                    <Text type="secondary">{roleKey}</Text>
+                  </span>
+                  <span className="erp-role-template-card__meta">
+                    <Tag color={role.disabled ? 'default' : 'green'}>
+                      {role.disabled ? '停用' : '启用'}
+                    </Tag>
+                    <Text type="secondary">
+                      {summary.permissionSummary?.total || 0} 项权限
+                    </Text>
+                    <Text type="secondary">
+                      {summary.adminCount || 0} 个账号
+                    </Text>
+                  </span>
+                </button>
+              )
+            })
+          )}
+        </aside>
+
+        <section className="erp-role-center-detail">
+          {selectedRole ? (
+            <>
+              <div className="erp-role-center-detail__head">
+                <div>
+                  <Space size={8} wrap>
+                    <Title level={5} style={{ margin: 0 }}>
+                      {selectedRole.name || selectedRoleKey}
+                    </Title>
+                    <Tag>{selectedRoleKey}</Tag>
+                    {selectedRole.builtin ? (
+                      <Tag color="cyan">内置模板</Tag>
+                    ) : (
+                      <Tag color="blue">客户模板</Tag>
+                    )}
+                  </Space>
+                  <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
+                    {selectedRole.description ||
+                      '该角色通过权限码组合获得菜单、岗位任务端入口和接口动作能力。'}
+                  </Paragraph>
+                </div>
+                <Button
+                  type="primary"
+                  loading={saving}
+                  disabled={!canManageRolePermissions || !selectedRoleKey}
+                  onClick={saveRolePermissions}
+                >
+                  保存角色权限
+                </Button>
+              </div>
+
+              <div className="erp-role-center-metrics">
+                <div>
+                  <Text type="secondary">权限码</Text>
+                  <strong>{selectedRolePermissionSummary.total}</strong>
+                </div>
+                <div>
+                  <Text type="secondary">影响账号</Text>
+                  <strong>{selectedRoleAdmins.length}</strong>
+                </div>
+                <div>
+                  <Text type="secondary">岗位入口</Text>
+                  <strong>
+                    {selectedRolePermissionSummary.mobileAccessCount}
+                  </strong>
+                </div>
+                <div>
+                  <Text type="secondary">系统权限</Text>
+                  <strong>
+                    {selectedRolePermissionSummary.systemPermissionCount}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="erp-role-center-impact">
+                <div>
+                  <Text strong>影响管理员</Text>
+                  <div className="erp-role-center-impact__list">
+                    {selectedRoleAdmins.length > 0 ? (
+                      selectedRoleAdmins.map((admin) => (
+                        <Tag key={admin.id || admin.username}>
+                          {admin.username}
+                        </Tag>
+                      ))
+                    ) : (
+                      <Text type="secondary">暂无账号绑定该角色</Text>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <Text strong>关键入口 / 高风险能力</Text>
+                  <div className="erp-role-center-impact__list">
+                    {selectedRolePermissionHighlights.length > 0 ? (
+                      selectedRolePermissionHighlights.map((permission) => (
+                        <Tag key={permission.key} color="blue">
+                          {permission.label}
+                        </Tag>
+                      ))
+                    ) : (
+                      <Text type="secondary">未包含岗位入口或系统管理权限</Text>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <Alert
+                type="info"
+                showIcon
+                message="客户角色可以不同，职责权限保持统一"
+                description="不同甲方可以配置不同角色名称和默认权限包；流程节点仍绑定稳定职责 / 权限，不能按客户角色名写死业务事实规则。"
+              />
+
+              <PermissionChecklist
+                groups={permissionGroups}
+                value={selectedRolePermissionKeys}
+                disabled={!canManageRolePermissions || !selectedRoleKey}
+                onChange={setSelectedRolePermissionKeys}
+              />
+
+              <div className="erp-role-center-footer">
+                <Text type="secondary">
+                  当前模块分布：
+                  {formatModuleSummary(
+                    selectedRolePermissionSummary.moduleCounts
+                  )}
+                </Text>
+                <Button
+                  type="primary"
+                  loading={saving}
+                  disabled={!canManageRolePermissions || !selectedRoleKey}
+                  onClick={saveRolePermissions}
+                >
+                  保存角色权限
+                </Button>
+              </div>
+            </>
+          ) : (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="请选择一个角色模板"
+            />
+          )}
+        </section>
+      </div>
+    </Card>
+  )
+
+  const adminAccountTab = (
+    <Card
+      className="erp-permission-section erp-permission-section--admins"
+      variant="borderless"
+    >
+      <Space
+        size={12}
+        style={{ width: '100%', justifyContent: 'space-between' }}
+        wrap
+      >
+        <div>
+          <Text className="erp-permission-section__eyebrow">Account Roles</Text>
+          <Title level={5} style={{ margin: 0 }}>
+            管理员与角色
+          </Title>
+          <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
+            新账号默认没有权限，必须分配角色后才能访问受保护页面和接口。
+          </Paragraph>
+        </div>
+        <Space size={8} wrap>
+          <Tag color="green">共 {admins.length} 个管理员</Tag>
+          <Button
+            type="primary"
+            disabled={!canCreateUsers}
+            onClick={openCreateModal}
+          >
+            创建管理员
+          </Button>
+        </Space>
+      </Space>
+
+      <div className="erp-permission-list-toolbar">
+        <div className="erp-permission-list-toolbar__filters">
+          <Input
+            allowClear
+            className="erp-permission-list-toolbar__search"
+            value={adminSearchKeyword}
+            placeholder="搜索管理员账号、手机号、角色或权限码"
+            onChange={(event) => {
+              setAdminSearchKeyword(event.target.value)
+              setTablePagination((prev) => ({ ...prev, current: 1 }))
+            }}
+          />
+          <Select
+            value={adminStatusFilter}
+            options={adminStatusOptions}
+            onChange={(value) => {
+              setAdminStatusFilter(value || ADMIN_STATUS_FILTERS.ALL)
+              setTablePagination((prev) => ({ ...prev, current: 1 }))
+            }}
+          />
+        </div>
+        <Text type="secondary">
+          {hasAdminFilter
+            ? `命中 ${filteredAdmins.length}/${admins.length} 个管理员`
+            : `共 ${admins.length} 个管理员`}
+        </Text>
+      </div>
+      <Table
+        rowKey="id"
+        columns={columns}
+        dataSource={filteredAdmins}
+        loading={loading}
+        pagination={{
+          current: tablePagination.current,
+          pageSize: tablePagination.pageSize,
+          pageSizeOptions: TABLE_PAGE_SIZE_OPTIONS,
+          showSizeChanger: true,
+          showTotal: (total) => `共 ${total} 条`,
+        }}
+        locale={{ emptyText }}
+        scroll={{ x: 1040 }}
+        onChange={handleTableChange}
+      />
+    </Card>
+  )
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Card className="erp-permission-hero" variant="borderless">
@@ -774,14 +1049,7 @@ export default function PermissionCenterPage() {
               RBAC：用户绑定角色，角色拥有权限码；菜单、岗位任务端入口和接口守卫统一消费权限码。
             </Paragraph>
           </div>
-          <Button
-            type="primary"
-            size="large"
-            disabled={!canCreateUsers}
-            onClick={openCreateModal}
-          >
-            创建管理员
-          </Button>
+          <Tag color="blue">默认先维护角色模板</Tag>
         </div>
       </Card>
 
@@ -794,263 +1062,33 @@ export default function PermissionCenterPage() {
         />
       ) : null}
 
-      <Card
-        className="erp-permission-section erp-permission-section--admins"
-        variant="borderless"
-      >
-        <Space
-          size={12}
-          style={{ width: '100%', justifyContent: 'space-between' }}
-          wrap
-        >
-          <div>
-            <Text className="erp-permission-section__eyebrow">
-              Account Roles
-            </Text>
-            <Title level={5} style={{ margin: 0 }}>
-              管理员与角色
-            </Title>
-            <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-              新账号默认没有权限，必须分配角色后才能访问受保护页面和接口。
-            </Paragraph>
-          </div>
-          <Tag color="green">共 {admins.length} 个管理员</Tag>
-        </Space>
-
-        <div className="erp-permission-list-toolbar">
-          <div className="erp-permission-list-toolbar__filters">
-            <Input
-              allowClear
-              className="erp-permission-list-toolbar__search"
-              value={adminSearchKeyword}
-              placeholder="搜索管理员账号、手机号、角色或权限码"
-              onChange={(event) => {
-                setAdminSearchKeyword(event.target.value)
-                setTablePagination((prev) => ({ ...prev, current: 1 }))
-              }}
-            />
-            <Select
-              value={adminStatusFilter}
-              options={adminStatusOptions}
-              onChange={(value) => {
-                setAdminStatusFilter(value || ADMIN_STATUS_FILTERS.ALL)
-                setTablePagination((prev) => ({ ...prev, current: 1 }))
-              }}
-            />
-          </div>
-          <Text type="secondary">
-            {hasAdminFilter
-              ? `命中 ${filteredAdmins.length}/${admins.length} 个管理员`
-              : `共 ${admins.length} 个管理员`}
-          </Text>
-        </div>
-        <Table
-          rowKey="id"
-          columns={columns}
-          dataSource={filteredAdmins}
-          loading={loading}
-          pagination={{
-            current: tablePagination.current,
-            pageSize: tablePagination.pageSize,
-            pageSizeOptions: TABLE_PAGE_SIZE_OPTIONS,
-            showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 条`,
-          }}
-          locale={{ emptyText }}
-          scroll={{ x: 1040 }}
-          onChange={handleTableChange}
-        />
-      </Card>
-
-      <Card
-        className="erp-permission-section erp-permission-section--roles"
-        variant="borderless"
-      >
-        <div className="erp-role-center-header">
-          <div>
-            <Text className="erp-permission-section__eyebrow">
-              Role Templates
-            </Text>
-            <Title level={5} style={{ margin: 0 }}>
-              当前客户角色模板
-            </Title>
-            <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-              页面按角色模板维护权限；后续客户配置只替换角色模板和默认权限组合，不改变产品内核权限码。
-            </Paragraph>
-          </div>
-          <Tag color="blue">Product Core 权限码稳定</Tag>
-        </div>
-
-        <div className="erp-role-center-layout">
-          <aside className="erp-role-center-sidebar" aria-label="角色模板列表">
-            {roles.length === 0 ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="暂无角色模板"
-              />
-            ) : (
-              roles.map((role) => {
-                const roleKey = getRoleKey(role)
-                const summary =
-                  roleSummaries.find((item) => item.key === roleKey) || {}
-                const selected = roleKey === selectedRoleKey
-                return (
-                  <button
-                    key={roleKey}
-                    type="button"
-                    className={`erp-role-template-card${
-                      selected ? ' erp-role-template-card--active' : ''
-                    }`}
-                    onClick={() => setSelectedRoleKey(roleKey)}
-                  >
-                    <span className="erp-role-template-card__main">
-                      <Text strong>{role.name || roleKey}</Text>
-                      <Text type="secondary">{roleKey}</Text>
-                    </span>
-                    <span className="erp-role-template-card__meta">
-                      <Tag color={role.disabled ? 'default' : 'green'}>
-                        {role.disabled ? '停用' : '启用'}
-                      </Tag>
-                      <Text type="secondary">
-                        {summary.permissionSummary?.total || 0} 项权限
-                      </Text>
-                      <Text type="secondary">
-                        {summary.adminCount || 0} 个账号
-                      </Text>
-                    </span>
-                  </button>
-                )
-              })
-            )}
-          </aside>
-
-          <section className="erp-role-center-detail">
-            {selectedRole ? (
-              <>
-                <div className="erp-role-center-detail__head">
-                  <div>
-                    <Space size={8} wrap>
-                      <Title level={5} style={{ margin: 0 }}>
-                        {selectedRole.name || selectedRoleKey}
-                      </Title>
-                      <Tag>{selectedRoleKey}</Tag>
-                      {selectedRole.builtin ? (
-                        <Tag color="cyan">内置模板</Tag>
-                      ) : (
-                        <Tag color="blue">客户模板</Tag>
-                      )}
-                    </Space>
-                    <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-                      {selectedRole.description ||
-                        '该角色通过权限码组合获得菜单、岗位任务端入口和接口动作能力。'}
-                    </Paragraph>
-                  </div>
-                  <Button
-                    type="primary"
-                    loading={saving}
-                    disabled={!canManageRolePermissions || !selectedRoleKey}
-                    onClick={saveRolePermissions}
-                  >
-                    保存角色权限
-                  </Button>
-                </div>
-
-                <div className="erp-role-center-metrics">
-                  <div>
-                    <Text type="secondary">权限码</Text>
-                    <strong>{selectedRolePermissionSummary.total}</strong>
-                  </div>
-                  <div>
-                    <Text type="secondary">影响账号</Text>
-                    <strong>{selectedRoleAdmins.length}</strong>
-                  </div>
-                  <div>
-                    <Text type="secondary">岗位入口</Text>
-                    <strong>
-                      {selectedRolePermissionSummary.mobileAccessCount}
-                    </strong>
-                  </div>
-                  <div>
-                    <Text type="secondary">系统权限</Text>
-                    <strong>
-                      {selectedRolePermissionSummary.systemPermissionCount}
-                    </strong>
-                  </div>
-                </div>
-
-                <div className="erp-role-center-impact">
-                  <div>
-                    <Text strong>影响管理员</Text>
-                    <div className="erp-role-center-impact__list">
-                      {selectedRoleAdmins.length > 0 ? (
-                        selectedRoleAdmins.map((admin) => (
-                          <Tag key={admin.id || admin.username}>
-                            {admin.username}
-                          </Tag>
-                        ))
-                      ) : (
-                        <Text type="secondary">暂无账号绑定该角色</Text>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <Text strong>关键入口 / 高风险能力</Text>
-                    <div className="erp-role-center-impact__list">
-                      {selectedRolePermissionHighlights.length > 0 ? (
-                        selectedRolePermissionHighlights.map((permission) => (
-                          <Tag key={permission.key} color="blue">
-                            {permission.label}
-                          </Tag>
-                        ))
-                      ) : (
-                        <Text type="secondary">
-                          未包含岗位入口或系统管理权限
-                        </Text>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <Alert
-                  type="info"
-                  showIcon
-                  message="客户角色可以不同，职责权限保持统一"
-                  description="不同甲方可以配置不同角色名称和默认权限包；流程节点仍绑定稳定职责 / 权限，不能按客户角色名写死业务事实规则。"
-                />
-
-                <PermissionChecklist
-                  groups={permissionGroups}
-                  value={selectedRolePermissionKeys}
-                  disabled={!canManageRolePermissions || !selectedRoleKey}
-                  onChange={setSelectedRolePermissionKeys}
-                />
-
-                <div className="erp-role-center-footer">
-                  <Text type="secondary">
-                    当前模块分布：
-                    {formatModuleSummary(
-                      selectedRolePermissionSummary.moduleCounts
-                    )}
-                  </Text>
-                  <Button
-                    type="primary"
-                    loading={saving}
-                    disabled={!canManageRolePermissions || !selectedRoleKey}
-                    onClick={saveRolePermissions}
-                  >
-                    保存角色权限
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="请选择一个角色模板"
-              />
-            )}
-          </section>
-        </div>
-      </Card>
+      <Tabs
+        activeKey={activeTabKey}
+        className="erp-permission-tabs"
+        items={[
+          {
+            key: PERMISSION_CENTER_TAB_KEYS.ROLES,
+            label: (
+              <span className="erp-permission-tabs__label">
+                角色模板
+                <Tag color="blue">{roles.length}</Tag>
+              </span>
+            ),
+            children: roleTemplateTab,
+          },
+          {
+            key: PERMISSION_CENTER_TAB_KEYS.ADMINS,
+            label: (
+              <span className="erp-permission-tabs__label">
+                管理员账号
+                <Tag color="green">{admins.length}</Tag>
+              </span>
+            ),
+            children: adminAccountTab,
+          },
+        ]}
+        onChange={setActiveTabKey}
+      />
 
       <Modal
         title="创建管理员"

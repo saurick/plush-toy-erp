@@ -226,7 +226,14 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 		t.Fatalf("repeat post must keep one inbound txn, got %d", count)
 	}
 
-	_, listRes, err := j.handlePurchase(adminCtx, "list_purchase_receipts", "5", mustJSONRPCStruct(t, map[string]any{"status": biz.PurchaseReceiptStatusPosted}))
+	_, listRes, err := j.handlePurchase(adminCtx, "list_purchase_receipts", "5", mustJSONRPCStruct(t, map[string]any{
+		"status":       biz.PurchaseReceiptStatusPosted,
+		"date_from":    "2026-06-11",
+		"date_to":      "2026-06-11",
+		"material_id":  float64(fixtures.materialID),
+		"warehouse_id": float64(fixtures.warehouseID),
+		"lot_id":       float64(lotID),
+	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}

@@ -266,6 +266,7 @@ export default function V1OutsourcingOrdersPage() {
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [supplierFilter, setSupplierFilter] = useState('')
   const [dateField, setDateField] = useState('order_date')
   const [dateRange, setDateRange] = useState([null, null])
   const [sortValue, setSortValue] = useState('updated_at:desc')
@@ -349,6 +350,7 @@ export default function V1OutsourcingOrdersPage() {
       const { sortBy, sortDirection } = parseSortValue(sortValue)
       const data = await listOutsourcingOrders({
         keyword,
+        supplier_id: supplierFilter || undefined,
         lifecycle_status: statusFilter,
         date_field: dateField,
         date_from: dateRange?.[0] || undefined,
@@ -369,7 +371,15 @@ export default function V1OutsourcingOrdersPage() {
     } finally {
       setLoading(false)
     }
-  }, [dateField, dateRange, keyword, pagination, sortValue, statusFilter])
+  }, [
+    dateField,
+    dateRange,
+    keyword,
+    pagination,
+    sortValue,
+    statusFilter,
+    supplierFilter,
+  ])
 
   const loadOrderItems = useCallback(async (order) => {
     if (!order?.id) return []
@@ -963,6 +973,18 @@ export default function V1OutsourcingOrdersPage() {
               options={STATUS_OPTIONS}
               onChange={(value) => {
                 setStatusFilter(value)
+                setPagination(DEFAULT_PAGINATION)
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={supplierFilter}
+              options={[{ label: '全部加工厂', value: '' }, ...supplierOptions]}
+              placeholder="全部加工厂"
+              showSearch
+              optionFilterProp="label"
+              onChange={(value) => {
+                setSupplierFilter(value || '')
                 setPagination(DEFAULT_PAGINATION)
               }}
             />

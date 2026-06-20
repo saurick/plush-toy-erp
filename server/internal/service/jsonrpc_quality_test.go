@@ -79,8 +79,14 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 	assertInventoryTxnCountUnchanged(t, ctx, client, txnCount)
 
 	_, listRes, err := j.handleQuality(adminCtx, "list_quality_inspections", "4", mustJSONRPCStruct(t, map[string]any{
-		"status": biz.QualityInspectionStatusPassed,
-		"result": biz.QualityInspectionResultConcession,
+		"status":              biz.QualityInspectionStatusPassed,
+		"result":              biz.QualityInspectionResultConcession,
+		"date_from":           "2026-06-17",
+		"date_to":             "2026-06-17",
+		"purchase_receipt_id": float64(receipt.ID),
+		"inventory_lot_id":    float64(lotID),
+		"material_id":         float64(fixtures.materialID),
+		"warehouse_id":        float64(fixtures.warehouseID),
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)

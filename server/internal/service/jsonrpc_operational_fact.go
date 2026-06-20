@@ -368,11 +368,27 @@ func financeFactCreateFromParams(pm map[string]any) (*biz.FinanceFactCreate, boo
 }
 
 func operationalFactFilterFromParams(pm map[string]any) biz.OperationalFactFilter {
+	dateFrom, _ := getOptionalJSONRPCTime(pm, "date_from")
+	dateTo, _ := getOptionalJSONRPCTime(pm, "date_to")
 	return biz.OperationalFactFilter{
-		Status:   getString(pm, "status"),
-		FactType: getString(pm, "fact_type"),
-		Limit:    getInt(pm, "limit", 50),
-		Offset:   getInt(pm, "offset", 0),
+		Status:         getString(pm, "status"),
+		FactType:       getString(pm, "fact_type"),
+		Keyword:        getString(pm, "keyword"),
+		DateField:      getString(pm, "date_field"),
+		DateFrom:       dateFrom,
+		DateTo:         dateTo,
+		SubjectType:    getString(pm, "subject_type"),
+		SubjectID:      getInt(pm, "subject_id", 0),
+		WarehouseID:    getInt(pm, "warehouse_id", 0),
+		LotID:          getInt(pm, "lot_id", 0),
+		SourceType:     getString(pm, "source_type"),
+		SourceID:       getInt(pm, "source_id", 0),
+		CustomerID:     getInt(pm, "customer_id", 0),
+		ProductID:      getInt(pm, "product_id", 0),
+		ProductSkuID:   getInt(pm, "product_sku_id", 0),
+		CounterpartyID: getInt(pm, "counterparty_id", 0),
+		Limit:          getInt(pm, "limit", 50),
+		Offset:         getInt(pm, "offset", 0),
 	}
 }
 

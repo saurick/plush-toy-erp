@@ -29,6 +29,7 @@ import {
   BusinessDataTable,
   BusinessPageLayout,
   DateInput,
+  DateRangeFilter,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -89,6 +90,7 @@ const STATUS_COLORS = Object.freeze({
   POSTED: 'blue',
   CANCELLED: 'red',
 })
+const DATE_FILTER_OPTIONS = [{ label: '入库日期', value: 'received_at' }]
 const REFERENCE_LOAD_RETRY_DELAYS_MS = [500, 1000]
 
 function statusTag(status) {
@@ -364,6 +366,12 @@ export default function V1PurchaseReceiptsPage() {
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [dateFilterField, setDateFilterField] = useState('received_at')
+  const [dateFilterStart, setDateFilterStart] = useState('')
+  const [dateFilterEnd, setDateFilterEnd] = useState('')
+  const [materialFilter, setMaterialFilter] = useState('')
+  const [warehouseFilter, setWarehouseFilter] = useState('')
+  const [lotFilter, setLotFilter] = useState('')
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -433,6 +441,12 @@ export default function V1PurchaseReceiptsPage() {
         compactParams({
           status: statusFilter,
           keyword: trimOptional(keyword),
+          date_field: dateFilterField,
+          date_from: dateFilterStart || undefined,
+          date_to: dateFilterEnd || undefined,
+          material_id: materialFilter || undefined,
+          warehouse_id: warehouseFilter || undefined,
+          lot_id: lotFilter || undefined,
           ...getBusinessPaginationParams(pagination),
         })
       )
@@ -451,7 +465,17 @@ export default function V1PurchaseReceiptsPage() {
     } finally {
       setLoading(false)
     }
-  }, [keyword, pagination, statusFilter])
+  }, [
+    dateFilterEnd,
+    dateFilterField,
+    dateFilterStart,
+    keyword,
+    lotFilter,
+    materialFilter,
+    pagination,
+    statusFilter,
+    warehouseFilter,
+  ])
 
   useEffect(() => {
     loadRows()
@@ -794,6 +818,63 @@ export default function V1PurchaseReceiptsPage() {
               options={STATUS_OPTIONS}
               onChange={(nextStatus) => {
                 setStatusFilter(nextStatus)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={materialFilter}
+              options={[{ label: '全部材料', value: '' }, ...materialOptions]}
+              placeholder="全部材料"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextMaterial) => {
+                setMaterialFilter(nextMaterial || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={warehouseFilter}
+              options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
+              placeholder="全部仓库"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextWarehouse) => {
+                setWarehouseFilter(nextWarehouse || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={lotFilter}
+              options={[
+                { label: '全部批次', value: '' },
+                ...inventoryLotOptions,
+              ]}
+              placeholder="全部批次"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextLot) => {
+                setLotFilter(nextLot || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <DateRangeFilter
+              options={DATE_FILTER_OPTIONS}
+              value={dateFilterField}
+              onTypeChange={(nextField) => {
+                setDateFilterField(nextField || 'received_at')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+              startValue={dateFilterStart}
+              endValue={dateFilterEnd}
+              onStartChange={(nextStart) => {
+                setDateFilterStart(nextStart)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+              onEndChange={(nextEnd) => {
+                setDateFilterEnd(nextEnd)
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />

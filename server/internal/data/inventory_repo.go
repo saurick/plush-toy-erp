@@ -386,6 +386,11 @@ func (r *inventoryRepo) ListInventoryLots(ctx context.Context, filter biz.Invent
 	if filter.Status != "" {
 		query = query.Where(inventorylot.StatusEQ(filter.Status))
 	}
+	if filter.WarehouseID > 0 {
+		query = query.Where(inventorylot.HasInventoryBalancesWith(
+			inventorybalance.WarehouseID(filter.WarehouseID),
+		))
+	}
 	if filter.Keyword != "" {
 		query = query.Where(inventorylot.Or(
 			inventorylot.SubjectTypeContainsFold(filter.Keyword),
@@ -399,6 +404,12 @@ func (r *inventoryRepo) ListInventoryLots(ctx context.Context, filter biz.Invent
 			inventorylot.SubjectIDEQ(parsePositiveIntOrZero(filter.Keyword)),
 			inventorylot.ProductSkuIDEQ(parsePositiveIntOrZero(filter.Keyword)),
 		))
+	}
+	if filter.DateFrom != nil {
+		query = query.Where(inventorylot.ReceivedAtGTE(*filter.DateFrom))
+	}
+	if filter.DateTo != nil {
+		query = query.Where(inventorylot.ReceivedAtLTE(endOfDateFilter(*filter.DateTo)))
 	}
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
@@ -458,6 +469,12 @@ func (r *inventoryRepo) ListInventoryTxns(ctx context.Context, filter biz.Invent
 			inventorytxn.SourceLineIDEQ(parsePositiveIntOrZero(filter.Keyword)),
 			inventorytxn.ReversalOfTxnIDEQ(parsePositiveIntOrZero(filter.Keyword)),
 		))
+	}
+	if filter.DateFrom != nil {
+		query = query.Where(inventorytxn.OccurredAtGTE(*filter.DateFrom))
+	}
+	if filter.DateTo != nil {
+		query = query.Where(inventorytxn.OccurredAtLTE(endOfDateFilter(*filter.DateTo)))
 	}
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
