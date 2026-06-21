@@ -318,5 +318,13 @@
 - 完成：新增项目专属 `.agents/skills/plush-prompt-governance/`，用于把 plush 需求整理成可执行提示词，默认强调“要完成什么、先读什么、允许改什么、怎么验收、如何收口”，只在 AGENTS、真源、Workflow / Fact、RBAC、客户资料、生产数据、Git 和测试声明等高风险边界使用“不要 / 禁止”。
 - 完成：新增通用 `~/.codex/skills/prompt-governance/`，用于跨项目提示词治理；同步根 `README.md` 中 `.agents/skills/` 职责，加入提示词治理。
 - 验证：追加前 `progress.md` 为 330 行、56995 字节，未达到归档阈值；已执行两份 skill 的 `quick_validate.py`、Ruby YAML 解析、TODO 扫描、中文 `display_name` 扫描、默认提示扫描和 `git diff --check`，均通过。
+
+## 2026-06-21 Codex 高风险治理 skills 补充
+
+- 完成：新增项目专属 `.agents/skills/plush-release-governance/`、`plush-domain-boundary-governance/`、`plush-runtime-diagnostics/`、`plush-seed-import-governance/`、`plush-observability-error-governance/`、`plush-security-privacy-governance/`，覆盖发布/版本、业务边界、运行诊断、seed/import、可观测错误和安全隐私治理；同步通用 `~/.codex/skills/` 6 个同名范式 skill。
+- 完成：同步根 `README.md` 中 `.agents/skills/` 职责，并补充项目 prompt-governance 的 skill pairing 表，方便后续一次提示词带出相关治理 skill。
+- 验证：追加前 `progress.md` 为 370 行、64643 字节，未达到归档阈值；本轮只改 skill / README / progress，不改运行时代码、schema、migration、RBAC、部署脚本或生产配置；验证命令见本轮最终回复。
+- 下一步：后续涉及发布/部署/版本、运行报错、业务边界、seed/import、可观测错误或安全隐私任务时优先使用对应项目 skill；跨项目通用任务可用全局同名 skill。
+- 阻塞/风险：新 skill 是执行治理入口，不等于已经修改 release 脚本、监控系统、安全策略或真实导入流程；如需自动守卫仍需后续落到脚本、测试或 CI/hook。
 - 下一步：后续新开主会话、side chat、review 会话或需要把一句话需求改成可执行任务时，优先使用 `$plush-prompt-governance`；跨项目通用提示词整理使用 `$prompt-governance`。
 - 阻塞/风险：本轮只新增 Codex skill、README 入口和过程记录，不改运行时代码、schema、migration、RBAC、菜单、Workflow / Fact、页面样式、测试脚本或部署脚本；当前工作区已有多项非本轮未提交改动，本轮不回退、不归并。

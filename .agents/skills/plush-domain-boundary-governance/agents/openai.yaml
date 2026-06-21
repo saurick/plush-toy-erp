@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plush Domain Boundary Governance"
+  short_description: "Keep implementation aligned with domain truth and ownership"
+  default_prompt: "Use $plush-domain-boundary-governance to handle this plush-toy-erp task with project truth, validation, and risk reporting."

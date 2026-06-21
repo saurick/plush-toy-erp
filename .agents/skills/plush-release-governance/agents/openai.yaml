@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plush Release Governance"
+  short_description: "Govern release, deploy, version, rollback, and evidence"
+  default_prompt: "Use $plush-release-governance to handle this plush-toy-erp task with project truth, validation, and risk reporting."

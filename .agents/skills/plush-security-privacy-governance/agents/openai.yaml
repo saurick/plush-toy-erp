@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plush Security Privacy Governance"
+  short_description: "Handle auth, secrets, permissions, privacy, and safe data use"
+  default_prompt: "Use $plush-security-privacy-governance to handle this plush-toy-erp task with project truth, validation, and risk reporting."

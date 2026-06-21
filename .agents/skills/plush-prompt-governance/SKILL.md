@@ -67,6 +67,12 @@ $relevant-plush-skill
 | 代码 review | `$plush-code-review-governance` |
 | 测试选择 / 验证范围 | `$plush-test-governance` |
 | 通用提示词整理 | `$prompt-governance` |
+| 发布/部署/版本 | `$plush-release-governance` |
+| 领域边界/实现前评估 | `$plush-domain-boundary-governance` |
+| 运行故障诊断 | `$plush-runtime-diagnostics` |
+| seed/import/fixture | `$plush-seed-import-governance` |
+| 可观测/错误提示 | `$plush-observability-error-governance` |
+| 安全/隐私/权限 | `$plush-security-privacy-governance` |
 
 If the task often needs two skills, include both explicitly. There is no special shortcut required; one prompt can list multiple `$skill-name` lines.
 
