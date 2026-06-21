@@ -287,3 +287,10 @@
 - 验证：追加前 `progress.md` 为 281 行、47497 字节，未达到归档阈值；已执行 `quick_validate.py` 验证通用 `test-governance` 与项目 `plush-test-governance` 均通过；已执行 Ruby YAML 解析、TODO 扫描、中文 `display_name` 扫描、默认提示扫描和 `git diff --check`，均通过。
 - 下一步：后续涉及测试选择、测试补齐、验证范围说明或“是否测试充分”时优先使用 `$plush-test-governance`；只需要通用测试分类时可用 `$test-governance`。
 - 阻塞/风险：本轮只新增 Codex skill、README 入口和过程记录，不改运行时代码、schema、migration、RBAC、菜单、Workflow / Fact、页面样式或真实测试脚本；因此未运行前后端业务测试、`style:l1` 或 real-write E2E。
+
+## 2026-06-21 自动化测试策略术语边界补充
+
+- 完成：补充 `docs/product/自动化测试策略.md` 的术语边界，把“架构层级 / 验证层级 T0-T8 / 测试形态 / 证据环境”拆开说明，避免把单元测试、集成测试、smoke、E2E、浏览器回归和部署验证混成同一种测试层级。
+- 验证：追加前 `progress.md` 为 289 行、48893 字节，未达到归档阈值；已执行 `git diff --check -- docs/product/自动化测试策略.md` 通过。
+- 下一步：后续在最终回复或验收记录里同时说明验证层级、测试形态和证据环境，避免只写“测试通过”。
+- 阻塞/风险：本轮只改测试策略文档和过程记录，不改运行时代码、schema、migration、RBAC、菜单、Workflow / Fact、页面样式或真实测试脚本；未新增自动化 runner。
