@@ -312,3 +312,11 @@
 - 验证：追加前 `progress.md` 为 306 行、51913 字节，未达到归档阈值；`docs/当前真源与交接顺序.md` 瘦身后为 159 行、18956 字节；已执行 `git diff --check`、旧长流水关键词反查、目标标题 / dev-only 入口 / 台账链接扫描、目标链接文件存在性检查和 `cd web && node --test src/erp/utils/businessModuleNavigation.test.mjs`，均通过。
 - 下一步：后续能力细节、运行时证据和长条目继续写入 `docs/product/产品能力进度台账.md`、`docs/product/产品能力证据详情.md`、`web/README.md` 或专题文档；当前真源索引只保留阅读顺序、禁区和高风险摘要。
 - 阻塞/风险：本轮只做正式文档瘦身和过程记录，不改 runtime、schema、migration、API、RBAC、菜单、Workflow / Fact、页面样式、测试脚本、客户原始资料、archive/reference 或目录结构；因此未运行 Go、pnpm、`style:l1`、migration、真实浏览器回归或 real-write E2E。
+
+## 2026-06-21 Codex 提示词治理 skill 补充
+
+- 完成：新增项目专属 `.agents/skills/plush-prompt-governance/`，用于把 plush 需求整理成可执行提示词，默认强调“要完成什么、先读什么、允许改什么、怎么验收、如何收口”，只在 AGENTS、真源、Workflow / Fact、RBAC、客户资料、生产数据、Git 和测试声明等高风险边界使用“不要 / 禁止”。
+- 完成：新增通用 `~/.codex/skills/prompt-governance/`，用于跨项目提示词治理；同步根 `README.md` 中 `.agents/skills/` 职责，加入提示词治理。
+- 验证：追加前 `progress.md` 为 330 行、56995 字节，未达到归档阈值；已执行两份 skill 的 `quick_validate.py`、Ruby YAML 解析、TODO 扫描、中文 `display_name` 扫描、默认提示扫描和 `git diff --check`，均通过。
+- 下一步：后续新开主会话、side chat、review 会话或需要把一句话需求改成可执行任务时，优先使用 `$plush-prompt-governance`；跨项目通用提示词整理使用 `$prompt-governance`。
+- 阻塞/风险：本轮只新增 Codex skill、README 入口和过程记录，不改运行时代码、schema、migration、RBAC、菜单、Workflow / Fact、页面样式、测试脚本或部署脚本；当前工作区已有多项非本轮未提交改动，本轮不回退、不归并。

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plush Prompt Governance"
+  short_description: "Draft bounded plush task prompts"
+  default_prompt: "Use $plush-prompt-governance to turn this plush request into an executable task prompt."
