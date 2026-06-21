@@ -279,3 +279,11 @@
 - 验证：追加前 `progress.md` 为 273 行、45943 字节，未达到归档阈值；已执行 `pnpm --dir web lint`、`pnpm --dir web css`、`node --check web/scripts/styleL1.mjs`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop pnpm --dir web style:l1`、`STYLE_L1_SCENARIOS=admin-login-mobile pnpm --dir web style:l1`、`git diff --check -- web/src/pages/AdminLogin/index.jsx web/scripts/styleL1.mjs web/src/common/consts/errorCodes.generated.js`，均通过；`pnpm --dir web test` 共 380 个前端单测通过。
 - 下一步：如后续继续压缩登录页密度，可单独评审入口 segmented 高度、登录方式 segmented 和卡片垂直间距，并继续覆盖桌面 / 移动端盒模型。
 - 阻塞/风险：本轮未改 schema、migration、后端认证、RBAC、菜单、Workflow / Fact、客户配置、路由、短信登录逻辑或原型资产；当前工作区仍有本轮前已有的 `progress.md`、`web/scripts/mobileAuthLoginRouteSmoke.mjs`、`web/src/erp/router.jsx` 脏改动，本轮未回退、未归并。
+
+## 2026-06-21 Codex 测试治理 skill 补充
+
+- 完成：新增 `.agents/skills/plush-test-governance/`，作为 plush 项目专属测试治理入口，覆盖 T0-T8 测试分层、Workflow / Fact / RBAC / 页面 / import / real-write / release 验证选择和汇报标准；同步根 `README.md` 中 `.agents/skills/` 职责为文档治理、页面治理、代码审查和测试治理。
+- 完成：同步新增通用 `~/.codex/skills/test-governance/`，用于跨项目测试分类和验证范围选择；项目内仍以 `.agents/skills/plush-test-governance/` 承载 plush 专属命令与边界。
+- 验证：追加前 `progress.md` 为 281 行、47497 字节，未达到归档阈值；已执行 `quick_validate.py` 验证通用 `test-governance` 与项目 `plush-test-governance` 均通过；已执行 Ruby YAML 解析、TODO 扫描、中文 `display_name` 扫描、默认提示扫描和 `git diff --check`，均通过。
+- 下一步：后续涉及测试选择、测试补齐、验证范围说明或“是否测试充分”时优先使用 `$plush-test-governance`；只需要通用测试分类时可用 `$test-governance`。
+- 阻塞/风险：本轮只新增 Codex skill、README 入口和过程记录，不改运行时代码、schema、migration、RBAC、菜单、Workflow / Fact、页面样式或真实测试脚本；因此未运行前后端业务测试、`style:l1` 或 real-write E2E。

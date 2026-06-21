@@ -1,0 +1,55 @@
+---
+name: plush-test-governance
+description: Project-specific test governance for /Users/simon/projects/plush-toy-erp. Use when Codex chooses, runs, reviews, or explains validation scope for plush-toy-erp changes, including unit tests, integration tests, JSON-RPC/RBAC tests, migration checks, browser/page regressions, style:l1, smoke tests, real-write E2E, import dry-runs, release checks, or when the user asks 测试分类/测试治理/怎么测/要不要补测试.
+---
+
+# Plush Test Governance
+
+用这份 skill 把 plush-toy-erp 的测试选择、执行和汇报收口到项目真实边界。它不是“多跑命令越好”，而是按改动影响面选出足够但不过度的验证组合。
+
+## Workflow
+
+1. 先收敛本轮改动类型和风险层级。
+   - 只改文档、skill、README 或进度记录时，默认做静态校验、Markdown/skill 校验和相关引用检查，不机械运行前后端全量测试。
+   - 触达服务端 usecase、repo、schema、RBAC、JSON-RPC、业务事实或 migration 时，必须升级到对应 Go/API/迁移测试。
+   - 触达页面、样式、表单、表格、导航、交互态或可见文案时，必须纳入 `web` 测试和浏览器级回归，不能只跑静态 lint。
+   - 触达部署、初始化、seed、导入导出或真实写入链路时，必须按真实边界补 dry-run、real-write 或发布前检查。
+2. 先读相关真源，再定测试。
+   - 常用入口：`README.md`、`docs/当前真源与交接顺序.md`、`docs/product/自动化测试策略.md`、`server/README.md`、`web/README.md`、`scripts/README.md`。
+   - 不把历史 changes、聊天规划或单个测试名当成测试范围真源。
+3. 按影响面选择 T 级测试，不用一个固定清单套所有任务。
+4. 执行前检查工作区状态；执行后记录命令、结果、未覆盖项和剩余风险。
+5. 有文件改动时，按项目约定更新 `progress.md`。
+
+## Test Levels
+
+| Level | 适用场景 | 常用命令 / 验证 |
+| --- | --- | --- |
+| T0 静态现场 | 任意改动、提交前、skill/docs 小改 | `git status --short`、`git diff --stat`、`git diff --check`、必要时 `rg` 查引用 |
+| T1 文档与边界 | README/docs/AGENTS/skill/菜单口径/真源文档 | Markdown 结构、链接/引用、`docs/文档清单.md`、相关 README、skill validator |
+| T2 Schema / Migration | Ent schema、migration、DB 字段、数据真源 | `cd server && make print_db_url`、`make data`、`make migrate_status`、相关 schema/data Go tests |
+| T3 Usecase / Repo / Core | Inventory/Purchase/Quality/Shipment/Finance/Workflow 事实或业务逻辑 | `cd server && go test ./internal/core/... ./internal/biz ./internal/data`，按域收窄或扩大 |
+| T4 API / RBAC / JSON-RPC | JSON-RPC handler、权限码、角色、错误码、鉴权 | `cd server && go test ./internal/biz ./internal/data ./internal/service ./internal/server`，错误码同步脚本 |
+| T5 Frontend / Page | 页面、表单、样式、表格、导航、交互态 | `cd web && pnpm lint`、`pnpm css`、`pnpm test`、`pnpm style:l1`，必要时真实浏览器脚本 |
+| T6 Import / Seed / Fixture | 客户导入、source snapshot、模拟数据、初始化模板 | `node --test scripts/import/*.test.mjs`、相关 dry-run / freeze 检查 |
+| T7 Real-write / Business E2E | 采购入库、库存、出货、加工、真实后端读写闭环 | `node scripts/qa/*real-write*.mjs`、`cd web && pnpm smoke:*real-write*`、`node scripts/qa/mvp-closure.mjs` |
+| T8 Release / Deploy | 镜像、低配服务器、migration、健康检查、回滚 | `bash scripts/qa/full.sh` 或 `strict.sh`，再按 `server/deploy/README.md` 做发布前后检查 |
+
+## Selection Rules
+
+- Workflow 改动至少覆盖 `done / blocked / rejected`、reason 必填、旧原因清理、重复提交、settled 状态、JSON-RPC/RBAC 边界。
+- Fact / Inventory / Purchase / Quality / Shipment / Finance 改动至少覆盖 happy path、非法状态、重复提交、取消/冲正、幂等、事务失败和事实表一致性。
+- RBAC / API 改动至少覆盖未登录、disabled 管理员、非管理员、无权限、角色不匹配、super_admin 和前端隐藏菜单不是安全边界。
+- 页面治理改动至少覆盖默认态、交互态、恢复态、相邻区域、长文本/大数字/多标签等边界样本；`style:l1` 是浏览器级回归，不替代真实后端读写回归。
+- Import / Seed 改动必须区分 dry-run、fixture、模拟客户数据和真实客户数据；当前没有可直接执行的真实客户数据导入。
+- 部署测试默认不在低配服务器构建；远端只做加载制品、migration、启动、健康检查和必要 smoke。
+
+## Reporting Standard
+
+最终回复必须写清：
+
+- 本轮选了哪些 T 级测试，为什么。
+- 实际运行了哪些命令，结果如何。
+- 哪些测试没有跑，原因是什么。
+- 是否覆盖默认态、交互态、恢复态、真实后端读写、migration 或发布边界。
+- 剩余盲区和下一步建议，不能只写“已通过测试”。
