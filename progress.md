@@ -295,3 +295,20 @@
 - 验证：追加前 `progress.md` 为 289 行、48893 字节，未达到归档阈值；已执行 `git diff --check -- docs/product/自动化测试策略.md .agents/skills/plush-test-governance/SKILL.md .agents/skills/plush-docs-governance/SKILL.md`、Ruby YAML 解析、两个项目 skill 的 `quick_validate.py`，均通过；`rg "项目层级|项目分层|T 级测试|测试层级"` 对本轮三处文件无命中。
 - 下一步：后续在最终回复或验收记录里同时说明验证层级、测试形态、证据环境和跳过原因，避免只写“测试通过”；如果要把该口径提升为强制仓库级规则，再单独评审是否改 `AGENTS.md`。
 - 阻塞/风险：本轮只改测试策略文档、Codex skills 和过程记录，不改运行时代码、schema、migration、RBAC、菜单、Workflow / Fact、页面样式或真实测试脚本；未新增自动化 runner，未运行 Go、pnpm、`style:l1`、migration 或 real-write E2E。
+
+## 2026-06-21 项目治理口径中心导航
+
+- 完成：在 `docs/当前真源与交接顺序.md` 新增“项目治理口径 / Governance Axes”导航表，集中说明架构责任层级、验证层级 T0-T8、测试形态、证据环境、文档真源层级、原型状态、产品化层级、数据语义层级和交付运行层级分别应该看哪里。
+- 完成：在 `docs/product/README.md` 的 reader paths 增加治理口径入口，指向当前真源文档的中心导航，并链接模块边界、自动化测试策略、原型 README 和 `AGENTS.md`，避免在每篇产品文档重复解释。
+- 完成：同步 `docs/文档清单.md` 中当前真源文档的当前用途，标明它包含项目治理口径导航，方便从清单层面发现入口。
+- 验证：更新前 `progress.md` 为 305 行、51727 字节，未达到归档阈值；已执行 `git diff --check`、治理口径关键词扫描、文档清单命中扫描和目标文档 diff 检查，均通过。
+- 下一步：后续新增新的“层级 / 状态 / 形态”口径时，优先更新中心导航和对应专题文档，不在所有文档复制说明。
+- 阻塞/风险：本轮只改正式文档和过程记录，不改 runtime、schema、migration、RBAC、菜单、Workflow / Fact、页面样式、测试脚本或 Codex skill；因此未运行 Go、pnpm、`style:l1`、migration 或 real-write E2E。
+
+## 2026-06-21 当前真源索引瘦身
+
+- 完成：将 `docs/当前真源与交接顺序.md` 的“当前业务保存层交接摘录”从长流水改为 10 行摘要表，保留旧 `business_records` 退出、MasterData / Source Document、Inventory / Purchase / Quality / BOM / Outsourcing、Operational Fact、Workflow、生命周期动作、删除 / 归档引用检查边界、RBAC / 菜单、yoyoosun 导入和产品化交付等高风险判断，并把详情导向产品能力台账、证据详情、模块边界和对应专题文档。
+- 完成：将“前端文档与开发验收入口”改为 dev-only 入口路由表，集中说明仓库正式文档、旧产品内 docs 退出、正式 ERP 菜单、`/__dev/docs`、`/__dev/testing`、`/__dev/prototypes`、`/__dev/capability-ledger`、`/__dev/customer-config` 和主题 / 打印预览边界；未新增文档、metadata、frontmatter 或 Mermaid 图。
+- 验证：追加前 `progress.md` 为 306 行、51913 字节，未达到归档阈值；`docs/当前真源与交接顺序.md` 瘦身后为 159 行、18956 字节；已执行 `git diff --check`、旧长流水关键词反查、目标标题 / dev-only 入口 / 台账链接扫描、目标链接文件存在性检查和 `cd web && node --test src/erp/utils/businessModuleNavigation.test.mjs`，均通过。
+- 下一步：后续能力细节、运行时证据和长条目继续写入 `docs/product/产品能力进度台账.md`、`docs/product/产品能力证据详情.md`、`web/README.md` 或专题文档；当前真源索引只保留阅读顺序、禁区和高风险摘要。
+- 阻塞/风险：本轮只做正式文档瘦身和过程记录，不改 runtime、schema、migration、API、RBAC、菜单、Workflow / Fact、页面样式、测试脚本、客户原始资料、archive/reference 或目录结构；因此未运行 Go、pnpm、`style:l1`、migration、真实浏览器回归或 real-write E2E。
