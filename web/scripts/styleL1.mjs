@@ -6409,8 +6409,8 @@ async function assertThemeReadable(page, { scenarioName, selector }) {
 }
 
 async function assertLoginSegmentedReadable(page, { scenarioName }) {
-  const metrics = await page.evaluate(() =>
-    Array.from(
+  const metrics = await page.evaluate(() => {
+    const selectedItems = Array.from(
       document.querySelectorAll(
         '.erp-login-card .ant-segmented .ant-segmented-item-selected'
       )
@@ -6424,13 +6424,46 @@ async function assertLoginSegmentedReadable(page, { scenarioName }) {
         color: labelStyle.color,
       }
     })
-  )
+
+    const visibleFormLabels = Array.from(
+      document.querySelectorAll('.erp-login-card .ant-form-item-label > label')
+    )
+      .filter((label) => {
+        const rect = label.getBoundingClientRect()
+        const style = window.getComputedStyle(label)
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        )
+      })
+      .map((label) => label.textContent?.replace(/\s+/g, ' ').trim() || '')
+
+    return {
+      selectedItems,
+      entrySegmentedAriaLabel:
+        document
+          .querySelector('.erp-login-card .ant-segmented[aria-label]')
+          ?.getAttribute('aria-label') || '',
+      visibleFormLabels,
+    }
+  })
 
   assert(
-    metrics.length >= 2,
+    metrics.selectedItems.length >= 2,
     `${scenarioName} 登录页缺少主题或入口 Segmented 选中项: ${JSON.stringify(metrics)}`
   )
-  metrics.forEach((item) => {
+  assert.equal(
+    metrics.entrySegmentedAriaLabel,
+    '登录入口',
+    `${scenarioName} 登录入口 Segmented 缺少可访问名称: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    !metrics.visibleFormLabels.includes('登录入口'),
+    `${scenarioName} 登录页不应显示重复的“登录入口”表单标签: ${JSON.stringify(metrics)}`
+  )
+  metrics.selectedItems.forEach((item) => {
     const background = parseRgb(item.backgroundColor)
     const color = parseRgb(item.color)
     assert(

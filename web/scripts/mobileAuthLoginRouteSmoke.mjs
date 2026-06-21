@@ -702,12 +702,17 @@ async function runMobileAuthScenario(
     await page.getByRole('button', { name: /登\s*录/ }).click()
     await waitForPath(page, '/erp/dashboard')
 
-    await page.goBack({ waitUntil: 'domcontentloaded' })
-    await delay(500)
+    const firstBackLeak = await captureTextsAfterNavigation(page, () =>
+      page.goBack({ waitUntil: 'domcontentloaded' })
+    )
     assert.notEqual(
       new URL(page.url()).pathname,
       tasksPath,
       `${app.id} 退出岗位端并登录后台后，浏览器返回不应恢复旧岗位任务端首页`
+    )
+    assert(
+      !firstBackLeak.includes('登录与安全'),
+      `${app.id} 退出岗位端并登录后台后，浏览器返回不应短暂渲染旧岗位任务端：${firstBackLeak}`
     )
 
     await page.evaluate(() => {
@@ -728,8 +733,15 @@ async function runMobileAuthScenario(
     await page.getByRole('button', { name: /登\s*录/ }).click()
     await waitForPath(page, tasksPath)
 
-    await page.goBack({ waitUntil: 'domcontentloaded' })
+    const secondBackLeak = await captureTextsAfterNavigation(page, () =>
+      page.goBack({ waitUntil: 'domcontentloaded' })
+    )
     await waitForPath(page, tasksPath)
+    assert(
+      !secondBackLeak.includes('看板中心') &&
+        !secondBackLeak.includes('今日工作台'),
+      `${app.id} 岗位任务端登录后，浏览器返回不应短暂渲染后台页面：${secondBackLeak}`
+    )
   }
 }
 
@@ -741,6 +753,22 @@ async function expectText(page, text) {
 async function expectNoText(page, text) {
   const count = await page.getByText(text, { exact: false }).count()
   assert.equal(count, 0, `页面不应显示文案: ${text}`)
+}
+
+async function captureTextsAfterNavigation(page, navigateAction) {
+  const samples = []
+  await navigateAction()
+  const deadline = Date.now() + 700
+  while (Date.now() < deadline) {
+    samples.push(
+      await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')
+    )
+    await delay(50)
+  }
+  return samples.join('\n---sample---\n')
 }
 
 async function waitForPath(page, expectedPath) {

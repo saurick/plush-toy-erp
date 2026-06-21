@@ -263,3 +263,19 @@
 - 验证：追加前 `progress.md` 为 257 行、43153 字节，未达到归档阈值；已执行 `MOBILE_AUTH_SMOKE_APP_ID=mobile-warehouse pnpm --dir web smoke:mobile-auth-login-route`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`，均通过；`pnpm --dir web test` 共 380 个前端单测通过。
 - 下一步：如后续仍要允许同一登录态下从岗位端直接切后台，应走 `/entry` 显式切换入口并更新入口选择，不应依赖浏览器后退穿透旧历史。
 - 阻塞/风险：本轮未改 schema、migration、RBAC、菜单、Workflow / Fact、客户配置或后端认证；浏览器回归仍按影响面覆盖仓库岗位端，未全量跑 8 个岗位角色。
+
+## 2026-06-21 入口返回无闪烁隔离
+
+- 完成：将后台 / 岗位端入口隔离从全局 `useLayoutEffect` 事后跳转改为 `/erp` 与 `/m/:roleKey` 路由壳同步判断；当前入口不匹配时直接返回 `Navigate replace`，不挂载错误入口页面，避免浏览器返回时先短暂渲染串页内容。
+- 完成：保留岗位端最近路径记录用于后台误入时回到当前可用岗位；若当前入口为后台，岗位端路由壳会在渲染任务页前直接回后台看板。未新增页面文案、按钮、菜单、RBAC 或业务事实能力。
+- 验证：追加前 `progress.md` 为 265 行、44506 字节，未达到归档阈值；已执行 `pnpm --dir web lint`、`MOBILE_AUTH_SMOKE_APP_ID=mobile-warehouse pnpm --dir web smoke:mobile-auth-login-route`、`pnpm --dir web css`、`pnpm --dir web test`、`git diff --check`，均通过；smoke 增加返回后 700ms 正文采样，确认未短暂出现旧岗位端“登录与安全”或后台“看板中心 / 今日工作台”文案。
+- 下一步：如后续要支持同一已登录状态下主动跨入口，应提供明确的“切换入口”动作并同步更新入口选择，不应让浏览器后退承担入口切换。
+- 阻塞/风险：本轮未改 schema、migration、RBAC、菜单、Workflow / Fact、客户配置、后端认证或原型资产；浏览器回归按影响面覆盖仓库岗位端，未全量跑 8 个岗位角色。
+
+## 2026-06-21 登录页入口标签降噪
+
+- 完成：去掉统一登录页入口切换控件上方重复可见的“登录入口”表单标签，保留“后台管理 / 岗位任务端”真实入口选项和登录页主标题；入口选择语义通过 `aria-label="登录入口"` 保留给键盘和读屏。
+- 完成：`style:l1` 登录页 Segmented 断言补充可见标签移除和入口控件可访问名称检查，避免后续把重复文案加回或丢失无障碍名称。
+- 验证：追加前 `progress.md` 为 273 行、45943 字节，未达到归档阈值；已执行 `pnpm --dir web lint`、`pnpm --dir web css`、`node --check web/scripts/styleL1.mjs`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop pnpm --dir web style:l1`、`STYLE_L1_SCENARIOS=admin-login-mobile pnpm --dir web style:l1`、`git diff --check -- web/src/pages/AdminLogin/index.jsx web/scripts/styleL1.mjs web/src/common/consts/errorCodes.generated.js`，均通过；`pnpm --dir web test` 共 380 个前端单测通过。
+- 下一步：如后续继续压缩登录页密度，可单独评审入口 segmented 高度、登录方式 segmented 和卡片垂直间距，并继续覆盖桌面 / 移动端盒模型。
+- 阻塞/风险：本轮未改 schema、migration、后端认证、RBAC、菜单、Workflow / Fact、客户配置、路由、短信登录逻辑或原型资产；当前工作区仍有本轮前已有的 `progress.md`、`web/scripts/mobileAuthLoginRouteSmoke.mjs`、`web/src/erp/router.jsx` 脏改动，本轮未回退、未归并。

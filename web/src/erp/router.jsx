@@ -1,10 +1,9 @@
-import React, { Suspense, lazy, useLayoutEffect, useRef } from 'react'
+import React, { Suspense, lazy, useLayoutEffect } from 'react'
 import {
   Navigate,
   Route,
   Routes,
   useLocation,
-  useNavigate,
   useParams,
 } from 'react-router-dom'
 import AuthGuard from '@/common/auth/AuthGuard'
@@ -162,10 +161,6 @@ function buildLocationPath(location) {
   }`
 }
 
-function isDesktopEntryPath(pathname = '') {
-  return pathname === '/' || pathname === '/erp' || pathname.startsWith('/erp/')
-}
-
 function resolveMobileEntryPath(adminProfile, entryConfig, preferredPath = '') {
   const preferredRoleKey = parseMobileRoleFromPath(preferredPath)
   const enabledRoleKeys = getEnabledMobileRoleKeys(entryConfig)
@@ -200,60 +195,57 @@ function isBrowserHistoryRestore() {
   return navigationEntry?.type === 'back_forward'
 }
 
-function MobileEntryBackGuard() {
+function DesktopShellRoute() {
   const location = useLocation()
-  const navigate = useNavigate()
-  const lastMobilePathRef = useRef('')
-  const currentPath = buildLocationPath(location)
+  const adminProfile = getStoredAdminProfile()
   const lastEntryTarget = getLastEntryTarget()
   const entryConfig = getEntryConfig()
-  const adminProfile = getStoredAdminProfile()
 
-  useLayoutEffect(() => {
-    if (parseMobileRoleFromPath(location.pathname)) {
-      if (lastEntryTarget === ENTRY_TARGET.DESKTOP) {
-        navigate('/erp/dashboard', { replace: true })
-        return
-      }
-
-      lastMobilePathRef.current = currentPath
-      rememberLastMobileEntryPath(currentPath)
-      return
-    }
-
-    if (lastEntryTarget !== ENTRY_TARGET.MOBILE_TASKS) {
-      lastMobilePathRef.current = ''
-      return
-    }
-
+  if (adminProfile && lastEntryTarget === ENTRY_TARGET.MOBILE_TASKS) {
     const lastMobilePath =
-      lastMobilePathRef.current ||
-      (isBrowserHistoryRestore() ? readLastMobileEntryPath() : '')
+      readLastMobileEntryPath() ||
+      (isBrowserHistoryRestore() ? buildLocationPath(location) : '')
     const mobileEntryPath = resolveMobileEntryPath(
       adminProfile,
       entryConfig,
       lastMobilePath
     )
+    return <Navigate to={mobileEntryPath || '/entry'} replace />
+  }
 
-    if (isDesktopEntryPath(location.pathname)) {
-      navigate(mobileEntryPath || '/entry', { replace: true })
+  return (
+    <AuthGuard requireAdmin>
+      <ERPLayout />
+    </AuthGuard>
+  )
+}
+
+function MobileShellRoute() {
+  const location = useLocation()
+  const adminProfile = getStoredAdminProfile()
+  const lastEntryTarget = getLastEntryTarget()
+  const currentPath = buildLocationPath(location)
+
+  useLayoutEffect(() => {
+    if (adminProfile && parseMobileRoleFromPath(location.pathname)) {
+      rememberLastMobileEntryPath(currentPath)
     }
-  }, [
-    adminProfile,
-    currentPath,
-    entryConfig,
-    lastEntryTarget,
-    location.pathname,
-    navigate,
-  ])
+  }, [adminProfile, currentPath, location.pathname])
 
-  return null
+  if (adminProfile && lastEntryTarget === ENTRY_TARGET.DESKTOP) {
+    return <Navigate to="/erp/dashboard" replace />
+  }
+
+  return (
+    <AuthGuard requireAdmin>
+      <MobileAppLayout />
+    </AuthGuard>
+  )
 }
 
 export default function ERPRouter() {
   return (
     <Suspense fallback={<RouteLoadingFallback />}>
-      <MobileEntryBackGuard />
       <Routes>
         {DevHubPage ? (
           <Route path={DEV_HUB_ROUTE} element={<DevHubPage />} />
@@ -313,14 +305,7 @@ export default function ERPRouter() {
           element={<Navigate to="/erp/dashboard" replace />}
         />
 
-        <Route
-          path="/erp"
-          element={
-            <AuthGuard requireAdmin>
-              <ERPLayout />
-            </AuthGuard>
-          }
-        >
+        <Route path="/erp" element={<DesktopShellRoute />}>
           <Route index element={<DesktopEntryRedirect />} />
           <Route
             path="dashboard"
@@ -477,14 +462,7 @@ export default function ERPRouter() {
           element={<PrintWorkspaceRoute />}
         />
 
-        <Route
-          path="/m/:roleKey"
-          element={
-            <AuthGuard requireAdmin>
-              <MobileAppLayout />
-            </AuthGuard>
-          }
-        >
+        <Route path="/m/:roleKey" element={<MobileShellRoute />}>
           <Route index element={<Navigate to="tasks" replace />} />
           <Route path="tasks" element={<MobileRoleTasksPage />} />
           <Route path="*" element={<MobileRoleTasksRedirect />} />

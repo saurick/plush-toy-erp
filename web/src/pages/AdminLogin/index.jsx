@@ -367,8 +367,9 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
             onFinish={onFinish}
           >
             {entryOptions.length > 1 ? (
-              <Form.Item label="登录入口">
+              <Form.Item>
                 <Segmented
+                  aria-label="登录入口"
                   block
                   value={entryTarget}
                   onChange={(value) => {
