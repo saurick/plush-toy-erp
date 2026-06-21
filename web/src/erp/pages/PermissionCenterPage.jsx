@@ -35,9 +35,13 @@ const { Paragraph, Text, Title } = Typography
 const TABLE_PAGE_SIZE_OPTIONS = ['8', '10', '20', '50', '100']
 const DEFAULT_TABLE_PAGE_SIZE = 8
 const PASSWORD_MIN_LENGTH = 6
+const READ_USER_PERMISSION = 'system.user.read'
+const READ_ROLE_PERMISSION = 'system.role.read'
+const READ_PERMISSION_PERMISSION = 'system.permission.read'
 const MANAGE_ROLE_PERMISSION = 'system.permission.manage'
 const UPDATE_USER_PERMISSION = 'system.user.update'
 const CREATE_USER_PERMISSION = 'system.user.create'
+const DISABLE_USER_PERMISSION = 'system.user.disable'
 const PERMISSION_CENTER_TAB_KEYS = {
   ROLES: 'roles',
   ADMINS: 'admins',
@@ -54,6 +58,10 @@ function normalizeStringList(values = []) {
   return Array.isArray(values)
     ? values.map((item) => String(item || '').trim()).filter(Boolean)
     : []
+}
+
+function buildPermissionSignature(values = []) {
+  return normalizeStringList(values).sort().join('\n')
 }
 
 function getRoleKey(role = {}) {
@@ -128,9 +136,37 @@ function buildPermissionDetailMap(permissions = []) {
       key: permissionKey,
       label: permission.name || permissionKey,
       module: String(permission.module || 'other').trim() || 'other',
+      action: String(permission.action || '').trim(),
+      resource: String(permission.resource || '').trim(),
     })
   })
   return detailMap
+}
+
+function isHighRiskPermission(permission = {}) {
+  if (!permission?.key) {
+    return false
+  }
+  if (permission.module === 'system' || permission.module === 'mobile') {
+    return true
+  }
+  if (permission.module === 'debug') {
+    return true
+  }
+  return [
+    'activate',
+    'approve',
+    'cancel',
+    'clear',
+    'cleanup',
+    'confirm',
+    'disable',
+    'handle',
+    'manage',
+    'reject',
+    'seed',
+    'ship',
+  ].includes(permission.action)
 }
 
 function adminsForRole(admins = [], roleKey = '') {
@@ -194,11 +230,24 @@ function PermissionChecklist({
   disabled = false,
 }) {
   const [keyword, setKeyword] = useState('')
-  const normalizedValue = normalizeStringList(value)
-  const visibleGroups = useMemo(
-    () => filterPermissionGroups(groups, keyword),
-    [groups, keyword]
+  const [showSelectedOnly, setShowSelectedOnly] = useState(false)
+  const normalizedValue = useMemo(() => normalizeStringList(value), [value])
+  const selectedKeySet = useMemo(
+    () => new Set(normalizedValue),
+    [normalizedValue]
   )
+  const visibleGroups = useMemo(() => {
+    const filteredGroups = filterPermissionGroups(groups, keyword)
+    if (!showSelectedOnly) {
+      return filteredGroups
+    }
+    return filteredGroups
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => selectedKeySet.has(item.key)),
+      }))
+      .filter((section) => section.items.length > 0)
+  }, [groups, keyword, selectedKeySet, showSelectedOnly])
 
   const handleSectionChange = (sectionKeys, nextSectionValues) => {
     const next = [
@@ -210,13 +259,23 @@ function PermissionChecklist({
 
   return (
     <div className="erp-permission-checklist-shell">
-      <Input
-        allowClear
-        className="erp-permission-checklist-search"
-        value={keyword}
-        placeholder="搜索权限码、权限名称或模块"
-        onChange={(event) => setKeyword(event.target.value)}
-      />
+      <div className="erp-permission-checklist-toolbar">
+        <Input
+          allowClear
+          className="erp-permission-checklist-search"
+          value={keyword}
+          placeholder="搜索权限码、权限名称或模块"
+          onChange={(event) => setKeyword(event.target.value)}
+        />
+        <label className="erp-permission-checklist-filter">
+          <Switch
+            size="small"
+            checked={showSelectedOnly}
+            onChange={setShowSelectedOnly}
+          />
+          <span>只看已选</span>
+        </label>
+      </div>
       <div className="erp-permission-checklist">
         {visibleGroups.map((section) => {
           const originalSection =
@@ -232,6 +291,9 @@ function PermissionChecklist({
             originalSectionKeys.includes(item)
           )
           const hasKeyword = Boolean(String(keyword || '').trim())
+          const allOriginalSelected =
+            originalSectionKeys.length > 0 &&
+            originalSectionKeys.every((item) => selectedKeySet.has(item))
 
           return (
             <section
@@ -239,16 +301,50 @@ function PermissionChecklist({
               key={section.title}
             >
               <div className="erp-permission-checklist__header">
-                <Text strong>{section.title}</Text>
-                <Text type="secondary">
-                  {hasKeyword
-                    ? `命中 ${section.items.length}/${originalSection.items.length}，已选 ${selectedOriginalKeys.length}`
-                    : `${selectedOriginalKeys.length}/${originalSection.items.length}`}
-                </Text>
+                <span className="erp-permission-checklist__title">
+                  <Text strong>{section.title}</Text>
+                  <Text type="secondary">
+                    {hasKeyword || showSelectedOnly
+                      ? `显示 ${section.items.length}/${originalSection.items.length}，已选 ${selectedOriginalKeys.length}`
+                      : `${selectedOriginalKeys.length}/${originalSection.items.length}`}
+                  </Text>
+                </span>
+                <span className="erp-permission-checklist__actions">
+                  <Button
+                    size="small"
+                    type="text"
+                    disabled={disabled || allOriginalSelected}
+                    onClick={() =>
+                      handleSectionChange(
+                        originalSectionKeys,
+                        originalSectionKeys
+                      )
+                    }
+                  >
+                    全选本组
+                  </Button>
+                  <Button
+                    size="small"
+                    type="text"
+                    disabled={disabled || selectedOriginalKeys.length === 0}
+                    onClick={() => handleSectionChange(originalSectionKeys, [])}
+                  >
+                    清空
+                  </Button>
+                </span>
               </div>
               <Checkbox.Group
                 options={section.items.map((item) => ({
-                  label: `${item.label} (${item.key})`,
+                  label: (
+                    <span className="erp-permission-option">
+                      <span className="erp-permission-option__label">
+                        {item.label}
+                      </span>
+                      <code className="erp-permission-option__key">
+                        {item.key}
+                      </code>
+                    </span>
+                  ),
                   value: item.key,
                 }))}
                 value={selectedKeys}
@@ -265,7 +361,9 @@ function PermissionChecklist({
       {visibleGroups.length === 0 ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="没有匹配的权限码"
+          description={
+            showSelectedOnly ? '当前筛选下没有已选权限' : '没有匹配的权限码'
+          }
         />
       ) : null}
     </div>
@@ -330,6 +428,13 @@ export default function PermissionCenterPage() {
     () => roles.find((role) => getRoleKey(role) === selectedRoleKey) || null,
     [roles, selectedRoleKey]
   )
+  const selectedRoleSavedPermissionKeys = useMemo(
+    () => permissionKeysForRole(selectedRole || {}),
+    [selectedRole]
+  )
+  const rolePermissionsDirty =
+    buildPermissionSignature(selectedRolePermissionKeys) !==
+    buildPermissionSignature(selectedRoleSavedPermissionKeys)
   const roleSummaries = useMemo(
     () =>
       roles.map((role) => {
@@ -361,19 +466,34 @@ export default function PermissionCenterPage() {
       normalizeStringList(selectedRolePermissionKeys)
         .map((permissionKey) => permissionDetailMap.get(permissionKey))
         .filter(Boolean)
-        .filter(
-          (permission) =>
-            permission.module === 'mobile' || permission.module === 'system'
-        )
+        .filter(isHighRiskPermission)
         .slice(0, 8),
     [permissionDetailMap, selectedRolePermissionKeys]
   )
+  const canReadUsers = hasPermission(currentAdmin, READ_USER_PERMISSION)
+  const canReadRoleTemplates =
+    hasPermission(currentAdmin, READ_ROLE_PERMISSION) ||
+    hasPermission(currentAdmin, READ_PERMISSION_PERMISSION)
   const canCreateUsers = hasPermission(currentAdmin, CREATE_USER_PERMISSION)
   const canManageUsers = hasPermission(currentAdmin, UPDATE_USER_PERMISSION)
+  const canDisableUsers = hasPermission(currentAdmin, DISABLE_USER_PERMISSION)
   const canManageRolePermissions = hasPermission(
     currentAdmin,
     MANAGE_ROLE_PERMISSION
   )
+  const selectedRoleReadOnly = selectedRole?.disabled === true
+  const permissionWarningMessages = [
+    !canReadRoleTemplates ? '缺少查看角色或权限码权限，不能查看角色模板' : '',
+    !canReadUsers ? '缺少查看管理员权限，不能查看管理员账号' : '',
+    !canManageRolePermissions
+      ? '缺少管理角色权限，不能保存角色模板的权限码调整'
+      : '',
+    !canManageUsers
+      ? '缺少更新管理员权限，不能分配用户角色、修改手机号或重置密码'
+      : '',
+    !canDisableUsers ? '缺少启停管理员权限，不能启用或禁用管理员' : '',
+    !canCreateUsers ? '缺少创建管理员权限，不能新增账号' : '',
+  ].filter(Boolean)
   const filteredAdmins = useMemo(
     () =>
       filterAdminRecords(admins, {
@@ -390,15 +510,25 @@ export default function PermissionCenterPage() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [meResult, listResult, optionsResult] = await Promise.all([
-        adminRpc.call('me', {}),
-        adminRpc.call('list', {}),
-        adminRpc.call('rbac_options', {}),
+      const meResult = await adminRpc.call('me', {})
+      const nextCurrentAdmin = meResult?.data || null
+      const shouldLoadAdmins = hasPermission(
+        nextCurrentAdmin,
+        READ_USER_PERMISSION
+      )
+      const shouldLoadRBACOptions =
+        hasPermission(nextCurrentAdmin, READ_ROLE_PERMISSION) ||
+        hasPermission(nextCurrentAdmin, READ_PERMISSION_PERMISSION)
+      const [listResult, optionsResult] = await Promise.all([
+        shouldLoadAdmins ? adminRpc.call('list', {}) : Promise.resolve(null),
+        shouldLoadRBACOptions
+          ? adminRpc.call('rbac_options', {})
+          : Promise.resolve(null),
       ])
       const nextRoles = Array.isArray(optionsResult?.data?.roles)
         ? optionsResult.data.roles
         : []
-      setCurrentAdmin(meResult?.data || null)
+      setCurrentAdmin(nextCurrentAdmin)
       setAdmins(
         Array.isArray(listResult?.data?.admins) ? listResult.data.admins : []
       )
@@ -417,6 +547,26 @@ export default function PermissionCenterPage() {
       setLoading(false)
     }
   }, [adminRpc])
+
+  const selectRoleTemplate = (roleKey) => {
+    const nextRoleKey = getRoleKey({ role_key: roleKey })
+    if (!nextRoleKey || nextRoleKey === selectedRoleKey) {
+      return
+    }
+    if (!rolePermissionsDirty) {
+      setSelectedRoleKey(nextRoleKey)
+      return
+    }
+    modal.confirm({
+      centered: true,
+      title: '放弃未保存的角色权限调整？',
+      content:
+        '切换角色会丢弃当前未保存的勾选结果。请先保存，或确认放弃本次调整。',
+      okText: '放弃并切换',
+      cancelText: '继续编辑',
+      onOk: () => setSelectedRoleKey(nextRoleKey),
+    })
+  }
 
   useEffect(() => {
     loadData()
@@ -520,7 +670,9 @@ export default function PermissionCenterPage() {
         username: String(values.username || '').trim(),
         password: values.password,
         phone: String(values.phone || '').trim(),
-        role_keys: normalizeStringList(values.role_keys || []),
+        role_keys: canManageUsers
+          ? normalizeStringList(values.role_keys || [])
+          : [],
       }
       const result = await adminRpc.call('create', payload)
       const createdAdmin = result?.data?.admin
@@ -702,7 +854,7 @@ export default function PermissionCenterPage() {
         if (record.is_super_admin) {
           return <Tag color="gold">始终启用</Tag>
         }
-        if (!canManageUsers) {
+        if (!canDisableUsers) {
           return (
             <Tag color={disabled ? 'red' : 'green'}>
               {disabled ? '禁用' : '启用'}
@@ -806,7 +958,7 @@ export default function PermissionCenterPage() {
                   className={`erp-role-template-card${
                     selected ? ' erp-role-template-card--active' : ''
                   }`}
-                  onClick={() => setSelectedRoleKey(roleKey)}
+                  onClick={() => selectRoleTemplate(roleKey)}
                 >
                   <span className="erp-role-template-card__main">
                     <Text strong>{role.name || roleKey}</Text>
@@ -850,14 +1002,24 @@ export default function PermissionCenterPage() {
                       '该角色通过权限码组合获得菜单、岗位任务端入口和接口动作能力。'}
                   </Paragraph>
                 </div>
-                <Button
-                  type="primary"
-                  loading={saving}
-                  disabled={!canManageRolePermissions || !selectedRoleKey}
-                  onClick={saveRolePermissions}
-                >
-                  保存角色权限
-                </Button>
+                <div className="erp-role-center-actions">
+                  <Tag color={rolePermissionsDirty ? 'orange' : 'green'}>
+                    {rolePermissionsDirty ? '有未保存调整' : '已同步'}
+                  </Tag>
+                  <Button
+                    type="primary"
+                    loading={saving}
+                    disabled={
+                      !canManageRolePermissions ||
+                      !selectedRoleKey ||
+                      !rolePermissionsDirty ||
+                      selectedRoleReadOnly
+                    }
+                    onClick={saveRolePermissions}
+                  >
+                    保存角色权限
+                  </Button>
+                </div>
               </div>
 
               <div className="erp-role-center-metrics">
@@ -914,17 +1076,37 @@ export default function PermissionCenterPage() {
                 </div>
               </div>
 
-              <Alert
-                type="info"
-                showIcon
-                message="客户角色可以不同，职责权限保持统一"
-                description="不同甲方可以配置不同角色名称和默认权限包；流程节点仍绑定稳定职责 / 权限，不能按客户角色名写死业务事实规则。"
-              />
+              {selectedRoleReadOnly ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="停用角色只能查看，不能调整权限"
+                  description="如需恢复该角色，请先在角色管理主路径启用角色；权限中心不会绕过停用状态直接写入权限组合。"
+                />
+              ) : rolePermissionsDirty ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="当前角色权限尚未保存"
+                  description="切换角色或刷新页面前请先保存；本页只调整角色权限组合，不改变权限码真源。"
+                />
+              ) : (
+                <Alert
+                  type="info"
+                  showIcon
+                  message="客户角色可以不同，职责权限保持统一"
+                  description="不同甲方可以配置不同角色名称和默认权限包；流程节点仍绑定稳定职责 / 权限，不能按客户角色名写死业务事实规则。"
+                />
+              )}
 
               <PermissionChecklist
                 groups={permissionGroups}
                 value={selectedRolePermissionKeys}
-                disabled={!canManageRolePermissions || !selectedRoleKey}
+                disabled={
+                  !canManageRolePermissions ||
+                  !selectedRoleKey ||
+                  selectedRoleReadOnly
+                }
                 onChange={setSelectedRolePermissionKeys}
               />
 
@@ -938,7 +1120,12 @@ export default function PermissionCenterPage() {
                 <Button
                   type="primary"
                   loading={saving}
-                  disabled={!canManageRolePermissions || !selectedRoleKey}
+                  disabled={
+                    !canManageRolePermissions ||
+                    !selectedRoleKey ||
+                    !rolePermissionsDirty ||
+                    selectedRoleReadOnly
+                  }
                   onClick={saveRolePermissions}
                 >
                   保存角色权限
@@ -1053,12 +1240,12 @@ export default function PermissionCenterPage() {
         </div>
       </Card>
 
-      {!canManageUsers || !canManageRolePermissions ? (
+      {permissionWarningMessages.length > 0 ? (
         <Alert
           type="warning"
           showIcon
-          message="当前账号只能查看部分权限结果"
-          description="创建管理员、分配用户角色或调整角色权限需要对应系统权限。超级管理员账号不能在此页面被普通管理员修改。"
+          message="当前账号部分操作受限"
+          description={`${permissionWarningMessages.join('；')}。超级管理员账号不能在此页面被普通管理员修改。`}
         />
       ) : null}
 
@@ -1139,10 +1326,23 @@ export default function PermissionCenterPage() {
             <Select
               mode="multiple"
               allowClear
-              placeholder="选择一个或多个角色"
+              disabled={!canManageUsers}
+              placeholder={
+                canManageUsers
+                  ? '选择一个或多个角色'
+                  : '当前账号只能创建无角色账号'
+              }
               options={roleOptions}
             />
           </Form.Item>
+          {!canManageUsers ? (
+            <Alert
+              type="info"
+              showIcon
+              message="创建后暂不分配角色"
+              description="当前账号缺少更新管理员权限，只能创建无角色账号；后续需由有权限的管理员进入“分配角色”完成授权。"
+            />
+          ) : null}
         </Form>
       </Modal>
 

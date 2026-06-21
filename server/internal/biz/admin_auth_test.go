@@ -79,7 +79,7 @@ func TestAdminAuthUsecase_SMSLogin_Success(t *testing.T) {
 	tp := tracesdk.NewTracerProvider()
 	uc := NewAdminAuthUsecase(repo, func(userID int, username string, role int8) (string, time.Time, error) {
 		return "tok-admin-sms", time.Now().Add(time.Hour), nil
-	}, logger, tp)
+	}, nil, logger, tp)
 
 	challenge, err := uc.RequestSMSLoginCode(context.Background(), "13800138000", "purchase")
 	if err != nil {

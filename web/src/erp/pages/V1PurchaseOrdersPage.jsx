@@ -20,7 +20,11 @@ import {
   Tag,
   Tooltip,
 } from 'antd'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import {
+  useNavigate,
+  useOutletContext,
+  useSearchParams,
+} from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -101,6 +105,10 @@ import {
   PRINT_WORKSPACE_ENTRY_SOURCE,
   openPrintWorkspaceWindow,
 } from '../utils/printWorkspace.js'
+import {
+  routeWithQuery,
+  searchParamPositiveIntText,
+} from '../utils/routeQuery.mjs'
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -269,6 +277,7 @@ function workflowPayloadOf(task = {}) {
 export default function V1PurchaseOrdersPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
@@ -323,6 +332,10 @@ export default function V1PurchaseOrdersPage() {
   const [editingOrder, setEditingOrder] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [inboundDraftModalOpen, setInboundDraftModalOpen] = useState(false)
+  const routePurchaseOrderID = searchParamPositiveIntText(
+    searchParams,
+    'purchase_order_id'
+  )
   const supplierOptions = useMemo(
     () => uniqueReferenceOptions(suppliers, supplierOption),
     [suppliers]
@@ -381,6 +394,14 @@ export default function V1PurchaseOrdersPage() {
       const nextOrders = data?.purchase_orders || []
       setOrders(nextOrders)
       setTotal(Number(data?.total || 0))
+      const routeSelectedID = Number(routePurchaseOrderID || 0)
+      if (routeSelectedID > 0) {
+        const routeSelectedOrder =
+          nextOrders.find((item) => item.id === routeSelectedID) || null
+        applySelectedRowKeys(routeSelectedOrder ? [routeSelectedID] : [])
+        setSelectedOrder(routeSelectedOrder)
+        return
+      }
       const validKeys = selectedRowKeysRef.current.filter((key) =>
         nextOrders.some((item) => item.id === key)
       )
@@ -402,6 +423,7 @@ export default function V1PurchaseOrdersPage() {
     dateFilterStart,
     keyword,
     pagination,
+    routePurchaseOrderID,
     sortValue,
     status,
     supplierFilter,
@@ -704,7 +726,7 @@ export default function V1PurchaseOrdersPage() {
     try {
       const values = await inboundDraftForm.validateFields()
       setGeneratingInboundDraft(true)
-      await createPurchaseReceiptFromPurchaseOrder({
+      const receipt = await createPurchaseReceiptFromPurchaseOrder({
         purchase_order_id: singleSelectedOrder.id,
         receipt_no: values.receipt_no,
         warehouse_id: Number(values.warehouse_id || 0),
@@ -713,7 +735,12 @@ export default function V1PurchaseOrdersPage() {
       })
       setInboundDraftModalOpen(false)
       message.success('采购入库草稿已生成')
-      navigate(V1_ROUTE_PATHS.purchaseReceipts)
+      navigate(
+        routeWithQuery(V1_ROUTE_PATHS.purchaseReceipts, {
+          receipt_id: receipt?.id,
+          purchase_order_id: singleSelectedOrder.id,
+        })
+      )
     } catch (error) {
       if (error?.errorFields) return
       message.error(getActionErrorMessage(error, '生成采购入库草稿失败'))
@@ -931,7 +958,6 @@ export default function V1PurchaseOrdersPage() {
     { key: 'order-items', label: '采购订单明细' },
     { key: 'purchase-receipts', label: '采购入库' },
     { key: 'quality-inspections', label: '来料质检' },
-    { key: 'inventory', label: '库存台账' },
   ]
   const openRelatedTable = ({ key }) => {
     if (!singleSelectedOrder) {
@@ -942,15 +968,19 @@ export default function V1PurchaseOrdersPage() {
       return
     }
     if (key === 'purchase-receipts') {
-      navigate(V1_ROUTE_PATHS.purchaseReceipts)
+      navigate(
+        routeWithQuery(V1_ROUTE_PATHS.purchaseReceipts, {
+          purchase_order_id: singleSelectedOrder.id,
+        })
+      )
       return
     }
     if (key === 'quality-inspections') {
-      navigate(V1_ROUTE_PATHS.qualityInspections)
-      return
-    }
-    if (key === 'inventory') {
-      navigate(V1_ROUTE_PATHS.inventory)
+      navigate(
+        routeWithQuery(V1_ROUTE_PATHS.qualityInspections, {
+          purchase_order_id: singleSelectedOrder.id,
+        })
+      )
     }
   }
   const visibleLifecycleActions = useMemo(() => {

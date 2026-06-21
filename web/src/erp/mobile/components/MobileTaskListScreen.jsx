@@ -153,25 +153,29 @@ export default function MobileTaskListScreen({
     label,
     value,
     Icon,
+    tone = '',
     valueClassName = 'text-slate-950',
     testID,
-  }) => (
-    <div
-      key={label}
-      data-testid={testID}
-      className="mobile-role-summary-metric min-w-0 px-2 text-center"
-    >
+  }) => {
+    const toneClass = tone ? `mobile-role-summary-metric--${tone}` : ''
+    return (
       <div
-        className={`mobile-role-metric-button__value font-semibold leading-tight ${valueClassName}`}
+        key={label}
+        data-testid={testID}
+        className={`mobile-role-summary-metric ${toneClass} min-w-0 px-2 text-center`}
       >
-        {value}
+        <div
+          className={`mobile-role-metric-button__value font-semibold leading-tight ${valueClassName}`}
+        >
+          {value}
+        </div>
+        <div className="mobile-role-metric-button__label mt-1 flex items-center justify-center gap-1 text-base">
+          {Icon ? <Icon aria-hidden="true" /> : null}
+          <span>{label}</span>
+        </div>
       </div>
-      <div className="mobile-role-metric-button__label mt-1 flex items-center justify-center gap-1 text-base text-slate-600">
-        {Icon ? <Icon aria-hidden="true" /> : null}
-        <span>{label}</span>
-      </div>
-    </div>
-  )
+    )
+  }
 
   const renderProgressPanel = () => (
     <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -191,35 +195,34 @@ export default function MobileTaskListScreen({
             label: '待处理',
             value: taskSummary.pending,
             Icon: FileTextOutlined,
-            filterKey: MOBILE_TASK_FILTER_KEYS.PENDING,
+            tone: 'pending',
             testID: 'mobile-role-progress-pending',
           },
           {
             label: '处理中',
             value: taskSummary.processing,
             Icon: ClockCircleOutlined,
-            filterKey: MOBILE_TASK_FILTER_KEYS.PROCESSING,
+            tone: 'processing',
             testID: 'mobile-role-progress-processing',
           },
           {
             label: '卡住',
             value: taskSummary.blockedProgress,
             Icon: PauseOutlined,
-            filterKey: MOBILE_TASK_FILTER_KEYS.BLOCKED,
+            tone: 'blocked',
             testID: 'mobile-role-progress-blocked',
           },
           {
             label: '完成',
             value: taskSummary.done,
             Icon: CheckSquareOutlined,
-            mainTabKey: MOBILE_MAIN_TAB_KEYS.DONE,
-            listKey: MOBILE_LIST_KEYS.DONE,
+            tone: 'done',
             testID: 'mobile-role-progress-done',
           },
         ].map((item) =>
           renderSummaryMetric({
             ...item,
-            valueClassName: 'text-xl text-slate-950',
+            valueClassName: 'text-xl',
           })
         )}
       </div>
@@ -613,12 +616,14 @@ export default function MobileTaskListScreen({
             {
               label: '待办',
               value: activeTasks.length,
+              tone: 'todo',
               filterKey: MOBILE_TASK_FILTER_KEYS.ALL,
               testID: 'mobile-role-mine-metric-todo',
             },
             {
               label: '已办',
               value: doneTasks.length,
+              tone: 'done',
               mainTabKey: MOBILE_MAIN_TAB_KEYS.DONE,
               listKey: MOBILE_LIST_KEYS.DONE,
               testID: 'mobile-role-mine-metric-done',
@@ -626,12 +631,14 @@ export default function MobileTaskListScreen({
             {
               label: '超时',
               value: overdueTasks.length,
+              tone: 'overdue',
               filterKey: MOBILE_TASK_FILTER_KEYS.OVERDUE,
               testID: 'mobile-role-mine-metric-overdue',
             },
             {
               label: '风险',
               value: riskTasks.length,
+              tone: 'risk',
               filterKey: MOBILE_TASK_FILTER_KEYS.RISK,
               testID: 'mobile-role-mine-metric-risk',
             },
@@ -641,7 +648,7 @@ export default function MobileTaskListScreen({
               type="button"
               data-testid={item.testID}
               aria-label={`查看${item.label}任务`}
-              className={`${mobileTheme.metricCard} mobile-role-mine-metric-button`}
+              className={`${mobileTheme.metricCard} mobile-role-mine-metric-button mobile-role-mine-metric-button--${item.tone}`}
               onClick={() =>
                 openTaskBucket({
                   mainTabKey: item.mainTabKey || MOBILE_MAIN_TAB_KEYS.TODO,
@@ -654,7 +661,9 @@ export default function MobileTaskListScreen({
                 <span>{item.label}</span>
                 <ArrowRightOutlined aria-hidden="true" />
               </span>
-              <div className={mobileTheme.metricValue}>{item.value}</div>
+              <div className="mobile-role-mine-metric-button__value text-xl font-semibold">
+                {item.value}
+              </div>
               <small className="mobile-role-mine-metric-button__hint">
                 查看任务
               </small>

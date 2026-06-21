@@ -8,7 +8,11 @@ import {
   SettingOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Form, Space, Tag } from 'antd'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import {
+  useNavigate,
+  useOutletContext,
+  useSearchParams,
+} from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -79,6 +83,10 @@ import {
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
 } from '../utils/businessPagination.mjs'
+import {
+  routeWithQuery,
+  searchParamPositiveIntText,
+} from '../utils/routeQuery.mjs'
 import {
   customerOption,
   uniqueReferenceOptions,
@@ -261,6 +269,7 @@ function lineStatusTag(status) {
 export default function V1SalesOrdersPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
@@ -289,6 +298,10 @@ export default function V1SalesOrdersPage() {
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [orderForm] = Form.useForm()
   const [productSKUs, setProductSKUs] = useState([])
+  const routeSalesOrderID = searchParamPositiveIntText(
+    searchParams,
+    'sales_order_id'
+  )
   const paymentConditionSnapshotRef = useRef({
     method: '',
     termDays: undefined,
@@ -471,6 +484,10 @@ export default function V1SalesOrdersPage() {
       setOrders(nextOrders)
       setTotal(Number(result?.total || nextOrders.length || 0))
       setSelectedOrder((current) => {
+        const routeSelectedID = Number(routeSalesOrderID || 0)
+        if (routeSelectedID > 0) {
+          return nextOrders.find((item) => item.id === routeSelectedID) || null
+        }
         if (!current?.id) return null
         return nextOrders.find((item) => item.id === current.id) || null
       })
@@ -488,6 +505,7 @@ export default function V1SalesOrdersPage() {
     dateFilterStart,
     keyword,
     pagination,
+    routeSalesOrderID,
     sortFilter,
     statusFilter,
   ])
@@ -997,18 +1015,17 @@ export default function V1SalesOrdersPage() {
   const relatedMenuItems = [
     { key: 'shipments', label: '出货单' },
     { key: 'outbound', label: '出库 / 预留' },
-    { key: 'receivables', label: '应收管理' },
-    { key: 'invoices', label: '发票管理' },
-    { key: 'inventory', label: '库存台账' },
   ]
   const openRelatedTable = ({ key }) => {
     if (!selectedOrder) return
+    const salesOrderID = selectedOrder.id
     const pathByKey = {
-      shipments: V1_ROUTE_PATHS.shipments,
-      outbound: V1_ROUTE_PATHS.outbound,
-      receivables: V1_ROUTE_PATHS.receivables,
-      invoices: V1_ROUTE_PATHS.invoices,
-      inventory: V1_ROUTE_PATHS.inventory,
+      shipments: routeWithQuery(V1_ROUTE_PATHS.shipments, {
+        sales_order_id: salesOrderID,
+      }),
+      outbound: routeWithQuery(V1_ROUTE_PATHS.outbound, {
+        sales_order_id: salesOrderID,
+      }),
     }
     const targetPath = pathByKey[key]
     if (targetPath) {

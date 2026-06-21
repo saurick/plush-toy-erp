@@ -1,7 +1,3 @@
-.erp-permission-checklist-search {
-  width: 100%;
-}
-
 .erp-permission-checklist {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -31,19 +27,103 @@
   line-height: 1.4;
 }
 
+.erp-permission-checklist-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #dfe9e1;
+  border-radius: 10px;
+  background: #f8fbf9;
+}
+
+.erp-permission-checklist-search {
+  flex: 1 1 320px;
+  min-width: 220px;
+}
+
+.erp-permission-checklist-filter {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  color: #374151;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.erp-permission-checklist__title,
+.erp-permission-checklist__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-permission-checklist__title {
+  flex: 1 1 180px;
+}
+
+.erp-permission-checklist__actions {
+  justify-content: flex-end;
+}
+
+.erp-permission-checklist__actions .ant-btn {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+}
+
 .erp-permission-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
-  gap: 8px 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 12px;
   padding: 10px 12px 12px;
 }
 
 .erp-permission-grid .ant-checkbox-wrapper {
+  align-items: flex-start;
+  gap: 8px;
   min-width: 0;
   margin-inline-start: 0;
   color: #374151;
   line-height: 1.45;
+}
+
+.erp-permission-grid .ant-checkbox {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
+:where(.erp-permission-grid .ant-checkbox + span) {
+  min-width: 0;
+}
+
+.erp-permission-option {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.erp-permission-option__label {
+  color: #1f2937;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.erp-permission-option__key {
+  color: #6b7280;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.35;
   overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: normal;
 }
 
 .erp-business-page-layout {
@@ -654,6 +734,18 @@
   flex: 0 0 132px;
   min-width: 132px;
   height: calc(var(--erp-business-control-height) - 2px);
+}
+
+.erp-business-date-range-filter__type-label {
+  display: inline-flex;
+  flex: 0 0 132px;
+  min-width: 132px;
+  height: calc(var(--erp-business-control-height) - 2px);
+  align-items: center;
+  padding: 0 12px;
+  background: #fbfdfb;
+  color: var(--erp-text);
+  font-size: 13px;
 }
 
 :where(.erp-business-date-range-filter__type.ant-select) .ant-select-selector {

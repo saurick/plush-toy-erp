@@ -1,6 +1,7 @@
 package biz
 
 import (
+	"context"
 	"crypto/rand"
 	"errors"
 	"fmt"
@@ -37,6 +38,11 @@ type SMSLoginChallenge struct {
 	MockCode     string
 }
 
+type SMSLoginCodeProvider interface {
+	Request(ctx context.Context, phone string) (*SMSLoginChallenge, error)
+	Verify(ctx context.Context, phone, code string) (string, error)
+}
+
 type smsLoginCodeEntry struct {
 	code         string
 	expiresAt    time.Time
@@ -50,11 +56,40 @@ type SMSLoginCodeManager struct {
 	now     func() time.Time
 }
 
+type localSMSLoginCodeProvider struct {
+	scope   string
+	manager *SMSLoginCodeManager
+}
+
 func NewSMSLoginCodeManager() *SMSLoginCodeManager {
 	return &SMSLoginCodeManager{
 		entries: make(map[string]smsLoginCodeEntry),
 		now:     time.Now,
 	}
+}
+
+func NewLocalSMSLoginCodeProvider(scope string) SMSLoginCodeProvider {
+	if strings.TrimSpace(scope) == "" {
+		scope = "admin"
+	}
+	return &localSMSLoginCodeProvider{
+		scope:   scope,
+		manager: NewSMSLoginCodeManager(),
+	}
+}
+
+func (p *localSMSLoginCodeProvider) Request(_ context.Context, phone string) (*SMSLoginChallenge, error) {
+	if p == nil {
+		return NewSMSLoginCodeManager().Request("admin", phone)
+	}
+	return p.manager.Request(p.scope, phone)
+}
+
+func (p *localSMSLoginCodeProvider) Verify(_ context.Context, phone, code string) (string, error) {
+	if p == nil {
+		return "", ErrSMSCodeNotFound
+	}
+	return p.manager.Verify(p.scope, phone, code)
 }
 
 func NormalizeLoginPhone(raw string) (string, error) {

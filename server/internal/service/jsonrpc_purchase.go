@@ -203,11 +203,13 @@ func purchaseReceiptFilterFromParams(pm map[string]any) biz.PurchaseReceiptFilte
 	return biz.PurchaseReceiptFilter{
 		Status:              getString(pm, "status"),
 		Keyword:             getString(pm, "keyword"),
+		SupplierName:        getString(pm, "supplier_name"),
 		DateFrom:            dateFrom,
 		DateTo:              dateTo,
 		MaterialID:          getInt(pm, "material_id", 0),
 		WarehouseID:         getInt(pm, "warehouse_id", 0),
 		LotID:               getInt(pm, "lot_id", 0),
+		PurchaseOrderID:     getInt(pm, "purchase_order_id", 0),
 		PurchaseOrderItemID: getInt(pm, "purchase_order_item_id", 0),
 		Limit:               getInt(pm, "limit", 50),
 		Offset:              getInt(pm, "offset", 0),

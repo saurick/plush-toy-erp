@@ -27,7 +27,7 @@ docker compose --env-file .env -f compose.yml up -d
 - `WEB_IMAGE`
 - `POSTGRES_IMAGE` 和 `JAEGER_IMAGE` 使用固定版本 tag，不能使用 `latest` / `dev`
 - `APP_JWT_SECRET`
-- `APP_AUTH_SMS_MODE=disabled`
+- `APP_AUTH_SMS_MODE=disabled`；如启用 `provider`，必须同时配置阿里云 PNVS `APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID`、`APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET`、`APP_AUTH_SMS_ALIYUN_SIGN_NAME` 和 `APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE`
 - `APP_ADMIN_USERNAME`
 - `BOOTSTRAP_ADMIN_ONCE=false`；只有新库首次初始化 bootstrap 管理员时才临时改为 `true`
 - `POSTGRES_BIND_ADDR=127.0.0.1`，PostgreSQL 宿主机映射只允许 loopback，migration 从宿主机本地 `127.0.0.1:5435` 访问
@@ -56,6 +56,12 @@ export ERP_PDF_RENDER_CONCURRENCY=2
 export ERP_PDF_WARMUP_ENABLED=true
 export APP_JWT_SECRET='replace-with-runtime-secret'
 export APP_AUTH_SMS_MODE=disabled
+# export APP_AUTH_SMS_MODE=provider
+# export APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID='replace-with-runtime-ak-id'
+# export APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET='replace-with-runtime-ak-secret'
+# export APP_AUTH_SMS_ALIYUN_SIGN_NAME='速通互联验证码'
+# export APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE='100001'
+# export APP_AUTH_SMS_ALIYUN_TEMPLATE_PARAM='{"code":"##code##","min":"5"}'
 export APP_ADMIN_USERNAME=admin
 export BOOTSTRAP_ADMIN_ONCE=false
 export ERP_DEBUG_ENV=prod

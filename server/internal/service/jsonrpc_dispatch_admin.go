@@ -68,6 +68,11 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		phone := getString(pm, "phone")
 		password := getString(pm, "password")
 		roleKeys := getStringSlice(pm, "role_keys")
+		if len(biz.NormalizeAdminRoleKeys(roleKeys)) > 0 {
+			if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
+				return id, res, nil
+			}
+		}
 
 		admin, err := d.adminManageUC.Create(ctx, username, phone, password, roleKeys)
 		if err != nil {

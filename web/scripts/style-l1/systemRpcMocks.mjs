@@ -184,6 +184,27 @@ export async function installSystemRpcMocks(page, context) {
       return
     }
 
+    if (method === 'send_sms_code') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id,
+          result: {
+            code: 0,
+            message: 'OK',
+            data: {
+              mock_delivery: true,
+              mock_code: '123456',
+              resend_after: Math.floor(Date.now() / 1000) + 60,
+            },
+          },
+        }),
+      })
+      return
+    }
+
     if (method === 'admin_login') {
       await route.fulfill({
         status: 200,

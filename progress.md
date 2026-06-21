@@ -129,3 +129,93 @@
 - 验证：追加前 `progress.md` 为 115 行、16153 字节，未达到归档阈值；已执行目标 ESLint（`PermissionCenterPage.jsx`、`styleL1.mjs`、`scenarios.mjs`）、`pnpm --dir web css`、权限工具定向单测、`STYLE_L1_SCENARIOS=permission-center-loading-state,permission-center-desktop pnpm --dir web style:l1`、`pnpm --dir web test`、目标 `git diff --check`，均通过。
 - 下一步：后续真正接客户角色模板 runtime loader 时，继续复用当前角色模板 tab，不新增前端本地权限真源。
 - 阻塞/风险：本轮只改权限中心前端信息架构、样式、L1 回归和过程记录；未改后端 RBAC、权限码、schema、migration、菜单入口、客户配置 loader、Workflow / Fact、部署或原型状态。当前工作区仍有其他会话 / 既有后端和业务页脏改动，本轮未回退、未归并。
+
+## 2026-06-21 权限中心 tab 后顶部色条降级
+
+- 完成：移除权限管理页“角色模板 / 管理员账号”卡片顶部蓝 / 绿强调线；tab 已承担当前视图识别，卡片保留中性边框和背景，暗色模式同步改为中性卡片面。
+- 完成：L1 增加权限中心默认角色模板模块“不再显示顶部强调线”的断言，防止后续样式回退。
+- 验证：追加前 `progress.md` 为 131 行、19084 字节，未达到归档阈值；已执行目标 ESLint（`styleL1.mjs`）、`pnpm --dir web css`、`STYLE_L1_SCENARIOS=permission-center-loading-state,permission-center-desktop pnpm --dir web style:l1`，均通过。
+- 下一步：如后续继续压缩权限中心视觉层级，优先围绕 tab、表格和角色详情区域做局部回归，不新增原型或菜单语义。
+- 阻塞/风险：本轮只改权限中心局部样式和 L1 断言；未改 RBAC、权限码、schema、migration、菜单入口、客户配置、Workflow / Fact、部署或原型状态。当前工作区仍有其他会话 / 既有后端和业务页脏改动，本轮未回退、未归并。
+
+## 2026-06-21 权限中心旧权限清理与权限项排版
+
+- 完成：后端权限列表只返回 `server/internal/biz/rbac.go` 当前内置权限；RBAC seed 会清理已退出的旧内置 `permissions` 行和对应 `role_permissions` 绑定，避免 `business.record.*`、`erp.help_center.read` 等历史残留继续出现在权限中心。
+- 完成：权限中心权限项改为“中文名称 + 单独权限码”两行展示，并补齐 `outsourcing`、`shipment` 模块中文标题；L1 增加权限项不横向溢出、不显示旧权限码的浏览器断言。
+- 完成：`docs/roles/角色权限矩阵第一版.md` 同步权限中心只展示当前 RBAC 真源、旧内置权限由 seed 和列表接口收口的口径。
+- 验证：追加前 `progress.md` 为 139 行、20207 字节，未达到归档阈值；已执行 `go test ./internal/data -run 'TestSeedBuiltinRBACPrunesStaleBuiltinPermissions|TestListPermissionsHidesRowsOutsideRBACSource|TestLoadAdminRBAC'`、`go test ./internal/biz ./internal/data ./internal/service`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=permission-center-loading-state,permission-center-desktop pnpm --dir web style:l1`、`git diff --check`，均通过。
+- 下一步：后续如继续调整角色模板，应优先保持后端 RBAC 真源、seed、列表 API 和权限中心展示一致，不在前端恢复旧权限码兼容。
+- 阻塞/风险：本轮未直接修改本地开发库数据；旧内置权限行会在新代码 seed 执行时被清理，即使尚未清理，列表接口也不会继续返回。当前工作区仍有本轮前已有的权限中心样式 / progress 改动，本轮未回退、未归并。
+
+## 2026-06-21 权限中心查看与操作体验优化
+
+- 完成：权限中心角色模板页增加权限搜索工具栏、“只看已选”、分组全选 / 清空和未保存状态提示；保存按钮只在权限组合实际变更后可用，避免无差别重复保存。
+- 完成：重整角色模板区域视觉层级，角色列表、角色详情头部、权限矩阵工具栏和底部保存区改为更清晰的中性卡片层级；暗色模式和窄屏响应式同步覆盖。
+- 完成：账号权限不足提示改为按缺失能力精确说明，区分创建管理员、更新管理员和管理角色权限，不再只给笼统的“部分权限结果”提示。
+- 验证：追加前 `progress.md` 为 148 行、21921 字节，未达到归档阈值；已执行 `pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=permission-center-loading-state,permission-center-desktop pnpm --dir web style:l1`、`git diff --check`，均通过。
+- 下一步：如继续优化，可补权限中心窄屏专用 L1 断言，或进一步收敛管理员账号 tab 的批量操作体验；仍应保持后端 RBAC 真源，不在前端新增权限码真源。
+- 阻塞/风险：本轮只改权限中心页面、局部样式、L1 回归和过程记录；未改后端 RBAC、权限码、schema、migration、菜单入口、客户配置、Workflow / Fact、部署或原型状态。当前工作区仍有其他会话 / 既有后端和业务页脏改动，本轮未回退、未归并。
+
+## 2026-06-21 权限中心语义与权限守卫修复
+
+- 完成：修正创建管理员时分配角色的权限边界；后端 `admin.create` 只有在同时具备 `system.user.update` 时才接受非空 `role_keys`，前端缺少更新管理员权限时只能创建无角色账号并给出说明。
+- 完成：启停管理员改按 `system.user.disable` 单独判断，更新管理员权限只负责分配角色、手机号和重置密码；页面受限提示按查看、创建、更新、启停和角色权限管理分别说明。
+- 完成：角色模板加载按当前账号权限分层读取管理员列表和 RBAC 选项；角色切换会在存在未保存权限调整时确认放弃，停用角色详情只读；“关键入口 / 高风险能力”纳入 debug 和高风险业务动作。
+- 完成：权限中心 L1 回归补充未保存切换角色确认断言；服务端补充创建管理员带角色需要更新权限的 JSON-RPC 单测。
+- 验证：追加前 `progress.md` 为 157 行、23434 字节，未达到归档阈值；已执行 `go test ./internal/service -run 'TestJsonrpcDispatcher_AdminCreateWithRolesRequiresUpdatePermission|TestJsonrpcDispatcher_AdminResetPassword'`、`go test ./internal/service`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=permission-center-loading-state,permission-center-desktop pnpm --dir web style:l1`、`git diff --check`，均通过。
+- 下一步：如后续继续细分系统权限，可评审是否单独拆出“重置密码”权限码；当前仍复用 `system.user.update`，不在本轮新增权限码。
+- 阻塞/风险：本轮未改 schema、migration、菜单结构、Workflow / Fact、客户配置、部署或原型资产；`AGENTS.md` 和原型 README 只读不改。当前工作区仍有其他会话 / 既有采购、质检、出货等脏改动，本轮未回退、未归并。
+
+## 2026-06-21 岗位任务端状态语义色
+
+- 完成：岗位任务端已办页进度摘要增加待处理 / 处理中 / 卡住 / 完成 tone class，数字和标签按轻量语义色显示，仍保持只读摘要语义。
+- 完成：“我的”页待办 / 已办 / 超时 / 风险快捷入口增加左侧语义色条、同色数字和箭头，并同步浅色 / 暗色变量；入口仍只做任务筛选 / 跳转，不新增 Workflow / Fact 或权限语义。
+- 完成：`style:l1` 岗位任务端断言补充语义色校验，覆盖进度摘要 tone class、快捷入口左侧色条、数字 / 箭头色彩一致性、待办页风险摘要原有橙 / 红状态色和横向溢出。
+- 验证：追加前 `progress.md` 为 167 行、25327 字节，未达到归档阈值；已执行 `pnpm --dir web css`、`pnpm --dir web test`、`node --check web/scripts/style-l1/mobileTaskAssertions.mjs`、`STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm --dir web style:l1`，均通过。
+- 下一步：如继续优化岗位任务端视觉，可再补浅色专用 L1 截图断言或扩展到消息卡片 tone，但仍应保持颜色只表达任务状态和动作入口优先级。
+- 阻塞/风险：本轮只改岗位任务端前端展示、L1 回归和过程记录；未改后端、RBAC、权限码、schema、migration、菜单、客户配置、Workflow / Fact、部署或原型状态。当前工作区仍有其他会话 / 既有后端和业务页脏改动，本轮未回退、未归并。
+
+## 2026-06-21 业务页筛选与跳转闭环收口
+
+- 完成：采购入库补齐供应商、采购订单来源和入库单上下文筛选；来料质检补齐采购订单 / 入库单上下文筛选并改为仓库主数据选项；出货单、库存台账、Operational Fact、采购订单、销售订单之间的相关操作统一携带 route query，并去掉没有直接逻辑闭环的销售订单财务 / 库存、采购订单库存直达入口。
+- 完成：后端采购入库和来料质检 JSON-RPC / usecase / repo 补齐 `supplier_name`、`purchase_order_id` 等筛选参数；Workflow V1 页面增加到期日期筛选；单日期类型的 `DateRangeFilter` 改为只读日期类型标签，避免无意义下拉。
+- 完成：修正打印工作台 L1 场景按钮文案锚点，从旧“删除当前行”同步为当前“移除当前行”，不改变打印工作台运行时行为。
+- 验证：追加前 `progress.md` 为 176 行、26756 字节，未达到归档阈值；已执行 `gofmt`、`git diff --check`、`go test ./internal/service ./internal/biz ./internal/data`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、定向 `STYLE_L1_SCENARIOS=print-workspace-material-row-selection-reset,print-workspace-processing-row-selection-reset pnpm --dir web style:l1`、`STYLE_L1_SCENARIOS=dev-testing-light-desktop pnpm --dir web style:l1`、`STYLE_L1_SCENARIOS=business-collaboration-purchase-selected-desktop pnpm --dir web style:l1`、`STYLE_L1_SCENARIOS=purchase-order-date-filter-desktop pnpm --dir web style:l1`、`STYLE_L1_SCENARIOS=shipment-date-filter-desktop pnpm --dir web style:l1`、`STYLE_L1_SCENARIOS=shipment-date-filter-mobile pnpm --dir web style:l1`，均通过。
+- 下一步：如继续扩展搜索和筛选，仍应优先补后端参数和 repo 查询测试；生产 / 委外事实从库存流水反跳目标事实页仍需先评审事实 ID 与 source_id 语义，避免用前端 query 伪造闭环。
+- 阻塞/风险：完整 `pnpm --dir web style:l1` 曾在全量长跑中出现 dev server `ERR_CONNECTION_REFUSED`，换端口后长时间无输出已手动中断；本轮已用直接相关单场景覆盖。未改 schema、migration、RBAC、菜单结构、客户配置、部署或原型资产；当前工作区仍有权限中心、岗位任务端等其他会话脏改动，本轮未回退、未归并。
+
+## 2026-06-21 岗位任务端详情操作体验收口
+
+- 完成：岗位任务端详情页移除没有真实结果的“编辑查看详情 / 查看全部”按钮和关联单据箭头，降级为“摘要 / 来源 / 最近一条”只读元信息，避免现场用户误以为可进入未接通页面。
+- 完成：跨岗位可见任务在动作栏增加不可代办提示，说明当前岗位只能查看 / 催办，处理、阻塞和完成仍由任务 owner 岗位负责；保留按钮禁用态，不改变后端 RBAC、Workflow 或 Fact 语义。
+- 完成：清理已办页进度摘要里遗留的旧点击元数据；同步 `mobile-role-tasks-v1/implemented-reference.html` 当前实现参考，并扩展 `mobile-tasks-dark` L1 断言覆盖无假按钮、跨岗位提示、暗色可读性和横向溢出。
+- 验证：追加前 `progress.md` 为 185 行、29172 字节，未达到归档阈值；已执行 `node --check web/scripts/style-l1/mobileTaskAssertions.mjs`、`pnpm --dir web css`、`pnpm --dir web lint`、`pnpm --dir web test`、`node --test src/erp/config/devPrototypes.test.mjs`、`STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm --dir web style:l1` 和目标 `git diff --check`，均通过。
+- 下一步：如后续要从任务详情跳转到真实业务单据，应先评审目标路由、RBAC、source_type 到正式页面的映射和不可见 / 无权限状态，再恢复可点击入口。
+- 阻塞/风险：本轮未改 schema、migration、后端 RBAC、菜单入口、WorkflowUsecase、Fact usecase、客户配置、部署或 PNG 历史参考；`AGENTS.md`、当前真源和原型 README 只读不改。当前工作区仍有其他会话 / 既有后端、权限中心和业务页脏改动，本轮未回退、未归并。
+
+## 2026-06-21 阿里云 PNVS 短信登录接入
+
+- 完成：短信登录 `provider` 模式接入阿里云号码认证 PNVS，后端通过 `SendSmsVerifyCode` 发送验证码、`CheckSmsVerifyCode` 核验验证码；`auth.capabilities` 在 provider 模式返回可用且不暴露 `mock_code`。
+- 完成：`AdminAuthUsecase` 改为注入 `SMSLoginCodeProvider`，发送前仍先校验 `admin_users.phone` 绑定、管理员启用态和岗位任务端 `mobile.<role>.access` 权限；本轮不新增注册、账号模型、schema、migration、菜单或 Workflow / Fact 逻辑。
+- 完成：生产启动校验、部署 preflight、Compose 环境透传和部署 / API / 配置 / 当前真源文档同步 provider 口径；阿里云 AK 只允许通过运行时 env / 密钥管理注入，不写入仓库。
+- 验证：追加前 `progress.md` 为 194 行、30913 字节，未达到归档阈值；已执行临时 SDK 向已授权手机号实发 PNVS 验证码、`go test ./...`、`go test ./cmd/server ./internal/data ./internal/service ./internal/biz`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test -- authCapabilities`、`bash scripts/deploy/production-preflight.sh --example --skip-compose-config`、provider 临时 env 的 `bash scripts/deploy/production-preflight.sh --env-file <tmp> --skip-compose-config`、`git diff --check`，均通过。
+- 下一步：将目标环境 `.env` 设置为 `APP_AUTH_SMS_MODE=provider` 并注入 `APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID`、`APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET`、`APP_AUTH_SMS_ALIYUN_SIGN_NAME=速通互联验证码`、`APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE=100001` 后重启服务，再用已绑定手机号的管理员账号做一次登录页端到端回归。
+- 阻塞/风险：本轮未把真实 AK 写入仓库，也未在项目后端长期运行态中用真实 `.env` 直连实发；已完成的真实短信验证来自临时 SDK 和同一 PNVS 参数。当前工作区仍有本轮前已有的权限中心、岗位任务端、采购 / 质检和业务页等脏改动，本轮未回退、未归并。
+
+## 2026-06-21 登录页短信提示视觉降级
+
+- 完成：短信验证码发送成功提示从 AntD 默认满宽 info alert 降级为登录页专用轻量状态胶囊，保留“验证码已发送”反馈语义，但不再和主登录按钮争抢视觉层级；暗色主题同步使用低饱和绿色状态面。
+- 完成：`style:l1` 登录页主题场景补充短信发送 mock 和短信提示盒模型断言，覆盖浅色 / 暗色下提示宽度、高度、按钮间距、文字溢出和对比度。
+- 验证：追加前 `progress.md` 为 203 行、32983 字节，未达到归档阈值；已执行 `node --check web/scripts/styleL1.mjs web/scripts/style-l1/scenarios.mjs web/scripts/style-l1/systemRpcMocks.mjs`、`STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop pnpm --dir web style:l1`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、Playwright 桌面 provider 提示盒模型抽查和移动端长 mock 文案盒模型抽查，均通过。
+- 下一步：如后续继续优化登录页，可单独评审是否降低入口 segmented 高度或压缩卡片垂直间距；本轮不改变登录方式、入口选择或认证流程。
+- 阻塞/风险：本轮未改后端、schema、migration、RBAC、菜单、Workflow / Fact、客户配置或原型资产；`styleL1.mjs`、`scenarios.mjs`、`theme-overrides.css` 当前仍包含本轮前已有的权限中心等未提交改动，本轮只追加登录页短信提示相关逻辑。
+
+## 2026-06-21 登录页刷新状态保持
+
+- 完成：统一登录页手动选择的“后台管理 / 岗位任务端”和“密码登录 / 短信登录”刷新后保持；从具体后台或岗位任务端路径回登录页时仍优先尊重来源路径语义。
+- 完成：短信验证码发送后的手机号、提示和前端倒计时写入当前标签页 sessionStorage，刷新后继续显示剩余等待时间并禁用“获取验证码”；真实重发频控和验证码校验仍以后端为准。
+- 完成：修正 `useAuthCapabilities` 对被 `JsonRpc` 包装的 AbortError 误判为能力失败的问题，避免 React 开发模式刷新时把短信能力短暂判成 disabled 并覆盖回密码登录。
+- 完成：`adminLoginState` 增加登录方式偏好和短信倒计时状态单测，登录页 L1 增加刷新后入口 tab、短信 tab、手机号和倒计时禁用态断言；`web/README.md` 与 `docs/当前真源与交接顺序.md` 同步刷新保持口径。
+- 验证：追加前 `progress.md` 为 211 行、34447 字节，未达到归档阈值；已执行目标 Playwright 探针、`node --test src/common/auth/authCapabilities.test.mjs src/pages/AdminLogin/adminLoginState.test.mjs src/pages/AdminLogin/adminLoginRouting.test.mjs`、`pnpm --dir web lint`、`STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop pnpm --dir web style:l1`、`pnpm --dir web test`、`pnpm --dir web css`、`git diff --check`，均通过。
+- 下一步：如后续继续增强短信登录，可补真实 provider 模式下的端到端登录回归；当前前端刷新保持不替代后端频控、手机号绑定和岗位权限校验。
+- 阻塞/风险：本轮只改登录页状态保持、认证能力加载 abort 识别、相关测试和文档口径；未改 schema、migration、RBAC、菜单、Workflow / Fact、短信 provider 后端实现或账号数据。当前工作区仍有其他会话 / 既有短信 provider、权限中心、业务页和岗位任务端脏改动，本轮未回退、未归并。

@@ -16,15 +16,11 @@ const PAGE_CONFIGS = Object.freeze({
     },
   },
   outbound: {
-    initialActiveKey: 'shipments',
-    enabledViews: ['shipments', 'reservations'],
+    initialActiveKey: 'reservations',
+    enabledViews: ['reservations'],
     pageSummary:
-      '出库管理当前承接出货单确认和库存预留处理；只有出货单发货才写库存 OUT，取消已出货写 REVERSAL，预留释放 / 消耗不等于库存流水。',
+      '出库管理当前只处理库存预留释放 / 消耗；出货单新建、确认出货和取消出货统一回到正式出货单页面。',
     viewOverrides: {
-      shipments: {
-        title: '出货出库',
-        createLabel: '新建出货单',
-      },
       reservations: {
         title: '库存预留',
         createLabel: '新建库存预留',

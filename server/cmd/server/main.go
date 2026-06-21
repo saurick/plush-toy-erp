@@ -195,6 +195,35 @@ func envValueIsExplicitFalse(value string) bool {
 	}
 }
 
+func validateProductionAuthSMSProviderConfig(getenv func(string) string, dataCfg *conf.Data) error {
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+	mode := ""
+	if dataCfg != nil && dataCfg.Auth != nil && dataCfg.Auth.Sms != nil {
+		mode = strings.ToLower(strings.TrimSpace(dataCfg.Auth.Sms.Mode))
+	}
+	if mode != "provider" {
+		return nil
+	}
+	required := []string{
+		"APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID",
+		"APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET",
+		"APP_AUTH_SMS_ALIYUN_SIGN_NAME",
+		"APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE",
+	}
+	for _, key := range required {
+		value := strings.TrimSpace(getenv(key))
+		if value == "" {
+			return fmt.Errorf("production preflight failed: %s is required when APP_AUTH_SMS_MODE=provider", key)
+		}
+		if containsRuntimePlaceholder(value) {
+			return fmt.Errorf("production preflight failed: %s still contains placeholder", key)
+		}
+	}
+	return nil
+}
+
 func validateProductionBootstrapConfig(confPath string, dataCfg *conf.Data, getenv func(string) string) error {
 	if !isProductionRuntime(confPath, getenv) {
 		return nil
@@ -213,6 +242,9 @@ func validateProductionBootstrapConfig(confPath string, dataCfg *conf.Data, gete
 	}
 	if dataCfg.Auth.Sms != nil && strings.EqualFold(strings.TrimSpace(dataCfg.Auth.Sms.Mode), "mock") {
 		return fmt.Errorf("production preflight failed: APP_AUTH_SMS_MODE cannot be mock")
+	}
+	if err := validateProductionAuthSMSProviderConfig(getenv, dataCfg); err != nil {
+		return err
 	}
 	if containsRuntimePlaceholder(dataCfg.Auth.JwtSecret) {
 		return fmt.Errorf("production preflight failed: APP_JWT_SECRET still contains placeholder")

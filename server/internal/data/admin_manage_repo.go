@@ -233,11 +233,16 @@ ORDER BY module ASC, permission_key ASC`)
 		_ = rows.Close()
 	}()
 
+	allowed := biz.PermissionKeySet(biz.AllPermissionKeys())
 	out := []biz.AdminPermission{}
 	for rows.Next() {
 		var item biz.AdminPermission
 		if err := rows.Scan(&item.ID, &item.Key, &item.Name, &item.Description, &item.Module, &item.Action, &item.Resource, &item.Builtin); err != nil {
 			return nil, err
+		}
+		item.Key = strings.TrimSpace(item.Key)
+		if _, ok := allowed[item.Key]; !ok {
+			continue
 		}
 		out = append(out, item)
 	}

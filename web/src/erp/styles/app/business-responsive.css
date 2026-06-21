@@ -843,6 +843,21 @@
     grid-template-columns: 1fr;
   }
 
+  .erp-permission-checklist-toolbar,
+  .erp-permission-checklist__header,
+  .erp-permission-checklist__actions {
+    align-items: stretch;
+  }
+
+  .erp-permission-checklist-filter,
+  .erp-role-center-actions {
+    width: 100%;
+  }
+
+  .erp-permission-checklist__actions .ant-btn {
+    flex: 1 1 92px;
+  }
+
   .erp-permission-grid {
     grid-template-columns: 1fr;
   }

@@ -15,7 +15,7 @@ import {
   Table,
   Tag,
 } from 'antd'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -87,6 +87,10 @@ import {
   unitOption,
   warehouseOptionFromRecord,
 } from '../utils/referenceSelectOptions.mjs'
+import {
+  searchParamPositiveIntText,
+  searchParamText,
+} from '../utils/routeQuery.mjs'
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -454,6 +458,7 @@ function ShipmentItemsTable({
 
 export default function ShipmentsPage() {
   const outletContext = useOutletContext()
+  const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = outletContext?.adminProfile || {}
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -482,6 +487,15 @@ export default function ShipmentsPage() {
   const [salesOrderImportOpen, setSalesOrderImportOpen] = useState(false)
   const [shipmentForm] = Form.useForm()
   const selectedSalesOrderID = Form.useWatch('sales_order_id', shipmentForm)
+  const routeSalesOrderID = searchParamPositiveIntText(
+    searchParams,
+    'sales_order_id'
+  )
+  const routeShipmentID =
+    searchParamPositiveIntText(searchParams, 'shipment_id') ||
+    (searchParamText(searchParams, 'source_type').toUpperCase() === 'SHIPMENT'
+      ? searchParamPositiveIntText(searchParams, 'source_id')
+      : '')
 
   const canCreate = hasPermission(adminProfile, 'shipment.create')
   const canShip = hasPermission(adminProfile, 'shipment.ship')
@@ -538,10 +552,11 @@ export default function ShipmentsPage() {
       const data = await listShipments(
         compactParams({
           status: statusFilter,
-          keyword: trimOptional(keyword),
+          keyword: trimOptional(keyword) || routeShipmentID || undefined,
           customer_id: customerFilter || undefined,
           product_id: productFilter || undefined,
           warehouse_id: warehouseFilter || undefined,
+          source_id: routeSalesOrderID || undefined,
           date_field: dateFilterField,
           date_from: dateFilterStart || undefined,
           date_to: dateFilterEnd || undefined,
@@ -550,11 +565,15 @@ export default function ShipmentsPage() {
       )
       const nextRows = Array.isArray(data?.shipments) ? data.shipments : []
       setRows(nextRows)
-      setSelectedRow((current) =>
-        current?.id
+      setSelectedRow((current) => {
+        const routeSelectedID = Number(routeShipmentID || 0)
+        if (routeSelectedID > 0) {
+          return nextRows.find((item) => item.id === routeSelectedID) || null
+        }
+        return current?.id
           ? nextRows.find((item) => item.id === current.id) || null
           : null
-      )
+      })
       setTotal(Number(data?.total || 0))
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载出货单'))
@@ -569,9 +588,21 @@ export default function ShipmentsPage() {
     keyword,
     pagination,
     productFilter,
+    routeSalesOrderID,
+    routeShipmentID,
     statusFilter,
     warehouseFilter,
   ])
+
+  const clearRouteContext = useCallback(() => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('sales_order_id')
+    nextParams.delete('shipment_id')
+    nextParams.delete('source_type')
+    nextParams.delete('source_id')
+    setSearchParams(nextParams, { replace: true })
+    resetBusinessPaginationCurrent(setPagination)
+  }, [searchParams, setSearchParams])
 
   useEffect(() => {
     loadRows()
@@ -1078,6 +1109,16 @@ export default function ShipmentsPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
+            {routeSalesOrderID ? (
+              <Tag closable color="blue" onClose={clearRouteContext}>
+                销售订单 #{routeSalesOrderID}
+              </Tag>
+            ) : null}
+            {routeShipmentID ? (
+              <Tag closable color="blue" onClose={clearRouteContext}>
+                出货单 #{routeShipmentID}
+              </Tag>
+            ) : null}
           </>
         }
         actions={

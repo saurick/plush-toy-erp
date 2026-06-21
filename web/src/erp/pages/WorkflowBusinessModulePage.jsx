@@ -146,6 +146,12 @@ function toUnixSeconds(value) {
   return parsed.isValid() ? parsed.endOf('day').unix() : undefined
 }
 
+function toUnixStartSeconds(value) {
+  if (!value) return undefined
+  const parsed = dayjs(String(value).trim())
+  return parsed.isValid() ? parsed.startOf('day').unix() : undefined
+}
+
 function getTaskID(task = {}) {
   return Number(task.id || 0)
 }
@@ -186,6 +192,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState('')
   const [ownerRoleKey, setOwnerRoleKey] = useState('')
+  const [dueFrom, setDueFrom] = useState('')
+  const [dueTo, setDueTo] = useState('')
   const [selectedTaskKeys, setSelectedTaskKeys] = useState([])
   const [taskActionLoadingID, setTaskActionLoadingID] = useState(0)
   const [urgingTaskID, setUrgingTaskID] = useState(0)
@@ -259,11 +267,16 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
 
   const filteredTasks = useMemo(() => {
     const normalizedKeyword = normalizeText(keyword)
+    const dueFromUnix = toUnixStartSeconds(dueFrom)
+    const dueToUnix = toUnixSeconds(dueTo)
     return tasks.filter((task) => {
       if (status && task.task_status_key !== status) return false
       if (ownerRoleKey && getTaskOwnerRoleKey(task) !== ownerRoleKey) {
         return false
       }
+      const dueAt = Number(task.due_at || 0)
+      if (dueFromUnix && (!dueAt || dueAt < dueFromUnix)) return false
+      if (dueToUnix && (!dueAt || dueAt > dueToUnix)) return false
       if (!normalizedKeyword) return true
       return [
         task.task_code,
@@ -273,7 +286,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         getWorkflowTaskReason(task),
       ].some((item) => normalizeText(item).includes(normalizedKeyword))
     })
-  }, [keyword, ownerRoleKey, status, tasks])
+  }, [dueFrom, dueTo, keyword, ownerRoleKey, status, tasks])
 
   const selectedTasks = useMemo(
     () => tasks.filter((task) => selectedTaskKeys.includes(task.id)),
@@ -630,6 +643,18 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 ...config.ownerRoleOptions,
               ]}
               onChange={setOwnerRoleKey}
+            />
+            <DateInput
+              aria-label="到期开始"
+              value={dueFrom}
+              placeholder="到期开始"
+              onChange={setDueFrom}
+            />
+            <DateInput
+              aria-label="到期结束"
+              value={dueTo}
+              placeholder="到期结束"
+              onChange={setDueTo}
             />
           </>
         }

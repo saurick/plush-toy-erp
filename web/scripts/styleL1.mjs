@@ -87,6 +87,7 @@ function getScenarios() {
   return createStyleL1Scenarios({
     assert,
     assertAdminLoginLayout,
+    assertAdminLoginSmsHintLayout,
     assertAdminRoleModalLayout,
     assertAppAlertDialogLayout,
     assertBusinessCollaborationPanelCollapsedByDefault,
@@ -129,6 +130,7 @@ function getScenarios() {
     assertOrderLifecycleActionsConsolidated,
     assertOutsourcingProcessSelectOptions,
     assertPaginationSizeChangerFocusStyle,
+    assertPermissionChecklistItemLayout,
     assertPermissionSectionVisualSeparation,
     assertPrintCenterPreviewPopup,
     assertPrintPreviewPopup,
@@ -3028,6 +3030,84 @@ async function assertAdminLoginLayout(page, { minCardWidth }) {
   )
 }
 
+async function assertAdminLoginSmsHintLayout(page, { scenarioName }) {
+  await page
+    .locator('.erp-login-card .erp-login-sms-hint')
+    .waitFor({ state: 'visible', timeout: 10_000 })
+
+  const metrics = await page.evaluate(() => {
+    const hint = document.querySelector('.erp-login-card .erp-login-sms-hint')
+    const message = hint?.querySelector('.ant-alert-message')
+    const icon = hint?.querySelector('.ant-alert-icon')
+    const card = document.querySelector('.erp-login-card')
+    const form = document.querySelector('.erp-login-card form')
+    const submitButton = document.querySelector(
+      '.erp-login-card button[type="submit"]'
+    )
+    const hintRect = hint?.getBoundingClientRect()
+    const formRect = form?.getBoundingClientRect()
+    const submitRect = submitButton?.getBoundingClientRect()
+    const hintStyle = hint ? window.getComputedStyle(hint) : null
+    const messageStyle = message ? window.getComputedStyle(message) : null
+
+    return {
+      cardWidth: card?.getBoundingClientRect?.().width || 0,
+      formWidth: formRect?.width || 0,
+      hintWidth: hintRect?.width || 0,
+      hintHeight: hintRect?.height || 0,
+      hintBottom: hintRect?.bottom || 0,
+      submitTop: submitRect?.top || 0,
+      submitHeight: submitRect?.height || 0,
+      borderRadius: Number.parseFloat(hintStyle?.borderTopLeftRadius || '0'),
+      backgroundColor: hintStyle?.backgroundColor || '',
+      color: messageStyle?.color || '',
+      iconColor: icon ? window.getComputedStyle(icon).color : '',
+      overflowX: hint ? hint.scrollWidth - hint.clientWidth : 0,
+      messageText: message?.textContent?.replace(/\s+/g, ' ').trim() || '',
+    }
+  })
+
+  assert(metrics.hintWidth > 0, `${scenarioName} 短信提示未渲染`)
+  assert(
+    metrics.hintWidth <= metrics.formWidth,
+    `${scenarioName} 短信提示宽度不应撑满或溢出表单: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.hintHeight >= 32 && metrics.hintHeight <= 46,
+    `${scenarioName} 短信提示高度应是轻量反馈: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.borderRadius >= 18,
+    `${scenarioName} 短信提示圆角回退: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.submitTop - metrics.hintBottom >= 10,
+    `${scenarioName} 短信提示和登录按钮间距不足或重叠: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.submitHeight >= 54,
+    `${scenarioName} 登录按钮高度被短信提示影响: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.overflowX <= 1,
+    `${scenarioName} 短信提示文字横向溢出: ${JSON.stringify(metrics)}`
+  )
+  const background = parseRgb(metrics.backgroundColor)
+  const color = parseRgb(metrics.color)
+  assert(
+    background && color,
+    `${scenarioName} 无法解析短信提示颜色: ${JSON.stringify(metrics)}`
+  )
+  const contrastRatio = getContrastRatio(color, background)
+  assert(
+    contrastRatio >= 4.5,
+    `${scenarioName} 短信提示文字对比度不足: ${JSON.stringify({
+      ...metrics,
+      contrastRatio,
+    })}`
+  )
+}
+
 async function assertAppAlertDialogLayout(
   page,
   { scenarioName, expectedMessage = '未登录' }
@@ -3397,12 +3477,19 @@ async function assertPermissionSectionVisualSeparation(page, { scenarioName }) {
     const read = (node) => {
       if (!node) return null
       const style = window.getComputedStyle(node)
+      const beforeStyle = window.getComputedStyle(node, '::before')
       const rect = node.getBoundingClientRect()
+      const beforeContent = beforeStyle.content || ''
+      const beforeHeight = Number.parseFloat(beforeStyle.height || '0')
       return {
         top: rect.top,
         background: style.background,
         backgroundColor: style.backgroundColor,
         borderColor: style.borderColor,
+        topAccentVisible:
+          beforeHeight > 1 &&
+          beforeContent !== 'none' &&
+          beforeContent !== 'normal',
       }
     }
     return {
@@ -3418,6 +3505,71 @@ async function assertPermissionSectionVisualSeparation(page, { scenarioName }) {
   assert(
     metrics.role.borderColor && metrics.role.background,
     `${scenarioName} 默认角色模板模块缺少可读边框或背景: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    !metrics.role.topAccentVisible,
+    `${scenarioName} tab 化后角色模板模块不应再显示顶部强调线: ${JSON.stringify(metrics)}`
+  )
+}
+
+async function assertPermissionChecklistItemLayout(page, { scenarioName }) {
+  const metrics = await page.evaluate(() => {
+    const checklist = document.querySelector('.erp-permission-checklist')
+    const wrappers = [
+      ...document.querySelectorAll(
+        '.erp-permission-grid .ant-checkbox-wrapper'
+      ),
+    ].slice(0, 8)
+    const bodyText = document.body.textContent || ''
+    const readWrapper = (wrapper) => {
+      const label = wrapper.querySelector('.erp-permission-option__label')
+      const key = wrapper.querySelector('.erp-permission-option__key')
+      const wrapperRect = wrapper.getBoundingClientRect()
+      const labelRect = label?.getBoundingClientRect()
+      const keyRect = key?.getBoundingClientRect()
+      const keyStyle = key ? window.getComputedStyle(key) : null
+      return {
+        text: String(wrapper.textContent || '').trim(),
+        wrapperWidth: wrapperRect.width,
+        wrapperScrollWidth: wrapper.scrollWidth,
+        labelWidth: labelRect?.width || 0,
+        keyWidth: keyRect?.width || 0,
+        keyTop: keyRect?.top || 0,
+        labelTop: labelRect?.top || 0,
+        keyFontSize: keyStyle?.fontSize || '',
+      }
+    }
+    return {
+      checklistScrollWidth: checklist?.scrollWidth || 0,
+      checklistClientWidth: checklist?.clientWidth || 0,
+      wrapperCount: wrappers.length,
+      hasStaleBusinessRecord: bodyText.includes('business.record.'),
+      hasStaleHelpCenter: bodyText.includes('erp.help_center.read'),
+      wrappers: wrappers.map(readWrapper),
+    }
+  })
+  assert(
+    metrics.wrapperCount > 0,
+    `${scenarioName} 未找到权限复选项: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    !metrics.hasStaleBusinessRecord && !metrics.hasStaleHelpCenter,
+    `${scenarioName} 不应显示已退出的旧权限码: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.checklistScrollWidth <= metrics.checklistClientWidth + 1,
+    `${scenarioName} 权限项列表出现横向溢出: ${JSON.stringify(metrics)}`
+  )
+  const invalid = metrics.wrappers.filter(
+    (item) =>
+      item.labelWidth <= 0 ||
+      item.keyWidth <= 0 ||
+      item.keyTop <= item.labelTop ||
+      item.wrapperScrollWidth > item.wrapperWidth + 1
+  )
+  assert(
+    invalid.length === 0,
+    `${scenarioName} 权限名称和权限码布局异常: ${JSON.stringify(metrics)}`
   )
 }
 
@@ -6650,7 +6802,7 @@ async function assertRowSelectionClearsAfterCancel(
   )
   await assertButtonDisabled(page, '上插一行')
   await assertButtonDisabled(page, '下插一行')
-  await assertButtonDisabled(page, '删除当前行')
+  await assertButtonDisabled(page, '移除当前行')
 }
 
 async function assertButtonDisabled(page, name) {

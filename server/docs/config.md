@@ -92,10 +92,10 @@
 
 - 这组字段决定用户 token 签名和默认管理员初始化逻辑。
 - 必须替换仓库里的默认密钥；bootstrap 管理员密码默认留空，只有新库首次初始化时才同时通过 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD` 临时注入。
-- `data.auth.sms.mode` 控制短信登录运行时能力，当前只实现 `disabled` 和 `mock`：
+- `data.auth.sms.mode` 控制短信登录运行时能力，当前支持 `disabled`、`mock` 和 `provider`：
   - `disabled`：关闭短信登录，`auth.capabilities` 返回不可用，`send_sms_code` / `sms_login` 返回 `AuthSMSLoginDisabled`。
   - `mock`：仅用于 local / dev / test，后端返回 `mock_code` 方便本地回归。
-  - `provider`：保留给后续真实短信服务商接入；当前不会假装可用。
+  - `provider`：接入阿里云号码认证 PNVS 短信认证，后端调用 `SendSmsVerifyCode` 发送验证码并调用 `CheckSmsVerifyCode` 核验；生产必须通过 env / 密钥管理提供阿里云配置。
 - dev 默认 `mock`，prod 默认 `disabled`；生产环境禁止返回 mock 验证码，启动校验会拒绝 `APP_AUTH_SMS_MODE=mock` 或配置文件里的 `data.auth.sms.mode: mock`。
 - 短信登录是后端 Auth 能力配置，不是客户业务配置包、`tenant_id` 或 SaaS tenant 级认证策略。
 
@@ -104,12 +104,18 @@
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `APP_JWT_SECRET` | 读取配置文件 | 覆盖 `data.auth.jwtSecret`，不在日志中输出密钥明文 |
-| `APP_AUTH_SMS_MODE` | 读取配置文件 | 覆盖 `data.auth.sms.mode`，当前支持 `disabled` / `mock`，`provider` 保留但未接入真实服务商 |
+| `APP_AUTH_SMS_MODE` | 读取配置文件 | 覆盖 `data.auth.sms.mode`，当前支持 `disabled` / `mock` / `provider` |
+| `APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID` | 空 | `provider` 模式必填，阿里云 PNVS RAM AccessKey ID |
+| `APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET` | 空 | `provider` 模式必填，阿里云 PNVS RAM AccessKey Secret，不写入 Git、日志、trace 或测试输出 |
+| `APP_AUTH_SMS_ALIYUN_SIGN_NAME` | 空 | `provider` 模式必填，PNVS 短信认证签名，例如控制台赠送签名 |
+| `APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE` | 空 | `provider` 模式必填，PNVS 短信认证模板，例如登录 / 注册模板 `100001` |
+| `APP_AUTH_SMS_ALIYUN_TEMPLATE_PARAM` | `{"code":"##code##","min":"5"}` | PNVS 模板参数，默认让阿里云生成验证码并写入 `code` 变量 |
+| `APP_AUTH_SMS_ALIYUN_SCHEME_NAME` | 空 | PNVS 认证方案名，空值使用阿里云默认方案 |
 | `APP_ADMIN_USERNAME` | 读取配置文件 | 覆盖默认管理员账号 |
 | `BOOTSTRAP_ADMIN_ONCE` | `false` | 仅在新库首次初始化 bootstrap 管理员时临时设为 `true`；成功后写 marker 并恢复为 `false` |
 | `APP_ADMIN_PASSWORD` | 空 | 仅在 `BOOTSTRAP_ADMIN_ONCE=true` 的首次初始化窗口临时注入；已有同名管理员不会被自动提权 |
 
-生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET` 或 bootstrap 管理员密码中的 `change-this` / placeholder，并拒绝 SMS mock、未显式关闭的 debug seed / cleanup。Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时，才允许同时临时设置 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD`；初始化成功后会写入 runtime marker 和 runtime audit event，后续重复 bootstrap 会被拒绝。如果 `admin` 或同名管理员已经存在，启动逻辑不会重置密码，也不会自动提权，应通过管理员改密或受控 SQL 更新密码哈希。当前产品不提供公开自助注册 API 或前端路由，协作账号来源回到受控初始化或后续账号管理流程。
+生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET`、阿里云 PNVS 必填配置或 bootstrap 管理员密码中的 `change-this` / placeholder，并拒绝 SMS mock、未显式关闭的 debug seed / cleanup。Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时，才允许同时临时设置 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD`；初始化成功后会写入 runtime marker 和 runtime audit event，后续重复 bootstrap 会被拒绝。如果 `admin` 或同名管理员已经存在，启动逻辑不会重置密码，也不会自动提权，应通过管理员改密或受控 SQL 更新密码哈希。当前产品不提供公开自助注册 API 或前端路由，协作账号来源回到受控初始化或后续账号管理流程。
 
 ## HTTP 安全响应头
 
@@ -179,7 +185,7 @@ ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
 - `trace.jaeger.traceName`
 - `trace.jaeger.endpoint`
 
-仓库内生产配置只保留占位值，不保留 token 形态样例、真实 webhook token、真实短信供应商 token 或聊天群 ID。需要接入外部通知或短信服务商时，只能通过生产 `.env` / 密钥管理注入，并在日志、trace、文档和测试输出中保持脱敏。
+仓库内生产配置只保留占位值，不保留 token 形态样例、真实 webhook token、真实短信供应商 token、阿里云 AK Secret 或聊天群 ID。需要接入外部通知或短信服务商时，只能通过生产 `.env` / 密钥管理注入，并在日志、trace、文档和测试输出中保持脱敏。
 
 ## 配置选择建议
 

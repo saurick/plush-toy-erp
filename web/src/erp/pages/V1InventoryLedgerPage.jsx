@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { DownOutlined, LinkOutlined } from '@ant-design/icons'
 import { Button, Card, Dropdown, Empty, Table, Tabs, Tag } from 'antd'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import {
+  useNavigate,
+  useOutletContext,
+  useSearchParams,
+} from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -47,6 +51,11 @@ import {
   uniqueReferenceOptions,
   warehouseOptionFromRecord,
 } from '../utils/referenceSelectOptions.mjs'
+import {
+  routeWithQuery,
+  searchParamPositiveIntText,
+  searchParamText,
+} from '../utils/routeQuery.mjs'
 
 const VIEW_BALANCES = 'balances'
 const VIEW_LOTS = 'lots'
@@ -271,6 +280,7 @@ function sourceRouteFor(sourceType) {
 export default function V1InventoryLedgerPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = outletContext?.adminProfile || {}
   const [activeView, setActiveView] = useState(VIEW_BALANCES)
   const [rows, setRows] = useState([])
@@ -292,6 +302,10 @@ export default function V1InventoryLedgerPage() {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [loading, setLoading] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
+  const routeView = searchParamText(searchParams, 'view')
+  const routeLotID = searchParamPositiveIntText(searchParams, 'lot_id')
+  const routeSourceID = searchParamPositiveIntText(searchParams, 'source_id')
+  const routeSourceType = searchParamText(searchParams, 'source_type')
 
   const loadRows = useCallback(async () => {
     setLoading(true)
@@ -300,7 +314,7 @@ export default function V1InventoryLedgerPage() {
         subject_type: subjectType,
         subject_id: subjectID || undefined,
         warehouse_id: warehouseID || undefined,
-        lot_id: lotID || undefined,
+        lot_id: lotID || routeLotID || undefined,
         keyword: trimOptional(keyword),
         ...getBusinessPaginationParams(pagination),
       })
@@ -320,7 +334,9 @@ export default function V1InventoryLedgerPage() {
           compactParams({
             ...commonParams,
             txn_type: txnType,
-            source_type: trimOptional(sourceType),
+            source_type:
+              trimOptional(sourceType) || routeSourceType || undefined,
+            source_id: routeSourceID || undefined,
             date_field: 'occurred_at',
             date_from: dateFilterStart || undefined,
             date_to: dateFilterEnd || undefined,
@@ -350,6 +366,9 @@ export default function V1InventoryLedgerPage() {
     lotStatus,
     lotID,
     pagination,
+    routeLotID,
+    routeSourceID,
+    routeSourceType,
     sourceType,
     subjectID,
     subjectType,
@@ -360,6 +379,13 @@ export default function V1InventoryLedgerPage() {
   useEffect(() => {
     loadRows()
   }, [loadRows])
+
+  useEffect(() => {
+    if (routeView && VIEW_LABELS[routeView] && routeView !== activeView) {
+      setActiveView(routeView)
+      setSelectedRow(null)
+    }
+  }, [activeView, routeView])
 
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(loadRows)
@@ -396,9 +422,25 @@ export default function V1InventoryLedgerPage() {
     if (!selectedRow) return
     if (key === 'source') {
       const targetPath = sourceRouteFor(selectedRow.source_type)
-      if (targetPath) navigate(targetPath)
+      if (targetPath) {
+        navigate(
+          routeWithQuery(targetPath, {
+            source_type: selectedRow.source_type,
+            source_id: selectedRow.source_id,
+          })
+        )
+      }
     }
   }
+
+  const clearRouteContext = useCallback(() => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('source_type')
+    nextParams.delete('source_id')
+    nextParams.delete('lot_id')
+    setSearchParams(nextParams, { replace: true })
+    resetCurrentPage()
+  }, [resetCurrentPage, searchParams, setSearchParams])
 
   const loadReferenceOptions = useCallback(async () => {
     try {
@@ -881,6 +923,16 @@ export default function V1InventoryLedgerPage() {
                   resetCurrentPage()
                 }}
               />
+            ) : null}
+            {routeSourceType && routeSourceID ? (
+              <Tag closable color="blue" onClose={clearRouteContext}>
+                来源 {routeSourceType} #{routeSourceID}
+              </Tag>
+            ) : null}
+            {routeLotID ? (
+              <Tag closable color="blue" onClose={clearRouteContext}>
+                批次 #{routeLotID}
+              </Tag>
             ) : null}
           </>
         }

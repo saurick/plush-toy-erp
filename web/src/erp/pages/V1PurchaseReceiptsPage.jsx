@@ -8,7 +8,11 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Form, Input, Popconfirm, Select, Tag } from 'antd'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import {
+  useNavigate,
+  useOutletContext,
+  useSearchParams,
+} from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -21,6 +25,7 @@ import {
 import { listInventoryLots } from '../api/inventoryApi.mjs'
 import {
   listMaterials,
+  listSuppliers,
   listUnits,
   listWarehouses,
 } from '../api/masterDataOrderApi.mjs'
@@ -71,6 +76,11 @@ import {
   unitOption,
   warehouseOptionFromRecord,
 } from '../utils/referenceSelectOptions.mjs'
+import {
+  routeWithQuery,
+  searchParamPositiveIntText,
+  searchParamText,
+} from '../utils/routeQuery.mjs'
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -361,6 +371,7 @@ function PurchaseReceiptItemFormFields({
 export default function V1PurchaseReceiptsPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = outletContext?.adminProfile || {}
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -369,6 +380,7 @@ export default function V1PurchaseReceiptsPage() {
   const [dateFilterField, setDateFilterField] = useState('received_at')
   const [dateFilterStart, setDateFilterStart] = useState('')
   const [dateFilterEnd, setDateFilterEnd] = useState('')
+  const [supplierFilter, setSupplierFilter] = useState('')
   const [materialFilter, setMaterialFilter] = useState('')
   const [warehouseFilter, setWarehouseFilter] = useState('')
   const [lotFilter, setLotFilter] = useState('')
@@ -378,11 +390,22 @@ export default function V1PurchaseReceiptsPage() {
   const [selectedRow, setSelectedRow] = useState(null)
   const [receiptModal, setReceiptModal] = useState(null)
   const [materials, setMaterials] = useState([])
+  const [suppliers, setSuppliers] = useState([])
   const [units, setUnits] = useState([])
   const [warehouses, setWarehouses] = useState([])
   const [inventoryLots, setInventoryLots] = useState([])
   const [receiptForm] = Form.useForm()
   const [itemForm] = Form.useForm()
+  const routePurchaseOrderID = searchParamPositiveIntText(
+    searchParams,
+    'purchase_order_id'
+  )
+  const routeReceiptID =
+    searchParamPositiveIntText(searchParams, 'receipt_id') ||
+    (searchParamText(searchParams, 'source_type').toUpperCase() ===
+    'PURCHASE_RECEIPT'
+      ? searchParamPositiveIntText(searchParams, 'source_id')
+      : '')
 
   const canCreate = hasPermission(adminProfile, 'purchase.receipt.create')
   const canPost =
@@ -396,6 +419,20 @@ export default function V1PurchaseReceiptsPage() {
     () => uniqueReferenceOptions(materials, materialOption),
     [materials]
   )
+  const supplierOptions = useMemo(() => {
+    const seen = new Set()
+    return suppliers
+      .map((supplier) => {
+        const value = String(supplier?.name || '').trim()
+        if (!value || seen.has(value)) return null
+        seen.add(value)
+        return {
+          label: [supplier.code, value].filter(Boolean).join(' / '),
+          value,
+        }
+      })
+      .filter(Boolean)
+  }, [suppliers])
   const unitOptions = useMemo(
     () => uniqueReferenceOptions(units, unitOption),
     [units]
@@ -425,8 +462,14 @@ export default function V1PurchaseReceiptsPage() {
     if (!selectedRow) return
     const pathByKey = {
       'purchase-orders': V1_ROUTE_PATHS.purchaseOrders,
-      'quality-inspections': V1_ROUTE_PATHS.qualityInspections,
-      inventory: V1_ROUTE_PATHS.inventory,
+      'quality-inspections': routeWithQuery(V1_ROUTE_PATHS.qualityInspections, {
+        purchase_receipt_id: selectedRow.id,
+      }),
+      inventory: routeWithQuery(V1_ROUTE_PATHS.inventory, {
+        source_type: 'PURCHASE_RECEIPT',
+        source_id: selectedRow.id,
+        view: 'txns',
+      }),
     }
     const targetPath = pathByKey[key]
     if (targetPath) {
@@ -440,13 +483,15 @@ export default function V1PurchaseReceiptsPage() {
       const data = await listPurchaseReceipts(
         compactParams({
           status: statusFilter,
-          keyword: trimOptional(keyword),
+          keyword: trimOptional(keyword) || routeReceiptID || undefined,
+          supplier_name: supplierFilter || undefined,
           date_field: dateFilterField,
           date_from: dateFilterStart || undefined,
           date_to: dateFilterEnd || undefined,
           material_id: materialFilter || undefined,
           warehouse_id: warehouseFilter || undefined,
           lot_id: lotFilter || undefined,
+          purchase_order_id: routePurchaseOrderID || undefined,
           ...getBusinessPaginationParams(pagination),
         })
       )
@@ -454,11 +499,15 @@ export default function V1PurchaseReceiptsPage() {
         ? data.purchase_receipts
         : []
       setRows(nextRows)
-      setSelectedRow((current) =>
-        current?.id
+      setSelectedRow((current) => {
+        const routeSelectedID = Number(routeReceiptID || 0)
+        if (routeSelectedID > 0) {
+          return nextRows.find((item) => item.id === routeSelectedID) || null
+        }
+        return current?.id
           ? nextRows.find((item) => item.id === current.id) || null
           : null
-      )
+      })
       setTotal(Number(data?.total || 0))
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载采购入库单'))
@@ -473,9 +522,22 @@ export default function V1PurchaseReceiptsPage() {
     lotFilter,
     materialFilter,
     pagination,
+    routePurchaseOrderID,
+    routeReceiptID,
     statusFilter,
+    supplierFilter,
     warehouseFilter,
   ])
+
+  const clearRouteContext = useCallback(() => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('purchase_order_id')
+    nextParams.delete('receipt_id')
+    nextParams.delete('source_type')
+    nextParams.delete('source_id')
+    setSearchParams(nextParams, { replace: true })
+    resetBusinessPaginationCurrent(setPagination)
+  }, [searchParams, setSearchParams])
 
   useEffect(() => {
     loadRows()
@@ -485,6 +547,7 @@ export default function V1PurchaseReceiptsPage() {
     let lastError
     try {
       let materialResult
+      let supplierResult
       let unitResult
       let warehouseResult
       let lotResult
@@ -498,6 +561,7 @@ export default function V1PurchaseReceiptsPage() {
             limit: 500,
             active_only: true,
           })
+          supplierResult = await listSuppliers({ limit: 500 })
           unitResult = await listUnits({ limit: 500 })
           warehouseResult = await listWarehouses({
             limit: 500,
@@ -521,6 +585,9 @@ export default function V1PurchaseReceiptsPage() {
       setMaterials(
         Array.isArray(materialResult?.materials) ? materialResult.materials : []
       )
+      setSuppliers(
+        Array.isArray(supplierResult?.suppliers) ? supplierResult.suppliers : []
+      )
       setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
       setWarehouses(
         Array.isArray(warehouseResult?.warehouses)
@@ -533,6 +600,7 @@ export default function V1PurchaseReceiptsPage() {
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载入库引用数据'))
       setMaterials([])
+      setSuppliers([])
       setUnits([])
       setWarehouses([])
       setInventoryLots([])
@@ -823,6 +891,18 @@ export default function V1PurchaseReceiptsPage() {
             />
             <SelectFilter
               className="erp-business-filter-control--status"
+              value={supplierFilter}
+              options={[{ label: '全部供应商', value: '' }, ...supplierOptions]}
+              placeholder="全部供应商"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextSupplier) => {
+                setSupplierFilter(nextSupplier || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
               value={materialFilter}
               options={[{ label: '全部材料', value: '' }, ...materialOptions]}
               placeholder="全部材料"
@@ -878,6 +958,16 @@ export default function V1PurchaseReceiptsPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
+            {routePurchaseOrderID ? (
+              <Tag closable color="blue" onClose={clearRouteContext}>
+                采购订单 #{routePurchaseOrderID}
+              </Tag>
+            ) : null}
+            {routeReceiptID ? (
+              <Tag closable color="blue" onClose={clearRouteContext}>
+                采购入库 #{routeReceiptID}
+              </Tag>
+            ) : null}
           </>
         }
         actions={

@@ -1288,6 +1288,38 @@
   border-radius: 14px;
 }
 
+.erp-login-card .erp-login-sms-hint.ant-alert {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  max-width: 100%;
+  min-height: 36px;
+  margin: -8px 0 18px;
+  padding: 8px 12px;
+  border-color: #cfe3d7;
+  border-radius: 999px;
+  background: #f4faf6;
+}
+
+.erp-login-card .erp-login-sms-hint .ant-alert-icon {
+  flex: 0 0 auto;
+  margin-inline-end: 8px;
+  color: #248b4f;
+  font-size: 15px;
+}
+
+.erp-login-card .erp-login-sms-hint .ant-alert-content {
+  min-width: 0;
+}
+
+.erp-login-card .erp-login-sms-hint .ant-alert-message {
+  color: #1f5d3a;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .erp-login-card .ant-input,
 .erp-login-card .ant-input-affix-wrapper {
   min-height: 56px;

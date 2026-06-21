@@ -420,6 +420,9 @@ func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.Pur
 			purchasereceipt.SupplierNameContainsFold(filter.Keyword),
 		))
 	}
+	if filter.SupplierName != "" {
+		query = query.Where(purchasereceipt.SupplierNameContainsFold(filter.SupplierName))
+	}
 	if filter.DateFrom != nil {
 		query = query.Where(purchasereceipt.ReceivedAtGTE(*filter.DateFrom))
 	}
@@ -435,6 +438,14 @@ func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.Pur
 	}
 	if filter.LotID > 0 {
 		itemPredicates = append(itemPredicates, purchasereceiptitem.LotID(filter.LotID))
+	}
+	if filter.PurchaseOrderID > 0 {
+		itemPredicates = append(
+			itemPredicates,
+			purchasereceiptitem.HasPurchaseOrderItemWith(
+				purchaseorderitem.PurchaseOrderID(filter.PurchaseOrderID),
+			),
+		)
 	}
 	if filter.PurchaseOrderItemID > 0 {
 		itemPredicates = append(itemPredicates, purchasereceiptitem.PurchaseOrderItemID(filter.PurchaseOrderItemID))

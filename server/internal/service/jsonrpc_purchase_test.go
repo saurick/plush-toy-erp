@@ -227,12 +227,13 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	}
 
 	_, listRes, err := j.handlePurchase(adminCtx, "list_purchase_receipts", "5", mustJSONRPCStruct(t, map[string]any{
-		"status":       biz.PurchaseReceiptStatusPosted,
-		"date_from":    "2026-06-11",
-		"date_to":      "2026-06-11",
-		"material_id":  float64(fixtures.materialID),
-		"warehouse_id": float64(fixtures.warehouseID),
-		"lot_id":       float64(lotID),
+		"status":        biz.PurchaseReceiptStatusPosted,
+		"supplier_name": "布料供应商",
+		"date_from":     "2026-06-11",
+		"date_to":       "2026-06-11",
+		"material_id":   float64(fixtures.materialID),
+		"warehouse_id":  float64(fixtures.warehouseID),
+		"lot_id":        float64(lotID),
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -274,6 +275,23 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.PurchaseReceiptSourceType), inventorytxn.TxnType(biz.InventoryTxnReversal)).CountX(ctx); count != 1 {
 		t.Fatalf("repeat cancel must keep one reversal txn, got %d", count)
+	}
+}
+
+func TestPurchaseReceiptFilterFromParamsForwardsContextFilters(t *testing.T) {
+	filter := purchaseReceiptFilterFromParams(map[string]any{
+		"supplier_name":          "布料供应商",
+		"purchase_order_id":      float64(21),
+		"purchase_order_item_id": float64(34),
+	})
+	if filter.SupplierName != "布料供应商" {
+		t.Fatalf("expected supplier_name forwarded, got %q", filter.SupplierName)
+	}
+	if filter.PurchaseOrderID != 21 {
+		t.Fatalf("expected purchase_order_id forwarded, got %d", filter.PurchaseOrderID)
+	}
+	if filter.PurchaseOrderItemID != 34 {
+		t.Fatalf("expected purchase_order_item_id forwarded, got %d", filter.PurchaseOrderItemID)
 	}
 }
 

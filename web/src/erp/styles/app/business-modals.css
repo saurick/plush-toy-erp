@@ -1018,7 +1018,12 @@
 .erp-permission-hero.ant-card,
 .erp-permission-section.ant-card {
   border: 1px solid #dfe9e1;
-  box-shadow: 0 8px 24px rgb(31 41 55 / 5%);
+  border-radius: 12px;
+  box-shadow: 0 10px 26px rgb(31 41 55 / 6%);
+}
+
+.erp-permission-hero.ant-card .ant-card-body {
+  padding: 16px 18px;
 }
 
 .erp-permission-hero__content {
@@ -1064,34 +1069,20 @@
 
 .erp-permission-section.ant-card {
   position: relative;
-  overflow: hidden;
 }
 
-.erp-permission-section.ant-card::before {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 4px;
-  content: '';
+.erp-permission-section.ant-card .ant-card-body {
+  padding: 18px;
 }
 
 .erp-permission-section--admins.ant-card {
-  border-color: #cfe6d6;
-  background: #fcfefc;
-}
-
-.erp-permission-section--admins.ant-card::before {
-  background: linear-gradient(90deg, #15803d, #86c998);
+  border-color: #dfe9e1;
+  background: #fff;
 }
 
 .erp-permission-section--roles.ant-card {
-  border-color: #cfdef4;
-  background: #fbfdff;
-}
-
-.erp-permission-section--roles.ant-card::before {
-  background: linear-gradient(90deg, #2563eb, #8fb4f7);
+  border-color: #dfe9e1;
+  background: #fff;
 }
 
 .erp-permission-section__eyebrow.ant-typography {
@@ -1114,12 +1105,14 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e7efe8;
 }
 
 .erp-role-center-layout {
   display: grid;
-  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  grid-template-columns: minmax(248px, 308px) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -1128,6 +1121,10 @@
   display: grid;
   gap: 10px;
   min-width: 0;
+  padding: 10px;
+  border: 1px solid #e2ece4;
+  border-radius: 12px;
+  background: #f8fbf9;
 }
 
 .erp-role-template-card {
@@ -1142,6 +1139,7 @@
   color: #1f2937;
   text-align: left;
   cursor: pointer;
+  appearance: none;
   transition:
     border-color 0.16s ease,
     box-shadow 0.16s ease,
@@ -1158,8 +1156,10 @@
 
 .erp-role-template-card--active {
   border-color: #228b54;
-  background: #f2faf5;
-  box-shadow: inset 3px 0 0 #228b54;
+  background: #f0faf4;
+  box-shadow:
+    inset 3px 0 0 #228b54,
+    0 8px 18px rgb(34 139 84 / 10%);
 }
 
 .erp-role-template-card__main,
@@ -1192,6 +1192,18 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  padding: 14px;
+  border: 1px solid #e2ece4;
+  border-radius: 12px;
+  background: #fbfdfb;
+}
+
+.erp-role-center-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .erp-role-center-metrics {
@@ -1245,6 +1257,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 10px 12px;
+  border: 1px solid #dfe9e1;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 -8px 18px rgb(31 41 55 / 6%);
 }
 
 .erp-permission-list-toolbar {

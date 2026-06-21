@@ -430,19 +430,36 @@ export function DateRangeFilter({
   onStartChange,
   onEndChange,
 }) {
+  const hasMultipleDateTypes = options.length > 1
+  const selectedDateTypeLabel =
+    options.find((option) => option.value === value)?.label || options[0]?.label
   return (
     <div className="erp-business-filter-control erp-business-date-range-filter erp-business-module-date-filter">
-      <Select
-        className="erp-business-date-range-filter__type"
-        aria-label="日期类型"
-        options={options}
-        value={value || undefined}
-        onChange={onTypeChange}
-        classNames={{
-          popup: { root: 'erp-business-module-select-popup' },
-        }}
-      />
-      <div className="erp-business-date-range-filter__divider" />
+      {hasMultipleDateTypes ? (
+        <>
+          <Select
+            className="erp-business-date-range-filter__type"
+            aria-label="日期类型"
+            options={options}
+            value={value || undefined}
+            onChange={onTypeChange}
+            classNames={{
+              popup: { root: 'erp-business-module-select-popup' },
+            }}
+          />
+          <div className="erp-business-date-range-filter__divider" />
+        </>
+      ) : selectedDateTypeLabel ? (
+        <>
+          <span
+            className="erp-business-date-range-filter__type erp-business-date-range-filter__type-label"
+            aria-label="日期类型"
+          >
+            {selectedDateTypeLabel}
+          </span>
+          <div className="erp-business-date-range-filter__divider" />
+        </>
+      ) : null}
       <div className="erp-business-date-range-filter__range">
         <DateInput
           aria-label="开始日期"

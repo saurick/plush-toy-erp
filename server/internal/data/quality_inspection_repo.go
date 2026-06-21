@@ -12,6 +12,9 @@ import (
 	"server/internal/biz"
 	corestatus "server/internal/core/status"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/purchaseorderitem"
+	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/qualityinspection"
 
 	"entgo.io/ent/dialect"
@@ -245,6 +248,17 @@ func (r *inventoryRepo) ListQualityInspections(ctx context.Context, filter biz.Q
 	}
 	if filter.PurchaseReceiptItemID > 0 {
 		query = query.Where(qualityinspection.PurchaseReceiptItemID(filter.PurchaseReceiptItemID))
+	}
+	if filter.PurchaseOrderID > 0 {
+		query = query.Where(
+			qualityinspection.HasPurchaseReceiptWith(
+				purchasereceipt.HasItemsWith(
+					purchasereceiptitem.HasPurchaseOrderItemWith(
+						purchaseorderitem.PurchaseOrderID(filter.PurchaseOrderID),
+					),
+				),
+			),
+		)
 	}
 	if filter.InventoryLotID > 0 {
 		query = query.Where(qualityinspection.InventoryLotID(filter.InventoryLotID))

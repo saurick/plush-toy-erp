@@ -122,7 +122,7 @@ HTTP 路由：
 - `mock_delivery`
 - `mock_code`
 
-当前暂未接入运营商短信，服务端使用进程内验证码存储，验证码 5 分钟有效、60 秒内不可重复发送、最多尝试 5 次。`mock_delivery=true` 时 `mock_code` 只用于本地和过渡期联调；接入短信供应商后应由发送适配层替换该返回口径，登录校验接口保持不变。
+`data.auth.sms.mode=mock` 时，服务端使用进程内验证码存储，验证码 5 分钟有效、60 秒内不可重复发送、最多尝试 5 次，`mock_delivery=true` 且返回 `mock_code` 只用于 local / dev / test。`data.auth.sms.mode=provider` 时，后端使用阿里云号码认证 PNVS 短信认证发送并核验验证码，`mock_delivery=false` 且不返回 `mock_code`；登录校验接口和手机号 / 岗位权限边界保持不变。
 
 ### `auth.me`
 

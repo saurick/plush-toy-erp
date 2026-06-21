@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strconv"
+	"strings"
 	"time"
 
 	"server/internal/biz"
@@ -47,6 +49,9 @@ ON CONFLICT (permission_key) DO UPDATE SET
 			return err
 		}
 	}
+	if err := pruneStaleBuiltinPermissions(ctx, db); err != nil {
+		return err
+	}
 
 	for _, role := range biz.BuiltinRoles() {
 		if _, err := db.ExecContext(ctx, `
@@ -75,6 +80,34 @@ ON CONFLICT (role_key) DO UPDATE SET
 
 	if l != nil {
 		l.Infof("rbac seed completed permissions=%d roles=%d", len(biz.BuiltinPermissions()), len(biz.BuiltinRoles()))
+	}
+	return nil
+}
+
+func pruneStaleBuiltinPermissions(ctx context.Context, db *sql.DB) error {
+	keys := biz.AllPermissionKeys()
+	if len(keys) == 0 {
+		return nil
+	}
+	placeholders := make([]string, 0, len(keys))
+	args := make([]any, 0, len(keys))
+	for index, key := range keys {
+		placeholders = append(placeholders, "$"+strconv.Itoa(index+1))
+		args = append(args, key)
+	}
+	inClause := strings.Join(placeholders, ", ")
+	if _, err := db.ExecContext(ctx, `
+DELETE FROM role_permissions
+WHERE permission_id IN (
+  SELECT id FROM permissions
+  WHERE builtin = TRUE AND permission_key NOT IN (`+inClause+`)
+)`, args...); err != nil {
+		return err
+	}
+	if _, err := db.ExecContext(ctx, `
+DELETE FROM permissions
+WHERE builtin = TRUE AND permission_key NOT IN (`+inClause+`)`, args...); err != nil {
+		return err
 	}
 	return nil
 }

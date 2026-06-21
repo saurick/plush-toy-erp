@@ -73,6 +73,7 @@ type QualityInspectionFilter struct {
 	DateTo                *time.Time
 	PurchaseReceiptID     int
 	PurchaseReceiptItemID int
+	PurchaseOrderID       int
 	InventoryLotID        int
 	MaterialID            int
 	WarehouseID           int

@@ -429,6 +429,64 @@ func TestJsonrpcDispatcher_AdminResetPassword(t *testing.T) {
 	}
 }
 
+func TestJsonrpcDispatcher_AdminCreateWithRolesRequiresUpdatePermission(t *testing.T) {
+	repo := newMemAdminManageRepoForData()
+	now := time.Now()
+	repo.admins[1] = &biz.AdminUser{
+		ID:          1,
+		Username:    "admin",
+		Permissions: []string{biz.PermissionSystemUserCreate},
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	logger := log.NewStdLogger(io.Discard)
+	j := &jsonrpcDispatcher{
+		log:           log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
+		adminReader:   repo,
+		adminManageUC: biz.NewAdminManageUsecase(repo, logger, tracesdk.NewTracerProvider()),
+	}
+	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{
+		UserID:   1,
+		Username: "admin",
+		Role:     biz.RoleAdmin,
+	})
+	withRoleParams, _ := structpb.NewStruct(map[string]any{
+		"username":  "operator-with-role",
+		"password":  "new-secret",
+		"role_keys": []any{biz.WarehouseRoleKey},
+	})
+
+	_, res, err := j.handleAdmin(ctx, "create", "1", withRoleParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("expected permission denied, got %+v", res)
+	}
+
+	withoutRoleParams, _ := structpb.NewStruct(map[string]any{
+		"username": "operator-no-role",
+		"password": "new-secret",
+	})
+	_, res, err = j.handleAdmin(ctx, "create", "2", withoutRoleParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected create without roles to succeed, got %+v", res)
+	}
+
+	repo.admins[1].Permissions = append(repo.admins[1].Permissions, biz.PermissionSystemUserUpdate)
+	_, res, err = j.handleAdmin(ctx, "create", "3", withRoleParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected create with roles to succeed after update permission, got %+v", res)
+	}
+}
+
 func TestJsonrpcDispatcher_AdminSetERPColumnOrder(t *testing.T) {
 	repo := newMemAdminManageRepoForData()
 	now := time.Now()

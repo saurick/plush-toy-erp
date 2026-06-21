@@ -192,6 +192,22 @@ else
   [[ "$postgres_image" != *":dev" && "$postgres_image" != *":latest" ]] || fail "POSTGRES_IMAGE 不能使用 :dev 或 :latest"
   [[ "$jaeger_image" != *":dev" && "$jaeger_image" != *":latest" ]] || fail "JAEGER_IMAGE 不能使用 :dev 或 :latest"
   [[ "$app_auth_sms_mode" != "mock" ]] || fail "APP_AUTH_SMS_MODE 生产环境不能使用 mock"
+  if [[ "$app_auth_sms_mode" == "provider" ]]; then
+    provider_required_keys=(
+      APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID
+      APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET
+      APP_AUTH_SMS_ALIYUN_SIGN_NAME
+      APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE
+    )
+    for key in "${provider_required_keys[@]}"; do
+      has_value "$key" || fail "APP_AUTH_SMS_MODE=provider 时缺少必需变量: $key"
+      value="$(value_of "$key")"
+      [[ -n "$value" ]] || fail "APP_AUTH_SMS_MODE=provider 时 $key 不能为空"
+      if grep -Eiq "$placeholder_pattern" <<<"$value"; then
+        fail "$key 仍包含 placeholder"
+      fi
+    done
+  fi
   [[ "$erp_debug_env" == "prod" ]] || fail "ERP_DEBUG_ENV 必须为 prod"
   [[ "$erp_debug_seed_enabled" == "false" ]] || fail "ERP_DEBUG_SEED_ENABLED 必须为 false"
   [[ "$erp_debug_cleanup_enabled" == "false" ]] || fail "ERP_DEBUG_CLEANUP_ENABLED 必须为 false"

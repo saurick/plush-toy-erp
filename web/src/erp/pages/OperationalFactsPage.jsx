@@ -9,7 +9,11 @@ import {
   RollbackOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Form, Modal, Popconfirm, Tabs, Tag } from 'antd'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import {
+  useNavigate,
+  useOutletContext,
+  useSearchParams,
+} from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -65,6 +69,11 @@ import {
   downloadBusinessListCSV,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
+import {
+  routeWithQuery,
+  searchParamPositiveIntText,
+  searchParamText,
+} from '../utils/routeQuery.mjs'
 import {
   PRINT_WORKSPACE_ENTRY_SOURCE,
   PROCESSING_CONTRACT_TEMPLATE_KEY,
@@ -149,6 +158,7 @@ export function OperationalFactWorkspace({
 }) {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = outletContext?.adminProfile || {}
   const [activeKey, setActiveKey] = useState(initialActiveKey)
   const [keyword, setKeyword] = useState('')
@@ -165,6 +175,13 @@ export function OperationalFactWorkspace({
   const [createForm] = Form.useForm()
   const [shipmentItemOpen, setShipmentItemOpen] = useState(false)
   const [shipmentItemForm] = Form.useForm()
+  const routeSalesOrderID = searchParamPositiveIntText(
+    searchParams,
+    'sales_order_id'
+  )
+  const routeSourceID = searchParamPositiveIntText(searchParams, 'source_id')
+  const routeSourceType = searchParamText(searchParams, 'source_type')
+  const routeView = searchParamText(searchParams, 'view')
 
   const baseConfigs = useMemo(
     () => ({
@@ -319,6 +336,12 @@ export function OperationalFactWorkspace({
     }
   }, [activeKey, configs, enabledViewKeys])
 
+  useEffect(() => {
+    if (routeView && configs[routeView] && routeView !== activeKey) {
+      setActiveKey(routeView)
+    }
+  }, [activeKey, configs, routeView])
+
   const activeConfig = configs[activeKey] || configs.production
   const activeRows = useMemo(
     () => rowsByKey[activeKey] || [],
@@ -349,6 +372,22 @@ export function OperationalFactWorkspace({
     [activeKey]
   )
 
+  const routeListParamsForKey = useCallback(
+    (key) => {
+      if (['shipments', 'reservations'].includes(key) && routeSalesOrderID) {
+        return { source_id: routeSalesOrderID }
+      }
+      if (key === 'finance' && routeSourceType && routeSourceID) {
+        return {
+          source_type: routeSourceType,
+          source_id: routeSourceID,
+        }
+      }
+      return {}
+    },
+    [routeSalesOrderID, routeSourceID, routeSourceType]
+  )
+
   const loadRows = useCallback(
     async (key = activeKey) => {
       const config = configs[key]
@@ -366,6 +405,7 @@ export function OperationalFactWorkspace({
             date_from: dateRangeByKey[key]?.[0] || undefined,
             date_to: dateRangeByKey[key]?.[1] || undefined,
             ...(config.listParams || {}),
+            ...routeListParamsForKey(key),
             ...getBusinessPaginationParams(pagination),
           })
         )
@@ -400,6 +440,7 @@ export function OperationalFactWorkspace({
       dateRangeByKey,
       keyword,
       paginationByKey,
+      routeListParamsForKey,
       statusFilter,
     ]
   )
@@ -824,14 +865,40 @@ export function OperationalFactWorkspace({
   const openRelatedTable = ({ key }) => {
     if (!activeSelectedRow) return
     const pathByKey = {
-      'sales-order': V1_ROUTE_PATHS.salesOrders,
-      inventory: V1_ROUTE_PATHS.inventory,
-      receivables: V1_ROUTE_PATHS.receivables,
-      invoices: V1_ROUTE_PATHS.invoices,
+      'sales-order': routeWithQuery(V1_ROUTE_PATHS.salesOrders, {
+        sales_order_id: activeSelectedRow.sales_order_id,
+      }),
+      inventory: routeWithQuery(V1_ROUTE_PATHS.inventory, {
+        source_type:
+          activeKey === 'shipments'
+            ? 'SHIPMENT'
+            : activeSelectedRow.source_type || undefined,
+        source_id:
+          activeKey === 'shipments'
+            ? activeSelectedRow.id
+            : activeSelectedRow.source_id || undefined,
+        sales_order_id: activeSelectedRow.sales_order_id,
+        view: 'txns',
+      }),
+      receivables: routeWithQuery(V1_ROUTE_PATHS.receivables, {
+        source_type: 'SHIPMENT',
+        source_id: activeSelectedRow.id,
+      }),
+      invoices: routeWithQuery(V1_ROUTE_PATHS.invoices, {
+        source_type: 'SHIPMENT',
+        source_id: activeSelectedRow.id,
+      }),
     }
     if (key === 'source') {
       const targetPath = sourceRouteFor(activeSelectedRow.source_type)
-      if (targetPath) navigate(targetPath)
+      if (targetPath) {
+        navigate(
+          routeWithQuery(targetPath, {
+            source_type: activeSelectedRow.source_type,
+            source_id: activeSelectedRow.source_id,
+          })
+        )
+      }
       return
     }
     const targetPath = pathByKey[key]
@@ -840,6 +907,14 @@ export function OperationalFactWorkspace({
     }
   }
   const currentRowsCount = activeRows.length
+  const clearRouteContext = useCallback(() => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('sales_order_id')
+    nextParams.delete('source_type')
+    nextParams.delete('source_id')
+    setSearchParams(nextParams, { replace: true })
+    resetPaginationForKey()
+  }, [resetPaginationForKey, searchParams, setSearchParams])
   const activeDraftCount = activeRows.filter(
     (item) => item.status === 'DRAFT'
   ).length
@@ -932,6 +1007,16 @@ export function OperationalFactWorkspace({
                 resetPaginationForKey()
               }}
             />
+            {routeSalesOrderID ? (
+              <Tag closable color="blue" onClose={clearRouteContext}>
+                销售订单 #{routeSalesOrderID}
+              </Tag>
+            ) : null}
+            {routeSourceType && routeSourceID ? (
+              <Tag closable color="blue" onClose={clearRouteContext}>
+                来源 {routeSourceType} #{routeSourceID}
+              </Tag>
+            ) : null}
           </>
         }
         actions={

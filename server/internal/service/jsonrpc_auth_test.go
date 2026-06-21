@@ -150,7 +150,7 @@ func getNestedString(values map[string]any, key string) string {
 func newAdminAuthUsecaseForTest(repo *memAdminAuthRepoForData) *biz.AdminAuthUsecase {
 	return biz.NewAdminAuthUsecase(repo, func(userID int, username string, role int8) (string, time.Time, error) {
 		return "admin-token", time.Now().Add(time.Hour), nil
-	}, log.DefaultLogger, nil)
+	}, nil, log.DefaultLogger, nil)
 }
 
 type memAdminAuthRepoForData struct {

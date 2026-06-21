@@ -37,8 +37,8 @@ func normalizeAuthSMSRuntimeConfig(mode string) authSMSRuntimeConfig {
 		}
 	case authSMSModeProvider:
 		return authSMSRuntimeConfig{
-			Mode:           authSMSModeProvider,
-			DisabledReason: "短信服务商尚未接入",
+			Mode:    authSMSModeProvider,
+			Enabled: true,
 		}
 	case "", authSMSModeDisabled:
 		return authSMSRuntimeConfig{

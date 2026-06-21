@@ -156,6 +156,23 @@ func TestJsonrpcDispatcher_QualityInspectionAPIRequiresDomainPermissions(t *test
 	}
 }
 
+func TestQualityInspectionFilterFromParamsForwardsContextFilters(t *testing.T) {
+	filter := qualityInspectionFilterFromParams(map[string]any{
+		"purchase_order_id":        float64(21),
+		"purchase_receipt_id":      float64(34),
+		"purchase_receipt_item_id": float64(55),
+	})
+	if filter.PurchaseOrderID != 21 {
+		t.Fatalf("expected purchase_order_id forwarded, got %d", filter.PurchaseOrderID)
+	}
+	if filter.PurchaseReceiptID != 34 {
+		t.Fatalf("expected purchase_receipt_id forwarded, got %d", filter.PurchaseReceiptID)
+	}
+	if filter.PurchaseReceiptItemID != 55 {
+		t.Fatalf("expected purchase_receipt_item_id forwarded, got %d", filter.PurchaseReceiptItemID)
+	}
+}
+
 func newQualityJSONRPCTestData(data *datarepo.Data, admin *biz.AdminUser) *jsonrpcDispatcher {
 	logger := log.NewStdLogger(io.Discard)
 	return &jsonrpcDispatcher{

@@ -31,7 +31,12 @@ func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger, tr
 	}
 	adminAuthRepo := data.NewAdminAuthRepo(dataData, logger)
 	adminTokenGenerator := data.NewAdminTokenGenerator(confData, logger)
-	adminAuthUsecase := biz.NewAdminAuthUsecase(adminAuthRepo, adminTokenGenerator, logger, tracerProvider)
+	smsLoginCodeProvider, err := data.NewSMSLoginCodeProvider(confData, logger)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	adminAuthUsecase := biz.NewAdminAuthUsecase(adminAuthRepo, adminTokenGenerator, smsLoginCodeProvider, logger, tracerProvider)
 	adminManageRepo := data.NewAdminManageRepo(dataData, logger)
 	adminManageUsecase := biz.NewAdminManageUsecase(adminManageRepo, logger, tracerProvider)
 	workflowRepo := data.NewWorkflowRepo(dataData, logger)

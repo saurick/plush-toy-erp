@@ -132,6 +132,7 @@ func qualityInspectionFilterFromParams(pm map[string]any) biz.QualityInspectionF
 		DateTo:                dateTo,
 		PurchaseReceiptID:     getInt(pm, "purchase_receipt_id", 0),
 		PurchaseReceiptItemID: getInt(pm, "purchase_receipt_item_id", 0),
+		PurchaseOrderID:       getInt(pm, "purchase_order_id", 0),
 		InventoryLotID:        getInt(pm, "inventory_lot_id", 0),
 		MaterialID:            getInt(pm, "material_id", 0),
 		WarehouseID:           getInt(pm, "warehouse_id", 0),

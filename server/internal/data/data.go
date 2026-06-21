@@ -30,6 +30,7 @@ var ProviderSet = wire.NewSet(
 	wire.Bind(new(biz.AdminAuthRepo), new(*adminAuthRepo)),
 	wire.Bind(new(biz.AdminAccountReader), new(*adminAuthRepo)),
 	NewAdminTokenGenerator,
+	NewSMSLoginCodeProvider,
 	NewAdminManageRepo,
 	wire.Bind(new(biz.AdminManageRepo), new(*adminManageRepo)),
 

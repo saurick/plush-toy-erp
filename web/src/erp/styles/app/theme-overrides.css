@@ -516,6 +516,19 @@
   color: #ffffff;
 }
 
+[data-erp-theme='dark'] .erp-login-card .erp-login-sms-hint.ant-alert {
+  border-color: rgb(74 222 128 / 0.32);
+  background: rgb(22 101 52 / 0.22);
+}
+
+[data-erp-theme='dark'] .erp-login-card .erp-login-sms-hint .ant-alert-icon {
+  color: #86efac;
+}
+
+[data-erp-theme='dark'] .erp-login-card .erp-login-sms-hint .ant-alert-message {
+  color: #dcfce7;
+}
+
 [data-erp-theme='dark'] .ant-card,
 [data-erp-theme='dark'] .ant-table-wrapper .ant-table,
 [data-erp-theme='dark'] .ant-table-wrapper .ant-table-thead > tr > th,
@@ -861,8 +874,12 @@
 [data-erp-theme='dark'] .erp-business-collaboration-task-panel.ant-card,
 [data-erp-theme='dark'] .erp-business-module-task-item,
 [data-erp-theme='dark'] .erp-role-template-card,
+[data-erp-theme='dark'] .erp-role-center-sidebar,
+[data-erp-theme='dark'] .erp-role-center-detail__head,
 [data-erp-theme='dark'] .erp-role-center-metrics > div,
 [data-erp-theme='dark'] .erp-role-center-impact > div,
+[data-erp-theme='dark'] .erp-role-center-footer,
+[data-erp-theme='dark'] .erp-permission-checklist-toolbar,
 [data-erp-theme='dark'] .erp-permission-checklist__section {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg);
@@ -904,28 +921,18 @@
   color: var(--erp-text);
 }
 
-[data-erp-theme='dark'] .erp-permission-section--admins.ant-card {
-  border-color: #2f6847;
-  background: linear-gradient(180deg, #0f2119, #111827 34%);
+[data-erp-theme='dark'] .erp-permission-section.ant-card {
+  border-color: var(--erp-border);
+  background: var(--erp-surface);
   box-shadow: 0 14px 30px rgb(0 0 0 / 24%);
-}
-
-[data-erp-theme='dark'] .erp-permission-section--roles.ant-card {
-  border-color: #34508f;
-  background: linear-gradient(180deg, #101b35, #111827 34%);
-  box-shadow: 0 14px 30px rgb(0 0 0 / 24%);
-}
-
-[data-erp-theme='dark'] .erp-permission-section--admins.ant-card::before {
-  background: linear-gradient(90deg, #22c55e, #86efac);
-}
-
-[data-erp-theme='dark'] .erp-permission-section--roles.ant-card::before {
-  background: linear-gradient(90deg, #60a5fa, #a78bfa);
 }
 
 [data-erp-theme='dark'] .erp-permission-section__eyebrow.ant-typography {
   color: #86efac;
+}
+
+[data-erp-theme='dark'] .erp-role-center-header {
+  border-bottom-color: var(--erp-border);
 }
 
 [data-erp-theme='dark']
@@ -946,6 +953,7 @@
 [data-erp-theme='dark'] .erp-module-column-header-trigger.ant-btn:focus-visible,
 [data-erp-theme='dark'] .erp-permission-modal__title-main,
 [data-erp-theme='dark'] .erp-business-action-modal__title span,
+[data-erp-theme='dark'] .erp-permission-option__label,
 [data-erp-theme='dark'] .erp-permission-grid .ant-checkbox-wrapper {
   color: var(--erp-text);
 }
@@ -953,6 +961,8 @@
 [data-erp-theme='dark'] .erp-business-action-modal__title small,
 [data-erp-theme='dark'] .erp-business-page-header-card p,
 [data-erp-theme='dark'] .erp-business-date-range-filter__range > span,
+[data-erp-theme='dark'] .erp-permission-option__key,
+[data-erp-theme='dark'] .erp-permission-checklist-filter,
 [data-erp-theme='dark'] .erp-business-status-transition-option span,
 [data-erp-theme='dark'] .erp-business-module-task-item span,
 [data-erp-theme='dark'] .erp-business-filter-panel__summary,
@@ -1117,6 +1127,7 @@
 [data-erp-theme='dark']
   :where(.erp-business-date-range-filter__type.ant-select)
   .ant-select-selector,
+[data-erp-theme='dark'] .erp-business-date-range-filter__type-label,
 [data-erp-theme='dark']
   .erp-business-date-range-filter
   .erp-business-date-input.ant-picker,

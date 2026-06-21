@@ -192,6 +192,43 @@ func TestValidateProductionBootstrapConfigRejectsMockSMS(t *testing.T) {
 	}
 }
 
+func TestValidateProductionBootstrapConfigRequiresAliyunProviderSecrets(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{
+		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
+		Auth: &conf.Data_Auth{
+			JwtSecret: "0123456789abcdef0123456789abcdef",
+			Sms:       &conf.Data_Auth_SMS{Mode: "provider"},
+			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
+		},
+	}
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, productionConfigTestEnv(nil)); err == nil {
+		t.Fatal("expected production sms provider without secrets to be rejected")
+	}
+}
+
+func TestValidateProductionBootstrapConfigAllowsAliyunProviderSecrets(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{
+		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
+		Auth: &conf.Data_Auth{
+			JwtSecret: "0123456789abcdef0123456789abcdef",
+			Sms:       &conf.Data_Auth_SMS{Mode: "provider"},
+			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
+		},
+	}
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, productionConfigTestEnv(map[string]string{
+		"APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID":     "LTAI-example",
+		"APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET": "runtime-secret",
+		"APP_AUTH_SMS_ALIYUN_SIGN_NAME":         "速通互联验证码",
+		"APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE":     "100001",
+	})); err != nil {
+		t.Fatalf("expected production sms provider config to pass, got %v", err)
+	}
+}
+
 func TestValidateProductionBootstrapConfigRequiresDebugMutationFlagsDisabled(t *testing.T) {
 	t.Parallel()
 

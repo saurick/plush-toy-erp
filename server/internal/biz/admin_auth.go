@@ -48,10 +48,10 @@ type AdminAuthUsecase struct {
 	tracer   trace.Tracer
 	repo     AdminAuthRepo
 	genTok   AdminTokenGenerator
-	smsCodes *SMSLoginCodeManager
+	smsCodes SMSLoginCodeProvider
 }
 
-func NewAdminAuthUsecase(repo AdminAuthRepo, genTok AdminTokenGenerator, logger log.Logger, tp *tracesdk.TracerProvider) *AdminAuthUsecase {
+func NewAdminAuthUsecase(repo AdminAuthRepo, genTok AdminTokenGenerator, smsCodes SMSLoginCodeProvider, logger log.Logger, tp *tracesdk.TracerProvider) *AdminAuthUsecase {
 	helper := log.NewHelper(log.With(logger, "module", "biz.admin_auth"))
 
 	var tr trace.Tracer
@@ -60,11 +60,14 @@ func NewAdminAuthUsecase(repo AdminAuthRepo, genTok AdminTokenGenerator, logger 
 	} else {
 		tr = otel.Tracer("biz.admin_auth")
 	}
+	if smsCodes == nil {
+		smsCodes = NewLocalSMSLoginCodeProvider("admin")
+	}
 
 	return &AdminAuthUsecase{
 		repo:     repo,
 		genTok:   genTok,
-		smsCodes: NewSMSLoginCodeManager(),
+		smsCodes: smsCodes,
 		log:      helper,
 		logger:   logger,
 		tp:       tp,
@@ -176,7 +179,7 @@ func (uc *AdminAuthUsecase) RequestSMSLoginCode(ctx context.Context, phone, mobi
 		return nil, err
 	}
 
-	challenge, err = uc.smsCodes.Request("admin", normalizedPhone)
+	challenge, err = uc.smsCodes.Request(ctx, normalizedPhone)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
@@ -232,7 +235,7 @@ func (uc *AdminAuthUsecase) LoginWithSMSCode(ctx context.Context, phone, code, m
 		return "", time.Time{}, nil, err
 	}
 
-	if _, err = uc.smsCodes.Verify("admin", normalizedPhone, code); err != nil {
+	if _, err = uc.smsCodes.Verify(ctx, normalizedPhone, code); err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		l.Infof("SMSLogin admin verify failed admin_id=%d phone=%s err=%v", admin.ID, maskPhone(normalizedPhone), err)
 		return "", time.Time{}, nil, err

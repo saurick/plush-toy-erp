@@ -8,6 +8,8 @@ test('permissionModuleLabels: 内置权限模块显示中文并保留英文 key'
   assert.equal(getPermissionModuleTitle('debug'), '调试能力 (debug)')
   assert.equal(getPermissionModuleTitle('masterdata'), '主数据 (masterdata)')
   assert.equal(getPermissionModuleTitle('mobile'), '岗位任务端 (mobile)')
+  assert.equal(getPermissionModuleTitle('outsourcing'), '委外 (outsourcing)')
+  assert.equal(getPermissionModuleTitle('shipment'), '出货 (shipment)')
 })
 
 test('permissionModuleLabels: 空模块归入其他，未知模块保留原 key', () => {

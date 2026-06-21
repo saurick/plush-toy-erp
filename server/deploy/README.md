@@ -31,7 +31,7 @@ Atlas migration 在生产 / 低配服务器上统一使用宿主机 `/usr/local/
 - `WEB_IMAGE`
 - `POSTGRES_IMAGE` 和 `JAEGER_IMAGE` 必须使用固定版本 tag，不能用 `latest` / `dev`
 - `APP_JWT_SECRET`
-- `APP_AUTH_SMS_MODE=disabled`，生产环境不能使用 `mock`
+- `APP_AUTH_SMS_MODE=disabled`，生产环境不能使用 `mock`；如启用 `provider`，必须同时通过运行时 Secret 注入阿里云 PNVS `APP_AUTH_SMS_ALIYUN_*` 配置
 - `APP_ADMIN_USERNAME`
 - `BOOTSTRAP_ADMIN_ONCE=false`；只有新库首次初始化 bootstrap 管理员时才临时改为 `true`
 - `POSTGRES_BIND_ADDR=127.0.0.1`，PostgreSQL 宿主机映射只允许 loopback

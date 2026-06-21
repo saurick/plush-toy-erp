@@ -116,6 +116,12 @@ export function createMobileTaskAssertions(deps) {
   }
 
   async function assertMobileTaskProgressSummary(page, { scenarioName }) {
+    const expectedToneByTestID = {
+      'mobile-role-progress-pending': 'pending',
+      'mobile-role-progress-processing': 'processing',
+      'mobile-role-progress-blocked': 'blocked',
+      'mobile-role-progress-done': 'done',
+    }
     const metrics = await page.evaluate(() =>
       [
         'mobile-role-progress-pending',
@@ -124,6 +130,10 @@ export function createMobileTaskAssertions(deps) {
         'mobile-role-progress-done',
       ].map((testID) => {
         const node = document.querySelector(`[data-testid="${testID}"]`)
+        const value = node?.querySelector('.mobile-role-metric-button__value')
+        const label = node?.querySelector('.mobile-role-metric-button__label')
+        const valueStyle = value ? window.getComputedStyle(value) : null
+        const labelStyle = label ? window.getComputedStyle(label) : null
         const rect = node?.getBoundingClientRect()
         return {
           testID,
@@ -132,6 +142,8 @@ export function createMobileTaskAssertions(deps) {
           ariaPressed: node?.getAttribute('aria-pressed'),
           className: node?.className || '',
           text: node?.textContent?.replace(/\s+/g, ' ').trim() || '',
+          valueColor: valueStyle?.color || '',
+          labelColor: labelStyle?.color || '',
           width: rect?.width || 0,
           height: rect?.height || 0,
           scrollWidth: node?.scrollWidth || 0,
@@ -153,6 +165,17 @@ export function createMobileTaskAssertions(deps) {
       assert(
         item.scrollWidth <= item.clientWidth + 1,
         `${scenarioName} 进度摘要出现横向溢出: ${JSON.stringify(metrics)}`
+      )
+      assert(
+        String(item.className).includes(
+          `mobile-role-summary-metric--${expectedToneByTestID[item.testID]}`
+        ),
+        `${scenarioName} 进度摘要缺少语义色 tone class: ${JSON.stringify(metrics)}`
+      )
+      assert(
+        !isTransparentColor(item.valueColor) &&
+          item.valueColor === item.labelColor,
+        `${scenarioName} 进度摘要数字和标签应使用同一语义色: ${JSON.stringify(metrics)}`
       )
     })
   }
@@ -267,6 +290,12 @@ export function createMobileTaskAssertions(deps) {
   }
 
   async function assertMobileSummaryMetricsReadonly(page, { scenarioName }) {
+    const expectedValueClassByTestID = {
+      'mobile-role-metric-alerts': 'text-orange-500',
+      'mobile-role-metric-overdue': 'text-red-500',
+      'mobile-role-metric-due-soon': 'text-slate-600',
+      'mobile-role-metric-risk': 'text-red-500',
+    }
     const metrics = await page.evaluate(() =>
       [
         'mobile-role-metric-alerts',
@@ -275,6 +304,10 @@ export function createMobileTaskAssertions(deps) {
         'mobile-role-metric-risk',
       ].map((testID) => {
         const node = document.querySelector(`[data-testid="${testID}"]`)
+        const value = node?.querySelector('.mobile-role-metric-button__value')
+        const label = node?.querySelector('.mobile-role-metric-button__label')
+        const valueStyle = value ? window.getComputedStyle(value) : null
+        const labelStyle = label ? window.getComputedStyle(label) : null
         const rect = node?.getBoundingClientRect()
         return {
           testID,
@@ -282,6 +315,9 @@ export function createMobileTaskAssertions(deps) {
           role: node?.getAttribute('role') || '',
           ariaPressed: node?.getAttribute('aria-pressed'),
           className: node?.className || '',
+          valueClassName: value?.className || '',
+          valueColor: valueStyle?.color || '',
+          labelColor: labelStyle?.color || '',
           text: node?.textContent?.replace(/\s+/g, ' ').trim() || '',
           width: rect?.width || 0,
           height: rect?.height || 0,
@@ -309,10 +345,33 @@ export function createMobileTaskAssertions(deps) {
         item.scrollWidth <= item.clientWidth + 1,
         `${scenarioName} 顶部统计摘要出现横向溢出: ${JSON.stringify(metrics)}`
       )
+      assert(
+        !String(item.className).includes('mobile-role-summary-metric--'),
+        `${scenarioName} 待办页顶部风险摘要不应套用进度摘要 tone class: ${JSON.stringify(metrics)}`
+      )
+      assert(
+        String(item.valueClassName).includes(
+          expectedValueClassByTestID[item.testID]
+        ),
+        `${scenarioName} 待办页顶部风险摘要丢失原始状态色 class: ${JSON.stringify(metrics)}`
+      )
+      if (item.testID !== 'mobile-role-metric-due-soon') {
+        assert.notEqual(
+          item.valueColor,
+          item.labelColor,
+          `${scenarioName} 风险/超时摘要数字不应退回中性标签色: ${JSON.stringify(metrics)}`
+        )
+      }
     })
   }
 
   async function assertMobileMineMetricButtonsVisible(page, { scenarioName }) {
+    const expectedToneByTestID = {
+      'mobile-role-mine-metric-todo': 'todo',
+      'mobile-role-mine-metric-done': 'done',
+      'mobile-role-mine-metric-overdue': 'overdue',
+      'mobile-role-mine-metric-risk': 'risk',
+    }
     const metrics = await page.evaluate(() =>
       [
         'mobile-role-mine-metric-todo',
@@ -322,6 +381,17 @@ export function createMobileTaskAssertions(deps) {
       ].map((testID) => {
         const node = document.querySelector(`[data-testid="${testID}"]`)
         const style = node ? window.getComputedStyle(node) : null
+        const beforeStyle = node
+          ? window.getComputedStyle(node, '::before')
+          : null
+        const value = node?.querySelector(
+          '.mobile-role-mine-metric-button__value'
+        )
+        const icon = node?.querySelector(
+          '.mobile-role-mine-metric-button__head .anticon'
+        )
+        const valueStyle = value ? window.getComputedStyle(value) : null
+        const iconStyle = icon ? window.getComputedStyle(icon) : null
         const rect = node?.getBoundingClientRect()
         return {
           testID,
@@ -333,6 +403,10 @@ export function createMobileTaskAssertions(deps) {
           borderWidth: style?.borderWidth || '',
           boxShadow: style?.boxShadow || '',
           cursor: style?.cursor || '',
+          beforeBackgroundColor: beforeStyle?.backgroundColor || '',
+          beforeWidth: beforeStyle?.width || '',
+          valueColor: valueStyle?.color || '',
+          iconColor: iconStyle?.color || '',
           ariaLabel: node?.getAttribute('aria-label') || '',
           headText: String(
             node?.querySelector('.mobile-role-mine-metric-button__head')
@@ -399,6 +473,22 @@ export function createMobileTaskAssertions(deps) {
       assert(
         item.scrollWidth <= item.clientWidth + 1,
         `${scenarioName} 我的统计入口出现横向溢出: ${JSON.stringify(metrics)}`
+      )
+      assert(
+        String(item.className).includes(
+          `mobile-role-mine-metric-button--${expectedToneByTestID[item.testID]}`
+        ),
+        `${scenarioName} 我的统计入口缺少语义色 tone class: ${JSON.stringify(metrics)}`
+      )
+      assert(
+        Number.parseFloat(item.beforeWidth) >= 3 &&
+          !isTransparentColor(item.beforeBackgroundColor),
+        `${scenarioName} 我的统计入口缺少左侧语义色条: ${JSON.stringify(metrics)}`
+      )
+      assert(
+        item.valueColor === item.beforeBackgroundColor &&
+          item.iconColor === item.beforeBackgroundColor,
+        `${scenarioName} 我的统计入口数字和箭头应跟随语义色条: ${JSON.stringify(metrics)}`
       )
     })
   }
@@ -864,6 +954,15 @@ export function createMobileTaskAssertions(deps) {
       const shellRect = shell?.getBoundingClientRect()
       const headerRect = header?.getBoundingClientRect()
       const actionBarRect = actionBar?.getBoundingClientRect()
+      const detailButtons = Array.from(
+        shell?.querySelectorAll('button') || []
+      ).map((button) => button.textContent?.replace(/\s+/g, ' ').trim() || '')
+      const detailMeta = Array.from(
+        shell?.querySelectorAll('.mobile-role-detail-meta') || []
+      ).map((node) => node.textContent?.replace(/\s+/g, ' ').trim() || '')
+      const relatedItem = shell?.querySelector(
+        '.mobile-role-detail-related-item'
+      )
       const buttons = Array.from(
         actionBar?.querySelectorAll('.mobile-role-action-bar__button') || []
       ).map((button) => {
@@ -898,6 +997,19 @@ export function createMobileTaskAssertions(deps) {
               height: actionBarRect.height,
             }
           : null,
+        detailButtons,
+        detailMeta,
+        relatedItem: relatedItem
+          ? {
+              text: relatedItem.textContent?.replace(/\s+/g, ' ').trim() || '',
+              interactiveCount: relatedItem.querySelectorAll('button,a').length,
+              scrollWidth: relatedItem.scrollWidth,
+              clientWidth: relatedItem.clientWidth,
+            }
+          : null,
+        actionGuidanceCount: document.querySelectorAll(
+          '[data-testid="mobile-role-action-guidance"]'
+        ).length,
         buttons,
         scrollTopButtonCount: document.querySelectorAll(
           '[data-testid="mobile-role-scroll-top"]'
@@ -938,6 +1050,94 @@ export function createMobileTaskAssertions(deps) {
         `${scenarioName} 详情页动作按钮尺寸不稳定: ${JSON.stringify(metrics)}`
       )
     })
+    assert.equal(
+      metrics.actionGuidanceCount,
+      0,
+      `${scenarioName} 本岗位可处理任务不应显示不可代办提示: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      !metrics.detailButtons.some((text) => /编辑查看详情|查看全部/.test(text)),
+      `${scenarioName} 详情页仍存在没有真实动作的查看按钮: ${JSON.stringify(metrics)}`
+    )
+    assert.deepEqual(
+      metrics.detailMeta,
+      ['摘要', '来源', '最近一条'],
+      `${scenarioName} 详情页应将无动作入口降级为只读元信息: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.relatedItem &&
+        metrics.relatedItem.interactiveCount === 0 &&
+        !metrics.relatedItem.text.includes('>') &&
+        metrics.relatedItem.scrollWidth <= metrics.relatedItem.clientWidth + 1,
+      `${scenarioName} 关联单据没有真实跳转时不应呈现可点击箭头或溢出: ${JSON.stringify(metrics)}`
+    )
+
+    await gotoScenarioPath(page, '/m/boss/tasks', {
+      waitUntil: 'domcontentloaded',
+    })
+    await expectText(page, '暗色任务验证')
+    await page
+      .getByRole('button', { name: /暗色任务验证/ })
+      .first()
+      .click()
+    await page
+      .locator('.mobile-role-tasks-page--detail')
+      .waitFor({ state: 'visible', timeout: 10_000 })
+    await expectText(page, '当前岗位可查看并催办')
+
+    const crossRoleMetrics = await page.evaluate(() => {
+      const guidance = document.querySelector(
+        '[data-testid="mobile-role-action-guidance"]'
+      )
+      const guidanceRect = guidance?.getBoundingClientRect()
+      const buttons = Array.from(
+        document.querySelectorAll('.mobile-role-action-bar__button')
+      ).map((button) => ({
+        text: button.textContent?.replace(/\s+/g, ' ').trim() || '',
+        disabled: button.disabled,
+      }))
+      return {
+        guidanceText: guidance?.textContent?.replace(/\s+/g, ' ').trim() || '',
+        guidanceRect: guidanceRect
+          ? {
+              width: guidanceRect.width,
+              height: guidanceRect.height,
+            }
+          : null,
+        guidanceScrollWidth: guidance?.scrollWidth || 0,
+        guidanceClientWidth: guidance?.clientWidth || 0,
+        buttons,
+        documentScrollWidth: document.documentElement.scrollWidth,
+        documentClientWidth: document.documentElement.clientWidth,
+      }
+    })
+    assert(
+      crossRoleMetrics.guidanceText.includes('当前岗位可查看并催办') &&
+        crossRoleMetrics.guidanceText.includes('业务') &&
+        crossRoleMetrics.guidanceScrollWidth <=
+          crossRoleMetrics.guidanceClientWidth + 1,
+      `${scenarioName} 跨岗位可见任务缺少不可代办说明或提示溢出: ${JSON.stringify(crossRoleMetrics)}`
+    )
+    assert(
+      crossRoleMetrics.buttons.some(
+        (button) => button.text === '处理' && button.disabled
+      ) &&
+        crossRoleMetrics.buttons.some(
+          (button) => button.text === '阻塞' && button.disabled
+        ) &&
+        crossRoleMetrics.buttons.some(
+          (button) => button.text === '完成' && button.disabled
+        ) &&
+        crossRoleMetrics.buttons.some(
+          (button) => button.text === '催办' && !button.disabled
+        ),
+      `${scenarioName} 跨岗位可见任务动作权限提示和按钮状态不一致: ${JSON.stringify(crossRoleMetrics)}`
+    )
+    assert(
+      crossRoleMetrics.documentScrollWidth <=
+        crossRoleMetrics.documentClientWidth + 1,
+      `${scenarioName} 跨岗位不可代办提示造成横向溢出: ${JSON.stringify(crossRoleMetrics)}`
+    )
   }
 
   async function readMobileTaskLayoutMetrics(page) {

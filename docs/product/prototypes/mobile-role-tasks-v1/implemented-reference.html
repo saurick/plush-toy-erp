@@ -140,6 +140,12 @@
         font-weight: 700;
       }
 
+      .detail-meta {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
       .sync {
         display: flex;
         flex-wrap: wrap;
@@ -745,7 +751,7 @@
             <section class="panel" style="margin: 0">
               <div style="display: flex; justify-content: space-between; gap: 12px">
                 <h2>▤ 任务关键信息</h2>
-                <button class="refresh">编辑查看详情 ›</button>
+                <span class="detail-meta">摘要</span>
               </div>
               <div class="fact-grid">
                 <div class="fact"><label>状态</label><strong>待处理</strong></div>
@@ -766,9 +772,9 @@
             <section class="panel" style="margin: 14px 0 0">
               <div style="display: flex; justify-content: space-between">
                 <h2>◇ 关联单据（1）</h2>
-                <button class="refresh">查看全部 ›</button>
+                <span class="detail-meta">来源</span>
               </div>
-              <div class="done-card">订单：DBG-RUN-20260425T161301-F6D947-PROSHIP-01 ›</div>
+              <div class="done-card">订单：DBG-RUN-20260425T161301-F6D947-PROSHIP-01</div>
             </section>
 
             <section class="panel" style="margin: 14px 0 0">
@@ -783,7 +789,7 @@
             <section class="panel" style="margin: 14px 0 0">
               <div style="display: flex; justify-content: space-between">
                 <h2>◷ 最近动态</h2>
-                <button class="refresh">查看全部 ›</button>
+                <span class="detail-meta">最近一条</span>
               </div>
               <div class="event">
                 <span class="event-dot"></span>

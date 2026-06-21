@@ -5,6 +5,7 @@ export function createStyleL1Scenarios(deps) {
   const {
     assert,
     assertAdminLoginLayout,
+    assertAdminLoginSmsHintLayout,
     assertAdminRoleModalLayout,
     assertAppAlertDialogLayout,
     assertBusinessCollaborationPanelCollapsedByDefault,
@@ -47,6 +48,7 @@ export function createStyleL1Scenarios(deps) {
     assertOrderLifecycleActionsConsolidated,
     assertOutsourcingProcessSelectOptions,
     assertPaginationSizeChangerFocusStyle,
+    assertPermissionChecklistItemLayout,
     assertPermissionSectionVisualSeparation,
     assertPrintCenterPreviewPopup,
     assertPrintPreviewPopup,
@@ -158,6 +160,75 @@ export function createStyleL1Scenarios(deps) {
         await assertLoginSegmentedReadable(page, {
           scenarioName: 'admin-login-theme-modes-desktop',
         })
+        await page.getByText('岗位任务端', { exact: true }).click()
+        await page
+          .locator('.erp-login-card label.ant-segmented-item')
+          .filter({ hasText: '短信登录' })
+          .click()
+        await page.getByPlaceholder('请输入手机号').fill('13794566255')
+        await page.getByRole('button', { name: '获取验证码' }).click()
+        await expectText(page, '临时验证码')
+        await assertAdminLoginSmsHintLayout(page, {
+          scenarioName: 'admin-login-theme-modes-desktop-dark-sms-hint',
+        })
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await page
+          .locator('.erp-login-card label.ant-segmented-item')
+          .filter({ hasText: '短信登录' })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await page.waitForFunction(
+          () =>
+            document.querySelector('input[placeholder="请输入手机号"]')
+              ?.value === '13794566255',
+          null,
+          { timeout: 10_000 }
+        )
+        const persistedLoginState = await page.evaluate(() => {
+          const selectedTexts = [
+            ...document.querySelectorAll(
+              '.erp-login-card .ant-segmented-item-selected'
+            ),
+          ].map((item) => item.textContent.replace(/\s+/g, ' ').trim())
+          const codeButton = document.querySelector(
+            '.erp-login-card .erp-login-sms-code-compact button'
+          )
+
+          return {
+            selectedTexts,
+            phoneValue:
+              document.querySelector('input[placeholder="请输入手机号"]')
+                ?.value || '',
+            codeButtonText: codeButton?.textContent?.trim() || '',
+            codeButtonDisabled: Boolean(codeButton?.disabled),
+          }
+        })
+        assert(
+          persistedLoginState.selectedTexts.includes('岗位任务端'),
+          `登录入口刷新后未保持岗位任务端: ${JSON.stringify(
+            persistedLoginState
+          )}`
+        )
+        assert(
+          persistedLoginState.selectedTexts.includes('短信登录'),
+          `登录方式刷新后未保持短信登录: ${JSON.stringify(persistedLoginState)}`
+        )
+        assert.equal(
+          persistedLoginState.phoneValue,
+          '13794566255',
+          `短信手机号刷新后未恢复: ${JSON.stringify(persistedLoginState)}`
+        )
+        assert(
+          persistedLoginState.codeButtonDisabled,
+          `短信倒计时刷新后未保持禁用: ${JSON.stringify(persistedLoginState)}`
+        )
+        assert.match(
+          persistedLoginState.codeButtonText,
+          /^\d+s$/,
+          `短信倒计时刷新后未恢复秒数: ${JSON.stringify(persistedLoginState)}`
+        )
+        await assertAdminLoginSmsHintLayout(page, {
+          scenarioName: 'admin-login-theme-modes-desktop-refresh-sms-hint',
+        })
         await page.evaluate(() => {
           window.localStorage.setItem('plush_erp_theme_mode', 'light')
           window.dispatchEvent(new Event('focus'))
@@ -171,6 +242,9 @@ export function createStyleL1Scenarios(deps) {
           scenarioName: 'admin-login-theme-modes-desktop-storage-sync',
           expectedMode: 'light',
           expectedEffectiveTheme: 'light',
+        })
+        await assertAdminLoginSmsHintLayout(page, {
+          scenarioName: 'admin-login-theme-modes-desktop-light-sms-hint',
         })
         await clickERPThemeOption(page, '暗色')
         await page.reload({ waitUntil: 'domcontentloaded' })
@@ -2569,6 +2643,19 @@ export function createStyleL1Scenarios(deps) {
             roleCenterMetrics.checklistClientWidth + 1,
           `权限管理权限矩阵出现横向溢出: ${JSON.stringify(roleCenterMetrics)}`
         )
+        await assertPermissionChecklistItemLayout(page, {
+          scenarioName: 'permission-center-desktop',
+        })
+        await expectText(page, '只看已选')
+        await page.getByRole('button', { name: '全选本组' }).first().click()
+        await expectText(page, '有未保存调整')
+        const roleCards = page.locator('.erp-role-template-card')
+        if ((await roleCards.count()) > 1) {
+          await roleCards.nth(1).click()
+          await expectText(page, '放弃未保存的角色权限调整？')
+          await page.getByRole('button', { name: '继续编辑' }).click()
+          await expectText(page, '有未保存调整')
+        }
         await page.getByRole('tab', { name: /管理员账号/ }).click()
         await expectText(page, '管理员与角色')
         await expectText(page, '创建管理员')

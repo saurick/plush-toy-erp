@@ -19,7 +19,11 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import {
+  useNavigate,
+  useOutletContext,
+  useSearchParams,
+} from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -32,7 +36,7 @@ import {
 } from '../api/qualityApi.mjs'
 import { listPurchaseReceipts } from '../api/purchaseApi.mjs'
 import { listInventoryLots } from '../api/inventoryApi.mjs'
-import { listMaterials } from '../api/masterDataOrderApi.mjs'
+import { listMaterials, listWarehouses } from '../api/masterDataOrderApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   BusinessDataTable,
@@ -87,6 +91,10 @@ import {
   uniqueReferenceOptions,
   warehouseOptionFromRecord,
 } from '../utils/referenceSelectOptions.mjs'
+import {
+  routeWithQuery,
+  searchParamPositiveIntText,
+} from '../utils/routeQuery.mjs'
 
 const QUALITY_INSPECTIONS_MODULE_KEY = 'quality-inspections'
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
@@ -263,6 +271,7 @@ function inspectorLabel(inspectorID) {
 export default function V1QualityInspectionsPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = outletContext?.adminProfile || EMPTY_ADMIN_PROFILE
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -287,8 +296,17 @@ export default function V1QualityInspectionsPage() {
   const [purchaseReceipts, setPurchaseReceipts] = useState([])
   const [inventoryLots, setInventoryLots] = useState([])
   const [materials, setMaterials] = useState([])
+  const [warehouses, setWarehouses] = useState([])
   const [inspectionForm] = Form.useForm()
   const [decisionForm] = Form.useForm()
+  const routePurchaseOrderID = searchParamPositiveIntText(
+    searchParams,
+    'purchase_order_id'
+  )
+  const routePurchaseReceiptID = searchParamPositiveIntText(
+    searchParams,
+    'purchase_receipt_id'
+  )
   const selectedPurchaseReceiptID = Form.useWatch(
     'purchase_receipt_id',
     inspectionForm
@@ -343,9 +361,8 @@ export default function V1QualityInspectionsPage() {
     [materials]
   )
   const warehouseOptions = useMemo(
-    () =>
-      uniqueReferenceOptions(purchaseReceiptItems, warehouseOptionFromRecord),
-    [purchaseReceiptItems]
+    () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
+    [warehouses]
   )
 
   const persistColumnOrder = useCallback(
@@ -380,8 +397,15 @@ export default function V1QualityInspectionsPage() {
   const openRelatedTable = ({ key }) => {
     if (!selectedRow) return
     const pathByKey = {
-      'purchase-receipts': V1_ROUTE_PATHS.purchaseReceipts,
-      inventory: V1_ROUTE_PATHS.inventory,
+      'purchase-receipts': routeWithQuery(V1_ROUTE_PATHS.purchaseReceipts, {
+        receipt_id: selectedRow.purchase_receipt_id,
+      }),
+      inventory: routeWithQuery(V1_ROUTE_PATHS.inventory, {
+        source_type: 'PURCHASE_RECEIPT',
+        source_id: selectedRow.purchase_receipt_id,
+        lot_id: selectedRow.inventory_lot_id,
+        view: 'txns',
+      }),
     }
     const targetPath = pathByKey[key]
     if (targetPath) {
@@ -400,7 +424,9 @@ export default function V1QualityInspectionsPage() {
           date_field: dateFilterField,
           date_from: dateFilterStart || undefined,
           date_to: dateFilterEnd || undefined,
-          purchase_receipt_id: purchaseReceiptFilter || undefined,
+          purchase_receipt_id:
+            purchaseReceiptFilter || routePurchaseReceiptID || undefined,
+          purchase_order_id: routePurchaseOrderID || undefined,
           material_id: materialFilter || undefined,
           warehouse_id: warehouseFilter || undefined,
           inventory_lot_id: lotFilter || undefined,
@@ -431,6 +457,8 @@ export default function V1QualityInspectionsPage() {
     materialFilter,
     pagination,
     purchaseReceiptFilter,
+    routePurchaseOrderID,
+    routePurchaseReceiptID,
     resultFilter,
     statusFilter,
     warehouseFilter,
@@ -442,11 +470,13 @@ export default function V1QualityInspectionsPage() {
 
   const loadReferenceOptions = useCallback(async () => {
     try {
-      const [receiptResult, lotResult, materialResult] = await Promise.all([
-        listPurchaseReceipts({ limit: 500 }),
-        listInventoryLots({ limit: 500 }),
-        listMaterials({ limit: 500, active_only: true }),
-      ])
+      const [receiptResult, lotResult, materialResult, warehouseResult] =
+        await Promise.all([
+          listPurchaseReceipts({ limit: 500 }),
+          listInventoryLots({ limit: 500 }),
+          listMaterials({ limit: 500, active_only: true }),
+          listWarehouses({ limit: 500, active_only: true }),
+        ])
       setPurchaseReceipts(
         Array.isArray(receiptResult?.purchase_receipts)
           ? receiptResult.purchase_receipts
@@ -458,13 +488,27 @@ export default function V1QualityInspectionsPage() {
       setMaterials(
         Array.isArray(materialResult?.materials) ? materialResult.materials : []
       )
+      setWarehouses(
+        Array.isArray(warehouseResult?.warehouses)
+          ? warehouseResult.warehouses
+          : []
+      )
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载质检引用数据'))
       setPurchaseReceipts([])
       setInventoryLots([])
       setMaterials([])
+      setWarehouses([])
     }
   }, [])
+
+  const clearRouteContext = useCallback(() => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('purchase_order_id')
+    nextParams.delete('purchase_receipt_id')
+    setSearchParams(nextParams, { replace: true })
+    resetBusinessPaginationCurrent(setPagination)
+  }, [searchParams, setSearchParams])
 
   useEffect(() => {
     loadReferenceOptions()
@@ -1116,6 +1160,16 @@ export default function V1QualityInspectionsPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
+            {routePurchaseOrderID ? (
+              <Tag closable color="blue" onClose={clearRouteContext}>
+                采购订单 #{routePurchaseOrderID}
+              </Tag>
+            ) : null}
+            {routePurchaseReceiptID ? (
+              <Tag closable color="blue" onClose={clearRouteContext}>
+                采购入库 #{routePurchaseReceiptID}
+              </Tag>
+            ) : null}
           </>
         }
         actions={

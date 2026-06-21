@@ -9,7 +9,6 @@ import {
   FileTextOutlined,
   LeftOutlined,
   LinkOutlined,
-  MoreOutlined,
   PauseOutlined,
 } from '@ant-design/icons'
 import { formatMobileTaskTime } from '../../utils/mobileTaskView.mjs'
@@ -54,6 +53,12 @@ export default function MobileTaskDetailScreen({
   const showRejected = supportsRejectedAction(activeRoleKey, selectedTask)
   const isUpdating = updatingID === selectedTask.id
   const isUrging = urgingID === selectedTask.id
+  const ownerRoleLabel = getMobileRoleLabel(selectedTask.owner_role_key)
+  const actionGuidance = !selectedCanOperate
+    ? selectedCanUrge
+      ? `当前岗位可查看并催办，处理 / 阻塞 / 完成由${ownerRoleLabel}负责。`
+      : `当前岗位仅可查看，处理 / 阻塞 / 完成由${ownerRoleLabel}负责。`
+    : ''
 
   return (
     <div className="mobile-role-tasks-page mobile-role-tasks-page--detail surface-panel bg-white text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
@@ -73,13 +78,12 @@ export default function MobileTaskDetailScreen({
           <h1 className="truncate text-center text-2xl font-semibold text-slate-950">
             {selectedTask.task_name}
           </h1>
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end">
             <span
               className={`rounded-full px-3 py-1 text-base font-semibold ${selectedSeverity.badgeClass}`}
             >
               {selectedSeverity.label}
             </span>
-            <MoreOutlined className="text-xl text-slate-700" />
           </div>
         </div>
         <div className="flex min-w-0 items-center gap-2 px-5 pb-4 text-base text-slate-500">
@@ -96,12 +100,9 @@ export default function MobileTaskDetailScreen({
               <FileTextOutlined className="text-blue-500" />
               任务关键信息
             </h2>
-            <button
-              type="button"
-              className="text-base font-semibold text-blue-600"
-            >
-              编辑查看详情 &gt;
-            </button>
+            <span className="mobile-role-detail-meta text-sm font-semibold text-slate-400">
+              摘要
+            </span>
           </div>
           <div className="mobile-role-detail-fact-grid mt-4 grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200">
             {factRows.slice(0, 6).map(([label, value]) => (
@@ -143,16 +144,12 @@ export default function MobileTaskDetailScreen({
               <LinkOutlined className="text-purple-500" />
               关联单据（1）
             </h2>
-            <button
-              type="button"
-              className="text-base font-semibold text-blue-600"
-            >
-              查看全部 &gt;
-            </button>
+            <span className="mobile-role-detail-meta text-sm font-semibold text-slate-400">
+              来源
+            </span>
           </div>
           <div className="mobile-role-detail-related-item mt-4 flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-base text-slate-600">
             <span className="min-w-0 break-all">订单：{relatedSource}</span>
-            <span className="shrink-0 text-slate-400">&gt;</span>
           </div>
         </section>
 
@@ -198,12 +195,9 @@ export default function MobileTaskDetailScreen({
               <ClockCircleOutlined className="text-orange-500" />
               最近动态
             </h2>
-            <button
-              type="button"
-              className="text-base font-semibold text-blue-600"
-            >
-              查看全部 &gt;
-            </button>
+            <span className="mobile-role-detail-meta text-sm font-semibold text-slate-400">
+              最近一条
+            </span>
           </div>
           <div className="mobile-role-detail-event mt-4 rounded-xl bg-slate-50 px-4 py-4">
             <div className="flex items-start gap-3">
@@ -303,6 +297,15 @@ export default function MobileTaskDetailScreen({
       </main>
 
       <div className="mobile-role-action-bar grid grid-cols-4 gap-3 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
+        {actionGuidance ? (
+          <div
+            className="mobile-role-action-guidance col-span-4"
+            data-testid="mobile-role-action-guidance"
+            role="note"
+          >
+            {actionGuidance}
+          </div>
+        ) : null}
         <button
           type="button"
           className="mobile-role-action-bar__button mobile-role-action-bar__button--processing rounded-xl bg-blue-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
