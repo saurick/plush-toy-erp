@@ -214,6 +214,7 @@ async function runMobileAuthScenario(
   const guidePath = legacyMultiAppMode ? '/guide' : `/m/${app.roleKey}/guide`
   const staleToken = createMockAdminToken(`${app.roleKey}-stale-admin`)
   const loginToken = createMockAdminToken(`${app.roleKey}-mobile-admin`)
+  const desktopLoginToken = createMockAdminToken(`${app.roleKey}-desktop-admin`)
   let workflowCalls = 0
   let authedWorkflowCalls = 0
   let passwordLoginCalls = 0
@@ -293,12 +294,16 @@ async function runMobileAuthScenario(
 
     if (method === 'admin_login') {
       passwordLoginCalls += 1
-      assert.equal(
-        body.params?.username,
-        `${app.roleKey}-mobile-admin`,
-        `${app.id} 密码登录应提交管理员账号`
+      const username = String(body.params?.username || '')
+      const isDesktopLogin = username === `${app.roleKey}-desktop-admin`
+      assert(
+        username === `${app.roleKey}-mobile-admin` || isDesktopLogin,
+        `${app.id} 密码登录应提交预期管理员账号，实际为 ${username}`
       )
-      assert.equal(body.params?.password, 'mobile-password')
+      assert.equal(
+        body.params?.password,
+        isDesktopLogin ? 'desktop-password' : 'mobile-password'
+      )
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -308,10 +313,17 @@ async function runMobileAuthScenario(
           result: {
             code: 0,
             message: 'OK',
-            data: createMockAdminLoginData({
-              app,
-              token: loginToken,
-            }),
+            data: isDesktopLogin
+              ? createMockAdminLoginData({
+                  app,
+                  token: desktopLoginToken,
+                  username,
+                  menus: [{ path: '/erp/dashboard', label: '看板中心' }],
+                })
+              : createMockAdminLoginData({
+                  app,
+                  token: loginToken,
+                }),
           },
         }),
       })
@@ -354,6 +366,24 @@ async function runMobileAuthScenario(
     const body = route.request().postDataJSON() || {}
     const { id = 'mock-id', method, params = {} } = body
     const authorization = String(route.request().headers().authorization || '')
+    const currentPagePath = new URL(page.url()).pathname
+
+    if (currentPagePath.startsWith('/erp/')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id,
+          result: {
+            code: 0,
+            message: 'OK',
+            data: { tasks: [], total: 0, limit: 100, offset: 0 },
+          },
+        }),
+      })
+      return
+    }
 
     if (shouldLoadAllWorkflowTasksForRole(app.roleKey)) {
       assert.equal(
@@ -664,6 +694,22 @@ async function runMobileAuthScenario(
     localStorage.getItem('admin_access_token')
   )
   assert.equal(storedToken, null, `${app.id} 退出登录后应清空管理员 token`)
+
+  if (!legacyMultiAppMode) {
+    await page.getByText('后台管理').click()
+    await page.getByLabel('管理员账号').fill(`${app.roleKey}-desktop-admin`)
+    await page.locator('#password').fill('desktop-password')
+    await page.getByRole('button', { name: /登\s*录/ }).click()
+    await waitForPath(page, '/erp/dashboard')
+
+    await page.goBack({ waitUntil: 'domcontentloaded' })
+    await delay(500)
+    assert.notEqual(
+      new URL(page.url()).pathname,
+      tasksPath,
+      `${app.id} 退出岗位端并登录后台后，浏览器返回不应恢复旧岗位任务端首页`
+    )
+  }
 }
 
 async function expectText(page, text) {
@@ -698,17 +744,17 @@ function createMockAdminToken(username) {
   return `${base64UrlEncode(header)}.${base64UrlEncode(payload)}.signature`
 }
 
-function createMockAdminLoginData({ app, token }) {
+function createMockAdminLoginData({ app, token, username, menus } = {}) {
   const roleKey = app.roleKey
   return {
     access_token: token,
     token_type: 'Bearer',
-    username: `${app.roleKey}-mobile-admin`,
+    username: username || `${app.roleKey}-mobile-admin`,
     expires_at: Math.floor(Date.now() / 1000) + 3600,
     is_super_admin: false,
     roles: [{ role_key: roleKey, name: app.shortTitle }],
     permissions: [`mobile.${roleKey}.access`, 'workflow.task.read'],
-    menus: [],
+    menus: Array.isArray(menus) ? menus : [],
     erp_preferences: { column_orders: {} },
   }
 }

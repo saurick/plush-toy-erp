@@ -5,6 +5,7 @@ export function createStyleL1Scenarios(deps) {
   const {
     assert,
     assertAdminLoginLayout,
+    assertAdminLoginSmsCodeErrorHintSpacing,
     assertAdminLoginSmsHintLayout,
     assertAdminRoleModalLayout,
     assertAppAlertDialogLayout,
@@ -170,6 +171,10 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '临时验证码')
         await assertAdminLoginSmsHintLayout(page, {
           scenarioName: 'admin-login-theme-modes-desktop-dark-sms-hint',
+        })
+        await page.getByRole('button', { name: /^登\s*录$/ }).click()
+        await assertAdminLoginSmsCodeErrorHintSpacing(page, {
+          scenarioName: 'admin-login-theme-modes-desktop-dark-sms-code-error',
         })
         await page.reload({ waitUntil: 'domcontentloaded' })
         await page

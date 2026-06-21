@@ -22,6 +22,7 @@ import {
   ENTRY_TARGET,
   getEnabledMobileRoleKeys,
   getEntryConfig,
+  getLastEntryTarget,
   hasDesktopEntryAccess,
   parseMobileRoleFromPath,
   resolveDefaultEntryTarget,
@@ -192,12 +193,31 @@ function MobileEntryBackGuard() {
   const navigate = useNavigate()
   const navigationType = useNavigationType()
   const lastMobilePathRef = useRef('')
+  const hasSeenRouteRef = useRef(false)
   const currentPath = buildLocationPath(location)
+  const lastEntryTarget = getLastEntryTarget()
 
   useLayoutEffect(() => {
+    const hasSeenRoute = hasSeenRouteRef.current
+    hasSeenRouteRef.current = true
+
     if (parseMobileRoleFromPath(location.pathname)) {
+      if (
+        hasSeenRoute &&
+        navigationType === 'POP' &&
+        lastEntryTarget === ENTRY_TARGET.DESKTOP
+      ) {
+        navigate('/erp/dashboard', { replace: true })
+        return
+      }
+
       lastMobilePathRef.current = currentPath
       rememberLastMobileEntryPath(currentPath)
+      return
+    }
+
+    if (lastEntryTarget !== ENTRY_TARGET.MOBILE_TASKS) {
+      lastMobilePathRef.current = ''
       return
     }
 
@@ -212,7 +232,13 @@ function MobileEntryBackGuard() {
     ) {
       navigate(lastMobilePath, { replace: true })
     }
-  }, [currentPath, location.pathname, navigate, navigationType])
+  }, [
+    currentPath,
+    lastEntryTarget,
+    location.pathname,
+    navigate,
+    navigationType,
+  ])
 
   return null
 }

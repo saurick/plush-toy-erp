@@ -239,3 +239,19 @@
 - 验证：追加前 `progress.md` 为 231 行、38368 字节，未达到归档阈值；已执行 `go test ./internal/errcode ./internal/biz ./internal/data ./internal/service`、`bash scripts/qa/error-code-sync.sh && bash scripts/qa/error-codes.sh`、`pnpm --dir web test`、`pnpm --dir web lint`、`pnpm --dir web css`、`STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop pnpm --dir web style:l1`、`make build`、`git diff --check`，均通过；已重启本地后端，`8300` 和 `5175` 均确认 `mode=provider`、`mock_delivery=false`。
 - 下一步：如后续拿到阿里云更细错误码样本，可继续补充分类 helper 的关键字和单测；目标服务器切换 provider 仍需单独走部署 `.env` 注入、重启和端到端登录回归。
 - 阻塞/风险：本轮未改 schema、migration、RBAC、菜单、Workflow / Fact、客户配置或生产 `.env`；错误分类来自阿里云响应形态的 mock 覆盖，不包含所有未来未知服务商错误码，未知错误会保守落到“短信服务暂不可用”。
+
+## 2026-06-21 登录页短信提示与验证码错误间距
+
+- 完成：修正登录页短信提示胶囊对上一行的负外边距，避免“请输入验证码”校验文案和短信提示互相遮挡；页面主语义不变，短信提示仍作为发送验证码后的操作反馈。
+- 完成：`style:l1` 登录页主题场景新增验证码为空错误态断言，覆盖短信提示和验证码错误文案的盒模型边界，避免提示压住字段校验反馈。
+- 验证：追加前 `progress.md` 为 241 行、40593 字节，未达到归档阈值；已执行 `STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop pnpm --dir web style:l1`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`，均通过。
+- 下一步：如后续继续压缩登录页垂直密度，应同时保留字段错误文案、短信提示和主按钮之间的独立占位，并扩展 L1 盒模型断言。
+- 阻塞/风险：本轮只改登录页局部样式和浏览器级回归断言；未改后端短信 provider、schema、migration、RBAC、菜单、Workflow / Fact、客户配置或原型资产。
+
+## 2026-06-21 岗位端退出后后台返回隔离
+
+- 完成：修正桌面统一入口里的岗位端返回守卫；同一 SPA 会话中当前入口已明确选择后台时，浏览器 POP 回旧 `/m/<role>/tasks` 会被替换到后台看板，避免退出岗位端后重新登录后台仍可通过浏览器返回看到岗位任务端首页。
+- 完成：`smoke:mobile-auth-login-route` 新增恢复态覆盖：岗位端登录、退出、选择后台管理重新登录、浏览器返回后不得恢复旧岗位任务端；同时为后台看板 workflow 请求补独立 mock，避免把后台请求误判成岗位端请求。
+- 验证：追加前 `progress.md` 为 249 行、41701 字节，未达到归档阈值；已执行 `pnpm --dir web css`、`MOBILE_AUTH_SMOKE_APP_ID=mobile-warehouse pnpm --dir web smoke:mobile-auth-login-route`、`pnpm --dir web lint`、`pnpm --dir web test`、`git diff --check -- web/src/erp/router.jsx web/scripts/mobileAuthLoginRouteSmoke.mjs`，均通过；`pnpm --dir web test` 共 380 个前端单测通过。
+- 下一步：如后续要把浏览器返回从 `/admin-login` 进一步统一替换回 `/erp/dashboard`，应作为登录页历史栈体验专项处理，并覆盖后台登录页 BFCache / history 恢复态。
+- 阻塞/风险：本轮未改 schema、migration、RBAC、菜单、Workflow / Fact、客户配置或后端认证；定向浏览器回归覆盖仓库岗位端，未机械全跑 8 个岗位角色。

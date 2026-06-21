@@ -87,6 +87,7 @@ function getScenarios() {
   return createStyleL1Scenarios({
     assert,
     assertAdminLoginLayout,
+    assertAdminLoginSmsCodeErrorHintSpacing,
     assertAdminLoginSmsHintLayout,
     assertAdminRoleModalLayout,
     assertAppAlertDialogLayout,
@@ -3105,6 +3106,62 @@ async function assertAdminLoginSmsHintLayout(page, { scenarioName }) {
       ...metrics,
       contrastRatio,
     })}`
+  )
+}
+
+async function assertAdminLoginSmsCodeErrorHintSpacing(page, { scenarioName }) {
+  await page
+    .getByText('请输入验证码', { exact: true })
+    .waitFor({ state: 'visible', timeout: 10_000 })
+  await page
+    .locator('.erp-login-card .erp-login-sms-hint')
+    .waitFor({ state: 'visible', timeout: 10_000 })
+
+  const metrics = await page.evaluate(() => {
+    const errorNodes = [
+      ...document.querySelectorAll(
+        '.erp-login-card .ant-form-item-explain-error'
+      ),
+    ]
+    const codeError = errorNodes.find(
+      (node) => node.textContent?.trim() === '请输入验证码'
+    )
+    const hint = document.querySelector('.erp-login-card .erp-login-sms-hint')
+    const codeInput = document.querySelector(
+      '.erp-login-card input[placeholder="请输入验证码"]'
+    )
+    const codeGroup = document.querySelector(
+      '.erp-login-card .erp-login-sms-code-compact'
+    )
+    const errorRect = codeError?.getBoundingClientRect()
+    const hintRect = hint?.getBoundingClientRect()
+    const inputRect = codeInput?.getBoundingClientRect()
+    const groupRect = codeGroup?.getBoundingClientRect()
+
+    return {
+      errorText: codeError?.textContent?.trim() || '',
+      errorTop: errorRect?.top || 0,
+      errorBottom: errorRect?.bottom || 0,
+      hintTop: hintRect?.top || 0,
+      hintBottom: hintRect?.bottom || 0,
+      codeInputBottom: inputRect?.bottom || 0,
+      codeGroupBottom: groupRect?.bottom || 0,
+      overlap: errorRect && hintRect ? errorRect.bottom - hintRect.top : 0,
+    }
+  })
+
+  assert.equal(
+    metrics.errorText,
+    '请输入验证码',
+    `${scenarioName} 未找到验证码错误文案: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.errorTop >= metrics.codeGroupBottom,
+    `${scenarioName} 验证码错误文案不应盖住输入组: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.hintTop - metrics.errorBottom >= 6,
+    `${scenarioName} 短信提示不应遮挡验证码错误文案: ${JSON.stringify(metrics)}`
   )
 }
 
