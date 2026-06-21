@@ -1,11 +1,13 @@
 ---
 name: plush-test-governance
-description: Project-specific test governance for /Users/simon/projects/plush-toy-erp. Use when Codex chooses, runs, reviews, or explains validation scope for plush-toy-erp changes, including unit tests, integration tests, JSON-RPC/RBAC tests, migration checks, browser/page regressions, style:l1, smoke tests, real-write E2E, import dry-runs, release checks, or when the user asks 测试分类/测试治理/怎么测/要不要补测试.
+description: Project-specific test governance for /Users/simon/projects/plush-toy-erp. Use when Codex chooses, runs, reviews, or explains validation scope for plush-toy-erp changes, including validation levels T0-T8, test shapes, evidence environments, unit tests, integration tests, JSON-RPC/RBAC tests, migration checks, browser/page regressions, style:l1, smoke tests, real-write E2E, import dry-runs, release checks, or when the user asks 验证层级/测试形态/测试分类/测试治理/怎么测/要不要补测试.
 ---
 
 # Plush Test Governance
 
 用这份 skill 把 plush-toy-erp 的测试选择、执行和汇报收口到项目真实边界。它不是“多跑命令越好”，而是按改动影响面选出足够但不过度的验证组合。
+
+`T0-T8` 是验证层级，不是项目架构分层。Workflow / Fact / RBAC / API/UI 这类架构层级用于判断系统责任和风险边界；验证层级用于判断本轮测到哪里；测试形态用于说明测试证明了什么。
 
 ## Workflow
 
@@ -17,11 +19,20 @@ description: Project-specific test governance for /Users/simon/projects/plush-to
 2. 先读相关真源，再定测试。
    - 常用入口：`README.md`、`docs/当前真源与交接顺序.md`、`docs/product/自动化测试策略.md`、`server/README.md`、`web/README.md`、`scripts/README.md`。
    - 不把历史 changes、聊天规划或单个测试名当成测试范围真源。
-3. 按影响面选择 T 级测试，不用一个固定清单套所有任务。
+3. 按影响面选择验证层级 T0-T8，不用一个固定清单套所有任务。
 4. 执行前检查工作区状态；执行后记录命令、结果、未覆盖项和剩余风险。
 5. 有文件改动时，按项目约定更新 `progress.md`。
 
-## Test Levels
+## Terms
+
+| 口径 | 作用 | 示例 |
+| --- | --- | --- |
+| 架构层级 | 判断系统责任、真源和风险边界 | MasterData、Workflow、Fact、RBAC、API/UI、Productization/Delivery |
+| 验证层级 T0-T8 | 判断本轮验证测到哪里 | T0 静态现场、T5 Frontend / Page、T8 Release / Deploy |
+| 测试形态 | 说明测试证明了什么 | unit、integration、contract、UI regression、smoke、E2E、deployment |
+| 证据环境 | 说明测试在哪里发生、可信度到哪 | static scan、local mock、local real DB、browser runtime、dev/test env、target deployment env |
+
+## Verification Levels
 
 | Level | 适用场景 | 常用命令 / 验证 |
 | --- | --- | --- |
@@ -34,6 +45,18 @@ description: Project-specific test governance for /Users/simon/projects/plush-to
 | T6 Import / Seed / Fixture | 客户导入、source snapshot、模拟数据、初始化模板 | `node --test scripts/import/*.test.mjs`、相关 dry-run / freeze 检查 |
 | T7 Real-write / Business E2E | 采购入库、库存、出货、加工、真实后端读写闭环 | `node scripts/qa/*real-write*.mjs`、`cd web && pnpm smoke:*real-write*`、`node scripts/qa/mvp-closure.mjs` |
 | T8 Release / Deploy | 镜像、低配服务器、migration、健康检查、回滚 | `bash scripts/qa/full.sh` 或 `strict.sh`，再按 `server/deploy/README.md` 做发布前后检查 |
+
+## Test Shapes
+
+| 测试形态 | 证明内容 | 常见证据环境 |
+| --- | --- | --- |
+| unit | 单个函数、组件或纯规则在输入输出层面正确 | local mock、static scan |
+| integration | repo、usecase、DB、脚本或多个模块协作正确 | local real DB、local runtime |
+| contract | API、JSON-RPC、RBAC、错误码、参数和返回语义稳定 | local runtime、dev/test env |
+| UI regression | 页面默认态、交互态、恢复态、布局、焦点和相邻区域没有被破坏 | browser runtime |
+| smoke | 主路径可打开、可登录、关键入口未炸 | browser runtime、dev/test env、target deployment env |
+| E2E | 跨前端、后端、DB 或事实链路完成真实闭环 | local real DB、dev/test env |
+| deployment | 构建产物、migration、健康检查、启动、回滚或发布后检查可用 | target deployment env |
 
 ## Selection Rules
 
@@ -48,7 +71,8 @@ description: Project-specific test governance for /Users/simon/projects/plush-to
 
 最终回复必须写清：
 
-- 本轮选了哪些 T 级测试，为什么。
+- 本轮选了哪些验证层级 T0-T8，为什么。
+- 本轮对应哪些测试形态和证据环境。
 - 实际运行了哪些命令，结果如何。
 - 哪些测试没有跑，原因是什么。
 - 是否覆盖默认态、交互态、恢复态、真实后端读写、migration 或发布边界。

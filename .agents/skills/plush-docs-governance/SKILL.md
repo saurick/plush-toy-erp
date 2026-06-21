@@ -1,6 +1,6 @@
 ---
 name: plush-docs-governance
-description: Project-specific documentation governance for /Users/simon/projects/plush-toy-erp. Use when Codex reviews, creates, renames, reorganizes, simplifies, or updates plush ERP Markdown docs, README files, docs inventory, progress.md, customer docs, reference/archive docs, project guidance, AGENTS.md docs rules, Markdown metadata/frontmatter, tables, classification matrices, Mermaid diagrams, flowcharts, state diagrams, architecture diagrams, decision diagrams, reader paths, quick starts, conclusion-first structure, or copyable commands, or when the user mentions 文档治理, docs, AGENTS, 文档清单, 中文文件名, 真源, frontmatter, metadata, progress归档, reference不是正式真源, 信息密度高, 心智负担, 一眼看不懂, 简洁易用, 美观, 表格, 矩阵, 跳转到指定位置, 流程图, 状态图, 架构图, 读者路径, 结论前置, 命令可复制, or asks whether docs guidance should become reusable.
+description: Project-specific documentation governance for /Users/simon/projects/plush-toy-erp. Use when Codex reviews, creates, renames, reorganizes, simplifies, or updates plush ERP Markdown docs, README files, docs inventory, progress.md, customer docs, reference/archive docs, project guidance, AGENTS.md docs rules, Markdown metadata/frontmatter, tables, classification matrices, architecture layers, validation levels, test shapes, Mermaid diagrams, flowcharts, state diagrams, architecture diagrams, decision diagrams, reader paths, quick starts, conclusion-first structure, or copyable commands, or when the user mentions 文档治理, docs, AGENTS, 文档清单, 中文文件名, 真源, frontmatter, metadata, progress归档, reference不是正式真源, 信息密度高, 心智负担, 一眼看不懂, 简洁易用, 美观, 表格, 矩阵, 架构层级, 验证层级, 测试形态, 跳转到指定位置, 流程图, 状态图, 架构图, 读者路径, 结论前置, 命令可复制, or asks whether docs guidance should become reusable.
 ---
 
 # Plush Docs Governance
@@ -43,6 +43,7 @@ Use this skill to keep plush-toy-erp docs useful for humans and safe as project 
    - Prefer Chinese main headings with stable English anchors or technical terms where useful.
    - Avoid front-loading history, internal IDs, stage labels, or capability anchors when the document is meant for human scanning.
    - Use open-source and large-company documentation patterns as information architecture only: Quick start, Concepts, How-to, Reference, Troubleshooting, FAQ, Changelog. Keep the actual process lightweight for personal development.
+   - When docs involve classification matrices, separate architecture layers, validation levels, test shapes, and evidence environments. Do not call `T0-T8` project architecture layers; treat them as validation levels. Keep detailed test selection in `docs/product/自动化测试策略.md` or the `plush-test-governance` skill, and link there instead of duplicating the full testing policy.
 
 6. Reduce documentation density by meaning.
    - Delete or move repeated background, stale process notes, duplicated warnings, hidden task history, and explanations that do not change reader action.

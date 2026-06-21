@@ -291,6 +291,7 @@
 ## 2026-06-21 自动化测试策略术语边界补充
 
 - 完成：补充 `docs/product/自动化测试策略.md` 的术语边界，把“架构层级 / 验证层级 T0-T8 / 测试形态 / 证据环境”拆开说明，避免把单元测试、集成测试、smoke、E2E、浏览器回归和部署验证混成同一种测试层级。
-- 验证：追加前 `progress.md` 为 289 行、48893 字节，未达到归档阈值；已执行 `git diff --check -- docs/product/自动化测试策略.md` 通过。
-- 下一步：后续在最终回复或验收记录里同时说明验证层级、测试形态和证据环境，避免只写“测试通过”。
-- 阻塞/风险：本轮只改测试策略文档和过程记录，不改运行时代码、schema、migration、RBAC、菜单、Workflow / Fact、页面样式或真实测试脚本；未新增自动化 runner。
+- 完成：同步更新 `.agents/skills/plush-test-governance/SKILL.md`，将 T0-T8 口径收敛为验证层级，补充测试形态表和最终回复里的证据环境要求；轻量更新 `.agents/skills/plush-docs-governance/SKILL.md`，要求文档分类矩阵分清架构层级、验证层级、测试形态和证据环境。
+- 验证：追加前 `progress.md` 为 289 行、48893 字节，未达到归档阈值；已执行 `git diff --check -- docs/product/自动化测试策略.md .agents/skills/plush-test-governance/SKILL.md .agents/skills/plush-docs-governance/SKILL.md`、Ruby YAML 解析、两个项目 skill 的 `quick_validate.py`，均通过；`rg "项目层级|项目分层|T 级测试|测试层级"` 对本轮三处文件无命中。
+- 下一步：后续在最终回复或验收记录里同时说明验证层级、测试形态、证据环境和跳过原因，避免只写“测试通过”；如果要把该口径提升为强制仓库级规则，再单独评审是否改 `AGENTS.md`。
+- 阻塞/风险：本轮只改测试策略文档、Codex skills 和过程记录，不改运行时代码、schema、migration、RBAC、菜单、Workflow / Fact、页面样式或真实测试脚本；未新增自动化 runner，未运行 Go、pnpm、`style:l1`、migration 或 real-write E2E。
