@@ -64,6 +64,7 @@ test('adminLoginState: 短信倒计时未过期时跨刷新恢复', () => {
       phone: ' 13794566255 ',
       cooldownUntil: 61_000,
       hint: '验证码已发送，请查看手机短信',
+      mockDelivery: true,
     },
     now
   )
@@ -72,6 +73,7 @@ test('adminLoginState: 短信倒计时未过期时跨刷新恢复', () => {
     phone: '13794566255',
     cooldownUntil: 61_000,
     hint: '验证码已发送，请查看手机短信',
+    mockDelivery: true,
   })
   assert.equal(
     sessionStorage.getItem('erp:admin_login_sms_state') !== null,
@@ -90,6 +92,7 @@ test('adminLoginState: 过期或损坏的短信倒计时不会恢复', () => {
         phone: '13794566255',
         cooldownUntil: 900,
         hint: '验证码已发送，请查看手机短信',
+        mockDelivery: true,
       },
       1_000
     ),
@@ -115,4 +118,25 @@ test('adminLoginState: 过期或损坏的短信倒计时不会恢复', () => {
   assert.equal(sessionStorage.getItem('erp:admin_login_sms_state'), null)
 
   delete globalThis.window
+})
+
+test('adminLoginState: 未声明 mockDelivery 的旧短信会话按非 mock 处理', () => {
+  const now = 1_000
+
+  assert.deepEqual(
+    normalizeSMSLoginSession(
+      {
+        phone: '13794566255',
+        cooldownUntil: 61_000,
+        hint: '验证码已发送，请查看手机短信',
+      },
+      now
+    ),
+    {
+      phone: '13794566255',
+      cooldownUntil: 61_000,
+      hint: '验证码已发送，请查看手机短信',
+      mockDelivery: false,
+    }
+  )
 })

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -184,66 +185,78 @@ func (d *jsonrpcDispatcher) handleAuth(
 func (d *jsonrpcDispatcher) mapAuthError(ctx context.Context, err error) *v1.JsonrpcResult {
 	logger := d.log.WithContext(ctx)
 
-	switch err {
-	case biz.ErrUserNotFound:
+	switch {
+	case errors.Is(err, biz.ErrUserNotFound):
 		logger.Warn("[auth] user not found")
 		return &v1.JsonrpcResult{
 			Code:    errcode.AuthUserNotFound.Code,
 			Message: errcode.AuthUserNotFound.Message,
 		}
-	case biz.ErrPhoneNotBound:
+	case errors.Is(err, biz.ErrPhoneNotBound):
 		logger.Warn("[auth] phone not bound")
 		return &v1.JsonrpcResult{
 			Code:    errcode.AuthPhoneNotBound.Code,
 			Message: errcode.AuthPhoneNotBound.Message,
 		}
-	case biz.ErrMobileRoleDenied:
+	case errors.Is(err, biz.ErrMobileRoleDenied):
 		logger.Warn("[auth] mobile role denied")
 		return &v1.JsonrpcResult{
 			Code:    errcode.AuthMobileRoleDenied.Code,
 			Message: errcode.AuthMobileRoleDenied.Message,
 		}
-	case biz.ErrInvalidPassword:
+	case errors.Is(err, biz.ErrInvalidPassword):
 		logger.Warn("[auth] invalid password")
 		return &v1.JsonrpcResult{
 			Code:    errcode.AuthInvalidPassword.Code,
 			Message: errcode.AuthInvalidPassword.Message,
 		}
-	case biz.ErrUserDisabled:
+	case errors.Is(err, biz.ErrUserDisabled):
 		logger.Warn("[auth] user disabled")
 		return &v1.JsonrpcResult{
 			Code:    errcode.AuthUserDisabled.Code,
 			Message: errcode.AuthUserDisabled.Message,
 		}
-	case biz.ErrInvalidPhoneNumber:
+	case errors.Is(err, biz.ErrInvalidPhoneNumber):
 		logger.Warn("[auth] invalid phone number")
 		return &v1.JsonrpcResult{
 			Code:    errcode.AuthInvalidPhone.Code,
 			Message: errcode.AuthInvalidPhone.Message,
 		}
-	case biz.ErrSMSCodeCooldown:
+	case errors.Is(err, biz.ErrSMSCodeCooldown):
 		logger.Warn("[auth] sms code cooldown")
 		return &v1.JsonrpcResult{
 			Code:    errcode.AuthSMSCodeTooFrequent.Code,
 			Message: errcode.AuthSMSCodeTooFrequent.Message,
 		}
-	case biz.ErrSMSCodeExpired:
+	case errors.Is(err, biz.ErrSMSCodeExpired):
 		logger.Warn("[auth] sms code expired")
 		return &v1.JsonrpcResult{
 			Code:    errcode.AuthSMSCodeExpired.Code,
 			Message: errcode.AuthSMSCodeExpired.Message,
 		}
-	case biz.ErrSMSCodeInvalid, biz.ErrSMSCodeNotFound:
+	case errors.Is(err, biz.ErrSMSCodeInvalid), errors.Is(err, biz.ErrSMSCodeNotFound):
 		logger.Warn("[auth] sms code invalid")
 		return &v1.JsonrpcResult{
 			Code:    errcode.AuthInvalidSMSCode.Code,
 			Message: errcode.AuthInvalidSMSCode.Message,
 		}
-	case biz.ErrSMSCodeAttemptsExceeded:
+	case errors.Is(err, biz.ErrSMSCodeAttemptsExceeded):
 		logger.Warn("[auth] sms code attempts exceeded")
 		return &v1.JsonrpcResult{
 			Code:    errcode.AuthSMSCodeAttemptsExceeded.Code,
 			Message: errcode.AuthSMSCodeAttemptsExceeded.Message,
+		}
+	case errors.Is(err, biz.ErrSMSServiceUnavailable):
+		logger.Warn("[auth] sms service unavailable")
+		return &v1.JsonrpcResult{
+			Code:    errcode.AuthSMSServiceUnavailable.Code,
+			Message: errcode.AuthSMSServiceUnavailable.Message,
+		}
+	case errors.Is(err, biz.ErrSMSServiceQuotaExceeded):
+		logger.Warn("[auth] sms service quota exceeded")
+		return &v1.JsonrpcResult{
+			Code:    errcode.AuthSMSServiceQuotaExceeded.Code,
+			Message: errcode.AuthSMSServiceQuotaExceeded.Message,
 		}
 	default:
 		logger.Errorf("[auth] internal error: %v", err)

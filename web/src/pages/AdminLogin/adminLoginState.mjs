@@ -45,6 +45,7 @@ export function normalizeSMSLoginSession(input, now = Date.now()) {
     phone: String(source.phone || '').trim(),
     cooldownUntil,
     hint: String(source.hint || '').trim(),
+    mockDelivery: source.mockDelivery === true,
   }
 }
 

@@ -124,6 +124,20 @@ HTTP 路由：
 
 `data.auth.sms.mode=mock` 时，服务端使用进程内验证码存储，验证码 5 分钟有效、60 秒内不可重复发送、最多尝试 5 次，`mock_delivery=true` 且返回 `mock_code` 只用于 local / dev / test。`data.auth.sms.mode=provider` 时，后端使用阿里云号码认证 PNVS 短信认证发送并核验验证码，`mock_delivery=false` 且不返回 `mock_code`；登录校验接口和手机号 / 岗位权限边界保持不变。
 
+短信登录用户可见错误按错误码收口：
+
+| 错误码 | 典型场景 | 用户提示 |
+| --- | --- | --- |
+| `AuthInvalidPhone` | 手机号格式不正确 | 手机号格式不正确 |
+| `AuthPhoneNotBound` | 手机号未绑定管理员账号 | 该手机号未开通登录权限，请联系管理员 |
+| `AuthMobileRoleDenied` | 岗位任务端手机号已绑定但无当前岗位权限 | 该账号暂无当前岗位任务端登录权限，请联系管理员 |
+| `AuthSMSCodeTooFrequent` | 本地频控或阿里云返回发送过于频繁 | 验证码发送过于频繁，请稍后再试 |
+| `AuthSMSServiceQuotaExceeded` | 阿里云短信套餐 / 余额 / 额度已用完 | 短信服务额度已用完，请联系管理员处理 |
+| `AuthSMSServiceUnavailable` | 阿里云服务异常、网络超时或服务商拒绝发送 / 核验 | 短信服务暂不可用，请稍后再试或联系管理员 |
+| `AuthInvalidSMSCode` | 验证码错误或服务商返回验证码不匹配 | 验证码错误 |
+| `AuthSMSCodeExpired` | 验证码过期 | 验证码已过期，请重新获取 |
+| `AuthSMSCodeAttemptsExceeded` | 本地 mock 验证码错误次数过多 | 验证码错误次数过多，请重新获取 |
+
 ### `auth.me`
 
 返回当前管理员的最小信息，用于前端恢复登录态。旧普通用户 token 会按未登录处理。

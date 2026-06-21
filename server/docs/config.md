@@ -96,6 +96,7 @@
   - `disabled`：关闭短信登录，`auth.capabilities` 返回不可用，`send_sms_code` / `sms_login` 返回 `AuthSMSLoginDisabled`。
   - `mock`：仅用于 local / dev / test，后端返回 `mock_code` 方便本地回归。
   - `provider`：接入阿里云号码认证 PNVS 短信认证，后端调用 `SendSmsVerifyCode` 发送验证码并调用 `CheckSmsVerifyCode` 核验；生产必须通过 env / 密钥管理提供阿里云配置。
+- `provider` 模式下，阿里云频控返回 `AuthSMSCodeTooFrequent`，套餐 / 余额 / 额度不足返回 `AuthSMSServiceQuotaExceeded`，服务异常、网络超时或服务商拒绝发送 / 核验返回 `AuthSMSServiceUnavailable`；前端按错误码展示中文提示，不透传阿里云原始错误。
 - dev 默认 `mock`，prod 默认 `disabled`；生产环境禁止返回 mock 验证码，启动校验会拒绝 `APP_AUTH_SMS_MODE=mock` 或配置文件里的 `data.auth.sms.mode: mock`。
 - 短信登录是后端 Auth 能力配置，不是客户业务配置包、`tenant_id` 或 SaaS tenant 级认证策略。
 

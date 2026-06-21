@@ -118,4 +118,12 @@ test('errorCodes: 默认文案覆盖核心鉴权错误', () => {
     DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_SMS_LOGIN_DISABLED],
     '当前部署未启用短信登录'
   )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_SMS_SERVICE_UNAVAILABLE],
+    '短信服务暂不可用，请稍后再试或联系管理员'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_SMS_SERVICE_QUOTA_EXCEEDED],
+    '短信服务额度已用完，请联系管理员处理'
+  )
 })

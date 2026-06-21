@@ -186,7 +186,10 @@ func (p *aliyunSMSLoginProvider) Request(_ context.Context, phone string) (*biz.
 		if isAliyunSMSCooldown(err) {
 			return nil, biz.ErrSMSCodeCooldown
 		}
-		return nil, fmt.Errorf("aliyun sms send failed: %w", err)
+		if isAliyunSMSQuotaExceeded(err) {
+			return nil, biz.ErrSMSServiceQuotaExceeded
+		}
+		return nil, fmt.Errorf("%w: aliyun sms send failed: %v", biz.ErrSMSServiceUnavailable, err)
 	}
 	if resp == nil || resp.Body == nil || !tea.BoolValue(resp.Body.Success) || !strings.EqualFold(tea.StringValue(resp.Body.Code), "OK") {
 		code := ""
@@ -198,7 +201,10 @@ func (p *aliyunSMSLoginProvider) Request(_ context.Context, phone string) (*biz.
 		if isAliyunSMSCooldownCode(code, message) {
 			return nil, biz.ErrSMSCodeCooldown
 		}
-		return nil, fmt.Errorf("aliyun sms send rejected: code=%s message=%s", code, message)
+		if isAliyunSMSQuotaExceededCode(code, message) {
+			return nil, biz.ErrSMSServiceQuotaExceeded
+		}
+		return nil, fmt.Errorf("%w: aliyun sms send rejected: code=%s message=%s", biz.ErrSMSServiceUnavailable, code, message)
 	}
 	now := time.Now()
 	return &biz.SMSLoginChallenge{
@@ -229,10 +235,25 @@ func (p *aliyunSMSLoginProvider) Verify(_ context.Context, phone, code string) (
 	}
 	resp, err := p.client.CheckSmsVerifyCodeWithOptions(req, aliyunRuntimeOptions())
 	if err != nil {
-		return "", fmt.Errorf("aliyun sms verify failed: %w", err)
+		return "", fmt.Errorf("%w: aliyun sms verify failed: %v", biz.ErrSMSServiceUnavailable, err)
 	}
 	if resp == nil || resp.Body == nil || !tea.BoolValue(resp.Body.Success) || !strings.EqualFold(tea.StringValue(resp.Body.Code), "OK") {
-		return "", biz.ErrSMSCodeInvalid
+		code := ""
+		message := ""
+		if resp != nil && resp.Body != nil {
+			code = tea.StringValue(resp.Body.Code)
+			message = tea.StringValue(resp.Body.Message)
+		}
+		if isAliyunSMSCodeExpiredCode(code, message) {
+			return "", biz.ErrSMSCodeExpired
+		}
+		if isAliyunSMSInvalidVerifyCode(code, message) {
+			return "", biz.ErrSMSCodeInvalid
+		}
+		if isAliyunSMSQuotaExceededCode(code, message) {
+			return "", biz.ErrSMSServiceQuotaExceeded
+		}
+		return "", fmt.Errorf("%w: aliyun sms verify rejected: code=%s message=%s", biz.ErrSMSServiceUnavailable, code, message)
 	}
 	if resp.Body.Model == nil || !strings.EqualFold(tea.StringValue(resp.Body.Model.VerifyResult), "PASS") {
 		return "", biz.ErrSMSCodeInvalid
@@ -254,10 +275,52 @@ func isAliyunSMSCooldown(err error) bool {
 	return isAliyunSMSCooldownCode("", err.Error())
 }
 
+func isAliyunSMSQuotaExceeded(err error) bool {
+	if err == nil {
+		return false
+	}
+	return isAliyunSMSQuotaExceededCode("", err.Error())
+}
+
 func isAliyunSMSCooldownCode(code, message string) bool {
 	text := strings.ToLower(code + " " + message)
 	return strings.Contains(text, "business_limit") ||
 		strings.Contains(text, "frequency") ||
 		strings.Contains(text, "too frequent") ||
 		strings.Contains(text, "频繁")
+}
+
+func isAliyunSMSQuotaExceededCode(code, message string) bool {
+	text := strings.ToLower(code + " " + message)
+	return strings.Contains(text, "quotanotenough") ||
+		strings.Contains(text, "quota not enough") ||
+		strings.Contains(text, "insufficient") ||
+		strings.Contains(text, "余额不足") ||
+		strings.Contains(text, "余量不足") ||
+		strings.Contains(text, "额度不足") ||
+		strings.Contains(text, "套餐余量") ||
+		strings.Contains(text, "套餐已用完") ||
+		strings.Contains(text, "欠费")
+}
+
+func isAliyunSMSCodeExpiredCode(code, message string) bool {
+	text := strings.ToLower(code + " " + message)
+	return strings.Contains(text, "expired") ||
+		strings.Contains(text, "expire") ||
+		strings.Contains(text, "过期") ||
+		strings.Contains(text, "超时")
+}
+
+func isAliyunSMSInvalidVerifyCode(code, message string) bool {
+	text := strings.ToLower(code + " " + message)
+	return strings.Contains(text, "verifycode") ||
+		strings.Contains(text, "verify code") ||
+		strings.Contains(text, "invalid") ||
+		strings.Contains(text, "incorrect") ||
+		strings.Contains(text, "not match") ||
+		strings.Contains(text, "验证码") ||
+		strings.Contains(text, "校验码") ||
+		strings.Contains(text, "错误") ||
+		strings.Contains(text, "不正确") ||
+		strings.Contains(text, "不匹配")
 }

@@ -95,6 +95,29 @@ test('errorMessage: 已知错误码优先走现有中文码表', () => {
   )
 })
 
+test('errorMessage: 短信登录错误码显示精确中文提示', () => {
+  const cases = [
+    [RpcErrorCode.AUTH_SMS_CODE_TOO_FREQUENT, '验证码发送过于频繁，请稍后再试'],
+    [
+      RpcErrorCode.AUTH_SMS_SERVICE_QUOTA_EXCEEDED,
+      '短信服务额度已用完，请联系管理员处理',
+    ],
+    [
+      RpcErrorCode.AUTH_SMS_SERVICE_UNAVAILABLE,
+      '短信服务暂不可用，请稍后再试或联系管理员',
+    ],
+    [RpcErrorCode.AUTH_INVALID_SMS_CODE, '验证码错误'],
+    [RpcErrorCode.AUTH_SMS_CODE_EXPIRED, '验证码已过期，请重新获取'],
+  ]
+
+  for (const [code, message] of cases) {
+    assert.equal(
+      getActionErrorMessage({ message: 'Business error', code }, '获取验证码'),
+      message
+    )
+  }
+})
+
 test('errorMessage: 已是中文的后端文案保持原样', () => {
   assert.equal(
     getUserFacingErrorMessage('用户名已存在', '注册失败，请稍后重试'),

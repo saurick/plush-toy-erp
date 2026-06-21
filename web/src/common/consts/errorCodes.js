@@ -48,6 +48,10 @@ export const DEFAULT_RPC_ERROR_MESSAGES = Object.freeze({
   [RpcErrorCode.AUTH_MOBILE_ROLE_DENIED]:
     '该账号暂无当前岗位任务端登录权限，请联系管理员',
   [RpcErrorCode.AUTH_SMS_LOGIN_DISABLED]: '当前部署未启用短信登录',
+  [RpcErrorCode.AUTH_SMS_SERVICE_UNAVAILABLE]:
+    '短信服务暂不可用，请稍后再试或联系管理员',
+  [RpcErrorCode.AUTH_SMS_SERVICE_QUOTA_EXCEEDED]:
+    '短信服务额度已用完，请联系管理员处理',
   [RpcErrorCode.ADMIN_EXISTS]: '管理员账号已存在',
   [RpcErrorCode.ADMIN_PHONE_EXISTS]: '手机号已绑定其他管理员',
 })

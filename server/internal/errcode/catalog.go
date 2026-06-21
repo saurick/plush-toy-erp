@@ -44,6 +44,8 @@ var (
 	AuthPhoneNotBound           = Definition{Name: "AuthPhoneNotBound", Code: 10012, Message: "该手机号未开通登录权限，请联系管理员"}
 	AuthMobileRoleDenied        = Definition{Name: "AuthMobileRoleDenied", Code: 10013, Message: "该账号暂无当前岗位任务端登录权限，请联系管理员"}
 	AuthSMSLoginDisabled        = Definition{Name: "AuthSMSLoginDisabled", Code: 10014, Message: "当前部署未启用短信登录"}
+	AuthSMSServiceUnavailable   = Definition{Name: "AuthSMSServiceUnavailable", Code: 10015, Message: "短信服务暂不可用，请稍后再试或联系管理员"}
+	AuthSMSServiceQuotaExceeded = Definition{Name: "AuthSMSServiceQuotaExceeded", Code: 10016, Message: "短信服务额度已用完，请联系管理员处理"}
 	AdminExists                 = Definition{Name: "AdminExists", Code: 40910, Message: "管理员账号已存在"}
 	AdminPhoneExists            = Definition{Name: "AdminPhoneExists", Code: 40911, Message: "手机号已绑定其他管理员"}
 
@@ -84,6 +86,8 @@ var definitions = []Definition{
 	AuthPhoneNotBound,
 	AuthMobileRoleDenied,
 	AuthSMSLoginDisabled,
+	AuthSMSServiceUnavailable,
+	AuthSMSServiceQuotaExceeded,
 	AdminExists,
 	AdminPhoneExists,
 	Internal,

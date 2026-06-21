@@ -100,6 +100,138 @@ func TestAliyunSMSLoginProviderSendsWithConfiguredTemplate(t *testing.T) {
 	}
 }
 
+func TestAliyunSMSLoginProviderSendFailureMapsToCooldown(t *testing.T) {
+	client := &fakeAliyunDypnsClient{
+		sendErr: errors.New("BUSINESS_LIMIT_CONTROL: too frequent"),
+	}
+	provider := newAliyunSMSLoginProvider(client, aliyunSMSConfig{
+		CountryCode:     "86",
+		SignName:        "速通互联验证码",
+		TemplateCode:    "100001",
+		TemplateParam:   `{"code":"##code##","min":"5"}`,
+		CodeType:        1,
+		CodeLength:      6,
+		ValidSeconds:    300,
+		IntervalSeconds: 60,
+	})
+
+	if _, err := provider.Request(t.Context(), "13794566255"); !errors.Is(err, biz.ErrSMSCodeCooldown) {
+		t.Fatalf("expected ErrSMSCodeCooldown, got %v", err)
+	}
+}
+
+func TestAliyunSMSLoginProviderSendRejectedMapsToCooldown(t *testing.T) {
+	client := &fakeAliyunDypnsClient{
+		sendResp: &dypnsapi.SendSmsVerifyCodeResponse{Body: &dypnsapi.SendSmsVerifyCodeResponseBody{
+			Success: tea.Bool(false),
+			Code:    tea.String("BUSINESS_LIMIT_CONTROL"),
+			Message: tea.String("发送过于频繁"),
+		}},
+	}
+	provider := newAliyunSMSLoginProvider(client, aliyunSMSConfig{
+		CountryCode:     "86",
+		SignName:        "速通互联验证码",
+		TemplateCode:    "100001",
+		TemplateParam:   `{"code":"##code##","min":"5"}`,
+		CodeType:        1,
+		CodeLength:      6,
+		ValidSeconds:    300,
+		IntervalSeconds: 60,
+	})
+
+	if _, err := provider.Request(t.Context(), "13794566255"); !errors.Is(err, biz.ErrSMSCodeCooldown) {
+		t.Fatalf("expected ErrSMSCodeCooldown, got %v", err)
+	}
+}
+
+func TestAliyunSMSLoginProviderSendFailureMapsToQuotaExceeded(t *testing.T) {
+	client := &fakeAliyunDypnsClient{
+		sendErr: errors.New("QuotaNotEnough: sms package exhausted"),
+	}
+	provider := newAliyunSMSLoginProvider(client, aliyunSMSConfig{
+		CountryCode:     "86",
+		SignName:        "速通互联验证码",
+		TemplateCode:    "100001",
+		TemplateParam:   `{"code":"##code##","min":"5"}`,
+		CodeType:        1,
+		CodeLength:      6,
+		ValidSeconds:    300,
+		IntervalSeconds: 60,
+	})
+
+	if _, err := provider.Request(t.Context(), "13794566255"); !errors.Is(err, biz.ErrSMSServiceQuotaExceeded) {
+		t.Fatalf("expected ErrSMSServiceQuotaExceeded, got %v", err)
+	}
+}
+
+func TestAliyunSMSLoginProviderSendRejectedMapsToQuotaExceeded(t *testing.T) {
+	client := &fakeAliyunDypnsClient{
+		sendResp: &dypnsapi.SendSmsVerifyCodeResponse{Body: &dypnsapi.SendSmsVerifyCodeResponseBody{
+			Success: tea.Bool(false),
+			Code:    tea.String("QuotaNotEnough"),
+			Message: tea.String("套餐余量不足"),
+		}},
+	}
+	provider := newAliyunSMSLoginProvider(client, aliyunSMSConfig{
+		CountryCode:     "86",
+		SignName:        "速通互联验证码",
+		TemplateCode:    "100001",
+		TemplateParam:   `{"code":"##code##","min":"5"}`,
+		CodeType:        1,
+		CodeLength:      6,
+		ValidSeconds:    300,
+		IntervalSeconds: 60,
+	})
+
+	if _, err := provider.Request(t.Context(), "13794566255"); !errors.Is(err, biz.ErrSMSServiceQuotaExceeded) {
+		t.Fatalf("expected ErrSMSServiceQuotaExceeded, got %v", err)
+	}
+}
+
+func TestAliyunSMSLoginProviderSendFailureMapsToServiceUnavailable(t *testing.T) {
+	client := &fakeAliyunDypnsClient{
+		sendErr: errors.New("ServiceUnavailable: upstream timeout"),
+	}
+	provider := newAliyunSMSLoginProvider(client, aliyunSMSConfig{
+		CountryCode:     "86",
+		SignName:        "速通互联验证码",
+		TemplateCode:    "100001",
+		TemplateParam:   `{"code":"##code##","min":"5"}`,
+		CodeType:        1,
+		CodeLength:      6,
+		ValidSeconds:    300,
+		IntervalSeconds: 60,
+	})
+
+	if _, err := provider.Request(t.Context(), "13794566255"); !errors.Is(err, biz.ErrSMSServiceUnavailable) {
+		t.Fatalf("expected ErrSMSServiceUnavailable, got %v", err)
+	}
+}
+
+func TestAliyunSMSLoginProviderSendRejectedMapsToServiceUnavailable(t *testing.T) {
+	client := &fakeAliyunDypnsClient{
+		sendResp: &dypnsapi.SendSmsVerifyCodeResponse{Body: &dypnsapi.SendSmsVerifyCodeResponseBody{
+			Success: tea.Bool(false),
+			Code:    tea.String("ServiceUnavailable"),
+			Message: tea.String("阿里云短信服务暂时不可用"),
+		}},
+	}
+	provider := newAliyunSMSLoginProvider(client, aliyunSMSConfig{
+		CountryCode:     "86",
+		SignName:        "速通互联验证码",
+		TemplateCode:    "100001",
+		TemplateParam:   `{"code":"##code##","min":"5"}`,
+		CodeType:        1,
+		CodeLength:      6,
+		ValidSeconds:    300,
+		IntervalSeconds: 60,
+	})
+
+	if _, err := provider.Request(t.Context(), "13794566255"); !errors.Is(err, biz.ErrSMSServiceUnavailable) {
+		t.Fatalf("expected ErrSMSServiceUnavailable, got %v", err)
+	}
+}
+
 func TestAliyunSMSLoginProviderVerifyPass(t *testing.T) {
 	client := &fakeAliyunDypnsClient{
 		checkResp: &dypnsapi.CheckSmsVerifyCodeResponse{Body: &dypnsapi.CheckSmsVerifyCodeResponseBody{
@@ -138,5 +270,61 @@ func TestAliyunSMSLoginProviderVerifyUnknownMapsToInvalidCode(t *testing.T) {
 
 	if _, err := provider.Verify(t.Context(), "13794566255", "000000"); !errors.Is(err, biz.ErrSMSCodeInvalid) {
 		t.Fatalf("expected ErrSMSCodeInvalid, got %v", err)
+	}
+}
+
+func TestAliyunSMSLoginProviderVerifyFailureMapsToServiceUnavailable(t *testing.T) {
+	client := &fakeAliyunDypnsClient{
+		checkErr: errors.New("ServiceUnavailable: upstream timeout"),
+	}
+	provider := newAliyunSMSLoginProvider(client, aliyunSMSConfig{CountryCode: "86"})
+
+	if _, err := provider.Verify(t.Context(), "13794566255", "123456"); !errors.Is(err, biz.ErrSMSServiceUnavailable) {
+		t.Fatalf("expected ErrSMSServiceUnavailable, got %v", err)
+	}
+}
+
+func TestAliyunSMSLoginProviderVerifyRejectedMapsToExpiredCode(t *testing.T) {
+	client := &fakeAliyunDypnsClient{
+		checkResp: &dypnsapi.CheckSmsVerifyCodeResponse{Body: &dypnsapi.CheckSmsVerifyCodeResponseBody{
+			Success: tea.Bool(false),
+			Code:    tea.String("VerifyCodeExpired"),
+			Message: tea.String("验证码已过期"),
+		}},
+	}
+	provider := newAliyunSMSLoginProvider(client, aliyunSMSConfig{CountryCode: "86"})
+
+	if _, err := provider.Verify(t.Context(), "13794566255", "123456"); !errors.Is(err, biz.ErrSMSCodeExpired) {
+		t.Fatalf("expected ErrSMSCodeExpired, got %v", err)
+	}
+}
+
+func TestAliyunSMSLoginProviderVerifyRejectedMapsToInvalidCode(t *testing.T) {
+	client := &fakeAliyunDypnsClient{
+		checkResp: &dypnsapi.CheckSmsVerifyCodeResponse{Body: &dypnsapi.CheckSmsVerifyCodeResponseBody{
+			Success: tea.Bool(false),
+			Code:    tea.String("InvalidVerifyCode"),
+			Message: tea.String("验证码错误"),
+		}},
+	}
+	provider := newAliyunSMSLoginProvider(client, aliyunSMSConfig{CountryCode: "86"})
+
+	if _, err := provider.Verify(t.Context(), "13794566255", "000000"); !errors.Is(err, biz.ErrSMSCodeInvalid) {
+		t.Fatalf("expected ErrSMSCodeInvalid, got %v", err)
+	}
+}
+
+func TestAliyunSMSLoginProviderVerifyRejectedMapsToServiceUnavailable(t *testing.T) {
+	client := &fakeAliyunDypnsClient{
+		checkResp: &dypnsapi.CheckSmsVerifyCodeResponse{Body: &dypnsapi.CheckSmsVerifyCodeResponseBody{
+			Success: tea.Bool(false),
+			Code:    tea.String("ServiceUnavailable"),
+			Message: tea.String("阿里云短信服务暂时不可用"),
+		}},
+	}
+	provider := newAliyunSMSLoginProvider(client, aliyunSMSConfig{CountryCode: "86"})
+
+	if _, err := provider.Verify(t.Context(), "13794566255", "123456"); !errors.Is(err, biz.ErrSMSServiceUnavailable) {
+		t.Fatalf("expected ErrSMSServiceUnavailable, got %v", err)
 	}
 }

@@ -137,7 +137,8 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
     []
   )
   const authCapabilities = useAuthCapabilities(authRpc)
-  const { authCapabilitiesLoaded, smsLoginEnabled } = authCapabilities
+  const { authCapabilitiesLoaded, smsLoginEnabled, smsLoginMockDelivery } =
+    authCapabilities
 
   const smsCooldownSeconds = Math.max(
     0,
@@ -204,6 +205,19 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
     }
   }, [authCapabilitiesLoaded, loginMode, smsLoginEnabled])
 
+  useEffect(() => {
+    if (
+      authCapabilitiesLoaded &&
+      smsLoginEnabled &&
+      !smsLoginMockDelivery &&
+      smsHint.includes('临时验证码')
+    ) {
+      setSmsCooldownUntil(0)
+      setSmsHint('')
+      clearSMSLoginSession()
+    }
+  }, [authCapabilitiesLoaded, smsHint, smsLoginEnabled, smsLoginMockDelivery])
+
   const resolvePostLoginPath = (adminProfile, { shouldRemember = true } = {}) =>
     resolveAdminPostLoginPath({
       adminProfile,
@@ -257,12 +271,14 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
           phone: smsPhone.trim(),
           cooldownUntil,
           hint: nextHint,
+          mockDelivery: true,
         })
       } else if (cooldownUntil > Date.now()) {
         rememberSMSLoginSession({
           phone: smsPhone.trim(),
           cooldownUntil,
           hint: nextHint,
+          mockDelivery: false,
         })
       }
     } catch (err) {
@@ -427,6 +443,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
                           phone: nextPhone,
                           cooldownUntil: smsCooldownUntil,
                           hint: '',
+                          mockDelivery: smsLoginMockDelivery,
                         })
                       }
                     }}

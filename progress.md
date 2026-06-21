@@ -219,3 +219,23 @@
 - 验证：追加前 `progress.md` 为 211 行、34447 字节，未达到归档阈值；已执行目标 Playwright 探针、`node --test src/common/auth/authCapabilities.test.mjs src/pages/AdminLogin/adminLoginState.test.mjs src/pages/AdminLogin/adminLoginRouting.test.mjs`、`pnpm --dir web lint`、`STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop pnpm --dir web style:l1`、`pnpm --dir web test`、`pnpm --dir web css`、`git diff --check`，均通过。
 - 下一步：如后续继续增强短信登录，可补真实 provider 模式下的端到端登录回归；当前前端刷新保持不替代后端频控、手机号绑定和岗位权限校验。
 - 阻塞/风险：本轮只改登录页状态保持、认证能力加载 abort 识别、相关测试和文档口径；未改 schema、migration、RBAC、菜单、Workflow / Fact、短信 provider 后端实现或账号数据。当前工作区仍有其他会话 / 既有短信 provider、权限中心、业务页和岗位任务端脏改动，本轮未回退、未归并。
+
+## 2026-06-21 短信 provider 运行态与不可用提示
+
+- 完成：本地后端已用阿里云 PNVS env 启动到 `provider` 模式，`auth.capabilities` 经 `8300` 和前端代理 `5175` 均返回 `mode=provider`、`mock_delivery=false`；已向 `13794566255` 实发一次验证码，返回不包含 `mock_code`。
+- 完成：阿里云发送失败、套餐余量不足或服务商拒绝发送时，provider 错误统一包裹为 `ErrSMSServiceUnavailable`，JSON-RPC 返回 `AuthSMSServiceUnavailable`，前端统一提示“短信服务暂不可用，请稍后再试或联系管理员”。
+- 完成：登录页在 provider 能力加载后会清理旧 mock 模式残留的“临时验证码”提示和倒计时；provider 模式下真实发送成功仍保留手机号、提示和倒计时刷新状态。
+- 完成：同步 `server/docs/api.md`、`server/docs/config.md`、`web/README.md` 和 `docs/当前真源与交接顺序.md` 的短信 provider 失败口径；`docs/文档清单.md` 未改，因为没有新增、删除、重命名或改变长期文档分类。
+- 验证：追加前 `progress.md` 为 221 行、36458 字节，未达到归档阈值；已执行 `go test ./internal/errcode ./internal/biz ./internal/data ./internal/service`、`pnpm --dir web test`、`pnpm --dir web lint`、`pnpm --dir web css`、`STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop pnpm --dir web style:l1`，均通过；运行态已用 `curl` 确认 provider 能力。
+- 下一步：如果要把目标服务器也切到 provider，需要把同一组阿里云 PNVS env 注入目标环境 `.env` 并按部署流程重启，再用已绑定手机号管理员做一次端到端登录回归。
+- 阻塞/风险：本轮未改 schema、migration、RBAC、菜单、Workflow / Fact、客户配置、部署脚本或生产 `.env`；真实 AK 只在本地运行进程 env 中使用，未写入仓库、日志、trace 或文档。
+
+## 2026-06-21 短信错误提示矩阵
+
+- 完成：短信 provider 错误从单一不可用提示拆成频控、额度耗尽和服务不可用三类；阿里云 `BUSINESS_LIMIT` / 频繁类错误返回 `AuthSMSCodeTooFrequent`，套餐 / 余额 / 额度不足返回 `AuthSMSServiceQuotaExceeded`，服务异常、网络超时或服务商拒绝发送 / 核验返回 `AuthSMSServiceUnavailable`。
+- 完成：验证码核验阶段同步收口 provider 错误，验证码过期返回 `AuthSMSCodeExpired`，验证码错误返回 `AuthInvalidSMSCode`，阿里云核验接口异常返回 `AuthSMSServiceUnavailable`；前端错误消费层补齐精确中文提示，不透传阿里云原始错误。
+- 完成：补齐 fake provider / mock 单测，覆盖发送太频繁、额度不足、服务异常、核验异常、验证码过期和验证码错误；本轮未反复调用真实阿里云发送接口，避免额外扣量。
+- 完成：同步 `server/docs/api.md`、`server/docs/config.md`、`web/README.md` 和 `docs/当前真源与交接顺序.md` 的短信错误提示口径；`docs/文档清单.md` 未改，因为没有新增、删除、重命名或改变长期文档分类。
+- 验证：追加前 `progress.md` 为 231 行、38368 字节，未达到归档阈值；已执行 `go test ./internal/errcode ./internal/biz ./internal/data ./internal/service`、`bash scripts/qa/error-code-sync.sh && bash scripts/qa/error-codes.sh`、`pnpm --dir web test`、`pnpm --dir web lint`、`pnpm --dir web css`、`STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop pnpm --dir web style:l1`、`make build`、`git diff --check`，均通过；已重启本地后端，`8300` 和 `5175` 均确认 `mode=provider`、`mock_delivery=false`。
+- 下一步：如后续拿到阿里云更细错误码样本，可继续补充分类 helper 的关键字和单测；目标服务器切换 provider 仍需单独走部署 `.env` 注入、重启和端到端登录回归。
+- 阻塞/风险：本轮未改 schema、migration、RBAC、菜单、Workflow / Fact、客户配置或生产 `.env`；错误分类来自阿里云响应形态的 mock 覆盖，不包含所有未来未知服务商错误码，未知错误会保守落到“短信服务暂不可用”。

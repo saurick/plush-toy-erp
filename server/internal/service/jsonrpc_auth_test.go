@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -126,6 +127,64 @@ func TestJsonrpcDispatcher_AuthSMSLogin_DisabledByConfig(t *testing.T) {
 	}
 }
 
+func TestJsonrpcDispatcher_AuthSMSSendProviderErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		err     error
+		code    int32
+		message string
+	}{
+		{
+			name:    "cooldown",
+			err:     fmt.Errorf("wrapped provider error: %w", biz.ErrSMSCodeCooldown),
+			code:    errcode.AuthSMSCodeTooFrequent.Code,
+			message: errcode.AuthSMSCodeTooFrequent.Message,
+		},
+		{
+			name:    "quota exceeded",
+			err:     fmt.Errorf("wrapped provider error: %w", biz.ErrSMSServiceQuotaExceeded),
+			code:    errcode.AuthSMSServiceQuotaExceeded.Code,
+			message: errcode.AuthSMSServiceQuotaExceeded.Message,
+		},
+		{
+			name:    "service unavailable",
+			err:     fmt.Errorf("wrapped provider error: %w", biz.ErrSMSServiceUnavailable),
+			code:    errcode.AuthSMSServiceUnavailable.Code,
+			message: errcode.AuthSMSServiceUnavailable.Message,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := newMemAdminAuthRepoForData()
+			if err := repo.putAdmin("boss", "13800138000", "secret", false); err != nil {
+				t.Fatalf("put admin: %v", err)
+			}
+			d := &jsonrpcDispatcher{
+				log: log.NewHelper(log.DefaultLogger),
+				adminAuthUC: newAdminAuthUsecaseForTestWithSMSProvider(repo, unavailableSMSLoginCodeProvider{
+					err: tt.err,
+				}),
+				authSMS: normalizeAuthSMSRuntimeConfig(authSMSModeProvider),
+			}
+
+			_, res, err := d.handleAuth(context.Background(), "send_sms_code", "1", mustAuthStruct(t, map[string]any{
+				"phone": "13800138000",
+				"scope": "admin",
+			}))
+			if err != nil {
+				t.Fatalf("handle auth.send_sms_code: %v", err)
+			}
+			if res == nil || res.Code != tt.code {
+				t.Fatalf("expected code %d, got %+v", tt.code, res)
+			}
+			if res.Message != tt.message {
+				t.Fatalf("unexpected message: %q", res.Message)
+			}
+		})
+	}
+}
+
 func mustAuthStruct(t *testing.T, values map[string]any) *structpb.Struct {
 	t.Helper()
 	st, err := structpb.NewStruct(values)
@@ -151,6 +210,24 @@ func newAdminAuthUsecaseForTest(repo *memAdminAuthRepoForData) *biz.AdminAuthUse
 	return biz.NewAdminAuthUsecase(repo, func(userID int, username string, role int8) (string, time.Time, error) {
 		return "admin-token", time.Now().Add(time.Hour), nil
 	}, nil, log.DefaultLogger, nil)
+}
+
+func newAdminAuthUsecaseForTestWithSMSProvider(repo *memAdminAuthRepoForData, smsProvider biz.SMSLoginCodeProvider) *biz.AdminAuthUsecase {
+	return biz.NewAdminAuthUsecase(repo, func(userID int, username string, role int8) (string, time.Time, error) {
+		return "admin-token", time.Now().Add(time.Hour), nil
+	}, smsProvider, log.DefaultLogger, nil)
+}
+
+type unavailableSMSLoginCodeProvider struct {
+	err error
+}
+
+func (p unavailableSMSLoginCodeProvider) Request(context.Context, string) (*biz.SMSLoginChallenge, error) {
+	return nil, p.err
+}
+
+func (p unavailableSMSLoginCodeProvider) Verify(context.Context, string, string) (string, error) {
+	return "", p.err
 }
 
 type memAdminAuthRepoForData struct {

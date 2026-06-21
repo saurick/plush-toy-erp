@@ -27,6 +27,8 @@ var (
 	ErrSMSCodeExpired          = errors.New("sms code expired")
 	ErrSMSCodeInvalid          = errors.New("sms code invalid")
 	ErrSMSCodeAttemptsExceeded = errors.New("sms code attempts exceeded")
+	ErrSMSServiceUnavailable   = errors.New("sms service unavailable")
+	ErrSMSServiceQuotaExceeded = errors.New("sms service quota exceeded")
 	mainlandMobilePhonePattern = regexp.MustCompile(`^1[3-9]\d{9}$`)
 )
 
