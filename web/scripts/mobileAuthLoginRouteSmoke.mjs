@@ -709,6 +709,27 @@ async function runMobileAuthScenario(
       tasksPath,
       `${app.id} 退出岗位端并登录后台后，浏览器返回不应恢复旧岗位任务端首页`
     )
+
+    await page.evaluate(() => {
+      for (const key of Object.keys(localStorage)) {
+        if (key === 'admin_access_token' || key.startsWith('admin_')) {
+          localStorage.removeItem(key)
+        }
+      }
+      sessionStorage.clear()
+    })
+    await page.goto(new URL('/admin-login', `${appBaseURL}/`).toString(), {
+      waitUntil: 'domcontentloaded',
+    })
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await page.getByText('岗位任务端').click()
+    await page.getByLabel('管理员账号').fill(`${app.roleKey}-mobile-admin`)
+    await page.locator('#password').fill('mobile-password')
+    await page.getByRole('button', { name: /登\s*录/ }).click()
+    await waitForPath(page, tasksPath)
+
+    await page.goBack({ waitUntil: 'domcontentloaded' })
+    await waitForPath(page, tasksPath)
   }
 }
 

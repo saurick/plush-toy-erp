@@ -5,7 +5,6 @@ import {
   Routes,
   useLocation,
   useNavigate,
-  useNavigationType,
   useParams,
 } from 'react-router-dom'
 import AuthGuard from '@/common/auth/AuthGuard'
@@ -167,6 +166,19 @@ function isDesktopEntryPath(pathname = '') {
   return pathname === '/' || pathname === '/erp' || pathname.startsWith('/erp/')
 }
 
+function resolveMobileEntryPath(adminProfile, entryConfig, preferredPath = '') {
+  const preferredRoleKey = parseMobileRoleFromPath(preferredPath)
+  const enabledRoleKeys = getEnabledMobileRoleKeys(entryConfig)
+  const allowedRoleKeys = getAllowedMobileRoleKeys(
+    adminProfile,
+    enabledRoleKeys
+  )
+  if (preferredRoleKey && allowedRoleKeys.includes(preferredRoleKey)) {
+    return resolveMobileTasksPath(preferredRoleKey)
+  }
+  return allowedRoleKeys[0] ? resolveMobileTasksPath(allowedRoleKeys[0]) : ''
+}
+
 function readLastMobileEntryPath() {
   try {
     return window.sessionStorage?.getItem(LAST_MOBILE_ENTRY_PATH_KEY) || ''
@@ -191,22 +203,15 @@ function isBrowserHistoryRestore() {
 function MobileEntryBackGuard() {
   const location = useLocation()
   const navigate = useNavigate()
-  const navigationType = useNavigationType()
   const lastMobilePathRef = useRef('')
-  const hasSeenRouteRef = useRef(false)
   const currentPath = buildLocationPath(location)
   const lastEntryTarget = getLastEntryTarget()
+  const entryConfig = getEntryConfig()
+  const adminProfile = getStoredAdminProfile()
 
   useLayoutEffect(() => {
-    const hasSeenRoute = hasSeenRouteRef.current
-    hasSeenRouteRef.current = true
-
     if (parseMobileRoleFromPath(location.pathname)) {
-      if (
-        hasSeenRoute &&
-        navigationType === 'POP' &&
-        lastEntryTarget === ENTRY_TARGET.DESKTOP
-      ) {
+      if (lastEntryTarget === ENTRY_TARGET.DESKTOP) {
         navigate('/erp/dashboard', { replace: true })
         return
       }
@@ -224,20 +229,22 @@ function MobileEntryBackGuard() {
     const lastMobilePath =
       lastMobilePathRef.current ||
       (isBrowserHistoryRestore() ? readLastMobileEntryPath() : '')
+    const mobileEntryPath = resolveMobileEntryPath(
+      adminProfile,
+      entryConfig,
+      lastMobilePath
+    )
 
-    if (
-      navigationType === 'POP' &&
-      lastMobilePath &&
-      isDesktopEntryPath(location.pathname)
-    ) {
-      navigate(lastMobilePath, { replace: true })
+    if (isDesktopEntryPath(location.pathname)) {
+      navigate(mobileEntryPath || '/entry', { replace: true })
     }
   }, [
+    adminProfile,
     currentPath,
+    entryConfig,
     lastEntryTarget,
     location.pathname,
     navigate,
-    navigationType,
   ])
 
   return null

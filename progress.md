@@ -255,3 +255,11 @@
 - 验证：追加前 `progress.md` 为 249 行、41701 字节，未达到归档阈值；已执行 `pnpm --dir web css`、`MOBILE_AUTH_SMOKE_APP_ID=mobile-warehouse pnpm --dir web smoke:mobile-auth-login-route`、`pnpm --dir web lint`、`pnpm --dir web test`、`git diff --check -- web/src/erp/router.jsx web/scripts/mobileAuthLoginRouteSmoke.mjs`，均通过；`pnpm --dir web test` 共 380 个前端单测通过。
 - 下一步：如后续要把浏览器返回从 `/admin-login` 进一步统一替换回 `/erp/dashboard`，应作为登录页历史栈体验专项处理，并覆盖后台登录页 BFCache / history 恢复态。
 - 阻塞/风险：本轮未改 schema、migration、RBAC、菜单、Workflow / Fact、客户配置或后端认证；定向浏览器回归覆盖仓库岗位端，未机械全跑 8 个岗位角色。
+
+## 2026-06-21 后台与岗位端双向历史隔离
+
+- 完成：把入口历史守卫从浏览器 `POP` 事件判断改为当前入口选择与当前路径合法性判断；当前入口为岗位任务端时，访问或返回到 `/erp/*` 会被替换回当前可用岗位任务端，当前入口为后台时，访问或返回到 `/m/<role>/tasks` 会替换回后台看板。
+- 完成：修正登录页刷新后的反向串入口；`smoke:mobile-auth-login-route` 新增“后台登录历史存在 -> 清登录态进入登录页 -> 刷新登录页 -> 选择岗位任务端登录 -> 浏览器返回仍停留岗位任务端”的断言。
+- 验证：追加前 `progress.md` 为 257 行、43153 字节，未达到归档阈值；已执行 `MOBILE_AUTH_SMOKE_APP_ID=mobile-warehouse pnpm --dir web smoke:mobile-auth-login-route`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`，均通过；`pnpm --dir web test` 共 380 个前端单测通过。
+- 下一步：如后续仍要允许同一登录态下从岗位端直接切后台，应走 `/entry` 显式切换入口并更新入口选择，不应依赖浏览器后退穿透旧历史。
+- 阻塞/风险：本轮未改 schema、migration、RBAC、菜单、Workflow / Fact、客户配置或后端认证；浏览器回归仍按影响面覆盖仓库岗位端，未全量跑 8 个岗位角色。
