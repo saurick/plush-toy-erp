@@ -12,6 +12,15 @@
 - 归档时应优先保留当前活跃事项、未完成事项、阻塞/风险和最近完成事项；已完成且已同步到正式文档的旧流水，可移动到 `docs/archive/progress-YYYY-MM.md` 等归档文件。
 - 归档后应在 `progress.md` 保留归档索引或摘要，方便后续追溯。
 
+## 项目专属 Skill 维护约定
+
+- 本项目专属 Codex skill 统一放在 `.agents/skills/<skill-name>/`，并随本仓库 git 管理；`~/.codex/skills/` 只放跨项目通用 skill。
+- 项目专属 skill 只写 plush-toy-erp 的当前真源、边界、命令和验证要求，不把临时任务状态、聊天结论、客户未确认资料或一次性方案写成长期规则。
+- skill 的 `name`、目录名、UI `display_name` 保持英文；`SKILL.md description`、正文、`agents/openai.yaml short_description/default_prompt` 使用中文主体 + English anchors。
+- 项目版 skill 不能只是通用版复制，至少应包含 `Truth Chain / 必读真源`、`Project Rules / 项目边界`、`Workflow / 工作流`、`Output / 输出要求`，必要时补 `Validation / 验证要求`。
+- 新增、删除、重命名或调整项目 skill 职责时，同步检查根 `README.md`、相关 docs 索引和 `progress.md` 是否需要更新；只改正文且不改变职责时通常不需要改文档清单。
+- 修改 skill 后至少运行 skill validator、YAML 解析和 metadata 扫描，确认 `$skill-name`、中英摘要和英文 `display_name` 都符合规则。
+
 ## 阅读顺序
 
 遇到新任务时，优先按下面顺序收敛真源：
