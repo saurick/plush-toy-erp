@@ -4138,6 +4138,7 @@ async function assertBusinessModuleToolbarControlStyle(
     `${scenarioName} 点击日期输入框文本区域后应打开日期面板`
   )
   await page.keyboard.press('Escape')
+  await assertBusinessDateRangePickerOrderGuard(page, { scenarioName })
   assert.equal(
     metrics.actionButton.cursor,
     'pointer',
@@ -4191,6 +4192,34 @@ async function assertBusinessModuleToolbarControlStyle(
     Math.abs(metrics.statusArrow.centerY - metrics.statusSelector.centerY) <= 1,
     `${scenarioName} 状态筛选箭头未上下居中: ${JSON.stringify(metrics)}`
   )
+}
+
+async function assertBusinessDateRangePickerOrderGuard(page, { scenarioName }) {
+  const dateInputs = page.locator(
+    '.erp-business-date-range-filter .erp-business-date-input'
+  )
+  await dateInputs.first().click({ position: { x: 16, y: 16 } })
+  await page
+    .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
+    .locator('.ant-picker-cell[title="2026-06-17"]')
+    .click()
+  await dateInputs.nth(1).click({ position: { x: 16, y: 16 } })
+  const earlierEndCell = page
+    .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
+    .locator('.ant-picker-cell[title="2026-06-02"]')
+    .last()
+  await earlierEndCell.waitFor({ state: 'visible', timeout: 1500 })
+  const earlierEndMetrics = await earlierEndCell.evaluate((node) => ({
+    className: node.className,
+    ariaDisabled: node.getAttribute('aria-disabled'),
+    title: node.getAttribute('title'),
+  }))
+  assert(
+    earlierEndMetrics.className.includes('ant-picker-cell-disabled') ||
+      earlierEndMetrics.ariaDisabled === 'true',
+    `${scenarioName} 结束日期不能选择早于开始日期的日期: ${JSON.stringify(earlierEndMetrics)}`
+  )
+  await page.keyboard.press('Escape')
 }
 
 async function assertPaginationSizeChangerFocusStyle(page, { scenarioName }) {

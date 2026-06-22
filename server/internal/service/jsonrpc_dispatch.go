@@ -29,6 +29,7 @@ type jsonrpcDispatcher struct {
 	outsourcingOrderUC *biz.OutsourcingOrderUsecase
 	inventoryUC        *biz.InventoryUsecase
 	operationalFactUC  *biz.OperationalFactUsecase
+	attachmentUC       *biz.BusinessAttachmentUsecase
 	authSMS            authSMSRuntimeConfig
 
 	adminReader biz.AdminAccountReader
@@ -47,6 +48,7 @@ func newJSONRPCDispatcher(
 	outsourcingOrderUC *biz.OutsourcingOrderUsecase,
 	inventoryUC *biz.InventoryUsecase,
 	operationalFactUC *biz.OperationalFactUsecase,
+	attachmentUC *biz.BusinessAttachmentUsecase,
 	adminReader biz.AdminAccountReader,
 ) *jsonrpcDispatcher {
 	helper := log.NewHelper(log.With(logger, "module", "service.jsonrpc"))
@@ -81,6 +83,9 @@ func newJSONRPCDispatcher(
 	if operationalFactUC == nil {
 		panic("newJSONRPCDispatcher: operationalFactUC is nil")
 	}
+	if attachmentUC == nil {
+		panic("newJSONRPCDispatcher: attachmentUC is nil")
+	}
 	if adminReader == nil {
 		panic("newJSONRPCDispatcher: adminReader is nil")
 	}
@@ -100,6 +105,7 @@ func newJSONRPCDispatcher(
 		outsourcingOrderUC: outsourcingOrderUC,
 		inventoryUC:        inventoryUC,
 		operationalFactUC:  operationalFactUC,
+		attachmentUC:       attachmentUC,
 		authSMS:            authSMS,
 		adminReader:        adminReader,
 	}
@@ -161,6 +167,8 @@ func (d *jsonrpcDispatcher) Handle(
 		return d.handleBOM(ctx, method, id, params)
 	case "operational_fact":
 		return d.handleOperationalFact(ctx, method, id, params)
+	case "attachment":
+		return d.handleBusinessAttachment(ctx, method, id, params)
 	case "debug":
 		return d.handleDebug(ctx, method, id, params)
 	default:

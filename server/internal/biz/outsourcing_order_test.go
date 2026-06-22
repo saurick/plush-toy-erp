@@ -106,6 +106,7 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierProductProcessAndUnit(t *testi
 	}
 	uc := NewOutsourcingOrderUsecase(repo)
 	orderDate := time.Date(2026, 6, 17, 0, 0, 0, 0, time.UTC)
+	expectedReturnDate := orderDate.AddDate(0, 0, 1)
 	qty := decimal.NewFromInt(12)
 	price := decimal.NewFromFloat(3.2)
 
@@ -114,6 +115,7 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierProductProcessAndUnit(t *testi
 		SupplierID:         1,
 		SupplierSnapshot:   map[string]any{"name": "加工厂 A"},
 		OrderDate:          orderDate,
+		ExpectedReturnDate: &expectedReturnDate,
 	}, []*OutsourcingOrderItemSaveMutation{
 		{
 			OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{
@@ -150,6 +152,13 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierProductProcessAndUnit(t *testi
 	}
 	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-006", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, ProductID: 10, ProcessID: 30, UnitID: 21, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrUnitInactive) {
 		t.Fatalf("expected inactive unit rejected, got %v", err)
+	}
+	beforeOrderDate := orderDate.AddDate(0, 0, -1)
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-BAD-DATE", SupplierID: 1, OrderDate: orderDate, ExpectedReturnDate: &beforeOrderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, ProductID: 10, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected expected return before order date rejected, got %v", err)
+	}
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-BAD-LINE-DATE", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, ProductID: 10, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty, ExpectedReturnDate: &beforeOrderDate}}}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected line expected return before order date rejected, got %v", err)
 	}
 }
 

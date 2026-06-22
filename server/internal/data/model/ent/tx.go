@@ -20,6 +20,8 @@ type Tx struct {
 	BOMHeader *BOMHeaderClient
 	// BOMItem is the client for interacting with the BOMItem builders.
 	BOMItem *BOMItemClient
+	// BusinessAttachment is the client for interacting with the BusinessAttachment builders.
+	BusinessAttachment *BusinessAttachmentClient
 	// Contact is the client for interacting with the Contact builders.
 	Contact *ContactClient
 	// Customer is the client for interacting with the Customer builders.
@@ -233,6 +235,7 @@ func (tx *Tx) init() {
 	tx.AdminUserRole = NewAdminUserRoleClient(tx.config)
 	tx.BOMHeader = NewBOMHeaderClient(tx.config)
 	tx.BOMItem = NewBOMItemClient(tx.config)
+	tx.BusinessAttachment = NewBusinessAttachmentClient(tx.config)
 	tx.Contact = NewContactClient(tx.config)
 	tx.Customer = NewCustomerClient(tx.config)
 	tx.FinanceFact = NewFinanceFactClient(tx.config)

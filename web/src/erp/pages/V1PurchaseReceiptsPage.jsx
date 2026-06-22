@@ -47,6 +47,7 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import {
   compactParams,
   formatUnixDate,
@@ -1088,6 +1089,15 @@ export default function V1PurchaseReceiptsPage() {
           </Popconfirm>
         </SelectionActionBar>
       </BusinessOperationPanel>
+
+      <BusinessAttachmentPanel
+        ownerType="purchase_receipt"
+        ownerId={selectedRow?.id}
+        title="入库附件"
+        description="上传送货单、物流单、仓库收货照片或异常说明；附件不替代过账和库存流水。"
+        canUpload={canCreate || canPost}
+        canDelete={canCreate || canPost}
+      />
 
       <BusinessDataTable
         rowKey="id"

@@ -721,7 +721,7 @@ export default function MobileTaskListScreen({
             className={`mobile-role-bottom-nav__item ${
               active ? 'mobile-role-bottom-nav__item--active' : ''
             }`}
-            onClick={() => setActiveMainTabKey(key)}
+            onClick={() => openTaskBucket({ mainTabKey: key })}
           >
             <Icon aria-hidden="true" />
             <span>{label}</span>

@@ -21,9 +21,16 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import dayjs from 'dayjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import {
+  DATE_INPUT_DISPLAY_FORMAT,
+  DATE_INPUT_VALUE_FORMAT,
+  isDateInputAfter,
+  isDateInputBefore,
+  isDateInputRangeReversed,
+  parseDateInputValue,
+} from '../../utils/dateRange.mjs'
 import WorkflowTaskActionDrawer, {
   TASK_ACTION_META,
 } from '../workflow/WorkflowTaskActionDrawer.jsx'
@@ -49,8 +56,6 @@ const BUSINESS_TABLE_DEFAULT_SCROLL_X = 960
 const BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH = 160
 const BUSINESS_TABLE_MIN_COLUMN_WIDTH = 88
 const BUSINESS_TABLE_SELECTION_COLUMN_WIDTH = 52
-const DATE_INPUT_VALUE_FORMAT = 'YYYY-MM-DD'
-const DATE_INPUT_DISPLAY_FORMAT = 'YYYY/MM/DD'
 const DEFAULT_TASK_STATUS_LABELS = new Map([
   ['pending', '待处理'],
   ['ready', '可执行'],
@@ -150,15 +155,6 @@ function resolveCollaborationPanelMaxHeight() {
     COLLABORATION_PANEL_MIN_HEIGHT,
     Math.min(COLLABORATION_PANEL_MAX_HEIGHT, viewportMaxHeight)
   )
-}
-
-function parseDateInputValue(value) {
-  const normalizedValue = String(value || '')
-    .trim()
-    .replaceAll('/', '-')
-  if (!normalizedValue) return null
-  const parsedValue = dayjs(normalizedValue)
-  return parsedValue.isValid() ? parsedValue : null
 }
 
 export const DateInput = React.forwardRef(
@@ -433,8 +429,22 @@ export function DateRangeFilter({
   const hasMultipleDateTypes = options.length > 1
   const selectedDateTypeLabel =
     options.find((option) => option.value === value)?.label || options[0]?.label
+  const rangeInvalid = isDateInputRangeReversed(startValue, endValue)
+  const startDisabledDate = React.useCallback(
+    (current) => isDateInputAfter(current, endValue),
+    [endValue]
+  )
+  const endDisabledDate = React.useCallback(
+    (current) => isDateInputBefore(current, startValue),
+    [startValue]
+  )
   return (
-    <div className="erp-business-filter-control erp-business-date-range-filter erp-business-module-date-filter">
+    <div
+      className={joinClassNames(
+        'erp-business-filter-control erp-business-date-range-filter erp-business-module-date-filter',
+        rangeInvalid ? 'erp-business-date-range-filter--invalid' : ''
+      )}
+    >
       {hasMultipleDateTypes ? (
         <>
           <Select
@@ -465,7 +475,9 @@ export function DateRangeFilter({
           aria-label="开始日期"
           className="erp-business-date-range-filter__date"
           placeholder="开始日期"
+          status={rangeInvalid ? 'error' : undefined}
           value={startValue}
+          disabledDate={endValue ? startDisabledDate : undefined}
           onChange={onStartChange}
         />
         <span aria-hidden="true">-</span>
@@ -473,7 +485,9 @@ export function DateRangeFilter({
           aria-label="结束日期"
           className="erp-business-date-range-filter__date"
           placeholder="结束日期"
+          status={rangeInvalid ? 'error' : undefined}
           value={endValue}
+          disabledDate={startValue ? endDisabledDate : undefined}
           onChange={onEndChange}
         />
       </div>

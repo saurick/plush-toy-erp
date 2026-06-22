@@ -166,6 +166,29 @@
       var(--erp-tab-motion-easing, cubic-bezier(0.2, 0, 0, 1));
 }
 
+.mobile-role-tasks-page .business-attachment-panel {
+  border-color: #e5e7eb;
+  background: #fff;
+  color: #111827;
+}
+
+.mobile-role-tasks-page .business-attachment-panel .ant-typography,
+.mobile-role-tasks-page .business-attachment-panel .ant-list-item-meta-title {
+  color: #111827;
+}
+
+.mobile-role-tasks-page .business-attachment-panel .ant-typography-secondary,
+.mobile-role-tasks-page
+  .business-attachment-panel
+  .ant-list-item-meta-description {
+  color: #4b5563;
+}
+
+.mobile-role-tasks-page .business-attachment-panel .ant-btn-primary {
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+}
+
 .mobile-role-message-tabs {
   position: sticky;
   top: 0;

@@ -223,7 +223,11 @@ func (uc *PurchaseOrderUsecase) AddPurchaseOrderItem(ctx context.Context, in *Pu
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.validateOpenPurchaseOrder(ctx, normalized.PurchaseOrderID); err != nil {
+	order, err := uc.openPurchaseOrder(ctx, normalized.PurchaseOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateOptionalDateNotBefore(order.PurchaseDate, normalized.ExpectedArrivalDate); err != nil {
 		return nil, err
 	}
 	if err := uc.validateMaterialAndUnitActive(ctx, normalized.MaterialID, normalized.UnitID); err != nil {
@@ -247,7 +251,11 @@ func (uc *PurchaseOrderUsecase) UpdatePurchaseOrderItem(ctx context.Context, id 
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.validateOpenPurchaseOrder(ctx, normalized.PurchaseOrderID); err != nil {
+	order, err := uc.openPurchaseOrder(ctx, normalized.PurchaseOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateOptionalDateNotBefore(order.PurchaseDate, normalized.ExpectedArrivalDate); err != nil {
 		return nil, err
 	}
 	if err := uc.validateMaterialAndUnitActive(ctx, normalized.MaterialID, normalized.UnitID); err != nil {
@@ -332,6 +340,9 @@ func (uc *PurchaseOrderUsecase) SavePurchaseOrderWithItems(ctx context.Context, 
 		if err != nil {
 			return nil, err
 		}
+		if err := validateOptionalDateNotBefore(normalizedOrder.PurchaseDate, normalizedItem.ExpectedArrivalDate); err != nil {
+			return nil, err
+		}
 		if err := uc.validateMaterialAndUnitActive(ctx, normalizedItem.MaterialID, normalizedItem.UnitID); err != nil {
 			return nil, err
 		}
@@ -384,14 +395,19 @@ func (uc *PurchaseOrderUsecase) validateSupplierActive(ctx context.Context, id i
 }
 
 func (uc *PurchaseOrderUsecase) validateOpenPurchaseOrder(ctx context.Context, id int) error {
+	_, err := uc.openPurchaseOrder(ctx, id)
+	return err
+}
+
+func (uc *PurchaseOrderUsecase) openPurchaseOrder(ctx context.Context, id int) (*PurchaseOrder, error) {
 	order, err := uc.repo.GetPurchaseOrder(ctx, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if isPurchaseOrderSettled(order.LifecycleStatus) {
-		return ErrBadParam
+		return nil, ErrBadParam
 	}
-	return nil
+	return order, nil
 }
 
 func (uc *PurchaseOrderUsecase) validateMaterialAndUnitActive(ctx context.Context, materialID int, unitID int) error {
@@ -421,6 +437,9 @@ func normalizePurchaseOrderMutation(in PurchaseOrderMutation) (PurchaseOrderMuta
 	}
 	if in.PurchaseOrderNo == "" || in.SupplierID <= 0 || in.PurchaseDate.IsZero() {
 		return PurchaseOrderMutation{}, ErrBadParam
+	}
+	if err := validateOptionalDateNotBefore(in.PurchaseDate, in.ExpectedArrivalDate); err != nil {
+		return PurchaseOrderMutation{}, err
 	}
 	return in, nil
 }

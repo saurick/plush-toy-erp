@@ -1144,6 +1144,10 @@
   color: var(--erp-text);
 }
 
+[data-erp-theme='dark'] .erp-business-date-range-filter--invalid {
+  border-color: #ff7875;
+}
+
 [data-erp-theme='dark']
   .erp-business-date-range-filter
   .erp-business-date-input.ant-picker {

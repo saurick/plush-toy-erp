@@ -52,6 +52,8 @@ var ProviderSet = wire.NewSet(
 	wire.Bind(new(biz.InventoryRepo), new(*inventoryRepo)),
 	NewOperationalFactRepo,
 	wire.Bind(new(biz.OperationalFactRepo), new(*operationalFactRepo)),
+	NewBusinessAttachmentRepo,
+	wire.Bind(new(biz.BusinessAttachmentRepo), new(*businessAttachmentRepo)),
 )
 
 // Data 聚合 DB 等外部资源。

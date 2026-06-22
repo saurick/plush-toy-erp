@@ -20,6 +20,7 @@ import {
   resolveTaskSourceLabel,
   supportsRejectedAction,
 } from '../utils/mobileRoleTaskModel.mjs'
+import BusinessAttachmentPanel from '../../components/business-list/BusinessAttachmentPanel.jsx'
 
 export default function MobileTaskDetailScreen({
   activeRoleKey,
@@ -187,6 +188,16 @@ export default function MobileTaskDetailScreen({
               ))}
             </div>
           ) : null}
+          <div className="mt-4">
+            <BusinessAttachmentPanel
+              ownerType="workflow_task"
+              ownerId={selectedTask.id}
+              title="现场附件"
+              description="上传现场照片、异常截图或处理凭证；附件只作为任务证据，不改变任务状态。"
+              canUpload={selectedCanOperate}
+              canDelete={selectedCanOperate}
+            />
+          </div>
         </section>
 
         <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

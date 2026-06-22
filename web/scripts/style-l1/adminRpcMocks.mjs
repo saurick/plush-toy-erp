@@ -7,6 +7,7 @@ import { installFactRpcMocks } from './factRpcMocks.mjs'
 import { installMasterDataRpcMocks } from './masterDataRpcMocks.mjs'
 import { installOrderRpcMocks } from './orderRpcMocks.mjs'
 import { installSystemRpcMocks } from './systemRpcMocks.mjs'
+import { installAttachmentRpcMocks } from './attachmentRpcMocks.mjs'
 
 const mockPdfBuffer = Buffer.from(
   '%PDF-1.4\n%plush-style-l1\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n',
@@ -190,6 +191,7 @@ export async function installAdminRpcMocks(
   await installMasterDataRpcMocks(page, mockContext)
   await installOrderRpcMocks(page, mockContext)
   await installFactRpcMocks(page, mockContext)
+  await installAttachmentRpcMocks(page, mockContext)
 }
 
 export async function installAdminAuthExpiredRpcMocks(page) {

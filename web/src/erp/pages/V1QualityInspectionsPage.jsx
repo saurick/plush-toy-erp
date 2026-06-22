@@ -55,6 +55,7 @@ import {
   getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import {
   QualityInspectionCreateForm,
   QualityInspectionDecisionForm,
@@ -1372,6 +1373,15 @@ export default function V1QualityInspectionsPage() {
             mode={inspectionModal?.mode}
           />
         )}
+        <BusinessAttachmentPanel
+          ownerType="quality_inspection"
+          ownerId={inspectionModal?.inspection?.id}
+          title="质检附件"
+          description="上传不良照片、检验报告、让步说明或批次异常证据；附件不替代质检状态动作。"
+          canUpload={canCreate || canUpdate}
+          canDelete={canUpdate}
+          variant="inline"
+        />
       </BusinessFormModal>
     </BusinessPageLayout>
   )

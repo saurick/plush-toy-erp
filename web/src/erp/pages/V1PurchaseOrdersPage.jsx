@@ -46,6 +46,7 @@ import {
   getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import {
   PurchaseOrderFormFields,
   createBlankPurchaseLine,
@@ -1336,6 +1337,17 @@ export default function V1PurchaseOrdersPage() {
           unitOptions={unitOptions}
           onSupplierChange={handleSupplierChange}
           onMaterialChange={handleMaterialChange}
+          attachmentPanel={
+            <BusinessAttachmentPanel
+              ownerType="purchase_order"
+              ownerId={editingOrder?.id}
+              title="采购附件"
+              description="上传供应商报价、签回采购单、到货要求或价格确认资料；附件不替代采购订单事实。"
+              canUpload={canUpdate || canCreate}
+              canDelete={canUpdate}
+              variant="inline"
+            />
+          }
         />
       </BusinessFormModal>
       <Modal

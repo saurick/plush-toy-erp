@@ -33,6 +33,7 @@ import {
   getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import {
   activateSalesOrder,
   cancelSalesOrder,
@@ -1326,6 +1327,15 @@ export default function V1SalesOrdersPage() {
             onCustomerChange={applyCustomerPaymentDefaults}
             onPaymentMethodChange={applyPaymentMethodTermDays}
             onPaymentConditionBlur={requestPaymentConditionPriceReview}
+          />
+          <BusinessAttachmentPanel
+            ownerType="sales_order"
+            ownerId={editingOrder?.id}
+            title="订单附件"
+            description="上传客户 PO、合同、样品图或确认截图；附件不改变订单生命周期。"
+            canUpload={canUpdateOrder || canCreateOrder}
+            canDelete={canUpdateOrder}
+            variant="inline"
           />
           <SalesOrderItemsFormSection
             form={orderForm}

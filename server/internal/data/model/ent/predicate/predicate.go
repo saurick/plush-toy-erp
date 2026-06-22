@@ -18,6 +18,9 @@ type BOMHeader func(*sql.Selector)
 // BOMItem is the predicate function for bomitem builders.
 type BOMItem func(*sql.Selector)
 
+// BusinessAttachment is the predicate function for businessattachment builders.
+type BusinessAttachment func(*sql.Selector)
+
 // Contact is the predicate function for contact builders.
 type Contact func(*sql.Selector)
 

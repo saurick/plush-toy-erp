@@ -202,6 +202,16 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 		repo.lastFilter.SortDirection != "asc" {
 		t.Fatalf("expected outsourcing order filter to be mapped, got %#v", repo.lastFilter)
 	}
+	_, reversedListRes, err := j.handleOutsourcingOrder(ctx, "list_outsourcing_orders", "reversed-date", mustJSONRPCStruct(t, map[string]any{
+		"date_from": "2026-06-30",
+		"date_to":   "2026-06-01",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if reversedListRes == nil || reversedListRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected invalid param for reversed outsourcing order date filter, got %#v", reversedListRes)
+	}
 
 	_, itemListRes, err := j.handleOutsourcingOrder(ctx, "list_outsourcing_order_items", "3", mustJSONRPCStruct(t, map[string]any{
 		"outsourcing_order_id": float64(orderID),

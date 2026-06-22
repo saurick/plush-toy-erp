@@ -56,6 +56,18 @@ func (f BOMItemFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, err
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BOMItemMutation", m)
 }
 
+// The BusinessAttachmentFunc type is an adapter to allow the use of ordinary
+// function as BusinessAttachment mutator.
+type BusinessAttachmentFunc func(context.Context, *ent.BusinessAttachmentMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BusinessAttachmentFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BusinessAttachmentMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BusinessAttachmentMutation", m)
+}
+
 // The ContactFunc type is an adapter to allow the use of ordinary
 // function as Contact mutator.
 type ContactFunc func(context.Context, *ent.ContactMutation) (ent.Value, error)

@@ -15,6 +15,7 @@ import (
 	"server/internal/data/model/ent/adminuserrole"
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/bomitem"
+	"server/internal/data/model/ent/businessattachment"
 	"server/internal/data/model/ent/contact"
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/financefact"
@@ -74,6 +75,8 @@ type Client struct {
 	BOMHeader *BOMHeaderClient
 	// BOMItem is the client for interacting with the BOMItem builders.
 	BOMItem *BOMItemClient
+	// BusinessAttachment is the client for interacting with the BusinessAttachment builders.
+	BusinessAttachment *BusinessAttachmentClient
 	// Contact is the client for interacting with the Contact builders.
 	Contact *ContactClient
 	// Customer is the client for interacting with the Customer builders.
@@ -167,6 +170,7 @@ func (c *Client) init() {
 	c.AdminUserRole = NewAdminUserRoleClient(c.config)
 	c.BOMHeader = NewBOMHeaderClient(c.config)
 	c.BOMItem = NewBOMItemClient(c.config)
+	c.BusinessAttachment = NewBusinessAttachmentClient(c.config)
 	c.Contact = NewContactClient(c.config)
 	c.Customer = NewCustomerClient(c.config)
 	c.FinanceFact = NewFinanceFactClient(c.config)
@@ -302,6 +306,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		AdminUserRole:                 NewAdminUserRoleClient(cfg),
 		BOMHeader:                     NewBOMHeaderClient(cfg),
 		BOMItem:                       NewBOMItemClient(cfg),
+		BusinessAttachment:            NewBusinessAttachmentClient(cfg),
 		Contact:                       NewContactClient(cfg),
 		Customer:                      NewCustomerClient(cfg),
 		FinanceFact:                   NewFinanceFactClient(cfg),
@@ -364,6 +369,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		AdminUserRole:                 NewAdminUserRoleClient(cfg),
 		BOMHeader:                     NewBOMHeaderClient(cfg),
 		BOMItem:                       NewBOMItemClient(cfg),
+		BusinessAttachment:            NewBusinessAttachmentClient(cfg),
 		Contact:                       NewContactClient(cfg),
 		Customer:                      NewCustomerClient(cfg),
 		FinanceFact:                   NewFinanceFactClient(cfg),
@@ -432,16 +438,17 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem, c.Contact, c.Customer,
-		c.FinanceFact, c.InventoryBalance, c.InventoryLot, c.InventoryTxn, c.Material,
-		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem, c.Permission,
-		c.Process, c.Product, c.ProductSKU, c.ProductionFact, c.PurchaseOrder,
-		c.PurchaseOrderItem, c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
-		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
-		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RolePermission,
-		c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem,
-		c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier, c.Unit,
-		c.Warehouse, c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
+		c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem, c.BusinessAttachment,
+		c.Contact, c.Customer, c.FinanceFact, c.InventoryBalance, c.InventoryLot,
+		c.InventoryTxn, c.Material, c.OutsourcingFact, c.OutsourcingOrder,
+		c.OutsourcingOrderItem, c.Permission, c.Process, c.Product, c.ProductSKU,
+		c.ProductionFact, c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
+		c.PurchaseReceiptAdjustment, c.PurchaseReceiptAdjustmentItem,
+		c.PurchaseReceiptItem, c.PurchaseReturn, c.PurchaseReturnItem,
+		c.QualityInspection, c.Role, c.RolePermission, c.RuntimeAuditEvent,
+		c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem, c.Shipment, c.ShipmentItem,
+		c.StockReservation, c.Supplier, c.Unit, c.Warehouse, c.WorkflowBusinessState,
+		c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Use(hooks...)
 	}
@@ -451,16 +458,17 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem, c.Contact, c.Customer,
-		c.FinanceFact, c.InventoryBalance, c.InventoryLot, c.InventoryTxn, c.Material,
-		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem, c.Permission,
-		c.Process, c.Product, c.ProductSKU, c.ProductionFact, c.PurchaseOrder,
-		c.PurchaseOrderItem, c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
-		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
-		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RolePermission,
-		c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem,
-		c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier, c.Unit,
-		c.Warehouse, c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
+		c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem, c.BusinessAttachment,
+		c.Contact, c.Customer, c.FinanceFact, c.InventoryBalance, c.InventoryLot,
+		c.InventoryTxn, c.Material, c.OutsourcingFact, c.OutsourcingOrder,
+		c.OutsourcingOrderItem, c.Permission, c.Process, c.Product, c.ProductSKU,
+		c.ProductionFact, c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
+		c.PurchaseReceiptAdjustment, c.PurchaseReceiptAdjustmentItem,
+		c.PurchaseReceiptItem, c.PurchaseReturn, c.PurchaseReturnItem,
+		c.QualityInspection, c.Role, c.RolePermission, c.RuntimeAuditEvent,
+		c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem, c.Shipment, c.ShipmentItem,
+		c.StockReservation, c.Supplier, c.Unit, c.Warehouse, c.WorkflowBusinessState,
+		c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -477,6 +485,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.BOMHeader.mutate(ctx, m)
 	case *BOMItemMutation:
 		return c.BOMItem.mutate(ctx, m)
+	case *BusinessAttachmentMutation:
+		return c.BusinessAttachment.mutate(ctx, m)
 	case *ContactMutation:
 		return c.Contact.mutate(ctx, m)
 	case *CustomerMutation:
@@ -1169,6 +1179,139 @@ func (c *BOMItemClient) mutate(ctx context.Context, m *BOMItemMutation) (Value, 
 		return (&BOMItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown BOMItem mutation op: %q", m.Op())
+	}
+}
+
+// BusinessAttachmentClient is a client for the BusinessAttachment schema.
+type BusinessAttachmentClient struct {
+	config
+}
+
+// NewBusinessAttachmentClient returns a client for the BusinessAttachment from the given config.
+func NewBusinessAttachmentClient(c config) *BusinessAttachmentClient {
+	return &BusinessAttachmentClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `businessattachment.Hooks(f(g(h())))`.
+func (c *BusinessAttachmentClient) Use(hooks ...Hook) {
+	c.hooks.BusinessAttachment = append(c.hooks.BusinessAttachment, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `businessattachment.Intercept(f(g(h())))`.
+func (c *BusinessAttachmentClient) Intercept(interceptors ...Interceptor) {
+	c.inters.BusinessAttachment = append(c.inters.BusinessAttachment, interceptors...)
+}
+
+// Create returns a builder for creating a BusinessAttachment entity.
+func (c *BusinessAttachmentClient) Create() *BusinessAttachmentCreate {
+	mutation := newBusinessAttachmentMutation(c.config, OpCreate)
+	return &BusinessAttachmentCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of BusinessAttachment entities.
+func (c *BusinessAttachmentClient) CreateBulk(builders ...*BusinessAttachmentCreate) *BusinessAttachmentCreateBulk {
+	return &BusinessAttachmentCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *BusinessAttachmentClient) MapCreateBulk(slice any, setFunc func(*BusinessAttachmentCreate, int)) *BusinessAttachmentCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &BusinessAttachmentCreateBulk{err: fmt.Errorf("calling to BusinessAttachmentClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*BusinessAttachmentCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &BusinessAttachmentCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for BusinessAttachment.
+func (c *BusinessAttachmentClient) Update() *BusinessAttachmentUpdate {
+	mutation := newBusinessAttachmentMutation(c.config, OpUpdate)
+	return &BusinessAttachmentUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *BusinessAttachmentClient) UpdateOne(_m *BusinessAttachment) *BusinessAttachmentUpdateOne {
+	mutation := newBusinessAttachmentMutation(c.config, OpUpdateOne, withBusinessAttachment(_m))
+	return &BusinessAttachmentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *BusinessAttachmentClient) UpdateOneID(id int) *BusinessAttachmentUpdateOne {
+	mutation := newBusinessAttachmentMutation(c.config, OpUpdateOne, withBusinessAttachmentID(id))
+	return &BusinessAttachmentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for BusinessAttachment.
+func (c *BusinessAttachmentClient) Delete() *BusinessAttachmentDelete {
+	mutation := newBusinessAttachmentMutation(c.config, OpDelete)
+	return &BusinessAttachmentDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *BusinessAttachmentClient) DeleteOne(_m *BusinessAttachment) *BusinessAttachmentDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *BusinessAttachmentClient) DeleteOneID(id int) *BusinessAttachmentDeleteOne {
+	builder := c.Delete().Where(businessattachment.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &BusinessAttachmentDeleteOne{builder}
+}
+
+// Query returns a query builder for BusinessAttachment.
+func (c *BusinessAttachmentClient) Query() *BusinessAttachmentQuery {
+	return &BusinessAttachmentQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeBusinessAttachment},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a BusinessAttachment entity by its id.
+func (c *BusinessAttachmentClient) Get(ctx context.Context, id int) (*BusinessAttachment, error) {
+	return c.Query().Where(businessattachment.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *BusinessAttachmentClient) GetX(ctx context.Context, id int) *BusinessAttachment {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *BusinessAttachmentClient) Hooks() []Hook {
+	return c.hooks.BusinessAttachment
+}
+
+// Interceptors returns the client interceptors.
+func (c *BusinessAttachmentClient) Interceptors() []Interceptor {
+	return c.inters.BusinessAttachment
+}
+
+func (c *BusinessAttachmentClient) mutate(ctx context.Context, m *BusinessAttachmentMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&BusinessAttachmentCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&BusinessAttachmentUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&BusinessAttachmentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&BusinessAttachmentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown BusinessAttachment mutation op: %q", m.Op())
 	}
 }
 
@@ -8731,25 +8874,26 @@ func (c *WorkflowTaskEventClient) mutate(ctx context.Context, m *WorkflowTaskEve
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		AdminUser, AdminUserRole, BOMHeader, BOMItem, Contact, Customer, FinanceFact,
-		InventoryBalance, InventoryLot, InventoryTxn, Material, OutsourcingFact,
-		OutsourcingOrder, OutsourcingOrderItem, Permission, Process, Product,
-		ProductSKU, ProductionFact, PurchaseOrder, PurchaseOrderItem, PurchaseReceipt,
-		PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
-		PurchaseReturn, PurchaseReturnItem, QualityInspection, Role, RolePermission,
-		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
-		ShipmentItem, StockReservation, Supplier, Unit, Warehouse,
-		WorkflowBusinessState, WorkflowTask, WorkflowTaskEvent []ent.Hook
+		AdminUser, AdminUserRole, BOMHeader, BOMItem, BusinessAttachment, Contact,
+		Customer, FinanceFact, InventoryBalance, InventoryLot, InventoryTxn, Material,
+		OutsourcingFact, OutsourcingOrder, OutsourcingOrderItem, Permission, Process,
+		Product, ProductSKU, ProductionFact, PurchaseOrder, PurchaseOrderItem,
+		PurchaseReceipt, PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem,
+		PurchaseReceiptItem, PurchaseReturn, PurchaseReturnItem, QualityInspection,
+		Role, RolePermission, RuntimeAuditEvent, RuntimeMarker, SalesOrder,
+		SalesOrderItem, Shipment, ShipmentItem, StockReservation, Supplier, Unit,
+		Warehouse, WorkflowBusinessState, WorkflowTask, WorkflowTaskEvent []ent.Hook
 	}
 	inters struct {
-		AdminUser, AdminUserRole, BOMHeader, BOMItem, Contact, Customer, FinanceFact,
-		InventoryBalance, InventoryLot, InventoryTxn, Material, OutsourcingFact,
-		OutsourcingOrder, OutsourcingOrderItem, Permission, Process, Product,
-		ProductSKU, ProductionFact, PurchaseOrder, PurchaseOrderItem, PurchaseReceipt,
-		PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
-		PurchaseReturn, PurchaseReturnItem, QualityInspection, Role, RolePermission,
-		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
-		ShipmentItem, StockReservation, Supplier, Unit, Warehouse,
-		WorkflowBusinessState, WorkflowTask, WorkflowTaskEvent []ent.Interceptor
+		AdminUser, AdminUserRole, BOMHeader, BOMItem, BusinessAttachment, Contact,
+		Customer, FinanceFact, InventoryBalance, InventoryLot, InventoryTxn, Material,
+		OutsourcingFact, OutsourcingOrder, OutsourcingOrderItem, Permission, Process,
+		Product, ProductSKU, ProductionFact, PurchaseOrder, PurchaseOrderItem,
+		PurchaseReceipt, PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem,
+		PurchaseReceiptItem, PurchaseReturn, PurchaseReturnItem, QualityInspection,
+		Role, RolePermission, RuntimeAuditEvent, RuntimeMarker, SalesOrder,
+		SalesOrderItem, Shipment, ShipmentItem, StockReservation, Supplier, Unit,
+		Warehouse, WorkflowBusinessState, WorkflowTask,
+		WorkflowTaskEvent []ent.Interceptor
 	}
 )

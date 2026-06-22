@@ -33,6 +33,7 @@ import {
   BusinessListToolbarActions,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
+import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import { getBusinessModule } from '../config/businessModules.mjs'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
@@ -757,6 +758,15 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           </Button>
         </SelectionActionBar>
       </BusinessOperationPanel>
+
+      <BusinessAttachmentPanel
+        ownerType="workflow_task"
+        ownerId={selectedTask?.id}
+        title="协同任务附件"
+        description="上传现场照片、异常截图或任务处理证据；附件不代表任务已完成，也不写业务事实。"
+        canUpload={canUpdateWorkflowTasks || canCompleteWorkflowTasks}
+        canDelete={canUpdateWorkflowTasks}
+      />
 
       <BusinessDataTable
         rowKey="id"

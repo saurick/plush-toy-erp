@@ -33,6 +33,7 @@ func NewJsonrpcService(
 	outsourcingOrderUC *biz.OutsourcingOrderUsecase,
 	inventoryUC *biz.InventoryUsecase,
 	operationalFactUC *biz.OperationalFactUsecase,
+	attachmentUC *biz.BusinessAttachmentUsecase,
 	adminReader biz.AdminAccountReader,
 ) *JsonrpcService {
 	return &JsonrpcService{
@@ -49,6 +50,7 @@ func NewJsonrpcService(
 			outsourcingOrderUC,
 			inventoryUC,
 			operationalFactUC,
+			attachmentUC,
 			adminReader,
 		),
 		log: log.NewHelper(log.With(logger, "module", "service.jsonrpc.transport")),

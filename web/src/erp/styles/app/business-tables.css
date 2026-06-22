@@ -729,6 +729,10 @@
   background: #fff;
 }
 
+.erp-business-date-range-filter--invalid {
+  border-color: #d4380d;
+}
+
 .erp-business-date-range-filter__type.ant-select,
 :where(.erp-business-date-range-filter__type.ant-select) .ant-select-selector {
   flex: 0 0 132px;

@@ -104,6 +104,16 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 	if invalidListRes == nil || invalidListRes.Code != errcode.InvalidParam.Code {
 		t.Fatalf("expected invalid param for bad quality date filter, got %#v", invalidListRes)
 	}
+	_, reversedListRes, err := j.handleQuality(adminCtx, "list_quality_inspections", "reversed-date", mustJSONRPCStruct(t, map[string]any{
+		"date_from": "2026-06-30",
+		"date_to":   "2026-06-01",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if reversedListRes == nil || reversedListRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected invalid param for reversed quality date filter, got %#v", reversedListRes)
+	}
 
 	rejectReceipt, rejectItem, rejectLotID := createPostedQualityReceipt(t, ctx, j.inventoryUC, fixtures, "QI-JSONRPC-IN-REJECT", "QI-JSONRPC-LOT-REJECT")
 	rejectDraft := createQualityDraftViaRPC(t, adminCtx, j, "QI-JSONRPC-REJECT", rejectReceipt.ID, rejectItem.ID, rejectLotID, fixtures)

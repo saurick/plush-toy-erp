@@ -69,6 +69,7 @@ import {
   downloadBusinessListCSV,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
+import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import {
   routeWithQuery,
   searchParamPositiveIntText,
@@ -833,6 +834,13 @@ export function OperationalFactWorkspace({
     activeConfig.confirmPermissions || activeConfig.writePermissions
   )
   const selectedLabel = selectedLabelForKey(activeKey, activeSelectedRow)
+  const activeAttachmentOwnerType =
+    {
+      production: 'production_fact',
+      outsourcing: 'outsourcing_fact',
+      finance: 'finance_fact',
+      shipments: 'shipment',
+    }[activeKey] || ''
   const relatedMenuItems = useMemo(() => {
     if (!activeSelectedRow) return []
     const items = []
@@ -1278,6 +1286,17 @@ export function OperationalFactWorkspace({
           ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>
+
+      {activeAttachmentOwnerType ? (
+        <BusinessAttachmentPanel
+          ownerType={activeAttachmentOwnerType}
+          ownerId={activeSelectedRow?.id}
+          title={`${activeConfig.title}附件`}
+          description="上传与当前记录相关的图片、票据、对账或确认资料；附件只作为证据，不改变业务事实状态。"
+          canUpload={canWriteActive || canConfirmActive}
+          canDelete={canWriteActive || canConfirmActive}
+        />
+      ) : null}
 
       <BusinessDataTable
         tableHeader={

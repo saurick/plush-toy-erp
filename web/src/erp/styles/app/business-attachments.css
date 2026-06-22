@@ -1,0 +1,107 @@
+.business-attachment-panel {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+  color: #111827;
+}
+
+.business-attachment-panel--inline {
+  grid-column: 1 / -1;
+  border-color: #d8e3dc;
+  padding: 10px 12px;
+}
+
+.business-attachment-panel .ant-typography,
+.business-attachment-panel .ant-list-item-meta-title {
+  color: #111827;
+}
+
+.business-attachment-panel .ant-typography-secondary,
+.business-attachment-panel .ant-list-item-meta-description {
+  color: #4b5563;
+}
+
+.business-attachment-panel .ant-btn-primary {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.business-attachment-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.business-attachment-panel--inline .business-attachment-panel__header {
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.business-attachment-panel__header .ant-typography {
+  margin-bottom: 0;
+}
+
+.business-attachment-panel__header .ant-typography-secondary {
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+.business-attachment-panel .ant-list-item {
+  padding-inline: 0;
+}
+
+.business-attachment-panel__empty {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #6b7280;
+}
+
+.business-attachment-panel--inline .ant-list-empty-text {
+  padding: 4px 0 0;
+}
+
+.business-attachment-panel--inline .business-attachment-panel__empty {
+  justify-content: flex-start;
+}
+
+[data-erp-theme='dark'] .business-attachment-panel {
+  border-color: #334155;
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
+[data-erp-theme='dark'] .business-attachment-panel--inline {
+  border-color: #475569;
+}
+
+[data-erp-theme='dark'] .business-attachment-panel .ant-typography,
+[data-erp-theme='dark'] .business-attachment-panel .ant-list-item-meta-title {
+  color: #e5e7eb;
+}
+
+[data-erp-theme='dark'] .business-attachment-panel .ant-typography-secondary,
+[data-erp-theme='dark']
+  .business-attachment-panel
+  .ant-list-item-meta-description {
+  color: #94a3b8;
+}
+
+[data-erp-theme='dark'] .business-attachment-panel__empty {
+  color: #94a3b8;
+}
+
+@media (max-width: 640px) {
+  .business-attachment-panel__header {
+    flex-direction: column;
+  }
+
+  .business-attachment-panel__header .ant-btn {
+    width: 100%;
+  }
+}

@@ -251,6 +251,16 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	if invalidListRes == nil || invalidListRes.Code != errcode.InvalidParam.Code {
 		t.Fatalf("expected invalid param for bad purchase receipt date filter, got %#v", invalidListRes)
 	}
+	_, reversedListRes, err := j.handlePurchase(adminCtx, "list_purchase_receipts", "reversed-date", mustJSONRPCStruct(t, map[string]any{
+		"date_from": "2026-06-30",
+		"date_to":   "2026-06-01",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if reversedListRes == nil || reversedListRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected invalid param for reversed purchase receipt date filter, got %#v", reversedListRes)
+	}
 
 	_, dashboardRes, err := j.handleBusiness(adminCtx, "dashboard_stats", "6", nil)
 	if err != nil {

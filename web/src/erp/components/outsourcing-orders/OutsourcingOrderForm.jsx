@@ -1,7 +1,13 @@
-import React from 'react'
+import React, { useCallback } from 'react'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { Button, Form, Input, InputNumber, Select } from 'antd'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import {
+  dateInputNotAfterRule,
+  dateInputNotBeforeRule,
+  isDateInputAfter,
+  isDateInputBefore,
+} from '../../utils/dateRange.mjs'
 import { unixToDateInputValue } from '../../utils/masterDataOrderView.mjs'
 
 function decimalNumber(value) {
@@ -120,12 +126,23 @@ export default function OutsourcingOrderForm({
   productOptions,
   processOptions,
   unitOptions,
+  attachmentPanel,
   onProductChange,
   onProcessChange,
   onUnitChange,
 }) {
   const watchedItems = Form.useWatch('items', form) || []
+  const orderDate = Form.useWatch('order_date', form)
+  const expectedReturnDate = Form.useWatch('expected_return_date', form)
   const lineSummary = summarizeLines(watchedItems)
+  const disableOrderDateAfterExpectedReturn = useCallback(
+    (current) => isDateInputAfter(current, expectedReturnDate),
+    [expectedReturnDate]
+  )
+  const disableExpectedReturnBeforeOrderDate = useCallback(
+    (current) => isDateInputBefore(current, orderDate),
+    [orderDate]
+  )
 
   return (
     <Form
@@ -164,16 +181,37 @@ export default function OutsourcingOrderForm({
         className="erp-business-action-form__field"
         name="order_date"
         label="下单日期"
-        rules={[{ required: true, message: '请选择下单日期' }]}
+        rules={[
+          { required: true, message: '请选择下单日期' },
+          dateInputNotAfterRule({
+            getEndValue: () => form.getFieldValue('expected_return_date'),
+            message: '下单日期不能晚于预计回货',
+          }),
+        ]}
       >
-        <DateInput />
+        <DateInput
+          disabledDate={
+            expectedReturnDate ? disableOrderDateAfterExpectedReturn : undefined
+          }
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
+        dependencies={['order_date']}
         name="expected_return_date"
         label="预计回货"
+        rules={[
+          dateInputNotBeforeRule({
+            getStartValue: () => form.getFieldValue('order_date'),
+            message: '预计回货不能早于下单日期',
+          }),
+        ]}
       >
-        <DateInput />
+        <DateInput
+          disabledDate={
+            orderDate ? disableExpectedReturnBeforeOrderDate : undefined
+          }
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
@@ -182,6 +220,7 @@ export default function OutsourcingOrderForm({
       >
         <Input.TextArea allowClear rows={2} showCount maxLength={255} />
       </Form.Item>
+      {attachmentPanel}
 
       <section className="erp-sales-order-lines-form">
         <Form.List name="items">
@@ -312,8 +351,22 @@ export default function OutsourcingOrderForm({
                       <Form.Item
                         name={[field.name, 'expected_return_date']}
                         label="行预计回货"
+                        dependencies={['order_date']}
+                        rules={[
+                          dateInputNotBeforeRule({
+                            getStartValue: () =>
+                              form.getFieldValue('order_date'),
+                            message: '行预计回货不能早于下单日期',
+                          }),
+                        ]}
                       >
-                        <DateInput />
+                        <DateInput
+                          disabledDate={
+                            orderDate
+                              ? disableExpectedReturnBeforeOrderDate
+                              : undefined
+                          }
+                        />
                       </Form.Item>
                       <Form.Item
                         className="erp-sales-order-lines-form__field--full"

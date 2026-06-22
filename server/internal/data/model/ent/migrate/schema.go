@@ -162,6 +162,50 @@ var (
 			},
 		},
 	}
+	// BusinessAttachmentsColumns holds the columns for the "business_attachments" table.
+	BusinessAttachmentsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "owner_type", Type: field.TypeString, Size: 64},
+		{Name: "owner_id", Type: field.TypeInt},
+		{Name: "attachment_type", Type: field.TypeString, Size: 64, Default: "evidence"},
+		{Name: "slot_key", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "file_name", Type: field.TypeString, Size: 255},
+		{Name: "mime_type", Type: field.TypeString, Size: 128},
+		{Name: "file_size", Type: field.TypeInt},
+		{Name: "sha256", Type: field.TypeString, Size: 64},
+		{Name: "content", Type: field.TypeBytes},
+		{Name: "uploaded_by", Type: field.TypeInt, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// BusinessAttachmentsTable holds the schema information for the "business_attachments" table.
+	BusinessAttachmentsTable = &schema.Table{
+		Name:       "business_attachments",
+		Columns:    BusinessAttachmentsColumns,
+		PrimaryKey: []*schema.Column{BusinessAttachmentsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "businessattachment_owner_type_owner_id",
+				Unique:  false,
+				Columns: []*schema.Column{BusinessAttachmentsColumns[1], BusinessAttachmentsColumns[2]},
+			},
+			{
+				Name:    "businessattachment_owner_type_owner_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{BusinessAttachmentsColumns[1], BusinessAttachmentsColumns[2], BusinessAttachmentsColumns[12]},
+			},
+			{
+				Name:    "businessattachment_sha256",
+				Unique:  false,
+				Columns: []*schema.Column{BusinessAttachmentsColumns[8]},
+			},
+			{
+				Name:    "businessattachment_uploaded_by",
+				Unique:  false,
+				Columns: []*schema.Column{BusinessAttachmentsColumns[10]},
+			},
+		},
+	}
 	// ContactsColumns holds the columns for the "contacts" table.
 	ContactsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -2484,6 +2528,7 @@ var (
 		AdminUserRolesTable,
 		BomHeadersTable,
 		BomItemsTable,
+		BusinessAttachmentsTable,
 		ContactsTable,
 		CustomersTable,
 		FinanceFactsTable,
@@ -2535,6 +2580,11 @@ func init() {
 	BomItemsTable.Annotation.Checks = map[string]string{
 		"bom_items_loss_rate_non_negative": "loss_rate >= 0",
 		"bom_items_quantity_positive":      "quantity > 0",
+	}
+	BusinessAttachmentsTable.Annotation = &entsql.Annotation{}
+	BusinessAttachmentsTable.Annotation.Checks = map[string]string{
+		"business_attachments_file_size_positive": "file_size > 0",
+		"business_attachments_owner_type_allowed": "owner_type IN ('sales_order', 'purchase_order', 'outsourcing_order', 'purchase_receipt', 'quality_inspection', 'shipment', 'finance_fact', 'production_fact', 'outsourcing_fact', 'product_sku', 'bom_header', 'workflow_task')",
 	}
 	ContactsTable.Annotation = &entsql.Annotation{}
 	ContactsTable.Annotation.Checks = map[string]string{

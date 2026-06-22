@@ -234,7 +234,11 @@ func (uc *SalesOrderUsecase) AddSalesOrderItem(ctx context.Context, in *SalesOrd
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.validateOpenSalesOrder(ctx, normalized.SalesOrderID); err != nil {
+	order, err := uc.openSalesOrder(ctx, normalized.SalesOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateOptionalDateNotBefore(order.OrderDate, normalized.PlannedDeliveryDate); err != nil {
 		return nil, err
 	}
 	if err := uc.validateProductAndUnitActive(ctx, normalized.ProductID, normalized.UnitID); err != nil {
@@ -258,7 +262,11 @@ func (uc *SalesOrderUsecase) UpdateSalesOrderItem(ctx context.Context, id int, i
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.validateOpenSalesOrder(ctx, normalized.SalesOrderID); err != nil {
+	order, err := uc.openSalesOrder(ctx, normalized.SalesOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateOptionalDateNotBefore(order.OrderDate, normalized.PlannedDeliveryDate); err != nil {
 		return nil, err
 	}
 	if err := uc.validateProductAndUnitActive(ctx, normalized.ProductID, normalized.UnitID); err != nil {
@@ -343,6 +351,9 @@ func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int
 		if err != nil {
 			return nil, err
 		}
+		if err := validateOptionalDateNotBefore(normalizedOrder.OrderDate, normalizedItem.PlannedDeliveryDate); err != nil {
+			return nil, err
+		}
 		if err := uc.validateProductAndUnitActive(ctx, normalizedItem.ProductID, normalizedItem.UnitID); err != nil {
 			return nil, err
 		}
@@ -395,14 +406,19 @@ func (uc *SalesOrderUsecase) validateCustomerActive(ctx context.Context, id int)
 }
 
 func (uc *SalesOrderUsecase) validateOpenSalesOrder(ctx context.Context, id int) error {
+	_, err := uc.openSalesOrder(ctx, id)
+	return err
+}
+
+func (uc *SalesOrderUsecase) openSalesOrder(ctx context.Context, id int) (*SalesOrder, error) {
 	order, err := uc.repo.GetSalesOrder(ctx, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if isSalesOrderSettled(order.LifecycleStatus) {
-		return ErrBadParam
+		return nil, ErrBadParam
 	}
-	return nil
+	return order, nil
 }
 
 func (uc *SalesOrderUsecase) validateProductAndUnitActive(ctx context.Context, productID int, unitID int) error {
@@ -434,6 +450,9 @@ func normalizeSalesOrderMutation(in SalesOrderMutation) (SalesOrderMutation, err
 	}
 	if in.OrderNo == "" || in.CustomerID <= 0 || in.OrderDate.IsZero() || (in.PaymentTermDays != nil && *in.PaymentTermDays < 0) {
 		return SalesOrderMutation{}, ErrBadParam
+	}
+	if err := validateOptionalDateNotBefore(in.OrderDate, in.PlannedDeliveryDate); err != nil {
+		return SalesOrderMutation{}, err
 	}
 	return in, nil
 }

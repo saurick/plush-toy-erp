@@ -4063,6 +4063,7 @@ export function createStyleL1Scenarios(deps) {
       assertBusinessMainTableHasNoOperationColumn,
       assertBusinessMainTableInitialSelectionEmpty,
       assertBusinessMainTableSortableColumns,
+      assertBusinessModuleToolbarControlStyle,
       assertBusinessPageRefreshEntrypoint,
       assertERPThemeMode,
       assertNoHorizontalOverflow,

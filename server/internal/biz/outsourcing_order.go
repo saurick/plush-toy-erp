@@ -222,6 +222,9 @@ func (uc *OutsourcingOrderUsecase) SaveOutsourcingOrderWithItems(ctx context.Con
 		if err != nil {
 			return nil, err
 		}
+		if err := validateOptionalDateNotBefore(normalizedOrder.OrderDate, normalizedItem.ExpectedReturnDate); err != nil {
+			return nil, err
+		}
 		if err := uc.validateProductProcessAndUnit(ctx, normalizedItem.ProductID, normalizedItem.ProcessID, normalizedItem.UnitID); err != nil {
 			return nil, err
 		}
@@ -326,6 +329,9 @@ func normalizeOutsourcingOrderMutation(in OutsourcingOrderMutation) (Outsourcing
 	}
 	if in.OutsourcingOrderNo == "" || in.SupplierID <= 0 || in.OrderDate.IsZero() {
 		return OutsourcingOrderMutation{}, ErrBadParam
+	}
+	if err := validateOptionalDateNotBefore(in.OrderDate, in.ExpectedReturnDate); err != nil {
+		return OutsourcingOrderMutation{}, err
 	}
 	if in.SourceSalesOrderID != nil && *in.SourceSalesOrderID <= 0 {
 		return OutsourcingOrderMutation{}, ErrBadParam

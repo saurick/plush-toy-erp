@@ -7,6 +7,7 @@ import (
 	"server/internal/data/model/ent/adminuserrole"
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/bomitem"
+	"server/internal/data/model/ent/businessattachment"
 	"server/internal/data/model/ent/contact"
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/financefact"
@@ -212,6 +213,124 @@ func init() {
 	bomitem.DefaultUpdatedAt = bomitemDescUpdatedAt.Default.(func() time.Time)
 	// bomitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	bomitem.UpdateDefaultUpdatedAt = bomitemDescUpdatedAt.UpdateDefault.(func() time.Time)
+	businessattachmentFields := schema.BusinessAttachment{}.Fields()
+	_ = businessattachmentFields
+	// businessattachmentDescOwnerType is the schema descriptor for owner_type field.
+	businessattachmentDescOwnerType := businessattachmentFields[0].Descriptor()
+	// businessattachment.OwnerTypeValidator is a validator for the "owner_type" field. It is called by the builders before save.
+	businessattachment.OwnerTypeValidator = func() func(string) error {
+		validators := businessattachmentDescOwnerType.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(owner_type string) error {
+			for _, fn := range fns {
+				if err := fn(owner_type); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// businessattachmentDescOwnerID is the schema descriptor for owner_id field.
+	businessattachmentDescOwnerID := businessattachmentFields[1].Descriptor()
+	// businessattachment.OwnerIDValidator is a validator for the "owner_id" field. It is called by the builders before save.
+	businessattachment.OwnerIDValidator = businessattachmentDescOwnerID.Validators[0].(func(int) error)
+	// businessattachmentDescAttachmentType is the schema descriptor for attachment_type field.
+	businessattachmentDescAttachmentType := businessattachmentFields[2].Descriptor()
+	// businessattachment.DefaultAttachmentType holds the default value on creation for the attachment_type field.
+	businessattachment.DefaultAttachmentType = businessattachmentDescAttachmentType.Default.(string)
+	// businessattachment.AttachmentTypeValidator is a validator for the "attachment_type" field. It is called by the builders before save.
+	businessattachment.AttachmentTypeValidator = func() func(string) error {
+		validators := businessattachmentDescAttachmentType.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(attachment_type string) error {
+			for _, fn := range fns {
+				if err := fn(attachment_type); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// businessattachmentDescSlotKey is the schema descriptor for slot_key field.
+	businessattachmentDescSlotKey := businessattachmentFields[3].Descriptor()
+	// businessattachment.SlotKeyValidator is a validator for the "slot_key" field. It is called by the builders before save.
+	businessattachment.SlotKeyValidator = businessattachmentDescSlotKey.Validators[0].(func(string) error)
+	// businessattachmentDescFileName is the schema descriptor for file_name field.
+	businessattachmentDescFileName := businessattachmentFields[4].Descriptor()
+	// businessattachment.FileNameValidator is a validator for the "file_name" field. It is called by the builders before save.
+	businessattachment.FileNameValidator = func() func(string) error {
+		validators := businessattachmentDescFileName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(file_name string) error {
+			for _, fn := range fns {
+				if err := fn(file_name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// businessattachmentDescMimeType is the schema descriptor for mime_type field.
+	businessattachmentDescMimeType := businessattachmentFields[5].Descriptor()
+	// businessattachment.MimeTypeValidator is a validator for the "mime_type" field. It is called by the builders before save.
+	businessattachment.MimeTypeValidator = func() func(string) error {
+		validators := businessattachmentDescMimeType.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(mime_type string) error {
+			for _, fn := range fns {
+				if err := fn(mime_type); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// businessattachmentDescFileSize is the schema descriptor for file_size field.
+	businessattachmentDescFileSize := businessattachmentFields[6].Descriptor()
+	// businessattachment.FileSizeValidator is a validator for the "file_size" field. It is called by the builders before save.
+	businessattachment.FileSizeValidator = businessattachmentDescFileSize.Validators[0].(func(int) error)
+	// businessattachmentDescSha256 is the schema descriptor for sha256 field.
+	businessattachmentDescSha256 := businessattachmentFields[7].Descriptor()
+	// businessattachment.Sha256Validator is a validator for the "sha256" field. It is called by the builders before save.
+	businessattachment.Sha256Validator = func() func(string) error {
+		validators := businessattachmentDescSha256.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(sha256 string) error {
+			for _, fn := range fns {
+				if err := fn(sha256); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// businessattachmentDescUploadedBy is the schema descriptor for uploaded_by field.
+	businessattachmentDescUploadedBy := businessattachmentFields[9].Descriptor()
+	// businessattachment.UploadedByValidator is a validator for the "uploaded_by" field. It is called by the builders before save.
+	businessattachment.UploadedByValidator = businessattachmentDescUploadedBy.Validators[0].(func(int) error)
+	// businessattachmentDescNote is the schema descriptor for note field.
+	businessattachmentDescNote := businessattachmentFields[10].Descriptor()
+	// businessattachment.NoteValidator is a validator for the "note" field. It is called by the builders before save.
+	businessattachment.NoteValidator = businessattachmentDescNote.Validators[0].(func(string) error)
+	// businessattachmentDescCreatedAt is the schema descriptor for created_at field.
+	businessattachmentDescCreatedAt := businessattachmentFields[11].Descriptor()
+	// businessattachment.DefaultCreatedAt holds the default value on creation for the created_at field.
+	businessattachment.DefaultCreatedAt = businessattachmentDescCreatedAt.Default.(func() time.Time)
 	contactFields := schema.Contact{}.Fields()
 	_ = contactFields
 	// contactDescOwnerType is the schema descriptor for owner_type field.

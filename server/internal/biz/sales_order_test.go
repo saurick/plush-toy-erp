@@ -121,15 +121,17 @@ func TestSalesOrderUsecaseCreateGuardsCustomer(t *testing.T) {
 	paymentMethod := " 30天月结 "
 	paymentTermDays := 30
 	priceConditionNote := " 账期改短，单价已核对 "
+	plannedDeliveryDate := orderDate.AddDate(0, 0, 1)
 
 	order, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{
-		OrderNo:            " SO-001 ",
-		CustomerID:         10,
-		CustomerOrderNo:    &customerOrderNo,
-		PaymentMethod:      &paymentMethod,
-		PaymentTermDays:    &paymentTermDays,
-		PriceConditionNote: &priceConditionNote,
-		OrderDate:          orderDate,
+		OrderNo:             " SO-001 ",
+		CustomerID:          10,
+		CustomerOrderNo:     &customerOrderNo,
+		PaymentMethod:       &paymentMethod,
+		PaymentTermDays:     &paymentTermDays,
+		PriceConditionNote:  &priceConditionNote,
+		OrderDate:           orderDate,
+		PlannedDeliveryDate: &plannedDeliveryDate,
 	})
 	if err != nil {
 		t.Fatalf("create sales order failed: %v", err)
@@ -146,6 +148,10 @@ func TestSalesOrderUsecaseCreateGuardsCustomer(t *testing.T) {
 	negativeTermDays := -1
 	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-BAD-PAYMENT", CustomerID: 10, PaymentTermDays: &negativeTermDays, OrderDate: orderDate}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected negative payment term rejected, got %v", err)
+	}
+	beforeOrderDate := orderDate.AddDate(0, 0, -1)
+	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-BAD-DATE", CustomerID: 10, OrderDate: orderDate, PlannedDeliveryDate: &beforeOrderDate}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected planned delivery before order date rejected, got %v", err)
 	}
 
 	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-002", CustomerID: 999, OrderDate: orderDate}); !errors.Is(err, ErrCustomerNotFound) {
@@ -299,5 +305,11 @@ func TestSalesOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 		{ID: 10, SalesOrderItemMutation: SalesOrderItemMutation{LineNo: 1, ProductID: 100, UnitID: 200, OrderedQuantity: qty}},
 	}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected existing item on new order rejected, got %v", err)
+	}
+	beforeOrderDate := orderDate.AddDate(0, 0, -1)
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{OrderNo: "SO-BAD-LINE-DATE", CustomerID: 1000, OrderDate: orderDate}, []*SalesOrderItemSaveMutation{
+		{ID: 10, SalesOrderItemMutation: SalesOrderItemMutation{LineNo: 1, ProductID: 100, UnitID: 200, OrderedQuantity: qty, PlannedDeliveryDate: &beforeOrderDate}},
+	}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected line planned delivery before order date rejected, got %v", err)
 	}
 }

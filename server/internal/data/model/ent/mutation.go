@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/adminuserrole"
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/bomitem"
+	"server/internal/data/model/ent/businessattachment"
 	"server/internal/data/model/ent/contact"
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/financefact"
@@ -71,6 +72,7 @@ const (
 	TypeAdminUserRole                 = "AdminUserRole"
 	TypeBOMHeader                     = "BOMHeader"
 	TypeBOMItem                       = "BOMItem"
+	TypeBusinessAttachment            = "BusinessAttachment"
 	TypeContact                       = "Contact"
 	TypeCustomer                      = "Customer"
 	TypeFinanceFact                   = "FinanceFact"
@@ -3266,6 +3268,1089 @@ func (m *BOMItemMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown BOMItem edge %s", name)
+}
+
+// BusinessAttachmentMutation represents an operation that mutates the BusinessAttachment nodes in the graph.
+type BusinessAttachmentMutation struct {
+	config
+	op              Op
+	typ             string
+	id              *int
+	owner_type      *string
+	owner_id        *int
+	addowner_id     *int
+	attachment_type *string
+	slot_key        *string
+	file_name       *string
+	mime_type       *string
+	file_size       *int
+	addfile_size    *int
+	sha256          *string
+	content         *[]byte
+	uploaded_by     *int
+	adduploaded_by  *int
+	note            *string
+	created_at      *time.Time
+	clearedFields   map[string]struct{}
+	done            bool
+	oldValue        func(context.Context) (*BusinessAttachment, error)
+	predicates      []predicate.BusinessAttachment
+}
+
+var _ ent.Mutation = (*BusinessAttachmentMutation)(nil)
+
+// businessattachmentOption allows management of the mutation configuration using functional options.
+type businessattachmentOption func(*BusinessAttachmentMutation)
+
+// newBusinessAttachmentMutation creates new mutation for the BusinessAttachment entity.
+func newBusinessAttachmentMutation(c config, op Op, opts ...businessattachmentOption) *BusinessAttachmentMutation {
+	m := &BusinessAttachmentMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeBusinessAttachment,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withBusinessAttachmentID sets the ID field of the mutation.
+func withBusinessAttachmentID(id int) businessattachmentOption {
+	return func(m *BusinessAttachmentMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *BusinessAttachment
+		)
+		m.oldValue = func(ctx context.Context) (*BusinessAttachment, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().BusinessAttachment.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withBusinessAttachment sets the old BusinessAttachment of the mutation.
+func withBusinessAttachment(node *BusinessAttachment) businessattachmentOption {
+	return func(m *BusinessAttachmentMutation) {
+		m.oldValue = func(context.Context) (*BusinessAttachment, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m BusinessAttachmentMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m BusinessAttachmentMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *BusinessAttachmentMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *BusinessAttachmentMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().BusinessAttachment.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetOwnerType sets the "owner_type" field.
+func (m *BusinessAttachmentMutation) SetOwnerType(s string) {
+	m.owner_type = &s
+}
+
+// OwnerType returns the value of the "owner_type" field in the mutation.
+func (m *BusinessAttachmentMutation) OwnerType() (r string, exists bool) {
+	v := m.owner_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerType returns the old "owner_type" field's value of the BusinessAttachment entity.
+// If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BusinessAttachmentMutation) OldOwnerType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerType: %w", err)
+	}
+	return oldValue.OwnerType, nil
+}
+
+// ResetOwnerType resets all changes to the "owner_type" field.
+func (m *BusinessAttachmentMutation) ResetOwnerType() {
+	m.owner_type = nil
+}
+
+// SetOwnerID sets the "owner_id" field.
+func (m *BusinessAttachmentMutation) SetOwnerID(i int) {
+	m.owner_id = &i
+	m.addowner_id = nil
+}
+
+// OwnerID returns the value of the "owner_id" field in the mutation.
+func (m *BusinessAttachmentMutation) OwnerID() (r int, exists bool) {
+	v := m.owner_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerID returns the old "owner_id" field's value of the BusinessAttachment entity.
+// If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BusinessAttachmentMutation) OldOwnerID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerID: %w", err)
+	}
+	return oldValue.OwnerID, nil
+}
+
+// AddOwnerID adds i to the "owner_id" field.
+func (m *BusinessAttachmentMutation) AddOwnerID(i int) {
+	if m.addowner_id != nil {
+		*m.addowner_id += i
+	} else {
+		m.addowner_id = &i
+	}
+}
+
+// AddedOwnerID returns the value that was added to the "owner_id" field in this mutation.
+func (m *BusinessAttachmentMutation) AddedOwnerID() (r int, exists bool) {
+	v := m.addowner_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetOwnerID resets all changes to the "owner_id" field.
+func (m *BusinessAttachmentMutation) ResetOwnerID() {
+	m.owner_id = nil
+	m.addowner_id = nil
+}
+
+// SetAttachmentType sets the "attachment_type" field.
+func (m *BusinessAttachmentMutation) SetAttachmentType(s string) {
+	m.attachment_type = &s
+}
+
+// AttachmentType returns the value of the "attachment_type" field in the mutation.
+func (m *BusinessAttachmentMutation) AttachmentType() (r string, exists bool) {
+	v := m.attachment_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAttachmentType returns the old "attachment_type" field's value of the BusinessAttachment entity.
+// If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BusinessAttachmentMutation) OldAttachmentType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAttachmentType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAttachmentType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAttachmentType: %w", err)
+	}
+	return oldValue.AttachmentType, nil
+}
+
+// ResetAttachmentType resets all changes to the "attachment_type" field.
+func (m *BusinessAttachmentMutation) ResetAttachmentType() {
+	m.attachment_type = nil
+}
+
+// SetSlotKey sets the "slot_key" field.
+func (m *BusinessAttachmentMutation) SetSlotKey(s string) {
+	m.slot_key = &s
+}
+
+// SlotKey returns the value of the "slot_key" field in the mutation.
+func (m *BusinessAttachmentMutation) SlotKey() (r string, exists bool) {
+	v := m.slot_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSlotKey returns the old "slot_key" field's value of the BusinessAttachment entity.
+// If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BusinessAttachmentMutation) OldSlotKey(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSlotKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSlotKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSlotKey: %w", err)
+	}
+	return oldValue.SlotKey, nil
+}
+
+// ClearSlotKey clears the value of the "slot_key" field.
+func (m *BusinessAttachmentMutation) ClearSlotKey() {
+	m.slot_key = nil
+	m.clearedFields[businessattachment.FieldSlotKey] = struct{}{}
+}
+
+// SlotKeyCleared returns if the "slot_key" field was cleared in this mutation.
+func (m *BusinessAttachmentMutation) SlotKeyCleared() bool {
+	_, ok := m.clearedFields[businessattachment.FieldSlotKey]
+	return ok
+}
+
+// ResetSlotKey resets all changes to the "slot_key" field.
+func (m *BusinessAttachmentMutation) ResetSlotKey() {
+	m.slot_key = nil
+	delete(m.clearedFields, businessattachment.FieldSlotKey)
+}
+
+// SetFileName sets the "file_name" field.
+func (m *BusinessAttachmentMutation) SetFileName(s string) {
+	m.file_name = &s
+}
+
+// FileName returns the value of the "file_name" field in the mutation.
+func (m *BusinessAttachmentMutation) FileName() (r string, exists bool) {
+	v := m.file_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFileName returns the old "file_name" field's value of the BusinessAttachment entity.
+// If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BusinessAttachmentMutation) OldFileName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFileName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFileName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFileName: %w", err)
+	}
+	return oldValue.FileName, nil
+}
+
+// ResetFileName resets all changes to the "file_name" field.
+func (m *BusinessAttachmentMutation) ResetFileName() {
+	m.file_name = nil
+}
+
+// SetMimeType sets the "mime_type" field.
+func (m *BusinessAttachmentMutation) SetMimeType(s string) {
+	m.mime_type = &s
+}
+
+// MimeType returns the value of the "mime_type" field in the mutation.
+func (m *BusinessAttachmentMutation) MimeType() (r string, exists bool) {
+	v := m.mime_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMimeType returns the old "mime_type" field's value of the BusinessAttachment entity.
+// If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BusinessAttachmentMutation) OldMimeType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMimeType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMimeType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMimeType: %w", err)
+	}
+	return oldValue.MimeType, nil
+}
+
+// ResetMimeType resets all changes to the "mime_type" field.
+func (m *BusinessAttachmentMutation) ResetMimeType() {
+	m.mime_type = nil
+}
+
+// SetFileSize sets the "file_size" field.
+func (m *BusinessAttachmentMutation) SetFileSize(i int) {
+	m.file_size = &i
+	m.addfile_size = nil
+}
+
+// FileSize returns the value of the "file_size" field in the mutation.
+func (m *BusinessAttachmentMutation) FileSize() (r int, exists bool) {
+	v := m.file_size
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFileSize returns the old "file_size" field's value of the BusinessAttachment entity.
+// If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BusinessAttachmentMutation) OldFileSize(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFileSize is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFileSize requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFileSize: %w", err)
+	}
+	return oldValue.FileSize, nil
+}
+
+// AddFileSize adds i to the "file_size" field.
+func (m *BusinessAttachmentMutation) AddFileSize(i int) {
+	if m.addfile_size != nil {
+		*m.addfile_size += i
+	} else {
+		m.addfile_size = &i
+	}
+}
+
+// AddedFileSize returns the value that was added to the "file_size" field in this mutation.
+func (m *BusinessAttachmentMutation) AddedFileSize() (r int, exists bool) {
+	v := m.addfile_size
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetFileSize resets all changes to the "file_size" field.
+func (m *BusinessAttachmentMutation) ResetFileSize() {
+	m.file_size = nil
+	m.addfile_size = nil
+}
+
+// SetSha256 sets the "sha256" field.
+func (m *BusinessAttachmentMutation) SetSha256(s string) {
+	m.sha256 = &s
+}
+
+// Sha256 returns the value of the "sha256" field in the mutation.
+func (m *BusinessAttachmentMutation) Sha256() (r string, exists bool) {
+	v := m.sha256
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSha256 returns the old "sha256" field's value of the BusinessAttachment entity.
+// If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BusinessAttachmentMutation) OldSha256(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSha256 is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSha256 requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSha256: %w", err)
+	}
+	return oldValue.Sha256, nil
+}
+
+// ResetSha256 resets all changes to the "sha256" field.
+func (m *BusinessAttachmentMutation) ResetSha256() {
+	m.sha256 = nil
+}
+
+// SetContent sets the "content" field.
+func (m *BusinessAttachmentMutation) SetContent(b []byte) {
+	m.content = &b
+}
+
+// Content returns the value of the "content" field in the mutation.
+func (m *BusinessAttachmentMutation) Content() (r []byte, exists bool) {
+	v := m.content
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContent returns the old "content" field's value of the BusinessAttachment entity.
+// If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BusinessAttachmentMutation) OldContent(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContent: %w", err)
+	}
+	return oldValue.Content, nil
+}
+
+// ResetContent resets all changes to the "content" field.
+func (m *BusinessAttachmentMutation) ResetContent() {
+	m.content = nil
+}
+
+// SetUploadedBy sets the "uploaded_by" field.
+func (m *BusinessAttachmentMutation) SetUploadedBy(i int) {
+	m.uploaded_by = &i
+	m.adduploaded_by = nil
+}
+
+// UploadedBy returns the value of the "uploaded_by" field in the mutation.
+func (m *BusinessAttachmentMutation) UploadedBy() (r int, exists bool) {
+	v := m.uploaded_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUploadedBy returns the old "uploaded_by" field's value of the BusinessAttachment entity.
+// If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BusinessAttachmentMutation) OldUploadedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUploadedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUploadedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUploadedBy: %w", err)
+	}
+	return oldValue.UploadedBy, nil
+}
+
+// AddUploadedBy adds i to the "uploaded_by" field.
+func (m *BusinessAttachmentMutation) AddUploadedBy(i int) {
+	if m.adduploaded_by != nil {
+		*m.adduploaded_by += i
+	} else {
+		m.adduploaded_by = &i
+	}
+}
+
+// AddedUploadedBy returns the value that was added to the "uploaded_by" field in this mutation.
+func (m *BusinessAttachmentMutation) AddedUploadedBy() (r int, exists bool) {
+	v := m.adduploaded_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearUploadedBy clears the value of the "uploaded_by" field.
+func (m *BusinessAttachmentMutation) ClearUploadedBy() {
+	m.uploaded_by = nil
+	m.adduploaded_by = nil
+	m.clearedFields[businessattachment.FieldUploadedBy] = struct{}{}
+}
+
+// UploadedByCleared returns if the "uploaded_by" field was cleared in this mutation.
+func (m *BusinessAttachmentMutation) UploadedByCleared() bool {
+	_, ok := m.clearedFields[businessattachment.FieldUploadedBy]
+	return ok
+}
+
+// ResetUploadedBy resets all changes to the "uploaded_by" field.
+func (m *BusinessAttachmentMutation) ResetUploadedBy() {
+	m.uploaded_by = nil
+	m.adduploaded_by = nil
+	delete(m.clearedFields, businessattachment.FieldUploadedBy)
+}
+
+// SetNote sets the "note" field.
+func (m *BusinessAttachmentMutation) SetNote(s string) {
+	m.note = &s
+}
+
+// Note returns the value of the "note" field in the mutation.
+func (m *BusinessAttachmentMutation) Note() (r string, exists bool) {
+	v := m.note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNote returns the old "note" field's value of the BusinessAttachment entity.
+// If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BusinessAttachmentMutation) OldNote(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNote: %w", err)
+	}
+	return oldValue.Note, nil
+}
+
+// ClearNote clears the value of the "note" field.
+func (m *BusinessAttachmentMutation) ClearNote() {
+	m.note = nil
+	m.clearedFields[businessattachment.FieldNote] = struct{}{}
+}
+
+// NoteCleared returns if the "note" field was cleared in this mutation.
+func (m *BusinessAttachmentMutation) NoteCleared() bool {
+	_, ok := m.clearedFields[businessattachment.FieldNote]
+	return ok
+}
+
+// ResetNote resets all changes to the "note" field.
+func (m *BusinessAttachmentMutation) ResetNote() {
+	m.note = nil
+	delete(m.clearedFields, businessattachment.FieldNote)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *BusinessAttachmentMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *BusinessAttachmentMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the BusinessAttachment entity.
+// If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BusinessAttachmentMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *BusinessAttachmentMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the BusinessAttachmentMutation builder.
+func (m *BusinessAttachmentMutation) Where(ps ...predicate.BusinessAttachment) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the BusinessAttachmentMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *BusinessAttachmentMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.BusinessAttachment, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *BusinessAttachmentMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *BusinessAttachmentMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (BusinessAttachment).
+func (m *BusinessAttachmentMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *BusinessAttachmentMutation) Fields() []string {
+	fields := make([]string, 0, 12)
+	if m.owner_type != nil {
+		fields = append(fields, businessattachment.FieldOwnerType)
+	}
+	if m.owner_id != nil {
+		fields = append(fields, businessattachment.FieldOwnerID)
+	}
+	if m.attachment_type != nil {
+		fields = append(fields, businessattachment.FieldAttachmentType)
+	}
+	if m.slot_key != nil {
+		fields = append(fields, businessattachment.FieldSlotKey)
+	}
+	if m.file_name != nil {
+		fields = append(fields, businessattachment.FieldFileName)
+	}
+	if m.mime_type != nil {
+		fields = append(fields, businessattachment.FieldMimeType)
+	}
+	if m.file_size != nil {
+		fields = append(fields, businessattachment.FieldFileSize)
+	}
+	if m.sha256 != nil {
+		fields = append(fields, businessattachment.FieldSha256)
+	}
+	if m.content != nil {
+		fields = append(fields, businessattachment.FieldContent)
+	}
+	if m.uploaded_by != nil {
+		fields = append(fields, businessattachment.FieldUploadedBy)
+	}
+	if m.note != nil {
+		fields = append(fields, businessattachment.FieldNote)
+	}
+	if m.created_at != nil {
+		fields = append(fields, businessattachment.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *BusinessAttachmentMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case businessattachment.FieldOwnerType:
+		return m.OwnerType()
+	case businessattachment.FieldOwnerID:
+		return m.OwnerID()
+	case businessattachment.FieldAttachmentType:
+		return m.AttachmentType()
+	case businessattachment.FieldSlotKey:
+		return m.SlotKey()
+	case businessattachment.FieldFileName:
+		return m.FileName()
+	case businessattachment.FieldMimeType:
+		return m.MimeType()
+	case businessattachment.FieldFileSize:
+		return m.FileSize()
+	case businessattachment.FieldSha256:
+		return m.Sha256()
+	case businessattachment.FieldContent:
+		return m.Content()
+	case businessattachment.FieldUploadedBy:
+		return m.UploadedBy()
+	case businessattachment.FieldNote:
+		return m.Note()
+	case businessattachment.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *BusinessAttachmentMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case businessattachment.FieldOwnerType:
+		return m.OldOwnerType(ctx)
+	case businessattachment.FieldOwnerID:
+		return m.OldOwnerID(ctx)
+	case businessattachment.FieldAttachmentType:
+		return m.OldAttachmentType(ctx)
+	case businessattachment.FieldSlotKey:
+		return m.OldSlotKey(ctx)
+	case businessattachment.FieldFileName:
+		return m.OldFileName(ctx)
+	case businessattachment.FieldMimeType:
+		return m.OldMimeType(ctx)
+	case businessattachment.FieldFileSize:
+		return m.OldFileSize(ctx)
+	case businessattachment.FieldSha256:
+		return m.OldSha256(ctx)
+	case businessattachment.FieldContent:
+		return m.OldContent(ctx)
+	case businessattachment.FieldUploadedBy:
+		return m.OldUploadedBy(ctx)
+	case businessattachment.FieldNote:
+		return m.OldNote(ctx)
+	case businessattachment.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown BusinessAttachment field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *BusinessAttachmentMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case businessattachment.FieldOwnerType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerType(v)
+		return nil
+	case businessattachment.FieldOwnerID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerID(v)
+		return nil
+	case businessattachment.FieldAttachmentType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAttachmentType(v)
+		return nil
+	case businessattachment.FieldSlotKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSlotKey(v)
+		return nil
+	case businessattachment.FieldFileName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFileName(v)
+		return nil
+	case businessattachment.FieldMimeType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMimeType(v)
+		return nil
+	case businessattachment.FieldFileSize:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFileSize(v)
+		return nil
+	case businessattachment.FieldSha256:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSha256(v)
+		return nil
+	case businessattachment.FieldContent:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContent(v)
+		return nil
+	case businessattachment.FieldUploadedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUploadedBy(v)
+		return nil
+	case businessattachment.FieldNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNote(v)
+		return nil
+	case businessattachment.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown BusinessAttachment field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *BusinessAttachmentMutation) AddedFields() []string {
+	var fields []string
+	if m.addowner_id != nil {
+		fields = append(fields, businessattachment.FieldOwnerID)
+	}
+	if m.addfile_size != nil {
+		fields = append(fields, businessattachment.FieldFileSize)
+	}
+	if m.adduploaded_by != nil {
+		fields = append(fields, businessattachment.FieldUploadedBy)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *BusinessAttachmentMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case businessattachment.FieldOwnerID:
+		return m.AddedOwnerID()
+	case businessattachment.FieldFileSize:
+		return m.AddedFileSize()
+	case businessattachment.FieldUploadedBy:
+		return m.AddedUploadedBy()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *BusinessAttachmentMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case businessattachment.FieldOwnerID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddOwnerID(v)
+		return nil
+	case businessattachment.FieldFileSize:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFileSize(v)
+		return nil
+	case businessattachment.FieldUploadedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUploadedBy(v)
+		return nil
+	}
+	return fmt.Errorf("unknown BusinessAttachment numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *BusinessAttachmentMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(businessattachment.FieldSlotKey) {
+		fields = append(fields, businessattachment.FieldSlotKey)
+	}
+	if m.FieldCleared(businessattachment.FieldUploadedBy) {
+		fields = append(fields, businessattachment.FieldUploadedBy)
+	}
+	if m.FieldCleared(businessattachment.FieldNote) {
+		fields = append(fields, businessattachment.FieldNote)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *BusinessAttachmentMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *BusinessAttachmentMutation) ClearField(name string) error {
+	switch name {
+	case businessattachment.FieldSlotKey:
+		m.ClearSlotKey()
+		return nil
+	case businessattachment.FieldUploadedBy:
+		m.ClearUploadedBy()
+		return nil
+	case businessattachment.FieldNote:
+		m.ClearNote()
+		return nil
+	}
+	return fmt.Errorf("unknown BusinessAttachment nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *BusinessAttachmentMutation) ResetField(name string) error {
+	switch name {
+	case businessattachment.FieldOwnerType:
+		m.ResetOwnerType()
+		return nil
+	case businessattachment.FieldOwnerID:
+		m.ResetOwnerID()
+		return nil
+	case businessattachment.FieldAttachmentType:
+		m.ResetAttachmentType()
+		return nil
+	case businessattachment.FieldSlotKey:
+		m.ResetSlotKey()
+		return nil
+	case businessattachment.FieldFileName:
+		m.ResetFileName()
+		return nil
+	case businessattachment.FieldMimeType:
+		m.ResetMimeType()
+		return nil
+	case businessattachment.FieldFileSize:
+		m.ResetFileSize()
+		return nil
+	case businessattachment.FieldSha256:
+		m.ResetSha256()
+		return nil
+	case businessattachment.FieldContent:
+		m.ResetContent()
+		return nil
+	case businessattachment.FieldUploadedBy:
+		m.ResetUploadedBy()
+		return nil
+	case businessattachment.FieldNote:
+		m.ResetNote()
+		return nil
+	case businessattachment.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown BusinessAttachment field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *BusinessAttachmentMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *BusinessAttachmentMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *BusinessAttachmentMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *BusinessAttachmentMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *BusinessAttachmentMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *BusinessAttachmentMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *BusinessAttachmentMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown BusinessAttachment unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *BusinessAttachmentMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown BusinessAttachment edge %s", name)
 }
 
 // ContactMutation represents an operation that mutates the Contact nodes in the graph.

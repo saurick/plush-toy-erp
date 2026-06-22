@@ -151,6 +151,16 @@ func TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists(t *testing.T) {
 			method: "list_inventory_txns",
 			params: map[string]any{"date_to": "not-a-date"},
 		},
+		{
+			name:   "lot reversed date",
+			method: "list_inventory_lots",
+			params: map[string]any{"date_from": "2026-06-30", "date_to": "2026-06-01"},
+		},
+		{
+			name:   "txn reversed date",
+			method: "list_inventory_txns",
+			params: map[string]any{"date_from": "2026-06-30", "date_to": "2026-06-01"},
+		},
 	} {
 		t.Run("invalid date "+tc.name, func(t *testing.T) {
 			_, invalidRes, err := j.handleInventory(adminCtx, tc.method, "invalid-date", mustJSONRPCStruct(t, tc.params))

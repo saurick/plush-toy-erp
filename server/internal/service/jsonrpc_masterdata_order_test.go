@@ -830,6 +830,21 @@ func TestJsonrpcDispatcher_SalesOrderListAcceptsDateAndSortFilters(t *testing.T)
 	if invalidRes == nil || invalidRes.Code != errcode.InvalidParam.Code {
 		t.Fatalf("expected invalid param for bad date filter, got %#v", invalidRes)
 	}
+	_, reversedRes, err := j.handleSalesOrder(
+		workflowJSONRPCAdminContext(),
+		"list_sales_orders",
+		"3",
+		mustJSONRPCStruct(t, map[string]any{
+			"date_from": "2026-06-30",
+			"date_to":   "2026-06-01",
+		}),
+	)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if reversedRes == nil || reversedRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected invalid param for reversed date filter, got %#v", reversedRes)
+	}
 }
 
 func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesSingleUsecase(t *testing.T) {

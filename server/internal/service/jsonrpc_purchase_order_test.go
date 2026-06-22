@@ -227,6 +227,16 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 	if repo.lastFilter.DateField != "purchase_date" || repo.lastFilter.Keyword != "PO-JSONRPC" {
 		t.Fatalf("expected purchase order filter to be mapped, got %#v", repo.lastFilter)
 	}
+	_, reversedListRes, err := j.handlePurchaseOrder(ctx, "list_purchase_orders", "reversed-date", mustJSONRPCStruct(t, map[string]any{
+		"date_from": "2026-06-30",
+		"date_to":   "2026-06-01",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if reversedListRes == nil || reversedListRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected invalid param for reversed purchase order date filter, got %#v", reversedListRes)
+	}
 
 	_, itemListRes, err := j.handlePurchaseOrder(ctx, "list_purchase_order_items", "3", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(orderID),

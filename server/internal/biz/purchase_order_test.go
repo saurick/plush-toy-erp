@@ -118,12 +118,14 @@ func TestPurchaseOrderUsecaseCreateGuardsSupplier(t *testing.T) {
 	uc := NewPurchaseOrderUsecase(repo)
 	orderDate := time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC)
 	supplierPurchaseOrderNo := "  PO-001 "
+	expectedArrivalDate := orderDate.AddDate(0, 0, 1)
 
 	order, err := uc.CreatePurchaseOrder(ctx, &PurchaseOrderMutation{
 		PurchaseOrderNo:         " PO-001 ",
 		SupplierID:              10,
 		SupplierPurchaseOrderNo: &supplierPurchaseOrderNo,
 		PurchaseDate:            orderDate,
+		ExpectedArrivalDate:     &expectedArrivalDate,
 	})
 	if err != nil {
 		t.Fatalf("create purchase order failed: %v", err)
@@ -140,6 +142,10 @@ func TestPurchaseOrderUsecaseCreateGuardsSupplier(t *testing.T) {
 	}
 	if _, err := uc.CreatePurchaseOrder(ctx, &PurchaseOrderMutation{PurchaseOrderNo: "PO-003", SupplierID: 11, PurchaseDate: orderDate}); !errors.Is(err, ErrSupplierInactive) {
 		t.Fatalf("expected inactive supplier rejected, got %v", err)
+	}
+	beforePurchaseDate := orderDate.AddDate(0, 0, -1)
+	if _, err := uc.CreatePurchaseOrder(ctx, &PurchaseOrderMutation{PurchaseOrderNo: "PO-BAD-DATE", SupplierID: 10, PurchaseDate: orderDate, ExpectedArrivalDate: &beforePurchaseDate}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected expected arrival before purchase date rejected, got %v", err)
 	}
 }
 
@@ -286,5 +292,11 @@ func TestPurchaseOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 		{ID: 10, PurchaseOrderItemMutation: PurchaseOrderItemMutation{LineNo: 1, MaterialID: 100, UnitID: 200, PurchasedQuantity: qty}},
 	}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected existing item on new order rejected, got %v", err)
+	}
+	beforePurchaseDate := orderDate.AddDate(0, 0, -1)
+	if _, err := uc.SavePurchaseOrderWithItems(ctx, 1, &PurchaseOrderMutation{PurchaseOrderNo: "PO-BAD-LINE-DATE", SupplierID: 1000, PurchaseDate: orderDate}, []*PurchaseOrderItemSaveMutation{
+		{ID: 10, PurchaseOrderItemMutation: PurchaseOrderItemMutation{LineNo: 1, MaterialID: 100, UnitID: 200, PurchasedQuantity: qty, ExpectedArrivalDate: &beforePurchaseDate}},
+	}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected line expected arrival before purchase date rejected, got %v", err)
 	}
 }

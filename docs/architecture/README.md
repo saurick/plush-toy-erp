@@ -11,6 +11,7 @@
 | 做库存、BOM、采购、质检相关实现 | `材料成品物料清单与库存专表模型评审.md`、`产品款号物料清单边界评审.md`、`订单采购边界评审.md` | Ent schema、Atlas migration、data / biz tests |
 | 做出货或放行相关实现 | `出货放行工作流用例评审.md`、`出货事实与库存边界评审.md`、`出货事实最小模型评审.md` | Shipment / Inventory usecase、RBAC、UI 回归 |
 | 做业务事实扩展 | `业务事实扩展总评审.md` | operational fact usecase、target evidence、产品能力台账 |
+| 做附件上传、现场证据或单据留档 | `业务附件证据边界评审.md` | attachment JSON-RPC、所属业务对象权限、页面接入回归 |
 
 ## 文档分组 / Document Groups
 
@@ -21,6 +22,7 @@
 | MasterData / Source Document | `客户供应商主数据评审.md`、`订单采购边界评审.md` |
 | Inventory / BOM / Quality | `材料成品物料清单与库存专表模型评审.md`、`产品款号物料清单边界评审.md` |
 | Shipment / Operational Fact | `出货事实与库存边界评审.md`、`出货事实最小模型评审.md`、`业务事实扩展总评审.md` |
+| Reporting / Audit / Integration | `业务附件证据边界评审.md` |
 
 ## 真源边界 / Source Boundary
 

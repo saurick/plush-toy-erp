@@ -1,9 +1,15 @@
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { Button, Form, Input, InputNumber, Select } from 'antd'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
+import {
+  dateInputNotAfterRule,
+  dateInputNotBeforeRule,
+  isDateInputAfter,
+  isDateInputBefore,
+} from '../../utils/dateRange.mjs'
 import { unixToDateInputValue } from '../../utils/masterDataOrderView.mjs'
 
 function decimalNumber(value) {
@@ -110,12 +116,23 @@ export function PurchaseOrderFormFields({
   suppliers,
   materials,
   unitOptions,
+  attachmentPanel,
   onSupplierChange,
   onMaterialChange,
 }) {
   const [materialImportOpen, setMaterialImportOpen] = useState(false)
   const watchedItems = Form.useWatch('items', form) || []
+  const purchaseDate = Form.useWatch('purchase_date', form)
+  const expectedArrivalDate = Form.useWatch('expected_arrival_date', form)
   const lineSummary = summarizePurchaseLines(watchedItems)
+  const disablePurchaseDateAfterExpectedArrival = useCallback(
+    (current) => isDateInputAfter(current, expectedArrivalDate),
+    [expectedArrivalDate]
+  )
+  const disableExpectedArrivalBeforePurchaseDate = useCallback(
+    (current) => isDateInputBefore(current, purchaseDate),
+    [purchaseDate]
+  )
   const supplierOptions = useMemo(
     () =>
       suppliers.map((item) => ({
@@ -198,16 +215,39 @@ export function PurchaseOrderFormFields({
         className="erp-business-action-form__field"
         name="purchase_date"
         label="采购日期"
-        rules={[{ required: true, message: '请选择采购日期' }]}
+        rules={[
+          { required: true, message: '请选择采购日期' },
+          dateInputNotAfterRule({
+            getEndValue: () => form.getFieldValue('expected_arrival_date'),
+            message: '采购日期不能晚于预计到货',
+          }),
+        ]}
       >
-        <DateInput />
+        <DateInput
+          disabledDate={
+            expectedArrivalDate
+              ? disablePurchaseDateAfterExpectedArrival
+              : undefined
+          }
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
+        dependencies={['purchase_date']}
         name="expected_arrival_date"
         label="预计到货"
+        rules={[
+          dateInputNotBeforeRule({
+            getStartValue: () => form.getFieldValue('purchase_date'),
+            message: '预计到货不能早于采购日期',
+          }),
+        ]}
       >
-        <DateInput />
+        <DateInput
+          disabledDate={
+            purchaseDate ? disableExpectedArrivalBeforePurchaseDate : undefined
+          }
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -216,6 +256,7 @@ export function PurchaseOrderFormFields({
       >
         <Input.TextArea allowClear rows={2} showCount maxLength={255} />
       </Form.Item>
+      {attachmentPanel}
 
       <section className="erp-sales-order-lines-form">
         <Form.List name="items">
@@ -362,8 +403,22 @@ export function PurchaseOrderFormFields({
                       <Form.Item
                         name={[field.name, 'expected_arrival_date']}
                         label="预计到货"
+                        dependencies={['purchase_date']}
+                        rules={[
+                          dateInputNotBeforeRule({
+                            getStartValue: () =>
+                              form.getFieldValue('purchase_date'),
+                            message: '明细预计到货不能早于采购日期',
+                          }),
+                        ]}
                       >
-                        <DateInput />
+                        <DateInput
+                          disabledDate={
+                            purchaseDate
+                              ? disableExpectedArrivalBeforePurchaseDate
+                              : undefined
+                          }
+                        />
                       </Form.Item>
                       <Form.Item
                         className="erp-sales-order-lines-form__field--full"

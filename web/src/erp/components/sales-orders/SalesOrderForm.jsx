@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import {
   AutoComplete,
@@ -14,6 +14,12 @@ import {
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
+import {
+  dateInputNotAfterRule,
+  dateInputNotBeforeRule,
+  isDateInputAfter,
+  isDateInputBefore,
+} from '../../utils/dateRange.mjs'
 import {
   deriveSalesOrderItemAmount,
   paymentConditionCompleteness,
@@ -195,6 +201,17 @@ export function SalesOrderFormFields({
   onPaymentMethodChange,
   onPaymentConditionBlur,
 }) {
+  const orderDate = Form.useWatch('order_date', form)
+  const plannedDeliveryDate = Form.useWatch('planned_delivery_date', form)
+  const disableOrderDateAfterPlannedDelivery = useCallback(
+    (current) => isDateInputAfter(current, plannedDeliveryDate),
+    [plannedDeliveryDate]
+  )
+  const disablePlannedDeliveryBeforeOrderDate = useCallback(
+    (current) => isDateInputBefore(current, orderDate),
+    [orderDate]
+  )
+
   return (
     <>
       <Form.Item
@@ -298,16 +315,39 @@ export function SalesOrderFormFields({
         className="erp-business-action-form__field"
         label="订单日期"
         name="order_date"
-        rules={[{ required: true, message: '请选择订单日期' }]}
+        rules={[
+          { required: true, message: '请选择订单日期' },
+          dateInputNotAfterRule({
+            getEndValue: () => form.getFieldValue('planned_delivery_date'),
+            message: '订单日期不能晚于计划交付日期',
+          }),
+        ]}
       >
-        <DateInput />
+        <DateInput
+          disabledDate={
+            plannedDeliveryDate
+              ? disableOrderDateAfterPlannedDelivery
+              : undefined
+          }
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
+        dependencies={['order_date']}
         label="计划交付日期"
         name="planned_delivery_date"
+        rules={[
+          dateInputNotBeforeRule({
+            getStartValue: () => form.getFieldValue('order_date'),
+            message: '计划交付日期不能早于订单日期',
+          }),
+        ]}
       >
-        <DateInput />
+        <DateInput
+          disabledDate={
+            orderDate ? disablePlannedDeliveryBeforeOrderDate : undefined
+          }
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
@@ -329,10 +369,15 @@ export function SalesOrderItemsFormSection({
 }) {
   const [skuImportOpen, setSkuImportOpen] = useState(false)
   const watchedItems = Form.useWatch('items', form) || EMPTY_ORDER_LINES
+  const orderDate = Form.useWatch('order_date', form)
   const lineSummary = summarizeSalesOrderLines(watchedItems)
   const skuByID = useMemo(
     () => new Map(productSKUs.map((sku) => [sku.id, sku])),
     [productSKUs]
+  )
+  const disablePlannedDeliveryBeforeOrderDate = useCallback(
+    (current) => isDateInputBefore(current, orderDate),
+    [orderDate]
   )
   useEffect(() => {
     const currentLines = form.getFieldValue('items') || []
@@ -639,8 +684,23 @@ export function SalesOrderItemsFormSection({
                         <Form.Item
                           label="计划交付日期"
                           name={[field.name, 'planned_delivery_date']}
+                          dependencies={['order_date']}
+                          rules={[
+                            dateInputNotBeforeRule({
+                              getStartValue: () =>
+                                form.getFieldValue('order_date'),
+                              message: '订单行计划交付不能早于订单日期',
+                            }),
+                          ]}
                         >
-                          <DateInput disabled={!canEditLine} />
+                          <DateInput
+                            disabled={!canEditLine}
+                            disabledDate={
+                              orderDate
+                                ? disablePlannedDeliveryBeforeOrderDate
+                                : undefined
+                            }
+                          />
                         </Form.Item>
                         <Form.Item
                           className="erp-sales-order-lines-form__field--full"

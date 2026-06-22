@@ -52,6 +52,7 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import SourceImportPickerModal from '../components/business-list/SourceImportPickerModal.jsx'
 import {
   compactParams,
@@ -1269,6 +1270,15 @@ export default function ShipmentsPage() {
             customerOptions={customerOptions}
             disabled={!isCreateModal}
             salesOrderOptions={salesOrderOptions}
+          />
+          <BusinessAttachmentPanel
+            ownerType="shipment"
+            ownerId={modalSelectedShipment?.id}
+            title="出货附件"
+            description="上传装箱照片、物流单、签收回单、交付或出口凭证；附件不替代确认出货动作。"
+            canUpload={canCreate || canShip}
+            canDelete={canCreate || canShip}
+            variant="inline"
           />
           {modalSelectedShipment ? (
             <section className="erp-master-contact-list erp-shipment-modal-items">

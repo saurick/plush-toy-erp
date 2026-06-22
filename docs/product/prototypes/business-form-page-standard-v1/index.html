@@ -354,6 +354,41 @@
         font-weight: 650;
       }
 
+      .attachment-inline {
+        grid-column: 1 / -1;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 10px 12px;
+      }
+
+      .attachment-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .attachment-files {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .attachment-file {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--panel-soft);
+        color: var(--muted);
+        font-size: 12px;
+        padding: 4px 8px;
+      }
+
+      .attachment-file.empty {
+        border-style: dashed;
+      }
+
       .required::after {
         color: var(--red);
         content: " *";
@@ -710,7 +745,7 @@
                   <small id="modeNote">新增态允许保存草稿；真实权限由 RBAC 和 usecase 决定。</small>
                 </div>
                 <div class="source-note" id="sourceNote">
-                  已从销售订单带出客户、产品、数量和交期。若切换来源，将清空产品、数量、交期和附件引用，避免旧值残留。
+                  已从销售订单带出客户、产品、数量和交期。若切换来源，将清空产品、数量、交期和附件证据，避免旧值残留。
                 </div>
               </div>
 
@@ -735,6 +770,44 @@
                         <option>PMC</option>
                         <option>采购</option>
                       </select>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="group">
+                  <h3>交付、附件与备注</h3>
+                  <div class="fields">
+                    <div class="field">
+                      <label for="warehouse">目标仓库</label>
+                      <select id="warehouse">
+                        <option>成品仓</option>
+                        <option>材料仓</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label for="status">状态</label>
+                      <select id="status">
+                        <option>草稿</option>
+                        <option>待提交</option>
+                        <option>已提交只读</option>
+                      </select>
+                      <small>已提交或无权限时只读展示，不能继续本地保存。</small>
+                    </div>
+                    <div class="field attachment-inline">
+                      <div class="attachment-row">
+                        <div>
+                          <label for="attachment">附件上传</label>
+                          <small>保存后可上传图纸、合同、确认截图；附件只作为证据，不改变业务事实。</small>
+                        </div>
+                        <button class="btn" id="attachment" type="button">上传附件</button>
+                      </div>
+                      <div class="attachment-files">
+                        <span class="attachment-file" id="attachmentFile">blue-hanger-spec-v3.pdf</span>
+                      </div>
+                    </div>
+                    <div class="field" style="grid-column: 1 / -1">
+                      <label for="remark">备注</label>
+                      <textarea id="remark">示例备注只用于原型，不作为正式字段真源。</textarea>
                     </div>
                   </div>
                 </section>
@@ -806,37 +879,6 @@
                   </div>
                 </section>
 
-                <section class="group">
-                  <h3>交付与备注</h3>
-                  <div class="fields">
-                    <div class="field">
-                      <label for="warehouse">目标仓库</label>
-                      <select id="warehouse">
-                        <option>成品仓</option>
-                        <option>材料仓</option>
-                      </select>
-                    </div>
-                    <div class="field">
-                      <label for="attachment">附件引用</label>
-                      <input id="attachment" value="blue-hanger-spec-v3.pdf" />
-                      <small>附件引用随来源切换清空，不在原型中实现上传。</small>
-                    </div>
-                    <div class="field">
-                      <label for="status">状态</label>
-                      <select id="status">
-                        <option>草稿</option>
-                        <option>待提交</option>
-                        <option>已提交只读</option>
-                      </select>
-                      <small>已提交或无权限时只读展示，不能继续本地保存。</small>
-                    </div>
-                    <div class="field" style="grid-column: 1 / -1">
-                      <label for="remark">备注</label>
-                      <textarea id="remark">示例备注只用于原型，不作为正式字段真源。</textarea>
-                    </div>
-                  </div>
-                </section>
-
                 <div class="guard" id="guard">
                   当前来源已带出 4 个字段。保存前检查：
                   <ul>
@@ -878,7 +920,7 @@
       const sourceData = {
         sales: {
           note:
-            "已从销售订单带出客户、产品、数量和交期。若切换来源，将清空产品、数量、交期和附件引用，避免旧值残留。",
+            "已从销售订单带出客户、产品、数量和交期。若切换来源，将清空产品、数量、交期和附件证据，避免旧值残留。",
           guard:
             "当前来源已带出 4 个字段。保存前检查：切换来源后旧产品、旧数量、旧交期和旧附件不得继续残留。",
           values: defaults,
@@ -971,8 +1013,20 @@
       };
 
       function setValue(id, value) {
+        if (id === "attachment") {
+          setAttachment(value);
+          return;
+        }
         const field = document.querySelector(`#${id}`);
         if (field) field.value = value;
+      }
+
+      function setAttachment(value) {
+        const file = document.querySelector("#attachmentFile");
+        if (!file) return;
+        const hasValue = Boolean(String(value || "").trim());
+        file.textContent = hasValue ? value : "暂无附件";
+        file.classList.toggle("empty", !hasValue);
       }
 
       function clearErrors() {

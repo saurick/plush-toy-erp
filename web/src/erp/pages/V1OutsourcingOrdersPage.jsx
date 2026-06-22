@@ -32,6 +32,7 @@ import {
   getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import OutsourcingOrderForm, {
   createBlankOutsourcingLine,
   normalizeOutsourcingLineFormValue,
@@ -1205,6 +1206,17 @@ export default function V1OutsourcingOrdersPage() {
           onProductChange={handleProductChange}
           onProcessChange={handleProcessChange}
           onUnitChange={handleUnitChange}
+          attachmentPanel={
+            <BusinessAttachmentPanel
+              ownerType="outsourcing_order"
+              ownerId={editingRow?.id}
+              title="加工合同附件"
+              description="上传纸样、图纸、签回合同、加工要求或报价结算依据；附件不写库存、质检或应付事实。"
+              canUpload={canUpdate || canCreate}
+              canDelete={canUpdate}
+              variant="inline"
+            />
+          }
         />
       </BusinessFormModal>
     </BusinessPageLayout>

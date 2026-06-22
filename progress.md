@@ -71,3 +71,29 @@
 - 验证：追加前 `progress.md` 为 65 行、9295 字节，未达到归档阈值；已执行相关 skill validator 和 diff 检查。
 - 下一步：页面任务若需要新增或修改后端能力，先切到 `$plush-domain-boundary-governance`，再按 test / security / release skill 补验证。
 - 阻塞/风险：本轮只改两份 skill 和过程记录，不新增后端 skill，不改运行时代码、schema、migration、RBAC、页面、部署脚本或测试实现。
+
+## 2026-06-22 P0/P1 业务附件证据层接入
+
+- 完成：新增 `business_attachments` schema、migration、repo、usecase 和 `attachment` JSON-RPC 域，按 owner_type 复用对应业务对象既有读写权限；上传内容走 base64，限制 5MB 和白名单 MIME，并在 RPC 日志参数中补充附件内容脱敏。
+- 完成：新增共享 `BusinessAttachmentPanel` 和附件 API，接入销售订单、采购订单、委外订单、采购入库、来料质检、出货、运营事实、BOM、产品 SKU、Workflow 看板和岗位任务端详情等 P0/P1 编辑或详情场景；附件只作为证据层，不替代 Source Document、Fact 或 Workflow 真源。
+- 完成：同步新增 `docs/architecture/业务附件证据边界评审.md`，并更新架构索引、文档清单、当前真源、产品能力台账、能力证据、`server/README.md` 和 `web/README.md` 的附件口径。
+- 验证：追加前 `progress.md` 为 73 行、10405 字节，未达到归档阈值；已执行 `cd server && make data`、`cd server && go test ./internal/biz ./internal/data ./internal/service`、`cd server && make migrate_status`、`cd web && pnpm lint`、`cd web && pnpm test`、`cd web && pnpm css`、`cd web && pnpm style:l1`、`git diff --check`，均通过；`style:l1` 共验证 68 个场景，前端单测 387 个通过。
+- 下一步：需要在共享开发库或线上环境启用前，按部署 / migration 主路径应用 `20260622140642_migrate.sql`；如后续要做对象存储、病毒扫描、预览缩略图或附件引用审计，应作为单独任务评审。
+- 阻塞/风险：本轮只生成 migration 并确认本地迁移状态存在 1 个 pending 文件，未对 `192.168.0.106` 等共享数据库执行 `make migrate_apply`；现阶段附件内容仍存 PostgreSQL bytea，适合当前 P0/P1 证据补齐，不作为长期大文件存储方案。
+
+## 2026-06-22 全局日期先后校验收口
+
+- 完成：新增前端共享 `dateRange` 工具，将业务列表日期范围、销售订单、采购订单、委外订单和 BOM 生效期接入统一先后校验；日期控件会禁选不合法日期，表单提交前也会给出中文校验提示。
+- 完成：在销售订单、采购订单、委外订单 biz 层补充后端保存合同，拒绝表头计划日期早于单据日期、明细计划日期早于单据日期；列表 JSON-RPC 反向 `date_from / date_to` 和 BOM 反向生效期补负向测试。
+- 完成：将正式业务页 L1 回归接上日期范围控件断言，并新增真实 DatePicker 交互校验：选择开始日期后，结束日期面板中更早日期必须禁用。
+- 验证：追加前 `progress.md` 为 82 行、12284 字节，未达到归档阈值；已执行 `cd server && go test ./internal/biz ./internal/service`、`cd web && pnpm test`、`cd web && pnpm css`、针对本轮文件的 `pnpm exec eslint --fix --ext .js --ext .jsx ...`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm style:l1`，均通过。
+- 下一步：后续新增业务表单日期对或列表日期范围时，复用 `web/src/erp/utils/dateRange.mjs`，后端入口同步补保存 / 筛选合同测试。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact 写入边界、客户差异配置或部署脚本；当前只覆盖已识别的通用列表日期范围和核心订单 / BOM 日期对，未把所有单日期字段改成范围关系。
+
+## 2026-06-22 业务附件编辑区布局与原型同步
+
+- 完成：将共享 `BusinessAttachmentPanel` 增加紧凑 inline 形态，未保存和无附件状态改为轻量空态；销售订单、采购订单、委外订单、出货单、BOM、SKU 和质检等编辑场景把附件入口收口到备注 / 交付 / 合同资料 / 凭证附近，位于明细 items 之前，不再作为弹窗末尾大区块。
+- 完成：同步更新业务表单原型 `business-form-page-standard-v1` 的 HTML 和 README，来源切换时会清空附件证据显示；同步调整原型总览、业务详情原型说明、`web/README.md` 和 `docs/architecture/业务附件证据边界评审.md` 的附件布局口径。
+- 验证：追加前 `progress.md` 为 91 行、13838 字节，未达到归档阈值；已执行 `git diff --check`、旧术语搜索、`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test`、`cd web && pnpm style:l1`，均通过；`style:l1` 共验证 68 个场景，前端单测 387 个通过。
+- 下一步：后续新增带明细的业务编辑弹窗时，单据级附件默认沿用 inline 证据行；页面级选中记录详情可继续用独立 section，但必须绑定已保存 owner。
+- 阻塞/风险：本轮只改附件面板布局、运行时接入位置和原型 / 文档口径，不改 schema、migration、附件 JSON-RPC、RBAC、Workflow / Fact 写入边界、客户配置或部署脚本；工作区内仍有其他会话留下的附件后端、日期校验和文档改动，本轮未回退。

@@ -7,6 +7,7 @@ export function createBusinessFormalScenarios(deps) {
     assertBusinessMainTableHasNoOperationColumn,
     assertBusinessMainTableInitialSelectionEmpty,
     assertBusinessMainTableSortableColumns,
+    assertBusinessModuleToolbarControlStyle,
     assertBusinessPageRefreshEntrypoint,
     assertERPThemeMode,
     assertNoHorizontalOverflow,
@@ -339,6 +340,9 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-v1-sales-orders',
         })
         await assertBusinessHeaderHasNoSectionTitle(page, {
+          scenarioName: 'business-v1-sales-orders',
+        })
+        await assertBusinessModuleToolbarControlStyle(page, {
           scenarioName: 'business-v1-sales-orders',
         })
         await assertBusinessMainTableSortableColumns(page, {

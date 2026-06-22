@@ -28,6 +28,7 @@ import {
   getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import {
   ContactFormList,
   MasterDataFormFields,
@@ -1522,6 +1523,17 @@ export default function V1MasterDataPage({ type }) {
             customerPaymentConditionOptions={customerPaymentConditionOptions}
             onCustomerPaymentMethodChange={applyCustomerPaymentMethod}
           />
+          {effectiveType === 'product_skus' ? (
+            <BusinessAttachmentPanel
+              ownerType="product_sku"
+              ownerId={editingRecord?.id}
+              title="SKU 附件"
+              description="上传产品图、样品图、包装图或客户款式确认资料；附件不改变 SKU 主数据启停状态。"
+              canUpload={canCreate || canUpdate}
+              canDelete={canUpdate}
+              variant="inline"
+            />
+          ) : null}
           {showContactForm ? (
             <ContactFormList form={recordForm} entityLabel={entityLabel} />
           ) : null}

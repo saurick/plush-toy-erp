@@ -58,11 +58,18 @@ import {
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import {
   formatUnixDate,
   formatUnixDateTime,
   hasActionPermission,
 } from '../utils/masterDataOrderView.mjs'
+import {
+  dateInputNotAfterRule,
+  dateInputNotBeforeRule,
+  isDateInputAfter,
+  isDateInputBefore,
+} from '../utils/dateRange.mjs'
 import {
   applyBusinessColumnSorters,
   applyModuleColumnOrder,
@@ -231,6 +238,7 @@ function buildItemParams(values = {}, extra = {}) {
 }
 
 function HeaderFormFields({
+  form,
   includeProduct = true,
   disabled = false,
   productOptions = [],
@@ -238,6 +246,22 @@ function HeaderFormFields({
   versionSuggestionLoading = false,
   onUseVersionSuggestion,
 }) {
+  const effectiveFrom = Form.useWatch('effective_from', form)
+  const effectiveTo = Form.useWatch('effective_to', form)
+  const disableEffectiveFromOnOrAfterEnd = useCallback(
+    (current) =>
+      isDateInputAfter(current, effectiveTo, {
+        allowSameDay: false,
+      }),
+    [effectiveTo]
+  )
+  const disableEffectiveToOnOrBeforeStart = useCallback(
+    (current) =>
+      isDateInputBefore(current, effectiveFrom, {
+        allowSameDay: false,
+      }),
+    [effectiveFrom]
+  )
   let versionHint = null
   if (!disabled) {
     if (versionSuggestionLoading) {
@@ -301,15 +325,40 @@ function HeaderFormFields({
         className="erp-business-action-form__field"
         label="生效开始"
         name="effective_from"
+        rules={[
+          dateInputNotAfterRule({
+            getEndValue: () => form.getFieldValue('effective_to'),
+            message: '生效开始必须早于生效结束',
+            allowSameDay: false,
+          }),
+        ]}
       >
-        <DateInput disabled={disabled} />
+        <DateInput
+          disabled={disabled}
+          disabledDate={
+            effectiveTo ? disableEffectiveFromOnOrAfterEnd : undefined
+          }
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
+        dependencies={['effective_from']}
         label="生效结束"
         name="effective_to"
+        rules={[
+          dateInputNotBeforeRule({
+            getStartValue: () => form.getFieldValue('effective_from'),
+            message: '生效结束必须晚于生效开始',
+            allowSameDay: false,
+          }),
+        ]}
       >
-        <DateInput disabled={disabled} />
+        <DateInput
+          disabled={disabled}
+          disabledDate={
+            effectiveFrom ? disableEffectiveToOnOrBeforeStart : undefined
+          }
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
@@ -1333,6 +1382,7 @@ export default function BOMVersionsPage() {
           }}
         >
           <HeaderFormFields
+            form={headerForm}
             includeProduct={headerMode !== 'edit'}
             disabled={headerMode === 'view'}
             productOptions={productOptions}
@@ -1341,6 +1391,15 @@ export default function BOMVersionsPage() {
             onUseVersionSuggestion={useHeaderVersionSuggestion}
           />
         </Form>
+        <BusinessAttachmentPanel
+          ownerType="bom_header"
+          ownerId={selectedVersion?.id}
+          title="BOM 附件"
+          description="上传色卡、SOP、工艺图片或材料清单来源文件；附件不写库存、采购或成本事实。"
+          canUpload={canCreate || canUpdate}
+          canDelete={canUpdate}
+          variant="inline"
+        />
         {headerMode === 'create' ? (
           <p className="erp-business-selection-action-bar__hint">
             保存 BOM 草稿后，在同一 BOM 版本弹窗下方维护材料明细。
