@@ -5,6 +5,8 @@ description: plush-toy-erp 项目代码审查治理。Use when Codex reviews plu
 
 # Plush 代码审查治理 Code Review Governance
 
+阅读口径：正文默认中文主线 + English anchors；`name` / `display_name` 保持英文，`Workflow / Fact / RBAC / API / migration / runtime` 等术语按需保留，方便触发、检索和跨工具引用。
+
 用这个 skill 审查 `/Users/simon/projects/plush-toy-erp` 的代码和正式文档改动。默认只审查，不改代码。
 
 ## 范围解析 Scope

@@ -185,6 +185,7 @@ func TestJsonrpcDispatcher_OperationalFactListsRejectInvalidDateFilters(t *testi
 		biz.PermissionPMCPlanRead,
 		biz.PermissionPurchaseOrderRead,
 		biz.PermissionWarehouseInventoryRead,
+		biz.PermissionShipmentRead,
 		biz.PermissionFinanceReceivableRead,
 	)
 	j := newOperationalFactJSONRPCTestData(admin)
@@ -194,9 +195,16 @@ func TestJsonrpcDispatcher_OperationalFactListsRejectInvalidDateFilters(t *testi
 		params map[string]any
 	}{
 		{method: "list_production_facts", params: map[string]any{"date_from": "not-a-date"}},
+		{method: "list_production_facts", params: map[string]any{"date_to": ""}},
+		{method: "list_production_facts", params: map[string]any{"date_from": "2026-06-30", "date_to": "2026-06-01"}},
 		{method: "list_outsourcing_facts", params: map[string]any{"date_to": "not-a-date"}},
+		{method: "list_outsourcing_facts", params: map[string]any{"date_from": "2026-06-30", "date_to": "2026-06-01"}},
+		{method: "list_shipments", params: map[string]any{"date_from": "not-a-date"}},
+		{method: "list_shipments", params: map[string]any{"date_from": "2026-06-30", "date_to": "2026-06-01"}},
 		{method: "list_stock_reservations", params: map[string]any{"date_from": "not-a-date"}},
+		{method: "list_stock_reservations", params: map[string]any{"date_from": "2026-06-30", "date_to": "2026-06-01"}},
 		{method: "list_finance_facts", params: map[string]any{"date_to": "not-a-date"}},
+		{method: "list_finance_facts", params: map[string]any{"date_from": "2026-06-30", "date_to": "2026-06-01"}},
 	} {
 		t.Run(tc.method, func(t *testing.T) {
 			_, res, err := j.handleOperationalFact(ctx, tc.method, "invalid-date", mustJSONRPCStruct(t, tc.params))
@@ -205,6 +213,47 @@ func TestJsonrpcDispatcher_OperationalFactListsRejectInvalidDateFilters(t *testi
 			}
 			if res == nil || res.Code != errcode.InvalidParam.Code {
 				t.Fatalf("expected invalid param for bad operational fact date filter, got %#v", res)
+			}
+		})
+	}
+}
+
+func TestJsonrpcDispatcher_OperationalFactListsRejectInvalidEnums(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.PMCRoleKey, biz.PurchaseRoleKey, biz.WarehouseRoleKey, biz.FinanceRoleKey},
+		biz.PermissionPMCPlanRead,
+		biz.PermissionPurchaseOrderRead,
+		biz.PermissionWarehouseInventoryRead,
+		biz.PermissionShipmentRead,
+		biz.PermissionFinanceReceivableRead,
+	)
+	j := newOperationalFactJSONRPCTestData(admin)
+
+	for _, tc := range []struct {
+		name   string
+		method string
+		params map[string]any
+	}{
+		{name: "production invalid status", method: "list_production_facts", params: map[string]any{"status": "settled"}},
+		{name: "production invalid fact type", method: "list_production_facts", params: map[string]any{"fact_type": "receivable"}},
+		{name: "outsourcing invalid status", method: "list_outsourcing_facts", params: map[string]any{"status": "settled"}},
+		{name: "outsourcing invalid fact type", method: "list_outsourcing_facts", params: map[string]any{"fact_type": "input"}},
+		{name: "shipment invalid status", method: "list_shipments", params: map[string]any{"status": "posted"}},
+		{name: "shipment invalid date field", method: "list_shipments", params: map[string]any{"date_field": "occurred_at", "date_from": "2026-06-01"}},
+		{name: "stock reservation invalid status", method: "list_stock_reservations", params: map[string]any{"status": "posted"}},
+		{name: "stock reservation invalid date field", method: "list_stock_reservations", params: map[string]any{"date_field": "occurred_at", "date_from": "2026-06-01"}},
+		{name: "finance invalid status", method: "list_finance_facts", params: map[string]any{"status": "active"}},
+		{name: "finance invalid fact type", method: "list_finance_facts", params: map[string]any{"fact_type": "output"}},
+		{name: "finance invalid date field", method: "list_finance_facts", params: map[string]any{"date_field": "reserved_at", "date_from": "2026-06-01"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, res, err := j.handleOperationalFact(ctx, tc.method, "invalid-enum", mustJSONRPCStruct(t, tc.params))
+			if err != nil {
+				t.Fatalf("expected nil err, got %v", err)
+			}
+			if res == nil || res.Code != errcode.InvalidParam.Code {
+				t.Fatalf("expected invalid param for bad operational fact filter, got %#v", res)
 			}
 		})
 	}

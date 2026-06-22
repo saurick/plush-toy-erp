@@ -1,9 +1,11 @@
 ---
 name: plush-release-governance
-description: plush-toy-erp 项目发布、部署、版本、migration、rollback 和 release evidence 治理。Use when Codex plans, performs, reviews, or explains plush-toy-erp releases, deploys, image tags, migrations, changelog, rollback, health checks, post-deploy verification, or target environment delivery.
+description: plush-toy-erp 项目发布、部署、版本与回滚治理。Use when Codex plans, performs, reviews, or explains plush-toy-erp releases, deploys, image tags, migrations, changelog, rollback, health checks, post-deploy verification, or target environment delivery.
 ---
 
 # Plush 发布治理 Release Governance
+
+阅读口径：正文默认中文主线 + English anchors；`name` / `display_name` 保持英文，`Workflow / Fact / RBAC / API / migration / runtime` 等术语按需保留，方便触发、检索和跨工具引用。
 
 用这个 skill 处理 `plush-toy-erp` 的 release、deploy、version、migration、rollback 和 release evidence。版本管理默认并入发布证据，不另起重流程。
 

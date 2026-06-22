@@ -784,7 +784,7 @@ export default function V1InventoryLedgerPage() {
       <PageHeaderCard
         compact
         title="库存台账"
-        description="按余额、批次、流水三种视图追溯库存；可用量由后端按 ACTIVE 预留扣减后只读返回，历史流水通过冲正或调整修正，本页不写库存事实。"
+        description="按余额、批次、流水三种视图追溯库存；批次按仓库筛选只看当前有余额批次，历史发生记录进入流水视图追溯，本页不写库存事实。"
         tags={[
           <Tag color="blue" key="balances">
             余额只读
@@ -847,7 +847,9 @@ export default function V1InventoryLedgerPage() {
               className="erp-business-filter-control--status"
               value={warehouseID}
               options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
-              placeholder="全部仓库"
+              placeholder={
+                activeView === VIEW_LOTS ? '当前有余额仓库' : '全部仓库'
+              }
               showSearch
               optionFilterProp="label"
               onChange={(nextID) => {

@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Release Governance"
-  short_description: "发布/部署/版本/回滚治理 Release"
-  default_prompt: "Use $plush-release-governance 按中文主线和 English anchors 处理任务：先收敛真源、范围、验证和剩余风险。"
+  short_description: "发布/版本/回滚 Release"
+  default_prompt: "Use $plush-release-governance 按中文主线 + English anchors 处理：先收敛真源、范围、验证和风险。"

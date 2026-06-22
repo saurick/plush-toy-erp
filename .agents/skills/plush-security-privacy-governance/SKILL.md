@@ -5,6 +5,8 @@ description: plush-toy-erp 项目安全与隐私治理。Use when Codex works on
 
 # Plush 安全与隐私治理 Security Privacy Governance
 
+阅读口径：正文默认中文主线 + English anchors；`name` / `display_name` 保持英文，`Workflow / Fact / RBAC / API / migration / runtime` 等术语按需保留，方便触发、检索和跨工具引用。
+
 用这个 skill 处理 `plush-toy-erp` authentication、authorization、RBAC、secrets、production access、customer/user data、sensitive logs、exports 和 privacy boundaries。
 
 ## 真源链 Truth Chain

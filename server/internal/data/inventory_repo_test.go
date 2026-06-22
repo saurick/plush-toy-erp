@@ -170,6 +170,69 @@ func createTestInventoryLot(t *testing.T, ctx context.Context, uc *biz.Inventory
 	return lot
 }
 
+func TestInventoryUsecase_ListInventoryLotsWarehouseFilterRequiresPositiveBalance(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_lot_warehouse_positive_balance")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	lot := createTestInventoryLot(t, ctx, uc, biz.InventorySubjectMaterial, fixtures.materialID, "LOT-WH-POSITIVE")
+	quantity := mustDecimal(t, "5")
+
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		LotID:          &lot.ID,
+		TxnType:        biz.InventoryTxnIn,
+		Direction:      1,
+		Quantity:       quantity,
+		UnitID:         fixtures.unitID,
+		SourceType:     "TEST",
+		IdempotencyKey: "LOT-WH-POSITIVE-IN",
+		OccurredAt:     time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("seed positive lot balance failed: %v", err)
+	}
+
+	items, total, err := uc.ListInventoryLots(ctx, biz.InventoryLotFilter{
+		WarehouseID: fixtures.warehouseID,
+		Keyword:     "LOT-WH-POSITIVE",
+	})
+	if err != nil {
+		t.Fatalf("list lots with positive balance failed: %v", err)
+	}
+	if total != 1 || len(items) != 1 || items[0].ID != lot.ID {
+		t.Fatalf("expected lot with positive warehouse balance, total=%d items=%#v", total, items)
+	}
+
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		LotID:          &lot.ID,
+		TxnType:        biz.InventoryTxnOut,
+		Direction:      -1,
+		Quantity:       quantity,
+		UnitID:         fixtures.unitID,
+		SourceType:     "TEST",
+		IdempotencyKey: "LOT-WH-POSITIVE-OUT",
+		OccurredAt:     time.Date(2026, 6, 22, 10, 0, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("consume lot balance failed: %v", err)
+	}
+
+	items, total, err = uc.ListInventoryLots(ctx, biz.InventoryLotFilter{
+		WarehouseID: fixtures.warehouseID,
+		Keyword:     "LOT-WH-POSITIVE",
+	})
+	if err != nil {
+		t.Fatalf("list lots after zero balance failed: %v", err)
+	}
+	if total != 0 || len(items) != 0 {
+		t.Fatalf("expected zero-balance historical lot excluded by warehouse filter, total=%d items=%#v", total, items)
+	}
+}
+
 func TestInventoryUsecase_DirectWritePrimitiveAllowsHistoricalInactiveReferences(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "inventory_direct_write_inactive_refs")

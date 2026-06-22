@@ -389,6 +389,7 @@ func (r *inventoryRepo) ListInventoryLots(ctx context.Context, filter biz.Invent
 	if filter.WarehouseID > 0 {
 		query = query.Where(inventorylot.HasInventoryBalancesWith(
 			inventorybalance.WarehouseID(filter.WarehouseID),
+			inventorybalance.QuantityGT(decimal.Zero),
 		))
 	}
 	if filter.Keyword != "" {

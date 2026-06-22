@@ -1,9 +1,11 @@
 ---
 name: plush-prompt-governance
-description: Project-specific prompt governance for /Users/simon/projects/plush-toy-erp. Use when Codex writes, refines, evaluates, or converts a plush-toy-erp request into an executable prompt for implementation, review, docs governance, page design, tests, deployment, handoff, side chat, main chat, or commit/push work; when the user asks how to phrase a plush task; or when prompts need project boundaries such as README/current source of truth, AGENTS.md, Workflow/Fact, RBAC, customer data, progress.md, validation scope, related skills, or positive "要做什么" wording instead of broad "不要" lists.
+description: plush-toy-erp 项目提示词治理。Use when Codex writes, refines, evaluates, or converts a plush-toy-erp request into an executable prompt for implementation, review, docs governance, page design, tests, deployment, handoff, side chat, main chat, or commit/push work; when the user asks how to phrase a plush task; or when prompts need project boundaries such as README/current source of truth, AGENTS.md, Workflow/Fact, RBAC, customer data, progress.md, validation scope, related skills, or positive "要做什么" wording instead of broad "不要" lists.
 ---
 
 # Plush Prompt Governance
+
+阅读口径：正文默认中文主线 + English anchors；`name` / `display_name` 保持英文，`Workflow / Fact / RBAC / API / migration / runtime` 等术语按需保留，方便触发、检索和跨工具引用。
 
 Use this skill to draft prompts that make plush-toy-erp work executable and bounded. The main pattern is positive: state the goal, true sources, scope, validation, and closeout. Use "不要 / 禁止" only for project risks that commonly cause bad changes.
 

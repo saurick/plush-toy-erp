@@ -1,6 +1,6 @@
 ---
 name: plush-domain-boundary-governance
-description: plush-toy-erp 项目业务边界、数据真源与后端实现治理。Use when Codex implements or reviews plush-toy-erp feature work that may affect backend implementation, server code, schema, migration, repo, usecase, JSON-RPC, APIs, RBAC, transactions, idempotency, error codes, data ownership, domain models, workflows, facts, frontend/backend responsibility, customer-specific behavior, source-of-truth fields, stale/missing field values, or cross-module boundaries.
+description: plush-toy-erp 项目业务边界与数据真源治理。Use when Codex implements or reviews plush-toy-erp feature work that may affect backend implementation, server code, schema, migration, repo, usecase, JSON-RPC, APIs, RBAC, transactions, idempotency, error codes, data ownership, domain models, workflows, facts, frontend/backend responsibility, customer-specific behavior, source-of-truth fields, stale/missing field values, or cross-module boundaries.
 ---
 
 # Plush 业务边界治理 Domain Boundary Governance

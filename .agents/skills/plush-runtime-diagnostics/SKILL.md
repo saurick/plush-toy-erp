@@ -1,9 +1,11 @@
 ---
 name: plush-runtime-diagnostics
-description: plush-toy-erp 项目运行时故障诊断 workflow。Use when Codex diagnoses plush-toy-erp page errors, API/RPC failures, backend read/write failures, migration drift, database mismatch, deployment mismatch, browser/runtime issues, logs, request IDs, configuration drift, environment confusion, or production/test/local differences before changing code.
+description: plush-toy-erp 项目运行时故障诊断。Use when Codex diagnoses plush-toy-erp page errors, API/RPC failures, backend read/write failures, migration drift, database mismatch, deployment mismatch, browser/runtime issues, logs, request IDs, configuration drift, environment confusion, or production/test/local differences before changing code.
 ---
 
 # Plush 运行时诊断 Runtime Diagnostics
+
+阅读口径：正文默认中文主线 + English anchors；`name` / `display_name` 保持英文，`Workflow / Fact / RBAC / API / migration / runtime` 等术语按需保留，方便触发、检索和跨工具引用。
 
 用这个 skill 在修改 `plush-toy-erp` 代码前先用 runtime evidence 分层定位故障，避免把环境、数据、migration、部署或浏览器问题误修成代码补丁。
 

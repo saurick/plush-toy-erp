@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Seed Import Governance"
-  short_description: "Seed/导入/清理治理 Import"
-  default_prompt: "Use $plush-seed-import-governance 按中文主线和 English anchors 处理任务：先收敛真源、范围、验证和剩余风险。"
+  short_description: "Seed/导入/清理 Import"
+  default_prompt: "Use $plush-seed-import-governance 按中文主线 + English anchors 处理：先收敛真源、范围、验证和风险。"

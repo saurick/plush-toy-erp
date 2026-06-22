@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Runtime Diagnostics"
-  short_description: "运行时故障诊断 Runtime"
-  default_prompt: "Use $plush-runtime-diagnostics 按中文主线和 English anchors 处理任务：先收敛真源、范围、验证和剩余风险。"
+  short_description: "运行时诊断 Runtime"
+  default_prompt: "Use $plush-runtime-diagnostics 按中文主线 + English anchors 处理：先收敛真源、范围、验证和风险。"

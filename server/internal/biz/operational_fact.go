@@ -378,7 +378,11 @@ func (uc *OperationalFactUsecase) ListProductionFacts(ctx context.Context, filte
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListProductionFacts(ctx, normalizeOperationalFactFilter(filter))
+	normalized, err := normalizeProductionFactFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListProductionFacts(ctx, normalized)
 }
 
 func (uc *OperationalFactUsecase) CreateOutsourcingFactDraft(ctx context.Context, in *OperationalFactMutation) (*OutsourcingFact, error) {
@@ -423,7 +427,11 @@ func (uc *OperationalFactUsecase) ListOutsourcingFacts(ctx context.Context, filt
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListOutsourcingFacts(ctx, normalizeOperationalFactFilter(filter))
+	normalized, err := normalizeOutsourcingFactFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListOutsourcingFacts(ctx, normalized)
 }
 
 func (uc *OperationalFactUsecase) CreateShipmentDraft(ctx context.Context, in *ShipmentCreate) (*Shipment, error) {
@@ -530,7 +538,11 @@ func (uc *OperationalFactUsecase) ListStockReservations(ctx context.Context, fil
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListStockReservations(ctx, normalizeOperationalFactFilter(filter))
+	normalized, err := normalizeStockReservationFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListStockReservations(ctx, normalized)
 }
 
 func (uc *OperationalFactUsecase) CreateFinanceFactDraft(ctx context.Context, in *FinanceFactCreate) (*FinanceFact, error) {
@@ -575,7 +587,11 @@ func (uc *OperationalFactUsecase) ListFinanceFacts(ctx context.Context, filter O
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListFinanceFacts(ctx, normalizeOperationalFactFilter(filter))
+	normalized, err := normalizeFinanceFactFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListFinanceFacts(ctx, normalized)
 }
 
 var productionFactTypes = map[string]struct{}{
@@ -626,6 +642,32 @@ var financeInvoiceCategories = map[string]struct{}{
 	FinanceInvoiceCategoryVATGeneral1:   {},
 	FinanceInvoiceCategoryVATSpecial3:   {},
 	FinanceInvoiceCategoryVATSpecial13:  {},
+}
+
+var postedOperationalFactStatuses = map[string]struct{}{
+	OperationalFactStatusDraft:     {},
+	OperationalFactStatusPosted:    {},
+	OperationalFactStatusCancelled: {},
+}
+
+var financeFactStatuses = map[string]struct{}{
+	OperationalFactStatusDraft:     {},
+	OperationalFactStatusPosted:    {},
+	OperationalFactStatusCancelled: {},
+	OperationalFactStatusSettled:   {},
+}
+
+var shipmentStatuses = map[string]struct{}{
+	ShipmentStatusDraft:     {},
+	ShipmentStatusShipped:   {},
+	ShipmentStatusCancelled: {},
+}
+
+var stockReservationStatuses = map[string]struct{}{
+	StockReservationStatusActive:    {},
+	StockReservationStatusReleased:  {},
+	StockReservationStatusConsumed:  {},
+	StockReservationStatusCancelled: {},
 }
 
 func normalizeOperationalFactMutation(in *OperationalFactMutation, allowedTypes map[string]struct{}) (*OperationalFactMutation, error) {
@@ -919,8 +961,37 @@ func normalizeOperationalFactFilter(in OperationalFactFilter) OperationalFactFil
 	return in
 }
 
+func normalizeProductionFactFilter(in OperationalFactFilter) (OperationalFactFilter, error) {
+	in = normalizeOperationalFactFilter(in)
+	if err := validateOperationalFactStatusAndType(in, postedOperationalFactStatuses, productionFactTypes); err != nil {
+		return OperationalFactFilter{}, err
+	}
+	var err error
+	in, err = normalizeOperationalFactDateRange(in, "occurred_at")
+	if err != nil {
+		return OperationalFactFilter{}, err
+	}
+	return in, nil
+}
+
+func normalizeOutsourcingFactFilter(in OperationalFactFilter) (OperationalFactFilter, error) {
+	in = normalizeOperationalFactFilter(in)
+	if err := validateOperationalFactStatusAndType(in, postedOperationalFactStatuses, outsourcingFactTypes); err != nil {
+		return OperationalFactFilter{}, err
+	}
+	var err error
+	in, err = normalizeOperationalFactDateRange(in, "occurred_at")
+	if err != nil {
+		return OperationalFactFilter{}, err
+	}
+	return in, nil
+}
+
 func normalizeShipmentFilter(in OperationalFactFilter) (OperationalFactFilter, error) {
 	in = normalizeOperationalFactFilter(in)
+	if err := validateFilterValue(in.Status, shipmentStatuses); err != nil {
+		return OperationalFactFilter{}, err
+	}
 	switch in.DateField {
 	case "", "planned_ship_at", "shipped_at":
 	default:
@@ -933,6 +1004,64 @@ func normalizeShipmentFilter(in OperationalFactFilter) (OperationalFactFilter, e
 		return OperationalFactFilter{}, ErrBadParam
 	}
 	return in, nil
+}
+
+func normalizeStockReservationFilter(in OperationalFactFilter) (OperationalFactFilter, error) {
+	in = normalizeOperationalFactFilter(in)
+	if err := validateFilterValue(in.Status, stockReservationStatuses); err != nil {
+		return OperationalFactFilter{}, err
+	}
+	var err error
+	in, err = normalizeOperationalFactDateRange(in, "reserved_at")
+	if err != nil {
+		return OperationalFactFilter{}, err
+	}
+	return in, nil
+}
+
+func normalizeFinanceFactFilter(in OperationalFactFilter) (OperationalFactFilter, error) {
+	in = normalizeOperationalFactFilter(in)
+	if err := validateOperationalFactStatusAndType(in, financeFactStatuses, financeFactTypes); err != nil {
+		return OperationalFactFilter{}, err
+	}
+	var err error
+	in, err = normalizeOperationalFactDateRange(in, "occurred_at")
+	if err != nil {
+		return OperationalFactFilter{}, err
+	}
+	return in, nil
+}
+
+func validateOperationalFactStatusAndType(in OperationalFactFilter, allowedStatuses map[string]struct{}, allowedTypes map[string]struct{}) error {
+	if err := validateFilterValue(in.Status, allowedStatuses); err != nil {
+		return err
+	}
+	return validateFilterValue(in.FactType, allowedTypes)
+}
+
+func normalizeOperationalFactDateRange(in OperationalFactFilter, defaultDateField string) (OperationalFactFilter, error) {
+	switch in.DateField {
+	case "", defaultDateField:
+	default:
+		return OperationalFactFilter{}, ErrBadParam
+	}
+	if in.DateField == "" && (in.DateFrom != nil || in.DateTo != nil) {
+		in.DateField = defaultDateField
+	}
+	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
+		return OperationalFactFilter{}, ErrBadParam
+	}
+	return in, nil
+}
+
+func validateFilterValue(value string, allowed map[string]struct{}) error {
+	if value == "" {
+		return nil
+	}
+	if _, ok := allowed[value]; !ok {
+		return ErrBadParam
+	}
+	return nil
 }
 
 func normalizeOptionalUpperString(value *string) *string {

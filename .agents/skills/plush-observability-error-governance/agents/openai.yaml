@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Observability Error Governance"
-  short_description: "可观测性/错误治理 Observability"
-  default_prompt: "Use $plush-observability-error-governance 按中文主线和 English anchors 处理任务：先收敛真源、范围、验证和剩余风险。"
+  short_description: "可观测性/错误 Observability"
+  default_prompt: "Use $plush-observability-error-governance 按中文主线 + English anchors 处理：先收敛真源、范围、验证和风险。"

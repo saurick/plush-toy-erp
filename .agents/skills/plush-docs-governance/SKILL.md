@@ -1,9 +1,11 @@
 ---
 name: plush-docs-governance
-description: Project-specific documentation governance for /Users/simon/projects/plush-toy-erp. Use when Codex reviews, creates, renames, reorganizes, simplifies, or updates plush ERP Markdown docs, README files, docs inventory, progress.md, customer docs, reference/archive docs, project guidance, AGENTS.md docs rules, Markdown metadata/frontmatter, tables, classification matrices, architecture layers, validation levels, test shapes, Mermaid diagrams, flowcharts, state diagrams, architecture diagrams, decision diagrams, reader paths, quick starts, conclusion-first structure, or copyable commands, or when the user mentions 文档治理, docs, AGENTS, 文档清单, 中文文件名, 真源, frontmatter, metadata, progress归档, reference不是正式真源, 信息密度高, 心智负担, 一眼看不懂, 简洁易用, 美观, 表格, 矩阵, 架构层级, 验证层级, 测试形态, 跳转到指定位置, 流程图, 状态图, 架构图, 读者路径, 结论前置, 命令可复制, or asks whether docs guidance should become reusable.
+description: plush-toy-erp 项目文档治理。Use when Codex reviews, creates, renames, reorganizes, simplifies, or updates plush ERP Markdown docs, README files, docs inventory, progress.md, customer docs, reference/archive docs, project guidance, AGENTS.md docs rules, Markdown metadata/frontmatter, tables, classification matrices, architecture layers, validation levels, test shapes, Mermaid diagrams, flowcharts, state diagrams, architecture diagrams, decision diagrams, reader paths, quick starts, conclusion-first structure, or copyable commands, or when the user mentions 文档治理, docs, AGENTS, 文档清单, 中文文件名, 真源, frontmatter, metadata, progress归档, reference不是正式真源, 信息密度高, 心智负担, 一眼看不懂, 简洁易用, 美观, 表格, 矩阵, 架构层级, 验证层级, 测试形态, 跳转到指定位置, 流程图, 状态图, 架构图, 读者路径, 结论前置, 命令可复制, or asks whether docs guidance should become reusable.
 ---
 
 # Plush Docs Governance
+
+阅读口径：正文默认中文主线 + English anchors；`name` / `display_name` 保持英文，`Workflow / Fact / RBAC / API / migration / runtime` 等术语按需保留，方便触发、检索和跨工具引用。
 
 Use this skill to keep plush-toy-erp docs useful for humans and safe as project truth. It covers both governance and reading experience: current source of truth, inventory sync, Chinese filenames, low information density, reader paths, conclusion-first structure, clear section anchors, copyable commands, diagrams that reduce understanding cost, and links to exact relevant locations.
 

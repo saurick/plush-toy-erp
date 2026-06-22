@@ -1,9 +1,11 @@
 ---
 name: plush-observability-error-governance
-description: plush-toy-erp 项目可观测性和错误治理 workflow。Use when Codex designs, reviews, or changes plush-toy-erp structured logs, request IDs, trace IDs, metrics, audit evidence, error codes, error classification, retries, fallbacks, alerts, dashboards, user-facing error messages, or debugging evidence.
+description: plush-toy-erp 项目可观测性与错误治理。Use when Codex designs, reviews, or changes plush-toy-erp structured logs, request IDs, trace IDs, metrics, audit evidence, error codes, error classification, retries, fallbacks, alerts, dashboards, user-facing error messages, or debugging evidence.
 ---
 
 # Plush 可观测性与错误治理 Observability Error Governance
+
+阅读口径：正文默认中文主线 + English anchors；`name` / `display_name` 保持英文，`Workflow / Fact / RBAC / API / migration / runtime` 等术语按需保留，方便触发、检索和跨工具引用。
 
 用这个 skill 处理 `plush-toy-erp` logs、traces、metrics、audit evidence、error codes、fallbacks、dashboards 和 user-facing errors，让问题能被定位、解释和复现。
 

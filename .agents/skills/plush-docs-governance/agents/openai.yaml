@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Docs Governance"
-  short_description: "plush ERP 文档治理、结构表达、metadata 和可读性检查"
-  default_prompt: "Use $plush-docs-governance to review or update plush-toy-erp docs with source-of-truth, metadata/frontmatter boundaries, progress handling, tables, diagrams, links, inventory, and validation."
+  short_description: "文档治理 Docs"
+  default_prompt: "Use $plush-docs-governance 按中文主线 + English anchors 处理：先收敛真源、范围、验证和风险。"

@@ -1,9 +1,11 @@
 ---
 name: plush-test-governance
-description: Project-specific test governance for /Users/simon/projects/plush-toy-erp. Use when Codex chooses, runs, reviews, or explains validation scope for plush-toy-erp changes, including validation levels T0-T8, test shapes, evidence environments, unit tests, integration tests, JSON-RPC/RBAC tests, migration checks, browser/page regressions, style:l1, smoke tests, real-write E2E, import dry-runs, release checks, or when the user asks 验证层级/测试形态/测试分类/测试治理/怎么测/要不要补测试.
+description: plush-toy-erp 项目测试治理。Use when Codex chooses, runs, reviews, or explains validation scope for plush-toy-erp changes, including validation levels T0-T8, test shapes, evidence environments, unit tests, integration tests, JSON-RPC/RBAC tests, migration checks, browser/page regressions, style:l1, smoke tests, real-write E2E, import dry-runs, release checks, or when the user asks 验证层级/测试形态/测试分类/测试治理/怎么测/要不要补测试.
 ---
 
 # Plush Test Governance
+
+阅读口径：正文默认中文主线 + English anchors；`name` / `display_name` 保持英文，`Workflow / Fact / RBAC / API / migration / runtime` 等术语按需保留，方便触发、检索和跨工具引用。
 
 用这份 skill 把 plush-toy-erp 的测试选择、执行和汇报收口到项目真实边界。它不是“多跑命令越好”，而是按改动影响面选出足够但不过度的验证组合。
 
