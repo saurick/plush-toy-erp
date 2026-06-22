@@ -94,81 +94,6 @@ export function createBusinessFormalScenarios(deps) {
     )
   }
 
-  const assertViewTabsInTableCard = async (
-    page,
-    { scenarioName, tabNames }
-  ) => {
-    await page
-      .locator('.erp-business-module-table-card .erp-business-view-tabs')
-      .waitFor({ state: 'visible', timeout: 10_000 })
-    const metrics = await page.evaluate((expectedTabNames) => {
-      const rectOf = (element) => {
-        if (!(element instanceof HTMLElement)) return null
-        const rect = element.getBoundingClientRect()
-        return {
-          top: rect.top,
-          bottom: rect.bottom,
-          height: rect.height,
-          width: rect.width,
-        }
-      }
-      const operationPanel = document.querySelector(
-        '.erp-business-operation-panel'
-      )
-      const tableCard = document.querySelector(
-        '.erp-business-module-table-card'
-      )
-      const tabs = document.querySelector('.erp-business-view-tabs')
-      const table = document.querySelector(
-        '.erp-business-module-table-card table'
-      )
-      const tabTexts =
-        tabs instanceof HTMLElement
-          ? Array.from(tabs.querySelectorAll('[role="tab"]')).map((node) =>
-              String(node.textContent || '')
-                .replace(/\s+/g, ' ')
-                .trim()
-            )
-          : []
-      return {
-        expectedTabNames,
-        tabTexts,
-        tabsInsideTableCard:
-          tableCard instanceof HTMLElement &&
-          tabs instanceof HTMLElement &&
-          tableCard.contains(tabs),
-        operationPanel: rectOf(operationPanel),
-        tableCard: rectOf(tableCard),
-        tabs: rectOf(tabs),
-        table: rectOf(table),
-      }
-    }, tabNames)
-
-    assert(
-      metrics.tabsInsideTableCard,
-      `${scenarioName} 视图 Tabs 应归属到表格卡片顶部: ${JSON.stringify(metrics)}`
-    )
-    for (const tabName of tabNames) {
-      assert(
-        metrics.tabTexts.some((text) => text.includes(tabName)),
-        `${scenarioName} 缺少视图 Tab “${tabName}”: ${JSON.stringify(metrics)}`
-      )
-    }
-    assert(
-      metrics.operationPanel &&
-        metrics.tableCard &&
-        metrics.operationPanel.bottom <= metrics.tableCard.top + 2,
-      `${scenarioName} 表格卡片应位于筛选/当前操作卡之后: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.tabs &&
-        metrics.table &&
-        metrics.tabs.top >= metrics.tableCard.top &&
-        metrics.tabs.bottom <= metrics.table.top + 2,
-      `${scenarioName} 视图 Tabs 应位于表格卡片内且在表格之前: ${JSON.stringify(metrics)}`
-    )
-  }
-
   const assertUnifiedListToolbarShell = async (
     page,
     {
@@ -1359,23 +1284,14 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '出库管理')
-        await expectButton(page, '新建出货单')
-        await expectText(page, 'SHIP-STYLE-L1')
-        await expectText(page, '出货出库')
-        await assertUnifiedListToolbarShell(page, {
-          scenarioName: 'business-v1-outbound-shipments',
-        })
-        await assertViewTabsInTableCard(page, {
-          scenarioName: 'business-v1-outbound-shipments',
-          tabNames: ['出货出库', '库存预留'],
-        })
-        await assertTextAbsent(page, '生成出库')
-        await page.getByRole('tab', { name: '库存预留' }).click()
         await expectButton(page, '新建库存预留')
         await expectText(page, 'RSV-STYLE-L1')
+        await expectText(page, '库存预留释放 / 消耗')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-outbound-reservations',
         })
+        await assertTextAbsent(page, '新建出货单')
+        await assertTextAbsent(page, '生成出库')
         await assertNoHorizontalOverflow(page, 'business-v1-outbound')
 
         await gotoScenarioPath(page, '/erp/finance/receivables', {

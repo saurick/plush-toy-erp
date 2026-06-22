@@ -1,0 +1,126 @@
+:root {
+  --erp-tab-motion-duration: 180ms;
+  --erp-tab-motion-easing: cubic-bezier(0.2, 0, 0, 1);
+  --erp-tab-active-bg: rgb(232 245 234 / 0.92);
+  --erp-tab-active-shadow: 0 8px 20px rgb(47 143 75 / 0.12);
+}
+
+.ant-segmented {
+  transition:
+    border-color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    background-color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    box-shadow var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
+}
+
+.ant-segmented .ant-segmented-thumb {
+  transition:
+    transform var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    width var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    height var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    background-color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    box-shadow var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
+  box-shadow: var(--erp-tab-active-shadow);
+}
+
+.ant-segmented .ant-segmented-item {
+  transition:
+    color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    background-color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    transform var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
+}
+
+.ant-segmented .ant-segmented-item-label {
+  transition:
+    color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    font-weight var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
+}
+
+.ant-tabs .ant-tabs-ink-bar {
+  transition:
+    left var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    right var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    width var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    transform var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    background-color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
+}
+
+.ant-tabs .ant-tabs-tab {
+  transition:
+    color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    background-color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    border-color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    box-shadow var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    transform var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
+}
+
+.ant-tabs .ant-tabs-tab-btn {
+  transition:
+    color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    text-shadow var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
+}
+
+.erp-business-view-tabs .ant-tabs-tab-active,
+.erp-permission-tabs .ant-tabs-tab-active {
+  background: var(--erp-tab-active-bg);
+  box-shadow: var(--erp-tab-active-shadow);
+}
+
+.erp-business-collaboration-task-panel__tab {
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    box-shadow var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    transform var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
+}
+
+.erp-business-collaboration-task-panel__tab::before {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--erp-tab-active-bg);
+  content: '';
+  opacity: 0;
+  transform: scaleX(0.72);
+  transform-origin: center;
+  transition:
+    opacity var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    transform var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
+    background-color var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
+}
+
+.erp-business-collaboration-task-panel__tab:hover::before,
+.erp-business-collaboration-task-panel__tab:focus-visible::before,
+.erp-business-collaboration-task-panel__tab--active::before {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.erp-business-collaboration-task-panel__tab--active {
+  box-shadow: var(--erp-tab-active-shadow);
+}
+
+.erp-business-collaboration-task-panel__tab > * {
+  position: relative;
+  z-index: 1;
+}
+
+[data-erp-theme='dark'] {
+  --erp-tab-active-bg: rgb(22 101 52 / 0.34);
+  --erp-tab-active-shadow: 0 8px 20px rgb(0 0 0 / 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ant-segmented,
+  .ant-segmented .ant-segmented-thumb,
+  .ant-segmented .ant-segmented-item,
+  .ant-segmented .ant-segmented-item-label,
+  .ant-tabs .ant-tabs-ink-bar,
+  .ant-tabs .ant-tabs-tab,
+  .ant-tabs .ant-tabs-tab-btn,
+  .erp-business-collaboration-task-panel__tab,
+  .erp-business-collaboration-task-panel__tab::before {
+    transition-duration: 0.01ms;
+  }
+}

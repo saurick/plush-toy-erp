@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Observability Error Governance"
-  short_description: "Design logs, traces, metrics, errors, and user messages"
-  default_prompt: "Use $plush-observability-error-governance to handle this plush-toy-erp task with project truth, validation, and risk reporting."
+  short_description: "可观测性/错误治理 Observability"
+  default_prompt: "Use $plush-observability-error-governance 按中文主线和 English anchors 处理任务：先收敛真源、范围、验证和剩余风险。"

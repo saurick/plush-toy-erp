@@ -41,6 +41,13 @@ pnpm style:l1
 \`\`\`
 `
 
+const currentStrategyMarkdown = strategyMarkdown
+  .replace('## 3. 测试分层', '## 4. 验证层级 T0-T8')
+  .replace(
+    '| 层级 | 改动类型 | 必跑或优先命令 | 说明 |',
+    '| 验证层级 | 改动类型 | 必跑或优先命令 | 说明 |'
+  )
+
 const deliveryEvidenceMarkdown = `
 # 岗位任务端目标环境发布证据 / Mobile Workflow Target Release Evidence
 
@@ -84,6 +91,15 @@ test('devTesting: 解析测试策略分层表和命令', () => {
   assert.equal(tiers[2].key, 'T7')
   assert.equal(tiers[2].commands.length, 0)
   assert.match(tiers[2].copyText, /当前没有完整业务 E2E runner/)
+})
+
+test('devTesting: 兼容当前自动化测试策略的验证层级标题', () => {
+  const tiers = parseDevTestingStrategyTiers(currentStrategyMarkdown)
+
+  assert.equal(tiers.length, 3)
+  assert.equal(tiers[1].key, 'T5')
+  assert.equal(tiers[1].level, 'T5 Frontend UI / 样式')
+  assert(tiers[1].commands.includes('cd web && pnpm style:l1'))
 })
 
 test('devTesting: 为常用预设和分层复制生成命令文本', () => {

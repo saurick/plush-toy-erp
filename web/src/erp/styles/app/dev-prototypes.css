@@ -1257,14 +1257,70 @@
 }
 
 .erp-login-card .ant-segmented {
+  --erp-login-segmented-motion-duration: 420ms;
+  --erp-login-segmented-motion-easing: cubic-bezier(0.215, 0.61, 0.355, 1);
+  --erp-login-segmented-indicator-bg: #ffffff;
+  --erp-login-segmented-indicator-shadow: 0 8px 20px rgb(15 23 42 / 0.08);
   padding: 4px;
   border-radius: 18px;
   background: #eef4f0;
 }
 
+.erp-login-card .erp-login-segmented.ant-segmented .ant-segmented-group {
+  position: relative;
+  isolation: isolate;
+}
+
+.erp-login-card
+  .erp-login-segmented.ant-segmented
+  .ant-segmented-group::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 0;
+  width: 50%;
+  border-radius: 14px;
+  background: var(--erp-login-segmented-indicator-bg);
+  box-shadow: var(--erp-login-segmented-indicator-shadow);
+  content: '';
+  pointer-events: none;
+  transition:
+    transform var(--erp-login-segmented-motion-duration)
+      var(--erp-login-segmented-motion-easing),
+    background-color var(--erp-login-segmented-motion-duration)
+      var(--erp-login-segmented-motion-easing),
+    box-shadow var(--erp-login-segmented-motion-duration)
+      var(--erp-login-segmented-motion-easing);
+}
+
+.erp-login-card
+  .erp-login-segmented--right.ant-segmented
+  .ant-segmented-group::before {
+  transform: translateX(100%);
+}
+
+.erp-login-card .erp-login-segmented.ant-segmented .ant-segmented-thumb {
+  display: none;
+}
+
 .erp-login-card .ant-segmented .ant-segmented-item {
+  position: relative;
+  z-index: 1;
   min-height: 42px;
   border-radius: 14px;
+  background: transparent;
+  box-shadow: none;
+  transition:
+    color var(--erp-login-segmented-motion-duration)
+      var(--erp-login-segmented-motion-easing),
+    transform var(--erp-login-segmented-motion-duration)
+      var(--erp-login-segmented-motion-easing);
+}
+
+.erp-login-card
+  .erp-login-segmented.ant-segmented
+  .ant-segmented-item-selected {
+  background: transparent;
+  box-shadow: none;
 }
 
 .erp-login-card .ant-segmented .ant-segmented-item-label {
@@ -1275,7 +1331,23 @@
   color: #1f2937;
   font-size: 15px;
   font-weight: 700;
+  transition:
+    color var(--erp-login-segmented-motion-duration)
+      var(--erp-login-segmented-motion-easing),
+    font-weight var(--erp-login-segmented-motion-duration)
+      var(--erp-login-segmented-motion-easing);
   white-space: normal;
+}
+
+.erp-login-card
+  .erp-login-segmented--left.ant-segmented
+  label.ant-segmented-item:nth-of-type(1)
+  .ant-segmented-item-label,
+.erp-login-card
+  .erp-login-segmented--right.ant-segmented
+  label.ant-segmented-item:nth-of-type(2)
+  .ant-segmented-item-label {
+  color: #0f5132;
 }
 
 .erp-login-card .ant-form-item-label > label {

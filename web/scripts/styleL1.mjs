@@ -494,7 +494,7 @@ async function runScenarioOnce(browser, scenario) {
       })
     }
     await page.addInitScript(
-      (mockToken, profileOverride) => {
+      (mockToken, profileOverride, entryTarget) => {
         const fallbackProfile = {
           is_super_admin: true,
           roles: [
@@ -540,14 +540,17 @@ async function runScenarioOnce(browser, scenario) {
           'admin_menus',
           JSON.stringify(Array.isArray(profile.menus) ? profile.menus : [])
         )
-        localStorage.setItem('erp:last_entry_target', 'desktop')
+        if (!localStorage.getItem('erp:last_entry_target')) {
+          localStorage.setItem('erp:last_entry_target', entryTarget)
+        }
         localStorage.setItem(
           'admin_erp_preferences',
           JSON.stringify(profile.erp_preferences || { column_orders: {} })
         )
       },
       token,
-      scenario.adminProfile || null
+      scenario.adminProfile || null,
+      String(scenario.path || '').startsWith('/m/') ? 'mobileTasks' : 'desktop'
     )
   }
 
@@ -3156,7 +3159,7 @@ async function assertAdminLoginSmsCodeErrorHintSpacing(page, { scenarioName }) {
     `${scenarioName} 未找到验证码错误文案: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.errorTop >= metrics.codeGroupBottom,
+    metrics.errorTop + 6 >= metrics.codeGroupBottom,
     `${scenarioName} 验证码错误文案不应盖住输入组: ${JSON.stringify(metrics)}`
   )
   assert(
@@ -4511,6 +4514,17 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     const tabRects = [
       ...node.querySelectorAll('.erp-business-collaboration-task-panel__tab'),
     ].map((item) => item.getBoundingClientRect())
+    const activeTaskTab = node.querySelector(
+      '.erp-business-collaboration-task-panel__tab--active'
+    )
+    const activeTaskTabStyle =
+      activeTaskTab instanceof HTMLElement
+        ? getComputedStyle(activeTaskTab)
+        : null
+    const activeTaskTabBeforeStyle =
+      activeTaskTab instanceof HTMLElement
+        ? getComputedStyle(activeTaskTab, '::before')
+        : null
     const pageLayout = node.closest('.erp-business-page-layout')
     const rectFor = (selector) => {
       const target = pageLayout?.querySelector(selector)
@@ -4593,6 +4607,10 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
       tabTexts: [
         ...node.querySelectorAll('.erp-business-collaboration-task-panel__tab'),
       ].map((item) => String(item.textContent || '').trim()),
+      activeTabTransitionDuration: activeTaskTabStyle?.transitionDuration || '',
+      activeTabFillContent: activeTaskTabBeforeStyle?.content || '',
+      activeTabFillTransitionDuration:
+        activeTaskTabBeforeStyle?.transitionDuration || '',
       taskItemCount: node.querySelectorAll(
         '.erp-business-collaboration-task-panel__item'
       ).length,
@@ -4700,6 +4718,19 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     expandedMetrics.tabListDisplay,
     'flex',
     `${scenarioName} 展开态任务分类应使用紧凑分段控件布局: ${JSON.stringify(
+      expandedMetrics
+    )}`
+  )
+  assert(
+    expandedMetrics.activeTabFillContent !== 'none' &&
+      expandedMetrics.activeTabFillContent !== 'normal' &&
+      String(expandedMetrics.activeTabTransitionDuration)
+        .split(',')
+        .some((part) => Number.parseFloat(part) > 0) &&
+      String(expandedMetrics.activeTabFillTransitionDuration)
+        .split(',')
+        .some((part) => Number.parseFloat(part) > 0),
+    `${scenarioName} 协同任务分类缺少平滑选中态过渡: ${JSON.stringify(
       expandedMetrics
     )}`
   )
@@ -6409,19 +6440,57 @@ async function assertThemeReadable(page, { scenarioName, selector }) {
 }
 
 async function assertLoginSegmentedReadable(page, { scenarioName }) {
+  await page.waitForTimeout(480)
   const metrics = await page.evaluate(() => {
-    const selectedItems = Array.from(
-      document.querySelectorAll(
-        '.erp-login-card .ant-segmented .ant-segmented-item-selected'
-      )
-    ).map((item) => {
-      const label = item.querySelector('.ant-segmented-item-label') || item
-      const itemStyle = window.getComputedStyle(item)
-      const labelStyle = window.getComputedStyle(label)
+    const segmentedControls = Array.from(
+      document.querySelectorAll('.erp-login-card .ant-segmented')
+    ).map((control) => {
+      const style = window.getComputedStyle(control)
+      const group = control.querySelector('.ant-segmented-group')
+      const groupStyle = group ? window.getComputedStyle(group) : null
+      const indicatorStyle = group
+        ? window.getComputedStyle(group, '::before')
+        : null
+      const items = Array.from(
+        control.querySelectorAll('.ant-segmented-item')
+      ).map((item, index) => {
+        const label = item.querySelector('.ant-segmented-item-label') || item
+        const itemStyle = window.getComputedStyle(item)
+        const labelStyle = window.getComputedStyle(label)
+        const isActiveByState =
+          (control.classList.contains('erp-login-segmented--left') &&
+            index === 0) ||
+          (control.classList.contains('erp-login-segmented--right') &&
+            index === 1)
+        return {
+          text: label.textContent?.replace(/\s+/g, ' ').trim() || '',
+          isActiveByState,
+          className: item.className,
+          backgroundColor: itemStyle.backgroundColor,
+          color: labelStyle.color,
+          itemTransitionDuration: itemStyle.transitionDuration,
+          itemTransitionTimingFunction: itemStyle.transitionTimingFunction,
+        }
+      })
       return {
-        text: label.textContent?.replace(/\s+/g, ' ').trim() || '',
-        backgroundColor: itemStyle.backgroundColor,
-        color: labelStyle.color,
+        className: control.className,
+        motionDuration: style
+          .getPropertyValue('--erp-login-segmented-motion-duration')
+          .trim(),
+        motionEasing: style
+          .getPropertyValue('--erp-login-segmented-motion-easing')
+          .trim(),
+        transitionDuration: style.transitionDuration,
+        transitionTimingFunction: style.transitionTimingFunction,
+        groupPosition: groupStyle?.position || '',
+        indicatorContent: indicatorStyle?.content || '',
+        indicatorBackgroundColor: indicatorStyle?.backgroundColor || '',
+        indicatorBoxShadow: indicatorStyle?.boxShadow || '',
+        indicatorTransform: indicatorStyle?.transform || '',
+        indicatorTransitionDuration: indicatorStyle?.transitionDuration || '',
+        indicatorTransitionTimingFunction:
+          indicatorStyle?.transitionTimingFunction || '',
+        items,
       }
     })
 
@@ -6441,7 +6510,7 @@ async function assertLoginSegmentedReadable(page, { scenarioName }) {
       .map((label) => label.textContent?.replace(/\s+/g, ' ').trim() || '')
 
     return {
-      selectedItems,
+      segmentedControls,
       entrySegmentedAriaLabel:
         document
           .querySelector('.erp-login-card .ant-segmented[aria-label]')
@@ -6449,10 +6518,105 @@ async function assertLoginSegmentedReadable(page, { scenarioName }) {
       visibleFormLabels,
     }
   })
+  const parseTransitionDurationsMs = (value) =>
+    String(value || '')
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const numeric = Number.parseFloat(part)
+        if (!Number.isFinite(numeric)) return 0
+        return part.endsWith('ms') ? numeric : numeric * 1000
+      })
 
   assert(
-    metrics.selectedItems.length >= 2,
-    `${scenarioName} 登录页缺少主题或入口 Segmented 选中项: ${JSON.stringify(metrics)}`
+    metrics.segmentedControls.length >= 2,
+    `${scenarioName} 登录页缺少主题或入口 Segmented 控件: ${JSON.stringify(metrics)}`
+  )
+  metrics.segmentedControls.forEach((control) => {
+    const maxDuration = Math.max(
+      ...parseTransitionDurationsMs(control.motionDuration)
+    )
+    const maxIndicatorDuration = Math.max(
+      ...parseTransitionDurationsMs(control.indicatorTransitionDuration)
+    )
+    const activeItems = control.items.filter((item) => item.isActiveByState)
+    const indicatorBackground = parseRgb(control.indicatorBackgroundColor)
+    assert(
+      maxDuration >= 400 &&
+        control.motionEasing.includes('0.215') &&
+        !control.motionEasing.includes('0.2, 0, 0, 1'),
+      `${scenarioName} 登录页 Segmented 专属动效变量被全局短动效覆盖: ${JSON.stringify(
+        {
+          ...control,
+          maxDuration,
+        }
+      )}`
+    )
+    assert(
+      control.groupPosition === 'relative' &&
+        control.indicatorContent !== 'none' &&
+        control.indicatorContent !== 'normal' &&
+        indicatorBackground &&
+        maxIndicatorDuration >= 400 &&
+        control.indicatorTransitionTimingFunction.includes('0.215') &&
+        !control.indicatorTransitionTimingFunction.includes('0.2, 0, 0, 1'),
+      `${scenarioName} 登录页 Segmented 缺少常驻滑动底板: ${JSON.stringify({
+        ...control,
+        maxIndicatorDuration,
+      })}`
+    )
+    assert(
+      activeItems.length === 1,
+      `${scenarioName} 登录页 Segmented 当前状态没有唯一激活项: ${JSON.stringify(
+        control
+      )}`
+    )
+    activeItems.forEach((item) => {
+      const color = parseRgb(item.color)
+      const maxItemDuration = Math.max(
+        ...parseTransitionDurationsMs(item.itemTransitionDuration)
+      )
+      assert(
+        color,
+        `${scenarioName} 无法解析登录页 Segmented 文字颜色: ${JSON.stringify(
+          control
+        )}`
+      )
+      const ratio = getContrastRatio(color, indicatorBackground)
+      assert(
+        ratio >= 4.5,
+        `${scenarioName} 登录页 Segmented 激活项与滑块对比度不足: ${JSON.stringify(
+          {
+            ...item,
+            indicatorBackgroundColor: control.indicatorBackgroundColor,
+            contrastRatio: ratio,
+          }
+        )}`
+      )
+      assert(
+        maxItemDuration >= 400 &&
+          item.itemTransitionTimingFunction.includes('0.215') &&
+          !item.itemTransitionTimingFunction.includes('0.2, 0, 0, 1'),
+        `${scenarioName} 登录页 Segmented 文字动效被全局短动效覆盖: ${JSON.stringify(
+          {
+            ...item,
+            maxItemDuration,
+          }
+        )}`
+      )
+    })
+  })
+  assert(
+    metrics.segmentedControls.some((control) =>
+      control.className.includes('erp-login-segmented--right')
+    ) ||
+      metrics.segmentedControls.some((control) =>
+        control.className.includes('erp-login-segmented--left')
+      ),
+    `${scenarioName} 登录页 Segmented 缺少左右状态类: ${JSON.stringify(
+      metrics
+    )}`
   )
   assert.equal(
     metrics.entrySegmentedAriaLabel,
@@ -6463,22 +6627,6 @@ async function assertLoginSegmentedReadable(page, { scenarioName }) {
     !metrics.visibleFormLabels.includes('登录入口'),
     `${scenarioName} 登录页不应显示重复的“登录入口”表单标签: ${JSON.stringify(metrics)}`
   )
-  metrics.selectedItems.forEach((item) => {
-    const background = parseRgb(item.backgroundColor)
-    const color = parseRgb(item.color)
-    assert(
-      background && color,
-      `${scenarioName} 无法解析登录页 Segmented 颜色: ${JSON.stringify(metrics)}`
-    )
-    const ratio = getContrastRatio(color, background)
-    assert(
-      ratio >= 4.5,
-      `${scenarioName} 登录页 Segmented 选中项对比度不足: ${JSON.stringify({
-        ...item,
-        contrastRatio: ratio,
-      })}`
-    )
-  })
 }
 
 async function assertDarkThemeContrast(

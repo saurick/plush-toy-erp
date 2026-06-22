@@ -16,6 +16,7 @@
 
 ## 当前边界
 
+- 文档入口：[docs/README.md](docs/README.md)；当前真源：[docs/当前真源与交接顺序.md](docs/当前真源与交接顺序.md)；项目治理地图：[docs/项目治理地图.md](docs/项目治理地图.md)。
 - 当前唯一部署真源仍是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前后端统一走 `8300`
 - 本地开发数据库默认命中 `192.168.0.106:5432/plush_erp`；`192.168.0.133:5435/plush_erp` 是测试 / 目标环境，不作为本地开发默认库

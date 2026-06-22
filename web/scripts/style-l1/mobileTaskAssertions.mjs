@@ -501,10 +501,21 @@ export function createMobileTaskAssertions(deps) {
     const metrics = await page.getByTestId(testID).evaluate((node) => {
       const style = window.getComputedStyle(node)
       const rect = node.getBoundingClientRect()
+      const filters = node.closest('.mobile-role-task-filters')
+      const filterThumbStyle =
+        filters instanceof HTMLElement
+          ? window.getComputedStyle(filters, '::before')
+          : null
       return {
         testID: node.getAttribute('data-testid'),
         ariaPressed: node.getAttribute('aria-pressed'),
         className: node.className,
+        filtersClassName: filters?.className || '',
+        filterThumbContent: filterThumbStyle?.content || '',
+        filterThumbTransform: filterThumbStyle?.transform || '',
+        filterThumbTransitionDuration:
+          filterThumbStyle?.transitionDuration || '',
+        filterTransitionDuration: style.transitionDuration || '',
         backgroundColor: style.backgroundColor,
         color: style.color,
         boxShadow: style.boxShadow,
@@ -523,10 +534,20 @@ export function createMobileTaskAssertions(deps) {
       String(metrics.className).includes('mobile-role-task-filter--active'),
       `${scenarioName} ${label} 筛选选中态缺少 active class: ${JSON.stringify(metrics)}`
     )
+    const expectedFilterKey = String(testID).replace('mobile-role-filter-', '')
     assert(
-      !isTransparentColor(metrics.backgroundColor) ||
-        (metrics.boxShadow && metrics.boxShadow !== 'none'),
-      `${scenarioName} ${label} 筛选选中态缺少可见背景或阴影: ${JSON.stringify(metrics)}`
+      String(metrics.filtersClassName).includes(
+        `mobile-role-task-filters--${expectedFilterKey}`
+      ) &&
+        metrics.filterThumbContent !== 'none' &&
+        metrics.filterThumbContent !== 'normal' &&
+        String(metrics.filterThumbTransitionDuration)
+          .split(',')
+          .some((part) => Number.parseFloat(part) > 0) &&
+        String(metrics.filterTransitionDuration)
+          .split(',')
+          .some((part) => Number.parseFloat(part) > 0),
+      `${scenarioName} ${label} 筛选缺少滑动选中态过渡: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.scrollWidth <= metrics.clientWidth + 1,
@@ -750,6 +771,21 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 点击通知后未激活通知 tab: ${JSON.stringify(noticeMetrics)}`
     )
     assert(
+      noticeMetrics.tabsClassName.includes('mobile-role-message-tabs--notice'),
+      `${scenarioName} 通知 tab 缺少滑动选中态类名: ${JSON.stringify(noticeMetrics)}`
+    )
+    assert(
+      noticeMetrics.tabsThumbContent !== 'none' &&
+        noticeMetrics.tabsThumbContent !== 'normal' &&
+        String(noticeMetrics.tabsThumbTransitionDuration)
+          .split(',')
+          .some((part) => Number.parseFloat(part) > 0) &&
+        String(noticeMetrics.activeTabTransitionDuration)
+          .split(',')
+          .some((part) => Number.parseFloat(part) > 0),
+      `${scenarioName} 消息 tab 缺少平滑选中态过渡: ${JSON.stringify(noticeMetrics)}`
+    )
+    assert(
       noticeMetrics.sectionHeadings.length === 1 &&
         noticeMetrics.sectionHeadings[0] === '通知',
       `${scenarioName} 通知 tab 不应继续被预警列表挤到下方: ${JSON.stringify(noticeMetrics)}`
@@ -782,6 +818,14 @@ export function createMobileTaskAssertions(deps) {
       ).map((heading) => heading.textContent?.trim() || '')
       return headings.includes('预警') && !headings.includes('通知')
     })
+    const warningMetrics = await readMobileTaskMessageTabMetrics(page)
+    assert(
+      warningMetrics.activeTab === '预警' &&
+        warningMetrics.tabsClassName.includes(
+          'mobile-role-message-tabs--warning'
+        ),
+      `${scenarioName} 回到预警 tab 后滑动选中态未恢复: ${JSON.stringify(warningMetrics)}`
+    )
   }
 
   async function assertMobileTaskDarkMessagesReadable(page, { scenarioName }) {
@@ -1156,6 +1200,17 @@ export function createMobileTaskAssertions(deps) {
       const scrollRect = scroll?.getBoundingClientRect()
       const navRect = nav?.getBoundingClientRect()
       const logoutRect = logout?.getBoundingClientRect()
+      const navBeforeStyle =
+        nav instanceof HTMLElement
+          ? window.getComputedStyle(nav, '::before')
+          : null
+      const activeNavItem = nav?.querySelector(
+        '.mobile-role-bottom-nav__item--active'
+      )
+      const activeNavItemStyle =
+        activeNavItem instanceof HTMLElement
+          ? window.getComputedStyle(activeNavItem)
+          : null
       const sectionHeadings = Array.from(
         document.querySelectorAll('.mobile-role-tasks-page h2')
       ).map((heading) => heading.textContent?.trim() || '')
@@ -1189,6 +1244,13 @@ export function createMobileTaskAssertions(deps) {
             }
           : null,
         navButtonCount: nav?.querySelectorAll('button').length || 0,
+        navClassName: nav?.className || '',
+        activeNavText:
+          activeNavItem?.textContent?.replace(/\s+/g, '').trim() || '',
+        navThumbContent: navBeforeStyle?.content || '',
+        navThumbTransitionDuration: navBeforeStyle?.transitionDuration || '',
+        activeNavItemTransitionDuration:
+          activeNavItemStyle?.transitionDuration || '',
         logoutVisible:
           Boolean(logout) &&
           Boolean(logoutRect) &&
@@ -1211,12 +1273,20 @@ export function createMobileTaskAssertions(deps) {
       const tabsRect = tabs?.getBoundingClientRect()
       const tabsStyle =
         tabs instanceof HTMLElement ? window.getComputedStyle(tabs) : null
+      const tabsBeforeStyle =
+        tabs instanceof HTMLElement
+          ? window.getComputedStyle(tabs, '::before')
+          : null
       const sectionHeadings = Array.from(
         document.querySelectorAll('.mobile-role-tasks-page h2')
       ).map((heading) => heading.textContent?.trim() || '')
       const activeTab = Array.from(
         document.querySelectorAll('.mobile-role-message-tabs__item')
       ).find((item) => item.getAttribute('aria-selected') === 'true')
+      const activeTabStyle =
+        activeTab instanceof HTMLElement
+          ? window.getComputedStyle(activeTab)
+          : null
       const cards = Array.from(
         document.querySelectorAll(
           '.mobile-role-message-card, .mobile-role-message-empty'
@@ -1234,8 +1304,13 @@ export function createMobileTaskAssertions(deps) {
 
       return {
         activeTab: activeTab?.textContent?.replace(/\d+/g, '').trim() || '',
+        tabsClassName: tabs?.className || '',
         sectionHeadings,
         tabsSticky: tabsStyle?.position === 'sticky',
+        tabsThumbContent: tabsBeforeStyle?.content || '',
+        tabsThumbTransform: tabsBeforeStyle?.transform || '',
+        tabsThumbTransitionDuration: tabsBeforeStyle?.transitionDuration || '',
+        activeTabTransitionDuration: activeTabStyle?.transitionDuration || '',
         tabs: tabsRect
           ? {
               width: tabsRect.width,
@@ -1285,10 +1360,23 @@ export function createMobileTaskAssertions(deps) {
       const tabsRect = tabs?.getBoundingClientRect()
       const tabsStyle =
         tabs instanceof HTMLElement ? window.getComputedStyle(tabs) : null
+      const tabsBeforeStyle =
+        tabs instanceof HTMLElement
+          ? window.getComputedStyle(tabs, '::before')
+          : null
+      const activeTabStyle =
+        activeTab instanceof HTMLElement
+          ? window.getComputedStyle(activeTab)
+          : null
       return {
         activeLabel: activeTab?.textContent?.replace(/\s+/g, '').trim() || '',
         buttonCount: tabs?.querySelectorAll('button').length || 0,
+        tabsClassName: tabs?.className || '',
         tabsSticky: tabsStyle?.position === 'sticky',
+        tabsThumbContent: tabsBeforeStyle?.content || '',
+        tabsThumbTransform: tabsBeforeStyle?.transform || '',
+        tabsThumbTransitionDuration: tabsBeforeStyle?.transitionDuration || '',
+        activeTabTransitionDuration: activeTabStyle?.transitionDuration || '',
         scroll: scrollRect
           ? {
               top: scrollRect.top,
@@ -1324,6 +1412,18 @@ export function createMobileTaskAssertions(deps) {
     assert(
       metrics.activeLabel.includes('全部'),
       `${scenarioName} 待办筛选 sticky tab 选中态错误: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      String(metrics.tabsClassName).includes('mobile-role-task-filters--all') &&
+        metrics.tabsThumbContent !== 'none' &&
+        metrics.tabsThumbContent !== 'normal' &&
+        String(metrics.tabsThumbTransitionDuration)
+          .split(',')
+          .some((part) => Number.parseFloat(part) > 0) &&
+        String(metrics.activeTabTransitionDuration)
+          .split(',')
+          .some((part) => Number.parseFloat(part) > 0),
+      `${scenarioName} 待办筛选默认态缺少滑动选中态过渡: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.tabsSticky,
@@ -1389,6 +1489,18 @@ export function createMobileTaskAssertions(deps) {
       metrics.navButtonCount,
       4,
       `${scenarioName} 底部导航应固定为四项: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      String(metrics.navClassName).includes('mobile-role-bottom-nav--') &&
+        metrics.navThumbContent !== 'none' &&
+        metrics.navThumbContent !== 'normal' &&
+        String(metrics.navThumbTransitionDuration)
+          .split(',')
+          .some((part) => Number.parseFloat(part) > 0) &&
+        String(metrics.activeNavItemTransitionDuration)
+          .split(',')
+          .some((part) => Number.parseFloat(part) > 0),
+      `${scenarioName} 底部导航缺少平滑滑块选中态: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.shell.bottom <= metrics.viewport.height + 1,

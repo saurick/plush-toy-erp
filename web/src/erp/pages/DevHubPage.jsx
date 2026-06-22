@@ -26,35 +26,23 @@ import {
   DEV_HUB_ALL_GROUP,
   DEV_HUB_ITEMS,
   DEV_HUB_PINNED_STORAGE_KEY,
-  DEV_HUB_RECENT_STORAGE_KEY,
   buildDevHubPinnedItems,
   buildDevHubSummary,
-  buildDevHubRecentItems,
   filterDevHubItems,
   getDevHubGroupOptions,
   normalizeDevHubPinnedRoutes,
-  normalizeDevHubRecentRoutes,
-  recordDevHubRecentRoute,
   toggleDevHubPinnedRoute,
 } from '../config/devHub.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
 const ICON_BY_KEY = {
+  governance: <ExperimentOutlined />,
   docs: <FileSearchOutlined />,
   testing: <SafetyCertificateOutlined />,
   prototypes: <AppstoreOutlined />,
   'capability-ledger': <FundProjectionScreenOutlined />,
   'customer-config': <SettingOutlined />,
-}
-
-function readRecentRoutes() {
-  try {
-    const raw = window.localStorage?.getItem(DEV_HUB_RECENT_STORAGE_KEY)
-    return normalizeDevHubRecentRoutes(JSON.parse(raw || '[]'))
-  } catch {
-    return []
-  }
 }
 
 function readPinnedRoutes() {
@@ -74,10 +62,6 @@ function writeLocalRoutes(storageKey, routes = []) {
   }
 }
 
-function writeRecentRoutes(routes = []) {
-  writeLocalRoutes(DEV_HUB_RECENT_STORAGE_KEY, routes)
-}
-
 function writePinnedRoutes(routes = []) {
   writeLocalRoutes(DEV_HUB_PINNED_STORAGE_KEY, routes)
 }
@@ -92,13 +76,7 @@ function Metric({ label, value, note }) {
   )
 }
 
-function EntryCard({
-  item,
-  compact = false,
-  pinned = false,
-  onOpen,
-  onTogglePinned,
-}) {
+function EntryCard({ item, compact = false, pinned = false, onTogglePinned }) {
   const className = compact
     ? 'erp-dev-hub-card erp-dev-hub-card--compact'
     : 'erp-dev-hub-card'
@@ -152,7 +130,6 @@ function EntryCard({
             className="erp-dev-hub-card__link"
             rel="noreferrer"
             target="_blank"
-            onClick={() => onOpen?.(item.route)}
           >
             <span>{item.route}</span>
             <RightOutlined />
@@ -166,16 +143,11 @@ function EntryCard({
 export default function DevHubPage() {
   const [keyword, setKeyword] = useState('')
   const [group, setGroup] = useState(DEV_HUB_ALL_GROUP)
-  const [recentRoutes, setRecentRoutes] = useState(readRecentRoutes)
   const [pinnedRoutes, setPinnedRoutes] = useState(readPinnedRoutes)
   const groupOptions = useMemo(() => getDevHubGroupOptions(DEV_HUB_ITEMS), [])
   const items = useMemo(
     () => filterDevHubItems(DEV_HUB_ITEMS, { keyword, group }),
     [group, keyword]
-  )
-  const recentItems = useMemo(
-    () => buildDevHubRecentItems(DEV_HUB_ITEMS, recentRoutes),
-    [recentRoutes]
   )
   const pinnedItems = useMemo(
     () => buildDevHubPinnedItems(DEV_HUB_ITEMS, pinnedRoutes),
@@ -183,13 +155,6 @@ export default function DevHubPage() {
   )
   const summary = useMemo(() => buildDevHubSummary(DEV_HUB_ITEMS), [])
   const pinnedRouteSet = useMemo(() => new Set(pinnedRoutes), [pinnedRoutes])
-  const handleEntryOpen = (route) => {
-    setRecentRoutes((currentRoutes) => {
-      const nextRoutes = recordDevHubRecentRoute(route, currentRoutes)
-      writeRecentRoutes(nextRoutes)
-      return nextRoutes
-    })
-  }
   const handleTogglePinned = (route) => {
     setPinnedRoutes((currentRoutes) => {
       const nextRoutes = toggleDevHubPinnedRoute(route, currentRoutes)
@@ -251,7 +216,6 @@ export default function DevHubPage() {
                   item={item}
                   compact
                   pinned={pinnedRouteSet.has(item.route)}
-                  onOpen={handleEntryOpen}
                   onTogglePinned={handleTogglePinned}
                 />
               ))}
@@ -259,33 +223,6 @@ export default function DevHubPage() {
           ) : (
             <Text className="erp-dev-hub-pinned__empty">
               用入口卡片右上角图钉把常用页面固定在这里。
-            </Text>
-          )}
-        </section>
-
-        <section className="erp-dev-hub-recent" aria-label="最近访问入口">
-          <div className="erp-dev-hub-section-head">
-            <Text strong>最近访问 / Recent</Text>
-            <Text className="erp-dev-hub-toolbar__note">
-              保存在当前浏览器 / Local browser
-            </Text>
-          </div>
-          {recentItems.length > 0 ? (
-            <div className="erp-dev-hub-recent__grid">
-              {recentItems.map((item) => (
-                <EntryCard
-                  key={item.key}
-                  item={item}
-                  compact
-                  pinned={pinnedRouteSet.has(item.route)}
-                  onOpen={handleEntryOpen}
-                  onTogglePinned={handleTogglePinned}
-                />
-              ))}
-            </div>
-          ) : (
-            <Text className="erp-dev-hub-recent__empty">
-              点击任一入口后会在这里保留最近访问记录。
             </Text>
           )}
         </section>
@@ -315,7 +252,6 @@ export default function DevHubPage() {
                 key={item.key}
                 item={item}
                 pinned={pinnedRouteSet.has(item.route)}
-                onOpen={handleEntryOpen}
                 onTogglePinned={handleTogglePinned}
               />
             ))}

@@ -1,32 +1,31 @@
 ---
 name: plush-security-privacy-governance
-description: Project-specific security and privacy governance for plush-toy-erp. Use when Codex works on plush-toy-erp authentication, authorization, RBAC, permissions, secrets, credentials, API keys, tokens, production access, customer data, PII, data export, logs containing sensitive data, privacy boundaries, or security-sensitive deployment/configuration changes.
+description: plush-toy-erp 项目安全与隐私治理。Use when Codex works on plush-toy-erp authentication, authorization, RBAC, permissions, secrets, credentials, API keys, tokens, production access, customer data, PII, data export, logs containing sensitive data, privacy boundaries, or security-sensitive deployment/configuration changes.
 ---
 
-# Plush Security Privacy Governance
+# Plush 安全与隐私治理 Security Privacy Governance
 
-Use this skill when plush-toy-erp changes touch authentication, authorization, secrets, credentials, production access, customer/user data, sensitive logs, exports, or privacy boundaries.
+用这个 skill 处理 `plush-toy-erp` authentication、authorization、RBAC、secrets、production access、customer/user data、sensitive logs、exports 和 privacy boundaries。
 
-## Truth Chain
+## 真源链 Truth Chain
 
-- Read project `AGENTS.md`, auth/RBAC docs, deploy/config docs, secret/preflight scripts, and touched code/tests.
-- Treat production/test envs, tokens, credentials, customer data, logs, screenshots, and exports as sensitive by default.
+- 先读 `AGENTS.md`、`README.md`、`docs/当前真源与交接顺序.md`、相关 module docs/code/tests。
+- auth/RBAC docs、deploy/config docs、secret/preflight scripts、touched code/tests 是当前判断依据。
 
-## Project Rules
+## 项目规则 Project Rules
 
-- RBAC 后端校验是真安全边界，前端隐藏菜单只算可见性。
-- 客户资料、手机号、token、密钥、生产配置和导出内容默认敏感；不写进日志、截图、fixture 或公开文档。
-- 生产/测试环境数据操作必须明确目标库、权限、备份/回滚和审计证据。
+- 后端 RBAC 是安全边界，前端菜单隐藏只是不展示。
+- 客户资料、导出文件、生产 env、管理员凭据、日志截图默认敏感。
+- 不要把 yoyoosun 或任一客户专属资料写成通用 Product Core 规则。
 
-## Workflow
+## 工作流 Workflow
 
-1. Identify assets, actors, permissions, secrets, and sensitive data involved.
-2. Confirm backend/API authorization; UI hiding is not a security boundary.
-3. Avoid logging/committing/exposing real secrets, tokens, PII, customer files, or reusable credentials.
-4. Use least privilege and explicit target environment for risky operations.
-5. Validate unauthorized/disabled/no-permission/wrong-role/secret-placeholder/data-leak paths as relevant.
-6. Update docs/progress when security, privacy, deploy, or permission behavior changes.
+1. 识别 assets、actors、permissions、secrets、sensitive data。
+2. 确认 backend/API authorization；UI hiding 不是 security boundary。
+3. 不记录、不提交、不展示真实 secrets、tokens、PII、customer files、reusable credentials。
+4. 高风险操作使用 least privilege、explicit target environment、backup/rollback。
+5. 用 tests、secret scan、log redaction check、preflight 或 deployment evidence 验证。
 
-## Output
+## 输出 Output
 
-Report assets touched, permission model, secret/privacy handling, checks run, residual risk, and any rotation or follow-up needed.
+汇报 assets、permission boundary、secret/privacy handling、logs/export choices、validation commands 和 residual risks。

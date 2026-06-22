@@ -1,6 +1,7 @@
 import { DEV_CAPABILITY_LEDGER_ROUTE } from '../../erp/config/devCapabilityLedger.mjs'
 import { DEV_CUSTOMER_CONFIG_ROUTE } from '../../erp/config/devCustomerConfig.mjs'
 import { DEV_DOCS_ROUTE } from '../../erp/config/devDocs.mjs'
+import { DEV_GOVERNANCE_ROUTE } from '../../erp/config/devGovernance.mjs'
 import { DEV_HUB_ROUTE } from '../../erp/config/devHub.mjs'
 import { DEV_PROTOTYPES_ROUTE } from '../../erp/config/devPrototypes.mjs'
 import { DEV_TESTING_ROUTE } from '../../erp/config/devTesting.mjs'
@@ -30,6 +31,11 @@ export const ERP_FAVICON_VARIANTS = Object.freeze({
   docs: Object.freeze({
     key: 'docs',
     href: '/favicon-docs.svg',
+    type: 'image/svg+xml',
+  }),
+  governance: Object.freeze({
+    key: 'governance',
+    href: '/favicon-governance.svg',
     type: 'image/svg+xml',
   }),
   capabilityLedger: Object.freeze({
@@ -132,6 +138,9 @@ export function resolveERPFavicon(pathname = '', options = {}) {
   }
   if (normalizedPathname === DEV_TESTING_ROUTE) {
     return ERP_FAVICON_VARIANTS.testing
+  }
+  if (normalizedPathname === DEV_GOVERNANCE_ROUTE) {
+    return ERP_FAVICON_VARIANTS.governance
   }
   if (normalizedPathname === DEV_CAPABILITY_LEDGER_ROUTE) {
     return ERP_FAVICON_VARIANTS.capabilityLedger

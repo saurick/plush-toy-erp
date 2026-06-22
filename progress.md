@@ -318,6 +318,63 @@
 - 完成：新增项目专属 `.agents/skills/plush-prompt-governance/`，用于把 plush 需求整理成可执行提示词，默认强调“要完成什么、先读什么、允许改什么、怎么验收、如何收口”，只在 AGENTS、真源、Workflow / Fact、RBAC、客户资料、生产数据、Git 和测试声明等高风险边界使用“不要 / 禁止”。
 - 完成：新增通用 `~/.codex/skills/prompt-governance/`，用于跨项目提示词治理；同步根 `README.md` 中 `.agents/skills/` 职责，加入提示词治理。
 - 验证：追加前 `progress.md` 为 330 行、56995 字节，未达到归档阈值；已执行两份 skill 的 `quick_validate.py`、Ruby YAML 解析、TODO 扫描、中文 `display_name` 扫描、默认提示扫描和 `git diff --check`，均通过。
+- 下一步：后续新开主会话、side chat、review 会话或需要把一句话需求改成可执行任务时，优先使用 `$plush-prompt-governance`；跨项目通用提示词整理使用 `$prompt-governance`。
+- 阻塞/风险：本轮只新增 Codex skill、README 入口和过程记录，不改运行时代码、schema、migration、RBAC、菜单、Workflow / Fact、页面样式、测试脚本或部署脚本；当前工作区已有多项非本轮未提交改动，本轮不回退、不归并。
+
+## 2026-06-21 项目治理地图
+
+- 完成：新增 `docs/项目治理地图.md`，用读者路径、Mermaid 分流图、治理轴速查表和常见任务分流表承接“架构责任层级 / 数据语义层级 / 验证层级 T0-T8 / 测试形态 / 证据环境 / 文档真源层级 / 原型状态 / 页面设计治理 / 产品化与客户差异 / 交付运行层级”的导航。
+- 完成：将 `docs/当前真源与交接顺序.md` 的“项目治理口径”瘦身为治理地图入口，避免当前真源索引继续膨胀成第二份治理手册；同步 `docs/README.md`、`docs/product/README.md`、`docs/文档清单.md`、根 `README.md` 和 `web/src/erp/config/devDocs.mjs`，让仓库首页、docs 首页、产品 README、文档清单和 `/__dev/docs` pinned 常用入口都能找到该文档。
+- 验证：追加前 `progress.md` 为 314 行、53826 字节，未达到归档阈值；已执行 `git diff --check`、治理地图关键词扫描和 `cd web && node --test src/erp/config/devDocs.test.mjs`，均通过；`devDocs` 相关单测 7 个通过。
+- 下一步：后续新增新的治理轴或改变某条治理轴真源时，只更新治理地图和对应专题文档，不在当前真源索引、README 和产品文档中重复复制完整规则。
+- 阻塞/风险：本轮只改正式文档、dev-only 文档查看器置顶配置和过程记录，不改 runtime、schema、migration、API、RBAC、菜单、Workflow / Fact、页面样式、客户资料、archive/reference、测试脚本或部署脚本；因此未运行 Go、pnpm 全量测试、`style:l1`、migration、真实浏览器回归或 real-write E2E。
+
+## 2026-06-21 dev-only 项目治理地图页面
+
+- 完成：新增 `/__dev/governance` dev-only 页面，读取 `docs/项目治理地图.md` 并派生治理轴导航、当前轴“回答什么 / 先看哪里 / 不要混成”、常见任务分流、Mermaid 分流图、文档查看器跳转和路径复制；页面标题使用“项目治理地图 / Governance Map”，不叫“项目治理系统”。
+- 完成：新增 `web/src/erp/config/devGovernance.mjs` 解析配置与单测，接入 `web/src/erp/router.jsx`、`DEV_HUB_ITEMS`、favicon、dev docs `?path=#anchor` 定位和 scoped 样式；同步 `docs/项目治理地图.md`、`docs/README.md`、`docs/当前真源与交接顺序.md`、`web/README.md` 说明该入口只读派生 Markdown，不进入正式菜单或第二套真源。
+- 验证：追加前 `progress.md` 为 322 行、55464 字节，未达到归档阈值；本条记录追加后需执行 `git diff --check`、dev-only 页面 / docs viewer / router 相关单测和必要前端检查。
+- 下一步：若后续治理地图新增长期 Markdown 或改变文档职责，再按 docs 清单规则更新 `docs/文档清单.md`；本轮没有新增长期 Markdown，仅新增 dev-only runtime 页面。
+- 阻塞/风险：本轮明确不做后端、schema、migration、RBAC、正式业务菜单、Workflow / Fact、客户资料导入、部署脚本或生产构建入口；页面展示依赖 `docs/项目治理地图.md` 的表格和 Mermaid 结构，后续若大幅改写 Markdown 结构需同步 parser 单测。
+
+## 2026-06-21 dev-only 总控移除最近访问
+
+- 完成：移除 `/__dev` 总控页的“最近访问 / Recent”区块和 recent localStorage 读写链路，只保留置顶入口、筛选和主入口列表；同步 `DEV_HUB` 配置 helper、配置单测、L1 场景、相关 CSS 和 `web/README.md`，避免页面继续暗示存在最近访问偏好。
+- 验证：追加前 `progress.md` 为 330 行、56995 字节，未达到归档阈值；已执行 `cd web && node --test src/erp/config/devHub.test.mjs`、`cd web && pnpm css`、`cd web && pnpm exec eslint --ext .jsx --ext .mjs src/erp/pages/DevHubPage.jsx src/erp/config/devHub.mjs src/erp/config/devHub.test.mjs`、`cd web && STYLE_L1_SCENARIOS=dev-hub-dark-desktop pnpm style:l1`、相关路径 `git diff --check`，均通过；L1 场景确认 `.erp-dev-hub-recent` 不存在、置顶偏好仍可写入并无横向溢出。
+- 下一步：若后续还要继续压缩 `/__dev` 总控信息密度，可评审置顶区是否仍必要，或把入口治理规则进一步收口到文档跳转。
+- 阻塞/风险：本轮只改 dev-only 总控 UI、前端配置测试、L1 回归断言、样式和说明文档；不改正式 ERP 菜单、seedData、RBAC、后端、schema、migration、Workflow / Fact、原型资产或生产部署。
+
+## 2026-06-21 dev-only 治理地图 Mermaid 操作对齐
+
+- 完成：将 `/__dev/governance` 的 Mermaid 区块套入 `erp-dev-docs-markdown` 样式作用域，复用 `/__dev/docs` 已优化的 Mermaid 工具条、缩放、重置和全屏交互；补充暗色主题下治理图 Mermaid 节点文字对比，避免工具条修正后图内文字低对比。
+- 完成：扩展 `dev-governance-dark-desktop` L1 场景，断言治理页 Mermaid 工具条动作顺序、按钮尺寸、初始 100% 缩放、放大到 120%、全屏 dialog、全屏默认 140% 和关闭入口，防止后续退回裸图标状态。
+- 验证：追加前 `progress.md` 为 345 行、59666 字节，未达到归档阈值；已执行 `cd web && node --check scripts/style-l1/scenarios.mjs`、`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && STYLE_L1_SCENARIOS=dev-governance-dark-desktop pnpm style:l1`、`git diff --check`，均通过。
+- 下一步：若其他 dev-only 页面也直接使用 `Markdown` 渲染 Mermaid，优先复用 `erp-dev-docs-markdown` 或抽出共享 Mermaid 容器样式，不再各自维护一套工具条样式。
+- 阻塞/风险：本轮只改 dev-only 治理地图页面样式作用域、暗色 Mermaid 对比和 L1 回归断言；不改 Markdown 真源、后端、schema、migration、RBAC、正式菜单、Workflow / Fact、客户资料或部署脚本。
+
+## 2026-06-21 全局 Tab 滑动过渡
+
+- 完成：新增 `web/src/erp/styles/app/tabs-motion.css` 并接入 `app.css`，统一 AntD `Segmented`、AntD `Tabs`、业务页协同任务分类和权限页 tab 的 active / ink-bar 平滑过渡；动效只作用于 tab 选中态和滑块，不让重表格 / 明细内容整体滑入滑出。
+- 完成：移动端岗位任务页底部导航和“预警 / 通知”消息 tab 增加登录页式滑动选中底板，补齐暗色主题与 `prefers-reduced-motion`；L1 增加移动消息 tab、底部导航、权限 tab 和协同任务 tab 的真实 transition 断言。
+- 完成：顺手修正本轮完整 L1 暴露的 dev-only 测试入口解析口径，兼容当前 `## 4. 验证层级 T0-T8` 与旧 `## 3. 测试分层` 标题、`验证层级 / 层级` 两列表头；修正 `business-formal-module-shells-desktop` 对 `/erp/warehouse/outbound` 的旧断言，按当前出库管理只处理库存预留的页面职责验收。
+- 验证：追加前 `progress.md` 为 353 行、61011 字节，未达到归档阈值；已执行 `cd web && pnpm css`、`cd web && pnpm lint`、`cd web && pnpm test`、`cd web && STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm style:l1`、`cd web && pnpm style:l1`，均通过；完整 L1 共验证 68 个场景，前端单测 383 个通过。
+- 下一步：如果后续要继续增强页面切换动效，应先评审具体轻量页面，避免把业务表格、弹窗表单或长列表内容做整体滑动造成性能和可读性问题。
+- 阻塞/风险：本轮不改后端、schema、migration、RBAC、正式菜单、Workflow / Fact、客户资料、真实写入链路或部署脚本；当前工作区仍有本轮前已有的 dev-only 治理地图、文档和配置改动，本轮未回退、未归并这些并行改动。
+
+## 2026-06-21 治理维度与口径术语统一
+
+- 完成：将 `docs/当前真源与交接顺序.md` 的入口标题从“项目治理口径 / Governance Axes”改为“治理维度与口径 / Governance Axes”，并把正文和 `/__dev/governance` 说明中的“治理轴”改为“治理维度与口径”，避免误读成坐标轴。
+- 完成：同步 `docs/项目治理地图.md`、`docs/README.md`、`web/README.md`、`/__dev/governance` 的解析表头 / 可见文案、`/__dev` 总控描述和 L1 断言文案；`docs/product/README.md` 仍保留“治理口径”表述，因为未误导成坐标轴；`docs/文档清单.md` 标题和用途未变，不需要同步。
+- 验证：追加前 `progress.md` 为 362 行、62828 字节，未达到归档阈值；已执行治理术语 targeted scan（外显文档和可见文案未命中 `治理轴`、`项目治理口径`、旧 `Governance Axis`，内部 CSS class 仍保留 `axis` 实现名）、`cd web && node --test src/erp/config/devGovernance.test.mjs src/erp/config/devHub.test.mjs`、`cd web && node --check scripts/style-l1/scenarios.mjs && node --check src/erp/config/devGovernance.mjs && node --check src/erp/config/devHub.mjs`、`cd web && pnpm exec eslint --ext .jsx --ext .mjs src/erp/pages/DevGovernancePage.jsx src/erp/config/devGovernance.mjs src/erp/config/devHub.mjs scripts/style-l1/scenarios.mjs` 和相关路径 `git diff --check`，均通过。
+- 下一步：后续新增同类分类矩阵时优先使用“治理维度与口径”，只在英文保留 `Governance Axes` 作为稳定技术锚点。
+- 阻塞/风险：本轮只做文档与 dev-only 文档查看入口的术语修正，不改后端、schema、migration、API、RBAC、正式菜单、Workflow / Fact、页面样式、客户资料、archive/reference 或部署脚本。
+
+## 2026-06-21 dev-only 治理地图 favicon
+
+- 完成：新增 `web/public/favicon-governance.svg`，将 `/__dev/governance` 从通用 dev favicon 切到专用 Governance Map favicon；同步 `ERP_FAVICON_VARIANTS.governance`、favicon 单测和 `dev-governance-dark-desktop` L1 断言。
+- 验证：追加前 `progress.md` 为 370 行、64643 字节，未达到归档阈值；已执行 `cd web && node --test src/common/consts/favicon.test.mjs`、`cd web && node --check scripts/style-l1/scenarios.mjs`、`cd web && pnpm lint`、`cd web && STYLE_L1_SCENARIOS=dev-governance-dark-desktop pnpm style:l1`、`git diff --check`，均通过；L1 已确认治理地图运行时 favicon 为 `/favicon-governance.svg`。
+- 下一步：其他 dev-only 入口若需要独立 favicon，应继续走 `ERP_FAVICON_VARIANTS` 和对应 L1 / 单测断言，不走正式菜单或客户品牌覆盖。
+- 阻塞/风险：本轮只改 dev-only favicon 资产、favicon resolver、单测和治理页 L1；不改后端、schema、migration、RBAC、正式菜单、Workflow / Fact、客户资料、Markdown 真源或部署脚本。
 
 ## 2026-06-21 Codex 高风险治理 skills 补充
 
@@ -326,5 +383,46 @@
 - 验证：追加前 `progress.md` 为 370 行、64643 字节，未达到归档阈值；本轮只改 skill / README / progress，不改运行时代码、schema、migration、RBAC、部署脚本或生产配置；验证命令见本轮最终回复。
 - 下一步：后续涉及发布/部署/版本、运行报错、业务边界、seed/import、可观测错误或安全隐私任务时优先使用对应项目 skill；跨项目通用任务可用全局同名 skill。
 - 阻塞/风险：新 skill 是执行治理入口，不等于已经修改 release 脚本、监控系统、安全策略或真实导入流程；如需自动守卫仍需后续落到脚本、测试或 CI/hook。
-- 下一步：后续新开主会话、side chat、review 会话或需要把一句话需求改成可执行任务时，优先使用 `$plush-prompt-governance`；跨项目通用提示词整理使用 `$prompt-governance`。
-- 阻塞/风险：本轮只新增 Codex skill、README 入口和过程记录，不改运行时代码、schema、migration、RBAC、菜单、Workflow / Fact、页面样式、测试脚本或部署脚本；当前工作区已有多项非本轮未提交改动，本轮不回退、不归并。
+
+## 2026-06-21 移动端待办筛选四段滑块补漏
+
+- 完成：确认用户截图对应 `mobile-role-task-filters` 自定义四段筛选，不属于上一轮已覆盖的 AntD Tabs / Segmented、底部导航或“预警 / 通知”消息 tab；补充 `mobile-role-task-filters--<key>` active class、四段 `::before` 滑动底板、亮色 / 暗色态和 `prefers-reduced-motion`。
+- 完成：移除四段筛选按钮自身的旧 Tailwind active ring / shadow，避免滑块下方继续叠一个静态白框；保留 `aria-pressed` 筛选语义，不强行改成 ARIA tabs，不改变任务筛选、Workflow 或权限逻辑。
+- 完成：扩展移动端 L1 断言，覆盖“全部”默认 sticky 态、点击“风险 / 超时”后的 active class、滑块伪元素和 transition duration，防止后续自定义筛选 tab 再退回静态选中框。
+- 验证：追加前 `progress.md` 为 385 行、67075 字节，未达到归档阈值；已执行 `cd web && pnpm css`、`cd web && pnpm lint`、`cd web && STYLE_L1_SCENARIOS=mobile-tasks-dark,mobile-tasks-browser-back-stays-mobile pnpm style:l1`、`cd web && pnpm test`、`cd web && STYLE_L1_SCENARIOS=dev-governance-dark-desktop pnpm style:l1`、`cd web && STYLE_L1_PORT=4187 pnpm style:l1`，均通过；完整 L1 共验证 68 个场景，前端单测 383 个通过。
+- 下一步：后续若发现其他自定义“看起来像 tab”的按钮组，应统一纳入 `tabs-motion.css` 或对应局部 motion 断言；不要只覆盖组件库自带 Tabs。
+- 阻塞/风险：本轮不改后端、schema、migration、RBAC、正式菜单、Workflow / Fact、客户资料、真实写入链路、原型状态或部署脚本；岗位任务端原型已确认只是 Current 参考，真实页面以运行时代码和 L1 为准。
+
+## 2026-06-21 登录页 Segmented 滑动动效回退
+
+- 完成：确认登录页 AntD `Segmented` 被上一轮全局 `tabs-motion.css` 的 180ms 短动效覆盖；在 `.erp-login-card` 作用域恢复登录页专属 300ms `cubic-bezier(0.645, 0.045, 0.355, 1)` 滑动过渡和较轻 thumb 阴影，不回滚公共业务 tab 动效。
+- 完成：扩展登录页 L1 断言，检查登录页 Segmented 专属 motion 变量、thumb CSSOM 规则和选中项 computed transition；断言采样等待动画落定，避免刚切换暗色主题时抓到过渡中间态造成误判。
+- 验证：追加前 `progress.md` 为 394 行、68858 字节，未达到归档阈值；已执行 `cd web && pnpm css`、`cd web && pnpm lint`、`cd web && pnpm test`、`cd web && STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop,admin-login-mobile pnpm style:l1`，均通过；前端单测 383 个通过，登录页 L1 共验证 2 个场景。
+- 下一步：后续如果继续调整公共 tab 动效，应保留登录页局部 motion 变量，避免把登录入口的滑动手感再次拉回全局短动效。
+- 阻塞/风险：本轮只改登录页样式和登录页 L1 视觉断言，不改后端、schema、migration、RBAC、正式菜单、Workflow / Fact、客户资料、真实写入链路或部署脚本；当前工作区仍有多项本轮前已有改动，本轮未回退、未归并。
+
+## 2026-06-21 dev-only 治理地图相关视图联动
+
+- 完成：确认 `/__dev/governance` 原实现只有“当前治理维度与口径”详情随左侧选择变化，任务分流仍是全局 Markdown 表；新增从 `docs/项目治理地图.md` 链接路径和少量可见文本派生的相关任务匹配，默认展示当前维度相关任务，并提供“查看全部 / 只看相关”切换。
+- 完成：将任务区标题改为“相关任务分流 / Related Task Routing”，补充当前维度、匹配计数和全局 Mermaid 标识；Mermaid 仍复用 Markdown 唯一全局分流图，不按页面状态生成第二套图。
+- 完成：补充 `devGovernance` 配置单测和 `dev-governance-dark-desktop` L1 断言，覆盖相关任务默认态、页面设计治理切换、查看全部后搜索部署、暗色态、横向溢出和 Mermaid 工具条交互。
+- 验证：追加前 `progress.md` 为 402 行、70231 字节，未达到归档阈值；已执行 `cd web && node --test src/erp/config/devGovernance.test.mjs`、`cd web && node --check scripts/style-l1/scenarios.mjs && node --check src/erp/config/devGovernance.mjs`、`git diff --check`、`cd web && pnpm exec eslint --ext .jsx --ext .mjs src/erp/pages/DevGovernancePage.jsx src/erp/config/devGovernance.mjs src/erp/config/devGovernance.test.mjs scripts/style-l1/scenarios.mjs`、`cd web && pnpm css`、`cd web && STYLE_L1_SCENARIOS=dev-governance-dark-desktop pnpm style:l1`，均通过。
+- 下一步：如果后续要让 Mermaid 也按维度变化，必须先回到 `docs/项目治理地图.md` 明确新增对应 Markdown 真源结构，不能在页面内手写第二套分流图。
+- 阻塞/风险：本轮只改 dev-only 治理地图前端派生逻辑、样式、单测、L1 断言和 `progress.md`；不改后端、schema、migration、RBAC、正式菜单、Workflow / Fact、客户资料、部署脚本或 Markdown 治理真源正文。
+
+## 2026-06-21 登录页 Segmented 常驻滑块修复
+
+- 完成：确认前一版仍依赖 AntD `Segmented` 临时 thumb，点击时 AntD 会短暂移除 selected class，导致滑完后选中背景二次补位，看起来像“一闪而过”；改为登录页 `erp-login-segmented--left/right` 状态类驱动 `.ant-segmented-group::before` 常驻滑块。
+- 完成：登录页入口切换和登录方式切换均隐藏 AntD 临时 thumb，item 本身背景改为透明，亮色 / 暗色分别由常驻滑块承载选中底板；文字激活态改用 `label.ant-segmented-item:nth-of-type()`，避免 AntD 插入隐藏 thumb 后 `nth-child` 指错。
+- 完成：扩展登录页 L1 断言，覆盖常驻滑块伪元素、420ms 动效变量、点击到右侧状态后的激活项对比度和动效，避免再次退回短动效或临时 thumb 闪动。
+- 验证：追加前 `progress.md` 为 411 行、72152 字节，未达到归档阈值；已执行真实 Playwright 采样确认亮色点击中 0 / 50 / 220 / 520ms 滑块 transform 连续变化且 thumb `display: none`，暗色右侧状态滑块和文字对比正常；已执行 `cd web && pnpm css`、`cd web && pnpm lint`、`cd web && pnpm test`、`cd web && STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop,admin-login-mobile pnpm style:l1`，均通过；前端单测 384 个通过，登录页 L1 共验证 2 个场景。
+- 下一步：后续如要把常驻滑块推广到其他 AntD `Segmented`，应按页面逐个评估，不直接把登录页的 state class 方案全局套用。
+- 阻塞/风险：本轮只改登录页 Segmented 交互动效、登录页局部样式、暗色覆盖和登录页 L1 断言，不改后端、schema、migration、RBAC、正式菜单、Workflow / Fact、客户资料、认证方式、真实写入链路或部署脚本；未找到匹配登录页原型资产，因此未更新 prototype。
+
+## 2026-06-21 Codex 高风险治理 skills 中英可读性修正
+
+- 完成：将项目专属 `plush-release-governance`、`plush-domain-boundary-governance`、`plush-runtime-diagnostics`、`plush-seed-import-governance`、`plush-observability-error-governance`、`plush-security-privacy-governance` 的 `SKILL.md` 改为中文主线 + English anchors；`name` 和 UI `display_name` 保持英文，`description` / `default_prompt` 改为中英结合。
+- 完成：同步更新通用 `~/.codex/skills/` 中 6 个同类高风险治理 skill 的中英可读性，保持跨项目触发名稳定。
+- 验证：追加前 `progress.md` 为 411 行、72152 字节，未达到归档阈值；已执行 29 个相关 skill 目录的 `quick_validate.py`，均通过。
+- 下一步：后续如继续发现旧治理 skill 正文过度英文，可按同一口径逐个补中文主线，不改 `$skill-name`。
+- 阻塞/风险：本轮只改 Codex skill 文本和 metadata，不改运行时代码、schema、migration、RBAC、部署脚本、真实导入流程、监控系统或安全策略。

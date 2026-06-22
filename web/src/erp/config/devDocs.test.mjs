@@ -48,6 +48,7 @@ test('devDocs: 只通过开发态独立路径暴露', () => {
 test('devDocs: 全量开发文档列表不恢复产品内文档 registry', () => {
   const docs = buildDevDocsItems({
     '../../../../README.md': '# 仓库 README',
+    '../../../../AGENTS.md': '# 协作约定',
     '../../../README.md': '# 前端 README',
     '../../../../docs/当前真源与交接顺序.md': '# 当前真源与交接顺序',
     '../../../../docs/product/产品完成路线图.md': '# 产品完成路线图',
@@ -65,6 +66,7 @@ test('devDocs: 全量开发文档列表不恢复产品内文档 registry', () =>
     'doc:docs/product/产品完成路线图.md'
   )
   assert(paths.includes('README.md'))
+  assert(paths.includes('AGENTS.md'))
   assert(paths.includes('web/README.md'))
   assert(paths.includes('docs/当前真源与交接顺序.md'))
   assert(
@@ -90,6 +92,7 @@ test('devDocs: 全量开发文档列表不恢复产品内文档 registry', () =>
     '客户'
   )
   assert.equal(docs[0]?.path, 'README.md')
+  assert.equal(docs[1]?.path, 'AGENTS.md')
   assert.equal(
     docs.find((item) => item.path === 'README.md')?.defaultPinned,
     true
@@ -150,6 +153,7 @@ test('devDocs: 支持按标题、路径和正文索引筛选', () => {
 test('devDocs: 支持本地置顶路径归一化和排序', () => {
   const docs = buildDevDocsItems({
     '../../../../README.md': '# 仓库 README',
+    '../../../../AGENTS.md': '# 协作约定',
     '../../../../docs/当前真源与交接顺序.md': '# 当前真源与交接顺序',
     '../../../../docs/product/产品完成路线图.md': '# 产品完成路线图',
     '../../../../docs/archive/progress-2026-06.md': '# 过程归档',
@@ -157,6 +161,7 @@ test('devDocs: 支持本地置顶路径归一化和排序', () => {
 
   assert.deepEqual(getDefaultDevDocsPinnedPaths(docs), [
     'README.md',
+    'AGENTS.md',
     'docs/当前真源与交接顺序.md',
     'docs/product/产品完成路线图.md',
   ])

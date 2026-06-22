@@ -13,6 +13,7 @@ import ERPLayout from './components/ERPLayout.jsx'
 import { DEV_CAPABILITY_LEDGER_ROUTE } from './config/devCapabilityLedger.mjs'
 import { DEV_CUSTOMER_CONFIG_ROUTE } from './config/devCustomerConfig.mjs'
 import { DEV_DOCS_ROUTE } from './config/devDocs.mjs'
+import { DEV_GOVERNANCE_ROUTE } from './config/devGovernance.mjs'
 import { DEV_HUB_ROUTE } from './config/devHub.mjs'
 import { DEV_PROTOTYPES_ROUTE } from './config/devPrototypes.mjs'
 import { DEV_TESTING_ROUTE } from './config/devTesting.mjs'
@@ -77,6 +78,9 @@ const DevHubPage = import.meta.env.DEV
   : null
 const DevDocsPage = import.meta.env.DEV
   ? lazy(() => import('./pages/DevDocsPage.jsx'))
+  : null
+const DevGovernancePage = import.meta.env.DEV
+  ? lazy(() => import('./pages/DevGovernancePage.jsx'))
   : null
 const DevPrototypesPage = import.meta.env.DEV
   ? lazy(() => import('./pages/DevPrototypesPage.jsx'))
@@ -252,6 +256,9 @@ export default function ERPRouter() {
         ) : null}
         {DevDocsPage ? (
           <Route path={DEV_DOCS_ROUTE} element={<DevDocsPage />} />
+        ) : null}
+        {DevGovernancePage ? (
+          <Route path={DEV_GOVERNANCE_ROUTE} element={<DevGovernancePage />} />
         ) : null}
         {DevPrototypesPage ? (
           <Route path={DEV_PROTOTYPES_ROUTE} element={<DevPrototypesPage />} />

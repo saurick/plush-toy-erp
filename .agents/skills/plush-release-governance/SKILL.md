@@ -1,33 +1,33 @@
 ---
 name: plush-release-governance
-description: Project-specific release, deployment, version, migration, rollback, and release-evidence governance for plush-toy-erp. Use when Codex plans, performs, reviews, or explains plush-toy-erp releases, deploys, version tags, image tags, migrations, release notes, changelog, rollback, production preflight, health checks, post-deploy verification, or target environment delivery.
+description: plush-toy-erp 项目发布、部署、版本、migration、rollback 和 release evidence 治理。Use when Codex plans, performs, reviews, or explains plush-toy-erp releases, deploys, image tags, migrations, changelog, rollback, health checks, post-deploy verification, or target environment delivery.
 ---
 
-# Plush Release Governance
+# Plush 发布治理 Release Governance
 
-Use this skill for plush-toy-erp release, deployment, and lightweight version governance. Version management is part of release evidence unless the project later needs a standalone customer-facing release program.
+用这个 skill 处理 `plush-toy-erp` 的 release、deploy、version、migration、rollback 和 release evidence。版本管理默认并入发布证据，不另起重流程。
 
-## Truth Chain
+## 真源链 Truth Chain
 
-- Read project `AGENTS.md`, `README.md`, deployment docs, test strategy, and changed release scripts before action.
-- Check worktree and upstream before commit/push/deploy.
+- 先读 `AGENTS.md`、`README.md`、`docs/当前真源与交接顺序.md`、相关 module docs/code/tests。
+- 执行前检查 `git status -sb`、upstream state、unrelated dirty files。
 
-## Project Rules
+## 项目规则 Project Rules
 
-- 低配服务器只加载本地/CI 构建产物，不在目标机执行 docker build / pnpm build / go build。
-- 当前唯一部署真源是 `server/deploy/compose/prod`；Atlas 线上 migration 使用宿主机 `/usr/local/bin/atlas` 和 `flock`。
-- 版本证据至少绑定 commit hash、image tag、migration 状态、目标环境、健康检查和回滚点。
+- 低配服务器只加载本地/CI 构建产物，不在目标机执行 `docker build / pnpm build / go build`。
+- 当前部署 truth 是 `server/deploy/compose/prod`；Atlas 线上 migration 使用宿主机 `/usr/local/bin/atlas` 和 `flock`。
+- 版本证据至少绑定 commit hash、image tag、migration 状态、目标环境、health/ready、smoke 和 rollback point。
 
-## Workflow
+## 工作流 Workflow
 
-1. Define scope: target branch, target host/environment, service/container, migration, config/env, and rollback point.
-2. Bind version: commit hash, image/package tag, migration status, config/env version, and release note/changelog need.
-3. Run local/CI validation appropriate to changed surfaces before touching a target environment.
-4. Build artifacts off low-spec targets unless project docs explicitly allow target-side build.
-5. Deploy using the documented path; confirm the target is running the new version from runtime evidence.
-6. Check health/ready, logs, smoke/browser/API evidence, migration state, and disk/image cleanup boundaries.
-7. Update progress/docs when release behavior, versioning, deployment, config, or operational truth changes.
+1. 定义 scope：branch、host/environment、service/container、migration、config/env、rollback point。
+2. 绑定 version：commit hash、image/package tag、migration status、config/env version、release note/changelog need。
+3. 先跑本地/CI validation，再触碰目标环境。
+4. 低配目标默认不构建，只加载 artifacts、执行 migration、启动服务、做 health/smoke。
+5. 从目标 runtime evidence 确认新版本已运行，而不是从本地预期推断。
+6. 检查 health/ready、logs、smoke/browser/API、migration state、disk/image cleanup boundary。
+7. 发布行为、版本、部署、配置或 operational truth 改变时，同步 docs/progress。
 
-## Output
+## 输出 Output
 
-Report commit/tag/image, target environment, migration status, commands, health/smoke evidence, rollback point, cleanup, docs/progress updates, and remaining blind spots.
+汇报 commit/tag/image、target environment、migration status、commands、health/smoke evidence、rollback point、cleanup、docs/progress updates 和 remaining blind spots。

@@ -1,17 +1,32 @@
 import { DEV_CAPABILITY_LEDGER_ROUTE } from './devCapabilityLedger.mjs'
 import { DEV_CUSTOMER_CONFIG_ROUTE } from './devCustomerConfig.mjs'
 import { DEV_DOCS_ROUTE } from './devDocs.mjs'
+import { DEV_GOVERNANCE_ROUTE } from './devGovernance.mjs'
 import { DEV_PROTOTYPES_ROUTE } from './devPrototypes.mjs'
 import { DEV_TESTING_ROUTE } from './devTesting.mjs'
 
 export const DEV_HUB_ROUTE = '/__dev'
-export const DEV_HUB_RECENT_STORAGE_KEY = 'plush_erp_dev_hub_recent_routes'
 export const DEV_HUB_PINNED_STORAGE_KEY = 'plush_erp_dev_hub_pinned_routes'
-export const DEV_HUB_MAX_RECENT_ITEMS = 3
 export const DEV_HUB_MAX_PINNED_ITEMS = 5
 export const DEV_HUB_ALL_GROUP = 'all'
 
 export const DEV_HUB_ITEMS = Object.freeze([
+  Object.freeze({
+    key: 'governance',
+    title: '项目治理地图 / Governance Map',
+    group: '文档治理 / Docs',
+    route: DEV_GOVERNANCE_ROUTE,
+    source: 'docs/项目治理地图.md',
+    truthSource: '治理地图 Markdown / Governance Markdown',
+    status: '只读可视化 / Read-only map',
+    guardrails: Object.freeze([
+      '只读派生 / Derived only',
+      '不新增规则 / No new rules',
+      '不进生产构建 / No prod build',
+    ]),
+    description:
+      '把项目治理地图可视化成治理维度与口径、任务分流和文档跳转；navigate governance axes without creating a second truth source.',
+  }),
   Object.freeze({
     key: 'docs',
     title: '开发文档 / Dev Docs',
@@ -161,10 +176,10 @@ function buildRouteSet(items = DEV_HUB_ITEMS) {
   return new Set(items.map((item) => item.route))
 }
 
-export function normalizeDevHubRecentRoutes(
+function normalizeDevHubRoutes(
   routes = [],
   items = DEV_HUB_ITEMS,
-  maxItems = DEV_HUB_MAX_RECENT_ITEMS
+  maxItems = DEV_HUB_MAX_PINNED_ITEMS
 ) {
   const validRoutes = buildRouteSet(items)
   const seen = new Set()
@@ -183,32 +198,7 @@ export function normalizeDevHubPinnedRoutes(
   items = DEV_HUB_ITEMS,
   maxItems = DEV_HUB_MAX_PINNED_ITEMS
 ) {
-  return normalizeDevHubRecentRoutes(routes, items, maxItems)
-}
-
-export function recordDevHubRecentRoute(
-  route = '',
-  currentRoutes = [],
-  items = DEV_HUB_ITEMS,
-  maxItems = DEV_HUB_MAX_RECENT_ITEMS
-) {
-  const normalizedRoute = String(route || '').trim()
-  return normalizeDevHubRecentRoutes(
-    [normalizedRoute, ...(Array.isArray(currentRoutes) ? currentRoutes : [])],
-    items,
-    maxItems
-  )
-}
-
-export function buildDevHubRecentItems(
-  items = DEV_HUB_ITEMS,
-  recentRoutes = []
-) {
-  const itemByRoute = new Map(items.map((item) => [item.route, item]))
-  return normalizeDevHubRecentRoutes(recentRoutes, items).flatMap((route) => {
-    const item = itemByRoute.get(route)
-    return item ? [item] : []
-  })
+  return normalizeDevHubRoutes(routes, items, maxItems)
 }
 
 export function toggleDevHubPinnedRoute(

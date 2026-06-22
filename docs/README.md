@@ -13,6 +13,7 @@
 | 要解决的问题 | 先读 | 再读 / 验证 |
 | --- | --- | --- |
 | 判断当前能力是否可用 | [当前真源与交接顺序](当前真源与交接顺序.md) | [产品能力进度台账](product/产品能力进度台账.md)、相关代码、migration、测试 |
+| 判断治理维度与口径、职责边界、验证口径或文档真源层级 | [项目治理地图](项目治理地图.md) | [当前真源与交接顺序](当前真源与交接顺序.md)、[模块实施治理](product/模块实施治理.md)、[自动化测试策略](product/自动化测试策略.md)、[AGENTS.md](../AGENTS.md) |
 | 规划下一轮产品实现 | [产品完成路线图](product/产品完成路线图.md) | [产品台账索引](product/产品台账索引.md)、[模块实施治理](product/模块实施治理.md)、对应目录 README |
 | 改菜单、页面、原型或信息密度 | [web/README.md](../web/README.md)、[产品原型资产](product/prototypes/README.md) | 对应原型 README、真实运行页、[正式产品入口与菜单配置计划](product/正式产品入口与菜单配置计划.md) |
 | 改 Workflow、状态或 Fact 边界 | [状态 / Workflow / Fact 边界](architecture/状态工作流事实边界.md) | 相关 architecture 评审、[server/README.md](../server/README.md)、usecase / schema / test |
@@ -27,6 +28,7 @@
 | 区域 | 回答什么问题 | 入口 |
 | --- | --- | --- |
 | 当前真源 | 当前状态、阅读顺序、部署和实现边界 | [当前真源与交接顺序](当前真源与交接顺序.md) |
+| 项目治理 | 治理维度与口径、判断路径、专题真源分流 | [项目治理地图](项目治理地图.md) |
 | 产品与路线 | 产品路线、能力台账、页面 / 菜单 / 原型、产品化治理 | [product/README.md](product/README.md) |
 | 架构评审 | Workflow / Fact / MasterData / Source Document / 状态边界 | [architecture/README.md](architecture/README.md) |
 | 客户资料 | 客户资料、客户差异、导入准备、交付矩阵 | [customers/README.md](customers/README.md) |
@@ -42,6 +44,7 @@
 
 | 图 | 位置 | 用途 |
 | --- | --- | --- |
+| 项目治理分流 / Governance Routing | [项目治理地图](项目治理地图.md) | 说明任务问题如何分流到 AGENTS、当前真源、模块实施治理、测试策略、客户 / 部署和页面原型等专题真源。 |
 | 产品核心与客户投影 / Product Core And Customer Projection | [模块边界](product/模块边界.md) | 区分 Product Core、客户投影、升级门禁和 Workflow / Fact 禁区。 |
 | yoyoosun 客户投影 / Yoyoosun Customer Projection | [yoyoosun 客户资料](customers/yoyoosun/README.md) | 说明 yoyoosun 原始资料、客户配置、模拟 seed、模板候选、Product Core、tenant 和事实表边界。 |
 | 出货放行边界 / Shipment Release Boundary | [状态 / Workflow / Fact 边界](architecture/状态工作流事实边界.md) | 锁住 `shipment_release done -> shipping_released`，避免把放行误判成 shipment、inventory 或 finance facts。 |
@@ -99,6 +102,7 @@
 - 不再维护 `web/src/erp/docs/*.md`、`web/src/erp/config/docs.mjs` 或 `docRegistry`。
 - 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/help-center`、`/erp/source-readiness`、`/erp/mobile-workbenches` 和 `/erp/roles/*` 路径只做兼容重定向到 `/erp/dashboard`。
 - 正式文档继续保留在 `docs/`、`server/docs/`、`web/README.md`、`server/README.md` 等仓库文档入口，不复制或镜像到前端运行时页面。
+- 本地开发态可通过 `/__dev/governance` 只读浏览 [项目治理地图](项目治理地图.md) 的治理维度与口径、任务分流和文档跳转；该入口不进入 ERP 正式菜单，也不替代 Markdown 真源。
 
 未来若重新新增产品内文档入口，必须先设计 registry、seed navigation、菜单权限、路由、渲染代码和测试断言；不要为了静态说明页临时恢复旧 docs registry。
 

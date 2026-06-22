@@ -51,6 +51,11 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
   },
 ])
 
+const DEV_TESTING_TIER_HEADINGS = Object.freeze([
+  '## 4. 验证层级 T0-T8',
+  '## 3. 测试分层',
+])
+
 const DEV_TESTING_TIER_COPY_FALLBACKS = Object.freeze({
   T1: [
     'cd /Users/simon/projects/plush-toy-erp',
@@ -191,6 +196,14 @@ function parseMarkdownTable(source = '', heading = '') {
   return { headers, rows }
 }
 
+function parseFirstMarkdownTable(source = '', headings = []) {
+  for (const heading of headings) {
+    const table = parseMarkdownTable(source, heading)
+    if (table.headers.length > 0) return table
+  }
+  return { headers: [], rows: [] }
+}
+
 function extractInlineCommands(value = '') {
   return [...String(value || '').matchAll(/`([^`]+)`/g)]
     .map((match) => stripMarkdownInline(match[1]))
@@ -201,8 +214,19 @@ function extractInlineCommands(value = '') {
     })
 }
 
+function getMarkdownTableCell(cells = [], headerIndex = {}, headerNames = []) {
+  for (const headerName of headerNames) {
+    const index = headerIndex[headerName]
+    if (Number.isInteger(index)) return cells[index] || ''
+  }
+  return ''
+}
+
 export function parseDevTestingStrategyTiers(source = '') {
-  const { headers, rows } = parseMarkdownTable(source, '## 3. 测试分层')
+  const { headers, rows } = parseFirstMarkdownTable(
+    source,
+    DEV_TESTING_TIER_HEADINGS
+  )
   if (headers.length === 0) return []
 
   const headerIndex = Object.fromEntries(
@@ -210,10 +234,18 @@ export function parseDevTestingStrategyTiers(source = '') {
   )
 
   return rows.map((cells, index) => {
-    const level = stripMarkdownInline(cells[headerIndex['层级']] || '')
-    const changeType = stripMarkdownInline(cells[headerIndex['改动类型']] || '')
-    const commandText = cells[headerIndex['必跑或优先命令']] || ''
-    const description = stripMarkdownInline(cells[headerIndex['说明']] || '')
+    const level = stripMarkdownInline(
+      getMarkdownTableCell(cells, headerIndex, ['层级', '验证层级'])
+    )
+    const changeType = stripMarkdownInline(
+      getMarkdownTableCell(cells, headerIndex, ['改动类型'])
+    )
+    const commandText = getMarkdownTableCell(cells, headerIndex, [
+      '必跑或优先命令',
+    ])
+    const description = stripMarkdownInline(
+      getMarkdownTableCell(cells, headerIndex, ['说明'])
+    )
     const key = level.split(/\s+/)[0] || `T${index}`
 
     const commands = extractInlineCommands(commandText)

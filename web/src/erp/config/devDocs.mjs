@@ -2,8 +2,10 @@ export const DEV_DOCS_ROUTE = '/__dev/docs'
 
 export const PINNED_DEV_DOC_PATHS = Object.freeze([
   'README.md',
+  'AGENTS.md',
   'web/README.md',
   'docs/当前真源与交接顺序.md',
+  'docs/项目治理地图.md',
   'docs/product/模块实施治理.md',
   'docs/product/产品完成路线图.md',
   'docs/product/产品台账索引.md',
@@ -37,6 +39,9 @@ function normalizeGlobPath(modulePath = '') {
   if (cleanPath === '../../../../README.md') {
     return 'README.md'
   }
+  if (cleanPath === '../../../../AGENTS.md') {
+    return 'AGENTS.md'
+  }
   if (cleanPath === '../../../README.md') {
     return 'web/README.md'
   }
@@ -65,6 +70,7 @@ function groupForPath(path = '') {
   if (
     [
       'README.md',
+      'AGENTS.md',
       'web/README.md',
       'server/README.md',
       'scripts/README.md',
@@ -76,6 +82,7 @@ function groupForPath(path = '') {
     [
       'docs/README.md',
       'docs/当前真源与交接顺序.md',
+      'docs/项目治理地图.md',
       'docs/文档清单.md',
     ].includes(path)
   ) {

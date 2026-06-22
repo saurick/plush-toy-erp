@@ -13,6 +13,7 @@ import {
   VerticalAlignTopOutlined,
 } from '@ant-design/icons'
 import { Button, Empty, Input, Space, Tag, Tooltip, Typography } from 'antd'
+import { useLocation } from 'react-router-dom'
 import { Markdown, extractMarkdownHeadings } from '@/common/components/markdown'
 import { message } from '@/common/utils/antdApp'
 import {
@@ -38,6 +39,7 @@ const DEFAULT_EXPANDED_DIR_KEYS = Object.freeze(['dir:docs'])
 const markdownModules = import.meta.glob(
   [
     '../../../../README.md',
+    '../../../../AGENTS.md',
     '../../../README.md',
     '../../../../server/README.md',
     '../../../../scripts/README.md',
@@ -49,6 +51,28 @@ const markdownModules = import.meta.glob(
     query: '?raw',
   }
 )
+
+function readSelectedPathFromSearch(search = '') {
+  try {
+    return new URLSearchParams(search).get('path') || ''
+  } catch {
+    return ''
+  }
+}
+
+function readHeadingIdFromHash(hash = '') {
+  const rawHash = String(hash || '')
+    .replace(/^#/, '')
+    .trim()
+  if (!rawHash) {
+    return ''
+  }
+  try {
+    return decodeURIComponent(rawHash)
+  } catch {
+    return rawHash
+  }
+}
 
 function collectDirectoryKeys(nodes = []) {
   return nodes.flatMap((node) =>
@@ -78,7 +102,19 @@ function readPinnedPaths(docs = []) {
   }
 }
 
-function readSelectedKey(docs = []) {
+function readSelectedKey(docs = [], search = '') {
+  const querySelectedPath = normalizeDevDocsSelectedPath(
+    readSelectedPathFromSearch(search),
+    docs
+  )
+  if (querySelectedPath) {
+    return (
+      docs.find((item) => item.path === querySelectedPath)?.key ||
+      docs[0]?.key ||
+      ''
+    )
+  }
+
   if (typeof window === 'undefined') {
     return docs[0]?.key || ''
   }
@@ -233,6 +269,7 @@ function DevDocsTreeNode({
 }
 
 export default function DevDocsPage() {
+  const location = useLocation()
   const docs = useMemo(() => buildDevDocsItems(markdownModules), [])
   const [pinnedPaths, setPinnedPaths] = useState(() => readPinnedPaths(docs))
   const docsWithPinnedState = useMemo(
@@ -249,7 +286,7 @@ export default function DevDocsPage() {
   )
   const [keyword, setKeyword] = useState('')
   const [selectedKey, setSelectedKey] = useState(() =>
-    readSelectedKey(docsWithPinnedState)
+    readSelectedKey(docsWithPinnedState, location.search)
   )
   const [expandedKeys, setExpandedKeys] = useState(
     () => new Set(readExpandedKeys(allDirectoryKeys))
@@ -353,8 +390,29 @@ export default function DevDocsPage() {
   }, [tocExpanded])
 
   useEffect(() => {
+    const querySelectedPath = normalizeDevDocsSelectedPath(
+      readSelectedPathFromSearch(location.search),
+      docsWithPinnedState
+    )
+    if (!querySelectedPath) {
+      return
+    }
+    const querySelectedKey = docsWithPinnedState.find(
+      (item) => item.path === querySelectedPath
+    )?.key
+    if (querySelectedKey && querySelectedKey !== selectedKey) {
+      setSelectedKey(querySelectedKey)
+    }
+  }, [docsWithPinnedState, location.search, selectedKey])
+
+  useEffect(() => {
+    const headingId = readHeadingIdFromHash(location.hash)
+    if (headingId) {
+      window.setTimeout(() => scrollToHeading(headingId), 120)
+      return
+    }
     markdownRef.current?.scrollTo({ top: 0 })
-  }, [selectedDoc?.key])
+  }, [location.hash, selectedDoc?.key])
 
   const copyPath = async () => {
     if (!selectedDoc?.path) {

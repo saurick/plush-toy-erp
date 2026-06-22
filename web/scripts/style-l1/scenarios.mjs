@@ -162,10 +162,16 @@ export function createStyleL1Scenarios(deps) {
           scenarioName: 'admin-login-theme-modes-desktop',
         })
         await page.getByText('岗位任务端', { exact: true }).click()
+        await assertLoginSegmentedReadable(page, {
+          scenarioName: 'admin-login-theme-modes-desktop-entry-switch',
+        })
         await page
           .locator('.erp-login-card label.ant-segmented-item')
           .filter({ hasText: '短信登录' })
           .click()
+        await assertLoginSegmentedReadable(page, {
+          scenarioName: 'admin-login-theme-modes-desktop-login-mode-switch',
+        })
         await page.getByPlaceholder('请输入手机号').fill('13794566255')
         await page.getByRole('button', { name: '获取验证码' }).click()
         await expectText(page, '临时验证码')
@@ -965,8 +971,8 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await page.evaluate(async () => {
-          const createTask = async (params) =>
-            fetch('/rpc/workflow', {
+          const createTask = async (params) => {
+            const response = await fetch('/rpc/workflow', {
               method: 'POST',
               headers: {
                 Accept: 'application/json',
@@ -979,6 +985,12 @@ export function createStyleL1Scenarios(deps) {
                 params,
               }),
             })
+            const payload = await response.json()
+            if (!response.ok || payload?.result?.code !== 0) {
+              throw new Error(`create_task failed: ${JSON.stringify(payload)}`)
+            }
+            return payload.result.data?.task || null
+          }
 
           const bulkTasks = [
             ...Array.from({ length: 30 }, (_, index) => ({
@@ -1097,7 +1109,7 @@ export function createStyleL1Scenarios(deps) {
             business_status_key: 'project_pending',
             task_status_key: 'blocked',
             owner_role_key: 'sales',
-            priority: 3,
+            priority: 9,
             blocked_reason: '暗色模式阻塞原因回显',
             payload: {
               critical_path: true,
@@ -1149,6 +1161,9 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectHeading(page, '工作台')
+        await page.evaluate(() => {
+          localStorage.setItem('erp:last_entry_target', 'mobileTasks')
+        })
         await gotoScenarioPath(page, '/m/sales/tasks', {
           waitUntil: 'domcontentloaded',
         })
@@ -1926,6 +1941,7 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1536, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '开发入口总控 / Dev Hub')
+        await expectText(page, '项目治理地图 / Governance Map')
         await expectText(page, '开发文档 / Dev Docs')
         await expectText(page, '测试入口 / Test Entry')
         await expectText(page, '产品原型 / Prototypes')
@@ -1934,8 +1950,6 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '入口台账规则 / Registry Rules')
         await expectText(page, '置顶入口 / Pinned')
         await expectText(page, '用入口卡片右上角图钉把常用页面固定在这里。')
-        await expectText(page, '最近访问 / Recent')
-        await expectText(page, '点击任一入口后会在这里保留最近访问记录。')
         const defaultMetrics = await page.evaluate(() => ({
           cardCount: document.querySelectorAll(
             '.erp-dev-hub-grid .erp-dev-hub-card'
@@ -1968,8 +1982,8 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           defaultMetrics.cardCount,
-          5,
-          `开发入口总控应渲染 5 个入口: ${JSON.stringify(defaultMetrics)}`
+          6,
+          `开发入口总控应渲染 6 个入口: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
           defaultMetrics.guardrailCount >= 10,
@@ -1977,7 +1991,7 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           defaultMetrics.pinButtonCount,
-          5,
+          6,
           `开发入口总控应为每个入口提供置顶按钮: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
@@ -2001,10 +2015,6 @@ export function createStyleL1Scenarios(deps) {
 
         await page.evaluate(() => {
           localStorage.setItem(
-            'plush_erp_dev_hub_recent_routes',
-            JSON.stringify(['/__dev/testing', '/__dev/docs', '/erp/dashboard'])
-          )
-          localStorage.setItem(
             'plush_erp_dev_hub_pinned_routes',
             JSON.stringify([
               '/__dev/customer-config',
@@ -2015,7 +2025,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await page.reload({ waitUntil: 'domcontentloaded' })
         await expectText(page, '保存在当前浏览器 / Local browser')
-        const recentMetrics = await page.evaluate(() => ({
+        const pinnedMetrics = await page.evaluate(() => ({
           pinnedCount: document.querySelectorAll(
             '.erp-dev-hub-pinned .erp-dev-hub-card'
           ).length,
@@ -2024,28 +2034,22 @@ export function createStyleL1Scenarios(deps) {
               '.erp-dev-hub-pinned .erp-dev-hub-card__link'
             )
           ).map((link) => link.getAttribute('href')),
-          recentCount: document.querySelectorAll(
-            '.erp-dev-hub-recent .erp-dev-hub-card'
-          ).length,
-          recentHrefs: Array.from(
-            document.querySelectorAll(
-              '.erp-dev-hub-recent .erp-dev-hub-card__link'
-            )
-          ).map((link) => link.getAttribute('href')),
+          hasRecentSection: Boolean(
+            document.querySelector('.erp-dev-hub-recent')
+          ),
           overflow:
             document.documentElement.scrollWidth >
             document.documentElement.clientWidth + 1,
         }))
         assert.deepEqual(
-          recentMetrics,
+          pinnedMetrics,
           {
             pinnedCount: 2,
             pinnedHrefs: ['/__dev/customer-config', '/__dev/prototypes'],
-            recentCount: 2,
-            recentHrefs: ['/__dev/testing', '/__dev/docs'],
+            hasRecentSection: false,
             overflow: false,
           },
-          `开发入口总控最近访问应过滤非法路径并保持顺序: ${JSON.stringify(recentMetrics)}`
+          `开发入口总控应只保留置顶偏好并移除最近访问区: ${JSON.stringify(pinnedMetrics)}`
         )
 
         await page
@@ -2082,7 +2086,7 @@ export function createStyleL1Scenarios(deps) {
           .locator('.erp-dev-hub-group-filter .ant-segmented-item')
           .filter({ hasText: '产品治理 / Product Governance' })
           .click()
-        await expectText(page, '当前匹配 / Matches 1 / 5')
+        await expectText(page, '当前匹配 / Matches 1 / 6')
         const groupMetrics = await page.evaluate(() => ({
           cardCount: document.querySelectorAll(
             '.erp-dev-hub-grid .erp-dev-hub-card'
@@ -2109,7 +2113,7 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: '全部 / All' })
           .click()
         await page.getByPlaceholder('搜索入口、路径或资料来源').fill('测试')
-        await expectText(page, '当前匹配 / Matches 1 / 5')
+        await expectText(page, '当前匹配 / Matches 1 / 6')
         const filteredMetrics = await page.evaluate(() => ({
           cardCount: document.querySelectorAll(
             '.erp-dev-hub-grid .erp-dev-hub-card'
@@ -2131,6 +2135,296 @@ export function createStyleL1Scenarios(deps) {
           scenarioName: 'dev-hub-dark-desktop',
           selector: '.erp-dev-hub-page',
         })
+      },
+    },
+    {
+      name: 'dev-governance-dark-desktop',
+      path: '/__dev/governance',
+      themeMode: 'dark',
+      viewport: { width: 1536, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '项目治理地图 / Governance Map')
+        await expectText(page, 'docs/项目治理地图.md')
+        await expectText(page, '相关任务分流 / Related Task Routing')
+        await expectText(page, '项目治理分流图 / Governance Routing')
+        await page
+          .locator(
+            '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
+          )
+          .waitFor({ state: 'visible', timeout: 12000 })
+
+        const defaultMetrics = await page.evaluate(() => {
+          const root = document.querySelector('.erp-dev-governance-page')
+          const activeAxis = document.querySelector(
+            '.erp-dev-governance-axis-nav__item--active'
+          )
+          const firstDocLink = document.querySelector(
+            '.erp-dev-governance-link a'
+          )
+          const mermaid = document.querySelector(
+            '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
+          )
+          const toolbar = document.querySelector(
+            '.erp-dev-governance-mermaid .erp-markdown-mermaid__toolbar'
+          )
+          const tools = [
+            ...document.querySelectorAll(
+              '.erp-dev-governance-mermaid .erp-markdown-mermaid__tool'
+            ),
+          ]
+          const label = document.querySelector(
+            '.erp-dev-governance-mermaid [data-mermaid-zoom-label]'
+          )
+          const rootRect = root?.getBoundingClientRect()
+          const mermaidRect = mermaid?.getBoundingClientRect()
+          const toolbarStyle = toolbar ? getComputedStyle(toolbar) : null
+          const toolRects = tools.map((tool) => tool.getBoundingClientRect())
+          return {
+            hasRoot: Boolean(root),
+            faviconHref:
+              document
+                .querySelector('link[rel~="icon"]')
+                ?.getAttribute('href') || '',
+            axisCount: document.querySelectorAll(
+              '.erp-dev-governance-axis-nav__item'
+            ).length,
+            taskCount: document.querySelectorAll('.erp-dev-governance-task')
+              .length,
+            taskScopeText:
+              document.querySelector('.erp-dev-governance-task-scope')
+                ?.textContent || '',
+            activeAxisText: activeAxis?.textContent || '',
+            firstDocHref: firstDocLink?.getAttribute('href') || '',
+            mermaidRendered: Boolean(mermaid),
+            mermaidWidth: mermaidRect?.width || 0,
+            mermaidHeight: mermaidRect?.height || 0,
+            mermaidActions: [
+              ...document.querySelectorAll(
+                '.erp-dev-governance-mermaid [data-mermaid-zoom-action]'
+              ),
+            ].map((node) => node.getAttribute('data-mermaid-zoom-action')),
+            mermaidFullscreenOpenCount: document.querySelectorAll(
+              '.erp-dev-governance-mermaid [data-mermaid-fullscreen-action="open"]'
+            ).length,
+            mermaidToolbarDisplay: toolbarStyle?.display || '',
+            mermaidToolbarGap: toolbarStyle?.gap || '',
+            mermaidToolWidths: toolRects.map((rect) => Math.round(rect.width)),
+            mermaidToolHeights: toolRects.map((rect) =>
+              Math.round(rect.height)
+            ),
+            mermaidZoomLabel: label?.textContent?.trim() || '',
+            rootHeight: rootRect?.height || 0,
+            overflow:
+              document.documentElement.scrollWidth >
+              document.documentElement.clientWidth + 1,
+          }
+        })
+        assert.equal(
+          defaultMetrics.hasRoot,
+          true,
+          `项目治理地图页面根节点缺失: ${JSON.stringify(defaultMetrics)}`
+        )
+        assert.equal(
+          defaultMetrics.faviconHref,
+          '/favicon-governance.svg',
+          `项目治理地图 favicon 异常: ${JSON.stringify(defaultMetrics)}`
+        )
+        assert.ok(
+          defaultMetrics.axisCount >= 10,
+          `项目治理地图应展示治理维度与口径导航: ${JSON.stringify(defaultMetrics)}`
+        )
+        assert.ok(
+          defaultMetrics.taskCount >= 1 && defaultMetrics.taskCount < 6,
+          `项目治理地图默认应展示当前治理维度与口径相关任务: ${JSON.stringify(
+            defaultMetrics
+          )}`
+        )
+        assert.match(
+          defaultMetrics.taskScopeText,
+          /当前治理维度与口径.*查看全部/s,
+          `项目治理地图任务分流默认应优先展示当前维度相关项: ${JSON.stringify(
+            defaultMetrics
+          )}`
+        )
+        assert.match(
+          defaultMetrics.activeAxisText,
+          /当前真源/,
+          `项目治理地图默认应选中第一条治理维度与口径: ${JSON.stringify(defaultMetrics)}`
+        )
+        assert.match(
+          defaultMetrics.firstDocHref,
+          /^\/__dev\/docs\?path=/,
+          `项目治理地图文档链接应跳到 dev docs viewer: ${JSON.stringify(defaultMetrics)}`
+        )
+        assert.equal(
+          defaultMetrics.mermaidRendered,
+          true,
+          `项目治理地图 Mermaid 应渲染为 SVG: ${JSON.stringify(defaultMetrics)}`
+        )
+        assert.ok(
+          defaultMetrics.mermaidWidth > 240 &&
+            defaultMetrics.mermaidHeight > 120,
+          `项目治理地图 Mermaid 尺寸异常: ${JSON.stringify(defaultMetrics)}`
+        )
+        assert.deepEqual(
+          defaultMetrics.mermaidActions,
+          ['fit', 'zoom-out', 'zoom-in', 'reset'],
+          `项目治理地图 Mermaid 应复用 docs 页缩放工具条: ${JSON.stringify(
+            defaultMetrics
+          )}`
+        )
+        assert.equal(
+          defaultMetrics.mermaidFullscreenOpenCount,
+          1,
+          `项目治理地图 Mermaid 应提供唯一全屏入口: ${JSON.stringify(
+            defaultMetrics
+          )}`
+        )
+        assert.equal(
+          defaultMetrics.mermaidToolbarDisplay,
+          'flex',
+          `项目治理地图 Mermaid 工具条应使用 docs 页 flex 布局: ${JSON.stringify(
+            defaultMetrics
+          )}`
+        )
+        assert.ok(
+          defaultMetrics.mermaidToolWidths.every((width) => width >= 30) &&
+            defaultMetrics.mermaidToolHeights.every((height) => height >= 30),
+          `项目治理地图 Mermaid 工具按钮不应挤成裸图标: ${JSON.stringify(
+            defaultMetrics
+          )}`
+        )
+        assert.equal(
+          defaultMetrics.mermaidZoomLabel,
+          '100%',
+          `项目治理地图 Mermaid 初始缩放标签应为 100%: ${JSON.stringify(
+            defaultMetrics
+          )}`
+        )
+        assert.equal(
+          defaultMetrics.overflow,
+          false,
+          `项目治理地图默认态不应横向溢出: ${JSON.stringify(defaultMetrics)}`
+        )
+
+        await page
+          .locator(
+            '.erp-dev-governance-mermaid [data-mermaid-zoom-action="zoom-in"]'
+          )
+          .click()
+        const zoomInMetrics = await page.evaluate(() => {
+          const canvas = document.querySelector(
+            '.erp-dev-governance-mermaid .erp-markdown-mermaid__canvas'
+          )
+          return {
+            zoom: canvas?.getAttribute('data-mermaid-zoom') || '',
+            label:
+              document
+                .querySelector(
+                  '.erp-dev-governance-mermaid [data-mermaid-zoom-label]'
+                )
+                ?.textContent?.trim() || '',
+          }
+        })
+        assert.deepEqual(
+          zoomInMetrics,
+          { zoom: '120', label: '120%' },
+          `项目治理地图 Mermaid 放大操作应与 docs 页一致: ${JSON.stringify(
+            zoomInMetrics
+          )}`
+        )
+        await page
+          .locator(
+            '.erp-dev-governance-mermaid [data-mermaid-fullscreen-action="open"]'
+          )
+          .click()
+        const fullscreenMetrics = await page.evaluate(() => {
+          const shell = document.querySelector(
+            '.erp-dev-governance-mermaid .erp-markdown-mermaid'
+          )
+          const canvas = document.querySelector(
+            '.erp-dev-governance-mermaid .erp-markdown-mermaid__canvas'
+          )
+          const style = shell ? getComputedStyle(shell) : null
+          return {
+            fullscreen: shell?.getAttribute('data-mermaid-fullscreen') || '',
+            role: shell?.getAttribute('role') || '',
+            ariaModal: shell?.getAttribute('aria-modal') || '',
+            position: style?.position || '',
+            zoom: canvas?.getAttribute('data-mermaid-zoom') || '',
+            closeButtonCount: document.querySelectorAll(
+              '.erp-dev-governance-mermaid [data-mermaid-fullscreen-action="close"]'
+            ).length,
+          }
+        })
+        assert.deepEqual(
+          fullscreenMetrics,
+          {
+            fullscreen: 'true',
+            role: 'dialog',
+            ariaModal: 'true',
+            position: 'fixed',
+            zoom: '140',
+            closeButtonCount: 1,
+          },
+          `项目治理地图 Mermaid 全屏操作应与 docs 页一致: ${JSON.stringify(
+            fullscreenMetrics
+          )}`
+        )
+        await page
+          .locator(
+            '.erp-dev-governance-mermaid [data-mermaid-fullscreen-action="close"]'
+          )
+          .click()
+
+        await page.getByRole('button', { name: /页面设计治理/ }).click()
+        await expectText(page, '页面是否简洁易用')
+        await expectText(page, '当前维度：页面设计治理')
+        const relatedPageTaskMetrics = await page.evaluate(() => ({
+          taskCount: document.querySelectorAll('.erp-dev-governance-task')
+            .length,
+          taskText:
+            document.querySelector('.erp-dev-governance-task')?.textContent ||
+            '',
+        }))
+        assert.equal(
+          relatedPageTaskMetrics.taskCount,
+          1,
+          `页面设计治理应只展示相关任务分流: ${JSON.stringify(
+            relatedPageTaskMetrics
+          )}`
+        )
+        assert.match(
+          relatedPageTaskMetrics.taskText,
+          /改页面、菜单、原型或信息密度/,
+          `页面设计治理相关任务异常: ${JSON.stringify(relatedPageTaskMetrics)}`
+        )
+        await page.getByRole('button', { name: '查看全部' }).click()
+        await page.getByPlaceholder('搜索任务、第一跳或同步检查').fill('部署')
+        await expectText(page, '改部署、发布或低配运行口径')
+        const filteredMetrics = await page.evaluate(() => ({
+          taskCount: document.querySelectorAll('.erp-dev-governance-task')
+            .length,
+          overflow:
+            document.documentElement.scrollWidth >
+            document.documentElement.clientWidth + 1,
+        }))
+        assert.deepEqual(
+          filteredMetrics,
+          { taskCount: 1, overflow: false },
+          `项目治理地图任务搜索应收窄且不溢出: ${JSON.stringify(filteredMetrics)}`
+        )
+
+        await assertERPThemeMode(page, {
+          scenarioName: 'dev-governance-dark-desktop',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertDarkThemeContrast(page, {
+          scenarioName: 'dev-governance-dark-desktop',
+          selector: '.erp-dev-governance-page',
+        })
+        await assertNoHorizontalOverflow(page, 'dev-governance-dark-desktop')
       },
     },
     {
@@ -2593,6 +2887,17 @@ export function createStyleL1Scenarios(deps) {
           const activeTab = document.querySelector(
             '.erp-permission-tabs .ant-tabs-tab-active'
           )
+          const tabInkBar = document.querySelector(
+            '.erp-permission-tabs .ant-tabs-ink-bar'
+          )
+          const activeTabStyle =
+            activeTab instanceof HTMLElement
+              ? window.getComputedStyle(activeTab)
+              : null
+          const tabInkBarStyle =
+            tabInkBar instanceof HTMLElement
+              ? window.getComputedStyle(tabInkBar)
+              : null
           const adminSection = document.querySelector(
             '.erp-permission-section--admins'
           )
@@ -2612,6 +2917,10 @@ export function createStyleL1Scenarios(deps) {
             hasAdminSection: Boolean(adminSection),
             hasRoleSection: Boolean(roleSection),
             activeTabText: String(activeTab?.textContent || '').trim(),
+            activeTabTransitionDuration:
+              activeTabStyle?.transitionDuration || '',
+            tabInkBarTransitionDuration:
+              tabInkBarStyle?.transitionDuration || '',
             adminTop: adminRect?.top || 0,
             adminHeight: adminRect?.height || 0,
             roleTop: roleRect?.top || 0,
@@ -2631,6 +2940,15 @@ export function createStyleL1Scenarios(deps) {
             roleCenterMetrics.hasRoleSection &&
             roleCenterMetrics.roleHeight > 0,
           `权限管理默认应先显示角色模板 tab: ${JSON.stringify(roleCenterMetrics)}`
+        )
+        assert(
+          String(roleCenterMetrics.activeTabTransitionDuration)
+            .split(',')
+            .some((part) => Number.parseFloat(part) > 0) &&
+            String(roleCenterMetrics.tabInkBarTransitionDuration)
+              .split(',')
+              .some((part) => Number.parseFloat(part) > 0),
+          `权限管理 tab 缺少全局平滑过渡: ${JSON.stringify(roleCenterMetrics)}`
         )
         assert(
           roleCenterMetrics.hasLayout &&

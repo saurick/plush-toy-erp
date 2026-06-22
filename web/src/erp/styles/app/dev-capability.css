@@ -888,14 +888,6 @@
   padding: 0 0 14px;
 }
 
-.erp-dev-hub-recent {
-  display: grid;
-  gap: 10px;
-  margin-bottom: 14px;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 0 0 14px;
-}
-
 .erp-dev-hub-section-head {
   display: flex;
   align-items: center;
@@ -903,15 +895,13 @@
   gap: 12px;
 }
 
-.erp-dev-hub-pinned__grid,
-.erp-dev-hub-recent__grid {
+.erp-dev-hub-pinned__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
-.erp-dev-hub-pinned__empty,
-.erp-dev-hub-recent__empty {
+.erp-dev-hub-pinned__empty {
   color: #64748b;
   line-height: 1.5;
 }

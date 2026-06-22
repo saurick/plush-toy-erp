@@ -79,8 +79,7 @@
 }
 
 @media screen and (max-width: 1023px) {
-  .erp-dev-hub-pinned__grid,
-  .erp-dev-hub-recent__grid {
+  .erp-dev-hub-pinned__grid {
     grid-template-columns: 1fr;
   }
 
@@ -89,6 +88,11 @@
   }
 
   .erp-dev-docs-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .erp-dev-governance-shell {
     grid-template-columns: 1fr;
     height: auto;
   }
@@ -105,6 +109,8 @@
 
   .erp-dev-docs-sidebar,
   .erp-dev-docs-reader,
+  .erp-dev-governance-sidebar,
+  .erp-dev-governance-main,
   .erp-dev-prototypes-sidebar,
   .erp-dev-prototypes-reader,
   .erp-dev-testing-sidebar,
@@ -129,6 +135,11 @@
   }
 
   .erp-dev-testing-presets {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-governance-answer-grid,
+  .erp-dev-governance-task-grid {
     grid-template-columns: 1fr;
   }
 
@@ -211,6 +222,10 @@
     padding: 10px;
   }
 
+  .erp-dev-governance-page {
+    padding: 10px;
+  }
+
   .erp-dev-prototypes-page {
     padding: 10px;
   }
@@ -224,6 +239,11 @@
   .erp-dev-docs-header,
   .erp-dev-docs-sidebar,
   .erp-dev-docs-reader,
+  .erp-dev-governance-header,
+  .erp-dev-governance-sidebar,
+  .erp-dev-governance-main,
+  .erp-dev-governance-axis-detail,
+  .erp-dev-governance-section,
   .erp-dev-prototypes-header,
   .erp-dev-prototypes-sidebar,
   .erp-dev-prototypes-reader,
@@ -238,6 +258,10 @@
   .erp-dev-hub-toolbar,
   .erp-dev-testing-header,
   .erp-dev-testing-reader__toolbar,
+  .erp-dev-governance-header,
+  .erp-dev-governance-axis-detail__head,
+  .erp-dev-governance-section__head,
+  .erp-dev-governance-task__head,
   .erp-dev-prototypes-header,
   .erp-dev-prototypes-reader__toolbar,
   .erp-dev-prototypes-reader__info,
@@ -250,6 +274,17 @@
     grid-template-columns: 1fr;
     width: 100%;
     min-width: 0;
+  }
+
+  .erp-dev-governance-header__metrics {
+    grid-template-columns: 1fr;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .erp-dev-governance-section__head .ant-input-affix-wrapper,
+  .erp-dev-governance-source-card .ant-btn {
+    width: 100%;
   }
 
   .erp-dev-hub-toolbar .ant-input-search {

@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Seed Import Governance"
-  short_description: "Govern seed data, fixtures, dry-runs, imports, and cleanup"
-  default_prompt: "Use $plush-seed-import-governance to handle this plush-toy-erp task with project truth, validation, and risk reporting."
+  short_description: "Seed/导入/清理治理 Import"
+  default_prompt: "Use $plush-seed-import-governance 按中文主线和 English anchors 处理任务：先收敛真源、范围、验证和剩余风险。"

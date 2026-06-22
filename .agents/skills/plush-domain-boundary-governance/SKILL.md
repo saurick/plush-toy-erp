@@ -1,32 +1,32 @@
 ---
 name: plush-domain-boundary-governance
-description: Project-specific domain-boundary implementation governance for plush-toy-erp. Use when Codex implements or reviews plush-toy-erp feature work that may affect data ownership, domain models, workflows, facts, schemas, APIs, permissions, frontend/backend responsibility, customer-specific behavior, source-of-truth fields, stale/missing field values, or cross-module boundaries.
+description: plush-toy-erp 项目业务域边界、数据真源和实现责任治理。Use when Codex implements or reviews plush-toy-erp feature work that may affect data ownership, domain models, workflows, facts, schemas, APIs, permissions, frontend/backend responsibility, customer-specific behavior, source-of-truth fields, stale/missing field values, or cross-module boundaries.
 ---
 
-# Plush Domain Boundary Governance
+# Plush 业务边界治理 Domain Boundary Governance
 
-Use this skill before implementing plush-toy-erp feature work that may change domain ownership, data truth, APIs, permissions, frontend/backend responsibility, or customer/template-specific behavior.
+用这个 skill 在实现 `plush-toy-erp` 功能前收敛 domain ownership、source of truth、API/RBAC、frontend/backend responsibility 和 customer/template-specific boundary。
 
-## Truth Chain
+## 真源链 Truth Chain
 
-- Read project `AGENTS.md`, `README.md`, current-source docs, and nearest module docs/code/tests for the touched area.
-- Treat existing code, schema/migrations, tests, and formal docs as stronger truth than chat plans or old reference notes.
+- 先读 `AGENTS.md`、`README.md`、`docs/当前真源与交接顺序.md`、相关 module docs/code/tests。
+- 代码、schema/migrations、tests、formal docs 强于聊天规划或旧 reference notes。
 
-## Project Rules
+## 项目规则 Project Rules
 
-- 先按 MasterData / Workflow / Fact / RBAC / API-UI / Productization 分层定位责任。
-- Workflow task done 不等于 Fact posted；WorkflowUsecase 不直接写库存、出货、财务事实。
-- 禁止新增 `tenant_id`、SaaS 多租户、license server 或把当前客户字段硬编码进 Product Core。
+- 先按 `MasterData / Workflow / Fact / RBAC / API-UI / Productization` 分层定位责任。
+- `Workflow task done` 不等于 `Fact posted`；`WorkflowUsecase` 不直接写库存、出货、财务事实。
+- 禁止新增 `tenant_id`、SaaS 多租户、license server，禁止把当前客户字段硬编码进 Product Core。
 
-## Workflow
+## 工作流 Workflow
 
-1. State the single domain outcome and the owning layer.
-2. Identify source-of-truth fields, states, identifiers, permissions, and derived values.
-3. Check whether an existing table/usecase/API/helper already owns the behavior.
-4. Cover stale/missing value paths: defaults, edits, source switch/clear, list/detail/print/export/search, and historical fallback when relevant.
-5. Keep UI from inventing backend facts and keep customer/template specifics out of generic core.
-6. Choose tests by impact: unit/integration/contract/browser/migration as applicable.
+1. 写出 single domain outcome 和 owning layer。
+2. 找到 source-of-truth fields、states、identifiers、permissions、derived values。
+3. 检查现有 table/usecase/API/helper 是否已经拥有该行为。
+4. 覆盖 stale/missing value paths：defaults、edits、source switch/clear、list/detail/print/export/search、historical fallback。
+5. UI 不补造 backend facts；客户/模板特例不污染 generic core。
+6. 按影响面选择 unit、integration、contract、browser、migration validation。
 
-## Output
+## 输出 Output
 
-Report ownership decisions, source truth, changed layers, intentionally untouched layers, stale/missing paths, validation, and residual risks.
+汇报 ownership decisions、source truth、changed layers、intentionally untouched layers、stale/missing paths、validation 和 residual risks。

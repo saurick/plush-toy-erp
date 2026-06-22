@@ -60,7 +60,7 @@ function createDocumentStub(existingLinks = []) {
   }
 }
 
-test('favicon: routes resolve to separate admin, tasks, dev, testing, docs, capability ledger, prototype, customer config and print template icons', () => {
+test('favicon: routes resolve to separate admin, tasks, dev, governance, testing, docs, capability ledger, prototype, customer config and print template icons', () => {
   assert.equal(resolveERPFavicon('/erp/dashboard'), ERP_FAVICON_VARIANTS.admin)
   assert.equal(resolveERPFavicon('/admin-login'), ERP_FAVICON_VARIANTS.admin)
   assert.equal(
@@ -70,6 +70,11 @@ test('favicon: routes resolve to separate admin, tasks, dev, testing, docs, capa
   assert.equal(resolveERPFavicon('/tasks'), ERP_FAVICON_VARIANTS.tasks)
   assert.equal(resolveERPFavicon('/__dev'), ERP_FAVICON_VARIANTS.devHub)
   assert.equal(resolveERPFavicon('/__dev/'), ERP_FAVICON_VARIANTS.devHub)
+  assert.equal(ERP_FAVICON_VARIANTS.governance.href, '/favicon-governance.svg')
+  assert.equal(
+    resolveERPFavicon('/__dev/governance'),
+    ERP_FAVICON_VARIANTS.governance
+  )
   assert.equal(
     resolveERPFavicon('/__dev/testing'),
     ERP_FAVICON_VARIANTS.testing
@@ -154,6 +159,12 @@ test('favicon: customer favicon overrides customer-facing admin and task routes'
       customerFaviconHref: '/favicon-yoyoosun.svg',
     }),
     ERP_FAVICON_VARIANTS.testing
+  )
+  assert.equal(
+    resolveERPFavicon('/__dev/governance', {
+      customerFaviconHref: '/favicon-yoyoosun.svg',
+    }),
+    ERP_FAVICON_VARIANTS.governance
   )
 })
 

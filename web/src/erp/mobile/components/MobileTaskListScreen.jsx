@@ -328,7 +328,9 @@ export default function MobileTaskListScreen({
   )
 
   const renderTaskFilters = () => (
-    <div className="mobile-role-task-filters mx-5 mt-4 grid grid-cols-4 rounded-2xl bg-slate-100 p-1 shadow-inner">
+    <div
+      className={`mobile-role-task-filters mobile-role-task-filters--${activeFilterKey} mx-5 mt-4 grid grid-cols-4 rounded-2xl bg-slate-100 p-1 shadow-inner`}
+    >
       {filterItems.map((item) => {
         const active = item.key === activeFilterKey
         return (
@@ -338,9 +340,7 @@ export default function MobileTaskListScreen({
             data-testid={`mobile-role-filter-${item.key}`}
             aria-pressed={active}
             className={`mobile-role-task-filter min-w-0 rounded-xl px-2 py-3 text-base font-semibold transition ${
-              active
-                ? 'mobile-role-task-filter--active shadow-sm ring-1 ring-slate-200'
-                : 'text-slate-500'
+              active ? 'mobile-role-task-filter--active' : 'text-slate-500'
             }`}
             onClick={() => {
               setActiveFilterKey(item.key)
@@ -455,7 +455,10 @@ export default function MobileTaskListScreen({
     ]
 
     return (
-      <div className="mobile-role-message-tabs" role="tablist">
+      <div
+        className={`mobile-role-message-tabs mobile-role-message-tabs--${activeMessageTabKey}`}
+        role="tablist"
+      >
         {items.map((item) => {
           const active = item.key === activeMessageTabKey
           return (
@@ -703,7 +706,7 @@ export default function MobileTaskListScreen({
 
   const renderBottomNavigation = () => (
     <nav
-      className="mobile-role-bottom-nav"
+      className={`mobile-role-bottom-nav mobile-role-bottom-nav--${activeMainTabKey}`}
       aria-label="移动端主导航"
       data-testid="mobile-role-bottom-nav"
     >
