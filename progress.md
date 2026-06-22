@@ -4,8 +4,8 @@
 
 ## 归档索引
 
-| 归档文件 | 范围 |
-| --- | --- |
+| 归档文件                                                         | 范围                                                                                                                                     |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `docs/archive/progress-2026-06-20-before-lifecycle-ui-policy.md` | 截至 2026-06-20 业务数据生命周期页面治理前的完整过程流水，包含 debug 清表、删除 / 回收站边界、项目 skills 迁入和加工环节页面收口等记录。 |
 
 ## 最近活跃事项
@@ -426,3 +426,19 @@
 - 验证：追加前 `progress.md` 为 411 行、72152 字节，未达到归档阈值；已执行 29 个相关 skill 目录的 `quick_validate.py`，均通过。
 - 下一步：后续如继续发现旧治理 skill 正文过度英文，可按同一口径逐个补中文主线，不改 `$skill-name`。
 - 阻塞/风险：本轮只改 Codex skill 文本和 metadata，不改运行时代码、schema、migration、RBAC、部署脚本、真实导入流程、监控系统或安全策略。
+
+## 2026-06-22 提交推送收口与日期过滤合同
+
+- 完成：将 `devGovernance` 汇总逻辑中以 `(` / `[` 开头的表达式语句改为可选链和中间变量，消除 Prettier 与 ESLint fix 在行首分号上的反复改写。
+- 完成：收口库存、采购、质检和运营事实 JSON-RPC 列表过滤中的 `date_from` / `date_to` 解析合同；非法日期不再静默忽略，统一返回 `InvalidParam`，并补充对应服务端测试。
+- 验证：追加前 `progress.md` 为 428 行、75107 字节，未达到归档阈值；提交推送路径由 pre-commit Prettier 和 pre-push `qa:full` 覆盖。
+- 下一步：后续新增 JSON-RPC 日期筛选时复用 `getOptionalJSONRPCTime` 的布尔结果，不要丢弃解析失败状态；新增类似前端表达式语句时优先使用命名中间变量。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、正式菜单、Workflow / Fact 事实落账、客户资料或部署脚本。
+
+## 2026-06-22 JSON-RPC 日期筛选非法参数收口
+
+- 完成：将库存台账、采购入库、来料质检和 operational_fact 通用列表筛选的 `date_from / date_to` 解析改为严格合同；非法日期不再静默当作未传筛选，而是在 service 层返回 `InvalidParam`。
+- 完成：补充 inventory lot / txn、purchase receipt、quality inspection、production / outsourcing / stock reservation / finance fact 列表的 `not-a-date` 负例测试；保留 shipment list 既有严格日期解析路径。
+- 验证：追加前 `progress.md` 为 428 行、75107 字节，未达到归档阈值；已执行 `cd server && go test ./internal/service -run 'Test(JsonrpcDispatcher_Inventory|PurchaseReceipt|QualityInspection|OperationalFact)'`、`git diff --check`、`cd server && go test ./internal/biz ./internal/data ./internal/service ./internal/server`，均通过。
+- 下一步：提交前如合并无关前端格式化现场，需按实际改动范围补前端校验；本轮后端日期筛选合同已完成。
+- 阻塞/风险：本轮只改 JSON-RPC service parser 和 service 测试，不改 schema、migration、RBAC、正式菜单、页面结构、WorkflowUsecase、Fact usecase、客户差异配置或部署脚本；前端页面 / 原型 / 浏览器回归不属于本次修复范围。

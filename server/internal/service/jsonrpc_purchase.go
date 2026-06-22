@@ -96,7 +96,11 @@ func (d *jsonrpcDispatcher) handlePurchase(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptRead, biz.PermissionWarehouseInboundRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.inventoryUC.ListPurchaseReceipts(ctx, purchaseReceiptFilterFromParams(pm))
+		filter, ok := purchaseReceiptFilterFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.inventoryUC.ListPurchaseReceipts(ctx, filter)
 		if err != nil {
 			return id, d.mapPurchaseError(ctx, err), nil
 		}
@@ -197,9 +201,15 @@ func purchaseReceiptItemsCreateFromParams(pm map[string]any) ([]*biz.PurchaseRec
 	return items, true
 }
 
-func purchaseReceiptFilterFromParams(pm map[string]any) biz.PurchaseReceiptFilter {
-	dateFrom, _ := getOptionalJSONRPCTime(pm, "date_from")
-	dateTo, _ := getOptionalJSONRPCTime(pm, "date_to")
+func purchaseReceiptFilterFromParams(pm map[string]any) (biz.PurchaseReceiptFilter, bool) {
+	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	if !ok {
+		return biz.PurchaseReceiptFilter{}, false
+	}
+	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	if !ok {
+		return biz.PurchaseReceiptFilter{}, false
+	}
 	return biz.PurchaseReceiptFilter{
 		Status:              getString(pm, "status"),
 		Keyword:             getString(pm, "keyword"),
@@ -213,7 +223,7 @@ func purchaseReceiptFilterFromParams(pm map[string]any) biz.PurchaseReceiptFilte
 		PurchaseOrderItemID: getInt(pm, "purchase_order_item_id", 0),
 		Limit:               getInt(pm, "limit", 50),
 		Offset:              getInt(pm, "offset", 0),
-	}
+	}, true
 }
 
 func purchaseReceiptResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.PurchaseReceipt, err error) *v1.JsonrpcResult {

@@ -95,6 +95,16 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 		t.Fatalf("expected one passed inspection in list, got %d", total)
 	}
 
+	_, invalidListRes, err := j.handleQuality(adminCtx, "list_quality_inspections", "invalid-date", mustJSONRPCStruct(t, map[string]any{
+		"date_to": "not-a-date",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if invalidListRes == nil || invalidListRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected invalid param for bad quality date filter, got %#v", invalidListRes)
+	}
+
 	rejectReceipt, rejectItem, rejectLotID := createPostedQualityReceipt(t, ctx, j.inventoryUC, fixtures, "QI-JSONRPC-IN-REJECT", "QI-JSONRPC-LOT-REJECT")
 	rejectDraft := createQualityDraftViaRPC(t, adminCtx, j, "QI-JSONRPC-REJECT", rejectReceipt.ID, rejectItem.ID, rejectLotID, fixtures)
 	if _, submitRejectRes, err := j.handleQuality(adminCtx, "submit_quality_inspection", "5", mustJSONRPCStruct(t, map[string]any{"id": float64(rejectDraft)})); err != nil || submitRejectRes.Code != errcode.OK.Code {
@@ -157,11 +167,14 @@ func TestJsonrpcDispatcher_QualityInspectionAPIRequiresDomainPermissions(t *test
 }
 
 func TestQualityInspectionFilterFromParamsForwardsContextFilters(t *testing.T) {
-	filter := qualityInspectionFilterFromParams(map[string]any{
+	filter, ok := qualityInspectionFilterFromParams(map[string]any{
 		"purchase_order_id":        float64(21),
 		"purchase_receipt_id":      float64(34),
 		"purchase_receipt_item_id": float64(55),
 	})
+	if !ok {
+		t.Fatal("expected quality inspection filter to parse")
+	}
 	if filter.PurchaseOrderID != 21 {
 		t.Fatalf("expected purchase_order_id forwarded, got %d", filter.PurchaseOrderID)
 	}

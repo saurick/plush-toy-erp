@@ -79,7 +79,11 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.inventoryUC.ListQualityInspections(ctx, qualityInspectionFilterFromParams(pm))
+		filter, ok := qualityInspectionFilterFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.inventoryUC.ListQualityInspections(ctx, filter)
 		if err != nil {
 			return id, d.mapQualityError(ctx, err), nil
 		}
@@ -121,9 +125,15 @@ func qualityInspectionDecisionFromParams(pm map[string]any) (*biz.QualityInspect
 	}, true
 }
 
-func qualityInspectionFilterFromParams(pm map[string]any) biz.QualityInspectionFilter {
-	dateFrom, _ := getOptionalJSONRPCTime(pm, "date_from")
-	dateTo, _ := getOptionalJSONRPCTime(pm, "date_to")
+func qualityInspectionFilterFromParams(pm map[string]any) (biz.QualityInspectionFilter, bool) {
+	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	if !ok {
+		return biz.QualityInspectionFilter{}, false
+	}
+	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	if !ok {
+		return biz.QualityInspectionFilter{}, false
+	}
 	return biz.QualityInspectionFilter{
 		Status:                getString(pm, "status"),
 		Result:                getString(pm, "result"),
@@ -138,7 +148,7 @@ func qualityInspectionFilterFromParams(pm map[string]any) biz.QualityInspectionF
 		WarehouseID:           getInt(pm, "warehouse_id", 0),
 		Limit:                 getInt(pm, "limit", 50),
 		Offset:                getInt(pm, "offset", 0),
-	}
+	}, true
 }
 
 func qualityInspectionResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.QualityInspection, err error) *v1.JsonrpcResult {

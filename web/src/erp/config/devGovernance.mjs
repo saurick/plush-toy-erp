@@ -330,16 +330,18 @@ export function buildGovernanceSummary({
 } = {}) {
   const uniqueSourcePaths = new Set()
   axes.forEach((axis) => {
-    ;(axis.sourcesLinks || []).forEach((link) => {
+    axis.sourcesLinks?.forEach((link) => {
       if (link.path) uniqueSourcePaths.add(link.path)
     })
   })
   tasks.forEach((task) => {
-    ;[...(task.firstHopLinks || []), ...(task.syncCheckLinks || [])].forEach(
-      (link) => {
-        if (link.path) uniqueSourcePaths.add(link.path)
-      }
-    )
+    const taskLinks = [
+      ...(task.firstHopLinks || []),
+      ...(task.syncCheckLinks || []),
+    ]
+    taskLinks.forEach((link) => {
+      if (link.path) uniqueSourcePaths.add(link.path)
+    })
   })
 
   return {

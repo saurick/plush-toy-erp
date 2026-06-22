@@ -178,8 +178,40 @@ func TestOperationalFactShipmentFilterFromParamsParsesDateRange(t *testing.T) {
 	}
 }
 
+func TestJsonrpcDispatcher_OperationalFactListsRejectInvalidDateFilters(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.PMCRoleKey, biz.PurchaseRoleKey, biz.WarehouseRoleKey, biz.FinanceRoleKey},
+		biz.PermissionPMCPlanRead,
+		biz.PermissionPurchaseOrderRead,
+		biz.PermissionWarehouseInventoryRead,
+		biz.PermissionFinanceReceivableRead,
+	)
+	j := newOperationalFactJSONRPCTestData(admin)
+
+	for _, tc := range []struct {
+		method string
+		params map[string]any
+	}{
+		{method: "list_production_facts", params: map[string]any{"date_from": "not-a-date"}},
+		{method: "list_outsourcing_facts", params: map[string]any{"date_to": "not-a-date"}},
+		{method: "list_stock_reservations", params: map[string]any{"date_from": "not-a-date"}},
+		{method: "list_finance_facts", params: map[string]any{"date_to": "not-a-date"}},
+	} {
+		t.Run(tc.method, func(t *testing.T) {
+			_, res, err := j.handleOperationalFact(ctx, tc.method, "invalid-date", mustJSONRPCStruct(t, tc.params))
+			if err != nil {
+				t.Fatalf("expected nil err, got %v", err)
+			}
+			if res == nil || res.Code != errcode.InvalidParam.Code {
+				t.Fatalf("expected invalid param for bad operational fact date filter, got %#v", res)
+			}
+		})
+	}
+}
+
 func TestOperationalFactFilterFromParamsParsesFactType(t *testing.T) {
-	filter := operationalFactFilterFromParams(mustJSONRPCStruct(t, map[string]any{
+	filter, ok := operationalFactFilterFromParams(mustJSONRPCStruct(t, map[string]any{
 		"status":          "posted",
 		"fact_type":       "receivable",
 		"keyword":         "FIN-001",
@@ -196,6 +228,9 @@ func TestOperationalFactFilterFromParamsParsesFactType(t *testing.T) {
 		"limit":           float64(20),
 		"offset":          float64(5),
 	}).AsMap())
+	if !ok {
+		t.Fatal("expected operational fact filter params to parse")
+	}
 	if filter.Status != "posted" ||
 		filter.FactType != "receivable" ||
 		filter.Keyword != "FIN-001" ||

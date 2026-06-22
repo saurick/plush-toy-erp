@@ -57,7 +57,11 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanRead, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.operationalFactUC.ListProductionFacts(ctx, operationalFactFilterFromParams(pm))
+		filter, ok := operationalFactFilterFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.operationalFactUC.ListProductionFacts(ctx, filter)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -89,7 +93,11 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseOrderRead, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.operationalFactUC.ListOutsourcingFacts(ctx, operationalFactFilterFromParams(pm))
+		filter, ok := operationalFactFilterFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.operationalFactUC.ListOutsourcingFacts(ctx, filter)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -173,7 +181,11 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionWarehouseInventoryRead, biz.PermissionSalesOrderRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.operationalFactUC.ListStockReservations(ctx, operationalFactFilterFromParams(pm))
+		filter, ok := operationalFactFilterFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.operationalFactUC.ListStockReservations(ctx, filter)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -211,7 +223,11 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionFinanceReceivableRead, biz.PermissionFinancePayableRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.operationalFactUC.ListFinanceFacts(ctx, operationalFactFilterFromParams(pm))
+		filter, ok := operationalFactFilterFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.operationalFactUC.ListFinanceFacts(ctx, filter)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -367,9 +383,15 @@ func financeFactCreateFromParams(pm map[string]any) (*biz.FinanceFactCreate, boo
 	}, true
 }
 
-func operationalFactFilterFromParams(pm map[string]any) biz.OperationalFactFilter {
-	dateFrom, _ := getOptionalJSONRPCTime(pm, "date_from")
-	dateTo, _ := getOptionalJSONRPCTime(pm, "date_to")
+func operationalFactFilterFromParams(pm map[string]any) (biz.OperationalFactFilter, bool) {
+	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	if !ok {
+		return biz.OperationalFactFilter{}, false
+	}
+	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	if !ok {
+		return biz.OperationalFactFilter{}, false
+	}
 	return biz.OperationalFactFilter{
 		Status:         getString(pm, "status"),
 		FactType:       getString(pm, "fact_type"),
@@ -389,22 +411,14 @@ func operationalFactFilterFromParams(pm map[string]any) biz.OperationalFactFilte
 		CounterpartyID: getInt(pm, "counterparty_id", 0),
 		Limit:          getInt(pm, "limit", 50),
 		Offset:         getInt(pm, "offset", 0),
-	}
+	}, true
 }
 
 func operationalFactShipmentFilterFromParams(pm map[string]any) (biz.OperationalFactFilter, bool) {
-	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	filter, ok := operationalFactFilterFromParams(pm)
 	if !ok {
 		return biz.OperationalFactFilter{}, false
 	}
-	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
-	if !ok {
-		return biz.OperationalFactFilter{}, false
-	}
-	filter := operationalFactFilterFromParams(pm)
-	filter.DateField = getString(pm, "date_field")
-	filter.DateFrom = dateFrom
-	filter.DateTo = dateTo
 	return filter, true
 }
 

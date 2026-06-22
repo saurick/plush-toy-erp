@@ -136,6 +136,33 @@ func TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists(t *testing.T) {
 		t.Fatalf("expected source type MANUAL_SEED, got %#v", got)
 	}
 
+	for _, tc := range []struct {
+		name   string
+		method string
+		params map[string]any
+	}{
+		{
+			name:   "lot date_from",
+			method: "list_inventory_lots",
+			params: map[string]any{"date_from": "not-a-date"},
+		},
+		{
+			name:   "txn date_to",
+			method: "list_inventory_txns",
+			params: map[string]any{"date_to": "not-a-date"},
+		},
+	} {
+		t.Run("invalid date "+tc.name, func(t *testing.T) {
+			_, invalidRes, err := j.handleInventory(adminCtx, tc.method, "invalid-date", mustJSONRPCStruct(t, tc.params))
+			if err != nil {
+				t.Fatalf("expected nil err, got %v", err)
+			}
+			if invalidRes == nil || invalidRes.Code != errcode.InvalidParam.Code {
+				t.Fatalf("expected invalid param for bad inventory date filter, got %#v", invalidRes)
+			}
+		})
+	}
+
 	if _, err := j.inventoryUC.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
 		SubjectID:      fixtures.productID,

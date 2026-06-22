@@ -47,7 +47,11 @@ func (d *jsonrpcDispatcher) handleInventory(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.inventoryUC.ListInventoryLots(ctx, inventoryLotFilterFromParams(pm))
+		filter, ok := inventoryLotFilterFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.inventoryUC.ListInventoryLots(ctx, filter)
 		if err != nil {
 			return id, d.mapInventoryError(ctx, err), nil
 		}
@@ -61,7 +65,11 @@ func (d *jsonrpcDispatcher) handleInventory(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.inventoryUC.ListInventoryTxns(ctx, inventoryTxnFilterFromParams(pm))
+		filter, ok := inventoryTxnFilterFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.inventoryUC.ListInventoryTxns(ctx, filter)
 		if err != nil {
 			return id, d.mapInventoryError(ctx, err), nil
 		}
@@ -88,9 +96,15 @@ func inventoryBalanceFilterFromParams(pm map[string]any) biz.InventoryBalanceFil
 	}
 }
 
-func inventoryLotFilterFromParams(pm map[string]any) biz.InventoryLotFilter {
-	dateFrom, _ := getOptionalJSONRPCTime(pm, "date_from")
-	dateTo, _ := getOptionalJSONRPCTime(pm, "date_to")
+func inventoryLotFilterFromParams(pm map[string]any) (biz.InventoryLotFilter, bool) {
+	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	if !ok {
+		return biz.InventoryLotFilter{}, false
+	}
+	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	if !ok {
+		return biz.InventoryLotFilter{}, false
+	}
 	return biz.InventoryLotFilter{
 		SubjectType: getString(pm, "subject_type"),
 		SubjectID:   getInt(pm, "subject_id", 0),
@@ -101,12 +115,18 @@ func inventoryLotFilterFromParams(pm map[string]any) biz.InventoryLotFilter {
 		DateTo:      dateTo,
 		Limit:       getInt(pm, "limit", 50),
 		Offset:      getInt(pm, "offset", 0),
-	}
+	}, true
 }
 
-func inventoryTxnFilterFromParams(pm map[string]any) biz.InventoryTxnFilter {
-	dateFrom, _ := getOptionalJSONRPCTime(pm, "date_from")
-	dateTo, _ := getOptionalJSONRPCTime(pm, "date_to")
+func inventoryTxnFilterFromParams(pm map[string]any) (biz.InventoryTxnFilter, bool) {
+	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	if !ok {
+		return biz.InventoryTxnFilter{}, false
+	}
+	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	if !ok {
+		return biz.InventoryTxnFilter{}, false
+	}
 	return biz.InventoryTxnFilter{
 		SubjectType: getString(pm, "subject_type"),
 		SubjectID:   getInt(pm, "subject_id", 0),
@@ -120,7 +140,7 @@ func inventoryTxnFilterFromParams(pm map[string]any) biz.InventoryTxnFilter {
 		DateTo:      dateTo,
 		Limit:       getInt(pm, "limit", 50),
 		Offset:      getInt(pm, "offset", 0),
-	}
+	}, true
 }
 
 func (d *jsonrpcDispatcher) mapInventoryError(ctx context.Context, err error) *v1.JsonrpcResult {

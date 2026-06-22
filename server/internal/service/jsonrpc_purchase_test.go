@@ -242,6 +242,16 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 		t.Fatalf("expected one posted receipt in list, got %d", total)
 	}
 
+	_, invalidListRes, err := j.handlePurchase(adminCtx, "list_purchase_receipts", "invalid-date", mustJSONRPCStruct(t, map[string]any{
+		"date_from": "not-a-date",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if invalidListRes == nil || invalidListRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected invalid param for bad purchase receipt date filter, got %#v", invalidListRes)
+	}
+
 	_, dashboardRes, err := j.handleBusiness(adminCtx, "dashboard_stats", "6", nil)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -279,11 +289,14 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 }
 
 func TestPurchaseReceiptFilterFromParamsForwardsContextFilters(t *testing.T) {
-	filter := purchaseReceiptFilterFromParams(map[string]any{
+	filter, ok := purchaseReceiptFilterFromParams(map[string]any{
 		"supplier_name":          "布料供应商",
 		"purchase_order_id":      float64(21),
 		"purchase_order_item_id": float64(34),
 	})
+	if !ok {
+		t.Fatal("expected purchase receipt filter to parse")
+	}
 	if filter.SupplierName != "布料供应商" {
 		t.Fatalf("expected supplier_name forwarded, got %q", filter.SupplierName)
 	}
