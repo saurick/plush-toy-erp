@@ -57,12 +57,15 @@ function splitMarkdownTableRow(row = '') {
     }
     if (!inCode) {
       if (char === '[' && previous !== '\\') bracketDepth += 1
-      if (char === ']' && previous !== '\\')
+      if (char === ']' && previous !== '\\') {
         bracketDepth = Math.max(0, bracketDepth - 1)
-      if (char === '(' && previous !== '\\' && bracketDepth === 0)
+      }
+      if (char === '(' && previous !== '\\' && bracketDepth === 0) {
         parenDepth += 1
-      if (char === ')' && previous !== '\\')
+      }
+      if (char === ')' && previous !== '\\') {
         parenDepth = Math.max(0, parenDepth - 1)
+      }
     }
     if (
       char === '|' &&
