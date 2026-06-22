@@ -1,11 +1,15 @@
 ---
 name: plush-page-design-governance
-description: Project-specific page design governance for /Users/simon/projects/plush-toy-erp. Use when Codex designs, reviews, simplifies, or implements plush ERP pages, dashboards, workbenches, task boards, mobile role task pages, print center pages, lists, forms, detail pages, action modals, collaboration entries, page features, feature details, buttons, fields, filters, states, empty/error states, stale/missing field values, accessibility, keyboard/focus behavior, prototypes, prototype sync, Draft/To Implement/Current prototype states, or when the user mentions 简洁易用, 心智负担, 信息密度高, 一眼看不懂, 页面好看, 低密度, 严格按原型, 没意义的东西不要做, 功能评估, 功能细节, 按钮字段筛选状态, 字段残值, 字段缺值, 可访问性, 键盘焦点, 原型同步, 有原型, 无原型, or asks whether such page-design guidance should be made into a skill.
+description: plush-toy-erp 项目页面设计治理。Use when Codex designs, reviews, simplifies, or implements plush ERP pages, dashboards, workbenches, task boards, mobile role task pages, print center pages, lists, forms, detail pages, action modals, collaboration entries, page features, feature details, buttons, fields, filters, states, empty/error states, stale/missing field values, accessibility, keyboard/focus behavior, prototypes, prototype sync, Draft/To Implement/Current prototype states, or when the user mentions 简洁易用, 心智负担, 信息密度高, 一眼看不懂, 页面好看, 低密度, 严格按原型, 没意义的东西不要做, 功能评估, 功能细节, 按钮字段筛选状态, 字段残值, 字段缺值, 可访问性, 键盘焦点, 原型同步, 有原型, 无原型, or asks whether such page-design guidance should be made into a skill.
 ---
 
 # Plush Page Design Governance
 
+阅读口径：正文默认中文主线 + English anchors；`name` / `display_name` 保持英文，`Workflow / Fact / RBAC / API / migration / runtime` 等术语按需保留，方便触发、检索和跨工具引用。
+
 Use this skill to turn "简洁易用、美观、低心智负担" into concrete implementation checks for plush-toy-erp pages. Do not treat it as a generic visual taste guide. Its purpose is to protect page meaning, feature semantics, information hierarchy, ERP task focus, Workflow / Fact boundaries, RBAC/menu truth, and regression quality.
+
+边界说明：本 skill 只负责页面可见能力、功能语义、信息层级、交互和页面回归治理；涉及 API / RBAC / schema / migration / Workflow / Fact 时，只做真实性核对和升级判断，不直接把后端实现纳入页面治理范围。若页面改动需要新增或修改后端能力，应切换到 `plush-domain-boundary-governance`，并按对应 test / security / release skill 补足验证。
 
 ## Workflow
 

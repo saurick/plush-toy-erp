@@ -55,3 +55,11 @@
 - 验证：追加前 `progress.md` 为 460 行、80274 字节，已按规则归档到 `docs/archive/progress-2026-06-22-before-project-skill-agents-rules.md`；本轮只改项目级 AGENTS / progress，不改运行时代码、schema、migration、RBAC、页面或部署脚本；已执行 `git diff --check -- AGENTS.md progress.md docs/archive/progress-2026-06-22-before-project-skill-agents-rules.md`。
 - 下一步：后续新增或维护项目 skill 时，按项目 AGENTS 和全局 AGENTS 的一致规则执行；如只改 skill 正文且职责不变，通常不需要改文档清单。
 - 阻塞/风险：本轮规则只约束后续 skill 维护，不代表已经修改任何自动 hook、CI 或真实业务流程。
+
+## 2026-06-22 页面治理与后端边界 skill 说明收口
+
+- 完成：在 `plush-page-design-governance` 开头补充边界说明，明确该 skill 只负责页面可见能力、功能语义、信息层级、交互和页面回归；涉及 API / RBAC / schema / migration / Workflow / Fact 时只做真实性核对和升级判断。
+- 完成：增强 `plush-domain-boundary-governance`，去掉 description 重复句，并补充后端实现触发词与正文边界，明确它是 schema / migration / repo / usecase / JSON-RPC / API / RBAC / transaction / idempotency / error code / Workflow-Fact boundary 的主治理入口。
+- 验证：追加前 `progress.md` 为 65 行、9295 字节，未达到归档阈值；已执行相关 skill validator 和 diff 检查。
+- 下一步：页面任务若需要新增或修改后端能力，先切到 `$plush-domain-boundary-governance`，再按 test / security / release skill 补验证。
+- 阻塞/风险：本轮只改两份 skill 和过程记录，不新增后端 skill，不改运行时代码、schema、migration、RBAC、页面、部署脚本或测试实现。
