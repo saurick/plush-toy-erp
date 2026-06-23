@@ -254,3 +254,13 @@
 - 验证：追加前 `progress.md` 为 249 行、46397 字节，未达到归档阈值；已执行 `pnpm lint`、`pnpm css`、`pnpm test`、`git diff --check`，均通过；另用 Playwright 打开销售订单新建弹窗并选择 `客户确认.docx`，附件面板文本为“客户确认.docx / 25 B / 保存后上传 / 移除”，未出现 MIME 字符串，面板 `scrollHeight=136`、`clientHeight=136`，无纵向溢出。
 - 下一步：如后续需要展示文件类型，应使用中文业务标签或图标，不直接暴露 MIME / 存储路径。
 - 阻塞/风险：本轮只改附件行展示，不改上传格式合同、后端 MIME 校验、schema、migration、RBAC、菜单、Workflow / Fact 写入边界、客户配置或附件下载 / 预览逻辑；原型当前本身不展示 MIME，本轮未改原型。
+
+## 2026-06-23 Codex skills 目录 README 入口补充
+
+- 完成：新增 `.agents/skills/README.md`，作为项目专属 Codex skills 的父目录薄入口，列出 `$plush-*` skills、主要用途和维护规则。
+- 完成：明确单个 skill 子目录仍以 `SKILL.md` 为唯一入口，不给每个 skill 包再加 README / quick reference / changelog，避免违反 skill 包最小结构。
+- 完成：补充 `使用规则 / Rules` 小节，说明 `$skill-name` 触发、多 skill 组合、项目版优先、README 与 `SKILL.md` 的边界，以及 skill 修改时的 metadata 检查。
+- 完成：补充 `常用组合 / Pairings` 短表，列出 docs/page、page/domain、review/test、runtime/release、seed/security 等常见并用场景，便于一次会话同时 `$` 多个 skill。
+- 验证：追加前 `progress.md` 为 265 行、49007 字节，未达到归档阈值；本轮只新增并补充 skill 目录 README 和过程记录，不改运行时代码、schema、migration、RBAC、页面、部署脚本或真实业务流程。
+- 下一步：后续新增、删除、重命名项目 skill 时，同步更新 `.agents/skills/README.md`。
+- 阻塞/风险：README 只做目录路由，不替代各 skill 的 `SKILL.md`、项目 `AGENTS.md`、正式 docs 或自动化校验。
