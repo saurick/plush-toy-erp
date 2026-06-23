@@ -211,7 +211,9 @@ function PurchaseReceiptItemsList({
           {
             label: '采购订单行',
             value: item.purchase_order_item_id
-              ? `关联行 ${item.purchase_order_item_id}`
+              ? item.source_line_no
+                ? `来源行 ${item.source_line_no}`
+                : '已关联采购来源行'
               : '-',
           },
           { label: '来源行号', value: optionalText(item.source_line_no) },

@@ -26,6 +26,62 @@ export function formatQuantity(value) {
   return String(Number(numeric.toFixed(4)))
 }
 
+export function quantityBySourceItemID({
+  records = [],
+  itemKey = 'sales_order_item_id',
+  cancelledStatuses = ['CANCELLED', 'canceled'],
+} = {}) {
+  const cancelledStatusSet = new Set(
+    cancelledStatuses.map((status) => String(status || '').trim())
+  )
+  const quantityByID = new Map()
+  ;(Array.isArray(records) ? records : []).forEach((record) => {
+    if (cancelledStatusSet.has(String(record?.status || '').trim())) {
+      return
+    }
+    const recordItems = Array.isArray(record?.items) ? record.items : []
+    recordItems.forEach((item) => {
+      const sourceItemID = positiveInt(item?.[itemKey])
+      if (!sourceItemID) return
+      quantityByID.set(
+        sourceItemID,
+        (quantityByID.get(sourceItemID) || 0) + decimalNumber(item?.quantity)
+      )
+    })
+  })
+  return quantityByID
+}
+
+export function buildShipmentSourceRows({
+  salesOrderItems = [],
+  shipments = [],
+} = {}) {
+  const shippedBySalesOrderItemID = quantityBySourceItemID({
+    records: shipments,
+    itemKey: 'sales_order_item_id',
+    cancelledStatuses: ['CANCELLED'],
+  })
+  return (Array.isArray(salesOrderItems) ? salesOrderItems : []).map((item) => {
+    const orderedQuantity = decimalNumber(item?.ordered_quantity)
+    const shippedQuantity = shippedBySalesOrderItemID.get(Number(item?.id)) || 0
+    const remainingQuantity = Math.max(0, orderedQuantity - shippedQuantity)
+    const lineStatus = String(item?.line_status || 'open')
+    const disabledReason =
+      lineStatus !== 'open'
+        ? '来源行已关闭'
+        : remainingQuantity <= 0
+          ? '已全部生成出货'
+          : ''
+    return {
+      ...item,
+      orderedQuantity,
+      shippedQuantity,
+      remainingQuantity,
+      disabledReason,
+    }
+  })
+}
+
 export function buildPurchaseReceiptItemParams(receiptID, values = {}) {
   return compactParams({
     receipt_id: positiveInt(receiptID),
@@ -74,8 +130,16 @@ export function buildShipmentItemParams(values = {}) {
   })
 }
 
-export function createShipmentItemFromSalesOrderItem(item, shipmentID) {
+export function createShipmentItemFromSalesOrderItem(
+  item,
+  shipmentID,
+  { quantity } = {}
+) {
   const sourceItem = item || {}
+  const nextQuantity =
+    quantity === undefined || quantity === null || quantity === ''
+      ? sourceItem.remainingQuantity || sourceItem.ordered_quantity || ''
+      : quantity
   return {
     shipment_id: shipmentID,
     sales_order_item_id: sourceItem.id,
@@ -84,7 +148,7 @@ export function createShipmentItemFromSalesOrderItem(item, shipmentID) {
     warehouse_id: undefined,
     lot_id: undefined,
     unit_id: sourceItem.unit_id,
-    quantity: sourceItem.ordered_quantity || '',
+    quantity: nextQuantity,
     note: sourceItem.product_name_snapshot
       ? `来源销售订单行：${sourceItem.product_name_snapshot}`
       : '',

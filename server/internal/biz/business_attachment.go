@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	BusinessAttachmentMaxBytes = 5 * 1024 * 1024
+	BusinessAttachmentMaxBytes = 50 * 1024 * 1024
 )
 
 const (
@@ -54,18 +54,30 @@ var allowedBusinessAttachmentOwnerTypes = map[string]struct{}{
 	BusinessAttachmentOwnerWorkflowTask:      {},
 }
 
-var allowedBusinessAttachmentMIMETypes = map[string]struct{}{
-	"application/msword":       {},
-	"application/pdf":          {},
-	"application/vnd.ms-excel": {},
-	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":       {},
-	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": {},
-	"image/gif":  {},
-	"image/jpeg": {},
-	"image/png":  {},
-	"image/webp": {},
-	"text/csv":   {},
-	"text/plain": {},
+var allowedBusinessAttachmentFileTypes = map[string]map[string]struct{}{
+	".csv":  {"text/csv": {}},
+	".doc":  {"application/msword": {}},
+	".docx": {"application/vnd.openxmlformats-officedocument.wordprocessingml.document": {}},
+	".dps":  {"application/x-wps-presentation": {}},
+	".eml":  {"message/rfc822": {}},
+	".et":   {"application/x-wps-spreadsheet": {}},
+	".gif":  {"image/gif": {}},
+	".heic": {"image/heic": {}},
+	".heif": {"image/heif": {}},
+	".jpeg": {"image/jpeg": {}},
+	".jpg":  {"image/jpeg": {}},
+	".msg":  {"application/vnd.ms-outlook": {}},
+	".pdf":  {"application/pdf": {}},
+	".png":  {"image/png": {}},
+	".txt":  {"text/plain": {}},
+	".webp": {"image/webp": {}},
+	".wps":  {"application/x-wps-writer": {}},
+	".xls":  {"application/vnd.ms-excel": {}},
+	".xlsx": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}},
+	".zip": {
+		"application/zip":              {},
+		"application/x-zip-compressed": {},
+	},
 }
 
 type BusinessAttachment struct {
@@ -234,7 +246,7 @@ func normalizeBusinessAttachmentUploadInput(in BusinessAttachmentUploadInput) (B
 	}
 
 	in.MimeType = strings.ToLower(strings.TrimSpace(in.MimeType))
-	if _, ok := allowedBusinessAttachmentMIMETypes[in.MimeType]; !ok {
+	if !isBusinessAttachmentFileTypeAllowed(in.FileName, in.MimeType) {
 		return in, ErrBusinessAttachmentMimeNotAllowed
 	}
 
@@ -256,7 +268,20 @@ func normalizeBusinessAttachmentUploadInput(in BusinessAttachmentUploadInput) (B
 	return in, nil
 }
 
+func isBusinessAttachmentFileTypeAllowed(fileName string, mimeType string) bool {
+	allowedMIMETypes, ok := allowedBusinessAttachmentFileTypes[strings.ToLower(filepath.Ext(fileName))]
+	if !ok {
+		return false
+	}
+	_, ok = allowedMIMETypes[mimeType]
+	return ok
+}
+
 func decodeBusinessAttachmentContent(raw string) ([]byte, error) {
+	return decodeBusinessAttachmentContentWithMax(raw, BusinessAttachmentMaxBytes)
+}
+
+func decodeBusinessAttachmentContentWithMax(raw string, maxBytes int) ([]byte, error) {
 	text := strings.TrimSpace(raw)
 	if text == "" {
 		return nil, ErrBusinessAttachmentContentInvalid
@@ -268,7 +293,7 @@ func decodeBusinessAttachmentContent(raw string) ([]byte, error) {
 	if err != nil || len(content) == 0 {
 		return nil, ErrBusinessAttachmentContentInvalid
 	}
-	if len(content) > BusinessAttachmentMaxBytes {
+	if maxBytes <= 0 || len(content) > maxBytes {
 		return nil, ErrBusinessAttachmentTooLarge
 	}
 	return content, nil

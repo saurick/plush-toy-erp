@@ -460,6 +460,7 @@ export default function BOMVersionsPage() {
   const [selectedVersion, setSelectedVersion] = useState(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const selectedRowKeysRef = useRef([])
+  const headerAttachmentRef = useRef(null)
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
@@ -710,6 +711,7 @@ export default function BOMVersionsPage() {
   )
 
   const openCreate = () => {
+    headerAttachmentRef.current?.clearPendingAttachments()
     setHeaderMode('create')
     headerForm.resetFields()
     headerForm.setFieldsValue({ effective_from: '', effective_to: '' })
@@ -730,6 +732,7 @@ export default function BOMVersionsPage() {
 
   const openView = async (record = selectedVersion) => {
     if (!record?.id) return
+    headerAttachmentRef.current?.clearPendingAttachments()
     const detail = (await loadDetail(record.id)) || record
     setHeaderMode('view')
     fillHeaderForm(detail)
@@ -739,6 +742,7 @@ export default function BOMVersionsPage() {
 
   const openEdit = async (record = selectedVersion) => {
     if (!record?.id) return
+    headerAttachmentRef.current?.clearPendingAttachments()
     const detail = (await loadDetail(record.id)) || record
     setHeaderMode('edit')
     fillHeaderForm(detail)
@@ -748,6 +752,7 @@ export default function BOMVersionsPage() {
 
   const openCopy = (record = selectedVersion) => {
     if (!record?.id) return
+    headerAttachmentRef.current?.clearPendingAttachments()
     const nextVersionSuggestion = suggestNextBOMVersion(
       versions,
       record.product_id
@@ -769,20 +774,32 @@ export default function BOMVersionsPage() {
     const values = await headerForm.validateFields()
     setSaving(true)
     try {
+      let savedVersion = null
       if (headerMode === 'copy') {
-        await copyBOMVersion(
+        savedVersion = await copyBOMVersion(
           buildHeaderParams(values, { source_id: activeActionVersion?.id })
         )
-        message.success('BOM 新版本已复制为草稿')
       } else if (headerMode === 'edit') {
-        await updateBOMDraft(
+        savedVersion = await updateBOMDraft(
           buildHeaderParams(values, { id: activeActionVersion?.id })
         )
-        message.success('BOM 草稿已更新')
       } else {
-        await createBOMDraft(buildHeaderParams(values))
-        message.success('BOM 草稿已创建')
+        savedVersion = await createBOMDraft(buildHeaderParams(values))
       }
+      const attachmentSaved =
+        (await headerAttachmentRef.current?.flushPendingAttachments(
+          savedVersion?.id
+        )) !== false
+      message.success(
+        attachmentSaved
+          ? headerMode === 'copy'
+            ? 'BOM 新版本已复制为草稿'
+            : headerMode === 'edit'
+              ? 'BOM 草稿已更新'
+              : 'BOM 草稿已创建'
+          : 'BOM 草稿已保存，未上传的附件请重新选择'
+      )
+      headerAttachmentRef.current?.clearPendingAttachments()
       setHeaderModalOpen(false)
       await loadVersions()
     } catch (error) {
@@ -1362,7 +1379,10 @@ export default function BOMVersionsPage() {
         cancelText="取消"
         confirmLoading={saving || detailLoading}
         onOk={saveHeader}
-        onCancel={() => setHeaderModalOpen(false)}
+        onCancel={() => {
+          headerAttachmentRef.current?.clearPendingAttachments()
+          setHeaderModalOpen(false)
+        }}
         footer={
           headerMode === 'view' ? (
             <Button onClick={() => setHeaderModalOpen(false)}>关闭</Button>
@@ -1392,11 +1412,16 @@ export default function BOMVersionsPage() {
           />
         </Form>
         <BusinessAttachmentPanel
+          ref={headerAttachmentRef}
           ownerType="bom_header"
-          ownerId={selectedVersion?.id}
+          ownerId={
+            headerMode === 'edit' || headerMode === 'view'
+              ? activeActionVersion?.id || selectedVersion?.id
+              : undefined
+          }
           title="BOM 附件"
           description="上传色卡、SOP、工艺图片或材料清单来源文件；附件不写库存、采购或成本事实。"
-          canUpload={canCreate || canUpdate}
+          canUpload={headerMode !== 'view' && (canCreate || canUpdate)}
           canDelete={canUpdate}
           variant="inline"
         />

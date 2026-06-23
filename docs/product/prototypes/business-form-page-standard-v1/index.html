@@ -377,12 +377,25 @@
       }
 
       .attachment-file {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
         border: 1px solid var(--line);
         border-radius: 999px;
         background: var(--panel-soft);
         color: var(--muted);
         font-size: 12px;
         padding: 4px 8px;
+      }
+
+      .attachment-file button {
+        min-height: 24px;
+        border: 0;
+        border-radius: 6px;
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-size: 12px;
+        padding: 2px 7px;
       }
 
       .attachment-file.empty {
@@ -797,12 +810,16 @@
                       <div class="attachment-row">
                         <div>
                           <label for="attachment">附件上传</label>
-                          <small>保存后可上传图纸、合同、确认截图；附件只作为证据，不改变业务事实。</small>
+                          <small>可先选择图纸、合同、确认截图、资料包或邮件证据；单个附件 50MB 内，保存成功后自动上传并绑定，PNG / JPG / WEBP / GIF / PDF 可轻量预览，其他格式下载后查看。</small>
                         </div>
-                        <button class="btn" id="attachment" type="button">上传附件</button>
+                        <button class="btn" id="attachment" type="button">选择附件</button>
                       </div>
                       <div class="attachment-files">
-                        <span class="attachment-file" id="attachmentFile">blue-hanger-spec-v3.pdf</span>
+                        <span class="attachment-file" id="attachmentFile">
+                          blue-hanger-spec-v3.pdf
+                          <button type="button">预览</button>
+                          <button type="button">下载</button>
+                        </span>
                       </div>
                     </div>
                     <div class="field" style="grid-column: 1 / -1">

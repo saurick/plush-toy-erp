@@ -10,6 +10,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons'
 import {
+  Alert,
   Button,
   Dropdown,
   Form,
@@ -17,8 +18,10 @@ import {
   Modal,
   Select,
   Space,
+  Table,
   Tag,
   Tooltip,
+  Typography,
 } from 'antd'
 import {
   useNavigate,
@@ -64,7 +67,10 @@ import {
   savePurchaseOrderWithItems,
   submitPurchaseOrder,
 } from '../api/masterDataOrderApi.mjs'
-import { createPurchaseReceiptFromPurchaseOrder } from '../api/purchaseApi.mjs'
+import {
+  createPurchaseReceiptFromPurchaseOrder,
+  listPurchaseReceipts,
+} from '../api/purchaseApi.mjs'
 import { listInventoryLots } from '../api/inventoryApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
@@ -110,6 +116,9 @@ import {
   routeWithQuery,
   searchParamPositiveIntText,
 } from '../utils/routeQuery.mjs'
+import { decimalNumber, formatQuantity } from '../utils/businessLineItems.mjs'
+
+const { Text } = Typography
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -275,6 +284,57 @@ function workflowPayloadOf(task = {}) {
   return task.payload && typeof task.payload === 'object' ? task.payload : {}
 }
 
+function referenceName(options, id, fallbackLabel = '记录') {
+  const option = (Array.isArray(options) ? options : []).find(
+    (item) => String(item.value) === String(id)
+  )
+  return option?.label || (id ? `${fallbackLabel} #${id}` : '-')
+}
+
+function buildInboundDraftPreviewRows({
+  orderItems = [],
+  receipts = [],
+  materialOptions = [],
+  unitOptions = [],
+}) {
+  const receivedByOrderItemID = new Map()
+  receipts
+    .filter((receipt) => String(receipt?.status || '') !== 'CANCELLED')
+    .forEach((receipt) => {
+      (receipt?.items || []).forEach((item) => {
+        const sourceItemID = Number(item?.purchase_order_item_id || 0)
+        if (!sourceItemID) return
+        const current = receivedByOrderItemID.get(sourceItemID) || 0
+        receivedByOrderItemID.set(
+          sourceItemID,
+          current + decimalNumber(item?.quantity)
+        )
+      })
+    })
+
+  return orderItems
+    .filter((item) => String(item?.line_status || 'open') === 'open')
+    .map((item) => {
+      const purchasedQuantity = decimalNumber(item?.purchased_quantity)
+      const receivedQuantity = receivedByOrderItemID.get(Number(item?.id)) || 0
+      const remainingQuantity = Math.max(
+        0,
+        purchasedQuantity - receivedQuantity
+      )
+      const disabledReason = remainingQuantity <= 0 ? '已全部生成入库' : ''
+      return {
+        key: item.id || item.line_no,
+        lineNo: item.line_no,
+        material: referenceName(materialOptions, item.material_id, '材料'),
+        unit: referenceName(unitOptions, item.unit_id, '单位'),
+        purchasedQuantity,
+        receivedQuantity,
+        remainingQuantity,
+        disabledReason,
+      }
+    })
+}
+
 export default function V1PurchaseOrdersPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
@@ -309,6 +369,9 @@ export default function V1PurchaseOrdersPage() {
   const [saving, setSaving] = useState(false)
   const [printingContract, setPrintingContract] = useState(false)
   const [generatingInboundDraft, setGeneratingInboundDraft] = useState(false)
+  const [inboundDraftPreviewLoading, setInboundDraftPreviewLoading] =
+    useState(false)
+  const [inboundDraftPreviewRows, setInboundDraftPreviewRows] = useState([])
   const [workflowTasks, setWorkflowTasks] = useState([])
   const [orders, setOrders] = useState([])
   const [total, setTotal] = useState(0)
@@ -333,6 +396,7 @@ export default function V1PurchaseOrdersPage() {
   const [editingOrder, setEditingOrder] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [inboundDraftModalOpen, setInboundDraftModalOpen] = useState(false)
+  const orderAttachmentRef = useRef(null)
   const routePurchaseOrderID = searchParamPositiveIntText(
     searchParams,
     'purchase_order_id'
@@ -488,6 +552,7 @@ export default function V1PurchaseOrdersPage() {
   }, [outletContext, refreshPageData])
 
   const openCreateModal = () => {
+    orderAttachmentRef.current?.clearPendingAttachments()
     setEditingOrder(null)
     form.setFieldsValue({
       purchase_order_no: buildSequentialDraftCode(orders, {
@@ -505,6 +570,7 @@ export default function V1PurchaseOrdersPage() {
   }
 
   const openEditModal = async (record) => {
+    orderAttachmentRef.current?.clearPendingAttachments()
     const lines = await loadOrderItems(record)
     setEditingOrder(record)
     form.setFieldsValue({
@@ -569,13 +635,22 @@ export default function V1PurchaseOrdersPage() {
       setSaving(true)
       const result = await savePurchaseOrderWithItems(params)
       const saved = result?.purchase_order
+      const attachmentSaved =
+        (await orderAttachmentRef.current?.flushPendingAttachments(
+          saved?.id
+        )) !== false
       if (saved) {
         setSelectedOrder(saved)
         applySelectedRowKeys([saved.id])
         await loadOrderItems(saved)
       }
+      orderAttachmentRef.current?.clearPendingAttachments()
       setModalOpen(false)
-      message.success('采购订单已保存')
+      message.success(
+        attachmentSaved
+          ? '采购订单已保存'
+          : '采购订单已保存，未上传的附件请重新选择'
+      )
       await loadOrders()
     } catch (error) {
       if (error?.errorFields) return
@@ -707,10 +782,11 @@ export default function V1PurchaseOrdersPage() {
     }
   }
 
-  const openInboundDraftModal = (record) => {
+  const openInboundDraftModal = async (record) => {
     if (!record) {
       return
     }
+    setInboundDraftPreviewRows([])
     inboundDraftForm.setFieldsValue({
       receipt_no: `IN-${record.purchase_order_no || record.id}`,
       warehouse_id: undefined,
@@ -718,6 +794,32 @@ export default function V1PurchaseOrdersPage() {
       note: `来源采购订单 ${record.purchase_order_no || record.id}`,
     })
     setInboundDraftModalOpen(true)
+    setInboundDraftPreviewLoading(true)
+    try {
+      const [orderItems, receiptData] = await Promise.all([
+        loadOrderItems(record),
+        listPurchaseReceipts({
+          purchase_order_id: record.id,
+          limit: 200,
+        }),
+      ])
+      setInboundDraftPreviewRows(
+        buildInboundDraftPreviewRows({
+          orderItems,
+          receipts: receiptData?.purchase_receipts || [],
+          materialOptions: materials.map((item) => ({
+            value: item.id,
+            label: item.name || item.code || `材料 #${item.id}`,
+          })),
+          unitOptions,
+        })
+      )
+    } catch (error) {
+      setInboundDraftPreviewRows([])
+      message.warning(getActionErrorMessage(error, '加载采购来源明细失败'))
+    } finally {
+      setInboundDraftPreviewLoading(false)
+    }
   }
 
   const createInboundDraftFromOrder = async () => {
@@ -751,11 +853,15 @@ export default function V1PurchaseOrdersPage() {
   }
 
   const resolveSupplierName = useCallback(
-    (record = {}) =>
-      record?.supplier_snapshot?.name ||
-      suppliers.find((item) => item.id === record.supplier_id)?.name ||
-      record.supplier_id ||
-      '未指定供应商',
+    (record = {}) => {
+      const source = record || {}
+      return (
+        source?.supplier_snapshot?.name ||
+        suppliers.find((item) => item.id === source.supplier_id)?.name ||
+        source.supplier_id ||
+        '未指定供应商'
+      )
+    },
     [suppliers]
   )
 
@@ -955,6 +1061,70 @@ export default function V1PurchaseOrdersPage() {
   const canGenerateInboundDraft =
     canCreatePurchaseReceipt &&
     singleSelectedOrder?.lifecycle_status === 'approved'
+  const hasInboundDraftRemaining = inboundDraftPreviewRows.some(
+    (row) => row.remainingQuantity > 0
+  )
+  const inboundDraftPreviewColumns = useMemo(
+    () => [
+      {
+        title: '来源行',
+        dataIndex: 'lineNo',
+        width: 88,
+        render: (value) => value || '-',
+      },
+      {
+        title: '材料',
+        dataIndex: 'material',
+        width: 180,
+      },
+      {
+        title: '采购数量',
+        dataIndex: 'purchasedQuantity',
+        width: 110,
+        render: (value, row) => `${formatQuantity(value)} ${row.unit}`,
+      },
+      {
+        title: '已入库',
+        dataIndex: 'receivedQuantity',
+        width: 110,
+        render: (value, row) => `${formatQuantity(value)} ${row.unit}`,
+      },
+      {
+        title: '剩余数量',
+        dataIndex: 'remainingQuantity',
+        width: 110,
+        render: (value, row) => {
+          const text = `${formatQuantity(value)} ${row.unit}`
+          return value > 0 ? (
+            <Text strong>{text}</Text>
+          ) : (
+            <Text type="secondary">{text}</Text>
+          )
+        },
+      },
+      {
+        title: '本次生成',
+        key: 'nextInbound',
+        width: 120,
+        render: (_, row) =>
+          row.remainingQuantity > 0 ? (
+            <Tag color="blue">
+              {`${formatQuantity(row.remainingQuantity)} ${row.unit}`}
+            </Tag>
+          ) : (
+            <Tag>不生成</Tag>
+          ),
+      },
+      {
+        title: '不可生成原因',
+        dataIndex: 'disabledReason',
+        width: 140,
+        render: (value) =>
+          value ? <Text type="secondary">{value}</Text> : '可生成',
+      },
+    ],
+    []
+  )
   const relatedMenuItems = [
     { key: 'order-items', label: '采购订单明细' },
     { key: 'purchase-receipts', label: '采购入库' },
@@ -1326,7 +1496,10 @@ export default function V1PurchaseOrdersPage() {
         okText="保存"
         confirmLoading={saving || itemsLoading}
         onOk={handleSave}
-        onCancel={() => setModalOpen(false)}
+        onCancel={() => {
+          orderAttachmentRef.current?.clearPendingAttachments()
+          setModalOpen(false)
+        }}
         destroyOnHidden
         forceRender
       >
@@ -1339,6 +1512,7 @@ export default function V1PurchaseOrdersPage() {
           onMaterialChange={handleMaterialChange}
           attachmentPanel={
             <BusinessAttachmentPanel
+              ref={orderAttachmentRef}
               ownerType="purchase_order"
               ownerId={editingOrder?.id}
               title="采购附件"
@@ -1354,17 +1528,64 @@ export default function V1PurchaseOrdersPage() {
         title="生成采购入库草稿"
         open={inboundDraftModalOpen}
         centered
-        width={520}
+        width={920}
         okText="生成草稿"
         cancelText="取消"
         confirmLoading={generatingInboundDraft}
+        okButtonProps={{
+          disabled: inboundDraftPreviewLoading || !hasInboundDraftRemaining,
+        }}
         onOk={createInboundDraftFromOrder}
-        onCancel={() => setInboundDraftModalOpen(false)}
+        onCancel={() => {
+          setInboundDraftModalOpen(false)
+          setInboundDraftPreviewRows([])
+        }}
       >
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Alert
+            showIcon
+            type={
+              inboundDraftPreviewLoading || hasInboundDraftRemaining
+                ? 'info'
+                : 'warning'
+            }
+            message={
+              inboundDraftPreviewLoading
+                ? '正在加载采购订单来源明细'
+                : hasInboundDraftRemaining
+                  ? '将按采购订单剩余数量生成入库草稿'
+                  : '当前采购订单没有可生成的剩余明细'
+            }
+            description={
+              <Space direction="vertical" size={2}>
+                <Text>
+                  {`来源采购订单：${
+                    singleSelectedOrder?.purchase_order_no ||
+                    singleSelectedOrder?.id ||
+                    '-'
+                  }；供应商：${resolveSupplierName(singleSelectedOrder)}`}
+                </Text>
+                <Text type="secondary">
+                  下方只是生成前预览；后端会在保存时按采购订单状态、来源行和剩余数量重新校验，不由前端直接写库存事实。
+                </Text>
+              </Space>
+            }
+          />
+          <Table
+            aria-label="采购订单生成入库来源明细"
+            columns={inboundDraftPreviewColumns}
+            dataSource={inboundDraftPreviewRows}
+            loading={inboundDraftPreviewLoading}
+            pagination={false}
+            scroll={{ x: 760 }}
+            size="small"
+          />
+        </Space>
         <Form
           form={inboundDraftForm}
           layout="vertical"
           className="erp-business-form"
+          style={{ marginTop: 16 }}
         >
           <Form.Item
             name="receipt_no"

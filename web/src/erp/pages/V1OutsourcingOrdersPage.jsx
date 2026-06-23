@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -275,6 +275,7 @@ export default function V1OutsourcingOrdersPage() {
   const [selectedRow, setSelectedRow] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingRow, setEditingRow] = useState(null)
+  const orderAttachmentRef = useRef(null)
   const [suppliers, setSuppliers] = useState([])
   const [products, setProducts] = useState([])
   const [processes, setProcesses] = useState([])
@@ -317,6 +318,11 @@ export default function V1OutsourcingOrdersPage() {
       units.map((item) => ({
         value: item.id,
         label: unitLabel(item),
+        precision:
+          Number.isInteger(Number(item.precision)) &&
+          Number(item.precision) >= 0
+            ? Number(item.precision)
+            : undefined,
         item,
       })),
     [units]
@@ -421,6 +427,7 @@ export default function V1OutsourcingOrdersPage() {
   )
 
   const openCreate = () => {
+    orderAttachmentRef.current?.clearPendingAttachments()
     setEditingRow(null)
     form.setFieldsValue({
       outsourcing_order_no: buildSequentialDraftCode(rows, {
@@ -439,6 +446,7 @@ export default function V1OutsourcingOrdersPage() {
 
   const openEdit = async (record) => {
     if (!record) return
+    orderAttachmentRef.current?.clearPendingAttachments()
     setSaving(true)
     try {
       const items = await loadOrderItems(record)
@@ -461,6 +469,7 @@ export default function V1OutsourcingOrdersPage() {
   }
 
   const closeModal = () => {
+    orderAttachmentRef.current?.clearPendingAttachments()
     setModalOpen(false)
     setEditingRow(null)
     form.resetFields()
@@ -554,8 +563,18 @@ export default function V1OutsourcingOrdersPage() {
       )
       const saved = await saveOutsourcingOrderWithItems(payload)
       const savedOrder = saved?.outsourcing_order || null
+      const attachmentSaved =
+        (await orderAttachmentRef.current?.flushPendingAttachments(
+          savedOrder?.id
+        )) !== false
       setSelectedRow(savedOrder)
-      message.success(editingRow ? '加工合同已更新' : '加工合同已创建')
+      message.success(
+        attachmentSaved
+          ? editingRow
+            ? '加工合同已更新'
+            : '加工合同已创建'
+          : '加工合同已保存，未上传的附件请重新选择'
+      )
       closeModal()
       await Promise.all([loadOrders(), loadWorkflowTasks()])
     } catch (error) {
@@ -1208,6 +1227,7 @@ export default function V1OutsourcingOrdersPage() {
           onUnitChange={handleUnitChange}
           attachmentPanel={
             <BusinessAttachmentPanel
+              ref={orderAttachmentRef}
               ownerType="outsourcing_order"
               ownerId={editingRow?.id}
               title="加工合同附件"

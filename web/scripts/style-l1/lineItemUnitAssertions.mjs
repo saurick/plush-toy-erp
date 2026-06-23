@@ -1,0 +1,425 @@
+export function createLineItemUnitAssertions({ assert }) {
+  const assertLineQuantityUnitSuffix = async (
+    modal,
+    { label, expectedText, scenarioName }
+  ) => {
+    let metrics = null
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      metrics = await modal.evaluate(
+        (node, args) => {
+          const isVisible = (element) => {
+            if (!(element instanceof HTMLElement)) return false
+            const rect = element.getBoundingClientRect()
+            const style = window.getComputedStyle(element)
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style.display !== 'none' &&
+              style.visibility !== 'hidden'
+            )
+          }
+          const field = Array.from(
+            node.querySelectorAll('.ant-form-item')
+          ).find((item) => {
+            const labelText =
+              item
+                .querySelector('.ant-form-item-label label')
+                ?.textContent?.replace(/\s+/g, ' ')
+                .trim() || ''
+            const itemText = item.textContent?.replace(/\s+/g, ' ').trim() || ''
+            return (
+              (labelText.includes(args.label) ||
+                itemText.includes(args.label)) &&
+              item.querySelector('.erp-item-field-with-unit')
+            )
+          })
+          const wrapper = field?.querySelector('.erp-item-field-with-unit')
+          const suffix = field?.querySelector('.erp-item-field-unit-suffix')
+          const input = wrapper?.querySelector(
+            '.ant-input:not(.erp-item-field-unit-suffix), .ant-input-number'
+          )
+          const fieldRect = field?.getBoundingClientRect()
+          const wrapperRect = wrapper?.getBoundingClientRect()
+          const inputRect = input?.getBoundingClientRect()
+          const suffixRect = suffix?.getBoundingClientRect()
+          return {
+            label: args.label,
+            expectedText: args.expectedText,
+            hasField: Boolean(field),
+            unitWrapperCount: node.querySelectorAll('.erp-item-field-with-unit')
+              .length,
+            unitSuffixCount: node.querySelectorAll(
+              '.erp-item-field-unit-suffix'
+            ).length,
+            fieldVisible: isVisible(field),
+            wrapperVisible: isVisible(wrapper),
+            inputVisible: isVisible(input),
+            suffixVisible: isVisible(suffix),
+            suffixValue: suffix?.value || '',
+            suffixAria: suffix?.getAttribute('aria-label') || '',
+            fieldClientWidth: field?.clientWidth || 0,
+            fieldScrollWidth: field?.scrollWidth || 0,
+            fieldWidth: fieldRect?.width || 0,
+            wrapperWidth: wrapperRect?.width || 0,
+            inputWidth: inputRect?.width || 0,
+            suffixWidth: suffixRect?.width || 0,
+            inputRight: inputRect?.right || 0,
+            suffixLeft: suffixRect?.left || 0,
+            suffixRight: suffixRect?.right || 0,
+            wrapperRight: wrapperRect?.right || 0,
+          }
+        },
+        { label, expectedText }
+      )
+      if (
+        metrics.hasField &&
+        metrics.fieldVisible &&
+        metrics.wrapperVisible &&
+        metrics.inputVisible &&
+        metrics.suffixVisible
+      ) {
+        break
+      }
+      await new Promise((resolve) => {
+        setTimeout(resolve, 100)
+      })
+    }
+    assert(
+      metrics.hasField &&
+        metrics.fieldVisible &&
+        metrics.wrapperVisible &&
+        metrics.inputVisible &&
+        metrics.suffixVisible,
+      `${scenarioName} ${label} 应显示单位后缀: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.suffixValue,
+      expectedText,
+      `${scenarioName} ${label} 单位后缀应显示可读单位而不是裸 ID: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert.equal(
+      metrics.suffixAria,
+      `单位 ${expectedText}`,
+      `${scenarioName} ${label} 单位后缀缺少可访问名称: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      metrics.inputWidth >= 96 &&
+        metrics.suffixWidth >= 48 &&
+        metrics.suffixLeft >= metrics.inputRight - 1 &&
+        metrics.suffixRight <= metrics.wrapperRight + 1,
+      `${scenarioName} ${label} 单位后缀挤压或错位: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.fieldScrollWidth <= metrics.fieldClientWidth + 1,
+      `${scenarioName} ${label} 单位后缀造成字段横向溢出: ${JSON.stringify(
+        metrics
+      )}`
+    )
+  }
+
+  const assertLineSourceSummaryReadableUnit = async (
+    modal,
+    { label, expectedText, scenarioName }
+  ) => {
+    const metrics = await modal.evaluate(
+      (node, args) => {
+        const fields = Array.from(node.querySelectorAll('.ant-form-item'))
+          .filter((item) => {
+            const labelText =
+              item
+                .querySelector('.ant-form-item-label label')
+                ?.textContent?.replace(/\s+/g, ' ')
+                .trim() || ''
+            return labelText.includes(args.label)
+          })
+          .map((item) => ({
+            value: item.querySelector('input')?.value || '',
+          }))
+        return {
+          label: args.label,
+          expectedText: args.expectedText,
+          fieldCount: fields.length,
+          values: fields.map((field) => field.value),
+        }
+      },
+      { label, expectedText }
+    )
+    assert(
+      metrics.fieldCount > 0 &&
+        metrics.values.some((value) => value.includes(expectedText)),
+      `${scenarioName} ${label} 应显示可读单位: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.values.every((value) => !/单位\s*#\d+/.test(value)),
+      `${scenarioName} ${label} 不应显示裸单位 ID: ${JSON.stringify(metrics)}`
+    )
+  }
+
+  const assertLineAmountCalculation = async (
+    modal,
+    {
+      quantityLabel,
+      unitPriceLabel,
+      amountLabel,
+      quantity,
+      unitPrice,
+      expected,
+      scenarioName,
+    }
+  ) => {
+    const inputForLabel = (label) =>
+      modal
+        .locator('.ant-form-item')
+        .filter({ hasText: label })
+        .locator('input:not(.erp-item-field-unit-suffix)')
+        .first()
+
+    await inputForLabel(quantityLabel).fill(quantity)
+    await inputForLabel(unitPriceLabel).fill(unitPrice)
+
+    let metrics = null
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      metrics = await modal.evaluate(
+        (node, args) => {
+          const field = Array.from(
+            node.querySelectorAll('.ant-form-item')
+          ).find((item) => {
+            const labelText =
+              item
+                .querySelector('.ant-form-item-label label')
+                ?.textContent?.replace(/\s+/g, ' ')
+                .trim() || ''
+            return labelText.includes(args.amountLabel)
+          })
+          const input = field?.querySelector(
+            'input:not(.erp-item-field-unit-suffix)'
+          )
+          const fieldRect = field?.getBoundingClientRect()
+          return {
+            amountLabel: args.amountLabel,
+            expected: args.expected,
+            hasField: Boolean(field),
+            fieldVisible: Boolean(
+              fieldRect && fieldRect.width > 0 && fieldRect.height > 0
+            ),
+            inputValue: input?.value || '',
+            inputDisabled: Boolean(input?.disabled),
+            inputReadOnly: Boolean(input?.readOnly),
+          }
+        },
+        { amountLabel, expected }
+      )
+      if (metrics.inputValue === expected) {
+        break
+      }
+      await new Promise((resolve) => {
+        setTimeout(resolve, 100)
+      })
+    }
+
+    assert(
+      metrics.hasField && metrics.fieldVisible,
+      `${scenarioName} ${amountLabel} 字段应可见: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.inputValue,
+      expected,
+      `${scenarioName} ${amountLabel} 应按数量和单价计算: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.inputDisabled || metrics.inputReadOnly,
+      `${scenarioName} ${amountLabel} 应保持自动计算只读: ${JSON.stringify(metrics)}`
+    )
+  }
+
+  const assertLineQuantityPrecisionBlocksAmount = async (
+    modal,
+    {
+      quantityLabel,
+      unitPriceLabel,
+      amountLabel,
+      quantity,
+      unitPrice,
+      expectedErrorText,
+      scenarioName,
+    }
+  ) => {
+    const inputForLabel = (label) =>
+      modal
+        .locator('.ant-form-item')
+        .filter({ hasText: label })
+        .locator('input:not(.erp-item-field-unit-suffix)')
+        .first()
+
+    await inputForLabel(quantityLabel).fill(quantity)
+    await inputForLabel(unitPriceLabel).fill(unitPrice)
+    await modal
+      .locator('.ant-form-item-explain-error', { hasText: expectedErrorText })
+      .first()
+      .waitFor({ state: 'visible', timeout: 5_000 })
+
+    const metrics = await modal.evaluate(
+      (node, args) => {
+        const fields = Array.from(node.querySelectorAll('.ant-form-item'))
+        const amountField = fields.find((item) => {
+          const labelText =
+            item
+              .querySelector('.ant-form-item-label label')
+              ?.textContent?.replace(/\s+/g, ' ')
+              .trim() || ''
+          return labelText.includes(args.amountLabel)
+        })
+        const amountInput = amountField?.querySelector(
+          'input:not(.erp-item-field-unit-suffix)'
+        )
+        return {
+          amountLabel: args.amountLabel,
+          amountValue: amountInput?.value || '',
+          visibleErrors: fields
+            .flatMap((item) =>
+              Array.from(item.querySelectorAll('.ant-form-item-explain-error'))
+            )
+            .map((item) => item.textContent?.replace(/\s+/g, ' ').trim())
+            .filter(Boolean),
+        }
+      },
+      { amountLabel }
+    )
+
+    assert.equal(
+      metrics.amountValue,
+      '',
+      `${scenarioName} 数量精度非法时不应继续显示金额: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      metrics.visibleErrors.includes(expectedErrorText),
+      `${scenarioName} 应显示单位精度错误: ${JSON.stringify(metrics)}`
+    )
+  }
+
+  const assertLineItemFieldLayout = async (
+    modal,
+    { scenarioName, visibleThroughLabel, absentLabels = [], maxRowWidth = 2200 }
+  ) => {
+    const metrics = await modal.evaluate(
+      (node, args) => {
+        const isVisible = (element) => {
+          if (!(element instanceof HTMLElement)) return false
+          const rect = element.getBoundingClientRect()
+          const style = window.getComputedStyle(element)
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== 'none' &&
+            style.visibility !== 'hidden'
+          )
+        }
+        const list = node.querySelector('.erp-sales-order-lines-form__list')
+        const row = node.querySelector('.erp-sales-order-lines-form__row')
+        const grid = node.querySelector('.erp-sales-order-lines-form__grid')
+        const listRect = list?.getBoundingClientRect()
+        const rowRect = row?.getBoundingClientRect()
+        const fields = Array.from(
+          grid?.querySelectorAll(':scope > .ant-form-item') || []
+        )
+          .filter(isVisible)
+          .map((item) => {
+            const label =
+              item
+                .querySelector('.ant-form-item-label label')
+                ?.textContent?.replace(/\s+/g, ' ')
+                .trim() || ''
+            const input = item.querySelector(
+              'input:not([type="hidden"]), textarea'
+            )
+            const suffix = item.querySelector('.erp-item-field-unit-suffix')
+            const rect = item.getBoundingClientRect()
+            return {
+              label,
+              width: Math.round(rect.width),
+              inputClientWidth: input?.clientWidth || 0,
+              inputScrollWidth: input?.scrollWidth || 0,
+              suffixValue: suffix?.value || '',
+              suffixWidth: Math.round(
+                suffix?.getBoundingClientRect().width || 0
+              ),
+              fullyInViewport: rect.right <= (listRect?.right || 0) + 1,
+            }
+          })
+        const visibleText = node.textContent?.replace(/\s+/g, ' ').trim() || ''
+        return {
+          visibleThroughLabel: args.visibleThroughLabel,
+          absentLabels: args.absentLabels,
+          rowWidth: Math.round(rowRect?.width || 0),
+          listClientWidth: list?.clientWidth || 0,
+          listScrollWidth: list?.scrollWidth || 0,
+          fields,
+          visibleText,
+        }
+      },
+      { visibleThroughLabel, absentLabels }
+    )
+    assert(
+      metrics.rowWidth > 0 && metrics.rowWidth <= maxRowWidth,
+      `${scenarioName} 明细行宽度不合理: ${JSON.stringify(metrics)}`
+    )
+    const throughIndex = metrics.fields.findIndex(
+      (field) => field.label === visibleThroughLabel
+    )
+    assert(
+      throughIndex >= 0,
+      `${scenarioName} 未找到首屏目标字段 ${visibleThroughLabel}: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    const clippedFields = metrics.fields
+      .slice(0, throughIndex + 1)
+      .filter((field) => !field.fullyInViewport)
+    assert.deepEqual(
+      clippedFields,
+      [],
+      `${scenarioName} 行号到 ${visibleThroughLabel} 应在首屏完整可见: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    const narrowQuantityFields = metrics.fields.filter(
+      (field) =>
+        field.label.includes('数量') &&
+        field.suffixValue &&
+        field.inputClientWidth < 112
+    )
+    assert.deepEqual(
+      narrowQuantityFields,
+      [],
+      `${scenarioName} 带单位数量输入本体过窄: ${JSON.stringify(metrics)}`
+    )
+    const leakedLabels = absentLabels.filter((label) =>
+      metrics.visibleText.includes(label)
+    )
+    assert.deepEqual(
+      leakedLabels,
+      [],
+      `${scenarioName} 不应继续展示重复快照字段: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      !metrics.visibleText.includes('核心演示单位'),
+      `${scenarioName} 不应在明细行展示演示单位长文案: ${JSON.stringify(
+        metrics
+      )}`
+    )
+  }
+
+  return {
+    assertLineItemFieldLayout,
+    assertLineAmountCalculation,
+    assertLineQuantityPrecisionBlocksAmount,
+    assertLineQuantityUnitSuffix,
+    assertLineSourceSummaryReadableUnit,
+  }
+}

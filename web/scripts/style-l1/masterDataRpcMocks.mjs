@@ -137,8 +137,8 @@ export async function installMasterDataRpcMocks(page, context) {
     ]
     const unit = {
       id: 1,
-      code: 'PCS',
-      name: '只',
+      code: 'SIM-PLUSH-CORE-PCS',
+      name: '核心演示单位-件',
       precision: 0,
       is_active: true,
       created_at: nowUnix(),

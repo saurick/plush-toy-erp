@@ -3,6 +3,12 @@ import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { Button, Form, Input, InputNumber, Select } from 'antd'
 
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import FieldWithUnitSuffix, {
+  isQuantityTextWithinUnitPrecision,
+  unitPrecisionErrorMessage,
+  unitPrecisionFromOptions,
+  unitSuffixTextFromOptions,
+} from '../business-list/FieldWithUnitSuffix.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
 import {
   dateInputNotAfterRule,
@@ -64,6 +70,18 @@ function supplierLabel(supplier = {}) {
 
 function materialLabel(material = {}) {
   return [material.code, material.name].filter(Boolean).join(' / ')
+}
+
+function quantityPrecisionRule({ form, fieldName, unitOptions }) {
+  return {
+    validator: async (_, value) => {
+      const line = form.getFieldValue(['items', fieldName]) || {}
+      const precision = unitPrecisionFromOptions(unitOptions, line.unit_id)
+      if (!isQuantityTextWithinUnitPrecision(value, precision)) {
+        throw new Error(unitPrecisionErrorMessage(precision))
+      }
+    },
+  }
 }
 
 export function createBlankPurchaseLine(lineNo = 1) {
@@ -293,12 +311,26 @@ export function PurchaseOrderFormFields({
                 emptyDescription="暂无可导入材料"
                 onCancel={() => setMaterialImportOpen(false)}
                 onImport={(selectedMaterials) => {
-                  let nextLineNo = getNextLineNo(
-                    form.getFieldValue('items') || []
-                  )
-                  selectedMaterials.forEach((material) => {
-                    add(createLineFromMaterial(material, nextLineNo))
+                  const currentLines = form.getFieldValue('items') || []
+                  let nextLineNo = getNextLineNo(currentLines)
+                  const startIndex = currentLines.length
+                  const importedLines = selectedMaterials.map((material) => {
+                    const line = createLineFromMaterial(material, nextLineNo)
                     nextLineNo += 1
+                    return line
+                  })
+                  importedLines.forEach(() => {
+                    add()
+                  })
+                  window.setTimeout(() => {
+                    form.setFields(
+                      importedLines.flatMap((line, index) =>
+                        Object.entries(line).map(([key, value]) => ({
+                          name: ['items', startIndex + index, key],
+                          value,
+                        }))
+                      )
+                    )
                   })
                   setMaterialImportOpen(false)
                 }}
@@ -332,6 +364,7 @@ export function PurchaseOrderFormFields({
                         <Input />
                       </Form.Item>
                       <Form.Item
+                        className="erp-line-item-field erp-line-item-field--line-no"
                         name={[field.name, 'line_no']}
                         label="行号"
                         rules={[{ required: true, message: '请输入行号' }]}
@@ -343,6 +376,7 @@ export function PurchaseOrderFormFields({
                         />
                       </Form.Item>
                       <Form.Item
+                        className="erp-line-item-field erp-line-item-field--source"
                         name={[field.name, 'material_id']}
                         label="材料"
                         rules={[{ required: true, message: '请选择材料' }]}
@@ -357,50 +391,84 @@ export function PurchaseOrderFormFields({
                         />
                       </Form.Item>
                       <Form.Item
+                        className="erp-line-item-field erp-line-item-field--unit"
                         name={[field.name, 'unit_id']}
                         label="单位"
                         rules={[{ required: true, message: '请选择单位' }]}
                       >
                         <Select
                           allowClear
-                          optionFilterProp="label"
+                          optionFilterProp="searchText"
                           options={unitOptions}
                           placeholder="请选择单位"
                           showSearch
+                          onChange={() => {
+                            form
+                              .validateFields([
+                                ['items', field.name, 'purchased_quantity'],
+                              ])
+                              .catch(() => {})
+                          }}
                         />
                       </Form.Item>
                       <Form.Item
+                        className="erp-line-item-field erp-line-item-field--snapshot-code"
                         name={[field.name, 'material_code_snapshot']}
                         label="材料编码快照"
                       >
                         <Input maxLength={64} />
                       </Form.Item>
                       <Form.Item
+                        className="erp-line-item-field erp-line-item-field--snapshot-name"
                         name={[field.name, 'material_name_snapshot']}
                         label="材料名称快照"
                       >
                         <Input maxLength={255} />
                       </Form.Item>
                       <Form.Item
+                        className="erp-line-item-field erp-line-item-field--snapshot-small"
                         name={[field.name, 'color_snapshot']}
                         label="颜色快照"
                       >
                         <Input maxLength={64} />
                       </Form.Item>
                       <Form.Item
+                        className="erp-line-item-field erp-line-item-field--quantity"
                         name={[field.name, 'purchased_quantity']}
                         label="采购数量"
-                        rules={[{ required: true, message: '请输入采购数量' }]}
+                        rules={[
+                          { required: true, message: '请输入采购数量' },
+                          quantityPrecisionRule({
+                            form,
+                            fieldName: field.name,
+                            unitOptions,
+                          }),
+                        ]}
+                      >
+                        <FieldWithUnitSuffix
+                          control={<Input />}
+                          unitText={unitSuffixTextFromOptions(
+                            unitOptions,
+                            watchedItems?.[field.name]?.unit_id
+                          )}
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        className="erp-line-item-field erp-line-item-field--money"
+                        name={[field.name, 'unit_price']}
+                        label="单价"
                       >
                         <Input />
                       </Form.Item>
-                      <Form.Item name={[field.name, 'unit_price']} label="单价">
-                        <Input />
-                      </Form.Item>
-                      <Form.Item name={[field.name, 'amount']} label="金额">
+                      <Form.Item
+                        className="erp-line-item-field erp-line-item-field--money"
+                        name={[field.name, 'amount']}
+                        label="金额"
+                      >
                         <Input placeholder="留空时按数量和单价派生" />
                       </Form.Item>
                       <Form.Item
+                        className="erp-line-item-field erp-line-item-field--date"
                         name={[field.name, 'expected_arrival_date']}
                         label="预计到货"
                         dependencies={['purchase_date']}
@@ -421,7 +489,7 @@ export function PurchaseOrderFormFields({
                         />
                       </Form.Item>
                       <Form.Item
-                        className="erp-sales-order-lines-form__field--full"
+                        className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
                         name={[field.name, 'note']}
                         label="备注"
                       >

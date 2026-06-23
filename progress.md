@@ -97,3 +97,160 @@
 - 验证：追加前 `progress.md` 为 91 行、13838 字节，未达到归档阈值；已执行 `git diff --check`、旧术语搜索、`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test`、`cd web && pnpm style:l1`，均通过；`style:l1` 共验证 68 个场景，前端单测 387 个通过。
 - 下一步：后续新增带明细的业务编辑弹窗时，单据级附件默认沿用 inline 证据行；页面级选中记录详情可继续用独立 section，但必须绑定已保存 owner。
 - 阻塞/风险：本轮只改附件面板布局、运行时接入位置和原型 / 文档口径，不改 schema、migration、附件 JSON-RPC、RBAC、Workflow / Fact 写入边界、客户配置或部署脚本；工作区内仍有其他会话留下的附件后端、日期校验和文档改动，本轮未回退。
+
+## 2026-06-23 业务附件新建态待上传队列
+
+- 完成：共享 `BusinessAttachmentPanel` 支持新建未保存时先选择附件并展示“保存后上传”待上传行，保存成功拿到 owner_id 后由页面保存函数自动 flush 到 `business_attachments`；已有记录仍直接上传、下载和删除。
+- 完成：销售订单、采购订单、委外订单、出货单、BOM、SKU 和质检弹窗接入待上传附件 flush，并在打开新建 / 编辑、取消关闭时清空 pending，避免未保存附件串到下一张单；BOM 新建 / 复制不再沿用当前选中版本 id 作为附件 owner。
+- 完成：同步更新 `business-form-page-standard-v1` 原型、`web/README.md` 和 `docs/architecture/业务附件证据边界评审.md`，将“未保存禁用上传”改为“未保存先选附件，保存成功后自动上传绑定”。
+- 验证：追加前 `progress.md` 为 99 行、15372 字节，未达到归档阈值；已执行 `git diff --check`、旧禁用文案搜索、`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test`、`cd web && pnpm style:l1`，均通过；前端单测 387 个通过，`style:l1` 共验证 68 个场景。
+- 下一步：如果后续需要“选择后立即上传但未保存也持久化”，必须单独设计临时附件 owner / 草稿 token / 清理任务，不应在页面层绕过当前 owner_type + owner_id 真源。
+- 阻塞/风险：本轮不改 schema、migration、附件 JSON-RPC、RBAC、Workflow / Fact 写入边界、菜单、客户配置或部署脚本；附件自动上传失败时业务记录仍已保存，页面提示用户重新选择附件上传。
+
+## 2026-06-23 业务附件图片 PDF 轻量预览
+
+- 完成：共享 `BusinessAttachmentPanel` 新增图片 / PDF 轻量预览，已上传附件复用 `download_attachment` 的 owner 读权限取回内容后转 Blob URL 展示；新建态待上传附件可直接用前端暂存内容预览。Word、Excel、CSV、文本等类型继续下载查看。
+- 完成：预览入口只作为附件行内操作，不新增独立大区块；预览 Modal 使用现有 Ant Design 浮层，图片自适应容器，PDF 使用 iframe。预览、下载、删除都不改变 Source Document、Fact、Workflow 或库存 / 财务状态。
+- 完成：同步更新 `docs/architecture/业务附件证据边界评审.md`、`docs/当前真源与交接顺序.md`、`web/README.md` 和 `business-form-page-standard-v1` 原型 / README / 原型索引，将附件能力口径从上传 / 下载 / 删除扩展为图片 / PDF 轻量预览，并明确不做 Office 转换、缩略图、OCR、外链共享或对象存储。
+- 验证：追加前 `progress.md` 为 108 行、17027 字节，未达到归档阈值；已执行 `git diff --check`、旧预览排除口径搜索、`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test`、`cd web && pnpm style:l1`，均通过；前端单测 387 个通过，`style:l1` 共验证 68 个场景。
+- 下一步：如后续需要 Office 在线预览、缩略图、全文检索、病毒扫描、对象存储或客户外链共享，必须单独做附件存储 / 权限 / 安全评审，不能沿用当前轻量预览口径扩展。
+- 阻塞/风险：本轮不改 schema、migration、附件 JSON-RPC、RBAC、菜单、Workflow / Fact 写入边界、客户配置或部署脚本；预览内容仍通过 JSON-RPC base64 传输，受 5MB 附件上限约束。
+
+## 2026-06-23 业务附件预览入口显性化
+
+- 完成：将共享附件行操作从纯图标改为带文字的 `预览 / 下载 / 删除 / 移除` 行内动作。图片 / PDF 附件现在能直接看到“预览”字样，避免只显示眼睛图标导致用户误判没有预览功能；非图片 / PDF 仍只显示下载。
+- 验证：追加前 `progress.md` 为 117 行、18799 字节，未达到归档阈值；已执行 `git diff --check`、`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test`、`cd web && pnpm style:l1`，均通过；前端单测 387 个通过，`style:l1` 共验证 68 个场景。
+- 下一步：后续如果要让 Office / CSV / 文本也出现预览，需单独实现转换或安全渲染，不在当前轻量预览范围内。
+- 阻塞/风险：本轮只改共享附件面板可见操作文案，不改 schema、migration、附件 JSON-RPC、RBAC、菜单、Workflow / Fact 写入边界、客户配置或部署脚本。
+
+## 2026-06-23 业务附件格式合同扩展
+
+- 完成：将业务附件允许格式扩展到 HEIC / HEIF、ZIP、邮件证据 `.eml/.msg` 和 WPS 文件 `.wps/.et/.dps`；前端 `BusinessAttachmentPanel` 增加扩展名到 MIME 的受控归一和上传前不支持格式提示，后端同时校验 MIME 白名单与文件扩展名匹配，继续拒绝任意 `application/octet-stream`。
+- 完成：预览口径收窄为 PNG / JPG / WEBP / GIF / PDF；HEIC / HEIF、Office、ZIP、邮件证据和 WPS 文件只承诺上传 / 下载，不做在线转换或浏览器内预览。同步更新 `docs/architecture/业务附件证据边界评审.md`、`docs/当前真源与交接顺序.md`、`docs/product/产品能力证据详情.md`、`web/README.md` 和业务表单原型说明 / HTML。
+- 验证：追加前 `progress.md` 为 124 行、19768 字节，未达到归档阈值；已执行 `cd server && go test ./internal/biz`、`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test`、`STYLE_L1_PORT=4215 pnpm style:l1`、`git diff --check`，均通过；前端单测 387 个通过，`style:l1` 共验证 68 个场景。默认 `pnpm style:l1` 首次因本机 `4173` 端口占用导致 Vite 启动失败，改用 `4215` 后完整通过。
+- 下一步：如后续需要 RAR / 7z、PPT、BMP / TIFF、Office 在线预览、HEIC 转换、病毒扫描或对象存储，必须单独做附件存储 / 安全 / 预览评审。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact 写入边界、客户配置或部署脚本；附件仍受 5MB 上限约束。工作区内仍有其它数量单位后缀和 L1 脚本相关改动 / 未跟踪文件，本轮未回退。
+
+## 2026-06-23 业务附件上传上限调整
+
+- 完成：业务附件前端选择校验、后端解码校验、JSON-RPC 错误文案和正式文档统一从单个 5MB 调整为单个 50MB；服务端测试改为小阈值 helper，避免单测为验证超限而构造 50MB+ base64 内容。当前真源、附件边界评审、产品能力证据、web README 和业务弹窗原型已同步 50MB 口径。
+- 验证：追加前 `progress.md` 为 132 行、21465 字节，未达到归档阈值；已执行 `cd server && go test ./internal/biz ./internal/service`、`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test`、`git diff --check`，均通过；`STYLE_L1_PORT=4216 pnpm style:l1` 未通过，失败在既有数量单位后缀场景 `business-v1-purchase-order-form-modal 采购数量 应显示单位后缀`，本轮未回退工作区内相关未提交改动。
+- 下一步：若继续增长到大文件、批量资料包或长期附件库，应评审对象存储、上传进度、断点续传、病毒扫描和下载权限，而不是继续扩大 JSON-RPC base64 主路径。
+- 阻塞/风险：50MB 是解码后的文件内容上限，JSON-RPC base64 请求体会更大；本轮不改 schema、migration、存储形态、RBAC、菜单、Workflow / Fact 写入边界、客户配置或部署脚本。工作区内仍有其它数量单位后缀和 L1 脚本相关改动 / 未跟踪文件，本轮未回退。
+
+## 2026-06-23 业务弹窗附件间距修复
+
+- 完成：全局扫描弹窗内 `BusinessAttachmentPanel variant=\"inline\"` 接入点，确认销售订单、采购订单、委外订单、BOM、出货单、来料质检和 SKU 等业务弹窗共用 `.business-attachment-panel--inline`；已在共享样式增加 `margin-block-start: 16px`，避免附件证据行贴住上方备注 / 主表字段。
+- 验证：追加前 `progress.md` 为 148 行、24613 字节，未达到归档阈值；已执行 `cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test`、`git diff --check`，均通过；临时 Playwright 盒模型量测覆盖销售订单、采购订单、委外订单、BOM、出货单、来料质检和 SKU 新建弹窗，附件面板上方间距为 16px-32px，`scrollWidth <= clientWidth`，未发现横向溢出。
+- 下一步：全量 `style:l1` 仍需等既有数量单位后缀场景修复后重跑；当前附件间距已通过独立盒模型回归。
+- 阻塞/风险：本轮只改共享附件面板样式，不改 schema、migration、RBAC、菜单、Workflow / Fact 写入边界、客户配置、附件上传逻辑或原型状态。工作区内仍有其它数量单位后缀和 L1 脚本相关改动 / 未跟踪文件，本轮未回退。
+
+## 2026-06-23 弹窗明细数量单位后缀
+
+- 完成：新增共享 `FieldWithUnitSuffix`，采购订单、销售订单和委外订单明细的数量字段按当前行 `unit_id` / 单位快照显示只读单位后缀；未拿到可读单位时不显示裸 `单位 #id`。单价和金额不硬编码 `USD`，后续需有真实币种来源后再评审。
+- 完成：销售订单新建弹窗补加载单位选项；采购 / 销售来源导入改为先增 Form.List 行、再用 `setFields` 逐字段写入，确保来源材料 / SKU 的默认单位进入明细行并驱动数量后缀。
+- 完成：新增 `lineItemUnitAssertions` L1 断言，覆盖销售 SKU 导入后的“订单数量”单位后缀，以及采购材料导入后的“采购数量”单位后缀；断言同时检查可读单位、aria 名称、输入框 / 后缀盒模型和横向溢出。
+- 验证：追加前 `progress.md` 为 139 行、22890 字节，未达到归档阈值；已执行 `git diff --check`、`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test`、`STYLE_L1_SCENARIOS=purchase-order-date-filter-desktop pnpm style:l1`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm style:l1`、`cd web && pnpm style:l1`，均通过；前端单测 387 个通过，全量 `style:l1` 共验证 68 个场景。
+- 下一步：如果后续要给单价 / 金额显示币种后缀，应先收敛订单币种或客户 / 供应商币种真源，再统一接入，不能固定写 `USD`。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact 写入边界、客户配置或部署脚本；正式文档 / 原型未新增长期入口或职责变化，因此除本进度记录外未更新文档清单。
+
+## 2026-06-23 销售订单空行数量单位补齐
+
+- 完成：复查用户截图对应的销售订单新建空行状态，确认上一轮只覆盖了 SKU 导入 / 选择后状态，未覆盖未选 SKU 但已手填数量 / 单价的空行状态；现在单单位环境下空行“订单数量”也显示可读单位后缀 `只（PCS）`。
+- 完成：销售订单“带出产品 / 单位”摘要从裸 `单位 #id` 改为可读单位名称，避免 SKU 选择后仍暴露数据库 ID；L1 断言同步覆盖空行数量后缀、导入后数量后缀和来源摘要不显示裸单位 ID。
+- 验证：追加前 `progress.md` 为 155 行、25878 字节，未达到归档阈值；已执行 `cd web && pnpm lint`、`cd web && pnpm css`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm style:l1`、`cd web && pnpm test`、`git diff --check`、`cd web && pnpm style:l1`，均通过；前端单测 387 个通过，全量 `style:l1` 共验证 68 个场景。
+- 下一步：如果后续存在多单位环境，空行不应猜默认单位，应先选 SKU / 来源或明确单位真源；如需允许销售订单手工选择单位，应单独评审是否放开隐藏 `unit_id` 为可见可选字段。
+- 阻塞/风险：本轮仍不改 schema、migration、RBAC、菜单、Workflow / Fact 写入边界、客户配置或部署脚本；价格 / 金额币种后缀仍未做，需等待真实币种真源。
+
+## 2026-06-23 trade-erp 表单字段借鉴规则收口
+
+- 完成：将 trade-erp 弹窗字段和表单字段扫描结论收口到 `docs/product/业务主链路数据流向与字段来源规则.md`，新增可借鉴矩阵和落地优先级，明确只借来源导入、剩余数量、字段联动、明细 items 和附件证据等通用模式，不照搬外贸、结汇、水单、报关、提单或磁材字段。
+- 完成：同步更新 `business-form-page-standard-v1` 和 `action-modal-drawer-standard-v1` 原型 README，把来源摘要、不可导入原因、已选摘要、清空已选、剩余数量、父弹窗字段维护和后端 usecase 校验边界写成页面标准。
+- 验证：追加前 `progress.md` 为 163 行、27290 字节，未达到归档阈值；已执行 `git diff --check` 和 targeted `rg` 搜索确认 trade 借鉴、来源导入、剩余数量和不可导入原因已落到正式文档 / 原型标准。
+- 下一步：后续进入运行时代码时，优先从采购订单转采购入库、销售订单转出货或入库转质检中选一个闭环做“来源导入 + 剩余量约束 + 字段链路 QA”，不要一次性搬字段全集。
+- 阻塞/风险：本轮只改正式文档和原型 README，不改 schema、migration、API、RBAC、菜单、Workflow / Fact usecase、客户配置或部署脚本；当前 plush 工作区仍有其它未提交运行时代码和文档改动，本轮未回退。
+
+## 2026-06-23 采购订单生成入库来源预览
+
+- 完成：采购订单“生成采购入库草稿”弹窗新增来源明细预览，展示来源行、材料、采购数量、已入库、剩余数量和本次生成数量；无剩余数量时禁用生成按钮并给出明确提示。
+- 完成：预览数据复用已有采购订单明细和采购入库列表，按后端 `create_purchase_receipt_from_purchase_order` 主路径只计算 open 来源行、排除已取消入库单，并保留后端 usecase 的状态与剩余量复验；前端只做生成前反馈，不写库存事实。
+- 验证：追加前 `progress.md` 为 171 行、28723 字节，未达到归档阈值；已执行 `cd web && pnpm css`、`cd web && pnpm lint`、`cd web && pnpm test`、`STYLE_L1_PORT=4217 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm style:l1` 和 `git diff --check`，均通过；默认 `4173` 端口首次被占用导致 L1 启动失败，换端口后通过 1 个业务模块场景。
+- 下一步：如果要继续把 trade-erp 的“来源选择弹窗 + 部分行选择 + 不可导入原因”扩展到采购入库，需要先评审 API 合同和后端 usecase 参数，不应只在前端局部选择。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact 写入边界、客户配置或部署脚本；当前工作区仍有其它会话留下的附件、数量单位和 L1 脚本相关改动，本轮未回退。
+
+## 2026-06-23 销售订单单位字段与金额计算补齐
+
+- 完成：复查用户截图对应的销售订单新建明细，确认仅显示数量 suffix 不够，真实 `unit_id` 仍是隐藏字段；已将销售订单明细单位改为可见可选字段，并在单单位环境下自动填入默认单位，数量后缀改为读取真实 `unit_id`。
+- 完成：销售 / 采购 / 委外订单金额派生统一从 JS `Number` 乘法切换为字符串十进制乘法，避免小数精度误差；截图中的 `123.11 × 12.11` 按两位金额口径锁定为 `1490.86`，并补 `0.1 × 0.2`、`1.005 × 1` 回归。
+- 完成：L1 明细断言新增金额计算回读，销售订单新建弹窗会实际填写订单数量 `123.11`、单价 `12.11` 并断言金额字段为只读 `1490.86`，同时保留单位后缀盒模型 / 横向溢出校验。
+- 验证：追加前 `progress.md` 为 179 行、30010 字节，未达到归档阈值；已执行 `pnpm --dir web exec node --test src/erp/utils/masterDataOrderView.test.mjs`、`pnpm --dir web css`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1`、`pnpm --dir web test`、`pnpm --dir web style:l1`、`pnpm --dir web lint`、`git diff --check`，均通过；全量前端单测 387 个通过，全量 `style:l1` 共验证 68 个场景。
+- 下一步：如果后续要给单价 / 金额字段增加币种后缀，应先确定订单币种真源；当前只补数量单位和金额计算，不硬编码 `USD`。
+- 阻塞/风险：多单位环境下空行不会猜单位，必须选择 SKU 或单位后才显示对应数量后缀；本轮不改 schema、migration、RBAC、菜单、Workflow / Fact 写入边界、客户配置或部署脚本。
+
+## 2026-06-23 明细弹窗字段密度与单位精度修复
+
+- 完成：按页面设计治理复查销售订单新建弹窗真实 DOM / 盒模型，确认旧明细行 12 个字段等宽导致单行宽度约 3638px，数量输入本体被单位后缀挤到约 135px，并且产品编号 / 名称 / 颜色快照重复占位；现在销售明细保留行号、SKU 来源、带出产品 / 单位、单位、订单数量、单价、金额、计划交付日期和备注，隐藏重复快照字段但继续保存快照值。
+- 完成：共享明细 CSS 改为按字段语义定宽，行号 / 来源 / 摘要 / 单位 / 数量 / 金额 / 日期 / 备注不再等宽；目标 L1 默认视口下行号到金额字段完整可见，日期和备注保留在横向滚动后段，数量输入本体不小于 L1 锁定阈值。
+- 完成：单位 option 真源补传 `precision`；销售、采购、委外数量字段按单位精度校验。`只（PCS）` 精度为 0 时，`123.11` 会显示“当前单位只允许整数数量”，金额为空；改为合法整数 `123` 后才按 `123 × 12.11 = 1489.53` 显示金额。
+- 验证：追加前 `progress.md` 为 188 行、31903 字节，未达到归档阈值；已执行 `pnpm --dir web exec node --test src/erp/utils/masterDataOrderView.test.mjs src/erp/utils/referenceSelectOptions.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1`、`pnpm --dir web test`、`pnpm --dir web style:l1`、`git diff --check`，均通过；全量前端单测 388 个通过，全量 `style:l1` 共验证 68 个场景。
+- 下一步：若后续要让采购 / 委外也像销售一样合并重复快照字段，应单独按各自字段是否允许人工改写评审，不在本轮顺手隐藏。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact 写入边界、客户配置或部署脚本；单价 / 金额币种后缀仍等待订单币种真源，不硬编码 `USD`。
+
+## 2026-06-23 业务弹窗输入框圆角基线
+
+- 完成：按页面设计治理全局扫描业务弹窗输入控件，确认问题不应在单个“入库单号”字段硬编码；已将 `.erp-business-action-form` 下 AntD 输入、数字输入、下拉、日期、文本域和文本域 affix wrapper 的圆角基线统一到 10px，并在 focus 态显式清理浏览器默认 outline。
+- 完成：补上业务弹窗内 `DateInput` 的后置样式覆盖，避免 `.erp-business-date-input` 从列表筛选样式继承 8px 圆角；日期范围筛选内部组合控件仍保持原来的分段圆角，不当作独立输入框改动。
+- 完成：L1 增加业务表单控件圆角断言；采购入库新建弹窗额外锁定“入库单号 / 头部备注 / 材料下拉 / 入库数量”的 focus 绿色边框、圆角和 outline，防止截图里的方角输入框回归。
+- 验证：追加前 `progress.md` 为 197 行、33914 字节，未达到归档阈值；已执行 `pnpm --dir web css`、`pnpm --dir web lint`、`pnpm --dir web test`、`STYLE_L1_PORT=4224 STYLE_L1_SCENARIOS=purchase-receipt-create-modal-desktop pnpm --dir web style:l1`、`STYLE_L1_PORT=4223 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1`、`git diff --check`，均通过；前端单测 388 个通过，两个 targeted L1 场景各通过 1 个场景。
+- 下一步：若后续发现打印工作台或移动端原生输入也有类似视觉问题，应按各自 surface 单独收口，不把打印纸面编辑态和业务弹窗表单混成一套规则。
+- 阻塞/风险：本轮只改前端共享样式和 L1 断言，不改 schema、migration、API、RBAC、菜单、Workflow / Fact usecase、客户配置、正式文档或原型状态；当前工作区仍有其他会话留下的附件、单位后缀、文档和 `masterDataRpcMocks.mjs` 相关改动，本轮未回退。
+
+## 2026-06-23 输入控件圆角全局扫描收口
+
+- 完成：继续扩大输入圆角治理范围，将业务列表筛选、独立业务日期控件、业务动作弹窗、记录 / 权限 / 状态原因弹窗和打印中心工具栏搜索框统一到 12px 业务输入圆角基线；日期范围筛选内部、AntD compact 组合控件拼接边、打印纸张内部编辑单元格按组合 / 纸面编辑语义排除，不当作独立业务输入框硬改。
+- 完成：`style:l1` 新增全局后置扫描 `assertVisibleInputControlRadius`，每个通过 `verify` 的场景都会读取真实 DOM / computed style，检查可见 input / textarea / select / AntD InputNumber / DatePicker / Select selector 的四角圆角，防止后续再出现 6px / 8px / 直角输入框；采购入库新建弹窗继续保留 focus 圆角与 outline 专项断言。
+- 验证：追加前 `progress.md` 为 206 行、35804 字节，未达到归档阈值；已执行 `pnpm --dir web css`、`pnpm --dir web test`、`git diff --check`、`STYLE_L1_PORT=4240 STYLE_L1_SCENARIOS=purchase-receipt-create-modal-desktop,print-center-desktop,dev-docs-dark-desktop,dev-customer-config-dark-desktop,mobile-tasks-dark pnpm --dir web style:l1`、`STYLE_L1_PORT=4241 STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop pnpm --dir web style:l1`、`STYLE_L1_PORT=4243 STYLE_L1_SCENARIOS=erp-business-dashboard-desktop,business-module-dark-customers-desktop,shipment-date-filter-desktop pnpm --dir web style:l1`，均通过；前端单测 390 个通过。
+- 下一步：等当前脏工作区里的采购订单 / 出货业务页合同恢复后，再跑完整 `pnpm --dir web style:l1`，确认所有 68 个场景都能经过新的全局输入圆角扫描。
+- 阻塞/风险：`pnpm --dir web lint` 当前失败在既有 `ShipmentsPage.jsx` 未使用变量；`business-formal-module-shells-desktop` 当前失败在出货页找不到“从销售订单导入出货明细”；`purchase-order-date-filter-desktop` 当前失败在 `V1PurchaseOrdersPage.jsx` 读取 `supplier_id` 的 null 运行时错误。本轮不回退这些其它会话 / 既有业务改动，也不改 schema、migration、API、RBAC、菜单、Workflow / Fact usecase、客户配置或部署脚本。
+
+## 2026-06-23 输入控件圆角全局兜底规则
+
+- 完成：确认前一轮仍有遗漏，因为圆角规则只覆盖业务弹窗和部分业务列表，登录验证码 compact 输入、开发页、任务 / 工作台、部分原生输入和后续局部样式仍可能绕过；新增 `control-radius.css` 并在 `app.css` 最后导入，用 `#root` 和浮层作用域统一接管 ERP runtime 可见输入控件四角圆角，覆盖 AntD Input / AffixWrapper / InputNumber / DatePicker / Select selector / textarea / 常见原生 input / select。
+- 完成：把 `style:l1` 的全局输入圆角扫描改为严格四角检查，不再允许 compact 组合控件半边直角；只排除打印纸张内部编辑区、隐藏输入、checkbox/radio/file/button 和 AntD 内部无边框输入。业务弹窗专项 focus 断言继续保留。
+- 验证：追加前 `progress.md` 为 233 行、42454 字节，未达到归档阈值；已执行 `pnpm --dir web css`、`pnpm --dir web lint`、`pnpm --dir web test`、`STYLE_L1_PORT=4244 STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop,purchase-receipt-create-modal-desktop,print-center-desktop,mobile-tasks-dark pnpm --dir web style:l1`、`STYLE_L1_PORT=4245 STYLE_L1_SCENARIOS=erp-business-dashboard-desktop,business-module-dark-customers-desktop,shipment-date-filter-desktop,dev-docs-dark-desktop,dev-customer-config-dark-desktop,dev-governance-dark-desktop,dev-prototypes-dark-desktop,dev-testing-dark-desktop pnpm --dir web style:l1`、独立 Playwright 路由扫描 16 条路径、`STYLE_L1_PORT=4246 pnpm --dir web style:l1` 和 `git diff --check`，均通过；全量 `style:l1` 共验证 68 个场景，前端单测 390 个通过。
+- 下一步：后续如果新增独立 iframe、shadow DOM 或不走 `app.css` 的前端入口，需要把该入口纳入同一 `control-radius.css` 或单独补 L1 路由扫描。
+- 阻塞/风险：本轮只改 ERP runtime 前端样式入口和浏览器回归断言，不改 schema、migration、API、RBAC、菜单、Workflow / Fact usecase、客户配置、正式文档、原型状态或部署脚本；打印纸张内部编辑单元格按纸面表格编辑语义保留，不作为普通业务输入框统一圆角。
+
+## 2026-06-23 来源导入字段运行态收口
+
+- 完成：出货单来源导入从单据级改为销售订单行级候选，来源选择器展示销售订单号、来源行、客户、产品 / SKU、订单数量、已生成出货、剩余可出货、状态和不可导入原因；导入后默认本次数量使用剩余可出货数量，并在父弹窗展示来源销售订单、已导入来源行数量和剩余量摘要。
+- 完成：采购订单“生成采购入库草稿”预览补齐来源采购单摘要、供应商、来源行、采购数量、已生成入库、本次入库、剩余可生成和不可生成原因；采购入库明细详情不再展示裸 `purchase_order_item_id`，改为“来源行 N / 已关联采购来源行”。
+- 完成：质检新建表单展示来源采购入库、来源入库行、供应商、状态、到货数量、材料、仓库和批次提示；当前没有后端字段的“本次送检数量 / 已检数量 / 待检数量”不在前端伪造。
+- 完成：同步更新 `docs/product/业务主链路数据流向与字段来源规则.md`、`business-form-page-standard-v1` 和 `action-modal-drawer-standard-v1` 原型 README，记录 trade-erp 来源摘要、不可导入原因、已选摘要、清空已选和剩余数量模式的运行态吸收范围与禁止照搬边界。
+- 验证：追加前 `progress.md` 为 206 行、35804 字节，未达到归档阈值；已执行 `pnpm exec node --test src/erp/utils/businessLineItems.test.mjs`、`pnpm lint`、`pnpm css`、`pnpm test`、`STYLE_L1_PORT=4219 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm style:l1`、`git diff --check`，均通过；前端单测 390 个通过，targeted L1 验证 1 个正式业务模块场景。
+- 下一步：若继续做“全部值得引入字段”，优先进入后端合同：Shipment/OperationalFact usecase 按销售订单行剩余量强制阻断超量和并发重复；QualityUsecase/schema 增加本次送检数量、已检 / 待检数量后再接前端字段；委外回货、领料、出库的剩余量字段待对应 Source Document 和 Fact usecase 成立后再做。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact 写入边界、客户配置或部署脚本；出货页面当前剩余量是前端基于非取消出货行生成的可见提示，后端仍只保存 `sales_order_item_id` 追溯并校验 active 引用，尚未完成来源行剩余量强校验。当前工作区仍有其它附件、单位后缀、样式、L1 脚本和文档改动，本轮未回退。
+
+## 2026-06-23 明细金额精度与长单位文案收口
+
+- 完成：修正销售 / 采购 / 委外明细金额派生规则，不再把输入态金额固定四舍五入到 2 位；金额按数量与单价的小数位保留最多 6 位、最少 2 位，例如 `11.11 × 11.11` 显示 `123.4321`，整数金额仍显示 `40.00`。
+- 完成：单位下拉、数量后缀和主数据默认单位统一使用短业务标签，`核心演示单位-件（SIM-PLUSH-CORE-PCS）` 显示为 `件（PCS）`，长演示文案只保留在搜索文本和 title 中，不再挤占输入框可见空间。
+- 完成：补齐长单位文案与短标签的单测 / L1 断言；全量 L1 重新跑通后，前一条记录中的出货导入标题、采购订单 null supplier、紧凑组合控件圆角误报等阻塞已在本轮修正。
+- 验证：追加前 `progress.md` 为 224 行、40597 字节，未达到归档阈值；已执行 `pnpm --dir web exec node --test src/erp/utils/masterDataOrderView.test.mjs src/erp/utils/referenceSelectOptions.test.mjs`、`pnpm --dir web lint && pnpm --dir web css && pnpm --dir web test`、`STYLE_L1_SCENARIOS=material-master-header-desktop pnpm --dir web style:l1`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1`、`STYLE_L1_SCENARIOS=purchase-order-date-filter-desktop pnpm --dir web style:l1`、`pnpm --dir web style:l1`、`git diff --check`，均通过；全量前端单测 390 个通过，全量 `style:l1` 共验证 68 个场景。
+- 下一步：若要给单价 / 金额增加币种后缀，应先确定订单币种字段和后端合同；当前不硬编码 `USD`。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact 写入边界、客户配置或部署脚本；金额与单位验证基于前端单测和 mock/browser L1，未执行真实后端保存链路。
+
+## 2026-06-23 业务表单单行输入高度统一
+
+- 完成：将普通业务表单 `.erp-business-form` 纳入共享控件高度变量，单行 Input、Select、DatePicker、InputNumber 和 AffixWrapper 统一使用 36px 布局高度；textarea 保持多行语义，只继承最小高度，不按单行控件压缩。
+- 完成：`style:l1` 新增可见业务表单单行控件高度扫描，读取真实 DOM 的 `offsetHeight` 与 `--erp-control-height`，覆盖普通业务表单和业务动作表单；新增 `purchase-order-inbound-draft-modal-controls-desktop` 场景，打开“生成采购入库草稿”弹窗锁定入库单号、仓库下拉和入库日期的真实布局高度。
+- 验证：追加前 `progress.md` 为 241 行、44659 字节，未达到归档阈值；已执行 `pnpm --dir web css`、`pnpm --dir web lint`、`pnpm --dir web test`、`node --check web/scripts/styleL1.mjs && node --check web/scripts/style-l1/scenarios.mjs`、`STYLE_L1_PORT=4247 STYLE_L1_SCENARIOS=purchase-order-inbound-draft-modal-controls-desktop pnpm --dir web style:l1`、`STYLE_L1_PORT=4249 pnpm --dir web style:l1`、`git diff --check`，均通过；前端单测 390 个通过，全量 `style:l1` 共验证 69 个场景。
+- 下一步：若后续新增不带 `.erp-business-form` / `.erp-business-action-form` 的表单 surface，应优先补统一 class 或共享组件入口，再让 L1 扫描接管，不在页面里写死单独高度。
+- 阻塞/风险：本轮只改前端共享样式和浏览器回归断言，不改 schema、migration、API、RBAC、菜单、Workflow / Fact usecase、客户配置、正式文档或部署脚本；打印纸面编辑区、登录页和非业务表单不纳入这条 36px 业务表单高度规则。
+
+## 2026-06-23 附件行去除 MIME 展示
+
+- 完成：共享 `BusinessAttachmentPanel` 附件行去掉可见 `mime_type` 展示，避免上传后露出 `application/vnd...`、`image/...`、`text/...` 这类技术类型字符串；保留文件名、文件大小、保存后上传状态和预览 / 下载 / 删除动作。
+- 验证：追加前 `progress.md` 为 249 行、46397 字节，未达到归档阈值；已执行 `pnpm lint`、`pnpm css`、`pnpm test`、`git diff --check`，均通过；另用 Playwright 打开销售订单新建弹窗并选择 `客户确认.docx`，附件面板文本为“客户确认.docx / 25 B / 保存后上传 / 移除”，未出现 MIME 字符串，面板 `scrollHeight=136`、`clientHeight=136`，无纵向溢出。
+- 下一步：如后续需要展示文件类型，应使用中文业务标签或图标，不直接暴露 MIME / 存储路径。
+- 阻塞/风险：本轮只改附件行展示，不改上传格式合同、后端 MIME 校验、schema、migration、RBAC、菜单、Workflow / Fact 写入边界、客户配置或附件下载 / 预览逻辑；原型当前本身不展示 MIME，本轮未改原型。

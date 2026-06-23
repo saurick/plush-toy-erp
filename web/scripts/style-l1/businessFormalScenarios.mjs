@@ -1,3 +1,5 @@
+import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
+
 export function createBusinessFormalScenarios(deps) {
   const {
     assert,
@@ -27,6 +29,15 @@ export function createBusinessFormalScenarios(deps) {
     verifyBusinessRowDoubleClickEditModal,
     verifySourceImportPicker,
   } = deps
+  const {
+    assertLineItemFieldLayout,
+    assertLineAmountCalculation,
+    assertLineQuantityPrecisionBlocksAmount,
+    assertLineQuantityUnitSuffix,
+    assertLineSourceSummaryReadableUnit,
+  } = createLineItemUnitAssertions({
+    assert,
+  })
 
   const waitForTaskActionDrawerClosed = async (page, scenarioName) => {
     await page
@@ -361,6 +372,34 @@ export function createBusinessFormalScenarios(deps) {
           expectedTexts: ['SKU / 产品来源', '带出产品 / 单位'],
           absentTexts: ['产品引用 ID', '单位引用 ID'],
           afterOpen: async (modal) => {
+            await assertLineQuantityUnitSuffix(modal, {
+              label: '订单数量',
+              expectedText: '件（PCS）',
+              scenarioName: 'business-v1-sales-order-form-modal-empty-line',
+            })
+            await assertLineItemFieldLayout(modal, {
+              scenarioName: 'business-v1-sales-order-form-modal-empty-line',
+              visibleThroughLabel: '金额',
+              absentLabels: ['产品编号快照', '产品名称快照', '颜色快照'],
+            })
+            await assertLineQuantityPrecisionBlocksAmount(modal, {
+              quantityLabel: '订单数量',
+              unitPriceLabel: '单价',
+              amountLabel: '金额',
+              quantity: '123.11',
+              unitPrice: '12.11',
+              expectedErrorText: '当前单位只允许整数数量',
+              scenarioName: 'business-v1-sales-order-form-modal-empty-line',
+            })
+            await assertLineAmountCalculation(modal, {
+              quantityLabel: '订单数量',
+              unitPriceLabel: '单价',
+              amountLabel: '金额',
+              quantity: '11',
+              unitPrice: '12.11',
+              expected: '133.21',
+              scenarioName: 'business-v1-sales-order-form-modal-empty-line',
+            })
             await verifySourceImportPicker(page, {
               parentModal: modal,
               triggerButton: '从 SKU 库导入',
@@ -369,6 +408,16 @@ export function createBusinessFormalScenarios(deps) {
               emptyDescriptionText: '暂无可导入 SKU',
               selectText: 'SKU-STYLE-L1',
               scenarioName: 'sales-order-source-import-picker',
+            })
+            await assertLineQuantityUnitSuffix(modal, {
+              label: '订单数量',
+              expectedText: '件（PCS）',
+              scenarioName: 'business-v1-sales-order-form-modal',
+            })
+            await assertLineSourceSummaryReadableUnit(modal, {
+              label: '带出产品 / 单位',
+              expectedText: '件（PCS）',
+              scenarioName: 'business-v1-sales-order-form-modal',
             })
           },
         })

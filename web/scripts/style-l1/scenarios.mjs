@@ -1,4 +1,5 @@
 import { createBusinessFormalScenarios } from './businessFormalScenarios.mjs'
+import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { createPurchaseReceiptScenarios } from './purchaseReceiptScenarios.mjs'
 
 export function createStyleL1Scenarios(deps) {
@@ -98,6 +99,9 @@ export function createStyleL1Scenarios(deps) {
     waitForPath,
     webDir,
   } = deps
+  const { assertLineQuantityUnitSuffix } = createLineItemUnitAssertions({
+    assert,
+  })
 
   return [
     {
@@ -3706,7 +3710,7 @@ export function createStyleL1Scenarios(deps) {
         await expectHeading(page, '材料档案')
         await expectText(page, '样式材料')
         await expectText(page, '默认单位')
-        await expectText(page, '只（PCS）')
+        await expectText(page, '件（PCS）')
         await assertTextAbsent(page, '默认单位 ID')
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'material-master-header-desktop',
@@ -3783,7 +3787,7 @@ export function createStyleL1Scenarios(deps) {
           ),
           '材料颜色候选浮层不应退回浏览器黑底样式'
         )
-        await expectText(page, '只（PCS）')
+        await expectText(page, '件（PCS）')
         await assertTextAbsent(page, '默认单位 ID')
         await closeBusinessFormModal(page, materialModal)
         await assertNoHorizontalOverflow(page, 'material-master-header-desktop')
@@ -3857,8 +3861,119 @@ export function createStyleL1Scenarios(deps) {
               scenarioName: 'business-v1-purchase-order-form-modal',
               minRows: 2,
             })
+            await assertLineQuantityUnitSuffix(modal, {
+              label: '采购数量',
+              expectedText: '件（PCS）',
+              scenarioName: 'business-v1-purchase-order-form-modal',
+            })
           },
         })
+      },
+    },
+    {
+      name: 'purchase-order-inbound-draft-modal-controls-desktop',
+      path: '/erp/purchase/accessories',
+      auth: 'admin',
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await page.route('**/rpc/purchase_order', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          const { id = 'mock-id', method } = body
+          const nowUnix = Math.floor(Date.now() / 1000)
+          const purchaseOrder = {
+            id: 1,
+            purchase_order_no: 'PO-STYLE-L1',
+            supplier_id: 1,
+            supplier_snapshot: {
+              id: 1,
+              code: 'SUP-STYLE-L1',
+              name: '样式供应商',
+            },
+            supplier_purchase_order_no: 'SUP-PO-STYLE',
+            purchase_date: nowUnix,
+            expected_arrival_date: nowUnix + 86_400 * 7,
+            lifecycle_status: 'approved',
+            note: '',
+            created_at: nowUnix,
+            updated_at: nowUnix,
+          }
+          const purchaseOrderItem = {
+            id: 1,
+            purchase_order_id: 1,
+            line_no: 1,
+            material_id: 1,
+            material_code_snapshot: 'MAT-STYLE-L1',
+            material_name_snapshot: '样式材料',
+            purchased_quantity: '20',
+            unit_id: 1,
+            unit_price: '3.50',
+            amount: '70.00',
+            expected_arrival_date: nowUnix + 86_400 * 7,
+            line_status: 'open',
+            note: '',
+            created_at: nowUnix,
+            updated_at: nowUnix,
+          }
+
+          let data = {}
+          switch (method) {
+            case 'list_purchase_orders':
+              data = {
+                purchase_orders: [purchaseOrder],
+                total: 1,
+                limit: 100,
+                offset: 0,
+              }
+              break
+            case 'list_purchase_order_items':
+              data = {
+                purchase_order_items: [purchaseOrderItem],
+                total: 1,
+                limit: 100,
+                offset: 0,
+              }
+              break
+            case 'get_purchase_order':
+              data = { purchase_order: purchaseOrder }
+              break
+            default:
+              await route.fallback()
+              return
+          }
+
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id,
+              result: {
+                code: 0,
+                message: 'OK',
+                data,
+              },
+            }),
+          })
+        })
+      },
+      verify: async (page) => {
+        await expectHeading(page, '采购订单')
+        const purchaseOrderRow = page
+          .locator('.erp-business-data-table-card .ant-table-tbody tr')
+          .filter({ hasText: 'PO-STYLE-L1' })
+          .first()
+        await purchaseOrderRow.click()
+        await expectButton(page, '生成入库')
+        await page.getByRole('button', { name: '生成入库' }).click()
+        const modal = page
+          .locator('.ant-modal')
+          .filter({ hasText: '生成采购入库草稿' })
+          .last()
+        await modal.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(page, '入库单号')
+        await expectText(page, '入库仓库')
+        await expectText(page, '入库日期')
+        await expectText(page, '备注')
       },
     },
     {

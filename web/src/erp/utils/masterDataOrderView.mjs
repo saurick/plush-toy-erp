@@ -177,58 +177,89 @@ export function normalizeOptionalNonNegativeInteger(value) {
   return Math.trunc(numeric)
 }
 
-export function deriveSalesOrderItemAmount(values = {}) {
-  const quantityText = String(values.ordered_quantity ?? '').trim()
-  const unitPriceText = String(values.unit_price ?? '').trim()
-  const quantity = Number(quantityText)
-  const unitPrice = Number(unitPriceText)
-  if (
-    quantityText !== '' &&
-    unitPriceText !== '' &&
-    Number.isFinite(quantity) &&
-    quantity >= 0 &&
-    Number.isFinite(unitPrice) &&
-    unitPrice >= 0
-  ) {
-    return (quantity * unitPrice).toFixed(2)
+function parseUnsignedDecimal(value) {
+  const text = String(value ?? '')
+    .replace(/,/g, '')
+    .trim()
+  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) {
+    return null
   }
-  return trimOptional(values.amount)
+  const [integerText = '0', fractionText = ''] = text.split('.')
+  const digits = `${integerText || '0'}${fractionText}`.replace(/^0+(?=\d)/, '')
+  return {
+    value: BigInt(digits || '0'),
+    scale: fractionText.length,
+  }
+}
+
+function pow10(scale) {
+  return BigInt(10) ** BigInt(scale)
+}
+
+function trimDecimalZeros(text, minFractionDigits = 2) {
+  const source = String(text)
+  const [integerPart, fractionPart = ''] = source.split('.')
+  let fraction = fractionPart
+  while (fraction.length > minFractionDigits && fraction.endsWith('0')) {
+    fraction = fraction.slice(0, -1)
+  }
+  while (fraction.length < minFractionDigits) {
+    fraction += '0'
+  }
+  return fraction ? `${integerPart}.${fraction}` : integerPart
+}
+
+function formatFixedMinorUnits(value, fractionDigits) {
+  if (fractionDigits <= 0) {
+    return String(value)
+  }
+  const text = String(value).padStart(fractionDigits + 1, '0')
+  const integerPart = text.slice(0, -fractionDigits)
+  const fractionPart = text.slice(-fractionDigits)
+  return `${integerPart}.${fractionPart}`
+}
+
+function multiplyUnsignedDecimalToFixed(left, right, fractionDigits = 6) {
+  const leftDecimal = parseUnsignedDecimal(left)
+  const rightDecimal = parseUnsignedDecimal(right)
+  if (!leftDecimal || !rightDecimal) {
+    return undefined
+  }
+  const rawValue = leftDecimal.value * rightDecimal.value
+  const rawScale = leftDecimal.scale + rightDecimal.scale
+  if (rawScale <= fractionDigits) {
+    return trimDecimalZeros(formatFixedMinorUnits(rawValue, rawScale))
+  }
+  const divisor = pow10(rawScale)
+  const targetMultiplier = pow10(fractionDigits)
+  const scaledValue = rawValue * targetMultiplier
+  let roundedValue = scaledValue / divisor
+  if ((scaledValue % divisor) * BigInt(2) >= divisor) {
+    roundedValue += BigInt(1)
+  }
+  return trimDecimalZeros(formatFixedMinorUnits(roundedValue, fractionDigits))
+}
+
+function deriveOrderItemAmount(values, quantityField) {
+  const sourceValues = values || {}
+  return (
+    multiplyUnsignedDecimalToFixed(
+      sourceValues[quantityField],
+      sourceValues.unit_price
+    ) || trimOptional(sourceValues.amount)
+  )
+}
+
+export function deriveSalesOrderItemAmount(values = {}) {
+  return deriveOrderItemAmount(values, 'ordered_quantity')
 }
 
 export function derivePurchaseOrderItemAmount(values = {}) {
-  const quantityText = String(values.purchased_quantity ?? '').trim()
-  const unitPriceText = String(values.unit_price ?? '').trim()
-  const quantity = Number(quantityText)
-  const unitPrice = Number(unitPriceText)
-  if (
-    quantityText !== '' &&
-    unitPriceText !== '' &&
-    Number.isFinite(quantity) &&
-    quantity >= 0 &&
-    Number.isFinite(unitPrice) &&
-    unitPrice >= 0
-  ) {
-    return (quantity * unitPrice).toFixed(2)
-  }
-  return trimOptional(values.amount)
+  return deriveOrderItemAmount(values, 'purchased_quantity')
 }
 
 export function deriveOutsourcingOrderItemAmount(values = {}) {
-  const quantityText = String(values.outsourcing_quantity ?? '').trim()
-  const unitPriceText = String(values.unit_price ?? '').trim()
-  const quantity = Number(quantityText)
-  const unitPrice = Number(unitPriceText)
-  if (
-    quantityText !== '' &&
-    unitPriceText !== '' &&
-    Number.isFinite(quantity) &&
-    quantity >= 0 &&
-    Number.isFinite(unitPrice) &&
-    unitPrice >= 0
-  ) {
-    return (quantity * unitPrice).toFixed(2)
-  }
-  return trimOptional(values.amount)
+  return deriveOrderItemAmount(values, 'outsourcing_quantity')
 }
 
 export function compactParams(values = {}) {
@@ -294,6 +325,38 @@ export function formatUnitDisplayName(unitID, unitByID = new Map()) {
   return name || code || `单位 #${normalizedID}`
 }
 
+function shortDemoUnitName(name) {
+  const text = trimOptional(name)
+  const matched = text.match(/^核心演示单位[-－]\s*(.+)$/)
+  return matched?.[1]?.trim() || text
+}
+
+function shortUnitCode(code) {
+  const text = trimOptional(code)
+  if (!text) return ''
+  if (text.startsWith('SIM-')) {
+    return text.split('-').filter(Boolean).at(-1) || text
+  }
+  return text.length <= 8 ? text : ''
+}
+
+export function formatUnitShortDisplayName(unitID, unitByID = new Map()) {
+  const normalizedID = Number(unitID || 0)
+  if (!Number.isFinite(normalizedID) || normalizedID <= 0) {
+    return '-'
+  }
+  const unit = unitByID instanceof Map ? unitByID.get(normalizedID) : null
+  if (!unit) {
+    return `未知单位 #${normalizedID}`
+  }
+  const name = shortDemoUnitName(unit.name)
+  const code = shortUnitCode(unit.code)
+  if (name && code && name !== code) {
+    return `${name}（${code}）`
+  }
+  return name || code || `单位 #${normalizedID}`
+}
+
 export function buildUnitSelectOptions(units = []) {
   const activeUnits = Array.isArray(units)
     ? units.filter((unit) => unit?.is_active !== false)
@@ -309,9 +372,15 @@ export function buildUnitSelectOptions(units = []) {
       if (!Number.isFinite(value) || value <= 0) {
         return null
       }
+      const label = formatUnitShortDisplayName(value, unitByID)
+      const fullLabel = formatUnitDisplayName(value, unitByID)
       return {
         value,
-        label: formatUnitDisplayName(value, unitByID),
+        label,
+        suffixLabel: label,
+        searchText: [label, fullLabel].filter(Boolean).join(' '),
+        title: fullLabel,
+        precision: normalizeOptionalNonNegativeInteger(unit?.precision) ?? 0,
       }
     })
     .filter(Boolean)

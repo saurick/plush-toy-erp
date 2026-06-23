@@ -10,6 +10,21 @@ function compactParts(parts = []) {
     .join(' / ')
 }
 
+function shortDemoUnitName(name) {
+  const text = String(name ?? '').trim()
+  const matched = text.match(/^核心演示单位[-－]\s*(.+)$/)
+  return matched?.[1]?.trim() || text
+}
+
+function shortUnitCode(code) {
+  const text = String(code ?? '').trim()
+  if (!text) return ''
+  if (text.startsWith('SIM-')) {
+    return text.split('-').filter(Boolean).at(-1) || text
+  }
+  return text.length <= 8 ? text : ''
+}
+
 export function uniqueReferenceOptions(records, toOption) {
   const seen = new Set()
   return (Array.isArray(records) ? records : [])
@@ -76,12 +91,27 @@ export function productSKUOption(sku = {}) {
 export function unitOption(unit = {}) {
   const value = positiveID(unit.id)
   if (!value) return null
+  const precision = Number(unit.precision)
+  const name = shortDemoUnitName(unit.name)
+  const code = shortUnitCode(unit.code)
+  const fullName = String(unit.name ?? '').trim()
+  const fullCode = String(unit.code ?? '').trim()
+  const label =
+    name && code && name !== code
+      ? `${name}（${code}）`
+      : name || code || `单位 #${value}`
+  const fullLabel =
+    fullName && fullCode && fullName !== fullCode
+      ? `${fullName}（${fullCode}）`
+      : fullName || fullCode || label
   return {
     value,
-    label:
-      unit.name && unit.code && unit.name !== unit.code
-        ? `${unit.name}（${unit.code}）`
-        : unit.name || unit.code || `单位 #${value}`,
+    label,
+    suffixLabel: label,
+    searchText: [label, fullLabel].filter(Boolean).join(' '),
+    title: fullLabel,
+    precision:
+      Number.isInteger(precision) && precision >= 0 ? precision : undefined,
   }
 }
 

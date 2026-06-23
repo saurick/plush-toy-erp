@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -6,14 +6,17 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import {
+  Alert,
   Button,
   Empty,
   Form,
   Input,
   Popconfirm,
   Select,
+  Space,
   Table,
   Tag,
+  Typography,
 } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -64,8 +67,11 @@ import {
 } from '../utils/masterDataOrderView.mjs'
 import {
   buildShipmentItemParams,
+  buildShipmentSourceRows,
   createBlankShipmentItem,
   createShipmentItemFromSalesOrderItem,
+  decimalNumber,
+  formatQuantity,
   isBlankShipmentItem,
   positiveInt,
 } from '../utils/businessLineItems.mjs'
@@ -116,6 +122,7 @@ const STATUS_COLORS = Object.freeze({
   SHIPPED: 'blue',
   CANCELLED: 'red',
 })
+const { Text } = Typography
 
 function statusTag(status) {
   const key = String(status || '').trim()
@@ -167,6 +174,21 @@ function salesOrderCustomerText(order = {}) {
     snapshot?.code ||
     (order.customer_id ? `客户 #${order.customer_id}` : '')
   )
+}
+
+function sourceLineProductText(
+  item = {},
+  productOptions = [],
+  skuOptions = []
+) {
+  return [
+    referenceLabel(productOptions, item.product_id, '产品'),
+    item.product_sku_id
+      ? referenceLabel(skuOptions, item.product_sku_id, 'SKU')
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' / ')
 }
 
 function shipmentFormValues(shipment = {}) {
@@ -477,6 +499,8 @@ export default function ShipmentsPage() {
   const [selectedRow, setSelectedRow] = useState(null)
   const [shipmentModal, setShipmentModal] = useState(null)
   const [salesOrderSources, setSalesOrderSources] = useState([])
+  const [salesOrderSourceItems, setSalesOrderSourceItems] = useState([])
+  const [shipmentSourceRows, setShipmentSourceRows] = useState([])
   const [customers, setCustomers] = useState([])
   const [inventoryLots, setInventoryLots] = useState([])
   const [products, setProducts] = useState([])
@@ -487,7 +511,9 @@ export default function ShipmentsPage() {
   const [sourceLoading, setSourceLoading] = useState(false)
   const [salesOrderImportOpen, setSalesOrderImportOpen] = useState(false)
   const [shipmentForm] = Form.useForm()
+  const shipmentAttachmentRef = useRef(null)
   const selectedSalesOrderID = Form.useWatch('sales_order_id', shipmentForm)
+  const shipmentFormItems = Form.useWatch('items', shipmentForm)
   const routeSalesOrderID = searchParamPositiveIntText(
     searchParams,
     'sales_order_id'
@@ -519,6 +545,15 @@ export default function ShipmentsPage() {
   )
   const salesOrderOptions = useMemo(
     () => uniqueReferenceOptions(salesOrders, salesOrderOption),
+    [salesOrders]
+  )
+  const salesOrdersByID = useMemo(
+    () =>
+      new Map(
+        salesOrders
+          .map((order) => [Number(order?.id || 0), order])
+          .filter(([orderID]) => Number.isFinite(orderID) && orderID > 0)
+      ),
     [salesOrders]
   )
   const salesOrderItemOptions = useMemo(
@@ -705,51 +740,143 @@ export default function ShipmentsPage() {
   const shipmentModalMode = shipmentModal?.mode || ''
   const isCreateModal = shipmentModalMode === 'create'
   const isAppendModal = shipmentModalMode === 'append'
+  const selectedSalesOrder = useMemo(
+    () => salesOrdersByID.get(Number(selectedSalesOrderID || 0)) || null,
+    [salesOrdersByID, selectedSalesOrderID]
+  )
+  const selectedSourceRows = useMemo(() => {
+    const sourceItemIDs = new Set(
+      (Array.isArray(shipmentFormItems) ? shipmentFormItems : [])
+        .map((item) => Number(item?.sales_order_item_id || 0))
+        .filter((itemID) => Number.isFinite(itemID) && itemID > 0)
+    )
+    return shipmentSourceRows.filter((row) => sourceItemIDs.has(Number(row.id)))
+  }, [shipmentFormItems, shipmentSourceRows])
+  const selectedSourceRemainingTotal = selectedSourceRows.reduce(
+    (total, item) => total + decimalNumber(item.remainingQuantity),
+    0
+  )
   const salesOrderImportColumns = useMemo(
     () => [
       {
         title: '销售订单号',
-        dataIndex: 'order_no',
         width: 160,
-        searchText: (order) =>
-          [
-            order.order_no,
-            order.customer_order_no,
+        render: (_, item) => {
+          const order = salesOrdersByID.get(Number(item.sales_order_id || 0))
+          return order?.order_no || order?.customer_order_no || '-'
+        },
+        searchText: (item) => {
+          const order = salesOrdersByID.get(Number(item.sales_order_id || 0))
+          return [
+            order?.order_no,
+            order?.customer_order_no,
             salesOrderCustomerText(order),
-          ].join(' '),
+            item.line_no,
+            item.product_name_snapshot,
+          ].join(' ')
+        },
       },
-      { title: '客户订单号', dataIndex: 'customer_order_no', width: 140 },
+      {
+        title: '来源行',
+        dataIndex: 'line_no',
+        width: 88,
+        render: (value) => (value ? `第 ${value} 行` : '-'),
+      },
       {
         title: '客户',
-        width: 190,
-        render: (_, order) => salesOrderCustomerText(order) || '-',
-        searchText: (order) => salesOrderCustomerText(order),
+        width: 160,
+        render: (_, item) =>
+          salesOrderCustomerText(
+            salesOrdersByID.get(Number(item.sales_order_id || 0))
+          ) || '-',
+      },
+      {
+        title: '产品 / SKU',
+        width: 220,
+        render: (_, item) =>
+          sourceLineProductText(item, productOptions, productSKUOptions),
+      },
+      {
+        title: '订单数量',
+        dataIndex: 'orderedQuantity',
+        width: 100,
+        render: formatQuantity,
+      },
+      {
+        title: '已生成出货',
+        dataIndex: 'shippedQuantity',
+        width: 100,
+        render: formatQuantity,
+      },
+      {
+        title: '剩余可出货',
+        dataIndex: 'remainingQuantity',
+        width: 120,
+        render: (value) =>
+          value > 0 ? (
+            <Text strong>{formatQuantity(value)}</Text>
+          ) : (
+            <Text type="secondary">0</Text>
+          ),
       },
       {
         title: '状态',
-        dataIndex: 'lifecycle_status',
-        width: 110,
-      },
-      {
-        title: '计划交付',
-        dataIndex: 'planned_delivery_date',
-        width: 120,
-        render: formatUnixDate,
+        dataIndex: 'line_status',
+        width: 100,
       },
     ],
-    []
+    [productOptions, productSKUOptions, salesOrdersByID]
   )
 
   const loadSalesOrderSources = useCallback(async () => {
     setSourceLoading(true)
     try {
-      const data = await listSalesOrders({
-        lifecycle_status: 'active',
-        limit: 100,
-      })
-      setSalesOrderSources(
-        Array.isArray(data?.sales_orders) ? data.sales_orders : []
+      const [orderData, itemData, shipmentData] = await Promise.all([
+        listSalesOrders({
+          lifecycle_status: 'active',
+          limit: 100,
+        }),
+        listSalesOrderItems({
+          limit: 500,
+        }),
+        listShipments({
+          limit: 500,
+        }),
+      ])
+      const nextOrders = Array.isArray(orderData?.sales_orders)
+        ? orderData.sales_orders
+        : []
+      const activeOrderIDs = new Set(
+        nextOrders.map((order) => Number(order?.id)).filter(Boolean)
       )
+      const nextItems = (
+        Array.isArray(itemData?.sales_order_items)
+          ? itemData.sales_order_items
+          : []
+      ).filter((item) => activeOrderIDs.has(Number(item?.sales_order_id)))
+      const nextSourceRows = buildShipmentSourceRows({
+        salesOrderItems: nextItems,
+        shipments: Array.isArray(shipmentData?.shipments)
+          ? shipmentData.shipments
+          : [],
+      })
+      setSalesOrderSources(nextSourceRows)
+      setSalesOrderSourceItems(nextItems)
+      setShipmentSourceRows(nextSourceRows)
+      setSalesOrders((currentOrders) => {
+        const byID = new Map(
+          currentOrders
+            .map((order) => [Number(order?.id || 0), order])
+            .filter(([orderID]) => Number.isFinite(orderID) && orderID > 0)
+        )
+        nextOrders.forEach((order) => {
+          const orderID = Number(order?.id || 0)
+          if (Number.isFinite(orderID) && orderID > 0) {
+            byID.set(orderID, order)
+          }
+        })
+        return [...byID.values()]
+      })
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载销售订单来源'))
     } finally {
@@ -762,44 +889,51 @@ export default function ShipmentsPage() {
     loadSalesOrderSources()
   }
 
-  const importSalesOrderToShipment = async (orders = []) => {
-    const sourceOrder = orders[0]
+  const importSalesOrderToShipment = async (sourceItems = []) => {
+    const importableItems = sourceItems.filter(
+      (item) => !item.disabledReason && item.remainingQuantity > 0
+    )
+    if (importableItems.length === 0) {
+      message.warning('请选择仍有剩余可出货数量的销售订单行')
+      return
+    }
+    const sourceOrderIDs = new Set(
+      importableItems.map((item) => Number(item.sales_order_id || 0))
+    )
+    if (sourceOrderIDs.size !== 1) {
+      message.warning('一次出货草稿只能导入同一张销售订单的来源行')
+      return
+    }
+    const sourceOrderID = [...sourceOrderIDs][0]
+    const sourceOrder = salesOrdersByID.get(sourceOrderID)
     if (!sourceOrder?.id) return
     try {
       setSourceLoading(true)
-      const data = await listSalesOrderItems({
-        sales_order_id: sourceOrder.id,
-        line_status: 'open',
-        limit: 200,
-      })
-      const sourceItems = Array.isArray(data?.sales_order_items)
-        ? data.sales_order_items
-        : []
-      setSalesOrderItems(sourceItems)
+      const sameOrderItems = salesOrderSourceItems.filter(
+        (item) => Number(item.sales_order_id || 0) === sourceOrderID
+      )
+      setSalesOrderItems(sameOrderItems)
       shipmentForm.setFieldsValue({
         sales_order_id: sourceOrder.id,
         customer_id: sourceOrder.customer_id,
         customer_snapshot: salesOrderCustomerText(sourceOrder),
       })
-      if (sourceItems.length > 0) {
-        const currentItems = (shipmentForm.getFieldValue('items') || []).filter(
-          (item) => !isBlankShipmentItem(item)
-        )
-        shipmentForm.setFieldsValue({
-          items: [
-            ...currentItems,
-            ...sourceItems.map((item) =>
-              createShipmentItemFromSalesOrderItem(
-                item,
-                modalSelectedShipment?.id
-              )
-            ),
-          ],
-        })
-        message.success('已导入销售订单来源和出货明细')
-      } else {
-        message.warning('已带出销售订单信息，但该订单暂无可导入明细')
-      }
+      const currentItems = (shipmentForm.getFieldValue('items') || []).filter(
+        (item) => !isBlankShipmentItem(item)
+      )
+      shipmentForm.setFieldsValue({
+        items: [
+          ...currentItems,
+          ...importableItems.map((item) =>
+            createShipmentItemFromSalesOrderItem(
+              item,
+              modalSelectedShipment?.id,
+              { quantity: item.remainingQuantity }
+            )
+          ),
+        ],
+      })
+      message.success('已导入销售订单来源行和剩余可出货数量')
       setSalesOrderImportOpen(false)
     } catch (error) {
       message.error(getActionErrorMessage(error, '导入销售订单来源'))
@@ -809,6 +943,7 @@ export default function ShipmentsPage() {
   }
 
   const openCreate = () => {
+    shipmentAttachmentRef.current?.clearPendingAttachments()
     shipmentForm.resetFields()
     shipmentForm.setFieldsValue({
       shipment_no: buildSequentialDraftCode(rows, {
@@ -823,6 +958,7 @@ export default function ShipmentsPage() {
   }
 
   const openAppendItems = (shipment) => {
+    shipmentAttachmentRef.current?.clearPendingAttachments()
     shipmentForm.resetFields()
     shipmentForm.setFieldsValue({
       ...shipmentFormValues(shipment),
@@ -832,6 +968,7 @@ export default function ShipmentsPage() {
   }
 
   const closeShipmentModal = () => {
+    shipmentAttachmentRef.current?.clearPendingAttachments()
     setSalesOrderImportOpen(false)
     setShipmentModal(null)
     shipmentForm.resetFields()
@@ -853,13 +990,25 @@ export default function ShipmentsPage() {
     try {
       const values = await shipmentForm.validateFields()
       setSaving(true)
+      let savedShipment = modalSelectedShipment
       if (isCreateModal) {
-        await createShipmentWithItems(buildShipmentWithItemsParams(values))
-        message.success('出货单草稿和明细已保存')
+        savedShipment = await createShipmentWithItems(
+          buildShipmentWithItemsParams(values)
+        )
       } else if (isAppendModal) {
         await addShipmentItems(modalSelectedShipment?.id, values.items || [])
-        message.success('出货明细已保存')
       }
+      const attachmentSaved =
+        (await shipmentAttachmentRef.current?.flushPendingAttachments(
+          savedShipment?.id
+        )) !== false
+      message.success(
+        attachmentSaved
+          ? isCreateModal
+            ? '出货单草稿和明细已保存'
+            : '出货明细已保存'
+          : '出货单已保存，未上传的附件请重新选择'
+      )
       closeShipmentModal()
       await loadRows()
     } catch (error) {
@@ -1272,6 +1421,7 @@ export default function ShipmentsPage() {
             salesOrderOptions={salesOrderOptions}
           />
           <BusinessAttachmentPanel
+            ref={shipmentAttachmentRef}
             ownerType="shipment"
             ownerId={modalSelectedShipment?.id}
             title="出货附件"
@@ -1280,6 +1430,34 @@ export default function ShipmentsPage() {
             canDelete={canCreate || canShip}
             variant="inline"
           />
+          {selectedSalesOrder ? (
+            <Alert
+              className="erp-business-source-summary"
+              showIcon
+              type="info"
+              message={`来源销售订单：${
+                selectedSalesOrder.order_no ||
+                selectedSalesOrder.customer_order_no ||
+                selectedSalesOrder.id
+              }`}
+              description={
+                <Space direction="vertical" size={2}>
+                  <Text>
+                    {`客户：${salesOrderCustomerText(selectedSalesOrder) || '-'}；已导入来源行：${
+                      selectedSourceRows.length
+                    } 行；当前来源行剩余可出货合计：${formatQuantity(
+                      selectedSourceRemainingTotal
+                    )}`}
+                  </Text>
+                  <Text type="secondary">
+                    出货弹窗只做来源预览和默认数量；后端当前保存
+                    sales_order_item_id 追溯，剩余量强校验仍需后续 usecase
+                    合同补齐。
+                  </Text>
+                </Space>
+              }
+            />
+          ) : null}
           {modalSelectedShipment ? (
             <section className="erp-master-contact-list erp-shipment-modal-items">
               <div className="erp-master-contact-list__head">
@@ -1332,19 +1510,20 @@ export default function ShipmentsPage() {
                 <SourceImportPickerModal
                   open={salesOrderImportOpen}
                   title="从销售订单导入出货明细"
-                  description="这里只选择来源销售订单；导入后回到主弹窗维护本次出货数量、仓库和批次。"
+                  description="选择同一张销售订单的来源行；导入后回到主弹窗维护仓库和批次。"
                   rows={salesOrderSources}
                   columns={salesOrderImportColumns}
-                  multiple={false}
+                  multiple
                   loading={sourceLoading}
-                  getSelectedLabel={(order) =>
-                    order?.order_no ||
-                    order?.customer_order_no ||
-                    order?.id ||
-                    '-'
+                  getSelectedLabel={(item) =>
+                    `第 ${item?.line_no || '-'} 行 / ${formatQuantity(
+                      item?.remainingQuantity
+                    )}`
                   }
-                  searchPlaceholder="搜索销售订单号、客户订单号或客户"
-                  emptyDescription="暂无可导入销售订单"
+                  getRowDisabledReason={(item) => item.disabledReason}
+                  isRowDisabled={(item) => Boolean(item.disabledReason)}
+                  searchPlaceholder="搜索销售订单号、客户订单号、客户或产品"
+                  emptyDescription="暂无可导入销售订单行"
                   onCancel={() => setSalesOrderImportOpen(false)}
                   onImport={importSalesOrderToShipment}
                 />

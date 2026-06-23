@@ -274,7 +274,7 @@
 .erp-business-status-reason-modal :where(.ant-input-affix-wrapper),
 .erp-business-record-form textarea.ant-input,
 .erp-business-status-reason-modal textarea.ant-input {
-  border-radius: 10px;
+  border-radius: var(--erp-business-control-radius, 12px);
 }
 
 .erp-business-record-form
@@ -335,6 +335,10 @@
 .erp-permission-modal :where(.ant-input-affix-wrapper),
 .erp-permission-modal .ant-select-selector {
   min-height: 32px;
+}
+
+.erp-business-action-form .erp-business-date-input.ant-picker {
+  border-radius: var(--erp-business-control-radius, 12px);
 }
 
 .erp-business-record-form textarea.ant-input,
@@ -473,17 +477,19 @@
   width: 100%;
 }
 
-.erp-item-field-form-item .erp-item-field-with-unit,
+.erp-item-field-with-unit,
 .erp-item-field-form-item .ant-space-compact {
   width: 100%;
 }
 
+.erp-item-field-with-unit .ant-input,
 .erp-item-field-with-unit .ant-input-number {
   flex: 1 1 auto;
   min-width: 0;
 }
 
 .erp-item-field-unit-suffix.ant-input {
+  flex: 0 0 auto;
   text-align: center;
   color: rgb(0 0 0 / 45%);
   background: #fafafa;

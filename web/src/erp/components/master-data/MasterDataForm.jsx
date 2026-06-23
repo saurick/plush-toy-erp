@@ -29,7 +29,7 @@ function DefaultUnitSelect({ required = false, unitOptions, unitLoading }) {
         loading={unitLoading}
         options={unitOptions}
         placeholder="请选择默认单位"
-        optionFilterProp="label"
+        optionFilterProp="searchText"
       />
     </Form.Item>
   )

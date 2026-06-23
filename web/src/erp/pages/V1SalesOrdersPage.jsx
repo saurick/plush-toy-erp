@@ -42,6 +42,7 @@ import {
   listProductSKUs,
   listSalesOrderItems,
   listSalesOrders,
+  listUnits,
   saveSalesOrderWithItems,
   submitSalesOrder,
 } from '../api/masterDataOrderApi.mjs'
@@ -91,6 +92,7 @@ import {
 import {
   customerOption,
   uniqueReferenceOptions,
+  unitOption,
 } from '../utils/referenceSelectOptions.mjs'
 
 const STATUS_FILTER_OPTIONS = [
@@ -288,6 +290,7 @@ export default function V1SalesOrdersPage() {
   const [orders, setOrders] = useState([])
   const [items, setItems] = useState([])
   const [customers, setCustomers] = useState([])
+  const [units, setUnits] = useState([])
   const [total, setTotal] = useState(0)
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [selectedOrder, setSelectedOrder] = useState(null)
@@ -307,6 +310,7 @@ export default function V1SalesOrdersPage() {
     method: '',
     termDays: undefined,
   })
+  const orderAttachmentRef = useRef(null)
 
   const canCreateOrder = hasActionPermission(adminProfile, 'sales_order.create')
   const canUpdateOrder = hasActionPermission(adminProfile, 'sales_order.update')
@@ -325,6 +329,10 @@ export default function V1SalesOrdersPage() {
   const customerOptions = useMemo(
     () => uniqueReferenceOptions(customers, customerOption),
     [customers]
+  )
+  const unitOptions = useMemo(
+    () => uniqueReferenceOptions(units, unitOption),
+    [units]
   )
   const paymentConditionOptions = useMemo(
     () =>
@@ -428,9 +436,10 @@ export default function V1SalesOrdersPage() {
 
   const loadCustomers = useCallback(async () => {
     try {
-      const [customerResult, skuResult] = await Promise.all([
+      const [customerResult, skuResult, unitResult] = await Promise.all([
         listCustomers({ active_only: true, limit: 200 }),
         listProductSKUs({ active_only: true, limit: 200 }),
+        listUnits({ active_only: true, limit: 500 }),
       ])
       setCustomers(
         Array.isArray(customerResult?.customers) ? customerResult.customers : []
@@ -438,8 +447,9 @@ export default function V1SalesOrdersPage() {
       setProductSKUs(
         Array.isArray(skuResult?.product_skus) ? skuResult.product_skus : []
       )
+      setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
     } catch (error) {
-      message.error(getActionErrorMessage(error, '加载客户和 SKU 选项'))
+      message.error(getActionErrorMessage(error, '加载客户、SKU 和单位选项'))
     }
   }, [])
 
@@ -525,6 +535,7 @@ export default function V1SalesOrdersPage() {
   }, [loadOrders, outletContext])
 
   const openCreateOrder = () => {
+    orderAttachmentRef.current?.clearPendingAttachments()
     setEditingOrder(null)
     orderForm.resetFields()
     orderForm.setFieldsValue({
@@ -541,6 +552,7 @@ export default function V1SalesOrdersPage() {
 
   const openEditOrder = async (order) => {
     if (!order?.id) return
+    orderAttachmentRef.current?.clearPendingAttachments()
     setSelectedOrder(order)
     setEditingOrder(order)
     orderForm.setFieldsValue({
@@ -602,9 +614,18 @@ export default function V1SalesOrdersPage() {
       const savedItems = Array.isArray(result?.sales_order_items)
         ? result.sales_order_items
         : []
+      const attachmentSaved =
+        (await orderAttachmentRef.current?.flushPendingAttachments(
+          saved?.id
+        )) !== false
       message.success(
-        editingOrder?.id ? '销售订单与订单行已更新' : '销售订单已创建'
+        attachmentSaved
+          ? editingOrder?.id
+            ? '销售订单与订单行已更新'
+            : '销售订单已创建'
+          : '销售订单已保存，未上传的附件请重新选择'
       )
+      orderAttachmentRef.current?.clearPendingAttachments()
       setOrderModalOpen(false)
       setSelectedOrder(saved || selectedOrder)
       setItems(savedItems)
@@ -1310,7 +1331,10 @@ export default function V1SalesOrdersPage() {
         description="只维护客户订单承诺，不在此写出货、库存或财务事实。"
         open={orderModalOpen}
         onOk={saveOrder}
-        onCancel={() => setOrderModalOpen(false)}
+        onCancel={() => {
+          orderAttachmentRef.current?.clearPendingAttachments()
+          setOrderModalOpen(false)
+        }}
         confirmLoading={saving || itemLoading}
         forceRender
         destroyOnHidden={false}
@@ -1329,6 +1353,7 @@ export default function V1SalesOrdersPage() {
             onPaymentConditionBlur={requestPaymentConditionPriceReview}
           />
           <BusinessAttachmentPanel
+            ref={orderAttachmentRef}
             ownerType="sales_order"
             ownerId={editingOrder?.id}
             title="订单附件"
@@ -1343,6 +1368,7 @@ export default function V1SalesOrdersPage() {
             canUpdateItem={canUpdateItem}
             canCancelItem={canCancelItem}
             productSKUs={productSKUs}
+            unitOptions={unitOptions}
           />
         </Form>
       </BusinessFormModal>

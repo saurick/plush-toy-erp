@@ -9,6 +9,7 @@
 .business-attachment-panel--inline {
   grid-column: 1 / -1;
   border-color: #d8e3dc;
+  margin-block-start: 16px;
   padding: 10px 12px;
 }
 
@@ -62,6 +63,32 @@
   color: #6b7280;
 }
 
+.business-attachment-panel__preview-frame {
+  width: 100%;
+  height: min(72vh, 720px);
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.business-attachment-panel__preview-image-wrap {
+  display: grid;
+  place-items: center;
+  max-height: min(72vh, 720px);
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.business-attachment-panel__preview-image {
+  display: block;
+  max-width: 100%;
+  max-height: calc(min(72vh, 720px) - 24px);
+  object-fit: contain;
+}
+
 .business-attachment-panel--inline .ant-list-empty-text {
   padding: 4px 0 0;
 }
@@ -96,6 +123,16 @@
   color: #94a3b8;
 }
 
+[data-erp-theme='dark'] .business-attachment-panel__preview-frame {
+  border-color: #334155;
+  background: #0f172a;
+}
+
+[data-erp-theme='dark'] .business-attachment-panel__preview-image-wrap {
+  border-color: #334155;
+  background: #020617;
+}
+
 @media (max-width: 640px) {
   .business-attachment-panel__header {
     flex-direction: column;
@@ -103,5 +140,10 @@
 
   .business-attachment-panel__header .ant-btn {
     width: 100%;
+  }
+
+  .business-attachment-panel__preview-frame,
+  .business-attachment-panel__preview-image-wrap {
+    height: min(68vh, 560px);
   }
 }

@@ -2,6 +2,12 @@ import React, { useCallback } from 'react'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { Button, Form, Input, InputNumber, Select } from 'antd'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import FieldWithUnitSuffix, {
+  isQuantityTextWithinUnitPrecision,
+  unitPrecisionErrorMessage,
+  unitPrecisionFromOptions,
+  unitSuffixTextFromOptions,
+} from '../business-list/FieldWithUnitSuffix.jsx'
 import {
   dateInputNotAfterRule,
   dateInputNotBeforeRule,
@@ -45,6 +51,18 @@ function summarizeLines(lines = []) {
     }),
     { count: 0, quantity: 0, amount: 0 }
   )
+}
+
+function quantityPrecisionRule({ form, fieldName, unitOptions }) {
+  return {
+    validator: async (_, value) => {
+      const line = form.getFieldValue(['items', fieldName]) || {}
+      const precision = unitPrecisionFromOptions(unitOptions, line.unit_id)
+      if (!isQuantityTextWithinUnitPrecision(value, precision)) {
+        throw new Error(unitPrecisionErrorMessage(precision))
+      }
+    },
+  }
 }
 
 function getNextLineNo(lines = []) {
@@ -254,6 +272,7 @@ export default function OutsourcingOrderForm({
                         <Input />
                       </Form.Item>
                       <Form.Item
+                        className="erp-line-item-field erp-line-item-field--line-no"
                         name={[field.name, 'line_no']}
                         label="行号"
                         rules={[{ required: true, message: '请输入行号' }]}
@@ -265,6 +284,7 @@ export default function OutsourcingOrderForm({
                         />
                       </Form.Item>
                       <Form.Item
+                        className="erp-line-item-field erp-line-item-field--source"
                         name={[field.name, 'product_id']}
                         label="产品"
                         rules={[{ required: true, message: '请选择产品' }]}
@@ -279,6 +299,7 @@ export default function OutsourcingOrderForm({
                         />
                       </Form.Item>
                       <Form.Item
+                        className="erp-line-item-field erp-line-item-field--source"
                         name={[field.name, 'process_id']}
                         label="工序"
                         extra="查货只表示加工环节；合格、不合格、让步、返工等结果不在加工合同里维护。"
@@ -294,6 +315,7 @@ export default function OutsourcingOrderForm({
                         />
                       </Form.Item>
                       <Form.Item
+                        className="erp-line-item-field erp-line-item-field--unit"
                         name={[field.name, 'unit_id']}
                         label="单位"
                         rules={[{ required: true, message: '请选择单位' }]}
@@ -301,8 +323,15 @@ export default function OutsourcingOrderForm({
                         <Select
                           showSearch
                           options={unitOptions}
-                          optionFilterProp="label"
-                          onChange={(value) => onUnitChange(field.name, value)}
+                          optionFilterProp="searchText"
+                          onChange={(value) => {
+                            onUnitChange(field.name, value)
+                            form
+                              .validateFields([
+                                ['items', field.name, 'outsourcing_quantity'],
+                              ])
+                              .catch(() => {})
+                          }}
                         />
                       </Form.Item>
                       <Form.Item
@@ -336,19 +365,43 @@ export default function OutsourcingOrderForm({
                         <Input />
                       </Form.Item>
                       <Form.Item
+                        className="erp-line-item-field erp-line-item-field--quantity"
                         name={[field.name, 'outsourcing_quantity']}
                         label="加工数量"
-                        rules={[{ required: true, message: '请输入加工数量' }]}
+                        rules={[
+                          { required: true, message: '请输入加工数量' },
+                          quantityPrecisionRule({
+                            form,
+                            fieldName: field.name,
+                            unitOptions,
+                          }),
+                        ]}
+                      >
+                        <FieldWithUnitSuffix
+                          control={<Input />}
+                          unitText={unitSuffixTextFromOptions(
+                            unitOptions,
+                            watchedItems?.[field.name]?.unit_id,
+                            watchedItems?.[field.name]?.unit_name_snapshot
+                          )}
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        className="erp-line-item-field erp-line-item-field--money"
+                        name={[field.name, 'unit_price']}
+                        label="单价"
                       >
                         <Input />
                       </Form.Item>
-                      <Form.Item name={[field.name, 'unit_price']} label="单价">
-                        <Input />
-                      </Form.Item>
-                      <Form.Item name={[field.name, 'amount']} label="金额">
+                      <Form.Item
+                        className="erp-line-item-field erp-line-item-field--money"
+                        name={[field.name, 'amount']}
+                        label="金额"
+                      >
                         <Input />
                       </Form.Item>
                       <Form.Item
+                        className="erp-line-item-field erp-line-item-field--date"
                         name={[field.name, 'expected_return_date']}
                         label="行预计回货"
                         dependencies={['order_date']}
@@ -369,7 +422,7 @@ export default function OutsourcingOrderForm({
                         />
                       </Form.Item>
                       <Form.Item
-                        className="erp-sales-order-lines-form__field--full"
+                        className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
                         name={[field.name, 'note']}
                         label="备注"
                       >

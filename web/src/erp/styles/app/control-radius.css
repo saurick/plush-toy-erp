@@ -1,0 +1,166 @@
+#root,
+body {
+  --erp-control-radius: 12px;
+  --erp-form-control-height: 36px;
+}
+
+#root
+  :is(
+    .ant-input,
+    .ant-input-affix-wrapper,
+    .ant-input-number,
+    .ant-picker,
+    .ant-select-selector,
+    textarea.ant-input,
+    input:not([type]),
+    input[type='text'],
+    input[type='search'],
+    input[type='password'],
+    input[type='email'],
+    input[type='tel'],
+    input[type='number'],
+    select
+  ),
+body
+  :is(.ant-modal, .ant-drawer, .ant-popover, .ant-dropdown)
+  :is(
+    .ant-input,
+    .ant-input-affix-wrapper,
+    .ant-input-number,
+    .ant-picker,
+    .ant-select-selector,
+    textarea.ant-input,
+    input:not([type]),
+    input[type='text'],
+    input[type='search'],
+    input[type='password'],
+    input[type='email'],
+    input[type='tel'],
+    input[type='number'],
+    select
+  ) {
+  border-radius: var(--erp-control-radius);
+  border-start-start-radius: var(--erp-control-radius);
+  border-start-end-radius: var(--erp-control-radius);
+  border-end-start-radius: var(--erp-control-radius);
+  border-end-end-radius: var(--erp-control-radius);
+}
+
+#root
+  :is(
+    input[type='checkbox'],
+    input[type='radio'],
+    input[type='range'],
+    input[type='file'],
+    input[type='button'],
+    input[type='submit'],
+    input[type='reset'],
+    input[type='hidden'],
+    .ant-select-selection-search-input,
+    .ant-input-number-input,
+    .ant-picker-input > input,
+    .erp-item-field-unit-suffix
+  ),
+body
+  :is(.ant-modal, .ant-drawer, .ant-popover, .ant-dropdown)
+  :is(
+    input[type='checkbox'],
+    input[type='radio'],
+    input[type='range'],
+    input[type='file'],
+    input[type='button'],
+    input[type='submit'],
+    input[type='reset'],
+    input[type='hidden'],
+    .ant-select-selection-search-input,
+    .ant-input-number-input,
+    .ant-picker-input > input,
+    .erp-item-field-unit-suffix
+  ) {
+  border-radius: revert;
+  border-start-start-radius: revert;
+  border-start-end-radius: revert;
+  border-end-start-radius: revert;
+  border-end-end-radius: revert;
+}
+
+body .ant-modal .erp-business-form,
+#root .erp-business-form {
+  --erp-control-height: var(--erp-form-control-height);
+}
+
+body
+  .ant-modal
+  .erp-business-form
+  :is(
+    .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper),
+    .ant-input-number,
+    .ant-picker,
+    .ant-select-single,
+    .ant-select-single .ant-select-selector,
+    input.ant-input:not([type='hidden'])
+  ),
+#root
+  .erp-business-form
+  :is(
+    .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper),
+    .ant-input-number,
+    .ant-picker,
+    .ant-select-single,
+    .ant-select-single .ant-select-selector,
+    input.ant-input:not([type='hidden'])
+  ) {
+  height: var(--erp-control-height);
+  min-height: var(--erp-control-height);
+}
+
+body .ant-modal .erp-business-form :is(.ant-select-single .ant-select-selector),
+#root .erp-business-form :is(.ant-select-single .ant-select-selector) {
+  align-items: center;
+}
+
+body
+  .ant-modal
+  .erp-business-form
+  :is(
+    .ant-select-single .ant-select-selection-item,
+    .ant-select-single .ant-select-selection-placeholder,
+    .ant-select-single .ant-select-selection-search-input
+  ),
+#root
+  .erp-business-form
+  :is(
+    .ant-select-single .ant-select-selection-item,
+    .ant-select-single .ant-select-selection-placeholder,
+    .ant-select-single .ant-select-selection-search-input
+  ) {
+  height: calc(var(--erp-control-height) - 2px);
+  line-height: calc(var(--erp-control-height) - 2px);
+}
+
+body
+  .ant-modal
+  .erp-business-form
+  :is(
+    .ant-input-affix-wrapper input.ant-input,
+    .ant-input-number-input,
+    .ant-picker-input > input
+  ),
+#root
+  .erp-business-form
+  :is(
+    .ant-input-affix-wrapper input.ant-input,
+    .ant-input-number-input,
+    .ant-picker-input > input
+  ) {
+  height: calc(var(--erp-control-height) - 2px);
+  min-height: 0;
+  line-height: calc(var(--erp-control-height) - 2px);
+}
+
+body .ant-modal .erp-business-form textarea.ant-input,
+#root .erp-business-form textarea.ant-input {
+  height: auto;
+  min-height: calc(var(--erp-control-height) * 2);
+  line-height: 1.45;
+}

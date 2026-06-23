@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   DownloadOutlined,
@@ -79,7 +79,7 @@ import {
   buildProductSKUParams,
   buildTextSelectOptions,
   buildUnitSelectOptions,
-  formatUnitDisplayName,
+  formatUnitShortDisplayName,
   formatUnixDateTime,
   hasActionPermission,
   inferDefaultUnitID,
@@ -425,6 +425,7 @@ export default function V1MasterDataPage({ type }) {
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [recordForm] = Form.useForm()
+  const skuAttachmentRef = useRef(null)
   const moduleKey = config.recordKey
   const supportsContacts = Boolean(config.ownerType)
   const entityLabel = config.entityLabel || '主体'
@@ -507,7 +508,7 @@ export default function V1MasterDataPage({ type }) {
     [effectiveType, records]
   )
   const unitDisplay = useCallback(
-    (unitID) => formatUnitDisplayName(unitID, unitByID),
+    (unitID) => formatUnitShortDisplayName(unitID, unitByID),
     [unitByID]
   )
   const applyCustomerPaymentMethod = useCallback(
@@ -646,6 +647,7 @@ export default function V1MasterDataPage({ type }) {
   }, [effectiveType])
 
   const openCreateRecord = () => {
+    skuAttachmentRef.current?.clearPendingAttachments()
     setEditingRecord(null)
     setContacts([])
     recordForm.resetFields()
@@ -703,6 +705,7 @@ export default function V1MasterDataPage({ type }) {
 
   const openEditRecord = async (record) => {
     if (!record?.id) return
+    skuAttachmentRef.current?.clearPendingAttachments()
     setSelectedRecord(record)
     setEditingRecord(record)
     recordForm.resetFields()
@@ -743,7 +746,20 @@ export default function V1MasterDataPage({ type }) {
         : editingRecord?.id
           ? await config.update(params)
           : await config.create(params)
-      message.success(editingRecord?.id ? '主数据已更新' : '主数据已创建')
+      const attachmentSaved =
+        effectiveType === 'product_skus'
+          ? (await skuAttachmentRef.current?.flushPendingAttachments(
+              saved?.id
+            )) !== false
+          : true
+      message.success(
+        attachmentSaved
+          ? editingRecord?.id
+            ? '主数据已更新'
+            : '主数据已创建'
+          : '主数据已保存，未上传的附件请重新选择'
+      )
+      skuAttachmentRef.current?.clearPendingAttachments()
       setRecordModalOpen(false)
       setSelectedRecord(saved || selectedRecord)
       if (Array.isArray(savedData?.contacts)) {
@@ -1499,7 +1515,10 @@ export default function V1MasterDataPage({ type }) {
         description={config.formBoundary}
         open={recordModalOpen}
         onOk={saveRecord}
-        onCancel={() => setRecordModalOpen(false)}
+        onCancel={() => {
+          skuAttachmentRef.current?.clearPendingAttachments()
+          setRecordModalOpen(false)
+        }}
         confirmLoading={saving || contactLoading}
         forceRender
         destroyOnHidden={false}
@@ -1525,6 +1544,7 @@ export default function V1MasterDataPage({ type }) {
           />
           {effectiveType === 'product_skus' ? (
             <BusinessAttachmentPanel
+              ref={skuAttachmentRef}
               ownerType="product_sku"
               ownerId={editingRecord?.id}
               title="SKU 附件"

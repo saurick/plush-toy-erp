@@ -128,6 +128,7 @@
 
 .erp-business-page-layout {
   --erp-business-control-height: 36px;
+  --erp-business-control-radius: 12px;
   --erp-business-card-radius: 8px;
   --erp-business-card-border: #dfe9e1;
   --erp-business-collaboration-bg: #f6fbf7;
@@ -567,7 +568,7 @@
 :where(.erp-business-filter-control.ant-select) .ant-select-selector,
 .erp-business-date-range-filter {
   border-color: var(--erp-business-control-border);
-  border-radius: 10px;
+  border-radius: var(--erp-business-control-radius);
 }
 
 .erp-business-filter-control.ant-input-affix-wrapper:hover,
@@ -769,10 +770,14 @@
   min-width: 0;
   height: var(--erp-business-control-height);
   border-color: var(--erp-business-control-border);
-  border-radius: 8px;
+  border-radius: var(--erp-business-control-radius);
   background: #fff;
   cursor: pointer;
   box-shadow: none;
+}
+
+.erp-business-action-form .erp-business-date-input.ant-picker {
+  border-radius: var(--erp-business-control-radius);
 }
 
 .erp-business-date-input.ant-picker:hover,

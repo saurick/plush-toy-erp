@@ -596,6 +596,8 @@ async function runScenarioOnce(browser, scenario) {
     }
 
     await scenario.verify(page)
+    await assertVisibleInputControlRadius(page, scenario.name)
+    await assertVisibleBusinessFormControlHeight(page, scenario.name)
     await assertNoHorizontalOverflow(page, scenario.name)
     assert.deepEqual(errors, [], `${scenario.name} 出现控制台或运行时错误`)
 
@@ -1913,6 +1915,9 @@ async function verifyBusinessActionFormModal(
       )
     )
       .filter((control) => {
+        if (control.matches('.erp-item-field-unit-suffix')) {
+          return false
+        }
         if (
           control.matches('input.ant-input, textarea.ant-input') &&
           control.closest(
@@ -2174,6 +2179,12 @@ async function verifyBusinessActionFormModal(
       (control) => control.width >= 120 && control.height >= 30
     ),
     `${screenshotName} 表单控件尺寸异常: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.controls.every(
+      (control) => Number.parseFloat(control.borderRadius) >= 9
+    ),
+    `${screenshotName} 表单控件圆角未统一到业务弹窗基线: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.singleLineControls.length > 0 &&
@@ -3424,7 +3435,8 @@ async function assertAdminRoleModalLayout(page, { scenarioName, title }) {
     ...new Set(metrics.controls.map((control) => control.borderRadius)),
   ]
   assert(
-    controlRadii.length === 1 && controlRadii[0] === '10px',
+    controlRadii.length === 1 &&
+      Number.parseFloat(controlRadii[0] || '0') >= 10,
     `${scenarioName} 创建管理员弹窗输入框圆角不一致: ${JSON.stringify(metrics)}`
   )
 }
@@ -5766,6 +5778,233 @@ async function assertNoHorizontalOverflow(page, scenarioName) {
   assert(
     metrics.docScrollWidth <= metrics.viewportWidth + 2,
     `${scenarioName} document 出现横向溢出: ${JSON.stringify(metrics)}`
+  )
+}
+
+async function assertVisibleInputControlRadius(page, scenarioName) {
+  const issues = await page.evaluate(() => {
+    const minRadius = 10
+    const ignoredAncestorSelector = [
+      '.ant-picker-dropdown',
+      '.ant-select-dropdown',
+      '.ant-dropdown',
+      '.ant-tooltip',
+      '.ant-popover',
+      '.ant-table-filter-dropdown',
+      '.erp-print-shell',
+      '.erp-print-paper',
+      '.erp-material-contract-paper',
+      '.erp-processing-contract-paper',
+      '[data-server-pdf-root]',
+    ].join(',')
+    const candidateSelector = [
+      '.ant-input-affix-wrapper',
+      '.ant-input-number',
+      '.ant-picker',
+      '.ant-select-selector',
+      'input.ant-input:not([type="hidden"])',
+      'textarea.ant-input',
+      'input:not([type])',
+      'input[type="text"]',
+      'input[type="search"]',
+      'input[type="password"]',
+      'input[type="email"]',
+      'input[type="tel"]',
+      'input[type="number"]',
+      'textarea',
+      'select',
+    ].join(',')
+
+    const isVisible = (node) => {
+      const rect = node.getBoundingClientRect()
+      const style = window.getComputedStyle(node)
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== 'none' &&
+        style.visibility !== 'hidden'
+      )
+    }
+
+    const describe = (node) => {
+      const classes =
+        typeof node.className === 'string'
+          ? node.className.trim().split(/\s+/).filter(Boolean).slice(0, 5)
+          : []
+      return {
+        tagName: node.tagName,
+        className: classes.join(' '),
+        placeholder: node.getAttribute('placeholder') || '',
+        text: String(node.textContent || '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 80),
+        ariaLabel: node.getAttribute('aria-label') || '',
+        type: node.getAttribute('type') || '',
+      }
+    }
+
+    const isNestedNativeInput = (node) =>
+      node.matches('input, textarea, select') &&
+      node.closest(
+        '.ant-input-affix-wrapper, .ant-input-number, .ant-picker, .ant-select, .ant-input-textarea-affix-wrapper'
+      )
+
+    const isIgnoredNativeType = (node) =>
+      node.matches(
+        'input[type="hidden"], input[type="checkbox"], input[type="radio"], input[type="file"], input[type="button"], input[type="submit"], input[type="reset"]'
+      )
+
+    const failures = []
+    const candidates = Array.from(document.querySelectorAll(candidateSelector))
+    for (const node of candidates) {
+      if (!(node instanceof HTMLElement)) continue
+      if (!isVisible(node)) continue
+      if (node.closest(ignoredAncestorSelector)) continue
+      if (isIgnoredNativeType(node)) continue
+      if (isNestedNativeInput(node)) continue
+      if (
+        node.matches(
+          '.ant-select-selection-search-input, .ant-input-number-input'
+        )
+      ) {
+        continue
+      }
+      if (node.matches('.erp-item-field-unit-suffix')) continue
+
+      const style = window.getComputedStyle(node)
+      const radii = [
+        style.borderTopLeftRadius,
+        style.borderTopRightRadius,
+        style.borderBottomRightRadius,
+        style.borderBottomLeftRadius,
+      ].map((value) => Number.parseFloat(value || '0'))
+      const hasRadiusIssue = radii.some(
+        (value) => !Number.isFinite(value) || value < minRadius
+      )
+      if (hasRadiusIssue) {
+        const rect = node.getBoundingClientRect()
+        failures.push({
+          ...describe(node),
+          width: Number(rect.width.toFixed(1)),
+          height: Number(rect.height.toFixed(1)),
+          borderRadius: style.borderRadius,
+          radii,
+        })
+      }
+    }
+    return failures.slice(0, 20)
+  })
+
+  assert.deepEqual(
+    issues,
+    [],
+    `${scenarioName} 可见输入控件圆角未达到 ERP 基线: ${JSON.stringify(issues)}`
+  )
+}
+
+async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
+  const issues = await page.evaluate(() => {
+    const formSelector = '.erp-business-form, .erp-business-action-form'
+    const candidateSelector = [
+      '.ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)',
+      '.ant-input-number',
+      '.ant-picker',
+      '.ant-select-single',
+      'input.ant-input:not([type="hidden"])',
+    ].join(',')
+    const ignoredAncestorSelector = [
+      '.ant-picker-dropdown',
+      '.ant-select-dropdown',
+      '.ant-dropdown',
+      '.ant-tooltip',
+      '.ant-popover',
+      '.ant-table-filter-dropdown',
+      '.erp-print-shell',
+      '.erp-print-paper',
+      '.erp-material-contract-paper',
+      '.erp-processing-contract-paper',
+      '[data-server-pdf-root]',
+    ].join(',')
+
+    const isVisible = (node) => {
+      const rect = node.getBoundingClientRect()
+      const style = window.getComputedStyle(node)
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== 'none' &&
+        style.visibility !== 'hidden'
+      )
+    }
+
+    const getLayoutHeight = (node) => Number(node.offsetHeight || 0)
+
+    const describe = (node, form, expectedHeight) => {
+      const classes =
+        typeof node.className === 'string'
+          ? node.className.trim().split(/\s+/).filter(Boolean).slice(0, 5)
+          : []
+      return {
+        tagName: node.tagName,
+        className: classes.join(' '),
+        placeholder: node.getAttribute('placeholder') || '',
+        type: node.getAttribute('type') || '',
+        formClassName:
+          typeof form.className === 'string'
+            ? form.className
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean)
+                .slice(0, 5)
+                .join(' ')
+            : '',
+        expectedHeight,
+        height: Number(getLayoutHeight(node).toFixed(1)),
+      }
+    }
+
+    const forms = Array.from(document.querySelectorAll(formSelector))
+    const failures = []
+    for (const form of forms) {
+      if (!(form instanceof HTMLElement)) continue
+      if (!isVisible(form)) continue
+      const formStyle = window.getComputedStyle(form)
+      const expectedHeight =
+        Number.parseFloat(formStyle.getPropertyValue('--erp-control-height')) ||
+        36
+      const candidates = Array.from(form.querySelectorAll(candidateSelector))
+      for (const node of candidates) {
+        if (!(node instanceof HTMLElement)) continue
+        if (!isVisible(node)) continue
+        if (node.closest(ignoredAncestorSelector)) continue
+        if (
+          node.matches('input') &&
+          node.closest(
+            '.ant-input-affix-wrapper, .ant-input-number, .ant-picker, .ant-select'
+          )
+        ) {
+          continue
+        }
+        if (
+          node.matches('textarea, input[type="checkbox"], input[type="radio"]')
+        ) {
+          continue
+        }
+
+        const height = getLayoutHeight(node)
+        if (Math.abs(height - expectedHeight) > 1) {
+          failures.push(describe(node, form, expectedHeight))
+        }
+      }
+    }
+    return failures.slice(0, 20)
+  })
+
+  assert.deepEqual(
+    issues,
+    [],
+    `${scenarioName} 业务表单单行输入控件高度未统一: ${JSON.stringify(issues)}`
   )
 }
 

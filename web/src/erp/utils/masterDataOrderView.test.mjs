@@ -25,6 +25,7 @@ import {
   deriveOutsourcingOrderItemAmount,
   deriveSalesOrderItemAmount,
   formatUnitDisplayName,
+  formatUnitShortDisplayName,
   formatPaymentCondition,
   formatUnixDateTime,
   hasActionPermission,
@@ -368,20 +369,54 @@ test('masterDataOrderView: payment condition completeness requires method and cy
 
 test('masterDataOrderView: unit display uses readable unit truth instead of raw ids', () => {
   const units = [
-    { id: 12, code: 'M', name: '米', is_active: true },
-    { id: 13, code: 'PCS', name: 'PCS', is_active: true },
+    { id: 12, code: 'M', name: '米', precision: 2, is_active: true },
+    { id: 13, code: 'PCS', name: 'PCS', precision: 0, is_active: true },
+    {
+      id: 15,
+      code: 'SIM-PLUSH-CORE-KG',
+      name: '核心演示单位-千克',
+      precision: 3,
+      is_active: true,
+    },
     { id: 14, code: 'BOX', name: '箱', is_active: false },
   ]
   const unitByID = new Map(units.map((unit) => [unit.id, unit]))
 
   assert.equal(formatUnitDisplayName(12, unitByID), '米（M）')
   assert.equal(formatUnitDisplayName(13, unitByID), 'PCS')
+  assert.equal(
+    formatUnitDisplayName(15, unitByID),
+    '核心演示单位-千克（SIM-PLUSH-CORE-KG）'
+  )
+  assert.equal(formatUnitShortDisplayName(15, unitByID), '千克（KG）')
   assert.equal(formatUnitDisplayName(undefined, unitByID), '-')
   assert.equal(formatUnitDisplayName(99, unitByID), '未知单位 #99')
 
   assert.deepEqual(buildUnitSelectOptions(units), [
-    { value: 12, label: '米（M）' },
-    { value: 13, label: 'PCS' },
+    {
+      value: 12,
+      label: '米（M）',
+      suffixLabel: '米（M）',
+      searchText: '米（M） 米（M）',
+      title: '米（M）',
+      precision: 2,
+    },
+    {
+      value: 13,
+      label: 'PCS',
+      suffixLabel: 'PCS',
+      searchText: 'PCS PCS',
+      title: 'PCS',
+      precision: 0,
+    },
+    {
+      value: 15,
+      label: '千克（KG）',
+      suffixLabel: '千克（KG）',
+      searchText: '千克（KG） 核心演示单位-千克（SIM-PLUSH-CORE-KG）',
+      title: '核心演示单位-千克（SIM-PLUSH-CORE-KG）',
+      precision: 3,
+    },
   ])
 })
 
@@ -548,6 +583,30 @@ test('masterDataOrderView: sales order item amount derives from quantity and uni
       amount: '999',
     }),
     '40.00'
+  )
+  assert.equal(
+    deriveSalesOrderItemAmount({
+      ordered_quantity: '123.11',
+      unit_price: '12.11',
+      amount: '',
+    }),
+    '1490.8621'
+  )
+  assert.equal(
+    deriveSalesOrderItemAmount({
+      ordered_quantity: '0.1',
+      unit_price: '0.2',
+      amount: '',
+    }),
+    '0.02'
+  )
+  assert.equal(
+    deriveSalesOrderItemAmount({
+      ordered_quantity: '1.005',
+      unit_price: '1',
+      amount: '',
+    }),
+    '1.005'
   )
   assert.equal(
     deriveSalesOrderItemAmount({

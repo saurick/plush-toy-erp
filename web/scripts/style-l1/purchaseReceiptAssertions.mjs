@@ -830,7 +830,10 @@ export function createPurchaseReceiptAssertions(deps) {
           tagName: focusedControl.tagName,
           className: String(focusedControl.className || ''),
           borderColor: style.borderColor,
+          borderRadius: style.borderRadius,
           boxShadow: style.boxShadow,
+          outlineStyle: style.outlineStyle,
+          outlineWidth: style.outlineWidth,
           width: rect.width,
           height: rect.height,
           matchesFocus:
@@ -854,6 +857,14 @@ export function createPurchaseReceiptAssertions(deps) {
       assert(
         isAcceptedFocusBorder(metrics),
         `${scenarioName} ${metrics.label} focus 边框未统一到绿色主题: ${JSON.stringify(metrics)}`
+      )
+      assert(
+        Number.parseFloat(metrics.borderRadius) >= 9,
+        `${scenarioName} ${metrics.label} 输入框圆角未符合业务弹窗基线: ${JSON.stringify(metrics)}`
+      )
+      assert(
+        metrics.outlineStyle === 'none' || metrics.outlineWidth === '0px',
+        `${scenarioName} ${metrics.label} focus 仍暴露浏览器默认 outline: ${JSON.stringify(metrics)}`
       )
       assertNoBlueFocusStyle(metrics, scenarioName)
     })

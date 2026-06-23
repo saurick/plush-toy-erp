@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -11,6 +11,7 @@ import {
   StopOutlined,
 } from '@ant-design/icons'
 import {
+  Alert,
   Button,
   Dropdown,
   Form,
@@ -64,6 +65,7 @@ import {
   positiveInt,
   todayInputValue,
 } from '../components/quality-inspections/QualityInspectionForms.jsx'
+import { decimalNumber, formatQuantity } from '../utils/businessLineItems.mjs'
 import {
   compactParams,
   formatUnixDate,
@@ -300,6 +302,7 @@ export default function V1QualityInspectionsPage() {
   const [warehouses, setWarehouses] = useState([])
   const [inspectionForm] = Form.useForm()
   const [decisionForm] = Form.useForm()
+  const inspectionAttachmentRef = useRef(null)
   const routePurchaseOrderID = searchParamPositiveIntText(
     searchParams,
     'purchase_order_id'
@@ -310,6 +313,10 @@ export default function V1QualityInspectionsPage() {
   )
   const selectedPurchaseReceiptID = Form.useWatch(
     'purchase_receipt_id',
+    inspectionForm
+  )
+  const selectedPurchaseReceiptItemID = Form.useWatch(
+    'purchase_receipt_item_id',
     inspectionForm
   )
 
@@ -364,6 +371,16 @@ export default function V1QualityInspectionsPage() {
   const warehouseOptions = useMemo(
     () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
     [warehouses]
+  )
+  const selectedPurchaseReceipt = useMemo(
+    () => findByPositiveID(selectedPurchaseReceiptID, purchaseReceipts) || null,
+    [purchaseReceipts, selectedPurchaseReceiptID]
+  )
+  const selectedPurchaseReceiptItem = useMemo(
+    () =>
+      findByPositiveID(selectedPurchaseReceiptItemID, purchaseReceiptItems) ||
+      null,
+    [purchaseReceiptItems, selectedPurchaseReceiptItemID]
   )
 
   const persistColumnOrder = useCallback(
@@ -545,14 +562,17 @@ export default function V1QualityInspectionsPage() {
   }, [decisionForm, inspectionForm, inspectionModal?.mode, rows])
 
   const openCreate = useCallback(() => {
+    inspectionAttachmentRef.current?.clearPendingAttachments()
     setInspectionModal({ mode: 'create' })
   }, [])
 
   const openDecision = useCallback((mode, inspection) => {
+    inspectionAttachmentRef.current?.clearPendingAttachments()
     setInspectionModal({ mode, inspection })
   }, [])
 
   const closeModal = useCallback(() => {
+    inspectionAttachmentRef.current?.clearPendingAttachments()
     setInspectionModal(null)
   }, [])
 
@@ -594,7 +614,15 @@ export default function V1QualityInspectionsPage() {
       const inspection = await createQualityInspectionDraft(
         buildInspectionParams(values)
       )
-      message.success('来料质检草稿已创建')
+      const attachmentSaved =
+        (await inspectionAttachmentRef.current?.flushPendingAttachments(
+          inspection?.id
+        )) !== false
+      message.success(
+        attachmentSaved
+          ? '来料质检草稿已创建'
+          : '来料质检草稿已创建，未上传的附件请重新选择'
+      )
       setSelectedRow(inspection)
       closeModal()
       await loadRows()
@@ -642,8 +670,14 @@ export default function V1QualityInspectionsPage() {
         successText = '来料质检已取消'
       }
       const nextInspection = await action(params)
+      const attachmentSaved =
+        (await inspectionAttachmentRef.current?.flushPendingAttachments(
+          nextInspection?.id || inspection.id
+        )) !== false
       setSelectedRow(nextInspection || inspection)
-      message.success(successText)
+      message.success(
+        attachmentSaved ? successText : `${successText}，未上传的附件请重新选择`
+      )
       closeModal()
       await loadRows()
     } catch (error) {
@@ -1356,17 +1390,81 @@ export default function V1QualityInspectionsPage() {
         cancelText="关闭"
       >
         {inspectionModal?.mode === 'create' ? (
-          <QualityInspectionCreateForm
-            form={inspectionForm}
-            purchaseReceiptOptions={purchaseReceiptOptions}
-            purchaseReceiptItemOptions={purchaseReceiptItemOptions}
-            inventoryLotOptions={inventoryLotOptions}
-            materialOptions={materialOptions}
-            warehouseOptions={warehouseOptions}
-            onReceiptChange={handleReceiptChange}
-            onReceiptItemChange={handleReceiptItemChange}
-            onInventoryLotChange={handleInventoryLotChange}
-          />
+          <>
+            {selectedPurchaseReceipt ? (
+              <Alert
+                className="erp-business-source-summary"
+                showIcon
+                type={selectedPurchaseReceiptItem ? 'info' : 'warning'}
+                message={`来源采购入库：${
+                  selectedPurchaseReceipt.receipt_no ||
+                  selectedPurchaseReceipt.id
+                }`}
+                description={
+                  <Space direction="vertical" size={2}>
+                    <Text>
+                      {[
+                        `供应商：${selectedPurchaseReceipt.supplier_name || '-'}`,
+                        `状态：${selectedPurchaseReceipt.status || '-'}`,
+                        selectedPurchaseReceiptItem
+                          ? `来源行：${
+                              selectedPurchaseReceiptItem.source_line_no ||
+                              selectedPurchaseReceiptItem.id
+                            }`
+                          : '来源行：未选择',
+                      ].join('；')}
+                    </Text>
+                    {selectedPurchaseReceiptItem ? (
+                      <Text type="secondary">
+                        {[
+                          `到货数量：${formatQuantity(
+                            decimalNumber(selectedPurchaseReceiptItem.quantity)
+                          )}`,
+                          `材料：${referenceLabel(
+                            materialOptions,
+                            selectedPurchaseReceiptItem.material_id,
+                            '材料'
+                          )}`,
+                          `仓库：${referenceLabel(
+                            warehouseOptions,
+                            selectedPurchaseReceiptItem.warehouse_id,
+                            '仓库'
+                          )}`,
+                          selectedPurchaseReceiptItem.lot_id
+                            ? `批次：${referenceLabel(
+                                inventoryLotOptions,
+                                selectedPurchaseReceiptItem.lot_id,
+                                '批次'
+                              )}`
+                            : '',
+                        ]
+                          .filter(Boolean)
+                          .join('；')}
+                      </Text>
+                    ) : (
+                      <Text type="secondary">
+                        请选择采购入库行后再生成质检草稿，材料、仓库和批次会按来源行带出。
+                      </Text>
+                    )}
+                    <Text type="secondary">
+                      当前质检单按采购入库行建单；本次送检数量和已检数量还没有后端字段，不在前端伪造。
+                    </Text>
+                  </Space>
+                }
+              />
+            ) : null}
+            <QualityInspectionCreateForm
+              form={inspectionForm}
+              purchaseReceiptOptions={purchaseReceiptOptions}
+              purchaseReceiptItemOptions={purchaseReceiptItemOptions}
+              inventoryLotOptions={inventoryLotOptions}
+              materialOptions={materialOptions}
+              warehouseOptions={warehouseOptions}
+              onReceiptChange={handleReceiptChange}
+              onReceiptItemChange={handleReceiptItemChange}
+              onInventoryLotChange={handleInventoryLotChange}
+            />
+          </>
         ) : (
           <QualityInspectionDecisionForm
             form={decisionForm}
@@ -1374,6 +1472,7 @@ export default function V1QualityInspectionsPage() {
           />
         )}
         <BusinessAttachmentPanel
+          ref={inspectionAttachmentRef}
           ownerType="quality_inspection"
           ownerId={inspectionModal?.inspection?.id}
           title="质检附件"

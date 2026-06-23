@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  buildShipmentSourceRows,
   buildPurchaseReceiptItemParams,
   buildShipmentItemParams,
   createBlankPurchaseReceiptItem,
@@ -76,4 +77,59 @@ test('businessLineItems: shipment item preserves SKU traceability from sales ord
     quantity: '20',
     note: '来源销售订单行：小熊',
   })
+})
+
+test('businessLineItems: shipment source rows show shipped and remaining quantities', () => {
+  const rows = buildShipmentSourceRows({
+    salesOrderItems: [
+      {
+        id: 31,
+        line_no: 1,
+        product_id: 7,
+        unit_id: 2,
+        ordered_quantity: '20',
+        line_status: 'open',
+      },
+      {
+        id: 32,
+        line_no: 2,
+        product_id: 8,
+        unit_id: 2,
+        ordered_quantity: '5',
+        line_status: 'closed',
+      },
+    ],
+    shipments: [
+      {
+        status: 'SHIPPED',
+        items: [{ sales_order_item_id: 31, quantity: '8.5' }],
+      },
+      {
+        status: 'CANCELLED',
+        items: [{ sales_order_item_id: 31, quantity: '3' }],
+      },
+    ],
+  })
+
+  assert.equal(rows[0].shippedQuantity, 8.5)
+  assert.equal(rows[0].remainingQuantity, 11.5)
+  assert.equal(rows[0].disabledReason, '')
+  assert.equal(rows[1].disabledReason, '来源行已关闭')
+})
+
+test('businessLineItems: shipment import defaults to remaining source quantity', () => {
+  const item = createShipmentItemFromSalesOrderItem(
+    {
+      id: 31,
+      product_id: 7,
+      product_sku_id: 11,
+      unit_id: 2,
+      ordered_quantity: '20',
+      remainingQuantity: 11.5,
+      product_name_snapshot: '小熊',
+    },
+    5
+  )
+
+  assert.equal(item.quantity, 11.5)
 })

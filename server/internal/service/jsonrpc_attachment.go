@@ -221,7 +221,7 @@ func (d *jsonrpcDispatcher) mapBusinessAttachmentError(ctx context.Context, err 
 	}
 	switch {
 	case errors.Is(err, biz.ErrBusinessAttachmentTooLarge):
-		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: "附件超过 5MB，请压缩后再上传"}
+		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: "附件超过 50MB，请压缩后再上传"}
 	case errors.Is(err, biz.ErrBadParam),
 		errors.Is(err, biz.ErrBusinessAttachmentOwnerInvalid),
 		errors.Is(err, biz.ErrBusinessAttachmentContentInvalid),
