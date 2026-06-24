@@ -1,7 +1,10 @@
 import dayjs from 'dayjs'
+import customParseFormat from 'dayjs/plugin/customParseFormat.js'
 
 export const DATE_INPUT_VALUE_FORMAT = 'YYYY-MM-DD'
 export const DATE_INPUT_DISPLAY_FORMAT = 'YYYY/MM/DD'
+
+dayjs.extend(customParseFormat)
 
 export function parseDateInputValue(value) {
   if (dayjs.isDayjs(value)) {
@@ -13,7 +16,7 @@ export function parseDateInputValue(value) {
     .replaceAll('/', '-')
   if (!normalizedValue) return null
 
-  const parsedValue = dayjs(normalizedValue)
+  const parsedValue = dayjs(normalizedValue, DATE_INPUT_VALUE_FORMAT, true)
   return parsedValue.isValid() ? parsedValue : null
 }
 

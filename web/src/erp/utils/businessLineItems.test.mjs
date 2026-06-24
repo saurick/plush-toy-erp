@@ -6,6 +6,7 @@ import {
   buildPurchaseReceiptItemParams,
   buildShipmentItemParams,
   createBlankPurchaseReceiptItem,
+  createDuplicatedDraftLineItem,
   createShipmentItemFromSalesOrderItem,
   isBlankShipmentItem,
 } from './businessLineItems.mjs'
@@ -50,6 +51,31 @@ test('businessLineItems: blank purchase receipt item starts as unsaved draft det
     source_line_no: '',
     note: '',
   })
+})
+
+test('businessLineItems: duplicated draft line item clears identity and status fields', () => {
+  const source = {
+    id: 31,
+    line_no: 4,
+    line_status: 'closed',
+    created_at: 100,
+    updated_at: 200,
+    material_id: 12,
+    unit_id: 2,
+    purchased_quantity: '10',
+    unit_price: '3.5',
+    note: ' 同批 ',
+  }
+
+  assert.deepEqual(createDuplicatedDraftLineItem(source), {
+    material_id: 12,
+    unit_id: 2,
+    purchased_quantity: '10',
+    unit_price: '3.5',
+    note: ' 同批 ',
+  })
+  assert.equal(source.id, 31)
+  assert.equal(source.line_no, 4)
 })
 
 test('businessLineItems: shipment item preserves SKU traceability from sales order line', () => {

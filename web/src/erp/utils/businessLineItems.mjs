@@ -116,6 +116,17 @@ export function createBlankPurchaseReceiptItem(receiptID) {
   }
 }
 
+export function createDuplicatedDraftLineItem(item = {}) {
+  const source = item && typeof item === 'object' ? item : {}
+  const nextItem = { ...source }
+  delete nextItem.id
+  delete nextItem.line_no
+  delete nextItem.line_status
+  delete nextItem.created_at
+  delete nextItem.updated_at
+  return nextItem
+}
+
 export function buildShipmentItemParams(values = {}) {
   return compactParams({
     shipment_id: requiredInt(values.shipment_id),

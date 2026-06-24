@@ -349,3 +349,28 @@
 - 验证：追加前 `progress.md` 为 343 行、64853 字节，未达到归档阈值；已执行 `pnpm exec eslint --ext .js --ext .jsx scripts/style-l1/purchaseReceiptScenarios.mjs`、`pnpm css`、`STYLE_L1_PORT=4247 STYLE_L1_SCENARIOS=purchase-receipts-table-control-columns-desktop pnpm style:l1`、`git diff --check -- web/src/erp/styles/app/business-tables.css web/scripts/style-l1/purchaseReceiptScenarios.mjs`，均通过；targeted L1 覆盖入库管理默认态、日期筛选圆角壳层、相邻工具栏、表格和页面横向溢出。
 - 下一步：后续日期区间筛选仍走共享 `DateRangeFilter`；如果其它页面出现圆角或裁切异常，优先检查共享壳层与内部背景的盒模型关系，不在单页硬补。
 - 阻塞/风险：本轮只改前端共享样式和采购入库 L1 断言，不改 schema、migration、API、RBAC、菜单、WorkflowUsecase、Fact usecase、客户配置、原型或部署脚本；当前工作区仍有其它文档、附件、表单和 L1 相关现场改动，本轮未回退、未归并。
+
+## 2026-06-24 日期非法归一化审查与修复
+
+- 完成：按 code review 口径核查截图中的两类日期风险；后端采购、销售、外协保存合同已有 `validateOptionalDateNotBefore`，JSON-RPC 字符串日期走 Go `time.Parse`，未发现“交期早于单据日期仅前端校验”的同类缺口。
+- 完成：修复前端共享 `dateRange` helper 的宽松 `dayjs(value)` 解析，改为 `customParseFormat` 严格 `YYYY-MM-DD` 解析，并保留 `/` 输入归一到 `-` 后再校验；`2026-02-31 / 2026-13-01 / 2026-00-10` 不再被当成有效日期参与日期关系判断。
+- 完成：新增 `jsonrpc_params_test.go`，锁住后端 JSON-RPC 参数解析拒绝非法日历日期，避免后续入口误以为服务端可接受宽松归一化日期。
+- 验证：追加前 `progress.md` 为 351 行、66441 字节，补充 `style:l1` 前 `progress.md` 为 360 行、68285 字节，均未达到归档阈值；已执行 `pnpm exec node --test src/erp/utils/dateRange.test.mjs`、`pnpm exec eslint --ext .js --ext .jsx src/erp/utils/dateRange.mjs src/erp/utils/dateRange.test.mjs`、`go test ./internal/service`、`pnpm test`、`go test ./internal/biz ./internal/service`、`STYLE_L1_PORT=4247 pnpm style:l1`、`git diff --check -- web/src/erp/utils/dateRange.mjs web/src/erp/utils/dateRange.test.mjs server/internal/service/jsonrpc_params_test.go`，均通过；前端单测 398 个通过，完整 `style:l1` 覆盖 66 个场景。
+- 下一步：后续新增页面日期关系规则继续复用 `dateRange`，后端入口继续走 `getRequiredJSONRPCTime / getOptionalJSONRPCTime` 并检查 `ok`；如新增特殊日期格式，必须先评审并补严格解析测试。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、WorkflowUsecase、Fact usecase、客户配置、原型、部署脚本或页面布局；已补跑完整浏览器 `style:l1`，未发现页面回归。
+
+## 2026-06-24 业务弹窗明细行复制按钮
+
+- 完成：销售订单、采购订单、委外订单的业务弹窗明细行新增图标复制按钮，点击后在当前行下方插入草稿副本；复制副本清空 `id`、`line_no`、`line_status`、`created_at`、`updated_at`，保留业务输入字段，避免把已保存行身份或状态带到新草稿行。
+- 完成：新增共享 `createDuplicatedDraftLineItem` helper、对应单测，以及销售订单 L1 弹窗断言，锁住复制按钮存在、复制后行数增加、按钮 aria 文案随行号更新，并继续禁止弹窗内出现手动“行号”输入。
+- 验证：追加前 `progress.md` 为 360 行、68361 字节，未达到归档阈值；已执行 `pnpm --dir web exec node --test src/erp/utils/businessLineItems.test.mjs`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1`、`pnpm --dir web lint && pnpm --dir web css && pnpm --dir web test`、`pnpm --dir web style:l1`，均通过；前端单测 399 个通过，完整 `style:l1` 覆盖 66 个场景。
+- 下一步：后续若在已关联来源单据或已形成事实的明细上扩展复制，需要单独评审来源字段、数量余额和事实引用字段，不应把 source/fact 身份字段盲目复制。
+- 阻塞/风险：本轮不改 schema、migration、API、RBAC、菜单、WorkflowUsecase、Fact usecase、客户配置、原型状态或部署脚本；未执行真实后端保存链路，当前验证覆盖前端复制交互、DOM/行数/按钮文案和共享字段清理规则。
+
+## 2026-06-24 明细行操作按钮文案统一
+
+- 完成：销售订单、采购订单、委外订单弹窗明细行操作统一为“复制行 / 移除行”两枚图标加短文案按钮，移除复制按钮只靠图标和 tooltip 表意的不一致状态；销售订单删除按钮同步从“移除”统一为“移除行”。
+- 完成：业务弹窗 L1 断言补充明细行操作短文案检查，复制后每行都必须同时展示“复制行”和“移除行”，继续保留动态可访问名称 `复制第 N 行`。
+- 验证：追加前 `progress.md` 为 368 行、69925 字节，未达到归档阈值；已执行限定文件 `eslint`、`pnpm --dir web css`、`pnpm --dir web exec node --test src/erp/utils/businessLineItems.test.mjs`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1`，均通过；targeted L1 覆盖 1 个正式业务模块弹窗场景。
+- 下一步：后续新增明细行操作时，保持同一组行内操作的视觉语法一致；常用动作用图标加短文案，低频辅助动作再评审是否只保留图标。
+- 阻塞/风险：本轮只改前端按钮呈现和浏览器断言，不改 schema、migration、API、RBAC、菜单、WorkflowUsecase、Fact usecase、客户配置、原型状态或部署脚本；未跑完整 `pnpm --dir web test` 和完整 `style:l1`，因本轮是复制按钮文案一致性窄修，已用目标弹窗场景回归。

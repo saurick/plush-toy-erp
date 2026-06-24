@@ -31,6 +31,7 @@ export function createBusinessFormalScenarios(deps) {
     verifySourceImportPicker,
   } = deps
   const {
+    assertLineItemDuplicateAction,
     assertLineItemFieldLayout,
     assertLineAmountCalculation,
     assertLineQuantityPrecisionBlocksAmount,
@@ -517,6 +518,9 @@ export function createBusinessFormalScenarios(deps) {
             await assertLineSourceSummaryReadableUnit(modal, {
               label: '带出产品 / 单位',
               expectedText: '件（PCS）',
+              scenarioName: 'business-v1-sales-order-form-modal',
+            })
+            await assertLineItemDuplicateAction(modal, {
               scenarioName: 'business-v1-sales-order-form-modal',
             })
           },

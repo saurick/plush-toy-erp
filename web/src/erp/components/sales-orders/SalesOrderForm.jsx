@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { CopyOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import {
   AutoComplete,
   Button,
@@ -32,6 +32,7 @@ import {
   paymentConditionCompleteness,
   unixToDateInputValue,
 } from '../../utils/masterDataOrderView.mjs'
+import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
 
 const EMPTY_ORDER_LINES = []
 
@@ -560,15 +561,42 @@ export function SalesOrderItemsFormSection({
                           <strong>第 {index + 1} 行</strong>
                           {isExistingLine ? <Tag>已保存</Tag> : <Tag>新增</Tag>}
                         </Space>
-                        <Button
-                          danger
-                          size="small"
-                          icon={<DeleteOutlined />}
-                          disabled={!canRemoveLine}
-                          onClick={() => remove(field.name)}
+                        <Space
+                          className="erp-sales-order-lines-form__row-actions"
+                          size={4}
+                          wrap
                         >
-                          移除
-                        </Button>
+                          <Button
+                            aria-label={`复制第 ${index + 1} 行`}
+                            size="small"
+                            type="text"
+                            icon={<CopyOutlined />}
+                            disabled={!canCreateItem}
+                            onClick={() => {
+                              const currentLines =
+                                form.getFieldValue('items') || []
+                              const sourceLine =
+                                currentLines[field.name] ||
+                                currentLines[index] ||
+                                {}
+                              add(
+                                createDuplicatedDraftLineItem(sourceLine),
+                                index + 1
+                              )
+                            }}
+                          >
+                            复制行
+                          </Button>
+                          <Button
+                            danger
+                            size="small"
+                            icon={<DeleteOutlined />}
+                            disabled={!canRemoveLine}
+                            onClick={() => remove(field.name)}
+                          >
+                            移除行
+                          </Button>
+                        </Space>
                       </div>
                       <div className="erp-sales-order-lines-form__grid">
                         <Form.Item name={[field.name, 'id']} hidden>

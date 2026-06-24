@@ -425,7 +425,57 @@ export function createLineItemUnitAssertions({ assert }) {
     )
   }
 
+  const assertLineItemDuplicateAction = async (modal, { scenarioName }) => {
+    const duplicateButton = modal.getByRole('button', { name: '复制第 1 行' })
+    await duplicateButton.waitFor({ state: 'visible', timeout: 5_000 })
+    await duplicateButton.click()
+
+    const metrics = await modal.evaluate((node) => {
+      const visibleText = node.textContent?.replace(/\s+/g, ' ').trim() || ''
+      const rows = Array.from(
+        node.querySelectorAll('.erp-sales-order-lines-form__row')
+      )
+      return {
+        rowCount: rows.length,
+        copyLabels: Array.from(
+          node.querySelectorAll('button[aria-label^="复制第"]')
+        ).map((button) => button.getAttribute('aria-label')),
+        rowActionTexts: rows.map(
+          (row) =>
+            row
+              .querySelector('.erp-sales-order-lines-form__row-actions')
+              ?.textContent?.replace(/\s+/g, ' ')
+              .trim() || ''
+        ),
+        visibleText,
+      }
+    })
+
+    assert(
+      metrics.rowCount >= 2,
+      `${scenarioName} 复制本行后应插入新明细行: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.copyLabels.includes('复制第 1 行') &&
+        metrics.copyLabels.includes('复制第 2 行'),
+      `${scenarioName} 复制按钮应保留可访问名称并随行号更新: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      !metrics.visibleText.includes('行号'),
+      `${scenarioName} 复制后仍不应展示行号输入: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.rowActionTexts.every(
+        (text) => text.includes('复制行') && text.includes('移除行')
+      ),
+      `${scenarioName} 明细行操作应统一展示短文案: ${JSON.stringify(metrics)}`
+    )
+  }
+
   return {
+    assertLineItemDuplicateAction,
     assertLineItemFieldLayout,
     assertLineAmountCalculation,
     assertLineQuantityPrecisionBlocksAmount,

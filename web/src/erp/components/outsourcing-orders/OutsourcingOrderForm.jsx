@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react'
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, Form, Input, Select } from 'antd'
+import { CopyOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { Button, Form, Input, Select, Space } from 'antd'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import FieldWithUnitSuffix, {
   isQuantityTextWithinUnitPrecision,
@@ -15,6 +15,7 @@ import {
   isDateInputBefore,
 } from '../../utils/dateRange.mjs'
 import { unixToDateInputValue } from '../../utils/masterDataOrderView.mjs'
+import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
 
 function decimalNumber(value) {
   const numeric = Number(
@@ -257,15 +258,40 @@ export default function OutsourcingOrderForm({
                   >
                     <div className="erp-sales-order-lines-form__row-head">
                       <strong>第 {index + 1} 行</strong>
-                      <Button
-                        danger
-                        type="text"
-                        icon={<DeleteOutlined />}
-                        disabled={fields.length <= 1}
-                        onClick={() => remove(field.name)}
+                      <Space
+                        className="erp-sales-order-lines-form__row-actions"
+                        size={4}
+                        wrap
                       >
-                        移除行
-                      </Button>
+                        <Button
+                          aria-label={`复制第 ${index + 1} 行`}
+                          type="text"
+                          icon={<CopyOutlined />}
+                          onClick={() => {
+                            const currentLines =
+                              form.getFieldValue('items') || []
+                            const sourceLine =
+                              currentLines[field.name] ||
+                              currentLines[index] ||
+                              {}
+                            add(
+                              createDuplicatedDraftLineItem(sourceLine),
+                              index + 1
+                            )
+                          }}
+                        >
+                          复制行
+                        </Button>
+                        <Button
+                          danger
+                          type="text"
+                          icon={<DeleteOutlined />}
+                          disabled={fields.length <= 1}
+                          onClick={() => remove(field.name)}
+                        >
+                          移除行
+                        </Button>
+                      </Space>
                     </div>
                     <div className="erp-sales-order-lines-form__grid">
                       <Form.Item name={[field.name, 'id']} hidden>

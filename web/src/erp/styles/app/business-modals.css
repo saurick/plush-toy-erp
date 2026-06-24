@@ -677,6 +677,10 @@
   min-width: 0;
 }
 
+.erp-sales-order-lines-form__row-actions {
+  flex: 0 0 auto;
+}
+
 .erp-sales-order-lines-form__grid {
   display: grid;
   grid-auto-columns: max-content;
