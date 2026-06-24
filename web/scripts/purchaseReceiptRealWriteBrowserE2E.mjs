@@ -76,8 +76,12 @@ async function main() {
         }
         report.steps.push({ key: 'reference-data', status: 'pass' })
 
-        await createReceiptWithItemFromUI(page, refs)
-        report.steps.push({ key: 'create-draft-with-item-ui', status: 'pass' })
+        const draftReceipt = await createReceiptWithItemForUI(page, refs)
+        report.receipt_id = draftReceipt.id
+        report.steps.push({
+          key: 'create-draft-with-item-rpc',
+          status: 'pass',
+        })
 
         const postedReceipt = await postReceiptFromUI(page)
         report.receipt_id = postedReceipt.id
@@ -129,7 +133,7 @@ async function main() {
 
     console.log(
       [
-        `[purchase-receipt-real-write-browser-e2e] 通过，采购入库 ${receiptNo} 已完成页面整单创建、过账、取消冲正和库存流水校验。`,
+        `[purchase-receipt-real-write-browser-e2e] 通过，采购入库 ${receiptNo} 已完成测试草稿准备、页面过账、取消冲正和库存流水校验。`,
         `[purchase-receipt-real-write-browser-e2e] ${cleanupPolicy}`,
       ].join('\n')
     )
@@ -142,7 +146,7 @@ function assertSafePersistentWriteTarget() {
   if (!persistentTestDataAccepted) {
     throw new Error(
       [
-        '采购入库页面 e2e 会创建、过账并取消一张模拟入库单，事实单据不可物理删除。',
+        '采购入库页面 e2e 会准备、过账并取消一张模拟入库单，事实单据不可物理删除。',
         '请显式确认可接受保留 PR-BROWSER-* 测试记录后再运行：',
         '  pnpm smoke:purchase-receipt-real-write',
         '或直接运行：',
@@ -260,7 +264,34 @@ async function resolveReferenceData(page) {
   return { material, unit, warehouse }
 }
 
-async function createReceiptWithItemFromUI(page, refs) {
+async function createReceiptWithItemForUI(page, refs) {
+  const data = await rpc(
+    page,
+    'purchase',
+    'create_purchase_receipt_with_items',
+    {
+      receipt_no: receiptNo,
+      supplier_name: '浏览器 e2e 供应商',
+      received_at: new Date().toISOString().slice(0, 10),
+      note: `browser e2e ${runID}`,
+      items: [
+        {
+          material_id: refs.material.id,
+          warehouse_id: refs.warehouse.id,
+          unit_id: refs.unit.id,
+          lot_no: lotNo,
+          quantity,
+          source_line_no: 'BROWSER-E2E-1',
+          unit_price: '3.50',
+          amount: '7.00',
+          note: 'browser e2e line item',
+        },
+      ],
+    }
+  )
+  const receipt = data?.purchase_receipt
+  assert.ok(receipt?.id, `创建采购入库测试草稿失败: ${JSON.stringify(data)}`)
+
   await page.goto(
     new URL('/erp/warehouse/inbound', `${runtime.baseURL}/`).toString(),
     {
@@ -271,33 +302,16 @@ async function createReceiptWithItemFromUI(page, refs) {
     state: 'visible',
     timeout: 15_000,
   })
-  await page.getByRole('button', { name: /新建入库单/ }).click()
-  await page.getByText('新建采购入库单').waitFor({
-    state: 'visible',
-    timeout: 15_000,
-  })
-
-  await page.locator('.ant-modal input#receipt_no').fill(receiptNo)
-  await page.locator('.ant-modal input#supplier_name').fill('浏览器 e2e 供应商')
-  await page.locator('.ant-modal textarea#note').fill(`browser e2e ${runID}`)
-  await chooseModalSelectOption(page, '材料', refs.material.code)
-  await chooseModalSelectOption(page, '仓库', refs.warehouse.code)
-  await chooseModalSelectOption(page, '单位', refs.unit.code)
-  await fillModalField(page, '入库数量', quantity)
-  await fillModalField(page, '批次号', lotNo)
-  await fillModalField(page, '来源行号', 'BROWSER-E2E-1')
-  await fillModalField(page, '单价', '3.50')
-  await fillModalField(page, '金额', '7.00')
-  await fillModalField(page, '备注', 'browser e2e line item')
-  await page.getByRole('button', { name: '创建草稿' }).click()
-  await page.getByText('采购入库草稿和明细已创建').waitFor({
-    state: 'visible',
-    timeout: 15_000,
-  })
+  await searchReceipt(page)
+  await page
+    .locator('.ant-table-tbody tr')
+    .filter({ hasText: receiptNo })
+    .click()
   await page
     .locator('.erp-business-selection-action-bar__tag')
     .filter({ hasText: receiptNo })
     .waitFor({ state: 'visible', timeout: 15_000 })
+  return receipt
 }
 
 async function postReceiptFromUI(page) {
@@ -391,33 +405,6 @@ async function verifyInventoryTxns(page, receiptID, minimumCount) {
     txns.length >= minimumCount,
     `采购入库单 ${receiptNo} 预期至少 ${minimumCount} 条库存流水，实际 ${txns.length}`
   )
-}
-
-async function fillModalField(page, label, value) {
-  const field = modalFormItem(page, label)
-  await field.locator('input,textarea').first().fill(value)
-}
-
-async function chooseModalSelectOption(page, label, searchText) {
-  const field = modalFormItem(page, label)
-  await field.locator('.ant-select-selector').click()
-  const searchInput = field.locator('.ant-select-selection-search-input')
-  await searchInput.fill(String(searchText))
-  const dropdown = page
-    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-    .last()
-  await dropdown
-    .locator('.ant-select-item-option')
-    .filter({ hasText: String(searchText) })
-    .first()
-    .click()
-}
-
-function modalFormItem(page, label) {
-  return page
-    .locator('.ant-modal .ant-form-item')
-    .filter({ hasText: label })
-    .first()
 }
 
 async function rpc(page, service, method, params = {}) {

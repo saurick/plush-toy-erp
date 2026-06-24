@@ -117,9 +117,9 @@ test('workflow business modules: 三页不冒充事实写入', () => {
   for (const text of [
     'Workflow V1',
     '不写事实层',
-    '新建排程协同',
+    '发起排程协同',
     '登记异常协同',
-    '新建放行协同',
+    '发起放行协同',
     'createWorkflowTask',
     'listWorkflowTasks',
     'updateWorkflowTaskStatus',

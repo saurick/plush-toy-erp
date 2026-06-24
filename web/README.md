@@ -204,7 +204,7 @@ pnpm smoke:processing-contract-real-login
 - 若本地账号不在配置文件中，可通过环境变量 `REAL_LOGIN_ADMIN_USERNAME` / `REAL_LOGIN_ADMIN_PASSWORD` 覆盖
 - 桌面管理员登录页和岗位任务端登录页始终保留密码登录；短信登录只有在后端 `auth.capabilities` 返回可用时展示。用户不在登录前手选岗位角色，岗位任务端登录后按管理员账号已有 `mobile.<role>.access` 权限自动进入第一个可用岗位，固定 `/m/<role>/tasks` 直达入口仍校验对应岗位授权，短信登录额外依赖手机号绑定
 - 可通过 `REAL_LOGIN_PREVIEW_MAX_MS` 覆盖默认 `10000ms` 的 PDF 预览时延阈值
-- 采购入库真实写入 e2e 会验证：登录成功、入库管理页面可创建草稿、维护明细、过账写 `inventory_txns`、取消入库写冲正、列表回显已取消；该脚本会写本地 / 开发库的模拟采购入库事实，采购入库单据不可物理删除，收尾口径是取消冲正并保留 `PR-BROWSER-*` 可追踪记录。`pnpm smoke:purchase-receipt-real-write` 已显式传入 `--accept-persistent-test-data`，直接 `node` 执行时也必须显式传入该参数或设置 `PURCHASE_RECEIPT_E2E_ACCEPT_PERSISTENT_TEST_DATA=1`。脚本默认只允许 localhost / 127.0.0.1 页面目标；如确需跑准备好的开发 / 测试环境，必须额外传入 `--allow-external-base-url`，禁止直接跑生产或目标客户环境。若缺少单位、材料或仓库，可显式执行 `pnpm smoke:purchase-receipt-real-write -- --seed-core-demo` 先补核心演示主数据
+- 采购入库真实写入 e2e 会验证：登录成功、通过采购入库 RPC 准备测试草稿、入库管理页面可处理该草稿、过账写 `inventory_txns`、取消入库写冲正、列表回显已取消；该脚本会写本地 / 开发库的模拟采购入库事实，采购入库单据不可物理删除，收尾口径是取消冲正并保留 `PR-BROWSER-*` 可追踪记录。入库管理页不提供页面级“新建入库单”，正式入库草稿应从采购订单“生成入库”入口产生。`pnpm smoke:purchase-receipt-real-write` 已显式传入 `--accept-persistent-test-data`，直接 `node` 执行时也必须显式传入该参数或设置 `PURCHASE_RECEIPT_E2E_ACCEPT_PERSISTENT_TEST_DATA=1`。脚本默认只允许 localhost / 127.0.0.1 页面目标；如确需跑准备好的开发 / 测试环境，必须额外传入 `--allow-external-base-url`，禁止直接跑生产或目标客户环境。若缺少单位、材料或仓库，可显式执行 `pnpm smoke:purchase-receipt-real-write -- --seed-core-demo` 先补核心演示主数据
 - 采购合同烟测会验证：登录成功、采购合同工作台可打开、采购金额可手工修改、改单价后金额会按公式重算、在线 PDF 预览在阈值内打开
 - 加工合同烟测会验证：登录成功、加工合同工作台可打开、工序名称 / 数量 / 单价会同步到纸面并联动金额、在线 PDF 预览在阈值内打开
 

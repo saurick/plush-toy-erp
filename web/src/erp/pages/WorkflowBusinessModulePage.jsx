@@ -3,7 +3,6 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   PlusOutlined,
-  ReloadOutlined,
   SendOutlined,
 } from '@ant-design/icons'
 import { Button, Form, Input, Modal, Select, Space, Tag } from 'antd'
@@ -22,6 +21,7 @@ import {
   BusinessOperationPanel,
   BusinessPageLayout,
   CollaborationTaskPanel,
+  DateRangeFilter,
   DateInput,
   PageHeaderCard,
   SearchInput,
@@ -33,7 +33,7 @@ import {
   BusinessListToolbarActions,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
-import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
+import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
 import { getBusinessModule } from '../config/businessModules.mjs'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
@@ -68,13 +68,16 @@ const TASK_STATUS_OPTIONS = Object.freeze([
   { label: '已关闭', value: 'closed' },
   { label: '已取消', value: 'cancelled' },
 ])
+const DUE_DATE_FILTER_OPTIONS = Object.freeze([
+  { label: '到期日期', value: 'due_at' },
+])
 
 const MODULE_WORKFLOW_CONFIG = Object.freeze({
   'production-scheduling': {
     taskGroup: 'production_scheduling',
     defaultOwnerRoleKey: 'pmc',
-    createLabel: '新建排程协同',
-    createTitle: '新建排程协同任务',
+    createLabel: '发起排程协同',
+    createTitle: '发起排程协同任务',
     sourcePrefix: 'PS',
     successMessage: '排程协同任务已创建',
     createBusinessStatusKey: 'production_ready',
@@ -112,8 +115,8 @@ const MODULE_WORKFLOW_CONFIG = Object.freeze({
   'shipping-release': {
     taskGroup: 'shipment_release',
     defaultOwnerRoleKey: 'warehouse',
-    createLabel: '新建放行协同',
-    createTitle: '新建出货放行协同任务',
+    createLabel: '发起放行协同',
+    createTitle: '发起出货放行协同任务',
     sourcePrefix: 'SR',
     successMessage: '出货放行协同任务已创建',
     createBusinessStatusKey: 'shipment_pending',
@@ -645,36 +648,23 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               ]}
               onChange={setOwnerRoleKey}
             />
-            <DateInput
-              aria-label="到期开始"
-              value={dueFrom}
-              placeholder="到期开始"
-              onChange={setDueFrom}
-            />
-            <DateInput
-              aria-label="到期结束"
-              value={dueTo}
-              placeholder="到期结束"
-              onChange={setDueTo}
+            <DateRangeFilter
+              options={DUE_DATE_FILTER_OPTIONS}
+              value="due_at"
+              startValue={dueFrom}
+              endValue={dueTo}
+              onStartChange={setDueFrom}
+              onEndChange={setDueTo}
             />
           </>
         }
         actions={
-          <>
-            <BusinessListToolbarActions
-              moduleTitle={moduleItem.title}
-              exportDisabled
-              exportDisabledReason="当前 Workflow V1 只处理协同任务，不导出业务数据。"
-              onOpenColumnOrder={openColumnOrder}
-            />
-            <ToolbarButton
-              icon={<ReloadOutlined />}
-              loading={loading}
-              onClick={loadWorkflowTasks}
-            >
-              刷新协同
-            </ToolbarButton>
-          </>
+          <BusinessListToolbarActions
+            moduleTitle={moduleItem.title}
+            exportDisabled
+            exportDisabledReason="当前 Workflow V1 只处理协同任务，不导出业务数据。"
+            onOpenColumnOrder={openColumnOrder}
+          />
         }
         primaryAction={
           <ToolbarButton
@@ -756,17 +746,19 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           >
             催办
           </Button>
+          <BusinessAttachmentModalButton
+            ownerType="workflow_task"
+            ownerId={selectedTask?.id}
+            modalTitle="协同任务附件"
+            panelTitle="协同任务附件"
+            description="上传现场照片、异常截图或任务处理证据；附件不代表任务已完成，也不写业务事实。"
+            canUpload={canUpdateWorkflowTasks || canCompleteWorkflowTasks}
+            canDelete={canUpdateWorkflowTasks}
+            disabled={!selectedTask}
+            disabledReason="请先选择一条协同任务"
+          />
         </SelectionActionBar>
       </BusinessOperationPanel>
-
-      <BusinessAttachmentPanel
-        ownerType="workflow_task"
-        ownerId={selectedTask?.id}
-        title="协同任务附件"
-        description="上传现场照片、异常截图或任务处理证据；附件不代表任务已完成，也不写业务事实。"
-        canUpload={canUpdateWorkflowTasks || canCompleteWorkflowTasks}
-        canDelete={canUpdateWorkflowTasks}
-      />
 
       <BusinessDataTable
         rowKey="id"
@@ -839,7 +831,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               disabled={!canCreateWorkflowTasks}
               onClick={handleCreateTask}
             >
-              创建协同任务
+              发起协同任务
             </Button>
           </Space>
         }
@@ -911,7 +903,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           </Form.Item>
         </Form>
         <Tag icon={<CheckCircleOutlined />} color="blue">
-          创建结果只进入 Workflow 协同任务，不写库存、出货、财务或生产事实。
+          提交结果只进入 Workflow 协同任务，不写库存、出货、财务或生产事实。
         </Tag>
       </Modal>
 

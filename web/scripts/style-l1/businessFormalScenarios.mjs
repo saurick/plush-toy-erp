@@ -1,8 +1,10 @@
+import { createBusinessAttachmentAssertions } from './businessAttachmentAssertions.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 
 export function createBusinessFormalScenarios(deps) {
   const {
     assert,
+    assertAntdModalCentered,
     assertBusinessFormModalKeyboardRecovery,
     assertBusinessHeaderHasNoSectionTitle,
     assertBusinessHeaderStatsSingleLine,
@@ -13,7 +15,6 @@ export function createBusinessFormalScenarios(deps) {
     assertBusinessPageRefreshEntrypoint,
     assertERPThemeMode,
     assertNoHorizontalOverflow,
-    assertOperationalFactModalViewport,
     assertOrderLifecycleActionsConsolidated,
     assertOutsourcingProcessSelectOptions,
     assertProcessSuggestionOptions,
@@ -38,6 +39,11 @@ export function createBusinessFormalScenarios(deps) {
   } = createLineItemUnitAssertions({
     assert,
   })
+  const { assertPageAttachmentModalEntrypoint } =
+    createBusinessAttachmentAssertions({
+      assert,
+      assertAntdModalCentered,
+    })
 
   const waitForTaskActionDrawerClosed = async (page, scenarioName) => {
     await page
@@ -137,9 +143,103 @@ export function createBusinessFormalScenarios(deps) {
     )
     await expectNoButton(page, '批量删除')
     await expectNoButton(page, '回收站')
+    await expectNoButton(page, '刷新协同')
     if (exportTooltip) {
       await exportButton.locator('xpath=..').hover()
       await expectText(page, exportTooltip)
+    }
+  }
+
+  const assertWorkflowDueDateRangeFilterLayout = async (
+    page,
+    { scenarioName }
+  ) => {
+    const metrics = await page.evaluate(() => {
+      const panel = document.querySelector(
+        '.erp-workflow-business-page .erp-business-operation-panel__filters'
+      )
+      const range = panel?.querySelector('.erp-business-date-range-filter')
+      const typeLabel = range?.querySelector(
+        '.erp-business-date-range-filter__type-label'
+      )
+      const dateInputs = range
+        ? Array.from(
+            range.querySelectorAll('.erp-business-date-input.ant-picker')
+          )
+        : []
+      const standaloneDateInputs = panel
+        ? Array.from(panel.children).filter((node) =>
+            node.classList?.contains('erp-business-date-input')
+          )
+        : []
+      const panelBox = panel?.getBoundingClientRect()
+      const rangeBox = range?.getBoundingClientRect()
+      const inputBoxes = dateInputs.map((node) => {
+        const box = node.getBoundingClientRect()
+        return {
+          x: box.x,
+          y: box.y,
+          width: box.width,
+          height: box.height,
+          scrollWidth: node.scrollWidth,
+          clientWidth: node.clientWidth,
+        }
+      })
+      return {
+        viewportWidth: document.documentElement.clientWidth,
+        panelWidth: panelBox?.width || 0,
+        rangeWidth: rangeBox?.width || 0,
+        rangeHeight: rangeBox?.height || 0,
+        rangeScrollWidth: range?.scrollWidth || 0,
+        rangeClientWidth: range?.clientWidth || 0,
+        typeLabelText: typeLabel?.textContent?.trim() || '',
+        dateInputCount: dateInputs.length,
+        standaloneDateInputCount: standaloneDateInputs.length,
+        inputBoxes,
+      }
+    })
+    assert.equal(
+      metrics.standaloneDateInputCount,
+      0,
+      `${scenarioName} 到期日期筛选不应使用两个独立 DateInput: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert.equal(
+      metrics.typeLabelText,
+      '到期日期',
+      `${scenarioName} 到期日期筛选应显示日期类型标签: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert.equal(
+      metrics.dateInputCount,
+      2,
+      `${scenarioName} 到期日期筛选应保留开始/结束两个日期输入: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      metrics.rangeWidth > 0 &&
+        metrics.rangeWidth <= Math.max(metrics.panelWidth, 1) + 1,
+      `${scenarioName} 到期日期筛选不应溢出筛选栏: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.rangeScrollWidth <= metrics.rangeClientWidth + 1,
+      `${scenarioName} 到期日期筛选内部不应横向溢出: ${JSON.stringify(metrics)}`
+    )
+    if (metrics.viewportWidth >= 760) {
+      const [startInput, endInput] = metrics.inputBoxes
+      assert(
+        startInput &&
+          endInput &&
+          Math.abs(startInput.y - endInput.y) <= 2 &&
+          startInput.width >= 120 &&
+          endInput.width >= 120,
+        `${scenarioName} 宽屏下开始/结束日期应在同一行且保持可读宽度: ${JSON.stringify(
+          metrics
+        )}`
+      )
     }
   }
 
@@ -633,7 +733,7 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '来料质检')
-        await expectButton(page, '新建质检单')
+        await expectButton(page, '生成质检草稿')
         await expectButton(page, '导出当前结果')
         await expectButton(page, '列顺序')
         await assertNoListDeleteTrashToolbar(page)
@@ -748,8 +848,8 @@ export function createBusinessFormalScenarios(deps) {
           heading: '来料质检',
         })
         await assertBusinessFormModalKeyboardRecovery(page, {
-          triggerName: '新建质检单',
-          titleText: '新建来料质检单',
+          triggerName: '生成质检草稿',
+          titleText: '生成来料质检草稿',
           scenarioName: 'business-v1-quality-inspections',
         })
         await page.getByRole('row').filter({ hasText: 'QI-STYLE-L1' }).click()
@@ -757,8 +857,8 @@ export function createBusinessFormalScenarios(deps) {
         await expectButton(page, '判定合格')
         await expectButton(page, '判定不合格')
         await verifyBusinessActionFormModal(page, {
-          buttonName: '新建质检单',
-          titleText: '新建来料质检单',
+          buttonName: '生成质检草稿',
+          titleText: '生成来料质检草稿',
           minFieldCount: 7,
           screenshotName: 'business-v1-quality-inspection-create-form-modal',
           expectedTexts: ['采购入库单', '采购入库行', '批次', '材料', '仓库'],
@@ -1029,7 +1129,6 @@ export function createBusinessFormalScenarios(deps) {
           await expectHeading(page, heading)
           await expectText(page, 'Workflow V1')
           await expectText(page, '不写事实层')
-          await expectButton(page, '刷新协同')
           await expectButton(page, createButton)
           for (const text of absentTexts) {
             await assertTextAbsent(page, text)
@@ -1056,7 +1155,7 @@ export function createBusinessFormalScenarios(deps) {
         await verifyWorkflowV1Page({
           path: '/erp/production/scheduling',
           heading: '生产排程',
-          createButton: '新建排程协同',
+          createButton: '发起排程协同',
           absentTexts: ['新建排程单', '生成生产任务'],
           scenarioName: 'business-workflow-production-scheduling',
           afterPageReady: async () => {
@@ -1128,17 +1227,27 @@ export function createBusinessFormalScenarios(deps) {
         await verifyWorkflowV1Page({
           path: '/erp/warehouse/shipping-release',
           heading: '出货放行',
-          createButton: '新建放行协同',
+          createButton: '发起放行协同',
           absentTexts: ['新建放行单', '生成出货放行', '确认放行'],
           scenarioName: 'business-workflow-shipping-release',
           refreshMessage: '出货放行协同任务已刷新',
           afterPageReady: async () => {
+            await assertWorkflowDueDateRangeFilterLayout(page, {
+              scenarioName: 'business-workflow-shipping-release',
+            })
             await expectText(page, '待办')
             await page.getByRole('button', { name: '展开' }).first().click()
             await expectText(page, '出货放行协同确认')
             await expectText(page, 'SHIP-REL-L1')
             await assertTextAbsent(page, '同来源非放行任务')
             await assertTextAbsent(page, 'SHIP-REL-OTHER')
+            await assertPageAttachmentModalEntrypoint(page, {
+              scenarioName:
+                'business-workflow-shipping-release-attachment-modal',
+              rowText: 'SHIP-REL-L1',
+              modalTitle: '协同任务附件',
+              panelTitle: '协同任务附件',
+            })
 
             let failedListTasksOnce = false
             await page.route('**/rpc/workflow', async (route) => {
@@ -1314,7 +1423,7 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '生产进度')
-        await expectButton(page, '新建生产事实')
+        await expectButton(page, '登记生产事实')
         await expectText(page, 'PROD-FACT-L1')
         await expectText(page, '生产发料、成品入库和返工事实')
         await assertUnifiedListToolbarShell(page, {
@@ -1322,8 +1431,8 @@ export function createBusinessFormalScenarios(deps) {
         })
         await assertTextAbsent(page, '生成生产进度')
         await verifyBusinessActionFormModal(page, {
-          buttonName: '新建生产事实',
-          titleText: '新建生产事实',
+          buttonName: '登记生产事实',
+          titleText: '登记生产事实',
           minFieldCount: 9,
           screenshotName: 'business-v1-production-fact-create-form-modal',
           expectedTexts: ['事实单号', '对象类型', '数量', '来源类型'],
@@ -1337,12 +1446,12 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '出库管理')
-        await expectButton(page, '新建库存预留')
         await expectText(page, 'RSV-STYLE-L1')
         await expectText(page, '库存预留释放 / 消耗')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-outbound-reservations',
         })
+        await assertTextAbsent(page, '登记库存预留')
         await assertTextAbsent(page, '新建出货单')
         await assertTextAbsent(page, '生成出库')
         await assertNoHorizontalOverflow(page, 'business-v1-outbound')
@@ -1351,23 +1460,16 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '应收管理')
-        await expectButton(page, '登记应收事实')
         await expectText(page, 'AR-STYLE-L1')
         await expectText(page, 'finance_facts')
         await expectText(page, 'RECEIVABLE')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-receivables',
         })
+        await assertTextAbsent(page, '登记应收事实')
         await assertTextAbsent(page, '生成应收')
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'business-v1-receivables',
-        })
-        await verifyBusinessActionFormModal(page, {
-          buttonName: '登记应收事实',
-          titleText: '登记应收事实',
-          minFieldCount: 10,
-          screenshotName: 'business-v1-receivables-create-form-modal',
-          expectedTexts: ['事实类型', '金额', '来源类型'],
         })
         await assertNoHorizontalOverflow(page, 'business-v1-receivables')
 
@@ -1375,33 +1477,36 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '应付管理')
-        await expectButton(page, '登记应付事实')
         await expectText(page, 'AP-STYLE-L1')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-payables',
         })
+        await assertTextAbsent(page, '登记应付事实')
+        await assertTextAbsent(page, '生成应付')
         await assertNoHorizontalOverflow(page, 'business-v1-payables')
 
         await gotoScenarioPath(page, '/erp/finance/invoices', {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '发票管理')
-        await expectButton(page, '登记发票事实')
         await expectText(page, 'INV-STYLE-L1')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-invoices',
         })
+        await assertTextAbsent(page, '登记发票事实')
+        await assertTextAbsent(page, '生成发票')
         await assertNoHorizontalOverflow(page, 'business-v1-invoices')
 
         await gotoScenarioPath(page, '/erp/finance/reconciliation', {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '对账管理')
-        await expectButton(page, '登记对账事实')
         await expectText(page, 'REC-STYLE-L1')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-reconciliation',
         })
+        await assertTextAbsent(page, '登记对账事实')
+        await assertTextAbsent(page, '生成对账')
         await assertNoHorizontalOverflow(page, 'business-v1-reconciliation')
 
         await page.evaluate(() => {
@@ -1416,11 +1521,9 @@ export function createBusinessFormalScenarios(deps) {
           expectedEffectiveTheme: 'dark',
         })
         await expectHeading(page, '应收管理')
-        await page.getByRole('button', { name: '登记应收事实' }).click()
-        await assertOperationalFactModalViewport(
-          page,
-          'business-v1-receivables-dark-modal'
-        )
+        await assertTextAbsent(page, '登记应收事实')
+        await assertTextAbsent(page, '生成应收')
+        await assertNoHorizontalOverflow(page, 'business-v1-receivables-dark')
 
         await gotoScenarioPath(page, '/erp/production/exceptions', {
           waitUntil: 'domcontentloaded',
@@ -1457,8 +1560,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '出货放行')
         await expectText(page, 'Workflow V1')
         await expectText(page, '不写事实层')
-        await expectButton(page, '新建放行协同')
-        await expectButton(page, '刷新协同')
+        await expectButton(page, '发起放行协同')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-workflow-shipping-release-mobile',
           exportDisabled: true,
@@ -1558,7 +1660,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '出货放行')
         await expectText(page, 'Workflow V1')
         await expectText(page, '不写事实层')
-        await expectButton(page, '新建放行协同')
+        await expectButton(page, '发起放行协同')
         await assertUnifiedListToolbarShell(page, {
           scenarioName:
             'business-formal-shipping-release-no-permission-desktop',
@@ -1566,8 +1668,8 @@ export function createBusinessFormalScenarios(deps) {
           exportTooltip: '当前 Workflow V1 只处理协同任务，不导出业务数据。',
         })
         assert(
-          await page.getByRole('button', { name: '新建放行协同' }).isDisabled(),
-          '无 workflow.task.create 时出货放行页新建协同按钮应禁用'
+          await page.getByRole('button', { name: '发起放行协同' }).isDisabled(),
+          '无 workflow.task.create 时出货放行页发起协同按钮应禁用'
         )
         await expectText(page, '当前账号没有 Workflow 任务读取权限。')
         await page.getByRole('button', { name: '刷新当前页' }).click()

@@ -24,6 +24,7 @@ import {
   listBusinessAttachments,
   uploadBusinessAttachment,
 } from '../../api/attachmentApi.mjs'
+import { resolveBusinessAttachmentPanelState } from '../../utils/businessAttachmentPanelState.mjs'
 
 const MAX_ATTACHMENT_SIZE = 50 * 1024 * 1024
 const MAX_ATTACHMENT_SIZE_LABEL = '50MB'
@@ -206,6 +207,9 @@ const BusinessAttachmentPanel = forwardRef(
       canDelete = true,
       className = '',
       variant = 'section',
+      allowPendingAttachmentsWithoutOwner = true,
+      missingOwnerDescription,
+      missingOwnerEmptyText,
     },
     ref
   ) => {
@@ -218,9 +222,24 @@ const BusinessAttachmentPanel = forwardRef(
     const [previewing, setPreviewing] = useState(false)
     const [previewAttachment, setPreviewAttachment] = useState(null)
 
-    const normalizedOwnerId = Number(ownerId || 0)
-    const missingOwner = !ownerType || normalizedOwnerId <= 0
-    const uploadDisabled = !ownerType || !canUpload || uploading
+    const {
+      normalizedOwnerId,
+      missingOwner,
+      canQueuePending,
+      uploadDisabled,
+      panelDescription,
+      emptyDescription,
+      uploadButtonText,
+    } = resolveBusinessAttachmentPanelState({
+      ownerType,
+      ownerId,
+      canUpload,
+      uploading,
+      description,
+      allowPendingAttachmentsWithoutOwner,
+      missingOwnerDescription,
+      missingOwnerEmptyText,
+    })
 
     const containerClassName = useMemo(
       () =>
@@ -233,12 +252,6 @@ const BusinessAttachmentPanel = forwardRef(
           .join(' '),
       [className, variant]
     )
-    const panelDescription = missingOwner
-      ? '可先选择附件，保存业务记录后自动上传并绑定。'
-      : description
-    const emptyDescription =
-      missingOwner && canUpload ? '暂无附件，可先选择后随保存上传' : '暂无附件'
-    const uploadButtonText = missingOwner ? '选择附件' : '上传'
     const listItems = useMemo(
       () => [
         ...attachments.map((item) => ({ ...item, __kind: 'saved' })),
@@ -383,13 +396,17 @@ const BusinessAttachmentPanel = forwardRef(
           })
         }
 
-        if (missingOwner) {
+        if (missingOwner && canQueuePending) {
           setPendingAttachments((current) => [...current, ...preparedItems])
           message.success(
             preparedItems.length > 1
               ? `${preparedItems.length} 个附件将在保存后上传`
               : '附件将在保存后上传'
           )
+          return
+        }
+        if (missingOwner) {
+          message.warning(missingOwnerDescription || '请先选择业务记录')
           return
         }
 

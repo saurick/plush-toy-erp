@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
-  DeleteOutlined,
   DownOutlined,
   LinkOutlined,
   PlusOutlined,
@@ -18,7 +17,6 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   addPurchaseReceiptItem,
   cancelPurchaseReceipt,
-  createPurchaseReceiptWithItems,
   listPurchaseReceipts,
   postPurchaseReceipt,
 } from '../api/purchaseApi.mjs'
@@ -33,13 +31,11 @@ import {
   BusinessOperationPanel,
   BusinessDataTable,
   BusinessPageLayout,
-  DateInput,
   DateRangeFilter,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
   SelectionActionBar,
-  ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
@@ -47,19 +43,17 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
-import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
+import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
 import {
   compactParams,
   formatUnixDate,
   formatUnixDateTime,
-  buildSequentialDraftCode,
   hasActionPermission,
   trimOptional,
   V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
 import {
   buildPurchaseReceiptItemParams,
-  createBlankPurchaseReceiptItem,
   decimalNumber,
   formatQuantity,
 } from '../utils/businessLineItems.mjs'
@@ -120,10 +114,6 @@ function hasPermission(adminProfile, permission) {
   )
 }
 
-function todayInputValue() {
-  return new Date().toISOString().slice(0, 10)
-}
-
 function wait(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms)
@@ -133,24 +123,6 @@ function wait(ms) {
 function optionalText(value) {
   const text = String(value ?? '').trim()
   return text || '-'
-}
-
-function buildReceiptParams(values = {}) {
-  return compactParams({
-    receipt_no: trimOptional(values.receipt_no),
-    supplier_name: trimOptional(values.supplier_name),
-    received_at: trimOptional(values.received_at),
-    note: trimOptional(values.note),
-  })
-}
-
-function buildReceiptWithItemsParams(values = {}) {
-  return {
-    ...buildReceiptParams(values),
-    items: (values.items || []).map((item) =>
-      buildPurchaseReceiptItemParams(undefined, item)
-    ),
-  }
 }
 
 function receiptItemCount(receipt = {}) {
@@ -397,7 +369,6 @@ export default function V1PurchaseReceiptsPage() {
   const [units, setUnits] = useState([])
   const [warehouses, setWarehouses] = useState([])
   const [inventoryLots, setInventoryLots] = useState([])
-  const [receiptForm] = Form.useForm()
   const [itemForm] = Form.useForm()
   const routePurchaseOrderID = searchParamPositiveIntText(
     searchParams,
@@ -619,18 +590,6 @@ export default function V1PurchaseReceiptsPage() {
   }, [loadRows, outletContext])
 
   useEffect(() => {
-    if (receiptModal?.mode === 'create') {
-      receiptForm.setFieldsValue({
-        receipt_no: buildSequentialDraftCode(rows, {
-          prefix: 'PR',
-          field: 'receipt_no',
-        }),
-        supplier_name: '',
-        received_at: todayInputValue(),
-        note: '',
-        items: [createBlankPurchaseReceiptItem()],
-      })
-    }
     if (receiptModal?.mode === 'item') {
       itemForm.setFieldsValue({
         material_id: undefined,
@@ -646,11 +605,7 @@ export default function V1PurchaseReceiptsPage() {
         note: '',
       })
     }
-  }, [itemForm, receiptForm, receiptModal?.mode, rows])
-
-  const openCreate = useCallback(() => {
-    setReceiptModal({ mode: 'create' })
-  }, [])
+  }, [itemForm, receiptModal?.mode])
 
   const openAddItem = useCallback((receipt) => {
     setReceiptModal({ mode: 'item', receipt })
@@ -659,29 +614,6 @@ export default function V1PurchaseReceiptsPage() {
   const closeModal = useCallback(() => {
     setReceiptModal(null)
   }, [])
-
-  const handleCreateReceipt = useCallback(async () => {
-    let values
-    try {
-      values = await receiptForm.validateFields()
-    } catch {
-      return
-    }
-    setSaving(true)
-    try {
-      const receipt = await createPurchaseReceiptWithItems(
-        buildReceiptWithItemsParams(values)
-      )
-      message.success('采购入库草稿和明细已创建')
-      setSelectedRow(receipt)
-      closeModal()
-      await loadRows()
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '创建采购入库草稿'))
-    } finally {
-      setSaving(false)
-    }
-  }, [closeModal, loadRows, receiptForm])
 
   const handleAddItem = useCallback(async () => {
     let values
@@ -981,17 +913,6 @@ export default function V1PurchaseReceiptsPage() {
             onOpenColumnOrder={openColumnOrder}
           />
         }
-        primaryAction={
-          <ToolbarButton
-            type="primary"
-            className="erp-business-list-toolbar__primary-action"
-            icon={<PlusOutlined />}
-            disabled={!canCreate}
-            onClick={openCreate}
-          >
-            新建入库单
-          </ToolbarButton>
-        }
       >
         <SelectionActionBar
           embedded
@@ -1024,6 +945,17 @@ export default function V1PurchaseReceiptsPage() {
               关联 <DownOutlined />
             </Button>
           </Dropdown>
+          <BusinessAttachmentModalButton
+            ownerType="purchase_receipt"
+            ownerId={selectedRow?.id}
+            modalTitle="入库附件"
+            panelTitle="入库附件"
+            description="上传送货单、物流单、仓库收货照片或异常说明；附件不替代过账和库存流水。"
+            canUpload={canCreate || canPost}
+            canDelete={canCreate || canPost}
+            disabled={!selectedRow}
+            disabledReason="请先选择一条入库记录"
+          />
           <Button
             size="small"
             icon={<PlusOutlined />}
@@ -1092,15 +1024,6 @@ export default function V1PurchaseReceiptsPage() {
         </SelectionActionBar>
       </BusinessOperationPanel>
 
-      <BusinessAttachmentPanel
-        ownerType="purchase_receipt"
-        ownerId={selectedRow?.id}
-        title="入库附件"
-        description="上传送货单、物流单、仓库收货照片或异常说明；附件不替代过账和库存流水。"
-        canUpload={canCreate || canPost}
-        canDelete={canCreate || canPost}
-      />
-
       <BusinessDataTable
         rowKey="id"
         loading={loading}
@@ -1134,143 +1057,27 @@ export default function V1PurchaseReceiptsPage() {
       {columnOrderModal}
 
       <BusinessFormModal
-        title={
-          receiptModal?.mode === 'item' ? '添加入库明细' : '新建采购入库单'
-        }
+        title="添加入库明细"
         open={Boolean(receiptModal)}
         onCancel={closeModal}
-        onOk={
-          receiptModal?.mode === 'item' ? handleAddItem : handleCreateReceipt
-        }
+        onOk={handleAddItem}
         confirmLoading={saving}
         destroyOnHidden
-        okText={receiptModal?.mode === 'item' ? '添加明细' : '创建草稿'}
+        okText="添加明细"
         cancelText="关闭"
       >
-        {receiptModal?.mode === 'item' ? (
-          <Form
-            form={itemForm}
-            layout="vertical"
-            className="erp-business-action-form erp-business-action-form--grid"
-          >
-            <PurchaseReceiptItemFormFields
-              inventoryLotOptions={inventoryLotOptions}
-              materialOptions={materialOptions}
-              unitOptions={unitOptions}
-              warehouseOptions={warehouseOptions}
-            />
-          </Form>
-        ) : (
-          <Form
-            form={receiptForm}
-            layout="vertical"
-            className="erp-business-action-form"
-          >
-            <div className="erp-business-action-form--grid">
-              <Form.Item
-                className="erp-business-action-form__field"
-                label="入库单号（自动）"
-                name="receipt_no"
-                rules={[
-                  { required: true, message: '请填写或保留自动入库单号' },
-                ]}
-              >
-                <Input
-                  allowClear
-                  autoFocus
-                  autoComplete="off"
-                  placeholder="自动生成，可按需要调整"
-                />
-              </Form.Item>
-              <Form.Item
-                className="erp-business-action-form__field"
-                label="供应商"
-                name="supplier_name"
-                rules={[{ required: true, message: '请填写供应商' }]}
-              >
-                <Input allowClear autoComplete="off" />
-              </Form.Item>
-              <Form.Item
-                className="erp-business-action-form__field"
-                label="收货日期"
-                name="received_at"
-              >
-                <DateInput />
-              </Form.Item>
-              <Form.Item
-                className="erp-business-action-form__field erp-business-action-form__field--wide"
-                label="备注"
-                name="note"
-              >
-                <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
-              </Form.Item>
-            </div>
-            <Form.List name="items">
-              {(fields, { add, remove }) => (
-                <section className="erp-master-contact-list erp-purchase-receipt-modal-items">
-                  <div className="erp-master-contact-list__head">
-                    <div>
-                      <strong>入库明细</strong>
-                      <span>
-                        单头和初始明细由后端一次创建；库存流水仍只在过账时写入。
-                      </span>
-                    </div>
-                  </div>
-                  <div className="erp-master-contact-list__items">
-                    {fields.map((field) => (
-                      <div
-                        className="erp-master-contact-list__row"
-                        key={field.key}
-                      >
-                        <div className="erp-master-contact-list__row-head">
-                          <strong>明细 {field.name + 1}</strong>
-                          <Button
-                            danger
-                            size="small"
-                            icon={<DeleteOutlined />}
-                            disabled={fields.length <= 1}
-                            onClick={() => remove(field.name)}
-                          >
-                            移除明细
-                          </Button>
-                        </div>
-                        <div className="erp-master-contact-list__grid">
-                          <PurchaseReceiptItemFormFields
-                            field={field}
-                            inventoryLotOptions={inventoryLotOptions}
-                            materialOptions={materialOptions}
-                            unitOptions={unitOptions}
-                            warehouseOptions={warehouseOptions}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="erp-line-items-form__footer">
-                    <div className="erp-line-items-form__footer-actions">
-                      <Button
-                        type="dashed"
-                        icon={<PlusOutlined />}
-                        onClick={() => add(createBlankPurchaseReceiptItem())}
-                      >
-                        添加条目
-                      </Button>
-                    </div>
-                    <div className="erp-line-items-form__stats">
-                      <span className="erp-line-items-form__stat">
-                        已录入
-                        <strong className="erp-line-items-form__stat-value">
-                          {fields.length}
-                        </strong>
-                        条
-                      </span>
-                    </div>
-                  </div>
-                </section>
-              )}
-            </Form.List>
-          </Form>
-        )}
+        <Form
+          form={itemForm}
+          layout="vertical"
+          className="erp-business-action-form erp-business-action-form--grid"
+        >
+          <PurchaseReceiptItemFormFields
+            inventoryLotOptions={inventoryLotOptions}
+            materialOptions={materialOptions}
+            unitOptions={unitOptions}
+            warehouseOptions={warehouseOptions}
+          />
+        </Form>
       </BusinessFormModal>
     </BusinessPageLayout>
   )

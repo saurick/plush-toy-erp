@@ -69,7 +69,7 @@ import {
   downloadBusinessListCSV,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
-import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
+import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
 import {
   routeWithQuery,
   searchParamPositiveIntText,
@@ -189,7 +189,7 @@ export function OperationalFactWorkspace({
       production: {
         title: '生产事实',
         listKey: 'production_facts',
-        createLabel: '新建生产事实',
+        createLabel: '登记生产事实',
         createPrefix: 'prod',
         draftNumberField: 'fact_no',
         draftNumberPrefix: 'PROD',
@@ -212,7 +212,7 @@ export function OperationalFactWorkspace({
       outsourcing: {
         title: '委外事实',
         listKey: 'outsourcing_facts',
-        createLabel: '新建委外事实',
+        createLabel: '登记委外事实',
         createPrefix: 'outsource',
         draftNumberField: 'fact_no',
         draftNumberPrefix: 'OUTF',
@@ -238,7 +238,7 @@ export function OperationalFactWorkspace({
       shipments: {
         title: '出货事实',
         listKey: 'shipments',
-        createLabel: '新建出货单',
+        createLabel: '登记出货单草稿',
         createPrefix: 'shipment',
         draftNumberField: 'shipment_no',
         draftNumberPrefix: 'SHIP',
@@ -257,7 +257,8 @@ export function OperationalFactWorkspace({
       reservations: {
         title: '库存预留',
         listKey: 'stock_reservations',
-        createLabel: '新建库存预留',
+        createLabel: '登记库存预留',
+        hideCreateAction: true,
         createPrefix: 'reserve',
         draftNumberField: 'reservation_no',
         draftNumberPrefix: 'RSV',
@@ -276,7 +277,7 @@ export function OperationalFactWorkspace({
       finance: {
         title: '财务事实',
         listKey: 'finance_facts',
-        createLabel: '新建财务事实',
+        createLabel: '登记财务事实',
         createPrefix: 'finance',
         draftNumberField: 'fact_no',
         draftNumberPrefix: 'FIN',
@@ -359,6 +360,7 @@ export function OperationalFactWorkspace({
     adminProfile,
     activeConfig.writePermissions
   )
+  const canCreateActive = activeConfig.hideCreateAction !== true
 
   const resetPaginationForKey = useCallback(
     (key = activeKey) => {
@@ -1036,15 +1038,17 @@ export function OperationalFactWorkspace({
           />
         }
         primaryAction={
-          <ToolbarButton
-            type="primary"
-            className="erp-business-list-toolbar__primary-action"
-            icon={<PlusOutlined />}
-            disabled={!canWriteActive}
-            onClick={openCreate}
-          >
-            {activeConfig.createLabel}
-          </ToolbarButton>
+          canCreateActive ? (
+            <ToolbarButton
+              type="primary"
+              className="erp-business-list-toolbar__primary-action"
+              icon={<PlusOutlined />}
+              disabled={!canWriteActive}
+              onClick={openCreate}
+            >
+              {activeConfig.createLabel}
+            </ToolbarButton>
+          ) : null
         }
       >
         <SelectionActionBar
@@ -1126,6 +1130,19 @@ export function OperationalFactWorkspace({
             >
               加工合同打印
             </Button>
+          ) : null}
+          {activeAttachmentOwnerType ? (
+            <BusinessAttachmentModalButton
+              ownerType={activeAttachmentOwnerType}
+              ownerId={activeSelectedRow?.id}
+              modalTitle={`${activeConfig.title}附件`}
+              panelTitle={`${activeConfig.title}附件`}
+              description="上传与当前记录相关的图片、票据、对账或确认资料；附件只作为证据，不改变业务事实状态。"
+              canUpload={canWriteActive || canConfirmActive}
+              canDelete={canWriteActive || canConfirmActive}
+              disabled={!activeSelectedRow}
+              disabledReason="请先选择一条记录"
+            />
           ) : null}
           {activeKey === 'shipments' ? (
             <Popconfirm
@@ -1286,17 +1303,6 @@ export function OperationalFactWorkspace({
           ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>
-
-      {activeAttachmentOwnerType ? (
-        <BusinessAttachmentPanel
-          ownerType={activeAttachmentOwnerType}
-          ownerId={activeSelectedRow?.id}
-          title={`${activeConfig.title}附件`}
-          description="上传与当前记录相关的图片、票据、对账或确认资料；附件只作为证据，不改变业务事实状态。"
-          canUpload={canWriteActive || canConfirmActive}
-          canDelete={canWriteActive || canConfirmActive}
-        />
-      ) : null}
 
       <BusinessDataTable
         tableHeader={

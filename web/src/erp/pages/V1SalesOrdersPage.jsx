@@ -606,8 +606,12 @@ export default function V1SalesOrdersPage() {
       )
       const result = await saveSalesOrderWithItems({
         ...params,
-        items: (Array.isArray(values.items) ? values.items : []).map((item) =>
-          buildSalesOrderItemParams(item, item?.id ? { id: item.id } : {})
+        items: (Array.isArray(values.items) ? values.items : []).map(
+          (item, index) =>
+            buildSalesOrderItemParams(item, {
+              ...(item?.id ? { id: item.id } : {}),
+              line_no: index + 1,
+            })
         ),
       })
       const saved = result?.sales_order || null

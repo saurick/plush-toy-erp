@@ -20,7 +20,7 @@ import {
   resolveTaskSourceLabel,
   supportsRejectedAction,
 } from '../utils/mobileRoleTaskModel.mjs'
-import BusinessAttachmentPanel from '../../components/business-list/BusinessAttachmentPanel.jsx'
+import BusinessAttachmentModalButton from '../../components/business-list/BusinessAttachmentModalButton.jsx'
 
 export default function MobileTaskDetailScreen({
   activeRoleKey,
@@ -189,13 +189,18 @@ export default function MobileTaskDetailScreen({
             </div>
           ) : null}
           <div className="mt-4">
-            <BusinessAttachmentPanel
+            <BusinessAttachmentModalButton
               ownerType="workflow_task"
               ownerId={selectedTask.id}
-              title="现场附件"
+              buttonText="管理现场附件"
+              modalTitle="现场附件"
+              panelTitle="现场附件"
               description="上传现场照片、异常截图或处理凭证；附件只作为任务证据，不改变任务状态。"
               canUpload={selectedCanOperate}
               canDelete={selectedCanOperate}
+              disabled={!selectedTask}
+              disabledReason="请先进入一条任务详情"
+              buttonProps={{ className: 'w-full justify-center' }}
             />
           </div>
         </section>

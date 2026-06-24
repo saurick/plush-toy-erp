@@ -696,7 +696,7 @@ export default function V1QualityInspectionsPage() {
     : '请先选择一张来料质检单'
 
   const modalTitle = {
-    create: '新建来料质检单',
+    create: '生成来料质检草稿',
     pass: '判定合格',
     reject: '判定不合格',
     cancel: '取消质检',
@@ -711,7 +711,7 @@ export default function V1QualityInspectionsPage() {
   }[inspectionModal?.mode || 'create']
 
   const modalOkText = {
-    create: '创建草稿',
+    create: '生成草稿',
     pass: '确认合格',
     reject: '确认不合格',
     cancel: '确认取消',
@@ -1232,7 +1232,7 @@ export default function V1QualityInspectionsPage() {
             disabled={!canCreate}
             onClick={openCreate}
           >
-            新建质检单
+            生成质检草稿
           </ToolbarButton>
         }
       >

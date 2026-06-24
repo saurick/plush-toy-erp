@@ -239,6 +239,25 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
   )
 
   assert.deepEqual(
+    buildSalesOrderItemParams(
+      {
+        line_no: '9',
+        product_id: '5',
+        unit_id: '1',
+        ordered_quantity: '2',
+      },
+      { line_no: 3 }
+    ),
+    {
+      line_no: 3,
+      product_id: 5,
+      product_sku_id: 0,
+      unit_id: 1,
+      ordered_quantity: '2',
+    }
+  )
+
+  assert.deepEqual(
     buildPurchaseOrderParams({
       purchase_order_no: ' PO001 ',
       supplier_id: '7',
@@ -271,6 +290,24 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       material_id: 12,
       unit_id: 2,
       material_name_snapshot: '面料',
+      purchased_quantity: '10',
+    }
+  )
+
+  assert.deepEqual(
+    buildPurchaseOrderItemParams(
+      {
+        line_no: '8',
+        material_id: '12',
+        unit_id: '2',
+        purchased_quantity: '10',
+      },
+      { line_no: 2 }
+    ),
+    {
+      line_no: 2,
+      material_id: 12,
+      unit_id: 2,
       purchased_quantity: '10',
     }
   )
@@ -320,6 +357,26 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       outsourcing_quantity: '10',
       unit_price: '3.5',
       amount: '35.00',
+    }
+  )
+
+  assert.deepEqual(
+    buildOutsourcingOrderItemParams(
+      {
+        line_no: '7',
+        product_id: '12',
+        process_id: '8',
+        unit_id: '2',
+        outsourcing_quantity: '10',
+      },
+      { line_no: 2 }
+    ),
+    {
+      line_no: 2,
+      product_id: 12,
+      process_id: 8,
+      unit_id: 2,
+      outsourcing_quantity: '10',
     }
   )
 })

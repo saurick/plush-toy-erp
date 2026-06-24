@@ -1,8 +1,10 @@
+import { createBusinessAttachmentAssertions } from './businessAttachmentAssertions.mjs'
+
 export function createPurchaseReceiptScenarios(deps) {
   const {
     assert,
+    assertAntdModalCentered,
     assertBusinessFormModalKeyboardRecovery,
-    assertBusinessListEmptySearchState,
     assertBusinessMainTableInitialSelectionEmpty,
     assertERPThemeMode,
     assertNoHorizontalOverflow,
@@ -10,11 +12,6 @@ export function createPurchaseReceiptScenarios(deps) {
     assertPurchaseReceiptAddItemModalDarkTokens,
     assertPurchaseReceiptAddItemModalMetrics,
     assertPurchaseReceiptAddItemModalMobileLayout,
-    assertPurchaseReceiptCreateModalDarkTokens,
-    assertPurchaseReceiptCreateModalFocusStyles,
-    assertPurchaseReceiptCreateModalKeyboardRecovery,
-    assertPurchaseReceiptCreateModalMetrics,
-    assertPurchaseReceiptCreateModalMobileLayout,
     assertPurchaseReceiptRowItemCount,
     assertTextAbsent,
     closeBusinessFormModal,
@@ -22,12 +19,15 @@ export function createPurchaseReceiptScenarios(deps) {
     expectHeading,
     expectText,
     fillPurchaseReceiptAddItemModalBoundaryValues,
-    fillPurchaseReceiptCreateModalBoundaryValues,
     openPurchaseReceiptAddItemModal,
-    openPurchaseReceiptCreateModal,
     selectPurchaseReceiptRow,
     verifyBusinessModuleColumnOrderDialog,
   } = deps
+  const { assertPageAttachmentModalEntrypoint } =
+    createBusinessAttachmentAssertions({
+      assert,
+      assertAntdModalCentered,
+    })
 
   const assertPurchaseReceiptToolbarShell = async (page, scenarioName) => {
     for (const label of ['导出当前结果', '列顺序']) {
@@ -42,6 +42,11 @@ export function createPurchaseReceiptScenarios(deps) {
       await page.getByRole('button', { name: '回收站' }).count(),
       0,
       `${scenarioName} 入库列表没有回收站主路径时不应展示占位按钮`
+    )
+    assert.equal(
+      await page.getByRole('button', { name: '新建入库单' }).count(),
+      0,
+      `${scenarioName} 入库草稿应从采购订单生成，入库列表不应展示页面级新建按钮`
     )
     const exportButton = page
       .getByRole('button', { name: '导出当前结果' })
@@ -58,6 +63,83 @@ export function createPurchaseReceiptScenarios(deps) {
       await columnOrderButton.isDisabled(),
       false,
       `${scenarioName} 入库数据列应允许安全调整列顺序`
+    )
+  }
+
+  const assertPurchaseReceiptDateRangeRoundedShell = async (
+    page,
+    scenarioName
+  ) => {
+    const metrics = await page.evaluate(() => {
+      const control = Array.from(
+        document.querySelectorAll('.erp-business-date-range-filter')
+      ).find((node) => node.textContent?.includes('入库日期'))
+      const label = control?.querySelector(
+        '.erp-business-date-range-filter__type-label'
+      )
+      const range = control?.querySelector(
+        '.erp-business-date-range-filter__range'
+      )
+      const style = control ? window.getComputedStyle(control) : null
+      const labelStyle = label ? window.getComputedStyle(label) : null
+      const controlBox = control?.getBoundingClientRect()
+      const labelBox = label?.getBoundingClientRect()
+      return {
+        controlWidth: controlBox?.width || 0,
+        controlHeight: controlBox?.height || 0,
+        labelText: label?.textContent?.trim() || '',
+        overflowX: style?.overflowX || '',
+        overflowY: style?.overflowY || '',
+        borderTopLeftRadius: style?.borderTopLeftRadius || '',
+        borderBottomLeftRadius: style?.borderBottomLeftRadius || '',
+        controlScrollWidth: control?.scrollWidth || 0,
+        controlClientWidth: control?.clientWidth || 0,
+        rangeScrollWidth: range?.scrollWidth || 0,
+        rangeClientWidth: range?.clientWidth || 0,
+        labelBackground: labelStyle?.backgroundColor || '',
+        labelLeftDelta:
+          labelBox && controlBox
+            ? Math.abs(labelBox.left - controlBox.left)
+            : 0,
+        documentOverflow:
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      }
+    })
+    assert.equal(
+      metrics.labelText,
+      '入库日期',
+      `${scenarioName} 入库日期筛选应使用共享 DateRangeFilter 标签: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      metrics.controlWidth > 0 && metrics.controlHeight > 0,
+      `${scenarioName} 入库日期筛选控件应可见: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.overflowX === 'hidden' && metrics.overflowY === 'hidden',
+      `${scenarioName} 日期区间外壳应裁切内部标签背景到圆角内: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      Number.parseFloat(metrics.borderTopLeftRadius) >= 8 &&
+        Number.parseFloat(metrics.borderBottomLeftRadius) >= 8,
+      `${scenarioName} 日期区间外壳左侧应保留可见圆角: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.labelLeftDelta <= 1 &&
+        metrics.controlScrollWidth <= metrics.controlClientWidth + 1 &&
+        metrics.rangeScrollWidth <= metrics.rangeClientWidth + 1,
+      `${scenarioName} 入库日期筛选内部不应挤压或横向溢出: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.documentOverflow,
+      0,
+      `${scenarioName} 入库日期筛选不应造成页面级横向溢出: ${JSON.stringify(
+        metrics
+      )}`
     )
   }
 
@@ -186,6 +268,10 @@ export function createPurchaseReceiptScenarios(deps) {
           page,
           'purchase-receipts-table-control-columns-desktop'
         )
+        await assertPurchaseReceiptDateRangeRoundedShell(
+          page,
+          'purchase-receipts-table-control-columns-desktop'
+        )
         await assertBusinessMainTableInitialSelectionEmpty(page, {
           scenarioName: 'purchase-receipts-table-control-columns-desktop',
         })
@@ -289,128 +375,16 @@ export function createPurchaseReceiptScenarios(deps) {
           receiptNo: 'PR-STYLE-L1',
           scenarioName: 'purchase-receipts-expanded-items-readable-desktop',
         })
+        await assertPageAttachmentModalEntrypoint(page, {
+          scenarioName: 'purchase-receipts-attachment-modal-desktop',
+          rowText: 'PR-STYLE-L1',
+          modalTitle: '入库附件',
+          panelTitle: '入库附件',
+        })
         await verifyBusinessModuleColumnOrderDialog(page, {
           moduleKey: 'inbound',
           heading: '入库管理',
         })
-      },
-    },
-    {
-      name: 'purchase-receipt-create-modal-desktop',
-      path: '/erp/warehouse/inbound',
-      auth: 'admin',
-      viewport: { width: 1440, height: 900 },
-      verify: async (page) => {
-        await expectHeading(page, '入库管理')
-        await expectText(page, 'PR-STYLE-L1')
-        await assertPurchaseReceiptCreateModalKeyboardRecovery(page)
-        await assertBusinessListEmptySearchState(page, {
-          scenarioName: 'purchase-receipt-empty-search-state',
-          searchPlaceholder: '搜索入库单号 / 供应商',
-          emptyText: '暂无采购入库单',
-          staleText: 'PR-STYLE-L1',
-        })
-
-        const modal = await openPurchaseReceiptCreateModal(page)
-        await expectText(page, '新建采购入库单')
-        await expectText(page, '入库明细')
-        await expectText(page, '单头和初始明细由后端一次创建')
-        await assertTextAbsent(page, '材料 ID')
-        await assertTextAbsent(page, '仓库 ID')
-        await assertTextAbsent(page, '单位 ID')
-
-        await modal.getByRole('button', { name: '创建草稿' }).click()
-        await expectText(page, '请填写供应商')
-        await expectText(page, '请选择材料')
-        await expectText(page, '请选择仓库')
-        await expectText(page, '请选择单位')
-        await expectText(page, '请填写入库数量')
-
-        await fillPurchaseReceiptCreateModalBoundaryValues(page, modal)
-        await assertPurchaseReceiptCreateModalMetrics(page, modal, {
-          scenarioName: 'purchase-receipt-create-modal-desktop',
-          expectedRows: 1,
-        })
-        await assertPurchaseReceiptCreateModalFocusStyles(page, modal, {
-          scenarioName: 'purchase-receipt-create-modal-desktop',
-        })
-
-        await modal.getByRole('button', { name: '添加条目' }).click()
-        await expectText(page, '明细 2')
-        await assertPurchaseReceiptCreateModalMetrics(page, modal, {
-          scenarioName: 'purchase-receipt-create-modal-desktop-after-add',
-          expectedRows: 2,
-        })
-
-        await closeBusinessFormModal(page, modal)
-        await expectText(page, 'PR-STYLE-L1')
-        await assertNoHorizontalOverflow(
-          page,
-          'purchase-receipt-create-modal-desktop-recovery'
-        )
-
-        const reopenedModal = await openPurchaseReceiptCreateModal(page)
-        await assertPurchaseReceiptCreateModalMetrics(page, reopenedModal, {
-          scenarioName: 'purchase-receipt-create-modal-desktop-reopen',
-          expectedRows: 1,
-        })
-        await closeBusinessFormModal(page, reopenedModal)
-      },
-    },
-    {
-      name: 'purchase-receipt-create-modal-dark-desktop',
-      path: '/erp/warehouse/inbound',
-      auth: 'admin',
-      themeMode: 'dark',
-      viewport: { width: 1440, height: 900 },
-      verify: async (page) => {
-        await expectHeading(page, '入库管理')
-        await assertERPThemeMode(page, {
-          scenarioName: 'purchase-receipt-create-modal-dark-desktop',
-          expectedMode: 'dark',
-          expectedEffectiveTheme: 'dark',
-        })
-        await assertPurchaseReceiptExpandedItemsReadable(page, {
-          receiptNo: 'PR-STYLE-L1',
-          scenarioName:
-            'purchase-receipts-expanded-items-readable-dark-desktop',
-        })
-        await assertPurchaseReceiptCreateModalKeyboardRecovery(page)
-        const modal = await openPurchaseReceiptCreateModal(page)
-        await fillPurchaseReceiptCreateModalBoundaryValues(page, modal)
-        await assertPurchaseReceiptCreateModalMetrics(page, modal, {
-          scenarioName: 'purchase-receipt-create-modal-dark-desktop',
-          expectedRows: 1,
-        })
-        await assertPurchaseReceiptCreateModalDarkTokens(page, modal, {
-          scenarioName: 'purchase-receipt-create-modal-dark-desktop',
-        })
-        await closeBusinessFormModal(page, modal)
-      },
-    },
-    {
-      name: 'purchase-receipt-create-modal-mobile',
-      path: '/erp/warehouse/inbound',
-      auth: 'admin',
-      viewport: { width: 390, height: 844 },
-      verify: async (page) => {
-        await expectHeading(page, '入库管理')
-        await assertPurchaseReceiptCreateModalKeyboardRecovery(page)
-        const modal = await openPurchaseReceiptCreateModal(page)
-        await expectText(page, '新建采购入库单')
-        await fillPurchaseReceiptCreateModalBoundaryValues(page, modal)
-        await assertPurchaseReceiptCreateModalMetrics(page, modal, {
-          scenarioName: 'purchase-receipt-create-modal-mobile',
-          expectedRows: 1,
-        })
-        await assertPurchaseReceiptCreateModalMobileLayout(page, modal, {
-          scenarioName: 'purchase-receipt-create-modal-mobile',
-        })
-        await closeBusinessFormModal(page, modal)
-        await assertNoHorizontalOverflow(
-          page,
-          'purchase-receipt-create-modal-mobile-recovery'
-        )
       },
     },
     {

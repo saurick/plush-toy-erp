@@ -86,6 +86,7 @@ const {
 function getScenarios() {
   return createStyleL1Scenarios({
     assert,
+    assertAntdModalCentered,
     assertAdminLoginLayout,
     assertAdminLoginSmsCodeErrorHintSpacing,
     assertAdminLoginSmsHintLayout,
@@ -144,11 +145,6 @@ function getScenarios() {
     assertPurchaseReceiptAddItemModalMetrics,
     assertPurchaseReceiptAddItemModalMobileLayout,
     assertBusinessFormModalKeyboardRecovery,
-    assertPurchaseReceiptCreateModalDarkTokens,
-    assertPurchaseReceiptCreateModalFocusStyles,
-    assertPurchaseReceiptCreateModalKeyboardRecovery,
-    assertPurchaseReceiptCreateModalMetrics,
-    assertPurchaseReceiptCreateModalMobileLayout,
     assertPurchaseReceiptRowItemCount,
     assertRowSelectionClearsAfterCancel,
     assertShellRefreshButton,
@@ -164,11 +160,9 @@ function getScenarios() {
     expectNoButton,
     expectText,
     fillPurchaseReceiptAddItemModalBoundaryValues,
-    fillPurchaseReceiptCreateModalBoundaryValues,
     gotoScenarioPath,
     isLightSurfaceColor,
     openPurchaseReceiptAddItemModal,
-    openPurchaseReceiptCreateModal,
     outputDir,
     path,
     seedBusinessCollaborationOverflowTasks,
@@ -2307,21 +2301,14 @@ async function assertOutsourcingProcessSelectOptions(
 }
 
 const {
-  openPurchaseReceiptCreateModal,
   selectPurchaseReceiptRow,
   assertPurchaseReceiptActionButtonState,
   assertPurchaseReceiptRowItemCount,
   openPurchaseReceiptAddItemModal,
-  assertPurchaseReceiptCreateModalKeyboardRecovery,
-  fillPurchaseReceiptCreateModalBoundaryValues,
   fillPurchaseReceiptAddItemModalBoundaryValues,
-  assertPurchaseReceiptCreateModalMetrics,
   assertPurchaseReceiptAddItemModalMetrics,
   assertPurchaseReceiptAddItemModalDarkTokens,
   assertPurchaseReceiptAddItemModalMobileLayout,
-  assertPurchaseReceiptCreateModalFocusStyles,
-  assertPurchaseReceiptCreateModalDarkTokens,
-  assertPurchaseReceiptCreateModalMobileLayout,
   assertLineItemsUnifiedHorizontalScroll,
 } = createPurchaseReceiptAssertions({
   assert,

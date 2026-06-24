@@ -556,8 +556,10 @@ export default function V1OutsourcingOrdersPage() {
         },
         {
           id: editingRow?.id || undefined,
-          items: (values.items || []).map((item) =>
-            buildOutsourcingOrderItemParams(item)
+          items: (values.items || []).map((item, index) =>
+            buildOutsourcingOrderItemParams(item, {
+              line_no: index + 1,
+            })
           ),
         }
       )

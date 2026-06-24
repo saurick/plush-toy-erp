@@ -708,10 +708,6 @@
   min-width: 0;
 }
 
-.erp-sales-order-lines-form__grid .erp-line-item-field--line-no.ant-form-item {
-  width: 120px;
-}
-
 .erp-sales-order-lines-form__grid .erp-line-item-field--source.ant-form-item {
   width: 180px;
 }

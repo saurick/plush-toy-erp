@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, Form, Input, InputNumber, Select } from 'antd'
+import { Button, Form, Input, Select } from 'antd'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import FieldWithUnitSuffix, {
   isQuantityTextWithinUnitPrecision,
@@ -271,17 +271,8 @@ export default function OutsourcingOrderForm({
                       <Form.Item name={[field.name, 'id']} hidden>
                         <Input />
                       </Form.Item>
-                      <Form.Item
-                        className="erp-line-item-field erp-line-item-field--line-no"
-                        name={[field.name, 'line_no']}
-                        label="行号"
-                        rules={[{ required: true, message: '请输入行号' }]}
-                      >
-                        <InputNumber
-                          min={1}
-                          precision={0}
-                          style={{ width: '100%' }}
-                        />
+                      <Form.Item name={[field.name, 'line_no']} hidden>
+                        <Input />
                       </Form.Item>
                       <Form.Item
                         className="erp-line-item-field erp-line-item-field--source"

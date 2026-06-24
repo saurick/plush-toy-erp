@@ -8,7 +8,7 @@
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | 样式与页面 L1 回归 | `pnpm style:l1` / `styleL1.mjs` / `style-l1/`                                                                                | 启动前端并用 Playwright 覆盖登录、业务页、暗色、打印、移动端和局部页面交互 | 默认使用 mock / 前端态验证；失败要先分清页面回归、mock wiring 和浏览器基础设施问题                |
 | 真实登录 smoke     | `pnpm smoke:purchase-contract-real-login`、`pnpm smoke:processing-contract-real-login`、`pnpm smoke:mobile-auth-login-route` | 通过真实登录流程验证合同预览、岗位任务端入口和认证回跳                     | 依赖本地后端和开发账号；不替代 RBAC / usecase 单测                                                |
-| 真实写入 e2e       | `pnpm smoke:purchase-receipt-real-write`                                                                                     | 通过浏览器创建、过账和取消采购入库模拟单据                                 | 会写本地 / 开发库模拟采购入库事实；只能按脚本显式参数和 README 边界执行，禁止跑生产或客户正式环境 |
+| 真实写入 e2e       | `pnpm smoke:purchase-receipt-real-write`                                                                                     | 准备采购入库测试草稿，并通过浏览器过账和取消模拟单据                       | 会写本地 / 开发库模拟采购入库事实；只能按脚本显式参数和 README 边界执行，禁止跑生产或客户正式环境 |
 | 本地服务           | `pnpm serve:prod`、`pnpm start:mobile:all`                                                                                   | 本地静态服务验证和多端口岗位任务端调试                                     | 生产环境仍使用单端口 `5175`，多端口只用于本地开发调试                                             |
 | QA 报告生成        | `buildFieldLinkageCoverageReport.mjs`                                                                                        | 生成字段联动 latest 结构化报告                                             | 报告供开发验收页读取，不是业务事实真源                                                            |
 
@@ -30,7 +30,7 @@ pnpm smoke:purchase-receipt-real-write
 
 - `style:l1` 输出浏览器截图、日志和报告到 `web/output/playwright/style-l1/`，不纳入 git。
 - 真实登录 smoke 可能读取本地开发配置中的管理员账号，也可能通过环境变量覆盖账号密码；不要把账号、token 或截图里的敏感信息提交。
-- `smoke:purchase-receipt-real-write` 会写带 `PR-BROWSER-*` 前缀的模拟采购入库单据，收尾口径是取消冲正并保留可追踪记录，不物理删除已过账单据。
+- `smoke:purchase-receipt-real-write` 会用采购入库 RPC 准备带 `PR-BROWSER-*` 前缀的模拟草稿，再到入库管理页完成过账和取消；收尾口径是取消冲正并保留可追踪记录，不物理删除已过账单据。入库管理页本身不提供页面级“新建入库单”，真实业务草稿从采购订单“生成入库”入口产生。
 - 本目录脚本不能绕过后端 RBAC、schema、migration、Workflow / Fact usecase 或客户配置边界。
 
 ## 维护规则

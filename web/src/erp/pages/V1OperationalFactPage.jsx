@@ -11,7 +11,7 @@ const PAGE_CONFIGS = Object.freeze({
     viewOverrides: {
       production: {
         title: '生产发料 / 入库事实',
-        createLabel: '新建生产事实',
+        createLabel: '登记生产事实',
       },
     },
   },
@@ -23,7 +23,8 @@ const PAGE_CONFIGS = Object.freeze({
     viewOverrides: {
       reservations: {
         title: '库存预留',
-        createLabel: '新建库存预留',
+        createLabel: '登记库存预留',
+        hideCreateAction: true,
       },
     },
   },
@@ -36,10 +37,11 @@ const PAGE_CONFIGS = Object.freeze({
     viewOverrides: {
       finance: {
         title: '应收事实',
-        createLabel: '登记应收事实',
+        createLabel: '生成应收事实',
         createPrefix: 'receivable',
+        hideCreateAction: true,
         modalDescription:
-          '这里只登记 RECEIVABLE 业务事实；不生成收款核销、税控票据、总账凭证或多账簿数据。',
+          'RECEIVABLE 业务事实应从真实出货或后续对账来源生成；不在本页提供无来源手工登记。',
         selectionBoundaryText:
           '当前页只调用 finance_facts 后端 usecase；结清只关闭应收业务事实，不代表真实收款、税控或总账完成。',
         listParams: { fact_type: 'RECEIVABLE' },
@@ -65,10 +67,11 @@ const PAGE_CONFIGS = Object.freeze({
     viewOverrides: {
       finance: {
         title: '应付事实',
-        createLabel: '登记应付事实',
+        createLabel: '生成应付事实',
         createPrefix: 'payable',
+        hideCreateAction: true,
         modalDescription:
-          '这里只登记 PAYABLE 业务事实；不生成付款审批、付款流水、费用报销、核销或总账凭证。',
+          'PAYABLE 业务事实应从采购、委外或后续对账来源生成；不在本页提供无来源手工登记。',
         selectionBoundaryText:
           '当前页只调用 finance_facts 后端 usecase；结清只关闭应付业务事实，不代表付款审批、付款流水、核销或总账完成。',
         listParams: { fact_type: 'PAYABLE' },
@@ -91,10 +94,11 @@ const PAGE_CONFIGS = Object.freeze({
     viewOverrides: {
       finance: {
         title: '发票事实',
-        createLabel: '登记发票事实',
+        createLabel: '生成发票事实',
         createPrefix: 'invoice',
+        hideCreateAction: true,
         modalDescription:
-          '这里只登记 INVOICE 业务事实；不替代税控开票、发票查验、纳税申报、附件归档或总账凭证。',
+          'INVOICE 业务事实应从真实出货、应收或后续开票来源生成；不在本页提供无来源手工登记。',
         selectionBoundaryText:
           '当前页只调用 finance_facts 后端 usecase；过账、结清和取消不等于税控、查验、纳税或总账动作。',
         listParams: { fact_type: 'INVOICE' },
@@ -117,10 +121,11 @@ const PAGE_CONFIGS = Object.freeze({
     viewOverrides: {
       finance: {
         title: '对账事实',
-        createLabel: '登记对账事实',
+        createLabel: '生成对账事实',
         createPrefix: 'reconciliation',
+        hideCreateAction: true,
         modalDescription:
-          '这里只登记 RECONCILIATION 业务事实；不自动生成付款、发票、总账凭证、税务数据或跨账簿调整。',
+          'RECONCILIATION 业务事实应从明确的应收、应付、发票或后续对账来源生成；不在本页提供无来源手工登记。',
         selectionBoundaryText:
           '当前页只调用 finance_facts 后端 usecase；结清只关闭对账业务事实，不自动写付款、发票、总账或凭证。',
         listParams: { fact_type: 'RECONCILIATION' },

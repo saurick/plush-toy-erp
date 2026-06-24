@@ -177,6 +177,15 @@ export function normalizeOptionalNonNegativeInteger(value) {
   return Math.trunc(numeric)
 }
 
+function normalizeLineNo(primaryValue, fallbackValue) {
+  const normalized = normalizeOptionalNonNegativeInteger(primaryValue)
+  if (normalized && normalized > 0) {
+    return normalized
+  }
+  const fallback = normalizeOptionalNonNegativeInteger(fallbackValue)
+  return fallback && fallback > 0 ? fallback : 1
+}
+
 function parseUnsignedDecimal(value) {
   const text = String(value ?? '')
     .replace(/,/g, '')
@@ -699,7 +708,7 @@ export function buildSalesOrderParams(values = {}, extra = {}) {
 export function buildSalesOrderItemParams(values = {}, extra = {}) {
   return compactParams({
     ...extra,
-    line_no: Number(values.line_no || 0),
+    line_no: normalizeLineNo(extra.line_no, values.line_no),
     product_id: Number(values.product_id || 0),
     product_sku_id: Number(values.product_sku_id || 0),
     unit_id: Number(values.unit_id || 0),
@@ -733,7 +742,7 @@ export function buildPurchaseOrderParams(values = {}, extra = {}) {
 export function buildPurchaseOrderItemParams(values = {}, extra = {}) {
   return compactParams({
     ...extra,
-    line_no: Number(values.line_no || 0),
+    line_no: normalizeLineNo(extra.line_no, values.line_no),
     material_id: Number(values.material_id || 0),
     unit_id: Number(values.unit_id || 0),
     material_code_snapshot: trimOptional(values.material_code_snapshot),
@@ -772,7 +781,7 @@ export function buildOutsourcingOrderParams(values = {}, extra = {}) {
 export function buildOutsourcingOrderItemParams(values = {}, extra = {}) {
   return compactParams({
     ...extra,
-    line_no: Number(values.line_no || 0),
+    line_no: normalizeLineNo(extra.line_no, values.line_no),
     product_id: Number(values.product_id || 0),
     process_id: Number(values.process_id || 0),
     unit_id: Number(values.unit_id || 0),

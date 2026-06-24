@@ -701,7 +701,7 @@ export function BusinessDataTable({
   onRow,
   onChange,
   pagination,
-  emptyDescription = '暂无业务记录，点击“新建记录”开始落盘',
+  emptyDescription = '暂无匹配记录',
 }) {
   const resolvedColumns = React.useMemo(
     () => normalizeBusinessTableColumns(columns),

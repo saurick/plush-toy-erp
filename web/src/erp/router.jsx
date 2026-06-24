@@ -68,7 +68,6 @@ const WorkflowBusinessModulePage = lazy(
 )
 const BOMVersionsPage = lazy(() => import('./pages/BOMVersionsPage.jsx'))
 const ShipmentsPage = lazy(() => import('./pages/ShipmentsPage.jsx'))
-const OperationalFactsPage = lazy(() => import('./pages/OperationalFactsPage'))
 const MobileAppLayout = lazy(() => import('./mobile/MobileAppLayout'))
 const MobileRoleTasksPage = lazy(
   () => import('./mobile/pages/MobileRoleTasksPage')
@@ -418,7 +417,10 @@ export default function ERPRouter() {
             path="finance/invoices"
             element={<V1OperationalFactPage moduleKey="invoices" />}
           />
-          <Route path="operations/facts" element={<OperationalFactsPage />} />
+          <Route
+            path="operations/facts"
+            element={<Navigate to="/erp/business-dashboard" replace />}
+          />
           <Route
             path="flows/overview"
             element={<Navigate to="/erp/dashboard" replace />}

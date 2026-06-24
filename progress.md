@@ -240,6 +240,15 @@
 - 下一步：若要给单价 / 金额增加币种后缀，应先确定订单币种字段和后端合同；当前不硬编码 `USD`。
 - 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact 写入边界、客户配置或部署脚本；金额与单位验证基于前端单测和 mock/browser L1，未执行真实后端保存链路。
 
+## 2026-06-23 明细行号输入降级为自动序号
+
+- 完成：销售订单、采购订单和加工合同 / 委外下单弹窗不再展示可手填“行号”输入框；行头继续显示“第 N 行”作为定位信息，隐藏字段仅用于编辑旧数据回显。
+- 完成：保存参数统一按当前明细数组顺序生成 `line_no = index + 1`，覆盖隐藏旧值，避免删除 / 插入后出现不可见的残值行号；公共参数 helper 增加测试锁住“表单旧行号不能覆盖当前顺序”。
+- 完成：业务弹窗 L1 明细布局断言新增“行号不可作为可见输入字段”检查，防止后续回归成用户手填。
+- 验证：追加前 `progress.md` 为 256 行、47541 字节，未达到归档阈值；已执行 `pnpm --dir web exec node --test src/erp/utils/masterDataOrderView.test.mjs`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1`、`pnpm --dir web lint && pnpm --dir web css && pnpm --dir web test`、`pnpm --dir web style:l1`，均通过；全量前端单测 390 个通过，全量 `style:l1` 共验证 69 个场景。
+- 下一步：若未来需要业务可编辑的“客户行号 / 客户明细编号”，应作为独立业务字段评审命名和后端合同，不复用 `line_no`。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact 写入边界、客户配置、原型状态或部署脚本；未执行真实后端保存链路。
+
 ## 2026-06-23 业务表单单行输入高度统一
 
 - 完成：将普通业务表单 `.erp-business-form` 纳入共享控件高度变量，单行 Input、Select、DatePicker、InputNumber 和 AffixWrapper 统一使用 36px 布局高度；textarea 保持多行语义，只继承最小高度，不按单行控件压缩。
@@ -255,6 +264,15 @@
 - 下一步：如后续需要展示文件类型，应使用中文业务标签或图标，不直接暴露 MIME / 存储路径。
 - 阻塞/风险：本轮只改附件行展示，不改上传格式合同、后端 MIME 校验、schema、migration、RBAC、菜单、Workflow / Fact 写入边界、客户配置或附件下载 / 预览逻辑；原型当前本身不展示 MIME，本轮未改原型。
 
+## 2026-06-23 业务页新建入口语义收口
+
+- 完成：旧内部事实汇总路由 `/erp/operations/facts` 退出正式 ERP 运行时入口并重定向到业务看板，保留 `OperationalFactsPage` 作为收窄 V1 事实页复用的内部 workspace，不再提供客户可直达的内部事实汇总新建页。
+- 完成：Workflow 协同页入口从“新建排程协同 / 新建放行协同”收窄为“发起排程协同 / 发起放行协同”，弹窗提交按钮与结果提示同步改为发起 / 提交语义；生产进度和出库管理的事实入口从“新建生产事实 / 新建库存预留”收窄为“登记生产事实 / 登记库存预留”。
+- 完成：共享业务表格默认空态从“点击新建记录开始落盘”改为中性“暂无匹配记录”，避免只读页或来源生成页漏传空态时暗示可新建；同步更新业务事实扩展架构文档和 L1 / 单测断言。
+- 验证：追加前 `progress.md` 为 273 行、49891 字节，未达到归档阈值；已执行 `pnpm --dir web exec node --test src/erp/utils/businessModuleNavigation.test.mjs src/erp/config/seedData.test.mjs src/erp/config/menuPermissions.test.mjs`、`git diff --check`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`pnpm --dir web style:l1`，均通过；前端单测 390 个通过，全量 `style:l1` 共验证 69 个场景。
+- 下一步：如果后续决定库存预留必须全部从销售 / 出货来源生成，再另开任务隐藏 `/erp/warehouse/outbound` 的登记入口并补来源生成 usecase / 回归，不在本轮用前端隐藏替代后端合同。
+- 阻塞/风险：本轮不改 schema、migration、RBAC 权限码、后端 WorkflowUsecase / Fact usecase、客户菜单配置或部署脚本；当前工作区仍有本轮前已存在的表单 / 单位 / 样式相关改动和未跟踪 `.agents/skills/README.md`，本轮未回退、未归并。
+
 ## 2026-06-23 Codex skills 目录 README 入口补充
 
 - 完成：新增 `.agents/skills/README.md`，作为项目专属 Codex skills 的父目录薄入口，列出 `$plush-*` skills、主要用途和维护规则。
@@ -264,3 +282,70 @@
 - 验证：追加前 `progress.md` 为 265 行、49007 字节，未达到归档阈值；本轮只新增并补充 skill 目录 README 和过程记录，不改运行时代码、schema、migration、RBAC、页面、部署脚本或真实业务流程。
 - 下一步：后续新增、删除、重命名项目 skill 时，同步更新 `.agents/skills/README.md`。
 - 阻塞/风险：README 只做目录路由，不替代各 skill 的 `SKILL.md`、项目 `AGENTS.md`、正式 docs 或自动化校验。
+
+## 2026-06-23 入库出库库存页面级新建入口收口
+
+- 完成：对齐 trade-erp 的入库 / 出库 / 库存页面语义，采购入库列表移除页面级“新建入库单”和整单新建弹窗分支，保留采购订单“生成入库”来源入口以及已选草稿“添加明细”；出库管理库存预留 view 增加 `hideCreateAction`，不再展示页面级“登记库存预留”主按钮；库存台账仍保持只读事实 / 审计页。
+- 完成：同步更新 L1 场景、采购入库浏览器真实写入脚本和测试策略 / web 脚本 README，明确浏览器写入脚本通过 RPC 准备测试草稿，页面只处理过账 / 取消 / 回显，不再代表入库列表有整单新建能力。
+- 验证：追加前 `progress.md` 为 283 行、52019 字节，未达到归档阈值；已执行 `pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web exec node --test src/erp/utils/businessModuleNavigation.test.mjs src/erp/config/seedData.test.mjs src/erp/config/menuPermissions.test.mjs`、`node --check web/scripts/style-l1/purchaseReceiptAssertions.mjs && node --check web/scripts/style-l1/purchaseReceiptScenarios.mjs && node --check web/scripts/style-l1/scenarios.mjs && node --check web/scripts/styleL1.mjs && node --check web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs`、`git diff --check`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=purchase-receipts-table-control-columns-desktop,purchase-receipt-add-item-modal-draft-desktop,purchase-receipt-add-item-modal-dark-desktop,purchase-receipt-add-item-modal-mobile,business-formal-module-shells-desktop pnpm --dir web style:l1`，均通过；前端单测 390 个通过，targeted L1 覆盖 5 个受影响场景。
+- 下一步：如后续需要真实出库预留生成入口，应先评审销售 / 出货来源单据链路和对应后端 usecase，而不是在出库管理列表恢复手工新建按钮。
+- 阻塞/风险：本轮不改后端 purchase / operational fact API、RBAC、schema、migration 或菜单真源；`pnpm smoke:purchase-receipt-real-write` 因会写本地 / 开发库持久测试事实，本轮只做脚本语法检查和文档口径更新，未实际执行真实写入。
+
+## 2026-06-23 来源生成页面入口规则文档与剩余入口收口
+
+- 完成：新增 `docs/product/页面来源生成入口规则.md`，把“由其他页面、来源单据、事实行或后续 usecase 生成的表单不保留无来源页面级新建 / 登记按钮”写成正式产品治理规则；同步更新 `docs/product/README.md`、`docs/文档清单.md` 和 `docs/当前真源与交接顺序.md`。
+- 完成：来料质检页面主按钮从“新建质检单”改为“生成质检草稿”，弹窗标题改为“生成来料质检草稿”，保留采购入库 / 入库行 / 批次来源选择，不伪造本次送检数量等后端未闭环字段。
+- 完成：应收、应付、发票、对账四个财务事实页隐藏页面级“登记事实”入口，避免在来源生成 usecase 未完成前提供无来源手工登记按钮；同步更新 L1 断言和业务事实 / 字段来源 / 能力证据文档旧口径。
+- 验证：追加前 `progress.md` 为 292 行、54416 字节，未达到归档阈值；已执行 `pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`node --check web/scripts/style-l1/businessFormalScenarios.mjs && git diff --check`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1`，均通过；前端单测 390 个通过，targeted L1 覆盖 1 个正式业务模块场景。
+- 下一步：若后续要恢复应收 / 应付 / 发票 / 对账生成入口，先补真实来源生成 usecase、JSON-RPC、RBAC、审计、幂等和 L1，再按 `页面来源生成入口规则.md` 使用“从来源生成 / 生成草稿”语义。
+- 阻塞/风险：本轮不改 schema、migration、后端 usecase、RBAC、菜单真源、客户配置或部署脚本；生产事实页暂保留“登记生产事实”，因为当前页面仍是生产事实登记 owner，后续接入生产任务来源后再收口。
+
+## 2026-06-23 页面级附件缺少记录时禁用暂存上传
+
+- 完成：共享 `BusinessAttachmentPanel` 新增缺少 owner 时是否允许暂存附件的显式语义；默认保留表单弹窗“先选附件，保存业务对象后自动绑定”主路径，页面级附件区可关闭暂存并显示“请先选择记录 / 协同任务”。
+- 完成：桌面 Workflow 协同页、采购入库页、Operational Fact 复用页和移动任务详情关闭缺 owner 暂存附件；出货放行等 Workflow 页面未选任务时不再显示“保存业务记录后自动上传”误导文案，也不会启用选择附件按钮。
+- 完成：新增 `businessAttachmentPanelState` 纯 helper 和单测，锁住表单内待保存附件、页面级缺 owner 禁用上传、已有 owner 恢复真实上传文案三种状态。
+- 验证：追加前 `progress.md` 为 301 行、56312 字节，未达到归档阈值；已执行 `node --test src/erp/utils/businessAttachmentPanelState.test.mjs`、限定文件 `eslint --fix --ext .js --ext .jsx ...`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=shipment-date-filter-desktop,business-collaboration-purchase-selected-desktop,mobile-tasks-dark pnpm --dir web style:l1`，均通过；前端单测 393 个通过，targeted L1 覆盖 3 个相关页面 / 移动场景。
+- 下一步：如果后续新增页面级附件区，默认传入 `allowPendingAttachmentsWithoutOwner={false}` 并写清当前记录选择要求；只有业务表单保存链路才保留缺 owner 暂存。
+- 阻塞/风险：本轮不改 schema、migration、后端附件 usecase、WorkflowUsecase、Fact usecase、RBAC、菜单真源、客户配置、原型状态或部署脚本；未做真实文件上传 RPC，只验证前端状态合同、单测和页面 L1 回归。
+
+## 2026-06-23 出货放行日期筛选样式修复
+
+- 完成：出货放行 / Workflow V1 筛选栏的到期开始、到期结束从两个独立 `DateInput` 收口为共享 `DateRangeFilter`，显示单一“到期日期”类型标签，并沿用共享日期区间的边框、焦点、反向日期禁用和响应式布局。
+- 完成：在 `business-formal-module-shells-desktop` L1 场景中新增出货放行到期日期筛选 DOM / box 断言，锁住不再使用两个独立 DateInput、开始 / 结束输入数量、宽屏同排、内部无横向溢出和筛选栏不溢出父容器。
+- 验证：追加前 `progress.md` 为 310 行、58115 字节，未达到归档阈值；已执行 `pnpm exec eslint --ext .js --ext .jsx src/erp/pages/WorkflowBusinessModulePage.jsx scripts/style-l1/businessFormalScenarios.mjs`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm style:l1`，均通过。
+- 下一步：若后续其它 Workflow V1 页面出现同类日期筛选，应继续复用 `DateRangeFilter`，不要在页面筛选栏直接堆两个独立 DateInput。
+- 阻塞/风险：本轮只改前端筛选控件组合和 L1 断言，不改 schema、migration、RBAC、菜单、WorkflowUsecase、Fact usecase、客户配置、原型或部署脚本；当前工作区仍有其它文档、附件、表单和 L1 相关现场改动，本轮未回退、未归并。
+
+## 2026-06-23 页面级附件入口弹窗化
+
+- 完成：新增 `BusinessAttachmentModalButton`，把桌面 Workflow 协同页、采购入库页、Operational Fact 复用页和移动任务详情的页面主体附件区收口为“先选当前记录 / 任务，再通过动作按钮打开附件弹窗”，不再让附件块常驻占据页面业务表单 / 列表空间。
+- 完成：保留业务表单弹窗内的 `BusinessAttachmentPanel` 暂存上传主路径，明确区分页面级附件弹窗和表单保存后绑定附件；全局扫描确认剩余直接附件面板都位于 `BusinessFormModal` 内。
+- 完成：新增 `businessAttachmentEntrypoints` 静态测试和 `businessAttachmentAssertions` L1 helper，锁住页面级入口必须走弹窗、剩余直接附件面板必须留在业务表单弹窗内；入库管理和出货放行 L1 场景增加真实 DOM / modal / overflow 断言。
+- 验证：追加前 `progress.md` 为 318 行、59492 字节，未达到归档阈值；已执行限定文件 `eslint --fix`、`node --test src/erp/utils/businessAttachmentEntrypoints.test.mjs src/erp/utils/businessAttachmentPanelState.test.mjs`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,purchase-receipts-table-control-columns-desktop,mobile-tasks-dark pnpm --dir web style:l1`、`pnpm --dir web css`、`pnpm --dir web test`、`git diff --check`，均通过；前端单测 396 个通过，targeted L1 覆盖 3 个场景。
+- 下一步：后续新增页面级附件入口时，复用 `BusinessAttachmentModalButton`；只有业务表单弹窗内允许继续使用直接 `BusinessAttachmentPanel` 暂存待保存附件。
+- 阻塞/风险：本轮不改 schema、migration、后端附件 usecase、WorkflowUsecase、Fact usecase、RBAC、菜单真源、客户配置、原型状态或部署脚本；未执行真实文件上传到后端，只验证前端状态合同、静态约束和浏览器 L1。
+
+## 2026-06-23 Workflow 页面局部刷新协同按钮收口
+
+- 完成：桌面 Workflow V1 业务页移除 toolbar 内局部“刷新协同”按钮，保留壳层全局“刷新当前页”作为唯一刷新入口；`registerPageRefresh` 和协同任务加载逻辑不变。
+- 完成：`businessFormalScenarios` 的统一业务列表 toolbar L1 规则新增 `刷新协同` 负向断言，后续正式业务列表页不应再补回重复局部协同刷新按钮。
+- 验证：追加前 `progress.md` 为 327 行、61407 字节，未达到归档阈值；已执行 `pnpm --dir web exec eslint --ext .js --ext .jsx src/erp/pages/WorkflowBusinessModulePage.jsx scripts/style-l1/businessFormalScenarios.mjs`、`node --check web/scripts/style-l1/businessFormalScenarios.mjs`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1`、`pnpm --dir web css`、`git diff --check -- web/src/erp/pages/WorkflowBusinessModulePage.jsx web/scripts/style-l1/businessFormalScenarios.mjs progress.md`，均通过；前端单测 396 个通过，targeted L1 覆盖 1 个正式业务模块场景。
+- 下一步：如后续确需局部刷新入口，应先证明该入口不是全局刷新重复能力，并在 L1 中补对应例外说明。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、WorkflowUsecase、Fact usecase、客户配置、原型状态、部署脚本或移动端任务列表刷新；当前工作区仍有本轮前已存在的文档、附件、表单和 L1 相关现场改动，本轮未回退、未归并。
+
+## 2026-06-23 业务筛选日期区间组件防复发守卫
+
+- 完成：新增 `businessDateFilterUsage.test.mjs` 静态测试，扫描 `pages/**/*.jsx` 中的 `BusinessOperationPanel filters={...}`，禁止在业务筛选栏直接使用独立 `<DateInput>` 拼日期区间，要求走共享 `DateRangeFilter`。
+- 完成：将该守卫接入 `web/package.json` 的 `pnpm test`，保留表单、弹窗和单日期字段继续使用 `DateInput` 的合法路径，不机械替换所有日期输入。
+- 验证：追加前 `progress.md` 为 335 行、62981 字节，未达到归档阈值；已执行 `pnpm exec node --test src/erp/utils/businessDateFilterUsage.test.mjs`、`pnpm exec eslint --ext .js --ext .jsx src/erp/utils/businessDateFilterUsage.test.mjs src/erp/pages/WorkflowBusinessModulePage.jsx scripts/style-l1/businessFormalScenarios.mjs`、`pnpm test`、`STYLE_L1_PORT=4247 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm style:l1`、`git diff --check -- web/src/erp/utils/businessDateFilterUsage.test.mjs web/package.json web/src/erp/pages/WorkflowBusinessModulePage.jsx web/scripts/style-l1/businessFormalScenarios.mjs progress.md`，均通过；`pnpm test` 共 397 个测试通过。第一次不带端口的 targeted L1 因 `4173` 端口占用导致 Vite 未启动，换 `STYLE_L1_PORT=4247` 后通过。
+- 下一步：若未来新增业务筛选面板且确需日期区间，继续复用 `DateRangeFilter`；若新增非业务页独立日期筛选，需要按该页职责单独评审，不默认纳入 `BusinessOperationPanel` 守卫。
+- 阻塞/风险：本轮只增加前端静态守卫和测试脚本接入，不改 schema、migration、API、RBAC、菜单、WorkflowUsecase、Fact usecase、客户配置、原型或部署脚本；当前工作区仍有其它文档、附件、表单和 L1 相关现场改动，本轮未回退、未归并。
+
+## 2026-06-24 日期区间左侧圆角裁切修复
+
+- 完成：共享 `.erp-business-date-range-filter` 外壳从 `overflow: visible` 改为 `overflow: hidden`，让内部只读日期类型标签背景按外层边框圆角裁切，修复“入库日期”等日期区间筛选左侧圆角显示不完整的问题。
+- 完成：采购入库 L1 场景新增 `入库日期` 共享日期区间控件 DOM / box 断言，锁住标签文本、圆角半径、外壳 overflow、内部 scrollWidth/clientWidth 和页面级横向溢出。
+- 验证：追加前 `progress.md` 为 343 行、64853 字节，未达到归档阈值；已执行 `pnpm exec eslint --ext .js --ext .jsx scripts/style-l1/purchaseReceiptScenarios.mjs`、`pnpm css`、`STYLE_L1_PORT=4247 STYLE_L1_SCENARIOS=purchase-receipts-table-control-columns-desktop pnpm style:l1`、`git diff --check -- web/src/erp/styles/app/business-tables.css web/scripts/style-l1/purchaseReceiptScenarios.mjs`，均通过；targeted L1 覆盖入库管理默认态、日期筛选圆角壳层、相邻工具栏、表格和页面横向溢出。
+- 下一步：后续日期区间筛选仍走共享 `DateRangeFilter`；如果其它页面出现圆角或裁切异常，优先检查共享壳层与内部背景的盒模型关系，不在单页硬补。
+- 阻塞/风险：本轮只改前端共享样式和采购入库 L1 断言，不改 schema、migration、API、RBAC、菜单、WorkflowUsecase、Fact usecase、客户配置、原型或部署脚本；当前工作区仍有其它文档、附件、表单和 L1 相关现场改动，本轮未回退、未归并。

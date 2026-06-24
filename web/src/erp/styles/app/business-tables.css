@@ -725,7 +725,7 @@
   max-width: 560px;
   align-items: stretch;
   white-space: nowrap;
-  overflow: visible;
+  overflow: hidden;
   border: 1px solid var(--erp-business-control-border);
   background: #fff;
 }

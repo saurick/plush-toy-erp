@@ -574,21 +574,11 @@ export function SalesOrderItemsFormSection({
                         <Form.Item name={[field.name, 'id']} hidden>
                           <Input />
                         </Form.Item>
+                        <Form.Item name={[field.name, 'line_no']} hidden>
+                          <Input />
+                        </Form.Item>
                         <Form.Item name={[field.name, 'product_id']} hidden>
                           <InputNumber />
-                        </Form.Item>
-                        <Form.Item
-                          className="erp-line-item-field erp-line-item-field--line-no"
-                          label="行号"
-                          name={[field.name, 'line_no']}
-                          rules={[{ required: true, message: '请填写行号' }]}
-                        >
-                          <InputNumber
-                            min={1}
-                            precision={0}
-                            disabled={!canEditLine}
-                            style={{ width: '100%' }}
-                          />
                         </Form.Item>
                         <Form.Item
                           className="erp-line-item-field erp-line-item-field--source"

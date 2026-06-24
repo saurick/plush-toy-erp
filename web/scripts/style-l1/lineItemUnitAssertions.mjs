@@ -384,7 +384,17 @@ export function createLineItemUnitAssertions({ assert }) {
     assert.deepEqual(
       clippedFields,
       [],
-      `${scenarioName} 行号到 ${visibleThroughLabel} 应在首屏完整可见: ${JSON.stringify(
+      `${scenarioName} 首屏字段到 ${visibleThroughLabel} 应完整可见: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    const visibleLineNoFields = metrics.fields.filter(
+      (field) => field.label === '行号'
+    )
+    assert.deepEqual(
+      visibleLineNoFields,
+      [],
+      `${scenarioName} 行号应由明细顺序自动生成，不应作为可见输入字段: ${JSON.stringify(
         metrics
       )}`
     )
