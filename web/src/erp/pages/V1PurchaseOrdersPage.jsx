@@ -288,7 +288,7 @@ function referenceName(options, id, fallbackLabel = '记录') {
   const option = (Array.isArray(options) ? options : []).find(
     (item) => String(item.value) === String(id)
   )
-  return option?.label || (id ? `${fallbackLabel} #${id}` : '-')
+  return option?.label || (id ? `${fallbackLabel}已关联` : '-')
 }
 
 function buildInboundDraftPreviewRows({
@@ -809,7 +809,7 @@ export default function V1PurchaseOrdersPage() {
           receipts: receiptData?.purchase_receipts || [],
           materialOptions: materials.map((item) => ({
             value: item.id,
-            label: item.name || item.code || `材料 #${item.id}`,
+            label: item.name || item.code || '材料已关联',
           })),
           unitOptions,
         })
@@ -1008,6 +1008,23 @@ export default function V1PurchaseOrdersPage() {
     })
   }, [orders, visibleDataColumns])
 
+  const hasActiveFilters = Boolean(
+    keyword.trim() ||
+      status ||
+      supplierFilter ||
+      dateFilterStart ||
+      dateFilterEnd
+  )
+  const clearFilters = useCallback(() => {
+    setKeyword('')
+    setStatus('')
+    setSupplierFilter('')
+    setDateFilterField('purchase_date')
+    setDateFilterStart('')
+    setDateFilterEnd('')
+    setPagination((current) => ({ ...current, current: 1 }))
+  }, [])
+
   const selectedOrders = useMemo(
     () => orders.filter((record) => selectedRowKeys.includes(record.id)),
     [orders, selectedRowKeys]
@@ -1199,6 +1216,8 @@ export default function V1PurchaseOrdersPage() {
 
       <BusinessOperationPanel
         compact
+        onClearFilters={clearFilters}
+        clearFiltersDisabled={!hasActiveFilters}
         filters={
           <>
             <SearchInput

@@ -268,7 +268,7 @@ function renderStackCell(primary, secondaryItems = []) {
 }
 
 function inspectorLabel(inspectorID) {
-  return inspectorID ? `管理员 #${inspectorID}` : '-'
+  return inspectorID ? '管理员已关联' : '-'
 }
 
 export default function V1QualityInspectionsPage() {
@@ -1059,6 +1059,33 @@ export default function V1QualityInspectionsPage() {
     })
   }, [exportColumns, rows])
 
+  const hasActiveFilters = Boolean(
+    keyword.trim() ||
+      statusFilter ||
+      resultFilter ||
+      purchaseReceiptFilter ||
+      materialFilter ||
+      warehouseFilter ||
+      lotFilter ||
+      dateFilterStart ||
+      dateFilterEnd ||
+      routePurchaseOrderID ||
+      routePurchaseReceiptID
+  )
+  const clearFilters = useCallback(() => {
+    setKeyword('')
+    setStatusFilter('')
+    setResultFilter('')
+    setPurchaseReceiptFilter('')
+    setMaterialFilter('')
+    setWarehouseFilter('')
+    setLotFilter('')
+    setDateFilterField('inspected_at')
+    setDateFilterStart('')
+    setDateFilterEnd('')
+    clearRouteContext()
+  }, [clearRouteContext])
+
   return (
     <BusinessPageLayout className="erp-v1-quality-inspections-page">
       <PageHeaderCard
@@ -1094,6 +1121,8 @@ export default function V1QualityInspectionsPage() {
 
       <BusinessOperationPanel
         compact
+        onClearFilters={clearFilters}
+        clearFiltersDisabled={!hasActiveFilters}
         filters={
           <>
             <SearchInput
@@ -1197,12 +1226,12 @@ export default function V1QualityInspectionsPage() {
             />
             {routePurchaseOrderID ? (
               <Tag closable color="blue" onClose={clearRouteContext}>
-                采购订单 #{routePurchaseOrderID}
+                已按采购订单筛选
               </Tag>
             ) : null}
             {routePurchaseReceiptID ? (
               <Tag closable color="blue" onClose={clearRouteContext}>
-                采购入库 #{routePurchaseReceiptID}
+                已按采购入库筛选
               </Tag>
             ) : null}
           </>

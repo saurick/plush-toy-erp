@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from 'react'
 import {
   CheckCircleOutlined,
   DownloadOutlined,
@@ -7,10 +14,11 @@ import {
   SettingOutlined,
   StopOutlined,
 } from '@ant-design/icons'
-import { Button, Form, Popconfirm, Segmented, Space, Tag } from 'antd'
+import { Button, Form, Popconfirm, Space, Tabs, Tag } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import {
   BusinessDataTable,
   BusinessOperationPanel,
@@ -397,7 +405,9 @@ function needsUnitDictionary(type = '') {
 
 export default function V1MasterDataPage({ type }) {
   const isProductCatalogPage = type === 'product_skus'
+  const [productCatalogTabType, setProductCatalogTabType] = useState('products')
   const [productCatalogType, setProductCatalogType] = useState('products')
+  const [, startProductCatalogTransition] = useTransition()
   const effectiveType = isProductCatalogPage ? productCatalogType : type
   const config = PAGE_CONFIG[effectiveType] || PAGE_CONFIG.customers
   const isProcessDictionaryPage = effectiveType === 'processes'
@@ -426,6 +436,8 @@ export default function V1MasterDataPage({ type }) {
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [recordForm] = Form.useForm()
   const skuAttachmentRef = useRef(null)
+  const requestControllersRef = useRef({})
+  const requestSequenceRef = useRef({})
   const moduleKey = config.recordKey
   const supportsContacts = Boolean(config.ownerType)
   const entityLabel = config.entityLabel || '主体'
@@ -524,81 +536,164 @@ export default function V1MasterDataPage({ type }) {
     [customerPaymentConditionOptions, recordForm]
   )
 
+  const beginLatestRequest = useCallback((key) => {
+    requestControllersRef.current[key]?.abort()
+    const controller = new AbortController()
+    const nextSequence = Number(requestSequenceRef.current[key] || 0) + 1
+    requestControllersRef.current[key] = controller
+    requestSequenceRef.current[key] = nextSequence
+
+    return {
+      signal: controller.signal,
+      isCurrent: () =>
+        requestControllersRef.current[key] === controller &&
+        requestSequenceRef.current[key] === nextSequence &&
+        !controller.signal.aborted,
+      finish: () => {
+        if (requestControllersRef.current[key] === controller) {
+          delete requestControllersRef.current[key]
+        }
+      },
+    }
+  }, [])
+
+  useEffect(() => {
+    const controllers = requestControllersRef.current
+    return () => {
+      Object.values(controllers).forEach((controller) => {
+        controller?.abort()
+      })
+    }
+  }, [])
+
   const loadContacts = useCallback(
     async (record) => {
+      const request = beginLatestRequest('contacts')
       if (!supportsContacts || !record?.id) {
-        setContacts([])
+        if (request.isCurrent()) {
+          setContacts([])
+        }
+        request.finish()
         return []
       }
       setContactLoading(true)
       try {
-        const result = await listContactsByOwner({
-          owner_type: config.ownerType,
-          owner_id: record.id,
-          limit: 100,
-        })
+        const result = await listContactsByOwner(
+          {
+            owner_type: config.ownerType,
+            owner_id: record.id,
+            limit: 100,
+          },
+          { signal: request.signal }
+        )
+        if (!request.isCurrent()) {
+          return []
+        }
         const nextContacts = Array.isArray(result?.contacts)
           ? result.contacts
           : []
         setContacts(nextContacts)
         return nextContacts
       } catch (error) {
+        if (isRpcAbortError(error) || !request.isCurrent()) {
+          return []
+        }
         message.error(getActionErrorMessage(error, '加载联系人'))
         setContacts([])
         return []
       } finally {
-        setContactLoading(false)
+        if (request.isCurrent()) {
+          setContactLoading(false)
+          request.finish()
+        }
       }
     },
-    [config.ownerType, supportsContacts]
+    [beginLatestRequest, config.ownerType, supportsContacts]
   )
 
   const loadUnits = useCallback(async () => {
+    const request = beginLatestRequest('units')
     if (!needsUnitDictionary(effectiveType)) {
-      setUnits([])
+      if (request.isCurrent()) {
+        setUnits([])
+      }
+      request.finish()
       return true
     }
     setUnitLoading(true)
     try {
-      const result = await listUnits({ limit: 500 })
+      const result = await listUnits({ limit: 500 }, { signal: request.signal })
+      if (!request.isCurrent()) {
+        return false
+      }
       const nextUnits = Array.isArray(result?.units) ? result.units : []
       setUnits(nextUnits)
       return true
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return false
+      }
       message.error(getActionErrorMessage(error, '加载单位字典'))
       setUnits([])
       return false
     } finally {
-      setUnitLoading(false)
+      if (request.isCurrent()) {
+        setUnitLoading(false)
+        request.finish()
+      }
     }
-  }, [effectiveType])
+  }, [beginLatestRequest, effectiveType])
 
   const loadProductReferences = useCallback(async () => {
+    const request = beginLatestRequest('productReferences')
     if (effectiveType !== 'product_skus') {
-      setProductReferences([])
+      if (request.isCurrent()) {
+        setProductReferences([])
+      }
+      request.finish()
       return true
     }
     try {
-      const result = await listProducts({ limit: 500, active_only: true })
+      const result = await listProducts(
+        { limit: 500, active_only: true },
+        { signal: request.signal }
+      )
+      if (!request.isCurrent()) {
+        return false
+      }
       setProductReferences(
         Array.isArray(result?.products) ? result.products : []
       )
       return true
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return false
+      }
       message.error(getActionErrorMessage(error, '加载产品字典'))
       setProductReferences([])
       return false
+    } finally {
+      if (request.isCurrent()) {
+        request.finish()
+      }
     }
-  }, [effectiveType])
+  }, [beginLatestRequest, effectiveType])
 
   const loadRecords = useCallback(async () => {
+    const request = beginLatestRequest('records')
     setLoading(true)
     try {
-      const result = await config.list({
-        keyword,
-        active_only: activeOnly,
-        ...getBusinessPaginationParams(pagination),
-      })
+      const result = await config.list(
+        {
+          keyword,
+          active_only: activeOnly,
+          ...getBusinessPaginationParams(pagination),
+        },
+        { signal: request.signal }
+      )
+      if (!request.isCurrent()) {
+        return false
+      }
       const nextRecords = Array.isArray(result?.[config.recordKey])
         ? result[config.recordKey]
         : []
@@ -610,12 +705,29 @@ export default function V1MasterDataPage({ type }) {
       })
       return true
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return false
+      }
       message.error(getActionErrorMessage(error, `加载${config.title}`))
       return false
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
     }
-  }, [activeOnly, config, keyword, pagination])
+  }, [activeOnly, beginLatestRequest, config, keyword, pagination])
+
+  const refreshCurrentData = useCallback(async () => {
+    const [recordsOK, unitsOK, productReferencesOK] = await Promise.all([
+      loadRecords(),
+      loadUnits(),
+      loadProductReferences(),
+    ])
+    return (
+      recordsOK !== false && unitsOK !== false && productReferencesOK !== false
+    )
+  }, [loadProductReferences, loadRecords, loadUnits])
 
   useEffect(() => {
     loadRecords()
@@ -630,21 +742,40 @@ export default function V1MasterDataPage({ type }) {
   }, [loadProductReferences])
 
   useEffect(() => {
-    return outletContext?.registerPageRefresh?.(loadRecords)
-  }, [loadRecords, outletContext])
+    return outletContext?.registerPageRefresh?.(refreshCurrentData)
+  }, [outletContext, refreshCurrentData])
 
   useEffect(() => {
     setSelectedRecord(null)
     setContacts([])
     setEditingRecord(null)
-    setProductReferences([])
-    setUnits([])
     setRecordModalOpen(false)
     setColumnOrder(null)
-    setPagination({ current: 1, pageSize: 20 })
+    setPagination((current) =>
+      current.current === 1 && current.pageSize === 20
+        ? current
+        : { current: 1, pageSize: 20 }
+    )
+    setKeyword((current) => (current ? '' : current))
+    setActiveOnly((current) => (current ? false : current))
+  }, [effectiveType])
+
+  const hasActiveFilters = Boolean(keyword.trim() || activeOnly)
+  const clearFilters = useCallback(() => {
     setKeyword('')
     setActiveOnly(false)
-  }, [effectiveType])
+    resetBusinessPaginationCurrent(setPagination)
+  }, [])
+
+  const handleProductCatalogTabChange = useCallback(
+    (nextType) => {
+      setProductCatalogTabType(nextType)
+      startProductCatalogTransition(() => {
+        setProductCatalogType(nextType)
+      })
+    },
+    [startProductCatalogTransition]
+  )
 
   const openCreateRecord = () => {
     skuAttachmentRef.current?.clearPendingAttachments()
@@ -1305,6 +1436,13 @@ export default function V1MasterDataPage({ type }) {
     () => records.filter((record) => record.is_active !== false).length,
     [records]
   )
+  const productCatalogTabItems = useMemo(
+    () => [
+      { key: 'products', label: '产品基础信息', children: null },
+      { key: 'product_skus', label: '产品规格', children: null },
+    ],
+    []
+  )
   const selectedRecordDisplayText = useMemo(() => {
     if (!selectedRecord) return `请先选择一个${entityLabel}`
     return `${getRecordCode(selectedRecord, effectiveType) || selectedRecord.id} / ${
@@ -1345,20 +1483,10 @@ export default function V1MasterDataPage({ type }) {
         }
       />
 
-      {isProductCatalogPage ? (
-        <Segmented
-          aria-label="产品档案视图"
-          value={effectiveType}
-          onChange={(nextValue) => setProductCatalogType(nextValue)}
-          options={[
-            { label: '产品基础信息', value: 'products' },
-            { label: '产品规格', value: 'product_skus' },
-          ]}
-        />
-      ) : null}
-
       <BusinessOperationPanel
         compact
+        onClearFilters={clearFilters}
+        clearFiltersDisabled={!hasActiveFilters}
         filters={
           <>
             <SearchInput
@@ -1469,10 +1597,21 @@ export default function V1MasterDataPage({ type }) {
       </BusinessOperationPanel>
 
       <BusinessDataTable
+        tableHeader={
+          isProductCatalogPage ? (
+            <Tabs
+              aria-label="产品档案视图"
+              activeKey={productCatalogTabType}
+              onChange={handleProductCatalogTabChange}
+              items={productCatalogTabItems}
+            />
+          ) : null
+        }
         rowKey="id"
         loading={loading}
         columns={orderedRecordColumns}
         dataSource={records}
+        tableLayout={isProductCatalogPage ? 'fixed' : undefined}
         scroll={{ x: isProcessDictionaryPage ? 1000 : 1300 }}
         pagination={createBusinessTablePagination({
           pagination,

@@ -6,6 +6,14 @@ import { isAuthFailureCode } from '@/common/consts/errorCodes'
 
 let globalRpcId = 0
 
+function isAbortLikeError(error) {
+  return error?.name === 'AbortError' || error?.cause?.name === 'AbortError'
+}
+
+export function isRpcAbortError(error) {
+  return Boolean(error?.isAbortError || isAbortLikeError(error))
+}
+
 export class JsonRpc {
   constructor({ url, basePath = '/rpc', authScope = 'user', withAuth = true }) {
     if (!url) {
@@ -47,8 +55,10 @@ export class JsonRpc {
         signal,
       })
     } catch (e) {
-      throw new RpcError('Network error', {
-        isNetworkError: true,
+      const isAbortError = isAbortLikeError(e)
+      throw new RpcError(isAbortError ? 'Request aborted' : 'Network error', {
+        isNetworkError: !isAbortError,
+        isAbortError,
         cause: e,
       })
     }

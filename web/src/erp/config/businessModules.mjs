@@ -419,16 +419,16 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '进度',
     pageKind: 'formal-v1',
     description:
-      '生产进度当前接入生产发料、成品入库和返工事实；页面只提交事实动作。',
+      '生产进度当前接入生产发料、成品入库和返工事实；页面只处理已有事实动作，不提供需要手填系统字段的无来源登记入口。',
     primaryEntity: 'production_facts',
     factSource: 'production_facts, inventory_txns',
     boundary:
       '生产进度事实不从 Workflow 任务完成自动生成；生产排程和异常仍属于协同层，不自动写出货、应收或发票事实。',
     sourceRefs: ['production_facts', 'inventory_txns', 'workflow_tasks'],
     currentScope: [
-      '生产发料 MATERIAL_ISSUE',
-      '成品入库 FINISHED_GOODS_RECEIPT',
-      '返工 REWORK',
+      '生产发料',
+      '成品入库',
+      '返工',
       '过账写库存流水，取消按后端规则冲正',
     ],
   },

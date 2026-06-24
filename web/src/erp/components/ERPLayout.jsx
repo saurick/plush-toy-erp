@@ -150,6 +150,7 @@ export default function ERPLayout() {
   const profileSyncErrorNotifiedRef = useRef(false)
   const profileSessionUnavailableHandledRef = useRef(false)
   const [refreshingCurrentPage, setRefreshingCurrentPage] = useState(false)
+  const refreshingCurrentPageRef = useRef(false)
   const [pageRefreshHandler, setPageRefreshHandler] = useState(null)
 
   const authRpc = useMemo(
@@ -390,15 +391,6 @@ export default function ERPLayout() {
     ]
   )
 
-  const handleNavigate = (nextPath) => {
-    if (!nextPath || nextPath === location.pathname) {
-      setMobileNavOpen(false)
-      return
-    }
-    navigate(nextPath)
-    setMobileNavOpen(false)
-  }
-
   const handleLogout = async () => {
     if (loggingOut) {
       return
@@ -416,7 +408,7 @@ export default function ERPLayout() {
   }
 
   const handleRefreshCurrentPage = async () => {
-    if (refreshingCurrentPage) {
+    if (refreshingCurrentPageRef.current) {
       return
     }
 
@@ -425,6 +417,7 @@ export default function ERPLayout() {
       return
     }
 
+    refreshingCurrentPageRef.current = true
     setRefreshingCurrentPage(true)
     try {
       const refreshed = await pageRefreshHandler()
@@ -434,8 +427,24 @@ export default function ERPLayout() {
     } catch (error) {
       message.error(getActionErrorMessage(error, '刷新当前页面数据'))
     } finally {
+      refreshingCurrentPageRef.current = false
       setRefreshingCurrentPage(false)
     }
+  }
+
+  const handleNavigate = async (nextPath) => {
+    if (!nextPath) {
+      setMobileNavOpen(false)
+      return
+    }
+
+    if (nextPath === location.pathname) {
+      setMobileNavOpen(false)
+      return
+    }
+
+    navigate(nextPath)
+    setMobileNavOpen(false)
   }
 
   const sideNav = (

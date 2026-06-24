@@ -887,6 +887,22 @@ export default function V1OutsourcingOrdersPage() {
     })
   }, [rows, visibleDataColumns])
 
+  const hasActiveFilters = Boolean(
+    keyword.trim() ||
+      statusFilter ||
+      supplierFilter ||
+      dateRange?.[0] ||
+      dateRange?.[1]
+  )
+  const clearFilters = useCallback(() => {
+    setKeyword('')
+    setStatusFilter('')
+    setSupplierFilter('')
+    setDateField('order_date')
+    setDateRange([null, null])
+    setPagination((current) => ({ ...current, current: 1 }))
+  }, [])
+
   const selectedWorkflowTasks = useMemo(
     () =>
       selectedRow?.id
@@ -975,6 +991,8 @@ export default function V1OutsourcingOrdersPage() {
 
       <BusinessOperationPanel
         compact
+        onClearFilters={clearFilters}
+        clearFiltersDisabled={!hasActiveFilters}
         filters={
           <>
             <SearchInput

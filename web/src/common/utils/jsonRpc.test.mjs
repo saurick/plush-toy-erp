@@ -15,6 +15,9 @@ function loadJsonRpcModule({ token = 'stored-token' } = {}) {
     constructor(message, extra = {}) {
       super(message)
       this.code = extra.code ?? null
+      this.isNetworkError = !!extra.isNetworkError
+      this.isAbortError = !!extra.isAbortError
+      this.cause = extra.cause
     }
 
     static fromHttp(status) {
@@ -56,7 +59,8 @@ function loadJsonRpcModule({ token = 'stored-token' } = {}) {
       'const { isAuthFailureCode } = __errorCodes__\n'
     )
     .replace(/export class JsonRpc/u, 'class JsonRpc')
-    .concat('\nmodule.exports = { JsonRpc };\n')
+    .replace(/export function isRpcAbortError/u, 'function isRpcAbortError')
+    .concat('\nmodule.exports = { JsonRpc, isRpcAbortError };\n')
 
   const sandbox = {
     module: { exports: {} },
@@ -111,6 +115,7 @@ function loadJsonRpcModule({ token = 'stored-token' } = {}) {
   vm.runInNewContext(transformed, sandbox, { filename: filePath })
   return {
     JsonRpc: sandbox.module.exports.JsonRpc,
+    isRpcAbortError: sandbox.module.exports.isRpcAbortError,
     fetchCalls,
     logoutCalls,
     events,
@@ -134,6 +139,27 @@ test('jsonRpc: withAuth=false 不携带旧 token', async () => {
   assert.equal(harness.fetchCalls[0].init.headers.Authorization, undefined)
   assert.deepEqual(harness.logoutCalls, [])
   assert.deepEqual(harness.events, [])
+})
+
+test('jsonRpc: AbortError 标记为取消请求而不是网络错误', async () => {
+  const harness = loadJsonRpcModule()
+  harness.setFetch(async () => {
+    const error = new Error('The user aborted a request.')
+    error.name = 'AbortError'
+    throw error
+  })
+  const rpc = new harness.JsonRpc({ url: 'masterdata', authScope: 'admin' })
+
+  await assert.rejects(
+    () => rpc.call('list_materials'),
+    (error) => {
+      assert.equal(error.message, 'Request aborted')
+      assert.equal(error.isAbortError, true)
+      assert.equal(error.isNetworkError, false)
+      assert.equal(harness.isRpcAbortError(error), true)
+      return true
+    }
+  )
 })
 
 test('jsonRpc: withAuth=false 的鉴权错误不触发全局重新登录弹窗', async () => {

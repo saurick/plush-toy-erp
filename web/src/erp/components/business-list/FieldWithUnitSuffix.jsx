@@ -25,7 +25,7 @@ export function unitSuffixTextFromOptions(
   if (optionText) return optionText
 
   const fallback = normalizeText(fallbackText)
-  return fallback && !/^单位\s*#/.test(fallback) ? fallback : ''
+  return fallback && !/#\d+/.test(fallback) ? fallback : ''
 }
 
 export function unitPrecisionFromOptions(unitOptions, unitID) {

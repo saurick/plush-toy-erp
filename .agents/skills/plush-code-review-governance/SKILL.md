@@ -1,6 +1,6 @@
 ---
 name: plush-code-review-governance
-description: plush-toy-erp 项目代码审查治理。Use when Codex reviews plush-toy-erp code changes in any conversation, including side chats, new main chats, post-implementation reviews, pre-commit reviews, PR-style reviews, current worktree review, staged/unstaged diff review, commit review, or when the user mentions plush with code review, 审查代码, 查 bug, 独立审查, 缺测试, Workflow / Fact, RBAC, 文档漂移, 字段残值, 字段缺值, 删除/回收站, 页面治理, or 不要改只看.
+description: 项目代码审查治理（plush-toy-erp）。Use when Codex reviews plush-toy-erp code changes in any conversation, including side chats, new main chats, post-implementation reviews, pre-commit reviews, PR-style reviews, current worktree review, staged/unstaged diff review, commit review, or when the user mentions plush with code review, 审查代码, 查 bug, 独立审查, 缺测试, Workflow / Fact, RBAC, 文档漂移, 字段残值, 字段缺值, 删除/回收站, 页面治理, or 不要改只看.
 ---
 
 # Plush 代码审查治理 Code Review Governance
@@ -47,6 +47,7 @@ git -C /Users/simon/projects/plush-toy-erp diff --stat
 - 前端事实边界：前端不能本地补造后端事实、长期承担业务一致性，或把 workflow payload 当事实真源。
 - 删除 / 回收站：业务对象没有后端 usecase、RBAC、审计和引用检查时，不应出现通用删除/回收站主路径。
 - 页面设计：业务页面不要露裸数据库 ID；按钮、字段、筛选、状态、空态和快捷入口必须有真实业务意义和可验证结果。
+- 用户可见字段：业务前端不要展示 `idempotency_key`、幂等键、内部主键、内部引用、trace / request / raw ID 等工程实现字段；需要防重、追溯或关联时，由系统隐藏携带并展示可读业务编号、来源单据、状态或“已关联”反馈。
 - 客户差异：`yoyoosun` 可以是种子客户样本，不能硬编码进通用产品核心 usecase。
 - 部署与 migration：schema 变更必须走 Ent + Atlas；发布不能假设低配服务器可构建。
 - 错误码：新增/修改错误码必须保持服务端真源、前端生成码表、消费层和测试同步。

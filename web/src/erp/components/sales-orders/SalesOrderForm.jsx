@@ -481,7 +481,7 @@ export function SalesOrderItemsFormSection({
             <div className="erp-line-items-form__import-row">
               <div className="erp-line-items-form__import-copy">
                 <strong>从 SKU 添加明细</strong>
-                <span>从来源选择器导入；数量、单价和交期回到订单行维护。</span>
+                <span>从业务来源导入；数量、单价和交期回到订单行维护。</span>
               </div>
               <Button
                 className="erp-line-items-form__import-button"
@@ -677,9 +677,7 @@ export function SalesOrderItemsFormSection({
                             )
                             const sourceText = [
                               line?.product_code_snapshot ||
-                                (line?.product_id
-                                  ? `产品 #${line.product_id}`
-                                  : ''),
+                                (line?.product_id ? '产品已关联' : ''),
                               line?.product_name_snapshot,
                               line?.color_snapshot,
                               hasProductSource ? unitText : '',

@@ -661,6 +661,11 @@ export default function FormalBusinessModulePage({ moduleKey }) {
     },
     [loadShippingReleaseWorkflowTasks]
   )
+  const hasActiveFilters = Boolean(keyword.trim() || statusFilter)
+  const clearFilters = useCallback(() => {
+    setKeyword('')
+    setStatusFilter('')
+  }, [])
 
   if (!moduleItem) {
     return (
@@ -753,6 +758,8 @@ export default function FormalBusinessModulePage({ moduleKey }) {
       />
 
       <BusinessOperationPanel
+        onClearFilters={clearFilters}
+        clearFiltersDisabled={!hasActiveFilters}
         filters={
           <>
             <SearchInput

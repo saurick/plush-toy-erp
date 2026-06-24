@@ -30,8 +30,8 @@ function dataOf(result) {
   return result?.data || {}
 }
 
-export async function listCustomers(params = {}) {
-  const result = await masterDataRpc.call('list_customers', params)
+export async function listCustomers(params = {}, options = {}) {
+  const result = await masterDataRpc.call('list_customers', params, options)
   return dataOf(result)
 }
 
@@ -60,8 +60,8 @@ export async function setCustomerActive(params = {}) {
   return dataOf(result)?.customer || null
 }
 
-export async function listSuppliers(params = {}) {
-  const result = await masterDataRpc.call('list_suppliers', params)
+export async function listSuppliers(params = {}, options = {}) {
+  const result = await masterDataRpc.call('list_suppliers', params, options)
   return dataOf(result)
 }
 
@@ -90,13 +90,13 @@ export async function setSupplierActive(params = {}) {
   return dataOf(result)?.supplier || null
 }
 
-export async function listMaterials(params = {}) {
-  const result = await masterDataRpc.call('list_materials', params)
+export async function listMaterials(params = {}, options = {}) {
+  const result = await masterDataRpc.call('list_materials', params, options)
   return dataOf(result)
 }
 
-export async function listUnits(params = {}) {
-  const result = await masterDataRpc.call('list_units', params)
+export async function listUnits(params = {}, options = {}) {
+  const result = await masterDataRpc.call('list_units', params, options)
   return dataOf(result)
 }
 
@@ -125,8 +125,8 @@ export async function setMaterialActive(params = {}) {
   return dataOf(result)?.material || null
 }
 
-export async function listProcesses(params = {}) {
-  const result = await masterDataRpc.call('list_processes', params)
+export async function listProcesses(params = {}, options = {}) {
+  const result = await masterDataRpc.call('list_processes', params, options)
   return dataOf(result)
 }
 
@@ -150,8 +150,8 @@ export async function setProcessActive(params = {}) {
   return dataOf(result)?.process || null
 }
 
-export async function listProducts(params = {}) {
-  const result = await masterDataRpc.call('list_products', params)
+export async function listProducts(params = {}, options = {}) {
+  const result = await masterDataRpc.call('list_products', params, options)
   return dataOf(result)
 }
 
@@ -175,8 +175,8 @@ export async function setProductActive(params = {}) {
   return dataOf(result)?.product || null
 }
 
-export async function listProductSKUs(params = {}) {
-  const result = await masterDataRpc.call('list_product_skus', params)
+export async function listProductSKUs(params = {}, options = {}) {
+  const result = await masterDataRpc.call('list_product_skus', params, options)
   return dataOf(result)
 }
 
@@ -200,8 +200,12 @@ export async function setProductSKUActive(params = {}) {
   return dataOf(result)?.product_sku || null
 }
 
-export async function listContactsByOwner(params = {}) {
-  const result = await masterDataRpc.call('list_contacts_by_owner', params)
+export async function listContactsByOwner(params = {}, options = {}) {
+  const result = await masterDataRpc.call(
+    'list_contacts_by_owner',
+    params,
+    options
+  )
   return dataOf(result)
 }
 

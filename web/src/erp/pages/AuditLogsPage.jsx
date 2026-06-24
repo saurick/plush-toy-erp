@@ -168,7 +168,7 @@ function getActorText(payload = {}) {
     return actor.username
   }
   if (actor.id) {
-    return `ID ${actor.id}`
+    return '操作者已关联'
   }
   return '-'
 }
@@ -180,7 +180,7 @@ function getEventActorText(event = {}) {
 function getTargetText(payload = {}) {
   const target = payload.target || {}
   const key = target.key || ''
-  const id = target.id ? `#${target.id}` : ''
+  const id = target.id ? '目标已关联' : ''
   return key || id || '-'
 }
 

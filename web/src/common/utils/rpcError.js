@@ -20,6 +20,7 @@ export class RpcError extends Error {
     this.code = extra.code ?? null // 业务错误码 / 框架错误码
     this.httpStatus = extra.httpStatus ?? null
     this.isNetworkError = !!extra.isNetworkError
+    this.isAbortError = !!extra.isAbortError
     this.json = extra.json ?? null // 原始 JSON 响应
     this.cause = extra.cause // 原始异常（可选）
   }

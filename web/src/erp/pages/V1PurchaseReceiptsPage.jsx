@@ -768,6 +768,30 @@ export default function V1PurchaseReceiptsPage() {
       rows,
     })
   }, [rows, visibleColumns])
+  const hasActiveFilters = Boolean(
+    keyword.trim() ||
+      statusFilter ||
+      supplierFilter ||
+      materialFilter ||
+      warehouseFilter ||
+      lotFilter ||
+      dateFilterStart ||
+      dateFilterEnd ||
+      routePurchaseOrderID ||
+      routeReceiptID
+  )
+  const clearFilters = useCallback(() => {
+    setKeyword('')
+    setStatusFilter('')
+    setSupplierFilter('')
+    setMaterialFilter('')
+    setWarehouseFilter('')
+    setLotFilter('')
+    setDateFilterField('received_at')
+    setDateFilterStart('')
+    setDateFilterEnd('')
+    clearRouteContext()
+  }, [clearRouteContext])
 
   return (
     <BusinessPageLayout className="erp-v1-purchase-receipts-page">
@@ -804,6 +828,8 @@ export default function V1PurchaseReceiptsPage() {
 
       <BusinessOperationPanel
         compact
+        onClearFilters={clearFilters}
+        clearFiltersDisabled={!hasActiveFilters}
         filters={
           <>
             <SearchInput
@@ -895,12 +921,12 @@ export default function V1PurchaseReceiptsPage() {
             />
             {routePurchaseOrderID ? (
               <Tag closable color="blue" onClose={clearRouteContext}>
-                采购订单 #{routePurchaseOrderID}
+                已按采购订单筛选
               </Tag>
             ) : null}
             {routeReceiptID ? (
               <Tag closable color="blue" onClose={clearRouteContext}>
-                采购入库 #{routeReceiptID}
+                已按采购入库筛选
               </Tag>
             ) : null}
           </>

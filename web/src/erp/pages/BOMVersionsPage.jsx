@@ -1127,6 +1127,14 @@ export default function BOMVersionsPage() {
     ]
   )
 
+  const hasActiveFilters = Boolean(keyword.trim() || productID || status)
+  const clearFilters = useCallback(() => {
+    setKeyword('')
+    setProductID(undefined)
+    setStatus('')
+    resetBusinessPaginationCurrent(setPagination)
+  }, [])
+
   return (
     <BusinessPageLayout>
       <PageHeaderCard
@@ -1147,6 +1155,8 @@ export default function BOMVersionsPage() {
 
       <BusinessOperationPanel
         compact
+        onClearFilters={clearFilters}
+        clearFiltersDisabled={!hasActiveFilters}
         filters={
           <>
             <SearchInput

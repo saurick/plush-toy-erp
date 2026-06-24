@@ -118,7 +118,7 @@ const SUBJECT_TYPE_LABELS = Object.freeze({
 
 const SEARCH_PLACEHOLDERS = Object.freeze({
   [VIEW_LOTS]: '搜索批次号 / 供应商批次 / 色号',
-  [VIEW_TXNS]: '搜索来源 / 备注 / 幂等键',
+  [VIEW_TXNS]: '搜索来源 / 备注',
 })
 
 const LOT_STATUS_LABELS = Object.freeze({
@@ -238,7 +238,7 @@ function formatQuantity(value) {
 function internalRef(label, value) {
   return value === null || value === undefined || value === ''
     ? '-'
-    : `${label} ${value}`
+    : `${label}已关联`
 }
 
 function getRowsFromData(view, data) {
@@ -254,16 +254,14 @@ function getRowsFromData(view, data) {
 function selectedLabelFor(view, row) {
   if (!row) return '请先选择一条库存记录'
   if (view === VIEW_LOTS) {
-    return `批次 ${row.lot_no || internalRef('内部批次', row.id)} / ${
+    return `批次 ${row.lot_no || '已登记批次'} / ${
       LOT_STATUS_LABELS[row.status] || row.status || '-'
     }`
   }
   if (view === VIEW_TXNS) {
-    return `流水 ${row.source_type || row.txn_type || internalRef('内部流水', row.id)}`
+    return `流水 ${sourceTypeText(row.source_type) || txnTypeText(row.txn_type) || '已登记流水'}`
   }
-  return `库存项 ${internalRef('内部余额', row.id)} / 批次 ${
-    row.lot_no || internalRef('内部批次', row.lot_id)
-  }`
+  return `库存项已登记 / 批次 ${row.lot_no || (row.lot_id ? '已关联批次' : '-')}`
 }
 
 function sourceRouteFor(sourceType) {
@@ -513,15 +511,7 @@ export default function V1InventoryLedgerPage() {
           title: '批次号',
           dataIndex: 'lot_no',
           width: 180,
-          render: (value, record) =>
-            value || internalRef('内部批次', record.id),
-        },
-        {
-          title: '内部主键',
-          dataIndex: 'id',
-          width: 110,
-          render: (value) => internalRef('主键', value),
-          exportValue: (record) => internalRef('主键', record?.id),
+          render: (value, record) => value || (record.id ? '已登记批次' : '-'),
         },
         {
           title: '对象',
@@ -532,7 +522,7 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => subjectTypeText(record?.subject_type),
         },
         {
-          title: '对象内部引用',
+          title: '对象',
           dataIndex: 'subject_id',
           width: 140,
           render: (value, record) =>
@@ -582,11 +572,11 @@ export default function V1InventoryLedgerPage() {
     if (activeView === VIEW_TXNS) {
       return [
         {
-          title: '流水标识',
+          title: '流水',
           dataIndex: 'id',
           width: 130,
-          render: (value) => internalRef('内部流水', value),
-          exportValue: (record) => internalRef('内部流水', record?.id),
+          render: (value) => (value ? '已登记流水' : '-'),
+          exportValue: (record) => (record?.id ? '已登记流水' : ''),
         },
         {
           title: '类型',
@@ -613,20 +603,20 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => subjectTypeText(record?.subject_type),
         },
         {
-          title: '对象内部引用',
+          title: '对象',
           dataIndex: 'subject_id',
           width: 140,
           render: (value, record) =>
             internalRef(subjectTypeText(record?.subject_type) || '对象', value),
         },
         {
-          title: '仓库内部引用',
+          title: '仓库',
           dataIndex: 'warehouse_id',
           width: 140,
           render: (value) => internalRef('仓库', value),
         },
         {
-          title: '批次内部引用',
+          title: '批次',
           dataIndex: 'lot_id',
           width: 140,
           render: (value) => internalRef('批次', value),
@@ -640,7 +630,7 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => formatQuantity(record?.quantity),
         },
         {
-          title: '单位引用',
+          title: '单位',
           dataIndex: 'unit_id',
           width: 120,
           render: (value) => internalRef('单位', value),
@@ -679,11 +669,6 @@ export default function V1InventoryLedgerPage() {
           render: formatUnixDateTime,
           exportValue: (record) => formatUnixDateTime(record?.occurred_at),
         },
-        {
-          title: '幂等键',
-          dataIndex: 'idempotency_key',
-          width: 280,
-        },
         { title: '备注', dataIndex: 'note', width: 300 },
       ]
     }
@@ -693,8 +678,8 @@ export default function V1InventoryLedgerPage() {
         title: '库存项',
         dataIndex: 'id',
         width: 130,
-        render: (value) => internalRef('内部余额', value),
-        exportValue: (record) => internalRef('内部余额', record?.id),
+        render: (value) => (value ? '已登记库存' : '-'),
+        exportValue: (record) => (record?.id ? '已登记库存' : ''),
       },
       {
         title: '对象',
@@ -705,26 +690,26 @@ export default function V1InventoryLedgerPage() {
         exportValue: (record) => subjectTypeText(record?.subject_type),
       },
       {
-        title: '对象内部引用',
+        title: '对象',
         dataIndex: 'subject_id',
         width: 140,
         render: (value, record) =>
           internalRef(subjectTypeText(record?.subject_type) || '对象', value),
       },
       {
-        title: '仓库内部引用',
+        title: '仓库',
         dataIndex: 'warehouse_id',
         width: 140,
         render: (value) => internalRef('仓库', value),
       },
       {
-        title: '批次内部引用',
+        title: '批次',
         dataIndex: 'lot_id',
         width: 140,
         render: (value) => internalRef('批次', value),
       },
       {
-        title: '单位引用',
+        title: '单位',
         dataIndex: 'unit_id',
         width: 120,
         render: (value) => internalRef('单位', value),
@@ -779,6 +764,35 @@ export default function V1InventoryLedgerPage() {
     })
   }, [activeView, rows, visibleColumns])
 
+  const hasActiveFilters = Boolean(
+    keyword.trim() ||
+      subjectType ||
+      subjectID ||
+      warehouseID ||
+      lotID ||
+      lotStatus ||
+      txnType ||
+      sourceType ||
+      dateFilterStart ||
+      dateFilterEnd ||
+      routeSourceID ||
+      routeSourceType ||
+      routeLotID
+  )
+  const clearFilters = useCallback(() => {
+    setKeyword('')
+    setSubjectType('')
+    setSubjectID('')
+    setWarehouseID('')
+    setLotID('')
+    setLotStatus('')
+    setTxnType('')
+    setSourceType('')
+    setDateFilterStart('')
+    setDateFilterEnd('')
+    clearRouteContext()
+  }, [clearRouteContext])
+
   return (
     <BusinessPageLayout className="erp-v1-inventory-ledger-page">
       <PageHeaderCard
@@ -802,13 +816,15 @@ export default function V1InventoryLedgerPage() {
 
       <BusinessOperationPanel
         compact
+        onClearFilters={clearFilters}
+        clearFiltersDisabled={!hasActiveFilters}
         filters={
           <>
             <SearchInput
               value={keyword}
               placeholder={
                 activeView === VIEW_BALANCES
-                  ? '搜索对象、仓库、批次或内部引用'
+                  ? '搜索对象、仓库或批次'
                   : SEARCH_PLACEHOLDERS[activeView]
               }
               onChange={(event) => {
@@ -928,12 +944,12 @@ export default function V1InventoryLedgerPage() {
             ) : null}
             {routeSourceType && routeSourceID ? (
               <Tag closable color="blue" onClose={clearRouteContext}>
-                来源 {routeSourceType} #{routeSourceID}
+                已按来源单据筛选
               </Tag>
             ) : null}
             {routeLotID ? (
               <Tag closable color="blue" onClose={clearRouteContext}>
-                批次 #{routeLotID}
+                已按批次筛选
               </Tag>
             ) : null}
           </>

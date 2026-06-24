@@ -172,7 +172,7 @@ function salesOrderCustomerText(order = {}) {
     snapshot?.name ||
     snapshot?.short_name ||
     snapshot?.code ||
-    (order.customer_id ? `客户 #${order.customer_id}` : '')
+    (order.customer_id ? '客户已关联' : '')
   )
 }
 
@@ -262,13 +262,8 @@ function ShipmentFormFields({
       >
         <Input allowClear autoComplete="off" disabled={disabled} />
       </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="幂等键"
-        name="idempotency_key"
-        rules={[{ required: true, message: '请填写幂等键' }]}
-      >
-        <Input allowClear autoComplete="off" disabled={disabled} />
+      <Form.Item name="idempotency_key" hidden rules={[{ required: true }]}>
+        <Input disabled={disabled} />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -976,7 +971,7 @@ export default function ShipmentsPage() {
 
   const addShipmentItems = async (shipmentID, items = []) => {
     if (!positiveInt(shipmentID)) {
-      throw new Error('缺少出货单 ID，无法保存出货明细')
+      throw new Error('缺少出货单，无法保存出货明细')
     }
     const normalizedItems = items.map((item) =>
       buildShipmentItemParams({ ...item, shipment_id: shipmentID })
@@ -1048,15 +1043,6 @@ export default function ShipmentsPage() {
           sortType: 'text',
         },
         {
-          title: '内部记录',
-          exportTitle: '内部记录',
-          dataIndex: 'id',
-          width: 112,
-          sortType: 'number',
-          render: (value) => (value ? `主键 ${value}` : '-'),
-          exportValue: (record) => (record?.id ? `主键 ${record.id}` : ''),
-        },
-        {
           title: '状态',
           exportTitle: '状态',
           dataIndex: 'status',
@@ -1072,6 +1058,24 @@ export default function ShipmentsPage() {
           dataIndex: 'sales_order_id',
           width: 120,
           sortType: 'number',
+          render: (value) => {
+            const order = salesOrdersByID.get(Number(value || 0))
+            return (
+              order?.order_no ||
+              order?.customer_order_no ||
+              (value ? '已关联订单' : '-')
+            )
+          },
+          exportValue: (record) => {
+            const order = salesOrdersByID.get(
+              Number(record?.sales_order_id || 0)
+            )
+            return (
+              order?.order_no ||
+              order?.customer_order_no ||
+              (record?.sales_order_id ? '已关联订单' : '')
+            )
+          },
         },
         {
           title: '客户',
@@ -1079,13 +1083,13 @@ export default function ShipmentsPage() {
           width: 260,
           sortValue: (record) =>
             record.customer_snapshot ||
-            (record.customer_id ? `客户 #${record.customer_id}` : ''),
+            (record.customer_id ? '客户已关联' : ''),
           render: (_, record) =>
             record.customer_snapshot ||
-            (record.customer_id ? `客户 #${record.customer_id}` : '-'),
+            (record.customer_id ? '客户已关联' : '-'),
           exportValue: (record) =>
             record.customer_snapshot ||
-            (record.customer_id ? `客户 #${record.customer_id}` : ''),
+            (record.customer_id ? '客户已关联' : ''),
         },
         {
           title: '明细行',
@@ -1129,7 +1133,7 @@ export default function ShipmentsPage() {
           sortable: false,
         },
       ]),
-    []
+    [salesOrdersByID]
   )
   const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
     useBusinessColumnOrder({
@@ -1145,12 +1149,32 @@ export default function ShipmentsPage() {
       rows,
     })
   }, [rows, visibleColumns])
+  const hasActiveFilters = Boolean(
+    keyword.trim() ||
+      statusFilter ||
+      customerFilter ||
+      productFilter ||
+      warehouseFilter ||
+      dateFilterStart ||
+      dateFilterEnd ||
+      routeSalesOrderID ||
+      routeShipmentID
+  )
+  const clearFilters = useCallback(() => {
+    setKeyword('')
+    setStatusFilter('')
+    setCustomerFilter('')
+    setProductFilter('')
+    setWarehouseFilter('')
+    setDateFilterField('planned_ship_at')
+    setDateFilterStart('')
+    setDateFilterEnd('')
+    clearRouteContext()
+  }, [clearRouteContext])
   const selectedRowLabel = selectedRow
-    ? `${selectedRow.shipment_no || selectedRow.id} / ${
+    ? `${selectedRow.shipment_no || '已登记出货单'} / ${
         selectedRow.customer_snapshot ||
-        (selectedRow.customer_id
-          ? `客户 #${selectedRow.customer_id}`
-          : '未指定客户')
+        (selectedRow.customer_id ? '客户已关联' : '未指定客户')
       }`
     : '请先选择一张出货单'
 
@@ -1185,6 +1209,8 @@ export default function ShipmentsPage() {
 
       <BusinessOperationPanel
         compact
+        onClearFilters={clearFilters}
+        clearFiltersDisabled={!hasActiveFilters}
         filters={
           <>
             <SearchInput
@@ -1261,12 +1287,12 @@ export default function ShipmentsPage() {
             />
             {routeSalesOrderID ? (
               <Tag closable color="blue" onClose={clearRouteContext}>
-                销售订单 #{routeSalesOrderID}
+                已按销售订单筛选
               </Tag>
             ) : null}
             {routeShipmentID ? (
               <Tag closable color="blue" onClose={clearRouteContext}>
-                出货单 #{routeShipmentID}
+                已按出货单筛选
               </Tag>
             ) : null}
           </>
@@ -1438,7 +1464,7 @@ export default function ShipmentsPage() {
               message={`来源销售订单：${
                 selectedSalesOrder.order_no ||
                 selectedSalesOrder.customer_order_no ||
-                selectedSalesOrder.id
+                '已选择'
               }`}
               description={
                 <Space direction="vertical" size={2}>

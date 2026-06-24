@@ -285,7 +285,7 @@ export function PurchaseOrderFormFields({
                 <div className="erp-line-items-form__import-copy">
                   <strong>导入材料</strong>
                   <span>
-                    从来源选择器导入；数量、单价和预计到货回到采购明细维护。
+                    从业务来源导入；数量、单价和预计到货回到采购明细维护。
                   </span>
                 </div>
                 <Button

@@ -725,10 +725,10 @@ export default function V1SalesOrdersPage() {
           sorter: (a, b) =>
             compareText(a?.customer_snapshot?.name, b?.customer_snapshot?.name),
           render: (value, record) =>
-            value?.name || `客户 #${record.customer_id}`,
+            value?.name || (record.customer_id ? '客户已关联' : '-'),
           exportValue: (record) =>
             record?.customer_snapshot?.name ||
-            (record?.customer_id ? `客户 #${record.customer_id}` : ''),
+            (record?.customer_id ? '客户已关联' : ''),
         },
         {
           title: '客户订单号',
@@ -976,6 +976,23 @@ export default function V1SalesOrdersPage() {
     })
   }, [orders, visibleOrderDataColumns])
 
+  const hasActiveFilters = Boolean(
+    keyword.trim() ||
+      statusFilter ||
+      customerFilter ||
+      dateFilterStart ||
+      dateFilterEnd
+  )
+  const clearFilters = useCallback(() => {
+    setKeyword('')
+    setStatusFilter('')
+    setCustomerFilter('')
+    setDateFilterField('order_date')
+    setDateFilterStart('')
+    setDateFilterEnd('')
+    resetBusinessPaginationCurrent(setPagination)
+  }, [])
+
   const exportItems = useCallback(() => {
     if (!selectedOrder || items.length === 0) return
     const orderNo = String(
@@ -1002,8 +1019,8 @@ export default function V1SalesOrdersPage() {
     if (!selectedOrder) return '请先选择销售订单'
     const customerName =
       selectedOrder.customer_snapshot?.name ||
-      `客户 #${selectedOrder.customer_id}`
-    return `${selectedOrder.order_no || selectedOrder.id} / ${customerName}`
+      (selectedOrder.customer_id ? '客户已关联' : '未指定客户')
+    return `${selectedOrder.order_no || '已登记销售订单'} / ${customerName}`
   }, [selectedOrder])
   const visibleLifecycleActions = useMemo(() => {
     if (!selectedOrder) {
@@ -1074,6 +1091,8 @@ export default function V1SalesOrdersPage() {
 
       <BusinessOperationPanel
         compact
+        onClearFilters={clearFilters}
+        clearFiltersDisabled={!hasActiveFilters}
         filters={
           <>
             <SearchInput

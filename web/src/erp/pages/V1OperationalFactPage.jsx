@@ -11,7 +11,10 @@ const PAGE_CONFIGS = Object.freeze({
     viewOverrides: {
       production: {
         title: '生产发料 / 入库事实',
-        createLabel: '登记生产事实',
+        createLabel: '从生产任务生成事实',
+        hideCreateAction: true,
+        modalDescription:
+          '生产事实需要从明确的生产任务、物料、仓库、批次和单位来源生成；不在本页提供需要手填系统字段的登记表单。',
       },
     },
   },

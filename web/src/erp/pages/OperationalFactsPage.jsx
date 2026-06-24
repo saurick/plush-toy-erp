@@ -4,11 +4,10 @@ import {
   CloseCircleOutlined,
   DownOutlined,
   LinkOutlined,
-  PlusOutlined,
   PrinterOutlined,
   RollbackOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Form, Modal, Popconfirm, Tabs, Tag } from 'antd'
+import { Button, Dropdown, Popconfirm, Tabs, Tag } from 'antd'
 import {
   useNavigate,
   useOutletContext,
@@ -17,7 +16,6 @@ import {
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
-  addShipmentItem,
   cancelFinanceFact,
   cancelOutsourcingFact,
   cancelProductionFact,
@@ -42,7 +40,6 @@ import {
 } from '../api/operationalFactApi.mjs'
 import {
   compactParams,
-  buildSequentialDraftCode,
   formatUnixDate,
   formatUnixDateTime,
   trimOptional,
@@ -62,7 +59,6 @@ import {
   SearchInput,
   SelectFilter,
   SelectionActionBar,
-  ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
@@ -86,23 +82,12 @@ import {
   FINANCE_COLLECTION_TYPE_LABELS,
   FINANCE_INVOICE_CATEGORY_LABELS,
   FINANCE_PAYMENT_TERM_LABELS,
-  FinanceFormFields,
-  FactFormFields,
-  OUTSOURCING_FACT_TYPES,
-  PRODUCTION_FACT_TYPES,
-  ReservationFormFields,
-  ShipmentFormFields,
-  ShipmentItemFormFields,
   decimalNumber,
   buildFactParams,
   buildFinanceParams,
-  buildReservationParams,
-  buildShipmentItemParams,
   buildShipmentParams,
-  businessModalTitle,
   formatQuantity,
   hasAnyPermission,
-  idempotencyKey,
   selectedLabelForKey,
   sourceRouteFor,
   statusTag,
@@ -142,10 +127,48 @@ const DEFAULT_OPERATIONAL_FACT_SUMMARY =
   '统一承接生产、委外、出货、库存预留和财务事实的最小运行入口。页面只提交动作，库存流水、冲正和状态边界由后端 usecase 处理。'
 const EMPTY_VIEW_OVERRIDES = Object.freeze({})
 
-function internalRef(label, value) {
+const FACT_TYPE_LABELS = Object.freeze({
+  MATERIAL_ISSUE: '发料',
+  FINISHED_GOODS_RECEIPT: '成品入库',
+  REWORK: '返工',
+  RETURN_RECEIPT: '回料',
+  RECEIVABLE: '应收',
+  PAYABLE: '应付',
+  INVOICE: '发票',
+  PAYMENT: '收付款',
+  RECONCILIATION: '对账',
+})
+
+const SOURCE_TYPE_LABELS = Object.freeze({
+  SHIPMENT: '出货单',
+  PRODUCTION_FACT: '生产事实',
+  OUTSOURCING_FACT: '委外事实',
+  PURCHASE_RECEIPT: '采购入库',
+  SALES_ORDER: '销售订单',
+})
+
+const COUNTERPARTY_TYPE_LABELS = Object.freeze({
+  CUSTOMER: '客户',
+  SUPPLIER: '供应商',
+  OTHER: '其他',
+})
+
+function readableRef(label, value) {
   return value === null || value === undefined || value === ''
     ? '-'
-    : `${label} ${value}`
+    : `${label}已关联`
+}
+
+function factTypeLabel(value) {
+  return FACT_TYPE_LABELS[value] || value || '-'
+}
+
+function sourceTypeLabel(value) {
+  return SOURCE_TYPE_LABELS[value] || value || '来源'
+}
+
+function counterpartyTypeLabel(value) {
+  return COUNTERPARTY_TYPE_LABELS[value] || value || '往来方'
 }
 
 export function OperationalFactWorkspace({
@@ -172,10 +195,6 @@ export function OperationalFactWorkspace({
   const [totalByKey, setTotalByKey] = useState({})
   const [paginationByKey, setPaginationByKey] = useState({})
   const [selectedByKey, setSelectedByKey] = useState({})
-  const [createTarget, setCreateTarget] = useState(null)
-  const [createForm] = Form.useForm()
-  const [shipmentItemOpen, setShipmentItemOpen] = useState(false)
-  const [shipmentItemForm] = Form.useForm()
   const routeSalesOrderID = searchParamPositiveIntText(
     searchParams,
     'sales_order_id'
@@ -201,9 +220,6 @@ export function OperationalFactWorkspace({
         buildParams: buildFactParams,
         dateOptions: OCCURRED_DATE_FILTER_OPTIONS,
         defaultDateField: 'occurred_at',
-        renderForm: () => (
-          <FactFormFields typeOptions={PRODUCTION_FACT_TYPES} />
-        ),
         initialValues: {
           fact_type: 'MATERIAL_ISSUE',
           subject_type: 'MATERIAL',
@@ -224,12 +240,6 @@ export function OperationalFactWorkspace({
         buildParams: buildFactParams,
         dateOptions: OCCURRED_DATE_FILTER_OPTIONS,
         defaultDateField: 'occurred_at',
-        renderForm: () => (
-          <FactFormFields
-            typeOptions={OUTSOURCING_FACT_TYPES}
-            includeSupplier
-          />
-        ),
         initialValues: {
           fact_type: 'MATERIAL_ISSUE',
           subject_type: 'MATERIAL',
@@ -251,7 +261,6 @@ export function OperationalFactWorkspace({
         buildParams: buildShipmentParams,
         dateOptions: SHIPMENT_DATE_FILTER_OPTIONS,
         defaultDateField: 'planned_ship_at',
-        renderForm: () => <ShipmentFormFields />,
         initialValues: {},
       },
       reservations: {
@@ -268,10 +277,8 @@ export function OperationalFactWorkspace({
         consume: consumeStockReservation,
         writePermissions: ACTION_PERMISSIONS.reservationWrite,
         confirmPermissions: ACTION_PERMISSIONS.shipmentConfirm,
-        buildParams: buildReservationParams,
         dateOptions: RESERVED_DATE_FILTER_OPTIONS,
         defaultDateField: 'reserved_at',
-        renderForm: () => <ReservationFormFields />,
         initialValues: {},
       },
       finance: {
@@ -290,7 +297,6 @@ export function OperationalFactWorkspace({
         buildParams: buildFinanceParams,
         dateOptions: OCCURRED_DATE_FILTER_OPTIONS,
         defaultDateField: 'occurred_at',
-        renderForm: () => <FinanceFormFields />,
         initialValues: {
           fact_type: 'RECEIVABLE',
           counterparty_type: 'CUSTOMER',
@@ -360,7 +366,6 @@ export function OperationalFactWorkspace({
     adminProfile,
     activeConfig.writePermissions
   )
-  const canCreateActive = activeConfig.hideCreateAction !== true
 
   const resetPaginationForKey = useCallback(
     (key = activeKey) => {
@@ -456,50 +461,6 @@ export function OperationalFactWorkspace({
     return outletContext?.registerPageRefresh?.(() => loadRows(activeKey))
   }, [activeKey, loadRows, outletContext])
 
-  const openCreate = () => {
-    const today = new Date().toISOString().slice(0, 10)
-    const nextTarget = activeKey
-    const config = configs[nextTarget]
-    setCreateTarget(nextTarget)
-    createForm.setFieldsValue({
-      ...config.initialValues,
-      [config.draftNumberField]: buildSequentialDraftCode(activeRows, {
-        prefix: config.draftNumberPrefix,
-        field: config.draftNumberField,
-      }),
-      idempotency_key: idempotencyKey(config.createPrefix),
-      occurred_at: today,
-      reserved_at: today,
-    })
-  }
-
-  const closeCreate = () => {
-    setCreateTarget(null)
-    createForm.resetFields()
-  }
-
-  const submitCreate = async () => {
-    const config = configs[createTarget]
-    if (!config) {
-      return
-    }
-    try {
-      const values = await createForm.validateFields()
-      setSaving(true)
-      await config.create(config.buildParams(values))
-      message.success(`${config.createLabel}已保存`)
-      closeCreate()
-      await loadRows(createTarget)
-    } catch (error) {
-      if (error?.errorFields) {
-        return
-      }
-      message.error(getActionErrorMessage(error, config.createLabel))
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const runRowAction = async (config, row, actionKey, actionLabel) => {
     const action = config[actionKey]
     if (!action || !row?.id) {
@@ -512,34 +473,6 @@ export function OperationalFactWorkspace({
       await loadRows(activeKey)
     } catch (error) {
       message.error(getActionErrorMessage(error, actionLabel))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const openShipmentItem = (shipment) => {
-    shipmentItemForm.setFieldsValue({ shipment_id: shipment?.id })
-    setShipmentItemOpen(true)
-  }
-
-  const closeShipmentItem = () => {
-    setShipmentItemOpen(false)
-    shipmentItemForm.resetFields()
-  }
-
-  const submitShipmentItem = async () => {
-    try {
-      const values = await shipmentItemForm.validateFields()
-      setSaving(true)
-      await addShipmentItem(buildShipmentItemParams(values))
-      message.success('出货行已保存')
-      closeShipmentItem()
-      await loadRows('shipments')
-    } catch (error) {
-      if (error?.errorFields) {
-        return
-      }
-      message.error(getActionErrorMessage(error, '保存出货行'))
     } finally {
       setSaving(false)
     }
@@ -587,27 +520,27 @@ export function OperationalFactWorkspace({
 
   const quantityColumns = [
     {
-      title: '对象内部引用',
-      exportTitle: '对象内部引用',
+      title: '对象',
+      exportTitle: '对象',
       width: 150,
       sortValue: (record) =>
         `${record.subject_type || 'PRODUCT'}-${
           record.subject_id || record.product_id || ''
         }`,
       render: (_, record) =>
-        internalRef(
+        readableRef(
           record.subject_type || '产品',
           record.subject_id || record.product_id
         ),
       exportValue: (record) =>
-        internalRef(
+        readableRef(
           record.subject_type || '产品',
           record.subject_id || record.product_id
         ),
     },
     {
-      title: '仓库/批次/单位内部引用',
-      exportTitle: '仓库/批次/单位内部引用',
+      title: '仓库 / 批次 / 单位',
+      exportTitle: '仓库 / 批次 / 单位',
       width: 220,
       sortValue: (record) =>
         `${record.warehouse_id || ''}-${record.lot_id || ''}-${
@@ -615,15 +548,15 @@ export function OperationalFactWorkspace({
         }`,
       render: (_, record) =>
         [
-          internalRef('仓库', record.warehouse_id),
-          internalRef('批次', record.lot_id),
-          internalRef('单位', record.unit_id),
+          readableRef('仓库', record.warehouse_id),
+          readableRef('批次', record.lot_id),
+          readableRef('单位', record.unit_id),
         ].join(' / '),
       exportValue: (record) =>
         [
-          internalRef('仓库', record.warehouse_id),
-          internalRef('批次', record.lot_id),
-          internalRef('单位', record.unit_id),
+          readableRef('仓库', record.warehouse_id),
+          readableRef('批次', record.lot_id),
+          readableRef('单位', record.unit_id),
         ].join(' / '),
     },
     {
@@ -646,11 +579,11 @@ export function OperationalFactWorkspace({
         `${record.source_type || ''}-${record.source_id || ''}`,
       render: (_, record) =>
         record.source_type
-          ? `${record.source_type} / ${internalRef('来源', record.source_id)}`
+          ? `${sourceTypeLabel(record.source_type)} / ${readableRef('来源', record.source_id)}`
           : '-',
       exportValue: (record) =>
         record.source_type
-          ? `${record.source_type} / ${internalRef('来源', record.source_id)}`
+          ? `${sourceTypeLabel(record.source_type)} / ${readableRef('来源', record.source_id)}`
           : '',
     },
     {
@@ -693,13 +626,27 @@ export function OperationalFactWorkspace({
   const columnsByKey = {
     production: [
       ...baseColumns,
-      { title: '类型', dataIndex: 'fact_type', width: 170, sortType: 'text' },
+      {
+        title: '类型',
+        dataIndex: 'fact_type',
+        width: 170,
+        sortType: 'text',
+        render: factTypeLabel,
+        exportValue: (record) => factTypeLabel(record?.fact_type),
+      },
       ...quantityColumns,
       ...sourceColumns,
     ],
     outsourcing: [
       ...baseColumns,
-      { title: '类型', dataIndex: 'fact_type', width: 160, sortType: 'text' },
+      {
+        title: '类型',
+        dataIndex: 'fact_type',
+        width: 160,
+        sortType: 'text',
+        render: factTypeLabel,
+        exportValue: (record) => factTypeLabel(record?.fact_type),
+      },
       {
         title: '供应商',
         width: 220,
@@ -707,7 +654,7 @@ export function OperationalFactWorkspace({
         render: (_, record) =>
           record.supplier_name ||
           (record.supplier_id
-            ? internalRef('供应商', record.supplier_id)
+            ? readableRef('供应商', record.supplier_id)
             : '-'),
       },
       ...quantityColumns,
@@ -716,10 +663,13 @@ export function OperationalFactWorkspace({
     shipments: [
       ...baseColumns,
       {
-        title: '销售订单内部引用',
+        title: '销售订单',
         dataIndex: 'sales_order_id',
         width: 150,
         sortType: 'number',
+        render: (value) => (value ? '销售订单已关联' : '-'),
+        exportValue: (record) =>
+          record?.sales_order_id ? '销售订单已关联' : '',
       },
       {
         title: '客户',
@@ -728,7 +678,10 @@ export function OperationalFactWorkspace({
         sortValue: (record) =>
           record.customer_snapshot || record.customer_id || '',
         render: (_, record) =>
-          record.customer_snapshot || record.customer_id || '-',
+          record.customer_snapshot || (record.customer_id ? '客户已关联' : '-'),
+        exportValue: (record) =>
+          record?.customer_snapshot ||
+          (record?.customer_id ? '客户已关联' : ''),
       },
       {
         title: '行数',
@@ -741,25 +694,35 @@ export function OperationalFactWorkspace({
     reservations: [
       ...baseColumns,
       {
-        title: '销售订单内部引用',
+        title: '销售订单',
         dataIndex: 'sales_order_id',
         width: 150,
         sortType: 'number',
+        render: (value) => (value ? '销售订单已关联' : '-'),
+        exportValue: (record) =>
+          record?.sales_order_id ? '销售订单已关联' : '',
       },
       ...quantityColumns,
       ...sourceColumns,
     ],
     finance: [
       ...baseColumns,
-      { title: '类型', dataIndex: 'fact_type', width: 150, sortType: 'text' },
       {
-        title: '往来方内部引用',
+        title: '类型',
+        dataIndex: 'fact_type',
+        width: 150,
+        sortType: 'text',
+        render: factTypeLabel,
+        exportValue: (record) => factTypeLabel(record?.fact_type),
+      },
+      {
+        title: '往来方',
         width: 170,
         sortValue: (record) =>
           `${record.counterparty_type || ''}-${record.counterparty_id || ''}`,
         render: (_, record) =>
           record.counterparty_type
-            ? `${record.counterparty_type} / ${internalRef('往来方', record.counterparty_id)}`
+            ? `${counterpartyTypeLabel(record.counterparty_type)} / ${readableRef('往来方', record.counterparty_id)}`
             : '-',
       },
       {
@@ -808,11 +771,6 @@ export function OperationalFactWorkspace({
     ],
   }
 
-  const createConfig = createTarget ? configs[createTarget] : null
-  const createModalTitle = createConfig?.createLabel || '新建事实'
-  const createModalDescription =
-    createConfig?.modalDescription ||
-    '页面只提交业务事实动作，库存流水、冲正和状态边界由后端 usecase 处理。'
   const activeBoundaryText =
     activeConfig.selectionBoundaryText ||
     '当前操作只调用 operational_fact 后端 usecase；前端不本地写库存、出货、财务或 Workflow 事实。'
@@ -925,6 +883,28 @@ export function OperationalFactWorkspace({
     setSearchParams(nextParams, { replace: true })
     resetPaginationForKey()
   }, [resetPaginationForKey, searchParams, setSearchParams])
+  const hasActiveFilters = Boolean(
+    keyword.trim() ||
+      statusFilter ||
+      activeDateRange[0] ||
+      activeDateRange[1] ||
+      routeSalesOrderID ||
+      routeSourceType ||
+      routeSourceID
+  )
+  const clearFilters = useCallback(() => {
+    setKeyword('')
+    setStatusFilter('')
+    setDateFieldByKey((prev) => ({
+      ...prev,
+      [activeKey]: activeConfig.defaultDateField || 'occurred_at',
+    }))
+    setDateRangeByKey((prev) => ({
+      ...prev,
+      [activeKey]: ['', ''],
+    }))
+    clearRouteContext()
+  }, [activeConfig.defaultDateField, activeKey, clearRouteContext])
   const activeDraftCount = activeRows.filter(
     (item) => item.status === 'DRAFT'
   ).length
@@ -970,11 +950,13 @@ export function OperationalFactWorkspace({
 
       <BusinessOperationPanel
         compact
+        onClearFilters={clearFilters}
+        clearFiltersDisabled={!hasActiveFilters}
         filters={
           <>
             <SearchInput
               value={keyword}
-              placeholder="搜索单号、来源、备注或内部引用"
+              placeholder="搜索单号、来源或备注"
               onChange={(event) => {
                 setKeyword(event.target.value)
                 resetPaginationForKey()
@@ -1019,12 +1001,12 @@ export function OperationalFactWorkspace({
             />
             {routeSalesOrderID ? (
               <Tag closable color="blue" onClose={clearRouteContext}>
-                销售订单 #{routeSalesOrderID}
+                已按销售订单筛选
               </Tag>
             ) : null}
             {routeSourceType && routeSourceID ? (
               <Tag closable color="blue" onClose={clearRouteContext}>
-                来源 {routeSourceType} #{routeSourceID}
+                已按来源单据筛选
               </Tag>
             ) : null}
           </>
@@ -1036,19 +1018,6 @@ export function OperationalFactWorkspace({
             exportDisabled={activeRows.length === 0}
             onOpenColumnOrder={openColumnOrder}
           />
-        }
-        primaryAction={
-          canCreateActive ? (
-            <ToolbarButton
-              type="primary"
-              className="erp-business-list-toolbar__primary-action"
-              icon={<PlusOutlined />}
-              disabled={!canWriteActive}
-              onClick={openCreate}
-            >
-              {activeConfig.createLabel}
-            </ToolbarButton>
-          ) : null
         }
       >
         <SelectionActionBar
@@ -1082,21 +1051,6 @@ export function OperationalFactWorkspace({
               关联 <DownOutlined />
             </Button>
           </Dropdown>
-          {activeKey === 'shipments' ? (
-            <Button
-              size="small"
-              icon={<PlusOutlined />}
-              disabled={
-                !activeSelectedRow ||
-                activeSelectedRow.status !== 'DRAFT' ||
-                !canWriteActive ||
-                saving
-              }
-              onClick={() => openShipmentItem(activeSelectedRow)}
-            >
-              维护明细
-            </Button>
-          ) : null}
           {['production', 'outsourcing', 'finance'].includes(activeKey) ? (
             <Popconfirm
               title="确认过账？"
@@ -1351,50 +1305,6 @@ export function OperationalFactWorkspace({
         scroll={{ x: 1320 }}
       />
 
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--form erp-business-action-modal--operational-fact"
-        title={businessModalTitle(createModalTitle, createModalDescription)}
-        open={Boolean(createConfig)}
-        onCancel={closeCreate}
-        onOk={submitCreate}
-        confirmLoading={saving}
-        centered
-        forceRender
-        width={820}
-      >
-        <Form
-          form={createForm}
-          layout="vertical"
-          preserve={false}
-          className="erp-business-action-form"
-        >
-          {createConfig?.renderForm?.()}
-        </Form>
-      </Modal>
-
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--form erp-business-action-modal--operational-fact"
-        title={businessModalTitle(
-          '新增出货行',
-          '出货明细只维护出货单行，不在前端本地写库存或财务事实。'
-        )}
-        open={shipmentItemOpen}
-        onCancel={closeShipmentItem}
-        onOk={submitShipmentItem}
-        confirmLoading={saving}
-        centered
-        forceRender
-        width={640}
-      >
-        <Form
-          form={shipmentItemForm}
-          layout="vertical"
-          preserve={false}
-          className="erp-business-action-form"
-        >
-          <ShipmentItemFormFields />
-        </Form>
-      </Modal>
       {columnOrderModal}
     </BusinessPageLayout>
   )

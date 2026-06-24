@@ -44,7 +44,7 @@ export function referenceLabel(options, value, fallbackPrefix = '记录') {
   const matched = (Array.isArray(options) ? options : []).find(
     (option) => option?.value === normalizedValue
   )
-  return matched?.label || `${fallbackPrefix} #${normalizedValue}`
+  return matched?.label || `${fallbackPrefix}已关联`
 }
 
 export function materialOption(material = {}) {
@@ -53,7 +53,7 @@ export function materialOption(material = {}) {
   return {
     value,
     label: compactParts([
-      material.code || `材料 #${value}`,
+      material.code || '材料已关联',
       material.name,
       material.spec,
       material.color,
@@ -67,7 +67,7 @@ export function productOption(product = {}) {
   return {
     value,
     label: compactParts([
-      product.code || `产品 #${value}`,
+      product.code || '产品已关联',
       product.name,
       product.style_no,
     ]),
@@ -80,7 +80,7 @@ export function productSKUOption(sku = {}) {
   return {
     value,
     label: compactParts([
-      sku.sku_code || `SKU #${value}`,
+      sku.sku_code || 'SKU已关联',
       sku.sku_name,
       sku.color,
       sku.size,
@@ -99,7 +99,7 @@ export function unitOption(unit = {}) {
   const label =
     name && code && name !== code
       ? `${name}（${code}）`
-      : name || code || `单位 #${value}`
+      : name || code || '单位已关联'
   const fullLabel =
     fullName && fullCode && fullName !== fullCode
       ? `${fullName}（${fullCode}）`
@@ -121,7 +121,7 @@ export function customerOption(customer = {}) {
   return {
     value,
     label: compactParts([
-      customer.code || `客户 #${value}`,
+      customer.code || '客户已关联',
       customer.name,
       customer.short_name,
     ]),
@@ -134,7 +134,7 @@ export function supplierOption(supplier = {}) {
   return {
     value,
     label: compactParts([
-      supplier.code || `供应商 #${value}`,
+      supplier.code || '供应商已关联',
       supplier.name,
       supplier.short_name,
     ]),
@@ -147,7 +147,7 @@ export function salesOrderOption(order = {}) {
   return {
     value,
     label: compactParts([
-      order.order_no || order.document_no || `销售订单 #${value}`,
+      order.order_no || order.document_no || '销售订单已关联',
       order.customer_snapshot?.name || order.customer_name_snapshot,
     ]),
   }
@@ -159,7 +159,7 @@ export function salesOrderItemOption(item = {}) {
   return {
     value,
     label: compactParts([
-      item.line_no ? `第 ${item.line_no} 行` : `销售订单行 #${value}`,
+      item.line_no ? `第 ${item.line_no} 行` : '销售订单行已关联',
       item.product_name_snapshot || item.product_snapshot?.name,
       item.quantity,
     ]),
@@ -172,7 +172,7 @@ export function purchaseOrderItemOption(item = {}) {
   return {
     value,
     label: compactParts([
-      item.line_no ? `第 ${item.line_no} 行` : `采购订单行 #${value}`,
+      item.line_no ? `第 ${item.line_no} 行` : '采购订单行已关联',
       item.material_name_snapshot || item.material_snapshot?.name,
       item.quantity,
     ]),
@@ -185,7 +185,7 @@ export function purchaseReceiptOption(receipt = {}) {
   return {
     value,
     label: compactParts([
-      receipt.receipt_no || `采购入库单 #${value}`,
+      receipt.receipt_no || '采购入库已关联',
       receipt.supplier_name,
       receipt.status,
     ]),
@@ -198,7 +198,7 @@ export function shipmentOption(shipment = {}) {
   return {
     value,
     label: compactParts([
-      shipment.shipment_no || `出货单 #${value}`,
+      shipment.shipment_no || '出货单已关联',
       shipment.customer_snapshot,
       shipment.status,
     ]),
@@ -211,7 +211,7 @@ export function purchaseReceiptItemOption(item = {}) {
   return {
     value,
     label: compactParts([
-      item.source_line_no || `入库行 #${value}`,
+      item.source_line_no || '入库行已关联',
       item.material_name_snapshot || item.material_snapshot?.name,
       item.lot_no,
       item.quantity,
@@ -225,7 +225,7 @@ export function inventoryLotOption(lot = {}) {
   return {
     value,
     label: compactParts([
-      lot.lot_no || `批次 #${value}`,
+      lot.lot_no || '批次已关联',
       lot.supplier_lot_no,
       lot.status,
     ]),
@@ -242,6 +242,6 @@ export function warehouseOptionFromRecord(record = {}) {
     label:
       warehouseName || warehouseCode
         ? compactParts([warehouseName, warehouseCode])
-        : `仓库 #${value}`,
+        : '仓库已关联',
   }
 }

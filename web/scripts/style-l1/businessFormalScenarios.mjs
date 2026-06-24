@@ -46,6 +46,70 @@ export function createBusinessFormalScenarios(deps) {
       assertAntdModalCentered,
     })
 
+  const assertBusinessViewTabNeutralStyle = async (
+    page,
+    { scenarioName, tabName }
+  ) => {
+    const metrics = await page
+      .getByRole('tab', { name: tabName })
+      .evaluate((node) => {
+        const tab = node.closest('.ant-tabs-tab') || node
+        const style = window.getComputedStyle(tab)
+        return {
+          backgroundColor: style.backgroundColor,
+          boxShadow: style.boxShadow,
+        }
+      })
+    const background = String(metrics.backgroundColor || '')
+      .replace(/\s/g, '')
+      .toLowerCase()
+    assert(
+      background === 'rgba(0,0,0,0)' || background === 'transparent',
+      `${scenarioName} 主视图 Tab 不应出现激活背景色: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      !metrics.boxShadow || metrics.boxShadow === 'none',
+      `${scenarioName} 主视图 Tab 不应出现激活阴影: ${JSON.stringify(metrics)}`
+    )
+  }
+
+  const waitForMasterDataRequest = async (
+    page,
+    masterDataMethods,
+    { method, fromIndex, scenarioName }
+  ) => {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      if (masterDataMethods.slice(fromIndex).includes(method)) {
+        return
+      }
+      await page.waitForTimeout(100)
+    }
+    assert(
+      false,
+      `${scenarioName} 应重新请求 ${method}: ${JSON.stringify(
+        masterDataMethods.slice(fromIndex)
+      )}`
+    )
+  }
+
+  const assertNoMasterDataRequest = async (
+    page,
+    masterDataMethods,
+    { methods, fromIndex, scenarioName }
+  ) => {
+    await page.waitForTimeout(600)
+    const requested = masterDataMethods.slice(fromIndex)
+    const unexpected = requested.filter((method) => methods.includes(method))
+    assert(
+      unexpected.length === 0,
+      `${scenarioName} 不应重复请求 ${methods.join(' / ')}: ${JSON.stringify(
+        requested
+      )}`
+    )
+  }
+
   const waitForTaskActionDrawerClosed = async (page, scenarioName) => {
     await page
       .locator('.erp-task-action-drawer')
@@ -539,12 +603,29 @@ export function createBusinessFormalScenarios(deps) {
           },
         })
 
+        const masterDataMethods = []
+        page.on('request', (request) => {
+          if (!request.url().includes('/rpc/masterdata')) return
+          try {
+            const method = request.postDataJSON()?.method
+            if (method) masterDataMethods.push(method)
+          } catch {
+            // 非 JSON-RPC 请求不参与本断言。
+          }
+        })
+
         await gotoScenarioPath(page, '/erp/master/products', {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '产品档案')
         await expectText(page, '产品基础信息')
         await expectText(page, '产品规格')
+        await page.getByRole('tab', { name: '产品基础信息' }).waitFor()
+        await page.getByRole('tab', { name: '产品规格' }).waitFor()
+        await assertBusinessViewTabNeutralStyle(page, {
+          scenarioName: 'business-standard-products',
+          tabName: '产品基础信息',
+        })
         await expectButton(page, '新建产品')
         await assertNoListDeleteTrashToolbar(page)
         await expectText(page, 'PROD-STYLE-L1')
@@ -585,7 +666,22 @@ export function createBusinessFormalScenarios(deps) {
             .locator('.erp-business-action-modal--form.ant-modal:visible')
             .last()
         )
-        await page.getByText('产品规格', { exact: true }).click()
+        const beforeProductSKUTabRequests = masterDataMethods.length
+        await page.getByRole('tab', { name: '产品规格' }).click()
+        await waitForMasterDataRequest(page, masterDataMethods, {
+          method: 'list_product_skus',
+          fromIndex: beforeProductSKUTabRequests,
+          scenarioName: 'business-standard-product-skus-tab-refresh',
+        })
+        await waitForMasterDataRequest(page, masterDataMethods, {
+          method: 'list_products',
+          fromIndex: beforeProductSKUTabRequests,
+          scenarioName: 'business-standard-product-skus-reference-refresh',
+        })
+        await assertBusinessViewTabNeutralStyle(page, {
+          scenarioName: 'business-standard-product-skus',
+          tabName: '产品规格',
+        })
         await expectButton(page, '新建产品规格')
         await expectText(page, 'SKU-STYLE-L1')
         await assertBusinessMainTableSortableColumns(page, {
@@ -602,6 +698,48 @@ export function createBusinessFormalScenarios(deps) {
             .last()
         )
         await assertNoHorizontalOverflow(page, 'business-standard-products')
+
+        const beforeProductSKURefreshRequests = masterDataMethods.length
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await waitForMasterDataRequest(page, masterDataMethods, {
+          method: 'list_product_skus',
+          fromIndex: beforeProductSKURefreshRequests,
+          scenarioName: 'business-standard-product-skus-header-refresh',
+        })
+        await waitForMasterDataRequest(page, masterDataMethods, {
+          method: 'list_products',
+          fromIndex: beforeProductSKURefreshRequests,
+          scenarioName:
+            'business-standard-product-skus-header-reference-refresh',
+        })
+
+        const beforeMaterialsMenuRequests = masterDataMethods.length
+        await page
+          .locator('.erp-admin-menu')
+          .getByText('材料档案', { exact: true })
+          .click()
+        await expectHeading(page, '材料档案')
+        await waitForMasterDataRequest(page, masterDataMethods, {
+          method: 'list_materials',
+          fromIndex: beforeMaterialsMenuRequests,
+          scenarioName: 'business-standard-materials-menu-refresh',
+        })
+        await waitForMasterDataRequest(page, masterDataMethods, {
+          method: 'list_units',
+          fromIndex: beforeMaterialsMenuRequests,
+          scenarioName: 'business-standard-materials-menu-unit-refresh',
+        })
+
+        const beforeRepeatedMaterialsMenuRequests = masterDataMethods.length
+        await page
+          .locator('.erp-admin-menu')
+          .getByText('材料档案', { exact: true })
+          .click()
+        await assertNoMasterDataRequest(page, masterDataMethods, {
+          methods: ['list_materials', 'list_units'],
+          fromIndex: beforeRepeatedMaterialsMenuRequests,
+          scenarioName: 'business-standard-materials-current-menu-no-refresh',
+        })
 
         await gotoScenarioPath(page, '/erp/purchase/material-bom', {
           waitUntil: 'domcontentloaded',
@@ -1121,7 +1259,6 @@ export function createBusinessFormalScenarios(deps) {
         const verifyWorkflowV1Page = async ({
           path,
           heading,
-          createButton,
           absentTexts,
           scenarioName,
           refreshMessage,
@@ -1133,7 +1270,6 @@ export function createBusinessFormalScenarios(deps) {
           await expectHeading(page, heading)
           await expectText(page, 'Workflow V1')
           await expectText(page, '不写事实层')
-          await expectButton(page, createButton)
           for (const text of absentTexts) {
             await assertTextAbsent(page, text)
           }
@@ -1159,8 +1295,7 @@ export function createBusinessFormalScenarios(deps) {
         await verifyWorkflowV1Page({
           path: '/erp/production/scheduling',
           heading: '生产排程',
-          createButton: '发起排程协同',
-          absentTexts: ['新建排程单', '生成生产任务'],
+          absentTexts: ['发起排程协同', '新建排程单', '生成生产任务'],
           scenarioName: 'business-workflow-production-scheduling',
           afterPageReady: async () => {
             await expectText(page, '暂无生产排程协同任务')
@@ -1171,8 +1306,12 @@ export function createBusinessFormalScenarios(deps) {
         await verifyWorkflowV1Page({
           path: '/erp/production/exceptions',
           heading: '生产异常',
-          createButton: '登记异常协同',
-          absentTexts: ['新建异常单', '关闭异常单', '生成异常处理'],
+          absentTexts: [
+            '登记异常协同',
+            '新建异常单',
+            '关闭异常单',
+            '生成异常处理',
+          ],
           scenarioName: 'business-workflow-production-exceptions',
           afterPageReady: async () => {
             await expectText(page, '暂无生产异常协同任务')
@@ -1231,8 +1370,12 @@ export function createBusinessFormalScenarios(deps) {
         await verifyWorkflowV1Page({
           path: '/erp/warehouse/shipping-release',
           heading: '出货放行',
-          createButton: '发起放行协同',
-          absentTexts: ['新建放行单', '生成出货放行', '确认放行'],
+          absentTexts: [
+            '发起放行协同',
+            '新建放行单',
+            '生成出货放行',
+            '确认放行',
+          ],
           scenarioName: 'business-workflow-shipping-release',
           refreshMessage: '出货放行协同任务已刷新',
           afterPageReady: async () => {
@@ -1427,20 +1570,15 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '生产进度')
-        await expectButton(page, '登记生产事实')
         await expectText(page, 'PROD-FACT-L1')
         await expectText(page, '生产发料、成品入库和返工事实')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-production-progress',
         })
         await assertTextAbsent(page, '生成生产进度')
-        await verifyBusinessActionFormModal(page, {
-          buttonName: '登记生产事实',
-          titleText: '登记生产事实',
-          minFieldCount: 9,
-          screenshotName: 'business-v1-production-fact-create-form-modal',
-          expectedTexts: ['事实单号', '对象类型', '数量', '来源类型'],
-        })
+        await assertTextAbsent(page, '登记生产事实')
+        await assertTextAbsent(page, '幂等键')
+        await assertTextAbsent(page, '内部引用')
         await assertNoHorizontalOverflow(
           page,
           'business-v1-production-progress'
@@ -1535,7 +1673,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '生产异常')
         await expectText(page, 'Workflow V1')
         await expectText(page, '不写事实层')
-        await expectButton(page, '登记异常协同')
+        await assertTextAbsent(page, '登记异常协同')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-workflow-production-exceptions-dark',
           exportDisabled: true,
@@ -1564,7 +1702,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '出货放行')
         await expectText(page, 'Workflow V1')
         await expectText(page, '不写事实层')
-        await expectButton(page, '发起放行协同')
+        await assertTextAbsent(page, '发起放行协同')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-workflow-shipping-release-mobile',
           exportDisabled: true,
@@ -1664,17 +1802,13 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '出货放行')
         await expectText(page, 'Workflow V1')
         await expectText(page, '不写事实层')
-        await expectButton(page, '发起放行协同')
+        await assertTextAbsent(page, '发起放行协同')
         await assertUnifiedListToolbarShell(page, {
           scenarioName:
             'business-formal-shipping-release-no-permission-desktop',
           exportDisabled: true,
           exportTooltip: '当前 Workflow V1 只处理协同任务，不导出业务数据。',
         })
-        assert(
-          await page.getByRole('button', { name: '发起放行协同' }).isDisabled(),
-          '无 workflow.task.create 时出货放行页发起协同按钮应禁用'
-        )
         await expectText(page, '当前账号没有 Workflow 任务读取权限。')
         await page.getByRole('button', { name: '刷新当前页' }).click()
         assert.equal(

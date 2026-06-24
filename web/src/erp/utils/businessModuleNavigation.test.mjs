@@ -106,6 +106,10 @@ test('workflow business modules: 三页不冒充事实写入', () => {
     '加工合同打印',
     'openPrintWorkspaceWindow',
     'PROCESSING_CONTRACT_TEMPLATE_KEY',
+    '发起排程协同',
+    '登记异常协同',
+    '发起放行协同',
+    'createWorkflowTask',
   ]) {
     assert.equal(
       source.includes(text),
@@ -117,10 +121,6 @@ test('workflow business modules: 三页不冒充事实写入', () => {
   for (const text of [
     'Workflow V1',
     '不写事实层',
-    '发起排程协同',
-    '登记异常协同',
-    '发起放行协同',
-    'createWorkflowTask',
     'listWorkflowTasks',
     'updateWorkflowTaskStatus',
     'urgeWorkflowTask',
@@ -128,7 +128,7 @@ test('workflow business modules: 三页不冒充事实写入', () => {
     'workflow_page_scope',
     'BusinessListToolbarActions',
     '当前 Workflow V1 只处理协同任务，不导出业务数据。',
-    '不会生成生产、库存、出货、财务事实',
+    '不写生产、库存、出货、财务、开票或收付款事实',
   ]) {
     assert.equal(
       source.includes(text),

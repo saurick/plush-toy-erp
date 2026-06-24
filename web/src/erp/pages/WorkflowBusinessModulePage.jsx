@@ -2,16 +2,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
-  PlusOutlined,
   SendOutlined,
 } from '@ant-design/icons'
-import { Button, Form, Input, Modal, Select, Space, Tag } from 'antd'
+import { Button, Input, Modal, Space, Tag } from 'antd'
 import dayjs from 'dayjs'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
-  createWorkflowTask,
   listWorkflowTasks,
   updateWorkflowTaskStatus,
   urgeWorkflowTask,
@@ -22,12 +20,10 @@ import {
   BusinessPageLayout,
   CollaborationTaskPanel,
   DateRangeFilter,
-  DateInput,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
   SelectionActionBar,
-  ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
@@ -75,12 +71,6 @@ const DUE_DATE_FILTER_OPTIONS = Object.freeze([
 const MODULE_WORKFLOW_CONFIG = Object.freeze({
   'production-scheduling': {
     taskGroup: 'production_scheduling',
-    defaultOwnerRoleKey: 'pmc',
-    createLabel: '发起排程协同',
-    createTitle: '发起排程协同任务',
-    sourcePrefix: 'PS',
-    successMessage: '排程协同任务已创建',
-    createBusinessStatusKey: 'production_ready',
     completeBusinessStatusKey: 'production_processing',
     completionMessage:
       '排程协同任务已完成，领料、完工和入库仍需进入对应事实模块。',
@@ -94,12 +84,6 @@ const MODULE_WORKFLOW_CONFIG = Object.freeze({
   },
   'production-exceptions': {
     taskGroup: 'production_exception',
-    defaultOwnerRoleKey: 'production',
-    createLabel: '登记异常协同',
-    createTitle: '登记生产异常协同任务',
-    sourcePrefix: 'PE',
-    successMessage: '生产异常协同任务已创建',
-    createBusinessStatusKey: 'blocked',
     completeBusinessStatusKey: 'production_processing',
     completionMessage:
       '异常协同任务已完成，返工、报废或库存调整仍需进入对应事实模块。',
@@ -114,12 +98,6 @@ const MODULE_WORKFLOW_CONFIG = Object.freeze({
   },
   'shipping-release': {
     taskGroup: 'shipment_release',
-    defaultOwnerRoleKey: 'warehouse',
-    createLabel: '发起放行协同',
-    createTitle: '发起出货放行协同任务',
-    sourcePrefix: 'SR',
-    successMessage: '出货放行协同任务已创建',
-    createBusinessStatusKey: 'shipment_pending',
     completeBusinessStatusKey: 'shipping_released',
     completionMessage:
       '出货放行协同任务已完成，真实出货仍需出货单进入 SHIPPED。',
@@ -160,23 +138,9 @@ function getTaskID(task = {}) {
   return Number(task.id || 0)
 }
 
-function buildTaskCode({ moduleKey, config, taskName }) {
-  const normalizedName = String(taskName || '')
-    .trim()
-    .replace(/\s+/gu, '-')
-    .slice(0, 24)
-  return [
-    config.sourcePrefix,
-    dayjs().format('YYYYMMDDHHmmss'),
-    normalizedName || moduleKey,
-  ]
-    .filter(Boolean)
-    .join('-')
-}
-
 function formatTaskSource(task = {}) {
   if (task.source_no) return task.source_no
-  if (task.source_id) return `协同记录第 ${task.source_id} 条`
+  if (task.source_id) return '已关联业务记录'
   return '未登记来源号'
 }
 
@@ -190,8 +154,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   )
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [createModalOpen, setCreateModalOpen] = useState(false)
   const [taskReasonModal, setTaskReasonModal] = useState(null)
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState('')
@@ -201,14 +163,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   const [selectedTaskKeys, setSelectedTaskKeys] = useState([])
   const [taskActionLoadingID, setTaskActionLoadingID] = useState(0)
   const [urgingTaskID, setUrgingTaskID] = useState(0)
-  const [form] = Form.useForm()
   const canReadWorkflowTasks = hasActionPermission(
     adminProfile,
     'workflow.task.read'
-  )
-  const canCreateWorkflowTasks = hasActionPermission(
-    adminProfile,
-    'workflow.task.create'
   )
   const canUpdateWorkflowTasks = hasActionPermission(
     adminProfile,
@@ -346,54 +303,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     Boolean(selectedTask) &&
     canUpdateWorkflowTasks &&
     canRunWorkflowTaskAction(adminProfile, selectedTask, 'urge')
-
-  const openCreateModal = () => {
-    form.setFieldsValue({
-      task_name: '',
-      source_id: '',
-      source_no: '',
-      owner_role_key: config?.defaultOwnerRoleKey || '',
-      due_at: '',
-      note: '',
-    })
-    setCreateModalOpen(true)
-  }
-
-  const handleCreateTask = async () => {
-    if (!config || !moduleItem) return
-    const values = await form.validateFields()
-    setCreating(true)
-    try {
-      const taskName = String(values.task_name || '').trim()
-      const sourceID = Number(values.source_id)
-      await createWorkflowTask({
-        task_code: buildTaskCode({ moduleKey, config, taskName }),
-        task_group: config.taskGroup,
-        task_name: taskName,
-        source_type: moduleKey,
-        source_id: sourceID,
-        source_no: String(values.source_no || '').trim() || undefined,
-        business_status_key: config.createBusinessStatusKey || 'pending',
-        task_status_key: 'pending',
-        owner_role_key: values.owner_role_key,
-        due_at: toUnixSeconds(values.due_at),
-        priority: 2,
-        payload: {
-          entry_path: moduleItem.path,
-          record_title: taskName,
-          note: String(values.note || '').trim(),
-          workflow_page_scope: config.payloadScope,
-        },
-      })
-      message.success(config.successMessage)
-      setCreateModalOpen(false)
-      await loadWorkflowTasks()
-    } catch (error) {
-      message.error(getActionErrorMessage(error, `${config.createTitle}失败`))
-    } finally {
-      setCreating(false)
-    }
-  }
 
   const completeWorkflowTask = useCallback(
     async (task) => {
@@ -588,6 +497,16 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       moduleTitle: moduleItem?.title || '模块未登记',
       columns,
     })
+  const hasActiveFilters = Boolean(
+    keyword.trim() || status || ownerRoleKey || dueFrom || dueTo
+  )
+  const clearFilters = useCallback(() => {
+    setKeyword('')
+    setStatus('')
+    setOwnerRoleKey('')
+    setDueFrom('')
+    setDueTo('')
+  }, [])
 
   if (!moduleItem || !config) {
     return (
@@ -625,6 +544,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
 
       <BusinessOperationPanel
         compact
+        onClearFilters={clearFilters}
+        clearFiltersDisabled={!hasActiveFilters}
         filters={
           <>
             <SearchInput
@@ -665,17 +586,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             exportDisabledReason="当前 Workflow V1 只处理协同任务，不导出业务数据。"
             onOpenColumnOrder={openColumnOrder}
           />
-        }
-        primaryAction={
-          <ToolbarButton
-            type="primary"
-            className="erp-business-list-toolbar__primary-action"
-            icon={<PlusOutlined />}
-            disabled={!canCreateWorkflowTasks}
-            onClick={openCreateModal}
-          >
-            {config.createLabel}
-          </ToolbarButton>
         }
       >
         <SelectionActionBar
@@ -809,103 +719,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         taskActionLoadingID={taskActionLoadingID}
         urgingTaskID={urgingTaskID}
       />
-
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--form"
-        width={620}
-        title={businessActionModalTitle(
-          config.createTitle,
-          '登记结果只进入 Workflow 协同任务；不会生成生产、库存、出货或财务事实。'
-        )}
-        open={createModalOpen}
-        onCancel={() => setCreateModalOpen(false)}
-        maskClosable={false}
-        destroyOnHidden
-        footer={
-          <Space wrap>
-            <Button onClick={() => setCreateModalOpen(false)}>取消</Button>
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              loading={creating}
-              disabled={!canCreateWorkflowTasks}
-              onClick={handleCreateTask}
-            >
-              发起协同任务
-            </Button>
-          </Space>
-        }
-      >
-        <Form
-          form={form}
-          layout="vertical"
-          requiredMark={false}
-          className="erp-business-action-form"
-        >
-          <Form.Item
-            className="erp-business-action-form__field erp-business-action-form__field--full"
-            label="任务名称"
-            name="task_name"
-            rules={[{ required: true, message: '请填写任务名称' }]}
-          >
-            <Input placeholder="例如：核对某订单排程 / 处理延期异常 / 放行前复核" />
-          </Form.Item>
-          <Form.Item
-            className="erp-business-action-form__field"
-            label="关联来源"
-            name="source_id"
-            rules={[
-              { required: true, message: '请填写关联来源' },
-              {
-                validator: (_, value) =>
-                  Number(value) > 0
-                    ? Promise.resolve()
-                    : Promise.reject(new Error('关联来源必须为正整数')),
-              },
-            ]}
-          >
-            <Input
-              inputMode="numeric"
-              placeholder="填写关联来源记录；有业务单号时优先补来源号"
-            />
-          </Form.Item>
-          <Form.Item
-            className="erp-business-action-form__field"
-            label="来源号"
-            name="source_no"
-          >
-            <Input placeholder="可选，例如销售订单号或出货单号" />
-          </Form.Item>
-          <Form.Item
-            className="erp-business-action-form__field"
-            label="责任角色"
-            name="owner_role_key"
-            rules={[{ required: true, message: '请选择责任角色' }]}
-          >
-            <Select options={config.ownerRoleOptions} />
-          </Form.Item>
-          <Form.Item
-            className="erp-business-action-form__field"
-            label="到期日期"
-            name="due_at"
-          >
-            <DateInput placeholder="选择到期日期" />
-          </Form.Item>
-          <Form.Item
-            className="erp-business-action-form__field erp-business-action-form__field--full"
-            label="处理说明"
-            name="note"
-          >
-            <Input.TextArea
-              rows={3}
-              placeholder="只记录协同上下文；不会生成生产、库存、出货、财务事实。"
-            />
-          </Form.Item>
-        </Form>
-        <Tag icon={<CheckCircleOutlined />} color="blue">
-          提交结果只进入 Workflow 协同任务，不写库存、出货、财务或生产事实。
-        </Tag>
-      </Modal>
 
       <Modal
         className="erp-business-action-modal"

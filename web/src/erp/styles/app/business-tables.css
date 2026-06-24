@@ -184,6 +184,7 @@
   > :where(
     .ant-input-affix-wrapper,
     .ant-select,
+    .ant-btn,
     .erp-business-date-range-filter
   ) {
   width: auto;
@@ -490,6 +491,11 @@
   min-width: 160px;
 }
 
+.erp-business-filter-control--clear.ant-btn {
+  flex: 0 0 auto;
+  min-width: 112px;
+}
+
 @media screen and (min-width: 769px) {
   .erp-business-operation-panel__filters
     > .erp-business-filter-control--search.ant-input-affix-wrapper {
@@ -513,6 +519,11 @@
     > .erp-business-filter-control--sort.ant-select {
     flex-basis: 160px;
     width: 160px;
+  }
+
+  .erp-business-operation-panel__filters
+    > .erp-business-filter-control--clear.ant-btn {
+    flex: 0 0 auto;
   }
 
   .erp-business-operation-panel__filters > .erp-business-date-range-filter {

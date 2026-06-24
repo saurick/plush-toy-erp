@@ -5,6 +5,7 @@ import {
   CheckCircleOutlined,
   DownOutlined,
   ExclamationCircleOutlined,
+  RollbackOutlined,
   SearchOutlined,
   UpOutlined,
 } from '@ant-design/icons'
@@ -528,10 +529,13 @@ export function BusinessOperationPanel({
   filters,
   actions = null,
   primaryAction = null,
+  onClearFilters = null,
+  clearFiltersDisabled = false,
   children,
   compact = false,
 }) {
   const hasToolbar = Boolean(actions || primaryAction)
+  const hasClearFilters = typeof onClearFilters === 'function'
   return (
     <Card
       className={joinClassNames(
@@ -539,7 +543,19 @@ export function BusinessOperationPanel({
         compact ? 'erp-business-operation-panel--compact' : ''
       )}
     >
-      <div className="erp-business-operation-panel__filters">{filters}</div>
+      <div className="erp-business-operation-panel__filters">
+        {filters}
+        {hasClearFilters ? (
+          <Button
+            className="erp-business-filter-control erp-business-filter-control--clear"
+            disabled={clearFiltersDisabled}
+            icon={<RollbackOutlined />}
+            onClick={onClearFilters}
+          >
+            清空筛选
+          </Button>
+        ) : null}
+      </div>
       {hasToolbar ? (
         <div className="erp-business-operation-panel__toolbar">
           {actions ? (
@@ -694,6 +710,7 @@ export function BusinessDataTable({
   rowKey,
   columns,
   dataSource,
+  tableLayout,
   expandable,
   scroll,
   rowSelection,
@@ -734,6 +751,7 @@ export function BusinessDataTable({
         rowKey={rowKey}
         columns={resolvedColumns}
         dataSource={dataSource}
+        tableLayout={tableLayout}
         expandable={expandable}
         scroll={resolvedScroll}
         rowSelection={resolvedRowSelection}
