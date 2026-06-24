@@ -1,4 +1,4 @@
-export const DEV_DOCS_ROUTE = '/__dev/docs'
+export { DEV_DOCS_ROUTE } from './devRoutes.mjs'
 
 export const PINNED_DEV_DOC_PATHS = Object.freeze([
   'README.md',

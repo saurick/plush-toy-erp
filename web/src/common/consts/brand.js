@@ -1,18 +1,6 @@
-import { yoyoosunMenuConfig } from '../../../../config/customers/yoyoosun/menuConfig.mjs'
-
 export const ERP_BRAND_MARK = '绒'
 export const ERP_COMPANY_NAME = '毛绒玩具 ERP'
 export const ERP_ADMIN_SYSTEM_NAME = '毛绒 ERP 管理后台'
-
-const bundledCustomerBrandConfigs = Object.freeze({
-  yoyoosun: yoyoosunMenuConfig?.brand,
-})
-
-function normalizeCustomerKey(value = '') {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-}
 
 function normalizeBrandConfig(brandConfig = {}) {
   if (!brandConfig || typeof brandConfig !== 'object') {
@@ -51,33 +39,13 @@ function readRuntimeCustomerConfig() {
     : null
 }
 
-function readRuntimeCustomerKey() {
-  if (typeof window !== 'undefined') {
-    const windowKey = normalizeCustomerKey(window.__PLUSH_ERP_CUSTOMER_KEY__)
-    if (windowKey) {
-      return windowKey
-    }
-  }
-  return normalizeCustomerKey(import.meta.env?.VITE_ERP_CUSTOMER_KEY)
-}
-
 export function getActiveERPBrand() {
   const runtimeConfig = readRuntimeCustomerConfig()
   const runtimeBrand = normalizeBrandConfig(runtimeConfig?.brand)
-  const customerKey =
-    normalizeCustomerKey(runtimeConfig?.customerKey) || readRuntimeCustomerKey()
-  const bundledBrand = normalizeBrandConfig(
-    bundledCustomerBrandConfigs[customerKey]
-  )
   return {
-    brandMark:
-      runtimeBrand.brandMark || bundledBrand.brandMark || ERP_BRAND_MARK,
-    companyName:
-      runtimeBrand.companyName || bundledBrand.companyName || ERP_COMPANY_NAME,
-    systemName:
-      runtimeBrand.systemName ||
-      bundledBrand.systemName ||
-      ERP_ADMIN_SYSTEM_NAME,
-    faviconHref: runtimeBrand.faviconHref || bundledBrand.faviconHref,
+    brandMark: runtimeBrand.brandMark || ERP_BRAND_MARK,
+    companyName: runtimeBrand.companyName || ERP_COMPANY_NAME,
+    systemName: runtimeBrand.systemName || ERP_ADMIN_SYSTEM_NAME,
+    faviconHref: runtimeBrand.faviconHref,
   }
 }

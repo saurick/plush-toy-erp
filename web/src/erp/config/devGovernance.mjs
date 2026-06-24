@@ -1,6 +1,6 @@
 import { DEV_DOCS_ROUTE } from './devDocs.mjs'
 
-export const DEV_GOVERNANCE_ROUTE = '/__dev/governance'
+export { DEV_GOVERNANCE_ROUTE } from './devRoutes.mjs'
 export const DEV_GOVERNANCE_SOURCE_PATH = 'docs/项目治理地图.md'
 
 const AXIS_TABLE_HEADING = '## 治理维度与口径速查'

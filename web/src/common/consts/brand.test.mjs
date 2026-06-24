@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import {
@@ -7,6 +8,23 @@ import {
   ERP_COMPANY_NAME,
   getActiveERPBrand,
 } from './brand.js'
+
+test('brand: product runtime does not statically import customer packages', () => {
+  const runtimeFiles = [
+    new URL('./brand.js', import.meta.url),
+    new URL('./favicon.mjs', import.meta.url),
+    new URL('../../erp/config/customerMenuConfig.mjs', import.meta.url),
+    new URL('../../erp/config/devCustomerConfigRoute.mjs', import.meta.url),
+    new URL('../../erp/config/devRoutes.mjs', import.meta.url),
+    new URL('../../erp/router.jsx', import.meta.url),
+  ]
+
+  runtimeFiles.forEach((fileUrl) => {
+    const source = readFileSync(fileUrl, 'utf8')
+    assert.equal(source.includes('config/customers/yoyoosun'), false)
+    assert.equal(source.includes('yoyoosunMenuConfig'), false)
+  })
+})
 
 test('brand: 默认品牌保持产品中性，不包含客户公司名', () => {
   const previousWindow = global.window
@@ -31,7 +49,7 @@ test('brand: 默认品牌保持产品中性，不包含客户公司名', () => {
   }
 })
 
-test('brand: yoyoosun 客户 key 只通过客户配置覆盖品牌', () => {
+test('brand: customer key alone does not load bundled customer brand', () => {
   const previousWindow = global.window
   global.window = {
     __PLUSH_ERP_CUSTOMER_KEY__: 'yoyoosun',
@@ -39,10 +57,10 @@ test('brand: yoyoosun 客户 key 只通过客户配置覆盖品牌', () => {
 
   try {
     assert.deepEqual(getActiveERPBrand(), {
-      brandMark: '永',
-      companyName: '东莞市永绅玩具有限公司',
-      faviconHref: '/favicon-yoyoosun.svg',
-      systemName: '毛绒 ERP 管理后台',
+      brandMark: ERP_BRAND_MARK,
+      companyName: ERP_COMPANY_NAME,
+      faviconHref: undefined,
+      systemName: ERP_ADMIN_SYSTEM_NAME,
     })
   } finally {
     if (previousWindow === undefined) {
@@ -53,11 +71,11 @@ test('brand: yoyoosun 客户 key 只通过客户配置覆盖品牌', () => {
   }
 })
 
-test('brand: runtime config can override bundled customer brand', () => {
+test('brand: runtime customer config can override neutral product brand', () => {
   const previousWindow = global.window
   global.window = {
     __PLUSH_ERP_CUSTOMER_CONFIG__: {
-      customerKey: 'yoyoosun',
+      customerKey: 'demo',
       brand: {
         brandMark: '测',
         companyName: '测试客户',

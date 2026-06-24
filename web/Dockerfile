@@ -25,7 +25,13 @@ COPY server/internal/errcode ./server/internal/errcode
 
 WORKDIR /app/web
 
-RUN pnpm build:all
+ARG ERP_CUSTOMER_KEY=
+
+RUN pnpm build:all && \
+    node ../scripts/build/apply-customer-web-config.mjs \
+      --customer "${ERP_CUSTOMER_KEY}" \
+      --config-root /app/config \
+      --web-build-dir /app/web/build
 
 FROM ${RUNTIME_BASE_IMAGE} AS runtime
 

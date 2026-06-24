@@ -1,10 +1,12 @@
-import { DEV_CAPABILITY_LEDGER_ROUTE } from '../../erp/config/devCapabilityLedger.mjs'
-import { DEV_CUSTOMER_CONFIG_ROUTE } from '../../erp/config/devCustomerConfig.mjs'
-import { DEV_DOCS_ROUTE } from '../../erp/config/devDocs.mjs'
-import { DEV_GOVERNANCE_ROUTE } from '../../erp/config/devGovernance.mjs'
-import { DEV_HUB_ROUTE } from '../../erp/config/devHub.mjs'
-import { DEV_PROTOTYPES_ROUTE } from '../../erp/config/devPrototypes.mjs'
-import { DEV_TESTING_ROUTE } from '../../erp/config/devTesting.mjs'
+import {
+  DEV_CAPABILITY_LEDGER_ROUTE,
+  DEV_CUSTOMER_CONFIG_ROUTE,
+  DEV_DOCS_ROUTE,
+  DEV_GOVERNANCE_ROUTE,
+  DEV_HUB_ROUTE,
+  DEV_PROTOTYPES_ROUTE,
+  DEV_TESTING_ROUTE,
+} from '../../erp/config/devRoutes.mjs'
 import { getPrintTemplateByKey } from '../../erp/config/printTemplates.mjs'
 
 export const ERP_FAVICON_VARIANTS = Object.freeze({

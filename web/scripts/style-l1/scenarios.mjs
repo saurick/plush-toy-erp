@@ -381,6 +381,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '优先处理队列')
         await expectText(page, '当前任务上下文')
         await expectText(page, '等待交接')
+        await assertTextAbsent(page, '内部来源')
         await expectNoButton(page, '任务看板')
         await assertNoDuplicatedAdminPageTitle(page, {
           scenarioName: 'erp-dashboard-desktop',
@@ -414,6 +415,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '可推进任务')
         await expectText(page, '阻塞交接')
         await expectText(page, '逾期任务')
+        await assertTextAbsent(page, '内部来源')
         await assertNoDuplicatedAdminPageTitle(page, {
           scenarioName: 'erp-task-board-desktop',
         })
@@ -606,6 +608,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '当前风险')
         await expectText(page, '状态分布')
         await expectText(page, '核心链路健康')
+        await assertTextAbsent(page, '内部来源')
         await expectText(page, '对象族')
         await expectText(page, '采购/入库')
         await expectText(page, '记录数')
@@ -730,6 +733,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '优先处理队列')
         await expectText(page, '当前任务上下文')
         await expectText(page, '等待交接')
+        await assertTextAbsent(page, '内部来源')
         await expectNoButton(page, '任务看板')
         await assertNoDuplicatedAdminPageTitle(page, {
           scenarioName: 'erp-dashboard-mobile',
@@ -813,6 +817,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '毛绒 ERP 管理后台')
         await expectText(page, '任务看板')
         await expectText(page, '可推进任务')
+        await assertTextAbsent(page, '内部来源')
         await page.evaluate(async () => {
           const response = await fetch('/rpc/workflow', {
             method: 'POST',

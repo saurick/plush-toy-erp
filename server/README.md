@@ -100,7 +100,7 @@ go run ./cmd/seed-core-demo-data --help
 
 本地开发默认只使用 `192.168.0.106:5432/plush_erp`。`192.168.0.133:5435/plush_erp` 是测试 / 目标环境库，不应通过 `config.local.yaml` 静默混入本地 `make run`、seed 或 migration；确需对测试库执行一次性操作时，必须显式设置 `ERP_ALLOW_TEST_DB_AS_DEV=1` 并在命令里写清目标。
 
-库存事实 PostgreSQL 本地验收使用专用防呆 target，默认库名为 `plush_erp_phase2a_test`：
+库存事实 PostgreSQL 本地验收使用专用防呆 target，默认库名为 `plush_erp_inventory_test`：
 
 ```bash
 make inventory_pg_createdb
@@ -109,7 +109,7 @@ make inventory_migrate_apply
 make inventory_pg_test
 ```
 
-BOM + 批次库存 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_phase2b_test`：
+BOM + 批次库存 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_bom_lot_test`：
 
 ```bash
 make bom_lot_pg_createdb
@@ -118,7 +118,7 @@ make bom_lot_migrate_apply
 make bom_lot_pg_test
 ```
 
-采购入库 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_phase2c_test`：
+采购入库 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_purchase_receipt_test`：
 
 ```bash
 make purchase_receipt_pg_createdb
@@ -127,7 +127,7 @@ make purchase_receipt_migrate_apply
 make purchase_receipt_pg_test
 ```
 
-采购退货 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_phase2d_test`：
+采购退货 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_purchase_return_test`：
 
 ```bash
 make purchase_return_pg_createdb

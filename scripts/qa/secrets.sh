@@ -7,9 +7,11 @@ print_help() {
   bash scripts/qa/secrets.sh
 
 作用:
-  对变更文件做密钥泄露扫描，并始终拦截 npm registry token 明文配置
+  对变更文件或源码包文件做密钥泄露扫描，并始终拦截 npm registry token 明文配置
 
 行为:
+  git 仓库内: 扫描 diff/staged 候选文件，并额外检查 tracked npm/yarn 配置
+  非 git 目录: 按脚本所在源码包根目录扫描文件；不支持 staged-only / diff range
   未安装 gitleaks: npm token 检查仍会执行；SECRETS_STRICT=1 时阻断
   检测到疑似泄露: 阻断
 
@@ -32,7 +34,19 @@ if [[ $# -gt 0 ]]; then
   exit 1
 fi
 
-ROOT_DIR="$(git rev-parse --show-toplevel)"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+fallback_root="$(cd "$script_dir/../.." && pwd -P)"
+
+in_git_repo=0
+if git_root="$(git -C "$fallback_root" rev-parse --show-toplevel 2>/dev/null)" &&
+  git_root="$(cd "$git_root" && pwd -P)" &&
+  [[ "$git_root" == "$fallback_root" ]]; then
+  ROOT_DIR="$git_root"
+  in_git_repo=1
+else
+  ROOT_DIR="$fallback_root"
+fi
+
 cd "$ROOT_DIR"
 
 if [[ "${SKIP_SECRETS_SCAN:-0}" == "1" ]]; then
@@ -42,6 +56,11 @@ fi
 
 strict="${SECRETS_STRICT:-0}"
 staged_only="${SECRETS_STAGED_ONLY:-0}"
+
+if [[ "$in_git_repo" != "1" && "$staged_only" == "1" ]]; then
+  echo "[qa:secrets] 非 git 目录不支持 SECRETS_STAGED_ONLY=1"
+  exit 1
+fi
 
 has_gitleaks=1
 if ! command -v gitleaks >/dev/null 2>&1; then
@@ -62,7 +81,7 @@ if [[ "$staged_only" == "1" ]]; then
   while IFS= read -r f; do
     append_file "$f"
   done < <(git diff --cached --name-only --diff-filter=ACMR)
-else
+elif [[ "$in_git_repo" == "1" ]]; then
   range="${QA_BASE_RANGE:-}"
   if [[ -z "$range" ]] && git rev-parse --abbrev-ref --symbolic-full-name "@{upstream}" >/dev/null 2>&1; then
     upstream="$(git rev-parse --abbrev-ref --symbolic-full-name "@{upstream}")"
@@ -82,10 +101,33 @@ else
   while IFS= read -r f; do
     append_file "$f"
   done < <(git diff --name-only --cached)
+else
+  if [[ -n "${QA_BASE_RANGE:-}" ]]; then
+    echo "[qa:secrets] 非 git 目录忽略 QA_BASE_RANGE=${QA_BASE_RANGE}"
+  fi
+
+  while IFS= read -r f; do
+    append_file "${f#./}"
+  done < <(
+    find . \
+      \( -path "./.git" -o \
+      -path "./node_modules" -o \
+      -path "./web/node_modules" -o \
+      -path "./server/bin" -o \
+      -path "./output" -o \
+      -path "./tmp" -o \
+      -path "./build" -o \
+      -path "./dist" \) -prune -o \
+      -type f -print
+  )
 fi
 
-for f in .npmrc .yarnrc.yml web/.npmrc web/.yarnrc.yml; do
-  if git ls-files --error-unmatch "$f" >/dev/null 2>&1 || [[ -f "$ROOT_DIR/$f" ]]; then
+for f in .npmrc .npmrc.local .yarnrc.yml web/.npmrc web/.npmrc.local web/.yarnrc.yml; do
+  if [[ "$in_git_repo" == "1" ]]; then
+    if git ls-files --error-unmatch "$f" >/dev/null 2>&1 || [[ -f "$ROOT_DIR/$f" ]]; then
+      append_file "$f"
+    fi
+  elif [[ -f "$ROOT_DIR/$f" ]]; then
     append_file "$f"
   fi
 done
@@ -99,7 +141,7 @@ while IFS= read -r f; do
   [[ -z "$f" ]] && continue
 
   case "$f" in
-  .git/* | web/node_modules/* | server/bin/*)
+  .git/* | node_modules/* | web/node_modules/* | server/bin/* | output/* | tmp/* | build/* | dist/*)
     continue
     ;;
   esac
@@ -124,7 +166,7 @@ fi
 
 # shellcheck disable=SC2016
 npm_token_hits="$(
-  find "$tmp_dir" -type f \( -name ".npmrc" -o -name ".yarnrc.yml" \) -print0 |
+  find "$tmp_dir" -type f \( -name ".npmrc" -o -name ".npmrc.local" -o -name ".yarnrc.yml" \) -print0 |
     xargs -0 awk '
       /_authToken[[:space:]]*=/ || /npmAuthToken[[:space:]]*:/ {
         value = $0

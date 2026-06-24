@@ -8,6 +8,7 @@
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | `scripts/bootstrap.sh`                                 | 安装依赖、启用 hooks、跑快速自检                                                                                  | 新机器 / 首次拉仓库                                        |
 | `scripts/project-scan.sh`                              | 扫描项目名、默认密钥、部署地址和页面文案残留                                                                      | 改名后 / 配置收口后                                        |
+| `scripts/build/apply-customer-web-config.mjs`          | 本地 / CI 构建后按 `ERP_CUSTOMER_KEY` 把客户 `customer-config.js` 和 assets overlay 到前端静态产物                  | 构建客户私有化前端或服务端镜像时                            |
 | `scripts/seed-role-demo-admins.sh`                     | 显式生成 dev/test/demo 角色演示管理员账号，绑定真实 RBAC 角色                                                     | 需要多角色登录 / 岗位任务端验收                            |
 | `scripts/seed-core-demo-data.sh`                       | 显式生成核心产品模拟基础资料：单位、材料、产品、仓库和 BOM，并输出试用模拟 / 业务事实模拟可复用 ID                | 需要产品主数据、BOM 或业务事实前置 ID 的本地 / 试用演练前 |
 | `scripts/seed-trial-sim-masterdata.sh`                | 显式生成试用模拟产品 / 单位主数据，供模拟销售订单行引用                                                          | 试用环境模拟演练前                                         |
@@ -29,18 +30,18 @@
 | `scripts/deploy/release-evidence-gate.mjs`             | yoyoosun 发布证据门禁，检查本次 release evidence、pre-migration backup、backup restore、migration、smoke 和 sign-off 已脱敏填齐 | 客户试用或交付前                                           |
 | `scripts/deploy/production-preflight.sh`                | 产品级生产发布前门禁，检查运行时 env、一次性 admin bootstrap、固定镜像 tag、SMS mock、debug 写入开关、Compose、migration 脚本、PostgreSQL / 后端 / Jaeger loopback 和低配部署边界 | 每次生产发布 / 部署后运行态复核前                          |
 | `scripts/qa/core-boundary.test.mjs`                    | 自动扫描 `server/internal/core`，防止纯产品规则层 import `biz/data/service`、Ent、SQL、HTTP、配置或文件系统依赖 | 调整 `server/internal/core` 后                              |
-| `scripts/qa/phase-label-boundaries.mjs`                | 自动扫描活跃实现路径，阻止新增 runtime 阶段编号命名；仅允许当前旧 PostgreSQL 本地验收兼容入口                     | 调整命名、脚本、API、运行时代码或治理文档后                 |
+| `scripts/qa/phase-label-boundaries.mjs`                | 自动扫描活跃实现路径，阻止 runtime 阶段编号命名进入脚本、API、运行时代码、测试和正式文档入口                      | 调整命名、脚本、API、运行时代码或治理文档后                 |
 | `scripts/inventory-pg.sh`                              | 库存事实本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证库存流水、余额、冲正和防负库存                         |
 | `scripts/bom-lot-pg.sh`                                | BOM 与批次库存本地 PostgreSQL migration / 集成测试防呆入口                                                       | 验证 BOM schema 和批次库存行为                            |
 | `scripts/purchase-receipt-pg.sh`                       | 采购入库本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证采购入库 schema、IN 入库、REVERSAL 取消和批次追溯      |
 | `scripts/purchase-return-pg.sh`                        | 采购退货本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
 | `scripts/doctor.sh`                                    | 检查本机依赖和 hooks 是否齐全                                                                                     | 环境初始化 / 异常排查                                      |
-| `scripts/qa/fast.sh`                                   | 高频快速检查，包含客户导入、模拟数据工具和历史阶段标签边界守卫                                                       | 日常开发                                                   |
+| `scripts/qa/fast.sh`                                   | 高频快速检查，包含客户导入、模拟数据工具和阶段编号命名边界守卫                                                       | 日常开发                                                   |
 | `scripts/qa/trial-account-rbac.mjs`                    | 只读验证角色演示账号的真实登录、角色、岗位任务端入口权限和 debug 权限边界                                         | 生成试用 / 演示账号后                                      |
 | `scripts/qa/customer-config-boundaries.mjs`            | 只读验证 customer config 草案仍是 draft，未放开 runtime / schema / import / RBAC 边界                             | 调整客户配置草案后                                         |
 | `scripts/qa/erp-field-linkage.mjs`                     | 字段联动专项测试并刷新 latest 覆盖报告                                                                            | 改字段真源、保存转换、合同金额、打印快照后                 |
-| `scripts/qa/full.sh`                                   | 全量检查，包含客户导入、模拟数据工具和历史阶段标签边界守卫                                                           | 提交前 / 推送前                                            |
-| `scripts/qa/strict.sh`                                 | 严格检查，包含客户导入、模拟数据工具和历史阶段标签边界守卫                                                           | 发版前                                                     |
+| `scripts/qa/full.sh`                                   | 全量检查，包含客户导入、模拟数据工具和阶段编号命名边界守卫                                                           | 提交前 / 推送前                                            |
+| `scripts/qa/strict.sh`                                 | 严格检查，包含客户导入、模拟数据工具和阶段编号命名边界守卫                                                           | 发版前                                                     |
 | `scripts/qa/db-guard.sh`                               | 约束 schema 变更必须带 migration                                                                                  | 改数据模型后                                               |
 | `scripts/qa/error-code-sync.sh`                        | 校验前后端错误码同步                                                                                              | 改错误码后                                                 |
 | `scripts/qa/error-codes.sh`                            | 阻止业务代码裸写已注册错误码                                                                                      | 改接口 / 鉴权 / 前端错误处理后                             |
@@ -447,7 +448,7 @@ TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-boundaries.mjs
 ```
 
-该脚本只读取 `config/customers/yoyoosun/fieldNumberingConfig.mjs`，验证其仍为 draft，`runtimeEnabled=false`，且不放开 tenant、schema、migration、后端 RBAC、Workflow / Fact 或真实导入边界。脚本不连接数据库、不调用后端、不写配置。
+该脚本只读取 `config/customers/yoyoosun/fieldNumberingConfig.mjs`、`config/customers/yoyoosun/importConfig.mjs` 和前端客户配置 loader 源码，验证草案仍为 draft，`runtimeEnabled=false`，且不放开 tenant、schema、migration、后端 RBAC、Workflow / Fact、真实导入或默认产品前端静态打包客户配置边界。脚本不连接数据库、不调用后端、不写配置。
 
 ### 2C. Core 产品规则层边界检查
 
@@ -544,7 +545,8 @@ bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh 
 
 - 入库的 `web/.npmrc` 只保留无密钥的 pnpm 行为配置，不写 `_authToken`、`npmAuthToken`、`NPM_TOKEN` 或 `NODE_AUTH_TOKEN`。
 - 本机私有 registry token 放在被 `.gitignore` 忽略的 `.npmrc.local`、`web/.npmrc.local`，或通过 shell 环境变量注入。
-- `scripts/qa/secrets.sh` 会始终检查候选 `.npmrc` / `.yarnrc.yml` 中的 npm token 明文；安装 `gitleaks` 后会继续执行通用密钥扫描。
+- `scripts/qa/secrets.sh` 在 git 仓库内扫描 diff / staged 候选文件，并始终检查候选 `.npmrc` / `.npmrc.local` / `.yarnrc.yml` 中的 npm token 明文；安装 `gitleaks` 后会继续执行通用密钥扫描。
+- 源码包没有 `.git` 时，`scripts/qa/secrets.sh` 会按脚本所在目录推导项目根目录并扫描包内文件；该模式不支持 `SECRETS_STAGED_ONLY=1` 或 git diff range。
 
 ## Hook 对应关系
 

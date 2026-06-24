@@ -1,0 +1,179 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	v1 "server/api/jsonrpc/v1"
+	"server/internal/biz"
+	"server/internal/errcode"
+)
+
+func operationalFactMutationFromParams(pm map[string]any) (*biz.OperationalFactMutation, bool) {
+	quantity, ok := getRequiredJSONRPCDecimal(pm, "quantity")
+	if !ok {
+		return nil, false
+	}
+	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
+	if !ok {
+		return nil, false
+	}
+	return &biz.OperationalFactMutation{
+		FactNo:         getString(pm, "fact_no"),
+		FactType:       getString(pm, "fact_type"),
+		SubjectType:    getString(pm, "subject_type"),
+		SubjectID:      getInt(pm, "subject_id", 0),
+		WarehouseID:    getInt(pm, "warehouse_id", 0),
+		UnitID:         getInt(pm, "unit_id", 0),
+		LotID:          getOptionalInt(pm, "lot_id"),
+		Quantity:       quantity,
+		SupplierID:     getOptionalInt(pm, "supplier_id"),
+		SupplierName:   getWorkflowStringPtr(pm, "supplier_name"),
+		SourceType:     getWorkflowStringPtr(pm, "source_type"),
+		SourceID:       getOptionalInt(pm, "source_id"),
+		SourceLineID:   getOptionalInt(pm, "source_line_id"),
+		IdempotencyKey: getString(pm, "idempotency_key"),
+		OccurredAt:     optionalTimeValue(occurredAt),
+		Note:           getWorkflowStringPtr(pm, "note"),
+	}, true
+}
+
+func operationalFactFilterFromParams(pm map[string]any) (biz.OperationalFactFilter, bool) {
+	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	if !ok {
+		return biz.OperationalFactFilter{}, false
+	}
+	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	if !ok {
+		return biz.OperationalFactFilter{}, false
+	}
+	return biz.OperationalFactFilter{
+		Status:         getString(pm, "status"),
+		FactType:       getString(pm, "fact_type"),
+		Keyword:        getString(pm, "keyword"),
+		DateField:      getString(pm, "date_field"),
+		DateFrom:       dateFrom,
+		DateTo:         dateTo,
+		SubjectType:    getString(pm, "subject_type"),
+		SubjectID:      getInt(pm, "subject_id", 0),
+		WarehouseID:    getInt(pm, "warehouse_id", 0),
+		LotID:          getInt(pm, "lot_id", 0),
+		SourceType:     getString(pm, "source_type"),
+		SourceID:       getInt(pm, "source_id", 0),
+		CustomerID:     getInt(pm, "customer_id", 0),
+		ProductID:      getInt(pm, "product_id", 0),
+		ProductSkuID:   getInt(pm, "product_sku_id", 0),
+		CounterpartyID: getInt(pm, "counterparty_id", 0),
+		Limit:          getInt(pm, "limit", 50),
+		Offset:         getInt(pm, "offset", 0),
+	}, true
+}
+
+func operationalFactShipmentFilterFromParams(pm map[string]any) (biz.OperationalFactFilter, bool) {
+	filter, ok := operationalFactFilterFromParams(pm)
+	if !ok {
+		return biz.OperationalFactFilter{}, false
+	}
+	return filter, true
+}
+
+func getOptionalInt(pm map[string]any, key string) *int {
+	value := getInt(pm, key, 0)
+	if value <= 0 {
+		return nil
+	}
+	return &value
+}
+
+func getOptionalNonNegativeInt(pm map[string]any, key string) *int {
+	if _, ok := pm[key]; !ok {
+		return nil
+	}
+	value := getInt(pm, key, -1)
+	if value < 0 {
+		return nil
+	}
+	return &value
+}
+
+func optionalTimeValue(value *time.Time) time.Time {
+	if value == nil {
+		return time.Time{}
+	}
+	return *value
+}
+
+func invalidParamResult() *v1.JsonrpcResult {
+	return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+}
+
+func okData(data map[string]any) *v1.JsonrpcResult {
+	return &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(data)}
+}
+
+func unknownOperationalFactResult(method string) *v1.JsonrpcResult {
+	return &v1.JsonrpcResult{Code: errcode.UnknownMethod.Code, Message: fmt.Sprintf("未知业务事实接口 method=%s", method)}
+}
+
+func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err error) *v1.JsonrpcResult {
+	l := d.log.WithContext(ctx)
+	switch {
+	case errors.Is(err, biz.ErrBadParam):
+		l.Warnf("[operational_fact] invalid param err=%v", err)
+		return invalidParamResult()
+	case errors.Is(err, biz.ErrInventoryInsufficientStock):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存不足"}
+	case errors.Is(err, biz.ErrInventoryLotStatusBlocked):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "批次状态不允许扣减"}
+	case errors.Is(err, biz.ErrCustomerNotFound), errors.Is(err, biz.ErrCustomerInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该客户已停用，不能用于新业务；历史单据仍保留原引用"}
+	case errors.Is(err, biz.ErrMaterialNotFound), errors.Is(err, biz.ErrMaterialInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该材料已停用，不能新增引用；历史事实仍保留原引用"}
+	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该产品已停用，不能用于新业务；历史单据仍保留原引用"}
+	case errors.Is(err, biz.ErrProductSKUNotFound), errors.Is(err, biz.ErrProductSKUInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该 SKU 已停用，不能用于新业务；历史单据仍保留原引用"}
+	case errors.Is(err, biz.ErrSupplierNotFound), errors.Is(err, biz.ErrSupplierInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该供应商已停用，不能用于新业务；历史单据仍保留原引用"}
+	case errors.Is(err, biz.ErrUnitNotFound), errors.Is(err, biz.ErrUnitInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该单位已停用，不能新增引用；历史单据仍保留原引用"}
+	case errors.Is(err, biz.ErrWarehouseNotFound), errors.Is(err, biz.ErrWarehouseInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该仓库已停用，不能用于新业务"}
+	case errors.Is(err, biz.ErrProductionFactNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产事实不存在"}
+	case errors.Is(err, biz.ErrOutsourcingFactNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外事实不存在"}
+	case errors.Is(err, biz.ErrShipmentNotFound), errors.Is(err, biz.ErrShipmentItemNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货单或出货行不存在"}
+	case errors.Is(err, biz.ErrStockReservationNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存预留不存在"}
+	case errors.Is(err, biz.ErrFinanceFactNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "财务事实不存在"}
+	default:
+		l.Errorf("[operational_fact] internal err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+	}
+}
+
+func optionalIntToAny(value *int) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func optionalStringToAny(value *string) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func optionalUnix(value *time.Time) any {
+	if value == nil {
+		return nil
+	}
+	return value.Unix()
+}

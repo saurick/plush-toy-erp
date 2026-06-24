@@ -13,7 +13,9 @@
 
 当前已接入：
 
-- `menuConfig.mjs`：永绅 yoyoosun 前端品牌和桌面菜单配置。该配置只控制登录页 / 入口页 / 后台侧栏的客户品牌展示，以及前端桌面菜单的分组、排序、隐藏和文案；菜单隐藏不是安全边界，后端仍以 RBAC action permission 和业务 usecase 校验为准。
+- `menuConfig.mjs`：永绅 yoyoosun 前端品牌和桌面菜单配置源。该配置不再被默认产品前端静态 import；部署 yoyoosun 时应把 `customer-config.example.js` 复制或渲染为前端静态根路径的 `customer-config.js`，并发布 `assets/favicon-yoyoosun.svg` 到 `/customer-assets/yoyoosun/favicon-yoyoosun.svg`。该配置只控制登录页 / 入口页 / 后台侧栏的客户品牌展示，以及前端桌面菜单的分组、排序、隐藏和文案；菜单隐藏不是安全边界，后端仍以 RBAC action permission 和业务 usecase 校验为准。
+
+- `customer-config.example.js`：永绅 yoyoosun 前端部署注入示例。默认产品 Web 包只带中性的 `web/public/customer-config.js` 占位，不能把本示例复制进 Product Core 默认产物。
 
 - `fieldNumberingConfig.mjs`：永绅 yoyoosun 字段显示和编号规则配置草案。该文件当前 `runtimeEnabled=false`，只作为 Customer Config 评审清单；不接前端运行时、不改后端、不改 schema、不执行导入。
 

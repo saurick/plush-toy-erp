@@ -6,7 +6,7 @@ ARG RUNTIMEPLATFORM=linux/amd64
 ARG GO_TARGETOS=linux
 ARG GO_TARGETARCH=amd64
 ARG NODE_BUILDER_IMAGE=node:24.14.0
-ARG GO_BUILDER_IMAGE=golang:1.26.2
+ARG GO_BUILDER_IMAGE=golang:1.26.4
 ARG RUNTIME_BASE_IMAGE=debian:bookworm-slim
 
 # ======================
@@ -33,7 +33,12 @@ COPY config /config
 # 关键兜底：前端 prebuild 依赖服务端错误码真源与生成脚本，镜像构建时必须一并带入。
 COPY scripts /scripts
 COPY server/internal/errcode /server/internal/errcode
-RUN pnpm run build   # 输出到 web/build
+ARG ERP_CUSTOMER_KEY=
+RUN pnpm run build && \
+    node /scripts/build/apply-customer-web-config.mjs \
+      --customer "${ERP_CUSTOMER_KEY}" \
+      --config-root /config \
+      --web-build-dir /web/build
 
 # ======================
 # 2) Builder 阶段

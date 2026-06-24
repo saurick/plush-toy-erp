@@ -9,20 +9,7 @@ import {
   PlusOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
-import {
-  Alert,
-  Button,
-  Dropdown,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd'
+import { Button, Dropdown, Form, Space, Tooltip } from 'antd'
 import {
   useNavigate,
   useOutletContext,
@@ -34,7 +21,6 @@ import {
   BusinessOperationPanel,
   BusinessDataTable,
   CollaborationTaskPanel,
-  DateInput,
   DateRangeFilter,
   BusinessPageLayout,
   PageHeaderCard,
@@ -46,15 +32,14 @@ import {
 import {
   ColumnOrderHeaderMenu,
   ColumnOrderModal,
-  getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
-import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
-import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import {
-  PurchaseOrderFormFields,
   createBlankPurchaseLine,
   normalizePurchaseLineFormValue,
 } from '../components/purchase-orders/PurchaseOrderForm.jsx'
+import PurchaseOrderBusinessModal from '../components/purchase-orders/PurchaseOrderBusinessModal.jsx'
+import PurchaseOrderInboundDraftModal from '../components/purchase-orders/PurchaseOrderInboundDraftModal.jsx'
+import { buildPurchaseOrderColumns } from '../components/purchase-orders/purchaseOrderColumns.jsx'
 import {
   approvePurchaseOrder,
   cancelPurchaseOrder,
@@ -79,7 +64,6 @@ import {
   urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
 import {
-  PURCHASE_ORDER_STATUS_COLORS,
   PURCHASE_ORDER_STATUS_LABELS,
   V1_ROUTE_PATHS,
   buildMaterialPurchaseContractDraftFromPurchaseOrder,
@@ -88,18 +72,20 @@ import {
   buildSequentialDraftCode,
   buildSupplierSnapshot,
   canRunPurchaseOrderLifecycleAction,
-  formatUnixDate,
-  formatUnixDateTime,
   hasActionPermission,
-  statusText,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
 import { filterBusinessCollaborationTasksBySource } from '../utils/businessCollaborationTasks.mjs'
 import {
-  applyBusinessColumnSorters,
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
+import {
+  downloadCSV,
+  getPreferredColumnOrder,
+  parseBusinessSortValue,
+  writeStoredColumnOrder,
+} from '../utils/businessTableActions.mjs'
 import { ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
 import {
   supplierOption,
@@ -116,9 +102,7 @@ import {
   routeWithQuery,
   searchParamPositiveIntText,
 } from '../utils/routeQuery.mjs'
-import { decimalNumber, formatQuantity } from '../utils/businessLineItems.mjs'
-
-const { Text } = Typography
+import { decimalNumber } from '../utils/businessLineItems.mjs'
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -182,99 +166,7 @@ const LIFECYCLE_ACTIONS = [
 ]
 
 const PURCHASE_ORDERS_MODULE_KEY = 'accessories-purchase'
-const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const WORKFLOW_ROLE_LABELS = new Map(Object.entries(ROLE_DISPLAY_NAMES))
-
-function parseSortValue(value = 'updated_at:desc') {
-  const [sortBy = 'updated_at', sortDirection = 'desc'] =
-    String(value).split(':')
-  return { sortBy, sortDirection }
-}
-
-function readStoredColumnOrder(moduleKey) {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = window.localStorage.getItem(
-      `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
-    )
-    const parsed = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function writeStoredColumnOrder(moduleKey, order = []) {
-  if (typeof window === 'undefined') return
-  const storageKey = `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
-  if (!Array.isArray(order) || order.length === 0) {
-    window.localStorage.removeItem(storageKey)
-    return
-  }
-  window.localStorage.setItem(storageKey, JSON.stringify(order))
-}
-
-function getPreferredColumnOrder({
-  adminProfile,
-  moduleKey,
-  columns,
-  localOrder,
-}) {
-  if (Array.isArray(localOrder)) {
-    return sanitizeModuleColumnOrder(localOrder, columns)
-  }
-  const accountOrder = adminProfile?.erp_preferences?.column_orders?.[moduleKey]
-  const sanitizedAccountOrder = sanitizeModuleColumnOrder(accountOrder, columns)
-  if (sanitizedAccountOrder.length > 0) return sanitizedAccountOrder
-  return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
-}
-
-function csvEscape(value) {
-  const text = String(value ?? '')
-  return /[",\n\r]/u.test(text) ? `"${text.replace(/"/g, '""')}"` : text
-}
-
-function downloadCSV({ filename, columns, rows }) {
-  const header = columns.map((column) => csvEscape(getColumnLabel(column)))
-  const body = rows.map((row) =>
-    columns.map((column) => {
-      const rawValue =
-        typeof column.exportValue === 'function'
-          ? column.exportValue(row)
-          : row?.[column.dataIndex]
-      return csvEscape(rawValue)
-    })
-  )
-  const csv = [header, ...body].map((line) => line.join(',')).join('\n')
-  const blob = new Blob([`\uFEFF${csv}`], {
-    type: 'text/csv;charset=utf-8',
-  })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(url)
-}
-
-function compareText(a, b) {
-  return String(a || '').localeCompare(String(b || ''))
-}
-
-function compareNumber(a, b) {
-  return Number(a || 0) - Number(b || 0)
-}
-
-function statusTag(status) {
-  const key = String(status || '').trim()
-  return (
-    <Tag color={PURCHASE_ORDER_STATUS_COLORS[key] || 'default'}>
-      {statusText(key, PURCHASE_ORDER_STATUS_LABELS)}
-    </Tag>
-  )
-}
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10)
@@ -443,7 +335,7 @@ export default function V1PurchaseOrdersPage() {
   const loadOrders = useCallback(async () => {
     setLoading(true)
     try {
-      const { sortBy, sortDirection } = parseSortValue(sortValue)
+      const { sortBy, sortDirection } = parseBusinessSortValue(sortValue)
       const data = await listPurchaseOrders({
         keyword,
         supplier_id: supplierFilter || undefined,
@@ -895,67 +787,7 @@ export default function V1PurchaseOrdersPage() {
   )
 
   const dataColumns = useMemo(
-    () =>
-      applyBusinessColumnSorters([
-        {
-          title: '采购单号',
-          exportTitle: '采购单号',
-          dataIndex: 'purchase_order_no',
-          width: 180,
-          fixed: 'left',
-          sorter: (a, b) =>
-            compareText(a?.purchase_order_no, b?.purchase_order_no),
-        },
-        {
-          title: '供应商',
-          exportTitle: '供应商',
-          dataIndex: 'supplier_id',
-          width: 160,
-          sortValue: resolveSupplierName,
-          render: (_value, record) => resolveSupplierName(record),
-          exportValue: (record) => resolveSupplierName(record),
-        },
-        {
-          title: '状态',
-          exportTitle: '状态',
-          dataIndex: 'lifecycle_status',
-          width: 110,
-          sortValue: (record) =>
-            statusText(record?.lifecycle_status, PURCHASE_ORDER_STATUS_LABELS),
-          render: statusTag,
-          exportValue: (record) =>
-            statusText(record?.lifecycle_status, PURCHASE_ORDER_STATUS_LABELS),
-        },
-        {
-          title: '采购日期',
-          exportTitle: '采购日期',
-          dataIndex: 'purchase_date',
-          width: 130,
-          sorter: (a, b) => compareNumber(a?.purchase_date, b?.purchase_date),
-          render: formatUnixDate,
-          exportValue: (record) => formatUnixDate(record?.purchase_date),
-        },
-        {
-          title: '预计到货',
-          exportTitle: '预计到货',
-          dataIndex: 'expected_arrival_date',
-          width: 130,
-          sorter: (a, b) =>
-            compareNumber(a?.expected_arrival_date, b?.expected_arrival_date),
-          render: formatUnixDate,
-          exportValue: (record) =>
-            formatUnixDate(record?.expected_arrival_date),
-        },
-        {
-          title: '更新时间',
-          exportTitle: '更新时间',
-          dataIndex: 'updated_at',
-          width: 160,
-          sorter: (a, b) => compareNumber(a?.updated_at, b?.updated_at),
-          render: formatUnixDateTime,
-          exportValue: (record) => formatUnixDateTime(record?.updated_at),
-        },
-      ]),
+    () => buildPurchaseOrderColumns({ resolveSupplierName }),
     [resolveSupplierName]
   )
 
@@ -1080,67 +912,6 @@ export default function V1PurchaseOrdersPage() {
     singleSelectedOrder?.lifecycle_status === 'approved'
   const hasInboundDraftRemaining = inboundDraftPreviewRows.some(
     (row) => row.remainingQuantity > 0
-  )
-  const inboundDraftPreviewColumns = useMemo(
-    () => [
-      {
-        title: '来源行',
-        dataIndex: 'lineNo',
-        width: 88,
-        render: (value) => value || '-',
-      },
-      {
-        title: '材料',
-        dataIndex: 'material',
-        width: 180,
-      },
-      {
-        title: '采购数量',
-        dataIndex: 'purchasedQuantity',
-        width: 110,
-        render: (value, row) => `${formatQuantity(value)} ${row.unit}`,
-      },
-      {
-        title: '已入库',
-        dataIndex: 'receivedQuantity',
-        width: 110,
-        render: (value, row) => `${formatQuantity(value)} ${row.unit}`,
-      },
-      {
-        title: '剩余数量',
-        dataIndex: 'remainingQuantity',
-        width: 110,
-        render: (value, row) => {
-          const text = `${formatQuantity(value)} ${row.unit}`
-          return value > 0 ? (
-            <Text strong>{text}</Text>
-          ) : (
-            <Text type="secondary">{text}</Text>
-          )
-        },
-      },
-      {
-        title: '本次生成',
-        key: 'nextInbound',
-        width: 120,
-        render: (_, row) =>
-          row.remainingQuantity > 0 ? (
-            <Tag color="blue">
-              {`${formatQuantity(row.remainingQuantity)} ${row.unit}`}
-            </Tag>
-          ) : (
-            <Tag>不生成</Tag>
-          ),
-      },
-      {
-        title: '不可生成原因',
-        dataIndex: 'disabledReason',
-        width: 140,
-        render: (value) =>
-          value ? <Text type="secondary">{value}</Text> : '可生成',
-      },
-    ],
-    []
   )
   const relatedMenuItems = [
     { key: 'order-items', label: '采购订单明细' },
@@ -1508,136 +1279,42 @@ export default function V1PurchaseOrdersPage() {
         onClose={() => setColumnOrderOpen(false)}
       />
 
-      <BusinessFormModal
+      <PurchaseOrderBusinessModal
         open={modalOpen}
-        title={editingOrder ? '编辑采购订单' : '新建采购订单'}
-        description="只维护采购承诺，不在此写库存、质检或应付事实。"
-        okText="保存"
-        confirmLoading={saving || itemsLoading}
+        form={form}
+        editingOrder={editingOrder}
+        saving={saving}
+        itemsLoading={itemsLoading}
+        orderAttachmentRef={orderAttachmentRef}
+        suppliers={suppliers}
+        materials={materials}
+        unitOptions={unitOptions}
+        canCreate={canCreate}
+        canUpdate={canUpdate}
         onOk={handleSave}
         onCancel={() => {
           orderAttachmentRef.current?.clearPendingAttachments()
           setModalOpen(false)
         }}
-        destroyOnHidden
-        forceRender
-      >
-        <PurchaseOrderFormFields
-          form={form}
-          suppliers={suppliers}
-          materials={materials}
-          unitOptions={unitOptions}
-          onSupplierChange={handleSupplierChange}
-          onMaterialChange={handleMaterialChange}
-          attachmentPanel={
-            <BusinessAttachmentPanel
-              ref={orderAttachmentRef}
-              ownerType="purchase_order"
-              ownerId={editingOrder?.id}
-              title="采购附件"
-              description="上传供应商报价、签回采购单、到货要求或价格确认资料；附件不替代采购订单事实。"
-              canUpload={canUpdate || canCreate}
-              canDelete={canUpdate}
-              variant="inline"
-            />
-          }
-        />
-      </BusinessFormModal>
-      <Modal
-        title="生成采购入库草稿"
+        onSupplierChange={handleSupplierChange}
+        onMaterialChange={handleMaterialChange}
+      />
+      <PurchaseOrderInboundDraftModal
         open={inboundDraftModalOpen}
-        centered
-        width={920}
-        okText="生成草稿"
-        cancelText="取消"
-        confirmLoading={generatingInboundDraft}
-        okButtonProps={{
-          disabled: inboundDraftPreviewLoading || !hasInboundDraftRemaining,
-        }}
+        form={inboundDraftForm}
+        order={singleSelectedOrder}
+        rows={inboundDraftPreviewRows}
+        loading={inboundDraftPreviewLoading}
+        submitting={generatingInboundDraft}
+        warehouseOptions={warehouseOptions}
+        hasRemaining={hasInboundDraftRemaining}
+        resolveSupplierName={resolveSupplierName}
         onOk={createInboundDraftFromOrder}
         onCancel={() => {
           setInboundDraftModalOpen(false)
           setInboundDraftPreviewRows([])
         }}
-      >
-        <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <Alert
-            showIcon
-            type={
-              inboundDraftPreviewLoading || hasInboundDraftRemaining
-                ? 'info'
-                : 'warning'
-            }
-            message={
-              inboundDraftPreviewLoading
-                ? '正在加载采购订单来源明细'
-                : hasInboundDraftRemaining
-                  ? '将按采购订单剩余数量生成入库草稿'
-                  : '当前采购订单没有可生成的剩余明细'
-            }
-            description={
-              <Space direction="vertical" size={2}>
-                <Text>
-                  {`来源采购订单：${
-                    singleSelectedOrder?.purchase_order_no ||
-                    singleSelectedOrder?.id ||
-                    '-'
-                  }；供应商：${resolveSupplierName(singleSelectedOrder)}`}
-                </Text>
-                <Text type="secondary">
-                  下方只是生成前预览；后端会在保存时按采购订单状态、来源行和剩余数量重新校验，不由前端直接写库存事实。
-                </Text>
-              </Space>
-            }
-          />
-          <Table
-            aria-label="采购订单生成入库来源明细"
-            columns={inboundDraftPreviewColumns}
-            dataSource={inboundDraftPreviewRows}
-            loading={inboundDraftPreviewLoading}
-            pagination={false}
-            scroll={{ x: 760 }}
-            size="small"
-          />
-        </Space>
-        <Form
-          form={inboundDraftForm}
-          layout="vertical"
-          className="erp-business-form"
-          style={{ marginTop: 16 }}
-        >
-          <Form.Item
-            name="receipt_no"
-            label="入库单号"
-            rules={[{ required: true, message: '请输入入库单号' }]}
-          >
-            <Input maxLength={64} />
-          </Form.Item>
-          <Form.Item
-            name="warehouse_id"
-            label="入库仓库"
-            rules={[{ required: true, message: '请选择入库仓库' }]}
-          >
-            <Select
-              allowClear
-              optionFilterProp="label"
-              options={warehouseOptions}
-              placeholder="请选择入库仓库"
-              showSearch
-            />
-          </Form.Item>
-          <Form.Item
-            name="received_at"
-            label="入库日期"
-            rules={[{ required: true, message: '请选择入库日期' }]}
-          >
-            <DateInput />
-          </Form.Item>
-          <Form.Item name="note" label="备注">
-            <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
-          </Form.Item>
-        </Form>
-      </Modal>
+      />
     </BusinessPageLayout>
   )
 }

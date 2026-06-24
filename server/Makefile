@@ -210,158 +210,58 @@ db_create:
 		psql "$$ADMIN_URL" -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$$DBNAME\"" 2>/dev/null || psql "$$ADMIN_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM pg_database WHERE datname = '$$DBNAME'" >/dev/null; \
 	}
 
-PHASE2A_DB_URL ?= postgres://postgres:phase2a-local-password@127.0.0.1:55432/plush_erp_phase2a_test?sslmode=disable
-PHASE2B_DB_URL ?= postgres://postgres:phase2a-local-password@127.0.0.1:55432/plush_erp_phase2b_test?sslmode=disable
-PHASE2C_DB_URL ?= postgres://postgres:phase2a-local-password@127.0.0.1:55432/plush_erp_phase2c_test?sslmode=disable
-PHASE2D_DB_URL ?= postgres://postgres:phase2a-local-password@127.0.0.1:55432/plush_erp_phase2d_test?sslmode=disable
+INVENTORY_PG_DB_URL ?= postgres://postgres:inventory-local-password@127.0.0.1:55432/plush_erp_inventory_test?sslmode=disable
+BOM_LOT_PG_DB_URL ?= postgres://postgres:bom-lot-local-password@127.0.0.1:55432/plush_erp_bom_lot_test?sslmode=disable
+PURCHASE_RECEIPT_PG_DB_URL ?= postgres://postgres:purchase-receipt-local-password@127.0.0.1:55432/plush_erp_purchase_receipt_test?sslmode=disable
+PURCHASE_RETURN_PG_DB_URL ?= postgres://postgres:purchase-return-local-password@127.0.0.1:55432/plush_erp_purchase_return_test?sslmode=disable
 
 .PHONY: inventory_pg_createdb inventory_migrate_status inventory_migrate_apply inventory_pg_test inventory_pg_dropdb
 inventory_pg_createdb:
-	@PHASE2A_DB_URL="$(PHASE2A_DB_URL)" bash ../scripts/inventory-pg.sh createdb
+	@INVENTORY_PG_DB_URL="$(INVENTORY_PG_DB_URL)" bash ../scripts/inventory-pg.sh createdb
 inventory_migrate_status:
-	@PHASE2A_DB_URL="$(PHASE2A_DB_URL)" bash ../scripts/inventory-pg.sh status
+	@INVENTORY_PG_DB_URL="$(INVENTORY_PG_DB_URL)" bash ../scripts/inventory-pg.sh status
 inventory_migrate_apply:
-	@PHASE2A_DB_URL="$(PHASE2A_DB_URL)" bash ../scripts/inventory-pg.sh apply
+	@INVENTORY_PG_DB_URL="$(INVENTORY_PG_DB_URL)" bash ../scripts/inventory-pg.sh apply
 inventory_pg_test:
-	@PHASE2A_DB_URL="$(PHASE2A_DB_URL)" bash ../scripts/inventory-pg.sh test
+	@INVENTORY_PG_DB_URL="$(INVENTORY_PG_DB_URL)" bash ../scripts/inventory-pg.sh test
 inventory_pg_dropdb:
-	@PHASE2A_DB_URL="$(PHASE2A_DB_URL)" bash ../scripts/inventory-pg.sh dropdb
+	@INVENTORY_PG_DB_URL="$(INVENTORY_PG_DB_URL)" bash ../scripts/inventory-pg.sh dropdb
 
 .PHONY: bom_lot_pg_createdb bom_lot_migrate_status bom_lot_migrate_apply bom_lot_pg_test bom_lot_pg_dropdb
 bom_lot_pg_createdb:
-	@PHASE2B_DB_URL="$(PHASE2B_DB_URL)" bash ../scripts/bom-lot-pg.sh createdb
+	@BOM_LOT_PG_DB_URL="$(BOM_LOT_PG_DB_URL)" bash ../scripts/bom-lot-pg.sh createdb
 bom_lot_migrate_status:
-	@PHASE2B_DB_URL="$(PHASE2B_DB_URL)" bash ../scripts/bom-lot-pg.sh status
+	@BOM_LOT_PG_DB_URL="$(BOM_LOT_PG_DB_URL)" bash ../scripts/bom-lot-pg.sh status
 bom_lot_migrate_apply:
-	@PHASE2B_DB_URL="$(PHASE2B_DB_URL)" bash ../scripts/bom-lot-pg.sh apply
+	@BOM_LOT_PG_DB_URL="$(BOM_LOT_PG_DB_URL)" bash ../scripts/bom-lot-pg.sh apply
 bom_lot_pg_test:
-	@PHASE2B_DB_URL="$(PHASE2B_DB_URL)" bash ../scripts/bom-lot-pg.sh test
+	@BOM_LOT_PG_DB_URL="$(BOM_LOT_PG_DB_URL)" bash ../scripts/bom-lot-pg.sh test
 bom_lot_pg_dropdb:
-	@PHASE2B_DB_URL="$(PHASE2B_DB_URL)" bash ../scripts/bom-lot-pg.sh dropdb
+	@BOM_LOT_PG_DB_URL="$(BOM_LOT_PG_DB_URL)" bash ../scripts/bom-lot-pg.sh dropdb
 
 .PHONY: purchase_receipt_pg_createdb purchase_receipt_migrate_status purchase_receipt_migrate_apply purchase_receipt_pg_test purchase_receipt_pg_dropdb
 purchase_receipt_pg_createdb:
-	@PHASE2C_DB_URL="$(PHASE2C_DB_URL)" bash ../scripts/purchase-receipt-pg.sh createdb
+	@PURCHASE_RECEIPT_PG_DB_URL="$(PURCHASE_RECEIPT_PG_DB_URL)" bash ../scripts/purchase-receipt-pg.sh createdb
 purchase_receipt_migrate_status:
-	@PHASE2C_DB_URL="$(PHASE2C_DB_URL)" bash ../scripts/purchase-receipt-pg.sh status
+	@PURCHASE_RECEIPT_PG_DB_URL="$(PURCHASE_RECEIPT_PG_DB_URL)" bash ../scripts/purchase-receipt-pg.sh status
 purchase_receipt_migrate_apply:
-	@PHASE2C_DB_URL="$(PHASE2C_DB_URL)" bash ../scripts/purchase-receipt-pg.sh apply
+	@PURCHASE_RECEIPT_PG_DB_URL="$(PURCHASE_RECEIPT_PG_DB_URL)" bash ../scripts/purchase-receipt-pg.sh apply
 purchase_receipt_pg_test:
-	@PHASE2C_DB_URL="$(PHASE2C_DB_URL)" bash ../scripts/purchase-receipt-pg.sh test
+	@PURCHASE_RECEIPT_PG_DB_URL="$(PURCHASE_RECEIPT_PG_DB_URL)" bash ../scripts/purchase-receipt-pg.sh test
 purchase_receipt_pg_dropdb:
-	@PHASE2C_DB_URL="$(PHASE2C_DB_URL)" bash ../scripts/purchase-receipt-pg.sh dropdb
+	@PURCHASE_RECEIPT_PG_DB_URL="$(PURCHASE_RECEIPT_PG_DB_URL)" bash ../scripts/purchase-receipt-pg.sh dropdb
 
 .PHONY: purchase_return_pg_createdb purchase_return_migrate_status purchase_return_migrate_apply purchase_return_pg_test purchase_return_pg_dropdb
 purchase_return_pg_createdb:
-	@PHASE2D_DB_URL="$(PHASE2D_DB_URL)" bash ../scripts/purchase-return-pg.sh createdb
+	@PURCHASE_RETURN_PG_DB_URL="$(PURCHASE_RETURN_PG_DB_URL)" bash ../scripts/purchase-return-pg.sh createdb
 purchase_return_migrate_status:
-	@PHASE2D_DB_URL="$(PHASE2D_DB_URL)" bash ../scripts/purchase-return-pg.sh status
+	@PURCHASE_RETURN_PG_DB_URL="$(PURCHASE_RETURN_PG_DB_URL)" bash ../scripts/purchase-return-pg.sh status
 purchase_return_migrate_apply:
-	@PHASE2D_DB_URL="$(PHASE2D_DB_URL)" bash ../scripts/purchase-return-pg.sh apply
+	@PURCHASE_RETURN_PG_DB_URL="$(PURCHASE_RETURN_PG_DB_URL)" bash ../scripts/purchase-return-pg.sh apply
 purchase_return_pg_test:
-	@PHASE2D_DB_URL="$(PHASE2D_DB_URL)" bash ../scripts/purchase-return-pg.sh test
+	@PURCHASE_RETURN_PG_DB_URL="$(PURCHASE_RETURN_PG_DB_URL)" bash ../scripts/purchase-return-pg.sh test
 purchase_return_pg_dropdb:
-	@PHASE2D_DB_URL="$(PHASE2D_DB_URL)" bash ../scripts/purchase-return-pg.sh dropdb
-
-.PHONY: phase2a_pg_createdb
-# 兼容旧命名：创建库存事实本地 PostgreSQL 临时测试库（带 host/dbname 防呆）
-phase2a_pg_createdb:
-	@PHASE2A_DB_URL="$(PHASE2A_DB_URL)" bash ../scripts/phase2a-pg.sh createdb
-
-.PHONY: phase2a_migrate_status
-# 兼容旧命名：查看库存事实本地 PostgreSQL 临时测试库 migration 状态
-phase2a_migrate_status:
-	@PHASE2A_DB_URL="$(PHASE2A_DB_URL)" bash ../scripts/phase2a-pg.sh status
-
-.PHONY: phase2a_migrate_apply
-# 兼容旧命名：只对库存事实本地 PostgreSQL 临时测试库执行 migration apply
-phase2a_migrate_apply:
-	@PHASE2A_DB_URL="$(PHASE2A_DB_URL)" bash ../scripts/phase2a-pg.sh apply
-
-.PHONY: phase2a_pg_test
-# 兼容旧命名：在库存事实本地 PostgreSQL 临时测试库运行集成测试
-phase2a_pg_test:
-	@PHASE2A_DB_URL="$(PHASE2A_DB_URL)" bash ../scripts/phase2a-pg.sh test
-
-.PHONY: phase2a_pg_dropdb
-# 兼容旧命名：删除库存事实本地 PostgreSQL 临时测试库（带 host/dbname 防呆）
-phase2a_pg_dropdb:
-	@PHASE2A_DB_URL="$(PHASE2A_DB_URL)" bash ../scripts/phase2a-pg.sh dropdb
-
-.PHONY: phase2b_pg_createdb
-# 兼容旧命名：创建 BOM 与批次库存本地 PostgreSQL 临时测试库（带 host/dbname 防呆）
-phase2b_pg_createdb:
-	@PHASE2B_DB_URL="$(PHASE2B_DB_URL)" bash ../scripts/phase2b-pg.sh createdb
-
-.PHONY: phase2b_migrate_status
-# 兼容旧命名：查看 BOM 与批次库存本地 PostgreSQL 临时测试库 migration 状态
-phase2b_migrate_status:
-	@PHASE2B_DB_URL="$(PHASE2B_DB_URL)" bash ../scripts/phase2b-pg.sh status
-
-.PHONY: phase2b_migrate_apply
-# 兼容旧命名：只对 BOM 与批次库存本地 PostgreSQL 临时测试库执行 migration apply
-phase2b_migrate_apply:
-	@PHASE2B_DB_URL="$(PHASE2B_DB_URL)" bash ../scripts/phase2b-pg.sh apply
-
-.PHONY: phase2b_pg_test
-# 兼容旧命名：在 BOM 与批次库存本地 PostgreSQL 临时测试库运行集成测试
-phase2b_pg_test:
-	@PHASE2B_DB_URL="$(PHASE2B_DB_URL)" bash ../scripts/phase2b-pg.sh test
-
-.PHONY: phase2b_pg_dropdb
-# 兼容旧命名：删除 BOM 与批次库存本地 PostgreSQL 临时测试库（带 host/dbname 防呆）
-phase2b_pg_dropdb:
-	@PHASE2B_DB_URL="$(PHASE2B_DB_URL)" bash ../scripts/phase2b-pg.sh dropdb
-
-.PHONY: phase2c_pg_createdb
-# 兼容旧命名：创建采购入库本地 PostgreSQL 临时测试库（带 host/dbname 防呆）
-phase2c_pg_createdb:
-	@PHASE2C_DB_URL="$(PHASE2C_DB_URL)" bash ../scripts/phase2c-pg.sh createdb
-
-.PHONY: phase2c_migrate_status
-# 兼容旧命名：查看采购入库本地 PostgreSQL 临时测试库 migration 状态
-phase2c_migrate_status:
-	@PHASE2C_DB_URL="$(PHASE2C_DB_URL)" bash ../scripts/phase2c-pg.sh status
-
-.PHONY: phase2c_migrate_apply
-# 兼容旧命名：只对采购入库本地 PostgreSQL 临时测试库执行 migration apply
-phase2c_migrate_apply:
-	@PHASE2C_DB_URL="$(PHASE2C_DB_URL)" bash ../scripts/phase2c-pg.sh apply
-
-.PHONY: phase2c_pg_test
-# 兼容旧命名：在采购入库本地 PostgreSQL 临时测试库运行集成测试
-phase2c_pg_test:
-	@PHASE2C_DB_URL="$(PHASE2C_DB_URL)" bash ../scripts/phase2c-pg.sh test
-
-.PHONY: phase2c_pg_dropdb
-# 兼容旧命名：删除采购入库本地 PostgreSQL 临时测试库（带 host/dbname 防呆）
-phase2c_pg_dropdb:
-	@PHASE2C_DB_URL="$(PHASE2C_DB_URL)" bash ../scripts/phase2c-pg.sh dropdb
-
-.PHONY: phase2d_pg_createdb
-# 兼容旧命名：创建采购退货本地 PostgreSQL 临时测试库（带 host/dbname 防呆）
-phase2d_pg_createdb:
-	@PHASE2D_DB_URL="$(PHASE2D_DB_URL)" bash ../scripts/phase2d-pg.sh createdb
-
-.PHONY: phase2d_migrate_status
-# 兼容旧命名：查看采购退货本地 PostgreSQL 临时测试库 migration 状态
-phase2d_migrate_status:
-	@PHASE2D_DB_URL="$(PHASE2D_DB_URL)" bash ../scripts/phase2d-pg.sh status
-
-.PHONY: phase2d_migrate_apply
-# 兼容旧命名：只对采购退货本地 PostgreSQL 临时测试库执行 migration apply
-phase2d_migrate_apply:
-	@PHASE2D_DB_URL="$(PHASE2D_DB_URL)" bash ../scripts/phase2d-pg.sh apply
-
-.PHONY: phase2d_pg_test
-# 兼容旧命名：在采购退货本地 PostgreSQL 临时测试库运行集成测试
-phase2d_pg_test:
-	@PHASE2D_DB_URL="$(PHASE2D_DB_URL)" bash ../scripts/phase2d-pg.sh test
-
-.PHONY: phase2d_pg_dropdb
-# 兼容旧命名：删除采购退货本地 PostgreSQL 临时测试库（带 host/dbname 防呆）
-phase2d_pg_dropdb:
-	@PHASE2D_DB_URL="$(PHASE2D_DB_URL)" bash ../scripts/phase2d-pg.sh dropdb
+	@PURCHASE_RETURN_PG_DB_URL="$(PURCHASE_RETURN_PG_DB_URL)" bash ../scripts/purchase-return-pg.sh dropdb
 
 # show help
 help:

@@ -1,4 +1,4 @@
-export const DEV_PROTOTYPES_ROUTE = '/__dev/prototypes'
+export { DEV_PROTOTYPES_ROUTE } from './devRoutes.mjs'
 export const DEV_PROTOTYPE_PINNED_STORAGE_KEY =
   'plush_erp_dev_prototype_pinned_keys'
 export const DEV_PROTOTYPE_EXPANDED_GROUPS_STORAGE_KEY =

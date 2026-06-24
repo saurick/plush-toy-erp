@@ -1,4 +1,4 @@
-export const DEV_CAPABILITY_LEDGER_ROUTE = '/__dev/capability-ledger'
+export { DEV_CAPABILITY_LEDGER_ROUTE } from './devRoutes.mjs'
 export const DEV_CAPABILITY_LEDGER_SOURCE_PATH =
   'docs/product/产品能力进度台账.md'
 export const DEV_CUSTOMER_DELIVERY_MATRIX_SOURCE_PATH =

@@ -1,15 +1,3 @@
-import { yoyoosunMenuConfig } from '../../../../config/customers/yoyoosun/menuConfig.mjs'
-
-const bundledCustomerMenuConfigs = Object.freeze({
-  yoyoosun: yoyoosunMenuConfig,
-})
-
-function normalizeCustomerKey(value = '') {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-}
-
 function normalizeStringList(values = []) {
   if (!Array.isArray(values)) {
     return []
@@ -29,25 +17,12 @@ function readRuntimeCustomerConfig() {
     : null
 }
 
-function readRuntimeCustomerKey() {
-  if (typeof window !== 'undefined') {
-    const windowKey = normalizeCustomerKey(window.__PLUSH_ERP_CUSTOMER_KEY__)
-    if (windowKey) {
-      return windowKey
-    }
-  }
-  return normalizeCustomerKey(import.meta.env?.VITE_ERP_CUSTOMER_KEY)
-}
-
 export function getActiveCustomerMenuConfig() {
   const runtimeConfig = readRuntimeCustomerConfig()
   if (runtimeConfig?.desktopMenu) {
     return runtimeConfig
   }
-
-  const customerKey =
-    normalizeCustomerKey(runtimeConfig?.customerKey) || readRuntimeCustomerKey()
-  return bundledCustomerMenuConfigs[customerKey] || null
+  return null
 }
 
 function buildItemRegistry(sections = []) {

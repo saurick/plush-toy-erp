@@ -1,0 +1,7 @@
+export const DEV_HUB_ROUTE = '/__dev'
+export const DEV_DOCS_ROUTE = '/__dev/docs'
+export const DEV_GOVERNANCE_ROUTE = '/__dev/governance'
+export const DEV_PROTOTYPES_ROUTE = '/__dev/prototypes'
+export const DEV_CAPABILITY_LEDGER_ROUTE = '/__dev/capability-ledger'
+export const DEV_CUSTOMER_CONFIG_ROUTE = '/__dev/customer-config'
+export const DEV_TESTING_ROUTE = '/__dev/testing'

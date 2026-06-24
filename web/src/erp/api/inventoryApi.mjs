@@ -12,17 +12,21 @@ function dataOf(result) {
   return result?.data || {}
 }
 
-export async function listInventoryBalances(params = {}) {
-  const result = await inventoryRpc.call('list_inventory_balances', params)
+export async function listInventoryBalances(params = {}, options = {}) {
+  const result = await inventoryRpc.call(
+    'list_inventory_balances',
+    params,
+    options
+  )
   return dataOf(result)
 }
 
-export async function listInventoryLots(params = {}) {
-  const result = await inventoryRpc.call('list_inventory_lots', params)
+export async function listInventoryLots(params = {}, options = {}) {
+  const result = await inventoryRpc.call('list_inventory_lots', params, options)
   return dataOf(result)
 }
 
-export async function listInventoryTxns(params = {}) {
-  const result = await inventoryRpc.call('list_inventory_txns', params)
+export async function listInventoryTxns(params = {}, options = {}) {
+  const result = await inventoryRpc.call('list_inventory_txns', params, options)
   return dataOf(result)
 }

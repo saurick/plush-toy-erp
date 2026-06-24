@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DownOutlined, LinkOutlined } from '@ant-design/icons'
 import { Button, Card, Dropdown, Empty, Table, Tabs, Tag } from 'antd'
 import {
@@ -14,6 +14,7 @@ import {
   listInventoryTxns,
 } from '../api/inventoryApi.mjs'
 import {
+  listUnits,
   listMaterials,
   listProducts,
   listWarehouses,
@@ -48,7 +49,9 @@ import {
   inventoryLotOption,
   materialOption,
   productOption,
+  referenceLabel,
   uniqueReferenceOptions,
+  unitOption,
   warehouseOptionFromRecord,
 } from '../utils/referenceSelectOptions.mjs'
 import {
@@ -56,6 +59,7 @@ import {
   searchParamPositiveIntText,
   searchParamText,
 } from '../utils/routeQuery.mjs'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
 
 const VIEW_BALANCES = 'balances'
 const VIEW_LOTS = 'lots'
@@ -117,8 +121,9 @@ const SUBJECT_TYPE_LABELS = Object.freeze({
 })
 
 const SEARCH_PLACEHOLDERS = Object.freeze({
+  [VIEW_BALANCES]: '搜索对象类型',
   [VIEW_LOTS]: '搜索批次号 / 供应商批次 / 色号',
-  [VIEW_TXNS]: '搜索来源 / 备注',
+  [VIEW_TXNS]: '搜索流水类型 / 来源 / 备注',
 })
 
 const LOT_STATUS_LABELS = Object.freeze({
@@ -213,7 +218,8 @@ function sourceTypeText(value) {
   const key = String(value || '')
     .trim()
     .toUpperCase()
-  return SOURCE_TYPE_LABELS[key] || key || ''
+  if (!key) return ''
+  return SOURCE_TYPE_LABELS[key] || '其他来源'
 }
 
 function directionTag(value) {
@@ -239,6 +245,12 @@ function internalRef(label, value) {
   return value === null || value === undefined || value === ''
     ? '-'
     : `${label}已关联`
+}
+
+function relationRef(label, value) {
+  return value === null || value === undefined || value === ''
+    ? '-'
+    : `已关联${label}`
 }
 
 function getRowsFromData(view, data) {
@@ -280,6 +292,8 @@ export default function V1InventoryLedgerPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = outletContext?.adminProfile || {}
+  const requestControllersRef = useRef({})
+  const requestSequenceRef = useRef({})
   const [activeView, setActiveView] = useState(VIEW_BALANCES)
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -295,6 +309,7 @@ export default function V1InventoryLedgerPage() {
   const [dateFilterEnd, setDateFilterEnd] = useState('')
   const [materials, setMaterials] = useState([])
   const [products, setProducts] = useState([])
+  const [units, setUnits] = useState([])
   const [warehouses, setWarehouses] = useState([])
   const [inventoryLots, setInventoryLots] = useState([])
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
@@ -305,7 +320,38 @@ export default function V1InventoryLedgerPage() {
   const routeSourceID = searchParamPositiveIntText(searchParams, 'source_id')
   const routeSourceType = searchParamText(searchParams, 'source_type')
 
+  const beginLatestRequest = useCallback((key) => {
+    requestControllersRef.current[key]?.abort()
+    const controller = new AbortController()
+    const nextSequence = Number(requestSequenceRef.current[key] || 0) + 1
+    requestControllersRef.current[key] = controller
+    requestSequenceRef.current[key] = nextSequence
+
+    return {
+      signal: controller.signal,
+      isCurrent: () =>
+        requestControllersRef.current[key] === controller &&
+        requestSequenceRef.current[key] === nextSequence &&
+        !controller.signal.aborted,
+      finish: () => {
+        if (requestControllersRef.current[key] === controller) {
+          delete requestControllersRef.current[key]
+        }
+      },
+    }
+  }, [])
+
+  useEffect(() => {
+    const controllers = requestControllersRef.current
+    return () => {
+      Object.values(controllers).forEach((controller) => {
+        controller?.abort()
+      })
+    }
+  }, [])
+
   const loadRows = useCallback(async () => {
+    const request = beginLatestRequest('rows')
     setLoading(true)
     try {
       const commonParams = compactParams({
@@ -325,7 +371,8 @@ export default function V1InventoryLedgerPage() {
             date_field: 'received_at',
             date_from: dateFilterStart || undefined,
             date_to: dateFilterEnd || undefined,
-          })
+          }),
+          { signal: request.signal }
         )
       } else if (activeView === VIEW_TXNS) {
         data = await listInventoryTxns(
@@ -338,10 +385,16 @@ export default function V1InventoryLedgerPage() {
             date_field: 'occurred_at',
             date_from: dateFilterStart || undefined,
             date_to: dateFilterEnd || undefined,
-          })
+          }),
+          { signal: request.signal }
         )
       } else {
-        data = await listInventoryBalances(commonParams)
+        data = await listInventoryBalances(commonParams, {
+          signal: request.signal,
+        })
+      }
+      if (!request.isCurrent()) {
+        return
       }
       const nextRows = getRowsFromData(activeView, data)
       setRows(nextRows)
@@ -352,12 +405,19 @@ export default function V1InventoryLedgerPage() {
       )
       setTotal(Number(data?.total || 0))
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return
+      }
       message.error(getActionErrorMessage(error, '加载库存台账'))
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
     }
   }, [
     activeView,
+    beginLatestRequest,
     dateFilterEnd,
     dateFilterStart,
     keyword,
@@ -441,20 +501,40 @@ export default function V1InventoryLedgerPage() {
   }, [resetCurrentPage, searchParams, setSearchParams])
 
   const loadReferenceOptions = useCallback(async () => {
+    const request = beginLatestRequest('references')
     try {
-      const [materialResult, productResult, warehouseResult, lotResult] =
-        await Promise.all([
-          listMaterials({ limit: 500, active_only: true }),
-          listProducts({ limit: 500, active_only: true }),
-          listWarehouses({ limit: 500, active_only: true }),
-          listInventoryLots({ limit: 500 }),
-        ])
+      const [
+        materialResult,
+        productResult,
+        unitResult,
+        warehouseResult,
+        lotResult,
+      ] = await Promise.all([
+        listMaterials(
+          { limit: 500, active_only: true },
+          { signal: request.signal }
+        ),
+        listProducts(
+          { limit: 500, active_only: true },
+          { signal: request.signal }
+        ),
+        listUnits({ limit: 500 }, { signal: request.signal }),
+        listWarehouses(
+          { limit: 500, active_only: true },
+          { signal: request.signal }
+        ),
+        listInventoryLots({ limit: 500 }, { signal: request.signal }),
+      ])
+      if (!request.isCurrent()) {
+        return
+      }
       setMaterials(
         Array.isArray(materialResult?.materials) ? materialResult.materials : []
       )
       setProducts(
         Array.isArray(productResult?.products) ? productResult.products : []
       )
+      setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
       setWarehouses(
         Array.isArray(warehouseResult?.warehouses)
           ? warehouseResult.warehouses
@@ -464,27 +544,47 @@ export default function V1InventoryLedgerPage() {
         Array.isArray(lotResult?.inventory_lots) ? lotResult.inventory_lots : []
       )
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return
+      }
       message.error(getActionErrorMessage(error, '加载库存筛选引用数据'))
       setMaterials([])
       setProducts([])
+      setUnits([])
       setWarehouses([])
       setInventoryLots([])
+    } finally {
+      if (request.isCurrent()) {
+        request.finish()
+      }
     }
-  }, [])
+  }, [beginLatestRequest])
 
   useEffect(() => {
     loadReferenceOptions()
   }, [loadReferenceOptions])
 
+  const materialOptions = useMemo(
+    () => uniqueReferenceOptions(materials, materialOption),
+    [materials]
+  )
+  const productOptions = useMemo(
+    () => uniqueReferenceOptions(products, productOption),
+    [products]
+  )
+  const unitOptions = useMemo(
+    () => uniqueReferenceOptions(units, unitOption),
+    [units]
+  )
   const subjectOptions = useMemo(() => {
     if (subjectType === 'PRODUCT') {
-      return uniqueReferenceOptions(products, productOption)
+      return productOptions
     }
     if (subjectType === 'MATERIAL') {
-      return uniqueReferenceOptions(materials, materialOption)
+      return materialOptions
     }
     return []
-  }, [materials, products, subjectType])
+  }, [materialOptions, productOptions, subjectType])
   const warehouseOptions = useMemo(
     () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
     [warehouses]
@@ -492,6 +592,30 @@ export default function V1InventoryLedgerPage() {
   const inventoryLotOptions = useMemo(
     () => uniqueReferenceOptions(inventoryLots, inventoryLotOption),
     [inventoryLots]
+  )
+  const renderSubjectReference = useCallback(
+    (value, record) => {
+      if (record?.subject_type === 'PRODUCT') {
+        return referenceLabel(productOptions, value, '成品')
+      }
+      if (record?.subject_type === 'MATERIAL') {
+        return referenceLabel(materialOptions, value, '材料')
+      }
+      return internalRef(subjectTypeText(record?.subject_type) || '对象', value)
+    },
+    [materialOptions, productOptions]
+  )
+  const renderWarehouseReference = useCallback(
+    (value) => referenceLabel(warehouseOptions, value, '仓库'),
+    [warehouseOptions]
+  )
+  const renderLotReference = useCallback(
+    (value) => referenceLabel(inventoryLotOptions, value, '批次'),
+    [inventoryLotOptions]
+  )
+  const renderUnitReference = useCallback(
+    (value) => referenceLabel(unitOptions, value, '单位'),
+    [unitOptions]
   )
 
   const stats = useMemo(
@@ -524,9 +648,10 @@ export default function V1InventoryLedgerPage() {
         {
           title: '对象',
           dataIndex: 'subject_id',
-          width: 140,
-          render: (value, record) =>
-            internalRef(subjectTypeText(record?.subject_type) || '对象', value),
+          width: 220,
+          render: renderSubjectReference,
+          exportValue: (record) =>
+            renderSubjectReference(record?.subject_id, record),
         },
         {
           title: '供应商批次',
@@ -605,21 +730,25 @@ export default function V1InventoryLedgerPage() {
         {
           title: '对象',
           dataIndex: 'subject_id',
-          width: 140,
-          render: (value, record) =>
-            internalRef(subjectTypeText(record?.subject_type) || '对象', value),
+          width: 220,
+          render: renderSubjectReference,
+          exportValue: (record) =>
+            renderSubjectReference(record?.subject_id, record),
         },
         {
           title: '仓库',
           dataIndex: 'warehouse_id',
-          width: 140,
-          render: (value) => internalRef('仓库', value),
+          width: 180,
+          render: renderWarehouseReference,
+          exportValue: (record) =>
+            renderWarehouseReference(record?.warehouse_id),
         },
         {
           title: '批次',
           dataIndex: 'lot_id',
-          width: 140,
-          render: (value) => internalRef('批次', value),
+          width: 180,
+          render: renderLotReference,
+          exportValue: (record) => renderLotReference(record?.lot_id),
         },
         {
           title: '数量',
@@ -632,8 +761,9 @@ export default function V1InventoryLedgerPage() {
         {
           title: '单位',
           dataIndex: 'unit_id',
-          width: 120,
-          render: (value) => internalRef('单位', value),
+          width: 130,
+          render: renderUnitReference,
+          exportValue: (record) => renderUnitReference(record?.unit_id),
         },
         {
           title: '来源',
@@ -648,18 +778,23 @@ export default function V1InventoryLedgerPage() {
           dataIndex: 'source_id',
           width: 120,
           render: (value) => internalRef('来源', value),
+          exportValue: (record) => internalRef('来源', record?.source_id),
         },
         {
-          title: '来源行',
+          title: '来源行关联',
           dataIndex: 'source_line_id',
-          width: 110,
-          render: dash,
+          width: 130,
+          render: (value) => relationRef('来源行', value),
+          exportValue: (record) =>
+            relationRef('来源行', record?.source_line_id),
         },
         {
-          title: '冲正原流水',
+          title: '冲正关系',
           dataIndex: 'reversal_of_txn_id',
-          width: 120,
-          render: dash,
+          width: 130,
+          render: (value) => relationRef('原流水', value),
+          exportValue: (record) =>
+            relationRef('原流水', record?.reversal_of_txn_id),
         },
         {
           title: '发生时间',
@@ -692,27 +827,31 @@ export default function V1InventoryLedgerPage() {
       {
         title: '对象',
         dataIndex: 'subject_id',
-        width: 140,
-        render: (value, record) =>
-          internalRef(subjectTypeText(record?.subject_type) || '对象', value),
+        width: 220,
+        render: renderSubjectReference,
+        exportValue: (record) =>
+          renderSubjectReference(record?.subject_id, record),
       },
       {
         title: '仓库',
         dataIndex: 'warehouse_id',
-        width: 140,
-        render: (value) => internalRef('仓库', value),
+        width: 180,
+        render: renderWarehouseReference,
+        exportValue: (record) => renderWarehouseReference(record?.warehouse_id),
       },
       {
         title: '批次',
         dataIndex: 'lot_id',
-        width: 140,
-        render: (value) => internalRef('批次', value),
+        width: 180,
+        render: renderLotReference,
+        exportValue: (record) => renderLotReference(record?.lot_id),
       },
       {
         title: '单位',
         dataIndex: 'unit_id',
-        width: 120,
-        render: (value) => internalRef('单位', value),
+        width: 130,
+        render: renderUnitReference,
+        exportValue: (record) => renderUnitReference(record?.unit_id),
       },
       {
         title: '当前数量',
@@ -748,7 +887,13 @@ export default function V1InventoryLedgerPage() {
         exportValue: (record) => formatUnixDateTime(record?.updated_at),
       },
     ]
-  }, [activeView])
+  }, [
+    activeView,
+    renderLotReference,
+    renderSubjectReference,
+    renderUnitReference,
+    renderWarehouseReference,
+  ])
   const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
     useBusinessColumnOrder({
       adminProfile,
@@ -824,7 +969,7 @@ export default function V1InventoryLedgerPage() {
               value={keyword}
               placeholder={
                 activeView === VIEW_BALANCES
-                  ? '搜索对象、仓库或批次'
+                  ? SEARCH_PLACEHOLDERS[VIEW_BALANCES]
                   : SEARCH_PLACEHOLDERS[activeView]
               }
               onChange={(event) => {

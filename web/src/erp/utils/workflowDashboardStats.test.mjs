@@ -30,7 +30,7 @@ function task(overrides = {}) {
   }
 }
 
-test('dashboardTaskDisplay: 看板任务来源回显不直接露出英文模块 key', () => {
+test('dashboardTaskDisplay: 看板任务来源回显不直接露出内部来源或英文模块 key', () => {
   const sourceLabel = formatWorkflowTaskSource(
     task({
       source_type: 'shipping-release',
@@ -44,10 +44,12 @@ test('dashboardTaskDisplay: 看板任务来源回显不直接露出英文模块 
     task: task({ source_id: 12 }),
   })
 
-  assert.equal(sourceLabel, '出货放行协同 / 内部来源 9')
-  assert.equal(alertSourceLabel, '委外协同 / 内部来源 12')
+  assert.equal(sourceLabel, '出货放行协同 / 已关联业务来源')
+  assert.equal(alertSourceLabel, '委外协同 / 已关联业务来源')
   assert(!sourceLabel.includes('shipping-release'))
   assert(!alertSourceLabel.includes('processing-contracts'))
+  assert(!sourceLabel.includes('内部来源'))
+  assert(!alertSourceLabel.includes('内部来源'))
 })
 
 test('dashboardTaskDisplay: 看板任务导航只进入已登记的正式或 Workflow V1 对象页', () => {

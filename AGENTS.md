@@ -58,7 +58,7 @@
 - 所有长期规则以仓库文件为准，不依赖 ChatGPT 或 Codex 聊天记忆。长期规则优先参考：本文件、`docs/product/*`、`docs/architecture/*`、`docs/当前真源与交接顺序.md`、代码和测试。
 - plush-toy-erp 的产品边界、Workflow / Fact 边界、`tenant_id` 禁止项和客户资料边界，仍以本文件和正式产品 / 架构文档为准。当前永绅客户稳定 key 是 `yoyoosun`，不要恢复 `current` 客户目录或导入工作区别名。
 - 新任务组织主路径：按能力闭环、业务事实源、测试用例、验收标准和交付资料拆分；当前产品结构、代码结构、接口结构、菜单结构、测试结构和客户语言都使用真实业务领域命名。历史阶段编号只作为归档检索标签。
-- Runtime 命名主路径：使用 `shipment`、`inventory`、`purchase`、`quality`、`finance`、`workflow` 等业务领域词。新增运行时代码、API、路由、菜单、测试和配置由 `scripts/qa/phase-label-boundaries.mjs` 守卫阶段编号残留；已有 `phase2*` PostgreSQL 本地验收脚本、测试环境变量和数据库名只作为历史兼容入口保留，彻底迁移必须作为单独任务评审。
+- Runtime 命名主路径：使用 `shipment`、`inventory`、`purchase`、`quality`、`finance`、`workflow` 等业务领域词。新增运行时代码、API、路由、菜单、测试和配置由 `scripts/qa/phase-label-boundaries.mjs` 守卫阶段编号残留；活跃 PostgreSQL 本地验收脚本、测试环境变量、数据库名和 Make target 必须使用业务域命名，不再保留历史阶段编号兼容入口。
 - 处理任务时禁止：
   - 新增 `tenant_id`。
   - 实现 SaaS 多租户。

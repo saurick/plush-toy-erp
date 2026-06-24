@@ -100,8 +100,8 @@ export async function listUnits(params = {}, options = {}) {
   return dataOf(result)
 }
 
-export async function listWarehouses(params = {}) {
-  const result = await masterDataRpc.call('list_warehouses', params)
+export async function listWarehouses(params = {}, options = {}) {
+  const result = await masterDataRpc.call('list_warehouses', params, options)
   return dataOf(result)
 }
 

@@ -1,7 +1,8 @@
 import { yoyoosunFieldNumberingConfig } from '../../../../config/customers/yoyoosun/fieldNumberingConfig.mjs'
 import { yoyoosunMenuConfig } from '../../../../config/customers/yoyoosun/menuConfig.mjs'
+import { DEV_CUSTOMER_CONFIG_ROUTE } from './devCustomerConfigRoute.mjs'
 
-export const DEV_CUSTOMER_CONFIG_ROUTE = '/__dev/customer-config'
+export { DEV_CUSTOMER_CONFIG_ROUTE }
 export const DEV_CUSTOMER_CONFIG_QUERY_KEY = 'customer'
 export const DEFAULT_DEV_CUSTOMER_KEY = 'yoyoosun'
 export const DEV_CUSTOMER_CONFIG_SOURCE_PATH =

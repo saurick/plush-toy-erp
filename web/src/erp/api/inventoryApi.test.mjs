@@ -21,6 +21,12 @@ test('inventoryApi: exposes read-only inventory ledger methods only', () => {
   ]) {
     assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
   }
+  assert.match(source, /listInventoryBalances\(params = \{\}, options = \{\}\)/)
+  assert.match(source, /listInventoryLots\(params = \{\}, options = \{\}\)/)
+  assert.match(source, /listInventoryTxns\(params = \{\}, options = \{\}\)/)
+  assert.match(source, /'list_inventory_balances',[\s\S]*params,[\s\S]*options/)
+  assert.match(source, /'list_inventory_lots', params, options/)
+  assert.match(source, /'list_inventory_txns', params, options/)
 
   for (const forbiddenActionName of [
     'createInventoryTxn',

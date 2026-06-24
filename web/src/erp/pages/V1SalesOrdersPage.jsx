@@ -7,7 +7,7 @@ import {
   PlusOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Form, Space, Tag } from 'antd'
+import { Button, Dropdown, Form, Space } from 'antd'
 import {
   useNavigate,
   useOutletContext,
@@ -30,10 +30,7 @@ import {
 import {
   ColumnOrderHeaderMenu,
   ColumnOrderModal,
-  getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
-import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
-import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import {
   activateSalesOrder,
   cancelSalesOrder,
@@ -47,39 +44,39 @@ import {
   submitSalesOrder,
 } from '../api/masterDataOrderApi.mjs'
 import {
-  SalesOrderFormFields,
-  SalesOrderItemsFormSection,
   createBlankOrderLine,
   normalizeSalesOrderItemFormValue,
 } from '../components/sales-orders/SalesOrderForm.jsx'
+import SalesOrderBusinessModal from '../components/sales-orders/SalesOrderBusinessModal.jsx'
+import {
+  buildSalesOrderColumns,
+  buildSalesOrderItemColumns,
+} from '../components/sales-orders/salesOrderColumns.jsx'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
-  SALES_ORDER_ITEM_STATUS_LABELS,
-  SALES_ORDER_STATUS_COLORS,
-  SALES_ORDER_STATUS_LABELS,
   V1_ROUTE_PATHS,
   buildCustomerSnapshot,
   buildPaymentConditionOptions,
   buildSequentialDraftCode,
   canRunSalesOrderLifecycleAction,
-  deriveSalesOrderItemAmount,
   buildSalesOrderItemParams,
   buildSalesOrderParams,
-  formatPaymentCondition,
-  formatUnixDate,
-  formatUnixDateTime,
   hasActionPermission,
   mergePaymentConditionOptions,
   normalizeOptionalNonNegativeInteger,
   resolvePaymentTermDays,
-  statusText,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
 import {
-  applyBusinessColumnSorters,
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
+import {
+  downloadCSV,
+  getPreferredColumnOrder,
+  parseBusinessSortValue,
+  writeStoredColumnOrder,
+} from '../utils/businessTableActions.mjs'
 import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
@@ -158,116 +155,7 @@ const LIFECYCLE_ACTIONS = [
 
 const SALES_ORDERS_MODULE_KEY = 'sales-orders'
 const SALES_ORDER_ITEMS_MODULE_KEY = 'sales-order-items'
-const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const OPEN_LINE_STATUS = 'open'
-
-function parseSortFilterValue(value = 'updated_at:desc') {
-  const [sortBy = 'updated_at', sortDirection = 'desc'] =
-    String(value).split(':')
-  return { sortBy, sortDirection }
-}
-
-function readStoredColumnOrder(moduleKey) {
-  if (typeof window === 'undefined') {
-    return []
-  }
-
-  try {
-    const raw = window.localStorage.getItem(
-      `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
-    )
-    const parsed = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function writeStoredColumnOrder(moduleKey, order = []) {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  const storageKey = `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
-  if (!Array.isArray(order) || order.length === 0) {
-    window.localStorage.removeItem(storageKey)
-    return
-  }
-  window.localStorage.setItem(storageKey, JSON.stringify(order))
-}
-
-function getPreferredColumnOrder({
-  adminProfile,
-  moduleKey,
-  columns,
-  localOrder,
-}) {
-  if (Array.isArray(localOrder)) {
-    return sanitizeModuleColumnOrder(localOrder, columns)
-  }
-
-  const accountOrder = adminProfile?.erp_preferences?.column_orders?.[moduleKey]
-  const sanitizedAccountOrder = sanitizeModuleColumnOrder(accountOrder, columns)
-  if (sanitizedAccountOrder.length > 0) {
-    return sanitizedAccountOrder
-  }
-  return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
-}
-
-function csvEscape(value) {
-  const text = String(value ?? '')
-  if (/[",\n\r]/u.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`
-  }
-  return text
-}
-
-function downloadCSV({ filename, columns, rows }) {
-  const header = columns.map((column) => csvEscape(getColumnLabel(column)))
-  const body = rows.map((row) =>
-    columns.map((column) => {
-      const rawValue =
-        typeof column.exportValue === 'function'
-          ? column.exportValue(row)
-          : row?.[column.dataIndex]
-      return csvEscape(rawValue)
-    })
-  )
-  const csv = [header, ...body].map((line) => line.join(',')).join('\n')
-  const blob = new Blob([`\uFEFF${csv}`], {
-    type: 'text/csv;charset=utf-8',
-  })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(url)
-}
-
-function compareText(a, b) {
-  return String(a || '').localeCompare(String(b || ''))
-}
-
-function compareNumber(a, b) {
-  return Number(a || 0) - Number(b || 0)
-}
-
-function salesOrderStatusTag(status) {
-  const key = String(status || '').trim()
-  return (
-    <Tag color={SALES_ORDER_STATUS_COLORS[key] || 'default'}>
-      {statusText(key, SALES_ORDER_STATUS_LABELS)}
-    </Tag>
-  )
-}
-
-function lineStatusTag(status) {
-  const key = String(status || '').trim()
-  return <Tag>{statusText(key, SALES_ORDER_ITEM_STATUS_LABELS)}</Tag>
-}
 
 export default function V1SalesOrdersPage() {
   const outletContext = useOutletContext()
@@ -477,7 +365,7 @@ export default function V1SalesOrdersPage() {
   const loadOrders = useCallback(async () => {
     setLoading(true)
     try {
-      const { sortBy, sortDirection } = parseSortFilterValue(sortFilter)
+      const { sortBy, sortDirection } = parseBusinessSortValue(sortFilter)
       const result = await listSalesOrders({
         keyword,
         customer_id: customerFilter || undefined,
@@ -707,100 +595,7 @@ export default function V1SalesOrdersPage() {
     [outletContext]
   )
 
-  const orderDataColumns = useMemo(
-    () =>
-      applyBusinessColumnSorters([
-        {
-          title: '订单号',
-          exportTitle: '订单号',
-          dataIndex: 'order_no',
-          width: 160,
-          sorter: (a, b) => compareText(a?.order_no, b?.order_no),
-        },
-        {
-          title: '客户',
-          exportTitle: '客户',
-          dataIndex: 'customer_snapshot',
-          width: 180,
-          sorter: (a, b) =>
-            compareText(a?.customer_snapshot?.name, b?.customer_snapshot?.name),
-          render: (value, record) =>
-            value?.name || (record.customer_id ? '客户已关联' : '-'),
-          exportValue: (record) =>
-            record?.customer_snapshot?.name ||
-            (record?.customer_id ? '客户已关联' : ''),
-        },
-        {
-          title: '客户订单号',
-          exportTitle: '客户订单号',
-          dataIndex: 'customer_order_no',
-          width: 150,
-          sorter: (a, b) =>
-            compareText(a?.customer_order_no, b?.customer_order_no),
-          render: (value) => value || '-',
-        },
-        {
-          title: '付款条件',
-          exportTitle: '付款条件',
-          dataIndex: 'payment_method',
-          width: 170,
-          sorter: (a, b) =>
-            compareText(formatPaymentCondition(a), formatPaymentCondition(b)),
-          render: (_, record) => formatPaymentCondition(record),
-          exportValue: formatPaymentCondition,
-        },
-        {
-          title: '订单日期',
-          exportTitle: '订单日期',
-          dataIndex: 'order_date',
-          width: 120,
-          sorter: (a, b) => compareNumber(a?.order_date, b?.order_date),
-          render: formatUnixDate,
-          exportValue: (record) => formatUnixDate(record?.order_date),
-        },
-        {
-          title: '计划交付',
-          exportTitle: '计划交付',
-          dataIndex: 'planned_delivery_date',
-          width: 120,
-          sorter: (a, b) =>
-            compareNumber(a?.planned_delivery_date, b?.planned_delivery_date),
-          render: formatUnixDate,
-          exportValue: (record) =>
-            formatUnixDate(record?.planned_delivery_date),
-        },
-        {
-          title: '生命周期',
-          exportTitle: '生命周期',
-          dataIndex: 'lifecycle_status',
-          width: 120,
-          sorter: (a, b) =>
-            compareText(a?.lifecycle_status, b?.lifecycle_status),
-          render: salesOrderStatusTag,
-          exportValue: (record) =>
-            statusText(record?.lifecycle_status, SALES_ORDER_STATUS_LABELS),
-        },
-        {
-          title: '创建时间',
-          exportTitle: '创建时间',
-          dataIndex: 'created_at',
-          width: 160,
-          sorter: (a, b) => compareNumber(a?.created_at, b?.created_at),
-          render: formatUnixDateTime,
-          exportValue: (record) => formatUnixDateTime(record?.created_at),
-        },
-        {
-          title: '更新时间',
-          exportTitle: '更新时间',
-          dataIndex: 'updated_at',
-          width: 160,
-          sorter: (a, b) => compareNumber(a?.updated_at, b?.updated_at),
-          render: formatUnixDateTime,
-          exportValue: (record) => formatUnixDateTime(record?.updated_at),
-        },
-      ]),
-    []
-  )
+  const orderDataColumns = useMemo(() => buildSalesOrderColumns(), [])
 
   const effectiveOrderColumnOrder = useMemo(
     () =>
@@ -849,107 +644,7 @@ export default function V1SalesOrdersPage() {
     ]
   )
 
-  const itemDataColumns = useMemo(
-    () => [
-      {
-        title: '行号',
-        exportTitle: '行号',
-        dataIndex: 'line_no',
-        width: 80,
-        sorter: (a, b) => compareNumber(a?.line_no, b?.line_no),
-      },
-      {
-        title: '产品编号',
-        exportTitle: '产品编号',
-        dataIndex: 'product_code_snapshot',
-        width: 140,
-        sorter: (a, b) =>
-          compareText(a?.product_code_snapshot, b?.product_code_snapshot),
-        render: (value) => value || '-',
-      },
-      {
-        title: '产品名称',
-        exportTitle: '产品名称',
-        dataIndex: 'product_name_snapshot',
-        width: 180,
-        sorter: (a, b) =>
-          compareText(a?.product_name_snapshot, b?.product_name_snapshot),
-        render: (value) => value || '-',
-      },
-      {
-        title: '颜色',
-        exportTitle: '颜色',
-        dataIndex: 'color_snapshot',
-        width: 100,
-        sorter: (a, b) => compareText(a?.color_snapshot, b?.color_snapshot),
-        render: (value) => value || '-',
-      },
-      {
-        title: '订单数量',
-        exportTitle: '订单数量',
-        dataIndex: 'ordered_quantity',
-        width: 120,
-        sorter: (a, b) =>
-          compareNumber(a?.ordered_quantity, b?.ordered_quantity),
-      },
-      {
-        title: '单价',
-        exportTitle: '单价',
-        dataIndex: 'unit_price',
-        width: 100,
-        sorter: (a, b) => compareNumber(a?.unit_price, b?.unit_price),
-        render: (value) => value || '-',
-      },
-      {
-        title: '金额',
-        exportTitle: '金额',
-        dataIndex: 'amount',
-        width: 100,
-        sorter: (a, b) => compareNumber(a?.amount, b?.amount),
-        render: (value, record) => deriveSalesOrderItemAmount(record) || '-',
-        exportValue: (record) => deriveSalesOrderItemAmount(record) || '',
-      },
-      {
-        title: '计划交付',
-        exportTitle: '计划交付',
-        dataIndex: 'planned_delivery_date',
-        width: 120,
-        sorter: (a, b) =>
-          compareNumber(a?.planned_delivery_date, b?.planned_delivery_date),
-        render: formatUnixDate,
-        exportValue: (record) => formatUnixDate(record?.planned_delivery_date),
-      },
-      {
-        title: '行状态',
-        exportTitle: '行状态',
-        dataIndex: 'line_status',
-        width: 100,
-        sorter: (a, b) => compareText(a?.line_status, b?.line_status),
-        render: lineStatusTag,
-        exportValue: (record) =>
-          statusText(record?.line_status, SALES_ORDER_ITEM_STATUS_LABELS),
-      },
-      {
-        title: '创建时间',
-        exportTitle: '创建时间',
-        dataIndex: 'created_at',
-        width: 160,
-        sorter: (a, b) => compareNumber(a?.created_at, b?.created_at),
-        render: formatUnixDateTime,
-        exportValue: (record) => formatUnixDateTime(record?.created_at),
-      },
-      {
-        title: '更新时间',
-        exportTitle: '更新时间',
-        dataIndex: 'updated_at',
-        width: 160,
-        sorter: (a, b) => compareNumber(a?.updated_at, b?.updated_at),
-        render: formatUnixDateTime,
-        exportValue: (record) => formatUnixDateTime(record?.updated_at),
-      },
-    ],
-    []
-  )
+  const itemDataColumns = useMemo(() => buildSalesOrderItemColumns(), [])
 
   const effectiveItemColumnOrder = useMemo(
     () =>
@@ -1349,52 +1044,31 @@ export default function V1SalesOrdersPage() {
         onClose={() => setColumnOrderTarget(null)}
       />
 
-      <BusinessFormModal
-        title={editingOrder?.id ? '编辑销售订单' : '新建销售订单'}
-        description="只维护客户订单承诺，不在此写出货、库存或财务事实。"
+      <SalesOrderBusinessModal
         open={orderModalOpen}
+        form={orderForm}
+        editingOrder={editingOrder}
+        saving={saving}
+        itemLoading={itemLoading}
+        orderAttachmentRef={orderAttachmentRef}
+        customers={customers}
+        paymentConditionOptions={paymentConditionOptions}
+        unitOptions={unitOptions}
+        productSKUs={productSKUs}
+        canCreateOrder={canCreateOrder}
+        canUpdateOrder={canUpdateOrder}
+        canCreateItem={canCreateItem}
+        canUpdateItem={canUpdateItem}
+        canCancelItem={canCancelItem}
         onOk={saveOrder}
         onCancel={() => {
           orderAttachmentRef.current?.clearPendingAttachments()
           setOrderModalOpen(false)
         }}
-        confirmLoading={saving || itemLoading}
-        forceRender
-        destroyOnHidden={false}
-      >
-        <Form
-          form={orderForm}
-          layout="vertical"
-          className="erp-business-action-form"
-        >
-          <SalesOrderFormFields
-            form={orderForm}
-            customers={customers}
-            paymentConditionOptions={paymentConditionOptions}
-            onCustomerChange={applyCustomerPaymentDefaults}
-            onPaymentMethodChange={applyPaymentMethodTermDays}
-            onPaymentConditionBlur={requestPaymentConditionPriceReview}
-          />
-          <BusinessAttachmentPanel
-            ref={orderAttachmentRef}
-            ownerType="sales_order"
-            ownerId={editingOrder?.id}
-            title="订单附件"
-            description="上传客户 PO、合同、样品图或确认截图；附件不改变订单生命周期。"
-            canUpload={canUpdateOrder || canCreateOrder}
-            canDelete={canUpdateOrder}
-            variant="inline"
-          />
-          <SalesOrderItemsFormSection
-            form={orderForm}
-            canCreateItem={canCreateItem}
-            canUpdateItem={canUpdateItem}
-            canCancelItem={canCancelItem}
-            productSKUs={productSKUs}
-            unitOptions={unitOptions}
-          />
-        </Form>
-      </BusinessFormModal>
+        onCustomerChange={applyCustomerPaymentDefaults}
+        onPaymentMethodChange={applyPaymentMethodTermDays}
+        onPaymentConditionBlur={requestPaymentConditionPriceReview}
+      />
     </BusinessPageLayout>
   )
 }

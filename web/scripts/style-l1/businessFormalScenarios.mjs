@@ -864,8 +864,14 @@ export function createBusinessFormalScenarios(deps) {
 
         await page.getByRole('tab', { name: '库存流水' }).click()
         await expectText(page, '冲正')
-        await expectText(page, 'MANUAL_SEED')
+        await expectText(page, '其他来源')
+        await expectText(page, '已关联来源行')
+        await expectText(page, '已关联原流水')
         await expectText(page, 'ledger seed')
+        await assertTextAbsent(page, 'MANUAL_SEED')
+        await assertTextAbsent(page, 'INV-TXN-001')
+        await assertTextAbsent(page, '9002')
+        await assertTextAbsent(page, '888500999')
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'business-standard-inventory-txns',
         })

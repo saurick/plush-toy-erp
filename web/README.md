@@ -67,7 +67,7 @@ http://localhost:5175/m/quality/tasks
 
 当前前端不提供普通协作账号自助注册、登录或管理入口；旧 `/login` 只兼容重定向到 `/admin-login`，旧 `/admin-accounts` 与 `/admin-users` 只兼容重定向到权限中心。后端普通 `users` 表和 `user` JSON-RPC 域已退出，账号、岗位任务端和 RBAC 主路径统一使用 `admin_users`、角色和权限码。
 
-桌面后台菜单由 `web/src/erp/config/seedData.mjs` 生成，并可通过 `web/src/erp/config/customerMenuConfig.mjs` 接入客户菜单配置。前端品牌默认走 `web/src/common/consts/brand.js` 的中性产品名；当前已登记 `config/customers/yoyoosun/menuConfig.mjs`，可通过构建环境 `VITE_ERP_CUSTOMER_KEY=yoyoosun` 或页面预置 `window.__PLUSH_ERP_CUSTOMER_KEY__ = 'yoyoosun'` 启用 yoyoosun 品牌、favicon 和菜单；也可用 `window.__PLUSH_ERP_CUSTOMER_CONFIG__` 直接提供一次性品牌 / favicon / 菜单配置。客户配置只控制前端品牌展示、favicon 和桌面菜单分组、排序、显隐、文案，不替代后端 RBAC action permission、Workflow / Fact usecase、schema、migration 或真实导入。
+桌面后台菜单由 `web/src/erp/config/seedData.mjs` 生成，并可通过 `web/src/erp/config/customerMenuConfig.mjs` 接入客户菜单配置。前端品牌默认走 `web/src/common/consts/brand.js` 的中性产品名；默认产品构建不再静态打包任一客户配置包，也不通过 `VITE_ERP_CUSTOMER_KEY` 或 `window.__PLUSH_ERP_CUSTOMER_KEY__` 按 key 查找内置客户。客户部署时应在 `web/public/customer-config.js` 对应的静态根路径注入 `window.__PLUSH_ERP_CUSTOMER_CONFIG__`，例如把 `config/customers/yoyoosun/customer-config.example.js` 渲染或复制为部署产物的 `customer-config.js`，并发布对应客户资产。客户配置只控制前端品牌展示、favicon 和桌面菜单分组、排序、显隐、文案，不替代后端 RBAC action permission、Workflow / Fact usecase、schema、migration 或真实导入。
 
 ### 主题模式 / Theme mode
 
@@ -153,6 +153,15 @@ pnpm build:mobile:quality
 ```bash
 cd /Users/simon/projects/plush-toy-erp
 docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
+```
+
+默认命令构建中性产品包。客户私有化前端包必须在本地或 CI 构建时显式传入客户 key，Dockerfile 会把 `config/customers/<customer-key>/customer-config.example.js` 覆盖到构建产物的 `customer-config.js`，并复制客户资产到 `customer-assets/<customer-key>/`：
+
+```bash
+docker build \
+  --build-arg ERP_CUSTOMER_KEY=yoyoosun \
+  -f web/Dockerfile \
+  -t plush-toy-erp-web:yoyoosun-dev .
 ```
 
 本地验证生产入口：

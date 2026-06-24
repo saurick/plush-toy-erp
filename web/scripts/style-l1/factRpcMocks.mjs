@@ -596,7 +596,7 @@ export async function installFactRpcMocks(page, context) {
       source_type: 'MANUAL_SEED',
       source_id: 9001,
       source_line_id: 9002,
-      reversal_of_txn_id: 500,
+      reversal_of_txn_id: 888500999,
       idempotency_key: 'INV-TXN-001',
       note: 'ledger seed',
       occurred_at: nowUnix(),

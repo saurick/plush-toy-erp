@@ -1,11 +1,14 @@
-import { DEV_CAPABILITY_LEDGER_ROUTE } from './devCapabilityLedger.mjs'
-import { DEV_CUSTOMER_CONFIG_ROUTE } from './devCustomerConfig.mjs'
-import { DEV_DOCS_ROUTE } from './devDocs.mjs'
-import { DEV_GOVERNANCE_ROUTE } from './devGovernance.mjs'
-import { DEV_PROTOTYPES_ROUTE } from './devPrototypes.mjs'
-import { DEV_TESTING_ROUTE } from './devTesting.mjs'
+import {
+  DEV_CAPABILITY_LEDGER_ROUTE,
+  DEV_CUSTOMER_CONFIG_ROUTE,
+  DEV_DOCS_ROUTE,
+  DEV_GOVERNANCE_ROUTE,
+  DEV_HUB_ROUTE,
+  DEV_PROTOTYPES_ROUTE,
+  DEV_TESTING_ROUTE,
+} from './devRoutes.mjs'
 
-export const DEV_HUB_ROUTE = '/__dev'
+export { DEV_HUB_ROUTE }
 export const DEV_HUB_PINNED_STORAGE_KEY = 'plush_erp_dev_hub_pinned_routes'
 export const DEV_HUB_MAX_PINNED_ITEMS = 5
 export const DEV_HUB_ALL_GROUP = 'all'

@@ -7,6 +7,8 @@ import {
   resolveERPFavicon,
 } from './favicon.mjs'
 
+const CUSTOMER_FAVICON_HREF = '/customer-assets/yoyoosun/favicon-yoyoosun.svg'
+
 function createDocumentStub(existingLinks = []) {
   const removed = []
   const appended = []
@@ -130,11 +132,11 @@ test('favicon: mobile login redirect keeps the task icon by source route', () =>
 test('favicon: customer favicon overrides customer-facing admin and task routes', () => {
   assert.deepEqual(
     resolveERPFavicon('/erp/dashboard', {
-      customerFaviconHref: '/favicon-yoyoosun.svg',
+      customerFaviconHref: CUSTOMER_FAVICON_HREF,
     }),
     {
       key: 'customer',
-      href: '/favicon-yoyoosun.svg',
+      href: CUSTOMER_FAVICON_HREF,
       type: 'image/svg+xml',
     }
   )
@@ -150,19 +152,19 @@ test('favicon: customer favicon overrides customer-facing admin and task routes'
   )
   assert.equal(
     resolveERPFavicon('/__dev', {
-      customerFaviconHref: '/favicon-yoyoosun.svg',
+      customerFaviconHref: CUSTOMER_FAVICON_HREF,
     }),
     ERP_FAVICON_VARIANTS.devHub
   )
   assert.equal(
     resolveERPFavicon('/__dev/testing', {
-      customerFaviconHref: '/favicon-yoyoosun.svg',
+      customerFaviconHref: CUSTOMER_FAVICON_HREF,
     }),
     ERP_FAVICON_VARIANTS.testing
   )
   assert.equal(
     resolveERPFavicon('/__dev/governance', {
-      customerFaviconHref: '/favicon-yoyoosun.svg',
+      customerFaviconHref: CUSTOMER_FAVICON_HREF,
     }),
     ERP_FAVICON_VARIANTS.governance
   )
@@ -170,7 +172,7 @@ test('favicon: customer favicon overrides customer-facing admin and task routes'
 
 test('favicon: print workspace keeps template glyph before customer branding', () => {
   const result = resolveERPFavicon('/erp/print-workspace/processing-contract', {
-    customerFaviconHref: '/favicon-yoyoosun.svg',
+    customerFaviconHref: CUSTOMER_FAVICON_HREF,
   })
 
   assert.equal(result.key, 'print-template:processing-contract')
@@ -201,17 +203,17 @@ test('favicon: runtime update applies configured customer favicon', () => {
   ])
 
   const result = applyERPFavicon(documentStub, '/erp/dashboard', {
-    customerFaviconHref: '/favicon-yoyoosun.svg',
+    customerFaviconHref: CUSTOMER_FAVICON_HREF,
   })
 
   assert.deepEqual(result, {
     key: 'customer',
-    href: '/favicon-yoyoosun.svg',
+    href: CUSTOMER_FAVICON_HREF,
     type: 'image/svg+xml',
   })
   assert.equal(
     documentStub.links[0].getAttribute('href'),
-    '/favicon-yoyoosun.svg'
+    CUSTOMER_FAVICON_HREF
   )
   assert.equal(documentStub.links[0].getAttribute('type'), 'image/svg+xml')
 })

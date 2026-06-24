@@ -10,13 +10,15 @@ import AuthGuard from '@/common/auth/AuthGuard'
 import { getStoredAdminProfile } from '@/common/auth/auth'
 import { Loading } from '@/common/components/loading'
 import ERPLayout from './components/ERPLayout.jsx'
-import { DEV_CAPABILITY_LEDGER_ROUTE } from './config/devCapabilityLedger.mjs'
-import { DEV_CUSTOMER_CONFIG_ROUTE } from './config/devCustomerConfig.mjs'
-import { DEV_DOCS_ROUTE } from './config/devDocs.mjs'
-import { DEV_GOVERNANCE_ROUTE } from './config/devGovernance.mjs'
-import { DEV_HUB_ROUTE } from './config/devHub.mjs'
-import { DEV_PROTOTYPES_ROUTE } from './config/devPrototypes.mjs'
-import { DEV_TESTING_ROUTE } from './config/devTesting.mjs'
+import {
+  DEV_CAPABILITY_LEDGER_ROUTE,
+  DEV_CUSTOMER_CONFIG_ROUTE,
+  DEV_DOCS_ROUTE,
+  DEV_GOVERNANCE_ROUTE,
+  DEV_HUB_ROUTE,
+  DEV_PROTOTYPES_ROUTE,
+  DEV_TESTING_ROUTE,
+} from './config/devRoutes.mjs'
 import {
   ENTRY_TARGET,
   getEnabledMobileRoleKeys,

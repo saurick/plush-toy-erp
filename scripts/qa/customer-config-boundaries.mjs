@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 
+import { existsSync, readFileSync } from "node:fs";
+import nodeAssert from "node:assert/strict";
+import path from "node:path";
+import vm from "node:vm";
 import { yoyoosunFieldNumberingConfig } from "../../config/customers/yoyoosun/fieldNumberingConfig.mjs";
 import { yoyoosunImportConfig } from "../../config/customers/yoyoosun/importConfig.mjs";
+import { yoyoosunMenuConfig } from "../../config/customers/yoyoosun/menuConfig.mjs";
 
 const ALLOWED_FIELD_DECISIONS = new Set(["review_required", "defer_runtime"]);
 const ALLOWED_NUMBERING_DECISIONS = new Set(["review_required", "deferred"]);
@@ -27,6 +32,16 @@ const FORBIDDEN_RAW_DATA_KEYS = new Set([
   "records",
   "sources",
 ]);
+const PRODUCT_RUNTIME_FILES = [
+  "web/src/common/consts/brand.js",
+  "web/src/erp/config/customerMenuConfig.mjs",
+];
+const CUSTOMER_ASSET_ROOT = "/customer-assets/yoyoosun/";
+const repoRoot = path.resolve(import.meta.dirname, "..", "..");
+
+function repoPath(relativePath) {
+  return path.join(repoRoot, relativePath);
+}
 
 function assert(condition, message) {
   if (!condition) {
@@ -59,6 +74,108 @@ function assertNoRawDataPayload(value, path = "importConfig") {
       `${path}.${key} must not embed raw source rows or records`,
     );
     assertNoRawDataPayload(nestedValue, `${path}.${key}`);
+  }
+}
+
+function validateProductRuntimeDoesNotBundleCustomerPackages() {
+  for (const runtimeFile of PRODUCT_RUNTIME_FILES) {
+    const source = readFileSync(repoPath(runtimeFile), "utf8");
+    assert(
+      !source.includes("config/customers/"),
+      `${runtimeFile} must not import customer packages into the default product runtime`,
+    );
+    assert(
+      !source.includes("yoyoosunMenuConfig"),
+      `${runtimeFile} must not reference yoyoosun bundled menu config`,
+    );
+  }
+
+  assert(
+    existsSync(repoPath("web/public/customer-config.js")),
+    "web/public/customer-config.js neutral runtime injection placeholder must exist",
+  );
+  assert(
+    !existsSync(repoPath(path.join("web", "public", "favicon-yoyoosun.svg"))),
+    "web/public must not include yoyoosun-specific favicon in the default product package",
+  );
+  assert(
+    existsSync(repoPath("config/customers/yoyoosun/customer-config.example.js")),
+    "yoyoosun customer package must keep a deployment injection example",
+  );
+  assert(
+    existsSync(repoPath("config/customers/yoyoosun/assets/favicon-yoyoosun.svg")),
+    "yoyoosun customer favicon must stay in the customer package assets",
+  );
+}
+
+function cloneJSON(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function pickRuntimeCustomerConfig(config) {
+  return cloneJSON({
+    customerKey: config?.customerKey,
+    label: config?.label,
+    brand: config?.brand,
+    desktopMenu: config?.desktopMenu,
+  });
+}
+
+function readYoyoosunCustomerConfigExample() {
+  const examplePath = "config/customers/yoyoosun/customer-config.example.js";
+  const source = readFileSync(repoPath(examplePath), "utf8");
+  const sandbox = { window: {} };
+  vm.runInNewContext(source, sandbox, {
+    filename: repoPath(examplePath),
+  });
+  return sandbox.window.__PLUSH_ERP_CUSTOMER_CONFIG__;
+}
+
+function validateYoyoosunRuntimeInjectionExample() {
+  const exampleConfig = readYoyoosunCustomerConfigExample();
+  assert(
+    exampleConfig && typeof exampleConfig === "object",
+    "customer-config.example.js must assign window.__PLUSH_ERP_CUSTOMER_CONFIG__",
+  );
+  nodeAssert.deepStrictEqual(
+    pickRuntimeCustomerConfig(exampleConfig),
+    pickRuntimeCustomerConfig(yoyoosunMenuConfig),
+    "customer-config.example.js runtime injection fields must match menuConfig.mjs customerKey/label/brand/desktopMenu",
+  );
+
+  const faviconHref = exampleConfig.brand?.faviconHref || "";
+  assert(
+    faviconHref.startsWith(CUSTOMER_ASSET_ROOT),
+    `brand.faviconHref must live under ${CUSTOMER_ASSET_ROOT}`,
+  );
+  const faviconAssetName = faviconHref.slice(CUSTOMER_ASSET_ROOT.length);
+  assertNonEmptyString(faviconAssetName, "brand.faviconHref asset name");
+  assert(
+    existsSync(repoPath(path.join("config/customers/yoyoosun/assets", faviconAssetName))),
+    "customer favicon asset referenced by runtime config must exist",
+  );
+}
+
+function validateCustomerConfigReleaseOverlay() {
+  assert(
+    existsSync(repoPath("scripts/build/apply-customer-web-config.mjs")),
+    "customer web config overlay script must exist",
+  );
+  const dockerignore = readFileSync(repoPath(".dockerignore"), "utf8");
+  assert(
+    dockerignore.includes("!scripts/build/**"),
+    ".dockerignore must keep scripts/build/** in the Docker build context",
+  );
+  for (const dockerfile of ["web/Dockerfile", "server/Dockerfile"]) {
+    const source = readFileSync(repoPath(dockerfile), "utf8");
+    assert(
+      source.includes("ERP_CUSTOMER_KEY"),
+      `${dockerfile} must expose ERP_CUSTOMER_KEY build arg`,
+    );
+    assert(
+      source.includes("apply-customer-web-config.mjs"),
+      `${dockerfile} must apply customer web config during local/CI build`,
+    );
   }
 }
 
@@ -398,6 +515,9 @@ function validateYoyoosunImportConfig(config) {
 
 validateYoyoosunFieldNumberingConfig(yoyoosunFieldNumberingConfig);
 validateYoyoosunImportConfig(yoyoosunImportConfig);
+validateProductRuntimeDoesNotBundleCustomerPackages();
+validateYoyoosunRuntimeInjectionExample();
+validateCustomerConfigReleaseOverlay();
 
 console.log(
   `customer config boundaries ok: ${yoyoosunFieldNumberingConfig.customerKey}, field modules=${yoyoosunFieldNumberingConfig.fieldDisplayReview.length}, numbering rules=${yoyoosunFieldNumberingConfig.numberingRuleReview.length}, import config items=${yoyoosunImportConfig.configItems.length}, extracted rows=${yoyoosunImportConfig.globalScan.extractedSourceStats.sourceRows}`,

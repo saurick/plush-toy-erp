@@ -8,7 +8,6 @@ import {
   roleWorkbenches,
 } from './seedData.mjs'
 import { appDefinitions } from './appRegistry.mjs'
-import { yoyoosunMenuConfig } from '../../../../config/customers/yoyoosun/menuConfig.mjs'
 
 test('seedData: 每个岗位任务端入口都有运行时角色标签', () => {
   const mobileApps = appDefinitions.filter((app) => app.kind === 'mobile')
@@ -166,8 +165,37 @@ test('customerMenuConfig: 客户菜单配置可控制桌面菜单显隐、排序
   assert(!navigationSections[0].items.some((item) => item.key === 'suppliers'))
 })
 
-test('customerMenuConfig: yoyoosun 保留任务看板并隐藏高级和预览入口', () => {
-  const navigationSections = getNavigationSections(yoyoosunMenuConfig)
+test('customerMenuConfig: runtime config keeps task board and hides advanced entries', () => {
+  const navigationSections = getNavigationSections({
+    customerKey: 'demo-customer',
+    desktopMenu: {
+      hiddenItemKeys: [
+        'business-dashboard',
+        'production-scheduling',
+        'production-exceptions',
+        'shipping-release',
+        'exception-flow',
+      ],
+      sections: [
+        {
+          title: '看板中心',
+          items: ['global-dashboard', 'task-board', 'business-dashboard'],
+        },
+        {
+          title: '生产管理',
+          items: [
+            'production-scheduling',
+            'production-progress',
+            'production-exceptions',
+          ],
+        },
+        {
+          title: '出货管理',
+          items: ['shipping-release', 'outbound', 'shipments'],
+        },
+      ],
+    },
+  })
   const navPaths = navigationSections.flatMap((section) =>
     section.items.map((item) => item.path)
   )

@@ -190,9 +190,6 @@ test('moduleTableColumns: ERP 表格列禁止配置省略属性', () => {
 test('moduleTableColumns: 主业务列表页使用共享排序入口', () => {
   const mainBusinessTableFiles = [
     'pages/WorkflowBusinessModulePage.jsx',
-    'pages/V1MasterDataPage.jsx',
-    'pages/V1SalesOrdersPage.jsx',
-    'pages/V1PurchaseOrdersPage.jsx',
     'pages/V1PurchaseReceiptsPage.jsx',
     'pages/BOMVersionsPage.jsx',
     'pages/ShipmentsPage.jsx',
@@ -204,4 +201,39 @@ test('moduleTableColumns: 主业务列表页使用共享排序入口', () => {
   })
 
   assert.deepEqual(missing, [])
+
+  const masterDataPage = readFileSync(
+    resolve(erpSourceRoot, 'pages/V1MasterDataPage.jsx'),
+    'utf8'
+  )
+  const masterDataColumns = readFileSync(
+    resolve(erpSourceRoot, 'components/master-data/masterDataColumns.jsx'),
+    'utf8'
+  )
+  const salesOrdersPage = readFileSync(
+    resolve(erpSourceRoot, 'pages/V1SalesOrdersPage.jsx'),
+    'utf8'
+  )
+  const salesOrderColumns = readFileSync(
+    resolve(erpSourceRoot, 'components/sales-orders/salesOrderColumns.jsx'),
+    'utf8'
+  )
+  const purchaseOrdersPage = readFileSync(
+    resolve(erpSourceRoot, 'pages/V1PurchaseOrdersPage.jsx'),
+    'utf8'
+  )
+  const purchaseOrderColumns = readFileSync(
+    resolve(
+      erpSourceRoot,
+      'components/purchase-orders/purchaseOrderColumns.jsx'
+    ),
+    'utf8'
+  )
+  assert.match(masterDataPage, /buildMasterDataRecordColumns\(/u)
+  assert.match(masterDataColumns, /applyBusinessColumnSorters\(/u)
+  assert.match(salesOrdersPage, /buildSalesOrderColumns\(/u)
+  assert.match(salesOrdersPage, /buildSalesOrderItemColumns\(/u)
+  assert.match(salesOrderColumns, /applyBusinessColumnSorters\(/u)
+  assert.match(purchaseOrdersPage, /buildPurchaseOrderColumns\(/u)
+  assert.match(purchaseOrderColumns, /applyBusinessColumnSorters\(/u)
 })

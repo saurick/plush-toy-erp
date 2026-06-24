@@ -118,6 +118,20 @@ docker build -f server/Dockerfile -t plush-toy-erp-server:dev .
 docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
 ```
 
+默认构建产物是中性产品包。yoyoosun 客户试用 / 交付镜像必须在本地或 CI 构建时显式传入客户 key，Dockerfile 会把客户 `customer-config.js` 和 `customer-assets/yoyoosun/` 写入前端静态产物；低配目标机仍不执行构建。
+
+```bash
+docker build \
+  --build-arg ERP_CUSTOMER_KEY=yoyoosun \
+  -f server/Dockerfile \
+  -t plush-toy-erp-server:yoyoosun-dev .
+
+docker build \
+  --build-arg ERP_CUSTOMER_KEY=yoyoosun \
+  -f web/Dockerfile \
+  -t plush-toy-erp-web:yoyoosun-dev .
+```
+
 前端容器也可以独立运行，例如：
 
 ```bash

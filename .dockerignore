@@ -5,6 +5,8 @@
 **/node_modules
 **/.vite-cache
 **/build
+!scripts/build
+!scripts/build/**
 **/dist
 **/coverage
 

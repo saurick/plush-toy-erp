@@ -12,6 +12,7 @@ const scanDirs = ['pages', 'components', 'mobile'].map((dir) =>
 const scanFiles = ['utils/referenceSelectOptions.mjs'].map((file) =>
   join(rootDir, file)
 )
+scanFiles.push(join(rootDir, 'utils/dashboardTaskDisplay.mjs'))
 
 const sourceExtensions = new Set(['.js', '.jsx', '.mjs'])
 const forbiddenUserVisibleText = [
@@ -22,6 +23,7 @@ const forbiddenUserVisibleText = [
   '内部批次',
   '内部余额',
   '内部记录',
+  '内部来源',
   '客户 #',
   '供应商 #',
   '材料 #',

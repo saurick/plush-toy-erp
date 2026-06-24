@@ -12,7 +12,7 @@
 
 - 本样板不逐菜单复制一套完整页面，而是逐菜单列出内容范围，再映射到列表页、详情页、表单页、动作浮层、工作台、报表、导入和移动任务等既有样板。
 - 菜单覆盖来源是 `docs/reference/第二次20260611/产品核心菜单与页面功能规格.md`，该 reference 目录只作为设计输入；它可作为原型来源，但必须按当前真源复核，不替代运行时菜单、schema、API、RBAC、migration 或测试真源。
-- 当前正式运行时菜单仍以 `web/src/erp/config/seedData.mjs`、`web/src/erp/config/businessModules.mjs`、`config/customers/yoyoosun/menuConfig.mjs` 和后端 RBAC 返回为准。
+- 当前正式运行时菜单仍以 `web/src/erp/config/seedData.mjs`、`web/src/erp/config/businessModules.mjs`、部署注入的 `customer-config.js`、客户包源 `config/customers/yoyoosun/menuConfig.mjs` 和后端 RBAC 返回为准。
 - 第一批 / 第二批原型优先级只用于安排设计和实现顺序，不表示这些页面已经进入 Current，也不表示客户菜单必须全部启用。
 - 数据导入、系统配置、备份恢复、客户配置和 Legacy Archive 在本样板中保持“页面内容可评审”，不因此进入正式菜单、后端业务或生产构建。
 

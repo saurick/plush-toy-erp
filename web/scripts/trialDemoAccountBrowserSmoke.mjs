@@ -14,6 +14,14 @@ const outputDir = path.resolve(
   'playwright',
   'trial-demo-account-browser-smoke'
 )
+const trialCustomerConfigScriptPath = path.resolve(
+  webDir,
+  '..',
+  'config',
+  'customers',
+  'yoyoosun',
+  'customer-config.example.js'
+)
 const devServerPort = Number(process.env.TRIAL_BROWSER_SMOKE_PORT || 4194)
 const externalBaseURL = String(
   process.env.TRIAL_BROWSER_SMOKE_BASE_URL || ''
@@ -192,7 +200,6 @@ function startDevServer() {
       env: {
         ...process.env,
         BROWSER: 'none',
-        VITE_ERP_CUSTOMER_KEY: 'yoyoosun',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     }
@@ -230,7 +237,7 @@ async function ensureBackendReady() {
   let response
   try {
     response = await fetch(backendHealthURL, { redirect: 'manual' })
-  } catch (error) {
+  } catch (_error) {
     throw new Error(
       `无法访问后端健康检查 ${backendHealthURL}，请先启动 server。`
     )
@@ -264,6 +271,16 @@ async function waitForServer(url) {
 
 async function newPage(browser, viewport) {
   const context = await browser.newContext({ viewport })
+  const trialCustomerConfigScript = await fs.readFile(
+    trialCustomerConfigScriptPath,
+    'utf8'
+  )
+  await context.route('**/customer-config.js', (route) =>
+    route.fulfill({
+      contentType: 'application/javascript; charset=utf-8',
+      body: trialCustomerConfigScript,
+    })
+  )
   const page = await context.newPage()
   const runtimeErrors = []
   page.on('console', (message) => {

@@ -14,9 +14,9 @@ const formModalAttachmentEntrypoints = [
   '../pages/ShipmentsPage.jsx',
   '../pages/V1MasterDataPage.jsx',
   '../pages/V1OutsourcingOrdersPage.jsx',
-  '../pages/V1PurchaseOrdersPage.jsx',
   '../pages/V1QualityInspectionsPage.jsx',
-  '../pages/V1SalesOrdersPage.jsx',
+  '../components/purchase-orders/PurchaseOrderBusinessModal.jsx',
+  '../components/sales-orders/SalesOrderBusinessModal.jsx',
 ]
 
 test('page-level attachment entrypoints open attachments through modal actions', () => {

@@ -11,7 +11,7 @@
 | `scripts/` | 本地环境初始化、质量门禁和 Git hooks |
 | `.agents/skills/` | Codex 项目专属 skills，维护 plush 文档治理、页面治理、代码审查、测试治理、提示词治理、发布治理、业务边界、运行诊断、seed/import、可观测错误和安全隐私工作流；作为仓库内 canonical，不依赖个人本机 `~/.codex/skills` 副本 |
 | `docs/` | 仓库级约定、流程、数据模型、产品化架构、架构评审和部署文档 |
-| `config/` | 行业模板、客户配置包和私有化复制模板落点；当前已有 yoyoosun 前端品牌 / 桌面菜单展示配置 loader，不代表 SaaS tenant，也不改变后端 RBAC、schema 或事实规则，内部目录职责见 [`config/README.md`](config/README.md) |
+| `config/` | 行业模板、客户配置包和私有化复制模板落点；当前已有 yoyoosun 前端品牌 / 桌面菜单展示配置源和部署注入示例，默认产品前端包不静态打包具体客户配置，不代表 SaaS tenant，也不改变后端 RBAC、schema 或事实规则，内部目录职责见 [`config/README.md`](config/README.md) |
 | `deployments/` | 客户私有化部署实例资料落点；当前唯一部署真源仍在 `server/deploy/compose/prod`，私有化模板不创建第二套部署主路径 |
 
 ## 当前边界
@@ -104,6 +104,15 @@ pnpm start:mobile:quality
 ```bash
 cd /Users/simon/projects/plush-toy-erp
 docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
+```
+
+yoyoosun 等客户私有化前端包必须在本地或 CI 构建时显式注入客户配置，目标服务器仍只负责加载镜像：
+
+```bash
+docker build \
+  --build-arg ERP_CUSTOMER_KEY=yoyoosun \
+  -f web/Dockerfile \
+  -t plush-toy-erp-web:yoyoosun-dev .
 ```
 
 固定端口：前端 `5175`；生产 Compose 中后端 HTTP `127.0.0.1:8300`、后端 gRPC `127.0.0.1:9300` 只绑定宿主机 loopback，浏览器业务流量通过前端容器 `/rpc` 反代进入 Docker 网络内的 `app-server:8300`。

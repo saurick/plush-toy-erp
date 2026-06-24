@@ -22,9 +22,9 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func TestPhase2APostgresMigrationShape(t *testing.T) {
+func TestInventoryPostgresMigrationShape(t *testing.T) {
 	ctx := context.Background()
-	data, client := openPhase2APostgresTestData(t)
+	data, client := openInventoryPostgresTestData(t)
 
 	for _, table := range []string{
 		"units",
@@ -43,18 +43,18 @@ func TestPhase2APostgresMigrationShape(t *testing.T) {
 	assertPostgresUniqueIndex(t, data.sqldb, "inventory_txns", "inventorytxn_reversal_of_txn_id")
 	assertPostgresUniqueIndex(t, data.sqldb, "inventory_balances", "inventorybalance_subject_type_subject_id_warehouse_id_unit_id")
 
-	suffix := phase2APostgresSuffix()
+	suffix := postgresTestSuffix()
 	unit := createTestUnit(t, ctx, client, "PGU"+suffix)
 	if _, err := client.Unit.Create().SetCode(unit.Code).SetName("重复单位").Save(ctx); !ent.IsConstraintError(err) {
 		t.Fatalf("expected postgres unit code unique constraint, got %v", err)
 	}
 }
 
-func TestPhase2APostgresInventoryFlow(t *testing.T) {
+func TestInventoryPostgresFlow(t *testing.T) {
 	ctx := context.Background()
-	data, client := openPhase2APostgresTestData(t)
+	data, client := openInventoryPostgresTestData(t)
 
-	fixtures := createPhase2APostgresFixtures(t, ctx, client)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(
 		data,
 		log.NewStdLogger(io.Discard),
@@ -68,8 +68,8 @@ func TestPhase2APostgresInventoryFlow(t *testing.T) {
 		Direction:      1,
 		Quantity:       mustDecimal(t, "1.234567"),
 		UnitID:         fixtures.unitID,
-		SourceType:     "phase2a_pg",
-		IdempotencyKey: "phase2a-pg-decimal-" + fixtures.suffix,
+		SourceType:     "inventory_pg",
+		IdempotencyKey: "inventory-pg-decimal-" + fixtures.suffix,
 	})
 	if err != nil {
 		t.Fatalf("postgres decimal inbound failed: %v", err)
@@ -84,8 +84,8 @@ func TestPhase2APostgresInventoryFlow(t *testing.T) {
 		Direction:      1,
 		Quantity:       mustDecimal(t, "1.234567"),
 		UnitID:         fixtures.unitID,
-		SourceType:     "phase2a_pg",
-		IdempotencyKey: "phase2a-pg-decimal-" + fixtures.suffix,
+		SourceType:     "inventory_pg",
+		IdempotencyKey: "inventory-pg-decimal-" + fixtures.suffix,
 	})
 	if err != nil {
 		t.Fatalf("postgres idempotency replay failed: %v", err)
@@ -103,8 +103,8 @@ func TestPhase2APostgresInventoryFlow(t *testing.T) {
 		Direction:      1,
 		Quantity:       mustDecimal(t, "4"),
 		UnitID:         fixtures.unitID,
-		SourceType:     "phase2a_pg",
-		IdempotencyKey: "phase2a-pg-product-in-" + fixtures.suffix,
+		SourceType:     "inventory_pg",
+		IdempotencyKey: "inventory-pg-product-in-" + fixtures.suffix,
 	})
 	if err != nil {
 		t.Fatalf("postgres product inbound failed: %v", err)
@@ -119,8 +119,8 @@ func TestPhase2APostgresInventoryFlow(t *testing.T) {
 		Direction:      1,
 		Quantity:       mustDecimal(t, "8.765433"),
 		UnitID:         fixtures.unitID,
-		SourceType:     "phase2a_pg",
-		IdempotencyKey: "phase2a-pg-mat-in-" + fixtures.suffix,
+		SourceType:     "inventory_pg",
+		IdempotencyKey: "inventory-pg-mat-in-" + fixtures.suffix,
 	})
 	if err != nil {
 		t.Fatalf("postgres material inbound failed: %v", err)
@@ -135,8 +135,8 @@ func TestPhase2APostgresInventoryFlow(t *testing.T) {
 		Direction:      -1,
 		Quantity:       mustDecimal(t, "3"),
 		UnitID:         fixtures.unitID,
-		SourceType:     "phase2a_pg",
-		IdempotencyKey: "phase2a-pg-mat-out-" + fixtures.suffix,
+		SourceType:     "inventory_pg",
+		IdempotencyKey: "inventory-pg-mat-out-" + fixtures.suffix,
 	})
 	if err != nil {
 		t.Fatalf("postgres material outbound failed: %v", err)
@@ -151,8 +151,8 @@ func TestPhase2APostgresInventoryFlow(t *testing.T) {
 		Direction:      -1,
 		Quantity:       mustDecimal(t, "8"),
 		UnitID:         fixtures.unitID,
-		SourceType:     "phase2a_pg",
-		IdempotencyKey: "phase2a-pg-overdraw-" + fixtures.suffix,
+		SourceType:     "inventory_pg",
+		IdempotencyKey: "inventory-pg-overdraw-" + fixtures.suffix,
 	})
 	if !errors.Is(err, biz.ErrInventoryInsufficientStock) {
 		t.Fatalf("expected postgres insufficient stock, got %v", err)
@@ -167,8 +167,8 @@ func TestPhase2APostgresInventoryFlow(t *testing.T) {
 		Direction:       1,
 		Quantity:        mustDecimal(t, "3"),
 		UnitID:          fixtures.unitID,
-		SourceType:      "phase2a_pg",
-		IdempotencyKey:  "phase2a-pg-reversal-" + fixtures.suffix,
+		SourceType:      "inventory_pg",
+		IdempotencyKey:  "inventory-pg-reversal-" + fixtures.suffix,
 		ReversalOfTxnID: &reversalOf,
 	})
 	if err != nil {
@@ -184,8 +184,8 @@ func TestPhase2APostgresInventoryFlow(t *testing.T) {
 		Direction:       1,
 		Quantity:        mustDecimal(t, "3"),
 		UnitID:          fixtures.unitID,
-		SourceType:      "phase2a_pg",
-		IdempotencyKey:  "phase2a-pg-reversal-duplicate-" + fixtures.suffix,
+		SourceType:      "inventory_pg",
+		IdempotencyKey:  "inventory-pg-reversal-duplicate-" + fixtures.suffix,
 		ReversalOfTxnID: &reversalOf,
 	})
 	if !errors.Is(err, biz.ErrInventoryTxnAlreadyReversed) {
@@ -201,8 +201,8 @@ func TestPhase2APostgresInventoryFlow(t *testing.T) {
 		Direction:      1,
 		Quantity:       mustDecimal(t, "1"),
 		UnitID:         fixtures.unitID,
-		SourceType:     "phase2a_pg",
-		IdempotencyKey: "phase2a-pg-invalid-material-" + fixtures.suffix,
+		SourceType:     "inventory_pg",
+		IdempotencyKey: "inventory-pg-invalid-material-" + fixtures.suffix,
 	})
 	if !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("expected postgres MATERIAL with product id to be rejected, got %v", err)
@@ -217,8 +217,8 @@ func TestPhase2APostgresInventoryFlow(t *testing.T) {
 		Direction:      1,
 		Quantity:       mustDecimal(t, "1"),
 		UnitID:         fixtures.unitID,
-		SourceType:     "phase2a_pg",
-		IdempotencyKey: "phase2a-pg-invalid-product-" + fixtures.suffix,
+		SourceType:     "inventory_pg",
+		IdempotencyKey: "inventory-pg-invalid-product-" + fixtures.suffix,
 	})
 	if !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("expected postgres PRODUCT with material id to be rejected, got %v", err)
@@ -244,8 +244,8 @@ func TestPhase2APostgresInventoryFlow(t *testing.T) {
 
 func TestOperationalFactPostgresOutsourcingMaterialIssueWithoutLotPostAndCancel(t *testing.T) {
 	ctx := context.Background()
-	data, client := openPhase2APostgresTestData(t)
-	fixtures := createPhase2APostgresFixtures(t, ctx, client)
+	data, client := openInventoryPostgresTestData(t)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 
@@ -291,11 +291,11 @@ func TestOperationalFactPostgresOutsourcingMaterialIssueWithoutLotPostAndCancel(
 	}
 }
 
-func TestPhase2APostgresConcurrentOutbound(t *testing.T) {
+func TestInventoryPostgresConcurrentOutbound(t *testing.T) {
 	ctx := context.Background()
-	data, client := openPhase2APostgresTestData(t)
+	data, client := openInventoryPostgresTestData(t)
 
-	fixtures := createPhase2APostgresFixtures(t, ctx, client)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(
 		data,
 		log.NewStdLogger(io.Discard),
@@ -309,8 +309,8 @@ func TestPhase2APostgresConcurrentOutbound(t *testing.T) {
 		Direction:      1,
 		Quantity:       mustDecimal(t, "10"),
 		UnitID:         fixtures.unitID,
-		SourceType:     "phase2a_pg_concurrent",
-		IdempotencyKey: "phase2a-pg-concurrent-in-" + fixtures.suffix,
+		SourceType:     "inventory_pg_concurrent",
+		IdempotencyKey: "inventory-pg-concurrent-in-" + fixtures.suffix,
 	}); err != nil {
 		t.Fatalf("postgres concurrent inbound failed: %v", err)
 	}
@@ -333,8 +333,8 @@ func TestPhase2APostgresConcurrentOutbound(t *testing.T) {
 				Direction:      -1,
 				Quantity:       decimal.NewFromInt(1),
 				UnitID:         fixtures.unitID,
-				SourceType:     "phase2a_pg_concurrent",
-				IdempotencyKey: fmt.Sprintf("phase2a-pg-concurrent-out-%s-%02d", fixtures.suffix, i),
+				SourceType:     "inventory_pg_concurrent",
+				IdempotencyKey: fmt.Sprintf("inventory-pg-concurrent-out-%s-%02d", fixtures.suffix, i),
 			})
 			errs <- err
 		}()
@@ -383,7 +383,7 @@ func TestPhase2APostgresConcurrentOutbound(t *testing.T) {
 			inventorytxn.WarehouseID(fixtures.warehouseID),
 			inventorytxn.UnitID(fixtures.unitID),
 			inventorytxn.TxnType(biz.InventoryTxnOut),
-			inventorytxn.SourceType("PHASE2A_PG_CONCURRENT"),
+			inventorytxn.SourceType("INVENTORY_PG_CONCURRENT"),
 		).
 		Count(ctx)
 	if err != nil {
@@ -394,7 +394,7 @@ func TestPhase2APostgresConcurrentOutbound(t *testing.T) {
 	}
 }
 
-type phase2APostgresFixtures struct {
+type inventoryPostgresFixtures struct {
 	suffix      string
 	unitID      int
 	materialID  int
@@ -402,21 +402,21 @@ type phase2APostgresFixtures struct {
 	warehouseID int
 }
 
-type phase2BPostgresFixtures = phase2APostgresFixtures
-type phase2CPostgresFixtures = phase2APostgresFixtures
-type phase2DPostgresFixtures = phase2APostgresFixtures
+type inventoryLotPostgresFixtures = inventoryPostgresFixtures
+type purchaseReceiptPostgresFixtures = inventoryPostgresFixtures
+type purchaseOperationalPostgresFixtures = inventoryPostgresFixtures
 
-func openPhase2APostgresTestData(t *testing.T) (*Data, *ent.Client) {
+func openInventoryPostgresTestData(t *testing.T) (*Data, *ent.Client) {
 	t.Helper()
-	if os.Getenv("PHASE2A_PG_TEST") != "1" {
-		t.Skip("set PHASE2A_PG_TEST=1 and PHASE2A_PG_TEST_DB_URL to run PostgreSQL integration tests")
+	if os.Getenv("INVENTORY_PG_TEST") != "1" {
+		t.Skip("set INVENTORY_PG_TEST=1 and INVENTORY_PG_TEST_DB_URL to run PostgreSQL integration tests")
 	}
-	dsn := os.Getenv("PHASE2A_PG_TEST_DB_URL")
+	dsn := os.Getenv("INVENTORY_PG_TEST_DB_URL")
 	if dsn == "" {
-		dsn = os.Getenv("PHASE2A_DB_URL")
+		dsn = os.Getenv("INVENTORY_PG_DB_URL")
 	}
 	if dsn == "" {
-		t.Fatal("PHASE2A_PG_TEST_DB_URL or PHASE2A_DB_URL is required")
+		t.Fatal("INVENTORY_PG_TEST_DB_URL or INVENTORY_PG_DB_URL is required")
 	}
 
 	db, err := stdsql.Open("pgx", dsn)
@@ -441,134 +441,119 @@ func openPhase2APostgresTestData(t *testing.T) (*Data, *ent.Client) {
 	}, client
 }
 
-func openPhase2BPostgresTestData(t *testing.T) (*Data, *ent.Client) {
-	t.Helper()
-	if os.Getenv("PHASE2B_PG_TEST") != "1" {
-		t.Skip("set PHASE2B_PG_TEST=1 and PHASE2B_PG_TEST_DB_URL to run PostgreSQL integration tests")
-	}
-	dsn := os.Getenv("PHASE2B_PG_TEST_DB_URL")
-	if dsn == "" {
-		dsn = os.Getenv("PHASE2B_DB_URL")
-	}
-	if dsn == "" {
-		t.Fatal("PHASE2B_PG_TEST_DB_URL or PHASE2B_DB_URL is required")
-	}
-
-	db, err := stdsql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("open phase2b postgres failed: %v", err)
-	}
-	db.SetMaxOpenConns(30)
-	db.SetMaxIdleConns(10)
-	if err := db.Ping(); err != nil {
-		_ = db.Close()
-		t.Fatalf("ping phase2b postgres failed: %v", err)
-	}
-	client := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, db)))
-	t.Cleanup(func() {
-		_ = client.Close()
-		_ = db.Close()
-	})
-	return &Data{
-		postgres:   client,
-		sqldb:      db,
-		sqlDialect: dialect.Postgres,
-	}, client
-}
-
-func openPhase2CPostgresTestData(t *testing.T) (*Data, *ent.Client) {
-	t.Helper()
-	if os.Getenv("PHASE2C_PG_TEST") != "1" {
-		t.Skip("set PHASE2C_PG_TEST=1 and PHASE2C_PG_TEST_DB_URL to run PostgreSQL integration tests")
-	}
-	dsn := os.Getenv("PHASE2C_PG_TEST_DB_URL")
-	if dsn == "" {
-		dsn = os.Getenv("PHASE2C_DB_URL")
-	}
-	if dsn == "" {
-		t.Fatal("PHASE2C_PG_TEST_DB_URL or PHASE2C_DB_URL is required")
-	}
-
-	db, err := stdsql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("open phase2c postgres failed: %v", err)
-	}
-	db.SetMaxOpenConns(30)
-	db.SetMaxIdleConns(10)
-	if err := db.Ping(); err != nil {
-		_ = db.Close()
-		t.Fatalf("ping phase2c postgres failed: %v", err)
-	}
-	client := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, db)))
-	t.Cleanup(func() {
-		_ = client.Close()
-		_ = db.Close()
-	})
-	return &Data{
-		postgres:   client,
-		sqldb:      db,
-		sqlDialect: dialect.Postgres,
-	}, client
-}
-
-func openPhase2DPostgresTestData(t *testing.T) (*Data, *ent.Client) {
-	t.Helper()
-	if os.Getenv("PHASE2D_PG_TEST") != "1" {
-		t.Skip("set PHASE2D_PG_TEST=1 and PHASE2D_PG_TEST_DB_URL to run PostgreSQL integration tests")
-	}
-	dsn := os.Getenv("PHASE2D_PG_TEST_DB_URL")
-	if dsn == "" {
-		dsn = os.Getenv("PHASE2D_DB_URL")
-	}
-	if dsn == "" {
-		t.Fatal("PHASE2D_PG_TEST_DB_URL or PHASE2D_DB_URL is required")
-	}
-
-	db, err := stdsql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("open phase2d postgres failed: %v", err)
-	}
-	db.SetMaxOpenConns(30)
-	db.SetMaxIdleConns(10)
-	if err := db.Ping(); err != nil {
-		_ = db.Close()
-		t.Fatalf("ping phase2d postgres failed: %v", err)
-	}
-	client := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, db)))
-	t.Cleanup(func() {
-		_ = client.Close()
-		_ = db.Close()
-	})
-	return &Data{
-		postgres:   client,
-		sqldb:      db,
-		sqlDialect: dialect.Postgres,
-	}, client
-}
-
 func openInventoryLotPostgresTestData(t *testing.T) (*Data, *ent.Client) {
 	t.Helper()
-	return openPhase2BPostgresTestData(t)
+	if os.Getenv("BOM_LOT_PG_TEST") != "1" {
+		t.Skip("set BOM_LOT_PG_TEST=1 and BOM_LOT_PG_TEST_DB_URL to run PostgreSQL integration tests")
+	}
+	dsn := os.Getenv("BOM_LOT_PG_TEST_DB_URL")
+	if dsn == "" {
+		dsn = os.Getenv("BOM_LOT_PG_DB_URL")
+	}
+	if dsn == "" {
+		t.Fatal("BOM_LOT_PG_TEST_DB_URL or BOM_LOT_PG_DB_URL is required")
+	}
+
+	db, err := stdsql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatalf("open bom_lot postgres failed: %v", err)
+	}
+	db.SetMaxOpenConns(30)
+	db.SetMaxIdleConns(10)
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		t.Fatalf("ping bom_lot postgres failed: %v", err)
+	}
+	client := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, db)))
+	t.Cleanup(func() {
+		_ = client.Close()
+		_ = db.Close()
+	})
+	return &Data{
+		postgres:   client,
+		sqldb:      db,
+		sqlDialect: dialect.Postgres,
+	}, client
 }
 
 func openPurchaseReceiptPostgresTestData(t *testing.T) (*Data, *ent.Client) {
 	t.Helper()
-	return openPhase2CPostgresTestData(t)
+	if os.Getenv("PURCHASE_RECEIPT_PG_TEST") != "1" {
+		t.Skip("set PURCHASE_RECEIPT_PG_TEST=1 and PURCHASE_RECEIPT_PG_TEST_DB_URL to run PostgreSQL integration tests")
+	}
+	dsn := os.Getenv("PURCHASE_RECEIPT_PG_TEST_DB_URL")
+	if dsn == "" {
+		dsn = os.Getenv("PURCHASE_RECEIPT_PG_DB_URL")
+	}
+	if dsn == "" {
+		t.Fatal("PURCHASE_RECEIPT_PG_TEST_DB_URL or PURCHASE_RECEIPT_PG_DB_URL is required")
+	}
+
+	db, err := stdsql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatalf("open purchase_receipt postgres failed: %v", err)
+	}
+	db.SetMaxOpenConns(30)
+	db.SetMaxIdleConns(10)
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		t.Fatalf("ping purchase_receipt postgres failed: %v", err)
+	}
+	client := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, db)))
+	t.Cleanup(func() {
+		_ = client.Close()
+		_ = db.Close()
+	})
+	return &Data{
+		postgres:   client,
+		sqldb:      db,
+		sqlDialect: dialect.Postgres,
+	}, client
 }
 
 func openPurchaseOperationalPostgresTestData(t *testing.T) (*Data, *ent.Client) {
 	t.Helper()
-	return openPhase2DPostgresTestData(t)
+	if os.Getenv("PURCHASE_RETURN_PG_TEST") != "1" {
+		t.Skip("set PURCHASE_RETURN_PG_TEST=1 and PURCHASE_RETURN_PG_TEST_DB_URL to run PostgreSQL integration tests")
+	}
+	dsn := os.Getenv("PURCHASE_RETURN_PG_TEST_DB_URL")
+	if dsn == "" {
+		dsn = os.Getenv("PURCHASE_RETURN_PG_DB_URL")
+	}
+	if dsn == "" {
+		t.Fatal("PURCHASE_RETURN_PG_TEST_DB_URL or PURCHASE_RETURN_PG_DB_URL is required")
+	}
+
+	db, err := stdsql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatalf("open purchase_return postgres failed: %v", err)
+	}
+	db.SetMaxOpenConns(30)
+	db.SetMaxIdleConns(10)
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		t.Fatalf("ping purchase_return postgres failed: %v", err)
+	}
+	client := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, db)))
+	t.Cleanup(func() {
+		_ = client.Close()
+		_ = db.Close()
+	})
+	return &Data{
+		postgres:   client,
+		sqldb:      db,
+		sqlDialect: dialect.Postgres,
+	}, client
 }
 
-func createPhase2APostgresFixtures(t *testing.T, ctx context.Context, client *ent.Client) phase2APostgresFixtures {
+func createInventoryPostgresFixtures(t *testing.T, ctx context.Context, client *ent.Client) inventoryPostgresFixtures {
 	t.Helper()
-	suffix := phase2APostgresSuffix()
+	suffix := postgresTestSuffix()
 	unit := createTestUnit(t, ctx, client, "PGU"+suffix)
 	material := createTestMaterial(t, ctx, client, unit.ID, "PG-MAT-"+suffix)
 	product := createTestProduct(t, ctx, client, unit.ID, "PG-PRD-"+suffix)
 	warehouse := createTestWarehouse(t, ctx, client, "PG-WH-"+suffix)
-	return phase2APostgresFixtures{
+	return inventoryPostgresFixtures{
 		suffix:      suffix,
 		unitID:      unit.ID,
 		materialID:  material.ID,
@@ -577,40 +562,25 @@ func createPhase2APostgresFixtures(t *testing.T, ctx context.Context, client *en
 	}
 }
 
-func createPhase2BPostgresFixtures(t *testing.T, ctx context.Context, client *ent.Client) phase2BPostgresFixtures {
+func createInventoryLotPostgresFixtures(t *testing.T, ctx context.Context, client *ent.Client) inventoryLotPostgresFixtures {
 	t.Helper()
-	fixtures := createPhase2APostgresFixtures(t, ctx, client)
-	return phase2BPostgresFixtures(fixtures)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
+	return inventoryLotPostgresFixtures(fixtures)
 }
 
-func createPhase2CPostgresFixtures(t *testing.T, ctx context.Context, client *ent.Client) phase2CPostgresFixtures {
+func createPurchaseReceiptPostgresFixtures(t *testing.T, ctx context.Context, client *ent.Client) purchaseReceiptPostgresFixtures {
 	t.Helper()
-	fixtures := createPhase2APostgresFixtures(t, ctx, client)
-	return phase2CPostgresFixtures(fixtures)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
+	return purchaseReceiptPostgresFixtures(fixtures)
 }
 
-func createPhase2DPostgresFixtures(t *testing.T, ctx context.Context, client *ent.Client) phase2DPostgresFixtures {
+func createPurchaseOperationalPostgresFixtures(t *testing.T, ctx context.Context, client *ent.Client) purchaseOperationalPostgresFixtures {
 	t.Helper()
-	fixtures := createPhase2APostgresFixtures(t, ctx, client)
-	return phase2DPostgresFixtures(fixtures)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
+	return purchaseOperationalPostgresFixtures(fixtures)
 }
 
-func createInventoryLotPostgresFixtures(t *testing.T, ctx context.Context, client *ent.Client) phase2BPostgresFixtures {
-	t.Helper()
-	return createPhase2BPostgresFixtures(t, ctx, client)
-}
-
-func createPurchaseReceiptPostgresFixtures(t *testing.T, ctx context.Context, client *ent.Client) phase2CPostgresFixtures {
-	t.Helper()
-	return createPhase2CPostgresFixtures(t, ctx, client)
-}
-
-func createPurchaseOperationalPostgresFixtures(t *testing.T, ctx context.Context, client *ent.Client) phase2DPostgresFixtures {
-	t.Helper()
-	return createPhase2DPostgresFixtures(t, ctx, client)
-}
-
-func phase2APostgresSuffix() string {
+func postgresTestSuffix() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano()%1_000_000_000)
 }
 

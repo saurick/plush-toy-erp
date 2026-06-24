@@ -1,8 +1,35 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { writeDryRunPackage } from './customerImportDryRunReport.mjs'
+import {
+  ALLOWED_ACTIONS,
+  ALLOWED_SEVERITIES,
+  CUSTOMER_ALIASES,
+  DEFERRED_DOMAINS,
+  DOMAIN_TARGETS,
+  FIELD_DEFER_RULES,
+  FIELD_FORBIDDEN_RULES,
+  FORBIDDEN_DOMAINS,
+  MATERIAL_ALIASES,
+  PRODUCT_ALIASES,
+  SALES_ORDER_ALIASES,
+  SALES_ORDER_ITEM_ALIASES,
+  SOURCE_REQUIRED_FIELDS,
+  SUPPLIER_ALIASES,
+  UNIT_ALIASES,
+  WAREHOUSE_ALIASES,
+} from './customerImportDryRunRules.mjs'
+import {
+  isDateField,
+  normalizeDomain,
+  normalizeDate,
+  normalizeFields,
+  normalizeSourceType,
+} from './customerImportDryRunNormalize.mjs'
 
 const USAGE = `Customer import dry-run tooling
 
@@ -36,158 +63,6 @@ const OUTPUT_FILES = [
   'validation-summary.json',
   'dry-run-report.md',
 ]
-
-const ALLOWED_ACTIONS = new Set(['create', 'update', 'skip', 'defer', 'forbidden', 'review'])
-const ALLOWED_SEVERITIES = new Set(['block', 'defer', 'review', 'warning'])
-
-const SOURCE_REQUIRED_FIELDS = [
-  'sourceId',
-  'sourceType',
-  'sourceKind',
-  'moduleKey',
-  'domain',
-  'fields',
-]
-
-const DOMAIN_TARGETS = new Map([
-  ['customers', 'customers'],
-  ['suppliers', 'suppliers'],
-  ['contacts', 'contacts'],
-  ['sales_orders', 'sales_orders'],
-  ['sales_order_items', 'sales_order_items'],
-  ['products', 'products'],
-  ['materials', 'materials'],
-  ['units', 'units'],
-  ['warehouses', 'warehouses'],
-  ['bom', 'bom_headers / bom_items'],
-])
-
-const DEFERRED_DOMAINS = new Map([
-  ['product_skus', 'product_skus'],
-  ['purchase_orders', 'purchase_orders'],
-  ['purchase_order_items', 'purchase_order_items'],
-  ['outsourcing', 'outsourcing source documents'],
-])
-
-const FORBIDDEN_DOMAINS = new Map([
-  ['shipment', 'shipments'],
-  ['shipments', 'shipments'],
-  ['shipment_items', 'shipment_items'],
-  ['stock_reservations', 'stock_reservations'],
-  ['inventory', 'inventory facts'],
-  ['inventory_txns', 'inventory_txns'],
-  ['inventory_balances', 'inventory_balances'],
-  ['inventory_lots', 'inventory_lots'],
-  ['finance', 'finance facts'],
-  ['ar_ap', 'AR/AP'],
-  ['invoice', 'invoice'],
-  ['invoices', 'invoice'],
-  ['payment', 'payment'],
-  ['payments', 'payment'],
-  ['finance_reconciliation', 'finance reconciliation'],
-])
-
-const FIELD_FORBIDDEN_RULES = [
-  {
-    pattern: /shipping[_ -]?released|出货放行/u,
-    forbiddenTarget: 'shipped facts',
-    boundary: 'shipping_released != shipped',
-    reason: 'shipping_released is a release / permission state, not shipped or inventory deduction.',
-  },
-  {
-    pattern: /(^|[_ -])shipped($|[_ -])|已发货|已出库/u,
-    forbiddenTarget: 'shipped facts',
-    boundary: 'shipping facts require a future ShipmentUsecase.',
-    reason: 'A dry-run source field cannot prove a shipped fact.',
-  },
-  {
-    pattern: /unshipped|未出货|production_qty|生产数量/u,
-    forbiddenTarget: 'shipment / production facts',
-    boundary: 'sales_order remains a Source Document / Business Commitment.',
-    reason: 'Fulfillment or production quantities cannot create shipment, inventory, or production facts.',
-  },
-  {
-    pattern: /stock[_ -]?reservation|库存预留/u,
-    forbiddenTarget: 'stock_reservations',
-    boundary: 'stock reservation is a future fact domain.',
-    reason: 'Dry-run import cannot create stock reservations.',
-  },
-  {
-    pattern: /inventory[_ -]?(txn|transaction|balance|lot)|库存流水|库存余额|库存批次|入库数量|出库数量/u,
-    forbiddenTarget: 'inventory_txn / inventory_balance / inventory_lot',
-    boundary: 'inventory facts must be written by formal fact usecases.',
-    reason: 'Dry-run import cannot create or mutate inventory facts.',
-  },
-  {
-    pattern: /(^|[_ -])(ar|ap)($|[_ -])|receivable|payable|invoice|payment|reconciliation|应收|应付|发票|收款|付款|对账/u,
-    forbiddenTarget: 'AR/AP / invoice / payment / finance reconciliation',
-    boundary: 'finance facts are deferred to future finance review.',
-    reason: 'Dry-run import cannot create finance facts.',
-  },
-]
-
-const FIELD_DEFER_RULES = [
-  {
-    pattern: /product[_ -]?sku|sku|颜色|尺寸|包装版本/u,
-    target: 'product_skus',
-    reason: 'SKU, color, size, or packaging version fields are deferred and cannot create product_skus in this dry-run.',
-  },
-  {
-    pattern: /purchase[_ -]?order|采购单|采购订单/u,
-    target: 'purchase_orders',
-    reason: 'Purchase order source documents are deferred and cannot be created in this dry-run.',
-  },
-]
-
-const CUSTOMER_ALIASES = {
-  code: ['code', 'customer_code', 'customerCode', 'document_no', 'documentNo', '客户编号', '客户代码'],
-  name: ['name', 'title', 'customer_name', 'customerName', 'customer', '客户', '客户名称'],
-  display: ['displayName', 'display_name', 'display', '简称'],
-}
-
-const SUPPLIER_ALIASES = {
-  code: ['code', 'supplier_code', 'supplierCode', 'document_no', 'documentNo', '供应商编号', '供应商代码'],
-  name: ['name', 'title', 'supplier_name', 'supplierName', 'factory_name', 'factoryName', '供应商', '供应商名称', '加工厂', '厂家名称'],
-  display: ['shortName', 'short_name', 'displayName', 'display_name', '简称'],
-}
-
-const PRODUCT_ALIASES = {
-  code: ['code', 'product_code', 'productCode', 'product_no', 'productNo', 'document_no', 'documentNo', '产品编号', '产品资料编号'],
-  name: ['name', 'title', 'product_name', 'productName', 'item_name', 'itemName', '产品名称', '品名'],
-}
-
-const MATERIAL_ALIASES = {
-  code: ['code', 'material_code', 'materialCode', 'material_no', 'materialNo', 'document_no', 'documentNo', '物料编号', '材料编号'],
-  name: ['name', 'title', 'material_name', 'materialName', 'item_name', 'itemName', '材料品名', '物料名称'],
-}
-
-const UNIT_ALIASES = {
-  code: ['code', 'unit_code', 'unitCode', 'unit', '单位'],
-  name: ['name', 'unit_name', 'unitName', 'unit', '单位'],
-}
-
-const WAREHOUSE_ALIASES = {
-  code: ['code', 'warehouse_code', 'warehouseCode', 'warehouse_no', 'warehouseNo', '仓库编号'],
-  name: ['name', 'warehouse_name', 'warehouseName', 'warehouse', 'warehouse_location', '仓库', '仓库位置', '货位'],
-}
-
-const SALES_ORDER_ALIASES = {
-  orderNo: ['order_no', 'orderNo', 'document_no', 'documentNo', '订单编号'],
-  customerId: ['customer_id', 'customerId'],
-  customerCode: ['customer_code', 'customerCode', 'customer_no', 'customerNo', '客户编号'],
-  customerName: ['customer_name', 'customerName', 'customer', '客户', '客户名称'],
-  orderDate: ['order_date', 'orderDate', 'document_date', 'documentDate', '订单日期'],
-  expectedShipDate: ['expected_ship_date', 'expectedShipDate', 'due_date', 'dueDate', 'shipping_date', 'shippingDate', '交期', '出货日期'],
-}
-
-const SALES_ORDER_ITEM_ALIASES = {
-  productId: ['product_id', 'productId'],
-  productCode: ['product_code', 'productCode', 'product_no', 'productNo', '产品编号'],
-  productName: ['product_name', 'productName', 'item_name', 'itemName', '产品名称'],
-  unitId: ['unit_id', 'unitId'],
-  unitCode: ['unit_code', 'unitCode', 'unit', '单位'],
-  quantity: ['ordered_quantity', 'orderedQuantity', 'quantity', 'qty', '数量'],
-}
 
 class CliError extends Error {
   constructor(message, exitCode = 1) {
@@ -515,146 +390,6 @@ function buildSourceReferenceLabel(source, fallbackId) {
   const sheetPart = source.sheetName ? `#${source.sheetName}` : ''
   const rowPart = source.rowNumber !== null && source.rowNumber !== undefined ? `:row${source.rowNumber}` : ''
   return `${filePart}${sheetPart}${rowPart}/${fallbackId}`
-}
-
-function normalizeSourceType(value) {
-  return String(value ?? '')
-    .trim()
-    .toLowerCase()
-}
-
-function normalizeDomain(domain) {
-  return String(domain ?? '')
-    .trim()
-    .toLowerCase()
-    .replaceAll('-', '_')
-}
-
-function normalizeFields(fields, warnings) {
-  const normalized = {}
-  for (const [key, value] of Object.entries(fields)) {
-    normalized[key] = normalizeValue(key, value, warnings)
-  }
-  return normalized
-}
-
-function normalizeValue(key, value, warnings) {
-  if (value === undefined) {
-    return null
-  }
-  if (value === null || typeof value === 'boolean' || typeof value === 'number') {
-    return value
-  }
-  if (Array.isArray(value)) {
-    return value.map((item) => normalizeValue(key, item, warnings))
-  }
-  if (typeof value === 'object') {
-    const output = {}
-    for (const [nestedKey, nestedValue] of Object.entries(value)) {
-      output[nestedKey] = normalizeValue(nestedKey, nestedValue, warnings)
-    }
-    return output
-  }
-
-  const trimmed = String(value).trim()
-  if (trimmed === '') {
-    return null
-  }
-  if (isDateField(key)) {
-    const date = normalizeDate(trimmed)
-    if (!date) {
-      warnings.push(`Invalid date value for ${key}: ${trimmed}`)
-      return trimmed
-    }
-    return date
-  }
-  if (isMoneyField(key)) {
-    const money = normalizeMoney(trimmed)
-    if (money === null) {
-      warnings.push(`Invalid money value for ${key}: ${trimmed}`)
-      return trimmed
-    }
-    return money
-  }
-  if (isDecimalField(key) || looksDecimal(trimmed)) {
-    const decimal = normalizeDecimal(trimmed)
-    if (decimal === null) {
-      warnings.push(`Invalid decimal value for ${key}: ${trimmed}`)
-      return trimmed
-    }
-    return decimal
-  }
-  if (isUnitField(key)) {
-    return normalizeUnitText(trimmed)
-  }
-  return trimmed
-}
-
-function isDateField(key) {
-  return /date|日期|交期|出货日/i.test(key)
-}
-
-function isMoneyField(key) {
-  return /amount|money|price|tax|金额|单价|税额|货款/i.test(key)
-}
-
-function isDecimalField(key) {
-  return /quantity|qty|(?:^|[_-])count$|rate|数量|用量|损耗/i.test(key)
-}
-
-function isUnitField(key) {
-  return /unit|单位/i.test(key)
-}
-
-function normalizeDate(text) {
-  const normalized = text.replace(/[./年]/g, '-').replace(/[月]/g, '-').replace(/[日]/g, '')
-  const match = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
-  if (!match) {
-    return null
-  }
-  const year = Number(match[1])
-  const month = Number(match[2])
-  const day = Number(match[3])
-  const date = new Date(Date.UTC(year, month - 1, day))
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) {
-    return null
-  }
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-}
-
-function looksDecimal(text) {
-  return /^[-+]?\d{1,3}(,\d{3})*(\.\d+)?$|^[-+]?\d+(\.\d+)?$/.test(text)
-}
-
-function normalizeDecimal(text) {
-  const cleaned = String(text).replaceAll(',', '').trim()
-  if (!/^[-+]?\d+(\.\d+)?$/.test(cleaned)) {
-    return null
-  }
-  const number = Number(cleaned)
-  if (!Number.isFinite(number)) {
-    return null
-  }
-  return cleaned.includes('.') ? String(number) : cleaned
-}
-
-function normalizeMoney(text) {
-  const cleaned = String(text)
-    .replace(/[¥￥$,\s]/g, '')
-    .replace(/^RMB/i, '')
-  return normalizeDecimal(cleaned)
-}
-
-function normalizeUnitText(text) {
-  const value = text.trim()
-  if (/^[a-z]+$/i.test(value)) {
-    return value.toUpperCase()
-  }
-  return value
 }
 
 function evaluateRow(row, existingIndex, context) {
@@ -1743,131 +1478,6 @@ function countBy(items, key) {
     acc[value] = (acc[value] ?? 0) + 1
     return acc
   }, {})
-}
-
-async function writeDryRunPackage({ outDir, formats, sourcePath, existingPath, command, data }) {
-  await mkdir(outDir, { recursive: true })
-  if (formats.has('json')) {
-    await writeJson(path.join(outDir, 'source-references.json'), data.sourceReferences)
-    await writeJson(path.join(outDir, 'normalized-rows.json'), data.normalizedRows)
-    await writeJson(path.join(outDir, 'candidates.json'), data.candidates)
-    await writeJson(path.join(outDir, 'unresolved-queue.json'), data.unresolvedQueue)
-    await writeJson(path.join(outDir, 'duplicates.json'), data.duplicates)
-    await writeJson(path.join(outDir, 'conflicts.json'), data.conflicts)
-    await writeJson(path.join(outDir, 'forbidden-auto-import.json'), data.forbiddenAutoImport)
-    await writeJson(path.join(outDir, 'validation-summary.json'), data.validationSummary)
-  }
-  if (formats.has('md')) {
-    await writeFile(
-      path.join(outDir, 'dry-run-report.md'),
-      renderMarkdownReport({
-        sourcePath,
-        existingPath,
-        outDir,
-        command,
-        data,
-      }),
-      'utf8',
-    )
-  }
-}
-
-async function writeJson(filePath, data) {
-  await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, 'utf8')
-}
-
-function renderMarkdownReport({ sourcePath, existingPath, outDir, command, data }) {
-  const summary = data.validationSummary
-  const candidateRows = Object.entries(summary.candidateCountsByAction)
-    .map(([action, count]) => `| ${action} | ${count} |`)
-    .join('\n')
-  const unresolvedRows = Object.entries(summary.unresolvedCountsBySeverity)
-    .map(([severity, count]) => `| ${severity} | ${count} |`)
-    .join('\n')
-  const forbiddenList =
-    data.forbiddenAutoImport.length === 0
-      ? '- None'
-      : data.forbiddenAutoImport
-          .slice(0, 20)
-          .map((item) => `- ${item.sourceReference}: ${item.forbiddenTarget} (${item.boundary})`)
-          .join('\n')
-  const duplicateList =
-    data.duplicates.length === 0
-      ? '- None'
-      : data.duplicates
-          .slice(0, 20)
-          .map((item) => `- ${item.targetModel} ${item.duplicateType} ${item.key}: ${item.reason}`)
-          .join('\n')
-  const conflictList =
-    data.conflicts.length === 0
-      ? '- None'
-      : data.conflicts
-          .slice(0, 20)
-          .map((item) => `- ${item.targetModel} ${item.key}: ${item.reason}`)
-          .join('\n')
-
-  return `# Yoyoosun Customer Import Dry-run Report
-
-## Command
-
-\`\`\`bash
-${command ?? 'node scripts/import/customerImportDryRun.mjs ...'}
-\`\`\`
-
-## Inputs
-
-- Source snapshot: \`${sourcePath}\`
-- Existing snapshot: \`${existingPath}\`
-- Output directory: \`${outDir}\`
-
-## Summary
-
-| Metric | Value |
-|---|---:|
-| totalSources | ${summary.totalSources} |
-| normalizedRows | ${summary.normalizedRows} |
-| forbiddenCount | ${summary.forbiddenCount} |
-| duplicateCount | ${summary.duplicateCount} |
-| conflictCount | ${summary.conflictCount} |
-| blockerCount | ${summary.blockerCount} |
-| canProceedToManualReview | ${summary.canProceedToManualReview} |
-| canExecuteRealImport | ${summary.canExecuteRealImport} |
-
-## Candidate Counts
-
-| actionCandidate | count |
-|---|---:|
-${candidateRows}
-
-## Unresolved Counts
-
-| severity | count |
-|---|---:|
-${unresolvedRows}
-
-## Forbidden Auto-import Summary
-
-${forbiddenList}
-
-## Duplicate Summary
-
-${duplicateList}
-
-## Conflict Summary
-
-${conflictList}
-
-## No real import
-
-No real import is executed by this dry-run package. The tool does not connect to a database, does not write formal V1 tables, does not write \`business_records\`, does not create SQL, and does not modify schema, API, UI, seedData, or docs registry. \`canExecuteRealImport\` is always \`false\`.
-
-## Next manual review steps
-
-1. Review \`unresolved-queue.json\` and resolve block / defer / review items manually.
-2. Review \`duplicates.json\` and \`conflicts.json\` before any future loader design.
-3. Confirm \`forbidden-auto-import.json\` remains excluded from real import.
-4. Only a separate future implementation task may design or implement real import execution with backup, rollback, idempotency, validation, and customer sign-off.
-`
 }
 
 export async function runCli(argv = process.argv.slice(2)) {
