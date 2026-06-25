@@ -18,6 +18,23 @@
 | `$plush-observability-error-governance` | request_id、结构化日志、错误码、前端中文错误提示和排障证据 |
 | `$plush-security-privacy-governance` | RBAC、secrets、客户资料、导出、生产 env、日志脱敏和权限边界 |
 
+## 按问题选 Skill / Scenario Matrix
+
+| 你现在想做什么 | 优先使用 | 它解决什么 | 不负责什么 |
+| --- | --- | --- | --- |
+| 选中主会话一段话，简单问“是什么 / 为什么 / 合理吗 / 怎么办” | 全局 `$selected-context-analysis` | 片段理解、短问短答、上下文边界 | 不把片段当 plush 当前真源 |
+| 写新主会话、side chat、review、测试、部署或提交推送提示词 | `$plush-prompt-governance` | 把目标、真源、范围、验收和风险写成可执行 prompt | 不替代实际执行或验证 |
+| 页面报错、JSON-RPC 失败、本地 / 线上不一致、migration drift | `$plush-runtime-diagnostics` | 分层排查 browser / API / backend / DB / deploy / config | 不在定位前直接补代码 |
+| 判断测试是否通过、范围是否足够、要不要跑 `style:l1` / E2E / migration | `$plush-test-governance` | 选择验证层级 T0-T8、测试形态和剩余风险 | 不替代代码审查结论 |
+| 实现后看问题是否真的解决、改动是否对、有没有 bug / 缺测试 | `$plush-code-review-governance` | 独立审查 diff、Workflow / Fact、RBAC、字段残值/缺值和文档漂移 | 不以实现总结为主 |
+| 文档不好读、信息密度高、链接/目录/表格/Mermaid/真源漂移 | `$plush-docs-governance` | 文档真源、读者路径、文档清单、可读性和跳转 | 不证明 runtime 行为正确 |
+| 页面太密、功能细节看不懂、按钮/字段/状态意义不清、原型是否同步 | `$plush-page-design-governance` | 页面意义、信息层级、功能细节、交互态和页面回归 | 不直接管后端事实写入 |
+| 要新增或调整 schema / migration / repo / usecase / JSON-RPC / RBAC / 字段真源 | `$plush-domain-boundary-governance` | 业务边界、Workflow / Fact、读写真源和实现层级 | 不处理纯视觉或文案排版 |
+| 发布、部署、版本、Atlas migration、health/ready、rollback、旧镜像清理 | `$plush-release-governance` | 发布路径、低配服务器边界、回滚和 release evidence | 不替代 runtime 故障定位 |
+| seed、fixture、模拟试用数据、导入 dry-run、清理、真实客户数据边界 | `$plush-seed-import-governance` | 可逆数据、导入边界、cleanup 和客户资料隔离 | 不把模拟数据写成真实导入 |
+| request_id、错误码、中文错误提示、结构化日志、排障证据 | `$plush-observability-error-governance` | 可观测性、错误分类、用户提示和证据链 | 不替代安全审查 |
+| RBAC、secrets、客户资料、导出权限、生产 env、日志脱敏 | `$plush-security-privacy-governance` | 安全与隐私边界、敏感数据和权限风险 | 不替代普通业务 review |
+
 ## 常用组合 / Pairings
 
 | 场景 | 建议同时使用 |
