@@ -23,6 +23,7 @@
 | 你现在想做什么 | 优先使用 | 它解决什么 | 不负责什么 |
 | --- | --- | --- | --- |
 | 选中主会话一段话，简单问“是什么 / 为什么 / 合理吗 / 怎么办” | 全局 `$selected-context-analysis` | 片段理解、短问短答、上下文边界 | 不把片段当 plush 当前真源 |
+| 提交推送相关 / 所有代码、多会话同时收口、lint/test/hook 反复失败 | 全局 `$git-closeout-coordination` + `$plush-release-governance` | owner 判定、冻结范围、upstream/dirty 状态、hook 改写和 plush 收口证据 | 不替代具体 diff review 或业务测试判断 |
 | 写新主会话、side chat、review、测试、部署或提交推送提示词 | `$plush-prompt-governance` | 把目标、真源、范围、验收和风险写成可执行 prompt | 不替代实际执行或验证 |
 | 页面报错、JSON-RPC 失败、本地 / 线上不一致、migration drift | `$plush-runtime-diagnostics` | 分层排查 browser / API / backend / DB / deploy / config | 不在定位前直接补代码 |
 | 判断测试是否通过、范围是否足够、要不要跑 `style:l1` / E2E / migration | `$plush-test-governance` | 选择验证层级 T0-T8、测试形态和剩余风险 | 不替代代码审查结论 |
@@ -42,6 +43,7 @@
 | 文档改动会影响页面口径、帮助入口或原型 | `$plush-docs-governance` + `$plush-page-design-governance` |
 | 页面改动涉及 schema、JSON-RPC、RBAC、Workflow / Fact 或字段真源 | `$plush-page-design-governance` + `$plush-domain-boundary-governance` |
 | 实现完成后做独立 review 或提交前自查 | `$plush-code-review-governance` + `$plush-test-governance` |
+| 提交推送、hook 重试或多会话互相改工作区 | 全局 `$git-closeout-coordination` + `$plush-release-governance` |
 | 本地 / 线上故障排查后准备发布或回滚 | `$plush-runtime-diagnostics` + `$plush-release-governance` |
 | seed、导入、客户资料、权限或脱敏边界相关 | `$plush-seed-import-governance` + `$plush-security-privacy-governance` |
 

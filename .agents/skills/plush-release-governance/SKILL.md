@@ -16,6 +16,7 @@ description: plush-toy-erp 项目发布、部署、版本与回滚治理。Use w
 
 ## 项目规则 Project Rules
 
+- 提交推送、hook 重试或多会话同时收口时，先用全局 `$git-closeout-coordination` 判定 `owner`、冻结范围、upstream 和 dirty state，再回到本 skill 执行 plush release / closeout 证据。
 - 低配服务器只加载本地/CI 构建产物，不在目标机执行 `docker build / pnpm build / go build`。
 - 当前部署 truth 是 `server/deploy/compose/prod`；Atlas 线上 migration 使用宿主机 `/usr/local/bin/atlas` 和 `flock`。
 - 版本证据至少绑定 commit hash、image tag、migration 状态、目标环境、health/ready、smoke 和 rollback point。
@@ -24,11 +25,12 @@ description: plush-toy-erp 项目发布、部署、版本与回滚治理。Use w
 
 1. 定义 scope：branch、host/environment、service/container、migration、config/env、rollback point。
 2. 绑定 version：commit hash、image/package tag、migration status、config/env version、release note/changelog need。
-3. 先跑本地/CI validation，再触碰目标环境。
-4. 低配目标默认不构建，只加载 artifacts、执行 migration、启动服务、做 health/smoke。
-5. 从目标 runtime evidence 确认新版本已运行，而不是从本地预期推断。
-6. 检查 health/ready、logs、smoke/browser/API、migration state、disk/image cleanup boundary。
-7. 发布行为、版本、部署、配置或 operational truth 改变时，同步 docs/progress。
+3. 提交推送前按 `$git-closeout-coordination` 检查 staged/unstaged/untracked、远端 ahead/behind、hook 改写和并行会话风险。
+4. 先跑本地/CI validation，再触碰目标环境；hook 或 generator 改写文件后必须重新检查 `git status -sb`。
+5. 低配目标默认不构建，只加载 artifacts、执行 migration、启动服务、做 health/smoke。
+6. 从目标 runtime evidence 确认新版本已运行，而不是从本地预期推断。
+7. 检查 health/ready、logs、smoke/browser/API、migration state、disk/image cleanup boundary。
+8. 发布行为、版本、部署、配置或 operational truth 改变时，同步 docs/progress。
 
 ## 输出 Output
 
