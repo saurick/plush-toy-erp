@@ -287,9 +287,9 @@
 - 下一步：若后续要借鉴 trade-erp 的币种、贸易条款、外销流程、报价转订单、销售订单生成采购 / 出货 / 应收，应作为独立边界评审和 usecase / RBAC / 测试任务推进；若业务员要绑定系统用户或角色，也需要单独做 RBAC / Workflow 评审。
 - 阻塞/风险：本轮只生成 migration，未执行本地或线上数据库 `migrate apply`；未跑完整 `pnpm style:l1`，已用覆盖销售订单弹窗的定向 L1 替代；当前工作区仍有多组既有 / 并行改动，本轮未回退、未提交。
 
-## 2026-06-25 Git 收口钩子格式化补提交
+## 2026-06-25 Git 收口钩子格式冲突收口
 
-- 完成：补收 `pre-push` 全量检查后由 lint/format 留下的采购订单配置一行格式化差异，避免远端已推送但本地工作区继续脏。
+- 完成：补收 `pre-push` 全量检查后由 lint/format 留下的采购订单配置差异；将 `forEach` 回调内以 `(` 开头的明细遍历改为局部变量后再遍历，避免 Prettier 补前置分号、ESLint 删除分号导致反复脏工作区。
 - 验证：追加前 `progress.md` 为 288 行、54119 字节，未达到归档阈值；已完成上一轮 `git push` 触发的 `qa:full`，并确认本地与 `origin/main` 无 ahead/behind 分叉。
 - 下一步：继续按 full-worktree closeout 收到 `git status -sb` 干净后再结束。
 - 阻塞/风险：本轮不改业务语义、schema、migration、JSON-RPC、RBAC、菜单、Workflow / Fact usecase 或部署脚本。

@@ -104,7 +104,8 @@ export function buildInboundDraftPreviewRows({
   receipts
     .filter((receipt) => String(receipt?.status || '') !== 'CANCELLED')
     .forEach((receipt) => {
-      ;(receipt?.items || []).forEach((item) => {
+      const receiptItems = receipt?.items || []
+      receiptItems.forEach((item) => {
         const sourceItemID = Number(item?.purchase_order_item_id || 0)
         if (!sourceItemID) return
         const current = receivedByOrderItemID.get(sourceItemID) || 0
