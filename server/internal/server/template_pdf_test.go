@@ -112,26 +112,29 @@ func TestResolveTemplatePDFWarmupEnabled(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		raw  string
-		want bool
+		name       string
+		rawMode    string
+		rawEnabled string
+		want       bool
 	}{
-		{raw: "", want: true},
-		{raw: "true", want: true},
-		{raw: "1", want: true},
-		{raw: "on", want: true},
-		{raw: "false", want: false},
-		{raw: "0", want: false},
-		{raw: "off", want: false},
-		{raw: "no", want: false},
-		{raw: "unexpected", want: true},
+		{name: "default enabled", want: true},
+		{name: "mode async", rawMode: "async", want: true},
+		{name: "mode true", rawMode: "true", want: true},
+		{name: "mode off", rawMode: "off", want: false},
+		{name: "legacy true", rawEnabled: "true", want: true},
+		{name: "legacy false", rawEnabled: "false", want: false},
+		{name: "mode wins over legacy false", rawMode: "async", rawEnabled: "false", want: true},
+		{name: "mode off wins over legacy true", rawMode: "off", rawEnabled: "true", want: false},
+		{name: "legacy unexpected stays enabled", rawEnabled: "unexpected", want: true},
+		{name: "mode unexpected disables", rawMode: "unexpected", want: false},
 	}
 
 	for _, tc := range testCases {
 		tc := tc
-		t.Run(tc.raw, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := resolveTemplatePDFWarmupEnabled(tc.raw); got != tc.want {
-				t.Fatalf("resolveTemplatePDFWarmupEnabled(%q) = %v, want %v", tc.raw, got, tc.want)
+			if got := resolveTemplatePDFWarmupEnabled(tc.rawMode, tc.rawEnabled); got != tc.want {
+				t.Fatalf("resolveTemplatePDFWarmupEnabled(%q, %q) = %v, want %v", tc.rawMode, tc.rawEnabled, got, tc.want)
 			}
 		})
 	}

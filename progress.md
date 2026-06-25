@@ -172,3 +172,72 @@
 - 验证：`node --check scripts/qa/phase-label-boundaries.mjs`、`node scripts/qa/phase-label-boundaries.mjs`、阶段编号残留 grep（排除 `docs/archive/**` 与 `docs/reference/**`）、`bash -n scripts/inventory-pg.sh scripts/bom-lot-pg.sh scripts/purchase-receipt-pg.sh scripts/purchase-return-pg.sh`、`bash scripts/qa/shfmt.sh scripts/inventory-pg.sh scripts/bom-lot-pg.sh scripts/purchase-receipt-pg.sh scripts/purchase-return-pg.sh`、`cd server && go test ./internal/data -run 'TestInventoryPostgres|TestInventoryLotPostgres|TestPurchaseReceiptPostgres|TestPurchaseReturnPostgres|TestOperationalFactPostgresOutsourcingMaterialIssueWithoutLotPostAndCancel' -count=1`、`cd server && go test ./internal/data -run '^$'` 均通过。
 - 下一步：若历史 archive / reference 中的旧阶段证据影响人工查找，可另开文档归档索引治理；不要把历史证据移动到活跃入口。
 - 阻塞/风险：本轮不改 schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、原型状态、页面 UI 或部署脚本；未连接真实 PostgreSQL 运行写入级 PG 集成测试，当前验证覆盖脚本语法、命名守卫和 Go 编译 / skip 路径。
+
+## 2026-06-25 销售订单明细添加按钮滚动边界
+
+- 完成：销售订单弹窗明细区的添加按钮文案收口为共享 `添加条目`，并给 `.erp-line-items-form__footer` 明确加上不参与明细横向滚动的宽度约束，保持按钮随弹窗正文纵向滚动。
+- 完成：`business-formal-module-shells-desktop` 的销售订单弹窗 L1 增加 footer 滚动边界断言，锁住“明细列表承接横向滚动、弹窗正文不横向滚、添加条目按钮不随 item 横向滚动、footer 不被明细宽度撑开”。
+- 验证：`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test`、`cd web && STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm style:l1` 均通过；前端单测 402 条通过，目标 L1 验证 1 个场景。
+- 下一步：若后续继续治理业务弹窗明细区，优先把采购订单、委外订单和销售订单的 add-item footer 契约抽成更小的共享断言或组件，不在单页重复补规则。
+- 阻塞/风险：本轮不改 schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、原型状态或部署脚本；只跑了受影响业务壳的定向 L1，没有跑完整 `pnpm style:l1`。
+
+## 2026-06-25 多明细添加后的弹窗滚动体验收口
+
+- 完成：对照 trade-erp `ItemsFormList` 后确认 plush 不顺的主要原因是各业务弹窗 Form.List 只做 `add()`，没有在新行渲染完成后把弹窗正文平滑滚到新增明细；新增 `useLineItemAppendScroll` 共享 hook，统一记录目标行、注册行节点，并在行数变化后 `scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })`。
+- 完成：销售订单、采购订单、委外订单、出货单和主数据联系人添加 / 复制条目均接入新增后滚动策略；批量来源导入不触发自动拉动，避免导入回填时页面突然跳动。
+- 完成：销售订单 L1 增加连续添加多行后的浏览器断言，要求弹窗正文形成纵向滚动、自动滚到新明细附近、最新明细进入可视区，并继续保留 footer 不参与横向滚动的断言。
+- 验证：`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test`、`cd web && STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,purchase-order-date-filter-desktop pnpm style:l1` 均通过；前端单测 402 条通过，目标 L1 验证 2 个场景。
+- 下一步：若后续要进一步统一明细表单，应评审是否把销售 / 采购 / 委外 Form.List 抽成共享业务单据明细组件；本轮只抽滚动行为，不重排字段、保存映射或来源导入。
+- 阻塞/风险：本轮不改 schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、原型状态或部署脚本；未跑完整 `pnpm style:l1`，已用覆盖销售 / 采购 / 出货 / 委外 / 主数据联系人弹窗的定向 L1 组合替代。
+
+## 2026-06-25 item 区域纵向滚动对齐 trade-erp
+
+- 完成：对照 trade-erp `erp-items-list-unified-scroll` 后，将 plush 的 `.erp-sales-order-lines-form__list` 和 `.erp-master-contact-list__items` 改为 item 区域自身 `max-height: min(58vh, 680px)` + `overflow: auto`，由 items 列表同时承接横向和纵向滚动。
+- 完成：销售 / 采购 / 委外单据明细、出货明细、主数据联系人继续沿用同一批添加 / 复制后定位新行逻辑；添加条目 footer 保持在 item 滚动容器外，仍随弹窗整体内容滚动。
+- 完成：L1 连续添加多行断言从“弹窗正文应纵向滚动”改为“item 区域应纵向滚动并滚到最新明细”，避免后续把旧外层滚动行为误判为通过。
+- 验证：`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test`、`cd web && STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,purchase-order-date-filter-desktop pnpm style:l1`、`git diff --check` 均通过；前端单测 402 条通过，目标 L1 验证 2 个场景。
+- 下一步：若后续继续统一 item 表单，可评审是否抽共享明细列表组件；本轮只统一滚动容器和添加后定位行为，不重排字段、保存映射或来源导入。
+- 阻塞/风险：本轮不改 schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、原型状态或部署脚本；未跑完整 `pnpm style:l1`，已用覆盖受影响弹窗的定向 L1 组合替代。
+
+## 2026-06-25 活跃阶段编号残留二次收口
+
+- 完成：清理活跃客户私有化部署资料里的阶段编号文案，`deployments/README.md` 改为“客户私有化复制规则”，yoyoosun smoke checklist 改为禁止“开发阶段命名 / 内部闭环”等非产品化菜单文案，不再直接列出历史阶段号。
+- 完成：`businessAttachmentAssertions` 的内部断言状态字段从 `phase` 改为 `checkState`，避免前端 L1 脚本继续使用阶段语义字段名；`phase-label-boundaries` 扫描范围扩大到 `deployments` 和 `web/scripts`，补上此前 hook 漏扫的活跃目录。
+- 验证：`node --check scripts/qa/phase-label-boundaries.mjs`、`node scripts/qa/phase-label-boundaries.mjs`、活跃路径阶段编号与旧阶段状态字段 grep（排除 archive / reference / generated ent / guard 自身）、`node --check web/scripts/style-l1/businessAttachmentAssertions.mjs`、`pnpm --dir web exec eslint scripts/style-l1/businessAttachmentAssertions.mjs`、`node scripts/deploy/deployment-package-lint.mjs --customer yoyoosun`、限定 diff `git diff --check` 均通过。
+- 下一步：若要求连本机 ignored 生成产物也不含历史阶段号，需要单独清理 `output/**` 和 `server/bin/**` 这类不纳入 git 的构建 / evidence 产物；不要把它们误判为当前 tracked runtime 真源。
+- 阻塞/风险：本轮不改 schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、原型状态、页面运行时或部署脚本；仓库中 `docs/archive/**` 与 `docs/reference/**` 仍保留历史阶段号作为归档证据，当前守卫不扫描归档 / 参考资料。
+
+## 2026-06-25 出货 / 质检 / BOM 页面职责拆分收口
+
+- 完成：`ShipmentsPage.jsx` 抽出出货业务弹窗和出货列定义模块，页面保留列表加载、选择、确认出货、来源跳转和页面壳组合；出货附件仍在业务弹窗内，不把附件当成确认出货事实。
+- 完成：`V1QualityInspectionsPage.jsx` 继续沿用既有质检创建 / 判定表单边界，并抽出列定义、导出列、状态 / 结果展示和列排序入口；页面保留数据请求、筛选、详情状态、列顺序偏好和操作编排。
+- 完成：`BOMVersionsPage.jsx` 抽出 BOM 表头 / 明细表单、保存参数构造、版本建议和 BOM 列定义；页面保留产品 / BOM 数据加载、版本动作、明细动作和页面壳组合。
+- 完成：附件入口守卫和业务表格列守卫同步识别新组件边界，继续要求表单附件位于 `BusinessFormModal` 内部、业务列统一走共享排序入口。
+- 验证：`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test`、`cd web && STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm style:l1`、`git diff --check` 均通过；前端单测 402 条通过，定向 L1 验证 1 个业务页场景。
+- 下一步：剩余页面大文件如果继续拆，优先按数据加载 hook、生命周期 / Workflow 动作 hook、表单组合组件这类真实变更边界推进；CSS 只在触达对应视觉规则时按职责拆，不为行数单独大动。
+- 阻塞/风险：本轮不改 schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、原型状态或部署脚本；没有跑完整 `pnpm style:l1`，已用受影响业务页的定向 L1 代替。页面文件仍在 1000 行上下，但剩余内容主要是页面编排和状态动作，不继续为行数硬拆。
+
+## 2026-06-25 销售 / 采购订单页职责拆分收口
+
+- 完成：`V1SalesOrdersPage.jsx` 抽出销售订单状态 / 日期 / 排序 / 生命周期配置到 `salesOrderPageConfig.mjs`，并把付款条件变化后的单价复核逻辑收口到 `useSalesOrderPaymentReview`；页面继续负责列表加载、选中订单、保存、关联跳转和页面组合。
+- 完成：`V1PurchaseOrdersPage.jsx` 抽出采购订单页面配置、选中态视图模型、Workflow 任务动作、采购合同打印动作、入库草稿生成动作和上方筛选 / 选中操作条；页面继续负责采购订单加载、保存、列顺序、选中记录、关联跳转和页面组合。
+- 完成：销售页降到 919 行，采购页降到 846 行；拆分后没有新增后端能力、没有改变采购承诺 / 销售源单据 / 入库事实 / 出货事实边界，也没有新增页面级删除 / 回收站入口。
+- 验证：`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test`、`cd web && STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,purchase-order-date-filter-desktop pnpm style:l1`、`git diff --check` 均通过；前端单测 402 条通过，定向 L1 验证 2 个销售 / 采购相关业务页场景。
+- 下一步：若继续做大文件治理，前端优先评估 `OperationalFactsPage.jsx`、`V1OutsourcingOrdersPage.jsx`、`V1MasterDataPage.jsx` 和共享 `BusinessListLayout.jsx`；CSS、import dry-run、Workflow 后端文件不应混入页面拆分轮次。
+- 阻塞/风险：本轮不改 schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、原型状态或部署脚本；没有跑完整 `pnpm style:l1`，已用受影响业务页的定向 L1 代替。当前工作区仍有多组并行 / 既有改动，本轮未回退、未提交。
+
+## 2026-06-25 Codex skills 使用场景速查补充
+
+- 完成：补充根 `README.md` 的 `.agents/skills/` 导航，并完善 `.agents/skills/README.md` 的“按问题选 Skill / Scenario Matrix”，把选中文本分析、提示词、runtime 诊断、测试范围、代码 review、文档治理、页面治理、业务边界、发布、seed/import、可观测错误和安全隐私按常见提问方式映射到对应 skill。
+- 完成：同步新增全局 `/Users/simon/.codex/skills/README.md`，作为跨项目通用 skill 使用场景速查；单个 skill 子目录仍不新增 README。
+- 验证：追加前 `progress.md` 为 227 行、42476 字节，未达到归档阈值；本轮只改根 README、skills README 和过程记录，不改运行时代码、schema、migration、RBAC、菜单、测试脚本或部署脚本。
+- 下一步：后续在 side chat 里遇到“是什么 / 为什么 / 怎么解决 / 测试是否够 / review 是否通过”等问题时，优先按场景矩阵选择一个主 skill，再按影响面补相邻 skill。
+- 阻塞/风险：README 只负责选型导航，不替代各 skill 的 `SKILL.md`、项目 `AGENTS.md`、正式文档、代码、runtime 证据或自动化校验。
+
+## 2026-06-25 PDF warmup 变量口径对齐
+
+- 完成：plush PDF 预热新增推荐主变量 `ERP_PDF_WARMUP=async/off`，保留旧变量 `ERP_PDF_WARMUP_ENABLED=true/false` 兼容；两者同时设置时以 `ERP_PDF_WARMUP` 为准。
+- 完成：生产 compose 增加 `ERP_PDF_WARMUP` 空值透传，继续保留 `ERP_PDF_WARMUP_ENABLED=true` 默认，避免新变量默认值遮蔽旧变量；部署 README、runtime/config 文档同步说明推荐变量、legacy 变量和启动日志口径。
+- 验证：追加前 `progress.md` 为 235 行、43694 字节，未达到归档阈值；本轮不改 PDF DOM、打印模板、schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、页面 UI 或部署执行。
+- 下一步：发布或本地重启后，可用日志 `template pdf warmup started / success / failed / disabled` 与 `/readyz` 状态确认预热链路；如需关闭，优先设置 `ERP_PDF_WARMUP=off`。
+- 阻塞/风险：plush 继续保持既有 `/readyz` 语义，PDF warmup 未完成或失败时 readyz 不 ready；这次只统一配置变量口径，不把 readyz 语义改成 trade。

@@ -165,7 +165,10 @@ func CleanupTemplatePDFResources() {
 func StartTemplatePDFWarmupAsync(logger log.Logger) {
 	sharedTemplatePDFWarmupState.StartAsync(
 		logger,
-		resolveTemplatePDFWarmupEnabled(os.Getenv("ERP_PDF_WARMUP_ENABLED")),
+		resolveTemplatePDFWarmupEnabled(
+			os.Getenv("ERP_PDF_WARMUP"),
+			os.Getenv("ERP_PDF_WARMUP_ENABLED"),
+		),
 		warmupTemplatePDFResources,
 	)
 }
@@ -412,11 +415,23 @@ func resolveTemplatePDFRenderConcurrency(raw string) int {
 	return limit
 }
 
-func resolveTemplatePDFWarmupEnabled(raw string) bool {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "", "1", "true", "yes", "on":
+func resolveTemplatePDFWarmupEnabled(rawMode string, rawEnabled string) bool {
+	mode := strings.ToLower(strings.TrimSpace(rawMode))
+	if mode != "" {
+		switch mode {
+		case "1", "true", "yes", "on", "enabled", "async", "background":
+			return true
+		case "0", "false", "no", "off", "disabled", "none":
+			return false
+		default:
+			return false
+		}
+	}
+
+	switch strings.ToLower(strings.TrimSpace(rawEnabled)) {
+	case "", "1", "true", "yes", "on", "enabled":
 		return true
-	case "0", "false", "no", "off":
+	case "0", "false", "no", "off", "disabled", "none":
 		return false
 	default:
 		return true

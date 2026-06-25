@@ -49,7 +49,7 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
 - `/readyz`
   - 就绪检查，当前检查 PostgreSQL 连通性和 PDF 启动预热状态；成功返回 `ready`
 - `/templates/render-pdf`
-  - 在线 PDF 渲染入口，使用共享 Headless Chromium 进程生成 PDF；生产镜像默认内置 `/usr/bin/chromium`，并通过 `ERP_PDF_RENDER_CONCURRENCY` 限制并发；服务启动后默认异步执行一次中文合同 PDF 预热，`/readyz` 在预热完成前保持未就绪，可通过 `ERP_PDF_WARMUP_ENABLED=false` 关闭
+  - 在线 PDF 渲染入口，使用共享 Headless Chromium 进程生成 PDF；生产镜像默认内置 `/usr/bin/chromium`，并通过 `ERP_PDF_RENDER_CONCURRENCY` 限制并发；服务启动后默认异步执行一次中文合同 PDF 预热，`/readyz` 在预热完成前保持未就绪。推荐通过 `ERP_PDF_WARMUP=async/off` 控制；旧变量 `ERP_PDF_WARMUP_ENABLED=true/false` 仅在主变量未设置时兼容生效
 
 如果容器内存在静态目录，还会挂载前端静态资源：
 
