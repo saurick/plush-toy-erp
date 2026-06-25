@@ -56,6 +56,26 @@ func (_c *SalesOrderCreate) SetCustomerSnapshot(v map[string]interface{}) *Sales
 	return _c
 }
 
+// SetSalesOwner sets the "sales_owner" field.
+func (_c *SalesOrderCreate) SetSalesOwner(v string) *SalesOrderCreate {
+	_c.mutation.SetSalesOwner(v)
+	return _c
+}
+
+// SetNillableSalesOwner sets the "sales_owner" field if the given value is not nil.
+func (_c *SalesOrderCreate) SetNillableSalesOwner(v *string) *SalesOrderCreate {
+	if v != nil {
+		_c.SetSalesOwner(*v)
+	}
+	return _c
+}
+
+// SetContactSnapshot sets the "contact_snapshot" field.
+func (_c *SalesOrderCreate) SetContactSnapshot(v map[string]interface{}) *SalesOrderCreate {
+	_c.mutation.SetContactSnapshot(v)
+	return _c
+}
+
 // SetPaymentMethod sets the "payment_method" field.
 func (_c *SalesOrderCreate) SetPaymentMethod(v string) *SalesOrderCreate {
 	_c.mutation.SetPaymentMethod(v)
@@ -296,6 +316,11 @@ func (_c *SalesOrderCreate) check() error {
 			return &ValidationError{Name: "customer_order_no", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.customer_order_no": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.SalesOwner(); ok {
+		if err := salesorder.SalesOwnerValidator(v); err != nil {
+			return &ValidationError{Name: "sales_owner", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.sales_owner": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.PaymentMethod(); ok {
 		if err := salesorder.PaymentMethodValidator(v); err != nil {
 			return &ValidationError{Name: "payment_method", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.payment_method": %w`, err)}
@@ -373,6 +398,14 @@ func (_c *SalesOrderCreate) createSpec() (*SalesOrder, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.CustomerSnapshot(); ok {
 		_spec.SetField(salesorder.FieldCustomerSnapshot, field.TypeJSON, value)
 		_node.CustomerSnapshot = value
+	}
+	if value, ok := _c.mutation.SalesOwner(); ok {
+		_spec.SetField(salesorder.FieldSalesOwner, field.TypeString, value)
+		_node.SalesOwner = &value
+	}
+	if value, ok := _c.mutation.ContactSnapshot(); ok {
+		_spec.SetField(salesorder.FieldContactSnapshot, field.TypeJSON, value)
+		_node.ContactSnapshot = value
 	}
 	if value, ok := _c.mutation.PaymentMethod(); ok {
 		_spec.SetField(salesorder.FieldPaymentMethod, field.TypeString, value)

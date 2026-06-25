@@ -31,7 +31,9 @@ export function createBusinessFormalScenarios(deps) {
     verifySourceImportPicker,
   } = deps
   const {
+    assertLineItemAddActionScrollsToNewRow,
     assertLineItemDuplicateAction,
+    assertLineItemFooterFollowsModalScroll,
     assertLineItemFieldLayout,
     assertLineAmountCalculation,
     assertLineQuantityPrecisionBlocksAmount,
@@ -585,6 +587,12 @@ export function createBusinessFormalScenarios(deps) {
               scenarioName: 'business-v1-sales-order-form-modal',
             })
             await assertLineItemDuplicateAction(modal, {
+              scenarioName: 'business-v1-sales-order-form-modal',
+            })
+            await assertLineItemFooterFollowsModalScroll(modal, {
+              scenarioName: 'business-v1-sales-order-form-modal',
+            })
+            await assertLineItemAddActionScrollsToNewRow(modal, {
               scenarioName: 'business-v1-sales-order-form-modal',
             })
           },

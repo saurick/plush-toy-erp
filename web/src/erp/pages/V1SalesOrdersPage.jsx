@@ -32,16 +32,13 @@ import {
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import {
-  activateSalesOrder,
-  cancelSalesOrder,
-  closeSalesOrder,
   listCustomers,
+  listContactsByOwner,
   listProductSKUs,
   listSalesOrderItems,
   listSalesOrders,
   listUnits,
   saveSalesOrderWithItems,
-  submitSalesOrder,
 } from '../api/masterDataOrderApi.mjs'
 import {
   createBlankOrderLine,
@@ -52,19 +49,26 @@ import {
   buildSalesOrderColumns,
   buildSalesOrderItemColumns,
 } from '../components/sales-orders/salesOrderColumns.jsx'
+import {
+  OPEN_SALES_ORDER_LINE_STATUS,
+  SALES_ORDER_DATE_FILTER_OPTIONS,
+  SALES_ORDER_ITEMS_MODULE_KEY,
+  SALES_ORDER_LIFECYCLE_ACTIONS,
+  SALES_ORDER_SORT_FILTER_OPTIONS,
+  SALES_ORDER_STATUS_FILTER_OPTIONS,
+  SALES_ORDERS_MODULE_KEY,
+} from '../components/sales-orders/salesOrderPageConfig.mjs'
+import { useSalesOrderPaymentReview } from '../components/sales-orders/useSalesOrderPaymentReview.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   V1_ROUTE_PATHS,
+  buildOrderContactSnapshot,
   buildCustomerSnapshot,
-  buildPaymentConditionOptions,
   buildSequentialDraftCode,
   canRunSalesOrderLifecycleAction,
   buildSalesOrderItemParams,
   buildSalesOrderParams,
   hasActionPermission,
-  mergePaymentConditionOptions,
-  normalizeOptionalNonNegativeInteger,
-  resolvePaymentTermDays,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
 import {
@@ -92,70 +96,27 @@ import {
   unitOption,
 } from '../utils/referenceSelectOptions.mjs'
 
-const STATUS_FILTER_OPTIONS = [
-  { label: '全部状态', value: '' },
-  { label: '草稿', value: 'draft' },
-  { label: '已提交', value: 'submitted' },
-  { label: '已生效', value: 'active' },
-  { label: '已关闭', value: 'closed' },
-  { label: '已取消', value: 'canceled' },
-]
+const CUSTOMER_CONTACT_OWNER_TYPE = 'CUSTOMER'
 
-const DATE_FILTER_OPTIONS = [
-  { label: '订单日期', value: 'order_date' },
-  { label: '计划交付', value: 'planned_delivery_date' },
-]
+function contactPhoneText(contact = {}) {
+  return contact.mobile || contact.phone || ''
+}
 
-const SORT_FILTER_OPTIONS = [
-  { label: '最新优先', value: 'updated_at:desc' },
-  { label: '最早优先', value: 'updated_at:asc' },
-  { label: '订单日期新到旧', value: 'order_date:desc' },
-  { label: '订单日期旧到新', value: 'order_date:asc' },
-  { label: '交付日期新到旧', value: 'planned_delivery_date:desc' },
-  { label: '交付日期旧到新', value: 'planned_delivery_date:asc' },
-]
+function buildSalesOrderContactFormValues(source = {}) {
+  const snapshot = source.contact_snapshot || source
+  return {
+    contact_name: snapshot?.name || '',
+    contact_phone: contactPhoneText(snapshot),
+    contact_mobile: snapshot?.mobile || '',
+    contact_email: snapshot?.email || '',
+    contact_title: snapshot?.title || '',
+  }
+}
 
-const LIFECYCLE_ACTIONS = [
-  {
-    key: 'submit',
-    label: '提交',
-    permission: 'sales_order.submit',
-    nextStatus: 'submitted',
-    run: submitSalesOrder,
-  },
-  {
-    key: 'activate',
-    label: '生效',
-    permission: 'sales_order.activate',
-    nextStatus: 'active',
-    run: activateSalesOrder,
-  },
-  {
-    key: 'close',
-    label: '关闭',
-    permission: 'sales_order.close',
-    nextStatus: 'closed',
-    confirmTitle: '确认关闭销售订单',
-    confirmContent: '关闭后该销售订单不再继续推进，是否继续？',
-    okText: '确认关闭',
-    run: closeSalesOrder,
-  },
-  {
-    key: 'cancel',
-    label: '取消',
-    permission: 'sales_order.cancel',
-    nextStatus: 'canceled',
-    danger: true,
-    confirmTitle: '确认取消销售订单',
-    confirmContent: '取消后该销售订单不再继续推进，是否继续？',
-    okText: '确认取消',
-    run: cancelSalesOrder,
-  },
-]
-
-const SALES_ORDERS_MODULE_KEY = 'sales-orders'
-const SALES_ORDER_ITEMS_MODULE_KEY = 'sales-order-items'
-const OPEN_LINE_STATUS = 'open'
+function salesOwnerOptionFromText(text) {
+  const value = String(text || '').trim()
+  return value ? { value, label: value } : null
+}
 
 export default function V1SalesOrdersPage() {
   const outletContext = useOutletContext()
@@ -190,15 +151,13 @@ export default function V1SalesOrdersPage() {
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [orderForm] = Form.useForm()
   const [productSKUs, setProductSKUs] = useState([])
+  const [customerContacts, setCustomerContacts] = useState([])
   const routeSalesOrderID = searchParamPositiveIntText(
     searchParams,
     'sales_order_id'
   )
-  const paymentConditionSnapshotRef = useRef({
-    method: '',
-    termDays: undefined,
-  })
   const orderAttachmentRef = useRef(null)
+  const contactLoadSeqRef = useRef(0)
 
   const canCreateOrder = hasActionPermission(adminProfile, 'sales_order.create')
   const canUpdateOrder = hasActionPermission(adminProfile, 'sales_order.update')
@@ -222,104 +181,100 @@ export default function V1SalesOrdersPage() {
     () => uniqueReferenceOptions(units, unitOption),
     [units]
   )
-  const paymentConditionOptions = useMemo(
-    () =>
-      mergePaymentConditionOptions(
-        buildPaymentConditionOptions(customers),
-        buildPaymentConditionOptions(orders, {
-          methodField: 'payment_method',
-          termDaysField: 'payment_term_days',
-        })
-      ),
-    [customers, orders]
+  const {
+    applyCustomerPaymentDefaults,
+    applyPaymentMethodTermDays,
+    paymentConditionOptions,
+    rememberPaymentCondition,
+    requestPaymentConditionPriceReview,
+  } = useSalesOrderPaymentReview({
+    customers,
+    form: orderForm,
+    orders,
+  })
+  const salesOwnerOptions = useMemo(() => {
+    const seen = new Set()
+    return (Array.isArray(orders) ? orders : [])
+      .map((order) => salesOwnerOptionFromText(order?.sales_owner))
+      .filter(Boolean)
+      .filter((option) => {
+        if (seen.has(option.value)) {
+          return false
+        }
+        seen.add(option.value)
+        return true
+      })
+  }, [orders])
+
+  const applyContactToOrderForm = useCallback(
+    (contact = {}) => {
+      orderForm.setFieldsValue(buildSalesOrderContactFormValues(contact))
+    },
+    [orderForm]
   )
 
-  const readPaymentCondition = useCallback(() => {
-    const values = orderForm.getFieldsValue([
-      'payment_method',
-      'payment_term_days',
-    ])
-    return {
-      method: String(values.payment_method || '').trim(),
-      termDays: normalizeOptionalNonNegativeInteger(values.payment_term_days),
-    }
+  const clearContactFields = useCallback(() => {
+    orderForm.setFieldsValue(buildSalesOrderContactFormValues({}))
   }, [orderForm])
 
-  const rememberPaymentCondition = useCallback((values = {}) => {
-    paymentConditionSnapshotRef.current = {
-      method: String(values.payment_method || '').trim(),
-      termDays: normalizeOptionalNonNegativeInteger(values.payment_term_days),
-    }
-  }, [])
-
-  const hasPricedOrderLines = useCallback(() => {
-    const lines = orderForm.getFieldValue('items')
-    return (Array.isArray(lines) ? lines : []).some((line) =>
-      ['unit_price', 'amount'].some((field) =>
-        String(line?.[field] ?? '').trim()
-      )
-    )
-  }, [orderForm])
-
-  const clearOrderLinePrices = useCallback(() => {
-    const lines = orderForm.getFieldValue('items')
-    orderForm.setFieldValue(
-      'items',
-      (Array.isArray(lines) ? lines : []).map((line) => ({
-        ...line,
-        unit_price: '',
-        amount: '',
-      }))
-    )
-  }, [orderForm])
-
-  const requestPaymentConditionPriceReview = useCallback(() => {
-    const current = readPaymentCondition()
-    const previous = paymentConditionSnapshotRef.current
-    if (
-      current.method === previous.method &&
-      current.termDays === previous.termDays
-    ) {
-      return
-    }
-    paymentConditionSnapshotRef.current = current
-    if (!hasPricedOrderLines()) {
-      return
-    }
-    modal.confirm({
-      centered: true,
-      title: '付款条件已变化，请核对单价',
-      content:
-        '付款方式或账期会影响本单成交价。系统不会自动重算单价，请选择保留当前单价或清空明细单价后重新报价。',
-      okText: '清空单价重新报价',
-      cancelText: '保留当前单价',
-      onOk: clearOrderLinePrices,
-    })
-  }, [clearOrderLinePrices, hasPricedOrderLines, readPaymentCondition])
-
-  const applyPaymentMethodTermDays = useCallback(
-    (method) => {
-      const termDays = resolvePaymentTermDays(method, paymentConditionOptions)
-      if (termDays !== undefined) {
-        orderForm.setFieldValue('payment_term_days', termDays)
+  const loadCustomerContacts = useCallback(
+    async (customerID, { applyDefault = false } = {}) => {
+      const normalizedCustomerID = Number(customerID || 0)
+      const requestSeq = contactLoadSeqRef.current + 1
+      contactLoadSeqRef.current = requestSeq
+      if (normalizedCustomerID <= 0) {
+        setCustomerContacts([])
+        if (applyDefault) {
+          clearContactFields()
+        }
+        return []
+      }
+      try {
+        const result = await listContactsByOwner({
+          owner_type: CUSTOMER_CONTACT_OWNER_TYPE,
+          owner_id: normalizedCustomerID,
+          active_only: true,
+          limit: 200,
+        })
+        const nextContacts = Array.isArray(result?.contacts)
+          ? result.contacts
+          : []
+        if (contactLoadSeqRef.current !== requestSeq) {
+          return nextContacts
+        }
+        setCustomerContacts(nextContacts)
+        if (applyDefault) {
+          const defaultContact =
+            nextContacts.find((contact) => contact?.is_primary) ||
+            nextContacts[0]
+          if (defaultContact) {
+            applyContactToOrderForm(defaultContact)
+          } else {
+            clearContactFields()
+          }
+        }
+        return nextContacts
+      } catch (error) {
+        if (contactLoadSeqRef.current === requestSeq) {
+          setCustomerContacts([])
+          if (applyDefault) {
+            clearContactFields()
+          }
+        }
+        message.warning(getActionErrorMessage(error, '加载客户联系人'))
+        return []
       }
     },
-    [orderForm, paymentConditionOptions]
+    [applyContactToOrderForm, clearContactFields]
   )
 
-  const applyCustomerPaymentDefaults = useCallback(
+  const applyCustomerOrderDefaults = useCallback(
     (customerID) => {
-      const customer = customers.find((item) => item.id === customerID)
-      const termDays = normalizeOptionalNonNegativeInteger(
-        customer?.default_payment_term_days
-      )
-      orderForm.setFieldsValue({
-        payment_method: customer?.default_payment_method || undefined,
-        payment_term_days: termDays,
-      })
-      requestPaymentConditionPriceReview()
+      applyCustomerPaymentDefaults(customerID)
+      clearContactFields()
+      loadCustomerContacts(customerID, { applyDefault: true })
     },
-    [customers, orderForm, requestPaymentConditionPriceReview]
+    [applyCustomerPaymentDefaults, clearContactFields, loadCustomerContacts]
   )
 
   const loadCustomers = useCallback(async () => {
@@ -425,6 +380,7 @@ export default function V1SalesOrdersPage() {
   const openCreateOrder = () => {
     orderAttachmentRef.current?.clearPendingAttachments()
     setEditingOrder(null)
+    setCustomerContacts([])
     orderForm.resetFields()
     orderForm.setFieldsValue({
       order_no: buildSequentialDraftCode(orders, {
@@ -447,9 +403,11 @@ export default function V1SalesOrdersPage() {
       ...order,
       order_date: unixToDateInputValue(order.order_date),
       planned_delivery_date: unixToDateInputValue(order.planned_delivery_date),
+      ...buildSalesOrderContactFormValues(order),
       items: [],
     })
     rememberPaymentCondition(order)
+    loadCustomerContacts(order.customer_id)
     setOrderModalOpen(true)
     setItemLoading(true)
     try {
@@ -462,7 +420,7 @@ export default function V1SalesOrdersPage() {
         : []
       setItems(nextItems)
       const openItems = nextItems.filter(
-        (item) => String(item?.line_status) === OPEN_LINE_STATUS
+        (item) => String(item?.line_status) === OPEN_SALES_ORDER_LINE_STATUS
       )
       orderForm.setFieldsValue({
         ...order,
@@ -470,6 +428,7 @@ export default function V1SalesOrdersPage() {
         planned_delivery_date: unixToDateInputValue(
           order.planned_delivery_date
         ),
+        ...buildSalesOrderContactFormValues(order),
         items: openItems.map(normalizeSalesOrderItemFormValue),
       })
       rememberPaymentCondition(order)
@@ -489,6 +448,7 @@ export default function V1SalesOrdersPage() {
         {
           ...values,
           customer_snapshot: buildCustomerSnapshot(customer),
+          contact_snapshot: buildOrderContactSnapshot(values),
         },
         editingOrder?.id ? { id: editingOrder.id } : {}
       )
@@ -721,7 +681,7 @@ export default function V1SalesOrdersPage() {
     if (!selectedOrder) {
       return []
     }
-    return LIFECYCLE_ACTIONS.filter(
+    return SALES_ORDER_LIFECYCLE_ACTIONS.filter(
       (action) =>
         hasActionPermission(adminProfile, action.permission) &&
         canRunSalesOrderLifecycleAction(
@@ -791,7 +751,7 @@ export default function V1SalesOrdersPage() {
         filters={
           <>
             <SearchInput
-              placeholder="搜索订单号、客户订单号、付款方式"
+              placeholder="搜索订单号、客户订单号、业务员或付款方式"
               value={keyword}
               onChange={(event) => {
                 setKeyword(event.target.value)
@@ -801,7 +761,7 @@ export default function V1SalesOrdersPage() {
             />
             <SelectFilter
               className="erp-business-filter-control--status"
-              options={STATUS_FILTER_OPTIONS}
+              options={SALES_ORDER_STATUS_FILTER_OPTIONS}
               value={statusFilter}
               onChange={(nextStatus) => {
                 setStatusFilter(nextStatus)
@@ -821,7 +781,7 @@ export default function V1SalesOrdersPage() {
               }}
             />
             <DateRangeFilter
-              options={DATE_FILTER_OPTIONS}
+              options={SALES_ORDER_DATE_FILTER_OPTIONS}
               value={dateFilterField}
               onTypeChange={(nextField) => {
                 setDateFilterField(nextField)
@@ -840,7 +800,7 @@ export default function V1SalesOrdersPage() {
             />
             <SelectFilter
               className="erp-business-filter-control--sort"
-              options={SORT_FILTER_OPTIONS}
+              options={SALES_ORDER_SORT_FILTER_OPTIONS}
               value={sortFilter}
               onChange={(nextSort) => {
                 setSortFilter(nextSort)
@@ -1052,6 +1012,8 @@ export default function V1SalesOrdersPage() {
         itemLoading={itemLoading}
         orderAttachmentRef={orderAttachmentRef}
         customers={customers}
+        customerContacts={customerContacts}
+        salesOwnerOptions={salesOwnerOptions}
         paymentConditionOptions={paymentConditionOptions}
         unitOptions={unitOptions}
         productSKUs={productSKUs}
@@ -1065,7 +1027,8 @@ export default function V1SalesOrdersPage() {
           orderAttachmentRef.current?.clearPendingAttachments()
           setOrderModalOpen(false)
         }}
-        onCustomerChange={applyCustomerPaymentDefaults}
+        onCustomerChange={applyCustomerOrderDefaults}
+        onContactSelect={applyContactToOrderForm}
         onPaymentMethodChange={applyPaymentMethodTermDays}
         onPaymentConditionBlur={requestPaymentConditionPriceReview}
       />

@@ -21,6 +21,7 @@ import FieldWithUnitSuffix, {
   unitSuffixTextFromOptions,
 } from '../business-list/FieldWithUnitSuffix.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
+import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
   dateInputNotAfterRule,
   dateInputNotBeforeRule,
@@ -69,6 +70,16 @@ function summarizeSalesOrderLines(lines = []) {
 
 function skuLabel(sku = {}) {
   return [sku.sku_code, sku.sku_name || sku.customer_sku || sku.barcode]
+    .filter(Boolean)
+    .join(' / ')
+}
+
+function contactPhoneText(contact = {}) {
+  return contact.mobile || contact.phone || ''
+}
+
+function contactOptionLabel(contact = {}) {
+  return [contact.name, contact.title, contactPhoneText(contact)]
     .filter(Boolean)
     .join(' / ')
 }
@@ -223,8 +234,11 @@ function isOrderLineQuantityValidForUnit(line, quantityField, unitOptions) {
 export function SalesOrderFormFields({
   form,
   customers,
+  contactOptions = [],
+  salesOwnerOptions = [],
   paymentConditionOptions = [],
   onCustomerChange,
+  onContactSelect,
   onPaymentMethodChange,
   onPaymentConditionBlur,
 }) {
@@ -275,6 +289,80 @@ export function SalesOrderFormFields({
         name="customer_order_no"
       >
         <Input allowClear autoComplete="off" />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="业务员 / 跟单人"
+        name="sales_owner"
+      >
+        <AutoComplete
+          allowClear
+          autoComplete="off"
+          filterOption={(inputValue, option) =>
+            String(option?.value || '')
+              .toLowerCase()
+              .includes(String(inputValue || '').toLowerCase())
+          }
+          options={salesOwnerOptions}
+          placeholder="录入本单负责人"
+          maxLength={128}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="联系人"
+        name="contact_name"
+      >
+        <AutoComplete
+          allowClear
+          autoComplete="off"
+          filterOption={(inputValue, option) =>
+            String(option?.label || option?.value || '')
+              .toLowerCase()
+              .includes(String(inputValue || '').toLowerCase())
+          }
+          options={contactOptions
+            .map((contact) => ({
+              value: contact.name,
+              label: contactOptionLabel(contact),
+              contact,
+            }))
+            .filter((option) => option.value)}
+          placeholder="选择客户联系人或手动录入"
+          maxLength={128}
+          onChange={(value) => {
+            if (!value) {
+              form.setFieldsValue({
+                contact_phone: '',
+                contact_mobile: '',
+                contact_email: '',
+                contact_title: '',
+              })
+            }
+          }}
+          onSelect={(_, option) => onContactSelect?.(option?.contact)}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="联系电话"
+        name="contact_phone"
+      >
+        <Input allowClear autoComplete="off" maxLength={64} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="联系邮箱"
+        name="contact_email"
+        rules={[{ type: 'email', message: '请输入有效邮箱' }]}
+      >
+        <Input allowClear autoComplete="off" maxLength={128} />
+      </Form.Item>
+      <Form.Item name="contact_mobile" hidden>
+        <Input />
+      </Form.Item>
+      <Form.Item name="contact_title" hidden>
+        <Input />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -399,6 +487,8 @@ export function SalesOrderItemsFormSection({
   const watchedItems = Form.useWatch('items', form) || EMPTY_ORDER_LINES
   const orderDate = Form.useWatch('order_date', form)
   const lineSummary = summarizeSalesOrderLines(watchedItems)
+  const { registerLineItemRow, requestLineItemScroll } =
+    useLineItemAppendScroll(watchedItems.length)
   const skuByID = useMemo(
     () => new Map(productSKUs.map((sku) => [sku.id, sku])),
     [productSKUs]
@@ -515,6 +605,7 @@ export function SalesOrderItemsFormSection({
                 importedLines.forEach(() => {
                   add()
                 })
+                requestLineItemScroll(startIndex)
                 window.setTimeout(() => {
                   form.setFields(
                     importedLines.flatMap((line, index) =>
@@ -555,6 +646,7 @@ export function SalesOrderItemsFormSection({
                     <div
                       key={field.key}
                       className="erp-sales-order-lines-form__row"
+                      ref={(node) => registerLineItemRow(index, node)}
                     >
                       <div className="erp-sales-order-lines-form__row-head">
                         <Space wrap size={8}>
@@ -583,6 +675,7 @@ export function SalesOrderItemsFormSection({
                                 createDuplicatedDraftLineItem(sourceLine),
                                 index + 1
                               )
+                              requestLineItemScroll(index + 1)
                             }}
                           >
                             复制行
@@ -878,10 +971,11 @@ export function SalesOrderItemsFormSection({
                   disabled={!canCreateItem}
                   onClick={() => {
                     const currentLines = form.getFieldValue('items') || []
+                    requestLineItemScroll(currentLines.length)
                     add(createBlankOrderLine(getNextLineNo(currentLines)))
                   }}
                 >
-                  添加待选行
+                  添加条目
                 </Button>
               </div>
               <div className="erp-line-items-form__stats">

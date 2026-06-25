@@ -191,8 +191,8 @@ test('moduleTableColumns: 主业务列表页使用共享排序入口', () => {
   const mainBusinessTableFiles = [
     'pages/WorkflowBusinessModulePage.jsx',
     'pages/V1PurchaseReceiptsPage.jsx',
-    'pages/BOMVersionsPage.jsx',
-    'pages/ShipmentsPage.jsx',
+    'components/bom/BOMVersionColumns.jsx',
+    'components/shipments/shipmentColumns.jsx',
   ]
 
   const missing = mainBusinessTableFiles.filter((relativePath) => {

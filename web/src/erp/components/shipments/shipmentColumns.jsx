@@ -1,0 +1,140 @@
+import React from 'react'
+import { Tag } from 'antd'
+
+import {
+  formatUnixDate,
+  formatUnixDateTime,
+} from '../../utils/masterDataOrderView.mjs'
+import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
+
+export const SHIPMENTS_MODULE_KEY = 'shipments'
+
+export const SHIPMENT_STATUS_OPTIONS = [
+  { label: '全部状态', value: '' },
+  { label: '草稿', value: 'DRAFT' },
+  { label: '已出货', value: 'SHIPPED' },
+  { label: '已取消', value: 'CANCELLED' },
+]
+
+export const SHIPMENT_DATE_FILTER_OPTIONS = [
+  { label: '计划出货', value: 'planned_ship_at' },
+  { label: '实际出货', value: 'shipped_at' },
+]
+
+export const SHIPMENT_STATUS_LABELS = Object.freeze({
+  DRAFT: '草稿',
+  SHIPPED: '已出货',
+  CANCELLED: '已取消',
+})
+
+const SHIPMENT_STATUS_COLORS = Object.freeze({
+  DRAFT: 'default',
+  SHIPPED: 'blue',
+  CANCELLED: 'red',
+})
+
+export function shipmentStatusTag(status) {
+  const key = String(status || '').trim()
+  return (
+    <Tag color={SHIPMENT_STATUS_COLORS[key] || 'default'}>
+      {SHIPMENT_STATUS_LABELS[key] || key || '-'}
+    </Tag>
+  )
+}
+
+export function buildShipmentColumns({ salesOrdersByID }) {
+  return applyBusinessColumnSorters([
+    {
+      title: '出货单号',
+      exportTitle: '出货单号',
+      dataIndex: 'shipment_no',
+      width: 280,
+      sortType: 'text',
+    },
+    {
+      title: '状态',
+      exportTitle: '状态',
+      dataIndex: 'status',
+      width: 110,
+      sortValue: (record) =>
+        SHIPMENT_STATUS_LABELS[record.status] || record.status,
+      render: shipmentStatusTag,
+      exportValue: (record) =>
+        SHIPMENT_STATUS_LABELS[record?.status] || record?.status || '',
+    },
+    {
+      title: '销售订单',
+      exportTitle: '销售订单',
+      dataIndex: 'sales_order_id',
+      width: 120,
+      sortType: 'number',
+      render: (value) => {
+        const order = salesOrdersByID.get(Number(value || 0))
+        return (
+          order?.order_no ||
+          order?.customer_order_no ||
+          (value ? '已关联订单' : '-')
+        )
+      },
+      exportValue: (record) => {
+        const order = salesOrdersByID.get(Number(record?.sales_order_id || 0))
+        return (
+          order?.order_no ||
+          order?.customer_order_no ||
+          (record?.sales_order_id ? '已关联订单' : '')
+        )
+      },
+    },
+    {
+      title: '客户',
+      exportTitle: '客户',
+      width: 260,
+      sortValue: (record) =>
+        record.customer_snapshot || (record.customer_id ? '客户已关联' : ''),
+      render: (_, record) =>
+        record.customer_snapshot || (record.customer_id ? '客户已关联' : '-'),
+      exportValue: (record) =>
+        record.customer_snapshot || (record.customer_id ? '客户已关联' : ''),
+    },
+    {
+      title: '明细行',
+      exportTitle: '明细行',
+      width: 90,
+      sortValue: (record) => record.items?.length || 0,
+      render: (_, record) => record.items?.length || 0,
+      exportValue: (record) => record.items?.length || 0,
+    },
+    {
+      title: '计划 / 实际出货',
+      exportTitle: '计划 / 实际出货',
+      width: 180,
+      sortValue: (record) => record.shipped_at || record.planned_ship_at,
+      sortType: 'date',
+      render: (_, record) =>
+        `${formatUnixDate(record.planned_ship_at)} / ${formatUnixDate(
+          record.shipped_at
+        )}`,
+      exportValue: (record) =>
+        `${formatUnixDate(record.planned_ship_at)} / ${formatUnixDate(
+          record.shipped_at
+        )}`,
+    },
+    {
+      title: '创建时间',
+      exportTitle: '创建时间',
+      dataIndex: 'created_at',
+      width: 160,
+      sortType: 'date',
+      render: formatUnixDateTime,
+      sorter: (a, b) => Number(a?.created_at || 0) - Number(b?.created_at || 0),
+      exportValue: (record) => formatUnixDateTime(record?.created_at),
+    },
+    {
+      title: '备注',
+      exportTitle: '备注',
+      dataIndex: 'note',
+      width: 320,
+      sortable: false,
+    },
+  ])
+}

@@ -35,6 +35,8 @@ func (r *salesOrderRepo) CreateSalesOrder(ctx context.Context, in *biz.SalesOrde
 		SetCustomerID(in.CustomerID).
 		SetNillableCustomerOrderNo(in.CustomerOrderNo).
 		SetCustomerSnapshot(in.CustomerSnapshot).
+		SetNillableSalesOwner(in.SalesOwner).
+		SetContactSnapshot(in.ContactSnapshot).
 		SetNillablePaymentMethod(in.PaymentMethod).
 		SetNillablePaymentTermDays(in.PaymentTermDays).
 		SetNillablePriceConditionNote(in.PriceConditionNote).
@@ -54,11 +56,17 @@ func (r *salesOrderRepo) UpdateSalesOrder(ctx context.Context, id int, in *biz.S
 		SetOrderNo(in.OrderNo).
 		SetCustomerID(in.CustomerID).
 		SetCustomerSnapshot(in.CustomerSnapshot).
+		SetContactSnapshot(in.ContactSnapshot).
 		SetOrderDate(in.OrderDate)
 	if in.CustomerOrderNo == nil {
 		update.ClearCustomerOrderNo()
 	} else {
 		update.SetCustomerOrderNo(*in.CustomerOrderNo)
+	}
+	if in.SalesOwner == nil {
+		update.ClearSalesOwner()
+	} else {
+		update.SetSalesOwner(*in.SalesOwner)
 	}
 	if in.PaymentMethod == nil {
 		update.ClearPaymentMethod()
@@ -112,6 +120,7 @@ func (r *salesOrderRepo) ListSalesOrders(ctx context.Context, filter biz.SalesOr
 		query = query.Where(salesorder.Or(
 			salesorder.OrderNoContains(filter.Keyword),
 			salesorder.CustomerOrderNoContains(filter.Keyword),
+			salesorder.SalesOwnerContains(filter.Keyword),
 			salesorder.PaymentMethodContains(filter.Keyword),
 		))
 	}
@@ -327,11 +336,17 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			SetOrderNo(in.OrderNo).
 			SetCustomerID(in.CustomerID).
 			SetCustomerSnapshot(in.CustomerSnapshot).
+			SetContactSnapshot(in.ContactSnapshot).
 			SetOrderDate(in.OrderDate)
 		if in.CustomerOrderNo == nil {
 			update.ClearCustomerOrderNo()
 		} else {
 			update.SetCustomerOrderNo(*in.CustomerOrderNo)
+		}
+		if in.SalesOwner == nil {
+			update.ClearSalesOwner()
+		} else {
+			update.SetSalesOwner(*in.SalesOwner)
 		}
 		if in.PaymentMethod == nil {
 			update.ClearPaymentMethod()
@@ -371,6 +386,8 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			SetCustomerID(in.CustomerID).
 			SetNillableCustomerOrderNo(in.CustomerOrderNo).
 			SetCustomerSnapshot(in.CustomerSnapshot).
+			SetNillableSalesOwner(in.SalesOwner).
+			SetContactSnapshot(in.ContactSnapshot).
 			SetNillablePaymentMethod(in.PaymentMethod).
 			SetNillablePaymentTermDays(in.PaymentTermDays).
 			SetNillablePriceConditionNote(in.PriceConditionNote).
@@ -570,6 +587,8 @@ func entSalesOrderToBiz(row *ent.SalesOrder) *biz.SalesOrder {
 		CustomerID:          row.CustomerID,
 		CustomerOrderNo:     row.CustomerOrderNo,
 		CustomerSnapshot:    row.CustomerSnapshot,
+		SalesOwner:          row.SalesOwner,
+		ContactSnapshot:     row.ContactSnapshot,
 		PaymentMethod:       row.PaymentMethod,
 		PaymentTermDays:     row.PaymentTermDays,
 		PriceConditionNote:  row.PriceConditionNote,

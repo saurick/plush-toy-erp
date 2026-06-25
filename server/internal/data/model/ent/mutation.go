@@ -38699,6 +38699,8 @@ type SalesOrderMutation struct {
 	order_no                  *string
 	customer_order_no         *string
 	customer_snapshot         *map[string]interface{}
+	sales_owner               *string
+	contact_snapshot          *map[string]interface{}
 	payment_method            *string
 	payment_term_days         *int
 	addpayment_term_days      *int
@@ -38992,6 +38994,104 @@ func (m *SalesOrderMutation) CustomerSnapshotCleared() bool {
 func (m *SalesOrderMutation) ResetCustomerSnapshot() {
 	m.customer_snapshot = nil
 	delete(m.clearedFields, salesorder.FieldCustomerSnapshot)
+}
+
+// SetSalesOwner sets the "sales_owner" field.
+func (m *SalesOrderMutation) SetSalesOwner(s string) {
+	m.sales_owner = &s
+}
+
+// SalesOwner returns the value of the "sales_owner" field in the mutation.
+func (m *SalesOrderMutation) SalesOwner() (r string, exists bool) {
+	v := m.sales_owner
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSalesOwner returns the old "sales_owner" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldSalesOwner(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSalesOwner is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSalesOwner requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSalesOwner: %w", err)
+	}
+	return oldValue.SalesOwner, nil
+}
+
+// ClearSalesOwner clears the value of the "sales_owner" field.
+func (m *SalesOrderMutation) ClearSalesOwner() {
+	m.sales_owner = nil
+	m.clearedFields[salesorder.FieldSalesOwner] = struct{}{}
+}
+
+// SalesOwnerCleared returns if the "sales_owner" field was cleared in this mutation.
+func (m *SalesOrderMutation) SalesOwnerCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldSalesOwner]
+	return ok
+}
+
+// ResetSalesOwner resets all changes to the "sales_owner" field.
+func (m *SalesOrderMutation) ResetSalesOwner() {
+	m.sales_owner = nil
+	delete(m.clearedFields, salesorder.FieldSalesOwner)
+}
+
+// SetContactSnapshot sets the "contact_snapshot" field.
+func (m *SalesOrderMutation) SetContactSnapshot(value map[string]interface{}) {
+	m.contact_snapshot = &value
+}
+
+// ContactSnapshot returns the value of the "contact_snapshot" field in the mutation.
+func (m *SalesOrderMutation) ContactSnapshot() (r map[string]interface{}, exists bool) {
+	v := m.contact_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContactSnapshot returns the old "contact_snapshot" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldContactSnapshot(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContactSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContactSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContactSnapshot: %w", err)
+	}
+	return oldValue.ContactSnapshot, nil
+}
+
+// ClearContactSnapshot clears the value of the "contact_snapshot" field.
+func (m *SalesOrderMutation) ClearContactSnapshot() {
+	m.contact_snapshot = nil
+	m.clearedFields[salesorder.FieldContactSnapshot] = struct{}{}
+}
+
+// ContactSnapshotCleared returns if the "contact_snapshot" field was cleared in this mutation.
+func (m *SalesOrderMutation) ContactSnapshotCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldContactSnapshot]
+	return ok
+}
+
+// ResetContactSnapshot resets all changes to the "contact_snapshot" field.
+func (m *SalesOrderMutation) ResetContactSnapshot() {
+	m.contact_snapshot = nil
+	delete(m.clearedFields, salesorder.FieldContactSnapshot)
 }
 
 // SetPaymentMethod sets the "payment_method" field.
@@ -39627,7 +39727,7 @@ func (m *SalesOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SalesOrderMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 15)
 	if m.order_no != nil {
 		fields = append(fields, salesorder.FieldOrderNo)
 	}
@@ -39639,6 +39739,12 @@ func (m *SalesOrderMutation) Fields() []string {
 	}
 	if m.customer_snapshot != nil {
 		fields = append(fields, salesorder.FieldCustomerSnapshot)
+	}
+	if m.sales_owner != nil {
+		fields = append(fields, salesorder.FieldSalesOwner)
+	}
+	if m.contact_snapshot != nil {
+		fields = append(fields, salesorder.FieldContactSnapshot)
 	}
 	if m.payment_method != nil {
 		fields = append(fields, salesorder.FieldPaymentMethod)
@@ -39683,6 +39789,10 @@ func (m *SalesOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.CustomerOrderNo()
 	case salesorder.FieldCustomerSnapshot:
 		return m.CustomerSnapshot()
+	case salesorder.FieldSalesOwner:
+		return m.SalesOwner()
+	case salesorder.FieldContactSnapshot:
+		return m.ContactSnapshot()
 	case salesorder.FieldPaymentMethod:
 		return m.PaymentMethod()
 	case salesorder.FieldPaymentTermDays:
@@ -39718,6 +39828,10 @@ func (m *SalesOrderMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldCustomerOrderNo(ctx)
 	case salesorder.FieldCustomerSnapshot:
 		return m.OldCustomerSnapshot(ctx)
+	case salesorder.FieldSalesOwner:
+		return m.OldSalesOwner(ctx)
+	case salesorder.FieldContactSnapshot:
+		return m.OldContactSnapshot(ctx)
 	case salesorder.FieldPaymentMethod:
 		return m.OldPaymentMethod(ctx)
 	case salesorder.FieldPaymentTermDays:
@@ -39772,6 +39886,20 @@ func (m *SalesOrderMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCustomerSnapshot(v)
+		return nil
+	case salesorder.FieldSalesOwner:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSalesOwner(v)
+		return nil
+	case salesorder.FieldContactSnapshot:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContactSnapshot(v)
 		return nil
 	case salesorder.FieldPaymentMethod:
 		v, ok := value.(string)
@@ -39887,6 +40015,12 @@ func (m *SalesOrderMutation) ClearedFields() []string {
 	if m.FieldCleared(salesorder.FieldCustomerSnapshot) {
 		fields = append(fields, salesorder.FieldCustomerSnapshot)
 	}
+	if m.FieldCleared(salesorder.FieldSalesOwner) {
+		fields = append(fields, salesorder.FieldSalesOwner)
+	}
+	if m.FieldCleared(salesorder.FieldContactSnapshot) {
+		fields = append(fields, salesorder.FieldContactSnapshot)
+	}
 	if m.FieldCleared(salesorder.FieldPaymentMethod) {
 		fields = append(fields, salesorder.FieldPaymentMethod)
 	}
@@ -39922,6 +40056,12 @@ func (m *SalesOrderMutation) ClearField(name string) error {
 	case salesorder.FieldCustomerSnapshot:
 		m.ClearCustomerSnapshot()
 		return nil
+	case salesorder.FieldSalesOwner:
+		m.ClearSalesOwner()
+		return nil
+	case salesorder.FieldContactSnapshot:
+		m.ClearContactSnapshot()
+		return nil
 	case salesorder.FieldPaymentMethod:
 		m.ClearPaymentMethod()
 		return nil
@@ -39956,6 +40096,12 @@ func (m *SalesOrderMutation) ResetField(name string) error {
 		return nil
 	case salesorder.FieldCustomerSnapshot:
 		m.ResetCustomerSnapshot()
+		return nil
+	case salesorder.FieldSalesOwner:
+		m.ResetSalesOwner()
+		return nil
+	case salesorder.FieldContactSnapshot:
+		m.ResetContactSnapshot()
 		return nil
 	case salesorder.FieldPaymentMethod:
 		m.ResetPaymentMethod()

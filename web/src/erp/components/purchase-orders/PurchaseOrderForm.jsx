@@ -10,6 +10,7 @@ import FieldWithUnitSuffix, {
   unitSuffixTextFromOptions,
 } from '../business-list/FieldWithUnitSuffix.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
+import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
   dateInputNotAfterRule,
   dateInputNotBeforeRule,
@@ -144,6 +145,8 @@ export function PurchaseOrderFormFields({
   const purchaseDate = Form.useWatch('purchase_date', form)
   const expectedArrivalDate = Form.useWatch('expected_arrival_date', form)
   const lineSummary = summarizePurchaseLines(watchedItems)
+  const { registerLineItemRow, requestLineItemScroll } =
+    useLineItemAppendScroll(watchedItems.length)
   const disablePurchaseDateAfterExpectedArrival = useCallback(
     (current) => isDateInputAfter(current, expectedArrivalDate),
     [expectedArrivalDate]
@@ -347,6 +350,7 @@ export function PurchaseOrderFormFields({
                   <div
                     className="erp-sales-order-lines-form__row"
                     key={field.key}
+                    ref={(node) => registerLineItemRow(index, node)}
                   >
                     <div className="erp-sales-order-lines-form__row-head">
                       <strong>第 {index + 1} 行</strong>
@@ -370,6 +374,7 @@ export function PurchaseOrderFormFields({
                               createDuplicatedDraftLineItem(sourceLine),
                               index + 1
                             )
+                            requestLineItemScroll(index + 1)
                           }}
                         >
                           复制行
@@ -528,6 +533,7 @@ export function PurchaseOrderFormFields({
                     icon={<PlusOutlined />}
                     onClick={() => {
                       const currentLines = form.getFieldValue('items') || []
+                      requestLineItemScroll(currentLines.length)
                       add(createBlankPurchaseLine(getNextLineNo(currentLines)))
                     }}
                   >

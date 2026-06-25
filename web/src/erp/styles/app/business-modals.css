@@ -601,7 +601,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  justify-self: stretch;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
+  overflow: visible;
   border-top: 1px dashed var(--erp-sales-order-lines-border, #d7e2dc);
   padding-top: 10px;
 }
@@ -647,11 +651,11 @@
   display: grid;
   width: 100%;
   max-width: 100%;
+  max-height: min(58vh, 680px);
   gap: 12px;
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: visible;
-  overscroll-behavior-x: contain;
+  overflow: auto;
+  overscroll-behavior: contain;
   padding: 2px 2px 8px;
   scrollbar-gutter: stable both-edges;
   -webkit-overflow-scrolling: touch;
@@ -799,11 +803,11 @@
   display: grid;
   width: 100%;
   max-width: 100%;
+  max-height: min(58vh, 680px);
   gap: 12px;
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: visible;
-  overscroll-behavior-x: contain;
+  overflow: auto;
+  overscroll-behavior: contain;
   padding: 2px 2px 8px;
   scrollbar-gutter: stable both-edges;
   -webkit-overflow-scrolling: touch;

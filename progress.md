@@ -241,3 +241,48 @@
 - 验证：追加前 `progress.md` 为 235 行、43694 字节，未达到归档阈值；本轮不改 PDF DOM、打印模板、schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、页面 UI 或部署执行。
 - 下一步：发布或本地重启后，可用日志 `template pdf warmup started / success / failed / disabled` 与 `/readyz` 状态确认预热链路；如需关闭，优先设置 `ERP_PDF_WARMUP=off`。
 - 阻塞/风险：plush 继续保持既有 `/readyz` 语义，PDF warmup 未完成或失败时 readyz 不 ready；这次只统一配置变量口径，不把 readyz 语义改成 trade。
+
+## 2026-06-25 输入控件圆角裁剪全局修复
+
+- 完成：定位销售订单弹窗 `付款周期(天)` 的 `InputNumber` 圆角不完整，根因是圆角 wrapper 与内层原生 input 的背景 / 裁剪没有统一；计算圆角值达标，但内层矩形背景会在暗色业务弹窗里遮住左右圆角视觉。
+- 完成：在全局 `control-radius.css` 收口 `.ant-input-affix-wrapper`、`.ant-input-number`、`.ant-picker` 的子元素裁剪，并让嵌套原生输入透明化，避免在单页或单字段硬补。
+- 完成：`style:l1` 增加真实浏览器断言，检查圆角输入 wrapper 必须裁剪子元素，嵌套原生 input 背景必须透明，防止后续只看 `border-radius` 数值而漏掉视觉圆角被遮挡。
+- 验证：追加前 `progress.md` 为 243 行、44842 字节，未达到归档阈值；`pnpm --dir web css`、`node --check web/scripts/styleL1.mjs`、`pnpm --dir web test`、`STYLE_L1_PORT=4247 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 均通过；前端单测 402 条通过，定向 L1 验证 1 个业务页场景。
+- 下一步：若后续发现下拉面板、第三方弹层或特殊组合控件需要独立圆角策略，应先补 L1 复现断言，再评审是否扩展共享基线。
+- 阻塞/风险：本轮不改 schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、字段映射、原型状态或部署脚本；未跑完整 `pnpm style:l1`，已用覆盖销售订单弹窗和共享业务壳的定向 L1 代替。`pnpm lint` 未跑，因为该脚本会 `--fix` 整个 `src/`，当前工作区已有大量非本轮改动，避免自动改写并行现场。
+
+## 2026-06-25 页面大文件职责拆分一次收口
+
+- 完成：`BusinessListLayout.jsx` 抽出本页协同面板到 `business-list/CollaborationTaskPanel.jsx`，并把列顺序偏好与 CSV 导出收口到 `business-list/businessListPreferences.mjs`；共享列表壳继续只负责 header、筛选、当前操作、表格容器和页面布局组合。
+- 完成：`OperationalFactsPage.jsx` 抽出事实页配置、列定义、统计、附件 owner type 和关联入口构造到 `operational-facts/operationalFactPageConfig.mjs`；页面保留事实列表加载、筛选、创建 / 过账 / 取消 / 结算动作、附件弹窗和页面组合。
+- 完成：`V1OutsourcingOrdersPage.jsx` 抽出页面配置、列定义和 Workflow 任务动作到 `outsourcing-orders/*`；委外订单页继续只承接加工合同源单、打印快照、生命周期动作和页面编排，不承接质检、库存或应付事实。
+- 完成：`V1MasterDataPage.jsx` 抽出主数据对象配置、检索占位、编号 / 名称读取和单位字典判断到 `master-data/masterDataPageConfig.mjs`，并复用共享列顺序 / CSV helper；主数据页保留对象切换、列表加载、保存、启停和表单组合。
+- 完成：顺手清掉采购入库草稿里采购订单缺编号时的裸 ID 可见 fallback，改为业务占位口径；更新主数据聚合保存静态测试，让测试跟随新配置边界。
+- 验证：追加前 `progress.md` 为 243 行、44842 字节，未达到归档阈值；`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test`、`cd web && STYLE_L1_PORT=4189 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,material-master-header-desktop,purchase-order-date-filter-desktop pnpm style:l1`、`git diff --check` 均通过；前端单测 402 条通过，定向 L1 验证 3 个核心业务页场景。
+- 下一步：当前页面大文件治理可以先停，不建议继续为了行数拆页面。后续只在触达具体业务时再按真实责任拆：CSS 按视觉规则拆、import dry-run 按解析 / 归一化 / 匹配 / 报告拆、Workflow 后端按 transition policy / payload helper / task 派生规则单独拆。
+- 阻塞/风险：本轮不改 schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、原型状态或部署脚本；完整 `pnpm style:l1` 未跑完，已用覆盖共享业务壳、主数据、委外、运营事实、采购相邻页的定向 L1 组合代替。当前工作区仍有多组并行 / 既有改动，本轮未回退、未提交。
+
+## 2026-06-25 委外订单缺号显示 fallback 收口
+
+- 完成：按 runtime 分层确认问题位于前端 UI 选中态文案，不涉及 JSON-RPC、后端 usecase、DB、migration、RBAC、Workflow 或部署；`V1OutsourcingOrdersPage.jsx` 缺加工合同号时不再显示 `加工合同 ${id}`，统一回退为 `加工合同未编号`。
+- 完成：将加工合同号显示 fallback 收口到 `getOutsourcingOrderDisplayNo`，选中摘要、选中条目和协同面板当前记录标签共用同一口径；`userVisibleTechnicalFields.test.mjs` 增加 `加工合同 ${` 静态守卫，防止后续再把裸 ID 拼进业务可见文案。
+- 验证：追加前 `progress.md` 为 263 行、49101 字节，未达到归档阈值；`node --test web/src/erp/utils/userVisibleTechnicalFields.test.mjs`、`node --test web/src/erp/api/masterDataOrderApi.test.mjs`、`cd web && pnpm test`、`cd web && pnpm exec eslint --ext .js --ext .jsx --ext .mjs src/erp/pages/V1OutsourcingOrdersPage.jsx src/erp/components/outsourcing-orders/outsourcingOrderPageConfig.mjs src/erp/utils/userVisibleTechnicalFields.test.mjs`、`cd web && STYLE_L1_PORT=4191 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm style:l1`、`git diff --check` 均通过；前端单测 402 条通过，定向 L1 验证 1 个核心业务页场景。
+- 下一步：页面大文件拆分保持当前边界，不继续为行数拆；后续若发现其它裸 ID fallback，优先补到用户可见技术字段守卫，而不是在页面局部硬补。
+- 阻塞/风险：本轮不改 schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、原型状态、部署脚本或样式；未跑完整 `pnpm style:l1`，已用覆盖委外页的定向 L1 代替。
+
+## 2026-06-25 Git closeout coordination skill 接入
+
+- 完成：新增全局 `/Users/simon/.codex/skills/git-closeout-coordination/`，用于提交推送、多会话同时收口、hook/lint/test 反复失败时先判定 owner、冻结范围、upstream/dirty 状态和停止条件。
+- 完成：在 `.agents/skills/README.md` 增加 `$git-closeout-coordination` + `$plush-release-governance` 场景入口；`plush-release-governance` 增加提交推送前先走全局协调、hook/generator 改写后重查 `git status -sb` 的项目差异规则。
+- 验证：追加前 `progress.md` 为 271 行、50868 字节，未达到归档阈值；已执行全局 skill 与 `plush-release-governance` 的 `quick_validate.py`、`agents/openai.yaml` Ruby YAML 解析、TODO 扫描和限定 `git diff --check`，均通过。
+- 下一步：后续 plush 提交推送相关 / 所有代码，尤其多会话、脏工作区或 hook 反复失败时，先 `$git-closeout-coordination`，再按 `$plush-release-governance` 和 `$plush-test-governance` 选择项目命令。
+- 阻塞/风险：本轮只改全局 skill、项目 skill README、release skill 和过程记录，不改运行时代码、schema、migration、JSON-RPC、RBAC、页面、测试脚本或部署脚本；当前工作区仍有多组并行 / 既有改动，本轮未回退、未提交。
+
+## 2026-06-25 销售订单录入字段与联系人快照收口
+
+- 完成：销售订单 Source Document 新增 `sales_owner` 与 `contact_snapshot`，并生成 Ent / Atlas migration；repo、biz、JSON-RPC 保存 / 返回 / 搜索同步接入，业务员参与关键词检索，联系人以订单快照保存，不回写客户联系人主数据。
+- 完成：销售订单弹窗新增业务员 / 跟单人、联系人、联系电话、邮箱等录入字段；选择客户后按客户主联系人 / 首个联系人带默认联系人，编辑已有订单时优先回显订单快照，手工修改联系人不会覆盖客户主数据。
+- 完成：销售订单列表 / 导出增加业务员和联系人列，搜索占位同步补充业务员；客户字段确认清单更新销售订单的业务员和联系人口径，明确本轮只做销售订单录入，不引入外销页面、报价单、下游出货、采购、财务或 Workflow / Fact 自动生成。
+- 验证：追加前 `progress.md` 为 279 行、52204 字节，未达到归档阈值；`cd server && make data`、`gofmt`、`cd server && go test ./internal/biz ./internal/data ./internal/service`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1`、`git diff --check` 均通过。
+- 下一步：若后续要借鉴 trade-erp 的币种、贸易条款、外销流程、报价转订单、销售订单生成采购 / 出货 / 应收，应作为独立边界评审和 usecase / RBAC / 测试任务推进；若业务员要绑定系统用户或角色，也需要单独做 RBAC / Workflow 评审。
+- 阻塞/风险：本轮只生成 migration，未执行本地或线上数据库 `migrate apply`；未跑完整 `pnpm style:l1`，已用覆盖销售订单弹窗的定向 L1 替代；当前工作区仍有多组既有 / 并行改动，本轮未回退、未提交。

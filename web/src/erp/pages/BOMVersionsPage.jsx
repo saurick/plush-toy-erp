@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   CopyOutlined,
-  DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
   InboxOutlined,
@@ -13,7 +12,6 @@ import {
   Button,
   Empty,
   Form,
-  Input,
   Popconfirm,
   Select,
   Space,
@@ -46,7 +44,6 @@ import {
   BusinessOperationPanel,
   BusinessPageLayout,
   CollaborationTaskPanel,
-  DateInput,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -60,18 +57,25 @@ import {
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import {
+  BOM_MODULE_KEY,
+  BOM_STATUS_LABELS,
+  BOM_STATUS_OPTIONS,
+  buildBOMItemColumns,
+  buildBOMVersionColumns,
+} from '../components/bom/BOMVersionColumns.jsx'
+import {
+  BOMHeaderFormFields,
+  BOMItemFormFields,
+  buildHeaderParams,
+  buildItemParams,
+  unixToDateInputValue,
+} from '../components/bom/BOMVersionForms.jsx'
+import {
   formatUnixDate,
   formatUnixDateTime,
   hasActionPermission,
 } from '../utils/masterDataOrderView.mjs'
 import {
-  dateInputNotAfterRule,
-  dateInputNotBeforeRule,
-  isDateInputAfter,
-  isDateInputBefore,
-} from '../utils/dateRange.mjs'
-import {
-  applyBusinessColumnSorters,
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
@@ -89,29 +93,7 @@ import {
   unitOption,
 } from '../utils/referenceSelectOptions.mjs'
 
-const BOM_MODULE_KEY = 'material-bom'
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
-const STATUS_OPTIONS = [
-  { label: '全部状态', value: '' },
-  { label: '草稿', value: 'DRAFT' },
-  { label: '已激活', value: 'ACTIVE' },
-  { label: '历史版本', value: 'ARCHIVED' },
-  { label: '已停用', value: 'DISABLED' },
-]
-
-const STATUS_LABELS = {
-  DRAFT: '草稿',
-  ACTIVE: '已激活',
-  ARCHIVED: '历史版本',
-  DISABLED: '已停用',
-}
-
-const STATUS_COLORS = {
-  DRAFT: 'gold',
-  ACTIVE: 'green',
-  ARCHIVED: 'default',
-  DISABLED: 'red',
-}
 
 function readStoredColumnOrder(moduleKey) {
   if (typeof window === 'undefined') return []
@@ -151,28 +133,6 @@ function getPreferredColumnOrder({
   return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
 }
 
-function statusTag(status) {
-  const key = String(status || '')
-    .trim()
-    .toUpperCase()
-  return (
-    <Tag color={STATUS_COLORS[key] || 'default'}>
-      {STATUS_LABELS[key] || key || '-'}
-    </Tag>
-  )
-}
-
-function unixToDateInputValue(value) {
-  if (!value) return ''
-  const date = new Date(Number(value) * 1000)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 10)
-}
-
-function dateInputToParam(value) {
-  return value ? String(value) : undefined
-}
-
 function csvEscape(value) {
   const text = String(value ?? '')
   return /[",\n\r]/u.test(text) ? `"${text.replace(/"/g, '""')}"` : text
@@ -191,7 +151,7 @@ function downloadCSV({ filename, rows }) {
   const body = rows.map((row) => [
     row.product_id,
     row.version,
-    STATUS_LABELS[row.status] || row.status,
+    BOM_STATUS_LABELS[row.status] || row.status,
     formatUnixDate(row.effective_from),
     formatUnixDate(row.effective_to),
     row.note || '',
@@ -211,235 +171,6 @@ function downloadCSV({ filename, rows }) {
   anchor.click()
   anchor.remove()
   URL.revokeObjectURL(url)
-}
-
-function buildHeaderParams(values = {}, extra = {}) {
-  return {
-    ...extra,
-    product_id: Number(values.product_id || extra.product_id || 0),
-    version: String(values.version || '').trim(),
-    effective_from: dateInputToParam(values.effective_from),
-    effective_to: dateInputToParam(values.effective_to),
-    note: values.note ? String(values.note).trim() : undefined,
-  }
-}
-
-function buildItemParams(values = {}, extra = {}) {
-  return {
-    ...extra,
-    bom_header_id: Number(values.bom_header_id || extra.bom_header_id || 0),
-    material_id: Number(values.material_id || 0),
-    quantity: String(values.quantity || '').trim(),
-    unit_id: Number(values.unit_id || 0),
-    loss_rate: String(values.loss_rate ?? '0').trim(),
-    position: values.position ? String(values.position).trim() : undefined,
-    note: values.note ? String(values.note).trim() : undefined,
-  }
-}
-
-function HeaderFormFields({
-  form,
-  includeProduct = true,
-  disabled = false,
-  productOptions = [],
-  versionSuggestion = '',
-  versionSuggestionLoading = false,
-  onUseVersionSuggestion,
-}) {
-  const effectiveFrom = Form.useWatch('effective_from', form)
-  const effectiveTo = Form.useWatch('effective_to', form)
-  const disableEffectiveFromOnOrAfterEnd = useCallback(
-    (current) =>
-      isDateInputAfter(current, effectiveTo, {
-        allowSameDay: false,
-      }),
-    [effectiveTo]
-  )
-  const disableEffectiveToOnOrBeforeStart = useCallback(
-    (current) =>
-      isDateInputBefore(current, effectiveFrom, {
-        allowSameDay: false,
-      }),
-    [effectiveFrom]
-  )
-  let versionHint = null
-  if (!disabled) {
-    if (versionSuggestionLoading) {
-      versionHint = '正在读取同产品已有 BOM 版本...'
-    } else if (versionSuggestion) {
-      versionHint = (
-        <Space size={4} wrap>
-          <span>建议使用下一个版本号</span>
-          <Button size="small" type="link" onClick={onUseVersionSuggestion}>
-            {versionSuggestion}
-          </Button>
-          <span>，也可手动填写。</span>
-        </Space>
-      )
-    } else {
-      versionHint =
-        '先选择产品，系统会建议下一个版本号；也可手动填写打样版 A 等自定义版本。'
-    }
-  }
-
-  return (
-    <>
-      {includeProduct ? (
-        <Form.Item
-          className="erp-business-action-form__field"
-          label="产品"
-          name="product_id"
-          rules={[{ required: true, message: '请选择产品' }]}
-        >
-          <Select
-            allowClear
-            disabled={disabled}
-            optionFilterProp="label"
-            options={productOptions}
-            placeholder="请选择产品"
-            showSearch
-          />
-        </Form.Item>
-      ) : null}
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="BOM 版本"
-        name="version"
-        rules={[{ required: true, message: '请填写 BOM 版本' }]}
-      >
-        <Input
-          allowClear
-          autoComplete="off"
-          disabled={disabled}
-          placeholder="例如 V1、V2、打样版 A"
-        />
-      </Form.Item>
-      {versionHint ? (
-        <div className="erp-business-action-form__field erp-business-action-form__field--full">
-          <span className="erp-business-selection-action-bar__hint">
-            {versionHint}
-          </span>
-        </div>
-      ) : null}
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="生效开始"
-        name="effective_from"
-        rules={[
-          dateInputNotAfterRule({
-            getEndValue: () => form.getFieldValue('effective_to'),
-            message: '生效开始必须早于生效结束',
-            allowSameDay: false,
-          }),
-        ]}
-      >
-        <DateInput
-          disabled={disabled}
-          disabledDate={
-            effectiveTo ? disableEffectiveFromOnOrAfterEnd : undefined
-          }
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        dependencies={['effective_from']}
-        label="生效结束"
-        name="effective_to"
-        rules={[
-          dateInputNotBeforeRule({
-            getStartValue: () => form.getFieldValue('effective_from'),
-            message: '生效结束必须晚于生效开始',
-            allowSameDay: false,
-          }),
-        ]}
-      >
-        <DateInput
-          disabled={disabled}
-          disabledDate={
-            effectiveFrom ? disableEffectiveToOnOrBeforeStart : undefined
-          }
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--full"
-        label="备注"
-        name="note"
-      >
-        <Input.TextArea
-          allowClear
-          disabled={disabled}
-          rows={3}
-          showCount
-          maxLength={300}
-        />
-      </Form.Item>
-    </>
-  )
-}
-
-function ItemFormFields({ materialOptions = [], unitOptions = [] }) {
-  return (
-    <>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="材料"
-        name="material_id"
-        rules={[{ required: true, message: '请选择材料' }]}
-      >
-        <Select
-          allowClear
-          optionFilterProp="label"
-          options={materialOptions}
-          placeholder="请选择材料"
-          showSearch
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="材料用量"
-        name="quantity"
-        rules={[{ required: true, message: '请填写材料用量' }]}
-      >
-        <Input autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="单位"
-        name="unit_id"
-        rules={[{ required: true, message: '请选择单位' }]}
-      >
-        <Select
-          allowClear
-          optionFilterProp="label"
-          options={unitOptions}
-          placeholder="请选择单位"
-          showSearch
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="损耗率"
-        name="loss_rate"
-        rules={[{ required: true, message: '请填写损耗率' }]}
-      >
-        <Input autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="部位"
-        name="position"
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--full"
-        label="备注"
-        name="note"
-      >
-        <Input.TextArea allowClear rows={3} showCount maxLength={300} />
-      </Form.Item>
-    </>
-  )
 }
 
 export default function BOMVersionsPage() {
@@ -697,7 +428,7 @@ export default function BOMVersionsPage() {
     key: record.id,
     label: record.version || `BOM ${record.id}`,
     title: `${referenceLabel(productOptions, record.product_id, '产品')} / ${
-      STATUS_LABELS[record.status] || record.status || '-'
+      BOM_STATUS_LABELS[record.status] || record.status || '-'
     }`,
   }))
   const selectSingleVersion = useCallback(
@@ -918,75 +649,7 @@ export default function BOMVersionsPage() {
   }
 
   const dataColumns = useMemo(
-    () =>
-      applyBusinessColumnSorters([
-        {
-          title: '产品',
-          exportTitle: '产品',
-          dataIndex: 'product_id',
-          width: 180,
-          sortType: 'number',
-          sorter: (a, b) =>
-            Number(a?.product_id || 0) - Number(b?.product_id || 0),
-          render: (value) => referenceLabel(productOptions, value, '产品'),
-          exportValue: (record) =>
-            referenceLabel(productOptions, record?.product_id, '产品'),
-        },
-        {
-          title: 'BOM 版本',
-          exportTitle: 'BOM 版本',
-          dataIndex: 'version',
-          width: 180,
-          sorter: (a, b) =>
-            String(a?.version || '').localeCompare(String(b?.version || '')),
-        },
-        {
-          title: '状态',
-          exportTitle: '状态',
-          dataIndex: 'status',
-          width: 110,
-          sortValue: (record) => STATUS_LABELS[record.status] || record.status,
-          render: statusTag,
-          exportValue: (record) =>
-            STATUS_LABELS[record.status] || record.status,
-        },
-        {
-          title: '生效开始',
-          exportTitle: '生效开始',
-          dataIndex: 'effective_from',
-          width: 130,
-          sortType: 'date',
-          render: formatUnixDate,
-          exportValue: (record) => formatUnixDate(record.effective_from),
-        },
-        {
-          title: '生效结束',
-          exportTitle: '生效结束',
-          dataIndex: 'effective_to',
-          width: 130,
-          sortType: 'date',
-          render: formatUnixDate,
-          exportValue: (record) => formatUnixDate(record.effective_to),
-        },
-        {
-          title: '备注',
-          exportTitle: '备注',
-          dataIndex: 'note',
-          width: 220,
-          sortable: false,
-          render: (value) => value || '-',
-        },
-        {
-          title: '更新时间',
-          exportTitle: '更新时间',
-          dataIndex: 'updated_at',
-          width: 160,
-          render: formatUnixDateTime,
-          sorter: (a, b) =>
-            Number(a?.updated_at || 0) - Number(b?.updated_at || 0),
-          exportValue: (record) => formatUnixDateTime(record.updated_at),
-        },
-      ]),
+    () => buildBOMVersionColumns({ productOptions }),
     [productOptions]
   )
 
@@ -1060,64 +723,14 @@ export default function BOMVersionsPage() {
   )
 
   const itemColumns = useMemo(
-    () => [
-      {
-        title: '材料',
-        dataIndex: 'material_id',
-        width: 180,
-        render: (value) => referenceLabel(materialOptions, value, '材料'),
-      },
-      { title: '用量', dataIndex: 'quantity', width: 110 },
-      {
-        title: '单位',
-        dataIndex: 'unit_id',
-        width: 100,
-        render: (value) => referenceLabel(unitOptions, value, '单位'),
-      },
-      { title: '损耗率', dataIndex: 'loss_rate', width: 110 },
-      {
-        title: '部位',
-        dataIndex: 'position',
-        width: 140,
-        render: (value) => value || '-',
-      },
-      {
-        title: '备注',
-        dataIndex: 'note',
-        width: 180,
-        render: (value) => value || '-',
-      },
-      {
-        title: '操作',
-        dataIndex: 'actions',
-        width: 150,
-        fixed: 'right',
-        render: (_, item) =>
-          activeActionCanEdit ? (
-            <Space size={8}>
-              <Button
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => openEditItem(item)}
-              >
-                编辑
-              </Button>
-              <Popconfirm
-                title="移除这条 BOM 明细？"
-                okText="移除"
-                cancelText="取消"
-                onConfirm={() => removeItem(item)}
-              >
-                <Button size="small" danger icon={<DeleteOutlined />}>
-                  移除
-                </Button>
-              </Popconfirm>
-            </Space>
-          ) : (
-            <Tag>只读</Tag>
-          ),
-      },
-    ],
+    () =>
+      buildBOMItemColumns({
+        activeActionCanEdit,
+        materialOptions,
+        onEditItem: openEditItem,
+        onRemoveItem: removeItem,
+        unitOptions,
+      }),
     [
       activeActionCanEdit,
       materialOptions,
@@ -1183,7 +796,7 @@ export default function BOMVersionsPage() {
             />
             <SelectFilter
               value={status}
-              options={STATUS_OPTIONS}
+              options={BOM_STATUS_OPTIONS}
               onChange={(nextStatus) => {
                 setStatus(nextStatus || '')
                 resetBusinessPaginationCurrent(setPagination)
@@ -1411,7 +1024,7 @@ export default function BOMVersionsPage() {
             }
           }}
         >
-          <HeaderFormFields
+          <BOMHeaderFormFields
             form={headerForm}
             includeProduct={headerMode !== 'edit'}
             disabled={headerMode === 'view'}
@@ -1497,7 +1110,7 @@ export default function BOMVersionsPage() {
           layout="vertical"
           className="erp-business-action-form"
         >
-          <ItemFormFields
+          <BOMItemFormFields
             materialOptions={materialOptions}
             unitOptions={unitOptions}
           />

@@ -474,8 +474,214 @@ export function createLineItemUnitAssertions({ assert }) {
     )
   }
 
+  const assertLineItemFooterFollowsModalScroll = async (
+    modal,
+    { scenarioName }
+  ) => {
+    const metrics = await modal.evaluate((node) => {
+      const list = node.querySelector('.erp-sales-order-lines-form__list')
+      const footer = node.querySelector('.erp-line-items-form__footer')
+      const addButton = Array.from(node.querySelectorAll('button')).find(
+        (button) => button.textContent?.includes('添加条目')
+      )
+      const modalBody =
+        node.querySelector('.ant-modal-body') || node.closest('.ant-modal-body')
+      const section = node.querySelector('.erp-sales-order-lines-form')
+      const footerStyle = footer ? window.getComputedStyle(footer) : null
+
+      if (list) {
+        list.scrollLeft = 0
+      }
+
+      const bodyBeforeScrollLeft = modalBody?.scrollLeft || 0
+      const listBeforeScrollLeft = list?.scrollLeft || 0
+      const footerBeforeRect = footer?.getBoundingClientRect()
+      const buttonBeforeRect = addButton?.getBoundingClientRect()
+
+      if (list) {
+        list.scrollLeft = Math.max(80, list.scrollWidth - list.clientWidth)
+      }
+
+      const footerAfterRect = footer?.getBoundingClientRect()
+      const buttonAfterRect = addButton?.getBoundingClientRect()
+
+      return {
+        hasList: Boolean(list),
+        hasFooter: Boolean(footer),
+        hasAddButton: Boolean(addButton),
+        footerInModalBody: Boolean(modalBody?.contains(footer)),
+        footerInsideHorizontalList: Boolean(list?.contains(footer)),
+        addButtonInsideFooter: Boolean(footer?.contains(addButton)),
+        footerPosition: footerStyle?.position || '',
+        bodyScrollLeft: modalBody?.scrollLeft || 0,
+        bodyBeforeScrollLeft,
+        listClientWidth: list?.clientWidth || 0,
+        listScrollWidth: list?.scrollWidth || 0,
+        listBeforeScrollLeft,
+        listAfterScrollLeft: list?.scrollLeft || 0,
+        sectionWidth: Math.round(section?.getBoundingClientRect().width || 0),
+        footerWidth: Math.round(footerAfterRect?.width || 0),
+        footerLeftDelta: Math.round(
+          (footerAfterRect?.left || 0) - (footerBeforeRect?.left || 0)
+        ),
+        buttonLeftDelta: Math.round(
+          (buttonAfterRect?.left || 0) - (buttonBeforeRect?.left || 0)
+        ),
+      }
+    })
+
+    assert(
+      metrics.hasList && metrics.hasFooter && metrics.hasAddButton,
+      `${scenarioName} 明细列表、footer 和添加条目按钮应同时存在: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert.equal(
+      metrics.footerInModalBody,
+      true,
+      `${scenarioName} 添加条目 footer 应随弹窗内容纵向滚动: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert.equal(
+      metrics.footerInsideHorizontalList,
+      false,
+      `${scenarioName} 添加条目 footer 不应放在明细横向滚动容器内: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert.equal(
+      metrics.addButtonInsideFooter,
+      true,
+      `${scenarioName} 添加条目按钮应归属 footer 操作区: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      metrics.footerPosition !== 'fixed' && metrics.footerPosition !== 'sticky',
+      `${scenarioName} 添加条目 footer 不应固定或吸附，应随弹窗滚动: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      metrics.listScrollWidth > metrics.listClientWidth &&
+        metrics.listAfterScrollLeft > metrics.listBeforeScrollLeft,
+      `${scenarioName} 应由明细列表承接横向滚动: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.bodyScrollLeft,
+      metrics.bodyBeforeScrollLeft,
+      `${scenarioName} 弹窗正文不应承接明细横向滚动: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      Math.abs(metrics.footerLeftDelta) <= 1 &&
+        Math.abs(metrics.buttonLeftDelta) <= 1,
+      `${scenarioName} 添加条目按钮不应跟随明细横向滚动: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      metrics.footerWidth <= metrics.sectionWidth + 1,
+      `${scenarioName} footer 不应被明细宽度撑开: ${JSON.stringify(metrics)}`
+    )
+  }
+
+  const assertLineItemAddActionScrollsToNewRow = async (
+    modal,
+    { scenarioName, targetRowCount = 6 }
+  ) => {
+    const addButton = modal.getByRole('button', { name: '添加条目' })
+    await addButton.waitFor({ state: 'visible', timeout: 5_000 })
+
+    let rowCount = await modal
+      .locator('.erp-sales-order-lines-form__row')
+      .count()
+    while (rowCount < targetRowCount) {
+      await addButton.scrollIntoViewIfNeeded()
+      await addButton.click()
+      rowCount += 1
+      await modal
+        .locator('.erp-sales-order-lines-form__row')
+        .nth(rowCount - 1)
+        .waitFor({ state: 'visible', timeout: 5_000 })
+    }
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 450)
+    })
+
+    const metrics = await modal.evaluate((node) => {
+      const modalBody =
+        node.querySelector('.ant-modal-body') || node.closest('.ant-modal-body')
+      const list = node.querySelector('.erp-sales-order-lines-form__list')
+      const rows = Array.from(
+        node.querySelectorAll('.erp-sales-order-lines-form__row')
+      )
+      const latestRow = rows[rows.length - 1]
+      const footer = node.querySelector('.erp-line-items-form__footer')
+      const listStyle = list ? window.getComputedStyle(list) : null
+      const listRect = list?.getBoundingClientRect()
+      const bodyRect = modalBody?.getBoundingClientRect()
+      const latestRect = latestRow?.getBoundingClientRect()
+      const footerRect = footer?.getBoundingClientRect()
+      return {
+        rowCount: rows.length,
+        listOverflowY: listStyle?.overflowY || '',
+        listScrollTop: Math.round(list?.scrollTop || 0),
+        listClientHeight: Math.round(list?.clientHeight || 0),
+        listScrollHeight: Math.round(list?.scrollHeight || 0),
+        bodyScrollTop: Math.round(modalBody?.scrollTop || 0),
+        bodyClientHeight: Math.round(modalBody?.clientHeight || 0),
+        bodyScrollHeight: Math.round(modalBody?.scrollHeight || 0),
+        latestRowTop: Math.round(latestRect?.top || 0),
+        latestRowBottom: Math.round(latestRect?.bottom || 0),
+        listTop: Math.round(listRect?.top || 0),
+        listBottom: Math.round(listRect?.bottom || 0),
+        bodyTop: Math.round(bodyRect?.top || 0),
+        bodyBottom: Math.round(bodyRect?.bottom || 0),
+        footerBottom: Math.round(footerRect?.bottom || 0),
+        latestRowVisibleInList:
+          Boolean(listRect && latestRect) &&
+          latestRect.top >= listRect.top - 1 &&
+          latestRect.bottom <= listRect.bottom + 1,
+      }
+    })
+
+    assert(
+      metrics.rowCount >= targetRowCount,
+      `${scenarioName} 连续添加后应达到目标明细行数: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.listOverflowY === 'auto' || metrics.listOverflowY === 'scroll',
+      `${scenarioName} 多明细列表应由 item 区域承接纵向滚动: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      metrics.listScrollHeight > metrics.listClientHeight,
+      `${scenarioName} 多明细后 item 区域应形成纵向滚动: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      metrics.listScrollTop > 0,
+      `${scenarioName} 添加多行后 item 区域应自动滚动到新明细附近: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert.equal(
+      metrics.latestRowVisibleInList,
+      true,
+      `${scenarioName} 最新添加的明细行应进入 item 区域可视区: ${JSON.stringify(
+        metrics
+      )}`
+    )
+  }
+
   return {
+    assertLineItemAddActionScrollsToNewRow,
     assertLineItemDuplicateAction,
+    assertLineItemFooterFollowsModalScroll,
     assertLineItemFieldLayout,
     assertLineAmountCalculation,
     assertLineQuantityPrecisionBlocksAmount,

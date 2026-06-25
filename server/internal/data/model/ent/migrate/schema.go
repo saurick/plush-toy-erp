@@ -1896,6 +1896,8 @@ var (
 		{Name: "order_no", Type: field.TypeString, Size: 64},
 		{Name: "customer_order_no", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "customer_snapshot", Type: field.TypeJSON, Nullable: true},
+		{Name: "sales_owner", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "contact_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "payment_method", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "payment_term_days", Type: field.TypeInt, Nullable: true},
 		{Name: "price_condition_note", Type: field.TypeString, Nullable: true, Size: 255},
@@ -1915,7 +1917,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "sales_orders_customers_sales_orders",
-				Columns:    []*schema.Column{SalesOrdersColumns[13]},
+				Columns:    []*schema.Column{SalesOrdersColumns[15]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1929,7 +1931,7 @@ var (
 			{
 				Name:    "salesorder_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[13]},
+				Columns: []*schema.Column{SalesOrdersColumns[15]},
 			},
 			{
 				Name:    "salesorder_customer_order_no",
@@ -1937,24 +1939,29 @@ var (
 				Columns: []*schema.Column{SalesOrdersColumns[2]},
 			},
 			{
-				Name:    "salesorder_payment_method",
+				Name:    "salesorder_sales_owner",
 				Unique:  false,
 				Columns: []*schema.Column{SalesOrdersColumns[4]},
 			},
 			{
+				Name:    "salesorder_payment_method",
+				Unique:  false,
+				Columns: []*schema.Column{SalesOrdersColumns[6]},
+			},
+			{
 				Name:    "salesorder_lifecycle_status",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[9]},
+				Columns: []*schema.Column{SalesOrdersColumns[11]},
 			},
 			{
 				Name:    "salesorder_order_date",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[7]},
+				Columns: []*schema.Column{SalesOrdersColumns[9]},
 			},
 			{
 				Name:    "salesorder_planned_delivery_date",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[8]},
+				Columns: []*schema.Column{SalesOrdersColumns[10]},
 			},
 		},
 	}

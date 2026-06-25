@@ -591,6 +591,7 @@ async function runScenarioOnce(browser, scenario) {
 
     await scenario.verify(page)
     await assertVisibleInputControlRadius(page, scenario.name)
+    await assertVisibleRoundedInputWrapperClipping(page, scenario.name)
     await assertVisibleBusinessFormControlHeight(page, scenario.name)
     await assertNoHorizontalOverflow(page, scenario.name)
     assert.deepEqual(errors, [], `${scenario.name} 出现控制台或运行时错误`)
@@ -2210,6 +2211,7 @@ async function verifyBusinessActionFormModal(
     )
   }
 
+  await assertVisibleRoundedInputWrapperClipping(page, screenshotName)
   await modal.screenshot({
     path: path.resolve(outputDir, `${screenshotName}.png`),
   })
@@ -5887,6 +5889,134 @@ async function assertVisibleInputControlRadius(page, scenarioName) {
     issues,
     [],
     `${scenarioName} 可见输入控件圆角未达到 ERP 基线: ${JSON.stringify(issues)}`
+  )
+}
+
+async function assertVisibleRoundedInputWrapperClipping(page, scenarioName) {
+  const issues = await page.evaluate(() => {
+    const ignoredAncestorSelector = [
+      '.ant-picker-dropdown',
+      '.ant-select-dropdown',
+      '.ant-dropdown',
+      '.ant-tooltip',
+      '.ant-popover',
+      '.ant-table-filter-dropdown',
+      '.erp-print-shell',
+      '.erp-print-paper',
+      '.erp-material-contract-paper',
+      '.erp-processing-contract-paper',
+      '[data-server-pdf-root]',
+    ].join(',')
+    const wrapperSelector = [
+      '.ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)',
+      '.ant-input-number',
+      '.ant-picker',
+    ].join(',')
+    const nestedInputSelector = [
+      'input.ant-input',
+      '.ant-input-number-input',
+      '.ant-picker-input > input',
+    ].join(',')
+
+    const isVisible = (node) => {
+      const rect = node.getBoundingClientRect()
+      const style = window.getComputedStyle(node)
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== 'none' &&
+        style.visibility !== 'hidden'
+      )
+    }
+
+    const isTransparentBackground = (value) => {
+      const normalized = String(value || '')
+        .replace(/\s/g, '')
+        .toLowerCase()
+      return (
+        normalized === 'transparent' ||
+        normalized === 'rgba(0,0,0,0)' ||
+        normalized === 'rgb(0,0,0,0)'
+      )
+    }
+
+    const describe = (node, extra = {}) => {
+      const classes =
+        typeof node.className === 'string'
+          ? node.className.trim().split(/\s+/).filter(Boolean).slice(0, 5)
+          : []
+      const rect = node.getBoundingClientRect()
+      return {
+        tagName: node.tagName,
+        className: classes.join(' '),
+        placeholder: node.getAttribute('placeholder') || '',
+        width: Number(rect.width.toFixed(1)),
+        height: Number(rect.height.toFixed(1)),
+        ...extra,
+      }
+    }
+
+    const failures = []
+    const wrappers = Array.from(document.querySelectorAll(wrapperSelector))
+    for (const wrapper of wrappers) {
+      if (!(wrapper instanceof HTMLElement)) continue
+      if (!isVisible(wrapper)) continue
+      if (wrapper.closest(ignoredAncestorSelector)) continue
+
+      const wrapperStyle = window.getComputedStyle(wrapper)
+      const wrapperOverflow = [
+        wrapperStyle.overflow,
+        wrapperStyle.overflowX,
+        wrapperStyle.overflowY,
+      ].map((value) => String(value || '').toLowerCase())
+      const clipsChildren = wrapperOverflow.some((value) =>
+        ['hidden', 'clip'].includes(value)
+      )
+      if (!clipsChildren) {
+        failures.push(
+          describe(wrapper, {
+            reason: 'wrapper-overflow',
+            overflow: wrapperStyle.overflow,
+            overflowX: wrapperStyle.overflowX,
+            overflowY: wrapperStyle.overflowY,
+            borderRadius: wrapperStyle.borderRadius,
+          })
+        )
+        continue
+      }
+
+      const input = Array.from(
+        wrapper.querySelectorAll(nestedInputSelector)
+      ).find((node) => node instanceof HTMLElement && isVisible(node))
+      if (!input) continue
+
+      const inputStyle = window.getComputedStyle(input)
+      if (!isTransparentBackground(inputStyle.backgroundColor)) {
+        failures.push(
+          describe(input, {
+            reason: 'nested-input-background',
+            wrapperClassName:
+              typeof wrapper.className === 'string'
+                ? wrapper.className
+                    .trim()
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(0, 5)
+                    .join(' ')
+                : '',
+            backgroundColor: inputStyle.backgroundColor,
+            borderRadius: inputStyle.borderRadius,
+          })
+        )
+      }
+    }
+    return failures.slice(0, 20)
+  })
+
+  assert.deepEqual(
+    issues,
+    [],
+    `${scenarioName} 圆角输入控件内层背景或裁剪会遮挡视觉圆角: ${JSON.stringify(issues)}`
   )
 }
 

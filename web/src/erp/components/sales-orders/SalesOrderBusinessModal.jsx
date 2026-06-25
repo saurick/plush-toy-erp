@@ -16,6 +16,8 @@ export default function SalesOrderBusinessModal({
   itemLoading,
   orderAttachmentRef,
   customers,
+  customerContacts,
+  salesOwnerOptions,
   paymentConditionOptions,
   unitOptions,
   productSKUs,
@@ -27,6 +29,7 @@ export default function SalesOrderBusinessModal({
   onOk,
   onCancel,
   onCustomerChange,
+  onContactSelect,
   onPaymentMethodChange,
   onPaymentConditionBlur,
 }) {
@@ -45,8 +48,11 @@ export default function SalesOrderBusinessModal({
         <SalesOrderFormFields
           form={form}
           customers={customers}
+          contactOptions={customerContacts}
+          salesOwnerOptions={salesOwnerOptions}
           paymentConditionOptions={paymentConditionOptions}
           onCustomerChange={onCustomerChange}
+          onContactSelect={onContactSelect}
           onPaymentMethodChange={onPaymentMethodChange}
           onPaymentConditionBlur={onPaymentConditionBlur}
         />

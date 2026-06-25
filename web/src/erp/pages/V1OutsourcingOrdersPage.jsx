@@ -29,8 +29,12 @@ import {
 import {
   ColumnOrderHeaderMenu,
   ColumnOrderModal,
-  getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
+import {
+  downloadBusinessCSV,
+  getPreferredColumnOrder,
+  writeStoredColumnOrder,
+} from '../components/business-list/businessListPreferences.mjs'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import OutsourcingOrderForm, {
@@ -43,9 +47,10 @@ import OutsourcingOrderForm, {
   unitLabel,
 } from '../components/outsourcing-orders/OutsourcingOrderForm.jsx'
 import {
-  cancelOutsourcingOrder,
-  closeOutsourcingOrder,
-  confirmOutsourcingOrder,
+  buildOutsourcingOrderColumns,
+  renderOutsourcingOrderStatusTag,
+} from '../components/outsourcing-orders/outsourcingOrderColumns.jsx'
+import {
   listOutsourcingOrderItems,
   listOutsourcingOrders,
   listProcesses,
@@ -53,201 +58,44 @@ import {
   listSuppliers,
   listUnits,
   saveOutsourcingOrderWithItems,
-  submitOutsourcingOrder,
 } from '../api/masterDataOrderApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
+import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
-  listWorkflowTasks,
-  updateWorkflowTaskStatus,
-  urgeWorkflowTask,
-} from '../api/workflowApi.mjs'
-import {
-  OUTSOURCING_ORDER_STATUS_COLORS,
   OUTSOURCING_ORDER_STATUS_LABELS,
   buildOutsourcingOrderItemParams,
   buildOutsourcingOrderParams,
   buildSequentialDraftCode,
   buildSupplierSnapshot,
   canRunOutsourcingOrderLifecycleAction,
-  formatUnixDate,
-  formatUnixDateTime,
   hasActionPermission,
-  statusText,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
 import { filterBusinessCollaborationTasksBySource } from '../utils/businessCollaborationTasks.mjs'
 import {
-  applyBusinessColumnSorters,
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
-import { ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
 import {
   PRINT_WORKSPACE_ENTRY_SOURCE,
   PROCESSING_CONTRACT_TEMPLATE_KEY,
   openPrintWorkspaceWindow,
 } from '../utils/printWorkspace.js'
 import { buildProcessingContractDraftFromOutsourcingOrder } from '../data/processingContractTemplate.mjs'
-
-const STATUS_OPTIONS = [
-  { label: '全部状态', value: '' },
-  { label: '草稿', value: 'draft' },
-  { label: '已提交', value: 'submitted' },
-  { label: '已确认', value: 'confirmed' },
-  { label: '已关闭', value: 'closed' },
-  { label: '已取消', value: 'canceled' },
-]
-
-const SORT_OPTIONS = [
-  { label: '最新优先', value: 'updated_at:desc' },
-  { label: '最早优先', value: 'updated_at:asc' },
-  { label: '下单日期新到旧', value: 'order_date:desc' },
-  { label: '下单日期旧到新', value: 'order_date:asc' },
-  { label: '预计回货新到旧', value: 'expected_return_date:desc' },
-  { label: '预计回货旧到新', value: 'expected_return_date:asc' },
-]
-
-const DATE_FILTER_OPTIONS = [
-  { label: '下单日期', value: 'order_date' },
-  { label: '预计回货', value: 'expected_return_date' },
-]
-
-const LIFECYCLE_ACTIONS = [
-  {
-    key: 'submit',
-    label: '提交',
-    permission: 'outsourcing.order.update',
-    nextStatus: 'submitted',
-    run: submitOutsourcingOrder,
-  },
-  {
-    key: 'confirm',
-    label: '确认下单',
-    permission: 'outsourcing.order.confirm',
-    nextStatus: 'confirmed',
-    run: confirmOutsourcingOrder,
-  },
-  {
-    key: 'close',
-    label: '关闭',
-    permission: 'outsourcing.order.update',
-    nextStatus: 'closed',
-    confirmTitle: '确认关闭加工合同',
-    confirmContent: '关闭后该加工合同不再继续推进，是否继续？',
-    okText: '确认关闭',
-    run: closeOutsourcingOrder,
-  },
-  {
-    key: 'cancel',
-    label: '取消',
-    permission: 'outsourcing.order.update',
-    nextStatus: 'canceled',
-    danger: true,
-    confirmTitle: '确认取消加工合同',
-    confirmContent:
-      '取消只终止合同源单，不会自动冲正已经登记的发料、回货或财务事实。',
-    okText: '确认取消',
-    run: cancelOutsourcingOrder,
-  },
-]
-
-const DEFAULT_PAGINATION = { current: 1, pageSize: 20 }
-const OUTSOURCING_ORDERS_MODULE_KEY = 'processing-contracts'
-const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
-const WORKFLOW_ROLE_LABELS = new Map(Object.entries(ROLE_DISPLAY_NAMES))
-
-function parseSortValue(value = 'updated_at:desc') {
-  const [sortBy = 'updated_at', sortDirection = 'desc'] =
-    String(value).split(':')
-  return { sortBy, sortDirection }
-}
-
-function readStoredColumnOrder(moduleKey) {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = window.localStorage.getItem(
-      `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
-    )
-    const parsed = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function writeStoredColumnOrder(moduleKey, order = []) {
-  if (typeof window === 'undefined') return
-  const storageKey = `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
-  if (!Array.isArray(order) || order.length === 0) {
-    window.localStorage.removeItem(storageKey)
-    return
-  }
-  window.localStorage.setItem(storageKey, JSON.stringify(order))
-}
-
-function getPreferredColumnOrder({
-  adminProfile,
-  moduleKey,
-  columns,
-  localOrder,
-}) {
-  if (Array.isArray(localOrder)) {
-    return sanitizeModuleColumnOrder(localOrder, columns)
-  }
-  const accountOrder = adminProfile?.erp_preferences?.column_orders?.[moduleKey]
-  const sanitizedAccountOrder = sanitizeModuleColumnOrder(accountOrder, columns)
-  if (sanitizedAccountOrder.length > 0) return sanitizedAccountOrder
-  return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
-}
-
-function csvEscape(value) {
-  const text = String(value ?? '')
-  return /[",\n\r]/u.test(text) ? `"${text.replace(/"/g, '""')}"` : text
-}
-
-function downloadCSV({ filename, columns, rows }) {
-  const header = columns.map((column) => csvEscape(getColumnLabel(column)))
-  const body = rows.map((row) =>
-    columns.map((column) => {
-      const rawValue =
-        typeof column.exportValue === 'function'
-          ? column.exportValue(row)
-          : row?.[column.dataIndex]
-      return csvEscape(rawValue)
-    })
-  )
-  const csv = [header, ...body].map((line) => line.join(',')).join('\n')
-  const blob = new Blob([`\uFEFF${csv}`], {
-    type: 'text/csv;charset=utf-8',
-  })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(url)
-}
-
-function workflowPayloadOf(task = {}) {
-  return task.payload && typeof task.payload === 'object' ? task.payload : {}
-}
-
-function statusTag(status) {
-  const key = String(status || '').trim()
-  return (
-    <Tag color={OUTSOURCING_ORDER_STATUS_COLORS[key] || 'default'}>
-      {statusText(key, OUTSOURCING_ORDER_STATUS_LABELS)}
-    </Tag>
-  )
-}
-
-function canEditOrder(record) {
-  return Boolean(
-    record && !['closed', 'canceled'].includes(record.lifecycle_status)
-  )
-}
+import {
+  DEFAULT_OUTSOURCING_ORDER_PAGINATION,
+  OUTSOURCING_ORDER_DATE_FILTER_OPTIONS,
+  OUTSOURCING_ORDER_LIFECYCLE_ACTIONS,
+  OUTSOURCING_ORDER_SORT_OPTIONS,
+  OUTSOURCING_ORDER_STATUS_OPTIONS,
+  OUTSOURCING_ORDER_WORKFLOW_ROLE_LABELS,
+  OUTSOURCING_ORDERS_MODULE_KEY,
+  buildOutsourcingOrderStats,
+  canEditOutsourcingOrder,
+  getOutsourcingOrderDisplayNo,
+  parseOutsourcingOrderSortValue,
+} from '../components/outsourcing-orders/outsourcingOrderPageConfig.mjs'
+import { useOutsourcingOrderWorkflowActions } from '../components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs'
 
 export default function V1OutsourcingOrdersPage() {
   const outletContext = useOutletContext()
@@ -271,7 +119,9 @@ export default function V1OutsourcingOrdersPage() {
   const [dateField, setDateField] = useState('order_date')
   const [dateRange, setDateRange] = useState([null, null])
   const [sortValue, setSortValue] = useState('updated_at:desc')
-  const [pagination, setPagination] = useState(DEFAULT_PAGINATION)
+  const [pagination, setPagination] = useState(
+    DEFAULT_OUTSOURCING_ORDER_PAGINATION
+  )
   const [selectedRow, setSelectedRow] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingRow, setEditingRow] = useState(null)
@@ -354,7 +204,8 @@ export default function V1OutsourcingOrdersPage() {
   const loadOrders = useCallback(async () => {
     setLoading(true)
     try {
-      const { sortBy, sortDirection } = parseSortValue(sortValue)
+      const { sortBy, sortDirection } =
+        parseOutsourcingOrderSortValue(sortValue)
       const data = await listOutsourcingOrders({
         keyword,
         supplier_id: supplierFilter || undefined,
@@ -638,81 +489,17 @@ export default function V1OutsourcingOrdersPage() {
     }
   }
 
-  const completeWorkflowTask = useCallback(
-    async (task) => {
-      await updateWorkflowTaskStatus({
-        id: task.id,
-        task_status_key: 'done',
-        business_status_key: task.business_status_key || undefined,
-        reason: '',
-        payload: {
-          ...workflowPayloadOf(task),
-          outsourcing_order_page_action: 'complete',
-        },
-      })
-      message.success('任务已处理完成')
-      await loadWorkflowTasks()
-    },
-    [loadWorkflowTasks]
-  )
+  const {
+    blockWorkflowTask,
+    completeWorkflowTask,
+    urgeOutsourcingWorkflowTask,
+  } = useOutsourcingOrderWorkflowActions({ loadWorkflowTasks })
 
-  const blockWorkflowTask = useCallback(
-    async (task, { reason = '' } = {}) => {
-      await updateWorkflowTaskStatus({
-        id: task.id,
-        task_status_key: 'blocked',
-        business_status_key: 'blocked',
-        reason,
-        payload: {
-          ...workflowPayloadOf(task),
-          outsourcing_order_page_action: 'block',
-          blocked_reason: reason,
-        },
-      })
-      message.success('阻塞原因已记录')
-      await loadWorkflowTasks()
-    },
-    [loadWorkflowTasks]
-  )
-
-  const urgeOutsourcingWorkflowTask = useCallback(
-    async (task, { reason = '' } = {}) => {
-      await urgeWorkflowTask({
-        task_id: task.id,
-        action: 'urge_task',
-        reason,
-        actor_role_key: 'admin',
-        payload: {
-          source_type: task.source_type,
-          source_id: task.source_id,
-          source_no: task.source_no,
-          entry: 'outsourcing_order_page',
-        },
-      })
-      message.success('催办已记录')
-      await loadWorkflowTasks()
-    },
-    [loadWorkflowTasks]
-  )
-
-  const selectedLabel = selectedRow
-    ? `${selectedRow.outsourcing_order_no} / ${
-        selectedRow.supplier_snapshot?.short_name ||
-        selectedRow.supplier_snapshot?.name ||
-        '未指定加工厂'
-      }`
-    : '请先选择一份加工合同'
-
-  const activeRows = rows.length
-  const draftCount = rows.filter(
-    (item) => item.lifecycle_status === 'draft'
-  ).length
-  const confirmedCount = rows.filter(
-    (item) => item.lifecycle_status === 'confirmed'
-  ).length
-  const closedCount = rows.filter((item) =>
-    ['closed', 'canceled'].includes(item.lifecycle_status)
-  ).length
+  const pageStats = buildOutsourcingOrderStats({
+    rows,
+    selectedRow,
+    total,
+  })
 
   const resolveSupplierName = useCallback(
     (record = {}) =>
@@ -723,6 +510,12 @@ export default function V1OutsourcingOrdersPage() {
       '未指定加工厂',
     [suppliers]
   )
+
+  const selectedLabel = selectedRow
+    ? `${getOutsourcingOrderDisplayNo(selectedRow)} / ${resolveSupplierName(
+        selectedRow
+      )}`
+    : '请先选择一份加工合同'
 
   const persistColumnOrder = useCallback(
     async (nextOrder, columnsForOrder) => {
@@ -754,87 +547,7 @@ export default function V1OutsourcingOrdersPage() {
   )
 
   const dataColumns = useMemo(
-    () =>
-      applyBusinessColumnSorters([
-        {
-          title: '加工合同号',
-          exportTitle: '加工合同号',
-          dataIndex: 'outsourcing_order_no',
-          width: 180,
-          fixed: 'left',
-          sortType: 'text',
-        },
-        {
-          title: '加工厂',
-          exportTitle: '加工厂',
-          dataIndex: 'supplier_id',
-          width: 180,
-          sortValue: resolveSupplierName,
-          render: (_, record) => resolveSupplierName(record),
-          exportValue: resolveSupplierName,
-        },
-        {
-          title: '状态',
-          exportTitle: '状态',
-          dataIndex: 'lifecycle_status',
-          width: 110,
-          sortValue: (record) =>
-            statusText(
-              record?.lifecycle_status,
-              OUTSOURCING_ORDER_STATUS_LABELS
-            ),
-          render: statusTag,
-          exportValue: (record) =>
-            statusText(
-              record?.lifecycle_status,
-              OUTSOURCING_ORDER_STATUS_LABELS
-            ),
-        },
-        {
-          title: '来源订单',
-          exportTitle: '来源订单',
-          dataIndex: 'source_order_no',
-          width: 160,
-          sortType: 'text',
-          render: (value) => value || '-',
-          exportValue: (record) => record?.source_order_no || '',
-        },
-        {
-          title: '下单日期',
-          exportTitle: '下单日期',
-          dataIndex: 'order_date',
-          width: 140,
-          render: formatUnixDate,
-          sortType: 'number',
-          exportValue: (record) => formatUnixDate(record?.order_date),
-        },
-        {
-          title: '预计回货',
-          exportTitle: '预计回货',
-          dataIndex: 'expected_return_date',
-          width: 140,
-          render: formatUnixDate,
-          sortType: 'number',
-          exportValue: (record) => formatUnixDate(record?.expected_return_date),
-        },
-        {
-          title: '备注',
-          exportTitle: '备注',
-          dataIndex: 'note',
-          width: 220,
-          render: (value) => value || '-',
-          exportValue: (record) => record?.note || '',
-        },
-        {
-          title: '更新时间',
-          exportTitle: '更新时间',
-          dataIndex: 'updated_at',
-          width: 170,
-          render: formatUnixDateTime,
-          sortType: 'number',
-          exportValue: (record) => formatUnixDateTime(record?.updated_at),
-        },
-      ]),
+    () => buildOutsourcingOrderColumns({ resolveSupplierName }),
     [resolveSupplierName]
   )
 
@@ -880,7 +593,7 @@ export default function V1OutsourcingOrdersPage() {
 
   const exportOrders = useCallback(() => {
     if (rows.length === 0) return
-    downloadCSV({
+    downloadBusinessCSV({
       filename: `outsourcing-orders-${new Date().toISOString().slice(0, 10)}.csv`,
       columns: visibleDataColumns,
       rows,
@@ -919,8 +632,7 @@ export default function V1OutsourcingOrdersPage() {
     ? [
         {
           key: selectedRow.id,
-          label:
-            selectedRow.outsourcing_order_no || `加工合同 ${selectedRow.id}`,
+          label: getOutsourcingOrderDisplayNo(selectedRow),
           title: `${resolveSupplierName(selectedRow)} / ${
             OUTSOURCING_ORDER_STATUS_LABELS[selectedRow.lifecycle_status] ||
             selectedRow.lifecycle_status ||
@@ -930,7 +642,7 @@ export default function V1OutsourcingOrdersPage() {
       ]
     : []
   const visibleLifecycleActions = selectedRow
-    ? LIFECYCLE_ACTIONS.filter(
+    ? OUTSOURCING_ORDER_LIFECYCLE_ACTIONS.filter(
         (action) =>
           hasActionPermission(adminProfile, action.permission) &&
           canRunOutsourcingOrderLifecycleAction(
@@ -980,13 +692,7 @@ export default function V1OutsourcingOrdersPage() {
             不直接写质检 / 库存 / 应付
           </Tag>,
         ]}
-        stats={[
-          { key: 'total', label: '总记录', value: total },
-          { key: 'current', label: '当前结果', value: activeRows },
-          { key: 'draft', label: '草稿', value: draftCount },
-          { key: 'confirmed', label: '已确认', value: confirmedCount },
-          { key: 'closed', label: '已关闭/取消', value: closedCount },
-        ]}
+        stats={pageStats}
       />
 
       <BusinessOperationPanel
@@ -999,21 +705,21 @@ export default function V1OutsourcingOrdersPage() {
               value={keyword}
               placeholder="搜索合同号或来源订单"
               onChange={(event) => {
-                setPagination(DEFAULT_PAGINATION)
+                setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
                 setKeyword(event.target.value)
               }}
               onPressEnter={() => {
-                setPagination(DEFAULT_PAGINATION)
+                setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
                 loadOrders()
               }}
             />
             <SelectFilter
               className="erp-business-filter-control--status"
               value={statusFilter}
-              options={STATUS_OPTIONS}
+              options={OUTSOURCING_ORDER_STATUS_OPTIONS}
               onChange={(value) => {
                 setStatusFilter(value)
-                setPagination(DEFAULT_PAGINATION)
+                setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
               }}
             />
             <SelectFilter
@@ -1025,34 +731,34 @@ export default function V1OutsourcingOrdersPage() {
               optionFilterProp="label"
               onChange={(value) => {
                 setSupplierFilter(value || '')
-                setPagination(DEFAULT_PAGINATION)
+                setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
               }}
             />
             <DateRangeFilter
-              options={DATE_FILTER_OPTIONS}
+              options={OUTSOURCING_ORDER_DATE_FILTER_OPTIONS}
               value={dateField}
               onTypeChange={(value) => {
                 setDateField(value || 'order_date')
-                setPagination(DEFAULT_PAGINATION)
+                setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
               }}
               startValue={dateRange?.[0] || ''}
               endValue={dateRange?.[1] || ''}
               onStartChange={(value) => {
                 setDateRange((current) => [value, current?.[1] || ''])
-                setPagination(DEFAULT_PAGINATION)
+                setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
               }}
               onEndChange={(value) => {
                 setDateRange((current) => [current?.[0] || '', value])
-                setPagination(DEFAULT_PAGINATION)
+                setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
               }}
             />
             <SelectFilter
               className="erp-business-filter-control--sort"
               value={sortValue}
-              options={SORT_OPTIONS}
+              options={OUTSOURCING_ORDER_SORT_OPTIONS}
               onChange={(value) => {
                 setSortValue(value)
-                setPagination(DEFAULT_PAGINATION)
+                setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
               }}
             />
           </>
@@ -1101,11 +807,17 @@ export default function V1OutsourcingOrdersPage() {
           >
             清空
           </Button>
-          {selectedRow ? statusTag(selectedRow.lifecycle_status) : null}
+          {selectedRow
+            ? renderOutsourcingOrderStatusTag(selectedRow.lifecycle_status)
+            : null}
           <Button
             size="small"
             icon={<EditOutlined />}
-            disabled={!selectedRow || !canUpdate || !canEditOrder(selectedRow)}
+            disabled={
+              !selectedRow ||
+              !canUpdate ||
+              !canEditOutsourcingOrder(selectedRow)
+            }
             onClick={() => openEdit(selectedRow)}
           >
             编辑
@@ -1204,9 +916,11 @@ export default function V1OutsourcingOrdersPage() {
       <CollaborationTaskPanel
         tasks={workflowTasks}
         selectedTasks={selectedWorkflowTasks}
-        selectedRecordLabel={selectedRow?.outsourcing_order_no || ''}
+        selectedRecordLabel={
+          selectedRow ? getOutsourcingOrderDisplayNo(selectedRow) : ''
+        }
         adminProfile={adminProfile}
-        roleLabelMap={WORKFLOW_ROLE_LABELS}
+        roleLabelMap={OUTSOURCING_ORDER_WORKFLOW_ROLE_LABELS}
         onCompleteTask={
           canCompleteWorkflowTasks ? completeWorkflowTask : undefined
         }

@@ -8,6 +8,7 @@ import FieldWithUnitSuffix, {
   unitPrecisionFromOptions,
   unitSuffixTextFromOptions,
 } from '../business-list/FieldWithUnitSuffix.jsx'
+import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
   dateInputNotAfterRule,
   dateInputNotBeforeRule,
@@ -154,6 +155,8 @@ export default function OutsourcingOrderForm({
   const orderDate = Form.useWatch('order_date', form)
   const expectedReturnDate = Form.useWatch('expected_return_date', form)
   const lineSummary = summarizeLines(watchedItems)
+  const { registerLineItemRow, requestLineItemScroll } =
+    useLineItemAppendScroll(watchedItems.length)
   const disableOrderDateAfterExpectedReturn = useCallback(
     (current) => isDateInputAfter(current, expectedReturnDate),
     [expectedReturnDate]
@@ -255,6 +258,7 @@ export default function OutsourcingOrderForm({
                   <div
                     className="erp-sales-order-lines-form__row"
                     key={field.key}
+                    ref={(node) => registerLineItemRow(index, node)}
                   >
                     <div className="erp-sales-order-lines-form__row-head">
                       <strong>第 {index + 1} 行</strong>
@@ -278,6 +282,7 @@ export default function OutsourcingOrderForm({
                               createDuplicatedDraftLineItem(sourceLine),
                               index + 1
                             )
+                            requestLineItemScroll(index + 1)
                           }}
                         >
                           复制行
@@ -459,13 +464,13 @@ export default function OutsourcingOrderForm({
                   <Button
                     type="dashed"
                     icon={<PlusOutlined />}
-                    onClick={() =>
+                    onClick={() => {
+                      const currentLines = form.getFieldValue('items') || []
+                      requestLineItemScroll(currentLines.length)
                       add(
-                        createBlankOutsourcingLine(
-                          getNextLineNo(form.getFieldValue('items') || [])
-                        )
+                        createBlankOutsourcingLine(getNextLineNo(currentLines))
                       )
-                    }
+                    }}
                   >
                     添加条目
                   </Button>

@@ -92,6 +92,38 @@ func (_u *SalesOrderUpdate) ClearCustomerSnapshot() *SalesOrderUpdate {
 	return _u
 }
 
+// SetSalesOwner sets the "sales_owner" field.
+func (_u *SalesOrderUpdate) SetSalesOwner(v string) *SalesOrderUpdate {
+	_u.mutation.SetSalesOwner(v)
+	return _u
+}
+
+// SetNillableSalesOwner sets the "sales_owner" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillableSalesOwner(v *string) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetSalesOwner(*v)
+	}
+	return _u
+}
+
+// ClearSalesOwner clears the value of the "sales_owner" field.
+func (_u *SalesOrderUpdate) ClearSalesOwner() *SalesOrderUpdate {
+	_u.mutation.ClearSalesOwner()
+	return _u
+}
+
+// SetContactSnapshot sets the "contact_snapshot" field.
+func (_u *SalesOrderUpdate) SetContactSnapshot(v map[string]interface{}) *SalesOrderUpdate {
+	_u.mutation.SetContactSnapshot(v)
+	return _u
+}
+
+// ClearContactSnapshot clears the value of the "contact_snapshot" field.
+func (_u *SalesOrderUpdate) ClearContactSnapshot() *SalesOrderUpdate {
+	_u.mutation.ClearContactSnapshot()
+	return _u
+}
+
 // SetPaymentMethod sets the "payment_method" field.
 func (_u *SalesOrderUpdate) SetPaymentMethod(v string) *SalesOrderUpdate {
 	_u.mutation.SetPaymentMethod(v)
@@ -410,6 +442,11 @@ func (_u *SalesOrderUpdate) check() error {
 			return &ValidationError{Name: "customer_order_no", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.customer_order_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SalesOwner(); ok {
+		if err := salesorder.SalesOwnerValidator(v); err != nil {
+			return &ValidationError{Name: "sales_owner", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.sales_owner": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.PaymentMethod(); ok {
 		if err := salesorder.PaymentMethodValidator(v); err != nil {
 			return &ValidationError{Name: "payment_method", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.payment_method": %w`, err)}
@@ -467,6 +504,18 @@ func (_u *SalesOrderUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if _u.mutation.CustomerSnapshotCleared() {
 		_spec.ClearField(salesorder.FieldCustomerSnapshot, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.SalesOwner(); ok {
+		_spec.SetField(salesorder.FieldSalesOwner, field.TypeString, value)
+	}
+	if _u.mutation.SalesOwnerCleared() {
+		_spec.ClearField(salesorder.FieldSalesOwner, field.TypeString)
+	}
+	if value, ok := _u.mutation.ContactSnapshot(); ok {
+		_spec.SetField(salesorder.FieldContactSnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.ContactSnapshotCleared() {
+		_spec.ClearField(salesorder.FieldContactSnapshot, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.PaymentMethod(); ok {
 		_spec.SetField(salesorder.FieldPaymentMethod, field.TypeString, value)
@@ -751,6 +800,38 @@ func (_u *SalesOrderUpdateOne) SetCustomerSnapshot(v map[string]interface{}) *Sa
 // ClearCustomerSnapshot clears the value of the "customer_snapshot" field.
 func (_u *SalesOrderUpdateOne) ClearCustomerSnapshot() *SalesOrderUpdateOne {
 	_u.mutation.ClearCustomerSnapshot()
+	return _u
+}
+
+// SetSalesOwner sets the "sales_owner" field.
+func (_u *SalesOrderUpdateOne) SetSalesOwner(v string) *SalesOrderUpdateOne {
+	_u.mutation.SetSalesOwner(v)
+	return _u
+}
+
+// SetNillableSalesOwner sets the "sales_owner" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillableSalesOwner(v *string) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetSalesOwner(*v)
+	}
+	return _u
+}
+
+// ClearSalesOwner clears the value of the "sales_owner" field.
+func (_u *SalesOrderUpdateOne) ClearSalesOwner() *SalesOrderUpdateOne {
+	_u.mutation.ClearSalesOwner()
+	return _u
+}
+
+// SetContactSnapshot sets the "contact_snapshot" field.
+func (_u *SalesOrderUpdateOne) SetContactSnapshot(v map[string]interface{}) *SalesOrderUpdateOne {
+	_u.mutation.SetContactSnapshot(v)
+	return _u
+}
+
+// ClearContactSnapshot clears the value of the "contact_snapshot" field.
+func (_u *SalesOrderUpdateOne) ClearContactSnapshot() *SalesOrderUpdateOne {
+	_u.mutation.ClearContactSnapshot()
 	return _u
 }
 
@@ -1085,6 +1166,11 @@ func (_u *SalesOrderUpdateOne) check() error {
 			return &ValidationError{Name: "customer_order_no", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.customer_order_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SalesOwner(); ok {
+		if err := salesorder.SalesOwnerValidator(v); err != nil {
+			return &ValidationError{Name: "sales_owner", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.sales_owner": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.PaymentMethod(); ok {
 		if err := salesorder.PaymentMethodValidator(v); err != nil {
 			return &ValidationError{Name: "payment_method", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.payment_method": %w`, err)}
@@ -1159,6 +1245,18 @@ func (_u *SalesOrderUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrder, 
 	}
 	if _u.mutation.CustomerSnapshotCleared() {
 		_spec.ClearField(salesorder.FieldCustomerSnapshot, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.SalesOwner(); ok {
+		_spec.SetField(salesorder.FieldSalesOwner, field.TypeString, value)
+	}
+	if _u.mutation.SalesOwnerCleared() {
+		_spec.ClearField(salesorder.FieldSalesOwner, field.TypeString)
+	}
+	if value, ok := _u.mutation.ContactSnapshot(); ok {
+		_spec.SetField(salesorder.FieldContactSnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.ContactSnapshotCleared() {
+		_spec.ClearField(salesorder.FieldContactSnapshot, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.PaymentMethod(); ok {
 		_spec.SetField(salesorder.FieldPaymentMethod, field.TypeString, value)

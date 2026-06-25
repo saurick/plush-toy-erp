@@ -22,6 +22,10 @@ const (
 	FieldCustomerOrderNo = "customer_order_no"
 	// FieldCustomerSnapshot holds the string denoting the customer_snapshot field in the database.
 	FieldCustomerSnapshot = "customer_snapshot"
+	// FieldSalesOwner holds the string denoting the sales_owner field in the database.
+	FieldSalesOwner = "sales_owner"
+	// FieldContactSnapshot holds the string denoting the contact_snapshot field in the database.
+	FieldContactSnapshot = "contact_snapshot"
 	// FieldPaymentMethod holds the string denoting the payment_method field in the database.
 	FieldPaymentMethod = "payment_method"
 	// FieldPaymentTermDays holds the string denoting the payment_term_days field in the database.
@@ -87,6 +91,8 @@ var Columns = []string{
 	FieldCustomerID,
 	FieldCustomerOrderNo,
 	FieldCustomerSnapshot,
+	FieldSalesOwner,
+	FieldContactSnapshot,
 	FieldPaymentMethod,
 	FieldPaymentTermDays,
 	FieldPriceConditionNote,
@@ -115,6 +121,8 @@ var (
 	CustomerIDValidator func(int) error
 	// CustomerOrderNoValidator is a validator for the "customer_order_no" field. It is called by the builders before save.
 	CustomerOrderNoValidator func(string) error
+	// SalesOwnerValidator is a validator for the "sales_owner" field. It is called by the builders before save.
+	SalesOwnerValidator func(string) error
 	// PaymentMethodValidator is a validator for the "payment_method" field. It is called by the builders before save.
 	PaymentMethodValidator func(string) error
 	// PaymentTermDaysValidator is a validator for the "payment_term_days" field. It is called by the builders before save.
@@ -156,6 +164,11 @@ func ByCustomerID(opts ...sql.OrderTermOption) OrderOption {
 // ByCustomerOrderNo orders the results by the customer_order_no field.
 func ByCustomerOrderNo(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCustomerOrderNo, opts...).ToFunc()
+}
+
+// BySalesOwner orders the results by the sales_owner field.
+func BySalesOwner(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSalesOwner, opts...).ToFunc()
 }
 
 // ByPaymentMethod orders the results by the payment_method field.

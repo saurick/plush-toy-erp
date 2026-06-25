@@ -70,6 +70,11 @@ func CustomerOrderNo(v string) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldEQ(FieldCustomerOrderNo, v))
 }
 
+// SalesOwner applies equality check predicate on the "sales_owner" field. It's identical to SalesOwnerEQ.
+func SalesOwner(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldSalesOwner, v))
+}
+
 // PaymentMethod applies equality check predicate on the "payment_method" field. It's identical to PaymentMethodEQ.
 func PaymentMethod(v string) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldEQ(FieldPaymentMethod, v))
@@ -283,6 +288,91 @@ func CustomerSnapshotIsNil() predicate.SalesOrder {
 // CustomerSnapshotNotNil applies the NotNil predicate on the "customer_snapshot" field.
 func CustomerSnapshotNotNil() predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldNotNull(FieldCustomerSnapshot))
+}
+
+// SalesOwnerEQ applies the EQ predicate on the "sales_owner" field.
+func SalesOwnerEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldSalesOwner, v))
+}
+
+// SalesOwnerNEQ applies the NEQ predicate on the "sales_owner" field.
+func SalesOwnerNEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldSalesOwner, v))
+}
+
+// SalesOwnerIn applies the In predicate on the "sales_owner" field.
+func SalesOwnerIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldSalesOwner, vs...))
+}
+
+// SalesOwnerNotIn applies the NotIn predicate on the "sales_owner" field.
+func SalesOwnerNotIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldSalesOwner, vs...))
+}
+
+// SalesOwnerGT applies the GT predicate on the "sales_owner" field.
+func SalesOwnerGT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldSalesOwner, v))
+}
+
+// SalesOwnerGTE applies the GTE predicate on the "sales_owner" field.
+func SalesOwnerGTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldSalesOwner, v))
+}
+
+// SalesOwnerLT applies the LT predicate on the "sales_owner" field.
+func SalesOwnerLT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldSalesOwner, v))
+}
+
+// SalesOwnerLTE applies the LTE predicate on the "sales_owner" field.
+func SalesOwnerLTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldSalesOwner, v))
+}
+
+// SalesOwnerContains applies the Contains predicate on the "sales_owner" field.
+func SalesOwnerContains(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContains(FieldSalesOwner, v))
+}
+
+// SalesOwnerHasPrefix applies the HasPrefix predicate on the "sales_owner" field.
+func SalesOwnerHasPrefix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasPrefix(FieldSalesOwner, v))
+}
+
+// SalesOwnerHasSuffix applies the HasSuffix predicate on the "sales_owner" field.
+func SalesOwnerHasSuffix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasSuffix(FieldSalesOwner, v))
+}
+
+// SalesOwnerIsNil applies the IsNil predicate on the "sales_owner" field.
+func SalesOwnerIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldSalesOwner))
+}
+
+// SalesOwnerNotNil applies the NotNil predicate on the "sales_owner" field.
+func SalesOwnerNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldSalesOwner))
+}
+
+// SalesOwnerEqualFold applies the EqualFold predicate on the "sales_owner" field.
+func SalesOwnerEqualFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEqualFold(FieldSalesOwner, v))
+}
+
+// SalesOwnerContainsFold applies the ContainsFold predicate on the "sales_owner" field.
+func SalesOwnerContainsFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContainsFold(FieldSalesOwner, v))
+}
+
+// ContactSnapshotIsNil applies the IsNil predicate on the "contact_snapshot" field.
+func ContactSnapshotIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldContactSnapshot))
+}
+
+// ContactSnapshotNotNil applies the NotNil predicate on the "contact_snapshot" field.
+func ContactSnapshotNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldContactSnapshot))
 }
 
 // PaymentMethodEQ applies the EQ predicate on the "payment_method" field.

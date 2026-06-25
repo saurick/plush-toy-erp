@@ -14,7 +14,7 @@ export function createBusinessAttachmentAssertions({
   ) {
     await assertNoVisiblePageAttachmentPanel(page, {
       scenarioName,
-      phase: 'before-open',
+      checkState: 'before-open',
     })
 
     if (rowText) {
@@ -93,13 +93,13 @@ export function createBusinessAttachmentAssertions({
     await modal.waitFor({ state: 'hidden', timeout: 10_000 })
     await assertNoVisiblePageAttachmentPanel(page, {
       scenarioName,
-      phase: 'after-close',
+      checkState: 'after-close',
     })
   }
 
   async function assertNoVisiblePageAttachmentPanel(
     page,
-    { scenarioName, phase }
+    { scenarioName, checkState }
   ) {
     const metrics = await page.evaluate(() => {
       const isVisible = (node) => {
@@ -121,7 +121,7 @@ export function createBusinessAttachmentAssertions({
     assert.deepEqual(
       metrics,
       [],
-      `${scenarioName} ${phase} 不应在页面主体常驻渲染附件面板: ${JSON.stringify(
+      `${scenarioName} ${checkState} 不应在页面主体常驻渲染附件面板: ${JSON.stringify(
         metrics
       )}`
     )

@@ -12,6 +12,7 @@ import {
 } from 'antd'
 
 import { paymentConditionCompleteness } from '../../utils/masterDataOrderView.mjs'
+import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 
 function DefaultUnitSelect({ required = false, unitOptions, unitLoading }) {
   return (
@@ -532,6 +533,10 @@ export function normalizeContactRows(rows = []) {
 }
 
 export function ContactFormList({ form, entityLabel }) {
+  const watchedContacts = Form.useWatch('contacts', form) || []
+  const { registerLineItemRow, requestLineItemScroll } =
+    useLineItemAppendScroll(watchedContacts.length)
+
   return (
     <Form.List
       name="contacts"
@@ -561,7 +566,11 @@ export function ContactFormList({ form, entityLabel }) {
           </div>
           <div className="erp-master-contact-list__items">
             {fields.map((field, index) => (
-              <div className="erp-master-contact-list__row" key={field.key}>
+              <div
+                className="erp-master-contact-list__row"
+                key={field.key}
+                ref={(node) => registerLineItemRow(index, node)}
+              >
                 <div className="erp-master-contact-list__row-head">
                   <strong>条目 {index + 1}</strong>
                   <Space size={4}>
@@ -578,6 +587,7 @@ export function ContactFormList({ form, entityLabel }) {
                           id: undefined,
                           is_primary: false,
                         })
+                        requestLineItemScroll(index + 1)
                       }}
                     />
                     <Button
@@ -655,7 +665,10 @@ export function ContactFormList({ form, entityLabel }) {
               <Button
                 type="dashed"
                 icon={<PlusOutlined />}
-                onClick={() => add({ is_primary: false })}
+                onClick={() => {
+                  requestLineItemScroll(fields.length)
+                  add({ is_primary: false })
+                }}
               >
                 添加条目
               </Button>

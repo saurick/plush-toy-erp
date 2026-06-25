@@ -48,6 +48,22 @@ body
 
 #root
   :is(
+    .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper),
+    .ant-input-number,
+    .ant-picker
+  ),
+body
+  :is(.ant-modal, .ant-drawer, .ant-popover, .ant-dropdown)
+  :is(
+    .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper),
+    .ant-input-number,
+    .ant-picker
+  ) {
+  overflow: hidden;
+}
+
+#root
+  :is(
     input[type='checkbox'],
     input[type='radio'],
     input[type='range'],
@@ -156,6 +172,24 @@ body
   height: calc(var(--erp-control-height) - 2px);
   min-height: 0;
   line-height: calc(var(--erp-control-height) - 2px);
+}
+
+#root
+  :is(
+    .ant-input-affix-wrapper input.ant-input,
+    .ant-input-number-input,
+    .ant-picker-input > input
+  ),
+body
+  :is(.ant-modal, .ant-drawer, .ant-popover, .ant-dropdown)
+  :is(
+    .ant-input-affix-wrapper input.ant-input,
+    .ant-input-number-input,
+    .ant-picker-input > input
+  ) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 body .ant-modal .erp-business-form textarea.ant-input,

@@ -39,6 +39,12 @@ func (SalesOrder) Fields() []ent.Field {
 		// Snapshot preserves order-time display data; Customer remains the master truth.
 		field.JSON("customer_snapshot", map[string]any{}).
 			Optional(),
+		field.String("sales_owner").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.JSON("contact_snapshot", map[string]any{}).
+			Optional(),
 		field.String("payment_method").
 			Optional().
 			Nillable().
@@ -90,6 +96,7 @@ func (SalesOrder) Indexes() []ent.Index {
 		index.Fields("order_no").Unique(),
 		index.Fields("customer_id"),
 		index.Fields("customer_order_no"),
+		index.Fields("sales_owner"),
 		index.Fields("payment_method"),
 		index.Fields("lifecycle_status"),
 		index.Fields("order_date"),

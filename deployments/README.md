@@ -8,7 +8,7 @@
 server/deploy/compose/prod
 ```
 
-## Phase 11 复制规则
+## 客户私有化复制规则
 
 新增客户时，客户包应至少具备：
 

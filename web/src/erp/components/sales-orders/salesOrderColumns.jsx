@@ -21,6 +21,12 @@ function compareNumber(a, b) {
   return Number(a || 0) - Number(b || 0)
 }
 
+function contactText(snapshot = {}) {
+  const name = snapshot?.name || ''
+  const phone = snapshot?.mobile || snapshot?.phone || ''
+  return [name, phone].filter(Boolean).join(' / ') || '-'
+}
+
 function salesOrderStatusTag(status) {
   const key = String(status || '').trim()
   return (
@@ -64,6 +70,27 @@ export function buildSalesOrderColumns() {
       width: 150,
       sorter: (a, b) => compareText(a?.customer_order_no, b?.customer_order_no),
       render: (value) => value || '-',
+    },
+    {
+      title: '业务员 / 跟单人',
+      exportTitle: '业务员 / 跟单人',
+      dataIndex: 'sales_owner',
+      width: 140,
+      sorter: (a, b) => compareText(a?.sales_owner, b?.sales_owner),
+      render: (value) => value || '-',
+    },
+    {
+      title: '联系人',
+      exportTitle: '联系人',
+      dataIndex: 'contact_snapshot',
+      width: 170,
+      sorter: (a, b) =>
+        compareText(
+          contactText(a?.contact_snapshot),
+          contactText(b?.contact_snapshot)
+        ),
+      render: contactText,
+      exportValue: (record) => contactText(record?.contact_snapshot),
     },
     {
       title: '付款条件',

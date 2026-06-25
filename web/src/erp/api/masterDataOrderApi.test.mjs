@@ -15,6 +15,15 @@ const masterDataPageSource = readFileSync(
   fileURLToPath(new URL('../pages/V1MasterDataPage.jsx', import.meta.url)),
   'utf8'
 )
+const masterDataPageConfigSource = readFileSync(
+  fileURLToPath(
+    new URL(
+      '../components/master-data/masterDataPageConfig.mjs',
+      import.meta.url
+    )
+  ),
+  'utf8'
+)
 
 test('masterDataOrderApi: V1 API client uses 007 JSON-RPC urls', () => {
   assert.match(source, /url:\s*'masterdata'/)
@@ -71,8 +80,8 @@ test('masterDataOrderApi: masterdata methods cover customers suppliers materials
 })
 
 test('V1MasterDataPage: owner and contacts save through backend aggregate API', () => {
-  assert.match(masterDataPageSource, /saveCustomerWithContacts/)
-  assert.match(masterDataPageSource, /saveSupplierWithContacts/)
+  assert.match(masterDataPageConfigSource, /saveCustomerWithContacts/)
+  assert.match(masterDataPageConfigSource, /saveSupplierWithContacts/)
   assert.match(masterDataPageSource, /saveWithContacts\(\{/)
 
   for (const functionName of [

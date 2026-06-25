@@ -33,8 +33,12 @@ import {
 import {
   ColumnOrderHeaderMenu,
   ColumnOrderModal,
-  getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
+import {
+  downloadBusinessCSV,
+  getPreferredColumnOrder,
+  writeStoredColumnOrder,
+} from '../components/business-list/businessListPreferences.mjs'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import {
@@ -46,34 +50,9 @@ import {
   normalizeContactRows,
 } from '../components/master-data/MasterDataForm.jsx'
 import {
-  createCustomer,
-  createMaterial,
-  createProcess,
-  createProduct,
-  createProductSKU,
-  createSupplier,
   listContactsByOwner,
-  listCustomers,
-  listMaterials,
-  listProcesses,
   listProducts,
-  listProductSKUs,
-  listSuppliers,
   listUnits,
-  saveCustomerWithContacts,
-  saveSupplierWithContacts,
-  setCustomerActive,
-  setMaterialActive,
-  setProcessActive,
-  setProductActive,
-  setProductSKUActive,
-  setSupplierActive,
-  updateCustomer,
-  updateMaterial,
-  updateProcess,
-  updateProduct,
-  updateProductSKU,
-  updateSupplier,
 } from '../api/masterDataOrderApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
@@ -109,271 +88,15 @@ import {
   SUPPLIER_TYPE_OPTIONS,
   buildMasterDataRecordColumns,
 } from '../components/master-data/masterDataColumns.jsx'
-
-const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
-
-const DEFAULT_PLUSH_PROCESS_NAMES = ['查货', '手工', '车缝', '包装']
-const DEFAULT_PLUSH_PROCESS_CATEGORIES = [
-  '查货',
-  '手工',
-  '车缝',
-  '包装',
-  '裁片',
-  '裁片质检',
-  '刀模',
-  '印刷',
-  '贴合',
-]
-
-const PAGE_CONFIG = Object.freeze({
-  customers: {
-    title: '客户档案',
-    ownerType: 'CUSTOMER',
-    entityKey: 'customer',
-    recordKey: 'customers',
-    list: listCustomers,
-    create: createCustomer,
-    update: updateCustomer,
-    saveWithContacts: saveCustomerWithContacts,
-    setActive: setCustomerActive,
-    permissions: {
-      create: 'customer.create',
-      update: 'customer.update',
-      disable: 'customer.disable',
-      contactCreate: 'contact.create',
-      contactUpdate: 'contact.update',
-      contactDisable: 'contact.disable',
-      contactPrimary: 'contact.set_primary',
-    },
-    entityLabel: '客户',
-    draftCodePrefix: 'CUS',
-    formBoundary: '只维护交易主体资料，不在此写订单、库存或财务事实。',
-    summary:
-      '维护客户交易主体和联系人；订单、出货、库存和财务事实在对应业务模块处理。',
-  },
-  suppliers: {
-    title: '供应商档案',
-    ownerType: 'SUPPLIER',
-    entityKey: 'supplier',
-    recordKey: 'suppliers',
-    list: listSuppliers,
-    create: createSupplier,
-    update: updateSupplier,
-    saveWithContacts: saveSupplierWithContacts,
-    setActive: setSupplierActive,
-    permissions: {
-      create: 'supplier.create',
-      update: 'supplier.update',
-      disable: 'supplier.disable',
-      contactCreate: 'contact.create',
-      contactUpdate: 'contact.update',
-      contactDisable: 'contact.disable',
-      contactPrimary: 'contact.set_primary',
-    },
-    entityLabel: '供应商',
-    draftCodePrefix: 'SUP',
-    formBoundary: '只维护交易主体资料，不在此写采购、库存、质检或财务事实。',
-    summary:
-      '维护供应商和加工厂交易主体；采购入库、质检、库存和财务事实在对应业务模块处理。',
-  },
-  materials: {
-    title: '材料档案',
-    recordKey: 'materials',
-    list: listMaterials,
-    create: createMaterial,
-    update: updateMaterial,
-    setActive: setMaterialActive,
-    permissions: {
-      create: 'material.create',
-      update: 'material.update',
-      disable: 'material.disable',
-    },
-    entityLabel: '材料',
-    draftCodePrefix: 'MAT',
-    formBoundary: '只维护材料主数据，不在此写采购、库存、质检或 BOM 用量。',
-    summary:
-      '维护材料主数据；采购订单、库存余额、来料质检和 BOM 用量在对应业务模块处理。',
-  },
-  processes: {
-    title: '加工环节',
-    recordKey: 'processes',
-    list: listProcesses,
-    create: createProcess,
-    update: updateProcess,
-    setActive: setProcessActive,
-    permissions: {
-      create: 'process.create',
-      update: 'process.update',
-      disable: 'process.disable',
-    },
-    entityLabel: '加工环节',
-    draftCodePrefix: 'PROC',
-    formBoundary:
-      '只维护委外订单和后续质检可引用的标准加工环节；需质检只是工序属性标记，不在此生成委外订单、生产任务、库存流水或质检判定。',
-    summary:
-      '维护少量可复用加工环节，用于委外订单选择和后续质检提示；不管理完整工艺路线、排程、报工、质检结果或库存事实。',
-    initialValues: {
-      outsourcing_enabled: true,
-      inhouse_enabled: false,
-      quality_required: false,
-      sort_order: 0,
-    },
-  },
-  products: {
-    title: '产品档案',
-    recordKey: 'products',
-    list: listProducts,
-    create: createProduct,
-    update: updateProduct,
-    setActive: setProductActive,
-    permissions: {
-      create: 'product.create',
-      update: 'product.update',
-      disable: 'product.disable',
-    },
-    entityLabel: '产品',
-    createTitleLabel: '产品',
-    draftCodePrefix: 'PRD',
-    formBoundary:
-      '只维护产品基础信息，不在此写订单、库存、BOM、生产或出货事实。',
-    summary:
-      '维护产品基础信息；产品规格 / SKU、BOM、订单、库存和出货事实在对应业务模块处理。',
-  },
-  product_skus: {
-    title: '产品档案',
-    recordKey: 'product_skus',
-    list: listProductSKUs,
-    create: createProductSKU,
-    update: updateProductSKU,
-    setActive: setProductSKUActive,
-    permissions: {
-      create: 'product_sku.create',
-      update: 'product_sku.update',
-      disable: 'product_sku.disable',
-    },
-    entityLabel: '产品规格',
-    createTitleLabel: '产品规格',
-    draftCodeField: 'sku_code',
-    draftCodePrefix: 'SKU',
-    formBoundary:
-      '只维护产品规格主数据，不在此写订单、库存、BOM、生产或出货事实。',
-    summary:
-      '维护产品规格 / SKU；产品归属使用 product_id，订单、库存、BOM 和出货事实在对应业务模块处理。',
-  },
-})
-
-function readStoredColumnOrder(moduleKey) {
-  if (typeof window === 'undefined') {
-    return []
-  }
-
-  try {
-    const raw = window.localStorage.getItem(
-      `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
-    )
-    const parsed = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function writeStoredColumnOrder(moduleKey, order = []) {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  const storageKey = `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
-  if (!Array.isArray(order) || order.length === 0) {
-    window.localStorage.removeItem(storageKey)
-    return
-  }
-  window.localStorage.setItem(storageKey, JSON.stringify(order))
-}
-
-function getPreferredColumnOrder({
-  adminProfile,
-  moduleKey,
-  columns,
-  localOrder,
-}) {
-  if (Array.isArray(localOrder)) {
-    return sanitizeModuleColumnOrder(localOrder, columns)
-  }
-
-  const accountOrder = adminProfile?.erp_preferences?.column_orders?.[moduleKey]
-  const sanitizedAccountOrder = sanitizeModuleColumnOrder(accountOrder, columns)
-  if (sanitizedAccountOrder.length > 0) {
-    return sanitizedAccountOrder
-  }
-  return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
-}
-
-function csvEscape(value) {
-  const text = String(value ?? '')
-  return /[",\n\r]/u.test(text) ? `"${text.replace(/"/g, '""')}"` : text
-}
-
-function downloadCSV({ filename, columns, rows }) {
-  const header = columns.map((column) => csvEscape(getColumnLabel(column)))
-  const body = rows.map((row) =>
-    columns.map((column) => {
-      const value =
-        typeof column.exportValue === 'function'
-          ? column.exportValue(row)
-          : row?.[column.dataIndex]
-      return csvEscape(value)
-    })
-  )
-  const csv = [header, ...body].map((line) => line.join(',')).join('\n')
-  const blob = new Blob([`\uFEFF${csv}`], {
-    type: 'text/csv;charset=utf-8',
-  })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(url)
-}
-
-function getRecordCode(record, type = '') {
-  const source = record || {}
-  return type === 'product_skus' ? source.sku_code : source.code
-}
-
-function getRecordName(record, type = '') {
-  const source = record || {}
-  if (type === 'product_skus') {
-    return source.sku_name || source.customer_sku || source.barcode || ''
-  }
-  return source.name
-}
-
-function getRecordSearchPlaceholder(type = '') {
-  if (type === 'materials') {
-    return '搜索编号、名称、分类、规格、颜色'
-  }
-  if (type === 'processes') {
-    return '搜索环节编号、名称、类别、备注'
-  }
-  if (type === 'products') {
-    return '搜索产品编号、名称、内部款号、客户款号'
-  }
-  if (type === 'product_skus') {
-    return '搜索 SKU、条码、客户 SKU、颜色、色号、尺码、包装版本'
-  }
-  if (type === 'customers') {
-    return '搜索编号、名称、简称、付款方式'
-  }
-  return '搜索编号、名称、简称'
-}
-
-function needsUnitDictionary(type = '') {
-  return ['materials', 'products', 'product_skus'].includes(type)
-}
+import {
+  DEFAULT_PLUSH_PROCESS_CATEGORIES,
+  DEFAULT_PLUSH_PROCESS_NAMES,
+  MASTER_DATA_PAGE_CONFIG,
+  getRecordCode,
+  getRecordName,
+  getRecordSearchPlaceholder,
+  needsUnitDictionary,
+} from '../components/master-data/masterDataPageConfig.mjs'
 
 export default function V1MasterDataPage({ type }) {
   const isProductCatalogPage = type === 'product_skus'
@@ -381,7 +104,8 @@ export default function V1MasterDataPage({ type }) {
   const [productCatalogType, setProductCatalogType] = useState('products')
   const [, startProductCatalogTransition] = useTransition()
   const effectiveType = isProductCatalogPage ? productCatalogType : type
-  const config = PAGE_CONFIG[effectiveType] || PAGE_CONFIG.customers
+  const config =
+    MASTER_DATA_PAGE_CONFIG[effectiveType] || MASTER_DATA_PAGE_CONFIG.customers
   const isProcessDictionaryPage = effectiveType === 'processes'
   const outletContext = useOutletContext()
   const adminProfile = useMemo(
@@ -976,12 +700,12 @@ export default function V1MasterDataPage({ type }) {
   )
   const selectedRecordDisplayText = useMemo(() => {
     if (!selectedRecord) return `请先选择一个${entityLabel}`
-    return `${getRecordCode(selectedRecord, effectiveType) || selectedRecord.id} / ${
-      getRecordName(selectedRecord, effectiveType) || `未命名${entityLabel}`
-    }`
+    return `${
+      getRecordCode(selectedRecord, effectiveType) || `${entityLabel}未编号`
+    } / ${getRecordName(selectedRecord, effectiveType) || `未命名${entityLabel}`}`
   }, [effectiveType, entityLabel, selectedRecord])
   const exportRecords = () => {
-    downloadCSV({
+    downloadBusinessCSV({
       filename: `${effectiveType}-current-results.csv`,
       columns: orderedRecordColumns,
       rows: records,

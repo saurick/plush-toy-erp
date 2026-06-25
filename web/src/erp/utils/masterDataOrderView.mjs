@@ -586,6 +586,16 @@ export function buildCustomerSnapshot(customer = {}) {
   })
 }
 
+export function buildOrderContactSnapshot(values = {}) {
+  return compactParams({
+    name: trimOptional(values.contact_name),
+    phone: trimOptional(values.contact_phone),
+    mobile: trimOptional(values.contact_mobile),
+    email: trimOptional(values.contact_email),
+    title: trimOptional(values.contact_title),
+  })
+}
+
 export function buildSupplierSnapshot(supplier = {}) {
   if (!supplier?.id) {
     return {}
@@ -694,6 +704,11 @@ export function buildSalesOrderParams(values = {}, extra = {}) {
       values.customer_snapshot && typeof values.customer_snapshot === 'object'
         ? values.customer_snapshot
         : {},
+    sales_owner: trimOptional(values.sales_owner),
+    contact_snapshot:
+      values.contact_snapshot && typeof values.contact_snapshot === 'object'
+        ? values.contact_snapshot
+        : buildOrderContactSnapshot(values),
     payment_method: trimOptional(values.payment_method),
     payment_term_days: normalizeOptionalNonNegativeInteger(
       values.payment_term_days
