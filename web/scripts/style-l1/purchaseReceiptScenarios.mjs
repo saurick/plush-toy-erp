@@ -323,7 +323,6 @@ export function createPurchaseReceiptScenarios(deps) {
                 '过账时间',
                 '明细行数',
                 '入库数量',
-                '创建时间',
               ].includes(node.text)
                 ? node.scrollWidth > node.clientWidth + 1
                 : false

@@ -236,12 +236,12 @@ export function PurchaseOrderFormFields({
       <Form.Item
         className="erp-business-action-form__field"
         name="purchase_date"
-        label="采购日期"
+        label="下单日期"
         rules={[
-          { required: true, message: '请选择采购日期' },
+          { required: true, message: '请选择下单日期' },
           dateInputNotAfterRule({
             getEndValue: () => form.getFieldValue('expected_arrival_date'),
-            message: '采购日期不能晚于预计到货',
+            message: '下单日期不能晚于预计到货日期',
           }),
         ]}
       >
@@ -257,11 +257,11 @@ export function PurchaseOrderFormFields({
         className="erp-business-action-form__field"
         dependencies={['purchase_date']}
         name="expected_arrival_date"
-        label="预计到货"
+        label="预计到货日期"
         rules={[
           dateInputNotBeforeRule({
             getStartValue: () => form.getFieldValue('purchase_date'),
-            message: '预计到货不能早于采购日期',
+            message: '预计到货日期不能早于下单日期',
           }),
         ]}
       >
@@ -276,7 +276,12 @@ export function PurchaseOrderFormFields({
         name="note"
         label="备注"
       >
-        <Input.TextArea allowClear rows={2} showCount maxLength={255} />
+        <Input.TextArea
+          allowClear
+          autoSize={{ minRows: 1, maxRows: 3 }}
+          showCount
+          maxLength={255}
+        />
       </Form.Item>
       {attachmentPanel}
 
@@ -288,7 +293,7 @@ export function PurchaseOrderFormFields({
                 <div className="erp-line-items-form__import-copy">
                   <strong>导入材料</strong>
                   <span>
-                    从业务来源导入；数量、单价和预计到货回到采购明细维护。
+                    从业务来源导入；数量、单价和预计到货日期回到采购明细维护。
                   </span>
                 </div>
                 <Button
@@ -301,7 +306,7 @@ export function PurchaseOrderFormFields({
               <SourceImportPickerModal
                 open={materialImportOpen}
                 title="从材料库导入采购明细"
-                description="这里只选择材料来源；数量、单价和预计到货仍在主弹窗采购明细里维护。"
+                description="这里只选择材料来源；数量、单价和预计到货日期仍在主弹窗采购明细里维护。"
                 rows={materials}
                 columns={materialImportColumns}
                 getSelectedLabel={(material) =>
@@ -492,13 +497,13 @@ export function PurchaseOrderFormFields({
                       <Form.Item
                         className="erp-line-item-field erp-line-item-field--date"
                         name={[field.name, 'expected_arrival_date']}
-                        label="预计到货"
+                        label="预计到货日期"
                         dependencies={['purchase_date']}
                         rules={[
                           dateInputNotBeforeRule({
                             getStartValue: () =>
                               form.getFieldValue('purchase_date'),
-                            message: '明细预计到货不能早于采购日期',
+                            message: '明细预计到货日期不能早于下单日期',
                           }),
                         ]}
                       >
@@ -517,7 +522,7 @@ export function PurchaseOrderFormFields({
                       >
                         <Input.TextArea
                           allowClear
-                          rows={2}
+                          autoSize={{ minRows: 1, maxRows: 3 }}
                           showCount
                           maxLength={255}
                         />

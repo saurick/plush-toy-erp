@@ -175,7 +175,7 @@ export function BOMHeaderFormFields({
         <Input.TextArea
           allowClear
           disabled={disabled}
-          rows={3}
+          autoSize={{ minRows: 1, maxRows: 3 }}
           showCount
           maxLength={300}
         />
@@ -243,7 +243,12 @@ export function BOMItemFormFields({ materialOptions = [], unitOptions = [] }) {
         label="备注"
         name="note"
       >
-        <Input.TextArea allowClear rows={3} showCount maxLength={300} />
+        <Input.TextArea
+          allowClear
+          autoSize={{ minRows: 1, maxRows: 3 }}
+          showCount
+          maxLength={300}
+        />
       </Form.Item>
     </>
   )

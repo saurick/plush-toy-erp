@@ -293,3 +293,65 @@
 - 验证：追加前 `progress.md` 为 288 行、54119 字节，未达到归档阈值；已完成上一轮 `git push` 触发的 `qa:full`，并确认本地与 `origin/main` 无 ahead/behind 分叉。
 - 下一步：继续按 full-worktree closeout 收到 `git status -sb` 干净后再结束。
 - 阻塞/风险：本轮不改业务语义、schema、migration、JSON-RPC、RBAC、菜单、Workflow / Fact usecase 或部署脚本。
+
+## 2026-06-25 业务页面系统时间列统一隐藏
+
+- 完成：普通业务页面 / 组件默认不再展示系统 `created_at / updated_at` 对应的创建时间、更新时间列；主数据、销售订单、采购订单、委外订单、BOM、采购入库、质检、出货、库存台账、业务事实和 formal shell 的默认表格 / 导出列统一保留业务日期、状态、来源、数量、金额、备注等业务字段。
+- 完成：`userVisibleTechnicalFields.test.mjs` 增加普通业务页面不默认展示“创建时间 / 更新时间 / 创建日期 / 更新日期”的静态守卫；`style:l1` 质检和采购入库表头断言同步更新，防止旧断言把系统时间列带回业务默认视图。
+- 验证：追加前 `progress.md` 为 295 行、54861 字节，未达到归档阈值；`node --test web/src/erp/utils/userVisibleTechnicalFields.test.mjs`、`cd web && pnpm test`、`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm style:l1`、`cd web && pnpm style:l1` 均通过；完整 L1 验证 66 个场景。
+- 下一步：若后续需要审计详情、管理员排障或专门历史追溯视图展示系统时间，应显式放到审计 / 详情 / 开发治理边界，不回到普通业务列表默认列。
+- 阻塞/风险：本轮不改 schema、migration、JSON-RPC 返回字段、排序参数、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、原型状态或部署脚本；后端仍可返回 `created_at / updated_at` 供审计、排序和内部排查使用。
+
+## 2026-06-25 生命周期可见文案收口为状态
+
+- 完成：销售订单列表 / 导出列头从“生命周期”改为“状态”，订单附件说明从“不改变订单生命周期”改为“不改变订单状态”；采购订单模块能力说明从“提交、审核、关闭、取消生命周期”改为“状态动作”口径。
+- 完成：dev 原型配置、原型索引、业务表单样板和局部动作弹窗样板里的“生命周期动作 / 生命周期规则”统一改为“状态动作 / 状态规则”，保留内部 `lifecycle_status` 字段和 HTML 脚本锚点不变。
+- 完成：`userVisibleTechnicalFields.test.mjs` 增加“业务可见文案不暴露架构状态机术语”守卫，覆盖页面、组件、移动端和 `businessModules / devPrototypes` 配置，防止“生命周期”再作为业务可见字段或动作说明回流。
+- 验证：追加前 `progress.md` 为 303 行、56457 字节，未达到归档阈值；`rg` 确认业务页面 / 组件 / 配置 / 脚本 / 原型资产中只剩原型 README 的“资产生命周期”普通阶段说明；`node --test web/src/erp/utils/userVisibleTechnicalFields.test.mjs web/src/erp/config/devPrototypes.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 均通过；前端单测 404 条通过，定向 L1 验证 1 个业务页场景。
+- 下一步：若后续需要在正式业务文档中解释内部状态机，继续使用“单据状态 / 状态动作 / 状态规则”作为用户可见口径，`lifecycle_status` 只留在代码、API 合同和架构文档里。
+- 阻塞/风险：本轮不改 schema、migration、JSON-RPC 字段、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置或部署脚本；完整 `pnpm style:l1` 未跑，已用覆盖销售订单和共享业务壳的定向 L1 代替。
+
+## 2026-06-25 销售订单单行导出入口移除
+
+- 完成：移除销售订单选中态操作栏里的“导出订单行”按钮；保留列表级“导出当前结果”，避免为通常只有一行的所选订单明细占用常驻操作位。
+- 完成：删除该按钮牵引的订单行 CSV 导出、选中订单后自动加载订单行、不可达的订单行列顺序弹窗和对应本地状态；订单行仍在销售订单新建 / 编辑业务弹窗内按真实编辑流程加载和维护。
+- 完成：同步 `moduleTableColumns.test.mjs`，不再要求销售订单页挂无可见入口的订单行列表列顺序；扫描确认当前前端没有“导出订单行 / 导出明细 / 导出行”类单行导出按钮文案，其他页面保留的是“导出当前结果”或禁用说明。
+- 验证：追加前 `progress.md` 为 312 行、58396 字节，未达到归档阈值；`pnpm --dir web exec eslint --ext .js --ext .jsx --ext .mjs src/erp/pages/V1SalesOrdersPage.jsx src/erp/utils/moduleTableColumns.test.mjs`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1`、`git diff --check -- web/src/erp/pages/V1SalesOrdersPage.jsx web/src/erp/utils/moduleTableColumns.test.mjs` 均通过；前端单测 404 条通过，定向 L1 验证 1 个业务页场景。
+- 下一步：若后续确有批量订单行对账 / 下发需求，应设计为列表级多行导出或详情里的低频更多操作，不恢复选中单行常驻按钮。
+- 阻塞/风险：本轮不改 schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、原型状态或部署脚本；未跑完整 `pnpm style:l1`，已用覆盖销售订单和共享业务壳的定向 L1 代替。当前工作区进入本轮前已有多组非本轮改动，本轮未回退、未提交。
+
+## 2026-06-25 销售订单签约与计划交付日期口径收口
+
+- 完成：销售订单 `order_date` 的用户可见文案统一从“订单日期”改为“签约日期”；`planned_delivery_date` 统一展示为“计划交付日期”，覆盖列表列头、导出列头、日期筛选、排序选项、弹窗字段标签和校验提示。
+- 完成：确认销售订单弹窗已经使用既有 `DateInput` 暴露 `order_date / planned_delivery_date`，本轮保留并加静态测试锁住两个日期控件，避免后续只在表格显示日期但弹窗无法录入。
+- 完成：同步 `docs/product/prototypes/core-menu-coverage-v1/index.html` 中销售订单字段口径；底层字段名、JSON-RPC、schema、migration、RBAC、菜单、Workflow / Fact 和客户配置均未修改。
+- 验证：追加前 `progress.md` 为 321 行、60252 字节，未达到归档阈值；`pnpm --dir web exec node --test src/erp/utils/userVisibleTechnicalFields.test.mjs src/erp/utils/moduleTableColumns.test.mjs`、`pnpm --dir web exec eslint --no-warn-ignored --ext .js --ext .jsx src/erp/components/sales-orders/SalesOrderForm.jsx src/erp/components/sales-orders/salesOrderColumns.jsx src/erp/components/sales-orders/salesOrderPageConfig.mjs src/erp/utils/userVisibleTechnicalFields.test.mjs`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 均通过；前端单测 405 条通过，定向 L1 验证 1 个业务页场景。
+- 下一步：若后续需要把后端字段从 `order_date` 物理改名为 `contract_date`，必须作为独立 schema/API/migration 兼容任务评审；当前只收口业务可见语义。
+- 阻塞/风险：本轮不改数据库字段名和 API 参数名，因此代码内部仍使用 `order_date` 作为兼容字段；未跑 `pnpm --dir web lint`，因为项目脚本会 `--fix` 整个 `src/`，当前工作区已有多组非本轮改动，已用定向 ESLint 只读校验替代。
+
+## 2026-06-25 全局业务日期可见口径扫描
+
+- 完成：全局扫描业务页面、L1 脚本和原型资产中的“订单日期 / 采购日期 / 预计到货 / 预计回货 / 计划出货 / 实际出货”等日期文案；采购订单统一为“下单日期 / 预计到货日期”，委外订单统一为“预计回货日期”，出货与运营事实筛选统一为“计划出货日期 / 实际出货日期”。
+- 完成：同步采购订单、委外订单、出货、运营事实、业务模块配置、原型样例和 L1 文案断言；补 `userVisibleTechnicalFields.test.mjs` 静态守卫，确认对应弹窗仍有 `DateInput` 日期控件，且短标签不会回流。
+- 完成：保留“收货日期 / 出货日期 / 回货日期”等事实日期口径，不改底层 `purchase_date / expected_arrival_date / expected_return_date / planned_ship_at / shipped_at` 字段名，也不改 schema、migration、JSON-RPC、RBAC、Workflow / Fact usecase、菜单或客户配置。
+- 验证：追加前 `progress.md` 为 330 行、62225 字节，未达到归档阈值；`rg -n "采购日期|预计到货(?!日期)|预计回货(?!日期)|计划出货(?!日期)|实际出货(?!日期)|计划 / 实际出货|行预计回货(?!日期)|明细预计到货(?!日期)" web/src web/scripts docs/product/prototypes -S --pcre2` 无遗留匹配；`cd web && pnpm exec node --test src/erp/utils/userVisibleTechnicalFields.test.mjs src/erp/utils/moduleTableColumns.test.mjs src/erp/config/seedData.test.mjs src/erp/config/devPrototypes.test.mjs`、定向 ESLint、`cd web && STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,purchase-order-date-filter-desktop,shipment-date-filter-desktop,shipment-date-filter-mobile pnpm style:l1`、`cd web && pnpm test`、限定 `git diff --check` 均通过；前端单测 406 条通过，定向 L1 验证 4 个场景。
+- 下一步：若后续要物理重命名底层日期字段，应作为独立 schema/API/migration 兼容任务推进；当前只治理用户可见文案和弹窗控件一致性。
+- 阻塞/风险：完整 `pnpm --dir web lint` 未跑，因为脚本会 `--fix` 整个 `src/`，当前工作区已有多组非本轮改动，已用定向 ESLint 只读校验替代；当前工作区仍有并行 / 既有改动，本轮未回退、未提交。
+
+## 2026-06-25 低频备注输入降级
+
+- 完成：销售订单 `price_condition_note` 从常驻全宽“价格条件说明”降级为普通权重“报价备注”，保留账期影响报价时记录核对结论的语义，不改字段名、API 参数或后端保存链路。
+- 完成：全局扫描业务页面 `TextArea`；将销售订单、采购订单、委外订单、BOM、主数据、出货、采购入库草稿 / 明细等普通可选备注改为一行起步、按内容自动展开，减少空备注框占用；Workflow 原因、质检判定备注、打印 / 合同模板文本区、移动端任务处理和 dev-only 边界预览因属于动作证据或正式输出，本轮保留。
+- 完成：同步 `docs/product/产品能力证据详情.md` 的销售订单 UI 口径为“报价备注（`price_condition_note`）”。
+- 验证：追加前 `progress.md` 为 339 行、64531 字节，未达到归档阈值；已复扫 `Input.TextArea / textarea`，确认剩余大块文本区均属于动作原因、判定、打印输出、移动端任务处理或 dev-only 预览边界；`git diff --check`、定向 ESLint、`cd web && pnpm css`、`cd web && pnpm test`、`cd web && STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,purchase-order-date-filter-desktop,shipment-date-filter-desktop pnpm style:l1` 均通过；前端单测 406 条通过，定向 L1 验证 3 个场景。
+- 下一步：如后续某个备注字段开始承载结构化业务判断，应独立评审为明确字段或动作原因，不继续堆在普通备注里。
+- 阻塞/风险：本轮不改 schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置或部署脚本；完整 `pnpm lint` 未跑，因为项目脚本会 `--fix` 整个 `src/`，当前工作区已有多组非本轮改动，已用定向 ESLint 只读校验替代；未跑完整 `pnpm style:l1`，已用覆盖业务表单、采购订单和出货日期筛选的定向 L1 代替。
+
+## 2026-06-25 邮箱电话保存校验收口
+
+- 完成：新增后端联系人校验主路径，客户 / 供应商联系人 `phone / mobile / email` 在主数据独立联系人 API 和 `save_customer_with_contacts / save_supplier_with_contacts` 聚合保存前统一 trim、校验和拒绝明显非法值；销售订单 `contact_snapshot` 的 `phone / mobile / email` 同步复用该规则，避免来源主数据和订单快照各拦各的。
+- 完成：新增前端 `contactValidation.mjs`，主数据联系人、销售订单联系人快照、管理员登录短信手机号和权限中心管理员手机号维护统一使用共享表单规则；管理员手机号仍按短信登录大陆手机号规则，业务联系人电话 / 手机使用较宽松联系电话规则，允许座机、总机、国际前缀和分机写法。
+- 完成：新增并登记 `contactValidation.test.mjs`；补后端 `masterdata / sales_order` 单测，覆盖有效邮箱、无效邮箱、有效联系电话、无效短号、销售订单快照 trim 和非法快照拒绝。
+- 验证：追加前 `progress.md` 为 348 行、66503 字节，未达到归档阈值；`go test ./internal/biz`、`go test ./internal/biz ./internal/service`、`pnpm --dir web exec node --test src/erp/utils/contactValidation.test.mjs src/erp/utils/masterDataOrderView.test.mjs`、定向 ESLint、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1`、限定 `git diff --check` 均通过；前端全量单测 409 条通过，定向 L1 验证 1 个业务表单场景。
+- 下一步：若后续需要清理历史脏联系人数据，应另做只读审计报告或受控修复脚本；本轮不直接改历史库数据。
+- 阻塞/风险：本轮不改 schema、migration、Ent 生成文件、错误码、JSON-RPC 方法、RBAC、菜单、WorkflowUsecase、Fact usecase、客户配置、原型状态或部署脚本；未跑完整 `pnpm lint`，因为该脚本会 `--fix` 整个 `src/`，当前工作区已有多组非本轮改动，已用定向 ESLint 只读校验替代；未跑完整 `pnpm style:l1`，已用覆盖正式业务表单壳的定向 L1 代替。

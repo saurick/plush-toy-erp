@@ -444,6 +444,7 @@ func (uc *SalesOrderUsecase) validateProductAndUnitActive(ctx context.Context, p
 }
 
 func normalizeSalesOrderMutation(in SalesOrderMutation) (SalesOrderMutation, error) {
+	var err error
 	in.OrderNo = strings.TrimSpace(in.OrderNo)
 	in.CustomerOrderNo = normalizeOptionalString(in.CustomerOrderNo)
 	in.SalesOwner = normalizeOptionalString(in.SalesOwner)
@@ -453,8 +454,9 @@ func normalizeSalesOrderMutation(in SalesOrderMutation) (SalesOrderMutation, err
 	if in.CustomerSnapshot == nil {
 		in.CustomerSnapshot = map[string]any{}
 	}
-	if in.ContactSnapshot == nil {
-		in.ContactSnapshot = map[string]any{}
+	in.ContactSnapshot, err = normalizeContactSnapshot(in.ContactSnapshot)
+	if err != nil {
+		return SalesOrderMutation{}, err
 	}
 	if in.OrderNo == "" || in.CustomerID <= 0 || in.OrderDate.IsZero() || (in.PaymentTermDays != nil && *in.PaymentTermDays < 0) {
 		return SalesOrderMutation{}, ErrBadParam

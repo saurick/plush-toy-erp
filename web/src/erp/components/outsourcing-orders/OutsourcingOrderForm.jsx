@@ -207,7 +207,7 @@ export default function OutsourcingOrderForm({
           { required: true, message: '请选择下单日期' },
           dateInputNotAfterRule({
             getEndValue: () => form.getFieldValue('expected_return_date'),
-            message: '下单日期不能晚于预计回货',
+            message: '下单日期不能晚于预计回货日期',
           }),
         ]}
       >
@@ -221,11 +221,11 @@ export default function OutsourcingOrderForm({
         className="erp-business-action-form__field"
         dependencies={['order_date']}
         name="expected_return_date"
-        label="预计回货"
+        label="预计回货日期"
         rules={[
           dateInputNotBeforeRule({
             getStartValue: () => form.getFieldValue('order_date'),
-            message: '预计回货不能早于下单日期',
+            message: '预计回货日期不能早于下单日期',
           }),
         ]}
       >
@@ -236,11 +236,16 @@ export default function OutsourcingOrderForm({
         />
       </Form.Item>
       <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--full"
+        className="erp-business-action-form__field"
         name="note"
         label="备注"
       >
-        <Input.TextArea allowClear rows={2} showCount maxLength={255} />
+        <Input.TextArea
+          allowClear
+          autoSize={{ minRows: 1, maxRows: 3 }}
+          showCount
+          maxLength={255}
+        />
       </Form.Item>
       {attachmentPanel}
 
@@ -425,13 +430,13 @@ export default function OutsourcingOrderForm({
                       <Form.Item
                         className="erp-line-item-field erp-line-item-field--date"
                         name={[field.name, 'expected_return_date']}
-                        label="行预计回货"
+                        label="行预计回货日期"
                         dependencies={['order_date']}
                         rules={[
                           dateInputNotBeforeRule({
                             getStartValue: () =>
                               form.getFieldValue('order_date'),
-                            message: '行预计回货不能早于下单日期',
+                            message: '行预计回货日期不能早于下单日期',
                           }),
                         ]}
                       >
@@ -450,7 +455,7 @@ export default function OutsourcingOrderForm({
                       >
                         <Input.TextArea
                           allowClear
-                          rows={2}
+                          autoSize={{ minRows: 1, maxRows: 3 }}
                           showCount
                           maxLength={255}
                         />

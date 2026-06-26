@@ -5,7 +5,6 @@ import {
   OUTSOURCING_ORDER_STATUS_COLORS,
   OUTSOURCING_ORDER_STATUS_LABELS,
   formatUnixDate,
-  formatUnixDateTime,
   statusText,
 } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
@@ -68,8 +67,8 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
       exportValue: (record) => formatUnixDate(record?.order_date),
     },
     {
-      title: '预计回货',
-      exportTitle: '预计回货',
+      title: '预计回货日期',
+      exportTitle: '预计回货日期',
       dataIndex: 'expected_return_date',
       width: 140,
       render: formatUnixDate,
@@ -83,15 +82,6 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
       width: 220,
       render: (value) => value || '-',
       exportValue: (record) => record?.note || '',
-    },
-    {
-      title: '更新时间',
-      exportTitle: '更新时间',
-      dataIndex: 'updated_at',
-      width: 170,
-      render: formatUnixDateTime,
-      sortType: 'number',
-      exportValue: (record) => formatUnixDateTime(record?.updated_at),
     },
   ])
 }

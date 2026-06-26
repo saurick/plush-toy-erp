@@ -15,17 +15,17 @@ export const SALES_ORDER_STATUS_FILTER_OPTIONS = [
 ]
 
 export const SALES_ORDER_DATE_FILTER_OPTIONS = [
-  { label: '订单日期', value: 'order_date' },
-  { label: '计划交付', value: 'planned_delivery_date' },
+  { label: '签约日期', value: 'order_date' },
+  { label: '计划交付日期', value: 'planned_delivery_date' },
 ]
 
 export const SALES_ORDER_SORT_FILTER_OPTIONS = [
   { label: '最新优先', value: 'updated_at:desc' },
   { label: '最早优先', value: 'updated_at:asc' },
-  { label: '订单日期新到旧', value: 'order_date:desc' },
-  { label: '订单日期旧到新', value: 'order_date:asc' },
-  { label: '交付日期新到旧', value: 'planned_delivery_date:desc' },
-  { label: '交付日期旧到新', value: 'planned_delivery_date:asc' },
+  { label: '签约日期新到旧', value: 'order_date:desc' },
+  { label: '签约日期旧到新', value: 'order_date:asc' },
+  { label: '计划交付日期新到旧', value: 'planned_delivery_date:desc' },
+  { label: '计划交付日期旧到新', value: 'planned_delivery_date:asc' },
 ]
 
 export const SALES_ORDER_LIFECYCLE_ACTIONS = [

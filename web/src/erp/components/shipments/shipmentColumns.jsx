@@ -1,10 +1,7 @@
 import React from 'react'
 import { Tag } from 'antd'
 
-import {
-  formatUnixDate,
-  formatUnixDateTime,
-} from '../../utils/masterDataOrderView.mjs'
+import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 
 export const SHIPMENTS_MODULE_KEY = 'shipments'
@@ -17,8 +14,8 @@ export const SHIPMENT_STATUS_OPTIONS = [
 ]
 
 export const SHIPMENT_DATE_FILTER_OPTIONS = [
-  { label: '计划出货', value: 'planned_ship_at' },
-  { label: '实际出货', value: 'shipped_at' },
+  { label: '计划出货日期', value: 'planned_ship_at' },
+  { label: '实际出货日期', value: 'shipped_at' },
 ]
 
 export const SHIPMENT_STATUS_LABELS = Object.freeze({
@@ -105,8 +102,8 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: (record) => record.items?.length || 0,
     },
     {
-      title: '计划 / 实际出货',
-      exportTitle: '计划 / 实际出货',
+      title: '计划出货日期 / 实际出货日期',
+      exportTitle: '计划出货日期 / 实际出货日期',
       width: 180,
       sortValue: (record) => record.shipped_at || record.planned_ship_at,
       sortType: 'date',
@@ -118,16 +115,6 @@ export function buildShipmentColumns({ salesOrdersByID }) {
         `${formatUnixDate(record.planned_ship_at)} / ${formatUnixDate(
           record.shipped_at
         )}`,
-    },
-    {
-      title: '创建时间',
-      exportTitle: '创建时间',
-      dataIndex: 'created_at',
-      width: 160,
-      sortType: 'date',
-      render: formatUnixDateTime,
-      sorter: (a, b) => Number(a?.created_at || 0) - Number(b?.created_at || 0),
-      exportValue: (record) => formatUnixDateTime(record?.created_at),
     },
     {
       title: '备注',

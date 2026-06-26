@@ -869,11 +869,11 @@ async function assertOrderLifecycleActionsConsolidated(
 
   assert(
     metrics.scrollWidth <= metrics.clientWidth + 2,
-    `${scenarioName} 生命周期动作收口后不应造成横向溢出: ${JSON.stringify(metrics)}`
+    `${scenarioName} 状态动作收口后不应造成横向溢出: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.buttons.every((item) => item.width > 0 && item.height > 0),
-    `${scenarioName} 生命周期动作按钮应保持可见尺寸: ${JSON.stringify(metrics)}`
+    `${scenarioName} 状态动作按钮应保持可见尺寸: ${JSON.stringify(metrics)}`
   )
   await page.keyboard.press('Escape')
 }

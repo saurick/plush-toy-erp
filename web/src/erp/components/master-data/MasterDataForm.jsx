@@ -12,6 +12,10 @@ import {
 } from 'antd'
 
 import { paymentConditionCompleteness } from '../../utils/masterDataOrderView.mjs'
+import {
+  optionalContactEmailRule,
+  optionalContactPhoneRule,
+} from '../../utils/contactValidation.mjs'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 
 function DefaultUnitSelect({ required = false, unitOptions, unitLoading }) {
@@ -337,7 +341,12 @@ export function MasterDataFormFields({
           label="备注"
           name="note"
         >
-          <Input.TextArea allowClear rows={3} showCount maxLength={300} />
+          <Input.TextArea
+            allowClear
+            autoSize={{ minRows: 1, maxRows: 3 }}
+            showCount
+            maxLength={300}
+          />
         </Form.Item>
       </>
     )
@@ -479,7 +488,12 @@ export function MasterDataFormFields({
         label="备注"
         name="note"
       >
-        <Input.TextArea allowClear rows={3} showCount maxLength={300} />
+        <Input.TextArea
+          allowClear
+          autoSize={{ minRows: 1, maxRows: 3 }}
+          showCount
+          maxLength={300}
+        />
       </Form.Item>
     </>
   )
@@ -615,13 +629,27 @@ export function ContactFormList({ form, entityLabel }) {
                   <Form.Item label="职位" name={[field.name, 'title']}>
                     <Input allowClear autoComplete="off" />
                   </Form.Item>
-                  <Form.Item label="手机" name={[field.name, 'mobile']}>
+                  <Form.Item
+                    label="手机"
+                    name={[field.name, 'mobile']}
+                    rules={[
+                      optionalContactPhoneRule('请输入有效手机或联系电话'),
+                    ]}
+                  >
                     <Input allowClear autoComplete="off" />
                   </Form.Item>
-                  <Form.Item label="电话" name={[field.name, 'phone']}>
+                  <Form.Item
+                    label="电话"
+                    name={[field.name, 'phone']}
+                    rules={[optionalContactPhoneRule()]}
+                  >
                     <Input allowClear autoComplete="off" />
                   </Form.Item>
-                  <Form.Item label="邮箱" name={[field.name, 'email']}>
+                  <Form.Item
+                    label="邮箱"
+                    name={[field.name, 'email']}
+                    rules={[optionalContactEmailRule()]}
+                  >
                     <Input allowClear autoComplete="off" />
                   </Form.Item>
                   <Form.Item
@@ -651,7 +679,7 @@ export function ContactFormList({ form, entityLabel }) {
                   >
                     <Input.TextArea
                       allowClear
-                      rows={2}
+                      autoSize={{ minRows: 1, maxRows: 3 }}
                       showCount
                       maxLength={200}
                     />

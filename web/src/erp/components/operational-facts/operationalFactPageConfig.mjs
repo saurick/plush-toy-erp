@@ -21,10 +21,7 @@ import {
   settleFinanceFact,
   shipShipment,
 } from '../../api/operationalFactApi.mjs'
-import {
-  formatUnixDate,
-  formatUnixDateTime,
-} from '../../utils/masterDataOrderView.mjs'
+import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import {
   ACTION_PERMISSIONS,
   FINANCE_COLLECTION_TYPE_LABELS,
@@ -61,8 +58,8 @@ export const OCCURRED_DATE_FILTER_OPTIONS = [
 ]
 
 const SHIPMENT_DATE_FILTER_OPTIONS = [
-  { label: '计划出货', value: 'planned_ship_at' },
-  { label: '实际出货', value: 'shipped_at' },
+  { label: '计划出货日期', value: 'planned_ship_at' },
+  { label: '实际出货日期', value: 'shipped_at' },
 ]
 
 const RESERVED_DATE_FILTER_OPTIONS = [
@@ -331,15 +328,6 @@ export function buildOperationalFactColumns(activeKey) {
         formatUnixDate(
           record.occurred_at || record.planned_ship_at || record.reserved_at
         ),
-    },
-    {
-      title: '创建时间',
-      exportTitle: '创建时间',
-      dataIndex: 'created_at',
-      width: 160,
-      render: formatUnixDateTime,
-      sortType: 'date',
-      exportValue: (record) => formatUnixDateTime(record?.created_at),
     },
     {
       title: '备注',

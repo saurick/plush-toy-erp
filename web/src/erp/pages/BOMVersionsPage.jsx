@@ -72,7 +72,6 @@ import {
 } from '../components/bom/BOMVersionForms.jsx'
 import {
   formatUnixDate,
-  formatUnixDateTime,
   hasActionPermission,
 } from '../utils/masterDataOrderView.mjs'
 import {
@@ -139,15 +138,7 @@ function csvEscape(value) {
 }
 
 function downloadCSV({ filename, rows }) {
-  const header = [
-    '产品ID',
-    'BOM版本',
-    '状态',
-    '生效开始',
-    '生效结束',
-    '备注',
-    '更新时间',
-  ]
+  const header = ['产品ID', 'BOM版本', '状态', '生效开始', '生效结束', '备注']
   const body = rows.map((row) => [
     row.product_id,
     row.version,
@@ -155,7 +146,6 @@ function downloadCSV({ filename, rows }) {
     formatUnixDate(row.effective_from),
     formatUnixDate(row.effective_to),
     row.note || '',
-    formatUnixDateTime(row.updated_at),
   ])
   const csv = [header, ...body]
     .map((line) => line.map(csvEscape).join(','))

@@ -2,10 +2,7 @@ import React from 'react'
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import { Button, Popconfirm, Space, Tag } from 'antd'
 
-import {
-  formatUnixDate,
-  formatUnixDateTime,
-} from '../../utils/masterDataOrderView.mjs'
+import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 
@@ -100,15 +97,6 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       width: 220,
       sortable: false,
       render: (value) => value || '-',
-    },
-    {
-      title: '更新时间',
-      exportTitle: '更新时间',
-      dataIndex: 'updated_at',
-      width: 160,
-      render: formatUnixDateTime,
-      sorter: (a, b) => Number(a?.updated_at || 0) - Number(b?.updated_at || 0),
-      exportValue: (record) => formatUnixDateTime(record.updated_at),
     },
   ])
 }

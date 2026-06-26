@@ -1,7 +1,6 @@
 import React from 'react'
 import { Tag } from 'antd'
 
-import { formatUnixDateTime } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 
@@ -32,18 +31,6 @@ function activeTag(active) {
   ) : (
     <Tag color="green">启用</Tag>
   )
-}
-
-function timestampColumn({ title, dataIndex }) {
-  return {
-    title,
-    exportTitle: title,
-    dataIndex,
-    width: 160,
-    sorter: (a, b) => Number(a?.[dataIndex] || 0) - Number(b?.[dataIndex] || 0),
-    render: formatUnixDateTime,
-    exportValue: (record) => formatUnixDateTime(record?.[dataIndex]),
-  }
 }
 
 function statusColumn() {
@@ -108,8 +95,6 @@ function productColumns({ unitDisplay }) {
     },
     unitColumn(unitDisplay),
     statusColumn(),
-    timestampColumn({ title: '创建时间', dataIndex: 'created_at' }),
-    timestampColumn({ title: '更新时间', dataIndex: 'updated_at' }),
   ]
 }
 
@@ -190,8 +175,6 @@ function productSKUColumns({ productOptions, unitDisplay }) {
     },
     unitColumn(unitDisplay),
     statusColumn(),
-    timestampColumn({ title: '创建时间', dataIndex: 'created_at' }),
-    timestampColumn({ title: '更新时间', dataIndex: 'updated_at' }),
   ]
 }
 
@@ -254,7 +237,6 @@ function processColumns() {
         value === true ? <Tag color="orange">是</Tag> : <Tag>否</Tag>,
     },
     statusColumn(),
-    timestampColumn({ title: '更新时间', dataIndex: 'updated_at' }),
   ]
 }
 
@@ -369,8 +351,6 @@ function baseColumns({ type, unitDisplay }) {
           },
         ]),
     statusColumn(),
-    timestampColumn({ title: '创建时间', dataIndex: 'created_at' }),
-    timestampColumn({ title: '更新时间', dataIndex: 'updated_at' }),
   ]
 }
 

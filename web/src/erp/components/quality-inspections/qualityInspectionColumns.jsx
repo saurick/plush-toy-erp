@@ -1,10 +1,7 @@
 import React from 'react'
 import { Space, Tag, Typography } from 'antd'
 
-import {
-  formatUnixDate,
-  formatUnixDateTime,
-} from '../../utils/masterDataOrderView.mjs'
+import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 
@@ -217,24 +214,6 @@ export function buildQualityInspectionExportColumns({
       exportValue: (record) => inspectorLabel(record?.inspector_id),
     },
     {
-      title: '创建时间',
-      exportTitle: '创建时间',
-      dataIndex: 'created_at',
-      width: 170,
-      sortType: 'date',
-      render: formatUnixDateTime,
-      exportValue: (record) => formatUnixDateTime(record?.created_at),
-    },
-    {
-      title: '更新时间',
-      exportTitle: '更新时间',
-      dataIndex: 'updated_at',
-      width: 170,
-      sortType: 'date',
-      render: formatUnixDateTime,
-      exportValue: (record) => formatUnixDateTime(record?.updated_at),
-    },
-    {
       title: '判定备注',
       exportTitle: '判定备注',
       dataIndex: 'decision_note',
@@ -360,15 +339,6 @@ export function buildQualityInspectionDataColumns({
         ]
           .filter(Boolean)
           .join(' / '),
-    },
-    {
-      title: '更新时间',
-      exportTitle: '更新时间',
-      dataIndex: 'updated_at',
-      width: 170,
-      sortType: 'date',
-      render: formatUnixDateTime,
-      exportValue: (record) => formatUnixDateTime(record?.updated_at),
     },
     {
       title: '判定备注',

@@ -337,7 +337,7 @@ function PurchaseReceiptItemFormFields({
         label="备注"
         name={formListName(field, 'note')}
       >
-        <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
+        <Input.TextArea autoSize={{ minRows: 1, maxRows: 3 }} />
       </Form.Item>
     </>
   )
@@ -725,24 +725,6 @@ export default function V1PurchaseReceiptsPage() {
           sortValue: receiptQuantityTotal,
           render: (_, record) => formatQuantity(receiptQuantityTotal(record)),
           exportValue: (record) => formatQuantity(receiptQuantityTotal(record)),
-        },
-        {
-          title: '创建时间',
-          exportTitle: '创建时间',
-          dataIndex: 'created_at',
-          width: 170,
-          sortType: 'date',
-          render: formatUnixDateTime,
-          exportValue: (record) => formatUnixDateTime(record?.created_at),
-        },
-        {
-          title: '更新时间',
-          exportTitle: '更新时间',
-          dataIndex: 'updated_at',
-          width: 170,
-          sortType: 'date',
-          render: formatUnixDateTime,
-          exportValue: (record) => formatUnixDateTime(record?.updated_at),
         },
         {
           title: '备注',

@@ -3793,8 +3793,8 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '采购订单')
-        await expectText(page, '采购日期')
-        await expectText(page, '预计到货')
+        await expectText(page, '下单日期')
+        await expectText(page, '预计到货日期')
         await expectText(page, '新建采购订单')
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'purchase-order-date-filter-desktop',
@@ -4037,8 +4037,8 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '出货单')
-        await expectText(page, '计划出货')
-        await expectText(page, '实际出货')
+        await expectText(page, '计划出货日期')
+        await expectText(page, '实际出货日期')
         await expectText(page, '新建草稿')
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'shipment-date-filter-desktop',
@@ -4071,8 +4071,8 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectHeading(page, '出货单')
-        await expectText(page, '计划出货')
-        await expectText(page, '实际出货')
+        await expectText(page, '计划出货日期')
+        await expectText(page, '实际出货日期')
         const metrics = await page.evaluate(() => {
           const control = document.querySelector(
             '.erp-business-date-range-filter'

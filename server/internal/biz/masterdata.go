@@ -841,11 +841,21 @@ func normalizeProductSKUMutation(in ProductSKUMutation) (ProductSKUMutation, err
 }
 
 func normalizeContactMutation(in ContactMutation) (ContactMutation, error) {
+	var err error
 	in.OwnerType = strings.ToUpper(strings.TrimSpace(in.OwnerType))
 	in.Name = strings.TrimSpace(in.Name)
-	in.Phone = normalizeOptionalString(in.Phone)
-	in.Mobile = normalizeOptionalString(in.Mobile)
-	in.Email = normalizeOptionalString(in.Email)
+	in.Phone, err = normalizeContactPhone(in.Phone)
+	if err != nil {
+		return ContactMutation{}, err
+	}
+	in.Mobile, err = normalizeContactPhone(in.Mobile)
+	if err != nil {
+		return ContactMutation{}, err
+	}
+	in.Email, err = normalizeContactEmail(in.Email)
+	if err != nil {
+		return ContactMutation{}, err
+	}
 	in.Title = normalizeOptionalString(in.Title)
 	in.Note = normalizeOptionalString(in.Note)
 	if !IsValidContactOwnerType(in.OwnerType) || in.OwnerID <= 0 || in.Name == "" {
@@ -861,12 +871,22 @@ func normalizeContactSaveMutations(in []*ContactSaveMutation) ([]*ContactSaveMut
 			return nil, ErrBadParam
 		}
 		mutation := item.ContactMutation
+		var err error
 		mutation.OwnerType = ""
 		mutation.OwnerID = 0
 		mutation.Name = strings.TrimSpace(mutation.Name)
-		mutation.Phone = normalizeOptionalString(mutation.Phone)
-		mutation.Mobile = normalizeOptionalString(mutation.Mobile)
-		mutation.Email = normalizeOptionalString(mutation.Email)
+		mutation.Phone, err = normalizeContactPhone(mutation.Phone)
+		if err != nil {
+			return nil, err
+		}
+		mutation.Mobile, err = normalizeContactPhone(mutation.Mobile)
+		if err != nil {
+			return nil, err
+		}
+		mutation.Email, err = normalizeContactEmail(mutation.Email)
+		if err != nil {
+			return nil, err
+		}
 		mutation.Title = normalizeOptionalString(mutation.Title)
 		mutation.Note = normalizeOptionalString(mutation.Note)
 		if mutation.Name == "" {

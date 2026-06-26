@@ -127,7 +127,7 @@ function ShipmentFormFields({
         <Input.TextArea
           allowClear
           disabled={disabled}
-          rows={3}
+          autoSize={{ minRows: 1, maxRows: 3 }}
           maxLength={300}
           showCount
         />
@@ -261,7 +261,12 @@ function ShipmentItemFormFields({
         label="备注"
         name={fieldName('note')}
       >
-        <Input.TextArea allowClear rows={3} maxLength={300} showCount />
+        <Input.TextArea
+          allowClear
+          autoSize={{ minRows: 1, maxRows: 3 }}
+          maxLength={300}
+          showCount
+        />
       </Form.Item>
     </>
   )

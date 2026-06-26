@@ -20,13 +20,13 @@ export const OUTSOURCING_ORDER_SORT_OPTIONS = [
   { label: '最早优先', value: 'updated_at:asc' },
   { label: '下单日期新到旧', value: 'order_date:desc' },
   { label: '下单日期旧到新', value: 'order_date:asc' },
-  { label: '预计回货新到旧', value: 'expected_return_date:desc' },
-  { label: '预计回货旧到新', value: 'expected_return_date:asc' },
+  { label: '预计回货日期新到旧', value: 'expected_return_date:desc' },
+  { label: '预计回货日期旧到新', value: 'expected_return_date:asc' },
 ]
 
 export const OUTSOURCING_ORDER_DATE_FILTER_OPTIONS = [
   { label: '下单日期', value: 'order_date' },
-  { label: '预计回货', value: 'expected_return_date' },
+  { label: '预计回货日期', value: 'expected_return_date' },
 ]
 
 export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [

@@ -683,14 +683,6 @@ export default function V1InventoryLedgerPage() {
           render: formatUnixDate,
           exportValue: (record) => formatUnixDate(record?.received_at),
         },
-        {
-          title: '更新时间',
-          exportTitle: '更新时间',
-          dataIndex: 'updated_at',
-          width: 170,
-          render: formatUnixDateTime,
-          exportValue: (record) => formatUnixDateTime(record?.updated_at),
-        },
       ]
     }
 
@@ -877,14 +869,6 @@ export default function V1InventoryLedgerPage() {
         width: 130,
         render: formatQuantity,
         exportValue: (record) => formatQuantity(record?.available_quantity),
-      },
-      {
-        title: '更新时间',
-        exportTitle: '更新时间',
-        dataIndex: 'updated_at',
-        width: 170,
-        render: formatUnixDateTime,
-        exportValue: (record) => formatUnixDateTime(record?.updated_at),
       },
     ]
   }, [

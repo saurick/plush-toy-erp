@@ -924,7 +924,6 @@ export function createBusinessFormalScenarios(deps) {
             '采购来源',
             '物料批次',
             '检验信息',
-            '更新时间',
             '判定备注',
           ],
           `来料质检默认表头应合并为可扫读列: ${JSON.stringify(
@@ -1030,8 +1029,8 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '出货单')
         await expectButton(page, '新建草稿')
-        await expectText(page, '计划出货')
-        await expectText(page, '实际出货')
+        await expectText(page, '计划出货日期')
+        await expectText(page, '实际出货日期')
         await expectText(page, 'SHIP-STYLE-L1')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-shipments',

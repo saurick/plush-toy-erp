@@ -207,8 +207,6 @@ function buildFormalShellRows(moduleItem) {
       business_status: 'source_grounded',
       owner_role: ownerRole,
       source_refs: refs,
-      created_at: '2026-06-13',
-      updated_at: '2026-06-13',
       scope: scopeItems[0] || moduleItem.primaryEntity || moduleItem.title,
     },
     {
@@ -218,8 +216,6 @@ function buildFormalShellRows(moduleItem) {
       business_status: 'review_required',
       owner_role: ownerRole,
       source_refs: moduleItem.primaryEntity || refs,
-      created_at: '2026-06-13',
-      updated_at: '2026-06-13',
       scope: scopeItems[1] || moduleItem.boundary || '字段和动作待评审',
     },
     {
@@ -229,8 +225,6 @@ function buildFormalShellRows(moduleItem) {
       business_status: 'pending_api',
       owner_role: ownerRole,
       source_refs: moduleItem.factSource || refs,
-      created_at: '2026-06-13',
-      updated_at: '2026-06-13',
       scope: scopeItems[2] || '操作入口待接入',
     },
   ]
@@ -488,20 +482,6 @@ export default function FormalBusinessModulePage({ moduleKey }) {
           dataIndex: 'scope',
           width: 260,
           sorter: (a, b) => compareText(a.scope, b.scope),
-        },
-        {
-          title: '创建时间',
-          exportTitle: '创建时间',
-          dataIndex: 'created_at',
-          width: 130,
-          sorter: (a, b) => compareText(a.created_at, b.created_at),
-        },
-        {
-          title: '更新时间',
-          exportTitle: '更新时间',
-          dataIndex: 'updated_at',
-          width: 130,
-          sorter: (a, b) => compareText(a.updated_at, b.updated_at),
         },
       ]).map((column, index) => ({
         ...column,

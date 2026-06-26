@@ -45,14 +45,10 @@ import {
   normalizeSalesOrderItemFormValue,
 } from '../components/sales-orders/SalesOrderForm.jsx'
 import SalesOrderBusinessModal from '../components/sales-orders/SalesOrderBusinessModal.jsx'
-import {
-  buildSalesOrderColumns,
-  buildSalesOrderItemColumns,
-} from '../components/sales-orders/salesOrderColumns.jsx'
+import { buildSalesOrderColumns } from '../components/sales-orders/salesOrderColumns.jsx'
 import {
   OPEN_SALES_ORDER_LINE_STATUS,
   SALES_ORDER_DATE_FILTER_OPTIONS,
-  SALES_ORDER_ITEMS_MODULE_KEY,
   SALES_ORDER_LIFECYCLE_ACTIONS,
   SALES_ORDER_SORT_FILTER_OPTIONS,
   SALES_ORDER_STATUS_FILTER_OPTIONS,
@@ -137,7 +133,6 @@ export default function V1SalesOrdersPage() {
   const [dateFilterEnd, setDateFilterEnd] = useState('')
   const [sortFilter, setSortFilter] = useState('updated_at:desc')
   const [orders, setOrders] = useState([])
-  const [items, setItems] = useState([])
   const [customers, setCustomers] = useState([])
   const [units, setUnits] = useState([])
   const [total, setTotal] = useState(0)
@@ -146,7 +141,6 @@ export default function V1SalesOrdersPage() {
   const [orderModalOpen, setOrderModalOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState(null)
   const [orderColumnOrder, setOrderColumnOrder] = useState(null)
-  const [itemColumnOrder, setItemColumnOrder] = useState(null)
   const [columnOrderTarget, setColumnOrderTarget] = useState(null)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [orderForm] = Form.useForm()
@@ -296,27 +290,6 @@ export default function V1SalesOrdersPage() {
     }
   }, [])
 
-  const loadItems = useCallback(async (order) => {
-    if (!order?.id) {
-      setItems([])
-      return
-    }
-    setItemLoading(true)
-    try {
-      const result = await listSalesOrderItems({
-        sales_order_id: order.id,
-        limit: 200,
-      })
-      setItems(
-        Array.isArray(result?.sales_order_items) ? result.sales_order_items : []
-      )
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '加载订单行'))
-    } finally {
-      setItemLoading(false)
-    }
-  }, [])
-
   const loadOrders = useCallback(async () => {
     setLoading(true)
     try {
@@ -370,10 +343,6 @@ export default function V1SalesOrdersPage() {
   }, [loadCustomers, loadOrders])
 
   useEffect(() => {
-    loadItems(selectedOrder)
-  }, [loadItems, selectedOrder])
-
-  useEffect(() => {
     return outletContext?.registerPageRefresh?.(loadOrders)
   }, [loadOrders, outletContext])
 
@@ -418,7 +387,6 @@ export default function V1SalesOrdersPage() {
       const nextItems = Array.isArray(result?.sales_order_items)
         ? result.sales_order_items
         : []
-      setItems(nextItems)
       const openItems = nextItems.filter(
         (item) => String(item?.line_status) === OPEN_SALES_ORDER_LINE_STATUS
       )
@@ -463,9 +431,6 @@ export default function V1SalesOrdersPage() {
         ),
       })
       const saved = result?.sales_order || null
-      const savedItems = Array.isArray(result?.sales_order_items)
-        ? result.sales_order_items
-        : []
       const attachmentSaved =
         (await orderAttachmentRef.current?.flushPendingAttachments(
           saved?.id
@@ -480,12 +445,8 @@ export default function V1SalesOrdersPage() {
       orderAttachmentRef.current?.clearPendingAttachments()
       setOrderModalOpen(false)
       setSelectedOrder(saved || selectedOrder)
-      setItems(savedItems)
       try {
         await loadOrders()
-        if (saved?.id) {
-          await loadItems(saved)
-        }
       } catch (refreshError) {
         message.warning(getActionErrorMessage(refreshError, '刷新销售订单列表'))
       }
@@ -604,24 +565,6 @@ export default function V1SalesOrdersPage() {
     ]
   )
 
-  const itemDataColumns = useMemo(() => buildSalesOrderItemColumns(), [])
-
-  const effectiveItemColumnOrder = useMemo(
-    () =>
-      getPreferredColumnOrder({
-        adminProfile,
-        moduleKey: SALES_ORDER_ITEMS_MODULE_KEY,
-        columns: itemDataColumns,
-        localOrder: itemColumnOrder,
-      }),
-    [adminProfile, itemColumnOrder, itemDataColumns]
-  )
-
-  const visibleItemDataColumns = useMemo(
-    () => applyModuleColumnOrder(itemDataColumns, effectiveItemColumnOrder),
-    [effectiveItemColumnOrder, itemDataColumns]
-  )
-
   const exportOrders = useCallback(() => {
     if (orders.length === 0) return
     downloadCSV({
@@ -647,22 +590,6 @@ export default function V1SalesOrdersPage() {
     setDateFilterEnd('')
     resetBusinessPaginationCurrent(setPagination)
   }, [])
-
-  const exportItems = useCallback(() => {
-    if (!selectedOrder || items.length === 0) return
-    const orderNo = String(
-      selectedOrder.order_no || selectedOrder.id || 'order'
-    )
-      .trim()
-      .replace(/[^\w.-]+/g, '-')
-    downloadCSV({
-      filename: `sales-order-items-${orderNo}-${new Date()
-        .toISOString()
-        .slice(0, 10)}.csv`,
-      columns: visibleItemDataColumns,
-      rows: items,
-    })
-  }, [items, selectedOrder, visibleItemDataColumns])
 
   const activeOrderCount = useMemo(
     () =>
@@ -850,18 +777,9 @@ export default function V1SalesOrdersPage() {
             disabled={!selectedOrder}
             onClick={() => {
               setSelectedOrder(null)
-              setItems([])
             }}
           >
             清空已选
-          </Button>
-          <Button
-            size="small"
-            icon={<DownloadOutlined />}
-            disabled={!selectedOrder || items.length === 0}
-            onClick={exportItems}
-          >
-            导出订单行
           </Button>
           <Dropdown
             trigger={['click']}
@@ -982,23 +900,6 @@ export default function V1SalesOrdersPage() {
             columns: orderDataColumns,
             nextOrder,
             setLocalOrder: setOrderColumnOrder,
-          })
-        }
-        onClose={() => setColumnOrderTarget(null)}
-      />
-
-      <ColumnOrderModal
-        open={columnOrderTarget === 'items'}
-        moduleTitle="销售订单行列表"
-        columns={itemDataColumns}
-        order={effectiveItemColumnOrder}
-        saving={columnOrderSaving}
-        onChange={(nextOrder) =>
-          persistColumnOrder({
-            moduleKey: SALES_ORDER_ITEMS_MODULE_KEY,
-            columns: itemDataColumns,
-            nextOrder,
-            setLocalOrder: setItemColumnOrder,
           })
         }
         onClose={() => setColumnOrderTarget(null)}

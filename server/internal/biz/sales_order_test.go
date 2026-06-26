@@ -127,6 +127,7 @@ func TestSalesOrderUsecaseCreateGuardsCustomer(t *testing.T) {
 		OrderNo:             " SO-001 ",
 		CustomerID:          10,
 		CustomerOrderNo:     &customerOrderNo,
+		ContactSnapshot:     map[string]any{"name": " 李四 ", "phone": " 0574-12345678 ", "email": " buyer@example.com "},
 		PaymentMethod:       &paymentMethod,
 		PaymentTermDays:     &paymentTermDays,
 		PriceConditionNote:  &priceConditionNote,
@@ -145,9 +146,18 @@ func TestSalesOrderUsecaseCreateGuardsCustomer(t *testing.T) {
 	if repo.createdOrder.PaymentMethod == nil || *repo.createdOrder.PaymentMethod != "30天月结" || repo.createdOrder.PaymentTermDays == nil || *repo.createdOrder.PaymentTermDays != 30 {
 		t.Fatalf("expected payment condition normalized, got %#v", repo.createdOrder)
 	}
+	if repo.createdOrder.ContactSnapshot["name"] != "李四" || repo.createdOrder.ContactSnapshot["email"] != "buyer@example.com" {
+		t.Fatalf("expected contact snapshot normalized, got %#v", repo.createdOrder.ContactSnapshot)
+	}
 	negativeTermDays := -1
 	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-BAD-PAYMENT", CustomerID: 10, PaymentTermDays: &negativeTermDays, OrderDate: orderDate}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected negative payment term rejected, got %v", err)
+	}
+	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-BAD-EMAIL", CustomerID: 10, ContactSnapshot: map[string]any{"email": "buyer@example"}, OrderDate: orderDate}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected invalid contact snapshot email rejected, got %v", err)
+	}
+	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-BAD-PHONE", CustomerID: 10, ContactSnapshot: map[string]any{"phone": "12345"}, OrderDate: orderDate}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected invalid contact snapshot phone rejected, got %v", err)
 	}
 	beforeOrderDate := orderDate.AddDate(0, 0, -1)
 	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-BAD-DATE", CustomerID: 10, OrderDate: orderDate, PlannedDeliveryDate: &beforeOrderDate}); !errors.Is(err, ErrBadParam) {

@@ -174,7 +174,7 @@ export default function PurchaseOrderInboundDraftModal({
           <DateInput />
         </Form.Item>
         <Form.Item name="note" label="备注">
-          <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
+          <Input.TextArea autoSize={{ minRows: 1, maxRows: 3 }} />
         </Form.Item>
       </Form>
     </Modal>

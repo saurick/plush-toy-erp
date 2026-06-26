@@ -20,15 +20,15 @@ export const PURCHASE_ORDER_STATUS_OPTIONS = [
 export const PURCHASE_ORDER_SORT_OPTIONS = [
   { label: '最新优先', value: 'updated_at:desc' },
   { label: '最早优先', value: 'updated_at:asc' },
-  { label: '采购日期新到旧', value: 'purchase_date:desc' },
-  { label: '采购日期旧到新', value: 'purchase_date:asc' },
-  { label: '预计到货新到旧', value: 'expected_arrival_date:desc' },
-  { label: '预计到货旧到新', value: 'expected_arrival_date:asc' },
+  { label: '下单日期新到旧', value: 'purchase_date:desc' },
+  { label: '下单日期旧到新', value: 'purchase_date:asc' },
+  { label: '预计到货日期新到旧', value: 'expected_arrival_date:desc' },
+  { label: '预计到货日期旧到新', value: 'expected_arrival_date:asc' },
 ]
 
 export const PURCHASE_ORDER_DATE_FILTER_OPTIONS = [
-  { label: '采购日期', value: 'purchase_date' },
-  { label: '预计到货', value: 'expected_arrival_date' },
+  { label: '下单日期', value: 'purchase_date' },
+  { label: '预计到货日期', value: 'expected_arrival_date' },
 ]
 
 export const PURCHASE_ORDER_LIFECYCLE_ACTIONS = [

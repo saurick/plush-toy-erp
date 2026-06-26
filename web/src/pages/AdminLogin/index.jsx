@@ -33,6 +33,7 @@ import {
   resolveDefaultEntryTarget,
 } from '@/erp/config/entryConfig.mjs'
 import { useERPWorkspace } from '@/erp/context/ERPWorkspaceProvider'
+import { optionalMainlandMobilePhoneRule } from '@/erp/utils/contactValidation.mjs'
 import { resolveAdminPostLoginPath } from './adminLoginRouting.mjs'
 import {
   LOGIN_MODE,
@@ -438,7 +439,10 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
                 <Form.Item
                   label="手机号"
                   name="phone"
-                  rules={[{ required: true, message: '请输入手机号' }]}
+                  rules={[
+                    { required: true, message: '请输入手机号' },
+                    optionalMainlandMobilePhoneRule(),
+                  ]}
                 >
                   <Input
                     placeholder="请输入手机号"

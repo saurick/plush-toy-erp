@@ -288,12 +288,23 @@ func TestMasterDataUsecaseNormalizesCustomerSupplierAndContactInput(t *testing.T
 	if _, err := normalizeProductMutation(ProductMutation{Code: "P-001", Name: "毛绒熊"}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected missing product unit rejected, got %v", err)
 	}
-	contactInput, err := normalizeContactMutation(ContactMutation{OwnerType: "supplier", OwnerID: 20, Name: " 联系人 "})
+	phone := " 0574-12345678 "
+	mobile := " +86 138 0013 8000 "
+	email := " buyer@example.com "
+	contactInput, err := normalizeContactMutation(ContactMutation{OwnerType: "supplier", OwnerID: 20, Name: " 联系人 ", Phone: &phone, Mobile: &mobile, Email: &email})
 	if err != nil {
 		t.Fatalf("expected contact mutation valid, got %v", err)
 	}
-	if contactInput.OwnerType != ContactOwnerSupplier || contactInput.Name != "联系人" {
+	if contactInput.OwnerType != ContactOwnerSupplier || contactInput.Name != "联系人" || contactInput.Phone == nil || *contactInput.Phone != "0574-12345678" || contactInput.Email == nil || *contactInput.Email != "buyer@example.com" {
 		t.Fatalf("expected normalized contact, got %#v", contactInput)
+	}
+	badEmail := "buyer@example"
+	if _, err := normalizeContactMutation(ContactMutation{OwnerType: "supplier", OwnerID: 20, Name: "联系人", Email: &badEmail}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected invalid contact email rejected, got %v", err)
+	}
+	badPhone := "12345"
+	if _, err := normalizeContactSaveMutations([]*ContactSaveMutation{{ContactMutation: ContactMutation{Name: "联系人", Phone: &badPhone}}}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected invalid aggregate contact phone rejected, got %v", err)
 	}
 }
 

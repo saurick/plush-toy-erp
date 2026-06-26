@@ -33,6 +33,10 @@ import {
   paymentConditionCompleteness,
   unixToDateInputValue,
 } from '../../utils/masterDataOrderView.mjs'
+import {
+  optionalContactEmailRule,
+  optionalContactPhoneRule,
+} from '../../utils/contactValidation.mjs'
 import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
 
 const EMPTY_ORDER_LINES = []
@@ -347,6 +351,7 @@ export function SalesOrderFormFields({
         className="erp-business-action-form__field"
         label="联系电话"
         name="contact_phone"
+        rules={[optionalContactPhoneRule()]}
       >
         <Input allowClear autoComplete="off" maxLength={64} />
       </Form.Item>
@@ -354,7 +359,7 @@ export function SalesOrderFormFields({
         className="erp-business-action-form__field"
         label="联系邮箱"
         name="contact_email"
-        rules={[{ type: 'email', message: '请输入有效邮箱' }]}
+        rules={[optionalContactEmailRule()]}
       >
         <Input allowClear autoComplete="off" maxLength={128} />
       </Form.Item>
@@ -414,27 +419,27 @@ export function SalesOrderFormFields({
         />
       </Form.Item>
       <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--full"
-        label="价格条件说明"
+        className="erp-business-action-form__field"
+        label="报价备注"
         name="price_condition_note"
       >
         <Input.TextArea
           allowClear
-          rows={2}
+          autoSize={{ minRows: 1, maxRows: 3 }}
           showCount
           maxLength={255}
-          placeholder="如因账期调整需重新报价，可记录本单价格条件"
+          placeholder="账期影响报价时记录核对结论"
         />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="订单日期"
+        label="签约日期"
         name="order_date"
         rules={[
-          { required: true, message: '请选择订单日期' },
+          { required: true, message: '请选择签约日期' },
           dateInputNotAfterRule({
             getEndValue: () => form.getFieldValue('planned_delivery_date'),
-            message: '订单日期不能晚于计划交付日期',
+            message: '签约日期不能晚于计划交付日期',
           }),
         ]}
       >
@@ -454,7 +459,7 @@ export function SalesOrderFormFields({
         rules={[
           dateInputNotBeforeRule({
             getStartValue: () => form.getFieldValue('order_date'),
-            message: '计划交付日期不能早于订单日期',
+            message: '计划交付日期不能早于签约日期',
           }),
         ]}
       >
@@ -469,7 +474,12 @@ export function SalesOrderFormFields({
         label="备注"
         name="note"
       >
-        <Input.TextArea allowClear rows={3} showCount maxLength={300} />
+        <Input.TextArea
+          allowClear
+          autoSize={{ minRows: 1, maxRows: 3 }}
+          showCount
+          maxLength={300}
+        />
       </Form.Item>
     </>
   )
@@ -931,7 +941,7 @@ export function SalesOrderItemsFormSection({
                             dateInputNotBeforeRule({
                               getStartValue: () =>
                                 form.getFieldValue('order_date'),
-                              message: '订单行计划交付不能早于订单日期',
+                              message: '订单行计划交付日期不能早于签约日期',
                             }),
                           ]}
                         >
@@ -951,7 +961,7 @@ export function SalesOrderItemsFormSection({
                         >
                           <Input.TextArea
                             allowClear
-                            rows={2}
+                            autoSize={{ minRows: 1, maxRows: 3 }}
                             showCount
                             maxLength={300}
                             disabled={!canEditLine}

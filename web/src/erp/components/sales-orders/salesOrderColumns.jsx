@@ -8,7 +8,6 @@ import {
   deriveSalesOrderItemAmount,
   formatPaymentCondition,
   formatUnixDate,
-  formatUnixDateTime,
   statusText,
 } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
@@ -103,8 +102,8 @@ export function buildSalesOrderColumns() {
       exportValue: formatPaymentCondition,
     },
     {
-      title: '订单日期',
-      exportTitle: '订单日期',
+      title: '签约日期',
+      exportTitle: '签约日期',
       dataIndex: 'order_date',
       width: 120,
       sorter: (a, b) => compareNumber(a?.order_date, b?.order_date),
@@ -112,8 +111,8 @@ export function buildSalesOrderColumns() {
       exportValue: (record) => formatUnixDate(record?.order_date),
     },
     {
-      title: '计划交付',
-      exportTitle: '计划交付',
+      title: '计划交付日期',
+      exportTitle: '计划交付日期',
       dataIndex: 'planned_delivery_date',
       width: 120,
       sorter: (a, b) =>
@@ -122,32 +121,14 @@ export function buildSalesOrderColumns() {
       exportValue: (record) => formatUnixDate(record?.planned_delivery_date),
     },
     {
-      title: '生命周期',
-      exportTitle: '生命周期',
+      title: '状态',
+      exportTitle: '状态',
       dataIndex: 'lifecycle_status',
       width: 120,
       sorter: (a, b) => compareText(a?.lifecycle_status, b?.lifecycle_status),
       render: salesOrderStatusTag,
       exportValue: (record) =>
         statusText(record?.lifecycle_status, SALES_ORDER_STATUS_LABELS),
-    },
-    {
-      title: '创建时间',
-      exportTitle: '创建时间',
-      dataIndex: 'created_at',
-      width: 160,
-      sorter: (a, b) => compareNumber(a?.created_at, b?.created_at),
-      render: formatUnixDateTime,
-      exportValue: (record) => formatUnixDateTime(record?.created_at),
-    },
-    {
-      title: '更新时间',
-      exportTitle: '更新时间',
-      dataIndex: 'updated_at',
-      width: 160,
-      sorter: (a, b) => compareNumber(a?.updated_at, b?.updated_at),
-      render: formatUnixDateTime,
-      exportValue: (record) => formatUnixDateTime(record?.updated_at),
     },
   ])
 }
@@ -212,8 +193,8 @@ export function buildSalesOrderItemColumns() {
       exportValue: (record) => deriveSalesOrderItemAmount(record) || '',
     },
     {
-      title: '计划交付',
-      exportTitle: '计划交付',
+      title: '计划交付日期',
+      exportTitle: '计划交付日期',
       dataIndex: 'planned_delivery_date',
       width: 120,
       sorter: (a, b) =>
@@ -230,24 +211,6 @@ export function buildSalesOrderItemColumns() {
       render: lineStatusTag,
       exportValue: (record) =>
         statusText(record?.line_status, SALES_ORDER_ITEM_STATUS_LABELS),
-    },
-    {
-      title: '创建时间',
-      exportTitle: '创建时间',
-      dataIndex: 'created_at',
-      width: 160,
-      sorter: (a, b) => compareNumber(a?.created_at, b?.created_at),
-      render: formatUnixDateTime,
-      exportValue: (record) => formatUnixDateTime(record?.created_at),
-    },
-    {
-      title: '更新时间',
-      exportTitle: '更新时间',
-      dataIndex: 'updated_at',
-      width: 160,
-      sorter: (a, b) => compareNumber(a?.updated_at, b?.updated_at),
-      render: formatUnixDateTime,
-      exportValue: (record) => formatUnixDateTime(record?.updated_at),
     },
   ]
 }

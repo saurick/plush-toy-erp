@@ -5,7 +5,6 @@ import {
   PURCHASE_ORDER_STATUS_COLORS,
   PURCHASE_ORDER_STATUS_LABELS,
   formatUnixDate,
-  formatUnixDateTime,
   statusText,
 } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
@@ -58,8 +57,8 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
         statusText(record?.lifecycle_status, PURCHASE_ORDER_STATUS_LABELS),
     },
     {
-      title: '采购日期',
-      exportTitle: '采购日期',
+      title: '下单日期',
+      exportTitle: '下单日期',
       dataIndex: 'purchase_date',
       width: 130,
       sorter: (a, b) => compareNumber(a?.purchase_date, b?.purchase_date),
@@ -67,23 +66,14 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       exportValue: (record) => formatUnixDate(record?.purchase_date),
     },
     {
-      title: '预计到货',
-      exportTitle: '预计到货',
+      title: '预计到货日期',
+      exportTitle: '预计到货日期',
       dataIndex: 'expected_arrival_date',
       width: 130,
       sorter: (a, b) =>
         compareNumber(a?.expected_arrival_date, b?.expected_arrival_date),
       render: formatUnixDate,
       exportValue: (record) => formatUnixDate(record?.expected_arrival_date),
-    },
-    {
-      title: '更新时间',
-      exportTitle: '更新时间',
-      dataIndex: 'updated_at',
-      width: 160,
-      sorter: (a, b) => compareNumber(a?.updated_at, b?.updated_at),
-      render: formatUnixDateTime,
-      exportValue: (record) => formatUnixDateTime(record?.updated_at),
     },
   ])
 }

@@ -109,7 +109,7 @@ test('moduleTableColumns: 无 dataIndex/key 的展示列按原始列位置解析
       render: (_, record) => record.customer_snapshot || '-',
     },
     {
-      title: '计划 / 实际出货',
+      title: '计划出货日期 / 实际出货日期',
       sortValue: (record) => record.shipped_at || record.planned_ship_at,
       render: (_, record) => record.shipped_at || record.planned_ship_at || '-',
     },
@@ -232,7 +232,6 @@ test('moduleTableColumns: 主业务列表页使用共享排序入口', () => {
   assert.match(masterDataPage, /buildMasterDataRecordColumns\(/u)
   assert.match(masterDataColumns, /applyBusinessColumnSorters\(/u)
   assert.match(salesOrdersPage, /buildSalesOrderColumns\(/u)
-  assert.match(salesOrdersPage, /buildSalesOrderItemColumns\(/u)
   assert.match(salesOrderColumns, /applyBusinessColumnSorters\(/u)
   assert.match(purchaseOrdersPage, /buildPurchaseOrderColumns\(/u)
   assert.match(purchaseOrderColumns, /applyBusinessColumnSorters\(/u)

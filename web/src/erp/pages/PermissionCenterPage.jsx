@@ -28,6 +28,10 @@ import {
   filterAdminRecords,
   filterPermissionGroups,
 } from '../utils/permissionCenterSearch.mjs'
+import {
+  isValidMainlandMobilePhone,
+  optionalMainlandMobilePhoneRule,
+} from '../utils/contactValidation.mjs'
 import { getPermissionModuleTitle } from '../utils/permissionModuleLabels.mjs'
 
 const { Paragraph, Text, Title } = Typography
@@ -694,15 +698,17 @@ export default function PermissionCenterPage() {
     if (!editingAdmin?.id) {
       return
     }
+    const nextPhone = String(editingPhone || '').trim()
+    if (nextPhone && !isValidMainlandMobilePhone(nextPhone)) {
+      message.warning('请输入有效手机号')
+      return
+    }
     setSaving(true)
     try {
-      if (
-        String(editingPhone || '').trim() !==
-        String(editingAdmin.phone || '').trim()
-      ) {
+      if (nextPhone !== String(editingAdmin.phone || '').trim()) {
         await adminRpc.call('set_phone', {
           id: editingAdmin.id,
-          phone: String(editingPhone || '').trim(),
+          phone: nextPhone,
         })
       }
       await adminRpc.call('set_roles', {
@@ -1306,7 +1312,11 @@ export default function PermissionCenterPage() {
           >
             <Input placeholder="例如 sales01" autoComplete="username" />
           </Form.Item>
-          <Form.Item label="手机号" name="phone">
+          <Form.Item
+            label="手机号"
+            name="phone"
+            rules={[optionalMainlandMobilePhoneRule()]}
+          >
             <Input placeholder="可选，用于短信登录" inputMode="tel" />
           </Form.Item>
           <Form.Item
