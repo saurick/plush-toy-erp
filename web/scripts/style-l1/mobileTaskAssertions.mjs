@@ -1184,6 +1184,167 @@ export function createMobileTaskAssertions(deps) {
     )
   }
 
+  async function assertMobileTaskInitialSkeleton(page, { scenarioName }) {
+    const skeleton = page.getByTestId('mobile-role-task-skeleton')
+    await skeleton.waitFor({ state: 'visible', timeout: 10_000 })
+
+    const defaultMetrics = await page.evaluate(() => {
+      const scroll = document.querySelector(
+        '[data-testid="mobile-role-scroll"]'
+      )
+      const skeletonNode = document.querySelector(
+        '[data-testid="mobile-role-task-skeleton"]'
+      )
+      const firstBlock = skeletonNode?.querySelector(
+        '.mobile-role-skeleton__block'
+      )
+      const firstBlockStyle =
+        firstBlock instanceof HTMLElement
+          ? window.getComputedStyle(firstBlock)
+          : null
+      const list = skeletonNode?.querySelector('.mobile-role-skeleton__list')
+      const listRect = list?.getBoundingClientRect()
+      const skeletonRect = skeletonNode?.getBoundingClientRect()
+      return {
+        scrollAriaBusy: scroll?.getAttribute('aria-busy') || '',
+        ariaHidden: skeletonNode?.getAttribute('aria-hidden') || '',
+        rowCount: Number(skeletonNode?.dataset?.skeletonRowCount || 0),
+        blockCount:
+          skeletonNode?.querySelectorAll('.mobile-role-skeleton__block')
+            .length || 0,
+        descendantCount: skeletonNode?.querySelectorAll('*').length || 0,
+        focusableCount:
+          skeletonNode?.querySelectorAll('button,a,input,textarea,select')
+            .length || 0,
+        firstBlockStyle: {
+          animationDuration: firstBlockStyle?.animationDuration || '',
+          backgroundColor: firstBlockStyle?.backgroundColor || '',
+          filter: firstBlockStyle?.filter || '',
+          backdropFilter: firstBlockStyle?.backdropFilter || '',
+        },
+        skeletonRect: skeletonRect
+          ? {
+              width: skeletonRect.width,
+              height: skeletonRect.height,
+            }
+          : null,
+        list: listRect
+          ? {
+              width: listRect.width,
+              height: listRect.height,
+              clientWidth: list instanceof HTMLElement ? list.clientWidth : 0,
+              scrollWidth: list instanceof HTMLElement ? list.scrollWidth : 0,
+            }
+          : null,
+        documentScrollWidth: document.documentElement.scrollWidth,
+        documentClientWidth: document.documentElement.clientWidth,
+      }
+    })
+
+    assert.equal(
+      defaultMetrics.scrollAriaBusy,
+      'true',
+      `${scenarioName} 首屏加载时滚动区应标记 aria-busy: ${JSON.stringify(defaultMetrics)}`
+    )
+    assert.equal(
+      defaultMetrics.ariaHidden,
+      'true',
+      `${scenarioName} 骨架屏占位不应作为业务内容朗读: ${JSON.stringify(defaultMetrics)}`
+    )
+    assert.equal(
+      defaultMetrics.rowCount,
+      4,
+      `${scenarioName} 首屏骨架任务行数量应固定为 4 行: ${JSON.stringify(defaultMetrics)}`
+    )
+    assert(
+      defaultMetrics.blockCount > 0 && defaultMetrics.blockCount <= 40,
+      `${scenarioName} 首屏骨架占位块数量应受控: ${JSON.stringify(defaultMetrics)}`
+    )
+    assert(
+      defaultMetrics.descendantCount <= 72,
+      `${scenarioName} 首屏骨架 DOM 节点过多: ${JSON.stringify(defaultMetrics)}`
+    )
+    assert.equal(
+      defaultMetrics.focusableCount,
+      0,
+      `${scenarioName} 首屏骨架不应包含可聚焦假控件: ${JSON.stringify(defaultMetrics)}`
+    )
+    assert(
+      defaultMetrics.skeletonRect &&
+        defaultMetrics.skeletonRect.width >= 320 &&
+        defaultMetrics.skeletonRect.height >= 420,
+      `${scenarioName} 首屏骨架尺寸不足以稳定占位: ${JSON.stringify(defaultMetrics)}`
+    )
+    assert(
+      defaultMetrics.list &&
+        defaultMetrics.list.scrollWidth <= defaultMetrics.list.clientWidth + 1,
+      `${scenarioName} 首屏骨架列表出现横向溢出: ${JSON.stringify(defaultMetrics)}`
+    )
+    assert(
+      defaultMetrics.documentScrollWidth <=
+        defaultMetrics.documentClientWidth + 1,
+      `${scenarioName} 首屏骨架导致页面横向溢出: ${JSON.stringify(defaultMetrics)}`
+    )
+    assert(
+      !isLightSurfaceColor(defaultMetrics.firstBlockStyle.backgroundColor) &&
+        defaultMetrics.firstBlockStyle.filter === 'none' &&
+        defaultMetrics.firstBlockStyle.backdropFilter === 'none',
+      `${scenarioName} 暗色首屏骨架不应使用浅色块或高成本滤镜: ${JSON.stringify(defaultMetrics)}`
+    )
+
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    const reducedMotionMetrics = await page.evaluate(() => {
+      const block = document.querySelector('.mobile-role-skeleton__block')
+      const style =
+        block instanceof HTMLElement ? window.getComputedStyle(block) : null
+      return {
+        animationDuration: style?.animationDuration || '',
+      }
+    })
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    assert(
+      String(reducedMotionMetrics.animationDuration)
+        .split(',')
+        .every((part) => Number.parseFloat(part) <= 0.01),
+      `${scenarioName} reduced-motion 下骨架动画未降级: ${JSON.stringify(reducedMotionMetrics)}`
+    )
+
+    await skeleton.waitFor({ state: 'detached', timeout: 10_000 })
+    await expectText(page, '当前筛选下暂无任务')
+    const afterLoadMetrics = await page.evaluate(() => ({
+      skeletonCount: document.querySelectorAll(
+        '[data-testid="mobile-role-task-skeleton"]'
+      ).length,
+      scrollAriaBusy:
+        document
+          .querySelector('[data-testid="mobile-role-scroll"]')
+          ?.getAttribute('aria-busy') || '',
+      listItemCount: document.querySelectorAll('.erp-mobile-list-item').length,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      documentClientWidth: document.documentElement.clientWidth,
+    }))
+    assert.equal(
+      afterLoadMetrics.skeletonCount,
+      0,
+      `${scenarioName} 首屏加载完成后不应残留骨架屏: ${JSON.stringify(afterLoadMetrics)}`
+    )
+    assert.equal(
+      afterLoadMetrics.scrollAriaBusy,
+      'false',
+      `${scenarioName} 首屏加载完成后 aria-busy 应恢复: ${JSON.stringify(afterLoadMetrics)}`
+    )
+    assert.equal(
+      afterLoadMetrics.listItemCount,
+      0,
+      `${scenarioName} 无数据加载完成后不应同时渲染真实任务行和骨架屏: ${JSON.stringify(afterLoadMetrics)}`
+    )
+    assert(
+      afterLoadMetrics.documentScrollWidth <=
+        afterLoadMetrics.documentClientWidth + 1,
+      `${scenarioName} 首屏加载恢复态出现横向溢出: ${JSON.stringify(afterLoadMetrics)}`
+    )
+  }
+
   async function readMobileTaskLayoutMetrics(page) {
     return page.evaluate(() => {
       const shell = document.querySelector('.mobile-role-tasks-page')
@@ -1522,6 +1683,7 @@ export function createMobileTaskAssertions(deps) {
 
   return {
     assertMobileTaskMainNavigation,
+    assertMobileTaskInitialSkeleton,
     readVisibleMobileTaskListText,
     assertMobileTaskProgressSummary,
     assertMobileTaskPrimaryFilterNavigation,

@@ -200,6 +200,143 @@
         overflow-wrap: anywhere;
       }
 
+      .skeleton-wrap {
+        margin: 20px;
+      }
+
+      .skeleton-metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--surface);
+        box-shadow: 0 5px 18px rgb(15 23 42 / 5%);
+      }
+
+      .skeleton-metric {
+        display: grid;
+        min-height: 82px;
+        align-content: center;
+        justify-items: center;
+        gap: 10px;
+        border-right: 1px solid var(--line);
+        padding: 14px 6px;
+      }
+
+      .skeleton-metric:last-child {
+        border-right: 0;
+      }
+
+      .skeleton-block {
+        display: block;
+        max-width: 100%;
+        border-radius: 999px;
+        background: #d8e2dd;
+        animation: skeleton-pulse 1.4s ease-in-out infinite;
+      }
+
+      .skeleton-value {
+        width: 42px;
+        height: 30px;
+        background: #c8d5ce;
+      }
+
+      .skeleton-label {
+        width: 54px;
+        height: 16px;
+      }
+
+      .skeleton-filters {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        margin-top: 16px;
+        border-radius: 18px;
+        background: #eef3ef;
+        padding: 4px;
+      }
+
+      .skeleton-filter {
+        height: 44px;
+        padding: 11px 9px;
+      }
+
+      .skeleton-list {
+        margin-top: 18px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--surface);
+      }
+
+      .skeleton-row {
+        display: grid;
+        min-height: 112px;
+        grid-template-columns: 64px minmax(0, 1fr) 94px;
+        gap: 12px;
+        padding: 16px 20px;
+      }
+
+      .skeleton-row + .skeleton-row {
+        border-top: 1px solid var(--line);
+      }
+
+      .skeleton-badge {
+        width: 52px;
+        height: 30px;
+        border-radius: 8px;
+      }
+
+      .skeleton-title {
+        width: min(190px, 88%);
+        height: 22px;
+        background: #c8d5ce;
+      }
+
+      .skeleton-source {
+        width: min(230px, 96%);
+        height: 16px;
+        margin-top: 10px;
+      }
+
+      .skeleton-meta {
+        width: min(180px, 78%);
+        height: 16px;
+        margin-top: 12px;
+      }
+
+      .skeleton-chip {
+        width: min(76px, 100%);
+        height: 28px;
+        margin-left: auto;
+        border-radius: 8px;
+        background: #c8d5ce;
+      }
+
+      .skeleton-time {
+        width: min(82px, 100%);
+        height: 16px;
+        margin-top: 12px;
+        margin-left: auto;
+      }
+
+      @keyframes skeleton-pulse {
+        0%,
+        100% {
+          opacity: 0.56;
+        }
+
+        50% {
+          opacity: 0.92;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .skeleton-block {
+          animation-duration: 0.01ms;
+        }
+      }
+
       .filters,
       .message-tabs {
         position: sticky;
@@ -968,6 +1105,54 @@
         `;
       }
 
+      function renderLoading() {
+        const metricPlaceholders = [0, 1, 2, 3]
+          .map(
+            () => `
+              <div class="skeleton-metric">
+                <span class="skeleton-block skeleton-value"></span>
+                <span class="skeleton-block skeleton-label"></span>
+              </div>`
+          )
+          .join("");
+        const filterPlaceholders = [0, 1, 2, 3]
+          .map(
+            () => `
+              <div class="skeleton-filter">
+                <span class="skeleton-block" style="height:22px"></span>
+              </div>`
+          )
+          .join("");
+        const rowPlaceholders = [0, 1, 2, 3]
+          .map(
+            () => `
+              <div class="skeleton-row">
+                <span class="skeleton-block skeleton-badge"></span>
+                <div>
+                  <span class="skeleton-block skeleton-title"></span>
+                  <span class="skeleton-block skeleton-source"></span>
+                  <span class="skeleton-block skeleton-meta"></span>
+                </div>
+                <div>
+                  <span class="skeleton-block skeleton-chip"></span>
+                  <span class="skeleton-block skeleton-time"></span>
+                </div>
+              </div>`
+          )
+          .join("");
+        return `
+          <section class="skeleton-wrap" aria-hidden="true">
+            <div class="skeleton-metrics">${metricPlaceholders}</div>
+            <div class="skeleton-filters">${filterPlaceholders}</div>
+            <div class="list-head" style="padding-top:18px">
+              <span class="skeleton-block" style="width:96px;height:20px"></span>
+              <span class="skeleton-block" style="justify-self:end;width:86px;height:20px"></span>
+            </div>
+            <div class="skeleton-list">${rowPlaceholders}</div>
+          </section>
+        `;
+      }
+
       function renderDone() {
         return `
           <section class="panel">
@@ -1026,11 +1211,13 @@
         `;
       }
 
-      function setTab(tab) {
+      function setTab(tab, options = {}) {
         const data = tabData[tab] || tabData.todo;
         pageTitle.textContent = data.title;
-        tabSummary.textContent = data.summary;
-        tabContent.innerHTML = data.content;
+        tabSummary.textContent = options.loading ? "正在加载任务" : data.summary;
+        tabContent.innerHTML =
+          options.loading && tab === "todo" ? renderLoading() : data.content;
+        mainScroll.setAttribute("aria-busy", options.loading ? "true" : "false");
         document.querySelectorAll("[data-tab]").forEach((button) => {
           button.classList.toggle("active", button.dataset.tab === tab);
         });
@@ -1081,7 +1268,8 @@
         }, 700);
       });
 
-      setTab("todo");
+      setTab("todo", { loading: true });
+      window.setTimeout(() => setTab("todo"), 700);
     </script>
   </body>
 </html>

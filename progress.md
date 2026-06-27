@@ -156,3 +156,20 @@
 - 验证：`/usr/local/bin/pnpm exec eslint --ext .jsx src/erp/pages/OperationalFactsPage.jsx`、限定 `git diff --check` 通过；Playwright 人为挂起 `/erp/production/progress` 的 `list_production_facts`，切到 `/erp/finance/reconciliation` 后再 abort 旧请求，验证无 pageerror、无 AntD message、无旧“加载生产进度”错误串页；`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop /usr/local/bin/pnpm style:l1` 通过，共 1 个场景。
 - 下一步：后续如果其它共享业务页也出现快速菜单 / tab 切换后旧请求串页，应优先在对应共享 workspace 建 latest-request guard，而不是在单页吞错误或硬延时。
 - 阻塞/风险：本轮仍只处理 Operational Fact 共享页的列表读取生命周期；没有全局改造 JSON-RPC abort signal，也没有扫描和修改其它业务页的请求生命周期。
+
+## 2026-06-27 岗位任务端首屏骨架屏
+
+- 完成：按 `plush-page-design-governance` 为岗位任务端 `/m/<role>/tasks` 增加首屏轻量骨架屏；骨架只在首次加载且没有旧数据时显示，刷新时保留旧任务列表并只切换刷新按钮状态，避免把“加载中”误判为“暂无任务”。
+- 完成：新增 `MobileTaskListSkeleton` 组件，骨架固定 4 个指标占位、4 个筛选占位和 4 条任务行占位；样式收口在 `mobileRoleTasks.css` 的 `mobile-role-skeleton-*` scoped class，覆盖暗色和 `prefers-reduced-motion`，不新增依赖、不使用 `!important`、不渲染可聚焦假控件。
+- 完成：岗位任务页请求增加 latest-request guard；切换岗位、刷新或重叠请求时，只有最新请求可更新任务、loading、首屏加载完成状态和 toast，避免旧请求回写当前页面。
+- 完成：同步岗位任务端 Current/as-built 原型参考 `mobile-role-tasks-v1/implemented-reference.html` 和 README，只记录首屏加载占位，不改变业务样例、权限、Workflow / Fact 语义或原型状态。
+- 验证：`pnpm lint`、`pnpm css`、`pnpm test`、`STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1`、`pnpm build:desktop`、`git diff --check` 均通过；`mobile-tasks-dark` 覆盖首屏骨架可见、节点数量受控、无可聚焦元素、无高成本滤镜、reduced-motion 动画降级、加载完成后卸载、空态恢复、暗色长列表、刷新失败保留旧数据、详情页动作栏和跨岗位说明。
+- 下一步：后续如果要把骨架模式扩展到桌面业务页，应先评审共享组件边界，不能把移动端岗位任务骨架直接泛化成全站 loading 框架。
+- 阻塞/风险：本轮不改 schema、migration、JSON-RPC 合同、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置或部署脚本；未跑全量 `pnpm style:l1`，本轮浏览器回归限定在受影响的 `mobile-tasks-dark` 场景。
+
+## 2026-06-27 全局路由加载态文案简化
+
+- 完成：按 `plush-page-design-governance` 将全局路由懒加载 fallback 从“页面加载中 + 正在准备当前模块和界面资源，请稍候...”简化为单句“正在加载中”，保留现有 Loading 组件、暗色样式、`role=status` 和 `aria-live` 反馈。
+- 验证：`/usr/local/bin/pnpm exec eslint --ext .jsx src/erp/router.jsx`、`/usr/local/bin/pnpm css`、`/usr/local/bin/pnpm test`、限定 `git diff --check -- web/src/erp/router.jsx progress.md` 均通过；`pnpm test` 覆盖 413 个前端单测。
+- 下一步：若后续继续收敛其它加载态文案，优先保留能区分业务动作的必要提示；路由资源加载这种纯等待态保持短文案即可。
+- 阻塞/风险：本轮只改前端路由加载态 copy，不改 schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、部署脚本或原型状态；当前工作区已有多组非本轮/并行改动，本轮未回退、未提交。

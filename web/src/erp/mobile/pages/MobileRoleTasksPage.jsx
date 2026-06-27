@@ -39,8 +39,10 @@ export default function MobileRoleTasksPage() {
   const { activeRoleKey } = useERPWorkspace()
   const { adminProfile, handleLogout, loggingOut } = useOutletContext() || {}
   const scrollContainerRef = useRef(null)
+  const taskLoadRequestSeqRef = useRef(0)
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(false)
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
   const [showScrollTopButton, setShowScrollTopButton] = useState(false)
   const [activeMainTabKey, setActiveMainTabKey] = useState(
     MOBILE_MAIN_TAB_KEYS.TODO
@@ -191,6 +193,8 @@ export default function MobileRoleTasksPage() {
 
   const loadTasks = useCallback(
     async ({ showRefreshFeedback = false } = {}) => {
+      const requestSeq = taskLoadRequestSeqRef.current + 1
+      taskLoadRequestSeqRef.current = requestSeq
       setLoading(true)
       try {
         const queryResults = await Promise.all(
@@ -198,11 +202,17 @@ export default function MobileRoleTasksPage() {
             listWorkflowTasks(query)
           )
         )
+        if (taskLoadRequestSeqRef.current !== requestSeq) {
+          return
+        }
         setTasks(mergeWorkflowTaskResults(queryResults))
         if (showRefreshFeedback) {
           message.success('数据已刷新')
         }
       } catch (error) {
+        if (taskLoadRequestSeqRef.current !== requestSeq) {
+          return
+        }
         message.error(
           getActionErrorMessage(
             error,
@@ -212,17 +222,25 @@ export default function MobileRoleTasksPage() {
           )
         )
       } finally {
-        setLoading(false)
+        if (taskLoadRequestSeqRef.current === requestSeq) {
+          setHasLoadedOnce(true)
+          setLoading(false)
+        }
       }
     },
     [activeRoleKey]
   )
 
   useEffect(() => {
+    setHasLoadedOnce(false)
+    setTasks([])
+    setSelectedTaskID(null)
+    setDetailAction(null)
     loadTasks()
   }, [loadTasks])
 
   const roleLabel = getMobileRoleLabel(activeRoleKey)
+  const initialLoading = loading && !hasLoadedOnce && tasks.length === 0
   const latestSync = resolveLatestTaskTime(activeTasks)
   const selectedSeverity = selectedTask
     ? getTaskSeverityView(selectedTask)
@@ -301,6 +319,7 @@ export default function MobileRoleTasksPage() {
       filteredTasks={filteredTasks}
       handleLogout={handleLogout}
       handleMainScroll={handleMainScroll}
+      initialLoading={initialLoading}
       latestSync={latestSync}
       loadTasks={loadTasks}
       loading={loading}

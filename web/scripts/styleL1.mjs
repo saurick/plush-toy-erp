@@ -123,6 +123,7 @@ function getScenarios() {
     assertMaterialContractPrintMediaIgnoresResponsiveBreakpoints,
     assertMobileTaskBossDoneList,
     assertMobileTaskDarkDetailReadable,
+    assertMobileTaskInitialSkeleton,
     assertMobileTaskMainNavigation,
     assertMobileTaskRefreshFeedback,
     assertNoDashboardCenterLocalRefreshButton,
@@ -7344,6 +7345,7 @@ async function assertNoERPThemeTooltip(page, message) {
 
 const {
   assertMobileTaskMainNavigation,
+  assertMobileTaskInitialSkeleton,
   assertMobileTaskBossDoneList,
   assertMobileTaskDarkDetailReadable,
   readMobileTaskVisibleListMetrics,

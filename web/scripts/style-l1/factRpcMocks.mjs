@@ -1,5 +1,7 @@
+import { setTimeout as delay } from 'node:timers/promises'
+
 export async function installFactRpcMocks(page, context) {
-  const { nowUnix } = context
+  const { nowUnix, resolveDelayFromReferer } = context
 
   await page.route('**/rpc/operational_fact', async (route) => {
     const body = route.request().postDataJSON() || {}
@@ -775,6 +777,13 @@ export async function installFactRpcMocks(page, context) {
         break
       }
       case 'list_tasks': {
+        const listDelayMs = resolveDelayFromReferer(
+          route.request(),
+          '__style_l1_workflow_list_delay'
+        )
+        if (listDelayMs > 0) {
+          await delay(listDelayMs)
+        }
         const tasks = workflowTasks.filter(
           (item) =>
             (!params.source_type || item.source_type === params.source_type) &&

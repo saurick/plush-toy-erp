@@ -13,6 +13,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
+import MobileTaskListSkeleton from './MobileTaskListSkeleton.jsx'
 import { formatMobileTaskTime } from '../../utils/mobileTaskView.mjs'
 import {
   MOBILE_LIST_COLLAPSED_LIMITS,
@@ -46,6 +47,7 @@ export default function MobileTaskListScreen({
   filteredTasks,
   handleLogout,
   handleMainScroll,
+  initialLoading,
   latestSync,
   loadTasks,
   loading,
@@ -358,36 +360,39 @@ export default function MobileTaskListScreen({
     </div>
   )
 
-  const renderTodoPanel = () => (
-    <>
-      {renderTaskMetricCards()}
-      {renderTaskFilters()}
-      <section className="mx-5 mt-5 pb-5">
-        <div className="grid grid-cols-[minmax(0,1fr)_112px] pb-2 text-base text-slate-500">
-          <span>任务信息</span>
-          <span className="text-right">业务状态 / 截止时间</span>
-        </div>
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          {filteredTasks.length === 0 ? (
-            <div className="px-5 py-8 text-center text-sm text-slate-500">
-              当前筛选下暂无任务
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-200">
-              {getVisibleListItems(filteredTasks, MOBILE_LIST_KEYS.TODO).map(
-                renderTaskRow
-              )}
-              {renderListLimitControl(
-                filteredTasks,
-                MOBILE_LIST_KEYS.TODO,
-                '条任务'
-              )}
-            </div>
-          )}
-        </div>
-      </section>
-    </>
-  )
+  const renderTodoPanel = () =>
+    initialLoading ? (
+      <MobileTaskListSkeleton />
+    ) : (
+      <>
+        {renderTaskMetricCards()}
+        {renderTaskFilters()}
+        <section className="mx-5 mt-5 pb-5">
+          <div className="grid grid-cols-[minmax(0,1fr)_112px] pb-2 text-base text-slate-500">
+            <span>任务信息</span>
+            <span className="text-right">业务状态 / 截止时间</span>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            {filteredTasks.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sm text-slate-500">
+                当前筛选下暂无任务
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-200">
+                {getVisibleListItems(filteredTasks, MOBILE_LIST_KEYS.TODO).map(
+                  renderTaskRow
+                )}
+                {renderListLimitControl(
+                  filteredTasks,
+                  MOBILE_LIST_KEYS.TODO,
+                  '条任务'
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      </>
+    )
 
   const renderDoneTaskItem = (task) => (
     <div
@@ -741,6 +746,7 @@ export default function MobileTaskListScreen({
         ref={scrollContainerRef}
         className="mobile-role-tasks-page__scroll"
         data-testid="mobile-role-scroll"
+        aria-busy={initialLoading ? 'true' : 'false'}
         onScroll={handleMainScroll}
       >
         <header className="flex items-center justify-between gap-3 px-5 pb-3 pt-8">

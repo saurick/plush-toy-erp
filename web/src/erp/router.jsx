@@ -133,8 +133,8 @@ function RootEntryRedirect() {
 function RouteLoadingFallback() {
   return (
     <Loading
-      title="页面加载中"
-      description="正在准备当前模块和界面资源，请稍候..."
+      title="正在加载中"
+      description={null}
       fullscreen
       className="loading-page--erp"
     />

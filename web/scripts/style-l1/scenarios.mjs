@@ -42,6 +42,7 @@ export function createStyleL1Scenarios(deps) {
     assertMaterialContractPrintMediaIgnoresResponsiveBreakpoints,
     assertMobileTaskBossDoneList,
     assertMobileTaskDarkDetailReadable,
+    assertMobileTaskInitialSkeleton,
     assertMobileTaskMainNavigation,
     assertMobileTaskRefreshFeedback,
     assertNoDashboardCenterLocalRefreshButton,
@@ -968,11 +969,14 @@ export function createStyleL1Scenarios(deps) {
     },
     {
       name: 'mobile-tasks-dark',
-      path: '/m/sales/tasks',
+      path: '/m/sales/tasks?__style_l1_workflow_list_delay=1300',
       auth: 'admin',
       themeMode: 'dark',
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
+        await assertMobileTaskInitialSkeleton(page, {
+          scenarioName: 'mobile-tasks-dark',
+        })
         await page.evaluate(async () => {
           const createTask = async (params) => {
             const response = await fetch('/rpc/workflow', {
