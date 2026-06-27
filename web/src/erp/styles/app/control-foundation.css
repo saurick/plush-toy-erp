@@ -2,6 +2,14 @@
 body {
   --erp-control-radius: 12px;
   --erp-form-control-height: 36px;
+  --erp-control-focus-border: #2b8a3e;
+  --erp-control-focus-ring: rgb(43 138 62 / 14%);
+}
+
+[data-erp-theme='dark'] #root,
+[data-erp-theme='dark'] body {
+  --erp-control-focus-border: var(--erp-interactive-border-focus);
+  --erp-control-focus-ring: var(--erp-focus-ring);
 }
 
 #root
@@ -62,6 +70,13 @@ body
   overflow: hidden;
 }
 
+#root :is(.ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)),
+body
+  :is(.ant-modal, .ant-drawer, .ant-popover, .ant-dropdown)
+  :is(.ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)) {
+  align-items: center;
+}
+
 #root
   :is(
     input[type='checkbox'],
@@ -100,80 +115,6 @@ body
   border-end-end-radius: revert;
 }
 
-body .ant-modal .erp-business-form,
-#root .erp-business-form {
-  --erp-control-height: var(--erp-form-control-height);
-}
-
-body
-  .ant-modal
-  .erp-business-form
-  :is(
-    .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper),
-    .ant-input-number,
-    .ant-picker,
-    .ant-select-single,
-    .ant-select-single .ant-select-selector,
-    input.ant-input:not([type='hidden'])
-  ),
-#root
-  .erp-business-form
-  :is(
-    .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper),
-    .ant-input-number,
-    .ant-picker,
-    .ant-select-single,
-    .ant-select-single .ant-select-selector,
-    input.ant-input:not([type='hidden'])
-  ) {
-  height: var(--erp-control-height);
-  min-height: var(--erp-control-height);
-}
-
-body .ant-modal .erp-business-form :is(.ant-select-single .ant-select-selector),
-#root .erp-business-form :is(.ant-select-single .ant-select-selector) {
-  align-items: center;
-}
-
-body
-  .ant-modal
-  .erp-business-form
-  :is(
-    .ant-select-single .ant-select-selection-item,
-    .ant-select-single .ant-select-selection-placeholder,
-    .ant-select-single .ant-select-selection-search-input
-  ),
-#root
-  .erp-business-form
-  :is(
-    .ant-select-single .ant-select-selection-item,
-    .ant-select-single .ant-select-selection-placeholder,
-    .ant-select-single .ant-select-selection-search-input
-  ) {
-  height: calc(var(--erp-control-height) - 2px);
-  line-height: calc(var(--erp-control-height) - 2px);
-}
-
-body
-  .ant-modal
-  .erp-business-form
-  :is(
-    .ant-input-affix-wrapper input.ant-input,
-    .ant-input-number-input,
-    .ant-picker-input > input
-  ),
-#root
-  .erp-business-form
-  :is(
-    .ant-input-affix-wrapper input.ant-input,
-    .ant-input-number-input,
-    .ant-picker-input > input
-  ) {
-  height: calc(var(--erp-control-height) - 2px);
-  min-height: 0;
-  line-height: calc(var(--erp-control-height) - 2px);
-}
-
 #root
   :is(
     .ant-input-affix-wrapper input.ant-input,
@@ -190,11 +131,4 @@ body
   border-color: transparent;
   background: transparent;
   box-shadow: none;
-}
-
-body .ant-modal .erp-business-form textarea.ant-input,
-#root .erp-business-form textarea.ant-input {
-  height: auto;
-  min-height: calc(var(--erp-control-height) * 2);
-  line-height: 1.45;
 }

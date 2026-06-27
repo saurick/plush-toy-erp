@@ -63,6 +63,8 @@ export function createLineItemUnitAssertions({ assert }) {
             wrapperWidth: wrapperRect?.width || 0,
             inputWidth: inputRect?.width || 0,
             suffixWidth: suffixRect?.width || 0,
+            suffixClientWidth: suffix?.clientWidth || 0,
+            suffixScrollWidth: suffix?.scrollWidth || 0,
             inputRight: inputRect?.right || 0,
             suffixLeft: suffixRect?.left || 0,
             suffixRight: suffixRect?.right || 0,
@@ -109,6 +111,7 @@ export function createLineItemUnitAssertions({ assert }) {
     assert(
       metrics.inputWidth >= 96 &&
         metrics.suffixWidth >= 48 &&
+        metrics.suffixScrollWidth <= metrics.suffixClientWidth + 1 &&
         metrics.suffixLeft >= metrics.inputRight - 1 &&
         metrics.suffixRight <= metrics.wrapperRight + 1,
       `${scenarioName} ${label} 单位后缀挤压或错位: ${JSON.stringify(metrics)}`
@@ -504,6 +507,11 @@ export function createLineItemUnitAssertions({ assert }) {
 
       const footerAfterRect = footer?.getBoundingClientRect()
       const buttonAfterRect = addButton?.getBoundingClientRect()
+      const listAfterScrollLeft = list?.scrollLeft || 0
+
+      if (list) {
+        list.scrollLeft = listBeforeScrollLeft
+      }
 
       return {
         hasList: Boolean(list),
@@ -518,7 +526,7 @@ export function createLineItemUnitAssertions({ assert }) {
         listClientWidth: list?.clientWidth || 0,
         listScrollWidth: list?.scrollWidth || 0,
         listBeforeScrollLeft,
-        listAfterScrollLeft: list?.scrollLeft || 0,
+        listAfterScrollLeft,
         sectionWidth: Math.round(section?.getBoundingClientRect().width || 0),
         footerWidth: Math.round(footerAfterRect?.width || 0),
         footerLeftDelta: Math.round(

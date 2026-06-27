@@ -5,6 +5,16 @@ function normalizeText(value) {
   return String(value ?? '').trim()
 }
 
+function unitSuffixWidthPx(text) {
+  const visualWidth = Array.from(text).reduce((width, char) => {
+    if (/[\u3400-\u9fff\uff00-\uffef]/u.test(char)) {
+      return width + 16
+    }
+    return width + 9
+  }, 28)
+  return Math.min(168, Math.max(72, Math.ceil(visualWidth)))
+}
+
 function positiveID(value) {
   const id = Number(value || 0)
   return Number.isFinite(id) && id > 0 ? id : undefined
@@ -102,8 +112,9 @@ export default function FieldWithUnitSuffix({
         readOnly
         tabIndex={-1}
         aria-label={`单位 ${suffixText}`}
+        title={suffixText}
         style={{
-          width: `${Math.min(132, Math.max(56, suffixText.length * 10 + 24))}px`,
+          '--erp-unit-suffix-width': `${unitSuffixWidthPx(suffixText)}px`,
         }}
       />
     </Space.Compact>

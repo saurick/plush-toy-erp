@@ -816,7 +816,8 @@ export default function V1PurchaseReceiptsPage() {
           <>
             <SearchInput
               value={keyword}
-              placeholder="搜索入库单号 / 供应商"
+              placeholder="搜索入库单"
+              searchHint="可搜索：入库单号、供应商"
               onChange={(event) => {
                 setKeyword(event.target.value)
                 resetBusinessPaginationCurrent(setPagination)
@@ -950,7 +951,7 @@ export default function V1PurchaseReceiptsPage() {
               icon={<LinkOutlined />}
               disabled={!selectedRow}
             >
-              关联 <DownOutlined />
+              相关单据 <DownOutlined />
             </Button>
           </Dropdown>
           <BusinessAttachmentModalButton

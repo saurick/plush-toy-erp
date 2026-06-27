@@ -766,7 +766,6 @@ export default function ShipmentsPage() {
             label: '草稿',
             value: rows.filter((item) => item.status === 'DRAFT').length,
           },
-          { key: 'selected', label: '已选出货单', value: selectedRow ? 1 : 0 },
         ]}
       />
 
@@ -778,7 +777,8 @@ export default function ShipmentsPage() {
           <>
             <SearchInput
               value={keyword}
-              placeholder="搜索出货单号 / 客户 / 销售订单"
+              placeholder="搜索出货"
+              searchHint="可搜索：出货单号、客户、销售订单"
               onChange={(event) => {
                 setKeyword(event.target.value)
                 resetBusinessPaginationCurrent(setPagination)

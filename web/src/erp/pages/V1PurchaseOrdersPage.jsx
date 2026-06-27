@@ -599,7 +599,6 @@ export default function V1PurchaseOrdersPage() {
 
   const stats = buildPurchaseOrderStats({
     orders,
-    selectedCount: selectedRowKeys.length,
     total,
   })
   const selectedOrderDisplayText = selectedPurchaseOrderDisplayText({

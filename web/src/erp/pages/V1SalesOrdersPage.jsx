@@ -667,7 +667,6 @@ export default function V1SalesOrdersPage() {
           { key: 'total', label: '总订单', value: total },
           { key: 'current', label: '当前结果', value: orders.length },
           { key: 'active', label: '已生效', value: activeOrderCount },
-          { key: 'selected', label: '已选订单', value: selectedOrder ? 1 : 0 },
         ]}
       />
 
@@ -678,7 +677,8 @@ export default function V1SalesOrdersPage() {
         filters={
           <>
             <SearchInput
-              placeholder="搜索订单号、客户订单号、业务员或付款方式"
+              placeholder="搜索订单"
+              searchHint="可搜索：订单号、客户订单号、业务员、付款方式"
               value={keyword}
               onChange={(event) => {
                 setKeyword(event.target.value)
@@ -743,7 +743,7 @@ export default function V1SalesOrdersPage() {
               disabled={orders.length === 0}
               onClick={exportOrders}
             >
-              导出当前结果
+              导出筛选结果
             </ToolbarButton>
             <ToolbarButton
               icon={<SettingOutlined />}
@@ -795,7 +795,7 @@ export default function V1SalesOrdersPage() {
               icon={<LinkOutlined />}
               disabled={!selectedOrder}
             >
-              关联 <DownOutlined />
+              相关单据 <DownOutlined />
             </Button>
           </Dropdown>
           {canUpdateOrder ? (

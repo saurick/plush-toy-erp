@@ -497,7 +497,6 @@ export default function V1OutsourcingOrdersPage() {
 
   const pageStats = buildOutsourcingOrderStats({
     rows,
-    selectedRow,
     total,
   })
 
@@ -703,7 +702,8 @@ export default function V1OutsourcingOrdersPage() {
           <>
             <SearchInput
               value={keyword}
-              placeholder="搜索合同号或来源订单"
+              placeholder="搜索合同"
+              searchHint="可搜索：合同号、来源订单"
               onChange={(event) => {
                 setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
                 setKeyword(event.target.value)
@@ -770,7 +770,7 @@ export default function V1OutsourcingOrdersPage() {
               disabled={rows.length === 0}
               onClick={exportOrders}
             >
-              导出当前结果
+              导出筛选结果
             </ToolbarButton>
             <ToolbarButton
               icon={<SettingOutlined />}

@@ -6,6 +6,10 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pagesRoot = resolve(__dirname, '../pages')
+const businessListLayoutPath = resolve(
+  __dirname,
+  '../components/business-list/BusinessListLayout.jsx'
+)
 
 function listPageFiles(rootDir) {
   return readdirSync(rootDir, { withFileTypes: true }).flatMap((entry) => {
@@ -122,5 +126,15 @@ test('business date filters: BusinessOperationPanel filters must use DateRangeFi
     `BusinessOperationPanel filters should not compose date ranges from standalone DateInput. Use DateRangeFilter instead: ${offenders.join(
       ', '
     )}`
+  )
+})
+
+test('业务当前操作条不渲染页面级边界说明', () => {
+  const source = readFileSync(businessListLayoutPath, 'utf8')
+
+  assert.equal(
+    source.includes('boundaryText'),
+    false,
+    'SelectionActionBar should not render page-level boundaryText in the shared current-operation row'
   )
 })

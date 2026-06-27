@@ -361,7 +361,7 @@ async function confirmVisiblePopover(page, title) {
 }
 
 async function searchReceipt(page) {
-  const searchInput = page.getByPlaceholder('搜索入库单号 / 供应商')
+  const searchInput = page.getByPlaceholder('搜索入库单')
   await searchInput.fill(receiptNo)
   await searchInput.press('Enter')
   await page

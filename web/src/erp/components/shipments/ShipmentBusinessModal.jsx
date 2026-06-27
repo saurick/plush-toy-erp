@@ -489,7 +489,8 @@ export default function ShipmentBusinessModal({
                 }
                 getRowDisabledReason={(item) => item.disabledReason}
                 isRowDisabled={(item) => Boolean(item.disabledReason)}
-                searchPlaceholder="搜索销售订单号、客户订单号、客户或产品"
+                searchPlaceholder="搜索订单"
+                searchHint="可搜索：销售订单号、客户订单号、客户、产品"
                 emptyDescription="暂无可导入销售订单行"
                 onCancel={() => setSalesOrderImportOpen(false)}
                 onImport={importSalesOrderToShipment}

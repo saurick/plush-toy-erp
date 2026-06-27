@@ -149,11 +149,7 @@ export function getSingleSelectedPurchaseOrder({
     : null
 }
 
-export function buildPurchaseOrderStats({
-  orders = [],
-  selectedCount = 0,
-  total = 0,
-}) {
+export function buildPurchaseOrderStats({ orders = [], total = 0 }) {
   return [
     { key: 'total', label: '总订单', value: total },
     { key: 'current', label: '当前结果', value: orders.length },
@@ -163,7 +159,6 @@ export function buildPurchaseOrderStats({
       value: orders.filter((item) => item.lifecycle_status === 'approved')
         .length,
     },
-    { key: 'selected', label: '已选订单', value: selectedCount },
   ]
 }
 

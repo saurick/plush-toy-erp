@@ -246,7 +246,7 @@ export function BusinessListToolbarActions({
           disabled={exportDisabled || !onExport}
           onClick={onExport}
         >
-          导出当前结果
+          导出筛选结果
         </ToolbarButton>
       </TooltipButton>
       <TooltipButton title={normalizedColumnReason}>

@@ -752,7 +752,6 @@ export default function BOMVersionsPage() {
             label: '已激活',
             value: versions.filter((item) => item.status === 'ACTIVE').length,
           },
-          { key: 'selected', label: '已选BOM', value: selectedRowKeys.length },
         ]}
       />
 
@@ -804,7 +803,7 @@ export default function BOMVersionsPage() {
                 downloadCSV({ filename: 'bom-versions.csv', rows: versions })
               }
             >
-              导出当前结果
+              导出筛选结果
             </ToolbarButton>
             <ToolbarButton
               icon={<SettingOutlined />}

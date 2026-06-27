@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -94,6 +94,8 @@ export function OperationalFactWorkspace({
   const [totalByKey, setTotalByKey] = useState({})
   const [paginationByKey, setPaginationByKey] = useState({})
   const [selectedByKey, setSelectedByKey] = useState({})
+  const listRequestVersionRef = useRef(0)
+  const mountedRef = useRef(false)
   const routeSalesOrderID = searchParamPositiveIntText(
     searchParams,
     'sales_order_id'
@@ -103,6 +105,14 @@ export function OperationalFactWorkspace({
   const routeView = searchParamText(searchParams, 'view')
 
   const baseConfigs = useMemo(() => buildOperationalFactViewConfigs(), [])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      listRequestVersionRef.current += 1
+    }
+  }, [])
 
   const enabledViewKeys = useMemo(() => {
     const requestedKeys =
@@ -146,25 +156,30 @@ export function OperationalFactWorkspace({
     }
   }, [activeKey, configs, routeView])
 
-  const activeConfig = configs[activeKey] || configs.production
+  const fallbackActiveKey =
+    enabledViewKeys.find((key) => configs[key]) || 'production'
+  const currentActiveKey = configs[activeKey] ? activeKey : fallbackActiveKey
+  const activeConfig = configs[currentActiveKey] || configs[fallbackActiveKey]
   const activeRows = useMemo(
-    () => rowsByKey[activeKey] || [],
-    [activeKey, rowsByKey]
+    () => rowsByKey[currentActiveKey] || [],
+    [currentActiveKey, rowsByKey]
   )
-  const activeTotal = totalByKey[activeKey] || 0
-  const activeSelectedRow = selectedByKey[activeKey] || null
+  const activeTotal = totalByKey[currentActiveKey] || 0
+  const activeSelectedRow = selectedByKey[currentActiveKey] || null
   const activePagination =
-    paginationByKey[activeKey] || DEFAULT_OPERATIONAL_FACT_PAGINATION
+    paginationByKey[currentActiveKey] || DEFAULT_OPERATIONAL_FACT_PAGINATION
   const activeDateField =
-    dateFieldByKey[activeKey] || activeConfig.defaultDateField || 'occurred_at'
-  const activeDateRange = dateRangeByKey[activeKey] || ['', '']
+    dateFieldByKey[currentActiveKey] ||
+    activeConfig.defaultDateField ||
+    'occurred_at'
+  const activeDateRange = dateRangeByKey[currentActiveKey] || ['', '']
   const canWriteActive = hasAnyPermission(
     adminProfile,
     activeConfig.writePermissions
   )
 
   const resetPaginationForKey = useCallback(
-    (key = activeKey) => {
+    (key = currentActiveKey) => {
       setPaginationByKey((prev) => ({
         ...prev,
         [key]: {
@@ -173,7 +188,7 @@ export function OperationalFactWorkspace({
         },
       }))
     },
-    [activeKey]
+    [currentActiveKey]
   )
 
   const routeListParamsForKey = useCallback(
@@ -193,11 +208,15 @@ export function OperationalFactWorkspace({
   )
 
   const loadRows = useCallback(
-    async (key = activeKey) => {
+    async (key = currentActiveKey) => {
       const config = configs[key]
       if (!config) {
         return
       }
+      const requestVersion = listRequestVersionRef.current + 1
+      listRequestVersionRef.current = requestVersion
+      const shouldApplyRequest = () =>
+        mountedRef.current && requestVersion === listRequestVersionRef.current
       setLoading(true)
       try {
         const pagination = paginationByKey[key] || activePagination
@@ -216,6 +235,9 @@ export function OperationalFactWorkspace({
         const nextRows = Array.isArray(data?.[config.listKey])
           ? data[config.listKey]
           : []
+        if (!shouldApplyRequest()) {
+          return
+        }
         setRowsByKey((prev) => ({
           ...prev,
           [key]: nextRows,
@@ -231,15 +253,19 @@ export function OperationalFactWorkspace({
         })
         setTotalByKey((prev) => ({ ...prev, [key]: Number(data?.total || 0) }))
       } catch (error) {
-        message.error(getActionErrorMessage(error, `加载${config.title}`))
+        if (shouldApplyRequest()) {
+          message.error(getActionErrorMessage(error, `加载${config.title}`))
+        }
       } finally {
-        setLoading(false)
+        if (shouldApplyRequest()) {
+          setLoading(false)
+        }
       }
     },
     [
-      activeKey,
       activePagination,
       configs,
+      currentActiveKey,
       dateFieldByKey,
       dateRangeByKey,
       keyword,
@@ -250,12 +276,14 @@ export function OperationalFactWorkspace({
   )
 
   useEffect(() => {
-    loadRows(activeKey)
-  }, [activeKey, loadRows])
+    loadRows(currentActiveKey)
+  }, [currentActiveKey, loadRows])
 
   useEffect(() => {
-    return outletContext?.registerPageRefresh?.(() => loadRows(activeKey))
-  }, [activeKey, loadRows, outletContext])
+    return outletContext?.registerPageRefresh?.(() =>
+      loadRows(currentActiveKey)
+    )
+  }, [currentActiveKey, loadRows, outletContext])
 
   const runRowAction = async (config, row, actionKey, actionLabel) => {
     const action = config[actionKey]
@@ -266,7 +294,7 @@ export function OperationalFactWorkspace({
       setSaving(true)
       await action({ id: row.id })
       message.success(`${actionLabel}已完成`)
-      await loadRows(activeKey)
+      await loadRows(currentActiveKey)
     } catch (error) {
       message.error(getActionErrorMessage(error, actionLabel))
     } finally {
@@ -275,7 +303,7 @@ export function OperationalFactWorkspace({
   }
 
   const clearActiveSelection = () => {
-    setSelectedByKey((prev) => ({ ...prev, [activeKey]: null }))
+    setSelectedByKey((prev) => ({ ...prev, [currentActiveKey]: null }))
   }
 
   const openProcessingContractPrint = () => {
@@ -293,7 +321,7 @@ export function OperationalFactWorkspace({
   }
 
   const columns = applyBusinessColumnSorters(
-    buildOperationalFactColumns(activeKey)
+    buildOperationalFactColumns(currentActiveKey)
   )
   const activeBoundaryText =
     activeConfig.selectionBoundaryText ||
@@ -301,31 +329,31 @@ export function OperationalFactWorkspace({
   const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
     useBusinessColumnOrder({
       adminProfile,
-      moduleKey: `${toolbarModuleKey}-${activeKey}`,
+      moduleKey: `${toolbarModuleKey}-${currentActiveKey}`,
       moduleTitle: `${pageTitle} / ${activeConfig.title}`,
       columns,
     })
   const exportRows = useCallback(() => {
     downloadBusinessListCSV({
-      filename: `${toolbarModuleKey}-${activeKey}.csv`,
+      filename: `${toolbarModuleKey}-${currentActiveKey}.csv`,
       columns: visibleColumns,
       rows: activeRows,
     })
-  }, [activeKey, activeRows, toolbarModuleKey, visibleColumns])
+  }, [activeRows, currentActiveKey, toolbarModuleKey, visibleColumns])
   const canConfirmActive = hasAnyPermission(
     adminProfile,
     activeConfig.confirmPermissions || activeConfig.writePermissions
   )
-  const selectedLabel = selectedLabelForKey(activeKey, activeSelectedRow)
+  const selectedLabel = selectedLabelForKey(currentActiveKey, activeSelectedRow)
   const activeAttachmentOwnerType =
-    getOperationalFactAttachmentOwnerType(activeKey)
+    getOperationalFactAttachmentOwnerType(currentActiveKey)
   const relatedMenuItems = useMemo(
     () =>
       buildOperationalFactRelatedMenuItems({
-        activeKey,
+        activeKey: currentActiveKey,
         activeSelectedRow,
       }),
-    [activeKey, activeSelectedRow]
+    [currentActiveKey, activeSelectedRow]
   )
 
   const openRelatedTable = ({ key }) => {
@@ -336,11 +364,11 @@ export function OperationalFactWorkspace({
       }),
       inventory: routeWithQuery(V1_ROUTE_PATHS.inventory, {
         source_type:
-          activeKey === 'shipments'
+          currentActiveKey === 'shipments'
             ? 'SHIPMENT'
             : activeSelectedRow.source_type || undefined,
         source_id:
-          activeKey === 'shipments'
+          currentActiveKey === 'shipments'
             ? activeSelectedRow.id
             : activeSelectedRow.source_id || undefined,
         sales_order_id: activeSelectedRow.sales_order_id,
@@ -394,17 +422,16 @@ export function OperationalFactWorkspace({
     setStatusFilter('')
     setDateFieldByKey((prev) => ({
       ...prev,
-      [activeKey]: activeConfig.defaultDateField || 'occurred_at',
+      [currentActiveKey]: activeConfig.defaultDateField || 'occurred_at',
     }))
     setDateRangeByKey((prev) => ({
       ...prev,
-      [activeKey]: ['', ''],
+      [currentActiveKey]: ['', ''],
     }))
     clearRouteContext()
-  }, [activeConfig.defaultDateField, activeKey, clearRouteContext])
+  }, [activeConfig.defaultDateField, clearRouteContext, currentActiveKey])
   const pageStats = buildOperationalFactStats({
     activeRows,
-    activeSelectedRow,
     activeTotal,
   })
   const tabItems = Object.entries(configs).map(([key, config]) => ({
@@ -443,12 +470,13 @@ export function OperationalFactWorkspace({
           <>
             <SearchInput
               value={keyword}
-              placeholder="搜索单号、来源或备注"
+              placeholder="搜索单号"
+              searchHint="可搜索：单号、来源、备注"
               onChange={(event) => {
                 setKeyword(event.target.value)
                 resetPaginationForKey()
               }}
-              onPressEnter={() => loadRows(activeKey)}
+              onPressEnter={() => loadRows(currentActiveKey)}
             />
             <SelectFilter
               className="erp-business-filter-control--status"
@@ -465,7 +493,8 @@ export function OperationalFactWorkspace({
               onTypeChange={(nextField) => {
                 setDateFieldByKey((prev) => ({
                   ...prev,
-                  [activeKey]: nextField || activeConfig.defaultDateField,
+                  [currentActiveKey]:
+                    nextField || activeConfig.defaultDateField,
                 }))
                 resetPaginationForKey()
               }}
@@ -474,14 +503,20 @@ export function OperationalFactWorkspace({
               onStartChange={(nextStart) => {
                 setDateRangeByKey((prev) => ({
                   ...prev,
-                  [activeKey]: [nextStart, prev[activeKey]?.[1] || ''],
+                  [currentActiveKey]: [
+                    nextStart,
+                    prev[currentActiveKey]?.[1] || '',
+                  ],
                 }))
                 resetPaginationForKey()
               }}
               onEndChange={(nextEnd) => {
                 setDateRangeByKey((prev) => ({
                   ...prev,
-                  [activeKey]: [prev[activeKey]?.[0] || '', nextEnd],
+                  [currentActiveKey]: [
+                    prev[currentActiveKey]?.[0] || '',
+                    nextEnd,
+                  ],
                 }))
                 resetPaginationForKey()
               }}
@@ -535,10 +570,12 @@ export function OperationalFactWorkspace({
               icon={<LinkOutlined />}
               disabled={!activeSelectedRow || relatedMenuItems.length === 0}
             >
-              关联 <DownOutlined />
+              相关单据 <DownOutlined />
             </Button>
           </Dropdown>
-          {['production', 'outsourcing', 'finance'].includes(activeKey) ? (
+          {['production', 'outsourcing', 'finance'].includes(
+            currentActiveKey
+          ) ? (
             <Popconfirm
               title="确认过账？"
               onConfirm={() =>
@@ -562,7 +599,7 @@ export function OperationalFactWorkspace({
               </Button>
             </Popconfirm>
           ) : null}
-          {activeKey === 'outsourcing' ? (
+          {currentActiveKey === 'outsourcing' ? (
             <Button
               size="small"
               icon={<PrinterOutlined />}
@@ -585,7 +622,7 @@ export function OperationalFactWorkspace({
               disabledReason="请先选择一条记录"
             />
           ) : null}
-          {activeKey === 'shipments' ? (
+          {currentActiveKey === 'shipments' ? (
             <Popconfirm
               title="确认发货并写出库流水？"
               onConfirm={() =>
@@ -609,7 +646,7 @@ export function OperationalFactWorkspace({
               </Button>
             </Popconfirm>
           ) : null}
-          {activeKey === 'reservations' ? (
+          {currentActiveKey === 'reservations' ? (
             <>
               <Popconfirm
                 title="确认释放库存预留？"
@@ -666,7 +703,7 @@ export function OperationalFactWorkspace({
               </Popconfirm>
             </>
           ) : null}
-          {activeKey === 'finance' ? (
+          {currentActiveKey === 'finance' ? (
             <Popconfirm
               title="确认结清财务事实？"
               onConfirm={() =>
@@ -689,7 +726,9 @@ export function OperationalFactWorkspace({
               </Button>
             </Popconfirm>
           ) : null}
-          {['production', 'outsourcing', 'finance'].includes(activeKey) ? (
+          {['production', 'outsourcing', 'finance'].includes(
+            currentActiveKey
+          ) ? (
             <Popconfirm
               title="确认取消并按后端规则处理冲正？"
               onConfirm={() =>
@@ -713,7 +752,7 @@ export function OperationalFactWorkspace({
               </Button>
             </Popconfirm>
           ) : null}
-          {activeKey === 'shipments' ? (
+          {currentActiveKey === 'shipments' ? (
             <Popconfirm
               title="确认取消并写出库冲正？"
               onConfirm={() =>
@@ -750,7 +789,7 @@ export function OperationalFactWorkspace({
           showTabs && tabItems.length > 1 ? (
             <Tabs
               className="erp-business-view-tabs"
-              activeKey={activeKey}
+              activeKey={currentActiveKey}
               onChange={setActiveKey}
               items={tabItems}
             />
@@ -766,7 +805,7 @@ export function OperationalFactWorkspace({
           onChange: (_keys, selectedRows) =>
             setSelectedByKey((prev) => ({
               ...prev,
-              [activeKey]: selectedRows[0] || null,
+              [currentActiveKey]: selectedRows[0] || null,
             })),
         }}
         rowClassName={(record) =>
@@ -776,7 +815,7 @@ export function OperationalFactWorkspace({
           onClick: () =>
             setSelectedByKey((prev) => ({
               ...prev,
-              [activeKey]: record,
+              [currentActiveKey]: record,
             })),
         })}
         emptyDescription="暂无业务事实记录"
@@ -786,7 +825,7 @@ export function OperationalFactWorkspace({
           onChange: (current, pageSize) =>
             setPaginationByKey((prev) => ({
               ...prev,
-              [activeKey]: { current, pageSize },
+              [currentActiveKey]: { current, pageSize },
             })),
         })}
         scroll={{ x: 1320 }}

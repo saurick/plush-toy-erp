@@ -188,12 +188,12 @@ export function createBusinessFormalScenarios(deps) {
       columnOrderDisabled = false,
     }
   ) => {
-    const labels = ['导出当前结果', '列顺序']
+    const labels = ['导出筛选结果', '列顺序']
     for (const label of labels) {
       await expectButton(page, label)
     }
     const exportButton = page
-      .getByRole('button', { name: '导出当前结果' })
+      .getByRole('button', { name: '导出筛选结果' })
       .first()
     const columnOrderButton = page
       .getByRole('button', { name: '列顺序' })
@@ -201,7 +201,7 @@ export function createBusinessFormalScenarios(deps) {
     assert.equal(
       await exportButton.isDisabled(),
       exportDisabled,
-      `${scenarioName} 导出当前结果按钮禁用态不符合当前页面能力边界`
+      `${scenarioName} 导出筛选结果按钮禁用态不符合当前页面能力边界`
     )
     assert.equal(
       await columnOrderButton.isDisabled(),
@@ -214,6 +214,72 @@ export function createBusinessFormalScenarios(deps) {
     if (exportTooltip) {
       await exportButton.locator('xpath=..').hover()
       await expectText(page, exportTooltip)
+    }
+    await assertCurrentOperationBarCompact(page, { scenarioName })
+  }
+
+  async function assertCurrentOperationBarCompact(page, { scenarioName }) {
+    const metrics = await page.evaluate(() => {
+      const bars = Array.from(
+        document.querySelectorAll('.erp-business-module-current-action')
+      )
+      return bars.map((bar) => {
+        const row = bar.querySelector('.erp-business-selection-action-bar__row')
+        const primary = bar.querySelector(
+          '.erp-business-selection-action-bar__primary'
+        )
+        const actions = bar.querySelector(
+          '.erp-business-selection-action-bar__actions'
+        )
+        const rowBox = row?.getBoundingClientRect()
+        const primaryBox = primary?.getBoundingClientRect()
+        const actionsBox = actions?.getBoundingClientRect()
+        const rowCenter = rowBox ? rowBox.top + rowBox.height / 2 : 0
+        const primaryCenter = primaryBox
+          ? primaryBox.top + primaryBox.height / 2
+          : 0
+        const actionsCenter = actionsBox
+          ? actionsBox.top + actionsBox.height / 2
+          : 0
+        const text = bar.textContent?.replace(/\s+/g, ' ').trim() || ''
+        return {
+          text,
+          hintCount: bar.querySelectorAll(
+            '.erp-business-selection-action-bar__hint'
+          ).length,
+          rowHeight: rowBox?.height || 0,
+          primaryOffset: Math.abs(primaryCenter - rowCenter),
+          actionsOffset: Math.abs(actionsCenter - rowCenter),
+        }
+      })
+    })
+    assert(metrics.length > 0, `${scenarioName} 应存在当前操作条`)
+    for (const metric of metrics) {
+      assert.equal(
+        metric.hintCount,
+        0,
+        `${scenarioName} 当前操作条不应渲染页面级边界说明: ${JSON.stringify(
+          metric
+        )}`
+      )
+      assert(
+        !/不写|不本地|usecase|只调用|只读；/.test(metric.text),
+        `${scenarioName} 当前操作条不应保留长边界说明: ${JSON.stringify(
+          metric
+        )}`
+      )
+      if (metric.rowHeight <= 96) {
+        assert(
+          metric.primaryOffset <= 2,
+          `${scenarioName} 当前操作标题与选中标签应上下居中: ${JSON.stringify(
+            metric
+          )}`
+        )
+        assert(
+          metric.actionsOffset <= 2,
+          `${scenarioName} 当前操作按钮组应上下居中: ${JSON.stringify(metric)}`
+        )
+      }
     }
   }
 
@@ -423,6 +489,9 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '供应商档案')
         await expectButton(page, '新建供应商')
         await expectText(page, '当前操作')
+        await assertCurrentOperationBarCompact(page, {
+          scenarioName: 'business-v1-suppliers',
+        })
         await expectText(page, '本页协同')
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'business-v1-suppliers',
@@ -460,6 +529,9 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '客户档案')
         await expectButton(page, '新建客户')
         await expectText(page, '当前操作')
+        await assertCurrentOperationBarCompact(page, {
+          scenarioName: 'business-v1-customers',
+        })
         await expectText(page, '暗色客户')
         await expectText(page, '本页协同')
         await assertBusinessPageRefreshEntrypoint(page, {
@@ -501,6 +573,9 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '销售订单')
         await expectButton(page, '新建订单')
         await expectText(page, '当前操作')
+        await assertCurrentOperationBarCompact(page, {
+          scenarioName: 'business-v1-sales-orders',
+        })
         await expectText(page, '订单行')
         await expectText(page, '本页协同')
         await assertNoListDeleteTrashToolbar(page)
@@ -639,6 +714,9 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, 'PROD-STYLE-L1')
         await expectText(page, 'BEAR-STYLE')
         await expectText(page, '当前操作')
+        await assertCurrentOperationBarCompact(page, {
+          scenarioName: 'business-standard-products',
+        })
         await expectText(page, '本页协同')
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'business-standard-products',
@@ -648,7 +726,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'business-standard-products',
-          expectedLabels: ['总产品', '当前结果', '启用产品', '已选产品'],
+          expectedLabels: ['总产品', '当前结果', '启用产品'],
         })
         await assertBusinessMainTableSortableColumns(page, {
           scenarioName: 'business-standard-products',
@@ -758,6 +836,9 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, 'BOM-STYLE-L1')
         await expectText(page, '已激活')
         await expectText(page, '当前操作')
+        await assertCurrentOperationBarCompact(page, {
+          scenarioName: 'business-standard-bom',
+        })
         await expectText(page, '本页协同')
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'business-standard-bom',
@@ -774,7 +855,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'business-standard-bom',
-          expectedLabels: ['总BOM', '当前结果', '已激活', '已选BOM'],
+          expectedLabels: ['总BOM', '当前结果', '已激活'],
         })
         await assertBusinessFormModalKeyboardRecovery(page, {
           triggerName: '新建草稿',
@@ -890,7 +971,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '来料质检')
         await expectButton(page, '生成质检草稿')
-        await expectButton(page, '导出当前结果')
+        await expectButton(page, '导出筛选结果')
         await expectButton(page, '列顺序')
         await assertNoListDeleteTrashToolbar(page)
         await expectText(page, 'quality_inspections')
@@ -982,7 +1063,7 @@ export function createBusinessFormalScenarios(deps) {
         await page.getByText('QI-STYLE-L1', { exact: false }).first().click()
         forceEmptyQualityInspections = true
         await page
-          .getByPlaceholder('搜索质检单号 / 入库单 / 批次')
+          .getByPlaceholder('搜索质检单')
           .first()
           .fill(qualityEmptySearchKeyword)
         await page.keyboard.press('Enter')
@@ -992,10 +1073,7 @@ export function createBusinessFormalScenarios(deps) {
           staleText: 'QI-STYLE-L1',
         })
         forceEmptyQualityInspections = false
-        await page
-          .getByPlaceholder('搜索质检单号 / 入库单 / 批次')
-          .first()
-          .fill('')
+        await page.getByPlaceholder('搜索质检单').first().fill('')
         await page.keyboard.press('Enter')
         await expectText(page, 'QI-STYLE-L1')
         await verifyBusinessModuleColumnOrderDialog(page, {
@@ -1180,14 +1258,22 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '委外订单')
         await expectButton(page, '新建加工合同')
-        await expectButton(page, '导出当前结果')
+        await expectButton(page, '导出筛选结果')
         await expectButton(page, '列顺序')
         await assertNoListDeleteTrashToolbar(page)
         await expectText(page, 'Source Document：加工合同')
-        await expectText(page, '加工合同只表达委外承诺和打印快照')
+        await assertTextAbsent(page, '加工合同只表达委外承诺和打印快照')
         await expectText(page, '查货只是工序候选')
-        await expectText(page, '判定结果回质检模块')
+        await assertTextAbsent(page, '判定结果回质检模块')
         await expectText(page, '本页协同')
+        await assertCurrentOperationBarCompact(page, {
+          scenarioName: 'business-v1-processing-contracts',
+        })
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'business-v1-processing-contracts',
+          expectedLabels: ['总记录', '当前结果', '草稿', '已确认'],
+          allowWrappedStats: true,
+        })
         await assertNoListDeleteTrashToolbar(page)
         await verifyBusinessModuleColumnOrderDialog(page, {
           moduleKey: 'processing-contracts',
@@ -1211,9 +1297,11 @@ export function createBusinessFormalScenarios(deps) {
           .filter({ hasText: 'SIM-OUTSOURCE-CONTRACT-L1' })
           .click()
         assert.equal(
-          await page.getByRole('button', { name: /^关联/ }).count(),
+          await page
+            .getByRole('button', { name: /^(关联|相关单据|查看关联)/ })
+            .count(),
           0,
-          '加工合同页当前操作区不应保留跨模块关联下拉，避免加工页承接质检、库存或应付事实'
+          '加工合同页当前操作区不应保留跨模块相关单据下拉，避免加工页承接质检、库存或应付事实'
         )
         assert.equal(
           await processingContractPrintButton.isDisabled(),
@@ -1597,6 +1685,19 @@ export function createBusinessFormalScenarios(deps) {
           'business-v1-production-progress'
         )
 
+        await page.getByRole('menuitem', { name: '对账管理' }).click()
+        await expectHeading(page, '对账管理')
+        await expectText(page, 'REC-STYLE-L1')
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-v1-production-to-reconciliation-navigation',
+        })
+        await assertTextAbsent(page, '登记对账事实')
+        await assertTextAbsent(page, '生成对账')
+        await assertNoHorizontalOverflow(
+          page,
+          'business-v1-production-to-reconciliation-navigation'
+        )
+
         await gotoScenarioPath(page, '/erp/warehouse/outbound', {
           waitUntil: 'domcontentloaded',
         })
@@ -1738,6 +1839,11 @@ export function createBusinessFormalScenarios(deps) {
           expectedEffectiveTheme: 'light',
         })
         await expectHeading(page, '委外订单')
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'business-v1-outsourcing-mobile',
+          expectedLabels: ['总记录', '当前结果', '草稿', '已确认'],
+          allowWrappedStats: true,
+        })
         await verifyBusinessActionFormModal(page, {
           buttonName: '新建加工合同',
           titleText: '新建加工合同',

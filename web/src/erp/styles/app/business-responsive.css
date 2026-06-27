@@ -262,135 +262,6 @@
   padding-bottom: 6px;
 }
 
-.erp-business-record-form :where(.ant-input),
-.erp-business-record-form :where(.ant-input-affix-wrapper),
-.erp-business-record-form .ant-input-number,
-.erp-business-record-form .ant-picker,
-.erp-business-record-form .ant-select-selector,
-.erp-permission-modal :where(.ant-input),
-.erp-permission-modal :where(.ant-input-affix-wrapper),
-.erp-permission-modal .ant-select-selector,
-.erp-business-status-reason-modal :where(.ant-input),
-.erp-business-status-reason-modal :where(.ant-input-affix-wrapper),
-.erp-business-record-form textarea.ant-input,
-.erp-business-status-reason-modal textarea.ant-input {
-  border-radius: var(--erp-business-control-radius, 12px);
-}
-
-.erp-business-record-form
-  :where(
-    .ant-input,
-    .ant-input-affix-wrapper,
-    .ant-input-number,
-    .ant-picker,
-    .ant-select-selector
-  ),
-.erp-permission-modal
-  :where(.ant-input, .ant-input-affix-wrapper, .ant-select-selector),
-.erp-business-status-reason-modal :where(.ant-input, .ant-input-affix-wrapper) {
-  border-color: var(--erp-modal-control-border, #d9d9d9);
-  background-color: var(--erp-modal-control-background, #fff);
-}
-
-.erp-business-record-form
-  :where(
-    .ant-input,
-    .ant-input-affix-wrapper,
-    .ant-input-number,
-    .ant-picker,
-    .ant-select-selector
-  ):hover,
-.erp-permission-modal
-  :where(.ant-input, .ant-input-affix-wrapper, .ant-select-selector):hover,
-.erp-business-status-reason-modal
-  :where(.ant-input, .ant-input-affix-wrapper):hover {
-  border-color: var(--erp-modal-control-hover, #bfbfbf);
-}
-
-.erp-business-record-form :where(.ant-input),
-.erp-permission-modal :where(.ant-input),
-.erp-business-status-reason-modal :where(.ant-input) {
-  min-height: 32px;
-  padding: 4px 11px;
-  line-height: 22px;
-}
-
-.erp-business-record-form :where(input.ant-input:not([type='hidden'])),
-.erp-permission-modal :where(input.ant-input:not([type='hidden'])),
-.erp-business-status-reason-modal :where(input.ant-input:not([type='hidden'])) {
-  height: 32px;
-}
-
-.erp-permission-modal .ant-input-affix-wrapper :where(input.ant-input) {
-  height: auto;
-  min-height: 0;
-  padding: 0;
-  border-color: transparent;
-  background-color: transparent;
-}
-
-.erp-business-record-form .ant-input-number,
-.erp-business-record-form .ant-picker,
-.erp-business-record-form .ant-select-selector,
-.erp-permission-modal :where(.ant-input-affix-wrapper),
-.erp-permission-modal .ant-select-selector {
-  min-height: 32px;
-}
-
-.erp-business-action-form .erp-business-date-input.ant-picker {
-  border-radius: var(--erp-business-control-radius, 12px);
-}
-
-.erp-business-record-form textarea.ant-input,
-.erp-business-status-reason-modal textarea.ant-input {
-  min-height: 74px;
-  border-color: var(--erp-modal-control-border, #d9d9d9);
-  background: var(--erp-modal-control-background, #fff);
-}
-
-.erp-business-record-form textarea.ant-input:hover,
-.erp-business-status-reason-modal textarea.ant-input:hover {
-  border-color: var(--erp-modal-control-hover, #bfbfbf);
-}
-
-.ant-modal :is(.ant-input:focus, .ant-input-focused),
-.ant-modal :is(.ant-input-affix-wrapper-focused),
-.ant-modal .ant-input-number-focused,
-.ant-modal .ant-picker-focused,
-.ant-modal .ant-select-focused .ant-select-selector,
-.ant-modal .ant-select-open .ant-select-selector {
-  border-color: #2b8a3e;
-  box-shadow: 0 0 0 2px rgb(43 138 62 / 12%);
-  outline: 0;
-}
-
-.ant-modal .ant-input-affix-wrapper > input.ant-input:focus,
-.ant-modal .ant-input-affix-wrapper > textarea.ant-input:focus,
-.ant-modal .ant-input-number-input:focus,
-.ant-modal .ant-picker-input > input:focus {
-  --tw-ring-color: transparent;
-  --tw-ring-offset-shadow: 0 0 #0000;
-  --tw-ring-shadow: 0 0 #0000;
-  border-color: transparent;
-  box-shadow: none;
-  outline: 0;
-}
-
-.ant-modal .ant-select-selection-search-input:focus,
-.ant-modal .ant-checkbox-input:focus {
-  --tw-ring-color: transparent;
-  --tw-ring-offset-shadow: 0 0 #0000;
-  --tw-ring-shadow: 0 0 #0000;
-  border-color: transparent;
-  box-shadow: none;
-  outline: 0;
-}
-
-.ant-modal .ant-checkbox-wrapper:focus-within .ant-checkbox-inner {
-  border-color: #2b8a3e;
-  box-shadow: 0 0 0 2px rgb(43 138 62 / 16%);
-}
-
 .erp-business-record-form__items-field.ant-form-item {
   margin-bottom: 14px;
 }
@@ -489,7 +360,10 @@
 }
 
 .erp-item-field-unit-suffix.ant-input {
-  flex: 0 0 auto;
+  flex: 0 0 var(--erp-unit-suffix-width, max-content);
+  width: var(--erp-unit-suffix-width, auto);
+  min-width: 72px;
+  max-width: 168px;
   text-align: center;
   color: rgb(0 0 0 / 45%);
   background: #fafafa;
@@ -680,10 +554,6 @@
   .erp-business-column-order-modal__actions .ant-space-item,
   .erp-business-column-order-modal__action {
     flex: 1 1 138px;
-  }
-
-  .erp-business-page-header-card__grid {
-    grid-template-columns: 1fr;
   }
 
   .erp-business-module-variant-grid {

@@ -600,7 +600,8 @@ export function SalesOrderItemsFormSection({
               getSelectedLabel={(sku) =>
                 sku?.sku_code || sku?.product_no || sku?.id || '-'
               }
-              searchPlaceholder="搜索 SKU 编码、名称、颜色或包装"
+              searchPlaceholder="搜索 SKU"
+              searchHint="可搜索：SKU 编码、名称、颜色、包装"
               emptyDescription="暂无可导入 SKU"
               onCancel={() => setSkuImportOpen(false)}
               onImport={(selectedSKUs) => {

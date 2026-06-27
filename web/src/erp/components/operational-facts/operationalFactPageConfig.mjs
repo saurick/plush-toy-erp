@@ -490,7 +490,6 @@ export function buildOperationalFactColumns(activeKey) {
 
 export function buildOperationalFactStats({
   activeRows = [],
-  activeSelectedRow,
   activeTotal = 0,
 }) {
   const activeDraftCount = activeRows.filter(
@@ -499,17 +498,12 @@ export function buildOperationalFactStats({
   const postedCount = activeRows.filter((item) =>
     ['POSTED', 'SHIPPED', 'SETTLED', 'CONSUMED'].includes(item.status)
   ).length
-  const activeCancelledCount = activeRows.filter((item) =>
-    ['CANCELLED', 'RELEASED'].includes(item.status)
-  ).length
 
   return [
     { key: 'total', label: '总记录', value: activeTotal },
     { key: 'current', label: '当前结果', value: activeRows.length },
     { key: 'draft', label: '草稿', value: activeDraftCount },
     { key: 'posted', label: '已生效', value: postedCount },
-    { key: 'closed', label: '已取消/释放', value: activeCancelledCount },
-    { key: 'selected', label: '已选记录', value: activeSelectedRow ? 1 : 0 },
   ]
 }
 

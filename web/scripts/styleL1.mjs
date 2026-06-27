@@ -592,6 +592,9 @@ async function runScenarioOnce(browser, scenario) {
     await scenario.verify(page)
     await assertVisibleInputControlRadius(page, scenario.name)
     await assertVisibleRoundedInputWrapperClipping(page, scenario.name)
+    await assertVisibleInputFocusRingNotClipped(page, scenario.name)
+    await assertVisibleInputTextVerticalRhythm(page, scenario.name)
+    await assertVisibleSearchPlaceholdersFit(page, scenario.name)
     await assertVisibleBusinessFormControlHeight(page, scenario.name)
     await assertNoHorizontalOverflow(page, scenario.name)
     assert.deepEqual(errors, [], `${scenario.name} 出现控制台或运行时错误`)
@@ -1849,7 +1852,12 @@ async function verifyBusinessActionFormModal(
       node.querySelectorAll('.erp-master-contact-list__items')
     ).map((list) => {
       const style = window.getComputedStyle(list)
+      const initialScrollLeft = list.scrollLeft
+      list.scrollLeft = 0
+      const defaultScrollLeft = list.scrollLeft
       list.scrollLeft = list.scrollWidth - list.clientWidth
+      const maxScrollLeft = list.scrollLeft
+      list.scrollLeft = defaultScrollLeft
       const rows = Array.from(
         list.querySelectorAll('.erp-master-contact-list__row')
       ).map((row) => {
@@ -1872,6 +1880,7 @@ async function verifyBusinessActionFormModal(
               text: field.textContent?.replace(/\s+/g, ' ').trim() || '',
               width: rect.width,
               scrollWidth: field.scrollWidth,
+              left: rect.left,
             }
           }
         )
@@ -1888,6 +1897,10 @@ async function verifyBusinessActionFormModal(
         clientWidth: list.clientWidth,
         scrollWidth: list.scrollWidth,
         scrollLeft: list.scrollLeft,
+        initialScrollLeft,
+        defaultScrollLeft,
+        maxScrollLeft,
+        left: list.getBoundingClientRect().left,
         overflowX: style.overflowX,
         overflowY: style.overflowY,
         rows,
@@ -2119,6 +2132,8 @@ async function verifyBusinessActionFormModal(
   if (typeof afterOpen === 'function') {
     await afterOpen(modal)
   }
+  await assertVisibleInputFocusRingNotClipped(page, screenshotName)
+  await assertVisibleInputTextVerticalRhythm(page, screenshotName)
   if (requireMultiColumn) {
     assert(
       metrics.gridTemplateColumns.split(' ').length >= 2,
@@ -2138,10 +2153,12 @@ async function verifyBusinessActionFormModal(
             ['auto', 'scroll'].includes(list.overflowX) &&
             ['auto', 'visible'].includes(list.overflowY) &&
             list.scrollWidth > list.clientWidth &&
-            list.scrollLeft > 0 &&
+            list.scrollLeft === 0 &&
+            list.defaultScrollLeft === 0 &&
+            list.maxScrollLeft > 0 &&
             list.clientWidth >= Math.min(1000, metrics.modal.width - 110)
         ),
-      `${screenshotName} 联系人区未由同一个外层列表稳定横向滚动: ${JSON.stringify(metrics)}`
+      `${screenshotName} 联系人区未由同一个外层列表稳定横向滚动，或默认态未停在首列: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.contactItemLists.every(
@@ -2167,6 +2184,14 @@ async function verifyBusinessActionFormModal(
         )
       ),
       `${screenshotName} 联系人字段宽度或文本溢出异常: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.contactItemLists.every((list) =>
+        list.grids.every((grid) =>
+          grid.fields.length === 0 ? true : grid.fields[0].left >= list.left - 1
+        )
+      ),
+      `${screenshotName} 联系人区默认态首列被裁切: ${JSON.stringify(metrics)}`
     )
   }
   assert(
@@ -2504,6 +2529,11 @@ async function verifySourceImportPicker(
   )
   assert(metrics.hasPagination, `${scenarioName} 来源导入选择器缺少分页`)
   await expectText(page, '未选择来源')
+  assert.equal(
+    await picker.getByRole('button', { name: '清空已选' }).count(),
+    0,
+    `${scenarioName} 未选择来源时不应显示清空已选按钮`
+  )
   assert(
     metrics.selectionTop > 0 &&
       metrics.tableTop > 0 &&
@@ -2628,6 +2658,49 @@ async function verifySourceImportPicker(
     await selectorControl.click()
     await expectText(page, '已选 1 条')
     await expectText(page, '清空已选')
+    const clearSelectionButton = picker.getByRole('button', {
+      name: '清空已选',
+    })
+    const clearSelectionBorder = await clearSelectionButton.evaluate(
+      (button) => {
+        const style = window.getComputedStyle(button)
+        return {
+          borderColor: style.borderColor,
+          borderWidth: style.borderWidth,
+          boxShadow: style.boxShadow,
+        }
+      }
+    )
+    assert(
+      (clearSelectionBorder.borderColor === 'rgba(0, 0, 0, 0)' ||
+        clearSelectionBorder.borderColor === 'transparent') &&
+        clearSelectionBorder.boxShadow === 'none',
+      `${scenarioName} 清空已选按钮默认不应显示边框: ${JSON.stringify(
+        clearSelectionBorder
+      )}`
+    )
+    await clearSelectionButton.hover()
+    const clearSelectionHoverBorder = await clearSelectionButton.evaluate(
+      (button) => {
+        const style = window.getComputedStyle(button)
+        return {
+          borderColor: style.borderColor,
+          borderWidth: style.borderWidth,
+          boxShadow: style.boxShadow,
+        }
+      }
+    )
+    const hasVisibleHoverFrame =
+      clearSelectionHoverBorder.boxShadow !== 'none' ||
+      (clearSelectionHoverBorder.borderWidth !== '0px' &&
+        clearSelectionHoverBorder.borderColor !== 'rgba(0, 0, 0, 0)' &&
+        clearSelectionHoverBorder.borderColor !== 'transparent')
+    assert(
+      hasVisibleHoverFrame,
+      `${scenarioName} 清空已选按钮 hover 时应显示边框: ${JSON.stringify(
+        clearSelectionHoverBorder
+      )}`
+    )
     const selectedMetrics = await picker.evaluate((node) => {
       const selection = node.querySelector(
         '.erp-source-import-picker__selection'
@@ -2651,8 +2724,13 @@ async function verifySourceImportPicker(
       (button) => button.disabled
     )
     assert.equal(importDisabled, false, `${scenarioName} 导入按钮不应禁用`)
-    await picker.getByRole('button', { name: '清空已选' }).click()
+    await clearSelectionButton.click()
     await assertTextAbsent(page, '已选 1 条')
+    assert.equal(
+      await picker.getByRole('button', { name: '清空已选' }).count(),
+      0,
+      `${scenarioName} 清空已选后按钮应从来源选择器中移除`
+    )
     await expectText(page, '未选择来源')
     const clearedImportDisabled = await importButton.evaluate(
       (button) => button.disabled
@@ -4036,6 +4114,9 @@ async function assertBusinessModuleToolbarControlStyle(
 
     return {
       search: readFromFilterRoot('.ant-input-affix-wrapper'),
+      searchInput: readFromFilterRoot(
+        '.erp-business-filter-control--search input'
+      ),
       dateInput: readFromFilterRoot('.erp-business-date-input'),
       dateControl: readFromFilterRoot('.erp-business-date-range-filter'),
       dateInputs: Array.from(
@@ -4170,6 +4251,13 @@ async function assertBusinessModuleToolbarControlStyle(
       metrics.dateControl.borderColor,
       metrics.search.borderColor,
       `${scenarioName} 日期控件边框颜色未对齐搜索框: ${JSON.stringify(metrics)}`
+    )
+  }
+  if (metrics.searchInput?.text) {
+    assert(
+      metrics.searchInput.effectiveTextWidth >=
+        metrics.searchInput.requiredTextWidth,
+      `${scenarioName} 搜索框 placeholder 可见文本区不足: ${JSON.stringify(metrics)}`
     )
   }
   assert(
@@ -5892,6 +5980,86 @@ async function assertVisibleInputControlRadius(page, scenarioName) {
   )
 }
 
+async function assertVisibleSearchPlaceholdersFit(page, scenarioName) {
+  const issues = await page.evaluate(() => {
+    const canvas = document.createElement('canvas')
+    const context = canvas.getContext('2d')
+    const measureTextWidth = (text, font) => {
+      if (!context) return 0
+      context.font = font
+      return context.measureText(text).width
+    }
+    const selectors = [
+      '.erp-business-filter-control--search input',
+      '.erp-source-import-picker input.ant-input',
+    ].join(',')
+    const isVisible = (node) => {
+      const rect = node.getBoundingClientRect()
+      const style = window.getComputedStyle(node)
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.bottom >= 0 &&
+        rect.right >= 0 &&
+        rect.top <= window.innerHeight &&
+        rect.left <= window.innerWidth &&
+        style.display !== 'none' &&
+        style.visibility !== 'hidden'
+      )
+    }
+    const describe = (node, extra = {}) => {
+      const owner =
+        node.closest('.ant-input-affix-wrapper') ||
+        node.closest('.erp-source-import-picker') ||
+        node
+      const ownerRect = owner.getBoundingClientRect()
+      const rect = node.getBoundingClientRect()
+      const classes =
+        typeof owner.className === 'string'
+          ? owner.className.trim().split(/\s+/).filter(Boolean).slice(0, 5)
+          : []
+      return {
+        className: classes.join(' '),
+        placeholder: node.getAttribute('placeholder') || '',
+        inputWidth: Number(rect.width.toFixed(1)),
+        ownerWidth: Number(ownerRect.width.toFixed(1)),
+        ...extra,
+      }
+    }
+
+    return Array.from(document.querySelectorAll(selectors))
+      .filter((node) => node instanceof HTMLInputElement)
+      .filter((node) => isVisible(node))
+      .filter((node) => !node.value)
+      .map((node) => {
+        const placeholder = node.getAttribute('placeholder') || ''
+        if (!placeholder) return null
+        const style = window.getComputedStyle(node)
+        const paddingX =
+          Number.parseFloat(style.paddingLeft || '0') +
+          Number.parseFloat(style.paddingRight || '0')
+        const available = Math.max(0, node.clientWidth - paddingX)
+        const required = Math.ceil(
+          measureTextWidth(placeholder, style.font) + 6
+        )
+        if (available >= required) return null
+        return describe(node, {
+          available,
+          required,
+          font: style.font,
+        })
+      })
+      .filter(Boolean)
+      .slice(0, 12)
+  })
+
+  assert.deepEqual(
+    issues,
+    [],
+    `${scenarioName} 业务搜索框 placeholder 显示不全: ${JSON.stringify(issues)}`
+  )
+}
+
 async function assertVisibleRoundedInputWrapperClipping(page, scenarioName) {
   const issues = await page.evaluate(() => {
     const ignoredAncestorSelector = [
@@ -6017,6 +6185,392 @@ async function assertVisibleRoundedInputWrapperClipping(page, scenarioName) {
     issues,
     [],
     `${scenarioName} 圆角输入控件内层背景或裁剪会遮挡视觉圆角: ${JSON.stringify(issues)}`
+  )
+}
+
+async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
+  const metrics = await page.evaluate(async () => {
+    const ignoredAncestorSelector = [
+      '.ant-picker-dropdown',
+      '.ant-select-dropdown',
+      '.ant-dropdown',
+      '.ant-tooltip',
+      '.ant-popover',
+      '.ant-table-filter-dropdown',
+      '.erp-print-shell',
+      '.erp-print-paper',
+      '.erp-material-contract-paper',
+      '.erp-processing-contract-paper',
+      '[data-server-pdf-root]',
+    ].join(',')
+    const focusTargetSelector = [
+      'input.ant-input:not([type="hidden"])',
+      'textarea.ant-input',
+      '.ant-input-number-input',
+      '.ant-picker-input > input',
+      '.ant-select-selection-search-input',
+    ].join(',')
+
+    const isVisible = (node) => {
+      const rect = node.getBoundingClientRect()
+      const style = window.getComputedStyle(node)
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== 'none' &&
+        style.visibility !== 'hidden'
+      )
+    }
+
+    const focusOwnerOf = (node) => {
+      const dateRange = node.closest('.erp-business-date-range-filter')
+      if (dateRange instanceof HTMLElement) return dateRange
+      const select = node.closest('.ant-select')
+      const selector = select?.querySelector('.ant-select-selector')
+      if (selector instanceof HTMLElement) return selector
+      return (
+        node.closest('.ant-input-affix-wrapper') ||
+        node.closest('.ant-input-number') ||
+        node.closest('.ant-picker') ||
+        node
+      )
+    }
+
+    const describeNode = (node, owner) => {
+      const ownerRect = owner.getBoundingClientRect()
+      const container =
+        owner.closest(
+          '.ant-form-item-control-input-content, .ant-form-item-control, .ant-form-item'
+        ) || owner.parentElement
+      const containerRect = container?.getBoundingClientRect()
+      const ownerStyle = window.getComputedStyle(owner)
+      const nodeStyle = window.getComputedStyle(node)
+      const classes =
+        typeof owner.className === 'string'
+          ? owner.className.trim().split(/\s+/).filter(Boolean).slice(0, 6)
+          : []
+      return {
+        tagName: owner.tagName,
+        className: classes.join(' '),
+        selectClassName: String(owner.closest('.ant-select')?.className || ''),
+        targetTagName: node.tagName,
+        targetClassName: String(node.className || '')
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 6)
+          .join(' '),
+        placeholder: node.getAttribute('placeholder') || '',
+        text: String(owner.textContent || '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 80),
+        formClassName: String(
+          owner.closest('form, .erp-business-form, .erp-business-action-form')
+            ?.className || ''
+        ),
+        modalClassName: String(owner.closest('.ant-modal')?.className || ''),
+        width: Number(ownerRect.width.toFixed(1)),
+        height: Number(ownerRect.height.toFixed(1)),
+        left: Number(ownerRect.left.toFixed(1)),
+        right: Number(ownerRect.right.toFixed(1)),
+        containerClassName: String(container?.className || '')
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 6)
+          .join(' '),
+        containerWidth: containerRect
+          ? Number(containerRect.width.toFixed(1))
+          : null,
+        containerLeft: containerRect
+          ? Number(containerRect.left.toFixed(1))
+          : null,
+        containerRight: containerRect
+          ? Number(containerRect.right.toFixed(1))
+          : null,
+        borderColor: ownerStyle.borderColor,
+        boxShadow: ownerStyle.boxShadow,
+        outlineStyle: ownerStyle.outlineStyle,
+        outlineWidth: ownerStyle.outlineWidth,
+        overflow: ownerStyle.overflow,
+        overflowX: ownerStyle.overflowX,
+        overflowY: ownerStyle.overflowY,
+        targetBorderColor: nodeStyle.borderColor,
+        targetBoxShadow: nodeStyle.boxShadow,
+        activeTagName: document.activeElement?.tagName || '',
+        activeClassName: String(document.activeElement?.className || ''),
+        theme: document.documentElement.dataset.erpTheme || 'light',
+      }
+    }
+
+    const targets = Array.from(document.querySelectorAll(focusTargetSelector))
+      .filter((node) => node instanceof HTMLElement)
+      .filter(isVisible)
+      .filter((node) => !node.closest(ignoredAncestorSelector))
+      .filter((node) => !node.disabled && !node.readOnly)
+
+    const checked = []
+    const seenOwners = new Set()
+    const previousActive = document.activeElement
+    for (const node of targets) {
+      const owner = focusOwnerOf(node)
+      if (!(owner instanceof HTMLElement)) continue
+      if (!isVisible(owner)) continue
+      if (seenOwners.has(owner)) continue
+      seenOwners.add(owner)
+      node.focus({ preventScroll: true })
+      await new Promise((resolve) => window.setTimeout(resolve, 180))
+      if (
+        document.activeElement !== node &&
+        document.activeElement !== owner &&
+        !owner.contains(document.activeElement) &&
+        !owner.matches(':focus-within')
+      ) {
+        continue
+      }
+      checked.push(describeNode(node, owner))
+      if (checked.length >= 24) break
+    }
+    if (previousActive instanceof HTMLElement) {
+      previousActive.focus({ preventScroll: true })
+    }
+    return checked
+  })
+
+  const focusIssues = metrics.filter((item) => {
+    const boxShadow = String(item.boxShadow || '').toLowerCase()
+    const outlineWidth = Number.parseFloat(item.outlineWidth || '0')
+    return !boxShadow.includes('inset') && !(outlineWidth > 0)
+  })
+
+  if (metrics.length === 0) return
+  assert.deepEqual(
+    focusIssues,
+    [],
+    `${scenarioName} 输入控件焦点环应在控件内部完整绘制，避免被圆角或滚动容器裁切: ${JSON.stringify(
+      focusIssues
+    )}`
+  )
+  const containmentIssues = metrics.filter((item) => {
+    if (
+      item.containerLeft === null ||
+      item.containerRight === null ||
+      item.containerWidth === null
+    ) {
+      return false
+    }
+    return (
+      item.left < item.containerLeft - 1 ||
+      item.right > item.containerRight + 1 ||
+      item.width > item.containerWidth + 1
+    )
+  })
+  assert.deepEqual(
+    containmentIssues,
+    [],
+    `${scenarioName} 输入控件 focus 后必须完整落在 Form.Item 内容盒内，不能出现右边框被父容器裁切或撑出可见区域: ${JSON.stringify(
+      containmentIssues
+    )}`
+  )
+  metrics.forEach((item) => {
+    if (item.theme === 'dark') {
+      assert(
+        isBluePrimaryColor(item.borderColor),
+        `${scenarioName} 暗色输入控件 focus 边框未统一到暗色主题色: ${JSON.stringify(item)}`
+      )
+    } else {
+      assert(
+        isAcceptedFocusBorder(item),
+        `${scenarioName} 输入控件 focus 边框未统一到主题色: ${JSON.stringify(item)}`
+      )
+      assertNoBlueFocusStyle(item, scenarioName)
+    }
+  })
+}
+
+async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
+  const metrics = await page.evaluate(() => {
+    const ignoredAncestorSelector = [
+      '.ant-picker-dropdown',
+      '.ant-select-dropdown',
+      '.ant-dropdown',
+      '.ant-tooltip',
+      '.ant-popover',
+      '.ant-table-filter-dropdown',
+      '.erp-print-shell',
+      '.erp-print-paper',
+      '.erp-material-contract-paper',
+      '.erp-processing-contract-paper',
+      '[data-server-pdf-root]',
+    ].join(',')
+    const scopeSelector = [
+      '.erp-business-form',
+      '.erp-business-action-form',
+      '.erp-business-filter-panel',
+      '.erp-login-card',
+    ].join(',')
+    const controlSelector = [
+      '.ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)',
+      'input.ant-input:not([type="hidden"]):not(.erp-item-field-unit-suffix)',
+      '.ant-select-single .ant-select-selector',
+    ].join(',')
+
+    const numberFromPx = (value) => {
+      const parsed = Number.parseFloat(String(value || ''))
+      return Number.isFinite(parsed) ? parsed : null
+    }
+
+    const isVisible = (node) => {
+      const rect = node.getBoundingClientRect()
+      const style = window.getComputedStyle(node)
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== 'none' &&
+        style.visibility !== 'hidden'
+      )
+    }
+
+    const describeNode = (node) => {
+      const rect = node.getBoundingClientRect()
+      const style = window.getComputedStyle(node)
+      return {
+        tagName: node.tagName,
+        className: String(node.className || '')
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 6)
+          .join(' '),
+        top: Number(rect.top.toFixed(2)),
+        bottom: Number(rect.bottom.toFixed(2)),
+        height: Number(rect.height.toFixed(2)),
+        center: Number(((rect.top + rect.bottom) / 2).toFixed(2)),
+        display: style.display,
+        alignItems: style.alignItems,
+        heightCss: style.height,
+        lineHeight: style.lineHeight,
+        paddingTop: style.paddingTop,
+        paddingBottom: style.paddingBottom,
+        borderTopWidth: style.borderTopWidth,
+        borderBottomWidth: style.borderBottomWidth,
+      }
+    }
+
+    return Array.from(document.querySelectorAll(controlSelector))
+      .filter((node) => node instanceof HTMLElement)
+      .filter(isVisible)
+      .filter((node) => node.closest(scopeSelector))
+      .filter((node) => !node.closest(ignoredAncestorSelector))
+      .filter(
+        (node) =>
+          !(
+            node.matches('input.ant-input') &&
+            node.closest(
+              '.ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)'
+            )
+          ) &&
+          !(node.matches('input.ant-input') && node.closest('.erp-login-card'))
+      )
+      .map((owner) => {
+        const ownerStyle = window.getComputedStyle(owner)
+        const ownerHeight = numberFromPx(ownerStyle.height)
+        const ownerInnerHeight =
+          ownerHeight === null
+            ? null
+            : ownerHeight -
+              (numberFromPx(ownerStyle.borderTopWidth) || 0) -
+              (numberFromPx(ownerStyle.borderBottomWidth) || 0)
+        const affixInput = owner.matches('.ant-input-affix-wrapper')
+          ? owner.querySelector('input.ant-input')
+          : null
+        const directInput = owner.matches('input.ant-input') ? owner : null
+        const selectTextNodes = owner.matches('.ant-select-selector')
+          ? Array.from(
+              owner.querySelectorAll(
+                '.ant-select-selection-item, .ant-select-selection-placeholder, .ant-select-selection-search, .ant-select-selection-search-input'
+              )
+            ).filter((node) => node instanceof HTMLElement && isVisible(node))
+          : []
+        return {
+          owner: describeNode(owner),
+          ownerInnerHeight:
+            ownerInnerHeight === null
+              ? null
+              : Number(ownerInnerHeight.toFixed(2)),
+          affixInput: affixInput ? describeNode(affixInput) : null,
+          directInput: directInput ? describeNode(directInput) : null,
+          selectTextNodes: selectTextNodes.map(describeNode),
+          formClassName: String(owner.closest(scopeSelector)?.className || ''),
+          text: String(owner.closest('.ant-form-item')?.textContent || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 80),
+        }
+      })
+  })
+
+  const issues = metrics.filter((item) => {
+    const ownerDisplay = String(item.owner.display || '')
+    const isLoginScope = String(item.formClassName || '').includes(
+      'erp-login-card'
+    )
+    if (
+      (ownerDisplay === 'flex' || ownerDisplay === 'inline-flex') &&
+      item.owner.alignItems !== 'center'
+    ) {
+      return true
+    }
+
+    if (item.affixInput) {
+      const centerDelta = Math.abs(item.affixInput.center - item.owner.center)
+      const inputHeight = Number.parseFloat(item.affixInput.heightCss || '0')
+      const inputLineHeight = Number.parseFloat(
+        item.affixInput.lineHeight || '0'
+      )
+      if (centerDelta > 1.5) return true
+      if (inputHeight > 0 && inputLineHeight > inputHeight + 1) return true
+      if (
+        !isLoginScope &&
+        item.ownerInnerHeight !== null &&
+        inputLineHeight > 0 &&
+        Math.abs(inputLineHeight - item.ownerInnerHeight) > 1.5
+      ) {
+        return true
+      }
+    }
+
+    if (item.directInput && item.ownerInnerHeight !== null) {
+      const inputLineHeight = Number.parseFloat(
+        item.directInput.lineHeight || '0'
+      )
+      return (
+        inputLineHeight > 0 &&
+        Math.abs(inputLineHeight - item.ownerInnerHeight) > 1.5
+      )
+    }
+
+    if (item.selectTextNodes.length > 0 && item.ownerInnerHeight !== null) {
+      return item.selectTextNodes.some((node) => {
+        const centerDelta = Math.abs(node.center - item.owner.center)
+        const lineHeight = Number.parseFloat(node.lineHeight || '0')
+        if (centerDelta > 1.5) return true
+        return (
+          lineHeight > 0 && Math.abs(lineHeight - item.ownerInnerHeight) > 1.5
+        )
+      })
+    }
+
+    return false
+  })
+
+  assert.deepEqual(
+    issues,
+    [],
+    `${scenarioName} 单行输入控件文字、placeholder 和 caret 的垂直节奏应由控件内高接管，不能被 AntD 默认 line-height 或 affix wrapper stretch 污染: ${JSON.stringify(
+      issues
+    )}`
   )
 }
 
@@ -6462,7 +7016,8 @@ async function assertBusinessHeaderStatsSingleLine(
   page,
   {
     scenarioName,
-    expectedLabels = ['总记录', '当前结果', '待处理', '已选记录'],
+    expectedLabels = ['总记录', '当前结果', '待处理'],
+    allowWrappedStats = false,
   }
 ) {
   const metrics = await page.evaluate(() => {
@@ -6484,15 +7039,13 @@ async function assertBusinessHeaderStatsSingleLine(
       const label = tile.querySelector('.ant-typography')
       const labelRect = label?.getBoundingClientRect()
       const labelStyle = label ? window.getComputedStyle(label) : null
-      const badge = tile.querySelector('.erp-metric-readonly-card__badge')
-      const badgeRect = badge?.getBoundingClientRect()
       const tileStyle = window.getComputedStyle(tile)
       return {
         tagName: tile.tagName,
         role: tile.getAttribute('role'),
         cursor: tileStyle.cursor,
         text: tile.textContent?.replace(/\s+/g, ' ').trim() || '',
-        badge: badge?.textContent || '',
+        ariaLabel: tile.getAttribute('aria-label') || '',
         hasButton: Boolean(tile.querySelector('button')),
         top: rect.top,
         bottom: rect.bottom,
@@ -6505,14 +7058,15 @@ async function assertBusinessHeaderStatsSingleLine(
         labelWhiteSpace: labelStyle?.whiteSpace || '',
         labelTextOverflow: labelStyle?.textOverflow || '',
         labelOverflow: labelStyle?.overflow || '',
-        badgeLabelGap:
-          labelRect && badgeRect ? badgeRect.left - labelRect.right : null,
       }
     })
     return {
       viewportWidth: window.innerWidth,
       bodyScrollWidth: document.body.scrollWidth,
       docScrollWidth: document.documentElement.scrollWidth,
+      headerSummaryCount: document.querySelectorAll(
+        '.erp-business-page-header-card__summary, .erp-business-module-hero__footer'
+      ).length,
       header: headerRect
         ? {
             left: headerRect.left,
@@ -6528,6 +7082,8 @@ async function assertBusinessHeaderStatsSingleLine(
         : null,
       main: mainRect
         ? {
+            top: mainRect.top,
+            bottom: mainRect.bottom,
             left: mainRect.left,
             right: mainRect.right,
             width: mainRect.width,
@@ -6535,12 +7091,17 @@ async function assertBusinessHeaderStatsSingleLine(
         : null,
       stats: statsRect
         ? {
+            top: statsRect.top,
+            bottom: statsRect.bottom,
             left: statsRect.left,
             right: statsRect.right,
             width: statsRect.width,
             scrollWidth: stats?.scrollWidth || 0,
             clientWidth: stats?.clientWidth || 0,
+            display: statsStyle?.display || '',
             flexWrap: statsStyle?.flexWrap || '',
+            gridAutoFlow: statsStyle?.gridAutoFlow || '',
+            gridTemplateColumns: statsStyle?.gridTemplateColumns || '',
             justifySelf: statsStyle?.justifySelf || '',
             justifyContent: statsStyle?.justifyContent || '',
           }
@@ -6558,14 +7119,17 @@ async function assertBusinessHeaderStatsSingleLine(
     `${scenarioName} 缺少业务页头部卡片: ${JSON.stringify(metrics)}`
   )
   assert.equal(
+    metrics.headerSummaryCount,
+    0,
+    `${scenarioName} 业务页头不应再渲染底部 summary 区域: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
     metrics.tiles.length,
     expectedLabels.length,
     `${scenarioName} formal 业务页统计项数量不符合当前口径: ${JSON.stringify(metrics)}`
   )
   assert.deepEqual(
-    metrics.tiles.map((tile) =>
-      tile.text.replace(/摘要/gu, '').replace(/\d+$/u, '')
-    ),
+    metrics.tiles.map((tile) => tile.text.replace(/\d+$/u, '')),
     expectedLabels,
     `${scenarioName} 业务页头部统计项不符合当前口径: ${JSON.stringify(metrics)}`
   )
@@ -6575,56 +7139,69 @@ async function assertBusinessHeaderStatsSingleLine(
         tile.tagName === 'DIV' &&
         tile.role === null &&
         tile.cursor === 'default' &&
-        tile.badge === '摘要' &&
+        /只读摘要/u.test(tile.ariaLabel) &&
         tile.hasButton === false
     ),
     `${scenarioName} 业务页头部统计应保持只读摘要，不应伪装成按钮: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.tiles.every(
-      (tile) =>
-        Number.isFinite(tile.badgeLabelGap) &&
-        tile.badgeLabelGap >= 2 &&
-        tile.badgeLabelGap <= 12
-    ),
-    `${scenarioName} 业务页头部摘要徽标应紧跟指标标签，不应被推到卡片最右: ${JSON.stringify(metrics)}`
+    metrics.grid?.gridTemplateColumns &&
+      ['center', 'start'].includes(metrics.grid?.alignItems),
+    `${scenarioName} 业务页头部应使用共享 grid 布局: ${JSON.stringify(metrics)}`
   )
-  assert(
-    metrics.grid?.gridTemplateColumns?.split(' ').filter((item) => item.trim())
-      .length >= 2 && metrics.grid?.alignItems === 'center',
-    `${scenarioName} 桌面业务页头部应使用左标题右摘要的两列布局: ${JSON.stringify(metrics)}`
-  )
-  assert(
+  const statsBesideMain =
     metrics.main &&
-      metrics.stats.left >= metrics.main.right + 8 &&
-      metrics.header.right - metrics.stats.right <= 24,
-    `${scenarioName} 桌面业务页头部摘要组应位于标题右侧并贴近右边界: ${JSON.stringify(metrics)}`
-  )
+    metrics.stats &&
+    metrics.stats.left >= metrics.main.right + 8 &&
+    metrics.stats.top < metrics.main.bottom &&
+    metrics.stats.bottom > metrics.main.top
+  const statsBelowMain =
+    metrics.main &&
+    metrics.stats &&
+    metrics.stats.top >= metrics.main.bottom + 6 &&
+    metrics.stats.left >= metrics.header.left - 1 &&
+    metrics.stats.right <= metrics.header.right + 1
   assert(
-    metrics.stats.justifySelf === 'end' &&
-      metrics.stats.justifyContent === 'end',
-    `${scenarioName} 桌面业务页头部摘要组应由共享布局右对齐: ${JSON.stringify(metrics)}`
+    statsBesideMain || statsBelowMain,
+    `${scenarioName} 业务页头部摘要组不应覆盖标题说明区: ${JSON.stringify(metrics)}`
   )
   assert.equal(
-    metrics.stats.flexWrap,
-    'nowrap',
-    `${scenarioName} 桌面业务页头部统计不应换行: ${JSON.stringify(metrics)}`
+    metrics.stats.display,
+    'grid',
+    `${scenarioName} 业务页头部统计区应使用 grid 稳定列宽: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    statsBelowMain ||
+      (metrics.header.right - metrics.stats.right <= 24 &&
+        metrics.stats.justifySelf === 'end' &&
+        metrics.stats.justifyContent === 'end'),
+    `${scenarioName} 桌面业务页头部摘要组应在空间足够时右对齐: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.stats.scrollWidth <= metrics.stats.clientWidth + 1,
     `${scenarioName} 业务页头部统计区内部不应横向溢出: ${JSON.stringify(metrics)}`
   )
-  assert(
-    metrics.tiles.every(
-      (tile) => Math.abs(tile.top - metrics.tiles[0].top) <= 1
-    ),
-    `${scenarioName} 业务页头部统计卡不应掉到第二行: ${JSON.stringify(metrics)}`
-  )
+  const compactViewport = metrics.viewportWidth <= 768
+  if (!compactViewport) {
+    assert.equal(
+      metrics.stats.gridAutoFlow,
+      'column',
+      `${scenarioName} 桌面业务页头部摘要应横向排列，不能竖排占用高度: ${JSON.stringify(metrics)}`
+    )
+  }
+  if (!allowWrappedStats && !compactViewport) {
+    assert(
+      metrics.tiles.every(
+        (tile) => Math.abs(tile.top - metrics.tiles[0].top) <= 1
+      ),
+      `${scenarioName} 业务页头部统计卡不应掉到第二行: ${JSON.stringify(metrics)}`
+    )
+  }
   assert(
     metrics.tiles.every(
       (tile) =>
-        tile.width >= 116 &&
-        tile.width <= 150 &&
+        tile.width >= 104 &&
+        tile.width <= (metrics.viewportWidth <= 480 ? 180 : 130) &&
         tile.height >= 48 &&
         tile.height <= 72
     ),

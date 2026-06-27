@@ -84,7 +84,8 @@ export default function PurchaseOrderOperationPanel({
         <>
           <SearchInput
             value={keyword}
-            placeholder="搜索采购单号 / 供应商单号"
+            placeholder="搜索采购单"
+            searchHint="可搜索：采购单号、供应商单号"
             onChange={(event) => {
               resetPagination()
               setKeyword(event.target.value)
@@ -145,7 +146,7 @@ export default function PurchaseOrderOperationPanel({
             disabled={orders.length === 0}
             onClick={exportOrders}
           >
-            导出当前结果
+            导出筛选结果
           </ToolbarButton>
           <ToolbarButton
             icon={<SettingOutlined />}
@@ -206,7 +207,7 @@ export default function PurchaseOrderOperationPanel({
             icon={<LinkOutlined />}
             disabled={selectedRowKeys.length !== 1 || !singleSelectedOrder}
           >
-            关联 <DownOutlined />
+            相关单据 <DownOutlined />
           </Button>
         </Dropdown>
         {primaryLifecycleAction ? (

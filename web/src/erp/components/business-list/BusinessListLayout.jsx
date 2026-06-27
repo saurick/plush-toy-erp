@@ -195,7 +195,6 @@ export function PageHeaderCard({
   description,
   tags = null,
   stats = [],
-  summary = null,
   compact = false,
 }) {
   return (
@@ -227,7 +226,6 @@ export function PageHeaderCard({
               >
                 <div className="erp-business-page-header-card__stat-head">
                   <Text type="secondary">{item.label}</Text>
-                  <span className="erp-metric-readonly-card__badge">摘要</span>
                 </div>
                 <strong>{item.value}</strong>
               </div>
@@ -235,11 +233,6 @@ export function PageHeaderCard({
           </div>
         ) : null}
       </div>
-      {summary ? (
-        <div className="erp-business-page-header-card__summary erp-business-module-hero__footer">
-          {summary}
-        </div>
-      ) : null}
     </Card>
   )
 }
@@ -287,16 +280,28 @@ export function SearchInput({
   onChange,
   onPressEnter,
   placeholder = '搜索关键词',
+  searchHint,
+  className = '',
+  ...restProps
 }) {
+  const accessibleLabel = restProps['aria-label'] || searchHint || placeholder
+  const title = restProps.title || searchHint || undefined
+
   return (
     <Input
       allowClear
-      className="erp-business-filter-control erp-business-filter-control--search"
+      className={joinClassNames(
+        'erp-business-filter-control erp-business-filter-control--search',
+        className
+      )}
       prefix={<SearchOutlined />}
       placeholder={placeholder}
+      aria-label={accessibleLabel}
+      title={title}
       value={value}
       onChange={onChange}
       onPressEnter={onPressEnter}
+      {...restProps}
     />
   )
 }
@@ -537,7 +542,6 @@ export function SelectionActionBar({
   selectedItems = [],
   summaryItems = [],
   collaborationItems = [],
-  boundaryText = '',
   children,
   embedded = false,
 }) {
@@ -585,11 +589,6 @@ export function SelectionActionBar({
             ))}
           </div>
         ) : null}
-        {boundaryText ? (
-          <Text className="erp-business-selection-action-bar__hint">
-            {boundaryText}
-          </Text>
-        ) : null}
       </div>
       <Space
         wrap
@@ -620,7 +619,9 @@ export function SelectedItemsSummaryTag({
       title: String(item?.title ?? item?.description ?? '').trim(),
     }))
     .filter((item) => item.label)
-  const label = selectedLabel || `已选择 ${selectedCount} 条记录`
+  const label = hasSelection
+    ? selectedLabel || `已选择 ${selectedCount} 条记录`
+    : '请选择一条记录'
   const tag = (
     <Tag
       tabIndex={hasSelection && items.length > 0 ? 0 : undefined}

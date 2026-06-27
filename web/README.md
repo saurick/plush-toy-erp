@@ -83,6 +83,24 @@ http://localhost:5175/m/quality/tasks
 - 新增状态类组件时必须同步覆盖暗色主题，包括 loading / empty / alert / message / notification / tooltip / popover / tag / badge / progress / pagination / drawer / table placeholder；优先复用全局 token 和 L1 断言，避免组件只在浅色模式可读。
 - 打印、PDF、采购合同 / 加工合同纸面预览默认固定浅色，不跟随暗色主题，避免污染导出物。
 
+### 共享控件样式边界 / Shared control style boundary
+
+`src/erp/styles/app.css` 的最后三层是输入框、选择器、日期框、数字框和 Ant Design portal 浮层控件的共享治理层。它们只处理控件基线，不承接单页布局、字段语义、业务状态或客户差异。
+
+| 文件                              | 职责                                                                                                                                       | 不应放入                                                        |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `app/control-foundation.css`      | ERP runtime 可见控件 token、圆角、wrapper 裁剪、portal 控件基线和嵌套原生输入透明化。                                                      | 单页间距、业务字段宽度、表格布局、具体弹窗内容排列。            |
+| `app/business-control-rhythm.css` | 业务表单、业务 action modal、业务筛选和业务记录弹窗的控件高度、真实 input / placeholder / search input 的 line-height、textarea 最小高度。 | focus 颜色、hover 状态、页面级 grid / flex 布局、业务保存逻辑。 |
+| `app/control-focus.css`           | ERP 控件 focus / focus-within ring、modal 内层原生 input 的默认浏览器 / Tailwind ring 清理、checkbox focus ring。                          | 控件高度、圆角、字段语义、可见文案、权限或菜单规则。            |
+
+维护规则：
+
+- 改 caret、placeholder 垂直居中、input 高度时，优先改 `business-control-rhythm.css`，并确认真实 `input.ant-input`、Select placeholder/search input 和 wrapper 作为一个控件合同一起生效。
+- 改圆角、裁剪或 AntD portal 基线时，优先改 `control-foundation.css`。
+- 改 focus ring 颜色、位置或内外扩策略时，优先改 `control-focus.css`，默认使用 inset ring，避免被圆角容器或滚动区域裁掉。
+- 不在业务页面 CSS 里重复写单字段 caret、line-height 或 focus ring 补丁；确有新控件类型时先补 `style:l1` 浏览器断言，再扩展共享层。
+- 新增规则不能使用 `!important`，除非正在对抗不可控的第三方内联样式，并且必须在交付说明中写明原因。
+
 ### 岗位任务端本地调试
 
 生产环境不再为岗位任务端启动独立前端容器或独立端口，统一使用 `5175` 上的 `/m/<role>/tasks`。下面的多端口命令只用于本地开发和回归调试：

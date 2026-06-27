@@ -122,8 +122,14 @@ const SUBJECT_TYPE_LABELS = Object.freeze({
 
 const SEARCH_PLACEHOLDERS = Object.freeze({
   [VIEW_BALANCES]: '搜索对象类型',
-  [VIEW_LOTS]: '搜索批次号 / 供应商批次 / 色号',
-  [VIEW_TXNS]: '搜索流水类型 / 来源 / 备注',
+  [VIEW_LOTS]: '搜索批次',
+  [VIEW_TXNS]: '搜索流水',
+})
+
+const SEARCH_HINTS = Object.freeze({
+  [VIEW_BALANCES]: '可搜索：对象类型',
+  [VIEW_LOTS]: '可搜索：批次号、供应商批次、色号',
+  [VIEW_TXNS]: '可搜索：流水类型、来源、备注',
 })
 
 const LOT_STATUS_LABELS = Object.freeze({
@@ -956,6 +962,11 @@ export default function V1InventoryLedgerPage() {
                   ? SEARCH_PLACEHOLDERS[VIEW_BALANCES]
                   : SEARCH_PLACEHOLDERS[activeView]
               }
+              searchHint={
+                activeView === VIEW_BALANCES
+                  ? SEARCH_HINTS[VIEW_BALANCES]
+                  : SEARCH_HINTS[activeView]
+              }
               onChange={(event) => {
                 setKeyword(event.target.value)
                 resetCurrentPage()
@@ -1120,7 +1131,7 @@ export default function V1InventoryLedgerPage() {
               icon={<LinkOutlined />}
               disabled={!selectedRow || relatedMenuItems.length === 0}
             >
-              查看关联 <DownOutlined />
+              相关单据 <DownOutlined />
             </Button>
           </Dropdown>
         </SelectionActionBar>

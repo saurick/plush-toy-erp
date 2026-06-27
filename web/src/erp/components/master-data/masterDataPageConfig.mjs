@@ -193,21 +193,46 @@ export function getRecordName(record, type = '') {
 
 export function getRecordSearchPlaceholder(type = '') {
   if (type === 'materials') {
-    return '搜索编号、名称、分类、规格、颜色'
+    return '搜索材料'
   }
   if (type === 'processes') {
-    return '搜索环节编号、名称、类别、备注'
+    return '搜索环节'
   }
   if (type === 'products') {
-    return '搜索产品编号、名称、内部款号、客户款号'
+    return '搜索产品'
   }
   if (type === 'product_skus') {
-    return '搜索 SKU、条码、客户 SKU、颜色、色号、尺码、包装版本'
+    return '搜索 SKU'
   }
   if (type === 'customers') {
-    return '搜索编号、名称、简称、付款方式'
+    return '搜索客户'
   }
-  return '搜索编号、名称、简称'
+  if (type === 'suppliers') {
+    return '搜索供应商'
+  }
+  return '搜索记录'
+}
+
+export function getRecordSearchHint(type = '') {
+  if (type === 'materials') {
+    return '可搜索：编号、名称、分类、规格、颜色'
+  }
+  if (type === 'processes') {
+    return '可搜索：环节编号、名称、类别、备注'
+  }
+  if (type === 'products') {
+    return '可搜索：产品编号、名称、内部款号、客户款号'
+  }
+  if (type === 'product_skus') {
+    return '可搜索：SKU、条码、客户 SKU、颜色、色号、尺码、包装版本'
+  }
+  if (type === 'customers') {
+    return '可搜索：编号、名称、简称、付款方式'
+  }
+  if (type === 'suppliers') {
+    return '可搜索：编号、名称、简称'
+  }
+  return getRecordSearchPlaceholder(type)
 }
 
 export function needsUnitDictionary(type = '') {

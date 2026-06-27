@@ -94,6 +94,7 @@ import {
   MASTER_DATA_PAGE_CONFIG,
   getRecordCode,
   getRecordName,
+  getRecordSearchHint,
   getRecordSearchPlaceholder,
   needsUnitDictionary,
 } from '../components/master-data/masterDataPageConfig.mjs'
@@ -710,7 +711,7 @@ export default function V1MasterDataPage({ type }) {
       columns: orderedRecordColumns,
       rows: records,
     })
-    message.success('已导出当前结果')
+    message.success('已导出筛选结果')
   }
   return (
     <BusinessPageLayout className="erp-v1-master-data-page">
@@ -729,11 +730,6 @@ export default function V1MasterDataPage({ type }) {
                   label: `启用${entityLabel}`,
                   value: activeRecordCount,
                 },
-                {
-                  key: 'selected',
-                  label: `已选${entityLabel}`,
-                  value: selectedRecord ? 1 : 0,
-                },
               ]
         }
       />
@@ -746,6 +742,7 @@ export default function V1MasterDataPage({ type }) {
           <>
             <SearchInput
               placeholder={getRecordSearchPlaceholder(effectiveType)}
+              searchHint={getRecordSearchHint(effectiveType)}
               value={keyword}
               onChange={(event) => {
                 setKeyword(event.target.value)
@@ -774,7 +771,7 @@ export default function V1MasterDataPage({ type }) {
               disabled={records.length === 0}
               onClick={exportRecords}
             >
-              导出当前结果
+              导出筛选结果
             </ToolbarButton>
             <ToolbarButton
               icon={<SettingOutlined />}

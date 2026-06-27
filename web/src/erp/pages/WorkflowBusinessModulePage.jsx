@@ -532,13 +532,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           </Space>
         }
         stats={stats}
-        summary={
-          <Space size={6} wrap>
-            <Tag color="default">主路径 workflow_tasks</Tag>
-            <Tag color="green">只处理协同任务</Tag>
-            <span>{moduleItem.boundary}</span>
-          </Space>
-        }
         compact
       />
 
@@ -550,7 +543,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           <>
             <SearchInput
               aria-label="搜索协同任务"
-              placeholder="搜索任务、来源号、原因"
+              placeholder="搜索任务"
+              searchHint="可搜索：任务、来源号、原因"
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
             />

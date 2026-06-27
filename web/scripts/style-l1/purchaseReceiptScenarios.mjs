@@ -30,7 +30,7 @@ export function createPurchaseReceiptScenarios(deps) {
     })
 
   const assertPurchaseReceiptToolbarShell = async (page, scenarioName) => {
-    for (const label of ['导出当前结果', '列顺序']) {
+    for (const label of ['导出筛选结果', '列顺序']) {
       await expectButton(page, label)
     }
     assert.equal(
@@ -49,7 +49,7 @@ export function createPurchaseReceiptScenarios(deps) {
       `${scenarioName} 入库草稿应从采购订单生成，入库列表不应展示页面级新建按钮`
     )
     const exportButton = page
-      .getByRole('button', { name: '导出当前结果' })
+      .getByRole('button', { name: '导出筛选结果' })
       .first()
     const columnOrderButton = page
       .getByRole('button', { name: '列顺序' })

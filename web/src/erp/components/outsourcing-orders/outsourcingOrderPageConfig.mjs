@@ -99,11 +99,7 @@ export function getOutsourcingOrderDisplayNo(record = {}) {
   return record?.outsourcing_order_no || OUTSOURCING_ORDER_UNNUMBERED_LABEL
 }
 
-export function buildOutsourcingOrderStats({
-  rows = [],
-  selectedRow,
-  total = 0,
-}) {
+export function buildOutsourcingOrderStats({ rows = [], total = 0 }) {
   const activeRows = rows.length
   const draftCount = rows.filter(
     (item) => item.lifecycle_status === 'draft'
@@ -111,16 +107,11 @@ export function buildOutsourcingOrderStats({
   const confirmedCount = rows.filter(
     (item) => item.lifecycle_status === 'confirmed'
   ).length
-  const closedCount = rows.filter((item) =>
-    ['closed', 'canceled'].includes(item.lifecycle_status)
-  ).length
 
   return [
     { key: 'total', label: '总记录', value: total },
     { key: 'current', label: '当前结果', value: activeRows },
     { key: 'draft', label: '草稿', value: draftCount },
     { key: 'confirmed', label: '已确认', value: confirmedCount },
-    { key: 'closed', label: '已关闭/取消', value: closedCount },
-    { key: 'selected', label: '已选合同', value: selectedRow ? 1 : 0 },
   ]
 }

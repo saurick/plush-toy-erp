@@ -72,6 +72,7 @@ export default function SourceImportPickerModal({
   title,
   description,
   searchPlaceholder = '搜索要导入的记录',
+  searchHint,
   rows = [],
   columns = [],
   rowKey = 'id',
@@ -163,6 +164,7 @@ export default function SourceImportPickerModal({
     setKeyword(event.target.value)
     setCurrentPage(1)
   }
+  const searchAccessibleLabel = searchHint || searchPlaceholder
 
   const updateSelectedRowKeys = (nextKeys = []) => {
     const normalizedKeys = Array.isArray(nextKeys) ? nextKeys : []
@@ -255,6 +257,8 @@ export default function SourceImportPickerModal({
           value={keyword}
           onChange={handleKeywordChange}
           placeholder={searchPlaceholder}
+          aria-label={searchAccessibleLabel}
+          title={searchAccessibleLabel}
         />
         <div className="erp-source-import-picker__selection">
           <div className="erp-source-import-picker__selection-items">
@@ -317,14 +321,16 @@ export default function SourceImportPickerModal({
               <Text type="secondary">未选择来源</Text>
             )}
           </div>
-          <Button
-            disabled={selectedSummaryItems.length === 0}
-            type="link"
-            size="small"
-            onClick={clearSelection}
-          >
-            清空已选
-          </Button>
+          {selectedSummaryItems.length > 0 ? (
+            <Button
+              className="erp-source-import-picker__clear-selection"
+              type="link"
+              size="small"
+              onClick={clearSelection}
+            >
+              清空已选
+            </Button>
+          ) : null}
         </div>
         <Table
           rowKey={rowKey}

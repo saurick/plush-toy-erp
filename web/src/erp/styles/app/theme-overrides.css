@@ -536,6 +536,14 @@
   color: #dcfce7;
 }
 
+[data-erp-theme='dark'] .erp-login-card .ant-input:focus,
+[data-erp-theme='dark'] .erp-login-card .ant-input-focused,
+[data-erp-theme='dark'] .erp-login-card .ant-input-affix-wrapper:focus,
+[data-erp-theme='dark'] .erp-login-card .ant-input-affix-wrapper-focused {
+  border-color: var(--erp-interactive-border-focus);
+  box-shadow: inset 0 0 0 2px var(--erp-focus-ring);
+}
+
 [data-erp-theme='dark'] .ant-card,
 [data-erp-theme='dark'] .ant-table-wrapper .ant-table,
 [data-erp-theme='dark'] .ant-table-wrapper .ant-table-thead > tr > th,
@@ -1032,7 +1040,7 @@
     .ant-input-affix-wrapper-focused
   ) {
   border-color: var(--erp-interactive-border-focus);
-  box-shadow: var(--erp-focus-ring);
+  box-shadow: inset 0 0 0 2px var(--erp-focus-ring);
 }
 
 [data-erp-theme='dark']
@@ -1077,10 +1085,6 @@
   box-shadow:
     inset 3px 0 0 var(--erp-interactive-border-hover),
     0 0 0 3px rgb(132 204 22 / 10%);
-}
-
-[data-erp-theme='dark'] .erp-business-page-header-card__summary {
-  border-top-color: var(--erp-border-strong);
 }
 
 [data-erp-theme='dark'] .erp-business-collaboration-task-panel__panel {
@@ -1197,7 +1201,7 @@
 [data-erp-theme='dark'] .ant-modal .ant-select-focused .ant-select-selector,
 [data-erp-theme='dark'] .ant-modal .ant-select-open .ant-select-selector {
   border-color: var(--erp-interactive-border-focus);
-  box-shadow: 0 0 0 2px var(--erp-focus-ring);
+  box-shadow: inset 0 0 0 2px var(--erp-focus-ring);
 }
 
 [data-erp-theme='dark']
@@ -1205,7 +1209,7 @@
   .ant-checkbox-wrapper:focus-within
   .ant-checkbox-inner {
   border-color: var(--erp-interactive-border-focus);
-  box-shadow: 0 0 0 2px var(--erp-focus-ring);
+  box-shadow: inset 0 0 0 2px var(--erp-focus-ring);
 }
 
 [data-erp-theme='dark'] .erp-item-field-unit-suffix.ant-input,

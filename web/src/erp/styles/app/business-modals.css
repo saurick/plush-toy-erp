@@ -328,8 +328,21 @@
 }
 
 .erp-business-action-form .ant-form-item {
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   margin-bottom: 0;
+}
+
+.erp-business-action-form
+  :where(
+    .ant-form-item-control,
+    .ant-form-item-control-input,
+    .ant-form-item-control-input-content
+  ) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .erp-business-source-summary {
@@ -533,6 +546,49 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.erp-source-import-picker__clear-selection.ant-btn,
+.erp-source-import-picker__clear-selection.ant-btn.ant-btn-color-link.ant-btn-variant-link,
+.erp-source-import-picker__clear-selection.ant-btn.ant-btn-link {
+  flex: 0 0 auto;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.erp-source-import-picker
+  .erp-source-import-picker__clear-selection.ant-btn:not(:disabled):not(
+    .ant-btn-disabled
+  ):hover,
+.erp-source-import-picker
+  .erp-source-import-picker__clear-selection.ant-btn:not(:disabled):not(
+    .ant-btn-disabled
+  ):focus-visible,
+.erp-source-import-picker
+  .erp-source-import-picker__clear-selection.ant-btn.ant-btn-color-link.ant-btn-variant-link:not(
+    :disabled
+  ):not(.ant-btn-disabled):hover,
+.erp-source-import-picker
+  .erp-source-import-picker__clear-selection.ant-btn.ant-btn-color-link.ant-btn-variant-link:not(
+    :disabled
+  ):not(.ant-btn-disabled):focus-visible,
+.erp-source-import-picker
+  .erp-source-import-picker__clear-selection.ant-btn.ant-btn-link:not(
+    :disabled
+  ):not(.ant-btn-disabled):hover,
+.erp-source-import-picker
+  .erp-source-import-picker__clear-selection.ant-btn.ant-btn-link:not(
+    :disabled
+  ):not(.ant-btn-disabled):focus-visible {
+  border-color: currentColor;
+  box-shadow: inset 0 0 0 1px currentColor;
+  background: rgb(37 99 235 / 0.06);
+}
+
+.erp-source-import-picker__clear-selection.erp-source-import-picker__clear-selection:hover,
+.erp-source-import-picker__clear-selection.erp-source-import-picker__clear-selection:focus-visible {
+  box-shadow: inset 0 0 0 1px currentColor;
 }
 
 .erp-source-import-picker__selection-tag.ant-tag {
@@ -745,7 +801,7 @@
 }
 
 .erp-sales-order-lines-form__grid .erp-line-item-field--quantity.ant-form-item {
-  width: 236px;
+  width: 264px;
 }
 
 .erp-sales-order-lines-form__grid .erp-line-item-field--money.ant-form-item {
@@ -865,10 +921,14 @@
   margin-top: 16px;
 }
 
-.erp-business-action-form :where(.ant-input, .ant-input-number, .ant-picker),
+.erp-business-action-form
+  :where(.ant-input, .ant-input-number, .ant-picker, .ant-select),
 .erp-business-action-form
   :where(.ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)),
 :where(.erp-business-action-form) .ant-select-selector {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   height: var(--erp-control-height, 36px);
   min-height: var(--erp-control-height, 36px);
   border-color: var(--erp-business-action-field-border, #becdc4);
@@ -896,7 +956,39 @@
     .ant-input-affix-wrapper-focused:not(.ant-input-textarea-affix-wrapper)
   ) {
   border-color: #2f8f4e;
-  box-shadow: 0 0 0 3px rgb(47 143 78 / 12%);
+  box-shadow: inset 0 0 0 2px rgb(47 143 78 / 16%);
+  outline: 0;
+}
+
+body
+  .ant-modal.ant-modal
+  .erp-business-action-form.erp-business-action-form
+  .ant-select.ant-select-focused:not(.ant-select-disabled)
+  .ant-select-selector,
+body
+  .ant-modal.ant-modal
+  .erp-business-action-form.erp-business-action-form
+  .ant-select.ant-select-open:not(.ant-select-disabled)
+  .ant-select-selector,
+body
+  .ant-modal.ant-modal
+  .erp-business-action-form.erp-business-action-form
+  .ant-select:not(.ant-select-disabled):focus-within
+  .ant-select-selector,
+#root
+  .erp-business-action-form.erp-business-action-form
+  .ant-select.ant-select-focused:not(.ant-select-disabled)
+  .ant-select-selector,
+#root
+  .erp-business-action-form.erp-business-action-form
+  .ant-select.ant-select-open:not(.ant-select-disabled)
+  .ant-select-selector,
+#root
+  .erp-business-action-form.erp-business-action-form
+  .ant-select:not(.ant-select-disabled):focus-within
+  .ant-select-selector {
+  border-color: #2f8f4e;
+  box-shadow: inset 0 0 0 2px rgb(47 143 78 / 16%);
   outline: 0;
 }
 

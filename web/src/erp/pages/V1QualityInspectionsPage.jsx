@@ -790,7 +790,8 @@ export default function V1QualityInspectionsPage() {
           <>
             <SearchInput
               value={keyword}
-              placeholder="搜索质检单号 / 入库单 / 批次"
+              placeholder="搜索质检单"
+              searchHint="可搜索：质检单号、入库单、批次"
               onChange={(event) => {
                 setKeyword(event.target.value)
                 resetBusinessPaginationCurrent(setPagination)
@@ -906,7 +907,7 @@ export default function V1QualityInspectionsPage() {
               disabled={rows.length === 0}
               onClick={exportQualityInspections}
             >
-              导出当前结果
+              导出筛选结果
             </ToolbarButton>
             <ToolbarButton
               icon={<SettingOutlined />}
@@ -956,7 +957,7 @@ export default function V1QualityInspectionsPage() {
               icon={<LinkOutlined />}
               disabled={!selectedRow}
             >
-              关联 <DownOutlined />
+              相关单据 <DownOutlined />
             </Button>
           </Dropdown>
           <Popconfirm

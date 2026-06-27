@@ -733,7 +733,6 @@ export default function FormalBusinessModulePage({ moduleKey }) {
               (record) => record.business_status === 'pending_api'
             ).length,
           },
-          { key: 'selected', label: '已选记录', value: selectedRowKeys.length },
         ]}
       />
 
@@ -744,7 +743,8 @@ export default function FormalBusinessModulePage({ moduleKey }) {
           <>
             <SearchInput
               value={keyword}
-              placeholder={`搜索${moduleItem.shortLabel || moduleItem.title}、编号、责任人`}
+              placeholder="搜索记录"
+              searchHint={`可搜索：${moduleItem.shortLabel || moduleItem.title}、编号、责任人`}
               onChange={(event) => setKeyword(event.target.value)}
             />
             <SelectFilter

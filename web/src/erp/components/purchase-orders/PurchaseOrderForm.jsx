@@ -316,7 +316,8 @@ export function PurchaseOrderFormFields({
                   material?.id ||
                   '-'
                 }
-                searchPlaceholder="搜索材料编码、名称、分类、规格或颜色"
+                searchPlaceholder="搜索材料"
+                searchHint="可搜索：材料编码、名称、分类、规格、颜色"
                 emptyDescription="暂无可导入材料"
                 onCancel={() => setMaterialImportOpen(false)}
                 onImport={(selectedMaterials) => {

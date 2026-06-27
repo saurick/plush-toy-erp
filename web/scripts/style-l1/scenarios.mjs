@@ -3617,7 +3617,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '出货放行')
         await expectText(page, '财务业务')
         await expectText(page, '应收管理')
-        await expectText(page, '导出当前结果')
+        await expectText(page, '导出筛选结果')
         await expectText(page, '列顺序')
         await expectText(page, '运营工具')
         await expectText(page, '模板打印中心')
@@ -3713,7 +3713,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'material-master-header-desktop',
-          expectedLabels: ['总材料', '当前结果', '启用材料', '已选材料'],
+          expectedLabels: ['总材料', '当前结果', '启用材料'],
         })
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'material-master-header-desktop',
@@ -3801,7 +3801,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'purchase-order-date-filter-desktop',
-          expectedLabels: ['总订单', '当前结果', '已审核', '已选订单'],
+          expectedLabels: ['总订单', '当前结果', '已审核'],
         })
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'purchase-order-date-filter-desktop',
@@ -4045,7 +4045,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'shipment-date-filter-desktop',
-          expectedLabels: ['总出货单', '当前结果', '草稿', '已选出货单'],
+          expectedLabels: ['总出货单', '当前结果', '草稿'],
         })
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'shipment-date-filter-desktop',
