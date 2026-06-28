@@ -7,6 +7,7 @@
 | 任务 | 先读 | 再核对 |
 | --- | --- | --- |
 | 判断 Workflow / Fact 边界 | `状态工作流事实边界.md` | `工作流用例统一编排评审.md`、对应 usecase / tests |
+| 判断各类“流”如何按 plush 实际建模 | `各类流程建模边界评审.md` | `状态工作流事实边界.md`、`工作流主任务树第一版.md`、`业务主链路数据流向与字段来源规则.md` |
 | 判断 MasterData / Source Document / Fact 分层 | `主数据源单据事实边界评审.md` | `docs/product/领域模型第一版.md`、当前 schema / repo |
 | 做库存、BOM、采购、质检相关实现 | `材料成品物料清单与库存专表模型评审.md`、`产品款号物料清单边界评审.md`、`订单采购边界评审.md` | Ent schema、Atlas migration、data / biz tests |
 | 做出货或放行相关实现 | `出货放行工作流用例评审.md`、`出货事实与库存边界评审.md`、`出货事实最小模型评审.md` | Shipment / Inventory usecase、RBAC、UI 回归 |
@@ -17,7 +18,7 @@
 
 | 分组 | 文档 |
 | --- | --- |
-| 总边界 | `状态工作流事实边界.md`、`主数据源单据事实边界评审.md`、`行业专表模型评审.md` |
+| 总边界 | `状态工作流事实边界.md`、`各类流程建模边界评审.md`、`主数据源单据事实边界评审.md`、`行业专表模型评审.md` |
 | Workflow usecase | `工作流用例统一编排评审.md`、`仓库入库工作流用例评审.md`、`成品入库工作流用例评审.md`、`出货放行工作流用例评审.md` |
 | MasterData / Source Document | `客户供应商主数据评审.md`、`订单采购边界评审.md` |
 | Inventory / BOM / Quality | `材料成品物料清单与库存专表模型评审.md`、`产品款号物料清单边界评审.md` |

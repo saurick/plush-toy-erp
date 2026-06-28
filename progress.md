@@ -173,3 +173,11 @@
 - 验证：`/usr/local/bin/pnpm exec eslint --ext .jsx src/erp/router.jsx`、`/usr/local/bin/pnpm css`、`/usr/local/bin/pnpm test`、限定 `git diff --check -- web/src/erp/router.jsx progress.md` 均通过；`pnpm test` 覆盖 413 个前端单测。
 - 下一步：若后续继续收敛其它加载态文案，优先保留能区分业务动作的必要提示；路由资源加载这种纯等待态保持短文案即可。
 - 阻塞/风险：本轮只改前端路由加载态 copy，不改 schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、部署脚本或原型状态；当前工作区已有多组非本轮/并行改动，本轮未回退、未提交。
+
+## 2026-06-28 各类流程建模边界收口
+
+- 完成：新增 `docs/architecture/各类流程建模边界评审.md`，把 `docs/reference/第四次20260627/erp各类“流”的边界与实现参考.md` 收敛为 plush 当前 Product Core、Workflow / Fact、页面表达和客户配置边界，不照搬流程模板平台。
+- 完成：同步 `docs/architecture/README.md`、`docs/README.md` 和 `docs/文档清单.md`，登记正式架构入口、可视化图索引和 reference 吸收关系。
+- 验证：`git diff --check -- docs/architecture/各类流程建模边界评审.md docs/architecture/README.md docs/README.md docs/reference/第四次20260627/erp各类“流”的边界与实现参考.md docs/文档清单.md progress.md` 通过；targeted `rg` 已确认正式入口和 reference 吸收关系，`tenant_id`、流程模板和扩展点只出现在禁止 / 边界语境；不运行 runtime、migration、浏览器或部署验证。
+- 下一步：若后续要把某类流推进实现，应按模块实施治理拆成单个可验证闭环，先确认真源、状态机、RBAC、usecase 和测试，不从 reference 直接施工。
+- 阻塞/风险：本轮不改 AGENTS、schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置包、导入脚本、部署脚本或页面 runtime；当前工作区仍有多组并行改动，本轮未回退、未提交。
