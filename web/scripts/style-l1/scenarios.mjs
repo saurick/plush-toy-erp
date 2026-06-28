@@ -1807,9 +1807,14 @@ export function createStyleL1Scenarios(deps) {
       themeMode: 'dark',
       viewport: { width: 1536, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '客户配置开发总控 / Customer Config Hub')
+        await expectHeading(
+          page,
+          '客户配置包预检控制台 / Package Preflight Console'
+        )
         await expectText(page, '当前 URL customer / Query')
         await expectText(page, 'yoyoosun')
+        await expectText(page, '当前配置包 / Current Package')
+        await expectText(page, 'PREVIEW_READY')
         await expectText(page, '已接运行时')
         await expectText(page, '真实客户数据导入')
         await assertERPThemeMode(page, {
@@ -1839,15 +1844,36 @@ export function createStyleL1Scenarios(deps) {
 
         await page
           .locator('.erp-dev-customer-view-switch .ant-segmented-item')
-          .filter({ hasText: '字段编号 / Fields' })
+          .filter({ hasText: '包预检 / Preflight' })
           .click()
-        await expectText(page, '边界守卫 / Boundary Guards')
+        await expectText(page, '包边界 / Package Guards')
         await expectText(page, 'runtimeEnabled')
-        await expectText(page, '客户编码')
+        await expectText(page, '预检步骤 / Preflight Gates')
+        await expectText(page, '资产摘要 / Asset Summary')
+        await expectText(page, '校验结果 / Validation Checks')
+        await expectText(page, '工作流预览 / Workflows')
+        await expectText(page, '销售订单审批')
+        await expectText(page, 'preview_only')
+        await expectText(page, 'workflow_only')
 
         await page
           .locator('.erp-dev-customer-view-switch .ant-segmented-item')
-          .filter({ hasText: '导入工具 / Import Tools' })
+          .filter({ hasText: '差异预览 / Diff' })
+          .click()
+        await expectText(page, '差异对比 / Diff Preview')
+        await expectText(page, '版本门禁 / Version Gates')
+        await expectText(page, '当前不可正式导入')
+
+        await page
+          .locator('.erp-dev-customer-view-switch .ant-segmented-item')
+          .filter({ hasText: '菜单字段 / Assets' })
+          .click()
+        await expectText(page, '客户编码')
+        await expectText(page, '东莞市永绅玩具有限公司')
+
+        await page
+          .locator('.erp-dev-customer-view-switch .ant-segmented-item')
+          .filter({ hasText: '工具边界 / Tools' })
           .click()
         await expectText(page, 'canExecuteRealImport')
         await expectText(page, 'false')
@@ -1864,7 +1890,10 @@ export function createStyleL1Scenarios(deps) {
             waitUntil: 'domcontentloaded',
           }
         )
-        await expectHeading(page, '客户配置开发总控 / Customer Config Hub')
+        await expectHeading(
+          page,
+          '客户配置包预检控制台 / Package Preflight Console'
+        )
         await expectText(page, '未登记客户配置包 / Missing Customer Package')
         await expectText(page, 'missing-customer')
         await expectText(page, '已登记客户包 / Registered Packages')
@@ -1881,7 +1910,7 @@ export function createStyleL1Scenarios(deps) {
         assert(!switchedUrl.pathname.startsWith('/erp'))
         await page
           .locator('.erp-dev-customer-view-switch .ant-segmented-item')
-          .filter({ hasText: '菜单品牌 / Menu Brand' })
+          .filter({ hasText: '菜单字段 / Assets' })
           .click()
         await expectText(page, '东莞市永绅玩具有限公司')
         await assertNoHorizontalOverflow(
@@ -1896,7 +1925,10 @@ export function createStyleL1Scenarios(deps) {
       themeMode: 'light',
       viewport: { width: 1536, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '客户配置开发总控 / Customer Config Hub')
+        await expectHeading(
+          page,
+          '客户配置包预检控制台 / Package Preflight Console'
+        )
         await expectText(page, '当前 URL customer / Query')
         await expectText(page, 'yoyoosun')
         await assertDevPageUsesGlobalThemeOnly(page, {
@@ -1912,12 +1944,16 @@ export function createStyleL1Scenarios(deps) {
       path: '/__dev/customer-config',
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await expectHeading(page, '客户配置开发总控 / Customer Config Hub')
+        await expectHeading(
+          page,
+          '客户配置包预检控制台 / Package Preflight Console'
+        )
         await expectText(page, '菜单分组 / Menu Groups')
         await expectText(page, '字段候选 / Field Candidates')
+        await expectText(page, '预检状态 / Preflight')
         await page
           .locator('.erp-dev-customer-view-switch .ant-segmented-item')
-          .filter({ hasText: '菜单品牌 / Menu Brand' })
+          .filter({ hasText: '菜单字段 / Assets' })
           .click()
         await expectText(page, '东莞市永绅玩具有限公司')
         await expectText(page, '运营工具')
@@ -1943,26 +1979,22 @@ export function createStyleL1Scenarios(deps) {
     },
     {
       name: 'dev-hub-dark-desktop',
-      path: '/__dev',
+      path: '/__dev/',
       themeMode: 'dark',
       viewport: { width: 1536, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '开发入口总控 / Dev Hub')
+        await expectHeading(page, '开发导航 / Dev Navigation')
         await expectText(page, '项目治理地图 / Governance Map')
         await expectText(page, '开发文档 / Dev Docs')
         await expectText(page, '测试入口 / Test Entry')
         await expectText(page, '产品原型 / Prototypes')
         await expectText(page, '能力台账 / Capability Ledger')
-        await expectText(page, '客户配置 / Customer Config')
-        await expectText(page, '入口台账规则 / Registry Rules')
-        await expectText(page, '置顶入口 / Pinned')
-        await expectText(page, '用入口卡片右上角图钉把常用页面固定在这里。')
+        await expectText(page, '客户配置包预检 / Package Preflight')
+        await expectText(page, '本地 dev-only 入口')
         const defaultMetrics = await page.evaluate(() => ({
+          path: location.pathname,
           cardCount: document.querySelectorAll(
             '.erp-dev-hub-grid .erp-dev-hub-card'
-          ).length,
-          guardrailCount: document.querySelectorAll(
-            '.erp-dev-hub-grid .erp-dev-hub-card__guards span'
           ).length,
           pinButtonCount: document.querySelectorAll(
             '.erp-dev-hub-grid .erp-dev-hub-card__pin'
@@ -1970,12 +2002,15 @@ export function createStyleL1Scenarios(deps) {
           firstHref: document
             .querySelector('.erp-dev-hub-grid .erp-dev-hub-card__link')
             ?.getAttribute('href'),
-          firstTarget: document
+          firstLinkText: document
             .querySelector('.erp-dev-hub-grid .erp-dev-hub-card__link')
-            ?.getAttribute('target'),
-          firstRel: document
-            .querySelector('.erp-dev-hub-grid .erp-dev-hub-card__link')
-            ?.getAttribute('rel'),
+            ?.textContent?.trim(),
+          hasGovernanceBanner: Boolean(
+            document.querySelector('.erp-dev-hub-governance')
+          ),
+          hasEmptyPinned: Boolean(
+            document.querySelector('.erp-dev-hub-pinned__empty')
+          ),
           faviconHref: document
             .querySelector('link[rel~="icon"]')
             ?.getAttribute('href'),
@@ -1983,41 +2018,47 @@ export function createStyleL1Scenarios(deps) {
           clientWidth: document.documentElement.clientWidth,
         }))
         assert.equal(
+          defaultMetrics.path,
+          '/__dev/',
+          `开发导航应兼容尾斜杠路径: ${JSON.stringify(defaultMetrics)}`
+        )
+        assert.equal(
           defaultMetrics.faviconHref,
           '/favicon-dev.svg',
-          `开发入口总控 favicon 异常: ${JSON.stringify(defaultMetrics)}`
+          `开发导航 favicon 异常: ${JSON.stringify(defaultMetrics)}`
         )
         assert.equal(
           defaultMetrics.cardCount,
           6,
-          `开发入口总控应渲染 6 个入口: ${JSON.stringify(defaultMetrics)}`
-        )
-        assert(
-          defaultMetrics.guardrailCount >= 10,
-          `开发入口总控应展示入口边界标签: ${JSON.stringify(defaultMetrics)}`
+          `开发导航应渲染 6 个入口: ${JSON.stringify(defaultMetrics)}`
         )
         assert.equal(
           defaultMetrics.pinButtonCount,
           6,
-          `开发入口总控应为每个入口提供置顶按钮: ${JSON.stringify(defaultMetrics)}`
+          `开发导航应为每个入口提供置顶按钮: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
           defaultMetrics.firstHref?.startsWith('/__dev/'),
-          `开发入口总控卡片链接应指向 /__dev 子路径: ${JSON.stringify(defaultMetrics)}`
+          `开发导航卡片链接应指向 /__dev 子路径: ${JSON.stringify(defaultMetrics)}`
         )
         assert.equal(
-          defaultMetrics.firstTarget,
-          '_blank',
-          `开发入口总控卡片链接应新标签打开: ${JSON.stringify(defaultMetrics)}`
+          defaultMetrics.firstLinkText,
+          '进入',
+          `开发导航卡片应提供清晰进入动作: ${JSON.stringify(defaultMetrics)}`
         )
         assert.equal(
-          defaultMetrics.firstRel,
-          'noreferrer',
-          `开发入口总控卡片链接应隔离 opener: ${JSON.stringify(defaultMetrics)}`
+          defaultMetrics.hasGovernanceBanner,
+          false,
+          `开发导航不应再用规则说明挤占首屏: ${JSON.stringify(defaultMetrics)}`
+        )
+        assert.equal(
+          defaultMetrics.hasEmptyPinned,
+          false,
+          `开发导航无置顶时不应显示空态说明: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
           defaultMetrics.scrollWidth <= defaultMetrics.clientWidth + 1,
-          `开发入口总控默认态不应横向溢出: ${JSON.stringify(defaultMetrics)}`
+          `开发导航默认态不应横向溢出: ${JSON.stringify(defaultMetrics)}`
         )
 
         await page.evaluate(() => {
@@ -2031,7 +2072,7 @@ export function createStyleL1Scenarios(deps) {
           )
         })
         await page.reload({ waitUntil: 'domcontentloaded' })
-        await expectText(page, '保存在当前浏览器 / Local browser')
+        await expectText(page, '置顶 / Pinned')
         const pinnedMetrics = await page.evaluate(() => ({
           pinnedCount: document.querySelectorAll(
             '.erp-dev-hub-pinned .erp-dev-hub-card'
@@ -2056,7 +2097,7 @@ export function createStyleL1Scenarios(deps) {
             hasRecentSection: false,
             overflow: false,
           },
-          `开发入口总控应只保留置顶偏好并移除最近访问区: ${JSON.stringify(pinnedMetrics)}`
+          `开发导航应只在已有置顶时显示置顶区并移除最近访问区: ${JSON.stringify(pinnedMetrics)}`
         )
 
         await page
@@ -2086,14 +2127,14 @@ export function createStyleL1Scenarios(deps) {
             firstPinnedHref: '/__dev/testing',
             overflow: false,
           },
-          `开发入口总控置顶入口应写入本地偏好并移动到首位: ${JSON.stringify(pinnedAfterClick)}`
+          `开发导航置顶入口应写入本地偏好并移动到首位: ${JSON.stringify(pinnedAfterClick)}`
         )
 
         await page
           .locator('.erp-dev-hub-group-filter .ant-segmented-item')
           .filter({ hasText: '产品治理 / Product Governance' })
           .click()
-        await expectText(page, '当前匹配 / Matches 1 / 6')
+        await expectText(page, '1 / 6')
         const groupMetrics = await page.evaluate(() => ({
           cardCount: document.querySelectorAll(
             '.erp-dev-hub-grid .erp-dev-hub-card'
@@ -2112,15 +2153,15 @@ export function createStyleL1Scenarios(deps) {
             onlyHref: '/__dev/capability-ledger',
             overflow: false,
           },
-          `开发入口总控分组筛选应只保留能力台账: ${JSON.stringify(groupMetrics)}`
+          `开发导航分组筛选应只保留能力台账: ${JSON.stringify(groupMetrics)}`
         )
 
         await page
           .locator('.erp-dev-hub-group-filter .ant-segmented-item')
           .filter({ hasText: '全部 / All' })
           .click()
-        await page.getByPlaceholder('搜索入口、路径或资料来源').fill('测试')
-        await expectText(page, '当前匹配 / Matches 1 / 6')
+        await page.getByPlaceholder('搜索入口或路径').fill('测试')
+        await expectText(page, '1 / 6')
         const filteredMetrics = await page.evaluate(() => ({
           cardCount: document.querySelectorAll(
             '.erp-dev-hub-grid .erp-dev-hub-card'
@@ -2712,6 +2753,9 @@ export function createStyleL1Scenarios(deps) {
               .length,
             docCount: document.querySelectorAll('.erp-dev-testing-doc-row')
               .length,
+            docPaths: Array.from(
+              document.querySelectorAll('.erp-dev-testing-doc-row__path')
+            ).map((node) => node.textContent.trim()),
             overflow:
               root &&
               document.documentElement.scrollWidth > root.clientWidth + 1,
@@ -2726,9 +2770,23 @@ export function createStyleL1Scenarios(deps) {
           defaultMetrics.tierCount >= 8,
           `测试入口应渲染测试分层: ${JSON.stringify(defaultMetrics)}`
         )
+        assert.equal(
+          defaultMetrics.docCount,
+          8,
+          `测试入口只应渲染当前白名单文档: ${JSON.stringify(defaultMetrics)}`
+        )
         assert(
-          defaultMetrics.docCount > 0,
-          `测试入口应渲染相关文档: ${JSON.stringify(defaultMetrics)}`
+          defaultMetrics.docPaths.includes('scripts/README.md') &&
+            defaultMetrics.docPaths.includes('web/README.md'),
+          `测试入口应包含当前 QA / 前端说明: ${JSON.stringify(defaultMetrics)}`
+        )
+        assert(
+          defaultMetrics.docPaths.every(
+            (docPath) =>
+              !docPath.startsWith('docs/reference/') &&
+              !docPath.startsWith('docs/archive/')
+          ),
+          `测试入口不应把 reference/archive 作为命令来源: ${JSON.stringify(defaultMetrics)}`
         )
         assert.equal(
           defaultMetrics.presetCount,

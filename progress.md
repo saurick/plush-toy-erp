@@ -174,6 +174,14 @@
 - 下一步：若后续继续收敛其它加载态文案，优先保留能区分业务动作的必要提示；路由资源加载这种纯等待态保持短文案即可。
 - 阻塞/风险：本轮只改前端路由加载态 copy，不改 schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置、部署脚本或原型状态；当前工作区已有多组非本轮/并行改动，本轮未回退、未提交。
 
+## 2026-06-28 开发测试入口白名单治理
+
+- 完成：按 `plush-test-governance` 将 `/__dev/testing` 从全量 `docs/**/*.md` 关键词聚合改为当前维护入口白名单，只读取自动化测试策略、项目 / 前端 / 后端 / 脚本 README 和部署说明；`docs/reference/**`、`docs/archive/**` 不再作为可复制命令来源。
+- 完成：收紧 fenced command block 抽取，只保留 shell 命令和续行，避免把输出文件清单、参考方案代码块或未来命令当成当前测试入口；同步 dev hub 文案、`web/README.md`、`docs/当前真源与交接顺序.md` 和 L1 断言。
+- 验证：`node --test web/src/erp/config/devTesting.test.mjs web/src/erp/config/devHub.test.mjs`、`cd web && corepack pnpm exec eslint --ext .js --ext .jsx src/erp/config/devTesting.mjs src/erp/config/devTesting.test.mjs src/erp/pages/DevTestingPage.jsx src/erp/config/devHub.mjs src/erp/config/devHub.test.mjs ../web/scripts/style-l1/scenarios.mjs`、`cd web && corepack pnpm css`、`cd web && corepack pnpm gen:error-codes && node --test $(node -e "const p=require('./package.json'); process.stdout.write(p.scripts.test.replace(/^node --test\\s*/, ''))")`、`cd web && STYLE_L1_SCENARIOS=dev-testing-dark-desktop,dev-testing-light-desktop corepack pnpm style:l1`、`git diff --check -- web/src/erp/config/devTesting.mjs web/src/erp/config/devTesting.test.mjs web/src/erp/config/devHub.mjs web/src/erp/config/devHub.test.mjs web/src/erp/pages/DevTestingPage.jsx web/scripts/style-l1/scenarios.mjs web/README.md docs/当前真源与交接顺序.md progress.md` 通过；真实构建数据为 8 篇当前入口文档、342 行可复制命令、reference/archive 命中 0。
+- 下一步：若后续新增长期 QA 文档，应先登记到测试入口白名单或自动化测试策略，再进入 `/__dev/testing`；历史 reference 继续只作为设计输入，不直接暴露为命令入口。
+- 阻塞/风险：本轮只治理 dev-only 测试入口、前端单测、L1 断言和说明文档；不改 schema、migration、JSON-RPC、RBAC、WorkflowUsecase、Fact usecase、真实写入 E2E、发布脚本或正式 ERP 菜单。当前工作区已有多组并行改动，本轮未回退、未提交。
+
 ## 2026-06-28 各类流程建模边界收口
 
 - 完成：新增 `docs/architecture/各类流程建模边界评审.md`，把 `docs/reference/第四次20260627/erp各类“流”的边界与实现参考.md` 收敛为 plush 当前 Product Core、Workflow / Fact、页面表达和客户配置边界，不照搬流程模板平台。

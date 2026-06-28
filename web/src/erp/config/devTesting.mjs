@@ -1,6 +1,17 @@
 export { DEV_TESTING_ROUTE } from './devRoutes.mjs'
 export const DEV_TESTING_STRATEGY_SOURCE_PATH = 'docs/product/自动化测试策略.md'
 
+export const DEV_TESTING_CURRENT_DOC_PATHS = Object.freeze([
+  DEV_TESTING_STRATEGY_SOURCE_PATH,
+  'README.md',
+  'web/README.md',
+  'server/README.md',
+  'scripts/README.md',
+  'docs/部署约定.md',
+  'server/deploy/README.md',
+  'server/deploy/compose/prod/README.md',
+])
+
 export const DEV_TESTING_DOC_KEYWORDS = Object.freeze([
   '测试',
   '验收',
@@ -207,11 +218,7 @@ function parseFirstMarkdownTable(source = '', headings = []) {
 function extractInlineCommands(value = '') {
   return [...String(value || '').matchAll(/`([^`]+)`/g)]
     .map((match) => stripMarkdownInline(match[1]))
-    .filter((command) => {
-      return /^(cd|pnpm|npm|node|bash|go|make|git|grep|docker|APP_ID=|STYLE_|TRIAL_|CUSTOMER_)/.test(
-        command
-      )
-    })
+    .filter(isShellCommandLine)
 }
 
 function getMarkdownTableCell(cells = [], headerIndex = {}, headerNames = []) {
@@ -276,6 +283,41 @@ export function buildDevTestingCopyText(commands = []) {
     .join('\n')
 }
 
+function isShellCommandLine(line = '') {
+  const command = String(line || '').trim()
+  return /^((env|CI|APP_ID|STYLE_[A-Z0-9_]*|TRIAL_[A-Z0-9_]*|CUSTOMER_[A-Z0-9_]*|ERP_[A-Z0-9_]*|NODE_[A-Z0-9_]*|SKIP_[A-Z0-9_]*|STRICT_[A-Z0-9_]*|QA_[A-Z0-9_]*)=[^\s]+(\s+|$))*((cd|pnpm|npm|node|bash|go|make|git|grep|docker|curl|ssh|scp|rsync|atlas)\b|\/usr\/local\/bin\/(pnpm|atlas)\b)/.test(
+    command
+  )
+}
+
+function extractShellCommandsFromBlock(rawBlock = '') {
+  const commands = []
+  const lines = String(rawBlock || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  let previousKeptContinuation = false
+  lines.forEach((line) => {
+    if (line.startsWith('#')) {
+      previousKeptContinuation = false
+      return
+    }
+    const keep =
+      isShellCommandLine(line) ||
+      (previousKeptContinuation &&
+        /^(-{1,2}|\||&&|\|\||[A-Z0-9_]+=)/.test(line))
+    if (!keep) {
+      previousKeptContinuation = false
+      return
+    }
+    commands.push(line)
+    previousKeptContinuation = line.endsWith('\\')
+  })
+
+  return commands
+}
+
 export function extractDevTestingCommandBlocks(
   source = '',
   { sourcePath = '', title = '' } = {}
@@ -290,11 +332,7 @@ export function extractDevTestingCommandBlocks(
     const before = text.slice(0, match.index)
     const headingMatch = [...before.matchAll(/^#{2,4}\s+(.+)$/gm)].pop()
     const context = headingMatch ? stripHeadingMarkdown(headingMatch[1]) : title
-    const commands = match[1]
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .filter((line) => !line.startsWith('#'))
+    const commands = extractShellCommandsFromBlock(match[1])
 
     if (commands.length === 0) continue
 
@@ -313,26 +351,23 @@ export function extractDevTestingCommandBlocks(
   return blocks
 }
 
-function classifyTestingDoc(path = '', source = '') {
+function classifyTestingDoc(path = '') {
   if (path === DEV_TESTING_STRATEGY_SOURCE_PATH) return '测试策略'
-  if (
-    /release-evidence|target-release-evidence/i.test(path) ||
-    /Release Evidence|发布证据|发布验收/.test(source)
-  ) {
-    return '发布验收'
+  if (path === 'scripts/README.md') return 'QA 脚本'
+  if (path === 'web/README.md') return '前端验证'
+  if (path === 'server/README.md') return '后端验证'
+  if (path === 'README.md') return '项目入口'
+  if (path === 'docs/部署约定.md' || path.startsWith('server/deploy/')) {
+    return '部署验证'
   }
+  if (/release-evidence|target-release-evidence/i.test(path)) return '发布验收'
   if (path.includes('/import-') || path.includes('/source-snapshot')) {
     return '导入验收'
   }
-  if (path.includes('/trial-') || path.includes('acceptance')) {
-    return '试用验收'
-  }
-  if (path.includes('/reference/')) return '参考'
-  if (path.includes('/archive/')) return '归档'
-  if (/qa|test|测试|验收|回归|smoke|style:l1/i.test(path)) {
-    return '测试资料'
-  }
-  return '相关文档'
+  if (path.includes('/trial-') || path.includes('acceptance')) return '试用验收'
+  return /qa|test|测试|验收|回归|smoke|style:l1/i.test(path)
+    ? '测试资料'
+    : '当前文档'
 }
 
 function countKeywordHits(value = '') {
@@ -345,13 +380,14 @@ function countKeywordHits(value = '') {
 
 export function buildDevTestingDocs(markdownModules = {}) {
   const byPath = new Map()
+  const currentDocPaths = new Set(DEV_TESTING_CURRENT_DOC_PATHS)
 
   Object.entries(markdownModules).forEach(([modulePath, moduleValue]) => {
     const path = normalizeGlobPath(modulePath)
     if (
-      !path.startsWith('docs/') ||
       !path.endsWith('.md') ||
-      byPath.has(path)
+      byPath.has(path) ||
+      !currentDocPaths.has(path)
     ) {
       return
     }
@@ -360,10 +396,6 @@ export function buildDevTestingDocs(markdownModules = {}) {
     const title = titleFromMarkdown(source, path)
     const haystack = [path, title, source].join('\n')
     const keywordHits = countKeywordHits(haystack)
-    if (path !== DEV_TESTING_STRATEGY_SOURCE_PATH && keywordHits === 0) {
-      return
-    }
-
     const commandBlocks = extractDevTestingCommandBlocks(source, {
       sourcePath: path,
       title,
@@ -386,9 +418,14 @@ export function buildDevTestingDocs(markdownModules = {}) {
     })
   })
 
+  const pathOrder = new Map(
+    DEV_TESTING_CURRENT_DOC_PATHS.map((path, index) => [path, index])
+  )
+
   return [...byPath.values()].sort((left, right) => {
-    if (left.path === DEV_TESTING_STRATEGY_SOURCE_PATH) return -1
-    if (right.path === DEV_TESTING_STRATEGY_SOURCE_PATH) return 1
+    const leftOrder = pathOrder.get(left.path) ?? Number.MAX_SAFE_INTEGER
+    const rightOrder = pathOrder.get(right.path) ?? Number.MAX_SAFE_INTEGER
+    if (leftOrder !== rightOrder) return leftOrder - rightOrder
     if (left.category !== right.category) {
       return left.category.localeCompare(right.category, 'zh-Hans-CN')
     }

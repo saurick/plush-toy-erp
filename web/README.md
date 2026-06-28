@@ -239,7 +239,7 @@ pnpm smoke:processing-contract-real-login
 
 - 根路由到后台登录的重定向
 - 管理员登录
-- 登录页主题三态、暗色后台看板、暗色业务页中性 hover / focus、暗色开发文档查看器、暗色客户配置开发页、暗色打印中心 / 预览入口和暗色岗位任务端核心路径
+- 登录页主题三态、暗色后台看板、暗色业务页中性 hover / focus、暗色开发文档查看器、暗色客户配置包预检页、暗色打印中心 / 预览入口和暗色岗位任务端核心路径
 - 未登录访问桌面后台的重定向
 - 桌面工作台、任务看板和异常 / 阻塞闭环，包括协同任务筛选、任务详情抽屉、阻塞原因面板、催办、完成动作和运营工具入口
 - 桌面业务看板和模板打印中心
@@ -269,13 +269,13 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 桌面侧栏只保留看板中心、业务分组、运营工具和系统管理。
 - 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/help-center`、`/erp/source-readiness` 和 `/erp/mobile-workbenches` 路径只做兼容重定向，不再作为产品内页面。
 - 仓库级 `docs/product/*`、`docs/architecture/*`、`docs/archive/*` 仍是正式文档体系，但不镜像到前端运行时。
-- 开发环境额外提供 `http://localhost:5175/__dev` 作为本地开发态入口台账 / 总控；该入口只汇总 `/__dev/governance`、`/__dev/docs`、`/__dev/testing`、`/__dev/prototypes`、`/__dev/capability-ledger` 和 `/__dev/customer-config` 等 dev-only 页面，展示入口维护真源、边界标签、治理分组筛选、搜索、跳转和浏览器本地置顶；入口卡片统一新标签打开，便于保留总控页对照，不改变各子页内部导航。不进入侧栏、seedData、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单，生产构建不可访问；置顶只写浏览器本地偏好，不是后端配置。入口总控使用 `/favicon-dev.svg`，测试入口使用 `/favicon-testing.svg`，只用于区分本地开发页面。
+- 开发环境额外提供 `http://localhost:5175/__dev` 作为本地开发态简洁导航；该入口只汇总 `/__dev/governance`、`/__dev/docs`、`/__dev/testing`、`/__dev/prototypes`、`/__dev/capability-ledger` 和 `/__dev/customer-config` 等 dev-only 页面，展示搜索、分组筛选、跳转和浏览器本地置顶；入口卡片在当前标签内进入子页，不改变各子页内部导航。不进入侧栏、seedData、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单，生产构建不可访问；置顶只写浏览器本地偏好，不是后端配置。开发导航使用 `/favicon-dev.svg`，测试入口使用 `/favicon-testing.svg`，只用于区分本地开发页面。
 - 开发环境额外提供 `http://localhost:5175/__dev/governance` 作为本地开发态项目治理地图；该入口只读解析 `docs/项目治理地图.md`，展示治理维度与口径速查、常见任务分流、Mermaid 分流图、文档查看器跳转和路径复制，不进入侧栏、seedData、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单，生产构建不可访问；`docs/项目治理地图.md` 仍是维护真源。
 - 开发环境额外提供 `http://localhost:5175/__dev/docs` 作为本地开发态文档查看器；该入口左侧专用于按真实目录树浏览仓库 tracked Markdown 和 `AGENTS.md`，支持 `?path=<markdown-path>#<section-anchor>` 直接定位文档和章节，并在搜索框下方提供浏览器本地持久化的置顶文档区，当前打开文档、目录树展开状态和章节标签展开 / 收起状态也会写入浏览器本地偏好以便刷新后恢复；搜索态显示匹配结果，右侧标题栏图钉可置顶 / 取消置顶当前文档，置顶区行内图钉可直接取消置顶，目录树和搜索结果行内图钉可快速置顶 / 取消置顶，章节标签默认展开为自动换行展示，也可收起为单行横向滚动；章节标签点击可滚动到对应标题并提供回到顶部，Markdown fenced `mermaid` 代码块会只读渲染为图表，并提供适配宽度、缩小、放大、重置 100% 和当前页面全屏查看的本地临时控件，不进入侧栏、seedData、RBAC 或产品内文档 registry，生产构建不可访问。
 - 开发环境额外提供 `http://localhost:5175/__dev/prototypes` 作为本地开发态产品原型查看器；该入口只浏览 `docs/product/prototypes` 下的 HTML 样板、PNG 方案图和截图证据，可按全部 / 当前实现 / 待实现 / 参考资料四类筛选、按目录分组折叠、使用浏览器本地偏好恢复上次筛选、当前打开资产和置顶状态，并在右侧预览。卡片里的参照范围只说明可借鉴的页面 / 菜单类型，不是正式菜单、路由、权限或 seedData 映射表；该入口不进入侧栏、seedData、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单，生产构建不可访问。
 - 开发环境额外提供 `http://localhost:5175/__dev/capability-ledger` 作为本地开发态能力台账可视化；该入口只读解析 `docs/product/产品能力进度台账.md`、`docs/customers/yoyoosun/客户交付矩阵.md` 和 `docs/customers/yoyoosun/客户差异台账.md`，展示产品能力成熟度、客户交付状态、客户差异分类和显式 `CAP-*` 关联，不进入侧栏、seedData、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单，生产构建不可访问；三份 Markdown 仍是唯一维护入口。
-- 开发环境额外提供 `http://localhost:5175/__dev/testing` 作为本地开发态测试入口；该入口只读解析 `docs/product/自动化测试策略.md` 和 `docs/**/*.md` 中的测试、验收、QA、smoke、`style:l1` 等相关文档，展示测试分层、命令块和相关文档索引，并为 T0-T8 每层及常用预设提供一键复制命令 / 清单；复制按钮不在浏览器内执行 shell，不进入侧栏、seedData、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单，生产构建不可访问；`docs/product/自动化测试策略.md` 仍是测试选择真源。
-- 开发环境额外提供 `http://localhost:5175/__dev/customer-config` 作为本地开发态客户配置总控页；该入口通过 `?customer=<customer-key>` 和页面客户包选择器读取 dev-only 客户包 registry，query 缺失时默认 `yoyoosun`，当前只登记 `yoyoosun`，后续新增客户包时只扩展同一 registry。未登记 customer 会显示“未登记客户配置包”和已登记客户列表，不 fallback 到 yoyoosun 冒充。选择器只更新 URL query，不写 localStorage、后端、数据库或正式运行配置；该页只读展示客户配置包、前端品牌 / 桌面菜单 runtime、字段 / 编号草案、导入 tooling 和边界状态，不进入侧栏、seedData、RBAC、后端业务、真实导入或 ERP 正式菜单，生产构建不可访问；`config/customers/<customer-key>/*`、`scripts/import/*` 和正式文档仍是维护真源。
+- 开发环境额外提供 `http://localhost:5175/__dev/testing` 作为本地开发态测试入口；该入口只读解析 `docs/product/自动化测试策略.md`、`scripts/README.md`、前后端 README 和部署说明等当前维护文档，展示 T0-T8 验证层级、命令块和常用预设复制入口；`docs/reference/**`、`docs/archive/**` 等历史参考默认不进入可复制命令来源，避免把旧方案或未来命令误当当前测试入口；复制按钮不在浏览器内执行 shell，不进入侧栏、seedData、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单，生产构建不可访问；`docs/product/自动化测试策略.md` 仍是测试选择真源。
+- 开发环境额外提供 `http://localhost:5175/__dev/customer-config` 作为本地开发态客户配置包预检控制台；该入口通过 `?customer=<customer-key>` 和页面客户包选择器读取 dev-only 客户包 registry，query 缺失时默认 `yoyoosun`，当前只登记 `yoyoosun`，后续新增客户包时只扩展同一 registry。未登记 customer 会显示“未登记客户配置包”和已登记客户列表，不 fallback 到 yoyoosun 冒充。选择器只更新 URL query，不写 localStorage、后端、数据库或正式运行配置；该页只读展示客户配置包、前端品牌 / 桌面菜单 runtime、字段 / 编号草案、流程结构 preview、预检步骤、差异预览、版本门禁、导入 tooling 和边界状态，不进入侧栏、seedData、RBAC、后端业务、真实导入或 ERP 正式菜单，生产构建不可访问；`config/customers/<customer-key>/*`、`config/catalog/*`、`config/schemas/*`、`scripts/import/*` 和正式文档仍是维护真源。
 
 ## 当前前端边界
 

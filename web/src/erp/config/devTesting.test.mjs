@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   DEV_TESTING_COPY_PRESETS,
+  DEV_TESTING_CURRENT_DOC_PATHS,
   DEV_TESTING_ROUTE,
   DEV_TESTING_STRATEGY_SOURCE_PATH,
   buildDevTestingCopyText,
@@ -58,6 +59,23 @@ TRIAL_BROWSER_SMOKE_BASE_URL=http://127.0.0.1:5175 pnpm --dir web smoke:trial-de
 \`\`\`
 `
 
+const scriptsReadmeMarkdown = `
+# QA 脚本说明
+
+## 推荐顺序
+
+\`\`\`bash
+node scripts/import/customerSourceExtract.mjs \\
+  --manifest docs/customers/yoyoosun/source-manifest.json \\
+  --out output/customers/yoyoosun/source-extract
+\`\`\`
+
+\`\`\`text
+source-snapshot.extracted.json
+existing-v1.empty-preview.json
+\`\`\`
+`
+
 const unrelatedMarkdown = `
 # 普通说明
 
@@ -70,6 +88,16 @@ test('devTesting: 只通过开发态独立路径暴露', () => {
     DEV_TESTING_STRATEGY_SOURCE_PATH,
     'docs/product/自动化测试策略.md'
   )
+  assert.deepEqual(DEV_TESTING_CURRENT_DOC_PATHS, [
+    'docs/product/自动化测试策略.md',
+    'README.md',
+    'web/README.md',
+    'server/README.md',
+    'scripts/README.md',
+    'docs/部署约定.md',
+    'server/deploy/README.md',
+    'server/deploy/compose/prod/README.md',
+  ])
   assert.equal(isDevTestingEnabled({ DEV: true }), true)
   assert.equal(isDevTestingEnabled({ DEV: false }), false)
   assert(!DEV_TESTING_ROUTE.startsWith('/erp/'))
@@ -129,68 +157,86 @@ test('devTesting: 提取 fenced command blocks 并保留章节上下文', () => 
   assert.deepEqual(blocks[1].commands.slice(-2), ['pnpm test', 'pnpm style:l1'])
 })
 
-test('devTesting: 从 docs Markdown 中筛出测试相关文档', () => {
+test('devTesting: 只索引当前测试入口白名单文档', () => {
   const docs = buildDevTestingDocs({
     '../../../../docs/product/自动化测试策略.md': strategyMarkdown,
+    '../../../../scripts/README.md': scriptsReadmeMarkdown,
+    '../../../../web/README.md': deliveryEvidenceMarkdown,
     '../../../../docs/archive/customer-evidence/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md':
       deliveryEvidenceMarkdown,
+    '../../../../docs/reference/第一次20260519/自动化测试计划.md':
+      deliveryEvidenceMarkdown,
     '../../../../docs/product/产品原则.md': unrelatedMarkdown,
-    '../../../README.md': deliveryEvidenceMarkdown,
+    '../../../../README.md': unrelatedMarkdown,
   })
 
   assert.deepEqual(
     docs.map((item) => item.path),
     [
       'docs/product/自动化测试策略.md',
-      'docs/archive/customer-evidence/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md',
+      'README.md',
+      'web/README.md',
+      'scripts/README.md',
     ]
   )
   assert.equal(docs[0].category, '测试策略')
-  assert.equal(docs[1].category, '发布验收')
-  assert.equal(docs[1].commandCount, 1)
+  assert.equal(docs[1].category, '项目入口')
+  assert.equal(docs[2].category, '前端验证')
+  assert.equal(docs[3].category, 'QA 脚本')
+  assert.equal(docs[3].commandCount, 3)
 })
 
-test('devTesting: 文档 key 使用完整路径避免中文目录下文件名碰撞', () => {
+test('devTesting: reference 和 archive 不作为测试命令入口', () => {
   const docs = buildDevTestingDocs({
     '../../../../docs/product/自动化测试策略.md': strategyMarkdown,
     '../../../../docs/reference/第一次20260519/自动化测试计划.md':
       deliveryEvidenceMarkdown,
     '../../../../docs/reference/第一次20260519/状态分层工作流与业务事实设计总结.md':
       deliveryEvidenceMarkdown,
+    '../../../../docs/archive/customer-evidence/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md':
+      deliveryEvidenceMarkdown,
   })
-  const keys = docs.map((item) => item.key)
 
-  assert.equal(new Set(keys).size, keys.length)
-  assert(keys.includes('docs/reference/第一次20260519/自动化测试计划.md'))
-  assert(
-    keys.includes(
-      'docs/reference/第一次20260519/状态分层工作流与业务事实设计总结.md'
-    )
+  assert.deepEqual(
+    docs.map((item) => item.path),
+    ['docs/product/自动化测试策略.md']
   )
+})
+
+test('devTesting: fenced block 只提取 shell 命令和续行', () => {
+  const blocks = extractDevTestingCommandBlocks(scriptsReadmeMarkdown, {
+    sourcePath: 'scripts/README.md',
+    title: 'QA 脚本说明',
+  })
+
+  assert.equal(blocks.length, 1)
+  assert.deepEqual(blocks[0].commands, [
+    'node scripts/import/customerSourceExtract.mjs \\',
+    '--manifest docs/customers/yoyoosun/source-manifest.json \\',
+    '--out output/customers/yoyoosun/source-extract',
+  ])
 })
 
 test('devTesting: 支持分类和关键词筛选并汇总', () => {
   const docs = buildDevTestingDocs({
     '../../../../docs/product/自动化测试策略.md': strategyMarkdown,
-    '../../../../docs/archive/customer-evidence/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md':
-      deliveryEvidenceMarkdown,
+    '../../../../scripts/README.md': scriptsReadmeMarkdown,
+    '../../../../web/README.md': deliveryEvidenceMarkdown,
   })
   const tiers = parseDevTestingStrategyTiers(strategyMarkdown)
   const summary = buildDevTestingSummary({ tiers, docs })
 
   assert.equal(summary.tierCount, 3)
-  assert.equal(summary.docCount, 2)
-  assert.equal(summary.docsWithCommands, 2)
-  assert.equal(summary.commandCount, 7)
+  assert.equal(summary.docCount, 3)
+  assert.equal(summary.docsWithCommands, 3)
+  assert.equal(summary.commandCount, 10)
   assert.deepEqual(
     getDevTestingCategoryOptions(docs).map((item) => item.value),
-    ['all', '测试策略', '发布验收']
+    ['all', '测试策略', '前端验证', 'QA 脚本']
   )
   assert.deepEqual(
     filterDevTestingDocs(docs, { keyword: 'trial' }).map((item) => item.path),
-    [
-      'docs/archive/customer-evidence/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md',
-    ]
+    ['web/README.md']
   )
   assert.deepEqual(
     filterDevTestingDocs(docs, { category: '测试策略' }).map(

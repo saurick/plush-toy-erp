@@ -57,10 +57,11 @@ export const DEV_HUB_ITEMS = Object.freeze([
     guardrails: Object.freeze([
       '不执行命令 / No shell execution',
       '不替代测试结果 / Not test evidence',
+      '不索引历史参考 / No reference commands',
       '不进生产构建 / No prod build',
     ]),
     description:
-      '汇总测试分层、命令块和 docs 下测试相关资料；pick validation commands for the current change.',
+      '汇总当前测试策略、QA 脚本和部署 / 前后端说明；pick validation commands without promoting reference docs.',
   }),
   Object.freeze({
     key: 'prototypes',
@@ -96,19 +97,19 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'customer-config',
-    title: '客户配置 / Customer Config',
+    title: '客户配置包预检 / Package Preflight',
     group: '客户治理 / Customer Governance',
     route: DEV_CUSTOMER_CONFIG_ROUTE,
     source: 'config/customers/yoyoosun',
     truthSource: '客户配置包与导入 tooling / Customer package',
-    status: '配置总控 / Config hub',
+    status: '预检控制台 / Preflight console',
     guardrails: Object.freeze([
       '只读汇总 / Read-only summary',
       '不做真实导入 / No real import',
       '不写核心规则 / No core rules',
     ]),
     description:
-      '汇总 yoyoosun 客户配置包、菜单品牌、字段编号草案和导入边界；review customer config boundaries.',
+      '汇总 yoyoosun 客户配置包、菜单品牌、字段编号草案、预检差异和导入边界；review package preflight boundaries.',
   }),
 ])
 

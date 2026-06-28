@@ -30,11 +30,23 @@ const VIEW_OPTIONS = [
   { label: '相关文档 / Docs', value: VIEW_DOCS },
 ]
 
-const markdownModules = import.meta.glob('../../../../docs/**/*.md', {
-  eager: true,
-  import: 'default',
-  query: '?raw',
-})
+const markdownModules = import.meta.glob(
+  [
+    '../../../../README.md',
+    '../../../../docs/product/自动化测试策略.md',
+    '../../../../docs/部署约定.md',
+    '../../../../server/README.md',
+    '../../../../server/deploy/README.md',
+    '../../../../server/deploy/compose/prod/README.md',
+    '../../../../scripts/README.md',
+    '../../../../web/README.md',
+  ],
+  {
+    eager: true,
+    import: 'default',
+    query: '?raw',
+  }
+)
 
 function MetricTile({ icon, label, value, note, tone = 'default' }) {
   return (
@@ -246,8 +258,8 @@ export default function DevTestingPage() {
             </Title>
           </Space>
           <Paragraph className="erp-dev-testing-summary">
-            读取测试策略和 docs 下测试 / 验收文档；index local validation tiers,
-            commands, and related docs.
+            读取当前测试策略、QA 脚本和部署 / 前后端说明；index current
+            validation tiers and executable command references.
           </Paragraph>
         </div>
         <div className="erp-dev-testing-header__stats">

@@ -85,6 +85,12 @@ test('devHub: filters by title, group, source and route', () => {
     filterDevHubItems(DEV_HUB_ITEMS, '不替代测试结果').map((item) => item.key),
     ['testing']
   )
+  assert.deepEqual(
+    filterDevHubItems(DEV_HUB_ITEMS, 'No reference commands').map(
+      (item) => item.key
+    ),
+    ['testing']
+  )
   assert.equal(filterDevHubItems(DEV_HUB_ITEMS, 'missing').length, 0)
 })
 
