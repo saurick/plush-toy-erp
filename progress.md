@@ -189,3 +189,11 @@
 - 验证：`git diff --check -- docs/architecture/各类流程建模边界评审.md docs/architecture/README.md docs/README.md docs/reference/第四次20260627/erp各类“流”的边界与实现参考.md docs/文档清单.md progress.md` 通过；targeted `rg` 已确认正式入口和 reference 吸收关系，`tenant_id`、流程模板和扩展点只出现在禁止 / 边界语境；不运行 runtime、migration、浏览器或部署验证。
 - 下一步：若后续要把某类流推进实现，应按模块实施治理拆成单个可验证闭环，先确认真源、状态机、RBAC、usecase 和测试，不从 reference 直接施工。
 - 阻塞/风险：本轮不改 AGENTS、schema、migration、JSON-RPC、RBAC、菜单真源、WorkflowUsecase、Fact usecase、客户配置包、导入脚本、部署脚本或页面 runtime；当前工作区仍有多组并行改动，本轮未回退、未提交。
+
+## 2026-06-30 Skill 自动选择规则补充
+
+- 完成：更新 `AGENTS.md`，新增“Skill 自动选择规则”，明确用户未指定 skill 时先评估明显匹配；项目专属 skill 优先；通用 skill 只在任务明确匹配时使用；无明显匹配或会引入不必要复杂度时可以不选 skill。
+- 完成：规则同时要求开始工作前用一句话说明选择或不选择 skill 的原因，并禁止为了“必须使用 skill”机械套用不相关 skill。
+- 验证：`progress.md` 更新前已检查规模为 320 行、65KB，低于归档阈值；按 docs-only 边界执行 `git diff --check -- AGENTS.md progress.md`。
+- 下一步：后续如新增、删除、重命名或调整项目 skill 职责，再按项目专属 skill 维护约定运行 validator、YAML 解析和 metadata 扫描。
+- 阻塞/风险：本轮只改项目级协作规则和进度记录，不改运行时代码、schema、测试脚本、部署流程、skill 内容或 `docs/文档清单.md`。

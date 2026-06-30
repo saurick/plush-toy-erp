@@ -21,6 +21,13 @@
 - 新增、删除、重命名或调整项目 skill 职责时，同步检查根 `README.md`、相关 docs 索引和 `progress.md` 是否需要更新；只改正文且不改变职责时通常不需要改文档清单。
 - 修改 skill 后至少运行 skill validator、YAML 解析和 metadata 扫描，确认 `$skill-name`、中英摘要和英文 `display_name` 都符合规则。
 
+## Skill 自动选择规则
+
+- 当用户没有显式指定 skill 时，Codex 必须先根据任务类型评估是否存在明显匹配的 skill；如果存在项目专属 skill，优先使用项目专属 skill。
+- 如果任务明确匹配通用 skill，例如文档、PDF / Word / Excel / PPT、浏览器回归、OpenAI 文档、Figma、安全评审、GitHub PR / CI 等，按现有 skill 说明选择对应 skill。
+- 如果没有明显匹配，或使用 skill 会引入不必要流程、额外复杂度、偏离当前任务边界，可以不选择 skill，直接按本文件、README、正式 docs、代码和测试执行。
+- 禁止为了“必须使用 skill”而机械套用不相关 skill；选择或不选择 skill 时，应在开始工作前用一句话说明原因。若跳过一个看似相关的 skill，也应简短说明边界。
+
 ## 阅读顺序
 
 遇到新任务时，优先按下面顺序收敛真源：
