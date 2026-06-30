@@ -2,8 +2,8 @@ import {
   activateSalesOrder,
   cancelSalesOrder,
   closeSalesOrder,
-  submitSalesOrder,
 } from '../../api/masterDataOrderApi.mjs'
+import { submitSalesOrderAcceptanceProcess } from '../../api/customerConfigApi.mjs'
 
 export const SALES_ORDER_STATUS_FILTER_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -34,7 +34,9 @@ export const SALES_ORDER_LIFECYCLE_ACTIONS = [
     label: '提交',
     permission: 'sales_order.submit',
     nextStatus: 'submitted',
-    run: submitSalesOrder,
+    run: submitSalesOrderAcceptanceProcess,
+    returnsRecord: false,
+    successMessage: '销售订单已提交，已进入老板审批',
   },
   {
     key: 'activate',

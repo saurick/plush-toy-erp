@@ -577,7 +577,10 @@ func (_q *QualityInspectionQuery) loadPurchaseReceipt(ctx context.Context, query
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*QualityInspection)
 	for i := range nodes {
-		fk := nodes[i].PurchaseReceiptID
+		if nodes[i].PurchaseReceiptID == nil {
+			continue
+		}
+		fk := *nodes[i].PurchaseReceiptID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -667,7 +670,10 @@ func (_q *QualityInspectionQuery) loadMaterial(ctx context.Context, query *Mater
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*QualityInspection)
 	for i := range nodes {
-		fk := nodes[i].MaterialID
+		if nodes[i].MaterialID == nil {
+			continue
+		}
+		fk := *nodes[i].MaterialID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}

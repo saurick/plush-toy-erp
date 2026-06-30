@@ -37,7 +37,7 @@ test('mobileRolePermissions: 岗位任务端入口只由权限码控制', () => 
   )
 })
 
-test('mobileRolePermissions: 八个岗位任务端角色入口使用独立权限码', () => {
+test('mobileRolePermissions: 九个岗位任务端角色入口使用独立权限码', () => {
   const cases = [
     ['boss', 'mobile.boss.access'],
     ['sales', 'mobile.sales.access'],
@@ -47,6 +47,7 @@ test('mobileRolePermissions: 八个岗位任务端角色入口使用独立权限
     ['quality', 'mobile.quality.access'],
     ['finance', 'mobile.finance.access'],
     ['pmc', 'mobile.pmc.access'],
+    ['engineering', 'mobile.engineering.access'],
   ]
 
   for (const [roleKey, permissionKey] of cases) {

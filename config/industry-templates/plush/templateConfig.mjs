@@ -75,6 +75,13 @@ export const plushIndustryTemplateConfig = Object.freeze({
       boundary: "负责齐套、排产、异常分发和催办；不替其他角色写事实。",
     },
     {
+      key: "engineering",
+      label: "工程",
+      classification: "industry_default_candidate",
+      evidence: "试用账号角色菜单核对清单.md",
+      boundary: "负责产品资料、工序和 BOM 资料补齐；工程任务完成不写采购、库存、生产、成本或财务事实。",
+    },
+    {
       key: "production",
       label: "生产经理",
       classification: "industry_default_candidate",
@@ -176,6 +183,14 @@ export const plushIndustryTemplateConfig = Object.freeze({
       note: "移动端留痕不替代 quality_inspections 判定。",
     },
     {
+      key: "engineering_data",
+      label: "工程资料补齐",
+      roles: Object.freeze(["engineering"]),
+      classification: "industry_default_candidate",
+      factBoundary: "workflow_only",
+      note: "工程资料任务只推进产品、工序和 BOM 资料补齐协同，不自动生成采购、库存、生产、成本或财务事实。",
+    },
+    {
       key: "shipment_release",
       label: "出货放行",
       roles: Object.freeze(["warehouse", "quality", "finance"]),
@@ -213,6 +228,13 @@ export const plushIndustryTemplateConfig = Object.freeze({
       classification: "industry_default_candidate",
       fields: Object.freeze(["product_code", "product_name", "unit"]),
       deferred: Object.freeze(["sku_color", "sku_size", "version"]),
+    },
+    {
+      module: "engineering",
+      label: "产品工程",
+      classification: "industry_default_candidate",
+      fields: Object.freeze(["product", "process", "bom_version"]),
+      deferred: Object.freeze(["route_planning", "cost_rollup", "mrp"]),
     },
     {
       module: "sales_orders",

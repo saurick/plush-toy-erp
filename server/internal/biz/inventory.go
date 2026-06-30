@@ -356,6 +356,7 @@ type InventoryRepo interface {
 	CancelPostedPurchaseReceiptAdjustment(ctx context.Context, adjustmentID int) (*PurchaseReceiptAdjustment, error)
 	GetPurchaseReceiptAdjustment(ctx context.Context, id int) (*PurchaseReceiptAdjustment, error)
 	CreateQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error)
+	CreateFinishedGoodsQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error)
 	SubmitQualityInspection(ctx context.Context, inspectionID int) (*QualityInspection, error)
 	PassQualityInspection(ctx context.Context, in *QualityInspectionDecision) (*QualityInspection, error)
 	RejectQualityInspection(ctx context.Context, in *QualityInspectionDecision) (*QualityInspection, error)

@@ -4,6 +4,9 @@
 
 | 字段 | 值 |
 | --- | --- |
+| releaseVersion | 待填写，必须与 `release-evidence.md` 一致 |
+| environment | 待填写，必须与 `release-evidence.md` 一致 |
+| backupId | 待填写，必须与 `release-evidence.md` 和 `backup-evidence.md` 一致 |
 | releaseConclusion | 待填写，可选 `customer-trial-approved` / `internal-only` / `rollback-or-forward-fix` |
 | deploymentOperator | 待填写 |
 | evidenceReviewer | 待填写 |

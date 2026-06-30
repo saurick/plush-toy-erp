@@ -26,22 +26,47 @@ func TestWorkflowRepo_CreateAndUpdateTaskStatus(t *testing.T) {
 		&Data{postgres: client},
 		log.NewStdLogger(io.Discard),
 	)
+	ownerPoolKey := "sales-order-followup"
+	requiredCapabilityKey := biz.PermissionWorkflowTaskComplete
+	configRevision := "customer-config-yoyoosun-rev-20260629"
+	processInstanceID := 101
+	processNodeInstanceID := 202
 
 	task, err := repo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
-		TaskCode:      "TASK-001",
-		TaskGroup:     "project-orders",
-		TaskName:      "确认客户资料",
-		SourceType:    "project-orders",
-		SourceID:      1001,
-		TaskStatusKey: "ready",
-		OwnerRoleKey:  biz.SalesRoleKey,
-		Payload:       map[string]any{"note": "首批联调任务"},
+		TaskCode:              "TASK-001",
+		TaskGroup:             "project-orders",
+		TaskName:              "确认客户资料",
+		SourceType:            "project-orders",
+		SourceID:              1001,
+		TaskStatusKey:         "ready",
+		OwnerRoleKey:          biz.SalesRoleKey,
+		OwnerPoolKey:          &ownerPoolKey,
+		RequiredCapabilityKey: &requiredCapabilityKey,
+		ConfigRevision:        &configRevision,
+		ProcessInstanceID:     &processInstanceID,
+		ProcessNodeInstanceID: &processNodeInstanceID,
+		Payload:               map[string]any{"note": "首批联调任务"},
 	}, 7)
 	if err != nil {
 		t.Fatalf("create task failed: %v", err)
 	}
 	if task.ID <= 0 {
 		t.Fatalf("expected task id")
+	}
+	if task.OwnerPoolKey == nil || *task.OwnerPoolKey != ownerPoolKey {
+		t.Fatalf("expected owner pool persisted, got %#v", task.OwnerPoolKey)
+	}
+	if task.RequiredCapabilityKey == nil || *task.RequiredCapabilityKey != requiredCapabilityKey {
+		t.Fatalf("expected required capability persisted, got %#v", task.RequiredCapabilityKey)
+	}
+	if task.ConfigRevision == nil || *task.ConfigRevision != configRevision {
+		t.Fatalf("expected config revision persisted, got %#v", task.ConfigRevision)
+	}
+	if task.ProcessInstanceID == nil || *task.ProcessInstanceID != processInstanceID {
+		t.Fatalf("expected process instance id persisted, got %#v", task.ProcessInstanceID)
+	}
+	if task.ProcessNodeInstanceID == nil || *task.ProcessNodeInstanceID != processNodeInstanceID {
+		t.Fatalf("expected process node instance id persisted, got %#v", task.ProcessNodeInstanceID)
 	}
 
 	updated, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
@@ -163,6 +188,80 @@ func TestWorkflowRepo_ListWorkflowTasksFiltersByTaskGroup(t *testing.T) {
 	}
 	if tasks[0].TaskGroup != "shipment_release" || tasks[0].SourceType != "shipping-release" {
 		t.Fatalf("unexpected task %#v", tasks[0])
+	}
+}
+
+func TestWorkflowRepo_ListWorkflowTasksAppliesVisibilityScope(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_repo_visibility?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+
+	repo := NewWorkflowRepo(
+		&Data{postgres: client},
+		log.NewStdLogger(io.Discard),
+	)
+
+	assigneeID := 42
+	for _, task := range []biz.WorkflowTaskCreate{
+		{
+			TaskCode:      "TASK-VISIBLE-OWNER",
+			TaskGroup:     "generic",
+			TaskName:      "品质任务",
+			SourceType:    "source",
+			SourceID:      1,
+			TaskStatusKey: "ready",
+			OwnerRoleKey:  biz.QualityRoleKey,
+			Payload:       map[string]any{},
+		},
+		{
+			TaskCode:      "TASK-VISIBLE-ASSIGNEE",
+			TaskGroup:     "generic",
+			TaskName:      "指派任务",
+			SourceType:    "source",
+			SourceID:      2,
+			TaskStatusKey: "ready",
+			OwnerRoleKey:  biz.WarehouseRoleKey,
+			AssigneeID:    &assigneeID,
+			Payload:       map[string]any{},
+		},
+		{
+			TaskCode:      "TASK-HIDDEN",
+			TaskGroup:     "generic",
+			TaskName:      "其他任务",
+			SourceType:    "source",
+			SourceID:      3,
+			TaskStatusKey: "ready",
+			OwnerRoleKey:  biz.FinanceRoleKey,
+			Payload:       map[string]any{},
+		},
+	} {
+		if _, err := repo.CreateWorkflowTask(ctx, &task, 7); err != nil {
+			t.Fatalf("create task %s failed: %v", task.TaskCode, err)
+		}
+	}
+
+	listed, total, err := repo.ListWorkflowTasks(ctx, biz.WorkflowTaskFilter{
+		Limit:                50,
+		VisibleOwnerRoleKeys: []string{biz.QualityRoleKey},
+		VisibleAssigneeID:    &assigneeID,
+	})
+	if err != nil {
+		t.Fatalf("list tasks failed: %v", err)
+	}
+	if total != 2 || len(listed) != 2 {
+		t.Fatalf("expected two visible tasks, total=%d len=%d", total, len(listed))
+	}
+	gotCodes := map[string]struct{}{}
+	for _, task := range listed {
+		gotCodes[task.TaskCode] = struct{}{}
+	}
+	for _, code := range []string{"TASK-VISIBLE-OWNER", "TASK-VISIBLE-ASSIGNEE"} {
+		if _, ok := gotCodes[code]; !ok {
+			t.Fatalf("expected visible task %s in %#v", code, gotCodes)
+		}
+	}
+	if _, ok := gotCodes["TASK-HIDDEN"]; ok {
+		t.Fatalf("hidden task must not be visible")
 	}
 }
 

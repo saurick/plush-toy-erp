@@ -110,8 +110,13 @@ type renderTemplatePDFRequest struct {
 	Title       string `json:"title"`
 	FileName    string `json:"file_name"`
 	TemplateKey string `json:"template_key"`
+	CustomerKey string `json:"customer_key"`
 	HTML        string `json:"html"`
 	BaseURL     string `json:"base_url"`
+}
+
+type templatePDFModuleGuard interface {
+	EnsureModuleKeysEnabled(ctx context.Context, customerKey string, moduleKeys ...string) error
 }
 
 type adminRequestVerifier struct {
@@ -454,6 +459,7 @@ func registerTemplatePDFHandler(
 	logger log.Logger,
 	tp *sdktrace.TracerProvider,
 	dc *conf.Data,
+	moduleGuard templatePDFModuleGuard,
 ) {
 	helper := log.NewHelper(log.With(logger, "logger.name", "server.template_pdf"))
 	adminVerifier := newAdminRequestVerifier(dc)
@@ -519,6 +525,26 @@ func registerTemplatePDFHandler(
 			writeJSON(w, statusCode, map[string]any{
 				"code":    errCode,
 				"message": err.Error(),
+			})
+			return
+		}
+
+		if err := enforceTemplatePDFModulesEnabled(ctx, moduleGuard, req.CustomerKey, req.TemplateKey); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "template module disabled")
+			l.Warnw(
+				"msg", "template pdf render module disabled",
+				"path", r.URL.Path,
+				"method", r.Method,
+				"request_id", requestID,
+				"trace_id", traceID,
+				"template_key", req.TemplateKey,
+				"customer_key", normalizeTemplatePDFCustomerKey(req.CustomerKey),
+				"err", err.Error(),
+			)
+			writeJSON(w, stdhttp.StatusBadRequest, map[string]any{
+				"code":    errcode.InvalidParam.Code,
+				"message": "当前客户配置未启用该打印模板所属模块，不能生成 PDF",
 			})
 			return
 		}
@@ -660,8 +686,45 @@ func parseRenderTemplatePDFRequest(r *stdhttp.Request) (*renderTemplatePDFReques
 	req.Title = strings.TrimSpace(req.Title)
 	req.FileName = strings.TrimSpace(req.FileName)
 	req.TemplateKey = strings.TrimSpace(req.TemplateKey)
+	req.CustomerKey = normalizeTemplatePDFCustomerKey(req.CustomerKey)
 
 	return &req, nil
+}
+
+func normalizeTemplatePDFCustomerKey(raw string) string {
+	value := biz.NormalizeCustomerKey(raw)
+	if value == "" {
+		return biz.DefaultCustomerKey
+	}
+	return value
+}
+
+func templatePDFReferencedModuleKeys(templateKey string) []string {
+	switch strings.TrimSpace(templateKey) {
+	case "material-purchase-contract":
+		return []string{"purchase_orders"}
+	case "processing-contract":
+		return []string{"outsourcing_orders"}
+	default:
+		return nil
+	}
+}
+
+func enforceTemplatePDFModulesEnabled(
+	ctx context.Context,
+	guard templatePDFModuleGuard,
+	customerKey string,
+	templateKey string,
+) error {
+	moduleKeys := templatePDFReferencedModuleKeys(templateKey)
+	if len(moduleKeys) == 0 || guard == nil {
+		return nil
+	}
+	return guard.EnsureModuleKeysEnabled(
+		ctx,
+		normalizeTemplatePDFCustomerKey(customerKey),
+		moduleKeys...,
+	)
 }
 
 func normalizeTemplatePDFBaseURL(raw string) (string, error) {

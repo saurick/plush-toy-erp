@@ -30,15 +30,31 @@ func (d *jsonrpcDispatcher) handleWorkflow(
 		l.Errorf("[workflow] usecase is nil method=%s id=%s", method, id)
 		return id, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}, nil
 	}
+	if workflowMethodRequiresEnabledModule(method) {
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), workflowModuleKeyTasks); res != nil {
+			return id, res, nil
+		}
+	}
 
 	switch method {
 	case "metadata":
 		return d.handleWorkflowMetadata(ctx, id)
-	case "list_tasks", "create_task", "update_task_status", "urge_task":
+	case "list_tasks", "create_task", "update_task_status", "complete_task_action", "block_task_action", "reject_task_action", "urge_task", "explain_action_access", "explain_task_assignment":
 		return d.handleWorkflowTask(ctx, method, id, pm, claims.UserID)
 	case "list_business_states", "upsert_business_state":
 		return d.handleWorkflowBusinessState(ctx, method, id, pm, claims.UserID)
 	default:
 		return id, unknownWorkflowResult(method), nil
+	}
+}
+
+const workflowModuleKeyTasks = "workflow_tasks"
+
+func workflowMethodRequiresEnabledModule(method string) bool {
+	switch method {
+	case "create_task", "update_task_status", "complete_task_action", "block_task_action", "reject_task_action", "urge_task", "upsert_business_state":
+		return true
+	default:
+		return false
 	}
 }

@@ -18,10 +18,16 @@ func (d *jsonrpcDispatcher) handleMasterDataMaterial(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionMaterialCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyMaterials); res != nil {
+			return id, res, nil
+		}
 		item, err := d.masterDataUC.CreateMaterial(ctx, materialMutationFromParams(pm))
 		return id, materialMutationResult(ctx, d, item, err), nil
 	case "update_material", "updateMaterial":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionMaterialUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyMaterials); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.UpdateMaterial(ctx, getInt(pm, "id", 0), materialMutationFromParams(pm))
@@ -48,6 +54,9 @@ func (d *jsonrpcDispatcher) handleMasterDataMaterial(
 		})}, nil
 	case "set_material_active", "setMaterialActive":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionMaterialDisable); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyMaterials); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.SetMaterialActive(ctx, getInt(pm, "id", 0), getBool(pm, "active", true))

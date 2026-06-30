@@ -31,7 +31,11 @@ function resolveDelayFromReferer(request, paramName) {
 
 export async function installAdminRpcMocks(
   page,
-  { baseURL = '', adminProfileOverride = null } = {}
+  {
+    baseURL = '',
+    adminProfileOverride = null,
+    effectiveSessionOverride = null,
+  } = {}
 ) {
   const nowUnix = () => Math.floor(Date.now() / 1000)
   const mockMenus = getNavigationSections()
@@ -176,6 +180,10 @@ export async function installAdminRpcMocks(
   }
   const mockContext = {
     adminProfile,
+    effectiveSession:
+      effectiveSessionOverride && typeof effectiveSessionOverride === 'object'
+        ? effectiveSessionOverride
+        : null,
     salesRole,
     adminRole,
     mockMenus,
@@ -192,6 +200,29 @@ export async function installAdminRpcMocks(
   await installOrderRpcMocks(page, mockContext)
   await installFactRpcMocks(page, mockContext)
   await installAttachmentRpcMocks(page, mockContext)
+
+  await page.route('**/rpc/customer_config', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method } = body
+    const data =
+      method === 'get_effective_session'
+        ? { session: mockContext.effectiveSession }
+        : {}
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          code: 0,
+          message: 'OK',
+          data,
+        },
+      }),
+    })
+  })
 }
 
 export async function installAdminAuthExpiredRpcMocks(page) {

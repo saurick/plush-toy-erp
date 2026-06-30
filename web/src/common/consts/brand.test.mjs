@@ -34,6 +34,7 @@ test('brand: 默认品牌保持产品中性，不包含客户公司名', () => {
     assert.deepEqual(getActiveERPBrand(), {
       brandMark: ERP_BRAND_MARK,
       companyName: ERP_COMPANY_NAME,
+      customerKey: undefined,
       faviconHref: undefined,
       systemName: ERP_ADMIN_SYSTEM_NAME,
     })
@@ -59,6 +60,7 @@ test('brand: customer key alone does not load bundled customer brand', () => {
     assert.deepEqual(getActiveERPBrand(), {
       brandMark: ERP_BRAND_MARK,
       companyName: ERP_COMPANY_NAME,
+      customerKey: undefined,
       faviconHref: undefined,
       systemName: ERP_ADMIN_SYSTEM_NAME,
     })
@@ -89,6 +91,7 @@ test('brand: runtime customer config can override neutral product brand', () => 
     assert.deepEqual(getActiveERPBrand(), {
       brandMark: '测',
       companyName: '测试客户',
+      customerKey: 'demo',
       faviconHref: '/favicon-test.svg',
       systemName: '测试 ERP',
     })

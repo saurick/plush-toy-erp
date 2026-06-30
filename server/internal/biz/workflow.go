@@ -73,8 +73,20 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 		if err := uc.applyPurchaseWarehouseInboundTransition(current, in); err != nil {
 			return nil, err
 		}
+	} else if isOutsourceReturnTrackingTask(current) {
+		if err := uc.applyOutsourceReturnTrackingTransition(current, in); err != nil {
+			return nil, err
+		}
 	} else if isOutsourceReturnQCTask(current) {
 		if err := uc.applyOutsourceReturnQCTransition(current, in); err != nil {
+			return nil, err
+		}
+	} else if isOutsourceWarehouseInboundTask(current) {
+		if err := uc.applyOutsourceWarehouseInboundTransition(current, in); err != nil {
+			return nil, err
+		}
+	} else if isOutsourceReworkTask(current) {
+		if err := uc.applyOutsourceReworkTransition(current, in); err != nil {
 			return nil, err
 		}
 	} else if isFinishedGoodsQCTask(current) {
@@ -85,10 +97,33 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 		if err := uc.applyFinishedGoodsInboundTransition(current, in); err != nil {
 			return nil, err
 		}
+	} else if isFinishedGoodsReworkTask(current) {
+		if err := uc.applyFinishedGoodsReworkTransition(current, in); err != nil {
+			return nil, err
+		}
 	} else if isShipmentReleaseTask(current) {
 		if err := uc.applyShipmentReleaseTransition(current, in); err != nil {
 			return nil, err
 		}
+	} else if isReceivableRegistrationTask(current) {
+		if err := uc.applyReceivableRegistrationTransition(current, in); err != nil {
+			return nil, err
+		}
+	} else if isInvoiceRegistrationTask(current) {
+		if err := uc.applyInvoiceRegistrationTransition(current, in); err != nil {
+			return nil, err
+		}
+	} else if isPayableRegistrationTask(current) {
+		if err := uc.applyPayableRegistrationTransition(current, in); err != nil {
+			return nil, err
+		}
+	} else if isPayableReconciliationTask(current) {
+		if err := uc.applyPayableReconciliationTransition(current, in); err != nil {
+			return nil, err
+		}
+	}
+	if err := normalizeWorkflowDerivedTaskRuntimeAnchors(current, in); err != nil {
+		return nil, err
 	}
 	if workflowStatusUpdateHasNumberedPhaseLabel(in) {
 		return nil, ErrBadParam
@@ -247,6 +282,27 @@ func (uc *WorkflowUsecase) applyPurchaseWarehouseInboundTransition(current *Work
 	return nil
 }
 
+func (uc *WorkflowUsecase) applyOutsourceReturnTrackingTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	switch in.TaskStatusKey {
+	case "done":
+		in.BusinessStatusKey = workflowQCPendingStatusKey
+		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+		delete(in.Payload, "blocked_reason")
+		delete(in.Payload, "rejected_reason")
+		in.Payload["return_task_id"] = current.ID
+		in.Payload["notification_type"] = "task_created"
+		in.Payload["alert_type"] = "outsource_return_qc_pending"
+		in.Payload["critical_path"] = true
+		in.Payload["outsource_processing"] = true
+		in.Payload["decision"] = "done"
+		in.Payload["transition_status"] = "done"
+		in.SideEffects = buildOutsourceReturnTrackingDoneSideEffects(workflowTaskWithPayload(current, in.Payload))
+	default:
+		return nil
+	}
+	return nil
+}
+
 func (uc *WorkflowUsecase) applyOutsourceReturnQCTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
 	switch in.TaskStatusKey {
 	case "done":
@@ -278,6 +334,67 @@ func (uc *WorkflowUsecase) applyOutsourceReturnQCTransition(current *WorkflowTas
 			in.Payload["rejected_reason"] = reason
 		}
 		in.SideEffects = buildOutsourceReturnQCReworkSideEffects(workflowTaskWithPayload(current, in.Payload), in.TaskStatusKey, reason)
+	default:
+		return nil
+	}
+	return nil
+}
+
+func (uc *WorkflowUsecase) applyOutsourceWarehouseInboundTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	switch in.TaskStatusKey {
+	case "done":
+		in.BusinessStatusKey = workflowInboundDoneStatusKey
+		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+		delete(in.Payload, "blocked_reason")
+		delete(in.Payload, "rejected_reason")
+		in.Payload["warehouse_task_id"] = current.ID
+		in.Payload["inbound_result"] = "done"
+		in.Payload["inventory_balance_deferred"] = true
+		in.Payload["critical_path"] = true
+		in.Payload["outsource_processing"] = true
+		in.Payload["payable_type"] = "outsource"
+		in.Payload["decision"] = "done"
+		in.Payload["transition_status"] = "done"
+		in.SideEffects = buildOutsourceWarehouseInboundDoneSideEffects(workflowTaskWithPayload(current, in.Payload))
+	default:
+		return nil
+	}
+	return nil
+}
+
+func (uc *WorkflowUsecase) applyOutsourceReworkTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	switch in.TaskStatusKey {
+	case "done":
+		in.BusinessStatusKey = workflowProductionProcessingStatusKey
+		ensureWorkflowPayload(&in.Payload)
+		in.Payload["decision"] = "done"
+		in.Payload["transition_status"] = "done"
+		in.Payload["rework_task_id"] = current.ID
+		in.Payload["rework_result"] = "arranged"
+		in.Payload["critical_path"] = true
+		in.Payload["outsource_processing"] = true
+		in.SideEffects = buildOutsourceReworkDoneSideEffects(current)
+	case "blocked", "rejected":
+		reason := workflowTransitionReason(in, in.TaskStatusKey)
+		if reason == "" {
+			return ErrBadParam
+		}
+		in.Reason = reason
+		in.BusinessStatusKey = workflowQCFailedStatusKey
+		ensureWorkflowPayload(&in.Payload)
+		in.Payload["decision"] = in.TaskStatusKey
+		in.Payload["transition_status"] = in.TaskStatusKey
+		in.Payload["rework_task_id"] = current.ID
+		in.Payload["critical_path"] = true
+		in.Payload["outsource_processing"] = true
+		if in.TaskStatusKey == "blocked" {
+			in.Payload["blocked_reason"] = reason
+			delete(in.Payload, "rejected_reason")
+		} else {
+			in.Payload["rejected_reason"] = reason
+			delete(in.Payload, "blocked_reason")
+		}
+		in.SideEffects = buildOutsourceReworkBlockedSideEffects(current, in.TaskStatusKey, reason)
 	default:
 		return nil
 	}
@@ -375,6 +492,43 @@ func (uc *WorkflowUsecase) applyFinishedGoodsInboundTransition(current *Workflow
 	return nil
 }
 
+func (uc *WorkflowUsecase) applyFinishedGoodsReworkTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	switch in.TaskStatusKey {
+	case "done":
+		in.BusinessStatusKey = workflowProductionProcessingStatusKey
+		ensureWorkflowPayload(&in.Payload)
+		in.Payload["decision"] = "done"
+		in.Payload["transition_status"] = "done"
+		in.Payload["rework_task_id"] = current.ID
+		in.Payload["rework_result"] = "arranged"
+		in.Payload["critical_path"] = true
+		in.Payload["finished_goods"] = true
+		in.SideEffects = buildFinishedGoodsReworkDoneSideEffects(current)
+	case "blocked", "rejected":
+		reason := workflowTransitionReason(in, in.TaskStatusKey)
+		if reason == "" {
+			return ErrBadParam
+		}
+		in.Reason = reason
+		in.BusinessStatusKey = workflowQCFailedStatusKey
+		ensureWorkflowPayload(&in.Payload)
+		in.Payload["decision"] = in.TaskStatusKey
+		in.Payload["transition_status"] = in.TaskStatusKey
+		in.Payload["rework_task_id"] = current.ID
+		in.Payload["critical_path"] = true
+		in.Payload["finished_goods"] = true
+		if in.TaskStatusKey == "blocked" {
+			in.Payload["blocked_reason"] = reason
+		} else {
+			in.Payload["rejected_reason"] = reason
+		}
+		in.SideEffects = buildFinishedGoodsReworkBlockedSideEffects(current, in.TaskStatusKey, reason)
+	default:
+		return nil
+	}
+	return nil
+}
+
 func (uc *WorkflowUsecase) applyShipmentReleaseTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
 	switch in.TaskStatusKey {
 	case "done":
@@ -419,6 +573,160 @@ func (uc *WorkflowUsecase) applyShipmentReleaseTransition(current *WorkflowTask,
 	return nil
 }
 
+func (uc *WorkflowUsecase) applyReceivableRegistrationTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	switch in.TaskStatusKey {
+	case "done":
+		in.BusinessStatusKey = workflowReconcilingStatusKey
+		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+		delete(in.Payload, "blocked_reason")
+		delete(in.Payload, "rejected_reason")
+		in.Payload["receivable_task_id"] = current.ID
+		in.Payload["receivable_result"] = "registered"
+		in.Payload["notification_type"] = "finance_pending"
+		in.Payload["alert_type"] = "invoice_pending"
+		in.Payload["critical_path"] = false
+		in.Payload["next_module_key"] = workflowInvoicesModuleKey
+		in.Payload["decision"] = "done"
+		in.Payload["transition_status"] = "done"
+		in.SideEffects = buildReceivableRegistrationDoneSideEffects(workflowTaskWithPayload(current, in.Payload))
+	case "blocked", "rejected":
+		if err := applyShipmentFinanceBlockedTransition(current, in); err != nil {
+			return err
+		}
+	default:
+		return nil
+	}
+	return nil
+}
+
+func (uc *WorkflowUsecase) applyInvoiceRegistrationTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	switch in.TaskStatusKey {
+	case "done":
+		in.BusinessStatusKey = workflowReconcilingStatusKey
+		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+		delete(in.Payload, "blocked_reason")
+		delete(in.Payload, "rejected_reason")
+		in.Payload["invoice_task_id"] = current.ID
+		in.Payload["invoice_result"] = "registered"
+		in.Payload["critical_path"] = false
+		in.Payload["next_module_key"] = "reconciliation"
+		in.Payload["decision"] = "done"
+		in.Payload["transition_status"] = "done"
+		in.SideEffects = buildInvoiceRegistrationDoneSideEffects(workflowTaskWithPayload(current, in.Payload))
+	case "blocked", "rejected":
+		if err := applyShipmentFinanceBlockedTransition(current, in); err != nil {
+			return err
+		}
+	default:
+		return nil
+	}
+	return nil
+}
+
+func applyShipmentFinanceBlockedTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	reason := workflowTransitionReason(in, in.TaskStatusKey)
+	if reason == "" {
+		return ErrBadParam
+	}
+	in.Reason = reason
+	in.BusinessStatusKey = workflowBlockedStatusKey
+	in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+	in.Payload["finance_task_id"] = current.ID
+	in.Payload["notification_type"] = "finance_pending"
+	in.Payload["alert_type"] = "finance_pending"
+	in.Payload["critical_path"] = true
+	in.Payload["decision"] = in.TaskStatusKey
+	in.Payload["transition_status"] = in.TaskStatusKey
+	if in.TaskStatusKey == "blocked" {
+		in.Payload["blocked_reason"] = reason
+		delete(in.Payload, "rejected_reason")
+	} else {
+		in.Payload["rejected_reason"] = reason
+		delete(in.Payload, "blocked_reason")
+	}
+	in.SideEffects = buildShipmentFinanceBlockedSideEffects(workflowTaskWithPayload(current, in.Payload), in.TaskStatusKey, reason)
+	return nil
+}
+
+func (uc *WorkflowUsecase) applyPayableRegistrationTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	switch in.TaskStatusKey {
+	case "done":
+		payableType := workflowPayableType(current)
+		in.BusinessStatusKey = workflowReconcilingStatusKey
+		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+		delete(in.Payload, "blocked_reason")
+		delete(in.Payload, "rejected_reason")
+		in.Payload["payable_task_id"] = current.ID
+		in.Payload["payable_result"] = "registered"
+		in.Payload["notification_type"] = "finance_pending"
+		in.Payload["alert_type"] = "reconciliation_pending"
+		in.Payload["critical_path"] = false
+		in.Payload["next_module_key"] = workflowReconciliationModuleKey
+		in.Payload["payable_type"] = payableType
+		in.Payload["decision"] = "done"
+		in.Payload["transition_status"] = "done"
+		in.SideEffects = buildPayableRegistrationDoneSideEffects(workflowTaskWithPayload(current, in.Payload))
+	case "blocked", "rejected":
+		if err := applyPayableFinanceBlockedTransition(current, in); err != nil {
+			return err
+		}
+	default:
+		return nil
+	}
+	return nil
+}
+
+func (uc *WorkflowUsecase) applyPayableReconciliationTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	switch in.TaskStatusKey {
+	case "done":
+		payableType := workflowPayableType(current)
+		in.BusinessStatusKey = workflowSettledStatusKey
+		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+		delete(in.Payload, "blocked_reason")
+		delete(in.Payload, "rejected_reason")
+		in.Payload["reconciliation_task_id"] = current.ID
+		in.Payload["reconciliation_result"] = "settled"
+		in.Payload["payable_type"] = payableType
+		in.Payload["decision"] = "done"
+		in.Payload["transition_status"] = "done"
+		in.SideEffects = buildPayableReconciliationDoneSideEffects(workflowTaskWithPayload(current, in.Payload))
+	case "blocked", "rejected":
+		if err := applyPayableFinanceBlockedTransition(current, in); err != nil {
+			return err
+		}
+	default:
+		return nil
+	}
+	return nil
+}
+
+func applyPayableFinanceBlockedTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	reason := workflowTransitionReason(in, in.TaskStatusKey)
+	if reason == "" {
+		return ErrBadParam
+	}
+	payableType := workflowPayableType(current)
+	in.Reason = reason
+	in.BusinessStatusKey = workflowBlockedStatusKey
+	in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+	in.Payload["finance_task_id"] = current.ID
+	in.Payload["notification_type"] = "finance_pending"
+	in.Payload["alert_type"] = "finance_pending"
+	in.Payload["critical_path"] = true
+	in.Payload["payable_type"] = payableType
+	in.Payload["decision"] = in.TaskStatusKey
+	in.Payload["transition_status"] = in.TaskStatusKey
+	if in.TaskStatusKey == "blocked" {
+		in.Payload["blocked_reason"] = reason
+		delete(in.Payload, "rejected_reason")
+	} else {
+		in.Payload["rejected_reason"] = reason
+		delete(in.Payload, "blocked_reason")
+	}
+	in.SideEffects = buildPayableFinanceBlockedSideEffects(workflowTaskWithPayload(current, in.Payload), in.TaskStatusKey, reason)
+	return nil
+}
+
 func (uc *WorkflowUsecase) UrgeTask(ctx context.Context, in *WorkflowTaskUrge, actorID int, actorRoleKey string) (*WorkflowTask, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
@@ -458,6 +766,7 @@ func (uc *WorkflowUsecase) UpsertBusinessState(ctx context.Context, in *Workflow
 
 func normalizeWorkflowTaskFilter(filter WorkflowTaskFilter) WorkflowTaskFilter {
 	filter.OwnerRoleKey = NormalizeRoleKey(filter.OwnerRoleKey)
+	filter.VisibleOwnerRoleKeys = normalizeWorkflowVisibleOwnerRoleKeys(filter.VisibleOwnerRoleKeys)
 	filter.TaskStatusKey = strings.TrimSpace(filter.TaskStatusKey)
 	filter.TaskGroup = strings.TrimSpace(filter.TaskGroup)
 	filter.SourceType = strings.TrimSpace(filter.SourceType)
@@ -473,6 +782,26 @@ func normalizeWorkflowTaskFilter(filter WorkflowTaskFilter) WorkflowTaskFilter {
 	return filter
 }
 
+func normalizeWorkflowVisibleOwnerRoleKeys(roleKeys []string) []string {
+	if len(roleKeys) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(roleKeys))
+	seen := map[string]struct{}{}
+	for _, raw := range roleKeys {
+		key := NormalizeRoleKey(raw)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, key)
+	}
+	return out
+}
+
 func normalizeWorkflowTaskCreate(in WorkflowTaskCreate) (WorkflowTaskCreate, error) {
 	in.TaskCode = strings.TrimSpace(in.TaskCode)
 	in.TaskGroup = strings.TrimSpace(in.TaskGroup)
@@ -480,6 +809,31 @@ func normalizeWorkflowTaskCreate(in WorkflowTaskCreate) (WorkflowTaskCreate, err
 	in.SourceType = strings.TrimSpace(in.SourceType)
 	in.TaskStatusKey = strings.TrimSpace(in.TaskStatusKey)
 	in.OwnerRoleKey = NormalizeRoleKey(in.OwnerRoleKey)
+	in.OwnerPoolKey = normalizeWorkflowOptionalStringPtr(in.OwnerPoolKey)
+	if in.OwnerPoolKey == nil && in.OwnerRoleKey != "" {
+		ownerPoolKey := in.OwnerRoleKey
+		in.OwnerPoolKey = &ownerPoolKey
+	}
+	in.RequiredCapabilityKey = normalizeWorkflowOptionalStringPtr(in.RequiredCapabilityKey)
+	if in.RequiredCapabilityKey == nil {
+		requiredCapabilityKey := workflowTaskDefaultRequiredCapability(in)
+		if requiredCapabilityKey != "" {
+			in.RequiredCapabilityKey = &requiredCapabilityKey
+		}
+	}
+	in.ConfigRevision = normalizeWorkflowOptionalStringPtr(in.ConfigRevision)
+	var err error
+	in.ProcessInstanceID, err = normalizeWorkflowOptionalPositiveIntPtr(in.ProcessInstanceID)
+	if err != nil {
+		return WorkflowTaskCreate{}, err
+	}
+	in.ProcessNodeInstanceID, err = normalizeWorkflowOptionalPositiveIntPtr(in.ProcessNodeInstanceID)
+	if err != nil {
+		return WorkflowTaskCreate{}, err
+	}
+	if in.ProcessNodeInstanceID != nil && in.ProcessInstanceID == nil {
+		return WorkflowTaskCreate{}, ErrBadParam
+	}
 	if in.TaskStatusKey == "" {
 		in.TaskStatusKey = "pending"
 	}
@@ -508,12 +862,62 @@ func normalizeWorkflowTaskCreate(in WorkflowTaskCreate) (WorkflowTaskCreate, err
 	return in, nil
 }
 
+func normalizeWorkflowOptionalStringPtr(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	normalized := strings.TrimSpace(*value)
+	if normalized == "" {
+		return nil
+	}
+	return &normalized
+}
+
+func normalizeWorkflowOptionalPositiveIntPtr(value *int) (*int, error) {
+	if value == nil {
+		return nil, nil
+	}
+	if *value <= 0 {
+		return nil, ErrBadParam
+	}
+	normalized := *value
+	return &normalized, nil
+}
+
+func workflowTaskDefaultRequiredCapability(in WorkflowTaskCreate) string {
+	task := &WorkflowTask{
+		TaskGroup:    in.TaskGroup,
+		SourceType:   in.SourceType,
+		OwnerRoleKey: in.OwnerRoleKey,
+	}
+	return WorkflowStatusActionPermission("done", task)
+}
+
+func normalizeWorkflowDerivedTaskRuntimeAnchors(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	if current == nil || in == nil || in.SideEffects == nil || in.SideEffects.DerivedTask == nil {
+		return nil
+	}
+	derived := *in.SideEffects.DerivedTask
+	if derived.ConfigRevision == nil && current.ConfigRevision != nil {
+		derived.ConfigRevision = normalizeWorkflowOptionalStringPtr(current.ConfigRevision)
+	}
+	normalized, err := normalizeWorkflowTaskCreate(derived)
+	if err != nil {
+		return err
+	}
+	in.SideEffects.DerivedTask = &normalized
+	return nil
+}
+
 func workflowCreateHasNumberedPhaseLabel(in WorkflowTaskCreate) bool {
 	return workflowTextHasNumberedPhaseLabel(
 		in.TaskCode,
 		in.TaskName,
 		workflowStringPtrValue(in.SourceNo),
 		workflowStringPtrValue(in.BlockedReason),
+		workflowStringPtrValue(in.OwnerPoolKey),
+		workflowStringPtrValue(in.RequiredCapabilityKey),
+		workflowStringPtrValue(in.ConfigRevision),
 	) || workflowValueHasNumberedPhaseLabel(in.Payload)
 }
 

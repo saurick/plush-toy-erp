@@ -37,6 +37,8 @@ var ProviderSet = wire.NewSet(
 	// domain repos
 	NewWorkflowRepo,
 	wire.Bind(new(biz.WorkflowRepo), new(*workflowRepo)),
+	NewProcessRuntimeRepo,
+	wire.Bind(new(biz.ProcessRuntimeRepo), new(*processRuntimeRepo)),
 	NewDebugSeedRepo,
 	wire.Bind(new(biz.DebugRepo), new(*debugSeedRepo)),
 	NewDebugSafetyConfig,
@@ -54,6 +56,8 @@ var ProviderSet = wire.NewSet(
 	wire.Bind(new(biz.OperationalFactRepo), new(*operationalFactRepo)),
 	NewBusinessAttachmentRepo,
 	wire.Bind(new(biz.BusinessAttachmentRepo), new(*businessAttachmentRepo)),
+	NewCustomerConfigRepo,
+	wire.Bind(new(biz.CustomerConfigRepo), new(*customerConfigRepo)),
 )
 
 // Data 聚合 DB 等外部资源。

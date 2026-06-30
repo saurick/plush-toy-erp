@@ -10,6 +10,7 @@ import (
 	"server/internal/errcode"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type stubOutsourcingOrderJSONRPCRepo struct {
@@ -24,6 +25,7 @@ type stubOutsourcingOrderJSONRPCRepo struct {
 	processOutsourcing bool
 	lastFilter         biz.OutsourcingOrderFilter
 	lastItemFilter     biz.OutsourcingOrderItemFilter
+	lifecycleCalls     int
 }
 
 func newStubOutsourcingOrderJSONRPCRepo() *stubOutsourcingOrderJSONRPCRepo {
@@ -58,6 +60,7 @@ func (s *stubOutsourcingOrderJSONRPCRepo) ListOutsourcingOrders(_ context.Contex
 }
 
 func (s *stubOutsourcingOrderJSONRPCRepo) UpdateOutsourcingOrderLifecycle(_ context.Context, id int, lifecycleStatus string) (*biz.OutsourcingOrder, error) {
+	s.lifecycleCalls++
 	order, ok := s.orders[id]
 	if !ok {
 		return nil, biz.ErrOutsourcingOrderNotFound
@@ -127,7 +130,7 @@ func (s *stubOutsourcingOrderJSONRPCRepo) ProcessIsUsableForOutsourcing(context.
 
 func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testing.T) {
 	repo := newStubOutsourcingOrderJSONRPCRepo()
-	j := newOutsourcingOrderJSONRPCTestData(repo, workflowJSONRPCAdmin(
+	j := newOutsourcingOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
 		[]string{biz.PurchaseRoleKey},
 		biz.PermissionOutsourcingOrderCreate,
 		biz.PermissionOutsourcingOrderRead,
@@ -248,13 +251,136 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	}
 }
 
-func newOutsourcingOrderJSONRPCTestData(repo *stubOutsourcingOrderJSONRPCRepo, admin *biz.AdminUser) *jsonrpcDispatcher {
+func TestJsonrpcDispatcher_OutsourcingOrderAPIRequiresEnabledModule(t *testing.T) {
+	repo := newStubOutsourcingOrderJSONRPCRepo()
+	j := newOutsourcingOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.PurchaseRoleKey},
+		biz.PermissionOutsourcingOrderCreate,
+		biz.PermissionOutsourcingOrderRead,
+		biz.PermissionOutsourcingOrderUpdate,
+		biz.PermissionOutsourcingOrderConfirm,
+	))
+	ctx := workflowJSONRPCAdminContext()
+	saveParams := outsourcingOrderJSONRPCSaveParams(t, "OUT-MODULE-GATE-SAVE")
+
+	readOnlyConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.outsourcing-orders-read-only",
+		"outsourcing_orders",
+		"read_only",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, readOnlyConfig)
+	_, saveRes, err := j.handleOutsourcingOrder(ctx, "save_outsourcing_order_with_items", "read-only-save", saveParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if saveRes == nil || saveRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected read_only outsourcing_orders save rejected, got %#v", saveRes)
+	}
+	if len(repo.orders) != 0 || len(repo.items) != 0 {
+		t.Fatalf("read_only outsourcing_orders must not save order/items, orders=%#v items=%#v", repo.orders, repo.items)
+	}
+	_, listRes, err := j.handleOutsourcingOrder(ctx, "list_outsourcing_orders", "read-after-read-only", mustJSONRPCStruct(t, map[string]any{"limit": 20}))
+	if err != nil {
+		t.Fatalf("expected nil err listing historical outsourcing orders, got %v", err)
+	}
+	if listRes == nil || listRes.Code != errcode.OK.Code {
+		t.Fatalf("expected list_outsourcing_orders to remain available for historical read, got %#v", listRes)
+	}
+
+	enabledConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.outsourcing-orders-enabled",
+		"outsourcing_orders",
+		"enabled",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, enabledConfig)
+	_, saveRes, err = j.handleOutsourcingOrder(ctx, "save_outsourcing_order_with_items", "enabled-save", saveParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if saveRes == nil || saveRes.Code != errcode.OK.Code {
+		t.Fatalf("expected enabled outsourcing_orders save OK, got %#v", saveRes)
+	}
+	orderID := jsonRPCInt(t, jsonRPCNestedMap(t, saveRes, "outsourcing_order"), "id")
+	_, submitRes, err := j.handleOutsourcingOrder(ctx, "submit_outsourcing_order", "enabled-submit", mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if submitRes == nil || submitRes.Code != errcode.OK.Code || repo.orders[orderID].LifecycleStatus != biz.OutsourcingOrderStatusSubmitted {
+		t.Fatalf("expected enabled outsourcing_orders submit OK, res=%#v order=%#v", submitRes, repo.orders[orderID])
+	}
+
+	disabledConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.outsourcing-orders-disabled",
+		"outsourcing_orders",
+		"disabled",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, disabledConfig)
+	beforeLifecycleCalls := repo.lifecycleCalls
+	_, confirmRes, err := j.handleOutsourcingOrder(ctx, "confirm_outsourcing_order", "disabled-confirm", mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if confirmRes == nil || confirmRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected disabled outsourcing_orders confirm rejected, got %#v", confirmRes)
+	}
+	if repo.lifecycleCalls != beforeLifecycleCalls || repo.orders[orderID].LifecycleStatus != biz.OutsourcingOrderStatusSubmitted {
+		t.Fatalf("disabled outsourcing_orders must not update lifecycle, calls=%d order=%#v", repo.lifecycleCalls, repo.orders[orderID])
+	}
+	_, itemListRes, err := j.handleOutsourcingOrder(ctx, "list_outsourcing_order_items", "read-items-after-disabled", mustJSONRPCStruct(t, map[string]any{"outsourcing_order_id": float64(orderID)}))
+	if err != nil {
+		t.Fatalf("expected nil err listing historical outsourcing order items, got %v", err)
+	}
+	if itemListRes == nil || itemListRes.Code != errcode.OK.Code {
+		t.Fatalf("expected list_outsourcing_order_items to remain available for historical read, got %#v", itemListRes)
+	}
+}
+
+func newOutsourcingOrderJSONRPCTestData(t *testing.T, repo *stubOutsourcingOrderJSONRPCRepo, admin *biz.AdminUser) *jsonrpcDispatcher {
+	t.Helper()
 	logger := log.NewStdLogger(io.Discard)
-	return &jsonrpcDispatcher{
+	dispatcher := &jsonrpcDispatcher{
 		log:                log.NewHelper(log.With(logger, "module", "service.jsonrpc.outsourcing_order.test")),
 		adminReader:        stubAdminAccountReader{admin: admin},
 		outsourcingOrderUC: biz.NewOutsourcingOrderUsecase(repo),
+		customerConfigUC:   biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo()),
 	}
+	activateOperationalFactTestCustomerConfig(t, dispatcher, customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.outsourcing-orders-default-enabled",
+		"outsourcing_orders",
+		"enabled",
+	))
+	return dispatcher
+}
+
+func outsourcingOrderJSONRPCSaveParams(t *testing.T, orderNo string) *structpb.Struct {
+	t.Helper()
+	return mustJSONRPCStruct(t, map[string]any{
+		"outsourcing_order_no": orderNo,
+		"supplier_id":          float64(1),
+		"source_order_no":      "SO-MODULE-GATE",
+		"order_date":           "2026-06-17",
+		"items": []any{
+			map[string]any{
+				"line_no":               float64(1),
+				"product_id":            float64(1),
+				"process_id":            float64(1),
+				"unit_id":               float64(1),
+				"outsourcing_quantity":  "12.5",
+				"product_no_snapshot":   "PROD-MODULE-GATE",
+				"product_name_snapshot": "半成品",
+				"process_name_snapshot": "车缝",
+				"unit_name_snapshot":    "只",
+			},
+		},
+	})
 }
 
 func outsourcingOrderFromMutation(id int, status string, in *biz.OutsourcingOrderMutation) *biz.OutsourcingOrder {

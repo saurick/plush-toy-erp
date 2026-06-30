@@ -1,0 +1,3 @@
+Migration Status: 待填写，恢复 dump 后、执行 atlas migrate apply 前记录
+Current Version: 待填写，必须等于 release-evidence.md migrationBefore
+Pending Files: 待填写，允许大于 0，但必须可解释为待 apply migration

@@ -17,6 +17,9 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionSalesOrderUpdate, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "inventory"); res != nil {
+			return id, res, nil
+		}
 		in, ok := stockReservationCreateFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -27,10 +30,16 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionSalesOrderUpdate, biz.PermissionWarehouseOutboundConfirm); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "inventory"); res != nil {
+			return id, res, nil
+		}
 		item, err := d.operationalFactUC.ReleaseStockReservation(ctx, getInt(pm, "id", 0))
 		return id, operationalFactStockReservationResult(ctx, d, item, err), nil
 	case "consume_stock_reservation", "consumeStockReservation":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseOutboundConfirm); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "inventory"); res != nil {
 			return id, res, nil
 		}
 		item, err := d.operationalFactUC.ConsumeStockReservation(ctx, getInt(pm, "id", 0))

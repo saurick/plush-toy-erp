@@ -11,6 +11,8 @@ import (
 	"server/internal/errcode"
 )
 
+const bomModuleKeyMaterialBOM = "material_bom"
+
 func unknownBOMResult(method string) *v1.JsonrpcResult {
 	return &v1.JsonrpcResult{Code: errcode.UnknownMethod.Code, Message: fmt.Sprintf("未知 bom 接口 method=%s", method)}
 }

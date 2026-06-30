@@ -26,10 +26,12 @@ import WorkflowTaskActionDrawer, {
   TASK_ACTION_META,
 } from '../components/workflow/WorkflowTaskActionDrawer.jsx'
 import {
+  blockWorkflowTaskAction,
+  completeWorkflowTaskAction,
   listWorkflowTasks,
-  updateWorkflowTaskStatus,
   urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
+import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js'
 import {
   formatWorkflowTaskSource,
   resolveWorkflowTaskEntryPath,
@@ -501,6 +503,16 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const selectedWorkbenchEntryPath = selectedWorkbenchTask
     ? resolveWorkflowTaskEntryPath(selectedWorkbenchTask)
     : ''
+  const selectedWorkbenchTaskAccess = useWorkflowTaskActionAccess({
+    adminProfile,
+    task: selectedWorkbenchTask,
+    enabled: Boolean(selectedWorkbenchTask),
+  })
+  const actionDrawerAccess = useWorkflowTaskActionAccess({
+    adminProfile,
+    task: selectedTask,
+    enabled: Boolean(selectedTask),
+  })
 
   const updateFilter = (key, value) => {
     setSearchParams(
@@ -566,12 +578,15 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       message.warning('已结束任务不能继续处理')
       return
     }
-    if (
-      !getWorkflowTaskAllowedActionModes(adminProfile, selectedTask).includes(
-        actionMode
+    if (actionDrawerAccess.loading) {
+      message.warning('正在核对任务动作权限，请稍后再提交')
+      return
+    }
+    if (!actionDrawerAccess.canRun(actionMode)) {
+      message.warning(
+        actionDrawerAccess.getReason(actionMode) ||
+          getWorkflowTaskReadonlyReason(adminProfile, selectedTask)
       )
-    ) {
-      message.warning(getWorkflowTaskReadonlyReason(adminProfile, selectedTask))
       return
     }
 
@@ -588,7 +603,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           task_id: selectedTask.id,
           action: 'urge_task',
           reason,
-          actor_role_key: 'admin',
           payload: {
             source_type: selectedTask.source_type,
             source_id: selectedTask.source_id,
@@ -598,9 +612,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         })
       } else {
         const nextStatusKey = actionMode === 'block' ? 'blocked' : 'done'
-        await updateWorkflowTaskStatus({
+        const actionParams = {
           id: selectedTask.id,
-          task_status_key: nextStatusKey,
           business_status_key:
             actionMode === 'block'
               ? 'blocked'
@@ -611,7 +624,18 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             desktop_task_board_action: actionMode,
             blocked_reason: actionMode === 'block' ? reason : undefined,
           },
-        })
+        }
+        if (nextStatusKey === 'done') {
+          await completeWorkflowTaskAction({
+            ...actionParams,
+            action_key: 'complete',
+          })
+        } else {
+          await blockWorkflowTaskAction({
+            ...actionParams,
+            action_key: 'block',
+          })
+        }
       }
       message.success(actionMeta.successMessage)
       closeTaskDrawer()
@@ -864,9 +888,13 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                         </Descriptions.Item>
                       </Descriptions>
                       <Space wrap className="erp-workbench-detail-actions">
-                        {getAllowedTaskActionModes(
-                          selectedWorkbenchTask
-                        ).includes('complete') ? (
+                        {selectedWorkbenchTaskAccess.loading ? (
+                          <Button disabled>核对权限中</Button>
+                        ) : null}
+                        {!selectedWorkbenchTaskAccess.loading &&
+                        selectedWorkbenchTaskAccess.allowedModes.includes(
+                          'complete'
+                        ) ? (
                           <Button
                             type="primary"
                             onClick={() =>
@@ -876,9 +904,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                             处理任务
                           </Button>
                         ) : null}
-                        {getAllowedTaskActionModes(
-                          selectedWorkbenchTask
-                        ).includes('block') ? (
+                        {!selectedWorkbenchTaskAccess.loading &&
+                        selectedWorkbenchTaskAccess.allowedModes.includes(
+                          'block'
+                        ) ? (
                           <Button
                             danger
                             onClick={() =>
@@ -888,9 +917,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                             标记阻塞
                           </Button>
                         ) : null}
-                        {getAllowedTaskActionModes(selectedWorkbenchTask)
-                          .length === 0 ? (
+                        {!selectedWorkbenchTaskAccess.loading &&
+                        selectedWorkbenchTaskAccess.allowedModes.length ===
+                          0 ? (
                             <Button
+                              title={selectedWorkbenchTaskAccess.readonlyReason}
                               onClick={() =>
                               openTaskDrawer(selectedWorkbenchTask)
                             }
@@ -1247,8 +1278,13 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         actionMode={actionMode}
         actionReason={actionReason}
         actionSaving={actionSaving}
-        allowedActionModes={getAllowedTaskActionModes(selectedTask)}
-        readonlyReason={getTaskReadonlyNotice(selectedTask)}
+        allowedActionModes={actionDrawerAccess.allowedModes}
+        readonlyReason={
+          actionDrawerAccess.loading
+            ? '正在向后端核对当前任务动作权限。'
+            : actionDrawerAccess.readonlyReason ||
+              getTaskReadonlyNotice(selectedTask)
+        }
         onActionModeChange={setActionMode}
         onActionReasonChange={setActionReason}
         onClose={closeTaskDrawer}

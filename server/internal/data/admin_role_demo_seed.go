@@ -51,6 +51,7 @@ func DefaultRoleDemoAdminAccounts(includeDebug bool) []RoleDemoAdminAccountSpec 
 		{Username: "demo_quality", RoleKey: biz.QualityRoleKey},
 		{Username: "demo_finance", RoleKey: biz.FinanceRoleKey},
 		{Username: "demo_pmc", RoleKey: biz.PMCRoleKey},
+		{Username: "demo_engineering", RoleKey: biz.EngineeringRoleKey},
 		{Username: "demo_admin", RoleKey: biz.AdminRoleKey},
 	}
 	if includeDebug {

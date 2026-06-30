@@ -9,6 +9,43 @@ import (
 )
 
 var (
+	// AccessEntitlementsColumns holds the columns for the "access_entitlements" table.
+	AccessEntitlementsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "customer_key", Type: field.TypeString, Size: 64},
+		{Name: "config_revision", Type: field.TypeString, Size: 64},
+		{Name: "role_key", Type: field.TypeString, Size: 64},
+		{Name: "capability_key", Type: field.TypeString, Size: 128},
+		{Name: "scope_type", Type: field.TypeString, Size: 64, Default: "global"},
+		{Name: "scope_value", Type: field.TypeString, Size: 128, Default: "*"},
+		{Name: "constraints", Type: field.TypeJSON, Nullable: true},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// AccessEntitlementsTable holds the schema information for the "access_entitlements" table.
+	AccessEntitlementsTable = &schema.Table{
+		Name:       "access_entitlements",
+		Columns:    AccessEntitlementsColumns,
+		PrimaryKey: []*schema.Column{AccessEntitlementsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "accessentitlement_customer_key_config_revision_role_key_capability_key_scope_type_scope_value",
+				Unique:  true,
+				Columns: []*schema.Column{AccessEntitlementsColumns[1], AccessEntitlementsColumns[2], AccessEntitlementsColumns[3], AccessEntitlementsColumns[4], AccessEntitlementsColumns[5], AccessEntitlementsColumns[6]},
+			},
+			{
+				Name:    "accessentitlement_customer_key_config_revision_role_key_enabled",
+				Unique:  false,
+				Columns: []*schema.Column{AccessEntitlementsColumns[1], AccessEntitlementsColumns[2], AccessEntitlementsColumns[3], AccessEntitlementsColumns[8]},
+			},
+			{
+				Name:    "accessentitlement_customer_key_config_revision_capability_key_enabled",
+				Unique:  false,
+				Columns: []*schema.Column{AccessEntitlementsColumns[1], AccessEntitlementsColumns[2], AccessEntitlementsColumns[4], AccessEntitlementsColumns[8]},
+			},
+		},
+	}
 	// AdminUsersColumns holds the columns for the "admin_users" table.
 	AdminUsersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -302,6 +339,80 @@ var (
 				Name:    "customer_is_active",
 				Unique:  false,
 				Columns: []*schema.Column{CustomersColumns[7]},
+			},
+		},
+	}
+	// CustomerConfigRevisionsColumns holds the columns for the "customer_config_revisions" table.
+	CustomerConfigRevisionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "customer_key", Type: field.TypeString, Size: 64},
+		{Name: "revision", Type: field.TypeString, Size: 64},
+		{Name: "product_version", Type: field.TypeString, Size: 128, Default: ""},
+		{Name: "config_hash", Type: field.TypeString, Size: 128},
+		{Name: "status", Type: field.TypeString, Size: 32, Default: "published"},
+		{Name: "compiled_snapshot", Type: field.TypeJSON, Nullable: true},
+		{Name: "published_by", Type: field.TypeInt, Nullable: true},
+		{Name: "published_at", Type: field.TypeTime, Nullable: true},
+		{Name: "activated_by", Type: field.TypeInt, Nullable: true},
+		{Name: "activated_at", Type: field.TypeTime, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// CustomerConfigRevisionsTable holds the schema information for the "customer_config_revisions" table.
+	CustomerConfigRevisionsTable = &schema.Table{
+		Name:       "customer_config_revisions",
+		Columns:    CustomerConfigRevisionsColumns,
+		PrimaryKey: []*schema.Column{CustomerConfigRevisionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "customerconfigrevision_customer_key_revision",
+				Unique:  true,
+				Columns: []*schema.Column{CustomerConfigRevisionsColumns[1], CustomerConfigRevisionsColumns[2]},
+			},
+			{
+				Name:    "customerconfigrevision_customer_key_status",
+				Unique:  false,
+				Columns: []*schema.Column{CustomerConfigRevisionsColumns[1], CustomerConfigRevisionsColumns[5]},
+			},
+			{
+				Name:    "customerconfigrevision_config_hash",
+				Unique:  false,
+				Columns: []*schema.Column{CustomerConfigRevisionsColumns[4]},
+			},
+		},
+	}
+	// DeploymentModuleStatesColumns holds the columns for the "deployment_module_states" table.
+	DeploymentModuleStatesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "customer_key", Type: field.TypeString, Size: 64},
+		{Name: "config_revision", Type: field.TypeString, Size: 64},
+		{Name: "module_key", Type: field.TypeString, Size: 128},
+		{Name: "contract_version", Type: field.TypeString, Size: 64, Default: ""},
+		{Name: "state", Type: field.TypeString, Size: 32, Default: "enabled"},
+		{Name: "reason", Type: field.TypeString, Size: 512, Default: ""},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// DeploymentModuleStatesTable holds the schema information for the "deployment_module_states" table.
+	DeploymentModuleStatesTable = &schema.Table{
+		Name:       "deployment_module_states",
+		Columns:    DeploymentModuleStatesColumns,
+		PrimaryKey: []*schema.Column{DeploymentModuleStatesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "deploymentmodulestate_customer_key_config_revision_module_key",
+				Unique:  true,
+				Columns: []*schema.Column{DeploymentModuleStatesColumns[1], DeploymentModuleStatesColumns[2], DeploymentModuleStatesColumns[3]},
+			},
+			{
+				Name:    "deploymentmodulestate_customer_key_module_key",
+				Unique:  false,
+				Columns: []*schema.Column{DeploymentModuleStatesColumns[1], DeploymentModuleStatesColumns[3]},
+			},
+			{
+				Name:    "deploymentmodulestate_state",
+				Unique:  false,
+				Columns: []*schema.Column{DeploymentModuleStatesColumns[5]},
 			},
 		},
 	}
@@ -909,6 +1020,123 @@ var (
 				Name:    "process_sort_order_id",
 				Unique:  false,
 				Columns: []*schema.Column{ProcessesColumns[7], ProcessesColumns[0]},
+			},
+		},
+	}
+	// ProcessInstancesColumns holds the columns for the "process_instances" table.
+	ProcessInstancesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "process_key", Type: field.TypeString, Size: 64},
+		{Name: "process_version", Type: field.TypeString, Size: 64},
+		{Name: "variant_key", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "config_revision", Type: field.TypeString, Size: 128},
+		{Name: "definition_hash", Type: field.TypeString, Size: 128},
+		{Name: "module_contract_snapshot", Type: field.TypeJSON, Nullable: true},
+		{Name: "business_ref_type", Type: field.TypeString, Size: 64},
+		{Name: "business_ref_id", Type: field.TypeInt},
+		{Name: "business_ref_no", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "correlation_key", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "idempotency_key", Type: field.TypeString, Size: 128},
+		{Name: "status", Type: field.TypeString, Size: 32, Default: "active"},
+		{Name: "started_at", Type: field.TypeTime},
+		{Name: "completed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "created_by", Type: field.TypeInt, Nullable: true},
+		{Name: "updated_by", Type: field.TypeInt, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// ProcessInstancesTable holds the schema information for the "process_instances" table.
+	ProcessInstancesTable = &schema.Table{
+		Name:       "process_instances",
+		Columns:    ProcessInstancesColumns,
+		PrimaryKey: []*schema.Column{ProcessInstancesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "processinstance_process_key_business_ref_type_business_ref_id_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{ProcessInstancesColumns[1], ProcessInstancesColumns[7], ProcessInstancesColumns[8], ProcessInstancesColumns[11]},
+			},
+			{
+				Name:    "processinstance_config_revision_process_key",
+				Unique:  false,
+				Columns: []*schema.Column{ProcessInstancesColumns[4], ProcessInstancesColumns[1]},
+			},
+			{
+				Name:    "processinstance_business_ref_type_business_ref_id",
+				Unique:  false,
+				Columns: []*schema.Column{ProcessInstancesColumns[7], ProcessInstancesColumns[8]},
+			},
+			{
+				Name:    "processinstance_status_updated_at",
+				Unique:  false,
+				Columns: []*schema.Column{ProcessInstancesColumns[12], ProcessInstancesColumns[18]},
+			},
+			{
+				Name:    "processinstance_correlation_key",
+				Unique:  false,
+				Columns: []*schema.Column{ProcessInstancesColumns[10]},
+			},
+		},
+	}
+	// ProcessNodeInstancesColumns holds the columns for the "process_node_instances" table.
+	ProcessNodeInstancesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "node_key", Type: field.TypeString, Size: 128},
+		{Name: "node_type", Type: field.TypeString, Size: 32},
+		{Name: "attempt", Type: field.TypeInt, Default: 1},
+		{Name: "status", Type: field.TypeString, Size: 32, Default: "waiting"},
+		{Name: "owner_pool_key", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "required_capability_key", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "form_profile_key", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "action_set_key", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "policy_snapshot", Type: field.TypeJSON, Nullable: true},
+		{Name: "due_at", Type: field.TypeTime, Nullable: true},
+		{Name: "started_at", Type: field.TypeTime, Nullable: true},
+		{Name: "completed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "outcome", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "version", Type: field.TypeInt, Default: 1},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "process_instance_id", Type: field.TypeInt},
+	}
+	// ProcessNodeInstancesTable holds the schema information for the "process_node_instances" table.
+	ProcessNodeInstancesTable = &schema.Table{
+		Name:       "process_node_instances",
+		Columns:    ProcessNodeInstancesColumns,
+		PrimaryKey: []*schema.Column{ProcessNodeInstancesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "process_node_instances_process_instances_nodes",
+				Columns:    []*schema.Column{ProcessNodeInstancesColumns[17]},
+				RefColumns: []*schema.Column{ProcessInstancesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "processnodeinstance_process_instance_id_node_key_attempt",
+				Unique:  true,
+				Columns: []*schema.Column{ProcessNodeInstancesColumns[17], ProcessNodeInstancesColumns[1], ProcessNodeInstancesColumns[3]},
+			},
+			{
+				Name:    "processnodeinstance_process_instance_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{ProcessNodeInstancesColumns[17], ProcessNodeInstancesColumns[4]},
+			},
+			{
+				Name:    "processnodeinstance_owner_pool_key_status",
+				Unique:  false,
+				Columns: []*schema.Column{ProcessNodeInstancesColumns[5], ProcessNodeInstancesColumns[4]},
+			},
+			{
+				Name:    "processnodeinstance_required_capability_key_status",
+				Unique:  false,
+				Columns: []*schema.Column{ProcessNodeInstancesColumns[6], ProcessNodeInstancesColumns[4]},
+			},
+			{
+				Name:    "processnodeinstance_due_at",
+				Unique:  false,
+				Columns: []*schema.Column{ProcessNodeInstancesColumns[10]},
 			},
 		},
 	}
@@ -1680,6 +1908,11 @@ var (
 	QualityInspectionsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "inspection_no", Type: field.TypeString, Size: 64},
+		{Name: "source_type", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "source_id", Type: field.TypeInt, Nullable: true},
+		{Name: "inspection_type", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "subject_type", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "subject_id", Type: field.TypeInt, Nullable: true},
 		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
 		{Name: "result", Type: field.TypeString, Nullable: true, Size: 32},
 		{Name: "original_lot_status", Type: field.TypeString, Size: 32, Default: ""},
@@ -1689,8 +1922,8 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "inventory_lot_id", Type: field.TypeInt},
-		{Name: "material_id", Type: field.TypeInt},
-		{Name: "purchase_receipt_id", Type: field.TypeInt},
+		{Name: "material_id", Type: field.TypeInt, Nullable: true},
+		{Name: "purchase_receipt_id", Type: field.TypeInt, Nullable: true},
 		{Name: "purchase_receipt_item_id", Type: field.TypeInt, Nullable: true},
 		{Name: "warehouse_id", Type: field.TypeInt},
 	}
@@ -1702,31 +1935,31 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "quality_inspections_inventory_lots_quality_inspections",
-				Columns:    []*schema.Column{QualityInspectionsColumns[10]},
+				Columns:    []*schema.Column{QualityInspectionsColumns[15]},
 				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "quality_inspections_materials_quality_inspections",
-				Columns:    []*schema.Column{QualityInspectionsColumns[11]},
+				Columns:    []*schema.Column{QualityInspectionsColumns[16]},
 				RefColumns: []*schema.Column{MaterialsColumns[0]},
-				OnDelete:   schema.NoAction,
+				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "quality_inspections_purchase_receipts_quality_inspections",
-				Columns:    []*schema.Column{QualityInspectionsColumns[12]},
+				Columns:    []*schema.Column{QualityInspectionsColumns[17]},
 				RefColumns: []*schema.Column{PurchaseReceiptsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "quality_inspections_purchase_receipt_items_quality_inspections",
-				Columns:    []*schema.Column{QualityInspectionsColumns[13]},
+				Columns:    []*schema.Column{QualityInspectionsColumns[18]},
 				RefColumns: []*schema.Column{PurchaseReceiptItemsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "quality_inspections_warehouses_quality_inspections",
-				Columns:    []*schema.Column{QualityInspectionsColumns[14]},
+				Columns:    []*schema.Column{QualityInspectionsColumns[19]},
 				RefColumns: []*schema.Column{WarehousesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1740,42 +1973,57 @@ var (
 			{
 				Name:    "qualityinspection_purchase_receipt_id",
 				Unique:  false,
-				Columns: []*schema.Column{QualityInspectionsColumns[12]},
+				Columns: []*schema.Column{QualityInspectionsColumns[17]},
 			},
 			{
 				Name:    "qualityinspection_purchase_receipt_item_id",
 				Unique:  false,
-				Columns: []*schema.Column{QualityInspectionsColumns[13]},
+				Columns: []*schema.Column{QualityInspectionsColumns[18]},
 			},
 			{
 				Name:    "qualityinspection_inventory_lot_id",
 				Unique:  false,
-				Columns: []*schema.Column{QualityInspectionsColumns[10]},
+				Columns: []*schema.Column{QualityInspectionsColumns[15]},
 			},
 			{
 				Name:    "qualityinspection_material_id",
 				Unique:  false,
-				Columns: []*schema.Column{QualityInspectionsColumns[11]},
+				Columns: []*schema.Column{QualityInspectionsColumns[16]},
 			},
 			{
 				Name:    "qualityinspection_warehouse_id",
 				Unique:  false,
-				Columns: []*schema.Column{QualityInspectionsColumns[14]},
+				Columns: []*schema.Column{QualityInspectionsColumns[19]},
+			},
+			{
+				Name:    "qualityinspection_source_type_source_id",
+				Unique:  false,
+				Columns: []*schema.Column{QualityInspectionsColumns[2], QualityInspectionsColumns[3]},
+			},
+			{
+				Name:    "qualityinspection_inspection_type",
+				Unique:  false,
+				Columns: []*schema.Column{QualityInspectionsColumns[4]},
+			},
+			{
+				Name:    "qualityinspection_subject_type_subject_id",
+				Unique:  false,
+				Columns: []*schema.Column{QualityInspectionsColumns[5], QualityInspectionsColumns[6]},
 			},
 			{
 				Name:    "qualityinspection_status",
 				Unique:  false,
-				Columns: []*schema.Column{QualityInspectionsColumns[2]},
+				Columns: []*schema.Column{QualityInspectionsColumns[7]},
 			},
 			{
 				Name:    "qualityinspection_inspected_at",
 				Unique:  false,
-				Columns: []*schema.Column{QualityInspectionsColumns[5]},
+				Columns: []*schema.Column{QualityInspectionsColumns[10]},
 			},
 			{
 				Name:    "qualityinspection_inventory_lot_id_submitted",
 				Unique:  true,
-				Columns: []*schema.Column{QualityInspectionsColumns[10]},
+				Columns: []*schema.Column{QualityInspectionsColumns[15]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "status = 'SUBMITTED'",
 				},
@@ -1839,6 +2087,43 @@ var (
 				Name:    "rolepermission_permission_id",
 				Unique:  false,
 				Columns: []*schema.Column{RolePermissionsColumns[2]},
+			},
+		},
+	}
+	// RoleProfilesColumns holds the columns for the "role_profiles" table.
+	RoleProfilesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "customer_key", Type: field.TypeString, Size: 64},
+		{Name: "config_revision", Type: field.TypeString, Size: 64},
+		{Name: "role_key", Type: field.TypeString, Size: 64},
+		{Name: "display_name", Type: field.TypeString, Size: 128},
+		{Name: "disabled", Type: field.TypeBool, Default: false},
+		{Name: "bundle_keys", Type: field.TypeJSON, Nullable: true},
+		{Name: "grants", Type: field.TypeJSON, Nullable: true},
+		{Name: "revokes", Type: field.TypeJSON, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// RoleProfilesTable holds the schema information for the "role_profiles" table.
+	RoleProfilesTable = &schema.Table{
+		Name:       "role_profiles",
+		Columns:    RoleProfilesColumns,
+		PrimaryKey: []*schema.Column{RoleProfilesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "roleprofile_customer_key_config_revision_role_key",
+				Unique:  true,
+				Columns: []*schema.Column{RoleProfilesColumns[1], RoleProfilesColumns[2], RoleProfilesColumns[3]},
+			},
+			{
+				Name:    "roleprofile_customer_key_role_key",
+				Unique:  false,
+				Columns: []*schema.Column{RoleProfilesColumns[1], RoleProfilesColumns[3]},
+			},
+			{
+				Name:    "roleprofile_disabled",
+				Unique:  false,
+				Columns: []*schema.Column{RoleProfilesColumns[5]},
 			},
 		},
 	}
@@ -2403,6 +2688,73 @@ var (
 			},
 		},
 	}
+	// WorkPoolsColumns holds the columns for the "work_pools" table.
+	WorkPoolsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "customer_key", Type: field.TypeString, Size: 64},
+		{Name: "config_revision", Type: field.TypeString, Size: 64},
+		{Name: "pool_key", Type: field.TypeString, Size: 128},
+		{Name: "module_key", Type: field.TypeString, Size: 128},
+		{Name: "display_name", Type: field.TypeString, Size: 128},
+		{Name: "description", Type: field.TypeString, Size: 512, Default: ""},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// WorkPoolsTable holds the schema information for the "work_pools" table.
+	WorkPoolsTable = &schema.Table{
+		Name:       "work_pools",
+		Columns:    WorkPoolsColumns,
+		PrimaryKey: []*schema.Column{WorkPoolsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "workpool_customer_key_config_revision_pool_key",
+				Unique:  true,
+				Columns: []*schema.Column{WorkPoolsColumns[1], WorkPoolsColumns[2], WorkPoolsColumns[3]},
+			},
+			{
+				Name:    "workpool_customer_key_config_revision_module_key",
+				Unique:  false,
+				Columns: []*schema.Column{WorkPoolsColumns[1], WorkPoolsColumns[2], WorkPoolsColumns[4]},
+			},
+		},
+	}
+	// WorkPoolMembershipsColumns holds the columns for the "work_pool_memberships" table.
+	WorkPoolMembershipsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "customer_key", Type: field.TypeString, Size: 64},
+		{Name: "config_revision", Type: field.TypeString, Size: 64},
+		{Name: "pool_key", Type: field.TypeString, Size: 128},
+		{Name: "role_key", Type: field.TypeString, Size: 64, Default: ""},
+		{Name: "user_id", Type: field.TypeInt, Default: 0},
+		{Name: "strategy", Type: field.TypeString, Size: 64, Default: "role_pool"},
+		{Name: "priority", Type: field.TypeInt, Default: 0},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// WorkPoolMembershipsTable holds the schema information for the "work_pool_memberships" table.
+	WorkPoolMembershipsTable = &schema.Table{
+		Name:       "work_pool_memberships",
+		Columns:    WorkPoolMembershipsColumns,
+		PrimaryKey: []*schema.Column{WorkPoolMembershipsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "workpoolmembership_customer_key_config_revision_pool_key_role_key_user_id",
+				Unique:  true,
+				Columns: []*schema.Column{WorkPoolMembershipsColumns[1], WorkPoolMembershipsColumns[2], WorkPoolMembershipsColumns[3], WorkPoolMembershipsColumns[4], WorkPoolMembershipsColumns[5]},
+			},
+			{
+				Name:    "workpoolmembership_customer_key_config_revision_role_key_enabled",
+				Unique:  false,
+				Columns: []*schema.Column{WorkPoolMembershipsColumns[1], WorkPoolMembershipsColumns[2], WorkPoolMembershipsColumns[4], WorkPoolMembershipsColumns[8]},
+			},
+			{
+				Name:    "workpoolmembership_customer_key_config_revision_user_id_enabled",
+				Unique:  false,
+				Columns: []*schema.Column{WorkPoolMembershipsColumns[1], WorkPoolMembershipsColumns[2], WorkPoolMembershipsColumns[5], WorkPoolMembershipsColumns[8]},
+			},
+		},
+	}
 	// WorkflowBusinessStatesColumns holds the columns for the "workflow_business_states" table.
 	WorkflowBusinessStatesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -2454,6 +2806,11 @@ var (
 		{Name: "business_status_key", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "task_status_key", Type: field.TypeString, Size: 32},
 		{Name: "owner_role_key", Type: field.TypeString, Size: 32},
+		{Name: "owner_pool_key", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "required_capability_key", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "config_revision", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "process_instance_id", Type: field.TypeInt, Nullable: true},
+		{Name: "process_node_instance_id", Type: field.TypeInt, Nullable: true},
 		{Name: "assignee_id", Type: field.TypeInt, Nullable: true},
 		{Name: "priority", Type: field.TypeInt16, Default: 0},
 		{Name: "blocked_reason", Type: field.TypeString, Nullable: true, Size: 255},
@@ -2489,9 +2846,34 @@ var (
 				Columns: []*schema.Column{WorkflowTasksColumns[9], WorkflowTasksColumns[8]},
 			},
 			{
+				Name:    "workflowtask_owner_pool_key_task_status_key",
+				Unique:  false,
+				Columns: []*schema.Column{WorkflowTasksColumns[10], WorkflowTasksColumns[8]},
+			},
+			{
+				Name:    "workflowtask_required_capability_key_task_status_key",
+				Unique:  false,
+				Columns: []*schema.Column{WorkflowTasksColumns[11], WorkflowTasksColumns[8]},
+			},
+			{
+				Name:    "workflowtask_config_revision_owner_pool_key_task_status_key",
+				Unique:  false,
+				Columns: []*schema.Column{WorkflowTasksColumns[12], WorkflowTasksColumns[10], WorkflowTasksColumns[8]},
+			},
+			{
+				Name:    "workflowtask_process_instance_id_task_status_key",
+				Unique:  false,
+				Columns: []*schema.Column{WorkflowTasksColumns[13], WorkflowTasksColumns[8]},
+			},
+			{
+				Name:    "workflowtask_process_node_instance_id",
+				Unique:  false,
+				Columns: []*schema.Column{WorkflowTasksColumns[14]},
+			},
+			{
 				Name:    "workflowtask_due_at",
 				Unique:  false,
-				Columns: []*schema.Column{WorkflowTasksColumns[13]},
+				Columns: []*schema.Column{WorkflowTasksColumns[18]},
 			},
 		},
 	}
@@ -2531,6 +2913,7 @@ var (
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
+		AccessEntitlementsTable,
 		AdminUsersTable,
 		AdminUserRolesTable,
 		BomHeadersTable,
@@ -2538,6 +2921,8 @@ var (
 		BusinessAttachmentsTable,
 		ContactsTable,
 		CustomersTable,
+		CustomerConfigRevisionsTable,
+		DeploymentModuleStatesTable,
 		FinanceFactsTable,
 		InventoryBalancesTable,
 		InventoryLotsTable,
@@ -2548,6 +2933,8 @@ var (
 		OutsourcingOrderItemsTable,
 		PermissionsTable,
 		ProcessesTable,
+		ProcessInstancesTable,
+		ProcessNodeInstancesTable,
 		ProductsTable,
 		ProductSkusTable,
 		ProductionFactsTable,
@@ -2562,6 +2949,7 @@ var (
 		QualityInspectionsTable,
 		RolesTable,
 		RolePermissionsTable,
+		RoleProfilesTable,
 		RuntimeAuditEventsTable,
 		RuntimeMarkersTable,
 		SalesOrdersTable,
@@ -2572,6 +2960,8 @@ var (
 		SuppliersTable,
 		UnitsTable,
 		WarehousesTable,
+		WorkPoolsTable,
+		WorkPoolMembershipsTable,
 		WorkflowBusinessStatesTable,
 		WorkflowTasksTable,
 		WorkflowTaskEventsTable,
@@ -2649,6 +3039,7 @@ func init() {
 	ProcessesTable.Annotation.Checks = map[string]string{
 		"processes_sort_order_non_negative": "sort_order >= 0",
 	}
+	ProcessNodeInstancesTable.ForeignKeys[0].RefTable = ProcessInstancesTable
 	ProductsTable.ForeignKeys[0].RefTable = UnitsTable
 	ProductSkusTable.ForeignKeys[0].RefTable = ProductsTable
 	ProductSkusTable.ForeignKeys[1].RefTable = UnitsTable

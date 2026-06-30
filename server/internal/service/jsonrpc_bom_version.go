@@ -37,6 +37,9 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), bomModuleKeyMaterialBOM); res != nil {
+			return id, res, nil
+		}
 		in, ok := bomHeaderCreateFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -49,6 +52,9 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		return id, okData(map[string]any{"bom_version": bomVersionDetailToAny(&biz.BOMVersionDetail{Header: item})}), nil
 	case "update_bom_draft", "updateBOMDraft":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), bomModuleKeyMaterialBOM); res != nil {
 			return id, res, nil
 		}
 		in, ok := bomHeaderUpdateFromParams(pm)
@@ -65,6 +71,9 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), bomModuleKeyMaterialBOM); res != nil {
+			return id, res, nil
+		}
 		in, ok := bomHeaderCreateFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -75,10 +84,16 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMActivate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), bomModuleKeyMaterialBOM); res != nil {
+			return id, res, nil
+		}
 		item, err := d.inventoryUC.ActivateBOMVersion(ctx, getInt(pm, "id", 0))
 		return id, bomVersionDetailResult(ctx, d, item, err), nil
 	case "archive_bom_version", "archiveBOMVersion":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), bomModuleKeyMaterialBOM); res != nil {
 			return id, res, nil
 		}
 		item, err := d.inventoryUC.ArchiveBOMVersion(ctx, getInt(pm, "id", 0))

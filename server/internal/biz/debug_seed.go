@@ -578,22 +578,22 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 		coverageStatus: "partial",
 		partial:        true,
 		warnings: []string{
-			"当前只生成 Workflow 调试任务和状态投影，不代表工程 BOM 专表已经落地。",
+			"当前只生成 Workflow 调试任务和状态投影，不代表工程资料发布、采购需求、库存、生产或成本事实已经落地。",
 		},
 		nextCheckpoints: []DebugCheckpoint{
 			{Label: "销售订单", Path: "/erp/sales/project-orders/sales-orders", Reason: "核对订单调试单据和业务状态"},
-			{Label: "任务看板", Path: "/erp/task-board", Reason: "核对工程资料任务是否进入 PMC / 相关角色池"},
+			{Label: "任务看板", Path: "/erp/task-board", Reason: "核对工程资料任务是否进入 engineering 角色池"},
 		},
 		records: []debugRecordTemplate{
 			{ref: "order", moduleKey: "project-orders", title: "订单审批通过，待工程资料", statusKey: "engineering_preparing", ownerRoleKey: "sales", customerName: "调试客户 A", styleNo: "DBG-STYLE-A", productNo: "DBG-TOY-A", productName: "调试款毛绒熊", quantity: 1200, unit: "只", amount: 57600, dueOffsetDays: 21},
-			{ref: "bom", moduleKey: "material-bom", title: "工程资料准备中", statusKey: "engineering_preparing", ownerRoleKey: "pmc", customerName: "调试客户 A", styleNo: "DBG-STYLE-A", productNo: "DBG-TOY-A", productName: "调试款毛绒熊", materialName: "BOM / 色卡 / 包装资料", quantity: 1, unit: "套", dueOffsetDays: 3},
+			{ref: "bom", moduleKey: "material-bom", title: "工程资料准备中", statusKey: "engineering_preparing", ownerRoleKey: "engineering", customerName: "调试客户 A", styleNo: "DBG-STYLE-A", productNo: "DBG-TOY-A", productName: "调试款毛绒熊", materialName: "BOM / 色卡 / 包装资料", quantity: 1, unit: "套", dueOffsetDays: 3},
 		},
 		tasks: []debugTaskTemplate{
-			{recordRef: "bom", suffix: "ENG", group: "engineering_material", name: "准备 BOM、色卡和包装资料", statusKey: "ready", businessStatusKey: "engineering_preparing", ownerRoleKey: "pmc", priority: 2, dueOffsetDays: 3},
+			{recordRef: "bom", suffix: "ENG", group: "engineering_data", name: "准备 BOM、色卡和包装资料", statusKey: "ready", businessStatusKey: "engineering_preparing", ownerRoleKey: "engineering", priority: 2, dueOffsetDays: 3},
 		},
 		states: []debugStateTemplate{
 			{recordRef: "order", statusKey: "engineering_preparing", ownerRoleKey: "sales"},
-			{recordRef: "bom", statusKey: "engineering_preparing", ownerRoleKey: "pmc"},
+			{recordRef: "bom", statusKey: "engineering_preparing", ownerRoleKey: "engineering"},
 		},
 	},
 	"purchase_iqc_inbound": {

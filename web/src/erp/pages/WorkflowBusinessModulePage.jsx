@@ -10,8 +10,9 @@ import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
+  blockWorkflowTaskAction,
+  completeWorkflowTaskAction,
   listWorkflowTasks,
-  updateWorkflowTaskStatus,
   urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
 import {
@@ -34,13 +35,12 @@ import { getBusinessModule } from '../config/businessModules.mjs'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
 import { ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
+import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js'
 import {
   getTaskOwnerRoleKey,
-  getWorkflowTaskReadonlyReason,
   getWorkflowTaskDueLabel,
   getWorkflowTaskReason,
   getWorkflowTaskStatusMeta,
-  canRunWorkflowTaskAction,
 } from '../utils/workflowTaskBoard.mjs'
 
 function businessActionModalTitle(title, description) {
@@ -287,30 +287,28 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   const selectedTaskStatusMeta = selectedTask
     ? getWorkflowTaskStatusMeta(selectedTask)
     : null
-  const selectedTaskReadonlyReason =
-    selectedTask && adminProfile
-      ? getWorkflowTaskReadonlyReason(adminProfile, selectedTask)
-      : ''
+  const selectedTaskActionAccess = useWorkflowTaskActionAccess({
+    adminProfile,
+    task: selectedTask,
+    enabled: Boolean(selectedTask && canReadWorkflowTasks),
+  })
+  const selectedTaskReadonlyReason = selectedTaskActionAccess.loading
+    ? '正在向后端核对当前任务动作权限。'
+    : selectedTaskActionAccess.readonlyReason
   const canCompleteSelected =
-    Boolean(selectedTask) &&
-    canCompleteWorkflowTasks &&
-    canRunWorkflowTaskAction(adminProfile, selectedTask, 'complete')
+    Boolean(selectedTask) && selectedTaskActionAccess.canRun('complete')
   const canBlockSelected =
-    Boolean(selectedTask) &&
-    canUpdateWorkflowTasks &&
-    canRunWorkflowTaskAction(adminProfile, selectedTask, 'block')
+    Boolean(selectedTask) && selectedTaskActionAccess.canRun('block')
   const canUrgeSelected =
-    Boolean(selectedTask) &&
-    canUpdateWorkflowTasks &&
-    canRunWorkflowTaskAction(adminProfile, selectedTask, 'urge')
+    Boolean(selectedTask) && selectedTaskActionAccess.canRun('urge')
 
   const completeWorkflowTask = useCallback(
     async (task) => {
       setTaskActionLoadingID(getTaskID(task))
       try {
-        await updateWorkflowTaskStatus({
+        await completeWorkflowTaskAction({
           id: task.id,
-          task_status_key: 'done',
+          action_key: 'complete',
           business_status_key: config.completeBusinessStatusKey,
           reason: '',
           payload: {
@@ -334,9 +332,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     async (task, { reason = '' } = {}) => {
       setTaskActionLoadingID(getTaskID(task))
       try {
-        await updateWorkflowTaskStatus({
+        await blockWorkflowTaskAction({
           id: task.id,
-          task_status_key: 'blocked',
+          action_key: 'block',
           business_status_key: 'blocked',
           reason,
           payload: {
@@ -365,7 +363,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           task_id: task.id,
           action: 'urge_task',
           reason,
-          actor_role_key: 'admin',
           payload: {
             source_type: task.source_type,
             source_id: task.source_id,
@@ -627,7 +624,11 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             type="primary"
             icon={<CheckCircleOutlined />}
             loading={taskActionLoadingID === selectedTask?.id}
-            disabled={!canCompleteSelected || taskActionLoadingID > 0}
+            disabled={
+              selectedTaskActionAccess.loading ||
+              !canCompleteSelected ||
+              taskActionLoadingID > 0
+            }
             onClick={() => completeWorkflowTask(selectedTask)}
           >
             完成协同
@@ -636,7 +637,11 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             size="small"
             danger
             icon={<ExclamationCircleOutlined />}
-            disabled={!canBlockSelected || taskActionLoadingID > 0}
+            disabled={
+              selectedTaskActionAccess.loading ||
+              !canBlockSelected ||
+              taskActionLoadingID > 0
+            }
             onClick={() => openTaskReasonModal('block')}
           >
             标记阻塞
@@ -645,7 +650,11 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             size="small"
             icon={<SendOutlined />}
             loading={urgingTaskID === selectedTask?.id}
-            disabled={!canUrgeSelected || urgingTaskID > 0}
+            disabled={
+              selectedTaskActionAccess.loading ||
+              !canUrgeSelected ||
+              urgingTaskID > 0
+            }
             onClick={() => openTaskReasonModal('urge')}
           >
             催办

@@ -13,6 +13,7 @@ const expectedAccounts = [
   ["demo_quality", "quality", "mobile.quality.access"],
   ["demo_finance", "finance", "mobile.finance.access"],
   ["demo_pmc", "pmc", "mobile.pmc.access"],
+  ["demo_engineering", "engineering", "mobile.engineering.access"],
   ["demo_admin", "admin", ""],
 ];
 
@@ -25,7 +26,7 @@ const usage = `用法:
   TRIAL_ACCOUNT_BACKEND_URL   后端地址，默认 ${defaultBackendURL}
 
 作用:
-  只读验证 9 个 demo_* 账号能通过真实 /rpc/auth admin_login + me，并核对:
+  只读验证 10 个 demo_* 账号能通过真实 /rpc/auth admin_login + me，并核对:
   - 单一预期角色
   - 对应 mobile.<role>.access
   - 无 debug.* 权限

@@ -6,6 +6,7 @@ print_help() {
 用法:
   bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env
   bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env --runtime
+  bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env --out deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/production-preflight-report.txt
   bash scripts/deploy/production-preflight.sh --example
 
 作用:
@@ -18,6 +19,7 @@ print_help() {
   --runtime              额外检查容器运行状态和健康检查
   --example              只检查 .env.example 结构，允许 placeholder，不能当生产放行
   --skip-compose-config  跳过 docker compose config -q
+  --out <path>           同步写入脱敏检查报告；父目录必须已存在
 USAGE
 }
 
@@ -51,6 +53,7 @@ env_file=""
 mode="runtime-env"
 runtime_check=0
 skip_compose_config=0
+out_file=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -75,6 +78,10 @@ while [[ $# -gt 0 ]]; do
     skip_compose_config=1
     shift
     ;;
+  --out)
+    out_file="${2:-}"
+    shift 2
+    ;;
   -h | --help)
     print_help
     exit 0
@@ -86,6 +93,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$root_dir"
+
+if [[ -n "$out_file" ]]; then
+  out_dir="$(dirname "$out_file")"
+  [[ -d "$out_dir" ]] || fail "输出目录不存在: $out_dir"
+  : >"$out_file"
+  exec > >(tee "$out_file") 2>&1
+fi
 
 compose_file="$compose_dir/compose.yml"
 migrate_script="$compose_dir/migrate_online.sh"

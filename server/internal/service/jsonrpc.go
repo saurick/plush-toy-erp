@@ -26,6 +26,7 @@ func NewJsonrpcService(
 	adminAuthUC *biz.AdminAuthUsecase,
 	adminManageUC *biz.AdminManageUsecase,
 	workflowUC *biz.WorkflowUsecase,
+	processRuntimeUC *biz.ProcessRuntimeUsecase,
 	debugUC *biz.DebugUsecase,
 	masterDataUC *biz.MasterDataUsecase,
 	salesOrderUC *biz.SalesOrderUsecase,
@@ -34,6 +35,7 @@ func NewJsonrpcService(
 	inventoryUC *biz.InventoryUsecase,
 	operationalFactUC *biz.OperationalFactUsecase,
 	attachmentUC *biz.BusinessAttachmentUsecase,
+	customerConfigUC *biz.CustomerConfigUsecase,
 	adminReader biz.AdminAccountReader,
 ) *JsonrpcService {
 	return &JsonrpcService{
@@ -43,6 +45,7 @@ func NewJsonrpcService(
 			adminAuthUC,
 			adminManageUC,
 			workflowUC,
+			processRuntimeUC,
 			debugUC,
 			masterDataUC,
 			salesOrderUC,
@@ -51,6 +54,7 @@ func NewJsonrpcService(
 			inventoryUC,
 			operationalFactUC,
 			attachmentUC,
+			customerConfigUC,
 			adminReader,
 		),
 		log: log.NewHelper(log.With(logger, "module", "service.jsonrpc.transport")),

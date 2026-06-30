@@ -22,6 +22,34 @@ type salesOrderRepoStub struct {
 	nextStatus     string
 }
 
+type salesOrderAcceptanceProcessOwnerResolver struct{}
+
+func (r *salesOrderAcceptanceProcessOwnerResolver) WorkflowCandidateOwnerRoleKeys(ctx context.Context, customerKey string, ownerPoolKey string, requiredCapabilities ...string) (*WorkflowTaskCandidateExplanation, error) {
+	candidateRoleKey := ""
+	switch ownerPoolKey {
+	case "order_approval":
+		candidateRoleKey = BossRoleKey
+	case "order_review":
+		candidateRoleKey = PMCRoleKey
+	}
+	if candidateRoleKey == "" {
+		return &WorkflowTaskCandidateExplanation{
+			ConfigRevision:         "yoyoosun-rev-1",
+			OwnerPoolKey:           ownerPoolKey,
+			RequiredCapabilities:   requiredCapabilities,
+			CandidateOwnerRoleKeys: nil,
+			Source:                 "active_customer_config",
+		}, nil
+	}
+	return &WorkflowTaskCandidateExplanation{
+		ConfigRevision:         "yoyoosun-rev-1",
+		OwnerPoolKey:           ownerPoolKey,
+		RequiredCapabilities:   requiredCapabilities,
+		CandidateOwnerRoleKeys: []string{candidateRoleKey},
+		Source:                 "active_customer_config",
+	}, nil
+}
+
 func (s *salesOrderRepoStub) CreateSalesOrder(_ context.Context, in *SalesOrderMutation) (*SalesOrder, error) {
 	cp := *in
 	s.createdOrder = &cp
@@ -204,6 +232,237 @@ func TestSalesOrderUsecaseLifecycleGuards(t *testing.T) {
 	}
 	if _, err := uc.CancelSalesOrder(ctx, 4); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected settled order transition rejected, got %v", err)
+	}
+}
+
+func TestSalesOrderProcessDomainCommandSubmitBindsUsecase(t *testing.T) {
+	ctx := context.Background()
+	salesOrderRepo := &salesOrderRepoStub{
+		orders: map[int]*SalesOrder{
+			1001: {ID: 1001, LifecycleStatus: SalesOrderStatusDraft},
+		},
+	}
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID:              10,
+			BusinessRefType: "sales_order",
+			BusinessRefID:   1001,
+			ConfigRevision:  "yoyoosun-rev-1",
+		},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID:                20,
+				ProcessInstanceID: 10,
+				NodeKey:           "submit_sales_order",
+				NodeType:          ProcessNodeTypeDomainCommand,
+				Status:            ProcessNodeStatusActive,
+				Version:           1,
+				PolicySnapshot: map[string]any{
+					"command_key": ProcessDomainCommandSalesOrderSubmit,
+				},
+			},
+		},
+	}
+	processRuntimeUC := NewProcessRuntimeUsecase(processRepo, nil)
+	if err := RegisterSalesOrderProcessDomainCommandHandlers(processRuntimeUC, NewSalesOrderUsecase(salesOrderRepo)); err != nil {
+		t.Fatalf("register sales order process command handler failed: %v", err)
+	}
+
+	node, err := processRuntimeUC.ExecuteDomainCommandNode(ctx, &ProcessDomainCommandExecution{
+		ProcessInstanceID:     10,
+		ProcessNodeInstanceID: 20,
+		ExpectedVersion:       1,
+		CommandKey:            ProcessDomainCommandSalesOrderSubmit,
+		IdempotencyKey:        "process:10:node:20:sales-order-submit",
+		Payload: map[string]any{
+			"sales_order_id": float64(1001),
+		},
+	}, 7)
+	if err != nil {
+		t.Fatalf("execute sales order submit domain command failed: %v", err)
+	}
+	if salesOrderRepo.nextStatus != SalesOrderStatusSubmitted {
+		t.Fatalf("expected sales order submitted, got %s", salesOrderRepo.nextStatus)
+	}
+	if node == nil || node.Outcome == nil || *node.Outcome != SalesOrderProcessCommandOutcomeSubmitted {
+		t.Fatalf("expected submitted process outcome, got %#v", node)
+	}
+	if processRepo.completedNode == nil || processRepo.completedNode.Outcome != SalesOrderProcessCommandOutcomeSubmitted {
+		t.Fatalf("expected process node completed with sales order outcome, got %#v", processRepo.completedNode)
+	}
+}
+
+func TestSalesOrderAcceptanceProcessSubmitCreatesBossApprovalAndPmcReview(t *testing.T) {
+	ctx := context.Background()
+	const (
+		processID    = 10
+		submitNodeID = 20
+		bossNodeID   = 21
+		pmcNodeID    = 22
+	)
+	salesOrderRepo := &salesOrderRepoStub{
+		orders: map[int]*SalesOrder{
+			1001: {ID: 1001, LifecycleStatus: SalesOrderStatusDraft},
+		},
+	}
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID:              processID,
+			ProcessKey:      "sales_order_acceptance",
+			ProcessVersion:  "v1",
+			BusinessRefType: "sales_order",
+			BusinessRefID:   1001,
+			ConfigRevision:  "yoyoosun-rev-1",
+			Status:          ProcessStatusActive,
+		},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID:                submitNodeID,
+				ProcessInstanceID: processID,
+				NodeKey:           "submit_sales_order",
+				NodeType:          ProcessNodeTypeDomainCommand,
+				Status:            ProcessNodeStatusActive,
+				Version:           1,
+				PolicySnapshot: map[string]any{
+					"command_key": ProcessDomainCommandSalesOrderSubmit,
+				},
+			},
+			{
+				ID:                    bossNodeID,
+				ProcessInstanceID:     processID,
+				NodeKey:               "order_approval",
+				NodeType:              ProcessNodeTypeApproval,
+				Attempt:               1,
+				Status:                ProcessNodeStatusWaiting,
+				OwnerPoolKey:          ptrString("order_approval"),
+				RequiredCapabilityKey: ptrString(PermissionWorkflowTaskApprove),
+				Version:               1,
+			},
+			{
+				ID:                    pmcNodeID,
+				ProcessInstanceID:     processID,
+				NodeKey:               "order_review",
+				NodeType:              ProcessNodeTypeHumanTask,
+				Attempt:               1,
+				Status:                ProcessNodeStatusWaiting,
+				OwnerPoolKey:          ptrString("order_review"),
+				RequiredCapabilityKey: ptrString(PermissionWorkflowTaskComplete),
+				Version:               1,
+			},
+		},
+	}
+	workflowRepo := &recordingWorkflowRepo{}
+	processRuntimeUC := NewProcessRuntimeUsecase(
+		processRepo,
+		workflowRepo,
+		&salesOrderAcceptanceProcessOwnerResolver{},
+	)
+	if err := RegisterSalesOrderProcessDomainCommandHandlers(processRuntimeUC, NewSalesOrderUsecase(salesOrderRepo)); err != nil {
+		t.Fatalf("register sales order process command handler failed: %v", err)
+	}
+
+	node, err := processRuntimeUC.ExecuteDomainCommandNode(ctx, &ProcessDomainCommandExecution{
+		ProcessInstanceID:     processID,
+		ProcessNodeInstanceID: submitNodeID,
+		ExpectedVersion:       1,
+		CommandKey:            ProcessDomainCommandSalesOrderSubmit,
+		IdempotencyKey:        "process:10:node:20:sales-order-submit",
+		Payload: map[string]any{
+			"sales_order_id": float64(1001),
+		},
+	}, 7)
+	if err != nil {
+		t.Fatalf("execute sales order submit domain command failed: %v", err)
+	}
+	if node == nil || node.Outcome == nil || *node.Outcome != SalesOrderProcessCommandOutcomeSubmitted {
+		t.Fatalf("expected submitted domain node, got %#v", node)
+	}
+	if salesOrderRepo.nextStatus != SalesOrderStatusSubmitted {
+		t.Fatalf("expected sales order submitted, got %s", salesOrderRepo.nextStatus)
+	}
+	if len(workflowRepo.createTaskInputs) != 1 {
+		t.Fatalf("expected boss approval task created, got %#v", workflowRepo.createTaskInputs)
+	}
+	bossTask := workflowRepo.createTaskInputs[0]
+	if bossTask.TaskGroup != "order_approval" || bossTask.OwnerRoleKey != BossRoleKey {
+		t.Fatalf("expected boss approval linked task, got %#v", bossTask)
+	}
+	if bossTask.ProcessNodeInstanceID == nil || *bossTask.ProcessNodeInstanceID != bossNodeID {
+		t.Fatalf("expected boss task linked to approval node, got %#v", bossTask.ProcessNodeInstanceID)
+	}
+	if bossTask.OwnerPoolKey == nil || *bossTask.OwnerPoolKey != "order_approval" {
+		t.Fatalf("expected order approval owner pool, got %#v", bossTask.OwnerPoolKey)
+	}
+	if bossTask.RequiredCapabilityKey == nil || *bossTask.RequiredCapabilityKey != PermissionWorkflowTaskApprove {
+		t.Fatalf("expected approve capability, got %#v", bossTask.RequiredCapabilityKey)
+	}
+
+	workflowRepo.currentTask = &WorkflowTask{
+		ID:                    501,
+		TaskStatusKey:         "done",
+		ProcessInstanceID:     processTestIntPtr(processID),
+		ProcessNodeInstanceID: processTestIntPtr(bossNodeID),
+		Payload: map[string]any{
+			"outcome": "approved",
+		},
+	}
+	completedBossNode, err := processRuntimeUC.CompleteLinkedWorkflowTask(ctx, &ProcessLinkedWorkflowTaskCompletion{
+		WorkflowTaskID: 501,
+	}, 8)
+	if err != nil {
+		t.Fatalf("complete boss approval linked task failed: %v", err)
+	}
+	if completedBossNode.ID != bossNodeID || completedBossNode.Outcome == nil || *completedBossNode.Outcome != "approved" {
+		t.Fatalf("expected boss node approved, got %#v", completedBossNode)
+	}
+	if len(workflowRepo.createTaskInputs) != 2 {
+		t.Fatalf("expected PMC review task created after boss approval, got %#v", workflowRepo.createTaskInputs)
+	}
+	pmcTask := workflowRepo.createTaskInputs[1]
+	if pmcTask.TaskGroup != "order_review" || pmcTask.OwnerRoleKey != PMCRoleKey {
+		t.Fatalf("expected PMC review linked task, got %#v", pmcTask)
+	}
+	if pmcTask.ProcessNodeInstanceID == nil || *pmcTask.ProcessNodeInstanceID != pmcNodeID {
+		t.Fatalf("expected PMC task linked to review node, got %#v", pmcTask.ProcessNodeInstanceID)
+	}
+	if pmcTask.OwnerPoolKey == nil || *pmcTask.OwnerPoolKey != "order_review" {
+		t.Fatalf("expected order review owner pool, got %#v", pmcTask.OwnerPoolKey)
+	}
+	if pmcTask.RequiredCapabilityKey == nil || *pmcTask.RequiredCapabilityKey != PermissionWorkflowTaskComplete {
+		t.Fatalf("expected complete capability, got %#v", pmcTask.RequiredCapabilityKey)
+	}
+	if processRepo.completedProcess != nil {
+		t.Fatalf("sales order acceptance must not complete before PMC review, got %#v", processRepo.completedProcess)
+	}
+}
+
+func TestSalesOrderProcessDomainCommandSubmitRejectsMismatchedBusinessRef(t *testing.T) {
+	ctx := context.Background()
+	salesOrderRepo := &salesOrderRepoStub{
+		orders: map[int]*SalesOrder{
+			1001: {ID: 1001, LifecycleStatus: SalesOrderStatusDraft},
+		},
+	}
+	handler := &salesOrderSubmitProcessCommandHandler{uc: NewSalesOrderUsecase(salesOrderRepo)}
+	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
+		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_order", BusinessRefID: 1001},
+		CommandKey:      ProcessDomainCommandSalesOrderSubmit,
+		IdempotencyKey:  "process:10:node:20:sales-order-submit",
+	}, 7); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected business ref type mismatch rejected, got %v", err)
+	}
+	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
+		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "sales_order", BusinessRefID: 1001},
+		CommandKey:      ProcessDomainCommandSalesOrderSubmit,
+		IdempotencyKey:  "process:10:node:20:sales-order-submit",
+		Payload: map[string]any{
+			"sales_order_id": float64(1002),
+		},
+	}, 7); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected payload sales order mismatch rejected, got %v", err)
+	}
+	if salesOrderRepo.nextStatus != "" {
+		t.Fatalf("mismatched command must not submit sales order, got %s", salesOrderRepo.nextStatus)
 	}
 }
 

@@ -36,7 +36,7 @@ import {
   unixToDateInputValue,
 } from './masterDataOrderView.mjs'
 
-test('masterDataOrderView: action permissions keep super admin shortcut', () => {
+test('masterDataOrderView: action permissions keep super admin shortcut before active session', () => {
   assert.equal(
     hasActionPermission({ is_super_admin: true }, 'sales_order.create'),
     true
@@ -52,6 +52,39 @@ test('masterDataOrderView: action permissions keep super admin shortcut', () => 
     hasActionPermission(
       { permissions: ['sales_order.read'] },
       'contact.create'
+    ),
+    false
+  )
+})
+
+test('masterDataOrderView: active session actions only narrow RBAC permissions', () => {
+  assert.equal(
+    hasActionPermission(
+      {
+        is_super_admin: true,
+        effective_session: { actions: ['sales_order.update'] },
+      },
+      'sales_order.create'
+    ),
+    false
+  )
+  assert.equal(
+    hasActionPermission(
+      {
+        permissions: ['sales_order.create', 'sales_order.update'],
+        effective_session: { actions: ['sales_order.update'] },
+      },
+      'sales_order.update'
+    ),
+    true
+  )
+  assert.equal(
+    hasActionPermission(
+      {
+        permissions: ['sales_order.create'],
+        effective_session: { actions: ['sales_order.update'] },
+      },
+      'sales_order.update'
     ),
     false
   )

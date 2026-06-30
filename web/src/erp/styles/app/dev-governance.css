@@ -129,12 +129,14 @@
 }
 
 .erp-dev-governance-axis-nav__item {
+  position: relative;
   display: grid;
   gap: 4px;
   width: 100%;
-  border: 1px solid #dce8dd;
+  border: 1px solid #cfded7;
   border-radius: 10px;
   background: #ffffff;
+  box-shadow: inset 3px 0 0 #e0f2fe;
   padding: 10px 12px;
   color: #1f2937;
   text-align: left;
@@ -151,6 +153,7 @@
 .erp-dev-governance-axis-nav__item--active {
   border-color: #2563eb;
   background: #eff6ff;
+  box-shadow: inset 3px 0 0 #2563eb;
   color: #1d4ed8;
 }
 
@@ -393,6 +396,7 @@
 [data-erp-theme='dark'] .erp-dev-governance-link {
   border-color: #263446;
   background: #111827;
+  box-shadow: inset 3px 0 0 #1e3a5f;
   color: #e5edf5;
 }
 
@@ -403,6 +407,7 @@
 [data-erp-theme='dark'] .erp-dev-governance-link:focus-within {
   border-color: #60a5fa;
   background: #172554;
+  box-shadow: inset 3px 0 0 #60a5fa;
   color: #dbeafe;
 }
 

@@ -17,6 +17,9 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseOrderCreate, biz.PermissionPurchaseOrderUpdate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders"); res != nil {
+			return id, res, nil
+		}
 		in, ok := operationalFactMutationFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -27,10 +30,16 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseOrderUpdate, biz.PermissionWarehouseAdjustmentCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders"); res != nil {
+			return id, res, nil
+		}
 		item, err := d.operationalFactUC.PostOutsourcingFact(ctx, getInt(pm, "id", 0))
 		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
 	case "cancel_outsourcing_fact", "cancelOutsourcingFact":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseOrderUpdate, biz.PermissionWarehouseAdjustmentCreate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders"); res != nil {
 			return id, res, nil
 		}
 		item, err := d.operationalFactUC.CancelPostedOutsourcingFact(ctx, getInt(pm, "id", 0))

@@ -488,6 +488,13 @@ func (uc *OperationalFactUsecase) ShipShipment(ctx context.Context, id int) (*Sh
 	return uc.repo.ShipShipment(ctx, id)
 }
 
+func (uc *OperationalFactUsecase) GetShipment(ctx context.Context, id int) (*Shipment, error) {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	return uc.repo.GetShipment(ctx, id)
+}
+
 func (uc *OperationalFactUsecase) CancelShippedShipment(ctx context.Context, id int) (*Shipment, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam

@@ -17,6 +17,7 @@ type stubAdminManageRepo struct {
 	adminsByID    map[int]*AdminUser
 	adminsByName  map[string]*AdminUser
 	adminsByPhone map[string]*AdminUser
+	customRoles   map[string]AdminRole
 	rolePerms     map[string][]string
 	auditEvents   []RuntimeAuditEvent
 	nextID        int
@@ -27,6 +28,7 @@ func newStubAdminManageRepo() *stubAdminManageRepo {
 		adminsByID:    map[int]*AdminUser{},
 		adminsByName:  map[string]*AdminUser{},
 		adminsByPhone: map[string]*AdminUser{},
+		customRoles:   map[string]AdminRole{},
 		rolePerms:     map[string][]string{},
 		auditEvents:   []RuntimeAuditEvent{},
 		nextID:        10,
@@ -63,7 +65,25 @@ func (r *stubAdminManageRepo) roleByKey(roleKey string) AdminRole {
 			}
 		}
 	}
+	if role, ok := r.customRoles[normalized]; ok {
+		permissions := r.rolePerms[role.Key]
+		if permissions == nil {
+			permissions = role.Permissions
+		}
+		role.Permissions = NormalizePermissionKeys(permissions)
+		return role
+	}
 	return AdminRole{}
+}
+
+func (r *stubAdminManageRepo) addCustomRole(role AdminRole) {
+	role.Key = NormalizeRoleKey(role.Key)
+	if role.Key == "" {
+		return
+	}
+	role.Builtin = false
+	role.Permissions = NormalizePermissionKeys(role.Permissions)
+	r.customRoles[role.Key] = role
 }
 
 func (r *stubAdminManageRepo) permissionsForRoleKeys(roleKeys []string) []string {
@@ -76,6 +96,9 @@ func (r *stubAdminManageRepo) permissionsForRoleKeys(roleKeys []string) []string
 					perms = role.Permissions
 					break
 				}
+			}
+			if role, exists := r.customRoles[roleKey]; exists {
+				perms = role.Permissions
 			}
 		}
 		for _, permissionKey := range NormalizePermissionKeys(perms) {
@@ -167,8 +190,11 @@ func (r *stubAdminManageRepo) UpdateAdminRoles(_ context.Context, id int, roleKe
 
 func (r *stubAdminManageRepo) ListRoles(_ context.Context) ([]AdminRole, error) {
 	defs := BuiltinRoles()
-	out := make([]AdminRole, 0, len(defs))
+	out := make([]AdminRole, 0, len(defs)+len(r.customRoles))
 	for _, role := range defs {
+		out = append(out, r.roleByKey(role.Key))
+	}
+	for _, role := range r.customRoles {
 		out = append(out, r.roleByKey(role.Key))
 	}
 	return out, nil
@@ -544,6 +570,68 @@ func TestAdminManageUsecase_SetRolesReplacesUserRoles(t *testing.T) {
 	}
 	if repo.auditEvents[0].EventKey != "admin_user.roles.set" {
 		t.Fatalf("unexpected audit event key %q", repo.auditEvents[0].EventKey)
+	}
+}
+
+func TestAdminManageUsecase_SetRolesAllowsConfiguredCustomRole(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	repo.adminsByID[2] = &AdminUser{ID: 2, Username: "manager"}
+	repo.adminsByName["manager"] = repo.adminsByID[2]
+	repo.addCustomRole(AdminRole{
+		Key:         "sample_room_manager",
+		Name:        "样品室主管",
+		Description: "客户配置中的样品室角色",
+		Permissions: []string{PermissionWorkflowTaskRead, PermissionMaterialRead},
+	})
+
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{
+		UserID:   1,
+		Username: "root",
+		Role:     RoleAdmin,
+	})
+
+	updated, err := uc.SetRoles(ctx, 2, []string{" sample_room_manager "})
+	if err != nil {
+		t.Fatalf("SetRoles() error = %v", err)
+	}
+	if !AdminHasRole(updated, "sample_room_manager") {
+		t.Fatalf("expected configured custom role, got %#v", updated.Roles)
+	}
+	if !AdminHasPermission(updated, PermissionWorkflowTaskRead) {
+		t.Fatalf("expected custom role permission to be granted")
+	}
+}
+
+func TestAdminManageUsecase_SetRolesRejectsMissingOrDisabledRole(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	repo.adminsByID[2] = &AdminUser{ID: 2, Username: "manager"}
+	repo.applyAdminRoles(repo.adminsByID[2], []string{PurchaseRoleKey})
+	repo.adminsByName["manager"] = repo.adminsByID[2]
+	repo.addCustomRole(AdminRole{
+		Key:      "disabled_custom_role",
+		Name:     "已停用角色",
+		Disabled: true,
+	})
+
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{
+		UserID:   1,
+		Username: "root",
+		Role:     RoleAdmin,
+	})
+
+	for _, roleKey := range []string{"missing_custom_role", "disabled_custom_role"} {
+		if _, err := uc.SetRoles(ctx, 2, []string{roleKey}); !errors.Is(err, ErrRoleNotFound) {
+			t.Fatalf("expected ErrRoleNotFound for %s, got %v", roleKey, err)
+		}
+		if !AdminHasRole(repo.adminsByID[2], PurchaseRoleKey) {
+			t.Fatalf("existing role should remain after rejected %s assignment", roleKey)
+		}
 	}
 }
 

@@ -37,6 +37,14 @@ func (_c *QualityInspectionCreate) SetPurchaseReceiptID(v int) *QualityInspectio
 	return _c
 }
 
+// SetNillablePurchaseReceiptID sets the "purchase_receipt_id" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillablePurchaseReceiptID(v *int) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetPurchaseReceiptID(*v)
+	}
+	return _c
+}
+
 // SetPurchaseReceiptItemID sets the "purchase_receipt_item_id" field.
 func (_c *QualityInspectionCreate) SetPurchaseReceiptItemID(v int) *QualityInspectionCreate {
 	_c.mutation.SetPurchaseReceiptItemID(v)
@@ -63,9 +71,87 @@ func (_c *QualityInspectionCreate) SetMaterialID(v int) *QualityInspectionCreate
 	return _c
 }
 
+// SetNillableMaterialID sets the "material_id" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableMaterialID(v *int) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetMaterialID(*v)
+	}
+	return _c
+}
+
 // SetWarehouseID sets the "warehouse_id" field.
 func (_c *QualityInspectionCreate) SetWarehouseID(v int) *QualityInspectionCreate {
 	_c.mutation.SetWarehouseID(v)
+	return _c
+}
+
+// SetSourceType sets the "source_type" field.
+func (_c *QualityInspectionCreate) SetSourceType(v string) *QualityInspectionCreate {
+	_c.mutation.SetSourceType(v)
+	return _c
+}
+
+// SetNillableSourceType sets the "source_type" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableSourceType(v *string) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetSourceType(*v)
+	}
+	return _c
+}
+
+// SetSourceID sets the "source_id" field.
+func (_c *QualityInspectionCreate) SetSourceID(v int) *QualityInspectionCreate {
+	_c.mutation.SetSourceID(v)
+	return _c
+}
+
+// SetNillableSourceID sets the "source_id" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableSourceID(v *int) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetSourceID(*v)
+	}
+	return _c
+}
+
+// SetInspectionType sets the "inspection_type" field.
+func (_c *QualityInspectionCreate) SetInspectionType(v string) *QualityInspectionCreate {
+	_c.mutation.SetInspectionType(v)
+	return _c
+}
+
+// SetNillableInspectionType sets the "inspection_type" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableInspectionType(v *string) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetInspectionType(*v)
+	}
+	return _c
+}
+
+// SetSubjectType sets the "subject_type" field.
+func (_c *QualityInspectionCreate) SetSubjectType(v string) *QualityInspectionCreate {
+	_c.mutation.SetSubjectType(v)
+	return _c
+}
+
+// SetNillableSubjectType sets the "subject_type" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableSubjectType(v *string) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetSubjectType(*v)
+	}
+	return _c
+}
+
+// SetSubjectID sets the "subject_id" field.
+func (_c *QualityInspectionCreate) SetSubjectID(v int) *QualityInspectionCreate {
+	_c.mutation.SetSubjectID(v)
+	return _c
+}
+
+// SetNillableSubjectID sets the "subject_id" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableSubjectID(v *int) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetSubjectID(*v)
+	}
 	return _c
 }
 
@@ -278,9 +364,6 @@ func (_c *QualityInspectionCreate) check() error {
 			return &ValidationError{Name: "inspection_no", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.inspection_no": %w`, err)}
 		}
 	}
-	if _, ok := _c.mutation.PurchaseReceiptID(); !ok {
-		return &ValidationError{Name: "purchase_receipt_id", err: errors.New(`ent: missing required field "QualityInspection.purchase_receipt_id"`)}
-	}
 	if v, ok := _c.mutation.PurchaseReceiptID(); ok {
 		if err := qualityinspection.PurchaseReceiptIDValidator(v); err != nil {
 			return &ValidationError{Name: "purchase_receipt_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.purchase_receipt_id": %w`, err)}
@@ -299,9 +382,6 @@ func (_c *QualityInspectionCreate) check() error {
 			return &ValidationError{Name: "inventory_lot_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.inventory_lot_id": %w`, err)}
 		}
 	}
-	if _, ok := _c.mutation.MaterialID(); !ok {
-		return &ValidationError{Name: "material_id", err: errors.New(`ent: missing required field "QualityInspection.material_id"`)}
-	}
 	if v, ok := _c.mutation.MaterialID(); ok {
 		if err := qualityinspection.MaterialIDValidator(v); err != nil {
 			return &ValidationError{Name: "material_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.material_id": %w`, err)}
@@ -313,6 +393,31 @@ func (_c *QualityInspectionCreate) check() error {
 	if v, ok := _c.mutation.WarehouseID(); ok {
 		if err := qualityinspection.WarehouseIDValidator(v); err != nil {
 			return &ValidationError{Name: "warehouse_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.warehouse_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SourceType(); ok {
+		if err := qualityinspection.SourceTypeValidator(v); err != nil {
+			return &ValidationError{Name: "source_type", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.source_type": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SourceID(); ok {
+		if err := qualityinspection.SourceIDValidator(v); err != nil {
+			return &ValidationError{Name: "source_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.source_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.InspectionType(); ok {
+		if err := qualityinspection.InspectionTypeValidator(v); err != nil {
+			return &ValidationError{Name: "inspection_type", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.inspection_type": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SubjectType(); ok {
+		if err := qualityinspection.SubjectTypeValidator(v); err != nil {
+			return &ValidationError{Name: "subject_type", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.subject_type": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SubjectID(); ok {
+		if err := qualityinspection.SubjectIDValidator(v); err != nil {
+			return &ValidationError{Name: "subject_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.subject_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.Status(); !ok {
@@ -352,14 +457,8 @@ func (_c *QualityInspectionCreate) check() error {
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		return &ValidationError{Name: "updated_at", err: errors.New(`ent: missing required field "QualityInspection.updated_at"`)}
 	}
-	if len(_c.mutation.PurchaseReceiptIDs()) == 0 {
-		return &ValidationError{Name: "purchase_receipt", err: errors.New(`ent: missing required edge "QualityInspection.purchase_receipt"`)}
-	}
 	if len(_c.mutation.InventoryLotIDs()) == 0 {
 		return &ValidationError{Name: "inventory_lot", err: errors.New(`ent: missing required edge "QualityInspection.inventory_lot"`)}
-	}
-	if len(_c.mutation.MaterialIDs()) == 0 {
-		return &ValidationError{Name: "material", err: errors.New(`ent: missing required edge "QualityInspection.material"`)}
 	}
 	if len(_c.mutation.WarehouseIDs()) == 0 {
 		return &ValidationError{Name: "warehouse", err: errors.New(`ent: missing required edge "QualityInspection.warehouse"`)}
@@ -393,6 +492,26 @@ func (_c *QualityInspectionCreate) createSpec() (*QualityInspection, *sqlgraph.C
 	if value, ok := _c.mutation.InspectionNo(); ok {
 		_spec.SetField(qualityinspection.FieldInspectionNo, field.TypeString, value)
 		_node.InspectionNo = value
+	}
+	if value, ok := _c.mutation.SourceType(); ok {
+		_spec.SetField(qualityinspection.FieldSourceType, field.TypeString, value)
+		_node.SourceType = &value
+	}
+	if value, ok := _c.mutation.SourceID(); ok {
+		_spec.SetField(qualityinspection.FieldSourceID, field.TypeInt, value)
+		_node.SourceID = &value
+	}
+	if value, ok := _c.mutation.InspectionType(); ok {
+		_spec.SetField(qualityinspection.FieldInspectionType, field.TypeString, value)
+		_node.InspectionType = &value
+	}
+	if value, ok := _c.mutation.SubjectType(); ok {
+		_spec.SetField(qualityinspection.FieldSubjectType, field.TypeString, value)
+		_node.SubjectType = &value
+	}
+	if value, ok := _c.mutation.SubjectID(); ok {
+		_spec.SetField(qualityinspection.FieldSubjectID, field.TypeInt, value)
+		_node.SubjectID = &value
 	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(qualityinspection.FieldStatus, field.TypeString, value)
@@ -440,7 +559,7 @@ func (_c *QualityInspectionCreate) createSpec() (*QualityInspection, *sqlgraph.C
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.PurchaseReceiptID = nodes[0]
+		_node.PurchaseReceiptID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.PurchaseReceiptItemIDs(); len(nodes) > 0 {
@@ -491,7 +610,7 @@ func (_c *QualityInspectionCreate) createSpec() (*QualityInspection, *sqlgraph.C
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.MaterialID = nodes[0]
+		_node.MaterialID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.WarehouseIDs(); len(nodes) > 0 {

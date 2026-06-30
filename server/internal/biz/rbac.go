@@ -14,6 +14,9 @@ const (
 	PermissionSystemPermissionRead   = "system.permission.read"
 	PermissionSystemPermissionManage = "system.permission.manage"
 	PermissionSystemAuditRead        = "system.audit.read"
+	PermissionCustomerConfigRead     = "customer_config.read"
+	PermissionCustomerConfigPublish  = "customer_config.publish"
+	PermissionCustomerConfigActivate = "customer_config.activate"
 
 	PermissionERPDashboardRead          = "erp.dashboard.read"
 	PermissionERPPrintTemplateRead      = "erp.print_template.read"
@@ -109,14 +112,15 @@ const (
 	PermissionPMCRiskRead               = "pmc.risk.read"
 	PermissionPMCRiskHandle             = "pmc.risk.handle"
 
-	PermissionMobileBossAccess       = "mobile.boss.access"
-	PermissionMobileSalesAccess      = "mobile.sales.access"
-	PermissionMobilePurchaseAccess   = "mobile.purchase.access"
-	PermissionMobileProductionAccess = "mobile.production.access"
-	PermissionMobileWarehouseAccess  = "mobile.warehouse.access"
-	PermissionMobileQualityAccess    = "mobile.quality.access"
-	PermissionMobileFinanceAccess    = "mobile.finance.access"
-	PermissionMobilePMCAccess        = "mobile.pmc.access"
+	PermissionMobileBossAccess        = "mobile.boss.access"
+	PermissionMobileSalesAccess       = "mobile.sales.access"
+	PermissionMobilePurchaseAccess    = "mobile.purchase.access"
+	PermissionMobileProductionAccess  = "mobile.production.access"
+	PermissionMobileWarehouseAccess   = "mobile.warehouse.access"
+	PermissionMobileQualityAccess     = "mobile.quality.access"
+	PermissionMobileFinanceAccess     = "mobile.finance.access"
+	PermissionMobilePMCAccess         = "mobile.pmc.access"
+	PermissionMobileEngineeringAccess = "mobile.engineering.access"
 
 	PermissionDebugSeed              = "debug.seed"
 	PermissionDebugCleanup           = "debug.cleanup"
@@ -186,6 +190,9 @@ var builtinPermissions = []PermissionDefinition{
 	{Key: PermissionSystemPermissionRead, Name: "查看权限码", Module: "system", Action: "read", Resource: "permission", Builtin: true},
 	{Key: PermissionSystemPermissionManage, Name: "管理角色权限", Module: "system", Action: "manage", Resource: "permission", Builtin: true},
 	{Key: PermissionSystemAuditRead, Name: "查看系统审计日志", Module: "system", Action: "read", Resource: "audit_log", Builtin: true},
+	{Key: PermissionCustomerConfigRead, Name: "查看客户配置版本", Module: "customer_config", Action: "read", Resource: "revision", Builtin: true},
+	{Key: PermissionCustomerConfigPublish, Name: "发布客户配置版本", Module: "customer_config", Action: "publish", Resource: "revision", Builtin: true},
+	{Key: PermissionCustomerConfigActivate, Name: "激活或回滚客户配置版本", Module: "customer_config", Action: "activate", Resource: "revision", Builtin: true},
 	{Key: PermissionERPDashboardRead, Name: "查看任务看板", Module: "erp", Action: "read", Resource: "dashboard", Builtin: true},
 	{Key: PermissionERPPrintTemplateRead, Name: "查看打印模板", Module: "erp", Action: "read", Resource: "print_template", Builtin: true},
 	{Key: PermissionERPBusinessChainDebugRead, Name: "查看业务链路调试能力", Module: "erp", Action: "read", Resource: "business_chain_debug", Builtin: true},
@@ -284,6 +291,7 @@ var builtinPermissions = []PermissionDefinition{
 	{Key: PermissionMobileQualityAccess, Name: "进入品质岗位任务端", Module: "mobile", Action: "access", Resource: QualityRoleKey, Builtin: true},
 	{Key: PermissionMobileFinanceAccess, Name: "进入财务岗位任务端", Module: "mobile", Action: "access", Resource: FinanceRoleKey, Builtin: true},
 	{Key: PermissionMobilePMCAccess, Name: "进入 PMC 岗位任务端", Module: "mobile", Action: "access", Resource: PMCRoleKey, Builtin: true},
+	{Key: PermissionMobileEngineeringAccess, Name: "进入工程岗位任务端", Module: "mobile", Action: "access", Resource: EngineeringRoleKey, Builtin: true},
 	{Key: PermissionDebugSeed, Name: "生成调试数据", Module: "debug", Action: "seed", Resource: "business_chain", Builtin: true},
 	{Key: PermissionDebugCleanup, Name: "清理调试数据", Module: "debug", Action: "cleanup", Resource: "business_chain", Builtin: true},
 	{Key: PermissionDebugBusinessClear, Name: "清空业务数据", Module: "debug", Action: "clear", Resource: "business", Builtin: true},
@@ -363,22 +371,18 @@ func NormalizeAdminRoleKeys(input []string) []string {
 	if len(input) == 0 {
 		return []string{}
 	}
-	valid := map[string]struct{}{}
-	for _, role := range BuiltinRoles() {
-		valid[role.Key] = struct{}{}
-	}
 	selected := make(map[string]struct{}, len(input))
+	out := make([]string, 0, len(input))
 	for _, raw := range input {
 		key := NormalizeRoleKey(raw)
-		if _, ok := valid[key]; ok {
-			selected[key] = struct{}{}
+		if key == "" {
+			continue
 		}
-	}
-	out := make([]string, 0, len(selected))
-	for _, role := range BuiltinRoles() {
-		if _, ok := selected[role.Key]; ok {
-			out = append(out, role.Key)
+		if _, ok := selected[key]; ok {
+			continue
 		}
+		selected[key] = struct{}{}
+		out = append(out, key)
 	}
 	return out
 }
@@ -422,20 +426,22 @@ func BuiltinRoles() []RoleDefinition {
 		{Key: FinanceRoleKey, Name: "财务", Description: "应收、应付、收付款和财务报表相关入口，任务处理仍受财务 owner/assignee 约束。", Builtin: true, SortOrder: 60, Permissions: []string{PermissionERPDashboardRead, PermissionERPPrintTemplateRead, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionProductSKURead, PermissionShipmentRead, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionWorkflowTaskReject, PermissionFinancePayableRead, PermissionFinancePayableConfirm, PermissionFinanceReceivableRead, PermissionFinanceReceivableConfirm, PermissionFinanceReportRead, PermissionMobileFinanceAccess}},
 		{Key: PMCRoleKey, Name: "PMC", Description: "生产计划、进度和风险跟进；可查看风险，不等于可代替其他角色完成任务。", Builtin: true, SortOrder: 70, Permissions: []string{PermissionERPDashboardRead, PermissionMaterialRead, PermissionProcessRead, PermissionProcessCreate, PermissionProcessUpdate, PermissionProcessDisable, PermissionProductRead, PermissionMaterialCreate, PermissionMaterialUpdate, PermissionProductCreate, PermissionProductUpdate, PermissionProductDisable, PermissionProductSKURead, PermissionProductSKUCreate, PermissionProductSKUUpdate, PermissionProductSKUDisable, PermissionBOMRead, PermissionBOMCreate, PermissionBOMUpdate, PermissionBOMActivate, PermissionShipmentRead, PermissionWorkflowTaskRead, PermissionWorkflowTaskCreate, PermissionWorkflowTaskUpdate, PermissionPMCPlanRead, PermissionPMCPlanCreate, PermissionPMCPlanUpdate, PermissionPMCRiskRead, PermissionPMCRiskHandle, PermissionMobilePMCAccess}},
 		{Key: ProductionRoleKey, Name: "生产", Description: "排产、进度、返工和生产异常处理，任务处理仍受生产 owner/assignee 约束。", Builtin: true, SortOrder: 80, Permissions: []string{PermissionERPDashboardRead, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionProductSKURead, PermissionOutsourcingOrderRead, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionPMCPlanRead, PermissionPMCPlanUpdate, PermissionPMCRiskRead, PermissionPMCRiskHandle, PermissionMobileProductionAccess}},
-		{Key: AdminRoleKey, Name: "系统管理员", Description: "管理管理员、角色、权限和基础配置，不天然拥有业务事实处理权。", Builtin: true, SortOrder: 90, Permissions: []string{PermissionSystemUserRead, PermissionSystemUserCreate, PermissionSystemUserUpdate, PermissionSystemUserDisable, PermissionSystemRoleRead, PermissionSystemRoleCreate, PermissionSystemRoleUpdate, PermissionSystemRoleDelete, PermissionSystemPermissionRead, PermissionSystemPermissionManage, PermissionSystemAuditRead}},
-		{Key: DebugOperatorRoleKey, Name: "调试操作员", Description: "仅限 local/dev/test 分配的 debug 操作角色。", Builtin: true, SortOrder: 100, Permissions: []string{PermissionERPBusinessChainDebugRead, PermissionDebugBusinessChainRead, PermissionDebugBusinessChainRun, PermissionDebugSeed, PermissionDebugCleanup, PermissionDebugBusinessClear}},
+		{Key: EngineeringRoleKey, Name: "工程", Description: "产品资料、工艺、BOM 和工程资料任务入口，任务处理仍受工程 owner/assignee 约束。", Builtin: true, SortOrder: 90, Permissions: []string{PermissionERPDashboardRead, PermissionMaterialRead, PermissionProcessRead, PermissionProcessCreate, PermissionProcessUpdate, PermissionProcessDisable, PermissionProductRead, PermissionProductCreate, PermissionProductUpdate, PermissionProductSKURead, PermissionProductSKUCreate, PermissionProductSKUUpdate, PermissionBOMRead, PermissionBOMCreate, PermissionBOMUpdate, PermissionBOMActivate, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionMobileEngineeringAccess}},
+		{Key: AdminRoleKey, Name: "系统管理员", Description: "管理管理员、角色、权限和基础配置，不天然拥有业务事实处理权。", Builtin: true, SortOrder: 100, Permissions: []string{PermissionSystemUserRead, PermissionSystemUserCreate, PermissionSystemUserUpdate, PermissionSystemUserDisable, PermissionSystemRoleRead, PermissionSystemRoleCreate, PermissionSystemRoleUpdate, PermissionSystemRoleDelete, PermissionSystemPermissionRead, PermissionSystemPermissionManage, PermissionSystemAuditRead, PermissionCustomerConfigRead, PermissionCustomerConfigPublish, PermissionCustomerConfigActivate}},
+		{Key: DebugOperatorRoleKey, Name: "调试操作员", Description: "仅限 local/dev/test 分配的 debug 操作角色。", Builtin: true, SortOrder: 110, Permissions: []string{PermissionERPBusinessChainDebugRead, PermissionDebugBusinessChainRead, PermissionDebugBusinessChainRun, PermissionDebugSeed, PermissionDebugCleanup, PermissionDebugBusinessClear}},
 	}
 }
 
 var builtinMobileRoleAccessPermissions = map[string]string{
-	BossRoleKey:       PermissionMobileBossAccess,
-	SalesRoleKey:      PermissionMobileSalesAccess,
-	PurchaseRoleKey:   PermissionMobilePurchaseAccess,
-	ProductionRoleKey: PermissionMobileProductionAccess,
-	WarehouseRoleKey:  PermissionMobileWarehouseAccess,
-	QualityRoleKey:    PermissionMobileQualityAccess,
-	FinanceRoleKey:    PermissionMobileFinanceAccess,
-	PMCRoleKey:        PermissionMobilePMCAccess,
+	BossRoleKey:        PermissionMobileBossAccess,
+	SalesRoleKey:       PermissionMobileSalesAccess,
+	PurchaseRoleKey:    PermissionMobilePurchaseAccess,
+	ProductionRoleKey:  PermissionMobileProductionAccess,
+	WarehouseRoleKey:   PermissionMobileWarehouseAccess,
+	QualityRoleKey:     PermissionMobileQualityAccess,
+	FinanceRoleKey:     PermissionMobileFinanceAccess,
+	PMCRoleKey:         PermissionMobilePMCAccess,
+	EngineeringRoleKey: PermissionMobileEngineeringAccess,
 }
 
 func MobileRoleAccessPermission(roleKey string) string {

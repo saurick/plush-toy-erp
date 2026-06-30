@@ -5,6 +5,7 @@ import (
 	httpx "github.com/go-kratos/kratos/v2/transport/http"
 
 	v1 "server/api/jsonrpc/v1"
+	"server/internal/biz"
 	"server/internal/conf"
 	"server/internal/data"
 	"server/internal/service"
@@ -23,6 +24,7 @@ func NewHTTPServer(
 	jsonrpcSvc *service.JsonrpcService,
 	tp *sdktrace.TracerProvider,
 	data *data.Data,
+	customerConfigUC *biz.CustomerConfigUsecase,
 
 	// Data 配置提供 JWT secret 等运行时依赖。
 	dc *conf.Data,
@@ -61,7 +63,7 @@ func NewHTTPServer(
 	v1.RegisterJsonrpcHTTPServer(srv, jsonrpcSvc)
 
 	registerHealthRoutes(srv, logger, tp, data.SQLDB(), sharedTemplatePDFWarmupState)
-	registerTemplatePDFHandler(srv, logger, tp, dc)
+	registerTemplatePDFHandler(srv, logger, tp, dc, customerConfigUC)
 	registerStaticHandler(srv, logger, tp)
 
 	return srv

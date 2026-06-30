@@ -23,6 +23,9 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderDocument(
 		if res := d.RequireAdminPermission(ctx, permission); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders"); res != nil {
+			return id, res, nil
+		}
 		in, ok := outsourcingOrderMutationFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil

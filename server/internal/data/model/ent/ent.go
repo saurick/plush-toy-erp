@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"server/internal/data/model/ent/accessentitlement"
 	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/adminuserrole"
 	"server/internal/data/model/ent/bomheader"
@@ -14,6 +15,8 @@ import (
 	"server/internal/data/model/ent/businessattachment"
 	"server/internal/data/model/ent/contact"
 	"server/internal/data/model/ent/customer"
+	"server/internal/data/model/ent/customerconfigrevision"
+	"server/internal/data/model/ent/deploymentmodulestate"
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
@@ -24,6 +27,8 @@ import (
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/process"
+	"server/internal/data/model/ent/processinstance"
+	"server/internal/data/model/ent/processnodeinstance"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
@@ -38,6 +43,7 @@ import (
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/rolepermission"
+	"server/internal/data/model/ent/roleprofile"
 	"server/internal/data/model/ent/runtimeauditevent"
 	"server/internal/data/model/ent/runtimemarker"
 	"server/internal/data/model/ent/salesorder"
@@ -51,6 +57,8 @@ import (
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
+	"server/internal/data/model/ent/workpool"
+	"server/internal/data/model/ent/workpoolmembership"
 	"sync"
 
 	"entgo.io/ent"
@@ -116,6 +124,7 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
+			accessentitlement.Table:             accessentitlement.ValidColumn,
 			adminuser.Table:                     adminuser.ValidColumn,
 			adminuserrole.Table:                 adminuserrole.ValidColumn,
 			bomheader.Table:                     bomheader.ValidColumn,
@@ -123,6 +132,8 @@ func checkColumn(t, c string) error {
 			businessattachment.Table:            businessattachment.ValidColumn,
 			contact.Table:                       contact.ValidColumn,
 			customer.Table:                      customer.ValidColumn,
+			customerconfigrevision.Table:        customerconfigrevision.ValidColumn,
+			deploymentmodulestate.Table:         deploymentmodulestate.ValidColumn,
 			financefact.Table:                   financefact.ValidColumn,
 			inventorybalance.Table:              inventorybalance.ValidColumn,
 			inventorylot.Table:                  inventorylot.ValidColumn,
@@ -133,6 +144,8 @@ func checkColumn(t, c string) error {
 			outsourcingorderitem.Table:          outsourcingorderitem.ValidColumn,
 			permission.Table:                    permission.ValidColumn,
 			process.Table:                       process.ValidColumn,
+			processinstance.Table:               processinstance.ValidColumn,
+			processnodeinstance.Table:           processnodeinstance.ValidColumn,
 			product.Table:                       product.ValidColumn,
 			productsku.Table:                    productsku.ValidColumn,
 			productionfact.Table:                productionfact.ValidColumn,
@@ -147,6 +160,7 @@ func checkColumn(t, c string) error {
 			qualityinspection.Table:             qualityinspection.ValidColumn,
 			role.Table:                          role.ValidColumn,
 			rolepermission.Table:                rolepermission.ValidColumn,
+			roleprofile.Table:                   roleprofile.ValidColumn,
 			runtimeauditevent.Table:             runtimeauditevent.ValidColumn,
 			runtimemarker.Table:                 runtimemarker.ValidColumn,
 			salesorder.Table:                    salesorder.ValidColumn,
@@ -157,6 +171,8 @@ func checkColumn(t, c string) error {
 			supplier.Table:                      supplier.ValidColumn,
 			unit.Table:                          unit.ValidColumn,
 			warehouse.Table:                     warehouse.ValidColumn,
+			workpool.Table:                      workpool.ValidColumn,
+			workpoolmembership.Table:            workpoolmembership.ValidColumn,
 			workflowbusinessstate.Table:         workflowbusinessstate.ValidColumn,
 			workflowtask.Table:                  workflowtask.ValidColumn,
 			workflowtaskevent.Table:             workflowtaskevent.ValidColumn,

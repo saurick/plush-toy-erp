@@ -11,6 +11,7 @@ Usage:
     --dry-run-package output/customers/yoyoosun/import-dry-run \\
     --approval scripts/import/fixtures/customers/yoyoosun/import-approval.sample.json \\
     --backup-evidence output/customers/yoyoosun/backup-evidence.txt \\
+    --recovery-plan output/customers/yoyoosun/import-recovery-plan.json \\
     --out output/customers/yoyoosun/import-execution
 
 Execution mode:
@@ -23,6 +24,7 @@ Options:
   --dry-run-package <dir>   Required. Directory containing candidates.json and validation-summary.json.
   --approval <path>         Required. Approved execution plan JSON.
   --backup-evidence <path>  Required. Existing backup evidence file.
+  --recovery-plan <path>    Required with --execute. Reviewed rollback / forward-fix recovery plan JSON.
   --out <dir>               Required. Output directory for execution report.
   --backend-url <url>       Backend base URL. Required with --execute unless CUSTOMER_IMPORT_BACKEND_URL is set.
   --execute                 Execute via JSON-RPC. Without this flag the loader only validates and writes a report.
@@ -41,6 +43,12 @@ const SUPPORTED_TARGETS = new Set([
 const SUPPORTED_ACTIONS = new Set(["create", "update"]);
 const FORBIDDEN_TARGET_PATTERN =
   /product_skus|purchase_orders|shipments?|stock_reservations|inventory|finance|invoice|payment|receivable|payable|reconciliation|facts?/iu;
+const TARGET_MODULE_KEYS = Object.freeze({
+  customers: Object.freeze(["customers"]),
+  suppliers: Object.freeze(["suppliers"]),
+  sales_orders: Object.freeze(["sales_orders"]),
+  sales_order_items: Object.freeze(["sales_orders"]),
+});
 
 class CliError extends Error {
   constructor(message, exitCode = 1) {
@@ -85,6 +93,9 @@ export function parseCliArgs(argv) {
         break;
       case "backup-evidence":
         options.backupEvidence = value;
+        break;
+      case "recovery-plan":
+        options.recoveryPlan = value;
         break;
       case "out":
         options.out = value;
@@ -180,7 +191,97 @@ export function validateApprovalPlan(approval) {
   if (!Array.isArray(approval.items) || approval.items.length === 0) {
     throw new CliError("approval.items must not be empty");
   }
+  requireApprovalModuleStates(approval);
   buildApprovalIndex(approval);
+}
+
+function moduleStateMapFromApproval(approval) {
+  const raw =
+    approval?.moduleStates ?? approval?.module_states ?? approval?.modules;
+  if (!raw || typeof raw !== "object") {
+    throw new CliError(
+      "approval.moduleStates must declare enabled module states for import targets",
+    );
+  }
+  const map = new Map();
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      const key = String(
+        item?.moduleKey ?? item?.module_key ?? item?.key ?? "",
+      ).trim();
+      const state = String(item?.state ?? item?.status ?? "").trim();
+      if (key && state) {
+        map.set(key, state.toLowerCase());
+      }
+    }
+    return map;
+  }
+  for (const [key, value] of Object.entries(raw)) {
+    const state =
+      value && typeof value === "object"
+        ? value.state ?? value.status
+        : value;
+    if (String(key).trim() && String(state ?? "").trim()) {
+      map.set(String(key).trim(), String(state).trim().toLowerCase());
+    }
+  }
+  return map;
+}
+
+function requireApprovalModuleStates(approval) {
+  const moduleStates = moduleStateMapFromApproval(approval);
+  if (moduleStates.size === 0) {
+    throw new CliError(
+      "approval.moduleStates must not be empty and must use enabled/read_only/disabled states",
+    );
+  }
+  return moduleStates;
+}
+
+function targetModuleKeysForCandidate(candidate, approvalItem = {}) {
+  const targetModel = String(candidate.targetModel || "");
+  if (targetModel === "contacts") {
+    const fields = {
+      ...(candidate.targetFields || {}),
+      ...(approvalItem.params || {}),
+    };
+    const ownerType = String(fields.ownerType ?? fields.owner_type ?? "")
+      .trim()
+      .toLowerCase();
+    if (ownerType === "customer" || ownerType === "customers") {
+      return ["customers"];
+    }
+    if (ownerType === "supplier" || ownerType === "suppliers") {
+      return ["suppliers"];
+    }
+    throw new CliError(
+      `${candidate.sourceReference}: contacts import requires ownerType customer or supplier for module state gate`,
+    );
+  }
+  return TARGET_MODULE_KEYS[targetModel] || [];
+}
+
+function assertCandidateModuleStateAllowed(candidate, approvalItem, moduleStates) {
+  const moduleKeys = targetModuleKeysForCandidate(candidate, approvalItem);
+  if (moduleKeys.length === 0) {
+    throw new CliError(
+      `${candidate.sourceReference}: no module state mapping for targetModel ${candidate.targetModel}`,
+    );
+  }
+  for (const moduleKey of moduleKeys) {
+    const state = moduleStates.get(moduleKey);
+    if (!state) {
+      throw new CliError(
+        `${candidate.sourceReference}: approval.moduleStates.${moduleKey} must be enabled for import execution`,
+      );
+    }
+    if (state !== "enabled") {
+      throw new CliError(
+        `${candidate.sourceReference}: module ${moduleKey} is ${state}; import execution requires enabled module`,
+      );
+    }
+  }
+  return moduleKeys;
 }
 
 function assertNoDryRunBlockers(summary, approval) {
@@ -258,6 +359,32 @@ function assertApprovedSourcesClear({
       );
     }
   }
+}
+
+function containsFixtureOrPlaceholderText(value) {
+  return /\b(sample|fixture|placeholder|mock|dummy|fake|todo|replace[-_ ]?with)\b|样例|示例|占位|模拟|替换/iu.test(
+    String(value ?? ""),
+  );
+}
+
+function parseKeyValueEvidence(text) {
+  const fields = {};
+  for (const line of String(text || "").split(/\r?\n/u)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const match = trimmed.match(/^([A-Za-z][A-Za-z0-9_.-]*)\s*[=:]\s*(.+)$/u);
+    if (!match) continue;
+    fields[match[1]] = match[2].trim();
+  }
+  return fields;
+}
+
+function requireEvidenceField(fields, fieldName, fileName) {
+  const value = String(fields[fieldName] ?? "").trim();
+  if (!value || containsFixtureOrPlaceholderText(value)) {
+    throw new CliError(`${fileName}.${fieldName} must be reviewed and non-placeholder`);
+  }
+  return value;
 }
 
 function asPositiveInt(value, pathName) {
@@ -511,6 +638,7 @@ export function buildExecutionPlan({
   validateApprovalPlan(approval);
   assertNoDryRunBlockers(summary, approval);
   const approvalIndex = buildApprovalIndex(approval);
+  const moduleStates = requireApprovalModuleStates(approval);
   assertApprovedSourcesClear({
     candidates,
     forbidden,
@@ -526,11 +654,17 @@ export function buildExecutionPlan({
       continue;
     }
     assertCandidateAllowed(candidate, approvalItem);
+    const moduleKeys = assertCandidateModuleStateAllowed(
+      candidate,
+      approvalItem,
+      moduleStates,
+    );
     const operation = buildRpcOperation(candidate, approvalItem);
     operations.push({
       sourceReference: key,
       sourceId,
       targetModel: candidate.targetModel,
+      moduleKeys,
       action: candidate.actionCandidate,
       rpcPath: operation.rpcPath,
       method: operation.method,
@@ -552,6 +686,213 @@ function normalizeBaseURL(raw) {
   url.search = "";
   url.hash = "";
   return url.toString().replace(/\/+$/, "");
+}
+
+function assertExecutionApprovalSource(options) {
+  const approvalPath = String(options.approval || "");
+  const normalizedApprovalPath = approvalPath.split(path.sep).join("/");
+  const approvalBaseName = path.basename(approvalPath).toLowerCase();
+  if (
+    /(^|\/)scripts\/import\/fixtures\//u.test(normalizedApprovalPath) ||
+    approvalBaseName.includes("sample") ||
+    approvalBaseName.includes("fixture")
+  ) {
+    throw new CliError(
+      "execute mode cannot use fixture or sample approval; provide a reviewed customer import approval file",
+    );
+  }
+}
+
+function assertExecutionApprovalContent(approval) {
+  const approvalText = JSON.stringify(approval);
+  if (containsFixtureOrPlaceholderText(approvalText)) {
+    throw new CliError(
+      "execute mode approval contains fixture, sample, or placeholder text; provide reviewed customer import approval",
+    );
+  }
+}
+
+function assertExecutionDryRunSourceReferences(sourceReferences) {
+  for (const reference of sourceReferences || []) {
+    const values = [
+      reference.sourceId,
+      reference.sourceType,
+      reference.sourceKind,
+      reference.moduleKey,
+      reference.fileName,
+      reference.sheetName,
+      reference.sourceManifestId,
+      reference.sourceManifestPath,
+      reference.sourceReferenceLabel,
+    ];
+    if (values.some((value) => containsFixtureOrPlaceholderText(value))) {
+      throw new CliError(
+        "execute mode dry-run package contains fixture, sample, or placeholder source references; provide reviewed customer dry-run evidence",
+      );
+    }
+  }
+}
+
+async function assertExecutionDryRunPackageEvidence(options, sourceReferences) {
+  assertExecutionDryRunSourceReferences(sourceReferences);
+  const reportPath = path.join(options.dryRunPackage, "dry-run-report.md");
+  if (!(await pathExists(reportPath))) {
+    throw new CliError(
+      "execute mode requires dry-run-report.md for reviewed customer dry-run evidence",
+    );
+  }
+  const reportText = await readFile(reportPath, "utf8");
+  if (containsFixtureOrPlaceholderText(reportText)) {
+    throw new CliError(
+      "execute mode dry-run report contains fixture, sample, or placeholder text; provide reviewed customer dry-run evidence",
+    );
+  }
+}
+
+async function assertExecutionBackupEvidence(options) {
+  const backupEvidencePath = String(options.backupEvidence || "");
+  const normalizedBackupPath = backupEvidencePath.split(path.sep).join("/");
+  const backupBaseName = path.basename(backupEvidencePath).toLowerCase();
+  if (
+    /(^|\/)scripts\/import\/fixtures\//u.test(normalizedBackupPath) ||
+    backupBaseName.includes("sample") ||
+    backupBaseName.includes("fixture") ||
+    backupBaseName.includes("placeholder")
+  ) {
+    throw new CliError(
+      "execute mode cannot use fixture, sample, or placeholder backup evidence; provide target-environment backup evidence",
+    );
+  }
+  const evidenceText = (await readFile(backupEvidencePath, "utf8")).trim();
+  if (!evidenceText) {
+    throw new CliError("execute mode requires non-empty backup evidence");
+  }
+  if (containsFixtureOrPlaceholderText(evidenceText)) {
+    throw new CliError(
+      "execute mode backup evidence contains fixture, sample, or placeholder text; provide target-environment backup evidence",
+    );
+  }
+  const fields = parseKeyValueEvidence(evidenceText);
+  const backupId = requireEvidenceField(fields, "backupId", "backupEvidence");
+  requireEvidenceField(fields, "releaseVersion", "backupEvidence");
+  requireEvidenceField(fields, "databaseSnapshot", "backupEvidence");
+  requireEvidenceField(fields, "operator", "backupEvidence");
+  const backupTime = requireEvidenceField(fields, "backupTime", "backupEvidence");
+  const databaseBackupSize = requireEvidenceField(
+    fields,
+    "databaseBackupSize",
+    "backupEvidence",
+  );
+  const databaseBackupHash = requireEvidenceField(
+    fields,
+    "databaseBackupHash",
+    "backupEvidence",
+  );
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/u.test(backupTime)) {
+    throw new CliError("backupEvidence.backupTime must be an ISO timestamp");
+  }
+  if (!(Number(databaseBackupSize) > 0)) {
+    throw new CliError("backupEvidence.databaseBackupSize must be a positive number");
+  }
+  if (!/^(sha256:)?[a-f0-9]{64}$/iu.test(databaseBackupHash)) {
+    throw new CliError("backupEvidence.databaseBackupHash must be sha256");
+  }
+  return { backupId };
+}
+
+function requireMeaningfulPlanText(value, pathName) {
+  const text = String(value ?? "").trim();
+  if (!text || containsFixtureOrPlaceholderText(text)) {
+    throw new CliError(`${pathName} must be reviewed and non-placeholder`);
+  }
+  return text;
+}
+
+function assertReviewedList(value, pathName) {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new CliError(`${pathName} must not be empty`);
+  }
+  for (const [index, item] of value.entries()) {
+    requireMeaningfulPlanText(item, `${pathName}[${index}]`);
+  }
+}
+
+function validateRecoveryPlan(plan, backupEvidence = {}) {
+  if (!plan || typeof plan !== "object") {
+    throw new CliError("recovery plan must be a JSON object");
+  }
+  if (plan.customerKey !== "yoyoosun") {
+    throw new CliError("recoveryPlan.customerKey must be yoyoosun");
+  }
+  if (plan.recoveryPlanApproved !== true) {
+    throw new CliError("recoveryPlan.recoveryPlanApproved must be true");
+  }
+  for (const [field, label] of [
+    [plan.approvedBy, "recoveryPlan.approvedBy"],
+    [plan.approvedAt, "recoveryPlan.approvedAt"],
+    [plan.rollbackOrForwardFixOwner, "recoveryPlan.rollbackOrForwardFixOwner"],
+    [plan.backupEvidence, "recoveryPlan.backupEvidence"],
+    [plan.rollbackTarget, "recoveryPlan.rollbackTarget"],
+    [plan.forwardFixPath, "recoveryPlan.forwardFixPath"],
+  ]) {
+    requireMeaningfulPlanText(field, label);
+  }
+  if (
+    backupEvidence.backupId &&
+    String(plan.backupEvidence || "").trim() !== backupEvidence.backupId
+  ) {
+    throw new CliError(
+      "recoveryPlan.backupEvidence must match backupEvidence.backupId",
+    );
+  }
+  assertReviewedList(plan.failureTriggers, "recoveryPlan.failureTriggers");
+  assertReviewedList(
+    plan.postRecoveryVerification,
+    "recoveryPlan.postRecoveryVerification",
+  );
+  if (plan.redaction?.containsSecrets !== false) {
+    throw new CliError("recoveryPlan.redaction.containsSecrets must be false");
+  }
+  if (plan.redaction?.containsRawCustomerRows !== false) {
+    throw new CliError(
+      "recoveryPlan.redaction.containsRawCustomerRows must be false",
+    );
+  }
+}
+
+async function assertExecutionRecoveryPlan(options, backupEvidence = {}) {
+  requireOption(options, "recoveryPlan");
+  const recoveryPlanPath = String(options.recoveryPlan || "");
+  const normalizedPlanPath = recoveryPlanPath.split(path.sep).join("/");
+  const planBaseName = path.basename(recoveryPlanPath).toLowerCase();
+  if (
+    /(^|\/)scripts\/import\/fixtures\//u.test(normalizedPlanPath) ||
+    planBaseName.includes("sample") ||
+    planBaseName.includes("fixture") ||
+    planBaseName.includes("placeholder")
+  ) {
+    throw new CliError(
+      "execute mode cannot use fixture, sample, or placeholder recovery plan; provide reviewed import failure recovery plan",
+    );
+  }
+  if (!(await pathExists(recoveryPlanPath))) {
+    throw new CliError(`recovery plan not found: ${recoveryPlanPath}`);
+  }
+  const plan = await readJson(recoveryPlanPath);
+  if (containsFixtureOrPlaceholderText(JSON.stringify(plan))) {
+    throw new CliError(
+      "execute mode recovery plan contains fixture, sample, or placeholder text; provide reviewed import failure recovery plan",
+    );
+  }
+  validateRecoveryPlan(plan, backupEvidence);
+}
+
+function requireExecutionConfirmation() {
+  if (process.env.CUSTOMER_IMPORT_CONFIRM !== CONFIRM_PHRASE) {
+    throw new CliError(
+      `execution requires CUSTOMER_IMPORT_CONFIRM=${CONFIRM_PHRASE}`,
+    );
+  }
 }
 
 async function rpcCall({ backendURL, token, rpcPath, method, params }) {
@@ -606,11 +947,7 @@ async function resolveAdminToken(backendURL) {
 }
 
 async function executeOperations({ backendURL, operations }) {
-  if (process.env.CUSTOMER_IMPORT_CONFIRM !== CONFIRM_PHRASE) {
-    throw new CliError(
-      `execution requires CUSTOMER_IMPORT_CONFIRM=${CONFIRM_PHRASE}`,
-    );
-  }
+  requireExecutionConfirmation();
   const token = await resolveAdminToken(backendURL);
   const results = [];
   for (const operation of operations) {
@@ -644,6 +981,9 @@ async function loadInputs(options) {
   const candidates = await readJson(
     path.join(options.dryRunPackage, "candidates.json"),
   );
+  const sourceReferences = await readJson(
+    path.join(options.dryRunPackage, "source-references.json"),
+  );
   const summary = await readJson(
     path.join(options.dryRunPackage, "validation-summary.json"),
   );
@@ -654,7 +994,14 @@ async function loadInputs(options) {
     path.join(options.dryRunPackage, "unresolved-queue.json"),
   );
   const approval = await readJson(options.approval);
-  return { candidates, summary, approval, forbidden, unresolved };
+  return {
+    candidates,
+    sourceReferences,
+    summary,
+    approval,
+    forbidden,
+    unresolved,
+  };
 }
 
 async function writeReport({ options, operations, results, executed }) {
@@ -666,6 +1013,7 @@ async function writeReport({ options, operations, results, executed }) {
     dryRunPackage: options.dryRunPackage,
     approval: options.approval,
     backupEvidence: options.backupEvidence,
+    recoveryPlan: options.recoveryPlan || null,
     operationCount: operations.length,
     operations,
     results,
@@ -687,6 +1035,7 @@ async function writeReport({ options, operations, results, executed }) {
       `| dryRunPackage | ${options.dryRunPackage} |`,
       `| approval | ${options.approval} |`,
       `| backupEvidence | ${options.backupEvidence} |`,
+      `| recoveryPlan | ${options.recoveryPlan || ""} |`,
       "",
       "This report is generated by the import execution loader. The loader uses JSON-RPC V1 APIs only and does not write database tables directly, write business_records, generate migrations, or create shipment / inventory / finance facts.",
       "",
@@ -699,6 +1048,17 @@ async function writeReport({ options, operations, results, executed }) {
 export async function runImportExecution(options) {
   const inputs = await loadInputs(options);
   const operations = buildExecutionPlan(inputs);
+  if (options.execute) {
+    requireExecutionConfirmation();
+    assertExecutionApprovalSource(options);
+    assertExecutionApprovalContent(inputs.approval);
+    await assertExecutionDryRunPackageEvidence(
+      options,
+      inputs.sourceReferences,
+    );
+    const backupEvidence = await assertExecutionBackupEvidence(options);
+    await assertExecutionRecoveryPlan(options, backupEvidence);
+  }
   if (
     options.execute &&
     !(options.backendURL || process.env.CUSTOMER_IMPORT_BACKEND_URL)

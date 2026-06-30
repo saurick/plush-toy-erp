@@ -12,6 +12,8 @@ import (
 // Tx is a transactional client that is created by calling Client.Tx().
 type Tx struct {
 	config
+	// AccessEntitlement is the client for interacting with the AccessEntitlement builders.
+	AccessEntitlement *AccessEntitlementClient
 	// AdminUser is the client for interacting with the AdminUser builders.
 	AdminUser *AdminUserClient
 	// AdminUserRole is the client for interacting with the AdminUserRole builders.
@@ -26,6 +28,10 @@ type Tx struct {
 	Contact *ContactClient
 	// Customer is the client for interacting with the Customer builders.
 	Customer *CustomerClient
+	// CustomerConfigRevision is the client for interacting with the CustomerConfigRevision builders.
+	CustomerConfigRevision *CustomerConfigRevisionClient
+	// DeploymentModuleState is the client for interacting with the DeploymentModuleState builders.
+	DeploymentModuleState *DeploymentModuleStateClient
 	// FinanceFact is the client for interacting with the FinanceFact builders.
 	FinanceFact *FinanceFactClient
 	// InventoryBalance is the client for interacting with the InventoryBalance builders.
@@ -46,6 +52,10 @@ type Tx struct {
 	Permission *PermissionClient
 	// Process is the client for interacting with the Process builders.
 	Process *ProcessClient
+	// ProcessInstance is the client for interacting with the ProcessInstance builders.
+	ProcessInstance *ProcessInstanceClient
+	// ProcessNodeInstance is the client for interacting with the ProcessNodeInstance builders.
+	ProcessNodeInstance *ProcessNodeInstanceClient
 	// Product is the client for interacting with the Product builders.
 	Product *ProductClient
 	// ProductSKU is the client for interacting with the ProductSKU builders.
@@ -74,6 +84,8 @@ type Tx struct {
 	Role *RoleClient
 	// RolePermission is the client for interacting with the RolePermission builders.
 	RolePermission *RolePermissionClient
+	// RoleProfile is the client for interacting with the RoleProfile builders.
+	RoleProfile *RoleProfileClient
 	// RuntimeAuditEvent is the client for interacting with the RuntimeAuditEvent builders.
 	RuntimeAuditEvent *RuntimeAuditEventClient
 	// RuntimeMarker is the client for interacting with the RuntimeMarker builders.
@@ -94,6 +106,10 @@ type Tx struct {
 	Unit *UnitClient
 	// Warehouse is the client for interacting with the Warehouse builders.
 	Warehouse *WarehouseClient
+	// WorkPool is the client for interacting with the WorkPool builders.
+	WorkPool *WorkPoolClient
+	// WorkPoolMembership is the client for interacting with the WorkPoolMembership builders.
+	WorkPoolMembership *WorkPoolMembershipClient
 	// WorkflowBusinessState is the client for interacting with the WorkflowBusinessState builders.
 	WorkflowBusinessState *WorkflowBusinessStateClient
 	// WorkflowTask is the client for interacting with the WorkflowTask builders.
@@ -231,6 +247,7 @@ func (tx *Tx) Client() *Client {
 }
 
 func (tx *Tx) init() {
+	tx.AccessEntitlement = NewAccessEntitlementClient(tx.config)
 	tx.AdminUser = NewAdminUserClient(tx.config)
 	tx.AdminUserRole = NewAdminUserRoleClient(tx.config)
 	tx.BOMHeader = NewBOMHeaderClient(tx.config)
@@ -238,6 +255,8 @@ func (tx *Tx) init() {
 	tx.BusinessAttachment = NewBusinessAttachmentClient(tx.config)
 	tx.Contact = NewContactClient(tx.config)
 	tx.Customer = NewCustomerClient(tx.config)
+	tx.CustomerConfigRevision = NewCustomerConfigRevisionClient(tx.config)
+	tx.DeploymentModuleState = NewDeploymentModuleStateClient(tx.config)
 	tx.FinanceFact = NewFinanceFactClient(tx.config)
 	tx.InventoryBalance = NewInventoryBalanceClient(tx.config)
 	tx.InventoryLot = NewInventoryLotClient(tx.config)
@@ -248,6 +267,8 @@ func (tx *Tx) init() {
 	tx.OutsourcingOrderItem = NewOutsourcingOrderItemClient(tx.config)
 	tx.Permission = NewPermissionClient(tx.config)
 	tx.Process = NewProcessClient(tx.config)
+	tx.ProcessInstance = NewProcessInstanceClient(tx.config)
+	tx.ProcessNodeInstance = NewProcessNodeInstanceClient(tx.config)
 	tx.Product = NewProductClient(tx.config)
 	tx.ProductSKU = NewProductSKUClient(tx.config)
 	tx.ProductionFact = NewProductionFactClient(tx.config)
@@ -262,6 +283,7 @@ func (tx *Tx) init() {
 	tx.QualityInspection = NewQualityInspectionClient(tx.config)
 	tx.Role = NewRoleClient(tx.config)
 	tx.RolePermission = NewRolePermissionClient(tx.config)
+	tx.RoleProfile = NewRoleProfileClient(tx.config)
 	tx.RuntimeAuditEvent = NewRuntimeAuditEventClient(tx.config)
 	tx.RuntimeMarker = NewRuntimeMarkerClient(tx.config)
 	tx.SalesOrder = NewSalesOrderClient(tx.config)
@@ -272,6 +294,8 @@ func (tx *Tx) init() {
 	tx.Supplier = NewSupplierClient(tx.config)
 	tx.Unit = NewUnitClient(tx.config)
 	tx.Warehouse = NewWarehouseClient(tx.config)
+	tx.WorkPool = NewWorkPoolClient(tx.config)
+	tx.WorkPoolMembership = NewWorkPoolMembershipClient(tx.config)
 	tx.WorkflowBusinessState = NewWorkflowBusinessStateClient(tx.config)
 	tx.WorkflowTask = NewWorkflowTaskClient(tx.config)
 	tx.WorkflowTaskEvent = NewWorkflowTaskEventClient(tx.config)
@@ -284,7 +308,7 @@ func (tx *Tx) init() {
 // of them in order to commit or rollback the transaction.
 //
 // If a closed transaction is embedded in one of the generated entities, and the entity
-// applies a query, for example: AdminUser.QueryXXX(), the query will be executed
+// applies a query, for example: AccessEntitlement.QueryXXX(), the query will be executed
 // through the driver which created this transaction.
 //
 // Note that txDriver is not goroutine safe.

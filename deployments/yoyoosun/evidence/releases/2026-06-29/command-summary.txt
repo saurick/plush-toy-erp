@@ -1,0 +1,5 @@
+backupId=待填写
+releaseVersion=待填写
+sourceAlias=待填写，必须脱敏，例如 env:SOURCE_POSTGRES_DSN
+restoreTarget=待填写，必须脱敏，例如 temp-postgres-container:postgres:18:removed-after-run
+steps=待填写，记录 pg_dump -> restore -> pre-apply atlas status -> atlas migrate apply -> post-apply atlas status -> smoke 的脱敏命令摘要，不保存完整 DSN、secret、dump 内容或客户 raw rows

@@ -174,6 +174,120 @@ func (_u *WorkflowTaskUpdate) SetNillableOwnerRoleKey(v *string) *WorkflowTaskUp
 	return _u
 }
 
+// SetOwnerPoolKey sets the "owner_pool_key" field.
+func (_u *WorkflowTaskUpdate) SetOwnerPoolKey(v string) *WorkflowTaskUpdate {
+	_u.mutation.SetOwnerPoolKey(v)
+	return _u
+}
+
+// SetNillableOwnerPoolKey sets the "owner_pool_key" field if the given value is not nil.
+func (_u *WorkflowTaskUpdate) SetNillableOwnerPoolKey(v *string) *WorkflowTaskUpdate {
+	if v != nil {
+		_u.SetOwnerPoolKey(*v)
+	}
+	return _u
+}
+
+// ClearOwnerPoolKey clears the value of the "owner_pool_key" field.
+func (_u *WorkflowTaskUpdate) ClearOwnerPoolKey() *WorkflowTaskUpdate {
+	_u.mutation.ClearOwnerPoolKey()
+	return _u
+}
+
+// SetRequiredCapabilityKey sets the "required_capability_key" field.
+func (_u *WorkflowTaskUpdate) SetRequiredCapabilityKey(v string) *WorkflowTaskUpdate {
+	_u.mutation.SetRequiredCapabilityKey(v)
+	return _u
+}
+
+// SetNillableRequiredCapabilityKey sets the "required_capability_key" field if the given value is not nil.
+func (_u *WorkflowTaskUpdate) SetNillableRequiredCapabilityKey(v *string) *WorkflowTaskUpdate {
+	if v != nil {
+		_u.SetRequiredCapabilityKey(*v)
+	}
+	return _u
+}
+
+// ClearRequiredCapabilityKey clears the value of the "required_capability_key" field.
+func (_u *WorkflowTaskUpdate) ClearRequiredCapabilityKey() *WorkflowTaskUpdate {
+	_u.mutation.ClearRequiredCapabilityKey()
+	return _u
+}
+
+// SetConfigRevision sets the "config_revision" field.
+func (_u *WorkflowTaskUpdate) SetConfigRevision(v string) *WorkflowTaskUpdate {
+	_u.mutation.SetConfigRevision(v)
+	return _u
+}
+
+// SetNillableConfigRevision sets the "config_revision" field if the given value is not nil.
+func (_u *WorkflowTaskUpdate) SetNillableConfigRevision(v *string) *WorkflowTaskUpdate {
+	if v != nil {
+		_u.SetConfigRevision(*v)
+	}
+	return _u
+}
+
+// ClearConfigRevision clears the value of the "config_revision" field.
+func (_u *WorkflowTaskUpdate) ClearConfigRevision() *WorkflowTaskUpdate {
+	_u.mutation.ClearConfigRevision()
+	return _u
+}
+
+// SetProcessInstanceID sets the "process_instance_id" field.
+func (_u *WorkflowTaskUpdate) SetProcessInstanceID(v int) *WorkflowTaskUpdate {
+	_u.mutation.ResetProcessInstanceID()
+	_u.mutation.SetProcessInstanceID(v)
+	return _u
+}
+
+// SetNillableProcessInstanceID sets the "process_instance_id" field if the given value is not nil.
+func (_u *WorkflowTaskUpdate) SetNillableProcessInstanceID(v *int) *WorkflowTaskUpdate {
+	if v != nil {
+		_u.SetProcessInstanceID(*v)
+	}
+	return _u
+}
+
+// AddProcessInstanceID adds value to the "process_instance_id" field.
+func (_u *WorkflowTaskUpdate) AddProcessInstanceID(v int) *WorkflowTaskUpdate {
+	_u.mutation.AddProcessInstanceID(v)
+	return _u
+}
+
+// ClearProcessInstanceID clears the value of the "process_instance_id" field.
+func (_u *WorkflowTaskUpdate) ClearProcessInstanceID() *WorkflowTaskUpdate {
+	_u.mutation.ClearProcessInstanceID()
+	return _u
+}
+
+// SetProcessNodeInstanceID sets the "process_node_instance_id" field.
+func (_u *WorkflowTaskUpdate) SetProcessNodeInstanceID(v int) *WorkflowTaskUpdate {
+	_u.mutation.ResetProcessNodeInstanceID()
+	_u.mutation.SetProcessNodeInstanceID(v)
+	return _u
+}
+
+// SetNillableProcessNodeInstanceID sets the "process_node_instance_id" field if the given value is not nil.
+func (_u *WorkflowTaskUpdate) SetNillableProcessNodeInstanceID(v *int) *WorkflowTaskUpdate {
+	if v != nil {
+		_u.SetProcessNodeInstanceID(*v)
+	}
+	return _u
+}
+
+// AddProcessNodeInstanceID adds value to the "process_node_instance_id" field.
+func (_u *WorkflowTaskUpdate) AddProcessNodeInstanceID(v int) *WorkflowTaskUpdate {
+	_u.mutation.AddProcessNodeInstanceID(v)
+	return _u
+}
+
+// ClearProcessNodeInstanceID clears the value of the "process_node_instance_id" field.
+func (_u *WorkflowTaskUpdate) ClearProcessNodeInstanceID() *WorkflowTaskUpdate {
+	_u.mutation.ClearProcessNodeInstanceID()
+	return _u
+}
+
 // SetAssigneeID sets the "assignee_id" field.
 func (_u *WorkflowTaskUpdate) SetAssigneeID(v int) *WorkflowTaskUpdate {
 	_u.mutation.ResetAssigneeID()
@@ -518,6 +632,31 @@ func (_u *WorkflowTaskUpdate) check() error {
 			return &ValidationError{Name: "owner_role_key", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.owner_role_key": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.OwnerPoolKey(); ok {
+		if err := workflowtask.OwnerPoolKeyValidator(v); err != nil {
+			return &ValidationError{Name: "owner_pool_key", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.owner_pool_key": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RequiredCapabilityKey(); ok {
+		if err := workflowtask.RequiredCapabilityKeyValidator(v); err != nil {
+			return &ValidationError{Name: "required_capability_key", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.required_capability_key": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ConfigRevision(); ok {
+		if err := workflowtask.ConfigRevisionValidator(v); err != nil {
+			return &ValidationError{Name: "config_revision", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.config_revision": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProcessInstanceID(); ok {
+		if err := workflowtask.ProcessInstanceIDValidator(v); err != nil {
+			return &ValidationError{Name: "process_instance_id", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.process_instance_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProcessNodeInstanceID(); ok {
+		if err := workflowtask.ProcessNodeInstanceIDValidator(v); err != nil {
+			return &ValidationError{Name: "process_node_instance_id", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.process_node_instance_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.AssigneeID(); ok {
 		if err := workflowtask.AssigneeIDValidator(v); err != nil {
 			return &ValidationError{Name: "assignee_id", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.assignee_id": %w`, err)}
@@ -588,6 +727,42 @@ func (_u *WorkflowTaskUpdate) sqlSave(ctx context.Context) (_node int, err error
 	}
 	if value, ok := _u.mutation.OwnerRoleKey(); ok {
 		_spec.SetField(workflowtask.FieldOwnerRoleKey, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.OwnerPoolKey(); ok {
+		_spec.SetField(workflowtask.FieldOwnerPoolKey, field.TypeString, value)
+	}
+	if _u.mutation.OwnerPoolKeyCleared() {
+		_spec.ClearField(workflowtask.FieldOwnerPoolKey, field.TypeString)
+	}
+	if value, ok := _u.mutation.RequiredCapabilityKey(); ok {
+		_spec.SetField(workflowtask.FieldRequiredCapabilityKey, field.TypeString, value)
+	}
+	if _u.mutation.RequiredCapabilityKeyCleared() {
+		_spec.ClearField(workflowtask.FieldRequiredCapabilityKey, field.TypeString)
+	}
+	if value, ok := _u.mutation.ConfigRevision(); ok {
+		_spec.SetField(workflowtask.FieldConfigRevision, field.TypeString, value)
+	}
+	if _u.mutation.ConfigRevisionCleared() {
+		_spec.ClearField(workflowtask.FieldConfigRevision, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProcessInstanceID(); ok {
+		_spec.SetField(workflowtask.FieldProcessInstanceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedProcessInstanceID(); ok {
+		_spec.AddField(workflowtask.FieldProcessInstanceID, field.TypeInt, value)
+	}
+	if _u.mutation.ProcessInstanceIDCleared() {
+		_spec.ClearField(workflowtask.FieldProcessInstanceID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ProcessNodeInstanceID(); ok {
+		_spec.SetField(workflowtask.FieldProcessNodeInstanceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedProcessNodeInstanceID(); ok {
+		_spec.AddField(workflowtask.FieldProcessNodeInstanceID, field.TypeInt, value)
+	}
+	if _u.mutation.ProcessNodeInstanceIDCleared() {
+		_spec.ClearField(workflowtask.FieldProcessNodeInstanceID, field.TypeInt)
 	}
 	if value, ok := _u.mutation.AssigneeID(); ok {
 		_spec.SetField(workflowtask.FieldAssigneeID, field.TypeInt, value)
@@ -868,6 +1043,120 @@ func (_u *WorkflowTaskUpdateOne) SetNillableOwnerRoleKey(v *string) *WorkflowTas
 	if v != nil {
 		_u.SetOwnerRoleKey(*v)
 	}
+	return _u
+}
+
+// SetOwnerPoolKey sets the "owner_pool_key" field.
+func (_u *WorkflowTaskUpdateOne) SetOwnerPoolKey(v string) *WorkflowTaskUpdateOne {
+	_u.mutation.SetOwnerPoolKey(v)
+	return _u
+}
+
+// SetNillableOwnerPoolKey sets the "owner_pool_key" field if the given value is not nil.
+func (_u *WorkflowTaskUpdateOne) SetNillableOwnerPoolKey(v *string) *WorkflowTaskUpdateOne {
+	if v != nil {
+		_u.SetOwnerPoolKey(*v)
+	}
+	return _u
+}
+
+// ClearOwnerPoolKey clears the value of the "owner_pool_key" field.
+func (_u *WorkflowTaskUpdateOne) ClearOwnerPoolKey() *WorkflowTaskUpdateOne {
+	_u.mutation.ClearOwnerPoolKey()
+	return _u
+}
+
+// SetRequiredCapabilityKey sets the "required_capability_key" field.
+func (_u *WorkflowTaskUpdateOne) SetRequiredCapabilityKey(v string) *WorkflowTaskUpdateOne {
+	_u.mutation.SetRequiredCapabilityKey(v)
+	return _u
+}
+
+// SetNillableRequiredCapabilityKey sets the "required_capability_key" field if the given value is not nil.
+func (_u *WorkflowTaskUpdateOne) SetNillableRequiredCapabilityKey(v *string) *WorkflowTaskUpdateOne {
+	if v != nil {
+		_u.SetRequiredCapabilityKey(*v)
+	}
+	return _u
+}
+
+// ClearRequiredCapabilityKey clears the value of the "required_capability_key" field.
+func (_u *WorkflowTaskUpdateOne) ClearRequiredCapabilityKey() *WorkflowTaskUpdateOne {
+	_u.mutation.ClearRequiredCapabilityKey()
+	return _u
+}
+
+// SetConfigRevision sets the "config_revision" field.
+func (_u *WorkflowTaskUpdateOne) SetConfigRevision(v string) *WorkflowTaskUpdateOne {
+	_u.mutation.SetConfigRevision(v)
+	return _u
+}
+
+// SetNillableConfigRevision sets the "config_revision" field if the given value is not nil.
+func (_u *WorkflowTaskUpdateOne) SetNillableConfigRevision(v *string) *WorkflowTaskUpdateOne {
+	if v != nil {
+		_u.SetConfigRevision(*v)
+	}
+	return _u
+}
+
+// ClearConfigRevision clears the value of the "config_revision" field.
+func (_u *WorkflowTaskUpdateOne) ClearConfigRevision() *WorkflowTaskUpdateOne {
+	_u.mutation.ClearConfigRevision()
+	return _u
+}
+
+// SetProcessInstanceID sets the "process_instance_id" field.
+func (_u *WorkflowTaskUpdateOne) SetProcessInstanceID(v int) *WorkflowTaskUpdateOne {
+	_u.mutation.ResetProcessInstanceID()
+	_u.mutation.SetProcessInstanceID(v)
+	return _u
+}
+
+// SetNillableProcessInstanceID sets the "process_instance_id" field if the given value is not nil.
+func (_u *WorkflowTaskUpdateOne) SetNillableProcessInstanceID(v *int) *WorkflowTaskUpdateOne {
+	if v != nil {
+		_u.SetProcessInstanceID(*v)
+	}
+	return _u
+}
+
+// AddProcessInstanceID adds value to the "process_instance_id" field.
+func (_u *WorkflowTaskUpdateOne) AddProcessInstanceID(v int) *WorkflowTaskUpdateOne {
+	_u.mutation.AddProcessInstanceID(v)
+	return _u
+}
+
+// ClearProcessInstanceID clears the value of the "process_instance_id" field.
+func (_u *WorkflowTaskUpdateOne) ClearProcessInstanceID() *WorkflowTaskUpdateOne {
+	_u.mutation.ClearProcessInstanceID()
+	return _u
+}
+
+// SetProcessNodeInstanceID sets the "process_node_instance_id" field.
+func (_u *WorkflowTaskUpdateOne) SetProcessNodeInstanceID(v int) *WorkflowTaskUpdateOne {
+	_u.mutation.ResetProcessNodeInstanceID()
+	_u.mutation.SetProcessNodeInstanceID(v)
+	return _u
+}
+
+// SetNillableProcessNodeInstanceID sets the "process_node_instance_id" field if the given value is not nil.
+func (_u *WorkflowTaskUpdateOne) SetNillableProcessNodeInstanceID(v *int) *WorkflowTaskUpdateOne {
+	if v != nil {
+		_u.SetProcessNodeInstanceID(*v)
+	}
+	return _u
+}
+
+// AddProcessNodeInstanceID adds value to the "process_node_instance_id" field.
+func (_u *WorkflowTaskUpdateOne) AddProcessNodeInstanceID(v int) *WorkflowTaskUpdateOne {
+	_u.mutation.AddProcessNodeInstanceID(v)
+	return _u
+}
+
+// ClearProcessNodeInstanceID clears the value of the "process_node_instance_id" field.
+func (_u *WorkflowTaskUpdateOne) ClearProcessNodeInstanceID() *WorkflowTaskUpdateOne {
+	_u.mutation.ClearProcessNodeInstanceID()
 	return _u
 }
 
@@ -1228,6 +1517,31 @@ func (_u *WorkflowTaskUpdateOne) check() error {
 			return &ValidationError{Name: "owner_role_key", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.owner_role_key": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.OwnerPoolKey(); ok {
+		if err := workflowtask.OwnerPoolKeyValidator(v); err != nil {
+			return &ValidationError{Name: "owner_pool_key", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.owner_pool_key": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RequiredCapabilityKey(); ok {
+		if err := workflowtask.RequiredCapabilityKeyValidator(v); err != nil {
+			return &ValidationError{Name: "required_capability_key", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.required_capability_key": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ConfigRevision(); ok {
+		if err := workflowtask.ConfigRevisionValidator(v); err != nil {
+			return &ValidationError{Name: "config_revision", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.config_revision": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProcessInstanceID(); ok {
+		if err := workflowtask.ProcessInstanceIDValidator(v); err != nil {
+			return &ValidationError{Name: "process_instance_id", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.process_instance_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProcessNodeInstanceID(); ok {
+		if err := workflowtask.ProcessNodeInstanceIDValidator(v); err != nil {
+			return &ValidationError{Name: "process_node_instance_id", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.process_node_instance_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.AssigneeID(); ok {
 		if err := workflowtask.AssigneeIDValidator(v); err != nil {
 			return &ValidationError{Name: "assignee_id", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.assignee_id": %w`, err)}
@@ -1315,6 +1629,42 @@ func (_u *WorkflowTaskUpdateOne) sqlSave(ctx context.Context) (_node *WorkflowTa
 	}
 	if value, ok := _u.mutation.OwnerRoleKey(); ok {
 		_spec.SetField(workflowtask.FieldOwnerRoleKey, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.OwnerPoolKey(); ok {
+		_spec.SetField(workflowtask.FieldOwnerPoolKey, field.TypeString, value)
+	}
+	if _u.mutation.OwnerPoolKeyCleared() {
+		_spec.ClearField(workflowtask.FieldOwnerPoolKey, field.TypeString)
+	}
+	if value, ok := _u.mutation.RequiredCapabilityKey(); ok {
+		_spec.SetField(workflowtask.FieldRequiredCapabilityKey, field.TypeString, value)
+	}
+	if _u.mutation.RequiredCapabilityKeyCleared() {
+		_spec.ClearField(workflowtask.FieldRequiredCapabilityKey, field.TypeString)
+	}
+	if value, ok := _u.mutation.ConfigRevision(); ok {
+		_spec.SetField(workflowtask.FieldConfigRevision, field.TypeString, value)
+	}
+	if _u.mutation.ConfigRevisionCleared() {
+		_spec.ClearField(workflowtask.FieldConfigRevision, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProcessInstanceID(); ok {
+		_spec.SetField(workflowtask.FieldProcessInstanceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedProcessInstanceID(); ok {
+		_spec.AddField(workflowtask.FieldProcessInstanceID, field.TypeInt, value)
+	}
+	if _u.mutation.ProcessInstanceIDCleared() {
+		_spec.ClearField(workflowtask.FieldProcessInstanceID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ProcessNodeInstanceID(); ok {
+		_spec.SetField(workflowtask.FieldProcessNodeInstanceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedProcessNodeInstanceID(); ok {
+		_spec.AddField(workflowtask.FieldProcessNodeInstanceID, field.TypeInt, value)
+	}
+	if _u.mutation.ProcessNodeInstanceIDCleared() {
+		_spec.ClearField(workflowtask.FieldProcessNodeInstanceID, field.TypeInt)
 	}
 	if value, ok := _u.mutation.AssigneeID(); ok {
 		_spec.SetField(workflowtask.FieldAssigneeID, field.TypeInt, value)

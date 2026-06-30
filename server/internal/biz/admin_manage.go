@@ -115,8 +115,11 @@ func NewAdminManageUsecase(repo AdminManageRepo, logger log.Logger, tp *tracesdk
 }
 
 const (
-	adminControlAuditEventType = "admin_control_plane"
-	adminControlAuditSource    = "admin_manage"
+	adminControlAuditEventType  = "admin_control_plane"
+	adminControlAuditSource     = "admin_manage"
+	workflowBreakGlassEventType = "workflow_break_glass"
+	workflowBreakGlassEventKey  = "workflow_task.break_glass"
+	workflowBreakGlassSource    = "workflow"
 )
 
 func (uc *AdminManageUsecase) Tracer() trace.Tracer {
@@ -253,6 +256,63 @@ func adminAuditRoleSnapshot(role *AdminRole) map[string]any {
 	}
 }
 
+func (uc *AdminManageUsecase) RecordWorkflowBreakGlassAudit(
+	ctx context.Context,
+	operator *AdminUser,
+	task *WorkflowTask,
+	actionKey string,
+	nextStatusKey string,
+	reason string,
+	expiresAt time.Time,
+) error {
+	if operator == nil || task == nil {
+		return ErrBadParam
+	}
+	actionKey = strings.TrimSpace(actionKey)
+	nextStatusKey = strings.TrimSpace(nextStatusKey)
+	reason = strings.TrimSpace(reason)
+	if actionKey == "" || nextStatusKey == "" || reason == "" || expiresAt.IsZero() {
+		return ErrBadParam
+	}
+	targetKey := fmt.Sprintf("workflow_task/%d", task.ID)
+	if strings.TrimSpace(task.TaskCode) != "" {
+		targetKey = strings.TrimSpace(task.TaskCode)
+	}
+	payload := map[string]any{
+		"action": workflowBreakGlassEventKey,
+		"actor": map[string]any{
+			"id":             operator.ID,
+			"username":       operator.Username,
+			"role_keys":      AdminRoleKeys(operator),
+			"is_super_admin": operator.IsSuperAdmin,
+		},
+		"target": map[string]any{
+			"type": "workflow_task",
+			"id":   task.ID,
+			"key":  targetKey,
+		},
+		"break_glass": map[string]any{
+			"action_key":                actionKey,
+			"reason":                    reason,
+			"expires_at":                expiresAt.UTC().Format(time.RFC3339),
+			"requested_next_status_key": nextStatusKey,
+		},
+		"task": map[string]any{
+			"task_group":      task.TaskGroup,
+			"source_type":     task.SourceType,
+			"source_id":       task.SourceID,
+			"owner_role_key":  task.OwnerRoleKey,
+			"task_status_key": task.TaskStatusKey,
+		},
+	}
+	return uc.repo.RecordRuntimeAuditEvent(ctx, &RuntimeAuditEventCreate{
+		EventType: workflowBreakGlassEventType,
+		EventKey:  workflowBreakGlassEventKey,
+		Source:    workflowBreakGlassSource,
+		Payload:   payload,
+	})
+}
+
 func EnrichRuntimeAuditEvent(event RuntimeAuditEvent) RuntimeAuditEvent {
 	event.ActorKey = auditPayloadActorKey(event.Payload)
 	event.TargetType = auditPayloadTargetValue(event.Payload, "type")
@@ -264,7 +324,10 @@ func EnrichRuntimeAuditEvent(event RuntimeAuditEvent) RuntimeAuditEvent {
 
 func auditPayloadActorKey(payload map[string]any) string {
 	actor, _ := payload["actor"].(map[string]any)
-	return strings.TrimSpace(anyToString(actor["username"]))
+	if username := strings.TrimSpace(anyToString(actor["username"])); username != "" {
+		return username
+	}
+	return strings.TrimSpace(anyToString(actor["id"]))
 }
 
 func auditPayloadTargetValue(payload map[string]any, key string) string {
@@ -286,6 +349,14 @@ func runtimeAuditActionLabelAndRisk(eventKey string) (string, string) {
 		return "密码重置", "high"
 	case "role.permissions.set":
 		return "角色权限变更", "high"
+	case "customer_config.publish":
+		return "客户配置发布", "high"
+	case "customer_config.activate":
+		return "客户配置激活", "high"
+	case "customer_config.rollback":
+		return "客户配置回滚", "high"
+	case workflowBreakGlassEventKey:
+		return "Workflow break-glass 请求", "high"
 	case "admin_bootstrap.completed":
 		return "初始化完成", "normal"
 	case "admin_bootstrap.blocked":
@@ -320,6 +391,14 @@ func runtimeAuditSummary(event RuntimeAuditEvent) string {
 		return actor + " 调整了 " + target + " 的账号角色"
 	case "role.permissions.set":
 		return actor + " 调整了 " + target + " 的角色权限"
+	case "customer_config.publish":
+		return actor + " 发布了客户配置 " + target
+	case "customer_config.activate":
+		return actor + " 激活了客户配置 " + target
+	case "customer_config.rollback":
+		return actor + " 回滚了客户配置 " + target
+	case workflowBreakGlassEventKey:
+		return actor + " 对 " + target + " 发起了 Workflow break-glass 请求"
 	case "admin_bootstrap.blocked":
 		if reason := strings.TrimSpace(anyToString(event.Payload["reason"])); reason != "" {
 			return "启动初始化被阻止：" + reason
@@ -438,7 +517,12 @@ func (uc *AdminManageUsecase) Create(
 		span.SetStatus(codes.Error, ErrBadParam.Error())
 		return nil, ErrBadParam
 	}
-	normalizedRoleKeys := NormalizeAdminRoleKeys(roleKeys)
+	normalizedRoleKeys, err := uc.normalizeAssignableAdminRoleKeys(ctx, roleKeys)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
 
 	if existing, checkErr := uc.repo.GetAdminByUsername(ctx, username); checkErr == nil && existing != nil {
 		span.SetStatus(codes.Error, ErrAdminExists.Error())
@@ -531,7 +615,12 @@ func (uc *AdminManageUsecase) SetRoles(
 	}
 	before := adminAuditUserSnapshot(target)
 
-	normalizedRoleKeys := NormalizeAdminRoleKeys(roleKeys)
+	normalizedRoleKeys, err := uc.normalizeAssignableAdminRoleKeys(ctx, roleKeys)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
 	if err = uc.repo.UpdateAdminRoles(ctx, adminID, normalizedRoleKeys); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
@@ -560,6 +649,31 @@ func (uc *AdminManageUsecase) SetRoles(
 	}
 	span.SetStatus(codes.Ok, "OK")
 	return target, nil
+}
+
+func (uc *AdminManageUsecase) normalizeAssignableAdminRoleKeys(ctx context.Context, roleKeys []string) ([]string, error) {
+	normalizedRoleKeys := NormalizeAdminRoleKeys(roleKeys)
+	if len(normalizedRoleKeys) == 0 {
+		return normalizedRoleKeys, nil
+	}
+	roles, err := uc.repo.ListRoles(ctx)
+	if err != nil {
+		return nil, err
+	}
+	assignable := map[string]struct{}{}
+	for _, role := range roles {
+		key := NormalizeRoleKey(role.Key)
+		if key == "" || role.Disabled {
+			continue
+		}
+		assignable[key] = struct{}{}
+	}
+	for _, key := range normalizedRoleKeys {
+		if _, ok := assignable[key]; !ok {
+			return nil, ErrRoleNotFound
+		}
+	}
+	return normalizedRoleKeys, nil
 }
 
 func (uc *AdminManageUsecase) ListRoles(ctx context.Context) ([]AdminRole, error) {

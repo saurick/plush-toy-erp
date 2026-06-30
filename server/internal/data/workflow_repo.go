@@ -7,6 +7,7 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
 
@@ -38,9 +39,28 @@ func (r *workflowRepo) GetWorkflowTask(ctx context.Context, id int) (*biz.Workfl
 	return entWorkflowTaskToBiz(row), nil
 }
 
+func (r *workflowRepo) GetWorkflowTaskByTaskCode(ctx context.Context, taskCode string) (*biz.WorkflowTask, error) {
+	taskCode = strings.TrimSpace(taskCode)
+	if taskCode == "" {
+		return nil, biz.ErrBadParam
+	}
+	row, err := r.data.postgres.WorkflowTask.Query().
+		Where(workflowtask.TaskCode(taskCode)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrWorkflowTaskNotFound
+		}
+		return nil, err
+	}
+	return entWorkflowTaskToBiz(row), nil
+}
+
 func (r *workflowRepo) ListWorkflowTasks(ctx context.Context, filter biz.WorkflowTaskFilter) ([]*biz.WorkflowTask, int, error) {
 	query := r.data.postgres.WorkflowTask.Query()
-	if filter.OwnerRoleKey != "" {
+	if scopePredicate := workflowTaskVisibilityPredicate(filter); scopePredicate != nil {
+		query = query.Where(scopePredicate)
+	} else if filter.OwnerRoleKey != "" {
 		query = query.Where(workflowtask.OwnerRoleKey(filter.OwnerRoleKey))
 	}
 	if filter.TaskStatusKey != "" {
@@ -77,6 +97,35 @@ func (r *workflowRepo) ListWorkflowTasks(ctx context.Context, filter biz.Workflo
 	return out, total, nil
 }
 
+func workflowTaskVisibilityPredicate(filter biz.WorkflowTaskFilter) predicate.WorkflowTask {
+	visible := make([]predicate.WorkflowTask, 0, 2)
+	if filter.OwnerRoleKey != "" {
+		for _, roleKey := range filter.VisibleOwnerRoleKeys {
+			if roleKey == filter.OwnerRoleKey {
+				visible = append(visible, workflowtask.OwnerRoleKey(filter.OwnerRoleKey))
+				break
+			}
+		}
+	} else if len(filter.VisibleOwnerRoleKeys) > 0 {
+		visible = append(visible, workflowtask.OwnerRoleKeyIn(filter.VisibleOwnerRoleKeys...))
+	}
+	if filter.VisibleAssigneeID != nil && *filter.VisibleAssigneeID > 0 {
+		assigned := workflowtask.AssigneeID(*filter.VisibleAssigneeID)
+		if filter.OwnerRoleKey != "" {
+			assigned = workflowtask.And(assigned, workflowtask.OwnerRoleKey(filter.OwnerRoleKey))
+		}
+		visible = append(visible, assigned)
+	}
+	switch len(visible) {
+	case 0:
+		return nil
+	case 1:
+		return visible[0]
+	default:
+		return workflowtask.Or(visible...)
+	}
+}
+
 func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowTaskCreate, actorID int) (*biz.WorkflowTask, error) {
 	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
@@ -94,6 +143,11 @@ func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowT
 		SetNillableBusinessStatusKey(in.BusinessStatusKey).
 		SetTaskStatusKey(in.TaskStatusKey).
 		SetOwnerRoleKey(in.OwnerRoleKey).
+		SetNillableOwnerPoolKey(in.OwnerPoolKey).
+		SetNillableRequiredCapabilityKey(in.RequiredCapabilityKey).
+		SetNillableConfigRevision(in.ConfigRevision).
+		SetNillableProcessInstanceID(in.ProcessInstanceID).
+		SetNillableProcessNodeInstanceID(in.ProcessNodeInstanceID).
 		SetNillableAssigneeID(in.AssigneeID).
 		SetPriority(in.Priority).
 		SetNillableBlockedReason(in.BlockedReason).
@@ -503,7 +557,12 @@ func ensureActiveWorkflowTaskInTx(
 	if existing != nil {
 		if refreshExistingPayload {
 			update := tx.WorkflowTask.UpdateOneID(existing.ID).
-				SetPayload(in.Payload)
+				SetPayload(in.Payload).
+				SetNillableOwnerPoolKey(in.OwnerPoolKey).
+				SetNillableRequiredCapabilityKey(in.RequiredCapabilityKey).
+				SetNillableConfigRevision(in.ConfigRevision).
+				SetNillableProcessInstanceID(in.ProcessInstanceID).
+				SetNillableProcessNodeInstanceID(in.ProcessNodeInstanceID)
 			if actorID > 0 {
 				update.SetUpdatedBy(actorID)
 			}
@@ -526,6 +585,11 @@ func ensureActiveWorkflowTaskInTx(
 		SetNillableBusinessStatusKey(in.BusinessStatusKey).
 		SetTaskStatusKey(in.TaskStatusKey).
 		SetOwnerRoleKey(in.OwnerRoleKey).
+		SetNillableOwnerPoolKey(in.OwnerPoolKey).
+		SetNillableRequiredCapabilityKey(in.RequiredCapabilityKey).
+		SetNillableConfigRevision(in.ConfigRevision).
+		SetNillableProcessInstanceID(in.ProcessInstanceID).
+		SetNillableProcessNodeInstanceID(in.ProcessNodeInstanceID).
 		SetNillableAssigneeID(in.AssigneeID).
 		SetPriority(in.Priority).
 		SetNillableBlockedReason(in.BlockedReason).
@@ -571,28 +635,33 @@ func entWorkflowTaskToBiz(row *ent.WorkflowTask) *biz.WorkflowTask {
 		payload = map[string]any{}
 	}
 	return &biz.WorkflowTask{
-		ID:                row.ID,
-		TaskCode:          row.TaskCode,
-		TaskGroup:         row.TaskGroup,
-		TaskName:          row.TaskName,
-		SourceType:        row.SourceType,
-		SourceID:          row.SourceID,
-		SourceNo:          row.SourceNo,
-		BusinessStatusKey: row.BusinessStatusKey,
-		TaskStatusKey:     row.TaskStatusKey,
-		OwnerRoleKey:      biz.NormalizeRoleKey(row.OwnerRoleKey),
-		AssigneeID:        row.AssigneeID,
-		Priority:          row.Priority,
-		BlockedReason:     row.BlockedReason,
-		DueAt:             row.DueAt,
-		StartedAt:         row.StartedAt,
-		CompletedAt:       row.CompletedAt,
-		ClosedAt:          row.ClosedAt,
-		Payload:           payload,
-		CreatedBy:         row.CreatedBy,
-		UpdatedBy:         row.UpdatedBy,
-		CreatedAt:         row.CreatedAt,
-		UpdatedAt:         row.UpdatedAt,
+		ID:                    row.ID,
+		TaskCode:              row.TaskCode,
+		TaskGroup:             row.TaskGroup,
+		TaskName:              row.TaskName,
+		SourceType:            row.SourceType,
+		SourceID:              row.SourceID,
+		SourceNo:              row.SourceNo,
+		BusinessStatusKey:     row.BusinessStatusKey,
+		TaskStatusKey:         row.TaskStatusKey,
+		OwnerRoleKey:          biz.NormalizeRoleKey(row.OwnerRoleKey),
+		OwnerPoolKey:          row.OwnerPoolKey,
+		RequiredCapabilityKey: row.RequiredCapabilityKey,
+		ConfigRevision:        row.ConfigRevision,
+		ProcessInstanceID:     row.ProcessInstanceID,
+		ProcessNodeInstanceID: row.ProcessNodeInstanceID,
+		AssigneeID:            row.AssigneeID,
+		Priority:              row.Priority,
+		BlockedReason:         row.BlockedReason,
+		DueAt:                 row.DueAt,
+		StartedAt:             row.StartedAt,
+		CompletedAt:           row.CompletedAt,
+		ClosedAt:              row.ClosedAt,
+		Payload:               payload,
+		CreatedBy:             row.CreatedBy,
+		UpdatedBy:             row.UpdatedBy,
+		CreatedAt:             row.CreatedAt,
+		UpdatedAt:             row.UpdatedAt,
 	}
 }
 

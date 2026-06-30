@@ -32,6 +32,16 @@ const (
 	FieldTaskStatusKey = "task_status_key"
 	// FieldOwnerRoleKey holds the string denoting the owner_role_key field in the database.
 	FieldOwnerRoleKey = "owner_role_key"
+	// FieldOwnerPoolKey holds the string denoting the owner_pool_key field in the database.
+	FieldOwnerPoolKey = "owner_pool_key"
+	// FieldRequiredCapabilityKey holds the string denoting the required_capability_key field in the database.
+	FieldRequiredCapabilityKey = "required_capability_key"
+	// FieldConfigRevision holds the string denoting the config_revision field in the database.
+	FieldConfigRevision = "config_revision"
+	// FieldProcessInstanceID holds the string denoting the process_instance_id field in the database.
+	FieldProcessInstanceID = "process_instance_id"
+	// FieldProcessNodeInstanceID holds the string denoting the process_node_instance_id field in the database.
+	FieldProcessNodeInstanceID = "process_node_instance_id"
 	// FieldAssigneeID holds the string denoting the assignee_id field in the database.
 	FieldAssigneeID = "assignee_id"
 	// FieldPriority holds the string denoting the priority field in the database.
@@ -81,6 +91,11 @@ var Columns = []string{
 	FieldBusinessStatusKey,
 	FieldTaskStatusKey,
 	FieldOwnerRoleKey,
+	FieldOwnerPoolKey,
+	FieldRequiredCapabilityKey,
+	FieldConfigRevision,
+	FieldProcessInstanceID,
+	FieldProcessNodeInstanceID,
 	FieldAssigneeID,
 	FieldPriority,
 	FieldBlockedReason,
@@ -124,6 +139,16 @@ var (
 	TaskStatusKeyValidator func(string) error
 	// OwnerRoleKeyValidator is a validator for the "owner_role_key" field. It is called by the builders before save.
 	OwnerRoleKeyValidator func(string) error
+	// OwnerPoolKeyValidator is a validator for the "owner_pool_key" field. It is called by the builders before save.
+	OwnerPoolKeyValidator func(string) error
+	// RequiredCapabilityKeyValidator is a validator for the "required_capability_key" field. It is called by the builders before save.
+	RequiredCapabilityKeyValidator func(string) error
+	// ConfigRevisionValidator is a validator for the "config_revision" field. It is called by the builders before save.
+	ConfigRevisionValidator func(string) error
+	// ProcessInstanceIDValidator is a validator for the "process_instance_id" field. It is called by the builders before save.
+	ProcessInstanceIDValidator func(int) error
+	// ProcessNodeInstanceIDValidator is a validator for the "process_node_instance_id" field. It is called by the builders before save.
+	ProcessNodeInstanceIDValidator func(int) error
 	// AssigneeIDValidator is a validator for the "assignee_id" field. It is called by the builders before save.
 	AssigneeIDValidator func(int) error
 	// DefaultPriority holds the default value on creation for the "priority" field.
@@ -193,6 +218,31 @@ func ByTaskStatusKey(opts ...sql.OrderTermOption) OrderOption {
 // ByOwnerRoleKey orders the results by the owner_role_key field.
 func ByOwnerRoleKey(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldOwnerRoleKey, opts...).ToFunc()
+}
+
+// ByOwnerPoolKey orders the results by the owner_pool_key field.
+func ByOwnerPoolKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOwnerPoolKey, opts...).ToFunc()
+}
+
+// ByRequiredCapabilityKey orders the results by the required_capability_key field.
+func ByRequiredCapabilityKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRequiredCapabilityKey, opts...).ToFunc()
+}
+
+// ByConfigRevision orders the results by the config_revision field.
+func ByConfigRevision(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldConfigRevision, opts...).ToFunc()
+}
+
+// ByProcessInstanceID orders the results by the process_instance_id field.
+func ByProcessInstanceID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProcessInstanceID, opts...).ToFunc()
+}
+
+// ByProcessNodeInstanceID orders the results by the process_node_instance_id field.
+func ByProcessNodeInstanceID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProcessNodeInstanceID, opts...).ToFunc()
 }
 
 // ByAssigneeID orders the results by the assignee_id field.

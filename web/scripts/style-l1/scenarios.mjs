@@ -403,6 +403,56 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'erp-effective-session-super-admin-system-diagnostic',
+      path: '/erp/system/permissions',
+      auth: 'admin',
+      effectiveSession: {
+        configRevision: 'style-l1-effective-session',
+        configHash: 'style-l1-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        pages: ['global-dashboard'],
+        actions: [],
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
+      expectPath: '/erp/system/permissions',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectText(page, '毛绒玩具 ERP')
+        await expectText(page, '系统管理')
+        await expectHeading(page, '权限管理')
+        await expectText(page, '角色模板')
+        await expectText(page, '管理员账号')
+      },
+    },
+    {
+      name: 'erp-effective-session-empty-pages-blocks-outlet',
+      path: '/erp/system/permissions',
+      auth: 'admin',
+      adminProfile: {
+        is_super_admin: false,
+        menus: [{ key: 'permission-center', path: '/erp/system/permissions' }],
+      },
+      effectiveSession: {
+        configRevision: 'style-l1-empty-pages',
+        configHash: 'style-l1-empty-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        pages: [],
+        actions: [],
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectText(page, '当前账号暂无可见后台入口')
+        await expectText(page, '当前客户有效配置的页面清单')
+        await assertTextAbsent(page, '权限中心')
+        await assertTextAbsent(page, '管理员列表')
+      },
+    },
+    {
       name: 'erp-task-board-desktop',
       path: '/erp/task-board',
       auth: 'admin',
@@ -1814,9 +1864,56 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '当前 URL customer / Query')
         await expectText(page, 'yoyoosun')
         await expectText(page, '当前配置包 / Current Package')
+        await expectText(page, '决策卡 / Decision Cards')
+        await expectText(page, '可以进入人工评审')
         await expectText(page, 'PREVIEW_READY')
-        await expectText(page, '已接运行时')
-        await expectText(page, '真实客户数据导入')
+        await expectText(page, '真实导入')
+        await expectText(page, '下一步 / Next')
+        const overviewDefaultMetrics = await page.evaluate(() => ({
+          panelCount: document.querySelectorAll(
+            '.erp-dev-customer-overview > .erp-dev-customer-panel'
+          ).length,
+          decisionCards: document.querySelectorAll(
+            '.erp-dev-customer-decision-card'
+          ).length,
+          quickActions: document.querySelectorAll(
+            '.erp-dev-customer-quick-action'
+          ).length,
+          oldMetricCards: document.querySelectorAll('.erp-dev-customer-metric')
+            .length,
+          duplicateAssetValue: document.body.innerText.includes('28\\n28'),
+          scrollWidth: document.documentElement.scrollWidth,
+          clientWidth: document.documentElement.clientWidth,
+          scrollHeight: document.documentElement.scrollHeight,
+          clientHeight: document.documentElement.clientHeight,
+        }))
+        assert.deepEqual(
+          {
+            panelCount: overviewDefaultMetrics.panelCount,
+            decisionCards: overviewDefaultMetrics.decisionCards,
+            quickActions: overviewDefaultMetrics.quickActions,
+            oldMetricCards: overviewDefaultMetrics.oldMetricCards,
+            duplicateAssetValue: overviewDefaultMetrics.duplicateAssetValue,
+          },
+          {
+            panelCount: 3,
+            decisionCards: 3,
+            quickActions: 3,
+            oldMetricCards: 0,
+            duplicateAssetValue: false,
+          },
+          `客户配置默认页应保持简洁预检工作台: ${JSON.stringify(overviewDefaultMetrics)}`
+        )
+        assert(
+          overviewDefaultMetrics.scrollHeight <=
+            overviewDefaultMetrics.clientHeight + 1,
+          `桌面客户配置默认页不应被摘要卡撑出首屏: ${JSON.stringify(overviewDefaultMetrics)}`
+        )
+        assert(
+          overviewDefaultMetrics.scrollWidth <=
+            overviewDefaultMetrics.clientWidth + 1,
+          `桌面客户配置默认页不应横向溢出: ${JSON.stringify(overviewDefaultMetrics)}`
+        )
         await assertERPThemeMode(page, {
           scenarioName: 'dev-customer-config-dark-desktop',
           expectedMode: 'dark',
@@ -1843,18 +1940,22 @@ export function createStyleL1Scenarios(deps) {
         })
 
         await page
-          .locator('.erp-dev-customer-view-switch .ant-segmented-item')
-          .filter({ hasText: '包预检 / Preflight' })
+          .locator('.erp-dev-customer-quick-action')
+          .filter({ hasText: '看预检' })
           .click()
         await expectText(page, '包边界 / Package Guards')
         await expectText(page, 'runtimeEnabled')
         await expectText(page, '预检步骤 / Preflight Gates')
         await expectText(page, '资产摘要 / Asset Summary')
+        await expectText(page, '人工评审清单 / Review Checklist')
         await expectText(page, '校验结果 / Validation Checks')
         await expectText(page, '工作流预览 / Workflows')
         await expectText(page, '销售订单审批')
         await expectText(page, 'preview_only')
         await expectText(page, 'workflow_only')
+        await expectText(page, '预检命令 / Preflight Commands')
+        await expectText(page, '生成预检报告')
+        await expectText(page, '来源路径 / Source References')
 
         await page
           .locator('.erp-dev-customer-view-switch .ant-segmented-item')
@@ -1873,11 +1974,152 @@ export function createStyleL1Scenarios(deps) {
 
         await page
           .locator('.erp-dev-customer-view-switch .ant-segmented-item')
-          .filter({ hasText: '工具边界 / Tools' })
+          .filter({ hasText: '导入工作台 / Import' })
           .click()
+        await expectText(page, '导入工作台 / Import Workbench')
+        await expectText(page, '可视化导入流程 / Visual Import Flow')
+        await expectText(page, '测试环境应用只写客户配置控制面')
+        await expectText(page, '测试环境应用 / Test Apply')
+        await expectText(page, '应用到测试环境')
+        await expectText(
+          page,
+          'validate / publish / activate / effective session'
+        )
+        await expectText(page, '写库目标 / Database Target')
+        await expectText(page, '测试环境 ERP 应用数据库')
+        await expectText(page, '目标环境 ERP 应用数据库')
+        await expectText(page, 'customer_config_revisions')
+        await expectText(page, 'get_effective_session')
+        await expectText(page, '真实客户业务数据')
+        await expectText(page, '业务数据导入')
         await expectText(page, 'canExecuteRealImport')
         await expectText(page, 'false')
+        await expectText(page, '测试版 UI Dry Run')
+        await expectText(page, '尚未运行测试 Dry Run')
+        await expectText(page, '正式版发布 / Release Apply')
+        await expectText(page, '正式版必须先过发布门禁')
+        await expectText(page, '检查发布门禁')
+        await expectText(page, '发布到正式版')
+        await expectText(page, '尚未检查发布门禁')
+        await expectText(page, 'customer config rollback readiness')
+        await expectText(page, '--require-rollback')
+        await expectText(page, 'customer config rollback executor')
+        await expectText(page, 'ROLLBACK_YOYOOSUN_CONFIG')
+        const importWorkbenchMetrics = await page.evaluate(() => ({
+          stepCount: document.querySelectorAll('.erp-dev-customer-import-step')
+            .length,
+          dbTargetCount: document.querySelectorAll(
+            '.erp-dev-customer-db-target'
+          ).length,
+          formalGateCount: document.querySelectorAll(
+            '.erp-dev-customer-formal-gate'
+          ).length,
+          testApplyButtons: [...document.querySelectorAll('button')].filter(
+            (button) => /应用到测试环境/.test(button.textContent || '')
+          ).length,
+          releaseCheckButtons: [...document.querySelectorAll('button')].filter(
+            (button) => /检查发布门禁/.test(button.textContent || '')
+          ).length,
+          releaseApplyButtons: [...document.querySelectorAll('button')].filter(
+            (button) => /发布到正式版/.test(button.textContent || '')
+          ).length,
+          disabledReleaseApplyButtons: [
+            ...document.querySelectorAll('button'),
+          ].filter(
+            (button) =>
+              /发布到正式版/.test(button.textContent || '') && button.disabled
+          ).length,
+          rawFormalImportButtons: [
+            ...document.querySelectorAll('button'),
+          ].filter((button) =>
+            /正式导入|直接写库|上传客户包/.test(button.textContent || '')
+          ).length,
+        }))
+        assert.deepEqual(
+          importWorkbenchMetrics,
+          {
+            stepCount: 5,
+            dbTargetCount: 5,
+            formalGateCount: 4,
+            testApplyButtons: 1,
+            releaseCheckButtons: 1,
+            releaseApplyButtons: 1,
+            disabledReleaseApplyButtons: 1,
+            rawFormalImportButtons: 0,
+          },
+          `导入工作台应提供测试版和发布版控件，并在门禁前禁用正式发布执行: ${JSON.stringify(importWorkbenchMetrics)}`
+        )
+        await page.getByRole('button', { name: '运行测试 Dry Run' }).click()
+        await expectText(page, 'Dry Run 已生成')
+        await expectText(page, '重新运行 Dry Run')
+        await expectText(page, '复制输出目录')
+        await expectText(page, '复制报告路径')
+        await expectText(page, '查看报告摘要')
+        await expectText(page, 'output/customers/yoyoosun/ui-import-dry-run')
+        await expectText(page, '正式导入')
+        await expectText(page, '不可执行')
+        await page.getByRole('button', { name: '查看报告摘要' }).click()
+        await expectText(page, 'Yoyoosun Customer Import Dry-run Report')
+        await expectText(page, 'canExecuteRealImport')
         await expectText(page, 'customerImportDryRun.mjs')
+        const dryRunResultMetrics = await page.evaluate(() => {
+          const metricCards = [
+            ...document.querySelectorAll(
+              '.erp-dev-customer-dry-run-metrics > div'
+            ),
+          ]
+          const actionButtons = [
+            ...document.querySelectorAll(
+              '.erp-dev-customer-dry-run-actions button'
+            ),
+          ].map((button) => button.textContent.replace(/\s+/g, ' ').trim())
+          const pathPanel = document.querySelector(
+            '.erp-dev-customer-dry-run-paths'
+          )
+          const reportPanel = document.querySelector(
+            '.erp-dev-customer-dry-run-report'
+          )
+          return {
+            metricCardCount: metricCards.length,
+            actionButtons,
+            metricBackgrounds: metricCards.map(
+              (card) => getComputedStyle(card).backgroundColor
+            ),
+            pathBackground: pathPanel
+              ? getComputedStyle(pathPanel).backgroundColor
+              : '',
+            reportBackground: reportPanel
+              ? getComputedStyle(reportPanel).backgroundColor
+              : '',
+            reportColor: reportPanel ? getComputedStyle(reportPanel).color : '',
+          }
+        })
+        assert.deepEqual(
+          {
+            metricCardCount: dryRunResultMetrics.metricCardCount,
+            actionButtons: dryRunResultMetrics.actionButtons,
+          },
+          {
+            metricCardCount: 4,
+            actionButtons: [
+              '重新运行 Dry Run',
+              '复制输出目录',
+              '复制报告路径',
+              '收起报告摘要',
+            ],
+          },
+          `Dry Run 结果区应提供后续操作组，而不是只有单个测试按钮: ${JSON.stringify(dryRunResultMetrics)}`
+        )
+        assert(
+          dryRunResultMetrics.metricBackgrounds.every(
+            (color) =>
+              color !== 'rgb(248, 251, 248)' && color !== 'rgb(255, 255, 255)'
+          ) &&
+            dryRunResultMetrics.pathBackground !== 'rgb(248, 251, 248)' &&
+            dryRunResultMetrics.reportBackground !== 'rgb(255, 255, 255)' &&
+            dryRunResultMetrics.reportColor !== 'rgb(255, 255, 255)',
+          `暗色 Dry Run 结果卡不能退回白底浅字: ${JSON.stringify(dryRunResultMetrics)}`
+        )
         await assertNoHorizontalOverflow(
           page,
           'dev-customer-config-import-view'
@@ -1948,13 +2190,54 @@ export function createStyleL1Scenarios(deps) {
           page,
           '客户配置包预检控制台 / Package Preflight Console'
         )
-        await expectText(page, '菜单分组 / Menu Groups')
-        await expectText(page, '字段候选 / Field Candidates')
-        await expectText(page, '预检状态 / Preflight')
+        await expectText(page, '决策卡 / Decision Cards')
+        const overviewMetrics = await page.evaluate(() => {
+          const decisionGrid = document.querySelector(
+            '.erp-dev-customer-decision-grid'
+          )
+          const decisionStyle = decisionGrid
+            ? getComputedStyle(decisionGrid)
+            : null
+          return {
+            decisionColumns: decisionStyle?.gridTemplateColumns || '',
+            panelCount: document.querySelectorAll(
+              '.erp-dev-customer-overview > .erp-dev-customer-panel'
+            ).length,
+            oldMetricCards: document.querySelectorAll(
+              '.erp-dev-customer-metric'
+            ).length,
+            duplicateAssetValue: document.body.innerText.includes('28\\n28'),
+            scrollWidth: document.documentElement.scrollWidth,
+            clientWidth: document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          overviewMetrics.decisionColumns &&
+            !overviewMetrics.decisionColumns.includes('repeat') &&
+            overviewMetrics.decisionColumns.split(' ').length <= 1,
+          `移动端决策卡应退成单列: ${JSON.stringify(overviewMetrics)}`
+        )
+        assert.equal(
+          overviewMetrics.panelCount,
+          3,
+          `移动端默认页只保留结论、决策卡和下一步: ${JSON.stringify(overviewMetrics)}`
+        )
+        assert.equal(
+          overviewMetrics.oldMetricCards,
+          0,
+          `移动端默认页不应保留旧指标卡: ${JSON.stringify(overviewMetrics)}`
+        )
+        assert.equal(
+          overviewMetrics.duplicateAssetValue,
+          false,
+          `移动端不应重复渲染资产数值: ${JSON.stringify(overviewMetrics)}`
+        )
         await page
           .locator('.erp-dev-customer-view-switch .ant-segmented-item')
           .filter({ hasText: '菜单字段 / Assets' })
           .click()
+        await expectText(page, '菜单分组 / Menu Groups')
+        await expectText(page, '字段显示候选 / Field Candidates')
         await expectText(page, '东莞市永绅玩具有限公司')
         await expectText(page, '运营工具')
         const metrics = await page.evaluate(() => {
@@ -2131,7 +2414,12 @@ export function createStyleL1Scenarios(deps) {
         )
 
         await page
-          .locator('.erp-dev-hub-group-filter .ant-segmented-item')
+          .locator('.erp-dev-hub-group-filter .ant-select-selector')
+          .click()
+        await page
+          .locator(
+            '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option'
+          )
           .filter({ hasText: '产品治理 / Product Governance' })
           .click()
         await expectText(page, '1 / 6')
@@ -2157,7 +2445,12 @@ export function createStyleL1Scenarios(deps) {
         )
 
         await page
-          .locator('.erp-dev-hub-group-filter .ant-segmented-item')
+          .locator('.erp-dev-hub-group-filter .ant-select-selector')
+          .click()
+        await page
+          .locator(
+            '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option'
+          )
           .filter({ hasText: '全部 / All' })
           .click()
         await page.getByPlaceholder('搜索入口或路径').fill('测试')
@@ -2183,6 +2476,410 @@ export function createStyleL1Scenarios(deps) {
           scenarioName: 'dev-hub-dark-desktop',
           selector: '.erp-dev-hub-page',
         })
+      },
+    },
+    {
+      name: 'dev-all-pages-mobile',
+      path: '/__dev/',
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        const devPages = [
+          {
+            path: '/__dev/',
+            heading: '开发导航 / Dev Navigation',
+            rootSelector: '.erp-dev-hub-page',
+          },
+          {
+            path: '/__dev/governance',
+            heading: '项目治理地图 / Governance Map',
+            rootSelector: '.erp-dev-governance-page',
+          },
+          {
+            path: '/__dev/docs',
+            heading: '开发文档查看器 / Dev Docs Viewer',
+            rootSelector: '.erp-dev-docs-page',
+          },
+          {
+            path: '/__dev/testing',
+            heading: '开发测试入口 / Dev Test Entry',
+            rootSelector: '.erp-dev-testing-page',
+          },
+          {
+            path: '/__dev/prototypes',
+            heading: '产品原型与样板查看器 / Prototype Viewer',
+            rootSelector: '.erp-dev-prototypes-page',
+          },
+          {
+            path: '/__dev/capability-ledger',
+            heading: '能力台账可视化 / Capability Ledger',
+            rootSelector: '.erp-dev-capability-page',
+          },
+          {
+            path: '/__dev/customer-config?customer=yoyoosun',
+            heading: '客户配置包预检控制台 / Package Preflight Console',
+            rootSelector: '.erp-dev-customer-page',
+          },
+        ]
+
+        for (const devPage of devPages) {
+          await gotoScenarioPath(page, devPage.path, {
+            waitUntil: 'domcontentloaded',
+          })
+          await expectHeading(page, devPage.heading)
+          await assertNoHorizontalOverflow(
+            page,
+            `dev-all-pages-mobile:${devPage.path}`
+          )
+
+          const metrics = await page.evaluate((rootSelector) => {
+            const root = document.querySelector(rootSelector)
+            const rootRect = root?.getBoundingClientRect()
+            const toolbar = document.querySelector('.erp-dev-hub-toolbar')
+            const groupFilter = document.querySelector(
+              '.erp-dev-hub-group-filter'
+            )
+            const header = root?.querySelector(
+              [
+                '.erp-dev-hub-header',
+                '.erp-dev-governance-header',
+                '.erp-dev-docs-header',
+                '.erp-dev-testing-header',
+                '.erp-dev-prototypes-header',
+                '.erp-dev-capability-header',
+                '.erp-dev-customer-header',
+              ].join(', ')
+            )
+            const shell = root?.querySelector(
+              [
+                '.erp-dev-hub-shell',
+                '.erp-dev-governance-shell',
+                '.erp-dev-docs-shell',
+                '.erp-dev-testing-shell',
+                '.erp-dev-prototypes-shell',
+                '.erp-dev-capability-shell',
+                '.erp-dev-customer-shell',
+              ].join(', ')
+            )
+            return {
+              rootExists: Boolean(root),
+              rootWidth: Math.round(rootRect?.width || 0),
+              clientWidth: document.documentElement.clientWidth,
+              scrollWidth: document.documentElement.scrollWidth,
+              headerHeight: Math.round(
+                header?.getBoundingClientRect().height || 0
+              ),
+              shellTop: Math.round(shell?.getBoundingClientRect().top || 0),
+              toolbarHeight: Math.round(
+                toolbar?.getBoundingClientRect().height || 0
+              ),
+              groupFilterHeight: Math.round(
+                groupFilter?.getBoundingClientRect().height || 0
+              ),
+            }
+          }, devPage.rootSelector)
+
+          assert.equal(
+            metrics.rootExists,
+            true,
+            `开发页根节点缺失: ${devPage.path} ${JSON.stringify(metrics)}`
+          )
+          assert(
+            metrics.rootWidth <= metrics.clientWidth + 1,
+            `开发页根节点不应宽于视口: ${devPage.path} ${JSON.stringify(metrics)}`
+          )
+          if (devPage.path === '/__dev/') {
+            assert(
+              metrics.toolbarHeight > 0 && metrics.toolbarHeight <= 140,
+              `开发导航移动端筛选区不应挤占首屏: ${JSON.stringify(metrics)}`
+            )
+            assert(
+              metrics.groupFilterHeight > 0 && metrics.groupFilterHeight <= 42,
+              `开发导航分组筛选应收敛为单行控件: ${JSON.stringify(metrics)}`
+            )
+          }
+        }
+      },
+    },
+    {
+      name: 'dev-ui-semantics-desktop',
+      path: '/__dev/',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const transparentColors = new Set(['rgba(0, 0, 0, 0)', 'transparent'])
+        const readSurfaceStyle = async (selector) =>
+          page.evaluate((targetSelector) => {
+            const node = document.querySelector(targetSelector)
+            const style = node ? getComputedStyle(node) : null
+            return {
+              exists: Boolean(node),
+              cursor: style?.cursor || '',
+              backgroundColor: style?.backgroundColor || '',
+              borderColor: style?.borderColor || '',
+              borderStyle: style?.borderStyle || '',
+              boxShadow: style?.boxShadow || '',
+              text: node?.textContent?.replace(/\s+/g, ' ').trim() || '',
+            }
+          }, selector)
+
+        await expectHeading(page, '开发导航 / Dev Navigation')
+        const hubCard = await readSurfaceStyle('.erp-dev-hub-card')
+        const hubAction = await readSurfaceStyle('.erp-dev-hub-card__link')
+        const hubPin = await readSurfaceStyle('.erp-dev-hub-card__pin')
+        assert.equal(
+          hubCard.cursor,
+          'auto',
+          `开发导航入口卡片本体应是阅读容器，主操作由进入按钮承担: ${JSON.stringify(hubCard)}`
+        )
+        assert.equal(
+          hubAction.cursor,
+          'pointer',
+          `开发导航进入动作应是明确可点击控件: ${JSON.stringify(hubAction)}`
+        )
+        assert(
+          !transparentColors.has(hubAction.backgroundColor) &&
+            hubAction.borderStyle !== 'none',
+          `开发导航进入动作不能退回普通文字链接: ${JSON.stringify(hubAction)}`
+        )
+        assert.equal(
+          hubPin.cursor,
+          'pointer',
+          `开发导航置顶图标仍应是次级操作按钮: ${JSON.stringify(hubPin)}`
+        )
+
+        await gotoScenarioPath(page, '/__dev/governance', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '项目治理地图 / Governance Map')
+        const governanceNav = await readSurfaceStyle(
+          '.erp-dev-governance-axis-nav__item'
+        )
+        const governanceTask = await readSurfaceStyle(
+          '.erp-dev-governance-task'
+        )
+        assert.equal(
+          governanceNav.cursor,
+          'pointer',
+          `治理维度列表项应明确是可选择导航: ${JSON.stringify(governanceNav)}`
+        )
+        assert(
+          governanceNav.boxShadow !== 'none',
+          `治理维度列表项需要 action 识别线: ${JSON.stringify(governanceNav)}`
+        )
+        assert.equal(
+          governanceTask.cursor,
+          'auto',
+          `治理任务卡应保持只读摘要语义: ${JSON.stringify(governanceTask)}`
+        )
+
+        await gotoScenarioPath(page, '/__dev/testing', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '开发测试入口 / Dev Test Entry')
+        const testingDoc = await readSurfaceStyle('.erp-dev-testing-doc-row')
+        const testingPreset = await readSurfaceStyle('.erp-dev-testing-preset')
+        assert.equal(
+          testingDoc.cursor,
+          'pointer',
+          `测试文档行应明确是可选择入口: ${JSON.stringify(testingDoc)}`
+        )
+        assert.equal(
+          testingPreset.cursor,
+          'pointer',
+          `测试预设应明确是复制命令入口: ${JSON.stringify(testingPreset)}`
+        )
+        assert(
+          testingPreset.boxShadow !== 'none',
+          `测试预设需要 action 识别线: ${JSON.stringify(testingPreset)}`
+        )
+
+        await gotoScenarioPath(page, '/__dev/prototypes', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '产品原型与样板查看器 / Prototype Viewer')
+        const prototypeCard = await readSurfaceStyle('.erp-dev-prototypes-card')
+        const prototypeCardBody = await readSurfaceStyle(
+          '.erp-dev-prototypes-card__body'
+        )
+        const prototypePin = await readSurfaceStyle(
+          '.erp-dev-prototypes-card__pin'
+        )
+        assert(
+          prototypeCard.boxShadow !== 'none',
+          `原型资产卡需要 action 识别线，避免像普通说明块: ${JSON.stringify(prototypeCard)}`
+        )
+        assert.equal(
+          prototypeCardBody.cursor,
+          'pointer',
+          `原型资产正文区应明确可选择: ${JSON.stringify(prototypeCardBody)}`
+        )
+        assert.equal(
+          prototypePin.cursor,
+          'pointer',
+          `原型置顶图标应保持次级操作语义: ${JSON.stringify(prototypePin)}`
+        )
+
+        await gotoScenarioPath(
+          page,
+          '/__dev/customer-config?customer=yoyoosun',
+          {
+            waitUntil: 'domcontentloaded',
+          }
+        )
+        await expectHeading(
+          page,
+          '客户配置包预检控制台 / Package Preflight Console'
+        )
+        const customerDecision = await readSurfaceStyle(
+          '.erp-dev-customer-decision-card'
+        )
+        const customerQuickAction = await readSurfaceStyle(
+          '.erp-dev-customer-quick-action'
+        )
+        assert.notEqual(
+          customerDecision.cursor,
+          'pointer',
+          `客户配置决策卡应保持只读摘要语义: ${JSON.stringify(customerDecision)}`
+        )
+        assert.equal(
+          customerQuickAction.cursor,
+          'pointer',
+          `客户配置下一步卡应明确是操作入口: ${JSON.stringify(customerQuickAction)}`
+        )
+        assert.notEqual(
+          customerDecision.backgroundColor,
+          customerQuickAction.backgroundColor,
+          `客户配置摘要卡和操作入口不能使用同一视觉语义: ${JSON.stringify({
+            customerDecision,
+            customerQuickAction,
+          })}`
+        )
+      },
+    },
+    {
+      name: 'dev-switch-controls-dark-desktop',
+      path: '/__dev/customer-config?customer=yoyoosun',
+      themeMode: 'dark',
+      viewport: { width: 1536, height: 900 },
+      verify: async (page) => {
+        const transparentColors = new Set(['rgba(0, 0, 0, 0)', 'transparent'])
+        const readControlGroup = async (rootSelector, itemSelector) =>
+          page.evaluate(
+            ({ rootSelector: rootQuery, itemSelector: itemQuery }) => {
+              const root = document.querySelector(rootQuery)
+              const items = root ? [...root.querySelectorAll(itemQuery)] : []
+              const selected =
+                items.find(
+                  (item) =>
+                    item.classList.contains('ant-segmented-item-selected') ||
+                    [...item.classList].some((className) =>
+                      className.endsWith('__item--active')
+                    )
+                ) || items[0]
+              const inactive = items.find((item) => item !== selected)
+              const styleOf = (node) => {
+                const style = node ? getComputedStyle(node) : null
+                const rect = node?.getBoundingClientRect()
+                return {
+                  exists: Boolean(node),
+                  cursor: style?.cursor || '',
+                  backgroundColor: style?.backgroundColor || '',
+                  borderColor: style?.borderColor || '',
+                  borderStyle: style?.borderStyle || '',
+                  boxShadow: style?.boxShadow || '',
+                  width: rect?.width || 0,
+                  height: rect?.height || 0,
+                  text: node?.textContent?.replace(/\s+/g, ' ').trim() || '',
+                }
+              }
+              return {
+                rootExists: Boolean(root),
+                itemCount: items.length,
+                selected: styleOf(selected),
+                inactive: styleOf(inactive),
+              }
+            },
+            { rootSelector, itemSelector }
+          )
+        const assertButtonGroup = (name, metrics) => {
+          assert(
+            metrics.rootExists && metrics.itemCount >= 2,
+            `${name} 应渲染为多个可选控件: ${JSON.stringify(metrics)}`
+          )
+          assert.equal(
+            metrics.inactive.cursor,
+            'pointer',
+            `${name} 未选中项不能像普通描述文字: ${JSON.stringify(metrics)}`
+          )
+          assert(
+            !transparentColors.has(metrics.inactive.backgroundColor) &&
+              metrics.inactive.borderStyle === 'solid' &&
+              metrics.inactive.width > 0 &&
+              metrics.inactive.height >= 30,
+            `${name} 未选中项需要稳定按钮盒模型: ${JSON.stringify(metrics)}`
+          )
+          assert(
+            metrics.selected.backgroundColor !==
+              metrics.inactive.backgroundColor ||
+              metrics.selected.borderColor !== metrics.inactive.borderColor ||
+              metrics.selected.boxShadow !== metrics.inactive.boxShadow,
+            `${name} 选中态和未选中态必须可区分: ${JSON.stringify(metrics)}`
+          )
+        }
+
+        await expectHeading(
+          page,
+          '客户配置包预检控制台 / Package Preflight Console'
+        )
+        assertButtonGroup(
+          '客户配置视图切换',
+          await readControlGroup(
+            '.erp-dev-customer-view-switch',
+            '.ant-segmented-item'
+          )
+        )
+
+        await gotoScenarioPath(page, '/__dev/capability-ledger', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '能力台账可视化 / Capability Ledger')
+        assertButtonGroup(
+          '能力台账视图切换',
+          await readControlGroup(
+            '.erp-dev-capability-view-switch',
+            '.ant-segmented-item'
+          )
+        )
+
+        await gotoScenarioPath(page, '/__dev/testing', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '开发测试入口 / Dev Test Entry')
+        assertButtonGroup(
+          '测试文档筛选',
+          await readControlGroup(
+            '.erp-dev-testing-filter',
+            '.erp-dev-testing-filter__item'
+          )
+        )
+        assertButtonGroup(
+          '测试阅读器视图切换',
+          await readControlGroup(
+            '.erp-dev-testing-reader__toolbar .ant-segmented',
+            '.ant-segmented-item'
+          )
+        )
+
+        await gotoScenarioPath(page, '/__dev/prototypes', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '产品原型与样板查看器 / Prototype Viewer')
+        assertButtonGroup(
+          '原型筛选',
+          await readControlGroup(
+            '.erp-dev-prototypes-filter',
+            '.erp-dev-prototypes-filter__item'
+          )
+        )
       },
     },
     {

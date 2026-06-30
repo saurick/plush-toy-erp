@@ -29,6 +29,7 @@ const MOBILE_ROLE_META = Object.freeze({
   finance: { title: '财务', label: '财务' },
   pmc: { title: 'PMC', label: 'PMC' },
   quality: { title: '品质', label: '品质' },
+  engineering: { title: '工程', label: '工程' },
 })
 
 export const roleWorkbenches = appDefinitions

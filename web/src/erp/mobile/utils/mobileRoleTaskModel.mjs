@@ -58,6 +58,7 @@ const MOBILE_ROLE_LABELS = {
   finance: '财务',
   pmc: 'PMC',
   quality: '质检',
+  engineering: '工程',
 }
 
 export const QUICK_REASONS = [

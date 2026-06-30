@@ -230,6 +230,7 @@ test('moduleTableColumns: 主业务列表页使用共享排序入口', () => {
     'utf8'
   )
   assert.match(masterDataPage, /buildMasterDataRecordColumns\(/u)
+  assert.match(masterDataPage, /filterColumnsByEffectiveFieldPolicy\(/u)
   assert.match(masterDataColumns, /applyBusinessColumnSorters\(/u)
   assert.match(salesOrdersPage, /buildSalesOrderColumns\(/u)
   assert.match(salesOrderColumns, /applyBusinessColumnSorters\(/u)

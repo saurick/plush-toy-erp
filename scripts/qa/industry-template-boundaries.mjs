@@ -140,6 +140,7 @@ function validateTemplate(config) {
     "quality",
     "finance",
     "pmc",
+    "engineering",
     "production",
   ]) {
     assert(roleKeys.has(key), `defaultRoles must include ${key}`);

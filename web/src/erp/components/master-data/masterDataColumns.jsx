@@ -246,6 +246,12 @@ function baseColumns({ type, unitDisplay }) {
       title: '编号',
       exportTitle: '编号',
       dataIndex: 'code',
+      effectiveFieldKey:
+        type === 'customers'
+          ? 'customer_code'
+          : type === 'suppliers'
+            ? 'supplier_code'
+            : undefined,
       width: 140,
       sorter: (a, b) => compareText(a?.code, b?.code),
     },
@@ -263,6 +269,12 @@ function baseColumns({ type, unitDisplay }) {
             title: '简称',
             exportTitle: '简称',
             dataIndex: 'short_name',
+            effectiveFieldKey:
+              type === 'customers'
+                ? 'display_name'
+                : type === 'suppliers'
+                  ? 'display_name'
+                  : undefined,
             width: 160,
             sorter: (a, b) => compareText(a?.short_name, b?.short_name),
             render: (value) => value || '-',
@@ -328,6 +340,7 @@ function baseColumns({ type, unitDisplay }) {
             title: '类型',
             exportTitle: '类型',
             dataIndex: 'supplier_type',
+            effectiveFieldKey: 'supplier_type',
             width: 140,
             sorter: (a, b) => compareText(a?.supplier_type, b?.supplier_type),
             render: (value) => SUPPLIER_TYPE_LABELS[value] || value || '-',
@@ -345,6 +358,7 @@ function baseColumns({ type, unitDisplay }) {
             title: '税号',
             exportTitle: '税号',
             dataIndex: 'tax_no',
+            effectiveFieldKey: 'tax_no',
             width: 180,
             sorter: (a, b) => compareText(a?.tax_no, b?.tax_no),
             render: (value) => value || '-',

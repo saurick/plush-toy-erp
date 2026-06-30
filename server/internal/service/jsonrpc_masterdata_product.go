@@ -18,10 +18,16 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProducts); res != nil {
+			return id, res, nil
+		}
 		item, err := d.masterDataUC.CreateProduct(ctx, productMutationFromParams(pm))
 		return id, productMutationResult(ctx, d, item, err), nil
 	case "update_product", "updateProduct":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProducts); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.UpdateProduct(ctx, getInt(pm, "id", 0), productMutationFromParams(pm))
@@ -50,16 +56,25 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductDisable); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProducts); res != nil {
+			return id, res, nil
+		}
 		item, err := d.masterDataUC.SetProductActive(ctx, getInt(pm, "id", 0), getBool(pm, "active", true))
 		return id, productMutationResult(ctx, d, item, err), nil
 	case "create_product_sku", "createProductSKU":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductSKUCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProducts); res != nil {
+			return id, res, nil
+		}
 		item, err := d.masterDataUC.CreateProductSKU(ctx, productSKUMutationFromParams(pm))
 		return id, productSKUMutationResult(ctx, d, item, err), nil
 	case "update_product_sku", "updateProductSKU":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductSKUUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProducts); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.UpdateProductSKU(ctx, getInt(pm, "id", 0), productSKUMutationFromParams(pm))
@@ -86,6 +101,9 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		})}, nil
 	case "set_product_sku_active", "setProductSKUActive":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductSKUDisable); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProducts); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.SetProductSKUActive(ctx, getInt(pm, "id", 0), getBool(pm, "active", true))

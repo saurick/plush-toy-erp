@@ -30,6 +30,13 @@ func TestInventoryRepo_QualityInspectionLifecycleAndLotStatus(t *testing.T) {
 	if draft.Status != biz.QualityInspectionStatusDraft || draft.OriginalLotStatus != "" || draft.Result != nil || draft.InspectedAt != nil {
 		t.Fatalf("unexpected draft state: status=%s original=%q result=%v inspected_at=%v", draft.Status, draft.OriginalLotStatus, draft.Result, draft.InspectedAt)
 	}
+	if draft.SourceType == nil || *draft.SourceType != biz.QualityInspectionSourcePurchaseReceipt ||
+		draft.SourceID == nil || *draft.SourceID != passReceipt.ID ||
+		draft.InspectionType == nil || *draft.InspectionType != biz.QualityInspectionTypeIncoming ||
+		draft.SubjectType == nil || *draft.SubjectType != biz.QualityInspectionSubjectMaterial ||
+		draft.SubjectID == nil || *draft.SubjectID != fixtures.materialID {
+		t.Fatalf("unexpected quality inspection source anchor: %+v", draft)
+	}
 	assertLotStatus(t, ctx, uc, *passItem.LotID, biz.InventoryLotActive)
 	assertInventoryTxnCount(t, ctx, client, beforeQualityTxnCount)
 	if _, err := uc.CreateQualityInspectionDraft(ctx, &biz.QualityInspectionCreate{
@@ -321,6 +328,185 @@ func TestInventoryRepo_QualityInspectionReferenceValidation(t *testing.T) {
 	lotMismatch.InventoryLotID = lotMismatchLot.ID
 	if _, err := uc.CreateQualityInspectionDraft(ctx, lotMismatch); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("expected receipt item lot mismatch to fail, got %v", err)
+	}
+	shipmentSource := base("QI-VALID-SHIPMENT-SOURCE")
+	shipmentSource.SourceType = "SHIPMENT"
+	shipmentSource.SourceID = 9001
+	if _, err := uc.CreateQualityInspectionDraft(ctx, shipmentSource); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected shipment source to stay blocked for incoming quality path, got %v", err)
+	}
+	sourceMismatch := base("QI-VALID-SOURCE-MISMATCH")
+	sourceMismatch.SourceID = validReceipt.ID + 1
+	if _, err := uc.CreateQualityInspectionDraft(ctx, sourceMismatch); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected source id mismatch to fail, got %v", err)
+	}
+}
+
+func TestInventoryRepo_FinishedGoodsQualityInspectionReferenceValidation(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_repo_finished_goods_quality_inspection_validation")
+
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+	operationalUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+
+	productLot := createTestInventoryLot(t, ctx, inventoryUC, biz.InventorySubjectProduct, fixtures.productID, "QI-FG-VALID-LOT")
+	shipment, err := operationalUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{
+			ShipmentNo:     "QI-FG-VALID-SHIP",
+			IdempotencyKey: "QI-FG-VALID-SHIP",
+		},
+		Items: []*biz.ShipmentItemCreate{
+			{
+				ProductID:   fixtures.productID,
+				WarehouseID: fixtures.warehouseID,
+				UnitID:      fixtures.unitID,
+				LotID:       &productLot.ID,
+				Quantity:    mustDecimal(t, "3"),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create shipment fixture failed: %v", err)
+	}
+	beforeQualityTxnCount := inventoryTxnCount(t, ctx, client)
+
+	draft, err := inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, &biz.QualityInspectionCreate{
+		InspectionNo:   "QI-FG-VALID",
+		SourceID:       shipment.ID,
+		InventoryLotID: productLot.ID,
+		WarehouseID:    fixtures.warehouseID,
+		SubjectID:      fixtures.productID,
+	})
+	if err != nil {
+		t.Fatalf("create finished goods quality inspection draft failed: %v", err)
+	}
+	if draft.Status != biz.QualityInspectionStatusDraft ||
+		draft.PurchaseReceiptID != 0 ||
+		draft.PurchaseReceiptItemID != nil ||
+		draft.MaterialID != 0 {
+		t.Fatalf("unexpected finished goods draft anchors: %+v", draft)
+	}
+	if draft.SourceType == nil || *draft.SourceType != biz.QualityInspectionSourceShipment ||
+		draft.SourceID == nil || *draft.SourceID != shipment.ID ||
+		draft.InspectionType == nil || *draft.InspectionType != biz.QualityInspectionTypeFinishedGoods ||
+		draft.SubjectType == nil || *draft.SubjectType != biz.QualityInspectionSubjectProduct ||
+		draft.SubjectID == nil || *draft.SubjectID != fixtures.productID {
+		t.Fatalf("unexpected finished goods source anchor: %+v", draft)
+	}
+	assertInventoryTxnCount(t, ctx, client, beforeQualityTxnCount)
+
+	submitted, err := inventoryUC.SubmitQualityInspection(ctx, draft.ID)
+	if err != nil {
+		t.Fatalf("submit finished goods quality inspection failed: %v", err)
+	}
+	if submitted.Status != biz.QualityInspectionStatusSubmitted ||
+		submitted.OriginalLotStatus != biz.InventoryLotActive {
+		t.Fatalf("unexpected submitted finished goods inspection: %+v", submitted)
+	}
+	assertLotStatus(t, ctx, inventoryUC, productLot.ID, biz.InventoryLotHold)
+	assertInventoryTxnCount(t, ctx, client, beforeQualityTxnCount)
+
+	items, total, err := inventoryUC.ListFinishedGoodsQualityInspections(ctx, biz.QualityInspectionFilter{
+		SourceID:  shipment.ID,
+		SubjectID: fixtures.productID,
+		Status:    biz.QualityInspectionStatusSubmitted,
+	})
+	if err != nil {
+		t.Fatalf("list finished goods quality inspections failed: %v", err)
+	}
+	if total != 1 || len(items) != 1 || items[0].ID != draft.ID {
+		t.Fatalf("expected one finished goods quality inspection, total=%d items=%+v", total, items)
+	}
+	if _, _, err := inventoryUC.ListQualityInspections(ctx, biz.QualityInspectionFilter{
+		SourceType: biz.QualityInspectionSourceShipment,
+	}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("ordinary quality list must reject shipment source, got %v", err)
+	}
+	if _, err := inventoryUC.CreateQualityInspectionDraft(ctx, &biz.QualityInspectionCreate{
+		InspectionNo:   "QI-FG-INCOMING-BLOCKED",
+		SourceType:     biz.QualityInspectionSourceShipment,
+		SourceID:       shipment.ID,
+		InventoryLotID: productLot.ID,
+		WarehouseID:    fixtures.warehouseID,
+		SubjectID:      fixtures.productID,
+	}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("incoming quality path must reject shipment source, got %v", err)
+	}
+
+	materialLot := createTestInventoryLot(t, ctx, inventoryUC, biz.InventorySubjectMaterial, fixtures.materialID, "QI-FG-MATERIAL-LOT")
+	if _, err := inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, &biz.QualityInspectionCreate{
+		InspectionNo:   "QI-FG-MATERIAL-LOT",
+		SourceID:       shipment.ID,
+		InventoryLotID: materialLot.ID,
+		WarehouseID:    fixtures.warehouseID,
+		SubjectID:      fixtures.productID,
+	}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("finished goods quality must reject material lot, got %v", err)
+	}
+
+	otherProduct := createTestProduct(t, ctx, client, fixtures.unitID, "PRD-QI-FG-OTHER")
+	otherProductLot := createTestInventoryLot(t, ctx, inventoryUC, biz.InventorySubjectProduct, otherProduct.ID, "QI-FG-OTHER-PRODUCT-LOT")
+	if _, err := inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, &biz.QualityInspectionCreate{
+		InspectionNo:   "QI-FG-NO-SHIPMENT-ITEM",
+		SourceID:       shipment.ID,
+		InventoryLotID: otherProductLot.ID,
+		WarehouseID:    fixtures.warehouseID,
+		SubjectID:      otherProduct.ID,
+	}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("finished goods quality must require matching shipment item, got %v", err)
+	}
+
+	shippedLot := createTestInventoryLot(t, ctx, inventoryUC, biz.InventorySubjectProduct, fixtures.productID, "QI-FG-SHIPPED-LOT")
+	if _, err := inventoryUC.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		LotID:          &shippedLot.ID,
+		TxnType:        biz.InventoryTxnIn,
+		Direction:      1,
+		Quantity:       mustDecimal(t, "1"),
+		UnitID:         fixtures.unitID,
+		SourceType:     "test_finished_goods_quality",
+		IdempotencyKey: "qi-fg-shipped-lot-in",
+	}); err != nil {
+		t.Fatalf("seed shipped shipment lot inventory failed: %v", err)
+	}
+	shippedShipment, err := operationalUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{
+			ShipmentNo:     "QI-FG-SHIPPED-SHIP",
+			IdempotencyKey: "QI-FG-SHIPPED-SHIP",
+		},
+		Items: []*biz.ShipmentItemCreate{
+			{
+				ProductID:   fixtures.productID,
+				WarehouseID: fixtures.warehouseID,
+				UnitID:      fixtures.unitID,
+				LotID:       &shippedLot.ID,
+				Quantity:    mustDecimal(t, "1"),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create shipped shipment fixture failed: %v", err)
+	}
+	if _, err := operationalUC.ShipShipment(ctx, shippedShipment.ID); err != nil {
+		t.Fatalf("ship shipment fixture failed: %v", err)
+	}
+	if _, err := inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, &biz.QualityInspectionCreate{
+		InspectionNo:   "QI-FG-SHIPPED-SHIP",
+		SourceID:       shippedShipment.ID,
+		InventoryLotID: shippedLot.ID,
+		WarehouseID:    fixtures.warehouseID,
+		SubjectID:      fixtures.productID,
+	}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("finished goods quality must reject non-draft shipment, got %v", err)
 	}
 }
 

@@ -93,6 +93,10 @@ test('workflow business modules: 三页不冒充事实写入', () => {
     new URL('../router.jsx', import.meta.url),
     'utf8'
   )
+  const workflowApiSource = readFileSync(
+    new URL('../api/workflowApi.mjs', import.meta.url),
+    'utf8'
+  )
 
   for (const text of [
     '新建放行单',
@@ -122,7 +126,8 @@ test('workflow business modules: 三页不冒充事实写入', () => {
     'Workflow V1',
     '不写事实层',
     'listWorkflowTasks',
-    'updateWorkflowTaskStatus',
+    'completeWorkflowTaskAction',
+    'blockWorkflowTaskAction',
     'urgeWorkflowTask',
     "taskGroup: 'shipment_release'",
     'workflow_page_scope',
@@ -134,6 +139,19 @@ test('workflow business modules: 三页不冒充事实写入', () => {
       source.includes(text),
       true,
       `workflow V1 page should expose real workflow scope: ${text}`
+    )
+  }
+
+  for (const text of [
+    'explainWorkflowActionAccess',
+    'explain_action_access',
+    'explainWorkflowTaskAssignment',
+    'explain_task_assignment',
+  ]) {
+    assert.equal(
+      workflowApiSource.includes(text),
+      true,
+      `workflow API client should expose backend explain contract: ${text}`
     )
   }
 

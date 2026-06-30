@@ -11,6 +11,7 @@ import (
 
 	"server/internal/data/model/ent/migrate"
 
+	"server/internal/data/model/ent/accessentitlement"
 	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/adminuserrole"
 	"server/internal/data/model/ent/bomheader"
@@ -18,6 +19,8 @@ import (
 	"server/internal/data/model/ent/businessattachment"
 	"server/internal/data/model/ent/contact"
 	"server/internal/data/model/ent/customer"
+	"server/internal/data/model/ent/customerconfigrevision"
+	"server/internal/data/model/ent/deploymentmodulestate"
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
@@ -28,6 +31,8 @@ import (
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/process"
+	"server/internal/data/model/ent/processinstance"
+	"server/internal/data/model/ent/processnodeinstance"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
@@ -42,6 +47,7 @@ import (
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/rolepermission"
+	"server/internal/data/model/ent/roleprofile"
 	"server/internal/data/model/ent/runtimeauditevent"
 	"server/internal/data/model/ent/runtimemarker"
 	"server/internal/data/model/ent/salesorder"
@@ -55,6 +61,8 @@ import (
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
+	"server/internal/data/model/ent/workpool"
+	"server/internal/data/model/ent/workpoolmembership"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
@@ -67,6 +75,8 @@ type Client struct {
 	config
 	// Schema is the client for creating, migrating and dropping schema.
 	Schema *migrate.Schema
+	// AccessEntitlement is the client for interacting with the AccessEntitlement builders.
+	AccessEntitlement *AccessEntitlementClient
 	// AdminUser is the client for interacting with the AdminUser builders.
 	AdminUser *AdminUserClient
 	// AdminUserRole is the client for interacting with the AdminUserRole builders.
@@ -81,6 +91,10 @@ type Client struct {
 	Contact *ContactClient
 	// Customer is the client for interacting with the Customer builders.
 	Customer *CustomerClient
+	// CustomerConfigRevision is the client for interacting with the CustomerConfigRevision builders.
+	CustomerConfigRevision *CustomerConfigRevisionClient
+	// DeploymentModuleState is the client for interacting with the DeploymentModuleState builders.
+	DeploymentModuleState *DeploymentModuleStateClient
 	// FinanceFact is the client for interacting with the FinanceFact builders.
 	FinanceFact *FinanceFactClient
 	// InventoryBalance is the client for interacting with the InventoryBalance builders.
@@ -101,6 +115,10 @@ type Client struct {
 	Permission *PermissionClient
 	// Process is the client for interacting with the Process builders.
 	Process *ProcessClient
+	// ProcessInstance is the client for interacting with the ProcessInstance builders.
+	ProcessInstance *ProcessInstanceClient
+	// ProcessNodeInstance is the client for interacting with the ProcessNodeInstance builders.
+	ProcessNodeInstance *ProcessNodeInstanceClient
 	// Product is the client for interacting with the Product builders.
 	Product *ProductClient
 	// ProductSKU is the client for interacting with the ProductSKU builders.
@@ -129,6 +147,8 @@ type Client struct {
 	Role *RoleClient
 	// RolePermission is the client for interacting with the RolePermission builders.
 	RolePermission *RolePermissionClient
+	// RoleProfile is the client for interacting with the RoleProfile builders.
+	RoleProfile *RoleProfileClient
 	// RuntimeAuditEvent is the client for interacting with the RuntimeAuditEvent builders.
 	RuntimeAuditEvent *RuntimeAuditEventClient
 	// RuntimeMarker is the client for interacting with the RuntimeMarker builders.
@@ -149,6 +169,10 @@ type Client struct {
 	Unit *UnitClient
 	// Warehouse is the client for interacting with the Warehouse builders.
 	Warehouse *WarehouseClient
+	// WorkPool is the client for interacting with the WorkPool builders.
+	WorkPool *WorkPoolClient
+	// WorkPoolMembership is the client for interacting with the WorkPoolMembership builders.
+	WorkPoolMembership *WorkPoolMembershipClient
 	// WorkflowBusinessState is the client for interacting with the WorkflowBusinessState builders.
 	WorkflowBusinessState *WorkflowBusinessStateClient
 	// WorkflowTask is the client for interacting with the WorkflowTask builders.
@@ -166,6 +190,7 @@ func NewClient(opts ...Option) *Client {
 
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
+	c.AccessEntitlement = NewAccessEntitlementClient(c.config)
 	c.AdminUser = NewAdminUserClient(c.config)
 	c.AdminUserRole = NewAdminUserRoleClient(c.config)
 	c.BOMHeader = NewBOMHeaderClient(c.config)
@@ -173,6 +198,8 @@ func (c *Client) init() {
 	c.BusinessAttachment = NewBusinessAttachmentClient(c.config)
 	c.Contact = NewContactClient(c.config)
 	c.Customer = NewCustomerClient(c.config)
+	c.CustomerConfigRevision = NewCustomerConfigRevisionClient(c.config)
+	c.DeploymentModuleState = NewDeploymentModuleStateClient(c.config)
 	c.FinanceFact = NewFinanceFactClient(c.config)
 	c.InventoryBalance = NewInventoryBalanceClient(c.config)
 	c.InventoryLot = NewInventoryLotClient(c.config)
@@ -183,6 +210,8 @@ func (c *Client) init() {
 	c.OutsourcingOrderItem = NewOutsourcingOrderItemClient(c.config)
 	c.Permission = NewPermissionClient(c.config)
 	c.Process = NewProcessClient(c.config)
+	c.ProcessInstance = NewProcessInstanceClient(c.config)
+	c.ProcessNodeInstance = NewProcessNodeInstanceClient(c.config)
 	c.Product = NewProductClient(c.config)
 	c.ProductSKU = NewProductSKUClient(c.config)
 	c.ProductionFact = NewProductionFactClient(c.config)
@@ -197,6 +226,7 @@ func (c *Client) init() {
 	c.QualityInspection = NewQualityInspectionClient(c.config)
 	c.Role = NewRoleClient(c.config)
 	c.RolePermission = NewRolePermissionClient(c.config)
+	c.RoleProfile = NewRoleProfileClient(c.config)
 	c.RuntimeAuditEvent = NewRuntimeAuditEventClient(c.config)
 	c.RuntimeMarker = NewRuntimeMarkerClient(c.config)
 	c.SalesOrder = NewSalesOrderClient(c.config)
@@ -207,6 +237,8 @@ func (c *Client) init() {
 	c.Supplier = NewSupplierClient(c.config)
 	c.Unit = NewUnitClient(c.config)
 	c.Warehouse = NewWarehouseClient(c.config)
+	c.WorkPool = NewWorkPoolClient(c.config)
+	c.WorkPoolMembership = NewWorkPoolMembershipClient(c.config)
 	c.WorkflowBusinessState = NewWorkflowBusinessStateClient(c.config)
 	c.WorkflowTask = NewWorkflowTaskClient(c.config)
 	c.WorkflowTaskEvent = NewWorkflowTaskEventClient(c.config)
@@ -302,6 +334,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	return &Tx{
 		ctx:                           ctx,
 		config:                        cfg,
+		AccessEntitlement:             NewAccessEntitlementClient(cfg),
 		AdminUser:                     NewAdminUserClient(cfg),
 		AdminUserRole:                 NewAdminUserRoleClient(cfg),
 		BOMHeader:                     NewBOMHeaderClient(cfg),
@@ -309,6 +342,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		BusinessAttachment:            NewBusinessAttachmentClient(cfg),
 		Contact:                       NewContactClient(cfg),
 		Customer:                      NewCustomerClient(cfg),
+		CustomerConfigRevision:        NewCustomerConfigRevisionClient(cfg),
+		DeploymentModuleState:         NewDeploymentModuleStateClient(cfg),
 		FinanceFact:                   NewFinanceFactClient(cfg),
 		InventoryBalance:              NewInventoryBalanceClient(cfg),
 		InventoryLot:                  NewInventoryLotClient(cfg),
@@ -319,6 +354,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		OutsourcingOrderItem:          NewOutsourcingOrderItemClient(cfg),
 		Permission:                    NewPermissionClient(cfg),
 		Process:                       NewProcessClient(cfg),
+		ProcessInstance:               NewProcessInstanceClient(cfg),
+		ProcessNodeInstance:           NewProcessNodeInstanceClient(cfg),
 		Product:                       NewProductClient(cfg),
 		ProductSKU:                    NewProductSKUClient(cfg),
 		ProductionFact:                NewProductionFactClient(cfg),
@@ -333,6 +370,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		QualityInspection:             NewQualityInspectionClient(cfg),
 		Role:                          NewRoleClient(cfg),
 		RolePermission:                NewRolePermissionClient(cfg),
+		RoleProfile:                   NewRoleProfileClient(cfg),
 		RuntimeAuditEvent:             NewRuntimeAuditEventClient(cfg),
 		RuntimeMarker:                 NewRuntimeMarkerClient(cfg),
 		SalesOrder:                    NewSalesOrderClient(cfg),
@@ -343,6 +381,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Supplier:                      NewSupplierClient(cfg),
 		Unit:                          NewUnitClient(cfg),
 		Warehouse:                     NewWarehouseClient(cfg),
+		WorkPool:                      NewWorkPoolClient(cfg),
+		WorkPoolMembership:            NewWorkPoolMembershipClient(cfg),
 		WorkflowBusinessState:         NewWorkflowBusinessStateClient(cfg),
 		WorkflowTask:                  NewWorkflowTaskClient(cfg),
 		WorkflowTaskEvent:             NewWorkflowTaskEventClient(cfg),
@@ -365,6 +405,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	return &Tx{
 		ctx:                           ctx,
 		config:                        cfg,
+		AccessEntitlement:             NewAccessEntitlementClient(cfg),
 		AdminUser:                     NewAdminUserClient(cfg),
 		AdminUserRole:                 NewAdminUserRoleClient(cfg),
 		BOMHeader:                     NewBOMHeaderClient(cfg),
@@ -372,6 +413,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		BusinessAttachment:            NewBusinessAttachmentClient(cfg),
 		Contact:                       NewContactClient(cfg),
 		Customer:                      NewCustomerClient(cfg),
+		CustomerConfigRevision:        NewCustomerConfigRevisionClient(cfg),
+		DeploymentModuleState:         NewDeploymentModuleStateClient(cfg),
 		FinanceFact:                   NewFinanceFactClient(cfg),
 		InventoryBalance:              NewInventoryBalanceClient(cfg),
 		InventoryLot:                  NewInventoryLotClient(cfg),
@@ -382,6 +425,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		OutsourcingOrderItem:          NewOutsourcingOrderItemClient(cfg),
 		Permission:                    NewPermissionClient(cfg),
 		Process:                       NewProcessClient(cfg),
+		ProcessInstance:               NewProcessInstanceClient(cfg),
+		ProcessNodeInstance:           NewProcessNodeInstanceClient(cfg),
 		Product:                       NewProductClient(cfg),
 		ProductSKU:                    NewProductSKUClient(cfg),
 		ProductionFact:                NewProductionFactClient(cfg),
@@ -396,6 +441,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		QualityInspection:             NewQualityInspectionClient(cfg),
 		Role:                          NewRoleClient(cfg),
 		RolePermission:                NewRolePermissionClient(cfg),
+		RoleProfile:                   NewRoleProfileClient(cfg),
 		RuntimeAuditEvent:             NewRuntimeAuditEventClient(cfg),
 		RuntimeMarker:                 NewRuntimeMarkerClient(cfg),
 		SalesOrder:                    NewSalesOrderClient(cfg),
@@ -406,6 +452,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Supplier:                      NewSupplierClient(cfg),
 		Unit:                          NewUnitClient(cfg),
 		Warehouse:                     NewWarehouseClient(cfg),
+		WorkPool:                      NewWorkPoolClient(cfg),
+		WorkPoolMembership:            NewWorkPoolMembershipClient(cfg),
 		WorkflowBusinessState:         NewWorkflowBusinessStateClient(cfg),
 		WorkflowTask:                  NewWorkflowTaskClient(cfg),
 		WorkflowTaskEvent:             NewWorkflowTaskEventClient(cfg),
@@ -415,7 +463,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 // Debug returns a new debug-client. It's used to get verbose logging on specific operations.
 //
 //	client.Debug().
-//		AdminUser.
+//		AccessEntitlement.
 //		Query().
 //		Count(ctx)
 func (c *Client) Debug() *Client {
@@ -438,16 +486,19 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem, c.BusinessAttachment,
-		c.Contact, c.Customer, c.FinanceFact, c.InventoryBalance, c.InventoryLot,
+		c.AccessEntitlement, c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem,
+		c.BusinessAttachment, c.Contact, c.Customer, c.CustomerConfigRevision,
+		c.DeploymentModuleState, c.FinanceFact, c.InventoryBalance, c.InventoryLot,
 		c.InventoryTxn, c.Material, c.OutsourcingFact, c.OutsourcingOrder,
-		c.OutsourcingOrderItem, c.Permission, c.Process, c.Product, c.ProductSKU,
-		c.ProductionFact, c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
+		c.OutsourcingOrderItem, c.Permission, c.Process, c.ProcessInstance,
+		c.ProcessNodeInstance, c.Product, c.ProductSKU, c.ProductionFact,
+		c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
 		c.PurchaseReceiptAdjustment, c.PurchaseReceiptAdjustmentItem,
 		c.PurchaseReceiptItem, c.PurchaseReturn, c.PurchaseReturnItem,
-		c.QualityInspection, c.Role, c.RolePermission, c.RuntimeAuditEvent,
-		c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem, c.Shipment, c.ShipmentItem,
-		c.StockReservation, c.Supplier, c.Unit, c.Warehouse, c.WorkflowBusinessState,
+		c.QualityInspection, c.Role, c.RolePermission, c.RoleProfile,
+		c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem,
+		c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier, c.Unit,
+		c.Warehouse, c.WorkPool, c.WorkPoolMembership, c.WorkflowBusinessState,
 		c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Use(hooks...)
@@ -458,16 +509,19 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem, c.BusinessAttachment,
-		c.Contact, c.Customer, c.FinanceFact, c.InventoryBalance, c.InventoryLot,
+		c.AccessEntitlement, c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem,
+		c.BusinessAttachment, c.Contact, c.Customer, c.CustomerConfigRevision,
+		c.DeploymentModuleState, c.FinanceFact, c.InventoryBalance, c.InventoryLot,
 		c.InventoryTxn, c.Material, c.OutsourcingFact, c.OutsourcingOrder,
-		c.OutsourcingOrderItem, c.Permission, c.Process, c.Product, c.ProductSKU,
-		c.ProductionFact, c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
+		c.OutsourcingOrderItem, c.Permission, c.Process, c.ProcessInstance,
+		c.ProcessNodeInstance, c.Product, c.ProductSKU, c.ProductionFact,
+		c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
 		c.PurchaseReceiptAdjustment, c.PurchaseReceiptAdjustmentItem,
 		c.PurchaseReceiptItem, c.PurchaseReturn, c.PurchaseReturnItem,
-		c.QualityInspection, c.Role, c.RolePermission, c.RuntimeAuditEvent,
-		c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem, c.Shipment, c.ShipmentItem,
-		c.StockReservation, c.Supplier, c.Unit, c.Warehouse, c.WorkflowBusinessState,
+		c.QualityInspection, c.Role, c.RolePermission, c.RoleProfile,
+		c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem,
+		c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier, c.Unit,
+		c.Warehouse, c.WorkPool, c.WorkPoolMembership, c.WorkflowBusinessState,
 		c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Intercept(interceptors...)
@@ -477,6 +531,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 // Mutate implements the ent.Mutator interface.
 func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
+	case *AccessEntitlementMutation:
+		return c.AccessEntitlement.mutate(ctx, m)
 	case *AdminUserMutation:
 		return c.AdminUser.mutate(ctx, m)
 	case *AdminUserRoleMutation:
@@ -491,6 +547,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Contact.mutate(ctx, m)
 	case *CustomerMutation:
 		return c.Customer.mutate(ctx, m)
+	case *CustomerConfigRevisionMutation:
+		return c.CustomerConfigRevision.mutate(ctx, m)
+	case *DeploymentModuleStateMutation:
+		return c.DeploymentModuleState.mutate(ctx, m)
 	case *FinanceFactMutation:
 		return c.FinanceFact.mutate(ctx, m)
 	case *InventoryBalanceMutation:
@@ -511,6 +571,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Permission.mutate(ctx, m)
 	case *ProcessMutation:
 		return c.Process.mutate(ctx, m)
+	case *ProcessInstanceMutation:
+		return c.ProcessInstance.mutate(ctx, m)
+	case *ProcessNodeInstanceMutation:
+		return c.ProcessNodeInstance.mutate(ctx, m)
 	case *ProductMutation:
 		return c.Product.mutate(ctx, m)
 	case *ProductSKUMutation:
@@ -539,6 +603,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Role.mutate(ctx, m)
 	case *RolePermissionMutation:
 		return c.RolePermission.mutate(ctx, m)
+	case *RoleProfileMutation:
+		return c.RoleProfile.mutate(ctx, m)
 	case *RuntimeAuditEventMutation:
 		return c.RuntimeAuditEvent.mutate(ctx, m)
 	case *RuntimeMarkerMutation:
@@ -559,6 +625,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Unit.mutate(ctx, m)
 	case *WarehouseMutation:
 		return c.Warehouse.mutate(ctx, m)
+	case *WorkPoolMutation:
+		return c.WorkPool.mutate(ctx, m)
+	case *WorkPoolMembershipMutation:
+		return c.WorkPoolMembership.mutate(ctx, m)
 	case *WorkflowBusinessStateMutation:
 		return c.WorkflowBusinessState.mutate(ctx, m)
 	case *WorkflowTaskMutation:
@@ -567,6 +637,139 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.WorkflowTaskEvent.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
+	}
+}
+
+// AccessEntitlementClient is a client for the AccessEntitlement schema.
+type AccessEntitlementClient struct {
+	config
+}
+
+// NewAccessEntitlementClient returns a client for the AccessEntitlement from the given config.
+func NewAccessEntitlementClient(c config) *AccessEntitlementClient {
+	return &AccessEntitlementClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `accessentitlement.Hooks(f(g(h())))`.
+func (c *AccessEntitlementClient) Use(hooks ...Hook) {
+	c.hooks.AccessEntitlement = append(c.hooks.AccessEntitlement, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `accessentitlement.Intercept(f(g(h())))`.
+func (c *AccessEntitlementClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AccessEntitlement = append(c.inters.AccessEntitlement, interceptors...)
+}
+
+// Create returns a builder for creating a AccessEntitlement entity.
+func (c *AccessEntitlementClient) Create() *AccessEntitlementCreate {
+	mutation := newAccessEntitlementMutation(c.config, OpCreate)
+	return &AccessEntitlementCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AccessEntitlement entities.
+func (c *AccessEntitlementClient) CreateBulk(builders ...*AccessEntitlementCreate) *AccessEntitlementCreateBulk {
+	return &AccessEntitlementCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AccessEntitlementClient) MapCreateBulk(slice any, setFunc func(*AccessEntitlementCreate, int)) *AccessEntitlementCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AccessEntitlementCreateBulk{err: fmt.Errorf("calling to AccessEntitlementClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AccessEntitlementCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AccessEntitlementCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AccessEntitlement.
+func (c *AccessEntitlementClient) Update() *AccessEntitlementUpdate {
+	mutation := newAccessEntitlementMutation(c.config, OpUpdate)
+	return &AccessEntitlementUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AccessEntitlementClient) UpdateOne(_m *AccessEntitlement) *AccessEntitlementUpdateOne {
+	mutation := newAccessEntitlementMutation(c.config, OpUpdateOne, withAccessEntitlement(_m))
+	return &AccessEntitlementUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AccessEntitlementClient) UpdateOneID(id int) *AccessEntitlementUpdateOne {
+	mutation := newAccessEntitlementMutation(c.config, OpUpdateOne, withAccessEntitlementID(id))
+	return &AccessEntitlementUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AccessEntitlement.
+func (c *AccessEntitlementClient) Delete() *AccessEntitlementDelete {
+	mutation := newAccessEntitlementMutation(c.config, OpDelete)
+	return &AccessEntitlementDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AccessEntitlementClient) DeleteOne(_m *AccessEntitlement) *AccessEntitlementDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AccessEntitlementClient) DeleteOneID(id int) *AccessEntitlementDeleteOne {
+	builder := c.Delete().Where(accessentitlement.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AccessEntitlementDeleteOne{builder}
+}
+
+// Query returns a query builder for AccessEntitlement.
+func (c *AccessEntitlementClient) Query() *AccessEntitlementQuery {
+	return &AccessEntitlementQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAccessEntitlement},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AccessEntitlement entity by its id.
+func (c *AccessEntitlementClient) Get(ctx context.Context, id int) (*AccessEntitlement, error) {
+	return c.Query().Where(accessentitlement.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AccessEntitlementClient) GetX(ctx context.Context, id int) *AccessEntitlement {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *AccessEntitlementClient) Hooks() []Hook {
+	return c.hooks.AccessEntitlement
+}
+
+// Interceptors returns the client interceptors.
+func (c *AccessEntitlementClient) Interceptors() []Interceptor {
+	return c.inters.AccessEntitlement
+}
+
+func (c *AccessEntitlementClient) mutate(ctx context.Context, m *AccessEntitlementMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AccessEntitlementCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AccessEntitlementUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AccessEntitlementUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AccessEntitlementDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AccessEntitlement mutation op: %q", m.Op())
 	}
 }
 
@@ -1610,6 +1813,272 @@ func (c *CustomerClient) mutate(ctx context.Context, m *CustomerMutation) (Value
 		return (&CustomerDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Customer mutation op: %q", m.Op())
+	}
+}
+
+// CustomerConfigRevisionClient is a client for the CustomerConfigRevision schema.
+type CustomerConfigRevisionClient struct {
+	config
+}
+
+// NewCustomerConfigRevisionClient returns a client for the CustomerConfigRevision from the given config.
+func NewCustomerConfigRevisionClient(c config) *CustomerConfigRevisionClient {
+	return &CustomerConfigRevisionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `customerconfigrevision.Hooks(f(g(h())))`.
+func (c *CustomerConfigRevisionClient) Use(hooks ...Hook) {
+	c.hooks.CustomerConfigRevision = append(c.hooks.CustomerConfigRevision, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `customerconfigrevision.Intercept(f(g(h())))`.
+func (c *CustomerConfigRevisionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.CustomerConfigRevision = append(c.inters.CustomerConfigRevision, interceptors...)
+}
+
+// Create returns a builder for creating a CustomerConfigRevision entity.
+func (c *CustomerConfigRevisionClient) Create() *CustomerConfigRevisionCreate {
+	mutation := newCustomerConfigRevisionMutation(c.config, OpCreate)
+	return &CustomerConfigRevisionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of CustomerConfigRevision entities.
+func (c *CustomerConfigRevisionClient) CreateBulk(builders ...*CustomerConfigRevisionCreate) *CustomerConfigRevisionCreateBulk {
+	return &CustomerConfigRevisionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *CustomerConfigRevisionClient) MapCreateBulk(slice any, setFunc func(*CustomerConfigRevisionCreate, int)) *CustomerConfigRevisionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &CustomerConfigRevisionCreateBulk{err: fmt.Errorf("calling to CustomerConfigRevisionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*CustomerConfigRevisionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &CustomerConfigRevisionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for CustomerConfigRevision.
+func (c *CustomerConfigRevisionClient) Update() *CustomerConfigRevisionUpdate {
+	mutation := newCustomerConfigRevisionMutation(c.config, OpUpdate)
+	return &CustomerConfigRevisionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *CustomerConfigRevisionClient) UpdateOne(_m *CustomerConfigRevision) *CustomerConfigRevisionUpdateOne {
+	mutation := newCustomerConfigRevisionMutation(c.config, OpUpdateOne, withCustomerConfigRevision(_m))
+	return &CustomerConfigRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *CustomerConfigRevisionClient) UpdateOneID(id int) *CustomerConfigRevisionUpdateOne {
+	mutation := newCustomerConfigRevisionMutation(c.config, OpUpdateOne, withCustomerConfigRevisionID(id))
+	return &CustomerConfigRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for CustomerConfigRevision.
+func (c *CustomerConfigRevisionClient) Delete() *CustomerConfigRevisionDelete {
+	mutation := newCustomerConfigRevisionMutation(c.config, OpDelete)
+	return &CustomerConfigRevisionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *CustomerConfigRevisionClient) DeleteOne(_m *CustomerConfigRevision) *CustomerConfigRevisionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *CustomerConfigRevisionClient) DeleteOneID(id int) *CustomerConfigRevisionDeleteOne {
+	builder := c.Delete().Where(customerconfigrevision.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &CustomerConfigRevisionDeleteOne{builder}
+}
+
+// Query returns a query builder for CustomerConfigRevision.
+func (c *CustomerConfigRevisionClient) Query() *CustomerConfigRevisionQuery {
+	return &CustomerConfigRevisionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeCustomerConfigRevision},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a CustomerConfigRevision entity by its id.
+func (c *CustomerConfigRevisionClient) Get(ctx context.Context, id int) (*CustomerConfigRevision, error) {
+	return c.Query().Where(customerconfigrevision.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *CustomerConfigRevisionClient) GetX(ctx context.Context, id int) *CustomerConfigRevision {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *CustomerConfigRevisionClient) Hooks() []Hook {
+	return c.hooks.CustomerConfigRevision
+}
+
+// Interceptors returns the client interceptors.
+func (c *CustomerConfigRevisionClient) Interceptors() []Interceptor {
+	return c.inters.CustomerConfigRevision
+}
+
+func (c *CustomerConfigRevisionClient) mutate(ctx context.Context, m *CustomerConfigRevisionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&CustomerConfigRevisionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&CustomerConfigRevisionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&CustomerConfigRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&CustomerConfigRevisionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown CustomerConfigRevision mutation op: %q", m.Op())
+	}
+}
+
+// DeploymentModuleStateClient is a client for the DeploymentModuleState schema.
+type DeploymentModuleStateClient struct {
+	config
+}
+
+// NewDeploymentModuleStateClient returns a client for the DeploymentModuleState from the given config.
+func NewDeploymentModuleStateClient(c config) *DeploymentModuleStateClient {
+	return &DeploymentModuleStateClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `deploymentmodulestate.Hooks(f(g(h())))`.
+func (c *DeploymentModuleStateClient) Use(hooks ...Hook) {
+	c.hooks.DeploymentModuleState = append(c.hooks.DeploymentModuleState, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `deploymentmodulestate.Intercept(f(g(h())))`.
+func (c *DeploymentModuleStateClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DeploymentModuleState = append(c.inters.DeploymentModuleState, interceptors...)
+}
+
+// Create returns a builder for creating a DeploymentModuleState entity.
+func (c *DeploymentModuleStateClient) Create() *DeploymentModuleStateCreate {
+	mutation := newDeploymentModuleStateMutation(c.config, OpCreate)
+	return &DeploymentModuleStateCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DeploymentModuleState entities.
+func (c *DeploymentModuleStateClient) CreateBulk(builders ...*DeploymentModuleStateCreate) *DeploymentModuleStateCreateBulk {
+	return &DeploymentModuleStateCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DeploymentModuleStateClient) MapCreateBulk(slice any, setFunc func(*DeploymentModuleStateCreate, int)) *DeploymentModuleStateCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DeploymentModuleStateCreateBulk{err: fmt.Errorf("calling to DeploymentModuleStateClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DeploymentModuleStateCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DeploymentModuleStateCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DeploymentModuleState.
+func (c *DeploymentModuleStateClient) Update() *DeploymentModuleStateUpdate {
+	mutation := newDeploymentModuleStateMutation(c.config, OpUpdate)
+	return &DeploymentModuleStateUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DeploymentModuleStateClient) UpdateOne(_m *DeploymentModuleState) *DeploymentModuleStateUpdateOne {
+	mutation := newDeploymentModuleStateMutation(c.config, OpUpdateOne, withDeploymentModuleState(_m))
+	return &DeploymentModuleStateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DeploymentModuleStateClient) UpdateOneID(id int) *DeploymentModuleStateUpdateOne {
+	mutation := newDeploymentModuleStateMutation(c.config, OpUpdateOne, withDeploymentModuleStateID(id))
+	return &DeploymentModuleStateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DeploymentModuleState.
+func (c *DeploymentModuleStateClient) Delete() *DeploymentModuleStateDelete {
+	mutation := newDeploymentModuleStateMutation(c.config, OpDelete)
+	return &DeploymentModuleStateDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DeploymentModuleStateClient) DeleteOne(_m *DeploymentModuleState) *DeploymentModuleStateDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DeploymentModuleStateClient) DeleteOneID(id int) *DeploymentModuleStateDeleteOne {
+	builder := c.Delete().Where(deploymentmodulestate.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DeploymentModuleStateDeleteOne{builder}
+}
+
+// Query returns a query builder for DeploymentModuleState.
+func (c *DeploymentModuleStateClient) Query() *DeploymentModuleStateQuery {
+	return &DeploymentModuleStateQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDeploymentModuleState},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DeploymentModuleState entity by its id.
+func (c *DeploymentModuleStateClient) Get(ctx context.Context, id int) (*DeploymentModuleState, error) {
+	return c.Query().Where(deploymentmodulestate.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DeploymentModuleStateClient) GetX(ctx context.Context, id int) *DeploymentModuleState {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *DeploymentModuleStateClient) Hooks() []Hook {
+	return c.hooks.DeploymentModuleState
+}
+
+// Interceptors returns the client interceptors.
+func (c *DeploymentModuleStateClient) Interceptors() []Interceptor {
+	return c.inters.DeploymentModuleState
+}
+
+func (c *DeploymentModuleStateClient) mutate(ctx context.Context, m *DeploymentModuleStateMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DeploymentModuleStateCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DeploymentModuleStateUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DeploymentModuleStateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DeploymentModuleStateDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DeploymentModuleState mutation op: %q", m.Op())
 	}
 }
 
@@ -3488,6 +3957,304 @@ func (c *ProcessClient) mutate(ctx context.Context, m *ProcessMutation) (Value, 
 		return (&ProcessDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Process mutation op: %q", m.Op())
+	}
+}
+
+// ProcessInstanceClient is a client for the ProcessInstance schema.
+type ProcessInstanceClient struct {
+	config
+}
+
+// NewProcessInstanceClient returns a client for the ProcessInstance from the given config.
+func NewProcessInstanceClient(c config) *ProcessInstanceClient {
+	return &ProcessInstanceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `processinstance.Hooks(f(g(h())))`.
+func (c *ProcessInstanceClient) Use(hooks ...Hook) {
+	c.hooks.ProcessInstance = append(c.hooks.ProcessInstance, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `processinstance.Intercept(f(g(h())))`.
+func (c *ProcessInstanceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ProcessInstance = append(c.inters.ProcessInstance, interceptors...)
+}
+
+// Create returns a builder for creating a ProcessInstance entity.
+func (c *ProcessInstanceClient) Create() *ProcessInstanceCreate {
+	mutation := newProcessInstanceMutation(c.config, OpCreate)
+	return &ProcessInstanceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ProcessInstance entities.
+func (c *ProcessInstanceClient) CreateBulk(builders ...*ProcessInstanceCreate) *ProcessInstanceCreateBulk {
+	return &ProcessInstanceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProcessInstanceClient) MapCreateBulk(slice any, setFunc func(*ProcessInstanceCreate, int)) *ProcessInstanceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProcessInstanceCreateBulk{err: fmt.Errorf("calling to ProcessInstanceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProcessInstanceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProcessInstanceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ProcessInstance.
+func (c *ProcessInstanceClient) Update() *ProcessInstanceUpdate {
+	mutation := newProcessInstanceMutation(c.config, OpUpdate)
+	return &ProcessInstanceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProcessInstanceClient) UpdateOne(_m *ProcessInstance) *ProcessInstanceUpdateOne {
+	mutation := newProcessInstanceMutation(c.config, OpUpdateOne, withProcessInstance(_m))
+	return &ProcessInstanceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProcessInstanceClient) UpdateOneID(id int) *ProcessInstanceUpdateOne {
+	mutation := newProcessInstanceMutation(c.config, OpUpdateOne, withProcessInstanceID(id))
+	return &ProcessInstanceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ProcessInstance.
+func (c *ProcessInstanceClient) Delete() *ProcessInstanceDelete {
+	mutation := newProcessInstanceMutation(c.config, OpDelete)
+	return &ProcessInstanceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProcessInstanceClient) DeleteOne(_m *ProcessInstance) *ProcessInstanceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProcessInstanceClient) DeleteOneID(id int) *ProcessInstanceDeleteOne {
+	builder := c.Delete().Where(processinstance.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProcessInstanceDeleteOne{builder}
+}
+
+// Query returns a query builder for ProcessInstance.
+func (c *ProcessInstanceClient) Query() *ProcessInstanceQuery {
+	return &ProcessInstanceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProcessInstance},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ProcessInstance entity by its id.
+func (c *ProcessInstanceClient) Get(ctx context.Context, id int) (*ProcessInstance, error) {
+	return c.Query().Where(processinstance.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProcessInstanceClient) GetX(ctx context.Context, id int) *ProcessInstance {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryNodes queries the nodes edge of a ProcessInstance.
+func (c *ProcessInstanceClient) QueryNodes(_m *ProcessInstance) *ProcessNodeInstanceQuery {
+	query := (&ProcessNodeInstanceClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(processinstance.Table, processinstance.FieldID, id),
+			sqlgraph.To(processnodeinstance.Table, processnodeinstance.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, processinstance.NodesTable, processinstance.NodesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ProcessInstanceClient) Hooks() []Hook {
+	return c.hooks.ProcessInstance
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProcessInstanceClient) Interceptors() []Interceptor {
+	return c.inters.ProcessInstance
+}
+
+func (c *ProcessInstanceClient) mutate(ctx context.Context, m *ProcessInstanceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProcessInstanceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProcessInstanceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProcessInstanceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProcessInstanceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ProcessInstance mutation op: %q", m.Op())
+	}
+}
+
+// ProcessNodeInstanceClient is a client for the ProcessNodeInstance schema.
+type ProcessNodeInstanceClient struct {
+	config
+}
+
+// NewProcessNodeInstanceClient returns a client for the ProcessNodeInstance from the given config.
+func NewProcessNodeInstanceClient(c config) *ProcessNodeInstanceClient {
+	return &ProcessNodeInstanceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `processnodeinstance.Hooks(f(g(h())))`.
+func (c *ProcessNodeInstanceClient) Use(hooks ...Hook) {
+	c.hooks.ProcessNodeInstance = append(c.hooks.ProcessNodeInstance, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `processnodeinstance.Intercept(f(g(h())))`.
+func (c *ProcessNodeInstanceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ProcessNodeInstance = append(c.inters.ProcessNodeInstance, interceptors...)
+}
+
+// Create returns a builder for creating a ProcessNodeInstance entity.
+func (c *ProcessNodeInstanceClient) Create() *ProcessNodeInstanceCreate {
+	mutation := newProcessNodeInstanceMutation(c.config, OpCreate)
+	return &ProcessNodeInstanceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ProcessNodeInstance entities.
+func (c *ProcessNodeInstanceClient) CreateBulk(builders ...*ProcessNodeInstanceCreate) *ProcessNodeInstanceCreateBulk {
+	return &ProcessNodeInstanceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProcessNodeInstanceClient) MapCreateBulk(slice any, setFunc func(*ProcessNodeInstanceCreate, int)) *ProcessNodeInstanceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProcessNodeInstanceCreateBulk{err: fmt.Errorf("calling to ProcessNodeInstanceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProcessNodeInstanceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProcessNodeInstanceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ProcessNodeInstance.
+func (c *ProcessNodeInstanceClient) Update() *ProcessNodeInstanceUpdate {
+	mutation := newProcessNodeInstanceMutation(c.config, OpUpdate)
+	return &ProcessNodeInstanceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProcessNodeInstanceClient) UpdateOne(_m *ProcessNodeInstance) *ProcessNodeInstanceUpdateOne {
+	mutation := newProcessNodeInstanceMutation(c.config, OpUpdateOne, withProcessNodeInstance(_m))
+	return &ProcessNodeInstanceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProcessNodeInstanceClient) UpdateOneID(id int) *ProcessNodeInstanceUpdateOne {
+	mutation := newProcessNodeInstanceMutation(c.config, OpUpdateOne, withProcessNodeInstanceID(id))
+	return &ProcessNodeInstanceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ProcessNodeInstance.
+func (c *ProcessNodeInstanceClient) Delete() *ProcessNodeInstanceDelete {
+	mutation := newProcessNodeInstanceMutation(c.config, OpDelete)
+	return &ProcessNodeInstanceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProcessNodeInstanceClient) DeleteOne(_m *ProcessNodeInstance) *ProcessNodeInstanceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProcessNodeInstanceClient) DeleteOneID(id int) *ProcessNodeInstanceDeleteOne {
+	builder := c.Delete().Where(processnodeinstance.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProcessNodeInstanceDeleteOne{builder}
+}
+
+// Query returns a query builder for ProcessNodeInstance.
+func (c *ProcessNodeInstanceClient) Query() *ProcessNodeInstanceQuery {
+	return &ProcessNodeInstanceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProcessNodeInstance},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ProcessNodeInstance entity by its id.
+func (c *ProcessNodeInstanceClient) Get(ctx context.Context, id int) (*ProcessNodeInstance, error) {
+	return c.Query().Where(processnodeinstance.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProcessNodeInstanceClient) GetX(ctx context.Context, id int) *ProcessNodeInstance {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryProcessInstance queries the process_instance edge of a ProcessNodeInstance.
+func (c *ProcessNodeInstanceClient) QueryProcessInstance(_m *ProcessNodeInstance) *ProcessInstanceQuery {
+	query := (&ProcessInstanceClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(processnodeinstance.Table, processnodeinstance.FieldID, id),
+			sqlgraph.To(processinstance.Table, processinstance.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, processnodeinstance.ProcessInstanceTable, processnodeinstance.ProcessInstanceColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ProcessNodeInstanceClient) Hooks() []Hook {
+	return c.hooks.ProcessNodeInstance
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProcessNodeInstanceClient) Interceptors() []Interceptor {
+	return c.inters.ProcessNodeInstance
+}
+
+func (c *ProcessNodeInstanceClient) mutate(ctx context.Context, m *ProcessNodeInstanceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProcessNodeInstanceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProcessNodeInstanceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProcessNodeInstanceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProcessNodeInstanceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ProcessNodeInstance mutation op: %q", m.Op())
 	}
 }
 
@@ -6241,6 +7008,139 @@ func (c *RolePermissionClient) mutate(ctx context.Context, m *RolePermissionMuta
 	}
 }
 
+// RoleProfileClient is a client for the RoleProfile schema.
+type RoleProfileClient struct {
+	config
+}
+
+// NewRoleProfileClient returns a client for the RoleProfile from the given config.
+func NewRoleProfileClient(c config) *RoleProfileClient {
+	return &RoleProfileClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `roleprofile.Hooks(f(g(h())))`.
+func (c *RoleProfileClient) Use(hooks ...Hook) {
+	c.hooks.RoleProfile = append(c.hooks.RoleProfile, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `roleprofile.Intercept(f(g(h())))`.
+func (c *RoleProfileClient) Intercept(interceptors ...Interceptor) {
+	c.inters.RoleProfile = append(c.inters.RoleProfile, interceptors...)
+}
+
+// Create returns a builder for creating a RoleProfile entity.
+func (c *RoleProfileClient) Create() *RoleProfileCreate {
+	mutation := newRoleProfileMutation(c.config, OpCreate)
+	return &RoleProfileCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of RoleProfile entities.
+func (c *RoleProfileClient) CreateBulk(builders ...*RoleProfileCreate) *RoleProfileCreateBulk {
+	return &RoleProfileCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *RoleProfileClient) MapCreateBulk(slice any, setFunc func(*RoleProfileCreate, int)) *RoleProfileCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &RoleProfileCreateBulk{err: fmt.Errorf("calling to RoleProfileClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*RoleProfileCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &RoleProfileCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for RoleProfile.
+func (c *RoleProfileClient) Update() *RoleProfileUpdate {
+	mutation := newRoleProfileMutation(c.config, OpUpdate)
+	return &RoleProfileUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *RoleProfileClient) UpdateOne(_m *RoleProfile) *RoleProfileUpdateOne {
+	mutation := newRoleProfileMutation(c.config, OpUpdateOne, withRoleProfile(_m))
+	return &RoleProfileUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *RoleProfileClient) UpdateOneID(id int) *RoleProfileUpdateOne {
+	mutation := newRoleProfileMutation(c.config, OpUpdateOne, withRoleProfileID(id))
+	return &RoleProfileUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for RoleProfile.
+func (c *RoleProfileClient) Delete() *RoleProfileDelete {
+	mutation := newRoleProfileMutation(c.config, OpDelete)
+	return &RoleProfileDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *RoleProfileClient) DeleteOne(_m *RoleProfile) *RoleProfileDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *RoleProfileClient) DeleteOneID(id int) *RoleProfileDeleteOne {
+	builder := c.Delete().Where(roleprofile.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &RoleProfileDeleteOne{builder}
+}
+
+// Query returns a query builder for RoleProfile.
+func (c *RoleProfileClient) Query() *RoleProfileQuery {
+	return &RoleProfileQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeRoleProfile},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a RoleProfile entity by its id.
+func (c *RoleProfileClient) Get(ctx context.Context, id int) (*RoleProfile, error) {
+	return c.Query().Where(roleprofile.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *RoleProfileClient) GetX(ctx context.Context, id int) *RoleProfile {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *RoleProfileClient) Hooks() []Hook {
+	return c.hooks.RoleProfile
+}
+
+// Interceptors returns the client interceptors.
+func (c *RoleProfileClient) Interceptors() []Interceptor {
+	return c.inters.RoleProfile
+}
+
+func (c *RoleProfileClient) mutate(ctx context.Context, m *RoleProfileMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&RoleProfileCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&RoleProfileUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&RoleProfileUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&RoleProfileDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown RoleProfile mutation op: %q", m.Op())
+	}
+}
+
 // RuntimeAuditEventClient is a client for the RuntimeAuditEvent schema.
 type RuntimeAuditEventClient struct {
 	config
@@ -8440,6 +9340,272 @@ func (c *WarehouseClient) mutate(ctx context.Context, m *WarehouseMutation) (Val
 	}
 }
 
+// WorkPoolClient is a client for the WorkPool schema.
+type WorkPoolClient struct {
+	config
+}
+
+// NewWorkPoolClient returns a client for the WorkPool from the given config.
+func NewWorkPoolClient(c config) *WorkPoolClient {
+	return &WorkPoolClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `workpool.Hooks(f(g(h())))`.
+func (c *WorkPoolClient) Use(hooks ...Hook) {
+	c.hooks.WorkPool = append(c.hooks.WorkPool, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `workpool.Intercept(f(g(h())))`.
+func (c *WorkPoolClient) Intercept(interceptors ...Interceptor) {
+	c.inters.WorkPool = append(c.inters.WorkPool, interceptors...)
+}
+
+// Create returns a builder for creating a WorkPool entity.
+func (c *WorkPoolClient) Create() *WorkPoolCreate {
+	mutation := newWorkPoolMutation(c.config, OpCreate)
+	return &WorkPoolCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of WorkPool entities.
+func (c *WorkPoolClient) CreateBulk(builders ...*WorkPoolCreate) *WorkPoolCreateBulk {
+	return &WorkPoolCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *WorkPoolClient) MapCreateBulk(slice any, setFunc func(*WorkPoolCreate, int)) *WorkPoolCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &WorkPoolCreateBulk{err: fmt.Errorf("calling to WorkPoolClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*WorkPoolCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &WorkPoolCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for WorkPool.
+func (c *WorkPoolClient) Update() *WorkPoolUpdate {
+	mutation := newWorkPoolMutation(c.config, OpUpdate)
+	return &WorkPoolUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *WorkPoolClient) UpdateOne(_m *WorkPool) *WorkPoolUpdateOne {
+	mutation := newWorkPoolMutation(c.config, OpUpdateOne, withWorkPool(_m))
+	return &WorkPoolUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *WorkPoolClient) UpdateOneID(id int) *WorkPoolUpdateOne {
+	mutation := newWorkPoolMutation(c.config, OpUpdateOne, withWorkPoolID(id))
+	return &WorkPoolUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for WorkPool.
+func (c *WorkPoolClient) Delete() *WorkPoolDelete {
+	mutation := newWorkPoolMutation(c.config, OpDelete)
+	return &WorkPoolDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *WorkPoolClient) DeleteOne(_m *WorkPool) *WorkPoolDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *WorkPoolClient) DeleteOneID(id int) *WorkPoolDeleteOne {
+	builder := c.Delete().Where(workpool.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &WorkPoolDeleteOne{builder}
+}
+
+// Query returns a query builder for WorkPool.
+func (c *WorkPoolClient) Query() *WorkPoolQuery {
+	return &WorkPoolQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeWorkPool},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a WorkPool entity by its id.
+func (c *WorkPoolClient) Get(ctx context.Context, id int) (*WorkPool, error) {
+	return c.Query().Where(workpool.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *WorkPoolClient) GetX(ctx context.Context, id int) *WorkPool {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *WorkPoolClient) Hooks() []Hook {
+	return c.hooks.WorkPool
+}
+
+// Interceptors returns the client interceptors.
+func (c *WorkPoolClient) Interceptors() []Interceptor {
+	return c.inters.WorkPool
+}
+
+func (c *WorkPoolClient) mutate(ctx context.Context, m *WorkPoolMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&WorkPoolCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&WorkPoolUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&WorkPoolUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&WorkPoolDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown WorkPool mutation op: %q", m.Op())
+	}
+}
+
+// WorkPoolMembershipClient is a client for the WorkPoolMembership schema.
+type WorkPoolMembershipClient struct {
+	config
+}
+
+// NewWorkPoolMembershipClient returns a client for the WorkPoolMembership from the given config.
+func NewWorkPoolMembershipClient(c config) *WorkPoolMembershipClient {
+	return &WorkPoolMembershipClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `workpoolmembership.Hooks(f(g(h())))`.
+func (c *WorkPoolMembershipClient) Use(hooks ...Hook) {
+	c.hooks.WorkPoolMembership = append(c.hooks.WorkPoolMembership, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `workpoolmembership.Intercept(f(g(h())))`.
+func (c *WorkPoolMembershipClient) Intercept(interceptors ...Interceptor) {
+	c.inters.WorkPoolMembership = append(c.inters.WorkPoolMembership, interceptors...)
+}
+
+// Create returns a builder for creating a WorkPoolMembership entity.
+func (c *WorkPoolMembershipClient) Create() *WorkPoolMembershipCreate {
+	mutation := newWorkPoolMembershipMutation(c.config, OpCreate)
+	return &WorkPoolMembershipCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of WorkPoolMembership entities.
+func (c *WorkPoolMembershipClient) CreateBulk(builders ...*WorkPoolMembershipCreate) *WorkPoolMembershipCreateBulk {
+	return &WorkPoolMembershipCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *WorkPoolMembershipClient) MapCreateBulk(slice any, setFunc func(*WorkPoolMembershipCreate, int)) *WorkPoolMembershipCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &WorkPoolMembershipCreateBulk{err: fmt.Errorf("calling to WorkPoolMembershipClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*WorkPoolMembershipCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &WorkPoolMembershipCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for WorkPoolMembership.
+func (c *WorkPoolMembershipClient) Update() *WorkPoolMembershipUpdate {
+	mutation := newWorkPoolMembershipMutation(c.config, OpUpdate)
+	return &WorkPoolMembershipUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *WorkPoolMembershipClient) UpdateOne(_m *WorkPoolMembership) *WorkPoolMembershipUpdateOne {
+	mutation := newWorkPoolMembershipMutation(c.config, OpUpdateOne, withWorkPoolMembership(_m))
+	return &WorkPoolMembershipUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *WorkPoolMembershipClient) UpdateOneID(id int) *WorkPoolMembershipUpdateOne {
+	mutation := newWorkPoolMembershipMutation(c.config, OpUpdateOne, withWorkPoolMembershipID(id))
+	return &WorkPoolMembershipUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for WorkPoolMembership.
+func (c *WorkPoolMembershipClient) Delete() *WorkPoolMembershipDelete {
+	mutation := newWorkPoolMembershipMutation(c.config, OpDelete)
+	return &WorkPoolMembershipDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *WorkPoolMembershipClient) DeleteOne(_m *WorkPoolMembership) *WorkPoolMembershipDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *WorkPoolMembershipClient) DeleteOneID(id int) *WorkPoolMembershipDeleteOne {
+	builder := c.Delete().Where(workpoolmembership.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &WorkPoolMembershipDeleteOne{builder}
+}
+
+// Query returns a query builder for WorkPoolMembership.
+func (c *WorkPoolMembershipClient) Query() *WorkPoolMembershipQuery {
+	return &WorkPoolMembershipQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeWorkPoolMembership},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a WorkPoolMembership entity by its id.
+func (c *WorkPoolMembershipClient) Get(ctx context.Context, id int) (*WorkPoolMembership, error) {
+	return c.Query().Where(workpoolmembership.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *WorkPoolMembershipClient) GetX(ctx context.Context, id int) *WorkPoolMembership {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *WorkPoolMembershipClient) Hooks() []Hook {
+	return c.hooks.WorkPoolMembership
+}
+
+// Interceptors returns the client interceptors.
+func (c *WorkPoolMembershipClient) Interceptors() []Interceptor {
+	return c.inters.WorkPoolMembership
+}
+
+func (c *WorkPoolMembershipClient) mutate(ctx context.Context, m *WorkPoolMembershipMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&WorkPoolMembershipCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&WorkPoolMembershipUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&WorkPoolMembershipUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&WorkPoolMembershipDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown WorkPoolMembership mutation op: %q", m.Op())
+	}
+}
+
 // WorkflowBusinessStateClient is a client for the WorkflowBusinessState schema.
 type WorkflowBusinessStateClient struct {
 	config
@@ -8874,26 +10040,33 @@ func (c *WorkflowTaskEventClient) mutate(ctx context.Context, m *WorkflowTaskEve
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		AdminUser, AdminUserRole, BOMHeader, BOMItem, BusinessAttachment, Contact,
-		Customer, FinanceFact, InventoryBalance, InventoryLot, InventoryTxn, Material,
-		OutsourcingFact, OutsourcingOrder, OutsourcingOrderItem, Permission, Process,
-		Product, ProductSKU, ProductionFact, PurchaseOrder, PurchaseOrderItem,
-		PurchaseReceipt, PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem,
-		PurchaseReceiptItem, PurchaseReturn, PurchaseReturnItem, QualityInspection,
-		Role, RolePermission, RuntimeAuditEvent, RuntimeMarker, SalesOrder,
-		SalesOrderItem, Shipment, ShipmentItem, StockReservation, Supplier, Unit,
-		Warehouse, WorkflowBusinessState, WorkflowTask, WorkflowTaskEvent []ent.Hook
+		AccessEntitlement, AdminUser, AdminUserRole, BOMHeader, BOMItem,
+		BusinessAttachment, Contact, Customer, CustomerConfigRevision,
+		DeploymentModuleState, FinanceFact, InventoryBalance, InventoryLot,
+		InventoryTxn, Material, OutsourcingFact, OutsourcingOrder,
+		OutsourcingOrderItem, Permission, Process, ProcessInstance,
+		ProcessNodeInstance, Product, ProductSKU, ProductionFact, PurchaseOrder,
+		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
+		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
+		PurchaseReturnItem, QualityInspection, Role, RolePermission, RoleProfile,
+		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
+		ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
+		WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
+		WorkflowTaskEvent []ent.Hook
 	}
 	inters struct {
-		AdminUser, AdminUserRole, BOMHeader, BOMItem, BusinessAttachment, Contact,
-		Customer, FinanceFact, InventoryBalance, InventoryLot, InventoryTxn, Material,
-		OutsourcingFact, OutsourcingOrder, OutsourcingOrderItem, Permission, Process,
-		Product, ProductSKU, ProductionFact, PurchaseOrder, PurchaseOrderItem,
-		PurchaseReceipt, PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem,
-		PurchaseReceiptItem, PurchaseReturn, PurchaseReturnItem, QualityInspection,
-		Role, RolePermission, RuntimeAuditEvent, RuntimeMarker, SalesOrder,
-		SalesOrderItem, Shipment, ShipmentItem, StockReservation, Supplier, Unit,
-		Warehouse, WorkflowBusinessState, WorkflowTask,
+		AccessEntitlement, AdminUser, AdminUserRole, BOMHeader, BOMItem,
+		BusinessAttachment, Contact, Customer, CustomerConfigRevision,
+		DeploymentModuleState, FinanceFact, InventoryBalance, InventoryLot,
+		InventoryTxn, Material, OutsourcingFact, OutsourcingOrder,
+		OutsourcingOrderItem, Permission, Process, ProcessInstance,
+		ProcessNodeInstance, Product, ProductSKU, ProductionFact, PurchaseOrder,
+		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
+		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
+		PurchaseReturnItem, QualityInspection, Role, RolePermission, RoleProfile,
+		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
+		ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
+		WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
 		WorkflowTaskEvent []ent.Interceptor
 	}
 )

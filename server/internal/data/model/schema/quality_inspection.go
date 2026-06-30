@@ -23,6 +23,11 @@ var qualityInspectionLockedFields = map[string]struct{}{
 	"inventory_lot_id":         {},
 	"material_id":              {},
 	"warehouse_id":             {},
+	"source_type":              {},
+	"source_id":                {},
+	"inspection_type":          {},
+	"subject_type":             {},
+	"subject_id":               {},
 	"status":                   {},
 	"result":                   {},
 	"original_lot_status":      {},
@@ -53,6 +58,8 @@ func (QualityInspection) Fields() []ent.Field {
 			NotEmpty().
 			MaxLen(64),
 		field.Int("purchase_receipt_id").
+			Optional().
+			Nillable().
 			Positive(),
 		field.Int("purchase_receipt_item_id").
 			Optional().
@@ -61,8 +68,30 @@ func (QualityInspection) Fields() []ent.Field {
 		field.Int("inventory_lot_id").
 			Positive(),
 		field.Int("material_id").
+			Optional().
+			Nillable().
 			Positive(),
 		field.Int("warehouse_id").
+			Positive(),
+		field.String("source_type").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.Int("source_id").
+			Optional().
+			Nillable().
+			Positive(),
+		field.String("inspection_type").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("subject_type").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.Int("subject_id").
+			Optional().
+			Nillable().
 			Positive(),
 		field.String("status").
 			NotEmpty().
@@ -101,7 +130,6 @@ func (QualityInspection) Edges() []ent.Edge {
 		edge.From("purchase_receipt", PurchaseReceipt.Type).
 			Ref("quality_inspections").
 			Field("purchase_receipt_id").
-			Required().
 			Unique().
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("purchase_receipt_item", PurchaseReceiptItem.Type).
@@ -118,7 +146,6 @@ func (QualityInspection) Edges() []ent.Edge {
 		edge.From("material", Material.Type).
 			Ref("quality_inspections").
 			Field("material_id").
-			Required().
 			Unique().
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("warehouse", Warehouse.Type).
@@ -138,6 +165,9 @@ func (QualityInspection) Indexes() []ent.Index {
 		index.Fields("inventory_lot_id"),
 		index.Fields("material_id"),
 		index.Fields("warehouse_id"),
+		index.Fields("source_type", "source_id"),
+		index.Fields("inspection_type"),
+		index.Fields("subject_type", "subject_id"),
 		index.Fields("status"),
 		index.Fields("inspected_at"),
 		// Only one in-flight inspection may hold the same lot at SUBMITTED status.

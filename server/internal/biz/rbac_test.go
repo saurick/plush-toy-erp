@@ -51,6 +51,25 @@ func TestAdminHasPermissionDisabledAdminHasNoPermissions(t *testing.T) {
 	}
 }
 
+func TestNormalizeAdminRoleKeysKeepsConfiguredRoleKeys(t *testing.T) {
+	got := NormalizeAdminRoleKeys([]string{
+		" " + SalesRoleKey + " ",
+		"sample_room_manager",
+		SalesRoleKey,
+		"customer.finance.assistant",
+		"",
+	})
+	want := []string{SalesRoleKey, "sample_room_manager", "customer.finance.assistant"}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d role keys, got %#v", len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected role key at %d: got %q want %q", i, got[i], want[i])
+		}
+	}
+}
+
 func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 	tests := []struct {
 		roleKey string
@@ -103,6 +122,21 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionMobileProductionAccess,
 			},
 			omits: []string{PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+		},
+		{
+			roleKey: EngineeringRoleKey,
+			has: []string{
+				PermissionProcessRead,
+				PermissionProcessCreate,
+				PermissionProductRead,
+				PermissionBOMRead,
+				PermissionBOMUpdate,
+				PermissionWorkflowTaskRead,
+				PermissionWorkflowTaskUpdate,
+				PermissionWorkflowTaskComplete,
+				PermissionMobileEngineeringAccess,
+			},
+			omits: []string{PermissionWorkflowTaskCreate, PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: PurchaseRoleKey,
@@ -184,6 +218,12 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 			assertPermissionSetContains(t, permissionSet, tt.has...)
 			assertPermissionSetOmits(t, permissionSet, tt.omits...)
 		})
+	}
+}
+
+func TestMobileRoleAccessPermissionIncludesEngineering(t *testing.T) {
+	if got := MobileRoleAccessPermission(EngineeringRoleKey); got != PermissionMobileEngineeringAccess {
+		t.Fatalf("expected engineering mobile access permission, got %q", got)
 	}
 }
 

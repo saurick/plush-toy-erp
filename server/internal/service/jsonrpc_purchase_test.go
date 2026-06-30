@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testing.T) {
@@ -22,7 +23,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	data, client := openInventoryRepoTestData(t, "jsonrpc_purchase_receipt")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 
-	j := newPurchaseJSONRPCTestData(data, workflowJSONRPCAdmin(
+	j := newPurchaseJSONRPCTestData(t, data, workflowJSONRPCAdmin(
 		[]string{biz.PurchaseRoleKey},
 		biz.PermissionPurchaseReceiptCreate,
 		biz.PermissionPurchaseReceiptRead,
@@ -360,7 +361,7 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 		t.Fatalf("approve purchase order failed: %v", err)
 	}
 
-	j := newPurchaseJSONRPCTestData(data, workflowJSONRPCAdmin(
+	j := newPurchaseJSONRPCTestData(t, data, workflowJSONRPCAdmin(
 		[]string{biz.PurchaseRoleKey},
 		biz.PermissionPurchaseReceiptCreate,
 		biz.PermissionPurchaseReceiptRead,
@@ -435,7 +436,7 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 
 func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresDomainPermissions(t *testing.T) {
 	data, _ := openInventoryRepoTestData(t, "jsonrpc_purchase_receipt_permissions")
-	j := newPurchaseJSONRPCTestData(data, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionPurchaseReceiptRead))
+	j := newPurchaseJSONRPCTestData(t, data, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionPurchaseReceiptRead))
 
 	_, createRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_draft", "1", mustJSONRPCStruct(t, map[string]any{
 		"receipt_no":    "PR-DENIED",
@@ -457,12 +458,131 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresDomainPermissions(t *testin
 	}
 }
 
-func newPurchaseJSONRPCTestData(data *datarepo.Data, admin *biz.AdminUser) *jsonrpcDispatcher {
+func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresEnabledModules(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "jsonrpc_purchase_receipt_module_gate")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	j := newPurchaseJSONRPCTestData(t, data, workflowJSONRPCAdmin(
+		[]string{biz.PurchaseRoleKey, biz.WarehouseRoleKey},
+		biz.PermissionPurchaseReceiptCreate,
+		biz.PermissionPurchaseReceiptRead,
+		biz.PermissionWarehouseInboundConfirm,
+		biz.PermissionWarehouseInboundRead,
+	))
+	adminCtx := workflowJSONRPCAdminContext()
+
+	readOnlyReceiptConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.28.purchase-receipts-read-only",
+		"purchase_receipts",
+		"read_only",
+	)
+	activatePurchaseTestCustomerConfig(t, j, readOnlyReceiptConfig)
+
+	_, createRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_draft", "read-only-create", mustJSONRPCStruct(t, map[string]any{
+		"receipt_no":    "PR-MODULE-READONLY",
+		"supplier_name": "模块只读供应商",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected module read_only create rejected, got %#v", createRes)
+	}
+	if count := client.PurchaseReceipt.Query().Where(purchasereceipt.ReceiptNo("PR-MODULE-READONLY")).CountX(ctx); count != 0 {
+		t.Fatalf("read_only purchase_receipts must not create purchase receipt, got %d", count)
+	}
+
+	enabledConfig := customerConfigPublishParamsForRevision(t, "2026.06.28.purchase-modules-enabled")
+	activatePurchaseTestCustomerConfig(t, j, enabledConfig)
+	_, receiptRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_draft", "enabled-create", mustJSONRPCStruct(t, map[string]any{
+		"receipt_no":    "PR-MODULE-ENABLED",
+		"supplier_name": "模块启用供应商",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if receiptRes == nil || receiptRes.Code != errcode.OK.Code {
+		t.Fatalf("expected enabled create OK, got %#v", receiptRes)
+	}
+	receiptID := jsonRPCInt(t, jsonRPCNestedMap(t, receiptRes, "purchase_receipt"), "id")
+	_, itemRes, err := j.handlePurchase(adminCtx, "add_purchase_receipt_item", "enabled-line", mustJSONRPCStruct(t, map[string]any{
+		"receipt_id":   float64(receiptID),
+		"material_id":  float64(fixtures.materialID),
+		"warehouse_id": float64(fixtures.warehouseID),
+		"unit_id":      float64(fixtures.unitID),
+		"lot_no":       "PR-MODULE-ENABLED-LOT",
+		"quantity":     "2",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if itemRes == nil || itemRes.Code != errcode.OK.Code {
+		t.Fatalf("expected enabled add item OK, got %#v", itemRes)
+	}
+
+	readOnlyInventoryConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.28.inventory-read-only",
+		"inventory",
+		"read_only",
+	)
+	activatePurchaseTestCustomerConfig(t, j, readOnlyInventoryConfig)
+
+	_, postRes, err := j.handlePurchase(adminCtx, "post_purchase_receipt", "inventory-read-only-post", mustJSONRPCStruct(t, map[string]any{
+		"id": float64(receiptID),
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if postRes == nil || postRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected inventory read_only post rejected, got %#v", postRes)
+	}
+	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.PurchaseReceiptSourceType), inventorytxn.SourceID(receiptID)).CountX(ctx); count != 0 {
+		t.Fatalf("inventory read_only post must not write inventory txns, got %d", count)
+	}
+
+	_, getRes, err := j.handlePurchase(adminCtx, "get_purchase_receipt", "read-after-disabled", mustJSONRPCStruct(t, map[string]any{
+		"id": float64(receiptID),
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err getting historical receipt, got %v", err)
+	}
+	if getRes == nil || getRes.Code != errcode.OK.Code {
+		t.Fatalf("expected get to remain available for historical read, got %#v", getRes)
+	}
+}
+
+func newPurchaseJSONRPCTestData(t *testing.T, data *datarepo.Data, admin *biz.AdminUser) *jsonrpcDispatcher {
+	t.Helper()
 	logger := log.NewStdLogger(io.Discard)
-	return &jsonrpcDispatcher{
-		log:         log.NewHelper(log.With(logger, "module", "service.jsonrpc.purchase.test")),
-		adminReader: stubAdminAccountReader{admin: admin},
-		inventoryUC: biz.NewInventoryUsecase(datarepo.NewInventoryRepo(data, logger)),
+	customerConfigUC := biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo())
+	dispatcher := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(logger, "module", "service.jsonrpc.purchase.test")),
+		adminReader:      stubAdminAccountReader{admin: admin},
+		inventoryUC:      biz.NewInventoryUsecase(datarepo.NewInventoryRepo(data, logger)),
+		customerConfigUC: customerConfigUC,
+	}
+	activatePurchaseTestCustomerConfig(t, dispatcher, customerConfigPublishParams(t))
+	return dispatcher
+}
+
+func activatePurchaseTestCustomerConfig(t *testing.T, dispatcher *jsonrpcDispatcher, params *structpb.Struct) {
+	t.Helper()
+	if dispatcher == nil || dispatcher.customerConfigUC == nil {
+		t.Fatalf("customerConfigUC missing")
+	}
+	in, ok := customerConfigPublishInputFromParams(params.AsMap())
+	if !ok {
+		t.Fatalf("invalid customer config params: %#v", params.AsMap())
+	}
+	if _, err := dispatcher.customerConfigUC.PublishCustomerConfig(context.Background(), in, 1); err != nil {
+		t.Fatalf("publish customer config %s err = %v", in.Revision, err)
+	}
+	if _, err := dispatcher.customerConfigUC.ActivateCustomerConfig(context.Background(), in.CustomerKey, in.Revision, 1); err != nil {
+		t.Fatalf("activate customer config %s err = %v", in.Revision, err)
 	}
 }
 

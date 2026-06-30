@@ -48,6 +48,9 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		if res := d.requireBusinessAttachmentOwnerPermission(ctx, ownerType, true); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireBusinessAttachmentOwnerModuleEnabled(ctx, getString(pm, "customer_key"), ownerType); res != nil {
+			return id, res, nil
+		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -89,6 +92,9 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		if res := d.requireBusinessAttachmentOwnerPermission(ctx, item.OwnerType, true); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireBusinessAttachmentOwnerModuleEnabled(ctx, getString(pm, "customer_key"), item.OwnerType); res != nil {
+			return id, res, nil
+		}
 		if err := d.attachmentUC.DeleteBusinessAttachment(ctx, item.ID); err != nil {
 			return id, d.mapBusinessAttachmentError(ctx, err), nil
 		}
@@ -111,6 +117,14 @@ func optionalStringFromParams(pm map[string]any, key string) *string {
 	return &text
 }
 
+func (d *jsonrpcDispatcher) requireBusinessAttachmentOwnerModuleEnabled(ctx context.Context, customerKey string, ownerType string) *v1.JsonrpcResult {
+	moduleKeys := businessAttachmentOwnerModuleKeys(ownerType)
+	if len(moduleKeys) == 0 {
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	return d.requireCustomerConfigModulesEnabled(ctx, customerKey, moduleKeys...)
+}
+
 func (d *jsonrpcDispatcher) requireBusinessAttachmentOwnerPermission(ctx context.Context, ownerType string, write bool) *v1.JsonrpcResult {
 	if !biz.IsBusinessAttachmentOwnerTypeAllowed(ownerType) {
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
@@ -119,6 +133,35 @@ func (d *jsonrpcDispatcher) requireBusinessAttachmentOwnerPermission(ctx context
 		return d.RequireAdminAnyPermission(ctx, businessAttachmentWritePermissions(ownerType)...)
 	}
 	return d.RequireAdminAnyPermission(ctx, businessAttachmentReadPermissions(ownerType)...)
+}
+
+func businessAttachmentOwnerModuleKeys(ownerType string) []string {
+	switch ownerType {
+	case biz.BusinessAttachmentOwnerSalesOrder:
+		return []string{"sales_orders"}
+	case biz.BusinessAttachmentOwnerPurchaseOrder:
+		return []string{"purchase_orders"}
+	case biz.BusinessAttachmentOwnerOutsourcingOrder, biz.BusinessAttachmentOwnerOutsourcingFact:
+		return []string{"outsourcing_orders"}
+	case biz.BusinessAttachmentOwnerPurchaseReceipt:
+		return []string{"purchase_receipts"}
+	case biz.BusinessAttachmentOwnerQualityInspection:
+		return []string{"quality_inspections"}
+	case biz.BusinessAttachmentOwnerShipment:
+		return []string{"shipments"}
+	case biz.BusinessAttachmentOwnerFinanceFact:
+		return []string{"finance"}
+	case biz.BusinessAttachmentOwnerProductionFact:
+		return []string{"production"}
+	case biz.BusinessAttachmentOwnerProductSKU:
+		return []string{"products"}
+	case biz.BusinessAttachmentOwnerBOMHeader:
+		return []string{"material_bom"}
+	case biz.BusinessAttachmentOwnerWorkflowTask:
+		return []string{"workflow_tasks"}
+	default:
+		return nil
+	}
 }
 
 func businessAttachmentReadPermissions(ownerType string) []string {

@@ -18,10 +18,16 @@ func (d *jsonrpcDispatcher) handleMasterDataProcess(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProcesses); res != nil {
+			return id, res, nil
+		}
 		item, err := d.masterDataUC.CreateProcess(ctx, processMutationFromParams(pm))
 		return id, processMutationResult(ctx, d, item, err), nil
 	case "update_process", "updateProcess":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProcesses); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.UpdateProcess(ctx, getInt(pm, "id", 0), processMutationFromParams(pm))
@@ -48,6 +54,9 @@ func (d *jsonrpcDispatcher) handleMasterDataProcess(
 		})}, nil
 	case "set_process_active", "setProcessActive":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessDisable); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProcesses); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.SetProcessActive(ctx, getInt(pm, "id", 0), getBool(pm, "active", true))

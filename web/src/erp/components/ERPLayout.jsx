@@ -48,7 +48,14 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import { resolveMenuPermissionKey } from '../config/menuPermissions.mjs'
 import { getNavigationSections } from '../config/seedData.mjs'
-import { getAdminProfileSyncErrorAction } from '../utils/adminProfileSync.mjs'
+import { getEffectiveSession } from '../api/customerConfigApi.mjs'
+import {
+  attachEffectiveSessionToAdminProfile,
+  attachUnavailableEffectiveSessionToAdminProfile,
+  filterNavigationSectionsByAdminProfile,
+  getAdminProfileSyncErrorAction,
+  shouldRedirectFromCurrentNavigation,
+} from '../utils/adminProfileSync.mjs'
 
 const { Content, Header, Sider } = Layout
 const { Paragraph, Text } = Typography
@@ -187,7 +194,41 @@ export default function ERPLayout() {
     setProfileLoading(true)
     try {
       const result = await adminRpc.call('me', {})
-      const nextProfile = result?.data || null
+      let nextProfile = result?.data || null
+      if (nextProfile) {
+        try {
+          const effectiveSession = await getEffectiveSession({
+            customer_key: activeBrand?.customerKey || 'yoyoosun',
+          })
+          nextProfile = attachEffectiveSessionToAdminProfile(
+            nextProfile,
+            effectiveSession
+          )
+        } catch (sessionError) {
+          const syncErrorAction = getAdminProfileSyncErrorAction(sessionError, {
+            hasCachedProfile: Boolean(nextProfile || adminProfileRef.current),
+            alreadyNotified: profileSyncErrorNotifiedRef.current,
+          })
+          if (syncErrorAction === 'reauth') {
+            throw sessionError
+          }
+          console.warn(
+            '客户有效配置同步失败，继续使用缓存投影或空投影',
+            sessionError
+          )
+          const cachedEffectiveSession =
+            adminProfileRef.current?.effective_session &&
+            typeof adminProfileRef.current.effective_session === 'object'
+              ? adminProfileRef.current.effective_session
+              : null
+          nextProfile = cachedEffectiveSession
+            ? attachEffectiveSessionToAdminProfile(
+                nextProfile,
+                cachedEffectiveSession
+              )
+            : attachUnavailableEffectiveSessionToAdminProfile(nextProfile)
+        }
+      }
       if (nextProfile) {
         persistAuthMeta(
           {
@@ -244,7 +285,7 @@ export default function ERPLayout() {
       setProfileLoading(false)
       setProfileSyncCompleted(true)
     }
-  }, [adminRpc])
+  }, [activeBrand?.customerKey, adminRpc])
 
   useEffect(() => {
     loadProfile()
@@ -261,19 +302,13 @@ export default function ERPLayout() {
   )
 
   const visibleSections = useMemo(() => {
-    if (isSuperAdmin) {
-      return navigationSections
-    }
-
-    return navigationSections
-      .map((section) => ({
-        ...section,
-        items: section.items.filter((item) =>
-          allowedMenuPaths.includes(item.path)
-        ),
-      }))
-      .filter((section) => section.items.length > 0)
-  }, [allowedMenuPaths, isSuperAdmin, navigationSections])
+    return filterNavigationSectionsByAdminProfile({
+      navigationSections,
+      adminProfile,
+      allowedMenuPaths,
+      isSuperAdmin,
+    })
+  }, [adminProfile, allowedMenuPaths, isSuperAdmin, navigationSections])
 
   const currentMenuPath = useMemo(
     () => resolveMenuPermissionKey(location.pathname),
@@ -281,10 +316,15 @@ export default function ERPLayout() {
   )
 
   useEffect(() => {
-    if (profileLoading || isSuperAdmin) {
-      return
-    }
-    if (!currentMenuPath || allowedMenuPaths.includes(currentMenuPath)) {
+    const shouldRedirect = shouldRedirectFromCurrentNavigation({
+      profileLoading,
+      adminProfile,
+      allowedMenuPaths,
+      isSuperAdmin,
+      currentMenuPath,
+      currentPageKey: currentEntry?.key || '',
+    })
+    if (!shouldRedirect) {
       return
     }
     const fallbackPath = visibleSections[0]?.items[0]?.path || ''
@@ -293,6 +333,8 @@ export default function ERPLayout() {
     }
   }, [
     allowedMenuPaths,
+    adminProfile,
+    currentEntry?.key,
     currentMenuPath,
     isSuperAdmin,
     location.pathname,
@@ -484,7 +526,7 @@ export default function ERPLayout() {
         .join(' / ') || '普通管理员'
   const displayUsername =
     adminProfile?.username || tokenAdmin?.username || 'admin'
-  const noVisibleMenus = !isSuperAdmin && visibleSections.length === 0
+  const noVisibleMenus = visibleSections.length === 0
 
   if (profileLoading && !adminProfile) {
     return (
@@ -581,8 +623,8 @@ export default function ERPLayout() {
               <Alert
                 type="warning"
                 showIcon
-                message="当前账号暂无后台入口权限"
-                description="请联系管理员在“系统管理 / 权限管理”里为该账号分配角色。"
+                message="当前账号暂无可见后台入口"
+                description="请确认账号角色权限和当前客户有效配置的页面清单；若客户配置同步失败，请稍后刷新或联系管理员复核 active revision。"
               />
             ) : (
               <Outlet context={outletContext} />

@@ -21,6 +21,9 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts"); res != nil {
+			return id, res, nil
+		}
 		item, err := d.inventoryUC.CreatePurchaseReceiptDraft(ctx, in)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
 	case "create_purchase_receipt_with_items", "createPurchaseReceiptWithItems":
@@ -35,6 +38,9 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts"); res != nil {
+			return id, res, nil
+		}
 		item, err := d.inventoryUC.CreatePurchaseReceiptWithItems(ctx, in, items)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
 	case "create_purchase_receipt_from_purchase_order", "createPurchaseReceiptFromPurchaseOrder":
@@ -44,6 +50,9 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		in, ok := purchaseReceiptFromPurchaseOrderCreateFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_orders", "purchase_receipts"); res != nil {
+			return id, res, nil
 		}
 		item, err := d.inventoryUC.CreatePurchaseReceiptFromPurchaseOrder(ctx, in)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
@@ -55,16 +64,25 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts"); res != nil {
+			return id, res, nil
+		}
 		item, err := d.inventoryUC.AddPurchaseReceiptItem(ctx, in)
 		return id, purchaseReceiptItemResult(ctx, d, item, err), nil
 	case "post_purchase_receipt", "postPurchaseReceipt":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptCreate, biz.PermissionWarehouseInboundConfirm); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "inventory"); res != nil {
+			return id, res, nil
+		}
 		item, err := d.inventoryUC.PostPurchaseReceipt(ctx, getInt(pm, "id", 0))
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
 	case "cancel_purchase_receipt", "cancelPurchaseReceipt":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptCreate, biz.PermissionWarehouseInboundConfirm); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "inventory"); res != nil {
 			return id, res, nil
 		}
 		item, err := d.inventoryUC.CancelPostedPurchaseReceipt(ctx, getInt(pm, "id", 0))

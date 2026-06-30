@@ -36,6 +36,16 @@ type WorkflowTask struct {
 	TaskStatusKey string `json:"task_status_key,omitempty"`
 	// OwnerRoleKey holds the value of the "owner_role_key" field.
 	OwnerRoleKey string `json:"owner_role_key,omitempty"`
+	// OwnerPoolKey holds the value of the "owner_pool_key" field.
+	OwnerPoolKey *string `json:"owner_pool_key,omitempty"`
+	// RequiredCapabilityKey holds the value of the "required_capability_key" field.
+	RequiredCapabilityKey *string `json:"required_capability_key,omitempty"`
+	// ConfigRevision holds the value of the "config_revision" field.
+	ConfigRevision *string `json:"config_revision,omitempty"`
+	// ProcessInstanceID holds the value of the "process_instance_id" field.
+	ProcessInstanceID *int `json:"process_instance_id,omitempty"`
+	// ProcessNodeInstanceID holds the value of the "process_node_instance_id" field.
+	ProcessNodeInstanceID *int `json:"process_node_instance_id,omitempty"`
 	// AssigneeID holds the value of the "assignee_id" field.
 	AssigneeID *int `json:"assignee_id,omitempty"`
 	// Priority holds the value of the "priority" field.
@@ -91,9 +101,9 @@ func (*WorkflowTask) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case workflowtask.FieldPayload:
 			values[i] = new([]byte)
-		case workflowtask.FieldID, workflowtask.FieldSourceID, workflowtask.FieldAssigneeID, workflowtask.FieldPriority, workflowtask.FieldCreatedBy, workflowtask.FieldUpdatedBy:
+		case workflowtask.FieldID, workflowtask.FieldSourceID, workflowtask.FieldProcessInstanceID, workflowtask.FieldProcessNodeInstanceID, workflowtask.FieldAssigneeID, workflowtask.FieldPriority, workflowtask.FieldCreatedBy, workflowtask.FieldUpdatedBy:
 			values[i] = new(sql.NullInt64)
-		case workflowtask.FieldTaskCode, workflowtask.FieldTaskGroup, workflowtask.FieldTaskName, workflowtask.FieldSourceType, workflowtask.FieldSourceNo, workflowtask.FieldBusinessStatusKey, workflowtask.FieldTaskStatusKey, workflowtask.FieldOwnerRoleKey, workflowtask.FieldBlockedReason:
+		case workflowtask.FieldTaskCode, workflowtask.FieldTaskGroup, workflowtask.FieldTaskName, workflowtask.FieldSourceType, workflowtask.FieldSourceNo, workflowtask.FieldBusinessStatusKey, workflowtask.FieldTaskStatusKey, workflowtask.FieldOwnerRoleKey, workflowtask.FieldOwnerPoolKey, workflowtask.FieldRequiredCapabilityKey, workflowtask.FieldConfigRevision, workflowtask.FieldBlockedReason:
 			values[i] = new(sql.NullString)
 		case workflowtask.FieldDueAt, workflowtask.FieldStartedAt, workflowtask.FieldCompletedAt, workflowtask.FieldClosedAt, workflowtask.FieldCreatedAt, workflowtask.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -173,6 +183,41 @@ func (_m *WorkflowTask) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field owner_role_key", values[i])
 			} else if value.Valid {
 				_m.OwnerRoleKey = value.String
+			}
+		case workflowtask.FieldOwnerPoolKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field owner_pool_key", values[i])
+			} else if value.Valid {
+				_m.OwnerPoolKey = new(string)
+				*_m.OwnerPoolKey = value.String
+			}
+		case workflowtask.FieldRequiredCapabilityKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field required_capability_key", values[i])
+			} else if value.Valid {
+				_m.RequiredCapabilityKey = new(string)
+				*_m.RequiredCapabilityKey = value.String
+			}
+		case workflowtask.FieldConfigRevision:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field config_revision", values[i])
+			} else if value.Valid {
+				_m.ConfigRevision = new(string)
+				*_m.ConfigRevision = value.String
+			}
+		case workflowtask.FieldProcessInstanceID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field process_instance_id", values[i])
+			} else if value.Valid {
+				_m.ProcessInstanceID = new(int)
+				*_m.ProcessInstanceID = int(value.Int64)
+			}
+		case workflowtask.FieldProcessNodeInstanceID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field process_node_instance_id", values[i])
+			} else if value.Valid {
+				_m.ProcessNodeInstanceID = new(int)
+				*_m.ProcessNodeInstanceID = int(value.Int64)
 			}
 		case workflowtask.FieldAssigneeID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -327,6 +372,31 @@ func (_m *WorkflowTask) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("owner_role_key=")
 	builder.WriteString(_m.OwnerRoleKey)
+	builder.WriteString(", ")
+	if v := _m.OwnerPoolKey; v != nil {
+		builder.WriteString("owner_pool_key=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.RequiredCapabilityKey; v != nil {
+		builder.WriteString("required_capability_key=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ConfigRevision; v != nil {
+		builder.WriteString("config_revision=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ProcessInstanceID; v != nil {
+		builder.WriteString("process_instance_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ProcessNodeInstanceID; v != nil {
+		builder.WriteString("process_node_instance_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.AssigneeID; v != nil {
 		builder.WriteString("assignee_id=")

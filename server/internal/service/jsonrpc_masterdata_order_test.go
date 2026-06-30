@@ -16,24 +16,45 @@ import (
 )
 
 type stubMasterDataJSONRPCRepo struct {
-	customerExists bool
-	supplierExists bool
-	productActive  bool
-	unitActive     bool
-	createdProcess *biz.ProcessMutation
-	createdProduct *biz.ProductMutation
-	createdSKU     *biz.ProductSKUMutation
-	createdContact *biz.ContactMutation
-	savedCustomer  *biz.CustomerMutation
-	savedSupplier  *biz.SupplierMutation
-	savedContacts  []*biz.ContactSaveMutation
+	customerExists      bool
+	supplierExists      bool
+	productActive       bool
+	unitActive          bool
+	contactOwnerType    string
+	createdCustomer     *biz.CustomerMutation
+	updatedCustomer     *biz.CustomerMutation
+	customerActiveCalls int
+	createdSupplier     *biz.SupplierMutation
+	updatedSupplier     *biz.SupplierMutation
+	supplierActiveCalls int
+	createdMaterial     *biz.MaterialMutation
+	updatedMaterial     *biz.MaterialMutation
+	materialActiveCalls int
+	createdProcess      *biz.ProcessMutation
+	updatedProcess      *biz.ProcessMutation
+	processActiveCalls  int
+	createdProduct      *biz.ProductMutation
+	updatedProduct      *biz.ProductMutation
+	productActiveCalls  int
+	createdSKU          *biz.ProductSKUMutation
+	updatedSKU          *biz.ProductSKUMutation
+	skuActiveCalls      int
+	createdContact      *biz.ContactMutation
+	updatedContact      *biz.ContactMutation
+	setPrimaryCalls     int
+	disableContactCalls int
+	savedCustomer       *biz.CustomerMutation
+	savedSupplier       *biz.SupplierMutation
+	savedContacts       []*biz.ContactSaveMutation
 }
 
 func (s *stubMasterDataJSONRPCRepo) CreateCustomer(_ context.Context, in *biz.CustomerMutation) (*biz.Customer, error) {
+	s.createdCustomer = in
 	return &biz.Customer{ID: 1, Code: in.Code, Name: in.Name, DefaultPaymentMethod: in.DefaultPaymentMethod, DefaultPaymentTermDays: in.DefaultPaymentTermDays, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 
 func (s *stubMasterDataJSONRPCRepo) UpdateCustomer(_ context.Context, id int, in *biz.CustomerMutation) (*biz.Customer, error) {
+	s.updatedCustomer = in
 	return &biz.Customer{ID: id, Code: in.Code, Name: in.Name, DefaultPaymentMethod: in.DefaultPaymentMethod, DefaultPaymentTermDays: in.DefaultPaymentTermDays, IsActive: true}, nil
 }
 
@@ -73,6 +94,7 @@ func (s *stubMasterDataJSONRPCRepo) ListCustomers(context.Context, biz.MasterDat
 }
 
 func (s *stubMasterDataJSONRPCRepo) SetCustomerActive(_ context.Context, id int, active bool) (*biz.Customer, error) {
+	s.customerActiveCalls++
 	return &biz.Customer{ID: id, Code: "C001", Name: "客户", IsActive: active}, nil
 }
 
@@ -81,10 +103,12 @@ func (s *stubMasterDataJSONRPCRepo) CustomerExists(context.Context, int) (bool, 
 }
 
 func (s *stubMasterDataJSONRPCRepo) CreateSupplier(_ context.Context, in *biz.SupplierMutation) (*biz.Supplier, error) {
+	s.createdSupplier = in
 	return &biz.Supplier{ID: 1, Code: in.Code, Name: in.Name, IsActive: true}, nil
 }
 
 func (s *stubMasterDataJSONRPCRepo) UpdateSupplier(_ context.Context, id int, in *biz.SupplierMutation) (*biz.Supplier, error) {
+	s.updatedSupplier = in
 	return &biz.Supplier{ID: id, Code: in.Code, Name: in.Name, IsActive: true}, nil
 }
 
@@ -120,6 +144,7 @@ func (s *stubMasterDataJSONRPCRepo) ListSuppliers(context.Context, biz.MasterDat
 }
 
 func (s *stubMasterDataJSONRPCRepo) SetSupplierActive(_ context.Context, id int, active bool) (*biz.Supplier, error) {
+	s.supplierActiveCalls++
 	return &biz.Supplier{ID: id, Code: "S001", Name: "供应商", IsActive: active}, nil
 }
 
@@ -128,10 +153,12 @@ func (s *stubMasterDataJSONRPCRepo) SupplierExists(context.Context, int) (bool, 
 }
 
 func (s *stubMasterDataJSONRPCRepo) CreateMaterial(_ context.Context, in *biz.MaterialMutation) (*biz.Material, error) {
+	s.createdMaterial = in
 	return &biz.Material{ID: 1, Code: in.Code, Name: in.Name, DefaultUnitID: in.DefaultUnitID, IsActive: true}, nil
 }
 
 func (s *stubMasterDataJSONRPCRepo) UpdateMaterial(_ context.Context, id int, in *biz.MaterialMutation) (*biz.Material, error) {
+	s.updatedMaterial = in
 	return &biz.Material{ID: id, Code: in.Code, Name: in.Name, DefaultUnitID: in.DefaultUnitID, IsActive: true}, nil
 }
 
@@ -144,6 +171,7 @@ func (s *stubMasterDataJSONRPCRepo) ListMaterials(context.Context, biz.MasterDat
 }
 
 func (s *stubMasterDataJSONRPCRepo) SetMaterialActive(_ context.Context, id int, active bool) (*biz.Material, error) {
+	s.materialActiveCalls++
 	return &biz.Material{ID: id, Code: "M001", Name: "材料", DefaultUnitID: 1, IsActive: active}, nil
 }
 
@@ -166,6 +194,7 @@ func (s *stubMasterDataJSONRPCRepo) CreateProcess(_ context.Context, in *biz.Pro
 	return &biz.Process{ID: 1, Code: in.Code, Name: in.Name, Category: in.Category, OutsourcingEnabled: in.OutsourcingEnabled, InhouseEnabled: in.InhouseEnabled, QualityRequired: in.QualityRequired, SortOrder: in.SortOrder, Note: in.Note, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 func (s *stubMasterDataJSONRPCRepo) UpdateProcess(_ context.Context, id int, in *biz.ProcessMutation) (*biz.Process, error) {
+	s.updatedProcess = in
 	return &biz.Process{ID: id, Code: in.Code, Name: in.Name, Category: in.Category, OutsourcingEnabled: in.OutsourcingEnabled, InhouseEnabled: in.InhouseEnabled, QualityRequired: in.QualityRequired, SortOrder: in.SortOrder, Note: in.Note, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 func (s *stubMasterDataJSONRPCRepo) GetProcess(_ context.Context, id int) (*biz.Process, error) {
@@ -177,6 +206,7 @@ func (s *stubMasterDataJSONRPCRepo) ListProcesses(context.Context, biz.MasterDat
 	return []*biz.Process{{ID: 1, Code: "PROC-001", Name: "车缝", Category: &category, OutsourcingEnabled: true, InhouseEnabled: false, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}}, 1, nil
 }
 func (s *stubMasterDataJSONRPCRepo) SetProcessActive(_ context.Context, id int, active bool) (*biz.Process, error) {
+	s.processActiveCalls++
 	return &biz.Process{ID: id, Code: "PROC-001", Name: "车缝", OutsourcingEnabled: true, IsActive: active, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 func (s *stubMasterDataJSONRPCRepo) ProductIsActive(context.Context, int) (bool, error) {
@@ -190,6 +220,7 @@ func (s *stubMasterDataJSONRPCRepo) CreateProduct(_ context.Context, in *biz.Pro
 	return &biz.Product{ID: 1, Code: in.Code, Name: in.Name, DefaultUnitID: in.DefaultUnitID, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 func (s *stubMasterDataJSONRPCRepo) UpdateProduct(_ context.Context, id int, in *biz.ProductMutation) (*biz.Product, error) {
+	s.updatedProduct = in
 	return &biz.Product{ID: id, Code: in.Code, Name: in.Name, DefaultUnitID: in.DefaultUnitID, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 func (s *stubMasterDataJSONRPCRepo) GetProduct(_ context.Context, id int) (*biz.Product, error) {
@@ -199,6 +230,7 @@ func (s *stubMasterDataJSONRPCRepo) ListProducts(context.Context, biz.MasterData
 	return []*biz.Product{{ID: 1, Code: "P001", Name: "产品", DefaultUnitID: 1, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}}, 1, nil
 }
 func (s *stubMasterDataJSONRPCRepo) SetProductActive(_ context.Context, id int, active bool) (*biz.Product, error) {
+	s.productActiveCalls++
 	return &biz.Product{ID: id, Code: "P001", Name: "产品", DefaultUnitID: 1, IsActive: active, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 func (s *stubMasterDataJSONRPCRepo) CreateProductSKU(_ context.Context, in *biz.ProductSKUMutation) (*biz.ProductSKU, error) {
@@ -206,6 +238,7 @@ func (s *stubMasterDataJSONRPCRepo) CreateProductSKU(_ context.Context, in *biz.
 	return &biz.ProductSKU{ID: 1, ProductID: in.ProductID, SKUCode: in.SKUCode, SKUName: in.SKUName, DefaultUnitID: in.DefaultUnitID, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 func (s *stubMasterDataJSONRPCRepo) UpdateProductSKU(_ context.Context, id int, in *biz.ProductSKUMutation) (*biz.ProductSKU, error) {
+	s.updatedSKU = in
 	return &biz.ProductSKU{ID: id, ProductID: in.ProductID, SKUCode: in.SKUCode, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 func (s *stubMasterDataJSONRPCRepo) GetProductSKU(_ context.Context, id int) (*biz.ProductSKU, error) {
@@ -215,6 +248,7 @@ func (s *stubMasterDataJSONRPCRepo) ListProductSKUs(context.Context, biz.Product
 	return []*biz.ProductSKU{{ID: 1, ProductID: 1, SKUCode: "SKU-001", IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}}, 1, nil
 }
 func (s *stubMasterDataJSONRPCRepo) SetProductSKUActive(_ context.Context, id int, active bool) (*biz.ProductSKU, error) {
+	s.skuActiveCalls++
 	return &biz.ProductSKU{ID: id, ProductID: 1, SKUCode: "SKU-001", IsActive: active, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 
@@ -224,11 +258,16 @@ func (s *stubMasterDataJSONRPCRepo) CreateContact(_ context.Context, in *biz.Con
 }
 
 func (s *stubMasterDataJSONRPCRepo) UpdateContact(_ context.Context, id int, in *biz.ContactMutation) (*biz.Contact, error) {
+	s.updatedContact = in
 	return &biz.Contact{ID: id, OwnerType: in.OwnerType, OwnerID: in.OwnerID, Name: in.Name, IsActive: true, IsPrimary: in.IsPrimary}, nil
 }
 
 func (s *stubMasterDataJSONRPCRepo) GetContact(_ context.Context, id int) (*biz.Contact, error) {
-	return &biz.Contact{ID: id, OwnerType: biz.ContactOwnerCustomer, OwnerID: 1, Name: "联系人", IsActive: true}, nil
+	ownerType := s.contactOwnerType
+	if ownerType == "" {
+		ownerType = biz.ContactOwnerCustomer
+	}
+	return &biz.Contact{ID: id, OwnerType: ownerType, OwnerID: 1, Name: "联系人", IsActive: true}, nil
 }
 
 func (s *stubMasterDataJSONRPCRepo) ListContactsByOwner(context.Context, biz.ContactFilter) ([]*biz.Contact, int, error) {
@@ -236,10 +275,12 @@ func (s *stubMasterDataJSONRPCRepo) ListContactsByOwner(context.Context, biz.Con
 }
 
 func (s *stubMasterDataJSONRPCRepo) SetPrimaryContact(_ context.Context, id int) (*biz.Contact, error) {
+	s.setPrimaryCalls++
 	return &biz.Contact{ID: id, OwnerType: biz.ContactOwnerCustomer, OwnerID: 1, Name: "联系人", IsActive: true, IsPrimary: true}, nil
 }
 
 func (s *stubMasterDataJSONRPCRepo) DisableContact(_ context.Context, id int) (*biz.Contact, error) {
+	s.disableContactCalls++
 	return &biz.Contact{ID: id, OwnerType: biz.ContactOwnerCustomer, OwnerID: 1, Name: "联系人", IsActive: false}, nil
 }
 
@@ -250,6 +291,7 @@ type stubSalesOrderJSONRPCRepo struct {
 	addedItem            *biz.SalesOrderItemMutation
 	savedOrder           *biz.SalesOrderMutation
 	savedItems           []*biz.SalesOrderItemSaveMutation
+	lifecycleStatus      string
 	lastSalesOrderFilter biz.SalesOrderFilter
 }
 
@@ -276,6 +318,7 @@ func (s *stubSalesOrderJSONRPCRepo) ListSalesOrders(_ context.Context, filter bi
 }
 
 func (s *stubSalesOrderJSONRPCRepo) UpdateSalesOrderLifecycle(_ context.Context, id int, lifecycleStatus string) (*biz.SalesOrder, error) {
+	s.lifecycleStatus = lifecycleStatus
 	return &biz.SalesOrder{ID: id, OrderNo: "SO001", CustomerID: 1, OrderDate: time.Unix(1, 0), LifecycleStatus: lifecycleStatus}, nil
 }
 
@@ -347,26 +390,61 @@ func (s *stubSalesOrderJSONRPCRepo) UnitIsActive(context.Context, int) (bool, er
 	return true, nil
 }
 
-func newMasterDataJSONRPCTestData(repo *stubMasterDataJSONRPCRepo, admin *biz.AdminUser) *jsonrpcDispatcher {
-	return &jsonrpcDispatcher{
-		log:          log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.masterdata.test")),
-		adminReader:  stubAdminAccountReader{admin: admin},
-		masterDataUC: biz.NewMasterDataUsecase(repo),
+func newMasterDataJSONRPCTestData(t *testing.T, repo *stubMasterDataJSONRPCRepo, admin *biz.AdminUser) *jsonrpcDispatcher {
+	t.Helper()
+	dispatcher := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.masterdata.test")),
+		adminReader:      stubAdminAccountReader{admin: admin},
+		masterDataUC:     biz.NewMasterDataUsecase(repo),
+		customerConfigUC: biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo()),
 	}
+	params := customerConfigPublishParams(t)
+	for _, moduleKey := range []string{
+		masterDataModuleKeyCustomers,
+		masterDataModuleKeySuppliers,
+		masterDataModuleKeyMaterials,
+		masterDataModuleKeyProducts,
+		masterDataModuleKeyProcesses,
+	} {
+		params = customerConfigPublishParamsWithRevisionAndModuleState(
+			t,
+			params,
+			"2026.06.30.masterdata-enabled",
+			moduleKey,
+			"enabled",
+		)
+	}
+	activateOperationalFactTestCustomerConfig(t, dispatcher, params)
+	return dispatcher
 }
 
-func newSalesOrderJSONRPCTestData(repo *stubSalesOrderJSONRPCRepo, admin *biz.AdminUser) *jsonrpcDispatcher {
-	return &jsonrpcDispatcher{
-		log:          log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.sales_order.test")),
-		adminReader:  stubAdminAccountReader{admin: admin},
-		salesOrderUC: biz.NewSalesOrderUsecase(repo),
+func activateMasterDataTestModuleState(t *testing.T, dispatcher *jsonrpcDispatcher, revision string, moduleKey string, state string) {
+	t.Helper()
+	activateOperationalFactTestCustomerConfig(t, dispatcher, customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		revision,
+		moduleKey,
+		state,
+	))
+}
+
+func newSalesOrderJSONRPCTestData(t *testing.T, repo *stubSalesOrderJSONRPCRepo, admin *biz.AdminUser) *jsonrpcDispatcher {
+	t.Helper()
+	dispatcher := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.sales_order.test")),
+		adminReader:      stubAdminAccountReader{admin: admin},
+		salesOrderUC:     biz.NewSalesOrderUsecase(repo),
+		customerConfigUC: biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo()),
 	}
+	activateOperationalFactTestCustomerConfig(t, dispatcher, customerConfigPublishParams(t))
+	return dispatcher
 }
 
 func TestJsonrpcDispatcher_MasterDataCreateCustomerRequiresAdminAndPermission(t *testing.T) {
 	params := mustJSONRPCStruct(t, map[string]any{"code": "C001", "name": "客户"})
 
-	j := newMasterDataJSONRPCTestData(&stubMasterDataJSONRPCRepo{}, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionCustomerCreate))
+	j := newMasterDataJSONRPCTestData(t, &stubMasterDataJSONRPCRepo{}, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionCustomerCreate))
 	_, unauthRes, err := j.handleMasterData(context.Background(), "create_customer", "1", params)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -386,7 +464,7 @@ func TestJsonrpcDispatcher_MasterDataCreateCustomerRequiresAdminAndPermission(t 
 
 	disabledAdmin := workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionCustomerCreate)
 	disabledAdmin.Disabled = true
-	j = newMasterDataJSONRPCTestData(&stubMasterDataJSONRPCRepo{}, disabledAdmin)
+	j = newMasterDataJSONRPCTestData(t, &stubMasterDataJSONRPCRepo{}, disabledAdmin)
 	_, disabledRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_customer", "3", params)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -395,7 +473,7 @@ func TestJsonrpcDispatcher_MasterDataCreateCustomerRequiresAdminAndPermission(t 
 		t.Fatalf("expected admin disabled, got %#v", disabledRes)
 	}
 
-	j = newMasterDataJSONRPCTestData(&stubMasterDataJSONRPCRepo{}, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionCustomerRead))
+	j = newMasterDataJSONRPCTestData(t, &stubMasterDataJSONRPCRepo{}, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionCustomerRead))
 	_, deniedRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_customer", "4", params)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -404,7 +482,7 @@ func TestJsonrpcDispatcher_MasterDataCreateCustomerRequiresAdminAndPermission(t 
 		t.Fatalf("expected permission denied, got %#v", deniedRes)
 	}
 
-	j = newMasterDataJSONRPCTestData(&stubMasterDataJSONRPCRepo{}, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionCustomerCreate))
+	j = newMasterDataJSONRPCTestData(t, &stubMasterDataJSONRPCRepo{}, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionCustomerCreate))
 	_, okRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_customer", "5", params)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -416,7 +494,7 @@ func TestJsonrpcDispatcher_MasterDataCreateCustomerRequiresAdminAndPermission(t 
 
 func TestJsonrpcDispatcher_ContactAPIUsesUsecaseOwnerGuard(t *testing.T) {
 	repo := &stubMasterDataJSONRPCRepo{customerExists: false}
-	j := newMasterDataJSONRPCTestData(repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionContactCreate))
+	j := newMasterDataJSONRPCTestData(t, repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionContactCreate))
 	params := mustJSONRPCStruct(t, map[string]any{
 		"owner_type": "CUSTOMER",
 		"owner_id":   float64(99),
@@ -450,7 +528,7 @@ func TestJsonrpcDispatcher_SaveCustomerWithContactsUsesAggregateUsecase(t *testi
 		},
 	})
 
-	j := newMasterDataJSONRPCTestData(
+	j := newMasterDataJSONRPCTestData(t,
 		&stubMasterDataJSONRPCRepo{},
 		workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionCustomerCreate, biz.PermissionContactCreate),
 	)
@@ -463,7 +541,7 @@ func TestJsonrpcDispatcher_SaveCustomerWithContactsUsesAggregateUsecase(t *testi
 	}
 
 	repo := &stubMasterDataJSONRPCRepo{}
-	j = newMasterDataJSONRPCTestData(
+	j = newMasterDataJSONRPCTestData(t,
 		repo,
 		workflowJSONRPCAdmin(
 			[]string{biz.SalesRoleKey},
@@ -503,7 +581,7 @@ func TestJsonrpcDispatcher_MaterialAPIRequiresPermissionAndValidUnit(t *testing.
 		"default_unit_id": float64(1),
 	})
 
-	j := newMasterDataJSONRPCTestData(&stubMasterDataJSONRPCRepo{unitActive: true}, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionMaterialRead))
+	j := newMasterDataJSONRPCTestData(t, &stubMasterDataJSONRPCRepo{unitActive: true}, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionMaterialRead))
 	_, deniedRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_material", "1", params)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -512,7 +590,7 @@ func TestJsonrpcDispatcher_MaterialAPIRequiresPermissionAndValidUnit(t *testing.
 		t.Fatalf("expected permission denied, got %#v", deniedRes)
 	}
 
-	j = newMasterDataJSONRPCTestData(&stubMasterDataJSONRPCRepo{unitActive: false}, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionMaterialCreate))
+	j = newMasterDataJSONRPCTestData(t, &stubMasterDataJSONRPCRepo{unitActive: false}, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionMaterialCreate))
 	_, invalidUnitRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_material", "2", params)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -521,7 +599,7 @@ func TestJsonrpcDispatcher_MaterialAPIRequiresPermissionAndValidUnit(t *testing.
 		t.Fatalf("expected invalid param for missing unit, got %#v", invalidUnitRes)
 	}
 
-	j = newMasterDataJSONRPCTestData(&stubMasterDataJSONRPCRepo{unitActive: true}, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionMaterialCreate))
+	j = newMasterDataJSONRPCTestData(t, &stubMasterDataJSONRPCRepo{unitActive: true}, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionMaterialCreate))
 	_, okRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_material", "3", params)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -532,7 +610,7 @@ func TestJsonrpcDispatcher_MaterialAPIRequiresPermissionAndValidUnit(t *testing.
 }
 
 func TestJsonrpcDispatcher_ListUnitsUsesMaterialReadPermission(t *testing.T) {
-	j := newMasterDataJSONRPCTestData(
+	j := newMasterDataJSONRPCTestData(t,
 		&stubMasterDataJSONRPCRepo{},
 		workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionSupplierRead),
 	)
@@ -544,7 +622,7 @@ func TestJsonrpcDispatcher_ListUnitsUsesMaterialReadPermission(t *testing.T) {
 		t.Fatalf("expected permission denied, got %#v", deniedRes)
 	}
 
-	j = newMasterDataJSONRPCTestData(
+	j = newMasterDataJSONRPCTestData(t,
 		&stubMasterDataJSONRPCRepo{},
 		workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionMaterialRead),
 	)
@@ -562,7 +640,7 @@ func TestJsonrpcDispatcher_ListUnitsUsesMaterialReadPermission(t *testing.T) {
 }
 
 func TestJsonrpcDispatcher_ListWarehousesUsesInventoryReadPermission(t *testing.T) {
-	j := newMasterDataJSONRPCTestData(
+	j := newMasterDataJSONRPCTestData(t,
 		&stubMasterDataJSONRPCRepo{},
 		workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionMaterialRead),
 	)
@@ -574,7 +652,7 @@ func TestJsonrpcDispatcher_ListWarehousesUsesInventoryReadPermission(t *testing.
 		t.Fatalf("expected permission denied, got %#v", deniedRes)
 	}
 
-	j = newMasterDataJSONRPCTestData(
+	j = newMasterDataJSONRPCTestData(t,
 		&stubMasterDataJSONRPCRepo{},
 		workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWarehouseInventoryRead),
 	)
@@ -602,7 +680,7 @@ func TestJsonrpcDispatcher_ProcessAPIRequiresPermissionAndKeepsFlexibleFlags(t *
 		"sort_order":          float64(20),
 	})
 
-	j := newMasterDataJSONRPCTestData(
+	j := newMasterDataJSONRPCTestData(t,
 		&stubMasterDataJSONRPCRepo{},
 		workflowJSONRPCAdmin([]string{biz.ProductionRoleKey}, biz.PermissionProcessRead),
 	)
@@ -615,7 +693,7 @@ func TestJsonrpcDispatcher_ProcessAPIRequiresPermissionAndKeepsFlexibleFlags(t *
 	}
 
 	repo := &stubMasterDataJSONRPCRepo{}
-	j = newMasterDataJSONRPCTestData(
+	j = newMasterDataJSONRPCTestData(t,
 		repo,
 		workflowJSONRPCAdmin([]string{biz.PMCRoleKey}, biz.PermissionProcessCreate),
 	)
@@ -639,6 +717,290 @@ func TestJsonrpcDispatcher_ProcessAPIRequiresPermissionAndKeepsFlexibleFlags(t *
 	}
 }
 
+func TestJsonrpcDispatcher_ProcessAPIRequiresEnabledModule(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	params := mustJSONRPCStruct(t, map[string]any{
+		"code":                "PROC-MODULE-GATE",
+		"name":                "门禁工序",
+		"outsourcing_enabled": true,
+		"inhouse_enabled":     false,
+	})
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.ProductionRoleKey},
+		biz.PermissionProcessCreate,
+		biz.PermissionProcessUpdate,
+		biz.PermissionProcessDisable,
+		biz.PermissionProcessRead,
+	)
+	repo := &stubMasterDataJSONRPCRepo{}
+	j := newMasterDataJSONRPCTestData(t, repo, admin)
+
+	readOnlyConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.processes-read-only",
+		masterDataModuleKeyProcesses,
+		"read_only",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, readOnlyConfig)
+	_, createRes, err := j.handleMasterData(ctx, "create_process", "read-only-create", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected read_only processes create rejected, got %#v", createRes)
+	}
+	if repo.createdProcess != nil {
+		t.Fatalf("read_only processes must not create process, got %#v", repo.createdProcess)
+	}
+	_, listRes, err := j.handleMasterData(ctx, "list_processes", "read-after-read-only", mustJSONRPCStruct(t, map[string]any{"limit": 20}))
+	if err != nil {
+		t.Fatalf("expected nil err listing historical processes, got %v", err)
+	}
+	if listRes == nil || listRes.Code != errcode.OK.Code {
+		t.Fatalf("expected list_processes to remain available for historical read, got %#v", listRes)
+	}
+
+	enabledConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.processes-enabled",
+		masterDataModuleKeyProcesses,
+		"enabled",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, enabledConfig)
+	_, createRes, err = j.handleMasterData(ctx, "create_process", "enabled-create", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if createRes == nil || createRes.Code != errcode.OK.Code {
+		t.Fatalf("expected enabled processes create OK, got %#v", createRes)
+	}
+	if repo.createdProcess == nil || repo.createdProcess.Code != "PROC-MODULE-GATE" {
+		t.Fatalf("enabled processes must reach create usecase, got %#v", repo.createdProcess)
+	}
+	_, updateRes, err := j.handleMasterData(ctx, "update_process", "enabled-update", mustJSONRPCStruct(t, map[string]any{
+		"id":                  float64(1),
+		"code":                "PROC-MODULE-GATE-2",
+		"name":                "门禁工序更新",
+		"outsourcing_enabled": true,
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if updateRes == nil || updateRes.Code != errcode.OK.Code {
+		t.Fatalf("expected enabled processes update OK, got %#v", updateRes)
+	}
+	if repo.updatedProcess == nil || repo.updatedProcess.Code != "PROC-MODULE-GATE-2" {
+		t.Fatalf("enabled processes must reach update usecase, got %#v", repo.updatedProcess)
+	}
+
+	disabledConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.processes-disabled",
+		masterDataModuleKeyProcesses,
+		"disabled",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, disabledConfig)
+	repo.processActiveCalls = 0
+	_, activeRes, err := j.handleMasterData(ctx, "set_process_active", "disabled-active", mustJSONRPCStruct(t, map[string]any{
+		"id":     float64(1),
+		"active": false,
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if activeRes == nil || activeRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected disabled processes active toggle rejected, got %#v", activeRes)
+	}
+	if repo.processActiveCalls != 0 {
+		t.Fatalf("disabled processes must not toggle active state, calls=%d", repo.processActiveCalls)
+	}
+	_, getRes, err := j.handleMasterData(ctx, "get_process", "read-after-disabled", mustJSONRPCStruct(t, map[string]any{"id": float64(1)}))
+	if err != nil {
+		t.Fatalf("expected nil err reading historical process, got %v", err)
+	}
+	if getRes == nil || getRes.Code != errcode.OK.Code {
+		t.Fatalf("expected get_process to remain available for historical read, got %#v", getRes)
+	}
+}
+
+func TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.SalesRoleKey, biz.PurchaseRoleKey, biz.EngineeringRoleKey},
+		biz.PermissionCustomerCreate,
+		biz.PermissionCustomerUpdate,
+		biz.PermissionCustomerDisable,
+		biz.PermissionCustomerRead,
+		biz.PermissionSupplierCreate,
+		biz.PermissionSupplierUpdate,
+		biz.PermissionSupplierDisable,
+		biz.PermissionSupplierRead,
+		biz.PermissionContactCreate,
+		biz.PermissionContactUpdate,
+		biz.PermissionContactSetPrimary,
+		biz.PermissionContactDisable,
+		biz.PermissionContactRead,
+		biz.PermissionMaterialCreate,
+		biz.PermissionMaterialUpdate,
+		biz.PermissionMaterialDisable,
+		biz.PermissionMaterialRead,
+		biz.PermissionProductCreate,
+		biz.PermissionProductUpdate,
+		biz.PermissionProductDisable,
+		biz.PermissionProductRead,
+		biz.PermissionProductSKUCreate,
+		biz.PermissionProductSKUUpdate,
+		biz.PermissionProductSKUDisable,
+		biz.PermissionProductSKURead,
+	)
+	customerParams := mustJSONRPCStruct(t, map[string]any{"code": "C-MODULE", "name": "门禁客户"})
+	supplierParams := mustJSONRPCStruct(t, map[string]any{
+		"code": "S-MODULE",
+		"name": "门禁供应商",
+		"contacts": []any{
+			map[string]any{"name": "供应商联系人", "owner_type": biz.ContactOwnerSupplier, "owner_id": float64(1)},
+		},
+	})
+	materialParams := mustJSONRPCStruct(t, map[string]any{"code": "M-MODULE", "name": "门禁材料", "default_unit_id": float64(1)})
+	productParams := mustJSONRPCStruct(t, map[string]any{"code": "P-MODULE", "name": "门禁产品", "default_unit_id": float64(1)})
+	skuParams := mustJSONRPCStruct(t, map[string]any{"product_id": float64(1), "sku_code": "SKU-MODULE", "default_unit_id": float64(1)})
+	supplierContactParams := mustJSONRPCStruct(t, map[string]any{"owner_type": biz.ContactOwnerSupplier, "owner_id": float64(1), "name": "供应商联系人"})
+
+	repo := &stubMasterDataJSONRPCRepo{customerExists: true, supplierExists: true, productActive: true, unitActive: true}
+	j := newMasterDataJSONRPCTestData(t, repo, admin)
+
+	activateMasterDataTestModuleState(t, j, "2026.06.30.masterdata-customers-read-only", masterDataModuleKeyCustomers, "read_only")
+	_, customerCreateRes, err := j.handleMasterData(ctx, "create_customer", "customers-read-only-create", customerParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if customerCreateRes == nil || customerCreateRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected read_only customers create rejected, got %#v", customerCreateRes)
+	}
+	if repo.createdCustomer != nil {
+		t.Fatalf("read_only customers must not call create, got %#v", repo.createdCustomer)
+	}
+	_, customerListRes, err := j.handleMasterData(ctx, "list_customers", "customers-read-only-list", mustJSONRPCStruct(t, map[string]any{}))
+	if err != nil {
+		t.Fatalf("expected nil err listing historical customers, got %v", err)
+	}
+	if customerListRes == nil || customerListRes.Code != errcode.OK.Code {
+		t.Fatalf("expected list_customers to remain available, got %#v", customerListRes)
+	}
+
+	activateMasterDataTestModuleState(t, j, "2026.06.30.masterdata-customers-enabled", masterDataModuleKeyCustomers, "enabled")
+	_, customerUpdateRes, err := j.handleMasterData(ctx, "update_customer", "customers-enabled-update", mustJSONRPCStruct(t, map[string]any{"id": float64(1), "code": "C-MODULE-2", "name": "门禁客户更新"}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if customerUpdateRes == nil || customerUpdateRes.Code != errcode.OK.Code {
+		t.Fatalf("expected enabled customers update OK, got %#v", customerUpdateRes)
+	}
+	if repo.updatedCustomer == nil || repo.updatedCustomer.Code != "C-MODULE-2" {
+		t.Fatalf("enabled customers must reach update usecase, got %#v", repo.updatedCustomer)
+	}
+
+	activateMasterDataTestModuleState(t, j, "2026.06.30.masterdata-suppliers-disabled", masterDataModuleKeySuppliers, "disabled")
+	_, supplierSaveRes, err := j.handleMasterData(ctx, "save_supplier_with_contacts", "suppliers-disabled-save", supplierParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if supplierSaveRes == nil || supplierSaveRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected disabled suppliers aggregate save rejected, got %#v", supplierSaveRes)
+	}
+	if repo.savedSupplier != nil {
+		t.Fatalf("disabled suppliers must not call aggregate save, got %#v", repo.savedSupplier)
+	}
+	_, supplierListRes, err := j.handleMasterData(ctx, "list_suppliers", "suppliers-disabled-list", mustJSONRPCStruct(t, map[string]any{}))
+	if err != nil {
+		t.Fatalf("expected nil err listing historical suppliers, got %v", err)
+	}
+	if supplierListRes == nil || supplierListRes.Code != errcode.OK.Code {
+		t.Fatalf("expected list_suppliers to remain available, got %#v", supplierListRes)
+	}
+
+	activateMasterDataTestModuleState(t, j, "2026.06.30.masterdata-materials-read-only", masterDataModuleKeyMaterials, "read_only")
+	_, materialCreateRes, err := j.handleMasterData(ctx, "create_material", "materials-read-only-create", materialParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if materialCreateRes == nil || materialCreateRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected read_only materials create rejected, got %#v", materialCreateRes)
+	}
+	if repo.createdMaterial != nil {
+		t.Fatalf("read_only materials must not call create, got %#v", repo.createdMaterial)
+	}
+	_, materialListRes, err := j.handleMasterData(ctx, "list_materials", "materials-read-only-list", mustJSONRPCStruct(t, map[string]any{}))
+	if err != nil {
+		t.Fatalf("expected nil err listing historical materials, got %v", err)
+	}
+	if materialListRes == nil || materialListRes.Code != errcode.OK.Code {
+		t.Fatalf("expected list_materials to remain available, got %#v", materialListRes)
+	}
+
+	activateMasterDataTestModuleState(t, j, "2026.06.30.masterdata-products-disabled", masterDataModuleKeyProducts, "disabled")
+	_, productCreateRes, err := j.handleMasterData(ctx, "create_product", "products-disabled-create", productParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if productCreateRes == nil || productCreateRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected disabled products create rejected, got %#v", productCreateRes)
+	}
+	if repo.createdProduct != nil {
+		t.Fatalf("disabled products must not call create, got %#v", repo.createdProduct)
+	}
+	_, skuCreateRes, err := j.handleMasterData(ctx, "create_product_sku", "products-disabled-sku-create", skuParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if skuCreateRes == nil || skuCreateRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected disabled products SKU create rejected, got %#v", skuCreateRes)
+	}
+	if repo.createdSKU != nil {
+		t.Fatalf("disabled products must not call SKU create, got %#v", repo.createdSKU)
+	}
+	_, skuListRes, err := j.handleMasterData(ctx, "list_product_skus", "products-disabled-sku-list", mustJSONRPCStruct(t, map[string]any{}))
+	if err != nil {
+		t.Fatalf("expected nil err listing historical SKUs, got %v", err)
+	}
+	if skuListRes == nil || skuListRes.Code != errcode.OK.Code {
+		t.Fatalf("expected list_product_skus to remain available, got %#v", skuListRes)
+	}
+
+	activateMasterDataTestModuleState(t, j, "2026.06.30.masterdata-suppliers-read-only", masterDataModuleKeySuppliers, "read_only")
+	_, contactCreateRes, err := j.handleMasterData(ctx, "create_contact", "supplier-contact-read-only-create", supplierContactParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if contactCreateRes == nil || contactCreateRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected supplier contact create rejected when suppliers read_only, got %#v", contactCreateRes)
+	}
+	if repo.createdContact != nil {
+		t.Fatalf("read_only supplier contacts must not call create, got %#v", repo.createdContact)
+	}
+	repo.contactOwnerType = biz.ContactOwnerSupplier
+	_, contactDisableRes, err := j.handleMasterData(ctx, "disable_contact", "supplier-contact-read-only-disable", mustJSONRPCStruct(t, map[string]any{"id": float64(1)}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if contactDisableRes == nil || contactDisableRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected supplier contact disable rejected after owner lookup, got %#v", contactDisableRes)
+	}
+	if repo.disableContactCalls != 0 {
+		t.Fatalf("read_only supplier contacts must not call disable, calls=%d", repo.disableContactCalls)
+	}
+	_, contactListRes, err := j.handleMasterData(ctx, "list_contacts_by_owner", "supplier-contact-read-only-list", mustJSONRPCStruct(t, map[string]any{"owner_type": biz.ContactOwnerSupplier, "owner_id": float64(1)}))
+	if err != nil {
+		t.Fatalf("expected nil err listing historical contacts, got %v", err)
+	}
+	if contactListRes == nil || contactListRes.Code != errcode.OK.Code {
+		t.Fatalf("expected list_contacts_by_owner to remain available, got %#v", contactListRes)
+	}
+}
+
 func TestJsonrpcDispatcher_ProductAPIRequiresPermissionAndValidUnit(t *testing.T) {
 	params := mustJSONRPCStruct(t, map[string]any{
 		"code":            " P001 ",
@@ -647,7 +1009,7 @@ func TestJsonrpcDispatcher_ProductAPIRequiresPermissionAndValidUnit(t *testing.T
 		"default_unit_id": float64(1),
 	})
 
-	j := newMasterDataJSONRPCTestData(
+	j := newMasterDataJSONRPCTestData(t,
 		&stubMasterDataJSONRPCRepo{unitActive: true},
 		workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionProductRead),
 	)
@@ -660,7 +1022,7 @@ func TestJsonrpcDispatcher_ProductAPIRequiresPermissionAndValidUnit(t *testing.T
 	}
 
 	repo := &stubMasterDataJSONRPCRepo{unitActive: false}
-	j = newMasterDataJSONRPCTestData(repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionProductCreate))
+	j = newMasterDataJSONRPCTestData(t, repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionProductCreate))
 	_, invalidUnitRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_product", "2", params)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -673,7 +1035,7 @@ func TestJsonrpcDispatcher_ProductAPIRequiresPermissionAndValidUnit(t *testing.T
 	}
 
 	repo = &stubMasterDataJSONRPCRepo{unitActive: true}
-	j = newMasterDataJSONRPCTestData(repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionProductCreate, biz.PermissionProductRead))
+	j = newMasterDataJSONRPCTestData(t, repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionProductCreate, biz.PermissionProductRead))
 	_, okRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_product", "3", params)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -706,7 +1068,7 @@ func TestJsonrpcDispatcher_ProductSKUAPIRequiresPermissionAndValidRefs(t *testin
 		"default_unit_id": float64(1),
 	})
 
-	j := newMasterDataJSONRPCTestData(
+	j := newMasterDataJSONRPCTestData(t,
 		&stubMasterDataJSONRPCRepo{productActive: true, unitActive: true},
 		workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionProductSKURead),
 	)
@@ -719,7 +1081,7 @@ func TestJsonrpcDispatcher_ProductSKUAPIRequiresPermissionAndValidRefs(t *testin
 	}
 
 	repo := &stubMasterDataJSONRPCRepo{productActive: false, unitActive: true}
-	j = newMasterDataJSONRPCTestData(repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionProductSKUCreate))
+	j = newMasterDataJSONRPCTestData(t, repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionProductSKUCreate))
 	_, invalidProductRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_product_sku", "2", params)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -732,7 +1094,7 @@ func TestJsonrpcDispatcher_ProductSKUAPIRequiresPermissionAndValidRefs(t *testin
 	}
 
 	repo = &stubMasterDataJSONRPCRepo{productActive: true, unitActive: true}
-	j = newMasterDataJSONRPCTestData(repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionProductSKUCreate, biz.PermissionProductSKURead))
+	j = newMasterDataJSONRPCTestData(t, repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionProductSKUCreate, biz.PermissionProductSKURead))
 	_, okRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_product_sku", "3", params)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -759,7 +1121,7 @@ func TestJsonrpcDispatcher_ProductSKUAPIRequiresPermissionAndValidRefs(t *testin
 
 func TestJsonrpcDispatcher_SalesOrderAPIRequiresPermissionAndRejectsShipmentVerb(t *testing.T) {
 	repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: true, unitActive: true}
-	j := newSalesOrderJSONRPCTestData(repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionSalesOrderCreate))
+	j := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionSalesOrderCreate))
 	params := mustJSONRPCStruct(t, map[string]any{
 		"order_no":             "SO001",
 		"customer_id":          float64(1),
@@ -803,7 +1165,7 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresPermissionAndRejectsShipmentVerb
 
 func TestJsonrpcDispatcher_SalesOrderListAcceptsDateAndSortFilters(t *testing.T) {
 	repo := &stubSalesOrderJSONRPCRepo{}
-	j := newSalesOrderJSONRPCTestData(repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionSalesOrderRead))
+	j := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionSalesOrderRead))
 	params := mustJSONRPCStruct(t, map[string]any{
 		"date_field":     "order_date",
 		"date_from":      "2026-06-01",
@@ -856,9 +1218,148 @@ func TestJsonrpcDispatcher_SalesOrderListAcceptsDateAndSortFilters(t *testing.T)
 	}
 }
 
+func TestJsonrpcDispatcher_SalesOrderAPIRequiresEnabledModule(t *testing.T) {
+	repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: true, unitActive: true}
+	j := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.SalesRoleKey},
+		biz.PermissionSalesOrderRead,
+		biz.PermissionSalesOrderCreate,
+		biz.PermissionSalesOrderSubmit,
+		biz.PermissionSalesOrderCancel,
+		biz.PermissionSalesOrderItemRead,
+		biz.PermissionSalesOrderItemCreate,
+		biz.PermissionSalesOrderItemCancel,
+	))
+	ctx := workflowJSONRPCAdminContext()
+	createParams := mustJSONRPCStruct(t, map[string]any{
+		"order_no":    "SO-MODULE-GATE-001",
+		"customer_id": float64(1),
+		"order_date":  "2026-06-15",
+	})
+	saveParams := mustJSONRPCStruct(t, map[string]any{
+		"order_no":    "SO-MODULE-GATE-SAVE",
+		"customer_id": float64(1),
+		"order_date":  "2026-06-15",
+		"items": []any{
+			map[string]any{
+				"line_no":          float64(1),
+				"product_id":       float64(1),
+				"unit_id":          float64(1),
+				"ordered_quantity": "12.5",
+			},
+		},
+	})
+
+	readOnlyConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.sales-orders-read-only",
+		"sales_orders",
+		"read_only",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, readOnlyConfig)
+
+	_, createRes, err := j.handleSalesOrder(ctx, "create_sales_order", "read-only-create", createParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected read_only sales_orders create rejected, got %#v", createRes)
+	}
+	if repo.savedOrder != nil {
+		t.Fatalf("read_only sales_orders must not create order, got %#v", repo.savedOrder)
+	}
+	_, saveRes, err := j.handleSalesOrder(ctx, "save_sales_order_with_items", "read-only-save", saveParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if saveRes == nil || saveRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected read_only sales_orders save rejected, got %#v", saveRes)
+	}
+	if len(repo.savedItems) != 0 {
+		t.Fatalf("read_only sales_orders must not save items, got %#v", repo.savedItems)
+	}
+	_, listRes, err := j.handleSalesOrder(ctx, "list_sales_orders", "read-after-read-only", mustJSONRPCStruct(t, map[string]any{"limit": 20}))
+	if err != nil {
+		t.Fatalf("expected nil err listing historical sales orders, got %v", err)
+	}
+	if listRes == nil || listRes.Code != errcode.OK.Code {
+		t.Fatalf("expected list_sales_orders to remain available for historical read, got %#v", listRes)
+	}
+
+	enabledConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.sales-orders-enabled",
+		"sales_orders",
+		"enabled",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, enabledConfig)
+	_, createRes, err = j.handleSalesOrder(ctx, "create_sales_order", "enabled-create", createParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if createRes == nil || createRes.Code != errcode.OK.Code {
+		t.Fatalf("expected enabled sales_orders create OK, got %#v", createRes)
+	}
+	if repo.savedOrder == nil || repo.savedOrder.OrderNo != "SO-MODULE-GATE-001" {
+		t.Fatalf("enabled sales_orders must reach create usecase, got %#v", repo.savedOrder)
+	}
+	_, submitRes, err := j.handleSalesOrder(ctx, "submit_sales_order", "enabled-submit", mustJSONRPCStruct(t, map[string]any{"id": float64(1)}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if submitRes == nil || submitRes.Code != errcode.OK.Code || repo.lifecycleStatus != biz.SalesOrderStatusSubmitted {
+		t.Fatalf("expected enabled sales_orders submit OK, res=%#v lifecycle=%s", submitRes, repo.lifecycleStatus)
+	}
+
+	disabledConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.sales-orders-disabled",
+		"sales_orders",
+		"disabled",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, disabledConfig)
+	repo.addedItem = nil
+	_, addItemRes, err := j.handleSalesOrder(ctx, "add_sales_order_item", "disabled-add-item", mustJSONRPCStruct(t, map[string]any{
+		"sales_order_id":   float64(1),
+		"line_no":          float64(1),
+		"product_id":       float64(1),
+		"unit_id":          float64(1),
+		"ordered_quantity": "12.5",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if addItemRes == nil || addItemRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected disabled sales_orders item add rejected, got %#v", addItemRes)
+	}
+	if repo.addedItem != nil {
+		t.Fatalf("disabled sales_orders must not add item, got %#v", repo.addedItem)
+	}
+	_, itemListRes, err := j.handleSalesOrder(ctx, "list_sales_order_items", "read-items-after-disabled", mustJSONRPCStruct(t, map[string]any{"sales_order_id": float64(1)}))
+	if err != nil {
+		t.Fatalf("expected nil err listing historical sales order items, got %v", err)
+	}
+	if itemListRes == nil || itemListRes.Code != errcode.OK.Code {
+		t.Fatalf("expected list_sales_order_items to remain available for historical read, got %#v", itemListRes)
+	}
+	_, cancelRes, err := j.handleSalesOrder(ctx, "cancel_sales_order", "disabled-cancel", mustJSONRPCStruct(t, map[string]any{"id": float64(1)}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if cancelRes == nil || cancelRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected disabled sales_orders cancel rejected, got %#v", cancelRes)
+	}
+	if repo.lifecycleStatus != biz.SalesOrderStatusSubmitted {
+		t.Fatalf("disabled sales_orders must not update lifecycle, got %s", repo.lifecycleStatus)
+	}
+}
+
 func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesSingleUsecase(t *testing.T) {
 	repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: true, unitActive: true}
-	j := newSalesOrderJSONRPCTestData(repo, workflowJSONRPCAdmin(
+	j := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
 		[]string{biz.SalesRoleKey},
 		biz.PermissionSalesOrderCreate,
 		biz.PermissionSalesOrderItemCreate,
@@ -922,7 +1423,7 @@ func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesSingleUsecase(t *testing.T
 
 func TestJsonrpcDispatcher_SalesOrderItemAPIUsesUsecaseProductUnitGuard(t *testing.T) {
 	repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: false, unitActive: true}
-	j := newSalesOrderJSONRPCTestData(repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionSalesOrderItemCreate))
+	j := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionSalesOrderItemCreate))
 	params := mustJSONRPCStruct(t, map[string]any{
 		"sales_order_id":   float64(1),
 		"line_no":          float64(1),

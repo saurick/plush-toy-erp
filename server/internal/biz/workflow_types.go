@@ -13,55 +13,67 @@ var (
 )
 
 type WorkflowTask struct {
-	ID                int
-	TaskCode          string
-	TaskGroup         string
-	TaskName          string
-	SourceType        string
-	SourceID          int
-	SourceNo          *string
-	BusinessStatusKey *string
-	TaskStatusKey     string
-	OwnerRoleKey      string
-	AssigneeID        *int
-	Priority          int16
-	BlockedReason     *string
-	DueAt             *time.Time
-	StartedAt         *time.Time
-	CompletedAt       *time.Time
-	ClosedAt          *time.Time
-	Payload           map[string]any
-	CreatedBy         *int
-	UpdatedBy         *int
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	ID                    int
+	TaskCode              string
+	TaskGroup             string
+	TaskName              string
+	SourceType            string
+	SourceID              int
+	SourceNo              *string
+	BusinessStatusKey     *string
+	TaskStatusKey         string
+	OwnerRoleKey          string
+	OwnerPoolKey          *string
+	RequiredCapabilityKey *string
+	ConfigRevision        *string
+	ProcessInstanceID     *int
+	ProcessNodeInstanceID *int
+	AssigneeID            *int
+	Priority              int16
+	BlockedReason         *string
+	DueAt                 *time.Time
+	StartedAt             *time.Time
+	CompletedAt           *time.Time
+	ClosedAt              *time.Time
+	Payload               map[string]any
+	CreatedBy             *int
+	UpdatedBy             *int
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 type WorkflowTaskFilter struct {
-	Limit         int
-	Offset        int
-	OwnerRoleKey  string
-	TaskStatusKey string
-	TaskGroup     string
-	SourceType    string
-	SourceID      int
+	Limit                int
+	Offset               int
+	OwnerRoleKey         string
+	VisibleOwnerRoleKeys []string
+	VisibleAssigneeID    *int
+	TaskStatusKey        string
+	TaskGroup            string
+	SourceType           string
+	SourceID             int
 }
 
 type WorkflowTaskCreate struct {
-	TaskCode          string
-	TaskGroup         string
-	TaskName          string
-	SourceType        string
-	SourceID          int
-	SourceNo          *string
-	BusinessStatusKey *string
-	TaskStatusKey     string
-	OwnerRoleKey      string
-	AssigneeID        *int
-	Priority          int16
-	BlockedReason     *string
-	DueAt             *time.Time
-	Payload           map[string]any
+	TaskCode              string
+	TaskGroup             string
+	TaskName              string
+	SourceType            string
+	SourceID              int
+	SourceNo              *string
+	BusinessStatusKey     *string
+	TaskStatusKey         string
+	OwnerRoleKey          string
+	OwnerPoolKey          *string
+	RequiredCapabilityKey *string
+	ConfigRevision        *string
+	ProcessInstanceID     *int
+	ProcessNodeInstanceID *int
+	AssigneeID            *int
+	Priority              int16
+	BlockedReason         *string
+	DueAt                 *time.Time
+	Payload               map[string]any
 }
 
 type WorkflowTaskStatusUpdate struct {
@@ -127,6 +139,7 @@ type WorkflowBusinessStateUpsert struct {
 
 type WorkflowRepo interface {
 	GetWorkflowTask(ctx context.Context, id int) (*WorkflowTask, error)
+	GetWorkflowTaskByTaskCode(ctx context.Context, taskCode string) (*WorkflowTask, error)
 	ListWorkflowTasks(ctx context.Context, filter WorkflowTaskFilter) ([]*WorkflowTask, int, error)
 	CreateWorkflowTask(ctx context.Context, in *WorkflowTaskCreate, actorID int) (*WorkflowTask, error)
 	UpdateWorkflowTaskStatus(ctx context.Context, in *WorkflowTaskStatusUpdate, actorID int, actorRoleKey string) (*WorkflowTask, error)

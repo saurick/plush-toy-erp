@@ -25,15 +25,25 @@ type QualityInspection struct {
 	// InspectionNo holds the value of the "inspection_no" field.
 	InspectionNo string `json:"inspection_no,omitempty"`
 	// PurchaseReceiptID holds the value of the "purchase_receipt_id" field.
-	PurchaseReceiptID int `json:"purchase_receipt_id,omitempty"`
+	PurchaseReceiptID *int `json:"purchase_receipt_id,omitempty"`
 	// PurchaseReceiptItemID holds the value of the "purchase_receipt_item_id" field.
 	PurchaseReceiptItemID *int `json:"purchase_receipt_item_id,omitempty"`
 	// InventoryLotID holds the value of the "inventory_lot_id" field.
 	InventoryLotID int `json:"inventory_lot_id,omitempty"`
 	// MaterialID holds the value of the "material_id" field.
-	MaterialID int `json:"material_id,omitempty"`
+	MaterialID *int `json:"material_id,omitempty"`
 	// WarehouseID holds the value of the "warehouse_id" field.
 	WarehouseID int `json:"warehouse_id,omitempty"`
+	// SourceType holds the value of the "source_type" field.
+	SourceType *string `json:"source_type,omitempty"`
+	// SourceID holds the value of the "source_id" field.
+	SourceID *int `json:"source_id,omitempty"`
+	// InspectionType holds the value of the "inspection_type" field.
+	InspectionType *string `json:"inspection_type,omitempty"`
+	// SubjectType holds the value of the "subject_type" field.
+	SubjectType *string `json:"subject_type,omitempty"`
+	// SubjectID holds the value of the "subject_id" field.
+	SubjectID *int `json:"subject_id,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// Result holds the value of the "result" field.
@@ -133,9 +143,9 @@ func (*QualityInspection) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case qualityinspection.FieldID, qualityinspection.FieldPurchaseReceiptID, qualityinspection.FieldPurchaseReceiptItemID, qualityinspection.FieldInventoryLotID, qualityinspection.FieldMaterialID, qualityinspection.FieldWarehouseID, qualityinspection.FieldInspectorID:
+		case qualityinspection.FieldID, qualityinspection.FieldPurchaseReceiptID, qualityinspection.FieldPurchaseReceiptItemID, qualityinspection.FieldInventoryLotID, qualityinspection.FieldMaterialID, qualityinspection.FieldWarehouseID, qualityinspection.FieldSourceID, qualityinspection.FieldSubjectID, qualityinspection.FieldInspectorID:
 			values[i] = new(sql.NullInt64)
-		case qualityinspection.FieldInspectionNo, qualityinspection.FieldStatus, qualityinspection.FieldResult, qualityinspection.FieldOriginalLotStatus, qualityinspection.FieldDecisionNote:
+		case qualityinspection.FieldInspectionNo, qualityinspection.FieldSourceType, qualityinspection.FieldInspectionType, qualityinspection.FieldSubjectType, qualityinspection.FieldStatus, qualityinspection.FieldResult, qualityinspection.FieldOriginalLotStatus, qualityinspection.FieldDecisionNote:
 			values[i] = new(sql.NullString)
 		case qualityinspection.FieldInspectedAt, qualityinspection.FieldCreatedAt, qualityinspection.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -170,7 +180,8 @@ func (_m *QualityInspection) assignValues(columns []string, values []any) error 
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field purchase_receipt_id", values[i])
 			} else if value.Valid {
-				_m.PurchaseReceiptID = int(value.Int64)
+				_m.PurchaseReceiptID = new(int)
+				*_m.PurchaseReceiptID = int(value.Int64)
 			}
 		case qualityinspection.FieldPurchaseReceiptItemID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -189,13 +200,49 @@ func (_m *QualityInspection) assignValues(columns []string, values []any) error 
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field material_id", values[i])
 			} else if value.Valid {
-				_m.MaterialID = int(value.Int64)
+				_m.MaterialID = new(int)
+				*_m.MaterialID = int(value.Int64)
 			}
 		case qualityinspection.FieldWarehouseID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field warehouse_id", values[i])
 			} else if value.Valid {
 				_m.WarehouseID = int(value.Int64)
+			}
+		case qualityinspection.FieldSourceType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field source_type", values[i])
+			} else if value.Valid {
+				_m.SourceType = new(string)
+				*_m.SourceType = value.String
+			}
+		case qualityinspection.FieldSourceID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field source_id", values[i])
+			} else if value.Valid {
+				_m.SourceID = new(int)
+				*_m.SourceID = int(value.Int64)
+			}
+		case qualityinspection.FieldInspectionType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field inspection_type", values[i])
+			} else if value.Valid {
+				_m.InspectionType = new(string)
+				*_m.InspectionType = value.String
+			}
+		case qualityinspection.FieldSubjectType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field subject_type", values[i])
+			} else if value.Valid {
+				_m.SubjectType = new(string)
+				*_m.SubjectType = value.String
+			}
+		case qualityinspection.FieldSubjectID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field subject_id", values[i])
+			} else if value.Valid {
+				_m.SubjectID = new(int)
+				*_m.SubjectID = int(value.Int64)
 			}
 		case qualityinspection.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -313,8 +360,10 @@ func (_m *QualityInspection) String() string {
 	builder.WriteString("inspection_no=")
 	builder.WriteString(_m.InspectionNo)
 	builder.WriteString(", ")
-	builder.WriteString("purchase_receipt_id=")
-	builder.WriteString(fmt.Sprintf("%v", _m.PurchaseReceiptID))
+	if v := _m.PurchaseReceiptID; v != nil {
+		builder.WriteString("purchase_receipt_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.PurchaseReceiptItemID; v != nil {
 		builder.WriteString("purchase_receipt_item_id=")
@@ -324,11 +373,38 @@ func (_m *QualityInspection) String() string {
 	builder.WriteString("inventory_lot_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.InventoryLotID))
 	builder.WriteString(", ")
-	builder.WriteString("material_id=")
-	builder.WriteString(fmt.Sprintf("%v", _m.MaterialID))
+	if v := _m.MaterialID; v != nil {
+		builder.WriteString("material_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("warehouse_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.WarehouseID))
+	builder.WriteString(", ")
+	if v := _m.SourceType; v != nil {
+		builder.WriteString("source_type=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SourceID; v != nil {
+		builder.WriteString("source_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.InspectionType; v != nil {
+		builder.WriteString("inspection_type=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SubjectType; v != nil {
+		builder.WriteString("subject_type=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SubjectID; v != nil {
+		builder.WriteString("subject_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)

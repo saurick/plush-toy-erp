@@ -10,22 +10,35 @@ const (
 	workflowProcessingContractsModuleKey       = "processing-contracts"
 	workflowProductionProgressModuleKey        = "production-progress"
 	workflowShippingReleaseModuleKey           = "shipping-release"
+	workflowOutboundModuleKey                  = "outbound"
+	workflowReceivablesModuleKey               = "receivables"
+	workflowInvoicesModuleKey                  = "invoices"
+	workflowPayablesModuleKey                  = "payables"
+	workflowReconciliationModuleKey            = "reconciliation"
 	workflowOrderApprovalTaskGroup             = "order_approval"
 	workflowEngineeringDataTaskGroup           = "engineering_data"
 	workflowOrderRevisionTaskGroup             = "order_revision"
 	workflowPurchaseIQCTaskGroup               = "purchase_iqc"
 	workflowWarehouseInboundTaskGroup          = "warehouse_inbound"
 	workflowPurchaseQualityExceptionGroup      = "purchase_quality_exception"
+	workflowOutsourceReturnTrackingTaskGroup   = "outsource_return_tracking"
 	workflowOutsourceReturnQCTaskGroup         = "outsource_return_qc"
 	workflowOutsourceWarehouseInboundTaskGroup = "outsource_warehouse_inbound"
 	workflowOutsourceReworkTaskGroup           = "outsource_rework"
+	workflowPurchasePayableRegistrationGroup   = "purchase_payable_registration"
+	workflowOutsourcePayableRegistrationGroup  = "outsource_payable_registration"
+	workflowPurchaseReconciliationGroup        = "purchase_reconciliation"
+	workflowOutsourceReconciliationGroup       = "outsource_reconciliation"
 	workflowFinishedGoodsQCTaskGroup           = "finished_goods_qc"
 	workflowFinishedGoodsInboundTaskGroup      = "finished_goods_inbound"
 	workflowFinishedGoodsReworkTaskGroup       = "finished_goods_rework"
 	workflowShipmentReleaseTaskGroup           = "shipment_release"
+	workflowReceivableRegistrationTaskGroup    = "receivable_registration"
+	workflowInvoiceRegistrationTaskGroup       = "invoice_registration"
 	workflowOrderApprovalStatusKey             = "project_pending"
 	workflowOrderApprovedStatusKey             = "project_approved"
 	workflowEngineeringPreparingStatusKey      = "engineering_preparing"
+	workflowProductionProcessingStatusKey      = "production_processing"
 	workflowQCPendingStatusKey                 = "qc_pending"
 	workflowIQCPendingStatusKey                = "iqc_pending"
 	workflowQCFailedStatusKey                  = "qc_failed"
@@ -34,6 +47,8 @@ const (
 	workflowShipmentPendingStatusKey           = "shipment_pending"
 	workflowShipmentReleasePendingStatusKey    = "shipment_release_pending"
 	workflowShippingReleasedStatusKey          = "shipping_released"
+	workflowReconcilingStatusKey               = "reconciling"
+	workflowSettledStatusKey                   = "settled"
 	workflowBlockedStatusKey                   = "blocked"
 )
 
@@ -175,9 +190,6 @@ func CanAdminHandleWorkflowTask(admin *AdminUser, task *WorkflowTask, nextStatus
 	}
 	if task.AssigneeID != nil {
 		return *task.AssigneeID == admin.ID
-	}
-	if admin.IsSuperAdmin && isShipmentReleaseTask(task) {
-		return true
 	}
 	return AdminHasRole(admin, task.OwnerRoleKey)
 }

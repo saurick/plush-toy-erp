@@ -8,17 +8,19 @@ import (
 	"server/internal/biz"
 	datarepo "server/internal/data"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/errcode"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryTxn(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "jsonrpc_quality_inspection")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
-	j := newQualityJSONRPCTestData(data, workflowJSONRPCAdmin(
+	j := newQualityJSONRPCTestData(t, data, workflowJSONRPCAdmin(
 		[]string{biz.QualityRoleKey},
 		biz.PermissionQualityInspectionRead,
 		biz.PermissionQualityInspectionCreate,
@@ -45,7 +47,15 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 	if createRes == nil || createRes.Code != errcode.OK.Code {
 		t.Fatalf("expected create OK, got %#v", createRes)
 	}
-	inspectionID := jsonRPCInt(t, jsonRPCNestedMap(t, createRes, "quality_inspection"), "id")
+	createdInspection := jsonRPCNestedMap(t, createRes, "quality_inspection")
+	inspectionID := jsonRPCInt(t, createdInspection, "id")
+	if createdInspection["source_type"] != biz.QualityInspectionSourcePurchaseReceipt ||
+		jsonRPCInt(t, createdInspection, "source_id") != receipt.ID ||
+		createdInspection["inspection_type"] != biz.QualityInspectionTypeIncoming ||
+		createdInspection["subject_type"] != biz.QualityInspectionSubjectMaterial ||
+		jsonRPCInt(t, createdInspection, "subject_id") != fixtures.materialID {
+		t.Fatalf("expected incoming quality source anchor, got %#v", createdInspection)
+	}
 	assertInventoryTxnCountUnchanged(t, ctx, client, txnCount)
 
 	_, submitRes, err := j.handleQuality(adminCtx, "submit_quality_inspection", "2", mustJSONRPCStruct(t, map[string]any{"id": float64(inspectionID)}))
@@ -149,9 +159,111 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 	assertLotStatus(t, ctx, client, cancelLotID, biz.InventoryLotActive)
 }
 
+func TestJsonrpcDispatcher_FinishedGoodsQualityInspectionAPIBindsShipmentFact(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "jsonrpc_finished_goods_quality_inspection")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	j := newQualityJSONRPCTestData(t, data, workflowJSONRPCAdmin(
+		[]string{biz.QualityRoleKey},
+		biz.PermissionQualityInspectionRead,
+		biz.PermissionQualityInspectionCreate,
+		biz.PermissionQualityInspectionUpdate,
+	))
+	adminCtx := workflowJSONRPCAdminContext()
+
+	lot, err := j.inventoryUC.CreateInventoryLot(ctx, &biz.InventoryLotCreate{
+		SubjectType: biz.InventorySubjectProduct,
+		SubjectID:   fixtures.productID,
+		LotNo:       "QI-JSONRPC-FG-LOT",
+	})
+	if err != nil {
+		t.Fatalf("create product lot failed: %v", err)
+	}
+	operationalUC := biz.NewOperationalFactUsecase(datarepo.NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+	shipment, err := operationalUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{
+			ShipmentNo:     "QI-JSONRPC-FG-SHIP",
+			IdempotencyKey: "QI-JSONRPC-FG-SHIP",
+		},
+		Items: []*biz.ShipmentItemCreate{
+			{
+				ProductID:   fixtures.productID,
+				WarehouseID: fixtures.warehouseID,
+				UnitID:      fixtures.unitID,
+				LotID:       &lot.ID,
+				Quantity:    mustDecimal(t, "2"),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create draft shipment failed: %v", err)
+	}
+	txnCount := client.InventoryTxn.Query().CountX(ctx)
+
+	_, createRes, err := j.handleQuality(adminCtx, "create_finished_goods_quality_inspection_draft", "fg-create", mustJSONRPCStruct(t, map[string]any{
+		"inspection_no":         "QI-JSONRPC-FG",
+		"shipment_id":           float64(shipment.ID),
+		"finished_goods_lot_id": float64(lot.ID),
+		"product_id":            float64(fixtures.productID),
+		"warehouse_id":          float64(fixtures.warehouseID),
+		"decision_note":         "成品质检待判定",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if createRes == nil || createRes.Code != errcode.OK.Code {
+		t.Fatalf("expected create OK, got %#v", createRes)
+	}
+	created := jsonRPCNestedMap(t, createRes, "quality_inspection")
+	inspectionID := jsonRPCInt(t, created, "id")
+	if created["purchase_receipt_id"] != nil || created["material_id"] != nil {
+		t.Fatalf("finished goods quality must not expose purchase/material anchors, got %#v", created)
+	}
+	if created["source_type"] != biz.QualityInspectionSourceShipment ||
+		jsonRPCInt(t, created, "source_id") != shipment.ID ||
+		created["inspection_type"] != biz.QualityInspectionTypeFinishedGoods ||
+		created["subject_type"] != biz.QualityInspectionSubjectProduct ||
+		jsonRPCInt(t, created, "subject_id") != fixtures.productID {
+		t.Fatalf("expected shipment finished goods source anchor, got %#v", created)
+	}
+	assertInventoryTxnCountUnchanged(t, ctx, client, txnCount)
+
+	_, submitRes, err := j.handleQuality(adminCtx, "submit_quality_inspection", "fg-submit", mustJSONRPCStruct(t, map[string]any{"id": float64(inspectionID)}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if submitRes == nil || submitRes.Code != errcode.OK.Code {
+		t.Fatalf("expected submit OK, got %#v", submitRes)
+	}
+	assertLotStatus(t, ctx, client, lot.ID, biz.InventoryLotHold)
+	assertInventoryTxnCountUnchanged(t, ctx, client, txnCount)
+
+	_, listRes, err := j.handleQuality(adminCtx, "list_finished_goods_quality_inspections", "fg-list", mustJSONRPCStruct(t, map[string]any{
+		"shipment_id": float64(shipment.ID),
+		"product_id":  float64(fixtures.productID),
+		"status":      biz.QualityInspectionStatusSubmitted,
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if total := jsonRPCInt(t, listRes.Data.AsMap(), "total"); total != 1 {
+		t.Fatalf("expected one finished goods inspection in list, got %d", total)
+	}
+
+	_, invalidRes, err := j.handleQuality(adminCtx, "list_quality_inspections", "fg-invalid-list", mustJSONRPCStruct(t, map[string]any{
+		"source_type": biz.QualityInspectionSourceShipment,
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if invalidRes == nil || invalidRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("ordinary quality list must keep incoming boundary, got %#v", invalidRes)
+	}
+}
+
 func TestJsonrpcDispatcher_QualityInspectionAPIRequiresDomainPermissions(t *testing.T) {
 	data, _ := openInventoryRepoTestData(t, "jsonrpc_quality_permissions")
-	j := newQualityJSONRPCTestData(data, workflowJSONRPCAdmin([]string{biz.QualityRoleKey}, biz.PermissionQualityInspectionRead))
+	j := newQualityJSONRPCTestData(t, data, workflowJSONRPCAdmin([]string{biz.QualityRoleKey}, biz.PermissionQualityInspectionRead))
 
 	_, createRes, err := j.handleQuality(workflowJSONRPCAdminContext(), "create_quality_inspection_draft", "1", mustJSONRPCStruct(t, map[string]any{
 		"inspection_no":       "QI-DENIED",
@@ -176,6 +288,85 @@ func TestJsonrpcDispatcher_QualityInspectionAPIRequiresDomainPermissions(t *test
 	}
 }
 
+func TestJsonrpcDispatcher_QualityInspectionAPIRequiresEnabledModules(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "jsonrpc_quality_module_gate")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	j := newQualityJSONRPCTestData(t, data, workflowJSONRPCAdmin(
+		[]string{biz.QualityRoleKey},
+		biz.PermissionQualityInspectionRead,
+		biz.PermissionQualityInspectionCreate,
+		biz.PermissionQualityInspectionUpdate,
+	))
+	adminCtx := workflowJSONRPCAdminContext()
+	receipt, item, lotID := createPostedQualityReceipt(t, ctx, j.inventoryUC, fixtures, "QI-MODULE-IN-READONLY", "QI-MODULE-LOT-READONLY")
+
+	readOnlyQualityConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.28.quality-read-only",
+		"quality_inspections",
+		"read_only",
+	)
+	activateQualityTestCustomerConfig(t, j, readOnlyQualityConfig)
+
+	_, createRes, err := j.handleQuality(adminCtx, "create_quality_inspection_draft", "quality-read-only-create", mustJSONRPCStruct(t, map[string]any{
+		"inspection_no":            "QI-MODULE-READONLY",
+		"purchase_receipt_id":      float64(receipt.ID),
+		"purchase_receipt_item_id": float64(item.ID),
+		"inventory_lot_id":         float64(lotID),
+		"material_id":              float64(fixtures.materialID),
+		"warehouse_id":             float64(fixtures.warehouseID),
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected read_only quality_inspections to reject create, got %#v", createRes)
+	}
+	if count := client.QualityInspection.Query().
+		Where(qualityinspection.InspectionNo("QI-MODULE-READONLY")).
+		CountX(ctx); count != 0 {
+		t.Fatalf("read_only quality_inspections must not create quality inspection, got %d", count)
+	}
+
+	activateQualityTestCustomerConfig(t, j, customerConfigPublishParamsForRevision(t, "2026.06.28.quality-enabled"))
+	createdID := createQualityDraftViaRPC(t, adminCtx, j, "QI-MODULE-ENABLED", receipt.ID, item.ID, lotID, fixtures)
+
+	readOnlyQualityUpdateConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.28.quality-update-read-only",
+		"quality_inspections",
+		"read_only",
+	)
+	activateQualityTestCustomerConfig(t, j, readOnlyQualityUpdateConfig)
+
+	_, submitRes, err := j.handleQuality(adminCtx, "submit_quality_inspection", "quality-read-only-submit", mustJSONRPCStruct(t, map[string]any{
+		"id": float64(createdID),
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if submitRes == nil || submitRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected read_only quality_inspections to reject submit, got %#v", submitRes)
+	}
+	stored := client.QualityInspection.GetX(ctx, createdID)
+	if stored.Status != biz.QualityInspectionStatusDraft {
+		t.Fatalf("read_only quality_inspections must not change status, got %s", stored.Status)
+	}
+
+	_, getRes, err := j.handleQuality(adminCtx, "get_quality_inspection", "quality-read-only-get", mustJSONRPCStruct(t, map[string]any{
+		"id": float64(createdID),
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if getRes == nil || getRes.Code != errcode.OK.Code {
+		t.Fatalf("expected get to remain available for historical read, got %#v", getRes)
+	}
+}
+
 func TestQualityInspectionFilterFromParamsForwardsContextFilters(t *testing.T) {
 	filter, ok := qualityInspectionFilterFromParams(map[string]any{
 		"purchase_order_id":        float64(21),
@@ -196,12 +387,34 @@ func TestQualityInspectionFilterFromParamsForwardsContextFilters(t *testing.T) {
 	}
 }
 
-func newQualityJSONRPCTestData(data *datarepo.Data, admin *biz.AdminUser) *jsonrpcDispatcher {
+func newQualityJSONRPCTestData(t *testing.T, data *datarepo.Data, admin *biz.AdminUser) *jsonrpcDispatcher {
+	t.Helper()
 	logger := log.NewStdLogger(io.Discard)
-	return &jsonrpcDispatcher{
-		log:         log.NewHelper(log.With(logger, "module", "service.jsonrpc.quality.test")),
-		adminReader: stubAdminAccountReader{admin: admin},
-		inventoryUC: biz.NewInventoryUsecase(datarepo.NewInventoryRepo(data, logger)),
+	customerConfigUC := biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo())
+	dispatcher := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(logger, "module", "service.jsonrpc.quality.test")),
+		adminReader:      stubAdminAccountReader{admin: admin},
+		inventoryUC:      biz.NewInventoryUsecase(datarepo.NewInventoryRepo(data, logger)),
+		customerConfigUC: customerConfigUC,
+	}
+	activateQualityTestCustomerConfig(t, dispatcher, customerConfigPublishParams(t))
+	return dispatcher
+}
+
+func activateQualityTestCustomerConfig(t *testing.T, dispatcher *jsonrpcDispatcher, params *structpb.Struct) {
+	t.Helper()
+	if dispatcher == nil || dispatcher.customerConfigUC == nil {
+		t.Fatalf("customerConfigUC missing")
+	}
+	in, ok := customerConfigPublishInputFromParams(params.AsMap())
+	if !ok {
+		t.Fatalf("invalid customer config params: %#v", params.AsMap())
+	}
+	if _, err := dispatcher.customerConfigUC.PublishCustomerConfig(context.Background(), in, 1); err != nil {
+		t.Fatalf("publish customer config %s err = %v", in.Revision, err)
+	}
+	if _, err := dispatcher.customerConfigUC.ActivateCustomerConfig(context.Background(), in.CustomerKey, in.Revision, 1); err != nil {
+		t.Fatalf("activate customer config %s err = %v", in.Revision, err)
 	}
 }
 

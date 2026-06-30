@@ -22,6 +22,7 @@ type jsonrpcDispatcher struct {
 	adminAuthUC        *biz.AdminAuthUsecase
 	adminManageUC      *biz.AdminManageUsecase
 	workflowUC         *biz.WorkflowUsecase
+	processRuntimeUC   *biz.ProcessRuntimeUsecase
 	debugUC            *biz.DebugUsecase
 	masterDataUC       *biz.MasterDataUsecase
 	salesOrderUC       *biz.SalesOrderUsecase
@@ -30,6 +31,7 @@ type jsonrpcDispatcher struct {
 	inventoryUC        *biz.InventoryUsecase
 	operationalFactUC  *biz.OperationalFactUsecase
 	attachmentUC       *biz.BusinessAttachmentUsecase
+	customerConfigUC   *biz.CustomerConfigUsecase
 	authSMS            authSMSRuntimeConfig
 
 	adminReader biz.AdminAccountReader
@@ -41,6 +43,7 @@ func newJSONRPCDispatcher(
 	adminAuthUC *biz.AdminAuthUsecase,
 	adminManageUC *biz.AdminManageUsecase,
 	workflowUC *biz.WorkflowUsecase,
+	processRuntimeUC *biz.ProcessRuntimeUsecase,
 	debugUC *biz.DebugUsecase,
 	masterDataUC *biz.MasterDataUsecase,
 	salesOrderUC *biz.SalesOrderUsecase,
@@ -49,6 +52,7 @@ func newJSONRPCDispatcher(
 	inventoryUC *biz.InventoryUsecase,
 	operationalFactUC *biz.OperationalFactUsecase,
 	attachmentUC *biz.BusinessAttachmentUsecase,
+	customerConfigUC *biz.CustomerConfigUsecase,
 	adminReader biz.AdminAccountReader,
 ) *jsonrpcDispatcher {
 	helper := log.NewHelper(log.With(logger, "module", "service.jsonrpc"))
@@ -61,6 +65,9 @@ func newJSONRPCDispatcher(
 	}
 	if workflowUC == nil {
 		panic("newJSONRPCDispatcher: workflowUC is nil")
+	}
+	if processRuntimeUC == nil {
+		panic("newJSONRPCDispatcher: processRuntimeUC is nil")
 	}
 	if debugUC == nil {
 		panic("newJSONRPCDispatcher: debugUC is nil")
@@ -86,8 +93,29 @@ func newJSONRPCDispatcher(
 	if attachmentUC == nil {
 		panic("newJSONRPCDispatcher: attachmentUC is nil")
 	}
+	if customerConfigUC == nil {
+		panic("newJSONRPCDispatcher: customerConfigUC is nil")
+	}
 	if adminReader == nil {
 		panic("newJSONRPCDispatcher: adminReader is nil")
+	}
+	if err := biz.RegisterSalesOrderProcessDomainCommandHandlers(processRuntimeUC, salesOrderUC); err != nil {
+		panic(fmt.Sprintf("newJSONRPCDispatcher: register sales order process command handlers: %v", err))
+	}
+	if err := biz.RegisterPurchaseReceiptProcessDomainCommandHandlers(processRuntimeUC, inventoryUC); err != nil {
+		panic(fmt.Sprintf("newJSONRPCDispatcher: register purchase receipt process command handlers: %v", err))
+	}
+	if err := biz.RegisterQualityInspectionProcessDomainCommandHandlers(processRuntimeUC, inventoryUC); err != nil {
+		panic(fmt.Sprintf("newJSONRPCDispatcher: register quality inspection process command handlers: %v", err))
+	}
+	if err := biz.RegisterInventoryProcessDomainCommandHandlers(processRuntimeUC, inventoryUC); err != nil {
+		panic(fmt.Sprintf("newJSONRPCDispatcher: register inventory process command handlers: %v", err))
+	}
+	if err := biz.RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
+		panic(fmt.Sprintf("newJSONRPCDispatcher: register shipment process command handlers: %v", err))
+	}
+	if err := biz.RegisterFinanceProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
+		panic(fmt.Sprintf("newJSONRPCDispatcher: register finance process command handlers: %v", err))
 	}
 	authSMS := newAuthSMSRuntimeConfig(c)
 
@@ -98,6 +126,7 @@ func newJSONRPCDispatcher(
 		adminAuthUC:        adminAuthUC,
 		adminManageUC:      adminManageUC,
 		workflowUC:         workflowUC,
+		processRuntimeUC:   processRuntimeUC,
 		debugUC:            debugUC,
 		masterDataUC:       masterDataUC,
 		salesOrderUC:       salesOrderUC,
@@ -106,6 +135,7 @@ func newJSONRPCDispatcher(
 		inventoryUC:        inventoryUC,
 		operationalFactUC:  operationalFactUC,
 		attachmentUC:       attachmentUC,
+		customerConfigUC:   customerConfigUC,
 		authSMS:            authSMS,
 		adminReader:        adminReader,
 	}
@@ -169,6 +199,8 @@ func (d *jsonrpcDispatcher) Handle(
 		return d.handleOperationalFact(ctx, method, id, params)
 	case "attachment":
 		return d.handleBusinessAttachment(ctx, method, id, params)
+	case "customer_config":
+		return d.handleCustomerConfig(ctx, method, id, params)
 	case "debug":
 		return d.handleDebug(ctx, method, id, params)
 	default:

@@ -26,6 +26,9 @@ func (d *jsonrpcDispatcher) handleMasterDataCustomer(
 		if res := d.requireContactAggregatePermissions(ctx); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyCustomers); res != nil {
+			return id, res, nil
+		}
 		contacts, ok := contactSaveMutationsFromParams(pm)
 		if !ok {
 			return id, d.mapMasterDataError(ctx, biz.ErrBadParam), nil
@@ -36,10 +39,16 @@ func (d *jsonrpcDispatcher) handleMasterDataCustomer(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyCustomers); res != nil {
+			return id, res, nil
+		}
 		item, err := d.masterDataUC.CreateCustomer(ctx, customerMutationFromParams(pm))
 		return id, customerMutationResult(ctx, d, item, err), nil
 	case "update_customer", "updateCustomer":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyCustomers); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.UpdateCustomer(ctx, getInt(pm, "id", 0), customerMutationFromParams(pm))
@@ -66,6 +75,9 @@ func (d *jsonrpcDispatcher) handleMasterDataCustomer(
 		})}, nil
 	case "set_customer_active", "setCustomerActive":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerDisable); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyCustomers); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.SetCustomerActive(ctx, getInt(pm, "id", 0), getBool(pm, "active", true))

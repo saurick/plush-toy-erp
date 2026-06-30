@@ -2,7 +2,8 @@ import { useCallback } from 'react'
 
 import { message } from '@/common/utils/antdApp'
 import {
-  updateWorkflowTaskStatus,
+  blockWorkflowTaskAction,
+  completeWorkflowTaskAction,
   urgeWorkflowTask,
 } from '../../api/workflowApi.mjs'
 import { workflowPayloadOf } from './outsourcingOrderPageConfig.mjs'
@@ -10,9 +11,9 @@ import { workflowPayloadOf } from './outsourcingOrderPageConfig.mjs'
 export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
   const completeWorkflowTask = useCallback(
     async (task) => {
-      await updateWorkflowTaskStatus({
+      await completeWorkflowTaskAction({
         id: task.id,
-        task_status_key: 'done',
+        action_key: 'complete',
         business_status_key: task.business_status_key || undefined,
         reason: '',
         payload: {
@@ -28,9 +29,9 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
 
   const blockWorkflowTask = useCallback(
     async (task, { reason = '' } = {}) => {
-      await updateWorkflowTaskStatus({
+      await blockWorkflowTaskAction({
         id: task.id,
-        task_status_key: 'blocked',
+        action_key: 'block',
         business_status_key: 'blocked',
         reason,
         payload: {
@@ -51,7 +52,6 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
         task_id: task.id,
         action: 'urge_task',
         reason,
-        actor_role_key: 'admin',
         payload: {
           source_type: task.source_type,
           source_id: task.source_id,

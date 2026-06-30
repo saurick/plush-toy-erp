@@ -8,6 +8,18 @@ import (
 	"server/internal/data/model/ent"
 )
 
+// The AccessEntitlementFunc type is an adapter to allow the use of ordinary
+// function as AccessEntitlement mutator.
+type AccessEntitlementFunc func(context.Context, *ent.AccessEntitlementMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f AccessEntitlementFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.AccessEntitlementMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AccessEntitlementMutation", m)
+}
+
 // The AdminUserFunc type is an adapter to allow the use of ordinary
 // function as AdminUser mutator.
 type AdminUserFunc func(context.Context, *ent.AdminUserMutation) (ent.Value, error)
@@ -90,6 +102,30 @@ func (f CustomerFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, er
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CustomerMutation", m)
+}
+
+// The CustomerConfigRevisionFunc type is an adapter to allow the use of ordinary
+// function as CustomerConfigRevision mutator.
+type CustomerConfigRevisionFunc func(context.Context, *ent.CustomerConfigRevisionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f CustomerConfigRevisionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.CustomerConfigRevisionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CustomerConfigRevisionMutation", m)
+}
+
+// The DeploymentModuleStateFunc type is an adapter to allow the use of ordinary
+// function as DeploymentModuleState mutator.
+type DeploymentModuleStateFunc func(context.Context, *ent.DeploymentModuleStateMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DeploymentModuleStateFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DeploymentModuleStateMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DeploymentModuleStateMutation", m)
 }
 
 // The FinanceFactFunc type is an adapter to allow the use of ordinary
@@ -210,6 +246,30 @@ func (f ProcessFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, err
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProcessMutation", m)
+}
+
+// The ProcessInstanceFunc type is an adapter to allow the use of ordinary
+// function as ProcessInstance mutator.
+type ProcessInstanceFunc func(context.Context, *ent.ProcessInstanceMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ProcessInstanceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ProcessInstanceMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProcessInstanceMutation", m)
+}
+
+// The ProcessNodeInstanceFunc type is an adapter to allow the use of ordinary
+// function as ProcessNodeInstance mutator.
+type ProcessNodeInstanceFunc func(context.Context, *ent.ProcessNodeInstanceMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ProcessNodeInstanceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ProcessNodeInstanceMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProcessNodeInstanceMutation", m)
 }
 
 // The ProductFunc type is an adapter to allow the use of ordinary
@@ -380,6 +440,18 @@ func (f RolePermissionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Val
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RolePermissionMutation", m)
 }
 
+// The RoleProfileFunc type is an adapter to allow the use of ordinary
+// function as RoleProfile mutator.
+type RoleProfileFunc func(context.Context, *ent.RoleProfileMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f RoleProfileFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.RoleProfileMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RoleProfileMutation", m)
+}
+
 // The RuntimeAuditEventFunc type is an adapter to allow the use of ordinary
 // function as RuntimeAuditEvent mutator.
 type RuntimeAuditEventFunc func(context.Context, *ent.RuntimeAuditEventMutation) (ent.Value, error)
@@ -498,6 +570,30 @@ func (f WarehouseFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, e
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.WarehouseMutation", m)
+}
+
+// The WorkPoolFunc type is an adapter to allow the use of ordinary
+// function as WorkPool mutator.
+type WorkPoolFunc func(context.Context, *ent.WorkPoolMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f WorkPoolFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.WorkPoolMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.WorkPoolMutation", m)
+}
+
+// The WorkPoolMembershipFunc type is an adapter to allow the use of ordinary
+// function as WorkPoolMembership mutator.
+type WorkPoolMembershipFunc func(context.Context, *ent.WorkPoolMembershipMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f WorkPoolMembershipFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.WorkPoolMembershipMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.WorkPoolMembershipMutation", m)
 }
 
 // The WorkflowBusinessStateFunc type is an adapter to allow the use of ordinary

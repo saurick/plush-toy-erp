@@ -61,6 +61,12 @@ func (_u *QualityInspectionUpdate) SetNillablePurchaseReceiptID(v *int) *Quality
 	return _u
 }
 
+// ClearPurchaseReceiptID clears the value of the "purchase_receipt_id" field.
+func (_u *QualityInspectionUpdate) ClearPurchaseReceiptID() *QualityInspectionUpdate {
+	_u.mutation.ClearPurchaseReceiptID()
+	return _u
+}
+
 // SetPurchaseReceiptItemID sets the "purchase_receipt_item_id" field.
 func (_u *QualityInspectionUpdate) SetPurchaseReceiptItemID(v int) *QualityInspectionUpdate {
 	_u.mutation.SetPurchaseReceiptItemID(v)
@@ -109,6 +115,12 @@ func (_u *QualityInspectionUpdate) SetNillableMaterialID(v *int) *QualityInspect
 	return _u
 }
 
+// ClearMaterialID clears the value of the "material_id" field.
+func (_u *QualityInspectionUpdate) ClearMaterialID() *QualityInspectionUpdate {
+	_u.mutation.ClearMaterialID()
+	return _u
+}
+
 // SetWarehouseID sets the "warehouse_id" field.
 func (_u *QualityInspectionUpdate) SetWarehouseID(v int) *QualityInspectionUpdate {
 	_u.mutation.SetWarehouseID(v)
@@ -120,6 +132,120 @@ func (_u *QualityInspectionUpdate) SetNillableWarehouseID(v *int) *QualityInspec
 	if v != nil {
 		_u.SetWarehouseID(*v)
 	}
+	return _u
+}
+
+// SetSourceType sets the "source_type" field.
+func (_u *QualityInspectionUpdate) SetSourceType(v string) *QualityInspectionUpdate {
+	_u.mutation.SetSourceType(v)
+	return _u
+}
+
+// SetNillableSourceType sets the "source_type" field if the given value is not nil.
+func (_u *QualityInspectionUpdate) SetNillableSourceType(v *string) *QualityInspectionUpdate {
+	if v != nil {
+		_u.SetSourceType(*v)
+	}
+	return _u
+}
+
+// ClearSourceType clears the value of the "source_type" field.
+func (_u *QualityInspectionUpdate) ClearSourceType() *QualityInspectionUpdate {
+	_u.mutation.ClearSourceType()
+	return _u
+}
+
+// SetSourceID sets the "source_id" field.
+func (_u *QualityInspectionUpdate) SetSourceID(v int) *QualityInspectionUpdate {
+	_u.mutation.ResetSourceID()
+	_u.mutation.SetSourceID(v)
+	return _u
+}
+
+// SetNillableSourceID sets the "source_id" field if the given value is not nil.
+func (_u *QualityInspectionUpdate) SetNillableSourceID(v *int) *QualityInspectionUpdate {
+	if v != nil {
+		_u.SetSourceID(*v)
+	}
+	return _u
+}
+
+// AddSourceID adds value to the "source_id" field.
+func (_u *QualityInspectionUpdate) AddSourceID(v int) *QualityInspectionUpdate {
+	_u.mutation.AddSourceID(v)
+	return _u
+}
+
+// ClearSourceID clears the value of the "source_id" field.
+func (_u *QualityInspectionUpdate) ClearSourceID() *QualityInspectionUpdate {
+	_u.mutation.ClearSourceID()
+	return _u
+}
+
+// SetInspectionType sets the "inspection_type" field.
+func (_u *QualityInspectionUpdate) SetInspectionType(v string) *QualityInspectionUpdate {
+	_u.mutation.SetInspectionType(v)
+	return _u
+}
+
+// SetNillableInspectionType sets the "inspection_type" field if the given value is not nil.
+func (_u *QualityInspectionUpdate) SetNillableInspectionType(v *string) *QualityInspectionUpdate {
+	if v != nil {
+		_u.SetInspectionType(*v)
+	}
+	return _u
+}
+
+// ClearInspectionType clears the value of the "inspection_type" field.
+func (_u *QualityInspectionUpdate) ClearInspectionType() *QualityInspectionUpdate {
+	_u.mutation.ClearInspectionType()
+	return _u
+}
+
+// SetSubjectType sets the "subject_type" field.
+func (_u *QualityInspectionUpdate) SetSubjectType(v string) *QualityInspectionUpdate {
+	_u.mutation.SetSubjectType(v)
+	return _u
+}
+
+// SetNillableSubjectType sets the "subject_type" field if the given value is not nil.
+func (_u *QualityInspectionUpdate) SetNillableSubjectType(v *string) *QualityInspectionUpdate {
+	if v != nil {
+		_u.SetSubjectType(*v)
+	}
+	return _u
+}
+
+// ClearSubjectType clears the value of the "subject_type" field.
+func (_u *QualityInspectionUpdate) ClearSubjectType() *QualityInspectionUpdate {
+	_u.mutation.ClearSubjectType()
+	return _u
+}
+
+// SetSubjectID sets the "subject_id" field.
+func (_u *QualityInspectionUpdate) SetSubjectID(v int) *QualityInspectionUpdate {
+	_u.mutation.ResetSubjectID()
+	_u.mutation.SetSubjectID(v)
+	return _u
+}
+
+// SetNillableSubjectID sets the "subject_id" field if the given value is not nil.
+func (_u *QualityInspectionUpdate) SetNillableSubjectID(v *int) *QualityInspectionUpdate {
+	if v != nil {
+		_u.SetSubjectID(*v)
+	}
+	return _u
+}
+
+// AddSubjectID adds value to the "subject_id" field.
+func (_u *QualityInspectionUpdate) AddSubjectID(v int) *QualityInspectionUpdate {
+	_u.mutation.AddSubjectID(v)
+	return _u
+}
+
+// ClearSubjectID clears the value of the "subject_id" field.
+func (_u *QualityInspectionUpdate) ClearSubjectID() *QualityInspectionUpdate {
+	_u.mutation.ClearSubjectID()
 	return _u
 }
 
@@ -378,6 +504,31 @@ func (_u *QualityInspectionUpdate) check() error {
 			return &ValidationError{Name: "warehouse_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.warehouse_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SourceType(); ok {
+		if err := qualityinspection.SourceTypeValidator(v); err != nil {
+			return &ValidationError{Name: "source_type", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.source_type": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SourceID(); ok {
+		if err := qualityinspection.SourceIDValidator(v); err != nil {
+			return &ValidationError{Name: "source_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.source_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.InspectionType(); ok {
+		if err := qualityinspection.InspectionTypeValidator(v); err != nil {
+			return &ValidationError{Name: "inspection_type", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.inspection_type": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SubjectType(); ok {
+		if err := qualityinspection.SubjectTypeValidator(v); err != nil {
+			return &ValidationError{Name: "subject_type", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.subject_type": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SubjectID(); ok {
+		if err := qualityinspection.SubjectIDValidator(v); err != nil {
+			return &ValidationError{Name: "subject_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.subject_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := qualityinspection.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.status": %w`, err)}
@@ -403,14 +554,8 @@ func (_u *QualityInspectionUpdate) check() error {
 			return &ValidationError{Name: "decision_note", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.decision_note": %w`, err)}
 		}
 	}
-	if _u.mutation.PurchaseReceiptCleared() && len(_u.mutation.PurchaseReceiptIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "QualityInspection.purchase_receipt"`)
-	}
 	if _u.mutation.InventoryLotCleared() && len(_u.mutation.InventoryLotIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "QualityInspection.inventory_lot"`)
-	}
-	if _u.mutation.MaterialCleared() && len(_u.mutation.MaterialIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "QualityInspection.material"`)
 	}
 	if _u.mutation.WarehouseCleared() && len(_u.mutation.WarehouseIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "QualityInspection.warehouse"`)
@@ -432,6 +577,42 @@ func (_u *QualityInspectionUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if value, ok := _u.mutation.InspectionNo(); ok {
 		_spec.SetField(qualityinspection.FieldInspectionNo, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SourceType(); ok {
+		_spec.SetField(qualityinspection.FieldSourceType, field.TypeString, value)
+	}
+	if _u.mutation.SourceTypeCleared() {
+		_spec.ClearField(qualityinspection.FieldSourceType, field.TypeString)
+	}
+	if value, ok := _u.mutation.SourceID(); ok {
+		_spec.SetField(qualityinspection.FieldSourceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSourceID(); ok {
+		_spec.AddField(qualityinspection.FieldSourceID, field.TypeInt, value)
+	}
+	if _u.mutation.SourceIDCleared() {
+		_spec.ClearField(qualityinspection.FieldSourceID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.InspectionType(); ok {
+		_spec.SetField(qualityinspection.FieldInspectionType, field.TypeString, value)
+	}
+	if _u.mutation.InspectionTypeCleared() {
+		_spec.ClearField(qualityinspection.FieldInspectionType, field.TypeString)
+	}
+	if value, ok := _u.mutation.SubjectType(); ok {
+		_spec.SetField(qualityinspection.FieldSubjectType, field.TypeString, value)
+	}
+	if _u.mutation.SubjectTypeCleared() {
+		_spec.ClearField(qualityinspection.FieldSubjectType, field.TypeString)
+	}
+	if value, ok := _u.mutation.SubjectID(); ok {
+		_spec.SetField(qualityinspection.FieldSubjectID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSubjectID(); ok {
+		_spec.AddField(qualityinspection.FieldSubjectID, field.TypeInt, value)
+	}
+	if _u.mutation.SubjectIDCleared() {
+		_spec.ClearField(qualityinspection.FieldSubjectID, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(qualityinspection.FieldStatus, field.TypeString, value)
@@ -662,6 +843,12 @@ func (_u *QualityInspectionUpdateOne) SetNillablePurchaseReceiptID(v *int) *Qual
 	return _u
 }
 
+// ClearPurchaseReceiptID clears the value of the "purchase_receipt_id" field.
+func (_u *QualityInspectionUpdateOne) ClearPurchaseReceiptID() *QualityInspectionUpdateOne {
+	_u.mutation.ClearPurchaseReceiptID()
+	return _u
+}
+
 // SetPurchaseReceiptItemID sets the "purchase_receipt_item_id" field.
 func (_u *QualityInspectionUpdateOne) SetPurchaseReceiptItemID(v int) *QualityInspectionUpdateOne {
 	_u.mutation.SetPurchaseReceiptItemID(v)
@@ -710,6 +897,12 @@ func (_u *QualityInspectionUpdateOne) SetNillableMaterialID(v *int) *QualityInsp
 	return _u
 }
 
+// ClearMaterialID clears the value of the "material_id" field.
+func (_u *QualityInspectionUpdateOne) ClearMaterialID() *QualityInspectionUpdateOne {
+	_u.mutation.ClearMaterialID()
+	return _u
+}
+
 // SetWarehouseID sets the "warehouse_id" field.
 func (_u *QualityInspectionUpdateOne) SetWarehouseID(v int) *QualityInspectionUpdateOne {
 	_u.mutation.SetWarehouseID(v)
@@ -721,6 +914,120 @@ func (_u *QualityInspectionUpdateOne) SetNillableWarehouseID(v *int) *QualityIns
 	if v != nil {
 		_u.SetWarehouseID(*v)
 	}
+	return _u
+}
+
+// SetSourceType sets the "source_type" field.
+func (_u *QualityInspectionUpdateOne) SetSourceType(v string) *QualityInspectionUpdateOne {
+	_u.mutation.SetSourceType(v)
+	return _u
+}
+
+// SetNillableSourceType sets the "source_type" field if the given value is not nil.
+func (_u *QualityInspectionUpdateOne) SetNillableSourceType(v *string) *QualityInspectionUpdateOne {
+	if v != nil {
+		_u.SetSourceType(*v)
+	}
+	return _u
+}
+
+// ClearSourceType clears the value of the "source_type" field.
+func (_u *QualityInspectionUpdateOne) ClearSourceType() *QualityInspectionUpdateOne {
+	_u.mutation.ClearSourceType()
+	return _u
+}
+
+// SetSourceID sets the "source_id" field.
+func (_u *QualityInspectionUpdateOne) SetSourceID(v int) *QualityInspectionUpdateOne {
+	_u.mutation.ResetSourceID()
+	_u.mutation.SetSourceID(v)
+	return _u
+}
+
+// SetNillableSourceID sets the "source_id" field if the given value is not nil.
+func (_u *QualityInspectionUpdateOne) SetNillableSourceID(v *int) *QualityInspectionUpdateOne {
+	if v != nil {
+		_u.SetSourceID(*v)
+	}
+	return _u
+}
+
+// AddSourceID adds value to the "source_id" field.
+func (_u *QualityInspectionUpdateOne) AddSourceID(v int) *QualityInspectionUpdateOne {
+	_u.mutation.AddSourceID(v)
+	return _u
+}
+
+// ClearSourceID clears the value of the "source_id" field.
+func (_u *QualityInspectionUpdateOne) ClearSourceID() *QualityInspectionUpdateOne {
+	_u.mutation.ClearSourceID()
+	return _u
+}
+
+// SetInspectionType sets the "inspection_type" field.
+func (_u *QualityInspectionUpdateOne) SetInspectionType(v string) *QualityInspectionUpdateOne {
+	_u.mutation.SetInspectionType(v)
+	return _u
+}
+
+// SetNillableInspectionType sets the "inspection_type" field if the given value is not nil.
+func (_u *QualityInspectionUpdateOne) SetNillableInspectionType(v *string) *QualityInspectionUpdateOne {
+	if v != nil {
+		_u.SetInspectionType(*v)
+	}
+	return _u
+}
+
+// ClearInspectionType clears the value of the "inspection_type" field.
+func (_u *QualityInspectionUpdateOne) ClearInspectionType() *QualityInspectionUpdateOne {
+	_u.mutation.ClearInspectionType()
+	return _u
+}
+
+// SetSubjectType sets the "subject_type" field.
+func (_u *QualityInspectionUpdateOne) SetSubjectType(v string) *QualityInspectionUpdateOne {
+	_u.mutation.SetSubjectType(v)
+	return _u
+}
+
+// SetNillableSubjectType sets the "subject_type" field if the given value is not nil.
+func (_u *QualityInspectionUpdateOne) SetNillableSubjectType(v *string) *QualityInspectionUpdateOne {
+	if v != nil {
+		_u.SetSubjectType(*v)
+	}
+	return _u
+}
+
+// ClearSubjectType clears the value of the "subject_type" field.
+func (_u *QualityInspectionUpdateOne) ClearSubjectType() *QualityInspectionUpdateOne {
+	_u.mutation.ClearSubjectType()
+	return _u
+}
+
+// SetSubjectID sets the "subject_id" field.
+func (_u *QualityInspectionUpdateOne) SetSubjectID(v int) *QualityInspectionUpdateOne {
+	_u.mutation.ResetSubjectID()
+	_u.mutation.SetSubjectID(v)
+	return _u
+}
+
+// SetNillableSubjectID sets the "subject_id" field if the given value is not nil.
+func (_u *QualityInspectionUpdateOne) SetNillableSubjectID(v *int) *QualityInspectionUpdateOne {
+	if v != nil {
+		_u.SetSubjectID(*v)
+	}
+	return _u
+}
+
+// AddSubjectID adds value to the "subject_id" field.
+func (_u *QualityInspectionUpdateOne) AddSubjectID(v int) *QualityInspectionUpdateOne {
+	_u.mutation.AddSubjectID(v)
+	return _u
+}
+
+// ClearSubjectID clears the value of the "subject_id" field.
+func (_u *QualityInspectionUpdateOne) ClearSubjectID() *QualityInspectionUpdateOne {
+	_u.mutation.ClearSubjectID()
 	return _u
 }
 
@@ -992,6 +1299,31 @@ func (_u *QualityInspectionUpdateOne) check() error {
 			return &ValidationError{Name: "warehouse_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.warehouse_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SourceType(); ok {
+		if err := qualityinspection.SourceTypeValidator(v); err != nil {
+			return &ValidationError{Name: "source_type", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.source_type": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SourceID(); ok {
+		if err := qualityinspection.SourceIDValidator(v); err != nil {
+			return &ValidationError{Name: "source_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.source_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.InspectionType(); ok {
+		if err := qualityinspection.InspectionTypeValidator(v); err != nil {
+			return &ValidationError{Name: "inspection_type", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.inspection_type": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SubjectType(); ok {
+		if err := qualityinspection.SubjectTypeValidator(v); err != nil {
+			return &ValidationError{Name: "subject_type", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.subject_type": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SubjectID(); ok {
+		if err := qualityinspection.SubjectIDValidator(v); err != nil {
+			return &ValidationError{Name: "subject_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.subject_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := qualityinspection.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.status": %w`, err)}
@@ -1017,14 +1349,8 @@ func (_u *QualityInspectionUpdateOne) check() error {
 			return &ValidationError{Name: "decision_note", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.decision_note": %w`, err)}
 		}
 	}
-	if _u.mutation.PurchaseReceiptCleared() && len(_u.mutation.PurchaseReceiptIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "QualityInspection.purchase_receipt"`)
-	}
 	if _u.mutation.InventoryLotCleared() && len(_u.mutation.InventoryLotIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "QualityInspection.inventory_lot"`)
-	}
-	if _u.mutation.MaterialCleared() && len(_u.mutation.MaterialIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "QualityInspection.material"`)
 	}
 	if _u.mutation.WarehouseCleared() && len(_u.mutation.WarehouseIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "QualityInspection.warehouse"`)
@@ -1063,6 +1389,42 @@ func (_u *QualityInspectionUpdateOne) sqlSave(ctx context.Context) (_node *Quali
 	}
 	if value, ok := _u.mutation.InspectionNo(); ok {
 		_spec.SetField(qualityinspection.FieldInspectionNo, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SourceType(); ok {
+		_spec.SetField(qualityinspection.FieldSourceType, field.TypeString, value)
+	}
+	if _u.mutation.SourceTypeCleared() {
+		_spec.ClearField(qualityinspection.FieldSourceType, field.TypeString)
+	}
+	if value, ok := _u.mutation.SourceID(); ok {
+		_spec.SetField(qualityinspection.FieldSourceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSourceID(); ok {
+		_spec.AddField(qualityinspection.FieldSourceID, field.TypeInt, value)
+	}
+	if _u.mutation.SourceIDCleared() {
+		_spec.ClearField(qualityinspection.FieldSourceID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.InspectionType(); ok {
+		_spec.SetField(qualityinspection.FieldInspectionType, field.TypeString, value)
+	}
+	if _u.mutation.InspectionTypeCleared() {
+		_spec.ClearField(qualityinspection.FieldInspectionType, field.TypeString)
+	}
+	if value, ok := _u.mutation.SubjectType(); ok {
+		_spec.SetField(qualityinspection.FieldSubjectType, field.TypeString, value)
+	}
+	if _u.mutation.SubjectTypeCleared() {
+		_spec.ClearField(qualityinspection.FieldSubjectType, field.TypeString)
+	}
+	if value, ok := _u.mutation.SubjectID(); ok {
+		_spec.SetField(qualityinspection.FieldSubjectID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSubjectID(); ok {
+		_spec.AddField(qualityinspection.FieldSubjectID, field.TypeInt, value)
+	}
+	if _u.mutation.SubjectIDCleared() {
+		_spec.ClearField(qualityinspection.FieldSubjectID, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(qualityinspection.FieldStatus, field.TypeString, value)

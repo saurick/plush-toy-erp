@@ -439,7 +439,14 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .erp-dev-customer-metrics {
+  .erp-dev-customer-decision-grid,
+  .erp-dev-customer-quick-actions,
+  .erp-dev-customer-review-list,
+  .erp-dev-customer-source-ref-list,
+  .erp-dev-customer-dry-run-metrics,
+  .erp-dev-customer-test-apply-steps,
+  .erp-dev-customer-test-apply-facts,
+  .erp-dev-customer-release-facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -661,6 +668,18 @@
     grid-template-columns: 1fr;
   }
 
+  .erp-dev-customer-asset-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-dev-customer-diff {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-customer-review-item {
+    grid-template-columns: 1fr;
+  }
+
   .erp-dev-capability-sidebar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -804,6 +823,155 @@
     padding: 12px;
   }
 
+  .erp-dev-hub-page,
+  .erp-dev-governance-page,
+  .erp-dev-testing-page,
+  .erp-dev-prototypes-page {
+    padding: 12px;
+  }
+
+  .erp-dev-hub-page *,
+  .erp-dev-governance-page *,
+  .erp-dev-testing-page *,
+  .erp-dev-prototypes-page *,
+  .erp-dev-capability-page * {
+    min-width: 0;
+  }
+
+  .erp-dev-hub-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .erp-dev-hub-toolbar .ant-input-search,
+  .erp-dev-hub-group-filter {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: none;
+  }
+
+  .erp-dev-hub-grid,
+  .erp-dev-hub-pinned__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-capability-header,
+  .erp-dev-governance-header,
+  .erp-dev-testing-header,
+  .erp-dev-prototypes-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    border-radius: 12px;
+    padding: 12px;
+  }
+
+  .erp-dev-governance-header__metrics,
+  .erp-dev-testing-header__stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-width: 0;
+    width: 100%;
+  }
+
+  .erp-dev-capability-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .erp-dev-governance-metric,
+  .erp-dev-testing-metric,
+  .erp-dev-capability-metric {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .erp-dev-testing-metric,
+  .erp-dev-capability-metric {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .erp-dev-testing-metric__icon,
+  .erp-dev-capability-metric__icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    font-size: 15px;
+  }
+
+  .erp-dev-governance-metric__note,
+  .erp-dev-testing-metric__note,
+  .erp-dev-capability-metric__note {
+    display: none;
+  }
+
+  .erp-dev-governance-metric__value,
+  .erp-dev-testing-metric__value,
+  .erp-dev-capability-metric__value {
+    font-size: 20px;
+  }
+
+  .erp-dev-prototypes-header__stats {
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  .erp-dev-prototypes-header__stats > * {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .erp-dev-capability-header__copy,
+  .erp-dev-capability-header__copy > .ant-space {
+    width: 100%;
+  }
+
+  .erp-dev-capability-header__copy > .ant-space {
+    flex-wrap: wrap;
+  }
+
+  .erp-dev-capability-summary.ant-typography {
+    max-width: 100%;
+  }
+
+  .erp-dev-capability-view-switch,
+  .erp-dev-capability-view-switch .ant-segmented {
+    width: 100%;
+  }
+
+  .erp-dev-capability-view-switch .ant-segmented-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .erp-dev-capability-view-switch .ant-segmented-item {
+    min-width: 0;
+  }
+
+  .erp-dev-capability-view-switch .ant-segmented-item-label {
+    padding-inline: 8px;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .erp-dev-capability-source,
+  .erp-dev-capability-row,
+  .erp-dev-capability-row__title,
+  .erp-dev-capability-row__meta,
+  .erp-dev-capability-row__tags,
+  .erp-dev-capability-detail__head,
+  .erp-dev-capability-detail__block,
+  .erp-dev-capability-relation,
+  .erp-dev-capability-panel {
+    overflow-wrap: anywhere;
+  }
+
+  .erp-dev-capability-row__tags .ant-tag,
+  .erp-dev-capability-detail__head .ant-tag {
+    max-width: 100%;
+    white-space: normal;
+  }
+
   .erp-dev-customer-page {
     padding: 12px;
   }
@@ -811,10 +979,16 @@
   .erp-dev-customer-page *,
   .erp-dev-customer-panel-grid,
   .erp-dev-customer-panel,
+  .erp-dev-customer-decision-card,
   .erp-dev-customer-menu-group,
   .erp-dev-customer-field,
   .erp-dev-customer-numbering,
-  .erp-dev-customer-guard {
+  .erp-dev-customer-review-item,
+  .erp-dev-customer-source-ref,
+  .erp-dev-customer-guard,
+  .erp-dev-customer-gate,
+  .erp-dev-customer-asset,
+  .erp-dev-customer-diff {
     min-width: 0;
   }
 
@@ -827,18 +1001,26 @@
   }
 
   .erp-dev-customer-header,
-  .erp-dev-customer-metric,
   .erp-dev-customer-panel {
     border-radius: 12px;
   }
 
-  .erp-dev-capability-metrics,
   .erp-dev-capability-sidebar {
     grid-template-columns: 1fr;
   }
 
-  .erp-dev-customer-metrics,
-  .erp-dev-customer-menu-groups {
+  .erp-dev-customer-decision-grid,
+  .erp-dev-customer-quick-actions,
+  .erp-dev-customer-import-flow,
+  .erp-dev-customer-db-targets,
+  .erp-dev-customer-review-list,
+  .erp-dev-customer-source-ref-list,
+  .erp-dev-customer-menu-groups,
+  .erp-dev-customer-asset-grid,
+  .erp-dev-customer-dry-run-metrics,
+  .erp-dev-customer-test-apply-steps,
+  .erp-dev-customer-test-apply-facts,
+  .erp-dev-customer-release-facts {
     grid-template-columns: 1fr;
   }
 
@@ -862,10 +1044,6 @@
     font-size: 18px;
   }
 
-  .erp-dev-capability-view-switch .ant-segmented-item-label {
-    padding-inline: 8px;
-  }
-
   .erp-dev-customer-view-switch .ant-segmented-item-label {
     padding-inline: 8px;
     white-space: normal;
@@ -883,19 +1061,46 @@
   }
 
   .erp-dev-customer-panel__head,
-  .erp-dev-customer-boundary__head,
+  .erp-dev-customer-decision-card__head,
   .erp-dev-customer-menu-group__title,
+  .erp-dev-customer-review-item__head,
+  .erp-dev-customer-source-ref,
   .erp-dev-customer-field__head,
   .erp-dev-customer-tool__head,
+  .erp-dev-customer-import-step__head,
+  .erp-dev-customer-db-target__head,
+  .erp-dev-customer-formal-gate,
   .erp-dev-customer-guard,
+  .erp-dev-customer-console,
+  .erp-dev-customer-gate,
+  .erp-dev-customer-asset__top,
+  .erp-dev-customer-diff__type,
   .erp-dev-customer-import-flags > div {
     align-items: flex-start;
     flex-direction: column;
   }
 
+  .erp-dev-customer-gate {
+    display: flex;
+  }
+
+  .erp-dev-customer-dry-run-paths {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-customer-db-target__body {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-customer-console__status {
+    justify-items: start;
+    text-align: left;
+  }
+
   .erp-dev-customer-panel__head :where(.ant-typography),
-  .erp-dev-customer-boundary__head :where(.ant-typography),
+  .erp-dev-customer-decision-card__head :where(.ant-typography),
   .erp-dev-customer-menu-group__title :where(.ant-typography),
+  .erp-dev-customer-review-item__head :where(.ant-typography),
   .erp-dev-customer-field__head :where(.ant-typography),
   .erp-dev-customer-tool__head :where(.ant-typography) {
     max-width: 100%;

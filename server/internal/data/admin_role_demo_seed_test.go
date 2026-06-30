@@ -16,13 +16,20 @@ import (
 
 func TestDefaultRoleDemoAdminAccountsExcludeDebugByDefault(t *testing.T) {
 	accounts := DefaultRoleDemoAdminAccounts(false)
-	if len(accounts) != 9 {
-		t.Fatalf("expected 9 default role demo accounts, got %d", len(accounts))
+	if len(accounts) != 10 {
+		t.Fatalf("expected 10 default role demo accounts, got %d", len(accounts))
 	}
+	foundEngineering := false
 	for _, account := range accounts {
 		if account.RoleKey == biz.DebugOperatorRoleKey || account.Username == "demo_debug" {
 			t.Fatalf("debug demo account must be opt-in, got %#v", account)
 		}
+		if account.Username == "demo_engineering" && account.RoleKey == biz.EngineeringRoleKey {
+			foundEngineering = true
+		}
+	}
+	if !foundEngineering {
+		t.Fatalf("expected demo_engineering account")
 	}
 }
 

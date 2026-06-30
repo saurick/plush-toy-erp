@@ -18,6 +18,9 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
+			return id, res, nil
+		}
 		in, ok := salesOrderMutationFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -26,6 +29,9 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 		return id, salesOrderMutationResult(ctx, d, item, err), nil
 	case "update_sales_order", "updateSalesOrder":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
 			return id, res, nil
 		}
 		in, ok := salesOrderMutationFromParams(pm)
@@ -41,6 +47,9 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 			orderPermission = biz.PermissionSalesOrderUpdate
 		}
 		if res := d.RequireAdminPermission(ctx, orderPermission); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
 			return id, res, nil
 		}
 		in, ok := salesOrderMutationFromParams(pm)

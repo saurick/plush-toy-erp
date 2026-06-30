@@ -9,6 +9,7 @@ export const MOBILE_ROLE_PERMISSION_MAP = Object.freeze({
   quality: 'mobile.quality.access',
   finance: 'mobile.finance.access',
   pmc: 'mobile.pmc.access',
+  engineering: 'mobile.engineering.access',
 })
 
 function normalizeStringList(values = []) {

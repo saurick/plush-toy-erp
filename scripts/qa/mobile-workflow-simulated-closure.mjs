@@ -410,14 +410,27 @@ async function createTask(plan, tokens, task) {
 }
 
 async function updateTask(plan, tokens, task, action) {
+  const methodByStatus = {
+    done: "complete_task_action",
+    blocked: "block_task_action",
+    rejected: "reject_task_action",
+  };
+  const actionKeyByStatus = {
+    done: "complete",
+    blocked: "block",
+    rejected: "reject",
+  };
+  const method = methodByStatus[action.nextStatus];
+  if (!method) {
+    throw new CliError(`unsupported workflow task status action: ${action.nextStatus}`);
+  }
   const data = await rpcCall({
     backendURL: plan.backendURL,
     domain: "workflow",
-    method: "update_task_status",
+    method,
     params: {
-      id: task.id,
-      task_status_key: action.nextStatus,
-      actor_role_key: action.role,
+      task_id: task.id,
+      action_key: actionKeyByStatus[action.nextStatus],
       reason: action.reason,
       payload: {
         ...(task.payload || {}),

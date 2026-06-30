@@ -17,10 +17,16 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments"); res != nil {
+			return id, res, nil
+		}
 		item, err := d.operationalFactUC.CreateShipmentDraft(ctx, shipmentCreateFromParams(pm))
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "create_shipment_with_items", "createShipmentWithItems":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments"); res != nil {
 			return id, res, nil
 		}
 		in, ok := shipmentCreateWithItemsFromParams(pm)
@@ -33,6 +39,9 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments"); res != nil {
+			return id, res, nil
+		}
 		in, ok := shipmentItemCreateFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -43,10 +52,16 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentShip); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments", "inventory"); res != nil {
+			return id, res, nil
+		}
 		item, err := d.operationalFactUC.ShipShipment(ctx, getInt(pm, "id", 0))
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "cancel_shipment", "cancelShipment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCancel); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments", "inventory"); res != nil {
 			return id, res, nil
 		}
 		item, err := d.operationalFactUC.CancelShippedShipment(ctx, getInt(pm, "id", 0))

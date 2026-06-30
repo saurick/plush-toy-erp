@@ -1,3 +1,5 @@
+import { effectiveSessionAllowsAction } from './adminProfileSync.mjs'
+
 export const V1_ROUTE_PATHS = Object.freeze({
   customers: '/erp/master/partners/customers',
   suppliers: '/erp/master/partners/suppliers',
@@ -153,12 +155,12 @@ export function hasActionPermission(admin = {}, permissionKey = '') {
   if (!permissionKey) {
     return false
   }
-  if (admin?.is_super_admin === true) {
-    return true
-  }
-  return Array.isArray(admin?.permissions)
-    ? admin.permissions.includes(permissionKey)
-    : false
+  const rbacAllowed =
+    admin?.is_super_admin === true ||
+    (Array.isArray(admin?.permissions)
+      ? admin.permissions.includes(permissionKey)
+      : false)
+  return rbacAllowed && effectiveSessionAllowsAction(admin, permissionKey)
 }
 
 export function trimOptional(value) {

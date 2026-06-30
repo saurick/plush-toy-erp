@@ -730,3 +730,106 @@ func TestWorkflowUsecase_FinishedGoodsInboundBlockedBusinessStatusStillUsesSpeci
 		t.Fatalf("expected blocked business state, got %#v", repo.updateTaskInput.SideEffects.BusinessState)
 	}
 }
+
+func TestWorkflowUsecase_FinishedGoodsReworkDoneWritesProductionProcessingState(t *testing.T) {
+	repo := &stubWorkflowRepo{currentTask: finishedGoodsReworkWorkflowTask()}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1301,
+		TaskStatusKey: "done",
+		Payload:       map[string]any{},
+	}, 7, "production")
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if repo.updateTaskInput.BusinessStatusKey != workflowProductionProcessingStatusKey {
+		t.Fatalf("expected production_processing business status, got %q", repo.updateTaskInput.BusinessStatusKey)
+	}
+	if repo.updateTaskInput.Payload["decision"] != "done" ||
+		repo.updateTaskInput.Payload["transition_status"] != "done" ||
+		repo.updateTaskInput.Payload["rework_task_id"] != 1301 ||
+		repo.updateTaskInput.Payload["rework_result"] != "arranged" ||
+		repo.updateTaskInput.Payload["finished_goods"] != true {
+		t.Fatalf("expected rework done update payload, got %#v", repo.updateTaskInput.Payload)
+	}
+	effects := repo.updateTaskInput.SideEffects
+	if effects == nil || effects.BusinessState == nil {
+		t.Fatalf("expected finished goods rework done side effects, got %#v", effects)
+	}
+	if effects.DerivedTask != nil {
+		t.Fatalf("finished goods rework done must not derive downstream task, got %#v", effects.DerivedTask)
+	}
+	if effects.WorkflowRuleKey != "finished_goods_rework_done_to_production_processing" {
+		t.Fatalf("expected finished goods rework done rule key, got %q", effects.WorkflowRuleKey)
+	}
+	if effects.BusinessState.BusinessStatusKey != workflowProductionProcessingStatusKey ||
+		effects.BusinessState.OwnerRoleKey == nil ||
+		*effects.BusinessState.OwnerRoleKey != "production" {
+		t.Fatalf("unexpected rework done business state %#v", effects.BusinessState)
+	}
+	if effects.BusinessState.Payload["rework_task_id"] != 1301 ||
+		effects.BusinessState.Payload["rework_result"] != "arranged" ||
+		effects.BusinessState.Payload["finished_goods"] != true {
+		t.Fatalf("expected rework done state payload, got %#v", effects.BusinessState.Payload)
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsReworkBlockedRequiresReason(t *testing.T) {
+	repo := &stubWorkflowRepo{currentTask: finishedGoodsReworkWorkflowTask()}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1301,
+		TaskStatusKey: "blocked",
+		Reason:        " ",
+		Payload:       map[string]any{},
+	}, 7, "production")
+	if !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected ErrBadParam, got %v", err)
+	}
+	if repo.updateTaskInput != nil {
+		t.Fatalf("repo update should not be called without reason")
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsReworkBlockedWritesQCFailedState(t *testing.T) {
+	repo := &stubWorkflowRepo{currentTask: finishedGoodsReworkWorkflowTask()}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1301,
+		TaskStatusKey: "blocked",
+		Reason:        "返工线等待确认",
+		Payload:       map[string]any{},
+	}, 7, "production")
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if repo.updateTaskInput.BusinessStatusKey != workflowQCFailedStatusKey {
+		t.Fatalf("expected qc_failed business status, got %q", repo.updateTaskInput.BusinessStatusKey)
+	}
+	if repo.updateTaskInput.Payload["decision"] != "blocked" ||
+		repo.updateTaskInput.Payload["transition_status"] != "blocked" ||
+		repo.updateTaskInput.Payload["blocked_reason"] != "返工线等待确认" ||
+		repo.updateTaskInput.Payload["finished_goods"] != true {
+		t.Fatalf("expected rework blocked update payload, got %#v", repo.updateTaskInput.Payload)
+	}
+	effects := repo.updateTaskInput.SideEffects
+	if effects == nil || effects.BusinessState == nil {
+		t.Fatalf("expected finished goods rework blocked side effects, got %#v", effects)
+	}
+	if effects.DerivedTask != nil {
+		t.Fatalf("finished goods rework blocked must not derive downstream task, got %#v", effects.DerivedTask)
+	}
+	if effects.WorkflowRuleKey != "finished_goods_rework_blocked_to_qc_failed" {
+		t.Fatalf("expected finished goods rework blocked rule key, got %q", effects.WorkflowRuleKey)
+	}
+	if effects.BusinessState.BusinessStatusKey != workflowQCFailedStatusKey ||
+		effects.BusinessState.OwnerRoleKey == nil ||
+		*effects.BusinessState.OwnerRoleKey != "production" ||
+		effects.BusinessState.BlockedReason == nil ||
+		*effects.BusinessState.BlockedReason != "返工线等待确认" {
+		t.Fatalf("unexpected rework blocked business state %#v", effects.BusinessState)
+	}
+}

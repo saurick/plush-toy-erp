@@ -254,7 +254,6 @@
   }
 
   .erp-dev-hub-header,
-  .erp-dev-hub-governance,
   .erp-dev-hub-toolbar,
   .erp-dev-testing-header,
   .erp-dev-testing-reader__toolbar,
@@ -268,12 +267,6 @@
   .erp-dev-prototypes-fullscreen__bar {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .erp-dev-hub-header__metrics {
-    grid-template-columns: 1fr;
-    width: 100%;
-    min-width: 0;
   }
 
   .erp-dev-governance-header__metrics {

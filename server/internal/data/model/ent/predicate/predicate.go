@@ -6,6 +6,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 )
 
+// AccessEntitlement is the predicate function for accessentitlement builders.
+type AccessEntitlement func(*sql.Selector)
+
 // AdminUser is the predicate function for adminuser builders.
 type AdminUser func(*sql.Selector)
 
@@ -26,6 +29,12 @@ type Contact func(*sql.Selector)
 
 // Customer is the predicate function for customer builders.
 type Customer func(*sql.Selector)
+
+// CustomerConfigRevision is the predicate function for customerconfigrevision builders.
+type CustomerConfigRevision func(*sql.Selector)
+
+// DeploymentModuleState is the predicate function for deploymentmodulestate builders.
+type DeploymentModuleState func(*sql.Selector)
 
 // FinanceFact is the predicate function for financefact builders.
 type FinanceFact func(*sql.Selector)
@@ -56,6 +65,12 @@ type Permission func(*sql.Selector)
 
 // Process is the predicate function for process builders.
 type Process func(*sql.Selector)
+
+// ProcessInstance is the predicate function for processinstance builders.
+type ProcessInstance func(*sql.Selector)
+
+// ProcessNodeInstance is the predicate function for processnodeinstance builders.
+type ProcessNodeInstance func(*sql.Selector)
 
 // Product is the predicate function for product builders.
 type Product func(*sql.Selector)
@@ -99,6 +114,9 @@ type Role func(*sql.Selector)
 // RolePermission is the predicate function for rolepermission builders.
 type RolePermission func(*sql.Selector)
 
+// RoleProfile is the predicate function for roleprofile builders.
+type RoleProfile func(*sql.Selector)
+
 // RuntimeAuditEvent is the predicate function for runtimeauditevent builders.
 type RuntimeAuditEvent func(*sql.Selector)
 
@@ -128,6 +146,12 @@ type Unit func(*sql.Selector)
 
 // Warehouse is the predicate function for warehouse builders.
 type Warehouse func(*sql.Selector)
+
+// WorkPool is the predicate function for workpool builders.
+type WorkPool func(*sql.Selector)
+
+// WorkPoolMembership is the predicate function for workpoolmembership builders.
+type WorkPoolMembership func(*sql.Selector)
 
 // WorkflowBusinessState is the predicate function for workflowbusinessstate builders.
 type WorkflowBusinessState func(*sql.Selector)

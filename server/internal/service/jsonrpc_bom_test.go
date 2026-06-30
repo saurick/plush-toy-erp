@@ -17,7 +17,7 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	data, client := openInventoryRepoTestData(t, "jsonrpc_bom_version")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 
-	j := newBOMJSONRPCTestData(data, workflowJSONRPCAdmin(
+	j := newBOMJSONRPCTestData(t, data, workflowJSONRPCAdmin(
 		[]string{biz.PMCRoleKey},
 		biz.PermissionBOMRead,
 		biz.PermissionBOMCreate,
@@ -142,7 +142,7 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 
 func TestJsonrpcDispatcher_BOMAPIRequiresDedicatedPermissions(t *testing.T) {
 	data, _ := openInventoryRepoTestData(t, "jsonrpc_bom_permissions")
-	j := newBOMJSONRPCTestData(data, workflowJSONRPCAdmin([]string{biz.PMCRoleKey}, biz.PermissionBOMRead))
+	j := newBOMJSONRPCTestData(t, data, workflowJSONRPCAdmin([]string{biz.PMCRoleKey}, biz.PermissionBOMRead))
 
 	_, createRes, err := j.handleBOM(workflowJSONRPCAdminContext(), "create_bom_draft", "1", mustJSONRPCStruct(t, map[string]any{
 		"product_id": float64(1),
@@ -164,11 +164,122 @@ func TestJsonrpcDispatcher_BOMAPIRequiresDedicatedPermissions(t *testing.T) {
 	}
 }
 
-func newBOMJSONRPCTestData(data *datarepo.Data, admin *biz.AdminUser) *jsonrpcDispatcher {
-	logger := log.NewStdLogger(io.Discard)
-	return &jsonrpcDispatcher{
-		log:         log.NewHelper(log.With(logger, "module", "service.jsonrpc.bom.test")),
-		adminReader: stubAdminAccountReader{admin: admin},
-		inventoryUC: biz.NewInventoryUsecase(datarepo.NewInventoryRepo(data, logger)),
+func TestJsonrpcDispatcher_BOMAPIRequiresEnabledModule(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "jsonrpc_bom_module_gate")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+
+	j := newBOMJSONRPCTestData(t, data, workflowJSONRPCAdmin(
+		[]string{biz.EngineeringRoleKey},
+		biz.PermissionBOMRead,
+		biz.PermissionBOMCreate,
+		biz.PermissionBOMUpdate,
+		biz.PermissionBOMActivate,
+	))
+	adminCtx := workflowJSONRPCAdminContext()
+	createParams := mustJSONRPCStruct(t, map[string]any{
+		"product_id": float64(fixtures.productID),
+		"version":    "MODULE-GATE-V1",
+	})
+
+	readOnlyConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.material-bom-read-only",
+		"material_bom",
+		"read_only",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, readOnlyConfig)
+	_, createRes, err := j.handleBOM(adminCtx, "create_bom_draft", "read-only-create", createParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
 	}
+	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected read_only material_bom create rejected, got %#v", createRes)
+	}
+	_, listRes, err := j.handleBOM(adminCtx, "list_bom_versions", "read-after-read-only", mustJSONRPCStruct(t, map[string]any{
+		"product_id": float64(fixtures.productID),
+		"limit":      float64(20),
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err listing historical BOM versions, got %v", err)
+	}
+	if listRes == nil || listRes.Code != errcode.OK.Code {
+		t.Fatalf("expected list_bom_versions to remain available for historical read, got %#v", listRes)
+	}
+
+	enabledConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.material-bom-enabled",
+		"material_bom",
+		"enabled",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, enabledConfig)
+	_, createRes, err = j.handleBOM(adminCtx, "create_bom_draft", "enabled-create", createParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if createRes == nil || createRes.Code != errcode.OK.Code {
+		t.Fatalf("expected enabled material_bom create OK, got %#v", createRes)
+	}
+	headerID := jsonRPCInt(t, jsonRPCNestedMap(t, createRes, "bom_version"), "id")
+	_, addItemRes, err := j.handleBOM(adminCtx, "add_bom_item", "enabled-add-item", mustJSONRPCStruct(t, map[string]any{
+		"bom_header_id": float64(headerID),
+		"material_id":   float64(fixtures.materialID),
+		"quantity":      "2",
+		"unit_id":       float64(fixtures.unitID),
+		"loss_rate":     "0",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if addItemRes == nil || addItemRes.Code != errcode.OK.Code {
+		t.Fatalf("expected enabled material_bom add item OK, got %#v", addItemRes)
+	}
+
+	disabledConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.material-bom-disabled",
+		"material_bom",
+		"disabled",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, disabledConfig)
+	_, activateRes, err := j.handleBOM(adminCtx, "activate_bom_version", "disabled-activate", mustJSONRPCStruct(t, map[string]any{"id": float64(headerID)}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if activateRes == nil || activateRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected disabled material_bom activate rejected, got %#v", activateRes)
+	}
+	_, getRes, err := j.handleBOM(adminCtx, "get_bom_version", "read-after-disabled", mustJSONRPCStruct(t, map[string]any{"id": float64(headerID)}))
+	if err != nil {
+		t.Fatalf("expected nil err reading historical BOM version, got %v", err)
+	}
+	if getRes == nil || getRes.Code != errcode.OK.Code {
+		t.Fatalf("expected get_bom_version to remain available for historical read, got %#v", getRes)
+	}
+	if status := jsonRPCNestedMap(t, getRes, "bom_version")["status"]; status != biz.BOMStatusDraft {
+		t.Fatalf("disabled material_bom must not activate BOM version, got status=%#v", status)
+	}
+}
+
+func newBOMJSONRPCTestData(t *testing.T, data *datarepo.Data, admin *biz.AdminUser) *jsonrpcDispatcher {
+	t.Helper()
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(logger, "module", "service.jsonrpc.bom.test")),
+		adminReader:      stubAdminAccountReader{admin: admin},
+		inventoryUC:      biz.NewInventoryUsecase(datarepo.NewInventoryRepo(data, logger)),
+		customerConfigUC: biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo()),
+	}
+	activateOperationalFactTestCustomerConfig(t, dispatcher, customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.material-bom-default-enabled",
+		"material_bom",
+		"enabled",
+	))
+	return dispatcher
 }

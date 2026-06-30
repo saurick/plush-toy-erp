@@ -20,7 +20,7 @@ import (
 func TestParseRenderTemplatePDFRequest(t *testing.T) {
 	t.Parallel()
 
-	body := `{"title":"采购合同","file_name":"purchase.pdf","template_key":"material-purchase-contract","html":"<html><body>ok</body></html>","base_url":"http://localhost:5173/erp/print-workspace/material-purchase-contract"}`
+	body := `{"title":"采购合同","file_name":"purchase.pdf","template_key":"material-purchase-contract","customer_key":" yoyoosun ","html":"<html><body>ok</body></html>","base_url":"http://localhost:5173/erp/print-workspace/material-purchase-contract"}`
 	req := httptest.NewRequest("POST", "/templates/render-pdf", bytes.NewBufferString(body))
 
 	parsed, err := parseRenderTemplatePDFRequest(req)
@@ -33,6 +33,9 @@ func TestParseRenderTemplatePDFRequest(t *testing.T) {
 	}
 	if parsed.TemplateKey != "material-purchase-contract" {
 		t.Fatalf("TemplateKey = %q", parsed.TemplateKey)
+	}
+	if parsed.CustomerKey != biz.DefaultCustomerKey {
+		t.Fatalf("CustomerKey = %q", parsed.CustomerKey)
 	}
 }
 
@@ -85,6 +88,93 @@ func TestBuildRenderPDFFilename(t *testing.T) {
 		if got := buildRenderPDFFilename(tc.in, ""); got != tc.want {
 			t.Fatalf("buildRenderPDFFilename(%q) = %q, want %q", tc.in, got, tc.want)
 		}
+	}
+}
+
+type stubTemplatePDFModuleGuard struct {
+	customerKey string
+	moduleKeys  []string
+	err         error
+}
+
+func (g *stubTemplatePDFModuleGuard) EnsureModuleKeysEnabled(_ context.Context, customerKey string, moduleKeys ...string) error {
+	g.customerKey = customerKey
+	g.moduleKeys = append([]string(nil), moduleKeys...)
+	return g.err
+}
+
+func TestTemplatePDFReferencedModuleKeys(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		templateKey string
+		want        []string
+	}{
+		{templateKey: "material-purchase-contract", want: []string{"purchase_orders"}},
+		{templateKey: "processing-contract", want: []string{"outsourcing_orders"}},
+		{templateKey: "unknown-template", want: nil},
+	}
+
+	for _, tt := range tests {
+		if got := templatePDFReferencedModuleKeys(tt.templateKey); strings.Join(got, ",") != strings.Join(tt.want, ",") {
+			t.Fatalf("templatePDFReferencedModuleKeys(%q) = %#v, want %#v", tt.templateKey, got, tt.want)
+		}
+	}
+}
+
+func TestEnforceTemplatePDFModulesEnabled(t *testing.T) {
+	t.Parallel()
+
+	guard := &stubTemplatePDFModuleGuard{}
+	if err := enforceTemplatePDFModulesEnabled(
+		context.Background(),
+		guard,
+		"",
+		"material-purchase-contract",
+	); err != nil {
+		t.Fatalf("enforceTemplatePDFModulesEnabled() error = %v", err)
+	}
+	if guard.customerKey != biz.DefaultCustomerKey {
+		t.Fatalf("customerKey = %q, want default", guard.customerKey)
+	}
+	if strings.Join(guard.moduleKeys, ",") != "purchase_orders" {
+		t.Fatalf("moduleKeys = %#v", guard.moduleKeys)
+	}
+
+	disabledGuard := &stubTemplatePDFModuleGuard{err: biz.ErrBadParam}
+	if err := enforceTemplatePDFModulesEnabled(
+		context.Background(),
+		disabledGuard,
+		"yoyoosun",
+		"processing-contract",
+	); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected ErrBadParam for disabled module, got %v", err)
+	}
+	if strings.Join(disabledGuard.moduleKeys, ",") != "outsourcing_orders" {
+		t.Fatalf("moduleKeys = %#v", disabledGuard.moduleKeys)
+	}
+
+	noGuardErr := enforceTemplatePDFModulesEnabled(
+		context.Background(),
+		nil,
+		"yoyoosun",
+		"material-purchase-contract",
+	)
+	if noGuardErr != nil {
+		t.Fatalf("nil guard should not block legacy tests, got %v", noGuardErr)
+	}
+
+	unknownGuard := &stubTemplatePDFModuleGuard{err: biz.ErrBadParam}
+	if err := enforceTemplatePDFModulesEnabled(
+		context.Background(),
+		unknownGuard,
+		"yoyoosun",
+		"unknown-template",
+	); err != nil {
+		t.Fatalf("unknown template should not be module gated, got %v", err)
+	}
+	if len(unknownGuard.moduleKeys) != 0 {
+		t.Fatalf("unknown template should not call guard, got %#v", unknownGuard.moduleKeys)
 	}
 }
 

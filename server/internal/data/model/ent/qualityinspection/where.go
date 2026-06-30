@@ -85,6 +85,31 @@ func WarehouseID(v int) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldEQ(FieldWarehouseID, v))
 }
 
+// SourceType applies equality check predicate on the "source_type" field. It's identical to SourceTypeEQ.
+func SourceType(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldSourceType, v))
+}
+
+// SourceID applies equality check predicate on the "source_id" field. It's identical to SourceIDEQ.
+func SourceID(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldSourceID, v))
+}
+
+// InspectionType applies equality check predicate on the "inspection_type" field. It's identical to InspectionTypeEQ.
+func InspectionType(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldInspectionType, v))
+}
+
+// SubjectType applies equality check predicate on the "subject_type" field. It's identical to SubjectTypeEQ.
+func SubjectType(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldSubjectType, v))
+}
+
+// SubjectID applies equality check predicate on the "subject_id" field. It's identical to SubjectIDEQ.
+func SubjectID(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldSubjectID, v))
+}
+
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
 func Status(v string) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldEQ(FieldStatus, v))
@@ -210,6 +235,16 @@ func PurchaseReceiptIDNotIn(vs ...int) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldNotIn(FieldPurchaseReceiptID, vs...))
 }
 
+// PurchaseReceiptIDIsNil applies the IsNil predicate on the "purchase_receipt_id" field.
+func PurchaseReceiptIDIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldPurchaseReceiptID))
+}
+
+// PurchaseReceiptIDNotNil applies the NotNil predicate on the "purchase_receipt_id" field.
+func PurchaseReceiptIDNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldPurchaseReceiptID))
+}
+
 // PurchaseReceiptItemIDEQ applies the EQ predicate on the "purchase_receipt_item_id" field.
 func PurchaseReceiptItemIDEQ(v int) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldEQ(FieldPurchaseReceiptItemID, v))
@@ -280,6 +315,16 @@ func MaterialIDNotIn(vs ...int) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldNotIn(FieldMaterialID, vs...))
 }
 
+// MaterialIDIsNil applies the IsNil predicate on the "material_id" field.
+func MaterialIDIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldMaterialID))
+}
+
+// MaterialIDNotNil applies the NotNil predicate on the "material_id" field.
+func MaterialIDNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldMaterialID))
+}
+
 // WarehouseIDEQ applies the EQ predicate on the "warehouse_id" field.
 func WarehouseIDEQ(v int) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldEQ(FieldWarehouseID, v))
@@ -298,6 +343,331 @@ func WarehouseIDIn(vs ...int) predicate.QualityInspection {
 // WarehouseIDNotIn applies the NotIn predicate on the "warehouse_id" field.
 func WarehouseIDNotIn(vs ...int) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldNotIn(FieldWarehouseID, vs...))
+}
+
+// SourceTypeEQ applies the EQ predicate on the "source_type" field.
+func SourceTypeEQ(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldSourceType, v))
+}
+
+// SourceTypeNEQ applies the NEQ predicate on the "source_type" field.
+func SourceTypeNEQ(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNEQ(FieldSourceType, v))
+}
+
+// SourceTypeIn applies the In predicate on the "source_type" field.
+func SourceTypeIn(vs ...string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIn(FieldSourceType, vs...))
+}
+
+// SourceTypeNotIn applies the NotIn predicate on the "source_type" field.
+func SourceTypeNotIn(vs ...string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotIn(FieldSourceType, vs...))
+}
+
+// SourceTypeGT applies the GT predicate on the "source_type" field.
+func SourceTypeGT(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGT(FieldSourceType, v))
+}
+
+// SourceTypeGTE applies the GTE predicate on the "source_type" field.
+func SourceTypeGTE(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGTE(FieldSourceType, v))
+}
+
+// SourceTypeLT applies the LT predicate on the "source_type" field.
+func SourceTypeLT(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLT(FieldSourceType, v))
+}
+
+// SourceTypeLTE applies the LTE predicate on the "source_type" field.
+func SourceTypeLTE(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLTE(FieldSourceType, v))
+}
+
+// SourceTypeContains applies the Contains predicate on the "source_type" field.
+func SourceTypeContains(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldContains(FieldSourceType, v))
+}
+
+// SourceTypeHasPrefix applies the HasPrefix predicate on the "source_type" field.
+func SourceTypeHasPrefix(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldHasPrefix(FieldSourceType, v))
+}
+
+// SourceTypeHasSuffix applies the HasSuffix predicate on the "source_type" field.
+func SourceTypeHasSuffix(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldHasSuffix(FieldSourceType, v))
+}
+
+// SourceTypeIsNil applies the IsNil predicate on the "source_type" field.
+func SourceTypeIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldSourceType))
+}
+
+// SourceTypeNotNil applies the NotNil predicate on the "source_type" field.
+func SourceTypeNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldSourceType))
+}
+
+// SourceTypeEqualFold applies the EqualFold predicate on the "source_type" field.
+func SourceTypeEqualFold(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEqualFold(FieldSourceType, v))
+}
+
+// SourceTypeContainsFold applies the ContainsFold predicate on the "source_type" field.
+func SourceTypeContainsFold(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldContainsFold(FieldSourceType, v))
+}
+
+// SourceIDEQ applies the EQ predicate on the "source_id" field.
+func SourceIDEQ(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldSourceID, v))
+}
+
+// SourceIDNEQ applies the NEQ predicate on the "source_id" field.
+func SourceIDNEQ(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNEQ(FieldSourceID, v))
+}
+
+// SourceIDIn applies the In predicate on the "source_id" field.
+func SourceIDIn(vs ...int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIn(FieldSourceID, vs...))
+}
+
+// SourceIDNotIn applies the NotIn predicate on the "source_id" field.
+func SourceIDNotIn(vs ...int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotIn(FieldSourceID, vs...))
+}
+
+// SourceIDGT applies the GT predicate on the "source_id" field.
+func SourceIDGT(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGT(FieldSourceID, v))
+}
+
+// SourceIDGTE applies the GTE predicate on the "source_id" field.
+func SourceIDGTE(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGTE(FieldSourceID, v))
+}
+
+// SourceIDLT applies the LT predicate on the "source_id" field.
+func SourceIDLT(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLT(FieldSourceID, v))
+}
+
+// SourceIDLTE applies the LTE predicate on the "source_id" field.
+func SourceIDLTE(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLTE(FieldSourceID, v))
+}
+
+// SourceIDIsNil applies the IsNil predicate on the "source_id" field.
+func SourceIDIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldSourceID))
+}
+
+// SourceIDNotNil applies the NotNil predicate on the "source_id" field.
+func SourceIDNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldSourceID))
+}
+
+// InspectionTypeEQ applies the EQ predicate on the "inspection_type" field.
+func InspectionTypeEQ(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldInspectionType, v))
+}
+
+// InspectionTypeNEQ applies the NEQ predicate on the "inspection_type" field.
+func InspectionTypeNEQ(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNEQ(FieldInspectionType, v))
+}
+
+// InspectionTypeIn applies the In predicate on the "inspection_type" field.
+func InspectionTypeIn(vs ...string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIn(FieldInspectionType, vs...))
+}
+
+// InspectionTypeNotIn applies the NotIn predicate on the "inspection_type" field.
+func InspectionTypeNotIn(vs ...string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotIn(FieldInspectionType, vs...))
+}
+
+// InspectionTypeGT applies the GT predicate on the "inspection_type" field.
+func InspectionTypeGT(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGT(FieldInspectionType, v))
+}
+
+// InspectionTypeGTE applies the GTE predicate on the "inspection_type" field.
+func InspectionTypeGTE(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGTE(FieldInspectionType, v))
+}
+
+// InspectionTypeLT applies the LT predicate on the "inspection_type" field.
+func InspectionTypeLT(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLT(FieldInspectionType, v))
+}
+
+// InspectionTypeLTE applies the LTE predicate on the "inspection_type" field.
+func InspectionTypeLTE(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLTE(FieldInspectionType, v))
+}
+
+// InspectionTypeContains applies the Contains predicate on the "inspection_type" field.
+func InspectionTypeContains(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldContains(FieldInspectionType, v))
+}
+
+// InspectionTypeHasPrefix applies the HasPrefix predicate on the "inspection_type" field.
+func InspectionTypeHasPrefix(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldHasPrefix(FieldInspectionType, v))
+}
+
+// InspectionTypeHasSuffix applies the HasSuffix predicate on the "inspection_type" field.
+func InspectionTypeHasSuffix(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldHasSuffix(FieldInspectionType, v))
+}
+
+// InspectionTypeIsNil applies the IsNil predicate on the "inspection_type" field.
+func InspectionTypeIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldInspectionType))
+}
+
+// InspectionTypeNotNil applies the NotNil predicate on the "inspection_type" field.
+func InspectionTypeNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldInspectionType))
+}
+
+// InspectionTypeEqualFold applies the EqualFold predicate on the "inspection_type" field.
+func InspectionTypeEqualFold(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEqualFold(FieldInspectionType, v))
+}
+
+// InspectionTypeContainsFold applies the ContainsFold predicate on the "inspection_type" field.
+func InspectionTypeContainsFold(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldContainsFold(FieldInspectionType, v))
+}
+
+// SubjectTypeEQ applies the EQ predicate on the "subject_type" field.
+func SubjectTypeEQ(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldSubjectType, v))
+}
+
+// SubjectTypeNEQ applies the NEQ predicate on the "subject_type" field.
+func SubjectTypeNEQ(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNEQ(FieldSubjectType, v))
+}
+
+// SubjectTypeIn applies the In predicate on the "subject_type" field.
+func SubjectTypeIn(vs ...string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIn(FieldSubjectType, vs...))
+}
+
+// SubjectTypeNotIn applies the NotIn predicate on the "subject_type" field.
+func SubjectTypeNotIn(vs ...string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotIn(FieldSubjectType, vs...))
+}
+
+// SubjectTypeGT applies the GT predicate on the "subject_type" field.
+func SubjectTypeGT(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGT(FieldSubjectType, v))
+}
+
+// SubjectTypeGTE applies the GTE predicate on the "subject_type" field.
+func SubjectTypeGTE(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGTE(FieldSubjectType, v))
+}
+
+// SubjectTypeLT applies the LT predicate on the "subject_type" field.
+func SubjectTypeLT(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLT(FieldSubjectType, v))
+}
+
+// SubjectTypeLTE applies the LTE predicate on the "subject_type" field.
+func SubjectTypeLTE(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLTE(FieldSubjectType, v))
+}
+
+// SubjectTypeContains applies the Contains predicate on the "subject_type" field.
+func SubjectTypeContains(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldContains(FieldSubjectType, v))
+}
+
+// SubjectTypeHasPrefix applies the HasPrefix predicate on the "subject_type" field.
+func SubjectTypeHasPrefix(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldHasPrefix(FieldSubjectType, v))
+}
+
+// SubjectTypeHasSuffix applies the HasSuffix predicate on the "subject_type" field.
+func SubjectTypeHasSuffix(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldHasSuffix(FieldSubjectType, v))
+}
+
+// SubjectTypeIsNil applies the IsNil predicate on the "subject_type" field.
+func SubjectTypeIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldSubjectType))
+}
+
+// SubjectTypeNotNil applies the NotNil predicate on the "subject_type" field.
+func SubjectTypeNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldSubjectType))
+}
+
+// SubjectTypeEqualFold applies the EqualFold predicate on the "subject_type" field.
+func SubjectTypeEqualFold(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEqualFold(FieldSubjectType, v))
+}
+
+// SubjectTypeContainsFold applies the ContainsFold predicate on the "subject_type" field.
+func SubjectTypeContainsFold(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldContainsFold(FieldSubjectType, v))
+}
+
+// SubjectIDEQ applies the EQ predicate on the "subject_id" field.
+func SubjectIDEQ(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldSubjectID, v))
+}
+
+// SubjectIDNEQ applies the NEQ predicate on the "subject_id" field.
+func SubjectIDNEQ(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNEQ(FieldSubjectID, v))
+}
+
+// SubjectIDIn applies the In predicate on the "subject_id" field.
+func SubjectIDIn(vs ...int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIn(FieldSubjectID, vs...))
+}
+
+// SubjectIDNotIn applies the NotIn predicate on the "subject_id" field.
+func SubjectIDNotIn(vs ...int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotIn(FieldSubjectID, vs...))
+}
+
+// SubjectIDGT applies the GT predicate on the "subject_id" field.
+func SubjectIDGT(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGT(FieldSubjectID, v))
+}
+
+// SubjectIDGTE applies the GTE predicate on the "subject_id" field.
+func SubjectIDGTE(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGTE(FieldSubjectID, v))
+}
+
+// SubjectIDLT applies the LT predicate on the "subject_id" field.
+func SubjectIDLT(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLT(FieldSubjectID, v))
+}
+
+// SubjectIDLTE applies the LTE predicate on the "subject_id" field.
+func SubjectIDLTE(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLTE(FieldSubjectID, v))
+}
+
+// SubjectIDIsNil applies the IsNil predicate on the "subject_id" field.
+func SubjectIDIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldSubjectID))
+}
+
+// SubjectIDNotNil applies the NotNil predicate on the "subject_id" field.
+func SubjectIDNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldSubjectID))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

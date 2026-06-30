@@ -71,6 +71,7 @@ import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
+import { filterColumnsByEffectiveFieldPolicy } from '../utils/adminProfileSync.mjs'
 import {
   downloadCSV,
   getPreferredColumnOrder,
@@ -121,6 +122,10 @@ export default function V1SalesOrdersPage() {
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
+  )
+  const activeCustomerKey = useMemo(
+    () => adminProfile?.effective_session?.customer?.key || '',
+    [adminProfile]
   )
   const [loading, setLoading] = useState(false)
   const [itemLoading, setItemLoading] = useState(false)
@@ -460,9 +465,17 @@ export default function V1SalesOrdersPage() {
   const runLifecycleAction = async (action, order) => {
     setSaving(true)
     try {
-      const updated = await action.run({ id: order.id })
-      message.success(`销售订单已${action.label}`)
-      setSelectedOrder(updated || order)
+      const updated = await action.run({
+        id: order.id,
+        sales_order_id: order.id,
+        order_no: order.order_no,
+        business_ref_no: order.order_no,
+        customer_key: activeCustomerKey || undefined,
+      })
+      message.success(action.successMessage || `销售订单已${action.label}`)
+      const nextSelectedOrder =
+        action.returnsRecord === false ? order : updated || order
+      setSelectedOrder(nextSelectedOrder)
       await loadOrders()
     } catch (error) {
       message.error(getActionErrorMessage(error, `${action.label}销售订单`))
@@ -516,7 +529,15 @@ export default function V1SalesOrdersPage() {
     [outletContext]
   )
 
-  const orderDataColumns = useMemo(() => buildSalesOrderColumns(), [])
+  const orderDataColumns = useMemo(
+    () =>
+      filterColumnsByEffectiveFieldPolicy(
+        buildSalesOrderColumns(),
+        adminProfile,
+        'sales_orders.default'
+      ),
+    [adminProfile]
+  )
 
   const effectiveOrderColumnOrder = useMemo(
     () =>

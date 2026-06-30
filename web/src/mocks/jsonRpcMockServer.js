@@ -104,6 +104,16 @@ const mockRoles = [
       'mobile.purchase.access',
     ],
   },
+  {
+    role_key: 'engineering',
+    name: '工程',
+    permissions: [
+      'erp.dashboard.read',
+      'workflow.task.read',
+      'workflow.task.complete',
+      'mobile.engineering.access',
+    ],
+  },
 ]
 
 const mockMenus = [
@@ -230,6 +240,7 @@ function seedMockMobileWorkflowTasks() {
     'finance',
     'pmc',
     'production',
+    'engineering',
   ]
   const roleLabels = {
     boss: '老板',
@@ -240,6 +251,7 @@ function seedMockMobileWorkflowTasks() {
     finance: '财务',
     pmc: 'PMC',
     production: '生产',
+    engineering: '工程',
   }
   const sourceTypes = {
     boss: 'project-orders',
@@ -250,6 +262,7 @@ function seedMockMobileWorkflowTasks() {
     finance: 'payables',
     pmc: 'production-progress',
     production: 'production-progress',
+    engineering: 'material-bom',
   }
   const taskCount = 24
 
@@ -371,6 +384,61 @@ function buildBusinessDashboardProjectionStats() {
     total: 0,
     status_counts: {},
   }))
+}
+
+function isMockTerminalWorkflowTask(task = {}) {
+  return ['done', 'closed', 'cancelled'].includes(
+    String(task.task_status_key || '').trim()
+  )
+}
+
+function buildMockWorkflowActionExplain(task, actionKey = 'complete') {
+  const normalizedAction =
+    actionKey === 'done'
+      ? 'complete'
+      : actionKey === 'blocked'
+        ? 'block'
+        : actionKey === 'rejected'
+          ? 'reject'
+          : actionKey
+  const permissionByAction = {
+    complete: 'workflow.task.complete',
+    block: 'workflow.task.update',
+    reject: 'workflow.task.reject',
+    urge: 'workflow.task.update',
+  }
+  const requiredPermission =
+    permissionByAction[normalizedAction] || 'workflow.task.update'
+  const hasPermission =
+    mockSuperAdminProfile.is_super_admin === true ||
+    mockSuperAdminProfile.permissions.includes(requiredPermission)
+  const allowed =
+    Boolean(task) && !isMockTerminalWorkflowTask(task) && hasPermission
+  return {
+    task_id: task?.id || 0,
+    action_key: normalizedAction,
+    status_key:
+      normalizedAction === 'complete'
+        ? 'done'
+        : normalizedAction === 'block'
+          ? 'blocked'
+          : normalizedAction === 'reject'
+            ? 'rejected'
+            : '',
+    required_permission: requiredPermission,
+    allowed,
+    actor_role_key: task?.owner_role_key || 'admin',
+    reason_code: allowed
+      ? 'allowed'
+      : isMockTerminalWorkflowTask(task)
+        ? 'terminal_task'
+        : 'missing_permission',
+    reason: allowed
+      ? '当前账号可执行该任务动作。'
+      : isMockTerminalWorkflowTask(task)
+        ? '该任务已结束，只能查看上下文。'
+        : '当前账号缺少执行该动作所需权限。',
+  }
 }
 
 // 构造一个 JSON-RPC 业务错误响应（code != 0）
@@ -677,6 +745,60 @@ export function setupJsonRpcMockServer() {
           }),
           error: '',
         }
+      } else if (method === 'explain_action_access') {
+        const task = mockWorkflowTasks.find(
+          (item) => Number(item.id) === Number(params.task_id || params.id)
+        )
+        if (!task) {
+          responseBody = makeJsonRpcBizError(id, 40010, '任务不存在')
+        } else {
+          const actionKey = String(params.action_key || params.action || '')
+          const actions = ['complete', 'block', 'reject', 'urge'].map((item) =>
+            buildMockWorkflowActionExplain(task, item)
+          )
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult(
+              actionKey
+                ? { action: buildMockWorkflowActionExplain(task, actionKey) }
+                : { task_id: task.id, actions }
+            ),
+            error: '',
+          }
+        }
+      } else if (method === 'explain_task_assignment') {
+        const task = mockWorkflowTasks.find(
+          (item) => Number(item.id) === Number(params.task_id || params.id)
+        )
+        if (!task) {
+          responseBody = makeJsonRpcBizError(id, 40010, '任务不存在')
+        } else {
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({
+              assignment: {
+                task_id: task.id,
+                owner_role_key: task.owner_role_key,
+                admin_role_keys: [task.owner_role_key || 'admin'],
+                visible: true,
+                assigned_to_current_admin: false,
+                owner_role_matched: true,
+                can_handle: !isMockTerminalWorkflowTask(task),
+                can_urge: !isMockTerminalWorkflowTask(task),
+                actor_role_key: task.owner_role_key || 'admin',
+                reason_code: isMockTerminalWorkflowTask(task)
+                  ? 'terminal_task'
+                  : 'owner_role_matched',
+                reason: isMockTerminalWorkflowTask(task)
+                  ? '该任务已结束，只能查看上下文。'
+                  : '当前账号属于该任务责任角色。',
+              },
+            }),
+            error: '',
+          }
+        }
       } else if (method === 'create_task') {
         const task = {
           id: mockWorkflowTaskID++,
@@ -708,6 +830,50 @@ export function setupJsonRpcMockServer() {
           id,
           result: makeBizResult({ task }),
           error: '',
+        }
+      } else if (method === 'complete_task_action') {
+        const task = mockWorkflowTasks.find(
+          (item) => Number(item.id) === Number(params.task_id || params.id)
+        )
+        if (!task) {
+          responseBody = makeJsonRpcBizError(id, 40010, '任务不存在')
+        } else {
+          task.task_status_key = 'done'
+          task.business_status_key =
+            params.business_status_key || task.business_status_key
+          task.updated_at = nowUnix()
+          task.payload = params.payload || task.payload || {}
+          task.completed_at = nowUnix()
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({ task }),
+            error: '',
+          }
+        }
+      } else if (
+        method === 'block_task_action' ||
+        method === 'reject_task_action'
+      ) {
+        const task = mockWorkflowTasks.find(
+          (item) => Number(item.id) === Number(params.task_id || params.id)
+        )
+        if (!task) {
+          responseBody = makeJsonRpcBizError(id, 40010, '任务不存在')
+        } else {
+          task.task_status_key =
+            method === 'block_task_action' ? 'blocked' : 'rejected'
+          task.business_status_key =
+            params.business_status_key || task.business_status_key
+          task.updated_at = nowUnix()
+          task.payload = params.payload || task.payload || {}
+          if (params.reason) task.blocked_reason = params.reason
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({ task }),
+            error: '',
+          }
         }
       } else if (method === 'update_task_status') {
         const task = mockWorkflowTasks.find(

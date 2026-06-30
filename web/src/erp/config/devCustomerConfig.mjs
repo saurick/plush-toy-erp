@@ -1,4 +1,5 @@
 import { yoyoosunFieldNumberingConfig } from '../../../../config/customers/yoyoosun/fieldNumberingConfig.mjs'
+import { yoyoosunCustomerPackage } from '../../../../config/customers/yoyoosun/customerPackage.mjs'
 import { yoyoosunMenuConfig } from '../../../../config/customers/yoyoosun/menuConfig.mjs'
 import { DEV_CUSTOMER_CONFIG_ROUTE } from './devCustomerConfigRoute.mjs'
 
@@ -11,9 +12,19 @@ export const DEV_CUSTOMER_MENU_CONFIG_SOURCE_PATH =
   'config/customers/yoyoosun/menuConfig.mjs'
 export const DEV_CUSTOMER_FIELD_NUMBERING_SOURCE_PATH =
   'config/customers/yoyoosun/fieldNumberingConfig.mjs'
+export const DEV_CUSTOMER_PACKAGE_SOURCE_PATH =
+  'config/customers/yoyoosun/customerPackage.mjs'
 export const DEV_CUSTOMER_IMPORT_TOOLING_SOURCE_PATH = 'scripts/import'
 export const DEV_CUSTOMER_CONFIG_QA_COMMAND =
   'node scripts/qa/customer-config-boundaries.mjs'
+export const DEV_CUSTOMER_PACKAGE_QA_COMMAND =
+  'node scripts/qa/customer-package-lint.mjs --customer yoyoosun'
+export const DEV_CUSTOMER_IMPORT_DRY_RUN_API =
+  '/__dev/api/customer-import/dry-run'
+export const DEV_CUSTOMER_CONFIG_RUNTIME_MANIFEST_API =
+  '/__dev/api/customer-config/runtime-manifest'
+export const DEV_CUSTOMER_CONFIG_RELEASE_READINESS_API =
+  '/__dev/api/customer-config/release-readiness'
 
 export const DEV_CUSTOMER_CONFIG_REGISTRY = Object.freeze({
   yoyoosun: Object.freeze({
@@ -24,6 +35,8 @@ export const DEV_CUSTOMER_CONFIG_REGISTRY = Object.freeze({
     menuConfigSourcePath: DEV_CUSTOMER_MENU_CONFIG_SOURCE_PATH,
     fieldNumberingConfig: yoyoosunFieldNumberingConfig,
     fieldNumberingSourcePath: DEV_CUSTOMER_FIELD_NUMBERING_SOURCE_PATH,
+    customerPackage: yoyoosunCustomerPackage,
+    customerPackageSourcePath: DEV_CUSTOMER_PACKAGE_SOURCE_PATH,
   }),
 })
 
@@ -121,6 +134,84 @@ function buildBoundaryItems(config = {}) {
   }))
 }
 
+function countPackageNodes(workflows = []) {
+  return workflows.reduce(
+    (total, workflow) => total + (workflow.nodes || []).length,
+    0
+  )
+}
+
+function allPackageBoundariesOk(boundaries = []) {
+  return boundaries.every((item) => item.ok)
+}
+
+export function buildCustomerPackagePreviewSummary(
+  config = yoyoosunCustomerPackage,
+  sourcePath = DEV_CUSTOMER_PACKAGE_SOURCE_PATH
+) {
+  const boundaries = [
+    {
+      key: 'runtimeEnabled',
+      value: config.runtimeEnabled === true,
+      expected: false,
+      ok: config.runtimeEnabled !== true,
+    },
+    {
+      key: 'previewOnly',
+      value: config.sourcePolicy?.previewOnly === true,
+      expected: true,
+      ok: config.sourcePolicy?.previewOnly === true,
+    },
+    ...buildBoundaryItems(config),
+  ]
+
+  return {
+    customerKey: config.customerKey,
+    label: config.label,
+    status: config.status,
+    runtimeEnabled: config.runtimeEnabled === true,
+    previewOnly: config.sourcePolicy?.previewOnly === true,
+    publishEnabled: config.sourcePolicy?.publishEnabled === true,
+    activateEnabled: config.sourcePolicy?.activateEnabled === true,
+    rollbackEnabled: config.sourcePolicy?.rollbackEnabled === true,
+    workflowCount: (config.workflows || []).length,
+    workflowNodeCount: countPackageNodes(config.workflows || []),
+    workflows: (config.workflows || []).map((workflow) => ({
+      key: workflow.key,
+      label: workflow.label,
+      status: workflow.status,
+      ownerPools: workflow.ownerPools || [],
+      nodeCount: (workflow.nodes || []).length,
+      factBoundary: workflow.factBoundary,
+      guardrail: workflow.guardrail,
+    })),
+    businessFlowCount: (config.businessFlows || []).length,
+    businessFlows: config.businessFlows || [],
+    stateMachineCount: (config.stateMachines || []).length,
+    stateMachines: (config.stateMachines || []).map((item) => ({
+      key: item.key,
+      label: item.label,
+      status: item.status,
+      stateCount: (item.states || []).length,
+      transitionCount: (item.transitions || []).length,
+      guardrail: item.guardrail,
+    })),
+    processPolicyCount: (config.processPolicies || []).length,
+    processPolicies: (config.processPolicies || []).map((item) => ({
+      key: item.key,
+      label: item.label,
+      status: item.status,
+      kind: item.kind,
+      ruleCount: (item.rules || []).length,
+      guardrail: item.guardrail,
+    })),
+    boundaries,
+    boundaryOk: allPackageBoundariesOk(boundaries),
+    qaCommand: DEV_CUSTOMER_PACKAGE_QA_COMMAND,
+    sourcePath,
+  }
+}
+
 export function buildCustomerMenuRuntimeSummary(
   menuConfig = yoyoosunMenuConfig,
   sourcePath = DEV_CUSTOMER_MENU_CONFIG_SOURCE_PATH
@@ -183,11 +274,181 @@ export function buildImportToolingSummary(
   const normalizedCustomerKey = normalizeCustomerKey(customerKey)
   const fixtureBasePath = `scripts/import/fixtures/customers/${normalizedCustomerKey}`
   const outputBasePath = `output/customers/${normalizedCustomerKey}`
+  const uiDryRunOut = `${outputBasePath}/ui-import-dry-run`
+  const releaseEvidenceDir = `deployments/${normalizedCustomerKey}/evidence/releases/<YYYY-MM-DD>`
+  const releaseManifestPath = `${outputBasePath}/customer-config-runtime-manifest.json`
+  const releaseReportPath = `${outputBasePath}/customer-config-release/customer-config-release-report.json`
   return {
     sourcePath: DEV_CUSTOMER_IMPORT_TOOLING_SOURCE_PATH,
     qaCommand: DEV_CUSTOMER_CONFIG_QA_COMMAND,
+    uiDryRunApiPath: DEV_CUSTOMER_IMPORT_DRY_RUN_API,
+    uiRuntimeManifestApiPath: DEV_CUSTOMER_CONFIG_RUNTIME_MANIFEST_API,
+    uiReleaseReadinessApiPath: DEV_CUSTOMER_CONFIG_RELEASE_READINESS_API,
+    canRunUiDryRun: normalizedCustomerKey === 'yoyoosun',
+    canApplyTestConfig: normalizedCustomerKey === 'yoyoosun',
+    canCheckReleaseReadiness: normalizedCustomerKey === 'yoyoosun',
     canExecuteRealImport: false,
-    writesDatabase: false,
+    writesBusinessData: false,
+    writesDatabase: true,
+    testApply: {
+      key: 'test-config-apply',
+      label: '应用到测试环境',
+      status:
+        normalizedCustomerKey === 'yoyoosun' ? 'test_apply_ready' : 'blocked',
+      target: '测试环境 ERP 应用数据库',
+      writes:
+        'customer_config_revisions / deployment_module_states / role_profiles / access_entitlements / work_pools / work_pool_memberships / runtime_audit_events',
+      operations: [
+        'compile_runtime_manifest',
+        'validate_customer_config',
+        'publish_customer_config',
+        'activate_customer_config',
+        'get_effective_session',
+      ],
+      note: '使用当前管理员登录态调用后端 customer_config；成功后后台和岗位任务端读取 active revision 的测试配置投影。',
+      noBusinessDataImport: true,
+    },
+    releaseApply: {
+      key: 'release-config-apply',
+      label: '发布到正式版',
+      status: 'release_gate_required',
+      target: '目标环境 ERP 应用数据库',
+      evidenceDir: `deployments/${normalizedCustomerKey}/evidence/releases`,
+      writes:
+        'customer_config_revisions / deployment_module_states / role_profiles / access_entitlements / work_pools / work_pool_memberships / runtime_audit_events',
+      operations: [
+        'release_readiness_gate',
+        'validate_customer_config',
+        'publish_customer_config',
+        'activate_customer_config',
+        'get_effective_session',
+      ],
+      note: '先检查 release evidence 和 manifest hash 绑定；门禁通过后才允许用当前管理员登录态发布并激活正式配置版本。',
+      noBusinessDataImport: true,
+    },
+    importFlow: [
+      {
+        key: 'tracked-package',
+        step: '1',
+        title: '读取客户包',
+        status: 'passed',
+        outcome: '已登记 yoyoosun 客户包',
+        target: 'config/customers/yoyoosun/customerPackage.mjs',
+        writesDatabase: false,
+      },
+      {
+        key: 'preflight',
+        step: '2',
+        title: '预检与差异',
+        status: 'passed',
+        outcome: 'lint / diff / workflow preview',
+        target: '只读解析，不写库',
+        writesDatabase: false,
+      },
+      {
+        key: 'ui-dry-run',
+        step: '3',
+        title: '测试 Dry Run',
+        status:
+          normalizedCustomerKey === 'yoyoosun' ? 'preview_only' : 'blocked',
+        outcome: '生成本地 evidence',
+        target: uiDryRunOut,
+        writesDatabase: false,
+      },
+      {
+        key: 'test-apply',
+        step: '4',
+        title: '测试环境应用',
+        status:
+          normalizedCustomerKey === 'yoyoosun' ? 'test_apply_ready' : 'blocked',
+        outcome: 'validate / publish / activate',
+        target: '测试环境 ERP 应用数据库',
+        writesDatabase: true,
+      },
+      {
+        key: 'formal-import',
+        step: '5',
+        title: '正式发布门禁',
+        status: 'release_gate_required',
+        outcome: '检查证据后发布正式版',
+        target: '目标环境 ERP 应用数据库',
+        writesDatabase: true,
+      },
+    ],
+    databaseTargets: [
+      {
+        key: 'ui-dry-run',
+        label: '当前页面可执行',
+        status: 'no_write',
+        target: '不写数据库',
+        writes: uiDryRunOut,
+        reason: '只生成 review evidence，供人工确认和后续发布门禁复核。',
+      },
+      {
+        key: 'test-config-apply',
+        label: '测试环境应用',
+        status:
+          normalizedCustomerKey === 'yoyoosun' ? 'test_apply_ready' : 'blocked',
+        target: '测试环境 ERP 应用数据库',
+        writes:
+          'customer_config_revisions / deployment_module_states / role_profiles / access_entitlements / work_pools / work_pool_memberships / runtime_audit_events',
+        reason:
+          '这是客户配置控制面写入；登录后的后台和岗位任务端通过 get_effective_session 读取 active revision。',
+      },
+      {
+        key: 'customer-config-publish',
+        label: '正式版发布配置',
+        status: 'release_gate_required',
+        target: '目标环境 ERP 应用数据库',
+        writes:
+          'customer_config_revisions / deployment_module_states / role_profiles / access_entitlements / work_pools / work_pool_memberships / runtime_audit_events',
+        reason:
+          '登录后的 get_effective_session 必须从当前 ERP 后端数据库读取 active revision，并与 RBAC 菜单取交集。',
+      },
+      {
+        key: 'customer-config-activate',
+        label: '正式版激活配置',
+        status: 'release_gate_required',
+        target: '目标环境 ERP 应用数据库',
+        writes: 'customer_config_revisions.status / runtime_audit_events',
+        reason: '激活只是切换有效配置版本，不写库存、出货、财务或业务事实。',
+      },
+      {
+        key: 'business-data-import',
+        label: '真实客户业务数据',
+        status: 'separate_task_required',
+        target: '目标环境 ERP 应用数据库的业务表',
+        writes: '客户、供应商、联系人、销售订单等领域表',
+        reason:
+          '这是历史业务数据迁移专项，必须走领域 usecase、备份、审计和回滚，不混入客户配置包发布。',
+      },
+    ],
+    formalGates: [
+      {
+        key: 'manifest-evidence',
+        label: 'Manifest hash 证据',
+        status: 'required',
+        note: 'runtime manifest 必须绑定 sha256，避免发布时替换 payload。',
+      },
+      {
+        key: 'release-evidence',
+        label: '目标环境发布证据',
+        status: 'required',
+        note: '备份恢复、migration、smoke 和 sign-off 必须齐备。',
+      },
+      {
+        key: 'admin-confirmation',
+        label: '管理员确认短语',
+        status: 'required',
+        note: 'publish / activate 必须显式确认，不能由页面默认触发。',
+      },
+      {
+        key: 'business-import',
+        label: '业务数据导入',
+        status: 'separate_task_required',
+        note: '配置版本发布不等于客户历史业务数据导入。',
+      },
+    ],
     tools: [
       {
         key: 'freeze',
@@ -204,8 +465,336 @@ export function buildImportToolingSummary(
       {
         key: 'execute-report',
         title: 'import execution report',
-        command: `node scripts/import/customerImportExecute.mjs --dry-run ${outputBasePath}/import-dry-run --approval ${fixtureBasePath}/import-approval.sample.json --out ${outputBasePath}/import-execution`,
+        command: `node scripts/import/customerImportExecute.mjs --dry-run-package ${outputBasePath}/import-dry-run --approval ${fixtureBasePath}/import-approval.sample.json --backup-evidence ${outputBasePath}/backup-evidence.txt --out ${outputBasePath}/import-execution`,
         status: 'report_gate_only',
+      },
+      {
+        key: 'release-rollback-readiness',
+        title: 'customer config rollback readiness',
+        command: `node scripts/deploy/customer-config-release-readiness.mjs --manifest ${releaseManifestPath} --evidence-dir ${releaseEvidenceDir} --release-report ${releaseReportPath} --require-executed --require-rollback`,
+        status: 'release_gate_required',
+      },
+      {
+        key: 'release-rollback-execute',
+        title: 'customer config rollback executor',
+        command: `CUSTOMER_CONFIG_CONFIRM=ROLLBACK_YOYOOSUN_CONFIG CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' node scripts/deploy/customer-config-release-execute.mjs --manifest ${releaseManifestPath} --evidence-dir ${releaseEvidenceDir} --out ${outputBasePath}/customer-config-release --backend-url http://127.0.0.1:8300 --execute --rollback`,
+        status: 'release_gate_required',
+      },
+    ],
+  }
+}
+
+function buildPackagePreviewReportCommand(
+  customerKey = DEFAULT_DEV_CUSTOMER_KEY
+) {
+  const normalizedCustomerKey = normalizeCustomerKey(customerKey)
+  return `node scripts/qa/customer-package-lint.mjs --customer ${normalizedCustomerKey} --out output/customers/${normalizedCustomerKey}/customer-package-preview.json`
+}
+
+export function buildCustomerPackageConsoleSummary({
+  menuSummary,
+  fieldNumberingSummary,
+  customerPackageSummary,
+  importSummary,
+} = {}) {
+  const fieldReviewCount = fieldNumberingSummary?.fieldCandidateCount || 0
+  const workflowCount = customerPackageSummary?.workflowCount || 0
+  const processPolicyCount = customerPackageSummary?.processPolicyCount || 0
+  const menuItemCount = menuSummary?.itemCount || 0
+  const boundaryOk = customerPackageSummary?.boundaryOk === true
+  const customerKey =
+    customerPackageSummary?.customerKey ||
+    menuSummary?.customerKey ||
+    DEFAULT_DEV_CUSTOMER_KEY
+  const packageQaCommand =
+    customerPackageSummary?.qaCommand || DEV_CUSTOMER_PACKAGE_QA_COMMAND
+  const boundaryFailedCount = (customerPackageSummary?.boundaries || []).filter(
+    (item) => !item.ok
+  ).length
+
+  return {
+    primaryStatus: boundaryOk ? 'PREVIEW_READY' : 'BLOCKED',
+    packageLabel: customerPackageSummary?.label || '未登记客户配置包',
+    reviewDecision: {
+      status: boundaryOk ? 'REVIEW_READY' : 'BLOCKED',
+      title: boundaryOk ? '可以进入人工评审' : '先修复配置包阻塞项',
+      summary: boundaryOk
+        ? '结构与禁止项已通过 lint；页面可做测试环境应用，正式发布必须先通过 release evidence 门禁。'
+        : `配置包存在 ${boundaryFailedCount} 个阻塞项；修复后重新运行 lint。`,
+      nextAction: boundaryOk
+        ? '先做 Dry Run 和测试环境应用；正式版进入发布门禁检查。'
+        : '先修复 failed boundary，再重新运行客户包 lint。',
+    },
+    decisionCards: [
+      {
+        key: 'review-ready',
+        label: '人工评审',
+        status: boundaryOk ? 'REVIEW_READY' : 'BLOCKED',
+        outcome: boundaryOk ? '可继续' : '阻塞',
+        note: boundaryOk
+          ? '只进入 review evidence，不改变 runtime。'
+          : '必须先修复配置包禁止项。',
+        nextAction: boundaryOk
+          ? '生成 customer-package-preview.json'
+          : packageQaCommand,
+      },
+      {
+        key: 'real-import',
+        label: '真实导入',
+        status: 'blocked_by_design',
+        outcome: '不可执行',
+        note: '配置发布不等于客户历史业务数据导入。',
+        nextAction:
+          '正式导入另开任务，并先完成客户确认、备份 evidence 和回滚方案。',
+      },
+      {
+        key: 'publish-runtime',
+        label: '发布 / 激活',
+        status: 'release_gate_required',
+        outcome: '门禁后可执行',
+        note: '发布版必须先通过 manifest hash、release evidence 和管理员确认。',
+        nextAction: '在导入工作台检查发布门禁；通过后再发布到正式版。',
+      },
+    ],
+    preflightStages: [
+      {
+        key: 'registered-package',
+        label: '读取已登记客户包',
+        status: 'passed',
+        note: '只读取 tracked config，不接上传入口。',
+      },
+      {
+        key: 'schema-lint',
+        label: '结构与禁止项校验',
+        status: boundaryOk ? 'passed' : 'blocked',
+        note: packageQaCommand,
+      },
+      {
+        key: 'diff-preview',
+        label: '差异预览',
+        status: 'preview_only',
+        note: `${menuItemCount} 个菜单项、${fieldReviewCount} 个字段候选进入人工评审。`,
+      },
+      {
+        key: 'dry-run',
+        label: '测试版 UI Dry Run',
+        status: importSummary?.canRunUiDryRun ? 'preview_only' : 'blocked',
+        note: '在开发页触发 dry-run，生成 evidence / report，不写数据库。',
+      },
+      {
+        key: 'publish',
+        label: '发布与回滚',
+        status: 'release_gate_required',
+        note: 'publish / activate / rollback 都必须走 release evidence；页面只提供命令复核，不提供裸回滚按钮。',
+      },
+    ],
+    reviewChecklist: [
+      {
+        key: 'package-lint',
+        label: '客户包结构预检',
+        role: '实施 / 开发',
+        status: boundaryOk ? 'passed' : 'blocked',
+        sourcePath: customerPackageSummary?.sourcePath,
+        nextAction: packageQaCommand,
+      },
+      {
+        key: 'field-numbering-review',
+        label: '字段显示与编号人工确认',
+        role: '实施 / 客户确认',
+        status: 'draft_only',
+        sourcePath: fieldNumberingSummary?.sourcePath,
+        nextAction: `${fieldReviewCount} 个字段候选仍为 draft，不接前端运行时。`,
+      },
+      {
+        key: 'workflow-structure-review',
+        label: '流程结构与 Fact 边界确认',
+        role: '产品 / 业务评审',
+        status: 'preview_only',
+        sourcePath: customerPackageSummary?.sourcePath,
+        nextAction: `${workflowCount} 条 Workflow preview 只评审结构，不写 WorkflowUsecase 或事实表。`,
+      },
+      {
+        key: 'dry-run-evidence',
+        label: '导入证据包',
+        role: '实施 / 运维',
+        status: 'report_gate_only',
+        sourcePath: importSummary?.sourcePath,
+        nextAction: '只允许 freeze、dry-run 和 execution report evidence。',
+      },
+      {
+        key: 'runtime-publish',
+        label: '发布生效',
+        role: '发布负责人',
+        status: 'release_gate_required',
+        sourcePath: customerPackageSummary?.sourcePath,
+        nextAction: '先跑 release readiness gate，通过后才可发布 / 激活。',
+      },
+    ],
+    qaCommands: [
+      {
+        key: 'package-lint',
+        label: '客户包 lint',
+        command: packageQaCommand,
+        note: '校验结构、禁止项和 preview-only 边界。',
+      },
+      {
+        key: 'package-preview-report',
+        label: '生成预检报告',
+        command: buildPackagePreviewReportCommand(customerKey),
+        note: '输出 review evidence，不写运行时配置。',
+      },
+      {
+        key: 'customer-config-boundaries',
+        label: '客户配置边界',
+        command: importSummary?.qaCommand || DEV_CUSTOMER_CONFIG_QA_COMMAND,
+        note: '校验客户配置、导入 tooling 和禁止项。',
+      },
+    ],
+    sourceReferences: [
+      {
+        key: 'menu',
+        label: '菜单品牌',
+        status: 'runtime_frontend_only',
+        sourcePath: menuSummary?.sourcePath,
+      },
+      {
+        key: 'field-numbering',
+        label: '字段编号',
+        status: 'draft_only',
+        sourcePath: fieldNumberingSummary?.sourcePath,
+      },
+      {
+        key: 'package',
+        label: '流程配置包',
+        status: 'preview_only',
+        sourcePath: customerPackageSummary?.sourcePath,
+      },
+      {
+        key: 'import-tools',
+        label: '导入工具边界',
+        status: 'report_gate_only',
+        sourcePath: importSummary?.sourcePath,
+      },
+    ],
+    assetSummary: [
+      {
+        key: 'menus',
+        label: '菜单品牌',
+        value: menuItemCount,
+        unit: '项',
+        status: 'runtime_frontend_only',
+        note: `${menuSummary?.sectionCount || 0} 个分组，只影响前端展示。`,
+      },
+      {
+        key: 'fields',
+        label: '字段编号',
+        value: fieldReviewCount,
+        unit: '项',
+        status: 'draft_only',
+        note: 'runtimeEnabled=false，必须人工确认。',
+      },
+      {
+        key: 'workflows',
+        label: '工作流',
+        value: workflowCount,
+        unit: '条',
+        status: 'preview_only',
+        note: `${customerPackageSummary?.workflowNodeCount || 0} 个节点，不写事实。`,
+      },
+      {
+        key: 'policies',
+        label: '策略预览',
+        value: processPolicyCount,
+        unit: '条',
+        status: 'preview_only',
+        note: '只允许绑定检查，不导入代码。',
+      },
+    ],
+    validationChecks: [
+      {
+        key: 'no-code-sql-secret',
+        label: '禁止代码 / SQL / secret',
+        status: boundaryOk ? 'passed' : 'blocked',
+        level: '高',
+        note: '客户包不能携带 JS / Go / SQL / secret 或原始客户资料。',
+      },
+      {
+        key: 'workflow-fact-boundary',
+        label: 'Workflow / Fact 边界',
+        status: customerPackageSummary?.workflows?.every(
+          (item) => item.factBoundary === 'workflow_only'
+        )
+          ? 'passed'
+          : 'blocked',
+        level: '高',
+        note: '协同流转预览不生成库存、出货、财务或发票事实。',
+      },
+      {
+        key: 'runtime-loader',
+        label: '运行时 loader',
+        status: customerPackageSummary?.runtimeEnabled ? 'blocked' : 'passed',
+        level: '高',
+        note: '配置包仍是 preview，不接后端 loader。',
+      },
+      {
+        key: 'real-import',
+        label: '真实导入',
+        status: importSummary?.canExecuteRealImport
+          ? 'blocked'
+          : 'blocked_by_design',
+        level: '高',
+        note: '客户配置发布只写控制面；真实客户业务数据导入仍不在本页执行。',
+      },
+    ],
+    diffItems: [
+      {
+        key: 'menu-brand',
+        type: '前端展示',
+        current: '中性产品默认包',
+        incoming: menuSummary?.label || '客户菜单配置',
+        impact: '部署包可替换品牌、菜单分组、排序和文案。',
+        status: 'runtime_frontend_only',
+      },
+      {
+        key: 'field-numbering',
+        type: '字段显示',
+        current: 'V1 字段真源',
+        incoming: `${fieldReviewCount} 个字段 / 编号候选`,
+        impact: '需要人工确认，不自动变成 Product Core 必填。',
+        status: 'draft_only',
+      },
+      {
+        key: 'workflow-preview',
+        type: '流程编排',
+        current: '当前 WorkflowUsecase',
+        incoming: `${workflowCount} 条工作流预览`,
+        impact: '只做结构预览，不改变当前任务状态规则。',
+        status: 'preview_only',
+      },
+      {
+        key: 'import-tooling',
+        type: '导入工具',
+        current: 'dry-run evidence',
+        incoming: 'execution report gate',
+        impact: '没有明确批准前不写 DB，不生成业务事实。',
+        status: 'report_gate_only',
+      },
+    ],
+    versionGates: [
+      {
+        key: 'publishEnabled',
+        label: '发布配置版本',
+        enabled: customerPackageSummary?.publishEnabled === true,
+      },
+      {
+        key: 'activateEnabled',
+        label: '切换生效版本',
+        enabled: customerPackageSummary?.activateEnabled === true,
+      },
+      {
+        key: 'rollbackEnabled',
+        label: '回滚配置版本',
+        enabled: customerPackageSummary?.rollbackEnabled === true,
       },
     ],
   }
@@ -216,6 +805,7 @@ export function buildCustomerConfigDevOverview({
   registry = DEV_CUSTOMER_CONFIG_REGISTRY,
   menuConfig,
   fieldNumberingConfig,
+  customerPackage,
 } = {}) {
   const resolved = resolveDevCustomerConfigPackage(customerKey, registry)
   if (!resolved.packageConfig) {
@@ -245,6 +835,7 @@ export function buildCustomerConfigDevOverview({
   const activeMenuConfig = menuConfig || packageConfig.menuConfig
   const activeFieldNumberingConfig =
     fieldNumberingConfig || packageConfig.fieldNumberingConfig
+  const activeCustomerPackage = customerPackage || packageConfig.customerPackage
   const menuSummary = buildCustomerMenuRuntimeSummary(
     activeMenuConfig,
     packageConfig.menuConfigSourcePath
@@ -253,7 +844,17 @@ export function buildCustomerConfigDevOverview({
     activeFieldNumberingConfig,
     packageConfig.fieldNumberingSourcePath
   )
+  const customerPackageSummary = buildCustomerPackagePreviewSummary(
+    activeCustomerPackage,
+    packageConfig.customerPackageSourcePath
+  )
   const importSummary = buildImportToolingSummary(packageConfig.customerKey)
+  const packageConsoleSummary = buildCustomerPackageConsoleSummary({
+    menuSummary,
+    fieldNumberingSummary,
+    customerPackageSummary,
+    importSummary,
+  })
 
   return {
     status: resolved.status,
@@ -264,6 +865,8 @@ export function buildCustomerConfigDevOverview({
     registeredCustomers: resolved.registeredCustomers,
     menuSummary,
     fieldNumberingSummary,
+    customerPackageSummary,
+    packageConsoleSummary,
     importSummary,
     runtimePieces: [
       {
@@ -284,6 +887,14 @@ export function buildCustomerConfigDevOverview({
         boundary:
           'runtimeEnabled=false；只作为客户确认清单，不接前端运行时、不改后端、不执行导入。',
       },
+      {
+        key: 'process-package',
+        title: '流程结构 / 策略预览',
+        sourcePath: customerPackageSummary.sourcePath,
+        status: 'preview_only',
+        boundary:
+          'raw 客户包只做 lint 和 preview；必须编译为受控 runtime manifest 后才可走 customer_config publish / activate，不接 Workflow / Fact runtime。',
+      },
     ],
     blockedPieces: [
       {
@@ -292,7 +903,7 @@ export function buildCustomerConfigDevOverview({
         sourcePath: importSummary.sourcePath,
         status: '未批准',
         boundary:
-          '当前只有 dry-run、freeze 和 execution report 工具；不写 DB，不写 business_records，不生成库存、出货或财务事实。',
+          '客户配置测试 / 发布只写控制面表；客户、供应商、订单、库存、出货、财务等历史业务数据导入必须另走专项。',
       },
       {
         key: 'saas-tenant',

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
@@ -18,10 +19,16 @@ func (d *jsonrpcDispatcher) handleMasterDataContact(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionContactCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireContactOwnerModuleEnabled(ctx, getString(pm, "customer_key"), getString(pm, "owner_type")); res != nil {
+			return id, res, nil
+		}
 		item, err := d.masterDataUC.CreateContact(ctx, contactMutationFromParams(pm))
 		return id, contactMutationResult(ctx, d, item, err), nil
 	case "update_contact", "updateContact":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionContactUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireContactOwnerModuleEnabled(ctx, getString(pm, "customer_key"), getString(pm, "owner_type")); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.UpdateContact(ctx, getInt(pm, "id", 0), contactMutationFromParams(pm))
@@ -56,10 +63,16 @@ func (d *jsonrpcDispatcher) handleMasterDataContact(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionContactSetPrimary); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireExistingContactOwnerModuleEnabled(ctx, getString(pm, "customer_key"), getInt(pm, "id", 0)); res != nil {
+			return id, res, nil
+		}
 		item, err := d.masterDataUC.SetPrimaryContact(ctx, getInt(pm, "id", 0))
 		return id, contactMutationResult(ctx, d, item, err), nil
 	case "disable_contact", "disableContact":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionContactDisable); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireExistingContactOwnerModuleEnabled(ctx, getString(pm, "customer_key"), getInt(pm, "id", 0)); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.DisableContact(ctx, getInt(pm, "id", 0))
@@ -117,6 +130,25 @@ func (d *jsonrpcDispatcher) requireContactAggregatePermissions(ctx context.Conte
 		}
 	}
 	return nil
+}
+
+func (d *jsonrpcDispatcher) requireContactOwnerModuleEnabled(ctx context.Context, customerKey string, ownerType string) *v1.JsonrpcResult {
+	moduleKey := masterDataContactOwnerModuleKey(strings.ToUpper(strings.TrimSpace(ownerType)))
+	if moduleKey == "" {
+		return d.mapMasterDataError(ctx, biz.ErrBadParam)
+	}
+	return d.requireCustomerConfigModulesEnabled(ctx, customerKey, moduleKey)
+}
+
+func (d *jsonrpcDispatcher) requireExistingContactOwnerModuleEnabled(ctx context.Context, customerKey string, contactID int) *v1.JsonrpcResult {
+	item, err := d.masterDataUC.GetContact(ctx, contactID)
+	if err != nil {
+		return d.mapMasterDataError(ctx, err)
+	}
+	if item == nil {
+		return d.mapMasterDataError(ctx, biz.ErrContactNotFound)
+	}
+	return d.requireContactOwnerModuleEnabled(ctx, customerKey, item.OwnerType)
 }
 
 func contactMutationResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.Contact, err error) *v1.JsonrpcResult {

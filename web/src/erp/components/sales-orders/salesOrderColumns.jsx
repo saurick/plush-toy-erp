@@ -66,6 +66,7 @@ export function buildSalesOrderColumns() {
       title: '客户订单号',
       exportTitle: '客户订单号',
       dataIndex: 'customer_order_no',
+      effectiveFieldKey: 'source_no',
       width: 150,
       sorter: (a, b) => compareText(a?.customer_order_no, b?.customer_order_no),
       render: (value) => value || '-',
@@ -114,6 +115,7 @@ export function buildSalesOrderColumns() {
       title: '计划交付日期',
       exportTitle: '计划交付日期',
       dataIndex: 'planned_delivery_date',
+      effectiveFieldKey: 'expected_ship_date',
       width: 120,
       sorter: (a, b) =>
         compareNumber(a?.planned_delivery_date, b?.planned_delivery_date),

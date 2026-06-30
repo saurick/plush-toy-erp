@@ -13,7 +13,10 @@ type stubWorkflowRepo struct {
 	urgeTaskInput    *WorkflowTaskUrge
 	upsertStateInput *WorkflowBusinessStateUpsert
 	currentTask      *WorkflowTask
+	taskByCode       *WorkflowTask
+	createTaskErr    error
 	getTaskCalled    bool
+	getByCodeCalled  bool
 	listTaskCalled   bool
 	listTaskFilter   WorkflowTaskFilter
 	derivedTaskCount int
@@ -37,6 +40,14 @@ func (s *stubWorkflowRepo) GetWorkflowTask(_ context.Context, id int) (*Workflow
 	}, nil
 }
 
+func (s *stubWorkflowRepo) GetWorkflowTaskByTaskCode(_ context.Context, taskCode string) (*WorkflowTask, error) {
+	s.getByCodeCalled = true
+	if s.taskByCode != nil {
+		return s.taskByCode, nil
+	}
+	return nil, ErrWorkflowTaskNotFound
+}
+
 func (s *stubWorkflowRepo) ListWorkflowTasks(_ context.Context, filter WorkflowTaskFilter) ([]*WorkflowTask, int, error) {
 	s.listTaskCalled = true
 	s.listTaskFilter = filter
@@ -45,10 +56,19 @@ func (s *stubWorkflowRepo) ListWorkflowTasks(_ context.Context, filter WorkflowT
 
 func (s *stubWorkflowRepo) CreateWorkflowTask(_ context.Context, in *WorkflowTaskCreate, _ int) (*WorkflowTask, error) {
 	s.createTaskInput = in
+	if s.createTaskErr != nil {
+		return nil, s.createTaskErr
+	}
 	return &WorkflowTask{
-		TaskCode:      in.TaskCode,
-		TaskStatusKey: in.TaskStatusKey,
-		Payload:       in.Payload,
+		TaskCode:              in.TaskCode,
+		TaskStatusKey:         in.TaskStatusKey,
+		OwnerRoleKey:          in.OwnerRoleKey,
+		OwnerPoolKey:          in.OwnerPoolKey,
+		RequiredCapabilityKey: in.RequiredCapabilityKey,
+		ConfigRevision:        in.ConfigRevision,
+		ProcessInstanceID:     in.ProcessInstanceID,
+		ProcessNodeInstanceID: in.ProcessNodeInstanceID,
+		Payload:               in.Payload,
 	}, nil
 }
 
@@ -118,6 +138,123 @@ func TestWorkflowUsecase_CreateTaskDefaultsPending(t *testing.T) {
 	}
 	if repo.createTaskInput.Payload == nil {
 		t.Fatalf("expected payload default to empty map")
+	}
+	if repo.createTaskInput.OwnerPoolKey == nil || *repo.createTaskInput.OwnerPoolKey != SalesRoleKey {
+		t.Fatalf("expected owner_pool_key default to owner role, got %#v", repo.createTaskInput.OwnerPoolKey)
+	}
+	if repo.createTaskInput.RequiredCapabilityKey == nil || *repo.createTaskInput.RequiredCapabilityKey != PermissionWorkflowTaskComplete {
+		t.Fatalf("expected required capability default complete, got %#v", repo.createTaskInput.RequiredCapabilityKey)
+	}
+}
+
+func TestWorkflowUsecase_CreateTaskPreservesRuntimeAnchors(t *testing.T) {
+	repo := &stubWorkflowRepo{}
+	uc := NewWorkflowUsecase(repo)
+	ownerPoolKey := "warehouse-inbound"
+	requiredCapabilityKey := PermissionWorkflowTaskUpdate
+	configRevision := "customer-config-yoyoosun-rev-20260629"
+	processInstanceID := 101
+	processNodeInstanceID := 202
+
+	task, err := uc.CreateTask(context.Background(), &WorkflowTaskCreate{
+		TaskCode:              "T-RUNTIME-ANCHORS",
+		TaskGroup:             "warehouse_inbound",
+		TaskName:              "仓库入库协同",
+		SourceType:            "purchase_receipt",
+		SourceID:              11,
+		OwnerRoleKey:          WarehouseRoleKey,
+		OwnerPoolKey:          &ownerPoolKey,
+		RequiredCapabilityKey: &requiredCapabilityKey,
+		ConfigRevision:        &configRevision,
+		ProcessInstanceID:     &processInstanceID,
+		ProcessNodeInstanceID: &processNodeInstanceID,
+	}, 7)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if task.OwnerPoolKey == nil || *task.OwnerPoolKey != ownerPoolKey {
+		t.Fatalf("expected owner pool preserved, got %#v", task.OwnerPoolKey)
+	}
+	if task.RequiredCapabilityKey == nil || *task.RequiredCapabilityKey != requiredCapabilityKey {
+		t.Fatalf("expected required capability preserved, got %#v", task.RequiredCapabilityKey)
+	}
+	if task.ConfigRevision == nil || *task.ConfigRevision != configRevision {
+		t.Fatalf("expected config revision preserved, got %#v", task.ConfigRevision)
+	}
+	if task.ProcessInstanceID == nil || *task.ProcessInstanceID != processInstanceID {
+		t.Fatalf("expected process instance id preserved, got %#v", task.ProcessInstanceID)
+	}
+	if task.ProcessNodeInstanceID == nil || *task.ProcessNodeInstanceID != processNodeInstanceID {
+		t.Fatalf("expected process node instance id preserved, got %#v", task.ProcessNodeInstanceID)
+	}
+}
+
+func TestWorkflowUsecase_CreateTaskRejectsNodeLinkWithoutProcessLink(t *testing.T) {
+	repo := &stubWorkflowRepo{}
+	uc := NewWorkflowUsecase(repo)
+	processNodeInstanceID := 202
+
+	_, err := uc.CreateTask(context.Background(), &WorkflowTaskCreate{
+		TaskCode:              "T-RUNTIME-NODE-ONLY",
+		TaskGroup:             "warehouse_inbound",
+		TaskName:              "仓库入库协同",
+		SourceType:            "purchase_receipt",
+		SourceID:              11,
+		OwnerRoleKey:          WarehouseRoleKey,
+		ProcessNodeInstanceID: &processNodeInstanceID,
+	}, 7)
+	if !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected bad param, got %v", err)
+	}
+}
+
+func TestWorkflowUsecase_CreateBossApprovalTaskDefaultsApproveCapability(t *testing.T) {
+	repo := &stubWorkflowRepo{}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.CreateTask(context.Background(), &WorkflowTaskCreate{
+		TaskCode:     "T-BOSS-APPROVAL",
+		TaskGroup:    "order_approval",
+		TaskName:     "老板审批订单",
+		SourceType:   workflowProjectOrderModuleKey,
+		SourceID:     12,
+		OwnerRoleKey: BossRoleKey,
+	}, 7)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if repo.createTaskInput.RequiredCapabilityKey == nil || *repo.createTaskInput.RequiredCapabilityKey != PermissionWorkflowTaskApprove {
+		t.Fatalf("expected boss approval capability, got %#v", repo.createTaskInput.RequiredCapabilityKey)
+	}
+}
+
+func TestWorkflowUsecase_DerivedTaskInheritsConfigRevisionAndRuntimeAnchors(t *testing.T) {
+	configRevision := "customer-config-yoyoosun-rev-20260629"
+	current := bossApprovalWorkflowTask()
+	current.ConfigRevision = &configRevision
+	repo := &stubWorkflowRepo{currentTask: current}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            current.ID,
+		TaskStatusKey: "done",
+		Payload:       map[string]any{},
+	}, 7, BossRoleKey)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if repo.updateTaskInput == nil || repo.updateTaskInput.SideEffects == nil || repo.updateTaskInput.SideEffects.DerivedTask == nil {
+		t.Fatalf("expected derived task")
+	}
+	derived := repo.updateTaskInput.SideEffects.DerivedTask
+	if derived.OwnerPoolKey == nil || *derived.OwnerPoolKey != EngineeringRoleKey {
+		t.Fatalf("expected engineering owner pool, got %#v", derived.OwnerPoolKey)
+	}
+	if derived.RequiredCapabilityKey == nil || *derived.RequiredCapabilityKey != PermissionWorkflowTaskComplete {
+		t.Fatalf("expected derived complete capability, got %#v", derived.RequiredCapabilityKey)
+	}
+	if derived.ConfigRevision == nil || *derived.ConfigRevision != configRevision {
+		t.Fatalf("expected inherited config revision, got %#v", derived.ConfigRevision)
 	}
 }
 
@@ -657,6 +794,178 @@ func TestWorkflowUsecase_SameNameNonOutsourceReturnQCTaskDoesNotDerive(t *testin
 	}
 }
 
+func TestWorkflowUsecase_SameNameNonOutsourceWarehouseInboundTaskDoesNotDerive(t *testing.T) {
+	cases := []struct {
+		name string
+		task *WorkflowTask
+	}{
+		{
+			name: "wrong owner",
+			task: &WorkflowTask{
+				ID:                9901,
+				TaskGroup:         workflowOutsourceWarehouseInboundTaskGroup,
+				TaskName:          "委外回货入库",
+				SourceType:        workflowProcessingContractsModuleKey,
+				SourceID:          99,
+				BusinessStatusKey: ptrString(workflowWarehouseInboundPendingKey),
+				TaskStatusKey:     "ready",
+				OwnerRoleKey:      "finance",
+				Payload:           map[string]any{"outsource_processing": true},
+			},
+		},
+		{
+			name: "wrong source",
+			task: &WorkflowTask{
+				ID:                9902,
+				TaskGroup:         workflowOutsourceWarehouseInboundTaskGroup,
+				TaskName:          "委外回货入库",
+				SourceType:        workflowAccessoriesPurchaseModuleKey,
+				SourceID:          99,
+				BusinessStatusKey: ptrString(workflowWarehouseInboundPendingKey),
+				TaskStatusKey:     "ready",
+				OwnerRoleKey:      "warehouse",
+				Payload:           map[string]any{"outsource_processing": true},
+			},
+		},
+		{
+			name: "missing outsource marker",
+			task: &WorkflowTask{
+				ID:                9903,
+				TaskGroup:         workflowOutsourceWarehouseInboundTaskGroup,
+				TaskName:          "委外回货入库",
+				SourceType:        workflowProcessingContractsModuleKey,
+				SourceID:          99,
+				BusinessStatusKey: ptrString(workflowWarehouseInboundPendingKey),
+				TaskStatusKey:     "ready",
+				OwnerRoleKey:      "warehouse",
+				Payload:           map[string]any{},
+			},
+		},
+		{
+			name: "settled business status",
+			task: &WorkflowTask{
+				ID:                9904,
+				TaskGroup:         workflowOutsourceWarehouseInboundTaskGroup,
+				TaskName:          "委外回货入库",
+				SourceType:        workflowProcessingContractsModuleKey,
+				SourceID:          99,
+				BusinessStatusKey: ptrString(workflowInboundDoneStatusKey),
+				TaskStatusKey:     "ready",
+				OwnerRoleKey:      "warehouse",
+				Payload:           map[string]any{"outsource_processing": true},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &stubWorkflowRepo{currentTask: tc.task}
+			uc := NewWorkflowUsecase(repo)
+
+			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+				ID:            tc.task.ID,
+				TaskStatusKey: "done",
+				Payload:       map[string]any{},
+			}, 7, tc.task.OwnerRoleKey)
+			if err != nil {
+				t.Fatalf("same-name non-outsource-warehouse-inbound task should keep original behavior, got %v", err)
+			}
+			if repo.updateTaskInput == nil {
+				t.Fatalf("expected repo update")
+			}
+			if repo.updateTaskInput.SideEffects != nil {
+				t.Fatalf("same-name non-outsource-warehouse-inbound task should not derive side effects")
+			}
+		})
+	}
+}
+
+func TestWorkflowUsecase_SameNameNonOutsourceReturnTrackingTaskDoesNotDerive(t *testing.T) {
+	cases := []struct {
+		name string
+		task *WorkflowTask
+	}{
+		{
+			name: "wrong owner",
+			task: &WorkflowTask{
+				ID:                9401,
+				TaskGroup:         workflowOutsourceReturnTrackingTaskGroup,
+				TaskName:          "跟踪委外回货",
+				SourceType:        workflowProcessingContractsModuleKey,
+				SourceID:          99,
+				BusinessStatusKey: ptrString(workflowProductionProcessingStatusKey),
+				TaskStatusKey:     "ready",
+				OwnerRoleKey:      "quality",
+				Payload:           map[string]any{"outsource_processing": true},
+			},
+		},
+		{
+			name: "wrong source",
+			task: &WorkflowTask{
+				ID:                9402,
+				TaskGroup:         workflowOutsourceReturnTrackingTaskGroup,
+				TaskName:          "跟踪委外回货",
+				SourceType:        workflowInboundModuleKey,
+				SourceID:          99,
+				BusinessStatusKey: ptrString(workflowProductionProcessingStatusKey),
+				TaskStatusKey:     "ready",
+				OwnerRoleKey:      "production",
+				Payload:           map[string]any{"outsource_processing": true},
+			},
+		},
+		{
+			name: "missing outsource marker",
+			task: &WorkflowTask{
+				ID:                9403,
+				TaskGroup:         workflowOutsourceReturnTrackingTaskGroup,
+				TaskName:          "跟踪委外回货",
+				SourceType:        workflowProcessingContractsModuleKey,
+				SourceID:          99,
+				BusinessStatusKey: ptrString(workflowProductionProcessingStatusKey),
+				TaskStatusKey:     "ready",
+				OwnerRoleKey:      "production",
+				Payload:           map[string]any{},
+			},
+		},
+		{
+			name: "settled business status",
+			task: &WorkflowTask{
+				ID:                9404,
+				TaskGroup:         workflowOutsourceReturnTrackingTaskGroup,
+				TaskName:          "跟踪委外回货",
+				SourceType:        workflowProcessingContractsModuleKey,
+				SourceID:          99,
+				BusinessStatusKey: ptrString(workflowQCPendingStatusKey),
+				TaskStatusKey:     "ready",
+				OwnerRoleKey:      "production",
+				Payload:           map[string]any{"outsource_processing": true},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &stubWorkflowRepo{currentTask: tc.task}
+			uc := NewWorkflowUsecase(repo)
+
+			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+				ID:            tc.task.ID,
+				TaskStatusKey: "done",
+				Payload:       map[string]any{},
+			}, 7, tc.task.OwnerRoleKey)
+			if err != nil {
+				t.Fatalf("same-name non-outsource-return-tracking task should keep original behavior, got %v", err)
+			}
+			if repo.updateTaskInput == nil {
+				t.Fatalf("expected repo update")
+			}
+			if repo.updateTaskInput.SideEffects != nil {
+				t.Fatalf("same-name non-outsource-return-tracking task should not derive side effects")
+			}
+		})
+	}
+}
+
 func TestWorkflowUsecase_SameNameNonShipmentReleaseTaskDoesNotDerive(t *testing.T) {
 	cases := []struct {
 		name string
@@ -964,6 +1273,109 @@ func outsourceReturnQCWorkflowTask() *WorkflowTask {
 	}
 }
 
+func outsourceReturnTrackingWorkflowTask() *WorkflowTask {
+	sourceNo := "OUT-TRACK-001"
+	statusKey := workflowProductionProcessingStatusKey
+	return &WorkflowTask{
+		ID:                931,
+		TaskCode:          "outsource-return-tracking-99",
+		TaskGroup:         workflowOutsourceReturnTrackingTaskGroup,
+		TaskName:          "跟踪委外回货",
+		SourceType:        workflowProcessingContractsModuleKey,
+		SourceID:          99,
+		SourceNo:          &sourceNo,
+		BusinessStatusKey: &statusKey,
+		TaskStatusKey:     "ready",
+		OwnerRoleKey:      "production",
+		Priority:          2,
+		Payload: map[string]any{
+			"record_title":             "兔子挂件委外车缝",
+			"supplier_name":            "联调加工厂",
+			"source_no":                "OUT-001",
+			"product_no":               "SKU-001",
+			"product_name":             "兔子挂件",
+			"quantity":                 300,
+			"unit":                     "pcs",
+			"due_date":                 "2026-04-28",
+			"expected_return_date":     "2026-04-28",
+			"outsource_owner_role_key": "outsource",
+			"outsource_processing":     true,
+			"critical_path":            true,
+		},
+	}
+}
+
+func outsourceReworkWorkflowTask() *WorkflowTask {
+	sourceNo := "OUT-REWORK-001"
+	statusKey := workflowQCFailedStatusKey
+	return &WorkflowTask{
+		ID:                971,
+		TaskCode:          "outsource-rework-99",
+		TaskGroup:         workflowOutsourceReworkTaskGroup,
+		TaskName:          "委外返工 / 补做处理",
+		SourceType:        workflowProcessingContractsModuleKey,
+		SourceID:          99,
+		SourceNo:          &sourceNo,
+		BusinessStatusKey: &statusKey,
+		TaskStatusKey:     "ready",
+		OwnerRoleKey:      "production",
+		Priority:          3,
+		Payload: map[string]any{
+			"record_title":             "兔子挂件委外返工",
+			"supplier_name":            "联调加工厂",
+			"source_no":                "OUT-001",
+			"product_no":               "SKU-001",
+			"product_name":             "兔子挂件",
+			"quantity":                 300,
+			"unit":                     "pcs",
+			"due_date":                 "2026-04-28",
+			"expected_return_date":     "2026-04-28",
+			"qc_type":                  "outsource_return",
+			"outsource_processing":     true,
+			"outsource_owner_role_key": "outsource",
+			"rejected_reason":          "车缝开线",
+			"alert_type":               "qc_failed",
+			"critical_path":            true,
+		},
+	}
+}
+
+func outsourceWarehouseInboundWorkflowTask() *WorkflowTask {
+	sourceNo := "OUT-IN-001"
+	statusKey := workflowWarehouseInboundPendingKey
+	return &WorkflowTask{
+		ID:                991,
+		TaskCode:          "outsource-warehouse-inbound-99",
+		TaskGroup:         workflowOutsourceWarehouseInboundTaskGroup,
+		TaskName:          "委外回货入库",
+		SourceType:        workflowProcessingContractsModuleKey,
+		SourceID:          99,
+		SourceNo:          &sourceNo,
+		BusinessStatusKey: &statusKey,
+		TaskStatusKey:     "ready",
+		OwnerRoleKey:      "warehouse",
+		Priority:          2,
+		Payload: map[string]any{
+			"record_title":         "兔子挂件委外入库",
+			"supplier_name":        "联调加工厂",
+			"source_no":            "OUT-001",
+			"product_no":           "SKU-001",
+			"product_name":         "兔子挂件",
+			"quantity":             300,
+			"unit":                 "pcs",
+			"due_date":             "2026-04-30",
+			"expected_return_date": "2026-04-28",
+			"qc_type":              "outsource_return",
+			"qc_result":            "pass",
+			"outsource_processing": true,
+			"critical_path":        true,
+			"amount":               12000,
+			"tax_rate":             "13%",
+			"amount_with_tax":      13560,
+		},
+	}
+}
+
 func finishedGoodsQCWorkflowTask() *WorkflowTask {
 	sourceNo := "FG-QC-001"
 	statusKey := workflowQCPendingStatusKey
@@ -1027,6 +1439,40 @@ func finishedGoodsInboundWorkflowTask() *WorkflowTask {
 			"shipping_requirement":       "客户唛头",
 			"finished_goods":             true,
 			"inventory_balance_deferred": true,
+		},
+	}
+}
+
+func finishedGoodsReworkWorkflowTask() *WorkflowTask {
+	sourceNo := "FG-REWORK-001"
+	statusKey := workflowQCFailedStatusKey
+	return &WorkflowTask{
+		ID:                1301,
+		TaskCode:          "finished-goods-rework-101",
+		TaskGroup:         workflowFinishedGoodsReworkTaskGroup,
+		TaskName:          "成品返工处理",
+		SourceType:        workflowProductionProgressModuleKey,
+		SourceID:          101,
+		SourceNo:          &sourceNo,
+		BusinessStatusKey: &statusKey,
+		TaskStatusKey:     "ready",
+		OwnerRoleKey:      "production",
+		Priority:          3,
+		Payload: map[string]any{
+			"record_title":    "小熊公仔返工",
+			"source_no":       "SO-2026-101",
+			"customer_name":   "成慧怡",
+			"style_no":        "ST-001",
+			"product_no":      "SKU-101",
+			"product_name":    "小熊公仔",
+			"quantity":        1200,
+			"unit":            "只",
+			"due_date":        "2026-04-28",
+			"shipment_date":   "2026-04-30",
+			"finished_goods":  true,
+			"rejected_reason": "尺寸偏差",
+			"alert_type":      "qc_failed",
+			"critical_path":   true,
 		},
 	}
 }

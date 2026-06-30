@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
-  createWorkflowTask,
-  listWorkflowTasks,
-  updateWorkflowTaskStatus,
-  upsertWorkflowBusinessState,
+  blockWorkflowTaskAction,
+  completeWorkflowTaskAction,
+  explainWorkflowActionAccess,
+  rejectWorkflowTaskAction,
   urgeWorkflowTask,
 } from '../../api/workflowApi.mjs'
 import {
@@ -14,48 +14,20 @@ import {
 } from '../../utils/mobileTaskView.mjs'
 import { isOrderApprovalTask } from '../../utils/orderApprovalFlow.mjs'
 import { isPurchaseIqcTask } from '../../utils/purchaseInboundFlow.mjs'
+import { isOutsourceReturnQcTask } from '../../utils/outsourceReturnFlow.mjs'
 import {
-  INBOUND_DONE_STATUS_KEY as OUTSOURCE_INBOUND_DONE_STATUS_KEY,
-  PRODUCTION_PROCESSING_STATUS_KEY as OUTSOURCE_PRODUCTION_PROCESSING_STATUS_KEY,
-  QC_PENDING_STATUS_KEY as OUTSOURCE_QC_PENDING_STATUS_KEY,
-  OUTSOURCE_RETURN_QC_TASK_GROUP,
-  buildOutsourceReturnQcTask,
-  isOutsourceReturnQcTask,
-  isOutsourceReturnTrackingTask,
-  isOutsourceReworkTask,
-  isOutsourceWarehouseInboundTask,
-} from '../../utils/outsourceReturnFlow.mjs'
-import {
-  PRODUCTION_PROCESSING_STATUS_KEY as FINISHED_GOODS_PRODUCTION_PROCESSING_STATUS_KEY,
-  isFinishedGoodsInboundTask,
   isFinishedGoodsQcTask,
-  isFinishedGoodsReworkTask,
   isShipmentReleaseTask,
 } from '../../utils/finishedGoodsFlow.mjs'
 import {
-  INVOICE_REGISTRATION_TASK_GROUP,
-  RECONCILING_STATUS_KEY as FINANCE_RECONCILING_STATUS_KEY,
-  buildFinanceBlockedState,
-  buildInvoiceRegistrationTask,
   isInvoiceRegistrationTask,
   isReceivableRegistrationTask,
 } from '../../utils/shipmentFinanceFlow.mjs'
 import {
-  OUTSOURCE_PAYABLE_REGISTRATION_TASK_GROUP,
-  OUTSOURCE_RECONCILIATION_TASK_GROUP,
-  PURCHASE_RECONCILIATION_TASK_GROUP,
-  RECONCILING_STATUS_KEY as PAYABLE_RECONCILING_STATUS_KEY,
-  SETTLED_STATUS_KEY as PAYABLE_SETTLED_STATUS_KEY,
-  buildOutsourcePayableRegistrationTask,
-  buildOutsourceReconciliationTask,
-  buildPayableBlockedState,
-  buildPurchaseReconciliationTask,
-  isOutsourcePayableRegistrationTask,
   isPayableRegistrationTask,
   isPayableReconciliationTask,
 } from '../../utils/payableReconciliationFlow.mjs'
 import {
-  TERMINAL_TASK_STATUS_KEYS,
   canOperateTask,
   canUrgeTask,
   resolveMobileTaskBusinessStatus,
@@ -76,519 +48,22 @@ export default function useMobileRoleTaskActions({
   const [urgeReasonByTaskID, setUrgeReasonByTaskID] = useState({})
   const [evidenceTextByTaskID, setEvidenceTextByTaskID] = useState({})
 
-  const buildSourceSnapshotForTask = async (task) => {
-    const sourceType = String(task.source_type || '').trim()
-    if (!sourceType) return null
-    const payload =
-      task.payload && typeof task.payload === 'object' ? task.payload : {}
-    return {
-      id: task.source_id,
-      module_key: sourceType,
-      document_no: task.source_no || payload.document_no || '',
-      title:
-        payload.record_title ||
-        payload.title ||
-        task.task_name ||
-        task.source_no ||
-        '',
-      business_status_key:
-        task.business_status_key || payload.business_status_key || '',
-      owner_role_key: task.owner_role_key || payload.owner_role_key || '',
-      source_no: task.source_no || payload.source_no || '',
-      payload,
-    }
-  }
-
-  const updateSourceStatusForTask = async () => null
-
-  const hasActiveTaskForSource = async (task, taskGroup) => {
-    const data = await listWorkflowTasks({
-      source_type: task.source_type,
-      source_id: task.source_id,
-      limit: 200,
-    })
-    return (data.tasks || []).some(
-      (item) =>
-        item.task_group === taskGroup &&
-        !TERMINAL_TASK_STATUS_KEYS.has(item.task_status_key)
-    )
-  }
-
-  const completeOutsourceReturnTrackingTask = async (task, reason) => {
-    const record = await buildSourceSnapshotForTask(task)
-    if (!record) {
-      throw new Error('未找到对应加工合同或委外回货记录')
-    }
-    const savedRecord =
-      (await updateSourceStatusForTask(
-        task,
-        record,
-        OUTSOURCE_QC_PENDING_STATUS_KEY,
-        reason || '委外已回货，转品质检验'
-      )) || record
-    await upsertWorkflowBusinessState({
-      source_type: task.source_type,
-      source_id: savedRecord.id,
-      source_no: savedRecord.document_no || task.source_no,
-      business_status_key: OUTSOURCE_QC_PENDING_STATUS_KEY,
-      owner_role_key: 'quality',
-      payload: {
-        record_title: savedRecord.title,
-        return_task_id: task.id,
-        notification_type: 'task_created',
-        alert_type: 'outsource_return_qc_pending',
-        critical_path: true,
-        outsource_processing: true,
-      },
-    })
-    const hasQcTask = await hasActiveTaskForSource(
-      task,
-      OUTSOURCE_RETURN_QC_TASK_GROUP
-    )
-    const qcTask = buildOutsourceReturnQcTask(
-      {
-        ...savedRecord,
-        module_key: task.source_type,
-      },
-      task
-    )
-    if (qcTask && !hasQcTask) {
-      await createWorkflowTask(qcTask)
-    }
-  }
-
-  const completeOutsourceWarehouseInboundTask = async (task, reason) => {
-    const record = await buildSourceSnapshotForTask(task)
-    if (!record) {
-      throw new Error('未找到对应加工合同或委外回货记录')
-    }
-    const savedRecord =
-      (await updateSourceStatusForTask(
-        task,
-        record,
-        OUTSOURCE_INBOUND_DONE_STATUS_KEY,
-        reason || '仓库已确认委外回货入库'
-      )) || record
-    await upsertWorkflowBusinessState({
-      source_type: task.source_type,
-      source_id: savedRecord.id,
-      source_no: savedRecord.document_no || task.source_no,
-      business_status_key: OUTSOURCE_INBOUND_DONE_STATUS_KEY,
-      owner_role_key: 'warehouse',
-      payload: {
-        record_title: savedRecord.title,
-        warehouse_task_id: task.id,
-        inbound_result: 'done',
-        inventory_balance_deferred: true,
-        critical_path: true,
-        outsource_processing: true,
-      },
-    })
-    const payableRecord = {
-      ...savedRecord,
-      module_key: task.source_type,
-      payload: {
-        ...(savedRecord.payload || {}),
-        inbound_result: 'done',
-        payable_type: 'outsource',
-        outsource_processing: true,
-      },
-    }
-    const hasPayableTask = await hasActiveTaskForSource(
-      task,
-      OUTSOURCE_PAYABLE_REGISTRATION_TASK_GROUP
-    )
-    const payableTask = buildOutsourcePayableRegistrationTask(
-      payableRecord,
-      task
-    )
-    let createdPayableTask = null
-    if (payableTask && !hasPayableTask) {
-      createdPayableTask = await createWorkflowTask(payableTask)
-    }
-    if (payableTask) {
-      await upsertWorkflowBusinessState({
-        source_type: task.source_type,
-        source_id: savedRecord.id,
-        source_no: savedRecord.document_no || task.source_no,
-        business_status_key: OUTSOURCE_INBOUND_DONE_STATUS_KEY,
-        owner_role_key: 'finance',
-        payload: {
-          record_title: savedRecord.title,
-          warehouse_task_id: task.id,
-          payable_task_id: createdPayableTask?.id,
-          inbound_result: 'done',
-          notification_type: 'finance_pending',
-          alert_type: 'payable_pending',
-          next_module_key: 'payables',
-          payable_type: 'outsource',
-          outsource_processing: true,
-        },
+  const explainTaskAction = async (task, actionKey) => {
+    try {
+      const data = await explainWorkflowActionAccess({
+        task_id: task.id,
+        action_key: actionKey,
       })
+      const action = data?.action || {}
+      if (action.allowed !== true) {
+        message.warning(action.reason || '当前账号不能提交这个任务动作')
+        return false
+      }
+      return true
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '核对任务动作权限失败'))
+      return false
     }
-  }
-
-  const completeOutsourceReworkTask = async (task, reason) => {
-    const record = await buildSourceSnapshotForTask(task)
-    if (!record) {
-      throw new Error('未找到对应加工合同或委外回货记录')
-    }
-    const savedRecord =
-      (await updateSourceStatusForTask(
-        task,
-        record,
-        OUTSOURCE_PRODUCTION_PROCESSING_STATUS_KEY,
-        reason || '委外返工 / 补做安排已确认'
-      )) || record
-    await upsertWorkflowBusinessState({
-      source_type: task.source_type,
-      source_id: savedRecord.id,
-      source_no: savedRecord.document_no || task.source_no,
-      business_status_key: OUTSOURCE_PRODUCTION_PROCESSING_STATUS_KEY,
-      owner_role_key: 'production',
-      payload: {
-        record_title: savedRecord.title,
-        rework_task_id: task.id,
-        rework_result: 'arranged',
-        critical_path: true,
-        outsource_processing: true,
-      },
-    })
-  }
-
-  const completeFinishedGoodsReworkTask = async (task, reason) => {
-    const record = await buildSourceSnapshotForTask(task)
-    if (!record) {
-      throw new Error('未找到对应生产进度记录')
-    }
-    const savedRecord =
-      (await updateSourceStatusForTask(
-        task,
-        record,
-        FINISHED_GOODS_PRODUCTION_PROCESSING_STATUS_KEY,
-        reason || '成品返工安排已确认'
-      )) || record
-    await upsertWorkflowBusinessState({
-      source_type: task.source_type,
-      source_id: savedRecord.id,
-      source_no: savedRecord.document_no || task.source_no,
-      business_status_key: FINISHED_GOODS_PRODUCTION_PROCESSING_STATUS_KEY,
-      owner_role_key: 'production',
-      payload: {
-        record_title: savedRecord.title,
-        rework_task_id: task.id,
-        rework_result: 'arranged',
-        critical_path: true,
-        finished_goods: true,
-      },
-    })
-  }
-
-  const completeReceivableRegistrationTask = async (task, reason) => {
-    const record = await buildSourceSnapshotForTask(task)
-    if (!record) {
-      throw new Error('未找到对应出货或应收登记记录')
-    }
-    const savedRecord =
-      (await updateSourceStatusForTask(
-        task,
-        record,
-        FINANCE_RECONCILING_STATUS_KEY,
-        reason || '应收登记已完成'
-      )) || record
-    await upsertWorkflowBusinessState({
-      source_type: task.source_type,
-      source_id: savedRecord.id,
-      source_no: savedRecord.document_no || task.source_no,
-      business_status_key: FINANCE_RECONCILING_STATUS_KEY,
-      owner_role_key: 'finance',
-      payload: {
-        record_title: savedRecord.title,
-        receivable_task_id: task.id,
-        receivable_result: 'registered',
-        notification_type: 'finance_pending',
-        alert_type: 'invoice_pending',
-        critical_path: false,
-        next_module_key: 'invoices',
-      },
-    })
-    const hasInvoiceTask = await hasActiveTaskForSource(
-      task,
-      INVOICE_REGISTRATION_TASK_GROUP
-    )
-    const invoiceTask = buildInvoiceRegistrationTask(
-      {
-        ...savedRecord,
-        module_key: task.source_type,
-      },
-      task
-    )
-    if (invoiceTask && !hasInvoiceTask) {
-      await createWorkflowTask(invoiceTask)
-    }
-  }
-
-  const completeInvoiceRegistrationTask = async (task, reason) => {
-    const record = await buildSourceSnapshotForTask(task)
-    if (!record) {
-      throw new Error('未找到对应应收或开票登记记录')
-    }
-    const savedRecord =
-      (await updateSourceStatusForTask(
-        task,
-        record,
-        FINANCE_RECONCILING_STATUS_KEY,
-        reason || '开票登记已完成，进入对账中'
-      )) || record
-    await upsertWorkflowBusinessState({
-      source_type: task.source_type,
-      source_id: savedRecord.id,
-      source_no: savedRecord.document_no || task.source_no,
-      business_status_key: FINANCE_RECONCILING_STATUS_KEY,
-      owner_role_key: 'finance',
-      payload: {
-        record_title: savedRecord.title,
-        invoice_task_id: task.id,
-        invoice_result: 'registered',
-        critical_path: false,
-        next_module_key: 'reconciliation',
-      },
-    })
-  }
-
-  const completePayableRegistrationTask = async (task, reason) => {
-    const record = await buildSourceSnapshotForTask(task)
-    if (!record) {
-      throw new Error('未找到对应采购、委外或应付登记记录')
-    }
-    const savedRecord =
-      (await updateSourceStatusForTask(
-        task,
-        record,
-        PAYABLE_RECONCILING_STATUS_KEY,
-        reason || '应付登记已完成，进入对账'
-      )) || record
-    await upsertWorkflowBusinessState({
-      source_type: task.source_type,
-      source_id: savedRecord.id,
-      source_no: savedRecord.document_no || task.source_no,
-      business_status_key: PAYABLE_RECONCILING_STATUS_KEY,
-      owner_role_key: 'finance',
-      payload: {
-        record_title: savedRecord.title,
-        payable_task_id: task.id,
-        payable_result: 'registered',
-        notification_type: 'finance_pending',
-        alert_type: 'reconciliation_pending',
-        critical_path: false,
-        next_module_key: 'reconciliation',
-        payable_type: task.payload?.payable_type,
-      },
-    })
-
-    const isOutsource = isOutsourcePayableRegistrationTask(task)
-    const taskGroup = isOutsource
-      ? OUTSOURCE_RECONCILIATION_TASK_GROUP
-      : PURCHASE_RECONCILIATION_TASK_GROUP
-    const hasReconciliationTask = await hasActiveTaskForSource(task, taskGroup)
-    const reconciliationRecord = {
-      ...savedRecord,
-      module_key: task.source_type,
-      payload: {
-        ...(savedRecord.payload || {}),
-        payable_type: isOutsource ? 'outsource' : 'purchase',
-      },
-    }
-    const reconciliationTask = isOutsource
-      ? buildOutsourceReconciliationTask(reconciliationRecord, task)
-      : buildPurchaseReconciliationTask(reconciliationRecord, task)
-    if (reconciliationTask && !hasReconciliationTask) {
-      await createWorkflowTask(reconciliationTask)
-    }
-  }
-
-  const completePayableReconciliationTask = async (task, reason) => {
-    const record = await buildSourceSnapshotForTask(task)
-    if (!record) {
-      throw new Error('未找到对应采购、委外或对账记录')
-    }
-    const savedRecord =
-      (await updateSourceStatusForTask(
-        task,
-        record,
-        PAYABLE_SETTLED_STATUS_KEY,
-        reason || '财务对账已完成'
-      )) || record
-    await upsertWorkflowBusinessState({
-      source_type: task.source_type,
-      source_id: savedRecord.id,
-      source_no: savedRecord.document_no || task.source_no,
-      business_status_key: PAYABLE_SETTLED_STATUS_KEY,
-      owner_role_key: 'finance',
-      payload: {
-        record_title: savedRecord.title,
-        reconciliation_task_id: task.id,
-        reconciliation_result: 'settled',
-        payable_type: task.payload?.payable_type,
-      },
-    })
-  }
-
-  const blockFinanceTask = async (task, reason) => {
-    const record = await buildSourceSnapshotForTask(task)
-    if (!record) {
-      throw new Error('未找到对应财务登记记录')
-    }
-    const savedRecord =
-      (await updateSourceStatusForTask(task, record, 'blocked', reason)) ||
-      record
-    const state = buildFinanceBlockedState(
-      {
-        ...savedRecord,
-        module_key: task.source_type,
-      },
-      task,
-      reason
-    )
-    if (state) {
-      await upsertWorkflowBusinessState(state)
-    }
-  }
-
-  const blockPayableFinanceTask = async (task, reason) => {
-    const record = await buildSourceSnapshotForTask(task)
-    if (!record) {
-      throw new Error('未找到对应应付或对账记录')
-    }
-    const savedRecord =
-      (await updateSourceStatusForTask(task, record, 'blocked', reason)) ||
-      record
-    const state = buildPayableBlockedState(
-      {
-        ...savedRecord,
-        module_key: task.source_type,
-      },
-      task,
-      reason
-    )
-    if (state) {
-      await upsertWorkflowBusinessState(state)
-    }
-  }
-
-  const runOutsourceReturnFollowUp = async (
-    task,
-    taskStatusKey,
-    reason = ''
-  ) => {
-    if (
-      activeRoleKey === 'production' &&
-      isOutsourceReturnTrackingTask(task) &&
-      taskStatusKey === 'done'
-    ) {
-      await completeOutsourceReturnTrackingTask(task, reason)
-      return
-    }
-
-    if (
-      activeRoleKey === 'warehouse' &&
-      isOutsourceWarehouseInboundTask(task) &&
-      taskStatusKey === 'done'
-    ) {
-      await completeOutsourceWarehouseInboundTask(task, reason)
-      return
-    }
-
-    if (
-      activeRoleKey === 'production' &&
-      isOutsourceReworkTask(task) &&
-      taskStatusKey === 'done'
-    ) {
-      await completeOutsourceReworkTask(task, reason)
-    }
-  }
-
-  const runFinishedGoodsFollowUp = async (task, taskStatusKey, reason = '') => {
-    if (activeRoleKey === 'quality' && isFinishedGoodsQcTask(task)) {
-      return
-    }
-
-    if (activeRoleKey === 'warehouse' && isFinishedGoodsInboundTask(task)) {
-      return
-    }
-
-    if (activeRoleKey === 'warehouse' && isShipmentReleaseTask(task)) {
-      return
-    }
-
-    if (
-      activeRoleKey === 'production' &&
-      isFinishedGoodsReworkTask(task) &&
-      taskStatusKey === 'done'
-    ) {
-      await completeFinishedGoodsReworkTask(task, reason)
-    }
-  }
-
-  const runShipmentFinanceFollowUp = async (
-    task,
-    taskStatusKey,
-    reason = ''
-  ) => {
-    if (
-      activeRoleKey !== 'finance' ||
-      (!isReceivableRegistrationTask(task) && !isInvoiceRegistrationTask(task))
-    ) {
-      return
-    }
-
-    if (taskStatusKey === 'blocked' || taskStatusKey === 'rejected') {
-      await blockFinanceTask(task, reason)
-      return
-    }
-
-    if (isReceivableRegistrationTask(task) && taskStatusKey === 'done') {
-      await completeReceivableRegistrationTask(task, reason)
-      return
-    }
-
-    if (isInvoiceRegistrationTask(task) && taskStatusKey === 'done') {
-      await completeInvoiceRegistrationTask(task, reason)
-    }
-  }
-
-  const runPayableReconciliationFollowUp = async (
-    task,
-    taskStatusKey,
-    reason = ''
-  ) => {
-    if (
-      activeRoleKey !== 'finance' ||
-      (!isPayableRegistrationTask(task) && !isPayableReconciliationTask(task))
-    ) {
-      return
-    }
-
-    if (taskStatusKey === 'blocked' || taskStatusKey === 'rejected') {
-      await blockPayableFinanceTask(task, reason)
-      return
-    }
-
-    if (isPayableRegistrationTask(task) && taskStatusKey === 'done') {
-      await completePayableRegistrationTask(task, reason)
-      return
-    }
-
-    if (isPayableReconciliationTask(task) && taskStatusKey === 'done') {
-      await completePayableReconciliationTask(task, reason)
-    }
-  }
-
-  const runTaskFollowUp = async (task, taskStatusKey, reason = '') => {
-    await runOutsourceReturnFollowUp(task, taskStatusKey, reason)
-    await runFinishedGoodsFollowUp(task, taskStatusKey, reason)
-    await runShipmentFinanceFollowUp(task, taskStatusKey, reason)
-    await runPayableReconciliationFollowUp(task, taskStatusKey, reason)
   }
 
   const moveTask = async (task, taskStatusKey) => {
@@ -604,6 +79,17 @@ export default function useMobileRoleTaskActions({
       message.warning('请先填写阻塞或退回原因')
       return false
     }
+    const explainActionKey =
+      taskStatusKey === 'done'
+        ? 'complete'
+        : taskStatusKey === 'blocked'
+          ? 'block'
+          : taskStatusKey === 'rejected'
+            ? 'reject'
+            : taskStatusKey
+    const explainAllowed = await explainTaskAction(task, explainActionKey)
+    if (!explainAllowed) return false
+
     const nextBusinessStatusKey = resolveMobileTaskBusinessStatus(
       task,
       taskStatusKey
@@ -617,11 +103,9 @@ export default function useMobileRoleTaskActions({
 
     setUpdatingID(task.id)
     try {
-      const updatedTask = await updateWorkflowTaskStatus({
+      const actionParams = {
         id: task.id,
-        task_status_key: taskStatusKey,
         business_status_key: nextBusinessStatusKey,
-        actor_role_key: activeRoleKey,
         reason: reasonRequired ? blockedReason : '',
         payload: {
           ...(task.payload || {}),
@@ -672,16 +156,25 @@ export default function useMobileRoleTaskActions({
               ? blockedReason
               : undefined,
         },
-      })
-      await runTaskFollowUp(
-        updatedTask || {
-          ...task,
-          task_status_key: taskStatusKey,
-          business_status_key: nextBusinessStatusKey,
-        },
-        taskStatusKey,
-        reasonRequired ? blockedReason : ''
-      )
+      }
+      if (taskStatusKey === 'done') {
+        await completeWorkflowTaskAction({
+          ...actionParams,
+          action_key: 'complete',
+        })
+      } else if (taskStatusKey === 'blocked') {
+        await blockWorkflowTaskAction({
+          ...actionParams,
+          action_key: 'block',
+        })
+      } else if (taskStatusKey === 'rejected') {
+        await rejectWorkflowTaskAction({
+          ...actionParams,
+          action_key: 'reject',
+        })
+      } else {
+        throw new Error('当前任务动作暂不支持')
+      }
       setBlockedReasonByTaskID((current) => {
         const next = { ...current }
         if (reasonRequired) {
@@ -719,6 +212,8 @@ export default function useMobileRoleTaskActions({
       message.warning('请先填写催办原因')
       return false
     }
+    const explainAllowed = await explainTaskAction(task, 'urge')
+    if (!explainAllowed) return false
 
     setUrgingID(task.id)
     try {
@@ -732,7 +227,6 @@ export default function useMobileRoleTaskActions({
         task_id: task.id,
         action: resolveMobileUrgeAction(activeRoleKey, task),
         reason,
-        actor_role_key: activeRoleKey,
         payload: {
           source_type: task.source_type,
           source_id: task.source_id,

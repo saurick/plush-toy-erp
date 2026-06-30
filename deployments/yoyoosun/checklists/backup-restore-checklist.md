@@ -20,7 +20,8 @@
 - [ ] 恢复后 migration status 正常。
 - [ ] 恢复后 smoke query 通过。
 - [ ] 恢复后 web / server 健康检查通过。
-- [ ] `backup-restore-report.json` 已生成，并声明 `backupCreated=true`、`restoreCompleted=true`、`migrationStatus=ok`、`smokeQueryStatus=passed`。
+- [ ] `command-summary.txt` 已生成，只记录脱敏命令摘要，不包含完整 DSN、secret、dump 内容或客户 raw rows。
+- [ ] `backup-restore-report.json` 已生成，并声明 `backupCreated=true`、`restoreCompleted=true`、`migrationStatus=ok`、`smokeQueryStatus=passed`，且 `artifacts.backupEvidence`、`artifacts.preMigrationStatus`、`artifacts.migrationStatus`、`artifacts.commandSummary` 指向当前 evidence 目录内真实存在的相对路径。
 
 ## 收口
 

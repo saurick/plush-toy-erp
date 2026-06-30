@@ -106,6 +106,18 @@ const desktopAccounts = [
     expectedMenus: ['工作台', '任务看板', '业务看板', '异常 / 阻塞闭环'],
   },
   {
+    username: 'demo_engineering',
+    expectedMenus: [
+      '工作台',
+      '任务看板',
+      '业务看板',
+      '产品档案',
+      '材料档案',
+      '工序档案',
+      'BOM 管理',
+    ],
+  },
+  {
     username: 'demo_admin',
     expectedMenus: ['权限管理'],
   },
@@ -120,6 +132,7 @@ const mobileAccounts = [
   ['demo_quality', 'quality'],
   ['demo_finance', 'finance'],
   ['demo_pmc', 'pmc'],
+  ['demo_engineering', 'engineering'],
 ]
 
 let devServerProcess = null

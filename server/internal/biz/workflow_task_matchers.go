@@ -4,6 +4,32 @@ import (
 	"strings"
 )
 
+func isShipmentFinanceSourceType(sourceType string) bool {
+	switch strings.TrimSpace(sourceType) {
+	case workflowShippingReleaseModuleKey,
+		workflowOutboundModuleKey,
+		workflowProductionProgressModuleKey,
+		workflowReceivablesModuleKey,
+		workflowInvoicesModuleKey:
+		return true
+	default:
+		return false
+	}
+}
+
+func isPayableSourceType(sourceType string) bool {
+	switch strings.TrimSpace(sourceType) {
+	case workflowAccessoriesPurchaseModuleKey,
+		workflowProcessingContractsModuleKey,
+		workflowInboundModuleKey,
+		workflowPayablesModuleKey,
+		workflowReconciliationModuleKey:
+		return true
+	default:
+		return false
+	}
+}
+
 func isBossOrderApprovalTask(task *WorkflowTask) bool {
 	if task == nil {
 		return false
@@ -59,6 +85,31 @@ func isPurchaseWarehouseInboundTask(task *WorkflowTask) bool {
 	}
 }
 
+func isOutsourceReturnTrackingTask(task *WorkflowTask) bool {
+	if task == nil || task.SourceID <= 0 {
+		return false
+	}
+	if strings.TrimSpace(task.SourceType) != workflowProcessingContractsModuleKey {
+		return false
+	}
+	if strings.TrimSpace(task.TaskGroup) != workflowOutsourceReturnTrackingTaskGroup ||
+		strings.TrimSpace(task.OwnerRoleKey) != "production" {
+		return false
+	}
+	if workflowPayloadString(task.Payload, "outsource_processing") != "true" {
+		return false
+	}
+	if task.BusinessStatusKey == nil {
+		return true
+	}
+	switch strings.TrimSpace(*task.BusinessStatusKey) {
+	case "", workflowProductionProcessingStatusKey:
+		return true
+	default:
+		return false
+	}
+}
+
 func isOutsourceReturnQCTask(task *WorkflowTask) bool {
 	if task == nil || task.SourceID <= 0 {
 		return false
@@ -80,6 +131,60 @@ func isOutsourceReturnQCTask(task *WorkflowTask) bool {
 	}
 	switch strings.TrimSpace(*task.BusinessStatusKey) {
 	case "", workflowQCPendingStatusKey, workflowQCFailedStatusKey:
+		return true
+	default:
+		return false
+	}
+}
+
+func isOutsourceWarehouseInboundTask(task *WorkflowTask) bool {
+	if task == nil || task.SourceID <= 0 {
+		return false
+	}
+	sourceType := strings.TrimSpace(task.SourceType)
+	if sourceType != workflowProcessingContractsModuleKey && sourceType != workflowInboundModuleKey {
+		return false
+	}
+	if strings.TrimSpace(task.TaskGroup) != workflowOutsourceWarehouseInboundTaskGroup ||
+		strings.TrimSpace(task.OwnerRoleKey) != "warehouse" {
+		return false
+	}
+	if workflowPayloadString(task.Payload, "qc_type") != "outsource_return" &&
+		workflowPayloadString(task.Payload, "outsource_processing") != "true" {
+		return false
+	}
+	if task.BusinessStatusKey == nil {
+		return true
+	}
+	switch strings.TrimSpace(*task.BusinessStatusKey) {
+	case "", workflowWarehouseInboundPendingKey:
+		return true
+	default:
+		return false
+	}
+}
+
+func isOutsourceReworkTask(task *WorkflowTask) bool {
+	if task == nil || task.SourceID <= 0 {
+		return false
+	}
+	sourceType := strings.TrimSpace(task.SourceType)
+	if sourceType != workflowProcessingContractsModuleKey && sourceType != workflowInboundModuleKey {
+		return false
+	}
+	if strings.TrimSpace(task.TaskGroup) != workflowOutsourceReworkTaskGroup ||
+		strings.TrimSpace(task.OwnerRoleKey) != "production" {
+		return false
+	}
+	if workflowPayloadString(task.Payload, "qc_type") != "outsource_return" &&
+		workflowPayloadString(task.Payload, "outsource_processing") != "true" {
+		return false
+	}
+	if task.BusinessStatusKey == nil {
+		return true
+	}
+	switch strings.TrimSpace(*task.BusinessStatusKey) {
+	case "", workflowQCFailedStatusKey:
 		return true
 	default:
 		return false
@@ -136,6 +241,31 @@ func isFinishedGoodsInboundTask(task *WorkflowTask) bool {
 	}
 }
 
+func isFinishedGoodsReworkTask(task *WorkflowTask) bool {
+	if task == nil || task.SourceID <= 0 {
+		return false
+	}
+	if strings.TrimSpace(task.SourceType) != workflowProductionProgressModuleKey {
+		return false
+	}
+	if strings.TrimSpace(task.TaskGroup) != workflowFinishedGoodsReworkTaskGroup ||
+		strings.TrimSpace(task.OwnerRoleKey) != "production" {
+		return false
+	}
+	if workflowPayloadString(task.Payload, "finished_goods") != "true" {
+		return false
+	}
+	if task.BusinessStatusKey == nil {
+		return true
+	}
+	switch strings.TrimSpace(*task.BusinessStatusKey) {
+	case "", workflowQCFailedStatusKey:
+		return true
+	default:
+		return false
+	}
+}
+
 func isShipmentReleaseTask(task *WorkflowTask) bool {
 	if task == nil || task.SourceID <= 0 {
 		return false
@@ -158,6 +288,102 @@ func isShipmentReleaseTask(task *WorkflowTask) bool {
 	}
 	switch strings.TrimSpace(*task.BusinessStatusKey) {
 	case "", workflowShipmentReleasePendingStatusKey, workflowShipmentPendingStatusKey, workflowBlockedStatusKey:
+		return true
+	default:
+		return false
+	}
+}
+
+func isReceivableRegistrationTask(task *WorkflowTask) bool {
+	if task == nil || task.SourceID <= 0 {
+		return false
+	}
+	if !isShipmentFinanceSourceType(task.SourceType) {
+		return false
+	}
+	if strings.TrimSpace(task.TaskGroup) != workflowReceivableRegistrationTaskGroup ||
+		strings.TrimSpace(task.OwnerRoleKey) != "finance" {
+		return false
+	}
+	if task.BusinessStatusKey == nil {
+		return true
+	}
+	switch strings.TrimSpace(*task.BusinessStatusKey) {
+	case "", workflowShippingReleasedStatusKey, workflowReconcilingStatusKey:
+		return true
+	default:
+		return false
+	}
+}
+
+func isInvoiceRegistrationTask(task *WorkflowTask) bool {
+	if task == nil || task.SourceID <= 0 {
+		return false
+	}
+	if !isShipmentFinanceSourceType(task.SourceType) {
+		return false
+	}
+	if strings.TrimSpace(task.TaskGroup) != workflowInvoiceRegistrationTaskGroup ||
+		strings.TrimSpace(task.OwnerRoleKey) != "finance" {
+		return false
+	}
+	if task.BusinessStatusKey == nil {
+		return true
+	}
+	switch strings.TrimSpace(*task.BusinessStatusKey) {
+	case "", workflowReconcilingStatusKey:
+		return true
+	default:
+		return false
+	}
+}
+
+func isPayableRegistrationTask(task *WorkflowTask) bool {
+	if task == nil || task.SourceID <= 0 {
+		return false
+	}
+	if !isPayableSourceType(task.SourceType) {
+		return false
+	}
+	taskGroup := strings.TrimSpace(task.TaskGroup)
+	if taskGroup != workflowPurchasePayableRegistrationGroup &&
+		taskGroup != workflowOutsourcePayableRegistrationGroup {
+		return false
+	}
+	if strings.TrimSpace(task.OwnerRoleKey) != "finance" {
+		return false
+	}
+	if task.BusinessStatusKey == nil {
+		return true
+	}
+	switch strings.TrimSpace(*task.BusinessStatusKey) {
+	case "", workflowInboundDoneStatusKey, workflowReconcilingStatusKey:
+		return true
+	default:
+		return false
+	}
+}
+
+func isPayableReconciliationTask(task *WorkflowTask) bool {
+	if task == nil || task.SourceID <= 0 {
+		return false
+	}
+	if !isPayableSourceType(task.SourceType) {
+		return false
+	}
+	taskGroup := strings.TrimSpace(task.TaskGroup)
+	if taskGroup != workflowPurchaseReconciliationGroup &&
+		taskGroup != workflowOutsourceReconciliationGroup {
+		return false
+	}
+	if strings.TrimSpace(task.OwnerRoleKey) != "finance" {
+		return false
+	}
+	if task.BusinessStatusKey == nil {
+		return true
+	}
+	switch strings.TrimSpace(*task.BusinessStatusKey) {
+	case "", workflowReconcilingStatusKey, workflowSettledStatusKey:
 		return true
 	default:
 		return false

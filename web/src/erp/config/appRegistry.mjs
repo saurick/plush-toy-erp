@@ -98,6 +98,17 @@ const ERP_APP_DEFINITIONS = {
     description:
       '品质岗位任务端独立入口，聚焦 IQC、过程异常、返工复检和放行 / 退回反馈。',
   },
+  'mobile-engineering': {
+    id: 'mobile-engineering',
+    kind: 'mobile',
+    title: '毛绒 ERP 工程岗位任务端',
+    shortTitle: '工程岗位任务端',
+    roleKey: 'engineering',
+    port: 5194,
+    command: 'pnpm start:mobile:engineering',
+    description:
+      '工程岗位任务端独立入口，聚焦产品资料、工序、BOM 和工程资料补齐任务。',
+  },
 }
 
 export const DEFAULT_ERP_APP_ID = 'desktop'

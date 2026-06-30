@@ -1,0 +1,355 @@
+import { execFile } from 'node:child_process'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import path from 'node:path'
+import { promisify } from 'node:util'
+
+const execFileAsync = promisify(execFile)
+
+const API_PATH = '/__dev/api/customer-import/dry-run'
+const RUNTIME_MANIFEST_API_PATH = '/__dev/api/customer-config/runtime-manifest'
+const RELEASE_READINESS_API_PATH =
+  '/__dev/api/customer-config/release-readiness'
+const SUPPORTED_CUSTOMERS = new Set(['yoyoosun'])
+
+function sendJson(res, statusCode, payload) {
+  res.statusCode = statusCode
+  res.setHeader('content-type', 'application/json; charset=utf-8')
+  res.end(JSON.stringify(payload))
+}
+
+function readRequestJson(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    req.on('data', (chunk) => {
+      chunks.push(chunk)
+    })
+    req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8').trim()
+      if (!raw) {
+        resolve({})
+        return
+      }
+      try {
+        resolve(JSON.parse(raw))
+      } catch (error) {
+        reject(error)
+      }
+    })
+    req.on('error', reject)
+  })
+}
+
+function normalizeCustomerKey(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+}
+
+function buildDryRunPaths(projectRoot, customerKey) {
+  const fixtureBasePath = path.join(
+    'scripts',
+    'import',
+    'fixtures',
+    'customers',
+    customerKey
+  )
+  const outputPath = path.join(
+    'output',
+    'customers',
+    customerKey,
+    'ui-import-dry-run'
+  )
+  return {
+    sourcePath: path.join(fixtureBasePath, 'source-snapshot.sample.json'),
+    existingPath: path.join(fixtureBasePath, 'existing-v1.sample.json'),
+    outputPath,
+    validationSummaryPath: path.join(outputPath, 'validation-summary.json'),
+    reportPath: path.join(outputPath, 'dry-run-report.md'),
+    absoluteOutputPath: path.join(projectRoot, outputPath),
+  }
+}
+
+function buildReleaseReadinessPaths(customerKey) {
+  const outputPath = path.join('output', 'customers', customerKey)
+  return {
+    evidenceDir: path.join('deployments', customerKey, 'evidence', 'releases'),
+    manifestPath: path.join(
+      outputPath,
+      'customer-config-runtime-manifest.ui-release.json'
+    ),
+  }
+}
+
+function summarizeValidation(summary = {}) {
+  return {
+    totalSources: Number(summary.totalSources || 0),
+    normalizedRows: Number(summary.normalizedRows || 0),
+    candidateCountsByAction: summary.candidateCountsByAction || {},
+    unresolvedCountsBySeverity: summary.unresolvedCountsBySeverity || {},
+    forbiddenCount: Number(summary.forbiddenCount || 0),
+    blockerCount: Number(summary.blockerCount || 0),
+    canExecuteRealImport: summary.canExecuteRealImport === true,
+  }
+}
+
+async function runDryRun(projectRoot, customerKey) {
+  const paths = buildDryRunPaths(projectRoot, customerKey)
+  const args = [
+    path.join('scripts', 'import', 'customerImportDryRun.mjs'),
+    '--source',
+    paths.sourcePath,
+    '--existing',
+    paths.existingPath,
+    '--out',
+    paths.outputPath,
+    '--format',
+    'json,md',
+  ]
+  const command = `node ${args.join(' ')}`
+
+  const result = await execFileAsync(process.execPath, args, {
+    cwd: projectRoot,
+    timeout: 30_000,
+    maxBuffer: 1024 * 1024 * 10,
+  })
+  const validationSummary = JSON.parse(
+    await readFile(path.join(projectRoot, paths.validationSummaryPath), 'utf8')
+  )
+  const reportMarkdown = await readFile(
+    path.join(projectRoot, paths.reportPath),
+    'utf8'
+  )
+
+  return {
+    customerKey,
+    status: 'success',
+    command,
+    outputPath: paths.outputPath,
+    reportPath: paths.reportPath,
+    generatedAt: new Date().toISOString(),
+    summary: summarizeValidation(validationSummary),
+    reportPreview: reportMarkdown.slice(0, 1800).trim(),
+    stdout: result.stdout.trim(),
+  }
+}
+
+async function compileRuntimeManifest(projectRoot, customerKey) {
+  return compileRuntimeManifestTo(
+    projectRoot,
+    customerKey,
+    path.join(
+      'output',
+      'customers',
+      customerKey,
+      'customer-config-runtime-manifest.ui-test.json'
+    )
+  )
+}
+
+async function compileRuntimeManifestTo(projectRoot, customerKey, outPath) {
+  const absoluteOutPath = path.join(projectRoot, outPath)
+  await mkdir(path.dirname(absoluteOutPath), { recursive: true })
+  await execFileAsync(
+    process.execPath,
+    [
+      path.join('scripts', 'qa', 'customer-config-runtime-manifest.mjs'),
+      '--customer',
+      customerKey,
+      '--mode',
+      'preview',
+      '--out',
+      outPath,
+    ],
+    {
+      cwd: projectRoot,
+      timeout: 30_000,
+      maxBuffer: 1024 * 1024 * 10,
+    }
+  )
+  const manifest = JSON.parse(await readFile(absoluteOutPath, 'utf8'))
+  await writeFile(absoluteOutPath, `${JSON.stringify(manifest, null, 2)}\n`)
+  return {
+    customerKey,
+    status: 'success',
+    manifest,
+    manifestPath: outPath,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      revision: manifest.revision,
+      productVersion: manifest.product_version,
+      moduleStateCount: manifest.module_states.length,
+      roleProfileCount: manifest.role_profiles.length,
+      entitlementCount: manifest.access_entitlements.length,
+      workPoolCount: manifest.work_pools.length,
+      membershipCount: manifest.work_pool_memberships.length,
+      pageCount: manifest.compiled_snapshot.pages.length,
+    },
+  }
+}
+
+function summarizeReleaseReadinessError(error) {
+  const raw = `${error?.stderr || ''}\n${error?.stdout || ''}\n${error?.message || ''}`
+  const details = raw
+    .split('\n')
+    .map((line) => line.replace(/^\s*-\s*/, '').trim())
+    .filter(Boolean)
+    .filter((line) => !/^Command failed:/i.test(line))
+    .slice(0, 12)
+  return details
+}
+
+async function runReleaseReadiness(projectRoot, customerKey) {
+  const paths = buildReleaseReadinessPaths(customerKey)
+  const manifestPayload = await compileRuntimeManifestTo(
+    projectRoot,
+    customerKey,
+    paths.manifestPath
+  )
+  const args = [
+    path.join('scripts', 'deploy', 'customer-config-release-readiness.mjs'),
+    '--customer',
+    customerKey,
+    '--manifest',
+    paths.manifestPath,
+    '--evidence-dir',
+    paths.evidenceDir,
+  ]
+
+  try {
+    const result = await execFileAsync(process.execPath, args, {
+      cwd: projectRoot,
+      timeout: 30_000,
+      maxBuffer: 1024 * 1024 * 10,
+    })
+    return {
+      customerKey,
+      status: 'ready',
+      generatedAt: new Date().toISOString(),
+      manifest: manifestPayload.manifest,
+      manifestPath: manifestPayload.manifestPath,
+      evidenceDir: paths.evidenceDir,
+      summary: manifestPayload.summary,
+      stdout: result.stdout.trim(),
+      missing: [],
+    }
+  } catch (error) {
+    return {
+      customerKey,
+      status: 'blocked',
+      generatedAt: new Date().toISOString(),
+      manifest: manifestPayload.manifest,
+      manifestPath: manifestPayload.manifestPath,
+      evidenceDir: paths.evidenceDir,
+      summary: manifestPayload.summary,
+      message: '发布门禁未通过',
+      missing: summarizeReleaseReadinessError(error),
+    }
+  }
+}
+
+export function createDevCustomerImportDryRunPlugin({
+  projectRoot = path.resolve(process.cwd(), '..'),
+} = {}) {
+  return {
+    name: 'plush-dev-customer-import-dry-run-api',
+    configureServer(server) {
+      server.middlewares.use(API_PATH, async (req, res) => {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, {
+            status: 'error',
+            message: 'Only POST is allowed for customer import dry-run.',
+          })
+          return
+        }
+
+        try {
+          const body = await readRequestJson(req)
+          const customerKey = normalizeCustomerKey(body.customerKey)
+          if (!SUPPORTED_CUSTOMERS.has(customerKey)) {
+            sendJson(res, 400, {
+              status: 'error',
+              message: `Unsupported customer package: ${customerKey || '(empty)'}`,
+            })
+            return
+          }
+
+          const payload = await runDryRun(projectRoot, customerKey)
+          sendJson(res, 200, payload)
+        } catch (error) {
+          sendJson(res, 500, {
+            status: 'error',
+            message:
+              error?.message || 'Customer import dry-run failed unexpectedly.',
+            stdout: error?.stdout || '',
+            stderr: error?.stderr || '',
+          })
+        }
+      })
+
+      server.middlewares.use(RUNTIME_MANIFEST_API_PATH, async (req, res) => {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, {
+            status: 'error',
+            message: 'Only POST is allowed for customer config manifest.',
+          })
+          return
+        }
+
+        try {
+          const body = await readRequestJson(req)
+          const customerKey = normalizeCustomerKey(body.customerKey)
+          if (!SUPPORTED_CUSTOMERS.has(customerKey)) {
+            sendJson(res, 400, {
+              status: 'error',
+              message: `Unsupported customer package: ${customerKey || '(empty)'}`,
+            })
+            return
+          }
+
+          const payload = await compileRuntimeManifest(projectRoot, customerKey)
+          sendJson(res, 200, payload)
+        } catch (error) {
+          sendJson(res, 500, {
+            status: 'error',
+            message:
+              error?.message ||
+              'Customer config runtime manifest compile failed unexpectedly.',
+          })
+        }
+      })
+
+      server.middlewares.use(RELEASE_READINESS_API_PATH, async (req, res) => {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, {
+            status: 'error',
+            message:
+              'Only POST is allowed for customer config release readiness.',
+          })
+          return
+        }
+
+        try {
+          const body = await readRequestJson(req)
+          const customerKey = normalizeCustomerKey(body.customerKey)
+          if (!SUPPORTED_CUSTOMERS.has(customerKey)) {
+            sendJson(res, 400, {
+              status: 'error',
+              message: `Unsupported customer package: ${customerKey || '(empty)'}`,
+            })
+            return
+          }
+
+          const payload = await runReleaseReadiness(projectRoot, customerKey)
+          sendJson(res, 200, payload)
+        } catch (error) {
+          sendJson(res, 500, {
+            status: 'error',
+            message:
+              error?.message ||
+              'Customer config release readiness failed unexpectedly.',
+          })
+        }
+      })
+    },
+  }
+}

@@ -4,15 +4,27 @@ set -euo pipefail
 print_help() {
   cat <<'USAGE'
 用法:
-  bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --report output/yoyoosun-smoke.json
+  bash deployments/yoyoosun/scripts/run-smoke.sh \
+    --endpoint https://erp.example.invalid \
+    --backend-url http://127.0.0.1:8300 \
+    --release-version 20260629T1200 \
+    --environment customer-trial \
+    --report output/yoyoosun-smoke.json \
+    --customer-config-revision yoyoosun-customer-package-v1.runtime-manifest-v1 \
+    --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN
 
 说明:
-  只做轻量 health / route smoke，不创建业务事实。
+  只做轻量 health / route / customer_config effective session smoke，不创建业务事实。
 USAGE
 }
 
 endpoint=""
+backend_url=""
+environment=""
+release_version=""
 report=""
+customer_config_revision=""
+admin_token_env=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -20,8 +32,28 @@ while [[ $# -gt 0 ]]; do
     endpoint="${2:-}"
     shift 2
     ;;
+  --backend-url)
+    backend_url="${2:-}"
+    shift 2
+    ;;
+  --environment)
+    environment="${2:-}"
+    shift 2
+    ;;
+  --release-version)
+    release_version="${2:-}"
+    shift 2
+    ;;
   --report)
     report="${2:-}"
+    shift 2
+    ;;
+  --customer-config-revision)
+    customer_config_revision="${2:-}"
+    shift 2
+    ;;
+  --admin-token-env)
+    admin_token_env="${2:-}"
     shift 2
     ;;
   -h | --help)
@@ -36,17 +68,41 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$endpoint" || -z "$report" ]]; then
+if [[ -z "$endpoint" || -z "$release_version" || -z "$environment" || -z "$report" ]]; then
   print_help
   exit 1
+fi
+
+reject_url_credentials() {
+  local label="$1"
+  local value="$2"
+  if [[ "$value" =~ ^[a-zA-Z][a-zA-Z0-9+.-]*://[^/?#[:space:]]+@ ]]; then
+    echo "[run-smoke] $label must not contain username or password"
+    exit 1
+  fi
+}
+
+reject_url_credentials "--endpoint" "$endpoint"
+if [[ -n "$backend_url" ]]; then
+  reject_url_credentials "--backend-url" "$backend_url"
 fi
 
 mkdir -p "$(dirname "$report")"
 
 checks=(
   "web-healthz:$endpoint/healthz"
+)
+
+if [[ -n "$backend_url" ]]; then
+  checks+=(
+    "server-healthz:$backend_url/healthz"
+    "server-readyz:$backend_url/readyz"
+  )
+fi
+
+checks+=(
   "login-page:$endpoint/admin-login"
-  "mobile-warehouse-route:$endpoint/m/warehouse/tasks"
+  "mobile-role-route:$endpoint/m/warehouse/tasks"
 )
 
 passed=0
@@ -57,21 +113,87 @@ for check in "${checks[@]}"; do
   name="${check%%:*}"
   url="${check#*:}"
   status="fail"
-  http_code="$(curl -k -sS -o /dev/null -w '%{http_code}' "$url" || true)"
+  http_code="$(curl -k --connect-timeout 2 --max-time 10 --retry 3 --retry-delay 1 --retry-connrefused -sS -o /dev/null -w '%{http_code}' "$url" || true)"
   if [[ "$http_code" =~ ^(200|302|401|403)$ ]]; then
     status="pass"
     passed=$((passed + 1))
   else
     failed=$((failed + 1))
   fi
-  items+=("{\"name\":\"$name\",\"status\":\"$status\",\"httpCode\":\"$http_code\"}")
+  items+=("{\"name\":\"$name\",\"status\":\"$status\",\"target\":\"$url\",\"httpCode\":\"$http_code\"}")
 done
+
+if [[ -n "$customer_config_revision" ]]; then
+  rpc_base_url="$endpoint"
+  if [[ -n "$backend_url" ]]; then
+    rpc_base_url="$backend_url"
+  fi
+  token=""
+  if [[ -n "$admin_token_env" ]]; then
+    token="${!admin_token_env:-}"
+  else
+    token="${CUSTOMER_CONFIG_ADMIN_TOKEN:-}"
+    admin_token_env="CUSTOMER_CONFIG_ADMIN_TOKEN"
+  fi
+
+  status="fail"
+  if [[ -n "$token" ]]; then
+    payload='{"jsonrpc":"2.0","id":"customer-config-smoke","method":"get_effective_session","params":{"customer_key":"yoyoosun"}}'
+    response="$(
+      curl -k --connect-timeout 2 --max-time 10 --retry 3 --retry-delay 1 --retry-connrefused \
+        -sS \
+        -H "Content-Type: application/json" \
+        -H "Accept: application/json" \
+        -H "Authorization: Bearer $token" \
+        -d "$payload" \
+        "$rpc_base_url/rpc/customer_config" || true
+    )"
+    if SMOKE_RESPONSE="$response" node - "$customer_config_revision" <<'NODE'; then
+const expectedRevision = process.argv[2];
+try {
+  const parsed = JSON.parse(process.env.SMOKE_RESPONSE || "");
+  const session = parsed?.result?.data?.session;
+  const fieldPolicies = session?.fieldPolicies;
+  const surfaces = fieldPolicies && typeof fieldPolicies === "object" && !Array.isArray(fieldPolicies)
+    ? Object.keys(fieldPolicies)
+    : [];
+  const ok =
+    parsed?.result?.code === 0 &&
+    session?.configRevision === expectedRevision &&
+    session?.source === "active_customer_config_revision" &&
+    Array.isArray(session?.pages) &&
+    session.pages.length > 0 &&
+    surfaces.includes("customers.default") &&
+    surfaces.includes("suppliers.default") &&
+    surfaces.includes("sales_orders.default");
+  process.exit(ok ? 0 : 1);
+} catch {
+  process.exit(1);
+}
+NODE
+      status="pass"
+    fi
+  fi
+  if [[ "$status" == "pass" ]]; then
+    passed=$((passed + 1))
+  else
+    failed=$((failed + 1))
+  fi
+  checks+=("customer-config-effective-session")
+  items+=("{\"name\":\"customer-config-effective-session\",\"status\":\"$status\",\"target\":\"jsonrpc:customer_config.get_effective_session\",\"expectedRevision\":\"$customer_config_revision\",\"tokenSourceEnv\":\"$admin_token_env\",\"responseBodyStored\":false}")
+fi
 
 {
   printf '{\n'
   printf '  "customerCode": "yoyoosun",\n'
+  printf '  "environment": "%s",\n' "$environment"
+  printf '  "releaseVersion": "%s",\n' "$release_version"
   printf '  "generatedAt": "%s",\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  printf '  "operatorRole": "deployment-operator",\n'
   printf '  "endpointAlias": "%s",\n' "$endpoint"
+  if [[ -n "$backend_url" ]]; then
+    printf '  "backendEndpointAlias": "%s",\n' "$backend_url"
+  fi
   printf '  "summary": {"total": %s, "passed": %s, "failed": %s},\n' "${#checks[@]}" "$passed" "$failed"
   printf '  "checks": [\n'
   for index in "${!items[@]}"; do

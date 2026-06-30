@@ -19,6 +19,9 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionFinanceReceivableConfirm, biz.PermissionFinancePayableConfirm); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance"); res != nil {
+			return id, res, nil
+		}
 		in, ok := financeFactCreateFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -29,16 +32,25 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionFinanceReceivableConfirm, biz.PermissionFinancePayableConfirm); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance"); res != nil {
+			return id, res, nil
+		}
 		item, err := d.operationalFactUC.PostFinanceFact(ctx, getInt(pm, "id", 0))
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "settle_finance_fact", "settleFinanceFact":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionFinanceReceivableConfirm, biz.PermissionFinancePayableConfirm); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance"); res != nil {
+			return id, res, nil
+		}
 		item, err := d.operationalFactUC.SettleFinanceFact(ctx, getInt(pm, "id", 0))
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "cancel_finance_fact", "cancelFinanceFact":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionFinanceReceivableConfirm, biz.PermissionFinancePayableConfirm); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance"); res != nil {
 			return id, res, nil
 		}
 		item, err := d.operationalFactUC.CancelPostedFinanceFact(ctx, getInt(pm, "id", 0))

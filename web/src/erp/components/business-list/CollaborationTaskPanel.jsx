@@ -12,6 +12,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import WorkflowTaskActionDrawer, {
   TASK_ACTION_META,
 } from '../workflow/WorkflowTaskActionDrawer.jsx'
+import useWorkflowTaskActionAccess from '../../hooks/useWorkflowTaskActionAccess.js'
 import {
   buildBusinessCollaborationTaskPanelModel,
   getBusinessCollaborationTaskReason,
@@ -194,17 +195,20 @@ export function CollaborationTaskPanel({
       ].filter(Boolean),
     [adminProfile, hasAdminProfile, onBlockTask, onCompleteTask, onUrgeTask]
   )
-  const actionDrawerAllowedModes = React.useMemo(
-    () => getTaskAllowedActionModes(actionDrawerTask),
-    [actionDrawerTask, getTaskAllowedActionModes]
+  const actionDrawerAccess = useWorkflowTaskActionAccess({
+    adminProfile,
+    task: actionDrawerTask,
+    enabled: Boolean(hasAdminProfile && actionDrawerTask),
+  })
+  const actionDrawerAllowedModes = actionDrawerAccess.allowedModes.filter(
+    (mode) =>
+      (mode === 'complete' && onCompleteTask) ||
+      (mode === 'block' && onBlockTask) ||
+      (mode === 'urge' && onUrgeTask)
   )
-  const actionDrawerReadonlyReason = React.useMemo(
-    () =>
-      hasAdminProfile && actionDrawerTask
-        ? getWorkflowTaskReadonlyReason(adminProfile, actionDrawerTask)
-        : '',
-    [actionDrawerTask, adminProfile, hasAdminProfile]
-  )
+  const actionDrawerReadonlyReason = actionDrawerAccess.loading
+    ? '正在向后端核对当前任务动作权限。'
+    : actionDrawerAccess.readonlyReason
   const taskPanelModel = React.useMemo(
     () =>
       buildBusinessCollaborationTaskPanelModel({
@@ -360,8 +364,15 @@ export function CollaborationTaskPanel({
     if (!actionDrawerTask || !actionDrawerMode) return
     const actionMeta = TASK_ACTION_META[actionDrawerMode]
     if (!actionMeta) return
+    if (actionDrawerAccess.loading) {
+      message.warning('正在核对任务动作权限，请稍后再提交')
+      return
+    }
     if (!actionDrawerAllowedModes.includes(actionDrawerMode)) {
-      message.warning('当前账号不能提交这个任务动作')
+      message.warning(
+        actionDrawerAccess.getReason(actionDrawerMode) ||
+          '当前账号不能提交这个任务动作'
+      )
       return
     }
 
@@ -397,6 +408,7 @@ export function CollaborationTaskPanel({
     actionDrawerReason,
     actionDrawerTask,
     actionDrawerAllowedModes,
+    actionDrawerAccess,
     closeActionDrawer,
     onBlockTask,
     onCompleteTask,

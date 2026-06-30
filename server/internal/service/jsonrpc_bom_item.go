@@ -17,6 +17,9 @@ func (d *jsonrpcDispatcher) handleBOMItem(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMUpdate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), bomModuleKeyMaterialBOM); res != nil {
+			return id, res, nil
+		}
 		in, ok := bomItemCreateFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -27,6 +30,9 @@ func (d *jsonrpcDispatcher) handleBOMItem(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMUpdate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), bomModuleKeyMaterialBOM); res != nil {
+			return id, res, nil
+		}
 		in, ok := bomItemUpdateFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -35,6 +41,9 @@ func (d *jsonrpcDispatcher) handleBOMItem(
 		return id, bomItemResult(ctx, d, item, err), nil
 	case "delete_bom_item", "deleteBOMItem":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), bomModuleKeyMaterialBOM); res != nil {
 			return id, res, nil
 		}
 		itemID := getInt(pm, "id", 0)

@@ -75,6 +75,7 @@ import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
+import { filterColumnsByEffectiveFieldPolicy } from '../utils/adminProfileSync.mjs'
 import {
   productOption,
   uniqueReferenceOptions,
@@ -643,7 +644,7 @@ export default function V1MasterDataPage({ type }) {
     [moduleKey, outletContext]
   )
 
-  const recordColumns = useMemo(
+  const baseRecordColumns = useMemo(
     () =>
       buildMasterDataRecordColumns({
         type: effectiveType,
@@ -651,6 +652,15 @@ export default function V1MasterDataPage({ type }) {
         unitDisplay,
       }),
     [effectiveType, productOptions, unitDisplay]
+  )
+  const recordColumns = useMemo(
+    () =>
+      filterColumnsByEffectiveFieldPolicy(
+        baseRecordColumns,
+        adminProfile,
+        `${effectiveType}.default`
+      ),
+    [adminProfile, baseRecordColumns, effectiveType]
   )
   const preferredRecordColumnOrder = useMemo(
     () =>

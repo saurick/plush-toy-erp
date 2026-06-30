@@ -27,6 +27,16 @@ const (
 	FieldMaterialID = "material_id"
 	// FieldWarehouseID holds the string denoting the warehouse_id field in the database.
 	FieldWarehouseID = "warehouse_id"
+	// FieldSourceType holds the string denoting the source_type field in the database.
+	FieldSourceType = "source_type"
+	// FieldSourceID holds the string denoting the source_id field in the database.
+	FieldSourceID = "source_id"
+	// FieldInspectionType holds the string denoting the inspection_type field in the database.
+	FieldInspectionType = "inspection_type"
+	// FieldSubjectType holds the string denoting the subject_type field in the database.
+	FieldSubjectType = "subject_type"
+	// FieldSubjectID holds the string denoting the subject_id field in the database.
+	FieldSubjectID = "subject_id"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldResult holds the string denoting the result field in the database.
@@ -101,6 +111,11 @@ var Columns = []string{
 	FieldInventoryLotID,
 	FieldMaterialID,
 	FieldWarehouseID,
+	FieldSourceType,
+	FieldSourceID,
+	FieldInspectionType,
+	FieldSubjectType,
+	FieldSubjectID,
 	FieldStatus,
 	FieldResult,
 	FieldOriginalLotStatus,
@@ -140,6 +155,16 @@ var (
 	MaterialIDValidator func(int) error
 	// WarehouseIDValidator is a validator for the "warehouse_id" field. It is called by the builders before save.
 	WarehouseIDValidator func(int) error
+	// SourceTypeValidator is a validator for the "source_type" field. It is called by the builders before save.
+	SourceTypeValidator func(string) error
+	// SourceIDValidator is a validator for the "source_id" field. It is called by the builders before save.
+	SourceIDValidator func(int) error
+	// InspectionTypeValidator is a validator for the "inspection_type" field. It is called by the builders before save.
+	InspectionTypeValidator func(string) error
+	// SubjectTypeValidator is a validator for the "subject_type" field. It is called by the builders before save.
+	SubjectTypeValidator func(string) error
+	// SubjectIDValidator is a validator for the "subject_id" field. It is called by the builders before save.
+	SubjectIDValidator func(int) error
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -198,6 +223,31 @@ func ByMaterialID(opts ...sql.OrderTermOption) OrderOption {
 // ByWarehouseID orders the results by the warehouse_id field.
 func ByWarehouseID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldWarehouseID, opts...).ToFunc()
+}
+
+// BySourceType orders the results by the source_type field.
+func BySourceType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSourceType, opts...).ToFunc()
+}
+
+// BySourceID orders the results by the source_id field.
+func BySourceID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSourceID, opts...).ToFunc()
+}
+
+// ByInspectionType orders the results by the inspection_type field.
+func ByInspectionType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldInspectionType, opts...).ToFunc()
+}
+
+// BySubjectType orders the results by the subject_type field.
+func BySubjectType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSubjectType, opts...).ToFunc()
+}
+
+// BySubjectID orders the results by the subject_id field.
+func BySubjectID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSubjectID, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

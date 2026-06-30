@@ -46,6 +46,26 @@ func (WorkflowTask) Fields() []ent.Field {
 		field.String("owner_role_key").
 			NotEmpty().
 			MaxLen(32),
+		field.String("owner_pool_key").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("required_capability_key").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.String("config_revision").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.Int("process_instance_id").
+			Optional().
+			Nillable().
+			Positive(),
+		field.Int("process_node_instance_id").
+			Optional().
+			Nillable().
+			Positive(),
 		field.Int("assignee_id").
 			Optional().
 			Nillable().
@@ -99,6 +119,11 @@ func (WorkflowTask) Indexes() []ent.Index {
 		index.Fields("task_code").Unique(),
 		index.Fields("source_type", "source_id"),
 		index.Fields("owner_role_key", "task_status_key"),
+		index.Fields("owner_pool_key", "task_status_key"),
+		index.Fields("required_capability_key", "task_status_key"),
+		index.Fields("config_revision", "owner_pool_key", "task_status_key"),
+		index.Fields("process_instance_id", "task_status_key"),
+		index.Fields("process_node_instance_id"),
 		index.Fields("due_at"),
 	}
 }

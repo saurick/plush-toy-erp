@@ -16,6 +16,7 @@ import (
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/qualityinspection"
+	"server/internal/data/model/ent/shipmentitem"
 
 	"entgo.io/ent/dialect"
 )
@@ -26,11 +27,42 @@ func (r *inventoryRepo) CreateQualityInspectionDraft(ctx context.Context, in *bi
 	}
 	row, err := r.data.postgres.QualityInspection.Create().
 		SetInspectionNo(in.InspectionNo).
-		SetPurchaseReceiptID(in.PurchaseReceiptID).
+		SetNillablePurchaseReceiptID(positiveIntPtr(in.PurchaseReceiptID)).
 		SetNillablePurchaseReceiptItemID(in.PurchaseReceiptItemID).
 		SetInventoryLotID(in.InventoryLotID).
-		SetMaterialID(in.MaterialID).
+		SetNillableMaterialID(positiveIntPtr(in.MaterialID)).
 		SetWarehouseID(in.WarehouseID).
+		SetSourceType(in.SourceType).
+		SetSourceID(in.SourceID).
+		SetInspectionType(in.InspectionType).
+		SetSubjectType(in.SubjectType).
+		SetSubjectID(in.SubjectID).
+		SetStatus(biz.QualityInspectionStatusDraft).
+		SetNillableInspectorID(in.InspectorID).
+		SetNillableDecisionNote(in.DecisionNote).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entQualityInspectionToBiz(row), nil
+}
+
+func (r *inventoryRepo) CreateFinishedGoodsQualityInspectionDraft(ctx context.Context, in *biz.QualityInspectionCreate) (*biz.QualityInspection, error) {
+	if err := validateQualityInspectionReferences(ctx, r.data.postgres, in); err != nil {
+		return nil, err
+	}
+	row, err := r.data.postgres.QualityInspection.Create().
+		SetInspectionNo(in.InspectionNo).
+		SetNillablePurchaseReceiptID(positiveIntPtr(in.PurchaseReceiptID)).
+		SetNillablePurchaseReceiptItemID(in.PurchaseReceiptItemID).
+		SetInventoryLotID(in.InventoryLotID).
+		SetNillableMaterialID(positiveIntPtr(in.MaterialID)).
+		SetWarehouseID(in.WarehouseID).
+		SetSourceType(in.SourceType).
+		SetSourceID(in.SourceID).
+		SetInspectionType(in.InspectionType).
+		SetSubjectType(in.SubjectType).
+		SetSubjectID(in.SubjectID).
 		SetStatus(biz.QualityInspectionStatusDraft).
 		SetNillableInspectorID(in.InspectorID).
 		SetNillableDecisionNote(in.DecisionNote).
@@ -76,7 +108,7 @@ func (r *inventoryRepo) SubmitQualityInspection(ctx context.Context, inspectionI
 		}
 		return nil, err
 	}
-	if err := validateQualityInspectionLot(lot, row.MaterialID); err != nil {
+	if err := validateSubmittedQualityInspectionLot(lot, row); err != nil {
 		return nil, err
 	}
 	if lot.Status == biz.InventoryLotDisabled || lot.Status == biz.InventoryLotRejected {
@@ -269,6 +301,21 @@ func (r *inventoryRepo) ListQualityInspections(ctx context.Context, filter biz.Q
 	if filter.WarehouseID > 0 {
 		query = query.Where(qualityinspection.WarehouseID(filter.WarehouseID))
 	}
+	if filter.SourceType != "" {
+		query = query.Where(qualityinspection.SourceType(filter.SourceType))
+	}
+	if filter.SourceID > 0 {
+		query = query.Where(qualityinspection.SourceID(filter.SourceID))
+	}
+	if filter.InspectionType != "" {
+		query = query.Where(qualityinspection.InspectionType(filter.InspectionType))
+	}
+	if filter.SubjectType != "" {
+		query = query.Where(qualityinspection.SubjectType(filter.SubjectType))
+	}
+	if filter.SubjectID > 0 {
+		query = query.Where(qualityinspection.SubjectID(filter.SubjectID))
+	}
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -354,6 +401,20 @@ func (r *inventoryRepo) decideSubmittedQualityInspection(ctx context.Context, in
 }
 
 func validateQualityInspectionReferences(ctx context.Context, client *ent.Client, in *biz.QualityInspectionCreate) error {
+	if in == nil {
+		return biz.ErrBadParam
+	}
+	switch in.SourceType {
+	case biz.QualityInspectionSourcePurchaseReceipt:
+		return validateIncomingQualityInspectionReferences(ctx, client, in)
+	case biz.QualityInspectionSourceShipment:
+		return validateFinishedGoodsQualityInspectionReferences(ctx, client, in)
+	default:
+		return biz.ErrBadParam
+	}
+}
+
+func validateIncomingQualityInspectionReferences(ctx context.Context, client *ent.Client, in *biz.QualityInspectionCreate) error {
 	receipt, err := client.PurchaseReceipt.Get(ctx, in.PurchaseReceiptID)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -406,8 +467,82 @@ func validateQualityInspectionReferences(ctx context.Context, client *ent.Client
 	return nil
 }
 
+func validateFinishedGoodsQualityInspectionReferences(ctx context.Context, client *ent.Client, in *biz.QualityInspectionCreate) error {
+	parent, err := client.Shipment.Get(ctx, in.SourceID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrShipmentNotFound
+		}
+		return err
+	}
+	if parent.Status != biz.ShipmentStatusDraft {
+		return biz.ErrBadParam
+	}
+	if _, err := client.Product.Get(ctx, in.SubjectID); err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrBadParam
+		}
+		return err
+	}
+	if _, err := client.Warehouse.Get(ctx, in.WarehouseID); err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrBadParam
+		}
+		return err
+	}
+	lot, err := client.InventoryLot.Get(ctx, in.InventoryLotID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrInventoryLotNotFound
+		}
+		return err
+	}
+	if err := validateFinishedGoodsQualityInspectionLot(lot, in.SubjectID); err != nil {
+		return err
+	}
+	matched, err := client.ShipmentItem.Query().
+		Where(
+			shipmentitem.ShipmentID(in.SourceID),
+			shipmentitem.ProductID(in.SubjectID),
+			shipmentitem.WarehouseID(in.WarehouseID),
+			shipmentitem.LotID(in.InventoryLotID),
+		).
+		Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if !matched {
+		return biz.ErrBadParam
+	}
+	return nil
+}
+
+func validateSubmittedQualityInspectionLot(lot *ent.InventoryLot, row *ent.QualityInspection) error {
+	if row == nil {
+		return biz.ErrBadParam
+	}
+	switch optionalStringValueOrEmpty(row.SourceType) {
+	case biz.QualityInspectionSourcePurchaseReceipt:
+		return validateQualityInspectionLot(lot, optionalIntValueOrZero(row.MaterialID))
+	case biz.QualityInspectionSourceShipment:
+		if optionalStringValueOrEmpty(row.InspectionType) != biz.QualityInspectionTypeFinishedGoods {
+			return biz.ErrBadParam
+		}
+		return validateFinishedGoodsQualityInspectionLot(lot, optionalIntValueOrZero(row.SubjectID))
+	default:
+		return biz.ErrBadParam
+	}
+}
+
 func validateQualityInspectionLot(lot *ent.InventoryLot, materialID int) error {
 	if lot.SubjectType != biz.InventorySubjectMaterial || lot.SubjectID != materialID {
+		return biz.ErrBadParam
+	}
+	return nil
+}
+
+func validateFinishedGoodsQualityInspectionLot(lot *ent.InventoryLot, productID int) error {
+	if lot.SubjectType != biz.InventorySubjectProduct || lot.SubjectID != productID {
 		return biz.ErrBadParam
 	}
 	return nil
@@ -521,17 +656,43 @@ func optionalStringSQLValue(value *string) any {
 	return *value
 }
 
+func optionalStringValueOrEmpty(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func optionalIntValueOrZero(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
+}
+
+func positiveIntPtr(value int) *int {
+	if value <= 0 {
+		return nil
+	}
+	return &value
+}
+
 func qualityInspectionCreateFromEnt(row *ent.QualityInspection) *biz.QualityInspectionCreate {
 	if row == nil {
 		return nil
 	}
 	return &biz.QualityInspectionCreate{
 		InspectionNo:          row.InspectionNo,
-		PurchaseReceiptID:     row.PurchaseReceiptID,
+		PurchaseReceiptID:     optionalIntValueOrZero(row.PurchaseReceiptID),
 		PurchaseReceiptItemID: row.PurchaseReceiptItemID,
 		InventoryLotID:        row.InventoryLotID,
-		MaterialID:            row.MaterialID,
+		MaterialID:            optionalIntValueOrZero(row.MaterialID),
 		WarehouseID:           row.WarehouseID,
+		SourceType:            optionalStringValueOrEmpty(row.SourceType),
+		SourceID:              optionalIntValueOrZero(row.SourceID),
+		InspectionType:        optionalStringValueOrEmpty(row.InspectionType),
+		SubjectType:           optionalStringValueOrEmpty(row.SubjectType),
+		SubjectID:             optionalIntValueOrZero(row.SubjectID),
 		InspectorID:           row.InspectorID,
 		DecisionNote:          row.DecisionNote,
 	}
@@ -544,11 +705,16 @@ func entQualityInspectionToBiz(row *ent.QualityInspection) *biz.QualityInspectio
 	return &biz.QualityInspection{
 		ID:                    row.ID,
 		InspectionNo:          row.InspectionNo,
-		PurchaseReceiptID:     row.PurchaseReceiptID,
+		PurchaseReceiptID:     optionalIntValueOrZero(row.PurchaseReceiptID),
 		PurchaseReceiptItemID: row.PurchaseReceiptItemID,
 		InventoryLotID:        row.InventoryLotID,
-		MaterialID:            row.MaterialID,
+		MaterialID:            optionalIntValueOrZero(row.MaterialID),
 		WarehouseID:           row.WarehouseID,
+		SourceType:            row.SourceType,
+		SourceID:              row.SourceID,
+		InspectionType:        row.InspectionType,
+		SubjectType:           row.SubjectType,
+		SubjectID:             row.SubjectID,
 		Status:                row.Status,
 		Result:                row.Result,
 		OriginalLotStatus:     row.OriginalLotStatus,

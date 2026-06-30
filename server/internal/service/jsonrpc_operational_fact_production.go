@@ -17,6 +17,9 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanCreate, biz.PermissionPMCPlanUpdate, biz.PermissionWarehouseAdjustmentCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "production"); res != nil {
+			return id, res, nil
+		}
 		in, ok := operationalFactMutationFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -27,10 +30,16 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanUpdate, biz.PermissionWarehouseAdjustmentCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "production"); res != nil {
+			return id, res, nil
+		}
 		item, err := d.operationalFactUC.PostProductionFact(ctx, getInt(pm, "id", 0))
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "cancel_production_fact", "cancelProductionFact":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanUpdate, biz.PermissionWarehouseAdjustmentCreate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "production"); res != nil {
 			return id, res, nil
 		}
 		item, err := d.operationalFactUC.CancelPostedProductionFact(ctx, getInt(pm, "id", 0))

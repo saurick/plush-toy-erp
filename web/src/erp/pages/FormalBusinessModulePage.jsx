@@ -24,8 +24,9 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
+  blockWorkflowTaskAction,
+  completeWorkflowTaskAction,
   listWorkflowTasks,
-  updateWorkflowTaskStatus,
   urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
 import {
@@ -584,9 +585,9 @@ export default function FormalBusinessModulePage({ moduleKey }) {
 
   const completeWorkflowTask = useCallback(
     async (task) => {
-      await updateWorkflowTaskStatus({
+      await completeWorkflowTaskAction({
         id: task.id,
-        task_status_key: 'done',
+        action_key: 'complete',
         business_status_key: task.business_status_key || 'shipping_released',
         reason: '',
         payload: {
@@ -603,9 +604,9 @@ export default function FormalBusinessModulePage({ moduleKey }) {
 
   const blockWorkflowTask = useCallback(
     async (task, { reason = '' } = {}) => {
-      await updateWorkflowTaskStatus({
+      await blockWorkflowTaskAction({
         id: task.id,
-        task_status_key: 'blocked',
+        action_key: 'block',
         business_status_key: 'blocked',
         reason,
         payload: {
@@ -627,7 +628,6 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         task_id: task.id,
         action: 'urge_task',
         reason,
-        actor_role_key: 'admin',
         payload: {
           source_type: task.source_type,
           source_id: task.source_id,

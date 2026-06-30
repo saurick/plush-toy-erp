@@ -36,6 +36,9 @@ func (d *jsonrpcDispatcher) handleSalesOrderLifecycleAction(
 	if res := d.RequireAdminPermission(ctx, permission); res != nil {
 		return id, res, nil
 	}
+	if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
+		return id, res, nil
+	}
 	item, err := action(ctx, getInt(pm, "id", 0))
 	return id, salesOrderMutationResult(ctx, d, item, err), nil
 }

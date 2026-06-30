@@ -465,6 +465,7 @@ async function runScenarioOnce(browser, scenario) {
     await installAdminRpcMocks(page, {
       baseURL,
       adminProfileOverride: scenario.adminProfile,
+      effectiveSessionOverride: scenario.effectiveSession,
     })
   }
 
@@ -480,12 +481,14 @@ async function runScenarioOnce(browser, scenario) {
       await installAdminRpcMocks(page, {
         baseURL,
         adminProfileOverride: scenario.adminProfile,
+        effectiveSessionOverride: scenario.effectiveSession,
       })
       await installAdminDisabledRpcMocks(page)
     } else {
       await installAdminRpcMocks(page, {
         baseURL,
         adminProfileOverride: scenario.adminProfile,
+        effectiveSessionOverride: scenario.effectiveSession,
       })
     }
     await page.addInitScript(
@@ -6471,8 +6474,7 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
             node.closest(
               '.ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)'
             )
-          ) &&
-          !(node.matches('input.ant-input') && node.closest('.erp-login-card'))
+          )
       )
       .map((owner) => {
         const ownerStyle = window.getComputedStyle(owner)
@@ -6486,6 +6488,11 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
         const affixInput = owner.matches('.ant-input-affix-wrapper')
           ? owner.querySelector('input.ant-input')
           : null
+        const affixSuffixNodes = owner.matches('.ant-input-affix-wrapper')
+          ? Array.from(owner.querySelectorAll('.ant-input-suffix')).filter(
+              (node) => node instanceof HTMLElement && isVisible(node)
+            )
+          : []
         const directInput = owner.matches('input.ant-input') ? owner : null
         const selectTextNodes = owner.matches('.ant-select-selector')
           ? Array.from(
@@ -6501,6 +6508,7 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
               ? null
               : Number(ownerInnerHeight.toFixed(2)),
           affixInput: affixInput ? describeNode(affixInput) : null,
+          affixSuffixNodes: affixSuffixNodes.map(describeNode),
           directInput: directInput ? describeNode(directInput) : null,
           selectTextNodes: selectTextNodes.map(describeNode),
           formClassName: String(owner.closest(scopeSelector)?.className || ''),
@@ -6514,9 +6522,6 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
 
   const issues = metrics.filter((item) => {
     const ownerDisplay = String(item.owner.display || '')
-    const isLoginScope = String(item.formClassName || '').includes(
-      'erp-login-card'
-    )
     if (
       (ownerDisplay === 'flex' || ownerDisplay === 'inline-flex') &&
       item.owner.alignItems !== 'center'
@@ -6533,13 +6538,19 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
       if (centerDelta > 1.5) return true
       if (inputHeight > 0 && inputLineHeight > inputHeight + 1) return true
       if (
-        !isLoginScope &&
         item.ownerInnerHeight !== null &&
         inputLineHeight > 0 &&
         Math.abs(inputLineHeight - item.ownerInnerHeight) > 1.5
       ) {
         return true
       }
+    }
+
+    if (item.affixSuffixNodes.length > 0) {
+      return item.affixSuffixNodes.some((node) => {
+        const centerDelta = Math.abs(node.center - item.owner.center)
+        return centerDelta > 1.5
+      })
     }
 
     if (item.directInput && item.ownerInnerHeight !== null) {

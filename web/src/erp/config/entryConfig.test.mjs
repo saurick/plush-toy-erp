@@ -26,6 +26,7 @@ test('entryConfig: 默认展示后台和全部岗位任务端角色', () => {
     'finance',
     'pmc',
     'quality',
+    'engineering',
   ])
 })
 
@@ -84,6 +85,7 @@ test('entryConfig: 路径优先于设备默认', () => {
 test('entryConfig: 岗位任务端角色路径解析和生成稳定', () => {
   assert.equal(parseMobileRoleFromPath('/m/warehouse/tasks'), 'warehouse')
   assert.equal(resolveMobileTasksPath('quality'), '/m/quality/tasks')
+  assert.equal(resolveMobileTasksPath('engineering'), '/m/engineering/tasks')
 })
 
 test('entryConfig: 平板识别覆盖 iPad 桌面 UA', () => {

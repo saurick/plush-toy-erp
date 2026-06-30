@@ -7,7 +7,9 @@ print_help() {
   SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
   bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh \
     --release-version local-dev-20260616 \
+    --backup-purpose pre-migration \
     --out output/customers/yoyoosun/backup-restore-rehearsal \
+    --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
     --backend-url http://127.0.0.1:8300 \
     --web-url http://127.0.0.1:5175/erp
 
@@ -16,9 +18,10 @@ print_help() {
   1. 用本机 pg_dump 生成 custom dump 到 output/。
   2. 启动临时隔离 PostgreSQL 容器。
   3. 将 dump 恢复到临时库。
-  4. 对恢复库执行 Atlas migration status 和 smoke query。
+  4. 对恢复库先读取 migrationBefore，再执行 Atlas migration apply 和 migration status。
   5. 可选执行 backend healthz/readyz 和 web 主路径 HTTP smoke。
-  6. 生成脱敏 backup-evidence.md、migration-status.txt 和 backup-restore-report.json。
+  6. 生成脱敏 backup-evidence.md、migration-status.txt、command-summary.txt 和 backup-restore-report.json。
+  7. 如提供 --evidence-dir，只复制上述脱敏 artifact 到 release evidence 目录；dump 仍留在 output/。
 
 边界:
   - 不读取、不提交真实 .env。
@@ -31,7 +34,7 @@ USAGE
 customer="yoyoosun"
 environment="local-dev"
 release_version=""
-backup_purpose="backup-restore-rehearsal"
+backup_purpose="pre-migration"
 out_root="output/customers/yoyoosun/backup-restore-rehearsal"
 postgres_image="${POSTGRES_REHEARSAL_IMAGE:-postgres:18}"
 pg_dump_bin="${PG_DUMP_BIN:-}"
@@ -39,6 +42,7 @@ source_env="SOURCE_POSTGRES_DSN"
 backend_url=""
 web_url=""
 keep_container="0"
+evidence_dir=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -60,6 +64,10 @@ while [[ $# -gt 0 ]]; do
     ;;
   --out)
     out_root="${2:-}"
+    shift 2
+    ;;
+  --evidence-dir)
+    evidence_dir="${2:-}"
     shift 2
     ;;
   --postgres-image)
@@ -107,6 +115,16 @@ if [[ -z "$release_version" ]]; then
   release_version="local-dev-$(git rev-parse --short=8 HEAD 2>/dev/null || date +%Y%m%d%H%M%S)"
 fi
 
+if [[ -n "$evidence_dir" && ! -d "$evidence_dir" ]]; then
+  echo "[backup-restore-rehearsal] --evidence-dir 必须是已存在的 release evidence 目录: $evidence_dir" >&2
+  exit 1
+fi
+
+if [[ ! "$backup_purpose" =~ (pre-migration|pre-deploy|发布前|migration[[:space:]]前) ]]; then
+  echo "[backup-restore-rehearsal] --backup-purpose 必须明确是 pre-migration / pre-deploy / 发布前 / migration 前" >&2
+  exit 1
+fi
+
 source_dsn="${!source_env:-}"
 if [[ -z "$source_dsn" ]]; then
   echo "[backup-restore-rehearsal] 请通过 $source_env 提供源库 DSN" >&2
@@ -151,6 +169,7 @@ mkdir -p "$run_dir"
 backup_file="$run_dir/database.dump"
 backup_evidence="$run_dir/backup-evidence.md"
 migration_status_file="$run_dir/migration-status.txt"
+pre_migration_status_file="$run_dir/migration-status-before-apply.txt"
 report_file="$run_dir/backup-restore-report.json"
 command_summary_file="$run_dir/command-summary.txt"
 
@@ -215,7 +234,21 @@ docker exec "$container_name" pg_restore --username postgres --no-owner --no-acl
 restore_port="$(docker port "$container_name" 5432/tcp | awk -F: 'NR==1 {print $NF}')"
 restore_dsn="postgres://postgres:${restore_pass}@127.0.0.1:${restore_port}/${restore_db}?sslmode=disable"
 
-echo "[backup-restore-rehearsal] running migration status against restored DB"
+echo "[backup-restore-rehearsal] reading pre-apply migration status against restored DB"
+(
+  cd server
+  atlas migrate status --dir "file://internal/data/model/migrate" --url "$restore_dsn"
+) >"$pre_migration_status_file"
+
+pre_migration_version="$(awk -F': ' '/Current Version:/ {print $2; exit}' "$pre_migration_status_file" | xargs || true)"
+
+echo "[backup-restore-rehearsal] applying migrations against restored DB"
+(
+  cd server
+  atlas migrate apply --dir "file://internal/data/model/migrate" --url "$restore_dsn"
+)
+
+echo "[backup-restore-rehearsal] running post-apply migration status against restored DB"
 (
   cd server
   atlas migrate status --dir "file://internal/data/model/migrate" --url "$restore_dsn"
@@ -268,6 +301,11 @@ if [[ "$keep_container" == "1" ]]; then
   restore_target="temp-postgres-container:${container_name}:kept"
 fi
 
+cat >>"$command_summary_file" <<EOF
+restoreTarget=$restore_target
+steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status -> atlas migrate apply -> post-apply atlas status -> smoke query
+EOF
+
 cat >"$backup_evidence" <<EOF
 # yoyoosun Backup Restore Rehearsal Evidence
 
@@ -281,7 +319,7 @@ cat >"$backup_evidence" <<EOF
 | environment | $environment |
 | operatorRole | local-developer |
 | releaseVersion | $release_version |
-| migrationVersion | ${current_version:-unknown} |
+| migrationVersion | ${pre_migration_version:-unknown} |
 
 ## 备份摘要
 
@@ -301,6 +339,8 @@ cat >"$backup_evidence" <<EOF
 | restoreTestStatus | passed-temp-container |
 | restoreTarget | $restore_target |
 | restoreMigrationVersion | ${current_version:-unknown} |
+| migrationBefore | ${pre_migration_version:-unknown} |
+| migrationAfter | ${current_version:-unknown} |
 | smokeQueryStatus | $smoke_query_status |
 | webSmokeStatus | $web_smoke_status |
 | verifiedAt | $verified_at |
@@ -323,17 +363,20 @@ cat >"$report_file" <<EOF
   "restoreTarget": "$restore_target",
   "artifacts": {
     "backupFileAlias": "$run_dir/database.dump",
-    "backupEvidence": "$backup_evidence",
-    "migrationStatus": "$migration_status_file",
-    "commandSummary": "$command_summary_file"
+    "backupEvidence": "backup-evidence.md",
+    "migrationStatus": "migration-status.txt",
+    "preMigrationStatus": "migration-status-before-apply.txt",
+    "commandSummary": "command-summary.txt"
   },
   "backup": {
     "databaseBackupSize": $backup_size,
     "databaseBackupHash": "$backup_hash",
-    "storageLocationAlias": "local-output-gitignored"
+    "storageLocationAlias": "local-output-gitignored",
+    "migrationVersion": "${pre_migration_version:-unknown}"
   },
   "restore": {
     "restoreTestStatus": "passed-temp-container",
+    "migrationBeforeApply": "${pre_migration_version:-unknown}",
     "restoreMigrationVersion": "${current_version:-unknown}",
     "pendingFiles": "${pending_files:-unknown}"
   },
@@ -370,6 +413,15 @@ fi
 if [[ "$backend_health_status" == "failed" || "$backend_ready_status" == "failed" || "$web_smoke_status" == "failed" ]]; then
   echo "[backup-restore-rehearsal] failed: backend/web smoke failed" >&2
   exit 1
+fi
+
+if [[ -n "$evidence_dir" ]]; then
+  cp "$backup_evidence" "$evidence_dir/backup-evidence.md"
+  cp "$pre_migration_status_file" "$evidence_dir/migration-status-before-apply.txt"
+  cp "$migration_status_file" "$evidence_dir/migration-status.txt"
+  cp "$command_summary_file" "$evidence_dir/command-summary.txt"
+  cp "$report_file" "$evidence_dir/backup-restore-report.json"
+  echo "[backup-restore-rehearsal] copied sanitized release artifacts to $evidence_dir"
 fi
 
 echo "[backup-restore-rehearsal] ok: $report_file"

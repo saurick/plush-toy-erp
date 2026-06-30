@@ -100,6 +100,31 @@ func OwnerRoleKey(v string) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldEQ(FieldOwnerRoleKey, v))
 }
 
+// OwnerPoolKey applies equality check predicate on the "owner_pool_key" field. It's identical to OwnerPoolKeyEQ.
+func OwnerPoolKey(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldOwnerPoolKey, v))
+}
+
+// RequiredCapabilityKey applies equality check predicate on the "required_capability_key" field. It's identical to RequiredCapabilityKeyEQ.
+func RequiredCapabilityKey(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldRequiredCapabilityKey, v))
+}
+
+// ConfigRevision applies equality check predicate on the "config_revision" field. It's identical to ConfigRevisionEQ.
+func ConfigRevision(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldConfigRevision, v))
+}
+
+// ProcessInstanceID applies equality check predicate on the "process_instance_id" field. It's identical to ProcessInstanceIDEQ.
+func ProcessInstanceID(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldProcessInstanceID, v))
+}
+
+// ProcessNodeInstanceID applies equality check predicate on the "process_node_instance_id" field. It's identical to ProcessNodeInstanceIDEQ.
+func ProcessNodeInstanceID(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldProcessNodeInstanceID, v))
+}
+
 // AssigneeID applies equality check predicate on the "assignee_id" field. It's identical to AssigneeIDEQ.
 func AssigneeID(v int) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldEQ(FieldAssigneeID, v))
@@ -733,6 +758,331 @@ func OwnerRoleKeyEqualFold(v string) predicate.WorkflowTask {
 // OwnerRoleKeyContainsFold applies the ContainsFold predicate on the "owner_role_key" field.
 func OwnerRoleKeyContainsFold(v string) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldContainsFold(FieldOwnerRoleKey, v))
+}
+
+// OwnerPoolKeyEQ applies the EQ predicate on the "owner_pool_key" field.
+func OwnerPoolKeyEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldOwnerPoolKey, v))
+}
+
+// OwnerPoolKeyNEQ applies the NEQ predicate on the "owner_pool_key" field.
+func OwnerPoolKeyNEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldOwnerPoolKey, v))
+}
+
+// OwnerPoolKeyIn applies the In predicate on the "owner_pool_key" field.
+func OwnerPoolKeyIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIn(FieldOwnerPoolKey, vs...))
+}
+
+// OwnerPoolKeyNotIn applies the NotIn predicate on the "owner_pool_key" field.
+func OwnerPoolKeyNotIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotIn(FieldOwnerPoolKey, vs...))
+}
+
+// OwnerPoolKeyGT applies the GT predicate on the "owner_pool_key" field.
+func OwnerPoolKeyGT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGT(FieldOwnerPoolKey, v))
+}
+
+// OwnerPoolKeyGTE applies the GTE predicate on the "owner_pool_key" field.
+func OwnerPoolKeyGTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGTE(FieldOwnerPoolKey, v))
+}
+
+// OwnerPoolKeyLT applies the LT predicate on the "owner_pool_key" field.
+func OwnerPoolKeyLT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLT(FieldOwnerPoolKey, v))
+}
+
+// OwnerPoolKeyLTE applies the LTE predicate on the "owner_pool_key" field.
+func OwnerPoolKeyLTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLTE(FieldOwnerPoolKey, v))
+}
+
+// OwnerPoolKeyContains applies the Contains predicate on the "owner_pool_key" field.
+func OwnerPoolKeyContains(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContains(FieldOwnerPoolKey, v))
+}
+
+// OwnerPoolKeyHasPrefix applies the HasPrefix predicate on the "owner_pool_key" field.
+func OwnerPoolKeyHasPrefix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasPrefix(FieldOwnerPoolKey, v))
+}
+
+// OwnerPoolKeyHasSuffix applies the HasSuffix predicate on the "owner_pool_key" field.
+func OwnerPoolKeyHasSuffix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasSuffix(FieldOwnerPoolKey, v))
+}
+
+// OwnerPoolKeyIsNil applies the IsNil predicate on the "owner_pool_key" field.
+func OwnerPoolKeyIsNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIsNull(FieldOwnerPoolKey))
+}
+
+// OwnerPoolKeyNotNil applies the NotNil predicate on the "owner_pool_key" field.
+func OwnerPoolKeyNotNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotNull(FieldOwnerPoolKey))
+}
+
+// OwnerPoolKeyEqualFold applies the EqualFold predicate on the "owner_pool_key" field.
+func OwnerPoolKeyEqualFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEqualFold(FieldOwnerPoolKey, v))
+}
+
+// OwnerPoolKeyContainsFold applies the ContainsFold predicate on the "owner_pool_key" field.
+func OwnerPoolKeyContainsFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContainsFold(FieldOwnerPoolKey, v))
+}
+
+// RequiredCapabilityKeyEQ applies the EQ predicate on the "required_capability_key" field.
+func RequiredCapabilityKeyEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldRequiredCapabilityKey, v))
+}
+
+// RequiredCapabilityKeyNEQ applies the NEQ predicate on the "required_capability_key" field.
+func RequiredCapabilityKeyNEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldRequiredCapabilityKey, v))
+}
+
+// RequiredCapabilityKeyIn applies the In predicate on the "required_capability_key" field.
+func RequiredCapabilityKeyIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIn(FieldRequiredCapabilityKey, vs...))
+}
+
+// RequiredCapabilityKeyNotIn applies the NotIn predicate on the "required_capability_key" field.
+func RequiredCapabilityKeyNotIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotIn(FieldRequiredCapabilityKey, vs...))
+}
+
+// RequiredCapabilityKeyGT applies the GT predicate on the "required_capability_key" field.
+func RequiredCapabilityKeyGT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGT(FieldRequiredCapabilityKey, v))
+}
+
+// RequiredCapabilityKeyGTE applies the GTE predicate on the "required_capability_key" field.
+func RequiredCapabilityKeyGTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGTE(FieldRequiredCapabilityKey, v))
+}
+
+// RequiredCapabilityKeyLT applies the LT predicate on the "required_capability_key" field.
+func RequiredCapabilityKeyLT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLT(FieldRequiredCapabilityKey, v))
+}
+
+// RequiredCapabilityKeyLTE applies the LTE predicate on the "required_capability_key" field.
+func RequiredCapabilityKeyLTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLTE(FieldRequiredCapabilityKey, v))
+}
+
+// RequiredCapabilityKeyContains applies the Contains predicate on the "required_capability_key" field.
+func RequiredCapabilityKeyContains(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContains(FieldRequiredCapabilityKey, v))
+}
+
+// RequiredCapabilityKeyHasPrefix applies the HasPrefix predicate on the "required_capability_key" field.
+func RequiredCapabilityKeyHasPrefix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasPrefix(FieldRequiredCapabilityKey, v))
+}
+
+// RequiredCapabilityKeyHasSuffix applies the HasSuffix predicate on the "required_capability_key" field.
+func RequiredCapabilityKeyHasSuffix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasSuffix(FieldRequiredCapabilityKey, v))
+}
+
+// RequiredCapabilityKeyIsNil applies the IsNil predicate on the "required_capability_key" field.
+func RequiredCapabilityKeyIsNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIsNull(FieldRequiredCapabilityKey))
+}
+
+// RequiredCapabilityKeyNotNil applies the NotNil predicate on the "required_capability_key" field.
+func RequiredCapabilityKeyNotNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotNull(FieldRequiredCapabilityKey))
+}
+
+// RequiredCapabilityKeyEqualFold applies the EqualFold predicate on the "required_capability_key" field.
+func RequiredCapabilityKeyEqualFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEqualFold(FieldRequiredCapabilityKey, v))
+}
+
+// RequiredCapabilityKeyContainsFold applies the ContainsFold predicate on the "required_capability_key" field.
+func RequiredCapabilityKeyContainsFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContainsFold(FieldRequiredCapabilityKey, v))
+}
+
+// ConfigRevisionEQ applies the EQ predicate on the "config_revision" field.
+func ConfigRevisionEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldConfigRevision, v))
+}
+
+// ConfigRevisionNEQ applies the NEQ predicate on the "config_revision" field.
+func ConfigRevisionNEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldConfigRevision, v))
+}
+
+// ConfigRevisionIn applies the In predicate on the "config_revision" field.
+func ConfigRevisionIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIn(FieldConfigRevision, vs...))
+}
+
+// ConfigRevisionNotIn applies the NotIn predicate on the "config_revision" field.
+func ConfigRevisionNotIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotIn(FieldConfigRevision, vs...))
+}
+
+// ConfigRevisionGT applies the GT predicate on the "config_revision" field.
+func ConfigRevisionGT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGT(FieldConfigRevision, v))
+}
+
+// ConfigRevisionGTE applies the GTE predicate on the "config_revision" field.
+func ConfigRevisionGTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGTE(FieldConfigRevision, v))
+}
+
+// ConfigRevisionLT applies the LT predicate on the "config_revision" field.
+func ConfigRevisionLT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLT(FieldConfigRevision, v))
+}
+
+// ConfigRevisionLTE applies the LTE predicate on the "config_revision" field.
+func ConfigRevisionLTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLTE(FieldConfigRevision, v))
+}
+
+// ConfigRevisionContains applies the Contains predicate on the "config_revision" field.
+func ConfigRevisionContains(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContains(FieldConfigRevision, v))
+}
+
+// ConfigRevisionHasPrefix applies the HasPrefix predicate on the "config_revision" field.
+func ConfigRevisionHasPrefix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasPrefix(FieldConfigRevision, v))
+}
+
+// ConfigRevisionHasSuffix applies the HasSuffix predicate on the "config_revision" field.
+func ConfigRevisionHasSuffix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasSuffix(FieldConfigRevision, v))
+}
+
+// ConfigRevisionIsNil applies the IsNil predicate on the "config_revision" field.
+func ConfigRevisionIsNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIsNull(FieldConfigRevision))
+}
+
+// ConfigRevisionNotNil applies the NotNil predicate on the "config_revision" field.
+func ConfigRevisionNotNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotNull(FieldConfigRevision))
+}
+
+// ConfigRevisionEqualFold applies the EqualFold predicate on the "config_revision" field.
+func ConfigRevisionEqualFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEqualFold(FieldConfigRevision, v))
+}
+
+// ConfigRevisionContainsFold applies the ContainsFold predicate on the "config_revision" field.
+func ConfigRevisionContainsFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContainsFold(FieldConfigRevision, v))
+}
+
+// ProcessInstanceIDEQ applies the EQ predicate on the "process_instance_id" field.
+func ProcessInstanceIDEQ(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldProcessInstanceID, v))
+}
+
+// ProcessInstanceIDNEQ applies the NEQ predicate on the "process_instance_id" field.
+func ProcessInstanceIDNEQ(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldProcessInstanceID, v))
+}
+
+// ProcessInstanceIDIn applies the In predicate on the "process_instance_id" field.
+func ProcessInstanceIDIn(vs ...int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIn(FieldProcessInstanceID, vs...))
+}
+
+// ProcessInstanceIDNotIn applies the NotIn predicate on the "process_instance_id" field.
+func ProcessInstanceIDNotIn(vs ...int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotIn(FieldProcessInstanceID, vs...))
+}
+
+// ProcessInstanceIDGT applies the GT predicate on the "process_instance_id" field.
+func ProcessInstanceIDGT(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGT(FieldProcessInstanceID, v))
+}
+
+// ProcessInstanceIDGTE applies the GTE predicate on the "process_instance_id" field.
+func ProcessInstanceIDGTE(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGTE(FieldProcessInstanceID, v))
+}
+
+// ProcessInstanceIDLT applies the LT predicate on the "process_instance_id" field.
+func ProcessInstanceIDLT(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLT(FieldProcessInstanceID, v))
+}
+
+// ProcessInstanceIDLTE applies the LTE predicate on the "process_instance_id" field.
+func ProcessInstanceIDLTE(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLTE(FieldProcessInstanceID, v))
+}
+
+// ProcessInstanceIDIsNil applies the IsNil predicate on the "process_instance_id" field.
+func ProcessInstanceIDIsNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIsNull(FieldProcessInstanceID))
+}
+
+// ProcessInstanceIDNotNil applies the NotNil predicate on the "process_instance_id" field.
+func ProcessInstanceIDNotNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotNull(FieldProcessInstanceID))
+}
+
+// ProcessNodeInstanceIDEQ applies the EQ predicate on the "process_node_instance_id" field.
+func ProcessNodeInstanceIDEQ(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldProcessNodeInstanceID, v))
+}
+
+// ProcessNodeInstanceIDNEQ applies the NEQ predicate on the "process_node_instance_id" field.
+func ProcessNodeInstanceIDNEQ(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldProcessNodeInstanceID, v))
+}
+
+// ProcessNodeInstanceIDIn applies the In predicate on the "process_node_instance_id" field.
+func ProcessNodeInstanceIDIn(vs ...int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIn(FieldProcessNodeInstanceID, vs...))
+}
+
+// ProcessNodeInstanceIDNotIn applies the NotIn predicate on the "process_node_instance_id" field.
+func ProcessNodeInstanceIDNotIn(vs ...int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotIn(FieldProcessNodeInstanceID, vs...))
+}
+
+// ProcessNodeInstanceIDGT applies the GT predicate on the "process_node_instance_id" field.
+func ProcessNodeInstanceIDGT(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGT(FieldProcessNodeInstanceID, v))
+}
+
+// ProcessNodeInstanceIDGTE applies the GTE predicate on the "process_node_instance_id" field.
+func ProcessNodeInstanceIDGTE(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGTE(FieldProcessNodeInstanceID, v))
+}
+
+// ProcessNodeInstanceIDLT applies the LT predicate on the "process_node_instance_id" field.
+func ProcessNodeInstanceIDLT(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLT(FieldProcessNodeInstanceID, v))
+}
+
+// ProcessNodeInstanceIDLTE applies the LTE predicate on the "process_node_instance_id" field.
+func ProcessNodeInstanceIDLTE(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLTE(FieldProcessNodeInstanceID, v))
+}
+
+// ProcessNodeInstanceIDIsNil applies the IsNil predicate on the "process_node_instance_id" field.
+func ProcessNodeInstanceIDIsNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIsNull(FieldProcessNodeInstanceID))
+}
+
+// ProcessNodeInstanceIDNotNil applies the NotNil predicate on the "process_node_instance_id" field.
+func ProcessNodeInstanceIDNotNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotNull(FieldProcessNodeInstanceID))
 }
 
 // AssigneeIDEQ applies the EQ predicate on the "assignee_id" field.

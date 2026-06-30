@@ -67,7 +67,23 @@ http://localhost:5175/m/quality/tasks
 
 当前前端不提供普通协作账号自助注册、登录或管理入口；旧 `/login` 只兼容重定向到 `/admin-login`，旧 `/admin-accounts` 与 `/admin-users` 只兼容重定向到权限中心。后端普通 `users` 表和 `user` JSON-RPC 域已退出，账号、岗位任务端和 RBAC 主路径统一使用 `admin_users`、角色和权限码。
 
-桌面后台菜单由 `web/src/erp/config/seedData.mjs` 生成，并可通过 `web/src/erp/config/customerMenuConfig.mjs` 接入客户菜单配置。前端品牌默认走 `web/src/common/consts/brand.js` 的中性产品名；默认产品构建不再静态打包任一客户配置包，也不通过 `VITE_ERP_CUSTOMER_KEY` 或 `window.__PLUSH_ERP_CUSTOMER_KEY__` 按 key 查找内置客户。客户部署时应在 `web/public/customer-config.js` 对应的静态根路径注入 `window.__PLUSH_ERP_CUSTOMER_CONFIG__`，例如把 `config/customers/yoyoosun/customer-config.example.js` 渲染或复制为部署产物的 `customer-config.js`，并发布对应客户资产。客户配置只控制前端品牌展示、favicon 和桌面菜单分组、排序、显隐、文案，不替代后端 RBAC action permission、Workflow / Fact usecase、schema、migration 或真实导入。
+桌面后台菜单由 `web/src/erp/config/seedData.mjs` 生成，并可通过 `web/src/erp/config/customerMenuConfig.mjs` 接入客户菜单配置。前端品牌默认走 `web/src/common/consts/brand.js` 的中性产品名；默认产品构建不静态打包任一客户配置包，也不通过 `VITE_ERP_CUSTOMER_KEY` 或 `window.__PLUSH_ERP_CUSTOMER_KEY__` 按 key 查找内置客户。客户部署时应在 `web/public/customer-config.js` 对应的静态根路径注入 `window.__PLUSH_ERP_CUSTOMER_CONFIG__`，例如把 `config/customers/yoyoosun/customer-config.example.js` 渲染或复制为部署产物的 `customer-config.js`，并发布对应客户资产。该静态配置只控制前端品牌展示、favicon 和桌面菜单分组、排序、显隐、文案，是客户部署外观和候选菜单输入，不是最终授权边界；登录后的正式后台还会通过 `ERPLayout` 调用后端 `customer_config.get_effective_session`，把当前 active customer config revision 的页面、动作、字段策略和责任池投影到当前 admin profile。
+
+`adminProfileSync` 当前只做前端 profile 投影、菜单过滤和当前 URL 是否应跳转的 helper 判断；`customer_config.get_effective_session` 拉取、cached effective session 复用、`effective_session_sync_failed` 空投影挂载，以及实际 `navigate(..., { replace: true })` fallback 跳转都由 `ERPLayout` 负责。菜单投影固定为两层：第一层是 RBAC 菜单路径，普通账号必须命中 `allowedMenuPaths`，`super admin` 只在这一层前端菜单路径判断中不依赖 `allowedMenuPaths`；第二层是 `effective_session.pages` 页面 key，`pages` 是数组时必须命中页面 key，空数组会收窄为无可见页面，不退回 RBAC-only，`super admin` 的第一层放行不改变第二层 pages 收窄。只有 `pages` 不是数组的 legacy profile 才保留旧 RBAC 行为；通过 `attachEffectiveSessionToAdminProfile` 挂载的 effective session 即使输入缺少 pages，也会被归一为空数组。
+
+当前诊断例外都收口在 `adminProfileSync` helper 的前端 pages 判定层，不改变正式客户 / 非前端 DEV 构建普通账号必须同时命中 RBAC 菜单路径和 active revision pages 的强收窄：`local dev` 指前端 DEV 构建态，不等于测试 / 目标环境；local dev 可放开第二层 pages 用于排障，但在菜单项过滤中普通账号仍必须先通过第一层 RBAC 菜单路径，且菜单过滤只会把导航定义里的页面传给 helper；`resolveEffectiveSessionPageAccess` 当前先判断 local dev，再判断 super admin sync failure / system diagnostic，因此前端 DEV 构建态下的 sync failure reason 仍是 `local_dev_sync_failed_diagnostic`。`super admin` 在第一层前端菜单路径判断中不依赖 `allowedMenuPaths`；正式构建且正常 active revision 时，第二层除 active pages 外只额外放开 `permission-center` / `system-audit-logs` 系统诊断页；非 local dev 的正式构建中，只有 super admin 且当前 profile 已挂载 `effective_session_sync_failed` 空投影时，sync failure 诊断例外才会放开当前传入 helper 的 page key。helper 本身不登记页面，也不校验原始 URL 是否是正式入口；页面范围来自调用方：菜单项过滤只会传入导航定义里的页面，隐藏 URL 判定则按 `buildCurrentEntry` 解析或 fallback 后的 page key 判定。当前 URL 若解析出未授权菜单权限路径，普通账号仍会被 RBAC 层判定跳转；若无法解析出菜单权限路径，则不会单独因 RBAC 触发跳转。未命中菜单定义时会按 `buildCurrentEntry` 的默认工作台 fallback 做 page key 判定：当前默认导航定义包含 `/erp/dashboard` 对应的 `global-dashboard`，因此未知 URL 通常按该 page key 进入 pages 判定；只有调用方最终传入空 page key 时，helper 才不会因 page key 阻断。它只影响前端菜单 / URL 排障可见性，不扩大后端 RBAC、动作权限、`customer_config` active revision、Workflow / Fact usecase、schema、migration、真实导入或 release evidence。`getAdminProfileSyncErrorAction` 的 `hasCachedProfile` 只决定同步失败错误的动作分类；`ERPLayout` 在客户配置同步失败时仍只复用 `adminProfileRef.current.effective_session`，普通 `me` profile 缓存不等于已经存在客户配置投影缓存。
+
+| 场景                                                                       | 当前前端行为                                                                                                                                                                                                                                                                                                                                                                                                                                                              | helper reason                                                               |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 正式客户 / 非前端 DEV 构建普通账号                                         | 正常 active revision 必须同时通过 RBAC 菜单路径和 active revision pages 交集；sync failure 且没有 `adminProfileRef.current.effective_session` 时挂载空投影，无可见菜单并阻止业务 `Outlet`；已有正常 cached effective session 时继续按缓存投影收窄，不进入 sync-failed 诊断例外，正式客户仍是强收窄。                                                                                                                                                                      | `effective_session_page` / `effective_session_page_blocked`                 |
+| `local dev` 普通账号                                                       | `ERPLayout` 当前不显式传 `isLocalDev`，helper 默认按 `import.meta.env.DEV` 判断前端 DEV 构建态；菜单项过滤中普通账号仍先过 RBAC 菜单路径，只在第二层 pages 放开调用方传入的导航页面；隐藏 URL 判定中，若当前路径解析出未授权菜单权限路径仍会跳转，若解析不出菜单权限路径则不会单独因 RBAC 阻断，但仍受 page key、可见 fallback 和 no-visible-menu 渲染边界约束。                                                                                                          | `local_dev_customer_config_diagnostic` / `local_dev_sync_failed_diagnostic` |
+| `local dev` super admin                                                    | 第一层前端 RBAC 菜单路径不依赖 `allowedMenuPaths`，第二层 pages 走 local dev 诊断例外；菜单项过滤只会放开导航定义传入 helper 的页面，隐藏 URL 仍按 `buildCurrentEntry` 解析或 fallback 后的 page key 判定，不证明原始 URL 已登记、已授权或可渲染业务内容。                                                                                                                                                                                                                | `local_dev_customer_config_diagnostic` / `local_dev_sync_failed_diagnostic` |
+| 正式 / 非前端 DEV 构建 super admin，正常 active revision                   | 第一层前端 RBAC 菜单路径不依赖 `allowedMenuPaths`；第二层仍按 active pages 收窄，只额外保留 `permission-center` / `system-audit-logs` 系统诊断页，不放开其它客户配置隐藏页。                                                                                                                                                                                                                                                                                              | `effective_session_page` / `super_admin_system_diagnostic`                  |
+| 正式 / 非前端 DEV 构建 super admin，`effective_session_sync_failed` 空投影 | 第一层前端 RBAC 菜单路径不依赖 `allowedMenuPaths`；只有当前 profile 已挂载 `source=effective_session_sync_failed` 的空投影且账号是 super admin 时，第二层才通过 sync failure 诊断例外放开当前传入 helper 的 page key。helper 不校验页面登记状态；菜单项过滤只会传入导航定义里的页面，隐藏 URL 判定仍按 `buildCurrentEntry` 解析或 fallback 后的 page key 判定。若 page key 来自 fallback，它只代表 fallback 后的判定对象，不证明原始 URL 已登记、已授权或可渲染业务内容。 | `super_admin_sync_failed_diagnostic`                                        |
+
+隐藏 URL 跳转也是 helper 判定，不是授权来源。直接打开已登记菜单路径但 RBAC 未授权、已登记页面被 active revision 隐藏，或 pages 判定不属于上述诊断例外时，`shouldRedirectFromCurrentNavigation` 只返回是否需要跳转；`ERPLayout` 只有在已过滤后的 `visibleSections[0].items[0].path` 存在时才 `replace` 到第一个可见入口。没有可见 fallback 时，只显示“当前账号暂无可见后台入口”并阻止业务 `Outlet`，不会跳到隐藏页、RBAC-only 页面或默认全量后台。当前 URL 的 RBAC 判断来自 `resolveMenuPermissionKey(location.pathname)` 解析出的 `currentMenuPath`，pages 判断来自 `buildCurrentEntry` 在未过滤菜单定义中解析出的 `currentEntry?.key`；空 `currentMenuPath` 不会单独触发 RBAC 跳转，未命中菜单定义的路径会优先回落到菜单定义里的默认工作台项做 page key 判定。当前默认导航定义存在 `global-dashboard`，所以这类 fallback 通常仍会按 `global-dashboard` 参与 pages 判定；只有调用方最终传入空 page key 时，helper 才不因 page key 阻断。这个 fallback 只服务当前 URL 判定和页头展示，不把原始 URL 升级为菜单入口、授权入口或业务页面准入；是否渲染业务内容仍由 React 路由、已过滤菜单是否为空、当前页面实际路由和对应后端权限共同决定。
+
+`ERPLayout` 在 `get_effective_session` 同步失败时只复用 `adminProfileRef.current.effective_session` 这个客户配置投影缓存；普通管理员 `me` profile 缓存不等于客户配置投影缓存，也不会触发 super admin sync failure 诊断。已有正常 cached effective session 时继续复用正常投影，不进入 sync-failed 诊断例外；缓存本身已经是 sync-failed 空投影时才继续复用该空投影；没有客户配置投影缓存时才挂载新的 `effective_session_sync_failed` 空投影。active revision 正常返回空页面清单不是 sync failure，而是按空 active pages 投影处理。`web/src/erp/utils/adminProfileSync.test.mjs` 覆盖正式普通账号 sync failure 不退回 RBAC-only、本地开发 pages 诊断、正式 super admin sync failure / 系统诊断例外和当前页面被 active pages 隐藏时的 helper 跳转判定；`scripts/qa/formal-frontend-customer-config-boundary.test.mjs` 只静态锁住 `ERPLayout` 仍存在空入口提示和 sync-failed helper anchor。`buildCurrentEntry` fallback 与实际 `navigate(..., { replace: true })` 行为仍以 `ERPLayout` 当前代码为准，本轮文档纠偏不把它写成已有独立单测覆盖；这些测试只锁住前端 helper / 页面壳边界，不替代后端 RBAC、active revision、目标环境 smoke 或 release evidence。
 
 ### 主题模式 / Theme mode
 
@@ -124,6 +140,7 @@ pnpm start:mobile:warehouse
 pnpm start:mobile:finance
 pnpm start:mobile:pmc
 pnpm start:mobile:quality
+pnpm start:mobile:engineering
 ```
 
 端口矩阵：
@@ -138,6 +155,7 @@ pnpm start:mobile:quality
 | 财务岗位任务端 | `5191` | 待对账、待付款、异常费用、结算提醒              |
 | PMC 岗位任务端 | `5192` | 齐套推进、排产推进、延期跟进、催办、异常分发    |
 | 品质岗位任务端 | `5193` | IQC、过程检验、返工复检、放行反馈、退回反馈     |
+| 工程岗位任务端 | `5194` | 产品资料、工序、BOM、工程资料补齐               |
 
 ## 构建命令
 
@@ -152,6 +170,7 @@ pnpm build:mobile:warehouse
 pnpm build:mobile:finance
 pnpm build:mobile:pmc
 pnpm build:mobile:quality
+pnpm build:mobile:engineering
 ```
 
 说明：
@@ -241,7 +260,7 @@ pnpm smoke:processing-contract-real-login
 - 管理员登录
 - 登录页主题三态、暗色后台看板、暗色业务页中性 hover / focus、暗色开发文档查看器、暗色客户配置包预检页、暗色打印中心 / 预览入口和暗色岗位任务端核心路径
 - 未登录访问桌面后台的重定向
-- 桌面工作台、任务看板和异常 / 阻塞闭环，包括协同任务筛选、任务详情抽屉、阻塞原因面板、催办、完成动作和运营工具入口
+- 桌面工作台、任务看板和异常 / 阻塞闭环，包括协同任务筛选、任务详情抽屉、阻塞原因面板、催办、基于 `complete_task_action` / `block_task_action` / `reject_task_action` 的任务动作和运营工具入口
 - 桌面业务看板和模板打印中心
 - 当前正式业务页连续回归，包括客户档案、供应商档案、销售订单 V1 页面、采购订单日期筛选和出货单日期筛选（桌面 / 窄屏）
 - 当前正式业务页表格、筛选、列顺序账号偏好、弹窗布局和协同入口
@@ -250,7 +269,7 @@ pnpm smoke:processing-contract-real-login
 - 采购合同打印工作台
 - 加工合同打印工作台
 
-`pnpm smoke:mobile-auth-login-route` 当前覆盖全部 8 个岗位任务端入口的未登录拦截、缺少岗位任务端角色授权的旧登录态回登录页、登录页密码入口、后端能力开启时的短信入口、账号密码登录后回跳任务页、任务 / 预警 / 通知 / 进度展示、岗位任务端不显示说明 / 角色文案，以及退出登录清空登录态。
+`pnpm smoke:mobile-auth-login-route` 当前覆盖全部 9 个业务岗位任务端入口的未登录拦截、缺少岗位任务端角色授权的旧登录态回登录页、登录页密码入口、后端能力开启时的短信入口、账号密码登录后回跳任务页、任务 / 预警 / 通知 / 进度展示、岗位任务端不显示说明 / 角色文案，以及退出登录清空登录态。
 
 `pnpm style:l1` 支持用逗号分隔的 `STYLE_L1_SCENARIOS` 跑指定场景，适合局部页面回归，例如：
 
@@ -275,7 +294,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 开发环境额外提供 `http://localhost:5175/__dev/prototypes` 作为本地开发态产品原型查看器；该入口只浏览 `docs/product/prototypes` 下的 HTML 样板、PNG 方案图和截图证据，可按全部 / 当前实现 / 待实现 / 参考资料四类筛选、按目录分组折叠、使用浏览器本地偏好恢复上次筛选、当前打开资产和置顶状态，并在右侧预览。卡片里的参照范围只说明可借鉴的页面 / 菜单类型，不是正式菜单、路由、权限或 seedData 映射表；该入口不进入侧栏、seedData、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单，生产构建不可访问。
 - 开发环境额外提供 `http://localhost:5175/__dev/capability-ledger` 作为本地开发态能力台账可视化；该入口只读解析 `docs/product/产品能力进度台账.md`、`docs/customers/yoyoosun/客户交付矩阵.md` 和 `docs/customers/yoyoosun/客户差异台账.md`，展示产品能力成熟度、客户交付状态、客户差异分类和显式 `CAP-*` 关联，不进入侧栏、seedData、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单，生产构建不可访问；三份 Markdown 仍是唯一维护入口。
 - 开发环境额外提供 `http://localhost:5175/__dev/testing` 作为本地开发态测试入口；该入口只读解析 `docs/product/自动化测试策略.md`、`scripts/README.md`、前后端 README 和部署说明等当前维护文档，展示 T0-T8 验证层级、命令块和常用预设复制入口；`docs/reference/**`、`docs/archive/**` 等历史参考默认不进入可复制命令来源，避免把旧方案或未来命令误当当前测试入口；复制按钮不在浏览器内执行 shell，不进入侧栏、seedData、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单，生产构建不可访问；`docs/product/自动化测试策略.md` 仍是测试选择真源。
-- 开发环境额外提供 `http://localhost:5175/__dev/customer-config` 作为本地开发态客户配置包预检控制台；该入口通过 `?customer=<customer-key>` 和页面客户包选择器读取 dev-only 客户包 registry，query 缺失时默认 `yoyoosun`，当前只登记 `yoyoosun`，后续新增客户包时只扩展同一 registry。未登记 customer 会显示“未登记客户配置包”和已登记客户列表，不 fallback 到 yoyoosun 冒充。选择器只更新 URL query，不写 localStorage、后端、数据库或正式运行配置；该页只读展示客户配置包、前端品牌 / 桌面菜单 runtime、字段 / 编号草案、流程结构 preview、预检步骤、差异预览、版本门禁、导入 tooling 和边界状态，不进入侧栏、seedData、RBAC、后端业务、真实导入或 ERP 正式菜单，生产构建不可访问；`config/customers/<customer-key>/*`、`config/catalog/*`、`config/schemas/*`、`scripts/import/*` 和正式文档仍是维护真源。
+- 开发环境额外提供 `http://localhost:5175/__dev/customer-config` 作为本地开发态客户配置包预检控制台；该入口通过 `?customer=<customer-key>` 和页面客户包选择器读取 dev-only 客户包 registry，query 缺失时默认 `yoyoosun`，当前只登记 `yoyoosun`，后续新增客户包时只扩展同一 registry。未登记 customer 会显示“未登记客户配置包”和已登记客户列表，不 fallback 到 yoyoosun 冒充。选择器只更新 URL query，不写 localStorage、后端、数据库或正式运行配置；该页展示客户配置包、前端品牌 / 桌面菜单 runtime、字段 / 编号草案、流程结构 preview、预检步骤、差异预览、版本门禁、导入 tooling 和边界状态，并可在本地开发服务中触发测试版 UI Dry Run，调用 `scripts/import/customerImportDryRun.mjs` 生成 ignored `output/customers/<customer-key>/ui-import-dry-run` evidence；也可编译受控 runtime manifest 并用当前管理员登录态调用后端 `customer_config.validate_customer_config / publish_customer_config / activate_customer_config / get_effective_session` 应用到测试环境。Dry Run 不写数据库；测试环境应用只写客户配置控制面表，不上传 raw 包、不直写数据库、不导入真实客户业务数据、不绕过后端 RBAC；后端 `rollback_customer_config` 只对已发布 compiled revision 做受控版本回滚并写独立审计，不是 raw 包回滚或导入失败恢复；正式版入口先运行 release readiness gate，门禁通过后才允许发布 / 激活，命令兜底区只展示 rollback readiness / executor 复核命令，不提供页面裸回滚按钮，仍必须依赖 release evidence、readiness gate 和后端受控 API；生产构建不可访问；`config/customers/<customer-key>/*`、`config/catalog/*`、`config/schemas/*`、`scripts/import/*` 和正式文档仍是维护真源。
 
 ## 当前前端边界
 
@@ -287,7 +306,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 桌面后台已移除 `帮助中心`、`开发与验收` 和 `高级文档` 分组；前端不再承接 Markdown 文档页、业务链路调试页或协同任务调试页
 - 岗位任务端生产环境统一走 `5175` 的 `/m/<role>/tasks`；按角色拆端口只作为本地开发调试入口保留，两者不拆第二个仓库
 - 岗位任务端只保留任务页，不展示角色说明、端口说明、技术字段、状态字典或帮助文案；根路径和未知路径统一进入任务页
-- 岗位任务页读取真实 workflow API，展示任务、预警、通知、进度和现场附件，并按当前端口角色支持处理、阻塞、完成三类 Workflow 任务状态回填；移动端不再回写 `business_records` 状态，附件上传不代表任务完成
+- 岗位任务页读取真实 workflow API，展示任务、预警、通知、进度和现场附件；完成 / 阻塞 / 退回分别走 `complete_task_action` / `block_task_action` / `reject_task_action`，均由服务端按当前管理员和任务责任推导角色；桌面任务看板、Workflow V1 页面、业务协同 Drawer 和岗位任务端提交前预检已消费 `explainWorkflowActionAccess` / `explainWorkflowTaskAssignment` 的后端只读原因，列表行即时按钮仍保留本地 helper fallback；移动端不再回写 `business_records` 状态，附件上传不代表任务完成
 - 岗位任务端复用管理员登录态，登录页固定提供密码登录，并在后端启用短信能力时提供短信登录；账号未授权当前角色、手机号未绑定或未授权当前角色、登录失效时进入 `/admin-login`，登录后回到任务页，并提供退出登录按钮
 - 模板打印当前由对应业务页选中记录后带值打开；打印中心保留默认样例，并已按原型复核后的轻量两栏承接左侧模板导航、右侧纸面预览和打印窗口入口；字段编辑在独立打印窗口内完成。
 - 扩展硬件链路、PDA、条码枪、图片识别继续 deferred

@@ -22,6 +22,7 @@ type stubPurchaseOrderJSONRPCRepo struct {
 	materialActive bool
 	unitActive     bool
 	lastFilter     biz.PurchaseOrderFilter
+	lifecycleCalls int
 }
 
 func newStubPurchaseOrderJSONRPCRepo() *stubPurchaseOrderJSONRPCRepo {
@@ -72,6 +73,7 @@ func (s *stubPurchaseOrderJSONRPCRepo) ListPurchaseOrders(_ context.Context, fil
 }
 
 func (s *stubPurchaseOrderJSONRPCRepo) UpdatePurchaseOrderLifecycle(_ context.Context, id int, lifecycleStatus string) (*biz.PurchaseOrder, error) {
+	s.lifecycleCalls++
 	order, ok := s.orders[id]
 	if !ok {
 		return nil, biz.ErrPurchaseOrderNotFound
@@ -162,7 +164,7 @@ func (s *stubPurchaseOrderJSONRPCRepo) UnitIsActive(context.Context, int) (bool,
 
 func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T) {
 	repo := newStubPurchaseOrderJSONRPCRepo()
-	j := newPurchaseOrderJSONRPCTestData(repo, workflowJSONRPCAdmin(
+	j := newPurchaseOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
 		[]string{biz.PurchaseRoleKey},
 		biz.PermissionPurchaseOrderCreate,
 		biz.PermissionPurchaseOrderRead,
@@ -275,7 +277,7 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 
 func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresDomainPermissions(t *testing.T) {
 	repo := newStubPurchaseOrderJSONRPCRepo()
-	j := newPurchaseOrderJSONRPCTestData(repo, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionPurchaseOrderRead))
+	j := newPurchaseOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionPurchaseOrderRead))
 	ctx := workflowJSONRPCAdminContext()
 
 	_, createRes, err := j.handlePurchaseOrder(ctx, "create_purchase_order", "1", purchaseOrderJSONRPCParams(t))
@@ -322,13 +324,147 @@ func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresDomainPermissions(t *testing.
 	}
 }
 
-func newPurchaseOrderJSONRPCTestData(repo *stubPurchaseOrderJSONRPCRepo, admin *biz.AdminUser) *jsonrpcDispatcher {
-	logger := log.NewStdLogger(io.Discard)
-	return &jsonrpcDispatcher{
-		log:             log.NewHelper(log.With(logger, "module", "service.jsonrpc.purchase_order.test")),
-		adminReader:     stubAdminAccountReader{admin: admin},
-		purchaseOrderUC: biz.NewPurchaseOrderUsecase(repo),
+func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresEnabledModule(t *testing.T) {
+	repo := newStubPurchaseOrderJSONRPCRepo()
+	j := newPurchaseOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.PurchaseRoleKey},
+		biz.PermissionPurchaseOrderCreate,
+		biz.PermissionPurchaseOrderRead,
+		biz.PermissionPurchaseOrderUpdate,
+		biz.PermissionPurchaseOrderApprove,
+	))
+	ctx := workflowJSONRPCAdminContext()
+	createParams := purchaseOrderJSONRPCParams(t)
+	saveParams := mustJSONRPCStruct(t, map[string]any{
+		"purchase_order_no": "PO-MODULE-GATE-SAVE",
+		"supplier_id":       float64(1),
+		"purchase_date":     "2026-06-15",
+		"items": []any{
+			map[string]any{
+				"line_no":            float64(1),
+				"material_id":        float64(1),
+				"unit_id":            float64(1),
+				"purchased_quantity": "12.5",
+			},
+		},
+	})
+
+	readOnlyConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.purchase-orders-read-only",
+		"purchase_orders",
+		"read_only",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, readOnlyConfig)
+
+	_, createRes, err := j.handlePurchaseOrder(ctx, "create_purchase_order", "read-only-create", createParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
 	}
+	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected read_only purchase_orders create rejected, got %#v", createRes)
+	}
+	if len(repo.orders) != 0 {
+		t.Fatalf("read_only purchase_orders must not create order, got %#v", repo.orders)
+	}
+	_, saveRes, err := j.handlePurchaseOrder(ctx, "save_purchase_order_with_items", "read-only-save", saveParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if saveRes == nil || saveRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected read_only purchase_orders save rejected, got %#v", saveRes)
+	}
+	if len(repo.items) != 0 {
+		t.Fatalf("read_only purchase_orders must not save items, got %#v", repo.items)
+	}
+	_, listRes, err := j.handlePurchaseOrder(ctx, "list_purchase_orders", "read-after-read-only", mustJSONRPCStruct(t, map[string]any{"limit": 20}))
+	if err != nil {
+		t.Fatalf("expected nil err listing historical purchase orders, got %v", err)
+	}
+	if listRes == nil || listRes.Code != errcode.OK.Code {
+		t.Fatalf("expected list_purchase_orders to remain available for historical read, got %#v", listRes)
+	}
+
+	enabledConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.purchase-orders-enabled",
+		"purchase_orders",
+		"enabled",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, enabledConfig)
+	_, createRes, err = j.handlePurchaseOrder(ctx, "create_purchase_order", "enabled-create", createParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if createRes == nil || createRes.Code != errcode.OK.Code {
+		t.Fatalf("expected enabled purchase_orders create OK, got %#v", createRes)
+	}
+	orderID := jsonRPCInt(t, jsonRPCNestedMap(t, createRes, "purchase_order"), "id")
+	_, submitRes, err := j.handlePurchaseOrder(ctx, "submit_purchase_order", "enabled-submit", mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if submitRes == nil || submitRes.Code != errcode.OK.Code || repo.orders[orderID].LifecycleStatus != biz.PurchaseOrderStatusSubmitted {
+		t.Fatalf("expected enabled purchase_orders submit OK, res=%#v order=%#v", submitRes, repo.orders[orderID])
+	}
+
+	disabledConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.06.30.purchase-orders-disabled",
+		"purchase_orders",
+		"disabled",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, disabledConfig)
+	beforeLifecycleCalls := repo.lifecycleCalls
+	_, addItemRes, err := j.handlePurchaseOrder(ctx, "add_purchase_order_item", "disabled-add-item", mustJSONRPCStruct(t, map[string]any{
+		"purchase_order_id":  float64(orderID),
+		"line_no":            float64(1),
+		"material_id":        float64(1),
+		"unit_id":            float64(1),
+		"purchased_quantity": "12.5",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if addItemRes == nil || addItemRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected disabled purchase_orders item add rejected, got %#v", addItemRes)
+	}
+	if len(repo.items) != 0 {
+		t.Fatalf("disabled purchase_orders must not add item, got %#v", repo.items)
+	}
+	_, itemListRes, err := j.handlePurchaseOrder(ctx, "list_purchase_order_items", "read-items-after-disabled", mustJSONRPCStruct(t, map[string]any{"purchase_order_id": float64(orderID)}))
+	if err != nil {
+		t.Fatalf("expected nil err listing historical purchase order items, got %v", err)
+	}
+	if itemListRes == nil || itemListRes.Code != errcode.OK.Code {
+		t.Fatalf("expected list_purchase_order_items to remain available for historical read, got %#v", itemListRes)
+	}
+	_, cancelRes, err := j.handlePurchaseOrder(ctx, "cancel_purchase_order", "disabled-cancel", mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if cancelRes == nil || cancelRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected disabled purchase_orders cancel rejected, got %#v", cancelRes)
+	}
+	if repo.lifecycleCalls != beforeLifecycleCalls || repo.orders[orderID].LifecycleStatus != biz.PurchaseOrderStatusSubmitted {
+		t.Fatalf("disabled purchase_orders must not update lifecycle, calls=%d order=%#v", repo.lifecycleCalls, repo.orders[orderID])
+	}
+}
+
+func newPurchaseOrderJSONRPCTestData(t *testing.T, repo *stubPurchaseOrderJSONRPCRepo, admin *biz.AdminUser) *jsonrpcDispatcher {
+	t.Helper()
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(logger, "module", "service.jsonrpc.purchase_order.test")),
+		adminReader:      stubAdminAccountReader{admin: admin},
+		purchaseOrderUC:  biz.NewPurchaseOrderUsecase(repo),
+		customerConfigUC: biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo()),
+	}
+	activateOperationalFactTestCustomerConfig(t, dispatcher, customerConfigPublishParams(t))
+	return dispatcher
 }
 
 func purchaseOrderJSONRPCParams(t *testing.T) *structpb.Struct {

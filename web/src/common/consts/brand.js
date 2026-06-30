@@ -29,6 +29,13 @@ function normalizeBrandConfig(brandConfig = {}) {
   }
 }
 
+function normalizeCustomerKey(runtimeConfig = {}) {
+  return typeof runtimeConfig?.customerKey === 'string' &&
+    runtimeConfig.customerKey.trim()
+    ? runtimeConfig.customerKey.trim()
+    : undefined
+}
+
 function readRuntimeCustomerConfig() {
   if (typeof window === 'undefined') {
     return null
@@ -43,6 +50,7 @@ export function getActiveERPBrand() {
   const runtimeConfig = readRuntimeCustomerConfig()
   const runtimeBrand = normalizeBrandConfig(runtimeConfig?.brand)
   return {
+    customerKey: normalizeCustomerKey(runtimeConfig),
     brandMark: runtimeBrand.brandMark || ERP_BRAND_MARK,
     companyName: runtimeBrand.companyName || ERP_COMPANY_NAME,
     systemName: runtimeBrand.systemName || ERP_ADMIN_SYSTEM_NAME,

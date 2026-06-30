@@ -4,6 +4,11 @@
   "approvedBy": "sample-approver",
   "realImportApproved": true,
   "allowRemainingReviewItems": true,
+  "moduleStates": {
+    "customers": "enabled",
+    "suppliers": "enabled",
+    "sales_orders": "enabled"
+  },
   "items": [
     {
       "sourceId": "src-customer-create",
