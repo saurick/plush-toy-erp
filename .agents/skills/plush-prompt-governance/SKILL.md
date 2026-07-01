@@ -1,6 +1,6 @@
 ---
 name: plush-prompt-governance
-description: plush-toy-erp 项目提示词治理。Use when Codex writes, refines, evaluates, or converts a plush-toy-erp request into an executable prompt for implementation, review, docs governance, page design, tests, deployment, handoff, side chat, main chat, or commit/push work; when the user asks how to phrase a plush task; when a complete copyable final prompt, prompt length control, Codex input limit, or prompt boundary conditions are needed; or when prompts need project boundaries such as README/current source of truth, AGENTS.md, Workflow/Fact, RBAC, customer data, progress.md, validation scope, related skills, or positive "要做什么" wording instead of broad "不要" lists.
+description: plush-toy-erp 项目提示词治理。Use when Codex writes, refines, evaluates, or converts a plush-toy-erp request into an executable prompt for implementation, review, docs governance, page design, tests, deployment, handoff, side chat, main chat, or commit/push work; when the user asks how to phrase a plush task; when a complete copyable final prompt, prompt length control, Codex input limit, engineering quality gate, maintainability, extensibility, simplicity, complexity budget, or prompt boundary conditions are needed; or when prompts need project boundaries such as README/current source of truth, AGENTS.md, Workflow/Fact, RBAC, customer data, progress.md, validation scope, related skills, or positive "要做什么" wording instead of broad "不要" lists.
 ---
 
 # Plush Prompt Governance
@@ -44,6 +44,18 @@ Only use "不要 / 禁止" for high-risk plush boundaries:
 
 完整 plush 提示词通常应包含：相关 `$plush-*` skills、目标、先读真源、允许修改、本轮不做、验收、progress.md 要求和收口要求。微型提示词可省略明显无关段落。
 
+## Engineering Quality Gate
+
+plush 提示词不能只要求“把目标做出来”。非平凡实现、页面、文档、测试、部署或 review 提示词必须要求 Codex 保持项目的复杂度预算：
+
+- 优先沿用当前架构、业务真源、共享组件、usecase/repo/API/RBAC 分层、QA 脚本和文档体系。
+- 先做最小必要但完整的主路径修复；不要用局部 fallback、重复派生、页面私有真源或宽松测试条件换取短期通过。
+- 新增 helper、组件、schema、migration、API、RBAC 权限、Workflow 规则、客户配置或部署步骤前，必须说明为什么现有能力不能复用，以及为什么现在值得增加复杂度。
+- 遇到跨 Workflow / Fact、字段残值 / 缺值、客户差异、页面共享层或发布部署的任务时，优先收窄成可验证切片，不在一轮里无约束扩张。
+- 收口必须说明：复用了哪些既有能力、增加了哪些复杂度、为什么恰当、未覆盖哪些路径、剩余风险是什么。
+
+如果用户说“完美 / 顶级 / 大厂 / 开源优秀”，提示词应转成可维护、可扩展、低心智负担、低信息密度、可回归的具体要求，而不是允许无限重构。
+
 ## Standard Plush Prompt
 
 ```markdown
@@ -63,6 +75,11 @@ $relevant-plush-skill
 
 本轮不做：
 - <only high-risk non-goals: schema, RBAC, deployment, AGENTS, customer core, etc.>
+
+工程质量：
+- 优先复用 plush 现有真源、共享组件、usecase/repo/API/RBAC 分层、QA 脚本和文档体系。
+- 新增抽象、helper、schema、API、权限、配置、fallback 或 Workflow 规则前，先说明复用不足和复杂度收益。
+- 收口时说明复杂度控制、复用点、取舍、未覆盖路径和剩余风险。
 
 验收：
 - 先按影响面选择验证层级和测试形态。
@@ -113,6 +130,10 @@ $plush-test-governance
 
 本轮不做：
 - 不改 schema / RBAC / deployment / AGENTS，除非代码确认必须改并先说明。
+
+工程质量：
+- 优先主路径修复，不用局部 fallback 或重复真源掩盖根因。
+- 新增抽象或共享层前先说明为什么现有结构不能承接。
 
 验收：
 - 按影响面选择 T0-T8 验证层级和测试形态。
@@ -169,3 +190,4 @@ $plush-prompt-governance
 - 把 AGENTS 或 README 全文复制进 prompt，反而淹没本轮目标。
 - 把 "参考大厂/开源" 写成照搬视觉或流程；应写成参考信息架构、密度控制、可读性和可操作性原则。
 - 只讲提示词原则但不给最终可复制版本，或把完整聊天历史塞进一个超长 prompt。
+- 只要求达成目标，却没有要求复杂度预算、复用优先、主路径修复和收口自检，导致实现不可维护。
