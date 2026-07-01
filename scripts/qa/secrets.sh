@@ -195,7 +195,9 @@ if [[ "$has_gitleaks" != "1" ]]; then
   exit 0
 fi
 
-if gitleaks detect --source "$tmp_dir" --no-banner --redact >/dev/null 2>&1; then
+# Git hooks export GIT_DIR/GIT_WORK_TREE. gitleaks scans a copied temp tree, so
+# do not let hook git context leak into the temp source scan.
+if env -u GIT_DIR -u GIT_WORK_TREE gitleaks detect --source "$tmp_dir" --no-banner --redact >/dev/null 2>&1; then
   echo "[qa:secrets] 通过"
   exit 0
 fi
