@@ -182,3 +182,18 @@
 - 完成：补齐 `docs/product/多甲方角色能力流程编排优先级.md` 和 `docs/当前真源与交接顺序.md` 中普通 JSON-RPC 写入口 inventory 的审计 anchor，明确 debug/admin/system 控制面不计入普通业务 API，避免 priority audit 文档锚点缺失导致 P5 本地门禁误判失败。
 - 下一步：重跑 `multi-client-role-workflow-priority-audit` 单测并 amend 到当前提交，再继续 push 的 `qa:full`。
 - 阻塞/风险：该修正只同步本地审计口径，不新增目标环境模块关闭验证，也不证明 release evidence 已闭环。
+
+## 2026-07-01 governance skills 结构质量门禁
+
+- 完成：按“恰到好处，不要太重太轻”的口径，补强 `plush-*` 治理 skills 的结构质量检查。`code-review/docs/domain/page/prompt/release/test/runtime/observability/security/seed-import` 均明确模块化、高内聚、低耦合、单一职责；页面、文档、测试、发布、运行时、可观测性、安全和导入各用对应场景措辞，不把通用架构口号机械复制。
+- 完成：同步 `agents/openai.yaml` 默认提示词，触发 `$plush-*` 时 UI prompt 会明确把工程/页面/文档/发布/测试质量门禁扩展为“含模块化、高内聚、低耦合、单一职责”。
+- 验证：追加前 `progress.md` 为 207 行、49707 字节，未达到归档阈值；Ruby YAML 解析通过 88 个 `agents/openai.yaml`；结构/frontmatter 扫描通过 54 个目标 skill；`quick_validate.py` 仍因当前 Python 环境缺 `yaml`/PyYAML 失败，已按依赖缺口记录。
+- 下一步：后续如果继续扩展 skill，应优先保持短门禁 + 项目事实，不把每个 skill 写成完整架构手册。
+- 阻塞/风险：本组只改 skill 文档、UI metadata 和过程记录；不改 runtime、schema、RBAC、Workflow / Fact、客户配置、测试脚本、部署或真实数据。当前工作区已有其它会话改动，本组未回退、未清理、未声明为本轮成果。
+
+## 2026-07-01 governance skills 边界清晰与合理严谨门禁
+
+- 完成：在 `plush-*` 项目治理 skills 的结构质量检查中补入一条短门禁：边界清晰、合理严谨；要求说明本轮管什么、不管什么、依赖哪个真源，以及为什么当前拆分、抽象和验证足够但不过度。
+- 完成：同步 `agents/openai.yaml` 默认提示词，让 `$plush-*` 的质量门禁显式包含边界清晰、合理严谨、模块化、高内聚、低耦合、单一职责。
+- 下一步：后续 skill 继续保持短约束，不把“合理严谨”扩成额外流程或长清单。
+- 阻塞/风险：追加前 `progress.md` 为 215 行、51108 字节，未达到归档阈值。本组只改 skill 文档、UI metadata 和过程记录；不改 runtime、schema、RBAC、Workflow / Fact、客户配置、测试脚本、部署或真实数据。

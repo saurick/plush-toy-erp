@@ -1,6 +1,6 @@
 ---
 name: plush-domain-boundary-governance
-description: plush-toy-erp 项目业务边界与数据真源治理。Use when Codex implements or reviews plush-toy-erp feature work that may affect backend implementation, server code, schema, migration, repo, usecase, JSON-RPC, APIs, RBAC, transactions, idempotency, error codes, data ownership, domain models, workflows, facts, frontend/backend responsibility, customer-specific behavior, source-of-truth fields, stale/missing field values, or cross-module boundaries.
+description: 项目业务边界与数据真源治理（plush-toy-erp）。Use when Codex implements or reviews plush-toy-erp feature work that may affect backend implementation, server code, schema, migration, repo, usecase, JSON-RPC, APIs, RBAC, transactions, idempotency, error codes, data ownership, domain models, workflows, facts, frontend/backend responsibility, customer-specific behavior, source-of-truth fields, stale/missing field values, or cross-module boundaries.
 ---
 
 # Plush 业务边界治理 Domain Boundary Governance
@@ -26,6 +26,14 @@ description: plush-toy-erp 项目业务边界与数据真源治理。Use when Co
 ## 工程质量门禁 Engineering Quality Gate
 
 业务边界治理必须守住最小必要复杂度和单一真源：
+
+### 结构质量检查 Structure Quality Checks
+
+- 边界清晰、合理严谨：说明本轮管什么、不管什么、依赖哪个真源，以及为什么当前拆分、抽象和验证足够但不过度。
+- 模块化：按真实业务/技术职责拆分；只有能降低理解、测试或变更成本时才拆，不做空壳转发或为拆而拆。
+- 高内聚：同一业务规则、字段真源、错误/权限判断、数据转换或状态推进尽量收口到同一 usecase/helper/config/test source。
+- 低耦合：页面不偷做后端事实逻辑，usecase 不管展示细节，repo 不承载业务决策；跨层依赖要有清楚方向和合同。
+- 单一职责：一个模块不要同时处理展示、权限、数据派生、保存、副作用和兜底；如果必须临时承载，说明边界和退出路径。
 
 - 新增 schema、migration、repo、usecase、API、RBAC 权限、状态、字段或配置前，先证明现有真源不能承接，并说明新增复杂度的收益和退出边界。
 - 优先主路径修复：不要用页面私有逻辑、脚本补写、兼容 fallback、重复派生字段或宽松校验掩盖 usecase / repo / API 合同缺口。

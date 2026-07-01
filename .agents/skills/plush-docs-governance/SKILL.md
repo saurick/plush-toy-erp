@@ -1,6 +1,6 @@
 ---
 name: plush-docs-governance
-description: plush-toy-erp 项目文档治理。Use when Codex reviews, creates, renames, reorganizes, simplifies, or updates plush ERP Markdown docs, README files, docs inventory, progress.md, customer docs, reference/archive docs, project guidance, AGENTS.md docs rules, Markdown metadata/frontmatter, tables, classification matrices, architecture layers, validation levels, test shapes, Mermaid diagrams, flowcharts, state diagrams, architecture diagrams, decision diagrams, reader paths, quick starts, conclusion-first structure, or copyable commands, or when the user mentions 文档治理, docs, AGENTS, 文档清单, 中文文件名, 真源, frontmatter, metadata, progress归档, reference不是正式真源, 信息密度高, 心智负担, 一眼看不懂, 简洁易用, 美观, 表格, 矩阵, 架构层级, 验证层级, 测试形态, 跳转到指定位置, 流程图, 状态图, 架构图, 读者路径, 结论前置, 命令可复制, or asks whether docs guidance should become reusable.
+description: 项目文档治理（plush-toy-erp）。Use when Codex reviews, creates, renames, reorganizes, simplifies, or updates plush ERP Markdown docs, README files, docs inventory, progress.md, customer docs, reference/archive docs, project guidance, AGENTS.md docs rules, Markdown metadata/frontmatter, tables, classification matrices, architecture layers, validation levels, test shapes, Mermaid diagrams, flowcharts, state diagrams, architecture diagrams, decision diagrams, reader paths, quick starts, conclusion-first structure, or copyable commands, or when the user mentions 文档治理, docs, AGENTS, 文档清单, 中文文件名, 真源, frontmatter, metadata, progress归档, reference不是正式真源, 信息密度高, 心智负担, 一眼看不懂, 简洁易用, 美观, 表格, 矩阵, 架构层级, 验证层级, 测试形态, 跳转到指定位置, 流程图, 状态图, 架构图, 读者路径, 结论前置, 命令可复制, or asks whether docs guidance should become reusable.
 ---
 
 # Plush Docs Governance
@@ -12,6 +12,14 @@ Use this skill to keep plush-toy-erp docs useful for humans and safe as project 
 ## 文档质量门禁 Docs Quality Gate
 
 文档治理不能只追求“写得多”或“排版整齐”。要把文档当成人读、AI 续写和项目真源收敛的共同入口：
+
+### 结构质量检查 Structure Quality Checks
+
+- 边界清晰、合理严谨：说明本轮管什么、不管什么、依赖哪个真源，以及为什么当前拆分、抽象和验证足够但不过度。
+- 模块化：按读者任务和真源边界组织文档；能在一页讲清就不拆，长文才用索引、摘要表和专题页。
+- 高内聚：同一口径、命令、状态、链接和跳转锚点尽量收口到一个真源或索引，不在多处复制近似说明。
+- 低耦合：文档引用代码、脚本、页面和正式真源位置，不复写易漂移的实现细节；过程记录不覆盖正式文档。
+- 单一职责：README 管导航，专题文档管业务/操作，progress/changelog 管过程；图表和表格只在降低理解成本时使用。
 
 - 先保护当前真源：新增、改写或合并文档前，确认它不会覆盖代码、migration、测试、README、`docs/当前真源与交接顺序.md` 或 `AGENTS.md` 的正式口径。
 - 降低心智负担：结论、适用范围、主路径、验收方式和风险边界前置；表格、Mermaid、链接和摘要只在减少查找成本时使用。

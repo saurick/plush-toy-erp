@@ -1,6 +1,6 @@
 ---
 name: plush-seed-import-governance
-description: plush-toy-erp 项目seed、fixture、导入与清理治理。Use when Codex creates, changes, reviews, or explains plush-toy-erp seed data, fixtures, import scripts, customer data imports, demo data, reversible manual-test data, cleanup scripts, destructive dev resets, source snapshots, or import validation.
+description: 项目seed、fixture、导入与清理治理（plush-toy-erp）。Use when Codex creates, changes, reviews, or explains plush-toy-erp seed data, fixtures, import scripts, customer data imports, demo data, reversible manual-test data, cleanup scripts, destructive dev resets, source snapshots, or import validation.
 ---
 
 # Plush Seed / 导入治理 Seed Import Governance
@@ -19,6 +19,14 @@ description: plush-toy-erp 项目seed、fixture、导入与清理治理。Use wh
 - 试用模拟只使用 seed、fixture 或手工构造数据；当前没有可直接导入的 yoyoosun 真实客户数据。
 - 模拟数据不得写成真实导入、客户字段确认、出货、库存或财务事实。
 - seed/import 要可定位、可回收、可复跑；不要污染 Product Core、RBAC 或长期 schema。
+
+## 结构质量门禁 Structure Quality Gate
+
+- 边界清晰、合理严谨：说明本轮管什么、不管什么、依赖哪个真源，以及为什么当前拆分、抽象和验证足够但不过度。
+- 模块化：seed、fixture、dry-run、真实 import、cleanup 和 rollback 分开入口，不用一个脚本同时承担模拟、写入和清理所有职责。
+- 高内聚：同一数据来源、run id/prefix、映射规则、去重规则和清理规则收口到共享配置或 helper。
+- 低耦合：测试数据不污染产品真源，demo 数据不伪装成客户事实，导入脚本不绕过 schema/usecase/RBAC/audit 主路径。
+- 单一职责：每批数据都说明 purpose、target env、write scope、cleanup path 和未覆盖风险；不可回收数据默认不写。
 
 ## 工作流 Workflow
 

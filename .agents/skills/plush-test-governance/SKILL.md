@@ -1,6 +1,6 @@
 ---
 name: plush-test-governance
-description: plush-toy-erp 项目测试治理。Use when Codex chooses, runs, reviews, or explains validation scope for plush-toy-erp changes, including validation levels T0-T8, test shapes, evidence environments, unit tests, integration tests, JSON-RPC/RBAC tests, migration checks, browser/page regressions, style:l1, smoke tests, real-write E2E, import dry-runs, release checks, or when the user asks 验证层级/测试形态/测试分类/测试治理/怎么测/要不要补测试.
+description: 项目测试治理（plush-toy-erp）。Use when Codex chooses, runs, reviews, or explains validation scope for plush-toy-erp changes, including validation levels T0-T8, test shapes, evidence environments, unit tests, integration tests, JSON-RPC/RBAC tests, migration checks, browser/page regressions, style:l1, smoke tests, real-write E2E, import dry-runs, release checks, or when the user asks 验证层级/测试形态/测试分类/测试治理/怎么测/要不要补测试.
 ---
 
 # Plush Test Governance
@@ -14,6 +14,14 @@ description: plush-toy-erp 项目测试治理。Use when Codex chooses, runs, re
 ## 测试质量门禁 Test Quality Gate
 
 测试治理不是“跑得越多越好”，也不是用一个全量命令替代关键场景：
+
+### 结构质量检查 Structure Quality Checks
+
+- 边界清晰、合理严谨：说明本轮管什么、不管什么、依赖哪个真源，以及为什么当前拆分、抽象和验证足够但不过度。
+- 模块化：测试按单元、集成、契约、浏览器回归、发布验证等风险层分工，不用一个大命令掩盖关键断言缺失。
+- 高内聚：同一业务规则的样本、fixture、helper 和断言尽量收口，避免不同测试文件维护近似但冲突的口径。
+- 低耦合：测试不依赖脆弱顺序、真实外部服务或无关全局状态；需要真实环境时显式声明 target 和证据。
+- 单一职责：每个测试说明它证明什么；验证报告区分已覆盖、未覆盖和不适合本轮覆盖的风险。
 
 - 足够但不过度：按改动影响面选择最小必要验证组合；docs/skill-only 不机械跑全量，业务真源、RBAC、migration、页面交互或发布链路必须升级验证。
 - 证明真实风险：测试要覆盖本轮最可能出错的合同、状态、权限、旧数据、边界值、浏览器状态或目标环境；不能只证明 happy path。
