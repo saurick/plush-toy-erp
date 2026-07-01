@@ -9,6 +9,15 @@ description: plush-toy-erp 项目文档治理。Use when Codex reviews, creates,
 
 Use this skill to keep plush-toy-erp docs useful for humans and safe as project truth. It covers both governance and reading experience: current source of truth, inventory sync, Chinese filenames, low information density, reader paths, conclusion-first structure, clear section anchors, copyable commands, diagrams that reduce understanding cost, and links to exact relevant locations.
 
+## 文档质量门禁 Docs Quality Gate
+
+文档治理不能只追求“写得多”或“排版整齐”。要把文档当成人读、AI 续写和项目真源收敛的共同入口：
+
+- 先保护当前真源：新增、改写或合并文档前，确认它不会覆盖代码、migration、测试、README、`docs/当前真源与交接顺序.md` 或 `AGENTS.md` 的正式口径。
+- 降低心智负担：结论、适用范围、主路径、验收方式和风险边界前置；表格、Mermaid、链接和摘要只在减少查找成本时使用。
+- 避免文档漂移：行为、入口、菜单、配置、测试或部署口径变化时，同步相关索引、README、`docs/文档清单.md` 和 `progress.md`；只改措辞时不机械扩大同步面。
+- 控制复杂度：不要为普通说明引入重模板、重审批流、重复负面清单或并行 metadata；能由脚本、索引或现有文档承接的规则，不再造一套文档真源。
+
 ## Workflow
 
 1. Snapshot scope and worktree.

@@ -11,6 +11,15 @@ Use this skill to turn "简洁易用、美观、低心智负担" into concrete i
 
 边界说明：本 skill 只负责页面可见能力、功能语义、信息层级、交互和页面回归治理；涉及 API / RBAC / schema / migration / Workflow / Fact 时，只做真实性核对和升级判断，不直接把后端实现纳入页面治理范围。若页面改动需要新增或修改后端能力，应切换到 `plush-domain-boundary-governance`，并按对应 test / security / release skill 补足验证。
 
+## 页面质量门禁 Page Quality Gate
+
+页面治理不能只追求“好看”或“少一点”。要把每个可见模块、字段、按钮、状态和文案压回真实业务意义：
+
+- 功能先于视觉：每个元素都要说明支持哪个角色、哪个判断、哪个动作或哪个反馈；无决策价值、重复入口、假快捷方式和装饰性卡片应删除、合并或降级。
+- 真源先于局部修补：页面不能补造后端事实、隐藏 Workflow / Fact 缺口、显示裸技术字段，或用页面私有字段映射替代共享 helper / API / RBAC 合同。
+- 低密度但不失真：减少信息密度必须通过信息分组、任务优先级、可读标签和可验证交互完成，不能靠隐藏必要状态、吞掉错误或弱化关键约束。
+- 可回归：样式、布局、交互和原型同步必须覆盖默认态、交互态、恢复态、长文本/大数字/多标签、暗色/移动端和相邻区域；共享组件按影响面升级验证。
+
 ## Workflow
 
 1. Establish the page state and truth source.

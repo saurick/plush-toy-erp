@@ -21,6 +21,15 @@ description: 项目发布、部署、版本与回滚治理（plush-toy-erp）。
 - 当前部署 truth 是 `server/deploy/compose/prod`；Atlas 线上 migration 使用宿主机 `/usr/local/bin/atlas` 和 `flock`。
 - 版本证据至少绑定 commit hash、image tag、migration 状态、目标环境、health/ready、smoke 和 rollback point。
 
+## 发布质量门禁 Release Quality Gate
+
+发布治理的质量不是“把版本推上去”，而是可复现、可回滚、可证明：
+
+- 最小发布面：只发布已提交、已验证、已绑定版本证据的范围；不要把未归属的 dirty worktree、临时脚本或手工远端改动混进 release truth。
+- 低配服务器边界：本地/CI 构建，远端只加载制品、执行 migration、启动、health/ready/smoke 和必要清理；不把目标机临时构建当主路径。
+- 可回滚：每次涉及 migration、配置、镜像或数据状态的发布，都要说明 rollback point、不可逆风险、前向修复路径和保留证据。
+- 可观测：运行版本必须用目标 runtime evidence 证明，包括 commit/tag、image digest、migration 状态、服务健康、日志和业务 smoke。
+
 ## 工作流 Workflow
 
 1. 定义 scope：branch、host/environment、service/container、migration、config/env、rollback point。
