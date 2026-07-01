@@ -142,9 +142,9 @@ function getScenarios() {
     assertProcessingContractPaperRowCount,
     assertProcessingContractSignatureLayout,
     assertPurchaseReceiptActionButtonState,
-    assertPurchaseReceiptAddItemModalDarkTokens,
-    assertPurchaseReceiptAddItemModalMetrics,
-    assertPurchaseReceiptAddItemModalMobileLayout,
+    assertPurchaseReceiptAddItemEditorDarkTokens,
+    assertPurchaseReceiptAddItemEditorMetrics,
+    assertPurchaseReceiptAddItemEditorMobileLayout,
     assertBusinessFormModalKeyboardRecovery,
     assertPurchaseReceiptRowItemCount,
     assertRowSelectionClearsAfterCancel,
@@ -160,10 +160,10 @@ function getScenarios() {
     expectHeading,
     expectNoButton,
     expectText,
-    fillPurchaseReceiptAddItemModalBoundaryValues,
+    fillPurchaseReceiptAddItemEditorBoundaryValues,
     gotoScenarioPath,
     isLightSurfaceColor,
-    openPurchaseReceiptAddItemModal,
+    openPurchaseReceiptAddItemEditor,
     outputDir,
     path,
     seedBusinessCollaborationOverflowTasks,
@@ -244,6 +244,7 @@ function startDevServer() {
       env: {
         ...process.env,
         BROWSER: 'none',
+        ERP_VITE_HMR_CLIENT_PORT: String(devServerPort),
       },
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -2335,11 +2336,11 @@ const {
   selectPurchaseReceiptRow,
   assertPurchaseReceiptActionButtonState,
   assertPurchaseReceiptRowItemCount,
-  openPurchaseReceiptAddItemModal,
-  fillPurchaseReceiptAddItemModalBoundaryValues,
-  assertPurchaseReceiptAddItemModalMetrics,
-  assertPurchaseReceiptAddItemModalDarkTokens,
-  assertPurchaseReceiptAddItemModalMobileLayout,
+  openPurchaseReceiptAddItemEditor,
+  fillPurchaseReceiptAddItemEditorBoundaryValues,
+  assertPurchaseReceiptAddItemEditorMetrics,
+  assertPurchaseReceiptAddItemEditorDarkTokens,
+  assertPurchaseReceiptAddItemEditorMobileLayout,
   assertLineItemsUnifiedHorizontalScroll,
 } = createPurchaseReceiptAssertions({
   assert,
@@ -4292,14 +4293,47 @@ async function assertBusinessDateRangePickerOrderGuard(page, { scenarioName }) {
     '.erp-business-date-range-filter .erp-business-date-input'
   )
   await dateInputs.first().click({ position: { x: 16, y: 16 } })
+  const startDateTitle = await page
+    .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
+    .evaluate((dropdown) => {
+      const titles = Array.from(
+        dropdown.querySelectorAll('.ant-picker-cell-in-view[title]')
+      )
+        .filter(
+          (cell) =>
+            !cell.className.includes('ant-picker-cell-disabled') &&
+            cell.getAttribute('aria-disabled') !== 'true'
+        )
+        .map((cell) => cell.getAttribute('title'))
+        .filter(Boolean)
+        .sort()
+      if (titles.length < 2) {
+        throw new Error('date range guard needs at least two selectable days')
+      }
+      return titles[Math.min(15, titles.length - 1)]
+    })
+  const earlierEndDateTitle = await page
+    .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
+    .evaluate((dropdown, selectedTitle) => {
+      const titles = Array.from(
+        dropdown.querySelectorAll('.ant-picker-cell-in-view[title]')
+      )
+        .map((cell) => cell.getAttribute('title'))
+        .filter((title) => title && title < selectedTitle)
+        .sort()
+      if (titles.length < 1) {
+        throw new Error('date range guard needs an earlier visible day')
+      }
+      return titles[0]
+    }, startDateTitle)
   await page
     .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
-    .locator('.ant-picker-cell[title="2026-06-17"]')
+    .locator(`.ant-picker-cell[title="${startDateTitle}"]`)
     .click()
   await dateInputs.nth(1).click({ position: { x: 16, y: 16 } })
   const earlierEndCell = page
     .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
-    .locator('.ant-picker-cell[title="2026-06-02"]')
+    .locator(`.ant-picker-cell[title="${earlierEndDateTitle}"]`)
     .last()
   await earlierEndCell.waitFor({ state: 'visible', timeout: 1500 })
   const earlierEndMetrics = await earlierEndCell.evaluate((node) => ({
@@ -5836,6 +5870,7 @@ function isIgnorableDevServerError(text) {
     text.includes('Outdated Request') ||
     text.includes('[hmr] Failed to reload') ||
     text.includes('net::ERR_CONNECTION_REFUSED') ||
+    text.includes('Failed to load resource: net::ERR_ADDRESS_INVALID') ||
     text.includes('[vite] failed to connect to websocket') ||
     text.includes(
       'Warning: trigger element and popup element should in same shadow root.'

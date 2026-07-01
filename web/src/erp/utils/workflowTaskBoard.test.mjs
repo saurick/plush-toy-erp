@@ -7,6 +7,8 @@ import {
   filterWorkflowTaskBoardTasks,
   getWorkflowTaskActionPermission,
   getWorkflowTaskAllowedActionModes,
+  getWorkflowTaskCodeLabel,
+  getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskReadonlyReason,
   getWorkflowTaskReason,
   getWorkflowTaskStatusMeta,
@@ -91,6 +93,45 @@ test('workflowTaskBoard: 状态文案和原因从任务或 payload 收口', () =
     color: 'blue',
   })
   assert.equal(getWorkflowTaskReason(tasks[1]), '库位未确认')
+})
+
+test('workflowTaskBoard: 责任角色展示和只读原因不透出 owner_role_key', () => {
+  const warehouseTask = {
+    id: 20,
+    task_status_key: 'ready',
+    owner_role_key: 'warehouse',
+    task_group: 'warehouse_inbound',
+    source_type: 'inbound',
+  }
+  const salesAdmin = {
+    id: 21,
+    roles: [{ role_key: 'sales' }],
+    permissions: ['workflow.task.read', 'workflow.task.complete'],
+  }
+
+  assert.equal(getWorkflowTaskOwnerRoleLabel(warehouseTask), '仓库')
+  assert.equal(
+    getWorkflowTaskOwnerRoleLabel({
+      ...warehouseTask,
+      owner_role_key: 'unknown_role_key',
+    }),
+    '责任岗位'
+  )
+
+  const readonlyReason = getWorkflowTaskReadonlyReason(
+    salesAdmin,
+    warehouseTask
+  )
+  assert.match(readonlyReason, /仓库责任角色/)
+  assert.doesNotMatch(readonlyReason, /warehouse/)
+})
+
+test('workflowTaskBoard: 任务编号缺失时不拼内部 ID', () => {
+  assert.equal(
+    getWorkflowTaskCodeLabel({ id: 88, task_code: 'TASK-BIZ-001' }),
+    'TASK-BIZ-001'
+  )
+  assert.equal(getWorkflowTaskCodeLabel({ id: 88 }), '任务已关联')
 })
 
 test('workflowTaskBoard: 生成原型式任务看板泳道并保留协同完成边界', () => {
@@ -224,7 +265,7 @@ test('workflowTaskBoard: 任务处理动作按权限码和 owner 角色收口', 
   )
   assert.match(
     getWorkflowTaskReadonlyReason(salesAdmin, warehouseTask),
-    /不属于 warehouse/
+    /不属于仓库责任角色/
   )
 })
 

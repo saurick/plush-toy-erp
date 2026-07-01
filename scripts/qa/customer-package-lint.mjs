@@ -16,6 +16,7 @@ const CUSTOMER_PACKAGES = Object.freeze({
 });
 
 const ALLOWED_MODES = Object.freeze(["validate", "compile", "preview", "activate", "rollback"]);
+const ALLOWED_MODULE_STATES = new Set(["enabled", "read_only", "disabled"]);
 
 function assert(condition, message) {
   if (!condition) {
@@ -76,6 +77,27 @@ function assertStringList(values, key) {
   assert(Array.isArray(values), `${key} must be an array`);
   assert(values.length > 0, `${key} must not be empty`);
   values.forEach((value, index) => assertNonEmptyString(value, `${key}[${index}]`));
+}
+
+function validateModuleStates(config, moduleKeys) {
+  if (config.moduleStates == null) {
+    return;
+  }
+  assert(Array.isArray(config.moduleStates), "moduleStates must be an array");
+  const seen = new Set();
+  config.moduleStates.forEach((item, index) => {
+    const path = `moduleStates[${index}]`;
+    assert(item && typeof item === "object" && !Array.isArray(item), `${path} must be an object`);
+    assertNonEmptyString(item.moduleKey, `${path}.moduleKey`);
+    assert(moduleKeys.has(item.moduleKey), `${path}.moduleKey contains unknown module ${item.moduleKey}`);
+    assert(!seen.has(item.moduleKey), `${path}.moduleKey must not be duplicated`);
+    seen.add(item.moduleKey);
+    assertNonEmptyString(item.state, `${path}.state`);
+    assert(ALLOWED_MODULE_STATES.has(item.state), `${path}.state must be enabled, read_only or disabled`);
+    if (item.state !== "enabled") {
+      assertNonEmptyString(item.reason, `${path}.reason`);
+    }
+  });
 }
 
 function assertNoForbiddenPayload(value, currentPath = "customerPackage") {
@@ -144,6 +166,8 @@ function validatePackage(config, catalog = customerPackageCatalog, schema = cust
   const workPoolKeys = toKeySet(catalog.workPools);
   const policyKeys = toKeySet(catalog.policies);
   const commandKeys = toKeySet(catalog.commands);
+
+  validateModuleStates(config, moduleKeys);
 
   assert(Array.isArray(config.workflows), "workflows must be an array");
   assert(config.workflows.length >= 3, "workflows must include the initial three preview workflows");

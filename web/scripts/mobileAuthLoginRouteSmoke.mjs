@@ -4,6 +4,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { setTimeout as delay } from 'node:timers/promises'
+import { pathToFileURL } from 'node:url'
 
 import { chromium } from 'playwright'
 import { RpcErrorCode } from '../src/common/consts/errorCodes.generated.js'
@@ -12,6 +13,9 @@ import { getRoleWorkbench } from '../src/erp/config/seedData.mjs'
 import { shouldLoadAllWorkflowTasksForRole } from '../src/erp/utils/mobileTaskQueries.mjs'
 
 const webDir = path.resolve(import.meta.dirname, '..')
+const repoRoot = path.resolve(webDir, '..')
+const INPUT_TEMPLATE_SCOPE = 'mobile-auth-login-route-smoke-input-template'
+const PREFLIGHT_SCOPE = 'mobile-auth-login-route-smoke-preflight-report'
 const outputDir = path.resolve(
   webDir,
   'output',
@@ -19,12 +23,14 @@ const outputDir = path.resolve(
   'mobile-auth-login-route-smoke'
 )
 const devServerPort = Number(process.env.MOBILE_AUTH_SMOKE_PORT || 4193)
-const externalBaseURL = String(
-  process.env.MOBILE_AUTH_SMOKE_BASE_URL || ''
-).trim()
-const baseURL = externalBaseURL || `http://127.0.0.1:${devServerPort}`
+const externalBaseURL = normalizeOptionalURL(
+  process.env.MOBILE_AUTH_SMOKE_BASE_URL || '',
+  'MOBILE_AUTH_SMOKE_BASE_URL'
+)
+const baseURL = externalBaseURL || `http://localhost:${devServerPort}`
 const legacyMultiAppMode =
   process.env.MOBILE_AUTH_SMOKE_LEGACY_MULTI_APP === '1'
+const useSharedDevServer = !externalBaseURL && !legacyMultiAppMode
 const headless = process.env.HEADED !== '1'
 const viewportProfiles = [
   {
@@ -42,19 +48,94 @@ const requestedAppIDs = String(process.env.MOBILE_AUTH_SMOKE_APP_ID || '')
   .split(',')
   .map((item) => item.trim())
   .filter(Boolean)
-const mobileApps = appDefinitions
-  .filter((app) => app.kind === 'mobile')
-  .filter(
-    (app) => requestedAppIDs.length === 0 || requestedAppIDs.includes(app.id)
-  )
+const allMobileApps = appDefinitions.filter((app) => app.kind === 'mobile')
+const mobileApps = allMobileApps.filter(
+  (app) => requestedAppIDs.length === 0 || requestedAppIDs.includes(app.id)
+)
+const cliArgs = process.argv.slice(2)
+const printInputTemplate = cliArgs.includes('--print-input-template')
+const printHelp = cliArgs.includes('-h') || cliArgs.includes('--help')
+const preflightReportPath = resolveOptionalPreflightReportPath(cliArgs)
 
-if (mobileApps.length === 0) {
+export function buildInputTemplate() {
+  return {
+    scope: INPUT_TEMPLATE_SCOPE,
+    writesDatabase: false,
+    callsBackend: false,
+    startsBrowser: false,
+    startsDevServer: false,
+    usesMockRpc: true,
+    viewportProfiles: viewportProfiles.map((item) => ({
+      id: item.id,
+      label: item.label,
+      viewport: item.viewport,
+    })),
+    roles: appDefinitions
+      .filter((app) => app.kind === 'mobile')
+      .map((app) => ({
+        appId: app.id,
+        roleKey: app.roleKey,
+        title: app.shortTitle,
+        taskPath: `/m/${app.roleKey}/tasks`,
+      })),
+    optionalInputs: [
+      {
+        key: 'MOBILE_AUTH_SMOKE_APP_ID',
+        requirement:
+          'Comma-separated mobile app ids for a subset run; omit to verify all mobile roles.',
+      },
+      {
+        key: 'MOBILE_AUTH_SMOKE_BASE_URL',
+        requirement:
+          'Optional existing frontend URL without username or password; when set, also set MOBILE_AUTH_SMOKE_APP_ID for one app.',
+      },
+      {
+        key: 'MOBILE_AUTH_SMOKE_PORT',
+        defaultValue: String(devServerPort),
+        requirement:
+          'Local Vite port used when MOBILE_AUTH_SMOKE_BASE_URL is omitted.',
+      },
+      {
+        key: 'MOBILE_AUTH_SMOKE_LEGACY_MULTI_APP',
+        defaultValue: '0',
+        requirement:
+          'Set to 1 only for legacy multi-app /tasks compatibility debugging.',
+      },
+      {
+        key: 'HEADED',
+        defaultValue: '0',
+        requirement: 'Set to 1 to run Playwright headed for local debugging.',
+      },
+    ],
+    commands: [
+      'PATH=/usr/local/bin:$PATH node web/scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template',
+      'PATH=/usr/local/bin:$PATH node web/scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json',
+      'PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-auth-login-route',
+      "MOBILE_AUTH_SMOKE_APP_ID='mobile-boss' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-auth-login-route",
+      "MOBILE_AUTH_SMOKE_APP_ID='mobile-boss' MOBILE_AUTH_SMOKE_BASE_URL='http://localhost:5175' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-auth-login-route",
+    ],
+    boundary:
+      'This template only prints mobile auth route smoke prerequisites. The preflight report only writes a local JSON route plan. Neither mode starts Vite, starts Playwright, calls a real backend, logs in to a real account, writes database rows, or proves real RBAC/customer-config active revision. The real smoke uses mocked auth/workflow RPC responses to verify mobile route guards, login return paths, task UI, notifications, logout, phone/iPad layout, and production single-port /m/<role>/tasks routing.',
+  }
+}
+
+if (
+  !printInputTemplate &&
+  !printHelp &&
+  !preflightReportPath &&
+  mobileApps.length === 0
+) {
   throw new Error(
     `未找到要验证的移动端应用：${requestedAppIDs.join(', ') || '(empty)'}`
   )
 }
 
-if (externalBaseURL && mobileApps.length > 1) {
+if (
+  !printInputTemplate &&
+  !printHelp &&
+  externalBaseURL &&
+  mobileApps.length > 1
+) {
   throw new Error(
     'MOBILE_AUTH_SMOKE_BASE_URL 只适合验证单个已启动入口；请同时设置 MOBILE_AUTH_SMOKE_APP_ID。'
   )
@@ -66,10 +147,18 @@ let devServerLogs = ''
 async function main() {
   await fs.mkdir(outputDir, { recursive: true })
 
-  const browser = await chromium.launch({ headless })
+  const browser = await chromium.launch({
+    headless,
+    args: ['--no-proxy-server'],
+  })
   const verifiedApps = []
 
   try {
+    if (useSharedDevServer) {
+      devServerLogs = ''
+      devServerProcess = startDevServer(mobileApps[0])
+      await waitForServer(baseURL, mobileApps[0])
+    }
     for (const app of mobileApps) {
       const role = getRoleWorkbench(app.roleKey)
       assert(role, `${app.id} 缺少角色工作台配置：${app.roleKey}`)
@@ -79,6 +168,9 @@ async function main() {
     }
   } finally {
     await browser.close()
+    if (useSharedDevServer) {
+      await stopDevServer()
+    }
   }
 
   console.log(
@@ -91,17 +183,31 @@ async function runMobileAppScenario(browser, { app }) {
   const appBaseURL = baseURL
 
   try {
-    if (!externalBaseURL) {
+    if (!externalBaseURL && !useSharedDevServer) {
       devServerProcess = startDevServer(app)
       await waitForServer(appBaseURL, app)
+    } else if (useSharedDevServer) {
+      await ensureDevServer(appBaseURL, app)
     }
 
     for (const viewportProfile of viewportProfiles) {
+      if (useSharedDevServer) {
+        await ensureDevServer(appBaseURL, app)
+      }
       const context = await browser.newContext({
         viewport: viewportProfile.viewport,
       })
       try {
         const page = await context.newPage()
+        page._mobileAuthDiagnostics = []
+        page.on('console', (message) => {
+          page._mobileAuthDiagnostics.push(
+            `[console:${message.type()}] ${message.text()}`
+          )
+        })
+        page.on('pageerror', (error) => {
+          page._mobileAuthDiagnostics.push(`[pageerror] ${error.message}`)
+        })
         await runMobileAuthScenario(page, {
           app,
           appBaseURL,
@@ -119,7 +225,9 @@ async function runMobileAppScenario(browser, { app }) {
       }
     }
   } finally {
-    await stopDevServer()
+    if (!externalBaseURL && !useSharedDevServer) {
+      await stopDevServer()
+    }
   }
 }
 
@@ -135,7 +243,7 @@ function startDevServer(app) {
       '--config',
       viteConfig,
       '--host',
-      '127.0.0.1',
+      'localhost',
       '--port',
       String(devServerPort),
       '--strictPort',
@@ -203,6 +311,15 @@ async function waitForServer(url, app) {
   throw new Error(
     `[mobile-auth-login-route-smoke] 无法启动 ${app.id} 预览：${lastError}\n最近 vite 输出：\n${tailLogs(devServerLogs)}`
   )
+}
+
+async function ensureDevServer(url, app) {
+  if (externalBaseURL) return
+  if (!devServerProcess || devServerProcess.exitCode !== null) {
+    devServerLogs += `\n[mobile-auth-login-route-smoke] restarting vite for ${app.id}`
+    devServerProcess = startDevServer(app)
+  }
+  await waitForServer(url, app)
 }
 
 async function runMobileAuthScenario(
@@ -495,6 +612,12 @@ async function runMobileAuthScenario(
     })
   })
 
+  await resetAuthStorage(page, appBaseURL)
+  assert.equal(
+    await page.evaluate(() => localStorage.getItem('admin_access_token')),
+    null,
+    `${app.id} 未登录路径前应清空管理员 token`
+  )
   await page.goto(new URL(tasksPath, `${appBaseURL}/`).toString(), {
     waitUntil: 'domcontentloaded',
   })
@@ -771,6 +894,33 @@ async function captureTextsAfterNavigation(page, navigateAction) {
   return samples.join('\n---sample---\n')
 }
 
+async function resetAuthStorage(page, appBaseURL) {
+  const loginURL = new URL('/admin-login', `${appBaseURL}/`).toString()
+  let lastError = null
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await page.goto(loginURL, { waitUntil: 'domcontentloaded' })
+      lastError = null
+      break
+    } catch (error) {
+      lastError = error
+      if (useSharedDevServer) {
+        await ensureDevServer(appBaseURL, { id: 'shared-vite' })
+      }
+      await delay(300 * attempt)
+    }
+  }
+  if (lastError) {
+    throw new Error(
+      `[mobile-auth-login-route-smoke] 无法打开登录页清理登录态：${lastError.message}\n最近 vite 输出：\n${tailLogs(devServerLogs)}`
+    )
+  }
+  await page.evaluate(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+  })
+}
+
 async function waitForPath(page, expectedPath) {
   const deadline = Date.now() + 10_000
   while (Date.now() < deadline) {
@@ -779,7 +929,25 @@ async function waitForPath(page, expectedPath) {
     }
     await delay(100)
   }
-  assert.equal(new URL(page.url()).pathname, expectedPath)
+  const diagnostics = await page
+    .evaluate(() => ({
+      path: window.location.pathname,
+      href: window.location.href,
+      title: document.title,
+      bodyText: String(document.body?.innerText || '').slice(0, 1200),
+      storageKeys: Object.keys(localStorage).sort(),
+      adminTokenPresent: Boolean(localStorage.getItem('admin_access_token')),
+      userTokenPresent: Boolean(localStorage.getItem('user_access_token')),
+    }))
+    .catch((error) => ({ error: error.message }))
+  diagnostics.browserLogs = Array.isArray(page._mobileAuthDiagnostics)
+    ? page._mobileAuthDiagnostics.slice(-20)
+    : []
+  assert.equal(
+    new URL(page.url()).pathname,
+    expectedPath,
+    `等待路由 ${expectedPath} 超时：${JSON.stringify(diagnostics)}`
+  )
 }
 
 function createMockAdminToken(username) {
@@ -822,7 +990,205 @@ function tailLogs(logs, maxLength = 4000) {
   return normalized.slice(-maxLength)
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exitCode = 1
-})
+export function normalizeOptionalURL(raw, label) {
+  const value = String(raw || '').trim()
+  if (!value) {
+    return ''
+  }
+  const url = new URL(value)
+  if (url.username || url.password) {
+    throw new Error(`${label} must not contain username or password`)
+  }
+  return value
+}
+
+export async function buildPreflightReport() {
+  const scriptPath = path.resolve(
+    import.meta.dirname,
+    'mobileAuthLoginRouteSmoke.mjs'
+  )
+  const scriptSource = await fs
+    .stat(scriptPath)
+    .then((stats) => ({
+      path: path.relative(repoRoot, scriptPath),
+      exists: true,
+      size: stats.size,
+    }))
+    .catch((error) => ({
+      path: path.relative(repoRoot, scriptPath),
+      exists: false,
+      size: 0,
+      error: String(error?.message || error),
+    }))
+  const invalidRequestedAppIDs = requestedAppIDs.filter(
+    (appID) => !allMobileApps.some((app) => app.id === appID)
+  )
+  const selectedApps = mobileApps
+  const routePlan = selectedApps.map((app) => ({
+    appId: app.id,
+    roleKey: app.roleKey,
+    title: app.shortTitle,
+    taskPath: `/m/${app.roleKey}/tasks`,
+    roleRootPath: `/m/${app.roleKey}`,
+    guidePath: `/m/${app.roleKey}/guide`,
+  }))
+  const routeCoverage = {
+    totalMobileRoleCount: allMobileApps.length,
+    selectedRoleCount: selectedApps.length,
+    requestedAppIDs,
+    invalidRequestedAppIDs,
+    coversAllRolesByDefault:
+      requestedAppIDs.length === 0 &&
+      selectedApps.length === allMobileApps.length,
+    hasRoutePathPerSelectedRole:
+      selectedApps.length > 0 &&
+      routePlan.every((item) => item.taskPath === `/m/${item.roleKey}/tasks`),
+    coversPhoneAndIpad:
+      viewportProfiles.some((item) => item.id === 'phone') &&
+      viewportProfiles.some((item) => item.id === 'ipad'),
+    validatesUnauthedRedirect: true,
+    validatesStaleMobileMetadataRedirect: true,
+    validatesPasswordAndSmsLoginReturn: true,
+    validatesWorkflowOwnerRoleQuery: true,
+    validatesNotificationsAndWarnings: true,
+    validatesLogoutAndBackNavigation: true,
+    validatesNoHorizontalOverflow: true,
+    validatesProductionSinglePortRolePaths: !legacyMultiAppMode,
+    usesMockRpcOnly: true,
+  }
+  const blockers = []
+  if (!scriptSource.exists) blockers.push('missing-mobile-auth-smoke-script')
+  if (invalidRequestedAppIDs.length > 0) blockers.push('unknown-mobile-app-id')
+  if (selectedApps.length === 0) blockers.push('no-mobile-apps-selected')
+  if (!routeCoverage.hasRoutePathPerSelectedRole) {
+    blockers.push('mobile-auth-route-plan-incomplete')
+  }
+  if (!routeCoverage.coversPhoneAndIpad) {
+    blockers.push('mobile-auth-viewport-plan-incomplete')
+  }
+  if (legacyMultiAppMode) {
+    blockers.push('legacy-multi-app-mode-not-production-route')
+  }
+
+  return {
+    scope: PREFLIGHT_SCOPE,
+    generatedAt: new Date().toISOString(),
+    writesDatabase: false,
+    callsBackend: false,
+    callsJSONRPC: false,
+    startsBrowser: false,
+    startsDevServer: false,
+    usesMockRpc: true,
+    readsPasswordValue: false,
+    storesPasswordValue: false,
+    storesAccessToken: false,
+    storesAuthorizationHeader: false,
+    externalBaseURLConfigured: Boolean(externalBaseURL),
+    legacyMultiAppMode,
+    scriptSource,
+    viewportProfiles: viewportProfiles.map((item) => ({
+      id: item.id,
+      label: item.label,
+      viewport: item.viewport,
+    })),
+    routePlan,
+    routeCoverage,
+    readyForMockSmoke: blockers.length === 0,
+    blockers,
+    nextCommand: blockers.length
+      ? 'Resolve blockers, then rerun this preflight before mobile auth route smoke.'
+      : 'PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-auth-login-route',
+    boundary:
+      'This preflight writes only a local JSON route plan. It does not start Vite, start Playwright, call a backend, call JSON-RPC, log in to a real account, read password values, store tokens, write database rows, or prove real RBAC/customer-config active revision.',
+  }
+}
+
+function resolveOptionalPreflightReportPath(tokens) {
+  let reportPath = ''
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index]
+    if (
+      token === '--print-input-template' ||
+      token === '-h' ||
+      token === '--help'
+    ) {
+      continue
+    }
+    if (token === '--preflight-report') {
+      const value = tokens[index + 1]
+      if (!value || value.startsWith('--')) {
+        throw new Error('参数 --preflight-report 缺少值')
+      }
+      reportPath = value
+      index += 1
+      continue
+    }
+    if (token.startsWith('--preflight-report=')) {
+      reportPath = token.slice('--preflight-report='.length)
+      if (!reportPath) {
+        throw new Error('参数 --preflight-report 缺少值')
+      }
+      continue
+    }
+    if (token.startsWith('--')) {
+      throw new Error(`未知参数：${token}`)
+    }
+  }
+  if (!reportPath) return ''
+  const resolved = path.resolve(repoRoot, reportPath)
+  const relative = path.relative(repoRoot, resolved)
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error('--preflight-report must stay inside the repository')
+  }
+  return resolved
+}
+
+async function writeJSONReport(filePath, payload) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true })
+  await fs.writeFile(`${filePath}.tmp`, `${JSON.stringify(payload, null, 2)}\n`)
+  await fs.rename(`${filePath}.tmp`, filePath)
+}
+
+async function runCli() {
+  if (printInputTemplate) {
+    console.log(JSON.stringify(buildInputTemplate(), null, 2))
+    return
+  }
+  if (preflightReportPath) {
+    const report = await buildPreflightReport()
+    await writeJSONReport(preflightReportPath, report)
+    console.log(
+      `[mobile-auth-login-route-smoke] preflight written: ${path.relative(repoRoot, preflightReportPath)}`
+    )
+    if (report.blockers.length > 0) {
+      console.log(
+        `[mobile-auth-login-route-smoke] blockers: ${report.blockers.join(', ')}`
+      )
+    }
+    return
+  }
+  if (printHelp) {
+    console.log(
+      [
+        'Usage:',
+        '  node web/scripts/mobileAuthLoginRouteSmoke.mjs',
+        '  node web/scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template',
+        '  node web/scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json',
+        '',
+        'The default command starts a local Vite server and Playwright with mocked auth/workflow RPC. The preflight report only writes a local no-write route plan.',
+      ].join('\n')
+    )
+    return
+  }
+  await main()
+}
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  runCli().catch((error) => {
+    console.error(error)
+    process.exitCode = 1
+  })
+}

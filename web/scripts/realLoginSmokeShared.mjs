@@ -4,6 +4,57 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { setTimeout as delay } from 'node:timers/promises'
+import { pathToFileURL } from 'node:url'
+
+const INPUT_TEMPLATE_SCOPE = 'real-login-smoke-shared-input-template'
+const PREFLIGHT_SCOPE = 'real-login-smoke-shared-preflight-report'
+const scriptDir = import.meta.dirname
+const webDir = path.resolve(scriptDir, '..')
+const repoDir = path.resolve(webDir, '..')
+
+export function buildRealLoginSmokeInputTemplate({ defaultPort = 4174 } = {}) {
+  return {
+    scope: INPUT_TEMPLATE_SCOPE,
+    writesDatabase: false,
+    callsBackend: false,
+    startsBrowser: false,
+    readsLocalConfig: false,
+    defaultPort,
+    secretInputs: [
+      'REAL_LOGIN_ADMIN_USERNAME/REAL_LOGIN_ADMIN_PASSWORD or server/configs/dev/config.local.yaml admin credentials',
+    ],
+    requiredInputs: [
+      {
+        key: 'REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL',
+        defaultValue: 'http://127.0.0.1:8300/healthz',
+        requirement: 'Backend health URL without username or password.',
+      },
+      {
+        key: 'REAL_LOGIN_SMOKE_BASE_URL',
+        defaultValue: `http://127.0.0.1:${defaultPort}`,
+        requirement:
+          'Optional existing frontend URL without username or password; omit to let the smoke start a local Vite server.',
+      },
+      {
+        key: 'REAL_LOGIN_ADMIN_USERNAME/REAL_LOGIN_ADMIN_PASSWORD',
+        requirement:
+          'Local development admin credentials; if omitted, real smoke may read server/configs/dev/config.local.yaml or config.yaml.',
+        secret: true,
+      },
+    ],
+    commands: [
+      'PATH=/usr/local/bin:$PATH node web/scripts/realLoginSmokeShared.mjs --print-input-template',
+      'PATH=/usr/local/bin:$PATH node web/scripts/realLoginSmokeShared.mjs --preflight-report output/real-login-smoke-shared/preflight.json',
+      'PATH=/usr/local/bin:$PATH node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template',
+      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-contract-real-login",
+      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:processing-contract-real-login",
+      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-auth-login-route",
+      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PURCHASE_RECEIPT_E2E_ACCEPT_PERSISTENT_TEST_DATA=1 PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-receipt-real-write",
+    ],
+    boundary:
+      'This template only prints shared real-login smoke prerequisites. The preflight report probes backend health and credential-source presence without reading config contents or validating credentials. Neither mode calls auth endpoints, starts Vite, starts Playwright, logs in, writes database rows, or proves contract/mobile/purchase receipt browser behavior. Downstream smoke scripts define their own write boundary; purchase-receipt-real-write persists local/development test facts and requires explicit acceptance.',
+  }
+}
 
 export function createRealLoginSmokeRuntime({
   scriptDir,
@@ -15,14 +66,17 @@ export function createRealLoginSmokeRuntime({
   const serverDir = path.resolve(repoDir, 'server')
   const outputDir = path.resolve(webDir, 'output', 'playwright', outputSubdir)
   const devServerPort = Number(process.env.REAL_LOGIN_SMOKE_PORT || defaultPort)
-  const externalBaseURL = String(
-    process.env.REAL_LOGIN_SMOKE_BASE_URL || ''
-  ).trim()
+  const externalBaseURL = normalizeSmokeURL({
+    raw: process.env.REAL_LOGIN_SMOKE_BASE_URL,
+    label: 'REAL_LOGIN_SMOKE_BASE_URL',
+    fallback: '',
+  })
   const baseURL = externalBaseURL || `http://127.0.0.1:${devServerPort}`
-  const backendHealthURL = String(
-    process.env.REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL ||
-      'http://127.0.0.1:8300/healthz'
-  ).trim()
+  const backendHealthURL = normalizeSmokeURL({
+    raw: process.env.REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL,
+    label: 'REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL',
+    fallback: 'http://127.0.0.1:8300/healthz',
+  })
   const backendAuthURL = new URL('/rpc/auth', backendHealthURL).toString()
   const headless = process.env.REAL_LOGIN_SMOKE_HEADED !== '1'
 
@@ -73,6 +127,121 @@ export function createRealLoginSmokeRuntime({
     prepare,
     cleanup,
   }
+}
+
+export async function buildRealLoginSmokePreflightReport({
+  defaultPort = 4174,
+} = {}) {
+  const serverDir = path.resolve(repoDir, 'server')
+  const backendHealthURL = normalizeSmokeURL({
+    raw: process.env.REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL,
+    label: 'REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL',
+    fallback: 'http://127.0.0.1:8300/healthz',
+  })
+  const externalBaseURL = normalizeSmokeURL({
+    raw: process.env.REAL_LOGIN_SMOKE_BASE_URL,
+    label: 'REAL_LOGIN_SMOKE_BASE_URL',
+    fallback: '',
+  })
+  const devServerPort = Number(process.env.REAL_LOGIN_SMOKE_PORT || defaultPort)
+  const baseURL = externalBaseURL || `http://127.0.0.1:${devServerPort}`
+  const credentialEnvPresent = Boolean(
+    String(process.env.REAL_LOGIN_ADMIN_USERNAME || '').trim() &&
+      String(process.env.REAL_LOGIN_ADMIN_PASSWORD || '').trim()
+  )
+  const configCandidates = await Promise.all(
+    [
+      path.resolve(serverDir, 'configs', 'dev', 'config.local.yaml'),
+      path.resolve(serverDir, 'configs', 'dev', 'config.yaml'),
+    ].map(async (configPath) =>
+      fs
+        .stat(configPath)
+        .then((stats) => ({
+          path: path.relative(repoDir, configPath),
+          exists: true,
+          size: stats.size,
+        }))
+        .catch((error) => ({
+          path: path.relative(repoDir, configPath),
+          exists: false,
+          size: 0,
+          error:
+            error?.code === 'ENOENT' ? '' : String(error?.message || error),
+        }))
+    )
+  )
+  const backendHealth = await probeBackendHealth(backendHealthURL)
+  const blockers = []
+
+  if (!backendHealth.ok) {
+    blockers.push('backend-health-unreachable')
+  }
+  if (!credentialEnvPresent && !configCandidates.some((item) => item.exists)) {
+    blockers.push('missing-admin-credential-source')
+  }
+
+  return {
+    scope: PREFLIGHT_SCOPE,
+    generatedAt: new Date().toISOString(),
+    writesDatabase: false,
+    startsBrowser: false,
+    startsDevServer: false,
+    callsBackendHealth: true,
+    callsAuthEndpoint: false,
+    callsJSONRPCAuth: false,
+    validatesCredentials: false,
+    readsLocalConfig: false,
+    readsPasswordValue: false,
+    storesPasswordValue: false,
+    storesAccessToken: false,
+    storesAuthorizationHeader: false,
+    backendHealthURL,
+    backendHealth,
+    baseURL,
+    externalBaseURLConfigured: Boolean(externalBaseURL),
+    credentialEnvPresent,
+    presentCredentialEnvNames: credentialEnvPresent
+      ? ['REAL_LOGIN_ADMIN_USERNAME', 'REAL_LOGIN_ADMIN_PASSWORD']
+      : [],
+    configCredentialCandidates: configCandidates,
+    readyForCredentialedSmokeCandidate: blockers.length === 0,
+    blockers,
+    nextCommand: blockers.length
+      ? 'Resolve blockers, then rerun this preflight before real login smoke.'
+      : 'PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-contract-real-login',
+    boundary:
+      'This preflight only probes backend health and credential-source presence. It does not read config contents, read password values, validate credentials, call auth JSON-RPC, start Vite, start Playwright, log in, write database rows, or prove downstream browser smoke behavior.',
+  }
+}
+
+async function probeBackendHealth(backendHealthURL) {
+  try {
+    const response = await fetch(backendHealthURL, { redirect: 'manual' })
+    return {
+      ok: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      statusText: '',
+      error: String(error?.message || error),
+    }
+  }
+}
+
+function normalizeSmokeURL({ raw, label, fallback }) {
+  const value = String(raw || fallback || '').trim()
+  if (!value) {
+    return ''
+  }
+  const url = new URL(value)
+  if (url.username || url.password) {
+    throw new Error(`${label} must not contain username or password`)
+  }
+  return value
 }
 
 export function attachErrorCollectors(page) {
@@ -319,6 +488,99 @@ function startDevServer({ webDir, devServerPort, onLog }) {
   })
 
   return child
+}
+
+async function runCli() {
+  const args = process.argv.slice(2)
+  if (args.includes('--print-input-template')) {
+    console.log(JSON.stringify(buildRealLoginSmokeInputTemplate(), null, 2))
+    return
+  }
+  const preflightReportPath = resolveOptionalReportPath(args)
+  if (preflightReportPath) {
+    const report = await buildRealLoginSmokePreflightReport()
+    await writeJSONReport(preflightReportPath, report)
+    console.log(
+      `[real-login-smoke-shared] preflight written: ${path.relative(repoDir, preflightReportPath)}`
+    )
+    if (report.blockers.length > 0) {
+      console.log(
+        `[real-login-smoke-shared] blockers: ${report.blockers.join(', ')}`
+      )
+    }
+    return
+  }
+  if (args.includes('-h') || args.includes('--help')) {
+    console.log(
+      [
+        'Usage:',
+        '  node web/scripts/realLoginSmokeShared.mjs --print-input-template',
+        '  node web/scripts/realLoginSmokeShared.mjs --preflight-report output/real-login-smoke-shared/preflight.json',
+        '',
+        'This shared helper is normally imported by real login smoke scripts. The preflight report probes only backend health and credential-source presence.',
+      ].join('\n')
+    )
+    return
+  }
+  throw new Error(
+    'realLoginSmokeShared.mjs is a shared helper. Use --print-input-template or run a concrete pnpm smoke:* script.'
+  )
+}
+
+function resolveOptionalReportPath(args) {
+  let reportPath = ''
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index]
+    if (
+      token === '--print-input-template' ||
+      token === '-h' ||
+      token === '--help'
+    ) {
+      continue
+    }
+    if (token === '--preflight-report') {
+      const value = args[index + 1]
+      if (!value || value.startsWith('--')) {
+        throw new Error('参数 --preflight-report 缺少值')
+      }
+      reportPath = value
+      index += 1
+      continue
+    }
+    if (token.startsWith('--preflight-report=')) {
+      reportPath = token.slice('--preflight-report='.length)
+      if (!reportPath) {
+        throw new Error('参数 --preflight-report 缺少值')
+      }
+      continue
+    }
+    if (token.startsWith('--')) {
+      throw new Error(`未知参数：${token}`)
+    }
+  }
+  if (!reportPath) return ''
+  const resolved = path.resolve(repoDir, reportPath)
+  const relative = path.relative(repoDir, resolved)
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error('--preflight-report must stay inside the repository')
+  }
+  return resolved
+}
+
+async function writeJSONReport(filePath, data) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true })
+  await fs.writeFile(`${filePath}.tmp`, `${JSON.stringify(data, null, 2)}\n`)
+  await fs.rename(`${filePath}.tmp`, filePath)
+}
+
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  runCli().catch((error) => {
+    console.error(error?.message || error)
+    process.exit(1)
+  })
 }
 
 async function waitForServer(url, readLogs, smokeName) {

@@ -1,12 +1,5 @@
 export function createPurchaseReceiptAssertions(deps) {
-  const {
-    assert,
-    path,
-    outputDir,
-    assertAntdModalCentered,
-    assertThemeReadable,
-    expectText,
-  } = deps
+  const { assert, path, outputDir, assertThemeReadable, expectText } = deps
 
   async function selectPurchaseReceiptRow(page, receiptNo) {
     const row = page
@@ -23,8 +16,12 @@ export function createPurchaseReceiptAssertions(deps) {
     page,
     { name, disabled, scenarioName }
   ) {
-    const button = page
-      .locator('.erp-business-selection-action-bar__actions button')
+    const buttonScope =
+      name === '添加明细'
+        ? page.locator('.erp-purchase-receipt-inline-item-panel')
+        : page.locator('.erp-business-selection-action-bar__actions')
+    const button = buttonScope
+      .locator('button')
       .filter({ hasText: name })
       .first()
     await button.waitFor({ state: 'visible', timeout: 10_000 })
@@ -68,76 +65,73 @@ export function createPurchaseReceiptAssertions(deps) {
     )
   }
 
-  async function openPurchaseReceiptAddItemModal(page) {
+  async function openPurchaseReceiptAddItemEditor(page) {
     await page
-      .locator('.erp-business-selection-action-bar__actions button')
+      .locator('.erp-purchase-receipt-inline-item-panel button')
       .filter({ hasText: '添加明细' })
       .first()
       .click()
-    const modal = page
-      .locator('.erp-business-action-modal--form.ant-modal:visible')
-      .filter({ hasText: '添加入库明细' })
-      .last()
-    await modal.waitFor({ state: 'visible', timeout: 10_000 })
-    await assertAntdModalCentered(
-      page,
-      modal,
-      'purchase-receipt-add-item-modal-open'
-    )
-    return modal
+    const editor = page.locator('.erp-purchase-receipt-inline-item-editor')
+    await editor.waitFor({ state: 'visible', timeout: 10_000 })
+    await editor.scrollIntoViewIfNeeded()
+    return editor
   }
 
-  async function fillPurchaseReceiptAddItemModalBoundaryValues(page, modal) {
-    await choosePurchaseReceiptAddItemModalOption(
+  async function fillPurchaseReceiptAddItemEditorBoundaryValues(page, editor) {
+    await choosePurchaseReceiptAddItemEditorOption(
       page,
-      modal,
+      editor,
       '材料',
       'MAT-STYLE-L1'
     )
-    await choosePurchaseReceiptAddItemModalOption(
+    await choosePurchaseReceiptAddItemEditorOption(
       page,
-      modal,
+      editor,
       '仓库',
       'WH-STYLE-L1'
     )
-    await choosePurchaseReceiptAddItemModalOption(page, modal, '单位', 'PCS')
-    await fillPurchaseReceiptAddItemModalField(
-      modal,
+    await choosePurchaseReceiptAddItemEditorOption(page, editor, '单位', 'PCS')
+    await fillPurchaseReceiptAddItemEditorField(
+      editor,
       '入库数量',
       '2345678901.1234'
     )
-    await choosePurchaseReceiptAddItemModalOption(
+    await choosePurchaseReceiptAddItemEditorOption(
       page,
-      modal,
+      editor,
       '批次',
       'INV-LOT-001'
     )
-    await fillPurchaseReceiptAddItemModalField(
-      modal,
+    await fillPurchaseReceiptAddItemEditorField(
+      editor,
       '批次号',
       'ADD-L1-LOT-ABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789'
     )
-    await fillPurchaseReceiptAddItemModalField(
-      modal,
+    await fillPurchaseReceiptAddItemEditorField(
+      editor,
       '来源行号',
       'ADD-L1-SOURCE-LINE-ABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789'
     )
-    await fillPurchaseReceiptAddItemModalField(modal, '单价', '88888888.1234')
-    await fillPurchaseReceiptAddItemModalField(modal, '金额', '234567890123.45')
-    await fillPurchaseReceiptAddItemModalField(
-      modal,
+    await fillPurchaseReceiptAddItemEditorField(editor, '单价', '88888888.1234')
+    await fillPurchaseReceiptAddItemEditorField(
+      editor,
+      '金额',
+      '234567890123.45'
+    )
+    await fillPurchaseReceiptAddItemEditorField(
+      editor,
       '备注',
-      '添加入库明细 L1 长备注 ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789，验证单行弹窗不伪装批量维护。'
+      '添加入库明细 L1 长备注 ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789，验证内联编辑区不伪装批量维护。'
     )
   }
 
-  async function choosePurchaseReceiptAddItemModalOption(
+  async function choosePurchaseReceiptAddItemEditorOption(
     page,
-    modal,
+    editor,
     label,
     optionText
   ) {
-    const field = purchaseReceiptAddItemModalField(modal, label)
+    const field = purchaseReceiptAddItemEditorField(editor, label)
     await field.locator('.ant-select-selector').click()
     const searchInput = field.locator('.ant-select-selection-search-input')
     await searchInput.fill(optionText)
@@ -151,30 +145,31 @@ export function createPurchaseReceiptAssertions(deps) {
       .click()
   }
 
-  async function fillPurchaseReceiptAddItemModalField(modal, label, value) {
-    const field = purchaseReceiptAddItemModalField(modal, label)
+  async function fillPurchaseReceiptAddItemEditorField(editor, label, value) {
+    const field = purchaseReceiptAddItemEditorField(editor, label)
     await field.locator('input,textarea').first().fill(value)
   }
 
-  function purchaseReceiptAddItemModalField(modal, label) {
-    return modal
+  function purchaseReceiptAddItemEditorField(editor, label) {
+    return editor
       .locator('.erp-business-action-form .ant-form-item')
       .filter({ hasText: label })
       .first()
   }
 
-  async function assertPurchaseReceiptAddItemModalMetrics(
+  async function assertPurchaseReceiptAddItemEditorMetrics(
     page,
-    modal,
+    editor,
     { scenarioName }
   ) {
-    await modal
+    await editor
       .locator('.erp-business-action-form .ant-form-item')
       .nth(9)
       .waitFor({ state: 'visible', timeout: 10_000 })
-    const metrics = await modal.evaluate((node) => {
-      const body = node.querySelector('.ant-modal-body')
-      const footer = node.querySelector('.ant-modal-footer')
+    const metrics = await editor.evaluate((node) => {
+      const footer = node.querySelector(
+        '.erp-purchase-receipt-inline-item-editor__footer'
+      )
       const form = node.querySelector('.erp-business-action-form')
       const fields = Array.from(
         node.querySelectorAll('.erp-business-action-form .ant-form-item')
@@ -192,25 +187,43 @@ export function createPurchaseReceiptAssertions(deps) {
           controlScrollWidth: control?.scrollWidth || 0,
         }
       })
-      const modalRect = node.getBoundingClientRect()
+      const editorRect = node.getBoundingClientRect()
+      const visibleBusinessModals = Array.from(
+        document.querySelectorAll('.erp-business-action-modal--form.ant-modal')
+      ).filter((modal) => {
+        const rect = modal.getBoundingClientRect()
+        const style = window.getComputedStyle(modal)
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        )
+      })
+      const visibleMasks = Array.from(
+        document.querySelectorAll('.ant-modal-root .ant-modal-mask')
+      ).filter((mask) => {
+        const rect = mask.getBoundingClientRect()
+        const style = window.getComputedStyle(mask)
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        )
+      })
       return {
         viewportWidth: window.innerWidth,
         viewportHeight: window.innerHeight,
-        modal: {
-          left: modalRect.left,
-          right: modalRect.right,
-          top: modalRect.top,
-          bottom: modalRect.bottom,
-          width: modalRect.width,
+        editor: {
+          left: editorRect.left,
+          right: editorRect.right,
+          top: editorRect.top,
+          bottom: editorRect.bottom,
+          width: editorRect.width,
+          clientWidth: node.clientWidth,
+          scrollWidth: node.scrollWidth,
         },
-        body: body
-          ? {
-              clientWidth: body.clientWidth,
-              scrollWidth: body.scrollWidth,
-              clientHeight: body.clientHeight,
-              scrollHeight: body.scrollHeight,
-            }
-          : null,
         form: form
           ? {
               clientWidth: form.clientWidth,
@@ -221,6 +234,9 @@ export function createPurchaseReceiptAssertions(deps) {
           (button) => button.textContent?.replace(/\s+/g, '').trim() || ''
         ),
         fields,
+        visibleBusinessModalCount: visibleBusinessModals.length,
+        visibleMaskCount: visibleMasks.length,
+        focusInside: node.contains(document.activeElement),
         visibleErrors: Array.from(
           node.querySelectorAll('.ant-form-item-explain-error')
         )
@@ -242,15 +258,20 @@ export function createPurchaseReceiptAssertions(deps) {
     })
 
     assert(
-      metrics.modal.left >= 0 &&
-        metrics.modal.right <= metrics.viewportWidth + 1 &&
-        metrics.modal.top >= 0 &&
-        metrics.modal.bottom <= metrics.viewportHeight + 1,
-      `${scenarioName} 添加明细弹窗未稳定限制在视口内: ${JSON.stringify(metrics)}`
+      metrics.editor.left >= 0 &&
+        metrics.editor.right <= metrics.viewportWidth + 1 &&
+        metrics.editor.scrollWidth <= metrics.editor.clientWidth + 1,
+      `${scenarioName} 添加明细内联编辑区未稳定限制在视口内: ${JSON.stringify(metrics)}`
     )
-    assert(
-      metrics.body && metrics.body.scrollWidth <= metrics.body.clientWidth + 1,
-      `${scenarioName} 添加明细弹窗 body 出现横向溢出: ${JSON.stringify(metrics)}`
+    assert.equal(
+      metrics.visibleBusinessModalCount,
+      0,
+      `${scenarioName} 添加明细不应再打开业务表单弹窗: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.visibleMaskCount,
+      0,
+      `${scenarioName} 添加明细内联编辑不应新增 modal mask: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.form && metrics.form.scrollWidth <= metrics.form.clientWidth + 1,
@@ -263,17 +284,17 @@ export function createPurchaseReceiptAssertions(deps) {
     )
     assert(
       metrics.footerButtons.includes('添加明细') &&
-        metrics.footerButtons.includes('关闭'),
-      `${scenarioName} 添加明细弹窗底部操作区缺失: ${JSON.stringify(metrics)}`
+        metrics.footerButtons.includes('取消'),
+      `${scenarioName} 添加明细内联编辑底部操作区缺失: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.fields.length >= 10 &&
         metrics.fields.every(
           (field) =>
-            field.width >= 220 &&
+            field.width >= 110 &&
             field.scrollWidth <= field.width + 2 &&
             field.controlWidth <= field.width + 2 &&
-            field.controlScrollWidth <= field.controlWidth + 280
+            field.controlScrollWidth <= field.controlWidth + 320
         ),
       `${scenarioName} 长文本或宽数字撑开了添加明细字段: ${JSON.stringify(metrics)}`
     )
@@ -282,24 +303,25 @@ export function createPurchaseReceiptAssertions(deps) {
       `${scenarioName} 填充后仍残留必填校验错误: ${JSON.stringify(metrics)}`
     )
 
-    await modal.screenshot({
+    await editor.screenshot({
       path: path.resolve(outputDir, `${scenarioName}.png`),
     })
   }
 
-  async function assertPurchaseReceiptAddItemModalDarkTokens(
+  async function assertPurchaseReceiptAddItemEditorDarkTokens(
     page,
-    modal,
+    editor,
     { scenarioName }
   ) {
-    const metrics = await modal.evaluate((node) => {
-      const content = node.querySelector('.ant-modal-content')
-      const header = node.querySelector('.ant-modal-header')
-      const body = node.querySelector('.ant-modal-body')
-      const footer = node.querySelector('.ant-modal-footer')
-      const title = node.querySelector('.erp-business-action-modal__title span')
+    const metrics = await editor.evaluate((node) => {
+      const head = node.querySelector(
+        '.erp-purchase-receipt-inline-item-editor__head'
+      )
+      const title = node.querySelector(
+        '.erp-purchase-receipt-inline-item-editor__head strong'
+      )
       const subtitle = node.querySelector(
-        '.erp-business-action-modal__title small'
+        '.erp-purchase-receipt-inline-item-editor__head span'
       )
       const form = node.querySelector('.erp-business-action-form')
       const input = node.querySelector('input.ant-input')
@@ -316,10 +338,8 @@ export function createPurchaseReceiptAssertions(deps) {
       }
       return {
         rootTheme: document.documentElement.dataset.erpTheme || '',
-        content: read(content),
-        header: read(header),
-        body: read(body),
-        footer: read(footer),
+        editor: read(node),
+        head: read(head),
         title: read(title),
         subtitle: read(subtitle),
         form: read(form),
@@ -345,24 +365,23 @@ export function createPurchaseReceiptAssertions(deps) {
     }
     await assertThemeReadable(page, {
       scenarioName,
-      selector: '.erp-business-action-modal--form .ant-modal-content',
+      selector: '.erp-purchase-receipt-inline-item-editor',
     })
   }
 
-  async function assertPurchaseReceiptAddItemModalMobileLayout(
+  async function assertPurchaseReceiptAddItemEditorMobileLayout(
     page,
-    modal,
+    editor,
     { scenarioName }
   ) {
-    const metrics = await modal.evaluate((node) => {
-      const content = node.querySelector('.ant-modal-content')
-      const body = node.querySelector('.ant-modal-body')
-      const footer = node.querySelector('.ant-modal-footer')
+    const metrics = await editor.evaluate((node) => {
+      const footer = node.querySelector(
+        '.erp-purchase-receipt-inline-item-editor__footer'
+      )
       const form = node.querySelector('.erp-business-action-form')
       const firstField = form?.querySelector('.ant-form-item')
       const footerButtons = Array.from(footer?.querySelectorAll('button') || [])
-      const modalRect = node.getBoundingClientRect()
-      const contentRect = content?.getBoundingClientRect()
+      const editorRect = node.getBoundingClientRect()
       const footerRect = footer?.getBoundingClientRect()
       const firstFieldRect = firstField?.getBoundingClientRect()
       const footerStyle = footer ? window.getComputedStyle(footer) : null
@@ -371,27 +390,15 @@ export function createPurchaseReceiptAssertions(deps) {
           width: window.innerWidth,
           height: window.innerHeight,
         },
-        modal: {
-          left: modalRect.left,
-          right: modalRect.right,
-          top: modalRect.top,
-          bottom: modalRect.bottom,
-          width: modalRect.width,
+        editor: {
+          left: editorRect.left,
+          right: editorRect.right,
+          top: editorRect.top,
+          bottom: editorRect.bottom,
+          width: editorRect.width,
+          clientWidth: node.clientWidth,
+          scrollWidth: node.scrollWidth,
         },
-        content: contentRect
-          ? {
-              height: contentRect.height,
-              bottom: contentRect.bottom,
-            }
-          : null,
-        body: body
-          ? {
-              clientHeight: body.clientHeight,
-              scrollHeight: body.scrollHeight,
-              clientWidth: body.clientWidth,
-              scrollWidth: body.scrollWidth,
-            }
-          : null,
         form: form
           ? {
               clientWidth: form.clientWidth,
@@ -426,21 +433,10 @@ export function createPurchaseReceiptAssertions(deps) {
     })
 
     assert(
-      metrics.modal.left >= 0 &&
-        metrics.modal.right <= metrics.viewport.width + 1 &&
-        metrics.modal.top >= 0 &&
-        metrics.modal.bottom <= metrics.viewport.height + 1,
-      `${scenarioName} 移动端添加明细弹窗超出视口: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.content && metrics.content.bottom <= metrics.viewport.height + 1,
-      `${scenarioName} 移动端添加明细内容高度超出视口: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.body &&
-        metrics.body.scrollHeight > metrics.body.clientHeight &&
-        metrics.body.scrollWidth <= metrics.body.clientWidth + 1,
-      `${scenarioName} 移动端添加明细 body 应纵向滚动且不横向溢出: ${JSON.stringify(metrics)}`
+      metrics.editor.left >= 0 &&
+        metrics.editor.right <= metrics.viewport.width + 1 &&
+        metrics.editor.scrollWidth <= metrics.editor.clientWidth + 1,
+      `${scenarioName} 移动端添加明细内联编辑区超出视口: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.form && metrics.form.scrollWidth <= metrics.form.clientWidth + 1,
@@ -449,7 +445,7 @@ export function createPurchaseReceiptAssertions(deps) {
     assert(
       metrics.footerButtons.length >= 2 &&
         metrics.footerButtons.every(
-          (button) => button.width >= 120 && button.height >= 34
+          (button) => button.width >= 120 && button.height >= 32
         ),
       `${scenarioName} 移动端添加明细底部按钮尺寸异常: ${JSON.stringify(metrics)}`
     )
@@ -460,7 +456,7 @@ export function createPurchaseReceiptAssertions(deps) {
       `${scenarioName} 移动端添加明细首字段不可被弹窗裁切: ${JSON.stringify(metrics)}`
     )
 
-    await modal.screenshot({
+    await editor.screenshot({
       path: path.resolve(outputDir, `${scenarioName}.png`),
     })
   }
@@ -574,14 +570,14 @@ export function createPurchaseReceiptAssertions(deps) {
     selectPurchaseReceiptRow,
     assertPurchaseReceiptActionButtonState,
     assertPurchaseReceiptRowItemCount,
-    openPurchaseReceiptAddItemModal,
-    fillPurchaseReceiptAddItemModalBoundaryValues,
-    choosePurchaseReceiptAddItemModalOption,
-    fillPurchaseReceiptAddItemModalField,
-    purchaseReceiptAddItemModalField,
-    assertPurchaseReceiptAddItemModalMetrics,
-    assertPurchaseReceiptAddItemModalDarkTokens,
-    assertPurchaseReceiptAddItemModalMobileLayout,
+    openPurchaseReceiptAddItemEditor,
+    fillPurchaseReceiptAddItemEditorBoundaryValues,
+    choosePurchaseReceiptAddItemEditorOption,
+    fillPurchaseReceiptAddItemEditorField,
+    purchaseReceiptAddItemEditorField,
+    assertPurchaseReceiptAddItemEditorMetrics,
+    assertPurchaseReceiptAddItemEditorDarkTokens,
+    assertPurchaseReceiptAddItemEditorMobileLayout,
     assertLineItemsUnifiedHorizontalScroll,
   }
 }

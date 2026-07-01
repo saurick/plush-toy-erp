@@ -22,3 +22,7 @@
 | `docs/archive/progress-2026-06-15-before-final-bom-closeout.md` | BOM 收口和文档治理前的 `progress.md` 过程记录归档 |
 | `docs/archive/progress-2026-06-16-before-audit-log-readable.md` | 审计日志可读性治理前的 `progress.md` 过程记录归档 |
 | `docs/archive/progress-2026-06-16-before-backup-restore-rehearsal.md` | 备份恢复演练前的 `progress.md` 过程记录归档 |
+| `docs/archive/progress-2026-07-01-before-action-projection-l1.md` | action projection L1 收口前的 `progress.md` 过程记录归档 |
+| `docs/archive/progress-2026-07-01-before-progress-archive-and-next-no-write.md` | 下一轮 no-write 闭环前的 `progress.md` 过程记录归档 |
+| `docs/archive/progress-2026-07-01-before-readme-preflight-sync-closeout.md` | Web README mobile preflight 口径同步后的 `progress.md` 过程记录归档 |
+| `docs/archive/progress-2026-07-01-before-bom-inline-editor.md` | BOM 明细弹窗内联编辑前的 `progress.md` 过程记录归档 |

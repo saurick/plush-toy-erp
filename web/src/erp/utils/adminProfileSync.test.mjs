@@ -160,7 +160,7 @@ test('adminProfileSync: effective session 同步失败时正式普通账号不�
   )
 })
 
-test('adminProfileSync: sync failure 在本地开发和 super admin 保留 RBAC 诊断路径', () => {
+test('adminProfileSync: sync failure 下普通本地开发可诊断，super admin 可看产品核心入口', () => {
   const profile = {
     id: 1,
     username: 'admin',
@@ -191,7 +191,7 @@ test('adminProfileSync: sync failure 在本地开发和 super admin 保留 RBAC 
       isSuperAdmin: true,
       isLocalDev: false,
     }),
-    { allowed: true, reason: 'super_admin_sync_failed_diagnostic' }
+    { allowed: true, reason: 'super_admin_product_core' }
   )
   assert.deepEqual(
     filterNavigationSectionsByAdminProfile({
@@ -220,6 +220,90 @@ test('adminProfileSync: sync failure 在本地开发和 super admin 保留 RBAC 
       currentMenuPath: '/erp/dashboard',
       currentPageKey: 'global-dashboard',
     }),
+    false
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(unavailable, 'sales_order.create'),
+    false
+  )
+  assert.equal(
+    hasEffectiveSessionAction(unavailable, 'workflow.task.complete'),
+    false
+  )
+})
+
+test('adminProfileSync: super admin 可审阅全部前端业务动作，普通账号仍按投影收窄', () => {
+  const syncFailedProfile = attachUnavailableEffectiveSessionToAdminProfile({
+    id: 1,
+    username: 'admin',
+    is_super_admin: true,
+    permissions: ['sales_order.create', 'workflow.task.complete'],
+    menus: [
+      { key: 'global-dashboard', path: '/erp/dashboard' },
+      { key: 'permission-center', path: '/erp/system/permissions' },
+    ],
+  })
+  const activeProfile = attachEffectiveSessionToAdminProfile(
+    {
+      id: 2,
+      username: 'super',
+      is_super_admin: true,
+      permissions: ['sales_order.create', 'workflow.task.complete'],
+      menus: [],
+    },
+    {
+      pages: ['global-dashboard'],
+      actions: ['workflow.task.read'],
+      fieldPolicies: {},
+      workPools: [],
+      source: 'active_customer_config_revision',
+    }
+  )
+
+  assert.deepEqual(
+    resolveEffectiveSessionPageAccess(syncFailedProfile, 'global-dashboard', {
+      isLocalDev: true,
+    }),
+    { allowed: true, reason: 'local_dev_sync_failed_diagnostic' }
+  )
+  assert.deepEqual(
+    resolveEffectiveSessionPageAccess(syncFailedProfile, 'global-dashboard', {
+      isSuperAdmin: true,
+      isLocalDev: false,
+    }),
+    { allowed: true, reason: 'super_admin_product_core' }
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(syncFailedProfile, 'sales_order.create'),
+    true
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(syncFailedProfile, 'workflow.task.complete'),
+    true
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(activeProfile, 'workflow.task.read'),
+    true
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(activeProfile, 'workflow.task.complete'),
+    true
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(activeProfile, 'sales_order.create'),
+    true
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(
+      {
+        permissions: ['sales_order.create', 'workflow.task.complete'],
+        effective_session: {
+          source: 'active_customer_config_revision',
+          actions: ['workflow.task.read'],
+        },
+      },
+      'sales_order.create'
+    ),
     false
   )
 })
@@ -267,6 +351,32 @@ test('adminProfileSync: field policy 收窄列表列但不改写列定义真源'
       'sales_orders.default'
     ),
     [columns[0], columns[2]]
+  )
+})
+
+test('adminProfileSync: super admin 不受 field policy 隐藏列收窄', () => {
+  const adminProfile = {
+    is_super_admin: true,
+    effective_session: {
+      field_policies: {
+        'sales_orders.default': {
+          source_no: { visible: false },
+        },
+      },
+    },
+  }
+  const columns = [
+    { dataIndex: 'order_no' },
+    { dataIndex: 'customer_order_no', effectiveFieldKey: 'source_no' },
+  ]
+
+  assert.deepEqual(
+    filterColumnsByEffectiveFieldPolicy(
+      columns,
+      adminProfile,
+      'sales_orders.default'
+    ),
+    columns
   )
 })
 
@@ -374,6 +484,152 @@ test('adminProfileSync: 正式普通账号菜单按 RBAC 与 effective session �
         items: [{ key: 'sales-orders', path: '/erp/sales/orders' }],
       },
     ]
+  )
+})
+
+test('adminProfileSync: active revision 空页面清单不回退 RBAC-only', () => {
+  const navigationSections = [
+    {
+      title: '业务',
+      items: [
+        { key: 'global-dashboard', path: '/erp/dashboard' },
+        { key: 'sales-orders', path: '/erp/sales/orders' },
+      ],
+    },
+  ]
+  const adminProfile = {
+    effective_session: {
+      source: 'active_customer_config_revision',
+      pages: [],
+    },
+  }
+
+  assert.deepEqual(
+    filterNavigationSectionsByAdminProfile({
+      navigationSections,
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard', '/erp/sales/orders'],
+      isSuperAdmin: false,
+      isLocalDev: false,
+    }),
+    []
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard'],
+      isSuperAdmin: false,
+      isLocalDev: false,
+      currentMenuPath: '/erp/dashboard',
+      currentPageKey: 'global-dashboard',
+    }),
+    true
+  )
+})
+
+test('adminProfileSync: 模块 disabled 后端投影隐藏业务页时正式账号需要跳转', () => {
+  const navigationSections = [
+    {
+      title: '看板',
+      items: [{ key: 'global-dashboard', path: '/erp/dashboard' }],
+    },
+    {
+      title: '业务',
+      items: [{ key: 'shipments', path: '/erp/warehouse/shipments' }],
+    },
+  ]
+  const adminProfile = {
+    effective_session: {
+      source: 'active_customer_config_revision',
+      modules: { shipments: 'disabled' },
+      pages: ['global-dashboard'],
+      actions: ['erp.dashboard.read'],
+    },
+  }
+
+  assert.deepEqual(
+    filterNavigationSectionsByAdminProfile({
+      navigationSections,
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard', '/erp/warehouse/shipments'],
+      isSuperAdmin: false,
+      isLocalDev: false,
+    }),
+    [
+      {
+        title: '看板',
+        items: [{ key: 'global-dashboard', path: '/erp/dashboard' }],
+      },
+    ]
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard', '/erp/warehouse/shipments'],
+      isSuperAdmin: false,
+      isLocalDev: false,
+      currentMenuPath: '/erp/warehouse/shipments',
+      currentPageKey: 'shipments',
+    }),
+    true
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard', '/erp/warehouse/shipments'],
+      isSuperAdmin: false,
+      isLocalDev: false,
+      currentMenuPath: '/erp/dashboard',
+      currentPageKey: 'global-dashboard',
+    }),
+    false
+  )
+})
+
+test('adminProfileSync: 正式 super admin 可审阅 active revision 未投出的业务页', () => {
+  const navigationSections = [
+    {
+      title: '系统',
+      items: [
+        { key: 'permission-center', path: '/erp/system/permissions' },
+        { key: 'system-audit-logs', path: '/erp/system/audit-logs' },
+      ],
+    },
+    {
+      title: '业务',
+      items: [
+        { key: 'sales-orders', path: '/erp/sales/orders' },
+        { key: 'shipments', path: '/erp/shipments' },
+      ],
+    },
+  ]
+  const adminProfile = {
+    effective_session: {
+      source: 'active_customer_config_revision',
+      pages: ['global-dashboard'],
+    },
+  }
+
+  assert.deepEqual(
+    filterNavigationSectionsByAdminProfile({
+      navigationSections,
+      adminProfile,
+      allowedMenuPaths: [],
+      isSuperAdmin: true,
+      isLocalDev: false,
+    }),
+    navigationSections
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile,
+      allowedMenuPaths: [],
+      isSuperAdmin: true,
+      isLocalDev: false,
+      currentMenuPath: '/erp/sales/orders',
+      currentPageKey: 'sales-orders',
+    }),
+    false
   )
 })
 

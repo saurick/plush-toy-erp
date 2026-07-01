@@ -38,7 +38,9 @@ import { ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
 import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js'
 import {
   getTaskOwnerRoleKey,
+  getWorkflowTaskCodeLabel,
   getWorkflowTaskDueLabel,
+  getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskReason,
   getWorkflowTaskStatusMeta,
 } from '../utils/workflowTaskBoard.mjs'
@@ -271,7 +273,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   }, [filteredTasks.length, tasks])
 
   const selectedTaskLabel = selectedTask
-    ? `${selectedTask.task_code || `TASK-${selectedTask.id}`} / ${
+    ? `${getWorkflowTaskCodeLabel(selectedTask)} / ${
         selectedTask.task_name || '未填写任务名称'
       }`
     : `请先选择一条${moduleItem?.shortLabel || ''}协同任务`
@@ -423,11 +425,11 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           fixed: 'left',
           render: (value, record) => (
             <Space direction="vertical" size={2}>
-              <strong>{value || `TASK-${record.id}`}</strong>
+              <strong>{value || getWorkflowTaskCodeLabel(record)}</strong>
               <span>{record.task_name}</span>
             </Space>
           ),
-          exportValue: (record) => record?.task_code || `TASK-${record?.id}`,
+          exportValue: getWorkflowTaskCodeLabel,
         },
         {
           title: '来源',
@@ -456,14 +458,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           dataIndex: 'owner_role_key',
           key: 'owner_role_key',
           width: 120,
-          render: (_, record) => {
-            const roleKey = getTaskOwnerRoleKey(record)
-            return WORKFLOW_ROLE_LABELS.get(roleKey) || roleKey || '-'
-          },
-          exportValue: (record) => {
-            const roleKey = getTaskOwnerRoleKey(record)
-            return WORKFLOW_ROLE_LABELS.get(roleKey) || roleKey || ''
-          },
+          render: (_, record) => getWorkflowTaskOwnerRoleLabel(record),
+          exportValue: (record) => getWorkflowTaskOwnerRoleLabel(record),
         },
         {
           title: '到期',
@@ -599,9 +595,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                     value:
                       WORKFLOW_ROLE_LABELS.get(
                         getTaskOwnerRoleKey(selectedTask)
-                      ) ||
-                      getTaskOwnerRoleKey(selectedTask) ||
-                      '-',
+                      ) || getWorkflowTaskOwnerRoleLabel(selectedTask),
                   },
                 ]
               : []

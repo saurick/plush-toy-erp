@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { message, modal } from '@/common/utils/antdApp'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   applyDetailCellMerge,
   buildBlankMaterialPurchaseContractDraft,
@@ -561,7 +562,7 @@ export default function MaterialPurchaseContractWorkbench({
       })
       setToolbarStatus('已生成在线 PDF 预览。')
     } catch (error) {
-      const errorMessage = error?.message || '生成 PDF 预览失败，请稍后重试。'
+      const errorMessage = getActionErrorMessage(error, '生成 PDF 预览')
       setToolbarStatus(errorMessage)
       message.error(errorMessage)
     } finally {
@@ -585,7 +586,7 @@ export default function MaterialPurchaseContractWorkbench({
       })
       setToolbarStatus('已开始下载 PDF。')
     } catch (error) {
-      const errorMessage = error?.message || '下载 PDF 失败，请稍后重试。'
+      const errorMessage = getActionErrorMessage(error, '下载 PDF')
       setToolbarStatus(errorMessage)
       message.error(errorMessage)
     } finally {

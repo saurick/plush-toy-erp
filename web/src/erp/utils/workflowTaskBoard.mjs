@@ -3,6 +3,7 @@ import {
   isTerminalWorkflowTask,
 } from './workflowDashboardStats.mjs'
 import { hasActionPermission } from './masterDataOrderView.mjs'
+import { getRoleDisplayName } from './roleKeys.mjs'
 
 export const TASK_BOARD_STATUS_OPTIONS = Object.freeze([
   { value: 'all', label: '全部状态' },
@@ -117,6 +118,15 @@ export function getTaskOwnerRoleKey(task = {}) {
   return String(task.owner_role_key || '').trim()
 }
 
+export function getWorkflowTaskOwnerRoleLabel(task = {}) {
+  const ownerRoleKey = getTaskOwnerRoleKey(task)
+  return getRoleDisplayName(ownerRoleKey, '责任岗位')
+}
+
+export function getWorkflowTaskCodeLabel(task = {}) {
+  return String(task.task_code || '').trim() || '任务已关联'
+}
+
 function getAdminRoleKeys(admin = {}) {
   return Array.isArray(admin?.roles)
     ? admin.roles
@@ -212,7 +222,7 @@ export function getWorkflowTaskReadonlyReason(admin = {}, task = {}) {
     return '当前账号只有查看任务权限，没有完成、阻塞或催办权限。'
   }
   if (ownerRoleKey && !canHandleTaskByOwner(admin, task)) {
-    return `当前账号不属于 ${ownerRoleKey} 责任角色，也不是该任务的指定处理人。`
+    return `当前账号不属于${getWorkflowTaskOwnerRoleLabel(task)}责任角色，也不是该任务的指定处理人。`
   }
   return '当前账号没有可执行的任务处理动作。'
 }

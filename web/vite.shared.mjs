@@ -9,6 +9,7 @@ const ROOT_DIR = fileURLToPath(new URL('.', import.meta.url))
 
 export function createERPViteConfig(appId) {
   const app = getAppDefinition(appId)
+  const hmrClientPort = Number(process.env.ERP_VITE_HMR_CLIENT_PORT || app.port)
 
   return defineConfig(({ command, mode }) => {
     const env = loadEnv(mode, process.cwd(), '')
@@ -79,6 +80,10 @@ export function createERPViteConfig(appId) {
         port: app.port,
         strictPort: true,
         open: app.kind === 'desktop',
+        hmr: {
+          host: '127.0.0.1',
+          clientPort: hmrClientPort,
+        },
         proxy: {
           '/rpc': {
             target: 'http://localhost:8300',

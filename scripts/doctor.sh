@@ -33,6 +33,7 @@ fi
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
+source "$ROOT_DIR/scripts/lib/pnpm.sh"
 
 missing=0
 warns=0
@@ -147,20 +148,22 @@ elif command -v node >/dev/null 2>&1; then
 fi
 
 if [[ -f web/package.json ]] && command -v node >/dev/null 2>&1; then
-  package_manager="$(node -e "const pkg=require('./web/package.json'); process.stdout.write(pkg.packageManager || '')")"
-  if [[ "$package_manager" =~ ^pnpm@(.+)$ ]]; then
-    expected_pnpm="${BASH_REMATCH[1]}"
+  expected_pnpm="$(project_expected_pnpm_version "$ROOT_DIR")"
+  if [[ -z "$expected_pnpm" ]]; then
+    echo "  - [缺失] web/package.json packageManager 应固定为 pnpm@x.y.z"
+    missing=1
+  elif resolved_pnpm="$(resolve_project_pnpm "$ROOT_DIR" 2>/dev/null)"; then
+    current_pnpm="$("$resolved_pnpm" -v)"
+    echo "  - [OK] pnpm: ${current_pnpm}（${resolved_pnpm}，web/package.json packageManager）"
     if command -v pnpm >/dev/null 2>&1; then
-      current_pnpm="$(pnpm -v)"
-      if [[ "$current_pnpm" == "$expected_pnpm" ]]; then
-        echo "  - [OK] pnpm: ${current_pnpm}（web/package.json packageManager）"
-      else
-        echo "  - [错误] pnpm 当前 ${current_pnpm}，web/package.json 期望 ${expected_pnpm}"
-        missing=1
+      path_pnpm="$(command -v pnpm)"
+      path_pnpm_version="$(pnpm -v 2>/dev/null || true)"
+      if [[ "$path_pnpm" != "$resolved_pnpm" || "$path_pnpm_version" != "$expected_pnpm" ]]; then
+        echo "  - [提示] PATH pnpm 当前 ${path_pnpm_version:-<未知>}（${path_pnpm}），脚本会使用匹配版本 ${resolved_pnpm}"
       fi
     fi
   else
-    echo "  - [缺失] web/package.json packageManager 应固定为 pnpm@x.y.z"
+    echo "  - [错误] 未找到 pnpm ${expected_pnpm}（web/package.json packageManager）"
     missing=1
   fi
 fi

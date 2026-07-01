@@ -109,10 +109,7 @@ const EMPTY_ADMIN_PROFILE = Object.freeze({})
 const { Text } = Typography
 
 function hasPermission(adminProfile, permission) {
-  return (
-    adminProfile?.is_super_admin === true ||
-    hasActionPermission(adminProfile, permission)
-  )
+  return hasActionPermission(adminProfile, permission)
 }
 
 function readStoredColumnOrder(moduleKey) {
@@ -608,7 +605,7 @@ export default function V1QualityInspectionsPage() {
   }, [closeModal, decisionForm, inspectionModal, loadRows])
 
   const selectedRowLabel = selectedRow
-    ? `${selectedRow.inspection_no || selectedRow.id} / ${referenceLabel(
+    ? `${selectedRow.inspection_no || '来料质检单已关联'} / ${referenceLabel(
         inventoryLotOptions,
         selectedRow.inventory_lot_id,
         '批次'

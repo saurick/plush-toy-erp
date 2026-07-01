@@ -10,12 +10,48 @@ import { fileURLToPath } from "node:url";
 import { buildRuntimeManifest } from "../qa/customer-config-runtime-manifest.mjs";
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
 import {
+  buildCustomerConfigReadbackPreflightReport,
+  buildInputTemplate,
   parseCliArgs,
   validateCustomerConfigReleaseReadiness,
 } from "./customer-config-release-readiness.mjs";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const readinessCli = path.join(testDir, "customer-config-release-readiness.mjs");
+
+test("input template 只输出 readiness 前置清单且不读取证据", () => {
+  const template = buildInputTemplate();
+
+  assert.equal(template.scope, "customer-config-release-readiness-input-template");
+  assert.equal(template.writesDatabase, false);
+  assert.equal(template.callsBackend, false);
+  assert.equal(template.readsManifest, false);
+  assert.equal(template.readsReleaseEvidence, false);
+  assert.equal(template.readsReleaseReport, false);
+  assert.equal(template.validatesReleaseEvidence, false);
+  assert.deepEqual(template.secretInputs, []);
+  assert.match(template.commands.join("\n"), /--require-executed --require-activated/);
+  assert.match(template.commands.join("\n"), /--require-executed --require-rollback/);
+  assert.match(template.commands.join("\n"), /--readback-preflight-report/);
+  assert(template.requiredReadbackEvidence.includes("release report effectiveSessionVerification.method=get_effective_session"));
+  assert(template.requiredReadbackEvidence.includes("target smoke check name=customer-config-effective-session"));
+  assert.match(template.boundary, /does not read manifest/);
+  assert.match(template.boundary, /does not .*call customer_config/);
+  assert.match(template.boundary, /does not .*prove active revision readback/);
+});
+
+test("CLI input template 不要求 manifest 或 evidence-dir", () => {
+  const result = spawnSync(process.execPath, [readinessCli, "--print-input-template"], {
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0);
+  const template = JSON.parse(result.stdout);
+  assert.equal(template.scope, "customer-config-release-readiness-input-template");
+  assert.equal(template.callsBackend, false);
+  assert.equal(template.readsReleaseEvidence, false);
+  assert.match(template.commands.join("\n"), /customer-config-release-readiness\.mjs/);
+  assert.match(template.boundary, /effectiveSessionVerification/);
+});
 
 function writeRuntimeManifest(root) {
   const manifestPath = path.join(
@@ -387,6 +423,7 @@ test("help 输出可运行", () => {
   assert.match(result.stdout, /Customer config release readiness gate/);
   assert.match(result.stdout, /--require-activated/);
   assert.match(result.stdout, /--require-rollback/);
+  assert.match(result.stdout, /--print-input-template/);
 });
 
 test("parseCliArgs 支持 readiness 参数", () => {
@@ -407,6 +444,147 @@ test("parseCliArgs 支持 readiness 参数", () => {
   assert.equal(options.requireExecuted, true);
   assert.equal(options.requireActivated, true);
   assert.equal(options.requireRollback, true);
+});
+
+test("parseCliArgs 支持 input template", () => {
+  const options = parseCliArgs(["--print-input-template"]);
+  assert.equal(options.printInputTemplate, true);
+});
+
+test("parseCliArgs 支持 readback preflight report", () => {
+  const options = parseCliArgs([
+    "--manifest",
+    "manifest.json",
+    "--evidence-dir",
+    "evidence",
+    "--release-report",
+    "release-report.json",
+    "--readback-preflight-report",
+    "output/readback-preflight.json",
+  ]);
+  assert.equal(options.manifest, "manifest.json");
+  assert.equal(options.evidenceDir, "evidence");
+  assert.equal(options.releaseReport, "release-report.json");
+  assert.equal(options.readbackPreflightReport, "output/readback-preflight.json");
+});
+
+test("readback preflight report summarizes missing evidence without backend calls", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-readback-missing-"));
+  try {
+    const reportPath = "output/customers/yoyoosun/customer-config-readback-preflight.json";
+    const result = spawnSync(
+      process.execPath,
+      [
+        readinessCli,
+        "--readback-preflight-report",
+        reportPath,
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+      },
+    );
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.match(result.stdout, /readback preflight report/);
+    const report = JSON.parse(fs.readFileSync(path.join(root, reportPath), "utf8"));
+    assert.equal(report.scope, "customer-config-active-readback-preflight-report");
+    assert.equal(report.writesDatabase, false);
+    assert.equal(report.writesReleaseEvidence, false);
+    assert.equal(report.callsBackend, false);
+    assert.equal(report.callsCustomerConfig, false);
+    assert.equal(report.readsAdminTokenValue, false);
+    assert.equal(report.storesAdminTokenValue, false);
+    assert.equal(report.storesResponseBody, false);
+    assert.equal(report.readyForReadinessGate, false);
+    assert.match(report.blockers.join("\n"), /missing-manifest-option/);
+    assert.match(report.blockers.join("\n"), /missing-release-report-option/);
+    assert.match(report.blockers.join("\n"), /missing-evidence-dir-option/);
+    assert.match(report.blockers.join("\n"), /missing-smoke-report-option/);
+    assert.doesNotMatch(JSON.stringify(report), /Bearer|access_token|CUSTOMER_CONFIG_ADMIN_TOKEN=.*[^']/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("readback preflight report accepts existing release and target smoke evidence", async () => {
+  const { root, manifest, evidenceDir } = await setupReadyRoot();
+  try {
+    const releaseReport = buildReleaseReport({
+      root,
+      manifest,
+      evidenceDir,
+      overrides: { executed: true, activate: true },
+    });
+    const releaseReportPath = await writeReleaseReport(root, releaseReport);
+    const report = await buildCustomerConfigReadbackPreflightReport(
+      {
+        customer: "yoyoosun",
+        manifest,
+        evidenceDir,
+        releaseReport: releaseReportPath,
+      },
+      { repoRoot: root },
+    );
+    assert.equal(report.scope, "customer-config-active-readback-preflight-report");
+    assert.equal(report.readyForReadinessGate, true);
+    assert.deepEqual(report.blockers, []);
+    assert.equal(report.manifest.revision, "yoyoosun-customer-package-v1.runtime-manifest-v1");
+    assert.equal(report.releaseReport.effectiveSessionVerification.status, "verified");
+    assert.equal(
+      report.targetSmoke.customerConfigEffectiveSession.target,
+      "jsonrpc:customer_config.get_effective_session",
+    );
+    assert.equal(report.targetSmoke.customerConfigEffectiveSession.responseBodyStored, true);
+    assert.equal(report.tokenEnv.expectedName, "CUSTOMER_CONFIG_ADMIN_TOKEN");
+    assert.equal(report.storesResponseBody, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("readback preflight report redacts credentialed backend aliases", async () => {
+  const { root, manifest, evidenceDir } = await setupReadyRoot();
+  try {
+    const releaseReport = buildReleaseReport({
+      root,
+      manifest,
+      evidenceDir,
+      overrides: {
+        executed: true,
+        activate: true,
+        backendEndpointAlias:
+          "https://deploy:secret@erp.example.invalid/api?token=hidden",
+      },
+    });
+    const releaseReportPath = await writeReleaseReport(root, releaseReport);
+    const smokePath = path.join(root, evidenceDir, "smoke-test-report.json");
+    const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+    smoke.backendEndpointAlias =
+      "https://smoke:secret@erp.example.invalid/api?token=hidden";
+    fs.writeFileSync(smokePath, `${JSON.stringify(smoke, null, 2)}\n`);
+
+    const report = await buildCustomerConfigReadbackPreflightReport(
+      {
+        customer: "yoyoosun",
+        manifest,
+        evidenceDir,
+        releaseReport: releaseReportPath,
+      },
+      { repoRoot: root },
+    );
+    const serialized = JSON.stringify(report);
+
+    assert.equal(report.readyForReadinessGate, false);
+    assert(report.blockers.includes("release-report-backend-endpoint-alias-contains-credentials"));
+    assert(report.blockers.includes("smoke-report-backend-endpoint-alias-contains-credentials"));
+    assert.equal(report.releaseReport.backendEndpointAlias, "https://erp.example.invalid/api");
+    assert.equal(report.targetSmoke.backendEndpointAlias, "https://erp.example.invalid/api");
+    assert(!serialized.includes("deploy:secret"));
+    assert(!serialized.includes("smoke:secret"));
+    assert(!serialized.includes("token=hidden"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("接受发布前 readiness：manifest + manifest evidence + release evidence", async () => {
@@ -628,6 +806,39 @@ test("接受已执行 publish 报告", async () => {
     );
     assert.equal(result.releaseReport.executed, true);
     assert.equal(result.releaseReport.resultCount, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("require-executed 拒绝带账号密码的 release backend alias", async () => {
+  const { root, manifest, evidenceDir } = await setupReadyRoot();
+  try {
+    const reportPath = await writeReleaseReport(
+      root,
+      buildReleaseReport({
+        root,
+        manifest,
+        evidenceDir,
+        overrides: {
+          executed: true,
+          backendEndpointAlias: "https://deploy:secret@erp.example.invalid",
+        },
+      }),
+    );
+    await assert.rejects(
+      () =>
+        validateCustomerConfigReleaseReadiness(
+          {
+            manifest,
+            evidenceDir,
+            releaseReport: reportPath,
+            requireExecuted: true,
+          },
+          { repoRoot: root },
+        ),
+      /release report backendEndpointAlias must not contain username or password/,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -873,6 +1084,55 @@ test("require-activated 拒绝执行报告与目标 smoke backend 不一致", as
           { repoRoot: root },
         ),
       /backendEndpointAlias must match target smoke backendEndpointAlias/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("require-activated 拒绝带账号密码的目标 smoke backend alias", async () => {
+  const { root, manifest, evidenceDir } = await setupReadyRoot();
+  try {
+    const smokePath = path.join(root, evidenceDir, "smoke-test-report.json");
+    const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+    smoke.backendEndpointAlias = "https://deploy:secret@erp.example.invalid";
+    fs.writeFileSync(smokePath, `${JSON.stringify(smoke, null, 2)}\n`);
+    const reportPath = await writeReleaseReport(
+      root,
+      buildReleaseReport({
+        root,
+        manifest,
+        evidenceDir,
+        overrides: {
+          executed: true,
+          activate: true,
+          operations: [
+            { key: "activate", method: "activate_customer_config" },
+          ],
+          results: [
+            {
+              key: "activate",
+              method: "activate_customer_config",
+              resultRevision:
+                "yoyoosun-customer-package-v1.runtime-manifest-v1",
+              resultStatus: "active",
+            },
+          ],
+        },
+      }),
+    );
+    await assert.rejects(
+      () =>
+        validateCustomerConfigReleaseReadiness(
+          {
+            manifest,
+            evidenceDir,
+            releaseReport: reportPath,
+            requireActivated: true,
+          },
+          { repoRoot: root },
+        ),
+      /smoke-test-report\.json (contains a credentialed URL|backendEndpointAlias must not contain)/,
     );
   } finally {
     await rm(root, { recursive: true, force: true });

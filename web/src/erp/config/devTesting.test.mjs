@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
 import {
   DEV_TESTING_COPY_PRESETS,
@@ -82,6 +85,21 @@ const unrelatedMarkdown = `
 这里只是普通说明。
 `
 
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../..')
+
+function extractLocalCommandFilePaths(commands = []) {
+  const paths = []
+  for (const command of commands) {
+    const matches = String(command).matchAll(
+      /(?:^|\s)(\/Users\/simon\/projects\/plush-toy-erp\/)?((?:web|scripts|server|deployments)\/[\w./-]+\.(?:mjs|js|sh))(?:\s|$)/g
+    )
+    for (const match of matches) {
+      paths.push(match[2])
+    }
+  }
+  return paths
+}
+
 test('devTesting: 只通过开发态独立路径暴露', () => {
   assert.equal(DEV_TESTING_ROUTE, '/__dev/testing')
   assert.equal(
@@ -133,16 +151,490 @@ test('devTesting: 兼容当前自动化测试策略的验证层级标题', () =>
 test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   assert.deepEqual(
     DEV_TESTING_COPY_PRESETS.map((preset) => preset.key),
-    ['frontend', 'pre-commit', 'release']
+    [
+      'frontend',
+      'workflow-backend-actions',
+      'trial-role-entries',
+      'frontend-role-menu-seed-contracts',
+      'trial-account-rbac',
+      'real-login-smoke-shared',
+      'trial-simulated-data',
+      'mvp-local-closure',
+      'mobile-workflow-smoke',
+      'customer-config-dev-console',
+      'dev-prototype-registry',
+      'dev-doc-governance-ledger',
+      'customer-config-package-runtime',
+      'customer-import-tooling',
+      'frontend-customer-config-projection',
+      'frontend-error-messages',
+      'business-action-field-boundaries',
+      'pre-commit',
+      'release',
+    ]
+  )
+  const presetsByKey = new Map(
+    DEV_TESTING_COPY_PRESETS.map((preset) => [preset.key, preset])
+  )
+  const getPreset = (key) => {
+    const preset = presetsByKey.get(key)
+    assert(preset, `missing preset: ${key}`)
+    return preset
+  }
+  const getPresetCopyText = (key) =>
+    buildDevTestingCopyText(getPreset(key).commands)
+
+  assert.match(getPresetCopyText('frontend'), /pnpm style:l1/)
+  assert.match(
+    getPresetCopyText('workflow-backend-actions'),
+    /TestWorkflowRepo_/
   )
   assert.match(
-    buildDevTestingCopyText(DEV_TESTING_COPY_PRESETS[0].commands),
-    /pnpm style:l1/
+    getPreset('workflow-backend-actions').description,
+    /只证明本地后端合同/
+  )
+  assert.match(getPresetCopyText('trial-role-entries'), /trial-role-entry-docs/)
+  assert.match(
+    getPresetCopyText('frontend-role-menu-seed-contracts'),
+    /entryConfig\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('frontend-role-menu-seed-contracts'),
+    /menuPermissions\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('frontend-role-menu-seed-contracts'),
+    /seedData\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('frontend-role-menu-seed-contracts'),
+    /workflowStatus\.test\.mjs/
+  )
+  assert.match(
+    getPreset('frontend-role-menu-seed-contracts').description,
+    /不替代后端 RBAC/
+  )
+  assert.match(
+    getPreset('frontend-role-menu-seed-contracts').description,
+    /不替代.*真实登录/
+  )
+  assert.match(
+    getPresetCopyText('trial-account-rbac'),
+    /trial-account-rbac\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('trial-account-rbac'),
+    /trial-account-rbac\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('trial-account-rbac'),
+    /trialDemoAccountBrowserSmoke\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('trial-account-rbac'),
+    /--print-input-template/
+  )
+  assert.match(
+    getPresetCopyText('trial-account-rbac'),
+    /trial-account-rbac\.mjs --preflight-report output\/trial-account-rbac\/preflight\.json/
+  )
+  assert.match(
+    getPresetCopyText('trial-account-rbac'),
+    /trialDemoAccountBrowserSmoke\.mjs --print-input-template/
+  )
+  assert.match(
+    getPresetCopyText('trial-account-rbac'),
+    /trialDemoAccountBrowserSmoke\.mjs --preflight-report output\/trial-demo-account-browser-smoke\/preflight\.json/
+  )
+  assert.match(
+    getPresetCopyText('trial-account-rbac'),
+    /TRIAL_ACCOUNT_PASSWORD/
+  )
+  assert.match(
+    getPresetCopyText('trial-account-rbac'),
+    /--report output\/trial-account-rbac\/report\.json/
+  )
+  assert.match(
+    getPresetCopyText('trial-account-rbac'),
+    /smoke:trial-demo-browser/
+  )
+  assert.match(getPreset('trial-account-rbac').description, /无写入输入模板/)
+  assert.match(
+    getPreset('trial-account-rbac').description,
+    /本地后端和演示账号密码/
+  )
+  assert.match(
+    getPresetCopyText('real-login-smoke-shared'),
+    /realLoginSmokeShared\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('real-login-smoke-shared'),
+    /mobileAuthLoginRouteSmoke\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('real-login-smoke-shared'),
+    /purchaseReceiptRealWriteBrowserE2E\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('real-login-smoke-shared'),
+    /realLoginSmokeShared\.mjs --print-input-template/
+  )
+  assert.match(
+    getPresetCopyText('real-login-smoke-shared'),
+    /realLoginSmokeShared\.mjs --preflight-report output\/real-login-smoke-shared\/preflight\.json/
+  )
+  assert.match(
+    getPresetCopyText('real-login-smoke-shared'),
+    /mobileAuthLoginRouteSmoke\.mjs --print-input-template/
+  )
+  assert.match(
+    getPresetCopyText('real-login-smoke-shared'),
+    /mobileAuthLoginRouteSmoke\.mjs --preflight-report output\/mobile-auth-login-route-smoke\/preflight\.json/
+  )
+  assert.match(
+    getPresetCopyText('real-login-smoke-shared'),
+    /purchaseReceiptRealWriteBrowserE2E\.mjs --print-input-template/
+  )
+  assert.match(
+    getPresetCopyText('real-login-smoke-shared'),
+    /purchaseReceiptRealWriteBrowserE2E\.mjs --preflight-report output\/purchase-receipt-real-write-browser-e2e\/preflight\.json/
+  )
+  assert.match(
+    getPresetCopyText('real-login-smoke-shared'),
+    /REAL_LOGIN_ADMIN_USERNAME/
+  )
+  assert.match(
+    getPresetCopyText('real-login-smoke-shared'),
+    /smoke:purchase-contract-real-login/
+  )
+  assert.match(
+    getPresetCopyText('real-login-smoke-shared'),
+    /smoke:processing-contract-real-login/
+  )
+  assert.match(
+    getPresetCopyText('real-login-smoke-shared'),
+    /smoke:mobile-auth-login-route/
+  )
+  assert.match(
+    getPresetCopyText('real-login-smoke-shared'),
+    /smoke:purchase-receipt-real-write/
+  )
+  assert.match(
+    getPreset('real-login-smoke-shared').description,
+    /no-write 输入模板/
+  )
+  assert.match(getPreset('real-login-smoke-shared').description, /preflight/)
+  assert.match(getPreset('real-login-smoke-shared').description, /前置清单/)
+  assert.match(
+    getPreset('real-login-smoke-shared').description,
+    /持久测试数据确认/
+  )
+  assert.match(getPreset('real-login-smoke-shared').description, /mock RPC/)
+  assert.match(
+    getPreset('real-login-smoke-shared').description,
+    /生产单端口岗位路由/
+  )
+  assert.match(
+    getPreset('real-login-smoke-shared').description,
+    /不执行真实登录/
+  )
+  assert.match(getPreset('real-login-smoke-shared').description, /不启动浏览器/)
+  assert.match(
+    getPresetCopyText('trial-simulated-data'),
+    /trial-simulated-data\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('trial-simulated-data'),
+    /operational-fact-simulated-closure\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('trial-simulated-data'),
+    /mobile-workflow-simulated-closure\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('trial-simulated-data'),
+    /trial-simulated-data\.mjs --print-input-template/
+  )
+  assert.match(
+    getPresetCopyText('trial-simulated-data'),
+    /operational-fact-simulated-closure\.mjs --print-input-template/
+  )
+  assert.match(
+    getPresetCopyText('trial-simulated-data'),
+    /mobile-workflow-simulated-closure\.mjs --print-input-template/
+  )
+  assert.match(
+    getPresetCopyText('trial-simulated-data'),
+    /trial-simulated-data-dev-testing-report/
+  )
+  assert.match(
+    getPresetCopyText('trial-simulated-data'),
+    /mobile-workflow-simulated-closure-dev-testing-report/
+  )
+  assert.match(
+    getPresetCopyText('trial-simulated-data'),
+    /operational-fact-simulated-closure-dev-testing-report/
+  )
+  assert.match(
+    getPresetCopyText('trial-simulated-data'),
+    /--product-id <product_id>/
+  )
+  assert.match(
+    getPreset('trial-simulated-data').description,
+    /no-write 输入模板/
+  )
+  assert.match(
+    getPreset('trial-simulated-data').description,
+    /simulated-only \/ no real import/
+  )
+  assert.match(getPreset('trial-simulated-data').description, /不连接后端/)
+  assert.match(getPresetCopyText('mvp-local-closure'), /mvp-closure\.test\.mjs/)
+  assert.match(
+    getPresetCopyText('mvp-local-closure'),
+    /purchase-receipt-real-write-e2e\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('mvp-local-closure'),
+    /purchase-receipt-real-write-e2e\.mjs --print-input-template/
+  )
+  assert.match(
+    getPresetCopyText('mvp-local-closure'),
+    /purchase-receipt-real-write-e2e\.mjs --preflight-report output\/qa\/purchase-receipt-real-write-e2e\/preflight\.json/
+  )
+  assert.match(
+    getPresetCopyText('mvp-local-closure'),
+    /mvp-closure\.mjs --out output\/customers\/yoyoosun\/mvp-closure/
+  )
+  assert.match(
+    getPresetCopyText('mvp-local-closure'),
+    /--run-report-tools --product-id <product_id>/
+  )
+  assert.match(getPreset('mvp-local-closure').description, /真实写入输入模板/)
+  assert.match(
+    getPreset('mvp-local-closure').description,
+    /plan-only \/ no-write evidence/
+  )
+  assert.match(
+    getPresetCopyText('mobile-workflow-smoke'),
+    /mobile-workflow-runtime-browser-smoke/
+  )
+  assert.match(
+    getPresetCopyText('mobile-workflow-smoke'),
+    /mobileWorkflowRuntimeBrowserSmoke\.mjs --print-input-template/
+  )
+  assert.match(
+    getPresetCopyText('mobile-workflow-smoke'),
+    /mobileWorkflowRuntimeBrowserSmoke\.mjs --preflight-report output\/mobile-workflow-runtime-browser-smoke\/preflight\.json/
+  )
+  assert.match(getPreset('mobile-workflow-smoke').description, /无写入输入模板/)
+  assert.match(
+    getPreset('mobile-workflow-smoke').description,
+    /需本地后端和演示账号密码/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-dev-console'),
+    /devCustomerConfig\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-dev-console'),
+    /printTemplates\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-dev-console'),
+    /dev-customer-config-dark-desktop/
+  )
+  assert.match(
+    getPreset('customer-config-dev-console').description,
+    /只证明 dev-only 控制台/
+  )
+  assert.match(
+    getPresetCopyText('dev-prototype-registry'),
+    /devPrototypes\.test\.mjs/
+  )
+  assert.match(getPresetCopyText('dev-prototype-registry'), /devHub\.test\.mjs/)
+  assert.match(
+    getPresetCopyText('dev-prototype-registry'),
+    /dev-prototypes-dark-desktop/
+  )
+  assert.match(
+    getPreset('dev-prototype-registry').description,
+    /不晋级 Current/
+  )
+  assert.match(getPreset('dev-prototype-registry').description, /不改正式菜单/)
+  assert.match(
+    getPresetCopyText('dev-doc-governance-ledger'),
+    /devDocs\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('dev-doc-governance-ledger'),
+    /devGovernance\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('dev-doc-governance-ledger'),
+    /devCapabilityLedger\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('dev-doc-governance-ledger'),
+    /dev-docs-dark-desktop/
+  )
+  assert.match(
+    getPresetCopyText('dev-doc-governance-ledger'),
+    /dev-governance-dark-desktop/
+  )
+  assert.match(
+    getPreset('dev-doc-governance-ledger').description,
+    /不改正式文档真源/
+  )
+  assert.match(
+    getPreset('dev-doc-governance-ledger').description,
+    /不进入正式菜单/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /customer-package-lint\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /customer-config-runtime-manifest\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /customer-config-release-execute\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /customer-config-release-readiness\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /run-smoke-script\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /customer-package-lint\.mjs --customer yoyoosun --mode compile/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /customer-config-runtime-manifest\.mjs --customer yoyoosun --mode compile/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /customer-config-runtime-manifest\.mjs --customer yoyoosun --mode preview --out output\/customers\/yoyoosun\/customer-config-runtime-manifest\.json/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /customer-config-release-execute\.mjs --print-input-template/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /customer-config-release-readiness\.mjs --print-input-template/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /customer-config-release-readiness\.mjs .*--readback-preflight-report output\/customers\/yoyoosun\/customer-config-readback-preflight\.json/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /run-smoke\.sh --print-input-template/
+  )
+  assert.match(
+    getPreset('customer-config-package-runtime').description,
+    /active revision 读回前置/
+  )
+  assert.match(
+    getPreset('customer-config-package-runtime').description,
+    /输入模板/
+  )
+  assert.match(
+    getPreset('customer-config-package-runtime').description,
+    /不发布/
+  )
+  assert.match(
+    getPreset('customer-config-package-runtime').description,
+    /不激活/
+  )
+  assert.match(
+    getPreset('customer-config-package-runtime').description,
+    /不调用后端/
+  )
+  assert.match(
+    getPresetCopyText('customer-import-tooling'),
+    /customerSourceManifestCheck\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('customer-import-tooling'),
+    /customerImportExecute\.test\.mjs/
+  )
+  assert.match(
+    getPreset('customer-import-tooling').description,
+    /不执行真实客户导入/
+  )
+  assert.match(
+    getPreset('customer-import-tooling').description,
+    /不连接目标环境/
+  )
+  assert.match(
+    getPresetCopyText('frontend-customer-config-projection'),
+    /formal-frontend-customer-config-boundary\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('frontend-customer-config-projection'),
+    /erp-effective-session-action-projection-business-pages/
+  )
+  assert.match(
+    getPreset('frontend-customer-config-projection').description,
+    /不读取 raw customer package/
+  )
+  assert.match(
+    getPresetCopyText('frontend-error-messages'),
+    /frontend-error-message-boundary\.test\.mjs/
+  )
+  assert.match(
+    getPreset('frontend-error-messages').description,
+    /共享 PDF 预览/
+  )
+  assert.match(
+    getPreset('frontend-error-messages').description,
+    /不透传底层英文异常/
+  )
+  assert.match(
+    getPresetCopyText('business-action-field-boundaries'),
+    /workflowTaskActionAccess\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('business-action-field-boundaries'),
+    /workflow-ui-action-boundary\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('business-action-field-boundaries'),
+    /sales-order-field-chain-boundary\.test\.mjs/
+  )
+  assert.match(
+    getPreset('business-action-field-boundaries').description,
+    /Source Document 生命周期/
+  )
+  assert.match(
+    getPreset('business-action-field-boundaries').description,
+    /后端登记表静态边界守卫/
   )
   assert.equal(
     buildDevTestingCopyText(['pnpm test', '', '  pnpm css  ']),
     'pnpm test\npnpm css'
   )
+})
+
+test('devTesting: 常用预设引用的本地脚本必须存在', () => {
+  const missing = []
+
+  for (const preset of DEV_TESTING_COPY_PRESETS) {
+    for (const localPath of extractLocalCommandFilePaths(preset.commands)) {
+      if (!existsSync(join(repoRoot, localPath))) {
+        missing.push(`${preset.key}: ${localPath}`)
+      }
+    }
+  }
+
+  assert.deepEqual(missing, [])
 })
 
 test('devTesting: 提取 fenced command blocks 并保留章节上下文', () => {

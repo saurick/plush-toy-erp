@@ -682,6 +682,9 @@ export function buildExecutionPlan({
 
 function normalizeBaseURL(raw) {
   const url = new URL(String(raw || "").trim());
+  if (url.username || url.password) {
+    throw new CliError("backend URL must not contain username or password");
+  }
   url.pathname = url.pathname.replace(/\/+$/, "");
   url.search = "";
   url.hash = "";

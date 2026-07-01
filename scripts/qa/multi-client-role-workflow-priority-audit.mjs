@@ -2226,10 +2226,16 @@ function collectChecks() {
         ]) &&
         sourceContains("docs/product/多甲方角色能力流程编排优先级.md", [
           "effective session 页面、动作、字段策略和责任池投影已按 enabled 模块收窄",
+        ]) &&
+        sourceContains("web/src/erp/utils/adminProfileSync.test.mjs", [
+          "模块 disabled 后端投影隐藏业务页时正式账号需要跳转",
+          "modules: { shipments: 'disabled' }",
+          "currentPageKey: 'shipments'",
         ]),
       evidence: [
         "server/internal/biz/customer_config.go",
         "server/internal/biz/customer_config_test.go",
+        "web/src/erp/utils/adminProfileSync.test.mjs",
         "docs/product/多甲方角色能力流程编排优先级.md",
       ],
       notProven: [
@@ -5272,20 +5278,35 @@ function collectChecks() {
         sourceContains("scripts/qa/customer-package-lint.mjs", [
           "demoCustomerPackage",
           "demo:",
+          "validateModuleStates",
           "packageKey must be namespaced by customerKey",
         ]) &&
         sourceContains("scripts/qa/customer-config-runtime-manifest.mjs", [
           "demoCustomerPackage",
+          "moduleStateOverridesFromPackage",
           "scope_value: customerKey",
           "compiled_snapshot.customer.key must match customer_key",
           "work pool role ${membership.role_key} must have workflow.task.read",
         ]) &&
         sourceContains("scripts/qa/customer-package-lint.test.mjs", [
           "demo package proves customer package validation is not yoyoosun-only",
+          "moduleStates stay catalog-bound and explain non-enabled modules",
         ]) &&
         sourceContains("scripts/qa/customer-config-runtime-manifest.test.mjs", [
+          "compiles controlled module state overrides",
           "compiles neutral demo package without yoyoosun scope",
           "enforces entitlement and work pool integrity",
+        ]) &&
+        sourceContains("web/src/erp/config/devCustomerConfig.mjs", [
+          "moduleStateCatalogCount",
+          "moduleStates 只允许 catalog 模块和 enabled / read_only / disabled",
+          "buildPrintTemplateFieldSummary",
+          "销售订单受理未接打印模板",
+        ]) &&
+        sourceContains("web/src/erp/config/devCustomerConfig.test.mjs", [
+          "moduleStates 进入控制台预检但不改变默认客户包",
+          "moduleStateCounts.disabled",
+          "打印模板字段只读进入客户配置控制台",
         ]),
       evidence: [
         "config/customers/demo/customerPackage.mjs",
@@ -5294,6 +5315,8 @@ function collectChecks() {
         "scripts/qa/customer-config-runtime-manifest.mjs",
         "scripts/qa/customer-package-lint.test.mjs",
         "scripts/qa/customer-config-runtime-manifest.test.mjs",
+        "web/src/erp/config/devCustomerConfig.mjs",
+        "web/src/erp/config/devCustomerConfig.test.mjs",
       ],
     },
     {
@@ -5321,12 +5344,23 @@ function collectChecks() {
           "filterColumnsByEffectiveFieldPolicy",
           "config/customers/",
         ]) &&
+        sourceContains("web/src/erp/utils/adminProfileSync.test.mjs", [
+          "active revision 空页面清单不回退 RBAC-only",
+          "当前页面被 effective session 隐藏时需要跳转",
+          "本地开发可按 RBAC 查看客户配置隐藏页用于诊断",
+          "模块 disabled 后端投影隐藏业务页时正式账号需要跳转",
+        ]) &&
         sourceContains("web/scripts/style-l1/scenarios.mjs", [
-          "erp-effective-session-super-admin-system-diagnostic",
-          "erp-effective-session-empty-pages-blocks-outlet",
-          "权限管理",
+          "erp-effective-session-super-admin-product-core",
+          "erp-effective-session-direct-url-local-dev-diagnostic",
+          "erp-effective-session-sync-failure-local-dev-diagnostic",
+          "erp-effective-session-empty-pages-local-dev-diagnostic",
+          "erp-no-visible-menu-blocks-outlet",
+          "erp-effective-session-action-projection-business-pages",
+          "SHIP-STYLE-L1",
           "当前账号暂无可见后台入口",
           "当前客户有效配置的页面清单",
+          "actions 为空时不应允许",
         ]),
       evidence: [
         "web/src/erp/api/customerConfigApi.mjs",
@@ -6155,30 +6189,36 @@ if (process.argv[1] === import.meta.filename) {
   try {
     const args = parseArgs(process.argv.slice(2));
     if (args.help) {
-      console.log(USAGE.trim());
-      process.exit(0);
-    }
-    const audit = runPriorityAudit({
-      releaseEvidenceDir: args.releaseEvidenceDir,
-      runtimeEnvFile: args.runtimeEnvFile,
-    });
-    if (args.inputChecklistJson) {
-      console.log(JSON.stringify(buildInputChecklistOutput(audit), null, 2));
-    } else if (args.inputChecklistMarkdown) {
-      process.stdout.write(formatInputChecklistMarkdown(audit));
-    } else if (args.inputChecklistCsv) {
-      process.stdout.write(formatInputChecklistCsv(audit));
+      process.stdout.write(`${USAGE.trim()}\n`);
+      process.exitCode = 0;
     } else {
-      console.log(args.json ? JSON.stringify(audit, null, 2) : formatAudit(audit));
+      const audit = runPriorityAudit({
+        releaseEvidenceDir: args.releaseEvidenceDir,
+        runtimeEnvFile: args.runtimeEnvFile,
+      });
+      if (args.inputChecklistJson) {
+        process.stdout.write(
+          `${JSON.stringify(buildInputChecklistOutput(audit), null, 2)}\n`,
+        );
+      } else if (args.inputChecklistMarkdown) {
+        process.stdout.write(formatInputChecklistMarkdown(audit));
+      } else if (args.inputChecklistCsv) {
+        process.stdout.write(formatInputChecklistCsv(audit));
+      } else {
+        process.stdout.write(
+          `${args.json ? JSON.stringify(audit, null, 2) : formatAudit(audit)}\n`,
+        );
+      }
+      const releaseReadyOk = !args.failOnReleaseNotReady || audit.releaseReady;
+      const completionReadyOk =
+        !args.failOnCompletionNotReady ||
+        audit.completionAudit.canCompleteLocally;
+      process.exitCode =
+        audit.ok && releaseReadyOk && completionReadyOk ? 0 : 1;
     }
-    const releaseReadyOk = !args.failOnReleaseNotReady || audit.releaseReady;
-    const completionReadyOk =
-      !args.failOnCompletionNotReady ||
-      audit.completionAudit.canCompleteLocally;
-    process.exit(audit.ok && releaseReadyOk && completionReadyOk ? 0 : 1);
   } catch (error) {
     console.error(error.message);
     console.error(USAGE.trim());
-    process.exit(1);
+    process.exitCode = 1;
   }
 }

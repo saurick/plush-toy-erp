@@ -4,6 +4,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { setTimeout as delay } from 'node:timers/promises'
+import { pathToFileURL } from 'node:url'
 
 import { chromium } from 'playwright'
 import {
@@ -12,17 +13,23 @@ import {
   safeScreenshot,
 } from './realLoginSmokeShared.mjs'
 
-const runtime = createRealLoginSmokeRuntime({
-  scriptDir: import.meta.dirname,
-  outputSubdir: 'purchase-receipt-real-write-browser-e2e',
-  defaultPort: 4196,
-})
+const DEFAULT_PORT = 4196
+const INPUT_TEMPLATE_SCOPE =
+  'purchase-receipt-real-write-browser-e2e-input-template'
+const PREFLIGHT_SCOPE =
+  'purchase-receipt-real-write-browser-e2e-preflight-report'
+const webDir = path.resolve(import.meta.dirname, '..')
+const repoRoot = path.resolve(webDir, '..')
 
 const runID = `PR-BROWSER-${Date.now()}`
 const receiptNo = runID
 const lotNo = `${runID}-LOT`
 const quantity = '2'
-const args = new Set(process.argv.slice(2))
+const argv = process.argv.slice(2)
+const args = new Set(argv)
+const printInputTemplate = args.has('--print-input-template')
+const printHelp = args.has('-h') || args.has('--help')
+const preflightReportPath = resolveOptionalReportPath(argv)
 const seedCoreDemo = args.has('--seed-core-demo')
 const persistentTestDataAccepted =
   args.has('--accept-persistent-test-data') ||
@@ -33,8 +40,117 @@ const externalTargetAllowed =
 const cleanupPolicy =
   '采购入库是不可物理删除的事实源单据；本脚本过账后只做取消冲正，保留带 PR-BROWSER-* 前缀的可追踪模拟单据。'
 
+export function buildInputTemplate() {
+  return {
+    scope: INPUT_TEMPLATE_SCOPE,
+    writesDatabase: false,
+    callsBackend: false,
+    startsBrowser: false,
+    startsDevServer: false,
+    readsLocalConfig: false,
+    downstreamWritesDatabase: true,
+    downstreamStartsBrowser: true,
+    downstreamCallsBackend: true,
+    requiresPersistentTestDataAcceptance: true,
+    defaultPort: DEFAULT_PORT,
+    generatedRecordPrefix: 'PR-BROWSER-*',
+    cleanupPolicy,
+    safeTargetPolicy:
+      'Real smoke defaults to localhost / 127.0.0.1 / ::1 only. Prepared development or test targets require --allow-external-base-url together with persistent test data acceptance. Never run this against production or a formal customer target.',
+    secretInputs: [
+      'REAL_LOGIN_ADMIN_USERNAME/REAL_LOGIN_ADMIN_PASSWORD or server/configs/dev/config.local.yaml admin credentials',
+    ],
+    optionalInputs: [
+      'REAL_LOGIN_SMOKE_BASE_URL',
+      'REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL',
+      'REAL_LOGIN_SMOKE_PORT',
+      'REAL_LOGIN_SMOKE_HEADED',
+      'PURCHASE_RECEIPT_E2E_ACCEPT_PERSISTENT_TEST_DATA',
+      'PURCHASE_RECEIPT_E2E_ALLOW_EXTERNAL_BASE_URL',
+      '--preflight-report',
+      '--seed-core-demo',
+    ],
+    commands: [
+      'PATH=/usr/local/bin:$PATH node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template',
+      'PATH=/usr/local/bin:$PATH node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --preflight-report output/purchase-receipt-real-write-browser-e2e/preflight.json',
+      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-receipt-real-write",
+      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-receipt-real-write -- --seed-core-demo",
+      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PATH=/usr/local/bin:$PATH node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --accept-persistent-test-data",
+      "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' REAL_LOGIN_SMOKE_BASE_URL='http://127.0.0.1:4196' PATH=/usr/local/bin:$PATH node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --accept-persistent-test-data",
+    ],
+    boundary:
+      'This template only prints purchase receipt browser E2E prerequisites. It does not read local config, validate credentials, call backend health/auth endpoints, start Vite, start Playwright, log in, create purchase receipts, post inventory facts, cancel/reverse receipts, write reports, or write database rows. The real smoke writes local/development simulated purchase receipt facts and requires explicit persistent test data acceptance.',
+  }
+}
+
+export async function buildPreflightReport() {
+  const baseURL = resolveSmokeBaseURL()
+  const backendHealthURL = resolveBackendHealthURL()
+  const backendHealth = await probeURL(backendHealthURL)
+  const credentialEnvNames = [
+    'REAL_LOGIN_ADMIN_USERNAME',
+    'REAL_LOGIN_ADMIN_PASSWORD',
+  ]
+  const presentCredentialEnvNames = credentialEnvNames.filter((name) =>
+    Boolean(String(process.env[name] || '').trim())
+  )
+  const credentialEnvComplete =
+    presentCredentialEnvNames.length === credentialEnvNames.length
+  const safeTarget = analyzeSafeWriteTarget(baseURL)
+  const blockers = []
+  if (!persistentTestDataAccepted) {
+    blockers.push('missing-persistent-test-data-acceptance')
+  }
+  if (!credentialEnvComplete) {
+    blockers.push('missing-admin-credential-env')
+  }
+  if (!backendHealth.ok) {
+    blockers.push('backend-health-unreachable')
+  }
+  if (!safeTarget.allowed) {
+    blockers.push('external-base-url-not-allowed')
+  }
+
+  return {
+    scope: PREFLIGHT_SCOPE,
+    generatedAt: new Date().toISOString(),
+    writesDatabase: false,
+    callsJSONRPC: false,
+    startsBrowser: false,
+    startsDevServer: false,
+    readsLocalConfig: false,
+    readsPasswordValue: false,
+    storesPasswordValue: false,
+    storesAccessToken: false,
+    storesAuthorizationHeader: false,
+    baseURL,
+    backendHealthURL,
+    backendHealth,
+    needsManagedDevServer: !String(
+      process.env.REAL_LOGIN_SMOKE_BASE_URL || ''
+    ).trim(),
+    persistentTestDataAccepted,
+    externalTargetAllowed,
+    safeTarget,
+    credentialEnvComplete,
+    presentCredentialEnvNames,
+    generatedRecordPrefix: 'PR-BROWSER-*',
+    cleanupPolicy,
+    readyForRealSmoke: blockers.length === 0,
+    blockers,
+    nextCommand: blockers.length
+      ? 'Resolve blockers, then rerun this preflight before real browser write smoke.'
+      : "REAL_LOGIN_ADMIN_USERNAME='<local-admin>' REAL_LOGIN_ADMIN_PASSWORD='<local-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-receipt-real-write",
+  }
+}
+
 async function main() {
-  assertSafePersistentWriteTarget()
+  const runtime = createRealLoginSmokeRuntime({
+    scriptDir: import.meta.dirname,
+    outputSubdir: 'purchase-receipt-real-write-browser-e2e',
+    defaultPort: DEFAULT_PORT,
+  })
+  assertSafePersistentWriteTarget(runtime.baseURL)
 
   const report = {
     name: 'purchase-receipt-real-write-browser-e2e',
@@ -65,7 +181,7 @@ async function main() {
       const errors = attachErrorCollectors(page)
 
       try {
-        await loginAsAdminForReceiptE2E(page, credentials)
+        await loginAsAdminForReceiptE2E(page, credentials, runtime.baseURL)
         report.steps.push({ key: 'login', status: 'pass' })
 
         const refs = await resolveReferenceData(page)
@@ -76,7 +192,11 @@ async function main() {
         }
         report.steps.push({ key: 'reference-data', status: 'pass' })
 
-        const draftReceipt = await createReceiptWithItemForUI(page, refs)
+        const draftReceipt = await createReceiptWithItemForUI(
+          page,
+          refs,
+          runtime.baseURL
+        )
         report.receipt_id = draftReceipt.id
         report.steps.push({
           key: 'create-draft-with-item-rpc',
@@ -124,7 +244,7 @@ async function main() {
         )
         throw error
       } finally {
-        await writeReport(report)
+        await writeReport(report, runtime.outputDir)
         await page.close()
       }
     } finally {
@@ -142,7 +262,159 @@ async function main() {
   }
 }
 
-function assertSafePersistentWriteTarget() {
+async function runCli() {
+  if (printInputTemplate) {
+    console.log(JSON.stringify(buildInputTemplate(), null, 2))
+    return
+  }
+
+  if (printHelp) {
+    console.log(
+      [
+        'Usage:',
+        '  node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template',
+        '  node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --preflight-report output/purchase-receipt-real-write-browser-e2e/preflight.json',
+        '  node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --accept-persistent-test-data [--seed-core-demo]',
+        '',
+        'This script runs a real browser E2E that persists local/development simulated purchase receipt facts. Use --print-input-template first when checking prerequisites.',
+      ].join('\n')
+    )
+    return
+  }
+
+  if (preflightReportPath) {
+    const report = await buildPreflightReport()
+    await writeJSONReport(preflightReportPath, report)
+    console.log(
+      `[purchase-receipt-real-write-browser-e2e] preflight report written: ${path.relative(
+        repoRoot,
+        preflightReportPath
+      )} ready=${report.readyForRealSmoke}`
+    )
+    return
+  }
+
+  await main()
+}
+
+function resolveOptionalReportPath(tokens) {
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index]
+    if (
+      token === '--print-input-template' ||
+      token === '-h' ||
+      token === '--help' ||
+      token === '--accept-persistent-test-data' ||
+      token === '--allow-external-base-url' ||
+      token === '--seed-core-demo'
+    ) {
+      continue
+    }
+    const equalIndex = token.indexOf('=')
+    const key = token.slice(2, equalIndex === -1 ? undefined : equalIndex)
+    if (!token.startsWith('--')) {
+      continue
+    }
+    if (key !== 'preflight-report') {
+      continue
+    }
+    const value =
+      equalIndex === -1 ? tokens[index + 1] : token.slice(equalIndex + 1)
+    if (!value || String(value).startsWith('--')) {
+      throw new Error('参数 --preflight-report 缺少值')
+    }
+    return resolveRepoOutputPath(value)
+  }
+  return ''
+}
+
+function resolveRepoOutputPath(raw) {
+  const value = String(raw || '').trim()
+  if (!value) {
+    throw new Error('参数 --preflight-report 缺少值')
+  }
+  const resolved = path.resolve(repoRoot, value)
+  const relative = path.relative(repoRoot, resolved)
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error('--preflight-report must stay inside the repository')
+  }
+  return resolved
+}
+
+function resolveSmokeBaseURL() {
+  const raw = String(process.env.REAL_LOGIN_SMOKE_BASE_URL || '').trim()
+  return normalizeSmokeURL(
+    raw ||
+      `http://127.0.0.1:${Number(process.env.REAL_LOGIN_SMOKE_PORT || DEFAULT_PORT)}`,
+    'REAL_LOGIN_SMOKE_BASE_URL'
+  )
+}
+
+function resolveBackendHealthURL() {
+  return normalizeSmokeURL(
+    process.env.REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL ||
+      'http://127.0.0.1:8300/healthz',
+    'REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL'
+  )
+}
+
+function normalizeSmokeURL(raw, label) {
+  const url = new URL(String(raw || '').trim())
+  if (url.username || url.password) {
+    throw new Error(`${label} must not contain username or password`)
+  }
+  return url.toString().replace(/\/+$/u, '')
+}
+
+function analyzeSafeWriteTarget(baseURL) {
+  const targetURL = new URL(baseURL)
+  const safeHosts = new Set(['127.0.0.1', 'localhost', '::1'])
+  const isLocalHost = safeHosts.has(targetURL.hostname)
+  return {
+    host: targetURL.hostname,
+    isLocalHost,
+    externalTargetAllowed,
+    allowed: isLocalHost || externalTargetAllowed,
+  }
+}
+
+async function probeURL(url, { timeoutMs = 3000 } = {}) {
+  const startedAt = Date.now()
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, {
+      redirect: 'manual',
+      signal: controller.signal,
+    })
+    return {
+      ok: response.ok || response.status === 302 || response.status === 304,
+      status: response.status,
+      elapsedMs: Date.now() - startedAt,
+      error: '',
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      elapsedMs: Date.now() - startedAt,
+      error:
+        error?.name === 'AbortError'
+          ? 'timeout'
+          : String(error?.message || error),
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function writeJSONReport(filePath, payload) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true })
+  await fs.writeFile(`${filePath}.tmp`, `${JSON.stringify(payload, null, 2)}\n`)
+  await fs.rename(`${filePath}.tmp`, filePath)
+}
+
+function assertSafePersistentWriteTarget(baseURL) {
   if (!persistentTestDataAccepted) {
     throw new Error(
       [
@@ -155,12 +427,12 @@ function assertSafePersistentWriteTarget() {
     )
   }
 
-  const targetURL = new URL(runtime.baseURL)
+  const targetURL = new URL(baseURL)
   const safeHosts = new Set(['127.0.0.1', 'localhost', '::1'])
   if (!safeHosts.has(targetURL.hostname) && !externalTargetAllowed) {
     throw new Error(
       [
-        `拒绝对非本地页面目标运行真实写入 e2e：${runtime.baseURL}`,
+        `拒绝对非本地页面目标运行真实写入 e2e：${baseURL}`,
         '如果这是明确准备好的开发 / 测试环境，需同时显式传入：',
         '  --accept-persistent-test-data --allow-external-base-url',
         '禁止把该脚本直接跑到生产或目标客户环境。',
@@ -177,8 +449,8 @@ async function seedCoreDemoData(report) {
   report.seed_core_demo_output = result.stdout.trim().split('\n').slice(-16)
 }
 
-async function loginAsAdminForReceiptE2E(page, credentials) {
-  await page.goto(new URL('/admin-login', `${runtime.baseURL}/`).toString(), {
+async function loginAsAdminForReceiptE2E(page, credentials, baseURL) {
+  await page.goto(new URL('/admin-login', `${baseURL}/`).toString(), {
     waitUntil: 'domcontentloaded',
   })
   await page.getByLabel('管理员账号').fill(credentials.username)
@@ -264,7 +536,7 @@ async function resolveReferenceData(page) {
   return { material, unit, warehouse }
 }
 
-async function createReceiptWithItemForUI(page, refs) {
+async function createReceiptWithItemForUI(page, refs, baseURL) {
   const data = await rpc(
     page,
     'purchase',
@@ -292,12 +564,9 @@ async function createReceiptWithItemForUI(page, refs) {
   const receipt = data?.purchase_receipt
   assert.ok(receipt?.id, `创建采购入库测试草稿失败: ${JSON.stringify(data)}`)
 
-  await page.goto(
-    new URL('/erp/warehouse/inbound', `${runtime.baseURL}/`).toString(),
-    {
-      waitUntil: 'domcontentloaded',
-    }
-  )
+  await page.goto(new URL('/erp/warehouse/inbound', `${baseURL}/`).toString(), {
+    waitUntil: 'domcontentloaded',
+  })
   await page.getByRole('heading', { name: '入库管理' }).waitFor({
     state: 'visible',
     timeout: 15_000,
@@ -458,10 +727,10 @@ async function rpc(page, service, method, params = {}) {
   throw new Error(`RPC ${service}.${method} failed after retries`)
 }
 
-async function writeReport(report) {
-  await fs.mkdir(runtime.outputDir, { recursive: true })
-  const jsonPath = path.resolve(runtime.outputDir, 'report.json')
-  const mdPath = path.resolve(runtime.outputDir, 'report.md')
+async function writeReport(report, outputDir) {
+  await fs.mkdir(outputDir, { recursive: true })
+  const jsonPath = path.resolve(outputDir, 'report.json')
+  const mdPath = path.resolve(outputDir, 'report.md')
   await fs.writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`)
   await fs.writeFile(mdPath, renderMarkdownReport(report))
 }
@@ -489,4 +758,12 @@ function renderMarkdownReport(report) {
     .join('\n')
 }
 
-await main()
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  runCli().catch((error) => {
+    console.error(error?.stack || error?.message || error)
+    process.exit(1)
+  })
+}

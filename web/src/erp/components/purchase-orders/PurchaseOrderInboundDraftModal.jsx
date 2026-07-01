@@ -16,6 +16,12 @@ import { formatQuantity } from '../../utils/businessLineItems.mjs'
 
 const { Text } = Typography
 
+function purchaseOrderLabel(order) {
+  if (order?.purchase_order_no) return order.purchase_order_no
+  if (order?.id) return '采购订单已关联'
+  return '-'
+}
+
 export default function PurchaseOrderInboundDraftModal({
   open,
   form,
@@ -120,9 +126,9 @@ export default function PurchaseOrderInboundDraftModal({
           description={
             <Space direction="vertical" size={2}>
               <Text>
-                {`来源采购订单：${
-                  order?.purchase_order_no || order?.id || '-'
-                }；供应商：${resolveSupplierName(order)}`}
+                {`来源采购订单：${purchaseOrderLabel(
+                  order
+                )}；供应商：${resolveSupplierName(order)}`}
               </Text>
               <Text type="secondary">
                 下方只是生成前预览；后端会在保存时按采购订单状态、来源行和剩余数量重新校验，不由前端直接写库存事实。

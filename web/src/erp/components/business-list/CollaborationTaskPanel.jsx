@@ -23,6 +23,7 @@ import {
 } from '../../utils/businessCollaborationTasks.mjs'
 import {
   canRunWorkflowTaskAction,
+  getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskReadonlyReason,
 } from '../../utils/workflowTaskBoard.mjs'
 import { formatWorkflowTaskSource } from '../../utils/dashboardTaskDisplay.mjs'
@@ -470,7 +471,8 @@ export function CollaborationTaskPanel({
               </div>
               <div className="erp-business-module-task-item__meta">
                 <Tag>
-                  {roleLabels.get(task.owner_role_key) || task.owner_role_key}
+                  {roleLabels.get(task.owner_role_key) ||
+                    getWorkflowTaskOwnerRoleLabel(task)}
                 </Tag>
                 <Tag color={isBlocking ? 'red' : isTerminal ? 'green' : 'blue'}>
                   {statusLabels.get(taskStatusKey) || taskStatusKey}

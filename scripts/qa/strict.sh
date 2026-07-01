@@ -16,36 +16,49 @@ print_help() {
   4) workflow-fact-boundary
   5) workflow-ui-action-boundary
   6) formal-frontend-customer-config-boundary
-  7) multi-client-role-workflow-priority-audit
-  8) docs-inventory
-  9) industry-template-boundaries
-  10) private-deployment-boundaries
-  11) customer-web-config-overlay
-  12) deployment-package-lint
-  13) run-smoke-script
-  14) immutable-version-evidence
-  15) release-evidence-gate
-  16) production-preflight
-  17) backup-restore-rehearsal-script
-  18) rollback-rehearsal-report
-  19) customer-config-manifest-evidence
-  20) customer-config-activation-gate
-  21) customer-config-release-execute
-  22) customer-config-release-readiness
-  23) customer-config-boundaries
-  24) customer-package-lint
-  25) customer-config-runtime-manifest
-  26) customer-import-tooling
-  27) trial-simulated-data
-  28) operational-fact-simulated-closure
-  29) mobile-workflow-simulated-closure
-  30) mvp-closure
-  31) industry-template-closure
-  32) private-deployment-package-closure
-  33) shellcheck + shfmt（可选）
-  34) govulncheck（可选）
-  34) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
-  35) server: go test ./... + make build
+  7) admin-profile-sync
+  8) frontend-role-menu-seed-contracts
+  9) dev-entry-config-contracts
+  10) trial-role-entry-docs
+  11) trial-account-rbac（无后端单测 + 浏览器 smoke 输入模板边界测试，不执行真实登录）
+  12) real-login-smoke-shared（真实登录 smoke 共享 URL 凭据边界单测，不执行真实登录）
+  13) mobile-auth-login-route-smoke（输入模板 + URL 凭据边界单测，不启动浏览器）
+  14) purchase-receipt-real-write-browser-e2e（输入模板 + 持久测试数据确认边界，不启动浏览器）
+  15) sales-order-field-chain-boundary
+  16) dev-entry-boundary
+  17) frontend-error-message-boundary
+  18) multi-client-role-workflow-priority-audit
+  19) docs-inventory
+  20) industry-template-boundaries
+  21) private-deployment-boundaries
+  22) customer-web-config-overlay
+  23) deployment-package-lint
+  24) run-smoke-script（CLI + 输入模板 + release gate 兼容报告）
+  25) immutable-version-evidence
+  26) release-evidence-gate
+  27) production-preflight
+  28) backup-restore-rehearsal-script
+  29) rollback-rehearsal-report
+  30) customer-config-manifest-evidence
+  31) customer-config-activation-gate
+  32) customer-config-release-execute
+  33) customer-config-release-readiness（聚合门禁 + 输入模板）
+  34) customer-config-boundaries
+  35) customer-package-lint
+  36) customer-config-runtime-manifest
+  37) customer-import-tooling
+  38) trial-simulated-data
+  39) operational-fact-simulated-closure
+  40) mobile-workflow-simulated-closure
+  41) mobile-workflow-runtime-browser-smoke
+  42) purchase-receipt-real-write-e2e（输入模板边界测试，不运行 Go 测试）
+  43) mvp-closure
+  44) industry-template-closure
+  45) private-deployment-package-closure
+  46) shellcheck + shfmt（可选）
+  47) govulncheck（可选）
+  48) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
+  49) server: go test ./... + make build
 
 环境变量:
   SKIP_DB_GUARD=1           跳过 DB 守卫
@@ -72,10 +85,13 @@ fi
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
-if ! command -v pnpm >/dev/null 2>&1; then
-  echo "[qa:strict] 未找到 pnpm，请先安装 pnpm"
+if ! command -v node >/dev/null 2>&1; then
+  echo "[qa:strict] 未找到 node，请先安装 Node.js"
   exit 1
 fi
+
+source "$ROOT_DIR/scripts/lib/pnpm.sh"
+PNPM_BIN="$(resolve_project_pnpm "$ROOT_DIR")"
 
 if ! command -v go >/dev/null 2>&1; then
   echo "[qa:strict] 未找到 go，请先安装 Go"
@@ -108,6 +124,86 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/formal-frontend-customer-config-boundary.test.mjs" ]; then
   echo "[qa:strict] 运行正式前端客户配置投影边界测试"
   node --test "$ROOT_DIR/scripts/qa/formal-frontend-customer-config-boundary.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/web/src/erp/utils/adminProfileSync.test.mjs" ]; then
+  echo "[qa:strict] 运行前端菜单投影同步边界测试"
+  node --test "$ROOT_DIR/web/src/erp/utils/adminProfileSync.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/web/src/erp/config/entryConfig.test.mjs" ]; then
+  echo "[qa:strict] 运行角色菜单与入口配置合同测试"
+  node --test \
+    "$ROOT_DIR/web/src/erp/config/entryConfig.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/menuPermissions.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/seedData.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/workflowStatus.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/web/src/erp/config/devTesting.test.mjs" ]; then
+  echo "[qa:strict] 运行开发入口配置合同测试"
+  node --test \
+    "$ROOT_DIR/web/src/erp/config/devHub.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/devTesting.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/devDocs.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/devGovernance.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/devPrototypes.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/devCapabilityLedger.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/devCustomerConfig.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/printTemplates.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/trial-role-entry-docs.test.mjs" ]; then
+  echo "[qa:strict] 运行试用角色入口文档边界测试"
+  node --test "$ROOT_DIR/scripts/qa/trial-role-entry-docs.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/trial-account-rbac.mjs" ]; then
+  if [ -f "$ROOT_DIR/scripts/qa/trial-account-rbac.test.mjs" ]; then
+    echo "[qa:strict] 运行试用账号 RBAC 边界单测"
+    node --test "$ROOT_DIR/scripts/qa/trial-account-rbac.test.mjs"
+  fi
+  echo "[qa:strict] 运行试用账号 RBAC 脚本语法检查"
+  node --check "$ROOT_DIR/scripts/qa/trial-account-rbac.mjs"
+fi
+
+if [ -f "$ROOT_DIR/web/scripts/trialDemoAccountBrowserSmoke.mjs" ]; then
+  if [ -f "$ROOT_DIR/web/scripts/trialDemoAccountBrowserSmoke.test.mjs" ]; then
+    echo "[qa:strict] 运行试用账号浏览器 smoke 输入模板边界测试"
+    node --test "$ROOT_DIR/web/scripts/trialDemoAccountBrowserSmoke.test.mjs"
+  fi
+  echo "[qa:strict] 运行试用账号浏览器 smoke 脚本语法检查"
+  node --check "$ROOT_DIR/web/scripts/trialDemoAccountBrowserSmoke.mjs"
+fi
+
+if [ -f "$ROOT_DIR/web/scripts/realLoginSmokeShared.test.mjs" ]; then
+  echo "[qa:strict] 运行真实登录 smoke 共享 URL 边界测试"
+  node --test "$ROOT_DIR/web/scripts/realLoginSmokeShared.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/web/scripts/mobileAuthLoginRouteSmoke.test.mjs" ]; then
+  echo "[qa:strict] 运行岗位任务端认证回跳 smoke 边界测试"
+  node --test "$ROOT_DIR/web/scripts/mobileAuthLoginRouteSmoke.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/web/scripts/purchaseReceiptRealWriteBrowserE2E.test.mjs" ]; then
+  echo "[qa:strict] 运行采购入库真实写入浏览器 e2e 边界测试"
+  node --test "$ROOT_DIR/web/scripts/purchaseReceiptRealWriteBrowserE2E.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/sales-order-field-chain-boundary.test.mjs" ]; then
+  echo "[qa:strict] 运行销售订单字段链路边界测试"
+  node --test "$ROOT_DIR/scripts/qa/sales-order-field-chain-boundary.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/dev-entry-boundary.test.mjs" ]; then
+  echo "[qa:strict] 运行开发验收入口边界测试"
+  node --test "$ROOT_DIR/scripts/qa/dev-entry-boundary.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/frontend-error-message-boundary.test.mjs" ]; then
+  echo "[qa:strict] 运行正式前端错误提示边界测试"
+  node --test "$ROOT_DIR/scripts/qa/frontend-error-message-boundary.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/multi-client-role-workflow-priority-audit.test.mjs" ]; then
@@ -258,6 +354,16 @@ if [ -f "$ROOT_DIR/scripts/qa/mobile-workflow-simulated-closure.test.mjs" ]; the
   node --test "$ROOT_DIR/scripts/qa/mobile-workflow-simulated-closure.test.mjs"
 fi
 
+if [ -f "$ROOT_DIR/scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs" ]; then
+  echo "[qa:strict] 运行岗位任务端真实浏览器模拟任务回归边界测试"
+  node --test "$ROOT_DIR/scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/purchase-receipt-real-write-e2e.test.mjs" ]; then
+  echo "[qa:strict] 运行采购入库服务层真实写入 e2e 边界测试"
+  node --test "$ROOT_DIR/scripts/qa/purchase-receipt-real-write-e2e.test.mjs"
+fi
+
 if [ -f "$ROOT_DIR/scripts/qa/mvp-closure.test.mjs" ]; then
   echo "[qa:strict] 运行 ERP MVP 闭环验收工具测试"
   node --test "$ROOT_DIR/scripts/qa/mvp-closure.test.mjs"
@@ -288,17 +394,17 @@ fi
 echo "[qa:strict] 运行 web 严格检查"
 (
   cd "$ROOT_DIR/web"
-  pnpm exec eslint --max-warnings=0 --ext .js --ext .jsx src/
-  pnpm exec stylelint "src/**/*.{css,scss,sass}" --max-warnings=0
+  "$PNPM_BIN" exec eslint --max-warnings=0 --ext .js --ext .jsx src/
+  "$PNPM_BIN" exec stylelint "src/**/*.{css,scss,sass}" --max-warnings=0
 
   # 兼容仓库差异：只有定义了 test 脚本才执行前端测试。
   if node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));process.exit(pkg.scripts&&pkg.scripts.test?0:1)"; then
-    pnpm test
+    "$PNPM_BIN" test
   else
     echo "[qa:strict] web/package.json 未定义 test，跳过前端测试"
   fi
 
-  pnpm build
+  "$PNPM_BIN" build
 )
 
 echo "[qa:strict] 运行 server 严格检查"

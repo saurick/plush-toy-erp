@@ -15,7 +15,9 @@ import {
 import { isTerminalWorkflowTask } from '../../utils/workflowDashboardStats.mjs'
 import {
   getTaskOwnerRoleKey,
+  getWorkflowTaskCodeLabel,
   getWorkflowTaskDueLabel,
+  getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskReason,
   getWorkflowTaskStatusMeta,
 } from '../../utils/workflowTaskBoard.mjs'
@@ -82,10 +84,6 @@ function getTaskActionTone(actionMode = '') {
   return 'neutral'
 }
 
-function formatTaskCode(task = {}) {
-  return task.task_code || `TASK-${task.id || '-'}`
-}
-
 export default function WorkflowTaskActionDrawer({
   task,
   actionMode = '',
@@ -107,7 +105,9 @@ export default function WorkflowTaskActionDrawer({
   const taskReason = task ? getWorkflowTaskReason(task) : ''
   const actionTone = getTaskActionTone(actionMode)
   const ownerRoleKey = task ? getTaskOwnerRoleKey(task) : ''
-  const ownerRoleLabel = roleLabelMap?.get?.(ownerRoleKey) || ownerRoleKey
+  const ownerRoleLabel =
+    roleLabelMap?.get?.(ownerRoleKey) ||
+    (task ? getWorkflowTaskOwnerRoleLabel(task) : '')
   const canOpenEntry = Boolean(task && entryPath && onOpenEntry)
   const allowedActionModeSet = new Set(allowedActionModes)
   const canSubmitAction = Boolean(
@@ -140,7 +140,7 @@ export default function WorkflowTaskActionDrawer({
       extra={
         task ? (
           <Space size={8} wrap>
-            <Tag>{formatTaskCode(task)}</Tag>
+            <Tag>{getWorkflowTaskCodeLabel(task)}</Tag>
             <Tag color={statusMeta?.color}>{statusMeta?.label}</Tag>
           </Space>
         ) : null

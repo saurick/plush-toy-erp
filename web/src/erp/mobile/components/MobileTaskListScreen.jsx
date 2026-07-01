@@ -21,6 +21,7 @@ import {
   MOBILE_MAIN_TAB_KEYS,
   MOBILE_MESSAGE_TAB_KEYS,
   MOBILE_TASK_FILTER_KEYS,
+  getMobileRoleLabel,
   getTaskQueueTone,
   getTaskSeverityView,
   resolveTaskBusinessChip,
@@ -584,7 +585,7 @@ export default function MobileTaskListScreen({
 
   const renderMinePanel = () => {
     const roleNames = (adminProfile?.roles || [])
-      .map((role) => role?.name || role?.role_key)
+      .map((role) => role?.name || getMobileRoleLabel(role?.role_key))
       .filter(Boolean)
       .join(' / ')
     return (

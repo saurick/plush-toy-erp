@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { buildRuntimeManifest } from "../qa/customer-config-runtime-manifest.mjs";
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
 import {
+  buildInputTemplate,
   parseCliArgs,
   runCustomerConfigRelease,
 } from "./customer-config-release-execute.mjs";
@@ -303,6 +304,41 @@ test("help 输出可运行", () => {
   assert.match(result.stdout, /Customer config release executor/);
   assert.match(result.stdout, /--activate/);
   assert.match(result.stdout, /--rollback/);
+  assert.match(result.stdout, /--print-input-template/);
+});
+
+test("input template 只输出前置清单且不读取目标文件", () => {
+  const template = buildInputTemplate();
+
+  assert.equal(template.scope, "customer-config-release-execute-input-template");
+  assert.equal(template.writesDatabase, false);
+  assert.equal(template.callsBackend, false);
+  assert.equal(template.readsManifest, false);
+  assert.equal(template.validatesReleaseEvidence, false);
+  assert.deepEqual(template.secretInputs, [
+    "CUSTOMER_CONFIG_ADMIN_TOKEN or CUSTOMER_CONFIG_ADMIN_USERNAME/CUSTOMER_CONFIG_ADMIN_PASSWORD",
+  ]);
+  assert.equal(template.confirmPhrases.publish, "PUBLISH_YOYOOSUN_CONFIG");
+  assert.equal(template.confirmPhrases.activate, "ACTIVATE_YOYOOSUN_CONFIG");
+  assert.equal(template.confirmPhrases.rollback, "ROLLBACK_YOYOOSUN_CONFIG");
+  assert(template.operations.includes("get_effective_session after activate or rollback"));
+  assert.match(template.commands.join("\n"), /--execute --activate/);
+  assert.match(template.commands.join("\n"), /--require-executed --require-activated/);
+  assert.match(template.boundary, /does not publish/);
+  assert.match(template.boundary, /effectiveSessionVerification/);
+  assert.match(template.boundary, /customer-config-effective-session/);
+});
+
+test("CLI input template 不要求 manifest 或 out", () => {
+  const result = spawnSync(process.execPath, [releaseCli, "--print-input-template"], {
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0);
+  const template = JSON.parse(result.stdout);
+  assert.equal(template.scope, "customer-config-release-execute-input-template");
+  assert.equal(template.callsBackend, false);
+  assert.equal(template.writesDatabase, false);
+  assert.match(template.commands.join("\n"), /customer-config-release-readiness\.mjs/);
 });
 
 test("parseCliArgs 支持发布和激活参数", () => {
@@ -323,6 +359,11 @@ test("parseCliArgs 支持发布和激活参数", () => {
   assert.equal(options.backendURL, "http://127.0.0.1:8300");
   assert.equal(options.execute, true);
   assert.equal(options.activate, true);
+});
+
+test("parseCliArgs 支持 input template", () => {
+  const options = parseCliArgs(["--print-input-template"]);
+  assert.equal(options.printInputTemplate, true);
 });
 
 test("parseCliArgs 支持 activate-only 重试路径", () => {

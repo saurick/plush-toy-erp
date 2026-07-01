@@ -1,4 +1,5 @@
 import { AUTH_SCOPE, getToken } from '../../common/auth/auth.js'
+import { getActionErrorMessage } from '../../common/utils/errorMessage.js'
 
 const DEFAULT_PDF_FILE_NAME = 'print-template.pdf'
 const DEFAULT_PDF_PREVIEW_TITLE = 'PDF 预览'
@@ -1137,8 +1138,7 @@ export const openPdfPreviewWindowFromBlob = async (
 
     return { blob, previewURL, previewWindow }
   } catch (error) {
-    const errorMessage =
-      String(error?.message || '').trim() || '生成 PDF 预览失败，请稍后重试。'
+    const errorMessage = getActionErrorMessage(error, '生成 PDF 预览')
     const previewHTML = buildPdfPreviewWindowHTML({
       title,
       statusText: errorMessage,

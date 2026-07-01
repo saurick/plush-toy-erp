@@ -57,7 +57,7 @@ test('masterDataOrderView: action permissions keep super admin shortcut before a
   )
 })
 
-test('masterDataOrderView: active session actions only narrow RBAC permissions', () => {
+test('masterDataOrderView: active session actions narrow normal accounts but not super admin', () => {
   assert.equal(
     hasActionPermission(
       {
@@ -66,7 +66,7 @@ test('masterDataOrderView: active session actions only narrow RBAC permissions',
       },
       'sales_order.create'
     ),
-    false
+    true
   )
   assert.equal(
     hasActionPermission(
@@ -87,6 +87,52 @@ test('masterDataOrderView: active session actions only narrow RBAC permissions',
       'sales_order.update'
     ),
     false
+  )
+})
+
+test('masterDataOrderView: super admin keeps all actions during diagnostic projection', () => {
+  assert.equal(
+    hasActionPermission(
+      {
+        is_super_admin: true,
+        effective_session: {
+          source: 'effective_session_sync_failed',
+          pages: [],
+          actions: [],
+        },
+      },
+      'sales_order.create'
+    ),
+    true
+  )
+  assert.equal(
+    hasActionPermission(
+      {
+        permissions: ['sales_order.create'],
+        effective_session: {
+          source: 'effective_session_sync_failed',
+          pages: [],
+          actions: [],
+        },
+      },
+      'sales_order.create'
+    ),
+    false
+  )
+  assert.equal(
+    hasActionPermission(
+      {
+        is_super_admin: true,
+        permissions: ['workflow.task.complete'],
+        effective_session: {
+          source: 'active_customer_config_revision',
+          pages: ['global-dashboard'],
+          actions: ['workflow.task.read'],
+        },
+      },
+      'workflow.task.complete'
+    ),
+    true
   )
 })
 
@@ -490,7 +536,8 @@ test('masterDataOrderView: unit display uses readable unit truth instead of raw 
   )
   assert.equal(formatUnitShortDisplayName(15, unitByID), '千克（KG）')
   assert.equal(formatUnitDisplayName(undefined, unitByID), '-')
-  assert.equal(formatUnitDisplayName(99, unitByID), '未知单位 #99')
+  assert.equal(formatUnitDisplayName(99, unitByID), '单位已关联')
+  assert.equal(formatUnitShortDisplayName(99, unitByID), '单位已关联')
 
   assert.deepEqual(buildUnitSelectOptions(units), [
     {

@@ -126,8 +126,14 @@ test('workflowTaskActionAccess: backend explain overrides local fallback', () =>
   assert.equal(access.source, 'backend')
   assert.equal(access.canRun('complete'), false)
   assert.equal(access.canRun('block'), true)
-  assert.deepEqual(access.allowedModes, ['block', 'urge'])
+  assert.equal(access.canRun('urge'), false)
+  assert.deepEqual(access.allowedModes, ['block'])
   assert.equal(access.getReason('complete'), '后端判定不可完成')
+  assert.equal(access.getReason('urge'), '后端未返回该动作权限，请刷新后重试。')
+  assert.equal(
+    access.byAction.urge.reasonCode,
+    'action_access_missing_from_backend'
+  )
 })
 
 test('workflowTaskActionAccess: fallback keeps local owner and terminal reasons', () => {
@@ -154,6 +160,32 @@ test('workflowTaskActionAccess: fallback keeps local owner and terminal reasons'
   })
   assert.equal(terminal.canRun('complete'), false)
   assert.equal(terminal.readonlyReason, '该任务已结束，只能查看上下文。')
+})
+
+test('workflowTaskActionAccess: failed backend explain disables local fallback actions', () => {
+  const access = buildWorkflowActionAccessState({
+    adminProfile: admin(),
+    task: task(),
+    failed: true,
+  })
+
+  assert.equal(access.source, 'fallback_failed')
+  assert.deepEqual(access.allowedModes, [])
+  assert.equal(access.canRun('complete'), false)
+  assert.equal(access.canRun('block'), false)
+  assert.equal(access.canRun('urge'), false)
+  assert.equal(
+    access.readonlyReason,
+    '无法核对后端任务动作权限，请刷新后重试。'
+  )
+  assert.equal(
+    access.getReason('complete'),
+    '无法核对后端任务动作权限，请刷新后重试。'
+  )
+  assert.equal(
+    access.byAction.complete.reasonCode,
+    'action_access_check_failed'
+  )
 })
 
 test('workflowTaskActionAccess: request outcome ignores stale and aborted responses', () => {

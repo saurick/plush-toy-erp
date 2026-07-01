@@ -9,6 +9,7 @@ const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR =
   "output/customers/yoyoosun/operational-fact-simulated-closure";
 const SIMULATION_PREFIX = "SIM-YOYOOSUN-OPFACT";
+const INPUT_TEMPLATE_SCOPE = "operational-fact-simulated-closure-input-template";
 const CONFIRM_PHRASE = "APPLY_SIMULATED_OPERATIONAL_FACTS";
 const FORBIDDEN_ARG_PATTERN =
   /--(?:execute|import|real|real-import|customer-data)/u;
@@ -24,6 +25,7 @@ const USAGE = `Operational fact simulated closure
 
 Usage:
   node scripts/qa/operational-fact-simulated-closure.mjs
+  node scripts/qa/operational-fact-simulated-closure.mjs --print-input-template
 
 Report-only mode:
   node scripts/qa/operational-fact-simulated-closure.mjs \\
@@ -40,6 +42,7 @@ Apply simulated operational fact data through JSON-RPC:
       --warehouse-id 1
 
 Options:
+  --print-input-template Print local input checklist only; no report/backend/database writes.
   --apply                Write simulated records through /rpc/operational_fact.
   --backend-url <url>    Backend base URL. Default ${DEFAULT_BACKEND_URL}.
   --out <dir>            Output report directory. Default ${DEFAULT_OUT_DIR}.
@@ -89,6 +92,9 @@ function asPositiveInt(value, pathName) {
 
 function normalizeBaseURL(raw) {
   const url = new URL(String(raw || DEFAULT_BACKEND_URL).trim());
+  if (url.username || url.password) {
+    throw new CliError("backend URL must not contain username or password", 2);
+  }
   url.pathname = url.pathname.replace(/\/+$/, "");
   url.search = "";
   url.hash = "";
@@ -99,6 +105,7 @@ function parseCliArgs(argv) {
   const options = {
     apply: false,
     help: false,
+    printInputTemplate: false,
     out: DEFAULT_OUT_DIR,
     backendURL: process.env.OPERATIONAL_FACT_SIM_BACKEND_URL || DEFAULT_BACKEND_URL,
     runId: process.env.OPERATIONAL_FACT_SIM_RUN_ID || buildTimestampRunId(),
@@ -113,6 +120,10 @@ function parseCliArgs(argv) {
     }
     if (token === "--help" || token === "-h") {
       options.help = true;
+      continue;
+    }
+    if (token === "--print-input-template") {
+      options.printInputTemplate = true;
       continue;
     }
     if (token === "--apply") {
@@ -158,7 +169,61 @@ function parseCliArgs(argv) {
   }
   options.backendURL = normalizeBaseURL(options.backendURL);
   options.runId = sanitizeRunId(options.runId);
+  if (options.printInputTemplate && options.apply) {
+    throw new CliError("--print-input-template cannot be combined with --apply", 2);
+  }
   return options;
+}
+
+function buildInputTemplate(options = {}) {
+  const backendURL = normalizeBaseURL(options.backendURL || DEFAULT_BACKEND_URL);
+  const out = optionalText(options.out) || DEFAULT_OUT_DIR;
+  const runId = sanitizeRunId(options.runId || "DEV-TESTING-REPORT");
+  return {
+    scope: INPUT_TEMPLATE_SCOPE,
+    customerKey: "yoyoosun",
+    scenario: "operational-fact-simulated-closure",
+    simulatedOnly: true,
+    realCustomerImport: false,
+    customerAcceptanceRequiredForClosure: false,
+    writesReports: false,
+    writesDatabase: false,
+    callsBackend: false,
+    importsRealCustomerData: false,
+    createsBusinessRecords: false,
+    downstreamReportOnlyWritesReports: true,
+    downstreamApplyWritesDatabase: true,
+    defaultBackendURL: DEFAULT_BACKEND_URL,
+    backendURL,
+    defaultOut: DEFAULT_OUT_DIR,
+    out,
+    runId,
+    requiredReportInputs: [
+      "--product-id <active_product_id>",
+      "--unit-id <active_unit_id>",
+      "--warehouse-id <active_warehouse_id>",
+    ],
+    requiredApplyInputs: [
+      "OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS",
+      "OPERATIONAL_FACT_SIM_PASSWORD or TRIAL_ACCOUNT_PASSWORD or ERP_ROLE_DEMO_PASSWORD",
+      "--product-id <active_product_id>",
+      "--unit-id <active_unit_id>",
+      "--warehouse-id <active_warehouse_id>",
+    ],
+    roleAccounts: ROLE_USERS,
+    commands: {
+      printInputTemplate:
+        "PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --print-input-template",
+      reportOnly:
+        `PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --product-id <active_product_id> --unit-id <active_unit_id> --warehouse-id <active_warehouse_id> --run-id ${runId} --out ${out}`,
+      applySimulated:
+        "OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS OPERATIONAL_FACT_SIM_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --apply --backend-url http://127.0.0.1:8300 --product-id <active_product_id> --unit-id <active_unit_id> --warehouse-id <active_warehouse_id>",
+      seedCoreDemo:
+        "PATH=/usr/local/bin:$PATH bash scripts/seed-core-demo-data.sh",
+    },
+    boundary:
+      "This template only prints prerequisites and commands. It does not write reports, call backend, login, import real customer data, write business_records, or create operational facts.",
+  };
 }
 
 function buildTimestampRunId(date = new Date()) {
@@ -597,6 +662,10 @@ async function main() {
     process.stdout.write(`${USAGE}\n`);
     return;
   }
+  if (options.printInputTemplate) {
+    process.stdout.write(`${JSON.stringify(buildInputTemplate(options), null, 2)}\n`);
+    return;
+  }
   const plan = buildPlan(options);
   const report = {
     mode: options.apply ? "apply-simulated-operational-facts" : "report-only",
@@ -643,9 +712,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 export {
+  buildInputTemplate,
   buildPlan,
   buildTimestampRunId,
   CONFIRM_PHRASE,
+  INPUT_TEMPLATE_SCOPE,
   parseCliArgs,
   sanitizeRunId,
 };

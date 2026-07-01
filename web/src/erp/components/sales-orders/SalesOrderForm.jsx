@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { CopyOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
 import {
   AutoComplete,
   Button,
@@ -21,6 +21,7 @@ import FieldWithUnitSuffix, {
   unitSuffixTextFromOptions,
 } from '../business-list/FieldWithUnitSuffix.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
+import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
   dateInputNotAfterRule,
@@ -73,19 +74,23 @@ function summarizeSalesOrderLines(lines = []) {
 }
 
 function skuLabel(sku = {}) {
-  return [sku.sku_code, sku.sku_name || sku.customer_sku || sku.barcode]
-    .filter(Boolean)
-    .join(' / ')
+  return (
+    [sku.sku_code, sku.sku_name || sku.customer_sku || sku.barcode]
+      .filter(Boolean)
+      .join(' / ') || 'SKU 已关联'
+  )
+}
+
+function contactOptionLabel(contact = {}) {
+  return (
+    [contact.name, contact.title, contactPhoneText(contact)]
+      .filter(Boolean)
+      .join(' / ') || '联系人已关联'
+  )
 }
 
 function contactPhoneText(contact = {}) {
   return contact.mobile || contact.phone || ''
-}
-
-function contactOptionLabel(contact = {}) {
-  return [contact.name, contact.title, contactPhoneText(contact)]
-    .filter(Boolean)
-    .join(' / ')
 }
 
 export function createBlankOrderLine(lineNo = 1) {
@@ -280,10 +285,16 @@ export function SalesOrderFormFields({
         <Select
           showSearch
           optionFilterProp="label"
-          options={customers.map((customer) => ({
-            label: `${customer.code || customer.id} - ${customer.name}`,
-            value: customer.id,
-          }))}
+          options={customers.map((customer) => {
+            const customerCode = String(customer.code || '').trim()
+            const customerName = String(customer.name || '').trim()
+            return {
+              label: customerCode
+                ? `${customerCode} - ${customerName || '未命名客户'}`
+                : customerName || '客户已关联',
+              value: customer.id,
+            }
+          })}
           onChange={onCustomerChange}
         />
       </Form.Item>
@@ -597,9 +608,7 @@ export function SalesOrderItemsFormSection({
               description="这里只选择来源记录；数量、单价和交期仍在主弹窗订单行里维护。"
               rows={productSKUs}
               columns={skuImportColumns}
-              getSelectedLabel={(sku) =>
-                sku?.sku_code || sku?.product_no || sku?.id || '-'
-              }
+              getSelectedLabel={skuLabel}
               searchPlaceholder="搜索 SKU"
               searchHint="可搜索：SKU 编码、名称、颜色、包装"
               emptyDescription="暂无可导入 SKU"
@@ -974,43 +983,33 @@ export function SalesOrderItemsFormSection({
                 })}
               </div>
             )}
-            <div className="erp-line-items-form__footer">
-              <div className="erp-line-items-form__footer-actions">
-                <Button
-                  type="dashed"
-                  icon={<PlusOutlined />}
-                  disabled={!canCreateItem}
-                  onClick={() => {
-                    const currentLines = form.getFieldValue('items') || []
-                    requestLineItemScroll(currentLines.length)
-                    add(createBlankOrderLine(getNextLineNo(currentLines)))
-                  }}
-                >
-                  添加条目
-                </Button>
-              </div>
-              <div className="erp-line-items-form__stats">
-                <span className="erp-line-items-form__stat">
-                  已录入
-                  <strong className="erp-line-items-form__stat-value">
-                    {lineSummary.count}
-                  </strong>
-                  条
-                </span>
-                <span className="erp-line-items-form__stat">
-                  数量合计
-                  <strong className="erp-line-items-form__stat-value">
-                    {formatSummaryNumber(lineSummary.quantity)}
-                  </strong>
-                </span>
-                <span className="erp-line-items-form__stat">
-                  金额合计
-                  <strong className="erp-line-items-form__stat-value">
-                    {formatSummaryNumber(lineSummary.amount, 2)}
-                  </strong>
-                </span>
-              </div>
-            </div>
+            <BusinessLineItemsFooter
+              addLabel="添加条目"
+              addDisabled={!canCreateItem}
+              onAdd={() => {
+                const currentLines = form.getFieldValue('items') || []
+                requestLineItemScroll(currentLines.length)
+                add(createBlankOrderLine(getNextLineNo(currentLines)))
+              }}
+              stats={[
+                {
+                  key: 'count',
+                  label: '已录入',
+                  value: lineSummary.count,
+                  suffix: '条',
+                },
+                {
+                  key: 'quantity',
+                  label: '数量合计',
+                  value: formatSummaryNumber(lineSummary.quantity),
+                },
+                {
+                  key: 'amount',
+                  label: '金额合计',
+                  value: formatSummaryNumber(lineSummary.amount, 2),
+                },
+              ]}
+            />
           </>
         )}
       </Form.List>

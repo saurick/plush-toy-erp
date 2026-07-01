@@ -1,13 +1,9 @@
 import { isAdminSessionUnavailableCode } from '../../common/consts/errorCodes.js'
 
 const EFFECTIVE_SESSION_SYNC_FAILED_SOURCE = 'effective_session_sync_failed'
-const SYSTEM_DIAGNOSTIC_PAGE_KEYS = new Set([
-  'permission-center',
-  'system-audit-logs',
-])
 
 function isLocalDevRuntime() {
-  return import.meta?.env?.DEV === true
+  return import.meta.env?.DEV === true
 }
 
 export function attachEffectiveSessionToAdminProfile(
@@ -100,14 +96,8 @@ export function resolveEffectiveSessionPageAccess(
           : 'local_dev_customer_config_diagnostic',
     }
   }
-  if (
-    isSuperAdmin &&
-    session?.source === EFFECTIVE_SESSION_SYNC_FAILED_SOURCE
-  ) {
-    return { allowed: true, reason: 'super_admin_sync_failed_diagnostic' }
-  }
-  if (isSuperAdmin && SYSTEM_DIAGNOSTIC_PAGE_KEYS.has(normalizedPageKey)) {
-    return { allowed: true, reason: 'super_admin_system_diagnostic' }
+  if (isSuperAdmin) {
+    return { allowed: true, reason: 'super_admin_product_core' }
   }
   return { allowed: false, reason: 'effective_session_page_blocked' }
 }
@@ -197,6 +187,9 @@ export function effectiveSessionAllowsAction(adminProfile, actionKey) {
   if (!normalizedActionKey) {
     return false
   }
+  if (adminProfile?.is_super_admin === true) {
+    return true
+  }
   const session = adminProfile?.effective_session
   if (!session || typeof session !== 'object') {
     return true
@@ -227,6 +220,9 @@ export function getEffectiveFieldPolicy(adminProfile, surfaceKey, fieldKey) {
 }
 
 export function isEffectiveFieldVisible(adminProfile, surfaceKey, fieldKey) {
+  if (adminProfile?.is_super_admin === true) {
+    return true
+  }
   const policy = getEffectiveFieldPolicy(adminProfile, surfaceKey, fieldKey)
   if (!policy || !Object.prototype.hasOwnProperty.call(policy, 'visible')) {
     return true

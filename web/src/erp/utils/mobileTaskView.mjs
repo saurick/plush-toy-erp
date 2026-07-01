@@ -18,10 +18,13 @@ import {
   isWarehouseWorkflowTask,
 } from './workflowDashboardStats.mjs'
 import {
+  getRoleDisplayName,
   isRoleKeyMatch,
   normalizeRoleKey,
   normalizeRolePayload,
 } from './roleKeys.mjs'
+import { formatWorkflowTaskSource } from './dashboardTaskDisplay.mjs'
+import { getWorkflowTaskGroupLabel } from './workflowTaskLabels.mjs'
 
 const taskStatusLabelMap = new Map(
   TASK_WORKFLOW_STATES.map((state) => [state.key, state.label])
@@ -50,15 +53,14 @@ const WAREHOUSE_SOURCE_TYPES = new Set([
   'outbound',
 ])
 const ROLE_EXTENDED_VISIBILITY_LABELS = Object.freeze({
-  pmc: 'PMC 扩展可见性关注 blocked / overdue / critical_path / 催办 / 升级 / 高优先级。',
-  boss: '老板扩展可见性关注高优先级、审批、出货风险、财务 critical 和升级到老板。',
+  pmc: 'PMC 扩展可见性关注阻塞、超时、关键路径、催办、升级和高优先级。',
+  boss: '老板扩展可见性关注高优先级、审批、出货风险、财务高风险和升级到老板。',
   production: '生产扩展可见性关注委外回货、成品返工和生产相关任务。',
-  sales: '业务扩展可见性关注出货、业务确认和 confirm_role_key。',
+  sales: '业务扩展可见性关注出货、业务确认和业务确认角色。',
   finance: '财务扩展可见性关注财务来源、财务通知和财务逾期。',
   warehouse: '仓库扩展可见性关注仓储来源和仓库任务。',
   quality: '品质扩展可见性关注质检来源、质检失败和品质任务。',
 })
-
 function payloadOf(task = {}) {
   return task.payload && typeof task.payload === 'object' ? task.payload : {}
 }
@@ -71,6 +73,18 @@ function appendReason(reasons, condition, reason) {
   if (condition) {
     reasons.push(reason)
   }
+}
+
+function roleLabel(roleKey, fallback = '当前岗位') {
+  return getRoleDisplayName(roleKey, fallback)
+}
+
+function taskGroupLabel(taskGroupKey, fallback = '业务协同') {
+  return getWorkflowTaskGroupLabel(taskGroupKey, fallback)
+}
+
+function sourceTypeLabel(sourceType) {
+  return formatWorkflowTaskSource({ source_type: sourceType })
 }
 
 function hasVisibilityPayloadSignal(taskView = {}) {
@@ -340,34 +354,38 @@ export function explainMobileTaskVisibility(
     normalizedRoleKey
   )
   const visible = isMobileTaskVisibleForRole(taskView, normalizedRoleKey)
+  const currentRoleLabel = roleLabel(normalizedRoleKey)
+  const ownerRoleLabel = roleLabel(taskView.owner_role_key, '未指定岗位')
 
   if (!normalizedRoleKey) {
-    blockers.push('未选择 role_key，无法判断岗位任务端角色可见性。')
+    blockers.push('未选择岗位，无法判断岗位任务端可见性。')
   }
 
   if (terminal) {
-    warnings.push(
-      'task_status_key 是终态；当前移动端规则会标记为终态并从活跃统计中排除。'
-    )
+    warnings.push('任务已处于终态；当前移动端规则会从活跃统计中排除。')
   }
 
-  appendReason(reasons, directOwnerMatch, 'owner_role_key 命中当前角色任务池。')
+  appendReason(
+    reasons,
+    directOwnerMatch,
+    `${currentRoleLabel}命中主责岗位任务池。`
+  )
 
   if (normalizedRoleKey === 'pmc') {
     appendReason(
       reasons,
       ['blocked', 'rejected'].includes(taskView.task_status_key),
-      'PMC 扩展命中 blocked / rejected 任务。'
+      'PMC 扩展命中阻塞或退回任务。'
     )
     appendReason(
       reasons,
       taskView.due_status === 'overdue',
-      'PMC 扩展命中 overdue 任务。'
+      'PMC 扩展命中已超时任务。'
     )
     appendReason(
       reasons,
       taskView.alert_level === 'critical',
-      'PMC 扩展命中 critical 预警。'
+      'PMC 扩展命中高风险预警。'
     )
     appendReason(reasons, taskView.is_urged, 'PMC 扩展命中已催办任务。')
     appendReason(reasons, taskView.is_escalated, 'PMC 扩展命中已升级任务。')
@@ -379,7 +397,7 @@ export function explainMobileTaskVisibility(
     appendReason(
       reasons,
       isCriticalPathWorkflowTask(taskView),
-      'PMC 扩展命中 critical_path 任务。'
+      'PMC 扩展命中关键路径任务。'
     )
     checks.push('PMC 可以看风险和卡点，但不能代办事实。')
   } else if (normalizedRoleKey === 'boss') {
@@ -391,12 +409,12 @@ export function explainMobileTaskVisibility(
     appendReason(
       reasons,
       isHighPriorityWorkflowTask(taskView),
-      '老板扩展命中 high priority 任务。'
+      '老板扩展命中高优先级任务。'
     )
     appendReason(
       reasons,
       taskView.due_status === 'overdue',
-      '老板扩展命中 overdue 任务。'
+      '老板扩展命中已超时任务。'
     )
     appendReason(
       reasons,
@@ -408,11 +426,11 @@ export function explainMobileTaskVisibility(
       taskView.notification_type === 'approval_required',
       '老板扩展命中审批提醒。'
     )
-    appendReason(reasons, isShipmentRisk, '老板扩展命中 shipment risk。')
+    appendReason(reasons, isShipmentRisk, '老板扩展命中出货风险。')
     appendReason(
       reasons,
       isFinanceWorkflowTask(taskView) && taskView.alert_level === 'critical',
-      '老板扩展命中 finance critical。'
+      '老板扩展命中财务高风险。'
     )
     checks.push(
       '老板可以看高优先级和升级关注，但不能代办财务 / 品质 / 仓库事实。'
@@ -423,69 +441,59 @@ export function explainMobileTaskVisibility(
       ['outsource_return_tracking', 'outsource_rework'].includes(
         taskView.task_group
       ),
-      'production 扩展命中委外回货 / 委外返工任务组。'
+      '生产经理扩展命中委外回货或委外返工。'
     )
     appendReason(
       reasons,
       taskView.task_group === 'finished_goods_rework',
-      'production 扩展命中成品返工任务组。'
+      '生产经理扩展命中成品返工。'
     )
     appendReason(
       reasons,
       isOutsourceReturnWorkflowTask(taskView) &&
         taskView.owner_role_key === 'production',
-      'production 扩展命中委外相关任务。'
+      '生产经理扩展命中委外相关任务。'
     )
     appendReason(
       reasons,
       isFinishedGoodsWorkflowTask(taskView) &&
         taskView.owner_role_key === 'production',
-      'production 扩展命中成品生产相关任务。'
+      '生产经理扩展命中成品生产相关任务。'
     )
     appendReason(
       reasons,
       payload.outsource_owner_role_key === 'outsource',
-      'production 扩展命中 outsource_owner_role_key。'
+      '生产经理扩展命中委外责任标记。'
     )
   } else if (normalizedRoleKey === 'finance') {
-    appendReason(
-      reasons,
-      isFinanceWorkflowTask(taskView),
-      'finance 命中财务任务。'
-    )
+    appendReason(reasons, isFinanceWorkflowTask(taskView), '财务命中财务任务。')
   } else if (normalizedRoleKey === 'warehouse') {
     appendReason(
       reasons,
       isWarehouseWorkflowTask(taskView),
-      'warehouse 命中仓库任务。'
+      '仓库命中仓储任务。'
     )
   } else if (normalizedRoleKey === 'quality') {
-    appendReason(
-      reasons,
-      isQualityWorkflowTask(taskView),
-      'quality 命中质检任务。'
-    )
+    appendReason(reasons, isQualityWorkflowTask(taskView), '品质命中质检任务。')
   } else if (normalizedRoleKey === 'sales') {
     appendReason(
       reasons,
       isRoleKeyMatch(payload.confirm_role_key, 'sales'),
-      'sales 扩展命中 confirm_role_key。'
+      '业务扩展命中业务确认角色。'
     )
     appendReason(
       reasons,
       ['shipping-release', 'outbound'].includes(taskView.source_type),
-      'sales 扩展命中出货相关 source_type。'
+      '业务扩展命中出货相关来源。'
     )
   } else if (normalizedRoleKey === 'purchase') {
-    checks.push(
-      '采购岗位任务端当前按 owner_role_key 直查，没有额外扩展可见性。'
-    )
+    checks.push('采购岗位任务端当前只看主责岗位任务池，没有额外扩展可见性。')
   }
 
   if (!visible && normalizedRoleKey) {
     if (!directOwnerMatch) {
       blockers.push(
-        `owner_role_key=${taskView.owner_role_key || '-'} 不匹配 role_key=${normalizedRoleKey}。`
+        `任务主责岗位是${ownerRoleLabel}，不属于${currentRoleLabel}。`
       )
     }
     if (!ROLE_EXTENDED_VISIBILITY_LABELS[normalizedRoleKey]) {
@@ -495,29 +503,27 @@ export function explainMobileTaskVisibility(
     }
 
     if (normalizedRoleKey === 'pmc') {
-      blockers.push(
-        '未命中 blocked / overdue / critical_path / high priority / urged / escalated。'
-      )
+      blockers.push('未命中阻塞、超时、关键路径、高优先级、催办或升级关注项。')
     }
     if (normalizedRoleKey === 'boss') {
       blockers.push(
-        '未命中 high priority / finance critical / shipment risk / approval_required / escalate_to_boss。'
+        '未命中高优先级、财务高风险、出货风险、审批提醒或升级给老板。'
       )
     }
     if (normalizedRoleKey === 'production') {
       blockers.push(
-        'task_group 不在生产关注范围，且 payload 未标记委外或成品生产信号。'
+        `${taskGroupLabel(taskView.task_group)}不在生产关注范围，且任务没有委外或成品生产标记。`
       )
     }
     if (
       ['finance', 'warehouse', 'quality', 'sales'].includes(normalizedRoleKey)
     ) {
-      blockers.push('source_type 或 task_group 不匹配该角色关注范围。')
+      blockers.push(
+        `${sourceTypeLabel(taskView.source_type)}或${taskGroupLabel(taskView.task_group)}不匹配${currentRoleLabel}关注范围。`
+      )
     }
     if (!hasVisibilityPayloadSignal(taskView)) {
-      blockers.push(
-        'payload 缺少扩展可见性需要的 alert_type / notification_type / critical_path 等字段。'
-      )
+      blockers.push('任务缺少扩展可见性需要的预警、通知或关键路径标记。')
     }
   }
 

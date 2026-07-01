@@ -13,6 +13,8 @@ import {
 
 const NOW_SEC = 1_800_000_000
 const NOW_MS = NOW_SEC * 1000
+const VISIBLE_TECHNICAL_TASK_FIELD_PATTERN =
+  /owner_role_key|role_key|task_status_key|task_group|source_type|payload|critical_path|high priority|finance critical|shipment risk|confirm_role_key|outsource_owner_role_key/u
 
 function task(overrides = {}) {
   return {
@@ -29,6 +31,18 @@ function task(overrides = {}) {
     due_at: NOW_SEC + 60 * 60,
     payload: {},
     ...overrides,
+  }
+}
+
+function assertNoVisibleTechnicalTaskFields(explanation) {
+  const visibleTexts = [
+    ...explanation.reasons,
+    ...explanation.blockers,
+    ...explanation.warnings,
+    ...explanation.checks,
+  ]
+  for (const text of visibleTexts) {
+    assert.doesNotMatch(text, VISIBLE_TECHNICAL_TASK_FIELD_PATTERN)
   }
 }
 
@@ -727,11 +741,10 @@ test('mobileTaskView: explainMobileTaskVisibility 解释 owner 命中和终态�
   assert.equal(explanation.visible, true)
   assert.equal(explanation.terminal, true)
   assert(
-    explanation.reasons.some((item) => item.includes('owner_role_key 命中'))
+    explanation.reasons.some((item) => item.includes('品质命中主责岗位任务池'))
   )
-  assert(
-    explanation.warnings.some((item) => item.includes('task_status_key 是终态'))
-  )
+  assert(explanation.warnings.some((item) => item.includes('任务已处于终态')))
+  assertNoVisibleTechnicalTaskFields(explanation)
 })
 
 test('mobileTaskView: explainMobileTaskVisibility 解释 PMC 风险扩展命中', () => {
@@ -747,10 +760,9 @@ test('mobileTaskView: explainMobileTaskVisibility 解释 PMC 风险扩展命中'
   )
 
   assert.equal(explanation.visible, true)
-  assert(
-    explanation.reasons.some((item) => item.includes('blocked / rejected'))
-  )
-  assert(explanation.reasons.some((item) => item.includes('critical_path')))
+  assert(explanation.reasons.some((item) => item.includes('阻塞或退回任务')))
+  assert(explanation.reasons.some((item) => item.includes('关键路径任务')))
+  assertNoVisibleTechnicalTaskFields(explanation)
 })
 
 test('mobileTaskView: explainMobileTaskVisibility 解释老板扩展命中', () => {
@@ -788,13 +800,14 @@ test('mobileTaskView: explainMobileTaskVisibility 解释老板扩展命中', () 
   )
 
   assert.equal(highPriority.visible, true)
-  assert(highPriority.reasons.some((item) => item.includes('high priority')))
+  assert(highPriority.reasons.some((item) => item.includes('高优先级任务')))
   assert.equal(financeCritical.visible, true)
-  assert(
-    financeCritical.reasons.some((item) => item.includes('finance critical'))
-  )
+  assert(financeCritical.reasons.some((item) => item.includes('财务高风险')))
   assert.equal(shipmentRisk.visible, true)
-  assert(shipmentRisk.reasons.some((item) => item.includes('shipment risk')))
+  assert(shipmentRisk.reasons.some((item) => item.includes('出货风险')))
+  assertNoVisibleTechnicalTaskFields(highPriority)
+  assertNoVisibleTechnicalTaskFields(financeCritical)
+  assertNoVisibleTechnicalTaskFields(shipmentRisk)
 })
 
 test('mobileTaskView: explainMobileTaskVisibility 解释生产扩展和不可见原因', () => {
@@ -824,10 +837,14 @@ test('mobileTaskView: explainMobileTaskVisibility 解释生产扩展和不可见
   assert.equal(notVisible.visible, false)
   assert(
     notVisible.blockers.some((item) =>
-      item.includes('owner_role_key=warehouse')
+      item.includes('任务主责岗位是仓库，不属于老板')
     )
   )
-  assert(notVisible.blockers.some((item) => item.includes('payload 缺少')))
+  assert(
+    notVisible.blockers.some((item) => item.includes('任务缺少扩展可见性'))
+  )
+  assertNoVisibleTechnicalTaskFields(productionVisible)
+  assertNoVisibleTechnicalTaskFields(notVisible)
 })
 
 test('mobileTaskView: 预警摘要统计可用于移动端顶部卡片', () => {

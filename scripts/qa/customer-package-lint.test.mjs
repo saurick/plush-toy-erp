@@ -117,6 +117,44 @@ test("customer-package-lint: package cannot carry executable or raw payloads", (
   );
 });
 
+test("customer-package-lint: moduleStates stay catalog-bound and explain non-enabled modules", () => {
+  validatePackage({
+    ...demoCustomerPackage,
+    moduleStates: Object.freeze([
+      Object.freeze({
+        moduleKey: "shipments",
+        state: "read_only",
+        reason: "trial package keeps shipment history visible without writes",
+      }),
+    ]),
+  });
+
+  assert.throws(
+    () =>
+      validatePackage({
+        ...demoCustomerPackage,
+        moduleStates: [{ moduleKey: "unknown_module", state: "disabled", reason: "invalid" }],
+      }),
+    /moduleStates\[0\]\.moduleKey contains unknown module unknown_module/,
+  );
+  assert.throws(
+    () =>
+      validatePackage({
+        ...demoCustomerPackage,
+        moduleStates: [{ moduleKey: "shipments", state: "paused", reason: "invalid" }],
+      }),
+    /moduleStates\[0\]\.state must be enabled, read_only or disabled/,
+  );
+  assert.throws(
+    () =>
+      validatePackage({
+        ...demoCustomerPackage,
+        moduleStates: [{ moduleKey: "shipments", state: "disabled" }],
+      }),
+    /moduleStates\[0\]\.reason must be a non-empty string/,
+  );
+});
+
 test("customer-package-lint: publish activate rollback switches stay disabled", () => {
   assert.throws(
     () => validatePackage({

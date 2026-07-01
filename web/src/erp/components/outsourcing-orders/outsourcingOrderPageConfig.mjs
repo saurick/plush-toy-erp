@@ -50,7 +50,8 @@ export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [
     permission: 'outsourcing.order.update',
     nextStatus: 'closed',
     confirmTitle: '确认关闭加工合同',
-    confirmContent: '关闭后该加工合同不再继续推进，是否继续？',
+    confirmContent:
+      '关闭只停止加工合同后续推进，不会自动写发料、回货、库存或财务事实。',
     okText: '确认关闭',
     run: closeOutsourcingOrder,
   },

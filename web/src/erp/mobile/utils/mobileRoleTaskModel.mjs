@@ -41,6 +41,7 @@ import {
   isPayableReconciliationTask,
   resolvePayableReconciliationTaskBusinessStatus,
 } from '../../utils/payableReconciliationFlow.mjs'
+import { getWorkflowTaskGroupLabel } from '../../utils/workflowTaskLabels.mjs'
 
 export const TERMINAL_TASK_STATUS_KEYS = new Set([
   'done',
@@ -114,6 +115,10 @@ export function getMobileRoleLabel(roleKey) {
   return MOBILE_ROLE_LABELS[normalizeRoleKey(roleKey)] || '岗位'
 }
 
+export function getMobileTaskGroupLabel(taskGroup) {
+  return getWorkflowTaskGroupLabel(taskGroup)
+}
+
 export function resolveLatestTaskTime(tasks) {
   const latest = tasks
     .map((task) => task.updated_at || task.created_at)
@@ -173,7 +178,7 @@ export function resolveTaskListMeta(task) {
       payload.payable_type || '-'
     }`
   }
-  return `分组：${task.task_group || '-'} ｜ 优先级：${task.priority || '-'}`
+  return `任务：${getMobileTaskGroupLabel(task.task_group)} ｜ 优先级：${task.priority || '-'}`
 }
 
 export function resolveTaskBusinessChip(task) {
@@ -185,6 +190,14 @@ export function resolveDetailActionLabel(action) {
   if (action === 'rejected') return '退回原因（必填）'
   if (action === 'urge') return '催办原因（必填）'
   return '处理原因'
+}
+
+export function resolveMobileActionLabel(action) {
+  if (action === 'blocked') return '阻塞'
+  if (action === 'done') return '完成'
+  if (action === 'rejected') return '退回'
+  if (action === 'urge') return '催办'
+  return '移动处理'
 }
 
 function resolveOrderApprovalBusinessStatus(task, taskStatusKey) {
@@ -433,7 +446,10 @@ export function buildTaskFactRows(task) {
       `${task.task_status_label} / ${formatMobileTaskTime(task.updated_at)}`,
     ],
     ['业务', task.business_status_label],
-    ['分组', `${task.task_group || '-'} / 优先级 ${task.priority}`],
+    [
+      '任务类型',
+      `${getMobileTaskGroupLabel(task.task_group)} / 优先级 ${task.priority}`,
+    ],
     ['截止', task.due_at_label || '-'],
   ]
 

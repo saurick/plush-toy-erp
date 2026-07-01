@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import test from 'node:test'
 
 import {
@@ -21,6 +23,8 @@ import {
   normalizeDevPrototypeSelectedKey,
   normalizeDevPrototypeStatusFilter,
 } from './devPrototypes.mjs'
+
+const repoRoot = path.resolve(import.meta.dirname, '../../../..')
 
 test('devPrototypes: 只通过开发态独立路径暴露', () => {
   assert.equal(DEV_PROTOTYPES_ROUTE, '/__dev/prototypes')
@@ -172,6 +176,37 @@ test('devPrototypes: 登记当前原型与样板资产并区分类型和状态',
     )?.statuses[0],
     DEV_PROTOTYPE_STATUSES.DRAFT
   )
+})
+
+test('devPrototypes: 岗位任务端 Current 参考不透出移动端旧动作和技术 key', () => {
+  const html = readFileSync(
+    path.join(
+      repoRoot,
+      'docs/product/prototypes/mobile-role-tasks-v1/implemented-reference.html'
+    ),
+    'utf8'
+  )
+
+  assert(
+    html.includes('任务已流转至仓库组'),
+    'mobile role tasks Current reference should use readable owner role label'
+  )
+  assert(
+    html.includes('请填写原因，说明卡点、退回依据或催办诉求'),
+    'mobile role tasks Current reference should keep the runtime reason placeholder'
+  )
+  assert(
+    html.includes('<strong>仓库组</strong>'),
+    'mobile role tasks Current reference should show readable role names in Mine tab'
+  )
+  assert(
+    html.includes('grid-template-columns: repeat(3, minmax(0, 1fr))'),
+    'mobile role tasks Current reference action bar should match the three runtime actions'
+  )
+  assert.doesNotMatch(html, /任务已流转至[^<]*\/\s*warehouse/u)
+  assert.doesNotMatch(html, /<strong>仓库\s*\/\s*demo<\/strong>/u)
+  assert.doesNotMatch(html, /class="action process"|▶ 处理/u)
+  assert.doesNotMatch(html, /请填写原因，至少 5 个字/u)
 })
 
 test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {

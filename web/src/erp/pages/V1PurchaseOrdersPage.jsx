@@ -447,7 +447,7 @@ export default function V1PurchaseOrdersPage() {
       return (
         source?.supplier_snapshot?.name ||
         suppliers.find((item) => item.id === source.supplier_id)?.name ||
-        source.supplier_id ||
+        (source.supplier_id ? '供应商已关联' : '') ||
         '未指定供应商'
       )
     },

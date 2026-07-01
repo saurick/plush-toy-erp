@@ -615,12 +615,41 @@ function packageRevision(config) {
   return `${config.packageKey}.runtime-manifest-v1`;
 }
 
-function moduleStatesFromCatalog(catalog) {
+function moduleStateOverridesFromPackage(config, catalog) {
+  const moduleKeys = new Set(catalog.modules.map((item) => item.key));
+  const overrides = new Map();
+  if (config.moduleStates == null) {
+    return overrides;
+  }
+  assert(Array.isArray(config.moduleStates), "moduleStates must be an array");
+  for (const [index, item] of config.moduleStates.entries()) {
+    const path = `moduleStates[${index}]`;
+    assert(item && typeof item === "object" && !Array.isArray(item), `${path} must be an object`);
+    assert(typeof item.moduleKey === "string" && item.moduleKey.trim() !== "", `${path}.moduleKey must be set`);
+    const moduleKey = item.moduleKey.trim();
+    assert(moduleKeys.has(moduleKey), `${path}.moduleKey contains unknown module ${moduleKey}`);
+    assert(!overrides.has(moduleKey), `${path}.moduleKey must not be duplicated`);
+    assert(typeof item.state === "string" && item.state.trim() !== "", `${path}.state must be set`);
+    const state = item.state.trim();
+    assert(["enabled", "read_only", "disabled"].includes(state), `${path}.state must be enabled, read_only or disabled`);
+    const reason = typeof item.reason === "string" ? item.reason.trim() : "";
+    if (state !== "enabled") {
+      assert(reason !== "", `${path}.reason must be set for read_only or disabled module`);
+    }
+    overrides.set(moduleKey, { state, reason });
+  }
+  return overrides;
+}
+
+function moduleStatesFromCatalog(catalog, config = {}) {
+  const overrides = moduleStateOverridesFromPackage(config, catalog);
   return catalog.modules.map((item) => ({
     module_key: item.key,
     contract_version: catalog.catalogKey,
-    state: "enabled",
-    reason: "compiled from tracked customer package catalog",
+    state: overrides.get(item.key)?.state || "enabled",
+    reason:
+      overrides.get(item.key)?.reason ||
+      "compiled from tracked customer package catalog",
   }));
 }
 
@@ -1161,7 +1190,7 @@ function buildRuntimeManifest(config, catalog = customerPackageCatalog) {
     revision: packageRevision(config),
     product_version: "local-customer-package",
     compiled_snapshot: compiledSnapshotFromPackage(config, catalog, processDefinitions),
-    module_states: moduleStatesFromCatalog(catalog),
+    module_states: moduleStatesFromCatalog(catalog, config),
     role_profiles: roleProfilesFromCatalog(catalog),
     access_entitlements: accessEntitlementsFromCatalog(catalog, config.customerKey),
     work_pools: workPoolsFromCatalog(catalog, processDefinitions),

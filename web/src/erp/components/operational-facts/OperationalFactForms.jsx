@@ -80,9 +80,6 @@ export const ACTION_PERMISSIONS = Object.freeze({
 })
 
 export function hasAnyPermission(adminProfile, permissions = []) {
-  if (adminProfile?.is_super_admin === true) {
-    return true
-  }
   return permissions.some((permission) =>
     hasActionPermission(adminProfile, permission)
   )
@@ -112,10 +109,22 @@ export function formatQuantity(value) {
   return String(Number(numeric.toFixed(4)))
 }
 
+const RECORD_FALLBACK_LABELS = Object.freeze({
+  production: '生产事实已关联',
+  outsourcing: '委外事实已关联',
+  shipments: '出货单已关联',
+  reservations: '库存预留已关联',
+  finance: '财务事实已关联',
+})
+
 export function recordNoForKey(key, record = {}) {
-  if (key === 'shipments') return record.shipment_no || record.id
-  if (key === 'reservations') return record.reservation_no || record.id
-  return record.fact_no || record.id
+  if (key === 'shipments') {
+    return record.shipment_no || RECORD_FALLBACK_LABELS.shipments
+  }
+  if (key === 'reservations') {
+    return record.reservation_no || RECORD_FALLBACK_LABELS.reservations
+  }
+  return record.fact_no || RECORD_FALLBACK_LABELS[key] || '业务事实已关联'
 }
 
 export function selectedLabelForKey(key, record) {

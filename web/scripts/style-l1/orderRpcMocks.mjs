@@ -334,6 +334,27 @@ export async function installOrderRpcMocks(page, context) {
       created_at: nowUnix(),
       updated_at: nowUnix(),
     }
+    const bomItems = [
+      bomItem,
+      {
+        ...bomItem,
+        id: 2,
+        material_id: 2,
+        quantity: '0.8500',
+        loss_rate: '0.0500',
+        position: '填充',
+        note: '辅料',
+      },
+      {
+        ...bomItem,
+        id: 3,
+        material_id: 3,
+        quantity: '1.0000',
+        loss_rate: '0',
+        position: '包装',
+        note: '包装料',
+      },
+    ]
 
     let data = {}
     switch (method) {
@@ -346,12 +367,21 @@ export async function installOrderRpcMocks(page, context) {
         }
         break
       case 'get_bom_version':
-        data = { bom_version: bomVersion, bom_items: [bomItem] }
+        data = {
+          bom_version:
+            Number(params.id || 0) === 2
+              ? { ...bomDraft, items: bomItems }
+              : { ...bomVersion, items: bomItems },
+          bom_items: bomItems,
+        }
         break
       case 'create_bom_draft':
       case 'update_bom_draft':
       case 'copy_bom_version':
-        data = { bom_version: { ...bomDraft, ...params }, bom_items: [bomItem] }
+        data = {
+          bom_version: { ...bomDraft, ...params, items: bomItems },
+          bom_items: bomItems,
+        }
         break
       case 'add_bom_item':
       case 'update_bom_item':

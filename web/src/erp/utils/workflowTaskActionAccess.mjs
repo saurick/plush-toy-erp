@@ -25,6 +25,11 @@ const ACTION_MODE_ALIASES = Object.freeze({
   urge: 'urge',
 })
 
+const WORKFLOW_ACTION_ACCESS_FAILED_REASON =
+  '无法核对后端任务动作权限，请刷新后重试。'
+const WORKFLOW_ACTION_ACCESS_MISSING_REASON =
+  '后端未返回该动作权限，请刷新后重试。'
+
 function normalizeActionMode(value = '') {
   const key = String(value || '').trim()
   return ACTION_MODE_ALIASES[key] || key
@@ -172,12 +177,29 @@ export function buildWorkflowActionAccessState({
   })
   const explainedByAction = normalizeWorkflowActionExplainData(explainData)
   const hasExplainData = Object.keys(explainedByAction).length > 0
-  const byAction = hasExplainData ? { ...fallback.byAction } : fallback.byAction
+  const byAction =
+    hasExplainData || failed ? { ...fallback.byAction } : fallback.byAction
 
   if (hasExplainData) {
     for (const actionMode of actionModes) {
       if (explainedByAction[actionMode]) {
         byAction[actionMode] = explainedByAction[actionMode]
+      } else {
+        byAction[actionMode] = {
+          ...byAction[actionMode],
+          allowed: false,
+          reason: WORKFLOW_ACTION_ACCESS_MISSING_REASON,
+          reasonCode: 'action_access_missing_from_backend',
+        }
+      }
+    }
+  } else if (failed) {
+    for (const actionMode of actionModes) {
+      byAction[actionMode] = {
+        ...byAction[actionMode],
+        allowed: false,
+        reason: WORKFLOW_ACTION_ACCESS_FAILED_REASON,
+        reasonCode: 'action_access_check_failed',
       }
     }
   }

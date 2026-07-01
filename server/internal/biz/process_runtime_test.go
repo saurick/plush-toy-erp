@@ -23,8 +23,11 @@ type memProcessRuntimeRepo struct {
 }
 
 type stubProcessOwnerRoleResolver struct {
-	explanation *WorkflowTaskCandidateExplanation
-	err         error
+	explanation          *WorkflowTaskCandidateExplanation
+	err                  error
+	customerKey          string
+	ownerPoolKey         string
+	requiredCapabilities []string
 }
 
 type stubProcessDomainCommandHandler struct {
@@ -80,6 +83,9 @@ func (h *stubProcessBranchPolicyHandler) ResolveProcessBranch(ctx context.Contex
 }
 
 func (r *stubProcessOwnerRoleResolver) WorkflowCandidateOwnerRoleKeys(ctx context.Context, customerKey string, ownerPoolKey string, requiredCapabilities ...string) (*WorkflowTaskCandidateExplanation, error) {
+	r.customerKey = customerKey
+	r.ownerPoolKey = ownerPoolKey
+	r.requiredCapabilities = append([]string{}, requiredCapabilities...)
 	if r.err != nil {
 		return nil, r.err
 	}
@@ -654,6 +660,62 @@ func TestProcessRuntimeUsecaseCreateLinkedWorkflowTaskResolvesOwnerRoleFromCandi
 	}
 	if workflowRepo.createTaskInput == nil || workflowRepo.createTaskInput.OwnerRoleKey != EngineeringRoleKey {
 		t.Fatalf("expected resolved owner role on task create, got %#v", workflowRepo.createTaskInput)
+	}
+}
+
+func TestProcessRuntimeUsecaseCreateLinkedWorkflowTaskUsesInstanceCustomerKeyForOwnerResolution(t *testing.T) {
+	ownerPoolKey := "warehouse_execution"
+	requiredCapabilityKey := PermissionWorkflowTaskComplete
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID:             10,
+			ConfigRevision: "customer-a-rev-1",
+			ModuleContractSnapshot: map[string]any{
+				"customer_key": " customer-a ",
+			},
+			BusinessRefType: "sales_order",
+			BusinessRefID:   1001,
+		},
+		node: &ProcessNodeInstance{
+			ID:                    20,
+			ProcessInstanceID:     10,
+			NodeKey:               "warehouse_release",
+			NodeType:              ProcessNodeTypeHumanTask,
+			Status:                ProcessNodeStatusActive,
+			Version:               2,
+			OwnerPoolKey:          &ownerPoolKey,
+			RequiredCapabilityKey: &requiredCapabilityKey,
+		},
+	}
+	workflowRepo := &stubWorkflowRepo{}
+	resolver := &stubProcessOwnerRoleResolver{
+		explanation: &WorkflowTaskCandidateExplanation{
+			ConfigRevision:         "customer-a-rev-1",
+			CandidateOwnerRoleKeys: []string{WarehouseRoleKey},
+			Source:                 "active_customer_config",
+		},
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, resolver)
+
+	_, err := uc.CreateLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCreate{
+		ProcessInstanceID:     10,
+		ProcessNodeInstanceID: 20,
+		ExpectedVersion:       2,
+	}, 7)
+	if err != nil {
+		t.Fatalf("expected owner role resolved from instance customer config, got %v", err)
+	}
+	if resolver.customerKey != "customer-a" {
+		t.Fatalf("expected resolver customer key from process snapshot, got %q", resolver.customerKey)
+	}
+	if resolver.ownerPoolKey != ownerPoolKey {
+		t.Fatalf("expected resolver owner pool %q, got %q", ownerPoolKey, resolver.ownerPoolKey)
+	}
+	if len(resolver.requiredCapabilities) != 1 || resolver.requiredCapabilities[0] != requiredCapabilityKey {
+		t.Fatalf("expected resolver capability %q, got %#v", requiredCapabilityKey, resolver.requiredCapabilities)
+	}
+	if workflowRepo.createTaskInput == nil || workflowRepo.createTaskInput.OwnerRoleKey != WarehouseRoleKey {
+		t.Fatalf("expected resolved warehouse owner role, got %#v", workflowRepo.createTaskInput)
 	}
 }
 

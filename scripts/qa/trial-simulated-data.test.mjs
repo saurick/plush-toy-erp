@@ -1,17 +1,27 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { execFile as execFileWithCallback } from "node:child_process";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 
 import {
   CONFIRM_PHRASE,
+  INPUT_TEMPLATE_SCOPE,
   SIMULATION_PREFIX,
   assertDatasetBoundary,
+  buildInputTemplate,
   buildSimulatedDataset,
   parseCliArgs,
   runTrialSimulatedData,
 } from "./trial-simulated-data.mjs";
+
+const scriptPath = fileURLToPath(
+  new URL("./trial-simulated-data.mjs", import.meta.url),
+);
+const execFile = promisify(execFileWithCallback);
 
 test("trial simulated dataset is explicitly simulated and excludes fact domains", () => {
   const dataset = buildSimulatedDataset({ productId: 1, unitId: 2 });
@@ -39,6 +49,54 @@ test("trial CLI refuses real import style flags", () => {
   assert.throws(
     () => parseCliArgs(["--real-import"]),
     /refuses real import style flag/u,
+  );
+});
+
+test("trial CLI rejects credentialed backend URL", () => {
+  assert.throws(
+    () => parseCliArgs(["--backend-url", "http://demo:secret@127.0.0.1:8300"]),
+    /backend URL must not contain username or password/u,
+  );
+});
+
+test("trial input template is no-write and keeps apply boundary visible", () => {
+  const template = buildInputTemplate({ out: "output/custom/trial-sim" });
+
+  assert.equal(template.scope, INPUT_TEMPLATE_SCOPE);
+  assert.equal(template.simulatedOnly, true);
+  assert.equal(template.realCustomerImport, false);
+  assert.equal(template.writesReports, false);
+  assert.equal(template.writesDatabase, false);
+  assert.equal(template.callsBackend, false);
+  assert.equal(template.importsRealCustomerData, false);
+  assert.equal(template.downstreamReportOnlyWritesReports, true);
+  assert.equal(template.downstreamApplyWritesDatabase, true);
+  assert.match(template.commands.printInputTemplate, /--print-input-template/u);
+  assert.match(template.commands.reportOnly, /output\/custom\/trial-sim/u);
+  assert.match(template.commands.applySimulated, /TRIAL_SIM_CONFIRM/u);
+  assert.match(template.boundary, /does not write reports/u);
+});
+
+test("trial CLI input template does not write reports", async () => {
+  const out = await mkdtemp(path.join(tmpdir(), "trial-sim-template-"));
+  await rm(out, { recursive: true, force: true });
+  const { stdout } = await execFile(process.execPath, [
+    scriptPath,
+    "--print-input-template",
+    "--out",
+    out,
+  ]);
+  const template = JSON.parse(stdout);
+
+  assert.equal(template.scope, INPUT_TEMPLATE_SCOPE);
+  assert.equal(template.writesReports, false);
+  await assert.rejects(() => access(out), /ENOENT/u);
+});
+
+test("trial CLI input template cannot be combined with apply", () => {
+  assert.throws(
+    () => parseCliArgs(["--print-input-template", "--apply"]),
+    /cannot be combined/u,
   );
 });
 

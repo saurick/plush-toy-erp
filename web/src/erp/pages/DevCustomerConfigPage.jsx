@@ -23,6 +23,7 @@ import {
 } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   activateCustomerConfig,
   getEffectiveSession,
@@ -73,7 +74,11 @@ function StatusTag({ status }) {
     test_apply_done: 'green',
     release_gate_required: 'purple',
     separate_task_required: 'volcano',
+    source_grounded: 'green',
     required: 'gold',
+    enabled: 'green',
+    read_only: 'gold',
+    disabled: 'red',
     待客户确认: 'gold',
     暂不接运行时: 'orange',
     后续评审: 'default',
@@ -157,7 +162,8 @@ function copyText(value) {
 
 function getCustomerConfigActionError(error, fallback) {
   const code = error?.code
-  const rawMessage = String(error?.message || '')
+  const rawMessage =
+    typeof error?.message === 'string' ? error.message.trim() : ''
   if (code === 40302 || rawMessage.includes('未登录')) {
     return '请先登录后台管理员账号，再执行客户配置应用。'
   }
@@ -167,7 +173,7 @@ function getCustomerConfigActionError(error, fallback) {
   if (error?.isNetworkError) {
     return '无法连接本地后端，请确认 server-dev 正在运行。'
   }
-  return rawMessage || fallback
+  return getActionErrorMessage(error, fallback)
 }
 
 function CommandBlock({ command }) {
@@ -413,6 +419,10 @@ function TestApplySummary({ applyState, onApplyTestConfig }) {
           <Text type="secondary">责任池 / Work Pools</Text>
           <Text strong>{manifestSummary.workPoolCount ?? '-'}</Text>
         </div>
+        <div>
+          <Text type="secondary">模块状态 / Module States</Text>
+          <Text strong>{manifestSummary.moduleStateCount ?? '-'}</Text>
+        </div>
       </div>
       <div className="erp-dev-customer-test-apply-session">
         <Text type="secondary">当前 effective session</Text>
@@ -550,6 +560,10 @@ function ReleaseApplySummary({
         <div>
           <Text type="secondary">页面投影 / Pages</Text>
           <Text strong>{summary.pageCount ?? '-'}</Text>
+        </div>
+        <div>
+          <Text type="secondary">模块状态 / Module States</Text>
+          <Text strong>{summary.moduleStateCount ?? '-'}</Text>
         </div>
         <div>
           <Text type="secondary">当前 effective session</Text>
@@ -751,7 +765,11 @@ function OverviewPanel({ overview, onNavigate }) {
   )
 }
 
-function AssetsPanel({ menuSummary, fieldNumberingSummary }) {
+function AssetsPanel({
+  menuSummary,
+  fieldNumberingSummary,
+  printTemplateSummary,
+}) {
   return (
     <div
       className="erp-dev-customer-panel-grid"
@@ -852,6 +870,38 @@ function AssetsPanel({ menuSummary, fieldNumberingSummary }) {
           ))}
         </div>
       </section>
+      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--print-templates">
+        <div className="erp-dev-customer-panel__head">
+          <FileTextOutlined />
+          <Text strong>打印模板字段 / Print Template Fields</Text>
+        </div>
+        <Alert
+          type="info"
+          showIcon
+          message="当前只展示采购合同和加工合同字段真源"
+          description="销售订单受理当前未接打印模板；客户抬头、签章和固定文案应留在客户配置或模板边界，不进入 Product Core 表单。"
+        />
+        <div className="erp-dev-customer-tool-list">
+          {printTemplateSummary.templates.map((template) => (
+            <article className="erp-dev-customer-tool" key={template.key}>
+              <div className="erp-dev-customer-tool__head">
+                <Space wrap>
+                  <Text strong>{template.title}</Text>
+                  <Tag>{template.key}</Tag>
+                  <Tag>{template.fieldTruthCount} fieldTruth</Tag>
+                </Space>
+                <StatusTag status={template.readiness} />
+              </div>
+              <Text type="secondary">{template.category}</Text>
+              <div className="erp-dev-customer-field-list">
+                {template.fieldTruth.map((truth) => (
+                  <Text key={truth}>{truth}</Text>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
     </div>
   )
 }
@@ -898,6 +948,33 @@ function PreflightPanel({ consoleSummary, customerPackageSummary }) {
         <div className="erp-dev-customer-asset-grid">
           {consoleSummary.assetSummary.map((item) => (
             <AssetTile item={item} key={item.key} />
+          ))}
+        </div>
+      </section>
+      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--module-states">
+        <div className="erp-dev-customer-panel__head">
+          <DeploymentUnitOutlined />
+          <Text strong>模块状态投影 / Module States</Text>
+        </div>
+        <Alert
+          type="info"
+          showIcon
+          message="moduleStates 只编译为客户配置控制面输入"
+          description="默认 catalog 模块会编译为 enabled；客户包若声明 read_only / disabled 必须带 reason。这里不安装或卸载模块，也不证明完整模块关闭流程已交付。"
+        />
+        <div className="erp-dev-customer-tool-list">
+          {customerPackageSummary.moduleStates.map((item) => (
+            <article className="erp-dev-customer-tool" key={item.moduleKey}>
+              <div className="erp-dev-customer-tool__head">
+                <Space wrap>
+                  <Text strong>{item.label}</Text>
+                  <Tag>{item.moduleKey}</Tag>
+                  {item.overridden ? <Tag>override</Tag> : null}
+                </Space>
+                <StatusTag status={item.state} />
+              </div>
+              <Paragraph>{item.reason}</Paragraph>
+            </article>
           ))}
         </div>
       </section>
@@ -1365,7 +1442,7 @@ export default function DevCustomerConfigPage() {
       }
       setDryRunState({
         status: 'error',
-        error: error?.message || 'Dry Run 生成失败',
+        error: getActionErrorMessage(error, 'Dry Run 生成失败'),
       })
       message.error('Dry Run 生成失败')
     }
@@ -1568,7 +1645,7 @@ export default function DevCustomerConfigPage() {
       }
       setReleaseState({
         status: 'error',
-        error: error?.message || '发布门禁检查失败',
+        error: getActionErrorMessage(error, '发布门禁检查失败'),
       })
       message.error('发布门禁检查失败')
     }
@@ -1669,6 +1746,7 @@ export default function DevCustomerConfigPage() {
       <AssetsPanel
         menuSummary={overview.menuSummary}
         fieldNumberingSummary={overview.fieldNumberingSummary}
+        printTemplateSummary={overview.printTemplateSummary}
       />
     ),
     [VIEW_IMPORT]: (

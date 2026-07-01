@@ -890,11 +890,362 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, 'BOM 版本')
         await expectText(page, '产品')
         await expectText(page, '先选择产品，系统会建议下一个版本号')
+        await expectText(page, 'BOM 附件')
+        await expectText(page, 'BOM 明细')
+        await expectText(page, '已录入')
+        await expectText(page, '0')
+        const bomCreateAttachmentMetrics = await bomDraftModal.evaluate(
+          (node) => {
+            const panel = node.querySelector('.business-attachment-panel')
+            const button = panel?.querySelector('button')
+            return {
+              panelText: panel?.textContent?.replace(/\s+/g, ' ').trim() || '',
+              buttonText:
+                button?.textContent?.replace(/\s+/g, ' ').trim() || '',
+            }
+          }
+        )
+        assert.equal(
+          bomCreateAttachmentMetrics.buttonText,
+          '选择附件',
+          `BOM 新建附件按钮应使用共享文案: ${JSON.stringify(
+            bomCreateAttachmentMetrics
+          )}`
+        )
         await bomDraftModal.getByLabel('产品').click()
         await page.getByText('PROD-STYLE-L1').last().click()
         await expectText(page, '建议使用下一个版本号')
         await expectText(page, 'V1')
+        await bomDraftModal.getByRole('button', { name: '添加条目' }).click()
+        await expectText(page, '第 1 行')
+        await expectText(page, '材料用量')
+        const bomCreateMetrics = await page.evaluate(() => {
+          const visible = (node) => {
+            if (!(node instanceof HTMLElement)) return false
+            const rect = node.getBoundingClientRect()
+            const style = window.getComputedStyle(node)
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style.display !== 'none' &&
+              style.visibility !== 'hidden'
+            )
+          }
+          const modal = Array.from(
+            document.querySelectorAll(
+              '.erp-business-action-modal--form.ant-modal'
+            )
+          )
+            .filter(visible)
+            .at(-1)
+          const section = modal?.querySelector('.erp-bom-modal-items')
+          const sectionClassNames = Array.from(section?.classList || [])
+          const rows = Array.from(
+            section?.querySelectorAll('.erp-sales-order-lines-form__row') || []
+          ).filter(visible)
+          const operationHeaderVisible = Array.from(
+            section?.querySelectorAll('th') || []
+          ).some(
+            (node) =>
+              visible(node) &&
+              node.textContent?.replace(/\s+/g, '').includes('操作')
+          )
+          const labels = Array.from(
+            rows[0]?.querySelectorAll('.ant-form-item-label label') || []
+          )
+            .filter(visible)
+            .map((node) => ({
+              text: node.textContent?.replace(/\s+/g, '').trim(),
+              top: node.getBoundingClientRect().top,
+            }))
+          const labelTexts = labels.map((item) => item.text)
+          const labelTops = labels.map((item) => item.top)
+          const footerButton = Array.from(
+            section?.querySelectorAll('.erp-line-items-form__footer button') ||
+              []
+          ).find(
+            (node) =>
+              visible(node) &&
+              node.textContent?.replace(/\s+/g, '').includes('添加条目')
+          )
+          const list = section?.querySelector(
+            '.erp-sales-order-lines-form__list'
+          )
+          const listStyle =
+            list instanceof HTMLElement ? window.getComputedStyle(list) : null
+          const grid = rows[0]?.querySelector(
+            '.erp-sales-order-lines-form__grid'
+          )
+          const gridStyle =
+            grid instanceof HTMLElement ? window.getComputedStyle(grid) : null
+          const noteTextarea = rows[0]?.querySelector(
+            '.erp-line-item-field--note textarea'
+          )
+          return {
+            sectionClassNames,
+            operationHeaderVisible,
+            footerButtonVisible: visible(footerButton),
+            noteTextareaVisible: visible(noteTextarea),
+            listOverflowX: listStyle?.overflowX || '',
+            listOverflowY: listStyle?.overflowY || '',
+            gridAutoFlow: gridStyle?.gridAutoFlow || '',
+            gridOverflowX: gridStyle?.overflowX || '',
+            rowCount: rows.length,
+            labelSameLine:
+              labelTops.length > 0
+                ? Math.max(...labelTops) - Math.min(...labelTops) <= 4
+                : false,
+            labels: labelTexts,
+          }
+        })
+        assert.deepEqual(
+          {
+            operationHeaderVisible: bomCreateMetrics.operationHeaderVisible,
+            footerButtonVisible: bomCreateMetrics.footerButtonVisible,
+            noteTextareaVisible: bomCreateMetrics.noteTextareaVisible,
+            listOverflowX: bomCreateMetrics.listOverflowX,
+            listOverflowY: bomCreateMetrics.listOverflowY,
+            gridAutoFlow: bomCreateMetrics.gridAutoFlow,
+            gridOverflowX: bomCreateMetrics.gridOverflowX,
+            rowCount: bomCreateMetrics.rowCount,
+            labelSameLine: bomCreateMetrics.labelSameLine,
+          },
+          {
+            operationHeaderVisible: false,
+            footerButtonVisible: true,
+            noteTextareaVisible: true,
+            listOverflowX: 'auto',
+            listOverflowY: 'auto',
+            gridAutoFlow: 'column',
+            gridOverflowX: 'visible',
+            rowCount: 1,
+            labelSameLine: true,
+          },
+          `BOM 新建草稿应使用同一套原地明细行且无操作列: ${JSON.stringify(
+            bomCreateMetrics
+          )}`
+        )
+        assert(
+          bomCreateMetrics.sectionClassNames.includes(
+            'erp-sales-order-lines-form'
+          ) &&
+            !bomCreateMetrics.sectionClassNames.includes(
+              'erp-master-contact-list'
+            ),
+          `BOM 明细应调用共享明细区外壳，不应复用联系人列表样式: ${JSON.stringify(
+            bomCreateMetrics
+          )}`
+        )
+        for (const label of [
+          '材料',
+          '材料用量',
+          '单位',
+          '损耗率',
+          '部位',
+          '备注',
+        ]) {
+          assert(
+            bomCreateMetrics.labels.includes(label),
+            `BOM 新建草稿明细行应完整显示 ${label} 字段: ${JSON.stringify(
+              bomCreateMetrics
+            )}`
+          )
+        }
         await closeBusinessFormModal(page, bomDraftModal)
+        await page.getByText('BOM-STYLE-DRAFT', { exact: true }).dblclick()
+        const bomEditModal = page
+          .locator('.erp-business-action-modal--form.ant-modal:visible')
+          .last()
+        await expectText(page, '编辑 BOM 草稿')
+        await expectText(page, 'BOM 附件')
+        await expectText(page, 'BOM 明细')
+        await expectText(page, '已录入')
+        await expectText(page, '3')
+        const bomEditAttachmentMetrics = await bomEditModal.evaluate((node) => {
+          const panel = node.querySelector('.business-attachment-panel')
+          const button = panel?.querySelector('button')
+          return {
+            panelText: panel?.textContent?.replace(/\s+/g, ' ').trim() || '',
+            buttonText: button?.textContent?.replace(/\s+/g, ' ').trim() || '',
+          }
+        })
+        assert.equal(
+          bomEditAttachmentMetrics.buttonText,
+          '选择附件',
+          `BOM 编辑附件按钮应使用共享文案: ${JSON.stringify(
+            bomEditAttachmentMetrics
+          )}`
+        )
+        await bomEditModal.getByRole('button', { name: '添加条目' }).click()
+        await expectText(page, '第 4 行')
+        await expectText(page, '材料用量')
+        await expectText(page, '4')
+        await page.waitForTimeout(220)
+        const bomLineMetrics = await page.evaluate(() => {
+          const visible = (node) => {
+            if (!(node instanceof HTMLElement)) return false
+            const rect = node.getBoundingClientRect()
+            const style = window.getComputedStyle(node)
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style.display !== 'none' &&
+              style.visibility !== 'hidden'
+            )
+          }
+          const section = document.querySelector('.erp-bom-modal-items')
+          const rows = Array.from(
+            section?.querySelectorAll('.erp-sales-order-lines-form__row') || []
+          ).filter(visible)
+          const lastRow = rows[rows.length - 1]
+          const operationHeaderVisible = Array.from(
+            section?.querySelectorAll('th') || []
+          ).some(
+            (node) =>
+              visible(node) &&
+              node.textContent?.replace(/\s+/g, '').includes('操作')
+          )
+          const modalCount = Array.from(
+            document.querySelectorAll(
+              '.erp-business-action-modal--form.ant-modal'
+            )
+          ).filter(visible).length
+          const maskCount = Array.from(
+            document.querySelectorAll('.ant-modal-root .ant-modal-mask')
+          ).filter(visible).length
+          const rowRect = lastRow?.getBoundingClientRect()
+          const modalBody = lastRow?.closest('.ant-modal-body')
+          const bodyRect = modalBody?.getBoundingClientRect()
+          const footer = section?.querySelector('.erp-line-items-form__footer')
+          const footerRect = footer?.getBoundingClientRect()
+          const footerButton = Array.from(
+            section?.querySelectorAll('.erp-line-items-form__footer button') ||
+              []
+          ).find(
+            (node) =>
+              visible(node) &&
+              node.textContent?.replace(/\s+/g, '').includes('添加条目')
+          )
+          const list = section?.querySelector(
+            '.erp-sales-order-lines-form__list'
+          )
+          const listStyle =
+            list instanceof HTMLElement ? window.getComputedStyle(list) : null
+          const grid =
+            lastRow instanceof HTMLElement
+              ? lastRow.querySelector('.erp-sales-order-lines-form__grid')
+              : null
+          const gridStyle =
+            grid instanceof HTMLElement ? window.getComputedStyle(grid) : null
+          const labels = Array.from(
+            lastRow?.querySelectorAll('.ant-form-item-label label') || []
+          )
+            .filter(visible)
+            .map((node) => ({
+              text: node.textContent?.replace(/\s+/g, '').trim(),
+              top: node.getBoundingClientRect().top,
+            }))
+          const labelTops = labels.map((item) => item.top)
+          const noteTextarea = lastRow?.querySelector(
+            '.erp-line-item-field--note textarea'
+          )
+          return {
+            modalCount,
+            maskCount,
+            operationHeaderVisible,
+            footerButtonVisible: visible(footerButton),
+            noteTextareaVisible: visible(noteTextarea),
+            rowCount: rows.length,
+            lastRowVisible: visible(lastRow),
+            listOverflowX: listStyle?.overflowX || '',
+            listOverflowY: listStyle?.overflowY || '',
+            gridAutoFlow: gridStyle?.gridAutoFlow || '',
+            gridOverflowX: gridStyle?.overflowX || '',
+            labelsSameLine:
+              labelTops.length > 0
+                ? Math.max(...labelTops) - Math.min(...labelTops) <= 4
+                : false,
+            lastRowOverflowX:
+              lastRow instanceof HTMLElement
+                ? lastRow.scrollWidth - lastRow.clientWidth
+                : 0,
+            rowTop: rowRect?.top || 0,
+            rowBottom: rowRect?.bottom || 0,
+            rowLeft: rowRect?.left || 0,
+            rowRight: rowRect?.right || 0,
+            bodyTop: bodyRect?.top || 0,
+            bodyBottom: bodyRect?.bottom || 0,
+            bodyLeft: bodyRect?.left || 0,
+            bodyRight: bodyRect?.right || 0,
+            footerTop: footerRect?.top || 0,
+            footerBottom: footerRect?.bottom || 0,
+            visibleLabels: labels.map((item) => item.text),
+          }
+        })
+        assert.deepEqual(
+          {
+            modalCount: bomLineMetrics.modalCount,
+            maskCount: bomLineMetrics.maskCount,
+            operationHeaderVisible: bomLineMetrics.operationHeaderVisible,
+            footerButtonVisible: bomLineMetrics.footerButtonVisible,
+            noteTextareaVisible: bomLineMetrics.noteTextareaVisible,
+            rowCount: bomLineMetrics.rowCount,
+            lastRowVisible: bomLineMetrics.lastRowVisible,
+            listOverflowX: bomLineMetrics.listOverflowX,
+            listOverflowY: bomLineMetrics.listOverflowY,
+            gridAutoFlow: bomLineMetrics.gridAutoFlow,
+            gridOverflowX: bomLineMetrics.gridOverflowX,
+            labelsSameLine: bomLineMetrics.labelsSameLine,
+          },
+          {
+            modalCount: 1,
+            maskCount: 1,
+            operationHeaderVisible: false,
+            footerButtonVisible: true,
+            noteTextareaVisible: true,
+            rowCount: 4,
+            lastRowVisible: true,
+            listOverflowX: 'auto',
+            listOverflowY: 'auto',
+            gridAutoFlow: 'column',
+            gridOverflowX: 'visible',
+            labelsSameLine: true,
+          },
+          `BOM 明细应原地新增行且不保留操作列: ${JSON.stringify(
+            bomLineMetrics
+          )}`
+        )
+        assert(
+          bomLineMetrics.lastRowOverflowX <= 1,
+          `BOM 新增行不应横向溢出: ${JSON.stringify(bomLineMetrics)}`
+        )
+        assert(
+          bomLineMetrics.rowLeft >= bomLineMetrics.bodyLeft - 1 &&
+            bomLineMetrics.rowRight <= bomLineMetrics.bodyRight + 1 &&
+            bomLineMetrics.rowTop >= bomLineMetrics.bodyTop - 1 &&
+            bomLineMetrics.rowBottom <= bomLineMetrics.bodyBottom + 1 &&
+            bomLineMetrics.footerTop >= bomLineMetrics.bodyTop - 1 &&
+            bomLineMetrics.footerBottom <= bomLineMetrics.bodyBottom + 1,
+          `BOM 新增行和添加条目按钮应同处 modal body 可见区域内: ${JSON.stringify(
+            bomLineMetrics
+          )}`
+        )
+        for (const label of [
+          '材料',
+          '材料用量',
+          '单位',
+          '损耗率',
+          '部位',
+          '备注',
+        ]) {
+          assert(
+            bomLineMetrics.visibleLabels.includes(label),
+            `BOM 新增行应完整显示 ${label} 字段: ${JSON.stringify(
+              bomLineMetrics
+            )}`
+          )
+        }
+        await closeBusinessFormModal(page, bomEditModal)
         await assertNoHorizontalOverflow(page, 'business-standard-bom')
 
         await gotoScenarioPath(page, '/erp/warehouse/inventory', {
@@ -1184,6 +1535,32 @@ export function createBusinessFormalScenarios(deps) {
           titleText: '新建出货单',
           scenarioName: 'business-v1-shipments',
         })
+        let emptyShipmentSourcesOnce = false
+        await page.route('**/rpc/operational_fact', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (
+            !emptyShipmentSourcesOnce &&
+            body.method === 'list_shipments' &&
+            Number(body.params?.limit || 0) === 500
+          ) {
+            emptyShipmentSourcesOnce = true
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: body.id || 'business-v1-shipment-source-import',
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: { shipments: [], total: 0, limit: 500, offset: 0 },
+                },
+              }),
+            })
+            return
+          }
+          await route.fallback()
+        })
         await verifyBusinessActionFormModal(page, {
           buttonName: '新建草稿',
           titleText: '新建出货单',
@@ -1195,9 +1572,20 @@ export function createBusinessFormalScenarios(deps) {
               parentModal: modal,
               triggerButton: '从销售订单导入',
               titleText: '从销售订单导入出货明细',
-              expectedTexts: ['销售订单号', '客户', 'SO-STYLE-L1'],
+              expectedTexts: [
+                '销售订单号',
+                '来源行',
+                '客户',
+                '剩余可出货',
+                'SO-STYLE-L1',
+                'PROD-STYLE-L1',
+              ],
+              emptyDescriptionText: '暂无可导入销售订单行',
+              selectText: 'SO-STYLE-L1',
+              importAndExpectText: '销售订单行追溯',
               scenarioName: 'shipment-source-import-picker',
             })
+            await assertTextAbsent(page, 'sales_order_item_id 追溯')
           },
         })
         await page.getByText('SHIP-STYLE-L1', { exact: true }).click()

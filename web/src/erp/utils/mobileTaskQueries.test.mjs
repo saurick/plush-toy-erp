@@ -44,7 +44,8 @@ test('mobileTaskQueries: explainMobileTaskQueryPlan 返回全量和直查解释'
     assert.equal(plan.strategy, 'owner_role_key')
     assert.equal(plan.loads_full_list, false)
     assert.deepEqual(plan.queries, [{ owner_role_key: roleKey, limit: 200 }])
-    assert.match(plan.reason, /owner_role_key/)
+    assert.match(plan.reason, /主责岗位/)
+    assert.doesNotMatch(plan.reason, /owner_role_key/)
   }
 })
 

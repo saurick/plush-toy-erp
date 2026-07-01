@@ -668,6 +668,59 @@ test("execute 模式拒绝 recovery plan 引用其他备份", async () => {
   await rm(tempDir, { recursive: true, force: true });
 });
 
+test("execute 模式拒绝带账号密码的 backend URL", async () => {
+  const tempDir = await mkdtemp(
+    path.join(os.tmpdir(), "customer-import-execute-"),
+  );
+  const dryRunDir = path.join(tempDir, "dry-run");
+  const outDir = path.join(tempDir, "out");
+  const approvalPath = path.join(tempDir, "reviewed-import-approval.json");
+  const backupEvidence = path.join(tempDir, "backup.txt");
+  const recoveryPlan = path.join(tempDir, "reviewed-import-recovery-plan.json");
+  await writeFile(
+    approvalPath,
+    JSON.stringify(buildReviewedApproval(), null, 2),
+    "utf8",
+  );
+  await writeTargetBackupEvidence(backupEvidence);
+  await writeFile(
+    recoveryPlan,
+    JSON.stringify(buildReviewedRecoveryPlan(), null, 2),
+    "utf8",
+  );
+  const dryRun = runDryRunCli(dryRunDir);
+  assert.equal(dryRun.status, 0, dryRun.stderr);
+  await writeReviewedDryRunReport(dryRunDir);
+
+  const result = runExecuteCli(
+    [
+      "--dry-run-package",
+      dryRunDir,
+      "--approval",
+      approvalPath,
+      "--backup-evidence",
+      backupEvidence,
+      "--recovery-plan",
+      recoveryPlan,
+      "--out",
+      outDir,
+      "--backend-url",
+      "http://operator:secret@127.0.0.1:1",
+      "--execute",
+    ],
+    {
+      CUSTOMER_IMPORT_CONFIRM: "EXECUTE_YOYOOSUN_IMPORT",
+      CUSTOMER_IMPORT_ADMIN_TOKEN: "test-admin-token",
+    },
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(
+    result.stderr,
+    /backend URL must not contain username or password/,
+  );
+  await rm(tempDir, { recursive: true, force: true });
+});
+
 function buildReviewedApproval() {
   return {
     customerKey: "yoyoosun",

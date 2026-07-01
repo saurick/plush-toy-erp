@@ -1,7 +1,8 @@
 import React, { useCallback } from 'react'
-import { CopyOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
 import { Button, Form, Input, Select, Space } from 'antd'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
+import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import FieldWithUnitSuffix, {
   isQuantityTextWithinUnitPrecision,
   unitPrecisionErrorMessage,
@@ -121,23 +122,29 @@ export function normalizeOutsourcingLineFormValue(item = {}) {
 }
 
 export function supplierLabel(supplier = {}) {
-  return [supplier.code, supplier.short_name || supplier.name]
-    .filter(Boolean)
-    .join(' / ')
+  return (
+    [supplier.code, supplier.short_name || supplier.name]
+      .filter(Boolean)
+      .join(' / ') || '供应商已关联'
+  )
 }
 
 export function productLabel(product = {}) {
-  return [product.code, product.name].filter(Boolean).join(' / ')
+  return (
+    [product.code, product.name].filter(Boolean).join(' / ') || '产品已关联'
+  )
 }
 
 export function processLabel(process = {}) {
-  return [process.code, process.name, process.category]
-    .filter(Boolean)
-    .join(' / ')
+  return (
+    [process.code, process.name, process.category]
+      .filter(Boolean)
+      .join(' / ') || '工序已关联'
+  )
 }
 
 export function unitLabel(unit = {}) {
-  return [unit.code, unit.name].filter(Boolean).join(' / ')
+  return [unit.code, unit.name].filter(Boolean).join(' / ') || '单位已关联'
 }
 
 export default function OutsourcingOrderForm({
@@ -464,44 +471,32 @@ export default function OutsourcingOrderForm({
                   </div>
                 ))}
               </div>
-              <div className="erp-line-items-form__footer">
-                <div className="erp-line-items-form__footer-actions">
-                  <Button
-                    type="dashed"
-                    icon={<PlusOutlined />}
-                    onClick={() => {
-                      const currentLines = form.getFieldValue('items') || []
-                      requestLineItemScroll(currentLines.length)
-                      add(
-                        createBlankOutsourcingLine(getNextLineNo(currentLines))
-                      )
-                    }}
-                  >
-                    添加条目
-                  </Button>
-                </div>
-                <div className="erp-line-items-form__stats">
-                  <span className="erp-line-items-form__stat">
-                    已录入
-                    <strong className="erp-line-items-form__stat-value">
-                      {lineSummary.count}
-                    </strong>
-                    条
-                  </span>
-                  <span className="erp-line-items-form__stat">
-                    数量合计
-                    <strong className="erp-line-items-form__stat-value">
-                      {formatSummaryNumber(lineSummary.quantity, 3)}
-                    </strong>
-                  </span>
-                  <span className="erp-line-items-form__stat">
-                    金额合计
-                    <strong className="erp-line-items-form__stat-value">
-                      {formatSummaryNumber(lineSummary.amount, 2)}
-                    </strong>
-                  </span>
-                </div>
-              </div>
+              <BusinessLineItemsFooter
+                addLabel="添加条目"
+                onAdd={() => {
+                  const currentLines = form.getFieldValue('items') || []
+                  requestLineItemScroll(currentLines.length)
+                  add(createBlankOutsourcingLine(getNextLineNo(currentLines)))
+                }}
+                stats={[
+                  {
+                    key: 'count',
+                    label: '已录入',
+                    value: lineSummary.count,
+                    suffix: '条',
+                  },
+                  {
+                    key: 'quantity',
+                    label: '数量合计',
+                    value: formatSummaryNumber(lineSummary.quantity, 3),
+                  },
+                  {
+                    key: 'amount',
+                    label: '金额合计',
+                    value: formatSummaryNumber(lineSummary.amount, 2),
+                  },
+                ]}
+              />
             </>
           )}
         </Form.List>

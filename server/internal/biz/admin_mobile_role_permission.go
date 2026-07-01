@@ -14,6 +14,7 @@ var adminMobileRolePermissionOptions = []AdminMobileRolePermissionOption{
 	{Key: FinanceRoleKey, Label: "财务岗位任务端"},
 	{Key: PMCRoleKey, Label: "PMC 岗位任务端"},
 	{Key: QualityRoleKey, Label: "品质岗位任务端"},
+	{Key: EngineeringRoleKey, Label: "工程岗位任务端"},
 }
 
 var adminMobileRolePermissionSet = func() map[string]struct{} {

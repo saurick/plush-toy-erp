@@ -91,10 +91,7 @@ import {
 const { Text } = Typography
 
 function hasPermission(adminProfile, permission) {
-  return (
-    adminProfile?.is_super_admin === true ||
-    hasActionPermission(adminProfile, permission)
-  )
+  return hasActionPermission(adminProfile, permission)
 }
 
 function idempotencyKey(prefix) {

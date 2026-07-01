@@ -105,6 +105,129 @@ func TestWorkflowRepo_CreateAndUpdateTaskStatus(t *testing.T) {
 	}
 }
 
+func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_repo_status_reason_cleanup?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+
+	repo := NewWorkflowRepo(
+		&Data{postgres: client},
+		log.NewStdLogger(io.Discard),
+	)
+
+	task, err := repo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
+		TaskCode:      "TASK-REASON-CLEANUP-001",
+		TaskGroup:     "order_approval",
+		TaskName:      "老板审批订单",
+		SourceType:    "project-orders",
+		SourceID:      2001,
+		TaskStatusKey: "ready",
+		OwnerRoleKey:  biz.BossRoleKey,
+		Payload:       map[string]any{"record_title": "订单资料确认"},
+	}, 7)
+	if err != nil {
+		t.Fatalf("create task failed: %v", err)
+	}
+
+	blockedReason := "缺少客户确认的包装方式"
+	blocked, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+		ID:                task.ID,
+		TaskStatusKey:     "blocked",
+		BusinessStatusKey: "blocked",
+		Reason:            blockedReason,
+		Payload: map[string]any{
+			"mobile_action": "blocked",
+			"evidence_refs": []any{"photo://packaging"},
+		},
+	}, 8, biz.BossRoleKey)
+	if err != nil {
+		t.Fatalf("block task failed: %v", err)
+	}
+	if blocked.BlockedReason == nil || *blocked.BlockedReason != blockedReason {
+		t.Fatalf("expected blocked reason persisted, got %#v", blocked.BlockedReason)
+	}
+
+	rejectedReason := "客户单价和交期未确认"
+	rejected, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+		ID:                task.ID,
+		TaskStatusKey:     "rejected",
+		BusinessStatusKey: "project_pending",
+		Reason:            rejectedReason,
+		Payload: map[string]any{
+			"mobile_action": "rejected",
+			"evidence_refs": []any{"note://price"},
+		},
+	}, 8, biz.BossRoleKey)
+	if err != nil {
+		t.Fatalf("reject task failed: %v", err)
+	}
+	if rejected.BlockedReason == nil || *rejected.BlockedReason != rejectedReason {
+		t.Fatalf("expected rejected reason to replace blocked reason, got %#v", rejected.BlockedReason)
+	}
+
+	done, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+		ID:                task.ID,
+		TaskStatusKey:     "done",
+		BusinessStatusKey: "project_approved",
+		Payload: map[string]any{
+			"mobile_action": "done",
+			"evidence_refs": []any{"note://approved"},
+		},
+	}, 8, biz.BossRoleKey)
+	if err != nil {
+		t.Fatalf("complete task failed: %v", err)
+	}
+	if done.TaskStatusKey != "done" || done.CompletedAt == nil {
+		t.Fatalf("expected completed task, got %#v", done)
+	}
+	if done.BlockedReason != nil {
+		t.Fatalf("done task must clear stale blocked/rejected reason, got %#v", done.BlockedReason)
+	}
+
+	events, err := client.WorkflowTaskEvent.Query().
+		Where(workflowtaskevent.TaskID(task.ID)).
+		Order(ent.Asc(workflowtaskevent.FieldID)).
+		All(ctx)
+	if err != nil {
+		t.Fatalf("query events failed: %v", err)
+	}
+	if len(events) != 4 {
+		t.Fatalf("expected created + blocked + rejected + done events, got %d", len(events))
+	}
+
+	assertEvent := func(index int, from string, to string, reason *string, mobileAction string) {
+		t.Helper()
+		event := events[index]
+		if event.EventType != "status_changed" {
+			t.Fatalf("event %d expected status_changed, got %q", index, event.EventType)
+		}
+		if event.FromStatusKey == nil || *event.FromStatusKey != from ||
+			event.ToStatusKey == nil || *event.ToStatusKey != to {
+			t.Fatalf("event %d expected %s -> %s, got %#v -> %#v", index, from, to, event.FromStatusKey, event.ToStatusKey)
+		}
+		if event.ActorID == nil || *event.ActorID != 8 {
+			t.Fatalf("event %d expected actor id 8, got %#v", index, event.ActorID)
+		}
+		if event.ActorRoleKey == nil || *event.ActorRoleKey != biz.BossRoleKey {
+			t.Fatalf("event %d expected actor role boss, got %#v", index, event.ActorRoleKey)
+		}
+		if reason == nil {
+			if event.Reason != nil {
+				t.Fatalf("event %d expected no reason, got %#v", index, event.Reason)
+			}
+		} else if event.Reason == nil || *event.Reason != *reason {
+			t.Fatalf("event %d expected reason %q, got %#v", index, *reason, event.Reason)
+		}
+		if event.Payload["mobile_action"] != mobileAction {
+			t.Fatalf("event %d expected mobile_action %q, got %#v", index, mobileAction, event.Payload["mobile_action"])
+		}
+	}
+
+	assertEvent(1, "ready", "blocked", &blockedReason, "blocked")
+	assertEvent(2, "blocked", "rejected", &rejectedReason, "rejected")
+	assertEvent(3, "rejected", "done", nil, "done")
+}
+
 func TestWorkflowRepo_GetWorkflowTaskByID(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_repo_get?mode=memory&cache=shared&_fk=1")

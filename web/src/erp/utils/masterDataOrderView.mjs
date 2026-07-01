@@ -326,14 +326,14 @@ export function formatUnitDisplayName(unitID, unitByID = new Map()) {
   }
   const unit = unitByID instanceof Map ? unitByID.get(normalizedID) : null
   if (!unit) {
-    return `未知单位 #${normalizedID}`
+    return '单位已关联'
   }
   const name = trimOptional(unit.name)
   const code = trimOptional(unit.code)
   if (name && code && name !== code) {
     return `${name}（${code}）`
   }
-  return name || code || `单位 #${normalizedID}`
+  return name || code || '单位已关联'
 }
 
 function shortDemoUnitName(name) {
@@ -358,14 +358,14 @@ export function formatUnitShortDisplayName(unitID, unitByID = new Map()) {
   }
   const unit = unitByID instanceof Map ? unitByID.get(normalizedID) : null
   if (!unit) {
-    return `未知单位 #${normalizedID}`
+    return '单位已关联'
   }
   const name = shortDemoUnitName(unit.name)
   const code = shortUnitCode(unit.code)
   if (name && code && name !== code) {
     return `${name}（${code}）`
   }
-  return name || code || `单位 #${normalizedID}`
+  return name || code || '单位已关联'
 }
 
 export function buildUnitSelectOptions(units = []) {

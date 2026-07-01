@@ -16,12 +16,11 @@ export function resolveBusinessAttachmentPanelState({
     !ownerType || !canUpload || uploading || (missingOwner && !canQueuePending)
   let panelDescription = description
   let emptyDescription = '暂无附件'
-  let uploadButtonText = '上传'
+  const uploadButtonText = '选择附件'
 
   if (missingOwner && canQueuePending) {
     panelDescription = '可先选择附件，保存业务记录后自动上传并绑定。'
     emptyDescription = '暂无附件，可先选择后随保存上传'
-    uploadButtonText = '选择附件'
   } else if (missingOwner) {
     panelDescription = missingOwnerDescription
     emptyDescription = missingOwnerEmptyText

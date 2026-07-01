@@ -5,7 +5,7 @@
 | 脚本 | 用途 |
 | --- | --- |
 | `verify-env.sh` | 校验 env 样例或受控 `.env` 的必需变量和危险配置 |
-| `run-smoke.sh` | 对指定 endpoint 执行轻量 health / route / customer_config effective session smoke，并输出脱敏 JSON |
+| `run-smoke.sh` | 对指定 endpoint 执行轻量 health / route / customer_config effective session smoke，并输出脱敏 JSON；支持 `--print-input-template` 只读输出目标 smoke 输入模板 |
 | `collect-evidence.sh` | 生成 release evidence 草稿目录和 backup restore artifact 占位，不采集 secret |
 | `verify-backup-restore.sh` | 检查备份恢复 evidence 是否具备必要字段，不处理备份文件本体 |
 | `run-backup-restore-rehearsal.sh` | 执行真实 dump -> 临时 PostgreSQL -> restore -> migration apply / status -> smoke query，并生成本地脱敏 evidence |
@@ -14,6 +14,7 @@
 
 ```bash
 bash deployments/yoyoosun/scripts/verify-env.sh --example
+bash deployments/yoyoosun/scripts/run-smoke.sh --print-input-template
 bash deployments/yoyoosun/scripts/run-smoke.sh \
   --endpoint https://erp.example.invalid \
   --backend-url http://127.0.0.1:8300 \
@@ -39,6 +40,8 @@ SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
     --web-url http://127.0.0.1:5175/erp
 node scripts/deploy/release-evidence-gate.mjs --customer yoyoosun --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
+
+`--print-input-template` 只输出目标 smoke 所需 endpoint、backend URL、releaseVersion、environment、report、客户配置 revision 和 token env 名，不触网、不读取 token、不写 smoke report、不证明 active revision 已读回。
 
 `--endpoint` 和 `--backend-url` 不允许携带 URL 账号密码；如果目标环境需要鉴权，必须走 token env 或受控网络入口，不能把 `https://user:pass@host` 写进 smoke evidence。`--backend-url` 用于目标环境后端 `/healthz`、`/readyz` 和 JSON-RPC 检查；未提供时脚本只检查公网 endpoint 的 web health、登录页和岗位端路由。`--customer-config-revision` 只在本次发布已经激活客户配置 revision 时使用；脚本会用指定 token env 调用 `customer_config.get_effective_session`，确认 active revision、source、非空页面投影和 `customers.default / suppliers.default / sales_orders.default` 字段策略 surface 可读回。生成的 smoke report 只记录检查目标、期望 revision、token 来源环境变量名和 `responseBodyStored=false`，不保存 token 或响应正文。
 

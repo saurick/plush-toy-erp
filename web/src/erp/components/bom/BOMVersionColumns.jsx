@@ -1,6 +1,5 @@
 import React from 'react'
-import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
-import { Button, Popconfirm, Space, Tag } from 'antd'
+import { Tag } from 'antd'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
@@ -99,71 +98,4 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       render: (value) => value || '-',
     },
   ])
-}
-
-export function buildBOMItemColumns({
-  activeActionCanEdit = false,
-  materialOptions = [],
-  onEditItem,
-  onRemoveItem,
-  unitOptions = [],
-}) {
-  return [
-    {
-      title: '材料',
-      dataIndex: 'material_id',
-      width: 180,
-      render: (value) => referenceLabel(materialOptions, value, '材料'),
-    },
-    { title: '用量', dataIndex: 'quantity', width: 110 },
-    {
-      title: '单位',
-      dataIndex: 'unit_id',
-      width: 100,
-      render: (value) => referenceLabel(unitOptions, value, '单位'),
-    },
-    { title: '损耗率', dataIndex: 'loss_rate', width: 110 },
-    {
-      title: '部位',
-      dataIndex: 'position',
-      width: 140,
-      render: (value) => value || '-',
-    },
-    {
-      title: '备注',
-      dataIndex: 'note',
-      width: 180,
-      render: (value) => value || '-',
-    },
-    {
-      title: '操作',
-      dataIndex: 'actions',
-      width: 150,
-      fixed: 'right',
-      render: (_, item) =>
-        activeActionCanEdit ? (
-          <Space size={8}>
-            <Button
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => onEditItem(item)}
-            >
-              编辑
-            </Button>
-            <Popconfirm
-              title="移除这条 BOM 明细？"
-              okText="移除"
-              cancelText="取消"
-              onConfirm={() => onRemoveItem(item)}
-            >
-              <Button size="small" danger icon={<DeleteOutlined />}>
-                移除
-              </Button>
-            </Popconfirm>
-          </Space>
-        ) : (
-          <Tag>只读</Tag>
-        ),
-    },
-  ]
 }

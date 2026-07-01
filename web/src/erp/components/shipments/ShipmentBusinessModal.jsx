@@ -1,5 +1,5 @@
 import React from 'react'
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { DeleteOutlined } from '@ant-design/icons'
 import {
   Alert,
   Button,
@@ -16,6 +16,7 @@ import {
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
+import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
@@ -419,9 +420,8 @@ export default function ShipmentBusinessModal({
                   )}`}
                 </Text>
                 <Text type="secondary">
-                  出货弹窗只做来源预览和默认数量；后端当前保存
-                  sales_order_item_id 追溯，剩余量强校验仍需后续 usecase
-                  合同补齐。
+                  出货弹窗只做来源预览和默认数量；后端当前保存销售订单行追溯，
+                  剩余量强校验仍需后续 usecase 合同补齐。
                 </Text>
               </Space>
             }
@@ -529,29 +529,21 @@ export default function ShipmentBusinessModal({
                   </div>
                 ))}
               </div>
-              <div className="erp-line-items-form__footer">
-                <div className="erp-line-items-form__footer-actions">
-                  <Button
-                    type="dashed"
-                    icon={<PlusOutlined />}
-                    onClick={() => {
-                      requestLineItemScroll(fields.length)
-                      add(createBlankShipmentItem(modalSelectedShipment?.id))
-                    }}
-                  >
-                    添加条目
-                  </Button>
-                </div>
-                <div className="erp-line-items-form__stats">
-                  <span className="erp-line-items-form__stat">
-                    已录入
-                    <strong className="erp-line-items-form__stat-value">
-                      {fields.length}
-                    </strong>
-                    条
-                  </span>
-                </div>
-              </div>
+              <BusinessLineItemsFooter
+                addLabel="添加条目"
+                onAdd={() => {
+                  requestLineItemScroll(fields.length)
+                  add(createBlankShipmentItem(modalSelectedShipment?.id))
+                }}
+                stats={[
+                  {
+                    key: 'count',
+                    label: '已录入',
+                    value: fields.length,
+                    suffix: '条',
+                  },
+                ]}
+              />
             </section>
           )}
         </Form.List>

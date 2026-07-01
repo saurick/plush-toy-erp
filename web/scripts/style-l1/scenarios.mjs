@@ -1,3 +1,5 @@
+import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+
 import { createBusinessFormalScenarios } from './businessFormalScenarios.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { createPurchaseReceiptScenarios } from './purchaseReceiptScenarios.mjs'
@@ -61,9 +63,9 @@ export function createStyleL1Scenarios(deps) {
     assertProcessingContractPaperRowCount,
     assertProcessingContractSignatureLayout,
     assertPurchaseReceiptActionButtonState,
-    assertPurchaseReceiptAddItemModalDarkTokens,
-    assertPurchaseReceiptAddItemModalMetrics,
-    assertPurchaseReceiptAddItemModalMobileLayout,
+    assertPurchaseReceiptAddItemEditorDarkTokens,
+    assertPurchaseReceiptAddItemEditorMetrics,
+    assertPurchaseReceiptAddItemEditorMobileLayout,
     assertPurchaseReceiptRowItemCount,
     assertRowSelectionClearsAfterCancel,
     assertShellRefreshButton,
@@ -78,10 +80,10 @@ export function createStyleL1Scenarios(deps) {
     expectHeading,
     expectNoButton,
     expectText,
-    fillPurchaseReceiptAddItemModalBoundaryValues,
+    fillPurchaseReceiptAddItemEditorBoundaryValues,
     gotoScenarioPath,
     isLightSurfaceColor,
-    openPurchaseReceiptAddItemModal,
+    openPurchaseReceiptAddItemEditor,
     outputDir,
     path,
     seedBusinessCollaborationOverflowTasks,
@@ -403,12 +405,50 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
-      name: 'erp-effective-session-super-admin-system-diagnostic',
-      path: '/erp/system/permissions',
+      name: 'erp-effective-session-super-admin-product-core',
+      path: '/erp/warehouse/shipments',
       auth: 'admin',
       effectiveSession: {
         configRevision: 'style-l1-effective-session',
         configHash: 'style-l1-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        pages: ['global-dashboard'],
+        actions: [],
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
+      expectPath: '/erp/warehouse/shipments',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectText(page, '毛绒玩具 ERP')
+        await expectText(page, 'style-l1-admin')
+        await expectHeading(page, '出货单')
+        await expectText(page, 'SHIP-STYLE-L1')
+
+        const createButton = page
+          .getByRole('button', { name: '新建草稿' })
+          .first()
+        await createButton.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await createButton.isDisabled(),
+          false,
+          'super admin 不应被 effective_session.actions=[] 收窄业务写按钮'
+        )
+      },
+    },
+    {
+      name: 'erp-effective-session-direct-url-local-dev-diagnostic',
+      path: '/erp/system/permissions',
+      auth: 'admin',
+      adminProfile: {
+        is_super_admin: false,
+        permissions: ['system.permission.read', 'system.permission.manage'],
+        menus: [{ key: 'permission-center', path: '/erp/system/permissions' }],
+      },
+      effectiveSession: {
+        configRevision: 'style-l1-direct-url',
+        configHash: 'style-l1-direct-url-hash',
         customer: { key: 'yoyoosun', name: '永绅' },
         pages: ['global-dashboard'],
         actions: [],
@@ -423,15 +463,63 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '系统管理')
         await expectHeading(page, '权限管理')
         await expectText(page, '角色模板')
-        await expectText(page, '管理员账号')
+        await assertTextAbsent(page, '当前账号暂无可见后台入口')
       },
     },
     {
-      name: 'erp-effective-session-empty-pages-blocks-outlet',
+      name: 'erp-effective-session-sync-failure-local-dev-diagnostic',
       path: '/erp/system/permissions',
       auth: 'admin',
       adminProfile: {
         is_super_admin: false,
+        permissions: ['system.permission.read', 'system.permission.manage'],
+        menus: [{ key: 'permission-center', path: '/erp/system/permissions' }],
+      },
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await page.unroute('**/rpc/customer_config')
+        await page.route('**/rpc/customer_config', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          const { id = 'mock-id', method } = body
+          const result =
+            method === 'get_effective_session'
+              ? {
+                  code: RpcErrorCode.INTERNAL,
+                  message: '客户有效配置同步失败',
+                  data: {},
+                }
+              : {
+                  code: 0,
+                  message: 'OK',
+                  data: {},
+                }
+
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id,
+              result,
+            }),
+          })
+        })
+      },
+      verify: async (page) => {
+        await expectText(page, '毛绒玩具 ERP')
+        await expectText(page, '系统管理')
+        await expectHeading(page, '权限管理')
+        await expectText(page, '角色模板')
+        await assertTextAbsent(page, '当前账号暂无可见后台入口')
+      },
+    },
+    {
+      name: 'erp-effective-session-empty-pages-local-dev-diagnostic',
+      path: '/erp/system/permissions',
+      auth: 'admin',
+      adminProfile: {
+        is_super_admin: false,
+        permissions: ['system.permission.read', 'system.permission.manage'],
         menus: [{ key: 'permission-center', path: '/erp/system/permissions' }],
       },
       effectiveSession: {
@@ -446,10 +534,186 @@ export function createStyleL1Scenarios(deps) {
       },
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
+        await expectText(page, '毛绒玩具 ERP')
+        await expectText(page, '系统管理')
+        await expectHeading(page, '权限管理')
+        await expectText(page, '角色模板')
+        await assertTextAbsent(page, '当前账号暂无可见后台入口')
+      },
+    },
+    {
+      name: 'erp-no-visible-menu-blocks-outlet',
+      path: '/erp/system/permissions',
+      auth: 'admin',
+      adminProfile: {
+        is_super_admin: false,
+        permissions: [],
+        menus: [],
+      },
+      effectiveSession: {
+        configRevision: 'style-l1-no-visible-menu',
+        configHash: 'style-l1-no-visible-menu-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        pages: [],
+        actions: [],
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
         await expectText(page, '当前账号暂无可见后台入口')
         await expectText(page, '当前客户有效配置的页面清单')
         await assertTextAbsent(page, '权限中心')
         await assertTextAbsent(page, '管理员列表')
+      },
+    },
+    {
+      name: 'erp-effective-session-action-projection-business-pages',
+      path: '/erp/warehouse/shipments',
+      auth: 'admin',
+      adminProfile: {
+        is_super_admin: false,
+      },
+      effectiveSession: {
+        configRevision: 'style-l1-action-projection',
+        configHash: 'style-l1-action-projection-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        pages: [
+          'shipments',
+          'quality-inspections',
+          'inbound',
+          'sales-orders',
+          'accessories-purchase',
+          'processing-contracts',
+        ],
+        actions: [],
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const expectProjectedActionDisabled = async (label, message) => {
+          const button = page.getByRole('button', { name: label }).first()
+          await button.waitFor({ state: 'visible', timeout: 10_000 })
+          await page.waitForFunction(
+            (buttonText) =>
+              Array.from(document.querySelectorAll('button')).some(
+                (node) =>
+                  String(node.textContent || '')
+                    .replace(/\s+/g, ' ')
+                    .includes(buttonText) && node.disabled
+              ),
+            label,
+            { timeout: 10_000 }
+          )
+          assert.equal(await button.isDisabled(), true, message)
+        }
+
+        await expectHeading(page, '出货单')
+        await expectText(page, 'SHIP-STYLE-L1')
+        await expectProjectedActionDisabled(
+          '新建草稿',
+          '出货页页面可见但 actions 为空时不应允许新建出货草稿'
+        )
+        await page.getByText('SHIP-STYLE-L1', { exact: true }).click()
+        await expectProjectedActionDisabled(
+          '维护明细',
+          '出货页 actions 为空时不应允许维护明细'
+        )
+        await expectProjectedActionDisabled(
+          '确认出货',
+          '出货页 actions 为空时不应允许确认出货'
+        )
+
+        await gotoScenarioPath(page, '/erp/production/quality-inspections', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '来料质检')
+        await expectText(page, 'QI-STYLE-L1')
+        await expectProjectedActionDisabled(
+          '生成质检草稿',
+          '质检页页面可见但 actions 为空时不应允许生成草稿'
+        )
+        await page.getByText('QI-STYLE-L1', { exact: false }).first().click()
+        for (const label of [
+          '提交质检',
+          '判定合格',
+          '判定不合格',
+          '取消质检',
+        ]) {
+          await expectProjectedActionDisabled(
+            label,
+            `质检页 actions 为空时不应允许${label}`
+          )
+        }
+
+        await gotoScenarioPath(page, '/erp/warehouse/inbound', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '入库管理')
+        await expectText(page, 'PR-STYLE-L1-DRAFT')
+        await page.getByText('PR-STYLE-L1-DRAFT', { exact: false }).click()
+        await expectProjectedActionDisabled(
+          '添加明细',
+          '采购入库页 actions 为空时不应允许给草稿添加明细'
+        )
+        await expectProjectedActionDisabled(
+          '过账入库',
+          '采购入库页 actions 为空时不应允许确认过账'
+        )
+
+        await gotoScenarioPath(page, '/erp/sales/project-orders/sales-orders', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '销售订单')
+        await expectText(page, 'SO-STYLE-L1')
+        await expectNoButton(page, '新建订单')
+        await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
+        await expectNoButton(page, '提交')
+        await expectNoButton(page, '取消')
+
+        await gotoScenarioPath(page, '/erp/purchase/accessories', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '采购订单')
+        await expectText(page, 'PO-STYLE-L1')
+        await expectProjectedActionDisabled(
+          '新建采购订单',
+          '采购订单页页面可见但 actions 为空时不应允许新建采购订单'
+        )
+        await page.getByText('PO-STYLE-L1', { exact: false }).first().click()
+        await expectProjectedActionDisabled(
+          '编辑',
+          '采购订单页 actions 为空时不应允许编辑采购订单'
+        )
+        await expectProjectedActionDisabled(
+          '生成入库',
+          '采购订单页 actions 为空时不应允许生成采购入库草稿'
+        )
+        await expectNoButton(page, '提交')
+        await expectNoButton(page, '取消')
+
+        await gotoScenarioPath(page, '/erp/purchase/processing-contracts', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '委外订单')
+        await expectText(page, 'SIM-OUTSOURCE-CONTRACT-L1')
+        await expectProjectedActionDisabled(
+          '新建加工合同',
+          '委外订单页页面可见但 actions 为空时不应允许新建加工合同'
+        )
+        await page
+          .getByRole('row')
+          .filter({ hasText: 'SIM-OUTSOURCE-CONTRACT-L1' })
+          .click()
+        await expectProjectedActionDisabled(
+          '编辑',
+          '委外订单页 actions 为空时不应允许编辑加工合同'
+        )
+        await expectNoButton(page, '提交')
+        await expectNoButton(page, '确认下单')
       },
     },
     {
@@ -1947,6 +2211,9 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, 'runtimeEnabled')
         await expectText(page, '预检步骤 / Preflight Gates')
         await expectText(page, '资产摘要 / Asset Summary')
+        await expectText(page, '模块状态投影 / Module States')
+        await expectText(page, 'moduleStates 只编译为客户配置控制面输入')
+        await expectText(page, 'manifest 编译时默认 enabled')
         await expectText(page, '人工评审清单 / Review Checklist')
         await expectText(page, '校验结果 / Validation Checks')
         await expectText(page, '工作流预览 / Workflows')
@@ -1956,6 +2223,51 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '预检命令 / Preflight Commands')
         await expectText(page, '生成预检报告')
         await expectText(page, '来源路径 / Source References')
+        const moduleStateMetrics = await page.evaluate(() => {
+          const panel = document.querySelector(
+            '.erp-dev-customer-panel--module-states'
+          )
+          const items = panel
+            ? [...panel.querySelectorAll('.erp-dev-customer-tool')]
+            : []
+          return {
+            itemCount: items.length,
+            hasCatalogDefaultCopy:
+              panel?.textContent?.includes('catalog 模块会编译为 enabled') ||
+              false,
+            hasInstallCopy:
+              panel?.textContent?.includes('不安装或卸载模块') || false,
+            hasShipmentModule: items.some((item) =>
+              item.textContent?.includes('shipments')
+            ),
+            enabledTags: items.filter((item) =>
+              item.textContent?.includes('enabled')
+            ).length,
+            panelWidth: panel?.getBoundingClientRect().width || 0,
+            viewportWidth: window.innerWidth,
+          }
+        })
+        assert.deepEqual(
+          {
+            itemCount: moduleStateMetrics.itemCount,
+            hasCatalogDefaultCopy: moduleStateMetrics.hasCatalogDefaultCopy,
+            hasInstallCopy: moduleStateMetrics.hasInstallCopy,
+            hasShipmentModule: moduleStateMetrics.hasShipmentModule,
+            enabledTags: moduleStateMetrics.enabledTags,
+          },
+          {
+            itemCount: 15,
+            hasCatalogDefaultCopy: true,
+            hasInstallCopy: true,
+            hasShipmentModule: true,
+            enabledTags: 15,
+          },
+          `客户配置控制台应展示 15 个 moduleStates 预览项且保持默认 enabled 口径: ${JSON.stringify(moduleStateMetrics)}`
+        )
+        assert(
+          moduleStateMetrics.panelWidth <= moduleStateMetrics.viewportWidth,
+          `moduleStates 预览区不应横向溢出视口: ${JSON.stringify(moduleStateMetrics)}`
+        )
 
         await page
           .locator('.erp-dev-customer-view-switch .ant-segmented-item')
@@ -1971,6 +2283,63 @@ export function createStyleL1Scenarios(deps) {
           .click()
         await expectText(page, '客户编码')
         await expectText(page, '东莞市永绅玩具有限公司')
+        await expectText(page, '打印模板字段 / Print Template Fields')
+        await expectText(page, '当前只展示采购合同和加工合同字段真源')
+        await expectText(page, '销售订单受理当前未接打印模板')
+        await expectText(page, '采购合同')
+        await expectText(page, '加工合同')
+        await expectText(page, 'fieldTruth')
+        const printTemplateMetrics = await page.evaluate(() => {
+          const panel = document.querySelector(
+            '.erp-dev-customer-panel--print-templates'
+          )
+          const items = panel
+            ? [...panel.querySelectorAll('.erp-dev-customer-tool')]
+            : []
+
+          return {
+            itemCount: items.length,
+            hasSalesOrderBoundary:
+              panel?.textContent?.includes('销售订单受理当前未接打印模板') ||
+              false,
+            hasCustomerCoreBoundary:
+              panel?.textContent?.includes('不进入 Product Core 表单') || false,
+            hasPurchaseTruth: items.some((item) =>
+              item.textContent?.includes('采购订单号')
+            ),
+            hasProcessingTruth: items.some((item) =>
+              item.textContent?.includes('委托加工')
+            ),
+            panelWidth: panel?.getBoundingClientRect().width || 0,
+            viewportWidth: window.innerWidth,
+          }
+        })
+        assert.deepEqual(
+          {
+            itemCount: printTemplateMetrics.itemCount,
+            hasSalesOrderBoundary: printTemplateMetrics.hasSalesOrderBoundary,
+            hasCustomerCoreBoundary:
+              printTemplateMetrics.hasCustomerCoreBoundary,
+            hasPurchaseTruth: printTemplateMetrics.hasPurchaseTruth,
+            hasProcessingTruth: printTemplateMetrics.hasProcessingTruth,
+          },
+          {
+            itemCount: 2,
+            hasSalesOrderBoundary: true,
+            hasCustomerCoreBoundary: true,
+            hasPurchaseTruth: true,
+            hasProcessingTruth: true,
+          },
+          `打印模板字段面板应只读展示正式模板字段真源: ${JSON.stringify(
+            printTemplateMetrics
+          )}`
+        )
+        assert(
+          printTemplateMetrics.panelWidth <= printTemplateMetrics.viewportWidth,
+          `打印模板字段面板不应横向溢出: ${JSON.stringify(
+            printTemplateMetrics
+          )}`
+        )
 
         await page
           .locator('.erp-dev-customer-view-switch .ant-segmented-item')
@@ -3453,6 +3822,9 @@ export function createStyleL1Scenarios(deps) {
             docPaths: Array.from(
               document.querySelectorAll('.erp-dev-testing-doc-row__path')
             ).map((node) => node.textContent.trim()),
+            presetTexts: Array.from(
+              document.querySelectorAll('.erp-dev-testing-preset')
+            ).map((node) => node.textContent.replace(/\s+/g, ' ').trim()),
             overflow:
               root &&
               document.documentElement.scrollWidth > root.clientWidth + 1,
@@ -3487,8 +3859,34 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           defaultMetrics.presetCount,
-          3,
+          19,
           `测试入口应渲染常用复制预设: ${JSON.stringify(defaultMetrics)}`
+        )
+        assert(
+          [
+            '本轮前端验证 / Frontend Check',
+            'Workflow 后端动作合同 / Backend Action Contract',
+            '试用角色入口 / Trial Role Entries',
+            '角色菜单与入口真源 / Role Menu & Entry Contracts',
+            '试用账号 RBAC / Trial Account RBAC',
+            '真实登录 smoke URL 边界 / Real Login Smoke URL Guard',
+            '试用模拟数据 / Trial Simulated Data',
+            'MVP 本地闭环计划 / MVP Local Closure',
+            '移动端 Workflow smoke / Mobile Workflow Smoke',
+            '客户配置控制台 / Customer Config Console',
+            '原型登记与查看器 / Prototype Registry',
+            '文档治理与台账查看器 / Docs Governance & Ledger',
+            '客户配置包运行时 / Customer Config Runtime',
+            '客户导入 tooling / Customer Import Tooling',
+            '客户配置前端投影 / Customer Config Projection',
+            '前端错误提示边界 / Frontend Error Messages',
+            '业务动作与字段链路 / Business Action & Field Boundaries',
+            '提交前 QA / Pre-commit QA',
+            '发版前严格 QA / Release QA',
+          ].every((label) =>
+            defaultMetrics.presetTexts.some((text) => text.includes(label))
+          ),
+          `测试入口预设应覆盖前端、Workflow、试用角色、角色菜单与入口真源、试用账号 RBAC、真实登录 URL、试用模拟数据、MVP 本地闭环、移动端、客户配置、原型、文档治理、导入、错误提示、业务动作字段、提交和发版: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
           defaultMetrics.tierCopyButtonCount >= defaultMetrics.tierCount,
@@ -3519,6 +3917,136 @@ export function createStyleL1Scenarios(deps) {
         assert(
           frontendPresetClipboard.includes('pnpm style:l1'),
           `前端验证预设应复制 style:l1 命令: ${frontendPresetClipboard}`
+        )
+        await page
+          .locator('.erp-dev-testing-preset')
+          .filter({ hasText: '试用账号 RBAC / Trial Account RBAC' })
+          .click()
+        const trialAccountRbacClipboard = await page.evaluate(() =>
+          navigator.clipboard.readText()
+        )
+        assert(
+          trialAccountRbacClipboard.includes('trial-account-rbac.mjs') &&
+            trialAccountRbacClipboard.includes('TRIAL_ACCOUNT_PASSWORD') &&
+            trialAccountRbacClipboard.includes('smoke:trial-demo-browser'),
+          `试用账号 RBAC 预设应复制真实登录 RBAC 和浏览器 smoke 命令: ${trialAccountRbacClipboard}`
+        )
+        await page
+          .locator('.erp-dev-testing-preset')
+          .filter({ hasText: '移动端 Workflow smoke / Mobile Workflow Smoke' })
+          .click()
+        const mobilePresetClipboard = await page.evaluate(() =>
+          navigator.clipboard.readText()
+        )
+        assert(
+          mobilePresetClipboard.includes(
+            'mobile-workflow-runtime-browser-smoke.test.mjs'
+          ) &&
+            mobilePresetClipboard.includes(
+              'MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD'
+            ),
+          `移动端 Workflow 预设应复制静态边界和真实浏览器命令: ${mobilePresetClipboard}`
+        )
+        await page
+          .locator('.erp-dev-testing-preset')
+          .filter({ hasText: '试用模拟数据 / Trial Simulated Data' })
+          .click()
+        const trialSimulatedDataClipboard = await page.evaluate(() =>
+          navigator.clipboard.readText()
+        )
+        assert(
+          trialSimulatedDataClipboard.includes(
+            'trial-simulated-data.test.mjs'
+          ) &&
+            trialSimulatedDataClipboard.includes(
+              'operational-fact-simulated-closure.test.mjs'
+            ) &&
+            trialSimulatedDataClipboard.includes(
+              'mobile-workflow-simulated-closure.test.mjs'
+            ),
+          `试用模拟数据预设应复制 seed / fixture 和模拟闭环边界测试: ${trialSimulatedDataClipboard}`
+        )
+        await page
+          .locator('.erp-dev-testing-preset')
+          .filter({ hasText: 'MVP 本地闭环计划 / MVP Local Closure' })
+          .click()
+        const mvpLocalClosureClipboard = await page.evaluate(() =>
+          navigator.clipboard.readText()
+        )
+        assert(
+          mvpLocalClosureClipboard.includes('mvp-closure.test.mjs') &&
+            mvpLocalClosureClipboard.includes(
+              'mvp-closure.mjs --out output/customers/yoyoosun/mvp-closure'
+            ) &&
+            mvpLocalClosureClipboard.includes(
+              '--run-report-tools --product-id <product_id>'
+            ),
+          `MVP 本地闭环预设应复制 plan-only 和 no-write report tools 命令: ${mvpLocalClosureClipboard}`
+        )
+        await page
+          .locator('.erp-dev-testing-preset')
+          .filter({ hasText: '客户配置控制台 / Customer Config Console' })
+          .click()
+        const customerConfigPresetClipboard = await page.evaluate(() =>
+          navigator.clipboard.readText()
+        )
+        assert(
+          customerConfigPresetClipboard.includes(
+            'web/src/erp/config/devCustomerConfig.test.mjs'
+          ) &&
+            customerConfigPresetClipboard.includes(
+              'dev-customer-config-dark-desktop'
+            ),
+          `客户配置预设应复制 dev console 测试和 L1 命令: ${customerConfigPresetClipboard}`
+        )
+        await page
+          .locator('.erp-dev-testing-preset')
+          .filter({
+            hasText: '客户配置前端投影 / Customer Config Projection',
+          })
+          .click()
+        const frontendConfigPresetClipboard = await page.evaluate(() =>
+          navigator.clipboard.readText()
+        )
+        assert(
+          frontendConfigPresetClipboard.includes(
+            'formal-frontend-customer-config-boundary.test.mjs'
+          ) &&
+            frontendConfigPresetClipboard.includes(
+              'erp-effective-session-action-projection-business-pages'
+            ),
+          `客户配置前端投影预设应复制正式投影测试和 L1 命令: ${frontendConfigPresetClipboard}`
+        )
+        await page
+          .locator('.erp-dev-testing-preset')
+          .filter({ hasText: '前端错误提示边界 / Frontend Error Messages' })
+          .click()
+        const frontendErrorPresetClipboard = await page.evaluate(() =>
+          navigator.clipboard.readText()
+        )
+        assert(
+          frontendErrorPresetClipboard.includes(
+            'frontend-error-message-boundary.test.mjs'
+          ),
+          `前端错误提示预设应复制用户可见错误边界测试: ${frontendErrorPresetClipboard}`
+        )
+        await page
+          .locator('.erp-dev-testing-preset')
+          .filter({
+            hasText: '业务动作与字段链路 / Business Action & Field Boundaries',
+          })
+          .click()
+        const businessActionFieldClipboard = await page.evaluate(() =>
+          navigator.clipboard.readText()
+        )
+        assert(
+          businessActionFieldClipboard.includes(
+            'workflow-ui-action-boundary.test.mjs'
+          ) &&
+            businessActionFieldClipboard.includes(
+              'sales-order-field-chain-boundary.test.mjs'
+            ),
+          `业务动作与字段链路预设应复制 Workflow UI 和销售订单字段链路边界测试: ${businessActionFieldClipboard}`
         )
         await page
           .locator('.erp-dev-testing-tier')
@@ -4439,17 +4967,17 @@ export function createStyleL1Scenarios(deps) {
       assertERPThemeMode,
       assertNoHorizontalOverflow,
       assertPurchaseReceiptActionButtonState,
-      assertPurchaseReceiptAddItemModalDarkTokens,
-      assertPurchaseReceiptAddItemModalMetrics,
-      assertPurchaseReceiptAddItemModalMobileLayout,
+      assertPurchaseReceiptAddItemEditorDarkTokens,
+      assertPurchaseReceiptAddItemEditorMetrics,
+      assertPurchaseReceiptAddItemEditorMobileLayout,
       assertPurchaseReceiptRowItemCount,
       assertTextAbsent,
       closeBusinessFormModal,
       expectButton,
       expectHeading,
       expectText,
-      fillPurchaseReceiptAddItemModalBoundaryValues,
-      openPurchaseReceiptAddItemModal,
+      fillPurchaseReceiptAddItemEditorBoundaryValues,
+      openPurchaseReceiptAddItemEditor,
       selectPurchaseReceiptRow,
       verifyBusinessModuleColumnOrderDialog,
     }),
@@ -4722,6 +5250,8 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: '生成采购入库草稿' })
           .last()
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(page, '来源采购订单：PO-STYLE-L1')
+        await assertTextAbsent(page, '来源采购订单：1')
         await expectText(page, '入库单号')
         await expectText(page, '入库仓库')
         await expectText(page, '入库日期')

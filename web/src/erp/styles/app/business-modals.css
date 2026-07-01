@@ -921,6 +921,98 @@
   margin-top: 16px;
 }
 
+.erp-bom-modal-items .erp-sales-order-lines-form__row {
+  width: 100%;
+  max-width: 100%;
+}
+
+.erp-bom-modal-items
+  .erp-sales-order-lines-form__grid
+  .erp-line-item-field--source.ant-form-item {
+  width: 220px;
+}
+
+.erp-bom-modal-items
+  .erp-sales-order-lines-form__grid
+  .erp-line-item-field--quantity.ant-form-item {
+  width: 150px;
+}
+
+.erp-bom-modal-items
+  .erp-sales-order-lines-form__grid
+  .erp-line-item-field--date.ant-form-item {
+  width: 150px;
+}
+
+.erp-bom-modal-items
+  .erp-sales-order-lines-form__grid
+  .erp-line-item-field--note.ant-form-item,
+.erp-bom-modal-items
+  .erp-sales-order-lines-form__grid
+  .erp-business-action-form__field--full.ant-form-item {
+  width: 220px;
+}
+
+.erp-purchase-receipt-inline-item-editor {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 12px 0 16px;
+  border: 1px solid var(--erp-line-items-import-border, #d7e5dd);
+  border-radius: 8px;
+  background: var(--erp-line-items-import-bg, #ffffff);
+  padding: 12px;
+}
+
+.erp-purchase-receipt-inline-item-editor__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.erp-purchase-receipt-inline-item-editor__head > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.erp-purchase-receipt-inline-item-editor__head strong {
+  color: var(--erp-sales-order-lines-title, #172033);
+  font-size: 14px;
+  font-weight: 780;
+}
+
+.erp-purchase-receipt-inline-item-editor__head span {
+  color: var(--erp-sales-order-lines-text-muted, #6b7788);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.erp-purchase-receipt-inline-item-form {
+  grid-template-columns:
+    minmax(220px, 1.1fr) minmax(180px, 0.9fr) minmax(140px, 0.7fr)
+    minmax(140px, 0.65fr) minmax(180px, 0.9fr);
+}
+
+.erp-purchase-receipt-inline-item-form
+  .erp-business-action-form__field--wide.ant-form-item {
+  grid-column: span 2;
+}
+
+.erp-purchase-receipt-inline-item-editor__footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-purchase-receipt-inline-item-panel {
+  margin-bottom: 16px;
+}
+
 .erp-business-action-form
   :where(.ant-input, .ant-input-number, .ant-picker, .ant-select),
 .erp-business-action-form

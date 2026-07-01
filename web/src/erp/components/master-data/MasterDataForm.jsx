@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { CopyOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
 import {
   AutoComplete,
   Button,
@@ -17,6 +17,7 @@ import {
   optionalContactPhoneRule,
 } from '../../utils/contactValidation.mjs'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
+import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 
 function DefaultUnitSelect({ required = false, unitOptions, unitLoading }) {
   return (
@@ -688,29 +689,21 @@ export function ContactFormList({ form, entityLabel }) {
               </div>
             ))}
           </div>
-          <div className="erp-line-items-form__footer">
-            <div className="erp-line-items-form__footer-actions">
-              <Button
-                type="dashed"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  requestLineItemScroll(fields.length)
-                  add({ is_primary: false })
-                }}
-              >
-                添加条目
-              </Button>
-            </div>
-            <div className="erp-line-items-form__stats">
-              <span className="erp-line-items-form__stat">
-                已录入
-                <strong className="erp-line-items-form__stat-value">
-                  {fields.length}
-                </strong>
-                条
-              </span>
-            </div>
-          </div>
+          <BusinessLineItemsFooter
+            addLabel="添加条目"
+            onAdd={() => {
+              requestLineItemScroll(fields.length)
+              add({ is_primary: false })
+            }}
+            stats={[
+              {
+                key: 'count',
+                label: '已录入',
+                value: fields.length,
+                suffix: '条',
+              },
+            ]}
+          />
           <Form.ErrorList errors={errors} />
         </div>
       )}

@@ -13,9 +13,60 @@ print_help() {
     --customer-config-revision yoyoosun-customer-package-v1.runtime-manifest-v1 \
     --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN
 
+Input template only:
+  bash deployments/yoyoosun/scripts/run-smoke.sh --print-input-template
+
 说明:
   只做轻量 health / route / customer_config effective session smoke，不创建业务事实。
 USAGE
+}
+
+print_input_template() {
+  cat <<'JSON'
+{
+  "scope": "yoyoosun-run-smoke-input-template",
+  "customer": "yoyoosun",
+  "writesReport": false,
+  "writesDatabase": false,
+  "callsEndpoint": false,
+  "callsBackend": false,
+  "callsCustomerConfig": false,
+  "readsAdminToken": false,
+  "secretInputs": [
+    "CUSTOMER_CONFIG_ADMIN_TOKEN or the environment variable named by --admin-token-env"
+  ],
+  "requiredInputs": [
+    "public ERP endpoint without username/password",
+    "release version",
+    "environment",
+    "smoke report path",
+    "optional backend URL without username/password",
+    "customer config revision when active revision readback is required",
+    "admin token env name when customer config readback is required"
+  ],
+  "checks": [
+    "web-healthz",
+    "server-healthz when --backend-url is provided",
+    "server-readyz when --backend-url is provided",
+    "login-page",
+    "mobile-role-route",
+    "customer-config-effective-session when --customer-config-revision is provided"
+  ],
+  "commands": [
+    "bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json",
+    "CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --customer-config-revision yoyoosun-customer-package-v1.runtime-manifest-v1 --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN"
+  ],
+  "requiredReadbackEvidence": [
+    "check name=customer-config-effective-session",
+    "target=jsonrpc:customer_config.get_effective_session",
+    "expectedRevision matches the activated customer config revision",
+    "tokenSourceEnv is recorded",
+    "responseBodyStored=false",
+    "report backendEndpointAlias matches the release executor report backendEndpointAlias"
+  ],
+  "boundary": "This template does not call endpoints, read admin tokens, call customer_config, write smoke-test-report.json, write database rows, import business data, or prove active revision readback. Real proof requires running the smoke command against the target backend with an admin token env and storing only the redacted customer-config-effective-session check."
+}
+JSON
 }
 
 endpoint=""
@@ -55,6 +106,10 @@ while [[ $# -gt 0 ]]; do
   --admin-token-env)
     admin_token_env="${2:-}"
     shift 2
+    ;;
+  --print-input-template)
+    print_input_template
+    exit 0
     ;;
   -h | --help)
     print_help

@@ -13,6 +13,7 @@ const scanFiles = ['utils/referenceSelectOptions.mjs'].map((file) =>
   join(rootDir, file)
 )
 scanFiles.push(join(rootDir, 'utils/dashboardTaskDisplay.mjs'))
+scanFiles.push(join(rootDir, 'utils/masterDataOrderView.mjs'))
 
 const sourceExtensions = new Set(['.js', '.jsx', '.mjs'])
 const businessVisibleScanDirs = ['pages', 'components'].map((dir) =>
@@ -49,7 +50,9 @@ const forbiddenUserVisibleText = [
   '入库行 #',
   '批次 #',
   '管理员 #',
+  '未知单位 #',
   '主键',
+  'sales_order_item_id 追溯',
   '关联来源必须',
   '填写关联来源记录',
   '缺少出货单 ID',
@@ -105,6 +108,137 @@ test('业务前端页面不暴露技术实现字段文案', () => {
   }
 
   assert.deepEqual(violations, [])
+})
+
+test('业务事实选中标签不把内部 ID 当业务编号 fallback', () => {
+  const filePath = join(
+    rootDir,
+    'components/operational-facts/OperationalFactForms.jsx'
+  )
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.doesNotMatch(
+    content,
+    /record\.(?:shipment_no|reservation_no|fact_no)\s*\|\|\s*record\.id/u
+  )
+  assert.match(content, /出货单已关联/u)
+  assert.match(content, /库存预留已关联/u)
+  assert.match(content, /业务事实已关联/u)
+})
+
+test('销售订单客户选项不把客户 ID 当客户编码 fallback', () => {
+  const filePath = join(rootDir, 'components/sales-orders/SalesOrderForm.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.doesNotMatch(content, /customer\.code\s*\|\|\s*customer\.id/u)
+  assert.match(content, /未命名客户/u)
+  assert.match(content, /客户已关联/u)
+})
+
+test('采购订单来源供应商不把 supplier_id 当供应商名称 fallback', () => {
+  const filePath = join(rootDir, 'pages/V1PurchaseOrdersPage.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.doesNotMatch(content, /source\.supplier_id\s*\|\|/u)
+  assert.match(content, /供应商已关联/u)
+})
+
+test('BOM 页面导出和选中项不把内部 ID 当业务字段', () => {
+  const filePath = join(rootDir, 'pages/BOMVersionsPage.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.doesNotMatch(content, /产品ID/u)
+  assert.doesNotMatch(content, /`BOM \$\{record\.id\}`/u)
+  assert.match(
+    content,
+    /referenceLabel\(productOptions, row\.product_id, '产品'\)/u
+  )
+  assert.match(content, /BOM 已关联/u)
+})
+
+test('委外订单表单引用选项缺字段时保留业务可读 fallback', () => {
+  const filePath = join(
+    rootDir,
+    'components/outsourcing-orders/OutsourcingOrderForm.jsx'
+  )
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(content, /供应商已关联/u)
+  assert.match(content, /产品已关联/u)
+  assert.match(content, /工序已关联/u)
+  assert.match(content, /单位已关联/u)
+})
+
+test('采购订单表单引用选项缺字段时保留业务可读 fallback', () => {
+  const filePath = join(
+    rootDir,
+    'components/purchase-orders/PurchaseOrderForm.jsx'
+  )
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(content, /供应商已关联/u)
+  assert.match(content, /材料已关联/u)
+})
+
+test('采购订单生成入库草稿弹窗不把订单 ID 当来源单号 fallback', () => {
+  const filePath = join(
+    rootDir,
+    'components/purchase-orders/PurchaseOrderInboundDraftModal.jsx'
+  )
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.doesNotMatch(
+    content,
+    /order\?\.purchase_order_no\s*\|\|\s*order\?\.id/u
+  )
+  assert.match(content, /采购订单已关联/u)
+})
+
+test('来源导入选中摘要不把内部 ID 当业务标签 fallback', () => {
+  const sourcePickerPath = join(
+    rootDir,
+    'components/business-list/SourceImportPickerModal.jsx'
+  )
+  const salesOrderFormPath = join(
+    rootDir,
+    'components/sales-orders/SalesOrderForm.jsx'
+  )
+  const purchaseOrderFormPath = join(
+    rootDir,
+    'components/purchase-orders/PurchaseOrderForm.jsx'
+  )
+  const sourcePickerContent = readFileSync(sourcePickerPath, 'utf8')
+  const salesOrderContent = readFileSync(salesOrderFormPath, 'utf8')
+  const purchaseOrderContent = readFileSync(purchaseOrderFormPath, 'utf8')
+
+  assert.doesNotMatch(sourcePickerContent, /row\.id\s*\|\|/u)
+  assert.doesNotMatch(salesOrderContent, /sku\?\.id\s*\|\|/u)
+  assert.doesNotMatch(purchaseOrderContent, /material\?\.id\s*\|\|/u)
+  assert.match(sourcePickerContent, /记录已关联/u)
+  assert.match(salesOrderContent, /SKU 已关联/u)
+  assert.match(salesOrderContent, /联系人已关联/u)
+  assert.match(purchaseOrderContent, /getSelectedLabel=\{materialLabel\}/u)
+})
+
+test('采购入库和来料质检选中标签不把内部 ID 当业务单号 fallback', () => {
+  const purchaseReceiptPath = join(rootDir, 'pages/V1PurchaseReceiptsPage.jsx')
+  const qualityInspectionPath = join(
+    rootDir,
+    'pages/V1QualityInspectionsPage.jsx'
+  )
+  const purchaseReceiptContent = readFileSync(purchaseReceiptPath, 'utf8')
+  const qualityInspectionContent = readFileSync(qualityInspectionPath, 'utf8')
+
+  assert.doesNotMatch(
+    purchaseReceiptContent,
+    /selectedRow\.receipt_no\s*\|\|\s*selectedRow\.id/u
+  )
+  assert.doesNotMatch(
+    qualityInspectionContent,
+    /selectedRow\.inspection_no\s*\|\|\s*selectedRow\.id/u
+  )
+  assert.match(purchaseReceiptContent, /采购入库单已关联/u)
+  assert.match(qualityInspectionContent, /来料质检单已关联/u)
 })
 
 test('业务可见文案不暴露架构状态机术语', () => {

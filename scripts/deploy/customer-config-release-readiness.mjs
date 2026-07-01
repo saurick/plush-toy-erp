@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,6 +37,16 @@ Post-rollback evidence check:
   node scripts/deploy/customer-config-release-readiness.mjs ... \\
     --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json \\
     --require-executed --require-rollback
+
+Input template only:
+  node scripts/deploy/customer-config-release-readiness.mjs --print-input-template
+
+No-write active readback preflight report:
+  node scripts/deploy/customer-config-release-readiness.mjs \\
+    --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \\
+    --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \\
+    --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json \\
+    --readback-preflight-report output/customers/yoyoosun/customer-config-readback-preflight.json
 
 Machine-readable report:
   node scripts/deploy/customer-config-release-readiness.mjs ... --json
@@ -76,6 +86,8 @@ export function parseCliArgs(argv) {
     requireExecuted: false,
     requireActivated: false,
     requireRollback: false,
+    printInputTemplate: false,
+    readbackPreflightReport: "",
     help: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -100,6 +112,10 @@ export function parseCliArgs(argv) {
     if (token === "--require-rollback") {
       options.requireExecuted = true;
       options.requireRollback = true;
+      continue;
+    }
+    if (token === "--print-input-template") {
+      options.printInputTemplate = true;
       continue;
     }
     if (!token.startsWith("--")) {
@@ -129,11 +145,58 @@ export function parseCliArgs(argv) {
       case "customer":
         options.customer = value;
         break;
+      case "readback-preflight-report":
+        options.readbackPreflightReport = value;
+        break;
       default:
         throw new CliError(`Unknown option --${key}`, 2);
     }
   }
   return options;
+}
+
+export function buildInputTemplate(customer = DEFAULT_CUSTOMER) {
+  return {
+    scope: "customer-config-release-readiness-input-template",
+    customer,
+    writesDatabase: false,
+    callsBackend: false,
+    readsManifest: false,
+    readsReleaseEvidence: false,
+    readsReleaseReport: false,
+    validatesReleaseEvidence: false,
+    secretInputs: [],
+    requiredInputs: [
+      "runtime manifest path",
+      "release evidence directory",
+      "optional customer-config-release-report.json when checking executed / activated / rollback status",
+      "target smoke customer-config-effective-session evidence when --require-activated or --require-rollback is used",
+    ],
+    modes: [
+      "pre-execution readiness evidence aggregation",
+      "post-execution publish report check with --require-executed",
+      "post-activation readback evidence check with --require-activated",
+      "post-rollback readback evidence check with --require-rollback",
+    ],
+    commands: [
+      "node scripts/deploy/customer-config-release-readiness.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>",
+      "node scripts/deploy/customer-config-release-readiness.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --require-executed",
+      "node scripts/deploy/customer-config-release-readiness.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --require-executed --require-activated",
+      "node scripts/deploy/customer-config-release-readiness.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --require-executed --require-rollback",
+      "node scripts/deploy/customer-config-release-readiness.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --readback-preflight-report output/customers/yoyoosun/customer-config-readback-preflight.json",
+    ],
+    requiredReadbackEvidence: [
+      "release report effectiveSessionVerification.status=verified",
+      "release report effectiveSessionVerification.method=get_effective_session",
+      "release report effectiveSessionVerification.configRevision matches manifest revision",
+      "target smoke check name=customer-config-effective-session",
+      "target smoke check target=jsonrpc:customer_config.get_effective_session",
+      "target smoke check responseBodyStored=false",
+      "target smoke backendEndpointAlias matches release report backendEndpointAlias",
+    ],
+    boundary:
+      "This template does not read manifest or release evidence, call customer_config, execute publish / activate / rollback, run migration, restore backups, import business data, write database rows, or prove active revision readback. Real readback proof requires readiness with --require-activated or --require-rollback, an executed release report with effectiveSessionVerification, and target smoke customer-config-effective-session evidence.",
+  };
 }
 
 function requireOption(options, key) {
@@ -153,6 +216,314 @@ async function readJson(filePath, label) {
   }
 }
 
+function resolveRepoOutputPath(repoRoot, raw, flagName) {
+  const value = String(raw || "").trim();
+  if (!value) {
+    throw new CliError(`${flagName} requires an output path`, 2);
+  }
+  const resolved = path.resolve(repoRoot, value);
+  const relative = path.relative(repoRoot, resolved);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new CliError(`${flagName} must stay inside the repository`, 2);
+  }
+  return resolved;
+}
+
+async function writeJson(filePath, data) {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+}
+
+function readOptionalJson(filePath, label, blockers) {
+  if (!filePath) {
+    blockers.push(`missing-${label}-option`);
+    return { exists: false, data: null, error: "" };
+  }
+  if (!fs.existsSync(filePath)) {
+    blockers.push(`missing-${label}`);
+    return { exists: false, data: null, error: "" };
+  }
+  try {
+    return {
+      exists: true,
+      data: JSON.parse(fs.readFileSync(filePath, "utf8")),
+      error: "",
+    };
+  } catch (error) {
+    blockers.push(`invalid-${label}-json`);
+    return {
+      exists: true,
+      data: null,
+      error: String(error?.message || error),
+    };
+  }
+}
+
+function buildManifestReadbackSummary(manifest, blockers) {
+  if (!manifest) {
+    return {
+      valid: false,
+      customerKey: "",
+      revision: "",
+      pageCount: 0,
+      fieldPolicySurfaceCount: 0,
+    };
+  }
+  try {
+    validateRuntimeManifest(manifest);
+  } catch (error) {
+    blockers.push("invalid-runtime-manifest");
+    return {
+      valid: false,
+      customerKey: manifest.customer_key || "",
+      revision: manifest.revision || "",
+      pageCount: 0,
+      fieldPolicySurfaceCount: 0,
+      error: String(error?.message || error),
+    };
+  }
+  return {
+    valid: true,
+    customerKey: manifest.customer_key,
+    revision: manifest.revision,
+    pageCount: Array.isArray(manifest.compiled_snapshot?.pages)
+      ? manifest.compiled_snapshot.pages.length
+      : 0,
+    fieldPolicySurfaceCount: sortedKeys(
+      manifest.compiled_snapshot?.fieldPolicies,
+    ).length,
+  };
+}
+
+function buildReleaseReportReadbackSummary({ report, manifestSummary, blockers }) {
+  const verification = report?.effectiveSessionVerification || null;
+  const backendEndpointAlias = sanitizeEndpointAliasForReport({
+    value: report?.backendEndpointAlias,
+    label: "release-report-backend-endpoint-alias",
+    blockers,
+  });
+  const summary = {
+    exists: Boolean(report),
+    executed: Boolean(report?.executed),
+    activate: Boolean(report?.activate),
+    rollback: Boolean(report?.rollback),
+    backendEndpointAlias,
+    effectiveSessionVerification: {
+      exists: Boolean(verification),
+      status: verification?.status || "",
+      method: verification?.method || "",
+      customerKey: verification?.customerKey || "",
+      configRevision: verification?.configRevision || "",
+      source: verification?.source || "",
+      pageCount: Number(verification?.pageCount || 0),
+      fieldPolicySurfaceCount: Number(
+        verification?.fieldPolicySurfaceCount || 0,
+      ),
+      pagesSubsetOfManifest: verification?.pagesSubsetOfManifest === true,
+      fieldPolicySurfacesMatchManifest:
+        verification?.fieldPolicySurfacesMatchManifest === true,
+    },
+  };
+  if (!report) return summary;
+  if (!verification) {
+    blockers.push("missing-effective-session-verification");
+    return summary;
+  }
+  if (verification.status !== "verified") {
+    blockers.push("effective-session-verification-not-verified");
+  }
+  if (verification.method !== "get_effective_session") {
+    blockers.push("effective-session-verification-method-mismatch");
+  }
+  if (
+    manifestSummary.valid &&
+    verification.configRevision !== manifestSummary.revision
+  ) {
+    blockers.push("effective-session-verification-revision-mismatch");
+  }
+  if (verification.source !== "active_customer_config_revision") {
+    blockers.push("effective-session-verification-source-mismatch");
+  }
+  if (Number(verification.pageCount || 0) <= 0) {
+    blockers.push("effective-session-verification-empty-pages");
+  }
+  if (verification.pagesSubsetOfManifest !== true) {
+    blockers.push("effective-session-verification-pages-not-subset");
+  }
+  if (verification.fieldPolicySurfacesMatchManifest !== true) {
+    blockers.push("effective-session-verification-field-policy-mismatch");
+  }
+  if (
+    manifestSummary.valid &&
+    Number(verification.fieldPolicySurfaceCount || 0) !==
+      manifestSummary.fieldPolicySurfaceCount
+  ) {
+    blockers.push("effective-session-verification-field-policy-count-mismatch");
+  }
+  return summary;
+}
+
+function buildSmokeReadbackSummary({ smokeReport, manifestSummary, releaseReportSummary, blockers }) {
+  const checks = Array.isArray(smokeReport?.checks) ? smokeReport.checks : [];
+  const check = checks.find(
+    (item) =>
+      item?.name === "customer-config-effective-session" ||
+      item?.target === "jsonrpc:customer_config.get_effective_session",
+  );
+  const backendEndpointAlias = sanitizeEndpointAliasForReport({
+    value: smokeReport?.backendEndpointAlias,
+    label: "smoke-report-backend-endpoint-alias",
+    blockers,
+  });
+  const summary = {
+    exists: Boolean(smokeReport),
+    backendEndpointAlias,
+    customerConfigEffectiveSession: {
+      exists: Boolean(check),
+      status: check?.status || "",
+      target: check?.target || "",
+      expectedRevision: check?.expectedRevision || "",
+      tokenSourceEnv: check?.tokenSourceEnv || "",
+      responseBodyStored: check?.responseBodyStored === false,
+    },
+  };
+  if (!smokeReport) return summary;
+  if (!summary.backendEndpointAlias) {
+    blockers.push("smoke-report-missing-backend-endpoint-alias");
+  }
+  if (!check) {
+    blockers.push("missing-smoke-effective-session-check");
+    return summary;
+  }
+  if (!/^(pass|passed|ok)$/i.test(String(check.status || "").trim())) {
+    blockers.push("smoke-effective-session-check-not-pass");
+  }
+  if (check.target !== "jsonrpc:customer_config.get_effective_session") {
+    blockers.push("smoke-effective-session-target-mismatch");
+  }
+  if (manifestSummary.valid && check.expectedRevision !== manifestSummary.revision) {
+    blockers.push("smoke-effective-session-revision-mismatch");
+  }
+  if (!String(check.tokenSourceEnv || "").trim()) {
+    blockers.push("smoke-effective-session-token-source-missing");
+  }
+  if (check.responseBodyStored !== false) {
+    blockers.push("smoke-effective-session-response-body-stored");
+  }
+  if (
+    releaseReportSummary.backendEndpointAlias &&
+    summary.backendEndpointAlias &&
+    releaseReportSummary.backendEndpointAlias !== summary.backendEndpointAlias
+  ) {
+    blockers.push("readback-backend-endpoint-alias-mismatch");
+  }
+  return summary;
+}
+
+export async function buildCustomerConfigReadbackPreflightReport(
+  options,
+  runtime = {},
+) {
+  const repoRoot = runtime.repoRoot || process.cwd();
+  const blockers = [];
+  const manifestPath = options.manifest
+    ? path.resolve(repoRoot, options.manifest)
+    : "";
+  const evidenceDir = options.evidenceDir
+    ? path.resolve(repoRoot, options.evidenceDir)
+    : "";
+  const releaseReportPath = options.releaseReport
+    ? path.resolve(repoRoot, options.releaseReport)
+    : "";
+  const smokeReportPath = evidenceDir
+    ? path.join(evidenceDir, "smoke-test-report.json")
+    : "";
+
+  const manifestRead = readOptionalJson(manifestPath, "manifest", blockers);
+  const manifestSummary = buildManifestReadbackSummary(
+    manifestRead.data,
+    blockers,
+  );
+  if (manifestSummary.valid && manifestSummary.customerKey !== options.customer) {
+    blockers.push("manifest-customer-mismatch");
+  }
+  if (!options.evidenceDir) {
+    blockers.push("missing-evidence-dir-option");
+  }
+  const releaseReportRead = readOptionalJson(
+    releaseReportPath,
+    "release-report",
+    blockers,
+  );
+  const releaseReportSummary = buildReleaseReportReadbackSummary({
+    report: releaseReportRead.data,
+    manifestSummary,
+    blockers,
+  });
+  const smokeReportRead = readOptionalJson(
+    smokeReportPath,
+    "smoke-report",
+    blockers,
+  );
+  const smokeReportSummary = buildSmokeReadbackSummary({
+    smokeReport: smokeReportRead.data,
+    manifestSummary,
+    releaseReportSummary,
+    blockers,
+  });
+  const tokenEnvName =
+    smokeReportSummary.customerConfigEffectiveSession.tokenSourceEnv ||
+    "CUSTOMER_CONFIG_ADMIN_TOKEN";
+
+  return {
+    scope: "customer-config-active-readback-preflight-report",
+    generatedAt: new Date().toISOString(),
+    customer: options.customer || DEFAULT_CUSTOMER,
+    writesDatabase: false,
+    writesReleaseEvidence: false,
+    callsBackend: false,
+    callsCustomerConfig: false,
+    readsAdminTokenValue: false,
+    storesAdminTokenValue: false,
+    storesResponseBody: false,
+    importsBusinessData: false,
+    validatesReleaseEvidence: false,
+    manifest: {
+      path: options.manifest || "",
+      exists: manifestRead.exists,
+      ...manifestSummary,
+      error: manifestRead.error || manifestSummary.error || "",
+    },
+    releaseReport: {
+      path: options.releaseReport || "",
+      exists: releaseReportRead.exists,
+      error: releaseReportRead.error,
+      ...releaseReportSummary,
+    },
+    targetSmoke: {
+      evidenceDir: options.evidenceDir || "",
+      path: options.evidenceDir ? path.join(options.evidenceDir, "smoke-test-report.json") : "",
+      exists: smokeReportRead.exists,
+      error: smokeReportRead.error,
+      ...smokeReportSummary,
+    },
+    tokenEnv: {
+      expectedName: tokenEnvName,
+      present: Boolean(String(process.env[tokenEnvName] || "").trim()),
+    },
+    readyForReadinessGate: blockers.length === 0,
+    readyForRealTargetSmoke:
+      manifestSummary.valid &&
+      Boolean(options.evidenceDir) &&
+      Boolean(tokenEnvName) &&
+      Boolean(String(process.env[tokenEnvName] || "").trim()),
+    blockers,
+    nextCommand: blockers.length
+      ? "Resolve blockers, then run readiness with --require-activated or --require-rollback when real readback evidence exists."
+      : "node scripts/deploy/customer-config-release-readiness.mjs --manifest <manifest> --evidence-dir <evidence-dir> --release-report <release-report> --require-executed --require-activated",
+  };
+}
+
 function assert(condition, message) {
   if (!condition) {
     throw new CliError(message);
@@ -170,6 +541,39 @@ function validateSafeReportFlags(report) {
 function requireNonEmptyString(value, message) {
   assert(typeof value === "string" && value.trim().length > 0, message);
   return value.trim();
+}
+
+function redactURLUserinfo(raw) {
+  const value = String(raw || "").trim();
+  if (!value || !/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
+    return { value, hadCredentials: false };
+  }
+  const url = new URL(value);
+  const hadCredentials = Boolean(url.username || url.password);
+  url.username = "";
+  url.password = "";
+  url.search = "";
+  url.hash = "";
+  return {
+    value: url.toString().replace(/\/$/, ""),
+    hadCredentials,
+  };
+}
+
+function sanitizeEndpointAliasForReport({ value, label, blockers }) {
+  const sanitized = redactURLUserinfo(value);
+  if (sanitized.hadCredentials) {
+    blockers.push(`${label}-contains-credentials`);
+  }
+  return sanitized.value;
+}
+
+function requireEndpointAliasWithoutCredentials(value, label) {
+  const sanitized = redactURLUserinfo(value);
+  if (sanitized.hadCredentials) {
+    throw new CliError(`${label} must not contain username or password`);
+  }
+  return sanitized.value;
 }
 
 function sortedKeys(value) {
@@ -234,6 +638,10 @@ async function validateTargetSmokeEffectiveSession({ repoRoot, evidenceDir, mani
   const backendEndpointAlias = requireNonEmptyString(
     smokeReport.backendEndpointAlias,
     "smoke-test-report.json backendEndpointAlias is required for target effective session verification",
+  );
+  requireEndpointAliasWithoutCredentials(
+    backendEndpointAlias,
+    "smoke-test-report.json backendEndpointAlias",
   );
   const checks = Array.isArray(smokeReport.checks) ? smokeReport.checks : [];
   const check = checks.find(
@@ -316,6 +724,10 @@ function validateReleaseReport({
     requireNonEmptyString(
       report.backendEndpointAlias,
       "release report backendEndpointAlias is required when execution is required",
+    );
+    requireEndpointAliasWithoutCredentials(
+      report.backendEndpointAlias,
+      "release report backendEndpointAlias",
     );
   }
   if (options.requireActivated) {
@@ -488,6 +900,30 @@ async function runCli() {
   const options = parseCliArgs(process.argv.slice(2));
   if (options.help) {
     console.log(USAGE);
+    return 0;
+  }
+  if (options.printInputTemplate) {
+    console.log(JSON.stringify(buildInputTemplate(options.customer), null, 2));
+    return 0;
+  }
+  if (options.readbackPreflightReport) {
+    const repoRoot = process.cwd();
+    const reportPath = resolveRepoOutputPath(
+      repoRoot,
+      options.readbackPreflightReport,
+      "--readback-preflight-report",
+    );
+    const report = await buildCustomerConfigReadbackPreflightReport(options, {
+      repoRoot,
+    });
+    await writeJson(reportPath, report);
+    console.log(
+      `customer config readback preflight report: ${path.relative(
+        repoRoot,
+        reportPath,
+      )}`,
+    );
+    console.log(`readyForReadinessGate: ${report.readyForReadinessGate}`);
     return 0;
   }
   let result = null;

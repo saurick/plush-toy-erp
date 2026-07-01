@@ -2,7 +2,6 @@ import React from 'react'
 import {
   BellOutlined,
   CameraOutlined,
-  CaretRightOutlined,
   CheckOutlined,
   ClockCircleOutlined,
   ExclamationCircleFilled,
@@ -17,6 +16,7 @@ import {
   buildTaskFactRows,
   getMobileRoleLabel,
   resolveDetailActionLabel,
+  resolveMobileActionLabel,
   resolveTaskSourceLabel,
   supportsRejectedAction,
 } from '../utils/mobileRoleTaskModel.mjs'
@@ -57,8 +57,8 @@ export default function MobileTaskDetailScreen({
   const ownerRoleLabel = getMobileRoleLabel(selectedTask.owner_role_key)
   const actionGuidance = !selectedCanOperate
     ? selectedCanUrge
-      ? `当前岗位可查看并催办，处理 / 阻塞 / 完成由${ownerRoleLabel}负责。`
-      : `当前岗位仅可查看，处理 / 阻塞 / 完成由${ownerRoleLabel}负责。`
+      ? `当前岗位可查看并催办，阻塞 / 完成 / 退回由${ownerRoleLabel}负责。`
+      : `当前岗位仅可查看，阻塞 / 完成 / 退回由${ownerRoleLabel}负责。`
     : ''
 
   return (
@@ -230,16 +230,14 @@ export default function MobileTaskDetailScreen({
                 </div>
                 <div className="mt-2 break-words text-base text-slate-700">
                   {latestMobileAction
-                    ? `${latestMobileActionRoleLabel} 已执行 ${
-                        latestMobileAction.action_key || '移动处理'
-                      }${
+                    ? `${latestMobileActionRoleLabel} 已执行 ${resolveMobileActionLabel(
+                        latestMobileAction.action_key
+                      )}${
                         latestMobileAction.reason
                           ? `：${latestMobileAction.reason}`
                           : ''
                       }`
-                    : `任务已流转至 ${roleLabel} / ${
-                        selectedTask.owner_role_key || '-'
-                      }`}
+                    : `任务已流转至 ${ownerRoleLabel}`}
                 </div>
                 {latestMobileAction?.evidence_refs?.length > 0 ? (
                   <div className="mt-2 break-words text-sm text-slate-500">
@@ -267,8 +265,9 @@ export default function MobileTaskDetailScreen({
               </button>
             </div>
             <textarea
+              data-testid="mobile-role-detail-reason-input"
               className="mt-4 min-h-[128px] w-full resize-y rounded-xl border border-slate-200 px-3 py-3 text-base text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-              placeholder="请填写原因，至少 5 个字..."
+              placeholder="请填写原因，说明卡点、退回依据或催办诉求"
               maxLength={500}
               value={detailReasonValue}
               onChange={(event) => updateDetailReason(event.target.value)}
@@ -312,25 +311,16 @@ export default function MobileTaskDetailScreen({
         ) : null}
       </main>
 
-      <div className="mobile-role-action-bar grid grid-cols-4 gap-3 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div className="mobile-role-action-bar grid grid-cols-3 gap-3 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
         {actionGuidance ? (
           <div
-            className="mobile-role-action-guidance col-span-4"
+            className="mobile-role-action-guidance col-span-3"
             data-testid="mobile-role-action-guidance"
             role="note"
           >
             {actionGuidance}
           </div>
         ) : null}
-        <button
-          type="button"
-          className="mobile-role-action-bar__button mobile-role-action-bar__button--processing rounded-xl bg-blue-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
-          disabled={!selectedCanOperate || isUpdating}
-          onClick={() => handleTaskAction(selectedTask, 'processing')}
-        >
-          <CaretRightOutlined className="mr-2" />
-          处理
-        </button>
         <button
           type="button"
           className="mobile-role-action-bar__button mobile-role-action-bar__button--blocked rounded-xl bg-orange-500 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
@@ -361,7 +351,7 @@ export default function MobileTaskDetailScreen({
         {showRejected ? (
           <button
             type="button"
-            className="mobile-role-action-bar__button mobile-role-action-bar__button--rejected col-span-4 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-base font-semibold text-red-600 disabled:opacity-50"
+            className="mobile-role-action-bar__button mobile-role-action-bar__button--rejected col-span-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-base font-semibold text-red-600 disabled:opacity-50"
             disabled={!selectedCanOperate || isUpdating}
             onClick={() => handleTaskAction(selectedTask, 'rejected')}
           >

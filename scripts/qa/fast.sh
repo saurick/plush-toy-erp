@@ -17,13 +17,24 @@ print_help() {
   workflow-fact-boundary: Workflow 运行时禁止直接写领域事实
   workflow-ui-action-boundary: 正式前端任务动作禁止绕过 action 合同
   formal-frontend-customer-config-boundary: 正式前端客户配置只能消费 get_effective_session 投影
+  admin-profile-sync: 前端菜单投影、sync failure 和 super admin 诊断边界
+  frontend-role-menu-seed-contracts: 角色菜单、岗位入口、seedData 和前端状态配置合同
+  dev-entry-config-contracts: /__dev 导航、测试入口、文档、原型、台账、客户配置和打印模板配置合同
+  trial-role-entry-docs: 试用账号、岗位任务端路径和 README 口径覆盖当前角色集合
+  trial-account-rbac: 试用账号真实 RBAC 无后端单测 + 浏览器 smoke 输入模板边界测试，不执行真实登录
+  real-login-smoke-shared: 真实登录 smoke 共享 URL 凭据边界单测，不执行真实登录
+  mobile-auth-login-route-smoke: 岗位任务端认证回跳 smoke 输入模板和 URL 凭据边界单测，不启动浏览器
+  purchase-receipt-real-write-browser-e2e: 采购入库真实写入浏览器 e2e 输入模板和持久测试数据确认边界，不启动浏览器
+  sales-order-field-chain-boundary: 销售订单列表 / 导出 / 打印字段边界一致性
+  dev-entry-boundary: /__dev、测试入口和客户配置预检控制台边界
+  frontend-error-message-boundary: 正式前端错误提示禁止透传底层 message
   multi-client-role-workflow-priority-audit: 多甲方角色能力优先级落地证据审计
   docs-inventory: 当前维护 Markdown 必须登记到 docs/文档清单.md
   industry-template-boundaries: 行业模板候选边界检查
   private-deployment-boundaries: 多客户私有化复制边界检查
   customer-web-config-overlay: 客户前端配置 overlay 脚本测试
   deployment-package-lint: 客户私有化部署资料包结构和敏感文件检查
-  run-smoke-script: smoke 脚本 CLI 和 release gate 兼容报告测试
+  run-smoke-script: smoke 脚本 CLI、输入模板和 release gate 兼容报告测试
   collect-evidence-script: release evidence 草稿目录结构和 backup restore artifact 占位测试
   image-digests-evidence: image-digests.txt 生成器和 release evidence digest 一致性测试
   immutable-version-evidence: release evidence 不可变版本字段和 image digest artifact 写入测试
@@ -36,7 +47,7 @@ print_help() {
   customer-config-manifest-evidence: 客户配置 manifest fingerprint evidence 生成器测试
   customer-config-activation-gate: 客户配置激活前 manifest + release evidence 门禁
   customer-config-release-execute: 客户配置 JSON-RPC 发布 / 激活执行器测试
-  customer-config-release-readiness: 客户配置发布就绪聚合门禁测试
+  customer-config-release-readiness: 客户配置发布就绪聚合门禁和输入模板测试
   customer-config-boundaries: 客户配置草案边界检查
   customer-package-lint: 客户配置包结构、流程预览和禁止项检查
   customer-config-runtime-manifest: 客户配置运行时 manifest 编译和门禁检查
@@ -44,6 +55,8 @@ print_help() {
   trial-simulated-data: 试用模拟数据工具测试
   operational-fact-simulated-closure: 业务事实模拟闭环工具测试
   mobile-workflow-simulated-closure: 岗位任务端模拟闭环工具测试
+  mobile-workflow-runtime-browser-smoke: 岗位任务端真实浏览器模拟任务回归边界测试
+  purchase-receipt-real-write-e2e: 采购入库服务层真实写入 e2e 输入模板边界测试，不运行 Go 测试
   mvp-closure: ERP MVP 闭环验收工具测试
   industry-template-closure: 行业模板模拟闭环工具测试
   private-deployment-package-closure: 多客户私有化复制模拟闭环工具测试
@@ -69,10 +82,13 @@ fi
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
-if ! command -v pnpm >/dev/null 2>&1; then
-  echo "[qa:fast] 未找到 pnpm，请先安装 pnpm"
+if ! command -v node >/dev/null 2>&1; then
+  echo "[qa:fast] 未找到 node，请先安装 Node.js"
   exit 1
 fi
+
+source "$ROOT_DIR/scripts/lib/pnpm.sh"
+PNPM_BIN="$(resolve_project_pnpm "$ROOT_DIR")"
 
 if ! command -v go >/dev/null 2>&1; then
   echo "[qa:fast] 未找到 go，请先安装 Go"
@@ -111,6 +127,86 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/formal-frontend-customer-config-boundary.test.mjs" ]; then
   echo "[qa:fast] 运行正式前端客户配置投影边界测试"
   node --test "$ROOT_DIR/scripts/qa/formal-frontend-customer-config-boundary.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/web/src/erp/utils/adminProfileSync.test.mjs" ]; then
+  echo "[qa:fast] 运行前端菜单投影同步边界测试"
+  node --test "$ROOT_DIR/web/src/erp/utils/adminProfileSync.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/web/src/erp/config/entryConfig.test.mjs" ]; then
+  echo "[qa:fast] 运行角色菜单与入口配置合同测试"
+  node --test \
+    "$ROOT_DIR/web/src/erp/config/entryConfig.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/menuPermissions.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/seedData.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/workflowStatus.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/web/src/erp/config/devTesting.test.mjs" ]; then
+  echo "[qa:fast] 运行开发入口配置合同测试"
+  node --test \
+    "$ROOT_DIR/web/src/erp/config/devHub.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/devTesting.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/devDocs.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/devGovernance.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/devPrototypes.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/devCapabilityLedger.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/devCustomerConfig.test.mjs" \
+    "$ROOT_DIR/web/src/erp/config/printTemplates.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/trial-role-entry-docs.test.mjs" ]; then
+  echo "[qa:fast] 运行试用角色入口文档边界测试"
+  node --test "$ROOT_DIR/scripts/qa/trial-role-entry-docs.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/trial-account-rbac.mjs" ]; then
+  if [ -f "$ROOT_DIR/scripts/qa/trial-account-rbac.test.mjs" ]; then
+    echo "[qa:fast] 运行试用账号 RBAC 边界单测"
+    node --test "$ROOT_DIR/scripts/qa/trial-account-rbac.test.mjs"
+  fi
+  echo "[qa:fast] 运行试用账号 RBAC 脚本语法检查"
+  node --check "$ROOT_DIR/scripts/qa/trial-account-rbac.mjs"
+fi
+
+if [ -f "$ROOT_DIR/web/scripts/trialDemoAccountBrowserSmoke.mjs" ]; then
+  if [ -f "$ROOT_DIR/web/scripts/trialDemoAccountBrowserSmoke.test.mjs" ]; then
+    echo "[qa:fast] 运行试用账号浏览器 smoke 输入模板边界测试"
+    node --test "$ROOT_DIR/web/scripts/trialDemoAccountBrowserSmoke.test.mjs"
+  fi
+  echo "[qa:fast] 运行试用账号浏览器 smoke 脚本语法检查"
+  node --check "$ROOT_DIR/web/scripts/trialDemoAccountBrowserSmoke.mjs"
+fi
+
+if [ -f "$ROOT_DIR/web/scripts/realLoginSmokeShared.test.mjs" ]; then
+  echo "[qa:fast] 运行真实登录 smoke 共享 URL 边界测试"
+  node --test "$ROOT_DIR/web/scripts/realLoginSmokeShared.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/web/scripts/mobileAuthLoginRouteSmoke.test.mjs" ]; then
+  echo "[qa:fast] 运行岗位任务端认证回跳 smoke 边界测试"
+  node --test "$ROOT_DIR/web/scripts/mobileAuthLoginRouteSmoke.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/web/scripts/purchaseReceiptRealWriteBrowserE2E.test.mjs" ]; then
+  echo "[qa:fast] 运行采购入库真实写入浏览器 e2e 边界测试"
+  node --test "$ROOT_DIR/web/scripts/purchaseReceiptRealWriteBrowserE2E.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/sales-order-field-chain-boundary.test.mjs" ]; then
+  echo "[qa:fast] 运行销售订单字段链路边界测试"
+  node --test "$ROOT_DIR/scripts/qa/sales-order-field-chain-boundary.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/dev-entry-boundary.test.mjs" ]; then
+  echo "[qa:fast] 运行开发验收入口边界测试"
+  node --test "$ROOT_DIR/scripts/qa/dev-entry-boundary.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/frontend-error-message-boundary.test.mjs" ]; then
+  echo "[qa:fast] 运行正式前端错误提示边界测试"
+  node --test "$ROOT_DIR/scripts/qa/frontend-error-message-boundary.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/multi-client-role-workflow-priority-audit.test.mjs" ]; then
@@ -281,6 +377,16 @@ if [ -f "$ROOT_DIR/scripts/qa/mobile-workflow-simulated-closure.test.mjs" ]; the
   node --test "$ROOT_DIR/scripts/qa/mobile-workflow-simulated-closure.test.mjs"
 fi
 
+if [ -f "$ROOT_DIR/scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs" ]; then
+  echo "[qa:fast] 运行岗位任务端真实浏览器模拟任务回归边界测试"
+  node --test "$ROOT_DIR/scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/purchase-receipt-real-write-e2e.test.mjs" ]; then
+  echo "[qa:fast] 运行采购入库服务层真实写入 e2e 边界测试"
+  node --test "$ROOT_DIR/scripts/qa/purchase-receipt-real-write-e2e.test.mjs"
+fi
+
 if [ -f "$ROOT_DIR/scripts/qa/mvp-closure.test.mjs" ]; then
   echo "[qa:fast] 运行 ERP MVP 闭环验收工具测试"
   node --test "$ROOT_DIR/scripts/qa/mvp-closure.test.mjs"
@@ -299,8 +405,8 @@ fi
 echo "[qa:fast] 运行 web 快速检查"
 (
   cd "$ROOT_DIR/web"
-  pnpm lint
-  pnpm css
+  "$PNPM_BIN" lint
+  "$PNPM_BIN" css
 )
 
 echo "[qa:fast] 运行 server 快速检查"

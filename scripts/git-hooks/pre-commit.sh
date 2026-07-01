@@ -142,17 +142,15 @@ fi
 
 build_web_targets
 if [[ "${#PRETTIER_TARGETS_WEB[@]}" -gt 0 || "${#ESLINT_TARGETS_WEB[@]}" -gt 0 ]]; then
-  if ! command -v pnpm >/dev/null 2>&1; then
-    echo "[pre-commit] 未找到 pnpm，请先安装 pnpm"
-    exit 1
-  fi
+  source "$ROOT_DIR/scripts/lib/pnpm.sh"
+  PNPM_BIN="$(resolve_project_pnpm "$ROOT_DIR")"
 fi
 
 if [[ "${#PRETTIER_TARGETS_WEB[@]}" -gt 0 ]]; then
   echo "[pre-commit] 运行 Prettier（仅暂存文件）"
   (
     cd "$ROOT_DIR/web"
-    pnpm exec prettier --write "${PRETTIER_TARGETS_WEB[@]}"
+    "$PNPM_BIN" exec prettier --write "${PRETTIER_TARGETS_WEB[@]}"
   )
   git add -- "${PRETTIER_TARGETS_ROOT[@]}"
 fi
@@ -161,7 +159,7 @@ if [[ "${#ESLINT_TARGETS_WEB[@]}" -gt 0 ]]; then
   echo "[pre-commit] 运行 ESLint --fix（仅暂存文件）"
   (
     cd "$ROOT_DIR/web"
-    pnpm exec eslint --fix --ext .js --ext .jsx "${ESLINT_TARGETS_WEB[@]}"
+    "$PNPM_BIN" exec eslint --fix --ext .js --ext .jsx "${ESLINT_TARGETS_WEB[@]}"
   )
   git add -- "${ESLINT_TARGETS_ROOT[@]}"
 fi

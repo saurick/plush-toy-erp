@@ -318,6 +318,26 @@ func TestJsonrpcDispatcher_WorkflowWriteAPIRequiresEnabledModule(t *testing.T) {
 	if repo.updateInput != nil {
 		t.Fatalf("read_only workflow_tasks must not call update usecase, got %#v", repo.updateInput)
 	}
+	_, explainReadOnlyRes, err := dispatcher.handleWorkflow(ctx, "explain_action_access", "read-only-explain-action", completeParams)
+	if err != nil {
+		t.Fatalf("expected nil err for read_only explain action, got %v", err)
+	}
+	if explainReadOnlyRes == nil || explainReadOnlyRes.Code != errcode.OK.Code {
+		t.Fatalf("expected read_only explain_action_access allowed, got %#v", explainReadOnlyRes)
+	}
+	if repo.updateInput != nil {
+		t.Fatalf("read_only explain_action_access must not call update usecase, got %#v", repo.updateInput)
+	}
+	_, assignmentReadOnlyRes, err := dispatcher.handleWorkflow(ctx, "explain_task_assignment", "read-only-explain-assignment", completeParams)
+	if err != nil {
+		t.Fatalf("expected nil err for read_only explain assignment, got %v", err)
+	}
+	if assignmentReadOnlyRes == nil || assignmentReadOnlyRes.Code != errcode.OK.Code {
+		t.Fatalf("expected read_only explain_task_assignment allowed, got %#v", assignmentReadOnlyRes)
+	}
+	if repo.updateInput != nil {
+		t.Fatalf("read_only explain_task_assignment must not call update usecase, got %#v", repo.updateInput)
+	}
 	upsertParams := mustJSONRPCStruct(t, map[string]any{
 		"source_type":         "generic-source",
 		"source_id":           float64(1),
@@ -682,6 +702,38 @@ func TestJsonrpcDispatcher_WorkflowActionRequiresCustomerWorkPoolActionEntitleme
 	}
 }
 
+func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsEmptyReason(t *testing.T) {
+	repo := &stubWorkflowJSONRPCRepo{}
+	j := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+		adminReader:      stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.PMCRoleKey}, biz.PermissionWorkflowTaskUpdate)},
+		workflowUC:       biz.NewWorkflowUsecase(repo),
+		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
+	}
+	params, err := structpb.NewStruct(map[string]any{
+		"task_id": float64(1),
+		"action":  "urge_task",
+		"reason":  " \t ",
+		"payload": map[string]any{
+			"source_no": "SHIP-001",
+		},
+	})
+	if err != nil {
+		t.Fatalf("build params failed: %v", err)
+	}
+
+	_, res, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "urge_task", "1", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected invalid param for empty urge reason, got %#v", res)
+	}
+	if repo.urgeInput != nil {
+		t.Fatalf("empty urge reason must not record urge input, got %#v", repo.urgeInput)
+	}
+}
+
 func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsUnrelatedOrdinaryRole(t *testing.T) {
 	repo := &stubWorkflowJSONRPCRepo{
 		currentTask: &biz.WorkflowTask{
@@ -958,6 +1010,9 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionUsesDoneAndServerActorRole(
 	if repo.updateInput.BusinessStatusKey != "" {
 		t.Fatalf("expected empty business status by default, got %q", repo.updateInput.BusinessStatusKey)
 	}
+	if repo.updateInput.Payload["entry"] != "mobile_role_task" {
+		t.Fatalf("expected mobile payload to pass through, got %#v", repo.updateInput.Payload)
+	}
 	if repo.updateActorRoleKey != biz.QualityRoleKey {
 		t.Fatalf("expected server-derived actor role %q, got %q", biz.QualityRoleKey, repo.updateActorRoleKey)
 	}
@@ -1160,6 +1215,9 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsUseServerStatusAndActorR
 			}
 			if repo.updateInput.Reason != strings.TrimSpace(tt.reason) {
 				t.Fatalf("expected trimmed reason, got %q", repo.updateInput.Reason)
+			}
+			if repo.updateInput.Payload["entry"] != "mobile_role_task" {
+				t.Fatalf("expected mobile payload to pass through, got %#v", repo.updateInput.Payload)
 			}
 			if repo.updateActorRoleKey != biz.QualityRoleKey {
 				t.Fatalf("expected server-derived actor role %q, got %q", biz.QualityRoleKey, repo.updateActorRoleKey)

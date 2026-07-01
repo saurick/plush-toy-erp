@@ -873,6 +873,8 @@
   --erp-business-control-focus: var(--erp-interactive-border-focus);
   --erp-business-control-focus-shadow: var(--erp-focus-ring);
   --erp-textarea-count-color: var(--erp-text-muted);
+  --erp-line-items-import-bg: rgb(15 23 42 / 72%);
+  --erp-line-items-import-border: var(--erp-border);
   --erp-sales-order-lines-bg: var(--erp-surface-bg-soft);
   --erp-sales-order-lines-border: var(--erp-border);
   --erp-sales-order-lines-title: var(--erp-text);

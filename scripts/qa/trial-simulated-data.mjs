@@ -9,6 +9,7 @@ const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR =
   "output/customers/yoyoosun/trial-simulated-data";
 const SIMULATION_PREFIX = "SIM-YOYOOSUN-TRIAL";
+const INPUT_TEMPLATE_SCOPE = "trial-simulated-data-input-template";
 const CONFIRM_PHRASE = "APPLY_SIMULATED_TRIAL_DATA";
 const FORBIDDEN_ARG_PATTERN =
   /--(?:execute|import|real|real-import|customer-data)/u;
@@ -19,6 +20,7 @@ const USAGE = `Trial simulated data
 
 Usage:
   node scripts/qa/trial-simulated-data.mjs
+  node scripts/qa/trial-simulated-data.mjs --print-input-template
 
 Report-only mode:
   node scripts/qa/trial-simulated-data.mjs \\
@@ -34,6 +36,7 @@ Apply simulated data through V1 JSON-RPC:
       --unit-id 1
 
 Options:
+  --print-input-template          Print local input checklist only; no report/backend/database writes.
   --apply                         Create missing simulated V1 records through JSON-RPC.
   --backend-url <url>             Backend base URL. Default ${DEFAULT_BACKEND_URL}.
   --out <dir>                     Output report directory. Default ${DEFAULT_OUT_DIR}.
@@ -94,6 +97,9 @@ function requiredText(value, pathName) {
 
 function normalizeBaseURL(raw) {
   const url = new URL(String(raw || DEFAULT_BACKEND_URL).trim());
+  if (url.username || url.password) {
+    throw new CliError("backend URL must not contain username or password");
+  }
   url.pathname = url.pathname.replace(/\/+$/, "");
   url.search = "";
   url.hash = "";
@@ -104,6 +110,7 @@ function parseCliArgs(argv) {
   const options = {
     apply: false,
     help: false,
+    printInputTemplate: false,
     out: DEFAULT_OUT_DIR,
     backendURL: process.env.TRIAL_SIM_BACKEND_URL || DEFAULT_BACKEND_URL,
     orderDate: "2026-06-08",
@@ -119,6 +126,10 @@ function parseCliArgs(argv) {
     }
     if (token === "--help" || token === "-h") {
       options.help = true;
+      continue;
+    }
+    if (token === "--print-input-template") {
+      options.printInputTemplate = true;
       continue;
     }
     if (token === "--apply") {
@@ -169,7 +180,62 @@ function parseCliArgs(argv) {
     }
   }
   options.backendURL = normalizeBaseURL(options.backendURL);
+  if (options.printInputTemplate && options.apply) {
+    throw new CliError("--print-input-template cannot be combined with --apply", 2);
+  }
   return options;
+}
+
+function buildInputTemplate(options = {}) {
+  const backendURL = normalizeBaseURL(options.backendURL || DEFAULT_BACKEND_URL);
+  const out = optionalText(options.out) || DEFAULT_OUT_DIR;
+  return {
+    scope: INPUT_TEMPLATE_SCOPE,
+    customerKey: "yoyoosun",
+    scenario: "trial-simulated-data",
+    simulatedOnly: true,
+    realCustomerImport: false,
+    writesReports: false,
+    writesDatabase: false,
+    callsBackend: false,
+    importsRealCustomerData: false,
+    createsBusinessRecords: false,
+    createsShipmentInventoryFinanceFacts: false,
+    downstreamReportOnlyWritesReports: true,
+    downstreamApplyWritesDatabase: true,
+    defaultBackendURL: DEFAULT_BACKEND_URL,
+    backendURL,
+    defaultOut: DEFAULT_OUT_DIR,
+    out,
+    requiredApplyInputs: [
+      "TRIAL_SIM_CONFIRM=APPLY_SIMULATED_TRIAL_DATA",
+      "TRIAL_SIM_PASSWORD or TRIAL_ACCOUNT_PASSWORD or ERP_ROLE_DEMO_PASSWORD",
+      "--product-id <active_product_id>",
+      "--unit-id <active_unit_id>",
+    ],
+    optionalInputs: [
+      "--backend-url <url>",
+      "--out <dir>",
+      "--product-code <code>",
+      "--product-name <name>",
+      "--order-date <yyyy-mm-dd>",
+      "--planned-delivery-date <yyyy-mm-dd>",
+      "TRIAL_SIM_ADMIN_TOKEN or TRIAL_SIM_ADMIN_USERNAME/PASSWORD",
+    ],
+    commands: {
+      printInputTemplate:
+        "PATH=/usr/local/bin:$PATH node scripts/qa/trial-simulated-data.mjs --print-input-template",
+      reportOnly: `PATH=/usr/local/bin:$PATH node scripts/qa/trial-simulated-data.mjs --out ${out}`,
+      applySimulated:
+        "TRIAL_SIM_CONFIRM=APPLY_SIMULATED_TRIAL_DATA TRIAL_SIM_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/trial-simulated-data.mjs --apply --backend-url http://127.0.0.1:8300 --product-id <active_product_id> --unit-id <active_unit_id>",
+      seedCoreDemo:
+        "PATH=/usr/local/bin:$PATH bash scripts/seed-core-demo-data.sh",
+      seedMinimalTrial:
+        "PATH=/usr/local/bin:$PATH bash scripts/seed-trial-sim-masterdata.sh",
+    },
+    boundary:
+      "This template only prints prerequisites and commands. It does not write reports, call backend, login, import real customer data, write business_records, create schema/migrations, or create shipment/inventory/finance facts.",
+  };
 }
 
 function unixSeconds(dateText, pathName) {
@@ -714,6 +780,10 @@ async function runCli() {
     console.log(USAGE);
     return 0;
   }
+  if (options.printInputTemplate) {
+    console.log(JSON.stringify(buildInputTemplate(options), null, 2));
+    return 0;
+  }
   const report = await runTrialSimulatedData(options);
   console.log(
     `trial simulated data report: ${path.join(
@@ -747,9 +817,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === currentFile) {
 export {
   CONFIRM_PHRASE,
   CliError,
+  INPUT_TEMPLATE_SCOPE,
   SIMULATION_PREFIX,
   USAGE,
   assertDatasetBoundary,
+  buildInputTemplate,
   buildSimulatedDataset,
   normalizeBaseURL,
   parseCliArgs,

@@ -38,10 +38,13 @@ fi
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
-if ! command -v pnpm >/dev/null 2>&1; then
-  echo "[qa:full] 未找到 pnpm，请先安装 pnpm"
+if ! command -v node >/dev/null 2>&1; then
+  echo "[qa:full] 未找到 node，请先安装 Node.js"
   exit 1
 fi
+
+source "$ROOT_DIR/scripts/lib/pnpm.sh"
+PNPM_BIN="$(resolve_project_pnpm "$ROOT_DIR")"
 
 if ! command -v go >/dev/null 2>&1; then
   echo "[qa:full] 未找到 go，请先安装 Go"
@@ -69,12 +72,12 @@ echo "[qa:full] 运行 web 测试与构建"
   cd "$ROOT_DIR/web"
   # fast.sh 已执行 lint/css；full 在此补充前端测试和构建。
   if node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));process.exit(pkg.scripts&&pkg.scripts.test?0:1)"; then
-    pnpm test
+    "$PNPM_BIN" test
   else
     echo "[qa:full] web/package.json 未定义 test，跳过前端测试"
   fi
 
-  pnpm build
+  "$PNPM_BIN" build
 )
 
 echo "[qa:full] 运行 server 全量检查"

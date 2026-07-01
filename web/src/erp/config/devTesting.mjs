@@ -41,6 +41,215 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     ],
   },
   {
+    key: 'workflow-backend-actions',
+    label: 'Workflow 后端动作合同 / Backend Action Contract',
+    description:
+      '任务动作、reason、事件 / actor role、payload 或任务端后端读回改动时复制；只证明本地后端合同。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp/server',
+      "go test ./internal/data -run 'TestWorkflowRepo_(TaskStatusReasonEventAndCompletionCleanup|CreateAndUpdateTaskStatus|UrgeWorkflowTaskWritesEventAndPayload)'",
+      "go test ./internal/service -run 'TestJsonrpcDispatcher_WorkflowUrgeTask|TestJsonrpcDispatcher_Workflow(CompleteTaskAction|ControlledTaskActions)'",
+    ],
+  },
+  {
+    key: 'trial-role-entries',
+    label: '试用角色入口 / Trial Role Entries',
+    description:
+      '试用账号、岗位任务端入口、角色菜单或 README 口径改动时复制；不登录真实后端。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'PATH=/usr/local/bin:$PATH node --test scripts/qa/trial-role-entry-docs.test.mjs',
+    ],
+  },
+  {
+    key: 'frontend-role-menu-seed-contracts',
+    label: '角色菜单与入口真源 / Role Menu & Entry Contracts',
+    description:
+      '角色菜单、岗位任务端入口、seedData、正式菜单权限或业务状态前端真源改动时复制；只证明本地前端配置合同，不替代后端 RBAC、customer config active revision 或真实登录。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'PATH=/usr/local/bin:$PATH node --test web/src/erp/config/entryConfig.test.mjs web/src/erp/config/menuPermissions.test.mjs web/src/erp/config/seedData.test.mjs web/src/erp/config/workflowStatus.test.mjs',
+    ],
+  },
+  {
+    key: 'trial-account-rbac',
+    label: '试用账号 RBAC / Trial Account RBAC',
+    description:
+      '生成试用账号、角色模板、岗位入口或菜单权限后复制；先打印无写入输入模板，真实验证需要本地后端和演示账号密码，只读核对登录、角色、岗位入口权限和 debug 权限边界。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'PATH=/usr/local/bin:$PATH node --test scripts/qa/trial-account-rbac.test.mjs web/scripts/trialDemoAccountBrowserSmoke.test.mjs',
+      'PATH=/usr/local/bin:$PATH node --check scripts/qa/trial-account-rbac.mjs',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs --print-input-template',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs --preflight-report output/trial-account-rbac/preflight.json',
+      'PATH=/usr/local/bin:$PATH node web/scripts/trialDemoAccountBrowserSmoke.mjs --print-input-template',
+      'PATH=/usr/local/bin:$PATH node web/scripts/trialDemoAccountBrowserSmoke.mjs --preflight-report output/trial-demo-account-browser-smoke/preflight.json',
+      "TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs",
+      "TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs --report output/trial-account-rbac/report.json",
+      "TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:trial-demo-browser",
+    ],
+  },
+  {
+    key: 'real-login-smoke-shared',
+    label: '真实登录 smoke URL 边界 / Real Login Smoke URL Guard',
+    description:
+      '真实登录 smoke 共享 helper、采购合同 / 加工合同 / 岗位任务端认证回跳 / 采购入库真实浏览器脚本入口改动时复制；先打印 no-write 输入模板和 shared / mobile-auth / 采购入库浏览器 preflight，单测只证明 URL 凭据边界、凭据来源前置、持久测试数据确认和前置清单，不执行真实登录、不启动浏览器；mobile-auth 回归使用 mock RPC 验证生产单端口岗位路由。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'PATH=/usr/local/bin:$PATH node --test web/scripts/realLoginSmokeShared.test.mjs web/scripts/mobileAuthLoginRouteSmoke.test.mjs web/scripts/purchaseReceiptRealWriteBrowserE2E.test.mjs',
+      'PATH=/usr/local/bin:$PATH node web/scripts/realLoginSmokeShared.mjs --print-input-template',
+      'PATH=/usr/local/bin:$PATH node web/scripts/realLoginSmokeShared.mjs --preflight-report output/real-login-smoke-shared/preflight.json',
+      'PATH=/usr/local/bin:$PATH node web/scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template',
+      'PATH=/usr/local/bin:$PATH node web/scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json',
+      'PATH=/usr/local/bin:$PATH node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template',
+      'PATH=/usr/local/bin:$PATH node web/scripts/purchaseReceiptRealWriteBrowserE2E.mjs --preflight-report output/purchase-receipt-real-write-browser-e2e/preflight.json',
+      "REAL_LOGIN_ADMIN_USERNAME='replace-with-local-admin' REAL_LOGIN_ADMIN_PASSWORD='replace-with-local-password' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-contract-real-login",
+      "REAL_LOGIN_ADMIN_USERNAME='replace-with-local-admin' REAL_LOGIN_ADMIN_PASSWORD='replace-with-local-password' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:processing-contract-real-login",
+      'PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-auth-login-route',
+      "REAL_LOGIN_ADMIN_USERNAME='replace-with-local-admin' REAL_LOGIN_ADMIN_PASSWORD='replace-with-local-password' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:purchase-receipt-real-write",
+    ],
+  },
+  {
+    key: 'trial-simulated-data',
+    label: '试用模拟数据 / Trial Simulated Data',
+    description:
+      '试用账号、seed / fixture、模拟主数据或本地闭环工具改动时复制；先打印 no-write 输入模板，再按需生成 report-only 证据；只证明本地 simulated-only / no real import 守卫，report-only 命令不连接后端。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'PATH=/usr/local/bin:$PATH node --test scripts/qa/trial-simulated-data.test.mjs scripts/qa/operational-fact-simulated-closure.test.mjs scripts/qa/mobile-workflow-simulated-closure.test.mjs',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/trial-simulated-data.mjs --print-input-template',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --print-input-template',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --print-input-template',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/trial-simulated-data.mjs --out output/customers/yoyoosun/trial-simulated-data-dev-testing-report',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --run-id DEV-TESTING-REPORT --out output/customers/yoyoosun/mobile-workflow-simulated-closure-dev-testing-report',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --product-id <product_id> --unit-id <unit_id> --warehouse-id <warehouse_id> --run-id DEV-TESTING-REPORT --out output/customers/yoyoosun/operational-fact-simulated-closure-dev-testing-report',
+    ],
+  },
+  {
+    key: 'mvp-local-closure',
+    label: 'MVP 本地闭环计划 / MVP Local Closure',
+    description:
+      '试用前主链路验收口径或采购入库服务层真实写入 e2e 前置改动时复制；先打印真实写入输入模板，MVP closure 只生成本地 plan-only / no-write evidence，不替代领域测试、浏览器回归或部署 smoke。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'PATH=/usr/local/bin:$PATH node --test scripts/qa/mvp-closure.test.mjs scripts/qa/purchase-receipt-real-write-e2e.test.mjs',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/purchase-receipt-real-write-e2e.mjs --print-input-template',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/purchase-receipt-real-write-e2e.mjs --preflight-report output/qa/purchase-receipt-real-write-e2e/preflight.json',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/mvp-closure.mjs --out output/customers/yoyoosun/mvp-closure',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/mvp-closure.mjs --run-report-tools --product-id <product_id> --unit-id <unit_id> --warehouse-id <warehouse_id> --out output/customers/yoyoosun/mvp-closure',
+    ],
+  },
+  {
+    key: 'mobile-workflow-smoke',
+    label: '移动端 Workflow smoke / Mobile Workflow Smoke',
+    description:
+      '移动端任务动作、内部提醒、完成反馈或跨角色催办改动时复制；先打印无写入输入模板并生成动作计划 preflight，真实浏览器命令需本地后端和演示账号密码。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'PATH=/usr/local/bin:$PATH node --test scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs',
+      'PATH=/usr/local/bin:$PATH node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --print-input-template',
+      'PATH=/usr/local/bin:$PATH node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --preflight-report output/mobile-workflow-runtime-browser-smoke/preflight.json',
+      "MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='replace-with-local-demo-password' pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:mobile-workflow-runtime-browser",
+    ],
+  },
+  {
+    key: 'customer-config-dev-console',
+    label: '客户配置控制台 / Customer Config Console',
+    description:
+      '客户配置预检、moduleStates、导入 tooling 或 /__dev/customer-config 页面改动时复制；只证明 dev-only 控制台和本地证据。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'PATH=/usr/local/bin:$PATH node --test web/src/erp/config/devCustomerConfig.test.mjs web/src/erp/config/printTemplates.test.mjs scripts/qa/dev-entry-boundary.test.mjs scripts/qa/multi-client-role-workflow-priority-audit.test.mjs',
+      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-customer-config-dark-desktop STYLE_L1_PORT=5235 pnpm --dir web style:l1',
+    ],
+  },
+  {
+    key: 'dev-prototype-registry',
+    label: '原型登记与查看器 / Prototype Registry',
+    description:
+      'docs/product/prototypes、原型资产登记或 /__dev/prototypes 查看器改动时复制；只证明 dev-only 原型查看器和本地资产登记，不晋级 Current、不改正式菜单。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'PATH=/usr/local/bin:$PATH node --test web/src/erp/config/devPrototypes.test.mjs web/src/erp/config/devHub.test.mjs',
+      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop STYLE_L1_PORT=5235 pnpm --dir web style:l1',
+    ],
+  },
+  {
+    key: 'dev-doc-governance-ledger',
+    label: '文档治理与台账查看器 / Docs Governance & Ledger',
+    description:
+      '仓库 Markdown 查看器、项目治理地图或能力台账可视化改动时复制；只证明 dev-only 只读查看器，不改正式文档真源、不进入正式菜单。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'PATH=/usr/local/bin:$PATH node --test web/src/erp/config/devDocs.test.mjs web/src/erp/config/devGovernance.test.mjs web/src/erp/config/devCapabilityLedger.test.mjs web/src/erp/config/devHub.test.mjs',
+      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-hub-dark-desktop,dev-docs-dark-desktop,dev-governance-dark-desktop STYLE_L1_PORT=5235 pnpm --dir web style:l1',
+    ],
+  },
+  {
+    key: 'customer-config-package-runtime',
+    label: '客户配置包运行时 / Customer Config Runtime',
+    description:
+      '客户配置包结构、moduleStates、角色池、页面 / 字段投影、runtime manifest 或 active revision 读回前置改动时复制；只做本地 validate / compile、输入模板和无后端测试，不发布、不激活、不调用后端。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'PATH=/usr/local/bin:$PATH node --test scripts/qa/customer-package-lint.test.mjs scripts/qa/customer-config-runtime-manifest.test.mjs scripts/deploy/customer-config-release-execute.test.mjs scripts/deploy/customer-config-release-readiness.test.mjs scripts/deploy/run-smoke-script.test.mjs',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer demo',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer demo --mode compile',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer yoyoosun',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer yoyoosun --mode compile',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --customer demo',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --customer demo --mode compile',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode compile',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-config-runtime-manifest.json',
+      'PATH=/usr/local/bin:$PATH node scripts/deploy/customer-config-release-execute.mjs --print-input-template',
+      'PATH=/usr/local/bin:$PATH node scripts/deploy/customer-config-release-readiness.mjs --print-input-template',
+      'PATH=/usr/local/bin:$PATH node scripts/deploy/customer-config-release-readiness.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --readback-preflight-report output/customers/yoyoosun/customer-config-readback-preflight.json',
+      'PATH=/usr/local/bin:$PATH bash deployments/yoyoosun/scripts/run-smoke.sh --print-input-template',
+    ],
+  },
+  {
+    key: 'customer-import-tooling',
+    label: '客户导入 tooling / Customer Import Tooling',
+    description:
+      '客户 source manifest、extract、freeze、dry-run 或 execute loader 门禁改动时复制；只跑无后端测试，不执行真实客户导入、不连接目标环境。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'PATH=/usr/local/bin:$PATH node --test scripts/import/customerSourceManifestCheck.test.mjs scripts/import/customerSourceExtract.test.mjs scripts/import/customerSourceSnapshotFreezeCheck.test.mjs scripts/import/customerImportDryRun.test.mjs scripts/import/customerImportExecute.test.mjs',
+    ],
+  },
+  {
+    key: 'frontend-customer-config-projection',
+    label: '客户配置前端投影 / Customer Config Projection',
+    description:
+      '正式前端 effective session、菜单、动作或字段投影改动时复制；只证明本地投影合同，不读取 raw customer package。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'PATH=/usr/local/bin:$PATH node --test web/src/erp/utils/adminProfileSync.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs scripts/qa/multi-client-role-workflow-priority-audit.test.mjs',
+      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-direct-url-local-dev-diagnostic,erp-effective-session-sync-failure-local-dev-diagnostic,erp-effective-session-empty-pages-local-dev-diagnostic,erp-no-visible-menu-blocks-outlet,erp-effective-session-action-projection-business-pages STYLE_L1_PORT=5235 pnpm --dir web style:l1',
+    ],
+  },
+  {
+    key: 'frontend-error-messages',
+    label: '前端错误提示边界 / Frontend Error Messages',
+    description:
+      '正式页面、组件、岗位任务端或共享 PDF 预览错误提示改动时复制；只证明本地用户可见错误不透传底层英文异常。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'PATH=/usr/local/bin:$PATH node --test scripts/qa/frontend-error-message-boundary.test.mjs',
+    ],
+  },
+  {
+    key: 'business-action-field-boundaries',
+    label: '业务动作与字段链路 / Business Action & Field Boundaries',
+    description:
+      'Workflow 动作入口、Source Document 生命周期、销售订单字段策略、导出或打印边界改动时复制；只证明本地前端、文档和后端登记表静态边界守卫。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'PATH=/usr/local/bin:$PATH node --test web/src/erp/utils/workflowTaskActionAccess.test.mjs scripts/qa/workflow-ui-action-boundary.test.mjs scripts/qa/sales-order-field-chain-boundary.test.mjs',
+    ],
+  },
+  {
     key: 'pre-commit',
     label: '提交前 QA / Pre-commit QA',
     description:

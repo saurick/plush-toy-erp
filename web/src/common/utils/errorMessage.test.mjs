@@ -47,11 +47,11 @@ function loadErrorMessageModule() {
   const source = fs.readFileSync(filePath, 'utf8')
   const transformed = source
     .replace(
-      /import\s+\{\s*logout\s*\}\s+from\s+["']@\/common\/auth\/auth["']\s*/u,
+      /import\s+\{\s*logout\s*\}\s+from\s+["'](?:@\/common\/auth\/auth|\.\.\/auth\/auth\.js)["']\s*/u,
       'const { logout } = __auth__\n'
     )
     .replace(
-      /import\s+\{[\s\S]*?\}\s+from\s+["']@\/common\/consts\/errorCodes["']\s*/u,
+      /import\s+\{[\s\S]*?\}\s+from\s+["'](?:@\/common\/consts\/errorCodes|\.\.\/consts\/errorCodes\.js)["']\s*/u,
       'const { DEFAULT_RPC_ERROR_MESSAGES, RpcErrorCode, isAuthFailureCode } = __errorCodes__\n'
     )
     .replace(/export function /g, 'function ')

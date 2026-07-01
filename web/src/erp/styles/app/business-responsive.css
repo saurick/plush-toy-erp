@@ -549,6 +549,27 @@
     grid-column: auto;
   }
 
+  .erp-purchase-receipt-inline-item-editor__head {
+    display: grid;
+  }
+
+  .erp-purchase-receipt-inline-item-form {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-purchase-receipt-inline-item-form
+    .erp-business-action-form__field--wide.ant-form-item {
+    grid-column: auto;
+  }
+
+  .erp-purchase-receipt-inline-item-editor__footer {
+    justify-content: stretch;
+  }
+
+  .erp-purchase-receipt-inline-item-editor__button {
+    flex: 1 1 120px;
+  }
+
   .erp-business-column-order-modal__row {
     grid-template-columns: 40px minmax(0, 1fr);
   }

@@ -73,6 +73,31 @@ test("run smoke help is runnable", () => {
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /--release-version/);
   assert.match(result.stdout, /--environment/);
+  assert.match(result.stdout, /--print-input-template/);
+});
+
+test("run smoke input template is no-write and does not require endpoint", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "run-smoke-template-"));
+  const reportPath = path.join(root, "smoke-test-report.json");
+  const result = runScript(["--print-input-template"]);
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const template = JSON.parse(result.stdout);
+  assert.equal(template.scope, "yoyoosun-run-smoke-input-template");
+  assert.equal(template.writesReport, false);
+  assert.equal(template.writesDatabase, false);
+  assert.equal(template.callsEndpoint, false);
+  assert.equal(template.callsBackend, false);
+  assert.equal(template.callsCustomerConfig, false);
+  assert.equal(template.readsAdminToken, false);
+  assert(template.checks.includes("customer-config-effective-session when --customer-config-revision is provided"));
+  assert(template.requiredReadbackEvidence.includes("target=jsonrpc:customer_config.get_effective_session"));
+  assert.match(template.commands.join("\n"), /--customer-config-revision yoyoosun-customer-package-v1\.runtime-manifest-v1/);
+  assert.match(template.commands.join("\n"), /--admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN/);
+  assert.match(template.boundary, /does not call endpoints/);
+  assert.match(template.boundary, /does not .*write smoke-test-report\.json/);
+  assert.match(template.boundary, /does not .*prove active revision readback/);
+  assert.equal(fs.existsSync(reportPath), false);
 });
 
 test("run smoke writes release-gate compatible report", async () => {

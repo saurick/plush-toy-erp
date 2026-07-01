@@ -1,12 +1,12 @@
-import { normalizeRoleKey } from './roleKeys.mjs'
+import { getRoleDisplayName, normalizeRoleKey } from './roleKeys.mjs'
 
 const LOAD_ALL_ROLE_KEYS = new Set(['pmc', 'boss', 'production', 'sales'])
 
 const LOAD_ALL_ROLE_REASON = Object.freeze({
-  pmc: 'PMC 需要在全量任务里筛选 blocked、overdue、critical_path、催办和升级关注项。',
-  boss: '老板需要在全量任务里筛选高优先级、审批、出货风险、财务 critical 和升级关注项。',
+  pmc: 'PMC 需要在全量任务里筛选阻塞、超时、关键路径、催办和升级关注项。',
+  boss: '老板需要在全量任务里筛选高优先级、审批、出货风险、财务高风险和升级关注项。',
   production:
-    '生产经理需要在全量任务里筛选委外、成品返工和生产相关任务，不只看 owner_role_key。',
+    '生产经理需要在全量任务里筛选委外、成品返工和生产相关任务，不只看主责岗位任务池。',
   sales: '业务需要在全量任务里筛选出货确认、业务确认和自己主责的任务。',
 })
 
@@ -62,8 +62,7 @@ export function explainMobileTaskQueryPlan(roleKey) {
     strategy: 'owner_role_key',
     loads_full_list: false,
     queries,
-    reason:
-      '该角色按 owner_role_key 直查任务池，扩展可见性不额外加载全量任务。',
+    reason: `${getRoleDisplayName(normalizedRoleKey, '该岗位')}按主责岗位直查任务池，扩展可见性不额外加载全量任务。`,
   }
 }
 

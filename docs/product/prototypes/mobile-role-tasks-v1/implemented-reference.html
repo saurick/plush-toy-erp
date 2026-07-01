@@ -771,7 +771,7 @@
       .action-bar {
         display: grid;
         flex: 0 0 auto;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
         border-top: 1px solid var(--line);
         background: rgb(255 255 255 / 95%);
@@ -785,10 +785,6 @@
         border-radius: 14px;
         color: #fff;
         font-weight: 800;
-      }
-
-      .action.process {
-        background: var(--blue);
       }
 
       .action.block {
@@ -933,7 +929,7 @@
                 <div>
                   <strong>系统 <span class="chip">待处理</span></strong>
                   <div style="margin-top: 6px; color: var(--muted)">
-                    任务已流转至仓库组 / warehouse
+                    任务已流转至仓库组
                   </div>
                 </div>
               </div>
@@ -944,7 +940,7 @@
                 <h2 id="reasonTitle">阻塞原因（必填） ·</h2>
                 <button class="refresh" id="closeReasonButton">收起 ^</button>
               </div>
-              <textarea class="textarea" placeholder="请填写原因，至少 5 个字..."></textarea>
+              <textarea class="textarea" placeholder="请填写原因，说明卡点、退回依据或催办诉求"></textarea>
               <div style="text-align: right; color: var(--muted); font-size: 13px">0/500</div>
               <div style="margin-top: 12px; color: var(--muted)">快捷选择（可选）</div>
               <div class="quick-reasons">
@@ -957,7 +953,6 @@
           </main>
 
           <div class="action-bar">
-            <button class="action process" data-action="处理原因">▶ 处理</button>
             <button class="action block" data-action="阻塞原因（必填）">Ⅱ 阻塞</button>
             <button class="action done" data-action="处理原因">✓ 完成</button>
             <button class="action urge" data-action="催办原因（必填）">◔ 催办</button>
@@ -1196,7 +1191,7 @@
               <span style="display:grid;place-items:center;width:56px;height:56px;border-radius:16px;background:var(--green-soft);color:var(--green);font-size:28px">♙</span>
               <div><h2>demo_warehouse</h2><p style="color:var(--muted)">仓库组任务端</p></div>
             </div>
-            <div class="mine-card"><span style="color:var(--muted)">账号角色</span><br><strong>仓库 / demo</strong></div>
+            <div class="mine-card"><span style="color:var(--muted)">账号角色</span><br><strong>仓库组</strong></div>
           </section>
           <section class="mine-grid">
             <button class="mine-metric"><strong>18</strong><span>待办</span></button>

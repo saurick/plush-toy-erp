@@ -1,10 +1,10 @@
 // web/src/common/utils/errorMessage.js
-import { logout } from '@/common/auth/auth'
+import { logout } from '../auth/auth.js'
 import {
   DEFAULT_RPC_ERROR_MESSAGES,
   RpcErrorCode,
   isAuthFailureCode,
-} from '@/common/consts/errorCodes'
+} from '../consts/errorCodes.js'
 
 const RAW_ERROR_MESSAGE_MAP = Object.freeze({
   'business error': '请求失败，请稍后重试',

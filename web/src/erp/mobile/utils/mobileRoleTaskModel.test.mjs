@@ -2,9 +2,14 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  TERMINAL_TASK_STATUS_KEYS,
   buildTaskFactRows,
   canUrgeTask,
+  getMobileTaskGroupLabel,
+  isTaskBlockedProgress,
+  resolveMobileActionLabel,
   resolveMobileTaskBusinessStatus,
+  resolveTaskListMeta,
   supportsRejectedAction,
 } from './mobileRoleTaskModel.mjs'
 
@@ -58,11 +63,26 @@ test('mobileRoleTaskModel: 催办权限区分终态、PMC 风险任务和财务�
     false
   )
   assert.equal(canUrgeTask('pmc', task({ task_status_key: 'blocked' })), true)
+  assert.equal(canUrgeTask('pmc', task({ task_status_key: 'rejected' })), true)
   assert.equal(
     canUrgeTask(
       'finance',
       task({ owner_role_key: 'finance', source_type: 'receivables' })
     ),
+    true
+  )
+})
+
+test('mobileRoleTaskModel: blocked / rejected 保持待办风险状态而非已办终态', () => {
+  assert.equal(TERMINAL_TASK_STATUS_KEYS.has('done'), true)
+  assert.equal(TERMINAL_TASK_STATUS_KEYS.has('blocked'), false)
+  assert.equal(TERMINAL_TASK_STATUS_KEYS.has('rejected'), false)
+  assert.equal(
+    isTaskBlockedProgress(task({ task_status_key: 'blocked' })),
+    true
+  )
+  assert.equal(
+    isTaskBlockedProgress(task({ task_status_key: 'rejected' })),
     true
   )
 })
@@ -81,6 +101,46 @@ test('mobileRoleTaskModel: 退回动作只开放给匹配业务岗位', () => {
     true
   )
   assert.equal(supportsRejectedAction('purchase', task()), false)
+})
+
+test('mobileRoleTaskModel: 最近动态动作展示不透出技术 action key', () => {
+  assert.equal(resolveMobileActionLabel('blocked'), '阻塞')
+  assert.equal(resolveMobileActionLabel('done'), '完成')
+  assert.equal(resolveMobileActionLabel('rejected'), '退回')
+  assert.equal(resolveMobileActionLabel('urge'), '催办')
+  assert.equal(resolveMobileActionLabel('unknown_action'), '移动处理')
+})
+
+test('mobileRoleTaskModel: 任务摘要和事实行不透出技术 task_group', () => {
+  assert.equal(getMobileTaskGroupLabel('shipment_release'), '出货放行协同')
+  assert.equal(getMobileTaskGroupLabel('unknown_task_group'), '业务协同')
+
+  const unknownGroupTask = task({
+    task_group: 'unknown_task_group',
+    payload: {},
+    priority: 2,
+  })
+  const listMeta = resolveTaskListMeta(unknownGroupTask)
+  const factRows = buildTaskFactRows({
+    ...unknownGroupTask,
+    task_status_label: '可执行',
+    updated_at: 1_800_000_000,
+  })
+
+  assert.equal(listMeta.includes('unknown_task_group'), false)
+  assert.equal(listMeta.includes('任务：业务协同'), true)
+  assert.equal(
+    factRows.some(([label]) => label === '分组'),
+    false
+  )
+  assert(
+    factRows.some(
+      ([label, value]) =>
+        label === '任务类型' &&
+        value.includes('业务协同') &&
+        !value.includes('unknown_task_group')
+    )
+  )
 })
 
 test('mobileRoleTaskModel: 详情事实行保留财务金额字段', () => {

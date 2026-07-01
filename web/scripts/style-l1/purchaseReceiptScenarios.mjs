@@ -4,22 +4,20 @@ export function createPurchaseReceiptScenarios(deps) {
   const {
     assert,
     assertAntdModalCentered,
-    assertBusinessFormModalKeyboardRecovery,
     assertBusinessMainTableInitialSelectionEmpty,
     assertERPThemeMode,
     assertNoHorizontalOverflow,
     assertPurchaseReceiptActionButtonState,
-    assertPurchaseReceiptAddItemModalDarkTokens,
-    assertPurchaseReceiptAddItemModalMetrics,
-    assertPurchaseReceiptAddItemModalMobileLayout,
+    assertPurchaseReceiptAddItemEditorDarkTokens,
+    assertPurchaseReceiptAddItemEditorMetrics,
+    assertPurchaseReceiptAddItemEditorMobileLayout,
     assertPurchaseReceiptRowItemCount,
     assertTextAbsent,
-    closeBusinessFormModal,
     expectButton,
     expectHeading,
     expectText,
-    fillPurchaseReceiptAddItemModalBoundaryValues,
-    openPurchaseReceiptAddItemModal,
+    fillPurchaseReceiptAddItemEditorBoundaryValues,
+    openPurchaseReceiptAddItemEditor,
     selectPurchaseReceiptRow,
     verifyBusinessModuleColumnOrderDialog,
   } = deps
@@ -387,14 +385,13 @@ export function createPurchaseReceiptScenarios(deps) {
       },
     },
     {
-      name: 'purchase-receipt-add-item-modal-draft-desktop',
+      name: 'purchase-receipt-add-item-inline-draft-desktop',
       path: '/erp/warehouse/inbound',
       auth: 'admin',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '入库管理')
         await expectText(page, 'PR-STYLE-L1-DRAFT')
-        await expectButton(page, '添加明细')
         await assertTextAbsent(page, '维护明细')
 
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
@@ -412,44 +409,39 @@ export function createPurchaseReceiptScenarios(deps) {
         })
 
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
+        await expectText(page, '已录入')
+        await expectText(page, '数量合计')
         await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 1)
         await assertPurchaseReceiptActionButtonState(page, {
           name: '添加明细',
           disabled: false,
           scenarioName: 'purchase-receipt-add-item-draft-enabled',
         })
-        await assertBusinessFormModalKeyboardRecovery(page, {
-          triggerName: /添加\s*明细/,
-          titleText: '添加入库明细',
-          scenarioName: 'purchase-receipt-add-item-modal',
-          closeMode: 'close-button',
-        })
-
-        const modal = await openPurchaseReceiptAddItemModal(page)
+        const editor = await openPurchaseReceiptAddItemEditor(page)
         await expectText(page, '添加入库明细')
         await assertTextAbsent(page, '编辑入库明细')
-        await modal.getByRole('button', { name: '添加明细' }).click()
+        await editor.getByRole('button', { name: '添加明细' }).click()
         await expectText(page, '请选择材料')
         await expectText(page, '请选择仓库')
         await expectText(page, '请选择单位')
         await expectText(page, '请填写入库数量')
 
-        await fillPurchaseReceiptAddItemModalBoundaryValues(page, modal)
-        await assertPurchaseReceiptAddItemModalMetrics(page, modal, {
-          scenarioName: 'purchase-receipt-add-item-modal-draft-desktop',
+        await fillPurchaseReceiptAddItemEditorBoundaryValues(page, editor)
+        await assertPurchaseReceiptAddItemEditorMetrics(page, editor, {
+          scenarioName: 'purchase-receipt-add-item-inline-draft-desktop',
         })
-        await modal.getByRole('button', { name: '添加明细' }).click()
+        await editor.getByRole('button', { name: '添加明细' }).click()
         await expectText(page, '入库明细已添加')
-        await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+        await editor.waitFor({ state: 'hidden', timeout: 10_000 })
         await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 2)
         await assertNoHorizontalOverflow(
           page,
-          'purchase-receipt-add-item-modal-draft-desktop-recovery'
+          'purchase-receipt-add-item-inline-draft-desktop-recovery'
         )
       },
     },
     {
-      name: 'purchase-receipt-add-item-modal-dark-desktop',
+      name: 'purchase-receipt-add-item-inline-dark-desktop',
       path: '/erp/warehouse/inbound',
       auth: 'admin',
       themeMode: 'dark',
@@ -457,44 +449,58 @@ export function createPurchaseReceiptScenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '入库管理')
         await assertERPThemeMode(page, {
-          scenarioName: 'purchase-receipt-add-item-modal-dark-desktop',
+          scenarioName: 'purchase-receipt-add-item-inline-dark-desktop',
           expectedMode: 'dark',
           expectedEffectiveTheme: 'dark',
         })
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
-        const modal = await openPurchaseReceiptAddItemModal(page)
+        const editor = await openPurchaseReceiptAddItemEditor(page)
         await expectText(page, '添加入库明细')
-        await fillPurchaseReceiptAddItemModalBoundaryValues(page, modal)
-        await assertPurchaseReceiptAddItemModalMetrics(page, modal, {
-          scenarioName: 'purchase-receipt-add-item-modal-dark-desktop',
+        await fillPurchaseReceiptAddItemEditorBoundaryValues(page, editor)
+        await assertPurchaseReceiptAddItemEditorMetrics(page, editor, {
+          scenarioName: 'purchase-receipt-add-item-inline-dark-desktop',
         })
-        await assertPurchaseReceiptAddItemModalDarkTokens(page, modal, {
-          scenarioName: 'purchase-receipt-add-item-modal-dark-desktop',
+        await assertPurchaseReceiptAddItemEditorDarkTokens(page, editor, {
+          scenarioName: 'purchase-receipt-add-item-inline-dark-desktop',
         })
-        await closeBusinessFormModal(page, modal)
+        await editor.evaluate((node) => {
+          node
+            .querySelector(
+              '.erp-purchase-receipt-inline-item-editor__footer button'
+            )
+            ?.click()
+        })
+        await editor.waitFor({ state: 'hidden', timeout: 10_000 })
       },
     },
     {
-      name: 'purchase-receipt-add-item-modal-mobile',
+      name: 'purchase-receipt-add-item-inline-mobile',
       path: '/erp/warehouse/inbound',
       auth: 'admin',
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectHeading(page, '入库管理')
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
-        const modal = await openPurchaseReceiptAddItemModal(page)
+        const editor = await openPurchaseReceiptAddItemEditor(page)
         await expectText(page, '添加入库明细')
-        await fillPurchaseReceiptAddItemModalBoundaryValues(page, modal)
-        await assertPurchaseReceiptAddItemModalMetrics(page, modal, {
-          scenarioName: 'purchase-receipt-add-item-modal-mobile',
+        await fillPurchaseReceiptAddItemEditorBoundaryValues(page, editor)
+        await assertPurchaseReceiptAddItemEditorMetrics(page, editor, {
+          scenarioName: 'purchase-receipt-add-item-inline-mobile',
         })
-        await assertPurchaseReceiptAddItemModalMobileLayout(page, modal, {
-          scenarioName: 'purchase-receipt-add-item-modal-mobile',
+        await assertPurchaseReceiptAddItemEditorMobileLayout(page, editor, {
+          scenarioName: 'purchase-receipt-add-item-inline-mobile',
         })
-        await closeBusinessFormModal(page, modal)
+        await editor.evaluate((node) => {
+          node
+            .querySelector(
+              '.erp-purchase-receipt-inline-item-editor__footer button'
+            )
+            ?.click()
+        })
+        await editor.waitFor({ state: 'hidden', timeout: 10_000 })
         await assertNoHorizontalOverflow(
           page,
-          'purchase-receipt-add-item-modal-mobile-recovery'
+          'purchase-receipt-add-item-inline-mobile-recovery'
         )
       },
     },

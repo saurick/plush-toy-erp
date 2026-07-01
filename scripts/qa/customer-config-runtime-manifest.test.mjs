@@ -40,6 +40,36 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
   validateRuntimeManifest(manifest);
 });
 
+test("customer-config-runtime-manifest: compiles controlled module state overrides", () => {
+  const manifest = buildRuntimeManifest({
+    ...demoCustomerPackage,
+    moduleStates: Object.freeze([
+      Object.freeze({
+        moduleKey: "shipments",
+        state: "read_only",
+        reason: "trial package keeps shipment history visible without writes",
+      }),
+      Object.freeze({
+        moduleKey: "finance",
+        state: "disabled",
+        reason: "trial package excludes finance operations",
+      }),
+    ]),
+  });
+  const moduleStates = new Map(
+    manifest.module_states.map((item) => [item.module_key, item]),
+  );
+
+  assert.equal(moduleStates.get("shipments")?.state, "read_only");
+  assert.equal(
+    moduleStates.get("shipments")?.reason,
+    "trial package keeps shipment history visible without writes",
+  );
+  assert.equal(moduleStates.get("finance")?.state, "disabled");
+  assert.equal(moduleStates.get("sales_orders")?.state, "enabled");
+  validateRuntimeManifest(manifest);
+});
+
 test("customer-config-runtime-manifest: compiles neutral demo package without yoyoosun scope", () => {
   const manifest = buildRuntimeManifest(demoCustomerPackage);
 

@@ -12,6 +12,7 @@ import {
   buildCustomerPackageConsoleSummary,
   buildCustomerPackagePreviewSummary,
   buildFieldNumberingDraftSummary,
+  buildPrintTemplateFieldSummary,
   buildImportToolingSummary,
   isDevCustomerConfigEnabled,
   listRegisteredDevCustomerPackages,
@@ -280,6 +281,10 @@ test('devCustomerConfig: 客户配置包流程结构只作为 preview', () => {
   assert.equal(summary.businessFlowCount, 4)
   assert.equal(summary.stateMachineCount, 3)
   assert.equal(summary.processPolicyCount, 3)
+  assert.equal(summary.moduleStateCatalogCount, 15)
+  assert.equal(summary.moduleStateOverrideCount, 0)
+  assert.equal(summary.moduleStateCounts.enabled, 15)
+  assert.deepEqual(summary.nonEnabledModuleStates, [])
   assert.equal(
     summary.workflows.find((item) => item.key === 'sales_order_approval')
       ?.factBoundary,
@@ -298,11 +303,74 @@ test('devCustomerConfig: 客户配置包流程结构只作为 preview', () => {
   assert.equal(summary.boundaryOk, true)
 })
 
+test('devCustomerConfig: 打印模板字段只读进入客户配置控制台', () => {
+  const summary = buildPrintTemplateFieldSummary()
+
+  assert.equal(summary.templateCount, 2)
+  assert.equal(summary.sourceGroundedCount, 2)
+  assert(summary.fieldTruthCount > 0)
+  assert.equal(summary.runtimeStatus, 'source_grounded')
+  assert.equal(summary.sourcePath, 'web/src/erp/config/printTemplates.mjs')
+  assert.equal(summary.behaviorDocPath, 'docs/打印模板字段与编辑行为清单.md')
+  assert.match(summary.boundary, /销售订单受理未接打印模板/)
+  assert.deepEqual(
+    summary.templates.map((item) => item.title),
+    ['采购合同', '加工合同']
+  )
+  assert(
+    summary.templates.every(
+      (item) =>
+        item.readiness === 'source_grounded' &&
+        item.fieldTruthCount > 0 &&
+        item.sourceFileCount > 0
+    )
+  )
+})
+
+test('devCustomerConfig: moduleStates 进入控制台预检但不改变默认客户包', () => {
+  const summary = buildCustomerPackagePreviewSummary({
+    ...DEV_CUSTOMER_CONFIG_REGISTRY.yoyoosun.customerPackage,
+    moduleStates: Object.freeze([
+      Object.freeze({
+        moduleKey: 'shipments',
+        state: 'read_only',
+        reason: '试用阶段只允许查看出货模块',
+      }),
+      Object.freeze({
+        moduleKey: 'finance',
+        state: 'disabled',
+        reason: '试用阶段暂不开放财务模块',
+      }),
+    ]),
+  })
+
+  assert.equal(summary.moduleStateCatalogCount, 15)
+  assert.equal(summary.moduleStateOverrideCount, 2)
+  assert.equal(summary.moduleStateCounts.enabled, 13)
+  assert.equal(summary.moduleStateCounts.read_only, 1)
+  assert.equal(summary.moduleStateCounts.disabled, 1)
+  assert.deepEqual(
+    summary.nonEnabledModuleStates
+      .map((item) => [item.moduleKey, item.state, item.reason])
+      .sort(),
+    [
+      ['finance', 'disabled', '试用阶段暂不开放财务模块'],
+      ['shipments', 'read_only', '试用阶段只允许查看出货模块'],
+    ].sort()
+  )
+  assert(
+    summary.moduleStates
+      .find((item) => item.moduleKey === 'sales_orders')
+      ?.reason.includes('默认 enabled')
+  )
+})
+
 test('devCustomerConfig: 配置包预检控制台只展示 preview / blocked 门禁', () => {
   const overview = buildCustomerConfigDevOverview()
   const summary = buildCustomerPackageConsoleSummary({
     menuSummary: overview.menuSummary,
     fieldNumberingSummary: overview.fieldNumberingSummary,
+    printTemplateSummary: overview.printTemplateSummary,
     customerPackageSummary: overview.customerPackageSummary,
     importSummary: overview.importSummary,
   })
@@ -326,9 +394,22 @@ test('devCustomerConfig: 配置包预检控制台只展示 preview / blocked 门
   )
   assert.deepEqual(
     summary.assetSummary.map((item) => item.status),
-    ['runtime_frontend_only', 'draft_only', 'preview_only', 'preview_only']
+    [
+      'runtime_frontend_only',
+      'draft_only',
+      'preview_only',
+      'preview_only',
+      'source_grounded',
+      'preview_only',
+    ]
   )
   assert(summary.validationChecks.some((item) => item.key === 'real-import'))
+  assert(summary.validationChecks.some((item) => item.key === 'module-states'))
+  assert(
+    summary.validationChecks.some(
+      (item) => item.key === 'print-template-boundary'
+    )
+  )
   assert(
     summary.diffItems.every((item) =>
       [
@@ -336,6 +417,7 @@ test('devCustomerConfig: 配置包预检控制台只展示 preview / blocked 门
         'draft_only',
         'preview_only',
         'report_gate_only',
+        'source_grounded',
       ].includes(item.status)
     )
   )
@@ -349,9 +431,18 @@ test('devCustomerConfig: 配置包预检控制台只展示 preview / blocked 门
       'passed',
       'draft_only',
       'preview_only',
+      'source_grounded',
+      'preview_only',
       'report_gate_only',
       'release_gate_required',
     ]
+  )
+  assert(
+    summary.sourceReferences.some(
+      (item) =>
+        item.key === 'print-templates' &&
+        item.sourcePath === 'web/src/erp/config/printTemplates.mjs'
+    )
   )
   assert(
     summary.qaCommands.some((item) =>
@@ -362,7 +453,13 @@ test('devCustomerConfig: 配置包预检控制台只展示 preview / blocked 门
   )
   assert.deepEqual(
     summary.sourceReferences.map((item) => item.status),
-    ['runtime_frontend_only', 'draft_only', 'preview_only', 'report_gate_only']
+    [
+      'runtime_frontend_only',
+      'draft_only',
+      'source_grounded',
+      'preview_only',
+      'report_gate_only',
+    ]
   )
 })
 

@@ -109,7 +109,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不写核心规则 / No core rules',
     ]),
     description:
-      '汇总 yoyoosun 客户配置包、菜单品牌、字段编号草案、预检差异和导入边界；review package preflight boundaries.',
+      '汇总 yoyoosun 客户配置包、菜单品牌、字段编号草案、打印模板字段、预检差异和导入边界；review package preflight boundaries.',
   }),
 ])
 

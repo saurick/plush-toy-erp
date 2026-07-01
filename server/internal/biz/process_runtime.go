@@ -496,7 +496,8 @@ func (uc *ProcessRuntimeUsecase) resolveLinkedWorkflowTaskOwnerRole(ctx context.
 		node.RequiredCapabilityKey == nil || strings.TrimSpace(*node.RequiredCapabilityKey) == "" {
 		return "", ErrProcessTaskOwnerRoleNotFound
 	}
-	explanation, err := uc.ownerResolver.WorkflowCandidateOwnerRoleKeys(ctx, "", *node.OwnerPoolKey, *node.RequiredCapabilityKey)
+	customerKey := processInstanceCustomerKey(instance)
+	explanation, err := uc.ownerResolver.WorkflowCandidateOwnerRoleKeys(ctx, customerKey, *node.OwnerPoolKey, *node.RequiredCapabilityKey)
 	if err != nil {
 		return "", err
 	}
@@ -515,6 +516,14 @@ func (uc *ProcessRuntimeUsecase) resolveLinkedWorkflowTaskOwnerRole(ctx context.
 	default:
 		return "", ErrProcessTaskOwnerRoleAmbiguous
 	}
+}
+
+func processInstanceCustomerKey(instance *ProcessInstance) string {
+	if instance == nil || instance.ModuleContractSnapshot == nil {
+		return ""
+	}
+	customerKey, _ := instance.ModuleContractSnapshot["customer_key"].(string)
+	return NormalizeCustomerKey(customerKey)
 }
 
 func (uc *ProcessRuntimeUsecase) CompleteLinkedWorkflowTask(ctx context.Context, in *ProcessLinkedWorkflowTaskCompletion, actorID int) (*ProcessNodeInstance, error) {

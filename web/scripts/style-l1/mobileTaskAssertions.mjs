@@ -1072,8 +1072,13 @@ export function createMobileTaskAssertions(deps) {
     assert(metrics.actionBar, `${scenarioName} 详情页动作栏未渲染`)
     assert.equal(
       metrics.buttons.length,
-      4,
-      `${scenarioName} 详情页动作栏应保留四个主按钮: ${JSON.stringify(metrics)}`
+      3,
+      `${scenarioName} 详情页动作栏应只保留已接后端合同的主按钮: ${JSON.stringify(metrics)}`
+    )
+    assert.deepEqual(
+      metrics.buttons.map((button) => button.text),
+      ['阻塞', '完成', '催办'],
+      `${scenarioName} 详情页动作栏不应保留 unsupported processing 按钮: ${JSON.stringify(metrics)}`
     )
     assert.equal(
       metrics.scrollTopButtonCount,
@@ -1115,6 +1120,20 @@ export function createMobileTaskAssertions(deps) {
         metrics.relatedItem.scrollWidth <= metrics.relatedItem.clientWidth + 1,
       `${scenarioName} 关联单据没有真实跳转时不应呈现可点击箭头或溢出: ${JSON.stringify(metrics)}`
     )
+
+    await page.getByRole('button', { name: /阻塞/u }).click()
+    const reasonInput = page.getByTestId('mobile-role-detail-reason-input')
+    await reasonInput.waitFor({ state: 'visible', timeout: 10_000 })
+    const reasonPlaceholder = await reasonInput.getAttribute('placeholder')
+    assert(
+      reasonPlaceholder &&
+        reasonPlaceholder.includes('原因') &&
+        !reasonPlaceholder.includes('至少 5 个字'),
+      `${scenarioName} 原因输入提示应只表达必填语义: ${reasonPlaceholder || '-'}`
+    )
+    await page.getByRole('button', { name: '提交' }).click()
+    await reasonInput.waitFor({ state: 'visible', timeout: 10_000 })
+    await page.getByRole('button', { name: /收起/u }).click()
 
     await gotoScenarioPath(page, '/m/boss/tasks', {
       waitUntil: 'domcontentloaded',
@@ -1163,14 +1182,15 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 跨岗位可见任务缺少不可代办说明或提示溢出: ${JSON.stringify(crossRoleMetrics)}`
     )
     assert(
-      crossRoleMetrics.buttons.some(
-        (button) => button.text === '处理' && button.disabled
-      ) &&
+      !crossRoleMetrics.buttons.some((button) => button.text === '处理') &&
         crossRoleMetrics.buttons.some(
           (button) => button.text === '阻塞' && button.disabled
         ) &&
         crossRoleMetrics.buttons.some(
           (button) => button.text === '完成' && button.disabled
+        ) &&
+        !crossRoleMetrics.buttons.some(
+          (button) => button.text === '退回当前任务' && !button.disabled
         ) &&
         crossRoleMetrics.buttons.some(
           (button) => button.text === '催办' && !button.disabled

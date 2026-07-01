@@ -14,7 +14,7 @@
 
 | 文件 | 用途 | 边界 |
 | --- | --- | --- |
-| `customerPackage.mjs` | 中性 demo 客户配置包草案，覆盖 3 条 preview workflow、4 条业务流、3 个状态机和 3 个流程策略 | 只服务 `customer-package-lint` 与 `customer-config-runtime-manifest` 本地验证 |
+| `customerPackage.mjs` | 中性 demo 客户配置包草案，覆盖 4 条 preview workflow、4 条业务流、3 个状态机和 3 个流程策略；可选 `moduleStates` 仅用于编译后端 `module_states` 输入并校验 catalog / reason 边界 | 只服务 `customer-package-lint` 与 `customer-config-runtime-manifest` 本地验证；不执行模块安装 / 卸载，不代表完整模块关闭已 ready |
 
 ## 校验命令
 
@@ -25,4 +25,3 @@ node scripts/qa/customer-package-lint.mjs --customer demo --mode compile
 node scripts/qa/customer-config-runtime-manifest.mjs --customer demo
 node scripts/qa/customer-config-runtime-manifest.mjs --customer demo --mode compile
 ```
-

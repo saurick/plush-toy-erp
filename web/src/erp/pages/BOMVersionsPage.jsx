@@ -2,22 +2,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   CopyOutlined,
+  DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
   InboxOutlined,
   PlusOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
-import {
-  Button,
-  Empty,
-  Form,
-  Popconfirm,
-  Select,
-  Space,
-  Table,
-  Tag,
-} from 'antd'
+import { Button, Form, Input, Popconfirm, Select, Space } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -56,16 +48,16 @@ import {
 } from '../components/business-list/ColumnOrderModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
+import BusinessLineItemsSection from '../components/business-list/BusinessLineItemsSection.jsx'
+import { useLineItemAppendScroll } from '../components/business-list/useLineItemAppendScroll.mjs'
 import {
   BOM_MODULE_KEY,
   BOM_STATUS_LABELS,
   BOM_STATUS_OPTIONS,
-  buildBOMItemColumns,
   buildBOMVersionColumns,
 } from '../components/bom/BOMVersionColumns.jsx'
 import {
   BOMHeaderFormFields,
-  BOMItemFormFields,
   buildHeaderParams,
   buildItemParams,
   unixToDateInputValue,
@@ -91,6 +83,7 @@ import {
   uniqueReferenceOptions,
   unitOption,
 } from '../utils/referenceSelectOptions.mjs'
+import { createDuplicatedDraftLineItem } from '../utils/businessLineItems.mjs'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 
@@ -137,10 +130,10 @@ function csvEscape(value) {
   return /[",\n\r]/u.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
-function downloadCSV({ filename, rows }) {
-  const header = ['产品ID', 'BOM版本', '状态', '生效开始', '生效结束', '备注']
+function downloadCSV({ filename, rows, productOptions = [] }) {
+  const header = ['产品', 'BOM版本', '状态', '生效开始', '生效结束', '备注']
   const body = rows.map((row) => [
-    row.product_id,
+    referenceLabel(productOptions, row.product_id, '产品'),
     row.version,
     BOM_STATUS_LABELS[row.status] || row.status,
     formatUnixDate(row.effective_from),
@@ -161,6 +154,222 @@ function downloadCSV({ filename, rows }) {
   anchor.click()
   anchor.remove()
   URL.revokeObjectURL(url)
+}
+
+function createBlankBOMLine(headerID) {
+  return {
+    bom_header_id: headerID,
+    material_id: undefined,
+    quantity: '',
+    unit_id: undefined,
+    loss_rate: '0',
+    position: '',
+    note: '',
+  }
+}
+
+function normalizeBOMLineForForm(headerID, item = {}) {
+  return {
+    id: item.id,
+    bom_header_id: item.bom_header_id || headerID,
+    material_id: item.material_id || undefined,
+    quantity: item.quantity ?? '',
+    unit_id: item.unit_id || undefined,
+    loss_rate: item.loss_rate ?? '0',
+    position: item.position || '',
+    note: item.note || '',
+  }
+}
+
+function normalizeBOMLinesForForm(headerID, items = []) {
+  return (Array.isArray(items) ? items : []).map((item) =>
+    normalizeBOMLineForForm(headerID, item)
+  )
+}
+
+function BOMLineItemsForm({
+  canEdit,
+  description,
+  form,
+  itemCount,
+  materialOptions,
+  onRemoveSavedItem,
+  registerLineItemRow,
+  requestLineItemScroll,
+  selectedVersionID,
+  unitOptions,
+}) {
+  const footerRef = useRef(null)
+  const pendingFooterScrollRef = useRef(false)
+
+  useEffect(() => {
+    if (!pendingFooterScrollRef.current) return undefined
+    pendingFooterScrollRef.current = false
+    const frameID = window.requestAnimationFrame(() => {
+      footerRef.current?.scrollIntoView?.({
+        behavior: 'smooth',
+        block: 'end',
+        inline: 'nearest',
+      })
+    })
+    return () => window.cancelAnimationFrame(frameID)
+  }, [itemCount])
+
+  return (
+    <BusinessLineItemsSection
+      className="erp-bom-modal-items"
+      title="BOM 明细"
+      description={description}
+      emptyDescription={
+        canEdit ? '暂无 BOM 明细，可在同一表单内新增' : '暂无 BOM 明细'
+      }
+      renderRow={({ add, field, fields, index, remove }) => {
+        const lineID = form.getFieldValue(['items', field.name, 'id'])
+
+        return (
+          <div
+            className="erp-sales-order-lines-form__row"
+            key={field.key}
+            ref={(node) => registerLineItemRow(index, node)}
+          >
+            <div className="erp-sales-order-lines-form__row-head">
+              <strong>第 {index + 1} 行</strong>
+              {canEdit ? (
+                <Space
+                  className="erp-sales-order-lines-form__row-actions"
+                  size={4}
+                  wrap
+                >
+                  <Button
+                    aria-label={`复制第 ${index + 1} 行`}
+                    type="text"
+                    icon={<CopyOutlined />}
+                    onClick={() => {
+                      const currentLines = form.getFieldValue('items') || []
+                      const sourceLine =
+                        currentLines[field.name] || currentLines[index] || {}
+                      add(createDuplicatedDraftLineItem(sourceLine), index + 1)
+                      requestLineItemScroll(index + 1)
+                    }}
+                  >
+                    复制行
+                  </Button>
+                  <Button
+                    danger
+                    type="text"
+                    icon={<DeleteOutlined />}
+                    disabled={fields.length <= 1}
+                    onClick={() => {
+                      if (lineID) {
+                        onRemoveSavedItem(lineID)
+                      }
+                      remove(field.name)
+                    }}
+                  >
+                    移除行
+                  </Button>
+                </Space>
+              ) : null}
+            </div>
+            <div className="erp-sales-order-lines-form__grid">
+              <Form.Item name={[field.name, 'id']} hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item name={[field.name, 'bom_header_id']} hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--source"
+                label="材料"
+                name={[field.name, 'material_id']}
+                rules={[{ required: true, message: '请选择材料' }]}
+              >
+                <Select
+                  allowClear
+                  disabled={!canEdit}
+                  optionFilterProp="label"
+                  options={materialOptions}
+                  placeholder="请选择材料"
+                  showSearch
+                />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--quantity"
+                label="材料用量"
+                name={[field.name, 'quantity']}
+                rules={[{ required: true, message: '请填写材料用量' }]}
+              >
+                <Input allowClear autoComplete="off" disabled={!canEdit} />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--unit"
+                label="单位"
+                name={[field.name, 'unit_id']}
+                rules={[{ required: true, message: '请选择单位' }]}
+              >
+                <Select
+                  allowClear
+                  disabled={!canEdit}
+                  optionFilterProp="label"
+                  options={unitOptions}
+                  placeholder="请选择单位"
+                  showSearch
+                />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--quantity"
+                label="损耗率"
+                name={[field.name, 'loss_rate']}
+                rules={[{ required: true, message: '请填写损耗率' }]}
+              >
+                <Input allowClear autoComplete="off" disabled={!canEdit} />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--date"
+                label="部位"
+                name={[field.name, 'position']}
+              >
+                <Input allowClear autoComplete="off" disabled={!canEdit} />
+              </Form.Item>
+              <Form.Item
+                className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
+                label="备注"
+                name={[field.name, 'note']}
+              >
+                <Input.TextArea
+                  allowClear
+                  autoSize={{ minRows: 1, maxRows: 3 }}
+                  disabled={!canEdit}
+                  maxLength={300}
+                  showCount
+                />
+              </Form.Item>
+            </div>
+          </div>
+        )
+      }}
+      footerProps={({ add }) => ({
+        addLabel: '添加条目',
+        addDisabled: !canEdit,
+        onAdd: canEdit
+          ? () => {
+              pendingFooterScrollRef.current = true
+              requestLineItemScroll(itemCount)
+              add(createBlankBOMLine(selectedVersionID))
+            }
+          : undefined,
+        ref: footerRef,
+        stats: [
+          {
+            key: 'count',
+            label: '已录入',
+            value: itemCount,
+            suffix: '条',
+          },
+        ],
+      })}
+    />
+  )
 }
 
 export default function BOMVersionsPage() {
@@ -187,13 +396,15 @@ export default function BOMVersionsPage() {
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [headerModalOpen, setHeaderModalOpen] = useState(false)
   const [headerMode, setHeaderMode] = useState('create')
-  const [itemModalOpen, setItemModalOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState(null)
+  const [removedItemIDs, setRemovedItemIDs] = useState([])
   const [products, setProducts] = useState([])
   const [materials, setMaterials] = useState([])
   const [units, setUnits] = useState([])
   const [headerForm] = Form.useForm()
-  const [itemForm] = Form.useForm()
+  const watchedItems = Form.useWatch('items', headerForm)
+  const itemCount = Array.isArray(watchedItems) ? watchedItems.length : 0
+  const { registerLineItemRow, requestLineItemScroll } =
+    useLineItemAppendScroll(itemCount)
   const [headerProductIDForSuggestion, setHeaderProductIDForSuggestion] =
     useState()
   const [headerVersionCandidates, setHeaderVersionCandidates] = useState({
@@ -405,6 +616,9 @@ export default function BOMVersionsPage() {
   const activeActionVersion = singleSelectedVersion
   const activeActionCanEdit =
     activeActionVersion?.status === 'DRAFT' && canUpdate
+  const modalActionVersion = selectedVersion || activeActionVersion
+  const modalActionCanEdit =
+    headerMode === 'edit' && modalActionVersion?.status === 'DRAFT' && canUpdate
   const archivableSelectedVersions = selectedVersions.filter(
     (record) => record?.status !== 'ARCHIVED'
   )
@@ -416,7 +630,7 @@ export default function BOMVersionsPage() {
         : '未选择 BOM'
   const selectedItems = selectedVersions.map((record) => ({
     key: record.id,
-    label: record.version || `BOM ${record.id}`,
+    label: record.version || 'BOM 已关联',
     title: `${referenceLabel(productOptions, record.product_id, '产品')} / ${
       BOM_STATUS_LABELS[record.status] || record.status || '-'
     }`,
@@ -433,9 +647,14 @@ export default function BOMVersionsPage() {
 
   const openCreate = () => {
     headerAttachmentRef.current?.clearPendingAttachments()
+    setRemovedItemIDs([])
     setHeaderMode('create')
     headerForm.resetFields()
-    headerForm.setFieldsValue({ effective_from: '', effective_to: '' })
+    headerForm.setFieldsValue({
+      effective_from: '',
+      effective_to: '',
+      items: [],
+    })
     setHeaderProductIDForSuggestion(undefined)
     setHeaderModalOpen(true)
   }
@@ -448,12 +667,15 @@ export default function BOMVersionsPage() {
       effective_from: unixToDateInputValue(record.effective_from),
       effective_to: unixToDateInputValue(record.effective_to),
       note: record.note || '',
+      items: normalizeBOMLinesForForm(record.id, record.items),
     })
   }
 
   const openView = async (record = selectedVersion) => {
     if (!record?.id) return
     headerAttachmentRef.current?.clearPendingAttachments()
+    setRemovedItemIDs([])
+    applySelectedRowKeys([record.id])
     const detail = (await loadDetail(record.id)) || record
     setHeaderMode('view')
     fillHeaderForm(detail)
@@ -464,6 +686,8 @@ export default function BOMVersionsPage() {
   const openEdit = async (record = selectedVersion) => {
     if (!record?.id) return
     headerAttachmentRef.current?.clearPendingAttachments()
+    setRemovedItemIDs([])
+    applySelectedRowKeys([record.id])
     const detail = (await loadDetail(record.id)) || record
     setHeaderMode('edit')
     fillHeaderForm(detail)
@@ -474,6 +698,8 @@ export default function BOMVersionsPage() {
   const openCopy = (record = selectedVersion) => {
     if (!record?.id) return
     headerAttachmentRef.current?.clearPendingAttachments()
+    setRemovedItemIDs([])
+    applySelectedRowKeys([record.id])
     const nextVersionSuggestion = suggestNextBOMVersion(
       versions,
       record.product_id
@@ -486,9 +712,37 @@ export default function BOMVersionsPage() {
       effective_from: '',
       effective_to: '',
       note: '',
+      items: [],
     })
     setHeaderProductIDForSuggestion(record.product_id)
     setHeaderModalOpen(true)
+  }
+
+  const syncBOMItems = async ({ bomHeaderID, items = [], removedIDs = [] }) => {
+    const normalizedBOMHeaderID = Number(bomHeaderID || 0)
+    if (!Number.isFinite(normalizedBOMHeaderID) || normalizedBOMHeaderID <= 0) {
+      throw new Error('缺少 BOM 草稿编号，无法同步 BOM 明细')
+    }
+    const uniqueRemovedIDs = Array.from(
+      new Set(
+        (Array.isArray(removedIDs) ? removedIDs : [])
+          .map((id) => Number(id || 0))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      )
+    )
+    for (const id of uniqueRemovedIDs) {
+      await deleteBOMItem({ id })
+    }
+    for (const item of Array.isArray(items) ? items : []) {
+      const params = buildItemParams(item, {
+        bom_header_id: normalizedBOMHeaderID,
+      })
+      if (item?.id) {
+        await updateBOMItem({ ...params, id: item.id })
+      } else {
+        await addBOMItem(params)
+      }
+    }
   }
 
   const saveHeader = async () => {
@@ -498,14 +752,24 @@ export default function BOMVersionsPage() {
       let savedVersion = null
       if (headerMode === 'copy') {
         savedVersion = await copyBOMVersion(
-          buildHeaderParams(values, { source_id: activeActionVersion?.id })
+          buildHeaderParams(values, { source_id: modalActionVersion?.id })
         )
       } else if (headerMode === 'edit') {
         savedVersion = await updateBOMDraft(
-          buildHeaderParams(values, { id: activeActionVersion?.id })
+          buildHeaderParams(values, { id: modalActionVersion?.id })
         )
+        await syncBOMItems({
+          bomHeaderID: savedVersion?.id || modalActionVersion?.id,
+          items: values.items,
+          removedIDs: removedItemIDs,
+        })
       } else {
         savedVersion = await createBOMDraft(buildHeaderParams(values))
+        await syncBOMItems({
+          bomHeaderID: savedVersion?.id,
+          items: values.items,
+          removedIDs: [],
+        })
       }
       const attachmentSaved =
         (await headerAttachmentRef.current?.flushPendingAttachments(
@@ -521,6 +785,7 @@ export default function BOMVersionsPage() {
           : 'BOM 草稿已保存，未上传的附件请重新选择'
       )
       headerAttachmentRef.current?.clearPendingAttachments()
+      setRemovedItemIDs([])
       setHeaderModalOpen(false)
       await loadVersions()
     } catch (error) {
@@ -529,79 +794,6 @@ export default function BOMVersionsPage() {
       setSaving(false)
     }
   }
-
-  const openCreateItem = () => {
-    if (!activeActionVersion?.id || selectedRowKeys.length !== 1) {
-      message.warning('请先选择一个 BOM 版本')
-      return
-    }
-    setEditingItem(null)
-    itemForm.resetFields()
-    itemForm.setFieldsValue({
-      bom_header_id: activeActionVersion.id,
-      quantity: '',
-      loss_rate: '0',
-    })
-    setItemModalOpen(true)
-  }
-
-  const openEditItem = useCallback(
-    (item) => {
-      if (!item?.id) return
-      setEditingItem(item)
-      itemForm.resetFields()
-      itemForm.setFieldsValue({
-        material_id: item.material_id,
-        quantity: item.quantity,
-        unit_id: item.unit_id,
-        loss_rate: item.loss_rate,
-        position: item.position || '',
-        note: item.note || '',
-      })
-      setItemModalOpen(true)
-    },
-    [itemForm]
-  )
-
-  const saveItem = async () => {
-    const values = await itemForm.validateFields()
-    setSaving(true)
-    try {
-      if (editingItem?.id) {
-        await updateBOMItem(buildItemParams(values, { id: editingItem.id }))
-        message.success('BOM 明细已更新')
-      } else {
-        await addBOMItem(
-          buildItemParams(values, { bom_header_id: activeActionVersion?.id })
-        )
-        message.success('BOM 明细已添加')
-      }
-      setItemModalOpen(false)
-      await loadDetail(activeActionVersion?.id)
-      await loadVersions()
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '保存 BOM 明细'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const removeItem = useCallback(
-    async (item) => {
-      setSaving(true)
-      try {
-        await deleteBOMItem({ id: item.id })
-        message.success('BOM 明细已移除')
-        await loadDetail(activeActionVersion?.id)
-        await loadVersions()
-      } catch (error) {
-        message.error(getActionErrorMessage(error, '移除 BOM 明细'))
-      } finally {
-        setSaving(false)
-      }
-    },
-    [activeActionVersion?.id, loadDetail, loadVersions]
-  )
 
   const activateSelected = async () => {
     if (!activeActionVersion?.id || selectedRowKeys.length !== 1) return
@@ -712,24 +904,6 @@ export default function BOMVersionsPage() {
     ]
   )
 
-  const itemColumns = useMemo(
-    () =>
-      buildBOMItemColumns({
-        activeActionCanEdit,
-        materialOptions,
-        onEditItem: openEditItem,
-        onRemoveItem: removeItem,
-        unitOptions,
-      }),
-    [
-      activeActionCanEdit,
-      materialOptions,
-      openEditItem,
-      removeItem,
-      unitOptions,
-    ]
-  )
-
   const hasActiveFilters = Boolean(keyword.trim() || productID || status)
   const clearFilters = useCallback(() => {
     setKeyword('')
@@ -800,7 +974,11 @@ export default function BOMVersionsPage() {
               icon={<DownloadOutlined />}
               disabled={versions.length === 0}
               onClick={() =>
-                downloadCSV({ filename: 'bom-versions.csv', rows: versions })
+                downloadCSV({
+                  filename: 'bom-versions.csv',
+                  rows: versions,
+                  productOptions,
+                })
               }
             >
               导出筛选结果
@@ -857,14 +1035,6 @@ export default function BOMVersionsPage() {
             onClick={() => openEdit(activeActionVersion)}
           >
             编辑草稿
-          </Button>
-          <Button
-            size="small"
-            icon={<PlusOutlined />}
-            disabled={selectedRowKeys.length !== 1 || !activeActionCanEdit}
-            onClick={openCreateItem}
-          >
-            添加明细
           </Button>
           <Button
             size="small"
@@ -993,11 +1163,19 @@ export default function BOMVersionsPage() {
         onOk={saveHeader}
         onCancel={() => {
           headerAttachmentRef.current?.clearPendingAttachments()
+          setRemovedItemIDs([])
           setHeaderModalOpen(false)
         }}
         footer={
           headerMode === 'view' ? (
-            <Button onClick={() => setHeaderModalOpen(false)}>关闭</Button>
+            <Button
+              onClick={() => {
+                setRemovedItemIDs([])
+                setHeaderModalOpen(false)
+              }}
+            >
+              关闭
+            </Button>
           ) : undefined
         }
       >
@@ -1022,57 +1200,49 @@ export default function BOMVersionsPage() {
             versionSuggestionLoading={headerVersionCandidates.loading}
             onUseVersionSuggestion={useHeaderVersionSuggestion}
           />
-        </Form>
-        <BusinessAttachmentPanel
-          ref={headerAttachmentRef}
-          ownerType="bom_header"
-          ownerId={
-            headerMode === 'edit' || headerMode === 'view'
-              ? activeActionVersion?.id || selectedVersion?.id
-              : undefined
-          }
-          title="BOM 附件"
-          description="上传色卡、SOP、工艺图片或材料清单来源文件；附件不写库存、采购或成本事实。"
-          canUpload={headerMode !== 'view' && (canCreate || canUpdate)}
-          canDelete={canUpdate}
-          variant="inline"
-        />
-        {headerMode === 'create' ? (
-          <p className="erp-business-selection-action-bar__hint">
-            保存 BOM 草稿后，在同一 BOM 版本弹窗下方维护材料明细。
-          </p>
-        ) : (
-          <section className="erp-master-contact-list erp-bom-modal-items">
-            <div className="erp-master-contact-list__head">
-              <strong>BOM 明细</strong>
-              <Space wrap size={8}>
-                <Tag>{selectedVersion?.items?.length || 0} 行</Tag>
-                <Button
-                  size="small"
-                  icon={<PlusOutlined />}
-                  disabled={!activeActionCanEdit}
-                  onClick={openCreateItem}
-                >
-                  添加明细
-                </Button>
-              </Space>
-            </div>
-            <Table
-              loading={detailLoading}
-              rowKey="id"
-              size="small"
-              columns={itemColumns}
-              dataSource={
-                Array.isArray(selectedVersion?.items)
-                  ? selectedVersion.items
-                  : []
+          <BusinessAttachmentPanel
+            ref={headerAttachmentRef}
+            ownerType="bom_header"
+            ownerId={
+              headerMode === 'edit' || headerMode === 'view'
+                ? activeActionVersion?.id || selectedVersion?.id
+                : undefined
+            }
+            title="BOM 附件"
+            description="上传色卡、SOP、工艺图片或材料清单来源文件；附件不写库存、采购或成本事实。"
+            canUpload={headerMode !== 'view' && (canCreate || canUpdate)}
+            canDelete={canUpdate}
+            variant="inline"
+          />
+          {headerMode === 'copy' ? (
+            <p className="erp-business-selection-action-bar__hint">
+              保存复制草稿后，可在编辑 BOM 草稿弹窗内原地维护材料明细。
+            </p>
+          ) : (
+            <BOMLineItemsForm
+              canEdit={headerMode === 'create' ? canCreate : modalActionCanEdit}
+              description={
+                headerMode === 'create'
+                  ? '新建草稿时可先录入材料明细，保存后一起写入当前 BOM 草稿。'
+                  : '在当前弹窗内维护材料、用量、损耗率和备注。'
               }
-              pagination={false}
-              scroll={{ x: 860 }}
-              locale={{ emptyText: <Empty description="暂无 BOM 明细" /> }}
+              form={headerForm}
+              itemCount={itemCount}
+              materialOptions={materialOptions}
+              onRemoveSavedItem={(id) =>
+                setRemovedItemIDs((current) =>
+                  current.includes(id) ? current : [...current, id]
+                )
+              }
+              registerLineItemRow={registerLineItemRow}
+              requestLineItemScroll={requestLineItemScroll}
+              selectedVersionID={
+                headerMode === 'create' ? undefined : modalActionVersion?.id
+              }
+              unitOptions={unitOptions}
             />
-          </section>
-        )}
+          )}
+        </Form>
       </BusinessFormModal>
 
       <ColumnOrderModal
@@ -1084,27 +1254,6 @@ export default function BOMVersionsPage() {
         onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
         onClose={() => setColumnOrderOpen(false)}
       />
-
-      <BusinessFormModal
-        open={itemModalOpen}
-        title={editingItem ? '编辑 BOM 明细' : '添加 BOM 明细'}
-        okText="保存"
-        cancelText="取消"
-        confirmLoading={saving}
-        onOk={saveItem}
-        onCancel={() => setItemModalOpen(false)}
-      >
-        <Form
-          form={itemForm}
-          layout="vertical"
-          className="erp-business-action-form"
-        >
-          <BOMItemFormFields
-            materialOptions={materialOptions}
-            unitOptions={unitOptions}
-          />
-        </Form>
-      </BusinessFormModal>
     </BusinessPageLayout>
   )
 }

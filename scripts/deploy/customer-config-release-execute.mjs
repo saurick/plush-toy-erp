@@ -20,6 +20,9 @@ Usage:
     --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \\
     --out output/customers/yoyoosun/customer-config-release
 
+Input template only:
+  node scripts/deploy/customer-config-release-execute.mjs --print-input-template
+
 Publish through JSON-RPC:
   CUSTOMER_CONFIG_CONFIRM=PUBLISH_YOYOOSUN_CONFIG \\
   CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' \\
@@ -57,6 +60,7 @@ Options:
   --activate-only        Activate an already published revision. Requires evidence gate and ACTIVATE confirmation.
   --rollback             Roll back active config to the manifest revision. Requires evidence gate and ROLLBACK confirmation.
   --customer <key>       Customer key. Currently only yoyoosun is supported.
+  --print-input-template Print required inputs and runnable command templates without reading files or calling the backend.
   --help                 Print this help.
 
 This script never uploads raw customer files, writes database tables directly,
@@ -79,6 +83,7 @@ export function parseCliArgs(argv) {
     activate: false,
     activateOnly: false,
     rollback: false,
+    printInputTemplate: false,
     help: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -102,6 +107,10 @@ export function parseCliArgs(argv) {
     }
     if (token === "--rollback") {
       options.rollback = true;
+      continue;
+    }
+    if (token === "--print-input-template") {
+      options.printInputTemplate = true;
       continue;
     }
     if (!token.startsWith("--")) {
@@ -139,6 +148,49 @@ export function parseCliArgs(argv) {
     }
   }
   return options;
+}
+
+export function buildInputTemplate(customer = DEFAULT_CUSTOMER) {
+  return {
+    scope: "customer-config-release-execute-input-template",
+    customer,
+    writesDatabase: false,
+    callsBackend: false,
+    readsManifest: false,
+    validatesReleaseEvidence: false,
+    secretInputs: [
+      "CUSTOMER_CONFIG_ADMIN_TOKEN or CUSTOMER_CONFIG_ADMIN_USERNAME/CUSTOMER_CONFIG_ADMIN_PASSWORD",
+    ],
+    requiredInputs: [
+      "runtime manifest path",
+      "output report directory",
+      "backend URL without username/password",
+      "release evidence directory when activating or rolling back",
+      "CUSTOMER_CONFIG_CONFIRM with the matching operation phrase",
+    ],
+    confirmPhrases: {
+      publish: PUBLISH_CONFIRM_PHRASE,
+      activate: ACTIVATE_CONFIRM_PHRASE,
+      rollback: ROLLBACK_CONFIRM_PHRASE,
+    },
+    operations: [
+      "validate_customer_config",
+      "publish_customer_config",
+      "activate_customer_config",
+      "rollback_customer_config",
+      "get_effective_session after activate or rollback",
+    ],
+    commands: [
+      "node scripts/deploy/customer-config-release-execute.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --out output/customers/yoyoosun/customer-config-release",
+      "CUSTOMER_CONFIG_CONFIRM=PUBLISH_YOYOOSUN_CONFIG CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' node scripts/deploy/customer-config-release-execute.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --out output/customers/yoyoosun/customer-config-release --backend-url http://127.0.0.1:8300 --execute",
+      "CUSTOMER_CONFIG_CONFIRM=ACTIVATE_YOYOOSUN_CONFIG CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' node scripts/deploy/customer-config-release-execute.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --out output/customers/yoyoosun/customer-config-release --backend-url http://127.0.0.1:8300 --execute --activate",
+      "CUSTOMER_CONFIG_CONFIRM=ACTIVATE_YOYOOSUN_CONFIG CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' node scripts/deploy/customer-config-release-execute.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --out output/customers/yoyoosun/customer-config-release --backend-url http://127.0.0.1:8300 --execute --activate-only",
+      "CUSTOMER_CONFIG_CONFIRM=ROLLBACK_YOYOOSUN_CONFIG CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' node scripts/deploy/customer-config-release-execute.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --out output/customers/yoyoosun/customer-config-release --backend-url http://127.0.0.1:8300 --execute --rollback",
+      "node scripts/deploy/customer-config-release-readiness.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --require-executed --require-activated",
+    ],
+    boundary:
+      "This template does not publish, activate, rollback, call get_effective_session, validate release evidence, read target runtime, import business data, write Workflow or Fact runtime, or prove active revision readback. Real activation proof requires an executed report with effectiveSessionVerification and target smoke customer-config-effective-session evidence.",
+  };
 }
 
 function requireOption(options, key) {
@@ -588,6 +640,10 @@ async function runCli() {
   const options = parseCliArgs(process.argv.slice(2));
   if (options.help) {
     console.log(USAGE);
+    return 0;
+  }
+  if (options.printInputTemplate) {
+    console.log(JSON.stringify(buildInputTemplate(options.customer), null, 2));
     return 0;
   }
   const report = await runCustomerConfigRelease(options);

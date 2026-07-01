@@ -9,6 +9,7 @@ const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR =
   "output/customers/yoyoosun/mobile-workflow-simulated-closure";
 const SIMULATION_PREFIX = "SIM-YOYOOSUN-MOBILE-WORKFLOW";
+const INPUT_TEMPLATE_SCOPE = "mobile-workflow-simulated-closure-input-template";
 const CONFIRM_PHRASE = "APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS";
 const FORBIDDEN_ARG_PATTERN =
   /--(?:execute|import|real|real-import|customer-data)/u;
@@ -24,6 +25,7 @@ const USAGE = `Mobile workflow simulated closure
 
 Usage:
   node scripts/qa/mobile-workflow-simulated-closure.mjs
+  node scripts/qa/mobile-workflow-simulated-closure.mjs --print-input-template
 
 Apply simulated mobile workflow tasks through JSON-RPC:
   MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS \\
@@ -33,6 +35,7 @@ Apply simulated mobile workflow tasks through JSON-RPC:
       --backend-url http://127.0.0.1:8300
 
 Options:
+  --print-input-template Print local input checklist only; no report/backend/database writes.
   --apply              Create and update simulated workflow tasks.
   --backend-url <url>  Backend base URL. Default ${DEFAULT_BACKEND_URL}.
   --out <dir>          Output report directory. Default ${DEFAULT_OUT_DIR}.
@@ -67,6 +70,9 @@ function requiredText(value, pathName) {
 
 function normalizeBaseURL(raw) {
   const url = new URL(String(raw || DEFAULT_BACKEND_URL).trim());
+  if (url.username || url.password) {
+    throw new CliError("backend URL must not contain username or password", 2);
+  }
   url.pathname = url.pathname.replace(/\/+$/, "");
   url.search = "";
   url.hash = "";
@@ -96,6 +102,7 @@ function parseCliArgs(argv) {
   const options = {
     apply: false,
     help: false,
+    printInputTemplate: false,
     out: DEFAULT_OUT_DIR,
     backendURL: process.env.MOBILE_WORKFLOW_SIM_BACKEND_URL || DEFAULT_BACKEND_URL,
     runId: process.env.MOBILE_WORKFLOW_SIM_RUN_ID || buildTimestampRunId(),
@@ -110,6 +117,10 @@ function parseCliArgs(argv) {
     }
     if (token === "--help" || token === "-h") {
       options.help = true;
+      continue;
+    }
+    if (token === "--print-input-template") {
+      options.printInputTemplate = true;
       continue;
     }
     if (token === "--apply") {
@@ -146,7 +157,70 @@ function parseCliArgs(argv) {
   }
   options.backendURL = normalizeBaseURL(options.backendURL);
   options.runId = sanitizeRunId(options.runId);
+  if (options.printInputTemplate && options.apply) {
+    throw new CliError("--print-input-template cannot be combined with --apply", 2);
+  }
   return options;
+}
+
+function buildInputTemplate(options = {}) {
+  const backendURL = normalizeBaseURL(options.backendURL || DEFAULT_BACKEND_URL);
+  const out = optionalText(options.out) || DEFAULT_OUT_DIR;
+  const runId = sanitizeRunId(options.runId || "DEV-TESTING-REPORT");
+  return {
+    scope: INPUT_TEMPLATE_SCOPE,
+    customerKey: "yoyoosun",
+    scenario: "mobile-workflow-simulated-closure",
+    simulatedOnly: true,
+    realCustomerImport: false,
+    factPosting: false,
+    customerAcceptanceRequiredForClosure: false,
+    writesReports: false,
+    writesDatabase: false,
+    callsBackend: false,
+    importsRealCustomerData: false,
+    createsBusinessRecords: false,
+    createsOperationalFacts: false,
+    downstreamReportOnlyWritesReports: true,
+    downstreamApplyWritesDatabase: true,
+    defaultBackendURL: DEFAULT_BACKEND_URL,
+    backendURL,
+    defaultOut: DEFAULT_OUT_DIR,
+    out,
+    runId,
+    roleAccounts: ROLE_USERS,
+    simulatedTaskGroups: [
+      "order_approval",
+      "finished_goods_qc",
+      "warehouse_inbound",
+      "shipment_release",
+    ],
+    simulatedActions: [
+      "boss done",
+      "quality done with evidence",
+      "warehouse done with evidence",
+      "shipment release blocked with exception report",
+    ],
+    requiredApplyInputs: [
+      "MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS",
+      "MOBILE_WORKFLOW_SIM_PASSWORD or TRIAL_ACCOUNT_PASSWORD or ERP_ROLE_DEMO_PASSWORD",
+    ],
+    optionalInputs: [
+      "--backend-url <url>",
+      "--out <dir>",
+      "--run-id <safe_run_id>",
+    ],
+    commands: {
+      printInputTemplate:
+        "PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --print-input-template",
+      reportOnly:
+        `PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --run-id ${runId} --out ${out}`,
+      applySimulated:
+        "MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS MOBILE_WORKFLOW_SIM_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --apply --backend-url http://127.0.0.1:8300",
+    },
+    boundary:
+      "This template only prints prerequisites and commands. It does not write reports, call backend, login, import real customer data, write business_records, create workflow tasks, or post operational facts.",
+  };
 }
 
 function evidence(actionKey, roleKey, reason, evidenceRefs, nowSec) {
@@ -545,6 +619,10 @@ async function main() {
     process.stdout.write(`${USAGE}\n`);
     return;
   }
+  if (options.printInputTemplate) {
+    process.stdout.write(`${JSON.stringify(buildInputTemplate(options), null, 2)}\n`);
+    return;
+  }
   const plan = buildPlan(options);
   const report = {
     mode: options.apply ? "apply-simulated-mobile-workflow-mobile-tasks" : "report-only",
@@ -591,9 +669,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 export {
+  buildInputTemplate,
   buildPlan,
   buildTimestampRunId,
   CONFIRM_PHRASE,
+  INPUT_TEMPLATE_SCOPE,
   parseCliArgs,
   sanitizeRunId,
 };

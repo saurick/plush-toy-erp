@@ -55,8 +55,7 @@ function defaultSelectedLabel(row = {}) {
     row.sku_code ||
     row.name ||
     row.title ||
-    row.id ||
-    '-'
+    '记录已关联'
   )
 }
 

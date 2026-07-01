@@ -46,10 +46,10 @@ import {
   TASK_BOARD_STATUS_OPTIONS,
   buildWorkflowTaskBoardLanes,
   filterWorkflowTaskBoardTasks,
-  getTaskOwnerRoleKey,
   getTaskStatusKey,
   getWorkflowTaskAllowedActionModes,
   getWorkflowTaskDueLabel,
+  getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskReason,
   getWorkflowTaskReadonlyReason,
   getWorkflowTaskStatusMeta,
@@ -69,7 +69,7 @@ const EXCEPTION_FLOW_STEPS = Object.freeze([
   {
     key: 'assign',
     title: '责任分派',
-    description: '按 owner_role_key 或具体负责人接收。',
+    description: '按责任角色或具体负责人接收。',
   },
   {
     key: 'follow',
@@ -682,7 +682,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       title: '负责',
       dataIndex: 'owner_role_key',
       width: 90,
-      render: (_, record) => getTaskOwnerRoleKey(record) || '-',
+      render: (_, record) => getWorkflowTaskOwnerRoleLabel(record),
     },
     {
       title: '到期 / SLA',
@@ -878,7 +878,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           {formatWorkflowTaskSource(selectedWorkbenchTask)}
                         </Descriptions.Item>
                         <Descriptions.Item label="负责角色">
-                          {getTaskOwnerRoleKey(selectedWorkbenchTask) || '-'}
+                          {getWorkflowTaskOwnerRoleLabel(selectedWorkbenchTask)}
                         </Descriptions.Item>
                         <Descriptions.Item label="到期">
                           {getWorkflowTaskDueLabel(selectedWorkbenchTask)}
