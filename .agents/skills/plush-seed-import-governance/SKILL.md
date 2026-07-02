@@ -23,6 +23,7 @@ description: 项目seed、fixture、导入与清理治理（plush-toy-erp）。U
 ## 结构质量门禁 Structure Quality Gate
 
 - 边界清晰、合理严谨：说明本轮管什么、不管什么、依赖哪个真源，以及为什么当前拆分、抽象和验证足够但不过度。
+- 语义清晰：seed、fixture、dry-run、模拟数据、真实客户数据、导入、清理和回滚必须区分清楚，避免把样例写成事实。
 - 模块化：seed、fixture、dry-run、真实 import、cleanup 和 rollback 分开入口，不用一个脚本同时承担模拟、写入和清理所有职责。
 - 高内聚：同一数据来源、run id/prefix、映射规则、去重规则和清理规则收口到共享配置或 helper。
 - 低耦合：测试数据不污染产品真源，demo 数据不伪装成客户事实，导入脚本不绕过 schema/usecase/RBAC/audit 主路径。

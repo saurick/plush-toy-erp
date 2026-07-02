@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Seed Import Governance"
   short_description: "Seed/导入/清理 Import / 数据质量门禁"
-  default_prompt: "Use $plush-seed-import-governance 按中文主线 + English anchors 处理：先收敛真源、范围、验证和风险；执行数据质量门禁（含边界清晰、合理严谨、模块化、高内聚、低耦合、单一职责），区分 seed/fixture/dry-run/真实导入，使用 stable prefix/run id、可回收清理、目标环境确认和验证证据，不污染 Product Core、RBAC 或长期 schema。"
+  default_prompt: "Use $plush-seed-import-governance 按中文主线 + English anchors 处理：先收敛真源、范围、验证和风险；执行数据质量门禁（含语义清晰、边界清晰、合理严谨、模块化、高内聚、低耦合、单一职责），区分 seed/fixture/dry-run/真实导入，使用 stable prefix/run id、可回收清理、目标环境确认和验证证据，不污染 Product Core、RBAC 或长期 schema。"
