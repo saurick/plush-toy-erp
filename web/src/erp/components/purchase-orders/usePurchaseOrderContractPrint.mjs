@@ -4,6 +4,10 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { buildMaterialPurchaseContractDraftFromPurchaseOrder } from '../../utils/masterDataOrderView.mjs'
 import {
+  completeMaterialPurchaseContractDraft,
+  mergeSnapshotMissingFields,
+} from '../../utils/contractPrintDraftCompleteness.mjs'
+import {
   MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
   PRINT_WORKSPACE_ENTRY_SOURCE,
   openPrintWorkspaceWindow,
@@ -15,6 +19,8 @@ export function usePurchaseOrderContractPrint({
   printTemplateDefaults = {},
   unitOptions = [],
   customerKey = '',
+  suppliers = [],
+  resolveSupplierSnapshot,
 }) {
   const [printingContract, setPrintingContract] = useState(false)
 
@@ -30,12 +36,25 @@ export function usePurchaseOrderContractPrint({
           message.warning('当前采购订单没有可打印的明细')
           return
         }
-        const initialDraft =
-          buildMaterialPurchaseContractDraftFromPurchaseOrder(record, items, {
+        const supplier = suppliers.find((item) => item.id === record.supplier_id)
+        const liveSupplierSnapshot =
+          typeof resolveSupplierSnapshot === 'function' && supplier
+            ? await resolveSupplierSnapshot(supplier)
+            : {}
+        const printRecord = {
+          ...record,
+          supplier_snapshot: mergeSnapshotMissingFields(
+            record.supplier_snapshot,
+            liveSupplierSnapshot
+          ),
+        }
+        const initialDraft = completeMaterialPurchaseContractDraft(
+          buildMaterialPurchaseContractDraftFromPurchaseOrder(printRecord, items, {
             materials,
             printTemplateDefaults,
             unitOptions,
           })
+        )
         openPrintWorkspaceWindow(MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY, {
           entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
           initialDraft,
@@ -48,7 +67,15 @@ export function usePurchaseOrderContractPrint({
         setPrintingContract(false)
       }
     },
-    [customerKey, loadOrderItems, materials, printTemplateDefaults, unitOptions]
+    [
+      customerKey,
+      loadOrderItems,
+      materials,
+      printTemplateDefaults,
+      resolveSupplierSnapshot,
+      suppliers,
+      unitOptions,
+    ]
   )
 
   return {
