@@ -9,11 +9,19 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v go >/dev/null 2>&1; then
+  echo "[qa:yoyoosun] 未找到 go，请先安装 Go"
+  exit 1
+fi
+
 echo "[qa:yoyoosun] 运行永绅客户闭环测试"
 node --test "$ROOT_DIR/scripts/qa/yoyoosun-customer-closure.test.mjs"
 
 echo "[qa:yoyoosun] 运行永绅发布就绪边界测试"
 node --test "$ROOT_DIR/scripts/qa/yoyoosun-release-readiness.test.mjs"
+
+echo "[qa:yoyoosun] 运行前端字段投影列隐藏测试"
+node --test "$ROOT_DIR/web/src/erp/utils/moduleTableColumnsFieldPolicy.test.mjs"
 
 if [ -f "$ROOT_DIR/scripts/qa/customer-package-preview-boundary.test.mjs" ]; then
   echo "[qa:yoyoosun] 运行客户配置包 preview-only 边界测试"
@@ -31,5 +39,8 @@ if [ -f "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" ]; then
   node "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" --customer yoyoosun
   node "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" --customer yoyoosun --mode compile
 fi
+
+echo "[qa:yoyoosun] 运行后端客户配置字段投影测试"
+go test ./server/internal/biz -run 'CustomerConfig|FieldPolicy'
 
 echo "[qa:yoyoosun] 完成"
