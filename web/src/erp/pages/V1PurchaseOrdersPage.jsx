@@ -96,6 +96,10 @@ export default function V1PurchaseOrdersPage() {
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
   )
+  const activeCustomerKey = useMemo(
+    () => adminProfile?.effective_session?.customer?.key || '',
+    [adminProfile]
+  )
   const [form] = Form.useForm()
   const [inboundDraftForm] = Form.useForm()
   const canCreate = hasActionPermission(adminProfile, 'purchase.order.create')
@@ -624,6 +628,7 @@ export default function V1PurchaseOrdersPage() {
       materials,
       printTemplateDefaults: purchasePrintTemplateDefaults,
       unitOptions,
+      customerKey: activeCustomerKey,
     })
   const {
     closeInboundDraftModal,

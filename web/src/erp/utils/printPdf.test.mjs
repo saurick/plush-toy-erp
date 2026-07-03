@@ -306,8 +306,23 @@ test('printPdf: 服务端 PDF 请求参数默认收口到统一格式', () => {
     title: '加工合同 PDF 预览',
     fileName: 'print-template.pdf',
     templateKey: 'processing-contract',
+    customerKey: '',
     timeoutMs: 45_000,
   })
+})
+
+test('printPdf: 服务端 PDF 请求参数携带客户配置 key', () => {
+  const normalized = __TEST_ONLY__.normalizeServerPdfRequestOptions({
+    title: '采购合同 PDF 预览',
+    fileName: 'PO-001.pdf',
+    templateKey: 'material-purchase-contract',
+    customerKey: 'yoyoosun',
+  })
+
+  assert.equal(normalized.title, '采购合同 PDF 预览')
+  assert.equal(normalized.fileName, 'PO-001.pdf')
+  assert.equal(normalized.templateKey, 'material-purchase-contract')
+  assert.equal(normalized.customerKey, 'yoyoosun')
 })
 
 test('printPdf: 服务端 PDF 错误按状态码生成用户可读文案', () => {
@@ -394,6 +409,61 @@ test('printPdf: 服务端 PDF 错误不会透传 JSON 或文本正文', async ()
     )
     assert.equal(jsonReadCount, 0)
     assert.equal(textReadCount, 0)
+  } finally {
+    if (typeof originalWindow === 'undefined') {
+      delete globalThis.window
+    } else {
+      globalThis.window = originalWindow
+    }
+    if (typeof originalFetch === 'undefined') {
+      delete globalThis.fetch
+    } else {
+      globalThis.fetch = originalFetch
+    }
+    if (typeof originalLocalStorage === 'undefined') {
+      delete globalThis.localStorage
+    } else {
+      globalThis.localStorage = originalLocalStorage
+    }
+  }
+})
+
+test('printPdf: 服务端 PDF fetch payload 写入 customer_key', async () => {
+  const originalWindow = globalThis.window
+  const originalFetch = globalThis.fetch
+  const originalLocalStorage = globalThis.localStorage
+  let payload = null
+
+  globalThis.localStorage = {
+    getItem: (key) =>
+      String(key) === 'admin_access_token' ? 'admin-token-for-test' : '',
+  }
+  globalThis.window = {
+    location: {
+      origin: 'http://127.0.0.1:4173',
+    },
+    setTimeout: () => 1,
+    clearTimeout: () => {},
+  }
+  globalThis.fetch = async (_url, options) => {
+    payload = JSON.parse(String(options?.body || '{}'))
+    return {
+      ok: true,
+      blob: async () => new Blob(['pdf']),
+    }
+  }
+
+  try {
+    const blob = await __TEST_ONLY__.requestServerPdfBlob('<html>PDF</html>', {
+      title: '采购合同 PDF 预览',
+      fileName: 'PO-001.pdf',
+      templateKey: 'material-purchase-contract',
+      customerKey: 'yoyoosun',
+    })
+
+    assert.equal(blob.size, 3)
+    assert.equal(payload?.customer_key, 'yoyoosun')
+    assert.equal(payload?.template_key, 'material-purchase-contract')
   } finally {
     if (typeof originalWindow === 'undefined') {
       delete globalThis.window
@@ -686,6 +756,13 @@ test('printPdf: 预览 PDF 缓存只命中完全相同快照', () => {
         fileName: 'processing-contract_next.pdf',
       }
     )
+    const nextCustomerCacheKey = __TEST_ONLY__.buildPdfPreviewBlobCacheKey(
+      snapshotHTML,
+      {
+        ...options,
+        customerKey: 'yoyoosun',
+      }
+    )
     const blob = new Blob(['pdf'])
 
     __TEST_ONLY__.writeCachedPdfPreviewBlob(cacheKey, snapshotHTML, blob)
@@ -695,6 +772,7 @@ test('printPdf: 预览 PDF 缓存只命中完全相同快照', () => {
       blob
     )
     assert.equal(cacheKey, nextFileNameCacheKey)
+    assert.notEqual(cacheKey, nextCustomerCacheKey)
     assert.notEqual(cacheKey, changedCacheKey)
     assert.equal(
       __TEST_ONLY__.readCachedPdfPreviewBlob(cacheKey, changedSnapshotHTML),

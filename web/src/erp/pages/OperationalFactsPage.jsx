@@ -84,6 +84,7 @@ export function OperationalFactWorkspace({
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = outletContext?.adminProfile || {}
+  const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
   const [activeKey, setActiveKey] = useState(initialActiveKey)
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -314,6 +315,7 @@ export function OperationalFactWorkspace({
       openPrintWorkspaceWindow(PROCESSING_CONTRACT_TEMPLATE_KEY, {
         entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
         initialDraft,
+        customerKey: activeCustomerKey,
       })
       message.success('已打开加工合同打印模板，可在窗口补齐工序和明细')
     } catch (error) {

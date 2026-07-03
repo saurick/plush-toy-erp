@@ -17,6 +17,7 @@
 | `node scripts/qa/phase-label-boundaries.mjs` | 扫描活跃运行时代码、脚本和正式文档入口的历史阶段命名残留 | 改脚本、API、命名或治理文档后 |
 | `node scripts/qa/test-data-isolation-boundary.mjs --json` | 只读检查 Product Core demo seed、yoyoosun 模拟数据、真实导入预检和真实导入执行门禁是否隔离 | 改 seed、fixture、模拟数据或导入工具后 |
 | `node scripts/qa/customer-config-effective-session-probe.mjs --json` | 无 Authorization 探测本地 `customer_config.get_effective_session`，确认后端可达和 `40302 未登录` 边界 | yoyoosun 静态入口已命中、但还没有真实登录证据时 |
+| `node --test scripts/qa/customer-package-preview-boundary.test.mjs` | 锁住客户配置包 businessFlows / stateMachines / processPolicies 仍为 preview-only，不写 Fact、不覆盖 usecase 生命周期 | 调整客户包流程、状态机或策略预览后 |
 
 ## 主要脚本分组
 
@@ -24,7 +25,7 @@
 | --- | --- | --- |
 | 编排入口 | `fast.sh`、`strict.sh`、`full.sh` | 只编排本地检查，不代表目标环境 release evidence 已完成 |
 | 文档与命名守卫 | `docs-inventory.test.mjs`、`phase-label-boundaries.mjs` | 只证明路径、命名和登记未漂移，不证明文档内容是 runtime truth |
-| 客户配置与私有化边界 | `customer-config-boundaries.mjs`、`customer-config-effective-session-probe.mjs`、`customer-package-lint.mjs`、`customer-config-runtime-manifest.mjs` | 只做 lint / preview / manifest 编译、无凭据读回探针和边界检查，不写 Fact |
+| 客户配置与私有化边界 | `customer-config-boundaries.mjs`、`customer-config-effective-session-probe.mjs`、`customer-package-lint.mjs`、`customer-package-preview-boundary.test.mjs`、`customer-config-runtime-manifest.mjs` | 只做 lint / preview / manifest 编译、无凭据读回探针和边界检查，不写 Fact |
 | Workflow / Fact 边界 | `workflow-fact-boundary.test.mjs`、`workflow-ui-action-boundary.test.mjs` | 防止协同任务路径越界写入事实层 |
 | 测试数据隔离 | `test-data-isolation-boundary.mjs`、`trial-simulated-data.mjs`、`mobile-workflow-simulated-closure.mjs`、`operational-fact-simulated-closure.mjs` | Product Core demo seed、yoyoosun 模拟数据、真实导入预检和真实执行门禁分桶检查；不连接后端、不写 DB、不执行导入 |
 | 代码质量和安全 | `secrets.sh`、`error-codes.sh`、`go-vet.sh`、`govulncheck.sh`、`shellcheck.sh`、`shfmt.sh`、`yamllint.sh` | 按对应语言 / 配置类型补充检查，不替代业务回归 |

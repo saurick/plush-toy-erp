@@ -17,6 +17,10 @@ const MATERIAL_PURCHASE_DRAFT_STORAGE_KEY =
 
 export default function MaterialPurchaseContractPrintWorkspacePage() {
   const [searchParams] = useSearchParams()
+  const customerKey = useMemo(
+    () => String(searchParams.get('customer_key') || '').trim(),
+    [searchParams]
+  )
   const template = getPrintTemplateByKey('material-purchase-contract')
   const workspaceStateID = resolvePrintWorkspaceStateID(searchParams)
   const entrySource = resolvePrintWorkspaceEntrySource(searchParams)
@@ -40,11 +44,12 @@ export default function MaterialPurchaseContractPrintWorkspacePage() {
         draftMode: resetDraftOnOpen
           ? PRINT_WORKSPACE_DRAFT_MODE.FRESH
           : PRINT_WORKSPACE_DRAFT_MODE.RESTORE,
+        customerKey,
         stateID: workspaceStateID,
       }),
       window.location.origin
     ).toString()
-  }, [entrySource, resetDraftOnOpen, workspaceStateID])
+  }, [customerKey, entrySource, resetDraftOnOpen, workspaceStateID])
 
   useEffect(() => {
     document.title = '采购合同打印窗口'
@@ -62,6 +67,7 @@ export default function MaterialPurchaseContractPrintWorkspacePage() {
       workspaceStateID={workspaceStateID}
       workspaceURL={workspaceURL}
       businessInput={entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS}
+      customerKey={customerKey}
       sourceTag={
         entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS
           ? '业务记录带值'

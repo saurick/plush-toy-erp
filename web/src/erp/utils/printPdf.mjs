@@ -145,12 +145,14 @@ function normalizeServerPdfRequestOptions(options = {}) {
   const templateKey =
     String(normalizedOptions.templateKey || '').trim() ||
     DEFAULT_PDF_TEMPLATE_KEY
+  const customerKey = String(normalizedOptions.customerKey || '').trim()
   const timeoutMs = Number(normalizedOptions.timeoutMs)
 
   return {
     title,
     fileName,
     templateKey,
+    customerKey,
     timeoutMs:
       Number.isFinite(timeoutMs) && timeoutMs > 0
         ? timeoutMs
@@ -402,7 +404,8 @@ function hashPdfPreviewSnapshotHTML(snapshotHTML) {
 }
 
 function buildPdfPreviewBlobCacheKey(snapshotHTML, options = {}) {
-  const { title, templateKey } = normalizeServerPdfRequestOptions(options)
+  const { title, templateKey, customerKey } =
+    normalizeServerPdfRequestOptions(options)
   const baseURL =
     typeof window !== 'undefined' && window.location
       ? String(window.location.origin || '')
@@ -410,6 +413,7 @@ function buildPdfPreviewBlobCacheKey(snapshotHTML, options = {}) {
   return [
     templateKey,
     title,
+    customerKey,
     baseURL,
     String(snapshotHTML || '').length,
     hashPdfPreviewSnapshotHTML(snapshotHTML),
@@ -1033,7 +1037,7 @@ function getServerPdfErrorMessage(response) {
 }
 
 async function requestServerPdfBlob(snapshotHTML, options = {}) {
-  const { title, fileName, templateKey, timeoutMs } =
+  const { title, fileName, templateKey, customerKey, timeoutMs } =
     normalizeServerPdfRequestOptions(options)
 
   const adminToken = getToken(AUTH_SCOPE.ADMIN)
@@ -1059,6 +1063,7 @@ async function requestServerPdfBlob(snapshotHTML, options = {}) {
         title,
         file_name: fileName,
         template_key: templateKey,
+        customer_key: customerKey || undefined,
         html: snapshotHTML,
         base_url: window.location.origin,
       }),

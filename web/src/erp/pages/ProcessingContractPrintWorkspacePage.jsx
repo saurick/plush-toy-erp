@@ -204,6 +204,10 @@ function resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag) {
 export default function ProcessingContractPrintWorkspacePage() {
   const { templateKey } = useParams()
   const [searchParams] = useSearchParams()
+  const customerKey = useMemo(
+    () => String(searchParams.get('customer_key') || '').trim(),
+    [searchParams]
+  )
   const paperRef = useRef(null)
   const stageWrapRef = useRef(null)
   const attachmentInputRefs = useRef({})
@@ -233,11 +237,12 @@ export default function ProcessingContractPrintWorkspacePage() {
         draftMode: resetDraftOnOpen
           ? PRINT_WORKSPACE_DRAFT_MODE.FRESH
           : PRINT_WORKSPACE_DRAFT_MODE.RESTORE,
+        customerKey,
         stateID: workspaceStateID,
       }),
       window.location.origin
     ).toString()
-  }, [entrySource, resetDraftOnOpen, workspaceStateID])
+  }, [customerKey, entrySource, resetDraftOnOpen, workspaceStateID])
   const [contract, setContract] = useState(() =>
     loadDraft({
       forceFresh: resetDraftOnOpen,
@@ -542,6 +547,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       title: '加工合同 PDF 预览',
       fileName: formatExportFileName(),
       templateKey: PROCESSING_CONTRACT_TEMPLATE_KEY,
+      customerKey,
     })
       .catch(() => null)
       .finally(() => {
@@ -550,7 +556,7 @@ export default function ProcessingContractPrintWorkspacePage() {
         }
       })
     pdfPreviewPreloadRef.current = preloadPromise
-  }, [busyAction])
+  }, [busyAction, customerKey])
 
   useEffect(() => {
     pdfPreviewPreloadRef.current = null
@@ -578,6 +584,7 @@ export default function ProcessingContractPrintWorkspacePage() {
         title: '加工合同 PDF 预览',
         fileName: formatExportFileName(),
         templateKey: PROCESSING_CONTRACT_TEMPLATE_KEY,
+        customerKey,
       })
     })
 
@@ -587,6 +594,7 @@ export default function ProcessingContractPrintWorkspacePage() {
         title: '加工合同 PDF 预览',
         fileName: formatExportFileName(),
         templateKey: PROCESSING_CONTRACT_TEMPLATE_KEY,
+        customerKey,
       })
     })
 

@@ -107,6 +107,10 @@ export default function V1OutsourcingOrdersPage() {
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
   )
+  const activeCustomerKey = useMemo(
+    () => adminProfile?.effective_session?.customer?.key || '',
+    [adminProfile]
+  )
   const [form] = Form.useForm()
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -540,6 +544,7 @@ export default function V1OutsourcingOrdersPage() {
       openPrintWorkspaceWindow(PROCESSING_CONTRACT_TEMPLATE_KEY, {
         entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
         initialDraft,
+        customerKey: activeCustomerKey,
       })
       message.success('已打开加工合同打印模板')
     } catch (error) {

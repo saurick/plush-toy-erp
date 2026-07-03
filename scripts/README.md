@@ -75,6 +75,7 @@
 | `scripts/qa/customer-config-boundaries.mjs`            | 只读验证 customer config 草案仍是 draft，未放开 runtime / schema / import / RBAC 边界，并扫描后端 Product Core 运行时代码没有嵌入 yoyoosun / 永绅客户专属规则 | 调整客户配置草案、客户配置 runtime 或后端客户差异边界后 |
 | `scripts/qa/customer-config-effective-session-probe.mjs` | 无 Authorization 的 `customer_config.get_effective_session` 本地只读探针；可写 `output/customers/yoyoosun/customer-config-effective-session-probe/current.json`，确认本地后端可达和 `40302 未登录` / 缺真实登录证据边界，不读取 token、不证明 active revision | yoyoosun 本地入口已命中但还没有演示密码 / token，需要解释为什么不能证明后端 active revision 时 |
 | `scripts/qa/customer-package-lint.mjs`                 | 验证客户配置包结构、流程预览、状态机预览、策略预览和 preview-only 打印 party defaults 仍只做 lint / preview，不接 Workflow / Fact runtime，不覆盖供应商业务快照 | 调整 `config/catalog`、`config/schemas` 或客户包流程 / 打印配置草案后 |
+| `scripts/qa/customer-package-preview-boundary.test.mjs` | 锁住 yoyoosun 客户包 `businessFlows / stateMachines / processPolicies` 仍为 preview-only，不执行 runtime command、不写 Fact、不覆盖 usecase 生命周期 | 调整客户包流程、状态机或策略预览后 |
 | `scripts/qa/customer-config-runtime-manifest.mjs`      | 将已跟踪客户包编译为后端 `customer_config` 可验证的 runtime manifest，检查 moduleStates、role key 映射、页面 / 字段投影、`sales_order_acceptance` 受控 `runtime_loader_ready` 流程定义、preview-only 打印 party defaults snapshot 和 forbidden payload；只允许白名单 ProcessRuntime 读取，不写 Fact，不声明销售订单打印模板启用 | 调整客户包 catalog、模块状态、角色池、页面投影、字段策略、打印配置草案、流程定义证据或 runtime 发布输入后 |
 | `scripts/qa/erp-field-linkage.mjs`                     | 字段联动专项测试并刷新 latest 覆盖报告                                                                            | 改字段真源、保存转换、合同金额、打印快照后                 |
 | `scripts/qa/full.sh`                                   | 推送前全量检查，先执行 `fast.sh`，再补 secrets / govulncheck、前端 test / build 和服务端 `go test ./...` / `make build` | 提交前 / 推送前                                            |
@@ -622,6 +623,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --customer yoyoosun
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --customer yoyoosun --mode compile
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --customer yoyoosun --customer demo --mode compile
+node --test /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-preview-boundary.test.mjs
 ```
 
 如需生成人工 review 用的本地预览：

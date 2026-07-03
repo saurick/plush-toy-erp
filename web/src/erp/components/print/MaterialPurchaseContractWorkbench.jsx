@@ -210,6 +210,7 @@ export default function MaterialPurchaseContractWorkbench({
   workspaceURL = '',
   sourceTag = '使用默认模板',
   businessInput = false,
+  customerKey = '',
 }) {
   const [draft, setDraft] = useState(() =>
     loadDraft(template, draftStorageKey, {
@@ -541,6 +542,7 @@ export default function MaterialPurchaseContractWorkbench({
       title: '采购合同 PDF 预览',
       fileName: buildPdfFileName(),
       templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+      customerKey,
     })
       .catch(() => null)
       .finally(() => {
@@ -549,7 +551,7 @@ export default function MaterialPurchaseContractWorkbench({
         }
       })
     pdfPreviewPreloadRef.current = preloadPromise
-  }, [buildPdfFileName, pdfAction, syncPrintRuntimeMargin])
+  }, [buildPdfFileName, customerKey, pdfAction, syncPrintRuntimeMargin])
 
   useEffect(() => {
     pdfPreviewPreloadRef.current = null
@@ -579,6 +581,7 @@ export default function MaterialPurchaseContractWorkbench({
         title: '采购合同 PDF 预览',
         fileName: buildPdfFileName(),
         templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+        customerKey,
       })
       setToolbarStatus('已生成在线 PDF 预览。')
     } catch (error) {
@@ -603,6 +606,7 @@ export default function MaterialPurchaseContractWorkbench({
         title: '采购合同 PDF 预览',
         fileName: buildPdfFileName(),
         templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+        customerKey,
       })
       setToolbarStatus('已开始下载 PDF。')
     } catch (error) {

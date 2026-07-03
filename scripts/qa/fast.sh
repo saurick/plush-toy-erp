@@ -51,6 +51,7 @@ print_help() {
   customer-config-release-readiness: 客户配置发布就绪聚合门禁和输入模板测试
   customer-config-boundaries: 客户配置草案边界检查
   customer-package-lint: 客户配置包结构、流程预览和禁止项检查
+  customer-package-preview-boundary: 客户配置包 preview-only 流程边界测试
   customer-config-runtime-manifest: 客户配置运行时 manifest 编译和门禁检查
   customer-import-tooling: 客户导入 dry-run / freeze / execution loader 测试
   test-data-isolation-boundary: 测试业务数据隔离边界守卫
@@ -351,6 +352,11 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/customer-package-lint.test.mjs" ]; then
   echo "[qa:fast] 运行客户配置包结构检查测试"
   node --test "$ROOT_DIR/scripts/qa/customer-package-lint.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/customer-package-preview-boundary.test.mjs" ]; then
+  echo "[qa:fast] 运行客户配置包 preview-only 边界测试"
+  node --test "$ROOT_DIR/scripts/qa/customer-package-preview-boundary.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" ]; then

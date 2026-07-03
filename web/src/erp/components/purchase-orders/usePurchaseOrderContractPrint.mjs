@@ -14,6 +14,7 @@ export function usePurchaseOrderContractPrint({
   materials = [],
   printTemplateDefaults = {},
   unitOptions = [],
+  customerKey = '',
 }) {
   const [printingContract, setPrintingContract] = useState(false)
 
@@ -38,6 +39,7 @@ export function usePurchaseOrderContractPrint({
         openPrintWorkspaceWindow(MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY, {
           entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
           initialDraft,
+          customerKey,
         })
         message.success('已打开采购合同打印模板')
       } catch (error) {
@@ -46,7 +48,7 @@ export function usePurchaseOrderContractPrint({
         setPrintingContract(false)
       }
     },
-    [loadOrderItems, materials, printTemplateDefaults, unitOptions]
+    [customerKey, loadOrderItems, materials, printTemplateDefaults, unitOptions]
   )
 
   return {

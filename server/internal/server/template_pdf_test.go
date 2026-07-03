@@ -124,6 +124,17 @@ func TestTemplatePDFReferencedModuleKeys(t *testing.T) {
 	}
 }
 
+func TestNormalizeTemplatePDFCustomerKeyDefaultsOnlyWhenMissing(t *testing.T) {
+	t.Parallel()
+
+	if got := normalizeTemplatePDFCustomerKey(" yoyoosun "); got != "yoyoosun" {
+		t.Fatalf("customer key = %q", got)
+	}
+	if got := normalizeTemplatePDFCustomerKey(""); got != biz.DefaultCustomerKey {
+		t.Fatalf("empty customer key should default, got %q", got)
+	}
+}
+
 func TestEnforceTemplatePDFModulesEnabled(t *testing.T) {
 	t.Parallel()
 

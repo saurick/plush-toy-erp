@@ -46,10 +46,11 @@ print_help() {
   34) customer-config-release-readiness（聚合门禁 + 输入模板）
   35) customer-config-boundaries
   36) customer-package-lint
-  37) customer-config-runtime-manifest
-  38) customer-import-tooling
-  39) test-data-isolation-boundary
-  40) trial-simulated-data
+  37) customer-package-preview-boundary
+  38) customer-config-runtime-manifest
+  39) customer-import-tooling
+  40) test-data-isolation-boundary
+  41) trial-simulated-data
   41) operational-fact-simulated-closure
   42) mobile-workflow-simulated-closure
   43) mobile-workflow-runtime-browser-smoke
@@ -328,6 +329,11 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/customer-package-lint.test.mjs" ]; then
   echo "[qa:strict] 运行客户配置包结构检查测试"
   node --test "$ROOT_DIR/scripts/qa/customer-package-lint.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/customer-package-preview-boundary.test.mjs" ]; then
+  echo "[qa:strict] 运行客户配置包 preview-only 边界测试"
+  node --test "$ROOT_DIR/scripts/qa/customer-package-preview-boundary.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" ]; then

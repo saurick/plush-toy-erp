@@ -57,6 +57,10 @@ function buildDraftSearchParams(options = {}) {
   if (options.draftMode === PRINT_WORKSPACE_DRAFT_MODE.FRESH) {
     searchParams.set('draft', PRINT_WORKSPACE_DRAFT_MODE.FRESH)
   }
+  const normalizedCustomerKey = String(options.customerKey || '').trim()
+  if (normalizedCustomerKey) {
+    searchParams.set('customer_key', normalizedCustomerKey)
+  }
   const normalizedStateID = normalizeStateID(options.stateID)
   if (normalizedStateID) {
     searchParams.set(PRINT_WORKSPACE_STATE_QUERY_KEY, normalizedStateID)

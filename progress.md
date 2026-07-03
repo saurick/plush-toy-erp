@@ -53,3 +53,11 @@
 - 完成：用户已授权“提交推送所有代码”；剩余 `docs/reference/**` 旧 PDF 删除已纳入本轮 Git 收口范围，不再作为未提交现场遗留。
 - 下一步：如要继续客户试用级别，需要提供目标环境管理员 token 或受控登录凭据，补 authenticated `customer_config.get_effective_session` active revision 读回、客户配置激活 / rollback 证据和客户确认；本轮 Git 收口继续执行 pre-push 门禁和 `origin/main` 推送。
 - 阻塞/风险：2026-07-03 evidence 是 `internal-only`，未证明真实客户数据导入、客户最终签收、客户配置 active revision authenticated readback 或客户配置激活 / rollback。
+
+## 2026-07-03 PDF customer_key 与 preview-only 边界补丁
+
+- 完成：按外部补丁方向补齐 PDF `customer_key` 前端链路：`printPdf` 请求 payload 写入 `customer_key`，打印工作台 URL 携带 `customer_key`，采购订单、委外订单和 operational facts 加工合同业务打印入口使用 active effective session customer key；采购 / 加工合同工作台预热、在线预览和下载 PDF 均透传该 key，PDF 预览缓存 key 也纳入 customer key。
+- 完成：新增 `docs/product/流程编排运行时完成度台账.md`，登记 Workflow、ProcessRuntime、businessFlows、stateMachines、processPolicies、domain command 与 Fact 写入完成度；同步更新 `docs/product/README.md`、`docs/product/产品台账索引.md` 和 `docs/文档清单.md`。
+- 完成：新增 `scripts/qa/customer-package-preview-boundary.test.mjs`，锁住 yoyoosun 客户包 businessFlows / stateMachines / processPolicies 仍为 preview-only；同步接入 `scripts/qa/fast.sh`、`scripts/qa/strict.sh`、`scripts/README.md` 和 `scripts/qa/README.md`。
+- 下一步：如果后续将 businessFlows、stateMachines 或 processPolicies 从 preview-only 升级为 runtime loader / execute，必须另拆任务补 domain command、RBAC、幂等、审计、取消 / 冲正和 Fact 写入测试，并同步更新运行时完成度台账。
+- 阻塞/风险：本轮未改 schema、RBAC、Workflow / Fact usecase、客户配置激活或目标环境 release evidence；新增台账是查阅真源入口，不代表 preview-only 已进入 runtime。
