@@ -124,16 +124,16 @@ test('yoyoosun flow orchestration coverage includes required runtime processes a
   }
 })
 
-test('yoyoosun projection matrix separates runtime-enabled from planned field surfaces', () => {
-  const runtimeSurfaces = yoyoosunProjectionMatrix.fieldSurfaces.filter(
+test('yoyoosun projection matrix separates consumed and backend-allowed field surfaces', () => {
+  const consumedSurfaces = yoyoosunProjectionMatrix.fieldSurfaces.filter(
     (surface) => surface.status === 'runtime_enabled'
   )
-  const plannedSurfaces = yoyoosunProjectionMatrix.fieldSurfaces.filter(
-    (surface) => surface.status === 'planned'
+  const backendAllowedSurfaces = yoyoosunProjectionMatrix.fieldSurfaces.filter(
+    (surface) => surface.status === 'backend_runtime_allowed'
   )
 
-  assert.ok(runtimeSurfaces.length >= 3, 'runtime surfaces must stay explicit')
-  assert.ok(plannedSurfaces.length >= 5, 'planned projection gaps must remain visible')
+  assert.ok(consumedSurfaces.length >= 3, 'runtime consumed surfaces must stay explicit')
+  assert.ok(backendAllowedSurfaces.length >= 8, 'backend-allowed surfaces must stay visible')
   for (const surface of yoyoosunProjectionMatrix.fieldSurfaces) {
     assert.ok(surface.surfaceKey.endsWith('.default'))
     assert.ok(surface.fields.length > 0)
