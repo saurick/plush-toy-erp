@@ -62,6 +62,9 @@ export default function MobileTaskDetailScreen({
   const latestMobileActionRoleLabel = latestMobileAction
     ? getMobileRoleLabel(latestMobileAction.role_key || activeRoleKey)
     : roleLabel
+  const latestMobileActionLabel = latestMobileAction
+    ? resolveMobileActionDisplayLabel(latestMobileAction)
+    : ''
   const showRejected = supportsRejectedAction(activeRoleKey, selectedTask)
   const isUpdating = updatingID === selectedTask.id
   const isUrging = urgingID === selectedTask.id
@@ -261,9 +264,7 @@ export default function MobileTaskDetailScreen({
                 </div>
                 <div className="mt-2 break-words text-base text-slate-700">
                   {latestMobileAction
-                    ? `${latestMobileActionRoleLabel} 已执行 ${resolveMobileActionDisplayLabel(
-                        latestMobileAction
-                      )}${
+                    ? `${latestMobileActionRoleLabel} 已执行 ${latestMobileActionLabel}${
                         latestMobileAction.reason
                           ? `：${latestMobileAction.reason}`
                           : ''

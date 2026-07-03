@@ -773,6 +773,14 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     testFile: 'web/src/erp/utils/materialPurchaseContractEditor.test.mjs',
   },
   {
+    caseId: 'FL_material_purchase_totals__skip_merged_hidden_amount_cells',
+    title: '采购合同合计不统计被合并覆盖的隐藏采购金额单元格',
+    fieldKeys: ['purchaseAmount', 'mergedCellContent'],
+    scenarioKey: 'merge_clears_covered_cells',
+    layer: 'web',
+    testFile: 'web/src/erp/utils/materialPurchaseContractEditor.test.mjs',
+  },
+  {
     caseId:
       'FL_material_purchase_business_draft__does_not_fill_missing_business_fields_from_template_sample',
     title: '采购合同业务带值草稿不从模板样例兜底真实缺值',
@@ -815,19 +823,54 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
   },
   {
     caseId:
-      'FL_processing_contract_product_order_no__prefills_from_blank_source',
-    title: '加工合同空白明细从委外来源重建产品订单编号',
-    fieldKeys: ['productOrderNo'],
-    scenarioKey: 'source_prefill_rebuilds_from_blank',
+      'FL_processing_contract_business_draft__does_not_fill_missing_business_fields_from_template_sample',
+    title: '加工合同业务带值草稿不从模板样例兜底真实缺值',
+    fieldKeys: ['businessDraftFields'],
+    scenarioKey: 'business_draft_does_not_use_template_sample',
     layer: 'web',
     testFile: 'web/src/erp/data/processingContractTemplate.test.mjs',
   },
   {
     caseId:
-      'FL_processing_contract_business_draft__does_not_fill_missing_business_fields_from_template_sample',
-    title: '加工合同业务带值草稿不从模板样例兜底真实缺值',
-    fieldKeys: ['businessDraftFields'],
+      'FL_processing_contract_business_draft__does_not_create_blank_line_without_items',
+    title: '加工合同业务带值打印无明细时不补造空白加工行',
+    fieldKeys: ['businessDraftFields', 'productOrderNo'],
     scenarioKey: 'business_draft_does_not_use_template_sample',
+    layer: 'web',
+    testFile: 'web/src/erp/data/processingContractTemplate.test.mjs',
+  },
+  {
+    caseId:
+      'FL_processing_contract_fact_trace__uses_business_numbers_without_internal_ids',
+    title: '加工合同委外事实追溯使用业务来源号且不展示内部 ID',
+    fieldKeys: ['sourceNo', 'businessDraftFields'],
+    scenarioKey: 'print_business_draft_blocks_raw_id_fallback',
+    layer: 'web',
+    testFile: 'web/src/erp/data/processingContractTemplate.test.mjs',
+  },
+  {
+    caseId:
+      'FL_processing_contract_print_lines__filters_canceled_outsourcing_items',
+    title: '加工合同业务打印草稿过滤已取消委外明细',
+    fieldKeys: ['businessDraftFields', 'productNo', 'productNameColor'],
+    scenarioKey: 'source_snapshot_retained',
+    layer: 'web',
+    testFile: 'web/src/erp/data/processingContractTemplate.test.mjs',
+  },
+  {
+    caseId:
+      'FL_processing_contract_print_party_defaults__uses_customer_config_party_defaults_only',
+    title: '加工合同打印草稿只使用客户配置委托方默认值且不覆盖加工方快照',
+    fieldKeys: ['printPartyDefaults', 'supplierContactSnapshot'],
+    scenarioKey: 'print_party_defaults_do_not_override_supplier_snapshot',
+    layer: 'web',
+    testFile: 'web/src/erp/data/processingContractTemplate.test.mjs',
+  },
+  {
+    caseId: 'FL_processing_contract_totals__skip_merged_hidden_amount_cells',
+    title: '加工合同合计不统计被合并覆盖的隐藏金额单元格',
+    fieldKeys: ['processingAmount', 'mergedCellContent'],
+    scenarioKey: 'merge_clears_covered_cells',
     layer: 'web',
     testFile: 'web/src/erp/data/processingContractTemplate.test.mjs',
   },
@@ -859,6 +902,14 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     caseId: 'FL_processing_contract_editor__clears_covered_cell_stale_value',
     title: '加工合同合并选区后会清空被覆盖单元格',
     fieldKeys: ['productOrderNo', 'mergedCellContent'],
+    scenarioKey: 'merge_clears_covered_cells',
+    layer: 'web',
+    testFile: 'web/src/erp/utils/processingContractEditor.test.mjs',
+  },
+  {
+    caseId: 'FL_processing_contract_editor__clears_covered_amount_stale_value',
+    title: '加工合同合并金额列后不保留被覆盖行的旧手工金额',
+    fieldKeys: ['processingAmount', 'mergedCellContent'],
     scenarioKey: 'merge_clears_covered_cells',
     layer: 'web',
     testFile: 'web/src/erp/utils/processingContractEditor.test.mjs',
@@ -904,6 +955,24 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
       'FL_print_templates_contract__declares_field_requirements_and_pdf_module_guard',
     title: '正式打印模板声明字段合同和 PDF 模块门禁',
     fieldKeys: ['printTemplateContract'],
+    scenarioKey: 'print_template_contract_declared',
+    layer: 'web',
+    testFile: 'web/src/erp/config/printTemplates.test.mjs',
+  },
+  {
+    caseId:
+      'FL_print_templates_processing_preview__uses_processing_signature_and_totals',
+    title: '加工合同静态预览读取加工合同签字和合计字段',
+    fieldKeys: ['printTemplateContract', 'processingAmount', 'itemQuantity'],
+    scenarioKey: 'print_template_contract_declared',
+    layer: 'web',
+    testFile: 'web/src/erp/config/printTemplates.test.mjs',
+  },
+  {
+    caseId:
+      'FL_print_templates_output_zero__does_not_use_falsy_fallback_for_paper_values',
+    title: '打印纸面输出不使用 falsy fallback 吞掉显式 0 值',
+    fieldKeys: ['printTemplateContract', 'itemQuantity', 'itemAmount'],
     scenarioKey: 'print_template_contract_declared',
     layer: 'web',
     testFile: 'web/src/erp/config/printTemplates.test.mjs',

@@ -47,5 +47,9 @@
 - 完成：在用户授权后精确提交 P5 候选范围，提交 `c298a2a3ba0f13b0ce41a0fe82c9cf5623c4a2e5`；从干净临时 worktree 构建 `plush-toy-erp-server:yoyoosun-20260703-c298a2a3-amd64` 与 `plush-toy-erp-web:yoyoosun-20260703-c298a2a3-amd64`，镜像 ID 分别为 `sha256:55f2778c6a71ce10439abaa9e5b4a2f46c971f0f0999a8c28d0e45630304af1d`、`sha256:fe2237235a7585112b1f6041fa3f8b81d33fc5e4b25cfeff70c48667af3e0cbb`。
 - 完成：133 服务器已 `docker load` 新镜像，备份并更新 `/opt/plush-toy-erp/current/server/deploy/compose/prod/.env`、`compose.yml`、`migrate_online.sh` 和 migration 目录；真实库从 `20260612112337` 迁移到 `20260701152057`，`Pending Files=0`；业务容器已切到新镜像，`production-preflight --runtime` 和目标 smoke 通过。
 - 完成：新增 `deployments/yoyoosun/evidence/releases/2026-07-03/`，release evidence gate 通过，`release-evidence-status --json` 返回 `status=ready`、`gateReady=true`、`closeoutSummary.ready=true`；`multi-client-role-workflow-priority-audit --release-evidence-dir deployments/yoyoosun/evidence/releases/2026-07-03 --json` 返回 `releaseReady=true`。
-- 下一步：如要继续客户试用级别，需要提供目标环境管理员 token 或受控登录凭据，补 authenticated `customer_config.get_effective_session` active revision 读回、客户配置激活 / rollback 证据和客户确认；如要代码同步远端 Git，还需要用户另行授权 push。
-- 阻塞/风险：2026-07-03 evidence 是 `internal-only`，未证明真实客户数据导入、客户最终签收、客户配置 active revision authenticated readback 或客户配置激活 / rollback。主工作区仍有未纳入本轮提交的 `docs/reference/**` PDF 删除，未处理且未提交。
+- 完成：提交推送收口前发现 pre-push 门禁卡在采购入库事实页 action projection 静态守卫；`workflow-ui-action-boundary` 改为锁定 Prettier 实际落盘的 `hasActionPermission` / `canPost` 主路径 token，仍要求页面直接消费共享 action projection helper，不放宽为页面私有 wrapper 或旁路判断。
+- 完成：第二次 pre-push 进入 `qa:full` 后发现移动端任务详情“最近动态”中文动作标签门禁被 JSX 换行影响；`MobileTaskDetailScreen` 改为先通过 `resolveMobileActionDisplayLabel(latestMobileAction)` 派生 `latestMobileActionLabel`，再渲染最近动态，避免 raw action key 或 raw action label 进入用户可见文案。
+- 完成：第三次 pre-push 进入 `qa:full` 后发现字段链路 FL case 与 `FIELD_LINKAGE_CASE_CATALOG` 登记漂移；补登记采购 / 加工合计隐藏金额、加工业务草稿、事实追溯、取消明细过滤、打印默认方、打印预览和 0 值输出相关真实 FL case，并移除已不存在的加工合同空白产品订单号旧 case，未改业务实现。
+- 完成：用户已授权“提交推送所有代码”；剩余 `docs/reference/**` 旧 PDF 删除已纳入本轮 Git 收口范围，不再作为未提交现场遗留。
+- 下一步：如要继续客户试用级别，需要提供目标环境管理员 token 或受控登录凭据，补 authenticated `customer_config.get_effective_session` active revision 读回、客户配置激活 / rollback 证据和客户确认；本轮 Git 收口继续执行 pre-push 门禁和 `origin/main` 推送。
+- 阻塞/风险：2026-07-03 evidence 是 `internal-only`，未证明真实客户数据导入、客户最终签收、客户配置 active revision authenticated readback 或客户配置激活 / rollback。
