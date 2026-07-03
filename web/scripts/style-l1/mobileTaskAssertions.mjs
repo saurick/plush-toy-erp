@@ -115,6 +115,43 @@ export function createMobileTaskAssertions(deps) {
     )
   }
 
+  async function assertMobileTaskVisibleTextNoTechnicalFields(
+    page,
+    { scenarioName, scope = '页面' } = {}
+  ) {
+    const metrics = await page.evaluate(() => {
+      const text = document.body?.innerText?.replace(/\s+/g, ' ').trim() || ''
+      const patterns = [
+        'owner_role_key',
+        'task_status_key',
+        'task_group',
+        'source_type',
+        'source_id',
+        'assignee_id',
+        'payload',
+        'business_status_key',
+        'unknown_task_group',
+        'unknown_source',
+        'project-orders',
+        'boss-review',
+        'TASK-\\d+',
+        '#\\d+',
+      ]
+      const matches = patterns.filter((pattern) =>
+        new RegExp(pattern, 'iu').test(text)
+      )
+      return {
+        matches,
+        sample: text.slice(0, 1200),
+      }
+    })
+    assert.equal(
+      metrics.matches.length,
+      0,
+      `${scenarioName} ${scope} 泄漏技术字段或内部编号 fallback: ${JSON.stringify(metrics)}`
+    )
+  }
+
   async function assertMobileTaskProgressSummary(page, { scenarioName }) {
     const expectedToneByTestID = {
       'mobile-role-progress-pending': 'pending',
@@ -971,12 +1008,21 @@ export function createMobileTaskAssertions(deps) {
       .locator('.mobile-role-tasks-page--detail')
       .waitFor({ state: 'visible', timeout: 10_000 })
     await expectText(page, '任务关键信息')
-    await expectText(page, '关联单据')
+    await expectText(page, '关联来源')
     await expectText(page, '现场留痕')
+    await expectText(page, '可选')
     await expectText(page, '最近动态')
     await page
       .getByTestId('mobile-role-evidence-input')
       .fill('STYLE-L1-EVIDENCE-001\nhttps://example.invalid/style-l1')
+    await page.getByRole('button', { name: '完成' }).click()
+    await expectText(page, '完成反馈')
+    await expectText(page, '必填')
+    await expectText(page, '完成说明（可选）')
+    await assertMobileTaskVisibleTextNoTechnicalFields(page, {
+      scenarioName,
+      scope: '本岗位详情',
+    })
     await assertThemeReadable(page, {
       scenarioName,
       selector: '.mobile-role-detail-header',
@@ -1118,7 +1164,7 @@ export function createMobileTaskAssertions(deps) {
         metrics.relatedItem.interactiveCount === 0 &&
         !metrics.relatedItem.text.includes('>') &&
         metrics.relatedItem.scrollWidth <= metrics.relatedItem.clientWidth + 1,
-      `${scenarioName} 关联单据没有真实跳转时不应呈现可点击箭头或溢出: ${JSON.stringify(metrics)}`
+      `${scenarioName} 关联来源没有真实跳转时不应呈现可点击箭头或溢出: ${JSON.stringify(metrics)}`
     )
 
     await page.getByRole('button', { name: /阻塞/u }).click()
@@ -1147,6 +1193,10 @@ export function createMobileTaskAssertions(deps) {
       .locator('.mobile-role-tasks-page--detail')
       .waitFor({ state: 'visible', timeout: 10_000 })
     await expectText(page, '当前岗位可查看并催办')
+    await assertMobileTaskVisibleTextNoTechnicalFields(page, {
+      scenarioName,
+      scope: '跨岗位详情',
+    })
 
     const crossRoleMetrics = await page.evaluate(() => {
       const guidance = document.querySelector(

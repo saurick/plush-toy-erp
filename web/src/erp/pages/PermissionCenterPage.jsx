@@ -33,6 +33,7 @@ import {
   optionalMainlandMobilePhoneRule,
 } from '../utils/contactValidation.mjs'
 import { getPermissionModuleTitle } from '../utils/permissionModuleLabels.mjs'
+import { getRoleDisplayName } from '../utils/roleKeys.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -72,10 +73,23 @@ function getRoleKey(role = {}) {
   return String(role?.role_key || role?.key || '').trim()
 }
 
+function getRoleVisibleName(role = {}) {
+  const name = String(role?.name || '').trim()
+  if (name) {
+    return name
+  }
+  return getRoleDisplayName(getRoleKey(role), '已配置角色')
+}
+
 function getPermissionKey(permission = {}) {
   return String(
     permission?.permission_key || permission?.key || permission || ''
   ).trim()
+}
+
+function getPermissionVisibleName(permission = {}) {
+  const name = String(permission?.name || '').trim()
+  return name || '未登记权限'
 }
 
 function roleKeysForAdmin(admin = {}) {
@@ -97,7 +111,7 @@ function buildRoleOptions(roles = []) {
   return roles
     .filter((role) => getRoleKey(role) && role.disabled !== true)
     .map((role) => ({
-      label: role.name || getRoleKey(role),
+      label: getRoleVisibleName(role),
       value: getRoleKey(role),
     }))
 }
@@ -117,7 +131,7 @@ function buildPermissionGroups(permissions = []) {
     }
     group.items.push({
       key: permissionKey,
-      label: permission.name || permissionKey,
+      label: getPermissionVisibleName(permission),
       description: permission.description || '',
     })
     groups.set(moduleKey, group)
@@ -138,7 +152,7 @@ function buildPermissionDetailMap(permissions = []) {
     }
     detailMap.set(permissionKey, {
       key: permissionKey,
-      label: permission.name || permissionKey,
+      label: getPermissionVisibleName(permission),
       module: String(permission.module || 'other').trim() || 'other',
       action: String(permission.action || '').trim(),
       resource: String(permission.resource || '').trim(),
@@ -830,7 +844,7 @@ export default function PermissionCenterPage() {
         return (
           <Space wrap size={[4, 6]}>
             {assignedRoles.map((role) => (
-              <Tag key={getRoleKey(role)}>{role.name || getRoleKey(role)}</Tag>
+              <Tag key={getRoleKey(role)}>{getRoleVisibleName(role)}</Tag>
             ))}
           </Space>
         )
@@ -967,8 +981,10 @@ export default function PermissionCenterPage() {
                   onClick={() => selectRoleTemplate(roleKey)}
                 >
                   <span className="erp-role-template-card__main">
-                    <Text strong>{role.name || roleKey}</Text>
-                    <Text type="secondary">{roleKey}</Text>
+                    <Text strong>{getRoleVisibleName(role)}</Text>
+                    <Text type="secondary">
+                      {role.disabled ? '已停用角色模板' : '角色模板'}
+                    </Text>
                   </span>
                   <span className="erp-role-template-card__meta">
                     <Tag color={role.disabled ? 'default' : 'green'}>
@@ -994,9 +1010,8 @@ export default function PermissionCenterPage() {
                 <div>
                   <Space size={8} wrap>
                     <Title level={5} style={{ margin: 0 }}>
-                      {selectedRole.name || selectedRoleKey}
+                      {getRoleVisibleName(selectedRole)}
                     </Title>
-                    <Tag>{selectedRoleKey}</Tag>
                     {selectedRole.builtin ? (
                       <Tag color="cyan">内置模板</Tag>
                     ) : (
@@ -1238,8 +1253,7 @@ export default function PermissionCenterPage() {
               type="secondary"
               style={{ marginTop: 8, marginBottom: 0 }}
             >
-              当前后台使用标准
-              RBAC：用户绑定角色，角色拥有权限码；菜单、岗位任务端入口和接口守卫统一消费权限码。
+              当前后台使用角色权限模型：用户绑定角色，角色拥有权限码；菜单、岗位任务端入口和后台接口统一按权限码控制。
             </Paragraph>
           </div>
           <Tag color="blue">默认先维护角色模板</Tag>

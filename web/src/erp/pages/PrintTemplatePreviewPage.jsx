@@ -26,12 +26,12 @@ export default function PrintTemplatePreviewPage() {
       <Space direction="vertical" size={16} style={{ width: '100%' }}>
         <div>
           <Text className="erp-print-center-detail-eyebrow">
-            {supportsWorkspace ? '兼容入口' : '模板预览'}
+            {supportsWorkspace ? '模板预览入口' : '模板预览'}
           </Text>
           <Title level={3}>{template.title}</Title>
           <Paragraph>
             {supportsWorkspace
-              ? '当前 `/erp/print-center/:templateKey` 作为兼容入口，保留旧路径，但主动作已经切到新的独立编辑打印窗口。'
+              ? '当前 `/erp/print-center/:templateKey` 作为打印中心预览入口，主编辑打印动作进入独立编辑打印窗口。'
               : '当前模板仍保留静态预览，用来先核字段口径、版式和样例数据。'}
           </Paragraph>
         </div>
@@ -46,16 +46,19 @@ export default function PrintTemplatePreviewPage() {
         </div>
 
         {supportsWorkspace ? (
-          <Space wrap>
-            <Button
-              type="primary"
-              icon={<PrinterOutlined />}
-              onClick={() => openPrintWorkspaceWindow(template.key)}
-            >
-              打开可编辑打印窗口
-            </Button>
-            <Link to="/erp/print-center">返回打印中心</Link>
-          </Space>
+          <>
+            <Space wrap>
+              <Button
+                type="primary"
+                icon={<PrinterOutlined />}
+                onClick={() => openPrintWorkspaceWindow(template.key)}
+              >
+                打开可编辑打印窗口
+              </Button>
+              <Link to="/erp/print-center">返回打印中心</Link>
+            </Space>
+            <PrintTemplateRenderer template={template} />
+          </>
         ) : (
           <>
             <div className="rounded-3xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm leading-6 text-amber-50">

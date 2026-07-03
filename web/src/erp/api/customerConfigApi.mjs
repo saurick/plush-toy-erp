@@ -41,6 +41,14 @@ export async function activateCustomerConfig(params = {}) {
   return dataOf(result)?.revision || null
 }
 
+export async function rollbackCustomerConfig(params = {}) {
+  const result = await customerConfigRpc.call(
+    'rollback_customer_config',
+    params
+  )
+  return dataOf(result)?.revision || null
+}
+
 export async function startSalesOrderAcceptanceProcess(params = {}) {
   const result = await customerConfigRpc.call(
     'start_sales_order_acceptance_process',
@@ -88,6 +96,7 @@ export async function submitSalesOrderAcceptanceProcess(params = {}) {
     throw new Error('接单流程启动结果缺少流程节点')
   }
   const executeData = await executeSalesOrderAcceptanceSubmit({
+    customer_key: startPayload.customer_key,
     process_instance_id: processInstance.id,
     process_node_instance_id: startedNode.id,
     expected_version: startedNode.version,

@@ -1,3 +1,8 @@
+import {
+  formatWorkflowRelatedDocumentRef,
+  resolveReadableWorkflowSourceNo,
+} from './workflowDocumentRefs.mjs'
+
 export const ACCESSORIES_PURCHASE_MODULE_KEY = 'accessories-purchase'
 export const PROCESSING_CONTRACTS_MODULE_KEY = 'processing-contracts'
 export const INBOUND_MODULE_KEY = 'inbound'
@@ -28,6 +33,20 @@ const DEFAULT_PRIORITY = 2
 const HIGH_PRIORITY = 3
 const URGENT_PRIORITY = 4
 const DAY_SECONDS = 24 * 60 * 60
+const QUALITY_RESULT_LABELS = Object.freeze({
+  pass: '合格',
+  passed: '合格',
+  qualified: '合格',
+  approved: '合格',
+  release: '放行',
+  released: '放行',
+  fail: '不合格',
+  failed: '不合格',
+  reject: '不合格',
+  rejected: '不合格',
+  rework: '返工',
+  pending: '待检',
+})
 
 function payloadOf(record = {}) {
   return record.payload && typeof record.payload === 'object'
@@ -38,6 +57,12 @@ function payloadOf(record = {}) {
 function normalizeText(value) {
   const text = String(value ?? '').trim()
   return text || ''
+}
+
+function qualityResultLabel(value) {
+  const key = normalizeText(value)
+  if (!key) return ''
+  return QUALITY_RESULT_LABELS[key] || '质检已记录'
 }
 
 function numberOrNull(value) {
@@ -65,7 +90,10 @@ function parseBusinessDateEndSecond(value) {
 
 function taskCode(prefix, record = {}, options = {}) {
   const stableID =
-    normalizeText(record.id) || normalizeText(record.document_no) || 'unknown'
+    normalizeText(record.document_no) ||
+    normalizeText(record.source_no) ||
+    normalizeText(record.title) ||
+    'no-readable-ref'
   return `${prefix}-${stableID}-${Number(options.nowMs ?? Date.now())}`
 }
 
@@ -75,12 +103,7 @@ export function resolvePayableSourceType(record = {}) {
 }
 
 export function resolvePayableSourceNo(record = {}) {
-  return (
-    normalizeText(record.document_no) ||
-    normalizeText(record.source_no) ||
-    normalizeText(record.title) ||
-    normalizeText(record.id)
-  )
+  return resolveReadableWorkflowSourceNo(record)
 }
 
 function containsOutsourceKeyword(record = {}) {
@@ -213,6 +236,11 @@ export function resolvePayablePriority(record = {}, options = {}) {
 function buildPayableRelatedDocuments(record = {}, options = {}) {
   const payableType = options.payableType || resolvePayableType(record)
   const sourceNo = resolvePayableSourceNo(record)
+  const sourceRef =
+    sourceNo ||
+    normalizeText(record.document_no) ||
+    normalizeText(record.source_no) ||
+    normalizeText(record.title)
   const payload = payloadOf(record)
   const quantityText =
     record.quantity !== undefined && record.quantity !== null
@@ -224,16 +252,24 @@ function buildPayableRelatedDocuments(record = {}, options = {}) {
     payload.payable_amount ??
     payload.amount_with_tax
   return [
-    sourceNo && payableType === 'purchase' ? `采购单：${sourceNo}` : '',
-    sourceNo && payableType === 'outsource' ? `加工合同：${sourceNo}` : '',
-    sourceNo &&
+    sourceRef && payableType === 'purchase'
+      ? formatWorkflowRelatedDocumentRef('采购单', record, sourceRef)
+      : '',
+    sourceRef && payableType === 'outsource'
+      ? formatWorkflowRelatedDocumentRef('加工合同', record, sourceRef)
+      : '',
+    sourceRef &&
     normalizeText(record.module_key || record.source_type) ===
       INBOUND_MODULE_KEY
-      ? `入库记录：${sourceNo}`
+      ? formatWorkflowRelatedDocumentRef('入库记录', record, sourceRef)
       : '',
-    record.source_no ? `来源单号：${record.source_no}` : '',
-    payload.iqc_result ? `IQC 结果：${payload.iqc_result}` : '',
-    payload.qc_result ? `检验结果：${payload.qc_result}` : '',
+    formatWorkflowRelatedDocumentRef('来源单号', record, record.source_no),
+    payload.iqc_result
+      ? `IQC 结果：${qualityResultLabel(payload.iqc_result)}`
+      : '',
+    payload.qc_result
+      ? `检验结果：${qualityResultLabel(payload.qc_result)}`
+      : '',
     record.supplier_name || payload.supplier_name
       ? `供应商 / 加工厂：${record.supplier_name || payload.supplier_name}`
       : '',

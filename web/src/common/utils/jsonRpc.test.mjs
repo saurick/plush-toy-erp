@@ -20,8 +20,10 @@ function loadJsonRpcModule({ token = 'stored-token' } = {}) {
       this.cause = extra.cause
     }
 
-    static fromHttp(status) {
-      return new RpcError(`HTTP error ${status}`, { code: status })
+    static fromHttp(status, json) {
+      return new RpcError(json?.message || `HTTP error ${status}`, {
+        code: json?.code ?? status,
+      })
     }
 
     static fromKratos(json) {
@@ -57,6 +59,10 @@ function loadJsonRpcModule({ token = 'stored-token' } = {}) {
     .replace(
       /import\s+\{\s*isAuthFailureCode\s*\}\s+from\s+["']@\/common\/consts\/errorCodes["']\s*/u,
       'const { isAuthFailureCode } = __errorCodes__\n'
+    )
+    .replace(
+      /import\s+\{\s*getUserFacingErrorMessage\s*\}\s+from\s+["']@\/common\/utils\/errorMessage["']\s*/u,
+      'const { getUserFacingErrorMessage } = __errorMessage__\n'
     )
     .replace(/export class JsonRpc/u, 'class JsonRpc')
     .replace(/export function isRpcAbortError/u, 'function isRpcAbortError')
@@ -107,7 +113,15 @@ function loadJsonRpcModule({ token = 'stored-token' } = {}) {
     },
     __errorCodes__: {
       isAuthFailureCode(code) {
-        return Number(code) === 10005
+        return [10005, 40302, 10006].includes(Number(code))
+      },
+    },
+    __errorMessage__: {
+      getUserFacingErrorMessage(err, fallback) {
+        if ([10005, 40302, 10006].includes(Number(err?.code))) {
+          return '登录已过期，请重新登录'
+        }
+        return fallback
       },
     },
   }
@@ -211,4 +225,79 @@ test('jsonRpc: 默认认证调用仍会处理登录态失效', async () => {
   assert.deepEqual(harness.logoutCalls, ['admin'])
   assert.equal(harness.events.length, 1)
   assert.equal(harness.events[0].loginPath, '/admin-login')
+  assert.equal(harness.events[0].message, '登录已过期，请重新登录')
+  assert.notEqual(harness.events[0].message, 'expired')
+})
+
+test('jsonRpc: HTTP 鉴权失败响应触发全局重新登录弹窗并脱敏', async () => {
+  const harness = loadJsonRpcModule()
+  harness.setFetch(async () => ({
+    ok: false,
+    status: 401,
+    async json() {
+      return {
+        code: 40302,
+        message: 'token expired',
+      }
+    },
+  }))
+  const rpc = new harness.JsonRpc({ url: 'business', authScope: 'admin' })
+
+  await assert.rejects(() => rpc.call('list'), {
+    name: 'Error',
+    code: 40302,
+  })
+  assert.deepEqual(harness.logoutCalls, ['admin'])
+  assert.equal(harness.events.length, 1)
+  assert.equal(harness.events[0].loginPath, '/admin-login')
+  assert.equal(harness.events[0].message, '登录已过期，请重新登录')
+  assert.notEqual(harness.events[0].message, 'token expired')
+})
+
+test('jsonRpc: HTTP 权限不足不触发重新登录弹窗', async () => {
+  const harness = loadJsonRpcModule()
+  harness.setFetch(async () => ({
+    ok: false,
+    status: 403,
+    async json() {
+      return {
+        code: 40304,
+        message: 'permission denied',
+      }
+    },
+  }))
+  const rpc = new harness.JsonRpc({ url: 'business', authScope: 'admin' })
+
+  await assert.rejects(() => rpc.call('list'), {
+    name: 'Error',
+    code: 40304,
+  })
+  assert.deepEqual(harness.logoutCalls, [])
+  assert.deepEqual(harness.events, [])
+})
+
+test('jsonRpc: withAuth=false 的 HTTP 鉴权失败不触发重新登录弹窗', async () => {
+  const harness = loadJsonRpcModule()
+  harness.setFetch(async () => ({
+    ok: false,
+    status: 401,
+    async json() {
+      return {
+        code: 40302,
+        message: 'token expired',
+      }
+    },
+  }))
+  const rpc = new harness.JsonRpc({
+    url: 'auth',
+    authScope: 'admin',
+    withAuth: false,
+  })
+
+  await assert.rejects(() => rpc.call('capabilities'), {
+    name: 'Error',
+    code: 40302,
+  })
+  assert.deepEqual(harness.logoutCalls, [])
+  assert.deepEqual(harness.events, [])
 })

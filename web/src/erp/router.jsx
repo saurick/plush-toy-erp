@@ -25,9 +25,11 @@ import {
   getEntryConfig,
   getLastEntryTarget,
   hasDesktopEntryAccess,
+  isDesktopEntryEnabled,
   parseMobileRoleFromPath,
   resolveDefaultEntryTarget,
   resolveMobileTasksPath,
+  shouldUseRememberedDesktopEntry,
 } from './config/entryConfig.mjs'
 import { getAllowedMobileRoleKeys } from './utils/mobileRolePermissions.mjs'
 import { canOpenPrintWorkspaceFromWindowState } from './utils/printWorkspace.js'
@@ -113,7 +115,10 @@ function RootEntryRedirect() {
 
   const entryConfig = getEntryConfig()
   const target = resolveDefaultEntryTarget({ config: entryConfig })
-  if (target === ENTRY_TARGET.DESKTOP && hasDesktopEntryAccess(admin)) {
+  if (
+    target === ENTRY_TARGET.DESKTOP &&
+    hasDesktopEntryAccess(admin, entryConfig)
+  ) {
     return <Navigate to="/erp/dashboard" replace />
   }
 
@@ -218,6 +223,11 @@ function DesktopShellRoute() {
     return <Navigate to={mobileEntryPath || '/entry'} replace />
   }
 
+  if (adminProfile && !isDesktopEntryEnabled(entryConfig)) {
+    const mobileEntryPath = resolveMobileEntryPath(adminProfile, entryConfig)
+    return <Navigate to={mobileEntryPath || '/entry'} replace />
+  }
+
   return (
     <AuthGuard requireAdmin>
       <ERPLayout />
@@ -229,6 +239,7 @@ function MobileShellRoute() {
   const location = useLocation()
   const adminProfile = getStoredAdminProfile()
   const lastEntryTarget = getLastEntryTarget()
+  const entryConfig = getEntryConfig()
   const currentPath = buildLocationPath(location)
 
   useLayoutEffect(() => {
@@ -237,7 +248,9 @@ function MobileShellRoute() {
     }
   }, [adminProfile, currentPath, location.pathname])
 
-  if (adminProfile && lastEntryTarget === ENTRY_TARGET.DESKTOP) {
+  if (
+    shouldUseRememberedDesktopEntry(adminProfile, lastEntryTarget, entryConfig)
+  ) {
     return <Navigate to="/erp/dashboard" replace />
   }
 
@@ -280,7 +293,6 @@ export default function ERPRouter() {
           <Route path={DEV_TESTING_ROUTE} element={<DevTestingPage />} />
         ) : null}
         <Route path="/" element={<RootEntryRedirect />} />
-        <Route path="/login" element={<Navigate to="/admin-login" replace />} />
         <Route path="/admin-login" element={<AdminLoginPage />} />
         <Route
           path="/entry"
@@ -290,29 +302,6 @@ export default function ERPRouter() {
             </AuthGuard>
           }
         />
-
-        <Route
-          path="/admin-accounts"
-          element={<Navigate to="/erp/system/permissions" replace />}
-        />
-        <Route
-          path="/admin-users"
-          element={<Navigate to="/erp/system/permissions" replace />}
-        />
-
-        <Route
-          path="/admin-menu"
-          element={<Navigate to="/erp/dashboard" replace />}
-        />
-        <Route
-          path="/admin-guide"
-          element={<Navigate to="/erp/dashboard" replace />}
-        />
-        <Route
-          path="/dashboard"
-          element={<Navigate to="/erp/dashboard" replace />}
-        />
-
         <Route path="/erp" element={<DesktopShellRoute />}>
           <Route index element={<DesktopEntryRedirect />} />
           <Route
@@ -419,18 +408,6 @@ export default function ERPRouter() {
             path="finance/invoices"
             element={<V1OperationalFactPage moduleKey="invoices" />}
           />
-          <Route
-            path="operations/facts"
-            element={<Navigate to="/erp/business-dashboard" replace />}
-          />
-          <Route
-            path="flows/overview"
-            element={<Navigate to="/erp/dashboard" replace />}
-          />
-          <Route
-            path="help-center"
-            element={<Navigate to="/erp/dashboard" replace />}
-          />
           <Route path="print-center" element={<PrintCenterPage />} />
           <Route
             path="print-center/:templateKey"
@@ -438,34 +415,6 @@ export default function ERPRouter() {
           />
           <Route path="system/permissions" element={<PermissionCenterPage />} />
           <Route path="system/audit-logs" element={<AuditLogsPage />} />
-          <Route
-            path="mobile-workbenches"
-            element={<Navigate to="/erp/dashboard" replace />}
-          />
-          <Route
-            path="roles/:roleKey"
-            element={<Navigate to="/erp/dashboard" replace />}
-          />
-          <Route
-            path="source-readiness"
-            element={<Navigate to="/erp/dashboard" replace />}
-          />
-          <Route
-            path="docs/*"
-            element={<Navigate to="/erp/dashboard" replace />}
-          />
-          <Route
-            path="qa/*"
-            element={<Navigate to="/erp/dashboard" replace />}
-          />
-          <Route
-            path="changes/current"
-            element={<Navigate to="/erp/dashboard" replace />}
-          />
-          <Route
-            path="*"
-            element={<Navigate to="/erp/business-dashboard" replace />}
-          />
         </Route>
 
         <Route

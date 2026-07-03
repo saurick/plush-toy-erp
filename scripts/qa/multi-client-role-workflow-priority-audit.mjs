@@ -482,7 +482,7 @@ const REFERENCE_COVERAGE_REQUIREMENTS = [
     checkIds: ["workflow-complete-action-process-runtime-completion"],
     releaseActionIds: [],
     notProven: [
-      "legacy update_task_status automatically calls ProcessRuntime completion",
+      "removed raw workflow status API is available to trigger ProcessRuntime completion",
       "process runner scans definitions or creates linked tasks beyond the just-activated adjacent human_task / approval node",
       "target environment exercised returnTo branches",
       "domain_command nodes execute domain usecases",
@@ -913,7 +913,7 @@ const IMPLEMENTATION_PHASES = [
     ],
     forbiddenScope: [
       "不引入后台 scheduler 或自由表达式",
-      "不让旧 update_task_status 自动触发 ProcessRuntime",
+      "不恢复 raw workflow status API 自动触发 ProcessRuntime",
     ],
     executionContract: {
       allowedPaths: [
@@ -3160,7 +3160,6 @@ function collectChecks() {
           "workflowMethodRequiresEnabledModule",
           "workflowModuleKeyTasks",
           "create_task",
-          "update_task_status",
           "complete_task_action",
           "block_task_action",
           "reject_task_action",
@@ -3639,7 +3638,7 @@ function collectChecks() {
         ]) &&
         sourceContains("server/internal/data/process_runtime_repo_test.go", [
           "TestProcessRuntimeRepoCreateAndRead",
-          "TestProcessRuntimeRepoRejectsDuplicateIdempotency",
+          "TestProcessRuntimeRepoReturnsExistingProcessForSameIdempotency",
         ]) &&
         sourceContains(priorityDoc, [
           "ProcessInstance / ProcessNodeInstance 最小运行时",
@@ -3815,7 +3814,7 @@ function collectChecks() {
           "TestProcessRuntimeUsecaseStartProcessInstanceActivatesFirstWaitingApprovalNode",
           "TestProcessRuntimeUsecaseStartProcessInstanceDoesNotCreateTaskForDomainCommand",
           "TestProcessRuntimeUsecaseStartProcessInstanceRejectsSettledProcess",
-          "TestProcessRuntimeUsecaseStartProcessInstanceRejectsNonWaitingFirstNode",
+          "TestProcessRuntimeUsecaseStartProcessInstanceRejectsBlockedFirstNode",
           "expected first waiting node activation",
           "domain command start must not create workflow task",
         ]) &&
@@ -3895,15 +3894,15 @@ function collectChecks() {
           "CompleteLinkedWorkflowTask",
           "ProcessLinkedWorkflowTaskCompletion",
         ]) &&
-        sourceContains("server/internal/service/jsonrpc_workflow_test.go", [
-          "TestJsonrpcDispatcher_WorkflowCompleteTaskActionCompletesLinkedProcessNode",
-          "TestJsonrpcDispatcher_WorkflowUpdateTaskStatusDoesNotAutoCompleteLinkedProcessNode",
-          "legacy update_task_status must not auto-complete linked process node",
-        ]) &&
-        sourceContains(priorityDoc, [
-          "`complete_task_action` 受控触发 linked 节点完成",
-          "旧 `update_task_status` 兼容路径不自动触发",
-        ]),
+	        sourceContains("server/internal/service/jsonrpc_workflow_test.go", [
+	          "TestJsonrpcDispatcher_WorkflowCompleteTaskActionCompletesLinkedProcessNode",
+	          "TestJsonrpcDispatcher_WorkflowUpdateTaskStatusRemoved",
+	          "expected update_task_status removed as unknown method",
+	        ]) &&
+	        sourceContains(priorityDoc, [
+	          "`complete_task_action` 受控触发 linked 节点完成",
+	          "`update_task_status` 已退出运行时",
+	        ]),
       evidence: [
         "server/internal/service/jsonrpc_dispatch.go",
         "server/internal/service/jsonrpc.go",
@@ -4782,10 +4781,10 @@ function collectChecks() {
           "shipment_result",
         ]) &&
         sourceContains("server/internal/service/jsonrpc_workflow_test.go", [
-          "TestJsonrpcDispatcher_WorkflowUpdateTaskStatusTriggersShipmentReleaseBusinessState",
-          "shipment release JSON-RPC update must not create downstream tasks",
-          "shipment release JSON-RPC update must not derive receivable task",
-          "list_tasks refresh path must not include finance task after shipment release done",
+          "TestJsonrpcDispatcher_WorkflowUpdateTaskStatusRemoved",
+          "expected update_task_status removed as unknown method",
+          "expected complete_task_action to write done status",
+          "complete_task_action",
         ]) &&
         sourceContains(priorityDoc, [
           "成品质检 -> 财务放行 -> 仓库出货 -> 应收线索",
@@ -5149,8 +5148,8 @@ function collectChecks() {
       description: "engineering 角色具备岗位入口、移动端权限映射、seed/RBAC 和客户配置投影",
       pass:
         sourceContains("web/src/erp/config/appRegistry.mjs", [
-          "mobile-engineering",
-          "5194",
+          "roleKey: 'engineering'",
+          "工程岗位任务端",
           "engineering",
         ]) &&
         sourceContains("web/src/erp/config/entryConfig.test.mjs", [
@@ -5299,7 +5298,7 @@ function collectChecks() {
         ]) &&
         sourceContains("web/src/erp/config/devCustomerConfig.mjs", [
           "moduleStateCatalogCount",
-          "moduleStates 只允许 catalog 模块和 enabled / read_only / disabled",
+          "模块状态只允许登记模块和启用 / 只读 / 关闭；非启用必须写原因。",
           "buildPrintTemplateFieldSummary",
           "销售订单受理未接打印模板",
         ]) &&
@@ -5425,7 +5424,7 @@ function collectChecks() {
       id: "super-admin-break-glass-controlled-runtime",
       status: "ready",
       category: "workflow-rbac",
-      description: "super admin 默认不处理业务任务；显式 break-glass 需要原因、有效期和 runtime audit，且旧 update_task_status 不支持",
+      description: "super admin 默认不处理业务任务；显式 break-glass 需要原因、有效期和 runtime audit，raw update_task_status 已退出",
       pass:
         !sourceContains("server/internal/biz/workflow_metadata.go", [
           "admin.IsSuperAdmin && isShipmentReleaseTask",
@@ -5447,7 +5446,8 @@ function collectChecks() {
           "break_glass",
         ]) &&
         sourceContains("server/internal/service/jsonrpc_workflow_test.go", [
-          "TestJsonrpcDispatcher_WorkflowUpdateTaskStatusRejectsSuperAdminShipmentReleaseWithoutBusinessRole",
+          "TestJsonrpcDispatcher_WorkflowUpdateTaskStatusRemoved",
+          "expected update_task_status removed as unknown method",
           "super admin can urge but cannot handle business task without owner role",
           "TestJsonrpcDispatcher_WorkflowCompleteTaskActionAllowsAuditedSuperAdminBreakGlass",
           "TestJsonrpcDispatcher_WorkflowBreakGlassRejectsMissingOrInvalidScope",

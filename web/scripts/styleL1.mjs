@@ -559,6 +559,21 @@ async function runScenarioOnce(browser, scenario) {
     }, scenario.themeMode)
   }
 
+  const runtimeCustomerKey =
+    typeof scenario.customerKey === 'string' && scenario.customerKey.trim()
+      ? scenario.customerKey.trim()
+      : typeof scenario.effectiveSession?.customer?.key === 'string'
+        ? scenario.effectiveSession.customer.key.trim()
+        : ''
+  if (runtimeCustomerKey) {
+    await page.addInitScript((customerKey) => {
+      window.__PLUSH_ERP_CUSTOMER_CONFIG__ = {
+        ...(window.__PLUSH_ERP_CUSTOMER_CONFIG__ || {}),
+        customerKey,
+      }
+    }, runtimeCustomerKey)
+  }
+
   page.on('console', (message) => {
     if (message.type() === 'error') {
       const text = message.text()
@@ -3253,7 +3268,7 @@ async function assertAdminLoginSmsCodeErrorHintSpacing(page, { scenarioName }) {
 
 async function assertAppAlertDialogLayout(
   page,
-  { scenarioName, expectedMessage = '未登录' }
+  { scenarioName, expectedMessage = '请先登录' }
 ) {
   await page
     .locator('.app-alert-dialog')

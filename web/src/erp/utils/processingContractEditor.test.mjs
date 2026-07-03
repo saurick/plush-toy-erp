@@ -150,6 +150,35 @@ test('FL_processing_contract_editor__clears_covered_cell_stale_value processingC
   assert.equal(split.merges.length, 0)
 })
 
+test('FL_processing_contract_editor__clears_covered_amount_stale_value processingContractEditor: 合并金额列后不保留被覆盖行的旧手工金额', () => {
+  const merged = applyProcessingDetailCellMerge({
+    lines: [
+      {
+        quantity: '10',
+        unitPrice: '2',
+        amount: '20',
+      },
+      {
+        quantity: '5',
+        unitPrice: '3',
+        amount: '99',
+      },
+    ],
+    merges: [],
+    selection: {
+      rowStart: 0,
+      rowEnd: 1,
+      colStart: 10,
+      colEnd: 10,
+    },
+  })
+
+  assert.equal(merged.ok, true)
+  assert.equal(merged.lines[0].amount, '20')
+  assert.equal(merged.lines[1].amount, '15')
+  assert.notEqual(merged.lines[1].amount, '99')
+})
+
 test('processingContractEditor: 插删行会同步维护纵向合并块', () => {
   const inserted = insertProcessingContractLine({
     lines: sampleLines,

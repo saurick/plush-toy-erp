@@ -2,6 +2,11 @@ import {
   getWorkflowTaskDueStatus,
   isTerminalWorkflowTask,
 } from './workflowDashboardStats.mjs'
+import {
+  getWorkflowTaskReason as resolveWorkflowTaskReason,
+  getWorkflowTaskReasonLabel,
+} from './workflowTaskReason.mjs'
+import { getBusinessStatusLabel } from '../config/workflowStatus.mjs'
 import { hasActionPermission } from './masterDataOrderView.mjs'
 import { getRoleDisplayName } from './roleKeys.mjs'
 
@@ -21,6 +26,7 @@ export const TASK_BOARD_ROLE_OPTIONS = Object.freeze([
   { value: 'boss', label: '老板' },
   { value: 'sales', label: '业务' },
   { value: 'purchase', label: '采购' },
+  { value: 'engineering', label: '工程' },
   { value: 'production', label: '生产' },
   { value: 'warehouse', label: '仓库' },
   { value: 'finance', label: '财务' },
@@ -123,6 +129,22 @@ export function getWorkflowTaskOwnerRoleLabel(task = {}) {
   return getRoleDisplayName(ownerRoleKey, '责任岗位')
 }
 
+export function getWorkflowTaskBusinessStatusLabel(task = {}) {
+  const payload = payloadOf(task)
+  const explicitLabel = String(
+    task.business_status_label ||
+      payload.business_status_label ||
+      payload.business_status_name ||
+      payload.business_status_text ||
+      ''
+  ).trim()
+  if (explicitLabel) return explicitLabel
+
+  const businessStatusKey = String(task.business_status_key || '').trim()
+  if (!businessStatusKey) return '业务状态未记录'
+  return getBusinessStatusLabel(businessStatusKey)
+}
+
 export function getWorkflowTaskCodeLabel(task = {}) {
   return String(task.task_code || '').trim() || '任务已关联'
 }
@@ -165,7 +187,11 @@ export function getWorkflowTaskActionPermission(actionMode = '', task = {}) {
       ? 'workflow.task.approve'
       : 'workflow.task.complete'
   }
-  if (actionMode === 'block' || actionMode === 'urge') {
+  if (
+    actionMode === 'block' ||
+    actionMode === 'reject' ||
+    actionMode === 'urge'
+  ) {
     return 'workflow.task.update'
   }
   return ''
@@ -201,7 +227,7 @@ export function canRunWorkflowTaskAction(
 }
 
 export function getWorkflowTaskAllowedActionModes(admin = {}, task = {}) {
-  return ['complete', 'block', 'urge'].filter((actionMode) =>
+  return ['complete', 'block', 'reject', 'urge'].filter((actionMode) =>
     canRunWorkflowTaskAction(admin, task, actionMode)
   )
 }
@@ -229,19 +255,19 @@ export function getWorkflowTaskReadonlyReason(admin = {}, task = {}) {
 
 export function getWorkflowTaskStatusMeta(task = {}) {
   const key = getTaskStatusKey(task)
-  return TASK_STATUS_META[key] || { label: key || '未知', color: 'default' }
+  return (
+    TASK_STATUS_META[key] || {
+      label: key ? '未知状态' : '未知',
+      color: 'default',
+    }
+  )
 }
 
 export function getWorkflowTaskReason(task = {}) {
-  const payload = payloadOf(task)
-  return String(
-    task.blocked_reason ||
-      payload.blocked_reason ||
-      payload.rejected_reason ||
-      payload.business_status_reason ||
-      ''
-  ).trim()
+  return resolveWorkflowTaskReason(task)
 }
+
+export { getWorkflowTaskReasonLabel }
 
 export function getWorkflowTaskDueLabel(task = {}, nowMs = Date.now()) {
   const dueAt = Number(task.due_at || 0)
@@ -378,7 +404,7 @@ function taskMatchesKeyword(task = {}, keyword = '') {
     task.source_type,
     task.task_group,
     task.owner_role_key,
-    task.business_status_key,
+    getWorkflowTaskBusinessStatusLabel(task),
     task.blocked_reason,
     payload.record_title,
     payload.module_title,

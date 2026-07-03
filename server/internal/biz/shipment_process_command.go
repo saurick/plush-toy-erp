@@ -10,7 +10,6 @@ const (
 	ShipmentProcessCommandOutcomeFinanceReleased  = "shipment.finance_released"
 	shipmentProcessCommandBusinessRefType         = "shipment"
 	shipmentProcessCommandPayloadShipmentID       = "shipment_id"
-	shipmentProcessCommandPayloadLegacyID         = "id"
 	shipmentProcessCommandPayloadShipmentNo       = "shipment_no"
 	shipmentProcessCommandPayloadWarehouseID      = "warehouse_id"
 	shipmentProcessCommandPayloadOperatorID       = "operator_id"
@@ -128,13 +127,6 @@ func shipmentIDFromProcessCommandPayload(payload map[string]any) (int, error) {
 	}
 	if hasShipmentID {
 		return shipmentID, nil
-	}
-	legacyID, hasLegacyID, err := processCommandPositiveIntFromPayload(payload, shipmentProcessCommandPayloadLegacyID)
-	if err != nil {
-		return 0, err
-	}
-	if hasLegacyID {
-		return legacyID, nil
 	}
 	return 0, ErrBadParam
 }

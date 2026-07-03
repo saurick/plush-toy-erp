@@ -237,12 +237,50 @@ test('outsourceReturnFlow: due_at 使用 Unix 秒，缺编号字段不崩溃', (
     }),
     { nowMs: NOW_MS }
   )
+  const taskWithoutReadableNo = buildOutsourceReturnTrackingTask(
+    processingRecord({
+      document_no: '',
+      source_no: '',
+      title: '',
+      due_date: '',
+    }),
+    { nowMs: NOW_MS }
+  )
+  const taskWithInternalSourceNo = buildOutsourceReturnTrackingTask(
+    processingRecord({
+      document_no: '',
+      source_no: '88',
+      title: '',
+      due_date: '',
+    }),
+    { nowMs: NOW_MS }
+  )
 
   assert.equal(
     resolveOutsourceReturnDueAt(processingRecord(), { nowMs: NOW_MS }) < NOW_MS,
     true
   )
   assert.equal(task.source_no, '标题兜底')
+  assert.equal(taskWithoutReadableNo.source_no, '')
+  assert.equal(taskWithInternalSourceNo.source_no, '')
+  assert.equal(
+    taskWithoutReadableNo.payload.related_documents.includes('加工合同：88'),
+    false
+  )
+  assert.equal(
+    taskWithInternalSourceNo.payload.related_documents.includes('加工合同：88'),
+    false
+  )
+  assert.equal(
+    taskWithInternalSourceNo.payload.related_documents.includes(
+      '加工合同已关联'
+    ),
+    true
+  )
+  assert.equal(
+    taskWithInternalSourceNo.payload.related_documents.includes('委外单已关联'),
+    true
+  )
   assert.equal(task.due_at, NOW_SEC + 24 * 60 * 60)
 })
 

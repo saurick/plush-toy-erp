@@ -1,35 +1,12 @@
 import React from 'react'
 
-const contractColumns = {
-  material: [
-    '采购订单号',
-    '产品订单编号',
-    '产品编号',
-    '产品名称',
-    '材料品名',
-    '厂商料号',
-    '规格',
-    '单位',
-    '单价',
-    '采购数量',
-    '采购金额',
-    '备注',
-  ],
-  processing: [
-    '委外加工订单号',
-    '产品订单编号',
-    '产品编号',
-    '产品名称',
-    '工序名称',
-    '加工厂商',
-    '工序类别',
-    '单位',
-    '单价',
-    '委托加工数量',
-    '委托加工金额',
-    '备注',
-  ],
-}
+import {
+  buildPrintTemplateLineCells,
+  getPrintTemplateLineColumns,
+  normalizePrintTemplatePreviewData,
+  resolvePrintTemplateTotals,
+} from './printTemplateRendererModel.mjs'
+import { coalescePrintValues, renderPrintValue } from './printValue.mjs'
 
 function PrintMetaGrid({ leftItems, rightItems }) {
   return (
@@ -38,7 +15,9 @@ function PrintMetaGrid({ leftItems, rightItems }) {
         {leftItems.map((item) => (
           <div key={item.label} className="erp-print-meta-grid__row">
             <span className="erp-print-meta-grid__label">{item.label}</span>
-            <span className="erp-print-meta-grid__value">{item.value}</span>
+            <span className="erp-print-meta-grid__value">
+              {renderPrintValue(item.value, '')}
+            </span>
           </div>
         ))}
       </div>
@@ -46,7 +25,9 @@ function PrintMetaGrid({ leftItems, rightItems }) {
         {rightItems.map((item) => (
           <div key={item.label} className="erp-print-meta-grid__row">
             <span className="erp-print-meta-grid__label">{item.label}</span>
-            <span className="erp-print-meta-grid__value">{item.value}</span>
+            <span className="erp-print-meta-grid__value">
+              {renderPrintValue(item.value, '')}
+            </span>
           </div>
         ))}
       </div>
@@ -79,25 +60,14 @@ function renderClauseItems(sectionKey, items) {
   ))
 }
 
-function ContractTemplate({ data, kind }) {
+function ContractTemplate({ data: rawData, kind }) {
+  const data = normalizePrintTemplatePreviewData(rawData)
   const isMaterial = kind === 'material'
-  const columns = isMaterial
-    ? contractColumns.material
-    : contractColumns.processing
-  const lines = Array.isArray(data?.lines) ? data.lines : []
+  const columns = getPrintTemplateLineColumns(kind)
+  const { lines, merges } = data
+  const totals = resolvePrintTemplateTotals(data, kind)
 
   if (isMaterial) {
-    const quantityTotal = lines.reduce((total, line) => {
-      const parsed = Number(String(line?.quantity || '').replaceAll(',', ''))
-      return Number.isFinite(parsed) ? total + parsed : total
-    }, 0)
-    const amountTotal = lines.reduce((total, line) => {
-      const parsed = Number(String(line?.amount || '').replaceAll(',', ''))
-      return Number.isFinite(parsed) ? total + parsed : total
-    }, 0)
-    const quantityText = quantityTotal > 0 ? String(quantityTotal) : ''
-    const amountText = amountTotal > 0 ? amountTotal.toFixed(2) : ''
-
     return (
       <div className="erp-material-contract-paper erp-material-contract-paper--preview">
         <div className="erp-material-contract-paper__title">合同订单</div>
@@ -110,7 +80,7 @@ function ContractTemplate({ data, kind }) {
                   采购订单号：
                 </span>
                 <span className="erp-material-contract-meta__value">
-                  {data.contractNo || ''}
+                  {renderPrintValue(data.contractNo, '')}
                 </span>
               </div>
             }
@@ -121,7 +91,7 @@ function ContractTemplate({ data, kind }) {
                     下单日期：
                   </span>
                   <span className="erp-material-contract-meta__value">
-                    {data.orderDateText || ''}
+                    {renderPrintValue(data.orderDateText, '')}
                   </span>
                 </div>
                 <div className="erp-material-contract-meta__row erp-material-contract-meta__row--top-item">
@@ -129,7 +99,7 @@ function ContractTemplate({ data, kind }) {
                     回货日期：
                   </span>
                   <span className="erp-material-contract-meta__value">
-                    {data.returnDateText || ''}
+                    {renderPrintValue(data.returnDateText, '')}
                   </span>
                 </div>
               </div>
@@ -142,7 +112,7 @@ function ContractTemplate({ data, kind }) {
                   供应商名称：
                 </span>
                 <span className="erp-material-contract-meta__value">
-                  {data.supplierName || ''}
+                  {renderPrintValue(data.supplierName, '')}
                 </span>
               </div>
             }
@@ -152,7 +122,7 @@ function ContractTemplate({ data, kind }) {
                   订货单位：
                 </span>
                 <span className="erp-material-contract-meta__value">
-                  {data.buyerCompany || ''}
+                  {renderPrintValue(data.buyerCompany, '')}
                 </span>
               </div>
             }
@@ -164,7 +134,7 @@ function ContractTemplate({ data, kind }) {
                   联系人：
                 </span>
                 <span className="erp-material-contract-meta__value">
-                  {data.supplierContact || ''}
+                  {renderPrintValue(data.supplierContact, '')}
                 </span>
               </div>
             }
@@ -174,7 +144,7 @@ function ContractTemplate({ data, kind }) {
                   订货人：
                 </span>
                 <span className="erp-material-contract-meta__value">
-                  {data.buyerContact || ''}
+                  {renderPrintValue(data.buyerContact, '')}
                 </span>
               </div>
             }
@@ -186,7 +156,7 @@ function ContractTemplate({ data, kind }) {
                   联系电话：
                 </span>
                 <span className="erp-material-contract-meta__value">
-                  {data.supplierPhone || ''}
+                  {renderPrintValue(data.supplierPhone, '')}
                 </span>
               </div>
             }
@@ -196,7 +166,7 @@ function ContractTemplate({ data, kind }) {
                   联系电话：
                 </span>
                 <span className="erp-material-contract-meta__value">
-                  {data.buyerPhone || ''}
+                  {renderPrintValue(data.buyerPhone, '')}
                 </span>
               </div>
             }
@@ -208,7 +178,7 @@ function ContractTemplate({ data, kind }) {
                   供应商地址：
                 </span>
                 <span className="erp-material-contract-meta__value">
-                  {data.supplierAddress || ''}
+                  {renderPrintValue(data.supplierAddress, '')}
                 </span>
               </div>
             }
@@ -218,7 +188,7 @@ function ContractTemplate({ data, kind }) {
                   公司地址：
                 </span>
                 <span className="erp-material-contract-meta__value">
-                  {data.buyerAddress || ''}
+                  {renderPrintValue(data.buyerAddress, '')}
                 </span>
               </div>
             }
@@ -243,34 +213,35 @@ function ContractTemplate({ data, kind }) {
           <thead>
             <tr>
               {columns.map((column) => (
-                <th key={column}>{column}</th>
+                <th key={column.key}>{column.label}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {lines.map((line, index) => (
               <tr key={`${line.contractNo}-${index}`}>
-                <td>{line.contractNo || ''}</td>
-                <td>{line.productOrderNo || ''}</td>
-                <td>{line.productNo || ''}</td>
-                <td>{line.productName || ''}</td>
-                <td>{line.materialName || ''}</td>
-                <td>{line.vendorCode || ''}</td>
-                <td>{line.spec || ''}</td>
-                <td>{line.unit || ''}</td>
-                <td>{line.unitPrice || ''}</td>
-                <td>{line.quantity || ''}</td>
-                <td>{line.amount || ''}</td>
-                <td>{line.remark || ''}</td>
+                {buildPrintTemplateLineCells(line, index, kind, merges).map(
+                  (cell) => (
+                    <td
+                      key={`${cell.key}-${index}`}
+                      rowSpan={cell.rowSpan}
+                      colSpan={cell.colSpan}
+                    >
+                      {cell.value}
+                    </td>
+                  )
+                )}
               </tr>
             ))}
             <tr className="erp-material-contract-table__total">
               <td colSpan={8} />
               <td>合计</td>
               <td className="erp-contract-table__total-value">
-                {quantityText}
+                {totals.quantityText}
               </td>
-              <td className="erp-contract-table__total-value">{amountText}</td>
+              <td className="erp-contract-table__total-value">
+                {totals.amountText}
+              </td>
               <td />
             </tr>
           </tbody>
@@ -346,7 +317,10 @@ function ContractTemplate({ data, kind }) {
                 甲方（订货方）：
               </div>
               <div className="erp-material-contract-signature__name">
-                {data.buyerSigner || data.buyerContact || ''}
+                {renderPrintValue(
+                  coalescePrintValues(data.buyerSigner, data.buyerContact),
+                  ''
+                )}
               </div>
             </div>
             <div className="erp-material-contract-signature__row erp-material-contract-signature__row--date">
@@ -354,7 +328,7 @@ function ContractTemplate({ data, kind }) {
                 日期：
               </div>
               <div className="erp-material-contract-signature__date-value">
-                {data.signDateText || ''}
+                {renderPrintValue(data.signDateText, '')}
               </div>
             </div>
           </div>
@@ -364,7 +338,7 @@ function ContractTemplate({ data, kind }) {
                 乙方（供货方）：
               </div>
               <div className="erp-material-contract-signature__name">
-                {data.supplierSigner || ''}
+                {renderPrintValue(data.supplierSigner, '')}
               </div>
             </div>
             <div className="erp-material-contract-signature__row erp-material-contract-signature__row--date">
@@ -372,7 +346,7 @@ function ContractTemplate({ data, kind }) {
                 日期：
               </div>
               <div className="erp-material-contract-signature__date-value">
-                {data.supplierSignDateText || ''}
+                {renderPrintValue(data.supplierSignDateText, '')}
               </div>
             </div>
           </div>
@@ -417,58 +391,34 @@ function ContractTemplate({ data, kind }) {
         <thead>
           <tr>
             {columns.map((column) => (
-              <th key={column}>{column}</th>
+              <th key={column.key}>{column.label}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {lines.map((line, index) => {
-            const values = isMaterial
-              ? [
-                  line.contractNo,
-                  line.productOrderNo,
-                  line.productNo,
-                  line.productName,
-                  line.materialName,
-                  line.vendorCode,
-                  line.spec,
-                  line.unit,
-                  line.unitPrice,
-                  line.quantity,
-                  line.amount,
-                  line.remark,
-                ]
-              : [
-                  line.contractNo,
-                  line.productOrderNo,
-                  line.productNo,
-                  line.productName,
-                  line.processName,
-                  line.supplierAlias,
-                  line.processCategory,
-                  line.unit,
-                  line.unitPrice,
-                  line.quantity,
-                  line.amount,
-                  line.remark,
-                ]
-
-            return (
-              <tr key={`${line.contractNo}-${index}`}>
-                {values.map((value, valueIndex) => (
-                  <td key={`${columns[valueIndex]}-${index}`}>{value || ''}</td>
-                ))}
-              </tr>
-            )
-          })}
+          {lines.map((line, index) => (
+            <tr key={`${line.contractNo}-${index}`}>
+              {buildPrintTemplateLineCells(line, index, kind, merges).map(
+                (cell) => (
+                  <td
+                    key={`${cell.key}-${index}`}
+                    rowSpan={cell.rowSpan}
+                    colSpan={cell.colSpan}
+                  >
+                    {cell.value}
+                  </td>
+                )
+              )}
+            </tr>
+          ))}
           <tr className="erp-print-table__total">
             <td colSpan={8} />
             <td>合计</td>
             <td className="erp-contract-table__total-value">
-              {data.totalQuantity}
+              {totals.quantityText}
             </td>
             <td className="erp-contract-table__total-value">
-              {data.totalAmount}
+              {totals.amountText}
             </td>
             <td />
           </tr>
@@ -495,154 +445,31 @@ function ContractTemplate({ data, kind }) {
           <div className="erp-print-signature__label">
             甲方（{isMaterial ? '订货方' : '委托方'}）：
           </div>
-          <div className="erp-print-signature__value">{data.buyerContact}</div>
+          <div className="erp-print-signature__value">
+            {renderPrintValue(
+              coalescePrintValues(data.buyerSigner, data.buyerContact),
+              ''
+            )}
+          </div>
           <div className="erp-print-signature__date">
-            日期：{data.signDateText}
+            日期：
+            {renderPrintValue(
+              isMaterial ? data.signDateText : data.buyerSignDateText,
+              ''
+            )}
           </div>
         </div>
         <div className="erp-print-signature__block">
           <div className="erp-print-signature__label">
             乙方（{isMaterial ? '供货方' : '受托方'}）：
           </div>
-          <div className="erp-print-signature__value">&nbsp;</div>
+          <div className="erp-print-signature__value">
+            {renderPrintValue(data.supplierSigner)}
+          </div>
           <div className="erp-print-signature__date">
-            日期：{data.supplierSignDateText}
+            日期：{renderPrintValue(data.supplierSignDateText, '')}
           </div>
         </div>
-      </div>
-    </div>
-  )
-}
-
-function SummaryTemplate({ data, kind }) {
-  const rows = Array.isArray(data?.rows) ? data.rows : []
-  const isMaterial = kind === 'material'
-
-  return (
-    <div className="erp-print-paper erp-print-paper--landscape">
-      <div className="erp-summary-sheet">
-        <div className="erp-summary-sheet__title">{data.title}</div>
-        <div className="erp-summary-sheet__meta">
-          <div>订单编号：{data.orderNo}</div>
-          <div>产品编号：{data.styleNo}</div>
-          <div>产品名称：{data.productName}</div>
-          <div>定单日期：{data.orderDateText}</div>
-        </div>
-        <table className="erp-print-table erp-print-table--summary">
-          <thead>
-            <tr>
-              <th rowSpan={2}>序号</th>
-              <th rowSpan={2}>订单编号</th>
-              <th rowSpan={2}>产品编号</th>
-              <th rowSpan={2}>产品名称</th>
-              <th rowSpan={2}>{isMaterial ? '材料品名' : '工序名称'}</th>
-              <th rowSpan={2}>{isMaterial ? '厂商料号' : '加工厂商'}</th>
-              <th rowSpan={2}>{isMaterial ? '规格' : '工序类别'}</th>
-              <th rowSpan={2}>单位</th>
-              <th rowSpan={2}>{isMaterial ? '采购数量' : '加工数量'}</th>
-              <th colSpan={3}>{isMaterial ? '材料耗量' : '加工数量带宽'}</th>
-            </tr>
-            <tr>
-              {data.quantityBands.map((item) => (
-                <th key={item}>{item}</th>
-              ))}
-            </tr>
-            <tr className="erp-print-table__subhead">
-              <th colSpan={9}>产品总数量</th>
-              {data.totalQuantities.map((item, index) => (
-                <th key={`${item}-${index}`}>{item}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={`${row[0]}-${index}`}>
-                {row.map((cell, cellIndex) => (
-                  <td key={`${row[0]}-${cellIndex}`}>{cell}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-function ThumbnailBadge({ label }) {
-  return <div className="erp-report-thumb">{label}</div>
-}
-
-function ProductionReportTemplate({ data }) {
-  const rows = Array.isArray(data?.rows) ? data.rows : []
-  const columns = [
-    '下单日期',
-    '客户',
-    '订单编号',
-    '客户订单号',
-    '产品编号',
-    '产品名称',
-    '颜色',
-    '订单数量',
-    '损头版',
-    '生产数量',
-    '出货日期',
-    '未出货数',
-    '业务人员',
-    '图片',
-    '类别',
-    '单价',
-    '备注',
-  ]
-
-  return (
-    <div className="erp-print-paper erp-print-paper--landscape">
-      <div className="erp-production-report">
-        <div className="erp-production-report__company">{data.companyName}</div>
-        <div className="erp-production-report__title">{data.title}</div>
-        <table className="erp-print-table erp-print-table--report">
-          <thead>
-            <tr>
-              {columns.map((column) => (
-                <th
-                  key={column}
-                  className={
-                    [
-                      '客户',
-                      '订单编号',
-                      '产品编号',
-                      '颜色',
-                      '订单数量',
-                      '生产数量',
-                      '出货日期',
-                      '类别',
-                      '单价',
-                    ].includes(column)
-                      ? 'erp-print-table__highlight'
-                      : ''
-                  }
-                >
-                  {column}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={`${row[2]}-${index}`}>
-                {row.map((cell, cellIndex) => (
-                  <td key={`${row[2]}-${cellIndex}`}>
-                    {cellIndex === 13 ? (
-                      <ThumbnailBadge label={row[4]} />
-                    ) : (
-                      cell
-                    )}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   )
@@ -659,18 +486,6 @@ export default function PrintTemplateRenderer({ template }) {
 
   if (template.key === 'processing-contract') {
     return <ContractTemplate data={template.sample} kind="processing" />
-  }
-
-  if (template.key === 'material-summary') {
-    return <SummaryTemplate data={template.sample} kind="material" />
-  }
-
-  if (template.key === 'processing-summary') {
-    return <SummaryTemplate data={template.sample} kind="processing" />
-  }
-
-  if (template.key === 'production-order-report') {
-    return <ProductionReportTemplate data={template.sample} />
   }
 
   return null

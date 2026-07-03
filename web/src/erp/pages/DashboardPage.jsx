@@ -29,17 +29,20 @@ import {
   blockWorkflowTaskAction,
   completeWorkflowTaskAction,
   listWorkflowTasks,
+  rejectWorkflowTaskAction,
   urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
 import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js'
 import {
   formatWorkflowTaskSource,
+  getWorkflowTaskSourceTypeLabel,
   resolveWorkflowTaskEntryPath,
 } from '../utils/dashboardTaskDisplay.mjs'
 import {
   getWorkflowTaskDueStatus,
   isTerminalWorkflowTask,
 } from '../utils/workflowDashboardStats.mjs'
+import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../utils/workflowTaskActionSubmitGuard.mjs'
 import {
   TASK_BOARD_ROLE_OPTIONS,
   TASK_BOARD_DUE_OPTIONS,
@@ -47,10 +50,10 @@ import {
   buildWorkflowTaskBoardLanes,
   filterWorkflowTaskBoardTasks,
   getTaskStatusKey,
-  getWorkflowTaskAllowedActionModes,
   getWorkflowTaskDueLabel,
   getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskReason,
+  getWorkflowTaskReasonLabel,
   getWorkflowTaskReadonlyReason,
   getWorkflowTaskStatusMeta,
   hasActiveWorkflowTaskBoardFilters,
@@ -94,10 +97,6 @@ const WORKBENCH_QUEUE_OPTIONS = Object.freeze([
   { key: 'waiting', label: '等待交接', hint: '非终态任务' },
 ])
 
-function payloadOf(task = {}) {
-  return task.payload && typeof task.payload === 'object' ? task.payload : {}
-}
-
 function buildSourceOptions(tasks = []) {
   const sourceTypes = [
     ...new Set(
@@ -111,7 +110,7 @@ function buildSourceOptions(tasks = []) {
     { value: 'all', label: '全部模块' },
     ...sourceTypes.map((sourceType) => ({
       value: sourceType,
-      label: sourceType,
+      label: getWorkflowTaskSourceTypeLabel(sourceType),
     })),
   ]
 }
@@ -122,11 +121,9 @@ function getWorkflowTaskStableKey(task) {
 
 function TaskLane({
   lane,
-  getAllowedActionModes,
   selectedTaskId,
   onSelectTask,
   onOpenTask,
-  onOpenAction,
   onOpenEntry,
 }) {
   return (
@@ -150,7 +147,6 @@ function TaskLane({
         {lane.tasks.length > 0 ? (
           lane.tasks.map((task) => {
             const statusMeta = getWorkflowTaskStatusMeta(task)
-            const allowedActionModes = getAllowedActionModes(task)
             const entryPath = resolveWorkflowTaskEntryPath(task)
             const taskId = getWorkflowTaskStableKey(task)
             const isSelected = taskId && taskId === selectedTaskId
@@ -189,31 +185,14 @@ function TaskLane({
                 </Text>
                 {getWorkflowTaskReason(task) ? (
                   <Text type="danger" className="erp-task-board-card-meta">
-                    阻塞原因：{getWorkflowTaskReason(task)}
+                    {getWorkflowTaskReasonLabel(task)}：
+                    {getWorkflowTaskReason(task)}
                   </Text>
                 ) : null}
                 <Space wrap>
                   <Button size="small" onClick={() => onOpenTask(task)}>
                     查看
                   </Button>
-                  {allowedActionModes.includes('complete') ? (
-                    <Button
-                      size="small"
-                      type="primary"
-                      onClick={() => onOpenAction(task, 'complete')}
-                    >
-                      完成
-                    </Button>
-                  ) : null}
-                  {allowedActionModes.includes('block') ? (
-                    <Button
-                      size="small"
-                      danger
-                      onClick={() => onOpenAction(task, 'block')}
-                    >
-                      阻塞
-                    </Button>
-                  ) : null}
                 </Space>
               </div>
             )
@@ -508,6 +487,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     task: selectedWorkbenchTask,
     enabled: Boolean(selectedWorkbenchTask),
   })
+  const taskCenterCurrentTaskAccess = useWorkflowTaskActionAccess({
+    adminProfile,
+    task: taskCenterCurrentTask,
+    enabled: Boolean(taskCenterCurrentTask),
+  })
   const actionDrawerAccess = useWorkflowTaskActionAccess({
     adminProfile,
     task: selectedTask,
@@ -537,11 +521,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     }
   }
 
-  const getAllowedTaskActionModes = useCallback(
-    (task) => getWorkflowTaskAllowedActionModes(adminProfile, task),
-    [adminProfile]
-  )
-
   const getTaskReadonlyNotice = useCallback(
     (task) => getWorkflowTaskReadonlyReason(adminProfile, task),
     [adminProfile]
@@ -555,11 +534,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   }, [])
 
   const openTaskDrawer = (task, mode = '') => {
-    const allowedActionModes = getWorkflowTaskAllowedActionModes(
-      adminProfile,
-      task
-    )
-    const nextMode = allowedActionModes.includes(mode) ? mode : ''
+    const nextMode = TASK_ACTION_META[mode] ? mode : ''
     setSelectedTask(task)
     setActionMode(nextMode)
     setActionReason(nextMode === 'block' ? getWorkflowTaskReason(task) : '')
@@ -595,6 +570,14 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       message.warning(`${actionMeta.title}需要填写原因`)
       return
     }
+    const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
+      task: selectedTask,
+      actionKey: actionMode,
+      reason,
+      onWarning: message.warning,
+      onError: message.error,
+    })
+    if (!accessVerified) return
 
     setActionSaving(true)
     try {
@@ -604,25 +587,23 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           action: 'urge_task',
           reason,
           payload: {
-            source_type: selectedTask.source_type,
-            source_id: selectedTask.source_id,
-            source_no: selectedTask.source_no,
             entry: 'desktop_task_board',
           },
         })
       } else {
-        const nextStatusKey = actionMode === 'block' ? 'blocked' : 'done'
+        const nextStatusKey =
+          actionMode === 'block'
+            ? 'blocked'
+            : actionMode === 'reject'
+              ? 'rejected'
+              : 'done'
         const actionParams = {
-          id: selectedTask.id,
-          business_status_key:
-            actionMode === 'block'
-              ? 'blocked'
-              : selectedTask.business_status_key || undefined,
+          task_id: selectedTask.id,
           reason,
           payload: {
-            ...payloadOf(selectedTask),
             desktop_task_board_action: actionMode,
             blocked_reason: actionMode === 'block' ? reason : undefined,
+            rejected_reason: actionMode === 'reject' ? reason : undefined,
           },
         }
         if (nextStatusKey === 'done') {
@@ -630,10 +611,15 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             ...actionParams,
             action_key: 'complete',
           })
-        } else {
+        } else if (nextStatusKey === 'blocked') {
           await blockWorkflowTaskAction({
             ...actionParams,
             action_key: 'block',
+          })
+        } else {
+          await rejectWorkflowTaskAction({
+            ...actionParams,
+            action_key: 'reject',
           })
         }
       }
@@ -650,7 +636,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const workbenchTaskColumns = [
     {
       title: '优先级',
-      dataIndex: 'task_status_key',
+      key: 'task_priority',
       width: 88,
       render: (_, record) => {
         const dueStatus = getWorkflowTaskDueStatus(record)
@@ -680,7 +666,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     },
     {
       title: '负责',
-      dataIndex: 'owner_role_key',
+      key: 'owner_role',
       width: 90,
       render: (_, record) => getWorkflowTaskOwnerRoleLabel(record),
     },
@@ -710,25 +696,15 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       key: 'actions',
       width: 112,
       render: (_, record) => {
-        const allowedActionModes = getWorkflowTaskAllowedActionModes(
-          adminProfile,
-          record
-        )
-        const actionMode = allowedActionModes.includes('complete')
-          ? 'complete'
-          : allowedActionModes.includes('block')
-            ? 'block'
-            : ''
         return (
           <Button
             size="small"
-            type={actionMode ? 'primary' : 'default'}
             onClick={(event) => {
               event.stopPropagation()
-              openTaskDrawer(record, actionMode)
+              openTaskDrawer(record)
             }}
           >
-            {actionMode ? '处理' : '查看'}
+            查看
           </Button>
         )
       },
@@ -883,7 +859,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                         <Descriptions.Item label="到期">
                           {getWorkflowTaskDueLabel(selectedWorkbenchTask)}
                         </Descriptions.Item>
-                        <Descriptions.Item label="阻塞/备注">
+                        <Descriptions.Item
+                          label={getWorkflowTaskReasonLabel(
+                            selectedWorkbenchTask
+                          )}
+                        >
                           {getWorkflowTaskReason(selectedWorkbenchTask) || '-'}
                         </Descriptions.Item>
                       </Descriptions>
@@ -915,6 +895,19 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                             }
                           >
                             标记阻塞
+                          </Button>
+                        ) : null}
+                        {!selectedWorkbenchTaskAccess.loading &&
+                        selectedWorkbenchTaskAccess.allowedModes.includes(
+                          'reject'
+                        ) ? (
+                          <Button
+                            danger
+                            onClick={() =>
+                              openTaskDrawer(selectedWorkbenchTask, 'reject')
+                            }
+                          >
+                            退回任务
                           </Button>
                         ) : null}
                         {!selectedWorkbenchTaskAccess.loading &&
@@ -1036,13 +1029,20 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                         type="danger"
                         className="erp-task-center-current-meta"
                       >
+                        {getWorkflowTaskReasonLabel(taskCenterCurrentTask)}：
                         {getWorkflowTaskReason(taskCenterCurrentTask)}
                       </Text>
                     ) : null}
                     <Space wrap className="erp-task-center-current-actions">
-                      {getAllowedTaskActionModes(
-                        taskCenterCurrentTask
-                      ).includes('complete') ? (
+                      {taskCenterCurrentTaskAccess.loading ? (
+                        <Button size="small" disabled>
+                          核对权限中
+                        </Button>
+                      ) : null}
+                      {!taskCenterCurrentTaskAccess.loading &&
+                      taskCenterCurrentTaskAccess.allowedModes.includes(
+                        'complete'
+                      ) ? (
                         <Button
                           size="small"
                           type="primary"
@@ -1053,9 +1053,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           处理完成
                         </Button>
                       ) : null}
-                      {getAllowedTaskActionModes(
-                        taskCenterCurrentTask
-                      ).includes('block') ? (
+                      {!taskCenterCurrentTaskAccess.loading &&
+                      taskCenterCurrentTaskAccess.allowedModes.includes(
+                        'block'
+                      ) ? (
                         <Button
                           size="small"
                           danger
@@ -1066,14 +1067,29 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           标记阻塞
                         </Button>
                       ) : null}
-                      {getAllowedTaskActionModes(taskCenterCurrentTask)
-                        .length === 0 ? (
-                          <Button
-                            size="small"
-                            onClick={() => openTaskDrawer(taskCenterCurrentTask)}
-                          >
-                            查看上下文
-                          </Button>
+                      {!taskCenterCurrentTaskAccess.loading &&
+                      taskCenterCurrentTaskAccess.allowedModes.includes(
+                        'reject'
+                      ) ? (
+                        <Button
+                          size="small"
+                          danger
+                          onClick={() =>
+                            openTaskDrawer(taskCenterCurrentTask, 'reject')
+                          }
+                        >
+                          退回任务
+                        </Button>
+                      ) : null}
+                      {!taskCenterCurrentTaskAccess.loading &&
+                      taskCenterCurrentTaskAccess.allowedModes.length === 0 ? (
+                        <Button
+                          size="small"
+                          title={taskCenterCurrentTaskAccess.readonlyReason}
+                          onClick={() => openTaskDrawer(taskCenterCurrentTask)}
+                        >
+                          查看上下文
+                        </Button>
                       ) : null}
                       {taskCenterCurrentEntryPath ? (
                         <Button
@@ -1097,7 +1113,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             <div className="erp-task-board-filters">
               <Input.Search
                 allowClear
-                placeholder="搜索任务、单号、来源、阻塞原因"
+                placeholder="搜索任务、单号、来源、处理原因"
                 value={filters.keyword}
                 onChange={(event) =>
                   updateFilter('keyword', event.target.value)
@@ -1132,16 +1148,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 <TaskLane
                   key={lane.key}
                   lane={lane}
-                  getAllowedActionModes={getAllowedTaskActionModes}
                   selectedTaskId={selectedTaskBoardTaskId}
                   onSelectTask={selectTaskBoardTask}
                   onOpenTask={(task) => {
                     selectTaskBoardTask(task)
                     openTaskDrawer(task)
-                  }}
-                  onOpenAction={(task, mode) => {
-                    selectTaskBoardTask(task)
-                    openTaskDrawer(task, mode)
                   }}
                   onOpenEntry={(task) => {
                     selectTaskBoardTask(task)
@@ -1242,8 +1253,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           <div className="erp-command-center-focus-copy">
                             <Text strong>{task.task_name || '未命名任务'}</Text>
                             <Text type="secondary">
-                              {getWorkflowTaskReason(task) ||
-                                formatWorkflowTaskSource(task)}
+                              {getWorkflowTaskReason(task)
+                                ? `${getWorkflowTaskReasonLabel(
+                                    task
+                                  )}：${getWorkflowTaskReason(task)}`
+                                : formatWorkflowTaskSource(task)}
                             </Text>
                           </div>
                           <Space wrap>
@@ -1252,7 +1266,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                             </Tag>
                             <Button
                               size="small"
-                              onClick={() => openTaskDrawer(task, 'block')}
+                              onClick={() => openTaskDrawer(task)}
                             >
                               处理闭环
                             </Button>

@@ -1,3 +1,8 @@
+import {
+  getWorkflowTaskReason,
+  getWorkflowTaskReasonLabel,
+} from './workflowTaskReason.mjs'
+
 const TERMINAL_TASK_STATUS_KEYS = new Set(['done', 'closed', 'cancelled'])
 const BLOCKING_TASK_STATUS_KEYS = new Set(['blocked', 'rejected'])
 
@@ -33,14 +38,11 @@ export function isBusinessCollaborationTaskBlocking(task = {}) {
 }
 
 export function getBusinessCollaborationTaskReason(task = {}) {
-  const payload = payloadOf(task)
-  return String(
-    task.blocked_reason ||
-      payload.blocked_reason ||
-      payload.rejected_reason ||
-      payload.business_status_reason ||
-      ''
-  ).trim()
+  return getWorkflowTaskReason(task)
+}
+
+export function getBusinessCollaborationTaskReasonLabel(task = {}) {
+  return getWorkflowTaskReasonLabel(task)
 }
 
 export function getBusinessCollaborationTaskUrgeMeta(task = {}) {

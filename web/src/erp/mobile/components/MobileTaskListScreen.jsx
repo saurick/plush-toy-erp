@@ -24,9 +24,13 @@ import {
   getMobileRoleLabel,
   getTaskQueueTone,
   getTaskSeverityView,
+  resolveMobileTaskDueLabel,
   resolveTaskBusinessChip,
   resolveTaskListMeta,
+  resolveTaskReason,
+  resolveTaskReasonLabel,
   resolveTaskSourceLabel,
+  resolveMobileTaskStatusLabel,
 } from '../utils/mobileRoleTaskModel.mjs'
 import { mobileTheme } from '../theme'
 
@@ -267,9 +271,9 @@ export default function MobileTaskListScreen({
               {resolveTaskListMeta(task)}
             </span>
           </div>
-          {task.blocked_reason ? (
+          {resolveTaskReason(task) ? (
             <div className="mt-1 text-sm leading-5 text-red-500">
-              阻塞：{task.blocked_reason}
+              {resolveTaskReasonLabel(task)}：{resolveTaskReason(task)}
             </div>
           ) : null}
         </div>
@@ -280,7 +284,7 @@ export default function MobileTaskListScreen({
           <div
             className={`mt-2 break-words text-sm leading-5 ${severity.timeClass}`}
           >
-            {task.due_at_label || task.due_status_label || '-'}
+            {resolveMobileTaskDueLabel(task)}
           </div>
         </div>
       </button>
@@ -410,7 +414,7 @@ export default function MobileTaskListScreen({
           </div>
         </div>
         <span className="shrink-0 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-sm font-semibold text-emerald-700">
-          {task.task_status_label}
+          {resolveMobileTaskStatusLabel(task)}
         </span>
       </div>
       <div className="mt-2 text-sm text-slate-500">
@@ -517,9 +521,9 @@ export default function MobileTaskListScreen({
                   <div className="mobile-role-message-card__source mt-1 break-all text-xs text-amber-700">
                     {resolveTaskSourceLabel(task)}
                   </div>
-                  {task.blocked_reason ? (
+                  {resolveTaskReason(task) ? (
                     <div className="mobile-role-message-card__reason mt-1 text-sm text-red-600">
-                      {task.blocked_reason}
+                      {resolveTaskReasonLabel(task)}：{resolveTaskReason(task)}
                     </div>
                   ) : null}
                 </button>

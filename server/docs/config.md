@@ -167,8 +167,6 @@ ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
 | `ERP_PDF_CHROME_PATH` | `/usr/bin/chromium` | Chrome / Chromium 可执行文件路径；本地开发可留空由服务自动探测系统 Chrome |
 | `ERP_PDF_RENDER_CONCURRENCY` | `2` | 同时渲染 PDF 的上限；低配服务器优先通过降低并发控制内存峰值 |
 | `ERP_PDF_WARMUP` | `async` | 推荐预热开关，支持 `async/off`；服务启动后异步跑一次中文合同 PDF 渲染，提前启动共享 Chromium 并加载 CJK 字体；`/readyz` 在预热完成前保持未就绪，避免首个真实预览请求承担冷启动成本；排障或极低内存场景可设为 `off` |
-| `ERP_PDF_WARMUP_ENABLED` | `true` | 旧兼容开关，支持 `true/false`；仅在 `ERP_PDF_WARMUP` 未设置时生效，两者同时设置时以 `ERP_PDF_WARMUP` 为准 |
-
 安全边界：
 
 - seed、debugRunId cleanup 和业务数据清空默认面向当前 SQL 连接开启，只有显式关闭环境变量、权限不足或清理范围不匹配时拒绝。

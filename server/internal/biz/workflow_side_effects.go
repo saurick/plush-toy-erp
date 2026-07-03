@@ -34,12 +34,9 @@ func buildPurchaseIQCExceptionSideEffects(current *WorkflowTask, taskStatusKey s
 		"qc_result":         qcResult,
 		"decision":          taskStatusKey,
 		"transition_status": taskStatusKey,
-		"rejected_reason":   reason,
 		"critical_path":     true,
 	}
-	if taskStatusKey == "blocked" {
-		statePayload["blocked_reason"] = reason
-	}
+	setWorkflowTransitionReasonPayload(statePayload, taskStatusKey, reason)
 	workflowRuleKey := "purchase_iqc_rejected_to_quality_exception"
 	if taskStatusKey == "blocked" {
 		workflowRuleKey = "purchase_iqc_blocked_to_quality_exception"
@@ -93,11 +90,7 @@ func buildPurchaseWarehouseInboundBlockedSideEffects(current *WorkflowTask, task
 		"transition_status": taskStatusKey,
 		"critical_path":     true,
 	}
-	if taskStatusKey == "blocked" {
-		statePayload["blocked_reason"] = reason
-	} else {
-		statePayload["rejected_reason"] = reason
-	}
+	setWorkflowTransitionReasonPayload(statePayload, taskStatusKey, reason)
 	return &WorkflowTaskStatusSideEffects{
 		BusinessState: &WorkflowBusinessStateUpsert{
 			SourceType:        current.SourceType,
@@ -208,15 +201,12 @@ func buildOutsourceReturnQCReworkSideEffects(current *WorkflowTask, taskStatusKe
 		"qc_type":              "outsource_return",
 		"decision":             taskStatusKey,
 		"transition_status":    taskStatusKey,
-		"rejected_reason":      reason,
 		"notification_type":    "qc_failed",
 		"alert_type":           "qc_failed",
 		"critical_path":        true,
 		"outsource_processing": true,
 	}
-	if taskStatusKey == "blocked" {
-		statePayload["blocked_reason"] = reason
-	}
+	setWorkflowTransitionReasonPayload(statePayload, taskStatusKey, reason)
 	workflowRuleKey := "outsource_return_qc_rejected_to_outsource_rework"
 	if taskStatusKey == "blocked" {
 		workflowRuleKey = "outsource_return_qc_blocked_to_outsource_rework"
@@ -268,11 +258,7 @@ func buildOutsourceReworkBlockedSideEffects(current *WorkflowTask, taskStatusKey
 	statePayload["transition_status"] = taskStatusKey
 	statePayload["critical_path"] = true
 	statePayload["outsource_owner_role_key"] = "outsource"
-	if taskStatusKey == "blocked" {
-		statePayload["blocked_reason"] = reason
-	} else {
-		statePayload["rejected_reason"] = reason
-	}
+	setWorkflowTransitionReasonPayload(statePayload, taskStatusKey, reason)
 	return &WorkflowTaskStatusSideEffects{
 		BusinessState: &WorkflowBusinessStateUpsert{
 			SourceType:        current.SourceType,
@@ -330,11 +316,7 @@ func buildFinishedGoodsQCReworkSideEffects(current *WorkflowTask, taskStatusKey 
 	statePayload["notification_type"] = "qc_failed"
 	statePayload["alert_type"] = "qc_failed"
 	statePayload["critical_path"] = true
-	if taskStatusKey == "blocked" {
-		statePayload["blocked_reason"] = reason
-	} else {
-		statePayload["rejected_reason"] = reason
-	}
+	setWorkflowTransitionReasonPayload(statePayload, taskStatusKey, reason)
 	workflowRuleKey := "finished_goods_qc_rejected_to_finished_goods_rework"
 	if taskStatusKey == "blocked" {
 		workflowRuleKey = "finished_goods_qc_blocked_to_finished_goods_rework"
@@ -387,11 +369,7 @@ func buildFinishedGoodsInboundBlockedSideEffects(current *WorkflowTask, taskStat
 	statePayload["critical_path"] = true
 	statePayload["decision"] = taskStatusKey
 	statePayload["transition_status"] = taskStatusKey
-	if taskStatusKey == "blocked" {
-		statePayload["blocked_reason"] = reason
-	} else {
-		statePayload["rejected_reason"] = reason
-	}
+	setWorkflowTransitionReasonPayload(statePayload, taskStatusKey, reason)
 	return &WorkflowTaskStatusSideEffects{
 		BusinessState: &WorkflowBusinessStateUpsert{
 			SourceType:        current.SourceType,
@@ -438,11 +416,7 @@ func buildFinishedGoodsReworkBlockedSideEffects(current *WorkflowTask, taskStatu
 	statePayload["transition_status"] = taskStatusKey
 	statePayload["critical_path"] = true
 	statePayload["finished_goods"] = true
-	if taskStatusKey == "blocked" {
-		statePayload["blocked_reason"] = reason
-	} else {
-		statePayload["rejected_reason"] = reason
-	}
+	setWorkflowTransitionReasonPayload(statePayload, taskStatusKey, reason)
 	return &WorkflowTaskStatusSideEffects{
 		BusinessState: &WorkflowBusinessStateUpsert{
 			SourceType:        current.SourceType,
@@ -492,11 +466,7 @@ func buildShipmentReleaseBlockedSideEffects(current *WorkflowTask, taskStatusKey
 	statePayload["critical_path"] = true
 	statePayload["decision"] = taskStatusKey
 	statePayload["transition_status"] = taskStatusKey
-	if taskStatusKey == "blocked" {
-		statePayload["blocked_reason"] = reason
-	} else {
-		statePayload["rejected_reason"] = reason
-	}
+	setWorkflowTransitionReasonPayload(statePayload, taskStatusKey, reason)
 	return &WorkflowTaskStatusSideEffects{
 		BusinessState: &WorkflowBusinessStateUpsert{
 			SourceType:        current.SourceType,
@@ -570,11 +540,7 @@ func buildShipmentFinanceBlockedSideEffects(current *WorkflowTask, taskStatusKey
 	statePayload["critical_path"] = true
 	statePayload["decision"] = taskStatusKey
 	statePayload["transition_status"] = taskStatusKey
-	if taskStatusKey == "blocked" {
-		statePayload["blocked_reason"] = reason
-	} else {
-		statePayload["rejected_reason"] = reason
-	}
+	setWorkflowTransitionReasonPayload(statePayload, taskStatusKey, reason)
 	return &WorkflowTaskStatusSideEffects{
 		BusinessState: &WorkflowBusinessStateUpsert{
 			SourceType:        current.SourceType,
@@ -652,11 +618,7 @@ func buildPayableFinanceBlockedSideEffects(current *WorkflowTask, taskStatusKey 
 	statePayload["payable_type"] = payableType
 	statePayload["decision"] = taskStatusKey
 	statePayload["transition_status"] = taskStatusKey
-	if taskStatusKey == "blocked" {
-		statePayload["blocked_reason"] = reason
-	} else {
-		statePayload["rejected_reason"] = reason
-	}
+	setWorkflowTransitionReasonPayload(statePayload, taskStatusKey, reason)
 	return &WorkflowTaskStatusSideEffects{
 		BusinessState: &WorkflowBusinessStateUpsert{
 			SourceType:        current.SourceType,

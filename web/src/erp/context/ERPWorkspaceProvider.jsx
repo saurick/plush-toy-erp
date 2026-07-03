@@ -12,13 +12,10 @@ export function ERPWorkspaceProvider({ children }) {
   const location = useLocation()
   const appConfig = useMemo(() => getRuntimeAppDefinition(), [])
   const routeMobileRoleKey = parseMobileRoleFromPath(location.pathname)
-  const activeRoleKey =
-    appConfig.kind === 'mobile'
-      ? appConfig.roleKey
-      : routeMobileRoleKey || FALLBACK_ROLE_KEY
+  const activeRoleKey = routeMobileRoleKey || FALLBACK_ROLE_KEY
   const activeRole = getRoleWorkbench(activeRoleKey)
   const isMobileRoute = Boolean(routeMobileRoleKey)
-  const isMobileExperience = appConfig.kind === 'mobile' || isMobileRoute
+  const isMobileExperience = isMobileRoute
 
   const value = useMemo(
     () => ({
@@ -26,7 +23,6 @@ export function ERPWorkspaceProvider({ children }) {
       activeRoleKey,
       activeRole,
       isDesktopApp: appConfig.kind === 'desktop',
-      isMobileApp: appConfig.kind === 'mobile',
       isMobileRoute,
       isMobileExperience,
     }),

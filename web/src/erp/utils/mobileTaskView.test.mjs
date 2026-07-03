@@ -7,6 +7,7 @@ import {
   buildMobileTaskSummary,
   buildMobileTaskView,
   explainMobileTaskVisibility,
+  getMobileTaskDueStatusLabel,
   normalizeMobileActionEvidenceRefs,
   normalizeRelatedDocuments,
 } from './mobileTaskView.mjs'
@@ -58,6 +59,41 @@ test('mobileTaskView: due_at 与状态中文 label 计算正确', () => {
   assert.equal(view.source_id, 8)
 })
 
+test('mobileTaskView: 未知业务状态不透出内部 key', () => {
+  const view = buildMobileTaskView(
+    task({ business_status_key: 'unknown_business_status_key' }),
+    { nowMs: NOW_MS }
+  )
+
+  assert.equal(view.business_status_label, '未知业务状态')
+  assert.doesNotMatch(
+    view.business_status_label,
+    /unknown_business_status_key/u
+  )
+})
+
+test('mobileTaskView: 未知任务状态不透出内部 key', () => {
+  const view = buildMobileTaskView(
+    task({ task_status_key: 'unknown_task_status_key' }),
+    { nowMs: NOW_MS }
+  )
+
+  assert.equal(view.task_status_label, '未知状态')
+  assert.doesNotMatch(view.task_status_label, /unknown_task_status_key/u)
+})
+
+test('mobileTaskView: 未知到期状态不透出内部 key', () => {
+  assert.equal(
+    getMobileTaskDueStatusLabel('unknown_due_status_key'),
+    '到期状态'
+  )
+  assert.equal(getMobileTaskDueStatusLabel(''), '-')
+  assert.doesNotMatch(
+    getMobileTaskDueStatusLabel('unknown_due_status_key'),
+    /unknown_due_status_key/u
+  )
+})
+
 test('mobileTaskView: alert_level / alert_label 和 payload 字段读取正确', () => {
   const view = buildMobileTaskView(
     task({
@@ -82,7 +118,41 @@ test('mobileTaskView: alert_level / alert_label 和 payload 字段读取正确',
   assert.equal(view.urge_count, 1)
   assert.equal(view.last_urge_reason, '请今天复核')
   assert.equal(view.last_urge_action, 'urge_task')
+  assert.equal(view.last_urge_action_label, '催办')
   assert.notEqual(view.last_urge_at_label, '-')
+})
+
+test('mobileTaskView: related_documents 结果类文案不透出 raw key', () => {
+  const view = buildMobileTaskView(
+    task({
+      payload: {
+        related_documents: [
+          'IQC 结果：pass',
+          '检验结果：failed',
+          '委外回货检验结果：custom_outsource_qc_key',
+          '成品抽检结果：custom_finished_goods_qc_key',
+          '订单：SO-001',
+        ],
+      },
+    }),
+    { nowMs: NOW_MS }
+  )
+
+  assert.deepEqual(view.related_documents, [
+    'IQC 结果：合格',
+    '检验结果：不合格',
+    '委外回货检验结果：质检已记录',
+    '成品抽检结果：抽检已记录',
+    '订单：SO-001',
+  ])
+  assert.equal(
+    view.related_documents.some((item) =>
+      /pass|failed|custom_outsource_qc_key|custom_finished_goods_qc_key/u.test(
+        item
+      )
+    ),
+    false
+  )
 })
 
 test('mobileTaskView: 空 payload 不报错并提供安全默认值', () => {
@@ -235,8 +305,10 @@ test('mobileTaskView: 品质和仓库能看到采购到货闭环任务字段', (
   assert.equal(qualityViews[0].payload.supplier_name, '联调供应商')
   assert.equal(warehouseViews[0].business_status_label, '待确认入库')
   assert.equal(warehouseViews[0].payload.qc_result, 'pass')
+  assert.deepEqual(warehouseViews[0].related_documents, ['IQC 结果：合格'])
   assert.equal(purchaseViews[0].task_group, 'purchase_quality_exception')
   assert.equal(purchaseViews[0].complete_condition, '采购处理来料异常')
+  assert.deepEqual(purchaseViews[0].related_documents, ['IQC 结果：不合格'])
 })
 
 test('mobileTaskView: 委外回货任务按生产 品质 仓库 PMC 视角展示', () => {
@@ -338,6 +410,10 @@ test('mobileTaskView: 委外回货任务按生产 品质 仓库 PMC 视角展示
     warehouseViews.find((item) => item.id === 23).complete_condition,
     /委外回货入库数量/
   )
+  assert.deepEqual(
+    warehouseViews.find((item) => item.id === 23).related_documents,
+    ['委外回货检验结果：合格']
+  )
   assert.equal(
     pmcViews.some((item) => item.id === 24),
     true
@@ -436,6 +512,10 @@ test('mobileTaskView: 成品抽检 入库 出货任务按角色视角展示', ()
   assert.deepEqual(
     warehouseViews.map((item) => item.id),
     [32, 33]
+  )
+  assert.deepEqual(
+    warehouseViews.find((item) => item.id === 32).related_documents,
+    ['成品抽检结果：合格']
   )
   assert.equal(
     productionViews.some((item) => item.id === 34),
@@ -714,6 +794,14 @@ test('mobileTaskView: 催办和升级任务进入 PMC / 老板关注', () => {
   )
   assert.equal(pmcViews.find((item) => item.id === 61).urge_count, 3)
   assert.equal(
+    pmcViews.find((item) => item.id === 61).last_urge_action_label,
+    '催办'
+  )
+  assert.equal(
+    bossViews.find((item) => item.id === 62).last_urge_action_label,
+    '升级给老板'
+  )
+  assert.equal(
     pmcViews.some((item) => item.id === 62),
     true
   )
@@ -890,6 +978,7 @@ test('mobileTaskView: 岗位处理 evidence 支持照片附件引用和去重', 
 
   assert.equal(payload.mobile_action.role_key, 'warehouse')
   assert.equal(payload.mobile_action.action_key, 'done')
+  assert.equal(payload.mobile_action.action_label, '完成')
   assert.equal(payload.mobile_action.recorded_at, NOW_SEC)
   assert.deepEqual(payload.mobile_action_evidence_refs, [
     'PHOTO-001',
@@ -908,6 +997,7 @@ test('mobileTaskView: blocked / rejected 移动处理生成异常上报快照', 
 
   assert.equal(payload.mobile_exception_report.role_key, 'quality')
   assert.equal(payload.mobile_exception_report.action_key, 'blocked')
+  assert.equal(payload.mobile_exception_report.action_label, '阻塞')
   assert.equal(payload.mobile_exception_report.reason, '成品抽检发现色差')
   assert.deepEqual(payload.mobile_exception_report.evidence_refs, [
     'QC-PHOTO-001',
@@ -923,4 +1013,54 @@ test('mobileTaskView: blocked / rejected 移动处理生成异常上报快照', 
   assert.deepEqual(view.mobile_action.evidence_refs, ['QC-PHOTO-001'])
   assert.deepEqual(view.mobile_action_evidence_refs, ['QC-PHOTO-001'])
   assert.equal(view.mobile_exception_report.reason, '成品抽检发现色差')
+  assert.equal(view.mobile_exception_report.action_label, '阻塞')
+  assert.doesNotMatch(
+    [
+      view.mobile_action.action_label,
+      view.mobile_exception_report.action_label,
+      view.last_urge_action_label,
+    ].join('\n'),
+    /urge_task|escalate_to_boss|blocked/u
+  )
+})
+
+test('mobileTaskView: 旧 mobile_action 只有 action_key 时补中文标签', () => {
+  const view = buildMobileTaskView(
+    task({
+      payload: {
+        mobile_action: {
+          role_key: 'quality',
+          action_key: 'rejected',
+          reason: '资料不完整',
+          evidence_refs: ['QC-REJECT-001'],
+        },
+      },
+    }),
+    { nowMs: NOW_MS }
+  )
+
+  assert.equal(view.mobile_action.action_key, 'rejected')
+  assert.equal(view.mobile_action.action_label, '退回')
+  assert.deepEqual(view.mobile_action.evidence_refs, ['QC-REJECT-001'])
+  assert.doesNotMatch(view.mobile_action.action_label, /rejected/u)
+})
+
+test('mobileTaskView: 旧 mobile_action 的 raw action_label 不进入用户可见视图', () => {
+  const view = buildMobileTaskView(
+    task({
+      payload: {
+        mobile_action: {
+          role_key: 'warehouse',
+          action_key: 'done',
+          action_label: 'unknown_action_key',
+          reason: '已完成入库',
+          evidence_refs: ['WH-001'],
+        },
+      },
+    }),
+    { nowMs: NOW_MS }
+  )
+
+  assert.equal(view.mobile_action.action_label, '完成')
+  assert.doesNotMatch(view.mobile_action.action_label, /unknown_action_key/u)
 })

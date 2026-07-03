@@ -414,6 +414,8 @@ test("默认只生成发布计划报告，不调用真实后端", async () => {
     assert.equal(report.activate, false);
     assert.equal(report.operations.length, 2);
     assert.equal(report.noRawFileUpload, true);
+    assert.equal(report.manifest, manifest);
+    assert.equal(path.isAbsolute(report.manifest), false);
     assert.match(report.manifestSha256, /^sha256:[a-f0-9]{64}$/);
     const saved = JSON.parse(
       await readFile(
@@ -422,8 +424,35 @@ test("默认只生成发布计划报告，不调用真实后端", async () => {
       ),
     );
     assert.equal(saved.revision, "yoyoosun-customer-package-v1.runtime-manifest-v1");
+    assert.equal(saved.manifest, manifest);
+    const markdown = await readFile(
+      path.join(out, "customer-config-release-report.md"),
+      "utf8",
+    );
+    assert.match(markdown, /\| manifest \| output\/customers\/yoyoosun\/customer-config-runtime-manifest\.json \|/);
+    assert.equal(markdown.includes(root), false);
   } finally {
     globalThis.fetch = originalFetch;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("拒绝把 release executor 报告写入 deployments evidence 目录", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-release-"));
+  const manifest = writeRuntimeManifest(root);
+  try {
+    await assert.rejects(
+      () =>
+        runCustomerConfigRelease(
+          {
+            manifest,
+            out: "deployments/yoyoosun/evidence/releases/2026-06-28/customer-config-release",
+          },
+          { repoRoot: root },
+        ),
+      /--out must not be inside deployments evidence or customer delivery directories/,
+    );
+  } finally {
     await rm(root, { recursive: true, force: true });
   }
 });

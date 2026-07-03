@@ -16,7 +16,7 @@ import {
 
 export const PROCESSING_CONTRACT_MAX_ROWS = 300
 const PROCESSING_DETAIL_COLUMN_KEYS = PROCESSING_CONTRACT_TABLE_COLUMNS.map(
-  (column) => column.fieldKey
+  (column) => column.fieldKey || column.key
 )
 
 const toRawLineText = (value) => String(value ?? '').replaceAll('\r', '')

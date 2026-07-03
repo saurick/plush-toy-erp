@@ -8,6 +8,7 @@ import {
   buildRealLoginSmokePreflightReport,
   buildRealLoginSmokeInputTemplate,
   createRealLoginSmokeRuntime,
+  waitForAdminDashboardReady,
 } from './realLoginSmokeShared.mjs'
 
 const scriptPath = path.resolve(import.meta.dirname, 'realLoginSmokeShared.mjs')
@@ -90,6 +91,35 @@ test('real login smoke runtime accepts plain local URLs', () => {
   assert.equal(runtime.baseURL, 'http://127.0.0.1:4174')
 })
 
+test('real login smoke waits current dashboard heading after login', async () => {
+  const calls = []
+  const page = {
+    getByRole(role, options) {
+      calls.push({ role, options })
+      return {
+        async waitFor(waitOptions) {
+          calls.push({ waitOptions })
+        },
+      }
+    },
+  }
+
+  await waitForAdminDashboardReady(page)
+
+  assert.deepEqual(calls, [
+    {
+      role: 'heading',
+      options: { name: '工作台', exact: true },
+    },
+    {
+      waitOptions: {
+        state: 'visible',
+        timeout: 15_000,
+      },
+    },
+  ])
+})
+
 test('real login smoke input template is no-write and keeps downstream write boundary visible', () => {
   const template = buildRealLoginSmokeInputTemplate()
 
@@ -129,6 +159,28 @@ test('real login smoke input template is no-write and keeps downstream write bou
   assert.match(template.boundary, /preflight report probes backend health/)
   assert.match(template.boundary, /Neither mode.*logs in/)
   assert.match(template.boundary, /purchase-receipt-real-write persists/)
+})
+
+test('contract real login smokes cover preview download and print entrypoints', () => {
+  const contractSmokeScripts = [
+    'purchaseContractRealLoginSmoke.mjs',
+    'processingContractRealLoginSmoke.mjs',
+  ]
+
+  for (const scriptName of contractSmokeScripts) {
+    const source = fs.readFileSync(
+      path.resolve(import.meta.dirname, scriptName),
+      'utf8'
+    )
+
+    assert.match(source, /verify\w+ContractPreviewPopup/u)
+    assert.match(source, /verifyPdfDownloadButton/u)
+    assert.match(source, /verifyPrintButtonInvokesWindowPrint/u)
+    assert.match(source, /acceptDownloads:\s*true/u)
+    assert.match(source, /在线预览耗时/u)
+    assert.match(source, /下载文件/u)
+    assert.match(source, /打印按钮已调用浏览器打印入口/u)
+  }
 })
 
 test('real login smoke preflight probes health without reading secrets or auth', async () => {

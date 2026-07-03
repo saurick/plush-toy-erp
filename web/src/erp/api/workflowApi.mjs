@@ -17,16 +17,6 @@ export async function listWorkflowTasks(params = {}) {
   return dataOf(result)
 }
 
-export async function createWorkflowTask(params = {}) {
-  const result = await workflowRpc.call('create_task', params)
-  return dataOf(result)?.task || null
-}
-
-export async function updateWorkflowTaskStatus(params = {}) {
-  const result = await workflowRpc.call('update_task_status', params)
-  return dataOf(result)?.task || null
-}
-
 export async function completeWorkflowTaskAction(params = {}) {
   const result = await workflowRpc.call('complete_task_action', params)
   return dataOf(result)?.task || null
@@ -68,9 +58,4 @@ export async function explainWorkflowTaskAssignment(params = {}, options = {}) {
 export async function listWorkflowBusinessStates(params = {}) {
   const result = await workflowRpc.call('list_business_states', params)
   return dataOf(result)
-}
-
-export async function upsertWorkflowBusinessState(params = {}) {
-  const result = await workflowRpc.call('upsert_business_state', params)
-  return dataOf(result)?.business_state || null
 }

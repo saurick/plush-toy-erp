@@ -20,5 +20,5 @@ const permissionModuleLabels = Object.freeze({
 export function getPermissionModuleTitle(moduleKey = '') {
   const normalizedKey = String(moduleKey || 'other').trim() || 'other'
   const label = permissionModuleLabels[normalizedKey]
-  return label ? `${label} (${normalizedKey})` : normalizedKey
+  return label ? `${label} (${normalizedKey})` : '未登记权限模块'
 }

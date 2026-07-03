@@ -170,10 +170,7 @@ func CleanupTemplatePDFResources() {
 func StartTemplatePDFWarmupAsync(logger log.Logger) {
 	sharedTemplatePDFWarmupState.StartAsync(
 		logger,
-		resolveTemplatePDFWarmupEnabled(
-			os.Getenv("ERP_PDF_WARMUP"),
-			os.Getenv("ERP_PDF_WARMUP_ENABLED"),
-		),
+		resolveTemplatePDFWarmupEnabled(os.Getenv("ERP_PDF_WARMUP")),
 		warmupTemplatePDFResources,
 	)
 }
@@ -420,26 +417,17 @@ func resolveTemplatePDFRenderConcurrency(raw string) int {
 	return limit
 }
 
-func resolveTemplatePDFWarmupEnabled(rawMode string, rawEnabled string) bool {
+func resolveTemplatePDFWarmupEnabled(rawMode string) bool {
 	mode := strings.ToLower(strings.TrimSpace(rawMode))
-	if mode != "" {
-		switch mode {
-		case "1", "true", "yes", "on", "enabled", "async", "background":
-			return true
-		case "0", "false", "no", "off", "disabled", "none":
-			return false
-		default:
-			return false
-		}
-	}
-
-	switch strings.ToLower(strings.TrimSpace(rawEnabled)) {
+	switch mode {
 	case "", "1", "true", "yes", "on", "enabled":
+		return true
+	case "async", "background":
 		return true
 	case "0", "false", "no", "off", "disabled", "none":
 		return false
 	default:
-		return true
+		return false
 	}
 }
 
@@ -699,14 +687,14 @@ func normalizeTemplatePDFCustomerKey(raw string) string {
 	return value
 }
 
-func templatePDFReferencedModuleKeys(templateKey string) []string {
+func templatePDFReferencedModuleKeys(templateKey string) ([]string, bool) {
 	switch strings.TrimSpace(templateKey) {
 	case "material-purchase-contract":
-		return []string{"purchase_orders"}
+		return []string{"purchase_orders"}, true
 	case "processing-contract":
-		return []string{"outsourcing_orders"}
+		return []string{"outsourcing_orders"}, true
 	default:
-		return nil
+		return nil, false
 	}
 }
 
@@ -716,7 +704,10 @@ func enforceTemplatePDFModulesEnabled(
 	customerKey string,
 	templateKey string,
 ) error {
-	moduleKeys := templatePDFReferencedModuleKeys(templateKey)
+	moduleKeys, ok := templatePDFReferencedModuleKeys(templateKey)
+	if !ok {
+		return fmt.Errorf("%w: 未登记的 PDF 模板", biz.ErrBadParam)
+	}
 	if len(moduleKeys) == 0 || guard == nil {
 		return nil
 	}

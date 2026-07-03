@@ -343,11 +343,11 @@ function baseColumns({ type, unitDisplay }) {
             effectiveFieldKey: 'supplier_type',
             width: 140,
             sorter: (a, b) => compareText(a?.supplier_type, b?.supplier_type),
-            render: (value) => SUPPLIER_TYPE_LABELS[value] || value || '-',
+            render: (value) =>
+              SUPPLIER_TYPE_LABELS[value] || (value ? '供应商类型' : '-'),
             exportValue: (record) =>
               SUPPLIER_TYPE_LABELS[record?.supplier_type] ||
-              record?.supplier_type ||
-              '',
+              (record?.supplier_type ? '供应商类型' : ''),
           },
         ]
       : []),

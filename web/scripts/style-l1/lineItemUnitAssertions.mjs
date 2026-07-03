@@ -596,64 +596,90 @@ export function createLineItemUnitAssertions({ assert }) {
 
   const assertLineItemAddActionScrollsToNewRow = async (
     modal,
-    { scenarioName, targetRowCount = 6 }
+    {
+      scenarioName,
+      targetRowCount = 6,
+      maxAverageAddMs = 900,
+      maxSingleAddMs = 1800,
+      maxAverageScrollFrameMs = 24,
+      maxSingleScrollFrameMs = 80,
+      listSelector = '.erp-sales-order-lines-form__list',
+      rowSelector = '.erp-sales-order-lines-form__row',
+    }
   ) => {
     const addButton = modal.getByRole('button', { name: '添加条目' })
     await addButton.waitFor({ state: 'visible', timeout: 5_000 })
 
-    let rowCount = await modal
-      .locator('.erp-sales-order-lines-form__row')
-      .count()
+    const addDurations = []
+    let rowCount = await modal.locator(rowSelector).count()
     while (rowCount < targetRowCount) {
       await addButton.scrollIntoViewIfNeeded()
+      const startedAt = await modal.evaluate(() => performance.now())
       await addButton.click()
       rowCount += 1
       await modal
-        .locator('.erp-sales-order-lines-form__row')
+        .locator(rowSelector)
         .nth(rowCount - 1)
-        .waitFor({ state: 'visible', timeout: 5_000 })
+        .waitFor({
+          state: 'visible',
+          timeout: 5_000,
+        })
+      const endedAt = await modal.evaluate(() => performance.now())
+      addDurations.push(Math.round(endedAt - startedAt))
     }
 
     await new Promise((resolve) => {
       setTimeout(resolve, 450)
     })
 
-    const metrics = await modal.evaluate((node) => {
-      const modalBody =
-        node.querySelector('.ant-modal-body') || node.closest('.ant-modal-body')
-      const list = node.querySelector('.erp-sales-order-lines-form__list')
-      const rows = Array.from(
-        node.querySelectorAll('.erp-sales-order-lines-form__row')
-      )
-      const latestRow = rows[rows.length - 1]
-      const footer = node.querySelector('.erp-line-items-form__footer')
-      const listStyle = list ? window.getComputedStyle(list) : null
-      const listRect = list?.getBoundingClientRect()
-      const bodyRect = modalBody?.getBoundingClientRect()
-      const latestRect = latestRow?.getBoundingClientRect()
-      const footerRect = footer?.getBoundingClientRect()
-      return {
-        rowCount: rows.length,
-        listOverflowY: listStyle?.overflowY || '',
-        listScrollTop: Math.round(list?.scrollTop || 0),
-        listClientHeight: Math.round(list?.clientHeight || 0),
-        listScrollHeight: Math.round(list?.scrollHeight || 0),
-        bodyScrollTop: Math.round(modalBody?.scrollTop || 0),
-        bodyClientHeight: Math.round(modalBody?.clientHeight || 0),
-        bodyScrollHeight: Math.round(modalBody?.scrollHeight || 0),
-        latestRowTop: Math.round(latestRect?.top || 0),
-        latestRowBottom: Math.round(latestRect?.bottom || 0),
-        listTop: Math.round(listRect?.top || 0),
-        listBottom: Math.round(listRect?.bottom || 0),
-        bodyTop: Math.round(bodyRect?.top || 0),
-        bodyBottom: Math.round(bodyRect?.bottom || 0),
-        footerBottom: Math.round(footerRect?.bottom || 0),
-        latestRowVisibleInList:
-          Boolean(listRect && latestRect) &&
-          latestRect.top >= listRect.top - 1 &&
-          latestRect.bottom <= listRect.bottom + 1,
-      }
-    })
+    const metrics = await modal.evaluate(
+      (node, args) => {
+        const modalBody =
+          node.querySelector('.ant-modal-body') ||
+          node.closest('.ant-modal-body')
+        const list = node.querySelector(args.listSelector)
+        const rows = Array.from(node.querySelectorAll(args.rowSelector))
+        const latestRow = rows[rows.length - 1]
+        const footer = node.querySelector('.erp-line-items-form__footer')
+        const listStyle = list ? window.getComputedStyle(list) : null
+        const listRect = list?.getBoundingClientRect()
+        const bodyRect = modalBody?.getBoundingClientRect()
+        const latestRect = latestRow?.getBoundingClientRect()
+        const footerRect = footer?.getBoundingClientRect()
+        return {
+          rowCount: rows.length,
+          listOverflowY: listStyle?.overflowY || '',
+          listScrollTop: Math.round(list?.scrollTop || 0),
+          listClientHeight: Math.round(list?.clientHeight || 0),
+          listScrollHeight: Math.round(list?.scrollHeight || 0),
+          bodyScrollTop: Math.round(modalBody?.scrollTop || 0),
+          bodyClientHeight: Math.round(modalBody?.clientHeight || 0),
+          bodyScrollHeight: Math.round(modalBody?.scrollHeight || 0),
+          latestRowTop: Math.round(latestRect?.top || 0),
+          latestRowBottom: Math.round(latestRect?.bottom || 0),
+          listTop: Math.round(listRect?.top || 0),
+          listBottom: Math.round(listRect?.bottom || 0),
+          bodyTop: Math.round(bodyRect?.top || 0),
+          bodyBottom: Math.round(bodyRect?.bottom || 0),
+          footerBottom: Math.round(footerRect?.bottom || 0),
+          latestRowVisibleInList:
+            Boolean(listRect && latestRect) &&
+            latestRect.top >= listRect.top - 1 &&
+            latestRect.bottom <= listRect.bottom + 1,
+          addDurations: args.addDurations,
+          maxAddDuration:
+            args.addDurations.length > 0 ? Math.max(...args.addDurations) : 0,
+          averageAddDuration:
+            args.addDurations.length > 0
+              ? Math.round(
+                  args.addDurations.reduce((total, value) => total + value, 0) /
+                    args.addDurations.length
+                )
+              : 0,
+        }
+      },
+      { addDurations, listSelector, rowSelector }
+    )
 
     assert(
       metrics.rowCount >= targetRowCount,
@@ -682,6 +708,78 @@ export function createLineItemUnitAssertions({ assert }) {
       true,
       `${scenarioName} 最新添加的明细行应进入 item 区域可视区: ${JSON.stringify(
         metrics
+      )}`
+    )
+    assert(
+      metrics.averageAddDuration <= maxAverageAddMs,
+      `${scenarioName} 连续添加条目的平均响应耗时应保持流畅: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      metrics.maxAddDuration <= maxSingleAddMs,
+      `${scenarioName} 单次添加条目不应出现明显卡顿: ${JSON.stringify(metrics)}`
+    )
+
+    const scrollFrameMetrics = await modal.evaluate(async (node, selector) => {
+      const list = node.querySelector(selector)
+      if (!list || list.scrollHeight <= list.clientHeight) {
+        return {
+          skipped: true,
+          reason: 'no-scrollable-list',
+          scrollHeight: Math.round(list?.scrollHeight || 0),
+          clientHeight: Math.round(list?.clientHeight || 0),
+        }
+      }
+
+      const frameDeltas = []
+      const startScrollTop = list.scrollTop
+      const maxScrollTop = list.scrollHeight - list.clientHeight
+      let previousTime = performance.now()
+
+      for (let index = 1; index <= 30; index += 1) {
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+        const currentTime = performance.now()
+        frameDeltas.push(Math.round(currentTime - previousTime))
+        previousTime = currentTime
+        list.scrollTop = Math.round((maxScrollTop * index) / 30)
+      }
+
+      const totalFrameMs = frameDeltas.reduce(
+        (total, value) => total + value,
+        0
+      )
+      return {
+        skipped: false,
+        frames: frameDeltas.length,
+        averageFrameMs: Math.round(totalFrameMs / frameDeltas.length),
+        maxFrameMs: Math.max(...frameDeltas),
+        frameDeltas,
+        startScrollTop: Math.round(startScrollTop),
+        endScrollTop: Math.round(list.scrollTop),
+        maxScrollTop: Math.round(maxScrollTop),
+        scrollHeight: Math.round(list.scrollHeight),
+        clientHeight: Math.round(list.clientHeight),
+      }
+    }, listSelector)
+
+    assert.equal(
+      scrollFrameMetrics.skipped,
+      false,
+      `${scenarioName} 明细列表应可滚动以验证滚动流畅度: ${JSON.stringify(
+        scrollFrameMetrics
+      )}`
+    )
+    assert(
+      scrollFrameMetrics.averageFrameMs <= maxAverageScrollFrameMs,
+      `${scenarioName} 明细滚动平均帧间隔应保持流畅: ${JSON.stringify(
+        scrollFrameMetrics
+      )}`
+    )
+    assert(
+      scrollFrameMetrics.maxFrameMs <= maxSingleScrollFrameMs,
+      `${scenarioName} 明细滚动不应出现明显长帧: ${JSON.stringify(
+        scrollFrameMetrics
       )}`
     )
   }

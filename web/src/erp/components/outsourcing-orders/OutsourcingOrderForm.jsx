@@ -3,6 +3,7 @@ import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
 import { Button, Form, Input, Select, Space } from 'antd'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
+import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
 import FieldWithUnitSuffix, {
   isQuantityTextWithinUnitPrecision,
   unitPrecisionErrorMessage,
@@ -100,6 +101,10 @@ export function createBlankOutsourcingLine(lineNo = 1) {
   }
 }
 
+function optionalFormValue(value) {
+  return value === null || value === undefined ? '' : value
+}
+
 export function normalizeOutsourcingLineFormValue(item = {}) {
   return {
     id: item.id,
@@ -112,9 +117,9 @@ export function normalizeOutsourcingLineFormValue(item = {}) {
     process_name_snapshot: item.process_name_snapshot || '',
     process_category_snapshot: item.process_category_snapshot || '',
     unit_name_snapshot: item.unit_name_snapshot || '',
-    outsourcing_quantity: item.outsourcing_quantity || '',
-    unit_price: item.unit_price || '',
-    amount: item.amount || '',
+    outsourcing_quantity: optionalFormValue(item.outsourcing_quantity),
+    unit_price: optionalFormValue(item.unit_price),
+    amount: optionalFormValue(item.amount),
     expected_return_date: unixToDateInputValue(item.expected_return_date),
     note: item.note || '',
     line_status: item.line_status,
@@ -150,6 +155,7 @@ export function unitLabel(unit = {}) {
 export default function OutsourcingOrderForm({
   form,
   supplierOptions,
+  onSupplierChange,
   productOptions,
   processOptions,
   unitOptions,
@@ -158,12 +164,10 @@ export default function OutsourcingOrderForm({
   onProcessChange,
   onUnitChange,
 }) {
-  const watchedItems = Form.useWatch('items', form) || []
   const orderDate = Form.useWatch('order_date', form)
   const expectedReturnDate = Form.useWatch('expected_return_date', form)
-  const lineSummary = summarizeLines(watchedItems)
   const { registerLineItemRow, requestLineItemScroll } =
-    useLineItemAppendScroll(watchedItems.length)
+    useLineItemAppendScroll()
   const disableOrderDateAfterExpectedReturn = useCallback(
     (current) => isDateInputAfter(current, expectedReturnDate),
     [expectedReturnDate]
@@ -194,7 +198,12 @@ export default function OutsourcingOrderForm({
         label="加工厂"
         rules={[{ required: true, message: '请选择加工厂' }]}
       >
-        <Select showSearch options={supplierOptions} optionFilterProp="label" />
+        <Select
+          showSearch
+          options={supplierOptions}
+          optionFilterProp="label"
+          onChange={onSupplierChange}
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -399,26 +408,42 @@ export default function OutsourcingOrderForm({
                         <Input />
                       </Form.Item>
                       <Form.Item
-                        className="erp-line-item-field erp-line-item-field--quantity"
-                        name={[field.name, 'outsourcing_quantity']}
-                        label="加工数量"
-                        rules={[
-                          { required: true, message: '请输入加工数量' },
-                          quantityPrecisionRule({
-                            form,
-                            fieldName: field.name,
-                            unitOptions,
-                          }),
-                        ]}
+                        noStyle
+                        shouldUpdate={(previous, current) =>
+                          previous?.items?.[field.name]?.unit_id !==
+                            current?.items?.[field.name]?.unit_id ||
+                          previous?.items?.[field.name]?.unit_name_snapshot !==
+                            current?.items?.[field.name]?.unit_name_snapshot
+                        }
                       >
-                        <FieldWithUnitSuffix
-                          control={<Input />}
-                          unitText={unitSuffixTextFromOptions(
-                            unitOptions,
-                            watchedItems?.[field.name]?.unit_id,
-                            watchedItems?.[field.name]?.unit_name_snapshot
-                          )}
-                        />
+                        {({ getFieldValue }) => (
+                          <Form.Item
+                            className="erp-line-item-field erp-line-item-field--quantity"
+                            name={[field.name, 'outsourcing_quantity']}
+                            label="加工数量"
+                            rules={[
+                              { required: true, message: '请输入加工数量' },
+                              quantityPrecisionRule({
+                                form,
+                                fieldName: field.name,
+                                unitOptions,
+                              }),
+                            ]}
+                          >
+                            <FieldWithUnitSuffix
+                              control={<Input />}
+                              unitText={unitSuffixTextFromOptions(
+                                unitOptions,
+                                getFieldValue(['items', field.name, 'unit_id']),
+                                getFieldValue([
+                                  'items',
+                                  field.name,
+                                  'unit_name_snapshot',
+                                ])
+                              )}
+                            />
+                          </Form.Item>
+                        )}
                       </Form.Item>
                       <Form.Item
                         className="erp-line-item-field erp-line-item-field--money"
@@ -475,25 +500,39 @@ export default function OutsourcingOrderForm({
                 addLabel="添加条目"
                 onAdd={() => {
                   const currentLines = form.getFieldValue('items') || []
-                  requestLineItemScroll(currentLines.length)
                   add(createBlankOutsourcingLine(getNextLineNo(currentLines)))
+                  requestLineItemScroll(currentLines.length)
                 }}
                 stats={[
                   {
                     key: 'count',
                     label: '已录入',
-                    value: lineSummary.count,
+                    value: fields.length,
                     suffix: '条',
                   },
                   {
                     key: 'quantity',
                     label: '数量合计',
-                    value: formatSummaryNumber(lineSummary.quantity, 3),
+                    value: (
+                      <BusinessLineItemsSummaryValue
+                        summarize={summarizeLines}
+                        select={(summary) =>
+                          formatSummaryNumber(summary.quantity, 3)
+                        }
+                      />
+                    ),
                   },
                   {
                     key: 'amount',
                     label: '金额合计',
-                    value: formatSummaryNumber(lineSummary.amount, 2),
+                    value: (
+                      <BusinessLineItemsSummaryValue
+                        summarize={summarizeLines}
+                        select={(summary) =>
+                          formatSummaryNumber(summary.amount, 2)
+                        }
+                      />
+                    ),
                   },
                 ]}
               />

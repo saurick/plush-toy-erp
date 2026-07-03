@@ -6,11 +6,28 @@ import test from "node:test";
 
 import { demoCustomerPackage } from "../../config/customers/demo/customerPackage.mjs";
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
+import { getNavigationSections } from "../../web/src/erp/config/seedData.mjs";
 import {
+  RUNTIME_PAGE_KEYS,
   buildRuntimeManifest,
   runCustomerConfigRuntimeManifest,
+  runCustomerConfigRuntimeManifestMany,
   validateRuntimeManifest,
 } from "./customer-config-runtime-manifest.mjs";
+
+function navigationPageKeys() {
+  return getNavigationSections().flatMap((section) =>
+    section.items.map((item) => item.key),
+  );
+}
+
+test("customer-config-runtime-manifest: runtime page allowlist follows desktop navigation truth", () => {
+  assert.deepEqual(RUNTIME_PAGE_KEYS, navigationPageKeys());
+  assert(RUNTIME_PAGE_KEYS.includes("sales-orders"));
+  assert(RUNTIME_PAGE_KEYS.includes("permission-center"));
+  assert(!RUNTIME_PAGE_KEYS.includes("help-center"));
+  assert(!RUNTIME_PAGE_KEYS.includes("operations-facts"));
+});
 
 test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shape", () => {
   const manifest = buildRuntimeManifest(yoyoosunCustomerPackage);
@@ -36,6 +53,53 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
   assert.equal(manifest.role_profiles.length, 9);
   assert.equal(manifest.work_pools.length, 18);
   assert.equal(manifest.work_pool_memberships.length, 18);
+  assert.equal(manifest.compiled_snapshot.flowCatalog.runtime_enabled, false);
+  assert.equal(manifest.compiled_snapshot.policyCatalog.runtime_enabled, false);
+  assert.equal(
+    manifest.compiled_snapshot.extensionPointCatalog.catalog_status,
+    "controlled_empty",
+  );
+  assert.equal(
+    manifest.compiled_snapshot.extensionPointCatalog.implementation_source,
+    "registered_deployment_package_required",
+  );
+  assert.equal(manifest.compiled_snapshot.extensionPointCatalog.handler_allowed, false);
+  assert.equal(
+    manifest.compiled_snapshot.extensionPointCatalog.customer_package_handler_allowed,
+    false,
+  );
+  assert.equal(
+    manifest.compiled_snapshot.printTemplateDefaults.runtime_enabled,
+    true,
+  );
+  assert.equal(
+    manifest.compiled_snapshot.printTemplateDefaults.formal_runtime_consumed,
+    true,
+  );
+  assert.equal(
+    manifest.compiled_snapshot.printTemplateDefaults.sales_order_print_template_enabled,
+    false,
+  );
+  assert.deepEqual(
+    manifest.compiled_snapshot.printTemplateDefaults.templates.map((item) => [
+      item.template_key,
+      item.party_defaults.buyerCompany,
+      item.runtime_consumed,
+      item.supplier_defaults_allowed,
+    ]),
+    [
+      ["material-purchase-contract", "东莞市永绅玩具有限公司", true, false],
+      ["processing-contract", "东莞市永绅玩具有限公司", true, false],
+    ],
+  );
+  assert.deepEqual(
+    manifest.compiled_snapshot.extensionPointCatalog.blocked_reasons,
+    [
+      "no_reviewed_extension_contract",
+      "customer_package_handler_forbidden",
+      "registered_deployment_package_required",
+    ],
+  );
   assert(manifest.access_entitlements.length > manifest.role_profiles.length);
   validateRuntimeManifest(manifest);
 });
@@ -92,6 +156,30 @@ test("customer-config-runtime-manifest: compiles neutral demo package without yo
   );
   assert.equal(manifest.role_profiles.length, 9);
   validateRuntimeManifest(manifest);
+});
+
+test("customer-config-runtime-manifest: repeated customer flags compile every requested package", () => {
+  const results = runCustomerConfigRuntimeManifestMany({
+    customers: ["yoyoosun", "demo"],
+    mode: "compile",
+    out: "",
+  });
+
+  assert.deepEqual(
+    results.map((result) => result.manifest.customer_key),
+    ["yoyoosun", "demo"],
+  );
+  assert.deepEqual(
+    results.map((result) => result.manifest.revision),
+    [
+      "yoyoosun-customer-package-v1.runtime-manifest-v1",
+      "demo-customer-package-v1.runtime-manifest-v1",
+    ],
+  );
+  for (const result of results) {
+    assert.equal(result.mode, "compile");
+    validateRuntimeManifest(result.manifest);
+  }
 });
 
 test("customer-config-runtime-manifest: proves same responsibility pool can map to different customer roles", () => {
@@ -549,6 +637,63 @@ test("customer-config-runtime-manifest: publishes only currently consumed field 
   );
 });
 
+test("customer-config-runtime-manifest: publishes preview-only flow, policy and extension catalogs", () => {
+  const manifest = buildRuntimeManifest(yoyoosunCustomerPackage);
+  const { flowCatalog, policyCatalog, extensionPointCatalog } =
+    manifest.compiled_snapshot;
+
+  assert.deepEqual(
+    flowCatalog.business_flows.map((flow) => flow.key).sort(),
+    [
+      "delivery_to_settlement",
+      "production_to_inventory",
+      "purchase_to_inventory",
+      "sales_to_production",
+    ],
+  );
+  assert.deepEqual(
+    flowCatalog.state_machines.map((stateMachine) => stateMachine.key).sort(),
+    [
+      "production_order_lifecycle",
+      "purchase_order_lifecycle",
+      "sales_order_lifecycle",
+    ],
+  );
+  assert.deepEqual(
+    policyCatalog.process_policies.map((policy) => policy.key).sort(),
+    ["auto_generate_policy", "close_policy", "skip_policy"],
+  );
+  assert(
+    policyCatalog.process_policies.every(
+      (policy) =>
+        policy.runtime_enabled === false &&
+        policy.rule_count > 0 &&
+        policy.rules.length === policy.rule_count,
+    ),
+  );
+  assert.deepEqual(policyCatalog.process_policies[0].rules, [
+    {
+      key: "skip_optional_review_when_unconfigured",
+      decision: "manual_review_required",
+    },
+  ]);
+  assert.equal(extensionPointCatalog.runtime_enabled, false);
+  assert.equal(extensionPointCatalog.catalog_status, "controlled_empty");
+  assert.equal(
+    extensionPointCatalog.implementation_source,
+    "registered_deployment_package_required",
+  );
+  assert.equal(extensionPointCatalog.handler_allowed, false);
+  assert.equal(extensionPointCatalog.customer_package_handler_allowed, false);
+  assert.deepEqual(extensionPointCatalog.blocked_reasons, [
+    "no_reviewed_extension_contract",
+    "customer_package_handler_forbidden",
+    "registered_deployment_package_required",
+  ]);
+  assert.deepEqual(extensionPointCatalog.extension_points, []);
+  validateRuntimeManifest(manifest);
+});
+
 test("customer-config-runtime-manifest: rejects empty or unknown page projections", () => {
   const manifest = buildRuntimeManifest(yoyoosunCustomerPackage);
 
@@ -656,6 +801,123 @@ test("customer-config-runtime-manifest: enforces entitlement and work pool integ
   assert.throws(
     () => validateRuntimeManifest(missingProcessCapabilityManifest),
     /order_review mapped role pmc must have workflow\.task\.complete/,
+  );
+});
+
+test("customer-config-runtime-manifest: rejects runtime-enabled policy and extension catalogs", () => {
+  const manifest = buildRuntimeManifest(yoyoosunCustomerPackage);
+
+  const runtimeFlowManifest = structuredClone(manifest);
+  runtimeFlowManifest.compiled_snapshot.flowCatalog.runtime_enabled = true;
+  assert.throws(
+    () => validateRuntimeManifest(runtimeFlowManifest),
+    /flowCatalog must not enable runtime flow execution/,
+  );
+
+  const runtimePolicyManifest = structuredClone(manifest);
+  runtimePolicyManifest.compiled_snapshot.policyCatalog.process_policies[0].runtime_enabled = true;
+  assert.throws(
+    () => validateRuntimeManifest(runtimePolicyManifest),
+    /skip_policy\.runtime_enabled must stay false/,
+  );
+
+  const emptyPolicyRulesManifest = structuredClone(manifest);
+  emptyPolicyRulesManifest.compiled_snapshot.policyCatalog.process_policies[0].rules = [];
+  assert.throws(
+    () => validateRuntimeManifest(emptyPolicyRulesManifest),
+    /skip_policy\.rules must match rule_count/,
+  );
+
+  const executablePolicyRulesManifest = structuredClone(manifest);
+  executablePolicyRulesManifest.compiled_snapshot.policyCatalog.process_policies[0].rules = [
+    {
+      key: "skip_optional_review_when_unconfigured",
+      decision: "manual_review_required",
+      handler: "customerPolicyHandler",
+    },
+  ];
+  assert.throws(
+    () => validateRuntimeManifest(executablePolicyRulesManifest),
+    /skip_policy\.rules\[0\]\.handler is not an allowed policy rule field/,
+  );
+
+  const runtimeExtensionManifest = structuredClone(manifest);
+  runtimeExtensionManifest.compiled_snapshot.extensionPointCatalog.catalog_status =
+    "contract_preview_only";
+  runtimeExtensionManifest.compiled_snapshot.extensionPointCatalog.extension_points = [
+    {
+      key: "customer_code_hook",
+      label: "客户代码扩展",
+      status: "preview_only",
+      runtime_enabled: true,
+      handler: "customerSpecificHandler",
+      guardrail: "invalid",
+    },
+  ];
+  assert.throws(
+    () => validateRuntimeManifest(runtimeExtensionManifest),
+    /customer_code_hook\.runtime_enabled must stay false/,
+  );
+});
+
+test("customer-config-runtime-manifest: extension points stay preview-only and non-executable", () => {
+  const manifest = buildRuntimeManifest({
+    ...yoyoosunCustomerPackage,
+    extensionPoints: Object.freeze([
+      Object.freeze({
+        key: "sales_order_acceptance_hook",
+        label: "销售订单受理扩展位",
+        status: "preview_only",
+        runtimeEnabled: false,
+        guardrail: "只声明扩展位，不允许客户包上传 handler。",
+      }),
+    ]),
+  });
+  const extensionPointCatalog = manifest.compiled_snapshot.extensionPointCatalog;
+  const [extensionPoint] = extensionPointCatalog.extension_points;
+
+  assert.equal(extensionPointCatalog.runtime_enabled, false);
+  assert.equal(extensionPointCatalog.catalog_status, "contract_preview_only");
+  assert.equal(
+    extensionPointCatalog.implementation_source,
+    "registered_deployment_package_required",
+  );
+  assert.equal(extensionPointCatalog.handler_allowed, false);
+  assert.equal(extensionPointCatalog.customer_package_handler_allowed, false);
+  assert.deepEqual(extensionPointCatalog.blocked_reasons, [
+    "no_reviewed_extension_contract",
+    "customer_package_handler_forbidden",
+    "registered_deployment_package_required",
+  ]);
+  assert.equal(extensionPoint.key, "sales_order_acceptance_hook");
+  assert.equal(extensionPoint.runtime_enabled, false);
+  assert.equal(extensionPoint.handler_allowed, false);
+  assert.equal(extensionPoint.customer_package_handler_allowed, false);
+  assert.equal(
+    extensionPoint.implementation_source,
+    "registered_deployment_package_required",
+  );
+  assert.deepEqual(extensionPoint.blocked_reasons, [
+    "no_reviewed_extension_contract",
+    "customer_package_handler_forbidden",
+    "registered_deployment_package_required",
+  ]);
+  validateRuntimeManifest(manifest);
+
+  const handlerManifest = structuredClone(manifest);
+  handlerManifest.compiled_snapshot.extensionPointCatalog.extension_points[0].handler =
+    "customerSpecificHandler";
+  assert.throws(
+    () => validateRuntimeManifest(handlerManifest),
+    /sales_order_acceptance_hook must not publish executable handlers/,
+  );
+
+  const missingBlockerManifest = structuredClone(manifest);
+  missingBlockerManifest.compiled_snapshot.extensionPointCatalog.extension_points[0].blocked_reasons =
+    [];
+  assert.throws(
+    () => validateRuntimeManifest(missingBlockerManifest),
+    /sales_order_acceptance_hook\.blocked_reasons must explain why runtime extension stays blocked/,
   );
 });
 
@@ -789,5 +1051,17 @@ test("customer-config-runtime-manifest: --out requires preview mode", () => {
         out: "output/customers/yoyoosun/customer-config-runtime-manifest.json",
       }),
     /--out requires --mode preview/,
+  );
+});
+
+test("customer-config-runtime-manifest: multi-customer preview output is rejected", () => {
+  assert.throws(
+    () =>
+      runCustomerConfigRuntimeManifestMany({
+        customers: ["yoyoosun", "demo"],
+        mode: "preview",
+        out: "output/customers/yoyoosun/customer-config-runtime-manifest.json",
+      }),
+    /--out only supports one customer runtime manifest/,
   );
 });

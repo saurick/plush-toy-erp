@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { customerPackageCatalog } from "../../config/catalog/customerPackageCatalog.mjs";
+import { customerPackageSchema } from "../../config/schemas/customerPackageSchema.mjs";
 import { demoCustomerPackage } from "../../config/customers/demo/customerPackage.mjs";
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
 import {
@@ -11,6 +12,7 @@ import {
   validateCatalog,
   validatePackage,
 } from "./customer-package-lint.mjs";
+import { getNavigationSections } from "../../web/src/erp/config/seedData.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 
@@ -201,37 +203,15 @@ const FORBIDDEN_RUNTIME_KEYS = Object.freeze([
   "records",
 ]);
 
-const RUNTIME_PAGE_KEYS = Object.freeze([
-  "global-dashboard",
-  "task-board",
-  "business-dashboard",
-  "customers",
-  "suppliers",
-  "products",
-  "materials",
-  "processes",
-  "sales-orders",
-  "material-bom",
-  "accessories-purchase",
-  "inbound",
-  "quality-inspections",
-  "inventory",
-  "processing-contracts",
-  "production-scheduling",
-  "production-progress",
-  "production-exceptions",
-  "shipping-release",
-  "outbound",
-  "shipments",
-  "reconciliation",
-  "payables",
-  "receivables",
-  "invoices",
-  "print-center",
-  "exception-flow",
-  "permission-center",
-  "system-audit-logs",
-]);
+function collectRuntimePageKeys() {
+  return getNavigationSections().flatMap((section) =>
+    (Array.isArray(section?.items) ? section.items : [])
+      .map((item) => String(item?.key || "").trim())
+      .filter(Boolean),
+  );
+}
+
+const RUNTIME_PAGE_KEYS = Object.freeze(collectRuntimePageKeys());
 
 const RUNTIME_FIELD_POLICY_SURFACES = Object.freeze({
   customers: Object.freeze({
@@ -567,13 +547,16 @@ function finishedGoodsDeliveryFactCommandContract(nodeKey) {
 function parseArgs(argv = process.argv.slice(2)) {
   const args = {
     customer: "yoyoosun",
+    customers: [],
     mode: "",
     out: "",
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--customer") {
-      args.customer = argv[index + 1] || "";
+      const customerKey = argv[index + 1] || "";
+      args.customer = customerKey;
+      args.customers.push(customerKey);
       index += 1;
     } else if (arg === "--mode") {
       args.mode = argv[index + 1] || "";
@@ -587,13 +570,18 @@ function parseArgs(argv = process.argv.slice(2)) {
       throw new Error(`unsupported argument: ${arg}`);
     }
   }
+  if (args.customers.length === 0) {
+    args.customers = [args.customer];
+  }
   return args;
 }
 
 function printHelp() {
   console.log(`Usage:
   node scripts/qa/customer-config-runtime-manifest.mjs --customer demo
+  node scripts/qa/customer-config-runtime-manifest.mjs --customer demo --customer yoyoosun
   node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun
+  node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode compile
   node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-config-runtime-manifest.json
 
 Modes:
@@ -1154,6 +1142,112 @@ function processDefinitionsFromPackage(config) {
   };
 }
 
+function flowCatalogFromPackage(config) {
+  return {
+    runtime_enabled: false,
+    catalog_status: "preview_only",
+    business_flows: config.businessFlows.map((flow) => ({
+      key: flow.key,
+      label: flow.label,
+      status: flow.status,
+      modules: [...flow.modules],
+      guardrail: flow.guardrail,
+    })),
+    state_machines: config.stateMachines.map((stateMachine) => ({
+      key: stateMachine.key,
+      label: stateMachine.label,
+      status: stateMachine.status,
+      states: [...stateMachine.states],
+      transitions: stateMachine.transitions.map((transition) => [...transition]),
+      guardrail: stateMachine.guardrail,
+    })),
+  };
+}
+
+function normalizeProcessPolicyRule(rule) {
+  const normalized = {};
+  for (const key of customerPackageSchema.allowedProcessPolicyRuleKeys) {
+    if (rule[key] != null) {
+      normalized[key] = String(rule[key]).trim();
+    }
+  }
+  return normalized;
+}
+
+function policyCatalogFromPackage(config) {
+  return {
+    runtime_enabled: false,
+    catalog_status: "preview_only",
+    process_policies: config.processPolicies.map((policy) => ({
+      key: policy.key,
+      kind: policy.kind,
+      label: policy.label,
+      status: policy.status,
+      runtime_enabled: false,
+      rule_count: policy.rules.length,
+      rules: policy.rules.map((rule) => normalizeProcessPolicyRule(rule)),
+      guardrail: policy.guardrail,
+    })),
+  };
+}
+
+function extensionPointCatalogFromPackage(config) {
+  const extensionRuntimeBlockers = [
+    "no_reviewed_extension_contract",
+    "customer_package_handler_forbidden",
+    "registered_deployment_package_required",
+  ];
+
+  return {
+    runtime_enabled: false,
+    catalog_status:
+      config.extensionPoints.length > 0 ? "contract_preview_only" : "controlled_empty",
+    implementation_source: "registered_deployment_package_required",
+    handler_allowed: false,
+    customer_package_handler_allowed: false,
+    blocked_reasons: [...extensionRuntimeBlockers],
+    extension_points: config.extensionPoints.map((extensionPoint) => ({
+      key: extensionPoint.key,
+      label: extensionPoint.label,
+      status: extensionPoint.status,
+      runtime_enabled: extensionPoint.runtimeEnabled,
+      implementation_source: "registered_deployment_package_required",
+      handler_allowed: false,
+      customer_package_handler_allowed: false,
+      blocked_reasons: [...extensionRuntimeBlockers],
+      guardrail: extensionPoint.guardrail,
+    })),
+  };
+}
+
+function printTemplateDefaultsFromPackage(config) {
+  const templates = (Array.isArray(config.printTemplateDefaults)
+    ? config.printTemplateDefaults
+    : []
+  ).map((item) => ({
+    template_key: item.templateKey,
+    status: "effective_session_projected",
+    runtime_consumed: true,
+    party_defaults: { ...(item.partyDefaults || {}) },
+    supplier_defaults_allowed: false,
+    guardrail: item.guardrail,
+  }));
+
+  return {
+    runtime_enabled: templates.length > 0,
+    catalog_status:
+      templates.length > 0
+        ? "effective_session_projected"
+        : "controlled_empty",
+    source: "customer_package_print_template_defaults",
+    formal_runtime_consumed: templates.length > 0,
+    sales_order_print_template_enabled: false,
+    templates,
+    guardrail:
+      "Customer package print defaults provide customer-specific buyer party display defaults through the reviewed customer_config effective session projection; supplier snapshots still come from business records.",
+  };
+}
+
 function compiledSnapshotFromPackage(config, catalog, processDefinitions = {}) {
   return {
     customer: {
@@ -1176,6 +1270,10 @@ function compiledSnapshotFromPackage(config, catalog, processDefinitions = {}) {
     fieldPolicies: fieldPoliciesFromCatalog(catalog),
     workPoolRoleOverrides: customerWorkPoolRoleOverrides(config, catalog),
     processDefinitions,
+    flowCatalog: flowCatalogFromPackage(config),
+    policyCatalog: policyCatalogFromPackage(config),
+    extensionPointCatalog: extensionPointCatalogFromPackage(config),
+    printTemplateDefaults: printTemplateDefaultsFromPackage(config),
     preview: buildPreview(config),
   };
 }
@@ -1557,6 +1655,126 @@ function validateProcessDefinitions(manifest, { workPoolKeys } = {}) {
   }
 }
 
+function validateFlowAndPolicyCatalogs(manifest) {
+  const flowCatalog = manifest.compiled_snapshot.flowCatalog;
+  assert(flowCatalog && typeof flowCatalog === "object", "compiled_snapshot.flowCatalog must exist");
+  assert(flowCatalog.runtime_enabled === false, "flowCatalog must not enable runtime flow execution");
+  assert(flowCatalog.catalog_status === "preview_only", "flowCatalog must stay preview_only");
+  assert(Array.isArray(flowCatalog.business_flows), "flowCatalog.business_flows must be an array");
+  assert(flowCatalog.business_flows.length >= 4, "flowCatalog must include the reviewed business flows");
+  assert(Array.isArray(flowCatalog.state_machines), "flowCatalog.state_machines must be an array");
+  assert(flowCatalog.state_machines.length >= 3, "flowCatalog must include reviewed state machine previews");
+  for (const stateMachine of flowCatalog.state_machines) {
+    assert(stateMachine.status === "preview_only", `${stateMachine.key}.status must stay preview_only`);
+    assert(Array.isArray(stateMachine.states) && stateMachine.states.length > 0, `${stateMachine.key}.states must not be empty`);
+    assert(Array.isArray(stateMachine.transitions), `${stateMachine.key}.transitions must be an array`);
+  }
+
+  const policyCatalog = manifest.compiled_snapshot.policyCatalog;
+  assert(policyCatalog && typeof policyCatalog === "object", "compiled_snapshot.policyCatalog must exist");
+  assert(policyCatalog.runtime_enabled === false, "policyCatalog must not enable arbitrary policy execution");
+  assert(policyCatalog.catalog_status === "preview_only", "policyCatalog must stay preview_only");
+  assert(Array.isArray(policyCatalog.process_policies), "policyCatalog.process_policies must be an array");
+  assert(policyCatalog.process_policies.length >= 3, "policyCatalog must include reviewed process policy previews");
+  const allowedPolicyKeys = new Set(customerPackageCatalog.policies.map((policy) => policy.key));
+  for (const policy of policyCatalog.process_policies) {
+    assert(allowedPolicyKeys.has(policy.key), `policyCatalog references unknown policy: ${policy.key}`);
+    assert(policy.status === "preview_only", `${policy.key}.status must stay preview_only`);
+    assert(policy.runtime_enabled === false, `${policy.key}.runtime_enabled must stay false`);
+    assert(policy.rule_count > 0, `${policy.key}.rule_count must be positive`);
+    assert(Array.isArray(policy.rules), `${policy.key}.rules must be an array`);
+    assert(policy.rules.length === policy.rule_count, `${policy.key}.rules must match rule_count`);
+    for (const [ruleIndex, rule] of policy.rules.entries()) {
+      const rulePath = `${policy.key}.rules[${ruleIndex}]`;
+      assert(rule && typeof rule === "object" && !Array.isArray(rule), `${rulePath} must be a rule object`);
+      assert(
+        customerPackageSchema.requiredProcessPolicyRuleTriggerKeys.some(
+          (key) => typeof rule[key] === "string" && rule[key].trim() !== "",
+        ),
+        `${rulePath} must declare key or when`,
+      );
+      assert(
+        customerPackageSchema.requiredProcessPolicyRuleResultKeys.some(
+          (key) => typeof rule[key] === "string" && rule[key].trim() !== "",
+        ),
+        `${rulePath} must declare decision or action`,
+      );
+      for (const [key, value] of Object.entries(rule)) {
+        assert(
+          customerPackageSchema.allowedProcessPolicyRuleKeys.includes(key),
+          `${rulePath}.${key} is not an allowed policy rule field`,
+        );
+        assert(typeof value === "string" && value.trim() !== "", `${rulePath}.${key} must be a non-empty string`);
+      }
+    }
+  }
+
+  const extensionPointCatalog = manifest.compiled_snapshot.extensionPointCatalog;
+  assert(
+    extensionPointCatalog && typeof extensionPointCatalog === "object",
+    "compiled_snapshot.extensionPointCatalog must exist",
+  );
+  assert(
+    extensionPointCatalog.runtime_enabled === false,
+    "extensionPointCatalog must not enable customer code execution",
+  );
+  assert(
+    ["controlled_empty", "contract_preview_only"].includes(extensionPointCatalog.catalog_status),
+    "extensionPointCatalog must declare controlled_empty or contract_preview_only until reviewed extension contracts exist",
+  );
+  assert(Array.isArray(extensionPointCatalog.extension_points), "extensionPointCatalog.extension_points must be an array");
+  assert(
+    extensionPointCatalog.extension_points.length > 0 ||
+      extensionPointCatalog.catalog_status === "controlled_empty",
+    "extensionPointCatalog must declare controlled_empty when no extension points are bound",
+  );
+  assert(
+    extensionPointCatalog.extension_points.length === 0 ||
+      extensionPointCatalog.catalog_status === "contract_preview_only",
+    "extensionPointCatalog must declare contract_preview_only when extension points are bound",
+  );
+  assert(
+    extensionPointCatalog.implementation_source === "registered_deployment_package_required",
+    "extensionPointCatalog must require registered deployment packages for implementations",
+  );
+  assert(
+    extensionPointCatalog.handler_allowed === false,
+    "extensionPointCatalog must not allow executable handlers",
+  );
+  assert(
+    extensionPointCatalog.customer_package_handler_allowed === false,
+    "extensionPointCatalog must not allow handlers from customer packages",
+  );
+  assert(
+    Array.isArray(extensionPointCatalog.blocked_reasons) &&
+      extensionPointCatalog.blocked_reasons.includes("no_reviewed_extension_contract") &&
+      extensionPointCatalog.blocked_reasons.includes("customer_package_handler_forbidden") &&
+      extensionPointCatalog.blocked_reasons.includes("registered_deployment_package_required"),
+    "extensionPointCatalog.blocked_reasons must explain why runtime extensions stay blocked",
+  );
+  for (const extensionPoint of extensionPointCatalog.extension_points) {
+    assert(extensionPoint.runtime_enabled === false, `${extensionPoint.key}.runtime_enabled must stay false`);
+    assert(extensionPoint.handler == null, `${extensionPoint.key} must not publish executable handlers`);
+    assert(extensionPoint.module == null, `${extensionPoint.key} must not publish executable modules`);
+    assert(
+      extensionPoint.implementation_source === "registered_deployment_package_required",
+      `${extensionPoint.key}.implementation_source must require registered deployment packages`,
+    );
+    assert(extensionPoint.handler_allowed === false, `${extensionPoint.key}.handler_allowed must stay false`);
+    assert(
+      extensionPoint.customer_package_handler_allowed === false,
+      `${extensionPoint.key}.customer_package_handler_allowed must stay false`,
+    );
+    assert(
+      Array.isArray(extensionPoint.blocked_reasons) &&
+        extensionPoint.blocked_reasons.includes("no_reviewed_extension_contract") &&
+        extensionPoint.blocked_reasons.includes("customer_package_handler_forbidden") &&
+        extensionPoint.blocked_reasons.includes("registered_deployment_package_required"),
+      `${extensionPoint.key}.blocked_reasons must explain why runtime extension stays blocked`,
+    );
+  }
+}
+
 function validateRuntimeManifest(manifest) {
   assert(typeof manifest.customer_key === "string" && manifest.customer_key.trim() !== "", "customer_key must be set");
   assert(typeof manifest.revision === "string" && manifest.revision.trim() !== "", "revision must be set");
@@ -1655,7 +1873,39 @@ function validateRuntimeManifest(manifest) {
     !fieldPolicies["sales_order_items.default"],
     "fieldPolicies must not publish sales order item draft fields before a runtime surface consumes them",
   );
+  validateFlowAndPolicyCatalogs(manifest);
   validateProcessDefinitions(manifest, { workPoolKeys });
+  const printTemplateDefaults = manifest.compiled_snapshot.printTemplateDefaults;
+  assert(
+    printTemplateDefaults && typeof printTemplateDefaults === "object" && !Array.isArray(printTemplateDefaults),
+    "compiled_snapshot.printTemplateDefaults must exist",
+  );
+  const hasPrintTemplates = printTemplateDefaults.templates.length > 0;
+  assert(
+    printTemplateDefaults.runtime_enabled === hasPrintTemplates,
+    "printTemplateDefaults runtime_enabled must match template presence",
+  );
+  assert(
+    printTemplateDefaults.formal_runtime_consumed === hasPrintTemplates,
+    "printTemplateDefaults formal runtime consumption must match effective session projection readiness",
+  );
+  assert(
+    printTemplateDefaults.sales_order_print_template_enabled === false,
+    "printTemplateDefaults must not enable sales order print templates",
+  );
+  assert(Array.isArray(printTemplateDefaults.templates), "printTemplateDefaults.templates must be an array");
+  for (const item of printTemplateDefaults.templates) {
+    assert(typeof item.template_key === "string" && item.template_key.trim() !== "", "print template default must include template_key");
+    assert(
+      item.status === "effective_session_projected",
+      `${item.template_key} print template default must be projected through effective session`,
+    );
+    assert(item.runtime_consumed === true, `${item.template_key} print template default must be marked runtime consumed`);
+    assert(item.supplier_defaults_allowed === false, `${item.template_key} must not override supplier business snapshots`);
+    assert(item.party_defaults && typeof item.party_defaults === "object", `${item.template_key} party_defaults must be an object`);
+    assert(Object.keys(item.party_defaults).length > 0, `${item.template_key} party_defaults must not be empty`);
+    assert(typeof item.guardrail === "string" && item.guardrail.trim() !== "", `${item.template_key} guardrail must be set`);
+  }
   assertNoForbiddenKeys(manifest);
 }
 
@@ -1686,16 +1936,51 @@ function runCustomerConfigRuntimeManifest(args) {
   };
 }
 
+function normalizeCustomerKeys(args) {
+  const requestedCustomers =
+    Array.isArray(args.customers) && args.customers.length > 0
+      ? args.customers
+      : [args.customer || "yoyoosun"];
+  const customerKeys = requestedCustomers.map((customerKey) =>
+    String(customerKey || "").trim(),
+  );
+  assert(
+    customerKeys.every((customerKey) => customerKey !== ""),
+    "--customer must be a non-empty customer key",
+  );
+  assert(
+    new Set(customerKeys).size === customerKeys.length,
+    "--customer entries must not be duplicated",
+  );
+  return customerKeys;
+}
+
+function runCustomerConfigRuntimeManifestMany(args) {
+  const customerKeys = normalizeCustomerKeys(args);
+  assert(
+    !args.out || customerKeys.length === 1,
+    "--out only supports one customer runtime manifest; run preview once per customer",
+  );
+  return customerKeys.map((customerKey) =>
+    runCustomerConfigRuntimeManifest({
+      ...args,
+      customer: customerKey,
+    }),
+  );
+}
+
 function main() {
   const args = parseArgs();
   if (args.help) {
     printHelp();
     return;
   }
-  const result = runCustomerConfigRuntimeManifest(args);
-  console.log(
-    `customer config runtime manifest ${result.mode} ok: ${result.manifest.customer_key}, revision=${result.manifest.revision}, modules=${result.manifest.module_states.length}, roles=${result.manifest.role_profiles.length}, entitlements=${result.manifest.access_entitlements.length}`,
-  );
+  const results = runCustomerConfigRuntimeManifestMany(args);
+  for (const result of results) {
+    console.log(
+      `customer config runtime manifest ${result.mode} ok: ${result.manifest.customer_key}, revision=${result.manifest.revision}, modules=${result.manifest.module_states.length}, roles=${result.manifest.role_profiles.length}, entitlements=${result.manifest.access_entitlements.length}`,
+    );
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -1703,7 +1988,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 export {
+  RUNTIME_PAGE_KEYS,
   buildRuntimeManifest,
   runCustomerConfigRuntimeManifest,
+  runCustomerConfigRuntimeManifestMany,
   validateRuntimeManifest,
 };

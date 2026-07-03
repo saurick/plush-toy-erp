@@ -13,6 +13,7 @@ import {
   blockWorkflowTaskAction,
   completeWorkflowTaskAction,
   listWorkflowTasks,
+  rejectWorkflowTaskAction,
   urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
 import {
@@ -34,8 +35,10 @@ import BusinessAttachmentModalButton from '../components/business-list/BusinessA
 import { getBusinessModule } from '../config/businessModules.mjs'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
-import { ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
+import { getRoleDisplayName } from '../utils/roleKeys.mjs'
 import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js'
+import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../utils/workflowTaskActionSubmitGuard.mjs'
+import { formatWorkflowTaskSource } from '../utils/dashboardTaskDisplay.mjs'
 import {
   getTaskOwnerRoleKey,
   getWorkflowTaskCodeLabel,
@@ -54,7 +57,10 @@ function businessActionModalTitle(title, description) {
   )
 }
 
-const WORKFLOW_ROLE_LABELS = new Map(Object.entries(ROLE_DISPLAY_NAMES))
+function workflowRoleOption(value) {
+  return { label: getRoleDisplayName(value, '责任岗位'), value }
+}
+
 const TASK_STATUS_OPTIONS = Object.freeze([
   { label: '全部状态', value: '' },
   { label: '待处理', value: 'pending' },
@@ -73,50 +79,43 @@ const DUE_DATE_FILTER_OPTIONS = Object.freeze([
 const MODULE_WORKFLOW_CONFIG = Object.freeze({
   'production-scheduling': {
     taskGroup: 'production_scheduling',
-    completeBusinessStatusKey: 'production_processing',
     completionMessage:
       '排程协同任务已完成，领料、完工和入库仍需进入对应事实模块。',
     emptyText: '暂无生产排程协同任务。',
     ownerRoleOptions: [
-      { label: 'PMC', value: 'pmc' },
-      { label: '生产', value: 'production' },
-      { label: '仓库', value: 'warehouse' },
+      workflowRoleOption('pmc'),
+      workflowRoleOption('production'),
+      workflowRoleOption('warehouse'),
     ],
     payloadScope: 'production_scheduling_workflow_only',
   },
   'production-exceptions': {
     taskGroup: 'production_exception',
-    completeBusinessStatusKey: 'production_processing',
     completionMessage:
       '异常协同任务已完成，返工、报废或库存调整仍需进入对应事实模块。',
     emptyText: '暂无生产异常协同任务。',
     ownerRoleOptions: [
-      { label: '生产', value: 'production' },
-      { label: 'PMC', value: 'pmc' },
-      { label: '品质', value: 'quality' },
-      { label: '仓库', value: 'warehouse' },
+      workflowRoleOption('production'),
+      workflowRoleOption('pmc'),
+      workflowRoleOption('quality'),
+      workflowRoleOption('warehouse'),
     ],
     payloadScope: 'production_exception_workflow_only',
   },
   'shipping-release': {
     taskGroup: 'shipment_release',
-    completeBusinessStatusKey: 'shipping_released',
     completionMessage:
       '出货放行协同任务已完成，真实出货仍需出货单进入 SHIPPED。',
     emptyText: '暂无出货放行协同任务。',
     ownerRoleOptions: [
-      { label: '仓库', value: 'warehouse' },
-      { label: '业务', value: 'sales' },
-      { label: '品质', value: 'quality' },
-      { label: '财务', value: 'finance' },
+      workflowRoleOption('warehouse'),
+      workflowRoleOption('sales'),
+      workflowRoleOption('quality'),
+      workflowRoleOption('finance'),
     ],
     payloadScope: 'shipment_release_workflow_only',
   },
 })
-
-function workflowPayloadOf(task = {}) {
-  return task.payload && typeof task.payload === 'object' ? task.payload : {}
-}
 
 function normalizeText(value = '') {
   return String(value || '')
@@ -138,12 +137,6 @@ function toUnixStartSeconds(value) {
 
 function getTaskID(task = {}) {
   return Number(task.id || 0)
-}
-
-function formatTaskSource(task = {}) {
-  if (task.source_no) return task.source_no
-  if (task.source_id) return '已关联业务记录'
-  return '未登记来源号'
 }
 
 export default function WorkflowBusinessModulePage({ moduleKey }) {
@@ -301,20 +294,27 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     Boolean(selectedTask) && selectedTaskActionAccess.canRun('complete')
   const canBlockSelected =
     Boolean(selectedTask) && selectedTaskActionAccess.canRun('block')
+  const canRejectSelected =
+    Boolean(selectedTask) && selectedTaskActionAccess.canRun('reject')
   const canUrgeSelected =
     Boolean(selectedTask) && selectedTaskActionAccess.canRun('urge')
 
   const completeWorkflowTask = useCallback(
     async (task) => {
+      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
+        task,
+        actionKey: 'complete',
+        onWarning: message.warning,
+        onError: message.error,
+      })
+      if (!accessVerified) return
       setTaskActionLoadingID(getTaskID(task))
       try {
         await completeWorkflowTaskAction({
-          id: task.id,
+          task_id: task.id,
           action_key: 'complete',
-          business_status_key: config.completeBusinessStatusKey,
           reason: '',
           payload: {
-            ...workflowPayloadOf(task),
             workflow_page_action: 'complete',
             workflow_page_scope: config.payloadScope,
           },
@@ -332,15 +332,21 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
 
   const blockWorkflowTask = useCallback(
     async (task, { reason = '' } = {}) => {
+      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
+        task,
+        actionKey: 'block',
+        reason,
+        onWarning: message.warning,
+        onError: message.error,
+      })
+      if (!accessVerified) return
       setTaskActionLoadingID(getTaskID(task))
       try {
         await blockWorkflowTaskAction({
-          id: task.id,
+          task_id: task.id,
           action_key: 'block',
-          business_status_key: 'blocked',
           reason,
           payload: {
-            ...workflowPayloadOf(task),
             blocked_reason: reason,
             workflow_page_action: 'block',
             workflow_page_scope: config.payloadScope,
@@ -357,8 +363,49 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     [config, loadWorkflowTasks]
   )
 
+  const rejectWorkflowTask = useCallback(
+    async (task, { reason = '' } = {}) => {
+      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
+        task,
+        actionKey: 'reject',
+        reason,
+        onWarning: message.warning,
+        onError: message.error,
+      })
+      if (!accessVerified) return
+      setTaskActionLoadingID(getTaskID(task))
+      try {
+        await rejectWorkflowTaskAction({
+          task_id: task.id,
+          action_key: 'reject',
+          reason,
+          payload: {
+            rejected_reason: reason,
+            workflow_page_action: 'reject',
+            workflow_page_scope: config.payloadScope,
+          },
+        })
+        message.success('退回原因已记录')
+        await loadWorkflowTasks()
+      } catch (error) {
+        message.error(getActionErrorMessage(error, '退回协同任务失败'))
+      } finally {
+        setTaskActionLoadingID(0)
+      }
+    },
+    [config, loadWorkflowTasks]
+  )
+
   const urgeWorkflowTaskFromPage = useCallback(
     async (task, { reason = '' } = {}) => {
+      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
+        task,
+        actionKey: 'urge',
+        reason,
+        onWarning: message.warning,
+        onError: message.error,
+      })
+      if (!accessVerified) return
       setUrgingTaskID(getTaskID(task))
       try {
         await urgeWorkflowTask({
@@ -366,9 +413,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           action: 'urge_task',
           reason,
           payload: {
-            source_type: task.source_type,
-            source_id: task.source_id,
-            source_no: task.source_no,
             entry_path: moduleItem?.path,
             workflow_page_scope: config.payloadScope,
           },
@@ -401,6 +445,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     }
     if (taskReasonModal.mode === 'block') {
       await blockWorkflowTask(selectedTask, { reason })
+    } else if (taskReasonModal.mode === 'reject') {
+      await rejectWorkflowTask(selectedTask, { reason })
     } else if (taskReasonModal.mode === 'urge') {
       await urgeWorkflowTaskFromPage(selectedTask, { reason })
     }
@@ -408,6 +454,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   }, [
     blockWorkflowTask,
     closeTaskReasonModal,
+    rejectWorkflowTask,
     selectedTask,
     taskReasonModal,
     urgeWorkflowTaskFromPage,
@@ -437,14 +484,13 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           dataIndex: 'source_no',
           key: 'source_no',
           width: 170,
-          render: (_, record) => formatTaskSource(record),
-          exportValue: formatTaskSource,
+          render: (_, record) => formatWorkflowTaskSource(record),
+          exportValue: formatWorkflowTaskSource,
         },
         {
           title: '状态',
           exportTitle: '状态',
-          dataIndex: 'task_status_key',
-          key: 'task_status_key',
+          key: 'task_status',
           width: 120,
           render: (_, record) => {
             const statusMeta = getWorkflowTaskStatusMeta(record)
@@ -455,8 +501,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         {
           title: '责任角色',
           exportTitle: '责任角色',
-          dataIndex: 'owner_role_key',
-          key: 'owner_role_key',
+          key: 'owner_role',
           width: 120,
           render: (_, record) => getWorkflowTaskOwnerRoleLabel(record),
           exportValue: (record) => getWorkflowTaskOwnerRoleLabel(record),
@@ -592,17 +637,14 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                   {
                     key: 'owner',
                     label: '责任',
-                    value:
-                      WORKFLOW_ROLE_LABELS.get(
-                        getTaskOwnerRoleKey(selectedTask)
-                      ) || getWorkflowTaskOwnerRoleLabel(selectedTask),
+                    value: getWorkflowTaskOwnerRoleLabel(selectedTask),
                   },
                 ]
               : []
           }
           boundaryText={
             selectedTaskReadonlyReason ||
-            '当前操作只调用 Workflow 后端 usecase；不写生产、库存、出货、财务、开票或收付款事实。'
+            '当前操作只调用后端协同任务规则；不写生产、库存、出货、财务、开票或收付款事实。'
           }
         >
           <Button
@@ -639,6 +681,19 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             onClick={() => openTaskReasonModal('block')}
           >
             标记阻塞
+          </Button>
+          <Button
+            size="small"
+            danger
+            icon={<ExclamationCircleOutlined />}
+            disabled={
+              selectedTaskActionAccess.loading ||
+              !canRejectSelected ||
+              taskActionLoadingID > 0
+            }
+            onClick={() => openTaskReasonModal('reject')}
+          >
+            退回任务
           </Button>
           <Button
             size="small"
@@ -705,11 +760,11 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           `请先选择一条${moduleItem.shortLabel}协同`
         }
         adminProfile={adminProfile}
-        roleLabelMap={WORKFLOW_ROLE_LABELS}
         onCompleteTask={
           canCompleteWorkflowTasks ? completeWorkflowTask : undefined
         }
         onBlockTask={canUpdateWorkflowTasks ? blockWorkflowTask : undefined}
+        onRejectTask={canUpdateWorkflowTasks ? rejectWorkflowTask : undefined}
         onUrgeTask={
           canUpdateWorkflowTasks ? urgeWorkflowTaskFromPage : undefined
         }
@@ -721,13 +776,23 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         className="erp-business-action-modal"
         width={520}
         title={businessActionModalTitle(
-          taskReasonModal?.mode === 'block' ? '标记阻塞' : '催办协同',
+          taskReasonModal?.mode === 'block'
+            ? '标记阻塞'
+            : taskReasonModal?.mode === 'reject'
+              ? '退回任务'
+              : '催办协同',
           selectedTaskLabel
         )}
         open={Boolean(taskReasonModal)}
         onCancel={closeTaskReasonModal}
         onOk={submitTaskReasonAction}
-        okText={taskReasonModal?.mode === 'block' ? '确认阻塞' : '确认催办'}
+        okText={
+          taskReasonModal?.mode === 'block'
+            ? '确认阻塞'
+            : taskReasonModal?.mode === 'reject'
+              ? '确认退回'
+              : '确认催办'
+        }
         confirmLoading={taskActionLoadingID > 0 || urgingTaskID > 0}
         destroyOnHidden
       >
@@ -739,7 +804,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           placeholder={
             taskReasonModal?.mode === 'block'
               ? '填写阻塞原因；只更新 Workflow 任务状态。'
-              : '填写催办原因；只记录协同事件。'
+              : taskReasonModal?.mode === 'reject'
+                ? '填写退回原因；只更新 Workflow 任务状态。'
+                : '填写催办原因；只记录协同事件。'
           }
           value={taskReasonModal?.reason || ''}
           onChange={(event) =>

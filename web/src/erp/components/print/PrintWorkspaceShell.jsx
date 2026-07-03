@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
+import { renderPrintValue } from './printValue.mjs'
+
 const PRINT_WORKSPACE_PREPARING_MIN_MS = 280
 
 function normalizeSearchText(value) {
@@ -32,7 +34,7 @@ export default function PrintWorkspaceShell({
 
     return fieldRows.filter((row) => {
       const haystack = normalizeSearchText(
-        `${row.label || ''} ${row.value || ''} ${row.key || ''}`
+        `${row.label ?? ''} ${row.value ?? ''} ${row.key ?? ''}`
       )
       return haystack.includes(normalizedQuery)
     })
@@ -149,7 +151,7 @@ export default function PrintWorkspaceShell({
                       <td className="erp-print-shell__field-value">
                         {row.readOnly ? (
                           <div className="erp-print-shell__field-static">
-                            {row.value || '-'}
+                            {renderPrintValue(row.value, '-')}
                           </div>
                         ) : row.multiline ? (
                           <textarea

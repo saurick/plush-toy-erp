@@ -875,30 +875,6 @@ export function setupJsonRpcMockServer() {
             error: '',
           }
         }
-      } else if (method === 'update_task_status') {
-        const task = mockWorkflowTasks.find(
-          (item) => Number(item.id) === Number(params.id)
-        )
-        if (!task) {
-          responseBody = makeJsonRpcBizError(id, 40010, '任务不存在')
-        } else {
-          task.task_status_key = params.task_status_key || task.task_status_key
-          task.business_status_key =
-            params.business_status_key || task.business_status_key
-          task.updated_at = nowUnix()
-          task.payload = params.payload || task.payload || {}
-          if (params.reason) task.blocked_reason = params.reason
-          if (task.task_status_key === 'processing' && !task.started_at) {
-            task.started_at = nowUnix()
-          }
-          if (task.task_status_key === 'done') task.completed_at = nowUnix()
-          responseBody = {
-            jsonrpc: '2.0',
-            id,
-            result: makeBizResult({ task }),
-            error: '',
-          }
-        }
       } else if (method === 'list_business_states') {
         const businessStates = mockWorkflowBusinessStates.filter((item) =>
           matchWorkflowFilter(item, params)

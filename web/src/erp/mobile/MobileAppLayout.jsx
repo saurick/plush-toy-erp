@@ -13,7 +13,7 @@ import { hasMobileRolePermission } from '../utils/mobileRolePermissions.mjs'
 
 export default function MobileAppLayout() {
   const navigate = useNavigate()
-  const { activeRole, activeRoleKey, isDesktopApp } = useERPWorkspace()
+  const { activeRole, activeRoleKey } = useERPWorkspace()
   const [loggingOut, setLoggingOut] = useState(false)
   const adminProfile = getStoredAdminProfile()
   const mobileRoleEntryAvailable =
@@ -34,12 +34,7 @@ export default function MobileAppLayout() {
   useEffect(() => {
     if (canUseCurrentMobileRole) return
     if (!mobileRoleEntryAvailable) {
-      if (isDesktopApp) {
-        navigate('/entry', { replace: true })
-        return
-      }
-      logout(AUTH_SCOPE.ADMIN)
-      navigate('/admin-login', { replace: true })
+      navigate('/entry', { replace: true })
       return
     }
     logout(AUTH_SCOPE.ADMIN)
@@ -47,16 +42,13 @@ export default function MobileAppLayout() {
       replace: true,
       state: {
         from: {
-          pathname: isDesktopApp
-            ? resolveMobileTasksPath(activeRoleKey) || '/entry'
-            : '/tasks',
+          pathname: resolveMobileTasksPath(activeRoleKey) || '/entry',
         },
       },
     })
   }, [
     activeRoleKey,
     canUseCurrentMobileRole,
-    isDesktopApp,
     mobileRoleEntryAvailable,
     navigate,
   ])
@@ -77,9 +69,7 @@ export default function MobileAppLayout() {
         replace: true,
         state: {
           from: {
-            pathname: isDesktopApp
-              ? resolveMobileTasksPath(activeRoleKey) || '/entry'
-              : '/tasks',
+            pathname: resolveMobileTasksPath(activeRoleKey) || '/entry',
           },
         },
       })

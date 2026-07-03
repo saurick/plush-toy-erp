@@ -10,7 +10,6 @@ const (
 	InventoryProcessCommandOutcomeInboundPosted           = "inventory.inbound_posted"
 	inventoryPostInboundProcessCommandBusinessRefType     = "purchase_receipt"
 	inventoryPostInboundProcessCommandPayloadReceiptID    = "purchase_receipt_id"
-	inventoryPostInboundProcessCommandPayloadLegacyID     = "id"
 	inventoryPostInboundProcessCommandPayloadReceiptNo    = "receipt_no"
 	inventoryPostInboundProcessCommandPayloadWarehouseID  = "warehouse_id"
 	inventoryPostInboundProcessCommandPayloadInventoryLot = "inventory_lot_id"
@@ -68,13 +67,6 @@ func purchaseReceiptIDFromProcessCommandPayload(payload map[string]any) (int, er
 	}
 	if hasReceiptID {
 		return receiptID, nil
-	}
-	legacyID, hasLegacyID, err := processCommandPositiveIntFromPayload(payload, inventoryPostInboundProcessCommandPayloadLegacyID)
-	if err != nil {
-		return 0, err
-	}
-	if hasLegacyID {
-		return legacyID, nil
 	}
 	return 0, ErrBadParam
 }

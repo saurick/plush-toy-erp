@@ -217,6 +217,12 @@ const BUSINESS_STATUS_BY_KEY = new Map(
 
 const BUSINESS_STATUS_REASON_REQUIRED_KEYS = new Set(['blocked', 'cancelled'])
 
+export function getBusinessStatusLabel(statusKey, fallback = '未知业务状态') {
+  const normalizedStatusKey = String(statusKey || '').trim()
+  if (!normalizedStatusKey) return fallback
+  return BUSINESS_STATUS_BY_KEY.get(normalizedStatusKey)?.label || fallback
+}
+
 export function getBusinessStatusTransitionOptions(currentStatusKey) {
   const transitionKeys = BUSINESS_STATUS_TRANSITION_KEYS[currentStatusKey] || []
   return transitionKeys

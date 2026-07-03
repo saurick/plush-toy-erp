@@ -4,20 +4,26 @@ import { message } from '@/common/utils/antdApp'
 import {
   blockWorkflowTaskAction,
   completeWorkflowTaskAction,
+  rejectWorkflowTaskAction,
   urgeWorkflowTask,
 } from '../../api/workflowApi.mjs'
-import { workflowPayloadOf } from './outsourcingOrderPageConfig.mjs'
+import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../../utils/workflowTaskActionSubmitGuard.mjs'
 
 export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
   const completeWorkflowTask = useCallback(
     async (task) => {
+      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
+        task,
+        actionKey: 'complete',
+        onWarning: message.warning,
+        onError: message.error,
+      })
+      if (!accessVerified) return
       await completeWorkflowTaskAction({
-        id: task.id,
+        task_id: task.id,
         action_key: 'complete',
-        business_status_key: task.business_status_key || undefined,
         reason: '',
         payload: {
-          ...workflowPayloadOf(task),
           outsourcing_order_page_action: 'complete',
         },
       })
@@ -29,13 +35,19 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
 
   const blockWorkflowTask = useCallback(
     async (task, { reason = '' } = {}) => {
+      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
+        task,
+        actionKey: 'block',
+        reason,
+        onWarning: message.warning,
+        onError: message.error,
+      })
+      if (!accessVerified) return
       await blockWorkflowTaskAction({
-        id: task.id,
+        task_id: task.id,
         action_key: 'block',
-        business_status_key: 'blocked',
         reason,
         payload: {
-          ...workflowPayloadOf(task),
           outsourcing_order_page_action: 'block',
           blocked_reason: reason,
         },
@@ -46,16 +58,46 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
     [loadWorkflowTasks]
   )
 
+  const rejectWorkflowTask = useCallback(
+    async (task, { reason = '' } = {}) => {
+      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
+        task,
+        actionKey: 'reject',
+        reason,
+        onWarning: message.warning,
+        onError: message.error,
+      })
+      if (!accessVerified) return
+      await rejectWorkflowTaskAction({
+        task_id: task.id,
+        action_key: 'reject',
+        reason,
+        payload: {
+          outsourcing_order_page_action: 'reject',
+          rejected_reason: reason,
+        },
+      })
+      message.success('退回原因已记录')
+      await loadWorkflowTasks()
+    },
+    [loadWorkflowTasks]
+  )
+
   const urgeOutsourcingWorkflowTask = useCallback(
     async (task, { reason = '' } = {}) => {
+      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
+        task,
+        actionKey: 'urge',
+        reason,
+        onWarning: message.warning,
+        onError: message.error,
+      })
+      if (!accessVerified) return
       await urgeWorkflowTask({
         task_id: task.id,
         action: 'urge_task',
         reason,
         payload: {
-          source_type: task.source_type,
-          source_id: task.source_id,
-          source_no: task.source_no,
           entry: 'outsourcing_order_page',
         },
       })
@@ -68,6 +110,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
   return {
     blockWorkflowTask,
     completeWorkflowTask,
+    rejectWorkflowTask,
     urgeOutsourcingWorkflowTask,
   }
 }

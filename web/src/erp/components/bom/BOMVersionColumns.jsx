@@ -29,14 +29,19 @@ const BOM_STATUS_COLORS = {
   DISABLED: 'red',
 }
 
+export function bomStatusText(status) {
+  const key = String(status || '')
+    .trim()
+    .toUpperCase()
+  return BOM_STATUS_LABELS[key] || (key ? 'BOM 状态' : '-')
+}
+
 function bomStatusTag(status) {
   const key = String(status || '')
     .trim()
     .toUpperCase()
   return (
-    <Tag color={BOM_STATUS_COLORS[key] || 'default'}>
-      {BOM_STATUS_LABELS[key] || key || '-'}
-    </Tag>
+    <Tag color={BOM_STATUS_COLORS[key] || 'default'}>{bomStatusText(key)}</Tag>
   )
 }
 
@@ -66,10 +71,9 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       exportTitle: '状态',
       dataIndex: 'status',
       width: 110,
-      sortValue: (record) => BOM_STATUS_LABELS[record.status] || record.status,
+      sortValue: (record) => bomStatusText(record.status),
       render: bomStatusTag,
-      exportValue: (record) =>
-        BOM_STATUS_LABELS[record.status] || record.status,
+      exportValue: (record) => bomStatusText(record.status),
     },
     {
       title: '生效开始',

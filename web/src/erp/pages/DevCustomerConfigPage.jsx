@@ -22,7 +22,7 @@ import {
   Typography,
 } from 'antd'
 import { useSearchParams } from 'react-router-dom'
-import { message } from '@/common/utils/antdApp'
+import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   activateCustomerConfig,
@@ -51,7 +51,62 @@ const VIEW_OPTIONS = [
   { label: '导入工作台 / Import', value: VIEW_IMPORT },
 ]
 
+const STATUS_LABELS = Object.freeze({
+  已接前端运行时: '已接前端运行时',
+  草案: '草案',
+  未批准: '未批准',
+  禁止误接: '禁止误接',
+  未登记: '未登记',
+  runtime_frontend_only: '前端展示',
+  evidence_only: '只生成证据',
+  preview_only: '仅预览',
+  report_gate_only: '报告门禁',
+  passed: '已通过',
+  blocked: '阻塞',
+  blocked_by_design: '设计上阻断',
+  draft_only: '草案',
+  REVIEW_READY: '可人工评审',
+  PREVIEW_READY: '预检通过',
+  BLOCKED: '阻塞',
+  no_write: '不写入',
+  test_apply_ready: '可应用到当前后端',
+  test_apply_done: '当前后端已应用',
+  release_gate_required: '需要发布门禁',
+  separate_task_required: '需单独专项',
+  source_grounded: '真源已登记',
+  required: '必需',
+  registered_binding: '已登记绑定',
+  controlled_empty: '受控空目录',
+  contract_preview_only: '合同预览',
+  snapshot_supported: '支持快照',
+  audit_supported: '支持审计',
+  rollback_supported: '支持回滚',
+  enabled: '启用',
+  read_only: '只读',
+  disabled: '关闭',
+  启用: '启用',
+  只读: '只读',
+  关闭: '关闭',
+  待客户确认: '待客户确认',
+  暂不接运行时: '暂不接运行时',
+  后续评审: '后续评审',
+  effective_session_projected: '有效配置投影',
+})
+
+function statusText(status) {
+  const key = String(status || '').trim()
+  if (!key) return '-'
+  if (STATUS_LABELS[key]) return STATUS_LABELS[key]
+  return /[\u4e00-\u9fff]/u.test(key) ? key : '状态'
+}
+
+function guardItemLabel(item, fallbackLabel) {
+  const label = String(item?.label || '').trim()
+  return label || fallbackLabel
+}
+
 function StatusTag({ status }) {
+  const normalizedStatus = String(status || '').trim()
   const colorByStatus = {
     已接前端运行时: 'green',
     草案: 'gold',
@@ -76,14 +131,27 @@ function StatusTag({ status }) {
     separate_task_required: 'volcano',
     source_grounded: 'green',
     required: 'gold',
+    registered_binding: 'green',
+    controlled_empty: 'blue',
+    contract_preview_only: 'cyan',
+    snapshot_supported: 'green',
+    audit_supported: 'green',
+    rollback_supported: 'purple',
     enabled: 'green',
     read_only: 'gold',
     disabled: 'red',
+    启用: 'green',
+    只读: 'gold',
+    关闭: 'red',
     待客户确认: 'gold',
     暂不接运行时: 'orange',
     后续评审: 'default',
   }
-  return <Tag color={colorByStatus[status] || 'default'}>{status}</Tag>
+  return (
+    <Tag color={colorByStatus[normalizedStatus] || 'default'}>
+      {statusText(normalizedStatus)}
+    </Tag>
+  )
 }
 
 function DecisionCard({ item }) {
@@ -129,7 +197,7 @@ function ReviewChecklistItem({ item }) {
         </div>
         <Text type="secondary">{item.role}</Text>
         <Text className="erp-dev-customer-review-item__path">
-          {item.sourcePath}
+          {item.sourceLabel || '来源已登记'}
         </Text>
       </div>
       <Text>{item.nextAction}</Text>
@@ -142,7 +210,7 @@ function SourceReference({ item }) {
     <article className="erp-dev-customer-source-ref">
       <div>
         <Text strong>{item.label}</Text>
-        <Text type="secondary">{item.sourcePath}</Text>
+        <Text type="secondary">{item.sourceLabel || '来源已登记'}</Text>
       </div>
       <StatusTag status={item.status} />
     </article>
@@ -208,6 +276,29 @@ function CommandList({ commands = [] }) {
   )
 }
 
+function buildDryRunReportPreviewLines(result = {}) {
+  const summary = result.summary || {}
+  const actionCounts = summary.candidateCountsByAction || {}
+  const unresolvedCounts = summary.unresolvedCountsBySeverity || {}
+
+  if (!result.reportPreview && !result.reportPath) {
+    return []
+  }
+
+  return [
+    '试跑报告摘要',
+    `来源行：${summary.totalSources ?? '-'}`,
+    `候选创建：${actionCounts.create || 0}`,
+    `阻塞项：${summary.blockerCount ?? 0}`,
+    `正式导入：${summary.canExecuteRealImport ? '可执行' : '不可执行'}`,
+    `未决队列：阻塞 ${unresolvedCounts.block || 0} / 延后 ${
+      unresolvedCounts.defer || 0
+    } / 复核 ${unresolvedCounts.review || 0}`,
+    '边界：只生成证据，不写业务数据库，不代表正式导入批准。',
+    `原始报告：${result.reportPath || '未生成'}`,
+  ]
+}
+
 function DryRunSummary({ dryRunState, onRunDryRun }) {
   const [showReportPreview, setShowReportPreview] = useState(false)
 
@@ -216,8 +307,8 @@ function DryRunSummary({ dryRunState, onRunDryRun }) {
       <Alert
         type="info"
         showIcon
-        message="尚未运行测试 Dry Run"
-        description="点击运行后会调用本地开发服务，只生成 output evidence，不写后端数据库。"
+        message="尚未运行测试试跑"
+        description="点击运行后会调用本地开发服务，只生成本地输出证据，不写后端数据库。"
       />
     )
   }
@@ -227,8 +318,8 @@ function DryRunSummary({ dryRunState, onRunDryRun }) {
       <Alert
         type="info"
         showIcon
-        message="Dry Run 正在生成"
-        description="正在读取 fixture source snapshot 与现有 V1 sample，完成后会回显报告路径和阻塞数量。"
+        message="试跑正在生成"
+        description="正在读取固定样本快照与现有 V1 样本，完成后会回显报告路径和阻塞数量。"
       />
     )
   }
@@ -238,7 +329,7 @@ function DryRunSummary({ dryRunState, onRunDryRun }) {
       <Alert
         type="error"
         showIcon
-        message="Dry Run 生成失败"
+        message="试跑生成失败"
         description={dryRunState.error || '请查看 Vite 终端输出。'}
       />
     )
@@ -248,15 +339,16 @@ function DryRunSummary({ dryRunState, onRunDryRun }) {
   const summary = result.summary || {}
   const actionCounts = summary.candidateCountsByAction || {}
   const unresolvedCounts = summary.unresolvedCountsBySeverity || {}
-  const hasReportPreview = Boolean(result.reportPreview)
+  const reportPreviewLines = buildDryRunReportPreviewLines(result)
+  const hasReportPreview = reportPreviewLines.length > 0
 
   return (
     <div className="erp-dev-customer-dry-run-result">
       <Alert
         type="success"
         showIcon
-        message="Dry Run 已生成"
-        description="测试版 UI 已生成 evidence；该结果仍不代表正式导入批准。"
+        message="试跑已生成"
+        description="测试版页面已生成证据；该结果仍不代表正式导入批准。"
       />
       <div className="erp-dev-customer-dry-run-actions">
         <Button
@@ -264,7 +356,7 @@ function DryRunSummary({ dryRunState, onRunDryRun }) {
           loading={dryRunState.status === 'running'}
           onClick={onRunDryRun}
         >
-          重新运行 Dry Run
+          重新运行试跑
         </Button>
         <Button
           icon={<CopyOutlined />}
@@ -319,7 +411,7 @@ function DryRunSummary({ dryRunState, onRunDryRun }) {
       </div>
       {showReportPreview && hasReportPreview ? (
         <pre className="erp-dev-customer-dry-run-report">
-          {result.reportPreview}
+          {reportPreviewLines.join('\n')}
         </pre>
       ) : null}
     </div>
@@ -332,8 +424,8 @@ function TestApplySummary({ applyState, onApplyTestConfig }) {
       <Alert
         type="info"
         showIcon
-        message="尚未应用到测试环境"
-        description="点击后会编译受控 runtime manifest，并用当前管理员登录态调用后端 validate / publish / activate。"
+        message="尚未应用到当前后端"
+        description="点击后会编译受控运行时清单，并用当前管理员登录态调用当前后端校验、发布和激活。"
       />
     )
   }
@@ -344,7 +436,7 @@ function TestApplySummary({ applyState, onApplyTestConfig }) {
         type="info"
         showIcon
         message="正在应用测试配置"
-        description={applyState.step || '正在准备 runtime manifest。'}
+        description={applyState.step || '正在准备运行时清单。'}
       />
     )
   }
@@ -370,7 +462,7 @@ function TestApplySummary({ applyState, onApplyTestConfig }) {
         type="success"
         showIcon
         message="测试配置已应用"
-        description="后台和岗位任务端会通过 active customer config revision 读取测试配置投影；这不包含真实客户业务数据导入。"
+        description="后台和岗位任务端会通过有效客户配置版本读取测试配置投影；这不包含真实客户业务数据导入。"
       />
       <div className="erp-dev-customer-test-apply-actions">
         <Button
@@ -384,7 +476,7 @@ function TestApplySummary({ applyState, onApplyTestConfig }) {
           icon={<CopyOutlined />}
           onClick={() => copyText(result.manifestPath || '')}
         >
-          复制 Manifest 路径
+          复制清单路径
         </Button>
         <Button
           icon={<CopyOutlined />}
@@ -425,7 +517,7 @@ function TestApplySummary({ applyState, onApplyTestConfig }) {
         </div>
       </div>
       <div className="erp-dev-customer-test-apply-session">
-        <Text type="secondary">当前 effective session</Text>
+        <Text type="secondary">当前有效配置投影</Text>
         <Text>
           {session.source || '-'} / {session.configRevision || '-'}
         </Text>
@@ -447,7 +539,7 @@ function ReleaseApplySummary({
         type="info"
         showIcon
         message="尚未检查发布门禁"
-        description="先检查 release evidence、manifest hash 绑定和发布前证据；门禁通过后才允许发布到正式版。"
+        description="先检查发布证据、清单指纹绑定和发布前证据；门禁通过后才允许发布到正式版。"
       />
     )
   }
@@ -458,7 +550,7 @@ function ReleaseApplySummary({
         type="info"
         showIcon
         message="正在检查发布门禁"
-        description="正在编译正式版 runtime manifest，并校验 release evidence。"
+        description="正在编译正式版运行时清单，并校验发布证据。"
       />
     )
   }
@@ -482,7 +574,7 @@ function ReleaseApplySummary({
           type="warning"
           showIcon
           message="发布门禁未通过"
-          description="正式版不能直接发布；先补齐下列 release evidence，再重新检查。"
+          description="正式版不能直接发布；先补齐下列发布证据，再重新检查。"
         />
         <div className="erp-dev-customer-release-missing">
           {missing.slice(0, 8).map((item) => (
@@ -528,7 +620,7 @@ function ReleaseApplySummary({
         description={
           isReady
             ? '可以发布到正式版；发布仍只调用后端 customer_config 控制面，不导入业务数据。'
-            : '正式版 active revision 已切换；后台和岗位任务端会读取该配置投影。'
+            : '正式版有效配置版本已切换；后台和岗位任务端会读取该配置投影。'
         }
       />
       <div className="erp-dev-customer-release-actions">
@@ -545,7 +637,7 @@ function ReleaseApplySummary({
           icon={<CopyOutlined />}
           onClick={() => copyText(result.manifestPath || '')}
         >
-          复制 Manifest 路径
+          复制清单路径
         </Button>
       </div>
       <div className="erp-dev-customer-release-facts">
@@ -566,7 +658,7 @@ function ReleaseApplySummary({
           <Text strong>{summary.moduleStateCount ?? '-'}</Text>
         </div>
         <div>
-          <Text type="secondary">当前 effective session</Text>
+          <Text type="secondary">当前有效配置投影</Text>
           <Text strong>
             {session.source || '-'} / {session.configRevision || '-'}
           </Text>
@@ -597,13 +689,23 @@ function DatabaseTargetCard({ item }) {
     <article className="erp-dev-customer-db-target">
       <div className="erp-dev-customer-db-target__head">
         <Text strong>{item.label}</Text>
-        <StatusTag status={item.status} />
+        <Space wrap size={4}>
+          <StatusTag status={item.status} />
+          <Tag>{item.writeClassLabel || '未标记写入类别'}</Tag>
+          {item.writesBusinessData ? (
+            <Tag color="red">
+              {item.dataBoundaryLabel || '业务数据导入专项'}
+            </Tag>
+          ) : (
+            <Tag color="blue">{item.dataBoundaryLabel || '配置控制面'}</Tag>
+          )}
+        </Space>
       </div>
       <div className="erp-dev-customer-db-target__body">
         <Text type="secondary">目标 / Target</Text>
         <Text strong>{item.target}</Text>
         <Text type="secondary">写入 / Writes</Text>
-        <Text>{item.writes}</Text>
+        <Text>{item.writesLabel || item.writes}</Text>
       </div>
       <Text type="secondary">{item.reason}</Text>
     </article>
@@ -622,16 +724,69 @@ function FormalGateItem({ item }) {
   )
 }
 
+function ImportAssetScopeItem({ item }) {
+  return (
+    <article className="erp-dev-customer-db-target">
+      <div className="erp-dev-customer-db-target__head">
+        <Text strong>{item.label}</Text>
+        <Space wrap size={4}>
+          <Tag>{item.value}</Tag>
+          <StatusTag status={item.status} />
+        </Space>
+      </div>
+      <Text type="secondary">{item.note}</Text>
+    </article>
+  )
+}
+
+function RegistryCheckItem({ item }) {
+  return (
+    <article className="erp-dev-customer-formal-gate">
+      <div>
+        <Text strong>{item.label}</Text>
+        <Text type="secondary">{item.note}</Text>
+        <Text type="secondary">
+          {item.implementationSourceLabel || '实现来源未登记'}
+        </Text>
+      </div>
+      <StatusTag status={item.status} />
+    </article>
+  )
+}
+
+function CompiledCatalogItem({ item }) {
+  return (
+    <article className="erp-dev-customer-tool">
+      <div className="erp-dev-customer-tool__head">
+        <Space wrap>
+          <Text strong>{item.label}</Text>
+          <Tag>{item.summary}</Tag>
+        </Space>
+        <StatusTag status={item.status} />
+      </div>
+      <Space wrap size={4}>
+        <Tag>{item.runtimeEnabledLabel || '运行时关闭'}</Tag>
+        <Tag>{item.catalogStatusLabel || '目录状态未标记'}</Tag>
+        <Tag>{item.implementationSourceLabel || '实现来源未登记'}</Tag>
+        {item.handlerAllowed === false ? (
+          <Tag>{item.handlerAllowedLabel || '禁止客户包处理器'}</Tag>
+        ) : null}
+      </Space>
+      <Paragraph>{item.note}</Paragraph>
+    </article>
+  )
+}
+
 function CustomerPackageSelector({ overview, onChange }) {
   const options = (overview.registeredCustomers || []).map((item) => ({
     value: item.customerKey,
-    label: `${item.label} (${item.customerKey})`,
+    label: item.label,
   }))
   const matched = options.some((item) => item.value === overview.customerKey)
 
   return (
     <div className="erp-dev-customer-selector">
-      <Text type="secondary">客户包选择 / Customer Package</Text>
+      <Text type="secondary">客户包选择</Text>
       <Select
         value={matched ? overview.customerKey : undefined}
         placeholder="选择已登记客户包 / Select registered package"
@@ -678,7 +833,7 @@ function MissingCustomerPanel({ overview }) {
     <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-missing">
       <div className="erp-dev-customer-panel__head">
         <ExclamationCircleOutlined />
-        <Text strong>未登记客户配置包 / Missing Customer Package</Text>
+        <Text strong>未登记客户配置包</Text>
       </div>
       <Alert
         type="warning"
@@ -690,9 +845,7 @@ function MissingCustomerPanel({ overview }) {
         <Text type="secondary">已登记客户包 / Registered Packages</Text>
         <Space wrap>
           {(overview.registeredCustomers || []).map((item) => (
-            <Tag key={item.customerKey}>
-              {item.label} / {item.customerKey}
-            </Tag>
+            <Tag key={item.customerKey}>{item.label}</Tag>
           ))}
         </Space>
       </div>
@@ -755,7 +908,7 @@ function OverviewPanel({ overview, onNavigate }) {
           <QuickAction
             icon={<DatabaseOutlined />}
             title="看工具"
-            note="dry-run 和报告命令"
+            note="试跑和报告命令"
             status="blocked_by_design"
             onClick={() => onNavigate(VIEW_IMPORT)}
           />
@@ -777,14 +930,14 @@ function AssetsPanel({
     >
       <section className="erp-dev-customer-panel erp-dev-customer-panel--brand">
         <div className="erp-dev-customer-brand-mark">
-          {menuSummary.brand.brandMark || menuSummary.customerKey.slice(0, 1)}
+          {menuSummary.brand.brandMark || '客'}
         </div>
         <div>
           <Title level={2}>{menuSummary.brand.companyName}</Title>
           <Paragraph>{menuSummary.brand.systemName}</Paragraph>
           <Space wrap>
             <StatusTag status={menuSummary.runtimeStatus} />
-            <Tag>{menuSummary.sourcePath}</Tag>
+            <Tag>{menuSummary.sourceLabel || '来源已登记'}</Tag>
           </Space>
         </div>
       </section>
@@ -820,9 +973,9 @@ function AssetsPanel({
         <div className="erp-dev-customer-guard-list">
           {fieldNumberingSummary.boundaries.map((item) => (
             <div className="erp-dev-customer-guard" key={item.key}>
-              <Text>{item.key}</Text>
+              <Text>{guardItemLabel(item, '字段编号边界')}</Text>
               <Tag color={item.ok ? 'green' : 'red'}>
-                {item.ok ? 'false / ok' : String(item.value)}
+                {item.ok ? item.expectedLabel : item.valueLabel}
               </Tag>
             </div>
           ))}
@@ -845,7 +998,7 @@ function AssetsPanel({
                 <StatusTag status={candidate.decisionLabel} />
               </div>
               <Text className="erp-dev-customer-field__key">
-                {candidate.key} / {candidate.source}
+                {candidate.fieldKeyLabel} / {candidate.sourceLabel}
               </Text>
               <Paragraph>{candidate.note}</Paragraph>
             </article>
@@ -879,7 +1032,7 @@ function AssetsPanel({
           type="info"
           showIcon
           message="当前只展示采购合同和加工合同字段真源"
-          description="销售订单受理当前未接打印模板；客户抬头、签章和固定文案应留在客户配置或模板边界，不进入 Product Core 表单。"
+          description="销售订单受理当前未接打印模板；客户抬头、签章和固定文案应留在客户配置或模板边界，不进入产品核心表单。"
         />
         <div className="erp-dev-customer-tool-list">
           {printTemplateSummary.templates.map((template) => (
@@ -887,8 +1040,10 @@ function AssetsPanel({
               <div className="erp-dev-customer-tool__head">
                 <Space wrap>
                   <Text strong>{template.title}</Text>
-                  <Tag>{template.key}</Tag>
-                  <Tag>{template.fieldTruthCount} fieldTruth</Tag>
+                  <Tag>{template.templateKeyLabel}</Tag>
+                  <Tag>{template.fieldTruthCountLabel}</Tag>
+                  <Tag>{template.fieldRequirementCountLabel}</Tag>
+                  <Tag>{template.factBoundaryLabel}</Tag>
                 </Space>
                 <StatusTag status={template.readiness} />
               </div>
@@ -896,6 +1051,21 @@ function AssetsPanel({
               <div className="erp-dev-customer-field-list">
                 {template.fieldTruth.map((truth) => (
                   <Text key={truth}>{truth}</Text>
+                ))}
+              </div>
+              <div className="erp-dev-customer-tool-list mt-3">
+                {template.fieldRequirementItems.map((requirement) => (
+                  <div
+                    className="erp-dev-customer-asset"
+                    key={`${template.key}-${requirement.label}`}
+                  >
+                    <Space wrap>
+                      <Text strong>{requirement.label}</Text>
+                      <Tag>{requirement.requirementKeyLabel}</Tag>
+                    </Space>
+                    <Text type="secondary">{requirement.sourceLabel}</Text>
+                    <Paragraph>{requirement.boundary}</Paragraph>
+                  </div>
                 ))}
               </div>
             </article>
@@ -920,9 +1090,9 @@ function PreflightPanel({ consoleSummary, customerPackageSummary }) {
         <div className="erp-dev-customer-guard-list">
           {customerPackageSummary.boundaries.map((item) => (
             <div className="erp-dev-customer-guard" key={item.key}>
-              <Text>{item.key}</Text>
+              <Text>{guardItemLabel(item, '客户配置包边界')}</Text>
               <Tag color={item.ok ? 'green' : 'red'}>
-                {item.ok ? String(item.expected) : String(item.value)}
+                {item.ok ? item.expectedLabel : item.valueLabel}
               </Tag>
             </div>
           ))}
@@ -943,11 +1113,28 @@ function PreflightPanel({ consoleSummary, customerPackageSummary }) {
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <DatabaseOutlined />
-          <Text strong>资产摘要 / Asset Summary</Text>
+          <Text strong>导入资产范围 / Import Asset Scope</Text>
         </div>
         <div className="erp-dev-customer-asset-grid">
           {consoleSummary.assetSummary.map((item) => (
             <AssetTile item={item} key={item.key} />
+          ))}
+        </div>
+      </section>
+      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+        <div className="erp-dev-customer-panel__head">
+          <DatabaseOutlined />
+          <Text strong>客户包对象 / Package Objects</Text>
+        </div>
+        <Alert
+          type="info"
+          showIcon
+          message="只导入配置对象，不导入任意代码、SQL 或业务事实"
+          description="本页覆盖配置、规则、流程编排、策略绑定、扩展点绑定、模板和导入映射；策略实现与扩展点实现必须来自产品核心、行业模板或已注册客户部署包。"
+        />
+        <div className="erp-dev-customer-db-targets">
+          {consoleSummary.packageAssetScope.map((item) => (
+            <ImportAssetScopeItem item={item} key={item.key} />
           ))}
         </div>
       </section>
@@ -959,8 +1146,8 @@ function PreflightPanel({ consoleSummary, customerPackageSummary }) {
         <Alert
           type="info"
           showIcon
-          message="moduleStates 只编译为客户配置控制面输入"
-          description="默认 catalog 模块会编译为 enabled；客户包若声明 read_only / disabled 必须带 reason。这里不安装或卸载模块，也不证明完整模块关闭流程已交付。"
+          message="模块状态只编译为客户配置控制面输入"
+          description="默认登记模块会按启用编译；客户包若声明只读或关闭必须带原因。这里不安装或卸载模块，也不证明完整模块关闭流程已交付。"
         />
         <div className="erp-dev-customer-tool-list">
           {customerPackageSummary.moduleStates.map((item) => (
@@ -968,12 +1155,42 @@ function PreflightPanel({ consoleSummary, customerPackageSummary }) {
               <div className="erp-dev-customer-tool__head">
                 <Space wrap>
                   <Text strong>{item.label}</Text>
-                  <Tag>{item.moduleKey}</Tag>
-                  {item.overridden ? <Tag>override</Tag> : null}
+                  <Tag>{item.sourceLabel}</Tag>
+                  {item.overridden ? <Tag>已覆盖</Tag> : null}
                 </Space>
-                <StatusTag status={item.state} />
+                <StatusTag status={item.stateLabel} />
               </div>
               <Paragraph>{item.reason}</Paragraph>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--print-template-defaults">
+        <div className="erp-dev-customer-panel__head">
+          <FileTextOutlined />
+          <Text strong>打印默认方信息 / Print Party Defaults</Text>
+        </div>
+        <Alert
+          type="info"
+          showIcon
+          message="客户包只声明打印默认方信息草案"
+          description="这些默认值只进入客户配置包预检和运行时清单快照；正式打印工作台仍需后续通过客户配置投影接入，不覆盖供应商业务快照，不启用销售订单打印模板。"
+        />
+        <div className="erp-dev-customer-tool-list">
+          {customerPackageSummary.printTemplateDefaults.map((item) => (
+            <article className="erp-dev-customer-tool" key={item.templateKey}>
+              <div className="erp-dev-customer-tool__head">
+                <Space wrap>
+                  <Text strong>{item.templateLabel}</Text>
+                  <Tag>{item.defaultFieldCountLabel}</Tag>
+                  <Tag>{item.supplierDefaultsAllowedLabel}</Tag>
+                </Space>
+                <StatusTag status={item.status} />
+              </div>
+              <Text type="secondary">
+                {item.partyDefaultKeysLabel || '默认方字段未声明'}
+              </Text>
+              <Paragraph>{item.guardrail}</Paragraph>
             </article>
           ))}
         </div>
@@ -1012,7 +1229,29 @@ function PreflightPanel({ consoleSummary, customerPackageSummary }) {
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <DeploymentUnitOutlined />
-          <Text strong>工作流预览 / Workflows</Text>
+          <Text strong>编译目录投影</Text>
+        </div>
+        <div className="erp-dev-customer-tool-list">
+          {customerPackageSummary.compiledCatalogSummary.map((item) => (
+            <CompiledCatalogItem item={item} key={item.key} />
+          ))}
+        </div>
+      </section>
+      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+        <div className="erp-dev-customer-panel__head">
+          <SafetyCertificateOutlined />
+          <Text strong>策略与扩展点登记</Text>
+        </div>
+        <div className="erp-dev-customer-formal-gates">
+          {consoleSummary.registryChecks.map((item) => (
+            <RegistryCheckItem item={item} key={item.key} />
+          ))}
+        </div>
+      </section>
+      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+        <div className="erp-dev-customer-panel__head">
+          <DeploymentUnitOutlined />
+          <Text strong>工作流预览</Text>
         </div>
         <div className="erp-dev-customer-tool-list">
           {customerPackageSummary.workflows.map((workflow) => (
@@ -1022,11 +1261,10 @@ function PreflightPanel({ consoleSummary, customerPackageSummary }) {
                 <StatusTag status={workflow.status} />
               </div>
               <Space wrap>
-                <Tag>{workflow.key}</Tag>
-                <Tag>{workflow.nodeCount} nodes</Tag>
-                <Tag>{workflow.factBoundary}</Tag>
-                {workflow.ownerPools.map((pool) => (
-                  <Tag key={pool}>{pool}</Tag>
+                <Tag>{workflow.nodeCount} 个节点</Tag>
+                <Tag>{workflow.factBoundaryLabel}</Tag>
+                {(workflow.ownerPoolLabels || []).map((poolLabel) => (
+                  <Tag key={poolLabel}>{poolLabel}</Tag>
                 ))}
               </Space>
               <Paragraph>{workflow.guardrail}</Paragraph>
@@ -1037,7 +1275,7 @@ function PreflightPanel({ consoleSummary, customerPackageSummary }) {
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <ApartmentOutlined />
-          <Text strong>业务流转 / Business Flows</Text>
+          <Text strong>业务流转</Text>
         </div>
         <div className="erp-dev-customer-field-list">
           {customerPackageSummary.businessFlows.map((flow) => (
@@ -1047,7 +1285,7 @@ function PreflightPanel({ consoleSummary, customerPackageSummary }) {
                 <StatusTag status={flow.status} />
               </div>
               <Text className="erp-dev-customer-field__key">
-                {flow.key} / {(flow.modules || []).join(' -> ')}
+                {flow.flowKeyLabel} / {flow.moduleRouteLabel}
               </Text>
               <Paragraph>{flow.guardrail}</Paragraph>
             </article>
@@ -1057,7 +1295,7 @@ function PreflightPanel({ consoleSummary, customerPackageSummary }) {
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <CodeOutlined />
-          <Text strong>状态机与策略 / State Machines And Policies</Text>
+          <Text strong>状态机与策略</Text>
         </div>
         <div className="erp-dev-customer-numbering-list">
           {customerPackageSummary.stateMachines.map((item) => (
@@ -1065,7 +1303,7 @@ function PreflightPanel({ consoleSummary, customerPackageSummary }) {
               <div>
                 <Text strong>{item.label}</Text>
                 <Text type="secondary">
-                  {item.stateCount} states / {item.transitionCount} transitions
+                  {item.stateCountLabel} / {item.transitionCountLabel}
                 </Text>
               </div>
               <StatusTag status={item.status} />
@@ -1077,8 +1315,21 @@ function PreflightPanel({ consoleSummary, customerPackageSummary }) {
               <div>
                 <Text strong>{item.label}</Text>
                 <Text type="secondary">
-                  {item.kind} / {item.ruleCount} rules
+                  {item.kindLabel} / {item.ruleCountLabel}
                 </Text>
+                {(item.ruleItems || []).length > 0 ? (
+                  <div className="erp-dev-customer-policy-rule-list">
+                    {item.ruleItems.map((rule) => (
+                      <div
+                        className="erp-dev-customer-policy-rule"
+                        key={rule.key}
+                      >
+                        <Text>{rule.triggerLabel}</Text>
+                        <Text type="secondary">{rule.resultLabel}</Text>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
               <StatusTag status={item.status} />
               <Paragraph>{item.guardrail}</Paragraph>
@@ -1089,14 +1340,14 @@ function PreflightPanel({ consoleSummary, customerPackageSummary }) {
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <CopyOutlined />
-          <Text strong>预检命令 / Preflight Commands</Text>
+          <Text strong>预检命令</Text>
         </div>
         <CommandList commands={consoleSummary.qaCommands} />
       </section>
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <CodeOutlined />
-          <Text strong>来源路径 / Source References</Text>
+          <Text strong>来源路径</Text>
         </div>
         <div className="erp-dev-customer-source-ref-list">
           {consoleSummary.sourceReferences.map((item) => (
@@ -1149,7 +1400,7 @@ function DiffPanel({ consoleSummary }) {
             <div className="erp-dev-customer-guard" key={gate.key}>
               <Text>{gate.label}</Text>
               <Tag color={gate.enabled ? 'green' : 'red'}>
-                {gate.enabled ? 'enabled' : 'disabled'}
+                {gate.enabled ? '已开启' : '未开启'}
               </Tag>
             </div>
           ))}
@@ -1164,7 +1415,7 @@ function DiffPanel({ consoleSummary }) {
           type="warning"
           showIcon
           message="当前不可正式导入"
-          description="Dry Run 和 execution report 只能生成评审证据；没有客户确认、备份 evidence、未匹配队列清零和单独真实导入任务前，不允许写数据库。"
+          description="试跑和执行报告只能生成评审证据；没有客户确认、备份证据、未匹配队列清零和单独真实导入任务前，不允许写数据库。"
         />
       </section>
     </div>
@@ -1193,20 +1444,19 @@ function ImportPanel({
         </div>
         <div className="erp-dev-customer-import-hero__copy">
           <Text strong>
-            当前页支持测试版 Dry Run 和测试环境应用；正式发布必须通过 release
-            evidence 门禁。
+            当前页支持测试版试跑和本地/测试后端应用；正式发布必须通过发布证据门禁。
           </Text>
           <Text type="secondary">
             这里把参考文档里的上传、解析、预检、Dry
             Run、正式导入、发布和审计流程压缩成当前可执行的开发态工作台；不会上传
-            raw 包，不会直接写业务事实。
+            原始包，不会直接写业务事实。
           </Text>
         </div>
         <Alert
           type="info"
           showIcon
-          message="测试环境应用只写客户配置控制面"
-          description="UI Dry Run 不写数据库；应用到测试环境会调用后端 customer_config validate / publish / activate，让后台和岗位任务端读取 active revision。真实客户业务数据导入仍是单独专项。"
+          message="本地/测试后端应用只写客户配置控制面"
+          description="页面试跑不写数据库；应用到当前后端会调用客户配置校验、发布和激活。本地开发默认写 8300；若连接测试环境必须先确认后端目标。真实客户业务数据导入仍是单独专项。"
         />
       </section>
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
@@ -1223,10 +1473,10 @@ function ImportPanel({
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <CheckCircleOutlined />
-          <Text strong>测试版 UI Dry Run</Text>
+          <Text strong>测试版页面试跑</Text>
         </div>
         <Paragraph type="secondary">
-          直接在页面生成 dry-run evidence；只写本地 output，不写数据库。
+          直接在页面生成试跑证据；只写本地输出目录，不写数据库。
         </Paragraph>
         <Button
           type="primary"
@@ -1234,17 +1484,18 @@ function ImportPanel({
           disabled={!importSummary.canRunUiDryRun}
           onClick={onRunDryRun}
         >
-          运行测试 Dry Run
+          运行测试试跑
         </Button>
         <DryRunSummary dryRunState={dryRunState} onRunDryRun={onRunDryRun} />
       </section>
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <DeploymentUnitOutlined />
-          <Text strong>测试环境应用 / Test Apply</Text>
+          <Text strong>本地/测试后端应用 / Local Or Test Apply</Text>
         </div>
         <Paragraph type="secondary">
-          一键把已选甲方配置应用到本地测试后端；成功后后台和岗位任务端会读取测试配置版本。
+          一键把已选甲方配置应用到当前后端的客户配置控制面；本地开发默认写
+          8300，若连接测试环境必须先确认后端目标。
         </Paragraph>
         <div className="erp-dev-customer-test-apply-primary">
           <Button
@@ -1253,11 +1504,10 @@ function ImportPanel({
             disabled={!importSummary.canApplyTestConfig}
             onClick={onApplyTestConfig}
           >
-            应用到测试环境
+            应用到当前后端
           </Button>
           <Text type="secondary">
-            validate / publish / activate / effective
-            session；不导入客户业务数据。
+            校验 / 发布 / 激活 / 有效配置投影；不导入客户业务数据。
           </Text>
         </div>
         <TestApplySummary
@@ -1285,7 +1535,7 @@ function ImportPanel({
           type="warning"
           showIcon
           message="正式版必须先过发布门禁"
-          description="发布版只写客户配置控制面；没有 manifest evidence、release evidence、管理员确认、审计和回滚方案前，发布按钮不可执行。"
+          description="发布版只写客户配置控制面；没有清单证据、发布证据、管理员确认、审计和回滚方案前，发布按钮不可执行。"
         />
         <div className="erp-dev-customer-release-primary">
           <Button
@@ -1322,22 +1572,35 @@ function ImportPanel({
       </section>
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
+          <SafetyCertificateOutlined />
+          <Text strong>版本快照 / 回滚 / 审计</Text>
+        </div>
+        <Alert
+          type="info"
+          showIcon
+          message="回滚只恢复配置版本，不删除业务事实"
+          description="客户配置版本写入配置控制面；发布 / 激活 / 回滚会记录脱敏运行审计。已产生的库存、出货、财务和业务单据必须走对应业务补偿，不能由配置回滚抹除。"
+        />
+        <div className="erp-dev-customer-formal-gates">
+          {importSummary.versionAuditSupport.map((item) => (
+            <FormalGateItem item={item} key={item.key} />
+          ))}
+        </div>
+      </section>
+      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+        <div className="erp-dev-customer-panel__head">
           <DatabaseOutlined />
           <Text strong>执行边界 / Execution Boundary</Text>
         </div>
         <div className="erp-dev-customer-import-flags">
-          <div>
-            <Text type="secondary">canExecuteRealImport</Text>
-            <Tag color="red">{String(importSummary.canExecuteRealImport)}</Tag>
-          </div>
-          <div>
-            <Text type="secondary">writesBusinessData</Text>
-            <Tag color="red">{String(importSummary.writesBusinessData)}</Tag>
-          </div>
-          <div>
-            <Text type="secondary">writesConfigControl</Text>
-            <Tag color="blue">{String(importSummary.writesDatabase)}</Tag>
-          </div>
+          {importSummary.executionFlagSummary.map((item) => (
+            <div key={item.key}>
+              <Text type="secondary">{item.label}</Text>
+              <Tag color={item.value === true ? 'blue' : 'red'}>
+                {item.valueLabel}
+              </Tag>
+            </div>
+          ))}
         </div>
         <CommandBlock command={importSummary.qaCommand} />
       </section>
@@ -1353,6 +1616,7 @@ function ImportPanel({
                 <Text strong>{tool.title}</Text>
                 <StatusTag status={tool.status} />
               </div>
+              {tool.note ? <Text type="secondary">{tool.note}</Text> : null}
               <CommandBlock command={tool.command} />
             </article>
           ))}
@@ -1429,10 +1693,10 @@ export default function DevCustomerConfigPage() {
         return
       }
       if (!response.ok) {
-        throw new Error(payload?.message || 'Dry Run 生成失败')
+        throw new Error('试跑生成失败')
       }
       setDryRunState({ status: 'success', result: payload })
-      message.success('Dry Run evidence 已生成')
+      message.success('试跑证据已生成')
     } catch (error) {
       if (error?.name === 'AbortError') {
         return
@@ -1442,9 +1706,9 @@ export default function DevCustomerConfigPage() {
       }
       setDryRunState({
         status: 'error',
-        error: getActionErrorMessage(error, 'Dry Run 生成失败'),
+        error: getActionErrorMessage(error, '试跑生成失败'),
       })
-      message.error('Dry Run 生成失败')
+      message.error('试跑生成失败')
     }
   }
 
@@ -1456,7 +1720,7 @@ export default function DevCustomerConfigPage() {
     applyAbortRef.current = controller
     setApplyState({
       status: 'running',
-      step: '正在编译 runtime manifest',
+      step: '正在编译运行时清单',
     })
 
     const ensureCurrent = () => applyRequestRef.current === requestId
@@ -1478,13 +1742,13 @@ export default function DevCustomerConfigPage() {
         return
       }
       if (!response.ok) {
-        throw new Error(manifestPayload?.message || 'Runtime manifest 编译失败')
+        throw new Error('运行时清单编译失败')
       }
       const { manifest } = manifestPayload
 
       setApplyState({
         status: 'running',
-        step: '正在调用 validate_customer_config',
+        step: '正在校验客户配置',
       })
       const validation = await validateCustomerConfig(manifest)
       if (!ensureCurrent()) {
@@ -1493,7 +1757,7 @@ export default function DevCustomerConfigPage() {
 
       setApplyState({
         status: 'running',
-        step: '正在调用 publish_customer_config',
+        step: '正在发布测试配置版本',
       })
       let publish = null
       let publishSkipped = false
@@ -1512,7 +1776,7 @@ export default function DevCustomerConfigPage() {
 
       setApplyState({
         status: 'running',
-        step: '正在调用 activate_customer_config',
+        step: '正在激活测试配置版本',
       })
       const activated = await activateCustomerConfig({
         customer_key: manifest.customer_key,
@@ -1524,7 +1788,7 @@ export default function DevCustomerConfigPage() {
 
       setApplyState({
         status: 'running',
-        step: '正在读取 get_effective_session',
+        step: '正在读取有效配置投影',
       })
       const effectiveSession = await getEffectiveSession({
         customer_key: manifest.customer_key,
@@ -1545,7 +1809,7 @@ export default function DevCustomerConfigPage() {
           steps: [
             {
               key: 'compile',
-              label: '编译 manifest',
+              label: '编译清单',
               status: 'passed',
               note: manifestPayload.manifestPath,
             },
@@ -1553,8 +1817,7 @@ export default function DevCustomerConfigPage() {
               key: 'validate',
               label: '后端校验',
               status: 'passed',
-              note:
-                validation?.config_hash || 'validate_customer_config passed',
+              note: validation?.config_hash || '客户配置校验通过',
             },
             {
               key: 'publish',
@@ -1562,21 +1825,19 @@ export default function DevCustomerConfigPage() {
               status: publishSkipped ? 'test_apply_done' : 'passed',
               note: publishSkipped
                 ? '当前 revision 已激活，跳过重复发布'
-                : publish?.status || 'publish_customer_config passed',
+                : publish?.status || '客户配置发布通过',
             },
             {
               key: 'activate',
               label: '激活测试版本',
               status: 'test_apply_done',
-              note: activated?.status || 'activate_customer_config passed',
+              note: activated?.status || '客户配置激活通过',
             },
             {
               key: 'session',
               label: '读取会话投影',
               status: 'test_apply_done',
-              note:
-                effectiveSession?.configRevision ||
-                'get_effective_session passed',
+              note: effectiveSession?.configRevision || '有效配置投影读取通过',
             },
           ],
         },
@@ -1598,6 +1859,18 @@ export default function DevCustomerConfigPage() {
       })
       message.error('测试配置应用失败')
     }
+  }
+
+  const requestApplyTestConfig = () => {
+    modal.confirm({
+      centered: true,
+      title: '确认应用测试配置？',
+      content:
+        '该操作会用当前管理员登录态写入当前后端的客户配置控制面，并激活测试配置版本；本地开发默认写 8300，若连接测试环境必须先确认后端目标；不会导入客户业务数据，也不代表正式发布通过。',
+      okText: '确认应用测试配置',
+      cancelText: '取消',
+      onOk: handleApplyTestConfig,
+    })
   }
 
   const handleCheckReleaseReadiness = async () => {
@@ -1627,7 +1900,7 @@ export default function DevCustomerConfigPage() {
         return
       }
       if (!response.ok) {
-        throw new Error(payload?.message || '发布门禁检查失败')
+        throw new Error('发布门禁检查失败')
       }
       if (payload.status === 'ready') {
         setReleaseState({ status: 'ready', result: payload })
@@ -1665,7 +1938,7 @@ export default function DevCustomerConfigPage() {
     releaseRequestRef.current = requestId
     setReleaseState({
       status: 'publishing',
-      step: '正在调用 validate_customer_config',
+      step: '正在校验客户配置',
       result: readiness,
     })
     const ensureCurrent = () => releaseRequestRef.current === requestId
@@ -1678,7 +1951,7 @@ export default function DevCustomerConfigPage() {
       }
       setReleaseState({
         status: 'publishing',
-        step: '正在调用 publish_customer_config',
+        step: '正在发布正式配置版本',
         result: readiness,
       })
       const publish = await publishCustomerConfig(manifest)
@@ -1687,7 +1960,7 @@ export default function DevCustomerConfigPage() {
       }
       setReleaseState({
         status: 'publishing',
-        step: '正在调用 activate_customer_config',
+        step: '正在激活正式配置版本',
         result: readiness,
       })
       const activated = await activateCustomerConfig({
@@ -1731,6 +2004,18 @@ export default function DevCustomerConfigPage() {
     }
   }
 
+  const requestApplyReleaseConfig = () => {
+    modal.confirm({
+      centered: true,
+      title: '确认发布正式配置？',
+      content:
+        '仅在 release readiness 已通过后继续。该操作会写入并激活正式客户配置控制面，不导入客户业务数据，也不替代生产部署、备份恢复或客户签收。',
+      okText: '确认发布正式配置',
+      cancelText: '取消',
+      onOk: handleApplyReleaseConfig,
+    })
+  }
+
   const panel = {
     [VIEW_OVERVIEW]: (
       <OverviewPanel overview={overview} onNavigate={setActiveView} />
@@ -1756,9 +2041,9 @@ export default function DevCustomerConfigPage() {
         applyState={applyState}
         releaseState={releaseState}
         onRunDryRun={handleRunDryRun}
-        onApplyTestConfig={handleApplyTestConfig}
+        onApplyTestConfig={requestApplyTestConfig}
         onCheckReleaseReadiness={handleCheckReleaseReadiness}
-        onApplyReleaseConfig={handleApplyReleaseConfig}
+        onApplyReleaseConfig={requestApplyReleaseConfig}
       />
     ),
   }[activeView]
@@ -1770,12 +2055,12 @@ export default function DevCustomerConfigPage() {
           <Space align="center" size={10}>
             <SettingOutlined className="erp-dev-customer-header__icon" />
             <Title className="erp-dev-customer-title" level={1}>
-              客户配置包预检控制台 / Package Preflight Console
+              客户配置包导入控制台 / Package Import Console
             </Title>
           </Space>
           <Text className="erp-dev-customer-summary">
-            dev-only，评审客户配置包；可 Dry Run、应用测试版，并在 release
-            evidence 通过后发布正式版。
+            dev-only，受控评审客户配置包；按上传解析、校验、差异、Dry
+            Run、草稿版本和发布推进，不上传任意代码、SQL 或脚本。
           </Text>
           <CustomerPackageSelector
             overview={overview}
@@ -1794,7 +2079,7 @@ export default function DevCustomerConfigPage() {
           <Text type="secondary">当前 URL customer / Query</Text>
           <Text strong>{overview.requestedCustomerKey}</Text>
           <Text type="secondary">
-            {overview.sourcePath || '未登记客户配置包'}
+            {overview.sourceLabel || '未登记客户配置包'}
           </Text>
         </div>
       </header>

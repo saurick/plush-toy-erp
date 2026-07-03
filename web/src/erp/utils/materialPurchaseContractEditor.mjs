@@ -50,6 +50,9 @@ export const MATERIAL_PURCHASE_DETAIL_COLUMNS = MATERIAL_DETAIL_COLUMNS
 export const MATERIAL_PURCHASE_MAX_ROWS = 300
 
 const DETAIL_COLUMN_KEYS = MATERIAL_DETAIL_COLUMNS.map((column) => column.key)
+const DETAIL_COLUMN_INDEX = Object.fromEntries(
+  MATERIAL_DETAIL_COLUMNS.map((column, index) => [column.key, index])
+)
 
 const toText = (value) =>
   String(value ?? '')
@@ -255,6 +258,17 @@ export const buildMaterialPurchaseContractDraft = (sample = {}) => {
   }
 }
 
+export const buildMaterialPurchaseContractBusinessDraft = (
+  draft = {},
+  templateSample = {}
+) =>
+  buildMaterialPurchaseContractDraft({
+    ...draft,
+    lines: Array.isArray(draft?.lines) ? draft.lines : [],
+    clauses: draft?.clauses || templateSample?.clauses,
+    merges: Array.isArray(draft?.merges) ? draft.merges : [],
+  })
+
 export const buildBlankMaterialPurchaseContractDraft = (draft = {}) => {
   const normalizedDraft = buildMaterialPurchaseContractDraft(draft)
   return {
@@ -286,19 +300,65 @@ export const clearMaterialPurchaseContractSignatureDraft = (draft = {}) => ({
   supplierSigner: '',
 })
 
-export const computeMaterialPurchaseTotals = (lines = []) => {
+const isMaterialPurchaseCellHiddenByMerge = (merges, rowIndex, columnKey) => {
+  const colIndex = DETAIL_COLUMN_INDEX[columnKey]
+  if (!Number.isInteger(colIndex) || !Array.isArray(merges)) {
+    return false
+  }
+
+  return merges.some((merge = {}) => {
+    const rowStart = Number(merge.rowStart)
+    const rowEnd = Number(merge.rowEnd)
+    const colStart = Number(merge.colStart)
+    const colEnd = Number(merge.colEnd)
+    if (
+      !Number.isInteger(rowStart) ||
+      !Number.isInteger(rowEnd) ||
+      !Number.isInteger(colStart) ||
+      !Number.isInteger(colEnd)
+    ) {
+      return false
+    }
+    if (
+      rowIndex < rowStart ||
+      rowIndex > rowEnd ||
+      colIndex < colStart ||
+      colIndex > colEnd
+    ) {
+      return false
+    }
+    return rowIndex !== rowStart || colIndex !== colStart
+  })
+}
+
+export const computeMaterialPurchaseTotals = (
+  lines = [],
+  { merges = [] } = {}
+) => {
   let quantityTotal = 0
   let amountTotal = 0
   let quantityHasValue = false
   let amountHasValue = false
 
-  ;(Array.isArray(lines) ? lines : []).forEach((line) => {
-    const quantity = parseNumeric(line?.quantity)
+  ;(Array.isArray(lines) ? lines : []).forEach((line, rowIndex) => {
+    const quantity = isMaterialPurchaseCellHiddenByMerge(
+      merges,
+      rowIndex,
+      'quantity'
+    )
+      ? Number.NaN
+      : parseNumeric(line?.quantity)
     if (Number.isFinite(quantity)) {
       quantityTotal += quantity
       quantityHasValue = true
     }
-    const amount = parseNumeric(line?.amount)
+    const amount = isMaterialPurchaseCellHiddenByMerge(
+      merges,
+      rowIndex,
+      'amount'
+    )
+      ? Number.NaN
+      : parseNumeric(line?.amount)
     if (Number.isFinite(amount)) {
       amountTotal += amount
       amountHasValue = true

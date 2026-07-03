@@ -19,7 +19,6 @@ export function resolveAdminPostLoginPath({
   defaultRedirect = '/erp/dashboard',
   fromMobileRoleKey = '',
   fixedMobileRoleKey = '',
-  isMobileApp = false,
   shouldRemember = true,
   rememberChoice = rememberEntryChoice,
 } = {}) {
@@ -41,7 +40,7 @@ export function resolveAdminPostLoginPath({
   }
 
   if (entryTarget === ENTRY_TARGET.DESKTOP) {
-    if (hasDesktopEntryAccess(adminProfile)) {
+    if (hasDesktopEntryAccess(adminProfile, entryConfig)) {
       if (shouldRemember) {
         rememberChoice(ENTRY_TARGET.DESKTOP)
       }
@@ -65,22 +64,22 @@ export function resolveAdminPostLoginPath({
       if (shouldRemember) {
         rememberChoice(ENTRY_TARGET.MOBILE_TASKS)
       }
-      return isMobileApp ? '/tasks' : resolveMobileTasksPath(requestedRoleKey)
+      return resolveMobileTasksPath(requestedRoleKey)
     }
     if (allowedRoleKeys.length === 1) {
       if (shouldRemember) {
         rememberChoice(ENTRY_TARGET.MOBILE_TASKS)
       }
-      return isMobileApp ? '/tasks' : resolveMobileTasksPath(allowedRoleKeys[0])
+      return resolveMobileTasksPath(allowedRoleKeys[0])
     }
     if (allowedRoleKeys.length > 1) {
       const defaultRoleKey = allowedRoleKeys[0]
       if (shouldRemember) {
         rememberChoice(ENTRY_TARGET.MOBILE_TASKS)
       }
-      return isMobileApp ? '/tasks' : resolveMobileTasksPath(defaultRoleKey)
+      return resolveMobileTasksPath(defaultRoleKey)
     }
-    if (hasDesktopEntryAccess(adminProfile)) {
+    if (hasDesktopEntryAccess(adminProfile, entryConfig)) {
       return '/entry?target=desktop'
     }
     return ''

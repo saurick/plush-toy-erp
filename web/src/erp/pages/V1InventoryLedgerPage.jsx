@@ -182,12 +182,12 @@ function dash(value) {
 function subjectTypeTag(value) {
   const key = String(value || '').trim()
   if (!key) return '-'
-  return <Tag>{SUBJECT_TYPE_LABELS[key] || key}</Tag>
+  return <Tag>{SUBJECT_TYPE_LABELS[key] || '对象'}</Tag>
 }
 
 function subjectTypeText(value) {
   const key = String(value || '').trim()
-  return SUBJECT_TYPE_LABELS[key] || key || ''
+  return SUBJECT_TYPE_LABELS[key] || (key ? '对象' : '')
 }
 
 function lotStatusTag(value) {
@@ -195,14 +195,14 @@ function lotStatusTag(value) {
   if (!key) return '-'
   return (
     <Tag color={LOT_STATUS_COLORS[key] || 'default'}>
-      {LOT_STATUS_LABELS[key] || key}
+      {LOT_STATUS_LABELS[key] || '批次状态'}
     </Tag>
   )
 }
 
 function lotStatusText(value) {
   const key = String(value || '').trim()
-  return LOT_STATUS_LABELS[key] || key || ''
+  return LOT_STATUS_LABELS[key] || (key ? '批次状态' : '')
 }
 
 function txnTypeTag(value) {
@@ -210,14 +210,14 @@ function txnTypeTag(value) {
   if (!key) return '-'
   return (
     <Tag color={TXN_TYPE_COLORS[key] || 'default'}>
-      {TXN_TYPE_LABELS[key] || key}
+      {TXN_TYPE_LABELS[key] || '库存流水'}
     </Tag>
   )
 }
 
 function txnTypeText(value) {
   const key = String(value || '').trim()
-  return TXN_TYPE_LABELS[key] || key || ''
+  return TXN_TYPE_LABELS[key] || (key ? '库存流水' : '')
 }
 
 function sourceTypeText(value) {
@@ -247,10 +247,23 @@ function formatQuantity(value) {
   return text || '-'
 }
 
-function internalRef(label, value) {
+function linkedBusinessRef(label, value) {
   return value === null || value === undefined || value === ''
     ? '-'
     : `${label}已关联`
+}
+
+function formatSourceDocumentRef(record = {}) {
+  const sourceNo = String(
+    record.source_no ||
+      record.document_no ||
+      record.order_no ||
+      record.receipt_no ||
+      record.shipment_no ||
+      ''
+  ).trim()
+  if (sourceNo) return sourceNo
+  return sourceTypeText(record.source_type) ? '未提供业务单号' : '-'
 }
 
 function relationRef(label, value) {
@@ -273,7 +286,7 @@ function selectedLabelFor(view, row) {
   if (!row) return '请先选择一条库存记录'
   if (view === VIEW_LOTS) {
     return `批次 ${row.lot_no || '已登记批次'} / ${
-      LOT_STATUS_LABELS[row.status] || row.status || '-'
+      lotStatusText(row.status) || '-'
     }`
   }
   if (view === VIEW_TXNS) {
@@ -291,6 +304,12 @@ function sourceRouteFor(sourceType) {
   if (key === 'PRODUCTION_FACT') return V1_ROUTE_PATHS.productionProgress
   if (key === 'OUTSOURCING_FACT') return V1_ROUTE_PATHS.processingContracts
   return ''
+}
+
+function canOpenSourceDocument(record = {}) {
+  return Boolean(
+    sourceRouteFor(record.source_type) && Number(record.source_id) > 0
+  )
 }
 
 export default function V1InventoryLedgerPage() {
@@ -476,7 +495,7 @@ export default function V1InventoryLedgerPage() {
     : undefined
   const relatedMenuItems = useMemo(() => {
     if (!selectedRow) return []
-    if (activeView === VIEW_TXNS && sourceRouteFor(selectedRow.source_type)) {
+    if (activeView === VIEW_TXNS && canOpenSourceDocument(selectedRow)) {
       return [{ key: 'source', label: '来源单据' }]
     }
     return []
@@ -486,7 +505,7 @@ export default function V1InventoryLedgerPage() {
     if (!selectedRow) return
     if (key === 'source') {
       const targetPath = sourceRouteFor(selectedRow.source_type)
-      if (targetPath) {
+      if (targetPath && Number(selectedRow.source_id) > 0) {
         navigate(
           routeWithQuery(targetPath, {
             source_type: selectedRow.source_type,
@@ -497,14 +516,19 @@ export default function V1InventoryLedgerPage() {
     }
   }
 
-  const clearRouteContext = useCallback(() => {
-    const nextParams = new URLSearchParams(searchParams)
-    nextParams.delete('source_type')
-    nextParams.delete('source_id')
-    nextParams.delete('lot_id')
-    setSearchParams(nextParams, { replace: true })
-    resetCurrentPage()
-  }, [resetCurrentPage, searchParams, setSearchParams])
+  const clearRouteContext = useCallback(
+    (keys) => {
+      const nextParams = new URLSearchParams(searchParams)
+      const keysToDelete =
+        Array.isArray(keys) && keys.length > 0
+          ? keys
+          : ['source_type', 'source_id', 'lot_id']
+      keysToDelete.forEach((key) => nextParams.delete(key))
+      setSearchParams(nextParams, { replace: true })
+      resetCurrentPage()
+    },
+    [resetCurrentPage, searchParams, setSearchParams]
+  )
 
   const loadReferenceOptions = useCallback(async () => {
     const request = beginLatestRequest('references')
@@ -607,7 +631,10 @@ export default function V1InventoryLedgerPage() {
       if (record?.subject_type === 'MATERIAL') {
         return referenceLabel(materialOptions, value, '材料')
       }
-      return internalRef(subjectTypeText(record?.subject_type) || '对象', value)
+      return linkedBusinessRef(
+        subjectTypeText(record?.subject_type) || '对象',
+        value
+      )
     },
     [materialOptions, productOptions]
   )
@@ -766,17 +793,17 @@ export default function V1InventoryLedgerPage() {
         {
           title: '来源',
           exportTitle: '来源',
-          dataIndex: 'source_type',
+          key: 'source_type_label',
           width: 170,
-          render: (value) => sourceTypeText(value) || '-',
+          render: (_, record) => sourceTypeText(record?.source_type) || '-',
           exportValue: (record) => sourceTypeText(record?.source_type),
         },
         {
           title: '来源单据',
-          dataIndex: 'source_id',
+          key: 'source_document',
           width: 120,
-          render: (value) => internalRef('来源', value),
-          exportValue: (record) => internalRef('来源', record?.source_id),
+          render: (_, record) => formatSourceDocumentRef(record),
+          exportValue: formatSourceDocumentRef,
         },
         {
           title: '来源行关联',
@@ -1083,12 +1110,20 @@ export default function V1InventoryLedgerPage() {
               />
             ) : null}
             {routeSourceType && routeSourceID ? (
-              <Tag closable color="blue" onClose={clearRouteContext}>
-                已按来源单据筛选
+              <Tag
+                closable
+                color="blue"
+                onClose={() => clearRouteContext(['source_type', 'source_id'])}
+              >
+                已按{sourceTypeText(routeSourceType)}筛选
               </Tag>
             ) : null}
             {routeLotID ? (
-              <Tag closable color="blue" onClose={clearRouteContext}>
+              <Tag
+                closable
+                color="blue"
+                onClose={() => clearRouteContext(['lot_id'])}
+              >
                 已按批次筛选
               </Tag>
             ) : null}

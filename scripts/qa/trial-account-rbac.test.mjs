@@ -92,6 +92,7 @@ test("trial account RBAC backend URL rejects embedded credentials", () => {
 
 test("trial account RBAC input template is no-write and lists required demo roles", () => {
   const template = buildInputTemplate();
+  const serialized = JSON.stringify(template);
 
   assert.equal(template.scope, "trial-account-rbac-input-template");
   assert.equal(template.writesReport, false);
@@ -107,23 +108,38 @@ test("trial account RBAC input template is no-write and lists required demo role
   ]);
   assert.match(template.optionalOutputs.join("\n"), /--report/);
   assert.match(template.optionalOutputs.join("\n"), /--preflight-report/);
-  assert.equal(template.expectedAccounts.length, 10);
+  assert.match(
+    template.optionalOutputs.join("\n"),
+    /trial-demo-account-browser-smoke\/preflight\.json/,
+  );
+  assert.match(
+    template.optionalOutputs.join("\n"),
+    /trial-demo-account-browser-smoke\/report\.json/,
+  );
+  assert.equal(template.expectedAccountSummaries.length, 10);
   assert(
-    template.expectedAccounts.some(
+    template.expectedAccountSummaries.some(
       (item) =>
         item.username === "demo_sales" &&
-        item.roleKey === "sales" &&
-        item.mobilePermission === "mobile.sales.access",
+        item.role === "业务" &&
+        item.mobileTaskEntry === "业务岗位任务端" &&
+        item.mobileAccessExpected === true,
     ),
   );
   assert(
-    template.expectedAccounts.some(
+    template.expectedAccountSummaries.some(
       (item) =>
         item.username === "demo_admin" &&
-        item.roleKey === "admin" &&
-        item.mobilePermission === null,
+        item.role === "后台管理员" &&
+        item.mobileTaskEntry === "不开放岗位任务端" &&
+        item.mobileAccessExpected === false,
     ),
   );
+  assert.doesNotMatch(serialized, /"roleKey"/);
+  assert.doesNotMatch(serialized, /"mobilePermission"/);
+  assert.doesNotMatch(serialized, /"mobilePath"/);
+  assert.doesNotMatch(serialized, /mobile\.[a-z]+\.access/);
+  assert.doesNotMatch(serialized, /\/m\/[a-z]+\/tasks/);
   assert.match(
     template.commands.join("\n"),
     /--preflight-report output\/trial-account-rbac\/preflight\.json/,
@@ -134,11 +150,69 @@ test("trial account RBAC input template is no-write and lists required demo role
   );
   assert.match(
     template.commands.join("\n"),
+    /trialDemoAccountBrowserSmoke\.mjs --preflight-report output\/trial-demo-account-browser-smoke\/preflight\.json/,
+  );
+  assert.match(
+    template.commands.join("\n"),
+    /trialDemoAccountBrowserSmoke\.mjs --report output\/trial-demo-account-browser-smoke\/report\.json/,
+  );
+  assert.match(
+    template.commands.join("\n"),
     /smoke:trial-demo-browser/,
   );
+  assert.equal(
+    template.browserSmokeEvidencePlan.scope,
+    "trial-demo-account-browser-smoke-evidence-plan",
+  );
+  assert.equal(template.browserSmokeEvidencePlan.requiresPassword, true);
+  assert.equal(template.browserSmokeEvidencePlan.requiresLocalBackend, true);
+  assert.equal(template.browserSmokeEvidencePlan.requiresFrontendRuntime, true);
+  assert(
+    template.realRBACCheckRequires.includes(
+      "trial account password env is present",
+    ),
+  );
+  assert(
+    template.notProvenByThisTemplate.includes(
+      "auth.me role and permission payload",
+    ),
+  );
+  assert(
+    template.notProvenByThisTemplate.includes("desktop menu projection"),
+  );
+  assert(
+    template.notProvenByThisTemplate.includes(
+      "target environment release evidence",
+    ),
+  );
+  assert.equal(
+    template.browserSmokeEvidencePlan.realSmokeReportPath,
+    "output/trial-demo-account-browser-smoke/report.json",
+  );
+  assert.deepEqual(
+    template.browserSmokeEvidencePlan.effectiveSessionDiagnostic
+      .acceptedProjectionModes,
+    ["local_dev_customer_config_diagnostic"],
+  );
+  assert.match(
+    template.browserSmokeEvidencePlan.effectiveSessionDiagnostic.forbiddenFields.join(
+      "\n",
+    ),
+    /accessToken|authorizationHeader|configHash|rawId|password|token/,
+  );
+  assert.match(
+    template.browserSmokeEvidencePlan.boundary,
+    /RBAC script proves auth role\/permission shape only/,
+  );
   assert.match(template.requiredRealEvidence.join("\n"), /admin_login \+ me/);
+  assert.match(
+    template.requiredRealEvidence.join("\n"),
+    /effective session diagnostic readback/,
+  );
   assert.match(template.boundary, /does not read passwords/);
   assert.match(template.boundary, /write reports/);
+  assert.match(template.boundary, /mobile task access/);
+  assert.match(template.boundary, /effective session diagnostic readback/);
   assert.match(template.boundary, /static role projection sources still agree/);
 });
 
@@ -156,9 +230,11 @@ test("trial account RBAC preflight report is no-login and records blockers", asy
       error: "fetch failed",
     }),
   });
+  const serialized = JSON.stringify(report);
 
   assert.equal(report.scope, "trial-account-rbac-preflight-report");
   assert.equal(report.writesReport, true);
+  assert.equal(report.preflightOnly, true);
   assert.equal(report.writesDatabase, false);
   assert.equal(report.callsJSONRPC, false);
   assert.equal(report.callsAuthRPC, false);
@@ -175,9 +251,45 @@ test("trial account RBAC preflight report is no-login and records blockers", asy
   assert.equal(report.expectedDesktopAdminCount, 1);
   assert.equal(report.staticProjection.ok, true);
   assert.equal(report.staticProjection.summary.expectedAccountCount, 10);
+  assert(
+    report.realRBACCheckRequires.includes(
+      "demo accounts exist in the target backend",
+    ),
+  );
+  assert(report.notProvenByThisPreflight.includes("real admin_login"));
+  assert(
+    report.notProvenByThisPreflight.includes(
+      "auth.me role and permission payload",
+    ),
+  );
+  assert(
+    report.notProvenByThisPreflight.includes("mobile task entry access"),
+  );
+  assert(
+    report.notProvenByThisPreflight.includes(
+      "target environment release evidence",
+    ),
+  );
   assert.equal(report.readyForRealRBACCheck, false);
   assert(report.blockers.includes("missing-trial-account-password-env"));
   assert(report.blockers.includes("backend-health-unreachable"));
+  assert.match(
+    report.suggestedRealRBACCommand,
+    /TRIAL_ACCOUNT_PASSWORD='<local-demo-password>'/,
+  );
+  assert.match(
+    report.suggestedRealRBACCommand,
+    /TRIAL_ACCOUNT_BACKEND_URL='http:\/\/127\.0\.0\.1:8300'/,
+  );
+  assert.match(
+    report.suggestedRealRBACCommand,
+    /trial-account-rbac\.mjs --report output\/trial-account-rbac\/report\.json/,
+  );
+  assert.doesNotMatch(serialized, /"roleKey"/);
+  assert.doesNotMatch(serialized, /"mobilePermission"/);
+  assert.doesNotMatch(serialized, /"mobilePath"/);
+  assert.doesNotMatch(serialized, /mobile\.[a-z]+\.access/);
+  assert.doesNotMatch(serialized, /\/m\/[a-z]+\/tasks/);
 });
 
 test("trial account RBAC static projection covers current seed, RBAC, mobile entry, smoke, and docs", () => {
@@ -197,9 +309,9 @@ test("trial account RBAC static projection covers current seed, RBAC, mobile ent
     report.roleRows.some(
       (item) =>
         item.username === "demo_engineering" &&
-        item.roleKey === "engineering" &&
-        item.mobilePermission === "mobile.engineering.access" &&
-        item.mobilePath === "/m/engineering/tasks" &&
+        item.role === "工程" &&
+        item.mobileTaskEntry === "工程岗位任务端" &&
+        item.mobileAccessExpected === true &&
         item.passed,
     ),
   );
@@ -207,13 +319,66 @@ test("trial account RBAC static projection covers current seed, RBAC, mobile ent
     report.roleRows.some(
       (item) =>
         item.username === "demo_admin" &&
-        item.roleKey === "admin" &&
-        item.mobilePermission === null &&
+        item.role === "后台管理员" &&
+        item.mobileTaskEntry === "不开放岗位任务端" &&
+        item.mobileAccessExpected === false &&
         item.checks.adminHasNoExpectedMobilePermission &&
         item.checks.browserMobileDenied &&
         item.passed,
     ),
   );
+  const serialized = JSON.stringify(report);
+  assert.doesNotMatch(serialized, /"roleKey"/);
+  assert.doesNotMatch(serialized, /"mobilePermission"/);
+  assert.doesNotMatch(serialized, /"mobilePath"/);
+  assert.doesNotMatch(serialized, /mobile\.[a-z]+\.access/);
+  assert.doesNotMatch(serialized, /\/m\/[a-z]+\/tasks/);
+});
+
+test("trial account RBAC docs keep preflight and real evidence boundary", () => {
+  const docs = [
+    [
+      "scripts README",
+      readFileSync(path.join(repoRoot, "scripts/README.md"), "utf8"),
+    ],
+    [
+      "automation test strategy",
+      readFileSync(
+        path.join(repoRoot, "docs/product/自动化测试策略.md"),
+        "utf8",
+      ),
+    ],
+    [
+      "yoyoosun trial runbook",
+      readFileSync(
+        path.join(repoRoot, "docs/customers/yoyoosun/试用环境执行手册.md"),
+        "utf8",
+      ),
+    ],
+  ];
+
+  for (const [context, source] of docs) {
+    assert.match(
+      source,
+      /trial-account-rbac\.mjs[\s\S]{0,160}--preflight-report/u,
+      `${context} must document trial account RBAC preflight command`,
+    );
+    assert.match(
+      source,
+      /preflightOnly=true/u,
+      `${context} must identify trial account RBAC preflight-only evidence`,
+    );
+    assert.match(
+      source,
+      /不调用 `admin_login \/ me`/u,
+      `${context} must keep no-login boundary`,
+    );
+    assert.match(
+      source,
+      /不证明真实 RBAC/u,
+      `${context} must not overstate RBAC proof`,
+    );
+  }
 });
 
 test("trial account RBAC preflight blocks static role projection drift", async () => {
@@ -268,14 +433,37 @@ test("trial account RBAC CLI preflight writes sanitized report", () => {
   const report = JSON.parse(reportText);
 
   assert.equal(report.scope, "trial-account-rbac-preflight-report");
+  assert.equal(report.preflightOnly, true);
   assert.equal(report.passwordEnvPresent, true);
+  assert(
+    report.realRBACCheckRequires.includes("backend health is reachable"),
+  );
+  assert(report.notProvenByThisPreflight.includes("backend RBAC authorization"));
+  assert(
+    report.notProvenByThisPreflight.includes(
+      "customer config active revision",
+    ),
+  );
   assert.deepEqual(report.presentPasswordEnvNames, ["TRIAL_ACCOUNT_PASSWORD"]);
   assert.equal(report.readyForRealRBACCheck, false);
   assert(report.blockers.includes("backend-health-unreachable"));
+  assert.match(
+    report.suggestedRealRBACCommand,
+    /TRIAL_ACCOUNT_BACKEND_URL='http:\/\/127\.0\.0\.1:1'/,
+  );
+  assert.match(
+    report.suggestedRealRBACCommand,
+    /TRIAL_ACCOUNT_PASSWORD='<local-demo-password>'/,
+  );
   assert.doesNotMatch(
     reportText,
     /should-not-be-stored|Bearer|access_token|Authorization:/i,
   );
+  assert.doesNotMatch(reportText, /"roleKey"/);
+  assert.doesNotMatch(reportText, /"mobilePermission"/);
+  assert.doesNotMatch(reportText, /"mobilePath"/);
+  assert.doesNotMatch(reportText, /mobile\.[a-z]+\.access/);
+  assert.doesNotMatch(reportText, /\/m\/[a-z]+\/tasks/);
 });
 
 test("trial account RBAC verification report is sanitized", () => {
@@ -307,8 +495,15 @@ test("trial account RBAC verification report is sanitized", () => {
     storesAuthorizationHeader: false,
   });
   assert.equal(report.checkedAccounts[0].username, "demo_sales");
+  assert.equal(report.checkedAccounts[0].role, "业务");
+  assert.equal(report.checkedAccounts[0].mobileTaskEntry, "业务岗位任务端");
+  assert.equal(report.checkedAccounts[0].mobileAccessVerified, true);
   assert.doesNotMatch(
     JSON.stringify(report),
     /Bearer|access_token|local-demo-password|replace-with-password/i,
   );
+  assert.doesNotMatch(JSON.stringify(report), /"roles"/);
+  assert.doesNotMatch(JSON.stringify(report), /"mobile"/);
+  assert.doesNotMatch(JSON.stringify(report), /mobile\.sales\.access/);
+  assert.doesNotMatch(JSON.stringify(report), /"sales"/);
 });

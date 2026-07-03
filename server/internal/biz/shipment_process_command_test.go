@@ -239,27 +239,23 @@ func TestShipmentProcessDomainCommandShipRequiresShipment(t *testing.T) {
 	}
 }
 
-func TestShipmentProcessDomainCommandShipAllowsLegacyID(t *testing.T) {
+func TestShipmentProcessDomainCommandShipRejectsLegacyID(t *testing.T) {
 	ctx := context.Background()
 	operationalFactRepo := &shipmentProcessOperationalFactRepoStub{
 		shipment: &Shipment{ID: 9001, Status: ShipmentStatusShipped},
 	}
 	handler := &shipmentShipProcessCommandHandler{uc: NewOperationalFactUsecase(operationalFactRepo)}
 
-	result, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
+	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "shipment", BusinessRefID: 9001},
 		CommandKey:      ProcessDomainCommandShipmentShip,
 		IdempotencyKey:  "process:10:node:20:shipment-ship",
 		Payload:         map[string]any{"id": float64(9001)},
-	}, 7)
-	if err != nil {
-		t.Fatalf("expected legacy id to be accepted, got %v", err)
+	}, 7); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected legacy id to be rejected, got %v", err)
 	}
-	if operationalFactRepo.shippedShipmentID != 9001 {
-		t.Fatalf("expected shipment 9001 to be shipped, got %d", operationalFactRepo.shippedShipmentID)
-	}
-	if result == nil || result.Outcome != ShipmentProcessCommandOutcomeShipped {
-		t.Fatalf("expected shipment shipped outcome, got %#v", result)
+	if operationalFactRepo.shippedShipmentID != 0 {
+		t.Fatalf("legacy id command must not ship shipment, got %d", operationalFactRepo.shippedShipmentID)
 	}
 }
 

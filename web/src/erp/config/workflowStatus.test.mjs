@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   BUSINESS_WORKFLOW_STATES,
+  getBusinessStatusLabel,
   getBusinessStatusTransitionOptions,
   requiresBusinessStatusReason,
 } from './workflowStatus.mjs'
@@ -38,6 +39,15 @@ test('workflowStatus: 待出货状态前后端闭环前置可见', () => {
 
 test('workflowStatus: 未知状态不返回误导性流转项', () => {
   assert.deepEqual(getBusinessStatusTransitionOptions('missing'), [])
+})
+
+test('workflowStatus: 业务状态展示文案不透出内部 key', () => {
+  assert.equal(getBusinessStatusLabel('shipping_released'), '已放行待出库')
+  assert.equal(
+    getBusinessStatusLabel('unknown_business_status_key'),
+    '未知业务状态'
+  )
+  assert.equal(getBusinessStatusLabel('', '-'), '-')
 })
 
 test('workflowStatus: 阻塞和取消需要填写原因', () => {

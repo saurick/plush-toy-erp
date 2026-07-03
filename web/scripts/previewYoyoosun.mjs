@@ -4,6 +4,9 @@ import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
+import { normalizeDevCustomerKey } from '../devCustomerConfigPlugin.mjs'
+import { resolveAvailablePort } from './localPort.mjs'
+
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const webRoot = path.resolve(scriptDir, '..')
 const repoRoot = path.resolve(webRoot, '..')
@@ -44,7 +47,7 @@ function parseArgs(argv) {
     }
   }
 
-  options.customer = String(options.customer || '').trim()
+  options.customer = normalizeDevCustomerKey(options.customer)
   options.port = String(options.port || '').trim()
   options.apiOrigin = String(options.apiOrigin || '')
     .trim()
@@ -95,12 +98,29 @@ function commandLines(options) {
 }
 
 function printPlan(options) {
+  const label = 'preview-yoyoosun'
+  const portNote =
+    options.port === options.requestedPort
+      ? `[${label}] port=${options.port}`
+      : `[${label}] requested port ${options.requestedPort} is occupied; using ${options.port}`
+  const verificationLines = [
+    `[${label}] verify customer config: curl -fsS http://localhost:${options.port}/customer-config.js | grep 'customerKey: "${options.customer}"'`,
+  ]
+
+  if (options.customer === 'yoyoosun') {
+    verificationLines.push(
+      `[${label}] verify customer asset: curl -fsSI http://localhost:${options.port}/customer-assets/yoyoosun/favicon-yoyoosun.svg | grep -i 'content-type: image/svg+xml'`
+    )
+  }
+
   process.stdout.write(
     [
-      `[preview-yoyoosun] customer=${options.customer}`,
-      `[preview-yoyoosun] url=http://localhost:${options.port}/erp`,
-      `[preview-yoyoosun] backend=${options.apiOrigin}`,
-      '[preview-yoyoosun] customer_config publish/activate is not executed',
+      `[${label}] customer=${options.customer}`,
+      portNote,
+      `[${label}] url=http://localhost:${options.port}/erp`,
+      `[${label}] backend=${options.apiOrigin}`,
+      `[${label}] customer_config publish/activate is not executed`,
+      ...verificationLines,
       ...commandLines(options).map((line) => `[preview-yoyoosun] ${line}`),
       '',
     ].join('\n')
@@ -164,6 +184,8 @@ function runStep(command, args, { cwd, env } = {}) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2))
+  options.requestedPort = options.port
+  options.port = await resolveAvailablePort(options.port)
 
   printPlan(options)
 

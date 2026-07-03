@@ -2,6 +2,16 @@
 
 本文档只说明当前仓库仍在使用的本地脚本和推荐执行顺序。
 
+## 子目录入口
+
+`scripts/README.md` 保留仓库级脚本总览、推荐顺序和跨目录边界；高频子目录的局部说明在各自 README 维护，避免把所有命令细节继续堆到一个入口里。
+
+| 子目录 | 先看哪里 | 主要用途 |
+| --- | --- | --- |
+| `scripts/qa/` | [scripts/qa/README.md](qa/README.md) | fast / strict / full、边界守卫、测试选择和本地验收入口 |
+| `scripts/deploy/` | [scripts/deploy/README.md](deploy/README.md) | 生产 preflight、release evidence、closeout、客户配置发布和部署证据工具 |
+| `scripts/import/` | [scripts/import/README.md](import/README.md) | yoyoosun source manifest、freeze、dry-run 和受控导入执行边界 |
+
 ## 总览
 
 | 脚本                                                   | 主要作用                                                                                                          | 建议时机                                                   |
@@ -17,10 +27,11 @@
 | `scripts/import/customerSourceSnapshotFreezeCheck.mjs` | customer source snapshot freeze checker，只读取 JSON snapshot 并生成 freeze evidence                              | yoyoosun 导入前 source freeze / 人工 review evidence       |
 | `scripts/import/customerImportDryRun.mjs`              | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包                                             | yoyoosun 导入前人工 review / 数据映射检查                  |
 | `scripts/import/customerImportExecute.mjs`             | 永绅 yoyoosun 导入 execution loader 报告 / 门禁工具；真实 `--execute` 额外要求结构化 backup evidence 与 reviewed recovery plan 绑定同一 `backupId`，当前没有可执行客户真实数据时不执行真实导入 | import tooling 自检 / 单独数据治理评审                    |
+| `scripts/qa/test-data-isolation-boundary.mjs`          | 只读检查 Product Core demo seed、yoyoosun 模拟数据、真实导入 dry-run / freeze 和真实导入执行门禁是否分桶隔离，不连接后端或数据库 | 调整 seed、fixture、模拟数据或导入工具后                  |
 | `scripts/qa/trial-simulated-data.mjs`           | 模拟试用数据入口，支持 `--print-input-template` 只读输出前置；真实执行只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据 | 试用环境演练                                               |
 | `scripts/qa/operational-fact-simulated-closure.mjs`    | 业务事实模拟闭环入口，支持 `--print-input-template` 只读输出前置；真实执行只使用显式模拟主数据覆盖生产 / 预留 / 委外 / 出货 / 财务链路 | 业务事实内部模拟验收 / 目标环境事实回归                  |
-| `scripts/qa/mobile-workflow-simulated-closure.mjs`       | 模拟岗位任务闭环入口，支持 `--print-input-template` 只读输出前置；真实执行只创建和更新显式模拟 workflow 任务，覆盖审批 / 质检 / 入库 / 出货放行异常和现场留痕 | 岗位任务端回归 / 目标环境移动任务闭环验收                  |
-| `web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs`      | 真实浏览器岗位任务端模拟任务回归，创建 `simulated_only` 老板审批 / 退回 / 完成 / 仓库放行任务，在 `/m/boss/tasks` 验证阻塞、退回、完成、催办反馈和内部提醒线索 | 本地 / 试用岗位任务端真实页面验收                         |
+| `scripts/qa/mobile-workflow-simulated-closure.mjs`       | 模拟岗位任务闭环入口，支持 `--print-input-template` 只读输出前置；真实执行只创建和更新显式模拟 workflow 任务，覆盖审批完成 / 退回、质检完成、入库完成、出货放行阻塞异常、跨角色催办和现场留痕 | 岗位任务端回归 / 目标环境移动任务闭环验收                  |
+| `web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs`      | 真实浏览器岗位任务端模拟任务回归，创建 `simulated_only` 老板审批 / 退回 / 完成、品质完成、仓库入库完成和仓库放行任务，分别登录 boss / quality / warehouse 岗位端验证完成、阻塞、退回、催办反馈和内部提醒线索 | 本地 / 试用岗位任务端真实页面验收                         |
 | `scripts/qa/mvp-closure.mjs`                    | ERP MVP 闭环验收入口，默认只生成计划和本地 evidence，可选运行现有 no-write report-only 工具                     | MVP 主链路验收口径收口 / 试用前证据整理                  |
 | `scripts/qa/purchase-receipt-real-write-e2e.mjs` | 采购入库真实写入链路验收入口，支持 `--print-input-template` 只读输出前置和 `--preflight-report <path>` 本地脱敏前置报告；真实命令默认跑 JSON-RPC 创建 / 加行 / 过账 / 回显 / 库存事实 / 权限测试，可选追加本地 PostgreSQL 防呆测试 | MVP 第一条真实写入链路回归 / 采购入库事实验收 |
 | `scripts/qa/industry-template-boundaries.mjs`          | 行业模板候选边界检查，确保模板不变成 tenant、runtime loader、真实导入或事实写入入口                              | 行业模板调整后                                             |
@@ -49,9 +60,9 @@
 | `web/src/erp/config/devHub.test.mjs` + dev-only config tests | 锁住 `/__dev` 导航、测试入口、文档查看器、治理地图、原型查看器、能力台账、客户配置控制台和打印模板字段预检配置合同；已纳入 fast / strict，不进入正式菜单 | 调整 `/__dev` 页面、测试入口、原型 / 文档 / 台账查看器、客户配置控制台或打印模板字段预检后 |
 | `scripts/qa/trial-role-entry-docs.test.mjs`             | 锁住试用角色演示账号、单端口岗位路径和前端说明必须覆盖当前 9 个业务岗位，避免 README / 脚本口径落后真实 seed / RBAC | 调整试用账号、岗位任务端入口或角色权限模板后 |
 | `scripts/qa/trial-account-rbac.test.mjs`                | 无后端单测锁住试用账号 RBAC 检查脚本必须拒绝多角色、多 mobile 权限、admin mobile 泄漏、debug 权限、super admin 和 disabled 账号，并确认 Go seed / RBAC / 前端移动入口 / 浏览器 smoke / 文档里的试用角色投影未漂移 | 调整试用账号 RBAC 检查脚本后 |
-| `scripts/qa/sales-order-field-chain-boundary.test.mjs`  | 锁住销售订单受理本地试用字段链路：列表 / 导出同受 `sales_orders.default` 字段策略控制，销售订单打印未接通前不得绕过 mapper 或发布明细字段策略 | 调整销售订单字段策略、导出列、打印字段链路或试用闭环文档后 |
+| `scripts/qa/sales-order-field-chain-boundary.test.mjs` + `web/src/erp/config/printTemplates.test.mjs` | 锁住销售订单受理本地试用字段链路和打印 catalog 边界：列表 / 导出同受 `sales_orders.default` 字段策略控制，销售订单打印未接通前不得绕过 mapper、注册模板或发布明细字段策略 | 调整销售订单字段策略、导出列、打印字段链路、打印 catalog 或试用闭环文档后 |
 | `scripts/qa/dev-entry-boundary.test.mjs`                 | 锁住 `/__dev`、测试入口和客户配置预检控制台仍是开发态入口：不进正式菜单、不索引 reference/archive 命令、不把 dry-run / 测试应用写成真实导入 | 调整开发验收入口、测试入口、客户配置预检控制台或正式菜单边界后 |
-| `scripts/qa/frontend-error-message-boundary.test.mjs`    | 扫描正式前端页面、组件、岗位任务端和共享 PDF 预览工具，防止用户可见错误提示直接透传 `error.message`，要求走统一中文错误 helper | 调整正式页面错误提示、打印工作台、移动端动作或错误 helper 后 |
+| `scripts/qa/frontend-error-message-boundary.test.mjs` + `web/src/common/utils/errorMessage.test.mjs` + `web/src/erp/utils/userVisibleTechnicalFields.test.mjs` + `web/src/erp/utils/dashboardTaskDisplay.test.mjs` | 扫描正式前端页面、组件、岗位任务端和共享 PDF 预览工具，防止用户可见错误提示直接透传 `error.message`；同时锁住统一中文错误 helper、业务界面不展示 raw id / 内部字段，以及任务来源筛选不展示 `source_type` 原始 key | 调整正式页面错误提示、打印工作台、移动端动作、错误 helper、业务字段回显、任务来源展示或技术字段可见性后 |
 | `scripts/qa/phase-label-boundaries.mjs`                | 自动扫描活跃实现路径，阻止 runtime 阶段编号命名进入脚本、API、运行时代码、测试和正式文档入口                      | 调整命名、脚本、API、运行时代码或治理文档后                 |
 | `scripts/qa/docs-inventory.test.mjs`                   | 自动扫描当前维护 Markdown，确认已登记到 `docs/文档清单.md`                                                     | 新增、删除、重命名或调整长期维护 Markdown 后                |
 | `scripts/inventory-pg.sh`                              | 库存事实本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证库存流水、余额、冲正和防负库存                         |
@@ -61,9 +72,10 @@
 | `scripts/doctor.sh`                                    | 检查本机依赖和 hooks 是否齐全                                                                                     | 环境初始化 / 异常排查                                      |
 | `scripts/qa/fast.sh`                                   | 高频快速检查，包含多甲方角色能力优先级审计、正式前端客户配置投影边界、角色菜单 / seedData 配置合同、开发入口配置合同、试用账号 RBAC 单测 / 浏览器 smoke 输入模板边界测试、真实登录 smoke 共享 URL 边界、客户导入、客户配置运行时 manifest、文档清单、模拟数据工具和阶段编号命名边界守卫 | 日常开发                                                   |
 | `scripts/qa/trial-account-rbac.mjs`                    | 只读验证角色演示账号的真实登录、角色、岗位任务端入口权限和 debug 权限边界；`--preflight-report` 会先写本地 no-write 前置报告，核对后端健康、密码 env 和静态角色投影；真实运行可选 `--report` 写本地脱敏报告，不保存密码或 token | 生成试用 / 演示账号后                                      |
-| `scripts/qa/customer-config-boundaries.mjs`            | 只读验证 customer config 草案仍是 draft，未放开 runtime / schema / import / RBAC 边界                             | 调整客户配置草案后                                         |
-| `scripts/qa/customer-package-lint.mjs`                 | 验证客户配置包结构、流程预览、状态机预览和策略预览仍只做 lint / preview，不接 Workflow / Fact runtime             | 调整 `config/catalog`、`config/schemas` 或客户包流程结构后 |
-| `scripts/qa/customer-config-runtime-manifest.mjs`      | 将已跟踪客户包编译为后端 `customer_config` 可验证的 runtime manifest，检查 moduleStates、role key 映射、页面 / 字段投影、`sales_order_acceptance` 受控 `runtime_loader_ready` 流程定义和 forbidden payload；只允许白名单 ProcessRuntime 读取，不写 Fact | 调整客户包 catalog、模块状态、角色池、页面投影、字段策略、流程定义证据或 runtime 发布输入后 |
+| `scripts/qa/customer-config-boundaries.mjs`            | 只读验证 customer config 草案仍是 draft，未放开 runtime / schema / import / RBAC 边界，并扫描后端 Product Core 运行时代码没有嵌入 yoyoosun / 永绅客户专属规则 | 调整客户配置草案、客户配置 runtime 或后端客户差异边界后 |
+| `scripts/qa/customer-config-effective-session-probe.mjs` | 无 Authorization 的 `customer_config.get_effective_session` 本地只读探针；可写 `output/customers/yoyoosun/customer-config-effective-session-probe/current.json`，确认本地后端可达和 `40302 未登录` / 缺真实登录证据边界，不读取 token、不证明 active revision | yoyoosun 本地入口已命中但还没有演示密码 / token，需要解释为什么不能证明后端 active revision 时 |
+| `scripts/qa/customer-package-lint.mjs`                 | 验证客户配置包结构、流程预览、状态机预览、策略预览和 preview-only 打印 party defaults 仍只做 lint / preview，不接 Workflow / Fact runtime，不覆盖供应商业务快照 | 调整 `config/catalog`、`config/schemas` 或客户包流程 / 打印配置草案后 |
+| `scripts/qa/customer-config-runtime-manifest.mjs`      | 将已跟踪客户包编译为后端 `customer_config` 可验证的 runtime manifest，检查 moduleStates、role key 映射、页面 / 字段投影、`sales_order_acceptance` 受控 `runtime_loader_ready` 流程定义、preview-only 打印 party defaults snapshot 和 forbidden payload；只允许白名单 ProcessRuntime 读取，不写 Fact，不声明销售订单打印模板启用 | 调整客户包 catalog、模块状态、角色池、页面投影、字段策略、打印配置草案、流程定义证据或 runtime 发布输入后 |
 | `scripts/qa/erp-field-linkage.mjs`                     | 字段联动专项测试并刷新 latest 覆盖报告                                                                            | 改字段真源、保存转换、合同金额、打印快照后                 |
 | `scripts/qa/full.sh`                                   | 推送前全量检查，先执行 `fast.sh`，再补 secrets / govulncheck、前端 test / build 和服务端 `go test ./...` / `make build` | 提交前 / 推送前                                            |
 | `scripts/qa/strict.sh`                                 | 严格检查，包含多甲方角色能力优先级审计、正式前端客户配置投影边界、角色菜单 / seedData 配置合同、开发入口配置合同、试用账号 RBAC 单测 / 浏览器 smoke 输入模板边界测试、真实登录 smoke 共享 URL 边界、客户导入、客户配置运行时 manifest、文档清单、模拟数据工具和阶段编号命名边界守卫 | 发版前                                                     |
@@ -84,7 +96,7 @@ cd /Users/simon/projects/plush-toy-erp/web
 pnpm style:l1
 ```
 
-如需按真实管理员登录流程回归合同编辑与在线预览时延，再执行：
+如需按真实管理员登录流程回归合同编辑、在线预览时延、下载 PDF 和浏览器打印入口，再执行：
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/server
@@ -230,6 +242,13 @@ CUSTOMER_IMPORT_ADMIN_PASSWORD='replace-with-password' \
 
 执行前必须已有客户确认、数据库备份、reviewed recovery plan 和目标环境信息；`--backend-url` / `CUSTOMER_IMPORT_BACKEND_URL` 不得包含 URL 账号密码；`--backup-evidence` 必须是结构化 key/value 文本，至少包含 `backupId`、`releaseVersion`、`databaseSnapshot`、ISO `backupTime`、正数 `databaseBackupSize`、合法 `databaseBackupHash` 和 `operator`；`--recovery-plan` 必须是 JSON，并包含 `recoveryPlanApproved=true`、owner、backup evidence、rollback target、forward-fix path、failure triggers、post-recovery verification 和脱敏声明，且 `recoveryPlan.backupEvidence` 必须等于 `backupEvidence.backupId`。不要把 fixture approval 当真实客户批准，脚本层也会拒绝路径或内容含 fixture / sample / placeholder 的 approval、dry-run report、backup evidence 或 recovery plan 进入 `--execute`。当前 yoyoosun 不满足这些条件，不能执行该真实写入命令。
 
+测试业务数据隔离守卫用于统一检查四类入口：Product Core demo seed、yoyoosun 试用 / 业务事实 / 岗位任务模拟数据、真实导入 dry-run / freeze 预检、真实导入 execute 门禁。它只读扫描源码和文档化输出标记，不连接后端、不登录、不写数据库、不执行真实导入：
+
+```bash
+node scripts/qa/test-data-isolation-boundary.mjs
+node --test scripts/qa/test-data-isolation-boundary.test.mjs
+```
+
 试用数据入口只允许模拟数据试用。先生成报告，确认模拟数据边界：
 
 ```bash
@@ -310,7 +329,7 @@ node scripts/qa/mobile-workflow-simulated-closure.mjs \
 
 `--print-input-template` 只输出 report-only / apply simulated mobile workflow tasks 所需的 runId、演示账号密码来源、岗位角色账号、模拟任务组和后续真实命令，不登录、不调用后端、不写报告、不写数据库、不创建 workflow 任务，也不写任何业务事实。
 
-若要写入本地或目标试用环境，只能显式 `--apply`。该脚本使用 `demo_pmc` 创建 `SIM-YOYOOSUN-MOBILE-WORKFLOW` 模拟 workflow 任务，再用 `demo_boss`、`demo_quality` 和 `demo_warehouse` 分别处理老板审批、成品抽检、仓库入库确认、出货放行异常上报和现场留痕 evidence；它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不绕过 `WorkflowUsecase` 或 operational fact usecase：
+若要写入本地或目标试用环境，只能显式 `--apply`。该脚本使用 `demo_pmc` 创建 `SIM-YOYOOSUN-MOBILE-WORKFLOW` 模拟 workflow 任务，再用 `demo_boss`、`demo_quality`、`demo_warehouse` 和 `demo_pmc` 分别处理老板审批完成、老板退回、成品抽检完成、仓库入库确认、出货放行异常上报、跨角色催办和现场留痕 evidence；它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不绕过 `WorkflowUsecase` 或 operational fact usecase：
 
 ```bash
 MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS \
@@ -456,21 +475,21 @@ ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
 
 生成或重置演示账号后，可执行只读核对。该脚本不创建账号、不改密码、不写数据库，只通过真实 `/rpc/auth` 登录和 `me` 返回校验角色、`mobile.<role>.access`、`debug.*` 权限、`is_super_admin` 和 `disabled` 边界：
 
-如果还没有本地演示账号密码，先打印输入模板。该模式只输出所需环境变量、账号清单、可选脱敏报告路径和真实核对命令，不读密码、不登录、不调用后端、不启动浏览器、不启动 Vite、不读取客户配置脚本、不写报告、不写数据库：
+如果还没有本地演示账号密码，先打印输入模板。该模式只输出所需环境变量、账号清单、可选脱敏报告路径、effective session 脱敏诊断读取计划和真实核对命令，不读密码、不登录、不调用后端、不启动浏览器、不启动 Vite、不读取客户配置脚本、不写报告、不写数据库：
 
 ```bash
 node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-account-rbac.mjs --print-input-template
 node /Users/simon/projects/plush-toy-erp/web/scripts/trialDemoAccountBrowserSmoke.mjs --print-input-template
 ```
 
-试用账号 RBAC 也可先写前置检查报告。该模式只探测后端健康检查、演示账号密码环境变量是否存在，并静态核对 Go seed、后端 RBAC mobile 权限、前端移动角色入口、浏览器 smoke 账号和文档入口里的试用角色投影是否一致；不读密码、不登录、不调用 `admin_login / me`，不写数据库，也不保存 access token 或 Authorization header：
+试用账号 RBAC 也可先写前置检查报告。该模式只探测后端健康检查、演示账号密码环境变量是否存在，并静态核对 Go seed、后端 RBAC mobile 权限、前端移动角色入口、浏览器 smoke 账号和文档入口里的试用角色投影是否一致；报告内 `preflightOnly=true`，并会列出真实 RBAC 检查前置和本报告未证明项。不读密码、不登录、不调用 `admin_login / me`，不写数据库，也不保存 access token 或 Authorization header；也不证明真实 RBAC、customer config active revision、桌面菜单投影或岗位任务端真实可用：
 
 ```bash
 node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-account-rbac.mjs \
   --preflight-report output/trial-account-rbac/preflight.json
 ```
 
-浏览器 smoke 还可先写前置检查报告。该模式只探测后端健康检查、演示账号密码环境变量是否存在、是否需要脚本托管 Vite、yoyoosun customer config 脚本是否存在，并静态输出桌面账号菜单应见 / 禁见、客户隐藏菜单、旧入口清理、岗位任务端路径和 `demo_admin` 移动端拒绝态的菜单投影覆盖计划；不读密码、不登录、不调用 JSON-RPC、不启动浏览器、不启动 Vite、不读取客户配置脚本、不创建任务、不写数据库，也不保存 access token 或 Authorization header：
+浏览器 smoke 还可先写前置检查报告。该模式只探测后端健康检查、演示账号密码环境变量是否存在、是否需要脚本托管 Vite、yoyoosun customer config 脚本是否存在，并复用 `audit:yoyoosun-entry` 做只读端口审计；如果显式传入 `TRIAL_BROWSER_SMOKE_BASE_URL`，该端口必须命中 yoyoosun config 和 yoyoosun asset，否则报告会以 `external-base-url-not-yoyoosun-entry` 阻止进入真实 smoke，避免把 Product Core、HTML fallback 或其他项目端口误当试用前端。报告还会静态输出桌面账号菜单应见 / 禁见、客户隐藏菜单、旧入口清理、岗位任务端路径、`demo_admin` 移动端拒绝态和 effective session DEV-only 脱敏诊断读取计划；报告内 `preflightOnly=true`，并会列出真实 smoke 前置和本报告未证明项。不读密码、不登录、不调用 JSON-RPC、不启动浏览器、不启动 Vite、不读取客户配置脚本、不创建任务、不写数据库，也不保存 access token 或 Authorization header。真实浏览器 smoke 在脚本托管 Vite 时会在桌面账号登录后读取 `window.__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__`，确认只包含脱敏摘要、投影模式、空阻塞项和可见菜单计数；需要留下本地读回记录时，可在真实命令上追加 `--report output/trial-demo-account-browser-smoke/report.json`，报告只保存账号通过数、岗位任务端通过数、拒绝态结果、source / projectionMode / configRevision / customerKey / 计数 / blockers 等脱敏摘要，不保存密码、token、Authorization header、raw customer package 或 action 列表，也不证明目标环境发布、真实客户导入或 release evidence 已完成。外部 base URL 默认不强制读取该 DEV-only 变量，如外部地址确认是 Vite DEV，可设置 `TRIAL_BROWSER_SMOKE_EXPECT_EFFECTIVE_SESSION_DIAGNOSTIC=1`：
 
 ```bash
 node /Users/simon/projects/plush-toy-erp/web/scripts/trialDemoAccountBrowserSmoke.mjs \
@@ -518,7 +537,13 @@ TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
   pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:trial-demo-browser
 ```
 
-该浏览器回归会自动启动单端口桌面 Vite，并使用 yoyoosun 菜单配置；它会同时检查各角色应看见的桌面菜单和不应看见的菜单，例如非 admin 不应看到权限管理，`demo_admin` 不应看到业务主入口。如需核对已启动前端地址，可设置 `TRIAL_BROWSER_SMOKE_BASE_URL`。
+该浏览器回归会自动启动单端口桌面 Vite，并使用 yoyoosun 菜单配置；它会同时检查各角色应看见的桌面菜单和不应看见的菜单，例如非 admin 不应看到权限管理，`demo_admin` 不应看到业务主入口。如需核对已启动前端地址，可设置 `TRIAL_BROWSER_SMOKE_BASE_URL`。如需保存本地脱敏读回报告，直接运行脚本并追加报告路径：
+
+```bash
+TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
+  node /Users/simon/projects/plush-toy-erp/web/scripts/trialDemoAccountBrowserSmoke.mjs \
+    --report output/trial-demo-account-browser-smoke/report.json
+```
 
 如只核对岗位任务端登录后回跳和生产单端口路由，执行：
 
@@ -538,9 +563,18 @@ node /Users/simon/projects/plush-toy-erp/web/scripts/mobileAuthLoginRouteSmoke.m
 pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:mobile-auth-login-route
 ```
 
-该回归默认验证 `/m/<role>/tasks`，与当前生产 `web-desktop` 单容器主路径一致，使用 mock auth / workflow RPC 覆盖未登录拦截、登录回跳、通知 / 预警展示和 phone / iPad 布局；preflight 只写本地 JSON，不证明真实后端 RBAC、customer config active revision 或真实账号可用。旧的 `mobile-*` 多实例 `/tasks` 路径仅用于本地兼容调试，需要显式设置 `MOBILE_AUTH_SMOKE_LEGACY_MULTI_APP=1`。
+该回归默认验证 `/m/<role>/tasks`，与当前生产 `web-desktop` 单容器主路径一致，使用 mock auth / workflow RPC 覆盖未登录拦截、登录回跳、通知 / 预警展示和 phone / iPad 布局；preflight 只写本地 JSON，不证明真实后端 RBAC、customer config active revision 或真实账号可用。旧的 `mobile-*` 多实例 `/tasks` 路径已退出，不再作为本地兼容调试入口。
 
 如需核对真实后端模拟任务在岗位任务端详情页可见，并可提交阻塞、退回、完成和跨角色催办动作，先确认本地后端和试用账号可用，再执行：
+
+触达移动端任务动作、内部提醒、完成反馈、跨角色催办、任务模型或任务看板动作 helper 时，先跑本地无写入边界和模型测试：
+
+```bash
+node --test \
+  /Users/simon/projects/plush-toy-erp/scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs \
+  /Users/simon/projects/plush-toy-erp/web/src/erp/mobile/utils/mobileRoleTaskModel.test.mjs \
+  /Users/simon/projects/plush-toy-erp/web/src/erp/utils/workflowTaskBoard.test.mjs
+```
 
 如果还没有本地演示账号密码或后端地址，先打印输入模板。该模式只输出所需环境变量、模拟任务计划和真实回归命令，不登录、不调用后端、不启动浏览器、不写数据库：
 
@@ -548,7 +582,7 @@ pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:mobile-auth-login-route
 node /Users/simon/projects/plush-toy-erp/web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --print-input-template
 ```
 
-本地前置看起来齐全但还不确定能否跑真实浏览器 smoke 时，先写 no-write preflight 报告。该报告只探测 backend health、演示密码 env 是否存在、是否需要脚本托管 Vite、试用 customer-config 脚本是否存在，并记录模拟任务动作计划 coverage：老板阻塞、老板完成、老板退回、跨角色催办、reason 必填、完成反馈、异常上报、evidence refs 和内部 `notification_type` 线索；不读取密码值、不登录、不调用 JSON-RPC、不启动 Vite / Playwright、不创建 workflow 任务、不写数据库，也不保存 token 或 Authorization header：
+本地前置看起来齐全但还不确定能否跑真实浏览器 smoke 时，先写 no-write preflight 报告。该报告只探测 backend health、演示密码 env 是否存在、是否需要脚本托管 Vite、试用 customer-config 脚本是否存在，并复用 `audit:yoyoosun-entry` 做只读端口审计；若显式传入 `MOBILE_WORKFLOW_BROWSER_SMOKE_BASE_URL`，该端口必须命中 yoyoosun config 和 yoyoosun asset，否则报告会以 `external-base-url-not-yoyoosun-entry` 阻止真实 smoke，避免把 Product Core、HTML fallback 或其他项目端口误当移动端任务端运行入口。报告还会记录模拟任务动作计划 coverage：老板阻塞、老板完成、老板退回、品质完成、仓库入库完成、跨角色催办、reason 必填、完成反馈、异常上报、evidence refs 和内部 `notification_type` 线索；不读取密码值、不登录、不调用 JSON-RPC、不启动 Vite / Playwright、不创建 workflow 任务、不写数据库，也不保存 token 或 Authorization header：
 
 ```bash
 node /Users/simon/projects/plush-toy-erp/web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs \
@@ -560,7 +594,15 @@ MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='replace-with-local-demo-password' \
   pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:mobile-workflow-runtime-browser
 ```
 
-该回归会通过 JSON-RPC 创建唯一的 `simulated_only` 老板审批任务、老板退回任务、老板完成任务和仓库放行任务，并为任务 payload 保留 `notification_type` 内部提醒线索；再用真实浏览器登录 `demo_boss`，在 `/m/boss/tasks` 打开详情、填写现场留痕、提交自有任务阻塞原因、退回原因，点击自有任务完成并在已办列表看到完成反馈，再验证 `owner_role_key=warehouse` 且 `assignee_id=demo_boss` 的跨角色任务只能催办、不能代办阻塞 / 完成，页面会显示催办反馈、催办原因和 evidence refs。它只写本地/试用模拟 workflow 证据，不导入真实客户数据，也不写库存、采购、质检或财务事实。
+如需留下本地真实浏览器读回记录，直接运行脚本并追加报告路径：
+
+```bash
+MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='replace-with-local-demo-password' \
+  node /Users/simon/projects/plush-toy-erp/web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs \
+    --report output/mobile-workflow-runtime-browser-smoke/report.json
+```
+
+该回归会通过 JSON-RPC 创建唯一的 `simulated_only` 老板审批任务、老板退回任务、老板完成任务、品质成品抽检任务、仓库入库任务和仓库放行任务，并为任务 payload 保留 `notification_type` 内部提醒线索；再用真实浏览器登录 `demo_boss`，在 `/m/boss/tasks` 打开详情、填写现场留痕、提交自有任务阻塞原因、退回原因，点击自有任务完成并在已办列表看到完成反馈，再验证 `owner_role_key=warehouse` 且 `assignee_id=demo_boss` 的跨角色任务只能催办、不能代办阻塞 / 完成；随后登录 `demo_quality` 和 `demo_warehouse`，分别完成品质成品抽检和仓库入库任务，并读回 evidence refs、完成反馈和已办列表。它只写本地/试用模拟 workflow 证据，不导入真实客户数据，也不写库存、采购、质检或财务事实。`--report` 只保存任务码、状态、动作结果、模拟任务计划 coverage 摘要、未证明项和脱敏布尔值，不保存密码、token、Authorization header、raw customer package 或 action 列表，也不进入 release evidence。
 
 ### 2B. Customer Config 草案边界检查
 
@@ -579,6 +621,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --customer demo --mode compile
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --customer yoyoosun
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --customer yoyoosun --mode compile
+node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --customer yoyoosun --customer demo --mode compile
 ```
 
 如需生成人工 review 用的本地预览：
@@ -587,7 +630,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-package-preview.json
 ```
 
-该脚本只读取 `config/catalog/customerPackageCatalog.mjs`、`config/schemas/customerPackageSchema.mjs` 和受控 `config/customers/<customer>/customerPackage.mjs`，当前登记 `demo` 与 `yoyoosun` 两个包；其中 `demo` 只证明配置包编译不是单客户硬编码，`yoyoosun` 承接永绅资料边界。脚本验证客户包仍为 `runtimeEnabled=false`、`previewOnly=true`，且不 publish、不 activate、不 rollback、不写 DB、不改 RBAC、schema、migration、Workflow / Fact。`activate` / `rollback` 模式当前会直接失败；`--out` 只能在 `--mode preview` 下写入 `output/`，报告不纳入 git。
+该脚本只读取 `config/catalog/customerPackageCatalog.mjs`、`config/schemas/customerPackageSchema.mjs` 和受控 `config/customers/<customer>/customerPackage.mjs`，当前登记 `demo` 与 `yoyoosun` 两个包；其中 `demo` 只证明配置包编译不是单客户硬编码，`yoyoosun` 承接永绅资料边界。脚本验证客户包仍为 `runtimeEnabled=false`、`previewOnly=true`，且不 publish、不 activate、不 rollback、不写 DB、不改 RBAC、schema、migration、Workflow / Fact。可以重复传入 `--customer` 一次性校验多个客户包，输出会逐客户打印；`activate` / `rollback` 模式当前会直接失败；`--out` 只能在 `--mode preview` 下写入 `output/`，且只支持单客户预览，报告不纳入 git。
 
 从已跟踪客户包生成后端 `customer_config.validate_customer_config / publish_customer_config` 可接收的 runtime manifest 时，执行：
 
@@ -596,6 +639,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-mani
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --customer demo --mode compile
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode compile
+node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --customer demo --mode compile
 ```
 
 如需生成人工 review 用的本地 manifest JSON：
@@ -604,7 +648,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-mani
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-config-runtime-manifest.json
 ```
 
-该脚本不读取 raw 客户文件、不上传文件、不调用后端、不 activate、不 rollback、不导入业务数据，也不写 Workflow / Fact runtime；它只把 tracked catalog / schema / package 编译为受控 JSON-RPC payload 形状，锁住 `purchase -> purchasing` 等后端角色 key 映射、模块状态、页面投影、字段策略、授权和责任池输入。客户包可选 `moduleStates` 只允许 catalog 内模块和 `enabled / read_only / disabled`，非 `enabled` 必须写 reason；编译器会把它转成后端 `module_states`，但不提供运行时安装 / 卸载模块，也不证明完整模块关闭已 ready。`demo` manifest 的 entitlement `scope_value` 必须保持 `demo`，不能串到 `yoyoosun`；`yoyoosun` manifest 仍用于永绅受控发布链路。`demo` 包可以通过受控 `workPoolRoleOverrides` 证明同一 runtime 责任池在不同客户配置中映射给不同角色，例如 `order_review -> sales`，而 yoyoosun 仍保持 `order_review -> pmc`；流程定义仍引用同一个 `owner_pool_key`，差异只落在编译后的 `work_pool_memberships`，不 fork 核心代码、不复制流程、不扩大后端 RBAC。页面投影必须来自已登记正式菜单 key，manifest 编译器和后端 `validate_customer_config / publish_customer_config` 都会拒绝缺失、空列表或未知 page key 的 `compiled_snapshot.pages`，`get_effective_session` 对旧 revision 缺 pages 或无有效 pages 不回退 RBAC 全量页面。字段策略只发布当前前端已消费的 `customers.default`、`suppliers.default` 和 `sales_orders.default`；`sales_order_items` 的产品 / 款式 / 颜色尺码候选仍是导入 / 客户评审草案，不进入 active field policy。后端 `validate_customer_config / publish_customer_config` 也会拒绝未登记 surface / field key，`get_effective_session` 会过滤旧 revision 中的非法字段策略。
+该脚本不读取 raw 客户文件、不上传文件、不调用后端、不 activate、不 rollback、不导入业务数据，也不写 Workflow / Fact runtime；它只把 tracked catalog / schema / package 编译为受控 JSON-RPC payload 形状，锁住 `purchase -> purchasing` 等后端角色 key 映射、模块状态、页面投影、字段策略、打印默认值、授权和责任池输入。可以重复传入 `--customer` 一次性编译多个 runtime manifest，输出会逐客户打印；`--out` 只能在 `--mode preview` 下写入 `output/`，且只支持单客户 manifest，不能用一个文件覆盖多个客户结果。客户包可选 `moduleStates` 只允许 catalog 内模块和 `enabled / read_only / disabled`，非 `enabled` 必须写 reason；编译器会把它转成后端 `module_states`，但不提供运行时安装 / 卸载模块，也不证明完整模块关闭已 ready。`demo` manifest 的 entitlement `scope_value` 必须保持 `demo`，不能串到 `yoyoosun`；`yoyoosun` manifest 仍用于永绅受控发布链路。`demo` 包可以通过受控 `workPoolRoleOverrides` 证明同一 runtime 责任池在不同客户配置中映射给不同角色，例如 `order_review -> sales`，而 yoyoosun 仍保持 `order_review -> pmc`；流程定义仍引用同一个 `owner_pool_key`，差异只落在编译后的 `work_pool_memberships`，不 fork 核心代码、不复制流程、不扩大后端 RBAC。页面投影必须来自已登记正式菜单 key，manifest 编译器和后端 `validate_customer_config / publish_customer_config` 都会拒绝缺失、空列表或未知 page key 的 `compiled_snapshot.pages`，`get_effective_session` 对旧 revision 缺 pages 或无有效 pages 不回退 RBAC 全量页面。字段策略只发布当前前端已消费的 `customers.default`、`suppliers.default` 和 `sales_orders.default`；`sales_order_items` 的产品 / 款式 / 颜色尺码候选仍是导入 / 客户评审草案，不进入 active field policy。`printTemplateDefaults` 只允许登记当前正式 `material-purchase-contract / processing-contract` 的甲方 party defaults，编译后通过 active revision 的 `get_effective_session` 受控投影；当前正式前端消费采购订单页 `material-purchase-contract` 和委外订单页 `processing-contract` 的买方 / 委托方默认值，不启用销售订单打印，也不允许 supplier defaults 覆盖业务快照。后端 `validate_customer_config / publish_customer_config` 也会拒绝未登记 surface / field key，`get_effective_session` 会过滤旧 revision 中的非法字段策略。
 
 客户配置 revision 进入 release evidence 前，先生成 manifest fingerprint evidence：
 
@@ -612,6 +656,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-mani
 node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-manifest-evidence.mjs \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
+  --review-status approved \
   --reviewer <reviewer-name>
 ```
 
@@ -622,10 +667,11 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-manifest
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
+  --review-status approved \
   --reviewer <reviewer-name>
 ```
 
-该生成器只向已存在的 release evidence 目录写入脱敏 `customer-config-manifest-evidence.json`，不创建发布目录、不上传 raw 客户文件、不调用后端、不执行 migration、不导入业务数据。
+该生成器只向已存在的 release evidence 目录写入脱敏 `customer-config-manifest-evidence.json`，不创建发布目录、不上传 raw 客户文件、不调用后端、不执行 migration、不导入业务数据。未传 `--review-status approved` 时默认生成 `draft`，不能通过 activation gate；只有人工 review 确认后才显式写 approved。
 
 客户配置 revision 准备激活前，先用 runtime manifest 叠加本次发布 evidence 做门禁：
 
@@ -764,7 +810,7 @@ node --test /Users/simon/projects/plush-toy-erp/scripts/qa/core-boundary.test.mj
 node --test /Users/simon/projects/plush-toy-erp/scripts/qa/workflow-fact-boundary.test.mjs
 ```
 
-该测试只扫描 Workflow runtime 源码，确认 `update_task_status`、`complete_task_action`、`block_task_action` 和 `reject_task_action` 链路不会直接引用 Operational Fact、库存、出货或财务事实写入口。Workflow 可以写协同状态和派生协同任务；真实库存、出货和财务事实必须从对应领域 usecase 显式入口执行。
+该测试只扫描 Workflow runtime 源码，确认受控 `complete_task_action`、`block_task_action` 和 `reject_task_action` 链路不会直接引用 Operational Fact、库存、出货或财务事实写入口；旧 `update_task_status` 已退出运行时。Workflow 可以写协同状态和派生协同任务；真实库存、出货和财务事实必须从对应领域 usecase 显式入口执行。
 
 如本轮触达任务动作合同、reason、事件 / actor role、payload 或岗位任务端后端读回，再补跑：
 
@@ -784,7 +830,7 @@ node --test \
   /Users/simon/projects/plush-toy-erp/scripts/qa/workflow-ui-action-boundary.test.mjs
 ```
 
-这组测试覆盖前端 Workflow action access helper 和正式运行时代码：`workflowTaskActionAccess.test.mjs` 锁住后端 explain 优先、本地 fallback、失败态禁用动作和 stale / abort request 处理；`workflow-ui-action-boundary.test.mjs` 扫描 `web/src/erp` 正式运行时代码，确认页面、组件、hook 和工具不直接调用 `createWorkflowTask`、`updateWorkflowTaskStatus`、`upsertWorkflowBusinessState` 或对应 raw JSON-RPC 方法。`web/src/erp/api/workflowApi.mjs` 仍可保留兼容 wrapper，mock、style:l1 场景和测试代码不作为正式 UI 主路径。
+这组测试覆盖前端 Workflow action access helper 和正式运行时代码：`workflowTaskActionAccess.test.mjs` 锁住后端 explain 优先、本地 fallback、失败态禁用动作和 stale / abort request 处理；`workflow-ui-action-boundary.test.mjs` 扫描 `web/src/erp` 正式运行时代码，确认页面、组件、hook 和工具不直接调用 `createWorkflowTask`、`updateWorkflowTaskStatus`、`upsertWorkflowBusinessState` 或对应 raw JSON-RPC 方法。`updateWorkflowTaskStatus` wrapper 和 raw `update_task_status` mock 已退出；style:l1 场景和测试代码不作为正式 UI 主路径。
 
 调整客户配置运行时投影、正式菜单、字段策略或业务页面动作权限后，执行：
 

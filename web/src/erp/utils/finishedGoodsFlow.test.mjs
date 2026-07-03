@@ -93,7 +93,39 @@ test('finishedGoodsFlow: 成品抽检合格能生成仓库成品入库任务', (
     inboundTask.payload.complete_condition,
     '仓库确认成品入库数量、库位和经手人'
   )
+  assert.equal(inboundTask.payload.qc_result, 'pass')
+  assert.equal(
+    inboundTask.payload.related_documents.includes('成品抽检结果：合格'),
+    true
+  )
+  assert.equal(
+    inboundTask.payload.related_documents.some((item) => item.includes('pass')),
+    false
+  )
   assert.equal(inboundTask.payload.inventory_balance_deferred, true)
+})
+
+test('finishedGoodsFlow: 成品抽检未知结果不透出 raw key', () => {
+  const inboundTask = buildFinishedGoodsInboundTask(
+    productionRecord(),
+    {
+      id: 99,
+      priority: 3,
+      payload: { approval_result: 'custom_finished_goods_qc_key' },
+    },
+    { nowMs: NOW_MS }
+  )
+
+  assert.equal(
+    inboundTask.payload.related_documents.includes('成品抽检结果：抽检已记录'),
+    true
+  )
+  assert.equal(
+    inboundTask.payload.related_documents.some((item) =>
+      item.includes('custom_finished_goods_qc_key')
+    ),
+    false
+  )
 })
 
 test('finishedGoodsFlow: 成品抽检不合格能生成生产返工任务和 critical 预警', () => {
@@ -110,6 +142,15 @@ test('finishedGoodsFlow: 成品抽检不合格能生成生产返工任务和 cri
   assert.equal(reworkTask.business_status_key, 'qc_failed')
   assert.equal(reworkTask.owner_role_key, 'production')
   assert.equal(reworkTask.priority, 3)
+  assert.equal(reworkTask.payload.qc_result, 'fail')
+  assert.equal(
+    reworkTask.payload.related_documents.includes('成品抽检结果：不合格'),
+    true
+  )
+  assert.equal(
+    reworkTask.payload.related_documents.some((item) => item.includes('fail')),
+    false
+  )
   assert.equal(reworkTask.payload.rejected_reason, '车缝开线')
   assert.equal(alert.alert_type, 'qc_failed')
   assert.equal(alert.alert_level, 'critical')
@@ -254,10 +295,30 @@ test('finishedGoodsFlow: 缺 source_no / document_no 时不崩溃', () => {
     }),
     { nowMs: NOW_MS }
   )
+  const taskWithInternalSourceNo = buildFinishedGoodsQcTask(
+    productionRecord({
+      document_no: '',
+      source_no: '42',
+      title: '',
+    }),
+    { nowMs: NOW_MS }
+  )
 
-  assert.equal(task.source_no, '42')
+  assert.equal(task.source_no, '')
+  assert.equal(taskWithInternalSourceNo.source_no, '')
+  assert.equal(task.payload.related_documents.includes('生产进度：42'), false)
   assert.equal(
-    task.payload.related_documents.some((item) => item.includes('42')),
+    taskWithInternalSourceNo.payload.related_documents.includes('生产进度：42'),
+    false
+  )
+  assert.equal(
+    taskWithInternalSourceNo.payload.related_documents.includes(
+      '生产进度已关联'
+    ),
+    true
+  )
+  assert.equal(
+    taskWithInternalSourceNo.payload.related_documents.includes('订单已关联'),
     true
   )
 })

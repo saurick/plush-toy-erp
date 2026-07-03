@@ -90,7 +90,6 @@ services:
       ERP_PDF_CHROME_PATH: "${ERP_PDF_CHROME_PATH:-/usr/bin/chromium}"
       ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-2}"
       ERP_PDF_WARMUP: "${ERP_PDF_WARMUP:-}"
-      ERP_PDF_WARMUP_ENABLED: "${ERP_PDF_WARMUP_ENABLED:-true}"
       # 设计意图：默认 DSN 必须与本项目 prod 配置保持一致，避免 .env 未显式覆盖时误连占位库名或占位密码。
       POSTGRES_DSN: "${POSTGRES_DSN:-postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_erp?sslmode=disable}"
       TRACE_ENDPOINT: "${TRACE_ENDPOINT:-jaeger:4318}"

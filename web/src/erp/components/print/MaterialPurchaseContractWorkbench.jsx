@@ -7,6 +7,7 @@ import {
   clearMaterialPurchaseContractSignatureDraft,
   MATERIAL_PURCHASE_DETAIL_COLUMNS,
   MATERIAL_PURCHASE_MAX_ROWS,
+  buildMaterialPurchaseContractBusinessDraft,
   buildMaterialPurchaseContractDraft,
   computeMaterialPurchaseTotals,
   deleteMaterialPurchaseLine,
@@ -146,39 +147,48 @@ function ClauseBlock({ title, items, onCommit, disabled = false }) {
 }
 
 function loadDraft(template, storageKey, options = {}) {
-  const { forceFresh = false, workspaceStateID = '' } = options
+  const {
+    forceFresh = false,
+    workspaceStateID = '',
+    businessInput = false,
+  } = options
   const fallbackDraft = buildMaterialPurchaseContractDraft(template?.sample)
+  const buildDraft = businessInput
+    ? (draft) =>
+        buildMaterialPurchaseContractBusinessDraft(draft, template?.sample)
+    : (draft) =>
+        buildMaterialPurchaseContractDraft({
+          ...template?.sample,
+          ...draft,
+          lines: draft?.lines || template?.sample?.lines,
+          clauses: draft?.clauses || template?.sample?.clauses,
+          merges: draft?.merges || template?.sample?.merges,
+        })
   if (forceFresh || !storageKey || typeof window === 'undefined') {
-    return fallbackDraft
+    return businessInput
+      ? buildMaterialPurchaseContractBusinessDraft({}, template?.sample)
+      : fallbackDraft
   }
   const initialDraft = readInitialPrintWorkspaceDraftFromWindowName(
     template?.key,
     workspaceStateID
   )
   if (initialDraft) {
-    return buildMaterialPurchaseContractDraft({
-      ...template?.sample,
-      ...initialDraft,
-      lines: initialDraft?.lines || template?.sample?.lines,
-      clauses: initialDraft?.clauses || template?.sample?.clauses,
-      merges: initialDraft?.merges || template?.sample?.merges,
-    })
+    return buildDraft(initialDraft)
   }
   try {
     const rawDraft = window.localStorage.getItem(storageKey) || ''
     if (!rawDraft) {
-      return fallbackDraft
+      return businessInput
+        ? buildMaterialPurchaseContractBusinessDraft({}, template?.sample)
+        : fallbackDraft
     }
     const parsedDraft = JSON.parse(rawDraft)
-    return buildMaterialPurchaseContractDraft({
-      ...template?.sample,
-      ...parsedDraft,
-      lines: parsedDraft?.lines || template?.sample?.lines,
-      clauses: parsedDraft?.clauses || template?.sample?.clauses,
-      merges: parsedDraft?.merges || template?.sample?.merges,
-    })
+    return buildDraft(parsedDraft)
   } catch {
-    return fallbackDraft
+    return businessInput
+      ? buildMaterialPurchaseContractBusinessDraft({}, template?.sample)
+      : fallbackDraft
   }
 }
 
@@ -199,11 +209,13 @@ export default function MaterialPurchaseContractWorkbench({
   workspaceStateID = '',
   workspaceURL = '',
   sourceTag = '使用默认模板',
+  businessInput = false,
 }) {
   const [draft, setDraft] = useState(() =>
     loadDraft(template, draftStorageKey, {
       forceFresh: resetDraftOnOpen,
       workspaceStateID,
+      businessInput,
     })
   )
   const [formulaVisible, setFormulaVisible] = useState(false)
@@ -227,6 +239,7 @@ export default function MaterialPurchaseContractWorkbench({
       loadDraft(template, draftStorageKey, {
         forceFresh: resetDraftOnOpen,
         workspaceStateID,
+        businessInput,
       })
     )
     setFormulaVisible(false)
@@ -239,7 +252,14 @@ export default function MaterialPurchaseContractWorkbench({
     setPdfAction('')
     setPdfActionStartedAt(0)
     setToolbarStatus(resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag))
-  }, [draftStorageKey, resetDraftOnOpen, sourceTag, template, workspaceStateID])
+  }, [
+    businessInput,
+    draftStorageKey,
+    resetDraftOnOpen,
+    sourceTag,
+    template,
+    workspaceStateID,
+  ])
 
   useEffect(() => {
     if (!draftStorageKey || typeof window === 'undefined') {
@@ -294,8 +314,8 @@ export default function MaterialPurchaseContractWorkbench({
   }, [pdfAction, pdfActionStartedAt])
 
   const totals = useMemo(
-    () => computeMaterialPurchaseTotals(draft.lines),
-    [draft.lines]
+    () => computeMaterialPurchaseTotals(draft.lines, { merges: draft.merges }),
+    [draft.lines, draft.merges]
   )
   const templateModesActive = rowSelectionMode || cellSelectionMode
   const mergeSelection = normalizeCellSelection(

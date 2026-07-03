@@ -548,9 +548,8 @@ export function normalizeContactRows(rows = []) {
 }
 
 export function ContactFormList({ form, entityLabel }) {
-  const watchedContacts = Form.useWatch('contacts', form) || []
   const { registerLineItemRow, requestLineItemScroll } =
-    useLineItemAppendScroll(watchedContacts.length)
+    useLineItemAppendScroll()
 
   return (
     <Form.List
@@ -692,8 +691,8 @@ export function ContactFormList({ form, entityLabel }) {
           <BusinessLineItemsFooter
             addLabel="添加条目"
             onAdd={() => {
-              requestLineItemScroll(fields.length)
               add({ is_primary: false })
+              requestLineItemScroll(fields.length)
             }}
             stats={[
               {

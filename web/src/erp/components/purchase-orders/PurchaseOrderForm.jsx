@@ -10,6 +10,7 @@ import FieldWithUnitSuffix, {
   unitSuffixTextFromOptions,
 } from '../business-list/FieldWithUnitSuffix.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
+import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
 import BusinessLineItemsSection from '../business-list/BusinessLineItemsSection.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
@@ -79,6 +80,17 @@ function materialLabel(material = {}) {
   )
 }
 
+function sourceDefaultUnitText(unitOptions, unitID) {
+  const normalizedID = Number(unitID || 0)
+  if (!Number.isFinite(normalizedID) || normalizedID <= 0) {
+    return '-'
+  }
+  return (
+    unitSuffixTextFromOptions(unitOptions, normalizedID, '单位已关联') ||
+    '单位已关联'
+  )
+}
+
 function quantityPrecisionRule({ form, fieldName, unitOptions }) {
   return {
     validator: async (_, value) => {
@@ -118,6 +130,10 @@ function createLineFromMaterial(material = {}, lineNo = 1) {
   }
 }
 
+function optionalFormValue(value) {
+  return value === null || value === undefined ? '' : value
+}
+
 export function normalizePurchaseLineFormValue(item = {}) {
   return {
     id: item.id,
@@ -127,9 +143,9 @@ export function normalizePurchaseLineFormValue(item = {}) {
     material_code_snapshot: item.material_code_snapshot || '',
     material_name_snapshot: item.material_name_snapshot || '',
     color_snapshot: item.color_snapshot || '',
-    purchased_quantity: item.purchased_quantity || '',
-    unit_price: item.unit_price || '',
-    amount: item.amount || '',
+    purchased_quantity: optionalFormValue(item.purchased_quantity),
+    unit_price: optionalFormValue(item.unit_price),
+    amount: optionalFormValue(item.amount),
     expected_arrival_date: unixToDateInputValue(item.expected_arrival_date),
     note: item.note || '',
     line_status: item.line_status,
@@ -146,12 +162,10 @@ export function PurchaseOrderFormFields({
   onMaterialChange,
 }) {
   const [materialImportOpen, setMaterialImportOpen] = useState(false)
-  const watchedItems = Form.useWatch('items', form) || []
   const purchaseDate = Form.useWatch('purchase_date', form)
   const expectedArrivalDate = Form.useWatch('expected_arrival_date', form)
-  const lineSummary = summarizePurchaseLines(watchedItems)
   const { registerLineItemRow, requestLineItemScroll } =
-    useLineItemAppendScroll(watchedItems.length)
+    useLineItemAppendScroll()
   const disablePurchaseDateAfterExpectedArrival = useCallback(
     (current) => isDateInputAfter(current, expectedArrivalDate),
     [expectedArrivalDate]
@@ -195,9 +209,15 @@ export function PurchaseOrderFormFields({
       { title: '分类', dataIndex: 'category', width: 120 },
       { title: '规格', dataIndex: 'spec', width: 170 },
       { title: '颜色', dataIndex: 'color', width: 110 },
-      { title: '默认单位', dataIndex: 'default_unit_id', width: 100 },
+      {
+        title: '默认单位',
+        key: 'default_unit',
+        width: 100,
+        render: (_, material) =>
+          sourceDefaultUnitText(unitOptions, material.default_unit_id),
+      },
     ],
-    []
+    [unitOptions]
   )
 
   return (
@@ -400,6 +420,7 @@ export function PurchaseOrderFormFields({
                 rules={[{ required: true, message: '请选择材料' }]}
               >
                 <Select
+                  allowClear
                   showSearch
                   options={materialOptions}
                   optionFilterProp="label"
@@ -449,25 +470,35 @@ export function PurchaseOrderFormFields({
                 <Input maxLength={64} />
               </Form.Item>
               <Form.Item
-                className="erp-line-item-field erp-line-item-field--quantity"
-                name={[field.name, 'purchased_quantity']}
-                label="采购数量"
-                rules={[
-                  { required: true, message: '请输入采购数量' },
-                  quantityPrecisionRule({
-                    form,
-                    fieldName: field.name,
-                    unitOptions,
-                  }),
-                ]}
+                noStyle
+                shouldUpdate={(previous, current) =>
+                  previous?.items?.[field.name]?.unit_id !==
+                  current?.items?.[field.name]?.unit_id
+                }
               >
-                <FieldWithUnitSuffix
-                  control={<Input />}
-                  unitText={unitSuffixTextFromOptions(
-                    unitOptions,
-                    watchedItems?.[field.name]?.unit_id
-                  )}
-                />
+                {({ getFieldValue }) => (
+                  <Form.Item
+                    className="erp-line-item-field erp-line-item-field--quantity"
+                    name={[field.name, 'purchased_quantity']}
+                    label="采购数量"
+                    rules={[
+                      { required: true, message: '请输入采购数量' },
+                      quantityPrecisionRule({
+                        form,
+                        fieldName: field.name,
+                        unitOptions,
+                      }),
+                    ]}
+                  >
+                    <FieldWithUnitSuffix
+                      control={<Input />}
+                      unitText={unitSuffixTextFromOptions(
+                        unitOptions,
+                        getFieldValue(['items', field.name, 'unit_id'])
+                      )}
+                    />
+                  </Form.Item>
+                )}
               </Form.Item>
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--money"
@@ -518,29 +549,39 @@ export function PurchaseOrderFormFields({
             </div>
           </div>
         )}
-        footerProps={({ add }) => ({
+        footerProps={({ add, fields }) => ({
           addLabel: '添加条目',
           onAdd: () => {
             const currentLines = form.getFieldValue('items') || []
-            requestLineItemScroll(currentLines.length)
             add(createBlankPurchaseLine(getNextLineNo(currentLines)))
+            requestLineItemScroll(currentLines.length)
           },
           stats: [
             {
               key: 'count',
               label: '已录入',
-              value: lineSummary.count,
+              value: fields.length,
               suffix: '条',
             },
             {
               key: 'quantity',
               label: '数量合计',
-              value: formatSummaryNumber(lineSummary.quantity),
+              value: (
+                <BusinessLineItemsSummaryValue
+                  summarize={summarizePurchaseLines}
+                  select={(summary) => formatSummaryNumber(summary.quantity)}
+                />
+              ),
             },
             {
               key: 'amount',
               label: '金额合计',
-              value: formatSummaryNumber(lineSummary.amount, 2),
+              value: (
+                <BusinessLineItemsSummaryValue
+                  summarize={summarizePurchaseLines}
+                  select={(summary) => formatSummaryNumber(summary.amount, 2)}
+                />
+              ),
             },
           ],
         })}

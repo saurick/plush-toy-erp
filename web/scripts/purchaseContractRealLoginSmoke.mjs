@@ -9,6 +9,8 @@ import {
   loginAsAdmin,
   resolvePositiveInteger,
   safeScreenshot,
+  verifyPdfDownloadButton,
+  verifyPrintButtonInvokesWindowPrint,
 } from './realLoginSmokeShared.mjs'
 
 const runtime = createRealLoginSmokeRuntime({
@@ -28,6 +30,7 @@ async function main() {
     const browser = await chromium.launch({ headless: runtime.headless })
     try {
       const page = await browser.newPage({
+        acceptDownloads: true,
         viewport: { width: 1440, height: 900 },
       })
       const errors = attachErrorCollectors(page)
@@ -36,6 +39,8 @@ async function main() {
         await loginAsAdmin(page, credentials, runtime.baseURL)
         await verifyPurchaseContractAmountEditing(page)
         const previewLatencyMs = await verifyPurchaseContractPreviewPopup(page)
+        const downloadResult = await verifyPdfDownloadButton(page)
+        await verifyPrintButtonInvokesWindowPrint(page)
         assert.deepEqual(errors, [], '页面出现控制台或运行时错误')
         await page.screenshot({
           path: path.resolve(
@@ -45,7 +50,7 @@ async function main() {
           fullPage: true,
         })
         console.log(
-          `[purchase-contract-real-login-smoke] 采购合同在线预览耗时 ${previewLatencyMs}ms（阈值 ${previewLatencyBudgetMs}ms）。`
+          `[purchase-contract-real-login-smoke] 采购合同在线预览耗时 ${previewLatencyMs}ms（阈值 ${previewLatencyBudgetMs}ms），下载文件 ${downloadResult.suggestedFilename}，打印按钮已调用浏览器打印入口。`
         )
       } catch (error) {
         await safeScreenshot(
@@ -118,10 +123,11 @@ async function verifyPurchaseContractPreviewPopup(page) {
   let popup = null
 
   try {
-    ;[popup] = await Promise.all([
+    const [nextPopup] = await Promise.all([
       page.waitForEvent('popup', { timeout: 15_000 }),
       page.getByRole('button', { name: '在线预览 PDF' }).click(),
     ])
+    popup = nextPopup
 
     await popup.waitForLoadState('domcontentloaded')
     await assertPdfPreviewPopupReady(popup)

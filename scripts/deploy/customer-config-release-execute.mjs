@@ -217,6 +217,45 @@ function sha256File(filePath) {
     .digest("hex");
 }
 
+function repoRelativePath(repoRoot, filePath, label) {
+  const relativePath = path.relative(repoRoot, filePath);
+  if (
+    !relativePath ||
+    relativePath.startsWith("..") ||
+    path.isAbsolute(relativePath)
+  ) {
+    throw new CliError(`${label} must stay inside repo root`);
+  }
+  return relativePath.split(path.sep).join("/");
+}
+
+function resolveOutputDir(repoRoot, raw) {
+  const value = String(raw || "").trim();
+  if (!value) {
+    throw new CliError("--out requires an output directory", 2);
+  }
+  const resolved = path.resolve(repoRoot, value);
+  const relativePath = path.relative(repoRoot, resolved);
+  if (
+    !relativePath ||
+    relativePath.startsWith("..") ||
+    path.isAbsolute(relativePath)
+  ) {
+    throw new CliError("--out must stay inside repo root", 2);
+  }
+  const deploymentsRoot = path.resolve(repoRoot, "deployments");
+  if (
+    resolved === deploymentsRoot ||
+    resolved.startsWith(`${deploymentsRoot}${path.sep}`)
+  ) {
+    throw new CliError(
+      "--out must not be inside deployments evidence or customer delivery directories",
+      2,
+    );
+  }
+  return resolved;
+}
+
 function normalizeBaseURL(raw) {
   const url = new URL(String(raw || "").trim());
   if (url.username || url.password) {
@@ -470,6 +509,7 @@ async function executeOperations({ backendURL, operations, manifest, activate, r
 async function loadAndValidateInputs(options, repoRoot) {
   requireOption(options, "manifest");
   requireOption(options, "out");
+  options.out = resolveOutputDir(repoRoot, options.out);
   if (options.customer !== DEFAULT_CUSTOMER) {
     throw new CliError(
       `Only ${DEFAULT_CUSTOMER} is supported by this executor today`,
@@ -506,6 +546,7 @@ async function loadAndValidateInputs(options, repoRoot) {
 
   return {
     manifestPath,
+    manifestRef: repoRelativePath(repoRoot, manifestPath, "manifest"),
     manifest,
     activationGate,
   };
@@ -514,6 +555,7 @@ async function loadAndValidateInputs(options, repoRoot) {
 async function writeReport({
   options,
   manifestPath,
+  manifestRef,
   manifest,
   activationGate,
   backendURL,
@@ -533,7 +575,7 @@ async function writeReport({
     activate: Boolean(options.activate),
     activateOnly: Boolean(options.activateOnly),
     rollback: Boolean(options.rollback),
-    manifest: manifestPath,
+    manifest: manifestRef,
     manifestSha256,
     evidenceDir: options.evidenceDir || "",
     backendEndpointAlias: backendURL || "",
@@ -567,7 +609,7 @@ async function writeReport({
       `| rollback | ${Boolean(options.rollback)} |`,
       `| customerKey | ${summary.customerKey} |`,
       `| revision | ${summary.revision} |`,
-      `| manifest | ${manifestPath} |`,
+      `| manifest | ${manifestRef} |`,
       `| manifestSha256 | ${manifestSha256} |`,
       `| evidenceDir | ${options.evidenceDir || ""} |`,
       `| backendEndpointAlias | ${backendURL || ""} |`,
@@ -593,7 +635,7 @@ export async function runCustomerConfigRelease(options, runtime = {}) {
     ...options,
   };
   const repoRoot = runtime.repoRoot || process.cwd();
-  const { manifestPath, manifest, activationGate } =
+  const { manifestPath, manifestRef, manifest, activationGate } =
     await loadAndValidateInputs(options, repoRoot);
   if (
     options.execute &&
@@ -626,6 +668,7 @@ export async function runCustomerConfigRelease(options, runtime = {}) {
   return writeReport({
     options,
     manifestPath,
+    manifestRef,
     manifest,
     activationGate,
     backendURL,

@@ -4,7 +4,6 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   blockWorkflowTaskAction,
   completeWorkflowTaskAction,
-  explainWorkflowActionAccess,
   rejectWorkflowTaskAction,
   urgeWorkflowTask,
 } from '../../api/workflowApi.mjs'
@@ -29,10 +28,74 @@ import {
 } from '../../utils/payableReconciliationFlow.mjs'
 import {
   canOperateTask,
+  canOpenMobileTaskDetailAction,
   canUrgeTask,
-  resolveMobileTaskBusinessStatus,
+  getMobileTaskActionReasonDraftKey,
+  normalizeMobileTaskActionKey,
+  requiresMobileActionFeedback,
+  resolveMobileTaskActionReason,
+  resolveMobileActionLabel,
   resolveMobileUrgeAction,
 } from '../utils/mobileRoleTaskModel.mjs'
+import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../../utils/workflowTaskActionSubmitGuard.mjs'
+
+function compactActionPayload(payload = {}) {
+  return Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== undefined)
+  )
+}
+
+function buildMobileWorkflowActionPayload({
+  activeRoleKey,
+  actionReason,
+  evidenceText,
+  reasonRequired,
+  task,
+  taskStatusKey,
+}) {
+  return compactActionPayload({
+    ...buildMobileTaskActionEvidence({
+      roleKey: activeRoleKey,
+      actionKey: taskStatusKey,
+      reason: reasonRequired ? actionReason : '',
+      evidenceText,
+    }),
+    mobile_role_key: activeRoleKey,
+    approval_result:
+      isOrderApprovalTask(task) && taskStatusKey === 'done'
+        ? 'approved'
+        : undefined,
+    qc_result:
+      (isPurchaseIqcTask(task) ||
+        isOutsourceReturnQcTask(task) ||
+        isFinishedGoodsQcTask(task)) &&
+      taskStatusKey === 'done'
+        ? 'pass'
+        : undefined,
+    shipment_release_result:
+      isShipmentReleaseTask(task) && taskStatusKey === 'done'
+        ? 'done'
+        : undefined,
+    receivable_result:
+      isReceivableRegistrationTask(task) && taskStatusKey === 'done'
+        ? 'registered'
+        : undefined,
+    invoice_result:
+      isInvoiceRegistrationTask(task) && taskStatusKey === 'done'
+        ? 'registered'
+        : undefined,
+    payable_result:
+      isPayableRegistrationTask(task) && taskStatusKey === 'done'
+        ? 'registered'
+        : undefined,
+    reconciliation_result:
+      isPayableReconciliationTask(task) && taskStatusKey === 'done'
+        ? 'settled'
+        : undefined,
+    rejected_reason: taskStatusKey === 'rejected' ? actionReason : undefined,
+    blocked_reason: taskStatusKey === 'blocked' ? actionReason : undefined,
+  })
+}
 
 export default function useMobileRoleTaskActions({
   activeRoleKey,
@@ -44,39 +107,32 @@ export default function useMobileRoleTaskActions({
 }) {
   const [updatingID, setUpdatingID] = useState(null)
   const [urgingID, setUrgingID] = useState(null)
-  const [blockedReasonByTaskID, setBlockedReasonByTaskID] = useState({})
+  const [taskActionReasonDrafts, setTaskActionReasonDrafts] = useState({})
   const [urgeReasonByTaskID, setUrgeReasonByTaskID] = useState({})
   const [evidenceTextByTaskID, setEvidenceTextByTaskID] = useState({})
 
-  const explainTaskAction = async (task, actionKey) => {
-    try {
-      const data = await explainWorkflowActionAccess({
-        task_id: task.id,
-        action_key: actionKey,
-      })
-      const action = data?.action || {}
-      if (action.allowed !== true) {
-        message.warning(action.reason || '当前账号不能提交这个任务动作')
-        return false
-      }
-      return true
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '核对任务动作权限失败'))
-      return false
-    }
-  }
-
   const moveTask = async (task, taskStatusKey) => {
-    if (!canOperateTask(activeRoleKey, task)) {
-      message.warning('当前角色只能查看该任务，不能代办完成')
+    if (!canOpenMobileTaskDetailAction(activeRoleKey, task, taskStatusKey)) {
+      message.warning(
+        `当前角色不能${resolveMobileActionLabel(taskStatusKey)}该任务`
+      )
       return false
     }
-    const blockedReason = String(
-      blockedReasonByTaskID[task.id] ?? task.blocked_reason ?? ''
+    const actionReason = String(
+      resolveMobileTaskActionReason({
+        task,
+        action: taskStatusKey,
+        reasonDrafts: taskActionReasonDrafts,
+      })
     ).trim()
     const reasonRequired = ['blocked', 'rejected'].includes(taskStatusKey)
-    if (reasonRequired && !blockedReason) {
+    if (reasonRequired && !actionReason) {
       message.warning('请先填写阻塞或退回原因')
+      return false
+    }
+    const evidenceText = String(evidenceTextByTaskID[task.id] || '').trim()
+    if (requiresMobileActionFeedback(taskStatusKey) && !evidenceText) {
+      message.warning('请先填写完成反馈或附件线索')
       return false
     }
     const explainActionKey =
@@ -87,75 +143,30 @@ export default function useMobileRoleTaskActions({
           : taskStatusKey === 'rejected'
             ? 'reject'
             : taskStatusKey
-    const explainAllowed = await explainTaskAction(task, explainActionKey)
+    const explainAllowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
+      task,
+      actionKey: explainActionKey,
+      reason: actionReason,
+      onWarning: message.warning,
+      onError: message.error,
+    })
     if (!explainAllowed) return false
 
-    const nextBusinessStatusKey = resolveMobileTaskBusinessStatus(
+    const payload = buildMobileWorkflowActionPayload({
+      activeRoleKey,
+      actionReason,
+      evidenceText,
+      reasonRequired,
       task,
-      taskStatusKey
-    )
-    const mobileActionEvidence = buildMobileTaskActionEvidence({
-      roleKey: activeRoleKey,
-      actionKey: taskStatusKey,
-      reason: reasonRequired ? blockedReason : '',
-      evidenceText: evidenceTextByTaskID[task.id] || '',
+      taskStatusKey,
     })
 
     setUpdatingID(task.id)
     try {
       const actionParams = {
-        id: task.id,
-        business_status_key: nextBusinessStatusKey,
-        reason: reasonRequired ? blockedReason : '',
-        payload: {
-          ...(task.payload || {}),
-          ...mobileActionEvidence,
-          mobile_role_key: activeRoleKey,
-          approval_result:
-            isOrderApprovalTask(task) && taskStatusKey === 'done'
-              ? 'approved'
-              : undefined,
-          qc_result:
-            (isPurchaseIqcTask(task) ||
-              isOutsourceReturnQcTask(task) ||
-              isFinishedGoodsQcTask(task)) &&
-            taskStatusKey === 'done'
-              ? 'pass'
-              : undefined,
-          shipment_release_result:
-            isShipmentReleaseTask(task) && taskStatusKey === 'done'
-              ? 'done'
-              : undefined,
-          receivable_result:
-            isReceivableRegistrationTask(task) && taskStatusKey === 'done'
-              ? 'registered'
-              : undefined,
-          invoice_result:
-            isInvoiceRegistrationTask(task) && taskStatusKey === 'done'
-              ? 'registered'
-              : undefined,
-          payable_result:
-            isPayableRegistrationTask(task) && taskStatusKey === 'done'
-              ? 'registered'
-              : undefined,
-          reconciliation_result:
-            isPayableReconciliationTask(task) && taskStatusKey === 'done'
-              ? 'settled'
-              : undefined,
-          rejected_reason:
-            (isOrderApprovalTask(task) ||
-              isPurchaseIqcTask(task) ||
-              isOutsourceReturnQcTask(task) ||
-              isFinishedGoodsQcTask(task) ||
-              isShipmentReleaseTask(task) ||
-              isReceivableRegistrationTask(task) ||
-              isInvoiceRegistrationTask(task) ||
-              isPayableRegistrationTask(task) ||
-              isPayableReconciliationTask(task)) &&
-            reasonRequired
-              ? blockedReason
-              : undefined,
-        },
+        task_id: task.id,
+        reason: reasonRequired ? actionReason : '',
+        payload,
       }
       if (taskStatusKey === 'done') {
         await completeWorkflowTaskAction({
@@ -175,12 +186,11 @@ export default function useMobileRoleTaskActions({
       } else {
         throw new Error('当前任务动作暂不支持')
       }
-      setBlockedReasonByTaskID((current) => {
+      setTaskActionReasonDrafts((current) => {
         const next = { ...current }
-        if (reasonRequired) {
-          next[task.id] = blockedReason
-        } else {
-          delete next[task.id]
+        const draftKey = getMobileTaskActionReasonDraftKey(task, taskStatusKey)
+        if (draftKey) {
+          delete next[draftKey]
         }
         return next
       })
@@ -212,7 +222,13 @@ export default function useMobileRoleTaskActions({
       message.warning('请先填写催办原因')
       return false
     }
-    const explainAllowed = await explainTaskAction(task, 'urge')
+    const explainAllowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
+      task,
+      actionKey: 'urge',
+      reason,
+      onWarning: message.warning,
+      onError: message.error,
+    })
     if (!explainAllowed) return false
 
     setUrgingID(task.id)
@@ -228,9 +244,6 @@ export default function useMobileRoleTaskActions({
         action: resolveMobileUrgeAction(activeRoleKey, task),
         reason,
         payload: {
-          source_type: task.source_type,
-          source_id: task.source_id,
-          source_no: task.source_no,
           mobile_role_key: activeRoleKey,
           ...mobileActionEvidence,
         },
@@ -258,7 +271,11 @@ export default function useMobileRoleTaskActions({
 
   const handleTaskAction = async (task, action) => {
     setSelectedTaskID(task.id)
-    if (['blocked', 'rejected', 'urge'].includes(action)) {
+    if (['done', 'blocked', 'rejected', 'urge'].includes(action)) {
+      if (!canOpenMobileTaskDetailAction(activeRoleKey, task, action)) {
+        message.warning(`当前角色不能${resolveMobileActionLabel(action)}该任务`)
+        return
+      }
       setDetailAction(action)
       return
     }
@@ -286,7 +303,11 @@ export default function useMobileRoleTaskActions({
   const detailReasonValue = selectedTask
     ? detailAction === 'urge'
       ? urgeReasonByTaskID[selectedTask.id] || ''
-      : blockedReasonByTaskID[selectedTask.id] || ''
+      : resolveMobileTaskActionReason({
+          task: selectedTask,
+          action: detailAction,
+          reasonDrafts: taskActionReasonDrafts,
+        })
     : ''
   const detailEvidenceValue = selectedTask
     ? evidenceTextByTaskID[selectedTask.id] || ''
@@ -306,9 +327,14 @@ export default function useMobileRoleTaskActions({
       }))
       return
     }
-    setBlockedReasonByTaskID((current) => ({
+    const draftKey = getMobileTaskActionReasonDraftKey(
+      selectedTask,
+      normalizeMobileTaskActionKey(detailAction)
+    )
+    if (!draftKey) return
+    setTaskActionReasonDrafts((current) => ({
       ...current,
-      [selectedTask.id]: value,
+      [draftKey]: value,
     }))
   }
 

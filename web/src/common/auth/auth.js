@@ -1,13 +1,10 @@
 import { jwtDecode } from 'jwt-decode'
 
 export const AUTH_SCOPE = {
-  USER: 'user',
   ADMIN: 'admin',
 }
 
-const LEGACY_TOKEN_KEY = 'access_token'
 const TOKEN_KEYS = {
-  [AUTH_SCOPE.USER]: 'user_access_token',
   [AUTH_SCOPE.ADMIN]: 'admin_access_token',
 }
 const META_KEYS = [
@@ -36,8 +33,8 @@ const JSON_META_KEYS = new Set([
   'erp_preferences',
 ])
 
-function normalizeScope(scope = AUTH_SCOPE.USER) {
-  return scope === AUTH_SCOPE.ADMIN ? AUTH_SCOPE.ADMIN : AUTH_SCOPE.USER
+function normalizeScope(_scope = AUTH_SCOPE.ADMIN) {
+  return AUTH_SCOPE.ADMIN
 }
 
 function getScopedMetaKey(scope, key) {
@@ -62,38 +59,17 @@ function removeStorageItem(storage, key) {
   }
 }
 
-function migrateLegacyUserToken() {
-  const userKey = TOKEN_KEYS[AUTH_SCOPE.USER]
-  const current = localStorage.getItem(userKey)
-  if (current) return current
-
-  const legacy = localStorage.getItem(LEGACY_TOKEN_KEY)
-  if (!legacy) return ''
-
-  localStorage.setItem(userKey, legacy)
-  localStorage.removeItem(LEGACY_TOKEN_KEY)
-  return legacy
-}
-
-export function getToken(scope = AUTH_SCOPE.USER) {
+export function getToken(scope = AUTH_SCOPE.ADMIN) {
   const normalizedScope = normalizeScope(scope)
   const key = TOKEN_KEYS[normalizedScope]
   const token = localStorage.getItem(key)
   if (token) return token
-
-  // 兼容历史单 token 存储
-  if (normalizedScope === AUTH_SCOPE.USER) {
-    return migrateLegacyUserToken()
-  }
   return ''
 }
 
-export function setToken(token, scope = AUTH_SCOPE.USER) {
+export function setToken(token, scope = AUTH_SCOPE.ADMIN) {
   const normalizedScope = normalizeScope(scope)
   localStorage.setItem(TOKEN_KEYS[normalizedScope], token)
-  if (normalizedScope === AUTH_SCOPE.USER) {
-    localStorage.removeItem(LEGACY_TOKEN_KEY)
-  }
 }
 
 function setScopedMeta(scope, data) {
@@ -121,7 +97,7 @@ function clearScopedMeta(scope) {
   })
 }
 
-export function persistAuth(data, scope = AUTH_SCOPE.USER) {
+export function persistAuth(data, scope = AUTH_SCOPE.ADMIN) {
   const token = data?.access_token
   if (!token) throw new Error('missing access_token')
 
@@ -130,7 +106,7 @@ export function persistAuth(data, scope = AUTH_SCOPE.USER) {
   setScopedMeta(normalizedScope, data || {})
 }
 
-export function persistAuthMeta(data, scope = AUTH_SCOPE.USER) {
+export function persistAuthMeta(data, scope = AUTH_SCOPE.ADMIN) {
   setScopedMeta(normalizeScope(scope), data || {})
 }
 
@@ -150,17 +126,14 @@ export function getAuthMeta(scope, key) {
   return raw
 }
 
-export function getLoginPath(_scope = AUTH_SCOPE.USER) {
+export function getLoginPath(_scope = AUTH_SCOPE.ADMIN) {
   return '/admin-login'
 }
 
-export function logout(scope = AUTH_SCOPE.USER) {
+export function logout(scope = AUTH_SCOPE.ADMIN) {
   const normalizedScope = normalizeScope(scope)
   localStorage.removeItem(TOKEN_KEYS[normalizedScope])
   clearScopedMeta(normalizedScope)
-  if (normalizedScope === AUTH_SCOPE.USER) {
-    localStorage.removeItem(LEGACY_TOKEN_KEY)
-  }
 
   try {
     sessionStorage.clear()
@@ -174,7 +147,7 @@ function isExpired(claims) {
   return claims.exp * 1000 <= Date.now()
 }
 
-export function getCurrentUser(scope = AUTH_SCOPE.USER) {
+export function getCurrentUser(scope = AUTH_SCOPE.ADMIN) {
   const normalizedScope = normalizeScope(scope)
   const token = getToken(normalizedScope)
   if (!token) return null
@@ -222,6 +195,6 @@ export function getStoredAdminProfile() {
   }
 }
 
-export function isLoggedIn(scope = AUTH_SCOPE.USER) {
+export function isLoggedIn(scope = AUTH_SCOPE.ADMIN) {
   return !!getCurrentUser(scope)
 }

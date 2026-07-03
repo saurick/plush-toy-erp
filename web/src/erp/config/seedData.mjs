@@ -1,4 +1,4 @@
-import { appDefinitions } from './appRegistry.mjs'
+import { mobileRoleDefinitions } from './appRegistry.mjs'
 import { businessNavigationSections } from './businessModules.mjs'
 import {
   applyCustomerMenuConfig,
@@ -20,34 +20,12 @@ export const STATUS_STYLES = {
     'border-slate-200 bg-slate-50 text-slate-600 shadow-[0_0_0_1px_rgba(148,163,184,0.06)]',
 }
 
-const MOBILE_ROLE_META = Object.freeze({
-  boss: { title: '老板 / 管理层', label: '老板' },
-  sales: { title: '业务', label: '业务' },
-  purchase: { title: '采购', label: '采购' },
-  production: { title: '生产经理', label: '生产' },
-  warehouse: { title: '仓库', label: '仓库' },
-  finance: { title: '财务', label: '财务' },
-  pmc: { title: 'PMC', label: 'PMC' },
-  quality: { title: '品质', label: '品质' },
-  engineering: { title: '工程', label: '工程' },
-})
-
-export const roleWorkbenches = appDefinitions
-  .filter((app) => app.kind === 'mobile' && app.roleKey)
-  .map((app) => {
-    const roleMeta = MOBILE_ROLE_META[app.roleKey] || {
-      title: app.shortTitle,
-      label: app.shortTitle,
-    }
-
-    return {
-      key: app.roleKey,
-      title: roleMeta.title,
-      label: roleMeta.label,
-      appId: app.id,
-      port: app.port,
-    }
-  })
+export const roleWorkbenches = mobileRoleDefinitions.map((role) => ({
+  key: role.roleKey,
+  title: role.title,
+  label: role.label,
+  path: `/m/${role.roleKey}/tasks`,
+}))
 
 const roleWorkbenchMap = new Map(
   roleWorkbenches.map((role) => [role.key, role])

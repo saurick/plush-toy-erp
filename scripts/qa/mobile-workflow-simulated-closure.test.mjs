@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile as execFileWithCallback } from "node:child_process";
 import { access, mkdtemp, rm } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -10,7 +11,9 @@ import { fileURLToPath } from "node:url";
 import {
   buildInputTemplate,
   buildPlan,
+  buildTaskStatusActionParams,
   buildTimestampRunId,
+  buildUrgeTaskParams,
   INPUT_TEMPLATE_SCOPE,
   parseCliArgs,
   sanitizeRunId,
@@ -32,12 +35,23 @@ test("mobile workflow simulated mobile closure plan stays simulated and workflow
   assert.equal(plan.customerAcceptanceRequiredForClosure, false);
   assert.match(plan.tasks.approval.task_code, /^SIM-YOYOOSUN-MOBILE-WORKFLOW-/u);
   assert.equal(plan.tasks.approval.task_group, "order_approval");
+  assert.equal(plan.tasks.approvalRejected.task_group, "order_approval");
   assert.equal(plan.tasks.quality.task_group, "finished_goods_qc");
   assert.equal(plan.tasks.warehouseInbound.task_group, "warehouse_inbound");
   assert.equal(plan.tasks.shipmentRelease.task_group, "shipment_release");
+  assert.equal(plan.tasks.warehouseUrge.task_group, "shipment_release");
   assert.equal(
     plan.tasks.shipmentRelease.business_status_key,
     "shipment_pending",
+  );
+  assert.equal(plan.actions.approvalRejected.nextStatus, "rejected");
+  assert.equal(plan.actions.approvalRejected.role, "boss");
+  assert.match(plan.actions.approvalRejected.reason, /退回销售补齐/u);
+  assert.equal(plan.actions.warehouseUrged.action, "urge_task");
+  assert.equal(plan.actions.warehouseUrged.role, "pmc");
+  assert.equal(
+    plan.actions.warehouseUrged.payload.notification_type,
+    "urgent_escalation",
   );
 });
 
@@ -68,9 +82,101 @@ test("mobile workflow simulated mobile closure action payload records evidence a
       .simulated_only,
     true,
   );
+  assert.equal(
+    plan.actions.approvalRejected.payload.mobile_exception_report
+      .simulated_only,
+    true,
+  );
+  assert.equal(
+    plan.actions.approvalRejected.payload.mobile_action.action_key,
+    "rejected",
+  );
   assert.match(
     plan.actions.shipmentReleaseBlocked.reason,
     /模拟出货唛头未确认/u,
+  );
+  assert.match(plan.actions.approvalRejected.reason, /资料不完整/u);
+  assert.equal(
+    plan.actions.warehouseUrged.payload.mobile_urge.simulated_only,
+    true,
+  );
+  assert.equal(
+    plan.actions.warehouseUrged.payload.mobile_urge.action_key,
+    "urge_task",
+  );
+});
+
+test("mobile workflow simulated apply action params do not replay workflow payload snapshots", () => {
+  const plan = buildPlan(parseCliArgs(["--run-id", "action boundary"]));
+  const task = {
+    id: 42,
+    source_type: "shipment",
+    source_id: 9001,
+    source_no: "SHIP-9001",
+    business_status_key: "shipment_pending",
+    task_status_key: "ready",
+    owner_role_key: "warehouse",
+    payload: {
+      source_type: "shipment",
+      source_id: 9001,
+      source_no: "SHIP-9001",
+      business_status_key: "shipment_pending",
+      task_status_key: "ready",
+      owner_role_key: "warehouse",
+      domain_command_key: "shipment.ship",
+      customer_name: "Mobile workflow 模拟客户",
+    },
+  };
+
+  const completeParams = buildTaskStatusActionParams(
+    task,
+    plan.actions.approvalDone,
+  );
+  const blockedParams = buildTaskStatusActionParams(
+    task,
+    plan.actions.shipmentReleaseBlocked,
+  );
+  const urgeParams = buildUrgeTaskParams(task, plan.actions.warehouseUrged);
+
+  for (const params of [completeParams, blockedParams, urgeParams]) {
+    assert.equal(params.task_id, 42);
+    assert(!("business_status_key" in params));
+    assert(!("task_status_key" in params));
+    assert(!("source_type" in params));
+    assert(!("source_id" in params));
+    assert(!("source_no" in params));
+    for (const forbiddenPayloadKey of [
+      "source_type",
+      "source_id",
+      "source_no",
+      "business_status_key",
+      "task_status_key",
+      "owner_role_key",
+      "domain_command_key",
+      "customer_name",
+    ]) {
+      assert(
+        !(forbiddenPayloadKey in params.payload),
+        `action payload must not replay ${forbiddenPayloadKey}`,
+      );
+    }
+  }
+  assert.equal(completeParams.payload.mobile_role_key, "boss");
+  assert.equal(blockedParams.payload.mobile_role_key, "warehouse");
+  assert.equal(urgeParams.payload.mobile_role_key, "pmc");
+  assert.equal(completeParams.action_key, "complete");
+  assert.equal(blockedParams.action_key, "block");
+  assert.equal(urgeParams.action, "urge_task");
+});
+
+test("mobile workflow simulated apply report does not expose business status as action evidence", () => {
+  const source = readFileSync(scriptPath, "utf8");
+
+  assert(!source.includes("business_status: updated.business_status_key"));
+  assert(!source.includes("business=${step.business_status}"));
+  assert(
+    source.includes("factPosting: false"),
+    "report boundary must continue to state simulated actions do not post facts",
   );
 });
 
@@ -103,6 +209,12 @@ test("mobile workflow simulated mobile closure input template is no-write", () =
     "warehouse_inbound",
     "shipment_release",
   ]);
+  assert(template.simulatedActions.includes("boss rejected with reason"));
+  assert(
+    template.simulatedActions.includes(
+      "pmc urges warehouse task without completing it",
+    ),
+  );
   assert.match(template.commands.printInputTemplate, /--print-input-template/u);
   assert.match(template.commands.reportOnly, /output\/custom\/mobile-workflow/u);
   assert.match(template.commands.applySimulated, /MOBILE_WORKFLOW_SIM_CONFIRM/u);

@@ -3,6 +3,7 @@ import { RpcError } from '@/common/utils/rpcError'
 import { getToken, logout, getLoginPath } from '@/common/auth/auth'
 import { authBus } from '@/common/auth/authBus'
 import { isAuthFailureCode } from '@/common/consts/errorCodes'
+import { getUserFacingErrorMessage } from '@/common/utils/errorMessage'
 
 let globalRpcId = 0
 
@@ -15,7 +16,12 @@ export function isRpcAbortError(error) {
 }
 
 export class JsonRpc {
-  constructor({ url, basePath = '/rpc', authScope = 'user', withAuth = true }) {
+  constructor({
+    url,
+    basePath = '/rpc',
+    authScope = 'admin',
+    withAuth = true,
+  }) {
     if (!url) {
       throw new Error('JsonRpc: url is required, e.g. "system" or "auth"')
     }
@@ -74,12 +80,15 @@ export class JsonRpc {
 
     // 1) HTTP 非 2xx
     if (!response.ok) {
-      throw RpcError.fromHttp(response.status, json)
+      const err = RpcError.fromHttp(response.status, json)
+      emitAuthFailureIfNeeded(err, this.authScope, withAuth)
+      throw err
     }
 
     // 2) Kratos 框架级错误
     if (typeof json.code === 'number' && json.message) {
       const err = RpcError.fromKratos(json)
+      emitAuthFailureIfNeeded(err, this.authScope, withAuth)
       if (receiveError) return err
       throw err
     }
@@ -87,6 +96,7 @@ export class JsonRpc {
     // 3) JSON-RPC error 字段
     if (json.error) {
       const err = RpcError.fromJsonRpc(json)
+      emitAuthFailureIfNeeded(err, this.authScope, withAuth)
       if (receiveError) return err
       throw err
     }
@@ -94,10 +104,8 @@ export class JsonRpc {
     // 4) 业务错误 result.code != 0
     const { result } = json
     if (result && typeof result.code === 'number' && result.code !== 0) {
-      if (withAuth) {
-        handleAuthError(result.code, result.message, this.authScope)
-      }
       const err = RpcError.fromBiz(json)
+      emitAuthFailureIfNeeded(err, this.authScope, withAuth)
       if (receiveError) return err
       throw err
     }
@@ -106,9 +114,18 @@ export class JsonRpc {
   }
 }
 
+function emitAuthFailureIfNeeded(error, authScope, withAuth) {
+  if (!withAuth) return
+  handleAuthError(error?.code, error?.message, authScope)
+}
+
 function handleAuthError(code, message, authScope) {
   // 仅登录态失效才清 token，避免把权限不足误处理成登出。
   if (!isAuthFailureCode(code)) return
+  const userMessage = getUserFacingErrorMessage(
+    { code, message },
+    '登录已过期，请重新登录'
+  )
 
   // 1) 清 token
   logout(authScope)
@@ -120,7 +137,7 @@ function handleAuthError(code, message, authScope) {
       search: window.location.search,
       hash: window.location.hash,
     },
-    message: message || '请重新登录',
+    message: userMessage,
     loginPath: getLoginPath(authScope),
   })
 }

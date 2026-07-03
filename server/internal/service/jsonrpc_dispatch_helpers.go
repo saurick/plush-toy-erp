@@ -63,8 +63,6 @@ func isSensitiveRPCParamKey(key string) bool {
 func getAuthLoginScope(m map[string]any) (string, error) {
 	scope := strings.ToLower(strings.TrimSpace(getString(m, "scope")))
 	switch scope {
-	case "", "user":
-		return "user", nil
 	case "admin":
 		return "admin", nil
 	default:

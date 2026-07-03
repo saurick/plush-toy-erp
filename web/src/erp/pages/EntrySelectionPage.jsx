@@ -25,7 +25,8 @@ export default function EntrySelectionPage() {
   const preferredTarget = searchParams.get('target')
 
   const desktopVisible =
-    entryConfig.desktop === true && hasDesktopEntryAccess(adminProfile)
+    entryConfig.desktop === true &&
+    hasDesktopEntryAccess(adminProfile, entryConfig)
 
   const allowedMobileRoleKeys = useMemo(
     () =>

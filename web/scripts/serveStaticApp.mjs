@@ -15,46 +15,6 @@ const appDefinitions = {
     port: 5175,
     buildDir: 'build',
   },
-  'mobile-boss': {
-    title: '老板岗位任务端',
-    port: 5186,
-    buildDir: 'build/mobile-boss',
-  },
-  'mobile-business': {
-    title: '业务岗位任务端',
-    port: 5187,
-    buildDir: 'build/mobile-business',
-  },
-  'mobile-purchasing': {
-    title: '采购岗位任务端',
-    port: 5188,
-    buildDir: 'build/mobile-purchasing',
-  },
-  'mobile-production': {
-    title: '生产岗位任务端',
-    port: 5189,
-    buildDir: 'build/mobile-production',
-  },
-  'mobile-warehouse': {
-    title: '仓库岗位任务端',
-    port: 5190,
-    buildDir: 'build/mobile-warehouse',
-  },
-  'mobile-finance': {
-    title: '财务岗位任务端',
-    port: 5191,
-    buildDir: 'build/mobile-finance',
-  },
-  'mobile-pmc': {
-    title: 'PMC 岗位任务端',
-    port: 5192,
-    buildDir: 'build/mobile-pmc',
-  },
-  'mobile-quality': {
-    title: '品质岗位任务端',
-    port: 5193,
-    buildDir: 'build/mobile-quality',
-  },
 }
 
 const contentTypes = new Map([

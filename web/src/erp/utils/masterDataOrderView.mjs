@@ -179,6 +179,11 @@ export function normalizeOptionalNonNegativeInteger(value) {
   return Math.trunc(numeric)
 }
 
+function normalizeOptionalPositiveInteger(value) {
+  const normalized = normalizeOptionalNonNegativeInteger(value)
+  return normalized && normalized > 0 ? normalized : undefined
+}
+
 function normalizeLineNo(primaryValue, fallbackValue) {
   const normalized = normalizeOptionalNonNegativeInteger(primaryValue)
   if (normalized && normalized > 0) {
@@ -273,6 +278,57 @@ export function deriveOutsourcingOrderItemAmount(values = {}) {
   return deriveOrderItemAmount(values, 'outsourcing_quantity')
 }
 
+function decimalNumber(value) {
+  const numeric = Number(
+    String(value ?? '')
+      .replace(/,/g, '')
+      .trim()
+  )
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+function snapshotDecimalNumber(snapshot, keys) {
+  const source = snapshot && typeof snapshot === 'object' ? snapshot : {}
+  const value = keys
+    .map((key) => source[key])
+    .find((item) => String(item ?? '').trim() !== '')
+  return decimalNumber(value)
+}
+
+export function summarizeSalesOrderLines(lines = [], snapshot = {}) {
+  const items = Array.isArray(lines) ? lines : []
+  if (items.length === 0) {
+    return {
+      count: snapshotDecimalNumber(snapshot, [
+        'count',
+        'item_count',
+        'line_count',
+      ]),
+      quantity: snapshotDecimalNumber(snapshot, [
+        'quantity',
+        'header_quantity',
+        'quantity_total',
+        'total_quantity',
+      ]),
+      amount: snapshotDecimalNumber(snapshot, [
+        'amount',
+        'header_amount',
+        'amount_total',
+        'total_amount',
+      ]),
+    }
+  }
+  return items.reduce(
+    (summary, line) => ({
+      count: summary.count + 1,
+      quantity: summary.quantity + decimalNumber(line?.ordered_quantity),
+      amount:
+        summary.amount + decimalNumber(deriveSalesOrderItemAmount(line) || 0),
+    }),
+    { count: 0, quantity: 0, amount: 0 }
+  )
+}
+
 export function compactParams(values = {}) {
   return Object.fromEntries(
     Object.entries(values).filter(([, value]) => value !== undefined)
@@ -314,9 +370,10 @@ export function unixToDateInputValue(value) {
   return new Date(timestamp * 1000).toISOString().slice(0, 10)
 }
 
-export function statusText(status, labels = {}) {
+export function statusText(status, labels = {}, fallback = '业务状态') {
   const key = String(status || '').trim()
-  return labels[key] || key || '-'
+  if (!key) return '-'
+  return labels[key] || fallback
 }
 
 export function formatUnitDisplayName(unitID, unitByID = new Map()) {
@@ -588,6 +645,19 @@ export function buildCustomerSnapshot(customer = {}) {
   })
 }
 
+export function buildSalesOrderCustomerSourceValues(customer = {}) {
+  if (!customer?.id) {
+    return {
+      customer_id: undefined,
+      customer_snapshot: {},
+    }
+  }
+  return {
+    customer_id: Number(customer.id || 0) || undefined,
+    customer_snapshot: buildCustomerSnapshot(customer),
+  }
+}
+
 export function buildOrderContactSnapshot(values = {}) {
   return compactParams({
     name: trimOptional(values.contact_name),
@@ -596,6 +666,19 @@ export function buildOrderContactSnapshot(values = {}) {
     email: trimOptional(values.contact_email),
     title: trimOptional(values.contact_title),
   })
+}
+
+export const SUPPLIER_CONTACT_OWNER_TYPE = 'SUPPLIER'
+
+function selectPrimaryContact(contacts = []) {
+  const activeContacts = (Array.isArray(contacts) ? contacts : []).filter(
+    (contact) => contact?.is_active !== false
+  )
+  return (
+    activeContacts.find((contact) => contact?.is_primary === true) ||
+    activeContacts[0] ||
+    {}
+  )
 }
 
 export function buildSupplierSnapshot(supplier = {}) {
@@ -607,6 +690,38 @@ export function buildSupplierSnapshot(supplier = {}) {
     code: trimOptional(supplier.code),
     name: trimOptional(supplier.name),
     short_name: trimOptional(supplier.short_name),
+    contact_name:
+      trimOptional(supplier.contact_name) ||
+      trimOptional(supplier.primary_contact_name),
+    contact_phone:
+      trimOptional(supplier.contact_phone) ||
+      trimOptional(supplier.phone) ||
+      trimOptional(supplier.primary_contact_phone),
+    contact_mobile:
+      trimOptional(supplier.contact_mobile) ||
+      trimOptional(supplier.mobile) ||
+      trimOptional(supplier.primary_contact_mobile),
+    address: trimOptional(supplier.address),
+  })
+}
+
+export function buildSupplierSnapshotWithContacts(
+  supplier = {},
+  contacts = []
+) {
+  const baseSnapshot = buildSupplierSnapshot(supplier)
+  if (!baseSnapshot.id) {
+    return {}
+  }
+  const primaryContact = selectPrimaryContact(contacts)
+  return compactParams({
+    ...baseSnapshot,
+    contact_name:
+      trimOptional(primaryContact.name) || baseSnapshot.contact_name,
+    contact_phone:
+      trimOptional(primaryContact.phone) || baseSnapshot.contact_phone,
+    contact_mobile:
+      trimOptional(primaryContact.mobile) || baseSnapshot.contact_mobile,
   })
 }
 
@@ -700,7 +815,12 @@ export function buildSalesOrderParams(values = {}, extra = {}) {
   return compactParams({
     ...extra,
     order_no: trimOptional(values.order_no),
-    customer_id: Number(values.customer_id || 0),
+    customer_id:
+      values.customer_id === undefined ||
+      values.customer_id === null ||
+      trimOptional(values.customer_id) === ''
+        ? undefined
+        : Number(values.customer_id || 0),
     customer_order_no: trimOptional(values.customer_order_no),
     customer_snapshot:
       values.customer_snapshot && typeof values.customer_snapshot === 'object'
@@ -726,9 +846,9 @@ export function buildSalesOrderItemParams(values = {}, extra = {}) {
   return compactParams({
     ...extra,
     line_no: normalizeLineNo(extra.line_no, values.line_no),
-    product_id: Number(values.product_id || 0),
-    product_sku_id: Number(values.product_sku_id || 0),
-    unit_id: Number(values.unit_id || 0),
+    product_id: normalizeOptionalPositiveInteger(values.product_id),
+    product_sku_id: normalizeOptionalPositiveInteger(values.product_sku_id),
+    unit_id: normalizeOptionalPositiveInteger(values.unit_id),
     product_code_snapshot: trimOptional(values.product_code_snapshot),
     product_name_snapshot: trimOptional(values.product_name_snapshot),
     color_snapshot: trimOptional(values.color_snapshot),
@@ -738,6 +858,63 @@ export function buildSalesOrderItemParams(values = {}, extra = {}) {
     planned_delivery_date: trimOptional(values.planned_delivery_date),
     note: trimOptional(values.note),
   })
+}
+
+export function buildSalesOrderItemSourceValuesFromSKU(sku = {}) {
+  if (!sku?.id) {
+    return {
+      product_sku_id: undefined,
+      product_id: undefined,
+      unit_id: undefined,
+      product_code_snapshot: '',
+      product_name_snapshot: '',
+      color_snapshot: '',
+    }
+  }
+  return {
+    product_sku_id: Number(sku.id || 0) || undefined,
+    product_id: Number(sku.product_id || 0) || undefined,
+    unit_id: Number(sku.default_unit_id || 0) || undefined,
+    product_code_snapshot: trimOptional(sku.sku_code) || '',
+    product_name_snapshot:
+      trimOptional(sku.sku_name) ||
+      trimOptional(sku.customer_sku) ||
+      trimOptional(sku.barcode) ||
+      '',
+    color_snapshot: trimOptional(sku.color) || '',
+  }
+}
+
+export function buildPurchaseOrderItemSourceValuesFromMaterial(material = {}) {
+  if (!material?.id) {
+    return {
+      material_id: undefined,
+      unit_id: undefined,
+      material_code_snapshot: '',
+      material_name_snapshot: '',
+      color_snapshot: '',
+    }
+  }
+  return {
+    material_id: Number(material.id || 0) || undefined,
+    unit_id: Number(material.default_unit_id || 0) || undefined,
+    material_code_snapshot: trimOptional(material.code) || '',
+    material_name_snapshot: trimOptional(material.name) || '',
+    color_snapshot: trimOptional(material.color) || '',
+  }
+}
+
+export function buildBOMItemSourceValuesFromMaterial(material = {}) {
+  if (!material?.id) {
+    return {
+      material_id: undefined,
+      unit_id: undefined,
+    }
+  }
+  return {
+    material_id: Number(material.id || 0) || undefined,
+    unit_id: Number(material.default_unit_id || 0) || undefined,
+  }
 }
 
 export function buildPurchaseOrderParams(values = {}, extra = {}) {
@@ -830,22 +1007,81 @@ function formatPrintDraftDate(value) {
     : undefined
 }
 
+function isCanceledBusinessLineStatus(value) {
+  return ['canceled', 'cancelled'].includes(
+    String(value ?? '')
+      .trim()
+      .toLowerCase()
+  )
+}
+
+function materialPurchasePrintPartyDefaults(printTemplateDefaults = {}) {
+  const directDefaults =
+    printTemplateDefaults?.['material-purchase-contract'] ||
+    printTemplateDefaults?.materialPurchaseContract ||
+    null
+  const templateDefaults = Array.isArray(printTemplateDefaults?.templates)
+    ? printTemplateDefaults.templates.find(
+        (item) => item?.template_key === 'material-purchase-contract'
+      )
+    : null
+  const partyDefaults =
+    directDefaults?.partyDefaults ||
+    directDefaults?.party_defaults ||
+    templateDefaults?.party_defaults ||
+    {}
+  const allowedKeys = [
+    'buyerCompany',
+    'buyerContact',
+    'buyerPhone',
+    'buyerAddress',
+    'buyerSigner',
+  ]
+  return allowedKeys.reduce((output, key) => {
+    const value = trimOptional(partyDefaults?.[key])
+    if (value) {
+      output[key] = value
+    }
+    return output
+  }, {})
+}
+
 export function buildMaterialPurchaseContractDraftFromPurchaseOrder(
   order = {},
   items = [],
-  { materials = [] } = {}
+  { materials = [], unitOptions = [], printTemplateDefaults = {} } = {}
 ) {
   const supplierSnapshot =
     order?.supplier_snapshot && typeof order.supplier_snapshot === 'object'
       ? order.supplier_snapshot
       : {}
   const materialByID = materialLookupByID(materials)
+  const unitLabelByID = new Map(
+    (Array.isArray(unitOptions) ? unitOptions : [])
+      .map((option) => [
+        Number(option?.value || 0),
+        trimOptional(option?.suffixLabel) ||
+          trimOptional(option?.label) ||
+          trimOptional(option?.title),
+      ])
+      .filter(
+        ([unitID, label]) => Number.isFinite(unitID) && unitID > 0 && label
+      )
+  )
   const lines = (Array.isArray(items) ? items : [])
-    .filter((item) => item?.line_status !== 'canceled')
+    .filter((item) => !isCanceledBusinessLineStatus(item?.line_status))
     .map((item) => {
       const material = materialByID.get(Number(item.material_id || 0)) || {}
       return compactParams({
         contractNo: trimOptional(order.purchase_order_no),
+        productOrderNo:
+          trimOptional(item.product_order_no_snapshot) ||
+          trimOptional(item.source_order_no_snapshot) ||
+          trimOptional(item.source_order_no),
+        productNo:
+          trimOptional(item.product_no_snapshot) ||
+          trimOptional(item.product_code_snapshot),
+        productName: trimOptional(item.product_name_snapshot),
         materialName:
           trimOptional(item.material_name_snapshot) ||
           trimOptional(material.name),
@@ -853,6 +1089,9 @@ export function buildMaterialPurchaseContractDraftFromPurchaseOrder(
           trimOptional(item.material_code_snapshot) ||
           trimOptional(material.code),
         spec: trimOptional(material.spec),
+        unit:
+          trimOptional(item.unit_name_snapshot) ||
+          unitLabelByID.get(Number(item.unit_id || 0)),
         unitPrice: trimOptional(item.unit_price),
         quantity: trimOptional(item.purchased_quantity),
         amount: derivePurchaseOrderItemAmount(item),
@@ -866,6 +1105,12 @@ export function buildMaterialPurchaseContractDraftFromPurchaseOrder(
     supplierName:
       trimOptional(supplierSnapshot.name) ||
       trimOptional(supplierSnapshot.short_name),
+    supplierContact: trimOptional(supplierSnapshot.contact_name),
+    supplierPhone:
+      trimOptional(supplierSnapshot.contact_phone) ||
+      trimOptional(supplierSnapshot.contact_mobile),
+    supplierAddress: trimOptional(supplierSnapshot.address),
+    ...materialPurchasePrintPartyDefaults(printTemplateDefaults),
     lines,
   })
 }

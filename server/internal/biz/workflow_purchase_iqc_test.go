@@ -102,7 +102,10 @@ func TestWorkflowUsecase_PurchaseIQCBlockedDerivesQualityExceptionTask(t *testin
 	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            501,
 		TaskStatusKey: "blocked",
-		Payload:       map[string]any{"blocked_reason": " 来料破包 "},
+		Payload: map[string]any{
+			"blocked_reason":  " 来料破包 ",
+			"rejected_reason": "旧退回原因",
+		},
 	}, 7, "quality")
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -117,6 +120,9 @@ func TestWorkflowUsecase_PurchaseIQCBlockedDerivesQualityExceptionTask(t *testin
 		repo.updateTaskInput.Payload["transition_status"] != "blocked" ||
 		repo.updateTaskInput.Payload["blocked_reason"] != "来料破包" {
 		t.Fatalf("expected blocked decision update payload, got %#v", repo.updateTaskInput.Payload)
+	}
+	if _, ok := repo.updateTaskInput.Payload["rejected_reason"]; ok {
+		t.Fatalf("expected blocked transition to clear stale rejected_reason, got %#v", repo.updateTaskInput.Payload)
 	}
 	effects := repo.updateTaskInput.SideEffects
 	if effects == nil || effects.BusinessState == nil || effects.DerivedTask == nil {
@@ -161,7 +167,7 @@ func TestWorkflowUsecase_PurchaseIQCRejectedDerivesQualityExceptionTask(t *testi
 		ID:            501,
 		TaskStatusKey: "rejected",
 		Reason:        " 来料尺寸不符 ",
-		Payload:       map[string]any{},
+		Payload:       map[string]any{"blocked_reason": "旧阻塞原因"},
 	}, 7, "quality")
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -176,6 +182,9 @@ func TestWorkflowUsecase_PurchaseIQCRejectedDerivesQualityExceptionTask(t *testi
 		repo.updateTaskInput.Payload["transition_status"] != "rejected" ||
 		repo.updateTaskInput.Payload["rejected_reason"] != "来料尺寸不符" {
 		t.Fatalf("expected rejected decision update payload, got %#v", repo.updateTaskInput.Payload)
+	}
+	if _, ok := repo.updateTaskInput.Payload["blocked_reason"]; ok {
+		t.Fatalf("expected rejected transition to clear stale blocked_reason, got %#v", repo.updateTaskInput.Payload)
 	}
 	effects := repo.updateTaskInput.SideEffects
 	if effects.BusinessState.BusinessStatusKey != workflowQCFailedStatusKey ||

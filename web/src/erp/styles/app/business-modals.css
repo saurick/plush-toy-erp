@@ -228,6 +228,7 @@
   display: grid;
   max-height: calc(100vh - 64px);
   grid-template-rows: auto minmax(0, 1fr) auto;
+  contain: layout paint;
   overflow: hidden;
   border: 1px solid var(--erp-business-action-modal-border, #d8e3dc);
   border-radius: 10px;
@@ -267,10 +268,12 @@
 }
 
 .erp-business-action-modal .ant-modal-body {
+  contain: paint;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  will-change: scroll-position;
   background: var(--erp-business-action-modal-bg, #ffffff);
   padding: 18px 24px 20px;
 }
@@ -708,12 +711,14 @@
   width: 100%;
   max-width: 100%;
   max-height: min(58vh, 680px);
+  contain: layout paint;
   gap: 12px;
   min-width: 0;
   overflow: auto;
   overscroll-behavior: contain;
   padding: 2px 2px 8px;
   scrollbar-gutter: stable both-edges;
+  will-change: scroll-position;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -725,7 +730,6 @@
   border: 1px solid var(--erp-sales-order-lines-row-border, #dfe7e2);
   border-radius: 8px;
   background: var(--erp-business-action-modal-bg, #ffffff);
-  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
   padding: 14px;
 }
 
@@ -860,12 +864,14 @@
   width: 100%;
   max-width: 100%;
   max-height: min(58vh, 680px);
+  contain: layout paint;
   gap: 12px;
   min-width: 0;
   overflow: auto;
   overscroll-behavior: contain;
   padding: 2px 2px 8px;
   scrollbar-gutter: stable both-edges;
+  will-change: scroll-position;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -877,7 +883,6 @@
   border: 1px solid var(--erp-sales-order-lines-row-border, #dfe7e2);
   border-radius: 8px;
   background: var(--erp-business-action-modal-bg, #ffffff);
-  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
   padding: 14px;
 }
 

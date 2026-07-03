@@ -22,6 +22,8 @@ const salesOrderPageSource = readFileSync(
 )
 
 test('customerConfigApi: sales order acceptance submit uses explicit start and domain command APIs', () => {
+  assert.match(customerConfigApiSource, /rollback_customer_config/)
+  assert.match(customerConfigApiSource, /rollbackCustomerConfig/)
   assert.match(
     customerConfigApiSource,
     /call\(\s*'start_sales_order_acceptance_process'/
@@ -37,6 +39,14 @@ test('customerConfigApi: sales order acceptance submit uses explicit start and d
   assert.match(
     customerConfigApiSource,
     /sales-order-acceptance\/\$\{salesOrderID\}/
+  )
+  assert.match(
+    customerConfigApiSource,
+    /startPayload\.customer_key = params\.customer_key/
+  )
+  assert.match(
+    customerConfigApiSource,
+    /executeSalesOrderAcceptanceSubmit\(\{\s*customer_key: startPayload\.customer_key,/u
   )
 })
 

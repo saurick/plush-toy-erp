@@ -1306,13 +1306,14 @@ func effectiveSessionToMap(session *biz.EffectiveSession) map[string]any {
 			"key":  session.Customer.Key,
 			"name": session.Customer.Name,
 		},
-		"modules":       toAnyMapStringString(session.Modules),
-		"roles":         toAnySliceString(session.Roles),
-		"pages":         toAnySliceString(session.Pages),
-		"actions":       toAnySliceString(session.Actions),
-		"workPools":     toAnySliceString(session.WorkPools),
-		"fieldPolicies": session.FieldPolicies,
-		"source":        session.Source,
+		"modules":               toAnyMapStringString(session.Modules),
+		"roles":                 toAnySliceString(session.Roles),
+		"pages":                 toAnySliceString(session.Pages),
+		"actions":               toAnySliceString(session.Actions),
+		"workPools":             toAnySliceString(session.WorkPools),
+		"fieldPolicies":         session.FieldPolicies,
+		"printTemplateDefaults": session.PrintTemplateDefaults,
+		"source":                session.Source,
 	}
 }
 

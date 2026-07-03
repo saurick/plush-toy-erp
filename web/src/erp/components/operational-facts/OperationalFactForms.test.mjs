@@ -8,18 +8,18 @@ const source = readFileSync(
   'utf8'
 )
 
-test('OperationalFactForms: finance currency is limited to USD CNY HKD and fee is submitted', () => {
-  for (const label of ['美金 USD', '人民币 CNY', '港币 HKD']) {
+test('OperationalFactForms: finance fact params keep fee, term, invoice and readable labels', () => {
+  for (const label of ['应收', '应付', '发票', '收付款', '对账']) {
     assert.match(source, new RegExp(label))
   }
-  for (const label of [
-    '应收 RECEIVABLE',
-    '应付 PAYABLE',
-    '发票 INVOICE',
-    '收付款 PAYMENT',
-    '对账 RECONCILIATION',
+  for (const value of [
+    'RECEIVABLE',
+    'PAYABLE',
+    'INVOICE',
+    'PAYMENT',
+    'RECONCILIATION',
   ]) {
-    assert.match(source, new RegExp(label))
+    assert.match(source, new RegExp(value))
   }
   for (const label of [
     '预收款',
@@ -35,7 +35,6 @@ test('OperationalFactForms: finance currency is limited to USD CNY HKD and fee i
   ]) {
     assert.match(source, new RegExp(label))
   }
-  assert.match(source, /name="fee_amount"/)
   assert.match(source, /fee_amount:\s*trimOptional\(values\.fee_amount\)/)
   assert.match(
     source,
@@ -49,7 +48,8 @@ test('OperationalFactForms: finance currency is limited to USD CNY HKD and fee i
     source,
     /invoice_category:\s*trimOptional\(values\.invoice_category\)/
   )
-  assert.match(source, /function CurrencyAmountInput/)
-  assert.match(source, /suffix=\{/)
-  assert.doesNotMatch(source, /addonAfter=/)
+  assert.match(source, /FINANCE_COLLECTION_TYPE_LABELS/u)
+  assert.match(source, /FINANCE_PAYMENT_TERM_LABELS/u)
+  assert.match(source, /FINANCE_INVOICE_CATEGORY_LABELS/u)
+  assert.doesNotMatch(source, /STATUS_LABELS\[key\]\s*\|\|\s*key/u)
 })

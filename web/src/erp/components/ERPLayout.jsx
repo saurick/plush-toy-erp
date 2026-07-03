@@ -50,10 +50,16 @@ import { resolveMenuPermissionKey } from '../config/menuPermissions.mjs'
 import { getNavigationSections } from '../config/seedData.mjs'
 import { getEffectiveSession } from '../api/customerConfigApi.mjs'
 import {
+  DEFAULT_DESKTOP_ENTRY,
+  resolveCurrentNavigationEntry,
+} from '../utils/currentNavigationEntry.mjs'
+import {
   attachEffectiveSessionToAdminProfile,
   attachUnavailableEffectiveSessionToAdminProfile,
+  buildEffectiveSessionDiagnosticSummary,
   filterNavigationSectionsByAdminProfile,
   getAdminProfileSyncErrorAction,
+  resolveEffectiveSessionCustomerKey,
   shouldRedirectFromCurrentNavigation,
 } from '../utils/adminProfileSync.mjs'
 
@@ -89,12 +95,6 @@ const navIconRegistry = {
   'system-audit-logs': <FileSearchOutlined />,
 }
 
-const DEFAULT_DESKTOP_ENTRY = {
-  label: '工作台',
-  path: '/erp/dashboard',
-  description: '聚合今日待办、阻塞、业务摘要、打印入口和常用业务模块。',
-}
-
 const SELF_CONTAINED_PAGE_HEAD_PATHS = new Set([
   DEFAULT_DESKTOP_ENTRY.path,
   '/erp/task-board',
@@ -104,25 +104,6 @@ const SELF_CONTAINED_PAGE_HEAD_PATHS = new Set([
   '/erp/system/permissions',
   '/erp/system/audit-logs',
 ])
-function buildCurrentEntry({ navigationSections, locationPath }) {
-  const items = navigationSections.flatMap((section) => section.items)
-  const exactMatch = items.find((item) => item.path === locationPath)
-  if (exactMatch) {
-    return exactMatch
-  }
-
-  const prefixMatch = items.find((item) =>
-    locationPath.startsWith(`${item.path}/`)
-  )
-  if (prefixMatch) {
-    return prefixMatch
-  }
-
-  return (
-    items.find((item) => item.path === DEFAULT_DESKTOP_ENTRY.path) ||
-    DEFAULT_DESKTOP_ENTRY
-  )
-}
 
 function normalizeMenuPaths(menus = []) {
   if (!Array.isArray(menus)) {
@@ -180,14 +161,15 @@ export default function ERPLayout() {
   )
 
   const navigationSections = useMemo(() => getNavigationSections(), [])
-  const currentEntry = useMemo(
+  const currentNavigationEntry = useMemo(
     () =>
-      buildCurrentEntry({
+      resolveCurrentNavigationEntry({
         navigationSections,
         locationPath: location.pathname,
       }),
     [location.pathname, navigationSections]
   )
+  const currentEntry = currentNavigationEntry.entry
 
   const loadProfile = useCallback(async () => {
     setProfileSyncCompleted(false)
@@ -197,13 +179,20 @@ export default function ERPLayout() {
       let nextProfile = result?.data || null
       if (nextProfile) {
         try {
-          const effectiveSession = await getEffectiveSession({
-            customer_key: activeBrand?.customerKey || 'yoyoosun',
-          })
-          nextProfile = attachEffectiveSessionToAdminProfile(
-            nextProfile,
-            effectiveSession
-          )
+          const effectiveSessionCustomerKey =
+            resolveEffectiveSessionCustomerKey(activeBrand)
+          if (!effectiveSessionCustomerKey) {
+            nextProfile =
+              attachUnavailableEffectiveSessionToAdminProfile(nextProfile)
+          } else {
+            const effectiveSession = await getEffectiveSession({
+              customer_key: effectiveSessionCustomerKey,
+            })
+            nextProfile = attachEffectiveSessionToAdminProfile(
+              nextProfile,
+              effectiveSession
+            )
+          }
         } catch (sessionError) {
           const syncErrorAction = getAdminProfileSyncErrorAction(sessionError, {
             hasCachedProfile: Boolean(nextProfile || adminProfileRef.current),
@@ -285,7 +274,7 @@ export default function ERPLayout() {
       setProfileLoading(false)
       setProfileSyncCompleted(true)
     }
-  }, [activeBrand?.customerKey, adminRpc])
+  }, [activeBrand, adminRpc])
 
   useEffect(() => {
     loadProfile()
@@ -310,38 +299,64 @@ export default function ERPLayout() {
     })
   }, [adminProfile, allowedMenuPaths, isSuperAdmin, navigationSections])
 
+  const effectiveSessionDiagnostic = useMemo(
+    () =>
+      buildEffectiveSessionDiagnosticSummary({
+        adminProfile,
+        allowedMenuPaths,
+        visibleSections,
+        isSuperAdmin,
+      }),
+    [adminProfile, allowedMenuPaths, isSuperAdmin, visibleSections]
+  )
+
+  useEffect(() => {
+    if (import.meta.env.DEV !== true || typeof window === 'undefined') {
+      return undefined
+    }
+    window.__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__ =
+      effectiveSessionDiagnostic
+    return () => {
+      delete window.__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__
+    }
+  }, [effectiveSessionDiagnostic])
+
   const currentMenuPath = useMemo(
     () => resolveMenuPermissionKey(location.pathname),
     [location.pathname]
   )
 
-  useEffect(() => {
-    const shouldRedirect = shouldRedirectFromCurrentNavigation({
+  const currentPageShouldRedirect = useMemo(
+    () =>
+      shouldRedirectFromCurrentNavigation({
+        profileLoading,
+        adminProfile,
+        allowedMenuPaths,
+        isSuperAdmin,
+        currentMenuPath,
+        currentPageKey: currentNavigationEntry.pageKey,
+        currentNavigationMatched: currentNavigationEntry.matched,
+      }),
+    [
       profileLoading,
       adminProfile,
       allowedMenuPaths,
       isSuperAdmin,
       currentMenuPath,
-      currentPageKey: currentEntry?.key || '',
-    })
-    if (!shouldRedirect) {
+      currentNavigationEntry.pageKey,
+      currentNavigationEntry.matched,
+    ]
+  )
+
+  useEffect(() => {
+    if (!currentPageShouldRedirect) {
       return
     }
     const fallbackPath = visibleSections[0]?.items[0]?.path || ''
     if (fallbackPath && fallbackPath !== location.pathname) {
       navigate(fallbackPath, { replace: true })
     }
-  }, [
-    allowedMenuPaths,
-    adminProfile,
-    currentEntry?.key,
-    currentMenuPath,
-    isSuperAdmin,
-    location.pathname,
-    navigate,
-    profileLoading,
-    visibleSections,
-  ])
+  }, [currentPageShouldRedirect, location.pathname, navigate, visibleSections])
 
   const menuItems = useMemo(
     () =>
@@ -358,7 +373,10 @@ export default function ERPLayout() {
     [visibleSections]
   )
 
-  const selectedKeys = currentEntry?.path ? [currentEntry.path] : []
+  const selectedKeys =
+    currentNavigationEntry.matched && currentEntry?.path
+      ? [currentEntry.path]
+      : []
   const hideCurrentEntryPageHead = [
     '/erp/master/',
     '/erp/sales/',
@@ -520,13 +538,17 @@ export default function ERPLayout() {
   const roleLabel = isSuperAdmin
     ? '超级管理员'
     : (adminProfile?.roles || [])
-        .map((role) => role?.name || role?.role_key || role?.key)
+        .map(
+          (role) =>
+            role?.name || (role?.role_key || role?.key ? '已配置角色' : '')
+        )
         .filter(Boolean)
         .slice(0, 2)
         .join(' / ') || '普通管理员'
   const displayUsername =
     adminProfile?.username || tokenAdmin?.username || 'admin'
   const noVisibleMenus = visibleSections.length === 0
+  const shouldBlockOutlet = noVisibleMenus && currentPageShouldRedirect
 
   if (profileLoading && !adminProfile) {
     return (
@@ -540,7 +562,11 @@ export default function ERPLayout() {
   }
 
   return (
-    <Layout className="erp-admin-shell">
+    <Layout
+      className="erp-admin-shell"
+      data-effective-session-source={effectiveSessionDiagnostic.source}
+      data-effective-session-mode={effectiveSessionDiagnostic.projectionMode}
+    >
       <Sider width={320} className="erp-admin-sider">
         {sideNav}
       </Sider>
@@ -619,12 +645,12 @@ export default function ERPLayout() {
           ) : null}
 
           <div className="erp-admin-outlet">
-            {noVisibleMenus ? (
+            {shouldBlockOutlet ? (
               <Alert
                 type="warning"
                 showIcon
                 message="当前账号暂无可见后台入口"
-                description="请确认账号角色权限和当前客户有效配置的页面清单；若客户配置同步失败，请稍后刷新或联系管理员复核 active revision。"
+                description="请确认账号角色权限和当前客户有效配置的页面清单；若客户配置同步失败，请稍后刷新或联系管理员复核当前有效配置版本。"
               />
             ) : (
               <Outlet context={outletContext} />

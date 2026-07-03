@@ -68,6 +68,7 @@ import {
   buildOperationalFactStats,
   buildOperationalFactViewConfigs,
   getOperationalFactAttachmentOwnerType,
+  sourceTypeLabel,
 } from '../components/operational-facts/operationalFactPageConfig.mjs'
 
 export function OperationalFactWorkspace({
@@ -325,7 +326,7 @@ export function OperationalFactWorkspace({
   )
   const activeBoundaryText =
     activeConfig.selectionBoundaryText ||
-    '当前操作只调用 operational_fact 后端 usecase；前端不本地写库存、出货、财务或 Workflow 事实。'
+    '当前操作只调用后端业务事实规则；前端不本地写库存、出货、财务或协同任务事实。'
   const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
     useBusinessColumnOrder({
       adminProfile,
@@ -400,14 +401,19 @@ export function OperationalFactWorkspace({
       navigate(targetPath)
     }
   }
-  const clearRouteContext = useCallback(() => {
-    const nextParams = new URLSearchParams(searchParams)
-    nextParams.delete('sales_order_id')
-    nextParams.delete('source_type')
-    nextParams.delete('source_id')
-    setSearchParams(nextParams, { replace: true })
-    resetPaginationForKey()
-  }, [resetPaginationForKey, searchParams, setSearchParams])
+  const clearRouteContext = useCallback(
+    (keys) => {
+      const nextParams = new URLSearchParams(searchParams)
+      const keysToDelete =
+        Array.isArray(keys) && keys.length > 0
+          ? keys
+          : ['sales_order_id', 'source_type', 'source_id']
+      keysToDelete.forEach((key) => nextParams.delete(key))
+      setSearchParams(nextParams, { replace: true })
+      resetPaginationForKey()
+    },
+    [resetPaginationForKey, searchParams, setSearchParams]
+  )
   const hasActiveFilters = Boolean(
     keyword.trim() ||
       statusFilter ||
@@ -450,10 +456,10 @@ export function OperationalFactWorkspace({
             {activeConfig.title}
           </Tag>,
           <Tag color="blue" key="fact">
-            Operational Fact：业务事实
+            业务事实
           </Tag>,
           <Tag color="green" key="backend">
-            后端 usecase 过账 / 冲正
+            后端规则过账 / 冲正
           </Tag>,
           <Tag color="gold" key="boundary">
             Workflow 不直接落事实
@@ -522,13 +528,21 @@ export function OperationalFactWorkspace({
               }}
             />
             {routeSalesOrderID ? (
-              <Tag closable color="blue" onClose={clearRouteContext}>
+              <Tag
+                closable
+                color="blue"
+                onClose={() => clearRouteContext(['sales_order_id'])}
+              >
                 已按销售订单筛选
               </Tag>
             ) : null}
             {routeSourceType && routeSourceID ? (
-              <Tag closable color="blue" onClose={clearRouteContext}>
-                已按来源单据筛选
+              <Tag
+                closable
+                color="blue"
+                onClose={() => clearRouteContext(['source_type', 'source_id'])}
+              >
+                已按{sourceTypeLabel(routeSourceType)}筛选
               </Tag>
             ) : null}
           </>

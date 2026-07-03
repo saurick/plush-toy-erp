@@ -123,16 +123,17 @@ type CustomerConfigValidationResult struct {
 }
 
 type EffectiveSession struct {
-	ConfigRevision string
-	ConfigHash     string
-	Customer       EffectiveSessionCustomer
-	Modules        map[string]string
-	Roles          []string
-	Pages          []string
-	Actions        []string
-	WorkPools      []string
-	FieldPolicies  map[string]any
-	Source         string
+	ConfigRevision        string
+	ConfigHash            string
+	Customer              EffectiveSessionCustomer
+	Modules               map[string]string
+	Roles                 []string
+	Pages                 []string
+	Actions               []string
+	WorkPools             []string
+	FieldPolicies         map[string]any
+	PrintTemplateDefaults map[string]any
+	Source                string
 }
 
 type EffectiveSessionCustomer struct {
@@ -952,6 +953,9 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 	if !compiledSnapshotFieldPoliciesAreAllowed(in.CompiledSnapshot) {
 		return CustomerConfigPublishInput{}, ErrBadParam
 	}
+	if !compiledSnapshotPrintTemplateDefaultsAreAllowed(in.CompiledSnapshot) {
+		return CustomerConfigPublishInput{}, ErrBadParam
+	}
 	for index := range in.ModuleStates {
 		item := &in.ModuleStates[index]
 		item.ModuleKey = strings.TrimSpace(item.ModuleKey)
@@ -1244,6 +1248,7 @@ func buildEffectiveSessionFromRevision(
 		}
 		fieldPolicies = effectiveFieldPoliciesFromSnapshotForEnabledModules(revision.CompiledSnapshot, enabledModules)
 	}
+	printTemplateDefaults := effectivePrintTemplateDefaultsFromSnapshotForEnabledModules(revision.CompiledSnapshot, enabledModules)
 	return &EffectiveSession{
 		ConfigRevision: revision.Revision,
 		ConfigHash:     revision.ConfigHash,
@@ -1251,14 +1256,153 @@ func buildEffectiveSessionFromRevision(
 			Key:  customerKey,
 			Name: customerName,
 		},
-		Modules:       moduleMap,
-		Roles:         roleKeys,
-		Pages:         effectivePageKeysForEnabledModules(admin, revision.CompiledSnapshot, enabledModules),
-		Actions:       actions,
-		WorkPools:     pools,
-		FieldPolicies: fieldPolicies,
-		Source:        "active_customer_config_revision",
+		Modules:               moduleMap,
+		Roles:                 roleKeys,
+		Pages:                 effectivePageKeysForEnabledModules(admin, revision.CompiledSnapshot, enabledModules),
+		Actions:               actions,
+		WorkPools:             pools,
+		FieldPolicies:         fieldPolicies,
+		PrintTemplateDefaults: printTemplateDefaults,
+		Source:                "active_customer_config_revision",
 	}
+}
+
+var runtimePrintTemplateModuleKeys = map[string][]string{
+	"material-purchase-contract": []string{"purchase_orders"},
+	"processing-contract":        []string{"outsourcing_orders"},
+}
+
+var runtimePrintPartyDefaultKeys = map[string]struct{}{
+	"buyerCompany": {},
+	"buyerContact": {},
+	"buyerPhone":   {},
+	"buyerAddress": {},
+	"buyerSigner":  {},
+}
+
+func compiledSnapshotPrintTemplateDefaultsAreAllowed(snapshot map[string]any) bool {
+	raw, exists := snapshot["printTemplateDefaults"]
+	if !exists || raw == nil {
+		return true
+	}
+	defaults, ok := raw.(map[string]any)
+	if !ok {
+		return false
+	}
+	if defaults["sales_order_print_template_enabled"] == true {
+		return false
+	}
+	templates, ok := defaults["templates"].([]any)
+	if !ok {
+		return false
+	}
+	seen := map[string]struct{}{}
+	for _, rawTemplate := range templates {
+		item, ok := rawTemplate.(map[string]any)
+		if !ok {
+			return false
+		}
+		templateKey, ok := item["template_key"].(string)
+		templateKey = strings.TrimSpace(templateKey)
+		if !ok || templateKey == "" {
+			return false
+		}
+		if _, allowed := runtimePrintTemplateModuleKeys[templateKey]; !allowed {
+			return false
+		}
+		if _, duplicate := seen[templateKey]; duplicate {
+			return false
+		}
+		seen[templateKey] = struct{}{}
+		if item["supplier_defaults_allowed"] == true || item["supplier_defaults"] != nil {
+			return false
+		}
+		partyDefaults, ok := item["party_defaults"].(map[string]any)
+		if !ok || len(partyDefaults) == 0 {
+			return false
+		}
+		for key, value := range partyDefaults {
+			if _, allowed := runtimePrintPartyDefaultKeys[key]; !allowed {
+				return false
+			}
+			text, ok := value.(string)
+			if !ok || strings.TrimSpace(text) == "" {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func effectivePrintTemplateDefaultsFromSnapshotForEnabledModules(snapshot map[string]any, enabledModules map[string]struct{}) map[string]any {
+	if len(snapshot) == 0 {
+		return map[string]any{}
+	}
+	raw, ok := snapshot["printTemplateDefaults"].(map[string]any)
+	if !ok || raw["runtime_enabled"] != true || raw["formal_runtime_consumed"] != true {
+		return map[string]any{}
+	}
+	templates, ok := raw["templates"].([]any)
+	if !ok {
+		return map[string]any{}
+	}
+	outTemplates := make([]any, 0, len(templates))
+	for _, rawTemplate := range templates {
+		item, ok := rawTemplate.(map[string]any)
+		if !ok {
+			continue
+		}
+		templateKey, ok := item["template_key"].(string)
+		templateKey = strings.TrimSpace(templateKey)
+		if !ok || templateKey == "" || !printTemplateModulesEnabled(templateKey, enabledModules) {
+			continue
+		}
+		partyDefaults, ok := item["party_defaults"].(map[string]any)
+		if !ok || len(partyDefaults) == 0 {
+			continue
+		}
+		cleanDefaults := map[string]any{}
+		for key, value := range partyDefaults {
+			if _, allowed := runtimePrintPartyDefaultKeys[key]; !allowed {
+				continue
+			}
+			if text, ok := value.(string); ok && strings.TrimSpace(text) != "" {
+				cleanDefaults[key] = strings.TrimSpace(text)
+			}
+		}
+		if len(cleanDefaults) == 0 {
+			continue
+		}
+		outTemplates = append(outTemplates, map[string]any{
+			"template_key":              templateKey,
+			"party_defaults":            cleanDefaults,
+			"supplier_defaults_allowed": false,
+			"source":                    "active_customer_config_revision",
+		})
+	}
+	if len(outTemplates) == 0 {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"runtime_enabled":                    true,
+		"formal_runtime_consumed":            true,
+		"sales_order_print_template_enabled": false,
+		"source":                             "active_customer_config_revision",
+		"templates":                          outTemplates,
+	}
+}
+
+func printTemplateModulesEnabled(templateKey string, enabledModules map[string]struct{}) bool {
+	moduleKeys, ok := runtimePrintTemplateModuleKeys[templateKey]
+	if !ok || len(moduleKeys) == 0 {
+		return false
+	}
+	for _, moduleKey := range moduleKeys {
+		if _, enabled := enabledModules[moduleKey]; !enabled {
+			return false
+		}
+	}
+	return true
 }
 
 func effectivePageKeys(admin *AdminUser, snapshot map[string]any) []string {

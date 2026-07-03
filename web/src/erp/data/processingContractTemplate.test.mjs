@@ -5,7 +5,9 @@ import {
   PROCESSING_CONTRACT_DRAFT_VERSION,
   buildProcessingContractDraftFromOutsourcingFact,
   buildProcessingContractDraftFromOutsourcingOrder,
+  calculateProcessingContractTotals,
   createBlankProcessingContractDraft,
+  createProcessingContractBusinessDraft,
   createProcessingContractDraft,
   normalizeProcessingLine,
   resolveProcessingLineAmount,
@@ -78,6 +80,46 @@ test('processingContractTemplate: 空白模板清空字段明细和附件但保�
   assert.deepEqual(blankDraft.merges, [])
 })
 
+test('FL_processing_contract_business_draft__does_not_fill_missing_business_fields_from_template_sample processingContractTemplate: 业务带值草稿不从加工合同样例兜底真实缺值', () => {
+  const draft = createProcessingContractBusinessDraft({
+    contractNo: 'OUT-1001',
+    supplierName: '真实加工厂',
+    lines: [
+      {
+        contractNo: 'OUT-1001',
+        productNo: 'P-100',
+        processName: '车缝',
+        unitPrice: '1.5',
+        quantity: '20',
+      },
+    ],
+    clauses: {
+      delivery: ['保留业务来货要求'],
+      contract: ['保留业务合同约定'],
+      settlement: ['保留业务结算方式'],
+    },
+  })
+
+  assert.equal(draft.draftVersion, PROCESSING_CONTRACT_DRAFT_VERSION)
+  assert.equal(draft.contractNo, 'OUT-1001')
+  assert.equal(draft.supplierName, '真实加工厂')
+  assert.equal(draft.supplierContact, '')
+  assert.equal(draft.supplierPhone, '')
+  assert.equal(draft.buyerCompany, '')
+  assert.equal(draft.buyerContact, '')
+  assert.equal(draft.buyerSigner, '')
+  assert.equal(draft.supplierSigner, '')
+  assert.equal(draft.lines.length, 1)
+  assert.equal(draft.lines[0].productNo, 'P-100')
+  assert.equal(draft.lines[0].productOrderNo, '')
+  assert.equal(draft.lines[0].productName, '')
+  assert.equal(draft.lines[0].supplierAlias, '')
+  assert.equal(draft.lines[0].amount, '30')
+  assert.deepEqual(draft.clauses.delivery, ['保留业务来货要求'])
+  assert.equal(draft.attachments['attachment-1'].dataURL, '')
+  assert.deepEqual(draft.merges, [])
+})
+
 test('processingContractTemplate: 委外事实只带入合同打印可确认快照字段', () => {
   const draft = buildProcessingContractDraftFromOutsourcingFact({
     fact_no: ' OUT-F-001 ',
@@ -105,17 +147,75 @@ test('processingContractTemplate: 委外事实只带入合同打印可确认快�
   assert.equal(draft.lines[0].unit, '')
   assert.equal(draft.lines[0].quantity, '')
   assert.equal(draft.lines[0].unitPrice, '')
-  assert.match(draft.lines[0].remark, /事实类型: MATERIAL_ISSUE/u)
-  assert.match(draft.lines[0].remark, /对象: MATERIAL #8/u)
-  assert.match(draft.lines[0].remark, /来源: SALES_ORDER #5/u)
+  assert.match(draft.lines[0].remark, /业务来源: 材料发料/u)
+  assert.match(draft.lines[0].remark, /加工对象: 加工对象已关联/u)
+  assert.match(draft.lines[0].remark, /来源单据: 来源单据已关联/u)
   assert.match(draft.lines[0].remark, /需先核对工序和单价/u)
+  assert.doesNotMatch(
+    draft.lines[0].remark,
+    /事实类型|业务事实|MATERIAL|SALES_ORDER|#8|#5/u
+  )
+})
+
+test('processingContractTemplate: 委外事实追溯优先显示业务单号且不暴露未知 key', () => {
+  const draft = buildProcessingContractDraftFromOutsourcingFact({
+    fact_no: ' OUT-F-002 ',
+    fact_type: 'CUSTOM_FACT_KEY',
+    subject_type: 'CUSTOM_SUBJECT',
+    subject_id: 18,
+    subject_no: 'MAT-26001',
+    supplier_name: ' 外协车缝厂 ',
+    source_type: 'CUSTOM_SOURCE',
+    source_id: 25,
+    source_no: 'SO-26001',
+  })
+
+  const [{ remark }] = draft.lines
+
+  assert.match(remark, /业务来源: 业务来源已关联/u)
+  assert.match(remark, /加工对象: MAT-26001/u)
+  assert.match(remark, /来源单据: SO-26001/u)
+  assert.doesNotMatch(
+    remark,
+    /事实类型|业务事实|CUSTOM_FACT_KEY|CUSTOM_SUBJECT|CUSTOM_SOURCE|#18|#25/u
+  )
+})
+
+test('FL_processing_contract_fact_trace__uses_business_numbers_without_internal_ids processingContractTemplate: 委外事实追溯不因内部 ID 缺失丢失业务来源号', () => {
+  const draft = buildProcessingContractDraftFromOutsourcingFact({
+    fact_no: ' OUT-F-003 ',
+    fact_type: 'RETURN_RECEIPT',
+    subject_type: 'PRODUCT',
+    subject_name: '半成品兔头',
+    supplier_name: ' 外协车缝厂 ',
+    source_type: 'OUTSOURCING_ORDER',
+    source_no: 'OUT-26003',
+    note: '按业务来源号核对',
+  })
+
+  const [{ remark }] = draft.lines
+
+  assert.match(remark, /业务来源: 委外回货/u)
+  assert.match(remark, /加工对象: 半成品兔头/u)
+  assert.match(remark, /来源单据: OUT-26003/u)
+  assert.match(remark, /按业务来源号核对/u)
+  assert.doesNotMatch(
+    remark,
+    /事实类型|业务事实|PRODUCT|OUTSOURCING_ORDER|subject_id|source_id/u
+  )
 })
 
 test('processingContractTemplate: 委外订单按加工合同源单带入工序明细', () => {
   const draft = buildProcessingContractDraftFromOutsourcingOrder(
     {
       outsourcing_order_no: ' OUT-ORDER-001 ',
-      supplier_snapshot: { short_name: ' 外协车缝厂 ', name: '不优先显示' },
+      supplier_snapshot: {
+        short_name: ' 外协车缝厂 ',
+        name: '不优先显示',
+        contact_name: ' 李厂长 ',
+        contact_mobile: ' 13900000000 ',
+        address: ' 宁波加工园 ',
+      },
       source_order_no: ' SO-26017 ',
       order_date: 1781654400,
       expected_return_date: 1782259200,
@@ -139,6 +239,9 @@ test('processingContractTemplate: 委外订单按加工合同源单带入工序�
   assert.equal(draft.draftVersion, PROCESSING_CONTRACT_DRAFT_VERSION)
   assert.equal(draft.contractNo, 'OUT-ORDER-001')
   assert.equal(draft.supplierName, '外协车缝厂')
+  assert.equal(draft.supplierContact, '李厂长')
+  assert.equal(draft.supplierPhone, '13900000000')
+  assert.equal(draft.supplierAddress, '宁波加工园')
   assert.equal(draft.orderDateText, '2026-06-17')
   assert.equal(draft.returnDateText, '2026-06-24')
   assert.deepEqual(draft.lines[0], {
@@ -157,6 +260,176 @@ test('processingContractTemplate: 委外订单按加工合同源单带入工序�
   })
 })
 
+test('FL_processing_contract_print_party_defaults__uses_customer_config_party_defaults_only processingContractTemplate: 加工合同打印草稿只从客户配置带入委托方默认值', () => {
+  const draft = buildProcessingContractDraftFromOutsourcingOrder(
+    {
+      outsourcing_order_no: ' OUT-ORDER-CONFIG ',
+      supplier_snapshot: {
+        short_name: '真实加工厂',
+        contact_name: '加工厂联系人',
+      },
+    },
+    [
+      {
+        process_name_snapshot: '车缝',
+        outsourcing_quantity: '5',
+        unit_price: '3',
+      },
+    ],
+    {
+      printTemplateDefaults: {
+        templates: [
+          {
+            template_key: 'material-purchase-contract',
+            party_defaults: {
+              buyerCompany: '采购合同买方',
+            },
+          },
+          {
+            template_key: 'processing-contract',
+            party_defaults: {
+              buyerCompany: '客户配置委托方',
+              buyerContact: '委外负责人',
+              supplierName: '不应覆盖加工厂',
+            },
+          },
+        ],
+      },
+    }
+  )
+
+  assert.equal(draft.contractNo, 'OUT-ORDER-CONFIG')
+  assert.equal(draft.buyerCompany, '客户配置委托方')
+  assert.equal(draft.buyerContact, '委外负责人')
+  assert.equal(draft.supplierName, '真实加工厂')
+  assert.equal(draft.supplierContact, '加工厂联系人')
+  assert.equal(draft.supplierSigner, '')
+  assert.equal(draft.lines[0].processName, '车缝')
+  assert.equal(draft.lines[0].amount, '15')
+})
+
+test('FL_processing_contract_product_order_no__retains_source_order_no_snapshot processingContractTemplate: product order no keeps outsourcing source order snapshot', () => {
+  const draft = buildProcessingContractDraftFromOutsourcingOrder(
+    {
+      outsourcing_order_no: ' OUT-ORDER-002 ',
+      source_order_no: ' SO-26018 ',
+    },
+    [
+      {
+        product_no_snapshot: ' P-001 ',
+        product_name_snapshot: ' 毛绒兔半成品 ',
+      },
+      {
+        product_no_snapshot: ' P-002 ',
+        product_name_snapshot: ' 毛绒熊半成品 ',
+      },
+    ]
+  )
+
+  assert.equal(draft.lines.length, 2)
+  assert.deepEqual(
+    draft.lines.map((line) => line.productOrderNo),
+    ['SO-26018', 'SO-26018']
+  )
+  assert.deepEqual(
+    draft.lines.map((line) => line.contractNo),
+    ['OUT-ORDER-002', 'OUT-ORDER-002']
+  )
+})
+
+test('FL_processing_contract_business_draft__does_not_create_blank_line_without_items processingContractTemplate: 业务带值打印无明细时不补造空白加工行', () => {
+  const blankDraft = createBlankProcessingContractDraft()
+  assert.equal(blankDraft.lines.length, 1)
+  assert.equal(blankDraft.lines[0].productOrderNo, '')
+
+  const draft = buildProcessingContractDraftFromOutsourcingOrder(
+    {
+      outsourcing_order_no: ' OUT-ORDER-003 ',
+      source_order_no: ' SO-26019 ',
+    },
+    []
+  )
+
+  assert.deepEqual(draft.lines, [])
+})
+
+test('FL_processing_contract_print_lines__filters_canceled_outsourcing_items processingContractTemplate: canceled outsourcing lines do not remain in print draft', () => {
+  const draft = buildProcessingContractDraftFromOutsourcingOrder(
+    {
+      outsourcing_order_no: ' OUT-ORDER-CANCEL ',
+      supplier_snapshot: {
+        short_name: '外协车缝厂',
+      },
+      source_order_no: ' SO-26020 ',
+    },
+    [
+      {
+        line_status: 'canceled',
+        product_no_snapshot: ' P-CANCELED ',
+        product_name_snapshot: ' 已取消产品 ',
+        process_name_snapshot: ' 已取消工序 ',
+        outsourcing_quantity: '999',
+        unit_price: '8',
+        note: '不应进入打印',
+      },
+      {
+        line_status: 'CANCELLED',
+        product_no_snapshot: ' P-LEGACY-CANCELED ',
+        product_name_snapshot: ' 旧状态取消产品 ',
+        process_name_snapshot: ' 旧状态取消工序 ',
+        outsourcing_quantity: '1000',
+        unit_price: '9',
+        note: '旧状态不应进入打印',
+      },
+      {
+        line_status: 'open',
+        product_no_snapshot: ' P-OPEN ',
+        product_name_snapshot: ' 有效半成品 ',
+        process_name_snapshot: ' 车缝 ',
+        outsourcing_quantity: '12',
+        unit_price: '1.5',
+        note: '有效明细',
+      },
+    ]
+  )
+
+  assert.equal(draft.lines.length, 1)
+  assert.deepEqual(draft.lines[0], {
+    contractNo: 'OUT-ORDER-CANCEL',
+    productOrderNo: 'SO-26020',
+    productNo: 'P-OPEN',
+    productName: '有效半成品',
+    processName: '车缝',
+    supplierAlias: '外协车缝厂',
+    processCategory: '',
+    unit: '',
+    unitPrice: '1.5',
+    quantity: '12',
+    amount: '18',
+    remark: '有效明细',
+  })
+  assert(!draft.lines.some((line) => line.productNo === 'P-CANCELED'))
+  assert(!draft.lines.some((line) => line.productNo === 'P-LEGACY-CANCELED'))
+  assert(!draft.lines.some((line) => line.remark === '不应进入打印'))
+  assert(!draft.lines.some((line) => line.remark === '旧状态不应进入打印'))
+
+  const allCanceledDraft = buildProcessingContractDraftFromOutsourcingOrder(
+    {
+      outsourcing_order_no: ' OUT-ORDER-ALL-CANCEL ',
+      source_order_no: ' SO-26021 ',
+    },
+    [
+      {
+        line_status: 'cancelled',
+        product_no_snapshot: ' P-CANCELED ',
+        process_name_snapshot: ' 已取消工序 ',
+      },
+    ]
+  )
+
+  assert.deepEqual(allCanceledDraft.lines, [])
+})
+
 test('FL_processing_contract_amount__derives_default_line_amount_snapshot processingContractTemplate: 默认金额会按数量和单价写入合同快照', () => {
   const draft = createProcessingContractDraft()
 
@@ -173,4 +446,34 @@ test('FL_processing_contract_amount__keeps_manual_line_amount_snapshot processin
 
   assert.equal(line.amount, '18.5')
   assert.equal(resolveProcessingLineAmount(line), '18.5')
+})
+
+test('FL_processing_contract_totals__skip_merged_hidden_amount_cells processingContractTemplate: 合计不统计被合并覆盖的隐藏金额单元格', () => {
+  const totals = calculateProcessingContractTotals(
+    [
+      normalizeProcessingLine({
+        quantity: '10',
+        unitPrice: '2',
+        amount: '20',
+      }),
+      normalizeProcessingLine({
+        quantity: '5',
+        unitPrice: '3',
+        amount: '99',
+      }),
+    ],
+    {
+      merges: [
+        {
+          rowStart: 0,
+          rowEnd: 1,
+          colStart: 10,
+          colEnd: 10,
+        },
+      ],
+    }
+  )
+
+  assert.equal(totals.totalQuantityText, '15')
+  assert.equal(totals.totalAmountText, '20')
 })

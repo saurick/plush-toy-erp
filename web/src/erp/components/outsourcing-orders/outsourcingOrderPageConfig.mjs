@@ -4,7 +4,6 @@ import {
   confirmOutsourcingOrder,
   submitOutsourcingOrder,
 } from '../../api/masterDataOrderApi.mjs'
-import { ROLE_DISPLAY_NAMES } from '../../utils/roleKeys.mjs'
 
 export const OUTSOURCING_ORDER_STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -76,9 +75,6 @@ export const DEFAULT_OUTSOURCING_ORDER_PAGINATION = {
 
 export const OUTSOURCING_ORDERS_MODULE_KEY = 'processing-contracts'
 export const OUTSOURCING_ORDER_UNNUMBERED_LABEL = '加工合同未编号'
-export const OUTSOURCING_ORDER_WORKFLOW_ROLE_LABELS = new Map(
-  Object.entries(ROLE_DISPLAY_NAMES)
-)
 
 export function parseOutsourcingOrderSortValue(value = 'updated_at:desc') {
   const [sortBy = 'updated_at', sortDirection = 'desc'] =

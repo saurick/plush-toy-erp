@@ -52,6 +52,39 @@ test('dashboardTaskDisplay: 看板任务来源回显不直接露出内部来源�
   assert(!alertSourceLabel.includes('内部来源'))
 })
 
+test('workflowDashboardStats: alert 暴露业务来源标签而不是内部 source_no fallback', () => {
+  const internalTaskNoAlert = buildWorkflowTaskAlert(
+    task({
+      id: 9,
+      task_status_key: 'blocked',
+      source_type: 'shipping-release',
+      source_id: 9,
+      source_no: 'TASK-9',
+    }),
+    { nowMs: NOW_MS }
+  )
+  const hashIdFallbackAlert = buildWorkflowTaskAlert(
+    task({
+      id: 10,
+      task_status_key: 'blocked',
+      source_type: 'processing-contracts',
+      source_id: 10,
+      source_no: '#10',
+    }),
+    { nowMs: NOW_MS }
+  )
+
+  assert.equal(
+    internalTaskNoAlert.source_label,
+    '出货放行协同 / 已关联业务来源'
+  )
+  assert.equal(hashIdFallbackAlert.source_label, '委外协同 / 已关联业务来源')
+  assert(!internalTaskNoAlert.source_label.includes('TASK-9'))
+  assert(!hashIdFallbackAlert.source_label.includes('#10'))
+  assert(!internalTaskNoAlert.source_label.includes('shipping-release'))
+  assert(!hashIdFallbackAlert.source_label.includes('processing-contracts'))
+})
+
 test('dashboardTaskDisplay: 看板任务导航只进入已登记的正式或 Workflow V1 对象页', () => {
   const shippingReleaseEntryPath = resolveWorkflowTaskEntryPath(
     task({

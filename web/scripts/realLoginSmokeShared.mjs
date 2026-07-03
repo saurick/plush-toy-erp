@@ -259,6 +259,60 @@ export function attachErrorCollectors(page) {
   return errors
 }
 
+export async function verifyPdfDownloadButton(page, { timeout = 15_000 } = {}) {
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout }),
+    page.getByRole('button', { name: '下载 PDF' }).click(),
+  ])
+  const suggestedFilename = download.suggestedFilename()
+  const failure = await download.failure().catch((error) => {
+    return String(error?.message || error)
+  })
+
+  assert.equal(failure, null, `PDF 下载失败: ${failure}`)
+  assert.match(
+    suggestedFilename,
+    /\.pdf$/i,
+    `PDF 下载文件名应以 .pdf 结尾: ${suggestedFilename}`
+  )
+
+  return {
+    suggestedFilename,
+  }
+}
+
+export async function verifyPrintButtonInvokesWindowPrint(
+  page,
+  { timeout = 15_000 } = {}
+) {
+  await page.evaluate(() => {
+    window.__PLUSH_PRINT_SMOKE_PRINT_CALLS__ = 0
+    window.__PLUSH_PRINT_SMOKE_ORIGINAL_PRINT__ = window.print
+    window.print = () => {
+      window.__PLUSH_PRINT_SMOKE_PRINT_CALLS__ += 1
+    }
+  })
+
+  try {
+    await page.getByRole('button', { name: '打印', exact: true }).click({
+      timeout,
+    })
+    const printCalls = await page.evaluate(() => {
+      return Number(window.__PLUSH_PRINT_SMOKE_PRINT_CALLS__ || 0)
+    })
+    assert.equal(printCalls, 1, '打印按钮必须调用当前窗口的 window.print()')
+    return { printCalls }
+  } finally {
+    await page.evaluate(() => {
+      if (window.__PLUSH_PRINT_SMOKE_ORIGINAL_PRINT__) {
+        window.print = window.__PLUSH_PRINT_SMOKE_ORIGINAL_PRINT__
+      }
+      delete window.__PLUSH_PRINT_SMOKE_PRINT_CALLS__
+      delete window.__PLUSH_PRINT_SMOKE_ORIGINAL_PRINT__
+    })
+  }
+}
+
 export async function loginAsAdmin(page, credentials, baseURL) {
   await page.goto(new URL('/admin-login', `${baseURL}/`).toString(), {
     waitUntil: 'domcontentloaded',
@@ -277,7 +331,11 @@ export async function loginAsAdmin(page, credentials, baseURL) {
     submitButton.click(),
   ])
 
-  await page.getByRole('heading', { name: '后台首页 / 工作台' }).waitFor({
+  await waitForAdminDashboardReady(page)
+}
+
+export async function waitForAdminDashboardReady(page) {
+  await page.getByRole('heading', { name: '工作台', exact: true }).waitFor({
     state: 'visible',
     timeout: 15_000,
   })
@@ -289,7 +347,7 @@ export async function safeScreenshot(page, outputDir, fileName) {
       path: path.resolve(outputDir, fileName),
       fullPage: true,
     })
-  } catch (error) {
+  } catch {
     // 截图失败时不覆盖主错误。
   }
 }
@@ -432,7 +490,7 @@ async function isAdminCredentialsUsable({ credentials, backendAuthURL }) {
     }
     const json = await response.json()
     return json?.result?.code === 0
-  } catch (error) {
+  } catch {
     return false
   }
 }
@@ -443,7 +501,7 @@ async function ensureBackendReady(backendHealthURL) {
     response = await fetch(backendHealthURL, {
       redirect: 'manual',
     })
-  } catch (error) {
+  } catch {
     throw new Error(
       `真实登录烟测前置检查失败：无法访问后端健康检查 ${backendHealthURL}。请先启动 server（make run）。`
     )
@@ -475,6 +533,8 @@ function startDevServer({ webDir, devServerPort, onLog }) {
       env: {
         ...process.env,
         BROWSER: 'none',
+        ERP_VITE_PORT: String(devServerPort),
+        ERP_VITE_HMR_CLIENT_PORT: String(devServerPort),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     }

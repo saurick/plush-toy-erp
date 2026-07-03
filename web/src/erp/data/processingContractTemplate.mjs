@@ -25,6 +25,10 @@ export const PROCESSING_CONTRACT_TABLE_COLUMNS = [
   { key: 'remark', fieldKey: 'remark', label: '备注', multiline: true },
 ]
 
+const processingContractColumnIndex = Object.fromEntries(
+  PROCESSING_CONTRACT_TABLE_COLUMNS.map((column, index) => [column.key, index])
+)
+
 const defaultClauses = {
   delivery: [
     '按订单明细分别打包（1k/包，不足1K单独包装），并标明产品编号、工序名称。',
@@ -40,6 +44,14 @@ const defaultClauses = {
     '按委托方仓库确认收到货物日期，次月开始对账，每月 15 号之前完成对账。',
     '对完账后，次月支付货款，加工厂开具等额增值税专用发票。',
   ],
+}
+
+const PROCESSING_FACT_TYPE_LABELS = {
+  MATERIAL_ISSUE: '材料发料',
+  RETURN_RECEIPT: '委外回货',
+  SETTLEMENT: '委外结算',
+  FINISHED_GOODS_RECEIPT: '成品入库',
+  REWORK: '返工',
 }
 
 export const processingContractAttachmentSlots = [
@@ -116,6 +128,9 @@ export const processingContractTemplateMeta = {
   shortTitle: '加工合同',
   category: '委外加工',
   readiness: 'source_grounded',
+  runtimeStatus: 'official_template',
+  factBoundary: 'read_snapshot_only',
+  moduleKeys: ['outsourcing_orders'],
   summary:
     '基于“模板-材料与加工合同.xlsx”的 `B类加工合同` 工作表，并对照 `9.3加工合同-子淳.pdf` 的单页纸质合同，收口加工合同的独立打印工作台。',
   scene: '委外加工下单、加工厂回签、财务对账留档',
@@ -143,6 +158,39 @@ export const processingContractTemplateMeta = {
     '工序名称、工序类别、单价、委托加工数量、委托加工金额属于合同明细快照；金额默认按数量 × 单价带值，但允许按合同快照手工改写。',
     '来货要求、合同约定、结算方式属于正式合同正文，不应只留在帮助文档里口头说明。',
     '纸样 / 图样附件属于附件快照层，当前通过工作台上传后进入页底附件位，并随 PDF / 打印一起冻结。',
+  ],
+  fieldRequirements: [
+    {
+      key: 'outsourcing_header_snapshot',
+      label: '加工合同头',
+      source: '委外订单或加工合同草稿',
+      boundary: '业务带值必须显式生成草稿；打印中心样例不能兜底真实业务缺值',
+    },
+    {
+      key: 'processor_snapshot',
+      label: '加工方快照',
+      source: '供应商 / 加工厂主数据或合同草稿',
+      boundary: '只读快照；打印编辑不反写加工厂主数据',
+    },
+    {
+      key: 'processing_line_snapshots',
+      label: '加工明细快照',
+      source: '委外订单明细或合同明细草稿',
+      boundary:
+        '工序、数量、单价和金额随合同草稿冻结，不自动生成发料、回货、库存或财务事实',
+    },
+    {
+      key: 'attachment_snapshots',
+      label: '纸样 / 图样附件快照',
+      source: '当前打印窗口上传的附件快照',
+      boundary: '随当前 PDF / 打印输出冻结，不替代正式附件归档事实',
+    },
+    {
+      key: 'contract_clauses',
+      label: '合同条款与签字区',
+      source: '正式模板正文',
+      boundary: '纸面文本可编辑，但不代表审批、签收、发料、回货或结算事实',
+    },
   ],
   helpNotes: [
     '当前主链路是“打印中心 -> 可编辑打印窗口 -> 独立 PDF 预览窗口 / 下载 PDF / 打印”，不再走静态预览页。',
@@ -174,6 +222,10 @@ function normalizeText(value) {
   return String(value ?? '')
     .replace(/\r/g, '')
     .trim()
+}
+
+function isCanceledBusinessLineStatus(value) {
+  return ['canceled', 'cancelled'].includes(normalizeText(value).toLowerCase())
 }
 
 function parseNumber(value) {
@@ -317,16 +369,62 @@ export function normalizeProcessingContractClauses(clauses = {}) {
   }, {})
 }
 
-export function calculateProcessingContractTotals(lines = []) {
+function isProcessingContractCellHiddenByMerge(merges, rowIndex, columnKey) {
+  const colIndex = processingContractColumnIndex[columnKey]
+  if (!Number.isInteger(colIndex) || !Array.isArray(merges)) {
+    return false
+  }
+
+  return merges.some((merge = {}) => {
+    const rowStart = Number(merge.rowStart)
+    const rowEnd = Number(merge.rowEnd)
+    const colStart = Number(merge.colStart)
+    const colEnd = Number(merge.colEnd)
+    if (
+      !Number.isInteger(rowStart) ||
+      !Number.isInteger(rowEnd) ||
+      !Number.isInteger(colStart) ||
+      !Number.isInteger(colEnd)
+    ) {
+      return false
+    }
+    if (
+      rowIndex < rowStart ||
+      rowIndex > rowEnd ||
+      colIndex < colStart ||
+      colIndex > colEnd
+    ) {
+      return false
+    }
+    return rowIndex !== rowStart || colIndex !== colStart
+  })
+}
+
+export function calculateProcessingContractTotals(
+  lines = [],
+  { merges = [] } = {}
+) {
   let totalQuantity = 0
   let totalAmount = 0
   let hasQuantity = false
   let hasAmount = false
 
-  lines.forEach((line) => {
+  lines.forEach((line, rowIndex) => {
     const normalizedLine = normalizeProcessingLine(line)
-    const quantity = parseNumber(normalizedLine.quantity)
-    const amount = parseNumber(resolveProcessingLineAmount(normalizedLine))
+    const quantity = isProcessingContractCellHiddenByMerge(
+      merges,
+      rowIndex,
+      'quantity'
+    )
+      ? null
+      : parseNumber(normalizedLine.quantity)
+    const amount = isProcessingContractCellHiddenByMerge(
+      merges,
+      rowIndex,
+      'amount'
+    )
+      ? null
+      : parseNumber(resolveProcessingLineAmount(normalizedLine))
 
     if (quantity !== null) {
       totalQuantity += quantity
@@ -396,6 +494,19 @@ export function createBlankProcessingContractDraft(draft = {}) {
   }
 }
 
+export function createProcessingContractBusinessDraft(draft = {}) {
+  const { attachments, lines, clauses, merges, ...rest } = draft || {}
+  return {
+    ...createBlankProcessingContractDraft({ clauses }),
+    ...rest,
+    lines: Array.isArray(lines)
+      ? lines.map((line) => normalizeProcessingLine(line))
+      : [normalizeProcessingLine(createEmptyProcessingLine())],
+    attachments: normalizeProcessingContractAttachments(attachments),
+    merges: Array.isArray(merges) ? merges : [],
+  }
+}
+
 function normalizeProcessingFactTrace(record = {}) {
   const traceParts = []
   const factType = normalizeText(record.fact_type)
@@ -403,16 +514,22 @@ function normalizeProcessingFactTrace(record = {}) {
   const subjectID = normalizeText(record.subject_id)
   const sourceType = normalizeText(record.source_type)
   const sourceID = normalizeText(record.source_id)
+  const subjectNo =
+    normalizeText(record.subject_no) || normalizeText(record.subject_name)
+  const sourceNo =
+    normalizeText(record.source_no) || normalizeText(record.source_name)
   const note = normalizeText(record.note)
 
   if (factType) {
-    traceParts.push(`事实类型: ${factType}`)
+    traceParts.push(
+      `业务来源: ${PROCESSING_FACT_TYPE_LABELS[factType] || '业务来源已关联'}`
+    )
   }
-  if (subjectType && subjectID) {
-    traceParts.push(`对象: ${subjectType} #${subjectID}`)
+  if (subjectNo || (subjectType && subjectID)) {
+    traceParts.push(`加工对象: ${subjectNo || '加工对象已关联'}`)
   }
-  if (sourceType && sourceID) {
-    traceParts.push(`来源: ${sourceType} #${sourceID}`)
+  if (sourceNo || (sourceType && sourceID)) {
+    traceParts.push(`来源单据: ${sourceNo || '来源单据已关联'}`)
   }
   if (note) {
     traceParts.push(note)
@@ -426,6 +543,37 @@ function formatProcessingDraftDate(value) {
     return normalizeText(value)
   }
   return new Date(timestamp * 1000).toISOString().slice(0, 10)
+}
+
+function processingPrintPartyDefaults(printTemplateDefaults = {}) {
+  const directDefaults =
+    printTemplateDefaults?.[PROCESSING_CONTRACT_TEMPLATE_KEY] ||
+    printTemplateDefaults?.processingContract ||
+    null
+  const templateDefaults = Array.isArray(printTemplateDefaults?.templates)
+    ? printTemplateDefaults.templates.find(
+        (item) => item?.template_key === PROCESSING_CONTRACT_TEMPLATE_KEY
+      )
+    : null
+  const partyDefaults =
+    directDefaults?.partyDefaults ||
+    directDefaults?.party_defaults ||
+    templateDefaults?.party_defaults ||
+    {}
+  const allowedKeys = [
+    'buyerCompany',
+    'buyerContact',
+    'buyerPhone',
+    'buyerAddress',
+    'buyerSigner',
+  ]
+  return allowedKeys.reduce((output, key) => {
+    const value = normalizeText(partyDefaults?.[key])
+    if (value) {
+      output[key] = value
+    }
+    return output
+  }, {})
 }
 
 export function buildProcessingContractDraftFromOutsourcingFact(record = {}) {
@@ -449,7 +597,8 @@ export function buildProcessingContractDraftFromOutsourcingFact(record = {}) {
 
 export function buildProcessingContractDraftFromOutsourcingOrder(
   order = {},
-  items = []
+  items = [],
+  { printTemplateDefaults = {} } = {}
 ) {
   const contractNo = normalizeText(order.outsourcing_order_no)
   const supplierSnapshot =
@@ -461,29 +610,37 @@ export function buildProcessingContractDraftFromOutsourcingOrder(
     normalizeText(supplierSnapshot.name)
   const draft = createBlankProcessingContractDraft()
   const sourceOrderNo = normalizeText(order.source_order_no)
+  const activeItems = (Array.isArray(items) ? items : []).filter(
+    (item) => !isCanceledBusinessLineStatus(item?.line_status)
+  )
 
   return {
     ...draft,
     contractNo,
     supplierName,
+    supplierContact: normalizeText(supplierSnapshot.contact_name),
+    supplierPhone:
+      normalizeText(supplierSnapshot.contact_phone) ||
+      normalizeText(supplierSnapshot.contact_mobile),
+    supplierAddress: normalizeText(supplierSnapshot.address),
+    ...processingPrintPartyDefaults(printTemplateDefaults),
     orderDateText: formatProcessingDraftDate(order.order_date),
     returnDateText: formatProcessingDraftDate(order.expected_return_date),
-    lines: (Array.isArray(items) && items.length > 0 ? items : [{}]).map(
-      (item) =>
-        normalizeProcessingLine({
-          contractNo,
-          productOrderNo: sourceOrderNo,
-          productNo: normalizeText(item.product_no_snapshot),
-          productName: normalizeText(item.product_name_snapshot),
-          processName: normalizeText(item.process_name_snapshot),
-          processCategory: normalizeText(item.process_category_snapshot),
-          supplierAlias: supplierName,
-          unit: normalizeText(item.unit_name_snapshot),
-          quantity: normalizeText(item.outsourcing_quantity),
-          unitPrice: normalizeText(item.unit_price),
-          amount: normalizeText(item.amount),
-          remark: normalizeText(item.note),
-        })
+    lines: activeItems.map((item) =>
+      normalizeProcessingLine({
+        contractNo,
+        productOrderNo: sourceOrderNo,
+        productNo: normalizeText(item.product_no_snapshot),
+        productName: normalizeText(item.product_name_snapshot),
+        processName: normalizeText(item.process_name_snapshot),
+        processCategory: normalizeText(item.process_category_snapshot),
+        supplierAlias: supplierName,
+        unit: normalizeText(item.unit_name_snapshot),
+        quantity: normalizeText(item.outsourcing_quantity),
+        unitPrice: normalizeText(item.unit_price),
+        amount: normalizeText(item.amount),
+        remark: normalizeText(item.note),
+      })
     ),
   }
 }

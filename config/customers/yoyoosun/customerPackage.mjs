@@ -30,6 +30,26 @@ export const yoyoosunCustomerPackage = Object.freeze({
     writesShipmentFacts: false,
     writesFinanceFacts: false,
   }),
+  printTemplateDefaults: Object.freeze([
+    Object.freeze({
+      templateKey: "material-purchase-contract",
+      status: "preview_only",
+      partyDefaults: Object.freeze({
+        buyerCompany: "东莞市永绅玩具有限公司",
+      }),
+      guardrail:
+        "仅作为 yoyoosun 客户配置草案里的采购合同买方抬头默认值，不进入 Product Core 默认样例，不自动生成签章、签收、采购事实或财务事实。",
+    }),
+    Object.freeze({
+      templateKey: "processing-contract",
+      status: "preview_only",
+      partyDefaults: Object.freeze({
+        buyerCompany: "东莞市永绅玩具有限公司",
+      }),
+      guardrail:
+        "仅作为 yoyoosun 客户配置草案里的加工合同委托方抬头默认值，不进入 Product Core 默认样例，不自动生成签章、签收、委外事实或财务事实。",
+    }),
+  ]),
   workflows: Object.freeze([
     {
       key: "sales_order_approval",
@@ -294,4 +314,5 @@ export const yoyoosunCustomerPackage = Object.freeze({
       guardrail: "关闭策略不能把 task done 写成 fact posted，也不能绕过冲正 / 取消规则。",
     },
   ]),
+  extensionPoints: Object.freeze([]),
 });

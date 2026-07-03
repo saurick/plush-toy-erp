@@ -3,6 +3,8 @@ import {
   processingContractTemplateMeta,
 } from '../data/processingContractTemplate.mjs'
 
+export const PRINT_TEMPLATE_FACT_BOUNDARY = 'read_snapshot_only'
+
 export const printTemplateCatalog = [
   {
     key: 'material-purchase-contract',
@@ -10,6 +12,9 @@ export const printTemplateCatalog = [
     shortTitle: '采购合同',
     category: '采购订单 / 材料采购',
     readiness: 'source_grounded',
+    runtimeStatus: 'official_template',
+    factBoundary: PRINT_TEMPLATE_FACT_BOUNDARY,
+    moduleKeys: ['purchase_orders'],
     summary:
       '基于“模板-材料与加工合同.xlsx”的 `C类辅料合同` 工作表，收口采购合同的固定版式、材料明细和条款区。',
     scene: '材料采购下单、供应商确认、财务留档',
@@ -35,6 +40,32 @@ export const printTemplateCatalog = [
       '供应商名称、联系人、联系电话、供应商地址来自材料厂商编号 sheet，是 partner 快照，不是当前页面手填自由文本。',
       '采购数量、单价、采购金额是合同快照；金额默认按数量 × 单价带值，也允许按合同快照手工改写，编辑时显示人民币前缀但底层仍按纯数字快照保存，后续都不能反写已经打印的合同。',
       '备注保留包装说明和工艺说明，不并入材料主档。',
+    ],
+    fieldRequirements: [
+      {
+        key: 'purchase_header_snapshot',
+        label: '采购合同头',
+        source: '采购订单或合同快照',
+        boundary: '业务带值必须显式生成草稿；打印中心样例不能兜底真实业务缺值',
+      },
+      {
+        key: 'supplier_snapshot',
+        label: '供应商快照',
+        source: '供应商主数据 / 材料厂商编号来源样本',
+        boundary: '只读快照；打印编辑不反写供应商主数据',
+      },
+      {
+        key: 'purchase_line_snapshots',
+        label: '采购明细快照',
+        source: '采购订单明细或合同明细草稿',
+        boundary: '数量、单价、金额和备注随合同草稿冻结，不自动生成采购事实',
+      },
+      {
+        key: 'contract_clauses',
+        label: '合同条款与签字区',
+        source: '正式模板正文',
+        boundary: '纸面文本可编辑，但不代表审批、签收或财务事实',
+      },
     ],
     helpNotes: [
       '这张模板适合采购发起材料采购下单、供应商确认和财务留档；辅料、包材等都来自材料主数据。',

@@ -27,6 +27,7 @@ import PurchaseOrderOperationPanel from '../components/purchase-orders/PurchaseO
 import { buildPurchaseOrderColumns } from '../components/purchase-orders/purchaseOrderColumns.jsx'
 import {
   listMaterials,
+  listContactsByOwner,
   listPurchaseOrderItems,
   listPurchaseOrders,
   listSuppliers,
@@ -40,7 +41,6 @@ import {
   canEditPurchaseOrderSelection,
   getSingleSelectedPurchaseOrder,
   PURCHASE_ORDER_LIFECYCLE_ACTIONS,
-  PURCHASE_ORDER_WORKFLOW_ROLE_LABELS,
   PURCHASE_ORDERS_MODULE_KEY,
   selectedPurchaseOrderDisplayText,
   todayInputValue,
@@ -53,12 +53,15 @@ import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
   V1_ROUTE_PATHS,
+  buildPurchaseOrderItemSourceValuesFromMaterial,
   buildPurchaseOrderItemParams,
   buildPurchaseOrderParams,
   buildSequentialDraftCode,
   buildSupplierSnapshot,
+  buildSupplierSnapshotWithContacts,
   canRunPurchaseOrderLifecycleAction,
   hasActionPermission,
+  SUPPLIER_CONTACT_OWNER_TYPE,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
 import { filterBusinessCollaborationTasksBySource } from '../utils/businessCollaborationTasks.mjs'
@@ -78,10 +81,12 @@ import {
   unitOption,
   warehouseOptionFromRecord,
 } from '../utils/referenceSelectOptions.mjs'
+import { getEffectivePrintTemplateDefaults } from '../utils/adminProfileSync.mjs'
 import {
   routeWithQuery,
   searchParamPositiveIntText,
 } from '../utils/routeQuery.mjs'
+import { MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY } from '../utils/printWorkspace.js'
 
 export default function V1PurchaseOrdersPage() {
   const outletContext = useOutletContext()
@@ -252,8 +257,12 @@ export default function V1PurchaseOrdersPage() {
       message.error(getActionErrorMessage(error, '加载采购协同任务失败'))
     }
   }, [canReadWorkflowTasks])
-  const { blockWorkflowTask, completeWorkflowTask, urgePurchaseWorkflowTask } =
-    usePurchaseOrderWorkflowActions({ loadWorkflowTasks })
+  const {
+    blockWorkflowTask,
+    completeWorkflowTask,
+    rejectWorkflowTask,
+    urgePurchaseWorkflowTask,
+  } = usePurchaseOrderWorkflowActions({ loadWorkflowTasks })
 
   const loadOrderItems = useCallback(async (order) => {
     if (!order?.id) {
@@ -336,39 +345,78 @@ export default function V1PurchaseOrdersPage() {
     setModalOpen(true)
   }
 
+  const resolveSupplierSnapshot = useCallback(
+    async (supplier, options = {}) => {
+      const baseSnapshot = buildSupplierSnapshot(supplier)
+      if (!supplier?.id) {
+        return baseSnapshot
+      }
+      try {
+        const data = await listContactsByOwner({
+          owner_type: SUPPLIER_CONTACT_OWNER_TYPE,
+          owner_id: supplier.id,
+          active_only: true,
+          limit: 50,
+        })
+        return buildSupplierSnapshotWithContacts(supplier, data?.contacts || [])
+      } catch (error) {
+        if (options.notifyOnError) {
+          message.warning(
+            `${getActionErrorMessage(error, '加载供应商联系人')}，将仅保存供应商基本信息`
+          )
+        }
+        return baseSnapshot
+      }
+    },
+    []
+  )
+
   const handleSupplierChange = (supplierID) => {
     const supplier = suppliers.find((item) => item.id === supplierID)
     form.setFieldValue('supplier_snapshot', buildSupplierSnapshot(supplier))
+    resolveSupplierSnapshot(supplier).then((snapshot) => {
+      if (
+        String(form.getFieldValue('supplier_id') ?? '') !==
+        String(supplierID ?? '')
+      ) {
+        return
+      }
+      form.setFieldValue('supplier_snapshot', snapshot)
+    })
   }
 
   const handleMaterialChange = (fieldName, materialID) => {
     const material = materials.find((item) => item.id === materialID)
-    if (!material) return
-    form.setFieldValue(
-      ['items', fieldName, 'unit_id'],
-      material.default_unit_id
-    )
-    form.setFieldValue(
-      ['items', fieldName, 'material_code_snapshot'],
-      material.code
-    )
-    form.setFieldValue(
-      ['items', fieldName, 'material_name_snapshot'],
-      material.name
-    )
-    form.setFieldValue(
-      ['items', fieldName, 'color_snapshot'],
-      material.color || ''
-    )
+    const sourceValues =
+      buildPurchaseOrderItemSourceValuesFromMaterial(material)
+    form.setFields([
+      { name: ['items', fieldName, 'unit_id'], value: sourceValues.unit_id },
+      {
+        name: ['items', fieldName, 'material_code_snapshot'],
+        value: sourceValues.material_code_snapshot,
+      },
+      {
+        name: ['items', fieldName, 'material_name_snapshot'],
+        value: sourceValues.material_name_snapshot,
+      },
+      {
+        name: ['items', fieldName, 'color_snapshot'],
+        value: sourceValues.color_snapshot,
+      },
+    ])
   }
 
   const handleSave = async () => {
+    setSaving(true)
     try {
       const values = await form.validateFields()
       const supplier = suppliers.find((item) => item.id === values.supplier_id)
+      const supplierSnapshot = await resolveSupplierSnapshot(supplier, {
+        notifyOnError: true,
+      })
       const params = buildPurchaseOrderParams(values, {
         id: editingOrder?.id,
-        supplier_snapshot: buildSupplierSnapshot(supplier),
+        supplier_snapshot: supplierSnapshot,
         items: (values.items || []).map((line, index) =>
           buildPurchaseOrderItemParams(line, {
             id: line.id,
@@ -376,7 +424,6 @@ export default function V1PurchaseOrdersPage() {
           })
         ),
       })
-      setSaving(true)
       const result = await savePurchaseOrderWithItems(params)
       const saved = result?.purchase_order
       const attachmentSaved =
@@ -563,10 +610,20 @@ export default function V1PurchaseOrdersPage() {
     selectedOrders,
     selectedRowKeys,
   })
+  const purchasePrintTemplateDefaults = useMemo(
+    () =>
+      getEffectivePrintTemplateDefaults(
+        adminProfile,
+        MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY
+      ),
+    [adminProfile]
+  )
   const { printPurchaseContract, printingContract } =
     usePurchaseOrderContractPrint({
       loadOrderItems,
       materials,
+      printTemplateDefaults: purchasePrintTemplateDefaults,
+      unitOptions,
     })
   const {
     closeInboundDraftModal,
@@ -782,11 +839,11 @@ export default function V1PurchaseOrdersPage() {
         selectedTasks={selectedOrderWorkflowTasks}
         selectedRecordLabel={singleSelectedOrder?.purchase_order_no || ''}
         adminProfile={adminProfile}
-        roleLabelMap={PURCHASE_ORDER_WORKFLOW_ROLE_LABELS}
         onCompleteTask={
           canCompleteWorkflowTasks ? completeWorkflowTask : undefined
         }
         onBlockTask={canUpdateWorkflowTasks ? blockWorkflowTask : undefined}
+        onRejectTask={canUpdateWorkflowTasks ? rejectWorkflowTask : undefined}
         onUrgeTask={
           canUpdateWorkflowTasks ? urgePurchaseWorkflowTask : undefined
         }

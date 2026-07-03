@@ -12,6 +12,19 @@ import (
 
 const workflowBreakGlassMaxDuration = 2 * time.Hour
 
+var workflowTaskActionPayloadSystemKeys = map[string]struct{}{
+	"business_status_key": {},
+	"command_key":         {},
+	"domain_command":      {},
+	"domain_command_key":  {},
+	"owner_role_key":      {},
+	"source_id":           {},
+	"source_line_id":      {},
+	"source_no":           {},
+	"source_type":         {},
+	"task_status_key":     {},
+}
+
 func (d *jsonrpcDispatcher) handleWorkflowTask(
 	ctx context.Context,
 	method, id string,
@@ -101,44 +114,6 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			Message: "任务已创建",
 			Data:    newDataStruct(map[string]any{"task": workflowTaskToMap(task)}),
 		}, nil
-	case "update_task_status":
-		payload, ok := getWorkflowPayload(pm, "payload")
-		if !ok {
-			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "payload 必须是对象"}, nil
-		}
-		taskID := getInt(pm, "id", 0)
-		currentTask, err := d.workflowUC.GetTask(ctx, taskID)
-		if err != nil {
-			return id, d.mapWorkflowError(ctx, err), nil
-		}
-		actionPermission := biz.WorkflowStatusActionPermission(getString(pm, "task_status_key"), currentTask)
-		if res := d.RequireAdminPermission(ctx, actionPermission); res != nil {
-			return id, res, nil
-		}
-		admin, adminRes := d.CurrentAdmin(ctx)
-		if adminRes != nil {
-			return id, adminRes, nil
-		}
-		visibleOwnerRoleKeys := d.workflowVisibleOwnerRoleKeys(ctx, admin, actionPermission)
-		if !workflowAdminCanHandleTask(admin, currentTask, getString(pm, "task_status_key"), visibleOwnerRoleKeys) {
-			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
-		}
-		actorRoleKey := workflowActorRoleKeyForAdminInScope(admin, currentTask, visibleOwnerRoleKeys)
-		task, err := d.workflowUC.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-			ID:                taskID,
-			TaskStatusKey:     getString(pm, "task_status_key"),
-			BusinessStatusKey: getString(pm, "business_status_key"),
-			Reason:            getString(pm, "reason"),
-			Payload:           payload,
-		}, actorID, actorRoleKey)
-		if err != nil {
-			return id, d.mapWorkflowError(ctx, err), nil
-		}
-		return id, &v1.JsonrpcResult{
-			Code:    errcode.OK.Code,
-			Message: "任务状态已更新",
-			Data:    newDataStruct(map[string]any{"task": workflowTaskToMap(task)}),
-		}, nil
 	case "complete_task_action":
 		return d.handleWorkflowTaskStatusAction(ctx, id, pm, actorID, workflowTaskActionContract{
 			Method:           "complete_task_action",
@@ -167,10 +142,23 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			RequireReason:    true,
 		})
 	case "urge_task":
+		taskID, taskIDRes := getRequiredWorkflowTaskID(pm)
+		if taskIDRes != nil {
+			return id, taskIDRes, nil
+		}
+		if _, exists := pm["task_status_key"]; exists {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "urge_task 不接收 task_status_key"}, nil
+		}
+		if _, exists := pm["business_status_key"]; exists {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "business_status_key 由服务端推导"}, nil
+		}
+		if _, exists := pm["actor_role_key"]; exists {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "actor_role_key 由服务端推导"}, nil
+		}
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskUpdate); res != nil {
 			return id, res, nil
 		}
-		currentTask, err := d.workflowUC.GetTask(ctx, getInt(pm, "task_id", 0))
+		currentTask, err := d.workflowUC.GetTask(ctx, taskID)
 		if err != nil {
 			return id, d.mapWorkflowError(ctx, err), nil
 		}
@@ -186,9 +174,12 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "payload 必须是对象"}, nil
 		}
+		if res := validateWorkflowTaskActionPayload(payload); res != nil {
+			return id, res, nil
+		}
 		actorRoleKey := workflowActorRoleKeyForAdminInScope(admin, currentTask, visibleOwnerRoleKeys)
 		task, err := d.workflowUC.UrgeTask(ctx, &biz.WorkflowTaskUrge{
-			ID:      getInt(pm, "task_id", 0),
+			ID:      taskID,
 			Action:  getString(pm, "action"),
 			Reason:  getString(pm, "reason"),
 			Payload: payload,
@@ -230,8 +221,15 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 	if _, exists := pm["task_status_key"]; exists {
 		return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: contract.Method + " 不接收 task_status_key"}, nil
 	}
+	if _, exists := pm["business_status_key"]; exists {
+		return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "business_status_key 由服务端推导"}, nil
+	}
 	if _, exists := pm["actor_role_key"]; exists {
 		return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "actor_role_key 由服务端推导"}, nil
+	}
+	taskID, taskIDRes := getRequiredWorkflowTaskID(pm)
+	if taskIDRes != nil {
+		return id, taskIDRes, nil
 	}
 	actionKey := strings.TrimSpace(getString(pm, "action_key"))
 	if actionKey == "" {
@@ -244,6 +242,9 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 	if !ok {
 		return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "payload 必须是对象"}, nil
 	}
+	if res := validateWorkflowTaskActionPayload(payload); res != nil {
+		return id, res, nil
+	}
 	reason := strings.TrimSpace(getString(pm, "reason"))
 	if contract.RequireReason && reason == "" {
 		return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "原因不能为空"}, nil
@@ -251,10 +252,6 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 	breakGlass, breakGlassResult := getWorkflowBreakGlassGrant(pm, time.Now())
 	if breakGlassResult != nil {
 		return id, breakGlassResult, nil
-	}
-	taskID := getInt(pm, "task_id", 0)
-	if taskID == 0 {
-		taskID = getInt(pm, "id", 0)
 	}
 	currentTask, err := d.workflowUC.GetTask(ctx, taskID)
 	if err != nil {
@@ -280,10 +277,6 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 	if !canHandle && !useBreakGlass {
 		return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
 	}
-	businessStatusKey := getString(pm, "business_status_key")
-	if businessStatusKey == "" {
-		businessStatusKey = contract.DefaultBusiness
-	}
 	actorRoleKey := workflowActorRoleKeyForAdminInScope(admin, currentTask, visibleOwnerRoleKeys)
 	if useBreakGlass {
 		if d.adminManageUC == nil {
@@ -305,7 +298,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 	task, err := d.workflowUC.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
 		ID:                taskID,
 		TaskStatusKey:     contract.StatusKey,
-		BusinessStatusKey: businessStatusKey,
+		BusinessStatusKey: contract.DefaultBusiness,
 		Reason:            reason,
 		Payload:           payload,
 	}, actorID, actorRoleKey)
@@ -322,6 +315,26 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 		Message: contract.SuccessMessage,
 		Data:    newDataStruct(map[string]any{"task": workflowTaskToMap(task)}),
 	}, nil
+}
+
+func validateWorkflowTaskActionPayload(payload map[string]any) *v1.JsonrpcResult {
+	for key := range payload {
+		if _, blocked := workflowTaskActionPayloadSystemKeys[strings.TrimSpace(key)]; blocked {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务动作参数包含系统字段，请刷新后重试"}
+		}
+	}
+	return nil
+}
+
+func getRequiredWorkflowTaskID(pm map[string]any) (int, *v1.JsonrpcResult) {
+	if _, exists := pm["id"]; exists {
+		return 0, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "Workflow 任务动作不接收 id，请使用 task_id"}
+	}
+	taskID := getInt(pm, "task_id", 0)
+	if taskID <= 0 {
+		return 0, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "task_id 必须大于 0"}
+	}
+	return taskID, nil
 }
 
 func (d *jsonrpcDispatcher) completeLinkedProcessNodeAfterTaskDone(ctx context.Context, task *biz.WorkflowTask, actorID int) *v1.JsonrpcResult {
@@ -451,7 +464,10 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskActionExplain(
 	if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 		return id, res, nil
 	}
-	taskID := getWorkflowTaskID(pm)
+	taskID, taskIDRes := getRequiredWorkflowTaskID(pm)
+	if taskIDRes != nil {
+		return id, taskIDRes, nil
+	}
 	currentTask, err := d.workflowUC.GetTask(ctx, taskID)
 	if err != nil {
 		return id, d.mapWorkflowError(ctx, err), nil
@@ -503,7 +519,10 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskAssignmentExplain(
 	if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 		return id, res, nil
 	}
-	taskID := getWorkflowTaskID(pm)
+	taskID, taskIDRes := getRequiredWorkflowTaskID(pm)
+	if taskIDRes != nil {
+		return id, taskIDRes, nil
+	}
 	currentTask, err := d.workflowUC.GetTask(ctx, taskID)
 	if err != nil {
 		return id, d.mapWorkflowError(ctx, err), nil
@@ -582,14 +601,6 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskAssignmentExplain(
 		Message: errcode.OK.Message,
 		Data:    newDataStruct(map[string]any{"assignment": assignment}),
 	}, nil
-}
-
-func getWorkflowTaskID(pm map[string]any) int {
-	taskID := getInt(pm, "task_id", 0)
-	if taskID == 0 {
-		taskID = getInt(pm, "id", 0)
-	}
-	return taskID
 }
 
 func workflowTaskActionExplainContracts(task *biz.WorkflowTask) []workflowTaskActionExplainContract {

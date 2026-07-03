@@ -21,6 +21,7 @@ import SourceImportPickerModal from '../business-list/SourceImportPickerModal.js
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
   createBlankShipmentItem,
+  decimalNumber,
   formatQuantity,
 } from '../../utils/businessLineItems.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
@@ -134,6 +135,68 @@ function ShipmentFormFields({
         />
       </Form.Item>
     </>
+  )
+}
+
+function selectedShipmentSourceRows(formItems = [], sourceRows = []) {
+  const sourceItemIDs = new Set(
+    (Array.isArray(formItems) ? formItems : [])
+      .map((item) => Number(item?.sales_order_item_id || 0))
+      .filter((itemID) => Number.isFinite(itemID) && itemID > 0)
+  )
+  return sourceRows.filter((row) => sourceItemIDs.has(Number(row.id)))
+}
+
+function ShipmentSelectedSourceAlert({
+  selectedSalesOrder,
+  shipmentSourceRows = [],
+}) {
+  if (!selectedSalesOrder) return null
+  return (
+    <Form.Item
+      noStyle
+      shouldUpdate={(previous, current) => previous?.items !== current?.items}
+    >
+      {({ getFieldValue }) => {
+        const selectedSourceRows = selectedShipmentSourceRows(
+          getFieldValue('items') || [],
+          shipmentSourceRows
+        )
+        const selectedSourceRemainingTotal = selectedSourceRows.reduce(
+          (total, item) => total + decimalNumber(item.remainingQuantity),
+          0
+        )
+        return (
+          <Alert
+            className="erp-business-source-summary"
+            showIcon
+            type="info"
+            message={`来源销售订单：${
+              selectedSalesOrder.order_no ||
+              selectedSalesOrder.customer_order_no ||
+              '已选择'
+            }`}
+            description={
+              <Space direction="vertical" size={2}>
+                <Text>
+                  {`客户：${
+                    salesOrderCustomerText(selectedSalesOrder) || '-'
+                  }；已导入来源行：${
+                    selectedSourceRows.length
+                  } 行；当前来源行剩余可出货合计：${formatQuantity(
+                    selectedSourceRemainingTotal
+                  )}`}
+                </Text>
+                <Text type="secondary">
+                  出货弹窗只做来源预览和默认数量；后端当前保存销售订单行追溯，
+                  剩余量强校验仍需后续后端规则补齐。
+                </Text>
+              </Space>
+            }
+          />
+        )
+      }}
+    </Form.Item>
   )
 }
 
@@ -349,20 +412,16 @@ export default function ShipmentBusinessModal({
   salesOrderSources = [],
   saving = false,
   selectedSalesOrder,
-  selectedSourceRemainingTotal = 0,
-  selectedSourceRows = [],
   setSalesOrderImportOpen,
   shipmentAttachmentRef,
-  shipmentFormItems = [],
+  shipmentSourceRows = [],
   shipmentOptions = [],
   sourceLoading = false,
   unitOptions = [],
   warehouseOptions = [],
 }) {
   const { registerLineItemRow, requestLineItemScroll } =
-    useLineItemAppendScroll(
-      Array.isArray(shipmentFormItems) ? shipmentFormItems.length : 0
-    )
+    useLineItemAppendScroll()
 
   return (
     <BusinessFormModal
@@ -400,33 +459,10 @@ export default function ShipmentBusinessModal({
           canDelete={canCreate || canShip}
           variant="inline"
         />
-        {selectedSalesOrder ? (
-          <Alert
-            className="erp-business-source-summary"
-            showIcon
-            type="info"
-            message={`来源销售订单：${
-              selectedSalesOrder.order_no ||
-              selectedSalesOrder.customer_order_no ||
-              '已选择'
-            }`}
-            description={
-              <Space direction="vertical" size={2}>
-                <Text>
-                  {`客户：${salesOrderCustomerText(selectedSalesOrder) || '-'}；已导入来源行：${
-                    selectedSourceRows.length
-                  } 行；当前来源行剩余可出货合计：${formatQuantity(
-                    selectedSourceRemainingTotal
-                  )}`}
-                </Text>
-                <Text type="secondary">
-                  出货弹窗只做来源预览和默认数量；后端当前保存销售订单行追溯，
-                  剩余量强校验仍需后续 usecase 合同补齐。
-                </Text>
-              </Space>
-            }
-          />
-        ) : null}
+        <ShipmentSelectedSourceAlert
+          selectedSalesOrder={selectedSalesOrder}
+          shipmentSourceRows={shipmentSourceRows}
+        />
         {modalSelectedShipment ? (
           <section className="erp-master-contact-list erp-shipment-modal-items">
             <div className="erp-master-contact-list__head">
@@ -532,8 +568,8 @@ export default function ShipmentBusinessModal({
               <BusinessLineItemsFooter
                 addLabel="添加条目"
                 onAdd={() => {
-                  requestLineItemScroll(fields.length)
                   add(createBlankShipmentItem(modalSelectedShipment?.id))
+                  requestLineItemScroll(fields.length)
                 }}
                 stats={[
                   {

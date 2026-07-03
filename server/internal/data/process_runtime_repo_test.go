@@ -171,7 +171,7 @@ func TestProcessRuntimeRepoCreateAndRead(t *testing.T) {
 	}
 }
 
-func TestProcessRuntimeRepoRejectsDuplicateIdempotency(t *testing.T) {
+func TestProcessRuntimeRepoReturnsExistingProcessForSameIdempotency(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:process_runtime_repo_duplicate?mode=memory&cache=shared&_fk=1")
 	defer mustCloseEntClient(t, client)
@@ -190,11 +190,21 @@ func TestProcessRuntimeRepoRejectsDuplicateIdempotency(t *testing.T) {
 		IdempotencyKey:  "sales_order:1001:engineering_release:v1",
 		Status:          biz.ProcessStatusActive,
 	}
-	if _, _, err := repo.CreateProcessInstance(ctx, in, 7); err != nil {
+	first, _, err := repo.CreateProcessInstance(ctx, in, 7)
+	if err != nil {
 		t.Fatalf("first create failed: %v", err)
 	}
-	if _, _, err := repo.CreateProcessInstance(ctx, in, 7); !errors.Is(err, biz.ErrProcessInstanceExists) {
-		t.Fatalf("expected ErrProcessInstanceExists, got %v", err)
+	second, _, err := repo.CreateProcessInstance(ctx, in, 7)
+	if err != nil {
+		t.Fatalf("same idempotency create should return existing process, got %v", err)
+	}
+	if second.ID != first.ID || second.IdempotencyKey != in.IdempotencyKey {
+		t.Fatalf("expected existing process returned, first=%#v second=%#v", first, second)
+	}
+	otherKey := *in
+	otherKey.IdempotencyKey = "sales_order:1001:engineering_release:v2"
+	if _, _, err := repo.CreateProcessInstance(ctx, &otherKey, 7); !errors.Is(err, biz.ErrProcessInstanceExists) {
+		t.Fatalf("expected ErrProcessInstanceExists for different idempotency key, got %v", err)
 	}
 	if _, err := repo.GetProcessInstance(ctx, 999); !errors.Is(err, biz.ErrProcessInstanceNotFound) {
 		t.Fatalf("expected not found, got %v", err)

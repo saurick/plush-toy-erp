@@ -177,10 +177,31 @@ test('shipmentFinanceFlow: 缺 source_no / document_no 时不崩溃', () => {
     null,
     { nowMs: NOW_MS }
   )
+  const taskWithInternalSourceNo = buildReceivableRegistrationTask(
+    shipmentRecord({
+      document_no: '',
+      source_no: '56',
+      title: '',
+    }),
+    null,
+    { nowMs: NOW_MS }
+  )
 
-  assert.equal(task.source_no, '56')
+  assert.equal(task.source_no, '')
+  assert.equal(taskWithInternalSourceNo.source_no, '')
+  assert.equal(task.payload.related_documents.includes('出货记录：56'), false)
   assert.equal(
-    task.payload.related_documents.some((item) => item.includes('56')),
+    taskWithInternalSourceNo.payload.related_documents.includes('出货记录：56'),
+    false
+  )
+  assert.equal(
+    taskWithInternalSourceNo.payload.related_documents.includes(
+      '出货记录已关联'
+    ),
+    true
+  )
+  assert.equal(
+    taskWithInternalSourceNo.payload.related_documents.includes('订单已关联'),
     true
   )
 })

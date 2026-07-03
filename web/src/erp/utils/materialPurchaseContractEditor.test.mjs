@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   applyDetailCellMerge,
   buildBlankMaterialPurchaseContractDraft,
+  buildMaterialPurchaseContractBusinessDraft,
   buildMaterialPurchaseContractDraft,
   clearMaterialPurchaseContractSignatureDraft,
   computeMaterialPurchaseTotals,
@@ -72,6 +73,59 @@ test('FL_material_purchase_amount__keeps_manual_amount_snapshot materialPurchase
   })
 
   assert.equal(draft.lines[0].amount, '9.00')
+})
+
+test('FL_material_purchase_business_draft__does_not_fill_missing_business_fields_from_template_sample materialPurchaseContractEditor: 业务带值草稿不从模板样例兜底真实缺值', () => {
+  const draft = buildMaterialPurchaseContractBusinessDraft(
+    {
+      contractNo: 'PO-1001',
+      supplierName: '真实供应商',
+      lines: [
+        {
+          contractNo: 'PO-1001',
+          materialName: '拉毛布',
+          unitPrice: '2',
+          quantity: '3',
+        },
+      ],
+    },
+    {
+      supplierContact: '供应商联系人样例',
+      supplierPhone: '供应商联系电话样例',
+      buyerCompany: '买方公司样例',
+      buyerContact: '买方联系人样例',
+      buyerSigner: '买方签字样例',
+      lines: [
+        {
+          productOrderNo: 'SAMPLE-SO',
+          productName: '样例产品',
+          materialName: '样例材料',
+          quantity: '999',
+        },
+      ],
+      clauses: {
+        delivery: ['保留模板来货要求'],
+        contract: ['保留模板合同约定'],
+        settlement: ['保留模板结算方式'],
+      },
+    }
+  )
+
+  assert.equal(draft.contractNo, 'PO-1001')
+  assert.equal(draft.supplierName, '真实供应商')
+  assert.equal(draft.supplierContact, '')
+  assert.equal(draft.supplierPhone, '')
+  assert.equal(draft.buyerCompany, '')
+  assert.equal(draft.buyerContact, '')
+  assert.equal(draft.buyerSigner, '')
+  assert.equal(draft.lines.length, 1)
+  assert.equal(draft.lines[0].materialName, '拉毛布')
+  assert.equal(draft.lines[0].productOrderNo, '')
+  assert.equal(draft.lines[0].productName, '')
+  assert.equal(draft.lines[0].quantity, '3')
+  assert.equal(draft.lines[0].amount, '6.00')
+  assert.deepEqual(draft.clauses.delivery, ['保留模板来货要求'])
+  assert.deepEqual(draft.merges, [])
 })
 
 test('materialPurchaseContractEditor: 可直接编辑采购金额并参与合计', () => {
@@ -224,6 +278,41 @@ test('FL_material_purchase_merge__clears_covered_cell_stale_value materialPurcha
   })
   assert.equal(split.ok, true)
   assert.equal(split.merges.length, 0)
+})
+
+test('FL_material_purchase_totals__skip_merged_hidden_amount_cells materialPurchaseContractEditor: 合计不统计被合并覆盖的隐藏采购金额单元格', () => {
+  const merged = applyDetailCellMerge({
+    lines: [
+      {
+        quantity: '10',
+        unitPrice: '2',
+        amount: '20',
+      },
+      {
+        quantity: '5',
+        unitPrice: '3',
+        amount: '99',
+      },
+    ],
+    merges: [],
+    selection: {
+      rowStart: 0,
+      rowEnd: 1,
+      colStart: 10,
+      colEnd: 10,
+    },
+  })
+
+  assert.equal(merged.ok, true)
+  assert.equal(merged.lines[0].amount, '20.00')
+  assert.equal(merged.lines[1].amount, '15.00')
+  assert.notEqual(merged.lines[1].amount, '99.00')
+
+  const totals = computeMaterialPurchaseTotals(merged.lines, {
+    merges: merged.merges,
+  })
+  assert.equal(totals.quantityText, '15')
+  assert.equal(totals.amountText, '20.00')
 })
 
 test('materialPurchaseContractEditor: 插入和删除明细行会同步调整当前选择', () => {

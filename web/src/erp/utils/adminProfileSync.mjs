@@ -1,9 +1,224 @@
 import { isAdminSessionUnavailableCode } from '../../common/consts/errorCodes.js'
 
 const EFFECTIVE_SESSION_SYNC_FAILED_SOURCE = 'effective_session_sync_failed'
+const PRINT_PARTY_DEFAULT_KEYS = new Set([
+  'buyerCompany',
+  'buyerContact',
+  'buyerPhone',
+  'buyerAddress',
+  'buyerSigner',
+])
+
+const PRODUCT_CORE_ACTION_KEYS = new Set([
+  'bom.activate',
+  'bom.create',
+  'bom.read',
+  'bom.update',
+  'contact.create',
+  'contact.disable',
+  'contact.read',
+  'contact.set_primary',
+  'contact.update',
+  'customer.create',
+  'customer.disable',
+  'customer.read',
+  'customer.update',
+  'customer_config.activate',
+  'customer_config.publish',
+  'customer_config.read',
+  'customer_config.rollback',
+  'erp.business_chain_debug.read',
+  'erp.dashboard.read',
+  'erp.print_template.read',
+  'finance.payable.confirm',
+  'finance.payable.read',
+  'finance.receivable.confirm',
+  'finance.receivable.read',
+  'finance.report.read',
+  'material.create',
+  'material.disable',
+  'material.read',
+  'material.update',
+  'outsourcing.order.confirm',
+  'outsourcing.order.create',
+  'outsourcing.order.read',
+  'outsourcing.order.update',
+  'pmc.plan.create',
+  'pmc.plan.read',
+  'pmc.plan.update',
+  'pmc.risk.handle',
+  'pmc.risk.read',
+  'process.create',
+  'process.disable',
+  'process.read',
+  'process.update',
+  'product.create',
+  'product.disable',
+  'product.read',
+  'product.update',
+  'product_sku.create',
+  'product_sku.disable',
+  'product_sku.read',
+  'product_sku.update',
+  'purchase.order.approve',
+  'purchase.order.create',
+  'purchase.order.read',
+  'purchase.order.update',
+  'purchase.receipt.create',
+  'purchase.receipt.read',
+  'purchase.return.create',
+  'purchase.return.read',
+  'quality.exception.handle',
+  'quality.inspection.create',
+  'quality.inspection.read',
+  'quality.inspection.update',
+  'sales_order.activate',
+  'sales_order.cancel',
+  'sales_order.close',
+  'sales_order.create',
+  'sales_order.read',
+  'sales_order.submit',
+  'sales_order.update',
+  'sales_order_item.cancel',
+  'sales_order_item.create',
+  'sales_order_item.read',
+  'sales_order_item.update',
+  'shipment.cancel',
+  'shipment.create',
+  'shipment.read',
+  'shipment.ship',
+  'supplier.create',
+  'supplier.disable',
+  'supplier.read',
+  'supplier.update',
+  'system.audit.read',
+  'system.permission.manage',
+  'system.permission.read',
+  'system.role.create',
+  'system.role.delete',
+  'system.role.read',
+  'system.role.update',
+  'system.user.create',
+  'system.user.disable',
+  'system.user.read',
+  'system.user.update',
+  'warehouse.adjustment.create',
+  'warehouse.inbound.confirm',
+  'warehouse.inbound.read',
+  'warehouse.inventory.read',
+  'warehouse.outbound.confirm',
+  'warehouse.outbound.read',
+  'workflow.task.approve',
+  'workflow.task.assign',
+  'workflow.task.complete',
+  'workflow.task.create',
+  'workflow.task.read',
+  'workflow.task.reject',
+  'workflow.task.update',
+])
 
 function isLocalDevRuntime() {
   return import.meta.env?.DEV === true
+}
+
+function countFieldPolicyEntries(fieldPolicies) {
+  if (!fieldPolicies || typeof fieldPolicies !== 'object') {
+    return { surfaces: 0, fields: 0, hiddenFields: 0 }
+  }
+  return Object.values(fieldPolicies).reduce(
+    (acc, surfacePolicies) => {
+      if (!surfacePolicies || typeof surfacePolicies !== 'object') {
+        return acc
+      }
+      acc.surfaces += 1
+      Object.values(surfacePolicies).forEach((policy) => {
+        if (!policy || typeof policy !== 'object') {
+          return
+        }
+        acc.fields += 1
+        if (policy.visible === false) {
+          acc.hiddenFields += 1
+        }
+      })
+      return acc
+    },
+    { surfaces: 0, fields: 0, hiddenFields: 0 }
+  )
+}
+
+function countVisibleMenuItems(visibleSections) {
+  return (Array.isArray(visibleSections) ? visibleSections : []).reduce(
+    (sum, section) =>
+      sum + (Array.isArray(section?.items) ? section.items.length : 0),
+    0
+  )
+}
+
+export function buildEffectiveSessionDiagnosticSummary({
+  adminProfile = null,
+  allowedMenuPaths = [],
+  visibleSections = [],
+  isSuperAdmin = false,
+  isLocalDev = isLocalDevRuntime(),
+} = {}) {
+  const session = adminProfile?.effective_session
+  const hasSession = Boolean(session && typeof session === 'object')
+  const pages = Array.isArray(session?.pages) ? session.pages : []
+  const actions = Array.isArray(session?.actions) ? session.actions : []
+  const roles = Array.isArray(session?.roles) ? session.roles : []
+  const workPools = Array.isArray(session?.work_pools) ? session.work_pools : []
+  const modules =
+    session?.modules && typeof session.modules === 'object'
+      ? session.modules
+      : {}
+  const fieldPolicyCounts = countFieldPolicyEntries(session?.field_policies)
+  const visibleMenuItems = countVisibleMenuItems(visibleSections)
+  const blockers = []
+
+  if (!hasSession) {
+    blockers.push('effective_session_missing')
+  }
+  if (session?.source === EFFECTIVE_SESSION_SYNC_FAILED_SOURCE) {
+    blockers.push('effective_session_sync_failed')
+  }
+  if (hasSession && Array.isArray(session?.pages) && pages.length === 0) {
+    blockers.push('effective_session_pages_empty')
+  }
+  if (!isSuperAdmin && visibleMenuItems === 0) {
+    blockers.push('no_visible_menu_items')
+  }
+
+  const projectionMode = isSuperAdmin
+    ? 'super_admin_product_core'
+    : isLocalDev && session?.source === EFFECTIVE_SESSION_SYNC_FAILED_SOURCE
+      ? 'local_dev_sync_failed_diagnostic'
+      : isLocalDev
+        ? 'local_dev_customer_config_diagnostic'
+        : 'formal_effective_session_projection'
+
+  return {
+    source: hasSession ? session.source || 'unknown' : 'missing',
+    customerKey: session?.customer?.key || '',
+    configRevision: session?.config_revision || '',
+    projectionMode,
+    isSuperAdmin: isSuperAdmin === true,
+    isLocalDev: isLocalDev === true,
+    counts: {
+      rbacMenuPaths: Array.isArray(allowedMenuPaths)
+        ? allowedMenuPaths.length
+        : 0,
+      visibleMenuItems,
+      pages: pages.length,
+      actions: actions.length,
+      roles: roles.length,
+      workPools: workPools.length,
+      modules: Object.keys(modules).length,
+      fieldPolicySurfaces: fieldPolicyCounts.surfaces,
+      fieldPolicyFields: fieldPolicyCounts.fields,
+      hiddenFieldPolicies: fieldPolicyCounts.hiddenFields,
+    },
+    blockers,
+  }
 }
 
 export function attachEffectiveSessionToAdminProfile(
@@ -55,6 +270,14 @@ export function attachEffectiveSessionToAdminProfile(
               typeof effectiveSession.field_policies === 'object'
             ? effectiveSession.field_policies
             : {},
+      print_template_defaults:
+        effectiveSession.printTemplateDefaults &&
+        typeof effectiveSession.printTemplateDefaults === 'object'
+          ? effectiveSession.printTemplateDefaults
+          : effectiveSession.print_template_defaults &&
+              typeof effectiveSession.print_template_defaults === 'object'
+            ? effectiveSession.print_template_defaults
+            : {},
       source: effectiveSession.source || '',
     },
   }
@@ -70,6 +293,14 @@ export function attachUnavailableEffectiveSessionToAdminProfile(profile) {
   })
 }
 
+export function resolveEffectiveSessionCustomerKey(activeBrand = {}) {
+  const customerKey =
+    typeof activeBrand?.customerKey === 'string'
+      ? activeBrand.customerKey.trim()
+      : ''
+  return customerKey || ''
+}
+
 export function resolveEffectiveSessionPageAccess(
   adminProfile,
   pageKey,
@@ -82,7 +313,13 @@ export function resolveEffectiveSessionPageAccess(
   const session = adminProfile?.effective_session
   const pages = session?.pages
   if (!Array.isArray(pages)) {
-    return { allowed: true, reason: 'legacy_without_effective_session_pages' }
+    if (isLocalDev) {
+      return { allowed: true, reason: 'local_dev_customer_config_diagnostic' }
+    }
+    if (isSuperAdmin) {
+      return { allowed: true, reason: 'super_admin_product_core' }
+    }
+    return { allowed: false, reason: 'effective_session_pages_missing' }
   }
   if (pages.includes(normalizedPageKey)) {
     return { allowed: true, reason: 'effective_session_page' }
@@ -116,7 +353,6 @@ export function filterNavigationSectionsByAdminProfile({
   adminProfile = null,
   allowedMenuPaths = [],
   isSuperAdmin = false,
-  isLocalDev = isLocalDevRuntime(),
 } = {}) {
   const allowedPaths = new Set(
     Array.isArray(allowedMenuPaths) ? allowedMenuPaths : []
@@ -130,7 +366,9 @@ export function filterNavigationSectionsByAdminProfile({
           return (
             rbacAllowed &&
             effectiveSessionAllowsPage(adminProfile, item?.key, {
-              isLocalDev,
+              // Local-dev page diagnostics are direct-URL only; side navigation
+              // still mirrors active pages for ordinary accounts.
+              isLocalDev: false,
               isSuperAdmin,
             })
           )
@@ -148,9 +386,13 @@ export function shouldRedirectFromCurrentNavigation({
   isLocalDev = isLocalDevRuntime(),
   currentMenuPath = '',
   currentPageKey = '',
+  currentNavigationMatched = true,
 } = {}) {
   if (profileLoading) {
     return false
+  }
+  if (currentNavigationMatched === false) {
+    return true
   }
   const normalizedMenuPath =
     typeof currentMenuPath === 'string' ? currentMenuPath.trim() : ''
@@ -187,18 +429,25 @@ export function effectiveSessionAllowsAction(adminProfile, actionKey) {
   if (!normalizedActionKey) {
     return false
   }
-  if (adminProfile?.is_super_admin === true) {
-    return true
-  }
   const session = adminProfile?.effective_session
+  const sessionActions = Array.isArray(session?.actions) ? session.actions : []
+  const rbacActions = Array.isArray(adminProfile?.permissions)
+    ? adminProfile.permissions
+    : []
+  if (adminProfile?.is_super_admin === true) {
+    return (
+      PRODUCT_CORE_ACTION_KEYS.has(normalizedActionKey) ||
+      sessionActions.includes(normalizedActionKey) ||
+      rbacActions.includes(normalizedActionKey)
+    )
+  }
   if (!session || typeof session !== 'object') {
-    return true
+    return false
   }
-  const { actions } = session
-  if (!Array.isArray(actions)) {
-    return true
+  if (!Array.isArray(session.actions)) {
+    return false
   }
-  return actions.includes(normalizedActionKey)
+  return session.actions.includes(normalizedActionKey)
 }
 
 export function getEffectiveFieldPolicy(adminProfile, surfaceKey, fieldKey) {
@@ -228,6 +477,49 @@ export function isEffectiveFieldVisible(adminProfile, surfaceKey, fieldKey) {
     return true
   }
   return policy.visible !== false
+}
+
+export function getEffectivePrintTemplateDefaults(adminProfile, templateKey) {
+  const normalizedTemplateKey =
+    typeof templateKey === 'string' ? templateKey.trim() : ''
+  if (!normalizedTemplateKey) {
+    return {}
+  }
+  const defaults = adminProfile?.effective_session?.print_template_defaults
+  if (!defaults || typeof defaults !== 'object') {
+    return {}
+  }
+  const templates = Array.isArray(defaults.templates) ? defaults.templates : []
+  const item = templates.find(
+    (template) => template?.template_key === normalizedTemplateKey
+  )
+  if (!item || item.supplier_defaults_allowed === true) {
+    return {}
+  }
+  const partyDefaults =
+    item.party_defaults && typeof item.party_defaults === 'object'
+      ? item.party_defaults
+      : {}
+  const cleanPartyDefaults = Object.fromEntries(
+    Object.entries(partyDefaults).filter(
+      ([key, value]) =>
+        PRINT_PARTY_DEFAULT_KEYS.has(key) &&
+        typeof value === 'string' &&
+        value.trim()
+    )
+  )
+  if (Object.keys(cleanPartyDefaults).length === 0) {
+    return {}
+  }
+  return {
+    templates: [
+      {
+        template_key: normalizedTemplateKey,
+        party_defaults: cleanPartyDefaults,
+        supplier_defaults_allowed: false,
+      },
+    ],
+  }
 }
 
 function resolveColumnFieldKey(column = {}) {

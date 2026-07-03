@@ -35,6 +35,8 @@ evidence/releases/<YYYY-MM-DD>/
   "customerKey": "yoyoosun",
   "revision": "yoyoosun-customer-package-v1.runtime-manifest-v1",
   "manifestSha256": "sha256:<64-hex>",
+  "manifestPath": "output/customers/yoyoosun/customer-config-runtime-manifest.json",
+  "releaseReport": "output/customers/yoyoosun/customer-config-release/customer-config-release-report.json",
   "reviewStatus": "approved",
   "redaction": {
     "containsSecrets": false,
@@ -44,6 +46,8 @@ evidence/releases/<YYYY-MM-DD>/
 }
 ```
 
+`manifestPath` 和 `releaseReport` 只保存仓库相对路径，不保存本机绝对路径；草稿目录如果 release evidence、smoke 或 sign-off 尚未通过，不应把 `reviewStatus` 写成 `approved`。
+
 推荐由脚本生成，避免手写哈希：
 
 ```bash
@@ -51,8 +55,11 @@ node scripts/deploy/customer-config-manifest-evidence.mjs \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
+  --review-status approved \
   --reviewer <reviewer-name>
 ```
+
+未传 `--review-status approved` 时脚本默认生成 `draft`，不能通过 activation gate；只有 manifest 已完成人工 review 并且目标 release evidence、smoke、sign-off 也能独立闭环时，才应显式写 approved。
 
 镜像 digest artifact 也应优先由脚本生成，避免手写 `image-digests.txt`：
 

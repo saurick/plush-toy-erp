@@ -160,15 +160,12 @@ function MermaidDiagram({ chart }) {
         if (!cancelled) {
           setRenderState({ status: 'rendered', svg, error: '' })
         }
-      } catch (error) {
+      } catch (_error) {
         if (!cancelled) {
           setRenderState({
             status: 'error',
             svg: '',
-            error:
-              error instanceof Error && error.message
-                ? error.message
-                : 'Mermaid 图表渲染失败',
+            error: '请检查 Mermaid 源码语法或稍后重试。',
           })
         }
       }

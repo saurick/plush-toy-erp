@@ -109,14 +109,16 @@ func TestTemplatePDFReferencedModuleKeys(t *testing.T) {
 	tests := []struct {
 		templateKey string
 		want        []string
+		wantOK      bool
 	}{
-		{templateKey: "material-purchase-contract", want: []string{"purchase_orders"}},
-		{templateKey: "processing-contract", want: []string{"outsourcing_orders"}},
-		{templateKey: "unknown-template", want: nil},
+		{templateKey: "material-purchase-contract", want: []string{"purchase_orders"}, wantOK: true},
+		{templateKey: "processing-contract", want: []string{"outsourcing_orders"}, wantOK: true},
+		{templateKey: "unknown-template", want: nil, wantOK: false},
 	}
 
 	for _, tt := range tests {
-		if got := templatePDFReferencedModuleKeys(tt.templateKey); strings.Join(got, ",") != strings.Join(tt.want, ",") {
+		got, ok := templatePDFReferencedModuleKeys(tt.templateKey)
+		if ok != tt.wantOK || strings.Join(got, ",") != strings.Join(tt.want, ",") {
 			t.Fatalf("templatePDFReferencedModuleKeys(%q) = %#v, want %#v", tt.templateKey, got, tt.want)
 		}
 	}
@@ -170,11 +172,11 @@ func TestEnforceTemplatePDFModulesEnabled(t *testing.T) {
 		unknownGuard,
 		"yoyoosun",
 		"unknown-template",
-	); err != nil {
-		t.Fatalf("unknown template should not be module gated, got %v", err)
+	); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("unknown template should be rejected, got %v", err)
 	}
 	if len(unknownGuard.moduleKeys) != 0 {
-		t.Fatalf("unknown template should not call guard, got %#v", unknownGuard.moduleKeys)
+		t.Fatalf("unknown template should fail before guard, got %#v", unknownGuard.moduleKeys)
 	}
 }
 
@@ -202,29 +204,23 @@ func TestResolveTemplatePDFWarmupEnabled(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name       string
-		rawMode    string
-		rawEnabled string
-		want       bool
+		name string
+		raw  string
+		want bool
 	}{
 		{name: "default enabled", want: true},
-		{name: "mode async", rawMode: "async", want: true},
-		{name: "mode true", rawMode: "true", want: true},
-		{name: "mode off", rawMode: "off", want: false},
-		{name: "legacy true", rawEnabled: "true", want: true},
-		{name: "legacy false", rawEnabled: "false", want: false},
-		{name: "mode wins over legacy false", rawMode: "async", rawEnabled: "false", want: true},
-		{name: "mode off wins over legacy true", rawMode: "off", rawEnabled: "true", want: false},
-		{name: "legacy unexpected stays enabled", rawEnabled: "unexpected", want: true},
-		{name: "mode unexpected disables", rawMode: "unexpected", want: false},
+		{name: "async", raw: "async", want: true},
+		{name: "true", raw: "true", want: true},
+		{name: "off", raw: "off", want: false},
+		{name: "unexpected disables", raw: "unexpected", want: false},
 	}
 
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := resolveTemplatePDFWarmupEnabled(tc.rawMode, tc.rawEnabled); got != tc.want {
-				t.Fatalf("resolveTemplatePDFWarmupEnabled(%q, %q) = %v, want %v", tc.rawMode, tc.rawEnabled, got, tc.want)
+			if got := resolveTemplatePDFWarmupEnabled(tc.raw); got != tc.want {
+				t.Fatalf("resolveTemplatePDFWarmupEnabled(%q) = %v, want %v", tc.raw, got, tc.want)
 			}
 		})
 	}

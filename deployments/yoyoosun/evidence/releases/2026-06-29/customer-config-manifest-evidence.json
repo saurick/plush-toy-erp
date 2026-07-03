@@ -3,9 +3,9 @@
   "revision": "yoyoosun-customer-package-v1.runtime-manifest-v1",
   "productVersion": "local-customer-package",
   "manifestSha256": "sha256:c7b20c29ec7dcfc56159ff9b4199216ae05429d7559551a05e7f0c5c448fd957",
-  "manifestPath": "/Users/simon/projects/plush-toy-erp/output/customers/yoyoosun/customer-config-runtime-manifest.json",
-  "releaseReport": "/Users/simon/projects/plush-toy-erp/output/customers/yoyoosun/customer-config-release/customer-config-release-report.json",
-  "reviewStatus": "approved",
+  "manifestPath": "output/customers/yoyoosun/customer-config-runtime-manifest.json",
+  "releaseReport": "output/customers/yoyoosun/customer-config-release/customer-config-release-report.json",
+  "reviewStatus": "draft",
   "reviewer": "codex-local-review",
   "generatedAt": "2026-06-29T00:06:46.699Z",
   "redaction": {

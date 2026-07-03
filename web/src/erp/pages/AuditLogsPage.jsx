@@ -21,7 +21,10 @@ import { AUTH_SCOPE } from '@/common/auth/auth'
 import { Loading } from '@/common/components/loading'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { message } from '@/common/utils/antdApp'
-import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import {
+  getActionErrorMessage,
+  getUserFacingErrorMessage,
+} from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import { DateInput } from '../components/business-list/BusinessListLayout.jsx'
 import { buildAuditLogParams } from '../utils/auditLogParams.mjs'
@@ -59,19 +62,19 @@ const actionMetaMap = {
     label: '账号角色变更',
     risk: 'warning',
     intent: '确认账号被授予或移除了哪些角色',
-    next: '重点看对象账号、before/after role_keys，以及是否包含系统管理员或 debug 角色。',
+    next: '重点核对对象账号的角色变更前后差异，以及是否包含系统管理员或调试权限。',
   },
   'admin_user.phone.set': {
     label: '账号手机号变更',
     risk: 'normal',
     intent: '确认登录或通知手机号是否被调整',
-    next: '核对 before/after phone，确认是否由账号负责人发起。',
+    next: '核对手机号变更前后差异，确认是否由账号负责人发起。',
   },
   'admin_user.disabled.set': {
     label: '账号启停变更',
     risk: 'high',
     intent: '确认账号是否被禁用或恢复',
-    next: '重点看 after.disabled；如果账号被误禁用，回到权限管理页恢复。',
+    next: '重点核对账号当前状态；如果账号被误禁用，回到权限管理页恢复。',
   },
   'admin_user.password.reset': {
     label: '密码重置',
@@ -83,19 +86,19 @@ const actionMetaMap = {
     label: '角色权限变更',
     risk: 'high',
     intent: '确认某个角色的权限集是否发生变化',
-    next: '重点看 before/after permission_keys，确认是否新增高危系统或 debug 权限。',
+    next: '重点核对权限变更前后差异，确认是否新增高危系统或调试权限。',
   },
   'admin_bootstrap.completed': {
     label: '初始化完成',
     risk: 'normal',
     intent: '确认启动初始化是否按预期完成',
-    next: '如不是首次部署，应确认是否误触发 BOOTSTRAP_ADMIN_ONCE。',
+    next: '如不是首次部署，应确认是否误触发一次性管理员初始化。',
   },
   'admin_bootstrap.blocked': {
     label: '初始化阻止',
     risk: 'high',
     intent: '确认启动期安全守卫阻止了什么',
-    next: '查看 payload.reason，并检查启动环境变量和生产 preflight。',
+    next: '查看阻止原因，并检查启动环境变量和生产 preflight。',
   },
 }
 
@@ -136,6 +139,27 @@ const fieldLabelMap = {
   password_reset: '密码',
 }
 
+const technicalAuditValueKeys = new Set([
+  'id',
+  'actor_id',
+  'target_id',
+  'source_id',
+  'source_line_id',
+  'source_type',
+  'owner_role_key',
+  'task_status_key',
+  'payload',
+])
+
+function isTechnicalAuditValueKey(key) {
+  const normalized = String(key || '').trim()
+  if (!normalized) return false
+  return (
+    technicalAuditValueKeys.has(normalized) ||
+    /(?:^|_)(?:id|key)$/u.test(normalized)
+  )
+}
+
 function normalizeAuditEvents(events = []) {
   return Array.isArray(events)
     ? events.map((event) => ({
@@ -164,9 +188,9 @@ function formatTime(event = {}) {
 
 function getActorText(payload = {}) {
   const actor = payload.actor || {}
-  if (actor.username) {
-    return actor.username
-  }
+  const name =
+    actor.username || actor.name || actor.display_name || actor.displayName
+  if (name) return name
   if (actor.id) {
     return '操作者已关联'
   }
@@ -174,18 +198,51 @@ function getActorText(payload = {}) {
 }
 
 function getEventActorText(event = {}) {
-  return event.actor_key || getActorText(event.payload)
+  return (
+    event.actor_label ||
+    event.actor_name ||
+    event.payload?.actor?.username ||
+    getActorText(event.payload)
+  )
 }
 
 function getTargetText(payload = {}) {
   const target = payload.target || {}
-  const key = target.key || ''
+  const key =
+    target.username ||
+    target.name ||
+    target.display_name ||
+    target.displayName ||
+    target.no ||
+    target.code ||
+    target.order_no ||
+    target.document_no ||
+    ''
   const id = target.id ? '目标已关联' : ''
   return key || id || '-'
 }
 
 function getEventTargetText(event = {}) {
-  return event.target_key || getTargetText(event.payload)
+  return getVisibleAuditText(
+    event.target_label || event.target_name,
+    getTargetText(event.payload)
+  )
+}
+
+function hasChineseText(value) {
+  return /[\u3400-\u9fff]/u.test(String(value || ''))
+}
+
+function getVisibleAuditText(value, fallback = '-') {
+  const text = String(value || '').trim()
+  if (!text) return fallback
+  return hasChineseText(text) ? text : fallback
+}
+
+function getVisibleAuditReason(reason, fallback = '需检查审计记录') {
+  const text = String(reason || '').trim()
+  if (!text) return fallback
+  return getUserFacingErrorMessage({ message: text }, fallback)
 }
 
 function getTargetTypeText(payload = {}) {
@@ -195,11 +252,14 @@ function getTargetTypeText(payload = {}) {
     role: '角色',
     bootstrap: '启动初始化',
   }
-  return typeMap[target.type] || target.type || '-'
+  return typeMap[target.type] || '对象'
 }
 
 function getEventTargetTypeText(event = {}) {
-  return event.target_type || getTargetTypeText(event.payload)
+  return getVisibleAuditText(
+    event.target_type,
+    getTargetTypeText(event.payload)
+  )
 }
 
 function compactValue(value, key) {
@@ -216,12 +276,16 @@ function compactValue(value, key) {
     return value ? '是' : '否'
   }
   if (Array.isArray(value)) {
-    return value.join('、') || '-'
+    return value.length > 0 ? `${value.length} 项` : '-'
   }
   if (typeof value === 'object') {
-    return JSON.stringify(value)
+    return '已记录'
   }
-  return String(value)
+  return isTechnicalAuditValueKey(key) ? '已记录' : String(value)
+}
+
+function getAuditFieldLabel(key) {
+  return fieldLabelMap[key] || '字段变更'
 }
 
 function summarizeChange(payload = {}) {
@@ -231,13 +295,13 @@ function summarizeChange(payload = {}) {
     ...new Set([...Object.keys(before || {}), ...Object.keys(after || {})]),
   ].filter((key) => !['id', 'username'].includes(key))
   if (keys.length === 0) {
-    return payload.reason || '-'
+    return getVisibleAuditReason(payload.reason, '-')
   }
   return keys
     .slice(0, 4)
     .map(
       (key) =>
-        `${fieldLabelMap[key] || key}: ${compactValue(
+        `${getAuditFieldLabel(key)}: ${compactValue(
           before[key],
           key
         )} -> ${compactValue(after[key], key)}`
@@ -249,32 +313,35 @@ function getActionMeta(event = {}) {
   if (event.action_label || event.risk_level) {
     const fallback = actionMetaMap[event.event_key] || {}
     return {
-      label:
-        event.action_label || fallback.label || event.event_key || '未知动作',
+      label: getVisibleAuditText(
+        event.action_label,
+        fallback.label || '未知动作'
+      ),
       risk: event.risk_level || fallback.risk || 'normal',
       intent:
-        fallback.intent || event.summary || '查看原始审计 payload 判断动作含义',
+        fallback.intent ||
+        getVisibleAuditText(event.summary, '查看审计摘要判断动作含义'),
       next:
         fallback.next ||
-        '先核对操作者、对象和 before/after，再回到对应系统管理入口处理。',
+        '先核对操作者、对象和变更前后差异，再回到对应系统管理入口处理。',
     }
   }
   return (
     actionMetaMap[event.event_key] || {
-      label: event.event_key || '未知动作',
+      label: '未知动作',
       risk: 'normal',
-      intent: '查看原始审计 payload 判断动作含义',
-      next: '先核对操作者、对象和 before/after，再回到对应系统管理入口处理。',
+      intent: '查看审计摘要判断动作含义',
+      next: '先核对操作者、对象和变更前后差异，再回到对应系统管理入口处理。',
     }
   )
 }
 
 function getSourceLabel(source) {
-  return sourceLabelMap[source] || source || '-'
+  return sourceLabelMap[source] || (source ? '审计来源' : '-')
 }
 
 function buildAuditConclusion(event = {}) {
-  if (event.summary) {
+  if (hasChineseText(event.summary)) {
     return event.summary
   }
   const meta = getActionMeta(event)
@@ -294,7 +361,10 @@ function buildAuditConclusion(event = {}) {
     return `${actor} 调整了 ${target} 的角色权限`
   }
   if (event.event_key === 'admin_bootstrap.blocked') {
-    return `启动初始化被阻止：${event.payload?.reason || '需检查启动配置'}`
+    return `启动初始化被阻止：${getVisibleAuditReason(
+      event.payload?.reason,
+      '需检查启动配置'
+    )}`
   }
   if (actor === '-' && target === '-') {
     return meta.intent
@@ -318,10 +388,6 @@ function countByRisk(events = []) {
     },
     { total: 0, high: 0, warning: 0, normal: 0 }
   )
-}
-
-function formatPayload(payload = {}) {
-  return JSON.stringify(payload || {}, null, 2)
 }
 
 function getEventDomId(event = {}) {
@@ -447,7 +513,7 @@ export default function AuditLogsPage() {
         <div className="erp-audit-command__title">
           <Title level={4}>审计日志</Title>
           <Text type="secondary">
-            系统控制面事件。先看风险和对象，再展开原始 payload。
+            系统控制面事件。先看风险、对象、变化摘要和下一步。
           </Text>
         </div>
         <div className="erp-audit-command__stats" aria-label="当前页审计摘要">
@@ -495,7 +561,7 @@ export default function AuditLogsPage() {
             allowClear
             prefix={<SearchOutlined />}
             value={keyword}
-            placeholder="操作者、对象、动作或 payload"
+            placeholder="操作者、对象、动作或摘要"
             onChange={(event) => {
               setKeyword(event.target.value)
               setPagination((prev) => ({ ...prev, current: 1 }))
@@ -590,7 +656,7 @@ export default function AuditLogsPage() {
                       <span className="erp-audit-event__meta">
                         <span>{formatTime(record)}</span>
                         <span>{getSourceLabel(record.source)}</span>
-                        <span>{record.event_key}</span>
+                        <span>{meta.label}</span>
                       </span>
                       <span className="erp-audit-event__summary">
                         {summarizeChange(record.payload)}
@@ -656,10 +722,6 @@ export default function AuditLogsPage() {
                   <strong>{summarizeChange(selectedEvent.payload)}</strong>
                 </div>
               </div>
-              <details className="erp-audit-payload">
-                <summary>原始 payload</summary>
-                <pre>{formatPayload(selectedEvent.payload)}</pre>
-              </details>
             </>
           ) : (
             <Empty

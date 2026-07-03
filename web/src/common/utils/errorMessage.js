@@ -8,6 +8,7 @@ import {
 
 const RAW_ERROR_MESSAGE_MAP = Object.freeze({
   'business error': '请求失败，请稍后重试',
+  expired: DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_EXPIRED],
   forbidden: DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.PERMISSION_DENIED],
   'invalid json response from server': '服务器返回异常，请稍后重试',
   'json-rpc error': '请求失败，请稍后重试',
@@ -17,6 +18,7 @@ const RAW_ERROR_MESSAGE_MAP = Object.freeze({
   'rpc error': '请求失败，请稍后重试',
   'server error': '服务器异常，请稍后重试',
   'session expired': DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_REQUIRED],
+  'token expired': DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_EXPIRED],
   unauthorized: DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_REQUIRED],
   'unknown error': '未知错误，请稍后重试',
 })
@@ -33,8 +35,15 @@ const RAW_ERROR_PATTERNS = Object.freeze([
   [/^http error \d+$/iu, '服务请求失败，请稍后重试'],
 ])
 
+const TECHNICAL_ERROR_MESSAGE_PATTERN =
+  /\b(?:idempotency_key|owner_role_key|task_status_key|source_type|source_id|source_line_id|payload|[a-z][a-z0-9]*_(?:id|key))\b/iu
+
 function containsCjk(text) {
   return /[\u3400-\u9fff]/u.test(String(text || ''))
+}
+
+function containsTechnicalErrorText(text) {
+  return TECHNICAL_ERROR_MESSAGE_PATTERN.test(String(text || ''))
 }
 
 function normalizeErrorText(message) {
@@ -54,6 +63,7 @@ function translateKnownErrorMessage(message) {
     if (pattern.test(normalized)) return translated
   }
 
+  if (containsTechnicalErrorText(normalized)) return ''
   if (containsCjk(normalized)) return normalized
   return ''
 }

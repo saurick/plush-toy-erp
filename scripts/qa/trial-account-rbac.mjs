@@ -9,6 +9,28 @@ const defaultBackendURL = "http://127.0.0.1:8300";
 const authRPCPath = "/rpc/auth";
 const preflightScope = "trial-account-rbac-preflight-report";
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
+const trialBrowserSmokePreflightReportPath =
+  "output/trial-demo-account-browser-smoke/preflight.json";
+const trialBrowserSmokeReportPath =
+  "output/trial-demo-account-browser-smoke/report.json";
+const realRBACCheckRequirements = Object.freeze([
+  "backend health is reachable",
+  "trial account password env is present",
+  "static role projection sources agree",
+  "local backend auth RPC is available",
+  "demo accounts exist in the target backend",
+]);
+const rbacPreflightNotProven = Object.freeze([
+  "real admin_login",
+  "auth.me role and permission payload",
+  "backend RBAC authorization",
+  "customer config active revision",
+  "desktop menu projection",
+  "mobile task entry access",
+  "DEV-only effective session diagnostic readback",
+  "browser smoke",
+  "target environment release evidence",
+]);
 export const expectedAccounts = [
   ["demo_boss", "boss", "mobile.boss.access"],
   ["demo_sales", "sales", "mobile.sales.access"],
@@ -41,6 +63,91 @@ export const expectedTrialRoleProjections = Object.freeze(
     mobilePath: mobilePermission ? `/m/${roleKey}/tasks` : null,
   })),
 );
+
+const roleDisplayNames = Object.freeze({
+  boss: "老板",
+  sales: "业务",
+  purchase: "采购",
+  production: "生产经理",
+  warehouse: "仓库",
+  quality: "品质",
+  finance: "财务",
+  pmc: "PMC",
+  engineering: "工程",
+  admin: "后台管理员",
+});
+
+const getRoleDisplayName = (roleKey) =>
+  roleDisplayNames[roleKey] || "岗位";
+
+const buildExpectedAccountSummary = ({
+  username,
+  roleKey,
+  mobilePermission,
+}) => ({
+  username,
+  role: getRoleDisplayName(roleKey),
+  mobileTaskEntry: mobilePermission
+    ? `${getRoleDisplayName(roleKey)}岗位任务端`
+    : "不开放岗位任务端",
+  mobileAccessExpected: Boolean(mobilePermission),
+});
+
+const buildVerificationAccountSummary = (row) => {
+  const roleKey = String(row.roleKey || row.roles || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)[0];
+  const role = row.role || getRoleDisplayName(roleKey);
+  const hasMobileAccess =
+    row.mobileAccessVerified === true ||
+    row.mobileAccessExpected === true ||
+    (Boolean(String(row.mobile || "").trim()) && row.mobile !== "-");
+  return {
+    username: row.username,
+    role,
+    mobileTaskEntry:
+      row.mobileTaskEntry ||
+      (hasMobileAccess ? `${role}岗位任务端` : "不开放岗位任务端"),
+    mobileAccessVerified: hasMobileAccess,
+    debugPermissionCount: row.debug,
+    isSuperAdmin: row.super,
+    disabled: row.disabled,
+  };
+};
+
+const buildBrowserSmokeEvidencePlan = () => ({
+  scope: "trial-demo-account-browser-smoke-evidence-plan",
+  script: "web/scripts/trialDemoAccountBrowserSmoke.mjs",
+  preflightReportPath: trialBrowserSmokePreflightReportPath,
+  realSmokeReportPath: trialBrowserSmokeReportPath,
+  requiresPassword: true,
+  requiresLocalBackend: true,
+  requiresFrontendRuntime: true,
+  checksDuringRealSmoke: [
+    "desktop menu projection for all 10 demo accounts",
+    "mobile task entry access for 9 role accounts",
+    "demo_admin denied from mobile task entry",
+    "DEV-only sanitized effective session diagnostic readback",
+  ],
+  effectiveSessionDiagnostic: {
+    windowKey: "__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__",
+    acceptedProjectionModes: ["local_dev_customer_config_diagnostic"],
+    sanitizedOnly: true,
+    forbiddenFields: [
+      "accessToken",
+      "authorizationHeader",
+      "configHash",
+      "config_hash",
+      "rawId",
+      "entitlement",
+      "password",
+      "token",
+    ],
+  },
+  boundary:
+    "The RBAC script proves auth role/permission shape only. Browser menu projection, mobile task access, and effective session diagnostic readback require the browser smoke report after a local backend, frontend runtime, and demo password are provided.",
+});
 
 const usage = `用法:
   TRIAL_ACCOUNT_PASSWORD='replace-with-password' node scripts/qa/trial-account-rbac.mjs
@@ -87,6 +194,9 @@ const rpcURLFor = (backendURL) =>
 
 const healthURLFor = (backendURL) =>
   new URL("/healthz", `${backendURL}/`).toString();
+
+const shellQuote = (value) =>
+  `'${String(value).replaceAll("'", "'\\''")}'`;
 
 const rpcCall = async ({ rpcURL, method, params, token }) => {
   const response = await fetch(rpcURL, {
@@ -185,30 +295,34 @@ export const buildInputTemplate = () => ({
   optionalOutputs: [
     "output/trial-account-rbac/preflight.json when --preflight-report is used",
     "output/trial-account-rbac/report.json when the real run is executed with --report",
+    `${trialBrowserSmokePreflightReportPath} when the browser smoke preflight is used`,
+    `${trialBrowserSmokeReportPath} when the real browser smoke is executed with --report`,
   ],
   defaultBackendURL,
-  expectedAccounts: expectedAccounts.map(
-    ([username, roleKey, mobilePermission]) => ({
-      username,
-      roleKey,
-      mobilePermission: mobilePermission || null,
-    }),
+  expectedAccountSummaries: expectedTrialRoleProjections.map(
+    buildExpectedAccountSummary,
   ),
   commands: [
     "PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs --preflight-report output/trial-account-rbac/preflight.json",
     "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs",
     "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs --report output/trial-account-rbac/report.json",
+    `PATH=/usr/local/bin:$PATH node web/scripts/trialDemoAccountBrowserSmoke.mjs --preflight-report ${trialBrowserSmokePreflightReportPath}`,
+    `TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node web/scripts/trialDemoAccountBrowserSmoke.mjs --report ${trialBrowserSmokeReportPath}`,
     "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:trial-demo-browser",
   ],
+  browserSmokeEvidencePlan: buildBrowserSmokeEvidencePlan(),
+  realRBACCheckRequires: [...realRBACCheckRequirements],
+  notProvenByThisTemplate: [...rbacPreflightNotProven],
   requiredRealEvidence: [
     "admin_login + me succeeds for every expected demo account",
     "each role account has exactly one expected role and one matching mobile.<role>.access permission",
     "demo_admin has no mobile.* permission",
     "no checked trial account has debug.* permission, is_super_admin=true, or disabled=true",
+    "browser smoke report proves desktop menu projection, mobile task entry access, demo_admin mobile denial, and DEV-only sanitized effective session diagnostic readback",
     "optional --report output is sanitized and must not contain passwords, access tokens, or raw Authorization headers",
   ],
   boundary:
-    "This template does not read passwords, call /rpc/auth, call me, start Vite, start a browser, write reports, write databases, or prove login, RBAC, customer config active revision, menu projection, or browser smoke until a local backend and demo password are provided. The preflight report checks backend health, whether a password env is present, and whether static role projection sources still agree.",
+    "This template does not read passwords, call /rpc/auth, call me, start Vite, start a browser, write reports, write databases, or prove login, RBAC, customer config active revision, menu projection, mobile task access, effective session diagnostic readback, or browser smoke until a local backend, frontend runtime, and demo password are provided. The preflight report checks backend health, whether a password env is present, and whether static role projection sources still agree.",
 });
 
 export { normalizeBaseURL };
@@ -219,12 +333,7 @@ export const buildVerificationReport = ({ backendURL, rows }) => ({
   backendEndpointAlias: backendURL,
   writesDatabase: false,
   checkedAccounts: rows.map((row) => ({
-    username: row.username,
-    roles: row.roles,
-    mobile: row.mobile,
-    debugPermissionCount: row.debug,
-    isSuperAdmin: row.super,
-    disabled: row.disabled,
+    ...buildVerificationAccountSummary(row),
   })),
   summary: {
     totalAccounts: rows.length,
@@ -312,7 +421,7 @@ export const buildStaticProjectionReport = ({
     }
 
     return {
-      ...projection,
+      ...buildExpectedAccountSummary(projection),
       checks,
       passed: Object.values(checks).every(Boolean),
     };
@@ -410,11 +519,19 @@ export const buildPreflightReport = async ({
   if (!staticProjection.ok) {
     blockers.push("static-role-projection-drift");
   }
+  const suggestedRealRBACCommand = [
+    `TRIAL_ACCOUNT_PASSWORD=${shellQuote("<local-demo-password>")}`,
+    `TRIAL_ACCOUNT_BACKEND_URL=${shellQuote(backendURL)}`,
+    "PATH=/usr/local/bin:$PATH",
+    "node scripts/qa/trial-account-rbac.mjs",
+    "--report output/trial-account-rbac/report.json",
+  ].join(" ");
 
   return {
     scope: preflightScope,
     generatedAt: new Date().toISOString(),
     writesReport: true,
+    preflightOnly: true,
     writesDatabase: false,
     callsJSONRPC: false,
     callsAuthRPC: false,
@@ -434,11 +551,14 @@ export const buildPreflightReport = async ({
     expectedDesktopAdminCount: expectedAccounts.filter((item) => !item[2])
       .length,
     staticProjection,
+    realRBACCheckRequires: [...realRBACCheckRequirements],
+    notProvenByThisPreflight: [...rbacPreflightNotProven],
     readyForRealRBACCheck: blockers.length === 0,
     blockers,
+    suggestedRealRBACCommand,
     nextCommand: blockers.length
       ? "Resolve blockers, then rerun this preflight before the real RBAC check."
-      : "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs --report output/trial-account-rbac/report.json",
+      : suggestedRealRBACCommand,
   };
 };
 
@@ -495,8 +615,11 @@ const verifyAccount = async ({ rpcURL, password, spec }) => {
 
   return {
     username,
-    roles: roleKeys.join(","),
-    mobile: mobilePermissions.join(",") || "-",
+    role: getRoleDisplayName(roleKeys[0]),
+    mobileTaskEntry: mobilePermissions.length
+      ? `${getRoleDisplayName(roleKeys[0])}岗位任务端`
+      : "不开放岗位任务端",
+    mobileAccessVerified: mobilePermissions.length > 0,
     debug: debugPermissions.length,
     super: Boolean(admin.is_super_admin),
     disabled: Boolean(admin.disabled),

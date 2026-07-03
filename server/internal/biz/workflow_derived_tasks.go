@@ -54,14 +54,11 @@ func buildRevisionTaskFromRejectedOrder(current *WorkflowTask, taskStatusKey str
 		}),
 		"decision":          taskStatusKey,
 		"transition_status": taskStatusKey,
-		"rejected_reason":   reason,
 		"notification_type": "task_rejected",
 		"alert_type":        "approval_pending",
 		"critical_path":     true,
 	}
-	if taskStatusKey == "blocked" {
-		payload["blocked_reason"] = reason
-	}
+	setWorkflowTransitionReasonPayload(payload, taskStatusKey, reason)
 	return &WorkflowTaskCreate{
 		TaskCode:          workflowTaskCode("order-revision", current.SourceID),
 		TaskGroup:         workflowOrderRevisionTaskGroup,

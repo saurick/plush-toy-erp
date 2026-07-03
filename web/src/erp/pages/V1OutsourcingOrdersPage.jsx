@@ -55,6 +55,7 @@ import {
   listOutsourcingOrders,
   listProcesses,
   listProducts,
+  listContactsByOwner,
   listSuppliers,
   listUnits,
   saveOutsourcingOrderWithItems,
@@ -67,8 +68,11 @@ import {
   buildOutsourcingOrderParams,
   buildSequentialDraftCode,
   buildSupplierSnapshot,
+  buildSupplierSnapshotWithContacts,
   canRunOutsourcingOrderLifecycleAction,
   hasActionPermission,
+  SUPPLIER_CONTACT_OWNER_TYPE,
+  statusText,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
 import { filterBusinessCollaborationTasksBySource } from '../utils/businessCollaborationTasks.mjs'
@@ -81,6 +85,7 @@ import {
   PROCESSING_CONTRACT_TEMPLATE_KEY,
   openPrintWorkspaceWindow,
 } from '../utils/printWorkspace.js'
+import { getEffectivePrintTemplateDefaults } from '../utils/adminProfileSync.mjs'
 import { buildProcessingContractDraftFromOutsourcingOrder } from '../data/processingContractTemplate.mjs'
 import {
   DEFAULT_OUTSOURCING_ORDER_PAGINATION,
@@ -88,7 +93,6 @@ import {
   OUTSOURCING_ORDER_LIFECYCLE_ACTIONS,
   OUTSOURCING_ORDER_SORT_OPTIONS,
   OUTSOURCING_ORDER_STATUS_OPTIONS,
-  OUTSOURCING_ORDER_WORKFLOW_ROLE_LABELS,
   OUTSOURCING_ORDERS_MODULE_KEY,
   buildOutsourcingOrderStats,
   canEditOutsourcingOrder,
@@ -276,6 +280,14 @@ export default function V1OutsourcingOrdersPage() {
     adminProfile,
     'workflow.task.complete'
   )
+  const processingPrintTemplateDefaults = useMemo(
+    () =>
+      getEffectivePrintTemplateDefaults(
+        adminProfile,
+        PROCESSING_CONTRACT_TEMPLATE_KEY
+      ),
+    [adminProfile]
+  )
 
   const openCreate = () => {
     orderAttachmentRef.current?.clearPendingAttachments()
@@ -395,15 +407,58 @@ export default function V1OutsourcingOrdersPage() {
     )
   }
 
+  const resolveSupplierSnapshot = useCallback(
+    async (supplier, options = {}) => {
+      const baseSnapshot = buildSupplierSnapshot(supplier)
+      if (!supplier?.id) {
+        return baseSnapshot
+      }
+      try {
+        const data = await listContactsByOwner({
+          owner_type: SUPPLIER_CONTACT_OWNER_TYPE,
+          owner_id: supplier.id,
+          active_only: true,
+          limit: 50,
+        })
+        return buildSupplierSnapshotWithContacts(supplier, data?.contacts || [])
+      } catch (error) {
+        if (options.notifyOnError) {
+          message.warning(
+            `${getActionErrorMessage(error, '加载加工厂联系人')}，将仅保存加工厂基本信息`
+          )
+        }
+        return baseSnapshot
+      }
+    },
+    []
+  )
+
+  const handleSupplierChange = (supplierID) => {
+    const supplier = suppliers.find((item) => item.id === supplierID)
+    form.setFieldValue('supplier_snapshot', buildSupplierSnapshot(supplier))
+    resolveSupplierSnapshot(supplier).then((snapshot) => {
+      if (
+        String(form.getFieldValue('supplier_id') ?? '') !==
+        String(supplierID ?? '')
+      ) {
+        return
+      }
+      form.setFieldValue('supplier_snapshot', snapshot)
+    })
+  }
+
   const submitForm = async () => {
     setSaving(true)
     try {
       const values = await form.validateFields()
       const supplier = suppliers.find((item) => item.id === values.supplier_id)
+      const supplierSnapshot = await resolveSupplierSnapshot(supplier, {
+        notifyOnError: true,
+      })
       const payload = buildOutsourcingOrderParams(
         {
           ...values,
-          supplier_snapshot: buildSupplierSnapshot(supplier),
+          supplier_snapshot: supplierSnapshot,
         },
         {
           id: editingRow?.id || undefined,
@@ -475,8 +530,13 @@ export default function V1OutsourcingOrdersPage() {
       const items = await loadOrderItems(selectedRow)
       const initialDraft = buildProcessingContractDraftFromOutsourcingOrder(
         selectedRow,
-        items
+        items,
+        { printTemplateDefaults: processingPrintTemplateDefaults }
       )
+      if (initialDraft.lines.length === 0) {
+        message.warning('当前委外订单没有可打印的明细')
+        return
+      }
       openPrintWorkspaceWindow(PROCESSING_CONTRACT_TEMPLATE_KEY, {
         entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
         initialDraft,
@@ -492,6 +552,7 @@ export default function V1OutsourcingOrdersPage() {
   const {
     blockWorkflowTask,
     completeWorkflowTask,
+    rejectWorkflowTask,
     urgeOutsourcingWorkflowTask,
   } = useOutsourcingOrderWorkflowActions({ loadWorkflowTasks })
 
@@ -632,11 +693,11 @@ export default function V1OutsourcingOrdersPage() {
         {
           key: selectedRow.id,
           label: getOutsourcingOrderDisplayNo(selectedRow),
-          title: `${resolveSupplierName(selectedRow)} / ${
-            OUTSOURCING_ORDER_STATUS_LABELS[selectedRow.lifecycle_status] ||
-            selectedRow.lifecycle_status ||
-            '-'
-          }`,
+          title: `${resolveSupplierName(selectedRow)} / ${statusText(
+            selectedRow.lifecycle_status,
+            OUTSOURCING_ORDER_STATUS_LABELS,
+            '委外订单状态'
+          )}`,
         },
       ]
     : []
@@ -676,10 +737,10 @@ export default function V1OutsourcingOrdersPage() {
       <PageHeaderCard
         compact
         title="委外订单"
-        description="维护加工合同源单、工序明细、加工厂承诺和打印快照；查货只作为可选工序，查货结果、发料、回货、质检、应付仍由对应事实 usecase 承接。"
+        description="维护加工合同源单、工序明细、加工厂承诺和打印快照；查货只作为可选工序，查货结果、发料、回货、质检、应付仍由对应后端事实规则承接。"
         tags={[
           <Tag color="blue" key="source">
-            Source Document：加工合同
+            源单：加工合同
           </Tag>,
           <Tag color="green" key="process">
             工序来自加工环节字典
@@ -920,11 +981,11 @@ export default function V1OutsourcingOrdersPage() {
           selectedRow ? getOutsourcingOrderDisplayNo(selectedRow) : ''
         }
         adminProfile={adminProfile}
-        roleLabelMap={OUTSOURCING_ORDER_WORKFLOW_ROLE_LABELS}
         onCompleteTask={
           canCompleteWorkflowTasks ? completeWorkflowTask : undefined
         }
         onBlockTask={canUpdateWorkflowTasks ? blockWorkflowTask : undefined}
+        onRejectTask={canUpdateWorkflowTasks ? rejectWorkflowTask : undefined}
         onUrgeTask={
           canUpdateWorkflowTasks ? urgeOutsourcingWorkflowTask : undefined
         }
@@ -953,6 +1014,7 @@ export default function V1OutsourcingOrdersPage() {
         <OutsourcingOrderForm
           form={form}
           supplierOptions={supplierOptions}
+          onSupplierChange={handleSupplierChange}
           productOptions={productOptions}
           processOptions={processOptions}
           unitOptions={unitOptions}

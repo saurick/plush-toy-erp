@@ -302,9 +302,11 @@ func TestWorkflowUsecase_OutsourceReturnQCBlockedDerivesReworkTask(t *testing.T)
 	if repo.updateTaskInput.Payload["decision"] != "blocked" ||
 		repo.updateTaskInput.Payload["transition_status"] != "blocked" ||
 		repo.updateTaskInput.Payload["blocked_reason"] != "回货抽检待判责" ||
-		repo.updateTaskInput.Payload["rejected_reason"] != "回货抽检待判责" ||
 		repo.updateTaskInput.Payload["qc_type"] != "outsource_return" {
 		t.Fatalf("expected blocked decision update payload, got %#v", repo.updateTaskInput.Payload)
+	}
+	if _, ok := repo.updateTaskInput.Payload["rejected_reason"]; ok {
+		t.Fatalf("expected blocked transition to clear stale rejected_reason, got %#v", repo.updateTaskInput.Payload)
 	}
 	effects := repo.updateTaskInput.SideEffects
 	if effects == nil || effects.BusinessState == nil || effects.DerivedTask == nil {
@@ -345,9 +347,14 @@ func TestWorkflowUsecase_OutsourceReturnQCBlockedOverridesStaleRejectedReason(t 
 		t.Fatalf("expected nil err, got %v", err)
 	}
 	if repo.updateTaskInput.Payload["decision"] != "blocked" ||
-		repo.updateTaskInput.Payload["blocked_reason"] != "当前阻塞原因" ||
-		repo.updateTaskInput.Payload["rejected_reason"] != "当前阻塞原因" {
+		repo.updateTaskInput.Payload["blocked_reason"] != "当前阻塞原因" {
 		t.Fatalf("expected blocked transition to refresh stale reason fields, got %#v", repo.updateTaskInput.Payload)
+	}
+	if _, ok := repo.updateTaskInput.Payload["rejected_reason"]; ok {
+		t.Fatalf("expected blocked transition to clear stale rejected_reason, got %#v", repo.updateTaskInput.Payload)
+	}
+	if _, ok := repo.updateTaskInput.SideEffects.DerivedTask.Payload["rejected_reason"]; ok {
+		t.Fatalf("expected blocked rework task payload to omit stale rejected_reason, got %#v", repo.updateTaskInput.SideEffects.DerivedTask.Payload)
 	}
 }
 

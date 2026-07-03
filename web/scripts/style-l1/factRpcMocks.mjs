@@ -823,18 +823,44 @@ export async function installFactRpcMocks(page, context) {
         data = { task }
         break
       }
-      case 'update_task_status': {
-        const task = workflowTasks.find(
-          (item) => Number(item.id) === Number(params.id)
+      case 'explain_action_access': {
+        const taskID = Number(params.task_id || 0)
+        const task = workflowTasks.find((item) => Number(item.id) === taskID)
+        const ownerRoleKey = task?.owner_role_key || ''
+        const statusKey = task?.task_status_key || ''
+        const actions = ['complete', 'block', 'reject', 'urge'].map(
+          (actionKey) => {
+            const requiredPermission =
+              actionKey === 'complete'
+                ? 'workflow.task.complete'
+                : 'workflow.task.update'
+            return {
+              action_key: actionKey,
+              allowed: Boolean(task),
+              reason: task ? 'style-l1 后端投影允许执行' : '任务不存在',
+              reason_code: task ? '' : 'task_not_found',
+              required_permission: requiredPermission,
+              owner_role_key: ownerRoleKey,
+              visible_owner_role_keys: ownerRoleKey ? [ownerRoleKey] : [],
+              candidate_owner_role_keys: ownerRoleKey ? [ownerRoleKey] : [],
+              owner_role_matched: Boolean(task),
+              work_pool_role_matched: Boolean(task),
+              work_pool_entitlement_matched: Boolean(task),
+              work_pool_entitlement_scope_matched: Boolean(task),
+              domain_command_entry: {
+                enabled: false,
+                will_write_fact: false,
+                source: 'style_l1_no_domain_command_contract',
+                command_key: '',
+                blocked_reasons: ['domain_command_contract_not_configured'],
+                required_contract: [],
+              },
+              actor_role_key: ownerRoleKey,
+              status_key: statusKey,
+            }
+          }
         )
-        if (task) {
-          task.task_status_key = params.task_status_key || task.task_status_key
-          task.business_status_key =
-            params.business_status_key || task.business_status_key
-          task.blocked_reason = params.reason || task.blocked_reason
-          task.updated_at = nowUnix()
-        }
-        data = { task }
+        data = { actions }
         break
       }
       default:

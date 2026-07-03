@@ -79,6 +79,19 @@ existing-v1.empty-preview.json
 \`\`\`
 `
 
+const webScriptsReadmeMarkdown = `
+# web 脚本说明
+
+## yoyoosun 本地入口
+
+\`\`\`bash
+pnpm --dir web start:yoyoosun -- --print-plan
+pnpm --dir web preview:yoyoosun -- --print-plan
+\`\`\`
+
+输出会包含 verify customer config 和 verify customer asset。
+`
+
 const unrelatedMarkdown = `
 # 普通说明
 
@@ -110,6 +123,7 @@ test('devTesting: 只通过开发态独立路径暴露', () => {
     'docs/product/自动化测试策略.md',
     'README.md',
     'web/README.md',
+    'web/scripts/README.md',
     'server/README.md',
     'scripts/README.md',
     'docs/部署约定.md',
@@ -258,7 +272,12 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
     getPresetCopyText('trial-account-rbac'),
     /smoke:trial-demo-browser/
   )
+  assert.match(
+    getPresetCopyText('trial-account-rbac'),
+    /trialDemoAccountBrowserSmoke\.mjs --report output\/trial-demo-account-browser-smoke\/report\.json/
+  )
   assert.match(getPreset('trial-account-rbac').description, /无写入输入模板/)
+  assert.match(getPreset('trial-account-rbac').description, /脱敏投影诊断/)
   assert.match(
     getPreset('trial-account-rbac').description,
     /本地后端和演示账号密码/
@@ -387,6 +406,7 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
     getPreset('trial-simulated-data').description,
     /simulated-only \/ no real import/
   )
+  assert.match(getPreset('trial-simulated-data').description, /退回和催办/)
   assert.match(getPreset('trial-simulated-data').description, /不连接后端/)
   assert.match(getPresetCopyText('mvp-local-closure'), /mvp-closure\.test\.mjs/)
   assert.match(
@@ -417,6 +437,14 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   assert.match(
     getPresetCopyText('mobile-workflow-smoke'),
     /mobile-workflow-runtime-browser-smoke/
+  )
+  assert.match(
+    getPresetCopyText('mobile-workflow-smoke'),
+    /mobileRoleTaskModel\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('mobile-workflow-smoke'),
+    /workflowTaskBoard\.test\.mjs/
   )
   assert.match(
     getPresetCopyText('mobile-workflow-smoke'),
@@ -511,6 +539,22 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   )
   assert.match(
     getPresetCopyText('customer-config-package-runtime'),
+    /pnpm --dir web start:yoyoosun -- --print-plan/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /pnpm --dir web preview:yoyoosun -- --print-plan/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /yoyoosunEntryPlan\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /devCustomerConfigPlugin\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
     /customer-package-lint\.mjs --customer yoyoosun --mode compile/
   )
   assert.match(
@@ -523,6 +567,10 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   )
   assert.match(
     getPresetCopyText('customer-config-package-runtime'),
+    /customer-config-effective-session-probe\.mjs --json --report output\/customers\/yoyoosun\/customer-config-effective-session-probe\/current\.json/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
     /customer-config-release-execute\.mjs --print-input-template/
   )
   assert.match(
@@ -532,6 +580,14 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   assert.match(
     getPresetCopyText('customer-config-package-runtime'),
     /customer-config-release-readiness\.mjs .*--readback-preflight-report output\/customers\/yoyoosun\/customer-config-readback-preflight\.json/
+  )
+  assert.match(
+    getPresetCopyText('customer-config-package-runtime'),
+    /--evidence-dir deployments\/yoyoosun\/evidence\/releases\/2026-06-29/
+  )
+  assert.doesNotMatch(
+    getPresetCopyText('customer-config-package-runtime'),
+    /<YYYY-MM-DD>|<[^>]+>/
   )
   assert.match(
     getPresetCopyText('customer-config-package-runtime'),
@@ -586,13 +642,30 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
     /不读取 raw customer package/
   )
   assert.match(
+    getPreset('frontend-customer-config-projection').description,
+    /脱敏诊断/
+  )
+  assert.match(
     getPresetCopyText('frontend-error-messages'),
     /frontend-error-message-boundary\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('frontend-error-messages'),
+    /errorMessage\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('frontend-error-messages'),
+    /userVisibleTechnicalFields\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('frontend-error-messages'),
+    /dashboardTaskDisplay\.test\.mjs/
   )
   assert.match(
     getPreset('frontend-error-messages').description,
     /共享 PDF 预览/
   )
+  assert.match(getPreset('frontend-error-messages').description, /raw id/)
   assert.match(
     getPreset('frontend-error-messages').description,
     /不透传底层英文异常/
@@ -608,6 +681,10 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   assert.match(
     getPresetCopyText('business-action-field-boundaries'),
     /sales-order-field-chain-boundary\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('business-action-field-boundaries'),
+    /printTemplates\.test\.mjs/
   )
   assert.match(
     getPreset('business-action-field-boundaries').description,
@@ -645,6 +722,10 @@ test('devTesting: 提取 fenced command blocks 并保留章节上下文', () => 
 
   assert.equal(blocks.length, 2)
   assert.equal(blocks[0].context, '6. 现有命令入口')
+  assert.equal(
+    blocks[0].sourceLabel,
+    '测试策略：自动化测试策略 / Test Strategy'
+  )
   assert.deepEqual(blocks[0].commands, ['bash scripts/qa/fast.sh'])
   assert.deepEqual(blocks[1].commands.slice(-2), ['pnpm test', 'pnpm style:l1'])
 })
@@ -654,6 +735,7 @@ test('devTesting: 只索引当前测试入口白名单文档', () => {
     '../../../../docs/product/自动化测试策略.md': strategyMarkdown,
     '../../../../scripts/README.md': scriptsReadmeMarkdown,
     '../../../../web/README.md': deliveryEvidenceMarkdown,
+    '../../../../web/scripts/README.md': webScriptsReadmeMarkdown,
     '../../../../docs/archive/customer-evidence/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md':
       deliveryEvidenceMarkdown,
     '../../../../docs/reference/第一次20260519/自动化测试计划.md':
@@ -668,14 +750,20 @@ test('devTesting: 只索引当前测试入口白名单文档', () => {
       'docs/product/自动化测试策略.md',
       'README.md',
       'web/README.md',
+      'web/scripts/README.md',
       'scripts/README.md',
     ]
   )
   assert.equal(docs[0].category, '测试策略')
+  assert.equal(docs[0].sourceLabel, '测试策略：自动化测试策略 / Test Strategy')
   assert.equal(docs[1].category, '项目入口')
   assert.equal(docs[2].category, '前端验证')
-  assert.equal(docs[3].category, 'QA 脚本')
-  assert.equal(docs[3].commandCount, 3)
+  assert.equal(docs[3].category, '前端脚本')
+  assert.equal(docs[3].sourceLabel, '前端脚本：web 脚本说明')
+  assert.equal(docs[3].commandBlocks[0].sourceLabel, '前端脚本：web 脚本说明')
+  assert.equal(docs[3].commandCount, 2)
+  assert.equal(docs[4].category, 'QA 脚本')
+  assert.equal(docs[4].commandCount, 3)
 })
 
 test('devTesting: reference 和 archive 不作为测试命令入口', () => {
@@ -702,6 +790,7 @@ test('devTesting: fenced block 只提取 shell 命令和续行', () => {
   })
 
   assert.equal(blocks.length, 1)
+  assert.equal(blocks[0].sourceLabel, 'QA 脚本：QA 脚本说明')
   assert.deepEqual(blocks[0].commands, [
     'node scripts/import/customerSourceExtract.mjs \\',
     '--manifest docs/customers/yoyoosun/source-manifest.json \\',

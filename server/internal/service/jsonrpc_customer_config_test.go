@@ -161,7 +161,19 @@ func newServiceSalesOrderRepo(orders map[int]*biz.SalesOrder) *serviceSalesOrder
 
 func (r *serviceProcessRuntimeRepo) CreateProcessInstance(_ context.Context, in *biz.ProcessInstanceCreate, actorID int) (*biz.ProcessInstance, []*biz.ProcessNodeInstance, error) {
 	for _, item := range r.processes {
+		if item.ProcessKey != in.ProcessKey || item.BusinessRefType != in.BusinessRefType || item.BusinessRefID != in.BusinessRefID {
+			continue
+		}
 		if item.IdempotencyKey == in.IdempotencyKey {
+			nodes := make([]*biz.ProcessNodeInstance, 0, len(r.nodesByProcess[item.ID]))
+			for _, nodeID := range r.nodesByProcess[item.ID] {
+				if node := r.nodes[nodeID]; node != nil {
+					nodes = append(nodes, cloneServiceProcessNodeInstance(node))
+				}
+			}
+			return cloneServiceProcessInstance(item), nodes, nil
+		}
+		if item.BusinessRefType == in.BusinessRefType && item.BusinessRefID == in.BusinessRefID {
 			return nil, nil, biz.ErrProcessInstanceExists
 		}
 	}
@@ -814,6 +826,21 @@ func customerConfigPublishParamsForRevision(t *testing.T, revision string) *stru
 					"source_no": map[string]any{"visible": false, "editable": false},
 				},
 			},
+			"printTemplateDefaults": map[string]any{
+				"runtime_enabled":                    true,
+				"formal_runtime_consumed":            true,
+				"sales_order_print_template_enabled": false,
+				"templates": []any{
+					map[string]any{
+						"template_key":              "material-purchase-contract",
+						"runtime_consumed":          true,
+						"supplier_defaults_allowed": false,
+						"party_defaults": map[string]any{
+							"buyerCompany": "永绅",
+						},
+					},
+				},
+			},
 		},
 		"module_states": []any{
 			map[string]any{"module_key": "customers", "state": "enabled"},
@@ -1304,6 +1331,13 @@ func TestCustomerConfigJSONRPCPublishActivateAndEffectiveSession(t *testing.T) {
 	}
 	if session["source"] != "active_customer_config_revision" {
 		t.Fatalf("source = %#v", session["source"])
+	}
+	printDefaults, ok := session["printTemplateDefaults"].(map[string]any)
+	if !ok {
+		t.Fatalf("printTemplateDefaults missing: %#v", session)
+	}
+	if printDefaults["sales_order_print_template_enabled"] != false {
+		t.Fatalf("sales order print template must stay disabled: %#v", printDefaults)
 	}
 }
 
@@ -2432,6 +2466,9 @@ func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcess(t *testing.T) {
 		startedNode["status"] != biz.ProcessNodeStatusActive {
 		t.Fatalf("started_node = %#v", startedNode)
 	}
+	if version, ok := startedNode["version"].(float64); !ok || version <= 0 {
+		t.Fatalf("started_node must expose positive version for frontend expected_version, got %#v", startedNode)
+	}
 	boundary, ok := data["runtime_boundary"].(map[string]any)
 	if !ok {
 		t.Fatalf("runtime_boundary missing: %#v", data)
@@ -2452,6 +2489,40 @@ func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcess(t *testing.T) {
 	secondNode, ok := nodes[1].(map[string]any)
 	if !ok || secondNode["status"] != biz.ProcessNodeStatusWaiting {
 		t.Fatalf("second node = %#v", nodes[1])
+	}
+
+	_, retryRes, err := dispatcher.handleCustomerConfig(ctx, "start_sales_order_acceptance_process", "start-retry", startParams)
+	if err != nil {
+		t.Fatalf("retry start err = %v", err)
+	}
+	if retryRes.Code != errcode.OK.Code {
+		t.Fatalf("retry start code = %d msg=%s", retryRes.Code, retryRes.Message)
+	}
+	retryData := retryRes.Data.AsMap()
+	retryInstance, ok := retryData["process_instance"].(map[string]any)
+	if !ok {
+		t.Fatalf("retry process_instance missing: %#v", retryData)
+	}
+	retryStartedNode, ok := retryData["started_node"].(map[string]any)
+	if !ok {
+		t.Fatalf("retry started_node missing: %#v", retryData)
+	}
+	if retryInstance["id"] != instance["id"] || retryStartedNode["id"] != startedNode["id"] {
+		t.Fatalf("retry should return existing process/node, first=%#v/%#v retry=%#v/%#v", instance, startedNode, retryInstance, retryStartedNode)
+	}
+
+	duplicateParams, _ := structpb.NewStruct(map[string]any{
+		"customer_key":    "yoyoosun",
+		"sales_order_id":  float64(42),
+		"business_ref_no": "SO-42",
+		"idempotency_key": "sales-order-acceptance/SO-42/retry-with-different-key",
+	})
+	_, duplicateRes, err := dispatcher.handleCustomerConfig(ctx, "start_sales_order_acceptance_process", "start-duplicate", duplicateParams)
+	if err != nil {
+		t.Fatalf("duplicate start err = %v", err)
+	}
+	if duplicateRes.Code != errcode.InvalidParam.Code || duplicateRes.Message != "流程实例已存在" {
+		t.Fatalf("duplicate start should be rejected, code=%d msg=%s", duplicateRes.Code, duplicateRes.Message)
 	}
 }
 
@@ -2496,6 +2567,9 @@ func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmit(t *testing.T) {
 	startData := startRes.Data.AsMap()
 	instance := startData["process_instance"].(map[string]any)
 	startedNode := startData["started_node"].(map[string]any)
+	if version, ok := startedNode["version"].(float64); !ok || version <= 0 {
+		t.Fatalf("started_node must expose positive version for frontend expected_version, got %#v", startedNode)
+	}
 
 	executeParams, _ := structpb.NewStruct(map[string]any{
 		"process_instance_id":      instance["id"],

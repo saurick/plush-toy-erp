@@ -129,7 +129,7 @@ function CommandBlock({ block }) {
         <div>
           <Text strong>{block.context || block.title}</Text>
           <div className="erp-dev-testing-command-block__path">
-            {block.sourcePath}
+            {block.sourceLabel || block.title || '测试命令来源'}
           </div>
         </div>
         <Button

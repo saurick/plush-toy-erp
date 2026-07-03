@@ -59,7 +59,7 @@ import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   V1_ROUTE_PATHS,
   buildOrderContactSnapshot,
-  buildCustomerSnapshot,
+  buildSalesOrderCustomerSourceValues,
   buildSequentialDraftCode,
   canRunSalesOrderLifecycleAction,
   buildSalesOrderItemParams,
@@ -356,13 +356,15 @@ export default function V1SalesOrdersPage() {
     setEditingOrder(null)
     setCustomerContacts([])
     orderForm.resetFields()
+    const defaultUnitID =
+      unitOptions.length === 1 ? unitOptions[0].value : undefined
     orderForm.setFieldsValue({
       order_no: buildSequentialDraftCode(orders, {
         prefix: 'SO',
         field: 'order_no',
       }),
       order_date: new Date().toISOString().slice(0, 10),
-      items: [createBlankOrderLine(1)],
+      items: [createBlankOrderLine(1, { unitID: defaultUnitID })],
     })
     rememberPaymentCondition({})
     setOrderModalOpen(true)
@@ -420,7 +422,7 @@ export default function V1SalesOrdersPage() {
       const params = buildSalesOrderParams(
         {
           ...values,
-          customer_snapshot: buildCustomerSnapshot(customer),
+          ...buildSalesOrderCustomerSourceValues(customer),
           contact_snapshot: buildOrderContactSnapshot(values),
         },
         editingOrder?.id ? { id: editingOrder.id } : {}

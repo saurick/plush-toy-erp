@@ -7,6 +7,7 @@ import {
 export const DEFAULT_WORKFLOW_ACTION_MODES = Object.freeze([
   'complete',
   'block',
+  'reject',
   'urge',
 ])
 
@@ -29,10 +30,12 @@ const WORKFLOW_ACTION_ACCESS_FAILED_REASON =
   '无法核对后端任务动作权限，请刷新后重试。'
 const WORKFLOW_ACTION_ACCESS_MISSING_REASON =
   '后端未返回该动作权限，请刷新后重试。'
+const WORKFLOW_ACTION_ACCESS_CHECKING_REASON =
+  '正在核对后端任务动作权限，请稍后再提交。'
 
-function normalizeActionMode(value = '') {
+export function normalizeWorkflowActionMode(value = '') {
   const key = String(value || '').trim()
-  return ACTION_MODE_ALIASES[key] || key
+  return ACTION_MODE_ALIASES[key] || ''
 }
 
 function normalizeStringList(values) {
@@ -69,7 +72,7 @@ function workflowActionFallbackDomainCommandEntry() {
 }
 
 function normalizeActionExplainItem(item = {}) {
-  const actionMode = normalizeActionMode(item.action_key || item.action)
+  const actionMode = normalizeWorkflowActionMode(item.action_key || item.action)
   if (!actionMode) return null
   return {
     actionMode,
@@ -177,8 +180,15 @@ export function buildWorkflowActionAccessState({
   })
   const explainedByAction = normalizeWorkflowActionExplainData(explainData)
   const hasExplainData = Object.keys(explainedByAction).length > 0
+  const shouldGateLocalActions =
+    Boolean(task) &&
+    !hasExplainData &&
+    !failed &&
+    fallback.allowedModes.length > 0
   const byAction =
-    hasExplainData || failed ? { ...fallback.byAction } : fallback.byAction
+    hasExplainData || failed || shouldGateLocalActions
+      ? { ...fallback.byAction }
+      : fallback.byAction
 
   if (hasExplainData) {
     for (const actionMode of actionModes) {
@@ -202,6 +212,15 @@ export function buildWorkflowActionAccessState({
         reasonCode: 'action_access_check_failed',
       }
     }
+  } else if (loading || shouldGateLocalActions) {
+    for (const actionMode of actionModes) {
+      byAction[actionMode] = {
+        ...byAction[actionMode],
+        allowed: false,
+        reason: WORKFLOW_ACTION_ACCESS_CHECKING_REASON,
+        reasonCode: 'action_access_checking',
+      }
+    }
   }
 
   const allowedModes = actionModes.filter(
@@ -220,17 +239,22 @@ export function buildWorkflowActionAccessState({
       ? 'backend'
       : failed
         ? 'fallback_failed'
-        : 'fallback',
+        : loading || shouldGateLocalActions
+          ? 'fallback_checking'
+          : 'fallback',
     loading,
     failed,
     byAction,
     allowedModes,
     readonlyReason,
     canRun(actionMode) {
-      return byAction[normalizeActionMode(actionMode)]?.allowed === true
+      return byAction[normalizeWorkflowActionMode(actionMode)]?.allowed === true
     },
     getReason(actionMode) {
-      return byAction[normalizeActionMode(actionMode)]?.reason || readonlyReason
+      return (
+        byAction[normalizeWorkflowActionMode(actionMode)]?.reason ||
+        readonlyReason
+      )
     },
   }
 }

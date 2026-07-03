@@ -17,6 +17,7 @@ print_help() {
   workflow-fact-boundary: Workflow 运行时禁止直接写领域事实
   workflow-ui-action-boundary: 正式前端任务动作禁止绕过 action 合同
   formal-frontend-customer-config-boundary: 正式前端客户配置只能消费 get_effective_session 投影
+  customer-config-effective-session-probe: 无凭据 get_effective_session 探针边界测试，不证明 active revision
   admin-profile-sync: 前端菜单投影、sync failure 和 super admin 诊断边界
   frontend-role-menu-seed-contracts: 角色菜单、岗位入口、seedData 和前端状态配置合同
   dev-entry-config-contracts: /__dev 导航、测试入口、文档、原型、台账、客户配置和打印模板配置合同
@@ -52,6 +53,7 @@ print_help() {
   customer-package-lint: 客户配置包结构、流程预览和禁止项检查
   customer-config-runtime-manifest: 客户配置运行时 manifest 编译和门禁检查
   customer-import-tooling: 客户导入 dry-run / freeze / execution loader 测试
+  test-data-isolation-boundary: 测试业务数据隔离边界守卫
   trial-simulated-data: 试用模拟数据工具测试
   operational-fact-simulated-closure: 业务事实模拟闭环工具测试
   mobile-workflow-simulated-closure: 岗位任务端模拟闭环工具测试
@@ -127,6 +129,15 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/formal-frontend-customer-config-boundary.test.mjs" ]; then
   echo "[qa:fast] 运行正式前端客户配置投影边界测试"
   node --test "$ROOT_DIR/scripts/qa/formal-frontend-customer-config-boundary.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/customer-config-effective-session-probe.mjs" ]; then
+  if [ -f "$ROOT_DIR/scripts/qa/customer-config-effective-session-probe.test.mjs" ]; then
+    echo "[qa:fast] 运行客户配置 effective session 无凭据探针边界测试"
+    node --test "$ROOT_DIR/scripts/qa/customer-config-effective-session-probe.test.mjs"
+  fi
+  echo "[qa:fast] 运行客户配置 effective session 无凭据探针语法检查"
+  node --check "$ROOT_DIR/scripts/qa/customer-config-effective-session-probe.mjs"
 fi
 
 if [ -f "$ROOT_DIR/web/src/erp/utils/adminProfileSync.test.mjs" ]; then
@@ -360,6 +371,11 @@ if ls "$ROOT_DIR"/scripts/import/*.test.mjs >/dev/null 2>&1; then
   for test_file in "$ROOT_DIR"/scripts/import/*.test.mjs; do
     node --test "$test_file"
   done
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/test-data-isolation-boundary.test.mjs" ]; then
+  echo "[qa:fast] 运行测试业务数据隔离边界守卫"
+  node --test "$ROOT_DIR/scripts/qa/test-data-isolation-boundary.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/trial-simulated-data.test.mjs" ]; then

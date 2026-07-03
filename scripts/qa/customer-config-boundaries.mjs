@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import nodeAssert from "node:assert/strict";
 import path from "node:path";
 import vm from "node:vm";
@@ -35,6 +35,28 @@ const FORBIDDEN_RAW_DATA_KEYS = new Set([
 const PRODUCT_RUNTIME_FILES = [
   "web/src/common/consts/brand.js",
   "web/src/erp/config/customerMenuConfig.mjs",
+];
+const BACKEND_PRODUCT_CORE_RUNTIME_ROOTS = [
+  "server/internal/biz",
+  "server/internal/core",
+  "server/internal/data",
+  "server/internal/service",
+];
+const BACKEND_PRODUCT_CORE_EXCLUDED_PREFIXES = [
+  "server/internal/data/model/ent/",
+  "server/internal/data/model/migrate/",
+];
+const BACKEND_CUSTOMER_SPECIFIC_TERMS = [
+  "yoyoosun",
+  "永绅",
+  "config/customers/",
+];
+const BACKEND_ALLOWED_CUSTOMER_REFERENCES = [
+  {
+    path: "server/internal/biz/customer_config.go",
+    pattern: /^\s*DefaultCustomerKey\s*=\s*"yoyoosun"\s*$/,
+    reason: "current single-customer private deployment default; not a business rule branch",
+  },
 ];
 const CUSTOMER_ASSET_ROOT = "/customer-assets/yoyoosun/";
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
@@ -108,6 +130,75 @@ function validateProductRuntimeDoesNotBundleCustomerPackages() {
   );
 }
 
+function toRepoRelativePath(filePath) {
+  return path.relative(repoRoot, filePath).split(path.sep).join("/");
+}
+
+function shouldSkipBackendProductCorePath(relativePath) {
+  return BACKEND_PRODUCT_CORE_EXCLUDED_PREFIXES.some((prefix) =>
+    relativePath.startsWith(prefix)
+  );
+}
+
+function collectBackendProductCoreRuntimeFiles() {
+  const files = [];
+  const visit = (absolutePath) => {
+    const relativePath = toRepoRelativePath(absolutePath);
+    if (shouldSkipBackendProductCorePath(relativePath)) {
+      return;
+    }
+
+    const stat = statSync(absolutePath);
+    if (stat.isDirectory()) {
+      for (const entry of readdirSync(absolutePath)) {
+        visit(path.join(absolutePath, entry));
+      }
+      return;
+    }
+
+    if (!relativePath.endsWith(".go") || relativePath.endsWith("_test.go")) {
+      return;
+    }
+    files.push(relativePath);
+  };
+
+  for (const root of BACKEND_PRODUCT_CORE_RUNTIME_ROOTS) {
+    visit(repoPath(root));
+  }
+  return files.sort();
+}
+
+function isAllowedBackendCustomerReference(relativePath, line) {
+  return BACKEND_ALLOWED_CUSTOMER_REFERENCES.some((allowance) =>
+    allowance.path === relativePath && allowance.pattern.test(line)
+  );
+}
+
+function validateBackendProductCoreDoesNotEmbedCustomerSpecificRules() {
+  const files = collectBackendProductCoreRuntimeFiles();
+  const violations = [];
+
+  for (const relativePath of files) {
+    const source = readFileSync(repoPath(relativePath), "utf8");
+    const lines = source.split(/\r?\n/);
+    lines.forEach((line, index) => {
+      if (!BACKEND_CUSTOMER_SPECIFIC_TERMS.some((term) => line.includes(term))) {
+        return;
+      }
+      if (isAllowedBackendCustomerReference(relativePath, line)) {
+        return;
+      }
+      violations.push(`${relativePath}:${index + 1}: ${line.trim()}`);
+    });
+  }
+
+  assert(
+    violations.length === 0,
+    `Product Core backend runtime must not embed yoyoosun/永绅/customer package rules outside customer config boundaries:\n${violations.join("\n")}`,
+  );
+  return files.length;
+}
+
 function cloneJSON(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -175,6 +266,25 @@ function validateCustomerConfigReleaseOverlay() {
     assert(
       source.includes("apply-customer-web-config.mjs"),
       `${dockerfile} must apply customer web config during local/CI build`,
+    );
+  }
+
+  const viteSharedSource = readFileSync(repoPath("web/vite.shared.mjs"), "utf8");
+  const viteRootImports = Array.from(
+    viteSharedSource.matchAll(/from\s+['"]\.\/([^'"]+\.mjs)['"]/g),
+    (match) => match[1],
+  ).filter((importPath) =>
+    !importPath.startsWith("vite.") && !importPath.includes("/")
+  );
+  const serverDockerfile = readFileSync(repoPath("server/Dockerfile"), "utf8");
+  for (const importPath of viteRootImports) {
+    assert(
+      existsSync(repoPath(path.join("web", importPath))),
+      `web/vite.shared.mjs imports missing root module ${importPath}`,
+    );
+    assert(
+      serverDockerfile.includes(`web/${importPath}`),
+      `server/Dockerfile must copy web/${importPath} because vite.shared.mjs imports it during the embedded frontend build`,
     );
   }
 }
@@ -516,9 +626,10 @@ function validateYoyoosunImportConfig(config) {
 validateYoyoosunFieldNumberingConfig(yoyoosunFieldNumberingConfig);
 validateYoyoosunImportConfig(yoyoosunImportConfig);
 validateProductRuntimeDoesNotBundleCustomerPackages();
+const backendProductCoreRuntimeFileCount = validateBackendProductCoreDoesNotEmbedCustomerSpecificRules();
 validateYoyoosunRuntimeInjectionExample();
 validateCustomerConfigReleaseOverlay();
 
 console.log(
-  `customer config boundaries ok: ${yoyoosunFieldNumberingConfig.customerKey}, field modules=${yoyoosunFieldNumberingConfig.fieldDisplayReview.length}, numbering rules=${yoyoosunFieldNumberingConfig.numberingRuleReview.length}, import config items=${yoyoosunImportConfig.configItems.length}, extracted rows=${yoyoosunImportConfig.globalScan.extractedSourceStats.sourceRows}`,
+  `customer config boundaries ok: ${yoyoosunFieldNumberingConfig.customerKey}, field modules=${yoyoosunFieldNumberingConfig.fieldDisplayReview.length}, numbering rules=${yoyoosunFieldNumberingConfig.numberingRuleReview.length}, import config items=${yoyoosunImportConfig.configItems.length}, extracted rows=${yoyoosunImportConfig.globalScan.extractedSourceStats.sourceRows}, backend runtime files=${backendProductCoreRuntimeFileCount}`,
 );

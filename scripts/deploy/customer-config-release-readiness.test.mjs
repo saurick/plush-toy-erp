@@ -534,7 +534,8 @@ test("readback preflight report accepts existing release and target smoke eviden
       report.targetSmoke.customerConfigEffectiveSession.target,
       "jsonrpc:customer_config.get_effective_session",
     );
-    assert.equal(report.targetSmoke.customerConfigEffectiveSession.responseBodyStored, true);
+    assert.equal(report.targetSmoke.customerConfigEffectiveSession.responseBodyStored, false);
+    assert.equal(report.targetSmoke.customerConfigEffectiveSession.responseBodyNotStored, true);
     assert.equal(report.tokenEnv.expectedName, "CUSTOMER_CONFIG_ADMIN_TOKEN");
     assert.equal(report.storesResponseBody, false);
   } finally {
@@ -587,6 +588,61 @@ test("readback preflight report redacts credentialed backend aliases", async () 
   }
 });
 
+test("readback preflight report blocks customer mismatches across report and smoke evidence", async () => {
+  const { root, manifest, evidenceDir } = await setupReadyRoot();
+  try {
+    const releaseReport = buildReleaseReport({
+      root,
+      manifest,
+      evidenceDir,
+      overrides: {
+        executed: true,
+        activate: true,
+        customerKey: "other-customer",
+        effectiveSessionVerification: {
+          status: "verified",
+          method: "get_effective_session",
+          customerKey: "other-customer",
+          configRevision: "yoyoosun-customer-package-v1.runtime-manifest-v1",
+          source: "active_customer_config_revision",
+          pageCount: 3,
+          fieldPolicySurfaceCount: 3,
+          pagesSubsetOfManifest: true,
+          fieldPolicySurfacesMatchManifest: true,
+        },
+      },
+    });
+    const releaseReportPath = await writeReleaseReport(root, releaseReport);
+    const smokePath = path.join(root, evidenceDir, "smoke-test-report.json");
+    const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+    smoke.customerCode = "other-customer";
+    fs.writeFileSync(smokePath, `${JSON.stringify(smoke, null, 2)}\n`);
+
+    const report = await buildCustomerConfigReadbackPreflightReport(
+      {
+        customer: "yoyoosun",
+        manifest,
+        evidenceDir,
+        releaseReport: releaseReportPath,
+      },
+      { repoRoot: root },
+    );
+
+    assert.equal(report.readyForReadinessGate, false);
+    assert(report.blockers.includes("release-report-customer-mismatch"));
+    assert(report.blockers.includes("effective-session-verification-customer-mismatch"));
+    assert(report.blockers.includes("smoke-report-customer-mismatch"));
+    assert.equal(report.releaseReport.customerKey, "other-customer");
+    assert.equal(
+      report.releaseReport.effectiveSessionVerification.customerMatchesManifest,
+      false,
+    );
+    assert.equal(report.targetSmoke.customerCode, "other-customer");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("接受发布前 readiness：manifest + manifest evidence + release evidence", async () => {
   const { root, manifest, evidenceDir } = await setupReadyRoot();
   try {
@@ -596,6 +652,8 @@ test("接受发布前 readiness：manifest + manifest evidence + release evidenc
     );
     assert.equal(result.customer, "yoyoosun");
     assert.equal(result.revision, "yoyoosun-customer-package-v1.runtime-manifest-v1");
+    assert.equal(result.manifest, manifest);
+    assert.equal(path.isAbsolute(result.manifest), false);
     assert.match(result.manifestSha256, /^sha256:[a-f0-9]{64}$/);
     assert.equal(result.releaseReport, null);
     assert.equal(result.backendTouched, false);

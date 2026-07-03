@@ -16,7 +16,6 @@ const (
 	qualityInspectionProcessCommandBusinessRefType           = "purchase_receipt"
 	finishedGoodsQualityProcessCommandBusinessRefType        = "shipment"
 	qualityInspectionProcessCommandPayloadInspectionID       = "quality_inspection_id"
-	qualityInspectionProcessCommandPayloadLegacyID           = "id"
 	qualityInspectionProcessCommandPayloadPurchaseReceiptID  = "purchase_receipt_id"
 	qualityInspectionProcessCommandPayloadInventoryLotID     = "inventory_lot_id"
 	qualityInspectionProcessCommandPayloadShipmentID         = "shipment_id"
@@ -202,13 +201,6 @@ func qualityInspectionIDFromProcessCommandPayload(payload map[string]any) (int, 
 	}
 	if hasInspectionID {
 		return inspectionID, nil
-	}
-	legacyID, hasLegacyID, err := processCommandPositiveIntFromPayload(payload, qualityInspectionProcessCommandPayloadLegacyID)
-	if err != nil {
-		return 0, err
-	}
-	if hasLegacyID {
-		return legacyID, nil
 	}
 	return 0, ErrBadParam
 }

@@ -61,7 +61,6 @@ import {
   buildShipmentSourceRows,
   createBlankShipmentItem,
   createShipmentItemFromSalesOrderItem,
-  decimalNumber,
   formatQuantity,
   isBlankShipmentItem,
   positiveInt,
@@ -89,10 +88,6 @@ import {
 } from '../utils/routeQuery.mjs'
 
 const { Text } = Typography
-
-function hasPermission(adminProfile, permission) {
-  return hasActionPermission(adminProfile, permission)
-}
 
 function idempotencyKey(prefix) {
   return `${prefix}-${Date.now()}`
@@ -167,7 +162,6 @@ export default function ShipmentsPage() {
   const [shipmentForm] = Form.useForm()
   const shipmentAttachmentRef = useRef(null)
   const selectedSalesOrderID = Form.useWatch('sales_order_id', shipmentForm)
-  const shipmentFormItems = Form.useWatch('items', shipmentForm)
   const routeSalesOrderID = searchParamPositiveIntText(
     searchParams,
     'sales_order_id'
@@ -178,9 +172,9 @@ export default function ShipmentsPage() {
       ? searchParamPositiveIntText(searchParams, 'source_id')
       : '')
 
-  const canCreate = hasPermission(adminProfile, 'shipment.create')
-  const canShip = hasPermission(adminProfile, 'shipment.ship')
-  const canCancel = hasPermission(adminProfile, 'shipment.cancel')
+  const canCreate = hasActionPermission(adminProfile, 'shipment.create')
+  const canShip = hasActionPermission(adminProfile, 'shipment.ship')
+  const canCancel = hasActionPermission(adminProfile, 'shipment.cancel')
   const customerOptions = useMemo(
     () => uniqueReferenceOptions(customers, customerOption),
     [customers]
@@ -284,15 +278,19 @@ export default function ShipmentsPage() {
     warehouseFilter,
   ])
 
-  const clearRouteContext = useCallback(() => {
-    const nextParams = new URLSearchParams(searchParams)
-    nextParams.delete('sales_order_id')
-    nextParams.delete('shipment_id')
-    nextParams.delete('source_type')
-    nextParams.delete('source_id')
-    setSearchParams(nextParams, { replace: true })
-    resetBusinessPaginationCurrent(setPagination)
-  }, [searchParams, setSearchParams])
+  const clearRouteContext = useCallback(
+    (keys) => {
+      const nextParams = new URLSearchParams(searchParams)
+      const keysToDelete =
+        Array.isArray(keys) && keys.length > 0
+          ? keys
+          : ['sales_order_id', 'shipment_id', 'source_type', 'source_id']
+      keysToDelete.forEach((key) => nextParams.delete(key))
+      setSearchParams(nextParams, { replace: true })
+      resetBusinessPaginationCurrent(setPagination)
+    },
+    [searchParams, setSearchParams]
+  )
 
   useEffect(() => {
     loadRows()
@@ -397,18 +395,6 @@ export default function ShipmentsPage() {
   const selectedSalesOrder = useMemo(
     () => salesOrdersByID.get(Number(selectedSalesOrderID || 0)) || null,
     [salesOrdersByID, selectedSalesOrderID]
-  )
-  const selectedSourceRows = useMemo(() => {
-    const sourceItemIDs = new Set(
-      (Array.isArray(shipmentFormItems) ? shipmentFormItems : [])
-        .map((item) => Number(item?.sales_order_item_id || 0))
-        .filter((itemID) => Number.isFinite(itemID) && itemID > 0)
-    )
-    return shipmentSourceRows.filter((row) => sourceItemIDs.has(Number(row.id)))
-  }, [shipmentFormItems, shipmentSourceRows])
-  const selectedSourceRemainingTotal = selectedSourceRows.reduce(
-    (total, item) => total + decimalNumber(item.remainingQuantity),
-    0
   )
   const salesOrderImportColumns = useMemo(
     () => [
@@ -743,7 +729,7 @@ export default function ShipmentsPage() {
       <PageHeaderCard
         compact
         title="出货单"
-        description="出货单对应 shipments / shipment_items；只有确认出货后的 SHIPPED 才是真实出货事实，并由后端写 inventory_txns.OUT。"
+        description="出货单维护出货单据和出货明细；只有确认出货后才是真实出货事实，并由后端写库存出库事实。"
         tags={[
           <Tag color="gold" key="release">
             出货放行：可发货
@@ -846,12 +832,22 @@ export default function ShipmentsPage() {
               }}
             />
             {routeSalesOrderID ? (
-              <Tag closable color="blue" onClose={clearRouteContext}>
+              <Tag
+                closable
+                color="blue"
+                onClose={() => clearRouteContext(['sales_order_id'])}
+              >
                 已按销售订单筛选
               </Tag>
             ) : null}
             {routeShipmentID ? (
-              <Tag closable color="blue" onClose={clearRouteContext}>
+              <Tag
+                closable
+                color="blue"
+                onClose={() =>
+                  clearRouteContext(['shipment_id', 'source_type', 'source_id'])
+                }
+              >
                 已按出货单筛选
               </Tag>
             ) : null}
@@ -999,11 +995,9 @@ export default function ShipmentsPage() {
         salesOrderSources={salesOrderSources}
         saving={saving}
         selectedSalesOrder={selectedSalesOrder}
-        selectedSourceRemainingTotal={selectedSourceRemainingTotal}
-        selectedSourceRows={selectedSourceRows}
         setSalesOrderImportOpen={setSalesOrderImportOpen}
         shipmentAttachmentRef={shipmentAttachmentRef}
-        shipmentFormItems={shipmentFormItems}
+        shipmentSourceRows={shipmentSourceRows}
         shipmentOptions={shipmentOptions}
         sourceLoading={sourceLoading}
         unitOptions={unitOptions}

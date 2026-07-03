@@ -31,13 +31,16 @@ function assertNonEmptyString(value, key) {
 function parseArgs(argv = process.argv.slice(2)) {
   const args = {
     customer: "yoyoosun",
+    customers: [],
     mode: "",
     out: "",
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--customer") {
-      args.customer = argv[index + 1] || "";
+      const customerKey = argv[index + 1] || "";
+      args.customer = customerKey;
+      args.customers.push(customerKey);
       index += 1;
     } else if (arg === "--mode") {
       args.mode = argv[index + 1] || "";
@@ -51,12 +54,16 @@ function parseArgs(argv = process.argv.slice(2)) {
       throw new Error(`unsupported argument: ${arg}`);
     }
   }
+  if (args.customers.length === 0) {
+    args.customers = [args.customer];
+  }
   return args;
 }
 
 function printHelp() {
   console.log(`Usage:
   node scripts/qa/customer-package-lint.mjs --customer demo
+  node scripts/qa/customer-package-lint.mjs --customer demo --customer yoyoosun
   node scripts/qa/customer-package-lint.mjs --customer yoyoosun
   node scripts/qa/customer-package-lint.mjs --customer yoyoosun --mode compile
   node scripts/qa/customer-package-lint.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-package-preview.json
@@ -100,6 +107,40 @@ function validateModuleStates(config, moduleKeys) {
   });
 }
 
+function validatePrintTemplateDefaults(config, schema = customerPackageSchema) {
+  if (config.printTemplateDefaults == null) {
+    return;
+  }
+  assert(Array.isArray(config.printTemplateDefaults), "printTemplateDefaults must be an array");
+  const allowedTemplateKeys = new Set(schema.allowedPrintTemplateKeys || []);
+  const allowedPartyKeys = new Set(schema.allowedPrintPartyDefaultKeys || []);
+  const seen = new Set();
+  config.printTemplateDefaults.forEach((item, index) => {
+    const itemPath = `printTemplateDefaults[${index}]`;
+    assert(item && typeof item === "object" && !Array.isArray(item), `${itemPath} must be an object`);
+    assertNonEmptyString(item.templateKey, `${itemPath}.templateKey`);
+    assert(allowedTemplateKeys.has(item.templateKey), `${itemPath}.templateKey contains unsupported template ${item.templateKey}`);
+    assert(!seen.has(item.templateKey), `${itemPath}.templateKey must not be duplicated`);
+    seen.add(item.templateKey);
+    assert(item.status === "preview_only", `${itemPath}.status must stay preview_only`);
+    assertNonEmptyString(item.guardrail, `${itemPath}.guardrail`);
+    assert(
+      item.partyDefaults && typeof item.partyDefaults === "object" && !Array.isArray(item.partyDefaults),
+      `${itemPath}.partyDefaults must be an object`,
+    );
+    const partyDefaultEntries = Object.entries(item.partyDefaults);
+    assert(partyDefaultEntries.length > 0, `${itemPath}.partyDefaults must not be empty`);
+    partyDefaultEntries.forEach(([key, value]) => {
+      assert(allowedPartyKeys.has(key), `${itemPath}.partyDefaults.${key} is not an allowed print party default`);
+      assertNonEmptyString(value, `${itemPath}.partyDefaults.${key}`);
+    });
+    assert(
+      item.supplierDefaults == null,
+      `${itemPath}.supplierDefaults must not override supplier snapshots from business records`,
+    );
+  });
+}
+
 function assertNoForbiddenPayload(value, currentPath = "customerPackage") {
   if (!value || typeof value !== "object") {
     return;
@@ -111,6 +152,43 @@ function assertNoForbiddenPayload(value, currentPath = "customerPackage") {
     );
     assertNoForbiddenPayload(nestedValue, `${currentPath}.${key}`);
   }
+}
+
+function normalizeProcessPolicyRule(rule, schema = customerPackageSchema) {
+  const normalized = {};
+  for (const key of schema.allowedProcessPolicyRuleKeys) {
+    if (rule[key] != null) {
+      normalized[key] = String(rule[key]).trim();
+    }
+  }
+  return normalized;
+}
+
+function assertProcessPolicyRules(rules, policyPath, schema = customerPackageSchema) {
+  assert(Array.isArray(rules), `${policyPath}.rules must be an array`);
+  assert(rules.length > 0, `${policyPath}.rules must not be empty`);
+  const allowedKeys = new Set(schema.allowedProcessPolicyRuleKeys);
+  const forbiddenKeys = new Set(schema.forbiddenProcessPolicyRuleKeys || []);
+  const triggerKeys = schema.requiredProcessPolicyRuleTriggerKeys || [];
+  const resultKeys = schema.requiredProcessPolicyRuleResultKeys || [];
+
+  rules.forEach((rule, ruleIndex) => {
+    const rulePath = `${policyPath}.rules[${ruleIndex}]`;
+    assert(rule && typeof rule === "object" && !Array.isArray(rule), `${rulePath} must be a rule object`);
+    for (const [key, value] of Object.entries(rule)) {
+      assert(!forbiddenKeys.has(key), `${rulePath}.${key} must not register executable policy behavior`);
+      assert(allowedKeys.has(key), `${rulePath}.${key} is not an allowed process policy rule field`);
+      assertNonEmptyString(value, `${rulePath}.${key}`);
+    }
+    assert(
+      triggerKeys.some((key) => typeof rule[key] === "string" && rule[key].trim() !== ""),
+      `${rulePath} must declare key or when`,
+    );
+    assert(
+      resultKeys.some((key) => typeof rule[key] === "string" && rule[key].trim() !== ""),
+      `${rulePath} must declare decision or action`,
+    );
+  });
 }
 
 function validateCatalog(catalog) {
@@ -168,6 +246,7 @@ function validatePackage(config, catalog = customerPackageCatalog, schema = cust
   const commandKeys = toKeySet(catalog.commands);
 
   validateModuleStates(config, moduleKeys);
+  validatePrintTemplateDefaults(config, schema);
 
   assert(Array.isArray(config.workflows), "workflows must be an array");
   assert(config.workflows.length >= 3, "workflows must include the initial three preview workflows");
@@ -237,9 +316,25 @@ function validatePackage(config, catalog = customerPackageCatalog, schema = cust
     assert(policyKeys.has(policy.key), `${policyPath}.key is not registered`);
     assert(schema.allowedPolicyKinds.includes(policy.kind), `${policyPath}.kind is not allowed`);
     assert(policy.status === "preview_only", `${policyPath}.status must stay preview_only`);
-    assert(Array.isArray(policy.rules), `${policyPath}.rules must be an array`);
-    assert(policy.rules.length > 0, `${policyPath}.rules must not be empty`);
+    assertProcessPolicyRules(policy.rules, policyPath, schema);
     assertNonEmptyString(policy.guardrail, `${policyPath}.guardrail`);
+  });
+
+  assert(Array.isArray(config.extensionPoints), "extensionPoints must be an array");
+  config.extensionPoints.forEach((extensionPoint, index) => {
+    const extensionPath = `extensionPoints[${index}]`;
+    assertNonEmptyString(extensionPoint.key, `${extensionPath}.key`);
+    assertNonEmptyString(extensionPoint.label, `${extensionPath}.label`);
+    assert(extensionPoint.status === "preview_only", `${extensionPath}.status must stay preview_only`);
+    assert(
+      extensionPoint.runtimeEnabled === false,
+      `${extensionPath}.runtimeEnabled must stay false until an extension contract is reviewed`,
+    );
+    assert(
+      extensionPoint.handler == null && extensionPoint.module == null,
+      `${extensionPath} must not register executable extension handlers`,
+    );
+    assertNonEmptyString(extensionPoint.guardrail, `${extensionPath}.guardrail`);
   });
 }
 
@@ -279,7 +374,20 @@ function buildPreview(config) {
       kind: policy.kind,
       label: policy.label,
       ruleCount: policy.rules.length,
+      rules: policy.rules.map((rule) => normalizeProcessPolicyRule(rule)),
       guardrail: policy.guardrail,
+    })),
+    extensionPoints: config.extensionPoints.map((extensionPoint) => ({
+      key: extensionPoint.key,
+      label: extensionPoint.label,
+      runtimeEnabled: extensionPoint.runtimeEnabled,
+      guardrail: extensionPoint.guardrail,
+    })),
+    printTemplateDefaults: (config.printTemplateDefaults || []).map((item) => ({
+      templateKey: item.templateKey,
+      status: item.status,
+      defaultFieldCount: Object.keys(item.partyDefaults || {}).length,
+      guardrail: item.guardrail,
     })),
     guardrails: {
       boundaries: config.boundaries,
@@ -301,6 +409,8 @@ function validatePreview(preview, schema = customerPackageSchema) {
   assert(Array.isArray(preview.businessFlows), "preview.businessFlows must be an array");
   assert(Array.isArray(preview.stateMachines), "preview.stateMachines must be an array");
   assert(Array.isArray(preview.processPolicies), "preview.processPolicies must be an array");
+  assert(Array.isArray(preview.extensionPoints), "preview.extensionPoints must be an array");
+  assert(Array.isArray(preview.printTemplateDefaults), "preview.printTemplateDefaults must be an array");
 }
 
 function writePreview(outPath, preview) {
@@ -335,14 +445,30 @@ function normalizeMode(args) {
   return mode;
 }
 
-function runCustomerPackageLint(args) {
+function normalizeCustomerKeys(args = {}) {
+  const customerKeys = (
+    Array.isArray(args.customers) && args.customers.length > 0
+      ? args.customers
+      : [args.customer || "yoyoosun"]
+  ).map((customerKey) => String(customerKey || "").trim());
+  assert(customerKeys.length > 0, "at least one customer package must be selected");
+  const seen = new Set();
+  for (const customerKey of customerKeys) {
+    assert(customerKey !== "", "customer package key must not be empty");
+    assert(!seen.has(customerKey), `customer package key is duplicated: ${customerKey}`);
+    seen.add(customerKey);
+  }
+  return customerKeys;
+}
+
+function runSingleCustomerPackageLint(args, customer) {
   const mode = normalizeMode(args);
   assert(
     mode !== "activate" && mode !== "rollback",
     `customer package ${mode} is disabled: current gate only supports validate, compile and preview`,
   );
-  const config = CUSTOMER_PACKAGES[args.customer];
-  assert(config, `unknown customer package: ${args.customer}`);
+  const config = CUSTOMER_PACKAGES[customer];
+  assert(config, `unknown customer package: ${customer}`);
 
   validateCatalog(customerPackageCatalog);
   validatePackage(config);
@@ -360,21 +486,45 @@ function runCustomerPackageLint(args) {
   };
 }
 
+function runCustomerPackageLint(args) {
+  return runSingleCustomerPackageLint(args, args.customer || "yoyoosun");
+}
+
+function runCustomerPackageLintMany(args) {
+  const customerKeys = normalizeCustomerKeys(args);
+  assert(
+    customerKeys.length === 1 || !args.out,
+    "--out only supports one customer package; run separate preview commands for multiple customers",
+  );
+  return customerKeys.map((customerKey) =>
+    runSingleCustomerPackageLint(args, customerKey),
+  );
+}
+
 function main() {
   const args = parseArgs();
   if (args.help) {
     printHelp();
     return;
   }
-  const result = runCustomerPackageLint(args);
-  const config = result.config;
-  console.log(
-    `customer package ${result.mode} ok: ${config.customerKey}, workflows=${config.workflows.length}, businessFlows=${config.businessFlows.length}, stateMachines=${config.stateMachines.length}, policies=${config.processPolicies.length}`,
-  );
+  const results = runCustomerPackageLintMany(args);
+  for (const result of results) {
+    const config = result.config;
+    console.log(
+      `customer package ${result.mode} ok: ${config.customerKey}, workflows=${config.workflows.length}, businessFlows=${config.businessFlows.length}, stateMachines=${config.stateMachines.length}, policies=${config.processPolicies.length}`,
+    );
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main();
 }
 
-export { buildPreview, runCustomerPackageLint, validateCatalog, validatePackage, validatePreview };
+export {
+  buildPreview,
+  runCustomerPackageLint,
+  runCustomerPackageLintMany,
+  validateCatalog,
+  validatePackage,
+  validatePreview,
+};

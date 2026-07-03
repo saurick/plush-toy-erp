@@ -12,7 +12,11 @@ test('permissionModuleLabels: 内置权限模块显示中文并保留英文 key'
   assert.equal(getPermissionModuleTitle('shipment'), '出货 (shipment)')
 })
 
-test('permissionModuleLabels: 空模块归入其他，未知模块保留原 key', () => {
+test('permissionModuleLabels: 空模块归入其他，未知模块不展示 raw key', () => {
   assert.equal(getPermissionModuleTitle(''), '其他 (other)')
-  assert.equal(getPermissionModuleTitle('custom_module'), 'custom_module')
+  assert.equal(getPermissionModuleTitle('custom_module'), '未登记权限模块')
+  assert.equal(
+    getPermissionModuleTitle('unknown.future.module'),
+    '未登记权限模块'
+  )
 })

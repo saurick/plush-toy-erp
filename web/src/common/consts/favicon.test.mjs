@@ -69,7 +69,10 @@ test('favicon: routes resolve to separate admin, tasks, dev, governance, testing
     resolveERPFavicon('/m/warehouse/tasks'),
     ERP_FAVICON_VARIANTS.tasks
   )
-  assert.equal(resolveERPFavicon('/tasks'), ERP_FAVICON_VARIANTS.tasks)
+  assert.equal(
+    resolveERPFavicon('/not-a-mobile-task'),
+    ERP_FAVICON_VARIANTS.admin
+  )
   assert.equal(resolveERPFavicon('/__dev'), ERP_FAVICON_VARIANTS.devHub)
   assert.equal(resolveERPFavicon('/__dev/'), ERP_FAVICON_VARIANTS.devHub)
   assert.equal(ERP_FAVICON_VARIANTS.governance.href, '/favicon-governance.svg')

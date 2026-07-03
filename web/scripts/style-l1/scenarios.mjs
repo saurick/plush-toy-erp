@@ -96,9 +96,34 @@ export function createStyleL1Scenarios(deps) {
     waitForPath,
     webDir,
   } = deps
-  const { assertLineQuantityUnitSuffix } = createLineItemUnitAssertions({
+  const {
+    assertLineItemAddActionScrollsToNewRow,
+    assertLineQuantityUnitSuffix,
+  } = createLineItemUnitAssertions({
     assert,
   })
+  const expectAdminMenuText = async (page, text) => {
+    const menu = page.locator('.erp-admin-menu').first()
+    await menu.waitFor({ state: 'visible', timeout: 10_000 })
+    const menuText = await menu.evaluate((node) =>
+      String(node.textContent || '')
+        .replace(/\s+/gu, ' ')
+        .trim()
+    )
+    assert(
+      menuText.includes(text),
+      `后台菜单应展示“${text}”，当前菜单文本：${menuText}`
+    )
+  }
+  const expectEffectiveSessionMode = async (page, mode) => {
+    const layout = page.locator('[data-effective-session-mode]').first()
+    await layout.waitFor({ state: 'visible', timeout: 10_000 })
+    assert.equal(
+      await layout.getAttribute('data-effective-session-mode'),
+      mode,
+      `effective session 诊断模式应为 ${mode}`
+    )
+  }
 
   return [
     {
@@ -460,7 +485,10 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '毛绒玩具 ERP')
-        await expectText(page, '系统管理')
+        await expectEffectiveSessionMode(
+          page,
+          'local_dev_customer_config_diagnostic'
+        )
         await expectHeading(page, '权限管理')
         await expectText(page, '角色模板')
         await assertTextAbsent(page, '当前账号暂无可见后台入口')
@@ -475,6 +503,7 @@ export function createStyleL1Scenarios(deps) {
         permissions: ['system.permission.read', 'system.permission.manage'],
         menus: [{ key: 'permission-center', path: '/erp/system/permissions' }],
       },
+      customerKey: 'yoyoosun',
       viewport: { width: 1440, height: 900 },
       beforeNavigate: async (page) => {
         await page.unroute('**/rpc/customer_config')
@@ -507,7 +536,10 @@ export function createStyleL1Scenarios(deps) {
       },
       verify: async (page) => {
         await expectText(page, '毛绒玩具 ERP')
-        await expectText(page, '系统管理')
+        await expectEffectiveSessionMode(
+          page,
+          'local_dev_sync_failed_diagnostic'
+        )
         await expectHeading(page, '权限管理')
         await expectText(page, '角色模板')
         await assertTextAbsent(page, '当前账号暂无可见后台入口')
@@ -535,7 +567,10 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '毛绒玩具 ERP')
-        await expectText(page, '系统管理')
+        await expectEffectiveSessionMode(
+          page,
+          'local_dev_customer_config_diagnostic'
+        )
         await expectHeading(page, '权限管理')
         await expectText(page, '角色模板')
         await assertTextAbsent(page, '当前账号暂无可见后台入口')
@@ -594,6 +629,38 @@ export function createStyleL1Scenarios(deps) {
       },
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
+        const assertEffectiveSessionMenuProjection = async () => {
+          const menuText = await page
+            .locator('.erp-admin-menu')
+            .evaluate((node) => node.textContent.replace(/\s+/g, ' ').trim())
+          for (const label of [
+            '出货单',
+            '来料质检',
+            '入库管理',
+            '销售订单',
+            '采购订单',
+            '委外订单',
+          ]) {
+            assert(
+              menuText.includes(label),
+              `普通账号菜单应保留 active pages 投影允许的入口 ${label}: ${menuText}`
+            )
+          }
+          for (const label of [
+            '权限管理',
+            '系统审计日志',
+            '模板打印中心',
+            '客户档案',
+            '供应商档案',
+            '产品资料',
+          ]) {
+            assert(
+              !menuText.includes(label),
+              `普通账号菜单不应显示 active pages 未投出的入口 ${label}: ${menuText}`
+            )
+          }
+        }
+
         const expectProjectedActionDisabled = async (label, message) => {
           const button = page.getByRole('button', { name: label }).first()
           await button.waitFor({ state: 'visible', timeout: 10_000 })
@@ -611,6 +678,7 @@ export function createStyleL1Scenarios(deps) {
           assert.equal(await button.isDisabled(), true, message)
         }
 
+        await assertEffectiveSessionMenuProjection()
         await expectHeading(page, '出货单')
         await expectText(page, 'SHIP-STYLE-L1')
         await expectProjectedActionDisabled(
@@ -781,7 +849,7 @@ export function createStyleL1Scenarios(deps) {
         await page.getByRole('button', { name: '刷新当前页' }).click()
         await expectText(page, '看板跳转测试任务')
         await page
-          .getByPlaceholder('搜索任务、单号、来源、阻塞原因')
+          .getByPlaceholder('搜索任务、单号、来源、处理原因')
           .fill('OUT-DASH-NAV')
         await page.getByText('全部角色').click()
         await page.getByTitle('仓库', { exact: true }).click()
@@ -832,7 +900,7 @@ export function createStyleL1Scenarios(deps) {
           .locator('.erp-task-action-drawer')
           .waitFor({ state: 'hidden', timeout: 10_000 })
         const restoredKeyword = await page
-          .getByPlaceholder('搜索任务、单号、来源、阻塞原因')
+          .getByPlaceholder('搜索任务、单号、来源、处理原因')
           .inputValue()
         assert.equal(restoredKeyword, 'OUT-DASH-NAV')
         const taskBoardFilters = page.locator('.erp-task-board-filters')
@@ -858,11 +926,11 @@ export function createStyleL1Scenarios(deps) {
         await page.waitForFunction(
           () =>
             document.querySelector(
-              'input[placeholder="搜索任务、单号、来源、阻塞原因"]'
+              'input[placeholder="搜索任务、单号、来源、处理原因"]'
             )?.value === ''
         )
         const clearedKeyword = await page
-          .getByPlaceholder('搜索任务、单号、来源、阻塞原因')
+          .getByPlaceholder('搜索任务、单号、来源、处理原因')
           .inputValue()
         assert.equal(clearedKeyword, '')
         assert.equal(
@@ -1187,7 +1255,7 @@ export function createStyleL1Scenarios(deps) {
           scenarioName: 'erp-task-board-dark-wide-desktop',
         })
         await page
-          .getByPlaceholder('搜索任务、单号、来源、阻塞原因')
+          .getByPlaceholder('搜索任务、单号、来源、处理原因')
           .fill('OUT-DASH-WIDE-LAYOUT')
         await expectText(page, '宽屏重叠回归任务')
         await expectText(page, '从下方任务卡选择一条任务')
@@ -2123,14 +2191,14 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectHeading(
           page,
-          '客户配置包预检控制台 / Package Preflight Console'
+          '客户配置包导入控制台 / Package Import Console'
         )
         await expectText(page, '当前 URL customer / Query')
         await expectText(page, 'yoyoosun')
         await expectText(page, '当前配置包 / Current Package')
         await expectText(page, '决策卡 / Decision Cards')
         await expectText(page, '可以进入人工评审')
-        await expectText(page, 'PREVIEW_READY')
+        await expectText(page, '预检通过')
         await expectText(page, '真实导入')
         await expectText(page, '下一步 / Next')
         const overviewDefaultMetrics = await page.evaluate(() => ({
@@ -2208,21 +2276,23 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: '看预检' })
           .click()
         await expectText(page, '包边界 / Package Guards')
-        await expectText(page, 'runtimeEnabled')
+        await expectText(page, '运行时启用')
         await expectText(page, '预检步骤 / Preflight Gates')
-        await expectText(page, '资产摘要 / Asset Summary')
+        await expectText(page, '导入资产范围 / Import Asset Scope')
+        await expectText(page, '客户包对象 / Package Objects')
+        await expectText(page, '策略与扩展点登记')
         await expectText(page, '模块状态投影 / Module States')
-        await expectText(page, 'moduleStates 只编译为客户配置控制面输入')
-        await expectText(page, 'manifest 编译时默认 enabled')
+        await expectText(page, '模块状态只编译为客户配置控制面输入')
+        await expectText(page, '默认登记模块会按启用编译')
         await expectText(page, '人工评审清单 / Review Checklist')
         await expectText(page, '校验结果 / Validation Checks')
-        await expectText(page, '工作流预览 / Workflows')
+        await expectText(page, '工作流预览')
         await expectText(page, '销售订单审批')
-        await expectText(page, 'preview_only')
-        await expectText(page, 'workflow_only')
-        await expectText(page, '预检命令 / Preflight Commands')
+        await expectText(page, '仅预览')
+        await expectText(page, '只做协同流转')
+        await expectText(page, '预检命令')
         await expectText(page, '生成预检报告')
-        await expectText(page, '来源路径 / Source References')
+        await expectText(page, '来源路径')
         const moduleStateMetrics = await page.evaluate(() => {
           const panel = document.querySelector(
             '.erp-dev-customer-panel--module-states'
@@ -2233,15 +2303,17 @@ export function createStyleL1Scenarios(deps) {
           return {
             itemCount: items.length,
             hasCatalogDefaultCopy:
-              panel?.textContent?.includes('catalog 模块会编译为 enabled') ||
-              false,
+              panel?.textContent?.includes('默认登记模块会按启用编译') || false,
             hasInstallCopy:
               panel?.textContent?.includes('不安装或卸载模块') || false,
-            hasShipmentModule: items.some((item) =>
+            hasShipmentModuleLabel: items.some((item) =>
+              item.textContent?.includes('出货单')
+            ),
+            hasRawShipmentModuleKey: items.some((item) =>
               item.textContent?.includes('shipments')
             ),
             enabledTags: items.filter((item) =>
-              item.textContent?.includes('enabled')
+              item.textContent?.includes('启用')
             ).length,
             panelWidth: panel?.getBoundingClientRect().width || 0,
             viewportWidth: window.innerWidth,
@@ -2252,21 +2324,61 @@ export function createStyleL1Scenarios(deps) {
             itemCount: moduleStateMetrics.itemCount,
             hasCatalogDefaultCopy: moduleStateMetrics.hasCatalogDefaultCopy,
             hasInstallCopy: moduleStateMetrics.hasInstallCopy,
-            hasShipmentModule: moduleStateMetrics.hasShipmentModule,
+            hasShipmentModuleLabel: moduleStateMetrics.hasShipmentModuleLabel,
+            hasRawShipmentModuleKey: moduleStateMetrics.hasRawShipmentModuleKey,
             enabledTags: moduleStateMetrics.enabledTags,
           },
           {
             itemCount: 15,
             hasCatalogDefaultCopy: true,
             hasInstallCopy: true,
-            hasShipmentModule: true,
+            hasShipmentModuleLabel: true,
+            hasRawShipmentModuleKey: false,
             enabledTags: 15,
           },
-          `客户配置控制台应展示 15 个 moduleStates 预览项且保持默认 enabled 口径: ${JSON.stringify(moduleStateMetrics)}`
+          `客户配置控制台应展示 15 个模块状态预览项且不直出 raw module key: ${JSON.stringify(moduleStateMetrics)}`
         )
         assert(
           moduleStateMetrics.panelWidth <= moduleStateMetrics.viewportWidth,
-          `moduleStates 预览区不应横向溢出视口: ${JSON.stringify(moduleStateMetrics)}`
+          `模块状态预览区不应横向溢出视口: ${JSON.stringify(moduleStateMetrics)}`
+        )
+        const printDefaultMetrics = await page.evaluate(() => {
+          const panel = document.querySelector(
+            '.erp-dev-customer-panel--print-template-defaults'
+          )
+          const text = panel?.textContent || ''
+
+          return {
+            hasPanel: Boolean(panel),
+            hasReadableAnchor: text.includes('默认方字段已登记'),
+            hasRawDefaultKey:
+              /\bbuyerCompany\b|\bbuyerContact\b|\bbuyerPhone\b|\bbuyerAddress\b|\bbuyerSigner\b/u.test(
+                text
+              ),
+            panelWidth: panel?.getBoundingClientRect().width || 0,
+            viewportWidth: window.innerWidth,
+          }
+        })
+        assert.deepEqual(
+          {
+            hasPanel: printDefaultMetrics.hasPanel,
+            hasReadableAnchor: printDefaultMetrics.hasReadableAnchor,
+            hasRawDefaultKey: printDefaultMetrics.hasRawDefaultKey,
+          },
+          {
+            hasPanel: true,
+            hasReadableAnchor: true,
+            hasRawDefaultKey: false,
+          },
+          `打印默认方信息面板不应展示默认字段 raw key: ${JSON.stringify(
+            printDefaultMetrics
+          )}`
+        )
+        assert(
+          printDefaultMetrics.panelWidth <= printDefaultMetrics.viewportWidth,
+          `打印默认方信息面板不应横向溢出: ${JSON.stringify(
+            printDefaultMetrics
+          )}`
         )
 
         await page
@@ -2288,7 +2400,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '销售订单受理当前未接打印模板')
         await expectText(page, '采购合同')
         await expectText(page, '加工合同')
-        await expectText(page, 'fieldTruth')
+        await expectText(page, '字段真源')
         const printTemplateMetrics = await page.evaluate(() => {
           const panel = document.querySelector(
             '.erp-dev-customer-panel--print-templates'
@@ -2303,13 +2415,17 @@ export function createStyleL1Scenarios(deps) {
               panel?.textContent?.includes('销售订单受理当前未接打印模板') ||
               false,
             hasCustomerCoreBoundary:
-              panel?.textContent?.includes('不进入 Product Core 表单') || false,
+              panel?.textContent?.includes('不进入产品核心表单') || false,
             hasPurchaseTruth: items.some((item) =>
               item.textContent?.includes('采购订单号')
             ),
             hasProcessingTruth: items.some((item) =>
               item.textContent?.includes('委托加工')
             ),
+            hasRawTemplateKey:
+              panel?.textContent?.includes('material-purchase-contract') ||
+              panel?.textContent?.includes('processing-contract') ||
+              false,
             panelWidth: panel?.getBoundingClientRect().width || 0,
             viewportWidth: window.innerWidth,
           }
@@ -2322,6 +2438,7 @@ export function createStyleL1Scenarios(deps) {
               printTemplateMetrics.hasCustomerCoreBoundary,
             hasPurchaseTruth: printTemplateMetrics.hasPurchaseTruth,
             hasProcessingTruth: printTemplateMetrics.hasProcessingTruth,
+            hasRawTemplateKey: printTemplateMetrics.hasRawTemplateKey,
           },
           {
             itemCount: 2,
@@ -2329,6 +2446,7 @@ export function createStyleL1Scenarios(deps) {
             hasCustomerCoreBoundary: true,
             hasPurchaseTruth: true,
             hasProcessingTruth: true,
+            hasRawTemplateKey: false,
           },
           `打印模板字段面板应只读展示正式模板字段真源: ${JSON.stringify(
             printTemplateMetrics
@@ -2347,33 +2465,33 @@ export function createStyleL1Scenarios(deps) {
           .click()
         await expectText(page, '导入工作台 / Import Workbench')
         await expectText(page, '可视化导入流程 / Visual Import Flow')
-        await expectText(page, '测试环境应用只写客户配置控制面')
-        await expectText(page, '测试环境应用 / Test Apply')
-        await expectText(page, '应用到测试环境')
+        await expectText(page, '本地/测试后端应用只写客户配置控制面')
+        await expectText(page, '本地/测试后端应用 / Local Or Test Apply')
+        await expectText(page, '应用到当前后端')
+        await expectText(page, '校验 / 发布 / 激活 / 有效配置投影')
+        await expectText(page, '写库目标 / Database Target')
+        await expectText(page, '当前后端（本地或显式测试环境）ERP 应用数据库')
+        await expectText(page, '目标环境 ERP 应用数据库')
         await expectText(
           page,
-          'validate / publish / activate / effective session'
+          '客户配置版本、模块状态、角色画像、授权、责任池和审计记录'
         )
-        await expectText(page, '写库目标 / Database Target')
-        await expectText(page, '测试环境 ERP 应用数据库')
-        await expectText(page, '目标环境 ERP 应用数据库')
-        await expectText(page, 'customer_config_revisions')
-        await expectText(page, 'get_effective_session')
+        await expectText(page, '客户配置投影')
         await expectText(page, '真实客户业务数据')
         await expectText(page, '业务数据导入')
-        await expectText(page, 'canExecuteRealImport')
-        await expectText(page, 'false')
-        await expectText(page, '测试版 UI Dry Run')
-        await expectText(page, '尚未运行测试 Dry Run')
+        await expectText(page, '不执行')
+        await expectText(page, '不写业务数据')
+        await expectText(page, '测试版页面试跑')
+        await expectText(page, '尚未运行测试试跑')
         await expectText(page, '正式版发布 / Release Apply')
         await expectText(page, '正式版必须先过发布门禁')
         await expectText(page, '检查发布门禁')
         await expectText(page, '发布到正式版')
         await expectText(page, '尚未检查发布门禁')
-        await expectText(page, 'customer config rollback readiness')
+        await expectText(page, '客户配置回滚就绪检查')
         await expectText(page, '--require-rollback')
-        await expectText(page, 'customer config rollback executor')
-        await expectText(page, 'ROLLBACK_YOYOOSUN_CONFIG')
+        await expectText(page, '客户配置回滚输入模板')
+        await expectText(page, '--print-input-template')
         const importWorkbenchMetrics = await page.evaluate(() => ({
           stepCount: document.querySelectorAll('.erp-dev-customer-import-step')
             .length,
@@ -2384,7 +2502,7 @@ export function createStyleL1Scenarios(deps) {
             '.erp-dev-customer-formal-gate'
           ).length,
           testApplyButtons: [...document.querySelectorAll('button')].filter(
-            (button) => /应用到测试环境/.test(button.textContent || '')
+            (button) => /应用到当前后端/.test(button.textContent || '')
           ).length,
           releaseCheckButtons: [...document.querySelectorAll('button')].filter(
             (button) => /检查发布门禁/.test(button.textContent || '')
@@ -2407,9 +2525,9 @@ export function createStyleL1Scenarios(deps) {
         assert.deepEqual(
           importWorkbenchMetrics,
           {
-            stepCount: 5,
+            stepCount: 6,
             dbTargetCount: 5,
-            formalGateCount: 4,
+            formalGateCount: 11,
             testApplyButtons: 1,
             releaseCheckButtons: 1,
             releaseApplyButtons: 1,
@@ -2418,9 +2536,9 @@ export function createStyleL1Scenarios(deps) {
           },
           `导入工作台应提供测试版和发布版控件，并在门禁前禁用正式发布执行: ${JSON.stringify(importWorkbenchMetrics)}`
         )
-        await page.getByRole('button', { name: '运行测试 Dry Run' }).click()
-        await expectText(page, 'Dry Run 已生成')
-        await expectText(page, '重新运行 Dry Run')
+        await page.getByRole('button', { name: '运行测试试跑' }).click()
+        await expectText(page, '试跑已生成')
+        await expectText(page, '重新运行试跑')
         await expectText(page, '复制输出目录')
         await expectText(page, '复制报告路径')
         await expectText(page, '查看报告摘要')
@@ -2428,9 +2546,9 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '正式导入')
         await expectText(page, '不可执行')
         await page.getByRole('button', { name: '查看报告摘要' }).click()
-        await expectText(page, 'Yoyoosun Customer Import Dry-run Report')
-        await expectText(page, 'canExecuteRealImport')
-        await expectText(page, 'customerImportDryRun.mjs')
+        await expectText(page, '试跑报告摘要')
+        await expectText(page, '正式导入：不可执行')
+        await expectText(page, '只生成证据，不写业务数据库')
         const dryRunResultMetrics = await page.evaluate(() => {
           const metricCards = [
             ...document.querySelectorAll(
@@ -2471,13 +2589,13 @@ export function createStyleL1Scenarios(deps) {
           {
             metricCardCount: 4,
             actionButtons: [
-              '重新运行 Dry Run',
+              '重新运行试跑',
               '复制输出目录',
               '复制报告路径',
               '收起报告摘要',
             ],
           },
-          `Dry Run 结果区应提供后续操作组，而不是只有单个测试按钮: ${JSON.stringify(dryRunResultMetrics)}`
+          `试跑结果区应提供后续操作组，而不是只有单个测试按钮: ${JSON.stringify(dryRunResultMetrics)}`
         )
         assert(
           dryRunResultMetrics.metricBackgrounds.every(
@@ -2487,7 +2605,7 @@ export function createStyleL1Scenarios(deps) {
             dryRunResultMetrics.pathBackground !== 'rgb(248, 251, 248)' &&
             dryRunResultMetrics.reportBackground !== 'rgb(255, 255, 255)' &&
             dryRunResultMetrics.reportColor !== 'rgb(255, 255, 255)',
-          `暗色 Dry Run 结果卡不能退回白底浅字: ${JSON.stringify(dryRunResultMetrics)}`
+          `暗色试跑结果卡不能退回白底浅字: ${JSON.stringify(dryRunResultMetrics)}`
         )
         await assertNoHorizontalOverflow(
           page,
@@ -2503,9 +2621,9 @@ export function createStyleL1Scenarios(deps) {
         )
         await expectHeading(
           page,
-          '客户配置包预检控制台 / Package Preflight Console'
+          '客户配置包导入控制台 / Package Import Console'
         )
-        await expectText(page, '未登记客户配置包 / Missing Customer Package')
+        await expectText(page, '未登记客户配置包')
         await expectText(page, 'missing-customer')
         await expectText(page, '已登记客户包 / Registered Packages')
         await expectText(page, '永绅 yoyoosun')
@@ -2513,7 +2631,8 @@ export function createStyleL1Scenarios(deps) {
 
         await page.locator('.erp-dev-customer-selector .ant-select').click()
         await page
-          .getByText('永绅 yoyoosun (yoyoosun)', { exact: true })
+          .locator('.ant-select-dropdown .ant-select-item-option-content')
+          .getByText('永绅 yoyoosun', { exact: true })
           .click()
         const switchedUrl = new URL(page.url())
         assert.equal(switchedUrl.pathname, '/__dev/customer-config')
@@ -2538,7 +2657,7 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectHeading(
           page,
-          '客户配置包预检控制台 / Package Preflight Console'
+          '客户配置包导入控制台 / Package Import Console'
         )
         await expectText(page, '当前 URL customer / Query')
         await expectText(page, 'yoyoosun')
@@ -2557,7 +2676,7 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectHeading(
           page,
-          '客户配置包预检控制台 / Package Preflight Console'
+          '客户配置包导入控制台 / Package Import Console'
         )
         await expectText(page, '决策卡 / Decision Cards')
         const overviewMetrics = await page.evaluate(() => {
@@ -2641,7 +2760,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '测试入口 / Test Entry')
         await expectText(page, '产品原型 / Prototypes')
         await expectText(page, '能力台账 / Capability Ledger')
-        await expectText(page, '客户配置包预检 / Package Preflight')
+        await expectText(page, '客户配置包导入 / Package Import')
         await expectText(page, '本地 dev-only 入口')
         const defaultMetrics = await page.evaluate(() => ({
           path: location.pathname,
@@ -2885,7 +3004,7 @@ export function createStyleL1Scenarios(deps) {
           },
           {
             path: '/__dev/customer-config?customer=yoyoosun',
-            heading: '客户配置包预检控制台 / Package Preflight Console',
+            heading: '客户配置包导入控制台 / Package Import Console',
             rootSelector: '.erp-dev-customer-page',
           },
         ]
@@ -3096,7 +3215,7 @@ export function createStyleL1Scenarios(deps) {
         )
         await expectHeading(
           page,
-          '客户配置包预检控制台 / Package Preflight Console'
+          '客户配置包导入控制台 / Package Import Console'
         )
         const customerDecision = await readSurfaceStyle(
           '.erp-dev-customer-decision-card'
@@ -3197,7 +3316,7 @@ export function createStyleL1Scenarios(deps) {
 
         await expectHeading(
           page,
-          '客户配置包预检控制台 / Package Preflight Console'
+          '客户配置包导入控制台 / Package Import Console'
         )
         assertButtonGroup(
           '客户配置视图切换',
@@ -4370,6 +4489,71 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'system-audit-logs-desktop',
+      path: '/erp/system/audit-logs',
+      auth: 'admin',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '审计日志')
+        await expectText(
+          page,
+          '系统控制面事件。先看风险、对象、变化摘要和下一步。'
+        )
+        await expectText(page, '账号角色变更')
+        await expectText(page, '目标已关联')
+        await expectText(page, '下一步')
+        await expectText(page, '变化')
+        await assertTextAbsent(page, '原始 payload')
+        await assertTextAbsent(page, 'assistant-admin')
+        await assertTextAbsent(page, 'admin_user.roles.set')
+        await assertTextAbsent(page, 'admin_bootstrap.blocked')
+        await assertTextAbsent(page, 'actor')
+        await assertTextAbsent(page, 'target')
+        await assertNoHorizontalOverflow(page, 'system-audit-logs-desktop')
+
+        const metrics = await page.evaluate(() => {
+          const pageNode = document.querySelector('.erp-audit-page')
+          const workspace = document.querySelector('.erp-audit-workspace')
+          const detail = document.querySelector('.erp-audit-detail')
+          const eventItems = document.querySelectorAll('.erp-audit-event')
+          const payloadNode = document.querySelector('.erp-audit-payload')
+          const rect = pageNode?.getBoundingClientRect()
+          const workspaceRect = workspace?.getBoundingClientRect()
+          const detailRect = detail?.getBoundingClientRect()
+          return {
+            hasPage: Boolean(pageNode),
+            hasWorkspace: Boolean(workspace),
+            hasDetail: Boolean(detail),
+            eventCount: eventItems.length,
+            hasPayloadNode: Boolean(payloadNode),
+            pageWidth: rect?.width || 0,
+            workspaceWidth: workspaceRect?.width || 0,
+            detailWidth: detailRect?.width || 0,
+            documentScrollWidth: document.documentElement.scrollWidth,
+            documentClientWidth: document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          metrics.hasPage &&
+            metrics.hasWorkspace &&
+            metrics.hasDetail &&
+            metrics.eventCount >= 2,
+          `审计日志默认态缺少关键区域: ${JSON.stringify(metrics)}`
+        )
+        assert.equal(
+          metrics.hasPayloadNode,
+          false,
+          `审计日志不应挂载原始事件结构区域: ${JSON.stringify(metrics)}`
+        )
+        assert(
+          metrics.workspaceWidth > 900 &&
+            metrics.detailWidth >= 300 &&
+            metrics.documentScrollWidth <= metrics.documentClientWidth + 2,
+          `审计日志桌面布局尺寸异常: ${JSON.stringify(metrics)}`
+        )
+      },
+    },
+    {
       name: 'print-center-desktop',
       path: '/erp/print-center',
       auth: 'admin',
@@ -4533,7 +4717,7 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '采购合同')
-        await expectText(page, '兼容入口')
+        await expectText(page, '模板预览入口')
         await expectText(page, '打开可编辑打印窗口')
         await expectText(page, '返回打印中心')
       },
@@ -4546,7 +4730,7 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '采购合同')
-        await expectText(page, '兼容入口')
+        await expectText(page, '模板预览入口')
         await expectText(page, '打开可编辑打印窗口')
         await expectText(page, '返回打印中心')
         await assertERPThemeMode(page, {
@@ -4567,9 +4751,12 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '加工合同')
-        await expectText(page, '兼容入口')
+        await expectText(page, '模板预览入口')
         await expectText(page, '打开可编辑打印窗口')
         await expectText(page, '返回打印中心')
+        await expectText(page, '受托方签字人')
+        await expectText(page, '27072')
+        await expectText(page, '4060.8')
       },
     },
     {
@@ -4916,7 +5103,7 @@ export function createStyleL1Scenarios(deps) {
         await page.locator('.erp-admin-menu').evaluate((node) => {
           node.scrollTop = node.scrollHeight
         })
-        await expectText(page, '系统管理')
+        await expectAdminMenuText(page, '系统管理')
         await expectText(page, '权限管理')
         const menu = page.locator('.erp-admin-menu')
         assert.equal(
@@ -5144,6 +5331,9 @@ export function createStyleL1Scenarios(deps) {
             await assertLineQuantityUnitSuffix(modal, {
               label: '采购数量',
               expectedText: '件（PCS）',
+              scenarioName: 'business-v1-purchase-order-form-modal',
+            })
+            await assertLineItemAddActionScrollsToNewRow(modal, {
               scenarioName: 'business-v1-purchase-order-form-modal',
             })
           },

@@ -16,11 +16,22 @@ import {
   buildTaskFactRows,
   getMobileRoleLabel,
   resolveDetailActionLabel,
-  resolveMobileActionLabel,
+  resolveMobileActionDisplayLabel,
+  resolveMobileTaskStatusLabel,
+  resolveTaskBusinessStatusLabel,
+  resolveTaskReason,
+  resolveTaskReasonLabel,
+  resolveTaskRelatedSourceLabel,
   resolveTaskSourceLabel,
   supportsRejectedAction,
 } from '../utils/mobileRoleTaskModel.mjs'
 import BusinessAttachmentModalButton from '../../components/business-list/BusinessAttachmentModalButton.jsx'
+
+function mobileFactValueText(value) {
+  if (value === null || value === undefined) return '-'
+  if (typeof value === 'string' && value.trim() === '') return '-'
+  return value
+}
 
 export default function MobileTaskDetailScreen({
   activeRoleKey,
@@ -54,7 +65,15 @@ export default function MobileTaskDetailScreen({
   const showRejected = supportsRejectedAction(activeRoleKey, selectedTask)
   const isUpdating = updatingID === selectedTask.id
   const isUrging = urgingID === selectedTask.id
+  const isDoneDetailAction = detailAction === 'done'
   const ownerRoleLabel = getMobileRoleLabel(selectedTask.owner_role_key)
+  const taskReason = resolveTaskReason(selectedTask)
+  const taskReasonLabel = resolveTaskReasonLabel(selectedTask)
+  const taskStatusLabel = resolveMobileTaskStatusLabel(selectedTask)
+  const taskBusinessStatusLabel = resolveTaskBusinessStatusLabel(
+    selectedTask,
+    ''
+  )
   const actionGuidance = !selectedCanOperate
     ? selectedCanUrge
       ? `当前岗位可查看并催办，阻塞 / 完成 / 退回由${ownerRoleLabel}负责。`
@@ -89,7 +108,7 @@ export default function MobileTaskDetailScreen({
         </div>
         <div className="flex min-w-0 items-center gap-2 px-5 pb-4 text-base text-slate-500">
           <FileTextOutlined />
-          <span className="shrink-0">单号：</span>
+          <span className="shrink-0">来源：</span>
           <span className="min-w-0 break-all">{relatedSource}</span>
         </div>
       </header>
@@ -113,19 +132,19 @@ export default function MobileTaskDetailScreen({
               >
                 <div className="text-base text-slate-500">{label}</div>
                 <div className="mt-2 break-words text-lg font-medium text-slate-950">
-                  {value || '-'}
+                  {mobileFactValueText(value)}
                 </div>
               </div>
             ))}
           </div>
         </section>
 
-        {selectedTask.business_status_label || selectedTask.blocked_reason ? (
+        {taskBusinessStatusLabel || taskReason ? (
           <section className="mobile-role-detail-risk rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-lg font-semibold text-red-700">
             <ExclamationCircleFilled className="mr-2" />
-            {selectedTask.business_status_label || '任务需要处理'}
-            {selectedTask.blocked_reason
-              ? ` · ${selectedTask.blocked_reason}`
+            {taskBusinessStatusLabel || '任务需要处理'}
+            {taskReason
+              ? ` · ${taskReasonLabel}：${taskReason}`
               : ' · 需要确认后继续流转'}
           </section>
         ) : null}
@@ -143,14 +162,16 @@ export default function MobileTaskDetailScreen({
           <div className="flex items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 text-2xl font-semibold text-slate-950">
               <LinkOutlined className="text-purple-500" />
-              关联单据（1）
+              关联来源（1）
             </h2>
             <span className="mobile-role-detail-meta text-sm font-semibold text-slate-400">
               来源
             </span>
           </div>
           <div className="mobile-role-detail-related-item mt-4 flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-base text-slate-600">
-            <span className="min-w-0 break-all">订单：{relatedSource}</span>
+            <span className="min-w-0 break-all">
+              {resolveTaskRelatedSourceLabel(selectedTask)}
+            </span>
           </div>
         </section>
 
@@ -158,14 +179,24 @@ export default function MobileTaskDetailScreen({
           <div className="flex items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 text-2xl font-semibold text-slate-950">
               <CameraOutlined className="text-emerald-500" />
-              现场留痕
+              {isDoneDetailAction ? '完成反馈' : '现场留痕'}
             </h2>
-            <span className="text-sm font-semibold text-slate-400">可选</span>
+            <span
+              className={`text-sm font-semibold ${
+                isDoneDetailAction ? 'text-red-500' : 'text-slate-400'
+              }`}
+            >
+              {isDoneDetailAction ? '必填' : '可选'}
+            </span>
           </div>
           <textarea
             data-testid="mobile-role-evidence-input"
             className="mt-4 min-h-[96px] w-full resize-y rounded-xl border border-slate-200 px-3 py-3 text-base text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-            placeholder="填写照片、附件编号或链接；多条可换行"
+            placeholder={
+              isDoneDetailAction
+                ? '请填写完成反馈、照片编号、附件编号或链接；多条可换行'
+                : '填写照片、附件编号或链接；多条可换行'
+            }
             maxLength={500}
             value={detailEvidenceValue}
             onChange={(event) => updateEvidenceText(event.target.value)}
@@ -222,7 +253,7 @@ export default function MobileTaskDetailScreen({
                 <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-slate-950">
                   <span>系统</span>
                   <span className="rounded-md bg-blue-100 px-2 py-1 text-sm text-blue-700">
-                    {selectedTask.task_status_label}
+                    {taskStatusLabel}
                   </span>
                   <span className="text-sm text-slate-400">
                     {formatMobileTaskTime(selectedTask.updated_at)}
@@ -230,8 +261,8 @@ export default function MobileTaskDetailScreen({
                 </div>
                 <div className="mt-2 break-words text-base text-slate-700">
                   {latestMobileAction
-                    ? `${latestMobileActionRoleLabel} 已执行 ${resolveMobileActionLabel(
-                        latestMobileAction.action_key
+                    ? `${latestMobileActionRoleLabel} 已执行 ${resolveMobileActionDisplayLabel(
+                        latestMobileAction
                       )}${
                         latestMobileAction.reason
                           ? `：${latestMobileAction.reason}`
@@ -267,7 +298,11 @@ export default function MobileTaskDetailScreen({
             <textarea
               data-testid="mobile-role-detail-reason-input"
               className="mt-4 min-h-[128px] w-full resize-y rounded-xl border border-slate-200 px-3 py-3 text-base text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-              placeholder="请填写原因，说明卡点、退回依据或催办诉求"
+              placeholder={
+                isDoneDetailAction
+                  ? '可选填写完成说明；完成反馈请先在上方现场留痕填写照片、附件编号或链接'
+                  : '请填写原因，说明卡点、退回依据或催办诉求'
+              }
               maxLength={500}
               value={detailReasonValue}
               onChange={(event) => updateDetailReason(event.target.value)}
@@ -275,21 +310,25 @@ export default function MobileTaskDetailScreen({
             <div className="mt-1 text-right text-sm text-slate-400">
               {detailReasonValue.length}/500
             </div>
-            <div className="mt-4 text-base text-slate-500">
-              快捷选择（可选）
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {QUICK_REASONS.map((reason) => (
-                <button
-                  key={reason}
-                  type="button"
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-600"
-                  onClick={() => appendQuickReason(reason)}
-                >
-                  {reason}
-                </button>
-              ))}
-            </div>
+            {!isDoneDetailAction ? (
+              <>
+                <div className="mt-4 text-base text-slate-500">
+                  快捷选择（可选）
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {QUICK_REASONS.map((reason) => (
+                    <button
+                      key={reason}
+                      type="button"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-600"
+                      onClick={() => appendQuickReason(reason)}
+                    >
+                      {reason}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : null}
             <div className="mt-4 grid grid-cols-2 gap-3">
               <button
                 type="button"

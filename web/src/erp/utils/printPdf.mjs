@@ -1012,27 +1012,24 @@ async function buildServerPdfSnapshotHTMLFromElement(element, options = {}) {
   return `<!doctype html>${clonedRoot.outerHTML}`
 }
 
-async function readServerErrorMessage(response) {
-  const contentType = String(
-    response?.headers?.get?.('content-type') || ''
-  ).toLowerCase()
-
-  if (contentType.includes('application/json')) {
-    try {
-      const payload = await response.json()
-      if (payload && payload.message) {
-        return String(payload.message)
-      }
-    } catch {
-      // JSON 解析失败时降级到文本正文。
-    }
+function getServerPdfErrorMessage(response) {
+  const status = Number(response?.status)
+  if (status === 401) {
+    return '登录已失效，请刷新页面后重试。'
   }
-
-  try {
-    return String((await response.text()) || '').trim()
-  } catch {
-    return ''
+  if (status === 403) {
+    return '当前账号不能生成 PDF，请联系管理员。'
   }
+  if (status === 408 || status === 504) {
+    return '服务器生成 PDF 超时，请稍后重试。'
+  }
+  if (status === 413) {
+    return '打印内容过大，请减少图片或附件后重试。'
+  }
+  if (status === 429) {
+    return 'PDF 生成请求过多，请稍后重试。'
+  }
+  return '服务器生成 PDF 失败，请稍后重试。'
 }
 
 async function requestServerPdfBlob(snapshotHTML, options = {}) {
@@ -1069,8 +1066,7 @@ async function requestServerPdfBlob(snapshotHTML, options = {}) {
     })
 
     if (!response.ok) {
-      const message = await readServerErrorMessage(response)
-      throw new Error(message || '服务器生成 PDF 失败，请稍后重试。')
+      throw new Error(getServerPdfErrorMessage(response))
     }
 
     const blob = await response.blob()
@@ -1285,4 +1281,6 @@ export const __TEST_ONLY__ = {
   shouldOptimizeServerPdfImageSource,
   applyServerPdfLayoutOverrides,
   normalizeServerPdfRequestOptions,
+  getServerPdfErrorMessage,
+  requestServerPdfBlob,
 }

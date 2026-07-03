@@ -1533,14 +1533,23 @@ func assertRevisionTask(t *testing.T, task *WorkflowTaskCreate, decision string,
 	if task.SourceType != workflowProjectOrderModuleKey || task.SourceID != 88 {
 		t.Fatalf("expected project order source, got %s/%d", task.SourceType, task.SourceID)
 	}
-	if task.Payload["rejected_reason"] != reason {
-		t.Fatalf("expected rejected reason %q, got %#v", reason, task.Payload["rejected_reason"])
-	}
 	if task.Payload["decision"] != decision || task.Payload["transition_status"] != decision {
 		t.Fatalf("expected decision %q payload, got %#v", decision, task.Payload)
 	}
-	if decision == "blocked" && task.Payload["blocked_reason"] != reason {
-		t.Fatalf("expected blocked reason %q, got %#v", reason, task.Payload["blocked_reason"])
+	if decision == "blocked" {
+		if task.Payload["blocked_reason"] != reason {
+			t.Fatalf("expected blocked reason %q, got %#v", reason, task.Payload["blocked_reason"])
+		}
+		if _, ok := task.Payload["rejected_reason"]; ok {
+			t.Fatalf("expected blocked revision task to omit rejected_reason, got %#v", task.Payload)
+		}
+	} else {
+		if task.Payload["rejected_reason"] != reason {
+			t.Fatalf("expected rejected reason %q, got %#v", reason, task.Payload["rejected_reason"])
+		}
+		if _, ok := task.Payload["blocked_reason"]; ok {
+			t.Fatalf("expected rejected revision task to omit blocked_reason, got %#v", task.Payload)
+		}
 	}
 	if task.Payload["notification_type"] != "task_rejected" ||
 		task.Payload["alert_type"] != "approval_pending" {
@@ -1568,11 +1577,20 @@ func assertPurchaseQualityExceptionTask(t *testing.T, task *WorkflowTaskCreate, 
 	if task.Payload["decision"] != decision || task.Payload["transition_status"] != decision {
 		t.Fatalf("expected decision %q payload, got %#v", decision, task.Payload)
 	}
-	if task.Payload["rejected_reason"] != reason {
-		t.Fatalf("expected rejected reason %q, got %#v", reason, task.Payload["rejected_reason"])
-	}
-	if decision == "blocked" && task.Payload["blocked_reason"] != reason {
-		t.Fatalf("expected blocked reason %q, got %#v", reason, task.Payload["blocked_reason"])
+	if decision == "blocked" {
+		if task.Payload["blocked_reason"] != reason {
+			t.Fatalf("expected blocked reason %q, got %#v", reason, task.Payload["blocked_reason"])
+		}
+		if _, ok := task.Payload["rejected_reason"]; ok {
+			t.Fatalf("expected blocked quality exception task to omit rejected_reason, got %#v", task.Payload)
+		}
+	} else {
+		if task.Payload["rejected_reason"] != reason {
+			t.Fatalf("expected rejected reason %q, got %#v", reason, task.Payload["rejected_reason"])
+		}
+		if _, ok := task.Payload["blocked_reason"]; ok {
+			t.Fatalf("expected rejected quality exception task to omit blocked_reason, got %#v", task.Payload)
+		}
 	}
 	if task.Payload["notification_type"] != "qc_failed" ||
 		task.Payload["alert_type"] != "qc_failed" {
@@ -1600,11 +1618,20 @@ func assertOutsourceReworkTask(t *testing.T, task *WorkflowTaskCreate, decision 
 	if task.Payload["decision"] != decision || task.Payload["transition_status"] != decision {
 		t.Fatalf("expected decision %q payload, got %#v", decision, task.Payload)
 	}
-	if task.Payload["rejected_reason"] != reason {
-		t.Fatalf("expected rejected reason %q, got %#v", reason, task.Payload["rejected_reason"])
-	}
-	if decision == "blocked" && task.Payload["blocked_reason"] != reason {
-		t.Fatalf("expected blocked reason %q, got %#v", reason, task.Payload["blocked_reason"])
+	if decision == "blocked" {
+		if task.Payload["blocked_reason"] != reason {
+			t.Fatalf("expected blocked reason %q, got %#v", reason, task.Payload["blocked_reason"])
+		}
+		if _, ok := task.Payload["rejected_reason"]; ok {
+			t.Fatalf("expected blocked outsource rework task to omit rejected_reason, got %#v", task.Payload)
+		}
+	} else {
+		if task.Payload["rejected_reason"] != reason {
+			t.Fatalf("expected rejected reason %q, got %#v", reason, task.Payload["rejected_reason"])
+		}
+		if _, ok := task.Payload["blocked_reason"]; ok {
+			t.Fatalf("expected rejected outsource rework task to omit blocked_reason, got %#v", task.Payload)
+		}
 	}
 	if task.Payload["qc_type"] != "outsource_return" ||
 		task.Payload["outsource_processing"] != true ||

@@ -33,6 +33,26 @@ export const demoCustomerPackage = Object.freeze({
   workPoolRoleOverrides: Object.freeze({
     order_review: "sales",
   }),
+  printTemplateDefaults: Object.freeze([
+    Object.freeze({
+      templateKey: "material-purchase-contract",
+      status: "preview_only",
+      partyDefaults: Object.freeze({
+        buyerCompany: "演示买方公司",
+      }),
+      guardrail:
+        "仅作为 demo 客户配置草案里的采购合同买方抬头默认值，不进入 Product Core 默认样例，不自动生成签章、签收、采购事实或财务事实。",
+    }),
+    Object.freeze({
+      templateKey: "processing-contract",
+      status: "preview_only",
+      partyDefaults: Object.freeze({
+        buyerCompany: "演示买方公司",
+      }),
+      guardrail:
+        "仅作为 demo 客户配置草案里的加工合同委托方抬头默认值，不进入 Product Core 默认样例，不自动生成签章、签收、委外事实或财务事实。",
+    }),
+  ]),
   workflows: Object.freeze([
     {
       key: "demo_sales_order_review",
@@ -271,4 +291,5 @@ export const demoCustomerPackage = Object.freeze({
       guardrail: "关闭策略只作预览，不关闭领域事实或历史记录。",
     },
   ]),
+  extensionPoints: Object.freeze([]),
 });

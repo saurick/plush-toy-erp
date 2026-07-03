@@ -4,6 +4,7 @@ import {
   buildWorkflowActionAccessFallback,
   buildWorkflowActionAccessState,
   normalizeWorkflowActionExplainData,
+  normalizeWorkflowActionMode,
   resolveWorkflowActionAccessRequestOutcome,
 } from './workflowTaskActionAccess.mjs'
 
@@ -17,6 +18,9 @@ function admin(overrides = {}) {
       'workflow.task.update',
       'workflow.task.complete',
     ],
+    effective_session: {
+      actions: ['workflow.task.complete', 'workflow.task.update'],
+    },
     ...overrides,
   }
 }
@@ -67,9 +71,19 @@ test('workflowTaskActionAccess: normalizes backend explain actions', () => {
         reason: '缺少权限',
       },
       {
+        action_key: 'rejected',
+        allowed: true,
+        reason: '可退回',
+      },
+      {
         action_key: 'urge_task',
         allowed: true,
         reason: '可催办',
+      },
+      {
+        action_key: 'custom_backend_action_key',
+        allowed: true,
+        reason: '自定义动作',
       },
     ],
   })
@@ -103,7 +117,17 @@ test('workflowTaskActionAccess: normalizes backend explain actions', () => {
   assert.equal(normalized.complete.actorRoleKey, 'warehouse')
   assert.equal(normalized.block.allowed, false)
   assert.equal(normalized.block.reasonCode, 'missing_permission')
+  assert.equal(normalized.reject.allowed, true)
   assert.equal(normalized.urge.allowed, true)
+  assert.equal(normalized.custom_backend_action_key, undefined)
+})
+
+test('workflowTaskActionAccess: normalizes action mode aliases for submit guards', () => {
+  assert.equal(normalizeWorkflowActionMode('done'), 'complete')
+  assert.equal(normalizeWorkflowActionMode('blocked'), 'block')
+  assert.equal(normalizeWorkflowActionMode('rejected'), 'reject')
+  assert.equal(normalizeWorkflowActionMode('urge_task'), 'urge')
+  assert.equal(normalizeWorkflowActionMode('custom_backend_action_key'), '')
 })
 
 test('workflowTaskActionAccess: backend explain overrides local fallback', () => {
@@ -126,10 +150,19 @@ test('workflowTaskActionAccess: backend explain overrides local fallback', () =>
   assert.equal(access.source, 'backend')
   assert.equal(access.canRun('complete'), false)
   assert.equal(access.canRun('block'), true)
+  assert.equal(access.canRun('reject'), false)
   assert.equal(access.canRun('urge'), false)
   assert.deepEqual(access.allowedModes, ['block'])
   assert.equal(access.getReason('complete'), '后端判定不可完成')
+  assert.equal(
+    access.getReason('reject'),
+    '后端未返回该动作权限，请刷新后重试。'
+  )
   assert.equal(access.getReason('urge'), '后端未返回该动作权限，请刷新后重试。')
+  assert.equal(
+    access.byAction.reject.reasonCode,
+    'action_access_missing_from_backend'
+  )
   assert.equal(
     access.byAction.urge.reasonCode,
     'action_access_missing_from_backend'
@@ -162,6 +195,26 @@ test('workflowTaskActionAccess: fallback keeps local owner and terminal reasons'
   assert.equal(terminal.readonlyReason, '该任务已结束，只能查看上下文。')
 })
 
+test('workflowTaskActionAccess: missing backend explain does not expose local fallback actions', () => {
+  const access = buildWorkflowActionAccessState({
+    adminProfile: admin(),
+    task: task(),
+  })
+
+  assert.equal(access.source, 'fallback_checking')
+  assert.equal(access.loading, false)
+  assert.deepEqual(access.allowedModes, [])
+  assert.equal(access.canRun('complete'), false)
+  assert.equal(access.canRun('block'), false)
+  assert.equal(access.canRun('reject'), false)
+  assert.equal(access.canRun('urge'), false)
+  assert.equal(
+    access.readonlyReason,
+    '正在核对后端任务动作权限，请稍后再提交。'
+  )
+  assert.equal(access.byAction.complete.reasonCode, 'action_access_checking')
+})
+
 test('workflowTaskActionAccess: failed backend explain disables local fallback actions', () => {
   const access = buildWorkflowActionAccessState({
     adminProfile: admin(),
@@ -173,6 +226,7 @@ test('workflowTaskActionAccess: failed backend explain disables local fallback a
   assert.deepEqual(access.allowedModes, [])
   assert.equal(access.canRun('complete'), false)
   assert.equal(access.canRun('block'), false)
+  assert.equal(access.canRun('reject'), false)
   assert.equal(access.canRun('urge'), false)
   assert.equal(
     access.readonlyReason,
@@ -186,6 +240,27 @@ test('workflowTaskActionAccess: failed backend explain disables local fallback a
     access.byAction.complete.reasonCode,
     'action_access_check_failed'
   )
+})
+
+test('workflowTaskActionAccess: loading backend explain does not expose fallback submit actions', () => {
+  const access = buildWorkflowActionAccessState({
+    adminProfile: admin(),
+    task: task(),
+    loading: true,
+  })
+
+  assert.equal(access.source, 'fallback_checking')
+  assert.equal(access.loading, true)
+  assert.deepEqual(access.allowedModes, [])
+  assert.equal(access.canRun('complete'), false)
+  assert.equal(access.canRun('block'), false)
+  assert.equal(access.canRun('reject'), false)
+  assert.equal(access.canRun('urge'), false)
+  assert.equal(
+    access.readonlyReason,
+    '正在核对后端任务动作权限，请稍后再提交。'
+  )
+  assert.equal(access.byAction.complete.reasonCode, 'action_access_checking')
 })
 
 test('workflowTaskActionAccess: request outcome ignores stale and aborted responses', () => {

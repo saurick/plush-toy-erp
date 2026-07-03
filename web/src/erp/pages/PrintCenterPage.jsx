@@ -69,8 +69,8 @@ export default function PrintCenterPage() {
     activeSample.contractNo
       ? `合同编号：${activeSample.contractNo}`
       : `模板：${activeTemplate?.title || '-'}`,
-    activeSample.signDateText
-      ? `签约日期：${activeSample.signDateText}`
+    activeSample.signDateText || activeSample.buyerSignDateText
+      ? `签约日期：${activeSample.signDateText || activeSample.buyerSignDateText}`
       : `场景：${activeTemplate?.scene || '-'}`,
     activeSample.supplierName
       ? `供应商：${activeSample.supplierName}`

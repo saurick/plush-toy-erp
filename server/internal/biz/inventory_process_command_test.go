@@ -118,27 +118,23 @@ func TestInventoryProcessDomainCommandPostInboundRequiresReceipt(t *testing.T) {
 	}
 }
 
-func TestInventoryProcessDomainCommandPostInboundAllowsLegacyID(t *testing.T) {
+func TestInventoryProcessDomainCommandPostInboundRejectsLegacyID(t *testing.T) {
 	ctx := context.Background()
 	inventoryRepo := &inventoryPostInboundProcessInventoryRepoStub{
 		postedReceipt: &PurchaseReceipt{ID: 6001, Status: PurchaseReceiptStatusPosted},
 	}
 	handler := &inventoryPostInboundProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
 
-	result, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
+	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_receipt", BusinessRefID: 6001},
 		CommandKey:      ProcessDomainCommandInventoryPostInbound,
 		IdempotencyKey:  "process:10:node:20:inventory-post-inbound",
 		Payload:         map[string]any{"id": float64(6001)},
-	}, 7)
-	if err != nil {
-		t.Fatalf("expected legacy id to be accepted, got %v", err)
+	}, 7); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected legacy id to be rejected, got %v", err)
 	}
-	if inventoryRepo.postedReceiptID != 6001 {
-		t.Fatalf("expected receipt 6001 to be posted, got %d", inventoryRepo.postedReceiptID)
-	}
-	if result == nil || result.Outcome != InventoryProcessCommandOutcomeInboundPosted {
-		t.Fatalf("expected inbound posted outcome, got %#v", result)
+	if inventoryRepo.postedReceiptID != 0 {
+		t.Fatalf("legacy id command must not post purchase receipt, got %d", inventoryRepo.postedReceiptID)
 	}
 }
 

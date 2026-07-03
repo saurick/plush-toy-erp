@@ -1,4 +1,5 @@
 import { normalizeRoleKey } from './roleKeys.mjs'
+import { formatWorkflowTaskSource } from './dashboardTaskDisplay.mjs'
 
 export const DUE_SOON_MS = 24 * 60 * 60 * 1000
 
@@ -330,6 +331,7 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
     task_name: task.task_name || '未命名任务',
     source_type: sourceType,
     source_no: task.source_no || '',
+    source_label: formatWorkflowTaskSource(task),
     due_status: dueStatus,
   }
 

@@ -102,13 +102,9 @@ function statusTag(status) {
   const key = String(status || '').trim()
   return (
     <Tag color={STATUS_COLORS[key] || 'default'}>
-      {STATUS_LABELS[key] || key || '-'}
+      {STATUS_LABELS[key] || (key ? '入库状态' : '-')}
     </Tag>
   )
-}
-
-function hasPermission(adminProfile, permission) {
-  return hasActionPermission(adminProfile, permission)
 }
 
 function wait(ms) {
@@ -389,7 +385,7 @@ function PurchaseReceiptInlineItemEditor({
         <div>
           <strong>添加入库明细</strong>
           <span>
-            保存后写入当前入库草稿；过账库存仍由后端采购入库 usecase 处理。
+            保存后写入当前入库草稿；过账库存仍由后端采购入库规则处理。
           </span>
         </div>
         <Tag color="blue">{receipt?.receipt_no || '已选入库草稿'}</Tag>
@@ -463,9 +459,9 @@ export default function V1PurchaseReceiptsPage() {
       ? searchParamPositiveIntText(searchParams, 'source_id')
       : '')
 
-  const canCreate = hasPermission(adminProfile, 'purchase.receipt.create')
+  const canCreate = hasActionPermission(adminProfile, 'purchase.receipt.create')
   const canPost =
-    canCreate || hasPermission(adminProfile, 'warehouse.inbound.confirm')
+    canCreate || hasActionPermission(adminProfile, 'warehouse.inbound.confirm')
   const relatedMenuItems = [
     { key: 'purchase-orders', label: '采购订单' },
     { key: 'quality-inspections', label: '来料质检' },
@@ -585,15 +581,19 @@ export default function V1PurchaseReceiptsPage() {
     warehouseFilter,
   ])
 
-  const clearRouteContext = useCallback(() => {
-    const nextParams = new URLSearchParams(searchParams)
-    nextParams.delete('purchase_order_id')
-    nextParams.delete('receipt_id')
-    nextParams.delete('source_type')
-    nextParams.delete('source_id')
-    setSearchParams(nextParams, { replace: true })
-    resetBusinessPaginationCurrent(setPagination)
-  }, [searchParams, setSearchParams])
+  const clearRouteContext = useCallback(
+    (keys) => {
+      const nextParams = new URLSearchParams(searchParams)
+      const keysToDelete =
+        Array.isArray(keys) && keys.length > 0
+          ? keys
+          : ['purchase_order_id', 'receipt_id', 'source_type', 'source_id']
+      keysToDelete.forEach((key) => nextParams.delete(key))
+      setSearchParams(nextParams, { replace: true })
+      resetBusinessPaginationCurrent(setPagination)
+    },
+    [searchParams, setSearchParams]
+  )
 
   useEffect(() => {
     loadRows()
@@ -743,7 +743,7 @@ export default function V1PurchaseReceiptsPage() {
           sortType: 'text',
           render: statusTag,
           exportValue: (record) =>
-            STATUS_LABELS[record?.status] || record?.status || '',
+            STATUS_LABELS[record?.status] || (record?.status ? '入库状态' : ''),
         },
         {
           title: '供应商',
@@ -842,16 +842,16 @@ export default function V1PurchaseReceiptsPage() {
       <PageHeaderCard
         compact
         title="入库管理"
-        description="入库管理当前接入 purchase_receipts / purchase_receipt_items；草稿加明细后由后端过账写库存流水、余额和批次，Workflow 入库任务完成不等于采购入库过账。"
+        description="入库管理维护采购入库草稿和入库明细；草稿加明细后由后端过账写库存流水、余额和批次，协同入库任务完成不等于采购入库过账。"
         tags={[
           <Tag color="gold" key="workflow">
-            Workflow：协同入库
+            协同任务：入库跟进
           </Tag>,
           <Tag color="blue" key="receipt">
-            PurchaseReceipt：入库事实
+            入库单：入库事实
           </Tag>,
           <Tag color="green" key="inventory">
-            过账后写 inventory_txns
+            过账后写库存流水
           </Tag>,
         ]}
         stats={[
@@ -965,12 +965,22 @@ export default function V1PurchaseReceiptsPage() {
               }}
             />
             {routePurchaseOrderID ? (
-              <Tag closable color="blue" onClose={clearRouteContext}>
+              <Tag
+                closable
+                color="blue"
+                onClose={() => clearRouteContext(['purchase_order_id'])}
+              >
                 已按采购订单筛选
               </Tag>
             ) : null}
             {routeReceiptID ? (
-              <Tag closable color="blue" onClose={clearRouteContext}>
+              <Tag
+                closable
+                color="blue"
+                onClose={() =>
+                  clearRouteContext(['receipt_id', 'source_type', 'source_id'])
+                }
+              >
                 已按采购入库筛选
               </Tag>
             ) : null}
@@ -989,7 +999,7 @@ export default function V1PurchaseReceiptsPage() {
           embedded
           selectedCount={selectedRow ? 1 : 0}
           selectedLabel={selectedRowLabel}
-          boundaryText="过账和取消均由后端采购入库 usecase 写库存事实或冲正；前端不本地改库存。"
+          boundaryText="过账和取消均由后端采购入库规则写库存事实或冲正；前端不本地改库存。"
         >
           <Button
             type="link"

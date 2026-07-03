@@ -219,12 +219,42 @@ test('purchaseInboundFlow: 缺 source_no/document_no 不崩溃，非到货模块
     arrivalRecord({ document_no: '', source_no: '', title: '标题兜底' }),
     { nowMs: NOW_MS }
   )
+  const taskWithoutReadableNo = buildIqcTaskFromArrivalRecord(
+    arrivalRecord({ document_no: '', source_no: '', title: '' }),
+    { nowMs: NOW_MS }
+  )
+  const taskWithInternalSourceNo = buildIqcTaskFromArrivalRecord(
+    arrivalRecord({ document_no: '', source_no: '66', title: '' }),
+    { nowMs: NOW_MS }
+  )
   const nonArrivalTask = buildIqcTaskFromArrivalRecord(
     arrivalRecord({ module_key: 'project-orders' }),
     { nowMs: NOW_MS }
   )
 
   assert.equal(task.source_no, '标题兜底')
+  assert.equal(taskWithoutReadableNo.source_no, '')
+  assert.equal(taskWithInternalSourceNo.source_no, '')
+  assert.equal(
+    taskWithoutReadableNo.payload.related_documents.includes('到货记录：66'),
+    false
+  )
+  assert.equal(
+    taskWithInternalSourceNo.payload.related_documents.includes('到货记录：66'),
+    false
+  )
+  assert.equal(
+    taskWithInternalSourceNo.payload.related_documents.includes(
+      '到货记录已关联'
+    ),
+    true
+  )
+  assert.equal(
+    taskWithInternalSourceNo.payload.related_documents.includes(
+      '采购记录已关联'
+    ),
+    true
+  )
   assert.equal(nonArrivalTask, null)
 })
 

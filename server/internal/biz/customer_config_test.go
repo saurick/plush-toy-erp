@@ -210,6 +210,29 @@ func validCustomerConfigInput() CustomerConfigPublishInput {
 					"source_no": map[string]any{"visible": false, "editable": false},
 				},
 			},
+			"printTemplateDefaults": map[string]any{
+				"runtime_enabled":                    true,
+				"formal_runtime_consumed":            true,
+				"sales_order_print_template_enabled": false,
+				"templates": []any{
+					map[string]any{
+						"template_key":              "material-purchase-contract",
+						"runtime_consumed":          true,
+						"supplier_defaults_allowed": false,
+						"party_defaults": map[string]any{
+							"buyerCompany": "永绅",
+						},
+					},
+					map[string]any{
+						"template_key":              "processing-contract",
+						"runtime_consumed":          true,
+						"supplier_defaults_allowed": false,
+						"party_defaults": map[string]any{
+							"buyerCompany": "永绅",
+						},
+					},
+				},
+			},
 		},
 		ModuleStates: []DeploymentModuleStateInput{
 			{ModuleKey: "customers", State: "enabled"},
@@ -555,6 +578,17 @@ func TestCustomerConfigUsecasePublishActivateAndEffectiveSession(t *testing.T) {
 	if _, ok := salesOrderPolicies["source_no"]; !ok {
 		t.Fatalf("source_no field policy missing: %#v", salesOrderPolicies)
 	}
+	printDefaults, ok := session.PrintTemplateDefaults["templates"].([]any)
+	if !ok || len(printDefaults) != 1 {
+		t.Fatalf("print template defaults must include enabled purchase template only, got %#v", session.PrintTemplateDefaults)
+	}
+	materialDefaults, _ := printDefaults[0].(map[string]any)
+	if materialDefaults["template_key"] != "material-purchase-contract" {
+		t.Fatalf("print template default = %#v", materialDefaults)
+	}
+	if materialDefaults["supplier_defaults_allowed"] != false {
+		t.Fatalf("supplier defaults must stay disabled: %#v", materialDefaults)
+	}
 }
 
 func TestCustomerConfigUsecaseEffectiveSessionFiltersProjectionByEnabledModules(t *testing.T) {
@@ -602,6 +636,21 @@ func TestCustomerConfigUsecaseEffectiveSessionFiltersProjectionByEnabledModules(
 	}
 	if _, ok := session.FieldPolicies["sales_orders.default"]; ok {
 		t.Fatalf("sales order field policy must be filtered when sales_orders is read_only: %#v", session.FieldPolicies)
+	}
+}
+
+func TestCustomerConfigUsecaseRejectsUnsafePrintTemplateDefaults(t *testing.T) {
+	ctx := context.Background()
+	repo := newMemCustomerConfigRepo()
+	uc := NewCustomerConfigUsecase(repo)
+	in := validCustomerConfigInput()
+	printDefaults := in.CompiledSnapshot["printTemplateDefaults"].(map[string]any)
+	templates := printDefaults["templates"].([]any)
+	firstTemplate := templates[0].(map[string]any)
+	firstTemplate["supplier_defaults_allowed"] = true
+
+	if _, err := uc.PublishCustomerConfig(ctx, in, 99); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("PublishCustomerConfig error = %v, want ErrBadParam", err)
 	}
 }
 

@@ -135,6 +135,42 @@ test('errorMessage: 未知英文原文收口到页面 fallback', () => {
   )
 })
 
+test('errorMessage: 直接传入英文拒绝原因也收口到 fallback', () => {
+  assert.equal(
+    getUserFacingErrorMessage(
+      'owner_role_key mismatch',
+      '当前账号不能提交这个任务动作'
+    ),
+    '当前账号不能提交这个任务动作'
+  )
+})
+
+test('errorMessage: 中文夹带技术字段也收口到页面 fallback', () => {
+  const cases = [
+    '当前账号 owner_role_key 不匹配',
+    'payload 校验失败，请检查 source_id',
+    'task_status_key 不允许从 done 改为 blocked',
+  ]
+
+  for (const message of cases) {
+    assert.equal(
+      getUserFacingErrorMessage(message, '当前账号不能提交这个任务动作'),
+      '当前账号不能提交这个任务动作'
+    )
+  }
+})
+
+test('errorMessage: 登录态短英文原文收口为中文重新登录提示', () => {
+  assert.equal(
+    getUserFacingErrorMessage('expired', '登录失败，请稍后重试'),
+    '登录已过期，请重新登录'
+  )
+  assert.equal(
+    getUserFacingErrorMessage('token expired', '登录失败，请稍后重试'),
+    '登录已过期，请重新登录'
+  )
+})
+
 test('errorMessage: 动作型 helper 自动补齐标准中文兜底', () => {
   assert.equal(
     getActionErrorMessage({ message: 'temporary upstream failure' }, '登录'),

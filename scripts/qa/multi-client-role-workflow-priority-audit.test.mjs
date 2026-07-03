@@ -865,7 +865,7 @@ test("multi-client role workflow priority audit passes current executable eviden
   ]);
   assert(
     workflowCompleteActionCoverage.notProven.includes(
-      "legacy update_task_status automatically calls ProcessRuntime completion",
+      "removed raw workflow status API is available to trigger ProcessRuntime completion",
     ),
   );
   assert(

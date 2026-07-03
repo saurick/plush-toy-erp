@@ -56,10 +56,123 @@ const NUMBERING_DECISION_LABELS = Object.freeze({
   deferred: '后续评审',
 })
 
+const FIELD_SOURCE_FALLBACK_LABEL = '来源已登记'
+const SOURCE_PATH_FALLBACK_LABEL = '来源已登记'
+
+const SOURCE_PATH_LABELS = Object.freeze({
+  [DEV_CUSTOMER_CONFIG_SOURCE_PATH]: '客户配置包说明',
+  [DEV_CUSTOMER_MENU_CONFIG_SOURCE_PATH]: '客户菜单配置',
+  [DEV_CUSTOMER_FIELD_NUMBERING_SOURCE_PATH]: '字段编号配置',
+  [DEV_CUSTOMER_PACKAGE_SOURCE_PATH]: '客户配置包',
+  [DEV_CUSTOMER_IMPORT_TOOLING_SOURCE_PATH]: '导入工具入口',
+  [DEV_PRINT_TEMPLATE_SOURCE_PATH]: '打印模板字段配置',
+  [DEV_PRINT_TEMPLATE_BEHAVIOR_DOC_PATH]: '打印模板字段清单',
+  'config/customers/<customer-key>/': '客户配置包目录',
+})
+
 const MODULE_STATE_LABELS = Object.freeze({
   enabled: '启用',
   read_only: '只读',
   disabled: '关闭',
+})
+
+const WORKFLOW_FACT_BOUNDARY_LABELS = Object.freeze({
+  workflow_only: '只做协同流转',
+})
+
+const MODULE_STATE_SOURCE_LABELS = Object.freeze({
+  customer_package_override: '客户包覆盖',
+  catalog_default: '目录默认',
+})
+
+const PRINT_TEMPLATE_FACT_BOUNDARY_LABELS = Object.freeze({
+  read_snapshot_only: '只读快照',
+})
+
+const CATALOG_STATUS_LABELS = Object.freeze({
+  preview_only: '预览，不接运行时',
+  controlled_empty: '受控空目录',
+  contract_preview_only: '合同预览，不启用处理器',
+})
+
+const IMPLEMENTATION_SOURCE_LABELS = Object.freeze({
+  compiled_runtime_manifest: '编译清单结构预览',
+  registered_deployment_package_required: '实现来自已登记部署包',
+})
+
+const RUNTIME_ENABLED_LABELS = Object.freeze({
+  true: '运行时开启',
+  false: '运行时关闭',
+})
+
+const CUSTOMER_PACKAGE_HANDLER_FORBIDDEN_LABEL = '禁止客户包处理器'
+
+const POLICY_KIND_LABELS = Object.freeze({
+  skip_policy: '跳过策略',
+  auto_generate_policy: '自动生成策略',
+  close_policy: '关闭策略',
+})
+
+const POLICY_RULE_TRIGGER_LABELS = Object.freeze({
+  skip_optional_review_when_unconfigured: '可选评审未配置时',
+  no_risk: '无风险事项',
+  source_ready: '来源资料已就绪',
+  all_tasks_done: '所有协同任务完成',
+})
+
+const POLICY_RULE_RESULT_LABELS = Object.freeze({
+  manual_review_required: '进入人工评审',
+  preview_only: '仅生成预览',
+  requires_usecase_review: '需要 usecase 评审',
+  skip_optional_review: '跳过可选评审',
+  generate_next_task_preview: '生成下一任务预览',
+  close_preview_flow: '关闭预览流程',
+})
+
+const BOUNDARY_LABELS = Object.freeze({
+  runtimeEnabled: '运行时启用',
+  previewOnly: '预览模式',
+  createsTenant: '创建租户',
+  changesSchema: '修改 schema',
+  changesMigration: '修改 migration',
+  changesBackendRbac: '修改后端 RBAC',
+  changesWorkflowFactRules: '修改 Workflow / Fact 规则',
+  changesRuntimeLoader: '修改运行时 loader',
+  executesImport: '执行导入',
+  executesRealImport: '执行真实导入',
+  writesBusinessRecords: '写 business_records',
+  writesFacts: '写事实层',
+  writesInventoryFacts: '写库存事实',
+  writesShipmentFacts: '写出货事实',
+  writesFinanceFacts: '写财务事实',
+})
+
+const WRITE_CLASS_LABELS = Object.freeze({
+  tracked_config_read: '读取已登记配置',
+  no_write_preflight: '只读预检',
+  no_write_diff_preview: '只读差异预览',
+  no_write_evidence: '不写库，仅生成报告',
+  test_config_control_write: '写当前后端配置控制面',
+  formal_config_control_write: '写正式配置控制面',
+  formal_config_control_activation: '切换正式配置版本',
+  business_data_import_separate_task: '真实业务数据导入专项',
+})
+
+const EXECUTION_BOUNDARY_LABELS = Object.freeze({
+  customer_config_control_plane_only: '只处理客户配置控制面',
+})
+
+const EXTENSION_RUNTIME_BLOCKERS = Object.freeze([
+  'no_reviewed_extension_contract',
+  'customer_package_handler_forbidden',
+  'registered_deployment_package_required',
+])
+
+const REGISTRY_CHECK_FALLBACK_LABELS = Object.freeze({
+  boundary: '配置边界',
+  command: '命令绑定',
+  extension: '扩展点绑定',
+  policy: '策略绑定',
 })
 
 export function isDevCustomerConfigEnabled(env = import.meta.env) {
@@ -72,6 +185,25 @@ function normalizeCustomerKey(value = '') {
     .toLowerCase()
 }
 
+function mapSourcePathLabel(sourcePath) {
+  if (typeof sourcePath !== 'string' || sourcePath.trim() === '') {
+    return SOURCE_PATH_FALLBACK_LABEL
+  }
+  return SOURCE_PATH_LABELS[sourcePath] || SOURCE_PATH_FALLBACK_LABEL
+}
+
+function resolveBrandMark(brand = {}, label = '') {
+  const explicitMark =
+    typeof brand.brandMark === 'string' ? brand.brandMark.trim() : ''
+  if (explicitMark) return explicitMark
+
+  const readableName =
+    [brand.companyName, brand.systemName, label].find(
+      (value) => typeof value === 'string' && value.trim()
+    ) || ''
+  return Array.from(readableName.trim().replace(/\s+/g, ''))[0] || '客'
+}
+
 export function listRegisteredDevCustomerPackages(
   registry = DEV_CUSTOMER_CONFIG_REGISTRY
 ) {
@@ -79,6 +211,7 @@ export function listRegisteredDevCustomerPackages(
     customerKey: item.customerKey,
     label: item.label,
     sourcePath: item.sourcePath,
+    sourceLabel: mapSourcePathLabel(item.sourcePath),
   }))
 }
 
@@ -133,6 +266,10 @@ function flattenFieldCandidates(config = {}) {
       module: moduleConfig.module,
       moduleLabel: moduleConfig.label,
       decisionLabel: FIELD_DECISION_LABELS[candidate.decision] || '未标记',
+      fieldKeyLabel: '字段锚点已登记',
+      sourceLabel: candidate.source
+        ? `来源：${candidate.source}`
+        : FIELD_SOURCE_FALLBACK_LABEL,
     }))
   )
 }
@@ -140,10 +277,54 @@ function flattenFieldCandidates(config = {}) {
 function buildBoundaryItems(config = {}) {
   return Object.entries(config.boundaries || {}).map(([key, value]) => ({
     key,
+    label: BOUNDARY_LABELS[key] || REGISTRY_CHECK_FALLBACK_LABELS.boundary,
     value: Boolean(value),
+    valueLabel: value ? '是' : '否',
     expected: false,
+    expectedLabel: '否',
     ok: value === false,
   }))
+}
+
+function buildPrintFieldRequirementItems(requirements = []) {
+  return (Array.isArray(requirements) ? requirements : []).map(
+    (requirement) => ({
+      label: requirement.label || '字段要求',
+      sourceLabel: requirement.source
+        ? `来源：${requirement.source}`
+        : '来源已登记',
+      boundary: requirement.boundary || '只读字段要求，不写业务事实',
+      requirementKeyLabel: '字段要求锚点已登记',
+    })
+  )
+}
+
+function withWriteBoundaryLabels(item = {}) {
+  const writesBusinessData = item.writesBusinessData === true
+  const writesConfigControl = item.writesConfigControl === true
+  const writesLabel =
+    item.writesLabel ||
+    (writesBusinessData
+      ? '客户、供应商、联系人、销售订单等业务数据'
+      : writesConfigControl
+        ? '客户配置版本、模块状态、角色画像、授权、责任池和审计记录'
+        : '本地报告或只读结果')
+  return {
+    ...item,
+    writesLabel,
+    writeClassLabel: WRITE_CLASS_LABELS[item.writeClass] || '未标记写入类别',
+    writesBusinessDataLabel: writesBusinessData
+      ? '会写业务数据'
+      : '不写业务数据',
+    writesConfigControlLabel: writesConfigControl
+      ? '写客户配置控制面'
+      : '不写客户配置控制面',
+    dataBoundaryLabel: writesBusinessData
+      ? '业务数据导入专项'
+      : writesConfigControl
+        ? '配置控制面'
+        : '不写数据库',
+  }
 }
 
 function countPackageNodes(workflows = []) {
@@ -153,8 +334,135 @@ function countPackageNodes(workflows = []) {
   )
 }
 
+function buildKeySet(items = []) {
+  return new Set((Array.isArray(items) ? items : []).map((item) => item.key))
+}
+
+function buildLabelMap(items = []) {
+  return new Map(
+    (Array.isArray(items) ? items : [])
+      .filter((item) => item?.key && item?.label)
+      .map((item) => [item.key, item.label])
+  )
+}
+
+function resolveRegistryCheckLabel(label = '', fallback = '') {
+  return String(label || '').trim() || fallback
+}
+
+function resolveModuleStateLabel(label = '') {
+  return resolveRegistryCheckLabel(label, '已登记模块')
+}
+
+function buildPolicyRuleItem(rule = {}, index = 0) {
+  const trigger = rule.when || rule.key || ''
+  const result = rule.action || rule.decision || ''
+  return {
+    key: `policy-rule-${index + 1}`,
+    triggerLabel: `条件：${POLICY_RULE_TRIGGER_LABELS[trigger] || '条件已登记'}`,
+    resultLabel: `结果：${POLICY_RULE_RESULT_LABELS[result] || '结果已登记'}`,
+    note:
+      typeof rule.note === 'string' && rule.note.trim() ? rule.note.trim() : '',
+  }
+}
+
+function uniqueValues(values = []) {
+  return [...new Set(values.filter(Boolean))]
+}
+
+const FORBIDDEN_STATE_TRANSITIONS = Object.freeze([
+  ['shipped', 'draft'],
+  ['settled', 'submitted'],
+  ['closed', 'processing'],
+  ['closed', 'in_progress'],
+  ['posted', 'draft'],
+])
+
+function isForbiddenStateTransition([from, to] = []) {
+  const normalizedFrom = String(from || '')
+    .trim()
+    .toLowerCase()
+  const normalizedTo = String(to || '')
+    .trim()
+    .toLowerCase()
+  return FORBIDDEN_STATE_TRANSITIONS.some(
+    ([blockedFrom, blockedTo]) =>
+      normalizedFrom === blockedFrom && normalizedTo === blockedTo
+  )
+}
+
 function allPackageBoundariesOk(boundaries = []) {
   return boundaries.every((item) => item.ok)
+}
+
+function buildCompiledCatalogSummary(config = {}) {
+  const businessFlows = Array.isArray(config.businessFlows)
+    ? config.businessFlows
+    : []
+  const stateMachines = Array.isArray(config.stateMachines)
+    ? config.stateMachines
+    : []
+  const processPolicies = Array.isArray(config.processPolicies)
+    ? config.processPolicies
+    : []
+  const extensionPoints = Array.isArray(config.extensionPoints)
+    ? config.extensionPoints
+    : []
+  const extensionCatalogStatus =
+    extensionPoints.length > 0 ? 'contract_preview_only' : 'controlled_empty'
+  const withCatalogLabels = (item) => ({
+    ...item,
+    runtimeEnabledLabel:
+      RUNTIME_ENABLED_LABELS[String(item.runtimeEnabled === true)],
+    catalogStatusLabel: CATALOG_STATUS_LABELS[item.catalogStatus] || '未标记',
+    implementationSourceLabel:
+      IMPLEMENTATION_SOURCE_LABELS[item.implementationSource] || '未登记来源',
+    ...(item.handlerAllowed === false
+      ? { handlerAllowedLabel: CUSTOMER_PACKAGE_HANDLER_FORBIDDEN_LABEL }
+      : {}),
+  })
+
+  return [
+    withCatalogLabels({
+      key: 'flow-catalog',
+      label: '流程目录',
+      status: 'preview_only',
+      runtimeEnabled: false,
+      catalogStatus: 'preview_only',
+      implementationSource: 'compiled_runtime_manifest',
+      itemCount: businessFlows.length + stateMachines.length,
+      summary: `${businessFlows.length} 条业务流转 / ${stateMachines.length} 个状态机`,
+      note: '编译后的流程目录只保留结构预览，运行时关闭；不改 WorkflowUsecase，也不写库存、出货、财务或开票事实。',
+    }),
+    withCatalogLabels({
+      key: 'policy-catalog',
+      label: '策略目录',
+      status: 'preview_only',
+      runtimeEnabled: false,
+      catalogStatus: 'preview_only',
+      implementationSource: 'registered_deployment_package_required',
+      itemCount: processPolicies.length,
+      summary: `${processPolicies.length} 条流程策略`,
+      note: '编译后的策略目录只允许已登记策略锚点和参数；策略实现必须来自产品核心、行业模板或已注册部署包。',
+    }),
+    withCatalogLabels({
+      key: 'extension-point-catalog',
+      label: '扩展点目录',
+      status: extensionCatalogStatus,
+      runtimeEnabled: false,
+      catalogStatus: extensionCatalogStatus,
+      implementationSource: 'registered_deployment_package_required',
+      handlerAllowed: false,
+      customerPackageHandlerAllowed: false,
+      blockedReasons: [...EXTENSION_RUNTIME_BLOCKERS],
+      itemCount: extensionPoints.length,
+      summary:
+        extensionPoints.length > 0
+          ? `${extensionPoints.length} 个扩展点合同预览`
+          : '当前无扩展点绑定',
+      note: '编译后的扩展点目录明确禁止客户包上传或启用处理器；后续实现只能来自已注册部署包。',
+    }),
+  ]
 }
 
 function buildModuleStateSummary(
@@ -179,12 +487,14 @@ function buildModuleStateSummary(
     const state = override?.state || 'enabled'
     return {
       moduleKey: item.key,
-      label: item.label || item.key,
+      label: resolveModuleStateLabel(item.label),
       state,
-      stateLabel: MODULE_STATE_LABELS[state] || state || '未标记',
-      reason:
-        override?.reason || '未在客户包覆盖，manifest 编译时默认 enabled。',
+      stateLabel: MODULE_STATE_LABELS[state] || '未标记',
+      reason: override?.reason || '未在客户包覆盖，编译清单默认按启用处理。',
       source: override ? 'customer_package_override' : 'catalog_default',
+      sourceLabel: override
+        ? MODULE_STATE_SOURCE_LABELS.customer_package_override
+        : MODULE_STATE_SOURCE_LABELS.catalog_default,
       overridden: Boolean(override),
     }
   })
@@ -222,11 +532,25 @@ export function buildPrintTemplateFieldSummary(
   const templates = (Array.isArray(catalog) ? catalog : []).map((item) => ({
     key: item.key,
     title: item.title,
+    templateKeyLabel: '模板锚点已登记',
     category: item.category,
     readiness: item.readiness || 'unknown',
+    runtimeStatus: item.runtimeStatus || 'unknown',
+    factBoundary: item.factBoundary || 'unknown',
+    factBoundaryLabel:
+      PRINT_TEMPLATE_FACT_BOUNDARY_LABELS[item.factBoundary] || '未标记边界',
+    moduleKeys: item.moduleKeys || [],
     fieldTruthCount: (item.fieldTruth || []).length,
+    fieldTruthCountLabel: `${(item.fieldTruth || []).length} 条字段真源`,
+    fieldRequirementCount: (item.fieldRequirements || []).length,
+    fieldRequirementCountLabel: `${
+      (item.fieldRequirements || []).length
+    } 条字段要求`,
     sourceFileCount: (item.sourceFiles || []).length,
     fieldTruth: item.fieldTruth || [],
+    fieldRequirementItems: buildPrintFieldRequirementItems(
+      item.fieldRequirements || []
+    ),
     output: item.output || '',
   }))
 
@@ -239,9 +563,15 @@ export function buildPrintTemplateFieldSummary(
       (total, item) => total + item.fieldTruthCount,
       0
     ),
+    fieldRequirementCount: templates.reduce(
+      (total, item) => total + item.fieldRequirementCount,
+      0
+    ),
     templates,
     sourcePath,
+    sourceLabel: mapSourcePathLabel(sourcePath),
     behaviorDocPath: DEV_PRINT_TEMPLATE_BEHAVIOR_DOC_PATH,
+    behaviorDocLabel: mapSourcePathLabel(DEV_PRINT_TEMPLATE_BEHAVIOR_DOC_PATH),
     runtimeStatus: 'source_grounded',
     boundary:
       '当前只登记采购合同和加工合同；销售订单受理未接打印模板，客户抬头 / 签章 / 固定文案留在客户配置或模板边界。',
@@ -254,17 +584,77 @@ export function buildCustomerPackagePreviewSummary(
   catalog = customerPackageCatalog
 ) {
   const moduleStateSummary = buildModuleStateSummary(config, catalog)
+  const catalogPolicyKeys = buildKeySet(catalog.policies)
+  const catalogCommandKeys = buildKeySet(catalog.commands)
+  const catalogPolicyLabels = buildLabelMap(catalog.policies)
+  const catalogCommandLabels = buildLabelMap(catalog.commands)
+  const catalogWorkPoolKeys = buildKeySet(catalog.workPools)
+  const catalogWorkPoolLabels = buildLabelMap(catalog.workPools)
+  const workflows = Array.isArray(config.workflows) ? config.workflows : []
+  const processPolicies = Array.isArray(config.processPolicies)
+    ? config.processPolicies
+    : []
+  const extensionPoints = Array.isArray(config.extensionPoints)
+    ? config.extensionPoints
+    : []
+  const printTemplateDefaults = Array.isArray(config.printTemplateDefaults)
+    ? config.printTemplateDefaults
+    : []
+  const printTemplateLabels = buildLabelMap(
+    printTemplateCatalog.map((item) => ({
+      key: item.key,
+      label: item.title,
+    }))
+  )
+  const workflowCommandKeys = uniqueValues(
+    workflows.flatMap((workflow) =>
+      (workflow.nodes || []).map((node) => node.command)
+    )
+  )
+  const missingWorkflowEndCount = workflows.filter(
+    (workflow) => !(workflow.nodes || []).some((node) => node.type === 'end')
+  ).length
+  const missingWorkflowRoleCount = workflows.reduce(
+    (total, workflow) =>
+      total +
+      (workflow.nodes || []).filter(
+        (node) => node.ownerPool && !catalogWorkPoolKeys.has(node.ownerPool)
+      ).length,
+    0
+  )
+  const illegalStateTransitionCount = (config.stateMachines || []).reduce(
+    (total, stateMachine) =>
+      total +
+      (stateMachine.transitions || []).filter(isForbiddenStateTransition)
+        .length,
+    0
+  )
+  const unregisteredPolicyBindingCount = processPolicies.filter(
+    (item) => !catalogPolicyKeys.has(item.key)
+  ).length
+  const unregisteredCommandBindingCount = workflowCommandKeys.filter(
+    (key) => !catalogCommandKeys.has(key)
+  ).length
+  const unregisteredExtensionBindingCount = extensionPoints.filter(
+    (item) => item.handler
+  ).length
   const boundaries = [
     {
       key: 'runtimeEnabled',
+      label: BOUNDARY_LABELS.runtimeEnabled,
       value: config.runtimeEnabled === true,
+      valueLabel: config.runtimeEnabled === true ? '是' : '否',
       expected: false,
+      expectedLabel: '否',
       ok: config.runtimeEnabled !== true,
     },
     {
       key: 'previewOnly',
+      label: BOUNDARY_LABELS.previewOnly,
       value: config.sourcePolicy?.previewOnly === true,
+      valueLabel: config.sourcePolicy?.previewOnly === true ? '是' : '否',
       expected: true,
+      expectedLabel: '是',
       ok: config.sourcePolicy?.previewOnly === true,
     },
     ...buildBoundaryItems(config),
@@ -279,19 +669,37 @@ export function buildCustomerPackagePreviewSummary(
     publishEnabled: config.sourcePolicy?.publishEnabled === true,
     activateEnabled: config.sourcePolicy?.activateEnabled === true,
     rollbackEnabled: config.sourcePolicy?.rollbackEnabled === true,
-    workflowCount: (config.workflows || []).length,
-    workflowNodeCount: countPackageNodes(config.workflows || []),
-    workflows: (config.workflows || []).map((workflow) => ({
+    workflowCount: workflows.length,
+    workflowNodeCount: countPackageNodes(workflows),
+    workflows: workflows.map((workflow) => ({
       key: workflow.key,
       label: workflow.label,
       status: workflow.status,
       ownerPools: workflow.ownerPools || [],
+      ownerPoolLabels: (workflow.ownerPools || []).map(
+        (pool) =>
+          catalogWorkPoolLabels.get(pool) ||
+          resolveRegistryCheckLabel('', '责任池')
+      ),
       nodeCount: (workflow.nodes || []).length,
+      hasEndNode: (workflow.nodes || []).some((node) => node.type === 'end'),
+      commandKeys: (workflow.nodes || [])
+        .map((node) => node.command)
+        .filter(Boolean),
       factBoundary: workflow.factBoundary,
+      factBoundaryLabel:
+        WORKFLOW_FACT_BOUNDARY_LABELS[workflow.factBoundary] ||
+        '协同边界未标记',
       guardrail: workflow.guardrail,
     })),
     businessFlowCount: (config.businessFlows || []).length,
-    businessFlows: config.businessFlows || [],
+    businessFlows: (config.businessFlows || []).map((item) => ({
+      ...item,
+      flowKeyLabel: '业务流锚点已登记',
+      moduleRouteLabel: (item.modules || []).length
+        ? `关联模块：${(item.modules || []).length} 个`
+        : '关联模块未声明',
+    })),
     stateMachineCount: (config.stateMachines || []).length,
     stateMachines: (config.stateMachines || []).map((item) => ({
       key: item.key,
@@ -299,17 +707,136 @@ export function buildCustomerPackagePreviewSummary(
       status: item.status,
       stateCount: (item.states || []).length,
       transitionCount: (item.transitions || []).length,
+      stateCountLabel: `${(item.states || []).length} 个状态`,
+      transitionCountLabel: `${(item.transitions || []).length} 条转换`,
       guardrail: item.guardrail,
     })),
-    processPolicyCount: (config.processPolicies || []).length,
-    processPolicies: (config.processPolicies || []).map((item) => ({
+    processPolicyCount: processPolicies.length,
+    processPolicies: processPolicies.map((item) => ({
       key: item.key,
       label: item.label,
       status: item.status,
       kind: item.kind,
       ruleCount: (item.rules || []).length,
+      kindLabel: item.kind
+        ? `策略类型：${POLICY_KIND_LABELS[item.kind] || '已登记策略'}`
+        : '策略类型未声明',
+      ruleCountLabel: `${(item.rules || []).length} 条规则`,
+      ruleItems: (item.rules || []).map((rule, ruleIndex) =>
+        buildPolicyRuleItem(rule, ruleIndex)
+      ),
+      registered: catalogPolicyKeys.has(item.key),
       guardrail: item.guardrail,
     })),
+    extensionPointCount: extensionPoints.length,
+    extensionPoints: extensionPoints.map((item) => ({
+      key: item.key,
+      label: item.label,
+      status: item.status,
+      runtimeEnabled: item.runtimeEnabled === true,
+      hasCustomerPackageHandler: Boolean(item.handler),
+      registered: !item.handler && item.runtimeEnabled !== true,
+      guardrail: item.guardrail,
+    })),
+    strategyRegistryChecks: processPolicies.map((item) => ({
+      key: item.key,
+      label: resolveRegistryCheckLabel(
+        item.label || catalogPolicyLabels.get(item.key),
+        REGISTRY_CHECK_FALLBACK_LABELS.policy
+      ),
+      status: catalogPolicyKeys.has(item.key)
+        ? 'registered_binding'
+        : 'blocked',
+      implementationSource: 'registered_deployment_package_required',
+      implementationSourceLabel:
+        IMPLEMENTATION_SOURCE_LABELS.registered_deployment_package_required,
+      note: catalogPolicyKeys.has(item.key)
+        ? '只允许绑定已登记策略 key；策略实现不得由客户包上传。'
+        : '策略 key 未登记，必须阻断导入。',
+    })),
+    commandBindingChecks: workflowCommandKeys.map((key) => ({
+      key,
+      label: resolveRegistryCheckLabel(
+        catalogCommandLabels.get(key),
+        REGISTRY_CHECK_FALLBACK_LABELS.command
+      ),
+      status: catalogCommandKeys.has(key) ? 'registered_binding' : 'blocked',
+      implementationSource: 'registered_deployment_package_required',
+      implementationSourceLabel:
+        IMPLEMENTATION_SOURCE_LABELS.registered_deployment_package_required,
+      note: catalogCommandKeys.has(key)
+        ? '流程节点只绑定已登记命令锚点；运行时执行仍由部署包 / 后端处理器决定。'
+        : '流程节点命令未登记，必须阻断导入。',
+    })),
+    extensionRegistryChecks:
+      extensionPoints.length > 0
+        ? extensionPoints.map((item) => ({
+            key: item.key,
+            label: resolveRegistryCheckLabel(
+              item.label,
+              REGISTRY_CHECK_FALLBACK_LABELS.extension
+            ),
+            status:
+              item.runtimeEnabled === true || item.handler
+                ? 'blocked'
+                : 'controlled_empty',
+            implementationSource: 'registered_deployment_package_required',
+            implementationSourceLabel:
+              IMPLEMENTATION_SOURCE_LABELS.registered_deployment_package_required,
+            handlerAllowed: false,
+            handlerAllowedLabel: CUSTOMER_PACKAGE_HANDLER_FORBIDDEN_LABEL,
+            customerPackageHandlerAllowed: false,
+            blockedReasons: [...EXTENSION_RUNTIME_BLOCKERS],
+            note:
+              item.runtimeEnabled === true || item.handler
+                ? '客户包不得上传扩展点实现或未登记处理器。'
+                : '扩展点合同只保留绑定位，不发布可执行处理器。',
+          }))
+        : [
+            {
+              key: 'controlled-empty-extension-catalog',
+              label: '扩展点绑定',
+              status: 'controlled_empty',
+              implementationSource: 'registered_deployment_package_required',
+              implementationSourceLabel:
+                IMPLEMENTATION_SOURCE_LABELS.registered_deployment_package_required,
+              handlerAllowed: false,
+              handlerAllowedLabel: CUSTOMER_PACKAGE_HANDLER_FORBIDDEN_LABEL,
+              customerPackageHandlerAllowed: false,
+              blockedReasons: [...EXTENSION_RUNTIME_BLOCKERS],
+              note: '当前客户包未绑定扩展点；后续如绑定，处理器必须来自已注册部署包。',
+            },
+          ],
+    compiledCatalogSummary: buildCompiledCatalogSummary(config),
+    importMappingCount: Array.isArray(config.importMappings)
+      ? config.importMappings.length
+      : 0,
+    printTemplateDefaultCount: printTemplateDefaults.length,
+    printTemplateDefaults: printTemplateDefaults.map((item) => ({
+      templateKey: item.templateKey,
+      templateLabel:
+        printTemplateLabels.get(item.templateKey) || '已登记打印模板',
+      templateKeyLabel: '模板锚点已登记',
+      status: item.status,
+      defaultFieldCount: Object.keys(item.partyDefaults || {}).length,
+      defaultFieldCountLabel: `${
+        Object.keys(item.partyDefaults || {}).length
+      } 个默认方字段`,
+      partyDefaultKeysLabel: `${
+        Object.keys(item.partyDefaults || {}).length
+      } 个默认方字段已登记`,
+      partyDefaultKeys: Object.keys(item.partyDefaults || {}),
+      runtimeConsumed: true,
+      supplierDefaultsAllowed: false,
+      supplierDefaultsAllowedLabel: '供应商快照受保护',
+      guardrail: item.guardrail,
+    })),
+    missingWorkflowEndCount,
+    missingWorkflowRoleCount,
+    illegalStateTransitionCount,
+    unregisteredPolicyBindingCount,
+    unregisteredCommandBindingCount,
+    unregisteredExtensionBindingCount,
     moduleStateCatalogCount: moduleStateSummary.catalogModuleCount,
     moduleStateOverrideCount: moduleStateSummary.overrideCount,
     moduleStateUnknownOverrideCount: moduleStateSummary.unknownOverrideCount,
@@ -321,6 +848,7 @@ export function buildCustomerPackagePreviewSummary(
     boundaryOk: allPackageBoundariesOk(boundaries),
     qaCommand: DEV_CUSTOMER_PACKAGE_QA_COMMAND,
     sourcePath,
+    sourceLabel: mapSourcePathLabel(sourcePath),
   }
 }
 
@@ -329,14 +857,19 @@ export function buildCustomerMenuRuntimeSummary(
   sourcePath = DEV_CUSTOMER_MENU_CONFIG_SOURCE_PATH
 ) {
   const sections = menuConfig.desktopMenu?.sections || []
+  const brand = menuConfig.brand || {}
   return {
     customerKey: menuConfig.customerKey,
     label: menuConfig.label,
-    brand: menuConfig.brand || {},
+    brand: {
+      ...brand,
+      brandMark: resolveBrandMark(brand, menuConfig.label),
+    },
     sectionCount: sections.length,
     itemCount: countMenuItems(sections),
     sections,
     sourcePath,
+    sourceLabel: mapSourcePathLabel(sourcePath),
     runtimeStatus: 'runtime_frontend_only',
   }
 }
@@ -370,13 +903,17 @@ export function buildFieldNumberingDraftSummary(
     boundaries: [
       {
         key: 'runtimeEnabled',
+        label: BOUNDARY_LABELS.runtimeEnabled,
         value: config.runtimeEnabled === true,
+        valueLabel: config.runtimeEnabled === true ? '是' : '否',
         expected: false,
+        expectedLabel: '否',
         ok: config.runtimeEnabled !== true,
       },
       ...buildBoundaryItems(config),
     ],
     sourcePath,
+    sourceLabel: mapSourcePathLabel(sourcePath),
   }
 }
 
@@ -388,10 +925,14 @@ export function buildImportToolingSummary(
   const outputBasePath = `output/customers/${normalizedCustomerKey}`
   const uiDryRunOut = `${outputBasePath}/ui-import-dry-run`
   const releaseEvidenceDir = `deployments/${normalizedCustomerKey}/evidence/releases/<YYYY-MM-DD>`
+  const releaseReadbackPreflightEvidenceDir = `deployments/${normalizedCustomerKey}/evidence/releases/2026-06-29`
   const releaseManifestPath = `${outputBasePath}/customer-config-runtime-manifest.json`
   const releaseReportPath = `${outputBasePath}/customer-config-release/customer-config-release-report.json`
+  const releaseReadbackPreflightReportPath = `${outputBasePath}/customer-config-readback-preflight.json`
+  const releaseReadbackPreflightCommand = `node scripts/deploy/customer-config-release-readiness.mjs --manifest ${releaseManifestPath} --evidence-dir ${releaseReadbackPreflightEvidenceDir} --release-report ${releaseReportPath} --readback-preflight-report ${releaseReadbackPreflightReportPath}`
   return {
     sourcePath: DEV_CUSTOMER_IMPORT_TOOLING_SOURCE_PATH,
+    sourceLabel: mapSourcePathLabel(DEV_CUSTOMER_IMPORT_TOOLING_SOURCE_PATH),
     qaCommand: DEV_CUSTOMER_CONFIG_QA_COMMAND,
     uiDryRunApiPath: DEV_CUSTOMER_IMPORT_DRY_RUN_API,
     uiRuntimeManifestApiPath: DEV_CUSTOMER_CONFIG_RUNTIME_MANIFEST_API,
@@ -401,15 +942,55 @@ export function buildImportToolingSummary(
     canCheckReleaseReadiness: normalizedCustomerKey === 'yoyoosun',
     canExecuteRealImport: false,
     writesBusinessData: false,
+    writesBusinessDataLabel: '不写业务数据',
+    writesConfigControl: true,
+    writesConfigControlLabel: '写客户配置控制面',
+    executionBoundary: 'customer_config_control_plane_only',
+    executionBoundaryLabel:
+      EXECUTION_BOUNDARY_LABELS.customer_config_control_plane_only,
+    canExecuteRealImportLabel: '不执行真实业务数据导入',
+    notBusinessDataImport: true,
     writesDatabase: true,
+    executionFlagSummary: [
+      {
+        key: 'canExecuteRealImport',
+        label: '真实业务数据导入',
+        value: false,
+        valueLabel: '不执行',
+        status: 'blocked_by_design',
+      },
+      {
+        key: 'writesBusinessData',
+        label: '业务数据写入',
+        value: false,
+        valueLabel: '不写业务数据',
+        status: 'passed',
+      },
+      {
+        key: 'writesConfigControl',
+        label: '配置控制面写入',
+        value: true,
+        valueLabel: '允许受控写入',
+        status: 'test_apply_ready',
+      },
+      {
+        key: 'executionBoundary',
+        label: '执行边界',
+        value: 'customer_config_control_plane_only',
+        valueLabel:
+          EXECUTION_BOUNDARY_LABELS.customer_config_control_plane_only,
+        status: 'passed',
+      },
+    ],
     testApply: {
       key: 'test-config-apply',
-      label: '应用到测试环境',
+      label: '本地/测试后端应用',
       status:
         normalizedCustomerKey === 'yoyoosun' ? 'test_apply_ready' : 'blocked',
-      target: '测试环境 ERP 应用数据库',
+      target: '当前后端（本地或显式测试环境）ERP 应用数据库',
       writes:
         'customer_config_revisions / deployment_module_states / role_profiles / access_entitlements / work_pools / work_pool_memberships / runtime_audit_events',
+      writesLabel: '客户配置版本、模块状态、角色画像、授权、责任池和审计记录',
       operations: [
         'compile_runtime_manifest',
         'validate_customer_config',
@@ -417,7 +998,7 @@ export function buildImportToolingSummary(
         'activate_customer_config',
         'get_effective_session',
       ],
-      note: '使用当前管理员登录态调用后端 customer_config；成功后后台和岗位任务端读取 active revision 的测试配置投影。',
+      note: '使用当前管理员登录态调用当前后端客户配置接口；本地开发默认是 8300，若指向测试环境必须显式确认目标后端；成功后后台和岗位任务端读取有效配置版本的测试投影。',
       noBusinessDataImport: true,
     },
     releaseApply: {
@@ -428,6 +1009,7 @@ export function buildImportToolingSummary(
       evidenceDir: `deployments/${normalizedCustomerKey}/evidence/releases`,
       writes:
         'customer_config_revisions / deployment_module_states / role_profiles / access_entitlements / work_pools / work_pool_memberships / runtime_audit_events',
+      writesLabel: '客户配置版本、模块状态、角色画像、授权、责任池和审计记录',
       operations: [
         'release_readiness_gate',
         'validate_customer_config',
@@ -435,125 +1017,237 @@ export function buildImportToolingSummary(
         'activate_customer_config',
         'get_effective_session',
       ],
-      note: '先检查 release evidence 和 manifest hash 绑定；门禁通过后才允许用当前管理员登录态发布并激活正式配置版本。',
+      note: '先检查发布证据和清单指纹绑定；门禁通过后才允许用当前管理员登录态发布并激活正式配置版本。',
       noBusinessDataImport: true,
     },
+    releaseReadbackPreflight: {
+      key: 'release-readback-preflight',
+      label: '有效版本读回预检',
+      status: 'report_gate_only',
+      target: releaseReadbackPreflightReportPath,
+      command: releaseReadbackPreflightCommand,
+      writesDatabase: false,
+      writesConfigControl: false,
+      writesBusinessData: false,
+      requiresReleaseEvidence: true,
+      requiresAdminConfirmation: false,
+      notProvenByThisReport: [
+        '目标后端已经读回有效客户配置版本',
+        '目标环境有效配置读回 smoke 已通过',
+        '目标环境发布已执行',
+      ],
+      note: '只生成不写入的读回缺口报告；不调用后端、不读取令牌、不写发布证据、不发布或激活客户配置。',
+    },
     importFlow: [
-      {
+      withWriteBoundaryLabels({
         key: 'tracked-package',
         step: '1',
-        title: '读取客户包',
+        title: '上传解析',
         status: 'passed',
-        outcome: '已登记 yoyoosun 客户包',
-        target: 'config/customers/yoyoosun/customerPackage.mjs',
+        outcome: '读取已登记客户包并解析资产清单',
+        target:
+          'config/customers/yoyoosun/customerPackage.mjs；不开放原始压缩包或任意代码上传',
         writesDatabase: false,
-      },
-      {
+        writesConfigControl: false,
+        writesBusinessData: false,
+        writeClass: 'tracked_config_read',
+        requiresReleaseEvidence: false,
+        requiresAdminConfirmation: false,
+        requiresSeparateTask: false,
+      }),
+      withWriteBoundaryLabels({
         key: 'preflight',
         step: '2',
-        title: '预检与差异',
+        title: '校验',
         status: 'passed',
         outcome:
-          'lint / diff / moduleStates / menu / role / field projection preview',
+          '阻断非法状态、未登记策略 / 扩展点、流程无闭环和角色缺失；模块状态只作为控制面输入',
         target: '只读解析，不写库',
         writesDatabase: false,
-      },
-      {
-        key: 'ui-dry-run',
+        writesConfigControl: false,
+        writesBusinessData: false,
+        writeClass: 'no_write_preflight',
+        requiresReleaseEvidence: false,
+        requiresAdminConfirmation: false,
+        requiresSeparateTask: false,
+      }),
+      withWriteBoundaryLabels({
+        key: 'diff-preview',
         step: '3',
-        title: '测试 Dry Run',
+        title: '差异对比',
+        status: 'preview_only',
+        outcome: '行业模板 / 当前生效配置 / 待导入包三方口径',
+        target: '页面只读差异，不写库',
+        writesDatabase: false,
+        writesConfigControl: false,
+        writesBusinessData: false,
+        writeClass: 'no_write_diff_preview',
+        requiresReleaseEvidence: false,
+        requiresAdminConfirmation: false,
+        requiresSeparateTask: false,
+      }),
+      withWriteBoundaryLabels({
+        key: 'ui-dry-run',
+        step: '4',
+        title: '测试试跑',
         status:
           normalizedCustomerKey === 'yoyoosun' ? 'preview_only' : 'blocked',
-        outcome: '生成本地 evidence',
+        outcome: '生成本地证据',
         target: uiDryRunOut,
         writesDatabase: false,
-      },
-      {
-        key: 'test-apply',
-        step: '4',
-        title: '测试环境应用',
+        writesConfigControl: false,
+        writesBusinessData: false,
+        writeClass: 'no_write_evidence',
+        requiresReleaseEvidence: false,
+        requiresAdminConfirmation: false,
+        requiresSeparateTask: false,
+      }),
+      withWriteBoundaryLabels({
+        key: 'import-draft-revision',
+        step: '5',
+        title: '导入草稿版本',
         status:
           normalizedCustomerKey === 'yoyoosun' ? 'test_apply_ready' : 'blocked',
-        outcome: 'validate / publish / activate',
-        target: '测试环境 ERP 应用数据库',
+        outcome: '校验并发布受控配置版本',
+        target: '当前后端（本地或显式测试环境）ERP 应用数据库',
         writesDatabase: true,
-      },
-      {
+        writesConfigControl: true,
+        writesBusinessData: false,
+        writeClass: 'test_config_control_write',
+        requiresReleaseEvidence: false,
+        requiresAdminConfirmation: true,
+        requiresSeparateTask: false,
+      }),
+      withWriteBoundaryLabels({
         key: 'formal-import',
-        step: '5',
-        title: '正式发布门禁',
+        step: '6',
+        title: '发布',
         status: 'release_gate_required',
-        outcome: '检查证据后发布正式版',
+        outcome: '激活切换有效配置版本；失败保留旧版本',
         target: '目标环境 ERP 应用数据库',
         writesDatabase: true,
-      },
+        writesConfigControl: true,
+        writesBusinessData: false,
+        writeClass: 'formal_config_control_write',
+        requiresReleaseEvidence: true,
+        requiresAdminConfirmation: true,
+        requiresSeparateTask: false,
+      }),
     ],
     databaseTargets: [
-      {
+      withWriteBoundaryLabels({
         key: 'ui-dry-run',
         label: '当前页面可执行',
         status: 'no_write',
         target: '不写数据库',
         writes: uiDryRunOut,
-        reason: '只生成 review evidence，供人工确认和后续发布门禁复核。',
-      },
-      {
+        writeClass: 'no_write_evidence',
+        writesConfigControl: false,
+        writesBusinessData: false,
+        requiresReleaseEvidence: false,
+        requiresAdminConfirmation: false,
+        requiresSeparateTask: false,
+        reason: '只生成评审证据，供人工确认和后续发布门禁复核。',
+      }),
+      withWriteBoundaryLabels({
         key: 'test-config-apply',
-        label: '测试环境应用',
+        label: '本地/测试后端应用',
         status:
           normalizedCustomerKey === 'yoyoosun' ? 'test_apply_ready' : 'blocked',
-        target: '测试环境 ERP 应用数据库',
+        target: '当前后端（本地或显式测试环境）ERP 应用数据库',
         writes:
           'customer_config_revisions / deployment_module_states / role_profiles / access_entitlements / work_pools / work_pool_memberships / runtime_audit_events',
+        writeClass: 'test_config_control_write',
+        writesConfigControl: true,
+        writesBusinessData: false,
+        requiresReleaseEvidence: false,
+        requiresAdminConfirmation: true,
+        requiresSeparateTask: false,
         reason:
-          '这是客户配置控制面写入；登录后的后台和岗位任务端通过 get_effective_session 读取 active revision。',
-      },
-      {
+          '这是当前后端客户配置控制面写入；本地默认 8300，显式测试环境必须先确认后端目标；登录后的后台和岗位任务端通过客户配置接口读取有效版本。',
+      }),
+      withWriteBoundaryLabels({
         key: 'customer-config-publish',
         label: '正式版发布配置',
         status: 'release_gate_required',
         target: '目标环境 ERP 应用数据库',
         writes:
           'customer_config_revisions / deployment_module_states / role_profiles / access_entitlements / work_pools / work_pool_memberships / runtime_audit_events',
+        writeClass: 'formal_config_control_write',
+        writesConfigControl: true,
+        writesBusinessData: false,
+        requiresReleaseEvidence: true,
+        requiresAdminConfirmation: true,
+        requiresSeparateTask: false,
         reason:
-          '登录后的 get_effective_session 必须从当前 ERP 后端数据库读取 active revision，并与 RBAC 菜单取交集。',
-      },
-      {
+          '登录后的客户配置投影必须从当前 ERP 后端数据库读取有效版本，并与角色权限菜单取交集。',
+      }),
+      withWriteBoundaryLabels({
         key: 'customer-config-activate',
         label: '正式版激活配置',
         status: 'release_gate_required',
         target: '目标环境 ERP 应用数据库',
         writes: 'customer_config_revisions.status / runtime_audit_events',
+        writeClass: 'formal_config_control_activation',
+        writesConfigControl: true,
+        writesBusinessData: false,
+        requiresReleaseEvidence: true,
+        requiresAdminConfirmation: true,
+        requiresSeparateTask: false,
         reason: '激活只是切换有效配置版本，不写库存、出货、财务或业务事实。',
-      },
-      {
+      }),
+      withWriteBoundaryLabels({
         key: 'business-data-import',
         label: '真实客户业务数据',
         status: 'separate_task_required',
         target: '目标环境 ERP 应用数据库的业务表',
         writes: '客户、供应商、联系人、销售订单等领域表',
+        writeClass: 'business_data_import_separate_task',
+        writesConfigControl: false,
+        writesBusinessData: true,
+        requiresReleaseEvidence: true,
+        requiresAdminConfirmation: true,
+        requiresSeparateTask: true,
         reason:
           '这是历史业务数据迁移专项，必须走领域 usecase、备份、审计和回滚，不混入客户配置包发布。',
-      },
+      }),
     ],
     formalGates: [
       {
         key: 'manifest-evidence',
-        label: 'Manifest hash 证据',
+        label: '清单指纹证据',
         status: 'required',
-        note: 'runtime manifest 必须绑定 sha256，避免发布时替换 payload。',
+        note: '运行时清单必须绑定 sha256，避免发布时替换内容。',
       },
       {
         key: 'release-evidence',
         label: '目标环境发布证据',
         status: 'required',
-        note: '备份恢复、migration、smoke 和 sign-off 必须齐备。',
+        note: '备份恢复、迁移、冒烟检查和签收必须齐备。',
       },
       {
         key: 'admin-confirmation',
         label: '管理员确认短语',
         status: 'required',
-        note: 'publish / activate 必须显式确认，不能由页面默认触发。',
+        note: '发布 / 激活必须显式确认，不能由页面默认触发。',
+      },
+      {
+        key: 'version-snapshot',
+        label: '配置版本快照',
+        status: 'snapshot_supported',
+        note: '发布写入编译快照和配置指纹；激活只切换有效配置版本。',
+      },
+      {
+        key: 'audit-log',
+        label: '审计日志',
+        status: 'audit_supported',
+        note: '发布 / 激活 / 回滚会写脱敏运行审计事件。',
+      },
+      {
+        key: 'rollback',
+        label: '受控回滚',
+        status: 'rollback_supported',
+        note: 'rollback_customer_config 只切换配置版本，不删除库存、出货、财务或业务事实。',
       },
       {
         key: 'business-import',
@@ -562,36 +1256,75 @@ export function buildImportToolingSummary(
         note: '配置版本发布不等于客户历史业务数据导入。',
       },
     ],
+    versionAuditSupport: [
+      {
+        key: 'compiled-snapshot',
+        label: '配置版本快照',
+        status: 'snapshot_supported',
+        note: '客户配置版本保存编译快照、配置指纹和版本状态。',
+      },
+      {
+        key: 'draft-before-active',
+        label: '草稿先行',
+        status: 'test_apply_ready',
+        note: '发布写入受控版本，激活单独切换有效版本；发布失败不影响旧版本。',
+      },
+      {
+        key: 'rollback-control',
+        label: '受控回滚',
+        status: 'rollback_supported',
+        note: 'rollback_customer_config 只恢复已发布配置版本，不删除业务事实。',
+      },
+      {
+        key: 'runtime-audit',
+        label: '审计日志',
+        status: 'audit_supported',
+        note: '发布 / 激活 / 回滚写脱敏运行审计。',
+      },
+    ],
     tools: [
       {
         key: 'freeze',
-        title: 'source snapshot freeze',
+        title: '来源快照冻结检查',
         command: `node scripts/import/customerSourceSnapshotFreezeCheck.mjs --source ${fixtureBasePath}/source-snapshot.freeze.sample.json --existing ${fixtureBasePath}/existing-v1.freeze.sample.json --out ${outputBasePath}/source-snapshot-freeze`,
         status: 'evidence_only',
+        note: '只读冻结来源快照，不连接后端、不写数据库、不代表真实导入批准。',
       },
       {
         key: 'dry-run',
-        title: 'customer import dry-run',
+        title: '客户导入试跑',
         command: `node scripts/import/customerImportDryRun.mjs --source ${fixtureBasePath}/source-snapshot.sample.json --existing ${fixtureBasePath}/existing-v1.sample.json --out ${outputBasePath}/import-dry-run`,
         status: 'preview_only',
+        note: '只生成候选、冲突和未决队列预览，不写客户业务表。',
       },
       {
         key: 'execute-report',
-        title: 'import execution report',
+        title: '导入执行报告',
         command: `node scripts/import/customerImportExecute.mjs --dry-run-package ${outputBasePath}/import-dry-run --approval ${fixtureBasePath}/import-approval.sample.json --backup-evidence ${outputBasePath}/backup-evidence.txt --out ${outputBasePath}/import-execution`,
         status: 'report_gate_only',
+        note: '默认报告模式，不执行真实导入；真实执行必须另行具备批准、备份和确认短语。',
+      },
+      {
+        key: 'release-readback-preflight',
+        title: '客户配置读回预检',
+        command: releaseReadbackPreflightCommand,
+        status: 'report_gate_only',
+        note: '只核对本地 manifest、release report 和 target smoke 证据形状，不调用后端、不读取令牌、不证明真实 active revision。',
       },
       {
         key: 'release-rollback-readiness',
-        title: 'customer config rollback readiness',
+        title: '客户配置回滚就绪检查',
         command: `node scripts/deploy/customer-config-release-readiness.mjs --manifest ${releaseManifestPath} --evidence-dir ${releaseEvidenceDir} --release-report ${releaseReportPath} --require-executed --require-rollback`,
         status: 'release_gate_required',
+        note: '只复核已存在的执行报告和目标 smoke 证据；不执行回滚、不写 release evidence。',
       },
       {
         key: 'release-rollback-execute',
-        title: 'customer config rollback executor',
-        command: `CUSTOMER_CONFIG_CONFIRM=ROLLBACK_YOYOOSUN_CONFIG CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' node scripts/deploy/customer-config-release-execute.mjs --manifest ${releaseManifestPath} --evidence-dir ${releaseEvidenceDir} --out ${outputBasePath}/customer-config-release --backend-url http://127.0.0.1:8300 --execute --rollback`,
+        title: '客户配置回滚输入模板',
+        command:
+          'node scripts/deploy/customer-config-release-execute.mjs --print-input-template',
         status: 'release_gate_required',
+        note: '只打印发布 / 激活 / 回滚输入模板，不读取 token、不调用客户配置接口。',
       },
     ],
   }
@@ -622,7 +1355,23 @@ export function buildCustomerPackageConsoleSummary({
   const menuItemCount = menuSummary?.itemCount || 0
   const printTemplateCount = printTemplateSummary?.templateCount || 0
   const printFieldTruthCount = printTemplateSummary?.fieldTruthCount || 0
+  const printTemplateDefaultCount =
+    customerPackageSummary?.printTemplateDefaultCount || 0
   const boundaryOk = customerPackageSummary?.boundaryOk === true
+  const policyBindingCount = customerPackageSummary?.processPolicyCount || 0
+  const extensionPointCount = customerPackageSummary?.extensionPointCount || 0
+  const importMappingCount = customerPackageSummary?.importMappingCount || 0
+  const unregisteredStrategyCount =
+    (customerPackageSummary?.unregisteredPolicyBindingCount || 0) +
+    (customerPackageSummary?.unregisteredCommandBindingCount || 0)
+  const unregisteredExtensionCount =
+    customerPackageSummary?.unregisteredExtensionBindingCount || 0
+  const missingWorkflowEndCount =
+    customerPackageSummary?.missingWorkflowEndCount || 0
+  const missingWorkflowRoleCount =
+    customerPackageSummary?.missingWorkflowRoleCount || 0
+  const illegalStateTransitionCount =
+    customerPackageSummary?.illegalStateTransitionCount || 0
   const customerKey =
     customerPackageSummary?.customerKey ||
     menuSummary?.customerKey ||
@@ -640,10 +1389,10 @@ export function buildCustomerPackageConsoleSummary({
       status: boundaryOk ? 'REVIEW_READY' : 'BLOCKED',
       title: boundaryOk ? '可以进入人工评审' : '先修复配置包阻塞项',
       summary: boundaryOk
-        ? '结构与禁止项已通过 lint；页面可做测试环境应用，正式发布必须先通过 release evidence 门禁。'
+        ? '结构与禁止项已通过检查；页面可做本地/测试后端配置应用，正式发布必须先通过发布证据门禁。'
         : `配置包存在 ${boundaryFailedCount} 个阻塞项；修复后重新运行 lint。`,
       nextAction: boundaryOk
-        ? '先做 Dry Run 和测试环境应用；正式版进入发布门禁检查。'
+        ? '先做试跑和本地/测试后端配置应用；正式版进入发布门禁检查。'
         : '先修复 failed boundary，再重新运行客户包 lint。',
     },
     decisionCards: [
@@ -653,7 +1402,7 @@ export function buildCustomerPackageConsoleSummary({
         status: boundaryOk ? 'REVIEW_READY' : 'BLOCKED',
         outcome: boundaryOk ? '可继续' : '阻塞',
         note: boundaryOk
-          ? '只进入 review evidence，不改变 runtime。'
+          ? '只进入评审证据，不改变运行时。'
           : '必须先修复配置包禁止项。',
         nextAction: boundaryOk
           ? '生成 customer-package-preview.json'
@@ -665,15 +1414,14 @@ export function buildCustomerPackageConsoleSummary({
         status: 'blocked_by_design',
         outcome: '不可执行',
         note: '配置发布不等于客户历史业务数据导入。',
-        nextAction:
-          '正式导入另开任务，并先完成客户确认、备份 evidence 和回滚方案。',
+        nextAction: '正式导入另开任务，并先完成客户确认、备份证据和回滚方案。',
       },
       {
         key: 'publish-runtime',
         label: '发布 / 激活',
         status: 'release_gate_required',
         outcome: '门禁后可执行',
-        note: '发布版必须先通过 manifest hash、release evidence 和管理员确认。',
+        note: '发布版必须先通过清单指纹、发布证据和管理员确认。',
         nextAction: '在导入工作台检查发布门禁；通过后再发布到正式版。',
       },
     ],
@@ -694,19 +1442,19 @@ export function buildCustomerPackageConsoleSummary({
         key: 'diff-preview',
         label: '差异预览',
         status: 'preview_only',
-        note: `${menuItemCount} 个菜单项、${fieldReviewCount} 个字段候选、${moduleStateOverrideCount} 个模块状态 override、${printTemplateCount} 套打印模板进入人工评审。`,
+        note: `${menuItemCount} 个菜单项、${fieldReviewCount} 个字段候选、${moduleStateOverrideCount} 个模块状态覆盖、${printTemplateCount} 套打印模板进入人工评审。`,
       },
       {
         key: 'dry-run',
-        label: '测试版 UI Dry Run',
+        label: '测试版页面试跑',
         status: importSummary?.canRunUiDryRun ? 'preview_only' : 'blocked',
-        note: '在开发页触发 dry-run，生成 evidence / report，不写数据库。',
+        note: '在开发页触发试跑，生成证据和报告，不写数据库。',
       },
       {
         key: 'publish',
         label: '发布与回滚',
         status: 'release_gate_required',
-        note: 'publish / activate / rollback 都必须走 release evidence；页面只提供命令复核，不提供裸回滚按钮。',
+        note: '发布 / 激活 / 回滚都必须走发布证据；页面只提供命令复核，不提供裸回滚按钮。',
       },
     ],
     reviewChecklist: [
@@ -716,6 +1464,7 @@ export function buildCustomerPackageConsoleSummary({
         role: '实施 / 开发',
         status: boundaryOk ? 'passed' : 'blocked',
         sourcePath: customerPackageSummary?.sourcePath,
+        sourceLabel: customerPackageSummary?.sourceLabel,
         nextAction: packageQaCommand,
       },
       {
@@ -724,7 +1473,8 @@ export function buildCustomerPackageConsoleSummary({
         role: '实施 / 客户确认',
         status: 'draft_only',
         sourcePath: fieldNumberingSummary?.sourcePath,
-        nextAction: `${fieldReviewCount} 个字段候选仍为 draft，不接前端运行时。`,
+        sourceLabel: fieldNumberingSummary?.sourceLabel,
+        nextAction: `${fieldReviewCount} 个字段候选仍为草案，不接前端运行时。`,
       },
       {
         key: 'module-state-review',
@@ -732,10 +1482,11 @@ export function buildCustomerPackageConsoleSummary({
         role: '实施 / 产品评审',
         status: 'preview_only',
         sourcePath: customerPackageSummary?.sourcePath,
+        sourceLabel: customerPackageSummary?.sourceLabel,
         nextAction:
           moduleStateOverrideCount > 0
-            ? `${moduleStateOverrideCount} 个 moduleStates override 将编译为后端 module_states；非 enabled 必须保留 reason。`
-            : `${moduleStateCount} 个 catalog 模块默认编译为 enabled；客户包未声明 read_only / disabled override。`,
+            ? `${moduleStateOverrideCount} 个模块状态覆盖将编译为后端模块状态控制面；非启用必须保留原因。`
+            : `${moduleStateCount} 个登记模块默认按启用编译；客户包未声明只读 / 关闭覆盖。`,
       },
       {
         key: 'print-template-field-review',
@@ -743,7 +1494,8 @@ export function buildCustomerPackageConsoleSummary({
         role: '实施 / 产品评审',
         status: 'source_grounded',
         sourcePath: printTemplateSummary?.sourcePath,
-        nextAction: `${printTemplateCount} 套模板、${printFieldTruthCount} 条 fieldTruth 只读展示；销售订单受理当前未接打印模板。`,
+        sourceLabel: printTemplateSummary?.sourceLabel,
+        nextAction: `${printTemplateCount} 套模板、${printFieldTruthCount} 条字段真源只读展示；${printTemplateDefaultCount} 条客户包打印默认方信息经有效配置投影后可供正式采购打印入口消费；销售订单受理当前未接打印模板。`,
       },
       {
         key: 'workflow-structure-review',
@@ -751,6 +1503,7 @@ export function buildCustomerPackageConsoleSummary({
         role: '产品 / 业务评审',
         status: 'preview_only',
         sourcePath: customerPackageSummary?.sourcePath,
+        sourceLabel: customerPackageSummary?.sourceLabel,
         nextAction: `${workflowCount} 条 Workflow preview 只评审结构，不写 WorkflowUsecase 或事实表。`,
       },
       {
@@ -759,7 +1512,8 @@ export function buildCustomerPackageConsoleSummary({
         role: '实施 / 运维',
         status: 'report_gate_only',
         sourcePath: importSummary?.sourcePath,
-        nextAction: '只允许 freeze、dry-run 和 execution report evidence。',
+        sourceLabel: importSummary?.sourceLabel,
+        nextAction: '只允许冻结检查、试跑和执行报告证据。',
       },
       {
         key: 'runtime-publish',
@@ -767,7 +1521,8 @@ export function buildCustomerPackageConsoleSummary({
         role: '发布负责人',
         status: 'release_gate_required',
         sourcePath: customerPackageSummary?.sourcePath,
-        nextAction: '先跑 release readiness gate，通过后才可发布 / 激活。',
+        sourceLabel: customerPackageSummary?.sourceLabel,
+        nextAction: '先跑发布就绪门禁，通过后才可发布 / 激活。',
       },
     ],
     qaCommands: [
@@ -781,7 +1536,7 @@ export function buildCustomerPackageConsoleSummary({
         key: 'package-preview-report',
         label: '生成预检报告',
         command: buildPackagePreviewReportCommand(customerKey),
-        note: '输出 review evidence，不写运行时配置。',
+        note: '输出评审证据，不写运行时配置。',
       },
       {
         key: 'customer-config-boundaries',
@@ -796,30 +1551,45 @@ export function buildCustomerPackageConsoleSummary({
         label: '菜单品牌',
         status: 'runtime_frontend_only',
         sourcePath: menuSummary?.sourcePath,
+        sourceLabel: menuSummary?.sourceLabel,
       },
       {
         key: 'field-numbering',
         label: '字段编号',
         status: 'draft_only',
         sourcePath: fieldNumberingSummary?.sourcePath,
+        sourceLabel: fieldNumberingSummary?.sourceLabel,
       },
       {
         key: 'print-templates',
         label: '打印模板字段',
         status: 'source_grounded',
         sourcePath: printTemplateSummary?.sourcePath,
+        sourceLabel: printTemplateSummary?.sourceLabel,
+      },
+      {
+        key: 'print-template-defaults',
+        label: '打印默认方信息',
+        status:
+          printTemplateDefaultCount > 0
+            ? 'effective_session_projected'
+            : 'controlled_empty',
+        sourcePath: customerPackageSummary?.sourcePath,
+        sourceLabel: customerPackageSummary?.sourceLabel,
       },
       {
         key: 'package',
         label: '流程配置包',
         status: 'preview_only',
         sourcePath: customerPackageSummary?.sourcePath,
+        sourceLabel: customerPackageSummary?.sourceLabel,
       },
       {
         key: 'import-tools',
         label: '导入工具边界',
         status: 'report_gate_only',
         sourcePath: importSummary?.sourcePath,
+        sourceLabel: importSummary?.sourceLabel,
       },
     ],
     assetSummary: [
@@ -837,7 +1607,7 @@ export function buildCustomerPackageConsoleSummary({
         value: fieldReviewCount,
         unit: '项',
         status: 'draft_only',
-        note: 'runtimeEnabled=false，必须人工确认。',
+        note: '运行时未启用，必须人工确认。',
       },
       {
         key: 'workflows',
@@ -855,8 +1625,8 @@ export function buildCustomerPackageConsoleSummary({
         status: 'preview_only',
         note:
           moduleStateNonEnabledCount > 0
-            ? `${moduleStateNonEnabledCount} 个非 enabled 状态需要 reason，编译到 deployment_module_states。`
-            : `${moduleStateCount} 个模块默认 enabled，未声明关闭或只读 override。`,
+            ? `${moduleStateNonEnabledCount} 个非启用状态需要原因，编译到模块状态控制面。`
+            : `${moduleStateCount} 个模块默认启用，未声明关闭或只读覆盖。`,
       },
       {
         key: 'print-templates',
@@ -864,7 +1634,21 @@ export function buildCustomerPackageConsoleSummary({
         value: printTemplateCount,
         unit: '套',
         status: 'source_grounded',
-        note: `${printFieldTruthCount} 条 fieldTruth；当前只覆盖采购合同和加工合同。`,
+        note: `${printFieldTruthCount} 条字段真源；当前只覆盖采购合同和加工合同。`,
+      },
+      {
+        key: 'print-template-defaults',
+        label: '打印默认方信息',
+        value: printTemplateDefaultCount,
+        unit: '条',
+        status:
+          printTemplateDefaultCount > 0
+            ? 'effective_session_projected'
+            : 'controlled_empty',
+        note:
+          printTemplateDefaultCount > 0
+            ? '客户包打印默认方信息通过有效配置投影供打印入口消费，不覆盖供应商快照。'
+            : '当前客户包未声明打印默认方信息。',
       },
       {
         key: 'policies',
@@ -882,6 +1666,56 @@ export function buildCustomerPackageConsoleSummary({
         status: boundaryOk ? 'passed' : 'blocked',
         level: '高',
         note: '客户包不能携带 JS / Go / SQL / secret 或原始客户资料。',
+      },
+      {
+        key: 'unregistered-strategy',
+        label: '未注册策略 / 命令',
+        status: unregisteredStrategyCount > 0 ? 'blocked' : 'passed',
+        level: '高',
+        note:
+          unregisteredStrategyCount > 0
+            ? `${unregisteredStrategyCount} 个策略或命令绑定未登记，必须阻断导入。`
+            : '流程策略和命令只允许绑定 catalog 已登记 key；实现不得由客户包上传。',
+      },
+      {
+        key: 'unregistered-extension',
+        label: '未注册扩展点',
+        status: unregisteredExtensionCount > 0 ? 'blocked' : 'passed',
+        level: '高',
+        note:
+          unregisteredExtensionCount > 0
+            ? `${unregisteredExtensionCount} 个扩展点处理器未登记或来自客户包，必须阻断导入。`
+            : '当前扩展点目录为受控空目录；后续处理器必须来自已注册部署包。',
+      },
+      {
+        key: 'workflow-closed-loop',
+        label: '流程闭环',
+        status: missingWorkflowEndCount > 0 ? 'blocked' : 'passed',
+        level: '高',
+        note:
+          missingWorkflowEndCount > 0
+            ? `${missingWorkflowEndCount} 条流程缺少结束节点，必须阻断导入。`
+            : '已检查每条流程预览都有结束节点；流程运行仍需后端运行时清单校验。',
+      },
+      {
+        key: 'role-coverage',
+        label: '角色覆盖',
+        status: missingWorkflowRoleCount > 0 ? 'blocked' : 'passed',
+        level: '高',
+        note:
+          missingWorkflowRoleCount > 0
+            ? `${missingWorkflowRoleCount} 个流程节点责任池未登记，必须阻断导入。`
+            : '流程节点责任池均来自登记目录；运行时清单还会映射为后端角色画像和授权。',
+      },
+      {
+        key: 'illegal-state-transition',
+        label: '非法状态跳转',
+        status: illegalStateTransitionCount > 0 ? 'blocked' : 'passed',
+        level: '高',
+        note:
+          illegalStateTransitionCount > 0
+            ? `${illegalStateTransitionCount} 条状态跳转命中禁止回退规则，必须阻断导入。`
+            : '当前状态机预览未包含已出货退回草稿、已结算退回已提交、已关闭退回处理中等非法跳转。',
       },
       {
         key: 'workflow-fact-boundary',
@@ -909,7 +1743,7 @@ export function buildCustomerPackageConsoleSummary({
             ? 'blocked'
             : 'passed',
         level: '高',
-        note: 'moduleStates 只允许 catalog 模块和 enabled / read_only / disabled；非 enabled 必须写 reason。',
+        note: '模块状态只允许登记模块和启用 / 只读 / 关闭；非启用必须写原因。',
       },
       {
         key: 'print-template-boundary',
@@ -930,6 +1764,101 @@ export function buildCustomerPackageConsoleSummary({
         level: '高',
         note: '客户配置发布只写控制面；真实客户业务数据导入仍不在本页执行。',
       },
+      {
+        key: 'rollback-no-facts',
+        label: '回滚不删除业务事实',
+        status: 'rollback_supported',
+        level: '高',
+        note: '受控回滚只切 active customer_config revision；库存流水、出货、财务和业务单据必须保留。',
+      },
+    ],
+    packageAssetScope: [
+      {
+        key: 'config-assets',
+        label: '配置资产',
+        value: menuItemCount + fieldReviewCount + moduleStateCount,
+        status: 'preview_only',
+        note: '菜单、字段显示、编号和模块状态只进入客户配置控制面。',
+      },
+      {
+        key: 'rule-assets',
+        label: '规则资产',
+        value: policyBindingCount,
+        status: 'registered_binding',
+        note: '只导入规则 / 策略绑定和参数，不上传策略实现代码。',
+      },
+      {
+        key: 'workflow-assets',
+        label: '流程编排',
+        value:
+          workflowCount +
+          (customerPackageSummary?.businessFlowCount || 0) +
+          (customerPackageSummary?.stateMachineCount || 0),
+        status: 'preview_only',
+        note: '协同流程、业务流转和状态机必须闭环，且不写业务事实。',
+      },
+      {
+        key: 'strategy-bindings',
+        label: '策略绑定',
+        value:
+          (customerPackageSummary?.strategyRegistryChecks || []).length +
+          (customerPackageSummary?.commandBindingChecks || []).length,
+        status:
+          unregisteredStrategyCount > 0 ? 'blocked' : 'registered_binding',
+        note: '策略 / 命令实现必须来自产品核心、行业模板或客户部署包登记。',
+      },
+      {
+        key: 'extension-bindings',
+        label: '扩展点绑定',
+        value: extensionPointCount,
+        status: unregisteredExtensionCount > 0 ? 'blocked' : 'controlled_empty',
+        note: '客户包只能绑定扩展点；处理器必须来自已注册部署包。',
+      },
+      {
+        key: 'template-assets',
+        label: '模板资产',
+        value: printTemplateCount,
+        status: 'source_grounded',
+        note: '当前只展示正式采购合同和加工合同模板字段真源。',
+      },
+      {
+        key: 'import-mapping-assets',
+        label: '导入映射',
+        value: importMappingCount,
+        status: 'report_gate_only',
+        note: '历史数据映射只进入试跑和执行报告；真实业务数据导入另开专项。',
+      },
+    ],
+    registryChecks: [
+      ...(customerPackageSummary?.strategyRegistryChecks || []),
+      ...(customerPackageSummary?.commandBindingChecks || []),
+      ...(customerPackageSummary?.extensionRegistryChecks || []),
+    ],
+    versionAuditSupport: [
+      {
+        key: 'compiled-snapshot',
+        label: '配置版本快照',
+        status: 'snapshot_supported',
+        note: '客户配置版本保存编译快照、配置指纹和版本状态。',
+      },
+      {
+        key: 'draft-before-active',
+        label: '草稿先行',
+        status: 'test_apply_ready',
+        note: '发布先写入受控版本，激活单独切换有效版本；发布失败不影响旧版本。',
+      },
+      {
+        key: 'rollback-control',
+        label: '受控回滚',
+        status: 'rollback_supported',
+        note: 'rollback_customer_config 只恢复已发布配置版本，不删除业务事实。',
+      },
+      {
+        key: 'runtime-audit',
+        label: '审计日志',
+        status: 'audit_supported',
+        note: '发布、激活、回滚都会写脱敏审计记录。',
+      },
     ],
     diffItems: [
       {
@@ -945,7 +1874,7 @@ export function buildCustomerPackageConsoleSummary({
         type: '字段显示',
         current: 'V1 字段真源',
         incoming: `${fieldReviewCount} 个字段 / 编号候选`,
-        impact: '需要人工确认，不自动变成 Product Core 必填。',
+        impact: '需要人工确认，不自动变成产品核心必填。',
         status: 'draft_only',
       },
       {
@@ -959,30 +1888,30 @@ export function buildCustomerPackageConsoleSummary({
       {
         key: 'module-states',
         type: '模块状态',
-        current: 'catalog 默认 enabled',
+        current: '登记模块默认启用',
         incoming:
           moduleStateOverrideCount > 0
-            ? `${moduleStateOverrideCount} 个客户包 override`
-            : '无客户包 override',
+            ? `${moduleStateOverrideCount} 个客户包覆盖`
+            : '无客户包覆盖',
         impact:
-          '只作为后端 module_states 控制面输入，不安装 / 卸载模块，也不代表完整关闭流程已交付。',
+          '只作为后端模块状态控制面输入，不安装 / 卸载模块，也不代表完整关闭流程已交付。',
         status: 'preview_only',
       },
       {
         key: 'print-template-fields',
         type: '打印模板',
         current: '采购合同 / 加工合同',
-        incoming: `${printTemplateCount} 套模板 / ${printFieldTruthCount} 条 fieldTruth`,
+        incoming: `${printTemplateCount} 套模板 / ${printFieldTruthCount} 条字段真源`,
         impact:
-          '只展示当前模板字段真源和缺口，不新增销售订单打印模板，不把客户专属抬头写入 Product Core。',
+          '只展示当前模板字段真源和缺口，不新增销售订单打印模板，不把客户专属抬头写入产品核心。',
         status: 'source_grounded',
       },
       {
         key: 'import-tooling',
         type: '导入工具',
-        current: 'dry-run evidence',
-        incoming: 'execution report gate',
-        impact: '没有明确批准前不写 DB，不生成业务事实。',
+        current: '试跑证据',
+        incoming: '执行报告门禁',
+        impact: '没有明确批准前不写数据库，不生成业务事实。',
         status: 'report_gate_only',
       },
     ],
@@ -1021,6 +1950,7 @@ export function buildCustomerConfigDevOverview({
       requestedCustomerKey: resolved.customerKey,
       route: DEV_CUSTOMER_CONFIG_ROUTE,
       sourcePath: '',
+      sourceLabel: '未登记客户配置包',
       registeredCustomers: resolved.registeredCustomers,
       runtimePieces: [],
       draftPieces: [],
@@ -1029,6 +1959,7 @@ export function buildCustomerConfigDevOverview({
           key: 'missing-customer-package',
           title: '未登记客户配置包',
           sourcePath: 'config/customers/<customer-key>/',
+          sourceLabel: mapSourcePathLabel('config/customers/<customer-key>/'),
           status: '未登记',
           boundary:
             '当前 URL customer 参数没有对应客户配置包；开发态总控不会 fallback 到 yoyoosun 冒充，也不会创建 SaaS tenant。',
@@ -1070,6 +2001,7 @@ export function buildCustomerConfigDevOverview({
     requestedCustomerKey: resolved.customerKey,
     route: DEV_CUSTOMER_CONFIG_ROUTE,
     sourcePath: packageConfig.sourcePath,
+    sourceLabel: mapSourcePathLabel(packageConfig.sourcePath),
     registeredCustomers: resolved.registeredCustomers,
     menuSummary,
     fieldNumberingSummary,
@@ -1082,6 +2014,7 @@ export function buildCustomerConfigDevOverview({
         key: 'brand-menu',
         title: '品牌 / 桌面菜单展示配置',
         sourcePath: menuSummary.sourcePath,
+        sourceLabel: menuSummary.sourceLabel,
         status: '已接前端运行时',
         boundary:
           '只控制前端品牌展示、桌面菜单分组、排序、隐藏和文案；不是安全边界。',
@@ -1092,14 +2025,16 @@ export function buildCustomerConfigDevOverview({
         key: 'field-numbering',
         title: '字段显示 / 编号规则',
         sourcePath: fieldNumberingSummary.sourcePath,
+        sourceLabel: fieldNumberingSummary.sourceLabel,
         status: '草案',
         boundary:
-          'runtimeEnabled=false；只作为客户确认清单，不接前端运行时、不改后端、不执行导入。',
+          '运行时未启用；只作为客户确认清单，不接前端运行时、不改后端、不执行导入。',
       },
       {
         key: 'process-package',
         title: '流程结构 / 策略预览',
         sourcePath: customerPackageSummary.sourcePath,
+        sourceLabel: customerPackageSummary.sourceLabel,
         status: 'preview_only',
         boundary:
           'raw 客户包只做 lint 和 preview；必须编译为受控 runtime manifest 后才可走 customer_config publish / activate，不接 Workflow / Fact runtime。',
@@ -1110,6 +2045,7 @@ export function buildCustomerConfigDevOverview({
         key: 'real-import',
         title: '真实客户数据导入',
         sourcePath: importSummary.sourcePath,
+        sourceLabel: importSummary.sourceLabel,
         status: '未批准',
         boundary:
           '客户配置测试 / 发布只写控制面表；客户、供应商、订单、库存、出货、财务等历史业务数据导入必须另走专项。',
@@ -1118,6 +2054,7 @@ export function buildCustomerConfigDevOverview({
         key: 'saas-tenant',
         title: 'SaaS tenant / tenant_id',
         sourcePath: DEV_CUSTOMER_CONFIG_SOURCE_PATH,
+        sourceLabel: mapSourcePathLabel(DEV_CUSTOMER_CONFIG_SOURCE_PATH),
         status: '禁止误接',
         boundary:
           'customer key 只表示客户包选择，不代表 SaaS runtime tenant，也不新增 tenant_id。',

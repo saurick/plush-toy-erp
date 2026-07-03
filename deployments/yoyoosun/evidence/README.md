@@ -84,7 +84,7 @@ node scripts/deploy/customer-config-activation-gate.mjs \
 
 该门禁只检查 manifest 与发布证据是否可进入激活，不会连接后端、不执行 `activate_customer_config`、不跑 migration、不恢复备份、不导入业务数据；真实恢复演练和目标环境发布仍必须独立完成。
 
-release evidence 目录还必须包含 `customer-config-manifest-evidence.json`，其中 `manifestSha256` 要等于当前 runtime manifest 的 `sha256:<64-hex>`，并声明 `reviewStatus=approved`、`containsSecrets=false`、`containsRawCustomerRows=false`、`containsRawCustomerFiles=false`。这样激活门禁会证明“这份证据”绑定的是“这一份 manifest”，而不是复用一份泛化发布证据。
+release evidence 目录还必须包含 `customer-config-manifest-evidence.json`，其中 `manifestSha256` 要等于当前 runtime manifest 的 `sha256:<64-hex>`，`manifestPath` / `releaseReport` 只保存仓库相对路径，并声明 `reviewStatus=approved`、`containsSecrets=false`、`containsRawCustomerRows=false`、`containsRawCustomerFiles=false`。这样激活门禁会证明“这份证据”绑定的是“这一份 manifest”，而不是复用一份泛化发布证据；草稿目录如果 release evidence、smoke 或 sign-off 尚未通过，不应写成 `approved`。
 
 生成该文件时使用：
 
@@ -93,10 +93,11 @@ node scripts/deploy/customer-config-manifest-evidence.mjs \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
+  --review-status approved \
   --reviewer <reviewer-name>
 ```
 
-`--release-report` 可省略；提供时会额外校验 report 里的 `manifestSha256` 与当前 manifest 一致。
+`--release-report` 可省略；提供时会额外校验 report 里的 `manifestSha256` 与当前 manifest 一致。未传 `--review-status approved` 时脚本默认生成 `draft`，不能通过 activation gate。
 
 发布前或发布后声明“客户配置发布包 ready”时，必须再跑聚合 readiness gate。发布前不带执行报告即可证明 manifest、manifest evidence、release evidence 和 activation gate 同时通过：
 

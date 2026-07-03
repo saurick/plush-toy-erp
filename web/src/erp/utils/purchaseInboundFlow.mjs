@@ -1,3 +1,8 @@
+import {
+  formatWorkflowRelatedDocumentRef,
+  resolveReadableWorkflowSourceNo,
+} from './workflowDocumentRefs.mjs'
+
 export const ACCESSORIES_PURCHASE_MODULE_KEY = 'accessories-purchase'
 export const INBOUND_MODULE_KEY = 'inbound'
 
@@ -58,7 +63,10 @@ function parseBusinessDateEndSecond(value) {
 
 function taskCode(prefix, record = {}, options = {}) {
   const stableID =
-    normalizeText(record.id) || normalizeText(record.document_no) || 'unknown'
+    normalizeText(record.document_no) ||
+    normalizeText(record.source_no) ||
+    normalizeText(record.title) ||
+    'no-readable-ref'
   return `${prefix}-${stableID}-${Number(options.nowMs ?? Date.now())}`
 }
 
@@ -72,12 +80,7 @@ export function isPurchaseArrivalRecord(record = {}) {
 }
 
 export function resolveInboundSourceNo(record = {}) {
-  return (
-    normalizeText(record.document_no) ||
-    normalizeText(record.source_no) ||
-    normalizeText(record.title) ||
-    normalizeText(record.id)
-  )
+  return resolveReadableWorkflowSourceNo(record)
 }
 
 export function resolveInboundPriority(record = {}, options = {}) {
@@ -138,13 +141,18 @@ export function isIqcFailResult(value) {
 
 function buildArrivalRelatedDocuments(record = {}, options = {}) {
   const sourceNo = resolveInboundSourceNo(record)
+  const sourceRef =
+    sourceNo ||
+    normalizeText(record.document_no) ||
+    normalizeText(record.source_no) ||
+    normalizeText(record.title)
   const quantityText =
     record.quantity !== undefined && record.quantity !== null
       ? `数量：${record.quantity}${record.unit || ''}`
       : ''
   return [
-    sourceNo ? `到货记录：${sourceNo}` : '',
-    record.source_no ? `采购记录：${record.source_no}` : '',
+    formatWorkflowRelatedDocumentRef('到货记录', record, sourceRef),
+    formatWorkflowRelatedDocumentRef('采购记录', record, record.source_no),
     record.supplier_name ? `供应商：${record.supplier_name}` : '',
     record.material_name ? `物料：${record.material_name}` : '',
     record.product_name ? `产品：${record.product_name}` : '',

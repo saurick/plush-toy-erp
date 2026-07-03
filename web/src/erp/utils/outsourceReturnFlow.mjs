@@ -1,3 +1,8 @@
+import {
+  formatWorkflowRelatedDocumentRef,
+  resolveReadableWorkflowSourceNo,
+} from './workflowDocumentRefs.mjs'
+
 export const PROCESSING_CONTRACTS_MODULE_KEY = 'processing-contracts'
 export const INBOUND_MODULE_KEY = 'inbound'
 
@@ -60,7 +65,10 @@ function parseBusinessDateEndSecond(value) {
 
 function taskCode(prefix, record = {}, options = {}) {
   const stableID =
-    normalizeText(record.id) || normalizeText(record.document_no) || 'unknown'
+    normalizeText(record.document_no) ||
+    normalizeText(record.source_no) ||
+    normalizeText(record.title) ||
+    'no-readable-ref'
   return `${prefix}-${stableID}-${Number(options.nowMs ?? Date.now())}`
 }
 
@@ -77,12 +85,7 @@ export function isOutsourceProcessingRecord(record = {}) {
 }
 
 export function resolveOutsourceReturnSourceNo(record = {}) {
-  return (
-    normalizeText(record.document_no) ||
-    normalizeText(record.source_no) ||
-    normalizeText(record.title) ||
-    normalizeText(record.id)
-  )
+  return resolveReadableWorkflowSourceNo(record)
 }
 
 function resolveExpectedReturnDate(record = {}) {
@@ -132,18 +135,23 @@ export function resolveOutsourcePriority(record = {}, options = {}) {
 function buildOutsourceRelatedDocuments(record = {}, options = {}) {
   const sourceType = normalizeText(record.module_key || record.source_type)
   const sourceNo = resolveOutsourceReturnSourceNo(record)
+  const sourceRef =
+    sourceNo ||
+    normalizeText(record.document_no) ||
+    normalizeText(record.source_no) ||
+    normalizeText(record.title)
   const quantityText =
     record.quantity !== undefined && record.quantity !== null
       ? `数量：${record.quantity}${record.unit || ''}`
       : ''
   return [
-    sourceNo && sourceType === PROCESSING_CONTRACTS_MODULE_KEY
-      ? `加工合同：${sourceNo}`
+    sourceRef && sourceType === PROCESSING_CONTRACTS_MODULE_KEY
+      ? formatWorkflowRelatedDocumentRef('加工合同', record, sourceRef)
       : '',
-    sourceNo && sourceType === INBOUND_MODULE_KEY
-      ? `回货记录：${sourceNo}`
+    sourceRef && sourceType === INBOUND_MODULE_KEY
+      ? formatWorkflowRelatedDocumentRef('回货记录', record, sourceRef)
       : '',
-    record.source_no ? `委外单：${record.source_no}` : '',
+    formatWorkflowRelatedDocumentRef('委外单', record, record.source_no),
     payloadOf(record).issue_no ? `发料记录：${payloadOf(record).issue_no}` : '',
     record.supplier_name ? `加工厂：${record.supplier_name}` : '',
     record.product_name ? `产品：${record.product_name}` : '',

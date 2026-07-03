@@ -1,3 +1,8 @@
+import {
+  formatWorkflowRelatedDocumentRef,
+  resolveReadableWorkflowSourceNo,
+} from './workflowDocumentRefs.mjs'
+
 export const PRODUCTION_PROGRESS_MODULE_KEY = 'production-progress'
 export const SHIPPING_RELEASE_MODULE_KEY = 'shipping-release'
 export const OUTBOUND_MODULE_KEY = 'outbound'
@@ -66,7 +71,10 @@ function parseBusinessDateEndSecond(value) {
 
 function taskCode(prefix, record = {}, options = {}) {
   const stableID =
-    normalizeText(record.id) || normalizeText(record.document_no) || 'unknown'
+    normalizeText(record.document_no) ||
+    normalizeText(record.source_no) ||
+    normalizeText(record.title) ||
+    'no-readable-ref'
   return `${prefix}-${stableID}-${Number(options.nowMs ?? Date.now())}`
 }
 
@@ -76,12 +84,7 @@ export function resolveShipmentFinanceSourceType(record = {}) {
 }
 
 export function resolveShipmentFinanceSourceNo(record = {}) {
-  return (
-    normalizeText(record.document_no) ||
-    normalizeText(record.source_no) ||
-    normalizeText(record.title) ||
-    normalizeText(record.id)
-  )
+  return resolveReadableWorkflowSourceNo(record)
 }
 
 function resolvePaymentDueDate(record = {}) {
@@ -173,6 +176,11 @@ export function isShipmentCompletedRecord(record = {}) {
 function buildFinanceRelatedDocuments(record = {}, options = {}) {
   const sourceNo = resolveShipmentFinanceSourceNo(record)
   const payload = payloadOf(record)
+  const sourceRef =
+    sourceNo ||
+    normalizeText(record.document_no) ||
+    normalizeText(record.source_no) ||
+    normalizeText(record.title)
   const quantityText =
     record.quantity !== undefined && record.quantity !== null
       ? `数量：${record.quantity}${record.unit || ''}`
@@ -183,8 +191,8 @@ function buildFinanceRelatedDocuments(record = {}, options = {}) {
     payload.receivable_amount ??
     payload.amount_with_tax
   return [
-    sourceNo ? `出货记录：${sourceNo}` : '',
-    record.source_no ? `订单：${record.source_no}` : '',
+    formatWorkflowRelatedDocumentRef('出货记录', record, sourceRef),
+    formatWorkflowRelatedDocumentRef('订单', record, record.source_no),
     payload.order_no ? `订单：${payload.order_no}` : '',
     record.customer_name || payload.customer_name
       ? `客户：${record.customer_name || payload.customer_name}`

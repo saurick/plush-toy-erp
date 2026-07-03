@@ -63,9 +63,7 @@ function normalizePathname(pathname = '') {
 }
 
 function isMobileTaskPath(pathname = '') {
-  return (
-    pathname === '/tasks' || /^\/m\/[^/]+(?:\/tasks)?(?:\/.*)?$/.test(pathname)
-  )
+  return /^\/m\/[^/]+(?:\/tasks)?(?:\/.*)?$/.test(pathname)
 }
 
 function buildCustomerFaviconVariant(href = '') {

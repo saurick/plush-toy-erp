@@ -10,6 +10,7 @@ import {
   isCellInsideSelection,
   isMergeTopLeftCell,
 } from '../../utils/detailCellMerge.mjs'
+import { renderPrintValue } from './printValue.mjs'
 
 function normalizeEditableText(value, multiline = false) {
   const rawText = String(value ?? '')
@@ -46,7 +47,7 @@ function EditableText({
       spellCheck={false}
       onBlur={handleBlur}
     >
-      {String(value || '').trim() ? value : '\u00A0'}
+      {renderPrintValue(value)}
     </Component>
   )
 }
@@ -74,7 +75,7 @@ function ContractTableCell({
   disabled = false,
 }) {
   if (readOnly || disabled) {
-    return <span className={className}>{value || '\u00A0'}</span>
+    return <span className={className}>{renderPrintValue(value)}</span>
   }
 
   return (
@@ -104,7 +105,9 @@ export default function ProcessingContractPaper({
   onClauseChange,
 }) {
   const printableLines = Array.isArray(contract?.lines) ? contract.lines : []
-  const totals = calculateProcessingContractTotals(contract?.lines || [])
+  const totals = calculateProcessingContractTotals(contract?.lines || [], {
+    merges: contract?.merges,
+  })
   const templateModesActive = lineSelectionMode || cellSelectionMode
   const uploadedAttachments = processingContractAttachmentSlots
     .map((slot) => ({

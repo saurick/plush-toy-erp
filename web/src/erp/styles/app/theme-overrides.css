@@ -729,7 +729,6 @@
 
 [data-erp-theme='dark'] .ant-modal-root .ant-modal-mask {
   background: var(--erp-modal-mask);
-  backdrop-filter: blur(3px);
 }
 
 [data-erp-theme='dark'] .erp-business-action-modal {
@@ -2435,33 +2434,6 @@
   font-size: 12px;
 }
 
-.erp-audit-payload {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
-.erp-audit-payload summary {
-  color: #36543b;
-  cursor: pointer;
-  font-weight: 700;
-}
-
-.erp-audit-payload pre {
-  max-height: 260px;
-  overflow: auto;
-  margin: 0;
-  padding: 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #f8fafc;
-  color: #111827;
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
 @media (max-width: 1180px) {
   .erp-audit-workspace {
     grid-template-columns: 1fr;
@@ -2514,8 +2486,7 @@
 [data-erp-theme='dark'] .erp-audit-feed,
 [data-erp-theme='dark'] .erp-audit-event,
 [data-erp-theme='dark'] .erp-audit-stat,
-[data-erp-theme='dark'] .erp-audit-detail,
-[data-erp-theme='dark'] .erp-audit-payload pre {
+[data-erp-theme='dark'] .erp-audit-detail {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg-soft);
   color: var(--erp-text);
@@ -2537,16 +2508,14 @@
 [data-erp-theme='dark'] .erp-audit-event__meta,
 [data-erp-theme='dark'] .erp-audit-event__summary,
 [data-erp-theme='dark'] .erp-audit-facts span,
-[data-erp-theme='dark'] .erp-audit-facts em,
-[data-erp-theme='dark'] .erp-audit-payload summary {
+[data-erp-theme='dark'] .erp-audit-facts em {
   color: var(--erp-text-muted);
 }
 
 [data-erp-theme='dark'] .erp-audit-stat strong,
 [data-erp-theme='dark'] .erp-audit-event__title,
 [data-erp-theme='dark'] .erp-audit-detail__head h5.ant-typography,
-[data-erp-theme='dark'] .erp-audit-facts strong,
-[data-erp-theme='dark'] .erp-audit-payload pre {
+[data-erp-theme='dark'] .erp-audit-facts strong {
   color: var(--erp-text);
 }
 

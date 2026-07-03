@@ -5,6 +5,7 @@ import {
   buildBusinessCollaborationTaskPanelModel,
   filterBusinessCollaborationTasksBySource,
   getBusinessCollaborationTaskReason,
+  getBusinessCollaborationTaskReasonLabel,
   getBusinessCollaborationTaskUrgeMeta,
   isBusinessCollaborationTaskBlocking,
   isBusinessCollaborationTaskTerminal,
@@ -88,7 +89,14 @@ test('businessCollaborationTasks: 阻塞原因按任务和 payload 顺序收口'
       blocked_reason: '页面填写的阻塞原因',
       payload: { rejected_reason: '旧退回原因' },
     }),
-    '页面填写的阻塞原因'
+    '旧退回原因'
+  )
+  assert.equal(
+    getBusinessCollaborationTaskReasonLabel({
+      task_status_key: 'rejected',
+      payload: { rejected_reason: '旧退回原因' },
+    }),
+    '退回原因'
   )
 })
 

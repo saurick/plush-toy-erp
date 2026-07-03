@@ -16,49 +16,51 @@ print_help() {
   4) workflow-fact-boundary
   5) workflow-ui-action-boundary
   6) formal-frontend-customer-config-boundary
-  7) admin-profile-sync
-  8) frontend-role-menu-seed-contracts
-  9) dev-entry-config-contracts
-  10) trial-role-entry-docs
-  11) trial-account-rbac（无后端单测 + 浏览器 smoke 输入模板边界测试，不执行真实登录）
-  12) real-login-smoke-shared（真实登录 smoke 共享 URL 凭据边界单测，不执行真实登录）
-  13) mobile-auth-login-route-smoke（输入模板 + URL 凭据边界单测，不启动浏览器）
-  14) purchase-receipt-real-write-browser-e2e（输入模板 + 持久测试数据确认边界，不启动浏览器）
-  15) sales-order-field-chain-boundary
-  16) dev-entry-boundary
-  17) frontend-error-message-boundary
-  18) multi-client-role-workflow-priority-audit
-  19) docs-inventory
-  20) industry-template-boundaries
-  21) private-deployment-boundaries
-  22) customer-web-config-overlay
-  23) deployment-package-lint
-  24) run-smoke-script（CLI + 输入模板 + release gate 兼容报告）
-  25) immutable-version-evidence
-  26) release-evidence-gate
-  27) production-preflight
-  28) backup-restore-rehearsal-script
-  29) rollback-rehearsal-report
-  30) customer-config-manifest-evidence
-  31) customer-config-activation-gate
-  32) customer-config-release-execute
-  33) customer-config-release-readiness（聚合门禁 + 输入模板）
-  34) customer-config-boundaries
-  35) customer-package-lint
-  36) customer-config-runtime-manifest
-  37) customer-import-tooling
-  38) trial-simulated-data
-  39) operational-fact-simulated-closure
-  40) mobile-workflow-simulated-closure
-  41) mobile-workflow-runtime-browser-smoke
-  42) purchase-receipt-real-write-e2e（输入模板边界测试，不运行 Go 测试）
-  43) mvp-closure
-  44) industry-template-closure
-  45) private-deployment-package-closure
-  46) shellcheck + shfmt（可选）
-  47) govulncheck（可选）
-  48) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
-  49) server: go test ./... + make build
+  7) customer-config-effective-session-probe（无凭据 get_effective_session 探针边界测试，不执行真实登录）
+  8) admin-profile-sync
+  9) frontend-role-menu-seed-contracts
+  10) dev-entry-config-contracts
+  11) trial-role-entry-docs
+  12) trial-account-rbac（无后端单测 + 浏览器 smoke 输入模板边界测试，不执行真实登录）
+  13) real-login-smoke-shared（真实登录 smoke 共享 URL 凭据边界单测，不执行真实登录）
+  14) mobile-auth-login-route-smoke（输入模板 + URL 凭据边界单测，不启动浏览器）
+  15) purchase-receipt-real-write-browser-e2e（输入模板 + 持久测试数据确认边界，不启动浏览器）
+  16) sales-order-field-chain-boundary
+  17) dev-entry-boundary
+  18) frontend-error-message-boundary
+  19) multi-client-role-workflow-priority-audit
+  20) docs-inventory
+  21) industry-template-boundaries
+  22) private-deployment-boundaries
+  23) customer-web-config-overlay
+  24) deployment-package-lint
+  25) run-smoke-script（CLI + 输入模板 + release gate 兼容报告）
+  26) immutable-version-evidence
+  27) release-evidence-gate
+  28) production-preflight
+  29) backup-restore-rehearsal-script
+  30) rollback-rehearsal-report
+  31) customer-config-manifest-evidence
+  32) customer-config-activation-gate
+  33) customer-config-release-execute
+  34) customer-config-release-readiness（聚合门禁 + 输入模板）
+  35) customer-config-boundaries
+  36) customer-package-lint
+  37) customer-config-runtime-manifest
+  38) customer-import-tooling
+  39) test-data-isolation-boundary
+  40) trial-simulated-data
+  41) operational-fact-simulated-closure
+  42) mobile-workflow-simulated-closure
+  43) mobile-workflow-runtime-browser-smoke
+  44) purchase-receipt-real-write-e2e（输入模板边界测试，不运行 Go 测试）
+  45) mvp-closure
+  46) industry-template-closure
+  47) private-deployment-package-closure
+  48) shellcheck + shfmt（可选）
+  49) govulncheck（可选）
+  50) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
+  51) server: go test ./... + make build
 
 环境变量:
   SKIP_DB_GUARD=1           跳过 DB 守卫
@@ -124,6 +126,15 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/formal-frontend-customer-config-boundary.test.mjs" ]; then
   echo "[qa:strict] 运行正式前端客户配置投影边界测试"
   node --test "$ROOT_DIR/scripts/qa/formal-frontend-customer-config-boundary.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/customer-config-effective-session-probe.mjs" ]; then
+  if [ -f "$ROOT_DIR/scripts/qa/customer-config-effective-session-probe.test.mjs" ]; then
+    echo "[qa:strict] 运行客户配置 effective session 无凭据探针边界测试"
+    node --test "$ROOT_DIR/scripts/qa/customer-config-effective-session-probe.test.mjs"
+  fi
+  echo "[qa:strict] 运行客户配置 effective session 无凭据探针语法检查"
+  node --check "$ROOT_DIR/scripts/qa/customer-config-effective-session-probe.mjs"
 fi
 
 if [ -f "$ROOT_DIR/web/src/erp/utils/adminProfileSync.test.mjs" ]; then
@@ -337,6 +348,11 @@ if ls "$ROOT_DIR"/scripts/import/*.test.mjs >/dev/null 2>&1; then
   for test_file in "$ROOT_DIR"/scripts/import/*.test.mjs; do
     node --test "$test_file"
   done
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/test-data-isolation-boundary.test.mjs" ]; then
+  echo "[qa:strict] 运行测试业务数据隔离边界守卫"
+  node --test "$ROOT_DIR/scripts/qa/test-data-isolation-boundary.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/trial-simulated-data.test.mjs" ]; then

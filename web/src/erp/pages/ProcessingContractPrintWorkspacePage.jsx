@@ -8,6 +8,7 @@ import {
   PROCESSING_CONTRACT_TEMPLATE_KEY,
   createEmptyProcessingAttachment,
   createBlankProcessingContractDraft,
+  createProcessingContractBusinessDraft,
   createProcessingContractDraft,
   normalizeProcessingContractAttachments,
   normalizeProcessingLine,
@@ -123,13 +124,18 @@ function loadDraft({
   forceFresh = false,
   storageKey = DRAFT_STORAGE_KEY,
   workspaceStateID = '',
+  businessInput = false,
 } = {}) {
+  const fallbackDraft = businessInput
+    ? createProcessingContractBusinessDraft()
+    : createProcessingContractDraft()
+
   if (typeof window === 'undefined') {
-    return createProcessingContractDraft()
+    return fallbackDraft
   }
 
   if (forceFresh) {
-    return createProcessingContractDraft()
+    return fallbackDraft
   }
 
   const initialDraft = readInitialPrintWorkspaceDraftFromWindowName(
@@ -137,6 +143,9 @@ function loadDraft({
     workspaceStateID
   )
   if (initialDraft) {
+    if (businessInput) {
+      return createProcessingContractBusinessDraft(initialDraft)
+    }
     const { attachments, lines, ...rest } = initialDraft || {}
     return {
       ...createProcessingContractDraft(),
@@ -151,10 +160,13 @@ function loadDraft({
   try {
     const raw = window.localStorage.getItem(storageKey) || ''
     if (!raw) {
-      return createProcessingContractDraft()
+      return fallbackDraft
     }
 
     const parsed = JSON.parse(raw)
+    if (businessInput) {
+      return createProcessingContractBusinessDraft(parsed)
+    }
     const { attachments, lines, ...rest } = parsed || {}
     return {
       ...createProcessingContractDraft(),
@@ -165,7 +177,7 @@ function loadDraft({
       attachments: normalizeProcessingContractAttachments(attachments),
     }
   } catch {
-    return createProcessingContractDraft()
+    return fallbackDraft
   }
 }
 
@@ -231,6 +243,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       forceFresh: resetDraftOnOpen,
       storageKey: draftStorageKey,
       workspaceStateID,
+      businessInput: entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
     })
   )
   const [rowSelectionMode, setRowSelectionMode] = useState(false)
@@ -257,6 +270,7 @@ export default function ProcessingContractPrintWorkspacePage() {
         forceFresh: resetDraftOnOpen,
         storageKey: draftStorageKey,
         workspaceStateID,
+        businessInput: entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
       })
     )
     setRowSelectionMode(false)
@@ -271,6 +285,7 @@ export default function ProcessingContractPrintWorkspacePage() {
     setToolbarStatus(resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag))
   }, [
     draftStorageKey,
+    entrySource,
     resetDraftOnOpen,
     sourceTag,
     templateKey,

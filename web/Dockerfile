@@ -51,13 +51,5 @@ COPY --from=builder /app/web/scripts/serveStaticApp.mjs ./scripts/serveStaticApp
 USER node
 
 EXPOSE 5175
-EXPOSE 5186
-EXPOSE 5187
-EXPOSE 5188
-EXPOSE 5189
-EXPOSE 5190
-EXPOSE 5191
-EXPOSE 5192
-EXPOSE 5193
 
 CMD ["node", "scripts/serveStaticApp.mjs"]

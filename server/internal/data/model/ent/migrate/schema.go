@@ -1052,6 +1052,11 @@ var (
 		PrimaryKey: []*schema.Column{ProcessInstancesColumns[0]},
 		Indexes: []*schema.Index{
 			{
+				Name:    "processinstance_process_key_business_ref_type_business_ref_id",
+				Unique:  true,
+				Columns: []*schema.Column{ProcessInstancesColumns[1], ProcessInstancesColumns[7], ProcessInstancesColumns[8]},
+			},
+			{
 				Name:    "processinstance_process_key_business_ref_type_business_ref_id_idempotency_key",
 				Unique:  true,
 				Columns: []*schema.Column{ProcessInstancesColumns[1], ProcessInstancesColumns[7], ProcessInstancesColumns[8], ProcessInstancesColumns[11]},

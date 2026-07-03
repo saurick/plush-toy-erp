@@ -57,11 +57,23 @@ const QUALITY_RESULT_COLORS = Object.freeze({
   REJECT: 'red',
 })
 
+const LOT_STATUS_LABELS = Object.freeze({
+  ACTIVE: '可用',
+  HOLD: '冻结',
+  REJECTED: '不合格',
+  DISABLED: '停用',
+})
+
+function lotStatusText(status) {
+  const key = String(status || '').trim()
+  return LOT_STATUS_LABELS[key] || (key ? '批次状态' : '')
+}
+
 function qualityStatusTag(status) {
   const key = String(status || '').trim()
   return (
     <Tag color={QUALITY_STATUS_COLORS[key] || 'default'}>
-      {QUALITY_STATUS_LABELS[key] || key || '-'}
+      {QUALITY_STATUS_LABELS[key] || (key ? '质检状态' : '-')}
     </Tag>
   )
 }
@@ -71,7 +83,7 @@ function qualityResultTag(result) {
   if (!key) return '-'
   return (
     <Tag color={QUALITY_RESULT_COLORS[key] || 'default'}>
-      {QUALITY_RESULT_LABELS[key] || key}
+      {QUALITY_RESULT_LABELS[key] || '质检结果'}
     </Tag>
   )
 }
@@ -116,7 +128,8 @@ export function buildQualityInspectionExportColumns({
       dataIndex: 'status',
       width: 110,
       exportValue: (record) =>
-        QUALITY_STATUS_LABELS[record?.status] || record?.status,
+        QUALITY_STATUS_LABELS[record?.status] ||
+        (record?.status ? '质检状态' : ''),
       render: qualityStatusTag,
     },
     {
@@ -125,7 +138,8 @@ export function buildQualityInspectionExportColumns({
       dataIndex: 'result',
       width: 120,
       exportValue: (record) =>
-        QUALITY_RESULT_LABELS[record?.result] || record?.result,
+        QUALITY_RESULT_LABELS[record?.result] ||
+        (record?.result ? '质检结果' : ''),
       render: qualityResultTag,
     },
     {
@@ -193,7 +207,8 @@ export function buildQualityInspectionExportColumns({
       exportTitle: '原批次状态',
       dataIndex: 'original_lot_status',
       width: 120,
-      render: (value) => value || '-',
+      render: (value) => lotStatusText(value) || '-',
+      exportValue: (record) => lotStatusText(record?.original_lot_status),
     },
     {
       title: '检验时间',
@@ -242,7 +257,8 @@ export function buildQualityInspectionDataColumns({
       dataIndex: 'status',
       width: 110,
       exportValue: (record) =>
-        QUALITY_STATUS_LABELS[record?.status] || record?.status,
+        QUALITY_STATUS_LABELS[record?.status] ||
+        (record?.status ? '质检状态' : ''),
       render: qualityStatusTag,
     },
     {
@@ -251,7 +267,8 @@ export function buildQualityInspectionDataColumns({
       dataIndex: 'result',
       width: 120,
       exportValue: (record) =>
-        QUALITY_RESULT_LABELS[record?.result] || record?.result,
+        QUALITY_RESULT_LABELS[record?.result] ||
+        (record?.result ? '质检结果' : ''),
       render: qualityResultTag,
     },
     {
@@ -306,7 +323,7 @@ export function buildQualityInspectionDataColumns({
             ),
             referenceLabel(warehouseOptions, record?.warehouse_id, '仓库'),
             record?.original_lot_status
-              ? `原批次状态 ${record.original_lot_status}`
+              ? `原批次状态 ${lotStatusText(record.original_lot_status)}`
               : '',
           ]
         ),
@@ -316,7 +333,7 @@ export function buildQualityInspectionDataColumns({
           referenceLabel(inventoryLotOptions, record?.inventory_lot_id, '批次'),
           referenceLabel(warehouseOptions, record?.warehouse_id, '仓库'),
           record?.original_lot_status
-            ? `原批次状态 ${record.original_lot_status}`
+            ? `原批次状态 ${lotStatusText(record.original_lot_status)}`
             : '',
         ]
           .filter(Boolean)

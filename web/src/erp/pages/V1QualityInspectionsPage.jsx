@@ -108,10 +108,6 @@ const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const EMPTY_ADMIN_PROFILE = Object.freeze({})
 const { Text } = Typography
 
-function hasPermission(adminProfile, permission) {
-  return hasActionPermission(adminProfile, permission)
-}
-
 function readStoredColumnOrder(moduleKey) {
   if (typeof window === 'undefined') return []
   try {
@@ -237,8 +233,14 @@ export default function V1QualityInspectionsPage() {
     inspectionForm
   )
 
-  const canCreate = hasPermission(adminProfile, 'quality.inspection.create')
-  const canUpdate = hasPermission(adminProfile, 'quality.inspection.update')
+  const canCreate = hasActionPermission(
+    adminProfile,
+    'quality.inspection.create'
+  )
+  const canUpdate = hasActionPermission(
+    adminProfile,
+    'quality.inspection.update'
+  )
   const relatedMenuItems = [
     { key: 'purchase-receipts', label: '采购入库' },
     { key: 'inventory', label: '库存台账' },
@@ -437,13 +439,19 @@ export default function V1QualityInspectionsPage() {
     }
   }, [])
 
-  const clearRouteContext = useCallback(() => {
-    const nextParams = new URLSearchParams(searchParams)
-    nextParams.delete('purchase_order_id')
-    nextParams.delete('purchase_receipt_id')
-    setSearchParams(nextParams, { replace: true })
-    resetBusinessPaginationCurrent(setPagination)
-  }, [searchParams, setSearchParams])
+  const clearRouteContext = useCallback(
+    (keys) => {
+      const nextParams = new URLSearchParams(searchParams)
+      const keysToDelete =
+        Array.isArray(keys) && keys.length > 0
+          ? keys
+          : ['purchase_order_id', 'purchase_receipt_id']
+      keysToDelete.forEach((key) => nextParams.delete(key))
+      setSearchParams(nextParams, { replace: true })
+      resetBusinessPaginationCurrent(setPagination)
+    },
+    [searchParams, setSearchParams]
+  )
 
   useEffect(() => {
     loadReferenceOptions()
@@ -751,16 +759,16 @@ export default function V1QualityInspectionsPage() {
       <PageHeaderCard
         compact
         title="来料质检"
-        description="来料质检当前接入 quality_inspections；提交质检会把材料批次置为 HOLD，合格 / 让步接收放回 ACTIVE，不合格置为 REJECTED。质检状态变化不写库存流水，不合格退供应商仍走采购退货。"
+        description="来料质检当前承接质检判定；提交质检会冻结材料批次，合格 / 让步接收放回可用，不合格置为不可用。质检状态变化不写库存流水，不合格退供应商仍走采购退货。"
         tags={[
           <Tag color="gold" key="hold">
-            SUBMITTED：批次 HOLD
+            已提交：批次冻结
           </Tag>,
           <Tag color="green" key="pass">
-            PASSED：批次 ACTIVE
+            通过：批次可用
           </Tag>,
           <Tag color="red" key="reject">
-            REJECTED：批次 REJECTED
+            不合格：批次不可用
           </Tag>,
         ]}
         stats={[
@@ -886,12 +894,20 @@ export default function V1QualityInspectionsPage() {
               }}
             />
             {routePurchaseOrderID ? (
-              <Tag closable color="blue" onClose={clearRouteContext}>
+              <Tag
+                closable
+                color="blue"
+                onClose={() => clearRouteContext(['purchase_order_id'])}
+              >
                 已按采购订单筛选
               </Tag>
             ) : null}
             {routePurchaseReceiptID ? (
-              <Tag closable color="blue" onClose={clearRouteContext}>
+              <Tag
+                closable
+                color="blue"
+                onClose={() => clearRouteContext(['purchase_receipt_id'])}
+              >
                 已按采购入库筛选
               </Tag>
             ) : null}

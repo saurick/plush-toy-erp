@@ -87,18 +87,18 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [form] = Form.useForm()
-  const { isDesktopApp, isMobileApp, activeRoleKey } = useERPWorkspace()
+  const { isDesktopApp } = useERPWorkspace()
   const entryConfig = useMemo(() => getEntryConfig(), [])
   const activeBrand = useMemo(() => getActiveERPBrand(), [])
   const initialSMSLoginSession = useMemo(() => readSMSLoginSession(), [])
   const canSelectDesktopEntry =
     isDesktopApp && isDesktopEntryEnabled(entryConfig)
   const canSelectMobileEntry =
-    (isDesktopApp || isMobileApp) && isMobileTasksEntryEnabled(entryConfig)
+    isDesktopApp && isMobileTasksEntryEnabled(entryConfig)
   const admin = getStoredAdminProfile()
   const fromPathname = location.state?.from?.pathname || ''
   const fromMobileRoleKey = parseMobileRoleFromPath(fromPathname)
-  const fixedMobileRoleKey = isMobileApp ? activeRoleKey : fromMobileRoleKey
+  const fixedMobileRoleKey = fromMobileRoleKey
   const shouldPreferRememberedEntry =
     !fromMobileRoleKey && !String(fromPathname || '').startsWith('/erp')
   const rememberedEntryTarget = shouldPreferRememberedEntry
@@ -155,8 +155,6 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   let mobileRoleForRequest = ''
   if (entryTarget === ENTRY_TARGET.MOBILE_TASKS && fixedMobileRoleKey) {
     mobileRoleForRequest = fixedMobileRoleKey
-  } else if (isMobileApp) {
-    mobileRoleForRequest = activeRoleKey
   }
   const entryOptions = [
     canSelectDesktopEntry
@@ -228,7 +226,6 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
       defaultRedirect,
       fromMobileRoleKey,
       fixedMobileRoleKey,
-      isMobileApp,
       shouldRemember,
       rememberChoice: rememberEntryChoice,
     })

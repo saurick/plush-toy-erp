@@ -197,9 +197,11 @@ function buildInputTemplate(options = {}) {
     ],
     simulatedActions: [
       "boss done",
+      "boss rejected with reason",
       "quality done with evidence",
       "warehouse done with evidence",
       "shipment release blocked with exception report",
+      "pmc urges warehouse task without completing it",
     ],
     requiredApplyInputs: [
       "MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS",
@@ -313,6 +315,23 @@ function buildPlan(options) {
           alert_type: "approval_pending",
         },
       }),
+      approvalRejected: buildTask(prefix, {
+        code: "APPROVAL-REJECT",
+        group: "order_approval",
+        name: "Mobile workflow 模拟老板退回",
+        sourceType: "project-orders",
+        sourceId: 910005,
+        sourceNo: "SO-REJECT",
+        businessStatus: "project_pending",
+        ownerRole: "boss",
+        dueAt,
+        completeCondition:
+          "老板在岗位任务端填写退回原因，退回只写 Workflow 任务状态。",
+        payload: {
+          notification_type: "approval_required",
+          alert_type: "approval_pending",
+        },
+      }),
       quality: buildTask(prefix, {
         code: "QC",
         group: "finished_goods_qc",
@@ -344,6 +363,25 @@ function buildPlan(options) {
           material_name: "Mobile workflow 模拟辅料",
         },
       }),
+      warehouseUrge: buildTask(prefix, {
+        code: "WH-URGE",
+        group: "shipment_release",
+        name: "Mobile workflow 模拟仓库任务催办",
+        sourceType: "shipping-release",
+        sourceId: 910006,
+        sourceNo: "WH-URGE",
+        businessStatus: "shipment_pending",
+        ownerRole: "warehouse",
+        priority: 3,
+        dueAt,
+        completeCondition:
+          "PMC 只能催办仓库任务，不能代办完成、阻塞或退回。",
+        payload: {
+          shipment_release: true,
+          notification_type: "shipment_release_pending",
+          alert_type: "shipment_release_pending",
+        },
+      }),
       shipmentRelease: buildTask(prefix, {
         code: "SHIP-REL",
         group: "shipment_release",
@@ -373,6 +411,18 @@ function buildPlan(options) {
           "boss",
           "",
           [`${prefix}-PHOTO-APPROVAL`],
+          nowSec,
+        ),
+      },
+      approvalRejected: {
+        role: "boss",
+        nextStatus: "rejected",
+        reason: "Mobile workflow 模拟资料不完整，退回销售补齐。",
+        payload: evidence(
+          "rejected",
+          "boss",
+          "Mobile workflow 模拟资料不完整，退回销售补齐。",
+          [`${prefix}-PHOTO-REJECT`],
           nowSec,
         ),
       },
@@ -408,6 +458,25 @@ function buildPlan(options) {
           [`${prefix}-PHOTO-SHIP-EXCEPTION`],
           nowSec,
         ),
+      },
+      warehouseUrged: {
+        role: "pmc",
+        action: "urge_task",
+        reason: "Mobile workflow 模拟 PMC 催办仓库出货放行。",
+        payload: {
+          mobile_urge: {
+            role_key: "pmc",
+            action_key: "urge_task",
+            reason: "Mobile workflow 模拟 PMC 催办仓库出货放行。",
+            simulated_only: true,
+            recorded_at: nowSec,
+          },
+          notification_type: "urgent_escalation",
+          alert_type: "urgent_escalation",
+          mobile_action_key: "urge_task",
+          mobile_action_role_key: "pmc",
+          mobile_action_recorded_at: nowSec,
+        },
       },
     },
   };
@@ -483,16 +552,32 @@ async function createTask(plan, tokens, task) {
   return data.task;
 }
 
+function buildTaskStatusActionParams(task, action) {
+  const actionKeyByStatus = {
+    done: "complete",
+    blocked: "block",
+    rejected: "reject",
+  };
+  const actionKey = actionKeyByStatus[action.nextStatus];
+  if (!actionKey) {
+    throw new CliError(`unsupported workflow task status action: ${action.nextStatus}`);
+  }
+  return {
+    task_id: task.id,
+    action_key: actionKey,
+    reason: action.reason,
+    payload: {
+      ...action.payload,
+      mobile_role_key: action.role,
+    },
+  };
+}
+
 async function updateTask(plan, tokens, task, action) {
   const methodByStatus = {
     done: "complete_task_action",
     blocked: "block_task_action",
     rejected: "reject_task_action",
-  };
-  const actionKeyByStatus = {
-    done: "complete",
-    blocked: "block",
-    rejected: "reject",
   };
   const method = methodByStatus[action.nextStatus];
   if (!method) {
@@ -502,16 +587,30 @@ async function updateTask(plan, tokens, task, action) {
     backendURL: plan.backendURL,
     domain: "workflow",
     method,
-    params: {
-      task_id: task.id,
-      action_key: actionKeyByStatus[action.nextStatus],
-      reason: action.reason,
-      payload: {
-        ...(task.payload || {}),
-        ...action.payload,
-        mobile_role_key: action.role,
-      },
+    params: buildTaskStatusActionParams(task, action),
+    token: tokens[action.role],
+  });
+  return data.task;
+}
+
+function buildUrgeTaskParams(task, action) {
+  return {
+    task_id: task.id,
+    action: action.action || "urge_task",
+    reason: action.reason,
+    payload: {
+      ...action.payload,
+      mobile_role_key: action.role,
     },
+  };
+}
+
+async function urgeTask(plan, tokens, task, action) {
+  const data = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "workflow",
+    method: "urge_task",
+    params: buildUrgeTaskParams(task, action),
     token: tokens[action.role],
   });
   return data.task;
@@ -542,13 +641,47 @@ async function applyPlan(plan, tokens) {
       label: `${label} update`,
       id: updated.id,
       status: updated.task_status_key,
-      business_status: updated.business_status_key,
       evidence_count: updated.payload?.mobile_action_evidence_refs?.length || 0,
       exception_reported: Boolean(updated.payload?.mobile_exception_report),
     });
   };
+  const runUrge = async (label, taskPlan, action) => {
+    let created;
+    try {
+      created = await createTask(plan, tokens, taskPlan);
+    } catch (error) {
+      throw new CliError(`${label} create failed: ${error.message}`);
+    }
+    steps.push({
+      label: `${label} create`,
+      id: created.id,
+      status: created.task_status_key,
+      task_group: created.task_group,
+    });
+    let updated;
+    try {
+      updated = await urgeTask(plan, tokens, created, action);
+    } catch (error) {
+      throw new CliError(`${label} urge failed: ${error.message}`);
+    }
+    const hasUrgeMarker = Boolean(
+      updated.payload?.urge_count || updated.payload?.last_urge_at,
+    );
+    steps.push({
+      label: `${label} urge`,
+      id: updated.id,
+      status: updated.task_status_key,
+      urge_count: hasUrgeMarker ? 1 : 0,
+      notification_type: updated.payload?.notification_type || "",
+    });
+  };
 
   await run("approval", plan.tasks.approval, plan.actions.approvalDone);
+  await run(
+    "approval rejected",
+    plan.tasks.approvalRejected,
+    plan.actions.approvalRejected,
+  );
   await run("quality", plan.tasks.quality, plan.actions.qualityDone);
   await run(
     "warehouse inbound",
@@ -559,6 +692,11 @@ async function applyPlan(plan, tokens) {
     "shipment release exception",
     plan.tasks.shipmentRelease,
     plan.actions.shipmentReleaseBlocked,
+  );
+  await runUrge(
+    "warehouse urge",
+    plan.tasks.warehouseUrge,
+    plan.actions.warehouseUrged,
   );
   return steps;
 }
@@ -583,7 +721,7 @@ function buildMarkdownReport(report) {
   } else {
     for (const step of report.steps) {
       lines.push(
-        `- ${step.label}: status=${step.status}${step.business_status ? ` business=${step.business_status}` : ""}${step.evidence_count ? ` evidence=${step.evidence_count}` : ""}${step.exception_reported ? " exception_reported=true" : ""}`,
+        `- ${step.label}: status=${step.status}${step.evidence_count ? ` evidence=${step.evidence_count}` : ""}${step.exception_reported ? " exception_reported=true" : ""}${step.urge_count ? ` urge=${step.urge_count}` : ""}${step.notification_type ? ` notification=${step.notification_type}` : ""}`,
       );
     }
   }
@@ -671,7 +809,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 export {
   buildInputTemplate,
   buildPlan,
+  buildTaskStatusActionParams,
   buildTimestampRunId,
+  buildUrgeTaskParams,
   CONFIRM_PHRASE,
   INPUT_TEMPLATE_SCOPE,
   parseCliArgs,

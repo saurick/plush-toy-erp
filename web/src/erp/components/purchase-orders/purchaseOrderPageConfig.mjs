@@ -5,8 +5,10 @@ import {
   submitPurchaseOrder,
 } from '../../api/masterDataOrderApi.mjs'
 import { decimalNumber } from '../../utils/businessLineItems.mjs'
-import { PURCHASE_ORDER_STATUS_LABELS } from '../../utils/masterDataOrderView.mjs'
-import { ROLE_DISPLAY_NAMES } from '../../utils/roleKeys.mjs'
+import {
+  PURCHASE_ORDER_STATUS_LABELS,
+  statusText,
+} from '../../utils/masterDataOrderView.mjs'
 
 export const PURCHASE_ORDER_STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -72,9 +74,6 @@ export const PURCHASE_ORDER_LIFECYCLE_ACTIONS = [
 ]
 
 export const PURCHASE_ORDERS_MODULE_KEY = 'accessories-purchase'
-export const PURCHASE_ORDER_WORKFLOW_ROLE_LABELS = new Map(
-  Object.entries(ROLE_DISPLAY_NAMES)
-)
 export const PURCHASE_ORDER_RELATED_MENU_ITEMS = [
   { key: 'order-items', label: '采购订单明细' },
   { key: 'purchase-receipts', label: '采购入库' },
@@ -185,11 +184,11 @@ export function buildSelectedPurchaseOrderItems({
   return selectedOrders.map((record) => ({
     key: record.id,
     label: record.purchase_order_no || '采购订单未编号',
-    title: `${resolveSupplierName(record)} / ${
-      PURCHASE_ORDER_STATUS_LABELS[record.lifecycle_status] ||
-      record.lifecycle_status ||
-      '-'
-    }`,
+    title: `${resolveSupplierName(record)} / ${statusText(
+      record.lifecycle_status,
+      PURCHASE_ORDER_STATUS_LABELS,
+      '采购订单状态'
+    )}`,
   }))
 }
 

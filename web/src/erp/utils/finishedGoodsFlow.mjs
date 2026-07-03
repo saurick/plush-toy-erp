@@ -1,4 +1,8 @@
 import { BUSINESS_ROLE_KEY } from './roleKeys.mjs'
+import {
+  formatWorkflowRelatedDocumentRef,
+  resolveReadableWorkflowSourceNo,
+} from './workflowDocumentRefs.mjs'
 
 export const PRODUCTION_PROGRESS_MODULE_KEY = 'production-progress'
 export const INBOUND_MODULE_KEY = 'inbound'
@@ -29,6 +33,20 @@ const HIGH_PRIORITY = 3
 const URGENT_PRIORITY = 4
 const HOUR_SECONDS = 60 * 60
 const DAY_SECONDS = 24 * HOUR_SECONDS
+const FINISHED_GOODS_QC_RESULT_LABELS = Object.freeze({
+  pass: '合格',
+  passed: '合格',
+  qualified: '合格',
+  approved: '合格',
+  release: '放行',
+  released: '放行',
+  fail: '不合格',
+  failed: '不合格',
+  reject: '不合格',
+  rejected: '不合格',
+  rework: '返工',
+  pending: '待检',
+})
 
 function payloadOf(record = {}) {
   return record.payload && typeof record.payload === 'object'
@@ -39,6 +57,12 @@ function payloadOf(record = {}) {
 function normalizeText(value) {
   const text = String(value ?? '').trim()
   return text || ''
+}
+
+function finishedGoodsQcResultLabel(value) {
+  const key = normalizeText(value)
+  if (!key) return ''
+  return FINISHED_GOODS_QC_RESULT_LABELS[key] || '抽检已记录'
 }
 
 function numberOrNull(value) {
@@ -66,7 +90,10 @@ function parseBusinessDateEndSecond(value) {
 
 function taskCode(prefix, record = {}, options = {}) {
   const stableID =
-    normalizeText(record.id) || normalizeText(record.document_no) || 'unknown'
+    normalizeText(record.document_no) ||
+    normalizeText(record.source_no) ||
+    normalizeText(record.title) ||
+    'no-readable-ref'
   return `${prefix}-${stableID}-${Number(options.nowMs ?? Date.now())}`
 }
 
@@ -88,12 +115,7 @@ export function isProductionCompletedRecord(record = {}) {
 }
 
 export function resolveFinishedGoodsSourceNo(record = {}) {
-  return (
-    normalizeText(record.document_no) ||
-    normalizeText(record.source_no) ||
-    normalizeText(record.title) ||
-    normalizeText(record.id)
-  )
+  return resolveReadableWorkflowSourceNo(record)
 }
 
 function resolveShipmentDate(record = {}) {
@@ -145,22 +167,27 @@ export function resolveFinishedGoodsPriority(record = {}, options = {}) {
 function buildFinishedGoodsRelatedDocuments(record = {}, options = {}) {
   const sourceType = normalizeText(record.module_key || record.source_type)
   const sourceNo = resolveFinishedGoodsSourceNo(record)
+  const sourceRef =
+    sourceNo ||
+    normalizeText(record.document_no) ||
+    normalizeText(record.source_no) ||
+    normalizeText(record.title)
   const quantityText =
     record.quantity !== undefined && record.quantity !== null
       ? `数量：${record.quantity}${record.unit || ''}`
       : ''
   const payload = payloadOf(record)
   return [
-    sourceNo && sourceType === PRODUCTION_PROGRESS_MODULE_KEY
-      ? `生产进度：${sourceNo}`
+    sourceRef && sourceType === PRODUCTION_PROGRESS_MODULE_KEY
+      ? formatWorkflowRelatedDocumentRef('生产进度', record, sourceRef)
       : '',
-    sourceNo && sourceType === INBOUND_MODULE_KEY
-      ? `入库记录：${sourceNo}`
+    sourceRef && sourceType === INBOUND_MODULE_KEY
+      ? formatWorkflowRelatedDocumentRef('入库记录', record, sourceRef)
       : '',
-    sourceNo && sourceType === SHIPPING_RELEASE_MODULE_KEY
-      ? `出货放行：${sourceNo}`
+    sourceRef && sourceType === SHIPPING_RELEASE_MODULE_KEY
+      ? formatWorkflowRelatedDocumentRef('出货放行', record, sourceRef)
       : '',
-    record.source_no ? `订单：${record.source_no}` : '',
+    formatWorkflowRelatedDocumentRef('订单', record, record.source_no),
     payload.order_no ? `订单：${payload.order_no}` : '',
     record.product_name ? `产品：${record.product_name}` : '',
     record.material_name ? `物料 / 成品：${record.material_name}` : '',
@@ -171,7 +198,9 @@ function buildFinishedGoodsRelatedDocuments(record = {}, options = {}) {
     payload.shipping_requirement
       ? `出货要求：${payload.shipping_requirement}`
       : '',
-    options.qcResult ? `成品抽检结果：${options.qcResult}` : '',
+    options.qcResult
+      ? `成品抽检结果：${finishedGoodsQcResultLabel(options.qcResult)}`
+      : '',
     options.reason ? `不良原因：${options.reason}` : '',
   ].filter(Boolean)
 }

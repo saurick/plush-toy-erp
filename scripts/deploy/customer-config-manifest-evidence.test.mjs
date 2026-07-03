@@ -263,16 +263,55 @@ test("parseCliArgs 支持 manifest evidence 参数", () => {
     "--evidence-dir",
     "evidence",
     "--release-report=report.json",
+    "--review-status=approved",
     "--reviewer",
     "ops",
   ]);
   assert.equal(options.manifest, "manifest.json");
   assert.equal(options.evidenceDir, "evidence");
   assert.equal(options.releaseReport, "report.json");
+  assert.equal(options.reviewStatus, "approved");
   assert.equal(options.reviewer, "ops");
 });
 
 test("生成 manifest evidence 后 activation gate 可通过", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-manifest-evidence-"));
+  const manifest = writeRuntimeManifest(root);
+  const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
+  writeReleaseEvidence(path.join(root, evidenceDir));
+
+  const result = await writeCustomerConfigManifestEvidence(
+    {
+      manifest,
+      evidenceDir,
+      reviewStatus: "approved",
+      reviewer: "ops-reviewer",
+    },
+    { repoRoot: root },
+  );
+
+  const evidence = JSON.parse(await readFile(result.evidencePath, "utf8"));
+  assert.equal(evidence.customerKey, "yoyoosun");
+  assert.equal(evidence.reviewStatus, "approved");
+  assert.equal(
+    evidence.manifestPath,
+    "output/customers/yoyoosun/customer-config-runtime-manifest.json",
+  );
+  assert.equal(path.isAbsolute(evidence.manifestPath), false);
+  assert.match(evidence.manifestSha256, /^sha256:[a-f0-9]{64}$/);
+  assert.equal(evidence.redaction.containsSecrets, false);
+
+  const gate = validateCustomerConfigActivationGate({
+    repoRoot: root,
+    manifest,
+    evidenceDir,
+  });
+  assert.equal(gate.revision, "yoyoosun-customer-package-v1.runtime-manifest-v1");
+
+  await rm(root, { recursive: true, force: true });
+});
+
+test("未显式 approved 时生成 draft，不自动通过 activation gate", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-manifest-evidence-"));
   const manifest = writeRuntimeManifest(root);
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
@@ -288,17 +327,16 @@ test("生成 manifest evidence 后 activation gate 可通过", async () => {
   );
 
   const evidence = JSON.parse(await readFile(result.evidencePath, "utf8"));
-  assert.equal(evidence.customerKey, "yoyoosun");
-  assert.equal(evidence.reviewStatus, "approved");
-  assert.match(evidence.manifestSha256, /^sha256:[a-f0-9]{64}$/);
-  assert.equal(evidence.redaction.containsSecrets, false);
-
-  const gate = validateCustomerConfigActivationGate({
-    repoRoot: root,
-    manifest,
-    evidenceDir,
-  });
-  assert.equal(gate.revision, "yoyoosun-customer-package-v1.runtime-manifest-v1");
+  assert.equal(evidence.reviewStatus, "draft");
+  assert.throws(
+    () =>
+      validateCustomerConfigActivationGate({
+        repoRoot: root,
+        manifest,
+        evidenceDir,
+      }),
+    /reviewStatus must be approved/,
+  );
 
   await rm(root, { recursive: true, force: true });
 });

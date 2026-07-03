@@ -7,6 +7,7 @@ import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/custome
 import {
   buildPreview,
   runCustomerPackageLint,
+  runCustomerPackageLintMany,
   validateCatalog,
   validatePackage,
   validatePreview,
@@ -25,6 +26,17 @@ test("customer-package-lint: yoyoosun package stays preview-only", () => {
   assert.equal(preview.businessFlows.length, 4);
   assert.equal(preview.stateMachines.length, 3);
   assert.equal(preview.processPolicies.length, 3);
+  assert(
+    preview.processPolicies.every(
+      (policy) =>
+        policy.ruleCount === policy.rules.length &&
+        policy.rules.every((rule) => rule && typeof rule === "object"),
+    ),
+  );
+  assert.equal(preview.printTemplateDefaults.length, 2);
+  assert(
+    preview.printTemplateDefaults.every((item) => item.status === "preview_only"),
+  );
   assert(preview.guardrails.forbiddenTargets.includes("tenant_id"));
   assert(preview.guardrails.forbiddenTargets.includes("workflow_done_to_fact_posted"));
   validatePreview(preview);
@@ -42,6 +54,36 @@ test("customer-package-lint: demo package proves customer package validation is 
   assert.equal(result.preview.workflows.length, 4);
   assert(result.preview.workflows.some((workflow) => workflow.key === "demo_finished_goods_delivery"));
   validatePreview(result.preview);
+});
+
+test("customer-package-lint: repeated customer flags validate every requested package", () => {
+  const results = runCustomerPackageLintMany({
+    customers: ["yoyoosun", "demo"],
+    mode: "compile",
+    out: "",
+  });
+
+  assert.deepEqual(
+    results.map((result) => result.config.customerKey),
+    ["yoyoosun", "demo"],
+  );
+  assert.deepEqual(
+    results.map((result) => result.mode),
+    ["compile", "compile"],
+  );
+  results.forEach((result) => validatePreview(result.preview));
+});
+
+test("customer-package-lint: multi-customer preview output must use separate files", () => {
+  assert.throws(
+    () =>
+      runCustomerPackageLintMany({
+        customers: ["yoyoosun", "demo"],
+        mode: "preview",
+        out: "output/customers/customer-package-preview.json",
+      }),
+    /--out only supports one customer package/,
+  );
 });
 
 test("customer-package-lint: finished goods delivery commands stay catalog-registered and preview-only", () => {
@@ -67,8 +109,10 @@ test("customer-package-lint: compile mode returns bounded preview only", () => {
   assert.equal(result.preview.identity.runtimeEnabled, false);
   assert.deepEqual(Object.keys(result.preview).sort(), [
     "businessFlows",
+    "extensionPoints",
     "guardrails",
     "identity",
+    "printTemplateDefaults",
     "processPolicies",
     "stateMachines",
     "workflows",
@@ -117,6 +161,65 @@ test("customer-package-lint: package cannot carry executable or raw payloads", (
   );
 });
 
+test("customer-package-lint: process policy rules must stay structured and non-executable", () => {
+  assert.throws(
+    () =>
+      validatePackage({
+        ...yoyoosunCustomerPackage,
+        processPolicies: [
+          {
+            ...yoyoosunCustomerPackage.processPolicies[0],
+            rules: [{}],
+          },
+          ...yoyoosunCustomerPackage.processPolicies.slice(1),
+        ],
+      }),
+    /processPolicies\[0\]\.rules\[0\] must declare key or when/,
+  );
+
+  assert.throws(
+    () =>
+      validatePackage({
+        ...yoyoosunCustomerPackage,
+        processPolicies: [
+          {
+            ...yoyoosunCustomerPackage.processPolicies[0],
+            rules: [
+              {
+                key: "invalid_executable_policy",
+                decision: "preview_only",
+                handler: "customerPolicyHandler",
+              },
+            ],
+          },
+          ...yoyoosunCustomerPackage.processPolicies.slice(1),
+        ],
+      }),
+    /processPolicies\[0\]\.rules\[0\]\.handler must not register executable policy behavior/,
+  );
+
+  assert.throws(
+    () =>
+      validatePackage({
+        ...yoyoosunCustomerPackage,
+        processPolicies: [
+          {
+            ...yoyoosunCustomerPackage.processPolicies[0],
+            rules: [
+              {
+                key: "unknown_field_policy",
+                decision: "preview_only",
+                scope: "not allowed",
+              },
+            ],
+          },
+          ...yoyoosunCustomerPackage.processPolicies.slice(1),
+        ],
+      }),
+    /processPolicies\[0\]\.rules\[0\]\.scope is not an allowed process policy rule field/,
+  );
+});
+
 test("customer-package-lint: moduleStates stay catalog-bound and explain non-enabled modules", () => {
   validatePackage({
     ...demoCustomerPackage,
@@ -152,6 +255,57 @@ test("customer-package-lint: moduleStates stay catalog-bound and explain non-ena
         moduleStates: [{ moduleKey: "shipments", state: "disabled" }],
       }),
     /moduleStates\[0\]\.reason must be a non-empty string/,
+  );
+});
+
+test("customer-package-lint: print template defaults stay bounded to party defaults", () => {
+  validatePackage(demoCustomerPackage);
+
+  assert.throws(
+    () =>
+      validatePackage({
+        ...demoCustomerPackage,
+        printTemplateDefaults: [
+          {
+            templateKey: "sales-order-confirmation",
+            status: "preview_only",
+            partyDefaults: { buyerCompany: "演示买方公司" },
+            guardrail: "invalid template",
+          },
+        ],
+      }),
+    /printTemplateDefaults\[0\]\.templateKey contains unsupported template sales-order-confirmation/,
+  );
+  assert.throws(
+    () =>
+      validatePackage({
+        ...demoCustomerPackage,
+        printTemplateDefaults: [
+          {
+            templateKey: "material-purchase-contract",
+            status: "preview_only",
+            partyDefaults: { supplierName: "不允许覆盖供应商" },
+            guardrail: "invalid supplier default",
+          },
+        ],
+      }),
+    /partyDefaults\.supplierName is not an allowed print party default/,
+  );
+  assert.throws(
+    () =>
+      validatePackage({
+        ...demoCustomerPackage,
+        printTemplateDefaults: [
+          {
+            templateKey: "material-purchase-contract",
+            status: "preview_only",
+            partyDefaults: { buyerCompany: "演示买方公司" },
+            supplierDefaults: { supplierName: "不允许覆盖供应商" },
+            guardrail: "invalid supplier default",
+          },
+        ],
+      }),
+    /supplierDefaults must not override supplier snapshots from business records/,
   );
 });
 

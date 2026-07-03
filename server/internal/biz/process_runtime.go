@@ -367,6 +367,9 @@ func (uc *ProcessRuntimeUsecase) StartProcessInstance(ctx context.Context, in *P
 	if firstNode.ProcessInstanceID != instance.ID {
 		return nil, ErrBadParam
 	}
+	if firstNode.Status == ProcessNodeStatusActive {
+		return firstNode, nil
+	}
 	if firstNode.Status != ProcessNodeStatusWaiting {
 		return nil, ErrProcessNodeInstanceConflict
 	}

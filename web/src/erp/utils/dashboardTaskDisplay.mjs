@@ -1,5 +1,9 @@
 import { businessModuleDefinitions } from '../config/businessModules.mjs'
 import { dashboardModules } from '../config/dashboardModules.mjs'
+import {
+  isInternalWorkflowDocumentRef,
+  resolveReadableWorkflowSourceNo,
+} from './workflowDocumentRefs.mjs'
 
 const TASK_SOURCE_TITLE_MAP = new Map([
   ...dashboardModules.map((moduleItem) => [moduleItem.key, moduleItem.title]),
@@ -38,20 +42,35 @@ const ACTIVE_TASK_ENTRY_PATHS = new Set([
   ...dashboardModules.map((moduleItem) => moduleItem.path),
 ])
 
+export function getWorkflowTaskSourceTypeLabel(
+  sourceType,
+  fallback = '业务来源'
+) {
+  const normalizedSourceType = String(sourceType || '').trim()
+  if (!normalizedSourceType) {
+    return fallback
+  }
+  return TASK_SOURCE_TITLE_MAP.get(normalizedSourceType) || fallback
+}
+
 export function formatWorkflowTaskSource(task = {}) {
-  if (task.source_no) {
-    return task.source_no
+  const sourceNo = resolveReadableWorkflowSourceNo(task, ['source_no'])
+  if (sourceNo) {
+    return sourceNo
   }
 
   const sourceType = String(task.source_type || '').trim()
-  const sourceTitle = TASK_SOURCE_TITLE_MAP.get(sourceType)
-  if (sourceTitle && task.source_id) {
+  const sourceTitle = getWorkflowTaskSourceTypeLabel(sourceType, '')
+  const hasLinkedSource = Boolean(
+    task.source_id || isInternalWorkflowDocumentRef(task.source_no, task)
+  )
+  if (sourceTitle && hasLinkedSource) {
     return `${sourceTitle} / 已关联业务来源`
   }
   if (sourceTitle) {
     return sourceTitle
   }
-  if (task.source_id) {
+  if (hasLinkedSource) {
     return '已关联业务来源'
   }
   return '未关联业务单据'
@@ -112,8 +131,12 @@ export function resolveWorkflowTaskEntryPath(task = {}) {
     return ''
   }
 
+  const linkKeyword = resolveReadableWorkflowSourceNo(task, [
+    'source_no',
+    'document_no',
+  ])
   const query = buildDashboardTaskQuery({
-    keyword: task.source_no,
+    keyword: linkKeyword,
     sourceKey: 'task-dashboard',
     matchFields: TASK_LINK_MATCH_FIELDS,
   })

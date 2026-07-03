@@ -154,6 +154,28 @@ func (uc *WorkflowUsecase) applyBossApprovalTransition(current *WorkflowTask, in
 	return nil
 }
 
+func setWorkflowTransitionReasonPayload(payload map[string]any, taskStatusKey string, reason string) {
+	if payload == nil {
+		return
+	}
+	switch strings.TrimSpace(taskStatusKey) {
+	case "blocked":
+		payload["blocked_reason"] = reason
+		delete(payload, "rejected_reason")
+	case "rejected":
+		payload["rejected_reason"] = reason
+		delete(payload, "blocked_reason")
+	}
+}
+
+func clearWorkflowTransitionReasonPayload(payload map[string]any) {
+	if payload == nil {
+		return
+	}
+	delete(payload, "blocked_reason")
+	delete(payload, "rejected_reason")
+}
+
 func buildBossApprovalDoneSideEffects(current *WorkflowTask) *WorkflowTaskStatusSideEffects {
 	ownerRoleKey := "engineering"
 	return &WorkflowTaskStatusSideEffects{
@@ -190,12 +212,9 @@ func buildBossApprovalRevisionSideEffects(current *WorkflowTask, taskStatusKey s
 		"approval_result":   "rejected",
 		"decision":          taskStatusKey,
 		"transition_status": taskStatusKey,
-		"rejected_reason":   reason,
 		"critical_path":     true,
 	}
-	if taskStatusKey == "blocked" {
-		statePayload["blocked_reason"] = reason
-	}
+	setWorkflowTransitionReasonPayload(statePayload, taskStatusKey, reason)
 	return &WorkflowTaskStatusSideEffects{
 		BusinessState: &WorkflowBusinessStateUpsert{
 			SourceType:        workflowProjectOrderModuleKey,
@@ -217,6 +236,7 @@ func (uc *WorkflowUsecase) applyPurchaseIQCTransition(current *WorkflowTask, in 
 	case "done":
 		in.BusinessStatusKey = workflowWarehouseInboundPendingKey
 		ensureWorkflowPayload(&in.Payload)
+		clearWorkflowTransitionReasonPayload(in.Payload)
 		if workflowPayloadString(in.Payload, "qc_result") == "" {
 			in.Payload["qc_result"] = "pass"
 		}
@@ -231,14 +251,7 @@ func (uc *WorkflowUsecase) applyPurchaseIQCTransition(current *WorkflowTask, in 
 		ensureWorkflowPayload(&in.Payload)
 		in.Payload["decision"] = in.TaskStatusKey
 		in.Payload["transition_status"] = in.TaskStatusKey
-		if in.TaskStatusKey == "blocked" {
-			in.Payload["blocked_reason"] = reason
-			if workflowPayloadString(in.Payload, "rejected_reason") == "" {
-				in.Payload["rejected_reason"] = reason
-			}
-		} else {
-			in.Payload["rejected_reason"] = reason
-		}
+		setWorkflowTransitionReasonPayload(in.Payload, in.TaskStatusKey, reason)
 		in.SideEffects = buildPurchaseIQCExceptionSideEffects(current, in.TaskStatusKey, reason)
 	default:
 		return nil
@@ -270,11 +283,7 @@ func (uc *WorkflowUsecase) applyPurchaseWarehouseInboundTransition(current *Work
 		in.Payload["transition_status"] = in.TaskStatusKey
 		in.Payload["warehouse_task_id"] = current.ID
 		in.Payload["critical_path"] = true
-		if in.TaskStatusKey == "blocked" {
-			in.Payload["blocked_reason"] = reason
-		} else {
-			in.Payload["rejected_reason"] = reason
-		}
+		setWorkflowTransitionReasonPayload(in.Payload, in.TaskStatusKey, reason)
 		in.SideEffects = buildPurchaseWarehouseInboundBlockedSideEffects(current, in.TaskStatusKey, reason)
 	default:
 		return nil
@@ -308,6 +317,7 @@ func (uc *WorkflowUsecase) applyOutsourceReturnQCTransition(current *WorkflowTas
 	case "done":
 		in.BusinessStatusKey = workflowWarehouseInboundPendingKey
 		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+		clearWorkflowTransitionReasonPayload(in.Payload)
 		if workflowPayloadString(in.Payload, "qc_result") == "" {
 			in.Payload["qc_result"] = "pass"
 		}
@@ -326,13 +336,7 @@ func (uc *WorkflowUsecase) applyOutsourceReturnQCTransition(current *WorkflowTas
 		in.Payload["transition_status"] = in.TaskStatusKey
 		in.Payload["qc_type"] = "outsource_return"
 		in.Payload["outsource_processing"] = true
-		if in.TaskStatusKey == "blocked" {
-			in.Payload["blocked_reason"] = reason
-			in.Payload["rejected_reason"] = reason
-		} else {
-			delete(in.Payload, "blocked_reason")
-			in.Payload["rejected_reason"] = reason
-		}
+		setWorkflowTransitionReasonPayload(in.Payload, in.TaskStatusKey, reason)
 		in.SideEffects = buildOutsourceReturnQCReworkSideEffects(workflowTaskWithPayload(current, in.Payload), in.TaskStatusKey, reason)
 	default:
 		return nil
@@ -387,13 +391,7 @@ func (uc *WorkflowUsecase) applyOutsourceReworkTransition(current *WorkflowTask,
 		in.Payload["rework_task_id"] = current.ID
 		in.Payload["critical_path"] = true
 		in.Payload["outsource_processing"] = true
-		if in.TaskStatusKey == "blocked" {
-			in.Payload["blocked_reason"] = reason
-			delete(in.Payload, "rejected_reason")
-		} else {
-			in.Payload["rejected_reason"] = reason
-			delete(in.Payload, "blocked_reason")
-		}
+		setWorkflowTransitionReasonPayload(in.Payload, in.TaskStatusKey, reason)
 		in.SideEffects = buildOutsourceReworkBlockedSideEffects(current, in.TaskStatusKey, reason)
 	default:
 		return nil
@@ -435,13 +433,10 @@ func (uc *WorkflowUsecase) applyFinishedGoodsQCTransition(current *WorkflowTask,
 		in.Payload["critical_path"] = true
 		if in.TaskStatusKey == "blocked" {
 			in.Payload["qc_result"] = "blocked"
-			in.Payload["blocked_reason"] = reason
-			delete(in.Payload, "rejected_reason")
 		} else {
 			in.Payload["qc_result"] = "rejected"
-			in.Payload["rejected_reason"] = reason
-			delete(in.Payload, "blocked_reason")
 		}
+		setWorkflowTransitionReasonPayload(in.Payload, in.TaskStatusKey, reason)
 		in.SideEffects = buildFinishedGoodsQCReworkSideEffects(workflowTaskWithPayload(current, in.Payload), in.TaskStatusKey, reason)
 	default:
 		return nil
@@ -478,13 +473,7 @@ func (uc *WorkflowUsecase) applyFinishedGoodsInboundTransition(current *Workflow
 		in.Payload["critical_path"] = true
 		in.Payload["decision"] = in.TaskStatusKey
 		in.Payload["transition_status"] = in.TaskStatusKey
-		if in.TaskStatusKey == "blocked" {
-			in.Payload["blocked_reason"] = reason
-			delete(in.Payload, "rejected_reason")
-		} else {
-			in.Payload["rejected_reason"] = reason
-			delete(in.Payload, "blocked_reason")
-		}
+		setWorkflowTransitionReasonPayload(in.Payload, in.TaskStatusKey, reason)
 		in.SideEffects = buildFinishedGoodsInboundBlockedSideEffects(workflowTaskWithPayload(current, in.Payload), in.TaskStatusKey, reason)
 	default:
 		return nil
@@ -517,11 +506,7 @@ func (uc *WorkflowUsecase) applyFinishedGoodsReworkTransition(current *WorkflowT
 		in.Payload["rework_task_id"] = current.ID
 		in.Payload["critical_path"] = true
 		in.Payload["finished_goods"] = true
-		if in.TaskStatusKey == "blocked" {
-			in.Payload["blocked_reason"] = reason
-		} else {
-			in.Payload["rejected_reason"] = reason
-		}
+		setWorkflowTransitionReasonPayload(in.Payload, in.TaskStatusKey, reason)
 		in.SideEffects = buildFinishedGoodsReworkBlockedSideEffects(current, in.TaskStatusKey, reason)
 	default:
 		return nil
@@ -559,13 +544,7 @@ func (uc *WorkflowUsecase) applyShipmentReleaseTransition(current *WorkflowTask,
 		in.Payload["critical_path"] = true
 		in.Payload["decision"] = in.TaskStatusKey
 		in.Payload["transition_status"] = in.TaskStatusKey
-		if in.TaskStatusKey == "blocked" {
-			in.Payload["blocked_reason"] = reason
-			delete(in.Payload, "rejected_reason")
-		} else {
-			in.Payload["rejected_reason"] = reason
-			delete(in.Payload, "blocked_reason")
-		}
+		setWorkflowTransitionReasonPayload(in.Payload, in.TaskStatusKey, reason)
 		in.SideEffects = buildShipmentReleaseBlockedSideEffects(workflowTaskWithPayload(current, in.Payload), in.TaskStatusKey, reason)
 	default:
 		return nil
@@ -637,13 +616,7 @@ func applyShipmentFinanceBlockedTransition(current *WorkflowTask, in *WorkflowTa
 	in.Payload["critical_path"] = true
 	in.Payload["decision"] = in.TaskStatusKey
 	in.Payload["transition_status"] = in.TaskStatusKey
-	if in.TaskStatusKey == "blocked" {
-		in.Payload["blocked_reason"] = reason
-		delete(in.Payload, "rejected_reason")
-	} else {
-		in.Payload["rejected_reason"] = reason
-		delete(in.Payload, "blocked_reason")
-	}
+	setWorkflowTransitionReasonPayload(in.Payload, in.TaskStatusKey, reason)
 	in.SideEffects = buildShipmentFinanceBlockedSideEffects(workflowTaskWithPayload(current, in.Payload), in.TaskStatusKey, reason)
 	return nil
 }
@@ -716,13 +689,7 @@ func applyPayableFinanceBlockedTransition(current *WorkflowTask, in *WorkflowTas
 	in.Payload["payable_type"] = payableType
 	in.Payload["decision"] = in.TaskStatusKey
 	in.Payload["transition_status"] = in.TaskStatusKey
-	if in.TaskStatusKey == "blocked" {
-		in.Payload["blocked_reason"] = reason
-		delete(in.Payload, "rejected_reason")
-	} else {
-		in.Payload["rejected_reason"] = reason
-		delete(in.Payload, "blocked_reason")
-	}
+	setWorkflowTransitionReasonPayload(in.Payload, in.TaskStatusKey, reason)
 	in.SideEffects = buildPayableFinanceBlockedSideEffects(workflowTaskWithPayload(current, in.Payload), in.TaskStatusKey, reason)
 	return nil
 }

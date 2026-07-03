@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import test from 'node:test'
 
 import {
@@ -8,10 +10,18 @@ import {
   ERP_PERMISSION_PRESETS,
   PERMISSION_CENTER_PATH,
   defaultMenuPermissions,
+  getMobileRolePermissionLabel,
+  getPermissionLabel,
   normalizeMobileRolePermissions,
   normalizeMenuPermissions,
   resolveMenuPermissionKey,
 } from './menuPermissions.mjs'
+
+const repoRoot = path.resolve(import.meta.dirname, '../../../..')
+
+function readRepoFile(relativePath) {
+  return readFileSync(path.join(repoRoot, relativePath), 'utf8')
+}
 
 test('menuPermissions: 包含权限管理入口', () => {
   assert(
@@ -74,7 +84,19 @@ test('menuPermissions: 岗位任务端角色权限只保留有效角色并保持
   )
 })
 
-test('menuPermissions: 只保留有效权限并把旧文档路径归一到看板', () => {
+test('menuPermissions: 未知菜单和岗位权限标签不透出 raw key', () => {
+  assert.equal(getPermissionLabel('/erp/unknown/raw-path'), '菜单权限')
+  assert.equal(getMobileRolePermissionLabel('unknown_role_key'), '岗位入口')
+  assert.equal(getPermissionLabel(''), '')
+  assert.equal(getMobileRolePermissionLabel(''), '')
+  assert.doesNotMatch(getPermissionLabel('/erp/unknown/raw-path'), /unknown/u)
+  assert.doesNotMatch(
+    getMobileRolePermissionLabel('unknown_role_key'),
+    /unknown_role_key/u
+  )
+})
+
+test('menuPermissions: 只保留有效权限并把旧入口权限归一到看板', () => {
   assert.deepEqual(
     normalizeMenuPermissions([
       '/erp/source-readiness',
@@ -184,4 +206,33 @@ test('menuPermissions: 当前权限项不包含前端文档或开发验收路径
   assert(!permissionKeys.some((key) => key.startsWith('/erp/docs/')))
   assert(!permissionKeys.some((key) => key.startsWith('/erp/qa/')))
   assert(!permissionKeys.includes('/erp/help-center'))
+})
+
+test('menuPermissions: 旧入口不保留路由重定向', () => {
+  const routerSource = readRepoFile('web/src/erp/router.jsx')
+  const retiredRouteTokens = [
+    'path="/login"',
+    'path="/admin-accounts"',
+    'path="/admin-users"',
+    'path="/admin-menu"',
+    'path="/admin-guide"',
+    'path="/dashboard"',
+    'path="operations/facts"',
+    'path="flows/overview"',
+    'path="help-center"',
+    'path="mobile-workbenches"',
+    'path="roles/:roleKey"',
+    'path="source-readiness"',
+    'path="docs/*"',
+    'path="qa/*"',
+    'path="changes/current"',
+  ]
+
+  for (const pathToken of retiredRouteTokens) {
+    assert.equal(
+      routerSource.includes(pathToken),
+      false,
+      `router must not keep retired route ${pathToken}`
+    )
+  }
 })

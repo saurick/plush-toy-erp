@@ -67,7 +67,7 @@ const RESERVED_DATE_FILTER_OPTIONS = [
 ]
 
 export const DEFAULT_OPERATIONAL_FACT_SUMMARY =
-  '统一承接生产、委外、出货、库存预留和财务事实的最小运行入口。页面只提交动作，库存流水、冲正和状态边界由后端 usecase 处理。'
+  '统一承接生产、委外、出货、库存预留和财务事实的最小运行入口。页面只提交动作，库存流水、冲正和状态边界由后端业务规则处理。'
 export const EMPTY_VIEW_OVERRIDES = Object.freeze({})
 
 const FACT_TYPE_LABELS = Object.freeze({
@@ -96,22 +96,79 @@ const COUNTERPARTY_TYPE_LABELS = Object.freeze({
   OTHER: '其他',
 })
 
+const SUBJECT_TYPE_LABELS = Object.freeze({
+  MATERIAL: '物料',
+  PRODUCT: '产品',
+  PRODUCT_SKU: '产品规格',
+  PROCESS: '工序',
+  OTHER: '业务对象',
+})
+
 function readableRef(label, value) {
   return value === null || value === undefined || value === ''
     ? '-'
     : `${label}已关联`
 }
 
-function factTypeLabel(value) {
-  return FACT_TYPE_LABELS[value] || value || '-'
+function safeRefText(label, value) {
+  return readableRef(label, value)
 }
 
-function sourceTypeLabel(value) {
-  return SOURCE_TYPE_LABELS[value] || value || '来源'
+function normalizeText(value) {
+  return String(value ?? '').trim()
+}
+
+function sourceDocumentRef(record = {}) {
+  const sourceNo =
+    normalizeText(record.source_no) ||
+    normalizeText(record.source_document_no) ||
+    normalizeText(record.document_no)
+  return sourceNo || '来源单据已关联'
+}
+
+function sourceColumnText(record = {}) {
+  if (!record.source_type) return ''
+  return `${sourceTypeLabel(record.source_type)} / ${sourceDocumentRef(record)}`
+}
+
+function subjectColumnText(record = {}) {
+  return safeRefText(
+    SUBJECT_TYPE_LABELS[record.subject_type] || '业务对象',
+    record.subject_id || record.product_id
+  )
+}
+
+function stockContextText(record = {}) {
+  return [
+    safeRefText('仓库', record.warehouse_id),
+    safeRefText('批次', record.lot_id),
+    safeRefText('单位', record.unit_id),
+  ].join(' / ')
+}
+
+function supplierColumnText(record = {}) {
+  return record.supplier_name || safeRefText('供应商', record.supplier_id)
+}
+
+function customerColumnText(record = {}) {
+  return record.customer_snapshot || safeRefText('客户', record.customer_id)
+}
+
+function counterpartyColumnText(record = {}) {
+  if (!record.counterparty_type) return '-'
+  return `${counterpartyTypeLabel(record.counterparty_type)} / ${safeRefText('往来方', record.counterparty_id)}`
+}
+
+function factTypeLabel(value) {
+  return FACT_TYPE_LABELS[value] || (value ? '业务事实' : '-')
+}
+
+export function sourceTypeLabel(value) {
+  return SOURCE_TYPE_LABELS[value] || '来源'
 }
 
 function counterpartyTypeLabel(value) {
-  return COUNTERPARTY_TYPE_LABELS[value] || value || '往来方'
+  return COUNTERPARTY_TYPE_LABELS[value] || '往来方'
 }
 
 export function buildOperationalFactViewConfigs() {
@@ -246,41 +303,17 @@ export function buildOperationalFactColumns(activeKey) {
       title: '对象',
       exportTitle: '对象',
       width: 150,
-      sortValue: (record) =>
-        `${record.subject_type || 'PRODUCT'}-${
-          record.subject_id || record.product_id || ''
-        }`,
-      render: (_, record) =>
-        readableRef(
-          record.subject_type || '产品',
-          record.subject_id || record.product_id
-        ),
-      exportValue: (record) =>
-        readableRef(
-          record.subject_type || '产品',
-          record.subject_id || record.product_id
-        ),
+      sortValue: subjectColumnText,
+      render: (_, record) => subjectColumnText(record),
+      exportValue: subjectColumnText,
     },
     {
       title: '仓库 / 批次 / 单位',
       exportTitle: '仓库 / 批次 / 单位',
       width: 220,
-      sortValue: (record) =>
-        `${record.warehouse_id || ''}-${record.lot_id || ''}-${
-          record.unit_id || ''
-        }`,
-      render: (_, record) =>
-        [
-          readableRef('仓库', record.warehouse_id),
-          readableRef('批次', record.lot_id),
-          readableRef('单位', record.unit_id),
-        ].join(' / '),
-      exportValue: (record) =>
-        [
-          readableRef('仓库', record.warehouse_id),
-          readableRef('批次', record.lot_id),
-          readableRef('单位', record.unit_id),
-        ].join(' / '),
+      sortValue: stockContextText,
+      render: (_, record) => stockContextText(record),
+      exportValue: stockContextText,
     },
     {
       title: '数量',
@@ -298,16 +331,9 @@ export function buildOperationalFactColumns(activeKey) {
       title: '来源',
       exportTitle: '来源',
       width: 240,
-      sortValue: (record) =>
-        `${record.source_type || ''}-${record.source_id || ''}`,
-      render: (_, record) =>
-        record.source_type
-          ? `${sourceTypeLabel(record.source_type)} / ${readableRef('来源', record.source_id)}`
-          : '-',
-      exportValue: (record) =>
-        record.source_type
-          ? `${sourceTypeLabel(record.source_type)} / ${readableRef('来源', record.source_id)}`
-          : '',
+      sortValue: sourceColumnText,
+      render: (_, record) => sourceColumnText(record) || '-',
+      exportValue: sourceColumnText,
     },
     {
       title: '日期',
@@ -364,12 +390,9 @@ export function buildOperationalFactColumns(activeKey) {
       {
         title: '供应商',
         width: 220,
-        sortValue: (record) => record.supplier_name || record.supplier_id || '',
-        render: (_, record) =>
-          record.supplier_name ||
-          (record.supplier_id
-            ? readableRef('供应商', record.supplier_id)
-            : '-'),
+        sortValue: supplierColumnText,
+        render: (_, record) => supplierColumnText(record),
+        exportValue: supplierColumnText,
       },
       ...quantityColumns,
       ...sourceColumns,
@@ -389,13 +412,9 @@ export function buildOperationalFactColumns(activeKey) {
         title: '客户',
         dataIndex: 'customer_id',
         width: 240,
-        sortValue: (record) =>
-          record.customer_snapshot || record.customer_id || '',
-        render: (_, record) =>
-          record.customer_snapshot || (record.customer_id ? '客户已关联' : '-'),
-        exportValue: (record) =>
-          record?.customer_snapshot ||
-          (record?.customer_id ? '客户已关联' : ''),
+        sortValue: customerColumnText,
+        render: (_, record) => customerColumnText(record),
+        exportValue: customerColumnText,
       },
       {
         title: '行数',
@@ -432,12 +451,9 @@ export function buildOperationalFactColumns(activeKey) {
       {
         title: '往来方',
         width: 170,
-        sortValue: (record) =>
-          `${record.counterparty_type || ''}-${record.counterparty_id || ''}`,
-        render: (_, record) =>
-          record.counterparty_type
-            ? `${counterpartyTypeLabel(record.counterparty_type)} / ${readableRef('往来方', record.counterparty_id)}`
-            : '-',
+        sortValue: counterpartyColumnText,
+        render: (_, record) => counterpartyColumnText(record),
+        exportValue: counterpartyColumnText,
       },
       {
         title: '金额',
@@ -458,7 +474,7 @@ export function buildOperationalFactColumns(activeKey) {
         width: 130,
         sortType: 'text',
         render: (value) =>
-          FINANCE_COLLECTION_TYPE_LABELS[value] || value || '-',
+          FINANCE_COLLECTION_TYPE_LABELS[value] || (value ? '收款分类' : '-'),
       },
       {
         title: '账期',
@@ -466,7 +482,8 @@ export function buildOperationalFactColumns(activeKey) {
         width: 150,
         sortType: 'text',
         render: (value, record) => {
-          const label = FINANCE_PAYMENT_TERM_LABELS[value] || value || '-'
+          const label =
+            FINANCE_PAYMENT_TERM_LABELS[value] || (value ? '账期' : '-')
           return record?.payment_term_days === null ||
             record?.payment_term_days === undefined
             ? label
@@ -479,7 +496,7 @@ export function buildOperationalFactColumns(activeKey) {
         width: 130,
         sortType: 'text',
         render: (value) =>
-          FINANCE_INVOICE_CATEGORY_LABELS[value] || value || '-',
+          FINANCE_INVOICE_CATEGORY_LABELS[value] || (value ? '发票类别' : '-'),
       },
       ...sourceColumns,
     ],

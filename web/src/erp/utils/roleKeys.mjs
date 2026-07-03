@@ -34,7 +34,9 @@ export function isRoleKeyMatch(actual, expected) {
 
 export function getRoleDisplayName(roleKey, fallback = '') {
   const normalized = normalizeRoleKey(roleKey)
-  return ROLE_DISPLAY_NAMES[normalized] || fallback || normalized
+  if (ROLE_DISPLAY_NAMES[normalized]) return ROLE_DISPLAY_NAMES[normalized]
+  if (fallback) return fallback
+  return normalized ? '已配置角色' : ''
 }
 
 export function normalizeRolePayload(payload = {}) {

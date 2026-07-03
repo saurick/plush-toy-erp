@@ -9,6 +9,7 @@ import { appAlert } from '@/common/components/modal/alertBridge'
 import AntdAppBridge from '@/common/components/AntdAppBridge'
 import { getActiveERPBrand } from '@/common/consts/brand'
 import { applyERPFavicon } from '@/common/consts/favicon.mjs'
+import { getUserFacingErrorMessage } from '@/common/utils/errorMessage'
 import {
   ERPWorkspaceProvider,
   useERPWorkspace,
@@ -16,12 +17,11 @@ import {
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
 
 const ERPRouter = lazy(() => import('@/erp/router'))
-const MobileRoleRouter = lazy(() => import('@/erp/mobile/router'))
 
 function AppContent() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { appConfig, isDesktopApp, isMobileExperience } = useERPWorkspace()
+  const { appConfig, isMobileExperience } = useERPWorkspace()
   const appTitle =
     appConfig.title || import.meta.env.VITE_APP_TITLE || 'Plush Toy ERP'
   const activeBrand = getActiveERPBrand()
@@ -35,6 +35,10 @@ function AppContent() {
         hash: window.location.hash,
       }
       const targetLoginPath = loginPath || '/admin-login'
+      const userMessage = getUserFacingErrorMessage(
+        message,
+        '登录已过期，请重新登录'
+      )
 
       if (isMobileExperience) {
         navigate(targetLoginPath, {
@@ -46,7 +50,7 @@ function AppContent() {
 
       appAlert({
         title: '登录状态已失效',
-        message: message || '登录已过期，请重新登录',
+        message: userMessage,
         confirmText: '重新登录',
         onConfirm: () => {
           navigate(targetLoginPath, {
@@ -77,7 +81,7 @@ function AppContent() {
         <title>{appTitle}</title>
       </Helmet>
       <Suspense fallback={null}>
-        {isDesktopApp ? <ERPRouter /> : <MobileRoleRouter />}
+        <ERPRouter />
       </Suspense>
     </>
   )

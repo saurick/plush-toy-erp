@@ -54,7 +54,6 @@ export WEB_API_ORIGIN=http://app-server:8300
 export ERP_PDF_CHROME_PATH=/usr/bin/chromium
 export ERP_PDF_RENDER_CONCURRENCY=2
 export ERP_PDF_WARMUP=async
-export ERP_PDF_WARMUP_ENABLED=
 export APP_JWT_SECRET='replace-with-runtime-secret'
 export APP_AUTH_SMS_MODE=disabled
 # export APP_AUTH_SMS_MODE=provider
@@ -106,7 +105,7 @@ export JAEGER_BIND_ADDR=127.0.0.1
 - 前端默认以根路径构建；如果网关使用路径前缀且不剥离前缀，需要先评审构建期 `VITE_BASE_URL`
 - 如果后续要重新开放公网域名或网关入口，必须先补新的正式部署方案，再更新本 README、Compose 环境说明和对应 smoke；不要沿用已经撤销的阿里云 / Cloudflare 旧口径。
 - PDF 运行依赖：服务端镜像内置 Debian `chromium` 与 `fonts-noto-cjk`，默认浏览器路径为 `/usr/bin/chromium`；如需自定义可通过 `ERP_PDF_CHROME_PATH` 覆盖。
-- PDF 资源建议：默认 `APP_MEM_LIMIT=896m`、`ERP_PDF_RENDER_CONCURRENCY=2`，推荐使用 `ERP_PDF_WARMUP=async/off` 控制预热；兼容旧变量 `ERP_PDF_WARMUP_ENABLED=true/false`，两者同时设置时以 `ERP_PDF_WARMUP` 为准。服务启动后异步预热共享 Chromium 和 CJK 字体，日志使用 `template pdf warmup started / success / failed / disabled` 口径；`/readyz` 在预热完成前保持未就绪，优先稳住在线 PDF 首次预览。如果同机项目较多或极低内存排障，先降低并发，必要时再临时关闭预热。
+- PDF 资源建议：默认 `APP_MEM_LIMIT=896m`、`ERP_PDF_RENDER_CONCURRENCY=2`，使用 `ERP_PDF_WARMUP=async/off` 控制预热。服务启动后异步预热共享 Chromium 和 CJK 字体，日志使用 `template pdf warmup started / success / failed / disabled` 口径；`/readyz` 在预热完成前保持未就绪，优先稳住在线 PDF 首次预览。如果同机项目较多或极低内存排障，先降低并发，必要时再临时关闭预热。
 
 ## 镜像构建
 

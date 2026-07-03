@@ -1,5 +1,5 @@
 import { getNavigationSections } from './seedData.mjs'
-import { appDefinitions } from './appRegistry.mjs'
+import { mobileRoleDefinitions } from './appRegistry.mjs'
 import { normalizeRoleKey } from '../utils/roleKeys.mjs'
 
 export const PERMISSION_CENTER_PATH = '/erp/system/permissions'
@@ -9,6 +9,7 @@ const PERMISSION_ALIAS_MAP = Object.freeze({
   '/erp/source-readiness': '/erp/dashboard',
   '/erp/mobile-workbenches': '/erp/dashboard',
   '/erp/help-center': '/erp/dashboard',
+  '/erp/changes/current': '/erp/dashboard',
 })
 
 const BUSINESS_SECTION_TITLES = Object.freeze([
@@ -41,12 +42,10 @@ export const ERP_MENU_PERMISSION_OPTIONS = Object.freeze(
 )
 
 export const ERP_MOBILE_ROLE_PERMISSION_OPTIONS = Object.freeze(
-  appDefinitions
-    .filter((app) => app.kind === 'mobile' && app.roleKey)
-    .map((app) => ({
-      key: app.roleKey,
-      label: app.shortTitle,
-    }))
+  mobileRoleDefinitions.map((role) => ({
+    key: role.roleKey,
+    label: role.shortTitle,
+  }))
 )
 
 const sectionPathMap = Object.freeze(
@@ -308,12 +307,12 @@ export const getMobileRolePermissionLabel = (key) => {
   const matched = ERP_MOBILE_ROLE_PERMISSION_OPTIONS.find(
     (item) => item.key === key
   )
-  return matched?.label || key
+  return matched?.label || (key ? '岗位入口' : '')
 }
 
 export const getPermissionLabel = (key) => {
   const matched = ERP_MENU_PERMISSION_OPTIONS.find((item) => item.key === key)
-  return matched?.label || key
+  return matched?.label || (key ? '菜单权限' : '')
 }
 
 export const getPermissionPreset = (presetKey) =>

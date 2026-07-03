@@ -801,7 +801,7 @@ func TestWorkflowUsecase_FinishedGoodsReworkBlockedWritesQCFailedState(t *testin
 		ID:            1301,
 		TaskStatusKey: "blocked",
 		Reason:        "返工线等待确认",
-		Payload:       map[string]any{},
+		Payload:       map[string]any{"rejected_reason": "旧退回原因"},
 	}, 7, "production")
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -814,6 +814,9 @@ func TestWorkflowUsecase_FinishedGoodsReworkBlockedWritesQCFailedState(t *testin
 		repo.updateTaskInput.Payload["blocked_reason"] != "返工线等待确认" ||
 		repo.updateTaskInput.Payload["finished_goods"] != true {
 		t.Fatalf("expected rework blocked update payload, got %#v", repo.updateTaskInput.Payload)
+	}
+	if _, ok := repo.updateTaskInput.Payload["rejected_reason"]; ok {
+		t.Fatalf("expected blocked transition to clear stale rejected_reason, got %#v", repo.updateTaskInput.Payload)
 	}
 	effects := repo.updateTaskInput.SideEffects
 	if effects == nil || effects.BusinessState == nil {
@@ -831,5 +834,45 @@ func TestWorkflowUsecase_FinishedGoodsReworkBlockedWritesQCFailedState(t *testin
 		effects.BusinessState.BlockedReason == nil ||
 		*effects.BusinessState.BlockedReason != "返工线等待确认" {
 		t.Fatalf("unexpected rework blocked business state %#v", effects.BusinessState)
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsReworkRejectedClearsBlockedReason(t *testing.T) {
+	repo := &stubWorkflowRepo{currentTask: finishedGoodsReworkWorkflowTask()}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1301,
+		TaskStatusKey: "rejected",
+		Reason:        "返工后仍未达标",
+		Payload:       map[string]any{"blocked_reason": "旧阻塞原因"},
+	}, 7, "production")
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if repo.updateTaskInput.BusinessStatusKey != workflowQCFailedStatusKey {
+		t.Fatalf("expected qc_failed business status, got %q", repo.updateTaskInput.BusinessStatusKey)
+	}
+	if repo.updateTaskInput.Payload["decision"] != "rejected" ||
+		repo.updateTaskInput.Payload["transition_status"] != "rejected" ||
+		repo.updateTaskInput.Payload["rejected_reason"] != "返工后仍未达标" ||
+		repo.updateTaskInput.Payload["finished_goods"] != true {
+		t.Fatalf("expected rework rejected update payload, got %#v", repo.updateTaskInput.Payload)
+	}
+	if _, ok := repo.updateTaskInput.Payload["blocked_reason"]; ok {
+		t.Fatalf("expected rejected transition to clear stale blocked_reason, got %#v", repo.updateTaskInput.Payload)
+	}
+	effects := repo.updateTaskInput.SideEffects
+	if effects == nil || effects.BusinessState == nil {
+		t.Fatalf("expected finished goods rework rejected side effects, got %#v", effects)
+	}
+	if effects.WorkflowRuleKey != "finished_goods_rework_rejected_to_qc_failed" {
+		t.Fatalf("expected finished goods rework rejected rule key, got %q", effects.WorkflowRuleKey)
+	}
+	if effects.BusinessState.Payload["rejected_reason"] != "返工后仍未达标" {
+		t.Fatalf("expected rejected business state reason, got %#v", effects.BusinessState.Payload)
+	}
+	if _, ok := effects.BusinessState.Payload["blocked_reason"]; ok {
+		t.Fatalf("expected rejected business state to omit stale blocked_reason, got %#v", effects.BusinessState.Payload)
 	}
 }

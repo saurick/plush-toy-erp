@@ -30,11 +30,16 @@ const SHIPMENT_STATUS_COLORS = Object.freeze({
   CANCELLED: 'red',
 })
 
+export function shipmentStatusText(status) {
+  const key = String(status || '').trim()
+  return SHIPMENT_STATUS_LABELS[key] || (key ? '出货状态' : '-')
+}
+
 export function shipmentStatusTag(status) {
   const key = String(status || '').trim()
   return (
     <Tag color={SHIPMENT_STATUS_COLORS[key] || 'default'}>
-      {SHIPMENT_STATUS_LABELS[key] || key || '-'}
+      {shipmentStatusText(key)}
     </Tag>
   )
 }
@@ -53,11 +58,9 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportTitle: '状态',
       dataIndex: 'status',
       width: 110,
-      sortValue: (record) =>
-        SHIPMENT_STATUS_LABELS[record.status] || record.status,
+      sortValue: (record) => shipmentStatusText(record.status),
       render: shipmentStatusTag,
-      exportValue: (record) =>
-        SHIPMENT_STATUS_LABELS[record?.status] || record?.status || '',
+      exportValue: (record) => shipmentStatusText(record?.status),
     },
     {
       title: '销售订单',

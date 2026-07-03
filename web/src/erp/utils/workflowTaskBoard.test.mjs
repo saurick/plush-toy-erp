@@ -7,13 +7,16 @@ import {
   filterWorkflowTaskBoardTasks,
   getWorkflowTaskActionPermission,
   getWorkflowTaskAllowedActionModes,
+  getWorkflowTaskBusinessStatusLabel,
   getWorkflowTaskCodeLabel,
   getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskReadonlyReason,
   getWorkflowTaskReason,
+  getWorkflowTaskReasonLabel,
   getWorkflowTaskStatusMeta,
   hasActiveWorkflowTaskBoardFilters,
   readWorkflowTaskBoardFiltersFromSearch,
+  TASK_BOARD_ROLE_OPTIONS,
   writeWorkflowTaskBoardFiltersToSearch,
 } from './workflowTaskBoard.mjs'
 
@@ -92,7 +95,89 @@ test('workflowTaskBoard: 状态文案和原因从任务或 payload 收口', () =
     label: '可执行',
     color: 'blue',
   })
+  assert.deepEqual(
+    getWorkflowTaskStatusMeta({
+      task_status_key: 'unknown_task_status_key',
+    }),
+    {
+      label: '未知状态',
+      color: 'default',
+    }
+  )
   assert.equal(getWorkflowTaskReason(tasks[1]), '库位未确认')
+  assert.equal(getWorkflowTaskReasonLabel(tasks[1]), '阻塞原因')
+  assert.equal(
+    getWorkflowTaskReason({
+      task_status_key: 'rejected',
+      payload: {
+        blocked_reason: '旧阻塞原因',
+        rejected_reason: '资料不完整',
+      },
+    }),
+    '资料不完整'
+  )
+  assert.equal(
+    getWorkflowTaskReasonLabel({
+      task_status_key: 'rejected',
+      payload: { rejected_reason: '资料不完整' },
+    }),
+    '退回原因'
+  )
+})
+
+test('FL_workflow_business_status__retains_business_status_snapshot workflowTaskBoard: 业务状态使用统一字典且不透出内部 key', () => {
+  assert.equal(
+    getWorkflowTaskBusinessStatusLabel({
+      business_status_key: 'shipping_released',
+    }),
+    '已放行待出库'
+  )
+  assert.equal(
+    getWorkflowTaskBusinessStatusLabel({
+      business_status_key: 'unknown_business_status_key',
+    }),
+    '未知业务状态'
+  )
+  assert.equal(
+    getWorkflowTaskBusinessStatusLabel({
+      business_status_key: 'shipping_released',
+      payload: { business_status_label: '客户确认中' },
+    }),
+    '客户确认中'
+  )
+  assert.equal(getWorkflowTaskBusinessStatusLabel({}), '业务状态未记录')
+  assert.deepEqual(
+    filterWorkflowTaskBoardTasks(
+      [
+        {
+          id: 40,
+          task_name: '出货放行确认',
+          task_status_key: 'ready',
+          owner_role_key: 'warehouse',
+          business_status_key: 'shipping_released',
+          payload: {},
+        },
+      ],
+      { keyword: '已放行' }
+    ).map((task) => task.id),
+    [40]
+  )
+  assert.deepEqual(
+    filterWorkflowTaskBoardTasks(
+      [
+        {
+          id: 41,
+          task_name: '未知状态任务',
+          task_status_key: 'ready',
+          owner_role_key: 'warehouse',
+          business_status_key: 'unknown_business_status_key',
+          payload: {},
+        },
+      ],
+      { keyword: 'unknown_business_status_key' }
+    ).map((task) => task.id),
+    []
+  )
 })
 
 test('workflowTaskBoard: 责任角色展示和只读原因不透出 owner_role_key', () => {
@@ -107,9 +192,19 @@ test('workflowTaskBoard: 责任角色展示和只读原因不透出 owner_role_k
     id: 21,
     roles: [{ role_key: 'sales' }],
     permissions: ['workflow.task.read', 'workflow.task.complete'],
+    effective_session: {
+      actions: ['workflow.task.complete'],
+    },
   }
 
   assert.equal(getWorkflowTaskOwnerRoleLabel(warehouseTask), '仓库')
+  assert.equal(
+    getWorkflowTaskOwnerRoleLabel({
+      ...warehouseTask,
+      owner_role_key: 'engineering',
+    }),
+    '工程'
+  )
   assert.equal(
     getWorkflowTaskOwnerRoleLabel({
       ...warehouseTask,
@@ -124,6 +219,35 @@ test('workflowTaskBoard: 责任角色展示和只读原因不透出 owner_role_k
   )
   assert.match(readonlyReason, /仓库责任角色/)
   assert.doesNotMatch(readonlyReason, /warehouse/)
+})
+
+test('workflowTaskBoard: 角色筛选包含工程岗位并按 role key 过滤', () => {
+  assert.deepEqual(
+    TASK_BOARD_ROLE_OPTIONS.find((item) => item.value === 'engineering'),
+    { value: 'engineering', label: '工程' }
+  )
+  assert.deepEqual(
+    filterWorkflowTaskBoardTasks(
+      [
+        {
+          id: 61,
+          task_name: '工程资料补齐',
+          task_status_key: 'ready',
+          owner_role_key: 'engineering',
+          source_type: 'material-bom',
+        },
+        {
+          id: 62,
+          task_name: '采购确认',
+          task_status_key: 'ready',
+          owner_role_key: 'purchase',
+          source_type: 'purchase-orders',
+        },
+      ],
+      { role: 'engineering' }
+    ).map((task) => task.id),
+    [61]
+  )
 })
 
 test('workflowTaskBoard: 任务编号缺失时不拼内部 ID', () => {
@@ -176,6 +300,10 @@ test('workflowTaskBoard: 从 URL 读取任务看板筛选并过滤非法值', ()
       sourceType: 'all',
     }
   )
+  assert.equal(
+    readWorkflowTaskBoardFiltersFromSearch('?role=engineering').role,
+    'engineering'
+  )
 })
 
 test('workflowTaskBoard: 写入 URL 时只保留非默认筛选并保留无关参数', () => {
@@ -223,17 +351,30 @@ test('workflowTaskBoard: 任务处理动作按权限码和 owner 角色收口', 
   const warehouseAdmin = {
     id: 7,
     roles: [{ role_key: 'warehouse' }],
-    permissions: ['workflow.task.read', 'workflow.task.complete'],
+    permissions: [
+      'workflow.task.read',
+      'workflow.task.complete',
+      'workflow.task.update',
+    ],
+    effective_session: {
+      actions: ['workflow.task.complete', 'workflow.task.update'],
+    },
   }
   const readOnlyAdmin = {
     id: 8,
     roles: [{ role_key: 'warehouse' }],
     permissions: ['workflow.task.read'],
+    effective_session: {
+      actions: [],
+    },
   }
   const salesAdmin = {
     id: 9,
     roles: [{ role_key: 'sales' }],
     permissions: ['workflow.task.read', 'workflow.task.complete'],
+    effective_session: {
+      actions: ['workflow.task.complete'],
+    },
   }
   const warehouseTask = {
     id: 10,
@@ -246,6 +387,18 @@ test('workflowTaskBoard: 任务处理动作按权限码和 owner 角色收口', 
   assert.equal(
     canRunWorkflowTaskAction(warehouseAdmin, warehouseTask, 'complete'),
     true
+  )
+  assert.equal(
+    canRunWorkflowTaskAction(warehouseAdmin, warehouseTask, 'reject'),
+    true
+  )
+  assert.equal(
+    getWorkflowTaskActionPermission('reject', warehouseTask),
+    'workflow.task.update'
+  )
+  assert.deepEqual(
+    getWorkflowTaskAllowedActionModes(warehouseAdmin, warehouseTask),
+    ['complete', 'block', 'reject', 'urge']
   )
   assert.equal(
     canRunWorkflowTaskAction(readOnlyAdmin, warehouseTask, 'complete'),
@@ -281,11 +434,17 @@ test('workflowTaskBoard: 审批类 done 使用 approve 权限，催办按 update
     id: 12,
     roles: [{ key: 'boss' }],
     permissions: ['workflow.task.approve', 'workflow.task.update'],
+    effective_session: {
+      actions: ['workflow.task.approve', 'workflow.task.update'],
+    },
   }
   const pmcAdmin = {
     id: 13,
     roles: [{ role_key: 'pmc' }],
     permissions: ['workflow.task.update'],
+    effective_session: {
+      actions: ['workflow.task.update'],
+    },
   }
 
   assert.equal(

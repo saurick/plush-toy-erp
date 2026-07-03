@@ -229,6 +229,14 @@ function resolveRepoOutputPath(repoRoot, raw, flagName) {
   return resolved;
 }
 
+function repoRelativePath(repoRoot, filePath, label) {
+  const relative = path.relative(repoRoot, filePath);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new CliError(`${label} must stay inside the repository`, 2);
+  }
+  return relative.split(path.sep).join("/");
+}
+
 async function writeJson(filePath, data) {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
@@ -304,6 +312,7 @@ function buildReleaseReportReadbackSummary({ report, manifestSummary, blockers }
   });
   const summary = {
     exists: Boolean(report),
+    customerKey: report?.customerKey || "",
     executed: Boolean(report?.executed),
     activate: Boolean(report?.activate),
     rollback: Boolean(report?.rollback),
@@ -322,12 +331,21 @@ function buildReleaseReportReadbackSummary({ report, manifestSummary, blockers }
       pagesSubsetOfManifest: verification?.pagesSubsetOfManifest === true,
       fieldPolicySurfacesMatchManifest:
         verification?.fieldPolicySurfacesMatchManifest === true,
+      customerMatchesManifest:
+        manifestSummary.valid &&
+        verification?.customerKey === manifestSummary.customerKey,
     },
   };
   if (!report) return summary;
+  if (manifestSummary.valid && report.customerKey !== manifestSummary.customerKey) {
+    blockers.push("release-report-customer-mismatch");
+  }
   if (!verification) {
     blockers.push("missing-effective-session-verification");
     return summary;
+  }
+  if (manifestSummary.valid && verification.customerKey !== manifestSummary.customerKey) {
+    blockers.push("effective-session-verification-customer-mismatch");
   }
   if (verification.status !== "verified") {
     blockers.push("effective-session-verification-not-verified");
@@ -377,6 +395,7 @@ function buildSmokeReadbackSummary({ smokeReport, manifestSummary, releaseReport
   });
   const summary = {
     exists: Boolean(smokeReport),
+    customerCode: smokeReport?.customerCode || "",
     backendEndpointAlias,
     customerConfigEffectiveSession: {
       exists: Boolean(check),
@@ -384,10 +403,14 @@ function buildSmokeReadbackSummary({ smokeReport, manifestSummary, releaseReport
       target: check?.target || "",
       expectedRevision: check?.expectedRevision || "",
       tokenSourceEnv: check?.tokenSourceEnv || "",
-      responseBodyStored: check?.responseBodyStored === false,
+      responseBodyStored: check?.responseBodyStored === true,
+      responseBodyNotStored: check?.responseBodyStored === false,
     },
   };
   if (!smokeReport) return summary;
+  if (manifestSummary.valid && smokeReport.customerCode !== manifestSummary.customerKey) {
+    blockers.push("smoke-report-customer-mismatch");
+  }
   if (!summary.backendEndpointAlias) {
     blockers.push("smoke-report-missing-backend-endpoint-alias");
   }
@@ -855,7 +878,7 @@ export async function validateCustomerConfigReleaseReadiness(
   return {
     customer: options.customer,
     revision: manifest.revision,
-    manifest: manifestPath,
+    manifest: repoRelativePath(repoRoot, manifestPath, "manifest"),
     manifestSha256: activationGate.manifestSha256,
     evidenceDir: activationGate.evidenceDir,
     manifestEvidence: {

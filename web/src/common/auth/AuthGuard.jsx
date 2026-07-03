@@ -9,9 +9,9 @@ import { AUTH_SCOPE, getCurrentUser, getLoginPath } from '@/common/auth/auth'
  * @param {React.ReactNode} children - 子组件
  * @returns {React.ReactNode} 保护路由组件
  */
-export default function AuthGuard({ requireAdmin = false, children }) {
+export default function AuthGuard({ requireAdmin = true, children }) {
   const location = useLocation()
-  const authScope = requireAdmin ? AUTH_SCOPE.ADMIN : AUTH_SCOPE.USER
+  const authScope = AUTH_SCOPE.ADMIN
   const user = getCurrentUser(authScope)
 
   // 未登录 → 去登录页

@@ -2,8 +2,10 @@ import React from 'react'
 import { STATUS_LABELS, STATUS_STYLES } from '../config/seedData.mjs'
 
 export default function StatusPill({ status }) {
-  const label = STATUS_LABELS[status] || status
-  const style = STATUS_STYLES[status] || STATUS_STYLES.deferred
+  const normalizedStatus = String(status || '').trim()
+  const label =
+    STATUS_LABELS[normalizedStatus] || (normalizedStatus ? '业务状态' : '-')
+  const style = STATUS_STYLES[normalizedStatus] || STATUS_STYLES.deferred
 
   return (
     <span

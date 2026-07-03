@@ -4,11 +4,17 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { setTimeout as delay } from 'node:timers/promises'
+import { fileURLToPath } from 'node:url'
 
 import { chromium } from 'playwright'
 import { yoyoosunMenuConfig } from '../../config/customers/yoyoosun/menuConfig.mjs'
 import { businessModuleDefinitions } from '../src/erp/config/businessModules.mjs'
 import { navigationItemRegistry } from '../src/erp/config/seedData.mjs'
+import { getRoleDisplayName } from '../src/erp/utils/roleKeys.mjs'
+import {
+  buildYoyoosunLocalEntryAudit,
+  defaultYoyoosunEntryAuditPorts,
+} from './yoyoosunLocalEntryAudit.mjs'
 
 const webDir = path.resolve(import.meta.dirname, '..')
 const repoRoot = path.resolve(webDir, '..')
@@ -26,6 +32,8 @@ const trialCustomerConfigScriptPath = path.resolve(
   'yoyoosun',
   'customer-config.example.js'
 )
+const defaultRealSmokeReportPath =
+  'output/trial-demo-account-browser-smoke/report.json'
 const devServerPort = Number(process.env.TRIAL_BROWSER_SMOKE_PORT || 4194)
 const externalBaseURL = normalizeOptionalURL(
   process.env.TRIAL_BROWSER_SMOKE_BASE_URL
@@ -37,6 +45,10 @@ const backendHealthURL = normalizeURL(
     'http://127.0.0.1:8300/healthz'
 )
 const headless = process.env.TRIAL_BROWSER_SMOKE_HEADED !== '1'
+const shouldCheckEffectiveSessionDiagnostic =
+  process.env.TRIAL_BROWSER_SMOKE_EFFECTIVE_SESSION_DIAGNOSTIC !== 'off' &&
+  (!externalBaseURL ||
+    process.env.TRIAL_BROWSER_SMOKE_EXPECT_EFFECTIVE_SESSION_DIAGNOSTIC === '1')
 
 const oldEntryLabels = [
   '客户/供应商',
@@ -180,6 +192,23 @@ const visibleCustomerMenuLabelSet = new Set(
 const forbiddenLegacyMenuLabels = oldEntryLabels.filter(
   (label) => !visibleCustomerMenuLabelSet.has(label)
 )
+const realSmokeRequires = Object.freeze([
+  'backend health is reachable',
+  'TRIAL_ACCOUNT_PASSWORD or ERP_ROLE_DEMO_PASSWORD is present',
+  'audited yoyoosun frontend runtime is available',
+  'customer config script exists for managed Vite smoke',
+  'static menu projection plan is complete',
+])
+const browserSmokeNotProven = Object.freeze([
+  'real browser login',
+  'backend RBAC authorization',
+  'ordinary account desktop menu projection',
+  'mobile task entry access',
+  'demo_admin mobile denial',
+  'DEV-only effective session diagnostic readback',
+  'customer config active revision source',
+  'target environment release evidence',
+])
 
 let devServerProcess = null
 let devServerLogs = ''
@@ -197,10 +226,42 @@ function normalizeURL(raw) {
   return url.toString().replace(/\/+$/u, '')
 }
 
+function getTrialRoleLabel(roleKey) {
+  return getRoleDisplayName(roleKey, '岗位')
+}
+
+function buildMobileTaskEntryLabel(roleKey) {
+  return `${getTrialRoleLabel(roleKey)}岗位任务端`
+}
+
+function buildMobileAccountSummary([username, roleKey], verifiedMobile = []) {
+  const summary = {
+    username,
+    role: getTrialRoleLabel(roleKey),
+    mobileTaskEntry: buildMobileTaskEntryLabel(roleKey),
+  }
+  if (verifiedMobile) {
+    summary.verified = verifiedMobile.includes(`${username}:${roleKey}`)
+  }
+  return summary
+}
+
+function buildMobileDeniedAccountSummary({ verified } = {}) {
+  return {
+    username: 'demo_admin',
+    role: getTrialRoleLabel('sales'),
+    mobileTaskEntry: buildMobileTaskEntryLabel('sales'),
+    expectedDenied: true,
+    ...(verified === undefined ? {} : { verified }),
+    expectedMessage: '该账号暂无当前入口权限，请联系管理员。',
+  }
+}
+
 const usage = `用法:
   TRIAL_ACCOUNT_PASSWORD='replace-with-password' pnpm --dir web smoke:trial-demo-browser
   node web/scripts/trialDemoAccountBrowserSmoke.mjs --print-input-template
   node web/scripts/trialDemoAccountBrowserSmoke.mjs --preflight-report output/trial-demo-account-browser-smoke/preflight.json
+  TRIAL_ACCOUNT_PASSWORD='replace-with-password' node web/scripts/trialDemoAccountBrowserSmoke.mjs --report ${defaultRealSmokeReportPath}
 
 环境变量:
   TRIAL_ACCOUNT_PASSWORD                 试用 / 演示账号密码；优先级高于 ERP_ROLE_DEMO_PASSWORD
@@ -208,11 +269,17 @@ const usage = `用法:
   TRIAL_BROWSER_SMOKE_BASE_URL           已启动前端地址；不设置时脚本自动启动 Vite
   TRIAL_BROWSER_SMOKE_BACKEND_HEALTH_URL 后端健康检查地址，默认 ${backendHealthURL}
   TRIAL_BROWSER_SMOKE_HEADED=1           使用 headed 浏览器
+  TRIAL_BROWSER_SMOKE_EFFECTIVE_SESSION_DIAGNOSTIC=off
+                                           跳过 DEV-only effective session 脱敏诊断读取
+  TRIAL_BROWSER_SMOKE_EXPECT_EFFECTIVE_SESSION_DIAGNOSTIC=1
+                                           已提供外部 Vite DEV 地址时强制读取诊断
 `
 
 function buildInputTemplate() {
   const menuProjectionPlan = buildMenuProjectionPlan()
   const menuProjectionCoverage = buildMenuProjectionCoverage(menuProjectionPlan)
+  const effectiveSessionDiagnosticPlan = buildEffectiveSessionDiagnosticPlan()
+  const yoyoosunEntryAuditPlan = buildYoyoosunEntryAuditPlan()
   return {
     scope: 'trial-demo-account-browser-smoke-input-template',
     writesDatabase: false,
@@ -238,19 +305,24 @@ function buildInputTemplate() {
       expectedMenus: account.expectedMenus,
       forbiddenMenus: account.forbiddenMenus,
     })),
-    mobileAccounts: mobileAccounts.map(([username, roleKey]) => ({
-      username,
-      roleKey,
-    })),
+    mobileAccounts: mobileAccounts.map((account) =>
+      buildMobileAccountSummary(account, null)
+    ),
     menuProjectionPlan,
     menuProjectionCoverage,
+    effectiveSessionDiagnosticPlan,
+    yoyoosunEntryAuditPlan,
+    realSmokeRequires: [...realSmokeRequires],
+    notProvenByThisTemplate: [...browserSmokeNotProven],
     commands: [
+      'PATH=/usr/local/bin:$PATH /usr/local/bin/pnpm --dir web --silent audit:yoyoosun-entry -- --json',
       'PATH=/usr/local/bin:$PATH node web/scripts/trialDemoAccountBrowserSmoke.mjs --preflight-report output/trial-demo-account-browser-smoke/preflight.json',
       "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:trial-demo-browser",
-      "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' TRIAL_BROWSER_SMOKE_BASE_URL='http://127.0.0.1:5175' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:trial-demo-browser",
+      `TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node web/scripts/trialDemoAccountBrowserSmoke.mjs --report ${defaultRealSmokeReportPath}`,
+      "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' TRIAL_BROWSER_SMOKE_BASE_URL='<audited-yoyoosun-url>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:trial-demo-browser",
     ],
     boundary:
-      'This template does not prove browser login, menu projection, mobile task access, backend health, or customer config active revision until a local backend, frontend runtime, and demo password are provided.',
+      'This template does not prove browser login, menu projection, mobile task access, backend health, yoyoosun entry ownership, effective session diagnostic readback, or customer config active revision until a local backend, audited yoyoosun frontend runtime, and demo password are provided.',
   }
 }
 
@@ -266,19 +338,10 @@ function buildMenuProjectionPlan() {
         ...forbiddenLegacyMenuLabels,
       ]),
     })),
-    mobileAccounts: mobileAccounts.map(([username, roleKey]) => ({
-      username,
-      roleKey,
-      path: `/m/${roleKey}/tasks`,
-    })),
-    mobileDeniedAccounts: [
-      {
-        username: 'demo_admin',
-        roleKey: 'sales',
-        path: '/m/sales/tasks',
-        expectedMessage: '该账号暂无当前入口权限，请联系管理员。',
-      },
-    ],
+    mobileAccounts: mobileAccounts.map((account) =>
+      buildMobileAccountSummary(account, null)
+    ),
+    mobileDeniedAccounts: [buildMobileDeniedAccountSummary()],
     customerHiddenMenuLabels: hiddenCustomerMenuLabels,
     forbiddenLegacyMenuLabels,
   }
@@ -311,7 +374,8 @@ function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
     coversMobileDeniedAdmin: plan.mobileDeniedAccounts.some(
       (account) =>
         account.username === 'demo_admin' &&
-        account.path === '/m/sales/tasks' &&
+        account.role === getTrialRoleLabel('sales') &&
+        account.mobileTaskEntry === buildMobileTaskEntryLabel('sales') &&
         account.expectedMessage === '该账号暂无当前入口权限，请联系管理员。'
     ),
     coversCustomerHiddenMenus:
@@ -334,8 +398,8 @@ function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
     allDesktopAccountsHaveForbiddenMenus: plan.desktopAccounts.every(
       (account) => account.forbiddenMenus.length > 0
     ),
-    allMobileAccountsHavePaths: plan.mobileAccounts.every(
-      (account) => account.path === `/m/${account.roleKey}/tasks`
+    allMobileAccountsHaveEntries: plan.mobileAccounts.every((account) =>
+      Boolean(account.role && account.mobileTaskEntry)
     ),
   }
   for (const [key, passed] of Object.entries(checks)) {
@@ -350,6 +414,57 @@ function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
   }
 }
 
+function buildEffectiveSessionDiagnosticPlan() {
+  return {
+    windowKey: '__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__',
+    scope: 'local-dev-browser-runtime',
+    checkedDuringRealSmoke: shouldCheckEffectiveSessionDiagnostic,
+    realSmokeReportPath: defaultRealSmokeReportPath,
+    desktopOnly: true,
+    expectedForManagedVite: true,
+    expectedForExternalBaseURL:
+      process.env.TRIAL_BROWSER_SMOKE_EXPECT_EFFECTIVE_SESSION_DIAGNOSTIC ===
+      '1',
+    requiredFields: [
+      'source',
+      'projectionMode',
+      'isSuperAdmin',
+      'isLocalDev',
+      'counts',
+      'blockers',
+    ],
+    sanitizedOnly: true,
+    forbiddenFields: [
+      'accessToken',
+      'authorizationHeader',
+      'configHash',
+      'config_hash',
+      'rawId',
+      'entitlement',
+      'password',
+      'token',
+    ],
+    acceptedProjectionModes: ['local_dev_customer_config_diagnostic'],
+    boundary:
+      'The real browser smoke reads only the DEV-only sanitized summary after login. It must not store tokens, Authorization headers, config hashes, raw IDs, action lists, or customer package payloads.',
+  }
+}
+
+function buildYoyoosunEntryAuditPlan() {
+  return {
+    command:
+      'PATH=/usr/local/bin:$PATH /usr/local/bin/pnpm --dir web --silent audit:yoyoosun-entry -- --json',
+    scope: 'local-frontend-entry-preflight',
+    requiredForExternalBaseURL: true,
+    defaultPorts: [...defaultYoyoosunEntryAuditPorts],
+    expectedCustomerConfigStatus: 'yoyoosun_config',
+    expectedCustomerAssetStatus: 'yoyoosun_asset',
+    externalBaseURL,
+    boundary:
+      'The browser smoke preflight must not treat Product Core placeholder, HTML fallback, or another project port as a yoyoosun trial frontend.',
+  }
+}
+
 function uniqueStrings(values) {
   return [...new Set(values.filter(Boolean))]
 }
@@ -359,6 +474,7 @@ function parseCliArgs(argv) {
     help: false,
     printInputTemplate: false,
     preflightReport: '',
+    report: '',
   }
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index]
@@ -385,7 +501,14 @@ function parseCliArgs(argv) {
       throw new Error(`参数 --${key} 缺少值`)
     }
     if (key === 'preflight-report') {
-      options.preflightReport = resolveRepoOutputPath(value)
+      options.preflightReport = resolveRepoOutputPath(
+        value,
+        '--preflight-report'
+      )
+      continue
+    }
+    if (key === 'report') {
+      options.report = resolveRepoOutputPath(value, '--report')
       continue
     }
     throw new Error(`不支持的参数: --${key}`)
@@ -393,15 +516,15 @@ function parseCliArgs(argv) {
   return options
 }
 
-function resolveRepoOutputPath(raw) {
+function resolveRepoOutputPath(raw, optionName) {
   const value = String(raw || '').trim()
   if (!value) {
-    throw new Error('参数 --preflight-report 缺少值')
+    throw new Error(`参数 ${optionName} 缺少值`)
   }
   const resolved = path.resolve(repoRoot, value)
   const relative = path.relative(repoRoot, resolved)
   if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    throw new Error('--preflight-report must stay inside the repository')
+    throw new Error(`${optionName} must stay inside the repository`)
   }
   return resolved
 }
@@ -436,14 +559,28 @@ async function probeURL(url, { timeoutMs = 3000 } = {}) {
   }
 }
 
-async function buildPreflightReport() {
+async function buildPreflightReport(runtime = {}) {
   const menuProjectionPlan = buildMenuProjectionPlan()
   const menuProjectionCoverage = buildMenuProjectionCoverage(menuProjectionPlan)
+  const effectiveSessionDiagnosticPlan = buildEffectiveSessionDiagnosticPlan()
+  const yoyoosunEntryAuditPlan = buildYoyoosunEntryAuditPlan()
   const passwordEnvNames = ['TRIAL_ACCOUNT_PASSWORD', 'ERP_ROLE_DEMO_PASSWORD']
   const presentPasswordEnvNames = passwordEnvNames.filter((name) =>
     Boolean(String(process.env[name] || '').trim())
   )
   const backendHealth = await probeURL(backendHealthURL)
+  const yoyoosunEntryAudit = await buildTrialYoyoosunEntryAudit(runtime)
+  const suggestedRealSmokeCommand = [
+    "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>'",
+    yoyoosunEntryAudit.suggestedExternalBaseURL
+      ? `TRIAL_BROWSER_SMOKE_BASE_URL='${yoyoosunEntryAudit.suggestedExternalBaseURL}'`
+      : '',
+    'PATH=/usr/local/bin:$PATH',
+    'node web/scripts/trialDemoAccountBrowserSmoke.mjs',
+    `--report ${defaultRealSmokeReportPath}`,
+  ]
+    .filter(Boolean)
+    .join(' ')
   const customerConfigScript = await fs
     .stat(trialCustomerConfigScriptPath)
     .then((stat) => ({
@@ -470,10 +607,14 @@ async function buildPreflightReport() {
   if (!menuProjectionCoverage.ok) {
     blockers.push('menu-projection-plan-incomplete')
   }
+  if (!yoyoosunEntryAudit.externalBaseURLMatchesYoyoosun) {
+    blockers.push('external-base-url-not-yoyoosun-entry')
+  }
 
   return {
     scope: 'trial-demo-account-browser-smoke-preflight-report',
     generatedAt: new Date().toISOString(),
+    preflightOnly: true,
     writesDatabase: false,
     callsJSONRPC: false,
     startsBrowser: false,
@@ -483,6 +624,8 @@ async function buildPreflightReport() {
     storesPasswordValue: false,
     storesAccessToken: false,
     storesAuthorizationHeader: false,
+    storesRawCustomerPackage: false,
+    storesActionList: false,
     backendHealthURL,
     backendHealth,
     baseURL,
@@ -493,12 +636,147 @@ async function buildPreflightReport() {
     mobileAccountCount: mobileAccounts.length,
     menuProjectionPlan,
     menuProjectionCoverage,
+    effectiveSessionDiagnosticPlan,
+    yoyoosunEntryAuditPlan,
+    yoyoosunEntryAudit,
     customerConfigScript,
+    realSmokeRequires: [...realSmokeRequires],
+    notProvenByThisPreflight: [...browserSmokeNotProven],
+    suggestedRealSmokeCommand,
     readyForRealSmoke: blockers.length === 0,
     blockers,
     nextCommand: blockers.length
       ? 'Resolve blockers, then rerun this preflight before real browser smoke.'
-      : "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:trial-demo-browser",
+      : suggestedRealSmokeCommand,
+  }
+}
+
+async function buildTrialYoyoosunEntryAudit(runtime = {}) {
+  const auditedPorts = externalBaseURL
+    ? [getPortFromURL(externalBaseURL)]
+    : buildYoyoosunEntryAuditPlan().defaultPorts
+  const report = await buildYoyoosunLocalEntryAudit(
+    {
+      customer: 'yoyoosun',
+      ports: auditedPorts,
+      backendHealthURL,
+    },
+    runtime
+  )
+  const externalPort = externalBaseURL ? getPortFromURL(externalBaseURL) : ''
+  const externalPortReport = externalPort
+    ? report.ports.find((item) => item.port === externalPort) || null
+    : null
+  const auditedYoyoosunURLs = report.summary.yoyoosunPorts.map(
+    (port) => `http://localhost:${port}/erp`
+  )
+
+  return {
+    scope: 'trial-demo-account-yoyoosun-entry-preflight',
+    readOnly: true,
+    callsJSONRPC: false,
+    writesDatabase: false,
+    startsBrowser: false,
+    startsDevServer: false,
+    readsSecrets: false,
+    externalBaseURL: externalBaseURL || '',
+    externalPort,
+    checkedPorts: report.summary.checkedPorts,
+    yoyoosunPorts: report.summary.yoyoosunPorts,
+    auditedYoyoosunURLs,
+    suggestedExternalBaseURL: externalBaseURL || auditedYoyoosunURLs[0] || '',
+    productCorePlaceholderPorts: report.summary.productCorePlaceholderPorts,
+    htmlFallbackPorts: report.summary.htmlFallbackPorts,
+    readyForStaticYoyoosunPreview: report.summary.readyForStaticYoyoosunPreview,
+    externalBaseURLMatchesYoyoosun:
+      !externalBaseURL ||
+      Boolean(
+        externalPortReport?.customerConfig?.matchedCustomer &&
+          externalPortReport?.customerAsset?.matchedCustomerAsset
+      ),
+    externalPortStatus: externalPortReport
+      ? {
+          config: externalPortReport.customerConfig.status,
+          asset: externalPortReport.customerAsset.status,
+          cwd: externalPortReport.process.cwd || '',
+          command: externalPortReport.process.command || '',
+        }
+      : null,
+    notProvenByThisAudit: report.notProvenByThisAudit,
+  }
+}
+
+function getPortFromURL(rawURL) {
+  const url = new URL(rawURL)
+  if (url.port) return url.port
+  return url.protocol === 'https:' ? '443' : '80'
+}
+
+function buildRealSmokeReport({
+  verifiedDesktop,
+  verifiedMobile,
+  desktopEffectiveSessionDiagnostics,
+}) {
+  const diagnosticBlockers = desktopEffectiveSessionDiagnostics.flatMap(
+    (entry) => entry.diagnostic.blockers || []
+  )
+  return {
+    scope: 'trial-demo-account-browser-smoke-report',
+    generatedAt: new Date().toISOString(),
+    writesDatabase: false,
+    callsJSONRPC: true,
+    startsBrowser: true,
+    startsDevServer: !externalBaseURL,
+    managedDevServer: !externalBaseURL,
+    readsCustomerConfigScript: true,
+    readsEffectiveSessionDiagnostic: shouldCheckEffectiveSessionDiagnostic,
+    storesPasswordValue: false,
+    storesAccessToken: false,
+    storesAuthorizationHeader: false,
+    storesRawCustomerPackage: false,
+    storesActionList: false,
+    baseURL,
+    backendHealthURL,
+    desktopAccounts: desktopAccounts.map((account) => ({
+      username: account.username,
+      expectedMenuCount: visibleCustomerMenuLabels(account.expectedMenus)
+        .length,
+      forbiddenMenuCount:
+        (account.forbiddenMenus || []).length +
+        hiddenCustomerMenuLabels.length +
+        forbiddenLegacyMenuLabels.length,
+      verified: verifiedDesktop.includes(account.username),
+    })),
+    mobileAccounts: mobileAccounts.map((account) =>
+      buildMobileAccountSummary(account, verifiedMobile)
+    ),
+    mobileDeniedAccount: buildMobileDeniedAccountSummary({ verified: true }),
+    desktopEffectiveSessionDiagnostics,
+    summary: {
+      desktopPassedCount: verifiedDesktop.length,
+      mobilePassedCount: verifiedMobile.length,
+      mobileDeniedPassed: true,
+      diagnosticAccountCount: desktopEffectiveSessionDiagnostics.length,
+      diagnosticBlockerCount: diagnosticBlockers.length,
+      diagnosticSources: uniqueStrings(
+        desktopEffectiveSessionDiagnostics.map(
+          (entry) => entry.diagnostic.source
+        )
+      ),
+      projectionModes: uniqueStrings(
+        desktopEffectiveSessionDiagnostics.map(
+          (entry) => entry.diagnostic.projectionMode
+        )
+      ),
+    },
+    boundaries: {
+      realCustomerImport: false,
+      customerConfigPublish: false,
+      customerConfigActivate: false,
+      releaseEvidence: false,
+      productionDeploy: false,
+      provesTargetEnvironment: false,
+    },
   }
 }
 
@@ -552,10 +830,17 @@ async function main() {
   const browser = await chromium.launch({ headless })
   const verifiedDesktop = []
   const verifiedMobile = []
+  const desktopEffectiveSessionDiagnostics = []
   try {
     for (const account of desktopAccounts) {
-      await verifyDesktopAccount(browser, account)
+      const diagnostic = await verifyDesktopAccount(browser, account)
       verifiedDesktop.push(account.username)
+      if (diagnostic) {
+        desktopEffectiveSessionDiagnostics.push({
+          username: account.username,
+          diagnostic,
+        })
+      }
     }
     for (const [username, roleKey] of mobileAccounts) {
       await verifyMobileAccount(browser, { username, roleKey })
@@ -565,6 +850,21 @@ async function main() {
   } finally {
     await browser.close()
     await stopDevServer()
+  }
+
+  if (args.report) {
+    const report = buildRealSmokeReport({
+      verifiedDesktop,
+      verifiedMobile,
+      desktopEffectiveSessionDiagnostics,
+    })
+    await writeJSONReport(args.report, report)
+    process.stdout.write(
+      `[trial-demo-account-browser-smoke] report written: ${path.relative(
+        repoRoot,
+        args.report
+      )}\n`
+    )
   }
 
   process.stdout.write(
@@ -591,6 +891,8 @@ function startDevServer() {
       env: {
         ...process.env,
         BROWSER: 'none',
+        ERP_VITE_PORT: String(devServerPort),
+        ERP_VITE_HMR_CLIENT_PORT: String(devServerPort),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     }
@@ -725,11 +1027,16 @@ async function verifyDesktopAccount(browser, account) {
     for (const label of forbiddenLegacyMenuLabels) {
       await assertNotVisibleInMenu(page, label, account.username)
     }
+    const diagnostic = await verifyEffectiveSessionDiagnostic(
+      page,
+      account.username
+    )
     await page.screenshot({
       path: path.resolve(outputDir, `${account.username}-desktop.png`),
       fullPage: true,
     })
     assertNoRuntimeErrors(runtimeErrors, `${account.username} desktop`)
+    return diagnostic
   } catch (error) {
     await screenshotOnFailure(page, `${account.username}-desktop-failed.png`)
     throw error
@@ -740,6 +1047,115 @@ async function verifyDesktopAccount(browser, account) {
 
 function visibleCustomerMenuLabels(labels = []) {
   return labels.filter((label) => !hiddenCustomerMenuLabelSet.has(label))
+}
+
+async function verifyEffectiveSessionDiagnostic(page, username) {
+  if (!shouldCheckEffectiveSessionDiagnostic) {
+    return null
+  }
+  await page.waitForFunction(
+    () => {
+      const diagnostic = window.__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__
+      return (
+        diagnostic &&
+        typeof diagnostic === 'object' &&
+        diagnostic.source &&
+        diagnostic.source !== 'missing'
+      )
+    },
+    null,
+    { timeout: 15_000 }
+  )
+  const diagnostic = await page.evaluate(
+    () => window.__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__ || null
+  )
+  assert(
+    diagnostic && typeof diagnostic === 'object',
+    `${username} 缺少本地 DEV effective session 脱敏诊断`
+  )
+  assert.equal(
+    diagnostic.isLocalDev,
+    true,
+    `${username} effective session 诊断应来自本地 DEV runtime`
+  )
+  assert.equal(
+    diagnostic.isSuperAdmin,
+    false,
+    `${username} 试用账号不应走 super_admin 产品核心看全模式`
+  )
+  assert.equal(
+    diagnostic.projectionMode,
+    'local_dev_customer_config_diagnostic',
+    `${username} 应读取客户配置本地诊断投影`
+  )
+  assert.equal(
+    typeof diagnostic.source,
+    'string',
+    `${username} effective session 诊断缺少 source`
+  )
+  assert.notEqual(
+    diagnostic.source,
+    'missing',
+    `${username} effective session 诊断不应缺失`
+  )
+  assert.deepEqual(
+    diagnostic.blockers,
+    [],
+    `${username} effective session 诊断存在阻塞项`
+  )
+  assert(
+    diagnostic.counts && typeof diagnostic.counts === 'object',
+    `${username} effective session 诊断缺少 counts`
+  )
+  assert(
+    Number(diagnostic.counts.visibleMenuItems) > 0,
+    `${username} effective session 诊断没有可见菜单计数`
+  )
+  const serialized = JSON.stringify(diagnostic)
+  assert.doesNotMatch(
+    serialized,
+    /Bearer|access_token|Authorization|authorizationHeader|config_hash|configHash|password|rawId|entitlement/u,
+    `${username} effective session 诊断包含敏感或底层字段`
+  )
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(diagnostic, 'actions'),
+    false,
+    `${username} effective session 诊断不能输出 action 列表`
+  )
+  return sanitizeEffectiveSessionDiagnostic(diagnostic)
+}
+
+function sanitizeEffectiveSessionDiagnostic(diagnostic) {
+  const sanitized = {
+    source: String(diagnostic.source || ''),
+    customerKey: String(diagnostic.customerKey || ''),
+    configRevision: String(diagnostic.configRevision || ''),
+    projectionMode: String(diagnostic.projectionMode || ''),
+    isSuperAdmin: Boolean(diagnostic.isSuperAdmin),
+    isLocalDev: Boolean(diagnostic.isLocalDev),
+    counts: {
+      rbacMenuPaths: Number(diagnostic.counts?.rbacMenuPaths || 0),
+      visibleMenuItems: Number(diagnostic.counts?.visibleMenuItems || 0),
+      pageCount: Number(diagnostic.counts?.pages || 0),
+      actionCount: Number(diagnostic.counts?.actions || 0),
+      roleCount: Number(diagnostic.counts?.roles || 0),
+      workPoolCount: Number(diagnostic.counts?.workPools || 0),
+      moduleCount: Number(diagnostic.counts?.modules || 0),
+      fieldPolicySurfaces: Number(diagnostic.counts?.fieldPolicySurfaces || 0),
+      fieldPolicyFields: Number(diagnostic.counts?.fieldPolicyFields || 0),
+      hiddenFieldPolicies: Number(diagnostic.counts?.hiddenFieldPolicies || 0),
+    },
+    blockers: Array.isArray(diagnostic.blockers)
+      ? diagnostic.blockers.map((item) => String(item))
+      : [],
+  }
+  const serialized = JSON.stringify(sanitized)
+  assert.doesNotMatch(
+    serialized,
+    /Bearer|access_token|Authorization|authorizationHeader|config_hash|configHash|password|rawId|entitlement|actions/u,
+    'effective session 诊断报告包含敏感字段或 action 列表'
+  )
+  return sanitized
 }
 
 async function verifyMobileAccount(browser, { username, roleKey }) {
@@ -823,6 +1239,7 @@ async function login(
       waitUntil: 'domcontentloaded',
     })
   }
+  await ensureLoginFormReady(page, { username, fromPath })
   const entryLabel = entry === 'mobile' ? '岗位任务端' : '后台管理'
   const entryButton = page
     .locator('.ant-segmented-item')
@@ -844,6 +1261,58 @@ async function login(
   } else {
     await submit.click()
   }
+}
+
+async function ensureLoginFormReady(
+  page,
+  { username = '', fromPath = '' } = {}
+) {
+  const attempts = 3
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    await page.waitForLoadState('domcontentloaded').catch(() => {})
+    await page
+      .waitForLoadState('networkidle', { timeout: 5_000 })
+      .catch(() => {})
+    const accountInput = page.getByLabel('管理员账号')
+    if (
+      await accountInput
+        .waitFor({ state: 'visible', timeout: 8_000 })
+        .then(() => true)
+        .catch(() => false)
+    ) {
+      return
+    }
+    if (attempt < attempts) {
+      await page.goto(new URL('/admin-login', `${baseURL}/`).toString(), {
+        waitUntil: 'domcontentloaded',
+      })
+    }
+  }
+  throw new Error(
+    [
+      'login-form-unavailable',
+      `username=${username || 'unknown'}`,
+      `fromPath=${fromPath || 'unknown'}`,
+      await describeLoginPageState(page),
+    ].join(' ')
+  )
+}
+
+async function describeLoginPageState(page) {
+  return page
+    .evaluate(() => {
+      const root = document.querySelector('#root')
+      const bodyText = (document.body?.innerText || '').replace(/\s+/g, ' ')
+      return {
+        url: window.location.href,
+        title: document.title,
+        readyState: document.readyState,
+        rootChildCount: root?.childElementCount || 0,
+        bodyText: bodyText.slice(0, 160),
+      }
+    })
+    .then((state) => `state=${JSON.stringify(state)}`)
+    .catch((error) => `state_error=${String(error?.message || error)}`)
 }
 
 async function assertNotVisibleInMenu(page, label, username) {
@@ -880,11 +1349,15 @@ function tailLogs(logs) {
     .join('\n')
 }
 
-await main().catch((error) => {
-  process.stderr.write(
-    `[trial-demo-account-browser-smoke][fatal] ${
-      error?.stack || error?.message || error
-    }\n`
-  )
-  process.exitCode = 1
-})
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    process.stderr.write(
+      `[trial-demo-account-browser-smoke][fatal] ${
+        error?.stack || error?.message || error
+      }\n`
+    )
+    process.exitCode = 1
+  })
+}
+
+export { buildInputTemplate, buildPreflightReport }

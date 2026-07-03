@@ -13,7 +13,9 @@ const scanFiles = ['utils/referenceSelectOptions.mjs'].map((file) =>
   join(rootDir, file)
 )
 scanFiles.push(join(rootDir, 'utils/dashboardTaskDisplay.mjs'))
+scanFiles.push(join(rootDir, 'utils/workflowDashboardStats.mjs'))
 scanFiles.push(join(rootDir, 'utils/masterDataOrderView.mjs'))
+scanFiles.push(join(rootDir, 'data/processingContractTemplate.mjs'))
 
 const sourceExtensions = new Set(['.js', '.jsx', '.mjs'])
 const businessVisibleScanDirs = ['pages', 'components'].map((dir) =>
@@ -57,6 +59,7 @@ const forbiddenUserVisibleText = [
   '填写关联来源记录',
   '缺少出货单 ID',
   '来源选择器',
+  'active revision',
 ]
 const forbiddenBusinessArchitectureText = ['生命周期']
 const forbiddenBusinessSystemTimestampText = [
@@ -65,6 +68,10 @@ const forbiddenBusinessSystemTimestampText = [
   '创建日期',
   '更新日期',
 ]
+const visibleStringAttributePattern =
+  /\b(?:label|placeholder|title|exportTitle|createLabel|description|aria-label|message)\s*(?:=|:)\s*(['"`])([^'"`]*?)\1/giu
+const technicalSnakeCasePattern =
+  /\b(?:idempotency_key|owner_role_key|task_status_key|source_type|source_id|source_line_id|payload|[a-z][a-z0-9]*_(?:id|key))\b/iu
 
 function isSourceFile(filePath) {
   return [...sourceExtensions].some((extension) => filePath.endsWith(extension))
@@ -126,6 +133,157 @@ test('业务事实选中标签不把内部 ID 当业务编号 fallback', () => {
   assert.match(content, /业务事实已关联/u)
 })
 
+test('业务事实页面不把 source_type 和 counterparty_type 原始 key 当可见 fallback', () => {
+  const pageConfigPath = join(
+    rootDir,
+    'components/operational-facts/operationalFactPageConfig.mjs'
+  )
+  const formsPath = join(
+    rootDir,
+    'components/operational-facts/OperationalFactForms.jsx'
+  )
+  const pageConfig = readFileSync(pageConfigPath, 'utf8')
+  const forms = readFileSync(formsPath, 'utf8')
+
+  assert.doesNotMatch(pageConfig, /FACT_TYPE_LABELS\[value\]\s*\|\|\s*value/u)
+  assert.doesNotMatch(pageConfig, /SOURCE_TYPE_LABELS\[value\]\s*\|\|\s*value/u)
+  assert.doesNotMatch(
+    pageConfig,
+    /COUNTERPARTY_TYPE_LABELS\[value\]\s*\|\|\s*value/u
+  )
+  assert.match(pageConfig, /return SOURCE_TYPE_LABELS\[value\] \|\| '来源'/u)
+  assert.match(
+    pageConfig,
+    /return COUNTERPARTY_TYPE_LABELS\[value\] \|\| '往来方'/u
+  )
+  assert.match(forms, /function factTypeText/u)
+  assert.match(forms, /function counterpartyTypeText/u)
+  assert.doesNotMatch(forms, /record\.counterparty_type\s*\|\|\s*'-'/u)
+  assert.doesNotMatch(forms, /record\.fact_type\s*\|\|\s*'-'/u)
+})
+
+test('业务事实来源列优先展示业务来源号且不把 source_id 当可见 fallback', () => {
+  const pageConfigPath = join(
+    rootDir,
+    'components/operational-facts/operationalFactPageConfig.mjs'
+  )
+  const pageConfig = readFileSync(pageConfigPath, 'utf8')
+
+  assert.match(pageConfig, /function sourceDocumentRef/u)
+  assert.match(pageConfig, /normalizeText\(record\.source_no\)/u)
+  assert.match(pageConfig, /normalizeText\(record\.source_document_no\)/u)
+  assert.match(pageConfig, /normalizeText\(record\.document_no\)/u)
+  const sourceDocumentRefBody =
+    pageConfig.match(/function sourceDocumentRef[\s\S]*?\n\}/u)?.[0] || ''
+  assert.match(sourceDocumentRefBody, /'来源单据已关联'/u)
+  assert.doesNotMatch(sourceDocumentRefBody, /source_id/u)
+  assert.doesNotMatch(pageConfig, /readableRef\('来源', record\.source_id\)/u)
+  assert.doesNotMatch(
+    pageConfig,
+    /record\.source_no\s*\|\|\s*record\.source_id/u
+  )
+  assert.doesNotMatch(
+    pageConfig,
+    /record\.document_no\s*\|\|\s*record\.source_id/u
+  )
+  assert.doesNotMatch(
+    pageConfig,
+    /\$\{record\.source_type\s*\|\|\s*''\}-\$\{record\.source_id\s*\|\|\s*''\}/u
+  )
+  assert.match(pageConfig, /function sourceColumnText\(record = \{\}\)/u)
+  assert.match(pageConfig, /sortValue:\s*sourceColumnText/u)
+  assert.match(pageConfig, /exportValue:\s*sourceColumnText/u)
+})
+
+test('Workflow 相关单据可见编号不把内部 ID 当 fallback', () => {
+  const flowFiles = [
+    {
+      file: 'utils/finishedGoodsFlow.mjs',
+      helper: 'resolveFinishedGoodsSourceNo',
+    },
+    {
+      file: 'utils/shipmentFinanceFlow.mjs',
+      helper: 'resolveShipmentFinanceSourceNo',
+    },
+    {
+      file: 'utils/payableReconciliationFlow.mjs',
+      helper: 'resolvePayableSourceNo',
+    },
+    {
+      file: 'utils/purchaseInboundFlow.mjs',
+      helper: 'resolveInboundSourceNo',
+    },
+    {
+      file: 'utils/outsourceReturnFlow.mjs',
+      helper: 'resolveOutsourceReturnSourceNo',
+    },
+  ]
+
+  for (const { file, helper } of flowFiles) {
+    const content = readFileSync(join(rootDir, file), 'utf8')
+    const helperBody =
+      content.match(
+        new RegExp(`function ${helper}[\\s\\S]*?\\n\\}`, 'u')
+      )?.[0] ||
+      content.match(
+        new RegExp(`export function ${helper}[\\s\\S]*?\\n\\}`, 'u')
+      )?.[0] ||
+      ''
+
+    assert.notEqual(helperBody, '', `${file} 缺少 ${helper}`)
+    assert.doesNotMatch(helperBody, /record\.id/u)
+    assert.doesNotMatch(helperBody, /normalizeText\([^)]*id[^)]*\)/u)
+    assert.match(helperBody, /resolveReadableWorkflowSourceNo\(record\)/u)
+    assert.match(content, /formatWorkflowRelatedDocumentRef/u)
+    assert.doesNotMatch(
+      content,
+      /record\.source_no \? `[^`]+：\$\{record\.source_no\}`/u
+    )
+  }
+})
+
+test('业务事实对象和往来方列不把内部 ID 当排序或导出值', () => {
+  const pageConfigPath = join(
+    rootDir,
+    'components/operational-facts/operationalFactPageConfig.mjs'
+  )
+  const pageConfig = readFileSync(pageConfigPath, 'utf8')
+
+  for (const helperName of [
+    'subjectColumnText',
+    'stockContextText',
+    'supplierColumnText',
+    'customerColumnText',
+    'counterpartyColumnText',
+  ]) {
+    assert.match(pageConfig, new RegExp(`function ${helperName}\\(`, 'u'))
+    assert.match(pageConfig, new RegExp(`sortValue:\\s*${helperName}`, 'u'))
+    assert.match(pageConfig, new RegExp(`exportValue:\\s*${helperName}`, 'u'))
+  }
+
+  for (const rawIDFallback of [
+    /record\.supplier_name\s*\|\|\s*record\.supplier_id/u,
+    /record\.customer_snapshot\s*\|\|\s*record\.customer_id/u,
+    /\$\{record\.counterparty_type\s*\|\|\s*''\}-\$\{record\.counterparty_id\s*\|\|\s*''\}/u,
+    /\$\{record\.subject_type\s*\|\|\s*'PRODUCT'\}-\$\{\s*record\.subject_id\s*\|\|\s*record\.product_id/u,
+    /\$\{record\.warehouse_id\s*\|\|\s*''\}-\$\{record\.lot_id\s*\|\|\s*''\}-\$\{\s*record\.unit_id/u,
+  ]) {
+    assert.doesNotMatch(pageConfig, rawIDFallback)
+  }
+  assert.match(pageConfig, /safeRefText\('供应商', record\.supplier_id\)/u)
+  assert.match(pageConfig, /safeRefText\('客户', record\.customer_id\)/u)
+  assert.match(pageConfig, /safeRefText\('往来方', record\.counterparty_id\)/u)
+  assert.match(pageConfig, /const SUBJECT_TYPE_LABELS/u)
+  assert.match(
+    pageConfig,
+    /SUBJECT_TYPE_LABELS\[record\.subject_type\]\s*\|\|\s*'业务对象'/u
+  )
+  assert.doesNotMatch(
+    pageConfig,
+    /safeRefText\(\s*record\.subject_type\s*\|\|/u
+  )
+})
+
 test('销售订单客户选项不把客户 ID 当客户编码 fallback', () => {
   const filePath = join(rootDir, 'components/sales-orders/SalesOrderForm.jsx')
   const content = readFileSync(filePath, 'utf8')
@@ -141,6 +299,53 @@ test('采购订单来源供应商不把 supplier_id 当供应商名称 fallback'
 
   assert.doesNotMatch(content, /source\.supplier_id\s*\|\|/u)
   assert.match(content, /供应商已关联/u)
+})
+
+test('采购和委外订单选中摘要不把生命周期状态 key 当可见 fallback', () => {
+  const purchaseConfigPath = join(
+    rootDir,
+    'components/purchase-orders/purchaseOrderPageConfig.mjs'
+  )
+  const outsourcingPagePath = join(rootDir, 'pages/V1OutsourcingOrdersPage.jsx')
+  const purchaseConfig = readFileSync(purchaseConfigPath, 'utf8')
+  const outsourcingPage = readFileSync(outsourcingPagePath, 'utf8')
+
+  assert.doesNotMatch(
+    purchaseConfig,
+    /PURCHASE_ORDER_STATUS_LABELS\[record\.lifecycle_status\]\s*\|\|\s*record\.lifecycle_status/u
+  )
+  assert.doesNotMatch(
+    outsourcingPage,
+    /OUTSOURCING_ORDER_STATUS_LABELS\[selectedRow\.lifecycle_status\]\s*\|\|\s*selectedRow\.lifecycle_status/u
+  )
+  assert.match(purchaseConfig, /'采购订单状态'/u)
+  assert.match(outsourcingPage, /'委外订单状态'/u)
+})
+
+test('权限中心角色展示不把 role_key 当用户可见 fallback', () => {
+  const filePath = join(rootDir, 'pages/PermissionCenterPage.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(content, /getRoleDisplayName/u)
+  assert.match(content, /function getRoleVisibleName/u)
+  assert.match(
+    content,
+    /getRoleDisplayName\(getRoleKey\(role\), '已配置角色'\)/u
+  )
+  assert.doesNotMatch(content, /role\.name\s*\|\|\s*getRoleKey\(role\)/u)
+  assert.doesNotMatch(content, /role\.name\s*\|\|\s*roleKey/u)
+  assert.doesNotMatch(content, /selectedRole\.name\s*\|\|\s*selectedRoleKey/u)
+  assert.doesNotMatch(content, /<Text type="secondary">\{roleKey\}<\/Text>/u)
+  assert.doesNotMatch(content, /<Tag>\{selectedRoleKey\}<\/Tag>/u)
+})
+
+test('权限中心权限名称不把 permission key 当用户可见 fallback', () => {
+  const filePath = join(rootDir, 'pages/PermissionCenterPage.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(content, /function getPermissionVisibleName/u)
+  assert.match(content, /return name \|\| '未登记权限'/u)
+  assert.doesNotMatch(content, /label:\s*permission\.name \|\| permissionKey/u)
 })
 
 test('BOM 页面导出和选中项不把内部 ID 当业务字段', () => {
@@ -178,6 +383,39 @@ test('采购订单表单引用选项缺字段时保留业务可读 fallback', ()
 
   assert.match(content, /供应商已关联/u)
   assert.match(content, /材料已关联/u)
+})
+
+test('采购和委外订单行表单初始化保留显式 0 值', () => {
+  const purchaseForm = readFileSync(
+    join(rootDir, 'components/purchase-orders/PurchaseOrderForm.jsx'),
+    'utf8'
+  )
+  const outsourcingForm = readFileSync(
+    join(rootDir, 'components/outsourcing-orders/OutsourcingOrderForm.jsx'),
+    'utf8'
+  )
+
+  for (const [content, quantityField] of [
+    [purchaseForm, 'purchased_quantity'],
+    [outsourcingForm, 'outsourcing_quantity'],
+  ]) {
+    assert.match(content, /function optionalFormValue\(value\)/u)
+    assert.match(
+      content,
+      new RegExp(
+        `${quantityField}: optionalFormValue\\(item\\.${quantityField}\\)`,
+        'u'
+      )
+    )
+    assert.match(content, /unit_price: optionalFormValue\(item\.unit_price\)/u)
+    assert.match(content, /amount: optionalFormValue\(item\.amount\)/u)
+    assert.doesNotMatch(
+      content,
+      new RegExp(`${quantityField}: item\\.${quantityField} \\|\\| ''`, 'u')
+    )
+    assert.doesNotMatch(content, /unit_price: item\.unit_price \|\| ''/u)
+    assert.doesNotMatch(content, /amount: item\.amount \|\| ''/u)
+  }
 })
 
 test('采购订单生成入库草稿弹窗不把订单 ID 当来源单号 fallback', () => {
@@ -220,6 +458,35 @@ test('来源导入选中摘要不把内部 ID 当业务标签 fallback', () => {
   assert.match(purchaseOrderContent, /getSelectedLabel=\{materialLabel\}/u)
 })
 
+test('来源导入默认单位列不把 default_unit_id 当可见值', () => {
+  const salesOrderFormPath = join(
+    rootDir,
+    'components/sales-orders/SalesOrderForm.jsx'
+  )
+  const purchaseOrderFormPath = join(
+    rootDir,
+    'components/purchase-orders/PurchaseOrderForm.jsx'
+  )
+  const combined = [salesOrderFormPath, purchaseOrderFormPath]
+    .map((filePath) => readFileSync(filePath, 'utf8'))
+    .join('\n')
+
+  assert.doesNotMatch(
+    combined,
+    /\{\s*title:\s*'默认单位',\s*dataIndex:\s*'default_unit_id'/u
+  )
+  assert.match(combined, /function sourceDefaultUnitText/u)
+  assert.match(
+    combined,
+    /sourceDefaultUnitText\(unitOptions, sku\.default_unit_id\)/u
+  )
+  assert.match(
+    combined,
+    /sourceDefaultUnitText\(unitOptions, material\.default_unit_id\)/u
+  )
+  assert.match(combined, /'单位已关联'/u)
+})
+
 test('采购入库和来料质检选中标签不把内部 ID 当业务单号 fallback', () => {
   const purchaseReceiptPath = join(rootDir, 'pages/V1PurchaseReceiptsPage.jsx')
   const qualityInspectionPath = join(
@@ -239,6 +506,160 @@ test('采购入库和来料质检选中标签不把内部 ID 当业务单号 fal
   )
   assert.match(purchaseReceiptContent, /采购入库单已关联/u)
   assert.match(qualityInspectionContent, /来料质检单已关联/u)
+})
+
+test('来料质检原批次状态不把批次状态 key 当用户可见 fallback', () => {
+  const filePath = join(
+    rootDir,
+    'components/quality-inspections/qualityInspectionColumns.jsx'
+  )
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(content, /function lotStatusText/u)
+  assert.match(
+    content,
+    /原批次状态 \$\{lotStatusText\(record\.original_lot_status\)\}/u
+  )
+  assert.doesNotMatch(content, /render:\s*\(value\)\s*=>\s*value \|\| '-'/u)
+  assert.doesNotMatch(content, /原批次状态 \$\{record\.original_lot_status\}/u)
+})
+
+test('库存台账引用列不把内部 ID 当来源单号或对象编号 fallback', () => {
+  const filePath = join(rootDir, 'pages/V1InventoryLedgerPage.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.doesNotMatch(content, /function internalRef/u)
+  assert.doesNotMatch(content, /dataIndex:\s*'source_type'/u)
+  assert.doesNotMatch(content, /dataIndex:\s*'source_id'/u)
+  assert.doesNotMatch(
+    content,
+    /exportValue:\s*\(record\)\s*=>\s*record\?\.source_id/u
+  )
+  assert.doesNotMatch(content, /render:\s*\(value\)\s*=>\s*value/u)
+  assert.match(content, /function linkedBusinessRef/u)
+  assert.match(content, /function formatSourceDocumentRef/u)
+  const sourceDocumentRefBody =
+    content.match(/function formatSourceDocumentRef[\s\S]*?\n\}/u)?.[0] || ''
+  assert.match(sourceDocumentRefBody, /'未提供业务单号'/u)
+  assert.doesNotMatch(sourceDocumentRefBody, /source_id/u)
+  assert.doesNotMatch(
+    content,
+    /linkedBusinessRef\('来源单据', record\.source_id\)/u
+  )
+  assert.match(content, /function canOpenSourceDocument/u)
+  assert.match(
+    content,
+    /linkedBusinessRef\(\s*subjectTypeText\(record\?\.subject_type\) \|\| '对象'/u
+  )
+  assert.match(content, /relationRef\('来源行', record\?\.source_line_id\)/u)
+})
+
+test('路由来源筛选标签使用业务口径并可按上下文单独清除', () => {
+  const inventoryLedgerContent = readFileSync(
+    join(rootDir, 'pages/V1InventoryLedgerPage.jsx'),
+    'utf8'
+  )
+  const operationalFactsContent = readFileSync(
+    join(rootDir, 'pages/OperationalFactsPage.jsx'),
+    'utf8'
+  )
+  const shipmentsContent = readFileSync(
+    join(rootDir, 'pages/ShipmentsPage.jsx'),
+    'utf8'
+  )
+  const purchaseReceiptsContent = readFileSync(
+    join(rootDir, 'pages/V1PurchaseReceiptsPage.jsx'),
+    'utf8'
+  )
+  const qualityInspectionsContent = readFileSync(
+    join(rootDir, 'pages/V1QualityInspectionsPage.jsx'),
+    'utf8'
+  )
+
+  assert.match(
+    inventoryLedgerContent,
+    /已按\{sourceTypeText\(routeSourceType\)\}筛选/u
+  )
+  assert.match(
+    inventoryLedgerContent,
+    /clearRouteContext\(\['source_type', 'source_id'\]\)/u
+  )
+  assert.match(inventoryLedgerContent, /clearRouteContext\(\['lot_id'\]\)/u)
+
+  assert.match(
+    operationalFactsContent,
+    /已按\{sourceTypeLabel\(routeSourceType\)\}筛选/u
+  )
+  assert.match(
+    operationalFactsContent,
+    /clearRouteContext\(\['sales_order_id'\]\)/u
+  )
+  assert.match(
+    operationalFactsContent,
+    /clearRouteContext\(\['source_type', 'source_id'\]\)/u
+  )
+
+  assert.match(shipmentsContent, /clearRouteContext\(\['sales_order_id'\]\)/u)
+  assert.match(
+    shipmentsContent,
+    /clearRouteContext\(\['shipment_id', 'source_type', 'source_id'\]\)/u
+  )
+  assert.match(
+    purchaseReceiptsContent,
+    /clearRouteContext\(\['purchase_order_id'\]\)/u
+  )
+  assert.match(
+    purchaseReceiptsContent,
+    /clearRouteContext\(\['receipt_id', 'source_type', 'source_id'\]\)/u
+  )
+  assert.match(
+    qualityInspectionsContent,
+    /clearRouteContext\(\['purchase_order_id'\]\)/u
+  )
+  assert.match(
+    qualityInspectionsContent,
+    /clearRouteContext\(\['purchase_receipt_id'\]\)/u
+  )
+})
+
+test('Workflow 任务列不把 task_status_key / owner_role_key 作为用户可见列字段', () => {
+  const workflowModulePath = join(
+    rootDir,
+    'pages/WorkflowBusinessModulePage.jsx'
+  )
+  const dashboardPath = join(rootDir, 'pages/DashboardPage.jsx')
+  const dashboardTaskDisplayPath = join(
+    rootDir,
+    'utils/dashboardTaskDisplay.mjs'
+  )
+  const workflowModuleContent = readFileSync(workflowModulePath, 'utf8')
+  const dashboardContent = readFileSync(dashboardPath, 'utf8')
+  const dashboardTaskDisplayContent = readFileSync(
+    dashboardTaskDisplayPath,
+    'utf8'
+  )
+
+  assert.doesNotMatch(workflowModuleContent, /dataIndex:\s*'task_status_key'/u)
+  assert.doesNotMatch(workflowModuleContent, /key:\s*'task_status_key'/u)
+  assert.doesNotMatch(workflowModuleContent, /dataIndex:\s*'owner_role_key'/u)
+  assert.doesNotMatch(workflowModuleContent, /key:\s*'owner_role_key'/u)
+  assert.doesNotMatch(dashboardContent, /dataIndex:\s*'task_status_key'/u)
+  assert.doesNotMatch(dashboardContent, /key:\s*'task_status_key'/u)
+  assert.doesNotMatch(dashboardContent, /dataIndex:\s*'owner_role_key'/u)
+  assert.doesNotMatch(dashboardContent, /key:\s*'owner_role_key'/u)
+  assert.doesNotMatch(workflowModuleContent, /function formatTaskSource/u)
+  assert.doesNotMatch(
+    workflowModuleContent,
+    /task\.source_no\) return task\.source_no/u
+  )
+  assert.match(workflowModuleContent, /formatWorkflowTaskSource/u)
+  assert.match(dashboardTaskDisplayContent, /resolveReadableWorkflowSourceNo/u)
+  assert.match(dashboardTaskDisplayContent, /isInternalWorkflowDocumentRef/u)
+  assert.doesNotMatch(
+    dashboardTaskDisplayContent,
+    /function isInternalSourceNoFallback/u
+  )
+  assert.doesNotMatch(dashboardTaskDisplayContent, /`TASK-\$\{task\.id/u)
 })
 
 test('业务可见文案不暴露架构状态机术语', () => {
@@ -266,6 +687,191 @@ test('业务可见文案不暴露架构状态机术语', () => {
   assert.deepEqual(violations, [])
 })
 
+test('正式业务边界文案不展示后端实现术语', () => {
+  const files = [
+    'pages/PermissionCenterPage.jsx',
+    'pages/FormalBusinessModulePage.jsx',
+    'pages/V1OperationalFactPage.jsx',
+    'pages/OperationalFactsPage.jsx',
+    'pages/V1OutsourcingOrdersPage.jsx',
+    'pages/V1PurchaseReceiptsPage.jsx',
+    'pages/ShipmentsPage.jsx',
+    'pages/WorkflowBusinessModulePage.jsx',
+    'config/businessModules.mjs',
+    'components/operational-facts/operationalFactPageConfig.mjs',
+    'components/shipments/ShipmentBusinessModal.jsx',
+  ].map((file) => join(rootDir, file))
+  const combined = files
+    .map((filePath) => readFileSync(filePath, 'utf8'))
+    .join('\n')
+
+  for (const staleVisibleText of [
+    'RBAC：',
+    '领域 usecase',
+    '后端 usecase',
+    'operational_fact 后端 usecase',
+    'finance_facts 后端 usecase',
+    '领域 API',
+    'API 和 RBAC',
+    'Source Document：',
+    'Operational Fact：',
+    'RECEIVABLE 业务事实',
+    'PAYABLE 业务事实',
+    'INVOICE 业务事实',
+    'RECONCILIATION 业务事实',
+    'finance_facts 的',
+  ]) {
+    assert.doesNotMatch(combined, new RegExp(staleVisibleText, 'u'))
+  }
+
+  for (const readableText of [
+    '角色权限模型',
+    '后台接口',
+    '权限控制',
+    '后端业务规则',
+    '后端财务规则',
+    '后端采购入库规则',
+    '后端协同任务规则',
+    '源单：加工合同',
+    '业务事实',
+    '库存出库事实',
+    '协同任务：入库跟进',
+    '入库单：入库事实',
+  ]) {
+    assert.match(combined, new RegExp(readableText, 'u'))
+  }
+})
+
+test('出货和入库正式页头不展示底层表名或状态 key', () => {
+  const shipmentPageContent = readFileSync(
+    join(rootDir, 'pages/ShipmentsPage.jsx'),
+    'utf8'
+  )
+  const purchaseReceiptPageContent = readFileSync(
+    join(rootDir, 'pages/V1PurchaseReceiptsPage.jsx'),
+    'utf8'
+  )
+
+  for (const staleShipmentHeaderPattern of [
+    /description="[^"]*shipments \/ shipment_items/u,
+    /description="[^"]*SHIPPED/u,
+    /description="[^"]*inventory_txns\.OUT/u,
+  ]) {
+    assert.doesNotMatch(shipmentPageContent, staleShipmentHeaderPattern)
+  }
+  for (const stalePurchaseReceiptHeaderPattern of [
+    /description="[^"]*purchase_receipts \/ purchase_receipt_items/u,
+    /description="[^"]*Workflow/u,
+    />\s*Workflow：协同入库/u,
+    />\s*PurchaseReceipt：入库事实/u,
+    />\s*过账后写 inventory_txns/u,
+  ]) {
+    assert.doesNotMatch(
+      purchaseReceiptPageContent,
+      stalePurchaseReceiptHeaderPattern
+    )
+  }
+
+  for (const readableShipmentHeaderText of [
+    '出货单维护出货单据和出货明细',
+    '库存出库事实',
+  ]) {
+    assert.match(
+      shipmentPageContent,
+      new RegExp(readableShipmentHeaderText, 'u')
+    )
+  }
+  for (const readablePurchaseReceiptHeaderText of [
+    '入库管理维护采购入库草稿和入库明细',
+    '协同任务：入库跟进',
+    '入库单：入库事实',
+    '过账后写库存流水',
+  ]) {
+    assert.match(
+      purchaseReceiptPageContent,
+      new RegExp(readablePurchaseReceiptHeaderText, 'u')
+    )
+  }
+})
+
+test('Formal 业务壳不把内部表名当用户可见业务范围', () => {
+  const formalShellContent = readFileSync(
+    join(rootDir, 'pages/FormalBusinessModulePage.jsx'),
+    'utf8'
+  )
+  const qualityInspectionPageContent = readFileSync(
+    join(rootDir, 'pages/V1QualityInspectionsPage.jsx'),
+    'utf8'
+  )
+  const businessModulesContent = readFileSync(
+    join(rootDir, 'config/businessModules.mjs'),
+    'utf8'
+  )
+
+  for (const staleShellPattern of [
+    /label: '主事实 \/ 真源'/u,
+    /label: '来源表'/u,
+    /moduleItem\.factSource\s*\|\|\s*moduleItem\.primaryEntity/u,
+    /moduleItem\.primaryEntity\s*\|\|\s*moduleItem\.title/u,
+    /moduleItem\.sourceRefs/u,
+    /business_records/u,
+    /领域真源待评审/u,
+    /领域表待评审/u,
+  ]) {
+    assert.doesNotMatch(formalShellContent, staleShellPattern)
+  }
+  for (const staleQualityHeaderPattern of [
+    /description="[^"]*quality_inspections/u,
+    /description="[^"]*HOLD/u,
+    /description="[^"]*ACTIVE/u,
+    /description="[^"]*REJECTED/u,
+    />\s*SUBMITTED：/u,
+    />\s*PASSED：/u,
+    />\s*REJECTED：/u,
+  ]) {
+    assert.doesNotMatch(qualityInspectionPageContent, staleQualityHeaderPattern)
+  }
+
+  for (const readableShellText of [
+    '当前业务范围',
+    '关联业务',
+    '后端规则待接入',
+    '旧业务记录壳',
+    '后端规则与接口',
+  ]) {
+    assert.match(formalShellContent, new RegExp(readableShellText, 'u'))
+  }
+  for (const readableQualityHeaderText of [
+    '来料质检当前承接质检判定',
+    '已提交：批次冻结',
+    '通过：批次可用',
+    '不合格：批次不可用',
+  ]) {
+    assert.match(
+      qualityInspectionPageContent,
+      new RegExp(readableQualityHeaderText, 'u')
+    )
+  }
+
+  for (const staleVisibleConfigText of [
+    '表入口',
+    'Source Document',
+    'Business Commitment',
+    'quality_inspections 判定',
+    'warehouse_inbound done',
+    'purchase_receipt posted',
+    '库存 OUT',
+    'REVERSAL',
+    '真实 shipped',
+    'operational facts 内部入口',
+  ]) {
+    assert.doesNotMatch(
+      businessModulesContent,
+      new RegExp(staleVisibleConfigText, 'u')
+    )
+  }
+})
+
 test('普通业务页面不默认展示系统创建更新时间', () => {
   const violations = []
   for (const dir of businessVisibleScanDirs) {
@@ -276,6 +882,37 @@ test('普通业务页面不默认展示系统创建更新时间', () => {
         if (content.includes(text)) {
           violations.push(`${relative(rootDir, filePath)}: ${text}`)
         }
+      }
+    }
+  }
+
+  assert.deepEqual(violations, [])
+})
+
+test('业务可见属性不直接展示 snake_case 技术字段名', () => {
+  const violations = []
+  const files = []
+  for (const dir of scanDirs) {
+    if (!statSync(dir, { throwIfNoEntry: false })?.isDirectory()) continue
+    files.push(
+      ...collectSourceFiles(dir).filter((filePath) => {
+        const fileName = filePath.split('/').pop() || ''
+        return !/^Dev/u.test(fileName)
+      })
+    )
+  }
+  for (const filePath of [join(rootDir, 'config/businessModules.mjs')]) {
+    if (statSync(filePath, { throwIfNoEntry: false })?.isFile()) {
+      files.push(filePath)
+    }
+  }
+
+  for (const filePath of files) {
+    const content = readFileSync(filePath, 'utf8')
+    for (const match of content.matchAll(visibleStringAttributePattern)) {
+      const visibleText = match[2]
+      if (technicalSnakeCasePattern.test(visibleText)) {
+        violations.push(`${relative(rootDir, filePath)}: ${visibleText}`)
       }
     }
   }
@@ -337,4 +974,420 @@ test('业务日期字段使用完整且一致的用户可见口径', () => {
   assert.doesNotMatch(combined, /['"`]计划出货['"`]/u)
   assert.doesNotMatch(combined, /['"`]实际出货['"`]/u)
   assert.doesNotMatch(combined, /计划 \/ 实际出货/u)
+})
+
+test('审计日志页使用业务可读摘要，不展示原始事件结构', () => {
+  const filePath = join(rootDir, 'pages/AuditLogsPage.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.doesNotMatch(content, /原始 payload/u)
+  assert.doesNotMatch(content, /payload 判断动作含义/u)
+  assert.doesNotMatch(content, /动作或 payload/u)
+  assert.doesNotMatch(content, /before\/after/u)
+  assert.doesNotMatch(
+    content,
+    /next:\s*['"`][^'"`]*after\.disabled[^'"`]*['"`]/u
+  )
+  assert.doesNotMatch(content, /BOOTSTRAP_ADMIN_ONCE/u)
+  assert.doesNotMatch(
+    content,
+    /next:\s*['"`][^'"`]*(?:role_keys|permission_keys)[^'"`]*['"`]/u
+  )
+  assert.doesNotMatch(content, /<pre>\{formatPayload/u)
+  assert.doesNotMatch(content, /<span>\{record\.event_key\}<\/span>/u)
+  assert.doesNotMatch(content, /return event\.actor_key \|\|/u)
+  assert.doesNotMatch(content, /event\.target_key \|\|/u)
+  assert.doesNotMatch(content, /fieldLabelMap\[key\] \|\| key/u)
+  assert.doesNotMatch(content, /JSON\.stringify\(value\)/u)
+  assert.match(content, /function isTechnicalAuditValueKey/u)
+  assert.match(content, /owner_role_key/u)
+  assert.match(content, /task_status_key/u)
+  assert.match(content, /source_type/u)
+  assert.match(content, /source_id/u)
+  assert.match(
+    content,
+    /return isTechnicalAuditValueKey\(key\) \? '已记录' : String\(value\)/u
+  )
+  assert.match(content, /变化摘要和下一步/u)
+  assert.match(content, /placeholder="操作者、对象、动作或摘要"/u)
+  assert.match(content, /<span>\{meta\.label\}<\/span>/u)
+  assert.match(content, /event\.target_label \|\| event\.target_name/u)
+  assert.match(content, /fieldLabelMap\[key\] \|\| '字段变更'/u)
+  assert.match(content, /return '已记录'/u)
+})
+
+test('后台布局角色标签不把 role key 当用户可见文案', () => {
+  const filePath = join(rootDir, 'components/ERPLayout.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(content, /role\?\.name \|\|/u)
+  assert.match(content, /'已配置角色'/u)
+  assert.doesNotMatch(content, /role\?\.name \|\| role\?\.role_key/u)
+  assert.doesNotMatch(content, /role\?\.name \|\| role\?\.key/u)
+})
+
+test('角色展示 helper 默认不把未知 role key 当用户可见 fallback', () => {
+  const filePath = join(rootDir, 'utils/roleKeys.mjs')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(content, /return normalized \? '已配置角色' : ''/u)
+  assert.doesNotMatch(content, /fallback \|\| normalized/u)
+})
+
+test('协同任务面板责任角色不把 owner_role_key 当用户可见 fallback', () => {
+  const filePath = join(
+    rootDir,
+    'components/business-list/CollaborationTaskPanel.jsx'
+  )
+  const content = readFileSync(filePath, 'utf8')
+  const actionDrawerContent = readFileSync(
+    join(rootDir, 'components/workflow/WorkflowTaskActionDrawer.jsx'),
+    'utf8'
+  )
+  const workflowPageContent = readFileSync(
+    join(rootDir, 'pages/WorkflowBusinessModulePage.jsx'),
+    'utf8'
+  )
+
+  assert.match(
+    content,
+    /<Tag>\{getWorkflowTaskOwnerRoleLabel\(task\)\}<\/Tag>/u
+  )
+  assert.match(
+    actionDrawerContent,
+    /const ownerRoleLabel = task \? getWorkflowTaskOwnerRoleLabel\(task\) : ''/u
+  )
+  assert.match(
+    workflowPageContent,
+    /value: getWorkflowTaskOwnerRoleLabel\(selectedTask\)/u
+  )
+  assert.doesNotMatch(content, /roleLabelMap/u)
+  assert.doesNotMatch(actionDrawerContent, /roleLabelMap/u)
+  assert.doesNotMatch(workflowPageContent, /WORKFLOW_ROLE_LABELS/u)
+  assert.doesNotMatch(
+    content,
+    /roleLabels\.get\(task\.owner_role_key\)\s*\|\|\s*getWorkflowTaskOwnerRoleLabel\(task\)/u
+  )
+  assert.doesNotMatch(content, /\{task\.owner_role_key\}/u)
+  assert.doesNotMatch(
+    actionDrawerContent,
+    /roleLabelMap\?\.get\?\.\(ownerRoleKey\)/u
+  )
+})
+
+test('移动端任务详情用来源口径，不把所有任务误称为订单或单号', () => {
+  const filePath = join(rootDir, 'mobile/components/MobileTaskDetailScreen.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(content, /resolveTaskRelatedSourceLabel\(selectedTask\)/u)
+  assert.match(content, /来源：/u)
+  assert.match(content, /关联来源（1）/u)
+  assert.doesNotMatch(content, /单号：/u)
+  assert.doesNotMatch(content, /订单：\{relatedSource\}/u)
+  assert.doesNotMatch(content, /关联单据（1）/u)
+})
+
+test('移动端任务详情优先展示动作中文标签而不是 raw action key', () => {
+  const filePath = join(rootDir, 'mobile/components/MobileTaskDetailScreen.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(
+    content,
+    /resolveMobileActionDisplayLabel\(latestMobileAction\)/u
+  )
+  assert.doesNotMatch(
+    content,
+    /已执行 \$\{resolveMobileActionLabel\(\s*latestMobileAction\.action_key\s*\)\}/u
+  )
+  assert.doesNotMatch(content, /latestMobileAction\.action_label\s*\|\|/u)
+})
+
+test('移动端任务详情事实行不把显式 0 当空态', () => {
+  const filePath = join(rootDir, 'mobile/components/MobileTaskDetailScreen.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(content, /function mobileFactValueText\(value\)/u)
+  assert.match(content, /typeof value === 'string' && value\.trim\(\) === ''/u)
+  assert.match(content, /\{mobileFactValueText\(value\)\}/u)
+  assert.doesNotMatch(content, /\{value \|\| '-'\}/u)
+})
+
+test('移动端任务列表不直接透出 raw due_status_label', () => {
+  const listScreen = readFileSync(
+    join(rootDir, 'mobile/components/MobileTaskListScreen.jsx'),
+    'utf8'
+  )
+  const taskModel = readFileSync(
+    join(rootDir, 'mobile/utils/mobileRoleTaskModel.mjs'),
+    'utf8'
+  )
+
+  assert.match(listScreen, /resolveMobileTaskDueLabel\(task\)/u)
+  assert.doesNotMatch(
+    listScreen,
+    /task\.due_at_label\s*\|\|\s*task\.due_status_label/u
+  )
+  assert.match(taskModel, /export function resolveMobileTaskDueLabel/u)
+  assert.match(taskModel, /getMobileTaskDueStatusLabel\(dueStatus\)/u)
+  assert.doesNotMatch(
+    taskModel,
+    /task\.alert_label\s*\|\|\s*task\.due_status_label/u
+  )
+})
+
+test('任务看板来源筛选不把 source_type 原始 key 当选项文案', () => {
+  const filePath = join(rootDir, 'pages/DashboardPage.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(content, /getWorkflowTaskSourceTypeLabel/u)
+  assert.doesNotMatch(content, /label:\s*sourceType/u)
+})
+
+test('任务看板预警模型提供业务来源标签，不要求页面消费 raw source_no', () => {
+  const statsPath = join(rootDir, 'utils/workflowDashboardStats.mjs')
+  const content = readFileSync(statsPath, 'utf8')
+
+  assert.match(content, /import \{ formatWorkflowTaskSource \}/u)
+  assert.match(content, /source_label:\s*formatWorkflowTaskSource\(task\)/u)
+  assert.doesNotMatch(content, /source_label:\s*task\.source_no/u)
+  assert.doesNotMatch(content, /source_label:\s*`\$\{sourceType\}/u)
+})
+
+test('菜单权限标签 helper 不把未知 path 或 role key 当可见 fallback', () => {
+  const content = readFileSync(
+    join(rootDir, 'config/menuPermissions.mjs'),
+    'utf8'
+  )
+
+  assert.doesNotMatch(content, /return matched\?\.label \|\| key/u)
+  assert.match(
+    content,
+    /return matched\?\.label \|\| \(key \? '菜单权限' : ''\)/u
+  )
+  assert.match(
+    content,
+    /return matched\?\.label \|\| \(key \? '岗位入口' : ''\)/u
+  )
+})
+
+test('权限中心模块标签不把未知 module key 当可见 fallback', () => {
+  const content = readFileSync(
+    join(rootDir, 'utils/permissionModuleLabels.mjs'),
+    'utf8'
+  )
+
+  assert.match(
+    content,
+    /return label \? `\$\{label\} \(\$\{normalizedKey\}\)` : '未登记权限模块'/u
+  )
+  assert.doesNotMatch(content, /:\s*normalizedKey/u)
+})
+
+test('Workflow 动作模式不把未知 action key 当可提交或可见 fallback', () => {
+  const content = readFileSync(
+    join(rootDir, 'utils/workflowTaskActionAccess.mjs'),
+    'utf8'
+  )
+
+  assert.doesNotMatch(content, /return ACTION_MODE_ALIASES\[key\] \|\| key/u)
+  assert.match(content, /return ACTION_MODE_ALIASES\[key\] \|\| ''/u)
+})
+
+test('任务派生 source_no 不把内部 ID 当业务来源编号 fallback', () => {
+  const files = [
+    'utils/purchaseInboundFlow.mjs',
+    'utils/outsourceReturnFlow.mjs',
+    'utils/finishedGoodsFlow.mjs',
+    'utils/shipmentFinanceFlow.mjs',
+    'utils/payableReconciliationFlow.mjs',
+  ].map((file) => join(rootDir, file))
+
+  for (const filePath of files) {
+    const content = readFileSync(filePath, 'utf8')
+    const functionBodies = content.match(
+      /export function resolve[A-Za-z]+SourceNo\(record = \{\}\) \{[\s\S]*?\n\}/gu
+    )
+    assert(
+      functionBodies?.length > 0,
+      `${relative(rootDir, filePath)} missing source no resolver`
+    )
+    for (const body of functionBodies) {
+      assert.doesNotMatch(body, /normalizeText\(record\.id\)/u)
+      assert.match(body, /resolveReadableWorkflowSourceNo\(record\)/u)
+    }
+    const taskCodeBody = content.match(
+      /function taskCode\(prefix, record = \{\}, options = \{\}\) \{[\s\S]*?\n\}/u
+    )?.[0]
+    assert(
+      taskCodeBody,
+      `${relative(rootDir, filePath)} missing taskCode helper`
+    )
+    assert.doesNotMatch(taskCodeBody, /normalizeText\(record\.id\)/u)
+    assert.match(taskCodeBody, /normalizeText\(record\.document_no\)/u)
+    assert.match(taskCodeBody, /normalizeText\(record\.source_no\)/u)
+    assert.match(taskCodeBody, /normalizeText\(record\.title\)/u)
+    assert.match(taskCodeBody, /'no-readable-ref'/u)
+  }
+})
+
+test('业务状态和类型列不把未知枚举 raw key 作为用户可见 fallback', () => {
+  const files = [
+    'components/operational-facts/OperationalFactForms.jsx',
+    'components/operational-facts/operationalFactPageConfig.mjs',
+    'components/sales-orders/salesOrderColumns.jsx',
+    'components/purchase-orders/purchaseOrderColumns.jsx',
+    'components/outsourcing-orders/outsourcingOrderColumns.jsx',
+    'components/StatusPill.jsx',
+    'pages/V1InventoryLedgerPage.jsx',
+    'pages/V1PurchaseReceiptsPage.jsx',
+    'pages/BOMVersionsPage.jsx',
+    'pages/DevCustomerConfigPage.jsx',
+    'components/bom/BOMVersionColumns.jsx',
+    'components/quality-inspections/qualityInspectionColumns.jsx',
+    'components/shipments/shipmentColumns.jsx',
+    'components/master-data/masterDataColumns.jsx',
+    'utils/masterDataOrderView.mjs',
+    'utils/mobileTaskView.mjs',
+  ].map((file) => join(rootDir, file))
+  const combined = files
+    .map((filePath) => readFileSync(filePath, 'utf8'))
+    .join('\n')
+
+  for (const rawFallback of [
+    /STATUS_LABELS\[key\]\s*\|\|\s*key/u,
+    /BOM_STATUS_LABELS\[key\]\s*\|\|\s*key/u,
+    /BOM_STATUS_LABELS\[row\.status\]\s*\|\|\s*row\.status/u,
+    /BOM_STATUS_LABELS\[record\.status\]\s*\|\|\s*record\.status/u,
+    /QUALITY_STATUS_LABELS\[key\]\s*\|\|\s*key/u,
+    /QUALITY_RESULT_LABELS\[key\]\s*\|\|\s*key/u,
+    /SHIPMENT_STATUS_LABELS\[key\]\s*\|\|\s*key/u,
+    /SHIPMENT_STATUS_LABELS\[record\.status\]\s*\|\|\s*record\.status/u,
+    /SUBJECT_TYPE_LABELS\[key\]\s*\|\|\s*key/u,
+    /LOT_STATUS_LABELS\[key\]\s*\|\|\s*key/u,
+    /TXN_TYPE_LABELS\[key\]\s*\|\|\s*key/u,
+    /FINANCE_COLLECTION_TYPE_LABELS\[value\]\s*\|\|\s*value/u,
+    /FINANCE_PAYMENT_TERM_LABELS\[value\]\s*\|\|\s*value/u,
+    /FINANCE_INVOICE_CATEGORY_LABELS\[value\]\s*\|\|\s*value/u,
+    /SUPPLIER_TYPE_LABELS\[value\]\s*\|\|\s*value/u,
+    /SUPPLIER_TYPE_LABELS\[record\?\.supplier_type\]\s*\|\|\s*record\?\.supplier_type/u,
+    /STATUS_LABELS\[record\?\.status\]\s*\|\|\s*record\?\.status/u,
+    /QUALITY_STATUS_LABELS\[record\?\.status\]\s*\|\|\s*record\?\.status/u,
+    /QUALITY_RESULT_LABELS\[record\?\.result\]\s*\|\|\s*record\?\.result/u,
+    /SHIPMENT_STATUS_LABELS\[record\?\.status\]\s*\|\|\s*record\?\.status/u,
+    /LOT_STATUS_LABELS\[row\.status\]\s*\|\|\s*row\.status/u,
+    /STATUS_LABELS\[status\]\s*\|\|\s*status/u,
+    /STATUS_LABELS\[normalizedStatus\]\s*\|\|\s*normalizedStatus/u,
+    /DUE_STATUS_LABELS\[dueStatus\]\s*\|\|\s*dueStatus/u,
+    /STATUS_OPTIONS\.find\(\(item\) => item\.value === record\.business_status\)[\s\S]*?\?\.label\s*\|\|\s*record\.business_status/u,
+    /return labels\[key\]\s*\|\|\s*key\s*\|\|\s*'-'/u,
+  ]) {
+    assert.doesNotMatch(combined, rawFallback)
+  }
+
+  assert.match(combined, /return labels\[key\] \|\| fallback/u)
+  for (const visibleFallback of [
+    '业务状态',
+    '收款分类',
+    '账期',
+    '发票类别',
+    '对象',
+    '批次状态',
+    '库存流水',
+    '入库状态',
+    'BOM 状态',
+    '质检状态',
+    '质检结果',
+    '出货状态',
+    '供应商类型',
+    '到期状态',
+  ]) {
+    assert.match(combined, new RegExp(visibleFallback, 'u'))
+  }
+})
+
+test('__dev/customer-config 边界列表不把 raw key 当可见 fallback', () => {
+  const filePath = join(rootDir, 'pages/DevCustomerConfigPage.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(content, /function guardItemLabel\(item, fallbackLabel\)/u)
+  assert.match(content, /guardItemLabel\(item, '字段编号边界'\)/u)
+  assert.match(content, /guardItemLabel\(item, '客户配置包边界'\)/u)
+  assert.doesNotMatch(content, /item\.label\s*\|\|\s*item\.key/u)
+})
+
+test('应付协同任务相关单据不把质检 raw key 拼成可见结果', () => {
+  const content = readFileSync(
+    join(rootDir, 'utils/payableReconciliationFlow.mjs'),
+    'utf8'
+  )
+
+  assert.doesNotMatch(content, /IQC 结果：\$\{payload\.iqc_result\}/u)
+  assert.doesNotMatch(content, /检验结果：\$\{payload\.qc_result\}/u)
+  assert.match(content, /function qualityResultLabel\(value\)/u)
+  assert.match(content, /QUALITY_RESULT_LABELS\[key\] \|\| '质检已记录'/u)
+})
+
+test('成品任务相关单据不把抽检 raw key 拼成可见结果', () => {
+  const content = readFileSync(
+    join(rootDir, 'utils/finishedGoodsFlow.mjs'),
+    'utf8'
+  )
+
+  assert.doesNotMatch(content, /成品抽检结果：\$\{options\.qcResult\}/u)
+  assert.match(content, /function finishedGoodsQcResultLabel\(value\)/u)
+  assert.match(
+    content,
+    /FINISHED_GOODS_QC_RESULT_LABELS\[key\] \|\| '抽检已记录'/u
+  )
+})
+
+test('移动任务相关单据结果类文案不原样透传 raw key', () => {
+  const content = readFileSync(
+    join(rootDir, 'utils/mobileTaskView.mjs'),
+    'utf8'
+  )
+
+  assert.doesNotMatch(
+    content,
+    /return value\.filter\(Boolean\)\.map\(String\)/u
+  )
+  assert.match(content, /function normalizeRelatedDocumentText\(value\)/u)
+  assert.match(content, /RELATED_DOCUMENT_RESULT_LABELS\[key\]/u)
+  assert.match(content, /relatedDocumentResultFallback\(prefix\)/u)
+})
+
+test('加工合同打印追溯不把底层 type 和内部 ID 当可见备注', () => {
+  const filePath = join(rootDir, 'data/processingContractTemplate.mjs')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.doesNotMatch(content, /事实类型/u)
+  assert.doesNotMatch(content, /业务事实/u)
+  assert.doesNotMatch(content, /#\$\{subjectID\}/u)
+  assert.doesNotMatch(content, /#\$\{sourceID\}/u)
+  assert.match(
+    content,
+    /PROCESSING_FACT_TYPE_LABELS\[factType\] \|\| '业务来源已关联'/u
+  )
+  assert.match(content, /subjectNo \|\| '加工对象已关联'/u)
+  assert.match(content, /sourceNo \|\| '来源单据已关联'/u)
+  assert.match(content, /业务来源:/u)
+  assert.match(content, /加工对象:/u)
+  assert.match(content, /来源单据:/u)
+})
+
+test('打印工作台字段表不把显式 0 当空态', () => {
+  const filePath = join(rootDir, 'components/print/PrintWorkspaceShell.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(
+    content,
+    /import \{ renderPrintValue \} from '\.\/printValue\.mjs'/u
+  )
+  assert.match(
+    content,
+    /\$\{row\.label \?\? ''\} \$\{row\.value \?\? ''\} \$\{row\.key \?\? ''\}/u
+  )
+  assert.match(content, /renderPrintValue\(row\.value, '-'\)/u)
+  assert.doesNotMatch(content, /row\.value\s*\|\|\s*'-'/u)
+  assert.doesNotMatch(content, /row\.value\s*\|\|\s*''/u)
 })

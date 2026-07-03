@@ -61,6 +61,7 @@ export default function MaterialPurchaseContractPrintWorkspacePage() {
       resetDraftOnOpen={resetDraftOnOpen}
       workspaceStateID={workspaceStateID}
       workspaceURL={workspaceURL}
+      businessInput={entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS}
       sourceTag={
         entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS
           ? '业务记录带值'

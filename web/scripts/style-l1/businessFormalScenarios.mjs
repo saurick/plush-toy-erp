@@ -532,6 +532,14 @@ export function createBusinessFormalScenarios(deps) {
           screenshotName: 'business-v1-suppliers-form-modal',
           expectedTexts: ['供应商类型', '联系人', '添加条目'],
           expectContactItemsLayout: true,
+          afterOpen: async (modal) => {
+            await assertLineItemAddActionScrollsToNewRow(modal, {
+              scenarioName: 'business-v1-suppliers-contact-form-modal',
+              targetRowCount: 5,
+              listSelector: '.erp-master-contact-list__items',
+              rowSelector: '.erp-master-contact-list__row',
+            })
+          },
         })
         await verifyBusinessRowDoubleClickEditModal(page, {
           rowText: '样式供应商',
@@ -575,6 +583,14 @@ export function createBusinessFormalScenarios(deps) {
           screenshotName: 'business-v1-customers-form-modal',
           expectedTexts: ['联系人', '添加条目'],
           expectContactItemsLayout: true,
+          afterOpen: async (modal) => {
+            await assertLineItemAddActionScrollsToNewRow(modal, {
+              scenarioName: 'business-v1-customers-contact-form-modal',
+              targetRowCount: 5,
+              listSelector: '.erp-master-contact-list__items',
+              rowSelector: '.erp-master-contact-list__row',
+            })
+          },
         })
         await assertNoHorizontalOverflow(page, 'business-standard-customers')
         await verifyBusinessRowDoubleClickEditModal(page, {
@@ -1051,6 +1067,9 @@ export function createBusinessFormalScenarios(deps) {
             )}`
           )
         }
+        await assertLineItemAddActionScrollsToNewRow(bomDraftModal, {
+          scenarioName: 'business-standard-bom-create-form-modal',
+        })
         await closeBusinessFormModal(page, bomDraftModal)
         await page.getByText('BOM-STYLE-DRAFT', { exact: true }).dblclick()
         const bomEditModal = page
@@ -1245,6 +1264,10 @@ export function createBusinessFormalScenarios(deps) {
             )}`
           )
         }
+        await assertLineItemAddActionScrollsToNewRow(bomEditModal, {
+          scenarioName: 'business-standard-bom-edit-form-modal',
+          targetRowCount: 7,
+        })
         await closeBusinessFormModal(page, bomEditModal)
         await assertNoHorizontalOverflow(page, 'business-standard-bom')
 
@@ -1325,11 +1348,13 @@ export function createBusinessFormalScenarios(deps) {
         await page.getByRole('tab', { name: '库存流水' }).click()
         await expectText(page, '冲正')
         await expectText(page, '其他来源')
+        await expectText(page, '未提供业务单号')
         await expectText(page, '已关联来源行')
         await expectText(page, '已关联原流水')
         await expectText(page, 'ledger seed')
         await assertTextAbsent(page, 'MANUAL_SEED')
         await assertTextAbsent(page, 'INV-TXN-001')
+        await assertTextAbsent(page, '9001')
         await assertTextAbsent(page, '9002')
         await assertTextAbsent(page, '888500999')
         await assertBusinessMainTableHasNoOperationColumn(page, {
@@ -1345,7 +1370,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectButton(page, '导出筛选结果')
         await expectButton(page, '列顺序')
         await assertNoListDeleteTrashToolbar(page)
-        await expectText(page, 'quality_inspections')
+        await assertTextAbsent(page, 'quality_inspections')
         await expectText(page, '不合格退供应商仍走采购退货')
         await expectText(page, 'QI-STYLE-L1')
         await expectText(page, 'PR-STYLE-L1')
@@ -1586,6 +1611,12 @@ export function createBusinessFormalScenarios(deps) {
               scenarioName: 'shipment-source-import-picker',
             })
             await assertTextAbsent(page, 'sales_order_item_id 追溯')
+            await assertLineItemAddActionScrollsToNewRow(modal, {
+              scenarioName: 'business-v1-shipment-create-form-modal',
+              targetRowCount: 5,
+              listSelector: '.erp-master-contact-list__items',
+              rowSelector: '.erp-master-contact-list__row',
+            })
           },
         })
         await page.getByText('SHIP-STYLE-L1', { exact: true }).click()
@@ -1669,7 +1700,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectButton(page, '导出筛选结果')
         await expectButton(page, '列顺序')
         await assertNoListDeleteTrashToolbar(page)
-        await expectText(page, 'Source Document：加工合同')
+        await expectText(page, '源单：加工合同')
         await assertTextAbsent(page, '加工合同只表达委外承诺和打印快照')
         await expectText(page, '查货只是工序候选')
         await assertTextAbsent(page, '判定结果回质检模块')
@@ -1745,6 +1776,9 @@ export function createBusinessFormalScenarios(deps) {
           afterOpen: async (modal) => {
             await assertOutsourcingProcessSelectOptions(page, modal, {
               scenarioName: 'business-v1-processing-contracts',
+            })
+            await assertLineItemAddActionScrollsToNewRow(modal, {
+              scenarioName: 'business-v1-processing-contracts-form-modal',
             })
           },
         })
@@ -2125,8 +2159,9 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '应收管理')
         await expectText(page, 'AR-STYLE-L1')
-        await expectText(page, 'finance_facts')
-        await expectText(page, 'RECEIVABLE')
+        await expectText(page, '应收业务事实')
+        await assertTextAbsent(page, 'finance_facts')
+        await assertTextAbsent(page, 'RECEIVABLE')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-receivables',
         })
@@ -2530,6 +2565,11 @@ export function createBusinessFormalScenarios(deps) {
             column_orders: {},
           },
         },
+        effectiveSession: {
+          source: 'style_l1_customer_config_projection',
+          pages: ['shipping-release'],
+          actions: ['workflow.task.read'],
+        },
         beforeNavigate: async (page) => {
           shippingReleaseListTaskCalls = 0
           workflowWriteCalls = 0
@@ -2579,10 +2619,7 @@ export function createBusinessFormalScenarios(deps) {
               })
               return
             }
-            if (
-              body.method === 'update_task_status' ||
-              body.method === 'urge_task'
-            ) {
+            if (body.method === 'urge_task') {
               workflowWriteCalls += 1
               await route.fulfill({
                 status: 200,
@@ -2667,11 +2704,7 @@ export function createBusinessFormalScenarios(deps) {
             shippingReleaseListTaskCalls >= 1,
             '有 workflow.task.read 时出货放行页应允许读取协同任务'
           )
-          assert.equal(
-            workflowWriteCalls,
-            0,
-            '只读协同任务不应触发 update_task_status 或 urge_task'
-          )
+          assert.equal(workflowWriteCalls, 0, '只读协同任务不应触发 urge_task')
           await assertTextAbsent(page, '任务处理')
           await assertTextAbsent(page, '出货放行协同任务已完成')
           await assertNoHorizontalOverflow(

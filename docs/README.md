@@ -101,7 +101,7 @@
 当前前端不再维护产品内文档中心、帮助中心、高级文档和开发与验收页面：
 
 - 不再维护 `web/src/erp/docs/*.md`、`web/src/erp/config/docs.mjs` 或 `docRegistry`。
-- 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/help-center`、`/erp/source-readiness`、`/erp/mobile-workbenches` 和 `/erp/roles/*` 路径只做兼容重定向到 `/erp/dashboard`。
+- 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/help-center`、`/erp/source-readiness`、`/erp/mobile-workbenches` 和 `/erp/roles/*` 路径不再注册运行时路由、重定向或权限别名。
 - 正式文档继续保留在 `docs/`、`server/docs/`、`web/README.md`、`server/README.md` 等仓库文档入口，不复制或镜像到前端运行时页面。
 - 本地开发态可通过 `/__dev/governance` 只读浏览 [项目治理地图](项目治理地图.md) 的治理维度与口径、任务分流和文档跳转；该入口不进入 ERP 正式菜单，也不替代 Markdown 真源。
 

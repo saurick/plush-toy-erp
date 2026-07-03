@@ -9,7 +9,8 @@ import { validateRuntimeManifest } from "../qa/customer-config-runtime-manifest.
 
 const DEFAULT_CUSTOMER = "yoyoosun";
 const EVIDENCE_FILE = "customer-config-manifest-evidence.json";
-const REVIEW_STATUS = "approved";
+const DEFAULT_REVIEW_STATUS = "draft";
+const VALID_REVIEW_STATUSES = new Set(["draft", "approved"]);
 
 const USAGE = `Customer config manifest evidence generator
 
@@ -17,6 +18,7 @@ Usage:
   node scripts/deploy/customer-config-manifest-evidence.mjs \\
     --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \\
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \\
+    --review-status draft|approved \\
     --reviewer <reviewer-name>
 
 With release executor report cross-check:
@@ -24,13 +26,15 @@ With release executor report cross-check:
     --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \\
     --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json \\
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \\
+    --review-status draft|approved \\
     --reviewer <reviewer-name>
 
 This writes customer-config-manifest-evidence.json into an existing release
 evidence directory. It validates the manifest shape, computes its sha256, and
-records a sanitized approval record. It does not call the backend, upload raw
-customer files, run migration, import business data, or write Workflow / Fact
-runtime state.`;
+records a sanitized review record. The default review status is draft; pass
+--review-status approved only after the manifest review has actually passed.
+It does not call the backend, upload raw customer files, run migration, import
+business data, or write Workflow / Fact runtime state.`;
 
 class CliError extends Error {
   constructor(message, exitCode = 1) {
@@ -41,7 +45,11 @@ class CliError extends Error {
 }
 
 export function parseCliArgs(argv) {
-  const options = { customer: DEFAULT_CUSTOMER, help: false };
+  const options = {
+    customer: DEFAULT_CUSTOMER,
+    help: false,
+    reviewStatus: DEFAULT_REVIEW_STATUS,
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--help" || token === "-h") {
@@ -74,6 +82,9 @@ export function parseCliArgs(argv) {
         break;
       case "reviewer":
         options.reviewer = value;
+        break;
+      case "review-status":
+        options.reviewStatus = value;
         break;
       case "customer":
         options.customer = value;
@@ -116,6 +127,26 @@ function assertMeaningful(value, message) {
   }
 }
 
+function normalizeReviewStatus(value) {
+  const reviewStatus = String(value || DEFAULT_REVIEW_STATUS).trim();
+  if (!VALID_REVIEW_STATUSES.has(reviewStatus)) {
+    throw new CliError("--review-status must be draft or approved", 2);
+  }
+  return reviewStatus;
+}
+
+function repoRelativePath(repoRoot, filePath, label) {
+  const relativePath = path.relative(repoRoot, filePath);
+  if (
+    !relativePath ||
+    relativePath.startsWith("..") ||
+    path.isAbsolute(relativePath)
+  ) {
+    throw new CliError(`${label} must stay inside repo root`);
+  }
+  return relativePath.split(path.sep).join("/");
+}
+
 function validateReleaseReport(report, manifest, manifestSha256) {
   if (report.customerKey !== manifest.customer_key) {
     throw new CliError("release report customerKey does not match manifest");
@@ -134,6 +165,7 @@ export async function buildCustomerConfigManifestEvidence(options, runtime = {})
   requireOption(options, "evidenceDir");
   requireOption(options, "reviewer");
   assertMeaningful(options.reviewer, "--reviewer must not be empty");
+  const reviewStatus = normalizeReviewStatus(options.reviewStatus);
   if ((options.customer || DEFAULT_CUSTOMER) !== DEFAULT_CUSTOMER) {
     throw new CliError(`Only ${DEFAULT_CUSTOMER} is supported by this evidence generator today`);
   }
@@ -165,9 +197,11 @@ export async function buildCustomerConfigManifestEvidence(options, runtime = {})
     revision: manifest.revision,
     productVersion: manifest.product_version,
     manifestSha256,
-    manifestPath,
-    releaseReport: releaseReportPath,
-    reviewStatus: REVIEW_STATUS,
+    manifestPath: repoRelativePath(repoRoot, manifestPath, "manifest"),
+    releaseReport: releaseReportPath
+      ? repoRelativePath(repoRoot, releaseReportPath, "release report")
+      : "",
+    reviewStatus,
     reviewer: String(options.reviewer).trim(),
     generatedAt: new Date().toISOString(),
     redaction: {
@@ -226,4 +260,4 @@ if (process.argv[1] && path.resolve(process.argv[1]) === currentFile) {
     });
 }
 
-export { CliError, EVIDENCE_FILE, REVIEW_STATUS, USAGE };
+export { CliError, DEFAULT_REVIEW_STATUS, EVIDENCE_FILE, USAGE };

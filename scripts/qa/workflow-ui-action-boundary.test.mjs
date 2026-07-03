@@ -7,7 +7,6 @@ const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 const erpSourceRoot = path.join(repoRoot, "web/src/erp");
 
 const sourceExtensions = new Set([".js", ".jsx", ".mjs"]);
-const skippedRelativePaths = new Set(["web/src/erp/api/workflowApi.mjs"]);
 const skippedSuffixes = [".test.js", ".test.jsx", ".test.mjs"];
 
 const forbiddenWorkflowUiContracts = [
@@ -19,7 +18,7 @@ const forbiddenWorkflowUiContracts = [
   {
     token: "updateWorkflowTaskStatus",
     reason:
-      "正式任务动作应走 complete/block/reject action 合同，旧 update_task_status 只保留兼容",
+      "正式任务动作应走 complete/block/reject action 合同，update_task_status 已退出运行时",
   },
   {
     token: "upsertWorkflowBusinessState",
@@ -58,7 +57,6 @@ function toRelative(filePath) {
 
 function shouldCheck(filePath) {
   const relativePath = toRelative(filePath);
-  if (skippedRelativePaths.has(relativePath)) return false;
   if (skippedSuffixes.some((suffix) => relativePath.endsWith(suffix))) {
     return false;
   }
@@ -80,6 +78,27 @@ function collectSourceFiles(dirPath) {
     }
   }
   return files.sort();
+}
+
+function assertWorkflowSubmitGuardBeforeActionCall({
+  source,
+  relativePath,
+  actionCall,
+}) {
+  const actionIndex = source.indexOf(actionCall);
+  assert(actionIndex >= 0, `${relativePath} must call ${actionCall}`);
+  const guardIndex = source.lastIndexOf(
+    "await verifyWorkflowTaskActionAccessBeforeSubmit",
+    actionIndex,
+  );
+  assert(
+    guardIndex >= 0,
+    `${relativePath} must await the shared submit guard before ${actionCall}`,
+  );
+  assert(
+    source.slice(guardIndex, actionIndex).includes("if (!accessVerified) return"),
+    `${relativePath} must stop submission when shared submit guard denies before ${actionCall}`,
+  );
 }
 
 test("workflow UI action boundary: runtime UI uses action contracts only", () => {
@@ -146,6 +165,28 @@ test("mobile mine role list fallback uses readable role label", () => {
   assert(
     !source.includes("role?.name || role?.role_key"),
     "mobile mine role list must not expose raw role_key when role name is missing",
+  );
+});
+
+test("mobile role labels use shared role display names", () => {
+  const roleModelPath = path.join(
+    erpSourceRoot,
+    "mobile/utils/mobileRoleTaskModel.mjs",
+  );
+  const source = readFileSync(roleModelPath, "utf8");
+
+  assert(
+    source.includes("getRoleDisplayName"),
+    "mobile role labels must reuse the shared role display name source",
+  );
+  assert(
+    !source.includes("const MOBILE_ROLE_LABELS"),
+    "mobile role labels must not keep a private role label table",
+  );
+  assert(
+    !source.includes("warehouse: '仓库组'") &&
+      !source.includes("quality: '质检'"),
+    "mobile role labels must not keep stale private warehouse / quality labels",
   );
 });
 
@@ -220,6 +261,15 @@ test("desktop workflow task UI hides raw owner role key fallbacks", () => {
     /getWorkflowTaskOwnerRoleLabel\(selectedWorkbenchTask\)/u,
   );
   assert(
+    !dashboardSource.includes("getWorkflowTaskAllowedActionModes"),
+    "dashboard must not use local workflow action fallback as executable button proof; backend explain projection controls task actions",
+  );
+  assert(
+    !dashboardSource.includes("getAllowedActionModes={") &&
+      !dashboardSource.includes("onOpenAction={"),
+    "dashboard task lanes must expose neutral task context entries before backend explain returns action choices",
+  );
+  assert(
     !dashboardSource.includes("按 owner_role_key 或具体负责人接收。"),
     "dashboard visible exception flow copy must not expose owner_role_key",
   );
@@ -252,17 +302,34 @@ test("desktop workflow task UI hides raw owner role key fallbacks", () => {
   );
   assert.match(
     collaborationPanelSource,
-    /roleLabels\.get\(task\.owner_role_key\) \|\|[\s\S]*getWorkflowTaskOwnerRoleLabel\(task\)/u,
+    /<Tag>\{getWorkflowTaskOwnerRoleLabel\(task\)\}<\/Tag>/u,
+  );
+  assert(
+    !collaborationPanelSource.includes("roleLabelMap") &&
+      !collaborationPanelSource.includes("roleLabels.get(task.owner_role_key)"),
+    "collaboration task panel must not keep page-level owner role label maps",
+  );
+  assert.match(
+    collaborationPanelSource,
+    /getWorkflowTaskStatusMeta\(task\)\.label/u,
+  );
+  assert.match(
+    collaborationPanelSource,
+    /getBusinessCollaborationTaskReasonLabel\(task\)/u,
+  );
+  assert(
+    !collaborationPanelSource.includes("阻塞原因：{taskReason}"),
+    "collaboration task panel must not label rejected reasons as blocked reasons",
   );
   assert(
     !collaborationPanelSource.includes(
-      "roleLabels.get(task.owner_role_key) || task.owner_role_key",
+      "statusLabels.get(taskStatusKey) || taskStatusKey",
     ),
-    "collaboration task panel must not render raw owner_role_key fallback",
+    "collaboration task panel must not render raw task_status_key fallback",
   );
   assert.match(
     actionDrawerSource,
-    /roleLabelMap\?\.get\?\.\(ownerRoleKey\) \|\|[\s\S]*getWorkflowTaskOwnerRoleLabel\(task\)/u,
+    /const ownerRoleLabel = task \? getWorkflowTaskOwnerRoleLabel\(task\) : ''/u,
   );
   assert.match(actionDrawerSource, /getWorkflowTaskCodeLabel\(task\)/u);
   assert(
@@ -270,16 +337,62 @@ test("desktop workflow task UI hides raw owner role key fallbacks", () => {
     "workflow task action drawer must not build visible task code from raw task id",
   );
   assert(
-    !actionDrawerSource.includes(
-      "roleLabelMap?.get?.(ownerRoleKey) || ownerRoleKey",
-    ),
-    "workflow task action drawer must not render raw owner_role_key fallback",
+    !actionDrawerSource.includes("roleLabelMap") &&
+      !actionDrawerSource.includes("ownerRoleKey"),
+    "workflow task action drawer must not keep page-level owner role label maps",
   );
   assert.match(taskBoardSource, /getWorkflowTaskOwnerRoleLabel/u);
   assert(
     !taskBoardSource.includes("当前账号不属于 ${ownerRoleKey}"),
     "workflow task readonly reason must not interpolate raw owner_role_key",
   );
+  assert.match(taskBoardSource, /getWorkflowTaskReasonLabel/u);
+  assert(
+    !readFileSync(path.join(erpSourceRoot, "pages/DashboardPage.jsx"), "utf8").includes(
+      "阻塞原因：{getWorkflowTaskReason(task)}",
+    ),
+    "dashboard task board must label blocked/rejected reasons through the shared reason helper",
+  );
+});
+
+test("workflow business role filters use shared role display names", () => {
+  const workflowBusinessPath = path.join(
+    erpSourceRoot,
+    "pages/WorkflowBusinessModulePage.jsx",
+  );
+  const source = readFileSync(workflowBusinessPath, "utf8");
+
+  assert.match(source, /getRoleDisplayName/u);
+  assert.match(
+    source,
+    /function workflowRoleOption\(value\) \{[\s\S]*getRoleDisplayName\(value, '责任岗位'\)/u,
+  );
+  for (const roleKey of [
+    "pmc",
+    "production",
+    "warehouse",
+    "quality",
+    "sales",
+    "finance",
+  ]) {
+    assert(
+      source.includes(`workflowRoleOption('${roleKey}')`),
+      `Workflow business owner-role filter must derive ${roleKey} label from shared role display names`,
+    );
+  }
+  for (const hardCodedRoleOption of [
+    "{ label: 'PMC', value: 'pmc' }",
+    "{ label: '生产', value: 'production' }",
+    "{ label: '仓库', value: 'warehouse' }",
+    "{ label: '品质', value: 'quality' }",
+    "{ label: '业务', value: 'sales' }",
+    "{ label: '财务', value: 'finance' }",
+  ]) {
+    assert(
+      !source.includes(hardCodedRoleOption),
+      `Workflow business page must not maintain hard-coded owner-role option ${hardCodedRoleOption}`,
+    );
+  }
 });
 
 test("mobile task actions explain backend access before submitting actions", () => {
@@ -287,34 +400,132 @@ test("mobile task actions explain backend access before submitting actions", () 
     erpSourceRoot,
     "mobile/hooks/useMobileRoleTaskActions.js",
   );
+  const submitGuardPath = path.join(
+    erpSourceRoot,
+    "utils/workflowTaskActionSubmitGuard.mjs",
+  );
   const source = readFileSync(actionHookPath, "utf8");
+  const submitGuardSource = readFileSync(submitGuardPath, "utf8");
 
   const reasonGuardIndex = source.indexOf(
-    "if (reasonRequired && !blockedReason)"
+    "if (reasonRequired && !actionReason)"
   );
   const explainCallIndex = source.indexOf(
-    "const explainAllowed = await explainTaskAction(task, explainActionKey)"
+    "const explainAllowed = await verifyWorkflowTaskActionAccessBeforeSubmit({"
   );
   const completeActionIndex = source.indexOf("await completeWorkflowTaskAction");
   const blockActionIndex = source.indexOf("await blockWorkflowTaskAction");
   const rejectActionIndex = source.indexOf("await rejectWorkflowTaskAction");
   const urgeReasonGuardIndex = source.indexOf("if (!reason)");
-  const urgeExplainIndex = source.indexOf(
-    "const explainAllowed = await explainTaskAction(task, 'urge')"
-  );
+  const urgeExplainIndex = source.indexOf("actionKey: 'urge',");
   const urgeActionIndex = source.indexOf("await urgeWorkflowTask");
 
-  assert.match(source, /import \{[\s\S]*explainWorkflowActionAccess/u);
   assert.match(
     source,
-    /import \{ getActionErrorMessage \} from ['"]@\/common\/utils\/errorMessage['"]/u,
+    /import \{ verifyWorkflowTaskActionAccessBeforeSubmit \} from ['"]\.\.\/\.\.\/utils\/workflowTaskActionSubmitGuard\.mjs['"]/u,
   );
-  assert.match(source, /task_id: task\.id,[\s\S]*action_key: actionKey/u);
-  assert.match(source, /message\.warning\(action\.reason \|\| '当前账号不能提交这个任务动作'\)/u);
   assert.match(
     source,
-    /message\.error\(getActionErrorMessage\(error, '核对任务动作权限失败'\)\)/u,
+    /resolveMobileTaskActionReason/u,
+    "mobile action hook must derive blocked/rejected reason through the shared action-specific resolver",
   );
+  assert.match(
+    source,
+    /canOpenMobileTaskDetailAction/u,
+    "mobile action hook must use the shared mobile action permission helper before opening or submitting task actions",
+  );
+  assert.match(
+    source,
+    /if \(!canOpenMobileTaskDetailAction\(activeRoleKey, task, taskStatusKey\)\)/u,
+    "mobile complete/block/reject submit path must re-check the selected action permission",
+  );
+  assert.match(
+    source,
+    /if \(!canOpenMobileTaskDetailAction\(activeRoleKey, task, action\)\)/u,
+    "mobile detail action entry must not rely only on hidden buttons for action permission",
+  );
+  assert(
+    !source.includes("blockedReasonByTaskID"),
+    "mobile action hook must not keep one shared blockedReasonByTaskID draft for blocked and rejected actions",
+  );
+  assert.match(
+    source,
+    /rejected_reason:\s*[\s\S]*taskStatusKey === 'rejected'[\s\S]*\?\s*actionReason/u,
+    "mobile rejected action payload must always carry the rejected reason for rejected actions",
+  );
+  assert.match(
+    source,
+    /blocked_reason:\s*[\s\S]*taskStatusKey === 'blocked'[\s\S]*\?\s*actionReason/u,
+    "mobile blocked action payload must carry the blocked reason only for blocked actions",
+  );
+  assert.match(
+    submitGuardSource,
+    /explainWorkflowActionAccess\(\{[\s\S]*task_id: taskID,[\s\S]*action_key: normalizedActionKey,[\s\S]*\}\)/u,
+    "shared submit guard must use the formal backend explain task_id/action_key contract",
+  );
+  assert.match(
+    submitGuardSource,
+    /REASON_REQUIRED_ACTION_MODES[\s\S]*block[\s\S]*reject[\s\S]*urge/u,
+    "shared submit guard must centralize reason-required workflow actions",
+  );
+  assert.match(
+    submitGuardSource,
+    /REASON_REQUIRED_ACTION_MODES\.has\(normalizedActionKey\)[\s\S]*!String\(reason \|\| ''\)\.trim\(\)/u,
+    "shared submit guard must reject missing reason before backend explain",
+  );
+  assert.match(
+    submitGuardSource,
+    /const taskID = Number\(task\?\.id \?\? 0\)/u,
+    "shared submit guard must derive the formal task_id request from the backend task id only",
+  );
+  assert(
+    !submitGuardSource.includes("task?.task_id"),
+    "shared submit guard must not accept legacy task_id fallback from task-shaped UI objects",
+  );
+  assert.match(
+    source,
+    /verifyWorkflowTaskActionAccessBeforeSubmit\(\{[\s\S]*task,[\s\S]*actionKey: explainActionKey,[\s\S]*reason: actionReason,[\s\S]*onWarning: message\.warning,[\s\S]*onError: message\.error,[\s\S]*\}\)/u,
+  );
+  assert(
+    !source.includes("explainWorkflowActionAccess"),
+    "mobile action hook must not keep a private backend explain branch",
+  );
+  assert.match(
+    source,
+    /verifyWorkflowTaskActionAccessBeforeSubmit\(\{[\s\S]*task,[\s\S]*actionKey: 'urge',[\s\S]*reason,[\s\S]*onWarning: message\.warning,[\s\S]*onError: message\.error,[\s\S]*\}\)/u,
+  );
+  assert.match(
+    source,
+    /const actionParams = \{[\s\S]*task_id: task\.id/u,
+    "mobile complete/block/reject payload must use the formal task_id action contract",
+  );
+  const actionParamsMatch = source.match(
+    /const actionParams = \{(?<body>[\s\S]*?)\n      \}/u,
+  );
+  assert(actionParamsMatch?.groups?.body, "mobile actionParams block must exist");
+  assert(
+    !/^\s*id:\s*task\.id,/mu.test(actionParamsMatch.groups.body),
+    "mobile complete/block/reject payload must not rely on legacy id fallback",
+  );
+  assert(
+    !source.includes("...(task.payload || {})") &&
+      !source.includes("...task.payload"),
+    "mobile complete/block/reject must not echo the raw workflow payload back to action APIs",
+  );
+  assert(
+    !source.includes("business_status_key:"),
+    "mobile complete/block/reject payload must not submit client-controlled business_status_key",
+  );
+  for (const rawWorkflowSourceField of [
+    "source_type",
+    "source_id",
+    "source_no",
+  ]) {
+    assert(
+      !source.includes(rawWorkflowSourceField),
+      `mobile action hook must not submit raw workflow source field ${rawWorkflowSourceField}`,
+    );
+  }
   assert(
     reasonGuardIndex >= 0 && reasonGuardIndex < explainCallIndex,
     "blocked/rejected reason must be validated before backend access explain",
@@ -338,6 +549,186 @@ test("mobile task actions explain backend access before submitting actions", () 
   assert(
     urgeExplainIndex >= 0 && urgeExplainIndex < urgeActionIndex,
     "mobile urge must explain backend access before submit",
+  );
+});
+
+test("desktop workflow task actions explain backend access before submitting actions", () => {
+  const expectations = [
+    {
+      relativePath: "web/src/erp/pages/DashboardPage.jsx",
+      actionCalls: [
+        "await completeWorkflowTaskAction",
+        "await blockWorkflowTaskAction",
+        "await rejectWorkflowTaskAction",
+        "await urgeWorkflowTask",
+      ],
+      forbiddenLegacyIDPattern: /^\s*id:\s*selectedTask\.id,/mu,
+    },
+    {
+      relativePath: "web/src/erp/pages/WorkflowBusinessModulePage.jsx",
+      actionCalls: [
+        "await completeWorkflowTaskAction",
+        "await blockWorkflowTaskAction",
+        "await rejectWorkflowTaskAction",
+        "await urgeWorkflowTask",
+      ],
+      forbiddenLegacyIDPattern: /^\s*id:\s*task\.id,/mu,
+    },
+    {
+      relativePath: "web/src/erp/pages/FormalBusinessModulePage.jsx",
+      actionCalls: [
+        "await completeWorkflowTaskAction",
+        "await blockWorkflowTaskAction",
+        "await rejectWorkflowTaskAction",
+        "await urgeWorkflowTask",
+      ],
+      forbiddenLegacyIDPattern: /^\s*id:\s*task\.id,/mu,
+    },
+    {
+      relativePath:
+        "web/src/erp/components/purchase-orders/usePurchaseOrderWorkflowActions.mjs",
+      actionCalls: [
+        "await completeWorkflowTaskAction",
+        "await blockWorkflowTaskAction",
+        "await rejectWorkflowTaskAction",
+        "await urgeWorkflowTask",
+      ],
+      forbiddenLegacyIDPattern: /^\s*id:\s*task\.id,/mu,
+    },
+    {
+      relativePath:
+        "web/src/erp/components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs",
+      actionCalls: [
+        "await completeWorkflowTaskAction",
+        "await blockWorkflowTaskAction",
+        "await rejectWorkflowTaskAction",
+        "await urgeWorkflowTask",
+      ],
+      forbiddenLegacyIDPattern: /^\s*id:\s*task\.id,/mu,
+    },
+  ];
+
+  for (const expectation of expectations) {
+    const source = readFileSync(
+      path.join(repoRoot, expectation.relativePath),
+      "utf8",
+    );
+    assert.match(
+      source,
+      /verifyWorkflowTaskActionAccessBeforeSubmit/u,
+      `${expectation.relativePath} must use the shared backend explain submit guard`,
+    );
+    assert.match(
+      source,
+      /verifyWorkflowTaskActionAccessBeforeSubmit\(\{[\s\S]*reason,/u,
+      `${expectation.relativePath} must pass the current reason to the shared submit guard`,
+    );
+    for (const actionCall of expectation.actionCalls) {
+      assertWorkflowSubmitGuardBeforeActionCall({
+        source,
+        relativePath: expectation.relativePath,
+        actionCall,
+      });
+    }
+    assert.match(
+      source,
+      /task_id:\s*(?:selectedTask|task)\.id/u,
+      `${expectation.relativePath} must submit formal task_id action payloads`,
+    );
+    assert(
+      !expectation.forbiddenLegacyIDPattern.test(source),
+      `${expectation.relativePath} must not rely on legacy id workflow action fallback`,
+    );
+    assert(
+      !source.includes("business_status_key:") &&
+        !source.includes("completeBusinessStatusKey"),
+      `${expectation.relativePath} must not submit client-controlled business_status_key; backend action/usecase derives business status`,
+    );
+    if (
+      expectation.relativePath.includes("usePurchaseOrderWorkflowActions") ||
+      expectation.relativePath.includes("useOutsourcingOrderWorkflowActions") ||
+      expectation.relativePath.includes("DashboardPage") ||
+      expectation.relativePath.includes("WorkflowBusinessModulePage") ||
+      expectation.relativePath.includes("FormalBusinessModulePage")
+    ) {
+      assert(
+        !source.includes("workflowPayloadOf(task)") &&
+          !source.includes("...workflowPayloadOf") &&
+          !source.includes("payloadOf(selectedTask)") &&
+          !source.includes("...payloadOf"),
+        `${expectation.relativePath} must not echo page-derived workflow payload snapshots back to action APIs`,
+      );
+    }
+  }
+});
+
+test("workflow urge payloads do not replay frontend task source fields", () => {
+  const urgeActionFiles = [
+    "web/src/erp/mobile/hooks/useMobileRoleTaskActions.js",
+    "web/src/erp/pages/DashboardPage.jsx",
+    "web/src/erp/pages/WorkflowBusinessModulePage.jsx",
+    "web/src/erp/pages/FormalBusinessModulePage.jsx",
+    "web/src/erp/components/purchase-orders/usePurchaseOrderWorkflowActions.mjs",
+    "web/src/erp/components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs",
+  ];
+
+  for (const relativePath of urgeActionFiles) {
+    const source = readFileSync(path.join(repoRoot, relativePath), "utf8");
+    assert(
+      source.includes("await urgeWorkflowTask"),
+      `${relativePath} must keep using the workflow urge API wrapper`,
+    );
+    assert.doesNotMatch(
+      source,
+      /^\s*source_(?:type|id|no):\s*(?:task|selectedTask)\.source_/mu,
+      `${relativePath} urge payload must not re-submit source fields; backend resolves source truth from task_id`,
+    );
+  }
+});
+
+test("business collaboration panel explains backend access before delegating actions", () => {
+  const panelPath = path.join(
+    erpSourceRoot,
+    "components/business-list/CollaborationTaskPanel.jsx",
+  );
+  const source = readFileSync(panelPath, "utf8");
+  const guardIndex = source.indexOf(
+    "await verifyWorkflowTaskActionAccessBeforeSubmit",
+  );
+  const actionHandlerIndex = source.indexOf("await actionHandler(actionDrawerTask");
+
+  assert.match(
+    source,
+    /import \{ verifyWorkflowTaskActionAccessBeforeSubmit \} from ['"]\.\.\/\.\.\/utils\/workflowTaskActionSubmitGuard\.mjs['"]/u,
+    "collaboration panel must use the shared backend explain submit guard",
+  );
+  assert(
+    !source.includes("canRunWorkflowTaskAction"),
+    "collaboration panel list actions must not use local workflow action fallback as executable proof",
+  );
+  assert(
+    !source.includes("openActionDrawer(task, 'complete')") &&
+      !source.includes("openActionDrawer(task, 'block')") &&
+      !source.includes("openActionDrawer(task, 'reject')") &&
+      !source.includes("openActionDrawer(task, 'urge')"),
+    "collaboration panel list must open the drawer without preselecting an action; backend explain decides available actions",
+  );
+  assert(
+    source.includes("onClick={() => openActionDrawer(task)}"),
+    "collaboration panel list must expose a neutral processing entry before backend explain returns action choices",
+  );
+  assert.match(
+    source,
+    /verifyWorkflowTaskActionAccessBeforeSubmit\(\{[\s\S]*task: actionDrawerTask,[\s\S]*actionKey: actionDrawerMode,[\s\S]*reason,[\s\S]*onWarning: message\.warning,[\s\S]*onError: message\.error,[\s\S]*\}\)/u,
+    "collaboration panel must pass task, action and reason to the shared submit guard",
+  );
+  assert(
+    guardIndex >= 0 &&
+      actionHandlerIndex > guardIndex &&
+      source
+        .slice(guardIndex, actionHandlerIndex)
+        .includes("if (!accessVerified) return"),
+    "collaboration panel must verify backend action access before delegating to page action handlers",
   );
 });
 
@@ -454,6 +845,15 @@ test("purchase order page keeps write buttons behind projected actions", () => {
       modalSource.includes("canDelete={canUpdate}"),
     "purchase order modal attachments must use projected create/update permissions",
   );
+  assert(
+    pageSource.includes("canUpdateWorkflowTasks ? blockWorkflowTask : undefined") &&
+      pageSource.includes("canUpdateWorkflowTasks ? rejectWorkflowTask : undefined") &&
+      pageSource.includes(
+        "canUpdateWorkflowTasks ? urgePurchaseWorkflowTask : undefined",
+      ) &&
+      pageSource.includes("canCompleteWorkflowTasks ? completeWorkflowTask : undefined"),
+    "purchase collaboration actions must remain behind workflow task action permissions",
+  );
 });
 
 test("outsourcing order page keeps write buttons behind projected actions", () => {
@@ -487,11 +887,17 @@ test("outsourcing order page keeps write buttons behind projected actions", () =
   );
   assert(
     pageSource.includes("canUpdateWorkflowTasks ? blockWorkflowTask : undefined") &&
+      pageSource.includes("canUpdateWorkflowTasks ? rejectWorkflowTask : undefined") &&
       pageSource.includes(
         "canUpdateWorkflowTasks ? urgeOutsourcingWorkflowTask : undefined",
       ) &&
       pageSource.includes("canCompleteWorkflowTasks ? completeWorkflowTask : undefined"),
     "outsourcing collaboration actions must remain behind workflow task action permissions",
+  );
+  assert(
+    pageSource.includes("if (initialDraft.lines.length === 0)") &&
+      pageSource.includes("message.warning('当前委外订单没有可打印的明细')"),
+    "outsourcing contract print entry must block empty active line drafts before opening the print workspace",
   );
 });
 
@@ -501,9 +907,9 @@ test("fact pages keep write buttons behind projected actions and status guards",
       relativePath: "web/src/erp/pages/ShipmentsPage.jsx",
       name: "shipment page",
       tokens: [
-        "const canCreate = hasPermission(adminProfile, 'shipment.create')",
-        "const canShip = hasPermission(adminProfile, 'shipment.ship')",
-        "const canCancel = hasPermission(adminProfile, 'shipment.cancel')",
+        "const canCreate = hasActionPermission(adminProfile, 'shipment.create')",
+        "const canShip = hasActionPermission(adminProfile, 'shipment.ship')",
+        "const canCancel = hasActionPermission(adminProfile, 'shipment.cancel')",
         "disabled={!canCreate}",
         "selectedRow.status !== 'DRAFT' ||\n              !canCreate",
         "selectedRow.status !== 'DRAFT' ||\n                !canShip",
@@ -516,22 +922,22 @@ test("fact pages keep write buttons behind projected actions and status guards",
       relativePath: "web/src/erp/pages/V1PurchaseReceiptsPage.jsx",
       name: "purchase receipt page",
       tokens: [
-        "const canCreate = hasPermission(adminProfile, 'purchase.receipt.create')",
-        "canCreate || hasPermission(adminProfile, 'warehouse.inbound.confirm')",
+        "const canCreate = hasActionPermission(\n    adminProfile,\n    'purchase.receipt.create'\n  )",
+        "canCreate ||\n    hasActionPermission(adminProfile, 'warehouse.inbound.confirm')",
         "canUpload={canCreate || canPost}",
         "canDelete={canCreate || canPost}",
         "selectedRow.status !== 'DRAFT' ||\n              !canCreate",
         "selectedRow.status !== 'DRAFT' ||\n                !canPost",
         "selectedRow.status !== 'POSTED' ||\n                !canPost",
-        "过账和取消均由后端采购入库 usecase 写库存事实或冲正",
+        "过账和取消均由后端采购入库规则写库存事实或冲正",
       ],
     },
     {
       relativePath: "web/src/erp/pages/V1QualityInspectionsPage.jsx",
       name: "quality inspection page",
       tokens: [
-        "const canCreate = hasPermission(adminProfile, 'quality.inspection.create')",
-        "const canUpdate = hasPermission(adminProfile, 'quality.inspection.update')",
+        "const canCreate = hasActionPermission(\n    adminProfile,\n    'quality.inspection.create'\n  )",
+        "const canUpdate = hasActionPermission(\n    adminProfile,\n    'quality.inspection.update'\n  )",
         "disabled={!canCreate}",
         "selectedRow.status !== 'DRAFT' ||\n                !canUpdate",
         "selectedRow.status !== 'SUBMITTED' ||\n              !canUpdate",
@@ -554,6 +960,10 @@ test("fact pages keep write buttons behind projected actions and status guards",
         `${expectation.name} must keep projected action/status guard token: ${token}`,
       );
     }
+    assert(
+      !/function\s+hasPermission\s*\(/u.test(source),
+      `${expectation.name} must call shared hasActionPermission directly instead of page-local wrappers`,
+    );
   }
 });
 
@@ -650,5 +1060,40 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
         );
       }
     }
+  }
+});
+
+test("formal module shell exposes action boundaries instead of fake unavailable actions", () => {
+  const modulePagePath = path.join(
+    erpSourceRoot,
+    "pages/FormalBusinessModulePage.jsx",
+  );
+  const source = readFileSync(modulePagePath, "utf8");
+
+  assert(
+    source.includes("label: '状态动作边界'"),
+    "formal module shell should frame preview-only status actions as boundaries",
+  );
+  assert(
+    source.includes("label: '提交前置边界'"),
+    "formal module shell should expose submit as a boundary review entry",
+  );
+  assert(
+    source.includes("label: '确认前置边界'"),
+    "formal module shell should expose approval as a boundary review entry",
+  );
+  assert(
+    source.includes("label: '退回处理边界'"),
+    "formal module shell should expose return as a boundary review entry",
+  );
+  for (const forbiddenLabel of [
+    "提交动作未接入",
+    "确认动作未接入",
+    "退回动作未接入",
+  ]) {
+    assert(
+      !source.includes(forbiddenLabel),
+      `formal module shell must not expose fake unavailable action label: ${forbiddenLabel}`,
+    );
   }
 });

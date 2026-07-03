@@ -12,6 +12,8 @@ import {
 export function usePurchaseOrderContractPrint({
   loadOrderItems,
   materials = [],
+  printTemplateDefaults = {},
+  unitOptions = [],
 }) {
   const [printingContract, setPrintingContract] = useState(false)
 
@@ -30,6 +32,8 @@ export function usePurchaseOrderContractPrint({
         const initialDraft =
           buildMaterialPurchaseContractDraftFromPurchaseOrder(record, items, {
             materials,
+            printTemplateDefaults,
+            unitOptions,
           })
         openPrintWorkspaceWindow(MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY, {
           entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
@@ -42,7 +46,7 @@ export function usePurchaseOrderContractPrint({
         setPrintingContract(false)
       }
     },
-    [loadOrderItems, materials]
+    [loadOrderItems, materials, printTemplateDefaults, unitOptions]
   )
 
   return {

@@ -89,7 +89,7 @@ export function statusTag(status) {
   const key = String(status || '').trim()
   return (
     <Tag color={STATUS_COLORS[key] || 'default'}>
-      {STATUS_LABELS[key] || key || '-'}
+      {STATUS_LABELS[key] || (key ? '业务状态' : '-')}
     </Tag>
   )
 }
@@ -127,6 +127,32 @@ export function recordNoForKey(key, record = {}) {
   return record.fact_no || RECORD_FALLBACK_LABELS[key] || '业务事实已关联'
 }
 
+function factTypeText(type) {
+  const key = String(type || '')
+    .trim()
+    .toUpperCase()
+  if (key === 'MATERIAL_ISSUE') return '发料'
+  if (key === 'FINISHED_GOODS_RECEIPT') return '成品入库'
+  if (key === 'REWORK') return '返工'
+  if (key === 'RETURN_RECEIPT') return '回料'
+  if (key === 'RECEIVABLE') return '应收'
+  if (key === 'PAYABLE') return '应付'
+  if (key === 'INVOICE') return '发票'
+  if (key === 'PAYMENT') return '收付款'
+  if (key === 'RECONCILIATION') return '对账'
+  return key ? '业务事实' : '-'
+}
+
+function counterpartyTypeText(type) {
+  const key = String(type || '')
+    .trim()
+    .toUpperCase()
+  if (key === 'CUSTOMER') return '客户'
+  if (key === 'SUPPLIER') return '供应商'
+  if (key === 'OTHER') return '其他往来方'
+  return key ? '往来方' : '-'
+}
+
 export function selectedLabelForKey(key, record) {
   if (!record) return '请先选择一条记录'
   if (key === 'outsourcing') {
@@ -145,11 +171,11 @@ export function selectedLabelForKey(key, record) {
     }`
   }
   if (key === 'finance') {
-    return `${recordNoForKey(key, record)} / ${
-      record.counterparty_type || '-'
-    } ${record.counterparty_id ? '已关联' : '-'}`
+    return `${recordNoForKey(key, record)} / ${counterpartyTypeText(
+      record.counterparty_type
+    )} ${record.counterparty_id ? '已关联' : '-'}`
   }
-  return `${recordNoForKey(key, record)} / ${record.fact_type || '-'}`
+  return `${recordNoForKey(key, record)} / ${factTypeText(record.fact_type)}`
 }
 
 export function sourceRouteFor(sourceType) {

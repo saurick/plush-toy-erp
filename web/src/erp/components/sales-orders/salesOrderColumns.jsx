@@ -20,6 +20,15 @@ function compareNumber(a, b) {
   return Number(a || 0) - Number(b || 0)
 }
 
+function displayOptionalValue(value, fallback = '-') {
+  const text = String(value ?? '').trim()
+  return text === '' ? fallback : text
+}
+
+function displaySalesOrderItemAmount(record, fallback = '-') {
+  return displayOptionalValue(deriveSalesOrderItemAmount(record), fallback)
+}
+
 function contactText(snapshot = {}) {
   const name = snapshot?.name || ''
   const phone = snapshot?.mobile || snapshot?.phone || ''
@@ -183,7 +192,7 @@ export function buildSalesOrderItemColumns() {
       dataIndex: 'unit_price',
       width: 100,
       sorter: (a, b) => compareNumber(a?.unit_price, b?.unit_price),
-      render: (value) => value || '-',
+      render: (value) => displayOptionalValue(value),
     },
     {
       title: '金额',
@@ -191,8 +200,8 @@ export function buildSalesOrderItemColumns() {
       dataIndex: 'amount',
       width: 100,
       sorter: (a, b) => compareNumber(a?.amount, b?.amount),
-      render: (value, record) => deriveSalesOrderItemAmount(record) || '-',
-      exportValue: (record) => deriveSalesOrderItemAmount(record) || '',
+      render: (value, record) => displaySalesOrderItemAmount(record),
+      exportValue: (record) => displaySalesOrderItemAmount(record, ''),
     },
     {
       title: '计划交付日期',

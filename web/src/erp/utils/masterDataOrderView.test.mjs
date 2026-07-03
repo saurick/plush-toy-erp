@@ -1,22 +1,31 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
 import {
   V1_ROUTE_PATHS,
   buildPaymentConditionOptions,
+  buildBOMItemSourceValuesFromMaterial,
   buildCustomerSnapshot,
   buildMaterialPurchaseContractDraftFromPurchaseOrder,
   buildMasterDataParams,
   buildMaterialDraftCode,
+  buildOrderContactSnapshot,
   buildOutsourcingOrderItemParams,
   buildOutsourcingOrderParams,
+  buildPurchaseOrderItemSourceValuesFromMaterial,
   buildProcessParams,
   buildProductParams,
+  buildSalesOrderCustomerSourceValues,
+  buildSalesOrderItemSourceValuesFromSKU,
   buildPurchaseOrderItemParams,
   buildPurchaseOrderParams,
   buildSalesOrderItemParams,
   buildSalesOrderParams,
   buildSequentialDraftCode,
+  buildSupplierSnapshot,
+  buildSupplierSnapshotWithContacts,
   buildTextSelectOptions,
   buildUnitSelectOptions,
   canRunPurchaseOrderLifecycleAction,
@@ -26,6 +35,7 @@ import {
   deriveSalesOrderItemAmount,
   formatUnitDisplayName,
   formatUnitShortDisplayName,
+  formatUnixDate,
   formatPaymentCondition,
   formatUnixDateTime,
   hasActionPermission,
@@ -33,20 +43,33 @@ import {
   paymentConditionCompleteness,
   resolvePaymentTermDays,
   statusText,
+  SUPPLIER_CONTACT_OWNER_TYPE,
+  summarizeSalesOrderLines,
   unixToDateInputValue,
 } from './masterDataOrderView.mjs'
 
-test('masterDataOrderView: action permissions keep super admin shortcut before active session', () => {
+function readERPSource(relativePath) {
+  return readFileSync(
+    fileURLToPath(new URL(relativePath, import.meta.url)),
+    'utf8'
+  )
+}
+
+test('masterDataOrderView: action permissions require projected actions for normal accounts', () => {
   assert.equal(
     hasActionPermission({ is_super_admin: true }, 'sales_order.create'),
     true
+  )
+  assert.equal(
+    hasActionPermission({ is_super_admin: true }, 'unknown.future.action'),
+    false
   )
   assert.equal(
     hasActionPermission(
       { permissions: ['sales_order.read', 'sales_order.update'] },
       'sales_order.update'
     ),
-    true
+    false
   )
   assert.equal(
     hasActionPermission(
@@ -340,7 +363,6 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
     {
       line_no: 3,
       product_id: 5,
-      product_sku_id: 0,
       unit_id: 1,
       ordered_quantity: '2',
     }
@@ -513,6 +535,245 @@ test('masterDataOrderView: payment condition completeness requires method and cy
   )
 })
 
+test('FL_product_master_style_no__retains_style_no_snapshot masterDataOrderView: product master params retain style no fields', () => {
+  assert.deepEqual(
+    buildProductParams({
+      code: ' P-STYLE-001 ',
+      name: ' 款式毛绒熊 ',
+      style_no: ' BEAR-2026 ',
+      customer_style_no: ' YOYOO-BEAR-01 ',
+      default_unit_id: '2',
+    }),
+    {
+      code: 'P-STYLE-001',
+      name: '款式毛绒熊',
+      style_no: 'BEAR-2026',
+      customer_style_no: 'YOYOO-BEAR-01',
+      default_unit_id: 2,
+    }
+  )
+})
+
+test('FL_product_master_style_no__prefills_from_blank_source masterDataOrderView: blank product style no can rebuild before save', () => {
+  assert.deepEqual(
+    buildProductParams({
+      code: ' P-STYLE-002 ',
+      name: ' 空白款式 ',
+      style_no: ' ',
+      customer_style_no: '',
+    }),
+    {
+      code: 'P-STYLE-002',
+      name: '空白款式',
+    }
+  )
+
+  assert.deepEqual(
+    buildProductParams({
+      code: ' P-STYLE-002 ',
+      name: ' 空白款式 ',
+      style_no: ' RABBIT-2026 ',
+      customer_style_no: ' YOYOO-RABBIT-01 ',
+    }),
+    {
+      code: 'P-STYLE-002',
+      name: '空白款式',
+      style_no: 'RABBIT-2026',
+      customer_style_no: 'YOYOO-RABBIT-01',
+    }
+  )
+})
+
+test('FL_purchase_order_accessory_material__retains_material_snapshot masterDataOrderView: purchase order item params retain material snapshots', () => {
+  assert.deepEqual(
+    buildPurchaseOrderItemParams({
+      line_no: '1',
+      material_id: '21',
+      unit_id: '2',
+      material_code_snapshot: ' MAT-A01 ',
+      material_name_snapshot: ' OPP袋 ',
+      color_snapshot: ' 透明 ',
+      purchased_quantity: '10',
+    }),
+    {
+      line_no: 1,
+      material_id: 21,
+      unit_id: 2,
+      material_code_snapshot: 'MAT-A01',
+      material_name_snapshot: 'OPP袋',
+      color_snapshot: '透明',
+      purchased_quantity: '10',
+    }
+  )
+})
+
+test('FL_purchase_order_accessory_material__clears_material_snapshot masterDataOrderView: clearing material source clears purchase line snapshots', () => {
+  const currentLine = {
+    material_id: 21,
+    unit_id: 2,
+    material_code_snapshot: 'MAT-A01',
+    material_name_snapshot: 'OPP袋',
+    color_snapshot: '透明',
+    purchased_quantity: '10',
+  }
+
+  assert.deepEqual(
+    {
+      ...currentLine,
+      ...buildPurchaseOrderItemSourceValuesFromMaterial(null),
+    },
+    {
+      material_id: undefined,
+      unit_id: undefined,
+      material_code_snapshot: '',
+      material_name_snapshot: '',
+      color_snapshot: '',
+      purchased_quantity: '10',
+    }
+  )
+})
+
+test('FL_purchase_order_accessory_material__switches_material_source masterDataOrderView: switching material source replaces stale purchase line snapshots', () => {
+  const currentLine = {
+    material_id: 21,
+    unit_id: 2,
+    material_code_snapshot: 'MAT-A01',
+    material_name_snapshot: 'OPP袋',
+    color_snapshot: '透明',
+    purchased_quantity: '10',
+  }
+
+  assert.deepEqual(
+    {
+      ...currentLine,
+      ...buildPurchaseOrderItemSourceValuesFromMaterial({
+        id: '22',
+        default_unit_id: '3',
+        code: ' MAT-B02 ',
+        name: ' 纸箱 ',
+        color: '',
+        category: 'not-copied',
+      }),
+    },
+    {
+      material_id: 22,
+      unit_id: 3,
+      material_code_snapshot: 'MAT-B02',
+      material_name_snapshot: '纸箱',
+      color_snapshot: '',
+      purchased_quantity: '10',
+    }
+  )
+})
+
+test('FL_bom_main_material__retains_material_source masterDataOrderView: BOM item material source keeps material and default unit ids', () => {
+  assert.deepEqual(
+    buildBOMItemSourceValuesFromMaterial({
+      id: '31',
+      default_unit_id: '4',
+      code: 'MAT-MAIN-01',
+      name: '主面料',
+    }),
+    {
+      material_id: 31,
+      unit_id: 4,
+    }
+  )
+})
+
+test('FL_bom_main_material__clears_material_source masterDataOrderView: clearing BOM item material source clears stale unit id', () => {
+  const currentLine = {
+    material_id: 31,
+    unit_id: 4,
+    quantity: '2.5',
+    loss_rate: '0.03',
+  }
+
+  assert.deepEqual(
+    {
+      ...currentLine,
+      ...buildBOMItemSourceValuesFromMaterial(null),
+    },
+    {
+      material_id: undefined,
+      unit_id: undefined,
+      quantity: '2.5',
+      loss_rate: '0.03',
+    }
+  )
+})
+
+test('FL_outsourcing_return_date__retains_expected_return_date_snapshot masterDataOrderView: outsourcing order keeps expected return dates on header and lines', () => {
+  assert.deepEqual(
+    buildOutsourcingOrderParams({
+      outsourcing_order_no: ' OUT-RET-001 ',
+      supplier_id: '7',
+      supplier_snapshot: { id: 7, name: '加工厂 A' },
+      source_order_no: ' SO-RET-001 ',
+      order_date: '2026-06-17',
+      expected_return_date: ' 2026-06-24 ',
+    }),
+    {
+      outsourcing_order_no: 'OUT-RET-001',
+      supplier_id: 7,
+      supplier_snapshot: { id: 7, name: '加工厂 A' },
+      source_order_no: 'SO-RET-001',
+      order_date: '2026-06-17',
+      expected_return_date: '2026-06-24',
+    }
+  )
+
+  assert.deepEqual(
+    buildOutsourcingOrderItemParams({
+      line_no: '1',
+      product_id: '12',
+      process_id: '8',
+      unit_id: '2',
+      outsourcing_quantity: '10',
+      expected_return_date: ' 2026-06-25 ',
+    }),
+    {
+      line_no: 1,
+      product_id: 12,
+      process_id: 8,
+      unit_id: 2,
+      outsourcing_quantity: '10',
+      expected_return_date: '2026-06-25',
+    }
+  )
+})
+
+test('FL_shipment_ship_date__retains_planned_and_actual_ship_dates masterDataOrderView: shipment date fields stay on shipment fact source paths', () => {
+  const shipmentsPageSource = readERPSource('../pages/ShipmentsPage.jsx')
+  const shipmentColumnsSource = readERPSource(
+    '../components/shipments/shipmentColumns.jsx'
+  )
+  const operationalFactFormsSource = readERPSource(
+    '../components/operational-facts/OperationalFactForms.jsx'
+  )
+
+  assert.match(
+    shipmentsPageSource,
+    /planned_ship_at:\s*trimOptional\(values\.planned_ship_at\)/u
+  )
+  assert.match(
+    operationalFactFormsSource,
+    /planned_ship_at:\s*dateValue\(values\.planned_ship_at\)/u
+  )
+  assert.match(
+    shipmentColumnsSource,
+    /formatUnixDate\(record\.planned_ship_at\)/u
+  )
+  assert.match(
+    shipmentColumnsSource,
+    /formatUnixDate\(\s*record\.shipped_at\s*\)/u
+  )
+  assert.match(
+    shipmentColumnsSource,
+    /exportTitle:\s*'计划出货日期 \/ 实际出货日期'/u
+  )
+})
+
 test('masterDataOrderView: unit display uses readable unit truth instead of raw ids', () => {
   const units = [
     { id: 12, code: 'M', name: '米', precision: 2, is_active: true },
@@ -643,19 +904,64 @@ test('masterDataOrderView: draft numbers use one shared date sequence rule', () 
   assert.equal(buildSequentialDraftCode([], { prefix: '', now }), '')
 })
 
+test('FL_sales_order_order_no__retains_order_no_snapshot masterDataOrderView: sales order params retain confirmed order no', () => {
+  assert.deepEqual(
+    buildSalesOrderParams({
+      order_no: ' SO-20260618-010 ',
+      customer_id: 3,
+      order_date: '2026-06-30',
+    }),
+    {
+      order_no: 'SO-20260618-010',
+      customer_id: 3,
+      customer_snapshot: {},
+      contact_snapshot: {},
+      order_date: '2026-06-30',
+    }
+  )
+})
+
+test('FL_sales_order_order_no__prefills_order_no_from_blank masterDataOrderView: sales order create draft uses shared internal sequence', () => {
+  const now = new Date('2026-06-18T10:00:00+08:00')
+
+  assert.equal(
+    buildSequentialDraftCode(
+      [
+        { order_no: 'SO-20260618-001' },
+        { order_no: 'SO-20260618-009' },
+        { order_no: 'SO-20260617-999' },
+        { order_no: 'CUS-PO-EXTERNAL-001' },
+      ],
+      { prefix: 'SO', field: 'order_no', now }
+    ),
+    'SO-20260618-010'
+  )
+})
+
 test('masterDataOrderView: purchase order print draft maps current purchase facts only', () => {
   const draft = buildMaterialPurchaseContractDraftFromPurchaseOrder(
     {
       purchase_order_no: ' PO-PRINT-001 ',
-      supplier_snapshot: { name: ' 供应商 A ' },
+      supplier_snapshot: {
+        name: ' 供应商 A ',
+        contact_name: ' 王采购 ',
+        contact_phone: ' 0769-123456 ',
+        contact_mobile: ' 13800000000 ',
+        address: ' 东莞市样例路 1 号 ',
+      },
       purchase_date: 1781654400,
       expected_arrival_date: 1782259200,
     },
     [
       {
         material_id: 11,
+        product_order_no_snapshot: ' SO-26001 ',
+        product_no_snapshot: ' P-001 ',
+        product_name_snapshot: ' 毛绒兔 ',
         material_code_snapshot: ' MAT-001 ',
         material_name_snapshot: ' 面料 ',
+        unit_id: 13,
+        unit_name_snapshot: ' 米 ',
         purchased_quantity: '10',
         unit_price: '3.50',
         amount: '',
@@ -666,6 +972,7 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
         material_id: 12,
         material_code_snapshot: '',
         material_name_snapshot: '',
+        unit_id: 15,
         color_snapshot: '红色',
         purchased_quantity: '2',
         unit_price: '',
@@ -678,24 +985,43 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
         purchased_quantity: '99',
         line_status: 'canceled',
       },
+      {
+        material_id: 14,
+        material_name_snapshot: ' 旧状态取消材料 ',
+        purchased_quantity: '100',
+        line_status: 'CANCELLED',
+      },
     ],
     {
       materials: [
         { id: 12, code: 'MAT-002', name: '辅料', spec: '12mm' },
         { id: 13, code: 'MAT-013', name: '不应出现' },
       ],
+      unitOptions: [
+        { value: 13, label: '码（YD）' },
+        { value: 15, label: 'PCS' },
+      ],
     }
   )
 
   assert.equal(draft.contractNo, 'PO-PRINT-001')
   assert.equal(draft.supplierName, '供应商 A')
+  assert.equal(draft.supplierContact, '王采购')
+  assert.equal(draft.supplierPhone, '0769-123456')
+  assert.equal(draft.supplierAddress, '东莞市样例路 1 号')
   assert.match(draft.orderDateText, /2026.*06.*17/)
   assert.match(draft.returnDateText, /2026.*06.*24/)
   assert.equal(draft.lines.length, 2)
+  assert(!draft.lines.some((line) => line.materialName === '已取消材料'))
+  assert(!draft.lines.some((line) => line.materialName === '旧状态取消材料'))
   assert.deepEqual(draft.lines[0], {
     contractNo: 'PO-PRINT-001',
+    productOrderNo: 'SO-26001',
+    productNo: 'P-001',
+    productName: '毛绒兔',
     materialName: '面料',
     vendorCode: 'MAT-001',
+    unit: '米',
     unitPrice: '3.50',
     quantity: '10',
     amount: '35.00',
@@ -706,6 +1032,7 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
     materialName: '辅料',
     vendorCode: 'MAT-002',
     spec: '12mm',
+    unit: 'PCS',
     quantity: '2',
     remark: '红色',
   })
@@ -713,7 +1040,13 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
   assert.deepEqual(
     buildMaterialPurchaseContractDraftFromPurchaseOrder(
       { purchase_order_no: 'PO-MISSING-DATE', supplier_snapshot: {} },
-      []
+      [
+        {
+          material_name_snapshot: '不应进入打印',
+          purchased_quantity: '1',
+          line_status: 'cancelled',
+        },
+      ]
     ),
     {
       contractNo: 'PO-MISSING-DATE',
@@ -722,7 +1055,97 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
   )
 })
 
-test('masterDataOrderView: sales order item amount derives from quantity and unit price', () => {
+test('FL_material_purchase_print_party_defaults__uses_customer_config_party_defaults_only masterDataOrderView: purchase print draft may use customer config buyer defaults without overriding supplier snapshots', () => {
+  const draft = buildMaterialPurchaseContractDraftFromPurchaseOrder(
+    {
+      purchase_order_no: 'PO-PRINT-CONFIG',
+      supplier_snapshot: {
+        name: '真实供应商',
+        contact_name: '供应商联系人',
+      },
+    },
+    [
+      {
+        material_name_snapshot: '拉毛布',
+        purchased_quantity: '3',
+        unit_price: '2',
+        line_status: 'open',
+      },
+    ],
+    {
+      printTemplateDefaults: {
+        templates: [
+          {
+            template_key: 'material-purchase-contract',
+            party_defaults: {
+              buyerCompany: '客户配置买方公司',
+              buyerContact: '采购负责人',
+              supplierName: '不应覆盖供应商',
+            },
+          },
+          {
+            template_key: 'processing-contract',
+            party_defaults: {
+              buyerCompany: '加工合同买方公司',
+            },
+          },
+        ],
+      },
+    }
+  )
+
+  assert.equal(draft.contractNo, 'PO-PRINT-CONFIG')
+  assert.equal(draft.buyerCompany, '客户配置买方公司')
+  assert.equal(draft.buyerContact, '采购负责人')
+  assert.equal(draft.supplierName, '真实供应商')
+  assert.equal(draft.supplierContact, '供应商联系人')
+  assert.equal(draft.supplierSigner, undefined)
+  assert.equal(draft.lines[0].materialName, '拉毛布')
+  assert.equal(draft.lines[0].amount, '6.00')
+})
+
+test('FL_material_purchase_print_snapshot__does_not_fallback_to_raw_ids masterDataOrderView: purchase print draft keeps missing line snapshots blank instead of raw ids', () => {
+  const draft = buildMaterialPurchaseContractDraftFromPurchaseOrder(
+    {
+      id: 99,
+      purchase_order_no: 'PO-PRINT-RAW-GUARD',
+      supplier_snapshot: {
+        id: 7,
+        name: '供应商 A',
+      },
+    },
+    [
+      {
+        id: 88,
+        material_id: 77,
+        unit_id: 66,
+        purchased_quantity: '1',
+        unit_price: '2',
+        line_status: 'open',
+      },
+    ],
+    {
+      materials: [],
+      unitOptions: [],
+    }
+  )
+
+  assert.equal(draft.lines.length, 1)
+  assert.deepEqual(draft.lines[0], {
+    contractNo: 'PO-PRINT-RAW-GUARD',
+    unitPrice: '2',
+    quantity: '1',
+    amount: '2.00',
+  })
+  assert.equal(draft.lines[0].productOrderNo, undefined)
+  assert.equal(draft.lines[0].productNo, undefined)
+  assert.equal(draft.lines[0].productName, undefined)
+  assert.equal(draft.lines[0].materialName, undefined)
+  assert.equal(draft.lines[0].vendorCode, undefined)
+  assert.equal(draft.lines[0].unit, undefined)
+})
+
+test('FL_sales_order_item_amount__derives_from_quantity_and_unit_price masterDataOrderView: sales order item amount derives from quantity and unit price', () => {
   assert.equal(
     deriveSalesOrderItemAmount({
       ordered_quantity: '12.5',
@@ -757,11 +1180,19 @@ test('masterDataOrderView: sales order item amount derives from quantity and uni
   )
   assert.equal(
     deriveSalesOrderItemAmount({
-      ordered_quantity: '',
+      ordered_quantity: '0',
       unit_price: '3.2',
-      amount: ' 88 ',
+      amount: '',
     }),
-    '88'
+    '0.00'
+  )
+  assert.equal(
+    deriveSalesOrderItemAmount({
+      ordered_quantity: '3',
+      unit_price: '0',
+      amount: '',
+    }),
+    '0.00'
   )
   assert.equal(
     deriveSalesOrderItemAmount({
@@ -771,6 +1202,837 @@ test('masterDataOrderView: sales order item amount derives from quantity and uni
     }),
     undefined
   )
+})
+
+test('FL_sales_order_item_amount__keeps_manual_snapshot_without_inputs masterDataOrderView: sales order item amount keeps manual snapshot without complete inputs', () => {
+  assert.equal(
+    deriveSalesOrderItemAmount({
+      ordered_quantity: '',
+      unit_price: '3.2',
+      amount: ' 88 ',
+    }),
+    '88'
+  )
+  assert.equal(
+    deriveSalesOrderItemAmount({
+      ordered_quantity: '3',
+      unit_price: '',
+      amount: ' 99.50 ',
+    }),
+    '99.50'
+  )
+  assert.equal(
+    deriveSalesOrderItemAmount({
+      ordered_quantity: '',
+      unit_price: '',
+      amount: ' 0 ',
+    }),
+    '0'
+  )
+})
+
+test('FL_sales_order_customer_snapshot__retains_customer_snapshot masterDataOrderView: sales order params retain customer source snapshot', () => {
+  assert.deepEqual(
+    buildSalesOrderParams({
+      order_no: ' SO-CUST-001 ',
+      customer_id: '3',
+      customer_snapshot: {
+        id: 3,
+        code: ' C003 ',
+        name: ' 客户三 ',
+        short_name: ' 三号客户 ',
+      },
+    }),
+    {
+      order_no: 'SO-CUST-001',
+      customer_id: 3,
+      customer_snapshot: {
+        id: 3,
+        code: ' C003 ',
+        name: ' 客户三 ',
+        short_name: ' 三号客户 ',
+      },
+      contact_snapshot: {},
+    }
+  )
+})
+
+test('FL_sales_order_customer_snapshot__prefills_customer_from_blank masterDataOrderView: customer source values rebuild customer snapshot from blank', () => {
+  assert.deepEqual(
+    buildSalesOrderCustomerSourceValues({
+      id: '3',
+      code: ' C003 ',
+      name: ' 客户三 ',
+      short_name: ' 三号客户 ',
+      tax_no: 'not-copied',
+    }),
+    {
+      customer_id: 3,
+      customer_snapshot: {
+        id: '3',
+        code: 'C003',
+        name: '客户三',
+        short_name: '三号客户',
+      },
+    }
+  )
+})
+
+test('FL_sales_order_customer_master_selection__syncs_customer_snapshot masterDataOrderView: customer master selection syncs business snapshot', () => {
+  assert.deepEqual(
+    buildSalesOrderParams({
+      order_no: 'SO-CUST-002',
+      ...buildSalesOrderCustomerSourceValues({
+        id: 4,
+        code: 'C004',
+        name: '客户四',
+      }),
+    }),
+    {
+      order_no: 'SO-CUST-002',
+      customer_id: 4,
+      customer_snapshot: {
+        id: 4,
+        code: 'C004',
+        name: '客户四',
+      },
+      contact_snapshot: {},
+    }
+  )
+})
+
+test('FL_sales_order_customer_snapshot__clears_customer_on_source_clear masterDataOrderView: clearing customer source clears stale customer snapshot', () => {
+  const currentOrder = {
+    customer_id: 3,
+    customer_snapshot: {
+      id: 3,
+      code: 'C003',
+      name: '客户三',
+    },
+    customer_order_no: 'CUS-PO-001',
+  }
+
+  assert.deepEqual(
+    {
+      ...currentOrder,
+      ...buildSalesOrderCustomerSourceValues(null),
+    },
+    {
+      customer_id: undefined,
+      customer_snapshot: {},
+      customer_order_no: 'CUS-PO-001',
+    }
+  )
+
+  assert.deepEqual(
+    {
+      ...currentOrder,
+      ...buildSalesOrderCustomerSourceValues({
+        id: 5,
+        code: 'C005',
+        name: '客户五',
+      }),
+    },
+    {
+      customer_id: 5,
+      customer_snapshot: {
+        id: 5,
+        code: 'C005',
+        name: '客户五',
+      },
+      customer_order_no: 'CUS-PO-001',
+    }
+  )
+})
+
+test('FL_sales_order_customer_master_selection__clears_customer_snapshot masterDataOrderView: clearing customer master selection clears business snapshot', () => {
+  assert.deepEqual(
+    buildSalesOrderParams({
+      order_no: 'SO-CUST-003',
+      ...buildSalesOrderCustomerSourceValues(null),
+    }),
+    {
+      order_no: 'SO-CUST-003',
+      customer_snapshot: {},
+      contact_snapshot: {},
+    }
+  )
+})
+
+test('FL_sales_order_partner_contacts__syncs_contact_snapshot masterDataOrderView: partner contact fields sync to order contact snapshot', () => {
+  const contactSnapshot = buildOrderContactSnapshot({
+    contact_name: ' 王五 ',
+    contact_phone: ' 0574-888888 ',
+    contact_mobile: ' 13800000000 ',
+    contact_email: ' buyer@example.com ',
+    contact_title: ' 采购 ',
+    note: 'not-copied',
+  })
+  assert.deepEqual(contactSnapshot, {
+    name: '王五',
+    phone: '0574-888888',
+    mobile: '13800000000',
+    email: 'buyer@example.com',
+    title: '采购',
+  })
+  assert.deepEqual(
+    buildSalesOrderParams({
+      order_no: 'SO-CONTACT-001',
+      customer_id: '3',
+      customer_snapshot: { id: 3, name: '客户 A' },
+      contact_snapshot: contactSnapshot,
+    }),
+    {
+      order_no: 'SO-CONTACT-001',
+      customer_id: 3,
+      customer_snapshot: { id: 3, name: '客户 A' },
+      contact_snapshot: {
+        name: '王五',
+        phone: '0574-888888',
+        mobile: '13800000000',
+        email: 'buyer@example.com',
+        title: '采购',
+      },
+    }
+  )
+})
+
+test('FL_sales_order_partner_contacts__clears_contact_snapshot masterDataOrderView: clearing partner contact fields clears order contact snapshot', () => {
+  const currentOrder = {
+    order_no: 'SO-CONTACT-002',
+    customer_id: 3,
+    customer_snapshot: { id: 3, name: '客户 A' },
+    contact_snapshot: {
+      name: '王五',
+      phone: '0574-888888',
+      mobile: '13800000000',
+      email: 'buyer@example.com',
+      title: '采购',
+    },
+  }
+  const clearedContactSnapshot = buildOrderContactSnapshot({
+    contact_name: '',
+    contact_phone: ' ',
+    contact_mobile: '',
+    contact_email: '',
+    contact_title: '',
+  })
+  assert.deepEqual(clearedContactSnapshot, {})
+  assert.deepEqual(
+    buildSalesOrderParams({
+      ...currentOrder,
+      contact_snapshot: clearedContactSnapshot,
+    }),
+    {
+      order_no: 'SO-CONTACT-002',
+      customer_id: 3,
+      customer_snapshot: { id: 3, name: '客户 A' },
+      contact_snapshot: {},
+    }
+  )
+})
+
+test('FL_purchase_supplier_master_selection__syncs_supplier_snapshot masterDataOrderView: supplier and processor master selection syncs supplier snapshot', () => {
+  const supplierSnapshot = buildSupplierSnapshot({
+    id: '7',
+    code: ' SUP-007 ',
+    name: ' 供应商 A ',
+    short_name: ' 东莞厂 ',
+    contact_name: ' 王采购 ',
+    contact_phone: ' 0769-123456 ',
+    contact_mobile: ' 13800000000 ',
+    address: ' 东莞市样例路 1 号 ',
+    tax_no: 'not-copied',
+  })
+  assert.deepEqual(supplierSnapshot, {
+    id: '7',
+    code: 'SUP-007',
+    name: '供应商 A',
+    short_name: '东莞厂',
+    contact_name: '王采购',
+    contact_phone: '0769-123456',
+    contact_mobile: '13800000000',
+    address: '东莞市样例路 1 号',
+  })
+  assert.deepEqual(
+    buildPurchaseOrderParams({
+      purchase_order_no: 'PO-SUP-001',
+      supplier_id: '7',
+      supplier_snapshot: supplierSnapshot,
+    }),
+    {
+      purchase_order_no: 'PO-SUP-001',
+      supplier_id: 7,
+      supplier_snapshot: {
+        id: '7',
+        code: 'SUP-007',
+        name: '供应商 A',
+        short_name: '东莞厂',
+        contact_name: '王采购',
+        contact_phone: '0769-123456',
+        contact_mobile: '13800000000',
+        address: '东莞市样例路 1 号',
+      },
+    }
+  )
+
+  const processorSnapshot = buildSupplierSnapshot({
+    id: 8,
+    code: ' PRC-008 ',
+    name: ' 加工厂 A ',
+    short_name: ' 外协车缝厂 ',
+    primary_contact_name: ' 李厂长 ',
+    primary_contact_mobile: ' 13900000000 ',
+    address: ' 宁波加工园 ',
+  })
+  assert.deepEqual(
+    buildOutsourcingOrderParams({
+      outsourcing_order_no: 'OUT-SUP-001',
+      supplier_id: '8',
+      supplier_snapshot: processorSnapshot,
+    }),
+    {
+      outsourcing_order_no: 'OUT-SUP-001',
+      supplier_id: 8,
+      supplier_snapshot: {
+        id: 8,
+        code: 'PRC-008',
+        name: '加工厂 A',
+        short_name: '外协车缝厂',
+        contact_name: '李厂长',
+        contact_mobile: '13900000000',
+        address: '宁波加工园',
+      },
+    }
+  )
+})
+
+test('FL_print_supplier_contact_snapshot__prefills_from_primary_supplier_contact masterDataOrderView: supplier snapshot uses primary contact truth for print drafts', () => {
+  assert.equal(SUPPLIER_CONTACT_OWNER_TYPE, 'SUPPLIER')
+  const snapshot = buildSupplierSnapshotWithContacts(
+    {
+      id: 7,
+      code: 'SUP-007',
+      name: '供应商 A',
+      contact_name: '旧联系人',
+      contact_phone: '旧电话',
+    },
+    [
+      {
+        name: '非主联系人',
+        phone: '0574-111111',
+        mobile: '13811111111',
+        is_primary: false,
+      },
+      {
+        name: '主联系人',
+        phone: '0574-222222',
+        mobile: '13822222222',
+        is_primary: true,
+      },
+    ]
+  )
+
+  assert.deepEqual(snapshot, {
+    id: 7,
+    code: 'SUP-007',
+    name: '供应商 A',
+    contact_name: '主联系人',
+    contact_phone: '0574-222222',
+    contact_mobile: '13822222222',
+  })
+  assert.deepEqual(
+    buildSupplierSnapshotWithContacts({ id: 7, name: '供应商 A' }, []),
+    {
+      id: 7,
+      name: '供应商 A',
+    }
+  )
+})
+
+test('FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_fetch_supplier_contacts_before_save masterDataOrderView: purchase and outsourcing save paths enrich supplier snapshot from contacts API', () => {
+  const purchasePageSource = readERPSource('../pages/V1PurchaseOrdersPage.jsx')
+  const outsourcingPageSource = readERPSource(
+    '../pages/V1OutsourcingOrdersPage.jsx'
+  )
+  const outsourcingFormSource = readERPSource(
+    '../components/outsourcing-orders/OutsourcingOrderForm.jsx'
+  )
+
+  for (const source of [purchasePageSource, outsourcingPageSource]) {
+    assert.match(source, /listContactsByOwner/u)
+    assert.match(source, /SUPPLIER_CONTACT_OWNER_TYPE/u)
+    assert.match(source, /buildSupplierSnapshotWithContacts/u)
+    assert.match(
+      source,
+      /const supplierSnapshot = await resolveSupplierSnapshot\(supplier,\s*\{\s*notifyOnError:\s*true,\s*\}\)/u
+    )
+    assert.match(
+      source,
+      /message\.warning\(\s*`\$\{getActionErrorMessage\(error, '加载(?:供应商|加工厂)联系人'\)\}，将仅保存(?:供应商|加工厂)基本信息`\s*\)/u
+    )
+    assert.doesNotMatch(
+      source,
+      /catch\s*\{\s*return baseSnapshot\s*\}/u,
+      'contact load failure must not be silently swallowed'
+    )
+  }
+
+  assert.match(outsourcingFormSource, /onSupplierChange/u)
+  assert.match(outsourcingFormSource, /onChange=\{onSupplierChange\}/u)
+})
+
+test('FL_sales_order_source_no__retains_customer_order_no_snapshot masterDataOrderView: sales order params retain customer source no', () => {
+  assert.deepEqual(
+    buildSalesOrderParams({
+      order_no: 'SO-SRC-001',
+      customer_id: 3,
+      customer_order_no: ' CUS-PO-001 ',
+      order_date: '2026-06-30',
+    }),
+    {
+      order_no: 'SO-SRC-001',
+      customer_id: 3,
+      customer_order_no: 'CUS-PO-001',
+      customer_snapshot: {},
+      contact_snapshot: {},
+      order_date: '2026-06-30',
+    }
+  )
+})
+
+test('FL_sales_order_source_no__prefills_customer_order_no_from_blank masterDataOrderView: blank source no can be rebuilt before save', () => {
+  const blankParams = buildSalesOrderParams({
+    order_no: 'SO-SRC-002',
+    customer_id: 3,
+    customer_order_no: '',
+    order_date: '2026-06-30',
+  })
+  assert.equal(
+    Object.hasOwn(blankParams, 'customer_order_no'),
+    false,
+    'blank source no must not create a stale source snapshot'
+  )
+
+  assert.deepEqual(
+    buildSalesOrderParams({
+      order_no: 'SO-SRC-002',
+      customer_id: 3,
+      customer_order_no: ' CUS-PO-002 ',
+      order_date: '2026-06-30',
+    }),
+    {
+      order_no: 'SO-SRC-002',
+      customer_id: 3,
+      customer_order_no: 'CUS-PO-002',
+      customer_snapshot: {},
+      contact_snapshot: {},
+      order_date: '2026-06-30',
+    }
+  )
+})
+
+test('FL_sales_order_source_no__clears_customer_order_no_on_source_clear masterDataOrderView: clearing source no removes stale save param', () => {
+  const params = buildSalesOrderParams({
+    order_no: 'SO-SRC-003',
+    customer_id: 3,
+    customer_order_no: '   ',
+    order_date: '2026-06-30',
+  })
+
+  assert.equal(
+    Object.hasOwn(params, 'customer_order_no'),
+    false,
+    'cleared source no should rely on backend nil clear path'
+  )
+  assert.deepEqual(params, {
+    order_no: 'SO-SRC-003',
+    customer_id: 3,
+    customer_snapshot: {},
+    contact_snapshot: {},
+    order_date: '2026-06-30',
+  })
+})
+
+test('FL_sales_order_order_date__retains_signing_date_snapshot masterDataOrderView: sales order signing date stays on form list export and save params', () => {
+  const params = buildSalesOrderParams({
+    order_no: 'SO-DATE-001',
+    customer_id: 3,
+    order_date: ' 2026-06-30 ',
+    planned_delivery_date: '2026-07-05',
+  })
+  assert.deepEqual(params, {
+    order_no: 'SO-DATE-001',
+    customer_id: 3,
+    customer_snapshot: {},
+    contact_snapshot: {},
+    order_date: '2026-06-30',
+    planned_delivery_date: '2026-07-05',
+  })
+  assert.match(formatUnixDate(1_782_777_600), /2026.*06.*30/)
+
+  const formSource = readERPSource(
+    '../components/sales-orders/SalesOrderForm.jsx'
+  )
+  const columnsSource = readERPSource(
+    '../components/sales-orders/salesOrderColumns.jsx'
+  )
+  const pageConfigSource = readERPSource(
+    '../components/sales-orders/salesOrderPageConfig.mjs'
+  )
+
+  assert.match(
+    formSource,
+    /label="签约日期"[\s\S]*name="order_date"[\s\S]*<DateInput/u
+  )
+  assert.match(
+    columnsSource,
+    /title: '签约日期'[\s\S]*exportTitle: '签约日期'[\s\S]*dataIndex: 'order_date'/u
+  )
+  assert.match(pageConfigSource, /label: '签约日期'[\s\S]*value: 'order_date'/u)
+  assert.doesNotMatch(formSource, /label="下单日期"/u)
+  assert.doesNotMatch(columnsSource, /title: '下单日期'/u)
+})
+
+test('FL_sales_order_item_source_snapshot__retains_product_sku_snapshots masterDataOrderView: sales order item params retain product SKU source snapshots', () => {
+  assert.deepEqual(
+    buildSalesOrderItemParams({
+      line_no: '4',
+      product_id: '12',
+      product_sku_id: '34',
+      unit_id: '2',
+      product_code_snapshot: ' SKU-001 ',
+      product_name_snapshot: ' 坐姿小熊 ',
+      color_snapshot: ' 棕色 ',
+      ordered_quantity: '6',
+    }),
+    {
+      line_no: 4,
+      product_id: 12,
+      product_sku_id: 34,
+      unit_id: 2,
+      product_code_snapshot: 'SKU-001',
+      product_name_snapshot: '坐姿小熊',
+      color_snapshot: '棕色',
+      ordered_quantity: '6',
+    }
+  )
+
+  assert.deepEqual(
+    buildSalesOrderItemParams({
+      line_no: '5',
+      product_id: '12',
+      product_sku_id: '34',
+      unit_id: '2',
+      product_code_snapshot: '',
+      product_name_snapshot: '   ',
+      color_snapshot: '',
+      ordered_quantity: '6',
+    }),
+    {
+      line_no: 5,
+      product_id: 12,
+      product_sku_id: 34,
+      unit_id: 2,
+      ordered_quantity: '6',
+    }
+  )
+})
+
+test('FL_sales_order_item_source_snapshot__prefills_product_sku_from_blank masterDataOrderView: SKU source values rebuild product snapshots from blank', () => {
+  assert.deepEqual(
+    buildSalesOrderItemSourceValuesFromSKU({
+      id: '34',
+      product_id: '12',
+      default_unit_id: '2',
+      sku_code: ' SKU-001 ',
+      sku_name: ' 坐姿小熊 ',
+      customer_sku: 'CUS-001',
+      barcode: 'BAR-001',
+      color: ' 棕色 ',
+    }),
+    {
+      product_sku_id: 34,
+      product_id: 12,
+      unit_id: 2,
+      product_code_snapshot: 'SKU-001',
+      product_name_snapshot: '坐姿小熊',
+      color_snapshot: '棕色',
+    }
+  )
+
+  assert.deepEqual(
+    buildSalesOrderItemSourceValuesFromSKU({
+      id: 35,
+      product_id: 13,
+      default_unit_id: 3,
+      sku_code: '',
+      sku_name: '',
+      customer_sku: ' 客户款-35 ',
+      barcode: 'BAR-035',
+      color: '',
+    }),
+    {
+      product_sku_id: 35,
+      product_id: 13,
+      unit_id: 3,
+      product_code_snapshot: '',
+      product_name_snapshot: '客户款-35',
+      color_snapshot: '',
+    }
+  )
+})
+
+test('FL_sales_order_product_description__mirrors_sku_description_snapshot masterDataOrderView: product description mirrors SKU name with controlled fallbacks', () => {
+  assert.deepEqual(
+    buildSalesOrderItemSourceValuesFromSKU({
+      id: '41',
+      product_id: '14',
+      default_unit_id: '2',
+      sku_code: 'SKU-DESC-001',
+      sku_name: ' 坐姿小熊中文描述 ',
+      customer_sku: 'CUS-DESC-001',
+      barcode: 'BAR-DESC-001',
+      color: '浅棕',
+    }),
+    {
+      product_sku_id: 41,
+      product_id: 14,
+      unit_id: 2,
+      product_code_snapshot: 'SKU-DESC-001',
+      product_name_snapshot: '坐姿小熊中文描述',
+      color_snapshot: '浅棕',
+    }
+  )
+
+  assert.equal(
+    buildSalesOrderItemSourceValuesFromSKU({
+      id: 42,
+      product_id: 14,
+      sku_name: '',
+      customer_sku: ' 客户款描述-42 ',
+      barcode: 'BAR-DESC-042',
+    }).product_name_snapshot,
+    '客户款描述-42'
+  )
+  assert.equal(
+    buildSalesOrderItemSourceValuesFromSKU({
+      id: 43,
+      product_id: 14,
+      sku_name: ' ',
+      customer_sku: '',
+      barcode: ' BAR-DESC-043 ',
+    }).product_name_snapshot,
+    'BAR-DESC-043'
+  )
+
+  const params = buildSalesOrderItemParams({
+    line_no: 6,
+    product_id: 14,
+    product_sku_id: 41,
+    unit_id: 2,
+    product_code_snapshot: 'SKU-DESC-001',
+    product_name_snapshot: '坐姿小熊中文描述',
+    ordered_quantity: '12',
+  })
+  assert.equal(params.product_name_snapshot, '坐姿小熊中文描述')
+  assert.equal(Object.hasOwn(params, 'product_description_snapshot'), false)
+  assert.equal(Object.hasOwn(params, 'product_description'), false)
+})
+
+test('FL_sales_order_product_master_selection__syncs_product_sku_selection masterDataOrderView: SKU master selection syncs product ids and unit', () => {
+  assert.deepEqual(
+    buildSalesOrderItemSourceValuesFromSKU({
+      id: '34',
+      product_id: '12',
+      default_unit_id: '2',
+      sku_code: ' SKU-001 ',
+      sku_name: ' 坐姿小熊 ',
+      color: ' 棕色 ',
+    }),
+    {
+      product_sku_id: 34,
+      product_id: 12,
+      unit_id: 2,
+      product_code_snapshot: 'SKU-001',
+      product_name_snapshot: '坐姿小熊',
+      color_snapshot: '棕色',
+    }
+  )
+})
+
+test('FL_sales_order_product_master_selection__clears_product_sku_selection masterDataOrderView: clearing SKU master selection clears product ids and unit', () => {
+  const currentLine = {
+    product_sku_id: 34,
+    product_id: 12,
+    unit_id: 2,
+    product_code_snapshot: 'SKU-001',
+    product_name_snapshot: '坐姿小熊',
+    color_snapshot: '棕色',
+    ordered_quantity: '6',
+  }
+
+  assert.deepEqual(
+    {
+      ...currentLine,
+      ...buildSalesOrderItemSourceValuesFromSKU(null),
+    },
+    {
+      product_sku_id: undefined,
+      product_id: undefined,
+      unit_id: undefined,
+      product_code_snapshot: '',
+      product_name_snapshot: '',
+      color_snapshot: '',
+      ordered_quantity: '6',
+    }
+  )
+})
+
+test('FL_sales_order_item_source_snapshot__clears_product_sku_on_source_clear masterDataOrderView: clearing SKU source clears stale product snapshots', () => {
+  const currentLine = {
+    product_sku_id: 34,
+    product_id: 12,
+    unit_id: 2,
+    product_code_snapshot: 'SKU-001',
+    product_name_snapshot: '坐姿小熊',
+    color_snapshot: '棕色',
+    ordered_quantity: '6',
+  }
+
+  assert.deepEqual(
+    {
+      ...currentLine,
+      ...buildSalesOrderItemSourceValuesFromSKU(null),
+    },
+    {
+      product_sku_id: undefined,
+      product_id: undefined,
+      unit_id: undefined,
+      product_code_snapshot: '',
+      product_name_snapshot: '',
+      color_snapshot: '',
+      ordered_quantity: '6',
+    }
+  )
+  const clearedParams = buildSalesOrderItemParams({
+    line_no: 1,
+    ordered_quantity: '6',
+    ...buildSalesOrderItemSourceValuesFromSKU(null),
+  })
+  assert.equal(
+    Object.hasOwn(clearedParams, 'product_sku_id'),
+    false,
+    'cleared SKU source must not serialize product_sku_id as 0'
+  )
+  assert.equal(
+    Object.hasOwn(clearedParams, 'product_id'),
+    false,
+    'cleared SKU source must not serialize product_id as 0'
+  )
+  assert.equal(
+    Object.hasOwn(clearedParams, 'unit_id'),
+    false,
+    'cleared SKU source must not serialize unit_id as 0'
+  )
+  assert.deepEqual(clearedParams, {
+    line_no: 1,
+    ordered_quantity: '6',
+  })
+
+  assert.deepEqual(
+    {
+      ...currentLine,
+      ...buildSalesOrderItemSourceValuesFromSKU({
+        id: 36,
+        product_id: 15,
+        default_unit_id: 4,
+        sku_code: 'SKU-NEW',
+        sku_name: '趴姿小熊',
+        color: '米白',
+      }),
+    },
+    {
+      product_sku_id: 36,
+      product_id: 15,
+      unit_id: 4,
+      product_code_snapshot: 'SKU-NEW',
+      product_name_snapshot: '趴姿小熊',
+      color_snapshot: '米白',
+      ordered_quantity: '6',
+    }
+  )
+})
+
+test('FL_sales_order_line_summary__derives_header_totals_from_items masterDataOrderView: sales order line summary derives header totals from current items', () => {
+  assert.deepEqual(
+    summarizeSalesOrderLines([
+      {
+        ordered_quantity: ' 12.5 ',
+        unit_price: '3.2',
+        amount: '999',
+      },
+      {
+        ordered_quantity: '2',
+        unit_price: '',
+        amount: ' 8.50 ',
+      },
+      {
+        ordered_quantity: 'bad-value',
+        unit_price: '10',
+        amount: '',
+      },
+    ]),
+    {
+      count: 3,
+      quantity: 14.5,
+      amount: 48.5,
+    }
+  )
+  assert.deepEqual(summarizeSalesOrderLines(null), {
+    count: 0,
+    quantity: 0,
+    amount: 0,
+  })
+})
+
+test('FL_sales_order_line_summary__keeps_header_snapshot_without_current_items masterDataOrderView: sales order line summary keeps header snapshot when current items are unavailable', () => {
+  assert.deepEqual(
+    summarizeSalesOrderLines([], {
+      item_count: '2',
+      quantity_total: ' 5.5 ',
+      amount_total: '88.10',
+    }),
+    {
+      count: 2,
+      quantity: 5.5,
+      amount: 88.1,
+    }
+  )
+  assert.deepEqual(
+    summarizeSalesOrderLines(
+      [
+        {
+          ordered_quantity: '3',
+          unit_price: '4',
+          amount: '999',
+        },
+      ],
+      {
+        item_count: '2',
+        quantity_total: '5.5',
+        amount_total: '88.10',
+      }
+    ),
+    {
+      count: 1,
+      quantity: 3,
+      amount: 12,
+    }
+  )
+})
+
+test('masterDataOrderView: outsourcing order item amount derives from quantity and unit price', () => {
   assert.equal(
     deriveOutsourcingOrderItemAmount({
       outsourcing_quantity: '12.5',
@@ -783,6 +2045,15 @@ test('masterDataOrderView: sales order item amount derives from quantity and uni
 
 test('masterDataOrderView: status display and snapshots are read models only', () => {
   assert.equal(statusText('active', { active: '已生效' }), '已生效')
+  assert.equal(
+    statusText('unknown_status_key', { active: '已生效' }),
+    '业务状态'
+  )
+  assert.equal(
+    statusText('unknown_line_status_key', { open: '未关闭' }, '明细状态'),
+    '明细状态'
+  )
+  assert.equal(statusText('', { active: '已生效' }), '-')
   assert.deepEqual(
     buildCustomerSnapshot({
       id: 9,

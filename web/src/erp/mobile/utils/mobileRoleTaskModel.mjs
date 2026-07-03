@@ -1,6 +1,14 @@
-import { formatMobileTaskTime } from '../../utils/mobileTaskView.mjs'
+import {
+  formatMobileTaskTime,
+  getMobileTaskDueStatusLabel,
+} from '../../utils/mobileTaskView.mjs'
 import { formatWorkflowTaskSource } from '../../utils/dashboardTaskDisplay.mjs'
-import { isRoleKeyMatch, normalizeRoleKey } from '../../utils/roleKeys.mjs'
+import { getWorkflowTaskStatusMeta } from '../../utils/workflowTaskBoard.mjs'
+import {
+  getRoleDisplayName,
+  isRoleKeyMatch,
+  normalizeRoleKey,
+} from '../../utils/roleKeys.mjs'
 import {
   ORDER_APPROVAL_STATUS_KEY,
   ORDER_APPROVED_STATUS_KEY,
@@ -42,6 +50,11 @@ import {
   resolvePayableReconciliationTaskBusinessStatus,
 } from '../../utils/payableReconciliationFlow.mjs'
 import { getWorkflowTaskGroupLabel } from '../../utils/workflowTaskLabels.mjs'
+import {
+  getWorkflowTaskReason,
+  getWorkflowTaskReasonLabel,
+} from '../../utils/workflowTaskReason.mjs'
+import { getBusinessStatusLabel } from '../../config/workflowStatus.mjs'
 
 export const TERMINAL_TASK_STATUS_KEYS = new Set([
   'done',
@@ -49,18 +62,26 @@ export const TERMINAL_TASK_STATUS_KEYS = new Set([
   'cancelled',
 ])
 
-const MOBILE_ROLE_LABELS = {
-  boss: '老板',
-  business: '业务',
-  sales: '业务',
-  purchase: '采购',
-  production: '生产',
-  warehouse: '仓库组',
-  finance: '财务',
-  pmc: 'PMC',
-  quality: '质检',
-  engineering: '工程',
-}
+const MOBILE_ROLE_ALIASES = Object.freeze({
+  business: 'sales',
+})
+
+const PAYABLE_TYPE_LABELS = Object.freeze({
+  purchase: '采购应付',
+  outsource: '委外应付',
+})
+
+const QC_RESULT_LABELS = Object.freeze({
+  pass: '合格',
+  passed: '合格',
+  qualified: '合格',
+  fail: '不合格',
+  failed: '不合格',
+  reject: '不合格',
+  rejected: '不合格',
+  rework: '返工',
+  pending: '待检',
+})
 
 export const QUICK_REASONS = [
   '材料不足',
@@ -112,11 +133,28 @@ export const MOBILE_LIST_COLLAPSED_LIMITS = Object.freeze({
 export const MOBILE_SCROLL_TOP_VISIBLE_OFFSET = 280
 
 export function getMobileRoleLabel(roleKey) {
-  return MOBILE_ROLE_LABELS[normalizeRoleKey(roleKey)] || '岗位'
+  const normalizedRoleKey = normalizeRoleKey(roleKey)
+  const displayRoleKey =
+    MOBILE_ROLE_ALIASES[normalizedRoleKey] || normalizedRoleKey
+  return getRoleDisplayName(displayRoleKey, '岗位')
 }
 
 export function getMobileTaskGroupLabel(taskGroup) {
   return getWorkflowTaskGroupLabel(taskGroup)
+}
+
+function resolvePayableTypeLabel(payableType) {
+  const normalized = String(payableType || '').trim()
+  if (!normalized) return '-'
+  return PAYABLE_TYPE_LABELS[normalized] || '应付事项'
+}
+
+function resolveQcResultLabel(qcResult) {
+  const normalized = String(qcResult || '')
+    .trim()
+    .toLowerCase()
+  if (!normalized) return '-'
+  return QC_RESULT_LABELS[normalized] || '质检已记录'
 }
 
 export function resolveLatestTaskTime(tasks) {
@@ -161,43 +199,160 @@ export function getTaskSeverityView(task) {
   }
 }
 
+function hasVisiblePayloadValue(value) {
+  if (value === null || value === undefined) return false
+  return String(value).trim() !== ''
+}
+
+function visiblePayloadValue(value, fallback = '-') {
+  return hasVisiblePayloadValue(value) ? String(value) : fallback
+}
+
 export function resolveTaskListMeta(task) {
   const payload = task.payload || {}
-  if (payload.customer_name || payload.style_no || payload.quantity) {
-    return `客户：${payload.customer_name || '-'} ｜ 款式：${
-      payload.style_no || payload.product_name || '-'
-    } ｜ 数量：${payload.quantity || '-'}${payload.unit || ''}`
+  const hasQuantity = hasVisiblePayloadValue(payload.quantity)
+  const hasSupplier = hasVisiblePayloadValue(payload.supplier_name)
+  const hasPayableContext =
+    hasSupplier || hasVisiblePayloadValue(payload.payable_type)
+  const hasMaterialContext =
+    hasVisiblePayloadValue(payload.material_name) ||
+    hasVisiblePayloadValue(payload.spec) ||
+    (hasSupplier && hasQuantity)
+  const hasCustomerContext =
+    hasVisiblePayloadValue(payload.customer_name) ||
+    hasVisiblePayloadValue(payload.style_no) ||
+    (!hasMaterialContext && hasVisiblePayloadValue(payload.product_name))
+  if (
+    hasCustomerContext ||
+    (hasQuantity && !hasMaterialContext && !hasPayableContext)
+  ) {
+    return `客户：${visiblePayloadValue(payload.customer_name)} ｜ 款式：${visiblePayloadValue(
+      payload.style_no || payload.product_name
+    )} ｜ 数量：${visiblePayloadValue(payload.quantity)}${visiblePayloadValue(
+      payload.unit,
+      ''
+    )}`
   }
-  if (payload.material_name || payload.spec || payload.quantity) {
-    return `物料：${payload.material_name || '-'} ｜ 规格：${
-      payload.spec || '-'
-    } ｜ 数量：${payload.quantity || '-'}${payload.unit || ''}`
+  if (hasMaterialContext || hasQuantity) {
+    return `物料：${visiblePayloadValue(payload.material_name)} ｜ 规格：${visiblePayloadValue(
+      payload.spec
+    )} ｜ 数量：${visiblePayloadValue(payload.quantity)}${visiblePayloadValue(
+      payload.unit,
+      ''
+    )}`
   }
   if (payload.supplier_name || payload.payable_type) {
-    return `供应商：${payload.supplier_name || '-'} ｜ 类型：${
-      payload.payable_type || '-'
-    }`
+    return `供应商：${payload.supplier_name || '-'} ｜ 类型：${resolvePayableTypeLabel(
+      payload.payable_type
+    )}`
   }
   return `任务：${getMobileTaskGroupLabel(task.task_group)} ｜ 优先级：${task.priority || '-'}`
 }
 
 export function resolveTaskBusinessChip(task) {
-  return task.business_status_label || task.task_status_label || '待处理'
+  const businessStatusLabel = resolveTaskBusinessStatusLabel(task, '')
+  return businessStatusLabel || resolveMobileTaskStatusLabel(task) || '待处理'
+}
+
+export function resolveMobileTaskStatusLabel(task = {}) {
+  const label = String(task.task_status_label || '').trim()
+  if (label) return label
+  return getWorkflowTaskStatusMeta(task).label || '未知状态'
+}
+
+function isBusinessReadableLabel(value) {
+  return /[\u4e00-\u9fff]/u.test(String(value || ''))
+}
+
+export function resolveTaskBusinessStatusLabel(task = {}, fallback = '-') {
+  const label = String(task.business_status_label || '').trim()
+  if (isBusinessReadableLabel(label)) return label
+  const statusKey = String(task.business_status_key || '').trim()
+  if (!statusKey) return fallback
+  return getBusinessStatusLabel(statusKey, '未知业务状态')
+}
+
+export function resolveTaskReason(task) {
+  return getWorkflowTaskReason(task)
+}
+
+export function resolveTaskReasonLabel(task) {
+  return getWorkflowTaskReasonLabel(task)
 }
 
 export function resolveDetailActionLabel(action) {
+  if (action === 'done') return '完成说明（可选）'
   if (action === 'blocked') return '阻塞原因（必填）'
   if (action === 'rejected') return '退回原因（必填）'
   if (action === 'urge') return '催办原因（必填）'
   return '处理原因'
 }
 
+export function requiresMobileActionFeedback(action) {
+  return action === 'done'
+}
+
 export function resolveMobileActionLabel(action) {
-  if (action === 'blocked') return '阻塞'
-  if (action === 'done') return '完成'
-  if (action === 'rejected') return '退回'
+  if (action === 'blocked' || action === 'block') return '阻塞'
+  if (action === 'done' || action === 'complete') return '完成'
+  if (action === 'rejected' || action === 'reject') return '退回'
   if (action === 'urge') return '催办'
   return '移动处理'
+}
+
+export function resolveMobileActionDisplayLabel(action = {}) {
+  if (typeof action === 'string') return resolveMobileActionLabel(action)
+  const actionKey = String(action.action_key || '').trim()
+  const mappedLabel = resolveMobileActionLabel(actionKey)
+  if (actionKey && mappedLabel !== '移动处理') return mappedLabel
+
+  const actionLabel = String(action.action_label || '').trim()
+  if (isBusinessReadableLabel(actionLabel)) return actionLabel
+  return mappedLabel || '移动处理'
+}
+
+export function normalizeMobileTaskActionKey(action) {
+  if (action === 'block') return 'blocked'
+  if (action === 'reject') return 'rejected'
+  if (action === 'complete') return 'done'
+  if (action === 'urge') return 'urge'
+  return String(action || '').trim()
+}
+
+export function getMobileTaskActionReasonDraftKey(task, action) {
+  const taskID = Number(task?.id || 0)
+  const actionKey = normalizeMobileTaskActionKey(action)
+  if (!Number.isFinite(taskID) || taskID <= 0 || !actionKey) return ''
+  return `${taskID}:${actionKey}`
+}
+
+export function resolveMobileTaskActionReason({
+  task,
+  action,
+  reasonDrafts = {},
+  urgeReasonByTaskID = {},
+} = {}) {
+  const actionKey = normalizeMobileTaskActionKey(action)
+  const taskID = task?.id
+  if (!task || !actionKey) return ''
+  if (actionKey === 'urge') {
+    return String(urgeReasonByTaskID[taskID] || '')
+  }
+
+  const draftKey = getMobileTaskActionReasonDraftKey(task, actionKey)
+  if (draftKey && Object.hasOwn(reasonDrafts, draftKey)) {
+    return String(reasonDrafts[draftKey] || '')
+  }
+
+  const taskStatusKey = String(task.task_status_key || '').trim()
+  if (
+    (actionKey === 'blocked' && taskStatusKey === 'blocked') ||
+    (actionKey === 'rejected' && taskStatusKey === 'rejected')
+  ) {
+    return resolveTaskReason(task)
+  }
+
+  return ''
 }
 
 function resolveOrderApprovalBusinessStatus(task, taskStatusKey) {
@@ -289,6 +444,22 @@ export function supportsRejectedAction(roleKey, task) {
         isPayableRegistrationTask(task) ||
         isPayableReconciliationTask(task)))
   )
+}
+
+export function canOpenMobileTaskDetailAction(roleKey, task, action) {
+  const normalizedAction = normalizeMobileTaskActionKey(action)
+  if (normalizedAction === 'urge') {
+    return canUrgeTask(roleKey, task)
+  }
+  if (normalizedAction === 'rejected') {
+    return (
+      canOperateTask(roleKey, task) && supportsRejectedAction(roleKey, task)
+    )
+  }
+  if (normalizedAction === 'done' || normalizedAction === 'blocked') {
+    return canOperateTask(roleKey, task)
+  }
+  return false
 }
 
 export function canOperateTask(roleKey, task) {
@@ -386,12 +557,29 @@ export function resolveTaskSourceLabel(task) {
   return formatWorkflowTaskSource(task)
 }
 
+export function resolveTaskRelatedSourceLabel(task) {
+  return `来源：${resolveTaskSourceLabel(task)}`
+}
+
 export function isTaskOverdue(task) {
   return task.due_status === 'overdue'
 }
 
 export function isTaskDueSoon(task) {
   return task.due_status === 'due_soon'
+}
+
+export function resolveMobileTaskDueLabel(task = {}) {
+  const dueAtLabel = String(task.due_at_label || '').trim()
+  if (dueAtLabel) return dueAtLabel
+
+  const dueStatus = String(task.due_status || '').trim()
+  if (dueStatus) return getMobileTaskDueStatusLabel(dueStatus)
+
+  const dueStatusLabel = String(task.due_status_label || '').trim()
+  if (isBusinessReadableLabel(dueStatusLabel)) return dueStatusLabel
+
+  return '-'
 }
 
 export function isTaskAlerted(task) {
@@ -433,9 +621,9 @@ export function getTaskQueueTone(task) {
     return '高风险'
   }
   if (isTaskAlerted(task)) {
-    return task.alert_label || task.due_status_label || '预警'
+    return task.alert_label || resolveMobileTaskDueLabel(task) || '预警'
   }
-  return task.task_status_label || '待处理'
+  return resolveMobileTaskStatusLabel(task)
 }
 
 export function buildTaskFactRows(task) {
@@ -443,9 +631,11 @@ export function buildTaskFactRows(task) {
   const rows = [
     [
       '状态',
-      `${task.task_status_label} / ${formatMobileTaskTime(task.updated_at)}`,
+      `${resolveMobileTaskStatusLabel(task)} / ${formatMobileTaskTime(
+        task.updated_at
+      )}`,
     ],
-    ['业务', task.business_status_label],
+    ['业务', resolveTaskBusinessStatusLabel(task)],
     [
       '任务类型',
       `${getMobileTaskGroupLabel(task.task_group)} / 优先级 ${task.priority}`,
@@ -453,41 +643,52 @@ export function buildTaskFactRows(task) {
     ['截止', task.due_at_label || '-'],
   ]
 
-  if (payload.customer_name || payload.style_no || payload.due_date) {
+  if (
+    hasVisiblePayloadValue(payload.customer_name) ||
+    hasVisiblePayloadValue(payload.style_no) ||
+    hasVisiblePayloadValue(payload.due_date)
+  ) {
     rows.push([
       '客户/款式/交期',
-      `${payload.customer_name || '-'} / ${
-        payload.style_no || payload.product_name || '-'
-      } / ${payload.due_date || '-'}`,
+      `${visiblePayloadValue(payload.customer_name)} / ${visiblePayloadValue(
+        payload.style_no || payload.product_name
+      )} / ${visiblePayloadValue(payload.due_date)}`,
     ])
   }
 
-  if (payload.supplier_name || payload.material_name || payload.quantity) {
+  if (
+    hasVisiblePayloadValue(payload.supplier_name) ||
+    hasVisiblePayloadValue(payload.material_name) ||
+    hasVisiblePayloadValue(payload.quantity)
+  ) {
     rows.push([
       '供应/物料/数量',
-      `${payload.supplier_name || '-'} / ${
-        payload.material_name || payload.product_name || '-'
-      } / ${payload.quantity || '-'}${payload.unit || ''}`,
+      `${visiblePayloadValue(payload.supplier_name)} / ${visiblePayloadValue(
+        payload.material_name || payload.product_name
+      )} / ${visiblePayloadValue(payload.quantity)}${visiblePayloadValue(
+        payload.unit,
+        ''
+      )}`,
     ])
   }
 
   if (payload.qc_result) {
-    rows.push(['IQC 结果', payload.qc_result])
+    rows.push(['IQC 结果', resolveQcResultLabel(payload.qc_result)])
   }
 
   if (hasFinanceAmountPayload(task)) {
     rows.push([
       '金额/税率',
-      `${payload.amount || '-'} / ${payload.tax_rate || '-'} / 税额 ${
-        payload.tax_amount || '-'
-      } / 含税 ${payload.amount_with_tax || '-'} / 不含税 ${
-        payload.amount_without_tax || '-'
-      }`,
+      `${visiblePayloadValue(payload.amount)} / ${visiblePayloadValue(
+        payload.tax_rate
+      )} / 税额 ${visiblePayloadValue(payload.tax_amount)} / 含税 ${visiblePayloadValue(
+        payload.amount_with_tax
+      )} / 不含税 ${visiblePayloadValue(payload.amount_without_tax)}`,
     ])
   }
 
   if (payload.payable_type) {
-    rows.push(['应付类型', payload.payable_type])
+    rows.push(['应付类型', resolvePayableTypeLabel(payload.payable_type)])
   }
 
   return rows

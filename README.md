@@ -1,12 +1,12 @@
 # 毛绒玩具 ERP / plush-toy-erp
 
-`plush-toy-erp` 当前是一套已经开始按真实资料收口的毛绒工厂 ERP：生产前端保持一个入口，桌面后台和岗位任务端统一由 `5175` 承载，岗位任务端通过 `/m/<role>/tasks` 进入；本地开发仍保留按角色拆端口的调试命令，并开始基于真实 PDF、Excel、报表截图收口流程、字段真源、数据模型和导入映射。
+`plush-toy-erp` 当前是一套已经开始按真实资料收口的毛绒工厂 ERP：生产前端保持一个入口，桌面后台和岗位任务端统一由 `5175` 承载，岗位任务端通过 `/m/<role>/tasks` 进入，并开始基于真实 PDF、Excel、报表截图收口流程、字段真源、数据模型和导入映射。
 
 ## 目录结构
 
 | 路径 | 职责 |
 | --- | --- |
-| `web/` | Vite + React 前端，包含桌面后台统一入口、登录入口选择、生产单端口 `/m/<role>/tasks` 岗位任务端路径，以及本地开发用的按角色移动端调试入口，内部目录职责见 [`web/README.md`](web/README.md) |
+| `web/` | Vite + React 前端，包含桌面后台统一入口、登录入口选择和生产单端口 `/m/<role>/tasks` 岗位任务端路径，内部目录职责见 [`web/README.md`](web/README.md) |
 | `server/` | Kratos + Ent + Atlas 后端，当前承载管理员账号、鉴权、错误码、工作流协同、领域 usecase、业务看板 `dashboard_stats`、客户配置版本 `customer_config` JSON-RPC 域、采购订单 `purchase_order` JSON-RPC 域、采购入库 `purchase` JSON-RPC 域、库存台账只读 `inventory` JSON-RPC 域、来料质检 `quality` JSON-RPC 域、业务事实 `operational_fact` JSON-RPC 域、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
 | `scripts/` | 本地环境初始化、质量门禁和 Git hooks |
 | [`.agents/skills/`](.agents/skills/README.md) | Codex 项目专属 skills，维护 plush 文档治理、页面治理、代码审查、测试治理、提示词治理、发布治理、业务边界、运行诊断、seed/import、可观测错误和安全隐私工作流，并提供“按问题选 Skill”的使用场景速查；作为仓库内 canonical，不依赖个人本机 `~/.codex/skills` 副本 |
@@ -54,50 +54,28 @@ bash scripts/bootstrap.sh
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web
 pnpm install
-pnpm start:desktop
+pnpm start
 ```
 
 默认地址：`http://localhost:5175`
 
-桌面构建同时提供单端口任务端兼容路径，例如 `http://localhost:5175/m/warehouse/tasks`。统一登录页会按设备给默认入口，手机默认岗位任务端、电脑默认后台、平板优先使用上次选择；入口按钮由前端入口配置控制。用户不在登录前手选岗位角色，岗位任务端按管理员账号已有 `mobile.<role>.access` 权限自动进入第一个可用岗位，最终访问仍由后端 RBAC 权限校验。
+同一个 Vite 服务同时提供桌面后台和岗位任务端，例如 `http://localhost:5175/m/warehouse/tasks`。统一登录页会按设备给默认入口，手机默认岗位任务端、电脑默认后台、平板优先使用上次选择；入口按钮由前端入口配置控制。用户不在登录前手选岗位角色，岗位任务端按管理员账号已有 `mobile.<role>.access` 权限自动进入第一个可用岗位，最终访问仍由后端 RBAC 权限校验。
 
 ### 岗位任务端
 
-```bash
-cd /Users/simon/projects/plush-toy-erp/web
-pnpm start:mobile:all
+岗位任务端不再单独启动 Vite，也不再按角色拆端口。本地和生产都通过同一个前端入口访问：
+
+```text
+http://localhost:5175/m/boss/tasks
+http://localhost:5175/m/sales/tasks
+http://localhost:5175/m/purchase/tasks
+http://localhost:5175/m/production/tasks
+http://localhost:5175/m/warehouse/tasks
+http://localhost:5175/m/finance/tasks
+http://localhost:5175/m/pmc/tasks
+http://localhost:5175/m/quality/tasks
+http://localhost:5175/m/engineering/tasks
 ```
-
-`pnpm start:mobile:all` 启动前会先停止旧的本项目移动端 Vite 进程，避免端口自动漂移导致角色入口错位。
-
-或按角色单独启动：
-
-```bash
-cd /Users/simon/projects/plush-toy-erp/web
-pnpm start:mobile:boss
-pnpm start:mobile:business
-pnpm start:mobile:purchasing
-pnpm start:mobile:production
-pnpm start:mobile:warehouse
-pnpm start:mobile:finance
-pnpm start:mobile:pmc
-pnpm start:mobile:quality
-pnpm start:mobile:engineering
-```
-
-端口矩阵：
-
-| 入口 | 端口 |
-| --- | --- |
-| 老板岗位任务端 | `5186` |
-| 业务岗位任务端 | `5187` |
-| 采购岗位任务端 | `5188` |
-| 生产岗位任务端 | `5189` |
-| 仓库岗位任务端 | `5190` |
-| 财务岗位任务端 | `5191` |
-| PMC 岗位任务端 | `5192` |
-| 品质岗位任务端 | `5193` |
-| 工程岗位任务端 | `5194` |
 
 ### 生产前端
 

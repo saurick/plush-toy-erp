@@ -5,6 +5,7 @@ export const DEV_TESTING_CURRENT_DOC_PATHS = Object.freeze([
   DEV_TESTING_STRATEGY_SOURCE_PATH,
   'README.md',
   'web/README.md',
+  'web/scripts/README.md',
   'server/README.md',
   'scripts/README.md',
   'docs/部署约定.md',
@@ -75,7 +76,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     key: 'trial-account-rbac',
     label: '试用账号 RBAC / Trial Account RBAC',
     description:
-      '生成试用账号、角色模板、岗位入口或菜单权限后复制；先打印无写入输入模板，真实验证需要本地后端和演示账号密码，只读核对登录、角色、岗位入口权限和 debug 权限边界。',
+      '生成试用账号、角色模板、岗位入口、菜单权限或 effective session 诊断后复制；先打印无写入输入模板，真实验证需要本地后端和演示账号密码，只读核对登录、角色、岗位入口权限、脱敏投影诊断和 debug 权限边界。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH node --test scripts/qa/trial-account-rbac.test.mjs web/scripts/trialDemoAccountBrowserSmoke.test.mjs',
@@ -87,6 +88,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
       "TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs",
       "TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' PATH=/usr/local/bin:$PATH node scripts/qa/trial-account-rbac.mjs --report output/trial-account-rbac/report.json",
       "TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:trial-demo-browser",
+      "TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' PATH=/usr/local/bin:$PATH node web/scripts/trialDemoAccountBrowserSmoke.mjs --report output/trial-demo-account-browser-smoke/report.json",
     ],
   },
   {
@@ -113,7 +115,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     key: 'trial-simulated-data',
     label: '试用模拟数据 / Trial Simulated Data',
     description:
-      '试用账号、seed / fixture、模拟主数据或本地闭环工具改动时复制；先打印 no-write 输入模板，再按需生成 report-only 证据；只证明本地 simulated-only / no real import 守卫，report-only 命令不连接后端。',
+      '试用账号、seed / fixture、模拟主数据或本地闭环工具改动时复制；先打印 no-write 输入模板，再按需生成 report-only 证据；岗位任务模拟计划覆盖完成、阻塞、退回和催办；只证明本地 simulated-only / no real import 守卫，report-only 命令不连接后端。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH node --test scripts/qa/trial-simulated-data.test.mjs scripts/qa/operational-fact-simulated-closure.test.mjs scripts/qa/mobile-workflow-simulated-closure.test.mjs',
@@ -146,10 +148,10 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
       '移动端任务动作、内部提醒、完成反馈或跨角色催办改动时复制；先打印无写入输入模板并生成动作计划 preflight，真实浏览器命令需本地后端和演示账号密码。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs',
+      'PATH=/usr/local/bin:$PATH node --test scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs web/src/erp/mobile/utils/mobileRoleTaskModel.test.mjs web/src/erp/utils/workflowTaskBoard.test.mjs',
       'PATH=/usr/local/bin:$PATH node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --print-input-template',
       'PATH=/usr/local/bin:$PATH node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --preflight-report output/mobile-workflow-runtime-browser-smoke/preflight.json',
-      "MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='replace-with-local-demo-password' pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:mobile-workflow-runtime-browser",
+      "MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='replace-with-local-demo-password' PATH=/usr/local/bin:$PATH node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --report output/mobile-workflow-runtime-browser-smoke/report.json",
     ],
   },
   {
@@ -192,7 +194,9 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
       '客户配置包结构、moduleStates、角色池、页面 / 字段投影、runtime manifest 或 active revision 读回前置改动时复制；只做本地 validate / compile、输入模板和无后端测试，不发布、不激活、不调用后端。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test scripts/qa/customer-package-lint.test.mjs scripts/qa/customer-config-runtime-manifest.test.mjs scripts/deploy/customer-config-release-execute.test.mjs scripts/deploy/customer-config-release-readiness.test.mjs scripts/deploy/run-smoke-script.test.mjs',
+      'PATH=/usr/local/bin:$PATH /usr/local/bin/pnpm --dir web start:yoyoosun -- --print-plan',
+      'PATH=/usr/local/bin:$PATH /usr/local/bin/pnpm --dir web preview:yoyoosun -- --print-plan',
+      'PATH=/usr/local/bin:$PATH node --test scripts/qa/customer-package-lint.test.mjs scripts/qa/customer-config-runtime-manifest.test.mjs scripts/deploy/customer-config-release-execute.test.mjs scripts/deploy/customer-config-release-readiness.test.mjs scripts/deploy/run-smoke-script.test.mjs web/scripts/yoyoosunEntryPlan.test.mjs web/devCustomerConfigPlugin.test.mjs',
       'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer demo',
       'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer demo --mode compile',
       'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer yoyoosun',
@@ -202,9 +206,10 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
       'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun',
       'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode compile',
       'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-config-runtime-manifest.json',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-effective-session-probe.mjs --json --report output/customers/yoyoosun/customer-config-effective-session-probe/current.json',
       'PATH=/usr/local/bin:$PATH node scripts/deploy/customer-config-release-execute.mjs --print-input-template',
       'PATH=/usr/local/bin:$PATH node scripts/deploy/customer-config-release-readiness.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node scripts/deploy/customer-config-release-readiness.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --readback-preflight-report output/customers/yoyoosun/customer-config-readback-preflight.json',
+      'PATH=/usr/local/bin:$PATH node scripts/deploy/customer-config-release-readiness.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/2026-06-29 --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --readback-preflight-report output/customers/yoyoosun/customer-config-readback-preflight.json',
       'PATH=/usr/local/bin:$PATH bash deployments/yoyoosun/scripts/run-smoke.sh --print-input-template',
     ],
   },
@@ -222,7 +227,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     key: 'frontend-customer-config-projection',
     label: '客户配置前端投影 / Customer Config Projection',
     description:
-      '正式前端 effective session、菜单、动作或字段投影改动时复制；只证明本地投影合同，不读取 raw customer package。',
+      '正式前端 effective session、菜单、动作、字段投影或脱敏诊断改动时复制；只证明本地投影合同，不读取 raw customer package。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH node --test web/src/erp/utils/adminProfileSync.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs scripts/qa/multi-client-role-workflow-priority-audit.test.mjs',
@@ -233,10 +238,10 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     key: 'frontend-error-messages',
     label: '前端错误提示边界 / Frontend Error Messages',
     description:
-      '正式页面、组件、岗位任务端或共享 PDF 预览错误提示改动时复制；只证明本地用户可见错误不透传底层英文异常。',
+      '正式页面、组件、岗位任务端、共享 PDF 预览、用户可见错误或技术字段展示改动时复制；只证明本地用户可见错误不透传底层英文异常，且业务界面不展示 raw id / 内部字段。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test scripts/qa/frontend-error-message-boundary.test.mjs',
+      'PATH=/usr/local/bin:$PATH node --test scripts/qa/frontend-error-message-boundary.test.mjs web/src/common/utils/errorMessage.test.mjs web/src/erp/utils/userVisibleTechnicalFields.test.mjs web/src/erp/utils/dashboardTaskDisplay.test.mjs',
     ],
   },
   {
@@ -246,7 +251,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
       'Workflow 动作入口、Source Document 生命周期、销售订单字段策略、导出或打印边界改动时复制；只证明本地前端、文档和后端登记表静态边界守卫。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test web/src/erp/utils/workflowTaskActionAccess.test.mjs scripts/qa/workflow-ui-action-boundary.test.mjs scripts/qa/sales-order-field-chain-boundary.test.mjs',
+      'PATH=/usr/local/bin:$PATH node --test web/src/erp/utils/workflowTaskActionAccess.test.mjs scripts/qa/workflow-ui-action-boundary.test.mjs scripts/qa/sales-order-field-chain-boundary.test.mjs web/src/erp/config/printTemplates.test.mjs',
     ],
   },
   {
@@ -542,17 +547,19 @@ export function extractDevTestingCommandBlocks(
     const headingMatch = [...before.matchAll(/^#{2,4}\s+(.+)$/gm)].pop()
     const context = headingMatch ? stripHeadingMarkdown(headingMatch[1]) : title
     const commands = extractShellCommandsFromBlock(match[1])
+    const sourceLabel = devTestingSourceLabel(sourcePath, title)
 
     if (commands.length === 0) continue
 
     blocks.push({
       key: `${sourcePath || 'source'}:${blocks.length}`,
       sourcePath,
+      sourceLabel,
       title,
       context,
       commands,
       commandText: commands.join('\n'),
-      searchText: [sourcePath, title, context, commands.join(' ')]
+      searchText: [sourcePath, sourceLabel, title, context, commands.join(' ')]
         .join(' ')
         .toLowerCase(),
     })
@@ -563,6 +570,7 @@ export function extractDevTestingCommandBlocks(
 function classifyTestingDoc(path = '') {
   if (path === DEV_TESTING_STRATEGY_SOURCE_PATH) return '测试策略'
   if (path === 'scripts/README.md') return 'QA 脚本'
+  if (path === 'web/scripts/README.md') return '前端脚本'
   if (path === 'web/README.md') return '前端验证'
   if (path === 'server/README.md') return '后端验证'
   if (path === 'README.md') return '项目入口'
@@ -577,6 +585,15 @@ function classifyTestingDoc(path = '') {
   return /qa|test|测试|验收|回归|smoke|style:l1/i.test(path)
     ? '测试资料'
     : '当前文档'
+}
+
+function devTestingSourceLabel(path = '', title = '') {
+  const category = classifyTestingDoc(path)
+  const cleanTitle = stripMarkdownInline(title)
+  if (cleanTitle && cleanTitle !== path) {
+    return `${category}：${cleanTitle}`
+  }
+  return category
 }
 
 function countKeywordHits(value = '') {
@@ -610,10 +627,12 @@ export function buildDevTestingDocs(markdownModules = {}) {
       title,
     })
     const category = classifyTestingDoc(path, source)
+    const sourceLabel = devTestingSourceLabel(path, title)
 
     byPath.set(path, {
       key: path,
       path,
+      sourceLabel,
       title,
       category,
       keywordHits,
@@ -623,7 +642,9 @@ export function buildDevTestingDocs(markdownModules = {}) {
       ),
       commandBlocks,
       source,
-      searchText: [path, title, category, source].join(' ').toLowerCase(),
+      searchText: [path, sourceLabel, title, category, source]
+        .join(' ')
+        .toLowerCase(),
     })
   })
 

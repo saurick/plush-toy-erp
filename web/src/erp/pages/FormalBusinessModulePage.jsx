@@ -27,6 +27,7 @@ import {
   blockWorkflowTaskAction,
   completeWorkflowTaskAction,
   listWorkflowTasks,
+  rejectWorkflowTaskAction,
   urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
 import {
@@ -55,12 +56,11 @@ import {
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
-import { ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
+import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../utils/workflowTaskActionSubmitGuard.mjs'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const SHIPPING_RELEASE_MODULE_KEY = 'shipping-release'
 const SHIPMENT_RELEASE_TASK_GROUP = 'shipment_release'
-const WORKFLOW_ROLE_LABELS = new Map(Object.entries(ROLE_DISPLAY_NAMES))
 
 const STATUS_OPTIONS = Object.freeze([
   { label: '全部状态', value: '' },
@@ -174,21 +174,47 @@ function getPreferredColumnOrder({
 }
 
 function statusTag(status) {
-  const option =
-    STATUS_OPTIONS.find((item) => item.value === status) || STATUS_OPTIONS[1]
-  return <Tag color={option.color || 'default'}>{option.label}</Tag>
+  const option = STATUS_OPTIONS.find((item) => item.value === status)
+  return <Tag color={option?.color || 'default'}>{statusText(status)}</Tag>
+}
+
+function statusText(status) {
+  const key = String(status || '').trim()
+  if (!key) return '-'
+  return STATUS_OPTIONS.find((item) => item.value === key)?.label || '业务状态'
 }
 
 function compareText(a, b) {
   return String(a || '').localeCompare(String(b || ''), 'zh-Hans-CN')
 }
 
-function workflowPayloadOf(task = {}) {
-  return task?.payload && typeof task.payload === 'object' ? task.payload : {}
-}
-
 function isShipmentReleaseWorkflowTask(task = {}) {
   return String(task?.task_group || '').trim() === SHIPMENT_RELEASE_TASK_GROUP
+}
+
+function getFormalModuleBusinessScope(moduleItem = {}, fallback = '') {
+  const scopeItems = Array.isArray(moduleItem.currentScope)
+    ? moduleItem.currentScope
+    : []
+  return scopeItems.find((item) => String(item || '').trim()) || fallback
+}
+
+function getFormalModuleRelationLabel(moduleItem = {}) {
+  if (moduleItem.sectionKey === 'finance') return '财务业务事实'
+  if (moduleItem.sectionKey === 'warehouse') return '库存与仓储业务'
+  if (moduleItem.sectionKey === 'quality') return '质检与批次业务'
+  if (moduleItem.sectionKey === 'outsourcing') return '委外加工业务'
+  if (moduleItem.sectionKey === 'shipment') return '出货与库存业务'
+  if (moduleItem.sectionKey === 'production') return '生产协同业务'
+  if (moduleItem.sectionKey === 'engineering') return '产品工程业务'
+  if (moduleItem.sectionKey === 'purchase') return '采购业务'
+  if (moduleItem.sectionKey === 'sales') return '销售业务'
+  if (moduleItem.sectionKey === 'master') return '主数据业务'
+  return `${moduleItem.title || '当前模块'}业务`
+}
+
+function getFormalModuleEntryLabel(moduleItem = {}) {
+  return `${moduleItem.title || '当前模块'}后端规则与接口`
 }
 
 function buildFormalShellRows(moduleItem) {
@@ -196,9 +222,7 @@ function buildFormalShellRows(moduleItem) {
     ? moduleItem.currentScope
     : []
   const ownerRole = OWNER_ROLE_LABELS[moduleItem.key] || '业务负责人'
-  const refs = Array.isArray(moduleItem.sourceRefs)
-    ? moduleItem.sourceRefs.join(' / ')
-    : moduleItem.factSource || moduleItem.primaryEntity || '领域表待评审'
+  const relationLabel = getFormalModuleRelationLabel(moduleItem)
 
   return [
     {
@@ -207,8 +231,8 @@ function buildFormalShellRows(moduleItem) {
       title: `${moduleItem.title}字段预览`,
       business_status: 'source_grounded',
       owner_role: ownerRole,
-      source_refs: refs,
-      scope: scopeItems[0] || moduleItem.primaryEntity || moduleItem.title,
+      source_refs: relationLabel,
+      scope: scopeItems[0] || `${moduleItem.title}业务范围`,
     },
     {
       id: `${moduleItem.key}-review`,
@@ -216,7 +240,7 @@ function buildFormalShellRows(moduleItem) {
       title: `${moduleItem.title}评审边界`,
       business_status: 'review_required',
       owner_role: ownerRole,
-      source_refs: moduleItem.primaryEntity || refs,
+      source_refs: getFormalModuleEntryLabel(moduleItem),
       scope: scopeItems[1] || moduleItem.boundary || '字段和动作待评审',
     },
     {
@@ -225,7 +249,7 @@ function buildFormalShellRows(moduleItem) {
       title: `${moduleItem.title}接入边界`,
       business_status: 'pending_api',
       owner_role: ownerRole,
-      source_refs: moduleItem.factSource || refs,
+      source_refs: '后端规则待接入',
       scope: scopeItems[2] || '操作入口待接入',
     },
   ]
@@ -261,13 +285,13 @@ function FormalShellActionForm({ moduleItem, actionModal, selectedLabel }) {
   const fieldScope = (moduleItem.currentScope || []).join('；') || record?.scope
   const boundaryText = [
     '当前页面仍是待接入预览页；不提供真实创建、保存、删除、打印、业务数据导出或领域事实写入。',
-    '真实能力必须接入领域 usecase、API、RBAC、审计和测试后启用，不能从前端本地伪造事实。',
+    '真实能力必须接入后端业务规则、后台接口、权限控制、审计和测试后启用，不能从前端本地伪造事实。',
     moduleItem.boundary ? `模块边界：${moduleItem.boundary}` : '',
-    '不读取、不创建、不更新、不删除 business_records；旧表族不作为运行时真源。',
+    '不读取、不创建、不更新、不删除旧业务记录壳；旧表族不作为运行时真源。',
   ]
     .filter(Boolean)
     .join(' ')
-  const valueOrPlaceholder = (value, placeholder = '待接入领域 API 后生成') =>
+  const valueOrPlaceholder = (value, placeholder = '待接入后台接口后生成') =>
     value || placeholder
   const shellFields = [
     {
@@ -282,16 +306,15 @@ function FormalShellActionForm({ moduleItem, actionModal, selectedLabel }) {
       value: statusOption?.label || '新建草稿',
     },
     {
-      label: '主事实 / 真源',
-      value:
-        moduleItem.factSource || moduleItem.primaryEntity || '领域真源待评审',
+      label: '当前业务范围',
+      value: getFormalModuleBusinessScope(
+        moduleItem,
+        `${moduleItem.title}业务范围`
+      ),
     },
     {
-      label: '来源表',
-      value:
-        record?.source_refs ||
-        (moduleItem.sourceRefs || []).join(' / ') ||
-        moduleItem.title,
+      label: '关联业务',
+      value: record?.source_refs || getFormalModuleRelationLabel(moduleItem),
     },
   ]
   const scopedCoreFields =
@@ -459,9 +482,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
           width: 120,
           render: statusTag,
           sorter: (a, b) => compareText(a.business_status, b.business_status),
-          exportValue: (record) =>
-            STATUS_OPTIONS.find((item) => item.value === record.business_status)
-              ?.label || record.business_status,
+          exportValue: (record) => statusText(record.business_status),
         },
         {
           title: '责任角色',
@@ -585,13 +606,18 @@ export default function FormalBusinessModulePage({ moduleKey }) {
 
   const completeWorkflowTask = useCallback(
     async (task) => {
+      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
+        task,
+        actionKey: 'complete',
+        onWarning: message.warning,
+        onError: message.error,
+      })
+      if (!accessVerified) return
       await completeWorkflowTaskAction({
-        id: task.id,
+        task_id: task.id,
         action_key: 'complete',
-        business_status_key: task.business_status_key || 'shipping_released',
         reason: '',
         payload: {
-          ...workflowPayloadOf(task),
           shipment_release_page_action: 'complete',
           shipment_release_page_scope: 'workflow_only',
         },
@@ -604,13 +630,19 @@ export default function FormalBusinessModulePage({ moduleKey }) {
 
   const blockWorkflowTask = useCallback(
     async (task, { reason = '' } = {}) => {
+      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
+        task,
+        actionKey: 'block',
+        reason,
+        onWarning: message.warning,
+        onError: message.error,
+      })
+      if (!accessVerified) return
       await blockWorkflowTaskAction({
-        id: task.id,
+        task_id: task.id,
         action_key: 'block',
-        business_status_key: 'blocked',
         reason,
         payload: {
-          ...workflowPayloadOf(task),
           blocked_reason: reason,
           shipment_release_page_action: 'block',
           shipment_release_page_scope: 'workflow_only',
@@ -622,16 +654,47 @@ export default function FormalBusinessModulePage({ moduleKey }) {
     [loadShippingReleaseWorkflowTasks]
   )
 
+  const rejectWorkflowTask = useCallback(
+    async (task, { reason = '' } = {}) => {
+      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
+        task,
+        actionKey: 'reject',
+        reason,
+        onWarning: message.warning,
+        onError: message.error,
+      })
+      if (!accessVerified) return
+      await rejectWorkflowTaskAction({
+        task_id: task.id,
+        action_key: 'reject',
+        reason,
+        payload: {
+          rejected_reason: reason,
+          shipment_release_page_action: 'reject',
+          shipment_release_page_scope: 'workflow_only',
+        },
+      })
+      message.success('出货放行退回原因已记录')
+      await loadShippingReleaseWorkflowTasks()
+    },
+    [loadShippingReleaseWorkflowTasks]
+  )
+
   const urgeShippingReleaseWorkflowTask = useCallback(
     async (task, { reason = '' } = {}) => {
+      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
+        task,
+        actionKey: 'urge',
+        reason,
+        onWarning: message.warning,
+        onError: message.error,
+      })
+      if (!accessVerified) return
       await urgeWorkflowTask({
         task_id: task.id,
         action: 'urge_task',
         reason,
         payload: {
-          source_type: task.source_type,
-          source_id: task.source_id,
-          source_no: task.source_no,
           entry: 'shipping_release_page',
           shipment_release_page_scope: 'workflow_only',
         },
@@ -709,12 +772,12 @@ export default function FormalBusinessModulePage({ moduleKey }) {
   const transitionMenuItems = [
     {
       key: 'status-transitions',
-      label: '待接入状态动作',
+      label: '状态动作边界',
       type: 'group',
       children: [
-        { key: 'submit', label: '提交动作未接入' },
-        { key: 'approve', label: '确认动作未接入' },
-        { key: 'return', label: '退回动作未接入' },
+        { key: 'submit', label: '提交前置边界' },
+        { key: 'approve', label: '确认前置边界' },
+        { key: 'return', label: '退回处理边界' },
       ],
     },
   ]
@@ -758,7 +821,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         }
         actions={
           <Space wrap>
-            <Tooltip title="当前待接入预览页不导出业务数据；字段清单应以产品台账和领域 API 接入评审为准。">
+            <Tooltip title="当前待接入预览页不导出业务数据；字段清单应以产品台账和后台接口接入评审为准。">
               <span>
                 <ToolbarButton icon={<DownloadOutlined />} disabled>
                   不导出业务数据
@@ -886,11 +949,11 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         selectedTasks={[]}
         selectedRecordLabel={selectedRows[0]?.title || selectedLabel}
         adminProfile={adminProfile}
-        roleLabelMap={WORKFLOW_ROLE_LABELS}
         onCompleteTask={
           canCompleteWorkflowTasks ? completeWorkflowTask : undefined
         }
         onBlockTask={canUpdateWorkflowTasks ? blockWorkflowTask : undefined}
+        onRejectTask={canUpdateWorkflowTasks ? rejectWorkflowTask : undefined}
         onUrgeTask={
           canUpdateWorkflowTasks ? urgeShippingReleaseWorkflowTask : undefined
         }
@@ -899,7 +962,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
       {actionModal?.variant === 'form' ? (
         <BusinessFormModal
           title={actionModal?.title || '操作'}
-          description="当前只预览待接入字段和边界；真实保存需接入领域 usecase、API 和 RBAC。"
+          description="当前只预览待接入字段和边界；真实保存需接入后端业务规则、后台接口和权限控制。"
           open={Boolean(actionModal)}
           onCancel={() => setActionModal(null)}
           footer={
@@ -942,11 +1005,10 @@ export default function FormalBusinessModulePage({ moduleKey }) {
               {actionModal?.record?.document_no || selectedLabel}
             </Descriptions.Item>
             <Descriptions.Item label="未来接入位置">
-              {moduleItem.primaryEntity || moduleItem.title}（待接入）
+              {getFormalModuleEntryLabel(moduleItem)}（待接入）
             </Descriptions.Item>
             <Descriptions.Item label="当前边界">
-              当前页面仍是待接入预览页；真实保存必须接入领域 usecase、API 和
-              RBAC 后启用，不能从前端本地伪造事实。
+              当前页面仍是待接入预览页；真实保存必须接入后端业务规则、后台接口和权限控制后启用，不能从前端本地伪造事实。
             </Descriptions.Item>
           </Descriptions>
         </Modal>

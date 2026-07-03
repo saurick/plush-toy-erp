@@ -22,6 +22,7 @@ import FieldWithUnitSuffix, {
 } from '../business-list/FieldWithUnitSuffix.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
+import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
   dateInputNotAfterRule,
@@ -30,8 +31,10 @@ import {
   isDateInputBefore,
 } from '../../utils/dateRange.mjs'
 import {
+  buildSalesOrderItemSourceValuesFromSKU,
   deriveSalesOrderItemAmount,
   paymentConditionCompleteness,
+  summarizeSalesOrderLines,
   unixToDateInputValue,
 } from '../../utils/masterDataOrderView.mjs'
 import {
@@ -40,17 +43,6 @@ import {
 } from '../../utils/contactValidation.mjs'
 import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
 
-const EMPTY_ORDER_LINES = []
-
-function decimalNumber(value) {
-  const numeric = Number(
-    String(value ?? '')
-      .replace(/,/g, '')
-      .trim()
-  )
-  return Number.isFinite(numeric) ? numeric : 0
-}
-
 function formatSummaryNumber(value, fractionDigits = 0) {
   if (!Number.isFinite(value) || value === 0) {
     return fractionDigits > 0 ? Number(0).toFixed(fractionDigits) : '0'
@@ -58,19 +50,6 @@ function formatSummaryNumber(value, fractionDigits = 0) {
   return fractionDigits > 0
     ? value.toFixed(fractionDigits)
     : String(Number(value.toFixed(4)))
-}
-
-function summarizeSalesOrderLines(lines = []) {
-  const items = Array.isArray(lines) ? lines : []
-  return items.reduce(
-    (summary, line) => ({
-      count: summary.count + 1,
-      quantity: summary.quantity + decimalNumber(line?.ordered_quantity),
-      amount:
-        summary.amount + decimalNumber(deriveSalesOrderItemAmount(line) || 0),
-    }),
-    { count: 0, quantity: 0, amount: 0 }
-  )
 }
 
 function skuLabel(sku = {}) {
@@ -93,12 +72,23 @@ function contactPhoneText(contact = {}) {
   return contact.mobile || contact.phone || ''
 }
 
-export function createBlankOrderLine(lineNo = 1) {
+function sourceDefaultUnitText(unitOptions, unitID) {
+  const normalizedID = Number(unitID || 0)
+  if (!Number.isFinite(normalizedID) || normalizedID <= 0) {
+    return '-'
+  }
+  return (
+    unitSuffixTextFromOptions(unitOptions, normalizedID, '单位已关联') ||
+    '单位已关联'
+  )
+}
+
+export function createBlankOrderLine(lineNo = 1, { unitID } = {}) {
   return {
     line_no: lineNo,
     product_sku_id: undefined,
     product_id: undefined,
-    unit_id: undefined,
+    unit_id: unitID,
     product_code_snapshot: '',
     product_name_snapshot: '',
     color_snapshot: '',
@@ -113,14 +103,12 @@ export function createBlankOrderLine(lineNo = 1) {
 function createOrderLineFromSKU(sku = {}, lineNo = 1) {
   return {
     ...createBlankOrderLine(lineNo),
-    product_sku_id: sku.id,
-    product_id: sku.product_id,
-    unit_id: sku.default_unit_id,
-    product_code_snapshot: sku.sku_code || '',
-    product_name_snapshot:
-      sku.sku_name || sku.customer_sku || sku.barcode || '',
-    color_snapshot: sku.color || '',
+    ...buildSalesOrderItemSourceValuesFromSKU(sku),
   }
+}
+
+function optionalFormValue(value) {
+  return value === null || value === undefined ? '' : value
 }
 
 export function normalizeSalesOrderItemFormValue(item = {}) {
@@ -134,9 +122,9 @@ export function normalizeSalesOrderItemFormValue(item = {}) {
     product_code_snapshot: item.product_code_snapshot || '',
     product_name_snapshot: item.product_name_snapshot || '',
     color_snapshot: item.color_snapshot || '',
-    ordered_quantity: item.ordered_quantity || '',
-    unit_price: item.unit_price || '',
-    amount: item.amount || '',
+    ordered_quantity: optionalFormValue(item.ordered_quantity),
+    unit_price: optionalFormValue(item.unit_price),
+    amount: optionalFormValue(item.amount),
     planned_delivery_date: unixToDateInputValue(item.planned_delivery_date),
     note: item.note || '',
   }
@@ -168,34 +156,12 @@ function findOrderLineSKU(line = {}, productSKUs = []) {
   })
 }
 
-function buildOrderLineSourceValues(sku = {}) {
-  if (!sku?.id) {
-    return {
-      product_sku_id: undefined,
-      product_id: undefined,
-      unit_id: undefined,
-      product_code_snapshot: '',
-      product_name_snapshot: '',
-      color_snapshot: '',
-    }
-  }
-  return {
-    product_sku_id: sku.id,
-    product_id: sku.product_id,
-    unit_id: sku.default_unit_id,
-    product_code_snapshot: sku.sku_code || '',
-    product_name_snapshot:
-      sku.sku_name || sku.customer_sku || sku.barcode || '',
-    color_snapshot: sku.color || '',
-  }
-}
-
 function setOrderLineSourceFromSKU(form, lineIndex, sku) {
   const currentLines = form.getFieldValue('items') || []
   const nextLines = [...currentLines]
   nextLines[lineIndex] = {
     ...(nextLines[lineIndex] || {}),
-    ...buildOrderLineSourceValues(sku),
+    ...buildSalesOrderItemSourceValuesFromSKU(sku),
   }
   form.setFieldsValue({ items: nextLines })
 }
@@ -283,6 +249,7 @@ export function SalesOrderFormFields({
         rules={[{ required: true, message: '请选择客户' }]}
       >
         <Select
+          allowClear
           showSearch
           optionFilterProp="label"
           options={customers.map((customer) => {
@@ -505,11 +472,9 @@ export function SalesOrderItemsFormSection({
   unitOptions = [],
 }) {
   const [skuImportOpen, setSkuImportOpen] = useState(false)
-  const watchedItems = Form.useWatch('items', form) || EMPTY_ORDER_LINES
   const orderDate = Form.useWatch('order_date', form)
-  const lineSummary = summarizeSalesOrderLines(watchedItems)
   const { registerLineItemRow, requestLineItemScroll } =
-    useLineItemAppendScroll(watchedItems.length)
+    useLineItemAppendScroll()
   const skuByID = useMemo(
     () => new Map(productSKUs.map((sku) => [sku.id, sku])),
     [productSKUs]
@@ -537,7 +502,7 @@ export function SalesOrderItemsFormSection({
     if (changed) {
       form.setFieldsValue({ items: nextLines })
     }
-  }, [defaultUnitID, form, watchedItems])
+  }, [defaultUnitID, form])
   useEffect(() => {
     const currentLines = form.getFieldValue('items') || []
     let changed = false
@@ -554,7 +519,7 @@ export function SalesOrderItemsFormSection({
     if (changed) {
       form.setFieldsValue({ items: nextLines })
     }
-  }, [form, productSKUs, watchedItems])
+  }, [form, productSKUs])
   const skuOptions = productSKUs.map((sku) => ({
     label: skuLabel(sku),
     value: sku.id,
@@ -581,7 +546,13 @@ export function SalesOrderItemsFormSection({
       render: (_, sku) =>
         [sku.size, sku.packaging_version].filter(Boolean).join(' / ') || '-',
     },
-    { title: '默认单位', dataIndex: 'default_unit_id', width: 100 },
+    {
+      title: '默认单位',
+      key: 'default_unit',
+      width: 100,
+      render: (_, sku) =>
+        sourceDefaultUnitText(unitOptions, sku.default_unit_id),
+    },
   ]
 
   return (
@@ -851,36 +822,50 @@ export function SalesOrderItemsFormSection({
                           <Input />
                         </Form.Item>
                         <Form.Item
-                          className="erp-line-item-field erp-line-item-field--quantity"
-                          label="订单数量"
-                          name={[field.name, 'ordered_quantity']}
-                          rules={[
-                            {
-                              required: true,
-                              message: '请填写订单数量',
-                            },
-                            quantityPrecisionRule({
-                              form,
-                              fieldName: field.name,
-                              unitOptions,
-                            }),
-                          ]}
+                          noStyle
+                          shouldUpdate={(previous, current) =>
+                            previous?.items?.[field.name]?.unit_id !==
+                            current?.items?.[field.name]?.unit_id
+                          }
                         >
-                          <FieldWithUnitSuffix
-                            control={
-                              <Input
-                                allowClear
-                                autoComplete="off"
-                                disabled={!canEditLine}
-                                placeholder="输入数量"
+                          {({ getFieldValue }) => (
+                            <Form.Item
+                              className="erp-line-item-field erp-line-item-field--quantity"
+                              label="订单数量"
+                              name={[field.name, 'ordered_quantity']}
+                              rules={[
+                                {
+                                  required: true,
+                                  message: '请填写订单数量',
+                                },
+                                quantityPrecisionRule({
+                                  form,
+                                  fieldName: field.name,
+                                  unitOptions,
+                                }),
+                              ]}
+                            >
+                              <FieldWithUnitSuffix
+                                control={
+                                  <Input
+                                    allowClear
+                                    autoComplete="off"
+                                    disabled={!canEditLine}
+                                    placeholder="输入数量"
+                                  />
+                                }
+                                unitText={unitSuffixTextFromOptions(
+                                  unitOptions,
+                                  getFieldValue([
+                                    'items',
+                                    field.name,
+                                    'unit_id',
+                                  ]),
+                                  singleUnitSuffixTextFromOptions(unitOptions)
+                                )}
                               />
-                            }
-                            unitText={unitSuffixTextFromOptions(
-                              unitOptions,
-                              watchedItems?.[field.name]?.unit_id,
-                              singleUnitSuffixTextFromOptions(unitOptions)
-                            )}
-                          />
+                            </Form.Item>
+                          )}
                         </Form.Item>
                         <Form.Item
                           className="erp-line-item-field erp-line-item-field--money"
@@ -988,25 +973,43 @@ export function SalesOrderItemsFormSection({
               addDisabled={!canCreateItem}
               onAdd={() => {
                 const currentLines = form.getFieldValue('items') || []
+                add(
+                  createBlankOrderLine(getNextLineNo(currentLines), {
+                    unitID: defaultUnitID,
+                  })
+                )
                 requestLineItemScroll(currentLines.length)
-                add(createBlankOrderLine(getNextLineNo(currentLines)))
               }}
               stats={[
                 {
                   key: 'count',
                   label: '已录入',
-                  value: lineSummary.count,
+                  value: fields.length,
                   suffix: '条',
                 },
                 {
                   key: 'quantity',
                   label: '数量合计',
-                  value: formatSummaryNumber(lineSummary.quantity),
+                  value: (
+                    <BusinessLineItemsSummaryValue
+                      summarize={summarizeSalesOrderLines}
+                      select={(summary) =>
+                        formatSummaryNumber(summary.quantity)
+                      }
+                    />
+                  ),
                 },
                 {
                   key: 'amount',
                   label: '金额合计',
-                  value: formatSummaryNumber(lineSummary.amount, 2),
+                  value: (
+                    <BusinessLineItemsSummaryValue
+                      summarize={summarizeSalesOrderLines}
+                      select={(summary) =>
+                        formatSummaryNumber(summary.amount, 2)
+                      }
+                    />
+                  ),
                 },
               ]}
             />

@@ -24,6 +24,18 @@ test('mobile auth login route smoke input template is no-write and covers all ro
   assert.equal(template.startsBrowser, false)
   assert.equal(template.startsDevServer, false)
   assert.equal(template.usesMockRpc, true)
+  assert.match(
+    template.suggestedMockSmokeCommand,
+    /smoke:mobile-auth-login-route/
+  )
+  assert.deepEqual(template.notProvenByThisTemplate, [
+    'real backend RBAC',
+    'real demo account login',
+    'customer config active revision readback',
+    'desktop menu projection',
+    'workflow task usecase writes',
+    'target environment release evidence',
+  ])
   assert.equal(template.viewportProfiles.length, 2)
   assert.equal(template.roles.length, 9)
   assert(
@@ -71,7 +83,7 @@ test('mobile auth login route smoke CLI input template does not start browser or
       encoding: 'utf8',
       env: {
         ...process.env,
-        MOBILE_AUTH_SMOKE_APP_ID: '',
+        MOBILE_AUTH_SMOKE_ROLE_KEY: '',
         MOBILE_AUTH_SMOKE_BASE_URL: '',
       },
     }
@@ -83,6 +95,9 @@ test('mobile auth login route smoke CLI input template does not start browser or
   assert.equal(template.startsDevServer, false)
   assert.equal(template.callsBackend, false)
   assert.equal(template.writesDatabase, false)
+  const legacyAppIdEnv = ['MOBILE_AUTH_SMOKE', 'APP_ID'].join('_')
+  assert.equal(JSON.stringify(template).includes(legacyAppIdEnv), false)
+  assert.equal(JSON.stringify(template).includes('appId'), false)
 })
 
 test('mobile auth login route smoke preflight is no-write and covers route plan', async () => {
@@ -108,6 +123,19 @@ test('mobile auth login route smoke preflight is no-write and covers route plan'
   assert.equal(report.routeCoverage.usesMockRpcOnly, true)
   assert.equal(report.readyForMockSmoke, true)
   assert.deepEqual(report.blockers, [])
+  assert.match(
+    report.suggestedMockSmokeCommand,
+    /smoke:mobile-auth-login-route/
+  )
+  assert.equal(report.nextCommand, report.suggestedMockSmokeCommand)
+  assert.deepEqual(report.notProvenByThisPreflight, [
+    'real backend RBAC',
+    'real demo account login',
+    'customer config active revision readback',
+    'desktop menu projection',
+    'workflow task usecase writes',
+    'target environment release evidence',
+  ])
   assert(
     report.routePlan.some(
       (item) =>
@@ -143,7 +171,7 @@ test('mobile auth login route smoke CLI writes preflight report without runtime 
       encoding: 'utf8',
       env: {
         ...process.env,
-        MOBILE_AUTH_SMOKE_APP_ID: '',
+        MOBILE_AUTH_SMOKE_ROLE_KEY: '',
         MOBILE_AUTH_SMOKE_BASE_URL: '',
       },
     }
@@ -158,4 +186,26 @@ test('mobile auth login route smoke CLI writes preflight report without runtime 
   assert.equal(report.callsJSONRPC, false)
   assert.equal(report.writesDatabase, false)
   assert.equal(report.readyForMockSmoke, true)
+  assert.equal(report.nextCommand, report.suggestedMockSmokeCommand)
+  const legacyRequestedAppIDs = ['requested', 'App', 'IDs'].join('')
+  assert.equal(JSON.stringify(report).includes(legacyRequestedAppIDs), false)
+  assert.equal(JSON.stringify(report).includes('appId'), false)
+})
+
+test('mobile auth login route smoke keeps logout click guarded against route rerenders', () => {
+  const source = fs.readFileSync(scriptPath, 'utf8')
+
+  assert.match(
+    source,
+    /async function clickAfterNavigationSettles\(page, locator\)/
+  )
+  assert.match(source, /isRetriableClickDuringNavigationError/)
+  assert.match(
+    source,
+    /clickAfterNavigationSettles\(\s*page,\s*page\.getByTestId\('mobile-role-logout-button'\)\s*\)/u
+  )
+  assert.doesNotMatch(
+    source,
+    /getByTestId\('mobile-role-logout-button'\)\.click\(/u
+  )
 })

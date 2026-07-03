@@ -99,12 +99,27 @@ test("formal frontend customer config boundary: page, action, and field projecti
   const layoutSource = readRelative("web/src/erp/components/ERPLayout.jsx");
   assert(layoutSource.includes("getEffectiveSession"));
   assert(layoutSource.includes("attachEffectiveSessionToAdminProfile"));
+  assert(layoutSource.includes("resolveEffectiveSessionCustomerKey"));
+  assert(layoutSource.includes("attachUnavailableEffectiveSessionToAdminProfile"));
+  assert(
+    !layoutSource.includes("customer_key: activeBrand?.customerKey || 'yoyoosun'"),
+    "formal layout must not fallback effective session requests to yoyoosun",
+  );
+  assert(
+    !layoutSource.includes('customer_key: activeBrand?.customerKey || "yoyoosun"'),
+    "formal layout must not fallback effective session requests to yoyoosun",
+  );
+  assert(layoutSource.includes("buildEffectiveSessionDiagnosticSummary"));
+  assert(layoutSource.includes("__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__"));
+  assert(layoutSource.includes("data-effective-session-source"));
   assert(layoutSource.includes("filterNavigationSectionsByAdminProfile"));
   assert(layoutSource.includes("shouldRedirectFromCurrentNavigation"));
   assert(layoutSource.includes("当前账号暂无可见后台入口"));
 
   const syncSource = readRelative("web/src/erp/utils/adminProfileSync.mjs");
   assert(syncSource.includes("effective_session_sync_failed"));
+  assert(syncSource.includes("super_admin_product_core"));
+  assert(syncSource.includes("hiddenFieldPolicies"));
   assert(syncSource.includes("filterNavigationSectionsByAdminProfile"));
   assert(syncSource.includes("filterColumnsByEffectiveFieldPolicy"));
   assert(syncSource.includes("effectiveSessionAllowsAction"));
@@ -120,4 +135,22 @@ test("formal frontend customer config boundary: page, action, and field projecti
   const salesOrderSource = readRelative("web/src/erp/pages/V1SalesOrdersPage.jsx");
   assert(salesOrderSource.includes("filterColumnsByEffectiveFieldPolicy"));
   assert(salesOrderSource.includes("'sales_orders.default'"));
+
+  const purchaseOrderSource = readRelative("web/src/erp/pages/V1PurchaseOrdersPage.jsx");
+  assert(purchaseOrderSource.includes("getEffectivePrintTemplateDefaults"));
+  assert(purchaseOrderSource.includes("MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY"));
+  assert(purchaseOrderSource.includes("printTemplateDefaults: purchasePrintTemplateDefaults"));
+
+  const outsourcingOrderSource = readRelative("web/src/erp/pages/V1OutsourcingOrdersPage.jsx");
+  assert(outsourcingOrderSource.includes("getEffectivePrintTemplateDefaults"));
+  assert(outsourcingOrderSource.includes("PROCESSING_CONTRACT_TEMPLATE_KEY"));
+  assert(outsourcingOrderSource.includes("printTemplateDefaults: processingPrintTemplateDefaults"));
+
+  const routerSource = readRelative("web/src/erp/router.jsx");
+  assert(routerSource.includes("shouldUseRememberedDesktopEntry"));
+  assert(routerSource.includes("isDesktopEntryEnabled(entryConfig)"));
+  assert(
+    !routerSource.includes("adminProfile && lastEntryTarget === ENTRY_TARGET.DESKTOP"),
+    "mobile route must not follow a remembered desktop entry unless the current admin has desktop menu access",
+  );
 });

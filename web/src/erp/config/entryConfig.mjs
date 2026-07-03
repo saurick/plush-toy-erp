@@ -1,4 +1,5 @@
-import { appDefinitions } from './appRegistry.mjs'
+import { mobileRoleDefinitions } from './appRegistry.mjs'
+import { resolveMenuPermissionKey } from './menuPermissions.mjs'
 import { normalizeRoleKey } from '../utils/roleKeys.mjs'
 
 export const ENTRY_TARGET = Object.freeze({
@@ -9,9 +10,7 @@ export const ENTRY_TARGET = Object.freeze({
 const LAST_ENTRY_TARGET_KEY = 'erp:last_entry_target'
 const LAST_USED = 'lastUsed'
 
-const allMobileRoleKeys = appDefinitions
-  .filter((app) => app.kind === 'mobile' && app.roleKey)
-  .map((app) => app.roleKey)
+const allMobileRoleKeys = mobileRoleDefinitions.map((role) => role.roleKey)
 
 const defaultMobileRoleConfig = Object.freeze(
   Object.fromEntries(allMobileRoleKeys.map((roleKey) => [roleKey, true]))
@@ -89,14 +88,39 @@ export function isDesktopEntryEnabled(config = getEntryConfig()) {
   return config?.desktop === true
 }
 
-export function hasDesktopEntryAccess(adminProfile) {
+export function hasDesktopEntryAccess(adminProfile, config = getEntryConfig()) {
   if (!adminProfile) {
+    return false
+  }
+  if (!isDesktopEntryEnabled(config)) {
     return false
   }
   if (adminProfile.is_super_admin === true) {
     return true
   }
-  return Array.isArray(adminProfile.menus) && adminProfile.menus.length > 0
+  if (!Array.isArray(adminProfile.menus)) {
+    return false
+  }
+  return adminProfile.menus.some((menu) => {
+    const path =
+      typeof menu === 'string'
+        ? menu
+        : menu && typeof menu === 'object'
+          ? menu.path
+          : ''
+    return Boolean(resolveMenuPermissionKey(path))
+  })
+}
+
+export function shouldUseRememberedDesktopEntry(
+  adminProfile,
+  lastEntryTarget,
+  config = getEntryConfig()
+) {
+  return (
+    lastEntryTarget === ENTRY_TARGET.DESKTOP &&
+    hasDesktopEntryAccess(adminProfile, config)
+  )
 }
 
 export function isMobileTasksEntryEnabled(config = getEntryConfig()) {

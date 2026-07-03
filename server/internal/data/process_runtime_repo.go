@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"server/internal/biz"
@@ -27,6 +28,20 @@ func NewProcessRuntimeRepo(d *Data, logger log.Logger) *processRuntimeRepo {
 var _ biz.ProcessRuntimeRepo = (*processRuntimeRepo)(nil)
 
 func (r *processRuntimeRepo) CreateProcessInstance(ctx context.Context, in *biz.ProcessInstanceCreate, actorID int) (*biz.ProcessInstance, []*biz.ProcessNodeInstance, error) {
+	if in == nil {
+		return nil, nil, biz.ErrBadParam
+	}
+	existing, existingNodes, err := r.getProcessInstanceByBusinessRef(ctx, in.ProcessKey, in.BusinessRefType, in.BusinessRefID)
+	if err == nil {
+		if existing.IdempotencyKey == in.IdempotencyKey {
+			return existing, existingNodes, nil
+		}
+		return nil, nil, biz.ErrProcessInstanceExists
+	}
+	if !errors.Is(err, biz.ErrProcessInstanceNotFound) {
+		return nil, nil, err
+	}
+
 	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -52,6 +67,10 @@ func (r *processRuntimeRepo) CreateProcessInstance(ctx context.Context, in *biz.
 	row, err := builder.Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
+			existing, existingNodes, findErr := r.getProcessInstanceByBusinessRef(ctx, in.ProcessKey, in.BusinessRefType, in.BusinessRefID)
+			if findErr == nil && existing.IdempotencyKey == in.IdempotencyKey {
+				return existing, existingNodes, nil
+			}
 			return nil, nil, biz.ErrProcessInstanceExists
 		}
 		return nil, nil, err
@@ -86,6 +105,28 @@ func (r *processRuntimeRepo) CreateProcessInstance(ctx context.Context, in *biz.
 	}
 	tx = nil
 	return entProcessInstanceToBiz(row), nodes, nil
+}
+
+func (r *processRuntimeRepo) getProcessInstanceByBusinessRef(ctx context.Context, processKey string, businessRefType string, businessRefID int) (*biz.ProcessInstance, []*biz.ProcessNodeInstance, error) {
+	row, err := r.data.postgres.ProcessInstance.Query().
+		Where(
+			processinstance.ProcessKey(processKey),
+			processinstance.BusinessRefType(businessRefType),
+			processinstance.BusinessRefID(businessRefID),
+		).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, nil, biz.ErrProcessInstanceNotFound
+		}
+		return nil, nil, err
+	}
+	instance := entProcessInstanceToBiz(row)
+	nodes, err := r.ListProcessNodeInstances(ctx, instance.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return instance, nodes, nil
 }
 
 func (r *processRuntimeRepo) GetProcessInstance(ctx context.Context, id int) (*biz.ProcessInstance, error) {

@@ -3,12 +3,14 @@ import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { createDevCustomerImportDryRunPlugin } from './devCustomerImportDryRunPlugin.mjs'
+import { createDevCustomerConfigPlugin } from './devCustomerConfigPlugin.mjs'
 import { getAppDefinition } from './src/erp/config/appRegistry.mjs'
 
 const ROOT_DIR = fileURLToPath(new URL('.', import.meta.url))
 
 export function createERPViteConfig(appId) {
   const app = getAppDefinition(appId)
+  const serverPort = Number(process.env.ERP_VITE_PORT || app.port)
   const hmrClientPort = Number(process.env.ERP_VITE_HMR_CLIENT_PORT || app.port)
 
   return defineConfig(({ command, mode }) => {
@@ -29,16 +31,18 @@ export function createERPViteConfig(appId) {
               projectRoot: resolve(ROOT_DIR, '..'),
             })
           : null,
+        isDev
+          ? createDevCustomerConfigPlugin({
+              projectRoot: resolve(ROOT_DIR, '..'),
+            })
+          : null,
       ].filter(Boolean),
-      define: {
-        'import.meta.env.VITE_ERP_APP_ID': JSON.stringify(app.id),
-      },
       esbuild: {
         drop: isProd ? ['console', 'debugger'] : [],
       },
       reportCompressedSize: false,
       build: {
-        outDir: app.kind === 'desktop' ? 'build' : `build/${app.id}`,
+        outDir: 'build',
         assetsDir: 'assets',
         sourcemap: !isProd,
         minify: 'esbuild',
@@ -77,9 +81,9 @@ export function createERPViteConfig(appId) {
       ),
       server: {
         host: '0.0.0.0',
-        port: app.port,
+        port: serverPort,
         strictPort: true,
-        open: app.kind === 'desktop',
+        open: true,
         hmr: {
           host: '127.0.0.1',
           clientPort: hmrClientPort,

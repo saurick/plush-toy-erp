@@ -457,6 +457,55 @@ func TestProcessRuntimeUsecaseStartProcessInstanceActivatesFirstWaitingApprovalN
 	}
 }
 
+func TestProcessRuntimeUsecaseStartProcessInstanceReturnsActiveFirstNode(t *testing.T) {
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID:              10,
+			Status:          ProcessStatusActive,
+			ConfigRevision:  "yoyoosun-rev-1",
+			BusinessRefType: "sales_order",
+			BusinessRefID:   1001,
+		},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID:                20,
+				ProcessInstanceID: 10,
+				NodeKey:           "submit_sales_order",
+				NodeType:          ProcessNodeTypeDomainCommand,
+				Attempt:           1,
+				Status:            ProcessNodeStatusActive,
+				Version:           3,
+				PolicySnapshot:    map[string]any{"command_key": ProcessDomainCommandSalesOrderSubmit},
+			},
+			{
+				ID:                21,
+				ProcessInstanceID: 10,
+				NodeKey:           "boss_approval",
+				NodeType:          ProcessNodeTypeApproval,
+				Attempt:           1,
+				Status:            ProcessNodeStatusWaiting,
+				Version:           1,
+			},
+		},
+	}
+	workflowRepo := &stubWorkflowRepo{}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, &stubProcessOwnerRoleResolver{})
+
+	startedNode, err := uc.StartProcessInstance(context.Background(), &ProcessInstanceStart{ID: 10}, 7)
+	if err != nil {
+		t.Fatalf("expected active first node to be returned, got %v", err)
+	}
+	if startedNode.ID != 20 || startedNode.Status != ProcessNodeStatusActive {
+		t.Fatalf("unexpected started node %#v", startedNode)
+	}
+	if processRepo.activatedNode != nil {
+		t.Fatalf("active first node should not be activated again, got %#v", processRepo.activatedNode)
+	}
+	if workflowRepo.createTaskInput != nil {
+		t.Fatalf("active first node should not create duplicate linked workflow task")
+	}
+}
+
 func TestProcessRuntimeUsecaseStartProcessInstanceDoesNotCreateTaskForDomainCommand(t *testing.T) {
 	processRepo := &memProcessRuntimeRepo{
 		process: &ProcessInstance{
@@ -538,7 +587,7 @@ func TestProcessRuntimeUsecaseStartProcessInstanceRejectsSettledProcess(t *testi
 	}
 }
 
-func TestProcessRuntimeUsecaseStartProcessInstanceRejectsNonWaitingFirstNode(t *testing.T) {
+func TestProcessRuntimeUsecaseStartProcessInstanceRejectsBlockedFirstNode(t *testing.T) {
 	processRepo := &memProcessRuntimeRepo{
 		process: &ProcessInstance{
 			ID:     10,
@@ -550,7 +599,7 @@ func TestProcessRuntimeUsecaseStartProcessInstanceRejectsNonWaitingFirstNode(t *
 				ProcessInstanceID: 10,
 				NodeKey:           "prepare_engineering_data",
 				NodeType:          ProcessNodeTypeHumanTask,
-				Status:            ProcessNodeStatusActive,
+				Status:            ProcessNodeStatusBlocked,
 				Version:           1,
 			},
 		},
@@ -561,10 +610,10 @@ func TestProcessRuntimeUsecaseStartProcessInstanceRejectsNonWaitingFirstNode(t *
 		ID: 10,
 	}, 7)
 	if !errors.Is(err, ErrProcessNodeInstanceConflict) {
-		t.Fatalf("expected non-waiting first node conflict, got %v", err)
+		t.Fatalf("expected blocked first node conflict, got %v", err)
 	}
 	if processRepo.activatedNode != nil {
-		t.Fatalf("non-waiting first node must not be re-activated")
+		t.Fatalf("blocked first node must not be re-activated")
 	}
 }
 

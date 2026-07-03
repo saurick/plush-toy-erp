@@ -24,8 +24,10 @@ const testFiles = [
   'src/erp/qa/fieldLinkageCatalog.test.mjs',
   'src/erp/data/processingContractTemplate.test.mjs',
   'src/erp/utils/materialPurchaseContractEditor.test.mjs',
+  'src/erp/utils/masterDataOrderView.test.mjs',
   'src/erp/utils/processingContractEditor.test.mjs',
   'src/erp/utils/printWorkspace.test.mjs',
+  'src/erp/utils/workflowTaskBoard.test.mjs',
   'src/erp/config/printTemplates.test.mjs',
 ]
 

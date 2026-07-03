@@ -1,7 +1,5 @@
-import {
-  BUSINESS_WORKFLOW_STATES,
-  TASK_WORKFLOW_STATES,
-} from '../config/workflowStatus.mjs'
+import { getBusinessStatusLabel } from '../config/workflowStatus.mjs'
+import { getWorkflowTaskStatusMeta } from './workflowTaskBoard.mjs'
 import {
   buildWorkflowTaskAlert,
   getWorkflowTaskDueStatus,
@@ -26,19 +24,18 @@ import {
 import { formatWorkflowTaskSource } from './dashboardTaskDisplay.mjs'
 import { getWorkflowTaskGroupLabel } from './workflowTaskLabels.mjs'
 
-const taskStatusLabelMap = new Map(
-  TASK_WORKFLOW_STATES.map((state) => [state.key, state.label])
-)
-const businessStatusLabelMap = new Map(
-  BUSINESS_WORKFLOW_STATES.map((state) => [state.key, state.label])
-)
-
 const DUE_STATUS_LABELS = Object.freeze({
   none: '无截止',
   normal: '未到期',
   due_soon: '即将到期',
   overdue: '已超时',
 })
+
+export function getMobileTaskDueStatusLabel(dueStatus) {
+  const key = String(dueStatus || '').trim()
+  if (!key) return '-'
+  return DUE_STATUS_LABELS[key] || '到期状态'
+}
 
 const FINANCE_SOURCE_TYPES = new Set([
   'reconciliation',
@@ -61,6 +58,38 @@ const ROLE_EXTENDED_VISIBILITY_LABELS = Object.freeze({
   warehouse: '仓库扩展可见性关注仓储来源和仓库任务。',
   quality: '品质扩展可见性关注质检来源、质检失败和品质任务。',
 })
+
+const MOBILE_TASK_ACTION_LABELS = Object.freeze({
+  done: '完成',
+  complete: '完成',
+  blocked: '阻塞',
+  block: '阻塞',
+  rejected: '退回',
+  reject: '退回',
+  urge: '催办',
+  urge_task: '催办',
+  escalate_to_boss: '升级给老板',
+})
+const RELATED_DOCUMENT_RESULT_LABELS = Object.freeze({
+  pass: '合格',
+  passed: '合格',
+  qualified: '合格',
+  approved: '合格',
+  release: '放行',
+  released: '放行',
+  fail: '不合格',
+  failed: '不合格',
+  reject: '不合格',
+  rejected: '不合格',
+  rework: '返工',
+  pending: '待检',
+  合格: '合格',
+  不合格: '不合格',
+  放行: '放行',
+  返工: '返工',
+  待检: '待检',
+})
+
 function payloadOf(task = {}) {
   return task.payload && typeof task.payload === 'object' ? task.payload : {}
 }
@@ -85,6 +114,24 @@ function taskGroupLabel(taskGroupKey, fallback = '业务协同') {
 
 function sourceTypeLabel(sourceType) {
   return formatWorkflowTaskSource({ source_type: sourceType })
+}
+
+function mobileTaskActionLabel(actionKey) {
+  const normalizedActionKey = String(actionKey || '').trim()
+  if (!normalizedActionKey) return ''
+  return MOBILE_TASK_ACTION_LABELS[normalizedActionKey] || '任务处理'
+}
+
+function isReadableBusinessLabel(value) {
+  return /[\u4e00-\u9fff]/u.test(String(value || ''))
+}
+
+function mobileTaskActionDisplayLabel(action = {}) {
+  const mappedLabel = mobileTaskActionLabel(action.action_key)
+  if (mappedLabel && mappedLabel !== '任务处理') return mappedLabel
+  const label = String(action.action_label || '').trim()
+  if (isReadableBusinessLabel(label)) return label
+  return mappedLabel || '任务处理'
 }
 
 function hasVisibilityPayloadSignal(taskView = {}) {
@@ -114,8 +161,32 @@ export function formatMobileTaskTime(value) {
 
 export function normalizeRelatedDocuments(value) {
   if (!value) return []
-  if (Array.isArray(value)) return value.filter(Boolean).map(String)
-  return [String(value)].filter(Boolean)
+  const documents = Array.isArray(value) ? value : [value]
+  return documents
+    .filter(Boolean)
+    .map((item) => normalizeRelatedDocumentText(String(item)))
+}
+
+function relatedDocumentResultFallback(prefix) {
+  return prefix.includes('成品抽检') ? '抽检已记录' : '质检已记录'
+}
+
+function relatedDocumentResultLabel(prefix, value) {
+  const key = String(value || '').trim()
+  if (!key) return ''
+  const label = RELATED_DOCUMENT_RESULT_LABELS[key]
+  if (label) return label
+  return /[A-Za-z_]/u.test(key) ? relatedDocumentResultFallback(prefix) : key
+}
+
+function normalizeRelatedDocumentText(value) {
+  const text = String(value || '').trim()
+  const resultMatch = text.match(
+    /^(IQC 结果|检验结果|委外回货检验结果|成品抽检结果)：(.+)$/u
+  )
+  if (!resultMatch) return text
+  const [, prefix, result] = resultMatch
+  return `${prefix}：${relatedDocumentResultLabel(prefix, result)}`
 }
 
 export function normalizeMobileActionEvidenceRefs(value) {
@@ -145,6 +216,7 @@ export function buildMobileTaskActionEvidence({
   const mobileAction = {
     role_key: normalizedRoleKey,
     action_key: normalizedActionKey,
+    action_label: mobileTaskActionLabel(normalizedActionKey),
     reason: normalizedReason,
     evidence_refs: normalizedEvidenceRefs,
     recorded_at: nowSec,
@@ -161,6 +233,7 @@ export function buildMobileTaskActionEvidence({
     payload.mobile_exception_report = {
       role_key: normalizedRoleKey,
       action_key: normalizedActionKey,
+      action_label: mobileTaskActionLabel(normalizedActionKey),
       reason: normalizedReason,
       evidence_refs: normalizedEvidenceRefs,
       reported_at: nowSec,
@@ -176,6 +249,7 @@ export function buildMobileTaskView(task = {}, options = {}) {
     payload.mobile_action && typeof payload.mobile_action === 'object'
       ? {
           ...payload.mobile_action,
+          action_label: mobileTaskActionDisplayLabel(payload.mobile_action),
           evidence_refs: normalizeMobileActionEvidenceRefs(
             payload.mobile_action.evidence_refs
           ),
@@ -188,7 +262,6 @@ export function buildMobileTaskView(task = {}, options = {}) {
   )
   const alert = buildWorkflowTaskAlert(task, { nowMs })
   const dueStatus = getWorkflowTaskDueStatus(task, nowMs)
-  const taskStatusKey = String(task.task_status_key || '').trim()
   const businessStatusKey = String(task.business_status_key || '').trim()
 
   return {
@@ -199,14 +272,14 @@ export function buildMobileTaskView(task = {}, options = {}) {
     source_id: task.source_id || '',
     task_group: task.task_group || '',
     owner_role_key: normalizeRoleKey(task.owner_role_key),
-    task_status_label:
-      taskStatusLabelMap.get(taskStatusKey) || taskStatusKey || '-',
-    business_status_label:
-      businessStatusLabelMap.get(businessStatusKey) || businessStatusKey || '-',
+    task_status_label: getWorkflowTaskStatusMeta(task).label,
+    business_status_label: businessStatusKey
+      ? getBusinessStatusLabel(businessStatusKey)
+      : '-',
     priority: Number(task.priority || 0),
     due_at_label: formatMobileTaskTime(task.due_at),
     due_status: dueStatus,
-    due_status_label: DUE_STATUS_LABELS[dueStatus] || dueStatus,
+    due_status_label: getMobileTaskDueStatusLabel(dueStatus),
     alert_level: alert?.alert_level || 'info',
     alert_label: alert?.alert_label || '',
     alert_type: alert?.alert_type || '',
@@ -217,6 +290,7 @@ export function buildMobileTaskView(task = {}, options = {}) {
     last_urge_at_label: formatMobileTaskTime(payload.last_urge_at),
     last_urge_reason: payload.last_urge_reason || '',
     last_urge_action: payload.last_urge_action || '',
+    last_urge_action_label: mobileTaskActionLabel(payload.last_urge_action),
     is_escalated: isEscalatedWorkflowTask(task),
     escalate_target_role_key: payload.escalate_target_role_key || '',
     complete_condition: payload.complete_condition || '',
@@ -228,6 +302,9 @@ export function buildMobileTaskView(task = {}, options = {}) {
       typeof payload.mobile_exception_report === 'object'
         ? {
             ...payload.mobile_exception_report,
+            action_label: mobileTaskActionLabel(
+              payload.mobile_exception_report.action_key
+            ),
             evidence_refs: normalizeMobileActionEvidenceRefs(
               payload.mobile_exception_report.evidence_refs
             ),

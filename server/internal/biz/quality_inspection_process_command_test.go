@@ -115,11 +115,11 @@ func TestQualityInspectionProcessDomainCommandDecideRejectBindsUsecase(t *testin
 		CommandKey:      ProcessDomainCommandQualityInspectionDecide,
 		IdempotencyKey:  "process:10:node:20:quality-inspection-decide",
 		Payload: map[string]any{
-			"id":                  float64(5002),
-			"purchase_receipt_id": float64(6002),
-			"inventory_lot_id":    float64(7002),
-			"result":              QualityInspectionResultReject,
-			"decision_note":       "拒收",
+			"quality_inspection_id": float64(5002),
+			"purchase_receipt_id":   float64(6002),
+			"inventory_lot_id":      float64(7002),
+			"result":                QualityInspectionResultReject,
+			"decision_note":         "拒收",
 		},
 	}, 7)
 	if err != nil {
@@ -139,6 +139,29 @@ func TestQualityInspectionProcessDomainCommandDecideRejectBindsUsecase(t *testin
 	}
 	if result == nil || result.Outcome != QualityInspectionProcessCommandOutcomeRejected {
 		t.Fatalf("expected quality rejected outcome, got %#v", result)
+	}
+}
+
+func TestQualityInspectionProcessDomainCommandDecideRejectsLegacyID(t *testing.T) {
+	ctx := context.Background()
+	inventoryRepo := &qualityInspectionProcessInventoryRepoStub{}
+	handler := &qualityInspectionDecideProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
+
+	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
+		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_receipt", BusinessRefID: 6002},
+		CommandKey:      ProcessDomainCommandQualityInspectionDecide,
+		IdempotencyKey:  "process:10:node:20:quality-inspection-decide",
+		Payload: map[string]any{
+			"id":                  float64(5002),
+			"purchase_receipt_id": float64(6002),
+			"inventory_lot_id":    float64(7002),
+			"result":              QualityInspectionResultReject,
+		},
+	}, 7); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected legacy id to be rejected, got %v", err)
+	}
+	if inventoryRepo.rejectInput != nil || inventoryRepo.passInput != nil {
+		t.Fatalf("legacy id command must not call quality usecase")
 	}
 }
 

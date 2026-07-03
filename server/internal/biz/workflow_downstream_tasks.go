@@ -65,7 +65,6 @@ func buildPurchaseQualityExceptionTaskFromIqc(current *WorkflowTask, taskStatusK
 		"qc_result":          qcResult,
 		"decision":           taskStatusKey,
 		"transition_status":  taskStatusKey,
-		"rejected_reason":    reason,
 		"complete_condition": "采购确认退货、补货、让步接收或重新到货安排",
 		"related_documents": workflowPurchaseInboundRelatedDocuments(current, workflowPurchaseInboundRelatedDocumentOptions{
 			qcResult: qcResult,
@@ -75,9 +74,7 @@ func buildPurchaseQualityExceptionTaskFromIqc(current *WorkflowTask, taskStatusK
 		"alert_type":        "qc_failed",
 		"critical_path":     true,
 	}
-	if taskStatusKey == "blocked" {
-		payload["blocked_reason"] = reason
-	}
+	setWorkflowTransitionReasonPayload(payload, taskStatusKey, reason)
 	return &WorkflowTaskCreate{
 		TaskCode:          workflowTaskCode("purchase-qc-exception", current.SourceID),
 		TaskGroup:         workflowPurchaseQualityExceptionGroup,
@@ -177,7 +174,6 @@ func buildOutsourceReworkTaskFromReturnQC(current *WorkflowTask, taskStatusKey s
 	payload["qc_result"] = "fail"
 	payload["decision"] = taskStatusKey
 	payload["transition_status"] = taskStatusKey
-	payload["rejected_reason"] = reason
 	payload["complete_condition"] = "生产/委外负责人确认返工、补做、让步接收或重新回货安排"
 	payload["related_documents"] = workflowOutsourceReturnRelatedDocuments(current, workflowOutsourceReturnRelatedDocumentOptions{
 		qcResult: "fail",
@@ -187,9 +183,7 @@ func buildOutsourceReworkTaskFromReturnQC(current *WorkflowTask, taskStatusKey s
 	payload["alert_type"] = "qc_failed"
 	payload["critical_path"] = true
 	payload["outsource_owner_role_key"] = "outsource"
-	if taskStatusKey == "blocked" {
-		payload["blocked_reason"] = reason
-	}
+	setWorkflowTransitionReasonPayload(payload, taskStatusKey, reason)
 	return &WorkflowTaskCreate{
 		TaskCode:          workflowTaskCode("outsource-rework", current.SourceID),
 		TaskGroup:         workflowOutsourceReworkTaskGroup,
@@ -311,11 +305,7 @@ func buildFinishedGoodsReworkTaskFromQC(current *WorkflowTask, taskStatusKey str
 	payload["notification_type"] = "qc_failed"
 	payload["alert_type"] = "qc_failed"
 	payload["critical_path"] = true
-	if taskStatusKey == "blocked" {
-		payload["blocked_reason"] = reason
-	} else {
-		payload["rejected_reason"] = reason
-	}
+	setWorkflowTransitionReasonPayload(payload, taskStatusKey, reason)
 	return &WorkflowTaskCreate{
 		TaskCode:          workflowTaskCode("finished-goods-rework", current.SourceID),
 		TaskGroup:         workflowFinishedGoodsReworkTaskGroup,

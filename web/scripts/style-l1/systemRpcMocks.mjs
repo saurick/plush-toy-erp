@@ -11,6 +11,7 @@ export async function installSystemRpcMocks(page, context) {
     mockPdfBuffer,
     resolveDelayFromReferer,
     createMockAdminToken,
+    nowUnix,
   } = context
 
   await page.route('**/rpc/admin', async (route) => {
@@ -104,6 +105,43 @@ export async function installSystemRpcMocks(page, context) {
           role_options: [salesRole, adminRole],
           permission_options: mockPermissions,
           menu_options: mockMenus,
+        }
+        break
+      case 'audit_logs':
+        data = {
+          total: 2,
+          events: [
+            {
+              id: 101,
+              source: 'admin_manage',
+              event_key: 'admin_user.roles.set',
+              created_at: nowUnix() - 300,
+              actor_key: 'style-l1-admin',
+              target_key: 'assistant-admin',
+              target_type: '管理员账号',
+              payload: {
+                actor: { id: 1, username: 'style-l1-admin' },
+                target: {
+                  id: 2,
+                  key: 'assistant-admin',
+                  type: 'admin_user',
+                },
+                before: { role_keys: ['sales'] },
+                after: { role_keys: ['sales', 'warehouse'] },
+              },
+            },
+            {
+              id: 102,
+              source: 'server_bootstrap',
+              event_key: 'admin_bootstrap.blocked',
+              created_at: nowUnix() - 180,
+              payload: {
+                actor: { id: 0, username: 'server' },
+                target: { type: 'bootstrap' },
+                reason: '生产环境缺少显式初始化确认',
+              },
+            },
+          ],
         }
         break
       default:

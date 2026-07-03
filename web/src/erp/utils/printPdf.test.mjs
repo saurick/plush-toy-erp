@@ -310,6 +310,109 @@ test('printPdf: 服务端 PDF 请求参数默认收口到统一格式', () => {
   })
 })
 
+test('printPdf: 服务端 PDF 错误按状态码生成用户可读文案', () => {
+  assert.equal(
+    __TEST_ONLY__.getServerPdfErrorMessage({ status: 401 }),
+    '登录已失效，请刷新页面后重试。'
+  )
+  assert.equal(
+    __TEST_ONLY__.getServerPdfErrorMessage({ status: 403 }),
+    '当前账号不能生成 PDF，请联系管理员。'
+  )
+  assert.equal(
+    __TEST_ONLY__.getServerPdfErrorMessage({ status: 408 }),
+    '服务器生成 PDF 超时，请稍后重试。'
+  )
+  assert.equal(
+    __TEST_ONLY__.getServerPdfErrorMessage({ status: 504 }),
+    '服务器生成 PDF 超时，请稍后重试。'
+  )
+  assert.equal(
+    __TEST_ONLY__.getServerPdfErrorMessage({ status: 413 }),
+    '打印内容过大，请减少图片或附件后重试。'
+  )
+  assert.equal(
+    __TEST_ONLY__.getServerPdfErrorMessage({ status: 429 }),
+    'PDF 生成请求过多，请稍后重试。'
+  )
+  assert.equal(
+    __TEST_ONLY__.getServerPdfErrorMessage({ status: 500 }),
+    '服务器生成 PDF 失败，请稍后重试。'
+  )
+})
+
+test('printPdf: 服务端 PDF 错误不会透传 JSON 或文本正文', async () => {
+  const originalWindow = globalThis.window
+  const originalFetch = globalThis.fetch
+  const originalLocalStorage = globalThis.localStorage
+  let jsonReadCount = 0
+  let textReadCount = 0
+
+  globalThis.localStorage = {
+    getItem: (key) =>
+      String(key) === 'admin_access_token' ? 'admin-token-for-test' : '',
+  }
+  globalThis.window = {
+    location: {
+      origin: 'http://127.0.0.1:4173',
+    },
+    setTimeout: () => 1,
+    clearTimeout: () => {},
+  }
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 500,
+    headers: {
+      get: () => 'application/json',
+    },
+    json: async () => {
+      jsonReadCount += 1
+      return {
+        message:
+          'template_key invalid: material-purchase-contract owner_role_key=warehouse',
+      }
+    },
+    text: async () => {
+      textReadCount += 1
+      return 'pq: relation customer_config_revisions does not exist'
+    },
+  })
+
+  try {
+    await assert.rejects(
+      () =>
+        __TEST_ONLY__.requestServerPdfBlob('<html>PDF</html>', {
+          title: '采购合同 PDF 预览',
+          templateKey: 'material-purchase-contract',
+        }),
+      (error) => {
+        assert.equal(error?.message, '服务器生成 PDF 失败，请稍后重试。')
+        assert.doesNotMatch(error?.message || '', /template_key|owner_role_key/)
+        assert.doesNotMatch(error?.message || '', /customer_config_revisions/)
+        return true
+      }
+    )
+    assert.equal(jsonReadCount, 0)
+    assert.equal(textReadCount, 0)
+  } finally {
+    if (typeof originalWindow === 'undefined') {
+      delete globalThis.window
+    } else {
+      globalThis.window = originalWindow
+    }
+    if (typeof originalFetch === 'undefined') {
+      delete globalThis.fetch
+    } else {
+      globalThis.fetch = originalFetch
+    }
+    if (typeof originalLocalStorage === 'undefined') {
+      delete globalThis.localStorage
+    } else {
+      globalThis.localStorage = originalLocalStorage
+    }
+  }
+})
+
 test('printPdf: 预览壳页 URL 与本地状态 key 统一收口', () => {
   const originalWindow = globalThis.window
   globalThis.window = {

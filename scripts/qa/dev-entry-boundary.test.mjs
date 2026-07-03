@@ -101,10 +101,12 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
 });
 
 test("dev entry boundary: dev testing indexes only current maintained docs", () => {
+  const devTestingPageSource = read("web/src/erp/pages/DevTestingPage.jsx");
   assert.deepEqual(DEV_TESTING_CURRENT_DOC_PATHS, [
     "docs/product/自动化测试策略.md",
     "README.md",
     "web/README.md",
+    "web/scripts/README.md",
     "server/README.md",
     "scripts/README.md",
     "docs/部署约定.md",
@@ -122,6 +124,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
 
   const docs = buildDevTestingDocs({
     "../../../../docs/product/自动化测试策略.md": "# 自动化测试策略\n",
+    "../../../../web/scripts/README.md": read("web/scripts/README.md"),
     "../../../../scripts/README.md": read("scripts/README.md"),
     "../../../../docs/reference/第四次20260627/旧测试计划.md":
       "```bash\nbash stale-reference-command.sh\n```",
@@ -131,7 +134,29 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
 
   assert.deepEqual(
     docs.map((item) => item.path),
-    ["docs/product/自动化测试策略.md", "scripts/README.md"],
+    [
+      "docs/product/自动化测试策略.md",
+      "web/scripts/README.md",
+      "scripts/README.md",
+    ],
+  );
+  const webScriptsDoc = docs.find(
+    (item) => item.path === "web/scripts/README.md",
+  );
+  assertIncludes(
+    webScriptsDoc?.source || "",
+    "pnpm start:yoyoosun --print-plan",
+    "dev testing web scripts README source",
+  );
+  assertIncludes(
+    webScriptsDoc?.source || "",
+    "pnpm preview:yoyoosun --print-plan",
+    "dev testing web scripts README source",
+  );
+  assertIncludes(
+    webScriptsDoc?.source || "",
+    "verify customer config",
+    "dev testing web scripts README source",
   );
   const scriptsDoc = docs.find((item) => item.path === "scripts/README.md");
   assertIncludes(
@@ -158,6 +183,15 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     scriptsDoc?.source || "",
     "workflow-fact-boundary",
     "dev testing scripts README source",
+  );
+  assertIncludes(
+    devTestingPageSource,
+    "block.sourceLabel || block.title || '测试命令来源'",
+    "dev testing page command source label",
+  );
+  assert(
+    !devTestingPageSource.includes("{block.sourcePath}"),
+    "dev testing command blocks must not render raw sourcePath as primary copy",
   );
   const presetKeys = DEV_TESTING_COPY_PRESETS.map((item) => item.key);
   assert.deepEqual(
@@ -191,6 +225,16 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
   assertIncludes(
     buildDevTestingCopyPresetSource(mobileWorkflowPreset),
     "mobile-workflow-runtime-browser-smoke.test.mjs",
+    "mobile workflow smoke preset",
+  );
+  assertIncludes(
+    buildDevTestingCopyPresetSource(mobileWorkflowPreset),
+    "mobileRoleTaskModel.test.mjs",
+    "mobile workflow smoke preset",
+  );
+  assertIncludes(
+    buildDevTestingCopyPresetSource(mobileWorkflowPreset),
+    "workflowTaskBoard.test.mjs",
     "mobile workflow smoke preset",
   );
   assertIncludes(
@@ -660,6 +704,11 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
   );
   assertIncludes(
     buildDevTestingCopyPresetSource(customerConfigRuntimePreset),
+    "customer-config-effective-session-probe.mjs --json --report output/customers/yoyoosun/customer-config-effective-session-probe/current.json",
+    "customer config runtime preset",
+  );
+  assertIncludes(
+    buildDevTestingCopyPresetSource(customerConfigRuntimePreset),
     "customer-config-release-execute.mjs --print-input-template",
     "customer config runtime preset",
   );
@@ -670,8 +719,14 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
   );
   assertIncludes(
     buildDevTestingCopyPresetSource(customerConfigRuntimePreset),
-    "customer-config-release-readiness.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --readback-preflight-report output/customers/yoyoosun/customer-config-readback-preflight.json",
+    "customer-config-release-readiness.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/2026-06-29 --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --readback-preflight-report output/customers/yoyoosun/customer-config-readback-preflight.json",
     "customer config runtime preset",
+  );
+  assert(
+    !/<YYYY-MM-DD>|<[^>]+>/.test(
+      buildDevTestingCopyPresetSource(customerConfigRuntimePreset),
+    ),
+    "customer config runtime preset must not expose shell-redirection placeholders",
   );
   assertIncludes(
     buildDevTestingCopyPresetSource(customerConfigRuntimePreset),
@@ -749,7 +804,27 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
   );
   assertIncludes(
     buildDevTestingCopyPresetSource(frontendErrorPreset),
+    "errorMessage.test.mjs",
+    "frontend error message preset",
+  );
+  assertIncludes(
+    buildDevTestingCopyPresetSource(frontendErrorPreset),
+    "userVisibleTechnicalFields.test.mjs",
+    "frontend error message preset",
+  );
+  assertIncludes(
+    buildDevTestingCopyPresetSource(frontendErrorPreset),
+    "dashboardTaskDisplay.test.mjs",
+    "frontend error message preset",
+  );
+  assertIncludes(
+    buildDevTestingCopyPresetSource(frontendErrorPreset),
     "共享 PDF 预览",
+    "frontend error message preset",
+  );
+  assertIncludes(
+    buildDevTestingCopyPresetSource(frontendErrorPreset),
+    "raw id",
     "frontend error message preset",
   );
   const businessActionFieldPreset = DEV_TESTING_COPY_PRESETS.find(
@@ -768,6 +843,11 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
   assertIncludes(
     buildDevTestingCopyPresetSource(businessActionFieldPreset),
     "sales-order-field-chain-boundary.test.mjs",
+    "business action and field boundary preset",
+  );
+  assertIncludes(
+    buildDevTestingCopyPresetSource(businessActionFieldPreset),
+    "printTemplates.test.mjs",
     "business action and field boundary preset",
   );
   assertIncludes(
@@ -813,6 +893,7 @@ test("dev entry boundary: indexed testing doc command scripts exist", () => {
 });
 
 test("dev entry boundary: customer config console stays preview or gated apply only", () => {
+  const pageSource = read("web/src/erp/pages/DevCustomerConfigPage.jsx");
   const missingOverview = buildCustomerConfigDevOverviewFromSearch(
     "?customer=unknown-customer",
   );
@@ -845,15 +926,16 @@ test("dev entry boundary: customer config console stays preview or gated apply o
   assert.equal(summary.releaseApply.noBusinessDataImport, true);
   assert(
     summary.importFlow.some((item) =>
-      String(item.outcome).includes("moduleStates"),
+      String(item.outcome).includes("模块状态"),
     ),
-    "customer config import flow must surface moduleStates projection input",
+    "customer config import flow must surface module state projection input",
   );
   assert.deepEqual(
     summary.importFlow.map((item) => item.status),
     [
       "passed",
       "passed",
+      "preview_only",
       "preview_only",
       "test_apply_ready",
       "release_gate_required",
@@ -874,5 +956,39 @@ test("dev entry boundary: customer config console stays preview or gated apply o
         item.status === "separate_task_required",
     ),
     "business data import must not be folded into customer config apply",
+  );
+  const devConsoleCommands = summary.tools.map((item) => item.command).join("\n");
+  assert(
+    !devConsoleCommands.includes("CUSTOMER_CONFIG_ADMIN_TOKEN"),
+    "dev customer config console must not render admin token placeholders",
+  );
+  assert(
+    !devConsoleCommands.includes("--execute"),
+    "dev customer config console fallback commands must stay no-write",
+  );
+  assert(
+    summary.tools.some(
+      (item) =>
+        item.key === "release-rollback-execute" &&
+        item.command ===
+          "node scripts/deploy/customer-config-release-execute.mjs --print-input-template",
+    ),
+    "customer config rollback fallback must be an input template, not an executable rollback command",
+  );
+  assert.match(
+    pageSource,
+    /const requestApplyTestConfig = \(\) => \{[\s\S]*modal\.confirm\([\s\S]*确认应用测试配置[\s\S]*当前后端[\s\S]*本地开发默认写 8300[\s\S]*不会导入客户业务数据[\s\S]*不代表正式发布通过[\s\S]*onOk: handleApplyTestConfig/su,
+  );
+  assert.match(
+    pageSource,
+    /const requestApplyReleaseConfig = \(\) => \{[\s\S]*modal\.confirm\([\s\S]*确认发布正式配置[\s\S]*不导入客户业务数据[\s\S]*不替代生产部署、备份恢复或客户签收[\s\S]*onOk: handleApplyReleaseConfig/su,
+  );
+  assert(
+    !pageSource.includes("onApplyTestConfig={handleApplyTestConfig}"),
+    "test config control-plane write must be mediated by confirmation",
+  );
+  assert(
+    !pageSource.includes("onApplyReleaseConfig={handleApplyReleaseConfig}"),
+    "release config control-plane write must be mediated by confirmation",
   );
 });
