@@ -11,7 +11,16 @@ const sourceManifest = JSON.parse(
   readFileSync('docs/customers/yoyoosun/source-manifest.json', 'utf8')
 )
 
-const blockedWords = /自动过账|直接过账|直接写库存|直接写出货|直接写财务/
+const forbiddenRuntimeFactCommitClaims =
+  /自动过账|直接过账|直接写库存|直接写出货|直接写财务/
+
+function assertNoPositiveRuntimeFactCommitClaim(text, context) {
+  const normalizedText = String(text || '').replace(
+    /(?:不|不能|不得|禁止)直接写(?:库存|出货|财务)(?:事实|流水|数据)?/g,
+    ''
+  )
+  assert.doesNotMatch(normalizedText, forbiddenRuntimeFactCommitClaims, context)
+}
 
 test('same customer key', () => {
   assert.equal(yoyoosunRoleFlowMatrix.customerKey, 'yoyoosun')
@@ -30,12 +39,18 @@ test('complete closure assets', () => {
   assert.ok(yoyoosunTrialDataFixture.workflowTasks.length > 0)
 })
 
-test('blocked wording stays absent', () => {
+test('positive runtime fact commit wording stays absent', () => {
   for (const role of yoyoosunRoleFlowMatrix.roles) {
-    assert.doesNotMatch(role.guardrail, blockedWords)
+    assertNoPositiveRuntimeFactCommitClaim(
+      role.guardrail,
+      `${role.roleKey} guardrail must not promise runtime fact commits`
+    )
   }
   for (const source of yoyoosunRawSourceFormMap.entries) {
-    assert.doesNotMatch(source.boundary, blockedWords)
+    assertNoPositiveRuntimeFactCommitClaim(
+      source.boundary,
+      `${source.sourceId} boundary must not promise runtime fact commits`
+    )
   }
 })
 
@@ -66,4 +81,9 @@ test('backend-allowed field surfaces stay separate from consumed field surfaces'
   for (const surface of ['purchase_orders.default', 'outsourcing_orders.default', 'shipments.default', 'finance_facts.default']) {
     assert.ok(backendAllowedSurfaces.has(surface), `${surface} must be backend allowed`)
   }
+  const outsourcingSurface = yoyoosunProjectionMatrix.fieldSurfaces.find(
+    (surface) => surface.surfaceKey === 'outsourcing_orders.default'
+  )
+  assert.ok(outsourcingSurface.fields.includes('expected_return_date'))
+  assert.ok(!outsourcingSurface.fields.includes('return_date'))
 })

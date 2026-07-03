@@ -188,23 +188,9 @@
 .erp-material-contract-paper .erp-material-contract-table tbody td {
   min-height: 15mm;
   position: relative;
-}
-
-.erp-material-contract-paper .erp-material-contract-table tbody td:nth-child(1),
-.erp-material-contract-paper .erp-material-contract-table tbody td:nth-child(2),
-.erp-material-contract-paper .erp-material-contract-table tbody td:nth-child(8),
-.erp-material-contract-paper
-  .erp-material-contract-table
-  tbody
-  td:nth-child(10),
-.erp-material-contract-paper
-  .erp-material-contract-table
-  tbody
-  td:nth-child(11) {
-  font-size: 3.45mm;
-  white-space: nowrap;
-  word-break: keep-all;
-  overflow-wrap: normal;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .erp-material-contract-table__editable {
@@ -212,39 +198,13 @@
   align-items: center;
   justify-content: center;
   width: 100%;
+  min-width: 0;
   min-height: 12.5mm;
   padding: 0;
   text-align: center;
-}
-
-.erp-material-contract-paper
-  .erp-material-contract-table
-  tbody
-  td:nth-child(1)
-  .erp-material-contract-table__editable,
-.erp-material-contract-paper
-  .erp-material-contract-table
-  tbody
-  td:nth-child(2)
-  .erp-material-contract-table__editable,
-.erp-material-contract-paper
-  .erp-material-contract-table
-  tbody
-  td:nth-child(8)
-  .erp-material-contract-table__editable,
-.erp-material-contract-paper
-  .erp-material-contract-table
-  tbody
-  td:nth-child(10)
-  .erp-material-contract-table__editable,
-.erp-material-contract-paper
-  .erp-material-contract-table
-  tbody
-  td:nth-child(11)
-  .erp-material-contract-table__editable {
-  white-space: nowrap;
-  word-break: keep-all;
-  overflow-wrap: normal;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .erp-material-contract-table__editable-multiline {

@@ -66,6 +66,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '销售订单',
       exportTitle: '销售订单',
       dataIndex: 'sales_order_id',
+      effectiveFieldKey: 'sales_order_no',
       width: 120,
       sortType: 'number',
       render: (value) => {
@@ -107,6 +108,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
     {
       title: '计划出货日期 / 实际出货日期',
       exportTitle: '计划出货日期 / 实际出货日期',
+      effectiveFieldKey: 'shipped_at',
       width: 180,
       sortValue: (record) => record.shipped_at || record.planned_ship_at,
       sortType: 'date',

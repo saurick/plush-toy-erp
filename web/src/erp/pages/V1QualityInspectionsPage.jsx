@@ -90,6 +90,7 @@ import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
+import { applyEffectiveFieldPolicyFlags } from '../utils/adminProfileSync.mjs'
 import {
   inventoryLotOption,
   materialOption,
@@ -137,6 +138,7 @@ function getPreferredColumnOrder({
   columns,
   localOrder,
 }) {
+  applyEffectiveFieldPolicyFlags({ adminProfile, moduleKey, columns })
   if (Array.isArray(localOrder)) {
     return sanitizeModuleColumnOrder(localOrder, columns)
   }
@@ -642,23 +644,27 @@ export default function V1QualityInspectionsPage() {
     cancel: '确认取消',
   }[inspectionModal?.mode || 'create']
 
-  const exportColumns = useMemo(
-    () =>
-      buildQualityInspectionExportColumns({
-        allPurchaseReceiptItemOptions,
-        inventoryLotOptions,
-        materialOptions,
-        purchaseReceiptOptions,
-        warehouseOptions,
-      }),
-    [
+  const exportColumns = useMemo(() => {
+    const columns = buildQualityInspectionExportColumns({
       allPurchaseReceiptItemOptions,
       inventoryLotOptions,
       materialOptions,
       purchaseReceiptOptions,
       warehouseOptions,
-    ]
-  )
+    })
+    return applyEffectiveFieldPolicyFlags({
+      adminProfile,
+      moduleKey: QUALITY_INSPECTIONS_MODULE_KEY,
+      columns,
+    })
+  }, [
+    allPurchaseReceiptItemOptions,
+    adminProfile,
+    inventoryLotOptions,
+    materialOptions,
+    purchaseReceiptOptions,
+    warehouseOptions,
+  ])
 
   const dataColumns = useMemo(
     () =>

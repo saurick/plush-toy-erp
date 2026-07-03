@@ -5,6 +5,7 @@ import { RpcErrorCode } from '../../common/consts/errorCodes.js'
 import {
   attachEffectiveSessionToAdminProfile,
   attachUnavailableEffectiveSessionToAdminProfile,
+  applyEffectiveFieldPolicyFlags,
   buildEffectiveSessionDiagnosticSummary,
   effectiveSessionAllowsAction,
   effectiveSessionAllowsPage,
@@ -14,6 +15,7 @@ import {
   getEffectivePrintTemplateDefaults,
   getAdminProfileSyncErrorAction,
   hasEffectiveSessionAction,
+  resolveDefaultFieldPolicySurface,
   resolveEffectiveSessionCustomerKey,
   resolveEffectiveSessionPageAccess,
   shouldRedirectFromCurrentNavigation,
@@ -651,6 +653,82 @@ test('adminProfileSync: master data field policy 可映射客户和供应商页�
     ).map((column) => column.dataIndex),
     ['code', 'tax_no']
   )
+})
+
+test('adminProfileSync: planned runtime field policy aliases can hide current business columns', () => {
+  const adminProfile = {
+    effective_session: {
+      field_policies: {
+        'purchase_orders.default': {
+          supplier_snapshot: { visible: false },
+        },
+        'outsourcing_orders.default': {
+          processor_snapshot: { visible: false },
+          expected_return_date: { visible: false },
+        },
+        'shipments.default': {
+          sales_order_no: { visible: false },
+        },
+        'quality_inspections.default': {
+          source_no: { visible: false },
+        },
+      },
+    },
+  }
+  const cases = [
+    {
+      moduleKey: 'accessories-purchase',
+      surface: 'purchase_orders.default',
+      column: {
+        dataIndex: 'supplier_id',
+        effectiveFieldKey: 'supplier_snapshot',
+      },
+    },
+    {
+      moduleKey: 'processing-contracts',
+      surface: 'outsourcing_orders.default',
+      column: {
+        dataIndex: 'supplier_id',
+        effectiveFieldKey: 'processor_snapshot',
+      },
+    },
+    {
+      moduleKey: 'processing-contracts',
+      surface: 'outsourcing_orders.default',
+      column: {
+        dataIndex: 'expected_return_date',
+        effectiveFieldKey: 'expected_return_date',
+      },
+    },
+    {
+      moduleKey: 'shipments',
+      surface: 'shipments.default',
+      column: {
+        dataIndex: 'sales_order_id',
+        effectiveFieldKey: 'sales_order_no',
+      },
+    },
+    {
+      moduleKey: 'quality-inspections',
+      surface: 'quality_inspections.default',
+      column: {
+        dataIndex: 'purchase_receipt_id',
+        effectiveFieldKey: 'source_no',
+      },
+    },
+  ]
+
+  for (const item of cases) {
+    assert.equal(resolveDefaultFieldPolicySurface(item.moduleKey), item.surface)
+    const columns = [{ dataIndex: 'always_visible' }, item.column]
+    applyEffectiveFieldPolicyFlags({
+      adminProfile,
+      moduleKey: item.moduleKey,
+      columns,
+    })
+    assert.equal(columns[0].hiddenByEffectiveFieldPolicy, undefined)
+    assert.equal(columns[1].hiddenByEffectiveFieldPolicy, true)
+  }
 })
 
 test('adminProfileSync: 正式普通账号菜单按 RBAC 与 effective session 取交集', () => {

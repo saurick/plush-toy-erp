@@ -85,6 +85,10 @@ export const FIELD_LINKAGE_SCENARIO_CATALOG = [
     label: '打印甲方默认值不覆盖供应商业务快照',
   },
   {
+    key: 'print_unit_english_normalized',
+    label: '打印合同单位按映射规范为英文短码',
+  },
+  {
     key: 'print_template_contract_declared',
     label: '打印模板声明字段合同和模块门禁',
   },
@@ -269,6 +273,14 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     requiredScenarioKeys: [
       'print_party_defaults_do_not_override_supplier_snapshot',
     ],
+  },
+  {
+    fieldKey: 'printUnit',
+    fieldLabel: '打印合同单位',
+    category: '打印业务草稿单位快照',
+    risk: 'P1',
+    docLabels: ['单位', '打印合同单位'],
+    requiredScenarioKeys: ['print_unit_english_normalized'],
   },
   {
     fieldKey: 'printTemplateContract',
@@ -786,6 +798,14 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     title: '采购合同业务带值草稿不从模板样例兜底真实缺值',
     fieldKeys: ['businessDraftFields'],
     scenarioKey: 'business_draft_does_not_use_template_sample',
+    layer: 'web',
+    testFile: 'web/src/erp/utils/materialPurchaseContractEditor.test.mjs',
+  },
+  {
+    caseId: 'FL_material_purchase_unit__normalizes_unit_to_english_for_print',
+    title: '采购合同单位按映射规范为英文短码',
+    fieldKeys: ['printUnit'],
+    scenarioKey: 'print_unit_english_normalized',
     layer: 'web',
     testFile: 'web/src/erp/utils/materialPurchaseContractEditor.test.mjs',
   },

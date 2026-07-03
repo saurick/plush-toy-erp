@@ -30,7 +30,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "sales_to_production.source_review",
       ]),
       guardrail:
-        "销售只能维护客户、销售源单和协同提交线索，不直接写库存、质检、出货、应收或发票事实。",
+        "销售只能维护客户、销售源单和协同提交线索；库存、质检、出货、应收和发票事实必须由对应领域 usecase 处理。",
     }),
     Object.freeze({
       roleKey: "boss",

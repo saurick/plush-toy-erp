@@ -40,6 +40,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       title: '供应商',
       exportTitle: '供应商',
       dataIndex: 'supplier_id',
+      effectiveFieldKey: 'supplier_snapshot',
       width: 160,
       sortValue: resolveSupplierName,
       render: (_value, record) => resolveSupplierName(record),

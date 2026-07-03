@@ -74,6 +74,7 @@ const {
   assertWorkspaceContinuedPageMargin,
   assertMaterialContractMetaAlignment,
   assertContractTableEditableAlignment,
+  assertMaterialContractLineCellsWrapLongValues,
   assertContractTotalCellsWrapLargeNumbers,
   assertMaterialContractPrintMediaIgnoresResponsiveBreakpoints,
 } = createPrintAssertions({
@@ -119,6 +120,7 @@ function getScenarios() {
     assertEditablePrintWorkspacePopupRefresh,
     assertLineItemsUnifiedHorizontalScroll,
     assertLoginSegmentedReadable,
+    assertMaterialContractLineCellsWrapLongValues,
     assertMaterialContractMetaAlignment,
     assertMaterialContractPrintMediaIgnoresResponsiveBreakpoints,
     assertMobileTaskBossDoneList,

@@ -40,6 +40,7 @@ export function createStyleL1Scenarios(deps) {
     assertEditablePrintWorkspacePopupRefresh,
     assertLineItemsUnifiedHorizontalScroll,
     assertLoginSegmentedReadable,
+    assertMaterialContractLineCellsWrapLongValues,
     assertMaterialContractMetaAlignment,
     assertMaterialContractPrintMediaIgnoresResponsiveBreakpoints,
     assertMobileTaskBossDoneList,
@@ -4848,6 +4849,10 @@ export function createStyleL1Scenarios(deps) {
           editableSelector:
             '.erp-material-contract-table tbody td [contenteditable="true"]',
           scenarioLabel: '采购合同模板表格',
+        })
+        await assertMaterialContractLineCellsWrapLongValues(page, {
+          storageKey: '__plush_erp_material_purchase_contract_print_draft__',
+          scenarioLabel: '采购合同明细长编号带值',
         })
         await assertContractTotalCellsWrapLargeNumbers(page, {
           storageKey: '__plush_erp_material_purchase_contract_print_draft__',

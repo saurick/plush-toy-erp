@@ -9,6 +9,26 @@ const PRINT_PARTY_DEFAULT_KEYS = new Set([
   'buyerSigner',
 ])
 
+const DEFAULT_FIELD_POLICY_SURFACE_BY_MODULE = Object.freeze({
+  customers: 'customers.default',
+  suppliers: 'suppliers.default',
+  sales_orders: 'sales_orders.default',
+  'sales-orders': 'sales_orders.default',
+  sales_order_items: 'sales_order_items.default',
+  purchase_orders: 'purchase_orders.default',
+  'accessories-purchase': 'purchase_orders.default',
+  purchase_order_items: 'purchase_order_items.default',
+  purchase_receipts: 'purchase_receipts.default',
+  quality_inspections: 'quality_inspections.default',
+  'quality-inspections': 'quality_inspections.default',
+  inventory_lots: 'inventory_lots.default',
+  inventory_txns: 'inventory_txns.default',
+  shipments: 'shipments.default',
+  outsourcing_orders: 'outsourcing_orders.default',
+  'processing-contracts': 'outsourcing_orders.default',
+  finance_facts: 'finance_facts.default',
+})
+
 const PRODUCT_CORE_ACTION_KEYS = new Set([
   'bom.activate',
   'bom.create',
@@ -479,6 +499,15 @@ export function isEffectiveFieldVisible(adminProfile, surfaceKey, fieldKey) {
   return policy.visible !== false
 }
 
+export function resolveDefaultFieldPolicySurface(moduleKey = '') {
+  const normalizedModuleKey = String(moduleKey || '').trim()
+  if (!normalizedModuleKey) return ''
+  return (
+    DEFAULT_FIELD_POLICY_SURFACE_BY_MODULE[normalizedModuleKey] ||
+    `${normalizedModuleKey}.default`
+  )
+}
+
 export function getEffectivePrintTemplateDefaults(adminProfile, templateKey) {
   const normalizedTemplateKey =
     typeof templateKey === 'string' ? templateKey.trim() : ''
@@ -552,6 +581,38 @@ export function filterColumnsByEffectiveFieldPolicy(
     const fieldKey = resolveColumnFieldKey(column)
     return !fieldKey || isEffectiveFieldVisible(adminProfile, surface, fieldKey)
   })
+}
+
+export function applyEffectiveFieldPolicyFlags({
+  adminProfile = null,
+  moduleKey = '',
+  surfaceKey = '',
+  columns = [],
+} = {}) {
+  const normalizedColumns = Array.isArray(columns) ? columns : []
+  const surface =
+    (typeof surfaceKey === 'string' ? surfaceKey.trim() : '') ||
+    resolveDefaultFieldPolicySurface(moduleKey)
+  for (const column of normalizedColumns) {
+    if (!column || typeof column !== 'object') continue
+    const fieldKey = resolveColumnFieldKey(column)
+    const hidden = Boolean(
+      surface &&
+        fieldKey &&
+        !isEffectiveFieldVisible(adminProfile, surface, fieldKey)
+    )
+    if (hidden) {
+      column.hiddenByEffectiveFieldPolicy = true
+    } else if (
+      Object.prototype.hasOwnProperty.call(
+        column,
+        'hiddenByEffectiveFieldPolicy'
+      )
+    ) {
+      delete column.hiddenByEffectiveFieldPolicy
+    }
+  }
+  return normalizedColumns
 }
 
 export function getAdminProfileSyncErrorAction(

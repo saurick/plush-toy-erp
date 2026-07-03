@@ -40,7 +40,7 @@ func TestExpandedRuntimeFieldPolicySurfacesAreAllowed(t *testing.T) {
 			},
 			"outsourcing_orders.default": map[string]any{
 				"outsourcing_order_no": map[string]any{"visible": true},
-				"return_date":          map[string]any{"visible": false},
+				"expected_return_date": map[string]any{"visible": false},
 			},
 			"finance_facts.default": map[string]any{
 				"finance_fact_no": map[string]any{"visible": true},

@@ -25,7 +25,7 @@ export const yoyoosunProjectionMatrix = Object.freeze({
     Object.freeze({ surfaceKey: "inventory_lots.default", status: "backend_runtime_allowed", fields: Object.freeze(["lot_no", "warehouse", "material", "quantity", "status"]) }),
     Object.freeze({ surfaceKey: "inventory_txns.default", status: "backend_runtime_allowed", fields: Object.freeze(["txn_no", "txn_type", "warehouse", "material", "quantity"]) }),
     Object.freeze({ surfaceKey: "shipments.default", status: "backend_runtime_allowed", fields: Object.freeze(["shipment_no", "sales_order_no", "warehouse", "status", "shipped_at"]) }),
-    Object.freeze({ surfaceKey: "outsourcing_orders.default", status: "backend_runtime_allowed", fields: Object.freeze(["outsourcing_order_no", "processor_snapshot", "return_date", "lifecycle_status"]) }),
+    Object.freeze({ surfaceKey: "outsourcing_orders.default", status: "backend_runtime_allowed", fields: Object.freeze(["outsourcing_order_no", "processor_snapshot", "expected_return_date", "lifecycle_status"]) }),
     Object.freeze({ surfaceKey: "finance_facts.default", status: "backend_runtime_allowed", fields: Object.freeze(["finance_fact_no", "source_no", "fact_type", "amount", "status"]) }),
   ]),
   printTemplateDefaults: Object.freeze([

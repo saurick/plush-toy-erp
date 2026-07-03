@@ -41,6 +41,6 @@ if [ -f "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" ]; then
 fi
 
 echo "[qa:yoyoosun] 运行后端客户配置字段投影测试"
-go test ./server/internal/biz -run 'CustomerConfig|FieldPolicy'
+(cd "$ROOT_DIR/server" && go test ./internal/biz -run 'CustomerConfig|FieldPolicy')
 
 echo "[qa:yoyoosun] 完成"

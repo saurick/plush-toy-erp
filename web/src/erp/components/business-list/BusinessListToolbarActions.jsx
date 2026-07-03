@@ -4,6 +4,7 @@ import { Space, Tooltip } from 'antd'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { setERPColumnOrder } from '../../api/erpPreferenceApi.mjs'
+import { applyEffectiveFieldPolicyFlags } from '../../utils/adminProfileSync.mjs'
 import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
@@ -52,6 +53,7 @@ function getPreferredColumnOrder({
   columns,
   localOrder,
 }) {
+  applyEffectiveFieldPolicyFlags({ adminProfile, moduleKey, columns })
   if (Array.isArray(localOrder)) {
     return sanitizeModuleColumnOrder(localOrder, columns)
   }

@@ -15,6 +15,16 @@ const sourceManifest = JSON.parse(
 
 const manifestSourceIds = new Set(sourceManifest.sources.map((source) => source.sourceId))
 const syntheticSourceIds = new Set(['__synthetic_yoyoosun_trial__'])
+const forbiddenRuntimeFactCommitClaims =
+  /自动过账|直接过账|直接写库存|直接写出货|直接写财务/
+
+function assertNoPositiveRuntimeFactCommitClaim(text, context) {
+  const normalizedText = String(text || '').replace(
+    /(?:不|不能|不得|禁止)直接写(?:库存|出货|财务)(?:事实|流水|数据)?/g,
+    ''
+  )
+  assert.doesNotMatch(normalizedText, forbiddenRuntimeFactCommitClaims, context)
+}
 
 function assertKnownSourceIds(sourceIds, context) {
   assert.ok(Array.isArray(sourceIds) && sourceIds.length > 0, `${context} sourceIds required`)
@@ -57,7 +67,10 @@ test('yoyoosun raw source form map does not target runtime fact tables directly'
     for (const target of entry.targetEntities) {
       assert.ok(!forbiddenTargets.has(target), `${entry.sourceId} targets forbidden runtime table ${target}`)
     }
-    assert.doesNotMatch(entry.boundary, /自动写库存|自动写财务|自动写出货|直接过账/)
+    assertNoPositiveRuntimeFactCommitClaim(
+      entry.boundary,
+      `${entry.sourceId} boundary must not promise runtime fact commits`
+    )
   }
 })
 
@@ -84,7 +97,10 @@ test('yoyoosun role flow matrix keeps workflow handling separate from facts', ()
     assert.ok(role.ownerPools.length > 0)
     assert.ok(role.capabilityKeys.includes('workflow.task.read'), `${role.roleKey} needs workflow.task.read`)
     assert.match(role.guardrail, /不|不能|只有|必须/)
-    assert.doesNotMatch(role.guardrail, /直接写库存|直接写财务|直接写出货|自动过账/)
+    assertNoPositiveRuntimeFactCommitClaim(
+      role.guardrail,
+      `${role.roleKey} guardrail must not promise runtime fact commits`
+    )
   }
 })
 
@@ -138,6 +154,11 @@ test('yoyoosun projection matrix separates consumed and backend-allowed field su
     assert.ok(surface.surfaceKey.endsWith('.default'))
     assert.ok(surface.fields.length > 0)
   }
+  const outsourcingSurface = yoyoosunProjectionMatrix.fieldSurfaces.find(
+    (surface) => surface.surfaceKey === 'outsourcing_orders.default'
+  )
+  assert.ok(outsourcingSurface.fields.includes('expected_return_date'))
+  assert.ok(!outsourcingSurface.fields.includes('return_date'))
 })
 
 test('yoyoosun print projection protects supplier and processor snapshots', () => {

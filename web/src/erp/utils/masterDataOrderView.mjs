@@ -1,4 +1,5 @@
 import { effectiveSessionAllowsAction } from './adminProfileSync.mjs'
+import { normalizeMaterialPurchaseUnitText } from './materialPurchaseContractEditor.mjs'
 
 export const V1_ROUTE_PATHS = Object.freeze({
   customers: '/erp/master/partners/customers',
@@ -1072,6 +1073,7 @@ export function buildMaterialPurchaseContractDraftFromPurchaseOrder(
     .filter((item) => !isCanceledBusinessLineStatus(item?.line_status))
     .map((item) => {
       const material = materialByID.get(Number(item.material_id || 0)) || {}
+      const unitOptionLabel = unitLabelByID.get(Number(item.unit_id || 0))
       return compactParams({
         contractNo: trimOptional(order.purchase_order_no),
         productOrderNo:
@@ -1090,8 +1092,9 @@ export function buildMaterialPurchaseContractDraftFromPurchaseOrder(
           trimOptional(material.code),
         spec: trimOptional(material.spec),
         unit:
-          trimOptional(item.unit_name_snapshot) ||
-          unitLabelByID.get(Number(item.unit_id || 0)),
+          normalizeMaterialPurchaseUnitText(unitOptionLabel) ||
+          normalizeMaterialPurchaseUnitText(item.unit_name_snapshot) ||
+          undefined,
         unitPrice: trimOptional(item.unit_price),
         quantity: trimOptional(item.purchased_quantity),
         amount: derivePurchaseOrderItemAmount(item),

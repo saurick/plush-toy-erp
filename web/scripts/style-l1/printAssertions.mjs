@@ -987,6 +987,183 @@ export function createPrintAssertions({
     )
   }
 
+  async function assertMaterialContractLineCellsWrapLongValues(
+    page,
+    { storageKey, scenarioLabel }
+  ) {
+    const originalRaw = await page.evaluate(
+      (resolvedStorageKey) => window.localStorage.getItem(resolvedStorageKey),
+      storageKey
+    )
+
+    try {
+      await page.evaluate((resolvedStorageKey) => {
+        const rawDraft = window.localStorage.getItem(resolvedStorageKey)
+        const draft = rawDraft ? JSON.parse(rawDraft) : {}
+        const sourceLine =
+          Array.isArray(draft.lines) && draft.lines.length > 0
+            ? draft.lines[0]
+            : {}
+
+        draft.lines = [
+          {
+            ...sourceLine,
+            contractNo:
+              'SIM-YOYOOSUN-BULK-PO-03-LONG-CONTINUOUS-ORDER-20260703',
+            productOrderNo:
+              'SIM-PRODUCT-ORDER-LONG-CONTINUOUS-20260703-PRIMARY',
+            unit: 'M',
+            quantity: '330000000000',
+            amount: '165000000000.88',
+            remark: 'SIM bulk purchase order item.',
+          },
+        ]
+        draft.merges = []
+        window.localStorage.setItem(resolvedStorageKey, JSON.stringify(draft))
+      }, storageKey)
+
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await expectText(page, '当前记录字段（可编辑）')
+      await expectText(page, 'SIM-YOYOOSUN-BULK-PO-03')
+
+      const metrics = await page.evaluate(() => {
+        const table = document.querySelector('.erp-material-contract-table')
+        const paper = document.querySelector('.erp-material-contract-paper')
+        const row = table?.querySelector(
+          'tbody tr:not(.erp-material-contract-table__total)'
+        )
+        const tableRect = table?.getBoundingClientRect()
+        const paperRect = paper?.getBoundingClientRect()
+        const targetColumns = [
+          { index: 0, key: 'contractNo' },
+          { index: 1, key: 'productOrderNo' },
+          { index: 7, key: 'unit' },
+          { index: 9, key: 'quantity' },
+          { index: 10, key: 'amount' },
+          { index: 11, key: 'remark' },
+        ]
+
+        const cells = targetColumns.map(({ index, key }) => {
+          const cell = row?.children?.[index] || null
+          const editable = cell?.querySelector(
+            '.erp-material-contract-table__editable'
+          )
+          const node = editable || cell
+          const cellRect = cell?.getBoundingClientRect()
+          const nodeRect = node?.getBoundingClientRect()
+          const cellStyle = cell ? window.getComputedStyle(cell) : null
+          const nodeStyle = node ? window.getComputedStyle(node) : null
+
+          return {
+            key,
+            text: String(node?.textContent || '')
+              .replace(/\u00a0/g, ' ')
+              .trim(),
+            cellClientWidth: cell?.clientWidth || 0,
+            cellScrollWidth: cell?.scrollWidth || 0,
+            nodeClientWidth: node?.clientWidth || 0,
+            nodeScrollWidth: node?.scrollWidth || 0,
+            cellLeft: cellRect?.left || 0,
+            cellRight: cellRect?.right || 0,
+            nodeLeft: nodeRect?.left || 0,
+            nodeRight: nodeRect?.right || 0,
+            cellWhiteSpace: cellStyle?.whiteSpace || '',
+            cellOverflowWrap: cellStyle?.overflowWrap || '',
+            nodeWhiteSpace: nodeStyle?.whiteSpace || '',
+            nodeOverflowWrap: nodeStyle?.overflowWrap || '',
+            nodeWordBreak: nodeStyle?.wordBreak || '',
+          }
+        })
+
+        return {
+          hasTable: Boolean(table),
+          hasRow: Boolean(row),
+          tableLeft: tableRect?.left || 0,
+          tableRight: tableRect?.right || 0,
+          paperLeft: paperRect?.left || 0,
+          paperRight: paperRect?.right || 0,
+          cells,
+        }
+      })
+
+      assert(metrics.hasTable, `${scenarioLabel} 未找到采购合同表格`)
+      assert(metrics.hasRow, `${scenarioLabel} 未找到采购合同明细行`)
+
+      metrics.cells.forEach((metric) => {
+        assert(
+          metric.text.length > 0,
+          `${scenarioLabel} ${metric.key} 未写入边界样本: ${JSON.stringify(metric)}`
+        )
+        assert.equal(
+          metric.cellWhiteSpace,
+          'normal',
+          `${scenarioLabel} ${metric.key} 单元格不应强制单行: ${JSON.stringify(metric)}`
+        )
+        assert.equal(
+          metric.nodeWhiteSpace,
+          'normal',
+          `${scenarioLabel} ${metric.key} 内容块不应强制单行: ${JSON.stringify(metric)}`
+        )
+        assert.equal(
+          metric.nodeOverflowWrap,
+          'anywhere',
+          `${scenarioLabel} ${metric.key} 内容块未允许任意断行: ${JSON.stringify(metric)}`
+        )
+        assert(
+          metric.cellScrollWidth <= metric.cellClientWidth + 1,
+          `${scenarioLabel} ${metric.key} 单元格仍横向溢出: ${JSON.stringify(metric)}`
+        )
+        assert(
+          metric.nodeScrollWidth <= metric.nodeClientWidth + 1,
+          `${scenarioLabel} ${metric.key} 内容块仍横向溢出: ${JSON.stringify(metric)}`
+        )
+        assert(
+          metric.cellLeft >= metrics.tableLeft - 1 &&
+            metric.cellRight <= metrics.tableRight + 1,
+          `${scenarioLabel} ${metric.key} 单元格越过表格边界: ${JSON.stringify({
+            metric,
+            tableLeft: metrics.tableLeft,
+            tableRight: metrics.tableRight,
+          })}`
+        )
+        assert(
+          metric.nodeLeft >= metric.cellLeft - 1 &&
+            metric.nodeRight <= metric.cellRight + 1,
+          `${scenarioLabel} ${metric.key} 内容块越过单元格边界: ${JSON.stringify(metric)}`
+        )
+        if (metric.key === 'unit') {
+          assert.equal(
+            metric.text,
+            'M',
+            `${scenarioLabel} unit 列应统一显示英文单位: ${JSON.stringify(metric)}`
+          )
+        }
+      })
+
+      assert(
+        metrics.tableLeft >= metrics.paperLeft - 1 &&
+          metrics.tableRight <= metrics.paperRight + 1,
+        `${scenarioLabel} 表格越过纸面边界: ${JSON.stringify(metrics)}`
+      )
+    } finally {
+      await page.evaluate(
+        ({ resolvedStorageKey, resolvedOriginalRaw }) => {
+          if (typeof resolvedOriginalRaw === 'string') {
+            window.localStorage.setItem(resolvedStorageKey, resolvedOriginalRaw)
+            return
+          }
+          window.localStorage.removeItem(resolvedStorageKey)
+        },
+        {
+          resolvedStorageKey: storageKey,
+          resolvedOriginalRaw: originalRaw,
+        }
+      )
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await expectText(page, '当前记录字段（可编辑）')
+    }
+  }
+
   async function assertContractTotalCellsWrapLargeNumbers(
     page,
     { storageKey, templateKind, totalValueSelector, scenarioLabel }
@@ -1173,6 +1350,7 @@ export function createPrintAssertions({
     assertWorkspaceContinuedPageMargin,
     assertMaterialContractMetaAlignment,
     assertContractTableEditableAlignment,
+    assertMaterialContractLineCellsWrapLongValues,
     assertContractTotalCellsWrapLargeNumbers,
     assertMaterialContractPrintMediaIgnoresResponsiveBreakpoints,
   }

@@ -237,3 +237,51 @@ test('moduleTableColumns: 主业务列表页使用共享排序入口', () => {
   assert.match(purchaseOrdersPage, /buildPurchaseOrderColumns\(/u)
   assert.match(purchaseOrderColumns, /applyBusinessColumnSorters\(/u)
 })
+
+test('moduleTableColumns: planned field policy surfaces map to real business columns', () => {
+  const files = {
+    purchaseOrderColumns: readFileSync(
+      resolve(
+        erpSourceRoot,
+        'components/purchase-orders/purchaseOrderColumns.jsx'
+      ),
+      'utf8'
+    ),
+    outsourcingOrderColumns: readFileSync(
+      resolve(
+        erpSourceRoot,
+        'components/outsourcing-orders/outsourcingOrderColumns.jsx'
+      ),
+      'utf8'
+    ),
+    shipmentColumns: readFileSync(
+      resolve(erpSourceRoot, 'components/shipments/shipmentColumns.jsx'),
+      'utf8'
+    ),
+    qualityInspectionColumns: readFileSync(
+      resolve(
+        erpSourceRoot,
+        'components/quality-inspections/qualityInspectionColumns.jsx'
+      ),
+      'utf8'
+    ),
+  }
+
+  assert.match(
+    files.purchaseOrderColumns,
+    /effectiveFieldKey:\s*'supplier_snapshot'/u
+  )
+  assert.match(
+    files.outsourcingOrderColumns,
+    /effectiveFieldKey:\s*'processor_snapshot'/u
+  )
+  assert.match(
+    files.outsourcingOrderColumns,
+    /effectiveFieldKey:\s*'expected_return_date'/u
+  )
+  assert.match(files.shipmentColumns, /effectiveFieldKey:\s*'sales_order_no'/u)
+  assert.match(
+    files.qualityInspectionColumns,
+    /effectiveFieldKey:\s*'source_no'/u
+  )
+})

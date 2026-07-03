@@ -1,4 +1,5 @@
 import { getColumnLabel } from './ColumnOrderModal.jsx'
+import { applyEffectiveFieldPolicyFlags } from '../../utils/adminProfileSync.mjs'
 import { sanitizeModuleColumnOrder } from '../../utils/moduleTableColumns.mjs'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
@@ -32,6 +33,7 @@ export function getPreferredColumnOrder({
   columns,
   localOrder,
 }) {
+  applyEffectiveFieldPolicyFlags({ adminProfile, moduleKey, columns })
   if (Array.isArray(localOrder)) {
     return sanitizeModuleColumnOrder(localOrder, columns)
   }

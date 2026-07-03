@@ -46,3 +46,59 @@
 下一步：本地拉取 PR 分支后运行 `bash scripts/qa/yoyoosun-closure.sh`，再视结果运行原有 fast / strict；若需要把 planned field surfaces 升级为 runtime，应另开 runtime 代码改动，修改后端 field-policy allowlist、前端实际消费点和对应测试。
 
 阻塞/风险：当前分支新增的是配置资产、文档、fixture 和 QA 门禁，不直接修改后端 runtime usecase、schema、migration 或真实导入；客户签收仍需目标环境 authenticated effective session readback、角色 smoke、采购 / 加工合同目标 PDF evidence 和客户确认。
+
+## 2026-07-03 yoyoosun flow / projection closure 本地拉取验证
+
+完成：本地 `main` 已从 `origin/fix/yoyoosun-flow-projection-field-closure` 快进到 `2660ef0a`。补两处合并后验证缺口：销售角色 guardrail 改为正向领域 usecase 边界表达，避免 yoyoosun readiness 测试把“禁止直接写库存”文案误判为 blocked wording；`scripts/qa/yoyoosun-closure.sh` 的 Go 测试切到 `server/` 目录执行；`docs/文档清单.md` 已登记本分支新增的客户闭环与签收准备 Markdown。
+
+下一步：如需提交 / 推送，按本轮相关路径精确 stage；如继续升级 planned field surfaces，应另拆 runtime allowlist、前端消费点和测试切片。
+
+阻塞/风险：本轮只做本地拉取、测试和 QA / 文档登记修正；未执行目标环境 authenticated readback、真实角色 smoke、PDF 目标 evidence、部署或真实导入。已通过 `bash scripts/qa/yoyoosun-closure.sh`、`node --test scripts/qa/docs-inventory.test.mjs`、`bash scripts/qa/fast.sh`。
+
+## 2026-07-03 采购合同打印明细长编号换行修复
+
+完成：修复采购合同打印模板明细表格长采购订单号 / 产品订单编号带值后横向溢出单元格的问题。表体默认改为允许 `overflow-wrap: anywhere` 与格内换行，保留单位列不换行；新增 `style:l1` 采购合同工作台断言，写入超长采购订单号、产品订单编号、大数量、大金额和备注后检查单元格与内容块没有横向溢出、没有越过表格 / 纸面边界。
+
+下一步：如后续真实合同样本继续出现极端长规格或备注，可复用同一盒模型断言扩展对应列；本轮未调整采购订单业务 mapper、PDF 后端、RBAC、Workflow / Fact 或客户配置。
+
+阻塞/风险：本轮只覆盖采购合同打印工作台和浏览器级 L1 单页回归；没有执行目标环境真实登录 PDF smoke，也没有修改加工合同表体列策略。已通过 `node --check web/scripts/styleL1.mjs web/scripts/style-l1/printAssertions.mjs web/scripts/style-l1/scenarios.mjs`、`/usr/local/bin/pnpm --dir web css`、`/usr/local/bin/pnpm --dir web lint`、`/usr/local/bin/pnpm --dir web test`、`STYLE_L1_SCENARIOS=print-workspace-material /usr/local/bin/pnpm --dir web style:l1`。
+
+## 2026-07-03 planned field policy key 对齐与边界测试修复
+
+完成：处理 review 中的 planned field policy key 不一致和 preview-only 禁词误伤问题。将 moduleKey 到 field policy surface 的映射收口到 `adminProfileSync.mjs`，覆盖 `sales-orders`、`accessories-purchase`、`processing-contracts`、`quality-inspections` 等页面入口别名；采购、加工、出货、质检真实列补 `effectiveFieldKey`，质量页面列表和导出都接入 field policy 标记；加工合同 planned surface 从旧 `return_date` 统一为当前业务字段 `expected_return_date`，同步后端 allowlist、客户投影矩阵和文档。yoyoosun QA 禁词断言改为拦截正向 runtime fact commit 承诺，允许“不 / 不能 / 禁止直接写...”这类 Workflow / Fact 边界文案。
+
+下一步：planned surfaces 仍保持 `backend_runtime_allowed`，暂不发布到 runtime manifest；后续若提升采购、加工、出货、质检 field policy 为正式 runtime，需要补目标账号 effective session readback 和页面级真实隐藏 / 导出回归。
+
+阻塞/风险：本轮不改 schema、migration、WorkflowUsecase、Fact usecase、RBAC 或真实导入；未跑目标环境 authenticated readback、真实角色 smoke、PDF 目标 evidence 或部署验证。已通过 `node --test scripts/qa/yoyoosun-release-readiness.test.mjs scripts/qa/yoyoosun-customer-closure.test.mjs`、`/usr/local/bin/pnpm --dir web exec node --test src/erp/utils/adminProfileSync.test.mjs src/erp/utils/moduleTableColumns.test.mjs`、`cd server && go test ./internal/biz -run 'CustomerConfig|FieldPolicy'`、`bash scripts/qa/yoyoosun-closure.sh`、`bash scripts/qa/fast.sh`、`git diff --check`。
+
+## 2026-07-03 采购合同打印单位列溢出漏检修正
+
+完成：复核上一轮采购合同打印样式修复，确认单位列仍被 `nowrap` 特例限制且 L1 断言未覆盖 `unit` 列。已移除单位列不换行特例，并把 `米（M）` 加入采购合同明细长值盒模型回归，和采购订单号、产品订单号、数量、金额、备注一起检查内容块与单元格不横向溢出。
+
+下一步：同类打印表格修复不得再只按“看起来短”的字段排除断言；如继续发现规格 / 厂商料号等极端值，应纳入同一 `targetColumns` 断言集合。
+
+阻塞/风险：本轮仍只改采购合同打印样式和 L1 断言，不改业务 mapper、PDF 后端、RBAC、Workflow / Fact、客户配置或加工合同列策略。已通过 `node --check web/scripts/styleL1.mjs web/scripts/style-l1/printAssertions.mjs web/scripts/style-l1/scenarios.mjs`、`/usr/local/bin/pnpm --dir web css`、`STYLE_L1_SCENARIOS=print-workspace-material /usr/local/bin/pnpm --dir web style:l1`。
+
+## 2026-07-03 采购合同打印单位英文口径统一
+
+完成：将采购合同打印草稿的单位统一规范为英文单位。打印编辑器模型会把 `米（M）`、`pcs` 等单位值归一成 `M`、`PCS`；采购订单生成采购合同草稿时优先从单位选项解析英文 code，快照或选项只有中文且没有英文来源时不伪造单位值。L1 采购合同明细断言改为写入并校验 `M`，字段链路目录新增 `printUnit` 覆盖项。
+
+下一步：如后续加工合同也要求单位英文口径，应另按加工合同字段链路和模板样本评审，不在本轮顺手扩散。
+
+阻塞/风险：本轮只改采购合同打印草稿映射、编辑器单位规范化、字段链路目录和 L1 回归；未改全局单位选择器、主数据单位展示、PDF 后端、RBAC、Workflow / Fact、客户配置或加工合同。已通过 `node --check web/src/erp/utils/materialPurchaseContractEditor.mjs web/src/erp/utils/masterDataOrderView.mjs web/scripts/style-l1/printAssertions.mjs web/scripts/style-l1/scenarios.mjs web/scripts/styleL1.mjs`、`/usr/local/bin/pnpm --dir web exec node --test src/erp/qa/fieldLinkageCatalog.test.mjs src/erp/utils/materialPurchaseContractEditor.test.mjs src/erp/utils/masterDataOrderView.test.mjs`、`/usr/local/bin/pnpm --dir web lint`、`/usr/local/bin/pnpm --dir web css`、`/usr/local/bin/pnpm --dir web test`、`STYLE_L1_SCENARIOS=print-workspace-material /usr/local/bin/pnpm --dir web style:l1`、`git diff --check`。
+
+## 2026-07-03 采购合同打印单位映射口径修正
+
+完成：根据甲方样本中单位既有中文也有英文的现状，将上一轮“全英文”口径调整为“映射优先、未知保留”。采购合同单位现按映射输出打印短码：`片 / 件 / 个 / 只` -> `PCS`、`对 / 双` -> `PAIR`、`米` -> `M`、`码` -> `YD`，英文输入仍统一大写；无法确认的中文单位保留来源文本，不清空也不伪造英文。正式打印模板说明已同步。
+
+下一步：后续若甲方确认 `对` 也要统一打成 `PCS` 而不是 `PAIR`，只调整同一映射表和测试，不在模板、样式或业务页多处补分支。
+
+阻塞/风险：本轮不改主数据单位 schema / API、全局单位选择器、采购订单保存参数、PDF 后端、RBAC、Workflow / Fact、客户配置或加工合同。已通过 `node --check web/src/erp/utils/materialPurchaseContractEditor.mjs web/src/erp/utils/masterDataOrderView.mjs web/src/erp/qa/fieldLinkageCatalog.mjs web/scripts/style-l1/printAssertions.mjs`、`/usr/local/bin/pnpm --dir web exec node --test src/erp/qa/fieldLinkageCatalog.test.mjs src/erp/utils/materialPurchaseContractEditor.test.mjs src/erp/utils/masterDataOrderView.test.mjs`、`STYLE_L1_SCENARIOS=print-workspace-material /usr/local/bin/pnpm --dir web style:l1`。
+
+## 2026-07-03 采购合同打印单位全量文档扫描与映射扩表
+
+完成：按 README、docs、web/server/scripts README、`.agents/skills` Markdown 扫描单位候选；剔除普通语义单字误伤后，把采购合同打印单位映射扩到件数、配对、套、长度、重量、包装和批量单位族。映射只作用于采购合同打印草稿 `unit`，不改变全局单位选择器、主数据单位展示或其他业务页；正式打印模板说明已同步完整映射。
+
+下一步：若甲方确认某个单位短码口径不同，例如 `对 / 双` 要改成 `PCS` 而不是 `PAIR`，只改同一映射表、测试和两份打印模板说明。
+
+阻塞/风险：扫描覆盖仓库 Markdown / README，不解析 Excel、PDF、图片原件或外部甲方文档；未知单位仍保留来源文本，不伪造英文。已通过 `node --check web/src/erp/utils/materialPurchaseContractEditor.mjs web/src/erp/utils/masterDataOrderView.mjs web/src/erp/qa/fieldLinkageCatalog.mjs web/scripts/style-l1/printAssertions.mjs web/scripts/style-l1/scenarios.mjs web/scripts/styleL1.mjs`、`/usr/local/bin/pnpm --dir web exec node --test src/erp/qa/fieldLinkageCatalog.test.mjs src/erp/utils/materialPurchaseContractEditor.test.mjs src/erp/utils/masterDataOrderView.test.mjs`、`/usr/local/bin/pnpm --dir web lint`、`/usr/local/bin/pnpm --dir web css`、`/usr/local/bin/pnpm --dir web test`、`STYLE_L1_SCENARIOS=print-workspace-material /usr/local/bin/pnpm --dir web style:l1`、`git diff --check -- <本轮相关文件>`。

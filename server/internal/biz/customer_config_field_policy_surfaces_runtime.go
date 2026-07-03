@@ -61,7 +61,7 @@ func init() {
 	registerRuntimeFieldPolicySurface("outsourcing_orders.default", []string{
 		"outsourcing_order_no",
 		"processor_snapshot",
-		"return_date",
+		"expected_return_date",
 		"lifecycle_status",
 	})
 	registerRuntimeFieldPolicySurface("finance_facts.default", []string{

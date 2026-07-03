@@ -10,6 +10,7 @@ import {
   computeMaterialPurchaseTotals,
   deleteMaterialPurchaseLine,
   insertMaterialPurchaseLine,
+  normalizeMaterialPurchaseUnitText,
   splitDetailCellMerge,
   updateMaterialPurchaseLineCell,
 } from './materialPurchaseContractEditor.mjs'
@@ -126,6 +127,35 @@ test('FL_material_purchase_business_draft__does_not_fill_missing_business_fields
   assert.equal(draft.lines[0].amount, '6.00')
   assert.deepEqual(draft.clauses.delivery, ['保留模板来货要求'])
   assert.deepEqual(draft.merges, [])
+})
+
+test('FL_material_purchase_unit__normalizes_unit_to_english_for_print materialPurchaseContractEditor: 采购合同单位按映射保存打印短码', () => {
+  assert.equal(normalizeMaterialPurchaseUnitText(' 米（M） '), 'M')
+  assert.equal(normalizeMaterialPurchaseUnitText('pcs'), 'PCS')
+  assert.equal(normalizeMaterialPurchaseUnitText('米'), 'M')
+  assert.equal(normalizeMaterialPurchaseUnitText('片'), 'PCS')
+  assert.equal(normalizeMaterialPurchaseUnitText('对'), 'PAIR')
+  assert.equal(normalizeMaterialPurchaseUnitText('盒'), 'BOX')
+  assert.equal(normalizeMaterialPurchaseUnitText('袋'), 'BAG')
+  assert.equal(normalizeMaterialPurchaseUnitText('卷'), 'ROLL')
+  assert.equal(normalizeMaterialPurchaseUnitText('厘米'), 'CM')
+  assert.equal(normalizeMaterialPurchaseUnitText('吨'), 'T')
+  assert.equal(normalizeMaterialPurchaseUnitText('罗'), 'GRS')
+  assert.equal(normalizeMaterialPurchaseUnitText('未确认单位'), '未确认单位')
+
+  const draft = buildMaterialPurchaseContractDraft({
+    lines: [
+      {
+        materialName: '面料',
+        unit: '片',
+        quantity: '1',
+      },
+    ],
+  })
+  assert.equal(draft.lines[0].unit, 'PCS')
+
+  const updated = updateMaterialPurchaseLineCell(draft.lines, 0, 'unit', 'kg')
+  assert.equal(updated[0].unit, 'KG')
 })
 
 test('materialPurchaseContractEditor: 可直接编辑采购金额并参与合计', () => {

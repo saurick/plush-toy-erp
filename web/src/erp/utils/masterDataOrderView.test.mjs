@@ -998,8 +998,8 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
         { id: 13, code: 'MAT-013', name: '不应出现' },
       ],
       unitOptions: [
-        { value: 13, label: '码（YD）' },
-        { value: 15, label: 'PCS' },
+        { value: 13, label: '米（M）' },
+        { value: 15, label: '码（YD）' },
       ],
     }
   )
@@ -1021,7 +1021,7 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
     productName: '毛绒兔',
     materialName: '面料',
     vendorCode: 'MAT-001',
-    unit: '米',
+    unit: 'M',
     unitPrice: '3.50',
     quantity: '10',
     amount: '35.00',
@@ -1032,7 +1032,7 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
     materialName: '辅料',
     vendorCode: 'MAT-002',
     spec: '12mm',
-    unit: 'PCS',
+    unit: 'YD',
     quantity: '2',
     remark: '红色',
   })
