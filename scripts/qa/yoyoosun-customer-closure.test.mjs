@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 import { yoyoosunCustomerPackage } from '../../config/customers/yoyoosun/customerPackage.mjs'
+import { yoyoosunProjectionMatrix } from '../../config/customers/yoyoosun/projectionMatrix.mjs'
 import { yoyoosunRawSourceFormMap } from '../../config/customers/yoyoosun/rawSourceFormMap.mjs'
 import { yoyoosunRoleFlowMatrix } from '../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 import { yoyoosunTrialDataFixture } from '../../config/customers/yoyoosun/trialDataFixture.mjs'
@@ -83,6 +84,31 @@ test('yoyoosun role flow matrix keeps workflow handling separate from facts', ()
     assert.ok(role.capabilityKeys.includes('workflow.task.read'), `${role.roleKey} needs workflow.task.read`)
     assert.match(role.guardrail, /不|不能|只有|必须/)
     assert.doesNotMatch(role.guardrail, /直接写库存|直接写财务|直接写出货|自动过账/)
+  }
+})
+
+test('yoyoosun projection matrix separates runtime-enabled from planned field surfaces', () => {
+  const runtimeSurfaces = yoyoosunProjectionMatrix.fieldSurfaces.filter(
+    (surface) => surface.status === 'runtime_enabled'
+  )
+  const plannedSurfaces = yoyoosunProjectionMatrix.fieldSurfaces.filter(
+    (surface) => surface.status === 'planned'
+  )
+
+  assert.ok(runtimeSurfaces.length >= 3, 'runtime surfaces must stay explicit')
+  assert.ok(plannedSurfaces.length >= 5, 'planned projection gaps must remain visible')
+  for (const surface of yoyoosunProjectionMatrix.fieldSurfaces) {
+    assert.ok(surface.surfaceKey.endsWith('.default'))
+    assert.ok(surface.fields.length > 0)
+  }
+})
+
+test('yoyoosun print projection protects supplier and processor snapshots', () => {
+  for (const template of yoyoosunProjectionMatrix.printTemplateDefaults) {
+    assert.equal(template.status, 'runtime_enabled')
+    assert.equal(template.defaultFieldPolicy, 'buyer_party_only')
+    assert.ok(template.protectedBusinessSnapshots.includes('lines'))
+    assert.ok(template.protectedBusinessSnapshots.includes('supplierName'))
   }
 })
 
