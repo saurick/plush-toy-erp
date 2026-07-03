@@ -36,6 +36,9 @@ export const yoyoosunCustomerPackage = Object.freeze({
       status: "preview_only",
       partyDefaults: Object.freeze({
         buyerCompany: "东莞市永绅玩具有限公司",
+        buyerContact: "采购部",
+        buyerPhone: "待维护",
+        buyerAddress: "待维护",
       }),
       guardrail:
         "仅作为 yoyoosun 客户配置草案里的采购合同买方抬头默认值，不进入 Product Core 默认样例，不自动生成签章、签收、采购事实或财务事实。",
@@ -45,6 +48,9 @@ export const yoyoosunCustomerPackage = Object.freeze({
       status: "preview_only",
       partyDefaults: Object.freeze({
         buyerCompany: "东莞市永绅玩具有限公司",
+        buyerContact: "委外部",
+        buyerPhone: "待维护",
+        buyerAddress: "待维护",
       }),
       guardrail:
         "仅作为 yoyoosun 客户配置草案里的加工合同委托方抬头默认值，不进入 Product Core 默认样例，不自动生成签章、签收、委外事实或财务事实。",
