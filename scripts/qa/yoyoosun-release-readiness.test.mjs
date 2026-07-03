@@ -48,22 +48,22 @@ test('release evidence still marks readback boundary', () => {
   assert.match(releaseEvidence, /internal-only/)
 })
 
-test('planned field surfaces are separate from runtime field surfaces', () => {
-  const runtimeSurfaces = new Set(
+test('backend-allowed field surfaces stay separate from consumed field surfaces', () => {
+  const consumedSurfaces = new Set(
     yoyoosunProjectionMatrix.fieldSurfaces
       .filter((surface) => surface.status === 'runtime_enabled')
       .map((surface) => surface.surfaceKey)
   )
-  const plannedSurfaces = new Set(
+  const backendAllowedSurfaces = new Set(
     yoyoosunProjectionMatrix.fieldSurfaces
-      .filter((surface) => surface.status === 'planned')
+      .filter((surface) => surface.status === 'backend_runtime_allowed')
       .map((surface) => surface.surfaceKey)
   )
 
   for (const surface of ['customers.default', 'suppliers.default', 'sales_orders.default']) {
-    assert.ok(runtimeSurfaces.has(surface), `${surface} must remain runtime-enabled`)
+    assert.ok(consumedSurfaces.has(surface), `${surface} must remain consumed`)
   }
   for (const surface of ['purchase_orders.default', 'outsourcing_orders.default', 'shipments.default', 'finance_facts.default']) {
-    assert.ok(plannedSurfaces.has(surface), `${surface} must remain planned until backend runtime expansion lands`)
+    assert.ok(backendAllowedSurfaces.has(surface), `${surface} must be backend allowed`)
   }
 })
