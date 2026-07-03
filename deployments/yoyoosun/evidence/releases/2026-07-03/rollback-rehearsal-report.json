@@ -1,0 +1,38 @@
+{
+  "customerCode": "yoyoosun",
+  "environment": "customer-trial-133",
+  "releaseVersion": "yoyoosun-20260703-c298a2a3-amd64",
+  "rehearsedAt": "2026-07-03T05:18:00Z",
+  "rehearsalType": "rollback-forward-fix",
+  "triggerScenario": "post-deploy smoke or business confirmation fails after 133 deployment",
+  "rollbackTargetRelease": "133-previous-runtime-before-20260703T1312-c298a2a3-p5",
+  "rollbackRunbook": "deployments/yoyoosun/runbooks/03-rollback.md",
+  "steps": [
+    {
+      "name": "identify previous APP_IMAGE and WEB_IMAGE from backed up runtime env",
+      "status": "pass"
+    },
+    {
+      "name": "verify pre-migration backupId and backup hash are available",
+      "status": "pass"
+    },
+    {
+      "name": "verify forward-fix owner and post-action smoke scope",
+      "status": "pass"
+    }
+  ],
+  "postCheck": {
+    "smokeStatus": "pass",
+    "smokeReport": "smoke-test-report.json",
+    "smokeCheckCount": 6
+  },
+  "summary": {
+    "rehearsalCompleted": true,
+    "rollbackPathStatus": "pass"
+  },
+  "redaction": {
+    "containsSecrets": false,
+    "containsRawCustomerRows": false,
+    "containsFullDsn": false
+  }
+}

@@ -1,0 +1,5 @@
+Migration Status: PENDING
+  -- Current Version: 20260612112337
+  -- Next Version:    20260615113608
+  -- Executed Files:  20
+  -- Pending Files:   18

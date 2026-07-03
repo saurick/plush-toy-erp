@@ -1,0 +1,10 @@
+==> 迁移目录: /opt/plush-toy-erp/current/server/internal/data/model/migrate
+==> compose 文件: /opt/plush-toy-erp/current/server/deploy/compose/prod/compose.yml
+==> Postgres 容器: e63e638438906bc1a855aeabb8afc5d9e4df200d066759e0f0ae1f83b9f8946f
+==> Atlas: /usr/local/bin/atlas
+==> [1/3] 查看当前迁移状态
+Migration Status: PENDING
+  -- Current Version: 20260612112337
+  -- Next Version:    20260615113608
+  -- Executed Files:  20
+  -- Pending Files:   18

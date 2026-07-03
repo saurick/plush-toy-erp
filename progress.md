@@ -36,13 +36,16 @@
 ## 当前活跃事项
 
 - 多甲方角色能力流程编排以 `docs/product/多甲方角色能力流程编排优先级.md` 和 `node scripts/qa/multi-client-role-workflow-priority-audit.mjs --json` 的 `implementationOrder` 为本地优先级入口；GPT/reference 资料只作输入，当前真源仍回到代码、migration、测试和正式文档。
-- 当前审计显示 P0-P4 本地证据为 ready；P5 测试部署 / 导入 / 第二客户验证仍为 `target-evidence-required`，第一条 blocked release action 是 `immutable-version`。
-- P5 当前只允许 report-only、input template、preflight 和 checklist 准备；没有真实目标环境、镜像 digest、migration 前后版本、backup id、目标管理员凭据和用户确认时，不写 `deployments/**/evidence/**`，不执行 `--execute`，不把本地 ready 写成目标 release evidence。
-- 真实客户数据导入、正式生产发布、目标环境 smoke、目标 migration、备份恢复、回滚 / 前向修复演练、客户配置激活和签收仍未执行，不能被本地 dry-run、manifest 编译、status、gate、audit、runner report、input template 或 preflight 替代。
+- 当前审计显示 P0-P4 本地证据为 ready；P5 的 133 内部验证证据已收口到 `deployments/yoyoosun/evidence/releases/2026-07-03/`，`release-evidence-status` 为 `ready`，closeoutSummary 为 `gateVerified=6/6`、`blockers=0`。
+- 本次 133 发布验证已完成本地构建镜像、远端 `docker load`、运行时 `.env` 脱敏 preflight、migration before/after、pre-migration backup、隔离恢复 + migration 演练、真实库 migration、业务容器重建、目标 smoke、rollback / forward-fix evidence 和 internal-only sign-off。
+- 真实客户数据导入、客户最终签收、authenticated `customer_config.get_effective_session` active revision 读回和客户配置激活 / rollback 未执行；本次 smoke 只验证未登录边界，因此 2026-07-03 release evidence 结论限定为 `internal-only`，不能写成客户试用 approved。
 - 当前可继续推进的本地闭环优先落在：试用账号 / 菜单 / 岗位任务端前置检查、客户配置控制台 no-write 诊断、字段链路守卫、错误提示和 README / `__dev/testing` 入口口径一致性。
 
 ## 2026-07-03 P5 goal 恢复候选边界收口
 
 - 完成：恢复原 P5 goal 的执行边界；确认工具层 blocked goal 不能重新 create，但本会话继续按原目标推进。按 release / docs governance 先停止扩新功能，补齐 archive 人工索引漂移，并把 Docker build 依赖的 `web/devCustomerConfigPlugin.mjs` / 测试列入候选边界风险，避免提交时漏掉 untracked 文件导致 server 镜像构建再次失败。本次归档将原 81KB 根 `progress.md` 原样保留到 `docs/archive/progress-2026-07-03-before-p5-candidate-recovery.md`，根文件只保留活跃事项和当前恢复记录。
-- 下一步：跑 docs inventory、customer-config boundary、priority audit 和 diff check；随后在用户明确提交授权后，按候选边界精确 stage，生成可绑定 commit，再构建 server/web 镜像并收集 sha256 digest，最后到 133 执行目标环境 migration / smoke / effective session / backup restore / rollback-forward-fix evidence。
-- 阻塞/风险：当前 worktree 仍包含大量并行未提交改动、删除的 reference PDF、多个 untracked archive / scripts / web helper；未提交、未推送、未生成正式 image digest、未部署 133、未执行目标 smoke / 备份恢复 / 回滚演练 / 签收。没有提交授权前，不能进入 immutable release evidence。
+- 完成：在用户授权后精确提交 P5 候选范围，提交 `c298a2a3ba0f13b0ce41a0fe82c9cf5623c4a2e5`；从干净临时 worktree 构建 `plush-toy-erp-server:yoyoosun-20260703-c298a2a3-amd64` 与 `plush-toy-erp-web:yoyoosun-20260703-c298a2a3-amd64`，镜像 ID 分别为 `sha256:55f2778c6a71ce10439abaa9e5b4a2f46c971f0f0999a8c28d0e45630304af1d`、`sha256:fe2237235a7585112b1f6041fa3f8b81d33fc5e4b25cfeff70c48667af3e0cbb`。
+- 完成：133 服务器已 `docker load` 新镜像，备份并更新 `/opt/plush-toy-erp/current/server/deploy/compose/prod/.env`、`compose.yml`、`migrate_online.sh` 和 migration 目录；真实库从 `20260612112337` 迁移到 `20260701152057`，`Pending Files=0`；业务容器已切到新镜像，`production-preflight --runtime` 和目标 smoke 通过。
+- 完成：新增 `deployments/yoyoosun/evidence/releases/2026-07-03/`，release evidence gate 通过，`release-evidence-status --json` 返回 `status=ready`、`gateReady=true`、`closeoutSummary.ready=true`；`multi-client-role-workflow-priority-audit --release-evidence-dir deployments/yoyoosun/evidence/releases/2026-07-03 --json` 返回 `releaseReady=true`。
+- 下一步：如要继续客户试用级别，需要提供目标环境管理员 token 或受控登录凭据，补 authenticated `customer_config.get_effective_session` active revision 读回、客户配置激活 / rollback 证据和客户确认；如要代码同步远端 Git，还需要用户另行授权 push。
+- 阻塞/风险：2026-07-03 evidence 是 `internal-only`，未证明真实客户数据导入、客户最终签收、客户配置 active revision authenticated readback 或客户配置激活 / rollback。主工作区仍有未纳入本轮提交的 `docs/reference/**` PDF 删除，未处理且未提交。
