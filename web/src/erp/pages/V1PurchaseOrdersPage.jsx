@@ -627,6 +627,8 @@ export default function V1PurchaseOrdersPage() {
       loadOrderItems,
       materials,
       printTemplateDefaults: purchasePrintTemplateDefaults,
+      resolveSupplierSnapshot,
+      suppliers,
       unitOptions,
       customerKey: activeCustomerKey,
     })

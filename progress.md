@@ -110,3 +110,11 @@
 下一步：如果甲方后续确认某类英文 code 要显示成特定中文，例如 `PCS` 不用 `件` 而用 `片`，只改同一映射表和测试，不在模板或业务页多处补分支。
 
 阻塞/风险：本轮仍只改采购合同打印草稿 `unit` 生成与显示口径，不改主数据单位 schema / API、全局单位选择器、采购订单保存参数、PDF 后端、RBAC、Workflow / Fact、客户配置或加工合同。已通过 `node --check web/src/erp/utils/materialPurchaseContractEditor.mjs web/src/erp/utils/masterDataOrderView.mjs web/src/erp/qa/fieldLinkageCatalog.mjs web/scripts/style-l1/printAssertions.mjs`、`/usr/local/bin/pnpm --dir web exec node --test src/erp/qa/fieldLinkageCatalog.test.mjs src/erp/utils/materialPurchaseContractEditor.test.mjs src/erp/utils/masterDataOrderView.test.mjs`、`/usr/local/bin/pnpm --dir web lint`、`/usr/local/bin/pnpm --dir web css`、`/usr/local/bin/pnpm --dir web test`、`STYLE_L1_SCENARIOS=print-workspace-material /usr/local/bin/pnpm --dir web style:l1`。
+
+## 2026-07-04 合同打印补值 PR 审查修正
+
+完成：审查 PR #3 `fix(print): complete yoyoosun contract draft display values` 后，补齐采购合同打印 hook 的供应商列表与联系人快照入参，确保历史订单供应商快照缺字段时可按既有主数据回补空白；加工合同业务打印入口接入同一打印草稿补全 helper；新增补全单测纳入 `web` 常规 `pnpm test`；客户配置预检测试同步 4 个默认方字段口径。
+
+下一步：如后续要让采购订单明细真正带出产品订单编号 / 产品编号 / 产品名称，应单独评审采购订单明细业务模型、schema / migration / API / 导入和打印带值链路，不在打印补值层伪造。
+
+阻塞/风险：本轮只处理打印草稿显示补齐、客户配置默认方字段和测试覆盖；不改 schema、migration、采购订单明细业务模型、RBAC、Workflow / Fact 或 PDF 后端。已通过 `git diff --check`、`PATH=/usr/local/bin:$PATH node --test web/src/erp/utils/contractPrintDraftCompleteness.test.mjs web/src/erp/data/processingContractTemplate.test.mjs web/src/erp/utils/materialPurchaseContractEditor.test.mjs web/src/erp/utils/printWorkspace.test.mjs`、`PATH=/usr/local/bin:$PATH node --test web/src/erp/config/devCustomerConfig.test.mjs web/src/erp/utils/contractPrintDraftCompleteness.test.mjs`、`PATH=/usr/local/bin:$PATH pnpm --dir web lint`、`PATH=/usr/local/bin:$PATH pnpm --dir web css`、`PATH=/usr/local/bin:$PATH pnpm --dir web test`。
