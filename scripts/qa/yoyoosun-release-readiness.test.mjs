@@ -66,5 +66,4 @@ test('yoyoosun release readiness keeps planned field surfaces separate from runt
   for (const surface of ['purchase_orders.default', 'outsourcing_orders.default', 'shipments.default', 'finance_facts.default']) {
     assert.ok(plannedSurfaces.has(surface), `${surface} must remain planned until backend runtime expansion lands`)
   }
-}
-)
+})
