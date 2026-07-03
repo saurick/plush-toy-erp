@@ -85,8 +85,8 @@ export const FIELD_LINKAGE_SCENARIO_CATALOG = [
     label: '打印甲方默认值不覆盖供应商业务快照',
   },
   {
-    key: 'print_unit_english_normalized',
-    label: '打印合同单位按映射规范为英文短码',
+    key: 'print_unit_chinese_normalized',
+    label: '打印合同单位按映射规范为中文单位',
   },
   {
     key: 'print_template_contract_declared',
@@ -280,7 +280,7 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     category: '打印业务草稿单位快照',
     risk: 'P1',
     docLabels: ['单位', '打印合同单位'],
-    requiredScenarioKeys: ['print_unit_english_normalized'],
+    requiredScenarioKeys: ['print_unit_chinese_normalized'],
   },
   {
     fieldKey: 'printTemplateContract',
@@ -802,10 +802,10 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     testFile: 'web/src/erp/utils/materialPurchaseContractEditor.test.mjs',
   },
   {
-    caseId: 'FL_material_purchase_unit__normalizes_unit_to_english_for_print',
-    title: '采购合同单位按映射规范为英文短码',
+    caseId: 'FL_material_purchase_unit__normalizes_unit_to_chinese_for_print',
+    title: '采购合同单位按映射规范为中文单位',
     fieldKeys: ['printUnit'],
-    scenarioKey: 'print_unit_english_normalized',
+    scenarioKey: 'print_unit_chinese_normalized',
     layer: 'web',
     testFile: 'web/src/erp/utils/materialPurchaseContractEditor.test.mjs',
   },

@@ -129,18 +129,18 @@ test('FL_material_purchase_business_draft__does_not_fill_missing_business_fields
   assert.deepEqual(draft.merges, [])
 })
 
-test('FL_material_purchase_unit__normalizes_unit_to_english_for_print materialPurchaseContractEditor: 采购合同单位按映射保存打印短码', () => {
-  assert.equal(normalizeMaterialPurchaseUnitText(' 米（M） '), 'M')
-  assert.equal(normalizeMaterialPurchaseUnitText('pcs'), 'PCS')
-  assert.equal(normalizeMaterialPurchaseUnitText('米'), 'M')
-  assert.equal(normalizeMaterialPurchaseUnitText('片'), 'PCS')
-  assert.equal(normalizeMaterialPurchaseUnitText('对'), 'PAIR')
-  assert.equal(normalizeMaterialPurchaseUnitText('盒'), 'BOX')
-  assert.equal(normalizeMaterialPurchaseUnitText('袋'), 'BAG')
-  assert.equal(normalizeMaterialPurchaseUnitText('卷'), 'ROLL')
-  assert.equal(normalizeMaterialPurchaseUnitText('厘米'), 'CM')
-  assert.equal(normalizeMaterialPurchaseUnitText('吨'), 'T')
-  assert.equal(normalizeMaterialPurchaseUnitText('罗'), 'GRS')
+test('FL_material_purchase_unit__normalizes_unit_to_chinese_for_print materialPurchaseContractEditor: 采购合同单位按映射保存中文单位', () => {
+  assert.equal(normalizeMaterialPurchaseUnitText(' 米（M） '), '米')
+  assert.equal(normalizeMaterialPurchaseUnitText('pcs'), '件')
+  assert.equal(normalizeMaterialPurchaseUnitText('米'), '米')
+  assert.equal(normalizeMaterialPurchaseUnitText('片'), '片')
+  assert.equal(normalizeMaterialPurchaseUnitText('对'), '对')
+  assert.equal(normalizeMaterialPurchaseUnitText('盒'), '盒')
+  assert.equal(normalizeMaterialPurchaseUnitText('bag'), '袋')
+  assert.equal(normalizeMaterialPurchaseUnitText('ROLL'), '卷')
+  assert.equal(normalizeMaterialPurchaseUnitText('CM'), '厘米')
+  assert.equal(normalizeMaterialPurchaseUnitText('T'), '吨')
+  assert.equal(normalizeMaterialPurchaseUnitText('GRS'), '罗')
   assert.equal(normalizeMaterialPurchaseUnitText('未确认单位'), '未确认单位')
 
   const draft = buildMaterialPurchaseContractDraft({
@@ -152,10 +152,10 @@ test('FL_material_purchase_unit__normalizes_unit_to_english_for_print materialPu
       },
     ],
   })
-  assert.equal(draft.lines[0].unit, 'PCS')
+  assert.equal(draft.lines[0].unit, '片')
 
   const updated = updateMaterialPurchaseLineCell(draft.lines, 0, 'unit', 'kg')
-  assert.equal(updated[0].unit, 'KG')
+  assert.equal(updated[0].unit, '千克')
 })
 
 test('materialPurchaseContractEditor: 可直接编辑采购金额并参与合计', () => {

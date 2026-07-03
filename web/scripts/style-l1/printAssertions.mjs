@@ -1134,8 +1134,8 @@ export function createPrintAssertions({
         if (metric.key === 'unit') {
           assert.equal(
             metric.text,
-            'M',
-            `${scenarioLabel} unit 列应统一显示英文单位: ${JSON.stringify(metric)}`
+            '米',
+            `${scenarioLabel} unit 列应统一显示中文单位: ${JSON.stringify(metric)}`
           )
         }
       })

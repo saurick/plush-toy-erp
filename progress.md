@@ -102,3 +102,11 @@
 下一步：若甲方确认某个单位短码口径不同，例如 `对 / 双` 要改成 `PCS` 而不是 `PAIR`，只改同一映射表、测试和两份打印模板说明。
 
 阻塞/风险：扫描覆盖仓库 Markdown / README，不解析 Excel、PDF、图片原件或外部甲方文档；未知单位仍保留来源文本，不伪造英文。已通过 `node --check web/src/erp/utils/materialPurchaseContractEditor.mjs web/src/erp/utils/masterDataOrderView.mjs web/src/erp/qa/fieldLinkageCatalog.mjs web/scripts/style-l1/printAssertions.mjs web/scripts/style-l1/scenarios.mjs web/scripts/styleL1.mjs`、`/usr/local/bin/pnpm --dir web exec node --test src/erp/qa/fieldLinkageCatalog.test.mjs src/erp/utils/materialPurchaseContractEditor.test.mjs src/erp/utils/masterDataOrderView.test.mjs`、`/usr/local/bin/pnpm --dir web lint`、`/usr/local/bin/pnpm --dir web css`、`/usr/local/bin/pnpm --dir web test`、`STYLE_L1_SCENARIOS=print-workspace-material /usr/local/bin/pnpm --dir web style:l1`、`git diff --check -- <本轮相关文件>`。
+
+## 2026-07-03 采购合同打印单位中文口径回切
+
+完成：按当前确认口径，将采购合同打印草稿单位从“英文短码优先”回切为“中文优先”。中文来源单位保留原文；`米（M）` 这类中文加英文括号的单位取中文前缀；`PCS / M / KG / BOX` 等已知英文 code 映射回 `件 / 米 / 千克 / 盒` 等中文单位。采购订单带值、打印编辑器、字段链路目录、L1 打印回归和两份打印模板说明已同步。
+
+下一步：如果甲方后续确认某类英文 code 要显示成特定中文，例如 `PCS` 不用 `件` 而用 `片`，只改同一映射表和测试，不在模板或业务页多处补分支。
+
+阻塞/风险：本轮仍只改采购合同打印草稿 `unit` 生成与显示口径，不改主数据单位 schema / API、全局单位选择器、采购订单保存参数、PDF 后端、RBAC、Workflow / Fact、客户配置或加工合同。已通过 `node --check web/src/erp/utils/materialPurchaseContractEditor.mjs web/src/erp/utils/masterDataOrderView.mjs web/src/erp/qa/fieldLinkageCatalog.mjs web/scripts/style-l1/printAssertions.mjs`、`/usr/local/bin/pnpm --dir web exec node --test src/erp/qa/fieldLinkageCatalog.test.mjs src/erp/utils/materialPurchaseContractEditor.test.mjs src/erp/utils/masterDataOrderView.test.mjs`、`/usr/local/bin/pnpm --dir web lint`、`/usr/local/bin/pnpm --dir web css`、`/usr/local/bin/pnpm --dir web test`、`STYLE_L1_SCENARIOS=print-workspace-material /usr/local/bin/pnpm --dir web style:l1`。

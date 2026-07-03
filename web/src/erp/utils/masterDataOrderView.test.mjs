@@ -1021,7 +1021,7 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
     productName: '毛绒兔',
     materialName: '面料',
     vendorCode: 'MAT-001',
-    unit: 'M',
+    unit: '米',
     unitPrice: '3.50',
     quantity: '10',
     amount: '35.00',
@@ -1032,7 +1032,7 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
     materialName: '辅料',
     vendorCode: 'MAT-002',
     spec: '12mm',
-    unit: 'YD',
+    unit: '码',
     quantity: '2',
     remark: '红色',
   })

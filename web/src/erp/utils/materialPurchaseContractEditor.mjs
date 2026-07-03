@@ -59,53 +59,36 @@ const toText = (value) =>
     .replaceAll('\r', '')
     .trim()
 
-const MATERIAL_PURCHASE_PRINT_UNIT_CODE_BY_TEXT = new Map(
+const MATERIAL_PURCHASE_PRINT_UNIT_TEXT_BY_CODE = new Map(
   Object.entries({
-    个: 'PCS',
-    件: 'PCS',
-    只: 'PCS',
-    片: 'PCS',
-    条: 'PCS',
-    支: 'PCS',
-    枚: 'PCS',
-    颗: 'PCS',
-    粒: 'PCS',
-    块: 'PCS',
-    张: 'PCS',
-    本: 'PCS',
-    根: 'PCS',
-    束: 'PCS',
-    组: 'PCS',
-    台: 'PCS',
-    把: 'PCS',
-    板: 'PCS',
-    筒: 'PCS',
-    对: 'PAIR',
-    双: 'PAIR',
-    套: 'SET',
-    米: 'M',
-    码: 'YD',
-    厘米: 'CM',
-    毫米: 'MM',
-    尺: 'FT',
-    英寸: 'IN',
-    千克: 'KG',
-    公斤: 'KG',
-    克: 'G',
-    吨: 'T',
-    磅: 'LB',
-    盎司: 'OZ',
-    箱: 'CTN',
-    盒: 'BOX',
-    包: 'PKG',
-    袋: 'BAG',
-    卷: 'ROLL',
-    瓶: 'BTL',
-    桶: 'DRUM',
-    打: 'DOZ',
-    罗: 'GRS',
-    令: 'REAM',
-    扎: 'BDL',
+    PCS: '件',
+    PC: '件',
+    EA: '件',
+    PAIR: '对',
+    PR: '对',
+    SET: '套',
+    M: '米',
+    YD: '码',
+    CM: '厘米',
+    MM: '毫米',
+    FT: '尺',
+    IN: '英寸',
+    KG: '千克',
+    G: '克',
+    T: '吨',
+    LB: '磅',
+    OZ: '盎司',
+    CTN: '箱',
+    BOX: '盒',
+    PKG: '包',
+    BAG: '袋',
+    ROLL: '卷',
+    BTL: '瓶',
+    DRUM: '桶',
+    DOZ: '打',
+    GRS: '罗',
+    REAM: '令',
+    BDL: '扎',
   })
 )
 
@@ -114,14 +97,22 @@ export const normalizeMaterialPurchaseUnitText = (value) => {
   if (!text) {
     return ''
   }
-  const wrappedCode = text.match(/[（(]\s*([A-Za-z][A-Za-z0-9./_-]*)\s*[）)]/u)
-  if (wrappedCode?.[1]) {
-    return wrappedCode[1].toUpperCase()
+  const wrappedCode = text.match(
+    /^(.*?)\s*[（(]\s*([A-Za-z][A-Za-z0-9./_-]*)\s*[）)]\s*$/u
+  )
+  if (wrappedCode?.[2]) {
+    const prefix = toText(wrappedCode[1])
+    if (prefix && !/[A-Za-z]/u.test(prefix)) {
+      return prefix
+    }
+    const code = wrappedCode[2].toUpperCase()
+    return MATERIAL_PURCHASE_PRINT_UNIT_TEXT_BY_CODE.get(code) || code
   }
   if (/^[A-Za-z][A-Za-z0-9./_-]*$/u.test(text)) {
-    return text.toUpperCase()
+    const code = text.toUpperCase()
+    return MATERIAL_PURCHASE_PRINT_UNIT_TEXT_BY_CODE.get(code) || code
   }
-  return MATERIAL_PURCHASE_PRINT_UNIT_CODE_BY_TEXT.get(text) || text
+  return text
 }
 
 const cloneLine = (line = {}) =>
