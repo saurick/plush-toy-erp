@@ -1,7 +1,24 @@
 import { getColumnLabel } from '../components/business-list/ColumnOrderModal.jsx'
+import { isEffectiveFieldVisible } from './adminProfileSync.mjs'
 import { sanitizeModuleColumnOrder } from './moduleTableColumns.mjs'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
+
+const DEFAULT_FIELD_POLICY_SURFACE_BY_MODULE = Object.freeze({
+  customers: 'customers.default',
+  suppliers: 'suppliers.default',
+  sales_orders: 'sales_orders.default',
+  sales_order_items: 'sales_order_items.default',
+  purchase_orders: 'purchase_orders.default',
+  purchase_order_items: 'purchase_order_items.default',
+  purchase_receipts: 'purchase_receipts.default',
+  quality_inspections: 'quality_inspections.default',
+  inventory_lots: 'inventory_lots.default',
+  inventory_txns: 'inventory_txns.default',
+  shipments: 'shipments.default',
+  outsourcing_orders: 'outsourcing_orders.default',
+  finance_facts: 'finance_facts.default',
+})
 
 export function parseBusinessSortValue(value = 'updated_at:desc') {
   const [sortBy = 'updated_at', sortDirection = 'desc'] =
@@ -32,12 +49,57 @@ export function writeStoredColumnOrder(moduleKey, order = []) {
   window.localStorage.setItem(storageKey, JSON.stringify(order))
 }
 
+export function resolveDefaultFieldPolicySurface(moduleKey = '') {
+  const normalizedModuleKey = String(moduleKey || '').trim()
+  if (!normalizedModuleKey) return ''
+  return (
+    DEFAULT_FIELD_POLICY_SURFACE_BY_MODULE[normalizedModuleKey] ||
+    `${normalizedModuleKey}.default`
+  )
+}
+
+function resolveColumnFieldPolicyKey(column = {}) {
+  if (typeof column.effectiveFieldKey === 'string') {
+    return column.effectiveFieldKey.trim()
+  }
+  if (typeof column.dataIndex === 'string') {
+    return column.dataIndex.trim()
+  }
+  if (Array.isArray(column.dataIndex)) {
+    return column.dataIndex.filter(Boolean).join('.')
+  }
+  if (typeof column.key === 'string') {
+    return column.key.trim()
+  }
+  return ''
+}
+
+function applyEffectiveFieldPolicyFlags({ adminProfile, moduleKey, columns }) {
+  const normalizedColumns = Array.isArray(columns) ? columns : []
+  const surfaceKey = resolveDefaultFieldPolicySurface(moduleKey)
+  for (const column of normalizedColumns) {
+    if (!column || typeof column !== 'object') continue
+    const fieldKey = resolveColumnFieldPolicyKey(column)
+    const hidden = Boolean(
+      surfaceKey &&
+        fieldKey &&
+        !isEffectiveFieldVisible(adminProfile, surfaceKey, fieldKey)
+    )
+    if (hidden) {
+      column.hiddenByEffectiveFieldPolicy = true
+    } else if (Object.prototype.hasOwnProperty.call(column, 'hiddenByEffectiveFieldPolicy')) {
+      delete column.hiddenByEffectiveFieldPolicy
+    }
+  }
+}
+
 export function getPreferredColumnOrder({
   adminProfile,
   moduleKey,
   columns,
   localOrder,
 }) {
+  applyEffectiveFieldPolicyFlags({ adminProfile, moduleKey, columns })
   if (Array.isArray(localOrder)) {
     return sanitizeModuleColumnOrder(localOrder, columns)
   }
@@ -58,9 +120,12 @@ function csvEscape(value) {
 }
 
 export function downloadCSV({ filename, columns, rows }) {
-  const header = columns.map((column) => csvEscape(getColumnLabel(column)))
+  const visibleColumns = (Array.isArray(columns) ? columns : []).filter(
+    (column) => column?.hiddenByEffectiveFieldPolicy !== true
+  )
+  const header = visibleColumns.map((column) => csvEscape(getColumnLabel(column)))
   const body = rows.map((row) =>
-    columns.map((column) => {
+    visibleColumns.map((column) => {
       const value =
         typeof column.exportValue === 'function'
           ? column.exportValue(row)
