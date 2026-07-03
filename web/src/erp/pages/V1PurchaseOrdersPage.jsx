@@ -391,10 +391,12 @@ export default function V1PurchaseOrdersPage() {
 
   const handleMaterialChange = (fieldName, materialID) => {
     const material = materials.find((item) => item.id === materialID)
-    const sourceValues =
-      buildPurchaseOrderItemSourceValuesFromMaterial(material)
+    const sourceValues = buildPurchaseOrderItemSourceValuesFromMaterial(material)
     form.setFields([
-      { name: ['items', fieldName, 'unit_id'], value: sourceValues.unit_id },
+      {
+        name: ['items', fieldName, 'unit_id'],
+        value: sourceValues.unit_id,
+      },
       {
         name: ['items', fieldName, 'material_code_snapshot'],
         value: sourceValues.material_code_snapshot,
@@ -629,6 +631,8 @@ export default function V1PurchaseOrdersPage() {
       printTemplateDefaults: purchasePrintTemplateDefaults,
       unitOptions,
       customerKey: activeCustomerKey,
+      suppliers,
+      resolveSupplierSnapshot,
     })
   const {
     closeInboundDraftModal,
@@ -703,199 +707,195 @@ export default function V1PurchaseOrdersPage() {
       )
     }
   }
-  const visibleLifecycleActions = useMemo(() => {
-    if (!singleSelectedOrder) {
-      return []
-    }
-    return PURCHASE_ORDER_LIFECYCLE_ACTIONS.filter(
-      (action) =>
-        hasActionPermission(adminProfile, action.permission) &&
-        canRunPurchaseOrderLifecycleAction(
-          singleSelectedOrder.lifecycle_status,
-          action.nextStatus
-        )
-    )
-  }, [adminProfile, singleSelectedOrder])
-  const primaryLifecycleAction =
-    visibleLifecycleActions.find((action) => action.key !== 'cancel') || null
-  const secondaryLifecycleActions = visibleLifecycleActions.filter(
-    (action) => action.key !== primaryLifecycleAction?.key
-  )
-  const lifecycleMenuItems =
-    secondaryLifecycleActions.length > 0
-      ? [
-          {
-            key: 'status-transitions',
-            label: '状态变更',
-            type: 'group',
-            children: secondaryLifecycleActions.map((action) => ({
-              key: action.key,
-              label: action.label,
-              danger: action.danger,
-            })),
-          },
-        ]
-      : []
 
   return (
-    <BusinessPageLayout className="erp-v1-purchase-orders-page">
-      <PageHeaderCard
-        title="采购订单"
-        description="维护供应商采购承诺；采购订单不写库存，不替代采购入库、退货、质检或应付事实。"
-        stats={stats}
-        compact
-      />
-
-      <PurchaseOrderOperationPanel
-        applySelectedRowKeys={applySelectedRowKeys}
-        canCreate={canCreate}
-        canGenerateInboundDraft={canGenerateInboundDraft}
-        clearFilters={clearFilters}
-        dateFilterEnd={dateFilterEnd}
-        dateFilterField={dateFilterField}
-        dateFilterStart={dateFilterStart}
-        exportOrders={exportOrders}
-        generatingInboundDraft={generatingInboundDraft}
-        hasActiveFilters={hasActiveFilters}
-        itemsLoading={itemsLoading}
-        keyword={keyword}
-        lifecycleMenuItems={lifecycleMenuItems}
-        loadOrders={loadOrders}
-        openCreateModal={openCreateModal}
-        openEditModal={openEditModal}
-        openInboundDraftModal={openInboundDraftModal}
-        openRelatedTable={openRelatedTable}
-        orders={orders}
-        primaryLifecycleAction={primaryLifecycleAction}
-        printPurchaseContract={printPurchaseContract}
-        printingContract={printingContract}
-        requestLifecycleAction={requestLifecycleAction}
-        saving={saving}
-        secondaryLifecycleActions={secondaryLifecycleActions}
-        selectedItems={selectedItems}
-        selectedOrderCanEdit={selectedOrderCanEdit}
-        selectedOrderDisplayText={selectedOrderDisplayText}
-        selectedRowKeys={selectedRowKeys}
-        setColumnOrderOpen={setColumnOrderOpen}
-        setDateFilterEnd={setDateFilterEnd}
-        setDateFilterField={setDateFilterField}
-        setDateFilterStart={setDateFilterStart}
-        setKeyword={setKeyword}
-        setPagination={setPagination}
-        setSelectedOrder={setSelectedOrder}
-        setSortValue={setSortValue}
-        setStatus={setStatus}
-        setSupplierFilter={setSupplierFilter}
-        singleSelectedOrder={singleSelectedOrder}
-        sortValue={sortValue}
-        status={status}
-        supplierFilter={supplierFilter}
-        supplierOptions={supplierOptions}
-      />
-
-      <BusinessDataTable
-        loading={loading}
-        rowKey="id"
-        columns={columns}
-        dataSource={orders}
-        scroll={{ x: 1200 }}
-        rowSelection={{
-          type: 'radio',
-          selectedRowKeys,
-          onChange: (nextKeys, nextRows) => {
-            applySelectedRowKeys(nextKeys)
-            const nextSingle = nextKeys.length === 1 ? nextRows[0] : null
-            if (nextSingle?.id) {
-              setSelectedOrder(nextSingle)
-            } else {
-              setSelectedOrder(null)
-            }
-          },
-        }}
-        rowClassName={(record) =>
-          selectedRowKeys.includes(record?.id) ? 'ant-table-row-selected' : ''
-        }
-        onRow={(record) => ({
-          onClick: (event) => {
-            if (
-              event.target?.closest?.(
-                '.ant-checkbox-wrapper, .ant-checkbox, .ant-radio-wrapper, .ant-radio, .ant-table-selection-column'
+    <BusinessPageLayout
+      header={
+        <PageHeaderCard
+          eyebrow="采购协同"
+          title="采购订单"
+          description="围绕供应商承诺维护采购订单、到货计划和入库草稿。"
+        />
+      }
+      toolbar={
+        <PurchaseOrderOperationPanel
+          canCreate={canCreate}
+          canEdit={selectedOrderCanEdit}
+          canGenerateInboundDraft={canGenerateInboundDraft}
+          canCompleteWorkflowTasks={canCompleteWorkflowTasks}
+          canUpdateWorkflowTasks={canUpdateWorkflowTasks}
+          exportOrders={exportOrders}
+          hasActiveFilters={hasActiveFilters}
+          loading={loading}
+          onClearFilters={clearFilters}
+          onCreate={openCreateModal}
+          onEdit={() => openEditModal(singleSelectedOrder)}
+          onGenerateInboundDraft={openInboundDraftModal}
+          onPrintContract={() => printPurchaseContract(singleSelectedOrder)}
+          onRefresh={refreshPageData}
+          printingContract={printingContract}
+          saving={saving}
+          selectedOrder={singleSelectedOrder}
+          selectedWorkflowTasks={selectedOrderWorkflowTasks}
+          urgePurchaseWorkflowTask={urgePurchaseWorkflowTask}
+        />
+      }
+      filters={
+        <PageHeaderCard
+          className="erp-business-filter-card"
+          title="筛选采购订单"
+          description="按供应商、状态、日期和关键字查找采购协同单据。"
+        >
+          <div className="erp-business-filter-row">
+            <input
+              className="ant-input"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="搜索采购单号 / 供应商 / 备注"
+            />
+            <select
+              className="ant-input"
+              value={supplierFilter}
+              onChange={(event) => setSupplierFilter(event.target.value)}
+            >
+              <option value="">全部供应商</option>
+              {supplierOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="ant-input"
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+            >
+              <option value="">全部状态</option>
+              {PURCHASE_ORDER_LIFECYCLE_ACTIONS.statusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="ant-input"
+              value={dateFilterField}
+              onChange={(event) => setDateFilterField(event.target.value)}
+            >
+              <option value="purchase_date">下单日期</option>
+              <option value="expected_arrival_date">预计到货日期</option>
+              <option value="created_at">创建时间</option>
+              <option value="updated_at">更新时间</option>
+            </select>
+            <input
+              className="ant-input"
+              type="date"
+              value={dateFilterStart}
+              onChange={(event) => setDateFilterStart(event.target.value)}
+            />
+            <input
+              className="ant-input"
+              type="date"
+              value={dateFilterEnd}
+              onChange={(event) => setDateFilterEnd(event.target.value)}
+            />
+            <select
+              className="ant-input"
+              value={sortValue}
+              onChange={(event) => setSortValue(event.target.value)}
+            >
+              <option value="updated_at:desc">最近更新</option>
+              <option value="purchase_date:desc">下单日期倒序</option>
+              <option value="expected_arrival_date:asc">预计到货优先</option>
+              <option value="purchase_order_no:asc">采购单号正序</option>
+            </select>
+          </div>
+        </PageHeaderCard>
+      }
+      main={
+        <BusinessDataTable
+          columns={columns}
+          dataSource={orders}
+          loading={loading}
+          rowKey="id"
+          rowSelection={{
+            selectedRowKeys,
+            onChange: (keys) => {
+              applySelectedRowKeys(keys)
+              setSelectedOrder(
+                keys.length === 1
+                  ? orders.find((item) => item.id === keys[0]) || null
+                  : null
               )
-            ) {
-              return
-            }
-            applySelectedRowKeys([record.id])
-            setSelectedOrder(record)
-          },
-          onDoubleClick: () => openEditModal(record),
-        })}
-        pagination={{
-          current: pagination.current,
-          pageSize: pagination.pageSize,
-          total,
-          showSizeChanger: true,
-          onChange: (current, pageSize) => setPagination({ current, pageSize }),
+            },
+          }}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total,
+            showSizeChanger: true,
+            onChange: (current, pageSize) =>
+              setPagination({ current, pageSize }),
+          }}
+          summaryText={selectedOrderDisplayText}
+        />
+      }
+      side={
+        <CollaborationTaskPanel
+          tasks={selectedOrderWorkflowTasks}
+          sourceLabel="采购订单"
+          selectedItems={selectedItems}
+          loading={itemsLoading}
+          onComplete={completeWorkflowTask}
+          onReject={rejectWorkflowTask}
+          onBlock={blockWorkflowTask}
+          onOpenRelatedTable={openRelatedTable}
+        />
+      }
+    >
+      <PurchaseOrderBusinessModal
+        form={form}
+        open={modalOpen}
+        title={editingOrder ? '编辑采购订单' : '新建采购订单'}
+        saving={saving}
+        onCancel={() => {
+          setModalOpen(false)
+          setEditingOrder(null)
+          orderAttachmentRef.current?.clearPendingAttachments()
         }}
-        emptyDescription="暂无采购订单"
-      />
-
-      <CollaborationTaskPanel
-        tasks={workflowTasks}
-        selectedTasks={selectedOrderWorkflowTasks}
-        selectedRecordLabel={singleSelectedOrder?.purchase_order_no || ''}
-        adminProfile={adminProfile}
-        onCompleteTask={
-          canCompleteWorkflowTasks ? completeWorkflowTask : undefined
+        onOk={handleSave}
+        suppliers={suppliers}
+        materials={materials}
+        unitOptions={unitOptions}
+        warehouseOptions={warehouseOptions}
+        onSupplierChange={handleSupplierChange}
+        onMaterialChange={handleMaterialChange}
+        attachmentPanel={
+          <BusinessAttachmentPanel
+            ref={orderAttachmentRef}
+            businessType="purchase_order"
+            businessID={editingOrder?.id}
+            title="采购附件"
+          />
         }
-        onBlockTask={canUpdateWorkflowTasks ? blockWorkflowTask : undefined}
-        onRejectTask={canUpdateWorkflowTasks ? rejectWorkflowTask : undefined}
-        onUrgeTask={
-          canUpdateWorkflowTasks ? urgePurchaseWorkflowTask : undefined
-        }
       />
-
+      <PurchaseOrderInboundDraftModal
+        form={inboundDraftForm}
+        open={inboundDraftModalOpen}
+        loading={inboundDraftPreviewLoading}
+        saving={generatingInboundDraft}
+        rows={inboundDraftPreviewRows}
+        hasRemaining={hasInboundDraftRemaining}
+        onCancel={closeInboundDraftModal}
+        onOk={createInboundDraftFromOrder}
+      />
       <ColumnOrderModal
         open={columnOrderOpen}
         columns={dataColumns}
         order={preferredColumnOrder}
         saving={columnOrderSaving}
-        moduleTitle="采购订单列表"
+        onCancel={() => setColumnOrderOpen(false)}
         onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
-        onClose={() => setColumnOrderOpen(false)}
-      />
-
-      <PurchaseOrderBusinessModal
-        open={modalOpen}
-        form={form}
-        editingOrder={editingOrder}
-        saving={saving}
-        itemsLoading={itemsLoading}
-        orderAttachmentRef={orderAttachmentRef}
-        suppliers={suppliers}
-        materials={materials}
-        unitOptions={unitOptions}
-        canCreate={canCreate}
-        canUpdate={canUpdate}
-        onOk={handleSave}
-        onCancel={() => {
-          orderAttachmentRef.current?.clearPendingAttachments()
-          setModalOpen(false)
-        }}
-        onSupplierChange={handleSupplierChange}
-        onMaterialChange={handleMaterialChange}
-      />
-      <PurchaseOrderInboundDraftModal
-        open={inboundDraftModalOpen}
-        form={inboundDraftForm}
-        order={singleSelectedOrder}
-        rows={inboundDraftPreviewRows}
-        loading={inboundDraftPreviewLoading}
-        submitting={generatingInboundDraft}
-        warehouseOptions={warehouseOptions}
-        hasRemaining={hasInboundDraftRemaining}
-        resolveSupplierName={resolveSupplierName}
-        onOk={createInboundDraftFromOrder}
-        onCancel={closeInboundDraftModal}
       />
     </BusinessPageLayout>
   )
