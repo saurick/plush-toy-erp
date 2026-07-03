@@ -20,8 +20,14 @@ export const resolveModuleColumnKey = (column = {}, columns = []) => {
   return getModuleColumnKey(column, matchedIndex >= 0 ? matchedIndex : 0)
 }
 
+const isModuleColumnVisible = (column = {}) =>
+  column?.hiddenByEffectiveFieldPolicy !== true
+
+const visibleModuleColumns = (columns = []) =>
+  (Array.isArray(columns) ? columns : []).filter(isModuleColumnVisible)
+
 export const buildModuleColumnOrder = (columns = []) =>
-  (Array.isArray(columns) ? columns : []).map((column, index) =>
+  visibleModuleColumns(columns).map((column, index) =>
     getModuleColumnKey(column, index)
   )
 
@@ -40,7 +46,7 @@ export const sanitizeModuleColumnOrder = (order = [], columns = []) => {
 }
 
 export const applyModuleColumnOrder = (columns = [], order = []) => {
-  const normalizedColumns = Array.isArray(columns) ? columns : []
+  const normalizedColumns = visibleModuleColumns(columns)
   const keyToColumn = new Map(
     normalizedColumns.map((column, index) => [
       getModuleColumnKey(column, index),
