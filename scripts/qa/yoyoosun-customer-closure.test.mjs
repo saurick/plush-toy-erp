@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 import { yoyoosunCustomerPackage } from '../../config/customers/yoyoosun/customerPackage.mjs'
+import { yoyoosunFlowOrchestrationCoverage } from '../../config/customers/yoyoosun/flowOrchestrationCoverage.mjs'
 import { yoyoosunProjectionMatrix } from '../../config/customers/yoyoosun/projectionMatrix.mjs'
 import { yoyoosunRawSourceFormMap } from '../../config/customers/yoyoosun/rawSourceFormMap.mjs'
 import { yoyoosunRoleFlowMatrix } from '../../config/customers/yoyoosun/roleFlowMatrix.mjs'
@@ -84,6 +85,42 @@ test('yoyoosun role flow matrix keeps workflow handling separate from facts', ()
     assert.ok(role.capabilityKeys.includes('workflow.task.read'), `${role.roleKey} needs workflow.task.read`)
     assert.match(role.guardrail, /不|不能|只有|必须/)
     assert.doesNotMatch(role.guardrail, /直接写库存|直接写财务|直接写出货|自动过账/)
+  }
+})
+
+test('yoyoosun flow orchestration coverage records runtime and preview layers', () => {
+  const layers = new Map(
+    yoyoosunFlowOrchestrationCoverage.layers.map((layer) => [layer.key, layer])
+  )
+  assert.equal(layers.get('workflow_task')?.status, 'runtime_enabled')
+  assert.equal(layers.get('process_runtime')?.status, 'runtime_enabled_partial')
+  assert.equal(layers.get('business_flows')?.status, 'preview_only')
+  assert.equal(layers.get('state_machines')?.status, 'preview_only')
+  assert.equal(layers.get('process_policies')?.status, 'preview_only')
+})
+
+test('yoyoosun flow orchestration coverage includes all configured preview flows', () => {
+  const businessFlowKeys = new Set(yoyoosunCustomerPackage.businessFlows.map((flow) => flow.key))
+  const stateMachineKeys = new Set(yoyoosunCustomerPackage.stateMachines.map((machine) => machine.key))
+  const processPolicyKeys = new Set(yoyoosunCustomerPackage.processPolicies.map((policy) => policy.key))
+  const coverage = new Map(
+    yoyoosunFlowOrchestrationCoverage.layers.map((layer) => [layer.key, new Set(layer.evidence)])
+  )
+
+  for (const key of businessFlowKeys) assert.ok(coverage.get('business_flows').has(key), `${key} business flow must be covered`)
+  for (const key of stateMachineKeys) assert.ok(coverage.get('state_machines').has(key), `${key} state machine must be covered`)
+  for (const key of processPolicyKeys) assert.ok(coverage.get('process_policies').has(key), `${key} process policy must be covered`)
+})
+
+test('yoyoosun flow orchestration coverage includes required runtime processes and UI entries', () => {
+  const runtimeProcesses = new Set(
+    yoyoosunFlowOrchestrationCoverage.runtimeProcesses.map((process) => process.key)
+  )
+  for (const key of ['sales_order_acceptance', 'material_supply', 'finished_goods_delivery']) {
+    assert.ok(runtimeProcesses.has(key), `${key} runtime process coverage required`)
+  }
+  for (const uiKey of ['desktop_task_board', 'mobile_role_tasks', 'customer_config_preview', 'purchase_contract_print', 'processing_contract_print']) {
+    assert.ok(yoyoosunFlowOrchestrationCoverage.uiEntrypoints.includes(uiKey), `${uiKey} UI entry coverage required`)
   }
 })
 
