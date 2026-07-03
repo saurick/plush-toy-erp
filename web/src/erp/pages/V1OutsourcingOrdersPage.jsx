@@ -87,6 +87,7 @@ import {
 } from '../utils/printWorkspace.js'
 import { getEffectivePrintTemplateDefaults } from '../utils/adminProfileSync.mjs'
 import { buildProcessingContractDraftFromOutsourcingOrder } from '../data/processingContractTemplate.mjs'
+import { completeProcessingContractDraft } from '../utils/contractPrintDraftCompleteness.mjs'
 import {
   DEFAULT_OUTSOURCING_ORDER_PAGINATION,
   OUTSOURCING_ORDER_DATE_FILTER_OPTIONS,
@@ -532,10 +533,10 @@ export default function V1OutsourcingOrdersPage() {
     setPrinting(true)
     try {
       const items = await loadOrderItems(selectedRow)
-      const initialDraft = buildProcessingContractDraftFromOutsourcingOrder(
-        selectedRow,
-        items,
-        { printTemplateDefaults: processingPrintTemplateDefaults }
+      const initialDraft = completeProcessingContractDraft(
+        buildProcessingContractDraftFromOutsourcingOrder(selectedRow, items, {
+          printTemplateDefaults: processingPrintTemplateDefaults,
+        })
       )
       if (initialDraft.lines.length === 0) {
         message.warning('当前委外订单没有可打印的明细')
