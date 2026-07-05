@@ -8,6 +8,7 @@
 | --- | --- |
 | `$plush-docs-governance` | 文档治理、真源索引、文档清单、可读性、Mermaid、链接和 `progress.md` |
 | `$plush-page-design-governance` | 页面意义、功能细节、信息密度、原型同步、低心智负担和浏览器回归 |
+| `$plush-print-template-source-governance` | 客户 Excel / PDF / 截图源文件意图、重复模板块、打印模板版式和图片 / 行操作交互 |
 | `$plush-code-review-governance` | 独立代码审查、Workflow / Fact、RBAC、字段残值/缺值、删除语义和文档漂移 |
 | `$plush-test-governance` | 验证层级 T0-T8、测试形态、浏览器回归、migration、release checks |
 | `$plush-prompt-governance` | 新会话、side chat、review、实现、测试、部署和提交推送提示词 |
@@ -30,6 +31,7 @@
 | 实现后看问题是否真的解决、改动是否对、有没有 bug / 缺测试 | `$plush-code-review-governance` | 独立审查 diff、Workflow / Fact、RBAC、字段残值/缺值和文档漂移 | 不以实现总结为主 |
 | 文档不好读、信息密度高、链接/目录/表格/Mermaid/真源漂移 | `$plush-docs-governance` | 文档真源、读者路径、文档清单、可读性和跳转 | 不证明 runtime 行为正确 |
 | 页面太密、功能细节看不懂、按钮/字段/状态意义不清、原型是否同步 | `$plush-page-design-governance` | 页面意义、信息层级、功能细节、交互态和页面回归 | 不直接管后端事实写入 |
+| 甲方给 Excel / PDF / 截图，要求实现或评审打印模板、作业指导书、色卡、物料明细、合同样式 | `$plush-print-template-source-governance` | 先识别模板本体、重复块、样例数据、客户专属内容，再落版式、图片槽、行选择和 PDF / 打印验证 | 不把客户源文件直接提升为 Product Core 规则 |
 | 要新增或调整 schema / migration / repo / usecase / JSON-RPC / RBAC / 字段真源 | `$plush-domain-boundary-governance` | 业务边界、Workflow / Fact、读写真源和实现层级 | 不处理纯视觉或文案排版 |
 | 发布、部署、版本、Atlas migration、health/ready、rollback、旧镜像清理 | `$plush-release-governance` | 发布路径、低配服务器边界、回滚和 release evidence | 不替代 runtime 故障定位 |
 | seed、fixture、模拟试用数据、导入 dry-run、清理、真实客户数据边界 | `$plush-seed-import-governance` | 可逆数据、导入边界、cleanup 和客户资料隔离 | 不把模拟数据写成真实导入 |
@@ -42,6 +44,7 @@
 | --- | --- |
 | 文档改动会影响页面口径、帮助入口或原型 | `$plush-docs-governance` + `$plush-page-design-governance` |
 | 页面改动涉及 schema、JSON-RPC、RBAC、Workflow / Fact 或字段真源 | `$plush-page-design-governance` + `$plush-domain-boundary-governance` |
+| 客户源 Excel / PDF 变成打印模板并涉及页面交互、图片上传或 PDF / 打印输出 | `$plush-print-template-source-governance` + `$plush-page-design-governance` + `$plush-test-governance` |
 | 实现完成后做独立 review 或提交前自查 | `$plush-code-review-governance` + `$plush-test-governance` |
 | 提交推送、hook 重试或多会话互相改工作区 | 全局 `$git-closeout-coordination` + `$plush-release-governance` |
 | 本地 / 线上故障排查后准备发布或回滚 | `$plush-runtime-diagnostics` + `$plush-release-governance` |

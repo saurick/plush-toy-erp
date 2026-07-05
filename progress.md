@@ -118,3 +118,59 @@
 下一步：如后续要让采购订单明细真正带出产品订单编号 / 产品编号 / 产品名称，应单独评审采购订单明细业务模型、schema / migration / API / 导入和打印带值链路，不在打印补值层伪造。
 
 阻塞/风险：本轮只处理打印草稿显示补齐、客户配置默认方字段和测试覆盖；不改 schema、migration、采购订单明细业务模型、RBAC、Workflow / Fact 或 PDF 后端。已通过 `git diff --check`、`PATH=/usr/local/bin:$PATH node --test web/src/erp/utils/contractPrintDraftCompleteness.test.mjs web/src/erp/data/processingContractTemplate.test.mjs web/src/erp/utils/materialPurchaseContractEditor.test.mjs web/src/erp/utils/printWorkspace.test.mjs`、`PATH=/usr/local/bin:$PATH node --test web/src/erp/config/devCustomerConfig.test.mjs web/src/erp/utils/contractPrintDraftCompleteness.test.mjs`、`PATH=/usr/local/bin:$PATH pnpm --dir web lint`、`PATH=/usr/local/bin:$PATH pnpm --dir web css`、`PATH=/usr/local/bin:$PATH pnpm --dir web test`。
+
+## 2026-07-06 打印模板源文件治理 skill
+
+完成：新增项目 skill `$plush-print-template-source-governance`，把客户 Excel / PDF / 截图到打印模板的主路径收口为“先识别模板本体、重复模块、样例数据、客户专属内容和 runtime 字段，再实现版式、图片槽、行选择、PDF / 打印验证”。同步补充 `.agents/skills/README.md` 和根 `README.md` 的 skill 导航；同时新增全局通用 skill `$erp-print-template-source-governance` 作为跨项目范式。
+
+下一步：后续作业指导书、色卡、物料明细、采购 / 加工合同等打印模板任务，优先用本 skill 与 `$plush-page-design-governance`、`$plush-test-governance` 组合执行，避免再次把源 Excel 的重复下半段或样例文案误当作 runtime 模板。
+
+阻塞/风险：追加前 `progress.md` 为 201 行、51115 字节，未达到 600 行或 80KB 归档阈值。本轮只改 skill、skill 导航和进度记录，不改 runtime、schema、migration、RBAC、Workflow / Fact、PDF 后端、客户配置或源文件。验证覆盖 YAML 解析、metadata 扫描和 `git diff --check`；官方 `quick_validate.py` 后续发现受当前 Python 环境 PyYAML 缺失限制，见后续记录。
+
+## 2026-07-06 打印模板源文件噪点过滤约束
+
+完成：补强全局 `$erp-print-template-source-governance` 和项目 `$plush-print-template-source-governance`，新增 source noise / 噪点过滤门禁：甲方源文件中的扫描污点、截图边缘、临时批注、手工审阅痕迹、重复拼接缝、Excel 临时辅助行、偶发错位或孤立格式异常，默认不得照着实现；只有能证明它是稳定模板结构、客户固定要求或可编辑业务元素时，才进入模板实现。
+
+下一步：后续打印模板任务在截图比对之外，要显式写出哪些内容被当作 signal 实现、哪些被当作 noise 排除、哪些仍需客户确认。
+
+阻塞/风险：追加前 `progress.md` 为 209 行、52280 字节，未达到 600 行或 80KB 归档阈值。本轮只改 skill 和进度记录，不改 runtime、schema、migration、RBAC、Workflow / Fact、PDF 后端、客户配置或源文件。验证覆盖 YAML/metadata 扫描和 `git diff --check`；官方 `quick_validate.py` 后续发现受当前 Python 环境 PyYAML 缺失限制，见后续记录。
+
+## 2026-07-06 打印模板性能和质量治理约束
+
+完成：继续补强全局 `$erp-print-template-source-governance` 和项目 `$plush-print-template-source-governance`，新增打印模板 performance / quality gate：模板实现不仅要像源文件，还要控制 DOM / 图片 / localStorage 快照 / PDF payload / 测高循环成本，避免整页截图型模板、重复测量、一次性 CSS/JS 补丁、第二套隐藏 PDF DOM 或客户私有分支沉淀成长期债。
+
+下一步：后续打印模板任务在验收时除截图比对外，还要报告图片/DOM/snapshot 边界、布局稳定性、最高风险交互回归和未覆盖的性能盲区。
+
+阻塞/风险：追加前 `progress.md` 为 217 行、53304 字节，未达到 600 行或 80KB 归档阈值。本轮只改 skill 和进度记录，不改 runtime、schema、migration、RBAC、Workflow / Fact、PDF 后端、客户配置或源文件。验证覆盖 YAML/metadata 扫描和 `git diff --check`；官方 `quick_validate.py` 后续发现受当前 Python 环境 PyYAML 缺失限制，见后续记录。
+
+## 2026-07-06 打印模板源文件版本链与结构解析治理
+
+完成：继续补强全局 `$erp-print-template-source-governance` 和项目 `$plush-print-template-source-governance`，新增 source tooling / source provenance / coverage matrix 约束：读取 Excel / PDF 源文件时必须使用结构化工具或对应 skill 辅助，不只看截图；yoyoosun 原始文件必须先走 `source-manifest.json` 的 path / sha256 / size / structuredExtract 边界；实现前要识别真实 used range、打印区、重复模块、图片 drawing anchor、客户资产来源和模板覆盖矩阵。同步把图片资产 provenance、工程模板行数 / 图片数 / PDF payload 等性能边界写入项目 skill。
+
+下一步：后续作业指导书、色卡、物料明细、采购 / 加工合同等打印模板任务，输出里要额外报告源文件登记与 checksum 状态、真实内容区判断、图片锚点来源、模板 key / mapper / renderer / PDF 门禁 / L1 或 PDF 回归覆盖，以及仍未覆盖的盲区。
+
+阻塞/风险：追加前 `progress.md` 为 225 行、54302 字节，未达到 600 行或 80KB 归档阈值。本轮只改全局和项目 skill 以及进度记录，不改 runtime、schema、migration、RBAC、Workflow / Fact、PDF 后端、客户配置、客户源文件或图片资产。官方 `quick_validate.py` 因当前 Python 环境缺少 PyYAML 无法直接完成；已读取 validator 逻辑并用 Ruby 做等价 frontmatter 校验，YAML 解析和 metadata 扫描通过。
+
+## 2026-07-06 打印模板样例行与图片槽治理
+
+完成：继续补强全局 `$erp-print-template-source-governance` 和项目 `$plush-print-template-source-governance`，把“甲方源文件很多行但行行为一致时，默认样例只保留 2-5 条代表行”写成明确约束；长清单、分页和性能改由 fixture / L1 / PDF 回归覆盖，不再靠默认样例复制所有源行。同步补充图片导入规则：页眉 / 产品图按源单元格比例，作业行图片按有界缩略图 / 卡片放入行内图片区，页尾 / 文件末尾图片走有界 appendix 区域；多图先横向排列，宽度不够时在同一行内换行，必要时行高或分页增长，禁止隐藏溢出、拉伸变形或无界 base64。
+
+下一步：后续作业指导书、色卡、物料明细等模板任务，要在输出里说明默认代表行数量、为什么源文件额外行不进入样例、哪条回归覆盖长清单，以及每类图片槽的尺寸、数量上限、换行和行高策略。
+
+阻塞/风险：追加前 `progress.md` 为 233 行、55820 字节，未达到 600 行或 80KB 归档阈值。本轮只改全局和项目 skill 以及进度记录，不改 runtime、schema、migration、RBAC、Workflow / Fact、PDF 后端、客户配置、客户源文件或图片资产。官方 `quick_validate.py` 仍因当前 Python 环境缺少 PyYAML 无法直接完成；已用 Ruby 做等价 frontmatter 校验，后续还需继续跑 YAML / metadata / diff 检查。
+
+## 2026-07-06 打印模板图片源位置与源尺寸治理
+
+完成：继续补强全局 `$erp-print-template-source-governance` 和项目 `$plush-print-template-source-governance`，把“图片尺寸和位置先按甲方源文件理解”写成明确约束。产品图、色卡图、样板图、签章/签名或其他固定图片如果在源文件中有单元格、合并区域、坐标框或占位比例，运行时默认落在同一语义区域，并保持接近源文件的视觉尺寸；不能因为实现方便改放到文件末尾、通用上传条或任意缩略图区。动态行内多图仍按有界尺寸、横向优先、宽度不够换行和行高/分页增长治理。
+
+下一步：后续模板实现输出里要说明每类图片槽对应的源 anchor/box、运行时显示尺寸、为什么位置或尺寸有差异，以及产品图 / 行内图 / 页尾图 / 静态签章分别属于当前窗口草稿、客户样例资产还是 source-only evidence。
+
+阻塞/风险：追加前 `progress.md` 为 241 行、57314 字节，未达到 600 行或 80KB 归档阈值。本轮只改全局和项目 skill 以及进度记录，不改 runtime、schema、migration、RBAC、Workflow / Fact、PDF 后端、客户配置、客户源文件或图片资产。官方 `quick_validate.py` 仍因当前 Python 环境缺少 PyYAML 无法直接完成；已用 Ruby 做等价 frontmatter 校验，后续还需继续跑 YAML / metadata / diff 检查。
+
+## 2026-07-06 打印模板治理 skill 审查与提交收口
+
+完成：按 `$plush-code-review-governance` 复核新增的通用 `$erp-print-template-source-governance`、项目 `$plush-print-template-source-governance` 和 `$trade-print-template-source-governance` 三份打印模板治理 skill。审查重点为触发描述、项目版与通用版边界、源文件意图识别、重复模块过滤、噪点过滤、样例行数量、图片源位置/尺寸、性能质量门禁、metadata 和提交范围隔离；未发现需要继续修改的阻断问题。
+
+下一步：后续实际模板实现仍要按对应项目 skill 读取真实 Excel/PDF/截图、源文件 manifest、截图与 DOM/box 证据，不把本次 skill 审查等同于某个具体模板 runtime 已验收。
+
+阻塞/风险：追加前 `progress.md` 为 249 行、59493 字节，未达到 600 行或 80KB 归档阈值。本轮是 skill-only / docs-only 审查与提交收口，不改 runtime、schema、migration、RBAC、Workflow / Fact、PDF 后端、客户配置、源文件或图片资产。官方 `quick_validate.py` 因当前 Python 环境缺少 PyYAML 仍无法直接完成；已用 Ruby 做等价 frontmatter / `agents/openai.yaml` / metadata 校验，并用 `git diff --check` 检查相关 staged 范围。
