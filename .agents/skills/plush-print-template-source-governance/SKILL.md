@@ -1,6 +1,6 @@
 ---
 name: plush-print-template-source-governance
-description: 项目打印模板源文件治理（plush-toy-erp）。Use when Codex implements or reviews plush-toy-erp print templates, print workspaces, customer Excel/PDF/image sources, engineering material detail sheets, color cards, work instructions, purchase/processing contracts, yoyoosun customer print samples, repeated source blocks, source noise, scan artifacts, incidental marks, template source intent, cell layout, image upload behavior, row selection, rich text, PDF/print preview, performance/quality risks, or customer-vs-Product-Core print-template boundaries.
+description: 项目打印模板源文件治理（plush-toy-erp）。Use when Codex implements or reviews plush-toy-erp print templates, print workspaces, customer Excel/PDF/image sources, engineering material detail sheets, color cards, work instructions, purchase/processing contracts, yoyoosun customer print samples, repeated source blocks, source noise, scan artifacts, incidental marks, template source intent, cell layout, image upload behavior, row selection, rich text, PDF/print preview, screenshot debugging, visual evidence, performance/quality risks, or customer-vs-Product-Core print-template boundaries.
 ---
 
 # Plush Print Template Source Governance
@@ -90,6 +90,7 @@ description: 项目打印模板源文件治理（plush-toy-erp）。Use when Cod
 ## Validation / 验证要求
 
 - Source screenshot 和 runtime screenshot 要一起用，不能只依赖其中一个。
+- 截图调试必须覆盖实际问题状态：给截图或 Playwright artifact 命名，至少覆盖 source baseline、runtime editor、selected target、edit focus、insert above / below 后目标位置，以及必要的 PDF / print 输出；截图发现问题时继续调试到可重复验证通过。
 - Layout 验证要检查真实 cell geometry：table width、column ratios、row heights、font size、line height、borders、padding、overflow 和 adjacent boxes。
 - Cell editing 要比较 editable layer 与 parent cell 的 bounding box，确认它铺满 printable cell area；除非该 cell 明确是 label-only 或 non-editable，否则 focus / selection highlight 不应暴露一个更小的 inline editor。
 - Edit-focus styling 要在浏览器里检查 computed styles：official templates 的 active editable cells 不应混用 dashed 和 solid borders；selection 与 editing focus 要保持视觉区分。

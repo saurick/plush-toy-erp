@@ -1,6 +1,6 @@
 ---
 name: plush-page-design-governance
-description: 项目页面设计治理（plush-toy-erp）。Use when Codex designs, reviews, simplifies, or implements plush ERP pages, dashboards, workbenches, task boards, mobile role task pages, print center pages, lists, forms, detail pages, action modals, collaboration entries, page features, feature details, buttons, fields, filters, states, empty/error states, stale/missing field values, accessibility, keyboard/focus behavior, prototypes, prototype sync, Draft/To Implement/Current prototype states, or when the user mentions 简洁易用, 心智负担, 信息密度高, 一眼看不懂, 页面好看, 低密度, 严格按原型, 没意义的东西不要做, 功能评估, 功能细节, 按钮字段筛选状态, 字段残值, 字段缺值, 可访问性, 键盘焦点, 原型同步, 有原型, 无原型, or asks whether such page-design guidance should be made into a skill.
+description: 项目页面设计治理（plush-toy-erp）。Use when Codex designs, reviews, simplifies, or implements plush ERP pages, dashboards, workbenches, task boards, mobile role task pages, print center pages, lists, forms, detail pages, action modals, collaboration entries, page features, feature details, buttons, fields, filters, states, empty/error states, stale/missing field values, accessibility, keyboard/focus behavior, prototypes, prototype sync, Draft/To Implement/Current prototype states, screenshot debugging, visual evidence, or when the user mentions 简洁易用, 心智负担, 信息密度高, 一眼看不懂, 页面好看, 低密度, 严格按原型, 没意义的东西不要做, 功能评估, 功能细节, 按钮字段筛选状态, 字段残值, 字段缺值, 可访问性, 键盘焦点, 原型同步, 截图调试, 反复截图, 有原型, 无原型, or asks whether such page-design guidance should be made into a skill.
 ---
 
 # Plush Page Design Governance
@@ -29,6 +29,7 @@ Use this skill to turn "简洁易用、美观、低心智负担" into concrete i
 - 真源先于局部修补：页面不能补造后端事实、隐藏 Workflow / Fact 缺口、显示裸技术字段，或用页面私有字段映射替代共享 helper / API / RBAC 合同。
 - 低密度但不失真：减少信息密度必须通过信息分组、任务优先级、可读标签和可验证交互完成，不能靠隐藏必要状态、吞掉错误或弱化关键约束。
 - 可回归：样式、布局、交互和原型同步必须覆盖默认态、交互态、恢复态、长文本/大数字/多标签、暗色/移动端和相邻区域；共享组件按影响面升级验证。
+- 截图调试门禁：触达用户可见页面、打印预览、布局、焦点、选择或插入/删除等交互态时，必须用真实浏览器截图 / visual evidence 结合 DOM / box metrics 验证，不能只靠代码、单测或默认态截图收口。
 
 ## Workflow
 
@@ -89,6 +90,7 @@ Use this skill to turn "简洁易用、美观、低心智负担" into concrete i
 
 8. Validate as regression, not just screenshot review.
    - Cover default, interaction, recovery, and adjacent-area states.
+   - For visible layout or interaction changes, capture named screenshots or Playwright artifacts for the exact changed state and at least one boundary state; repeat screenshot debugging until target row/cell/focus/action result is visually and structurally correct.
    - Check DOM/box metrics for layout-sensitive changes: bounding boxes, overflow, scrollWidth/clientWidth, offsetHeight/clientHeight/scrollHeight, wrapping, and neighboring overlap.
    - Include long text, many tags, wide numbers, and mobile/dark cases when the changed area can receive variable data.
    - For field chain changes, validate relevant stale/missing value paths: new value replaces old value, source switching clears or replaces old values, missing truth is not fabricated, snapshot gaps fall back only by documented rules, and historical records do not display incorrect values.
