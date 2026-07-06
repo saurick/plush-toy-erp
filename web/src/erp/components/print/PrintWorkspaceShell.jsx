@@ -14,7 +14,9 @@ export default function PrintWorkspaceShell({
   title,
   sourceTag = '使用默认模板',
   statusText = '',
+  workspaceClassName = '',
   panelTip = '',
+  panelActions = null,
   detailEditor = null,
   fieldRows = [],
   toolbarActions = null,
@@ -93,7 +95,7 @@ export default function PrintWorkspaceShell({
     <div
       className={`erp-print-shell ${
         preparing ? 'erp-print-shell--preparing' : 'erp-print-shell--ready'
-      }`}
+      } ${workspaceClassName}`.trim()}
       data-preparing-text={preparingText}
     >
       <header className="erp-print-shell__toolbar">
@@ -131,6 +133,12 @@ export default function PrintWorkspaceShell({
                 placeholder="搜索字段名或字段值"
               />
             </div>
+
+            {panelActions ? (
+              <div className="erp-print-shell__panel-actions">
+                {panelActions}
+              </div>
+            ) : null}
 
             {detailEditor}
 

@@ -2,7 +2,7 @@ import React, { useCallback } from 'react'
 import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
 import { Button, Form, Input, Select, Space } from 'antd'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
-import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
+import BusinessLineItemsSection from '../business-list/BusinessLineItemsSection.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
 import FieldWithUnitSuffix, {
   isQuantityTextWithinUnitPrecision,
@@ -265,281 +265,242 @@ export default function OutsourcingOrderForm({
       </Form.Item>
       {attachmentPanel}
 
-      <section className="erp-sales-order-lines-form">
-        <Form.List name="items">
-          {(fields, { add, remove }) => (
-            <>
-              <div className="erp-sales-order-lines-form__head">
-                <div>
-                  <strong>加工明细</strong>
-                </div>
-              </div>
-              <div className="erp-sales-order-lines-form__list">
-                {fields.map((field, index) => (
-                  <div
-                    className="erp-sales-order-lines-form__row"
-                    key={field.key}
-                    ref={(node) => registerLineItemRow(index, node)}
+      <BusinessLineItemsSection
+        title="加工明细"
+        description="同一份加工合同内维护产品、工序、数量、单价和预计回货。"
+        emptyDescription="暂无加工明细"
+        renderRow={({ add, field, fields, index, remove }) => (
+          <div
+            className="erp-sales-order-lines-form__row"
+            key={field.key}
+            ref={(node) => registerLineItemRow(index, node)}
+          >
+            <div className="erp-sales-order-lines-form__row-head">
+              <strong>第 {index + 1} 行</strong>
+              <Space
+                className="erp-sales-order-lines-form__row-actions"
+                size={4}
+                wrap
+              >
+                <Button
+                  aria-label={`复制第 ${index + 1} 行`}
+                  type="text"
+                  icon={<CopyOutlined />}
+                  onClick={() => {
+                    const currentLines = form.getFieldValue('items') || []
+                    const sourceLine =
+                      currentLines[field.name] || currentLines[index] || {}
+                    add(createDuplicatedDraftLineItem(sourceLine), index + 1)
+                    requestLineItemScroll(index + 1)
+                  }}
+                >
+                  复制行
+                </Button>
+                <Button
+                  danger
+                  type="text"
+                  icon={<DeleteOutlined />}
+                  disabled={fields.length <= 1}
+                  onClick={() => remove(field.name)}
+                >
+                  移除行
+                </Button>
+              </Space>
+            </div>
+            <div className="erp-sales-order-lines-form__grid">
+              <Form.Item name={[field.name, 'id']} hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item name={[field.name, 'line_no']} hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--source"
+                name={[field.name, 'product_id']}
+                label="产品"
+                rules={[{ required: true, message: '请选择产品' }]}
+              >
+                <Select
+                  showSearch
+                  options={productOptions}
+                  optionFilterProp="label"
+                  onChange={(value) => onProductChange(field.name, value)}
+                />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--source"
+                name={[field.name, 'process_id']}
+                label="工序"
+                extra="查货只表示加工环节；合格、不合格、让步、返工等结果不在加工合同里维护。"
+                rules={[{ required: true, message: '请选择工序' }]}
+              >
+                <Select
+                  showSearch
+                  options={processOptions}
+                  optionFilterProp="label"
+                  onChange={(value) => onProcessChange(field.name, value)}
+                />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--unit"
+                name={[field.name, 'unit_id']}
+                label="单位"
+                rules={[{ required: true, message: '请选择单位' }]}
+              >
+                <Select
+                  showSearch
+                  options={unitOptions}
+                  optionFilterProp="searchText"
+                  onChange={(value) => {
+                    onUnitChange(field.name, value)
+                    form
+                      .validateFields([
+                        ['items', field.name, 'outsourcing_quantity'],
+                      ])
+                      .catch(() => {})
+                  }}
+                />
+              </Form.Item>
+              <Form.Item name={[field.name, 'product_no_snapshot']} hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item name={[field.name, 'product_name_snapshot']} hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item name={[field.name, 'process_name_snapshot']} hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item
+                name={[field.name, 'process_category_snapshot']}
+                hidden
+              >
+                <Input />
+              </Form.Item>
+              <Form.Item name={[field.name, 'unit_name_snapshot']} hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item
+                noStyle
+                shouldUpdate={(previous, current) =>
+                  previous?.items?.[field.name]?.unit_id !==
+                    current?.items?.[field.name]?.unit_id ||
+                  previous?.items?.[field.name]?.unit_name_snapshot !==
+                    current?.items?.[field.name]?.unit_name_snapshot
+                }
+              >
+                {({ getFieldValue }) => (
+                  <Form.Item
+                    className="erp-line-item-field erp-line-item-field--quantity"
+                    name={[field.name, 'outsourcing_quantity']}
+                    label="加工数量"
+                    rules={[
+                      { required: true, message: '请输入加工数量' },
+                      quantityPrecisionRule({
+                        form,
+                        fieldName: field.name,
+                        unitOptions,
+                      }),
+                    ]}
                   >
-                    <div className="erp-sales-order-lines-form__row-head">
-                      <strong>第 {index + 1} 行</strong>
-                      <Space
-                        className="erp-sales-order-lines-form__row-actions"
-                        size={4}
-                        wrap
-                      >
-                        <Button
-                          aria-label={`复制第 ${index + 1} 行`}
-                          type="text"
-                          icon={<CopyOutlined />}
-                          onClick={() => {
-                            const currentLines =
-                              form.getFieldValue('items') || []
-                            const sourceLine =
-                              currentLines[field.name] ||
-                              currentLines[index] ||
-                              {}
-                            add(
-                              createDuplicatedDraftLineItem(sourceLine),
-                              index + 1
-                            )
-                            requestLineItemScroll(index + 1)
-                          }}
-                        >
-                          复制行
-                        </Button>
-                        <Button
-                          danger
-                          type="text"
-                          icon={<DeleteOutlined />}
-                          disabled={fields.length <= 1}
-                          onClick={() => remove(field.name)}
-                        >
-                          移除行
-                        </Button>
-                      </Space>
-                    </div>
-                    <div className="erp-sales-order-lines-form__grid">
-                      <Form.Item name={[field.name, 'id']} hidden>
-                        <Input />
-                      </Form.Item>
-                      <Form.Item name={[field.name, 'line_no']} hidden>
-                        <Input />
-                      </Form.Item>
-                      <Form.Item
-                        className="erp-line-item-field erp-line-item-field--source"
-                        name={[field.name, 'product_id']}
-                        label="产品"
-                        rules={[{ required: true, message: '请选择产品' }]}
-                      >
-                        <Select
-                          showSearch
-                          options={productOptions}
-                          optionFilterProp="label"
-                          onChange={(value) =>
-                            onProductChange(field.name, value)
-                          }
-                        />
-                      </Form.Item>
-                      <Form.Item
-                        className="erp-line-item-field erp-line-item-field--source"
-                        name={[field.name, 'process_id']}
-                        label="工序"
-                        extra="查货只表示加工环节；合格、不合格、让步、返工等结果不在加工合同里维护。"
-                        rules={[{ required: true, message: '请选择工序' }]}
-                      >
-                        <Select
-                          showSearch
-                          options={processOptions}
-                          optionFilterProp="label"
-                          onChange={(value) =>
-                            onProcessChange(field.name, value)
-                          }
-                        />
-                      </Form.Item>
-                      <Form.Item
-                        className="erp-line-item-field erp-line-item-field--unit"
-                        name={[field.name, 'unit_id']}
-                        label="单位"
-                        rules={[{ required: true, message: '请选择单位' }]}
-                      >
-                        <Select
-                          showSearch
-                          options={unitOptions}
-                          optionFilterProp="searchText"
-                          onChange={(value) => {
-                            onUnitChange(field.name, value)
-                            form
-                              .validateFields([
-                                ['items', field.name, 'outsourcing_quantity'],
-                              ])
-                              .catch(() => {})
-                          }}
-                        />
-                      </Form.Item>
-                      <Form.Item
-                        name={[field.name, 'product_no_snapshot']}
-                        hidden
-                      >
-                        <Input />
-                      </Form.Item>
-                      <Form.Item
-                        name={[field.name, 'product_name_snapshot']}
-                        hidden
-                      >
-                        <Input />
-                      </Form.Item>
-                      <Form.Item
-                        name={[field.name, 'process_name_snapshot']}
-                        hidden
-                      >
-                        <Input />
-                      </Form.Item>
-                      <Form.Item
-                        name={[field.name, 'process_category_snapshot']}
-                        hidden
-                      >
-                        <Input />
-                      </Form.Item>
-                      <Form.Item
-                        name={[field.name, 'unit_name_snapshot']}
-                        hidden
-                      >
-                        <Input />
-                      </Form.Item>
-                      <Form.Item
-                        noStyle
-                        shouldUpdate={(previous, current) =>
-                          previous?.items?.[field.name]?.unit_id !==
-                            current?.items?.[field.name]?.unit_id ||
-                          previous?.items?.[field.name]?.unit_name_snapshot !==
-                            current?.items?.[field.name]?.unit_name_snapshot
-                        }
-                      >
-                        {({ getFieldValue }) => (
-                          <Form.Item
-                            className="erp-line-item-field erp-line-item-field--quantity"
-                            name={[field.name, 'outsourcing_quantity']}
-                            label="加工数量"
-                            rules={[
-                              { required: true, message: '请输入加工数量' },
-                              quantityPrecisionRule({
-                                form,
-                                fieldName: field.name,
-                                unitOptions,
-                              }),
-                            ]}
-                          >
-                            <FieldWithUnitSuffix
-                              control={<Input />}
-                              unitText={unitSuffixTextFromOptions(
-                                unitOptions,
-                                getFieldValue(['items', field.name, 'unit_id']),
-                                getFieldValue([
-                                  'items',
-                                  field.name,
-                                  'unit_name_snapshot',
-                                ])
-                              )}
-                            />
-                          </Form.Item>
-                        )}
-                      </Form.Item>
-                      <Form.Item
-                        className="erp-line-item-field erp-line-item-field--money"
-                        name={[field.name, 'unit_price']}
-                        label="单价"
-                      >
-                        <Input />
-                      </Form.Item>
-                      <Form.Item
-                        className="erp-line-item-field erp-line-item-field--money"
-                        name={[field.name, 'amount']}
-                        label="金额"
-                      >
-                        <Input />
-                      </Form.Item>
-                      <Form.Item
-                        className="erp-line-item-field erp-line-item-field--date"
-                        name={[field.name, 'expected_return_date']}
-                        label="行预计回货日期"
-                        dependencies={['order_date']}
-                        rules={[
-                          dateInputNotBeforeRule({
-                            getStartValue: () =>
-                              form.getFieldValue('order_date'),
-                            message: '行预计回货日期不能早于下单日期',
-                          }),
-                        ]}
-                      >
-                        <DateInput
-                          disabledDate={
-                            orderDate
-                              ? disableExpectedReturnBeforeOrderDate
-                              : undefined
-                          }
-                        />
-                      </Form.Item>
-                      <Form.Item
-                        className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
-                        name={[field.name, 'note']}
-                        label="备注"
-                      >
-                        <Input.TextArea
-                          allowClear
-                          autoSize={{ minRows: 1, maxRows: 3 }}
-                          showCount
-                          maxLength={255}
-                        />
-                      </Form.Item>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <BusinessLineItemsFooter
-                addLabel="添加条目"
-                onAdd={() => {
-                  const currentLines = form.getFieldValue('items') || []
-                  add(createBlankOutsourcingLine(getNextLineNo(currentLines)))
-                  requestLineItemScroll(currentLines.length)
-                }}
-                stats={[
-                  {
-                    key: 'count',
-                    label: '已录入',
-                    value: fields.length,
-                    suffix: '条',
-                  },
-                  {
-                    key: 'quantity',
-                    label: '数量合计',
-                    value: (
-                      <BusinessLineItemsSummaryValue
-                        summarize={summarizeLines}
-                        select={(summary) =>
-                          formatSummaryNumber(summary.quantity, 3)
-                        }
-                      />
-                    ),
-                  },
-                  {
-                    key: 'amount',
-                    label: '金额合计',
-                    value: (
-                      <BusinessLineItemsSummaryValue
-                        summarize={summarizeLines}
-                        select={(summary) =>
-                          formatSummaryNumber(summary.amount, 2)
-                        }
-                      />
-                    ),
-                  },
+                    <FieldWithUnitSuffix
+                      control={<Input />}
+                      unitText={unitSuffixTextFromOptions(
+                        unitOptions,
+                        getFieldValue(['items', field.name, 'unit_id']),
+                        getFieldValue([
+                          'items',
+                          field.name,
+                          'unit_name_snapshot',
+                        ])
+                      )}
+                    />
+                  </Form.Item>
+                )}
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--money"
+                name={[field.name, 'unit_price']}
+                label="单价"
+              >
+                <Input />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--money"
+                name={[field.name, 'amount']}
+                label="金额"
+              >
+                <Input />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--date"
+                name={[field.name, 'expected_return_date']}
+                label="行预计回货日期"
+                dependencies={['order_date']}
+                rules={[
+                  dateInputNotBeforeRule({
+                    getStartValue: () => form.getFieldValue('order_date'),
+                    message: '行预计回货日期不能早于下单日期',
+                  }),
                 ]}
-              />
-            </>
-          )}
-        </Form.List>
-      </section>
+              >
+                <DateInput
+                  disabledDate={
+                    orderDate ? disableExpectedReturnBeforeOrderDate : undefined
+                  }
+                />
+              </Form.Item>
+              <Form.Item
+                className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note"
+                name={[field.name, 'note']}
+                label="备注"
+              >
+                <Input.TextArea
+                  allowClear
+                  autoSize={{ minRows: 1, maxRows: 3 }}
+                  showCount
+                  maxLength={255}
+                />
+              </Form.Item>
+            </div>
+          </div>
+        )}
+        footerProps={({ add, fields }) => ({
+          addLabel: '添加条目',
+          onAdd: () => {
+            const currentLines = form.getFieldValue('items') || []
+            add(createBlankOutsourcingLine(getNextLineNo(currentLines)))
+            requestLineItemScroll(currentLines.length)
+          },
+          stats: [
+            {
+              key: 'count',
+              label: '已录入',
+              value: fields.length,
+              suffix: '条',
+            },
+            {
+              key: 'quantity',
+              label: '数量合计',
+              value: (
+                <BusinessLineItemsSummaryValue
+                  summarize={summarizeLines}
+                  select={(summary) => formatSummaryNumber(summary.quantity, 3)}
+                />
+              ),
+            },
+            {
+              key: 'amount',
+              label: '金额合计',
+              value: (
+                <BusinessLineItemsSummaryValue
+                  summarize={summarizeLines}
+                  select={(summary) => formatSummaryNumber(summary.amount, 2)}
+                />
+              ),
+            },
+          ],
+        })}
+      />
     </Form>
   )
 }

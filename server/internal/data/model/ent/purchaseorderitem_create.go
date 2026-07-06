@@ -91,6 +91,48 @@ func (_c *PurchaseOrderItemCreate) SetNillableColorSnapshot(v *string) *Purchase
 	return _c
 }
 
+// SetProductOrderNoSnapshot sets the "product_order_no_snapshot" field.
+func (_c *PurchaseOrderItemCreate) SetProductOrderNoSnapshot(v string) *PurchaseOrderItemCreate {
+	_c.mutation.SetProductOrderNoSnapshot(v)
+	return _c
+}
+
+// SetNillableProductOrderNoSnapshot sets the "product_order_no_snapshot" field if the given value is not nil.
+func (_c *PurchaseOrderItemCreate) SetNillableProductOrderNoSnapshot(v *string) *PurchaseOrderItemCreate {
+	if v != nil {
+		_c.SetProductOrderNoSnapshot(*v)
+	}
+	return _c
+}
+
+// SetProductNoSnapshot sets the "product_no_snapshot" field.
+func (_c *PurchaseOrderItemCreate) SetProductNoSnapshot(v string) *PurchaseOrderItemCreate {
+	_c.mutation.SetProductNoSnapshot(v)
+	return _c
+}
+
+// SetNillableProductNoSnapshot sets the "product_no_snapshot" field if the given value is not nil.
+func (_c *PurchaseOrderItemCreate) SetNillableProductNoSnapshot(v *string) *PurchaseOrderItemCreate {
+	if v != nil {
+		_c.SetProductNoSnapshot(*v)
+	}
+	return _c
+}
+
+// SetProductNameSnapshot sets the "product_name_snapshot" field.
+func (_c *PurchaseOrderItemCreate) SetProductNameSnapshot(v string) *PurchaseOrderItemCreate {
+	_c.mutation.SetProductNameSnapshot(v)
+	return _c
+}
+
+// SetNillableProductNameSnapshot sets the "product_name_snapshot" field if the given value is not nil.
+func (_c *PurchaseOrderItemCreate) SetNillableProductNameSnapshot(v *string) *PurchaseOrderItemCreate {
+	if v != nil {
+		_c.SetProductNameSnapshot(*v)
+	}
+	return _c
+}
+
 // SetPurchasedQuantity sets the "purchased_quantity" field.
 func (_c *PurchaseOrderItemCreate) SetPurchasedQuantity(v decimal.Decimal) *PurchaseOrderItemCreate {
 	_c.mutation.SetPurchasedQuantity(v)
@@ -323,6 +365,21 @@ func (_c *PurchaseOrderItemCreate) check() error {
 			return &ValidationError{Name: "color_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.color_snapshot": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.ProductOrderNoSnapshot(); ok {
+		if err := purchaseorderitem.ProductOrderNoSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "product_order_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.product_order_no_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ProductNoSnapshot(); ok {
+		if err := purchaseorderitem.ProductNoSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "product_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.product_no_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ProductNameSnapshot(); ok {
+		if err := purchaseorderitem.ProductNameSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "product_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.product_name_snapshot": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.PurchasedQuantity(); !ok {
 		return &ValidationError{Name: "purchased_quantity", err: errors.New(`ent: missing required field "PurchaseOrderItem.purchased_quantity"`)}
 	}
@@ -395,6 +452,18 @@ func (_c *PurchaseOrderItemCreate) createSpec() (*PurchaseOrderItem, *sqlgraph.C
 	if value, ok := _c.mutation.ColorSnapshot(); ok {
 		_spec.SetField(purchaseorderitem.FieldColorSnapshot, field.TypeString, value)
 		_node.ColorSnapshot = &value
+	}
+	if value, ok := _c.mutation.ProductOrderNoSnapshot(); ok {
+		_spec.SetField(purchaseorderitem.FieldProductOrderNoSnapshot, field.TypeString, value)
+		_node.ProductOrderNoSnapshot = &value
+	}
+	if value, ok := _c.mutation.ProductNoSnapshot(); ok {
+		_spec.SetField(purchaseorderitem.FieldProductNoSnapshot, field.TypeString, value)
+		_node.ProductNoSnapshot = &value
+	}
+	if value, ok := _c.mutation.ProductNameSnapshot(); ok {
+		_spec.SetField(purchaseorderitem.FieldProductNameSnapshot, field.TypeString, value)
+		_node.ProductNameSnapshot = &value
 	}
 	if value, ok := _c.mutation.PurchasedQuantity(); ok {
 		_spec.SetField(purchaseorderitem.FieldPurchasedQuantity, field.TypeOther, value)

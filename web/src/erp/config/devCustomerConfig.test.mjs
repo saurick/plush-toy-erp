@@ -848,8 +848,8 @@ test('devCustomerConfig: 页面只展示客户配置目录标签，不直出 raw
 test('devCustomerConfig: 打印模板字段只读进入客户配置控制台', () => {
   const summary = buildPrintTemplateFieldSummary()
 
-  assert.equal(summary.templateCount, 2)
-  assert.equal(summary.sourceGroundedCount, 2)
+  assert.equal(summary.templateCount, 5)
+  assert.equal(summary.sourceGroundedCount, 5)
   assert(summary.fieldTruthCount > 0)
   assert(summary.fieldRequirementCount > 0)
   assert.equal(summary.runtimeStatus, 'source_grounded')
@@ -860,7 +860,7 @@ test('devCustomerConfig: 打印模板字段只读进入客户配置控制台', (
   assert.match(summary.boundary, /销售订单受理未接打印模板/)
   assert.deepEqual(
     summary.templates.map((item) => item.title),
-    ['采购合同', '加工合同']
+    ['采购合同', '加工合同', '物料分析明细表', '色卡', '作业指导书']
   )
   assert(
     summary.templates.every(

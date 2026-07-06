@@ -905,8 +905,12 @@ test("dev entry boundary: customer config console stays preview or gated apply o
   const overview = buildCustomerConfigDevOverviewFromSearch(
     "?customer=yoyoosun",
   );
-  assert.equal(overview.printTemplateSummary.templateCount, 2);
-  assert.equal(overview.printTemplateSummary.sourceGroundedCount, 2);
+  assert.equal(overview.printTemplateSummary.templateCount, 5);
+  assert.equal(overview.printTemplateSummary.sourceGroundedCount, 5);
+  assert.deepEqual(
+    overview.printTemplateSummary.templates.map((item) => item.title),
+    ['采购合同', '加工合同', '物料分析明细表', '色卡', '作业指导书'],
+  );
   assert.match(
     overview.printTemplateSummary.boundary,
     /销售订单受理未接打印模板/,

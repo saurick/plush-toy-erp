@@ -10,6 +10,7 @@ import {
   buildPrintCenterPath,
   buildPrintWorkspaceDraftStorageKey,
   buildPrintWorkspacePath,
+  buildRestorablePrintWorkspaceURL,
   buildPrintWorkspaceShellURL,
   buildPrintWorkspaceWindowStateStorageKey,
   canOpenPrintWorkspaceFromWindowState,
@@ -47,6 +48,28 @@ test('printWorkspace: 工作台路径可携带 fresh 模式', () => {
     }),
     '/erp/print-workspace/material-purchase-contract?draft=fresh&state=window-1'
   )
+})
+
+test('printWorkspace: 可恢复工作台 URL 不保留 fresh 重置模式', () => {
+  const originalWindow = globalThis.window
+  globalThis.window = {
+    location: { origin: 'http://127.0.0.1:4173' },
+  }
+
+  try {
+    assert.equal(
+      buildRestorablePrintWorkspaceURL(
+        MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+        {
+          draftMode: PRINT_WORKSPACE_DRAFT_MODE.FRESH,
+          stateID: 'window-restore-1',
+        }
+      ),
+      'http://127.0.0.1:4173/erp/print-workspace/material-purchase-contract?state=window-restore-1'
+    )
+  } finally {
+    globalThis.window = originalWindow
+  }
 })
 
 test('printWorkspace: 业务打印窗口路径可携带 customer key', () => {
@@ -338,7 +361,7 @@ test('FL_print_workspace_window_snapshot__persists_current_html_snapshot printWo
   }
 })
 
-test('printWorkspace: 从打印中心打开时优先走壳页 URL，并落当前窗口状态', () => {
+test('printWorkspace: 从打印中心打开时直达可恢复工作台 URL，并落当前窗口状态', () => {
   const storage = new Map()
   const popup = {
     focusCalled: false,
@@ -383,14 +406,14 @@ test('printWorkspace: 从打印中心打开时优先走壳页 URL，并落当前
     assert.equal(popup.focusCalled, true)
     assert.equal(
       popup.openedURL,
-      'http://127.0.0.1:4173/print-window-shell.html?state=window-5'
+      'http://127.0.0.1:4173/erp/print-workspace/material-purchase-contract?state=window-5'
     )
     const payload = readPrintWorkspaceWindowState('window-5')
     assert.equal(payload?.version, 1)
     assert.equal(payload?.templateKey, 'material-purchase-contract')
     assert.equal(
       payload?.workspaceURL,
-      'http://127.0.0.1:4173/erp/print-workspace/material-purchase-contract?draft=fresh&state=window-5'
+      'http://127.0.0.1:4173/erp/print-workspace/material-purchase-contract?state=window-5'
     )
     assert.equal(Number.isFinite(Number(payload?.updatedAt)), true)
   } finally {
@@ -442,7 +465,7 @@ test('printWorkspace: 业务页打开时会先写入当前窗口专属打印草�
 
     assert.equal(
       popup.openedURL,
-      'http://127.0.0.1:4173/print-window-shell.html?state=business-window-1'
+      'http://127.0.0.1:4173/erp/print-workspace/material-purchase-contract?source=business&customer_key=yoyoosun&state=business-window-1'
     )
     assert.deepEqual(
       JSON.parse(

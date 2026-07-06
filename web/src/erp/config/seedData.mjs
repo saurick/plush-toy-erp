@@ -62,7 +62,7 @@ const navItemRegistry = {
     label: '模板打印中心',
     path: '/erp/print-center',
     shortLabel: '打印',
-    description: '统一查看采购合同和加工合同的固定打印模板。',
+    description: '统一查看合同、物料明细、色卡和作业指导书等固定打印模板。',
   },
   'exception-flow': {
     key: 'exception-flow',

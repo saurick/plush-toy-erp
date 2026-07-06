@@ -17,8 +17,12 @@ func init() {
 	})
 	registerRuntimeFieldPolicySurface("purchase_order_items.default", []string{
 		"product_order_no",
+		"product_order_no_snapshot",
 		"product_no",
+		"product_no_snapshot",
+		"product_name_snapshot",
 		"material_name",
+		"material_name_snapshot",
 		"spec",
 		"unit",
 		"quantity",

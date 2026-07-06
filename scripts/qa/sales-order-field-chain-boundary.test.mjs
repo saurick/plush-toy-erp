@@ -314,8 +314,13 @@ test("sales order print boundary stays explicit until a mapper is implemented", 
 
   assertIncludes(
     printBehaviorDoc,
-    "当前正式模板只有 `采购合同`、`加工合同` 两套",
+    "当前正式模板包括 `采购合同`、`加工合同`、`物料分析明细表`、`色卡`、`作业指导书`",
     "print field behavior doc"
+  );
+  assertIncludes(
+    printImplementationDoc,
+    "当前正式模板包括 `采购合同`、`加工合同`、`物料分析明细表`、`色卡`、`作业指导书`",
+    "print implementation doc"
   );
   assertIncludes(
     printBehaviorDoc,

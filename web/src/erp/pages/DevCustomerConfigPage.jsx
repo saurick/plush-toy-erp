@@ -1031,7 +1031,7 @@ function AssetsPanel({
         <Alert
           type="info"
           showIcon
-          message="当前只展示采购合同和加工合同字段真源"
+          message="当前展示合同和工程资料打印模板字段真源"
           description="销售订单受理当前未接打印模板；客户抬头、签章和固定文案应留在客户配置或模板边界，不进入产品核心表单。"
         />
         <div className="erp-dev-customer-tool-list">

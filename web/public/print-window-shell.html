@@ -154,6 +154,203 @@
           return readPersistedStateFromIndexedDB()
         }
 
+        const syncClonedFormState = (sourceDocument, clonedRoot) => {
+          const sourceFields = Array.from(
+            sourceDocument.querySelectorAll('input, textarea, select')
+          )
+          const clonedFields = Array.from(
+            clonedRoot.querySelectorAll('input, textarea, select')
+          )
+
+          sourceFields.forEach((sourceField, index) => {
+            const clonedField = clonedFields[index]
+            if (!clonedField) {
+              return
+            }
+
+            const tagName = String(sourceField.tagName || '').toLowerCase()
+            if (tagName === 'textarea') {
+              clonedField.textContent = sourceField.value
+              return
+            }
+
+            if (tagName === 'select') {
+              Array.from(clonedField.options || []).forEach(
+                (option, optionIndex) => {
+                  const sourceOption = sourceField.options?.[optionIndex]
+                  const isSelected = Boolean(sourceOption?.selected)
+                  option.selected = isSelected
+                  if (isSelected) {
+                    option.setAttribute('selected', 'selected')
+                  } else {
+                    option.removeAttribute('selected')
+                  }
+                }
+              )
+              return
+            }
+
+            const inputType = String(sourceField.type || '').toLowerCase()
+            if (inputType === 'checkbox' || inputType === 'radio') {
+              clonedField.checked = sourceField.checked
+              if (sourceField.checked) {
+                clonedField.setAttribute('checked', 'checked')
+              } else {
+                clonedField.removeAttribute('checked')
+              }
+              return
+            }
+
+            clonedField.value = sourceField.value
+            clonedField.setAttribute('value', sourceField.value)
+          })
+        }
+
+        const buildCurrentWindowHTML = () => {
+          if (!document.documentElement) {
+            return ''
+          }
+          const clonedRoot = document.documentElement.cloneNode(true)
+          clonedRoot
+            .querySelectorAll('script')
+            .forEach((script) => script.remove())
+          syncClonedFormState(document, clonedRoot)
+          return `<!doctype html>${clonedRoot.outerHTML}`
+        }
+
+        const persistStateRecordToIndexedDB = async (record) => {
+          const database = await openDatabase()
+          if (!database) {
+            return false
+          }
+
+          return new Promise((resolve) => {
+            try {
+              const transaction = database.transaction(
+                STATE_DB_STORE_NAME,
+                'readwrite'
+              )
+              const request = transaction
+                .objectStore(STATE_DB_STORE_NAME)
+                .put(record)
+              let settled = false
+              const finalize = (saved) => {
+                if (settled) {
+                  return
+                }
+                settled = true
+                resolve(saved)
+              }
+              request.onsuccess = () => finalize(true)
+              request.onerror = () => finalize(false)
+              transaction.oncomplete = () => finalize(true)
+              transaction.onerror = () => finalize(false)
+              transaction.onabort = () => finalize(false)
+            } catch (error) {
+              resolve(false)
+            }
+          })
+        }
+
+        const persistRestoredWindowSnapshot = (payload, windowHTMLOverride) => {
+          if (!stateID) {
+            return false
+          }
+          const windowHTML = windowHTMLOverride || buildCurrentWindowHTML()
+          if (!windowHTML) {
+            return false
+          }
+
+          const record = {
+            ...payload,
+            version: STATE_VERSION,
+            stateID,
+            updatedAt: Date.now(),
+            windowHTML,
+          }
+          try {
+            window.localStorage.setItem(
+              `${STORAGE_KEY_PREFIX}${stateID}`,
+              JSON.stringify(record)
+            )
+            persistStateRecordToIndexedDB(record).catch(() => {})
+            return true
+          } catch (error) {
+            persistStateRecordToIndexedDB(record).catch(() => {})
+            return false
+          }
+        }
+
+        const installRestoredWindowSnapshotPersistence = (payload) => {
+          if (!stateID) {
+            return
+          }
+
+          let persistTimer = 0
+          let persistIdle = 0
+          let pendingWindowHTML = ''
+          let lastPersistedWindowHTML = ''
+          const clearPersistHandles = () => {
+            if (persistTimer) {
+              window.clearTimeout(persistTimer)
+              persistTimer = 0
+            }
+            if (
+              persistIdle &&
+              typeof window.cancelIdleCallback === 'function'
+            ) {
+              window.cancelIdleCallback(persistIdle)
+              persistIdle = 0
+            }
+          }
+          const persistNow = () => {
+            clearPersistHandles()
+            const windowHTML =
+              pendingWindowHTML ||
+              lastPersistedWindowHTML ||
+              buildCurrentWindowHTML()
+            if (!windowHTML) {
+              return
+            }
+            pendingWindowHTML = ''
+            lastPersistedWindowHTML = windowHTML
+            persistRestoredWindowSnapshot(payload, windowHTML)
+          }
+          const capturePendingWindowHTML = () => {
+            const windowHTML = buildCurrentWindowHTML()
+            if (windowHTML) {
+              pendingWindowHTML = windowHTML
+            }
+          }
+          const schedulePersist = () => {
+            capturePendingWindowHTML()
+            clearPersistHandles()
+            persistTimer = window.setTimeout(() => {
+              persistTimer = 0
+              if (typeof window.requestIdleCallback === 'function') {
+                persistIdle = window.requestIdleCallback(persistNow, {
+                  timeout: 1000,
+                })
+                return
+              }
+              persistNow()
+            }, 0)
+          }
+
+          if (typeof window.MutationObserver === 'function') {
+            const observer = new window.MutationObserver(schedulePersist)
+            observer.observe(document.documentElement, {
+              subtree: true,
+              childList: true,
+              characterData: true,
+            })
+          }
+
+          document.addEventListener('input', schedulePersist, true)
+          document.addEventListener('change', schedulePersist, true)
+          persistNow()
+        }
+
         window[RESTORE_FUNCTION_NAME] = async () => {
           const payload = await readPersistedState()
           const windowHTML = String(payload?.windowHTML || '').trim()
@@ -161,6 +358,7 @@
             document.open()
             document.write(windowHTML)
             document.close()
+            installRestoredWindowSnapshotPersistence(payload)
             return
           }
           const workspaceURL = String(payload?.workspaceURL || '').trim()

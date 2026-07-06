@@ -156,6 +156,66 @@ func (_u *PurchaseOrderItemUpdate) ClearColorSnapshot() *PurchaseOrderItemUpdate
 	return _u
 }
 
+// SetProductOrderNoSnapshot sets the "product_order_no_snapshot" field.
+func (_u *PurchaseOrderItemUpdate) SetProductOrderNoSnapshot(v string) *PurchaseOrderItemUpdate {
+	_u.mutation.SetProductOrderNoSnapshot(v)
+	return _u
+}
+
+// SetNillableProductOrderNoSnapshot sets the "product_order_no_snapshot" field if the given value is not nil.
+func (_u *PurchaseOrderItemUpdate) SetNillableProductOrderNoSnapshot(v *string) *PurchaseOrderItemUpdate {
+	if v != nil {
+		_u.SetProductOrderNoSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearProductOrderNoSnapshot clears the value of the "product_order_no_snapshot" field.
+func (_u *PurchaseOrderItemUpdate) ClearProductOrderNoSnapshot() *PurchaseOrderItemUpdate {
+	_u.mutation.ClearProductOrderNoSnapshot()
+	return _u
+}
+
+// SetProductNoSnapshot sets the "product_no_snapshot" field.
+func (_u *PurchaseOrderItemUpdate) SetProductNoSnapshot(v string) *PurchaseOrderItemUpdate {
+	_u.mutation.SetProductNoSnapshot(v)
+	return _u
+}
+
+// SetNillableProductNoSnapshot sets the "product_no_snapshot" field if the given value is not nil.
+func (_u *PurchaseOrderItemUpdate) SetNillableProductNoSnapshot(v *string) *PurchaseOrderItemUpdate {
+	if v != nil {
+		_u.SetProductNoSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearProductNoSnapshot clears the value of the "product_no_snapshot" field.
+func (_u *PurchaseOrderItemUpdate) ClearProductNoSnapshot() *PurchaseOrderItemUpdate {
+	_u.mutation.ClearProductNoSnapshot()
+	return _u
+}
+
+// SetProductNameSnapshot sets the "product_name_snapshot" field.
+func (_u *PurchaseOrderItemUpdate) SetProductNameSnapshot(v string) *PurchaseOrderItemUpdate {
+	_u.mutation.SetProductNameSnapshot(v)
+	return _u
+}
+
+// SetNillableProductNameSnapshot sets the "product_name_snapshot" field if the given value is not nil.
+func (_u *PurchaseOrderItemUpdate) SetNillableProductNameSnapshot(v *string) *PurchaseOrderItemUpdate {
+	if v != nil {
+		_u.SetProductNameSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearProductNameSnapshot clears the value of the "product_name_snapshot" field.
+func (_u *PurchaseOrderItemUpdate) ClearProductNameSnapshot() *PurchaseOrderItemUpdate {
+	_u.mutation.ClearProductNameSnapshot()
+	return _u
+}
+
 // SetPurchasedQuantity sets the "purchased_quantity" field.
 func (_u *PurchaseOrderItemUpdate) SetPurchasedQuantity(v decimal.Decimal) *PurchaseOrderItemUpdate {
 	_u.mutation.SetPurchasedQuantity(v)
@@ -417,6 +477,21 @@ func (_u *PurchaseOrderItemUpdate) check() error {
 			return &ValidationError{Name: "color_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.color_snapshot": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProductOrderNoSnapshot(); ok {
+		if err := purchaseorderitem.ProductOrderNoSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "product_order_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.product_order_no_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProductNoSnapshot(); ok {
+		if err := purchaseorderitem.ProductNoSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "product_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.product_no_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProductNameSnapshot(); ok {
+		if err := purchaseorderitem.ProductNameSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "product_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.product_name_snapshot": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.LineStatus(); ok {
 		if err := purchaseorderitem.LineStatusValidator(v); err != nil {
 			return &ValidationError{Name: "line_status", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.line_status": %w`, err)}
@@ -474,6 +549,24 @@ func (_u *PurchaseOrderItemUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if _u.mutation.ColorSnapshotCleared() {
 		_spec.ClearField(purchaseorderitem.FieldColorSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProductOrderNoSnapshot(); ok {
+		_spec.SetField(purchaseorderitem.FieldProductOrderNoSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.ProductOrderNoSnapshotCleared() {
+		_spec.ClearField(purchaseorderitem.FieldProductOrderNoSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProductNoSnapshot(); ok {
+		_spec.SetField(purchaseorderitem.FieldProductNoSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.ProductNoSnapshotCleared() {
+		_spec.ClearField(purchaseorderitem.FieldProductNoSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProductNameSnapshot(); ok {
+		_spec.SetField(purchaseorderitem.FieldProductNameSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.ProductNameSnapshotCleared() {
+		_spec.ClearField(purchaseorderitem.FieldProductNameSnapshot, field.TypeString)
 	}
 	if value, ok := _u.mutation.PurchasedQuantity(); ok {
 		_spec.SetField(purchaseorderitem.FieldPurchasedQuantity, field.TypeOther, value)
@@ -783,6 +876,66 @@ func (_u *PurchaseOrderItemUpdateOne) ClearColorSnapshot() *PurchaseOrderItemUpd
 	return _u
 }
 
+// SetProductOrderNoSnapshot sets the "product_order_no_snapshot" field.
+func (_u *PurchaseOrderItemUpdateOne) SetProductOrderNoSnapshot(v string) *PurchaseOrderItemUpdateOne {
+	_u.mutation.SetProductOrderNoSnapshot(v)
+	return _u
+}
+
+// SetNillableProductOrderNoSnapshot sets the "product_order_no_snapshot" field if the given value is not nil.
+func (_u *PurchaseOrderItemUpdateOne) SetNillableProductOrderNoSnapshot(v *string) *PurchaseOrderItemUpdateOne {
+	if v != nil {
+		_u.SetProductOrderNoSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearProductOrderNoSnapshot clears the value of the "product_order_no_snapshot" field.
+func (_u *PurchaseOrderItemUpdateOne) ClearProductOrderNoSnapshot() *PurchaseOrderItemUpdateOne {
+	_u.mutation.ClearProductOrderNoSnapshot()
+	return _u
+}
+
+// SetProductNoSnapshot sets the "product_no_snapshot" field.
+func (_u *PurchaseOrderItemUpdateOne) SetProductNoSnapshot(v string) *PurchaseOrderItemUpdateOne {
+	_u.mutation.SetProductNoSnapshot(v)
+	return _u
+}
+
+// SetNillableProductNoSnapshot sets the "product_no_snapshot" field if the given value is not nil.
+func (_u *PurchaseOrderItemUpdateOne) SetNillableProductNoSnapshot(v *string) *PurchaseOrderItemUpdateOne {
+	if v != nil {
+		_u.SetProductNoSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearProductNoSnapshot clears the value of the "product_no_snapshot" field.
+func (_u *PurchaseOrderItemUpdateOne) ClearProductNoSnapshot() *PurchaseOrderItemUpdateOne {
+	_u.mutation.ClearProductNoSnapshot()
+	return _u
+}
+
+// SetProductNameSnapshot sets the "product_name_snapshot" field.
+func (_u *PurchaseOrderItemUpdateOne) SetProductNameSnapshot(v string) *PurchaseOrderItemUpdateOne {
+	_u.mutation.SetProductNameSnapshot(v)
+	return _u
+}
+
+// SetNillableProductNameSnapshot sets the "product_name_snapshot" field if the given value is not nil.
+func (_u *PurchaseOrderItemUpdateOne) SetNillableProductNameSnapshot(v *string) *PurchaseOrderItemUpdateOne {
+	if v != nil {
+		_u.SetProductNameSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearProductNameSnapshot clears the value of the "product_name_snapshot" field.
+func (_u *PurchaseOrderItemUpdateOne) ClearProductNameSnapshot() *PurchaseOrderItemUpdateOne {
+	_u.mutation.ClearProductNameSnapshot()
+	return _u
+}
+
 // SetPurchasedQuantity sets the "purchased_quantity" field.
 func (_u *PurchaseOrderItemUpdateOne) SetPurchasedQuantity(v decimal.Decimal) *PurchaseOrderItemUpdateOne {
 	_u.mutation.SetPurchasedQuantity(v)
@@ -1057,6 +1210,21 @@ func (_u *PurchaseOrderItemUpdateOne) check() error {
 			return &ValidationError{Name: "color_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.color_snapshot": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProductOrderNoSnapshot(); ok {
+		if err := purchaseorderitem.ProductOrderNoSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "product_order_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.product_order_no_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProductNoSnapshot(); ok {
+		if err := purchaseorderitem.ProductNoSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "product_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.product_no_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProductNameSnapshot(); ok {
+		if err := purchaseorderitem.ProductNameSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "product_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.product_name_snapshot": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.LineStatus(); ok {
 		if err := purchaseorderitem.LineStatusValidator(v); err != nil {
 			return &ValidationError{Name: "line_status", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrderItem.line_status": %w`, err)}
@@ -1131,6 +1299,24 @@ func (_u *PurchaseOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *Purch
 	}
 	if _u.mutation.ColorSnapshotCleared() {
 		_spec.ClearField(purchaseorderitem.FieldColorSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProductOrderNoSnapshot(); ok {
+		_spec.SetField(purchaseorderitem.FieldProductOrderNoSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.ProductOrderNoSnapshotCleared() {
+		_spec.ClearField(purchaseorderitem.FieldProductOrderNoSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProductNoSnapshot(); ok {
+		_spec.SetField(purchaseorderitem.FieldProductNoSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.ProductNoSnapshotCleared() {
+		_spec.ClearField(purchaseorderitem.FieldProductNoSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProductNameSnapshot(); ok {
+		_spec.SetField(purchaseorderitem.FieldProductNameSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.ProductNameSnapshotCleared() {
+		_spec.ClearField(purchaseorderitem.FieldProductNameSnapshot, field.TypeString)
 	}
 	if value, ok := _u.mutation.PurchasedQuantity(); ok {
 		_spec.SetField(purchaseorderitem.FieldPurchasedQuantity, field.TypeOther, value)

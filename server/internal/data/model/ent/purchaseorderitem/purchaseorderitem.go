@@ -28,6 +28,12 @@ const (
 	FieldMaterialNameSnapshot = "material_name_snapshot"
 	// FieldColorSnapshot holds the string denoting the color_snapshot field in the database.
 	FieldColorSnapshot = "color_snapshot"
+	// FieldProductOrderNoSnapshot holds the string denoting the product_order_no_snapshot field in the database.
+	FieldProductOrderNoSnapshot = "product_order_no_snapshot"
+	// FieldProductNoSnapshot holds the string denoting the product_no_snapshot field in the database.
+	FieldProductNoSnapshot = "product_no_snapshot"
+	// FieldProductNameSnapshot holds the string denoting the product_name_snapshot field in the database.
+	FieldProductNameSnapshot = "product_name_snapshot"
 	// FieldPurchasedQuantity holds the string denoting the purchased_quantity field in the database.
 	FieldPurchasedQuantity = "purchased_quantity"
 	// FieldUnitPrice holds the string denoting the unit_price field in the database.
@@ -94,6 +100,9 @@ var Columns = []string{
 	FieldMaterialCodeSnapshot,
 	FieldMaterialNameSnapshot,
 	FieldColorSnapshot,
+	FieldProductOrderNoSnapshot,
+	FieldProductNoSnapshot,
+	FieldProductNameSnapshot,
 	FieldPurchasedQuantity,
 	FieldUnitPrice,
 	FieldAmount,
@@ -129,6 +138,12 @@ var (
 	MaterialNameSnapshotValidator func(string) error
 	// ColorSnapshotValidator is a validator for the "color_snapshot" field. It is called by the builders before save.
 	ColorSnapshotValidator func(string) error
+	// ProductOrderNoSnapshotValidator is a validator for the "product_order_no_snapshot" field. It is called by the builders before save.
+	ProductOrderNoSnapshotValidator func(string) error
+	// ProductNoSnapshotValidator is a validator for the "product_no_snapshot" field. It is called by the builders before save.
+	ProductNoSnapshotValidator func(string) error
+	// ProductNameSnapshotValidator is a validator for the "product_name_snapshot" field. It is called by the builders before save.
+	ProductNameSnapshotValidator func(string) error
 	// DefaultLineStatus holds the default value on creation for the "line_status" field.
 	DefaultLineStatus string
 	// LineStatusValidator is a validator for the "line_status" field. It is called by the builders before save.
@@ -184,6 +199,21 @@ func ByMaterialNameSnapshot(opts ...sql.OrderTermOption) OrderOption {
 // ByColorSnapshot orders the results by the color_snapshot field.
 func ByColorSnapshot(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldColorSnapshot, opts...).ToFunc()
+}
+
+// ByProductOrderNoSnapshot orders the results by the product_order_no_snapshot field.
+func ByProductOrderNoSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProductOrderNoSnapshot, opts...).ToFunc()
+}
+
+// ByProductNoSnapshot orders the results by the product_no_snapshot field.
+func ByProductNoSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProductNoSnapshot, opts...).ToFunc()
+}
+
+// ByProductNameSnapshot orders the results by the product_name_snapshot field.
+func ByProductNameSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProductNameSnapshot, opts...).ToFunc()
 }
 
 // ByPurchasedQuantity orders the results by the purchased_quantity field.

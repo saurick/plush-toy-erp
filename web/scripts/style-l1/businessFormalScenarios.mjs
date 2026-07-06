@@ -77,6 +77,27 @@ export function createBusinessFormalScenarios(deps) {
     )
   }
 
+  const assertLineItemSectionTitleBold = async (
+    modal,
+    { scenarioName, titleText }
+  ) => {
+    const metrics = await modal
+      .locator('.erp-sales-order-lines-form__head strong')
+      .filter({ hasText: titleText })
+      .first()
+      .evaluate((node) => {
+        const style = window.getComputedStyle(node)
+        return {
+          text: node.textContent?.trim() || '',
+          fontWeight: style.fontWeight,
+        }
+      })
+    assert(
+      Number.parseInt(metrics.fontWeight, 10) >= 700,
+      `${scenarioName} ${titleText} 标题应保持加粗: ${JSON.stringify(metrics)}`
+    )
+  }
+
   const waitForMasterDataRequest = async (
     page,
     masterDataMethods,
@@ -1776,6 +1797,10 @@ export function createBusinessFormalScenarios(deps) {
           afterOpen: async (modal) => {
             await assertOutsourcingProcessSelectOptions(page, modal, {
               scenarioName: 'business-v1-processing-contracts',
+            })
+            await assertLineItemSectionTitleBold(modal, {
+              scenarioName: 'business-v1-processing-contracts-form-modal',
+              titleText: '加工明细',
             })
             await assertLineItemAddActionScrollsToNewRow(modal, {
               scenarioName: 'business-v1-processing-contracts-form-modal',

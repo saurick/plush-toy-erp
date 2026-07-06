@@ -607,6 +607,47 @@ test('FL_purchase_order_accessory_material__retains_material_snapshot masterData
   )
 })
 
+test('FL_purchase_order_product_snapshot__retains_optional_product_display_snapshot masterDataOrderView: purchase order item params retain product display snapshots', () => {
+  assert.deepEqual(
+    buildPurchaseOrderItemParams({
+      line_no: '1',
+      material_id: '21',
+      unit_id: '2',
+      product_order_no_snapshot: ' SO-26001 ',
+      product_no_snapshot: ' P-001 ',
+      product_name_snapshot: ' 坐姿小熊 ',
+      purchased_quantity: '10',
+    }),
+    {
+      line_no: 1,
+      material_id: 21,
+      unit_id: 2,
+      product_order_no_snapshot: 'SO-26001',
+      product_no_snapshot: 'P-001',
+      product_name_snapshot: '坐姿小熊',
+      purchased_quantity: '10',
+    }
+  )
+
+  assert.deepEqual(
+    buildPurchaseOrderItemParams({
+      line_no: '2',
+      material_id: '21',
+      unit_id: '2',
+      product_order_no_snapshot: ' ',
+      product_no_snapshot: '',
+      product_name_snapshot: '   ',
+      purchased_quantity: '10',
+    }),
+    {
+      line_no: 2,
+      material_id: 21,
+      unit_id: 2,
+      purchased_quantity: '10',
+    }
+  )
+})
+
 test('FL_purchase_order_accessory_material__clears_material_snapshot masterDataOrderView: clearing material source clears purchase line snapshots', () => {
   const currentLine = {
     material_id: 21,

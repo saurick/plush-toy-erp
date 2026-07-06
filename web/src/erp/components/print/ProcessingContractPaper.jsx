@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import {
   calculateProcessingContractTotals,
   processingContractAttachmentSlots,
@@ -10,6 +10,7 @@ import {
   isCellInsideSelection,
   isMergeTopLeftCell,
 } from '../../utils/detailCellMerge.mjs'
+import { runSilentPrintWorkspaceDraftUpdate } from '../../utils/usePersistentPrintWorkspaceDraft.js'
 import { renderPrintValue } from './printValue.mjs'
 
 function normalizeEditableText(value, multiline = false) {
@@ -30,24 +31,83 @@ function EditableText({
   onCommit,
   disabled = false,
 }) {
-  const handleBlur = (event) => {
-    if (disabled) {
+  const editableRef = useRef(null)
+  const displayText = String(renderPrintValue(value))
+  const commitElementValue = useCallback(
+    (element) => {
+      if (disabled) {
+        return
+      }
+      if (typeof onCommit === 'function') {
+        onCommit(
+          normalizeEditableText(
+            multiline ? element.innerText : element.textContent,
+            multiline
+          )
+        )
+      }
+    },
+    [disabled, multiline, onCommit]
+  )
+
+  useLayoutEffect(() => {
+    const element = editableRef.current
+    if (!element) {
       return
     }
-    if (typeof onCommit === 'function') {
-      onCommit(normalizeEditableText(event.currentTarget.innerText, multiline))
+    if (element.ownerDocument?.activeElement === element) {
+      return
     }
-  }
+    if (element.textContent !== displayText) {
+      element.textContent = displayText
+    }
+  }, [displayText])
+
+  useEffect(() => {
+    const element = editableRef.current
+    if (!element || disabled) {
+      return undefined
+    }
+
+    const ownerWindow = element.ownerDocument?.defaultView || window
+    const commitSilentDraft = () => {
+      runSilentPrintWorkspaceDraftUpdate(() => {
+        commitElementValue(element)
+      })
+    }
+    const observer = new ownerWindow.MutationObserver(commitSilentDraft)
+    observer.observe(element, {
+      characterData: true,
+      childList: true,
+      subtree: true,
+    })
+    element.dataset.printWorkspaceDraftReady = 'true'
+    element.addEventListener('input', commitSilentDraft)
+
+    return () => {
+      element.removeEventListener('input', commitSilentDraft)
+      observer.disconnect()
+      delete element.dataset.printWorkspaceDraftReady
+    }
+  }, [commitElementValue, disabled])
 
   return (
     <Component
+      ref={editableRef}
       className={`${className}${disabled ? ' erp-processing-contract-editable--disabled' : ''}`}
       contentEditable={!disabled}
       suppressContentEditableWarning
       spellCheck={false}
-      onBlur={handleBlur}
+      onInput={(event) => {
+        runSilentPrintWorkspaceDraftUpdate(() => {
+          commitElementValue(event.currentTarget)
+        })
+      }}
+      onBlur={(event) => {
+        commitElementValue(event.currentTarget)
+      }}
     >
-      {renderPrintValue(value)}
+      {displayText}
     </Component>
   )
 }

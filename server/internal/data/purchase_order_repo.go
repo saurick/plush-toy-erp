@@ -176,6 +176,9 @@ func (r *purchaseOrderRepo) AddPurchaseOrderItem(ctx context.Context, in *biz.Pu
 		SetNillableMaterialCodeSnapshot(in.MaterialCodeSnapshot).
 		SetNillableMaterialNameSnapshot(in.MaterialNameSnapshot).
 		SetNillableColorSnapshot(in.ColorSnapshot).
+		SetNillableProductOrderNoSnapshot(in.ProductOrderNoSnapshot).
+		SetNillableProductNoSnapshot(in.ProductNoSnapshot).
+		SetNillableProductNameSnapshot(in.ProductNameSnapshot).
 		SetPurchasedQuantity(in.PurchasedQuantity).
 		SetNillableUnitPrice(in.UnitPrice).
 		SetNillableAmount(in.Amount).
@@ -210,6 +213,21 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrderItem(ctx context.Context, id int,
 		update.ClearColorSnapshot()
 	} else {
 		update.SetColorSnapshot(*in.ColorSnapshot)
+	}
+	if in.ProductOrderNoSnapshot == nil {
+		update.ClearProductOrderNoSnapshot()
+	} else {
+		update.SetProductOrderNoSnapshot(*in.ProductOrderNoSnapshot)
+	}
+	if in.ProductNoSnapshot == nil {
+		update.ClearProductNoSnapshot()
+	} else {
+		update.SetProductNoSnapshot(*in.ProductNoSnapshot)
+	}
+	if in.ProductNameSnapshot == nil {
+		update.ClearProductNameSnapshot()
+	} else {
+		update.SetProductNameSnapshot(*in.ProductNameSnapshot)
 	}
 	if in.UnitPrice == nil {
 		update.ClearUnitPrice()
@@ -381,6 +399,9 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 			SetNillableMaterialCodeSnapshot(mutation.MaterialCodeSnapshot).
 			SetNillableMaterialNameSnapshot(mutation.MaterialNameSnapshot).
 			SetNillableColorSnapshot(mutation.ColorSnapshot).
+			SetNillableProductOrderNoSnapshot(mutation.ProductOrderNoSnapshot).
+			SetNillableProductNoSnapshot(mutation.ProductNoSnapshot).
+			SetNillableProductNameSnapshot(mutation.ProductNameSnapshot).
 			SetPurchasedQuantity(mutation.PurchasedQuantity).
 			SetNillableUnitPrice(mutation.UnitPrice).
 			SetNillableAmount(mutation.Amount).
@@ -481,6 +502,21 @@ func savePurchaseOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, in *bi
 	} else {
 		update.SetColorSnapshot(*in.ColorSnapshot)
 	}
+	if in.ProductOrderNoSnapshot == nil {
+		update.ClearProductOrderNoSnapshot()
+	} else {
+		update.SetProductOrderNoSnapshot(*in.ProductOrderNoSnapshot)
+	}
+	if in.ProductNoSnapshot == nil {
+		update.ClearProductNoSnapshot()
+	} else {
+		update.SetProductNoSnapshot(*in.ProductNoSnapshot)
+	}
+	if in.ProductNameSnapshot == nil {
+		update.ClearProductNameSnapshot()
+	} else {
+		update.SetProductNameSnapshot(*in.ProductNameSnapshot)
+	}
 	if in.UnitPrice == nil {
 		update.ClearUnitPrice()
 	} else {
@@ -543,22 +579,25 @@ func entPurchaseOrderItemToBiz(row *ent.PurchaseOrderItem) *biz.PurchaseOrderIte
 		return nil
 	}
 	return &biz.PurchaseOrderItem{
-		ID:                   row.ID,
-		PurchaseOrderID:      row.PurchaseOrderID,
-		LineNo:               row.LineNo,
-		MaterialID:           row.MaterialID,
-		UnitID:               row.UnitID,
-		MaterialCodeSnapshot: row.MaterialCodeSnapshot,
-		MaterialNameSnapshot: row.MaterialNameSnapshot,
-		ColorSnapshot:        row.ColorSnapshot,
-		PurchasedQuantity:    row.PurchasedQuantity,
-		UnitPrice:            row.UnitPrice,
-		Amount:               row.Amount,
-		ExpectedArrivalDate:  row.ExpectedArrivalDate,
-		LineStatus:           row.LineStatus,
-		Note:                 row.Note,
-		CreatedAt:            row.CreatedAt,
-		UpdatedAt:            row.UpdatedAt,
+		ID:                     row.ID,
+		PurchaseOrderID:        row.PurchaseOrderID,
+		LineNo:                 row.LineNo,
+		MaterialID:             row.MaterialID,
+		UnitID:                 row.UnitID,
+		MaterialCodeSnapshot:   row.MaterialCodeSnapshot,
+		MaterialNameSnapshot:   row.MaterialNameSnapshot,
+		ColorSnapshot:          row.ColorSnapshot,
+		ProductOrderNoSnapshot: row.ProductOrderNoSnapshot,
+		ProductNoSnapshot:      row.ProductNoSnapshot,
+		ProductNameSnapshot:    row.ProductNameSnapshot,
+		PurchasedQuantity:      row.PurchasedQuantity,
+		UnitPrice:              row.UnitPrice,
+		Amount:                 row.Amount,
+		ExpectedArrivalDate:    row.ExpectedArrivalDate,
+		LineStatus:             row.LineStatus,
+		Note:                   row.Note,
+		CreatedAt:              row.CreatedAt,
+		UpdatedAt:              row.UpdatedAt,
 	}
 }
 

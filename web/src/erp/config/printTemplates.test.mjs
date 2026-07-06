@@ -16,7 +16,7 @@ function read(relativePath) {
 }
 
 test('FL_print_templates_sample__uses_generic_sample_values_without_customer_identity printTemplates: 默认样例补中性字段且不带客户身份', () => {
-  assert.equal(printTemplateCatalog.length, 2)
+  assert.equal(printTemplateCatalog.length, 5)
   assert.equal(printTemplateStats.total, printTemplateCatalog.length)
   assert.equal(printTemplateStats.sourceGrounded, printTemplateCatalog.length)
 
@@ -84,6 +84,25 @@ test('FL_print_templates_sample__uses_generic_sample_values_without_customer_ide
     assert.notEqual(line.amount, '')
     assert.notEqual(line.remark, '')
   })
+
+  const materialDetailTemplate = getPrintTemplateByKey(
+    'engineering-material-detail'
+  )
+  assert.equal(materialDetailTemplate?.sample.companyName, '本公司')
+  assert.equal(materialDetailTemplate?.sample.images.header_left.dataURL, '')
+  assert(materialDetailTemplate?.sample.lines.length > 0)
+
+  const colorCardTemplate = getPrintTemplateByKey('engineering-color-card')
+  assert.equal(colorCardTemplate?.sample.companyName, '本公司')
+  assert(colorCardTemplate?.sample.blocks.length > 0)
+
+  const workInstructionTemplate = getPrintTemplateByKey(
+    'engineering-work-instruction'
+  )
+  assert.equal(workInstructionTemplate?.sample.companyName, '本公司')
+  assert.equal(workInstructionTemplate?.sample.images.header.dataURL, '')
+  assert(workInstructionTemplate?.sample.rows.length >= 2)
+  assert(workInstructionTemplate?.sample.rows.length <= 5)
 })
 
 test('FL_print_templates_contract__declares_field_requirements_and_pdf_module_guard printTemplates: 正式模板声明字段合同和 PDF 模块门禁', () => {

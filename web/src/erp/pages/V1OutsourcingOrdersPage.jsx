@@ -84,9 +84,14 @@ import {
   PRINT_WORKSPACE_ENTRY_SOURCE,
   PROCESSING_CONTRACT_TEMPLATE_KEY,
   openPrintWorkspaceWindow,
+  resolveRuntimeCustomerPrintCompanyName,
 } from '../utils/printWorkspace.js'
 import { getEffectivePrintTemplateDefaults } from '../utils/adminProfileSync.mjs'
 import { buildProcessingContractDraftFromOutsourcingOrder } from '../data/processingContractTemplate.mjs'
+import {
+  WORK_INSTRUCTION_TEMPLATE_KEY,
+  buildWorkInstructionDraftFromOutsourcingOrder,
+} from '../data/engineeringPrintTemplates.mjs'
 import { completeProcessingContractDraft } from '../utils/contractPrintDraftCompleteness.mjs'
 import {
   DEFAULT_OUTSOURCING_ORDER_PAGINATION,
@@ -117,7 +122,7 @@ export default function V1OutsourcingOrdersPage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [printing, setPrinting] = useState(false)
+  const [printingAction, setPrintingAction] = useState('')
   const [workflowTasks, setWorkflowTasks] = useState([])
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
@@ -530,7 +535,7 @@ export default function V1OutsourcingOrdersPage() {
 
   const openPrint = async () => {
     if (!selectedRow) return
-    setPrinting(true)
+    setPrintingAction(PROCESSING_CONTRACT_TEMPLATE_KEY)
     try {
       const items = await loadOrderItems(selectedRow)
       const initialDraft = completeProcessingContractDraft(
@@ -551,7 +556,30 @@ export default function V1OutsourcingOrdersPage() {
     } catch (error) {
       message.error(getActionErrorMessage(error, '打开加工合同打印失败'))
     } finally {
-      setPrinting(false)
+      setPrintingAction('')
+    }
+  }
+
+  const openWorkInstructionPrint = async () => {
+    if (!selectedRow) return
+    setPrintingAction(WORK_INSTRUCTION_TEMPLATE_KEY)
+    try {
+      const items = await loadOrderItems(selectedRow)
+      const initialDraft = buildWorkInstructionDraftFromOutsourcingOrder(
+        selectedRow,
+        items,
+        { companyName: resolveRuntimeCustomerPrintCompanyName() }
+      )
+      openPrintWorkspaceWindow(WORK_INSTRUCTION_TEMPLATE_KEY, {
+        entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
+        initialDraft,
+        customerKey: activeCustomerKey,
+      })
+      message.success('已打开作业指导书打印模板')
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '打开作业指导书打印失败'))
+    } finally {
+      setPrintingAction('')
     }
   }
 
@@ -911,11 +939,20 @@ export default function V1OutsourcingOrdersPage() {
           <Button
             size="small"
             icon={<PrinterOutlined />}
-            disabled={!selectedRow || printing}
-            loading={printing}
+            disabled={!selectedRow || printingAction !== ''}
+            loading={printingAction === PROCESSING_CONTRACT_TEMPLATE_KEY}
             onClick={openPrint}
           >
             加工合同打印
+          </Button>
+          <Button
+            size="small"
+            icon={<FileTextOutlined />}
+            disabled={!selectedRow || printingAction !== ''}
+            loading={printingAction === WORK_INSTRUCTION_TEMPLATE_KEY}
+            onClick={openWorkInstructionPrint}
+          >
+            作业指导书打印
           </Button>
           <Dropdown
             trigger={['click']}

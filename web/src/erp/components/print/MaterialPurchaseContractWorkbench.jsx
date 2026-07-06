@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -39,6 +46,11 @@ import {
   watchPrintPageMarginForPaper,
 } from '../../utils/printPageMargin.mjs'
 import usePrintWorkspaceWindowSnapshot from '../../utils/usePrintWorkspaceWindowSnapshot.js'
+import {
+  runSilentPrintWorkspaceDraftUpdate,
+  useFlushPrintWorkspaceDraftOnPageExit,
+  usePersistentPrintWorkspaceDraft,
+} from '../../utils/usePersistentPrintWorkspaceDraft.js'
 
 const CLAUSE_SECTIONS = [
   { key: 'delivery', title: '一、来货要求' },
@@ -54,9 +66,72 @@ function EditableText({
   disabled = false,
 }) {
   const Tag = multiline ? 'div' : 'span'
+  const editableRef = useRef(null)
+  const displayText = String(value ?? '').trim()
+    ? String(value ?? '')
+    : '\u00A0'
+  const commitElementValue = useCallback(
+    (element) => {
+      const elementText = multiline ? element.innerText : element.textContent
+      const nextValue = multiline
+        ? elementText
+            .replaceAll('\r', '')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim()
+        : String(elementText ?? '')
+            .replaceAll('\r', '')
+            .trim()
+      if (nextValue !== String(value ?? '')) {
+        onCommit(nextValue)
+      }
+    },
+    [multiline, onCommit, value]
+  )
+
+  useLayoutEffect(() => {
+    const element = editableRef.current
+    if (!element) {
+      return
+    }
+    if (element.ownerDocument?.activeElement === element) {
+      return
+    }
+    if (element.textContent !== displayText) {
+      element.textContent = displayText
+    }
+  }, [displayText])
+
+  useEffect(() => {
+    const element = editableRef.current
+    if (!element || disabled) {
+      return undefined
+    }
+
+    const ownerWindow = element.ownerDocument?.defaultView || window
+    const commitSilentDraft = () => {
+      runSilentPrintWorkspaceDraftUpdate(() => {
+        commitElementValue(element)
+      })
+    }
+    const observer = new ownerWindow.MutationObserver(commitSilentDraft)
+    observer.observe(element, {
+      characterData: true,
+      childList: true,
+      subtree: true,
+    })
+    element.dataset.printWorkspaceDraftReady = 'true'
+    element.addEventListener('input', commitSilentDraft)
+
+    return () => {
+      element.removeEventListener('input', commitSilentDraft)
+      observer.disconnect()
+      delete element.dataset.printWorkspaceDraftReady
+    }
+  }, [commitElementValue, disabled])
 
   return (
     <Tag
+      ref={editableRef}
       className={`erp-material-contract-editable ${className} ${
         disabled ? 'erp-material-contract-editable-disabled' : ''
       }`}
@@ -69,19 +144,16 @@ function EditableText({
           event.currentTarget.blur()
         }
       }}
+      onInput={(event) => {
+        runSilentPrintWorkspaceDraftUpdate(() => {
+          commitElementValue(event.currentTarget)
+        })
+      }}
       onBlur={(event) => {
-        const nextValue = multiline
-          ? event.currentTarget.innerText
-              .replaceAll('\r', '')
-              .replace(/\n{3,}/g, '\n\n')
-              .trim()
-          : event.currentTarget.innerText.replaceAll('\r', '').trim()
-        if (nextValue !== String(value ?? '')) {
-          onCommit(nextValue)
-        }
+        commitElementValue(event.currentTarget)
       }}
     >
-      {String(value ?? '').trim() ? String(value ?? '') : '\u00A0'}
+      {displayText}
     </Tag>
   )
 }
@@ -212,7 +284,7 @@ export default function MaterialPurchaseContractWorkbench({
   businessInput = false,
   customerKey = '',
 }) {
-  const [draft, setDraft] = useState(() =>
+  const [draft, setDraft, flushDraft] = usePersistentPrintWorkspaceDraft(() =>
     loadDraft(template, draftStorageKey, {
       forceFresh: resetDraftOnOpen,
       workspaceStateID,
@@ -257,10 +329,13 @@ export default function MaterialPurchaseContractWorkbench({
     businessInput,
     draftStorageKey,
     resetDraftOnOpen,
+    setDraft,
     sourceTag,
     template,
     workspaceStateID,
   ])
+
+  useFlushPrintWorkspaceDraftOnPageExit(flushDraft)
 
   useEffect(() => {
     if (!draftStorageKey || typeof window === 'undefined') {

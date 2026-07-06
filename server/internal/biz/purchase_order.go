@@ -46,22 +46,25 @@ type PurchaseOrder struct {
 }
 
 type PurchaseOrderItem struct {
-	ID                   int
-	PurchaseOrderID      int
-	LineNo               int
-	MaterialID           int
-	UnitID               int
-	MaterialCodeSnapshot *string
-	MaterialNameSnapshot *string
-	ColorSnapshot        *string
-	PurchasedQuantity    decimal.Decimal
-	UnitPrice            *decimal.Decimal
-	Amount               *decimal.Decimal
-	ExpectedArrivalDate  *time.Time
-	LineStatus           string
-	Note                 *string
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	ID                     int
+	PurchaseOrderID        int
+	LineNo                 int
+	MaterialID             int
+	UnitID                 int
+	MaterialCodeSnapshot   *string
+	MaterialNameSnapshot   *string
+	ColorSnapshot          *string
+	ProductOrderNoSnapshot *string
+	ProductNoSnapshot      *string
+	ProductNameSnapshot    *string
+	PurchasedQuantity      decimal.Decimal
+	UnitPrice              *decimal.Decimal
+	Amount                 *decimal.Decimal
+	ExpectedArrivalDate    *time.Time
+	LineStatus             string
+	Note                   *string
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
 }
 
 type PurchaseOrderMutation struct {
@@ -75,18 +78,21 @@ type PurchaseOrderMutation struct {
 }
 
 type PurchaseOrderItemMutation struct {
-	PurchaseOrderID      int
-	LineNo               int
-	MaterialID           int
-	UnitID               int
-	MaterialCodeSnapshot *string
-	MaterialNameSnapshot *string
-	ColorSnapshot        *string
-	PurchasedQuantity    decimal.Decimal
-	UnitPrice            *decimal.Decimal
-	Amount               *decimal.Decimal
-	ExpectedArrivalDate  *time.Time
-	Note                 *string
+	PurchaseOrderID        int
+	LineNo                 int
+	MaterialID             int
+	UnitID                 int
+	MaterialCodeSnapshot   *string
+	MaterialNameSnapshot   *string
+	ColorSnapshot          *string
+	ProductOrderNoSnapshot *string
+	ProductNoSnapshot      *string
+	ProductNameSnapshot    *string
+	PurchasedQuantity      decimal.Decimal
+	UnitPrice              *decimal.Decimal
+	Amount                 *decimal.Decimal
+	ExpectedArrivalDate    *time.Time
+	Note                   *string
 }
 
 type PurchaseOrderItemSaveMutation struct {
@@ -459,6 +465,9 @@ func normalizePurchaseOrderItemFields(in PurchaseOrderItemMutation) (PurchaseOrd
 	in.MaterialCodeSnapshot = normalizeOptionalString(in.MaterialCodeSnapshot)
 	in.MaterialNameSnapshot = normalizeOptionalString(in.MaterialNameSnapshot)
 	in.ColorSnapshot = normalizeOptionalString(in.ColorSnapshot)
+	in.ProductOrderNoSnapshot = normalizeOptionalString(in.ProductOrderNoSnapshot)
+	in.ProductNoSnapshot = normalizeOptionalString(in.ProductNoSnapshot)
+	in.ProductNameSnapshot = normalizeOptionalString(in.ProductNameSnapshot)
 	in.Note = normalizeOptionalString(in.Note)
 	if in.PurchaseOrderID < 0 || in.LineNo <= 0 || in.MaterialID <= 0 || in.UnitID <= 0 {
 		return PurchaseOrderItemMutation{}, ErrBadParam

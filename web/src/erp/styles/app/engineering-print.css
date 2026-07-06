@@ -1,0 +1,916 @@
+.erp-engineering-print-paper {
+  box-sizing: border-box;
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 12mm 10mm;
+  background: #fff;
+  color: #111827;
+  font-family: 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif;
+  font-size: 10.5px;
+  line-height: 1.35;
+  border-radius: 10px;
+  box-shadow: 0 18px 40px rgb(15 23 42 / 14%);
+  overflow: hidden;
+}
+
+.erp-engineering-print-paper--continued {
+  min-height: auto;
+}
+
+.erp-engineering-print-editable {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 1.2em;
+  outline: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.erp-engineering-print-editable:focus {
+  background: #ecfdf5;
+  outline: 0;
+  box-shadow: inset 0 0 0 1.5px rgb(22 163 74 / 82%);
+}
+
+.erp-engineering-print-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  row-gap: 0.8mm;
+  margin: 0.7mm 0 1.2mm;
+}
+
+.erp-engineering-print-meta-grid > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2mm;
+  align-items: center;
+  min-height: 7mm;
+  padding: 0.6mm 1.8mm 0.6mm 0;
+}
+
+.erp-engineering-print-meta-grid__label {
+  white-space: nowrap;
+}
+
+.erp-engineering-print-meta-grid > .erp-engineering-print-meta-grid__hair-cell {
+  grid-column: 1 / 2;
+}
+
+.erp-engineering-print-table {
+  width: 100%;
+  border: 1px solid #111827;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.erp-material-detail-table {
+  border: 0;
+  border-spacing: 0;
+  border-collapse: separate;
+}
+
+.erp-engineering-print-table th,
+.erp-engineering-print-table td {
+  min-height: 7mm;
+  padding: 1.4mm;
+  border: 1px solid #111827;
+  vertical-align: middle;
+  word-break: break-word;
+}
+
+.erp-engineering-print-table th {
+  font-weight: 700;
+  text-align: center;
+  background: #f8fafc;
+}
+
+.erp-engineering-print-row--selected > td,
+.erp-engineering-print-row--selected > span,
+.erp-engineering-print-row--selected .erp-engineering-print-editable {
+  background: #ecfdf5;
+}
+
+.erp-engineering-print-row--selected > td {
+  box-shadow: inset 0 0 0 1px #16a34a;
+}
+
+.erp-engineering-print-cell--selected {
+  background: #eff6ff;
+  box-shadow: inset 0 0 0 1px #2563eb;
+}
+
+.erp-engineering-print-cell--selected-anchor {
+  background: #dbeafe;
+  box-shadow: inset 0 0 0 2px #1d4ed8;
+}
+
+.erp-engineering-print-cell--merged {
+  background: #fff;
+}
+
+.erp-engineering-print-image-slot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 36mm;
+  border: 1px dashed #94a3b8;
+  background: #f8fafc;
+  color: #64748b;
+  overflow: hidden;
+}
+
+.erp-engineering-print-image-slot--compact {
+  min-height: 18mm;
+}
+
+.erp-engineering-print-image-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.erp-engineering-print-image-slot--cropped img {
+  position: absolute;
+  max-width: none;
+  max-height: none;
+  object-fit: fill;
+}
+
+.erp-engineering-print-image-slot--readonly.erp-engineering-print-image-slot--empty {
+  border-style: solid;
+  background: #fff;
+  color: transparent;
+}
+
+.erp-engineering-print-image-slot input {
+  display: none;
+}
+
+.erp-engineering-print-image-slot__actions {
+  position: absolute;
+  right: 1mm;
+  bottom: 1mm;
+  display: flex;
+  gap: 1mm;
+}
+
+.erp-engineering-print-image-slot__actions button,
+.erp-engineering-print-inline-button,
+.erp-engineering-print-row-actions button {
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+  color: #334155;
+  font-size: 10px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.erp-engineering-print-image-slot__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.erp-material-detail-paper {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 10mm 2.5mm;
+  font-size: 10px;
+  line-height: 1.16;
+}
+
+.erp-material-detail-paper__header {
+  display: grid;
+  grid-template-columns: 1fr 42mm;
+  gap: 3mm;
+  align-items: start;
+  margin-bottom: 1.5mm;
+}
+
+.erp-material-detail-paper__company,
+.erp-color-card-paper__company,
+.erp-work-instruction-paper__company {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.erp-material-detail-paper__title,
+.erp-work-instruction-paper__title {
+  margin-top: 1mm;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.erp-material-detail-paper__company,
+.erp-material-detail-paper__title {
+  font-size: 16px;
+}
+
+.erp-material-detail-paper__images {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1mm;
+}
+
+.erp-material-detail-table th,
+.erp-material-detail-table td {
+  height: 7.3mm;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid #111827;
+  border-bottom: 1px solid #111827;
+  text-align: center;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.erp-material-detail-table tr > :first-child {
+  border-left: 1px solid #111827;
+}
+
+.erp-material-detail-table thead tr:first-child > * {
+  border-top: 1px solid #111827;
+}
+
+.erp-material-detail-table tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.erp-material-detail-table th {
+  height: 8.7mm;
+  font-size: 9.5px;
+}
+
+.erp-material-detail-table__editable {
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 7.3mm;
+  padding: 0.7mm 0.45mm;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.erp-material-detail-table
+  td:nth-child(6)
+  .erp-material-detail-table__editable {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.erp-material-detail-paper__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3mm 20mm;
+  align-items: stretch;
+  margin-top: 0;
+  padding: 1.4mm 4mm 2mm;
+  font-weight: 700;
+}
+
+.erp-material-detail-paper__footer-field {
+  display: inline-grid;
+  grid-template-columns: auto minmax(28mm, 1fr);
+  gap: 2mm;
+  align-items: center;
+  min-width: 38mm;
+  min-height: 8mm;
+}
+
+.erp-material-detail-paper__footer-label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.erp-material-detail-paper__footer-value {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  min-width: 28mm;
+  min-height: 0;
+  height: 100%;
+}
+
+.erp-material-detail-paper__bottom-images {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7mm;
+  width: 100%;
+  margin: 4mm 0 0;
+}
+
+.erp-material-detail-paper__bottom-images .erp-engineering-print-image-slot {
+  min-height: 0;
+  height: 60mm;
+  border: 0;
+  background: transparent;
+}
+
+.erp-material-detail-paper__bottom-images
+  .erp-engineering-print-image-slot
+  img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.erp-color-card-paper {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 12mm 6mm;
+  font-size: 13px;
+}
+
+.erp-color-card-paper__meta {
+  display: grid;
+  grid-template-columns: auto 34mm auto 1fr;
+  grid-auto-rows: minmax(8mm, auto);
+  gap: 2mm;
+  align-items: center;
+  margin: 8mm 0 4mm;
+  font-size: 14px;
+}
+
+.erp-color-card-paper__meta > span {
+  white-space: nowrap;
+}
+
+.erp-color-card-paper__meta > .erp-engineering-print-editable {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.erp-color-card-paper__sheet {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: minmax(0, 1fr) 5.5mm minmax(0, 1fr);
+  align-items: start;
+  width: 100%;
+  margin-top: 3mm;
+}
+
+.erp-color-card-paper__side {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  border: 1px solid #111827;
+}
+
+.erp-color-card-paper__gutter {
+  align-self: stretch;
+  min-height: 0;
+}
+
+.erp-color-card-paper__material-col {
+  width: 43.5%;
+}
+
+.erp-color-card-paper__position-col {
+  width: 20%;
+}
+
+.erp-color-card-paper__method-col {
+  width: 36.5%;
+}
+
+.erp-color-card-paper__side td {
+  height: 8.1mm;
+  padding: 0;
+  border: 1px solid #111827;
+  vertical-align: middle;
+  line-height: 1.18;
+}
+
+.erp-color-card-paper__block-head-row td {
+  height: 8.1mm;
+  font-weight: 700;
+}
+
+.erp-color-card-paper__material-name,
+.erp-color-card-paper__vendor {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.erp-color-card-paper__swatch-cell {
+  background: #fff;
+}
+
+.erp-color-card-paper__position-cell,
+.erp-color-card-paper__method-cell {
+  text-align: center;
+}
+
+.erp-color-card-paper__block-row--selected td {
+  background: #ecfdf5;
+  box-shadow: inset 0 0 0 1px #16a34a;
+}
+
+.erp-color-card-paper__line-row.erp-engineering-print-row--selected
+  > .erp-color-card-paper__swatch-cell {
+  background: #fff;
+  box-shadow: none;
+}
+
+.erp-color-card-paper__footer {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4mm;
+  margin-top: 3mm;
+  padding-top: 0;
+  font-weight: 700;
+}
+
+.erp-color-card-paper__footer > span {
+  display: grid;
+  grid-template-columns: auto minmax(24mm, 1fr);
+  align-items: center;
+  min-width: 0;
+  min-height: 8mm;
+  gap: 2mm;
+  white-space: nowrap;
+}
+
+.erp-color-card-paper__footer .erp-engineering-print-editable {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.erp-engineering-print-workspace-shell .erp-print-shell__content {
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 6px;
+}
+
+.erp-engineering-print-workspace-shell .erp-print-shell__record-panel {
+  padding: 10px;
+}
+
+.erp-engineering-print-workspace-shell .erp-print-shell__stage {
+  padding: 24px;
+}
+
+.erp-engineering-print-workspace-shell .erp-print-shell__stage-wrap {
+  justify-content: center;
+}
+
+.erp-engineering-print-workspace-shell .erp-engineering-print-paper {
+  margin: 0 auto;
+}
+
+.erp-work-instruction-paper {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: visible;
+  padding: 3mm;
+  font-family:
+    SimSun, '宋体', 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif;
+  font-size: 14.67px;
+  line-height: 1.22;
+}
+
+.erp-work-instruction-paper__sheet {
+  flex: 0 0 auto;
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.erp-work-instruction-paper__sheet--continuation {
+  margin-top: 8mm;
+  break-before: page;
+  page-break-before: always;
+}
+
+.erp-work-instruction-paper__col-a {
+  width: 5.852%;
+}
+
+.erp-work-instruction-paper__col-b {
+  width: 6.488%;
+}
+
+.erp-work-instruction-paper__col-c {
+  width: 6.361%;
+}
+
+.erp-work-instruction-paper__col-d {
+  width: 5.852%;
+}
+
+.erp-work-instruction-paper__col-e {
+  width: 9.16%;
+}
+
+.erp-work-instruction-paper__col-f {
+  width: 10.779%;
+}
+
+.erp-work-instruction-paper__col-g {
+  width: 9.796%;
+}
+
+.erp-work-instruction-paper__col-h {
+  width: 17.776%;
+}
+
+.erp-work-instruction-paper__col-i {
+  width: 27.937%;
+}
+
+.erp-work-instruction-paper__sheet td {
+  height: var(--work-instruction-row-height, 7.6mm);
+  padding: 0;
+  border: 1px solid #111827;
+  vertical-align: middle;
+}
+
+.erp-work-instruction-paper__sheet .erp-engineering-print-editable {
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  min-height: 100%;
+  padding: 1.2mm 1.4mm;
+  line-height: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.erp-work-instruction-paper__company-cell,
+.erp-work-instruction-paper__title-cell {
+  text-align: center;
+}
+
+.erp-work-instruction-paper__company {
+  font-size: 21.33px;
+  font-weight: 700;
+}
+
+.erp-work-instruction-paper__title-cell {
+  font-size: 21.33px;
+  font-weight: 700;
+}
+
+.erp-work-instruction-paper__meta-label,
+.erp-work-instruction-paper__summary-label {
+  font-size: 16px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.erp-work-instruction-paper__meta-value {
+  font-size: 16px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.erp-work-instruction-paper__header-image-cell {
+  padding: 2mm;
+}
+
+.erp-work-instruction-paper__header-image-cell
+  .erp-engineering-print-image-slot {
+  height: 47mm;
+  min-height: 47mm;
+  border-style: dashed;
+}
+
+.erp-work-instruction-paper__header-image-cell
+  .erp-engineering-print-image-slot--readonly.erp-engineering-print-image-slot--empty {
+  border-style: solid;
+}
+
+.erp-work-instruction-paper__section-title-row td {
+  height: var(--work-instruction-row-height, 6.4mm);
+  font-size: 18.67px;
+  font-weight: 700;
+}
+
+.erp-work-instruction-paper__sewing-note-row td {
+  min-height: 14mm;
+  padding: 1.4mm;
+  font-size: 14.67px;
+}
+
+.erp-work-instruction-paper__notice-row td {
+  padding: 1.1mm 1.4mm;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.erp-work-instruction-paper__sewing-note-row strong {
+  margin-right: 1mm;
+}
+
+.erp-work-instruction-paper__text-cell {
+  min-height: 9mm;
+  font-size: 14.67px;
+}
+
+.erp-work-instruction-paper__step-no {
+  padding: 1mm;
+  font-size: var(--instruction-row-font-size, 16px);
+  text-align: center;
+  font-weight: 700;
+}
+
+.erp-work-instruction-paper__step-no > .erp-engineering-print-editable {
+  justify-content: center;
+  padding: 0;
+}
+
+.erp-work-instruction-paper__step-content-cell {
+  position: relative;
+  min-height: 9mm;
+  font-size: var(--instruction-row-font-size, 14.67px);
+}
+
+.erp-work-instruction-paper__step-row--text td {
+  height: var(--instruction-row-min-height, auto);
+}
+
+.erp-work-instruction-paper__step-row--image
+  .erp-work-instruction-paper__step-content-cell {
+  vertical-align: top;
+}
+
+.erp-work-instruction-paper__step-row--image td {
+  height: auto;
+  min-height: var(--instruction-row-min-height, 46mm);
+}
+
+.erp-work-instruction-paper__step-row--annotated td {
+  min-height: 68mm;
+}
+
+.erp-work-instruction-paper__annotation-layout {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(48mm, 54mm) 55.5mm minmax(55mm, 61mm);
+  gap: 4.5mm;
+  align-items: stretch;
+  min-height: var(--instruction-row-min-height, 70mm);
+  padding: 2mm 4mm;
+}
+
+.erp-work-instruction-paper__annotation-callouts {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.erp-work-instruction-paper__annotation-callouts line {
+  stroke-width: 0.35;
+  vector-effect: non-scaling-stroke;
+}
+
+.erp-work-instruction-paper__image-annotation-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.erp-work-instruction-paper__annotation-label {
+  position: absolute;
+  z-index: 5;
+  box-sizing: border-box;
+  padding: 1.2mm 1.4mm;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: var(--annotation-label-color, #ef4444);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
+.erp-work-instruction-paper__annotation-label--blue-fill {
+  border-color: #2563eb;
+  background: #3b78c8;
+  color: #fff;
+}
+
+.erp-work-instruction-paper__annotation-note {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  min-height: 43mm;
+  border: 1px solid #2563eb;
+  background: #fff;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.erp-work-instruction-paper__annotation-note::after {
+  position: absolute;
+  top: 50%;
+  width: 16mm;
+  height: 1px;
+  background: #2563eb;
+  content: '';
+}
+
+.erp-work-instruction-paper__annotation-note--left::after {
+  right: -16mm;
+  transform: rotate(-10deg);
+  transform-origin: left center;
+}
+
+.erp-work-instruction-paper__annotation-note--right::after {
+  left: -16mm;
+  transform: rotate(10deg);
+  transform-origin: right center;
+}
+
+.erp-work-instruction-paper__annotation-layout--with-callouts
+  .erp-work-instruction-paper__annotation-note::after {
+  content: none;
+}
+
+.erp-work-instruction-paper__annotation-note .erp-engineering-print-editable {
+  min-height: 100%;
+  padding: 2.2mm;
+}
+
+.erp-work-instruction-paper__annotation-images {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.erp-work-instruction-paper__row-images {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 2mm;
+  padding: 1.8mm;
+}
+
+.erp-work-instruction-paper__row-images--with-annotations {
+  justify-content: center;
+  min-height: var(--instruction-row-image-area-min-height, 190mm);
+  padding: 8mm 6mm;
+}
+
+.erp-work-instruction-paper__row-images--positioned {
+  display: block;
+  min-height: var(--instruction-row-image-area-min-height, 190mm);
+  padding: 0;
+}
+
+.erp-work-instruction-paper__annotation-images
+  .erp-work-instruction-paper__row-images {
+  justify-content: center;
+  width: 100%;
+  min-height: 47.6mm;
+  padding: 0;
+}
+
+.erp-work-instruction-paper__row-images--empty {
+  display: none;
+  padding: 0;
+}
+
+.erp-work-instruction-paper__row-image-input {
+  display: none;
+}
+
+.erp-work-instruction-paper__row-images .erp-engineering-print-image-slot {
+  flex: 0 0 54mm;
+  width: 54mm;
+  height: 38mm;
+  min-height: 38mm;
+  border-style: solid;
+}
+
+.erp-work-instruction-paper__row-images--positioned
+  .erp-engineering-print-image-slot--positioned {
+  position: absolute;
+  border: 0;
+  background: transparent;
+  flex: none;
+}
+
+.erp-work-instruction-paper__annotation-images
+  .erp-work-instruction-paper__row-images
+  .erp-engineering-print-image-slot {
+  flex-basis: 55.5mm;
+  width: 55.5mm;
+  height: 47.6mm;
+  min-height: 47.6mm;
+}
+
+.erp-work-instruction-paper__remark {
+  font-size: 16px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.erp-work-instruction-paper__remark .erp-engineering-print-editable {
+  padding: 2mm;
+}
+
+.erp-color-card-paper__side td > .erp-engineering-print-editable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 8.1mm;
+  padding: 0.8mm 1mm;
+}
+
+.erp-engineering-print-meta-grid > div > .erp-engineering-print-editable {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  height: 100%;
+  min-height: 0;
+}
+
+.erp-engineering-print-row-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+@media print {
+  .erp-engineering-print-paper {
+    box-sizing: border-box;
+    width: 210mm;
+    min-height: auto;
+    margin: 0 auto;
+    border: 0;
+    border-radius: 0;
+    background: #fff;
+    box-shadow: none;
+    color: #111827;
+    overflow: visible;
+    print-color-adjust: exact;
+  }
+
+  .erp-engineering-print-image-slot {
+    border-style: solid;
+    background: #fff;
+  }
+
+  .erp-engineering-print-image-slot__actions,
+  .erp-engineering-print-inline-button,
+  .erp-engineering-print-row-actions {
+    display: none;
+  }
+
+  .erp-engineering-print-row--selected > td,
+  .erp-engineering-print-row--selected > span,
+  .erp-engineering-print-row--selected .erp-engineering-print-editable,
+  .erp-engineering-print-cell--selected,
+  .erp-engineering-print-cell--selected-anchor,
+  .erp-color-card-paper__block-row--selected td {
+    background: transparent;
+    box-shadow: none;
+  }
+}

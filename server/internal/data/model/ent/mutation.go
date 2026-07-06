@@ -31757,6 +31757,9 @@ type PurchaseOrderItemMutation struct {
 	material_code_snapshot        *string
 	material_name_snapshot        *string
 	color_snapshot                *string
+	product_order_no_snapshot     *string
+	product_no_snapshot           *string
+	product_name_snapshot         *string
 	purchased_quantity            *decimal.Decimal
 	unit_price                    *decimal.Decimal
 	amount                        *decimal.Decimal
@@ -32187,6 +32190,153 @@ func (m *PurchaseOrderItemMutation) ColorSnapshotCleared() bool {
 func (m *PurchaseOrderItemMutation) ResetColorSnapshot() {
 	m.color_snapshot = nil
 	delete(m.clearedFields, purchaseorderitem.FieldColorSnapshot)
+}
+
+// SetProductOrderNoSnapshot sets the "product_order_no_snapshot" field.
+func (m *PurchaseOrderItemMutation) SetProductOrderNoSnapshot(s string) {
+	m.product_order_no_snapshot = &s
+}
+
+// ProductOrderNoSnapshot returns the value of the "product_order_no_snapshot" field in the mutation.
+func (m *PurchaseOrderItemMutation) ProductOrderNoSnapshot() (r string, exists bool) {
+	v := m.product_order_no_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProductOrderNoSnapshot returns the old "product_order_no_snapshot" field's value of the PurchaseOrderItem entity.
+// If the PurchaseOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderItemMutation) OldProductOrderNoSnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProductOrderNoSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProductOrderNoSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProductOrderNoSnapshot: %w", err)
+	}
+	return oldValue.ProductOrderNoSnapshot, nil
+}
+
+// ClearProductOrderNoSnapshot clears the value of the "product_order_no_snapshot" field.
+func (m *PurchaseOrderItemMutation) ClearProductOrderNoSnapshot() {
+	m.product_order_no_snapshot = nil
+	m.clearedFields[purchaseorderitem.FieldProductOrderNoSnapshot] = struct{}{}
+}
+
+// ProductOrderNoSnapshotCleared returns if the "product_order_no_snapshot" field was cleared in this mutation.
+func (m *PurchaseOrderItemMutation) ProductOrderNoSnapshotCleared() bool {
+	_, ok := m.clearedFields[purchaseorderitem.FieldProductOrderNoSnapshot]
+	return ok
+}
+
+// ResetProductOrderNoSnapshot resets all changes to the "product_order_no_snapshot" field.
+func (m *PurchaseOrderItemMutation) ResetProductOrderNoSnapshot() {
+	m.product_order_no_snapshot = nil
+	delete(m.clearedFields, purchaseorderitem.FieldProductOrderNoSnapshot)
+}
+
+// SetProductNoSnapshot sets the "product_no_snapshot" field.
+func (m *PurchaseOrderItemMutation) SetProductNoSnapshot(s string) {
+	m.product_no_snapshot = &s
+}
+
+// ProductNoSnapshot returns the value of the "product_no_snapshot" field in the mutation.
+func (m *PurchaseOrderItemMutation) ProductNoSnapshot() (r string, exists bool) {
+	v := m.product_no_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProductNoSnapshot returns the old "product_no_snapshot" field's value of the PurchaseOrderItem entity.
+// If the PurchaseOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderItemMutation) OldProductNoSnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProductNoSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProductNoSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProductNoSnapshot: %w", err)
+	}
+	return oldValue.ProductNoSnapshot, nil
+}
+
+// ClearProductNoSnapshot clears the value of the "product_no_snapshot" field.
+func (m *PurchaseOrderItemMutation) ClearProductNoSnapshot() {
+	m.product_no_snapshot = nil
+	m.clearedFields[purchaseorderitem.FieldProductNoSnapshot] = struct{}{}
+}
+
+// ProductNoSnapshotCleared returns if the "product_no_snapshot" field was cleared in this mutation.
+func (m *PurchaseOrderItemMutation) ProductNoSnapshotCleared() bool {
+	_, ok := m.clearedFields[purchaseorderitem.FieldProductNoSnapshot]
+	return ok
+}
+
+// ResetProductNoSnapshot resets all changes to the "product_no_snapshot" field.
+func (m *PurchaseOrderItemMutation) ResetProductNoSnapshot() {
+	m.product_no_snapshot = nil
+	delete(m.clearedFields, purchaseorderitem.FieldProductNoSnapshot)
+}
+
+// SetProductNameSnapshot sets the "product_name_snapshot" field.
+func (m *PurchaseOrderItemMutation) SetProductNameSnapshot(s string) {
+	m.product_name_snapshot = &s
+}
+
+// ProductNameSnapshot returns the value of the "product_name_snapshot" field in the mutation.
+func (m *PurchaseOrderItemMutation) ProductNameSnapshot() (r string, exists bool) {
+	v := m.product_name_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProductNameSnapshot returns the old "product_name_snapshot" field's value of the PurchaseOrderItem entity.
+// If the PurchaseOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderItemMutation) OldProductNameSnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProductNameSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProductNameSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProductNameSnapshot: %w", err)
+	}
+	return oldValue.ProductNameSnapshot, nil
+}
+
+// ClearProductNameSnapshot clears the value of the "product_name_snapshot" field.
+func (m *PurchaseOrderItemMutation) ClearProductNameSnapshot() {
+	m.product_name_snapshot = nil
+	m.clearedFields[purchaseorderitem.FieldProductNameSnapshot] = struct{}{}
+}
+
+// ProductNameSnapshotCleared returns if the "product_name_snapshot" field was cleared in this mutation.
+func (m *PurchaseOrderItemMutation) ProductNameSnapshotCleared() bool {
+	_, ok := m.clearedFields[purchaseorderitem.FieldProductNameSnapshot]
+	return ok
+}
+
+// ResetProductNameSnapshot resets all changes to the "product_name_snapshot" field.
+func (m *PurchaseOrderItemMutation) ResetProductNameSnapshot() {
+	m.product_name_snapshot = nil
+	delete(m.clearedFields, purchaseorderitem.FieldProductNameSnapshot)
 }
 
 // SetPurchasedQuantity sets the "purchased_quantity" field.
@@ -32698,7 +32848,7 @@ func (m *PurchaseOrderItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PurchaseOrderItemMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 18)
 	if m.purchase_order != nil {
 		fields = append(fields, purchaseorderitem.FieldPurchaseOrderID)
 	}
@@ -32719,6 +32869,15 @@ func (m *PurchaseOrderItemMutation) Fields() []string {
 	}
 	if m.color_snapshot != nil {
 		fields = append(fields, purchaseorderitem.FieldColorSnapshot)
+	}
+	if m.product_order_no_snapshot != nil {
+		fields = append(fields, purchaseorderitem.FieldProductOrderNoSnapshot)
+	}
+	if m.product_no_snapshot != nil {
+		fields = append(fields, purchaseorderitem.FieldProductNoSnapshot)
+	}
+	if m.product_name_snapshot != nil {
+		fields = append(fields, purchaseorderitem.FieldProductNameSnapshot)
 	}
 	if m.purchased_quantity != nil {
 		fields = append(fields, purchaseorderitem.FieldPurchasedQuantity)
@@ -32766,6 +32925,12 @@ func (m *PurchaseOrderItemMutation) Field(name string) (ent.Value, bool) {
 		return m.MaterialNameSnapshot()
 	case purchaseorderitem.FieldColorSnapshot:
 		return m.ColorSnapshot()
+	case purchaseorderitem.FieldProductOrderNoSnapshot:
+		return m.ProductOrderNoSnapshot()
+	case purchaseorderitem.FieldProductNoSnapshot:
+		return m.ProductNoSnapshot()
+	case purchaseorderitem.FieldProductNameSnapshot:
+		return m.ProductNameSnapshot()
 	case purchaseorderitem.FieldPurchasedQuantity:
 		return m.PurchasedQuantity()
 	case purchaseorderitem.FieldUnitPrice:
@@ -32805,6 +32970,12 @@ func (m *PurchaseOrderItemMutation) OldField(ctx context.Context, name string) (
 		return m.OldMaterialNameSnapshot(ctx)
 	case purchaseorderitem.FieldColorSnapshot:
 		return m.OldColorSnapshot(ctx)
+	case purchaseorderitem.FieldProductOrderNoSnapshot:
+		return m.OldProductOrderNoSnapshot(ctx)
+	case purchaseorderitem.FieldProductNoSnapshot:
+		return m.OldProductNoSnapshot(ctx)
+	case purchaseorderitem.FieldProductNameSnapshot:
+		return m.OldProductNameSnapshot(ctx)
 	case purchaseorderitem.FieldPurchasedQuantity:
 		return m.OldPurchasedQuantity(ctx)
 	case purchaseorderitem.FieldUnitPrice:
@@ -32878,6 +33049,27 @@ func (m *PurchaseOrderItemMutation) SetField(name string, value ent.Value) error
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetColorSnapshot(v)
+		return nil
+	case purchaseorderitem.FieldProductOrderNoSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProductOrderNoSnapshot(v)
+		return nil
+	case purchaseorderitem.FieldProductNoSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProductNoSnapshot(v)
+		return nil
+	case purchaseorderitem.FieldProductNameSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProductNameSnapshot(v)
 		return nil
 	case purchaseorderitem.FieldPurchasedQuantity:
 		v, ok := value.(decimal.Decimal)
@@ -32989,6 +33181,15 @@ func (m *PurchaseOrderItemMutation) ClearedFields() []string {
 	if m.FieldCleared(purchaseorderitem.FieldColorSnapshot) {
 		fields = append(fields, purchaseorderitem.FieldColorSnapshot)
 	}
+	if m.FieldCleared(purchaseorderitem.FieldProductOrderNoSnapshot) {
+		fields = append(fields, purchaseorderitem.FieldProductOrderNoSnapshot)
+	}
+	if m.FieldCleared(purchaseorderitem.FieldProductNoSnapshot) {
+		fields = append(fields, purchaseorderitem.FieldProductNoSnapshot)
+	}
+	if m.FieldCleared(purchaseorderitem.FieldProductNameSnapshot) {
+		fields = append(fields, purchaseorderitem.FieldProductNameSnapshot)
+	}
 	if m.FieldCleared(purchaseorderitem.FieldUnitPrice) {
 		fields = append(fields, purchaseorderitem.FieldUnitPrice)
 	}
@@ -33023,6 +33224,15 @@ func (m *PurchaseOrderItemMutation) ClearField(name string) error {
 		return nil
 	case purchaseorderitem.FieldColorSnapshot:
 		m.ClearColorSnapshot()
+		return nil
+	case purchaseorderitem.FieldProductOrderNoSnapshot:
+		m.ClearProductOrderNoSnapshot()
+		return nil
+	case purchaseorderitem.FieldProductNoSnapshot:
+		m.ClearProductNoSnapshot()
+		return nil
+	case purchaseorderitem.FieldProductNameSnapshot:
+		m.ClearProductNameSnapshot()
 		return nil
 	case purchaseorderitem.FieldUnitPrice:
 		m.ClearUnitPrice()
@@ -33064,6 +33274,15 @@ func (m *PurchaseOrderItemMutation) ResetField(name string) error {
 		return nil
 	case purchaseorderitem.FieldColorSnapshot:
 		m.ResetColorSnapshot()
+		return nil
+	case purchaseorderitem.FieldProductOrderNoSnapshot:
+		m.ResetProductOrderNoSnapshot()
+		return nil
+	case purchaseorderitem.FieldProductNoSnapshot:
+		m.ResetProductNoSnapshot()
+		return nil
+	case purchaseorderitem.FieldProductNameSnapshot:
+		m.ResetProductNameSnapshot()
 		return nil
 	case purchaseorderitem.FieldPurchasedQuantity:
 		m.ResetPurchasedQuantity()

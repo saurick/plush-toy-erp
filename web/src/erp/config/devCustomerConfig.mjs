@@ -574,7 +574,7 @@ export function buildPrintTemplateFieldSummary(
     behaviorDocLabel: mapSourcePathLabel(DEV_PRINT_TEMPLATE_BEHAVIOR_DOC_PATH),
     runtimeStatus: 'source_grounded',
     boundary:
-      '当前只登记采购合同和加工合同；销售订单受理未接打印模板，客户抬头 / 签章 / 固定文案留在客户配置或模板边界。',
+      '当前登记采购合同、加工合同、物料明细、色卡和作业指导书；销售订单受理未接打印模板，客户抬头 / 签章 / 固定文案留在客户配置或模板边界。',
   }
 }
 
@@ -1495,7 +1495,7 @@ export function buildCustomerPackageConsoleSummary({
         status: 'source_grounded',
         sourcePath: printTemplateSummary?.sourcePath,
         sourceLabel: printTemplateSummary?.sourceLabel,
-        nextAction: `${printTemplateCount} 套模板、${printFieldTruthCount} 条字段真源只读展示；${printTemplateDefaultCount} 条客户包打印默认方信息经有效配置投影后可供正式采购打印入口消费；销售订单受理当前未接打印模板。`,
+        nextAction: `${printTemplateCount} 套模板、${printFieldTruthCount} 条字段真源只读展示；${printTemplateDefaultCount} 条客户包打印默认方信息经有效配置投影后可供正式采购 / 委外合同打印入口消费；销售订单受理当前未接打印模板。`,
       },
       {
         key: 'workflow-structure-review',
@@ -1634,7 +1634,7 @@ export function buildCustomerPackageConsoleSummary({
         value: printTemplateCount,
         unit: '套',
         status: 'source_grounded',
-        note: `${printFieldTruthCount} 条字段真源；当前只覆盖采购合同和加工合同。`,
+        note: `${printFieldTruthCount} 条字段真源；当前覆盖合同和工程资料打印模板。`,
       },
       {
         key: 'print-template-defaults',
@@ -1749,7 +1749,9 @@ export function buildCustomerPackageConsoleSummary({
         key: 'print-template-boundary',
         label: '打印模板字段边界',
         status:
-          printTemplateCount === 2 && printFieldTruthCount > 0
+          printTemplateCount > 0 &&
+          printTemplateSummary?.sourceGroundedCount === printTemplateCount &&
+          printFieldTruthCount > 0
             ? 'passed'
             : 'blocked',
         level: '中',
@@ -1819,7 +1821,7 @@ export function buildCustomerPackageConsoleSummary({
         label: '模板资产',
         value: printTemplateCount,
         status: 'source_grounded',
-        note: '当前只展示正式采购合同和加工合同模板字段真源。',
+        note: '当前展示正式合同和工程资料打印模板字段真源。',
       },
       {
         key: 'import-mapping-assets',

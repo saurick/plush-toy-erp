@@ -1,4 +1,9 @@
 import { PROCESSING_CONTRACT_TEMPLATE_KEY } from '../data/processingContractTemplate.mjs'
+import {
+  COLOR_CARD_TEMPLATE_KEY,
+  MATERIAL_DETAIL_TEMPLATE_KEY,
+  WORK_INSTRUCTION_TEMPLATE_KEY,
+} from '../data/engineeringPrintTemplates.mjs'
 
 export const MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY =
   'material-purchase-contract'
@@ -34,6 +39,9 @@ export const MATERIAL_PURCHASE_CONTRACT_WORKSPACE_PATH = `/erp/print-workspace/$
 const supportedPrintWorkspaceTemplateKeys = new Set([
   PROCESSING_CONTRACT_TEMPLATE_KEY,
   MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+  MATERIAL_DETAIL_TEMPLATE_KEY,
+  COLOR_CARD_TEMPLATE_KEY,
+  WORK_INSTRUCTION_TEMPLATE_KEY,
 ])
 
 function normalizeTemplateKey(templateKey = '') {
@@ -42,6 +50,14 @@ function normalizeTemplateKey(templateKey = '') {
 
 function normalizeStateID(stateID = '') {
   return String(stateID || '').trim()
+}
+
+export function resolveRuntimeCustomerPrintCompanyName(windowLike) {
+  const runtimeWindow =
+    windowLike || (typeof window !== 'undefined' ? window : null)
+  return String(
+    runtimeWindow?.__PLUSH_ERP_CUSTOMER_CONFIG__?.brand?.companyName || ''
+  ).trim()
 }
 
 function appendSearch(pathname, searchParams) {
@@ -179,6 +195,16 @@ export function buildPrintWorkspaceURL(
     buildPrintWorkspacePath(templateKey, options),
     window.location.origin
   ).toString()
+}
+
+export function buildRestorablePrintWorkspaceURL(
+  templateKey = PROCESSING_CONTRACT_TEMPLATE_KEY,
+  options = {}
+) {
+  return buildPrintWorkspaceURL(templateKey, {
+    ...options,
+    draftMode: PRINT_WORKSPACE_DRAFT_MODE.RESTORE,
+  })
 }
 
 export function buildPrintWorkspaceShellURL(stateID = '') {
@@ -517,16 +543,15 @@ export function openPrintWorkspaceWindow(
       throw new Error('浏览器无法写入打印草稿，请检查存储权限后重试')
     }
   }
-  const workspaceURL = buildPrintWorkspaceURL(templateKey, {
+  const workspaceURL = buildRestorablePrintWorkspaceURL(templateKey, {
     ...workspaceOptions,
     stateID,
   })
-  const popupURL = persistPrintWorkspaceWindowState(stateID, {
+  persistPrintWorkspaceWindowState(stateID, {
     templateKey: normalizeTemplateKey(templateKey),
     workspaceURL,
   })
-    ? buildPrintWorkspaceShellURL(stateID)
-    : workspaceURL
+  const popupURL = workspaceURL
   const popup = initialDraftWindowNamePayload
     ? window.open('about:blank', '_blank', 'width=1440,height=920')
     : window.open(popupURL, '_blank', 'width=1440,height=920')

@@ -601,6 +601,15 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     testFile: 'web/src/erp/utils/masterDataOrderView.test.mjs',
   },
   {
+    caseId:
+      'FL_purchase_order_product_snapshot__retains_optional_product_display_snapshot',
+    title: '采购订单行保存参数保留可选产品展示快照',
+    fieldKeys: ['productOrderNo', 'productNo', 'productNameColor'],
+    scenarioKey: 'source_snapshot_retained',
+    layer: 'web',
+    testFile: 'web/src/erp/utils/masterDataOrderView.test.mjs',
+  },
+  {
     caseId: 'FL_purchase_order_accessory_material__clears_material_snapshot',
     title: '采购订单行清空材料来源时清空材料快照',
     fieldKeys: ['accessoryMaterial'],

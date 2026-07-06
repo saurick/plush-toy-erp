@@ -2421,8 +2421,20 @@ func init() {
 	purchaseorderitemDescColorSnapshot := purchaseorderitemFields[6].Descriptor()
 	// purchaseorderitem.ColorSnapshotValidator is a validator for the "color_snapshot" field. It is called by the builders before save.
 	purchaseorderitem.ColorSnapshotValidator = purchaseorderitemDescColorSnapshot.Validators[0].(func(string) error)
+	// purchaseorderitemDescProductOrderNoSnapshot is the schema descriptor for product_order_no_snapshot field.
+	purchaseorderitemDescProductOrderNoSnapshot := purchaseorderitemFields[7].Descriptor()
+	// purchaseorderitem.ProductOrderNoSnapshotValidator is a validator for the "product_order_no_snapshot" field. It is called by the builders before save.
+	purchaseorderitem.ProductOrderNoSnapshotValidator = purchaseorderitemDescProductOrderNoSnapshot.Validators[0].(func(string) error)
+	// purchaseorderitemDescProductNoSnapshot is the schema descriptor for product_no_snapshot field.
+	purchaseorderitemDescProductNoSnapshot := purchaseorderitemFields[8].Descriptor()
+	// purchaseorderitem.ProductNoSnapshotValidator is a validator for the "product_no_snapshot" field. It is called by the builders before save.
+	purchaseorderitem.ProductNoSnapshotValidator = purchaseorderitemDescProductNoSnapshot.Validators[0].(func(string) error)
+	// purchaseorderitemDescProductNameSnapshot is the schema descriptor for product_name_snapshot field.
+	purchaseorderitemDescProductNameSnapshot := purchaseorderitemFields[9].Descriptor()
+	// purchaseorderitem.ProductNameSnapshotValidator is a validator for the "product_name_snapshot" field. It is called by the builders before save.
+	purchaseorderitem.ProductNameSnapshotValidator = purchaseorderitemDescProductNameSnapshot.Validators[0].(func(string) error)
 	// purchaseorderitemDescLineStatus is the schema descriptor for line_status field.
-	purchaseorderitemDescLineStatus := purchaseorderitemFields[11].Descriptor()
+	purchaseorderitemDescLineStatus := purchaseorderitemFields[14].Descriptor()
 	// purchaseorderitem.DefaultLineStatus holds the default value on creation for the line_status field.
 	purchaseorderitem.DefaultLineStatus = purchaseorderitemDescLineStatus.Default.(string)
 	// purchaseorderitem.LineStatusValidator is a validator for the "line_status" field. It is called by the builders before save.
@@ -2442,15 +2454,15 @@ func init() {
 		}
 	}()
 	// purchaseorderitemDescNote is the schema descriptor for note field.
-	purchaseorderitemDescNote := purchaseorderitemFields[12].Descriptor()
+	purchaseorderitemDescNote := purchaseorderitemFields[15].Descriptor()
 	// purchaseorderitem.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	purchaseorderitem.NoteValidator = purchaseorderitemDescNote.Validators[0].(func(string) error)
 	// purchaseorderitemDescCreatedAt is the schema descriptor for created_at field.
-	purchaseorderitemDescCreatedAt := purchaseorderitemFields[13].Descriptor()
+	purchaseorderitemDescCreatedAt := purchaseorderitemFields[16].Descriptor()
 	// purchaseorderitem.DefaultCreatedAt holds the default value on creation for the created_at field.
 	purchaseorderitem.DefaultCreatedAt = purchaseorderitemDescCreatedAt.Default.(func() time.Time)
 	// purchaseorderitemDescUpdatedAt is the schema descriptor for updated_at field.
-	purchaseorderitemDescUpdatedAt := purchaseorderitemFields[14].Descriptor()
+	purchaseorderitemDescUpdatedAt := purchaseorderitemFields[17].Descriptor()
 	// purchaseorderitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	purchaseorderitem.DefaultUpdatedAt = purchaseorderitemDescUpdatedAt.Default.(func() time.Time)
 	// purchaseorderitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

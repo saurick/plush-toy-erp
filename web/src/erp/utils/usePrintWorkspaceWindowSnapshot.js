@@ -2,12 +2,34 @@ import { useEffect, useRef } from 'react'
 import {
   persistPrintWorkspaceWindowHTML,
   persistPrintWorkspaceWindowState,
-  syncPrintWorkspaceShellHistory,
 } from './printWorkspace.js'
 
 const SNAPSHOT_PERSIST_DELAY_MS = 320
 const SNAPSHOT_PERSIST_IDLE_TIMEOUT_MS = 1000
 const PRINT_WORKSPACE_PREPARING_TEXT = '正在准备打印模板...'
+const PRINT_WORKSPACE_FLUSH_ACTIVE_EDIT_EVENT =
+  'plush-print-workspace-flush-active-edit'
+
+function flushActiveContentEditable(documentLike) {
+  const activeElement = documentLike?.activeElement
+  if (!activeElement) {
+    return false
+  }
+
+  const editableElement =
+    activeElement.isContentEditable === true
+      ? activeElement
+      : activeElement.closest?.('[contenteditable="true"]')
+  if (!editableElement) {
+    return false
+  }
+
+  const ownerWindow = editableElement.ownerDocument?.defaultView || window
+  editableElement.dispatchEvent(
+    new ownerWindow.CustomEvent(PRINT_WORKSPACE_FLUSH_ACTIVE_EDIT_EVENT)
+  )
+  return true
+}
 
 function syncClonedFormState(sourceDocument, clonedDocument) {
   const sourceFields = Array.from(
@@ -147,7 +169,6 @@ export default function usePrintWorkspaceWindowSnapshot({
       templateKey,
       workspaceURL,
     })
-    syncPrintWorkspaceShellHistory(stateID)
   }, [stateID, templateKey, workspaceURL])
 
   useEffect(() => {
@@ -181,6 +202,7 @@ export default function usePrintWorkspaceWindowSnapshot({
     const persistSnapshot = () => {
       persistTimerRef.current = 0
       persistIdleRef.current = 0
+      flushActiveContentEditable(doc)
       const windowHTML = buildPrintWorkspaceWindowHTML(doc, workspaceURL)
       if (!windowHTML) {
         return
@@ -216,18 +238,10 @@ export default function usePrintWorkspaceWindowSnapshot({
       characterData: true,
     })
 
-    const handleInput = () => schedulePersist()
-    const handleVisibilityChange = () => {
-      if (doc.visibilityState === 'hidden') {
-        persistSnapshot()
-      }
-    }
+    const handleInput = () => schedulePersist(0)
 
     doc.addEventListener('input', handleInput, true)
     doc.addEventListener('change', handleInput, true)
-    doc.addEventListener('visibilitychange', handleVisibilityChange)
-    win.addEventListener('pagehide', persistSnapshot)
-    win.addEventListener('beforeunload', persistSnapshot)
 
     schedulePersist(0)
 
@@ -236,9 +250,6 @@ export default function usePrintWorkspaceWindowSnapshot({
       mutationObserver?.disconnect()
       doc.removeEventListener('input', handleInput, true)
       doc.removeEventListener('change', handleInput, true)
-      doc.removeEventListener('visibilitychange', handleVisibilityChange)
-      win.removeEventListener('pagehide', persistSnapshot)
-      win.removeEventListener('beforeunload', persistSnapshot)
     }
   }, [observeNodeRef, stateID, suspended, templateKey, workspaceURL])
 }

@@ -7,6 +7,9 @@ const MaterialPurchaseContractPrintWorkspacePage = lazy(
 const ProcessingContractPrintWorkspacePage = lazy(
   () => import('./ProcessingContractPrintWorkspacePage.jsx')
 )
+const EngineeringPrintWorkspacePage = lazy(
+  () => import('./EngineeringPrintWorkspacePage.jsx')
+)
 
 export default function PrintWorkspacePage() {
   const { templateKey } = useParams()
@@ -17,6 +20,14 @@ export default function PrintWorkspacePage() {
 
   if (templateKey === 'processing-contract') {
     return <ProcessingContractPrintWorkspacePage />
+  }
+
+  if (
+    templateKey === 'engineering-material-detail' ||
+    templateKey === 'engineering-color-card' ||
+    templateKey === 'engineering-work-instruction'
+  ) {
+    return <EngineeringPrintWorkspacePage />
   }
 
   return <Navigate to="/erp/print-center" replace />

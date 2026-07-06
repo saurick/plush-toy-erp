@@ -262,13 +262,24 @@ func TestPurchaseOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 	uc := NewPurchaseOrderUsecase(repo)
 	orderDate := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
 	qty := decimal.NewFromInt(6)
+	productOrderNo := " SO-26001 "
+	productNo := " P-001 "
+	productName := " 坐姿小熊 "
 
 	result, err := uc.SavePurchaseOrderWithItems(ctx, 1, &PurchaseOrderMutation{
 		PurchaseOrderNo: " PO-TX-001 ",
 		SupplierID:      1000,
 		PurchaseDate:    orderDate,
 	}, []*PurchaseOrderItemSaveMutation{
-		{ID: 10, PurchaseOrderItemMutation: PurchaseOrderItemMutation{LineNo: 1, MaterialID: 100, UnitID: 200, PurchasedQuantity: qty}},
+		{ID: 10, PurchaseOrderItemMutation: PurchaseOrderItemMutation{
+			LineNo:                 1,
+			MaterialID:             100,
+			UnitID:                 200,
+			ProductOrderNoSnapshot: &productOrderNo,
+			ProductNoSnapshot:      &productNo,
+			ProductNameSnapshot:    &productName,
+			PurchasedQuantity:      qty,
+		}},
 	})
 	if err != nil {
 		t.Fatalf("save purchase order with items failed: %v", err)
@@ -278,6 +289,12 @@ func TestPurchaseOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 	}
 	if len(repo.savedItems) != 1 || repo.savedItems[0].PurchaseOrderID != 1 {
 		t.Fatalf("expected item bound to order 1, got %#v", repo.savedItems)
+	}
+	savedItem := repo.savedItems[0]
+	if savedItem.ProductOrderNoSnapshot == nil || *savedItem.ProductOrderNoSnapshot != "SO-26001" ||
+		savedItem.ProductNoSnapshot == nil || *savedItem.ProductNoSnapshot != "P-001" ||
+		savedItem.ProductNameSnapshot == nil || *savedItem.ProductNameSnapshot != "坐姿小熊" {
+		t.Fatalf("expected normalized product snapshots, got %#v", savedItem)
 	}
 
 	if _, err := uc.SavePurchaseOrderWithItems(ctx, 2, &PurchaseOrderMutation{PurchaseOrderNo: "PO-CLOSED", SupplierID: 1000, PurchaseDate: orderDate}, nil); !errors.Is(err, ErrBadParam) {

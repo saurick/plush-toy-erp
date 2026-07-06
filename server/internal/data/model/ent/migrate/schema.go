@@ -1417,6 +1417,9 @@ var (
 		{Name: "material_code_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "material_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "color_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "product_order_no_snapshot", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "product_no_snapshot", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "product_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "purchased_quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "unit_price", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "amount", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
@@ -1437,19 +1440,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "purchase_order_items_materials_purchase_order_items",
-				Columns:    []*schema.Column{PurchaseOrderItemsColumns[13]},
+				Columns:    []*schema.Column{PurchaseOrderItemsColumns[16]},
 				RefColumns: []*schema.Column{MaterialsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_order_items_purchase_orders_items",
-				Columns:    []*schema.Column{PurchaseOrderItemsColumns[14]},
+				Columns:    []*schema.Column{PurchaseOrderItemsColumns[17]},
 				RefColumns: []*schema.Column{PurchaseOrdersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_order_items_units_purchase_order_items",
-				Columns:    []*schema.Column{PurchaseOrderItemsColumns[15]},
+				Columns:    []*schema.Column{PurchaseOrderItemsColumns[18]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1458,27 +1461,27 @@ var (
 			{
 				Name:    "purchaseorderitem_purchase_order_id_line_no",
 				Unique:  true,
-				Columns: []*schema.Column{PurchaseOrderItemsColumns[14], PurchaseOrderItemsColumns[1]},
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[17], PurchaseOrderItemsColumns[1]},
 			},
 			{
 				Name:    "purchaseorderitem_material_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrderItemsColumns[13]},
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[16]},
 			},
 			{
 				Name:    "purchaseorderitem_unit_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrderItemsColumns[15]},
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[18]},
 			},
 			{
 				Name:    "purchaseorderitem_line_status",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrderItemsColumns[9]},
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[12]},
 			},
 			{
 				Name:    "purchaseorderitem_expected_arrival_date",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrderItemsColumns[8]},
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[11]},
 			},
 		},
 	}

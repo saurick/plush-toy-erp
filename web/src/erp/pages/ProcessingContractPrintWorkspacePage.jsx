@@ -31,7 +31,7 @@ import {
   updateProcessingContractLineCell,
 } from '../utils/processingContractEditor.mjs'
 import {
-  buildPrintWorkspacePath,
+  buildRestorablePrintWorkspaceURL,
   buildPrintWorkspaceDraftStorageKey,
   PRINT_WORKSPACE_DRAFT_MODE,
   PRINT_WORKSPACE_ENTRY_SOURCE,
@@ -50,6 +50,10 @@ import {
   watchPrintPageMarginForPaper,
 } from '../utils/printPageMargin.mjs'
 import usePrintWorkspaceWindowSnapshot from '../utils/usePrintWorkspaceWindowSnapshot.js'
+import {
+  useFlushPrintWorkspaceDraftOnPageExit,
+  usePersistentPrintWorkspaceDraft,
+} from '../utils/usePersistentPrintWorkspaceDraft.js'
 
 const DRAFT_STORAGE_KEY = '__plush_erp_processing_contract_print_draft__'
 const ATTACHMENT_ACCEPT = 'image/*,.svg'
@@ -231,26 +235,21 @@ export default function ProcessingContractPrintWorkspacePage() {
       return ''
     }
 
-    return new URL(
-      buildPrintWorkspacePath(PROCESSING_CONTRACT_TEMPLATE_KEY, {
-        entrySource,
-        draftMode: resetDraftOnOpen
-          ? PRINT_WORKSPACE_DRAFT_MODE.FRESH
-          : PRINT_WORKSPACE_DRAFT_MODE.RESTORE,
-        customerKey,
-        stateID: workspaceStateID,
-      }),
-      window.location.origin
-    ).toString()
-  }, [customerKey, entrySource, resetDraftOnOpen, workspaceStateID])
-  const [contract, setContract] = useState(() =>
-    loadDraft({
-      forceFresh: resetDraftOnOpen,
-      storageKey: draftStorageKey,
-      workspaceStateID,
-      businessInput: entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
+    return buildRestorablePrintWorkspaceURL(PROCESSING_CONTRACT_TEMPLATE_KEY, {
+      entrySource,
+      customerKey,
+      stateID: workspaceStateID,
     })
-  )
+  }, [customerKey, entrySource, workspaceStateID])
+  const [contract, setContract, flushContractDraft] =
+    usePersistentPrintWorkspaceDraft(() =>
+      loadDraft({
+        forceFresh: resetDraftOnOpen,
+        storageKey: draftStorageKey,
+        workspaceStateID,
+        businessInput: entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
+      })
+    )
   const [rowSelectionMode, setRowSelectionMode] = useState(false)
   const [selectedLineIndex, setSelectedLineIndex] = useState(null)
   const [cellSelectionMode, setCellSelectionMode] = useState(false)
@@ -296,6 +295,8 @@ export default function ProcessingContractPrintWorkspacePage() {
     templateKey,
     workspaceStateID,
   ])
+
+  useFlushPrintWorkspaceDraftOnPageExit(flushContractDraft)
 
   useEffect(() => {
     persistPrintWorkspaceDraftSnapshot(draftStorageKey, contract)
@@ -1015,6 +1016,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       }
       panelTip="提示：左侧字段与右侧加工合同固定版式双向同步，右侧表格和条款区可直接编辑，打印时仅输出右侧模板。"
       prepareSignature={`${draftStorageKey}:${resetDraftOnOpen ? 'fresh' : 'restore'}`}
+      panelActions={attachmentUploadBar}
       detailEditor={detailEditor}
       fieldRows={fieldRows}
       formulaPanel={
@@ -1160,7 +1162,6 @@ export default function ProcessingContractPrintWorkspacePage() {
         </>
       }
     >
-      {attachmentUploadBar}
       <div className="erp-print-shell__stage-wrap" ref={stageWrapRef}>
         <ProcessingContractPaper
           paperRef={paperRef}

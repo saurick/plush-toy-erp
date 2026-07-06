@@ -693,6 +693,12 @@ func templatePDFReferencedModuleKeys(templateKey string) ([]string, bool) {
 		return []string{"purchase_orders"}, true
 	case "processing-contract":
 		return []string{"outsourcing_orders"}, true
+	case "engineering-material-detail":
+		return []string{"material_bom"}, true
+	case "engineering-color-card":
+		return []string{"material_bom"}, true
+	case "engineering-work-instruction":
+		return []string{"outsourcing_orders"}, true
 	default:
 		return nil, false
 	}

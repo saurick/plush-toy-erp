@@ -111,6 +111,9 @@ export function createBlankPurchaseLine(lineNo = 1) {
     material_code_snapshot: '',
     material_name_snapshot: '',
     color_snapshot: '',
+    product_order_no_snapshot: '',
+    product_no_snapshot: '',
+    product_name_snapshot: '',
     purchased_quantity: '',
     unit_price: '',
     amount: '',
@@ -143,6 +146,9 @@ export function normalizePurchaseLineFormValue(item = {}) {
     material_code_snapshot: item.material_code_snapshot || '',
     material_name_snapshot: item.material_name_snapshot || '',
     color_snapshot: item.color_snapshot || '',
+    product_order_no_snapshot: item.product_order_no_snapshot || '',
+    product_no_snapshot: item.product_no_snapshot || '',
+    product_name_snapshot: item.product_name_snapshot || '',
     purchased_quantity: optionalFormValue(item.purchased_quantity),
     unit_price: optionalFormValue(item.unit_price),
     amount: optionalFormValue(item.amount),
@@ -468,6 +474,27 @@ export function PurchaseOrderFormFields({
                 label="颜色快照"
               >
                 <Input maxLength={64} />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--snapshot-code"
+                name={[field.name, 'product_order_no_snapshot']}
+                label="产品订单编号"
+              >
+                <Input maxLength={128} />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--snapshot-code"
+                name={[field.name, 'product_no_snapshot']}
+                label="产品编号"
+              >
+                <Input maxLength={128} />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--snapshot-name"
+                name={[field.name, 'product_name_snapshot']}
+                label="产品名称"
+              >
+                <Input maxLength={255} />
               </Form.Item>
               <Form.Item
                 noStyle

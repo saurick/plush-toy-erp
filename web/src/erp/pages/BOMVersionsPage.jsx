@@ -7,6 +7,7 @@ import {
   EditOutlined,
   InboxOutlined,
   PlusOutlined,
+  PrinterOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
 import { Button, Form, Input, Popconfirm, Select, Space } from 'antd'
@@ -85,6 +86,17 @@ import {
   unitOption,
 } from '../utils/referenceSelectOptions.mjs'
 import { createDuplicatedDraftLineItem } from '../utils/businessLineItems.mjs'
+import {
+  PRINT_WORKSPACE_ENTRY_SOURCE,
+  openPrintWorkspaceWindow,
+  resolveRuntimeCustomerPrintCompanyName,
+} from '../utils/printWorkspace.js'
+import {
+  COLOR_CARD_TEMPLATE_KEY,
+  MATERIAL_DETAIL_TEMPLATE_KEY,
+  buildColorCardDraftFromBOMVersion,
+  buildMaterialDetailDraftFromBOMVersion,
+} from '../data/engineeringPrintTemplates.mjs'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 
@@ -411,9 +423,14 @@ export default function BOMVersionsPage() {
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
   )
+  const activeCustomerKey = useMemo(
+    () => adminProfile?.effective_session?.customer?.key || '',
+    [adminProfile]
+  )
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [printingTemplateKey, setPrintingTemplateKey] = useState('')
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState('')
   const [productID, setProductID] = useState()
@@ -672,6 +689,43 @@ export default function BOMVersionsPage() {
       record.status
     )}`,
   }))
+  const openEngineeringPrint = async (templateKey) => {
+    if (!activeActionVersion?.id || selectedRowKeys.length !== 1) return
+    setPrintingTemplateKey(templateKey)
+    try {
+      const detail =
+        selectedVersion?.id === activeActionVersion.id &&
+        Array.isArray(selectedVersion?.items)
+          ? selectedVersion
+          : await loadDetail(activeActionVersion.id)
+      if (!detail) return
+      const builder =
+        templateKey === COLOR_CARD_TEMPLATE_KEY
+          ? buildColorCardDraftFromBOMVersion
+          : buildMaterialDetailDraftFromBOMVersion
+      const initialDraft = builder(detail, {
+        productOptions,
+        products,
+        materials,
+        units,
+        companyName: resolveRuntimeCustomerPrintCompanyName(),
+      })
+      openPrintWorkspaceWindow(templateKey, {
+        entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
+        initialDraft,
+        customerKey: activeCustomerKey,
+      })
+      message.success(
+        templateKey === COLOR_CARD_TEMPLATE_KEY
+          ? '已打开色卡打印模板'
+          : '已打开物料明细打印模板'
+      )
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '打开工程打印模板失败'))
+    } finally {
+      setPrintingTemplateKey('')
+    }
+  }
   const selectSingleVersion = useCallback(
     async (record) => {
       if (!record?.id) return
@@ -1080,6 +1134,32 @@ export default function BOMVersionsPage() {
             onClick={() => openCopy(activeActionVersion)}
           >
             复制新版本
+          </Button>
+          <Button
+            size="small"
+            icon={<PrinterOutlined />}
+            disabled={
+              selectedRowKeys.length !== 1 ||
+              detailLoading ||
+              printingTemplateKey !== ''
+            }
+            loading={printingTemplateKey === MATERIAL_DETAIL_TEMPLATE_KEY}
+            onClick={() => openEngineeringPrint(MATERIAL_DETAIL_TEMPLATE_KEY)}
+          >
+            打印物料明细
+          </Button>
+          <Button
+            size="small"
+            icon={<PrinterOutlined />}
+            disabled={
+              selectedRowKeys.length !== 1 ||
+              detailLoading ||
+              printingTemplateKey !== ''
+            }
+            loading={printingTemplateKey === COLOR_CARD_TEMPLATE_KEY}
+            onClick={() => openEngineeringPrint(COLOR_CARD_TEMPLATE_KEY)}
+          >
+            打印色卡
           </Button>
           <Popconfirm
             title="激活该 BOM 版本？同产品当前生效版本会设为历史版本。"

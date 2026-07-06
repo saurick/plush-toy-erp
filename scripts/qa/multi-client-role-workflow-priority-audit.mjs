@@ -3204,7 +3204,7 @@ function collectChecks() {
       status: "ready",
       category: "print",
       description:
-        "模板 PDF 打印入口已按 template_key 所属 active module states 拒绝非 enabled 模块，当前覆盖采购合同和加工合同两个正式 PDF 模板",
+        "模板 PDF 打印入口已按 template_key 所属 active module states 拒绝非 enabled 模块，当前覆盖合同和工程资料正式 PDF 模板",
       pass:
         sourceContains("server/internal/server/http.go", [
           "customerConfigUC *biz.CustomerConfigUsecase",

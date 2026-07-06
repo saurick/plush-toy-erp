@@ -17,6 +17,8 @@
 
 - `customer-config.example.js`：永绅 yoyoosun 前端部署注入示例。默认产品 Web 包只带中性的 `web/public/customer-config.js` 占位，不能把本示例复制进 Product Core 默认产物。
 
+- `assets/engineering-work-instruction/sheet1/`：从 `docs/customers/yoyoosun/raw-source-files/26204#抱抱猴子材料明细表2026-4-10.xlsx` 的 `Sheet1` / `drawing4.xml` 抽取的作业指导书图片资产，用于 yoyoosun 客户静态配置下的工程打印样例预览。`customer-config.example.js` 只声明图片 URL、对应行锚点、`draftPatch` 文本覆盖和来源 workbook，不把 raw 客户照片、公司名或作业文本写进 Product Core 默认模板，也不代表真实 Excel 导入、图片附件归档、PDF 留档或业务事实写入已完成。
+
 - `fieldNumberingConfig.mjs`：永绅 yoyoosun 字段显示和编号规则配置草案。该文件当前 `runtimeEnabled=false`，只作为 Customer Config 评审清单；不接前端运行时、不改后端、不改 schema、不执行导入。
 
 - `importConfig.mjs`：永绅 yoyoosun 导入与客户差异配置草案。该文件根据已提取的 Excel evidence、产品核心边界和客户台账收口导入顺序、字段映射分组、人工 review 队列、禁止自动导入目标和 deferred runtime 项；当前 `runtimeEnabled=false`，不嵌入 raw rows，不接 loader，不执行真实导入。

@@ -16,6 +16,85 @@ export function createPrintAssertions({
   expectText,
   isIgnorableDevServerError,
 }) {
+  async function resolveCurrentPrintWorkspaceDraftStorageKeys(
+    page,
+    legacyStorageKey
+  ) {
+    return page.evaluate((fallbackKey) => {
+      const keys = []
+      const pathParts = window.location.pathname.split('/').filter(Boolean)
+      const workspaceIndex = pathParts.indexOf('print-workspace')
+      const templateKey =
+        workspaceIndex >= 0 ? pathParts[workspaceIndex + 1] : ''
+      const stateID = new URLSearchParams(window.location.search).get('state')
+
+      if (templateKey) {
+        keys.push(
+          stateID
+            ? `__plush_erp_print_workspace_draft__:${templateKey}:${stateID}`
+            : `__plush_erp_print_workspace_draft__:${templateKey}`
+        )
+      }
+
+      if (fallbackKey && !keys.includes(fallbackKey)) {
+        keys.push(fallbackKey)
+      }
+
+      return keys
+    }, legacyStorageKey)
+  }
+
+  async function snapshotLocalStorageValues(page, storageKeys) {
+    return page.evaluate((keys) => {
+      return keys.map((key) => ({
+        key,
+        value: window.localStorage.getItem(key),
+      }))
+    }, storageKeys)
+  }
+
+  async function restoreLocalStorageValues(page, entries) {
+    await page.evaluate((items) => {
+      items.forEach((item) => {
+        if (typeof item.value === 'string') {
+          window.localStorage.setItem(item.key, item.value)
+          return
+        }
+        window.localStorage.removeItem(item.key)
+      })
+    }, entries)
+  }
+
+  async function installDraftInjectionOnNextLoad(page, markerKey) {
+    await page.addInitScript((storageMarkerKey) => {
+      try {
+        const rawPayload = window.localStorage.getItem(storageMarkerKey)
+        if (!rawPayload) {
+          return
+        }
+        const payload = JSON.parse(rawPayload)
+        const draftJSON = String(payload?.draftJSON || '')
+        if (!draftJSON) {
+          return
+        }
+        const targetKeys = Array.isArray(payload?.keys) ? payload.keys : []
+        targetKeys.forEach((key) => {
+          if (key) {
+            window.localStorage.setItem(key, draftJSON)
+          }
+        })
+      } catch {
+        // L1 injection is best-effort; the assertion after reload reports drift.
+      }
+    }, markerKey)
+  }
+
+  function createDraftInjectionMarkerKey(label = 'draft') {
+    return `__plush_erp_style_l1_${label}_injection__:${Date.now()}:${Math.random()
+      .toString(36)
+      .slice(2)}`
+  }
+
   async function assertPrintPreviewPopup(
     page,
     { buttonName, title, screenshotName }
@@ -226,12 +305,27 @@ export function createPrintAssertions({
         `打印窗口首次打开缺少 state: ${popup.url()}`
       )
 
-      await popup.reload({ waitUntil: 'domcontentloaded' })
-      await expectPrintWorkspaceToolbarTitle(popup, expectedTitle)
-      await popup
-        .waitForLoadState('networkidle', { timeout: 5_000 })
-        .catch(() => {})
-      await popup.waitForTimeout(150)
+      if (editableSelector) {
+        await assertEditablePrintWorkspaceRefreshCycle(popup, {
+          expectedTitle,
+          editableSelector,
+          insertedText: 'ZZPERSISTONE',
+          scenarioLabel: `${editableScenarioLabel || expectedTitle} 第 1 轮`,
+        })
+        await assertEditablePrintWorkspaceRefreshCycle(popup, {
+          expectedTitle,
+          editableSelector,
+          insertedText: 'ZZPERSISTTWO',
+          scenarioLabel: `${editableScenarioLabel || expectedTitle} 第 2 轮`,
+        })
+      } else {
+        await popup.reload({ waitUntil: 'domcontentloaded' })
+        await expectPrintWorkspaceToolbarTitle(popup, expectedTitle)
+        await popup
+          .waitForLoadState('networkidle', { timeout: 5_000 })
+          .catch(() => {})
+        await popup.waitForTimeout(150)
+      }
 
       const reloadedURL = new URL(popup.url())
       assert(
@@ -242,12 +336,6 @@ export function createPrintAssertions({
         reloadedURL.searchParams.get('state'),
         `打印窗口刷新后缺少 state: ${popup.url()}`
       )
-      if (editableSelector) {
-        await assertEditablePopupCellInputAfterReload(popup, {
-          editableSelector,
-          scenarioLabel: editableScenarioLabel || expectedTitle,
-        })
-      }
       if (signatureValueSelector) {
         await assertPrintWorkspaceSignatureBlankAction(popup, {
           expectedTitle,
@@ -266,6 +354,49 @@ export function createPrintAssertions({
         await popup.close()
       }
     }
+  }
+
+  async function assertEditablePrintWorkspaceRefreshCycle(
+    page,
+    { expectedTitle, editableSelector, insertedText, scenarioLabel }
+  ) {
+    await appendTextToEditablePopupCell(page, {
+      editableSelector,
+      insertedText,
+      scenarioLabel,
+      commit: false,
+    })
+    await assertEditablePopupCellContainsText(page, {
+      editableSelector,
+      expectedText: insertedText,
+      scenarioLabel: `${scenarioLabel} 刷新前`,
+      requirePersistedDraft: false,
+    })
+
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expectPrintWorkspaceToolbarTitle(page, expectedTitle)
+    await page
+      .waitForLoadState('networkidle', { timeout: 5_000 })
+      .catch(() => {})
+    await page.waitForTimeout(150)
+
+    await assertEditablePopupCellContainsText(page, {
+      editableSelector,
+      expectedText: insertedText,
+      scenarioLabel,
+    })
+    const reloadInsertedText = await assertEditablePopupCellInputAfterReload(
+      page,
+      {
+        editableSelector,
+        scenarioLabel,
+      }
+    )
+    await assertPrintWorkspaceRestoreSampleAction(page, {
+      editableSelector,
+      staleTexts: [insertedText, reloadInsertedText],
+      scenarioLabel,
+    })
   }
 
   async function assertPrintWorkspaceSignatureBlankAction(
@@ -402,43 +533,150 @@ export function createPrintAssertions({
       .trim()
   }
 
+  async function appendTextToEditablePopupCell(
+    page,
+    { editableSelector, insertedText, scenarioLabel, commit = true }
+  ) {
+    const editableCell = page.locator(editableSelector).first()
+    await editableCell.waitFor({ state: 'visible', timeout: 15_000 })
+    await page.waitForFunction(
+      (selector) =>
+        document.querySelector(selector)?.dataset?.printWorkspaceDraftReady ===
+        'true',
+      editableSelector,
+      { timeout: 5_000 }
+    )
+
+    await editableCell.click()
+    await page.waitForFunction(
+      (selector) => document.activeElement === document.querySelector(selector),
+      editableSelector,
+      {
+        timeout: 5_000,
+      }
+    )
+    await page.keyboard.press('End')
+    await page.keyboard.type(insertedText)
+    await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          queueMicrotask(resolve)
+        })
+    )
+    if (commit) {
+      await page.keyboard.press('Tab')
+    }
+
+    const nextText = normalizeInlineText(await editableCell.textContent())
+    assert(
+      nextText.includes(insertedText),
+      `${scenarioLabel} 右侧表格未写入刷新前标记: ${JSON.stringify({
+        editableSelector,
+        insertedText,
+        nextText,
+      })}`
+    )
+  }
+
+  async function assertEditablePopupCellContainsText(
+    page,
+    {
+      editableSelector,
+      expectedText,
+      scenarioLabel,
+      requirePersistedDraft = true,
+    }
+  ) {
+    const editableCell = page.locator(editableSelector).first()
+    await editableCell.waitFor({ state: 'visible', timeout: 15_000 })
+
+    const nextText = normalizeInlineText(await editableCell.textContent())
+    const pageState = await page.evaluate((text) => {
+      const bodyText = document.body?.textContent || ''
+      const persistedMatches = Array.from(
+        { length: localStorage.length },
+        (_, index) => {
+          const key = localStorage.key(index) || ''
+          const value = localStorage.getItem(key) || ''
+          let draftPreview = null
+          if (key.includes('print_workspace_draft')) {
+            try {
+              const parsed = JSON.parse(value)
+              draftPreview = {
+                contractNo: parsed?.lines?.[0]?.contractNo,
+                processingOrderNo: parsed?.rows?.[0]?.orderNo,
+                productNo: parsed?.productNo,
+                firstMaterialName: parsed?.materials?.[0]?.name,
+              }
+            } catch {
+              draftPreview = null
+            }
+          }
+          return {
+            key,
+            hasExpectedText: value.includes(text),
+            valueLength: value.length,
+            draftPreview,
+          }
+        }
+      ).filter(
+        ({ key }) => key.includes('draft') || key.includes('print_window_state')
+      )
+      return {
+        url: location.href,
+        bodyHasExpectedText: bodyText.includes(text),
+        persistedMatches,
+      }
+    }, expectedText)
+    assert.equal(
+      pageState.bodyHasExpectedText,
+      true,
+      `${scenarioLabel} 刷新后页面正文未包含刷新前编辑内容: ${JSON.stringify({
+        editableSelector,
+        expectedText,
+        nextText,
+        pageState,
+      })}`
+    )
+    if (requirePersistedDraft) {
+      assert(
+        pageState.persistedMatches.some(
+          ({ hasExpectedText }) => hasExpectedText
+        ),
+        `${scenarioLabel} 刷新后结构化草稿未保存刷新前编辑内容: ${JSON.stringify(
+          {
+            editableSelector,
+            expectedText,
+            nextText,
+            pageState,
+          }
+        )}`
+      )
+    }
+    assert(
+      nextText.includes(expectedText),
+      `${scenarioLabel} 刷新后丢失刷新前编辑内容: ${JSON.stringify({
+        editableSelector,
+        expectedText,
+        nextText,
+        pageState,
+      })}`
+    )
+  }
+
   async function assertEditablePopupCellInputAfterReload(
     page,
     { editableSelector, scenarioLabel }
   ) {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        const editableCell = page.locator(editableSelector).first()
-        await editableCell.waitFor({ state: 'visible', timeout: 15_000 })
-
-        const originalText = normalizeInlineText(
-          await editableCell.textContent()
-        )
-        const insertedText = '__popup_reload__'
-
-        await editableCell.click()
-        await page.waitForFunction(
-          (selector) =>
-            document.activeElement === document.querySelector(selector),
+        const insertedText = 'ZZRELOAD'
+        await appendTextToEditablePopupCell(page, {
           editableSelector,
-          {
-            timeout: 5_000,
-          }
-        )
-        await page.keyboard.press('End')
-        await page.keyboard.type(insertedText)
-        await page.keyboard.press('Tab')
-
-        const nextText = normalizeInlineText(await editableCell.textContent())
-        assert(
-          nextText.includes(insertedText),
-          `${scenarioLabel} 刷新后右侧表格仍不可编辑: ${JSON.stringify({
-            editableSelector,
-            originalText,
-            nextText,
-          })}`
-        )
-        return
+          insertedText,
+          scenarioLabel,
+        })
+        return insertedText
       } catch (error) {
         if (
           attempt >= 2 ||
@@ -452,6 +690,49 @@ export function createPrintAssertions({
         await page.waitForTimeout(250)
       }
     }
+    return ''
+  }
+
+  async function assertPrintWorkspaceRestoreSampleAction(
+    page,
+    { editableSelector, staleTexts, scenarioLabel }
+  ) {
+    const filteredStaleTexts = staleTexts.filter(Boolean)
+    await page.getByRole('button', { name: '恢复样例' }).click()
+    await page.waitForFunction(
+      ({ selector, texts }) => {
+        const cell = document.querySelector(selector)
+        const cellText = String(cell?.textContent || '')
+        const bodyText = String(document.body?.textContent || '')
+        return texts.every(
+          (text) => !cellText.includes(text) && !bodyText.includes(text)
+        )
+      },
+      { selector: editableSelector, texts: filteredStaleTexts },
+      { timeout: 5_000 }
+    )
+
+    const afterRestore = await page.evaluate(
+      ({ selector, texts }) => {
+        const cell = document.querySelector(selector)
+        const cellText = String(cell?.textContent || '')
+        const bodyText = String(document.body?.textContent || '')
+        return {
+          cellText,
+          bodyHasStaleText: texts.some((text) => bodyText.includes(text)),
+        }
+      },
+      { selector: editableSelector, texts: filteredStaleTexts }
+    )
+    assert.equal(
+      afterRestore.bodyHasStaleText,
+      false,
+      `${scenarioLabel} 点击恢复样例后仍残留编辑标记: ${JSON.stringify({
+        editableSelector,
+        staleTexts: filteredStaleTexts,
+        afterRestore,
+      })}`
+    )
   }
 
   async function assertPrintWorkspacePaginationStyle(
@@ -647,19 +928,25 @@ export function createPrintAssertions({
     page,
     { storageKey, paperSelector, minimumLineCount = 32, clearMerges = false }
   ) {
-    const originalRaw = await page.evaluate(
-      (resolvedStorageKey) => window.localStorage.getItem(resolvedStorageKey),
+    const storageKeys = await resolveCurrentPrintWorkspaceDraftStorageKeys(
+      page,
       storageKey
     )
+    const originalEntries = await snapshotLocalStorageValues(page, storageKeys)
+    const injectionMarkerKey = createDraftInjectionMarkerKey('continued_page')
+    await installDraftInjectionOnNextLoad(page, injectionMarkerKey)
 
     try {
       await page.evaluate(
         ({
-          resolvedStorageKey,
+          resolvedStorageKeys,
           resolvedMinimumLineCount,
           shouldClearMerges,
+          resolvedInjectionMarkerKey,
         }) => {
-          const rawDraft = window.localStorage.getItem(resolvedStorageKey)
+          const rawDraft = resolvedStorageKeys
+            .map((key) => window.localStorage.getItem(key))
+            .find((value) => typeof value === 'string')
           const draft = rawDraft ? JSON.parse(rawDraft) : {}
           const baseLines =
             Array.isArray(draft.lines) && draft.lines.length > 0
@@ -692,12 +979,22 @@ export function createPrintAssertions({
             draft.merges = []
           }
 
-          window.localStorage.setItem(resolvedStorageKey, JSON.stringify(draft))
+          resolvedStorageKeys.forEach((key) => {
+            window.localStorage.setItem(key, JSON.stringify(draft))
+          })
+          window.localStorage.setItem(
+            resolvedInjectionMarkerKey,
+            JSON.stringify({
+              keys: resolvedStorageKeys,
+              draftJSON: JSON.stringify(draft),
+            })
+          )
         },
         {
-          resolvedStorageKey: storageKey,
+          resolvedStorageKeys: storageKeys,
           resolvedMinimumLineCount: minimumLineCount,
           shouldClearMerges: clearMerges,
+          resolvedInjectionMarkerKey: injectionMarkerKey,
         }
       )
 
@@ -757,19 +1054,11 @@ export function createPrintAssertions({
       )
     } finally {
       await page.evaluate(
-        ({ resolvedStorageKey, resolvedOriginalRaw }) => {
-          if (typeof resolvedOriginalRaw !== 'string') {
-            window.localStorage.removeItem(resolvedStorageKey)
-            return
-          }
-
-          window.localStorage.setItem(resolvedStorageKey, resolvedOriginalRaw)
-        },
-        {
-          resolvedStorageKey: storageKey,
-          resolvedOriginalRaw: originalRaw,
-        }
+        (resolvedInjectionMarkerKey) =>
+          window.localStorage.removeItem(resolvedInjectionMarkerKey),
+        injectionMarkerKey
       )
+      await restoreLocalStorageValues(page, originalEntries)
     }
   }
 
@@ -1168,15 +1457,24 @@ export function createPrintAssertions({
     page,
     { storageKey, templateKind, totalValueSelector, scenarioLabel }
   ) {
-    const originalRaw = await page.evaluate(
-      (resolvedStorageKey) => window.localStorage.getItem(resolvedStorageKey),
+    const storageKeys = await resolveCurrentPrintWorkspaceDraftStorageKeys(
+      page,
       storageKey
     )
+    const originalEntries = await snapshotLocalStorageValues(page, storageKeys)
+    const injectionMarkerKey = createDraftInjectionMarkerKey('large_total')
+    await installDraftInjectionOnNextLoad(page, injectionMarkerKey)
 
     try {
       await page.evaluate(
-        ({ resolvedStorageKey, resolvedTemplateKind }) => {
-          const rawDraft = window.localStorage.getItem(resolvedStorageKey)
+        ({
+          resolvedStorageKeys,
+          resolvedTemplateKind,
+          resolvedInjectionMarkerKey,
+        }) => {
+          const rawDraft = resolvedStorageKeys
+            .map((key) => window.localStorage.getItem(key))
+            .find((value) => typeof value === 'string')
           const draft = rawDraft ? JSON.parse(rawDraft) : {}
           const sourceLine =
             Array.isArray(draft.lines) && draft.lines.length > 0
@@ -1196,11 +1494,21 @@ export function createPrintAssertions({
             },
           ]
           draft.merges = []
-          window.localStorage.setItem(resolvedStorageKey, JSON.stringify(draft))
+          resolvedStorageKeys.forEach((key) => {
+            window.localStorage.setItem(key, JSON.stringify(draft))
+          })
+          window.localStorage.setItem(
+            resolvedInjectionMarkerKey,
+            JSON.stringify({
+              keys: resolvedStorageKeys,
+              draftJSON: JSON.stringify(draft),
+            })
+          )
         },
         {
-          resolvedStorageKey: storageKey,
+          resolvedStorageKeys: storageKeys,
           resolvedTemplateKind: templateKind,
+          resolvedInjectionMarkerKey: injectionMarkerKey,
         }
       )
 
@@ -1258,18 +1566,11 @@ export function createPrintAssertions({
       })
     } finally {
       await page.evaluate(
-        ({ resolvedStorageKey, resolvedOriginalRaw }) => {
-          if (typeof resolvedOriginalRaw === 'string') {
-            window.localStorage.setItem(resolvedStorageKey, resolvedOriginalRaw)
-            return
-          }
-          window.localStorage.removeItem(resolvedStorageKey)
-        },
-        {
-          resolvedStorageKey: storageKey,
-          resolvedOriginalRaw: originalRaw,
-        }
+        (resolvedInjectionMarkerKey) =>
+          window.localStorage.removeItem(resolvedInjectionMarkerKey),
+        injectionMarkerKey
       )
+      await restoreLocalStorageValues(page, originalEntries)
       await page.reload({ waitUntil: 'domcontentloaded' })
       await expectText(page, '当前记录字段（可编辑）')
     }
@@ -1327,8 +1628,8 @@ export function createPrintAssertions({
         `采购合同打印态头部信息不应在窄视口塌成单列: ${JSON.stringify(metrics)}`
       )
       assert(
-        metrics.paperPaddingLeft >= 30,
-        `采购合同打印态页边距不应退回移动端紧凑值: ${JSON.stringify(metrics)}`
+        metrics.paperPaddingLeft >= 18 && metrics.paperPaddingLeft <= 22,
+        `采购合同打印态左右页边距应保持 5mm 量级: ${JSON.stringify(metrics)}`
       )
       assert(
         metrics.tableFontSize >= 13.5,

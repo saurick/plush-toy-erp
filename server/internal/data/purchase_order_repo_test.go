@@ -36,6 +36,9 @@ func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 	expectedArrival := purchaseDate.AddDate(0, 0, 7)
 	qty := decimal.NewFromInt(10)
 	price := decimal.NewFromInt(5)
+	productOrderNo := "SO-PO-001"
+	productNo := "P-PO-001"
+	productName := "采购关联产品"
 
 	result, err := uc.SavePurchaseOrderWithItems(ctx, 0, &biz.PurchaseOrderMutation{
 		PurchaseOrderNo:     "PO-001",
@@ -46,14 +49,17 @@ func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 	}, []*biz.PurchaseOrderItemSaveMutation{
 		{
 			PurchaseOrderItemMutation: biz.PurchaseOrderItemMutation{
-				LineNo:               1,
-				MaterialID:           material.ID,
-				UnitID:               unit.ID,
-				MaterialCodeSnapshot: &material.Code,
-				MaterialNameSnapshot: &material.Name,
-				PurchasedQuantity:    qty,
-				UnitPrice:            &price,
-				ExpectedArrivalDate:  &expectedArrival,
+				LineNo:                 1,
+				MaterialID:             material.ID,
+				UnitID:                 unit.ID,
+				MaterialCodeSnapshot:   &material.Code,
+				MaterialNameSnapshot:   &material.Name,
+				ProductOrderNoSnapshot: &productOrderNo,
+				ProductNoSnapshot:      &productNo,
+				ProductNameSnapshot:    &productName,
+				PurchasedQuantity:      qty,
+				UnitPrice:              &price,
+				ExpectedArrivalDate:    &expectedArrival,
 			},
 		},
 	})
@@ -62,6 +68,12 @@ func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 	}
 	if result.Order.LifecycleStatus != biz.PurchaseOrderStatusDraft || len(result.Items) != 1 {
 		t.Fatalf("expected draft purchase order with one line, got %#v", result)
+	}
+	line := result.Items[0]
+	if line.ProductOrderNoSnapshot == nil || *line.ProductOrderNoSnapshot != productOrderNo ||
+		line.ProductNoSnapshot == nil || *line.ProductNoSnapshot != productNo ||
+		line.ProductNameSnapshot == nil || *line.ProductNameSnapshot != productName {
+		t.Fatalf("expected product snapshots persisted, got %#v", line)
 	}
 
 	if _, err := uc.SubmitPurchaseOrder(ctx, result.Order.ID); err != nil {

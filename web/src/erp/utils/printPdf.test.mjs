@@ -210,11 +210,29 @@ function createFakeSnapshotRoot() {
         },
         {
           cssText:
-            '@media print { .erp-material-contract-paper { box-shadow: none; } .erp-sidebar-panel { display: none; } }',
+            '.erp-engineering-print-paper { box-sizing: border-box; width: 210mm; padding: 12mm 10mm; }',
+        },
+        {
+          cssText: '.erp-material-detail-paper { padding: 10mm 2.5mm; }',
+        },
+        {
+          cssText:
+            '.erp-color-card-paper__sheet { grid-template-columns: minmax(0, 1fr) 5.5mm minmax(0, 1fr); }',
+        },
+        {
+          cssText:
+            '.erp-work-instruction-paper__sheet { width: 100%; table-layout: fixed; }',
+        },
+        {
+          cssText:
+            '@media print { .erp-material-contract-paper { box-shadow: none; } .erp-engineering-print-paper { margin: 0 auto; } .erp-sidebar-panel { display: none; } }',
           conditionText: 'print',
           cssRules: [
             {
               cssText: '.erp-material-contract-paper { box-shadow: none; }',
+            },
+            {
+              cssText: '.erp-engineering-print-paper { margin: 0 auto; }',
             },
             {
               cssText: '.erp-sidebar-panel { display: none; }',
@@ -918,6 +936,10 @@ test('printPdf: 服务端 PDF 快照会收口到纸面主区域并追加打印�
   assert.doesNotMatch(body.outerHTML, /toolbar/)
   assert.match(head.outerHTML, /data-server-pdf-style="true"/)
   assert.match(head.outerHTML, /\.erp-material-contract-paper/)
+  assert.match(head.outerHTML, /width: 210mm !important/)
+  assert.match(head.outerHTML, /max-width: 210mm !important/)
+  assert.match(head.outerHTML, /margin: 0 !important/)
+  assert.doesNotMatch(head.outerHTML, /margin: 0 auto !important/)
 })
 
 test('printPdf: 服务端 PDF 最小快照只克隆纸面目标区域', () => {
@@ -952,9 +974,15 @@ test('printPdf: 服务端 PDF 快照固定为浅色纸面口径', () => {
     '[data-server-pdf-inline-styles="true"]'
   )
   assert.match(inlineStyle.textContent, /width: 210mm/)
+  assert.match(inlineStyle.textContent, /erp-engineering-print-paper/)
+  assert.match(inlineStyle.textContent, /box-sizing: border-box/)
+  assert.match(inlineStyle.textContent, /erp-material-detail-paper/)
+  assert.match(inlineStyle.textContent, /erp-color-card-paper__sheet/)
+  assert.match(inlineStyle.textContent, /erp-work-instruction-paper__sheet/)
   assert.match(inlineStyle.textContent, /border: 1px solid #111827/)
   assert.match(inlineStyle.textContent, /@media print/)
   assert.match(inlineStyle.textContent, /box-shadow: none/)
+  assert.match(inlineStyle.textContent, /margin: 0 auto/)
   assert.doesNotMatch(inlineStyle.textContent, /erp-dashboard-card/)
   assert.doesNotMatch(inlineStyle.textContent, /erp-sidebar-panel/)
 
@@ -972,6 +1000,12 @@ test('printPdf: 服务端 PDF 快照固定为浅色纸面口径', () => {
 
   assert.match(head.outerHTML, /color-scheme: light !important/)
   assert.match(head.outerHTML, /background: #fff !important/)
+  assert.match(head.outerHTML, /overflow: visible !important/)
+  assert.match(head.outerHTML, /\[data-server-pdf-root="true"\] \{/)
+  assert.match(
+    head.outerHTML,
+    /margin:\s+0 !important;\n\s{2}width:\s+210mm !important;/
+  )
   assert.match(head.outerHTML, /visibility: visible !important/)
   assert.doesNotMatch(body.outerHTML, /erp-print-shell--preparing/)
 })

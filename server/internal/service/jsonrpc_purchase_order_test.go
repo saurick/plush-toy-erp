@@ -180,14 +180,17 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 		"purchase_date":     "2026-06-15",
 		"items": []any{
 			map[string]any{
-				"line_no":                float64(1),
-				"material_id":            float64(2),
-				"unit_id":                float64(3),
-				"material_code_snapshot": "MAT-JSONRPC-PO",
-				"material_name_snapshot": "短毛绒",
-				"purchased_quantity":     "12.5",
-				"unit_price":             "3.2",
-				"amount":                 "40",
+				"line_no":                   float64(1),
+				"material_id":               float64(2),
+				"unit_id":                   float64(3),
+				"material_code_snapshot":    "MAT-JSONRPC-PO",
+				"material_name_snapshot":    "短毛绒",
+				"product_order_no_snapshot": " SO-JSONRPC-001 ",
+				"product_no_snapshot":       " P-JSONRPC-001 ",
+				"product_name_snapshot":     " 毛绒兔 ",
+				"purchased_quantity":        "12.5",
+				"unit_price":                "3.2",
+				"amount":                    "40",
 			},
 		},
 	}))
@@ -209,6 +212,15 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 	item := items[0].(map[string]any)
 	if qty := item["purchased_quantity"]; qty != "12.5" {
 		t.Fatalf("expected purchased quantity 12.5, got %#v", qty)
+	}
+	if productOrderNo := item["product_order_no_snapshot"]; productOrderNo != "SO-JSONRPC-001" {
+		t.Fatalf("expected product order no snapshot, got %#v", productOrderNo)
+	}
+	if productNo := item["product_no_snapshot"]; productNo != "P-JSONRPC-001" {
+		t.Fatalf("expected product no snapshot, got %#v", productNo)
+	}
+	if productName := item["product_name_snapshot"]; productName != "毛绒兔" {
+		t.Fatalf("expected product name snapshot, got %#v", productName)
 	}
 
 	_, listRes, err := j.handlePurchaseOrder(ctx, "list_purchase_orders", "2", mustJSONRPCStruct(t, map[string]any{
@@ -494,21 +506,24 @@ func purchaseOrderFromMutation(id int, status string, in *biz.PurchaseOrderMutat
 
 func purchaseOrderItemFromMutation(id int, orderID int, in *biz.PurchaseOrderItemMutation) *biz.PurchaseOrderItem {
 	return &biz.PurchaseOrderItem{
-		ID:                   id,
-		PurchaseOrderID:      orderID,
-		LineNo:               in.LineNo,
-		MaterialID:           in.MaterialID,
-		UnitID:               in.UnitID,
-		MaterialCodeSnapshot: in.MaterialCodeSnapshot,
-		MaterialNameSnapshot: in.MaterialNameSnapshot,
-		ColorSnapshot:        in.ColorSnapshot,
-		PurchasedQuantity:    in.PurchasedQuantity,
-		UnitPrice:            in.UnitPrice,
-		Amount:               in.Amount,
-		ExpectedArrivalDate:  in.ExpectedArrivalDate,
-		LineStatus:           biz.PurchaseOrderItemStatusOpen,
-		Note:                 in.Note,
-		CreatedAt:            time.Unix(1, 0),
-		UpdatedAt:            time.Unix(1, 0),
+		ID:                     id,
+		PurchaseOrderID:        orderID,
+		LineNo:                 in.LineNo,
+		MaterialID:             in.MaterialID,
+		UnitID:                 in.UnitID,
+		MaterialCodeSnapshot:   in.MaterialCodeSnapshot,
+		MaterialNameSnapshot:   in.MaterialNameSnapshot,
+		ColorSnapshot:          in.ColorSnapshot,
+		ProductOrderNoSnapshot: in.ProductOrderNoSnapshot,
+		ProductNoSnapshot:      in.ProductNoSnapshot,
+		ProductNameSnapshot:    in.ProductNameSnapshot,
+		PurchasedQuantity:      in.PurchasedQuantity,
+		UnitPrice:              in.UnitPrice,
+		Amount:                 in.Amount,
+		ExpectedArrivalDate:    in.ExpectedArrivalDate,
+		LineStatus:             biz.PurchaseOrderItemStatusOpen,
+		Note:                   in.Note,
+		CreatedAt:              time.Unix(1, 0),
+		UpdatedAt:              time.Unix(1, 0),
 	}
 }

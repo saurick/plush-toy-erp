@@ -35,6 +35,12 @@ type PurchaseOrderItem struct {
 	MaterialNameSnapshot *string `json:"material_name_snapshot,omitempty"`
 	// ColorSnapshot holds the value of the "color_snapshot" field.
 	ColorSnapshot *string `json:"color_snapshot,omitempty"`
+	// ProductOrderNoSnapshot holds the value of the "product_order_no_snapshot" field.
+	ProductOrderNoSnapshot *string `json:"product_order_no_snapshot,omitempty"`
+	// ProductNoSnapshot holds the value of the "product_no_snapshot" field.
+	ProductNoSnapshot *string `json:"product_no_snapshot,omitempty"`
+	// ProductNameSnapshot holds the value of the "product_name_snapshot" field.
+	ProductNameSnapshot *string `json:"product_name_snapshot,omitempty"`
 	// PurchasedQuantity holds the value of the "purchased_quantity" field.
 	PurchasedQuantity decimal.Decimal `json:"purchased_quantity,omitempty"`
 	// UnitPrice holds the value of the "unit_price" field.
@@ -125,7 +131,7 @@ func (*PurchaseOrderItem) scanValues(columns []string) ([]any, error) {
 			values[i] = new(decimal.Decimal)
 		case purchaseorderitem.FieldID, purchaseorderitem.FieldPurchaseOrderID, purchaseorderitem.FieldLineNo, purchaseorderitem.FieldMaterialID, purchaseorderitem.FieldUnitID:
 			values[i] = new(sql.NullInt64)
-		case purchaseorderitem.FieldMaterialCodeSnapshot, purchaseorderitem.FieldMaterialNameSnapshot, purchaseorderitem.FieldColorSnapshot, purchaseorderitem.FieldLineStatus, purchaseorderitem.FieldNote:
+		case purchaseorderitem.FieldMaterialCodeSnapshot, purchaseorderitem.FieldMaterialNameSnapshot, purchaseorderitem.FieldColorSnapshot, purchaseorderitem.FieldProductOrderNoSnapshot, purchaseorderitem.FieldProductNoSnapshot, purchaseorderitem.FieldProductNameSnapshot, purchaseorderitem.FieldLineStatus, purchaseorderitem.FieldNote:
 			values[i] = new(sql.NullString)
 		case purchaseorderitem.FieldExpectedArrivalDate, purchaseorderitem.FieldCreatedAt, purchaseorderitem.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -194,6 +200,27 @@ func (_m *PurchaseOrderItem) assignValues(columns []string, values []any) error 
 			} else if value.Valid {
 				_m.ColorSnapshot = new(string)
 				*_m.ColorSnapshot = value.String
+			}
+		case purchaseorderitem.FieldProductOrderNoSnapshot:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field product_order_no_snapshot", values[i])
+			} else if value.Valid {
+				_m.ProductOrderNoSnapshot = new(string)
+				*_m.ProductOrderNoSnapshot = value.String
+			}
+		case purchaseorderitem.FieldProductNoSnapshot:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field product_no_snapshot", values[i])
+			} else if value.Valid {
+				_m.ProductNoSnapshot = new(string)
+				*_m.ProductNoSnapshot = value.String
+			}
+		case purchaseorderitem.FieldProductNameSnapshot:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field product_name_snapshot", values[i])
+			} else if value.Valid {
+				_m.ProductNameSnapshot = new(string)
+				*_m.ProductNameSnapshot = value.String
 			}
 		case purchaseorderitem.FieldPurchasedQuantity:
 			if value, ok := values[i].(*decimal.Decimal); !ok {
@@ -327,6 +354,21 @@ func (_m *PurchaseOrderItem) String() string {
 	builder.WriteString(", ")
 	if v := _m.ColorSnapshot; v != nil {
 		builder.WriteString("color_snapshot=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ProductOrderNoSnapshot; v != nil {
+		builder.WriteString("product_order_no_snapshot=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ProductNoSnapshot; v != nil {
+		builder.WriteString("product_no_snapshot=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ProductNameSnapshot; v != nil {
+		builder.WriteString("product_name_snapshot=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

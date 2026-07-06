@@ -159,7 +159,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     description:
       '保留模板导航、纸面预览和打印窗口入口；字段编辑和明细确认回到独立打印窗口。',
     appliesTo:
-      '模板打印中心可参照；只表达采购合同和加工合同两套正式模板入口，不新增样品确认单、字段映射配置、后端 API、RBAC 或 Fact 写入。',
+      '模板打印中心可参照；当前运行时正式模板包含合同和工程资料打印入口，不新增样品确认单、字段映射配置、后端 API、RBAC 或 Fact 写入。',
   },
   {
     key: 'business-task-collab-entry',

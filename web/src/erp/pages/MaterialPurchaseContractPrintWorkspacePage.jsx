@@ -3,7 +3,7 @@ import { Navigate, useSearchParams } from 'react-router-dom'
 import MaterialPurchaseContractWorkbench from '../components/print/MaterialPurchaseContractWorkbench.jsx'
 import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
 import {
-  buildPrintWorkspacePath,
+  buildRestorablePrintWorkspaceURL,
   buildPrintWorkspaceDraftStorageKey,
   PRINT_WORKSPACE_DRAFT_MODE,
   PRINT_WORKSPACE_ENTRY_SOURCE,
@@ -38,18 +38,12 @@ export default function MaterialPurchaseContractPrintWorkspacePage() {
       return ''
     }
 
-    return new URL(
-      buildPrintWorkspacePath('material-purchase-contract', {
-        entrySource,
-        draftMode: resetDraftOnOpen
-          ? PRINT_WORKSPACE_DRAFT_MODE.FRESH
-          : PRINT_WORKSPACE_DRAFT_MODE.RESTORE,
-        customerKey,
-        stateID: workspaceStateID,
-      }),
-      window.location.origin
-    ).toString()
-  }, [customerKey, entrySource, resetDraftOnOpen, workspaceStateID])
+    return buildRestorablePrintWorkspaceURL('material-purchase-contract', {
+      entrySource,
+      customerKey,
+      stateID: workspaceStateID,
+    })
+  }, [customerKey, entrySource, workspaceStateID])
 
   useEffect(() => {
     document.title = '采购合同打印窗口'
