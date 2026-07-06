@@ -31,6 +31,8 @@ description: 项目打印模板源文件治理（plush-toy-erp）。Use when Cod
 - 打印模板只读业务快照和当前窗口草稿，不创建、确认、过账或反写采购、委外、生产、库存、质检、出货或财务事实。
 - 客户源文件、客户公司名、真实联系人、真实电话、真实签字人、客户图片和原始资料路径不能自动进入 Product Core 默认样例。客户专属内容应留在 `docs/customers/<customer-key>/`、客户配置包、客户打印模板、assets 或交付资料边界。
 - 客户源文件里的轻微干扰和噪点不能照着实现：扫描污点、截图边缘、临时批注、手工审阅痕迹、重复拼接缝、Excel 临时辅助行、偶发错位或孤立格式异常，默认先归为 source noise，除非能证明它是稳定模板结构、客户固定要求或可编辑业务元素。
+- 噪点分级：source noise 是源文件污点 / 临时痕迹 / 偶发错位；rendering noise 是截图压缩、抗锯齿、字体 hinting 或 1px 内 subpixel 差；runtime product noise 是真实 UI / PDF 错位、遮挡、缺字、误高亮、错误焦点或业务误导。前两类通常记录或排除，第三类必须修或列为 remaining risk。
+- 噪点只有在重复出现、锚定到 workbook / PDF 结构、有业务含义、影响阅读/操作/打印，或被客户 / 用户明确确认时，才升级为模板元素、客户配置或测试断言。
 - Excel workbook 可能混有 print templates、summary sheets、vendor / customer reference data、import-prep clues、hidden helper rows 和 styled blank regions；任何内容进入 Product Core 或 customer config 前，都要先分类 sheet / region。
 - Excel dimensions 可能被样式或 drawings 撑大；必须计算真实内容区，并独立解析 drawing / image anchors。图片 anchor 在文本 used range 外，不等于可以丢弃。
 - 提取或生成的 customer assets 必须保留 provenance：workbook path、sheet name、drawing file / id、row / column anchor、crop / layout、source dimensions、runtime URL，以及它是 customer sample 还是 editable runtime slot。
@@ -91,6 +93,7 @@ description: 项目打印模板源文件治理（plush-toy-erp）。Use when Cod
 
 - Source screenshot 和 runtime screenshot 要一起用，不能只依赖其中一个。
 - 截图调试必须覆盖实际问题状态：给截图或 Playwright artifact 命名，至少覆盖 source baseline、runtime editor、selected target、edit focus、insert above / below 后目标位置，以及必要的 PDF / print 输出；截图发现问题时继续调试到可重复验证通过。
+- 截图够用标准 Screenshot sufficiency：小改动通常覆盖 source / runtime baseline、exact changed state、一个相关 boundary 和必要输出即可；官方模板、PDF parity、图片槽、分页或多步编辑可扩到 5-8 张，但每张都必须对应一个版式、交互或输出判断。
 - Layout 验证要检查真实 cell geometry：table width、column ratios、row heights、font size、line height、borders、padding、overflow 和 adjacent boxes。
 - Cell editing 要比较 editable layer 与 parent cell 的 bounding box，确认它铺满 printable cell area；除非该 cell 明确是 label-only 或 non-editable，否则 focus / selection highlight 不应暴露一个更小的 inline editor。
 - Edit-focus styling 要在浏览器里检查 computed styles：official templates 的 active editable cells 不应混用 dashed 和 solid borders；selection 与 editing focus 要保持视觉区分。
@@ -99,6 +102,7 @@ description: 项目打印模板源文件治理（plush-toy-erp）。Use when Cod
 - Sample rows 要确认重复行使用 compact default sample；长清单行为用 separate fixture / regression 覆盖。
 - Row operations 要覆盖 default row、section row、blank row、selected row、insert above / below、delete、add image、remove image 和 edit recovery。
 - PDF / print 要确认使用同一份 current paper DOM，editor highlights / toolbars 不进入打印结果。
+- 发现噪点时先分类为 source / rendering / runtime product noise；不要把源噪点照搬进模板，也不要用“噪点”掩盖真实运行时错位、遮挡、缺字或错误选择。
 - 职业任务文案要检查模板标题、按钮、导出/PDF、帮助提示和正式打印件，确认业务用户看到的是岗位任务语言，不是开发者术语。
 - Performance / quality 要检查本轮最高风险 bound：image count / size、DOM node growth、localStorage snapshot size、image load 后 layout settling、无 repeated measurement loop、编辑区域无明显 lag。
 - Source provenance 输出 manifest / checksum 结果、workbook / PDF 结构证据、real used range decision，涉及图片时输出 image-anchor provenance。

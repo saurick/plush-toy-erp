@@ -30,6 +30,7 @@ Use this skill to turn "简洁易用、美观、低心智负担" into concrete i
 - 低密度但不失真：减少信息密度必须通过信息分组、任务优先级、可读标签和可验证交互完成，不能靠隐藏必要状态、吞掉错误或弱化关键约束。
 - 可回归：样式、布局、交互和原型同步必须覆盖默认态、交互态、恢复态、长文本/大数字/多标签、暗色/移动端和相邻区域；共享组件按影响面升级验证。
 - 截图调试门禁：触达用户可见页面、打印预览、布局、焦点、选择或插入/删除等交互态时，必须用真实浏览器截图 / visual evidence 结合 DOM / box metrics 验证，不能只靠代码、单测或默认态截图收口。
+- 截图够用标准 Screenshot sufficiency：不是多拍图，而是形成证据链；至少证明问题/目标状态、改后状态、一个相关边界状态，并用 DOM / box metrics 证明目标行/单元格/按钮/焦点、溢出和相邻区域正确。
 
 ## Workflow
 
@@ -91,8 +92,10 @@ Use this skill to turn "简洁易用、美观、低心智负担" into concrete i
 8. Validate as regression, not just screenshot review.
    - Cover default, interaction, recovery, and adjacent-area states.
    - For visible layout or interaction changes, capture named screenshots or Playwright artifacts for the exact changed state and at least one boundary state; repeat screenshot debugging until target row/cell/focus/action result is visually and structurally correct.
+   - Minimum visual evidence is usually 2-4 targeted screenshots: default or baseline, exact changed / problem interaction, one relevant boundary, and adjacent area when overlap or layout push is possible. Print templates, PDF parity, mobile/dark, or multi-step editor flows can require 5-8 screenshots, but every screenshot must answer a concrete validation question.
    - Check DOM/box metrics for layout-sensitive changes: bounding boxes, overflow, scrollWidth/clientWidth, offsetHeight/clientHeight/scrollHeight, wrapping, and neighboring overlap.
    - Include long text, many tags, wide numbers, and mobile/dark cases when the changed area can receive variable data.
+   - Treat anti-aliasing, subpixel, font-rendering, or screenshot compression differences as rendering noise unless readability, geometry, interaction, or print output changes. Treat overlap, clipping, wrong focus, wrong row/cell selection, stale artifacts, missing text, or misleading business UI as product defects.
    - For field chain changes, validate relevant stale/missing value paths: new value replaces old value, source switching clears or replaces old values, missing truth is not fabricated, snapshot gaps fall back only by documented rules, and historical records do not display incorrect values.
    - For interactive controls, validate focus, keyboard, disabled/loading, and accessible-name behavior in the changed surface.
    - For navigation-sensitive pages, validate fast route/menu/tab switching. Confirm that stale requests are cancelled or ignored, no stale request produces a toast on the next page, and repeated clicks on the active menu entry do not trigger duplicate reads.

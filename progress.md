@@ -174,3 +174,11 @@
 下一步：后续实际模板实现仍要按对应项目 skill 读取真实 Excel/PDF/截图、源文件 manifest、截图与 DOM/box 证据，不把本次 skill 审查等同于某个具体模板 runtime 已验收。
 
 阻塞/风险：追加前 `progress.md` 为 249 行、59493 字节，未达到 600 行或 80KB 归档阈值。本轮是 skill-only / docs-only 审查与提交收口，不改 runtime、schema、migration、RBAC、Workflow / Fact、PDF 后端、客户配置、源文件或图片资产。官方 `quick_validate.py` 因当前 Python 环境缺少 PyYAML 仍无法直接完成；已用 Ruby 做等价 frontmatter / `agents/openai.yaml` / metadata 校验，并用 `git diff --check` 检查相关 staged 范围。
+
+## 2026-07-06 skill 截图尺度与噪点规则
+
+完成：回答“截图到什么程度、噪点怎么处理”后，补强全局 `$page-design-governance`、`$code-review-governance`、`$erp-print-template-source-governance`，以及项目 `$plush-page-design-governance`、`$plush-code-review-governance`、`$plush-print-template-source-governance`。本轮将“截图够用标准 / Screenshot sufficiency”写成证据链口径：默认 2-4 张关键截图覆盖 baseline、exact changed / problem state、相关 boundary 和相邻区域；打印模板、PDF parity、图片槽、分页或多步编辑等高风险场景可扩到 5-8 张，但每张必须回答具体版式、交互或输出判断。同步补“噪点分级”：source noise、rendering noise 默认记录或排除；runtime product noise 必须修复或列为 remaining risk，不能照搬源噪点，也不能用“截图噪点”掩盖真实错位、遮挡、缺字、误高亮或错误焦点。
+
+下一步：后续页面、打印模板和 UI review 按本规则输出截图/Playwright artifact 名称、DOM / box metrics、覆盖状态和剩余盲区；纯后端、schema、RBAC、docs-only 或 skill-only 任务不机械套用截图流程。
+
+阻塞/风险：追加前 `progress.md` 为 176 行、41029 字节，未达到 600 行或 80KiB 归档阈值。本轮只改全局 / 项目 skill 正文和进度记录，不改 runtime、schema、migration、RBAC、Workflow / Fact、PDF 后端、源文件、客户配置或 `agents/openai.yaml`。全局 `~/.codex/skills` 不属于当前仓库 git 管理；项目版 skill 会随本仓库提交。已通过临时 venv 中的 `quick_validate.py`、`agents/openai.yaml` YAML / metadata 扫描、关键词扫描和 `git diff --check`。
