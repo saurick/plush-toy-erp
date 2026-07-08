@@ -11,9 +11,14 @@ export const engineeringPrintTemplateKeys = new Set([
 export const WORK_INSTRUCTION_ROW_TYPES = Object.freeze({
   title: 'title',
   step: 'step',
-  note: 'note',
-  remark: 'remark',
+  text: 'text',
 })
+
+const WORK_INSTRUCTION_TEXT_ROW_TYPE_ALIASES = new Set([
+  WORK_INSTRUCTION_ROW_TYPES.text,
+  'note',
+  'remark',
+])
 
 export const WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM = 11.6
 
@@ -377,10 +382,17 @@ function normalizeInstructionTextRow(row = {}) {
   }
 }
 
-function normalizeWorkInstructionRowType(type) {
-  return Object.values(WORK_INSTRUCTION_ROW_TYPES).includes(type)
-    ? type
-    : WORK_INSTRUCTION_ROW_TYPES.step
+export function normalizeWorkInstructionRowType(type) {
+  if (type === WORK_INSTRUCTION_ROW_TYPES.title) {
+    return WORK_INSTRUCTION_ROW_TYPES.title
+  }
+  if (type === WORK_INSTRUCTION_ROW_TYPES.step) {
+    return WORK_INSTRUCTION_ROW_TYPES.step
+  }
+  if (WORK_INSTRUCTION_TEXT_ROW_TYPE_ALIASES.has(type)) {
+    return WORK_INSTRUCTION_ROW_TYPES.text
+  }
+  return WORK_INSTRUCTION_ROW_TYPES.step
 }
 
 function normalizeWorkInstructionBodyRow(row = {}, index = 0) {
@@ -401,17 +413,12 @@ function normalizeWorkInstructionBodyRow(row = {}, index = 0) {
 function renumberWorkInstructionBodyRows(rows = []) {
   let stepNo = 1
   return rows.map((row) => {
-    if (
-      row.type === WORK_INSTRUCTION_ROW_TYPES.title ||
-      row.type === WORK_INSTRUCTION_ROW_TYPES.note
-    ) {
-      stepNo = 1
-      return { ...row, no: '' }
+    const type = normalizeWorkInstructionRowType(row?.type)
+    if (type === WORK_INSTRUCTION_ROW_TYPES.step) {
+      return { ...row, type, no: String(stepNo++) }
     }
-    if (row.type === WORK_INSTRUCTION_ROW_TYPES.step || !row.type) {
-      return { ...row, no: String(stepNo++) }
-    }
-    return { ...row, no: '' }
+    stepNo = 1
+    return { ...row, type, no: '' }
   })
 }
 
@@ -443,7 +450,7 @@ function compactWorkInstructionLegacyRows(input = {}, fallback = {}) {
     const value = toText(text)
     if (!value) return
     rows.push({
-      type: WORK_INSTRUCTION_ROW_TYPES.note,
+      type: WORK_INSTRUCTION_ROW_TYPES.text,
       text: value,
       heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
     })
@@ -472,7 +479,7 @@ function compactWorkInstructionLegacyRows(input = {}, fallback = {}) {
     const value = toText(text)
     if (!value) return
     rows.push({
-      type: WORK_INSTRUCTION_ROW_TYPES.remark,
+      type: WORK_INSTRUCTION_ROW_TYPES.text,
       text: value,
       heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
     })
@@ -836,7 +843,7 @@ export const DEFAULT_WORK_INSTRUCTION_SAMPLE = {
       heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
     },
     {
-      type: WORK_INSTRUCTION_ROW_TYPES.note,
+      type: WORK_INSTRUCTION_ROW_TYPES.text,
       text: '注：车缝止口均匀，头车 5mm 止口。用 604# 配色线。打折拖圆顺，进出针倒针牢固。',
       heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
     },
@@ -853,7 +860,7 @@ export const DEFAULT_WORK_INSTRUCTION_SAMPLE = {
       heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
     },
     {
-      type: WORK_INSTRUCTION_ROW_TYPES.remark,
+      type: WORK_INSTRUCTION_ROW_TYPES.text,
       text: '备注：如有不明或不详处，请参照样板或详询板房。',
       heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
     },
@@ -1265,5 +1272,100 @@ export function buildWorkInstructionDraftFromBOMVersion(
     auditor: '',
     remark: version.note || '',
     rows: [],
+  })
+}
+
+function formatWorkInstructionDate(value) {
+  const raw = toText(value)
+  if (!raw) return ''
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+    return raw.slice(0, 10)
+  }
+  return raw
+}
+
+function isCanceledLineStatus(value) {
+  const normalized = toText(value).toLowerCase()
+  return normalized === 'canceled' || normalized === 'cancelled'
+}
+
+function summarizeOutsourcingInstructionItem(item = {}, index = 0) {
+  const productText = compactTextParts(
+    [item.product_no_snapshot, item.product_name_snapshot],
+    ' / '
+  )
+  const quantityText = compactTextParts(
+    [item.outsourcing_quantity, item.unit_name_snapshot],
+    ''
+  )
+  const parts = [
+    toText(item.process_name_snapshot)
+      ? `加工项目：${toText(item.process_name_snapshot)}`
+      : '',
+    productText ? `产品：${productText}` : '',
+    quantityText ? `数量：${quantityText}` : '',
+    toText(item.note) ? `要求：${toText(item.note)}` : '',
+  ].filter(Boolean)
+
+  return {
+    type: WORK_INSTRUCTION_ROW_TYPES.step,
+    no: String(index + 1),
+    text: parts.join('；') || '按工程资料、签样和现场确认要求执行。',
+    heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+  }
+}
+
+export function buildWorkInstructionDraftFromOutsourcingOrder(
+  order = {},
+  items = [],
+  { companyName = '' } = {}
+) {
+  const activeItems = (Array.isArray(items) ? items : []).filter(
+    (item) => !isCanceledLineStatus(item?.line_status)
+  )
+  const supplierSnapshot =
+    order.supplier_snapshot && typeof order.supplier_snapshot === 'object'
+      ? order.supplier_snapshot
+      : {}
+  const supplierName =
+    toText(supplierSnapshot.short_name) || toText(supplierSnapshot.name)
+  const productNos = activeItems.map((item) => item.product_no_snapshot)
+  const productNames = activeItems.map((item) => item.product_name_snapshot)
+  const processNames = activeItems.map((item) => item.process_name_snapshot)
+  const orderNo = toText(order.outsourcing_order_no)
+  const sourceOrderNo = toText(order.source_order_no)
+  const expectedReturnDate = formatWorkInstructionDate(
+    order.expected_return_date
+  )
+  const contextRows = activeItems.length
+    ? [
+        {
+          type: WORK_INSTRUCTION_ROW_TYPES.title,
+          text: '外发加工信息',
+          heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+        },
+        ...activeItems.map(summarizeOutsourcingInstructionItem),
+      ]
+    : []
+
+  return createWorkInstructionDraft({
+    companyName,
+    productNo: compactTextParts(productNos, ' / '),
+    productName: compactTextParts(productNames, ' / '),
+    versionText: expectedReturnDate ? `回货日期：${expectedReturnDate}` : '',
+    processName: compactTextParts(processNames, ' / '),
+    department: DEFAULT_WORK_INSTRUCTION_SAMPLE.department,
+    maker: '',
+    designer: '',
+    auditor: '',
+    orderNo: orderNo || sourceOrderNo,
+    remark: compactTextParts(
+      [
+        supplierName ? `加工厂：${supplierName}` : '',
+        sourceOrderNo ? `来源订单：${sourceOrderNo}` : '',
+      ],
+      '；'
+    ),
+    rows: contextRows,
   })
 }

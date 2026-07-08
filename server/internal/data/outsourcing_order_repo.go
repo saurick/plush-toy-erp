@@ -221,6 +221,7 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 			SetProcessID(mutation.ProcessID).
 			SetUnitID(mutation.UnitID).
 			SetNillableProductNoSnapshot(mutation.ProductNoSnapshot).
+			SetNillableProductOrderNoSnapshot(mutation.ProductOrderNoSnapshot).
 			SetNillableProductNameSnapshot(mutation.ProductNameSnapshot).
 			SetNillableProcessNameSnapshot(mutation.ProcessNameSnapshot).
 			SetNillableProcessCategorySnapshot(mutation.ProcessCategorySnapshot).
@@ -360,6 +361,11 @@ func saveOutsourcingOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, in 
 	} else {
 		update.SetProductNoSnapshot(*in.ProductNoSnapshot)
 	}
+	if in.ProductOrderNoSnapshot == nil {
+		update.ClearProductOrderNoSnapshot()
+	} else {
+		update.SetProductOrderNoSnapshot(*in.ProductOrderNoSnapshot)
+	}
 	if in.ProductNameSnapshot == nil {
 		update.ClearProductNameSnapshot()
 	} else {
@@ -450,6 +456,7 @@ func entOutsourcingOrderItemToBiz(row *ent.OutsourcingOrderItem) *biz.Outsourcin
 		ProcessID:               row.ProcessID,
 		UnitID:                  row.UnitID,
 		ProductNoSnapshot:       row.ProductNoSnapshot,
+		ProductOrderNoSnapshot:  row.ProductOrderNoSnapshot,
 		ProductNameSnapshot:     row.ProductNameSnapshot,
 		ProcessNameSnapshot:     row.ProcessNameSnapshot,
 		ProcessCategorySnapshot: row.ProcessCategorySnapshot,

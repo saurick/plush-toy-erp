@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useLayoutEffect } from 'react'
+import React, { Suspense, useLayoutEffect } from 'react'
 import {
   Navigate,
   Route,
@@ -9,6 +9,10 @@ import {
 import AuthGuard from '@/common/auth/AuthGuard'
 import { getStoredAdminProfile } from '@/common/auth/auth'
 import { Loading } from '@/common/components/loading'
+import {
+  isDynamicImportLoadError,
+  lazyWithDynamicImportRetry,
+} from '@/common/utils/lazyImportRetry.mjs'
 import ERPLayout from './components/ERPLayout.jsx'
 import {
   DEV_CAPABILITY_LEDGER_ROUTE,
@@ -34,68 +38,74 @@ import {
 import { getAllowedMobileRoleKeys } from './utils/mobileRolePermissions.mjs'
 import { canOpenPrintWorkspaceFromWindowState } from './utils/printWorkspace.js'
 
-const AdminLoginPage = lazy(() => import('@/pages/AdminLogin'))
-const EntrySelectionPage = lazy(() => import('./pages/EntrySelectionPage'))
-const BusinessDashboardPage = lazy(
+const lazyRoute = lazyWithDynamicImportRetry
+
+const AdminLoginPage = lazyRoute(() => import('@/pages/AdminLogin'))
+const EntrySelectionPage = lazyRoute(() => import('./pages/EntrySelectionPage'))
+const BusinessDashboardPage = lazyRoute(
   () => import('./pages/BusinessDashboardPage')
 )
-const DashboardPage = lazy(() => import('./pages/DashboardPage'))
-const PrintCenterPage = lazy(() => import('./pages/PrintCenterPage'))
-const PrintTemplatePreviewPage = lazy(
+const DashboardPage = lazyRoute(() => import('./pages/DashboardPage'))
+const PrintCenterPage = lazyRoute(() => import('./pages/PrintCenterPage'))
+const PrintTemplatePreviewPage = lazyRoute(
   () => import('./pages/PrintTemplatePreviewPage')
 )
-const PrintWorkspacePage = lazy(() => import('./pages/PrintWorkspacePage.jsx'))
-const PermissionCenterPage = lazy(() => import('./pages/PermissionCenterPage'))
-const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage.jsx'))
-const V1MasterDataPage = lazy(() => import('./pages/V1MasterDataPage'))
-const V1SalesOrdersPage = lazy(() => import('./pages/V1SalesOrdersPage'))
-const V1PurchaseOrdersPage = lazy(
+const PrintWorkspacePage = lazyRoute(
+  () => import('./pages/PrintWorkspacePage.jsx')
+)
+const PermissionCenterPage = lazyRoute(
+  () => import('./pages/PermissionCenterPage')
+)
+const AuditLogsPage = lazyRoute(() => import('./pages/AuditLogsPage.jsx'))
+const V1MasterDataPage = lazyRoute(() => import('./pages/V1MasterDataPage'))
+const V1SalesOrdersPage = lazyRoute(() => import('./pages/V1SalesOrdersPage'))
+const V1PurchaseOrdersPage = lazyRoute(
   () => import('./pages/V1PurchaseOrdersPage.jsx')
 )
-const V1OutsourcingOrdersPage = lazy(
+const V1OutsourcingOrdersPage = lazyRoute(
   () => import('./pages/V1OutsourcingOrdersPage.jsx')
 )
-const V1PurchaseReceiptsPage = lazy(
+const V1PurchaseReceiptsPage = lazyRoute(
   () => import('./pages/V1PurchaseReceiptsPage.jsx')
 )
-const V1QualityInspectionsPage = lazy(
+const V1QualityInspectionsPage = lazyRoute(
   () => import('./pages/V1QualityInspectionsPage.jsx')
 )
-const V1InventoryLedgerPage = lazy(
+const V1InventoryLedgerPage = lazyRoute(
   () => import('./pages/V1InventoryLedgerPage.jsx')
 )
-const V1OperationalFactPage = lazy(
+const V1OperationalFactPage = lazyRoute(
   () => import('./pages/V1OperationalFactPage.jsx')
 )
-const WorkflowBusinessModulePage = lazy(
+const WorkflowBusinessModulePage = lazyRoute(
   () => import('./pages/WorkflowBusinessModulePage.jsx')
 )
-const BOMVersionsPage = lazy(() => import('./pages/BOMVersionsPage.jsx'))
-const ShipmentsPage = lazy(() => import('./pages/ShipmentsPage.jsx'))
-const MobileAppLayout = lazy(() => import('./mobile/MobileAppLayout'))
-const MobileRoleTasksPage = lazy(
+const BOMVersionsPage = lazyRoute(() => import('./pages/BOMVersionsPage.jsx'))
+const ShipmentsPage = lazyRoute(() => import('./pages/ShipmentsPage.jsx'))
+const MobileAppLayout = lazyRoute(() => import('./mobile/MobileAppLayout'))
+const MobileRoleTasksPage = lazyRoute(
   () => import('./mobile/pages/MobileRoleTasksPage')
 )
 const DevHubPage = import.meta.env.DEV
-  ? lazy(() => import('./pages/DevHubPage.jsx'))
+  ? lazyRoute(() => import('./pages/DevHubPage.jsx'))
   : null
 const DevDocsPage = import.meta.env.DEV
-  ? lazy(() => import('./pages/DevDocsPage.jsx'))
+  ? lazyRoute(() => import('./pages/DevDocsPage.jsx'))
   : null
 const DevGovernancePage = import.meta.env.DEV
-  ? lazy(() => import('./pages/DevGovernancePage.jsx'))
+  ? lazyRoute(() => import('./pages/DevGovernancePage.jsx'))
   : null
 const DevPrototypesPage = import.meta.env.DEV
-  ? lazy(() => import('./pages/DevPrototypesPage.jsx'))
+  ? lazyRoute(() => import('./pages/DevPrototypesPage.jsx'))
   : null
 const DevCapabilityLedgerPage = import.meta.env.DEV
-  ? lazy(() => import('./pages/DevCapabilityLedgerPage.jsx'))
+  ? lazyRoute(() => import('./pages/DevCapabilityLedgerPage.jsx'))
   : null
 const DevCustomerConfigPage = import.meta.env.DEV
-  ? lazy(() => import('./pages/DevCustomerConfigPage.jsx'))
+  ? lazyRoute(() => import('./pages/DevCustomerConfigPage.jsx'))
   : null
 const DevTestingPage = import.meta.env.DEV
-  ? lazy(() => import('./pages/DevTestingPage.jsx'))
+  ? lazyRoute(() => import('./pages/DevTestingPage.jsx'))
   : null
 const LAST_MOBILE_ENTRY_PATH_KEY = 'erp:last_mobile_entry_path'
 function DesktopEntryRedirect() {
@@ -143,6 +153,82 @@ function RouteLoadingFallback() {
       fullscreen
       className="loading-page--erp"
     />
+  )
+}
+
+function RouteRuntimeErrorFallback({ error }) {
+  const isModuleLoadError = isDynamicImportLoadError(error)
+  const title = isModuleLoadError ? '页面模块加载失败' : '页面运行异常'
+  const description = isModuleLoadError
+    ? '本地开发服务的页面模块加载被中断，请重新加载当前页面；如果刚刚重启过前端服务，请先等服务稳定。'
+    : '当前页面渲染时出现异常，请重新加载当前页面；如果问题持续出现，请保留控制台错误继续排查。'
+
+  return (
+    <Loading
+      title={title}
+      description={description}
+      fullscreen
+      className="loading-page--erp"
+      actions={
+        <>
+          <button
+            type="button"
+            className="loading-page__action-button loading-page__action-button--primary"
+            onClick={() => window.location.reload()}
+          >
+            重新加载
+          </button>
+          <button
+            type="button"
+            className="loading-page__action-button"
+            onClick={() => window.location.assign('/erp/dashboard')}
+          >
+            返回工作台
+          </button>
+        </>
+      }
+    />
+  )
+}
+
+class RouteRuntimeErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error }
+  }
+
+  componentDidUpdate(prevProps) {
+    const { resetKey } = this.props
+    const { error } = this.state
+
+    if (prevProps.resetKey !== resetKey && error) {
+      this.setState({ error: null })
+    }
+  }
+
+  render() {
+    const { children } = this.props
+    const { error } = this.state
+
+    if (error) {
+      return <RouteRuntimeErrorFallback error={error} />
+    }
+
+    return children
+  }
+}
+
+function RouteRuntimeBoundary({ children }) {
+  const location = useLocation()
+
+  return (
+    <RouteRuntimeErrorBoundary resetKey={buildLocationPath(location)}>
+      {children}
+    </RouteRuntimeErrorBoundary>
   )
 }
 
@@ -263,173 +349,186 @@ function MobileShellRoute() {
 
 export default function ERPRouter() {
   return (
-    <Suspense fallback={<RouteLoadingFallback />}>
-      <Routes>
-        {DevHubPage ? (
-          <Route path={DEV_HUB_ROUTE} element={<DevHubPage />} />
-        ) : null}
-        {DevDocsPage ? (
-          <Route path={DEV_DOCS_ROUTE} element={<DevDocsPage />} />
-        ) : null}
-        {DevGovernancePage ? (
-          <Route path={DEV_GOVERNANCE_ROUTE} element={<DevGovernancePage />} />
-        ) : null}
-        {DevPrototypesPage ? (
-          <Route path={DEV_PROTOTYPES_ROUTE} element={<DevPrototypesPage />} />
-        ) : null}
-        {DevCapabilityLedgerPage ? (
+    <RouteRuntimeBoundary>
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <Routes>
+          {DevHubPage ? (
+            <Route path={DEV_HUB_ROUTE} element={<DevHubPage />} />
+          ) : null}
+          {DevDocsPage ? (
+            <Route path={DEV_DOCS_ROUTE} element={<DevDocsPage />} />
+          ) : null}
+          {DevGovernancePage ? (
+            <Route
+              path={DEV_GOVERNANCE_ROUTE}
+              element={<DevGovernancePage />}
+            />
+          ) : null}
+          {DevPrototypesPage ? (
+            <Route
+              path={DEV_PROTOTYPES_ROUTE}
+              element={<DevPrototypesPage />}
+            />
+          ) : null}
+          {DevCapabilityLedgerPage ? (
+            <Route
+              path={DEV_CAPABILITY_LEDGER_ROUTE}
+              element={<DevCapabilityLedgerPage />}
+            />
+          ) : null}
+          {DevCustomerConfigPage ? (
+            <Route
+              path={DEV_CUSTOMER_CONFIG_ROUTE}
+              element={<DevCustomerConfigPage />}
+            />
+          ) : null}
+          {DevTestingPage ? (
+            <Route path={DEV_TESTING_ROUTE} element={<DevTestingPage />} />
+          ) : null}
+          <Route path="/" element={<RootEntryRedirect />} />
+          <Route path="/admin-login" element={<AdminLoginPage />} />
           <Route
-            path={DEV_CAPABILITY_LEDGER_ROUTE}
-            element={<DevCapabilityLedgerPage />}
-          />
-        ) : null}
-        {DevCustomerConfigPage ? (
-          <Route
-            path={DEV_CUSTOMER_CONFIG_ROUTE}
-            element={<DevCustomerConfigPage />}
-          />
-        ) : null}
-        {DevTestingPage ? (
-          <Route path={DEV_TESTING_ROUTE} element={<DevTestingPage />} />
-        ) : null}
-        <Route path="/" element={<RootEntryRedirect />} />
-        <Route path="/admin-login" element={<AdminLoginPage />} />
-        <Route
-          path="/entry"
-          element={
-            <AuthGuard requireAdmin>
-              <EntrySelectionPage />
-            </AuthGuard>
-          }
-        />
-        <Route path="/erp" element={<DesktopShellRoute />}>
-          <Route index element={<DesktopEntryRedirect />} />
-          <Route
-            path="dashboard"
-            element={<DashboardPage initialView="workbench" />}
-          />
-          <Route
-            path="task-board"
-            element={<DashboardPage initialView="task-board" />}
-          />
-          <Route
-            path="operations/exceptions"
-            element={<DashboardPage initialView="exception-flow" />}
-          />
-          <Route
-            path="business-dashboard"
-            element={<BusinessDashboardPage />}
-          />
-          <Route
-            path="master/partners/customers"
-            element={<V1MasterDataPage type="customers" />}
-          />
-          <Route
-            path="master/partners/suppliers"
-            element={<V1MasterDataPage type="suppliers" />}
-          />
-          <Route
-            path="master/materials"
-            element={<V1MasterDataPage type="materials" />}
-          />
-          <Route
-            path="master/products"
-            element={<V1MasterDataPage type="product_skus" />}
-          />
-          <Route
-            path="sales/project-orders/sales-orders"
-            element={<V1SalesOrdersPage />}
-          />
-          <Route
-            path="purchase/accessories"
-            element={<V1PurchaseOrdersPage />}
-          />
-          <Route
-            path="warehouse/inbound"
-            element={<V1PurchaseReceiptsPage />}
-          />
-          <Route
-            path="production/quality-inspections"
-            element={<V1QualityInspectionsPage />}
-          />
-          <Route
-            path="warehouse/inventory"
-            element={<V1InventoryLedgerPage />}
-          />
-          <Route path="purchase/material-bom" element={<BOMVersionsPage />} />
-          <Route
-            path="engineering/processes"
-            element={<V1MasterDataPage type="processes" />}
-          />
-          <Route path="warehouse/shipments" element={<ShipmentsPage />} />
-          <Route
-            path="purchase/processing-contracts"
-            element={<V1OutsourcingOrdersPage />}
-          />
-          <Route
-            path="production/progress"
-            element={<V1OperationalFactPage moduleKey="production-progress" />}
-          />
-          <Route
-            path="production/scheduling"
+            path="/entry"
             element={
-              <WorkflowBusinessModulePage moduleKey="production-scheduling" />
+              <AuthGuard requireAdmin>
+                <EntrySelectionPage />
+              </AuthGuard>
             }
           />
-          <Route
-            path="production/exceptions"
-            element={
-              <WorkflowBusinessModulePage moduleKey="production-exceptions" />
-            }
-          />
-          <Route
-            path="warehouse/shipping-release"
-            element={
-              <WorkflowBusinessModulePage moduleKey="shipping-release" />
-            }
-          />
-          <Route
-            path="warehouse/outbound"
-            element={<V1OperationalFactPage moduleKey="outbound" />}
-          />
-          <Route
-            path="finance/reconciliation"
-            element={<V1OperationalFactPage moduleKey="reconciliation" />}
-          />
-          <Route
-            path="finance/payables"
-            element={<V1OperationalFactPage moduleKey="payables" />}
-          />
-          <Route
-            path="finance/receivables"
-            element={<V1OperationalFactPage moduleKey="receivables" />}
-          />
-          <Route
-            path="finance/invoices"
-            element={<V1OperationalFactPage moduleKey="invoices" />}
-          />
-          <Route path="print-center" element={<PrintCenterPage />} />
-          <Route
-            path="print-center/:templateKey"
-            element={<PrintTemplatePreviewPage />}
-          />
-          <Route path="system/permissions" element={<PermissionCenterPage />} />
-          <Route path="system/audit-logs" element={<AuditLogsPage />} />
-        </Route>
+          <Route path="/erp" element={<DesktopShellRoute />}>
+            <Route index element={<DesktopEntryRedirect />} />
+            <Route
+              path="dashboard"
+              element={<DashboardPage initialView="workbench" />}
+            />
+            <Route
+              path="task-board"
+              element={<DashboardPage initialView="task-board" />}
+            />
+            <Route
+              path="operations/exceptions"
+              element={<DashboardPage initialView="exception-flow" />}
+            />
+            <Route
+              path="business-dashboard"
+              element={<BusinessDashboardPage />}
+            />
+            <Route
+              path="master/partners/customers"
+              element={<V1MasterDataPage type="customers" />}
+            />
+            <Route
+              path="master/partners/suppliers"
+              element={<V1MasterDataPage type="suppliers" />}
+            />
+            <Route
+              path="master/materials"
+              element={<V1MasterDataPage type="materials" />}
+            />
+            <Route
+              path="master/products"
+              element={<V1MasterDataPage type="product_skus" />}
+            />
+            <Route
+              path="sales/project-orders/sales-orders"
+              element={<V1SalesOrdersPage />}
+            />
+            <Route
+              path="purchase/accessories"
+              element={<V1PurchaseOrdersPage />}
+            />
+            <Route
+              path="warehouse/inbound"
+              element={<V1PurchaseReceiptsPage />}
+            />
+            <Route
+              path="production/quality-inspections"
+              element={<V1QualityInspectionsPage />}
+            />
+            <Route
+              path="warehouse/inventory"
+              element={<V1InventoryLedgerPage />}
+            />
+            <Route path="purchase/material-bom" element={<BOMVersionsPage />} />
+            <Route
+              path="engineering/processes"
+              element={<V1MasterDataPage type="processes" />}
+            />
+            <Route path="warehouse/shipments" element={<ShipmentsPage />} />
+            <Route
+              path="purchase/processing-contracts"
+              element={<V1OutsourcingOrdersPage />}
+            />
+            <Route
+              path="production/progress"
+              element={
+                <V1OperationalFactPage moduleKey="production-progress" />
+              }
+            />
+            <Route
+              path="production/scheduling"
+              element={
+                <WorkflowBusinessModulePage moduleKey="production-scheduling" />
+              }
+            />
+            <Route
+              path="production/exceptions"
+              element={
+                <WorkflowBusinessModulePage moduleKey="production-exceptions" />
+              }
+            />
+            <Route
+              path="warehouse/shipping-release"
+              element={
+                <WorkflowBusinessModulePage moduleKey="shipping-release" />
+              }
+            />
+            <Route
+              path="warehouse/outbound"
+              element={<V1OperationalFactPage moduleKey="outbound" />}
+            />
+            <Route
+              path="finance/reconciliation"
+              element={<V1OperationalFactPage moduleKey="reconciliation" />}
+            />
+            <Route
+              path="finance/payables"
+              element={<V1OperationalFactPage moduleKey="payables" />}
+            />
+            <Route
+              path="finance/receivables"
+              element={<V1OperationalFactPage moduleKey="receivables" />}
+            />
+            <Route
+              path="finance/invoices"
+              element={<V1OperationalFactPage moduleKey="invoices" />}
+            />
+            <Route path="print-center" element={<PrintCenterPage />} />
+            <Route
+              path="print-center/:templateKey"
+              element={<PrintTemplatePreviewPage />}
+            />
+            <Route
+              path="system/permissions"
+              element={<PermissionCenterPage />}
+            />
+            <Route path="system/audit-logs" element={<AuditLogsPage />} />
+          </Route>
 
-        <Route
-          path="/erp/print-workspace/:templateKey"
-          element={<PrintWorkspaceRoute />}
-        />
+          <Route
+            path="/erp/print-workspace/:templateKey"
+            element={<PrintWorkspaceRoute />}
+          />
 
-        <Route path="/m/:roleKey" element={<MobileShellRoute />}>
-          <Route index element={<Navigate to="tasks" replace />} />
-          <Route path="tasks" element={<MobileRoleTasksPage />} />
-          <Route path="*" element={<MobileRoleTasksRedirect />} />
-        </Route>
+          <Route path="/m/:roleKey" element={<MobileShellRoute />}>
+            <Route index element={<Navigate to="tasks" replace />} />
+            <Route path="tasks" element={<MobileRoleTasksPage />} />
+            <Route path="*" element={<MobileRoleTasksRedirect />} />
+          </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </RouteRuntimeBoundary>
   )
 }

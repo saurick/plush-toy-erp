@@ -984,6 +984,7 @@ export function buildOutsourcingOrderItemParams(values = {}, extra = {}) {
     process_id: Number(values.process_id || 0),
     unit_id: Number(values.unit_id || 0),
     product_no_snapshot: trimOptional(values.product_no_snapshot),
+    product_order_no_snapshot: trimOptional(values.product_order_no_snapshot),
     product_name_snapshot: trimOptional(values.product_name_snapshot),
     process_name_snapshot: trimOptional(values.process_name_snapshot),
     process_category_snapshot: trimOptional(values.process_category_snapshot),

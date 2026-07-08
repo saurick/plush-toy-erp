@@ -86,6 +86,11 @@ func ProductNoSnapshot(v string) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldProductNoSnapshot, v))
 }
 
+// ProductOrderNoSnapshot applies equality check predicate on the "product_order_no_snapshot" field. It's identical to ProductOrderNoSnapshotEQ.
+func ProductOrderNoSnapshot(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldProductOrderNoSnapshot, v))
+}
+
 // ProductNameSnapshot applies equality check predicate on the "product_name_snapshot" field. It's identical to ProductNameSnapshotEQ.
 func ProductNameSnapshot(v string) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldProductNameSnapshot, v))
@@ -339,6 +344,81 @@ func ProductNoSnapshotEqualFold(v string) predicate.OutsourcingOrderItem {
 // ProductNoSnapshotContainsFold applies the ContainsFold predicate on the "product_no_snapshot" field.
 func ProductNoSnapshotContainsFold(v string) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldContainsFold(FieldProductNoSnapshot, v))
+}
+
+// ProductOrderNoSnapshotEQ applies the EQ predicate on the "product_order_no_snapshot" field.
+func ProductOrderNoSnapshotEQ(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldProductOrderNoSnapshot, v))
+}
+
+// ProductOrderNoSnapshotNEQ applies the NEQ predicate on the "product_order_no_snapshot" field.
+func ProductOrderNoSnapshotNEQ(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNEQ(FieldProductOrderNoSnapshot, v))
+}
+
+// ProductOrderNoSnapshotIn applies the In predicate on the "product_order_no_snapshot" field.
+func ProductOrderNoSnapshotIn(vs ...string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIn(FieldProductOrderNoSnapshot, vs...))
+}
+
+// ProductOrderNoSnapshotNotIn applies the NotIn predicate on the "product_order_no_snapshot" field.
+func ProductOrderNoSnapshotNotIn(vs ...string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotIn(FieldProductOrderNoSnapshot, vs...))
+}
+
+// ProductOrderNoSnapshotGT applies the GT predicate on the "product_order_no_snapshot" field.
+func ProductOrderNoSnapshotGT(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldGT(FieldProductOrderNoSnapshot, v))
+}
+
+// ProductOrderNoSnapshotGTE applies the GTE predicate on the "product_order_no_snapshot" field.
+func ProductOrderNoSnapshotGTE(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldGTE(FieldProductOrderNoSnapshot, v))
+}
+
+// ProductOrderNoSnapshotLT applies the LT predicate on the "product_order_no_snapshot" field.
+func ProductOrderNoSnapshotLT(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldLT(FieldProductOrderNoSnapshot, v))
+}
+
+// ProductOrderNoSnapshotLTE applies the LTE predicate on the "product_order_no_snapshot" field.
+func ProductOrderNoSnapshotLTE(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldLTE(FieldProductOrderNoSnapshot, v))
+}
+
+// ProductOrderNoSnapshotContains applies the Contains predicate on the "product_order_no_snapshot" field.
+func ProductOrderNoSnapshotContains(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldContains(FieldProductOrderNoSnapshot, v))
+}
+
+// ProductOrderNoSnapshotHasPrefix applies the HasPrefix predicate on the "product_order_no_snapshot" field.
+func ProductOrderNoSnapshotHasPrefix(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldHasPrefix(FieldProductOrderNoSnapshot, v))
+}
+
+// ProductOrderNoSnapshotHasSuffix applies the HasSuffix predicate on the "product_order_no_snapshot" field.
+func ProductOrderNoSnapshotHasSuffix(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldHasSuffix(FieldProductOrderNoSnapshot, v))
+}
+
+// ProductOrderNoSnapshotIsNil applies the IsNil predicate on the "product_order_no_snapshot" field.
+func ProductOrderNoSnapshotIsNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIsNull(FieldProductOrderNoSnapshot))
+}
+
+// ProductOrderNoSnapshotNotNil applies the NotNil predicate on the "product_order_no_snapshot" field.
+func ProductOrderNoSnapshotNotNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotNull(FieldProductOrderNoSnapshot))
+}
+
+// ProductOrderNoSnapshotEqualFold applies the EqualFold predicate on the "product_order_no_snapshot" field.
+func ProductOrderNoSnapshotEqualFold(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEqualFold(FieldProductOrderNoSnapshot, v))
+}
+
+// ProductOrderNoSnapshotContainsFold applies the ContainsFold predicate on the "product_order_no_snapshot" field.
+func ProductOrderNoSnapshotContainsFold(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldContainsFold(FieldProductOrderNoSnapshot, v))
 }
 
 // ProductNameSnapshotEQ applies the EQ predicate on the "product_name_snapshot" field.

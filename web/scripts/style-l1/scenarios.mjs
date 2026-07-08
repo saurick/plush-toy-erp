@@ -6535,9 +6535,11 @@ export function createStyleL1Scenarios(deps) {
                 const remarkTable = paper?.querySelector(
                   '.erp-work-instruction-paper__remark-table'
                 )
-                const remark = sheet?.querySelector(
-                  'tbody > tr.erp-work-instruction-paper__remark'
-                )
+                const remark = [
+                  ...(sheet?.querySelectorAll(
+                    'tbody > tr.erp-work-instruction-paper__text-row'
+                  ) || []),
+                ].find((row) => row.textContent.includes('备注：'))
                 const lastRow = sheet?.querySelector('tbody > tr:last-child')
                 const paperRect = paper?.getBoundingClientRect()
                 const sheetRect = sheet?.getBoundingClientRect()
@@ -7883,8 +7885,7 @@ export function createStyleL1Scenarios(deps) {
             '移除当前行',
             '设为标题行',
             '设为编号行',
-            '设为说明行',
-            '设为备注行',
+            '设为文本行',
             '给当前行加图',
             '清空当前行图片',
             '选择行',
@@ -7938,12 +7939,12 @@ export function createStyleL1Scenarios(deps) {
           `作业指导书作业行未选中时不应常驻行内加图按钮或空图片槽: ${JSON.stringify(workInstructionRowImageControlState)}`
         )
         assert.equal(
-          toolbarGroups[0].buttons[7].disabled,
+          toolbarGroups[0].buttons[6].disabled,
           true,
           '作业指导书未选择纸面行前，给当前行加图应禁用'
         )
         assert.equal(
-          toolbarGroups[0].buttons[8].disabled,
+          toolbarGroups[0].buttons[7].disabled,
           true,
           '作业指导书未选择纸面行前，清空当前行图片应禁用'
         )
@@ -8032,7 +8033,7 @@ export function createStyleL1Scenarios(deps) {
             '.erp-work-instruction-paper__step-content-cell'
           )
           const noticeCell = document.querySelector(
-            '.erp-work-instruction-paper__notice-row td'
+            '.erp-work-instruction-paper__text-row td'
           )
           const sheets = [
             ...document.querySelectorAll('.erp-work-instruction-paper__sheet'),
@@ -8054,8 +8055,7 @@ export function createStyleL1Scenarios(deps) {
             ...document.querySelectorAll(
               [
                 '.erp-work-instruction-paper__section-title-row',
-                '.erp-work-instruction-paper__notice-row',
-                '.erp-work-instruction-paper__remark',
+                '.erp-work-instruction-paper__text-row',
               ].join(',')
             ),
           ]
@@ -8177,18 +8177,13 @@ export function createStyleL1Scenarios(deps) {
               stepContent: firstStepContent
                 ? window.getComputedStyle(firstStepContent).fontSize
                 : '',
-              notice: noticeCell
+              text: noticeCell
                 ? window.getComputedStyle(noticeCell).fontSize
                 : '',
             },
-            noticeHeightVars: [
+            textHeightVars: [
               ...document.querySelectorAll(
-                '.erp-work-instruction-paper__notice-row'
-              ),
-            ].map(rowHeightVar),
-            remarkHeightVars: [
-              ...document.querySelectorAll(
-                '.erp-work-instruction-paper__remark'
+                '.erp-work-instruction-paper__text-row'
               ),
             ].map(rowHeightVar),
             continuationSummaries,
@@ -8215,8 +8210,7 @@ export function createStyleL1Scenarios(deps) {
             fullTextRowHeightVars:
               workInstructionGridState.fullTextRowHeightVars,
             firstStepHeightVar: workInstructionGridState.firstStepHeightVar,
-            noticeHeightVars: workInstructionGridState.noticeHeightVars,
-            remarkHeightVars: workInstructionGridState.remarkHeightVars,
+            textHeightVars: workInstructionGridState.textHeightVars,
           },
           {
             headerRowHeightVars: [
@@ -8236,10 +8230,9 @@ export function createStyleL1Scenarios(deps) {
               '11.6mm',
             ],
             firstStepHeightVar: '11.6mm',
-            noticeHeightVars: ['11.6mm'],
-            remarkHeightVars: ['11.6mm'],
+            textHeightVars: ['11.6mm', '11.6mm'],
           },
-          `作业指导书统一行模型应让标题、说明、备注和编号行使用一致行高: ${JSON.stringify(workInstructionGridState)}`
+          `作业指导书统一行模型应让标题、文本和编号行使用一致行高: ${JSON.stringify(workInstructionGridState)}`
         )
         assert(
           workInstructionGridState.sheetCount === 1 &&
@@ -8265,7 +8258,7 @@ export function createStyleL1Scenarios(deps) {
             ) &&
             workInstructionGridState.firstStepPixelHeight >= 40 &&
             workInstructionGridState.firstStepPixelHeight <= 50,
-          `作业指导书标题、说明、备注和编号行高度应保持一致: ${JSON.stringify(workInstructionGridState)}`
+          `作业指导书标题、文本和编号行高度应保持一致: ${JSON.stringify(workInstructionGridState)}`
         )
         const parseFontSize = (value) => parseFloat(String(value || '0'))
         assert(
@@ -8285,8 +8278,8 @@ export function createStyleL1Scenarios(deps) {
               14 &&
             parseFontSize(workInstructionGridState.fontSizes.stepContent) <=
               15 &&
-            parseFontSize(workInstructionGridState.fontSizes.notice) >= 14 &&
-            parseFontSize(workInstructionGridState.fontSizes.notice) <= 15,
+            parseFontSize(workInstructionGridState.fontSizes.text) >= 14 &&
+            parseFontSize(workInstructionGridState.fontSizes.text) <= 15,
           `作业指导书字号应按 Sheet1 16pt/12pt/14pt/11pt/9pt 比例映射: ${JSON.stringify(workInstructionGridState.fontSizes)}`
         )
         const defaultRichTextState = await page.evaluate(() => {
@@ -8378,7 +8371,7 @@ export function createStyleL1Scenarios(deps) {
           .dispatchEvent('mousedown', { bubbles: true, cancelable: true })
         toolbarGroups = await collectToolbarGroups()
         assert.equal(
-          toolbarGroups[0].buttons[7].disabled,
+          toolbarGroups[0].buttons[6].disabled,
           false,
           '作业指导书选择编号行后，给当前行加图应可用'
         )
@@ -8393,7 +8386,7 @@ export function createStyleL1Scenarios(deps) {
           '作业指导书选择编号作业行后，下插一行应可用'
         )
         assert.equal(
-          toolbarGroups[0].buttons[8].disabled,
+          toolbarGroups[0].buttons[7].disabled,
           true,
           '作业指导书选中无图片行时，清空当前行图片仍应禁用'
         )
@@ -8567,8 +8560,8 @@ export function createStyleL1Scenarios(deps) {
                 )
               : null,
             measure(
-              'remark',
-              '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__remark td',
+              'text-row',
+              '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__text-row td',
               ':scope > .erp-engineering-print-editable'
             ),
           ].filter(Boolean)
@@ -8596,7 +8589,7 @@ export function createStyleL1Scenarios(deps) {
             workInstructionCellVerticalState.offCenterStates.length === 0 &&
             workInstructionCellVerticalState.nonMiddleCells.length === 0 &&
             workInstructionCellVerticalState.nonCenteredEditables.length === 0,
-          `作业指导书头部、段落、编号、正文和备注单元格内容都应上下居中: ${JSON.stringify(workInstructionCellVerticalState)}`
+          `作业指导书头部、段落、编号、正文和文本单元格内容都应上下居中: ${JSON.stringify(workInstructionCellVerticalState)}`
         )
         await page
           .locator(
@@ -8675,7 +8668,7 @@ export function createStyleL1Scenarios(deps) {
         )
         toolbarGroups = await collectToolbarGroups()
         assert.equal(
-          toolbarGroups[0].buttons[8].disabled,
+          toolbarGroups[0].buttons[7].disabled,
           false,
           '作业指导书图片上传后，清空当前行图片应可用'
         )
@@ -8764,7 +8757,7 @@ export function createStyleL1Scenarios(deps) {
         )
         toolbarGroups = await collectToolbarGroups()
         assert.equal(
-          toolbarGroups[0].buttons[7].disabled,
+          toolbarGroups[0].buttons[6].disabled,
           false,
           '作业指导书最后一条作业行选中后，给当前行加图应可用'
         )
@@ -9066,7 +9059,7 @@ export function createStyleL1Scenarios(deps) {
           '作业指导书移除当前作业行后行数应恢复'
         )
         const instructionMainBodyRowSelector =
-          '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__section-title-row, .erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__notice-row, .erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__remark, .erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__step-row--text, .erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__step-row--image'
+          '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__section-title-row, .erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__text-row, .erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__step-row--text, .erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__step-row--image'
         const firstTitleRow = page
           .locator(
             '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__section-title-row'
@@ -9103,15 +9096,15 @@ export function createStyleL1Scenarios(deps) {
         )
         toolbarGroups = await collectToolbarGroups()
         assert.equal(
-          toolbarGroups[0].buttons[7].disabled,
+          toolbarGroups[0].buttons[6].disabled,
           true,
           '作业指导书标题行选中后，给当前行加图仍应禁用'
         )
-        await page.getByRole('button', { name: '设为说明行' }).click()
+        await page.getByRole('button', { name: '设为文本行' }).click()
         await page.waitForFunction(() =>
           Boolean(
             document.querySelector(
-              '.erp-work-instruction-paper__notice-row.erp-engineering-print-row--selected'
+              '.erp-work-instruction-paper__text-row.erp-engineering-print-row--selected'
             )
           )
         )
@@ -9948,8 +9941,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await expectHeading(page, '委外订单')
         await expectButton(page, '加工合同打印')
-        await expectNoButton(page, '作业指导书打印')
-        await assertTextAbsent(page, '打印作业指导书')
+        await expectButton(page, '作业指导书打印')
         const outsourcingActionMetrics = await page.evaluate(() => {
           const bar = document.querySelector(
             '.erp-business-selection-action-bar__actions'
@@ -9966,10 +9958,10 @@ export function createStyleL1Scenarios(deps) {
         assert(
           outsourcingActionMetrics.found &&
             outsourcingActionMetrics.text.includes('加工合同打印') &&
-            !outsourcingActionMetrics.text.includes('作业指导书') &&
+            outsourcingActionMetrics.text.includes('作业指导书打印') &&
             outsourcingActionMetrics.scrollWidth <=
               outsourcingActionMetrics.clientWidth + 1,
-          `委外当前操作区应只保留加工合同打印入口: ${JSON.stringify(
+          `委外当前操作区应容纳加工合同和作业指导书打印入口: ${JSON.stringify(
             outsourcingActionMetrics
           )}`
         )

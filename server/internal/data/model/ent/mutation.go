@@ -19809,6 +19809,7 @@ type OutsourcingOrderItemMutation struct {
 	line_no                   *int
 	addline_no                *int
 	product_no_snapshot       *string
+	product_order_no_snapshot *string
 	product_name_snapshot     *string
 	process_name_snapshot     *string
 	process_category_snapshot *string
@@ -20180,6 +20181,55 @@ func (m *OutsourcingOrderItemMutation) ProductNoSnapshotCleared() bool {
 func (m *OutsourcingOrderItemMutation) ResetProductNoSnapshot() {
 	m.product_no_snapshot = nil
 	delete(m.clearedFields, outsourcingorderitem.FieldProductNoSnapshot)
+}
+
+// SetProductOrderNoSnapshot sets the "product_order_no_snapshot" field.
+func (m *OutsourcingOrderItemMutation) SetProductOrderNoSnapshot(s string) {
+	m.product_order_no_snapshot = &s
+}
+
+// ProductOrderNoSnapshot returns the value of the "product_order_no_snapshot" field in the mutation.
+func (m *OutsourcingOrderItemMutation) ProductOrderNoSnapshot() (r string, exists bool) {
+	v := m.product_order_no_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProductOrderNoSnapshot returns the old "product_order_no_snapshot" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldProductOrderNoSnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProductOrderNoSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProductOrderNoSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProductOrderNoSnapshot: %w", err)
+	}
+	return oldValue.ProductOrderNoSnapshot, nil
+}
+
+// ClearProductOrderNoSnapshot clears the value of the "product_order_no_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ClearProductOrderNoSnapshot() {
+	m.product_order_no_snapshot = nil
+	m.clearedFields[outsourcingorderitem.FieldProductOrderNoSnapshot] = struct{}{}
+}
+
+// ProductOrderNoSnapshotCleared returns if the "product_order_no_snapshot" field was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) ProductOrderNoSnapshotCleared() bool {
+	_, ok := m.clearedFields[outsourcingorderitem.FieldProductOrderNoSnapshot]
+	return ok
+}
+
+// ResetProductOrderNoSnapshot resets all changes to the "product_order_no_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ResetProductOrderNoSnapshot() {
+	m.product_order_no_snapshot = nil
+	delete(m.clearedFields, outsourcingorderitem.FieldProductOrderNoSnapshot)
 }
 
 // SetProductNameSnapshot sets the "product_name_snapshot" field.
@@ -20860,7 +20910,7 @@ func (m *OutsourcingOrderItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OutsourcingOrderItemMutation) Fields() []string {
-	fields := make([]string, 0, 18)
+	fields := make([]string, 0, 19)
 	if m.outsourcing_order != nil {
 		fields = append(fields, outsourcingorderitem.FieldOutsourcingOrderID)
 	}
@@ -20878,6 +20928,9 @@ func (m *OutsourcingOrderItemMutation) Fields() []string {
 	}
 	if m.product_no_snapshot != nil {
 		fields = append(fields, outsourcingorderitem.FieldProductNoSnapshot)
+	}
+	if m.product_order_no_snapshot != nil {
+		fields = append(fields, outsourcingorderitem.FieldProductOrderNoSnapshot)
 	}
 	if m.product_name_snapshot != nil {
 		fields = append(fields, outsourcingorderitem.FieldProductNameSnapshot)
@@ -20935,6 +20988,8 @@ func (m *OutsourcingOrderItemMutation) Field(name string) (ent.Value, bool) {
 		return m.UnitID()
 	case outsourcingorderitem.FieldProductNoSnapshot:
 		return m.ProductNoSnapshot()
+	case outsourcingorderitem.FieldProductOrderNoSnapshot:
+		return m.ProductOrderNoSnapshot()
 	case outsourcingorderitem.FieldProductNameSnapshot:
 		return m.ProductNameSnapshot()
 	case outsourcingorderitem.FieldProcessNameSnapshot:
@@ -20980,6 +21035,8 @@ func (m *OutsourcingOrderItemMutation) OldField(ctx context.Context, name string
 		return m.OldUnitID(ctx)
 	case outsourcingorderitem.FieldProductNoSnapshot:
 		return m.OldProductNoSnapshot(ctx)
+	case outsourcingorderitem.FieldProductOrderNoSnapshot:
+		return m.OldProductOrderNoSnapshot(ctx)
 	case outsourcingorderitem.FieldProductNameSnapshot:
 		return m.OldProductNameSnapshot(ctx)
 	case outsourcingorderitem.FieldProcessNameSnapshot:
@@ -21054,6 +21111,13 @@ func (m *OutsourcingOrderItemMutation) SetField(name string, value ent.Value) er
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetProductNoSnapshot(v)
+		return nil
+	case outsourcingorderitem.FieldProductOrderNoSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProductOrderNoSnapshot(v)
 		return nil
 	case outsourcingorderitem.FieldProductNameSnapshot:
 		v, ok := value.(string)
@@ -21187,6 +21251,9 @@ func (m *OutsourcingOrderItemMutation) ClearedFields() []string {
 	if m.FieldCleared(outsourcingorderitem.FieldProductNoSnapshot) {
 		fields = append(fields, outsourcingorderitem.FieldProductNoSnapshot)
 	}
+	if m.FieldCleared(outsourcingorderitem.FieldProductOrderNoSnapshot) {
+		fields = append(fields, outsourcingorderitem.FieldProductOrderNoSnapshot)
+	}
 	if m.FieldCleared(outsourcingorderitem.FieldProductNameSnapshot) {
 		fields = append(fields, outsourcingorderitem.FieldProductNameSnapshot)
 	}
@@ -21227,6 +21294,9 @@ func (m *OutsourcingOrderItemMutation) ClearField(name string) error {
 	switch name {
 	case outsourcingorderitem.FieldProductNoSnapshot:
 		m.ClearProductNoSnapshot()
+		return nil
+	case outsourcingorderitem.FieldProductOrderNoSnapshot:
+		m.ClearProductOrderNoSnapshot()
 		return nil
 	case outsourcingorderitem.FieldProductNameSnapshot:
 		m.ClearProductNameSnapshot()
@@ -21277,6 +21347,9 @@ func (m *OutsourcingOrderItemMutation) ResetField(name string) error {
 		return nil
 	case outsourcingorderitem.FieldProductNoSnapshot:
 		m.ResetProductNoSnapshot()
+		return nil
+	case outsourcingorderitem.FieldProductOrderNoSnapshot:
+		m.ResetProductOrderNoSnapshot()
 		return nil
 	case outsourcingorderitem.FieldProductNameSnapshot:
 		m.ResetProductNameSnapshot()

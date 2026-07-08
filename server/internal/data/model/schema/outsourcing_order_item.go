@@ -46,6 +46,10 @@ func (OutsourcingOrderItem) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(128),
+		field.String("product_order_no_snapshot").
+			Optional().
+			Nillable().
+			MaxLen(128),
 		field.String("product_name_snapshot").
 			Optional().
 			Nillable().

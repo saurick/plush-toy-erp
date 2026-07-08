@@ -53,6 +53,7 @@ type OutsourcingOrderItem struct {
 	ProcessID               int
 	UnitID                  int
 	ProductNoSnapshot       *string
+	ProductOrderNoSnapshot  *string
 	ProductNameSnapshot     *string
 	ProcessNameSnapshot     *string
 	ProcessCategorySnapshot *string
@@ -85,6 +86,7 @@ type OutsourcingOrderItemMutation struct {
 	ProcessID               int
 	UnitID                  int
 	ProductNoSnapshot       *string
+	ProductOrderNoSnapshot  *string
 	ProductNameSnapshot     *string
 	ProcessNameSnapshot     *string
 	ProcessCategorySnapshot *string
@@ -341,6 +343,7 @@ func normalizeOutsourcingOrderMutation(in OutsourcingOrderMutation) (Outsourcing
 
 func normalizeOutsourcingOrderItemFields(in OutsourcingOrderItemMutation) (OutsourcingOrderItemMutation, error) {
 	in.ProductNoSnapshot = normalizeOptionalString(in.ProductNoSnapshot)
+	in.ProductOrderNoSnapshot = normalizeOptionalString(in.ProductOrderNoSnapshot)
 	in.ProductNameSnapshot = normalizeOptionalString(in.ProductNameSnapshot)
 	in.ProcessNameSnapshot = normalizeOptionalString(in.ProcessNameSnapshot)
 	in.ProcessCategorySnapshot = normalizeOptionalString(in.ProcessCategorySnapshot)

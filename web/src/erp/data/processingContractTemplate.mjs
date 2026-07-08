@@ -629,7 +629,8 @@ export function buildProcessingContractDraftFromOutsourcingOrder(
     lines: activeItems.map((item) =>
       normalizeProcessingLine({
         contractNo,
-        productOrderNo: sourceOrderNo,
+        productOrderNo:
+          normalizeText(item.product_order_no_snapshot) || sourceOrderNo,
         productNo: normalizeText(item.product_no_snapshot),
         productName: normalizeText(item.product_name_snapshot),
         processName: normalizeText(item.process_name_snapshot),

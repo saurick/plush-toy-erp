@@ -109,6 +109,7 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierProductProcessAndUnit(t *testi
 	expectedReturnDate := orderDate.AddDate(0, 0, 1)
 	qty := decimal.NewFromInt(12)
 	price := decimal.NewFromFloat(3.2)
+	productOrderNo := " SO-26001 "
 
 	result, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{
 		OutsourcingOrderNo: " OUT-001 ",
@@ -119,12 +120,13 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierProductProcessAndUnit(t *testi
 	}, []*OutsourcingOrderItemSaveMutation{
 		{
 			OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{
-				LineNo:              1,
-				ProductID:           10,
-				ProcessID:           30,
-				UnitID:              20,
-				OutsourcingQuantity: qty,
-				UnitPrice:           &price,
+				LineNo:                 1,
+				ProductID:              10,
+				ProcessID:              30,
+				UnitID:                 20,
+				ProductOrderNoSnapshot: &productOrderNo,
+				OutsourcingQuantity:    qty,
+				UnitPrice:              &price,
 			},
 		},
 	})
@@ -136,6 +138,9 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierProductProcessAndUnit(t *testi
 	}
 	if repo.savedOrder.OutsourcingOrderNo != "OUT-001" || !repo.savedItems[0].OutsourcingQuantity.Equal(qty) {
 		t.Fatalf("expected normalized saved mutation, got order=%#v items=%#v", repo.savedOrder, repo.savedItems)
+	}
+	if repo.savedItems[0].ProductOrderNoSnapshot == nil || *repo.savedItems[0].ProductOrderNoSnapshot != "SO-26001" {
+		t.Fatalf("expected normalized product order no snapshot, got %#v", repo.savedItems[0].ProductOrderNoSnapshot)
 	}
 
 	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-002", SupplierID: 2, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, ProductID: 10, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrSupplierInactive) {

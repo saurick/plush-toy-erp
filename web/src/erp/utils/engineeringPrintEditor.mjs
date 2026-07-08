@@ -8,6 +8,7 @@ import {
   createEmptyEngineeringImageSlot,
   createEngineeringPrintDraft,
   engineeringImageSlots,
+  normalizeWorkInstructionRowType,
 } from '../data/engineeringPrintTemplates.mjs'
 import {
   applyTableCellMerge,
@@ -202,24 +203,17 @@ function createBlankInstructionSectionRowFromNeighbor(
 function renumberInstructionRows(rows = []) {
   let stepNo = 1
   return rows.map((row) => {
-    if (
-      row?.type === WORK_INSTRUCTION_ROW_TYPES.title ||
-      row?.type === WORK_INSTRUCTION_ROW_TYPES.note
-    ) {
-      stepNo = 1
-      return { ...row, no: '' }
+    const type = normalizeWorkInstructionRowType(row?.type)
+    if (type === WORK_INSTRUCTION_ROW_TYPES.step) {
+      return { ...row, type, no: String(stepNo++) }
     }
-    if (row?.type === WORK_INSTRUCTION_ROW_TYPES.step || !row?.type) {
-      return { ...row, no: String(stepNo++) }
-    }
-    return { ...row, no: '' }
+    stepNo = 1
+    return { ...row, type, no: '' }
   })
 }
 
 function normalizeInstructionRowType(type) {
-  return Object.values(WORK_INSTRUCTION_ROW_TYPES).includes(type)
-    ? type
-    : WORK_INSTRUCTION_ROW_TYPES.step
+  return normalizeWorkInstructionRowType(type)
 }
 
 function applyInstructionRowTypeToRow(row, type) {
@@ -358,11 +352,9 @@ export function setInstructionRowType(draft, selectedIndex, type) {
     message:
       normalizedType === WORK_INSTRUCTION_ROW_TYPES.title
         ? '已设为标题行。'
-        : normalizedType === WORK_INSTRUCTION_ROW_TYPES.note
-          ? '已设为说明行。'
-          : normalizedType === WORK_INSTRUCTION_ROW_TYPES.remark
-            ? '已设为备注行。'
-            : '已设为编号行。',
+        : normalizedType === WORK_INSTRUCTION_ROW_TYPES.text
+          ? '已设为文本行。'
+          : '已设为编号行。',
   }
 }
 

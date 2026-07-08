@@ -130,6 +130,26 @@ func (_u *OutsourcingOrderItemUpdate) ClearProductNoSnapshot() *OutsourcingOrder
 	return _u
 }
 
+// SetProductOrderNoSnapshot sets the "product_order_no_snapshot" field.
+func (_u *OutsourcingOrderItemUpdate) SetProductOrderNoSnapshot(v string) *OutsourcingOrderItemUpdate {
+	_u.mutation.SetProductOrderNoSnapshot(v)
+	return _u
+}
+
+// SetNillableProductOrderNoSnapshot sets the "product_order_no_snapshot" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdate) SetNillableProductOrderNoSnapshot(v *string) *OutsourcingOrderItemUpdate {
+	if v != nil {
+		_u.SetProductOrderNoSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearProductOrderNoSnapshot clears the value of the "product_order_no_snapshot" field.
+func (_u *OutsourcingOrderItemUpdate) ClearProductOrderNoSnapshot() *OutsourcingOrderItemUpdate {
+	_u.mutation.ClearProductOrderNoSnapshot()
+	return _u
+}
+
 // SetProductNameSnapshot sets the "product_name_snapshot" field.
 func (_u *OutsourcingOrderItemUpdate) SetProductNameSnapshot(v string) *OutsourcingOrderItemUpdate {
 	_u.mutation.SetProductNameSnapshot(v)
@@ -441,6 +461,11 @@ func (_u *OutsourcingOrderItemUpdate) check() error {
 			return &ValidationError{Name: "product_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_no_snapshot": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProductOrderNoSnapshot(); ok {
+		if err := outsourcingorderitem.ProductOrderNoSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "product_order_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_order_no_snapshot": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ProductNameSnapshot(); ok {
 		if err := outsourcingorderitem.ProductNameSnapshotValidator(v); err != nil {
 			return &ValidationError{Name: "product_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_name_snapshot": %w`, err)}
@@ -509,6 +534,12 @@ func (_u *OutsourcingOrderItemUpdate) sqlSave(ctx context.Context) (_node int, e
 	}
 	if _u.mutation.ProductNoSnapshotCleared() {
 		_spec.ClearField(outsourcingorderitem.FieldProductNoSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProductOrderNoSnapshot(); ok {
+		_spec.SetField(outsourcingorderitem.FieldProductOrderNoSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.ProductOrderNoSnapshotCleared() {
+		_spec.ClearField(outsourcingorderitem.FieldProductOrderNoSnapshot, field.TypeString)
 	}
 	if value, ok := _u.mutation.ProductNameSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProductNameSnapshot, field.TypeString, value)
@@ -797,6 +828,26 @@ func (_u *OutsourcingOrderItemUpdateOne) SetNillableProductNoSnapshot(v *string)
 // ClearProductNoSnapshot clears the value of the "product_no_snapshot" field.
 func (_u *OutsourcingOrderItemUpdateOne) ClearProductNoSnapshot() *OutsourcingOrderItemUpdateOne {
 	_u.mutation.ClearProductNoSnapshot()
+	return _u
+}
+
+// SetProductOrderNoSnapshot sets the "product_order_no_snapshot" field.
+func (_u *OutsourcingOrderItemUpdateOne) SetProductOrderNoSnapshot(v string) *OutsourcingOrderItemUpdateOne {
+	_u.mutation.SetProductOrderNoSnapshot(v)
+	return _u
+}
+
+// SetNillableProductOrderNoSnapshot sets the "product_order_no_snapshot" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdateOne) SetNillableProductOrderNoSnapshot(v *string) *OutsourcingOrderItemUpdateOne {
+	if v != nil {
+		_u.SetProductOrderNoSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearProductOrderNoSnapshot clears the value of the "product_order_no_snapshot" field.
+func (_u *OutsourcingOrderItemUpdateOne) ClearProductOrderNoSnapshot() *OutsourcingOrderItemUpdateOne {
+	_u.mutation.ClearProductOrderNoSnapshot()
 	return _u
 }
 
@@ -1124,6 +1175,11 @@ func (_u *OutsourcingOrderItemUpdateOne) check() error {
 			return &ValidationError{Name: "product_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_no_snapshot": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProductOrderNoSnapshot(); ok {
+		if err := outsourcingorderitem.ProductOrderNoSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "product_order_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_order_no_snapshot": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ProductNameSnapshot(); ok {
 		if err := outsourcingorderitem.ProductNameSnapshotValidator(v); err != nil {
 			return &ValidationError{Name: "product_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_name_snapshot": %w`, err)}
@@ -1209,6 +1265,12 @@ func (_u *OutsourcingOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *Ou
 	}
 	if _u.mutation.ProductNoSnapshotCleared() {
 		_spec.ClearField(outsourcingorderitem.FieldProductNoSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProductOrderNoSnapshot(); ok {
+		_spec.SetField(outsourcingorderitem.FieldProductOrderNoSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.ProductOrderNoSnapshotCleared() {
+		_spec.ClearField(outsourcingorderitem.FieldProductOrderNoSnapshot, field.TypeString)
 	}
 	if value, ok := _u.mutation.ProductNameSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProductNameSnapshot, field.TypeString, value)

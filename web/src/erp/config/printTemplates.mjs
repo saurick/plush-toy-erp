@@ -259,21 +259,21 @@ export const printTemplateCatalog = [
     key: WORK_INSTRUCTION_TEMPLATE_KEY,
     title: '作业指导书',
     shortTitle: '作业指导书',
-    category: '工程资料 / 加工厂',
+    category: '工程资料 / 生产指导',
     readiness: 'source_grounded',
     runtimeStatus: 'official_template',
     factBoundary: PRINT_TEMPLATE_FACT_BOUNDARY,
     moduleKeys: ['material_bom'],
     summary:
-      '基于 yoyoosun 原始 Excel 的 `Sheet1` 工作表，收口给加工厂执行车缝 / 手工等工序的作业指导书打印模板。',
+      '基于 yoyoosun 原始 Excel 的 `Sheet1` 工作表，收口内部生产 / 品质参考和外发加工厂执行共用的作业指导书打印模板。',
     scene:
-      '工程部或跟单打印作业指导书，交给加工厂按工序、注意事项和图片参考生产。',
+      '工程部准备产品作业资料，生产 / 品质内部参考；委外订单可按加工厂外发场景带入加工项目、数量和回货上下文。',
     layout:
-      'A4 竖版作业指导书，包含产品头信息、右上产品图、可变标题 / 编号 / 说明 / 备注正文行；正文行默认等高，编号行可维护行内图片。',
+      'A4 竖版作业指导书，包含产品头信息、右上产品图、可变标题 / 编号 / 文本正文行；正文行默认等高，编号行可维护行内图片。',
     output: '在线预览 PDF / 下载 PDF / 打印',
     notes: [
-      '作业指导书从 BOM 管理页面带值，服务工程资料齐套和加工执行，不表示委外事实、质检事实或库存事实已完成。',
-      '右上产品图和编号行图片只进入当前打印草稿；正文行可添加并切换为标题行、编号行、说明行或备注行，图片只允许放在编号行。',
+      '作业指导书可从 BOM 管理带产品 / 工程资料上下文打开，也可从委外订单带加工厂、加工项目、数量和回货上下文打开；两者都只生成当前打印草稿。',
+      '右上产品图和编号行图片只进入当前打印草稿；正文行可添加并切换为标题行、编号行或文本行，图片只允许放在编号行。',
     ],
     tags: ['工程资料', '作业指导', '加工厂', '图片槽'],
     previewLines: ['产品头信息', '可变正文行', '编号行 / 图片槽'],
@@ -281,21 +281,21 @@ export const printTemplateCatalog = [
       '客户来源样本：docs/customers/yoyoosun/raw-source-files/26204#抱抱猴子材料明细表2026-4-10.xlsx（Sheet1 作业指导书）',
     ],
     fieldTruth: [
-      '产品编号、产品名称和 BOM 版本来自 BOM 版本、产品主数据或打印草稿；工序 / 部门等执行信息由当前打印草稿补充。',
-      '标题行、编号行、说明行和备注行都属于打印草稿正文，不固定为裁床、刺绣 / 印花或车缝，不写生产、质检或库存事实。',
+      '产品编号、产品名称和 BOM 版本来自 BOM 版本、委外订单明细、产品主数据或打印草稿；加工厂、加工项目、委外数量和回货日期只在委外入口作为外发打印上下文带入。',
+      '标题行、编号行和文本行都属于打印草稿正文，不固定为裁床、刺绣 / 印花或车缝，不写生产、质检或库存事实。',
       '右上图片和编号行图片来自当前打印窗口上传的图片快照。',
     ],
     fieldRequirements: [
       {
         key: 'work_instruction_header_snapshot',
         label: '作业指导书头信息',
-        source: 'BOM 版本、产品主数据或打印草稿',
+        source: 'BOM 版本、委外订单明细、产品主数据或打印草稿',
         boundary: '只读打印快照；不生成委外事实或质检事实',
       },
       {
         key: 'work_instruction_steps',
         label: '可变正文行和注意事项',
-        source: '模板正文、委外明细或打印草稿',
+        source: '模板正文、BOM / 工程资料、委外明细上下文或打印草稿',
         boundary: '可编辑打印内容，不代表 Workflow 完成或 Fact posted',
       },
       {
@@ -306,7 +306,7 @@ export const printTemplateCatalog = [
       },
     ],
     helpNotes: [
-      '作业指导书是工程资料打印件，和色卡、物料明细共用 BOM 产品上下文；委外订单页只负责加工合同源单打印。',
+      '作业指导书是工程资料打印件：BOM 管理负责内部工程资料上下文，委外订单负责外发加工厂上下文；打印不回写生产、委外、质检或库存事实。',
     ],
     sample: createWorkInstructionDraft(DEFAULT_WORK_INSTRUCTION_SAMPLE),
   },

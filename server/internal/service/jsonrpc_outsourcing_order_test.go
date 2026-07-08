@@ -152,6 +152,7 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 				"process_id":                float64(3),
 				"unit_id":                   float64(4),
 				"product_no_snapshot":       "PROD-JSONRPC",
+				"product_order_no_snapshot": " SO-JSONRPC-001 ",
 				"product_name_snapshot":     "半成品",
 				"process_name_snapshot":     "车缝",
 				"process_category_snapshot": "委外车缝",
@@ -180,6 +181,9 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	item := items[0].(map[string]any)
 	if processName := item["process_name_snapshot"]; processName != "车缝" {
 		t.Fatalf("expected process snapshot, got %#v", processName)
+	}
+	if productOrderNo := item["product_order_no_snapshot"]; productOrderNo != "SO-JSONRPC-001" {
+		t.Fatalf("expected product order no snapshot, got %#v", productOrderNo)
 	}
 
 	_, listRes, err := j.handleOutsourcingOrder(ctx, "list_outsourcing_orders", "2", mustJSONRPCStruct(t, map[string]any{
@@ -409,6 +413,7 @@ func outsourcingOrderItemFromMutation(id int, orderID int, in *biz.OutsourcingOr
 		ProcessID:               in.ProcessID,
 		UnitID:                  in.UnitID,
 		ProductNoSnapshot:       in.ProductNoSnapshot,
+		ProductOrderNoSnapshot:  in.ProductOrderNoSnapshot,
 		ProductNameSnapshot:     in.ProductNameSnapshot,
 		ProcessNameSnapshot:     in.ProcessNameSnapshot,
 		ProcessCategorySnapshot: in.ProcessCategorySnapshot,

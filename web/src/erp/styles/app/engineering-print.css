@@ -615,8 +615,7 @@
 }
 
 .erp-work-instruction-paper__section-title-row td,
-.erp-work-instruction-paper__notice-row td,
-.erp-work-instruction-paper__remark td {
+.erp-work-instruction-paper__text-row td {
   height: var(--work-instruction-row-height, 11.6mm);
   padding: 0;
   vertical-align: middle;
@@ -627,7 +626,7 @@
   font-weight: 700;
 }
 
-.erp-work-instruction-paper__notice-row td {
+.erp-work-instruction-paper__text-row td {
   font-size: 14.67px;
   font-weight: 700;
 }
@@ -840,12 +839,6 @@
   width: 55.5mm;
   height: 47.6mm;
   min-height: 47.6mm;
-}
-
-.erp-work-instruction-paper__remark {
-  font-size: 16px;
-  text-align: center;
-  font-weight: 700;
 }
 
 .erp-color-card-paper__side td > .erp-engineering-print-editable {

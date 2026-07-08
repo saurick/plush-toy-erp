@@ -48,6 +48,44 @@
   color: #475569;
 }
 
+.loading-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.loading-page__action-button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgb(47 143 75 / 34%);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #166534;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.loading-page__action-button:hover,
+.loading-page__action-button:focus-visible {
+  border-color: #2f8f4b;
+  background: rgb(47 143 75 / 8%);
+  outline: none;
+}
+
+.loading-page__action-button--primary {
+  border-color: #2f8f4b;
+  background: #2f8f4b;
+  color: #ffffff;
+}
+
+.loading-page__action-button--primary:hover,
+.loading-page__action-button--primary:focus-visible {
+  background: #24733c;
+}
+
 .loading-page--erp {
   background:
     radial-gradient(circle at top, rgb(47 143 75 / 18%), transparent 40%),
@@ -72,6 +110,29 @@
 
 [data-erp-theme='dark'] .loading-page__description {
   color: var(--erp-text-muted, #94a3b8);
+}
+
+[data-erp-theme='dark'] .loading-page__action-button {
+  border-color: rgb(96 165 250 / 45%);
+  background: rgb(15 23 42 / 0.86);
+  color: #bfdbfe;
+}
+
+[data-erp-theme='dark'] .loading-page__action-button:hover,
+[data-erp-theme='dark'] .loading-page__action-button:focus-visible {
+  border-color: #60a5fa;
+  background: rgb(96 165 250 / 14%);
+}
+
+[data-erp-theme='dark'] .loading-page__action-button--primary {
+  border-color: #60a5fa;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+[data-erp-theme='dark'] .loading-page__action-button--primary:hover,
+[data-erp-theme='dark'] .loading-page__action-button--primary:focus-visible {
+  background: #1d4ed8;
 }
 
 [data-erp-theme='dark'] .loading-page--erp {

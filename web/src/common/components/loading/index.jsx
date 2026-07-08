@@ -8,6 +8,7 @@ export const Loading = ({
   description = '正在准备当前页面，请稍候...',
   fullscreen = false,
   className = '',
+  actions = null,
 }) => {
   const rootClassName = [
     'loading-page',
@@ -25,6 +26,9 @@ export const Loading = ({
           <div className="loading-page__title">{title}</div>
           {description ? (
             <div className="loading-page__description">{description}</div>
+          ) : null}
+          {actions ? (
+            <div className="loading-page__actions">{actions}</div>
           ) : null}
         </div>
       </div>

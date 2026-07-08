@@ -853,6 +853,7 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "line_no", Type: field.TypeInt},
 		{Name: "product_no_snapshot", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "product_order_no_snapshot", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "product_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "process_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "process_category_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
@@ -878,25 +879,25 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "outsourcing_order_items_outsourcing_orders_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[15]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[16]},
 				RefColumns: []*schema.Column{OutsourcingOrdersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_order_items_processes_outsourcing_order_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[16]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[17]},
 				RefColumns: []*schema.Column{ProcessesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_order_items_products_outsourcing_order_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[17]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[18]},
 				RefColumns: []*schema.Column{ProductsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_order_items_units_outsourcing_order_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[18]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[19]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -905,32 +906,32 @@ var (
 			{
 				Name:    "outsourcingorderitem_outsourcing_order_id_line_no",
 				Unique:  true,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[15], OutsourcingOrderItemsColumns[1]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[16], OutsourcingOrderItemsColumns[1]},
 			},
 			{
 				Name:    "outsourcingorderitem_product_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[17]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[18]},
 			},
 			{
 				Name:    "outsourcingorderitem_process_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[16]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[17]},
 			},
 			{
 				Name:    "outsourcingorderitem_unit_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[18]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[19]},
 			},
 			{
 				Name:    "outsourcingorderitem_line_status",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[11]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[12]},
 			},
 			{
 				Name:    "outsourcingorderitem_expected_return_date",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[10]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[11]},
 			},
 		},
 	}

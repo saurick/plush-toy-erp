@@ -69,6 +69,20 @@ func (_c *OutsourcingOrderItemCreate) SetNillableProductNoSnapshot(v *string) *O
 	return _c
 }
 
+// SetProductOrderNoSnapshot sets the "product_order_no_snapshot" field.
+func (_c *OutsourcingOrderItemCreate) SetProductOrderNoSnapshot(v string) *OutsourcingOrderItemCreate {
+	_c.mutation.SetProductOrderNoSnapshot(v)
+	return _c
+}
+
+// SetNillableProductOrderNoSnapshot sets the "product_order_no_snapshot" field if the given value is not nil.
+func (_c *OutsourcingOrderItemCreate) SetNillableProductOrderNoSnapshot(v *string) *OutsourcingOrderItemCreate {
+	if v != nil {
+		_c.SetProductOrderNoSnapshot(*v)
+	}
+	return _c
+}
+
 // SetProductNameSnapshot sets the "product_name_snapshot" field.
 func (_c *OutsourcingOrderItemCreate) SetProductNameSnapshot(v string) *OutsourcingOrderItemCreate {
 	_c.mutation.SetProductNameSnapshot(v)
@@ -345,6 +359,11 @@ func (_c *OutsourcingOrderItemCreate) check() error {
 			return &ValidationError{Name: "product_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_no_snapshot": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.ProductOrderNoSnapshot(); ok {
+		if err := outsourcingorderitem.ProductOrderNoSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "product_order_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_order_no_snapshot": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.ProductNameSnapshot(); ok {
 		if err := outsourcingorderitem.ProductNameSnapshotValidator(v); err != nil {
 			return &ValidationError{Name: "product_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_name_snapshot": %w`, err)}
@@ -432,6 +451,10 @@ func (_c *OutsourcingOrderItemCreate) createSpec() (*OutsourcingOrderItem, *sqlg
 	if value, ok := _c.mutation.ProductNoSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProductNoSnapshot, field.TypeString, value)
 		_node.ProductNoSnapshot = &value
+	}
+	if value, ok := _c.mutation.ProductOrderNoSnapshot(); ok {
+		_spec.SetField(outsourcingorderitem.FieldProductOrderNoSnapshot, field.TypeString, value)
+		_node.ProductOrderNoSnapshot = &value
 	}
 	if value, ok := _c.mutation.ProductNameSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProductNameSnapshot, field.TypeString, value)

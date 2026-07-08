@@ -65,6 +65,7 @@ import {
 
 const { Content, Header, Sider } = Layout
 const { Paragraph, Text } = Typography
+const PROFILE_SYNC_INTERVAL_MS = 60 * 1000
 
 const navIconRegistry = {
   'workspace-home': <AppstoreOutlined />,
@@ -135,6 +136,7 @@ export default function ERPLayout() {
   )
   const [profileSyncCompleted, setProfileSyncCompleted] = useState(false)
   const adminProfileRef = useRef(adminProfile)
+  const profileSyncInFlightRef = useRef(null)
   const profileSyncErrorNotifiedRef = useRef(false)
   const profileSessionUnavailableHandledRef = useRef(false)
   const [refreshingCurrentPage, setRefreshingCurrentPage] = useState(false)
@@ -171,113 +173,155 @@ export default function ERPLayout() {
   )
   const currentEntry = currentNavigationEntry.entry
 
-  const loadProfile = useCallback(async () => {
-    setProfileSyncCompleted(false)
-    setProfileLoading(true)
-    try {
-      const result = await adminRpc.call('me', {})
-      let nextProfile = result?.data || null
-      if (nextProfile) {
+  const loadProfile = useCallback(
+    ({ showLoading = false } = {}) => {
+      if (profileSyncInFlightRef.current) {
+        return profileSyncInFlightRef.current
+      }
+
+      const syncPromise = (async () => {
+        if (showLoading) {
+          setProfileSyncCompleted(false)
+          setProfileLoading(true)
+        }
         try {
-          const effectiveSessionCustomerKey =
-            resolveEffectiveSessionCustomerKey(activeBrand)
-          if (!effectiveSessionCustomerKey) {
-            nextProfile =
-              attachUnavailableEffectiveSessionToAdminProfile(nextProfile)
-          } else {
-            const effectiveSession = await getEffectiveSession({
-              customer_key: effectiveSessionCustomerKey,
-            })
-            nextProfile = attachEffectiveSessionToAdminProfile(
-              nextProfile,
-              effectiveSession
+          const result = await adminRpc.call('me', {})
+          let nextProfile = result?.data || null
+          if (nextProfile) {
+            try {
+              const effectiveSessionCustomerKey =
+                resolveEffectiveSessionCustomerKey(activeBrand)
+              if (!effectiveSessionCustomerKey) {
+                nextProfile =
+                  attachUnavailableEffectiveSessionToAdminProfile(nextProfile)
+              } else {
+                const effectiveSession = await getEffectiveSession({
+                  customer_key: effectiveSessionCustomerKey,
+                })
+                nextProfile = attachEffectiveSessionToAdminProfile(
+                  nextProfile,
+                  effectiveSession
+                )
+              }
+            } catch (sessionError) {
+              const syncErrorAction = getAdminProfileSyncErrorAction(
+                sessionError,
+                {
+                  hasCachedProfile: Boolean(
+                    nextProfile || adminProfileRef.current
+                  ),
+                  alreadyNotified: profileSyncErrorNotifiedRef.current,
+                }
+              )
+              if (syncErrorAction === 'reauth') {
+                throw sessionError
+              }
+              console.warn(
+                '客户有效配置同步失败，继续使用缓存投影或空投影',
+                sessionError
+              )
+              const cachedEffectiveSession =
+                adminProfileRef.current?.effective_session &&
+                typeof adminProfileRef.current.effective_session === 'object'
+                  ? adminProfileRef.current.effective_session
+                  : null
+              nextProfile = cachedEffectiveSession
+                ? attachEffectiveSessionToAdminProfile(
+                    nextProfile,
+                    cachedEffectiveSession
+                  )
+                : attachUnavailableEffectiveSessionToAdminProfile(nextProfile)
+            }
+          }
+          if (nextProfile) {
+            persistAuthMeta(
+              {
+                user_id: nextProfile.id,
+                username: nextProfile.username,
+                is_super_admin: nextProfile.is_super_admin === true,
+                roles: nextProfile.roles || [],
+                permissions: nextProfile.permissions || [],
+                menus: nextProfile.menus || [],
+                erp_preferences: nextProfile.erp_preferences || {
+                  column_orders: {},
+                },
+              },
+              AUTH_SCOPE.ADMIN
             )
           }
-        } catch (sessionError) {
-          const syncErrorAction = getAdminProfileSyncErrorAction(sessionError, {
-            hasCachedProfile: Boolean(nextProfile || adminProfileRef.current),
+          setAdminProfile(nextProfile)
+          profileSyncErrorNotifiedRef.current = false
+        } catch (error) {
+          const syncErrorAction = getAdminProfileSyncErrorAction(error, {
+            hasCachedProfile: Boolean(adminProfileRef.current),
             alreadyNotified: profileSyncErrorNotifiedRef.current,
           })
           if (syncErrorAction === 'reauth') {
-            throw sessionError
+            if (profileSessionUnavailableHandledRef.current) {
+              return
+            }
+            profileSessionUnavailableHandledRef.current = true
+            logout(AUTH_SCOPE.ADMIN)
+            setAdminProfile(null)
+            authBus.emitUnauthorized?.({
+              from: {
+                pathname: window.location.pathname,
+                search: window.location.search,
+                hash: window.location.hash,
+              },
+              message: getActionErrorMessage(error, '同步管理员权限'),
+              loginPath: getLoginPath(AUTH_SCOPE.ADMIN),
+            })
+            return
           }
-          console.warn(
-            '客户有效配置同步失败，继续使用缓存投影或空投影',
-            sessionError
-          )
-          const cachedEffectiveSession =
-            adminProfileRef.current?.effective_session &&
-            typeof adminProfileRef.current.effective_session === 'object'
-              ? adminProfileRef.current.effective_session
-              : null
-          nextProfile = cachedEffectiveSession
-            ? attachEffectiveSessionToAdminProfile(
-                nextProfile,
-                cachedEffectiveSession
-              )
-            : attachUnavailableEffectiveSessionToAdminProfile(nextProfile)
+          if (syncErrorAction === 'keep_cached') {
+            console.warn('管理员权限同步失败，继续使用本地缓存 profile', error)
+            return
+          }
+          if (syncErrorAction === 'silent') {
+            return
+          }
+          if (!isAuthFailureCode(error?.code)) {
+            profileSyncErrorNotifiedRef.current = true
+            message.error(getActionErrorMessage(error, '同步管理员权限'))
+          }
+        } finally {
+          if (showLoading) {
+            setProfileLoading(false)
+          }
+          setProfileSyncCompleted(true)
+          if (profileSyncInFlightRef.current === syncPromise) {
+            profileSyncInFlightRef.current = null
+          }
         }
-      }
-      if (nextProfile) {
-        persistAuthMeta(
-          {
-            user_id: nextProfile.id,
-            username: nextProfile.username,
-            is_super_admin: nextProfile.is_super_admin === true,
-            roles: nextProfile.roles || [],
-            permissions: nextProfile.permissions || [],
-            menus: nextProfile.menus || [],
-            erp_preferences: nextProfile.erp_preferences || {
-              column_orders: {},
-            },
-          },
-          AUTH_SCOPE.ADMIN
-        )
-      }
-      setAdminProfile(nextProfile)
-      profileSyncErrorNotifiedRef.current = false
-    } catch (error) {
-      const syncErrorAction = getAdminProfileSyncErrorAction(error, {
-        hasCachedProfile: Boolean(adminProfileRef.current),
-        alreadyNotified: profileSyncErrorNotifiedRef.current,
-      })
-      if (syncErrorAction === 'reauth') {
-        if (profileSessionUnavailableHandledRef.current) {
-          return
-        }
-        profileSessionUnavailableHandledRef.current = true
-        logout(AUTH_SCOPE.ADMIN)
-        setAdminProfile(null)
-        authBus.emitUnauthorized?.({
-          from: {
-            pathname: window.location.pathname,
-            search: window.location.search,
-            hash: window.location.hash,
-          },
-          message: getActionErrorMessage(error, '同步管理员权限'),
-          loginPath: getLoginPath(AUTH_SCOPE.ADMIN),
-        })
-        return
-      }
-      if (syncErrorAction === 'keep_cached') {
-        console.warn('管理员权限同步失败，继续使用本地缓存 profile', error)
-        return
-      }
-      if (syncErrorAction === 'silent') {
-        return
-      }
-      if (!isAuthFailureCode(error?.code)) {
-        profileSyncErrorNotifiedRef.current = true
-        message.error(getActionErrorMessage(error, '同步管理员权限'))
-      }
-    } finally {
-      setProfileLoading(false)
-      setProfileSyncCompleted(true)
-    }
-  }, [activeBrand, adminRpc])
+      })()
+
+      profileSyncInFlightRef.current = syncPromise
+      return syncPromise
+    },
+    [activeBrand, adminRpc]
+  )
 
   useEffect(() => {
-    loadProfile()
+    loadProfile({ showLoading: true })
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadProfile()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    const profileSyncTimer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        loadProfile()
+      }
+    }, PROFILE_SYNC_INTERVAL_MS)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.clearInterval(profileSyncTimer)
+    }
   }, [loadProfile])
 
   useEffect(() => {

@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
 import { RpcErrorCode } from '../../common/consts/errorCodes.js'
 import {
@@ -20,6 +23,88 @@ import {
   resolveEffectiveSessionPageAccess,
   shouldRedirectFromCurrentNavigation,
 } from './adminProfileSync.mjs'
+
+const erpRootDir = dirname(dirname(fileURLToPath(import.meta.url)))
+
+function readERPLayoutSource() {
+  return readFileSync(join(erpRootDir, 'components/ERPLayout.jsx'), 'utf8')
+}
+
+test('ERPLayout: 管理员 profile 后台同步调度合同', () => {
+  const source = readERPLayoutSource()
+
+  assert.match(source, /const PROFILE_SYNC_INTERVAL_MS = 60 \* 1000/u)
+  assert.match(source, /const profileSyncInFlightRef = useRef\(null\)/u)
+  assert.match(
+    source,
+    /if \(profileSyncInFlightRef\.current\) \{\s*return profileSyncInFlightRef\.current\s*\}/u,
+    'single-flight guard should return the in-flight profile sync promise'
+  )
+  assert.match(source, /const result = await adminRpc\.call\('me', \{\}\)/u)
+  assert.match(
+    source,
+    /const effectiveSession = await getEffectiveSession\(\{\s*customer_key: effectiveSessionCustomerKey,\s*\}\)/u
+  )
+  assert.match(
+    source,
+    /profileSyncInFlightRef\.current = syncPromise/u,
+    'new profile sync should publish its in-flight promise'
+  )
+  assert.match(
+    source,
+    /if \(profileSyncInFlightRef\.current === syncPromise\) \{\s*profileSyncInFlightRef\.current = null\s*\}/u,
+    'profile sync should clear only the matching in-flight promise'
+  )
+})
+
+test('ERPLayout: profile 同步只由首次挂载、前台恢复和 visible 定时触发', () => {
+  const source = readERPLayoutSource()
+
+  assert.match(
+    source,
+    /useEffect\(\(\) => \{\s*loadProfile\(\{ showLoading: true \}\)/u,
+    'layout mount should request admin.me through loadProfile'
+  )
+  assert.match(
+    source,
+    /document\.addEventListener\('visibilitychange', handleVisibilityChange\)/u
+  )
+  assert.match(
+    source,
+    /const handleVisibilityChange = \(\) => \{\s*if \(document\.visibilityState === 'visible'\) \{\s*loadProfile\(\)\s*\}\s*\}/u,
+    'returning from hidden to visible should trigger exactly the shared sync path'
+  )
+  assert.match(
+    source,
+    /const profileSyncTimer = window\.setInterval\(\(\) => \{\s*if \(document\.visibilityState === 'visible'\) \{\s*loadProfile\(\)\s*\}\s*\}, PROFILE_SYNC_INTERVAL_MS\)/u,
+    'timer callback must not request profile while document is hidden'
+  )
+  assert.match(
+    source,
+    /return \(\) => \{\s*document\.removeEventListener\('visibilitychange', handleVisibilityChange\)\s*window\.clearInterval\(profileSyncTimer\)\s*\}/u,
+    'unmount should clean the visibility listener and timer'
+  )
+  assert.match(
+    source,
+    /useEffect\(\(\) => \{[\s\S]*?window\.clearInterval\(profileSyncTimer\)[\s\S]*?\}, \[loadProfile\]\)/u,
+    'ordinary route or menu changes should not re-run profile sync effect'
+  )
+  assert.match(
+    source,
+    /\},\s*\[\s*activeBrand,\s*adminRpc\s*\]\s*\)/u,
+    'loadProfile should not depend on location or selected menu state'
+  )
+  assert.match(
+    source,
+    /const loadProfile = useCallback\(\s*\(\{ showLoading = false \} = \{\}\) =>/u,
+    'background profile sync should default to silent mode'
+  )
+  assert.match(
+    source,
+    /if \(showLoading\) \{\s*setProfileSyncCompleted\(false\)\s*setProfileLoading\(true\)\s*\}/u,
+    'only the first explicit loading sync should reset visible loading/completed state'
+  )
+})
 
 test('adminProfileSync: 当前管理员会话不可用时要求重新登录', () => {
   for (const code of [

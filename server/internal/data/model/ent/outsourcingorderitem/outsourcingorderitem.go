@@ -26,6 +26,8 @@ const (
 	FieldUnitID = "unit_id"
 	// FieldProductNoSnapshot holds the string denoting the product_no_snapshot field in the database.
 	FieldProductNoSnapshot = "product_no_snapshot"
+	// FieldProductOrderNoSnapshot holds the string denoting the product_order_no_snapshot field in the database.
+	FieldProductOrderNoSnapshot = "product_order_no_snapshot"
 	// FieldProductNameSnapshot holds the string denoting the product_name_snapshot field in the database.
 	FieldProductNameSnapshot = "product_name_snapshot"
 	// FieldProcessNameSnapshot holds the string denoting the process_name_snapshot field in the database.
@@ -99,6 +101,7 @@ var Columns = []string{
 	FieldProcessID,
 	FieldUnitID,
 	FieldProductNoSnapshot,
+	FieldProductOrderNoSnapshot,
 	FieldProductNameSnapshot,
 	FieldProcessNameSnapshot,
 	FieldProcessCategorySnapshot,
@@ -136,6 +139,8 @@ var (
 	UnitIDValidator func(int) error
 	// ProductNoSnapshotValidator is a validator for the "product_no_snapshot" field. It is called by the builders before save.
 	ProductNoSnapshotValidator func(string) error
+	// ProductOrderNoSnapshotValidator is a validator for the "product_order_no_snapshot" field. It is called by the builders before save.
+	ProductOrderNoSnapshotValidator func(string) error
 	// ProductNameSnapshotValidator is a validator for the "product_name_snapshot" field. It is called by the builders before save.
 	ProductNameSnapshotValidator func(string) error
 	// ProcessNameSnapshotValidator is a validator for the "process_name_snapshot" field. It is called by the builders before save.
@@ -194,6 +199,11 @@ func ByUnitID(opts ...sql.OrderTermOption) OrderOption {
 // ByProductNoSnapshot orders the results by the product_no_snapshot field.
 func ByProductNoSnapshot(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProductNoSnapshot, opts...).ToFunc()
+}
+
+// ByProductOrderNoSnapshot orders the results by the product_order_no_snapshot field.
+func ByProductOrderNoSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProductOrderNoSnapshot, opts...).ToFunc()
 }
 
 // ByProductNameSnapshot orders the results by the product_name_snapshot field.

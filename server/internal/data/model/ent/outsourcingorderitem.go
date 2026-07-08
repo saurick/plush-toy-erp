@@ -34,6 +34,8 @@ type OutsourcingOrderItem struct {
 	UnitID int `json:"unit_id,omitempty"`
 	// ProductNoSnapshot holds the value of the "product_no_snapshot" field.
 	ProductNoSnapshot *string `json:"product_no_snapshot,omitempty"`
+	// ProductOrderNoSnapshot holds the value of the "product_order_no_snapshot" field.
+	ProductOrderNoSnapshot *string `json:"product_order_no_snapshot,omitempty"`
 	// ProductNameSnapshot holds the value of the "product_name_snapshot" field.
 	ProductNameSnapshot *string `json:"product_name_snapshot,omitempty"`
 	// ProcessNameSnapshot holds the value of the "process_name_snapshot" field.
@@ -134,7 +136,7 @@ func (*OutsourcingOrderItem) scanValues(columns []string) ([]any, error) {
 			values[i] = new(decimal.Decimal)
 		case outsourcingorderitem.FieldID, outsourcingorderitem.FieldOutsourcingOrderID, outsourcingorderitem.FieldLineNo, outsourcingorderitem.FieldProductID, outsourcingorderitem.FieldProcessID, outsourcingorderitem.FieldUnitID:
 			values[i] = new(sql.NullInt64)
-		case outsourcingorderitem.FieldProductNoSnapshot, outsourcingorderitem.FieldProductNameSnapshot, outsourcingorderitem.FieldProcessNameSnapshot, outsourcingorderitem.FieldProcessCategorySnapshot, outsourcingorderitem.FieldUnitNameSnapshot, outsourcingorderitem.FieldLineStatus, outsourcingorderitem.FieldNote:
+		case outsourcingorderitem.FieldProductNoSnapshot, outsourcingorderitem.FieldProductOrderNoSnapshot, outsourcingorderitem.FieldProductNameSnapshot, outsourcingorderitem.FieldProcessNameSnapshot, outsourcingorderitem.FieldProcessCategorySnapshot, outsourcingorderitem.FieldUnitNameSnapshot, outsourcingorderitem.FieldLineStatus, outsourcingorderitem.FieldNote:
 			values[i] = new(sql.NullString)
 		case outsourcingorderitem.FieldExpectedReturnDate, outsourcingorderitem.FieldCreatedAt, outsourcingorderitem.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -195,6 +197,13 @@ func (_m *OutsourcingOrderItem) assignValues(columns []string, values []any) err
 			} else if value.Valid {
 				_m.ProductNoSnapshot = new(string)
 				*_m.ProductNoSnapshot = value.String
+			}
+		case outsourcingorderitem.FieldProductOrderNoSnapshot:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field product_order_no_snapshot", values[i])
+			} else if value.Valid {
+				_m.ProductOrderNoSnapshot = new(string)
+				*_m.ProductOrderNoSnapshot = value.String
 			}
 		case outsourcingorderitem.FieldProductNameSnapshot:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -349,6 +358,11 @@ func (_m *OutsourcingOrderItem) String() string {
 	builder.WriteString(", ")
 	if v := _m.ProductNoSnapshot; v != nil {
 		builder.WriteString("product_no_snapshot=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ProductOrderNoSnapshot; v != nil {
+		builder.WriteString("product_order_no_snapshot=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

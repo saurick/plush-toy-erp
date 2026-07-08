@@ -22,6 +22,7 @@ import {
   createEngineeringPrintDraft,
   engineeringImageSlots,
   engineeringPrintTemplateKeys,
+  normalizeWorkInstructionRowType,
 } from '../data/engineeringPrintTemplates.mjs'
 import {
   PDF_ACTION_UI_STALE_TIMEOUT_MS,
@@ -154,9 +155,7 @@ function formatInstructionRowTargetLabel(target) {
 }
 
 function getWorkInstructionRowType(row = {}) {
-  return Object.values(WORK_INSTRUCTION_ROW_TYPES).includes(row?.type)
-    ? row.type
-    : WORK_INSTRUCTION_ROW_TYPES.step
+  return normalizeWorkInstructionRowType(row?.type)
 }
 
 function isWorkInstructionStepRow(row = {}) {
@@ -168,10 +167,7 @@ function getWorkInstructionFullRowClassName(row = {}) {
   if (type === WORK_INSTRUCTION_ROW_TYPES.title) {
     return 'erp-work-instruction-paper__section-title-row'
   }
-  if (type === WORK_INSTRUCTION_ROW_TYPES.remark) {
-    return 'erp-work-instruction-paper__remark'
-  }
-  return 'erp-work-instruction-paper__notice-row'
+  return 'erp-work-instruction-paper__text-row'
 }
 
 function toText(value) {
@@ -3523,11 +3519,9 @@ export default function EngineeringPrintWorkspacePage() {
       const typeLabel =
         rowType === WORK_INSTRUCTION_ROW_TYPES.title
           ? '标题行'
-          : rowType === WORK_INSTRUCTION_ROW_TYPES.note
-            ? '说明行'
-            : rowType === WORK_INSTRUCTION_ROW_TYPES.remark
-              ? '备注行'
-              : '编号行'
+          : rowType === WORK_INSTRUCTION_ROW_TYPES.text
+            ? '文本行'
+            : '编号行'
       const baseRows = [
         {
           key:
@@ -4127,13 +4121,13 @@ export default function EngineeringPrintWorkspacePage() {
         {[
           [WORK_INSTRUCTION_ROW_TYPES.title, '设为标题行'],
           [WORK_INSTRUCTION_ROW_TYPES.step, '设为编号行'],
-          [WORK_INSTRUCTION_ROW_TYPES.note, '设为说明行'],
-          [WORK_INSTRUCTION_ROW_TYPES.remark, '设为备注行'],
+          [WORK_INSTRUCTION_ROW_TYPES.text, '设为文本行'],
         ].map(([type, label]) => (
           <button
             type="button"
             className={getToolbarButtonClassName({
-              active: selectedInstructionRow?.type === type,
+              active:
+                getWorkInstructionRowType(selectedInstructionRow) === type,
             })}
             disabled={selectedWorkInstructionRowTarget === null}
             key={type}

@@ -223,6 +223,7 @@ test('processingContractTemplate: 委外订单按加工合同源单带入工序�
     [
       {
         line_status: 'open',
+        product_order_no_snapshot: ' SO-LINE-26017 ',
         product_no_snapshot: ' P-001 ',
         product_name_snapshot: ' 毛绒兔半成品 ',
         process_name_snapshot: ' 车缝 ',
@@ -246,7 +247,7 @@ test('processingContractTemplate: 委外订单按加工合同源单带入工序�
   assert.equal(draft.returnDateText, '2026-06-24')
   assert.deepEqual(draft.lines[0], {
     contractNo: 'OUT-ORDER-001',
-    productOrderNo: 'SO-26017',
+    productOrderNo: 'SO-LINE-26017',
     productNo: 'P-001',
     productName: '毛绒兔半成品',
     processName: '车缝',

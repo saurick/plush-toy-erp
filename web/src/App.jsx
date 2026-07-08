@@ -1,5 +1,5 @@
 // web/src/App.jsx
-import React, { Suspense, lazy, useEffect } from 'react'
+import React, { Suspense, useEffect } from 'react'
 import { App as AntdApp, ConfigProvider, theme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -15,8 +15,9 @@ import {
   useERPWorkspace,
 } from '@/erp/context/ERPWorkspaceProvider'
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
+import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 
-const ERPRouter = lazy(() => import('@/erp/router'))
+const ERPRouter = lazyWithDynamicImportRetry(() => import('@/erp/router'))
 
 function AppContent() {
   const location = useLocation()

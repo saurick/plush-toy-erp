@@ -89,6 +89,7 @@ export function createBlankOutsourcingLine(lineNo = 1) {
     process_id: undefined,
     unit_id: undefined,
     product_no_snapshot: '',
+    product_order_no_snapshot: '',
     product_name_snapshot: '',
     process_name_snapshot: '',
     process_category_snapshot: '',
@@ -113,6 +114,7 @@ export function normalizeOutsourcingLineFormValue(item = {}) {
     process_id: item.process_id,
     unit_id: item.unit_id,
     product_no_snapshot: item.product_no_snapshot || '',
+    product_order_no_snapshot: item.product_order_no_snapshot || '',
     product_name_snapshot: item.product_name_snapshot || '',
     process_name_snapshot: item.process_name_snapshot || '',
     process_category_snapshot: item.process_category_snapshot || '',
@@ -325,6 +327,18 @@ export default function OutsourcingOrderForm({
                   options={productOptions}
                   optionFilterProp="label"
                   onChange={(value) => onProductChange(field.name, value)}
+                />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--source"
+                name={[field.name, 'product_order_no_snapshot']}
+                label="产品订单编号"
+                extra="来自销售订单、客户产品订单或甲方加工汇总；用于加工合同逐行追溯。"
+              >
+                <Input
+                  allowClear
+                  maxLength={128}
+                  placeholder="如 SO-YOYO-TRIAL-001"
                 />
               </Form.Item>
               <Form.Item
