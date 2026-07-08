@@ -7,6 +7,48 @@ import { createDevCustomerConfigPlugin } from './devCustomerConfigPlugin.mjs'
 import { getAppDefinition } from './src/erp/config/appRegistry.mjs'
 
 const ROOT_DIR = fileURLToPath(new URL('.', import.meta.url))
+const DEV_HOST = '127.0.0.1'
+
+const createDevOrigin = (port) => `http://${DEV_HOST}:${port}`
+
+const normalizeDevLocalUrl = (url, port) => {
+  return String(url || '').replace(
+    `http://localhost:${port}`,
+    createDevOrigin(port)
+  )
+}
+
+const createDevLocalhostOriginNormalizer = (port) => ({
+  name: 'plush-dev-localhost-origin-normalizer',
+  apply: 'serve',
+  configureServer(server) {
+    const printUrls = server.printUrls.bind(server)
+    server.printUrls = () => {
+      if (server.resolvedUrls?.local) {
+        server.resolvedUrls.local = server.resolvedUrls.local.map((url) =>
+          normalizeDevLocalUrl(url, port)
+        )
+      }
+      printUrls()
+    }
+  },
+  transformIndexHtml() {
+    return [
+      {
+        tag: 'script',
+        injectTo: 'head-prepend',
+        children: `
+;(function () {
+  var loc = window.location
+  if (loc.protocol === 'http:' && loc.hostname === 'localhost' && loc.port === '${port}') {
+    loc.replace('${createDevOrigin(port)}' + loc.pathname + loc.search + loc.hash)
+  }
+})()
+`,
+      },
+    ]
+  },
+})
 
 export function createERPViteConfig(appId) {
   const app = getAppDefinition(appId)
@@ -25,6 +67,8 @@ export function createERPViteConfig(appId) {
     return {
       base: isDev ? '/' : env.VITE_BASE_URL || '/',
       plugins: [
+        // 本机开发统一用 IPv4 origin，避免 localhost 解析或代理链路导致源模块加载抖动。
+        isDev ? createDevLocalhostOriginNormalizer(serverPort) : null,
         react(),
         isDev
           ? createDevCustomerImportDryRunPlugin({
@@ -83,18 +127,18 @@ export function createERPViteConfig(appId) {
         host: '0.0.0.0',
         port: serverPort,
         strictPort: true,
-        open: true,
+        open: createDevOrigin(serverPort),
         hmr: {
-          host: '127.0.0.1',
+          host: DEV_HOST,
           clientPort: hmrClientPort,
         },
         proxy: {
           '/rpc': {
-            target: 'http://localhost:8300',
+            target: 'http://127.0.0.1:8300',
             changeOrigin: true,
           },
           '/templates': {
-            target: 'http://localhost:8300',
+            target: 'http://127.0.0.1:8300',
             changeOrigin: true,
           },
         },

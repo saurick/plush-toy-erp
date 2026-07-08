@@ -139,4 +139,16 @@
 
 下一步：如果后续继续新增打印模板，测试守卫应优先断言 catalog 标题、source-grounded 数量和销售订单未启用边界，不再写死旧模板数量；L1 需要 reload 注入草稿时继续走当前窗口级草稿 key，不回退到单一 legacy key。
 
+## 2026-07-07 本地 Vite proxy IPv4 固定
+
+完成：排查 `/Users/simon/projects` 下同类 Vite dev runtime 风险后，确认 plush 的 HMR 已固定为 `127.0.0.1`；本轮只把 `web/vite.shared.mjs` 中 `/rpc`、`/templates` proxy 默认目标从 `localhost:8300` 收口到 `127.0.0.1:8300`，避免本机 `localhost` 优先解析到 `::1` 时后端代理间歇失败。
+
+下一步：后续若调整 desktop / prototype / customer preview 的端口，继续保持 HMR host 与本地 proxy target 使用明确 IPv4 loopback；浏览器访问地址仍可按脚本实际打印端口使用。
+
+阻塞/风险：追加前 `progress.md` 为 190 行、52452 字节，未达到 600 行或 80KiB 归档阈值。本轮只改本地开发 Vite 共享配置，不改产品核心、客户配置、schema、migration、Workflow / Fact、打印模板或正式文档。
+
+## 2026-07-08 本地 Vite 开发入口 IPv4 统一
+
+完成：继续收口本地 Vite dev origin：`web/vite.shared.mjs` 保留 `host: 0.0.0.0` 和局域网 `Network` 地址，但按实际 `serverPort` 将自动打开地址、终端 `Local:` 打印和 `localhost:<port>` 页面访问统一规范到 `http://127.0.0.1:<port>`；同步更新 `web/README.md` 中 5175 桌面后台、岗位任务端和 dev-only 入口的本地访问示例。端口顺延类预览说明仍以脚本实际输出为准，本轮不硬改。
+
 阻塞/风险：追加前 `progress.md` 为 134 行、35469 字节，未达到 600 行或 80KiB 归档阈值。本轮只修提交前守卫和 L1 helper，不新增业务能力，不改 schema、migration、RBAC、Workflow / Fact、服务端 PDF、源 Excel、客户配置激活或真实导入。已通过 `node --test scripts/qa/sales-order-field-chain-boundary.test.mjs scripts/qa/dev-entry-boundary.test.mjs scripts/qa/docs-inventory.test.mjs`、`node --check web/scripts/style-l1/printAssertions.mjs`、`git diff --check -- web/scripts/style-l1/printAssertions.mjs`、`STYLE_L1_SCENARIOS=print-workspace-processing /usr/local/bin/pnpm --dir web style:l1`、`bash scripts/qa/full.sh`。完整 `/usr/local/bin/pnpm --dir web style:l1` 在 targeted 场景修复后再次运行超过 7 分钟无输出，已手动中断并清理本次 4173 测试服务；因此本轮完整 L1 全场景未完成，提交前浏览器证据以目标会话通过的 `print-center-engineering-preview-tablet`、本轮通过的 `print-workspace-processing` 和 `full.sh` 为准。
