@@ -30,9 +30,9 @@
 }
 
 .erp-engineering-print-editable:focus {
-  background: #ecfdf5;
+  background: rgb(47 143 75 / 8%);
   outline: 0;
-  box-shadow: inset 0 0 0 1.5px rgb(22 163 74 / 82%);
+  box-shadow: inset 0 0 0 1.5px rgb(47 143 75 / 82%);
 }
 
 .erp-engineering-print-meta-grid {
@@ -46,7 +46,7 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 2mm;
-  align-items: center;
+  align-items: baseline;
   min-height: 7mm;
   padding: 0.6mm 1.8mm 0.6mm 0;
 }
@@ -222,13 +222,16 @@
 .erp-material-detail-table th,
 .erp-material-detail-table td {
   height: 7.3mm;
+  max-width: 0;
+  min-width: 0;
   padding: 0;
   border: 0;
   border-right: 1px solid #111827;
   border-bottom: 1px solid #111827;
-  text-align: center;
-  word-break: break-word;
   overflow-wrap: anywhere;
+  text-align: center;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .erp-material-detail-table tr > :first-child {
@@ -254,20 +257,16 @@
   box-sizing: border-box;
   align-items: center;
   justify-content: center;
+  width: 100%;
   height: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 7.3mm;
   padding: 0.7mm 0.45mm;
+  line-break: anywhere;
   overflow-wrap: anywhere;
   white-space: normal;
   word-break: break-word;
-}
-
-.erp-material-detail-table
-  td:nth-child(6)
-  .erp-material-detail-table__editable {
-  white-space: nowrap;
-  overflow-wrap: normal;
-  word-break: normal;
 }
 
 .erp-material-detail-paper__footer {
@@ -284,7 +283,7 @@
   display: inline-grid;
   grid-template-columns: auto minmax(28mm, 1fr);
   gap: 2mm;
-  align-items: center;
+  align-items: baseline;
   min-width: 38mm;
   min-height: 8mm;
 }
@@ -297,10 +296,9 @@
 .erp-material-detail-paper__footer-value {
   display: flex;
   align-items: center;
-  align-self: stretch;
+  align-self: baseline;
   min-width: 28mm;
-  min-height: 0;
-  height: 100%;
+  min-height: 8mm;
 }
 
 .erp-material-detail-paper__bottom-images {
@@ -341,7 +339,7 @@
   grid-template-columns: auto 34mm auto 1fr;
   grid-auto-rows: minmax(8mm, auto);
   gap: 2mm;
-  align-items: center;
+  align-items: baseline;
   margin: 8mm 0 4mm;
   font-size: 14px;
 }
@@ -353,12 +351,12 @@
 .erp-color-card-paper__meta > .erp-engineering-print-editable {
   display: flex;
   align-items: center;
-  align-self: stretch;
+  align-self: baseline;
   width: 100%;
-  height: 100%;
+  min-height: 8mm;
   min-width: 0;
-  white-space: nowrap;
-  overflow-wrap: normal;
+  white-space: normal;
+  overflow-wrap: anywhere;
   word-break: normal;
 }
 
@@ -447,7 +445,7 @@
 .erp-color-card-paper__footer > span {
   display: grid;
   grid-template-columns: auto minmax(24mm, 1fr);
-  align-items: center;
+  align-items: baseline;
   min-width: 0;
   min-height: 8mm;
   gap: 2mm;
@@ -457,13 +455,13 @@
 .erp-color-card-paper__footer .erp-engineering-print-editable {
   display: flex;
   align-items: center;
-  align-self: stretch;
+  align-self: baseline;
   width: 100%;
   min-width: 0;
-  height: 100%;
-  white-space: nowrap;
-  overflow-wrap: normal;
-  word-break: normal;
+  min-height: 8mm;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .erp-engineering-print-workspace-shell .erp-print-shell__content {
@@ -552,7 +550,9 @@
   height: var(--work-instruction-row-height, 7.6mm);
   padding: 0;
   border: 1px solid #111827;
+  overflow-wrap: anywhere;
   vertical-align: middle;
+  word-break: break-word;
 }
 
 .erp-work-instruction-paper__sheet .erp-engineering-print-editable {
@@ -566,7 +566,8 @@
   padding: 1.2mm 1.4mm;
   line-height: inherit;
   white-space: pre-wrap;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .erp-work-instruction-paper__company-cell,
@@ -613,26 +614,22 @@
   border-style: solid;
 }
 
+.erp-work-instruction-paper__section-title-row td,
+.erp-work-instruction-paper__notice-row td,
+.erp-work-instruction-paper__remark td {
+  height: var(--work-instruction-row-height, 11.6mm);
+  padding: 0;
+  vertical-align: middle;
+}
+
 .erp-work-instruction-paper__section-title-row td {
-  height: var(--work-instruction-row-height, 6.4mm);
   font-size: 18.67px;
   font-weight: 700;
 }
 
-.erp-work-instruction-paper__sewing-note-row td {
-  min-height: 14mm;
-  padding: 1.4mm;
-  font-size: 14.67px;
-}
-
 .erp-work-instruction-paper__notice-row td {
-  padding: 1.1mm 1.4mm;
-  font-size: 12px;
+  font-size: 14.67px;
   font-weight: 700;
-}
-
-.erp-work-instruction-paper__sewing-note-row strong {
-  margin-right: 1mm;
 }
 
 .erp-work-instruction-paper__text-cell {
@@ -659,7 +656,7 @@
 }
 
 .erp-work-instruction-paper__step-row--text td {
-  height: var(--instruction-row-min-height, auto);
+  height: var(--instruction-row-min-height, 11.6mm);
 }
 
 .erp-work-instruction-paper__step-row--image
@@ -851,10 +848,6 @@
   font-weight: 700;
 }
 
-.erp-work-instruction-paper__remark .erp-engineering-print-editable {
-  padding: 2mm;
-}
-
 .erp-color-card-paper__side td > .erp-engineering-print-editable {
   display: flex;
   align-items: center;
@@ -866,9 +859,8 @@
 .erp-engineering-print-meta-grid > div > .erp-engineering-print-editable {
   display: flex;
   align-items: center;
-  align-self: stretch;
-  height: 100%;
-  min-height: 0;
+  align-self: baseline;
+  min-height: 7mm;
 }
 
 .erp-engineering-print-row-actions {
@@ -879,11 +871,27 @@
 }
 
 @media print {
+  .erp-engineering-print-workspace-shell,
+  .erp-engineering-print-workspace-shell .erp-print-shell__content,
+  .erp-engineering-print-workspace-shell .erp-print-shell__stage,
+  .erp-engineering-print-workspace-shell .erp-print-shell__stage-wrap {
+    box-sizing: border-box;
+    width: 210mm;
+    max-width: 210mm;
+    margin: 0;
+    padding: 0;
+  }
+
+  .erp-engineering-print-workspace-shell .erp-print-shell__stage-wrap {
+    justify-content: flex-start;
+  }
+
   .erp-engineering-print-paper {
     box-sizing: border-box;
     width: 210mm;
+    max-width: 210mm;
     min-height: auto;
-    margin: 0 auto;
+    margin: 0;
     border: 0;
     border-radius: 0;
     background: #fff;

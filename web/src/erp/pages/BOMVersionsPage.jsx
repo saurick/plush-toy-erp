@@ -94,8 +94,10 @@ import {
 import {
   COLOR_CARD_TEMPLATE_KEY,
   MATERIAL_DETAIL_TEMPLATE_KEY,
+  WORK_INSTRUCTION_TEMPLATE_KEY,
   buildColorCardDraftFromBOMVersion,
   buildMaterialDetailDraftFromBOMVersion,
+  buildWorkInstructionDraftFromBOMVersion,
 } from '../data/engineeringPrintTemplates.mjs'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
@@ -702,7 +704,9 @@ export default function BOMVersionsPage() {
       const builder =
         templateKey === COLOR_CARD_TEMPLATE_KEY
           ? buildColorCardDraftFromBOMVersion
-          : buildMaterialDetailDraftFromBOMVersion
+          : templateKey === WORK_INSTRUCTION_TEMPLATE_KEY
+            ? buildWorkInstructionDraftFromBOMVersion
+            : buildMaterialDetailDraftFromBOMVersion
       const initialDraft = builder(detail, {
         productOptions,
         products,
@@ -718,7 +722,9 @@ export default function BOMVersionsPage() {
       message.success(
         templateKey === COLOR_CARD_TEMPLATE_KEY
           ? '已打开色卡打印模板'
-          : '已打开物料明细打印模板'
+          : templateKey === WORK_INSTRUCTION_TEMPLATE_KEY
+            ? '已打开作业指导书打印模板'
+            : '已打开物料明细打印模板'
       )
     } catch (error) {
       message.error(getActionErrorMessage(error, '打开工程打印模板失败'))
@@ -1160,6 +1166,19 @@ export default function BOMVersionsPage() {
             onClick={() => openEngineeringPrint(COLOR_CARD_TEMPLATE_KEY)}
           >
             打印色卡
+          </Button>
+          <Button
+            size="small"
+            icon={<PrinterOutlined />}
+            disabled={
+              selectedRowKeys.length !== 1 ||
+              detailLoading ||
+              printingTemplateKey !== ''
+            }
+            loading={printingTemplateKey === WORK_INSTRUCTION_TEMPLATE_KEY}
+            onClick={() => openEngineeringPrint(WORK_INSTRUCTION_TEMPLATE_KEY)}
+          >
+            打印作业指导书
           </Button>
           <Popconfirm
             title="激活该 BOM 版本？同产品当前生效版本会设为历史版本。"

@@ -1,5 +1,5 @@
-const CANONICAL_LOCAL_DEV_HOST = 'localhost'
-const ALIAS_LOCAL_DEV_HOST = '127.0.0.1'
+const CANONICAL_LOCAL_DEV_HOST = '127.0.0.1'
+const ALIAS_LOCAL_DEV_HOST = 'localhost'
 
 export function buildCanonicalLocalDevUrl(locationLike) {
   if (locationLike?.hostname !== ALIAS_LOCAL_DEV_HOST) {
@@ -19,6 +19,10 @@ export function redirectToCanonicalLocalDevHost(windowObject) {
     return false
   }
 
-  windowObject.location.href = canonicalUrl
+  if (typeof windowObject.location.replace === 'function') {
+    windowObject.location.replace(canonicalUrl)
+  } else {
+    windowObject.location.href = canonicalUrl
+  }
   return true
 }

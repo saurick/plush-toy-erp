@@ -201,6 +201,49 @@ test('business list toolbar: 不提供通用删除和回收站壳能力', () => 
   }
 })
 
+test('print template business entries: 工程资料和委外打印入口归属正确页面', () => {
+  const bomPageSource = readFileSync(
+    new URL('../pages/BOMVersionsPage.jsx', import.meta.url),
+    'utf8'
+  )
+  const outsourcingPageSource = readFileSync(
+    new URL('../pages/V1OutsourcingOrdersPage.jsx', import.meta.url),
+    'utf8'
+  )
+
+  for (const text of [
+    'MATERIAL_DETAIL_TEMPLATE_KEY',
+    'COLOR_CARD_TEMPLATE_KEY',
+    'WORK_INSTRUCTION_TEMPLATE_KEY',
+    'buildWorkInstructionDraftFromBOMVersion',
+    '打印作业指导书',
+  ]) {
+    assert.equal(
+      bomPageSource.includes(text),
+      true,
+      `BOM page should own engineering print entry: ${text}`
+    )
+  }
+
+  assert.equal(
+    outsourcingPageSource.includes('PROCESSING_CONTRACT_TEMPLATE_KEY'),
+    true
+  )
+  assert.equal(outsourcingPageSource.includes('加工合同打印'), true)
+
+  for (const text of [
+    'WORK_INSTRUCTION_TEMPLATE_KEY',
+    'buildWorkInstructionDraftFromOutsourcingOrder',
+    '作业指导书打印',
+  ]) {
+    assert.equal(
+      outsourcingPageSource.includes(text),
+      false,
+      `outsourcing page should not own work instruction entry: ${text}`
+    )
+  }
+})
+
 test('business delete governance: 删除必须走引用检查和业务生命周期替代', () => {
   const agentsSource = readFileSync(
     new URL('../../../../AGENTS.md', import.meta.url),

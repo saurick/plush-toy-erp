@@ -8,6 +8,26 @@ export const engineeringPrintTemplateKeys = new Set([
   WORK_INSTRUCTION_TEMPLATE_KEY,
 ])
 
+export const WORK_INSTRUCTION_ROW_TYPES = Object.freeze({
+  title: 'title',
+  step: 'step',
+  note: 'note',
+  remark: 'remark',
+})
+
+export const WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM = 11.6
+
+const WORK_INSTRUCTION_LEGACY_BODY_KEYS = [
+  'cuttingTitle',
+  'cuttingRows',
+  'embroideryTitle',
+  'embroideryRows',
+  'sewingTitle',
+  'sewingIntroRows',
+  'sewingNote',
+  'remark',
+]
+
 export const MATERIAL_DETAIL_COLUMNS = [
   { key: 'category', label: '材料类别' },
   { key: 'materialName', label: '物料名称' },
@@ -357,10 +377,178 @@ function normalizeInstructionTextRow(row = {}) {
   }
 }
 
+function normalizeWorkInstructionRowType(type) {
+  return Object.values(WORK_INSTRUCTION_ROW_TYPES).includes(type)
+    ? type
+    : WORK_INSTRUCTION_ROW_TYPES.step
+}
+
+function normalizeWorkInstructionBodyRow(row = {}, index = 0) {
+  const source =
+    row && typeof row === 'object' && !Array.isArray(row) ? row : { text: row }
+  const type = normalizeWorkInstructionRowType(source.type)
+  const normalizedRow = normalizeInstructionRow(source, index)
+  const fallbackHeight =
+    normalizedRow.heightMm ?? WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM
+  return {
+    ...normalizedRow,
+    type,
+    no: type === WORK_INSTRUCTION_ROW_TYPES.step ? normalizedRow.no : '',
+    heightMm: fallbackHeight,
+  }
+}
+
+function renumberWorkInstructionBodyRows(rows = []) {
+  let stepNo = 1
+  return rows.map((row) => {
+    if (
+      row.type === WORK_INSTRUCTION_ROW_TYPES.title ||
+      row.type === WORK_INSTRUCTION_ROW_TYPES.note
+    ) {
+      stepNo = 1
+      return { ...row, no: '' }
+    }
+    if (row.type === WORK_INSTRUCTION_ROW_TYPES.step || !row.type) {
+      return { ...row, no: String(stepNo++) }
+    }
+    return { ...row, no: '' }
+  })
+}
+
+function compactWorkInstructionLegacyRows(input = {}, fallback = {}) {
+  const rows = []
+  const pushTitle = (title) => {
+    const text = toText(title)
+    if (!text) return
+    rows.push({
+      type: WORK_INSTRUCTION_ROW_TYPES.title,
+      text,
+      heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+    })
+  }
+  const pushTextRows = (sourceRows = []) => {
+    const textRows = Array.isArray(sourceRows) ? sourceRows : []
+    textRows.forEach((row) => {
+      const normalized = normalizeInstructionTextRow(row)
+      if (!normalized.text) return
+      rows.push({
+        type: WORK_INSTRUCTION_ROW_TYPES.step,
+        no: '',
+        text: normalized.text,
+        heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+      })
+    })
+  }
+  const pushNote = (text) => {
+    const value = toText(text)
+    if (!value) return
+    rows.push({
+      type: WORK_INSTRUCTION_ROW_TYPES.note,
+      text: value,
+      heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+    })
+  }
+  const pushSteps = (sourceRows = []) => {
+    const stepRows = Array.isArray(sourceRows) ? sourceRows : []
+    stepRows.forEach((row, index) => {
+      const normalized = normalizeInstructionRow(row, index)
+      if (
+        !normalized.text &&
+        !normalized.images.some((image) => image.dataURL)
+      ) {
+        return
+      }
+      const hasImage = normalized.images.some((image) => image.dataURL)
+      rows.push({
+        ...normalized,
+        type: WORK_INSTRUCTION_ROW_TYPES.step,
+        heightMm: hasImage
+          ? (normalized.heightMm ?? WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM)
+          : WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+      })
+    })
+  }
+  const pushRemark = (text) => {
+    const value = toText(text)
+    if (!value) return
+    rows.push({
+      type: WORK_INSTRUCTION_ROW_TYPES.remark,
+      text: value,
+      heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+    })
+  }
+
+  pushTitle(
+    hasOwn(input, 'cuttingTitle') ? input.cuttingTitle : fallback.cuttingTitle,
+    hasOwn(input, 'cuttingTitleHeightMm')
+      ? normalizeHeightMm(input.cuttingTitleHeightMm, { min: 4, max: 40 })
+      : fallback.cuttingTitleHeightMm
+  )
+  pushTextRows(
+    hasOwn(input, 'cuttingRows') ? input.cuttingRows : fallback.cuttingRows
+  )
+  pushTitle(
+    hasOwn(input, 'embroideryTitle')
+      ? input.embroideryTitle
+      : fallback.embroideryTitle,
+    hasOwn(input, 'embroideryTitleHeightMm')
+      ? normalizeHeightMm(input.embroideryTitleHeightMm, { min: 4, max: 40 })
+      : fallback.embroideryTitleHeightMm
+  )
+  pushTextRows(
+    hasOwn(input, 'embroideryRows')
+      ? input.embroideryRows
+      : fallback.embroideryRows
+  )
+  pushTitle(
+    hasOwn(input, 'sewingTitle') ? input.sewingTitle : fallback.sewingTitle,
+    hasOwn(input, 'sewingTitleHeightMm')
+      ? normalizeHeightMm(input.sewingTitleHeightMm, { min: 4, max: 40 })
+      : fallback.sewingTitleHeightMm
+  )
+  pushTextRows(
+    hasOwn(input, 'sewingIntroRows')
+      ? input.sewingIntroRows
+      : fallback.sewingIntroRows
+  )
+  pushNote(
+    hasOwn(input, 'sewingNote') ? input.sewingNote : fallback.sewingNote,
+    hasOwn(input, 'sewingNoteHeightMm')
+      ? normalizeHeightMm(input.sewingNoteHeightMm, { min: 4, max: 80 })
+      : fallback.sewingNoteHeightMm
+  )
+  pushSteps(hasOwn(input, 'rows') ? input.rows : fallback.rows)
+  pushRemark(hasOwn(input, 'remark') ? input.remark : fallback.remark)
+
+  return renumberWorkInstructionBodyRows(
+    rows.length
+      ? rows.map(normalizeWorkInstructionBodyRow)
+      : [
+          {
+            type: WORK_INSTRUCTION_ROW_TYPES.step,
+            no: '1',
+            text: '',
+            heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+          },
+        ].map(normalizeWorkInstructionBodyRow)
+  )
+}
+
+function hasWorkInstructionLegacyBodyFields(input = {}) {
+  return WORK_INSTRUCTION_LEGACY_BODY_KEYS.some((key) => hasOwn(input, key))
+}
+
 function normalizeWorkInstructionPage(page = {}) {
   const sourceHeaderRowHeights = Array.isArray(page.headerRowHeightsMm)
     ? page.headerRowHeightsMm
     : DEFAULT_WORK_INSTRUCTION_SAMPLE.headerRowHeightsMm
+  const sourceRows = hasOwn(page, 'bodyRows')
+    ? page.bodyRows
+    : hasOwn(page, 'rows') &&
+        Array.isArray(page.rows) &&
+        page.rows.some((row) => row?.type)
+      ? page.rows
+      : compactWorkInstructionLegacyRows(page, {})
   return {
     companyName: textWithDefault(
       page,
@@ -407,50 +595,10 @@ function normalizeWorkInstructionPage(page = {}) {
     headerRowHeightsMm: sourceHeaderRowHeights.map((height) =>
       normalizeHeightMm(height, { min: 4, max: 40 })
     ),
-    cuttingTitle: toText(page.cuttingTitle),
-    cuttingTitleHeightMm: normalizeHeightMm(page.cuttingTitleHeightMm, {
-      min: 4,
-      max: 40,
-    }),
-    cuttingRows: (Array.isArray(page.cuttingRows) ? page.cuttingRows : []).map(
-      normalizeInstructionTextRow
-    ),
-    embroideryTitle: toText(page.embroideryTitle),
-    embroideryTitleHeightMm: normalizeHeightMm(page.embroideryTitleHeightMm, {
-      min: 4,
-      max: 40,
-    }),
-    embroideryRows: (Array.isArray(page.embroideryRows)
-      ? page.embroideryRows
-      : []
-    ).map(normalizeInstructionTextRow),
     noticeText: toText(page.noticeText),
     noticeHeightMm: normalizeHeightMm(page.noticeHeightMm, { min: 4, max: 80 }),
-    sewingTitle: textWithDefault(
-      page,
-      'sewingTitle',
-      DEFAULT_WORK_INSTRUCTION_SAMPLE.sewingTitle
-    ),
-    sewingTitleHeightMm: normalizeHeightMm(page.sewingTitleHeightMm, {
-      min: 4,
-      max: 40,
-    }),
-    sewingIntroRows: (Array.isArray(page.sewingIntroRows)
-      ? page.sewingIntroRows
-      : []
-    ).map(normalizeInstructionTextRow),
-    sewingNoteHeightMm: normalizeHeightMm(page.sewingNoteHeightMm, {
-      min: 4,
-      max: 80,
-    }),
-    sewingNote: toText(page.sewingNote),
-    rows: (Array.isArray(page.rows) ? page.rows : []).map(
-      normalizeInstructionRow
-    ),
-    remark: textWithDefault(
-      page,
-      'remark',
-      DEFAULT_WORK_INSTRUCTION_SAMPLE.remark
+    rows: renumberWorkInstructionBodyRows(
+      sourceRows.map(normalizeWorkInstructionBodyRow)
     ),
     showHeader: page.showHeader !== false,
   }
@@ -653,69 +801,63 @@ export const DEFAULT_WORK_INSTRUCTION_SAMPLE = {
   orderNo: '',
   productName: '示例毛绒产品-头部',
   headerRowHeightsMm: [8.5, 8.5, 8.5, 8.5, 8.5, 8.5],
-  cuttingTitle: '裁床',
-  cuttingTitleHeightMm: 6.4,
-  cuttingRows: [
-    {
-      text: '核对资料 / 物料 / 色卡 / 样版 / 刀模，确保正确。',
-      heightMm: 11.6,
-    },
-    {
-      text: '拉布前先松布 8-12 小时，作详细拉布记录并及时反馈异常。',
-      heightMm: 11.6,
-    },
-    {
-      text: '试裁刀模板确认 OK 后再开裁，裁片按色号、部位、毛向分别标识。',
-      heightMm: 11.6,
-    },
-  ],
-  embroideryTitle: '刺绣 / 印花',
-  embroideryTitleHeightMm: 5,
-  embroideryRows: [
-    {
-      text: '按签样签收，核对颜色、位置、大小、走向和印花方向。',
-      heightMm: 11.6,
-    },
-  ],
-  sewingTitle: '车缝',
-  sewingTitleHeightMm: 5,
-  sewingIntroRows: [
-    {
-      text: '止口必须一致，不能松线、跳针、断线、起皱。所有进出口、夹车位和十字骨位都要倒针加固，未尽事宜参照下述流程。',
-      heightMm: 10.6,
-    },
-  ],
-  sewingNoteHeightMm: 14.8,
-  sewingNote:
-    '注：车缝止口均匀，头车 5mm 止口。用 604# 配色线。打折拖圆顺，进出针倒针牢固。',
   rows: [
     {
+      type: WORK_INSTRUCTION_ROW_TYPES.title,
+      text: '裁床',
+      heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+    },
+    {
+      type: WORK_INSTRUCTION_ROW_TYPES.step,
+      no: '1',
+      text: '核对资料 / 物料 / 色卡 / 样版 / 刀模，确保正确。',
+      heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+    },
+    {
+      type: WORK_INSTRUCTION_ROW_TYPES.step,
+      no: '2',
+      text: '拉布前先松布 8-12 小时，作详细拉布记录并及时反馈异常。',
+      heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+    },
+    {
+      type: WORK_INSTRUCTION_ROW_TYPES.title,
+      text: '刺绣 / 印花',
+      heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+    },
+    {
+      type: WORK_INSTRUCTION_ROW_TYPES.step,
+      no: '1',
+      text: '按签样签收，核对颜色、位置、大小、走向和印花方向。',
+      heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+    },
+    {
+      type: WORK_INSTRUCTION_ROW_TYPES.title,
+      text: '车缝',
+      heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+    },
+    {
+      type: WORK_INSTRUCTION_ROW_TYPES.note,
+      text: '注：车缝止口均匀，头车 5mm 止口。用 604# 配色线。打折拖圆顺，进出针倒针牢固。',
+      heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+    },
+    {
+      type: WORK_INSTRUCTION_ROW_TYPES.step,
       no: '1',
       text: '面打折：折位对齐打折，打折拖圆顺，不可起角。',
-      heightMm: 11.6,
+      heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
     },
     {
-      no: '2',
-      text: '面部打好折之后，然后才能去打鼻子、眼睛，打好鼻子、胶件之后然后才能运头。',
-      heightMm: 11.6,
-    },
-    {
-      no: '3',
-      text: '打眼鼻：按样板核对眼鼻配件、位置和方向，装配后确认牢固。',
-      heightMm: 11.6,
-    },
-    {
-      no: '4',
-      text: '上后头：左 / 右后头对齐脸片点位车。',
-      heightMm: 11.6,
-    },
-    {
+      type: WORK_INSTRUCTION_ROW_TYPES.step,
       no: '5',
       text: '头下面折边：向内折边并压明线。',
-      heightMm: 11.6,
+      heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+    },
+    {
+      type: WORK_INSTRUCTION_ROW_TYPES.remark,
+      text: '备注：如有不明或不详处，请参照样板或详询板房。',
+      heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
     },
   ],
-  remark: '备注：如有不明或不详处，请参照样板或详询板房。',
   continuationPages: [],
 }
 
@@ -844,26 +986,18 @@ export function createColorCardDraft(input = {}) {
 }
 
 export function createWorkInstructionDraft(input = {}) {
-  const sourceCuttingRows = hasOwn(input, 'cuttingRows')
-    ? Array.isArray(input.cuttingRows)
-      ? input.cuttingRows
-      : []
-    : DEFAULT_WORK_INSTRUCTION_SAMPLE.cuttingRows
-  const sourceEmbroideryRows = hasOwn(input, 'embroideryRows')
-    ? Array.isArray(input.embroideryRows)
-      ? input.embroideryRows
-      : []
-    : DEFAULT_WORK_INSTRUCTION_SAMPLE.embroideryRows
-  const sourceSewingIntroRows = hasOwn(input, 'sewingIntroRows')
-    ? Array.isArray(input.sewingIntroRows)
-      ? input.sewingIntroRows
-      : []
-    : DEFAULT_WORK_INSTRUCTION_SAMPLE.sewingIntroRows
-  const sourceRows = hasOwn(input, 'rows')
-    ? Array.isArray(input.rows)
-      ? input.rows
-      : []
-    : DEFAULT_WORK_INSTRUCTION_SAMPLE.rows
+  const sourceRows =
+    hasOwn(input, 'bodyRows') && Array.isArray(input.bodyRows)
+      ? input.bodyRows
+      : hasOwn(input, 'rows') &&
+          Array.isArray(input.rows) &&
+          input.rows.some((row) => row?.type)
+        ? input.rows
+        : hasOwn(input, 'rows') && !hasOwn(input, 'bodyRows')
+          ? compactWorkInstructionLegacyRows(input, {})
+          : hasWorkInstructionLegacyBodyFields(input)
+            ? compactWorkInstructionLegacyRows(input, {})
+            : DEFAULT_WORK_INSTRUCTION_SAMPLE.rows
   const sourceHeaderRowHeights = hasOwn(input, 'headerRowHeightsMm')
     ? Array.isArray(input.headerRowHeightsMm)
       ? input.headerRowHeightsMm
@@ -931,46 +1065,8 @@ export function createWorkInstructionDraft(input = {}) {
     headerRowHeightsMm: sourceHeaderRowHeights.map((height) =>
       normalizeHeightMm(height, { min: 4, max: 40 })
     ),
-    cuttingTitle: textWithDefault(
-      input,
-      'cuttingTitle',
-      DEFAULT_WORK_INSTRUCTION_SAMPLE.cuttingTitle
-    ),
-    cuttingTitleHeightMm:
-      normalizeHeightMm(input.cuttingTitleHeightMm, { min: 4, max: 40 }) ??
-      DEFAULT_WORK_INSTRUCTION_SAMPLE.cuttingTitleHeightMm,
-    cuttingRows: sourceCuttingRows.map(normalizeInstructionTextRow),
-    embroideryTitle: textWithDefault(
-      input,
-      'embroideryTitle',
-      DEFAULT_WORK_INSTRUCTION_SAMPLE.embroideryTitle
-    ),
-    embroideryTitleHeightMm:
-      normalizeHeightMm(input.embroideryTitleHeightMm, { min: 4, max: 40 }) ??
-      DEFAULT_WORK_INSTRUCTION_SAMPLE.embroideryTitleHeightMm,
-    embroideryRows: sourceEmbroideryRows.map(normalizeInstructionTextRow),
-    sewingTitle: textWithDefault(
-      input,
-      'sewingTitle',
-      DEFAULT_WORK_INSTRUCTION_SAMPLE.sewingTitle
-    ),
-    sewingTitleHeightMm:
-      normalizeHeightMm(input.sewingTitleHeightMm, { min: 4, max: 40 }) ??
-      DEFAULT_WORK_INSTRUCTION_SAMPLE.sewingTitleHeightMm,
-    sewingIntroRows: sourceSewingIntroRows.map(normalizeInstructionTextRow),
-    sewingNoteHeightMm:
-      normalizeHeightMm(input.sewingNoteHeightMm, { min: 4, max: 80 }) ??
-      DEFAULT_WORK_INSTRUCTION_SAMPLE.sewingNoteHeightMm,
-    sewingNote: textWithDefault(
-      input,
-      'sewingNote',
-      DEFAULT_WORK_INSTRUCTION_SAMPLE.sewingNote
-    ),
-    rows: sourceRows.map(normalizeInstructionRow),
-    remark: textWithDefault(
-      input,
-      'remark',
-      DEFAULT_WORK_INSTRUCTION_SAMPLE.remark
+    rows: renumberWorkInstructionBodyRows(
+      sourceRows.map(normalizeWorkInstructionBodyRow)
     ),
     continuationPages: sourceContinuationPages.map(
       normalizeWorkInstructionPage
@@ -1011,14 +1107,6 @@ function recordByID(records, id) {
       (item) => Number(item?.id || item?.value || 0) === targetID
     ) || null
   )
-}
-
-function formatSourceDate(value) {
-  const numberValue = Number(value || 0)
-  if (Number.isFinite(numberValue) && numberValue > 0) {
-    return new Date(numberValue * 1000).toISOString().slice(0, 10)
-  }
-  return toText(value)
 }
 
 function sourceProductSnapshot(
@@ -1160,81 +1248,22 @@ export function buildColorCardDraftFromBOMVersion(
   })
 }
 
-export function buildWorkInstructionDraftFromOutsourcingOrder(
-  order = {},
-  items = [],
-  { companyName = '' } = {}
+export function buildWorkInstructionDraftFromBOMVersion(
+  version = {},
+  { productOptions = [], products = [], companyName = '' } = {}
 ) {
-  const activeItems = (Array.isArray(items) ? items : []).filter(
-    (item) =>
-      !['canceled', 'cancelled'].includes(
-        toText(item?.line_status).toLowerCase()
-      )
-  )
-  const productText = compactTextParts(
-    activeItems.map(
-      (item) =>
-        item.product_name_snapshot ||
-        item.productName ||
-        order.product_snapshot?.name
-    )
-  )
-  const productNo = compactTextParts(
-    activeItems.map(
-      (item) =>
-        item.product_no_snapshot ||
-        item.product_code_snapshot ||
-        item.productNo ||
-        order.product_snapshot?.code
-    )
-  )
-  const processName = compactTextParts(
-    activeItems.map(
-      (item) =>
-        item.process_name_snapshot ||
-        item.processName ||
-        order.process_snapshot?.name
-    )
-  )
-  const rows = activeItems.map((item, index) =>
-    normalizeInstructionRow({
-      no: String(index + 1),
-      text: compactTextParts(
-        [
-          item.process_name_snapshot || item.processName || '',
-          compactTextParts(
-            [
-              item.product_name_snapshot || item.productName || '',
-              item.outsourcing_quantity
-                ? `${item.outsourcing_quantity}${item.unit_name_snapshot || ''}`
-                : '',
-              item.expected_return_date
-                ? `回货 ${formatSourceDate(item.expected_return_date)}`
-                : '',
-            ],
-            '，'
-          ),
-          item.remark || item.note || '',
-        ],
-        '：'
-      ),
-    })
-  )
-
+  const product = sourceProductSnapshot(version, { productOptions, products })
   return createWorkInstructionDraft({
     companyName,
-    productNo,
-    productName: productText,
-    orderNo: compactTextParts([
-      order.source_order_no,
-      order.outsourcing_order_no || order.order_no || order.contract_no,
-    ]),
-    processName,
+    productNo: product.productNo,
+    productName: product.productName,
+    orderNo: version.version ? `BOM ${version.version}` : '',
+    processName: '',
     department: '',
     maker: '',
     designer: '',
     auditor: '',
-    remark: order.note || '',
-    rows,
+    remark: version.note || '',
+    rows: [],
   })
 }

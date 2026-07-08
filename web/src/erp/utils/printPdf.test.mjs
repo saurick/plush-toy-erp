@@ -741,6 +741,38 @@ test('printPdf: PDF 生成完成后直接写入已打开的预览标签', async 
   }
 })
 
+test('printPdf: 快照提交等待在预览弹窗聚焦后不会永久等待 rAF', async () => {
+  const timers = []
+  let animationFrameRequested = false
+  let resolved = false
+  const throttledWindow = {
+    requestAnimationFrame: () => {
+      animationFrameRequested = true
+    },
+    setTimeout: (callback, ms) => {
+      timers.push({ callback, ms })
+      return timers.length
+    },
+    clearTimeout: () => {},
+  }
+
+  const waitPromise = __TEST_ONLY__
+    .waitForSnapshotCommit(throttledWindow)
+    .then(() => {
+      resolved = true
+    })
+
+  await Promise.resolve()
+  assert.equal(animationFrameRequested, true)
+  assert.equal(resolved, false)
+  assert.equal(timers.length, 1)
+  assert.equal(timers[0].ms, 80)
+
+  timers[0].callback()
+  await waitPromise
+  assert.equal(resolved, true)
+})
+
 test('printPdf: 预览 PDF 缓存只命中完全相同快照', () => {
   const originalWindow = globalThis.window
   __TEST_ONLY__.resetPdfPreviewBlobCacheForTest()

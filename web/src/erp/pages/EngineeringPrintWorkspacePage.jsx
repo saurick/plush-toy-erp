@@ -16,6 +16,7 @@ import {
   MATERIAL_DETAIL_COLUMNS,
   MATERIAL_DETAIL_TEMPLATE_KEY,
   WORK_INSTRUCTION_TEMPLATE_KEY,
+  WORK_INSTRUCTION_ROW_TYPES,
   applyEngineeringPrintRuntimeSample,
   createEmptyEngineeringImageSlot,
   createEngineeringPrintDraft,
@@ -58,14 +59,14 @@ import {
   insertColorCardLine,
   insertContinuationInstructionRow,
   insertInstructionRow,
-  insertInstructionSectionRow,
   insertMaterialDetailLine,
   removeColorCardBlock,
   removeColorCardLine,
   removeContinuationInstructionRow,
   removeInstructionRow,
-  removeInstructionSectionRow,
   removeMaterialDetailLine,
+  setContinuationInstructionRowType,
+  setInstructionRowType,
   splitMaterialDetailCellMerge,
 } from '../utils/engineeringPrintEditor.mjs'
 import {
@@ -111,46 +112,6 @@ function createContinuationInstructionRowTarget(pageIndex, rowIndex) {
   return normalizeInstructionRowTarget({ pageIndex, rowIndex })
 }
 
-const INSTRUCTION_SECTION_ROW_KEYS = [
-  'cuttingRows',
-  'embroideryRows',
-  'sewingIntroRows',
-]
-
-const INSTRUCTION_SECTION_ROW_LABELS = {
-  cuttingRows: '裁床',
-  embroideryRows: '刺绣',
-  sewingIntroRows: '车缝说明',
-}
-
-function normalizeInstructionSectionRowTarget(target) {
-  if (
-    !target ||
-    !INSTRUCTION_SECTION_ROW_KEYS.includes(target.sectionKey) ||
-    !Number.isInteger(target.rowIndex)
-  ) {
-    return null
-  }
-  return {
-    sectionKey: target.sectionKey,
-    rowIndex: target.rowIndex,
-  }
-}
-
-function createInstructionSectionRowTarget(sectionKey, rowIndex) {
-  return normalizeInstructionSectionRowTarget({ sectionKey, rowIndex })
-}
-
-function isSameInstructionSectionRowTarget(left, right) {
-  const normalizedLeft = normalizeInstructionSectionRowTarget(left)
-  const normalizedRight = normalizeInstructionSectionRowTarget(right)
-  if (!normalizedLeft || !normalizedRight) return false
-  return (
-    normalizedLeft.sectionKey === normalizedRight.sectionKey &&
-    normalizedLeft.rowIndex === normalizedRight.rowIndex
-  )
-}
-
 function isSameInstructionRowTarget(left, right) {
   const normalizedLeft = normalizeInstructionRowTarget(left)
   const normalizedRight = normalizeInstructionRowTarget(right)
@@ -162,10 +123,6 @@ function isSameInstructionRowTarget(left, right) {
 }
 
 function instructionRowTargetKey(target) {
-  const normalizedSectionTarget = normalizeInstructionSectionRowTarget(target)
-  if (normalizedSectionTarget) {
-    return `section-${normalizedSectionTarget.sectionKey}-${normalizedSectionTarget.rowIndex}`
-  }
   const normalizedTarget = normalizeInstructionRowTarget(target)
   if (!normalizedTarget) return ''
   return normalizedTarget.pageIndex === null
@@ -186,13 +143,6 @@ function getInstructionRowsForTarget(draft, target) {
 }
 
 function formatInstructionRowTargetLabel(target) {
-  const normalizedSectionTarget = normalizeInstructionSectionRowTarget(target)
-  if (normalizedSectionTarget) {
-    const sectionLabel =
-      INSTRUCTION_SECTION_ROW_LABELS[normalizedSectionTarget.sectionKey] ||
-      '段落'
-    return `${sectionLabel}第 ${normalizedSectionTarget.rowIndex + 1} 行`
-  }
   const normalizedTarget = normalizeInstructionRowTarget(target)
   if (!normalizedTarget) return ''
   if (normalizedTarget.pageIndex === null) {
@@ -201,6 +151,27 @@ function formatInstructionRowTargetLabel(target) {
   return `续页 ${normalizedTarget.pageIndex + 1} 第 ${
     normalizedTarget.rowIndex + 1
   } 行`
+}
+
+function getWorkInstructionRowType(row = {}) {
+  return Object.values(WORK_INSTRUCTION_ROW_TYPES).includes(row?.type)
+    ? row.type
+    : WORK_INSTRUCTION_ROW_TYPES.step
+}
+
+function isWorkInstructionStepRow(row = {}) {
+  return getWorkInstructionRowType(row) === WORK_INSTRUCTION_ROW_TYPES.step
+}
+
+function getWorkInstructionFullRowClassName(row = {}) {
+  const type = getWorkInstructionRowType(row)
+  if (type === WORK_INSTRUCTION_ROW_TYPES.title) {
+    return 'erp-work-instruction-paper__section-title-row'
+  }
+  if (type === WORK_INSTRUCTION_ROW_TYPES.remark) {
+    return 'erp-work-instruction-paper__remark'
+  }
+  return 'erp-work-instruction-paper__notice-row'
 }
 
 function toText(value) {
@@ -1602,11 +1573,8 @@ function ColorCardPaper({
 function WorkInstructionPaper({
   draft,
   selectedInstructionRowTarget,
-  selectedSectionRow,
   instructionRowSelectionMode,
-  sectionRowSelectionMode,
   onSelectInstructionRow,
-  onSelectSectionRow,
   onFieldChange,
   onInstructionRowChange,
   onInstructionImageUpload,
@@ -1616,106 +1584,295 @@ function WorkInstructionPaper({
   paperRef,
 }) {
   const headerSlot = engineeringImageSlots.workInstruction[0]
-  const renderSectionRows = (sectionKey, rows = []) =>
-    rows.map((row, index) => {
-      const rowTarget = createInstructionSectionRowTarget(sectionKey, index)
-      const rowText = getInstructionTextRowValue(row)
-      const rowHeightMm =
-        row && typeof row === 'object' && !Array.isArray(row)
-          ? row.heightMm
-          : null
-      const rowImages =
-        row && typeof row === 'object' && !Array.isArray(row)
-          ? Array.isArray(row.images)
-            ? row.images
-            : []
-          : []
+  const continuationPages = Array.isArray(draft.continuationPages)
+    ? draft.continuationPages
+    : []
+  const renderInstructionRows = (rows = [], pageIndex = null) =>
+    rows.map((row, rowIndex) => {
+      const rowTarget =
+        pageIndex === null
+          ? createMainInstructionRowTarget(rowIndex)
+          : createContinuationInstructionRowTarget(pageIndex, rowIndex)
+      const rowType = getWorkInstructionRowType(row)
+      const isStepRow = rowType === WORK_INSTRUCTION_ROW_TYPES.step
+      const isSelectedRow = isSameInstructionRowTarget(
+        selectedInstructionRowTarget,
+        rowTarget
+      )
+      if (!isStepRow) {
+        return (
+          <tr
+            className={`${getWorkInstructionFullRowClassName(row)} ${
+              isSelectedRow ? 'erp-engineering-print-row--selected' : ''
+            }`}
+            key={`body-${pageIndex ?? 'main'}-${rowIndex}`}
+            style={createWorkInstructionRowStyle(row.heightMm)}
+            onMouseDown={(event) => {
+              if (!instructionRowSelectionMode) return
+              clearRequestedEditableFocus()
+              scheduleBlurActiveEngineeringEditable(
+                event.currentTarget.ownerDocument
+              )
+              event.preventDefault()
+              onSelectInstructionRow(rowTarget)
+            }}
+          >
+            <td colSpan={9}>
+              <EditableText
+                value={row.text}
+                multiline
+                rich
+                as="div"
+                onCommit={(value) =>
+                  onInstructionRowChange(rowTarget, 'text', value)
+                }
+              />
+            </td>
+          </tr>
+        )
+      }
+      const rowImages = Array.isArray(row.images) ? row.images : []
       const visibleImages = rowImages
         .map((image, imageIndex) => ({ image, imageIndex }))
         .filter(({ image }) => image?.dataURL)
+      const hasText = richTextHasVisibleText(row.text)
       const isImageRow = visibleImages.length > 0
-      const selectionMode =
-        instructionRowSelectionMode || sectionRowSelectionMode
+      const hasImageNotes =
+        richTextHasVisibleText(row.imageNotes?.left) ||
+        richTextHasVisibleText(row.imageNotes?.right)
+      const useAnnotationLayout = hasImageNotes
+      const imageCallouts = Array.isArray(row.imageCallouts)
+        ? row.imageCallouts
+        : []
+      const imageLabels = Array.isArray(row.imageLabels) ? row.imageLabels : []
+      const hasImageAnnotations =
+        imageCallouts.length > 0 || imageLabels.length > 0
+      const hasPositionedImageLayout =
+        isImageRow &&
+        visibleImages.some(({ image }) => createImageLayoutStyle(image?.layout))
+      const rowStyle = {}
+      const heightMm = Number(row.heightMm)
+      const fontSizePt = Number(row.fontSizePt)
+      const imageAreaHeightMm = Number(row.imageAreaHeightMm)
+      if (Number.isFinite(heightMm) && heightMm > 0) {
+        rowStyle['--instruction-row-min-height'] = `${heightMm}mm`
+      }
+      if (Number.isFinite(fontSizePt) && fontSizePt > 0) {
+        rowStyle['--instruction-row-font-size'] = `${fontSizePt * (4 / 3)}px`
+      }
+      if (Number.isFinite(imageAreaHeightMm) && imageAreaHeightMm > 0) {
+        rowStyle['--instruction-row-image-area-min-height'] =
+          `${imageAreaHeightMm}mm`
+      }
+      const rowClassName = [
+        isSelectedRow ? 'erp-engineering-print-row--selected' : '',
+        isImageRow || useAnnotationLayout
+          ? 'erp-work-instruction-paper__step-row--image'
+          : 'erp-work-instruction-paper__step-row--text',
+        useAnnotationLayout
+          ? 'erp-work-instruction-paper__step-row--annotated'
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
       return (
         <tr
-          className={`erp-work-instruction-paper__section-row ${
-            isSameInstructionSectionRowTarget(selectedSectionRow, rowTarget)
-              ? 'erp-engineering-print-row--selected'
-              : ''
-          }`}
-          key={`${sectionKey}-${index}`}
-          style={createWorkInstructionRowStyle(rowHeightMm)}
-          aria-disabled={!selectionMode}
-          role="button"
-          tabIndex={0}
+          className={rowClassName}
+          key={`body-${pageIndex ?? 'main'}-${rowIndex}`}
+          style={rowStyle}
           onMouseDown={(event) => {
-            if (!selectionMode) return
+            if (!instructionRowSelectionMode) return
             if (event.target.closest('input')) return
             clearRequestedEditableFocus()
             scheduleBlurActiveEngineeringEditable(
               event.currentTarget.ownerDocument
             )
             event.preventDefault()
-            onSelectSectionRow(sectionKey, index)
-          }}
-          onKeyDown={(event) => {
-            if (selectionMode && (event.key === 'Enter' || event.key === ' ')) {
-              event.preventDefault()
-              onSelectSectionRow(sectionKey, index)
-            }
+            onSelectInstructionRow(rowTarget)
           }}
         >
-          <td className="erp-work-instruction-paper__step-no">{index + 1}</td>
-          <td className="erp-work-instruction-paper__text-cell" colSpan={8}>
+          <td className="erp-work-instruction-paper__step-no">
             <EditableText
-              value={rowText}
-              multiline
-              rich
-              as="div"
+              value={row.no}
               onCommit={(value) =>
-                onFieldChange(`${sectionKey}.${index}`, value)
+                onInstructionRowChange(rowTarget, 'no', value)
               }
             />
-            <div
-              className={`erp-work-instruction-paper__row-images${
-                isImageRow
-                  ? ''
-                  : ' erp-work-instruction-paper__row-images--empty'
-              }`}
-            >
-              <input
-                ref={(node) => onInstructionRowImageInputRef(rowTarget, node)}
-                className="erp-work-instruction-paper__row-image-input"
-                type="file"
-                accept={ATTACHMENT_ACCEPT}
-                multiple
-                onChange={(event) =>
-                  onInstructionRowImageFileChange(rowTarget, event)
+          </td>
+          <td
+            className="erp-work-instruction-paper__step-content-cell"
+            colSpan={8}
+          >
+            {hasText || (!isImageRow && !useAnnotationLayout) ? (
+              <EditableText
+                value={row.text}
+                multiline
+                rich
+                as="div"
+                onCommit={(value) =>
+                  onInstructionRowChange(rowTarget, 'text', value)
                 }
               />
-              {visibleImages.map(({ image, imageIndex }, visibleIndex) => (
-                <ImageSlot
-                  key={`${sectionKey}-${index}-image-${imageIndex}`}
-                  label={`${formatInstructionRowTargetLabel(rowTarget)} 图片 ${
-                    visibleIndex + 1
-                  }`}
-                  snapshot={image}
-                  compact
-                  showActions={false}
-                  onUpload={(file) =>
-                    onInstructionImageUpload(rowTarget, file, imageIndex)
+            ) : null}
+            {useAnnotationLayout ? (
+              <div
+                className={`erp-work-instruction-paper__annotation-layout${
+                  hasImageAnnotations
+                    ? ' erp-work-instruction-paper__annotation-layout--with-callouts'
+                    : ''
+                }`}
+              >
+                <InstructionImageAnnotationLayer
+                  rowIndex={
+                    pageIndex === null ? rowIndex : `${pageIndex}-${rowIndex}`
                   }
-                  onClear={() => onInstructionImageClear(rowTarget, imageIndex)}
+                  callouts={imageCallouts}
+                  labels={imageLabels}
                 />
-              ))}
-            </div>
+                <div className="erp-work-instruction-paper__annotation-note erp-work-instruction-paper__annotation-note--left">
+                  <EditableText
+                    value={row.imageNotes?.left}
+                    multiline
+                    rich
+                    as="div"
+                    onCommit={(value) =>
+                      onInstructionRowChange(
+                        rowTarget,
+                        'imageNotes.left',
+                        value
+                      )
+                    }
+                  />
+                </div>
+                <div className="erp-work-instruction-paper__annotation-images">
+                  <input
+                    ref={(node) =>
+                      onInstructionRowImageInputRef(rowTarget, node)
+                    }
+                    className="erp-work-instruction-paper__row-image-input"
+                    type="file"
+                    accept={ATTACHMENT_ACCEPT}
+                    multiple
+                    onChange={(event) =>
+                      onInstructionRowImageFileChange(rowTarget, event)
+                    }
+                  />
+                  <div
+                    className={`erp-work-instruction-paper__row-images${
+                      isImageRow
+                        ? ''
+                        : ' erp-work-instruction-paper__row-images--empty'
+                    }${
+                      hasPositionedImageLayout
+                        ? ' erp-work-instruction-paper__row-images--positioned'
+                        : ''
+                    }`}
+                  >
+                    {visibleImages.map(
+                      ({ image, imageIndex }, visibleIndex) => (
+                        <ImageSlot
+                          key={`step-${pageIndex ?? 'main'}-${rowIndex}-image-${imageIndex}`}
+                          label={`工序 ${row.no || rowIndex + 1} 图片 ${visibleIndex + 1}`}
+                          snapshot={image}
+                          compact
+                          showActions={false}
+                          layoutStyle={
+                            hasPositionedImageLayout
+                              ? createImageLayoutStyle(image.layout)
+                              : undefined
+                          }
+                          onUpload={(file) =>
+                            onInstructionImageUpload(
+                              rowTarget,
+                              file,
+                              imageIndex
+                            )
+                          }
+                          onClear={() =>
+                            onInstructionImageClear(rowTarget, imageIndex)
+                          }
+                        />
+                      )
+                    )}
+                  </div>
+                </div>
+                <div className="erp-work-instruction-paper__annotation-note erp-work-instruction-paper__annotation-note--right">
+                  <EditableText
+                    value={row.imageNotes?.right}
+                    multiline
+                    rich
+                    as="div"
+                    onCommit={(value) =>
+                      onInstructionRowChange(
+                        rowTarget,
+                        'imageNotes.right',
+                        value
+                      )
+                    }
+                  />
+                </div>
+              </div>
+            ) : (
+              <div
+                className={`erp-work-instruction-paper__row-images${
+                  isImageRow
+                    ? ''
+                    : ' erp-work-instruction-paper__row-images--empty'
+                }${
+                  isImageRow && hasImageAnnotations
+                    ? ' erp-work-instruction-paper__row-images--with-annotations'
+                    : ''
+                }${
+                  hasPositionedImageLayout
+                    ? ' erp-work-instruction-paper__row-images--positioned'
+                    : ''
+                }`}
+              >
+                {isImageRow && hasImageAnnotations ? (
+                  <InstructionImageAnnotationLayer
+                    rowIndex={
+                      pageIndex === null ? rowIndex : `${pageIndex}-${rowIndex}`
+                    }
+                    callouts={imageCallouts}
+                    labels={imageLabels}
+                  />
+                ) : null}
+                <input
+                  ref={(node) => onInstructionRowImageInputRef(rowTarget, node)}
+                  className="erp-work-instruction-paper__row-image-input"
+                  type="file"
+                  accept={ATTACHMENT_ACCEPT}
+                  multiple
+                  onChange={(event) =>
+                    onInstructionRowImageFileChange(rowTarget, event)
+                  }
+                />
+                {visibleImages.map(({ image, imageIndex }, visibleIndex) => (
+                  <ImageSlot
+                    key={`step-${pageIndex ?? 'main'}-${rowIndex}-image-${imageIndex}`}
+                    label={`工序 ${row.no || rowIndex + 1} 图片 ${visibleIndex + 1}`}
+                    snapshot={image}
+                    compact
+                    showActions={false}
+                    layoutStyle={
+                      hasPositionedImageLayout
+                        ? createImageLayoutStyle(image.layout)
+                        : undefined
+                    }
+                    onUpload={(file) =>
+                      onInstructionImageUpload(rowTarget, file, imageIndex)
+                    }
+                    onClear={() =>
+                      onInstructionImageClear(rowTarget, imageIndex)
+                    }
+                  />
+                ))}
+              </div>
+            )}
           </td>
         </tr>
       )
     })
-  const continuationPages = Array.isArray(draft.continuationPages)
-    ? draft.continuationPages
-    : []
 
   return (
     <div
@@ -1872,322 +2029,7 @@ function WorkInstructionPaper({
               />
             </td>
           </tr>
-          <tr
-            className="erp-work-instruction-paper__section-title-row"
-            style={createWorkInstructionRowStyle(draft.cuttingTitleHeightMm)}
-          >
-            <td colSpan={9}>
-              <EditableText
-                value={draft.cuttingTitle}
-                onCommit={(value) => onFieldChange('cuttingTitle', value)}
-              />
-            </td>
-          </tr>
-          {renderSectionRows('cuttingRows', draft.cuttingRows)}
-          <tr
-            className="erp-work-instruction-paper__section-title-row"
-            style={createWorkInstructionRowStyle(draft.embroideryTitleHeightMm)}
-          >
-            <td colSpan={9}>
-              <EditableText
-                value={draft.embroideryTitle}
-                onCommit={(value) => onFieldChange('embroideryTitle', value)}
-              />
-            </td>
-          </tr>
-          {renderSectionRows('embroideryRows', draft.embroideryRows)}
-          <tr
-            className="erp-work-instruction-paper__section-title-row"
-            style={createWorkInstructionRowStyle(draft.sewingTitleHeightMm)}
-          >
-            <td colSpan={9}>
-              <EditableText
-                value={draft.sewingTitle}
-                onCommit={(value) => onFieldChange('sewingTitle', value)}
-              />
-            </td>
-          </tr>
-          {renderSectionRows('sewingIntroRows', draft.sewingIntroRows)}
-          <tr
-            className="erp-work-instruction-paper__sewing-note-row"
-            style={createWorkInstructionRowStyle(draft.sewingNoteHeightMm)}
-          >
-            <td colSpan={9}>
-              <EditableText
-                value={draft.sewingNote}
-                multiline
-                rich
-                as="span"
-                onCommit={(value) => onFieldChange('sewingNote', value)}
-              />
-            </td>
-          </tr>
-          {draft.rows.map((row, rowIndex) => {
-            const rowTarget = createMainInstructionRowTarget(rowIndex)
-            const rowImages = Array.isArray(row.images) ? row.images : []
-            const visibleImages = rowImages
-              .map((image, imageIndex) => ({ image, imageIndex }))
-              .filter(({ image }) => image?.dataURL)
-            const isSelectedRow = isSameInstructionRowTarget(
-              selectedInstructionRowTarget,
-              rowTarget
-            )
-            const hasText = richTextHasVisibleText(row.text)
-            const isImageRow = visibleImages.length > 0
-            const hasImageNotes =
-              richTextHasVisibleText(row.imageNotes?.left) ||
-              richTextHasVisibleText(row.imageNotes?.right)
-            const useAnnotationLayout = hasImageNotes
-            const imageCallouts = Array.isArray(row.imageCallouts)
-              ? row.imageCallouts
-              : []
-            const imageLabels = Array.isArray(row.imageLabels)
-              ? row.imageLabels
-              : []
-            const hasImageAnnotations =
-              imageCallouts.length > 0 || imageLabels.length > 0
-            const hasPositionedImageLayout =
-              isImageRow &&
-              visibleImages.some(({ image }) =>
-                createImageLayoutStyle(image?.layout)
-              )
-            const rowStyle = {}
-            const heightMm = Number(row.heightMm)
-            const fontSizePt = Number(row.fontSizePt)
-            const imageAreaHeightMm = Number(row.imageAreaHeightMm)
-            if (Number.isFinite(heightMm) && heightMm > 0) {
-              rowStyle['--instruction-row-min-height'] = `${heightMm}mm`
-            }
-            if (Number.isFinite(fontSizePt) && fontSizePt > 0) {
-              rowStyle['--instruction-row-font-size'] =
-                `${fontSizePt * (4 / 3)}px`
-            }
-            if (Number.isFinite(imageAreaHeightMm) && imageAreaHeightMm > 0) {
-              rowStyle['--instruction-row-image-area-min-height'] =
-                `${imageAreaHeightMm}mm`
-            }
-            const rowClassName = [
-              isSelectedRow ? 'erp-engineering-print-row--selected' : '',
-              isImageRow || useAnnotationLayout
-                ? 'erp-work-instruction-paper__step-row--image'
-                : 'erp-work-instruction-paper__step-row--text',
-              useAnnotationLayout
-                ? 'erp-work-instruction-paper__step-row--annotated'
-                : '',
-            ]
-              .filter(Boolean)
-              .join(' ')
-            return (
-              <tr
-                className={rowClassName}
-                key={`step-${rowIndex}`}
-                style={rowStyle}
-                onMouseDown={(event) => {
-                  if (!instructionRowSelectionMode) return
-                  if (event.target.closest('input')) return
-                  clearRequestedEditableFocus()
-                  scheduleBlurActiveEngineeringEditable(
-                    event.currentTarget.ownerDocument
-                  )
-                  event.preventDefault()
-                  onSelectInstructionRow(rowTarget)
-                }}
-              >
-                <td className="erp-work-instruction-paper__step-no">
-                  <EditableText
-                    value={row.no}
-                    onCommit={(value) =>
-                      onInstructionRowChange(rowTarget, 'no', value)
-                    }
-                  />
-                </td>
-                <td
-                  className="erp-work-instruction-paper__step-content-cell"
-                  colSpan={8}
-                >
-                  {hasText || (!isImageRow && !useAnnotationLayout) ? (
-                    <EditableText
-                      value={row.text}
-                      multiline
-                      rich
-                      as="div"
-                      onCommit={(value) =>
-                        onInstructionRowChange(rowTarget, 'text', value)
-                      }
-                    />
-                  ) : null}
-                  {useAnnotationLayout ? (
-                    <div
-                      className={`erp-work-instruction-paper__annotation-layout${
-                        hasImageAnnotations
-                          ? ' erp-work-instruction-paper__annotation-layout--with-callouts'
-                          : ''
-                      }`}
-                    >
-                      <InstructionImageAnnotationLayer
-                        rowIndex={rowIndex}
-                        callouts={imageCallouts}
-                        labels={imageLabels}
-                      />
-                      <div className="erp-work-instruction-paper__annotation-note erp-work-instruction-paper__annotation-note--left">
-                        <EditableText
-                          value={row.imageNotes?.left}
-                          multiline
-                          rich
-                          as="div"
-                          onCommit={(value) =>
-                            onInstructionRowChange(
-                              rowTarget,
-                              'imageNotes.left',
-                              value
-                            )
-                          }
-                        />
-                      </div>
-                      <div className="erp-work-instruction-paper__annotation-images">
-                        <input
-                          ref={(node) =>
-                            onInstructionRowImageInputRef(rowTarget, node)
-                          }
-                          className="erp-work-instruction-paper__row-image-input"
-                          type="file"
-                          accept={ATTACHMENT_ACCEPT}
-                          multiple
-                          onChange={(event) =>
-                            onInstructionRowImageFileChange(rowTarget, event)
-                          }
-                        />
-                        <div
-                          className={`erp-work-instruction-paper__row-images${
-                            isImageRow
-                              ? ''
-                              : ' erp-work-instruction-paper__row-images--empty'
-                          }${
-                            hasPositionedImageLayout
-                              ? ' erp-work-instruction-paper__row-images--positioned'
-                              : ''
-                          }`}
-                        >
-                          {visibleImages.map(
-                            ({ image, imageIndex }, visibleIndex) => (
-                              <ImageSlot
-                                key={`step-${rowIndex}-image-${imageIndex}`}
-                                label={`工序 ${row.no || rowIndex + 1} 图片 ${visibleIndex + 1}`}
-                                snapshot={image}
-                                compact
-                                showActions={false}
-                                layoutStyle={
-                                  hasPositionedImageLayout
-                                    ? createImageLayoutStyle(image.layout)
-                                    : undefined
-                                }
-                                onUpload={(file) =>
-                                  onInstructionImageUpload(
-                                    rowTarget,
-                                    file,
-                                    imageIndex
-                                  )
-                                }
-                                onClear={() =>
-                                  onInstructionImageClear(rowTarget, imageIndex)
-                                }
-                              />
-                            )
-                          )}
-                        </div>
-                      </div>
-                      <div className="erp-work-instruction-paper__annotation-note erp-work-instruction-paper__annotation-note--right">
-                        <EditableText
-                          value={row.imageNotes?.right}
-                          multiline
-                          rich
-                          as="div"
-                          onCommit={(value) =>
-                            onInstructionRowChange(
-                              rowTarget,
-                              'imageNotes.right',
-                              value
-                            )
-                          }
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      className={`erp-work-instruction-paper__row-images${
-                        isImageRow
-                          ? ''
-                          : ' erp-work-instruction-paper__row-images--empty'
-                      }${
-                        isImageRow && hasImageAnnotations
-                          ? ' erp-work-instruction-paper__row-images--with-annotations'
-                          : ''
-                      }${
-                        hasPositionedImageLayout
-                          ? ' erp-work-instruction-paper__row-images--positioned'
-                          : ''
-                      }`}
-                    >
-                      {isImageRow && hasImageAnnotations ? (
-                        <InstructionImageAnnotationLayer
-                          rowIndex={rowIndex}
-                          callouts={imageCallouts}
-                          labels={imageLabels}
-                        />
-                      ) : null}
-                      <input
-                        ref={(node) =>
-                          onInstructionRowImageInputRef(rowTarget, node)
-                        }
-                        className="erp-work-instruction-paper__row-image-input"
-                        type="file"
-                        accept={ATTACHMENT_ACCEPT}
-                        multiple
-                        onChange={(event) =>
-                          onInstructionRowImageFileChange(rowTarget, event)
-                        }
-                      />
-                      {visibleImages.map(
-                        ({ image, imageIndex }, visibleIndex) => (
-                          <ImageSlot
-                            key={`step-${rowIndex}-image-${imageIndex}`}
-                            label={`工序 ${row.no || rowIndex + 1} 图片 ${visibleIndex + 1}`}
-                            snapshot={image}
-                            compact
-                            showActions={false}
-                            layoutStyle={
-                              hasPositionedImageLayout
-                                ? createImageLayoutStyle(image.layout)
-                                : undefined
-                            }
-                            onUpload={(file) =>
-                              onInstructionImageUpload(
-                                rowTarget,
-                                file,
-                                imageIndex
-                              )
-                            }
-                            onClear={() =>
-                              onInstructionImageClear(rowTarget, imageIndex)
-                            }
-                          />
-                        )
-                      )}
-                    </div>
-                  )}
-                </td>
-              </tr>
-            )
-          })}
-          <tr className="erp-work-instruction-paper__remark">
-            <td colSpan={9}>
-              <EditableText
-                value={draft.remark}
-                rich
-                onCommit={(value) => onFieldChange('remark', value)}
-              />
-            </td>
-          </tr>
+          {renderInstructionRows(draft.rows)}
         </tbody>
       </table>
       {continuationPages.map((page, pageIndex) => (
@@ -2225,25 +2067,48 @@ function WorkInstructionContinuationPage({
 }) {
   const headerSlot = engineeringImageSlots.workInstruction[0]
   const renderHeaderValue = (value) => <ReadOnlyText value={value} />
-  const renderSectionRows = (rows = []) =>
-    rows.map((row, rowIndex) => (
-      <tr
-        className="erp-work-instruction-paper__section-row"
-        key={`continuation-${pageIndex}-section-${rowIndex}`}
-        style={createWorkInstructionRowStyle(row.heightMm)}
-      >
-        <td className="erp-work-instruction-paper__step-no">{rowIndex + 1}</td>
-        <td className="erp-work-instruction-paper__text-cell" colSpan={8}>
-          <ReadOnlyText value={row.text} rich as="div" />
-        </td>
-      </tr>
-    ))
   const renderInstructionRows = (rows = []) =>
     rows.map((row, rowIndex) => {
       const rowTarget = createContinuationInstructionRowTarget(
         pageIndex,
         rowIndex
       )
+      if (!isWorkInstructionStepRow(row)) {
+        const isSelectedRow = isSameInstructionRowTarget(
+          selectedInstructionRowTarget,
+          rowTarget
+        )
+        return (
+          <tr
+            className={`${getWorkInstructionFullRowClassName(row)} ${
+              isSelectedRow ? 'erp-engineering-print-row--selected' : ''
+            }`}
+            key={`continuation-${pageIndex}-body-${rowIndex}`}
+            style={createWorkInstructionRowStyle(row.heightMm)}
+            onMouseDown={(event) => {
+              if (!instructionRowSelectionMode) return
+              clearRequestedEditableFocus()
+              scheduleBlurActiveEngineeringEditable(
+                event.currentTarget.ownerDocument
+              )
+              event.preventDefault()
+              onSelectInstructionRow(rowTarget)
+            }}
+          >
+            <td colSpan={9}>
+              <EditableText
+                value={row.text}
+                multiline
+                rich
+                as="div"
+                onCommit={(value) =>
+                  onInstructionRowChange(rowTarget, 'text', value)
+                }
+              />
+            </td>
+          </tr>
+        )
+      }
       const visibleImages = (Array.isArray(row.images) ? row.images : [])
         .map((image, imageIndex) => ({ image, imageIndex }))
         .filter(({ image }) => image?.dataURL)
@@ -2642,63 +2507,9 @@ function WorkInstructionContinuationPage({
                 {renderHeaderValue(page.auditor)}
               </td>
             </tr>
-            {page.noticeText ? (
-              <tr
-                className="erp-work-instruction-paper__notice-row"
-                style={createWorkInstructionRowStyle(page.noticeHeightMm)}
-              >
-                <td colSpan={9}>
-                  <ReadOnlyText value={page.noticeText} rich as="div" />
-                </td>
-              </tr>
-            ) : null}
-            {page.cuttingTitle ? (
-              <tr
-                className="erp-work-instruction-paper__section-title-row"
-                style={createWorkInstructionRowStyle(page.cuttingTitleHeightMm)}
-              >
-                <td colSpan={9}>{page.cuttingTitle}</td>
-              </tr>
-            ) : null}
-            {renderSectionRows(page.cuttingRows)}
-            {page.embroideryTitle ? (
-              <tr
-                className="erp-work-instruction-paper__section-title-row"
-                style={createWorkInstructionRowStyle(
-                  page.embroideryTitleHeightMm
-                )}
-              >
-                <td colSpan={9}>{page.embroideryTitle}</td>
-              </tr>
-            ) : null}
-            {renderSectionRows(page.embroideryRows)}
-            {page.sewingTitle ? (
-              <tr
-                className="erp-work-instruction-paper__section-title-row"
-                style={createWorkInstructionRowStyle(page.sewingTitleHeightMm)}
-              >
-                <td colSpan={9}>{page.sewingTitle}</td>
-              </tr>
-            ) : null}
-            {renderSectionRows(page.sewingIntroRows)}
-            {page.sewingNote ? (
-              <tr
-                className="erp-work-instruction-paper__sewing-note-row"
-                style={createWorkInstructionRowStyle(page.sewingNoteHeightMm)}
-              >
-                <td colSpan={9}>
-                  <ReadOnlyText value={page.sewingNote} rich as="span" />
-                </td>
-              </tr>
-            ) : null}
           </>
         ) : null}
         {renderInstructionRows(page.rows)}
-        <tr className="erp-work-instruction-paper__remark">
-          <td colSpan={9}>
-            <ReadOnlyText value={page.remark} rich />
-          </td>
-        </tr>
       </tbody>
     </table>
   )
@@ -2770,8 +2581,6 @@ export default function EngineeringPrintWorkspacePage() {
     useState(null)
   const [instructionRowSelectionMode, setInstructionRowSelectionMode] =
     useState(false)
-  const [selectedInstructionSectionRow, setSelectedInstructionSectionRow] =
-    useState(null)
 
   useEffect(() => {
     document.title = template?.title ? `${template.title}打印窗口` : '打印窗口'
@@ -2802,7 +2611,6 @@ export default function EngineeringPrintWorkspacePage() {
     setColorLineSelectionMode(false)
     setSelectedInstructionRowTarget(null)
     setInstructionRowSelectionMode(false)
-    setSelectedInstructionSectionRow(null)
   }, [
     businessInput,
     draftStorageKey,
@@ -2936,32 +2744,6 @@ export default function EngineeringPrintWorkspacePage() {
     }
   }
 
-  const updateInstructionSectionRowByTarget = (current, target, updater) => {
-    const normalizedTarget = normalizeInstructionSectionRowTarget(target)
-    if (!normalizedTarget) return current
-    const rows = Array.isArray(current[normalizedTarget.sectionKey])
-      ? current[normalizedTarget.sectionKey]
-      : []
-    return {
-      ...current,
-      [normalizedTarget.sectionKey]: rows.map((row, rowIndex) =>
-        rowIndex === normalizedTarget.rowIndex ? updater(row, rowIndex) : row
-      ),
-    }
-  }
-
-  const updateInstructionAnyRowByTarget = (current, target, updater) => {
-    const normalizedSectionTarget = normalizeInstructionSectionRowTarget(target)
-    if (normalizedSectionTarget) {
-      return updateInstructionSectionRowByTarget(
-        current,
-        normalizedSectionTarget,
-        updater
-      )
-    }
-    return updateInstructionRowByTarget(current, target, updater)
-  }
-
   const resetSelectionForTemplate = () => {
     setSelectedMaterialLineIndex(null)
     setMaterialLineSelectionMode(false)
@@ -2975,7 +2757,6 @@ export default function EngineeringPrintWorkspacePage() {
     setColorLineSelectionMode(false)
     setSelectedInstructionRowTarget(null)
     setInstructionRowSelectionMode(false)
-    setSelectedInstructionSectionRow(null)
   }
 
   const handleResetDraft = () => {
@@ -3220,7 +3001,6 @@ export default function EngineeringPrintWorkspacePage() {
         setToolbarStatus('已进入行选择模式，请点击作业指导书中的目标行。')
       } else {
         setSelectedInstructionRowTarget(null)
-        setSelectedInstructionSectionRow(null)
         setToolbarStatus('已退出行选择模式。')
       }
       return nextValue
@@ -3231,22 +3011,10 @@ export default function EngineeringPrintWorkspacePage() {
     const normalizedTarget = normalizeInstructionRowTarget(target)
     if (!normalizedTarget) return
     setSelectedInstructionRowTarget(normalizedTarget)
-    setSelectedInstructionSectionRow(null)
     setToolbarStatus(
       `已选中作业指导书${formatInstructionRowTargetLabel(
         normalizedTarget
-      )}，可继续上插 / 下插 / 移除 / 加图。`
-    )
-  }
-
-  const selectInstructionSectionRow = (sectionKey, rowIndex) => {
-    setSelectedInstructionSectionRow({ sectionKey, rowIndex })
-    setSelectedInstructionRowTarget(null)
-    setToolbarStatus(
-      `已选中${formatInstructionRowTargetLabel({
-        sectionKey,
-        rowIndex,
-      })}，可继续上插 / 下插 / 移除 / 加图。`
+      )}，可继续上插 / 下插 / 移除 / 调整行类型。`
     )
   }
 
@@ -3276,25 +3044,6 @@ export default function EngineeringPrintWorkspacePage() {
         pageIndex: target.pageIndex,
         rowIndex: result.selectedIndex,
       })
-      setSelectedInstructionSectionRow(null)
-      return result.draft
-    })
-  }
-
-  const applyInstructionSectionAction = (action, position = 'after') => {
-    const sectionKey = selectedInstructionSectionRow?.sectionKey
-    const rowIndex = selectedInstructionSectionRow?.rowIndex
-    setDraft((current) => {
-      const result =
-        action === 'remove'
-          ? removeInstructionSectionRow(current, sectionKey, rowIndex)
-          : insertInstructionSectionRow(current, sectionKey, rowIndex, position)
-      if (!showEditorMessage(result, '段落行操作失败')) return current
-      setSelectedInstructionSectionRow({
-        sectionKey,
-        rowIndex: result.selectedIndex,
-      })
-      setSelectedInstructionRowTarget(null)
       return result.draft
     })
   }
@@ -3303,11 +3052,29 @@ export default function EngineeringPrintWorkspacePage() {
     action,
     position = 'after'
   ) => {
-    if (selectedInstructionSectionRow) {
-      applyInstructionSectionAction(action, position)
-      return
-    }
     applyInstructionRowAction(action, position)
+  }
+
+  const applyInstructionRowType = (type) => {
+    const target = normalizeInstructionRowTarget(selectedInstructionRowTarget)
+    if (!target) return
+    setDraft((current) => {
+      const result =
+        target.pageIndex === null
+          ? setInstructionRowType(current, target.rowIndex, type)
+          : setContinuationInstructionRowType(
+              current,
+              target.pageIndex,
+              target.rowIndex,
+              type
+            )
+      if (!showEditorMessage(result, '行类型调整失败')) return current
+      setSelectedInstructionRowTarget({
+        pageIndex: target.pageIndex,
+        rowIndex: result.selectedIndex,
+      })
+      return result.draft
+    })
   }
 
   const updateField = (fieldKey, value) => {
@@ -3376,19 +3143,16 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const handleInstructionRowImageUploadClick = (target) => {
-    const normalizedSectionTarget = normalizeInstructionSectionRowTarget(target)
-    if (normalizedSectionTarget) {
-      setSelectedInstructionSectionRow(normalizedSectionTarget)
-      setSelectedInstructionRowTarget(null)
-      instructionRowImageInputRefs.current[
-        instructionRowTargetKey(normalizedSectionTarget)
-      ]?.click()
-      return
-    }
     const normalizedTarget = normalizeInstructionRowTarget(target)
     if (!normalizedTarget) return
+    const row = getInstructionRowsForTarget(draft, normalizedTarget)[
+      normalizedTarget.rowIndex
+    ]
+    if (!isWorkInstructionStepRow(row)) {
+      message.warning('图片只能添加到编号行。')
+      return
+    }
     setSelectedInstructionRowTarget(normalizedTarget)
-    setSelectedInstructionSectionRow(null)
     instructionRowImageInputRefs.current[
       instructionRowTargetKey(normalizedTarget)
     ]?.click()
@@ -3402,17 +3166,22 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const uploadInstructionImages = async (target, files = []) => {
-    const normalizedSectionTarget = normalizeInstructionSectionRowTarget(target)
     const normalizedTarget = normalizeInstructionRowTarget(target)
-    const uploadTarget = normalizedSectionTarget || normalizedTarget
-    if (!uploadTarget) return
+    if (!normalizedTarget) return
+    const row = getInstructionRowsForTarget(draft, normalizedTarget)[
+      normalizedTarget.rowIndex
+    ]
+    if (!isWorkInstructionStepRow(row)) {
+      message.warning('图片只能添加到编号行。')
+      return
+    }
     try {
       const snapshots = []
       for (const file of files) {
         snapshots.push(await createImageSnapshot(file))
       }
       setDraft((current) =>
-        updateInstructionAnyRowByTarget(current, uploadTarget, (row) => {
+        updateInstructionRowByTarget(current, normalizedTarget, (row) => {
           const baseRow =
             row && typeof row === 'object' && !Array.isArray(row)
               ? row
@@ -3422,16 +3191,14 @@ export default function EngineeringPrintWorkspacePage() {
             : []
           return {
             ...baseRow,
-            ...(normalizedTarget
-              ? resolveInstructionMeasurementRowLayout(baseRow)
-              : {}),
+            ...resolveInstructionMeasurementRowLayout(baseRow),
             images: [...images, ...snapshots],
           }
         })
       )
       setToolbarStatus(
         `图片已更新，${formatInstructionRowTargetLabel(
-          uploadTarget
+          normalizedTarget
         )}本次新增 ${snapshots.length} 张。`
       )
     } catch (error) {
@@ -3448,15 +3215,19 @@ export default function EngineeringPrintWorkspacePage() {
       await uploadImage('header', file)
       return
     }
-    const normalizedSectionTarget =
-      normalizeInstructionSectionRowTarget(targetOrSlotKey)
     const normalizedTarget = normalizeInstructionRowTarget(targetOrSlotKey)
-    const uploadTarget = normalizedSectionTarget || normalizedTarget
-    if (!uploadTarget) return
+    if (!normalizedTarget) return
+    const row = getInstructionRowsForTarget(draft, normalizedTarget)[
+      normalizedTarget.rowIndex
+    ]
+    if (!isWorkInstructionStepRow(row)) {
+      message.warning('图片只能添加到编号行。')
+      return
+    }
     try {
       const snapshot = await createImageSnapshot(file)
       setDraft((current) =>
-        updateInstructionAnyRowByTarget(current, uploadTarget, (row) => {
+        updateInstructionRowByTarget(current, normalizedTarget, (row) => {
           const baseRow =
             row && typeof row === 'object' && !Array.isArray(row)
               ? row
@@ -3467,9 +3238,7 @@ export default function EngineeringPrintWorkspacePage() {
           images[imageIndex] = snapshot
           return {
             ...baseRow,
-            ...(normalizedTarget
-              ? resolveInstructionMeasurementRowLayout(baseRow)
-              : {}),
+            ...resolveInstructionMeasurementRowLayout(baseRow),
             images,
           }
         })
@@ -3485,13 +3254,10 @@ export default function EngineeringPrintWorkspacePage() {
       clearImage('header')
       return
     }
-    const normalizedSectionTarget =
-      normalizeInstructionSectionRowTarget(targetOrSlotKey)
     const normalizedTarget = normalizeInstructionRowTarget(targetOrSlotKey)
-    const clearTarget = normalizedSectionTarget || normalizedTarget
-    if (!clearTarget) return
+    if (!normalizedTarget) return
     setDraft((current) =>
-      updateInstructionAnyRowByTarget(current, clearTarget, (row) => {
+      updateInstructionRowByTarget(current, normalizedTarget, (row) => {
         const baseRow =
           row && typeof row === 'object' && !Array.isArray(row)
             ? row
@@ -3504,12 +3270,10 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const clearInstructionRowImages = (target) => {
-    const normalizedSectionTarget = normalizeInstructionSectionRowTarget(target)
     const normalizedTarget = normalizeInstructionRowTarget(target)
-    const clearTarget = normalizedSectionTarget || normalizedTarget
-    if (!clearTarget) return
+    if (!normalizedTarget) return
     setDraft((current) =>
-      updateInstructionAnyRowByTarget(current, clearTarget, (row) => {
+      updateInstructionRowByTarget(current, normalizedTarget, (row) => {
         const baseRow =
           row && typeof row === 'object' && !Array.isArray(row)
             ? row
@@ -3521,7 +3285,9 @@ export default function EngineeringPrintWorkspacePage() {
       })
     )
     setToolbarStatus(
-      `已清空作业指导书${formatInstructionRowTargetLabel(clearTarget)}图片。`
+      `已清空作业指导书${formatInstructionRowTargetLabel(
+        normalizedTarget
+      )}图片。`
     )
   }
 
@@ -3746,23 +3512,46 @@ export default function EngineeringPrintWorkspacePage() {
   const createWorkInstructionRowFieldRows = ({
     rows = [],
     pageIndex = null,
-    labelPrefix = '作业行',
+    labelPrefix = '正文行',
   }) =>
     rows.flatMap((row, rowIndex) => {
       const target =
         pageIndex === null
           ? createMainInstructionRowTarget(rowIndex)
           : createContinuationInstructionRowTarget(pageIndex, rowIndex)
+      const rowType = getWorkInstructionRowType(row)
+      const typeLabel =
+        rowType === WORK_INSTRUCTION_ROW_TYPES.title
+          ? '标题行'
+          : rowType === WORK_INSTRUCTION_ROW_TYPES.note
+            ? '说明行'
+            : rowType === WORK_INSTRUCTION_ROW_TYPES.remark
+              ? '备注行'
+              : '编号行'
       const baseRows = [
         {
           key:
             pageIndex === null
-              ? `rows.${rowIndex}.no`
-              : `continuationPages.${pageIndex}.rows.${rowIndex}.no`,
-          label: `${labelPrefix} ${rowIndex + 1} 行号`,
-          value: row.no ?? '',
-          onChange: (value) => updateInstructionRowValue(target, 'no', value),
+              ? `rows.${rowIndex}.type`
+              : `continuationPages.${pageIndex}.rows.${rowIndex}.type`,
+          label: `${labelPrefix} ${rowIndex + 1} 类型`,
+          value: typeLabel,
+          readOnly: true,
         },
+        ...(rowType === WORK_INSTRUCTION_ROW_TYPES.step
+          ? [
+              {
+                key:
+                  pageIndex === null
+                    ? `rows.${rowIndex}.no`
+                    : `continuationPages.${pageIndex}.rows.${rowIndex}.no`,
+                label: `${labelPrefix} ${rowIndex + 1} 行号`,
+                value: row.no ?? '',
+                onChange: (value) =>
+                  updateInstructionRowValue(target, 'no', value),
+              },
+            ]
+          : []),
         {
           key:
             pageIndex === null
@@ -3775,6 +3564,9 @@ export default function EngineeringPrintWorkspacePage() {
           onChange: (value) => updateInstructionRowValue(target, 'text', value),
         },
       ]
+      if (rowType !== WORK_INSTRUCTION_ROW_TYPES.step) {
+        return baseRows
+      }
       const noteRows = ['left', 'right']
         .filter((noteKey) => richTextHasVisibleText(row.imageNotes?.[noteKey]))
         .map((noteKey) => ({
@@ -3887,62 +3679,19 @@ export default function EngineeringPrintWorkspacePage() {
     createDraftFieldRow({ key: 'maker', label: '制表' }),
     createDraftFieldRow({ key: 'designer', label: '设计师' }),
     createDraftFieldRow({ key: 'auditor', label: '审核' }),
-    createDraftFieldRow({ key: 'cuttingTitle', label: '裁床标题' }),
-    ...(draft.cuttingRows || []).map((row, index) => ({
-      key: `cuttingRows.${index}`,
-      label: `裁床行 ${index + 1}`,
-      value: plainTextFromRichHTML(getInstructionTextRowValue(row)),
-      multiline: true,
-      rows: 2,
-      onChange: (value) => updateField(`cuttingRows.${index}`, value),
-    })),
-    createDraftFieldRow({ key: 'embroideryTitle', label: '刺绣/印花标题' }),
-    ...(draft.embroideryRows || []).map((row, index) => ({
-      key: `embroideryRows.${index}`,
-      label: `刺绣/印花行 ${index + 1}`,
-      value: plainTextFromRichHTML(getInstructionTextRowValue(row)),
-      multiline: true,
-      rows: 2,
-      onChange: (value) => updateField(`embroideryRows.${index}`, value),
-    })),
-    createDraftFieldRow({ key: 'sewingTitle', label: '车缝标题' }),
-    ...(draft.sewingIntroRows || []).map((row, index) => ({
-      key: `sewingIntroRows.${index}`,
-      label: `车缝说明行 ${index + 1}`,
-      value: plainTextFromRichHTML(getInstructionTextRowValue(row)),
-      multiline: true,
-      rows: 2,
-      onChange: (value) => updateField(`sewingIntroRows.${index}`, value),
-    })),
-    {
-      key: 'sewingNote',
-      label: '车缝说明',
-      value: plainTextFromRichHTML(draft.sewingNote),
-      multiline: true,
-      rows: 3,
-      onChange: (value) => updateField('sewingNote', value),
-    },
     ...createWorkInstructionRowFieldRows({
       rows: draft.rows || [],
-      labelPrefix: '首页作业行',
+      labelPrefix: '首页正文行',
     }),
     ...(Array.isArray(draft.continuationPages)
       ? draft.continuationPages.flatMap((page, pageIndex) =>
           createWorkInstructionRowFieldRows({
             rows: Array.isArray(page.rows) ? page.rows : [],
             pageIndex,
-            labelPrefix: `续页 ${pageIndex + 1} 作业行`,
+            labelPrefix: `续页 ${pageIndex + 1} 正文行`,
           })
         )
       : []),
-    {
-      key: 'remark',
-      label: '备注',
-      value: plainTextFromRichHTML(draft.remark),
-      multiline: true,
-      rows: 2,
-      onChange: (value) => updateField('remark', value),
-    },
   ]
 
   const fieldRows =
@@ -4168,30 +3917,23 @@ export default function EngineeringPrintWorkspacePage() {
   const normalizedSelectedInstructionRowTarget = normalizeInstructionRowTarget(
     selectedInstructionRowTarget
   )
-  const normalizedSelectedInstructionSectionRow =
-    normalizeInstructionSectionRowTarget(selectedInstructionSectionRow)
   const selectedWorkInstructionRowTarget =
-    normalizedSelectedInstructionSectionRow ||
     normalizedSelectedInstructionRowTarget
   const selectedInstructionRows = getInstructionRowsForTarget(
     draft,
     normalizedSelectedInstructionRowTarget
   )
   const selectedInstructionRow =
-    selectedWorkInstructionRowTarget === null
+    normalizedSelectedInstructionRowTarget === null
       ? null
-      : normalizedSelectedInstructionSectionRow
-        ? draft[normalizedSelectedInstructionSectionRow.sectionKey]?.[
-            normalizedSelectedInstructionSectionRow.rowIndex
-          ]
-        : selectedInstructionRows[
-            normalizedSelectedInstructionRowTarget.rowIndex
-          ]
+      : selectedInstructionRows[normalizedSelectedInstructionRowTarget.rowIndex]
   const selectedInstructionRowImages = Array.isArray(
     selectedInstructionRow?.images
   )
     ? selectedInstructionRow.images.filter((image) => image?.dataURL)
     : []
+  const selectedInstructionRowIsStep =
+    selectedInstructionRow && isWorkInstructionStepRow(selectedInstructionRow)
 
   const templateEditorActions = (() => {
     if (templateKey === MATERIAL_DETAIL_TEMPLATE_KEY) {
@@ -4376,21 +4118,37 @@ export default function EngineeringPrintWorkspacePage() {
           className={getToolbarButtonClassName()}
           disabled={
             selectedWorkInstructionRowTarget === null ||
-            (normalizedSelectedInstructionSectionRow
-              ? (
-                  draft[normalizedSelectedInstructionSectionRow.sectionKey] ||
-                  []
-                ).length <= 1
-              : selectedInstructionRows.length <= 1)
+            selectedInstructionRows.length <= 1
           }
           onClick={() => applySelectedWorkInstructionRowAction('remove')}
         >
           移除当前行
         </button>
+        {[
+          [WORK_INSTRUCTION_ROW_TYPES.title, '设为标题行'],
+          [WORK_INSTRUCTION_ROW_TYPES.step, '设为编号行'],
+          [WORK_INSTRUCTION_ROW_TYPES.note, '设为说明行'],
+          [WORK_INSTRUCTION_ROW_TYPES.remark, '设为备注行'],
+        ].map(([type, label]) => (
+          <button
+            type="button"
+            className={getToolbarButtonClassName({
+              active: selectedInstructionRow?.type === type,
+            })}
+            disabled={selectedWorkInstructionRowTarget === null}
+            key={type}
+            onClick={() => applyInstructionRowType(type)}
+          >
+            {label}
+          </button>
+        ))}
         <button
           type="button"
           className={getToolbarButtonClassName()}
-          disabled={selectedWorkInstructionRowTarget === null}
+          disabled={
+            selectedWorkInstructionRowTarget === null ||
+            !selectedInstructionRowIsStep
+          }
           onClick={() =>
             handleInstructionRowImageUploadClick(
               selectedWorkInstructionRowTarget
@@ -4404,6 +4162,7 @@ export default function EngineeringPrintWorkspacePage() {
           className={getToolbarButtonClassName()}
           disabled={
             selectedWorkInstructionRowTarget === null ||
+            !selectedInstructionRowIsStep ||
             selectedInstructionRowImages.length === 0
           }
           onClick={() =>
@@ -4422,7 +4181,7 @@ export default function EngineeringPrintWorkspacePage() {
           {instructionRowSelectionMode ? '取消选择' : '选择行'}
         </button>
         <span className="erp-print-shell__counter">
-          作业行: {draft.rows.length}
+          正文行: {draft.rows.length}
           {Array.isArray(draft.continuationPages) &&
           draft.continuationPages.length
             ? ` + 续页 ${draft.continuationPages.reduce(
@@ -4541,11 +4300,8 @@ export default function EngineeringPrintWorkspacePage() {
         draft={draft}
         paperRef={paperRef}
         selectedInstructionRowTarget={selectedInstructionRowTarget}
-        selectedSectionRow={selectedInstructionSectionRow}
         instructionRowSelectionMode={instructionRowSelectionMode}
-        sectionRowSelectionMode={instructionRowSelectionMode}
         onSelectInstructionRow={selectInstructionRow}
-        onSelectSectionRow={selectInstructionSectionRow}
         onFieldChange={updateField}
         onInstructionImageUpload={uploadInstructionImage}
         onInstructionImageClear={clearInstructionImage}

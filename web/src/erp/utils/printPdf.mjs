@@ -9,6 +9,7 @@ const PDF_PREVIEW_URL_REVOKE_DELAY_MS = 60_000
 const PDF_DOWNLOAD_URL_REVOKE_DELAY_MS = 1_000
 const PDF_PREVIEW_AUTO_PRELOAD_DELAY_MS = 250
 const PDF_PREVIEW_AUTO_PRELOAD_IDLE_TIMEOUT_MS = 750
+const PDF_SNAPSHOT_COMMIT_FALLBACK_TIMEOUT_MS = 80
 const PDF_PREVIEW_SHELL_PATH = '/pdf-preview-shell.html'
 const PDF_PREVIEW_STATE_STORAGE_KEY_PREFIX = '__plush_erp_pdf_preview_state__'
 const PDF_PREVIEW_STATE_VERSION = 1
@@ -501,11 +502,32 @@ function resetPdfPreviewBlobCacheForTest() {
 
 function waitForSnapshotCommit(win) {
   return new Promise((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) {
+        return
+      }
+      settled = true
+      resolve()
+    }
+    const timeoutOwner =
+      win && typeof win.setTimeout === 'function' ? win : window
+    const fallbackTimer = timeoutOwner.setTimeout(
+      finish,
+      PDF_SNAPSHOT_COMMIT_FALLBACK_TIMEOUT_MS
+    )
+    const finishAndClear = () => {
+      if (!settled && typeof timeoutOwner.clearTimeout === 'function') {
+        timeoutOwner.clearTimeout(fallbackTimer)
+      }
+      finish()
+    }
+
     if (!win || typeof win.requestAnimationFrame !== 'function') {
-      window.setTimeout(resolve, 16)
+      finishAndClear()
       return
     }
-    win.requestAnimationFrame(() => resolve())
+    win.requestAnimationFrame(finishAndClear)
   })
 }
 
@@ -1289,6 +1311,7 @@ export const __TEST_ONLY__ = {
   writeCachedPdfPreviewBlob,
   requestPdfPreviewBlobWithCache,
   resetPdfPreviewBlobCacheForTest,
+  waitForSnapshotCommit,
   buildServerPdfTargetSelector,
   isolateServerPdfSnapshotToTarget,
   normalizeServerPdfSnapshotRuntimeState,

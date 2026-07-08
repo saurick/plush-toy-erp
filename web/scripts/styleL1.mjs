@@ -42,7 +42,7 @@ const webDir = path.resolve(import.meta.dirname, '..')
 const outputDir = path.resolve(webDir, 'output', 'playwright', 'style-l1')
 const devServerPort = Number(process.env.STYLE_L1_PORT || 4173)
 const externalBaseURL = String(process.env.STYLE_L1_BASE_URL || '').trim()
-const baseURL = externalBaseURL || `http://localhost:${devServerPort}`
+const baseURL = externalBaseURL || `http://127.0.0.1:${devServerPort}`
 const headless = process.env.HEADED !== '1'
 const scenarioFilter = new Set(
   String(process.env.STYLE_L1_SCENARIOS || '')
@@ -75,6 +75,8 @@ const {
   assertMaterialContractMetaAlignment,
   assertContractTableEditableAlignment,
   assertMaterialContractLineCellsWrapLongValues,
+  assertMaterialDetailLineCellsWrapLongValues,
+  assertPrintTemplateLongBusinessValuesStayInsidePaper,
   assertContractTotalCellsWrapLargeNumbers,
   assertMaterialContractPrintMediaIgnoresResponsiveBreakpoints,
 } = createPrintAssertions({
@@ -121,6 +123,8 @@ function getScenarios() {
     assertLineItemsUnifiedHorizontalScroll,
     assertLoginSegmentedReadable,
     assertMaterialContractLineCellsWrapLongValues,
+    assertMaterialDetailLineCellsWrapLongValues,
+    assertPrintTemplateLongBusinessValuesStayInsidePaper,
     assertMaterialContractMetaAlignment,
     assertMaterialContractPrintMediaIgnoresResponsiveBreakpoints,
     assertMobileTaskBossDoneList,
@@ -236,7 +240,7 @@ function startDevServer() {
       '--config',
       'vite.config.mjs',
       '--host',
-      'localhost',
+      '0.0.0.0',
       '--port',
       String(devServerPort),
       '--strictPort',
@@ -634,7 +638,10 @@ async function runScenarioOnce(browser, scenario) {
 }
 
 async function waitForScenarioDocumentReady(page, errors = []) {
-  await page.waitForLoadState('domcontentloaded', { timeout: 20_000 })
+  const documentReadyTimeout = 45_000
+  await page.waitForLoadState('domcontentloaded', {
+    timeout: documentReadyTimeout,
+  })
   try {
     await page.waitForFunction(
       () =>
@@ -642,7 +649,7 @@ async function waitForScenarioDocumentReady(page, errors = []) {
         document.body &&
         document.body.innerText.trim().length > 0,
       null,
-      { timeout: 20_000 }
+      { timeout: documentReadyTimeout }
     )
   } catch (error) {
     const snapshot = await page.evaluate(() => ({

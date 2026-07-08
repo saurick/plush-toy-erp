@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 
@@ -1453,6 +1454,433 @@ export function createPrintAssertions({
     }
   }
 
+  async function assertMaterialDetailLineCellsWrapLongValues(page) {
+    const scenarioLabel = '物料分析明细表长业务值换行'
+    const screenshotPath = path.join(
+      outputDir,
+      'engineering-template-review',
+      'runtime',
+      'material-detail-long-value-wrap-latest.png'
+    )
+    const injectedTexts = {
+      category: '材料类别超长连续值CATEGORY-LONG-WRAP-CHECK-20260707',
+      materialName:
+        '核心演示超长连续中文物料名称不应覆盖相邻列核心演示超长连续中文物料名称',
+      vendorCode:
+        'SIM-PLUSH-CORE-MATERIAL-DETAIL-LONG-CONTINUOUS-FACTORY-NO-20260707',
+      spec: '150cm幅宽超长规格值连续不换行回归样本',
+      color: '颜色超长连续值COLOR-LONG-WRAP-CHECK-20260707',
+      unit: '核心演示单位-米-LONG-UNIT-CONTINUOUS-WRAP-CHECK',
+      position: '核心演示单体车缝装配部位长文本SHOULD-WRAP-IN-CELL',
+      pieces: '1234567890PIECES-LONG-WRAP-CHECK',
+      unitUsage: '0.650000000000-UNIT-USAGE-LONG-WRAP-CHECK',
+      lossRate: '0.050000000000-LOSS-RATE-LONG-WRAP-CHECK',
+      totalUsage: '999999999999-TOTAL-USAGE-LONG-WRAP-CHECK',
+      processBase: '加工方式基础超长连续值PROCESS-BASE-LONG-WRAP-CHECK',
+      processMethod: '加工方式方法超长连续值PROCESS-METHOD-LONG-WRAP-CHECK',
+      remark: '备注井25251纸样色卡SIM-LONG-REMARK-CONTINUOUS-TEXT-WRAP-CHECK',
+    }
+    const originalTexts = await page.evaluate((texts) => {
+      const row = document.querySelector('.erp-material-detail-table tbody tr')
+      const targets = [
+        { key: 'category', index: 0 },
+        { key: 'materialName', index: 1 },
+        { key: 'vendorCode', index: 2 },
+        { key: 'spec', index: 3 },
+        { key: 'color', index: 4 },
+        { key: 'unit', index: 5 },
+        { key: 'position', index: 6 },
+        { key: 'pieces', index: 7 },
+        { key: 'unitUsage', index: 8 },
+        { key: 'lossRate', index: 9 },
+        { key: 'totalUsage', index: 10 },
+        { key: 'processBase', index: 11 },
+        { key: 'processMethod', index: 12 },
+        { key: 'remark', index: 13 },
+      ]
+      const originals = []
+      targets.forEach(({ key, index }) => {
+        const cell = row?.children?.[index] || null
+        const editable = cell?.querySelector(
+          '.erp-material-detail-table__editable'
+        )
+        originals.push({
+          key,
+          html: editable?.innerHTML ?? null,
+        })
+        if (editable) {
+          editable.textContent = texts[key]
+        }
+      })
+      return originals
+    }, injectedTexts)
+
+    try {
+      await page.waitForTimeout(50)
+      const metrics = await page.evaluate((expectedTexts) => {
+        const table = document.querySelector('.erp-material-detail-table')
+        const paper = document.querySelector('.erp-material-detail-paper')
+        const row = table?.querySelector('tbody tr')
+        const tableRect = table?.getBoundingClientRect()
+        const paperRect = paper?.getBoundingClientRect()
+        const targetColumns = [
+          { key: 'category', index: 0 },
+          { key: 'materialName', index: 1 },
+          { key: 'vendorCode', index: 2 },
+          { key: 'spec', index: 3 },
+          { key: 'color', index: 4 },
+          { key: 'unit', index: 5 },
+          { key: 'position', index: 6 },
+          { key: 'pieces', index: 7 },
+          { key: 'unitUsage', index: 8 },
+          { key: 'lossRate', index: 9 },
+          { key: 'totalUsage', index: 10 },
+          { key: 'processBase', index: 11 },
+          { key: 'processMethod', index: 12 },
+          { key: 'remark', index: 13 },
+        ]
+
+        const cells = targetColumns.map(({ key, index }) => {
+          const cell = row?.children?.[index] || null
+          const editable = cell?.querySelector(
+            '.erp-material-detail-table__editable'
+          )
+          const node = editable || cell
+          const cellRect = cell?.getBoundingClientRect()
+          const nodeRect = node?.getBoundingClientRect()
+          const cellStyle = cell ? window.getComputedStyle(cell) : null
+          const nodeStyle = node ? window.getComputedStyle(node) : null
+          const lineHeight = Number.parseFloat(nodeStyle?.lineHeight || '0')
+          const range = node ? document.createRange() : null
+          if (range && node) {
+            range.selectNodeContents(node)
+          }
+          const lineBoxCount = range
+            ? [...range.getClientRects()].filter(
+                (rect) => rect.width > 0 && rect.height > 0
+              ).length
+            : 0
+          range?.detach()
+          return {
+            key,
+            expectedText: expectedTexts[key],
+            text: String(node?.textContent || '')
+              .replace(/\u00a0/g, ' ')
+              .trim(),
+            cellClientWidth: cell?.clientWidth || 0,
+            cellScrollWidth: cell?.scrollWidth || 0,
+            nodeClientWidth: node?.clientWidth || 0,
+            nodeScrollWidth: node?.scrollWidth || 0,
+            cellLeft: cellRect?.left || 0,
+            cellRight: cellRect?.right || 0,
+            nodeLeft: nodeRect?.left || 0,
+            nodeRight: nodeRect?.right || 0,
+            nodeHeight: nodeRect?.height || 0,
+            lineHeight,
+            lineBoxCount,
+            cellWhiteSpace: cellStyle?.whiteSpace || '',
+            cellOverflowWrap: cellStyle?.overflowWrap || '',
+            cellWordBreak: cellStyle?.wordBreak || '',
+            nodeWhiteSpace: nodeStyle?.whiteSpace || '',
+            nodeOverflowWrap: nodeStyle?.overflowWrap || '',
+            nodeWordBreak: nodeStyle?.wordBreak || '',
+            nodeLineBreak: nodeStyle?.lineBreak || '',
+          }
+        })
+
+        return {
+          hasTable: Boolean(table),
+          hasRow: Boolean(row),
+          tableLeft: tableRect?.left || 0,
+          tableRight: tableRect?.right || 0,
+          paperLeft: paperRect?.left || 0,
+          paperRight: paperRect?.right || 0,
+          cells,
+        }
+      }, injectedTexts)
+
+      assert(metrics.hasTable, `${scenarioLabel} 未找到物料明细表格`)
+      assert(metrics.hasRow, `${scenarioLabel} 未找到物料明细行`)
+
+      metrics.cells.forEach((metric) => {
+        assert.equal(
+          metric.text,
+          metric.expectedText,
+          `${scenarioLabel} ${metric.key} 未写入边界样本: ${JSON.stringify(metric)}`
+        )
+        assert.equal(
+          metric.cellWhiteSpace,
+          'normal',
+          `${scenarioLabel} ${metric.key} 单元格不应强制单行: ${JSON.stringify(metric)}`
+        )
+        assert.equal(
+          metric.nodeWhiteSpace,
+          'normal',
+          `${scenarioLabel} ${metric.key} 内容块不应强制单行: ${JSON.stringify(metric)}`
+        )
+        assert.equal(
+          metric.nodeOverflowWrap,
+          'anywhere',
+          `${scenarioLabel} ${metric.key} 内容块未允许任意断行: ${JSON.stringify(metric)}`
+        )
+        assert(
+          metric.cellScrollWidth <= metric.cellClientWidth + 1,
+          `${scenarioLabel} ${metric.key} 单元格仍横向溢出: ${JSON.stringify(metric)}`
+        )
+        assert(
+          metric.nodeScrollWidth <= metric.nodeClientWidth + 1,
+          `${scenarioLabel} ${metric.key} 内容块仍横向溢出: ${JSON.stringify(metric)}`
+        )
+        assert(
+          metric.cellLeft >= metrics.tableLeft - 1 &&
+            metric.cellRight <= metrics.tableRight + 1,
+          `${scenarioLabel} ${metric.key} 单元格越过表格边界: ${JSON.stringify({
+            metric,
+            tableLeft: metrics.tableLeft,
+            tableRight: metrics.tableRight,
+          })}`
+        )
+        assert(
+          metric.nodeLeft >= metric.cellLeft - 1 &&
+            metric.nodeRight <= metric.cellRight + 1,
+          `${scenarioLabel} ${metric.key} 内容块越过单元格边界: ${JSON.stringify(metric)}`
+        )
+        assert(
+          metric.lineBoxCount >= 2 ||
+            metric.nodeHeight > metric.lineHeight * 1.5,
+          `${scenarioLabel} ${metric.key} 长文本应在格内形成多行: ${JSON.stringify(metric)}`
+        )
+      })
+
+      assert(
+        metrics.tableLeft >= metrics.paperLeft - 1 &&
+          metrics.tableRight <= metrics.paperRight + 1,
+        `${scenarioLabel} 表格越过纸面边界: ${JSON.stringify(metrics)}`
+      )
+
+      await fs.mkdir(path.dirname(screenshotPath), { recursive: true })
+      await page
+        .locator('.erp-material-detail-paper')
+        .screenshot({ path: screenshotPath })
+    } finally {
+      await page.evaluate((originals) => {
+        const row = document.querySelector(
+          '.erp-material-detail-table tbody tr'
+        )
+        const targetIndexes = {
+          category: 0,
+          materialName: 1,
+          vendorCode: 2,
+          spec: 3,
+          color: 4,
+          unit: 5,
+          position: 6,
+          pieces: 7,
+          unitUsage: 8,
+          lossRate: 9,
+          totalUsage: 10,
+          processBase: 11,
+          processMethod: 12,
+          remark: 13,
+        }
+        originals.forEach(({ key, html }) => {
+          const index = targetIndexes[key]
+          const cell = row?.children?.[index] || null
+          const editable = cell?.querySelector(
+            '.erp-material-detail-table__editable'
+          )
+          if (editable && typeof html === 'string') {
+            editable.innerHTML = html
+          }
+        })
+      }, originalTexts)
+    }
+  }
+
+  async function assertPrintTemplateLongBusinessValuesStayInsidePaper(
+    page,
+    { paperSelector, scenarioLabel, screenshotName }
+  ) {
+    const injectedState = await page.evaluate(
+      ({ resolvedPaperSelector, resolvedScenarioLabel }) => {
+        const paper = document.querySelector(resolvedPaperSelector)
+        const paperRect = paper?.getBoundingClientRect()
+        const editors = [
+          ...(paper?.querySelectorAll('[contenteditable="true"]') || []),
+        ]
+          .filter((editor) => {
+            const rect = editor.getBoundingClientRect()
+            return rect.width > 0 && rect.height > 0
+          })
+          .slice(0, 120)
+
+        return {
+          hasPaper: Boolean(paper),
+          paperWidth: paperRect?.width || 0,
+          count: editors.length,
+          originals: editors.map((editor, index) => {
+            const marker = `style-l1-long-business-value-${index}`
+            const originalHTML = editor.innerHTML
+            editor.setAttribute('data-style-l1-long-business-value', marker)
+            editor.textContent = `${resolvedScenarioLabel}长业务带值-${index}-LONG-CONTINUOUS-WRAP-CHECK-20260708-ABCDEFGHIJKLMNOPQRSTUVWXYZ`
+            return {
+              marker,
+              originalHTML,
+            }
+          }),
+        }
+      },
+      {
+        resolvedPaperSelector: paperSelector,
+        resolvedScenarioLabel: scenarioLabel,
+      }
+    )
+
+    assert(
+      injectedState.hasPaper,
+      `${scenarioLabel} 未找到纸面: ${paperSelector}`
+    )
+    assert(
+      injectedState.count > 0,
+      `${scenarioLabel} 未找到可编辑业务值槽: ${JSON.stringify(injectedState)}`
+    )
+
+    try {
+      await page.waitForTimeout(80)
+      const metrics = await page.evaluate(
+        ({ resolvedPaperSelector }) => {
+          const paper = document.querySelector(resolvedPaperSelector)
+          const paperRect = paper?.getBoundingClientRect()
+          const editors = [
+            ...(paper?.querySelectorAll(
+              '[data-style-l1-long-business-value]'
+            ) || []),
+          ]
+          const states = editors.map((editor, index) => {
+            const editorRect = editor.getBoundingClientRect()
+            const container =
+              editor.closest('td, th') ||
+              editor.closest(
+                [
+                  '.erp-material-contract-meta__row',
+                  '.erp-processing-contract-meta__row',
+                  '.erp-processing-contract-clauses__item',
+                  '.erp-processing-contract-signature__label',
+                  '.erp-processing-contract-signature__date',
+                  '.erp-engineering-print-meta-grid > div',
+                  '.erp-material-detail-paper__footer-field',
+                  '.erp-color-card-paper__meta',
+                  '.erp-color-card-paper__footer > span',
+                  '.erp-work-instruction-paper__summary-item',
+                ].join(',')
+              ) ||
+              editor.parentElement
+            const containerRect = container?.getBoundingClientRect()
+            const editorStyle = window.getComputedStyle(editor)
+            const containerStyle = container
+              ? window.getComputedStyle(container)
+              : null
+            const range = document.createRange()
+            range.selectNodeContents(editor)
+            const lineBoxCount = [...range.getClientRects()].filter(
+              (rect) => rect.width > 0 && rect.height > 0
+            ).length
+            range.detach()
+            return {
+              index,
+              marker: editor.getAttribute('data-style-l1-long-business-value'),
+              text: String(editor.textContent || '').trim(),
+              editorWidth: editorRect.width,
+              editorHeight: editorRect.height,
+              editorLeft: editorRect.left,
+              editorRight: editorRect.right,
+              editorClientWidth: editor.clientWidth,
+              editorScrollWidth: editor.scrollWidth,
+              containerTag: container?.tagName || '',
+              containerWidth: containerRect?.width || 0,
+              containerHeight: containerRect?.height || 0,
+              containerLeft: containerRect?.left || 0,
+              containerRight: containerRect?.right || 0,
+              containerClientWidth: container?.clientWidth || 0,
+              containerScrollWidth: container?.scrollWidth || 0,
+              paperLeft: paperRect?.left || 0,
+              paperRight: paperRect?.right || 0,
+              whiteSpace: editorStyle.whiteSpace,
+              overflowWrap: editorStyle.overflowWrap,
+              wordBreak: editorStyle.wordBreak,
+              display: editorStyle.display,
+              containerWhiteSpace: containerStyle?.whiteSpace || '',
+              containerOverflowWrap: containerStyle?.overflowWrap || '',
+              containerWordBreak: containerStyle?.wordBreak || '',
+              lineBoxCount,
+            }
+          })
+          return {
+            hasPaper: Boolean(paper),
+            checkedCount: states.length,
+            paperLeft: paperRect?.left || 0,
+            paperRight: paperRect?.right || 0,
+            issues: states.filter((state) => {
+              const isTableContainer =
+                state.containerTag === 'TD' || state.containerTag === 'TH'
+              return (
+                !state.text ||
+                state.editorWidth <= 0 ||
+                state.editorHeight <= 0 ||
+                state.editorScrollWidth > state.editorClientWidth + 1 ||
+                state.editorLeft < state.paperLeft - 1 ||
+                state.editorRight > state.paperRight + 1 ||
+                state.editorLeft < state.containerLeft - 1 ||
+                state.editorRight > state.containerRight + 1 ||
+                (isTableContainer &&
+                  state.containerScrollWidth > state.containerClientWidth + 1)
+              )
+            }),
+            states,
+          }
+        },
+        { resolvedPaperSelector: paperSelector }
+      )
+
+      assert(metrics.hasPaper, `${scenarioLabel} 未找到纸面`)
+      assert.equal(
+        metrics.checkedCount,
+        injectedState.count,
+        `${scenarioLabel} 注入值槽数量前后不一致: ${JSON.stringify(metrics)}`
+      )
+      assert.deepEqual(
+        metrics.issues,
+        [],
+        `${scenarioLabel} 长业务带值不应横向溢出、覆盖邻区或越过纸面: ${JSON.stringify(metrics)}`
+      )
+
+      if (screenshotName) {
+        await page.locator(paperSelector).screenshot({
+          path: path.resolve(outputDir, `${screenshotName}.png`),
+        })
+      }
+    } finally {
+      await page.evaluate(
+        ({ resolvedPaperSelector, originals }) => {
+          const paper = document.querySelector(resolvedPaperSelector)
+          originals.forEach(({ marker, originalHTML }) => {
+            const editor = paper?.querySelector(
+              `[data-style-l1-long-business-value="${marker}"]`
+            )
+            if (editor) {
+              editor.innerHTML = originalHTML
+              editor.removeAttribute('data-style-l1-long-business-value')
+            }
+          })
+        },
+        {
+          resolvedPaperSelector: paperSelector,
+          originals: injectedState.originals,
+        }
+      )
+    }
+  }
+
   async function assertContractTotalCellsWrapLargeNumbers(
     page,
     { storageKey, templateKind, totalValueSelector, scenarioLabel }
@@ -1652,6 +2080,8 @@ export function createPrintAssertions({
     assertMaterialContractMetaAlignment,
     assertContractTableEditableAlignment,
     assertMaterialContractLineCellsWrapLongValues,
+    assertMaterialDetailLineCellsWrapLongValues,
+    assertPrintTemplateLongBusinessValuesStayInsidePaper,
     assertContractTotalCellsWrapLargeNumbers,
     assertMaterialContractPrintMediaIgnoresResponsiveBreakpoints,
   }

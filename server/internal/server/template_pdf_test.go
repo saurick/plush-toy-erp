@@ -115,7 +115,7 @@ func TestTemplatePDFReferencedModuleKeys(t *testing.T) {
 		{templateKey: "processing-contract", want: []string{"outsourcing_orders"}, wantOK: true},
 		{templateKey: "engineering-material-detail", want: []string{"material_bom"}, wantOK: true},
 		{templateKey: "engineering-color-card", want: []string{"material_bom"}, wantOK: true},
-		{templateKey: "engineering-work-instruction", want: []string{"outsourcing_orders"}, wantOK: true},
+		{templateKey: "engineering-work-instruction", want: []string{"material_bom"}, wantOK: true},
 		{templateKey: "unknown-template", want: nil, wantOK: false},
 	}
 

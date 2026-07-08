@@ -41,6 +41,8 @@ export function createStyleL1Scenarios(deps) {
     assertLineItemsUnifiedHorizontalScroll,
     assertLoginSegmentedReadable,
     assertMaterialContractLineCellsWrapLongValues,
+    assertMaterialDetailLineCellsWrapLongValues,
+    assertPrintTemplateLongBusinessValuesStayInsidePaper,
     assertMaterialContractMetaAlignment,
     assertMaterialContractPrintMediaIgnoresResponsiveBreakpoints,
     assertMobileTaskBossDoneList,
@@ -157,13 +159,16 @@ export function createStyleL1Scenarios(deps) {
         }
       })
     const borderEvidence = `${metrics.editableBoxShadow} ${metrics.cellBoxShadow}`
+    const backgroundEvidence = `${metrics.editableBackground} ${metrics.cellBackground}`
     assert(
       metrics.activeElementMatches &&
         !/dashed/iu.test(metrics.editableOutlineStyle) &&
         !/dashed/iu.test(metrics.cellOutlineStyle) &&
         /rgba?\(/iu.test(borderEvidence) &&
-        borderEvidence !== 'none none',
-      `${scenarioLabel} 编辑焦点边框应统一为实线内描边，不能继续用虚线: ${JSON.stringify(metrics)}`
+        borderEvidence !== 'none none' &&
+        borderEvidence.includes('rgba(47, 143, 75, 0.82)') &&
+        backgroundEvidence.includes('rgba(47, 143, 75, 0.08)'),
+      `${scenarioLabel} 编辑焦点边框应统一为合同模板同款实线内描边和浅绿色底色，不能继续用虚线或另一套绿色: ${JSON.stringify(metrics)}`
     )
   }
   const assertPrintEditableFocusSurvivesSwitch = async (
@@ -5249,6 +5254,84 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'print-workspace-contract-title-parity',
+      path: '/erp/print-workspace/material-purchase-contract',
+      auth: 'admin',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const readTitleMetrics = async (selector) =>
+          page
+            .locator(selector)
+            .first()
+            .evaluate((node) => {
+              const style = window.getComputedStyle(node)
+              const rect = node.getBoundingClientRect()
+              return {
+                text: String(node.textContent || '').trim(),
+                fontFamily: style.fontFamily,
+                fontSize: style.fontSize,
+                fontWeight: style.fontWeight,
+                letterSpacing: style.letterSpacing,
+                height: rect.height,
+              }
+            })
+
+        await expectText(page, '合同订单')
+        const materialTitle = await readTitleMetrics(
+          '.erp-material-contract-paper__title'
+        )
+        await page
+          .locator('.erp-material-contract-paper__title')
+          .first()
+          .screenshot({
+            path: path.join(
+              outputDir,
+              'print-workspace-material-title-parity.png'
+            ),
+          })
+
+        await gotoScenarioPath(page, '/erp/print-workspace/processing-contract')
+        await expectText(page, '加工合同')
+        const processingTitle = await readTitleMetrics(
+          '.erp-processing-contract-paper__title'
+        )
+        await page
+          .locator('.erp-processing-contract-paper__title')
+          .first()
+          .screenshot({
+            path: path.join(
+              outputDir,
+              'print-workspace-processing-title-parity.png'
+            ),
+          })
+
+        assert.deepEqual(
+          {
+            fontFamily: processingTitle.fontFamily,
+            fontSize: processingTitle.fontSize,
+            fontWeight: processingTitle.fontWeight,
+            letterSpacing: processingTitle.letterSpacing,
+          },
+          {
+            fontFamily: materialTitle.fontFamily,
+            fontSize: materialTitle.fontSize,
+            fontWeight: materialTitle.fontWeight,
+            letterSpacing: materialTitle.letterSpacing,
+          },
+          `加工合同纸面标题应和采购合同纸面标题使用同一套字体规则: ${JSON.stringify(
+            { materialTitle, processingTitle }
+          )}`
+        )
+        assert(
+          Math.abs(processingTitle.height - materialTitle.height) <= 1,
+          `加工合同纸面标题高度应和采购合同纸面标题接近: ${JSON.stringify({
+            materialTitle,
+            processingTitle,
+          })}`
+        )
+      },
+    },
+    {
       name: 'print-workspace-processing',
       path: '/erp/print-workspace/processing-contract',
       auth: 'admin',
@@ -5516,6 +5599,7 @@ export function createStyleL1Scenarios(deps) {
               borderRightWidth: style?.borderRightWidth || '',
               backgroundColor: style?.backgroundColor || '',
               paperWidth: paperRect?.width || 0,
+              stageWidth: stageRect?.width || 0,
               paperLeftGap:
                 stageRect && paperRect ? paperRect.left - stageRect.left : -1,
               paperRightGap:
@@ -5557,6 +5641,10 @@ export function createStyleL1Scenarios(deps) {
               Math.abs(
                 screenMetrics.paperLeftGap - screenMetrics.paperRightGap
               ) <= 4 &&
+              printMetrics.stageWidth >= printMetrics.paperWidth - 1 &&
+              printMetrics.stageWidth <= printMetrics.paperWidth + 1 &&
+              Math.abs(printMetrics.paperLeftGap) <= 1 &&
+              Math.abs(printMetrics.paperRightGap) <= 1 &&
               printMetrics.borderLeftWidth === '0px' &&
               printMetrics.borderRightWidth === '0px' &&
               printMetrics.backgroundColor === 'rgb(255, 255, 255)',
@@ -5820,70 +5908,86 @@ export function createStyleL1Scenarios(deps) {
             `物料分析明细表所有表头和明细单元格内容都应上下居中且编辑层铺满单元格: ${JSON.stringify(metrics)}`
           )
         }
-        const assertMaterialDetailMetaGridVerticalCentering = async () => {
-          const metrics = await page.evaluate(() => {
-            const measureTextRect = (node) => {
-              if (!node) return null
-              const range = document.createRange()
-              range.selectNodeContents(node)
-              const rect = range.getBoundingClientRect()
-              range.detach()
-              return rect.width || rect.height ? rect : null
-            }
-            const cells = [
-              ...document.querySelectorAll(
-                '.erp-material-detail-paper .erp-engineering-print-meta-grid > div'
-              ),
-            ]
-            const states = cells.map((cell, index) => {
-              const label = cell.querySelector(
-                '.erp-engineering-print-meta-grid__label'
-              )
-              const editor = cell.querySelector(
-                '.erp-engineering-print-editable'
-              )
-              const cellRect = cell.getBoundingClientRect()
-              const labelRect = measureTextRect(label)
-              const editorRect = measureTextRect(editor)
-              const style = window.getComputedStyle(cell)
-              const centerY = cellRect.top + cellRect.height / 2
+        const assertMaterialDetailMetaGridFieldValueTextAlignment =
+          async () => {
+            const metrics = await page.evaluate(() => {
+              const measureTextRect = (node) => {
+                if (!node) return null
+                const range = document.createRange()
+                range.selectNodeContents(node)
+                const rect = range.getBoundingClientRect()
+                range.detach()
+                return rect.width || rect.height ? rect : null
+              }
+              const cells = [
+                ...document.querySelectorAll(
+                  '.erp-material-detail-paper .erp-engineering-print-meta-grid > div'
+                ),
+              ]
+              const states = cells.map((cell, index) => {
+                const label = cell.querySelector(
+                  '.erp-engineering-print-meta-grid__label'
+                )
+                const editor = cell.querySelector(
+                  '.erp-engineering-print-editable'
+                )
+                const cellRect = cell.getBoundingClientRect()
+                const labelRect = measureTextRect(label)
+                const editorTextRect = measureTextRect(editor)
+                const editorBoxRect = editor?.getBoundingClientRect()
+                const style = window.getComputedStyle(cell)
+                const editorCenter = editorTextRect
+                  ? editorTextRect.top + editorTextRect.height / 2
+                  : 0
+                const editorBoxCenter = editorBoxRect
+                  ? editorBoxRect.top + editorBoxRect.height / 2
+                  : 0
+                return {
+                  index,
+                  text: String(cell.textContent || '')
+                    .replace(/\s+/gu, ' ')
+                    .trim(),
+                  display: style.display,
+                  alignItems: style.alignItems,
+                  cellHeight: cellRect.height,
+                  textTopDelta:
+                    labelRect && editorTextRect
+                      ? Math.abs(labelRect.top - editorTextRect.top)
+                      : -1,
+                  editorBoxHeight: editorBoxRect?.height || 0,
+                  editorTextCenterDelta: editorTextRect
+                    ? Math.abs(editorCenter - editorBoxCenter)
+                    : -1,
+                }
+              })
               return {
-                index,
-                text: String(cell.textContent || '')
-                  .replace(/\s+/gu, ' ')
-                  .trim(),
-                display: style.display,
-                alignItems: style.alignItems,
-                cellHeight: cellRect.height,
-                labelCenterDelta: labelRect
-                  ? Math.abs(centerY - (labelRect.top + labelRect.height / 2))
-                  : -1,
-                editorCenterDelta: editorRect
-                  ? Math.abs(centerY - (editorRect.top + editorRect.height / 2))
-                  : -1,
+                checkedCount: states.length,
+                offTextAlignmentStates: states.filter(
+                  (state) => state.text && state.textTopDelta > 2
+                ),
+                offEditorTextCenterStates: states.filter(
+                  (state) => state.text && state.editorTextCenterDelta > 4
+                ),
+                smallEditorBoxStates: states.filter(
+                  (state) => state.text && state.editorBoxHeight < 20
+                ),
+                nonGridBaselineStates: states.filter(
+                  (state) =>
+                    state.text &&
+                    (state.display !== 'grid' ||
+                      state.alignItems !== 'baseline')
+                ),
               }
             })
-            return {
-              checkedCount: states.length,
-              offCenterStates: states.filter(
-                (state) =>
-                  state.text &&
-                  (state.labelCenterDelta > 5 || state.editorCenterDelta > 5)
-              ),
-              nonGridCenterStates: states.filter(
-                (state) =>
-                  state.text &&
-                  (state.display !== 'grid' || state.alignItems !== 'center')
-              ),
-            }
-          })
-          assert(
-            metrics.checkedCount === 9 &&
-              metrics.offCenterStates.length === 0 &&
-              metrics.nonGridCenterStates.length === 0,
-            `物料分析明细表顶部信息格内容应上下居中: ${JSON.stringify(metrics)}`
-          )
-        }
+            assert(
+              metrics.checkedCount === 9 &&
+                metrics.offTextAlignmentStates.length === 0 &&
+                metrics.offEditorTextCenterStates.length === 0 &&
+                metrics.smallEditorBoxStates.length === 0 &&
+                metrics.nonGridBaselineStates.length === 0,
+              `物料分析明细表顶部信息格字段名文字和值文字应对齐，值槽内部文字应上下居中: ${JSON.stringify(metrics)}`
+            )
+          }
         const assertMaterialDetailMetaValueEditableCoverage = async () => {
           const metrics = await page.evaluate(() => {
             const cells = [
@@ -5986,14 +6090,13 @@ export function createStyleL1Scenarios(deps) {
                       pair.editorDisplay !== 'flex' ||
                       pair.editorAlignItems !== 'center' ||
                       pair.editorBoxSizing !== 'border-box' ||
-                      pair.editorAlignSelf !== 'stretch'
+                      pair.editorAlignSelf !== 'baseline'
                   )
               ),
               nonFillingValueSlots: pairStates.filter(
                 (pair) =>
                   pair.editorWidth <= 0 ||
                   pair.editorHeight <= 0 ||
-                  pair.heightDelta > 2 ||
                   pair.rightGap > 2 ||
                   pair.labelEditorGap < 0 ||
                   (!pair.isCompoundCell && pair.nextPairGap < 0)
@@ -6095,7 +6198,7 @@ export function createStyleL1Scenarios(deps) {
             `物料分析明细表顶部信息区应按源 Excel 保持非格子打印视觉，毛向单独换行后应居左，主表格才开始画边框: ${JSON.stringify(metrics)}`
           )
         }
-        const assertMaterialDetailTableWidthAndUnitFit = async () => {
+        const assertMaterialDetailTableWidthAndUnitWrapPolicy = async () => {
           const metrics = await page.evaluate(() => {
             const paper = document.querySelector('.erp-material-detail-paper')
             const table = document.querySelector('.erp-material-detail-table')
@@ -6153,10 +6256,10 @@ export function createStyleL1Scenarios(deps) {
               metrics.unitText === 'PCS' &&
               metrics.unitCellWidth >= metrics.unitTextWidth + 6 &&
               metrics.unitTextHeight <= metrics.unitLineHeight * 1.35 &&
-              metrics.unitWhiteSpace === 'nowrap' &&
-              metrics.unitOverflowWrap === 'normal' &&
-              metrics.unitWordBreak === 'normal',
-            `物料分析明细表应收窄纸面左右留白，且单位列常规 PCS 不换行: ${JSON.stringify(metrics)}`
+              metrics.unitWhiteSpace === 'normal' &&
+              metrics.unitOverflowWrap === 'anywhere' &&
+              metrics.unitWordBreak === 'break-word',
+            `物料分析明细表应收窄纸面左右留白，且单位列使用可换行策略，常规 PCS 仍应自然单行显示: ${JSON.stringify(metrics)}`
           )
         }
         const assertMaterialDetailPageBreakBottomBorder = async () => {
@@ -6342,17 +6445,17 @@ export function createStyleL1Scenarios(deps) {
             metrics.every(
               (item) =>
                 item.fieldDisplay === 'grid' &&
-                item.fieldAlignItems === 'center' &&
+                item.fieldAlignItems === 'baseline' &&
                 item.fieldHeight >= 24 &&
                 item.labelValueGap >= 0 &&
                 item.labelValueGap <= 8 &&
                 item.valueRight <= item.labelRight + item.fieldWidth &&
                 item.valueDisplay === 'flex' &&
                 item.valueAlignItems === 'center' &&
-                item.valueAlignSelf === 'stretch' &&
+                item.valueAlignSelf === 'baseline' &&
                 item.valueBoxSizing === 'border-box' &&
                 item.valueWidth >= 100 &&
-                item.valueHeight >= item.fieldHeight - 2
+                item.valueHeight >= 24
             ),
             `物料明细底部字段名和值应紧邻排列，值槽应有稳定点击高度并沿用顶部信息区焦点命中口径: ${JSON.stringify(metrics)}`
           )
@@ -6695,7 +6798,7 @@ export function createStyleL1Scenarios(deps) {
           '.erp-material-detail-table tbody tr:first-child td:nth-child(2)',
           '.erp-material-detail-table__editable'
         )
-        await assertMaterialDetailMetaGridVerticalCentering()
+        await assertMaterialDetailMetaGridFieldValueTextAlignment()
         await assertMaterialDetailMetaValueEditableCoverage()
         await assertMaterialDetailMetaSourceHeaderVisual()
         await page
@@ -6720,7 +6823,8 @@ export function createStyleL1Scenarios(deps) {
           'material-detail-hair-direction-focus-latest.png'
         )
         await assertMaterialDetailTableVerticalCentering()
-        await assertMaterialDetailTableWidthAndUnitFit()
+        await assertMaterialDetailTableWidthAndUnitWrapPolicy()
+        await assertMaterialDetailLineCellsWrapLongValues(page)
         await assertPrintEditableFocusBorderStyle(page, {
           selector:
             '.erp-material-detail-table tbody tr:first-child td:nth-child(2) .erp-material-detail-table__editable',
@@ -6963,6 +7067,7 @@ export function createStyleL1Scenarios(deps) {
           materialRowsBefore,
           '物料明细移除当前行后行数应恢复'
         )
+        await page.getByRole('button', { name: '取消选择' }).click()
         await assertMaterialDetailPageBreakBottomBorder()
 
         await gotoScenarioPath(
@@ -7001,8 +7106,25 @@ export function createStyleL1Scenarios(deps) {
             '.erp-color-card-paper__line-row[data-color-line="true"] .erp-color-card-paper__method-cell .erp-engineering-print-editable',
           scenarioLabel: '色卡',
         })
+        const colorCardMetaOriginalHTML = await page.evaluate(() => {
+          const editors = [
+            ...document.querySelectorAll(
+              '.erp-color-card-paper__meta > .erp-engineering-print-editable'
+            ),
+          ]
+          const samples = [
+            '26204#-PRODUCT-NO-LONG-CONTINUOUS-WRAP-CHECK-20260708-ABCDEFGHIJKLMN',
+            '抱抱猴子-黑色-产品名称超长连续值不应覆盖相邻区域-ColorCardProductNameLongWrapCheck20260708',
+          ]
+          return editors.map((editor, index) => {
+            const html = editor.innerHTML
+            editor.textContent = samples[index] || editor.textContent
+            return html
+          })
+        })
         const colorCardMetaMetrics = await page.evaluate(() => {
           const meta = document.querySelector('.erp-color-card-paper__meta')
+          const metaStyle = meta ? window.getComputedStyle(meta) : null
           const children = [...(meta?.children || [])]
           const states = children
             .map((child, index) => ({ child, index }))
@@ -7017,6 +7139,13 @@ export function createStyleL1Scenarios(deps) {
               const previousLabelRect = previousLabel?.getBoundingClientRect()
               const nextLabelRect = nextLabel?.getBoundingClientRect()
               const metaRect = meta?.getBoundingClientRect()
+              const range = document.createRange()
+              range.selectNodeContents(child)
+              const lineBoxCount = [...range.getClientRects()].filter(
+                (lineRect) => lineRect.width > 0 && lineRect.height > 0
+              ).length
+              range.detach()
+              const lineHeight = Number.parseFloat(style.lineHeight || '0')
               return {
                 index,
                 text: String(child.textContent || '')
@@ -7039,10 +7168,20 @@ export function createStyleL1Scenarios(deps) {
                 alignItems: style.alignItems,
                 alignSelf: style.alignSelf,
                 boxSizing: style.boxSizing,
+                whiteSpace: style.whiteSpace,
+                overflowWrap: style.overflowWrap,
+                wordBreak: style.wordBreak,
+                lineHeight,
+                lineBoxCount,
+                editorClientWidth: child.clientWidth,
+                editorScrollWidth: child.scrollWidth,
+                editorClientHeight: child.clientHeight,
+                editorScrollHeight: child.scrollHeight,
               }
             })
           return {
             checkedCount: states.length,
+            metaAlignItems: metaStyle?.alignItems || '',
             metaText: String(meta?.textContent || '').replace(/\s+/gu, ' '),
             nonFillingValueSlots: states.filter(
               (state) =>
@@ -7054,19 +7193,40 @@ export function createStyleL1Scenarios(deps) {
                   : state.rightGap > 2) ||
                 state.display !== 'flex' ||
                 state.alignItems !== 'center' ||
-                state.alignSelf !== 'stretch' ||
-                state.boxSizing !== 'border-box'
+                state.alignSelf !== 'baseline' ||
+                state.boxSizing !== 'border-box' ||
+                state.whiteSpace !== 'normal' ||
+                state.overflowWrap !== 'anywhere' ||
+                state.editorScrollWidth > state.editorClientWidth + 1 ||
+                state.lineBoxCount < 2
             ),
             states,
           }
         })
         assert(
           colorCardMetaMetrics.checkedCount === 2 &&
+            colorCardMetaMetrics.metaAlignItems === 'baseline' &&
             colorCardMetaMetrics.metaText.includes('产品编号') &&
             colorCardMetaMetrics.metaText.includes('产品名称') &&
             colorCardMetaMetrics.nonFillingValueSlots.length === 0,
-          `色卡顶部产品编号/产品名称值槽应铺满标签右侧区域: ${JSON.stringify(colorCardMetaMetrics)}`
+          `色卡顶部产品编号/产品名称值槽应铺满标签右侧区域并允许长值换行: ${JSON.stringify(colorCardMetaMetrics)}`
         )
+        await writeEngineeringPaperReviewScreenshot(
+          '.erp-color-card-paper',
+          'color-card-meta-long-value-wrap-latest.png'
+        )
+        await page.evaluate((originalHTML) => {
+          const editors = [
+            ...document.querySelectorAll(
+              '.erp-color-card-paper__meta > .erp-engineering-print-editable'
+            ),
+          ]
+          editors.forEach((editor, index) => {
+            if (typeof originalHTML[index] === 'string') {
+              editor.innerHTML = originalHTML[index]
+            }
+          })
+        }, colorCardMetaOriginalHTML)
         await assertPrintEditableFocusBorderStyle(page, {
           selector:
             '.erp-color-card-paper__meta > .erp-engineering-print-editable:nth-child(4)',
@@ -7082,6 +7242,7 @@ export function createStyleL1Scenarios(deps) {
           const states = items.map((item, index) => {
             const editor = item.querySelector('.erp-engineering-print-editable')
             const itemRect = item.getBoundingClientRect()
+            const itemStyle = window.getComputedStyle(item)
             const editorRect = editor?.getBoundingClientRect()
             const editorStyle = editor ? window.getComputedStyle(editor) : null
             return {
@@ -7091,6 +7252,7 @@ export function createStyleL1Scenarios(deps) {
                 .trim(),
               itemWidth: itemRect.width,
               itemHeight: itemRect.height,
+              itemAlignItems: itemStyle.alignItems,
               editorWidth: editorRect?.width || 0,
               editorHeight: editorRect?.height || 0,
               rightGap: editorRect ? itemRect.right - editorRect.right : -1,
@@ -7116,9 +7278,10 @@ export function createStyleL1Scenarios(deps) {
                 state.editorHeight <= 0 ||
                 state.rightGap > 2 ||
                 state.heightDelta > 2 ||
+                state.itemAlignItems !== 'baseline' ||
                 state.editorDisplay !== 'flex' ||
                 state.editorAlignItems !== 'center' ||
-                state.editorAlignSelf !== 'stretch' ||
+                state.editorAlignSelf !== 'baseline' ||
                 state.editorBoxSizing !== 'border-box'
             ),
             states,
@@ -7718,6 +7881,10 @@ export function createStyleL1Scenarios(deps) {
             '上插一行',
             '下插一行',
             '移除当前行',
+            '设为标题行',
+            '设为编号行',
+            '设为说明行',
+            '设为备注行',
             '给当前行加图',
             '清空当前行图片',
             '选择行',
@@ -7771,12 +7938,12 @@ export function createStyleL1Scenarios(deps) {
           `作业指导书作业行未选中时不应常驻行内加图按钮或空图片槽: ${JSON.stringify(workInstructionRowImageControlState)}`
         )
         assert.equal(
-          toolbarGroups[0].buttons[3].disabled,
+          toolbarGroups[0].buttons[7].disabled,
           true,
           '作业指导书未选择纸面行前，给当前行加图应禁用'
         )
         assert.equal(
-          toolbarGroups[0].buttons[4].disabled,
+          toolbarGroups[0].buttons[8].disabled,
           true,
           '作业指导书未选择纸面行前，清空当前行图片应禁用'
         )
@@ -7883,9 +8050,13 @@ export function createStyleL1Scenarios(deps) {
               '.erp-work-instruction-paper__section-title-row'
             ),
           ]
-          const sectionRows = [
+          const fullTextRows = [
             ...document.querySelectorAll(
-              '.erp-work-instruction-paper__section-row'
+              [
+                '.erp-work-instruction-paper__section-title-row',
+                '.erp-work-instruction-paper__notice-row',
+                '.erp-work-instruction-paper__remark',
+              ].join(',')
             ),
           ]
           const stepRows = [
@@ -7950,11 +8121,20 @@ export function createStyleL1Scenarios(deps) {
               (row) => row.getBoundingClientRect().height
             ),
             sectionTitleHeightVars: sectionTitleRows.map(rowHeightVar),
-            sectionRowHeightVars: sectionRows.slice(0, 4).map(rowHeightVar),
-            sectionRowPixelHeights: sectionRows
-              .slice(0, 4)
-              .map((row) => row.getBoundingClientRect().height),
+            sectionTitlePixelHeights: sectionTitleRows.map(
+              (row) => row.getBoundingClientRect().height
+            ),
+            fullTextRowHeightVars: fullTextRows.map(rowHeightVar),
+            fullTextRowPixelHeights: fullTextRows.map(
+              (row) => row.getBoundingClientRect().height
+            ),
             stepRowCount: stepRows.length,
+            stepNumbers: stepRows.map((row) =>
+              String(
+                row.querySelector('.erp-work-instruction-paper__step-no')
+                  ?.textContent || ''
+              ).trim()
+            ),
             stepRowHeightVars: stepRows.map(
               (row) =>
                 row.style.getPropertyValue('--instruction-row-min-height') || ''
@@ -8001,10 +8181,16 @@ export function createStyleL1Scenarios(deps) {
                 ? window.getComputedStyle(noticeCell).fontSize
                 : '',
             },
-            sewingNoteHeightVar:
-              document
-                .querySelector('.erp-work-instruction-paper__sewing-note-row')
-                ?.style.getPropertyValue('--work-instruction-row-height') || '',
+            noticeHeightVars: [
+              ...document.querySelectorAll(
+                '.erp-work-instruction-paper__notice-row'
+              ),
+            ].map(rowHeightVar),
+            remarkHeightVars: [
+              ...document.querySelectorAll(
+                '.erp-work-instruction-paper__remark'
+              ),
+            ].map(rowHeightVar),
             continuationSummaries,
           }
         })
@@ -8025,11 +8211,12 @@ export function createStyleL1Scenarios(deps) {
             headerRowHeightVars:
               workInstructionGridState.headerRowHeightVars.slice(0, 6),
             sectionTitleHeightVars:
-              workInstructionGridState.sectionTitleHeightVars.slice(0, 2),
-            sectionRowHeightVars:
-              workInstructionGridState.sectionRowHeightVars.slice(0, 4),
+              workInstructionGridState.sectionTitleHeightVars.slice(0, 3),
+            fullTextRowHeightVars:
+              workInstructionGridState.fullTextRowHeightVars,
             firstStepHeightVar: workInstructionGridState.firstStepHeightVar,
-            sewingNoteHeightVar: workInstructionGridState.sewingNoteHeightVar,
+            noticeHeightVars: workInstructionGridState.noticeHeightVars,
+            remarkHeightVars: workInstructionGridState.remarkHeightVars,
           },
           {
             headerRowHeightVars: [
@@ -8040,35 +8227,45 @@ export function createStyleL1Scenarios(deps) {
               '8.5mm',
               '8.5mm',
             ],
-            sectionTitleHeightVars: ['6.4mm', '5mm'],
-            sectionRowHeightVars: ['11.6mm', '11.6mm', '11.6mm', '11.6mm'],
+            sectionTitleHeightVars: ['11.6mm', '11.6mm', '11.6mm'],
+            fullTextRowHeightVars: [
+              '11.6mm',
+              '11.6mm',
+              '11.6mm',
+              '11.6mm',
+              '11.6mm',
+            ],
             firstStepHeightVar: '11.6mm',
-            sewingNoteHeightVar: '14.8mm',
+            noticeHeightVars: ['11.6mm'],
+            remarkHeightVars: ['11.6mm'],
           },
-          `作业指导书同类说明行应统一使用车缝作业行高度: ${JSON.stringify(workInstructionGridState)}`
+          `作业指导书统一行模型应让标题、说明、备注和编号行使用一致行高: ${JSON.stringify(workInstructionGridState)}`
         )
         assert(
           workInstructionGridState.sheetCount === 1 &&
             workInstructionGridState.continuationSheetCount === 0 &&
             workInstructionGridState.continuationSummaries.length === 0 &&
             workInstructionGridState.stepRowCount === 5 &&
+            workInstructionGridState.stepNumbers[0] !== '' &&
+            JSON.stringify(workInstructionGridState.stepNumbers.slice(1)) ===
+              JSON.stringify(['2', '1', '1', '2']) &&
             workInstructionGridState.stepRowHeightVars.every(
               (heightVar) => heightVar === '11.6mm'
             ) &&
             workInstructionGridState.annotatedStepRowCount === 0 &&
             workInstructionGridState.defaultStepRowImageCount === 0,
-          `作业指导书默认样例应只保留首个备注前 5 条普通作业行，备注后不渲染重复页块: ${JSON.stringify(workInstructionGridState)}`
+          `作业指导书纸面应按小模块重编 5 条编号行，备注后不渲染重复页块: ${JSON.stringify(workInstructionGridState)}`
         )
         assert(
           workInstructionGridState.headerRowPixelHeights.every(
             (height) => height >= 29 && height <= 36
           ) &&
-            workInstructionGridState.sectionRowPixelHeights
-              .slice(0, 4)
-              .every((height) => height >= 40 && height <= 54) &&
+            workInstructionGridState.fullTextRowPixelHeights.every(
+              (height) => height >= 40 && height <= 54
+            ) &&
             workInstructionGridState.firstStepPixelHeight >= 40 &&
             workInstructionGridState.firstStepPixelHeight <= 50,
-          `作业指导书裁床/刺绣说明行和车缝编号行高度应保持一致: ${JSON.stringify(workInstructionGridState)}`
+          `作业指导书标题、说明、备注和编号行高度应保持一致: ${JSON.stringify(workInstructionGridState)}`
         )
         const parseFontSize = (value) => parseFloat(String(value || '0'))
         assert(
@@ -8088,11 +8285,8 @@ export function createStyleL1Scenarios(deps) {
               14 &&
             parseFontSize(workInstructionGridState.fontSizes.stepContent) <=
               15 &&
-            (!workInstructionGridState.fontSizes.notice ||
-              (parseFontSize(workInstructionGridState.fontSizes.notice) >=
-                11.5 &&
-                parseFontSize(workInstructionGridState.fontSizes.notice) <=
-                  12.5)),
+            parseFontSize(workInstructionGridState.fontSizes.notice) >= 14 &&
+            parseFontSize(workInstructionGridState.fontSizes.notice) <= 15,
           `作业指导书字号应按 Sheet1 16pt/12pt/14pt/11pt/9pt 比例映射: ${JSON.stringify(workInstructionGridState.fontSizes)}`
         )
         const defaultRichTextState = await page.evaluate(() => {
@@ -8184,7 +8378,7 @@ export function createStyleL1Scenarios(deps) {
           .dispatchEvent('mousedown', { bubbles: true, cancelable: true })
         toolbarGroups = await collectToolbarGroups()
         assert.equal(
-          toolbarGroups[0].buttons[3].disabled,
+          toolbarGroups[0].buttons[7].disabled,
           false,
           '作业指导书选择编号行后，给当前行加图应可用'
         )
@@ -8199,7 +8393,7 @@ export function createStyleL1Scenarios(deps) {
           '作业指导书选择编号作业行后，下插一行应可用'
         )
         assert.equal(
-          toolbarGroups[0].buttons[4].disabled,
+          toolbarGroups[0].buttons[8].disabled,
           true,
           '作业指导书选中无图片行时，清空当前行图片仍应禁用'
         )
@@ -8481,7 +8675,7 @@ export function createStyleL1Scenarios(deps) {
         )
         toolbarGroups = await collectToolbarGroups()
         assert.equal(
-          toolbarGroups[0].buttons[4].disabled,
+          toolbarGroups[0].buttons[8].disabled,
           false,
           '作业指导书图片上传后，清空当前行图片应可用'
         )
@@ -8565,13 +8759,12 @@ export function createStyleL1Scenarios(deps) {
           rowSelectionFromCellTextState.selected &&
             !rowSelectionFromCellTextState.activeIsEditor &&
             !rowSelectionFromCellTextState.activeIsContentEditable &&
-            rowSelectionFromCellTextState.rowNo ===
-              String(lastInstructionRowIndex + 1),
+            rowSelectionFromCellTextState.rowNo !== '',
           `作业指导书选择模式点击单元格文字应选中行而不是进入编辑: ${JSON.stringify(rowSelectionFromCellTextState)}`
         )
         toolbarGroups = await collectToolbarGroups()
         assert.equal(
-          toolbarGroups[0].buttons[3].disabled,
+          toolbarGroups[0].buttons[7].disabled,
           false,
           '作业指导书最后一条作业行选中后，给当前行加图应可用'
         )
@@ -8831,8 +9024,8 @@ export function createStyleL1Scenarios(deps) {
         })
         assert.deepEqual(
           instructionInsertState.rows,
-          instructionInsertState.rows.map((_, index) => String(index + 1)),
-          `作业指导书插行后行号应连续: ${JSON.stringify(instructionInsertState)}`
+          ['1', '2', '3', '1', '1', '2'],
+          `作业指导书插行后应按小模块重编行号: ${JSON.stringify(instructionInsertState)}`
         )
         assert(
           /^3$/u.test(instructionInsertState.insertedText) &&
@@ -8844,7 +9037,7 @@ export function createStyleL1Scenarios(deps) {
             instructionInsertState.insertedNoteCount === 0 &&
             instructionInsertState.insertedCalloutCount === 0 &&
             instructionInsertState.insertedSelected &&
-            instructionInsertState.shiftedAnnotationNo === '4' &&
+            instructionInsertState.shiftedAnnotationNo === '1' &&
             !instructionInsertState.shiftedAnnotationStillAnnotated &&
             instructionInsertState.shiftedAnnotationCalloutCount === 0,
           `作业指导书下插应在已选编号行后插入同高空白普通行，不复制图片或批注: ${JSON.stringify(instructionInsertState)}`
@@ -8872,22 +9065,23 @@ export function createStyleL1Scenarios(deps) {
           instructionRowsBefore,
           '作业指导书移除当前作业行后行数应恢复'
         )
-        const firstSectionRow = page
+        const instructionMainBodyRowSelector =
+          '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__section-title-row, .erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__notice-row, .erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__remark, .erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__step-row--text, .erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__step-row--image'
+        const firstTitleRow = page
           .locator(
-            '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__section-row'
+            '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__section-title-row'
           )
           .first()
-        await firstSectionRow
-          .locator(
-            '.erp-work-instruction-paper__text-cell > .erp-engineering-print-editable'
-          )
-          .click()
-        const sectionSelectionFromCellTextState = await page.evaluate(() => {
+        await firstTitleRow.dispatchEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+        })
+        const titleSelectionFromCellTextState = await page.evaluate(() => {
           const row = document.querySelector(
-            '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__section-row'
+            '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__section-title-row'
           )
           const editor = row?.querySelector(
-            '.erp-work-instruction-paper__text-cell > .erp-engineering-print-editable'
+            'td > .erp-engineering-print-editable'
           )
           return {
             selected: row?.classList.contains(
@@ -8901,118 +9095,70 @@ export function createStyleL1Scenarios(deps) {
           }
         })
         assert(
-          sectionSelectionFromCellTextState.selected &&
-            !sectionSelectionFromCellTextState.activeIsEditor &&
-            !sectionSelectionFromCellTextState.activeIsContentEditable &&
-            sectionSelectionFromCellTextState.text.includes('核对资料'),
-          `作业指导书选择模式点击段落行文字应选中行而不是进入编辑: ${JSON.stringify(sectionSelectionFromCellTextState)}`
-        )
-        await firstSectionRow
-          .locator('.erp-work-instruction-paper__row-image-input')
-          .setInputFiles([
-            path.resolve(webDir, 'public', 'favicon.svg'),
-            path.resolve(webDir, 'public', 'favicon.svg'),
-          ])
-        await page.waitForFunction(() => {
-          const row = document.querySelector(
-            '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__section-row'
-          )
-          return (
-            row?.querySelectorAll('.erp-engineering-print-image-slot img')
-              .length === 2
-          )
-        })
-        const sectionImageState = await page.evaluate(() => {
-          const row = document.querySelector(
-            '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__section-row'
-          )
-          const rowImages = row?.querySelector(
-            '.erp-work-instruction-paper__row-images'
-          )
-          return {
-            imageCount:
-              row?.querySelectorAll('.erp-engineering-print-image-slot img')
-                .length || 0,
-            rowImagesWrap: rowImages
-              ? window.getComputedStyle(rowImages).flexWrap
-              : '',
-            buttonCount: row?.querySelectorAll('button').length || 0,
-            selected: row?.classList.contains(
-              'erp-engineering-print-row--selected'
-            ),
-          }
-        })
-        assert(
-          sectionImageState.imageCount === 2 &&
-            sectionImageState.rowImagesWrap === 'wrap' &&
-            sectionImageState.buttonCount === 0 &&
-            sectionImageState.selected,
-          `作业指导书段落行应复用顶部选择后的图片上传和横向换行能力: ${JSON.stringify(sectionImageState)}`
+          titleSelectionFromCellTextState.selected &&
+            !titleSelectionFromCellTextState.activeIsEditor &&
+            !titleSelectionFromCellTextState.activeIsContentEditable &&
+            titleSelectionFromCellTextState.text.length > 0,
+          `作业指导书选择模式点击标题行应选中行而不是进入编辑: ${JSON.stringify(titleSelectionFromCellTextState)}`
         )
         toolbarGroups = await collectToolbarGroups()
         assert.equal(
-          toolbarGroups[0].buttons[4].disabled,
-          false,
-          '作业指导书段落行上传图片后，清空当前行图片应可用'
+          toolbarGroups[0].buttons[7].disabled,
+          true,
+          '作业指导书标题行选中后，给当前行加图仍应禁用'
         )
-        await page.getByRole('button', { name: '清空当前行图片' }).click()
-        await page.waitForFunction(() => {
-          const row = document.querySelector(
-            '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__section-row'
+        await page.getByRole('button', { name: '设为说明行' }).click()
+        await page.waitForFunction(() =>
+          Boolean(
+            document.querySelector(
+              '.erp-work-instruction-paper__notice-row.erp-engineering-print-row--selected'
+            )
           )
-          return (
-            row?.querySelectorAll('.erp-engineering-print-image-slot img')
-              .length === 0
+        )
+        await page.getByRole('button', { name: '设为标题行' }).click()
+        await page.waitForFunction(() =>
+          Boolean(
+            document.querySelector(
+              '.erp-work-instruction-paper__section-title-row.erp-engineering-print-row--selected'
+            )
           )
-        })
-        const sectionRowsBefore = await page
-          .locator(
-            '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__section-row'
-          )
+        )
+        const instructionBodyRowsBefore = await page
+          .locator(instructionMainBodyRowSelector)
           .count()
         await page.getByRole('button', { name: '下插一行' }).click()
         assert.equal(
-          await page
-            .locator(
-              '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__section-row'
-            )
-            .count(),
-          sectionRowsBefore + 1,
-          '作业指导书下插段落行应新增段落行'
+          await page.locator(instructionMainBodyRowSelector).count(),
+          instructionBodyRowsBefore + 1,
+          '作业指导书标题行下插一行应新增统一正文行'
         )
-        const sectionInsertHeightState = await page.evaluate(() => {
-          const mainSheet = document.querySelector(
-            '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation)'
+        const titleInsertHeightState = await page.evaluate(() => {
+          const insertedRow = document.querySelector(
+            '.erp-work-instruction-paper__step-row--text.erp-engineering-print-row--selected, .erp-work-instruction-paper__step-row--image.erp-engineering-print-row--selected'
           )
-          const rows = [
-            ...(mainSheet?.querySelectorAll(
-              '.erp-work-instruction-paper__section-row'
-            ) || []),
-          ]
-          const insertedRow = rows[1]
           return {
-            firstRowHeightVar:
-              rows[0]?.style.getPropertyValue(
-                '--work-instruction-row-height'
-              ) || '',
             insertedRowHeightVar:
               insertedRow?.style.getPropertyValue(
-                '--work-instruction-row-height'
+                '--instruction-row-min-height'
               ) || '',
             insertedPixelHeight:
               insertedRow?.getBoundingClientRect().height || 0,
             insertedEditableText: String(
               insertedRow?.querySelector(
-                '.erp-work-instruction-paper__text-cell .erp-engineering-print-editable'
+                '.erp-work-instruction-paper__step-content-cell > .erp-engineering-print-editable'
               )?.textContent || ''
             )
               .replace(/\s+/gu, '')
               .trim(),
             insertedHtml: String(
               insertedRow?.querySelector(
-                '.erp-work-instruction-paper__text-cell .erp-engineering-print-editable'
+                '.erp-work-instruction-paper__step-content-cell > .erp-engineering-print-editable'
               )?.innerHTML || ''
             ),
+            insertedNo: String(
+              insertedRow?.querySelector('.erp-work-instruction-paper__step-no')
+                ?.textContent || ''
+            ).trim(),
             insertedImageCount:
               insertedRow?.querySelectorAll(
                 '.erp-engineering-print-image-slot img'
@@ -9023,31 +9169,98 @@ export function createStyleL1Scenarios(deps) {
           }
         })
         assert(
-          sectionInsertHeightState.firstRowHeightVar === '11.6mm' &&
-            sectionInsertHeightState.insertedRowHeightVar === '11.6mm' &&
-            sectionInsertHeightState.insertedPixelHeight >= 40 &&
-            sectionInsertHeightState.insertedPixelHeight <= 54 &&
-            sectionInsertHeightState.insertedEditableText === '' &&
-            !/amp|nbsp/u.test(sectionInsertHeightState.insertedEditableText) &&
-            !/amp;amp|amp;nbsp/u.test(sectionInsertHeightState.insertedHtml) &&
-            sectionInsertHeightState.insertedImageCount === 0 &&
-            sectionInsertHeightState.insertedSelected,
-          `作业指导书新增段落行应继承相邻普通文本行高，但不复制图片或转义占位: ${JSON.stringify(sectionInsertHeightState)}`
+          titleInsertHeightState.insertedRowHeightVar === '11.6mm' &&
+            titleInsertHeightState.insertedPixelHeight >= 40 &&
+            titleInsertHeightState.insertedPixelHeight <= 54 &&
+            titleInsertHeightState.insertedEditableText === '' &&
+            !/amp|nbsp/u.test(titleInsertHeightState.insertedEditableText) &&
+            !/amp;amp|amp;nbsp/u.test(titleInsertHeightState.insertedHtml) &&
+            titleInsertHeightState.insertedNo.length > 0 &&
+            titleInsertHeightState.insertedImageCount === 0 &&
+            titleInsertHeightState.insertedSelected,
+          `作业指导书标题行后新增行应继承相邻普通文本行高，但不复制图片或转义占位: ${JSON.stringify(titleInsertHeightState)}`
         )
         await page.getByRole('button', { name: '移除当前行' }).click()
         assert.equal(
-          await page
-            .locator(
-              '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation) .erp-work-instruction-paper__section-row'
-            )
-            .count(),
-          sectionRowsBefore,
-          '作业指导书移除当前段落行后行数应恢复'
+          await page.locator(instructionMainBodyRowSelector).count(),
+          instructionBodyRowsBefore,
+          '作业指导书移除标题行后新增行后行数应恢复'
         )
         await assertNoHorizontalOverflow(
           page,
           'engineering-print-workspace-row-buttons'
         )
+      },
+    },
+    {
+      name: 'engineering-material-detail-long-value-wrap',
+      path: '/erp/print-workspace/engineering-material-detail?draft=fresh',
+      auth: 'admin',
+      viewport: { width: 1600, height: 1100 },
+      verify: async (page) => {
+        await page.locator('.erp-material-detail-paper').waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await assertMaterialDetailLineCellsWrapLongValues(page)
+      },
+    },
+    {
+      name: 'print-workspace-all-template-long-business-values',
+      path: '/erp/print-workspace/material-purchase-contract?draft=fresh',
+      auth: 'admin',
+      viewport: { width: 1600, height: 1100 },
+      verify: async (page) => {
+        const templates = [
+          {
+            key: 'material-purchase-contract',
+            title: '采购合同',
+            paperSelector: '.erp-material-contract-paper',
+          },
+          {
+            key: 'processing-contract',
+            title: '加工合同',
+            paperSelector: '.erp-processing-contract-paper',
+          },
+          {
+            key: 'engineering-material-detail',
+            title: '物料分析明细表',
+            paperSelector: '.erp-material-detail-paper',
+          },
+          {
+            key: 'engineering-color-card',
+            title: '色卡',
+            paperSelector: '.erp-color-card-paper',
+          },
+          {
+            key: 'engineering-work-instruction',
+            title: '作业指导书',
+            paperSelector: '.erp-work-instruction-paper',
+          },
+        ]
+
+        for (const [index, template] of templates.entries()) {
+          if (index > 0) {
+            await gotoScenarioPath(
+              page,
+              `/erp/print-workspace/${template.key}?draft=fresh`
+            )
+          }
+          await page.locator(template.paperSelector).waitFor({
+            state: 'visible',
+            timeout: 10_000,
+          })
+          await expectText(page, template.title)
+          await assertPrintTemplateLongBusinessValuesStayInsidePaper(page, {
+            paperSelector: template.paperSelector,
+            scenarioLabel: template.title,
+            screenshotName: `print-workspace-${template.key}-long-business-values`,
+          })
+          await assertNoHorizontalOverflow(
+            page,
+            `print-workspace-${template.key}-long-business-values`
+          )
+        }
       },
     },
     {
@@ -9294,20 +9507,20 @@ export function createStyleL1Scenarios(deps) {
                 '.erp-work-instruction-paper__summary-value'
               )[2]
             ),
-            sewingTitleText: textContent(
-              mainSheet?.querySelectorAll(
-                '.erp-work-instruction-paper__section-title-row'
-              )[2]
-            ),
-            sewingIntroText: textContent(
-              mainSheet?.querySelectorAll(
-                '.erp-work-instruction-paper__section-row'
-              )[4]
-            ),
+            sewingTitleText:
+              [
+                ...(mainSheet?.querySelectorAll(
+                  '.erp-work-instruction-paper__section-title-row'
+                ) || []),
+              ]
+                .map((node) => textContent(node))
+                .find((text) => text.includes('针型号')) || '',
+            sewingIntroText: textContent(stepRows(mainSheet)[4]),
             row1Text: textContent(stepRows(mainSheet)[0]),
             row2Text: textContent(row2),
             row3Text: textContent(row3),
-            row5Text: textContent(stepRows(mainSheet)[4]),
+            processRow1Text: textContent(stepRows(mainSheet)[5]),
+            processRow5Text: textContent(stepRows(mainSheet)[9]),
             defaultRedStrongCount: defaultRedStrongMarks.length,
             defaultStrongCount: defaultStrongMarks.length,
             defaultRedColors,
@@ -9394,7 +9607,7 @@ export function createStyleL1Scenarios(deps) {
             sampleAssetState.sheetSummaries[0]?.productName.includes(
               '猴子抱抱-头'
             ) &&
-            sampleAssetState.sheetSummaries[0]?.rowCount === 5 &&
+            sampleAssetState.sheetSummaries[0]?.rowCount === 10 &&
             sampleAssetState.sheetSummaries[0]?.imageRowCount === 0 &&
             JSON.stringify(sampleAssetState.sheetHeaderImageCounts) ===
               JSON.stringify([1]) &&
@@ -9422,10 +9635,11 @@ export function createStyleL1Scenarios(deps) {
             sampleAssetState.productNameText.includes('猴子抱抱-头') &&
             sampleAssetState.sewingTitleText.includes('针型号:12#针') &&
             sampleAssetState.sewingIntroText.includes('止口必须一致') &&
-            sampleAssetState.row1Text.includes('面打折') &&
-            sampleAssetState.row2Text.includes('面部打好折之后') &&
-            sampleAssetState.row3Text.includes('打眼鼻') &&
-            sampleAssetState.row5Text.includes('头下面折边') &&
+            sampleAssetState.row1Text.includes('核对资料') &&
+            sampleAssetState.row2Text.includes('拉布前先松布') &&
+            sampleAssetState.row3Text.includes('要试裁刀模版') &&
+            sampleAssetState.processRow1Text.includes('面打折') &&
+            sampleAssetState.processRow5Text.includes('头下面折边') &&
             !sampleAssetState.paperText.includes('猴子抱抱-身体') &&
             !sampleAssetState.paperText.includes('订按扣') &&
             !sampleAssetState.paperText.includes(
@@ -9556,6 +9770,53 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'print-workspace-engineering-preview-popups',
+      path: '/erp/print-workspace/engineering-material-detail?draft=fresh',
+      auth: 'admin',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const templates = [
+          {
+            key: 'engineering-material-detail',
+            title: '物料分析明细表',
+            screenshotName:
+              'print-workspace-engineering-material-detail-preview-popup-window',
+          },
+          {
+            key: 'engineering-color-card',
+            title: '色卡',
+            screenshotName:
+              'print-workspace-engineering-color-card-preview-popup-window',
+          },
+          {
+            key: 'engineering-work-instruction',
+            title: '作业指导书',
+            screenshotName:
+              'print-workspace-engineering-work-instruction-preview-popup-window',
+          },
+        ]
+
+        for (const [index, template] of templates.entries()) {
+          if (index > 0) {
+            await page.goto(
+              new URL(
+                `/erp/print-workspace/${template.key}?draft=fresh`,
+                page.url()
+              ).toString(),
+              {
+                waitUntil: 'domcontentloaded',
+              }
+            )
+          }
+          await assertPrintPreviewPopup(page, {
+            buttonName: '在线预览 PDF',
+            title: template.title,
+            screenshotName: template.screenshotName,
+          })
+        }
+      },
+    },
+    {
       name: 'business-menu-groups-desktop',
       path: '/erp/sales/project-orders/sales-orders',
       auth: 'admin',
@@ -9641,6 +9902,80 @@ export function createStyleL1Scenarios(deps) {
           await page.getByText('高级文档', { exact: true }).count(),
           0,
           '侧栏不应再显示“高级文档”入口'
+        )
+      },
+    },
+    {
+      name: 'print-template-business-entry-ownership',
+      path: '/erp/purchase/material-bom',
+      auth: 'admin',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, 'BOM 管理')
+        await expectText(page, '当前操作')
+        for (const label of ['打印物料明细', '打印色卡', '打印作业指导书']) {
+          await expectButton(page, label)
+        }
+        const bomActionMetrics = await page.evaluate(() => {
+          const bar = document.querySelector(
+            '.erp-business-selection-action-bar__actions'
+          )
+          const buttons = Array.from(bar?.querySelectorAll('button') || []).map(
+            (button) => ({
+              text: String(button.textContent || '')
+                .replace(/\s+/g, ' ')
+                .trim(),
+              disabled: button.disabled,
+            })
+          )
+          return {
+            found: Boolean(bar),
+            clientWidth: bar?.clientWidth || 0,
+            scrollWidth: bar?.scrollWidth || 0,
+            buttons,
+          }
+        })
+        assert(
+          bomActionMetrics.found &&
+            bomActionMetrics.scrollWidth <= bomActionMetrics.clientWidth + 1,
+          `BOM 当前操作区应容纳三套工程资料打印入口: ${JSON.stringify(
+            bomActionMetrics
+          )}`
+        )
+
+        await gotoScenarioPath(page, '/erp/purchase/processing-contracts', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '委外订单')
+        await expectButton(page, '加工合同打印')
+        await expectNoButton(page, '作业指导书打印')
+        await assertTextAbsent(page, '打印作业指导书')
+        const outsourcingActionMetrics = await page.evaluate(() => {
+          const bar = document.querySelector(
+            '.erp-business-selection-action-bar__actions'
+          )
+          return {
+            found: Boolean(bar),
+            text: String(bar?.textContent || '')
+              .replace(/\s+/g, ' ')
+              .trim(),
+            clientWidth: bar?.clientWidth || 0,
+            scrollWidth: bar?.scrollWidth || 0,
+          }
+        })
+        assert(
+          outsourcingActionMetrics.found &&
+            outsourcingActionMetrics.text.includes('加工合同打印') &&
+            !outsourcingActionMetrics.text.includes('作业指导书') &&
+            outsourcingActionMetrics.scrollWidth <=
+              outsourcingActionMetrics.clientWidth + 1,
+          `委外当前操作区应只保留加工合同打印入口: ${JSON.stringify(
+            outsourcingActionMetrics
+          )}`
+        )
+        await assertNoHorizontalOverflow(
+          page,
+          'print-template-business-entry-ownership'
         )
       },
     },

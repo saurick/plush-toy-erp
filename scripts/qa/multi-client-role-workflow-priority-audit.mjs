@@ -3219,6 +3219,8 @@ function collectChecks() {
           "purchase_orders",
           "processing-contract",
           "outsourcing_orders",
+          "engineering-work-instruction",
+          "material_bom",
           "EnsureModuleKeysEnabled",
           "当前客户配置未启用该打印模板所属模块",
         ]) &&

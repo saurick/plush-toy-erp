@@ -3,6 +3,8 @@ import {
   MATERIAL_DETAIL_COLUMNS,
   MATERIAL_DETAIL_TEMPLATE_KEY,
   WORK_INSTRUCTION_TEMPLATE_KEY,
+  WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+  WORK_INSTRUCTION_ROW_TYPES,
   createEmptyEngineeringImageSlot,
   createEngineeringPrintDraft,
   engineeringImageSlots,
@@ -112,9 +114,10 @@ export function createBlankColorCardBlock(lineCount = 3, side = '') {
 
 export function createBlankInstructionRow(no = '') {
   return {
+    type: WORK_INSTRUCTION_ROW_TYPES.step,
     no: toText(no),
     text: '',
-    heightMm: null,
+    heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
     fontSizePt: null,
     imageAreaHeightMm: null,
     imageNotes: {
@@ -155,7 +158,10 @@ function getInstructionTextRowLayout(row = {}) {
   const heightMm = Number(row.heightMm)
   const fontSizePt = Number(row.fontSizePt)
   return {
-    heightMm: Number.isFinite(heightMm) && heightMm > 0 ? heightMm : null,
+    heightMm:
+      Number.isFinite(heightMm) && heightMm > 0
+        ? heightMm
+        : WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
     fontSizePt:
       Number.isFinite(fontSizePt) && fontSizePt > 0 ? fontSizePt : null,
   }
@@ -167,7 +173,7 @@ function createBlankInstructionRowFromNeighbor(no, rows = [], insertIndex = 0) {
   const layout = previousLayout || nextLayout
   return {
     ...createBlankInstructionRow(no),
-    heightMm: layout?.heightMm ?? null,
+    heightMm: layout?.heightMm ?? WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
     fontSizePt: layout?.fontSizePt ?? null,
   }
 }
@@ -194,10 +200,52 @@ function createBlankInstructionSectionRowFromNeighbor(
 }
 
 function renumberInstructionRows(rows = []) {
-  return rows.map((row, index) => ({
-    ...row,
-    no: String(index + 1),
-  }))
+  let stepNo = 1
+  return rows.map((row) => {
+    if (
+      row?.type === WORK_INSTRUCTION_ROW_TYPES.title ||
+      row?.type === WORK_INSTRUCTION_ROW_TYPES.note
+    ) {
+      stepNo = 1
+      return { ...row, no: '' }
+    }
+    if (row?.type === WORK_INSTRUCTION_ROW_TYPES.step || !row?.type) {
+      return { ...row, no: String(stepNo++) }
+    }
+    return { ...row, no: '' }
+  })
+}
+
+function normalizeInstructionRowType(type) {
+  return Object.values(WORK_INSTRUCTION_ROW_TYPES).includes(type)
+    ? type
+    : WORK_INSTRUCTION_ROW_TYPES.step
+}
+
+function applyInstructionRowTypeToRow(row, type) {
+  const source = row && typeof row === 'object' ? row : {}
+  const normalizedType = normalizeInstructionRowType(type)
+  const nextRow = {
+    ...source,
+    type: normalizedType,
+    heightMm:
+      Number(source?.heightMm) > 0
+        ? source.heightMm
+        : WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+  }
+  if (normalizedType === WORK_INSTRUCTION_ROW_TYPES.step) {
+    return nextRow
+  }
+  return {
+    ...nextRow,
+    no: '',
+    fontSizePt: null,
+    imageAreaHeightMm: null,
+    imageNotes: { left: '', right: '' },
+    imageCallouts: [],
+    imageLabels: [],
+    images: [],
+  }
 }
 
 function getColorCardBlockSide(block) {
@@ -268,17 +316,9 @@ export function createBlankEngineeringDraft(templateKey) {
       auditor: '',
       orderNo: '',
       productName: '',
-      cuttingTitle: '裁床',
-      cuttingRows: [''],
-      embroideryTitle: '刺绣 / 印花',
-      embroideryRows: [''],
-      sewingTitle: '车缝',
-      sewingIntroRows: [''],
-      sewingNote: '',
       rows: Array.from({ length: 8 }, (_, index) =>
         createBlankInstructionRow(String(index + 1))
       ),
-      remark: '',
       continuationPages: [],
       images: Object.fromEntries(
         engineeringImageSlots.workInstruction.map((slot) => [
@@ -290,6 +330,86 @@ export function createBlankEngineeringDraft(templateKey) {
   }
 
   return {}
+}
+
+export function setInstructionRowType(draft, selectedIndex, type) {
+  const rows = Array.isArray(draft?.rows) ? draft.rows : []
+  if (
+    !Number.isInteger(selectedIndex) ||
+    selectedIndex < 0 ||
+    selectedIndex >= rows.length
+  ) {
+    return { ok: false, message: '请先选择要调整的行。' }
+  }
+  const normalizedType = normalizeInstructionRowType(type)
+  return {
+    ok: true,
+    draft: {
+      ...draft,
+      rows: renumberInstructionRows(
+        rows.map((row, index) =>
+          index === selectedIndex
+            ? applyInstructionRowTypeToRow(row, normalizedType)
+            : row
+        )
+      ),
+    },
+    selectedIndex,
+    message:
+      normalizedType === WORK_INSTRUCTION_ROW_TYPES.title
+        ? '已设为标题行。'
+        : normalizedType === WORK_INSTRUCTION_ROW_TYPES.note
+          ? '已设为说明行。'
+          : normalizedType === WORK_INSTRUCTION_ROW_TYPES.remark
+            ? '已设为备注行。'
+            : '已设为编号行。',
+  }
+}
+
+export function setContinuationInstructionRowType(
+  draft,
+  pageIndex,
+  selectedIndex,
+  type
+) {
+  const pages = Array.isArray(draft?.continuationPages)
+    ? draft.continuationPages
+    : []
+  const page = pages[pageIndex]
+  if (!page) {
+    return { ok: false, message: '请先选择作业指导书续页。' }
+  }
+  const rows = Array.isArray(page.rows) ? page.rows : []
+  if (
+    !Number.isInteger(selectedIndex) ||
+    selectedIndex < 0 ||
+    selectedIndex >= rows.length
+  ) {
+    return { ok: false, message: '请先选择要调整的行。' }
+  }
+  const normalizedType = normalizeInstructionRowType(type)
+  return {
+    ok: true,
+    draft: {
+      ...draft,
+      continuationPages: pages.map((item, index) =>
+        index === pageIndex
+          ? {
+              ...item,
+              rows: renumberInstructionRows(
+                rows.map((row, rowIndex) =>
+                  rowIndex === selectedIndex
+                    ? applyInstructionRowTypeToRow(row, normalizedType)
+                    : row
+                )
+              ),
+            }
+          : item
+      ),
+    },
+    selectedIndex,
+    message: '已调整当前续页行类型。',
+  }
 }
 
 export function insertMaterialDetailLine(
@@ -672,6 +792,9 @@ export function addInstructionRowImage(draft, rowIndex) {
   const row = rows[rowIndex]
   if (!row) {
     return { ok: false, message: '请先选择行。' }
+  }
+  if (row.type && row.type !== WORK_INSTRUCTION_ROW_TYPES.step) {
+    return { ok: false, message: '图片只能添加到编号行。' }
   }
   const images = Array.isArray(row.images) ? row.images : []
   if (images.length >= ENGINEERING_PRINT_LIMITS.instructionRowImages) {

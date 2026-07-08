@@ -17,7 +17,8 @@
 }
 
 .erp-processing-contract-paper__title {
-  font-size: 8.8mm;
+  font-family: 'SimSun', 'Songti SC', 'Noto Serif CJK SC', serif;
+  font-size: 8.6mm;
   font-weight: 700;
   letter-spacing: 0.08em;
 }

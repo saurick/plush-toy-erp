@@ -893,6 +893,9 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, 'BOM-STYLE-L1')
         await expectText(page, '已激活')
         await expectText(page, '当前操作')
+        await expectButton(page, '打印物料明细')
+        await expectButton(page, '打印色卡')
+        await expectButton(page, '打印作业指导书')
         await assertCurrentOperationBarCompact(page, {
           scenarioName: 'business-standard-bom',
         })
@@ -1745,6 +1748,8 @@ export function createBusinessFormalScenarios(deps) {
         })
         await assertTextAbsent(page, '生成委外合同')
         await expectButton(page, '加工合同打印')
+        await expectNoButton(page, '作业指导书打印')
+        await assertTextAbsent(page, '打印作业指导书')
         const processingContractPrintButton = page.getByRole('button', {
           name: '加工合同打印',
         })
@@ -2029,10 +2034,14 @@ export function createBusinessFormalScenarios(deps) {
               .locator('.erp-business-module-task-item')
               .filter({ hasText: '出货放行刷新后协同确认' })
               .first()
-              .getByRole('button', { name: '完成' })
+              .getByRole('button', { name: '处理' })
               .click()
             await expectText(page, '任务处理')
             await expectText(page, '出货放行刷新后协同确认')
+            await expectText(
+              page,
+              '完成、阻塞、退回和催办只处理协同任务；库存、出货、应收、开票、付款或其他事实仍回到对应业务模块。'
+            )
 
             let emptiedListTasksOnce = false
             await page.route('**/rpc/workflow', async (route) => {
@@ -2572,6 +2581,7 @@ export function createBusinessFormalScenarios(deps) {
         name: 'business-formal-shipping-release-readonly-actions-desktop',
         path: '/erp/warehouse/shipping-release',
         auth: 'admin',
+        customerKey: 'yoyoosun',
         viewport: { width: 1440, height: 900 },
         adminProfile: {
           username: 'style-l1-workflow-readonly',
@@ -2601,10 +2611,7 @@ export function createBusinessFormalScenarios(deps) {
           await page.unroute('**/rpc/workflow')
           await page.route('**/rpc/workflow', async (route) => {
             const body = route.request().postDataJSON() || {}
-            if (
-              body.method === 'list_tasks' &&
-              body.params?.source_type === 'shipping-release'
-            ) {
+            if (body.method === 'list_tasks') {
               shippingReleaseListTaskCalls += 1
               await route.fulfill({
                 status: 200,
@@ -2638,6 +2645,60 @@ export function createBusinessFormalScenarios(deps) {
                       total: 1,
                       limit: 100,
                       offset: 0,
+                    },
+                  },
+                }),
+              })
+              return
+            }
+            if (body.method === 'explain_action_access') {
+              const readonlyReason =
+                '当前账号只有查看任务权限，没有完成、阻塞或催办权限。'
+              await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  id:
+                    body.id || 'formal-shipping-release-readonly-action-access',
+                  result: {
+                    code: 0,
+                    message: 'OK',
+                    data: {
+                      actions: [
+                        {
+                          action_key: 'complete',
+                          allowed: false,
+                          reason: readonlyReason,
+                          reason_code: 'missing_workflow_write_permission',
+                          required_permission: 'workflow.task.complete',
+                          owner_role_key: 'warehouse',
+                        },
+                        {
+                          action_key: 'block',
+                          allowed: false,
+                          reason: readonlyReason,
+                          reason_code: 'missing_workflow_write_permission',
+                          required_permission: 'workflow.task.update',
+                          owner_role_key: 'warehouse',
+                        },
+                        {
+                          action_key: 'reject',
+                          allowed: false,
+                          reason: readonlyReason,
+                          reason_code: 'missing_workflow_write_permission',
+                          required_permission: 'workflow.task.update',
+                          owner_role_key: 'warehouse',
+                        },
+                        {
+                          action_key: 'urge',
+                          allowed: false,
+                          reason: readonlyReason,
+                          reason_code: 'missing_workflow_write_permission',
+                          required_permission: 'workflow.task.update',
+                          owner_role_key: 'warehouse',
+                        },
+                      ],
                     },
                   },
                 }),
@@ -2688,13 +2749,28 @@ export function createBusinessFormalScenarios(deps) {
           await page.getByRole('button', { name: '展开' }).first().click()
           await expectText(page, '出货放行只读协同确认')
           await expectText(page, 'SHIP-REL-READONLY')
-          await expectText(
-            page,
-            '只读：当前账号只有查看任务权限，没有完成、阻塞或催办权限。'
-          )
+          await page
+            .locator('.ant-table-row')
+            .filter({ hasText: '出货放行只读协同确认' })
+            .first()
+            .click()
+          for (const actionLabel of [
+            '完成协同',
+            '标记阻塞',
+            '退回任务',
+            '催办',
+          ]) {
+            assert.equal(
+              await page
+                .getByRole('button', { name: actionLabel })
+                .isDisabled(),
+              true,
+              `只读任务不应允许${actionLabel}`
+            )
+          }
 
           const readonlyMetrics = await page
-            .locator('.erp-business-module-task-item')
+            .locator('.ant-table-row')
             .filter({ hasText: '出货放行只读协同确认' })
             .first()
             .evaluate((node) => {
@@ -2710,16 +2786,11 @@ export function createBusinessFormalScenarios(deps) {
                 clientWidth: node.clientWidth,
               }
             })
-          assert.deepEqual(
-            readonlyMetrics.buttons,
-            [],
-            `只读任务项不应显示完成、阻塞或催办动作: ${JSON.stringify(
+          assert(
+            readonlyMetrics.buttons.length === 0,
+            `出货放行只读表格行不应直接暴露动作按钮: ${JSON.stringify(
               readonlyMetrics
             )}`
-          )
-          assert(
-            readonlyMetrics.text.includes('只读：当前账号只有查看任务权限'),
-            `只读任务项缺少权限原因: ${JSON.stringify(readonlyMetrics)}`
           )
           assert(
             readonlyMetrics.scrollWidth <= readonlyMetrics.clientWidth + 1,

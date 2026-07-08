@@ -84,14 +84,9 @@ import {
   PRINT_WORKSPACE_ENTRY_SOURCE,
   PROCESSING_CONTRACT_TEMPLATE_KEY,
   openPrintWorkspaceWindow,
-  resolveRuntimeCustomerPrintCompanyName,
 } from '../utils/printWorkspace.js'
 import { getEffectivePrintTemplateDefaults } from '../utils/adminProfileSync.mjs'
 import { buildProcessingContractDraftFromOutsourcingOrder } from '../data/processingContractTemplate.mjs'
-import {
-  WORK_INSTRUCTION_TEMPLATE_KEY,
-  buildWorkInstructionDraftFromOutsourcingOrder,
-} from '../data/engineeringPrintTemplates.mjs'
 import { completeProcessingContractDraft } from '../utils/contractPrintDraftCompleteness.mjs'
 import {
   DEFAULT_OUTSOURCING_ORDER_PAGINATION,
@@ -560,29 +555,6 @@ export default function V1OutsourcingOrdersPage() {
     }
   }
 
-  const openWorkInstructionPrint = async () => {
-    if (!selectedRow) return
-    setPrintingAction(WORK_INSTRUCTION_TEMPLATE_KEY)
-    try {
-      const items = await loadOrderItems(selectedRow)
-      const initialDraft = buildWorkInstructionDraftFromOutsourcingOrder(
-        selectedRow,
-        items,
-        { companyName: resolveRuntimeCustomerPrintCompanyName() }
-      )
-      openPrintWorkspaceWindow(WORK_INSTRUCTION_TEMPLATE_KEY, {
-        entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
-        initialDraft,
-        customerKey: activeCustomerKey,
-      })
-      message.success('已打开作业指导书打印模板')
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '打开作业指导书打印失败'))
-    } finally {
-      setPrintingAction('')
-    }
-  }
-
   const {
     blockWorkflowTask,
     completeWorkflowTask,
@@ -944,15 +916,6 @@ export default function V1OutsourcingOrdersPage() {
             onClick={openPrint}
           >
             加工合同打印
-          </Button>
-          <Button
-            size="small"
-            icon={<FileTextOutlined />}
-            disabled={!selectedRow || printingAction !== ''}
-            loading={printingAction === WORK_INSTRUCTION_TEMPLATE_KEY}
-            onClick={openWorkInstructionPrint}
-          >
-            作业指导书打印
           </Button>
           <Dropdown
             trigger={['click']}

@@ -94,15 +94,25 @@ test('FL_print_templates_sample__uses_generic_sample_values_without_customer_ide
 
   const colorCardTemplate = getPrintTemplateByKey('engineering-color-card')
   assert.equal(colorCardTemplate?.sample.companyName, '本公司')
+  assert.deepEqual(colorCardTemplate?.moduleKeys, ['material_bom'])
   assert(colorCardTemplate?.sample.blocks.length > 0)
 
   const workInstructionTemplate = getPrintTemplateByKey(
     'engineering-work-instruction'
   )
   assert.equal(workInstructionTemplate?.sample.companyName, '本公司')
+  assert.deepEqual(workInstructionTemplate?.moduleKeys, ['material_bom'])
+  assert.match(workInstructionTemplate?.notes.join('\n') || '', /BOM 管理/)
+  assert.doesNotMatch(
+    workInstructionTemplate?.notes.join('\n') || '',
+    /委外订单页面/
+  )
   assert.equal(workInstructionTemplate?.sample.images.header.dataURL, '')
-  assert(workInstructionTemplate?.sample.rows.length >= 2)
-  assert(workInstructionTemplate?.sample.rows.length <= 5)
+  const workInstructionStepRows = workInstructionTemplate?.sample.rows.filter(
+    (row) => row.type === 'step'
+  )
+  assert(workInstructionStepRows.length >= 2)
+  assert(workInstructionStepRows.length <= 5)
 })
 
 test('FL_print_templates_contract__declares_field_requirements_and_pdf_module_guard printTemplates: 正式模板声明字段合同和 PDF 模块门禁', () => {
