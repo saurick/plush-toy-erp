@@ -27,14 +27,15 @@ func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrde
 		return nil, false
 	}
 	return &biz.OutsourcingOrderMutation{
-		OutsourcingOrderNo: getString(pm, "outsourcing_order_no"),
-		SupplierID:         getInt(pm, "supplier_id", 0),
-		SupplierSnapshot:   getMap(pm, "supplier_snapshot"),
-		SourceOrderNo:      getWorkflowStringPtr(pm, "source_order_no"),
-		SourceSalesOrderID: getOptionalPositiveIntPtr(pm, "source_sales_order_id"),
-		OrderDate:          orderDate,
-		ExpectedReturnDate: expectedReturnDate,
-		Note:               getWorkflowStringPtr(pm, "note"),
+		OutsourcingOrderNo:    getString(pm, "outsourcing_order_no"),
+		SupplierID:            getInt(pm, "supplier_id", 0),
+		SupplierSnapshot:      getMap(pm, "supplier_snapshot"),
+		ContractPartySnapshot: getMap(pm, "contract_party_snapshot"),
+		SourceOrderNo:         getWorkflowStringPtr(pm, "source_order_no"),
+		SourceSalesOrderID:    getOptionalPositiveIntPtr(pm, "source_sales_order_id"),
+		OrderDate:             orderDate,
+		ExpectedReturnDate:    expectedReturnDate,
+		Note:                  getWorkflowStringPtr(pm, "note"),
 	}, true
 }
 
@@ -148,18 +149,19 @@ func outsourcingOrderToMap(item *biz.OutsourcingOrder) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":                    item.ID,
-		"outsourcing_order_no":  item.OutsourcingOrderNo,
-		"supplier_id":           item.SupplierID,
-		"supplier_snapshot":     item.SupplierSnapshot,
-		"source_order_no":       optionalStringValue(item.SourceOrderNo),
-		"source_sales_order_id": optionalIntValue(item.SourceSalesOrderID),
-		"order_date":            item.OrderDate.Unix(),
-		"expected_return_date":  optionalUnix(item.ExpectedReturnDate),
-		"lifecycle_status":      item.LifecycleStatus,
-		"note":                  optionalStringValue(item.Note),
-		"created_at":            item.CreatedAt.Unix(),
-		"updated_at":            item.UpdatedAt.Unix(),
+		"id":                      item.ID,
+		"outsourcing_order_no":    item.OutsourcingOrderNo,
+		"supplier_id":             item.SupplierID,
+		"supplier_snapshot":       item.SupplierSnapshot,
+		"contract_party_snapshot": item.ContractPartySnapshot,
+		"source_order_no":         optionalStringValue(item.SourceOrderNo),
+		"source_sales_order_id":   optionalIntValue(item.SourceSalesOrderID),
+		"order_date":              item.OrderDate.Unix(),
+		"expected_return_date":    optionalUnix(item.ExpectedReturnDate),
+		"lifecycle_status":        item.LifecycleStatus,
+		"note":                    optionalStringValue(item.Note),
+		"created_at":              item.CreatedAt.Unix(),
+		"updated_at":              item.UpdatedAt.Unix(),
 	}
 }
 

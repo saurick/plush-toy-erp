@@ -90,6 +90,18 @@ func (_u *PurchaseOrderUpdate) ClearSupplierSnapshot() *PurchaseOrderUpdate {
 	return _u
 }
 
+// SetContractPartySnapshot sets the "contract_party_snapshot" field.
+func (_u *PurchaseOrderUpdate) SetContractPartySnapshot(v map[string]interface{}) *PurchaseOrderUpdate {
+	_u.mutation.SetContractPartySnapshot(v)
+	return _u
+}
+
+// ClearContractPartySnapshot clears the value of the "contract_party_snapshot" field.
+func (_u *PurchaseOrderUpdate) ClearContractPartySnapshot() *PurchaseOrderUpdate {
+	_u.mutation.ClearContractPartySnapshot()
+	return _u
+}
+
 // SetPurchaseDate sets the "purchase_date" field.
 func (_u *PurchaseOrderUpdate) SetPurchaseDate(v time.Time) *PurchaseOrderUpdate {
 	_u.mutation.SetPurchaseDate(v)
@@ -312,6 +324,12 @@ func (_u *PurchaseOrderUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	if _u.mutation.SupplierSnapshotCleared() {
 		_spec.ClearField(purchaseorder.FieldSupplierSnapshot, field.TypeJSON)
 	}
+	if value, ok := _u.mutation.ContractPartySnapshot(); ok {
+		_spec.SetField(purchaseorder.FieldContractPartySnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.ContractPartySnapshotCleared() {
+		_spec.ClearField(purchaseorder.FieldContractPartySnapshot, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.PurchaseDate(); ok {
 		_spec.SetField(purchaseorder.FieldPurchaseDate, field.TypeTime, value)
 	}
@@ -484,6 +502,18 @@ func (_u *PurchaseOrderUpdateOne) SetSupplierSnapshot(v map[string]interface{}) 
 // ClearSupplierSnapshot clears the value of the "supplier_snapshot" field.
 func (_u *PurchaseOrderUpdateOne) ClearSupplierSnapshot() *PurchaseOrderUpdateOne {
 	_u.mutation.ClearSupplierSnapshot()
+	return _u
+}
+
+// SetContractPartySnapshot sets the "contract_party_snapshot" field.
+func (_u *PurchaseOrderUpdateOne) SetContractPartySnapshot(v map[string]interface{}) *PurchaseOrderUpdateOne {
+	_u.mutation.SetContractPartySnapshot(v)
+	return _u
+}
+
+// ClearContractPartySnapshot clears the value of the "contract_party_snapshot" field.
+func (_u *PurchaseOrderUpdateOne) ClearContractPartySnapshot() *PurchaseOrderUpdateOne {
+	_u.mutation.ClearContractPartySnapshot()
 	return _u
 }
 
@@ -738,6 +768,12 @@ func (_u *PurchaseOrderUpdateOne) sqlSave(ctx context.Context) (_node *PurchaseO
 	}
 	if _u.mutation.SupplierSnapshotCleared() {
 		_spec.ClearField(purchaseorder.FieldSupplierSnapshot, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.ContractPartySnapshot(); ok {
+		_spec.SetField(purchaseorder.FieldContractPartySnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.ContractPartySnapshotCleared() {
+		_spec.ClearField(purchaseorder.FieldContractPartySnapshot, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.PurchaseDate(); ok {
 		_spec.SetField(purchaseorder.FieldPurchaseDate, field.TypeTime, value)

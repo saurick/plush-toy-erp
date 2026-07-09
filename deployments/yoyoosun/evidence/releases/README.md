@@ -33,7 +33,7 @@ evidence/releases/<YYYY-MM-DD>/
 ```json
 {
   "customerKey": "yoyoosun",
-  "revision": "yoyoosun-customer-package-v1.runtime-manifest-v1",
+  "revision": "yoyoosun-customer-package-v3.runtime-manifest-v1",
   "manifestSha256": "sha256:<64-hex>",
   "manifestPath": "output/customers/yoyoosun/customer-config-runtime-manifest.json",
   "releaseReport": "output/customers/yoyoosun/customer-config-release/customer-config-release-report.json",
@@ -102,7 +102,7 @@ node scripts/deploy/rollback-rehearsal-report.mjs \
   --step "verify rollback command path=pass" \
   --step "verify forward-fix owner path=pass" \
   --post-smoke-report smoke-test-report.json \
-  --customer-config-revision yoyoosun-customer-package-v1.runtime-manifest-v1 \
+  --customer-config-revision yoyoosun-customer-package-v3.runtime-manifest-v1 \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
 

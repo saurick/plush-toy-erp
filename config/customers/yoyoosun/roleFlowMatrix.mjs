@@ -120,6 +120,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "supplier.read",
         "supplier.create",
         "supplier.update",
+        "material.read",
         "purchase.order.read",
         "purchase.order.create",
         "purchase.order.update",

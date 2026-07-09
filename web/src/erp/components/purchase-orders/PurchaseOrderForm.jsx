@@ -302,8 +302,46 @@ export function PurchaseOrderFormFields({
           }
         />
       </Form.Item>
+      <div className="erp-business-action-form__section-title">
+        合同订购方信息
+      </div>
       <Form.Item
         className="erp-business-action-form__field"
+        name={['contract_party_snapshot', 'buyerCompany']}
+        label="订购单位"
+      >
+        <Input maxLength={128} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name={['contract_party_snapshot', 'buyerContact']}
+        label="订购人"
+      >
+        <Input maxLength={64} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name={['contract_party_snapshot', 'buyerPhone']}
+        label="订购方电话"
+      >
+        <Input maxLength={64} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name={['contract_party_snapshot', 'buyerAddress']}
+        label="公司地址"
+      >
+        <Input maxLength={255} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name={['contract_party_snapshot', 'buyerSigner']}
+        label="订购方签字人"
+      >
+        <Input maxLength={64} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field erp-business-action-form__field--full"
         name="note"
         label="备注"
       >

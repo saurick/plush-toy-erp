@@ -3151,3 +3151,21 @@ func TestCustomerConfigJSONRPCRollbackUsesTargetRevision(t *testing.T) {
 		t.Fatalf("rollback revision = %#v", revision)
 	}
 }
+
+func TestCustomerConfigJSONRPCRollbackRequiresRollbackPermission(t *testing.T) {
+	admin := &biz.AdminUser{ID: 1, Username: "admin", CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	dispatcher := newCustomerConfigTestDispatcher(admin, nil)
+	admin.Permissions = []string{biz.PermissionCustomerConfigActivate}
+
+	params, _ := structpb.NewStruct(map[string]any{
+		"customer_key":    biz.DefaultCustomerKey,
+		"target_revision": "2026.06.28.1",
+	})
+	_, res, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, "admin"), "rollback_customer_config", "rollback", params)
+	if err != nil {
+		t.Fatalf("rollback err = %v", err)
+	}
+	if res.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("rollback code = %d, want permission denied", res.Code)
+	}
+}

@@ -10,7 +10,7 @@ import {
 test('contractPrintDraftCompleteness: purchase draft fills missing display fields without internal ids', () => {
   const draft = completeMaterialPurchaseContractDraft({
     contractNo: 'PO-001',
-    buyerCompany: '东莞市永绅玩具有限公司',
+    buyerCompany: '永绅',
     lines: [
       {
         materialName: '拉毛布',
@@ -22,7 +22,7 @@ test('contractPrintDraftCompleteness: purchase draft fills missing display field
   })
 
   assert.equal(draft.supplierContact, '未维护联系人')
-  assert.equal(draft.buyerCompany, '东莞市永绅玩具有限公司')
+  assert.equal(draft.buyerCompany, '永绅')
   assert.equal(draft.buyerContact, '未配置订货人')
   assert.equal(draft.lines[0].contractNo, 'PO-001')
   assert.equal(draft.lines[0].productOrderNo, '未关联产品订单')
@@ -35,7 +35,7 @@ test('contractPrintDraftCompleteness: processing draft fills missing display fie
   const draft = completeProcessingContractDraft({
     contractNo: 'OUT-001',
     supplierName: '加工厂 A',
-    buyerCompany: '东莞市永绅玩具有限公司',
+    buyerCompany: '永绅',
     lines: [
       {
         productNo: 'P-001',
@@ -64,4 +64,42 @@ test('contractPrintDraftCompleteness: live master snapshot only fills blank snap
     ),
     { name: '下单时供应商', contact_name: '王五', contact_phone: '旧电话' }
   )
+})
+
+test('contractPrintDraftCompleteness: configured party fields stay visible after completion', () => {
+  const purchaseDraft = completeMaterialPurchaseContractDraft({
+    contractNo: 'PO-YOYO-CONFIG',
+    supplierName: '振鼎包装材料',
+    supplierContact: '叶先生',
+    supplierPhone: '13802376786',
+    supplierAddress: '东莞虎门富民皮料市场A216号',
+    buyerCompany: '永绅',
+    buyerContact: '郭改玉',
+    buyerPhone: '13537313218',
+    buyerAddress: '东莞-茶山',
+    buyerSigner: '郭改玉',
+  })
+  assert.equal(purchaseDraft.buyerContact, '郭改玉')
+  assert.equal(purchaseDraft.buyerPhone, '13537313218')
+  assert.equal(purchaseDraft.buyerAddress, '东莞-茶山')
+  assert.equal(purchaseDraft.buyerSigner, '郭改玉')
+  assert.equal(purchaseDraft.supplierAddress, '东莞虎门富民皮料市场A216号')
+
+  const processingDraft = completeProcessingContractDraft({
+    contractNo: 'OUT-YOYO-CONFIG',
+    supplierName: '东莞市茶山富尔达电脑绣花店',
+    supplierContact: '黄先生',
+    supplierPhone: '0769-86862121',
+    supplierAddress: '东莞市茶山镇',
+    buyerCompany: '永绅',
+    buyerContact: '刘志强',
+    buyerPhone: '13694972987',
+    buyerAddress: '东莞茶山',
+    buyerSigner: '刘志强',
+  })
+  assert.equal(processingDraft.buyerContact, '刘志强')
+  assert.equal(processingDraft.buyerPhone, '13694972987')
+  assert.equal(processingDraft.buyerAddress, '东莞茶山')
+  assert.equal(processingDraft.buyerSigner, '刘志强')
+  assert.equal(processingDraft.supplierAddress, '东莞市茶山镇')
 })

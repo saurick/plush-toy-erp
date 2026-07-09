@@ -40,11 +40,13 @@
   .erp-business-board-hero,
   .erp-business-board-lower-grid,
   .erp-task-center-overview,
+  .erp-product-core-dashboard__grid,
   .erp-workbench-main-grid {
     grid-template-columns: 1fr;
   }
 
   .erp-task-center-metrics,
+  .erp-product-core-dashboard__metrics,
   .erp-business-board-summary-grid {
     grid-template-columns: repeat(2, minmax(118px, 1fr));
   }
@@ -71,6 +73,10 @@
     grid-template-columns: 1fr;
   }
 
+  .erp-product-core-entry-grid {
+    grid-template-columns: 1fr;
+  }
+
   .erp-dashboard-task-board-actions {
     justify-content: flex-start;
   }
@@ -82,9 +88,14 @@
   }
 
   .erp-workbench-command-head,
+  .erp-product-core-dashboard__hero,
   .erp-workbench-panel-head {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .erp-product-core-dashboard__metrics {
+    grid-template-columns: 1fr;
   }
 
   .erp-workbench-queue-filter-strip {

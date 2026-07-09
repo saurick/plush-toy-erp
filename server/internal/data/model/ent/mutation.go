@@ -18668,6 +18668,7 @@ type OutsourcingOrderMutation struct {
 	id                       *int
 	outsourcing_order_no     *string
 	supplier_snapshot        *map[string]interface{}
+	contract_party_snapshot  *map[string]interface{}
 	source_order_no          *string
 	source_sales_order_id    *int
 	addsource_sales_order_id *int
@@ -18905,6 +18906,55 @@ func (m *OutsourcingOrderMutation) SupplierSnapshotCleared() bool {
 func (m *OutsourcingOrderMutation) ResetSupplierSnapshot() {
 	m.supplier_snapshot = nil
 	delete(m.clearedFields, outsourcingorder.FieldSupplierSnapshot)
+}
+
+// SetContractPartySnapshot sets the "contract_party_snapshot" field.
+func (m *OutsourcingOrderMutation) SetContractPartySnapshot(value map[string]interface{}) {
+	m.contract_party_snapshot = &value
+}
+
+// ContractPartySnapshot returns the value of the "contract_party_snapshot" field in the mutation.
+func (m *OutsourcingOrderMutation) ContractPartySnapshot() (r map[string]interface{}, exists bool) {
+	v := m.contract_party_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContractPartySnapshot returns the old "contract_party_snapshot" field's value of the OutsourcingOrder entity.
+// If the OutsourcingOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderMutation) OldContractPartySnapshot(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContractPartySnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContractPartySnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContractPartySnapshot: %w", err)
+	}
+	return oldValue.ContractPartySnapshot, nil
+}
+
+// ClearContractPartySnapshot clears the value of the "contract_party_snapshot" field.
+func (m *OutsourcingOrderMutation) ClearContractPartySnapshot() {
+	m.contract_party_snapshot = nil
+	m.clearedFields[outsourcingorder.FieldContractPartySnapshot] = struct{}{}
+}
+
+// ContractPartySnapshotCleared returns if the "contract_party_snapshot" field was cleared in this mutation.
+func (m *OutsourcingOrderMutation) ContractPartySnapshotCleared() bool {
+	_, ok := m.clearedFields[outsourcingorder.FieldContractPartySnapshot]
+	return ok
+}
+
+// ResetContractPartySnapshot resets all changes to the "contract_party_snapshot" field.
+func (m *OutsourcingOrderMutation) ResetContractPartySnapshot() {
+	m.contract_party_snapshot = nil
+	delete(m.clearedFields, outsourcingorder.FieldContractPartySnapshot)
 }
 
 // SetSourceOrderNo sets the "source_order_no" field.
@@ -19383,7 +19433,7 @@ func (m *OutsourcingOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OutsourcingOrderMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.outsourcing_order_no != nil {
 		fields = append(fields, outsourcingorder.FieldOutsourcingOrderNo)
 	}
@@ -19392,6 +19442,9 @@ func (m *OutsourcingOrderMutation) Fields() []string {
 	}
 	if m.supplier_snapshot != nil {
 		fields = append(fields, outsourcingorder.FieldSupplierSnapshot)
+	}
+	if m.contract_party_snapshot != nil {
+		fields = append(fields, outsourcingorder.FieldContractPartySnapshot)
 	}
 	if m.source_order_no != nil {
 		fields = append(fields, outsourcingorder.FieldSourceOrderNo)
@@ -19431,6 +19484,8 @@ func (m *OutsourcingOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.SupplierID()
 	case outsourcingorder.FieldSupplierSnapshot:
 		return m.SupplierSnapshot()
+	case outsourcingorder.FieldContractPartySnapshot:
+		return m.ContractPartySnapshot()
 	case outsourcingorder.FieldSourceOrderNo:
 		return m.SourceOrderNo()
 	case outsourcingorder.FieldSourceSalesOrderID:
@@ -19462,6 +19517,8 @@ func (m *OutsourcingOrderMutation) OldField(ctx context.Context, name string) (e
 		return m.OldSupplierID(ctx)
 	case outsourcingorder.FieldSupplierSnapshot:
 		return m.OldSupplierSnapshot(ctx)
+	case outsourcingorder.FieldContractPartySnapshot:
+		return m.OldContractPartySnapshot(ctx)
 	case outsourcingorder.FieldSourceOrderNo:
 		return m.OldSourceOrderNo(ctx)
 	case outsourcingorder.FieldSourceSalesOrderID:
@@ -19507,6 +19564,13 @@ func (m *OutsourcingOrderMutation) SetField(name string, value ent.Value) error 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSupplierSnapshot(v)
+		return nil
+	case outsourcingorder.FieldContractPartySnapshot:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContractPartySnapshot(v)
 		return nil
 	case outsourcingorder.FieldSourceOrderNo:
 		v, ok := value.(string)
@@ -19612,6 +19676,9 @@ func (m *OutsourcingOrderMutation) ClearedFields() []string {
 	if m.FieldCleared(outsourcingorder.FieldSupplierSnapshot) {
 		fields = append(fields, outsourcingorder.FieldSupplierSnapshot)
 	}
+	if m.FieldCleared(outsourcingorder.FieldContractPartySnapshot) {
+		fields = append(fields, outsourcingorder.FieldContractPartySnapshot)
+	}
 	if m.FieldCleared(outsourcingorder.FieldSourceOrderNo) {
 		fields = append(fields, outsourcingorder.FieldSourceOrderNo)
 	}
@@ -19641,6 +19708,9 @@ func (m *OutsourcingOrderMutation) ClearField(name string) error {
 	case outsourcingorder.FieldSupplierSnapshot:
 		m.ClearSupplierSnapshot()
 		return nil
+	case outsourcingorder.FieldContractPartySnapshot:
+		m.ClearContractPartySnapshot()
+		return nil
 	case outsourcingorder.FieldSourceOrderNo:
 		m.ClearSourceOrderNo()
 		return nil
@@ -19669,6 +19739,9 @@ func (m *OutsourcingOrderMutation) ResetField(name string) error {
 		return nil
 	case outsourcingorder.FieldSupplierSnapshot:
 		m.ResetSupplierSnapshot()
+		return nil
+	case outsourcingorder.FieldContractPartySnapshot:
+		m.ResetContractPartySnapshot()
 		return nil
 	case outsourcingorder.FieldSourceOrderNo:
 		m.ResetSourceOrderNo()
@@ -30795,6 +30868,7 @@ type PurchaseOrderMutation struct {
 	purchase_order_no          *string
 	supplier_purchase_order_no *string
 	supplier_snapshot          *map[string]interface{}
+	contract_party_snapshot    *map[string]interface{}
 	purchase_date              *time.Time
 	expected_arrival_date      *time.Time
 	lifecycle_status           *string
@@ -31078,6 +31152,55 @@ func (m *PurchaseOrderMutation) SupplierSnapshotCleared() bool {
 func (m *PurchaseOrderMutation) ResetSupplierSnapshot() {
 	m.supplier_snapshot = nil
 	delete(m.clearedFields, purchaseorder.FieldSupplierSnapshot)
+}
+
+// SetContractPartySnapshot sets the "contract_party_snapshot" field.
+func (m *PurchaseOrderMutation) SetContractPartySnapshot(value map[string]interface{}) {
+	m.contract_party_snapshot = &value
+}
+
+// ContractPartySnapshot returns the value of the "contract_party_snapshot" field in the mutation.
+func (m *PurchaseOrderMutation) ContractPartySnapshot() (r map[string]interface{}, exists bool) {
+	v := m.contract_party_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContractPartySnapshot returns the old "contract_party_snapshot" field's value of the PurchaseOrder entity.
+// If the PurchaseOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderMutation) OldContractPartySnapshot(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContractPartySnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContractPartySnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContractPartySnapshot: %w", err)
+	}
+	return oldValue.ContractPartySnapshot, nil
+}
+
+// ClearContractPartySnapshot clears the value of the "contract_party_snapshot" field.
+func (m *PurchaseOrderMutation) ClearContractPartySnapshot() {
+	m.contract_party_snapshot = nil
+	m.clearedFields[purchaseorder.FieldContractPartySnapshot] = struct{}{}
+}
+
+// ContractPartySnapshotCleared returns if the "contract_party_snapshot" field was cleared in this mutation.
+func (m *PurchaseOrderMutation) ContractPartySnapshotCleared() bool {
+	_, ok := m.clearedFields[purchaseorder.FieldContractPartySnapshot]
+	return ok
+}
+
+// ResetContractPartySnapshot resets all changes to the "contract_party_snapshot" field.
+func (m *PurchaseOrderMutation) ResetContractPartySnapshot() {
+	m.contract_party_snapshot = nil
+	delete(m.clearedFields, purchaseorder.FieldContractPartySnapshot)
 }
 
 // SetPurchaseDate sets the "purchase_date" field.
@@ -31437,7 +31560,7 @@ func (m *PurchaseOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PurchaseOrderMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 11)
 	if m.purchase_order_no != nil {
 		fields = append(fields, purchaseorder.FieldPurchaseOrderNo)
 	}
@@ -31449,6 +31572,9 @@ func (m *PurchaseOrderMutation) Fields() []string {
 	}
 	if m.supplier_snapshot != nil {
 		fields = append(fields, purchaseorder.FieldSupplierSnapshot)
+	}
+	if m.contract_party_snapshot != nil {
+		fields = append(fields, purchaseorder.FieldContractPartySnapshot)
 	}
 	if m.purchase_date != nil {
 		fields = append(fields, purchaseorder.FieldPurchaseDate)
@@ -31484,6 +31610,8 @@ func (m *PurchaseOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.SupplierPurchaseOrderNo()
 	case purchaseorder.FieldSupplierSnapshot:
 		return m.SupplierSnapshot()
+	case purchaseorder.FieldContractPartySnapshot:
+		return m.ContractPartySnapshot()
 	case purchaseorder.FieldPurchaseDate:
 		return m.PurchaseDate()
 	case purchaseorder.FieldExpectedArrivalDate:
@@ -31513,6 +31641,8 @@ func (m *PurchaseOrderMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldSupplierPurchaseOrderNo(ctx)
 	case purchaseorder.FieldSupplierSnapshot:
 		return m.OldSupplierSnapshot(ctx)
+	case purchaseorder.FieldContractPartySnapshot:
+		return m.OldContractPartySnapshot(ctx)
 	case purchaseorder.FieldPurchaseDate:
 		return m.OldPurchaseDate(ctx)
 	case purchaseorder.FieldExpectedArrivalDate:
@@ -31561,6 +31691,13 @@ func (m *PurchaseOrderMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSupplierSnapshot(v)
+		return nil
+	case purchaseorder.FieldContractPartySnapshot:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContractPartySnapshot(v)
 		return nil
 	case purchaseorder.FieldPurchaseDate:
 		v, ok := value.(time.Time)
@@ -31643,6 +31780,9 @@ func (m *PurchaseOrderMutation) ClearedFields() []string {
 	if m.FieldCleared(purchaseorder.FieldSupplierSnapshot) {
 		fields = append(fields, purchaseorder.FieldSupplierSnapshot)
 	}
+	if m.FieldCleared(purchaseorder.FieldContractPartySnapshot) {
+		fields = append(fields, purchaseorder.FieldContractPartySnapshot)
+	}
 	if m.FieldCleared(purchaseorder.FieldExpectedArrivalDate) {
 		fields = append(fields, purchaseorder.FieldExpectedArrivalDate)
 	}
@@ -31669,6 +31809,9 @@ func (m *PurchaseOrderMutation) ClearField(name string) error {
 	case purchaseorder.FieldSupplierSnapshot:
 		m.ClearSupplierSnapshot()
 		return nil
+	case purchaseorder.FieldContractPartySnapshot:
+		m.ClearContractPartySnapshot()
+		return nil
 	case purchaseorder.FieldExpectedArrivalDate:
 		m.ClearExpectedArrivalDate()
 		return nil
@@ -31694,6 +31837,9 @@ func (m *PurchaseOrderMutation) ResetField(name string) error {
 		return nil
 	case purchaseorder.FieldSupplierSnapshot:
 		m.ResetSupplierSnapshot()
+		return nil
+	case purchaseorder.FieldContractPartySnapshot:
+		m.ResetContractPartySnapshot()
 		return nil
 	case purchaseorder.FieldPurchaseDate:
 		m.ResetPurchaseDate()

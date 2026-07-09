@@ -243,7 +243,7 @@ Pending Files: 0
   );
 }
 
-function writeCustomerConfigManifestEvidence(dir, revision = "yoyoosun-customer-package-v1.runtime-manifest-v1") {
+function writeCustomerConfigManifestEvidence(dir, revision = "yoyoosun-customer-package-v4.runtime-manifest-v1") {
   fs.writeFileSync(
     path.join(dir, "customer-config-manifest-evidence.json"),
     JSON.stringify(
@@ -1337,7 +1337,7 @@ test("release evidence gate requires rollback rehearsal effective session when s
     name: "customer-config-effective-session",
     status: "pass",
     target: "jsonrpc:customer_config.get_effective_session",
-    expectedRevision: "yoyoosun-customer-package-v1.runtime-manifest-v1",
+    expectedRevision: "yoyoosun-customer-package-v4.runtime-manifest-v1",
     tokenSourceEnv: "CUSTOMER_CONFIG_ADMIN_TOKEN",
     responseBodyStored: false,
   });
@@ -1361,7 +1361,7 @@ test("release evidence gate requires rollback rehearsal effective session when s
   const updatedReport = JSON.parse(fs.readFileSync(reportPath, "utf8"));
   updatedReport.postCheck.customerConfigEffectiveSession = {
     status: "verified",
-    expectedRevision: "yoyoosun-customer-package-v1.runtime-manifest-v1",
+    expectedRevision: "yoyoosun-customer-package-v4.runtime-manifest-v1",
     target: "jsonrpc:customer_config.get_effective_session",
   };
   fs.writeFileSync(reportPath, JSON.stringify(updatedReport, null, 2));

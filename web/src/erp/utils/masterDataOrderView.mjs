@@ -726,6 +726,50 @@ export function buildSupplierSnapshotWithContacts(
   })
 }
 
+export function buildContractPartySnapshot(values = {}) {
+  return compactParams({
+    buyerCompany: trimOptional(values.buyerCompany),
+    buyerContact: trimOptional(values.buyerContact),
+    buyerPhone: trimOptional(values.buyerPhone),
+    buyerAddress: trimOptional(values.buyerAddress),
+    buyerSigner: trimOptional(values.buyerSigner),
+  })
+}
+
+function buildOptionalContractPartySnapshotParam(values = {}) {
+  if (
+    !Object.prototype.hasOwnProperty.call(values, 'contract_party_snapshot')
+  ) {
+    return undefined
+  }
+  return values.contract_party_snapshot &&
+    typeof values.contract_party_snapshot === 'object'
+    ? buildContractPartySnapshot(values.contract_party_snapshot)
+    : {}
+}
+
+export function contractPartySnapshotFromPrintTemplateDefaults(
+  printTemplateDefaults = {},
+  templateKey = ''
+) {
+  const directDefaults =
+    printTemplateDefaults?.[templateKey] ||
+    printTemplateDefaults?.materialPurchaseContract ||
+    printTemplateDefaults?.processingContract ||
+    null
+  const templateDefaults = Array.isArray(printTemplateDefaults?.templates)
+    ? printTemplateDefaults.templates.find(
+        (item) => item?.template_key === templateKey
+      )
+    : null
+  return buildContractPartySnapshot(
+    directDefaults?.partyDefaults ||
+      directDefaults?.party_defaults ||
+      templateDefaults?.party_defaults ||
+      {}
+  )
+}
+
 export function buildMasterDataParams(values = {}, extra = {}) {
   return compactParams({
     ...extra,
@@ -928,6 +972,7 @@ export function buildPurchaseOrderParams(values = {}, extra = {}) {
       values.supplier_snapshot && typeof values.supplier_snapshot === 'object'
         ? values.supplier_snapshot
         : {},
+    contract_party_snapshot: buildOptionalContractPartySnapshotParam(values),
     purchase_date: trimOptional(values.purchase_date),
     expected_arrival_date: trimOptional(values.expected_arrival_date),
     note: trimOptional(values.note),
@@ -963,6 +1008,7 @@ export function buildOutsourcingOrderParams(values = {}, extra = {}) {
       values.supplier_snapshot && typeof values.supplier_snapshot === 'object'
         ? values.supplier_snapshot
         : {},
+    contract_party_snapshot: buildOptionalContractPartySnapshotParam(values),
     source_order_no: trimOptional(values.source_order_no),
     source_sales_order_id:
       values.source_sales_order_id === undefined ||
@@ -1006,10 +1052,12 @@ function materialLookupByID(materials = []) {
 }
 
 function formatPrintDraftDate(value) {
+  const text = trimOptional(value)
   const timestamp = Number(value || 0)
-  return Number.isFinite(timestamp) && timestamp > 0
-    ? formatUnixDate(value)
-    : undefined
+  if (Number.isFinite(timestamp) && timestamp > 0) {
+    return formatUnixDate(value)
+  }
+  return text || undefined
 }
 
 function isCanceledBusinessLineStatus(value) {
@@ -1018,37 +1066,6 @@ function isCanceledBusinessLineStatus(value) {
       .trim()
       .toLowerCase()
   )
-}
-
-function materialPurchasePrintPartyDefaults(printTemplateDefaults = {}) {
-  const directDefaults =
-    printTemplateDefaults?.['material-purchase-contract'] ||
-    printTemplateDefaults?.materialPurchaseContract ||
-    null
-  const templateDefaults = Array.isArray(printTemplateDefaults?.templates)
-    ? printTemplateDefaults.templates.find(
-        (item) => item?.template_key === 'material-purchase-contract'
-      )
-    : null
-  const partyDefaults =
-    directDefaults?.partyDefaults ||
-    directDefaults?.party_defaults ||
-    templateDefaults?.party_defaults ||
-    {}
-  const allowedKeys = [
-    'buyerCompany',
-    'buyerContact',
-    'buyerPhone',
-    'buyerAddress',
-    'buyerSigner',
-  ]
-  return allowedKeys.reduce((output, key) => {
-    const value = trimOptional(partyDefaults?.[key])
-    if (value) {
-      output[key] = value
-    }
-    return output
-  }, {})
 }
 
 export function buildMaterialPurchaseContractDraftFromPurchaseOrder(
@@ -1072,6 +1089,12 @@ export function buildMaterialPurchaseContractDraftFromPurchaseOrder(
       .filter(
         ([unitID, label]) => Number.isFinite(unitID) && unitID > 0 && label
       )
+  )
+  const contractPartySnapshot = buildContractPartySnapshot(
+    order?.contract_party_snapshot &&
+      typeof order.contract_party_snapshot === 'object'
+      ? order.contract_party_snapshot
+      : {}
   )
   const lines = (Array.isArray(items) ? items : [])
     .filter((item) => !isCanceledBusinessLineStatus(item?.line_status))
@@ -1109,6 +1132,7 @@ export function buildMaterialPurchaseContractDraftFromPurchaseOrder(
     contractNo: trimOptional(order.purchase_order_no),
     orderDateText: formatPrintDraftDate(order.purchase_date),
     returnDateText: formatPrintDraftDate(order.expected_arrival_date),
+    signDateText: formatPrintDraftDate(order.purchase_date),
     supplierName:
       trimOptional(supplierSnapshot.name) ||
       trimOptional(supplierSnapshot.short_name),
@@ -1117,7 +1141,11 @@ export function buildMaterialPurchaseContractDraftFromPurchaseOrder(
       trimOptional(supplierSnapshot.contact_phone) ||
       trimOptional(supplierSnapshot.contact_mobile),
     supplierAddress: trimOptional(supplierSnapshot.address),
-    ...materialPurchasePrintPartyDefaults(printTemplateDefaults),
+    ...contractPartySnapshotFromPrintTemplateDefaults(
+      printTemplateDefaults,
+      'material-purchase-contract'
+    ),
+    ...contractPartySnapshot,
     lines,
   })
 }

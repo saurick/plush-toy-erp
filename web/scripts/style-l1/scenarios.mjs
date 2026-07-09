@@ -33,8 +33,6 @@ export function createStyleL1Scenarios(deps) {
     assertDarkThemeNeutralInteractions,
     assertDashboardMetricInteractionSemantics,
     assertDashboardTaskBoardLayout,
-    assertDashboardWorkbenchEntryNavigation,
-    assertDashboardWorkbenchLayout,
     assertDevPageUsesGlobalThemeOnly,
     assertERPThemeMode,
     assertEditablePrintWorkspacePopupRefresh,
@@ -505,7 +503,7 @@ export function createStyleL1Scenarios(deps) {
         await page.locator('#password').fill('style-l1-password')
         await page.getByRole('button', { name: /^登\s*录$/ }).click()
         await waitForPath(page, '/erp/dashboard')
-        await expectHeading(page, '工作台')
+        await expectHeading(page, '产品核心总览')
 
         const rememberedEntry = await page.evaluate(() =>
           window.localStorage.getItem('erp:last_entry_target')
@@ -597,17 +595,15 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '毛绒玩具 ERP')
         await expectText(page, '超级管理员')
         await expectText(page, 'style-l1-admin')
-        await expectText(page, '看板中心')
-        await expectHeading(page, '工作台')
-        await expectText(page, '优先处理队列')
-        await expectText(page, '当前任务上下文')
-        await expectText(page, '等待交接')
+        await expectText(page, '产品核心')
+        await expectHeading(page, '产品核心总览')
+        await expectText(page, '能力审阅入口')
+        await expectText(page, '销售订单核心')
+        await expectText(page, '客户运行态')
         await assertTextAbsent(page, '内部来源')
-        await expectNoButton(page, '任务看板')
+        await assertTextAbsent(page, '优先处理队列')
+        await assertTextAbsent(page, '当前任务上下文')
         await assertNoDuplicatedAdminPageTitle(page, {
-          scenarioName: 'erp-dashboard-desktop',
-        })
-        await assertDashboardWorkbenchLayout(page, {
           scenarioName: 'erp-dashboard-desktop',
         })
         await assertShellRefreshButton(page, {
@@ -617,9 +613,55 @@ export function createStyleL1Scenarios(deps) {
         await assertNoDashboardCenterLocalRefreshButton(page, {
           scenarioName: 'erp-dashboard-desktop',
         })
-        await assertDashboardWorkbenchEntryNavigation(page, {
-          scenarioName: 'erp-dashboard-desktop',
+        const productCoreMetrics = await page.evaluate(() => {
+          const dashboard = document.querySelector(
+            '[data-product-core-dashboard="true"]'
+          )
+          const table = document.querySelector('.ant-table')
+          const metrics = Array.from(
+            document.querySelectorAll('.erp-product-core-metric')
+          ).map((item) => item.textContent || '')
+          const entries = Array.from(
+            document.querySelectorAll('.erp-product-core-entry')
+          ).map((item) => item.textContent || '')
+          const rect = dashboard?.getBoundingClientRect()
+          return {
+            hasDashboard: Boolean(dashboard),
+            hasTable: Boolean(table),
+            metrics,
+            entries,
+            width: rect?.width || 0,
+            height: rect?.height || 0,
+            scrollWidth: document.documentElement.scrollWidth,
+            clientWidth: document.documentElement.clientWidth,
+          }
         })
+        assert.equal(productCoreMetrics.hasDashboard, true)
+        assert.equal(productCoreMetrics.hasTable, false)
+        assert(
+          productCoreMetrics.metrics.some((item) =>
+            item.includes('不读取客户订单')
+          ) &&
+            productCoreMetrics.entries.some((item) =>
+              item.includes('销售订单核心')
+            ),
+          `Product Core 首页应展示能力总览和审阅入口: ${JSON.stringify(
+            productCoreMetrics
+          )}`
+        )
+        assert(
+          productCoreMetrics.width > 0 && productCoreMetrics.height > 0,
+          `Product Core 首页应有稳定占位: ${JSON.stringify(productCoreMetrics)}`
+        )
+        assert(
+          productCoreMetrics.scrollWidth <= productCoreMetrics.clientWidth + 1,
+          `Product Core 首页不应横向溢出: ${JSON.stringify(productCoreMetrics)}`
+        )
+        await page.getByRole('button', { name: /销售订单核心/ }).click()
+        await waitForPath(page, '/erp/sales/project-orders/sales-orders')
+        await expectText(page, '销售订单 能力审阅')
+        await page.goBack({ waitUntil: 'domcontentloaded' })
+        await expectHeading(page, '产品核心总览')
       },
     },
     {
@@ -656,6 +698,7 @@ export function createStyleL1Scenarios(deps) {
             '[data-product-core-business-data-guard="true"]'
           )
           const table = document.querySelector('.ant-table')
+          const menu = document.querySelector('.erp-admin-menu')
           const tableRect = table?.getBoundingClientRect()
           return {
             visibilityMode:
@@ -664,6 +707,7 @@ export function createStyleL1Scenarios(deps) {
               shell?.getAttribute('data-effective-session-data-scope') || '',
             hasGuard: Boolean(guard),
             hasTable: Boolean(table),
+            menuText: menu?.textContent || '',
             tableWidth: tableRect?.width || 0,
             scrollWidth: document.documentElement.scrollWidth,
             clientWidth: document.documentElement.clientWidth,
@@ -673,6 +717,12 @@ export function createStyleL1Scenarios(deps) {
         assert.equal(pageMetrics.dataRuntimeScope, 'customer_runtime')
         assert.equal(pageMetrics.hasGuard, false)
         assert.equal(pageMetrics.hasTable, true)
+        assert(
+          pageMetrics.menuText.includes('出货单'),
+          `super admin 客户运行态侧栏应显示客户业务导航: ${JSON.stringify(
+            pageMetrics
+          )}`
+        )
         assert(
           pageMetrics.scrollWidth <= pageMetrics.clientWidth + 1,
           `super admin 客户运行态业务页不应横向溢出: ${JSON.stringify(
@@ -690,8 +740,10 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectText(page, '毛绒 ERP 管理后台')
         await expectText(page, '超级管理员')
-        await expectText(page, '产品核心评审不读取客户业务数据')
-        await expectText(page, '业务看板 是客户运行时业务数据页')
+        await expectText(page, '业务看板 能力审阅')
+        await expectText(page, 'Product Core')
+        await expectText(page, 'business.dashboard_stats')
+        await assertTextAbsent(page, '产品核心评审不读取客户业务数据')
         await assertTextAbsent(page, '业务对象')
         await assertTextAbsent(page, '对象总量')
         await assertTextAbsent(page, '核心链路健康')
@@ -699,33 +751,57 @@ export function createStyleL1Scenarios(deps) {
           const guard = document.querySelector(
             '[data-product-core-business-data-guard="true"]'
           )
+          const review = document.querySelector(
+            '[data-product-core-capability-review="true"]'
+          )
           const dashboard = document.querySelector(
             '.erp-business-dashboard-page'
           )
           const table = document.querySelector('.ant-table')
-          const guardRect = guard?.getBoundingClientRect()
+          const menu = document.querySelector('.erp-admin-menu')
+          const reviewRect = review?.getBoundingClientRect()
           return {
             hasGuard: Boolean(guard),
+            hasReview: Boolean(review),
             hasBusinessDashboard: Boolean(dashboard),
             hasTable: Boolean(table),
-            guardWidth: guardRect?.width || 0,
-            guardHeight: guardRect?.height || 0,
+            menuText: menu?.textContent || '',
+            reviewWidth: reviewRect?.width || 0,
+            reviewHeight: reviewRect?.height || 0,
             scrollWidth: document.documentElement.scrollWidth,
             clientWidth: document.documentElement.clientWidth,
           }
         })
         assert.equal(pageMetrics.hasGuard, true)
+        assert.equal(pageMetrics.hasReview, true)
         assert.equal(pageMetrics.hasBusinessDashboard, false)
         assert.equal(pageMetrics.hasTable, false)
         assert(
-          pageMetrics.guardWidth > 0 && pageMetrics.guardHeight > 0,
-          `无客户 Product Core guard 应有稳定占位: ${JSON.stringify(
+          pageMetrics.menuText.includes('产品核心') &&
+            pageMetrics.menuText.includes('控制面') &&
+            pageMetrics.menuText.includes('模板打印中心') &&
+            pageMetrics.menuText.includes('权限管理'),
+          `无客户 Product Core 侧栏应显示控制面导航: ${JSON.stringify(
+            pageMetrics
+          )}`
+        )
+        assert(
+          !pageMetrics.menuText.includes('业务看板') &&
+            !pageMetrics.menuText.includes('BOM 管理') &&
+            !pageMetrics.menuText.includes('委外订单'),
+          `无客户 Product Core 侧栏不应显示客户业务导航: ${JSON.stringify(
+            pageMetrics
+          )}`
+        )
+        assert(
+          pageMetrics.reviewWidth > 0 && pageMetrics.reviewHeight > 0,
+          `无客户 Product Core 能力审阅页应有稳定占位: ${JSON.stringify(
             pageMetrics
           )}`
         )
         assert(
           pageMetrics.scrollWidth <= pageMetrics.clientWidth + 1,
-          `无客户 Product Core guard 不应横向溢出: ${JSON.stringify(
+          `无客户 Product Core 能力审阅页不应横向溢出: ${JSON.stringify(
             pageMetrics
           )}`
         )
@@ -1381,16 +1457,12 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectText(page, '超级管理员')
         await expectText(page, '毛绒 ERP 管理后台')
-        await expectText(page, '工作台')
-        await expectText(page, '优先处理队列')
-        await expectText(page, '当前任务上下文')
-        await expectText(page, '等待交接')
+        await expectText(page, '产品核心总览')
+        await expectText(page, '能力审阅入口')
+        await expectText(page, '控制面')
         await assertTextAbsent(page, '内部来源')
-        await expectNoButton(page, '任务看板')
+        await assertTextAbsent(page, '优先处理队列')
         await assertNoDuplicatedAdminPageTitle(page, {
-          scenarioName: 'erp-dashboard-mobile',
-        })
-        await assertDashboardWorkbenchLayout(page, {
           scenarioName: 'erp-dashboard-mobile',
         })
         await assertNoDashboardCenterLocalRefreshButton(page, {
@@ -1427,10 +1499,10 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '毛绒 ERP 管理后台')
-        await expectText(page, '工作台')
-        await expectText(page, '优先处理队列')
-        await expectText(page, '等待交接')
-        await expectNoButton(page, '任务看板')
+        await expectText(page, '产品核心总览')
+        await expectText(page, '能力审阅入口')
+        await expectText(page, '不挂载客户业务数据')
+        await assertTextAbsent(page, '优先处理队列')
         await assertNoDuplicatedAdminPageTitle(page, {
           scenarioName: 'erp-dashboard-dark-desktop',
         })
@@ -1438,9 +1510,6 @@ export function createStyleL1Scenarios(deps) {
           scenarioName: 'erp-dashboard-dark-desktop',
           expectedMode: 'dark',
           expectedEffectiveTheme: 'dark',
-        })
-        await assertDashboardWorkbenchLayout(page, {
-          scenarioName: 'erp-dashboard-dark-desktop',
         })
         await assertNoDashboardCenterLocalRefreshButton(page, {
           scenarioName: 'erp-dashboard-dark-desktop',
@@ -10213,6 +10282,12 @@ export function createStyleL1Scenarios(deps) {
           minFieldCount: 0,
           screenshotName: 'business-v1-purchase-order-form-modal',
           expectedTexts: [
+            '合同订购方信息',
+            '订购单位',
+            '订购人',
+            '订购方电话',
+            '公司地址',
+            '订购方签字人',
             '采购明细',
             '从材料库导入',
             '已录入',
@@ -10374,6 +10449,12 @@ export function createStyleL1Scenarios(deps) {
           minFieldCount: 6,
           screenshotName: 'business-v1-outsourcing-order-title-form-modal',
           expectedTexts: [
+            '合同委托方信息',
+            '委托单位',
+            '委托人',
+            '委托方电话',
+            '公司地址',
+            '委托方签字人',
             '加工合同号',
             '加工厂',
             '加工明细',

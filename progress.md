@@ -13,6 +13,14 @@
 - 当前审计显示 P0-P4 本地证据为 ready；P5 的 133 内部验证证据已收口到 `deployments/yoyoosun/evidence/releases/2026-07-03/`，`release-evidence-status` 为 `ready`，closeoutSummary 为 `gateVerified=6/6`、`blockers=0`。
 - 本次 133 发布验证已完成本地构建镜像、远端 `docker load`、运行时 `.env` 脱敏 preflight、migration before/after、pre-migration backup、隔离恢复 + migration 演练、真实库 migration、业务容器重建、目标 smoke、rollback / forward-fix evidence 和 internal-only sign-off。
 
+## 2026-07-09 Product Core 首页总览修正
+
+完成：修正 admin 无 customer key 进入 Product Core 后 `/erp/dashboard` 仍显示客户 Workflow 工作台空队列的问题。无客户态 Product Core 现在侧栏第一项显示“产品核心总览”，首页展示产品核心能力总览、能力审阅入口和控制面入口，并在加载逻辑中直接跳过 `listWorkflowTasks`，不读取客户订单、库存、Workflow 或财务事实。点击能力审阅入口会进入对应业务页的 `ProductCoreCapabilityReview`，继续保持不挂载客户业务数据。同步更新正式前端边界测试、`style:l1` 桌面 / 移动 / 暗色断言、`web/README.md` 和 `docs/当前真源与交接顺序.md`。
+
+下一步：如果要让 Product Core 控制面支持客户配置发布 / 激活 / 回滚的正式页面，需要单独评审 `/erp/product-core/customer-config` 或等价路由、后端 JSON-RPC 权限、release evidence 读回和目标环境 smoke。
+
+阻塞/风险：本轮只改前端 Product Core 首页、导航文案、样式和文档口径；不新增后端 API，不改 schema / migration / RBAC / Workflow / Fact，不执行真实客户导入或发布激活。已通过 `node --test web/src/erp/config/seedData.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs`、`node --check web/src/erp/config/seedData.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs web/scripts/style-l1/scenarios.mjs`、`/usr/local/bin/pnpm --dir web exec eslint --ext .js --ext .jsx --ext .mjs src/erp/pages/DashboardPage.jsx src/erp/config/seedData.mjs src/erp/config/seedData.test.mjs scripts/style-l1/scenarios.mjs`、`/usr/local/bin/pnpm --dir web css`、`STYLE_L1_PORT=5243 STYLE_L1_SCENARIOS=erp-dashboard-desktop,erp-dashboard-mobile,erp-dashboard-dark-desktop,erp-effective-session-super-admin-product-core-no-customer-business-dashboard /usr/local/bin/pnpm --dir web style:l1`。`node --check` 不适用于 `.jsx` 扩展名，本轮 JSX 语法由 ESLint / Vite L1 覆盖；Node 仍有 engine / typeless package warning。
+
 ## 2026-07-08 路由动态模块加载恢复
 
 完成：按 `$plush-runtime-diagnostics` 和 `$plush-code-review-governance` 排查“连续切菜单后 `<Route.Provider>` 报 `Failed to fetch dynamically imported module`”。截图指向 `V1SalesOrdersPage.jsx` 的 React Router lazy import；当前 runtime 证据显示 `curl` 直接请求 `V1SalesOrdersPage.jsx` 返回 `200 OK`，Vite dev server 监听 `*:5175`，`@vite/client` HMR 目标仍是 `127.0.0.1:5175`，不是业务 RPC、DB、RBAC 或 Workflow / Fact 层问题。Playwright 首次直接动态 import `router.jsx` 复现一次浏览器侧模块加载失败，随后 network 复查 `router.jsx`、`lazyImportRetry.mjs` 和 `V1SalesOrdersPage.jsx` 均为 `200`，销售页模块重复导入 5 次均返回默认 React component，说明故障链路更接近本地 Vite / 浏览器模块图瞬态失败。
@@ -73,7 +81,7 @@
 
 ## 2026-07-09 super admin 永绅菜单审阅可见性
 
-完成：修正永绅静态客户菜单先隐藏 `business-dashboard` 等入口，导致 `admin` 超级管理员也无法审阅业务看板的问题。`ERPLayout` 现在在 `is_super_admin=true` 时使用 Product Core 默认导航，不再被客户静态菜单子集收窄；普通账号仍按永绅 `customer-config.js`、RBAC 菜单路径和 active effective session pages 交集收窄。同步更新 `web/README.md`，明确该行为只影响前端审阅可见性，不扩大后端写入口、Workflow / Fact 或业务动作权限。
+完成：修正永绅静态客户菜单先隐藏 `business-dashboard` 等入口，导致 `admin` 超级管理员也无法审阅业务看板的问题。当时 `ERPLayout` 在 `is_super_admin=true` 时使用完整产品导航，不再被客户静态菜单子集收窄；普通账号仍按永绅 `customer-config.js`、RBAC 菜单路径和 active effective session pages 交集收窄。该历史记录已被下方“Product Core 控制面导航拆分”收窄：无客户 Product Core 只显示控制面导航，带 customer key 的 super admin 才显示完整产品导航。同步更新 `web/README.md`，明确该行为只影响前端审阅可见性，不扩大后端写入口、Workflow / Fact 或业务动作权限。
 
 下一步：如果后续要让普通永绅业务角色也看到业务看板，需要单独评审客户试用菜单和培训口径；当前只修复 `admin` 超级管理员看全产品核心菜单。
 
@@ -119,6 +127,22 @@
 
 阻塞/风险：本轮不新增 `tenant_id`、不实现 SaaS 多租户、不拆客户数据库、不执行真实客户导入、不改 schema / migration / RBAC / Workflow / Fact usecase 或后端 JSON-RPC 写入口。已通过 `node --test web/src/erp/utils/adminProfileSync.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs scripts/qa/manual-regression-data-plan.test.mjs scripts/qa/test-data-isolation-boundary.test.mjs scripts/qa/yoyoosun-customer-closure.test.mjs scripts/qa/trial-simulated-data.test.mjs scripts/qa/operational-fact-simulated-closure.test.mjs scripts/qa/mobile-workflow-simulated-closure.test.mjs`、`go test ./internal/data`、`/usr/local/bin/pnpm --dir web exec eslint --ext .js --ext .jsx --ext .mjs src/erp/utils/adminProfileSync.mjs src/erp/utils/adminProfileSync.test.mjs src/erp/components/ERPLayout.jsx scripts/style-l1/scenarios.mjs`、`/usr/local/bin/pnpm --dir web css`、`STYLE_L1_PORT=5239 STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-action-projection-business-pages /usr/local/bin/pnpm --dir web style:l1`、`node --check scripts/qa/manual-regression-data-plan.mjs scripts/qa/manual-regression-data-plan.test.mjs scripts/qa/test-data-isolation-boundary.mjs`、`node scripts/qa/test-data-isolation-boundary.mjs --json`、`node scripts/qa/manual-regression-data-plan.mjs --json` 和 `git diff --check`。Node 仍有 typeless package warning，不影响本轮测试结果。
 
+## 2026-07-09 Product Core / 客户运行态前后端门禁复查
+
+完成：再次复查 Product Core 与客户运行态在前端导航、后端 RBAC / JSON-RPC、customer_config 校验、发布 / 激活 / 回滚流程和 runtime audit 上的对齐情况。发现并修复 `rollback_customer_config` 后端仍复用 `customer_config.activate` 权限的问题：新增内置权限 `customer_config.rollback`，管理员角色纳入该权限，JSON-RPC 回滚入口改为独立 rollback 门禁，并补充“只有 activate 不能 rollback”的服务层回归测试。同步修正当前真源索引和多甲方能力台账，明确 super admin 带 customer key 才使用完整客户运行态导航，无 customer key 只显示 Product Core 控制面导航；rollback 使用独立 RBAC 权限并写独立审计。
+
+下一步：如果要把客户配置发布 / 激活 / 回滚从 dev-only 控制台推进为正式 Product Core 控制面页面，需要单独评审 `/erp/product-core/customer-config` 或等价路由、按钮权限、release evidence 读回和目标环境 smoke。
+
+阻塞/风险：本轮不改 schema / migration，不执行真实客户导入、发布、激活、回滚、目标环境 smoke、备份恢复或生产演练；priority audit 只证明本地代码 / 文档 / 脚本证据 ready。已通过 `cd server && go test ./internal/biz ./internal/data ./internal/service`、`cd server && go test ./internal/service -run 'TestCustomerConfigJSONRPCRollbackUsesTargetRevision|TestCustomerConfigJSONRPCRollbackRequiresRollbackPermission'`、`node --test web/src/erp/utils/adminProfileSync.test.mjs web/src/erp/config/seedData.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs`、`node --test scripts/qa/customer-config-runtime-manifest.test.mjs scripts/qa/yoyoosun-customer-closure.test.mjs`、`node scripts/qa/multi-client-role-workflow-priority-audit.mjs --json`、`pnpm --dir web exec eslint ...`、`pnpm --dir web css`、`STYLE_L1_PORT=5243 STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core-no-customer-business-dashboard,erp-effective-session-super-admin-product-core pnpm --dir web style:l1`、`node --check scripts/qa/formal-frontend-customer-config-boundary.test.mjs` 和 `git diff --check`。Node 仍有 engine / typeless package warning，不影响本轮结果。
+
+## 2026-07-09 Product Core 无客户态业务页审阅页
+
+完成：修正 Product Core 系统在委外订单、业务看板等多个业务页反复显示“产品核心评审不读取客户业务数据”提示的问题。保留 `shouldGuardCustomerBusinessPageRuntime` 阻止无客户态挂载真实业务 `Outlet` 的数据边界，但把重复 Alert 空态替换为 `ProductCoreCapabilityReview`：按当前页面读取 `businessModules` 的模块定义，展示模块说明、数据真源、当前审阅范围和边界说明；`business-dashboard` 和 `exception-flow` 使用本地 fallback 定义。同步更新暗色主题、正式前端客户配置边界测试、`style:l1` 场景、`web/README.md` 和 `docs/当前真源与交接顺序.md`，并增加静态断言防止旧提示文案回到 `ERPLayout`。
+
+下一步：如后续需要 Product Core 专门的能力矩阵总览，可新建只读产品能力页；不要把客户业务页改成读取客户表或真实业务事实来伪装产品核心数据。
+
+阻塞/风险：本轮只改前端页面语义和样式，不新增后端 API、不改 schema / migration / RBAC、不改 Workflow / Fact usecase、不执行真实客户导入，也不改变带 customer key 的客户运行态业务页读取路径。已通过 `node --test web/src/erp/utils/adminProfileSync.test.mjs web/src/erp/config/seedData.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs`、`/usr/local/bin/pnpm --dir web exec eslint --ext .js --ext .jsx --ext .mjs src/erp/components/ERPLayout.jsx scripts/style-l1/scenarios.mjs src/erp/config/businessModules.mjs src/erp/config/seedData.test.mjs src/erp/utils/adminProfileSync.mjs src/erp/utils/adminProfileSync.test.mjs`、`/usr/local/bin/pnpm --dir web css`、`STYLE_L1_PORT=5242 STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core-no-customer-business-dashboard,erp-effective-session-super-admin-product-core /usr/local/bin/pnpm --dir web style:l1`。首次 L1 断言误写为通用数据真源文案，已改为业务看板真实 fallback `business.dashboard_stats` 后通过；Node 仍有 typeless package warning。
+
 ## 2026-07-09 第二轮提交推送全量验证收口
 
 完成：继续按 full-worktree closeout 复跑提交前验证。`qa:full` 首次在 `server/internal/service` 暴露服务测试夹具仍写死旧 `yoyoosun` 默认客户 key；已将服务层客户配置测试中的默认客户 key / scope value 对齐到 `biz.DefaultCustomerKey`，避免后端默认客户从 `yoyoosun` 切到 `demo` 后，省略 `customer_key` 的业务 API 测试找不到 active revision。
@@ -126,3 +150,75 @@
 下一步：提交并推送当前全工作区改动，推送前继续确认远端未领先；如 pre-commit / pre-push 产生格式化或守卫问题，按 hook 反馈继续收口。
 
 阻塞/风险：本轮服务测试修正只改测试夹具，不改变 schema、migration、RBAC、Workflow / Fact、客户配置 usecase 或 JSON-RPC 运行时语义。已通过 `go test ./internal/service` 和 `bash scripts/qa/full.sh`；`qa:full` 最终显示 `[qa:full] 全部通过`。当前 Node 版本高于仓库 engine、`ProcessingContractPrintWorkspacePage.jsx` 仍有既有 React Hook dependency warning，不影响本轮 full QA 结果。
+
+## 2026-07-09 Product Core 控制面导航拆分
+
+完成：按 docs/reference 第四次的 Product Core / 客户运行态边界，把 super admin 无客户运行态侧栏从完整业务导航拆为 Product Core 控制面导航，只保留工作台、模板打印中心、权限管理和审计日志；带有 `yoyoosun` 等 customer key 的 super admin 仍使用完整产品导航进入客户运行态业务页。`ERPLayout` 同时保留完整产品导航作为当前 URL 识别真源，直访 `/erp/business-dashboard` 等业务 URL 仍能解析 page key 并进入 `ProductCoreCapabilityReview`，不会因为侧栏隐藏业务菜单而绕过客户业务页 guard。同步更新 `web/README.md`、`docs/当前真源与交接顺序.md`、`seedData` 单元测试、正式前端客户配置边界测试和 `style:l1` 浏览器断言。
+
+下一步：如要把第四次参考里的客户配置包导入控制台升级为正式 Product Core 页面，需要单独做 `/erp/product-core/customer-config` 或等价控制面路由评审，不能复用客户业务表单页。
+
+阻塞/风险：本轮不新增后端 API、不改 schema / migration / RBAC、不改 Workflow / Fact usecase、不执行真实客户导入，也不改变带 customer key 的客户运行态业务页读取路径。已通过 `node --test web/src/erp/utils/adminProfileSync.test.mjs web/src/erp/config/seedData.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs`、`/usr/local/bin/pnpm --dir web exec eslint --ext .js --ext .jsx --ext .mjs src/erp/components/ERPLayout.jsx src/erp/config/seedData.mjs src/erp/config/seedData.test.mjs scripts/style-l1/scenarios.mjs`、`node --check scripts/qa/formal-frontend-customer-config-boundary.test.mjs`、`/usr/local/bin/pnpm --dir web css`、`STYLE_L1_PORT=5243 STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core-no-customer-business-dashboard,erp-effective-session-super-admin-product-core /usr/local/bin/pnpm --dir web style:l1` 和 `git diff --check`。Node 仍有 engine / typeless package warning，不影响本轮验证结果。
+
+## 2026-07-09 加工合同与采购合同带值字段补齐
+
+完成：按永绅真源文件 `模板-材料与加工合同.xlsx` 核对采购合同 `C类辅料合同` 和加工合同 `B类加工合同` 的甲方 / 委托方字段，将 `customerPackage.mjs` 中 `material-purchase-contract`、`processing-contract` 的联系人、电话、地址和签名人从占位值补为真源值；同时为永绅 trial supplier fixture 补齐供应商 / 加工方地址，保证业务页跳转到采购合同、加工合同打印草稿时，甲方字段来自客户配置，乙方 / 加工方字段仍来自业务快照。补充 mapper、打印草稿完整性、runtime manifest 和客户闭环 QA 测试，防止 `待维护` 等占位值继续进入打印默认字段。
+
+下一步：如果要让目标环境立即生效，需要通过受控 `customer_config.validate_customer_config / publish_customer_config / activate_customer_config` 发布并激活新的永绅客户配置；如需截图或 PDF 证据，再在目标运行态打开采购订单和委外订单打印入口做浏览器 / PDF 回归。
+
+阻塞/风险：本轮不改 Product Core 通用默认样例、不覆盖供应商 / 加工方业务快照、不改 schema / migration / RBAC / Workflow / Fact usecase，也不执行真实客户数据导入或发布激活；现有 active revision 若尚未重新发布，运行环境仍可能继续使用旧配置。
+
+## 2026-07-09 加工合同与采购合同缺值二次收口
+
+完成：继续定位业务页跳转打印仍出现 `未配置 / 未维护 / 未关联` 的链路。采购合同日期 formatter 现在兼容字符串日期快照，永绅 trial 采购 / 委外 fixture 补齐下单日期并按合同源文件日期口径收口；委外订单打开加工合同时会像采购订单一样，在打印前用当前加工厂主数据和联系人列表补齐旧单缺失的 `supplier_snapshot` 空字段，但不覆盖已有业务快照。新增永绅采购合同 / 加工合同完整草稿扫描测试，直接从 trial 业务来源生成打印草稿并断言不输出 `未配置 / 未维护 / 未关联` 占位。
+
+下一步：如果当前浏览器仍看到历史 `SIM-SELECT-COL-*` 或 `SIM-YOYOOSUN-BULK-*` 旧草稿，需要清掉对应打印窗口 localStorage / 重新从业务页打开，或重建本地模拟业务单；这些历史草稿不是 tracked fixture 真源。
+
+阻塞/风险：本轮不从材料主数据伪造产品订单编号 / 产品编号 / 产品名称，不改 schema / migration / RBAC / Workflow / Fact，不执行真实客户数据导入，也不发布激活客户配置；旧数据库中已经保存且没有产品快照的采购明细，除非重新编辑补齐或重建模拟数据，仍会按缺值保护显示占位。
+
+## 2026-07-09 采购合同与加工合同本地运行态打印收口
+
+完成：把永绅客户配置包升级到 `yoyoosun-customer-package-v3`，为采购角色补入 `material.read`，使采购合同打印入口能读取材料 / 单位上下文；本地通过 `customer_config.validate_customer_config`、`publish_customer_config`、`activate_customer_config` 激活 v3，并确认当前登录态拿到 `material.read`。修复旧 `SIM-SELECT-COL-20260619T160406Z-OUT` 委外订单供应商快照和产品订单快照，新增本地采购合同验证单 `SIM-CODEX-PRINT-PO-20260709`。采购订单打印入口改为点击打印前按需刷新材料和单位主数据，避免基础资料异步未完成时生成 `未维护规格 / 未维护单位`；加工合同打印草稿改为优先使用供应商快照全称，短名仅作缺失兜底。浏览器在 `http://127.0.0.1:5177` 用 `demo_purchase` 从采购订单和委外订单业务页实际点击打印，采购合同与加工合同打印页 DOM 断言均无 `未配置 / 未维护 / 未关联`，并确认采购规格 / 单位、加工方联系人 / 电话 / 地址、委托方字段和产品订单号均带出。
+
+下一步：若要让目标环境生效，仍需按正式发布流程在目标环境执行客户配置发布 / 激活和 smoke；本轮只完成本地运行态闭环。
+
+阻塞/风险：本轮重置了本地 demo 账号密码用于浏览器验证，不涉及生产账号；未提交 / 未推送，未执行真实客户数据导入，不改 schema / migration / Workflow / Fact usecase。已通过 `node --test scripts/qa/customer-config-runtime-manifest.test.mjs scripts/deploy/customer-config-activation-gate.test.mjs scripts/deploy/customer-config-release-execute.test.mjs scripts/deploy/run-smoke-script.test.mjs`、`node --test scripts/qa/yoyoosun-customer-closure.test.mjs scripts/qa/trial-simulated-data.test.mjs`、`cd web && node --test src/erp/utils/masterDataOrderView.test.mjs src/erp/data/processingContractTemplate.test.mjs src/erp/utils/contractPrintDraftCompleteness.test.mjs src/erp/utils/referenceSelectOptions.test.mjs`、`cd web && node --test src/erp/utils/moduleTableColumns.test.mjs src/erp/utils/userVisibleTechnicalFields.test.mjs`、`cd web && pnpm build`、`node --check web/src/erp/components/purchase-orders/usePurchaseOrderContractPrint.mjs && node --check web/src/erp/data/processingContractTemplate.mjs` 和 `git diff --check`；`pnpm build` 仅提示当前 Node v26.5.0 高于仓库 engine `24.14.x`。
+
+## 2026-07-09 采购合同与加工合同固定字段源表收口
+
+完成：继续按永绅源文件 `模板-材料与加工合同.xlsx` 复核 `C类辅料合同` 和 `B类加工合同`，把“固定合同字段”和“业务页动态字段”重新分开。客户包升级为 `yoyoosun-customer-package-v4`，采购合同和加工合同的甲方 / 委托方显示名按源表固定为 `永绅`，联系人、电话、地址、签名人仍由 yoyoosun 客户配置投影；供应商 / 加工方、明细行、数量金额、产品追溯继续来自采购订单 / 委外订单业务快照。采购合同、加工合同和打印中心采购合同样例的固定合同条款已恢复为源表文本，补充测试锁住这些条款不再被摘要版覆盖。本地通过 `customer_config.validate_customer_config / publish_customer_config / activate_customer_config` 激活 v4，并读回 active effective session 的两个合同模板默认值；浏览器在 `http://127.0.0.1:5177` 使用 `demo_purchase` 从采购订单 `SIM-CODEX-PRINT-PO-20260709` 和委外订单 `SIM-SELECT-COL-20260619T160406Z-OUT` 实际点击打印，两个打印工作台均显示 `永绅`、源表固定条款，且 DOM 中无 `未配置 / 未维护 / 未关联`。
+
+下一步：如果目标环境也要同步，需要按正式 release evidence 流程发布 / 激活 `yoyoosun-customer-package-v4.runtime-manifest-v1` 并跑目标环境 customer-config smoke；本轮只完成本地运行态验证。
+
+阻塞/风险：本轮不改 Product Core 中性买方样例、不把永绅客户抬头写入通用核心、不覆盖供应商 / 加工方业务快照，不改 schema / migration / RBAC / Workflow / Fact usecase，也不执行真实客户导入。已通过 `node scripts/import/customerSourceManifestCheck.mjs --manifest docs/customers/yoyoosun/source-manifest.json --raw-dir docs/customers/yoyoosun/raw-source-files`、`node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview --out output/customer-config-runtime-manifest/yoyoosun-v4-runtime-manifest.json`、`node --test scripts/qa/customer-config-runtime-manifest.test.mjs scripts/qa/yoyoosun-customer-closure.test.mjs`、`node --test web/src/erp/utils/materialPurchaseContractEditor.test.mjs web/src/erp/data/processingContractTemplate.test.mjs web/src/erp/utils/contractPrintDraftCompleteness.test.mjs web/src/erp/utils/masterDataOrderView.test.mjs web/src/erp/config/printTemplates.test.mjs`、`node --test scripts/deploy/customer-config-activation-gate.test.mjs scripts/deploy/customer-config-release-execute.test.mjs scripts/deploy/run-smoke-script.test.mjs scripts/deploy/release-evidence-status.test.mjs scripts/deploy/customer-config-release-readiness.test.mjs` 和业务页 Playwright 跳转打印回归。
+
+## 2026-07-09 合同打印变量字段覆盖审计
+
+完成：按“每个纸面变量都要能追到业务页、主数据、客户配置或模板固定值”的口径复查采购合同和加工合同。采购合同业务草稿现在把 `signDateText` 从采购单 `purchase_date` 带出；加工合同业务草稿把 `buyerSignDateText` 从委外单 `order_date` 带出，避免甲方签字日期变量空着。永绅 trial 采购 / 委外明细补齐 `note`，让合同明细 `备注` 也有测试数据值。`yoyoosun-customer-closure.test.mjs` 新增字段覆盖矩阵：逐项声明采购合同头、采购明细、加工合同头、加工明细各字段来自采购订单页 / 委外订单页 / 主数据快照 / 客户配置，并对所有 trial 采购单和委外单逐单逐行生成打印草稿断言非空；同时静态检查采购订单表单、委外订单表单和操作区确实保留这些业务字段和打印入口。
+
+下一步：若目标环境要使用同一套新增 fixture / 字段断言，需要在正式发布流程里同步构建和客户配置 smoke；本轮只完成本地代码、fixture 和运行态打印验证。
+
+阻塞/风险：乙方 / 供应商签名和乙方日期仍按纸质回签留白处理，不从业务页伪造；本轮不新增 schema / migration / RBAC / Workflow / Fact，不把客户字段写入 Product Core。已通过 `node --test scripts/qa/yoyoosun-customer-closure.test.mjs`、`node --test web/src/erp/utils/masterDataOrderView.test.mjs web/src/erp/data/processingContractTemplate.test.mjs web/src/erp/utils/materialPurchaseContractEditor.test.mjs web/src/erp/utils/contractPrintDraftCompleteness.test.mjs`、`node scripts/import/customerSourceManifestCheck.mjs --manifest docs/customers/yoyoosun/source-manifest.json --raw-dir docs/customers/yoyoosun/raw-source-files`、`node --test scripts/qa/customer-config-runtime-manifest.test.mjs scripts/qa/yoyoosun-customer-closure.test.mjs web/src/erp/config/printTemplates.test.mjs`、`PATH=/usr/local/bin:$PATH pnpm --dir web build`、业务页 Playwright 跳转打印回归和 `git diff --check`。Node 仍有 typeless package warning，不影响本轮结果。
+
+## 2026-07-09 合同方变量字段源单化收口
+
+完成：继续按“采购合同 / 加工合同几乎所有字段都应来自源单变量”的口径复查并修正。新增 `purchase_orders.contract_party_snapshot` 与 `outsourcing_orders.contract_party_snapshot`，后端 biz / repo / JSON-RPC 均读写该源单合同方快照；采购订单、委外订单表单新增合同订购方 / 委托方字段（单位、联系人、电话、地址、签字人），新建 / 编辑时客户配置仅作为初始建议值，保存后打印优先读取源单快照。采购合同和加工合同业务草稿改为源单快照覆盖客户默认值，永绅 trial 采购 / 委外 fixture 也补齐每张源单的合同方测试数据，QA 矩阵改为指向采购订单页 / 委外订单页的 `contract_party_snapshot.*`。
+
+下一步：如要让已有本地或目标环境历史单据完全改用新字段，需要执行迁移后重新编辑保存历史采购 / 委外订单，或按受控脚本补齐历史源单 `contract_party_snapshot`；客户配置仍只适合作为新建默认建议和旧数据兼容兜底。
+
+阻塞/风险：本轮新增 schema / migration，已对本地 dev DB 执行 `make migrate_apply` 并复核 `migrate_status` 为 OK；也已重建 `./bin/server-dev`，当前 `server-dev` PID 99350 在 `8300/9300` 监听，`/healthz` 和 `/readyz` 通过。仍未写历史数据回填脚本；已有历史采购 / 委外单如果未重新保存，可能继续依赖客户默认兜底。浏览器验证使用 5177 + 项目 mock effective session 验证采购 / 委外表单新增字段真实可见，截图在 ignored 的 `web/output/playwright/contract-party-fields/`。已通过 `make data`、`make migrate_apply`、`env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy make migrate_status`、`go test ./internal/service -run 'PurchaseOrder|OutsourcingOrder'`、`go test ./internal/biz ./internal/data -run 'PurchaseOrder|OutsourcingOrder'`、`node --test web/src/erp/utils/masterDataOrderView.test.mjs web/src/erp/data/processingContractTemplate.test.mjs scripts/qa/yoyoosun-customer-closure.test.mjs`、`node --test scripts/qa/customer-config-runtime-manifest.test.mjs web/src/erp/config/printTemplates.test.mjs web/src/erp/utils/contractPrintDraftCompleteness.test.mjs web/src/erp/utils/materialPurchaseContractEditor.test.mjs`、`corepack pnpm --dir web build`、`git diff --check`、dev DB 新列只读查询、`curl /healthz` / `curl /readyz` 和一次性 Playwright DOM 字段可见性验证。`STYLE_L1_SCENARIOS=purchase-order-date-filter-desktop,processing-contract-form-modal-title-desktop corepack pnpm --dir web style:l1` 仍在采购场景前置“下单日期”处失败，未跑到新增字段断言；需单独修复当前 L1 入口 / 客户运行态前置漂移后再恢复该长期浏览器场景。
+
+## 2026-07-09 弹窗非明细备注整行布局
+
+完成：按页面治理口径把业务弹窗里非 item 明细行的普通备注收口为整行展示。销售订单的 `报价备注`、采购订单单据备注、委外订单单据备注、来料质检创建 / 判定备注、采购订单生成入库草稿备注都补齐 `erp-business-action-form__field--full`；明细 item 内的备注继续保留 `erp-line-item-field--note` 明细行布局，不拉成单据级整行。新增静态测试 `businessModalRemarkLayout.test.mjs`，并在 `business-formal-module-shells-desktop` L1 场景中加入非 item 备注盒模型断言。
+
+下一步：待当前业务 formal L1 的入口 / 权限投影前置恢复后，重新跑 `STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm style:l1`，让新增浏览器断言覆盖真实业务页弹窗。
+
+阻塞/风险：本轮不改字段保存、schema、migration、RBAC、Workflow / Fact、客户配置或 item 明细语义。已通过 `node --test src/erp/utils/businessModalRemarkLayout.test.mjs`、`pnpm lint`、`pnpm css` 和独立 Playwright 盒模型探针；`node --test src/erp/utils/businessModalRemarkLayout.test.mjs src/erp/utils/userVisibleTechnicalFields.test.mjs src/erp/utils/masterDataOrderView.test.mjs` 中新增备注测试和 masterData 测试通过，但被既有 `DashboardPage.jsx: 生命周期` 可见术语断言拦截；`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm style:l1` 未跑到本轮断言，当前卡在场景开头 `新建供应商` 按钮不可见。当前 Node 为 v26.5.0，高于仓库 engine `24.14.x`，命令均有 engine warning。
+
+## 2026-07-10 第三轮提交推送全量验证收口
+
+完成：继续按 full-worktree closeout 收口当前大批改动。`qa:full` 首轮暴露 `devCustomerConfig` 测试仍期望 4 个合同默认方字段，已同步为当前 `partyDefaults` 的 5 字段口径。第二轮 `web test` 暴露新增 `FL_*` 用例未登记字段链路目录、以及 Product Core 审阅卡片出现用户可见架构词“生命周期”；已补登记采购 / 加工合同打印日期、源单合同方快照、加工方名称 fallback 的 FL case，并将看板文案改为“业务状态、权限、动作和字段边界”。第三轮 `bash scripts/qa/full.sh` 已完整通过。
+
+下一步：提交并推送当前全工作区改动；推送前继续确认远端未领先，推送后以 `origin/main...HEAD = 0 0` 收口。
+
+阻塞/风险：本次 closeout 修正的是测试目录、测试断言和用户可见文案，不改变 schema / migration / RBAC / Workflow / Fact usecase 的运行时语义。`qa:full` 仍保留当前 Node v26.5.0 高于仓库 engine `24.14.x` 的 warning，以及既有 `ProcessingContractPrintWorkspacePage.jsx` React Hook dependency warning；均未阻断全量验证。

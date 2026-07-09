@@ -15,6 +15,7 @@ import {
 
 export function usePurchaseOrderContractPrint({
   loadOrderItems,
+  loadPrintReferenceData,
   materials = [],
   printTemplateDefaults = {},
   unitOptions = [],
@@ -36,7 +37,19 @@ export function usePurchaseOrderContractPrint({
           message.warning('当前采购订单没有可打印的明细')
           return
         }
-        const supplier = suppliers.find((item) => item.id === record.supplier_id)
+        const referenceData =
+          typeof loadPrintReferenceData === 'function'
+            ? await loadPrintReferenceData()
+            : {}
+        const printMaterials = Array.isArray(referenceData?.materials)
+          ? referenceData.materials
+          : materials
+        const printUnitOptions = Array.isArray(referenceData?.unitOptions)
+          ? referenceData.unitOptions
+          : unitOptions
+        const supplier = suppliers.find(
+          (item) => item.id === record.supplier_id
+        )
         const liveSupplierSnapshot =
           typeof resolveSupplierSnapshot === 'function' && supplier
             ? await resolveSupplierSnapshot(supplier)
@@ -49,11 +62,15 @@ export function usePurchaseOrderContractPrint({
           ),
         }
         const initialDraft = completeMaterialPurchaseContractDraft(
-          buildMaterialPurchaseContractDraftFromPurchaseOrder(printRecord, items, {
-            materials,
-            printTemplateDefaults,
-            unitOptions,
-          })
+          buildMaterialPurchaseContractDraftFromPurchaseOrder(
+            printRecord,
+            items,
+            {
+              materials: printMaterials,
+              printTemplateDefaults,
+              unitOptions: printUnitOptions,
+            }
+          )
         )
         openPrintWorkspaceWindow(MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY, {
           entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
@@ -70,6 +87,7 @@ export function usePurchaseOrderContractPrint({
     [
       customerKey,
       loadOrderItems,
+      loadPrintReferenceData,
       materials,
       printTemplateDefaults,
       resolveSupplierSnapshot,

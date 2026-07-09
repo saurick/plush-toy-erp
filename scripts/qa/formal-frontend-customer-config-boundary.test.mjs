@@ -123,10 +123,17 @@ test("formal frontend customer config boundary: page, action, and field projecti
   assert(layoutSource.includes("当前账号暂无可见后台入口"));
   assert(layoutSource.includes("isCustomerBusinessDataPageKey"));
   assert(layoutSource.includes("shouldGuardCustomerBusinessPageRuntime"));
+  assert(layoutSource.includes("getProductCoreNavigationSections"));
+  assert(layoutSource.includes("routeNavigationSections"));
+  assert(layoutSource.includes("menuNavigationSections"));
+  assert(layoutSource.includes("shouldUseProductCoreNavigation"));
   assert(layoutSource.includes("data-product-core-business-data-guard"));
-  assert(layoutSource.includes("产品核心评审不读取客户业务数据"));
+  assert(layoutSource.includes("data-product-core-capability-review"));
+  assert(layoutSource.includes("ProductCoreCapabilityReview"));
+  assert(layoutSource.includes("能力审阅"));
+  assert(!layoutSource.includes("产品核心评审不读取客户业务数据"));
   assert(layoutSource.includes("data-effective-session-data-scope"));
-  assert(layoutSource.includes("当前没有有效客户运行环境"));
+  assert(layoutSource.includes("无客户运行态"));
 
   const businessModuleSource = readRelative(
     "web/src/erp/config/businessModules.mjs",
@@ -135,6 +142,20 @@ test("formal frontend customer config boundary: page, action, and field projecti
   assert(businessModuleSource.includes("business-dashboard"));
   assert(businessModuleSource.includes("exception-flow"));
   assert(businessModuleSource.includes("businessModuleDefinitions.map"));
+
+  const seedDataSource = readRelative("web/src/erp/config/seedData.mjs");
+  assert(seedDataSource.includes("getProductCoreNavigationSections"));
+  assert(seedDataSource.includes("productCoreDashboardItem"));
+  assert(seedDataSource.includes("产品核心总览"));
+  assert(seedDataSource.includes("title: '产品核心'"));
+  assert(seedDataSource.includes("title: '控制面'"));
+
+  const dashboardSource = readRelative("web/src/erp/pages/DashboardPage.jsx");
+  assert(dashboardSource.includes("ProductCoreDashboard"));
+  assert(dashboardSource.includes('data-product-core-dashboard="true"'));
+  assert(dashboardSource.includes("shouldShowProductCoreDashboard"));
+  assert(dashboardSource.includes("if (shouldShowProductCoreDashboard)"));
+  assert(dashboardSource.includes("不加载客户订单、库存、Workflow"));
 
   const syncSource = readRelative("web/src/erp/utils/adminProfileSync.mjs");
   assert(syncSource.includes("effective_session_sync_failed"));

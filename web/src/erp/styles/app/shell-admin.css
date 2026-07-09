@@ -360,18 +360,43 @@
   min-width: 0;
 }
 
-.erp-product-core-data-guard {
+.erp-product-core-capability-review {
   display: grid;
   gap: 16px;
 }
 
-.erp-product-core-data-guard__body {
+.erp-product-core-capability-review__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  border: 1px solid #d8e3f0;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 18px 20px;
+}
+
+.erp-product-core-capability-review__header h2 {
+  margin: 4px 0 8px;
+  color: #1f2937;
+  font-size: 22px;
+  line-height: 1.35;
+}
+
+.erp-product-core-capability-review__header .ant-typography {
+  margin-bottom: 0;
+  color: #475569;
+}
+
+.erp-product-core-capability-review__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
-.erp-product-core-data-guard__body > div {
+.erp-product-core-capability-review__panel,
+.erp-product-core-capability-review__scope {
   display: grid;
   gap: 6px;
   min-width: 0;
@@ -381,15 +406,30 @@
   padding: 14px 16px;
 }
 
-.erp-product-core-data-guard__body strong {
+.erp-product-core-capability-review__panel--wide {
+  grid-column: span 1;
+}
+
+.erp-product-core-capability-review__panel strong {
   color: #1f2937;
   font-size: 15px;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
+.erp-product-core-capability-review__panel span {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 768px) {
-  .erp-product-core-data-guard__body {
+  .erp-product-core-capability-review__header {
+    display: grid;
+  }
+
+  .erp-product-core-capability-review__grid {
     grid-template-columns: 1fr;
   }
 }

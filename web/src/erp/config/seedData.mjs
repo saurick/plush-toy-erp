@@ -89,6 +89,13 @@ const navItemRegistry = {
 
 export const navigationItemRegistry = navItemRegistry
 
+const productCoreDashboardItem = {
+  ...navItemRegistry['global-dashboard'],
+  label: '产品核心总览',
+  shortLabel: '核心',
+  description: '审阅产品核心能力、运行边界、控制面和客户配置进入条件。',
+}
+
 function getDefaultNavigationSections() {
   return [
     {
@@ -109,6 +116,22 @@ function getDefaultNavigationSections() {
     },
     {
       title: '系统管理',
+      items: [
+        navItemRegistry['permission-center'],
+        navItemRegistry['system-audit-logs'],
+      ],
+    },
+  ]
+}
+
+export function getProductCoreNavigationSections() {
+  return [
+    {
+      title: '产品核心',
+      items: [productCoreDashboardItem, navItemRegistry['print-center']],
+    },
+    {
+      title: '控制面',
       items: [
         navItemRegistry['permission-center'],
         navItemRegistry['system-audit-logs'],

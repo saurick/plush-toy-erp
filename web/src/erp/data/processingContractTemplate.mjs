@@ -33,15 +33,15 @@ const defaultClauses = {
   delivery: [
     '按订单明细分别打包（1k/包，不足1K单独包装），并标明产品编号、工序名称。',
     '请严格按定单规定，准时足量送（发）货。',
-    '必须保证产品的品质，按 BOM 表要求的工艺生产。未达要求的产品，委托方有权要求返工，无法返工的，加工方承担赔偿责任。',
+    '必须保证产品的品质，按BOM表要求的生产艺生产。未达要求的产品，委托方有权要求返工，无法返工的，承担赔偿责任；因返工造成委托方延误工期的，加工方承担违约责任。（因委托方原因导致的，免除加工方的责任）。',
   ],
   contract: [
-    '在订单约定日期前交货。如因货期延误影响委托方正常生产计划，实际交货日期比合同货期延误一天以上的，每延误一天按 100 元 / 款处罚。',
-    '如因特殊原因不能按期交货，务必提前与委托方采购沟通确认，经同意后方可延期，否则加工方承担违约金并赔偿损失。',
-    '违约责任和解决合同纠纷的方式：按《经济合同法》和《购销合同条例》办理。',
+    '在订单约定日期前交货。如因货期延误，影响到我司正常生产计划的，委托方将对加工方收取违约金。实际交货日期比合同货期延误一天以上的，每延误一天，按100元/款来处罚，直接从货款扣除。',
+    '在交货中，如因特殊原因不能按期交货务必提前与委托方采购沟通确认，经同意后方可延期， 否则加工厂承担违约金，赔偿损失；',
+    '违约责任和解决合同纠纷的方式：按《经济合同法》和《购销合同条例》规定需承担的责任，进行友好协商或按《合同法》办理。',
   ],
   settlement: [
-    '按委托方仓库确认收到货物日期，次月开始对账，每月 15 号之前完成对账。',
+    '按委托方仓库确认收到货物日期，次月开始对账，每月15号之前完成对账。',
     '对完账后，次月支付货款，加工厂开具等额增值税专用发票。',
   ],
 }
@@ -576,6 +576,28 @@ function processingPrintPartyDefaults(printTemplateDefaults = {}) {
   }, {})
 }
 
+function processingContractPartySnapshot(order = {}) {
+  const source =
+    order.contract_party_snapshot &&
+    typeof order.contract_party_snapshot === 'object'
+      ? order.contract_party_snapshot
+      : {}
+  const allowedKeys = [
+    'buyerCompany',
+    'buyerContact',
+    'buyerPhone',
+    'buyerAddress',
+    'buyerSigner',
+  ]
+  return allowedKeys.reduce((output, key) => {
+    const value = normalizeText(source?.[key])
+    if (value) {
+      output[key] = value
+    }
+    return output
+  }, {})
+}
+
 export function buildProcessingContractDraftFromOutsourcingFact(record = {}) {
   const contractNo = normalizeText(record.fact_no)
   const supplierName = normalizeText(record.supplier_name)
@@ -606,8 +628,8 @@ export function buildProcessingContractDraftFromOutsourcingOrder(
       ? order.supplier_snapshot
       : {}
   const supplierName =
-    normalizeText(supplierSnapshot.short_name) ||
-    normalizeText(supplierSnapshot.name)
+    normalizeText(supplierSnapshot.name) ||
+    normalizeText(supplierSnapshot.short_name)
   const draft = createBlankProcessingContractDraft()
   const sourceOrderNo = normalizeText(order.source_order_no)
   const activeItems = (Array.isArray(items) ? items : []).filter(
@@ -624,8 +646,10 @@ export function buildProcessingContractDraftFromOutsourcingOrder(
       normalizeText(supplierSnapshot.contact_mobile),
     supplierAddress: normalizeText(supplierSnapshot.address),
     ...processingPrintPartyDefaults(printTemplateDefaults),
+    ...processingContractPartySnapshot(order),
     orderDateText: formatProcessingDraftDate(order.order_date),
     returnDateText: formatProcessingDraftDate(order.expected_return_date),
+    buyerSignDateText: formatProcessingDraftDate(order.order_date),
     lines: activeItems.map((item) =>
       normalizeProcessingLine({
         contractNo,

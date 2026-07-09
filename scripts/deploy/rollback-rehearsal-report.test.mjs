@@ -37,7 +37,7 @@ function writeCustomerConfigSmokeReport(root, overrides = {}) {
         name: "customer-config-effective-session",
         status: "pass",
         target: "jsonrpc:customer_config.get_effective_session",
-        expectedRevision: "yoyoosun-customer-package-v1.runtime-manifest-v1",
+        expectedRevision: "yoyoosun-customer-package-v4.runtime-manifest-v1",
         tokenSourceEnv: "CUSTOMER_CONFIG_ADMIN_TOKEN",
         responseBodyStored: false,
       },
@@ -154,7 +154,7 @@ test("buildReport accepts customer config post-smoke effective session proof", (
   writeCustomerConfigSmokeReport(root);
   const report = buildReport(
     baseOptions(root, {
-      customerConfigRevision: "yoyoosun-customer-package-v1.runtime-manifest-v1",
+      customerConfigRevision: "yoyoosun-customer-package-v4.runtime-manifest-v1",
     }),
     new Date("2026-06-29T12:30:00Z"),
   );
@@ -163,7 +163,7 @@ test("buildReport accepts customer config post-smoke effective session proof", (
   assert.equal(report.postCheck.smokeCheckCount, 3);
   assert.deepEqual(report.postCheck.customerConfigEffectiveSession, {
     status: "verified",
-    expectedRevision: "yoyoosun-customer-package-v1.runtime-manifest-v1",
+    expectedRevision: "yoyoosun-customer-package-v4.runtime-manifest-v1",
     target: "jsonrpc:customer_config.get_effective_session",
   });
 });
@@ -185,7 +185,7 @@ test("buildReport requires matching customer config post-smoke proof when reques
     () =>
       buildReport(
         baseOptions(root, {
-          customerConfigRevision: "yoyoosun-customer-package-v1.runtime-manifest-v1",
+          customerConfigRevision: "yoyoosun-customer-package-v4.runtime-manifest-v1",
         }),
       ),
     /must include customer-config-effective-session/,
@@ -210,7 +210,7 @@ test("buildReport requires matching customer config post-smoke proof when reques
     () =>
       buildReport(
         baseOptions(root, {
-          customerConfigRevision: "yoyoosun-customer-package-v1.runtime-manifest-v1",
+          customerConfigRevision: "yoyoosun-customer-package-v4.runtime-manifest-v1",
         }),
       ),
     /expectedRevision must match customerConfigRevision/,
@@ -324,7 +324,7 @@ test("CLI writes rollback rehearsal report", () => {
       "--post-smoke-report",
       "smoke-test-report.json",
       "--customer-config-revision",
-      "yoyoosun-customer-package-v1.runtime-manifest-v1",
+      "yoyoosun-customer-package-v4.runtime-manifest-v1",
       "--out",
       outPath,
     ],
@@ -337,7 +337,7 @@ test("CLI writes rollback rehearsal report", () => {
   assert.equal(report.postCheck.smokeStatus, "passed");
   assert.equal(
     report.postCheck.customerConfigEffectiveSession.expectedRevision,
-    "yoyoosun-customer-package-v1.runtime-manifest-v1",
+    "yoyoosun-customer-package-v4.runtime-manifest-v1",
   );
 });
 

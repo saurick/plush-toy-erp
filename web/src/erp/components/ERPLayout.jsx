@@ -46,9 +46,15 @@ import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
-import { isCustomerBusinessDataPageKey } from '../config/businessModules.mjs'
+import {
+  getBusinessModule,
+  isCustomerBusinessDataPageKey,
+} from '../config/businessModules.mjs'
 import { resolveMenuPermissionKey } from '../config/menuPermissions.mjs'
-import { getNavigationSections } from '../config/seedData.mjs'
+import {
+  getNavigationSections,
+  getProductCoreNavigationSections,
+} from '../config/seedData.mjs'
 import { getEffectiveSession } from '../api/customerConfigApi.mjs'
 import {
   DEFAULT_DESKTOP_ENTRY,
@@ -98,33 +104,97 @@ const navIconRegistry = {
   'system-audit-logs': <FileSearchOutlined />,
 }
 
-function ProductCoreBusinessDataGuard({ currentEntry }) {
-  const pageLabel = currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label
+const productCoreReviewFallbackByPageKey = {
+  'business-dashboard': {
+    title: '业务看板',
+    description: '业务看板汇总客户运行态的订单、库存、协同、出货和财务指标。',
+    primaryEntity: 'dashboard_stats',
+    factSource: 'business.dashboard_stats',
+    currentScope: ['看板入口', '菜单权限', '指标分组', '客户运行态读模型边界'],
+    boundary:
+      'Product Core 只审阅看板能力和指标边界，不在无客户态读取 dashboard_stats。',
+  },
+  'exception-flow': {
+    title: '异常 / 阻塞闭环',
+    description: '异常闭环承接客户运行态的阻塞任务、处理动作、原因和后续跟进。',
+    primaryEntity: 'workflow_tasks / workflow_task_events',
+    factSource: 'workflow runtime',
+    currentScope: ['异常入口', '责任角色', '阻塞状态', '处理动作边界'],
+    boundary: 'Workflow 任务处理不等于库存、出货、财务或其他 Fact posted。',
+  },
+}
+
+function ProductCoreCapabilityReview({ currentEntry }) {
+  const pageKey = currentEntry?.pageKey || currentEntry?.key || ''
+  const moduleDefinition =
+    getBusinessModule(pageKey) || productCoreReviewFallbackByPageKey[pageKey]
+  const pageLabel =
+    moduleDefinition?.title ||
+    moduleDefinition?.label ||
+    currentEntry?.label ||
+    DEFAULT_DESKTOP_ENTRY.label
+  const currentScope =
+    Array.isArray(moduleDefinition?.currentScope) &&
+    moduleDefinition.currentScope.length > 0
+      ? moduleDefinition.currentScope
+      : ['菜单入口', '权限码', '字段策略', '动作边界']
+  const sourceText =
+    moduleDefinition?.factSource ||
+    moduleDefinition?.primaryEntity ||
+    '客户运行态业务 API'
+  const boundaryText =
+    moduleDefinition?.boundary ||
+    'Product Core 只审阅页面能力、权限、字段和动作边界；客户业务记录需在客户运行态查看。'
 
   return (
     <div
-      className="erp-product-core-data-guard"
+      className="erp-product-core-capability-review"
       data-product-core-business-data-guard="true"
+      data-product-core-capability-review="true"
     >
-      <Alert
-        type="info"
-        showIcon
-        message="产品核心评审不读取客户业务数据"
-        description={`${pageLabel} 是客户运行时业务数据页；当前没有有效客户运行环境，只审阅菜单、权限、字段和动作边界，不读取或展示客户订单、库存、协同任务、财务或业务事实记录。`}
-      />
-      <div className="erp-product-core-data-guard__body">
+      <div className="erp-product-core-capability-review__header">
         <div>
-          <Text type="secondary">当前页</Text>
+          <Text type="secondary">Product Core</Text>
+          <h2>{pageLabel} 能力审阅</h2>
+          <Paragraph>
+            {moduleDefinition?.description ||
+              `${pageLabel} 当前作为产品核心已登记页面参与菜单、权限、字段和动作边界审阅。`}
+          </Paragraph>
+        </div>
+        <Space size={8} wrap>
+          <Tag color="blue">能力定义</Tag>
+          <Tag color="geekblue">不挂载客户数据</Tag>
+          <Tag>无客户运行态</Tag>
+        </Space>
+      </div>
+
+      <div className="erp-product-core-capability-review__grid">
+        <div className="erp-product-core-capability-review__panel">
+          <Text type="secondary">当前模块</Text>
           <strong>{pageLabel}</strong>
+          <span>{moduleDefinition?.sectionTitle || '产品核心能力目录'}</span>
         </div>
-        <div>
-          <Text type="secondary">评审范围</Text>
-          <strong>页面能力、权限、字段和动作边界</strong>
+        <div className="erp-product-core-capability-review__panel">
+          <Text type="secondary">数据真源</Text>
+          <strong>{sourceText}</strong>
+          <span>客户订单、库存、协同任务和财务记录只在客户运行态读取。</span>
         </div>
-        <div>
-          <Text type="secondary">客户数据</Text>
-          <strong>请切换到客户账号或客户运行态查看</strong>
+        <div className="erp-product-core-capability-review__panel erp-product-core-capability-review__panel--wide">
+          <Text type="secondary">边界说明</Text>
+          <strong>{boundaryText}</strong>
+          <span>
+            要查看真实业务记录，请切换到带 customer key 的客户运行环境。
+          </span>
         </div>
+      </div>
+
+      <div className="erp-product-core-capability-review__scope">
+        <Text type="secondary">已登记审阅范围</Text>
+        <Space size={8} wrap>
+          {currentScope.map((item) => (
+            <Tag key={item}>{item}</Tag>
+          ))}
+        </Space>
       </div>
     </div>
   )
@@ -197,17 +267,30 @@ export default function ERPLayout() {
   )
 
   const isSuperAdmin = adminProfile?.is_super_admin === true
-  const navigationSections = useMemo(
+  const effectiveSessionCustomerKey =
+    typeof adminProfile?.effective_session?.customer?.key === 'string'
+      ? adminProfile.effective_session.customer.key.trim()
+      : ''
+  const shouldUseProductCoreNavigation =
+    isSuperAdmin && !effectiveSessionCustomerKey
+  const routeNavigationSections = useMemo(
     () => getNavigationSections(isSuperAdmin ? null : undefined),
     [isSuperAdmin]
+  )
+  const menuNavigationSections = useMemo(
+    () =>
+      shouldUseProductCoreNavigation
+        ? getProductCoreNavigationSections()
+        : routeNavigationSections,
+    [routeNavigationSections, shouldUseProductCoreNavigation]
   )
   const currentNavigationEntry = useMemo(
     () =>
       resolveCurrentNavigationEntry({
-        navigationSections,
+        navigationSections: routeNavigationSections,
         locationPath: location.pathname,
       }),
-    [location.pathname, navigationSections]
+    [location.pathname, routeNavigationSections]
   )
   const currentEntry = currentNavigationEntry.entry
 
@@ -373,12 +456,12 @@ export default function ERPLayout() {
 
   const visibleSections = useMemo(() => {
     return filterNavigationSectionsByAdminProfile({
-      navigationSections,
+      navigationSections: menuNavigationSections,
       adminProfile,
       allowedMenuPaths,
       isSuperAdmin,
     })
-  }, [adminProfile, allowedMenuPaths, isSuperAdmin, navigationSections])
+  }, [adminProfile, allowedMenuPaths, isSuperAdmin, menuNavigationSections])
 
   const effectiveSessionDiagnostic = useMemo(
     () =>
@@ -744,7 +827,7 @@ export default function ERPLayout() {
                 description="请确认账号角色权限和当前客户有效配置的页面清单；若客户配置同步失败，请稍后刷新或联系管理员复核当前有效配置版本。"
               />
             ) : shouldGuardProductCoreBusinessData ? (
-              <ProductCoreBusinessDataGuard currentEntry={currentEntry} />
+              <ProductCoreCapabilityReview currentEntry={currentEntry} />
             ) : (
               <Outlet context={outletContext} />
             )}

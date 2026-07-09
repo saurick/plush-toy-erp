@@ -253,8 +253,46 @@ export default function OutsourcingOrderForm({
           }
         />
       </Form.Item>
+      <div className="erp-business-action-form__section-title">
+        合同委托方信息
+      </div>
       <Form.Item
         className="erp-business-action-form__field"
+        name={['contract_party_snapshot', 'buyerCompany']}
+        label="委托单位"
+      >
+        <Input maxLength={128} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name={['contract_party_snapshot', 'buyerContact']}
+        label="委托人"
+      >
+        <Input maxLength={64} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name={['contract_party_snapshot', 'buyerPhone']}
+        label="委托方电话"
+      >
+        <Input maxLength={64} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name={['contract_party_snapshot', 'buyerAddress']}
+        label="公司地址"
+      >
+        <Input maxLength={255} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        name={['contract_party_snapshot', 'buyerSigner']}
+        label="委托方签字人"
+      >
+        <Input maxLength={64} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field erp-business-action-form__field--full"
         name="note"
         label="备注"
       >

@@ -147,7 +147,7 @@ export function QualityInspectionCreateForm({
         />
       </Form.Item>
       <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--wide"
+        className="erp-business-action-form__field erp-business-action-form__field--full"
         label="备注"
         name="decision_note"
       >
@@ -184,7 +184,7 @@ export function QualityInspectionDecisionForm({ form, mode }) {
         </Form.Item>
       ) : null}
       <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--wide"
+        className="erp-business-action-form__field erp-business-action-form__field--full"
         label="判定备注"
         name="decision_note"
       >

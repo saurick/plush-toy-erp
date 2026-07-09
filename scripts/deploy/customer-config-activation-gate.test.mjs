@@ -38,7 +38,7 @@ function writeManifestEvidence(root, evidenceDir, manifest, overrides = {}) {
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        revision: "yoyoosun-customer-package-v1.runtime-manifest-v1",
+        revision: "yoyoosun-customer-package-v4.runtime-manifest-v1",
         manifestSha256: `sha256:${manifestSha256(root, manifest)}`,
         reviewStatus: overrides.reviewStatus ?? "approved",
         redaction: {
@@ -285,7 +285,7 @@ test("customer config activation gate accepts manifest with filled release evide
   });
 
   assert.equal(result.customer, "yoyoosun");
-  assert.equal(result.revision, "yoyoosun-customer-package-v1.runtime-manifest-v1");
+  assert.equal(result.revision, "yoyoosun-customer-package-v4.runtime-manifest-v1");
   assert.equal(result.scope.evidenceOnly, true);
 });
 

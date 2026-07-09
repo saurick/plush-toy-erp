@@ -137,6 +137,7 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 			SetOutsourcingOrderNo(in.OutsourcingOrderNo).
 			SetSupplierID(in.SupplierID).
 			SetSupplierSnapshot(in.SupplierSnapshot).
+			SetContractPartySnapshot(in.ContractPartySnapshot).
 			SetOrderDate(in.OrderDate)
 		if in.SourceOrderNo == nil {
 			update.ClearSourceOrderNo()
@@ -170,6 +171,7 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 			SetOutsourcingOrderNo(in.OutsourcingOrderNo).
 			SetSupplierID(in.SupplierID).
 			SetSupplierSnapshot(in.SupplierSnapshot).
+			SetContractPartySnapshot(in.ContractPartySnapshot).
 			SetNillableSourceOrderNo(in.SourceOrderNo).
 			SetNillableSourceSalesOrderID(in.SourceSalesOrderID).
 			SetOrderDate(in.OrderDate).
@@ -421,18 +423,19 @@ func entOutsourcingOrderToBiz(row *ent.OutsourcingOrder) *biz.OutsourcingOrder {
 		return nil
 	}
 	return &biz.OutsourcingOrder{
-		ID:                 row.ID,
-		OutsourcingOrderNo: row.OutsourcingOrderNo,
-		SupplierID:         row.SupplierID,
-		SupplierSnapshot:   row.SupplierSnapshot,
-		SourceOrderNo:      row.SourceOrderNo,
-		SourceSalesOrderID: row.SourceSalesOrderID,
-		OrderDate:          row.OrderDate,
-		ExpectedReturnDate: row.ExpectedReturnDate,
-		LifecycleStatus:    row.LifecycleStatus,
-		Note:               row.Note,
-		CreatedAt:          row.CreatedAt,
-		UpdatedAt:          row.UpdatedAt,
+		ID:                    row.ID,
+		OutsourcingOrderNo:    row.OutsourcingOrderNo,
+		SupplierID:            row.SupplierID,
+		SupplierSnapshot:      row.SupplierSnapshot,
+		ContractPartySnapshot: row.ContractPartySnapshot,
+		SourceOrderNo:         row.SourceOrderNo,
+		SourceSalesOrderID:    row.SourceSalesOrderID,
+		OrderDate:             row.OrderDate,
+		ExpectedReturnDate:    row.ExpectedReturnDate,
+		LifecycleStatus:       row.LifecycleStatus,
+		Note:                  row.Note,
+		CreatedAt:             row.CreatedAt,
+		UpdatedAt:             row.UpdatedAt,
 	}
 }
 

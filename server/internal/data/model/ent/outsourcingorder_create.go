@@ -40,6 +40,12 @@ func (_c *OutsourcingOrderCreate) SetSupplierSnapshot(v map[string]interface{}) 
 	return _c
 }
 
+// SetContractPartySnapshot sets the "contract_party_snapshot" field.
+func (_c *OutsourcingOrderCreate) SetContractPartySnapshot(v map[string]interface{}) *OutsourcingOrderCreate {
+	_c.mutation.SetContractPartySnapshot(v)
+	return _c
+}
+
 // SetSourceOrderNo sets the "source_order_no" field.
 func (_c *OutsourcingOrderCreate) SetSourceOrderNo(v string) *OutsourcingOrderCreate {
 	_c.mutation.SetSourceOrderNo(v)
@@ -299,6 +305,10 @@ func (_c *OutsourcingOrderCreate) createSpec() (*OutsourcingOrder, *sqlgraph.Cre
 	if value, ok := _c.mutation.SupplierSnapshot(); ok {
 		_spec.SetField(outsourcingorder.FieldSupplierSnapshot, field.TypeJSON, value)
 		_node.SupplierSnapshot = value
+	}
+	if value, ok := _c.mutation.ContractPartySnapshot(); ok {
+		_spec.SetField(outsourcingorder.FieldContractPartySnapshot, field.TypeJSON, value)
+		_node.ContractPartySnapshot = value
 	}
 	if value, ok := _c.mutation.SourceOrderNo(); ok {
 		_spec.SetField(outsourcingorder.FieldSourceOrderNo, field.TypeString, value)

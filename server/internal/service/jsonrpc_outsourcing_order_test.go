@@ -143,8 +143,13 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 		"outsourcing_order_no": "OUT-JSONRPC-001",
 		"supplier_id":          float64(1),
 		"supplier_snapshot":    map[string]any{"name": "加工厂"},
-		"source_order_no":      "SO-JSONRPC-001",
-		"order_date":           "2026-06-17",
+		"contract_party_snapshot": map[string]any{
+			"buyerCompany": "永绅",
+			"buyerContact": "委外负责人",
+			"buyerPhone":   "13600000000",
+		},
+		"source_order_no": "SO-JSONRPC-001",
+		"order_date":      "2026-06-17",
 		"items": []any{
 			map[string]any{
 				"line_no":                   float64(1),
@@ -173,6 +178,10 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	orderID := jsonRPCInt(t, order, "id")
 	if status := order["lifecycle_status"]; status != biz.OutsourcingOrderStatusDraft {
 		t.Fatalf("expected draft outsourcing order, got %#v", status)
+	}
+	partySnapshot, ok := order["contract_party_snapshot"].(map[string]any)
+	if !ok || partySnapshot["buyerCompany"] != "永绅" || partySnapshot["buyerContact"] != "委外负责人" {
+		t.Fatalf("expected contract party snapshot on outsourcing order, got %#v", order["contract_party_snapshot"])
 	}
 	items, ok := saveRes.Data.AsMap()["outsourcing_order_items"].([]any)
 	if !ok || len(items) != 1 {
@@ -389,18 +398,19 @@ func outsourcingOrderJSONRPCSaveParams(t *testing.T, orderNo string) *structpb.S
 
 func outsourcingOrderFromMutation(id int, status string, in *biz.OutsourcingOrderMutation) *biz.OutsourcingOrder {
 	return &biz.OutsourcingOrder{
-		ID:                 id,
-		OutsourcingOrderNo: in.OutsourcingOrderNo,
-		SupplierID:         in.SupplierID,
-		SupplierSnapshot:   in.SupplierSnapshot,
-		SourceOrderNo:      in.SourceOrderNo,
-		SourceSalesOrderID: in.SourceSalesOrderID,
-		OrderDate:          in.OrderDate,
-		ExpectedReturnDate: in.ExpectedReturnDate,
-		LifecycleStatus:    status,
-		Note:               in.Note,
-		CreatedAt:          time.Unix(1, 0),
-		UpdatedAt:          time.Unix(1, 0),
+		ID:                    id,
+		OutsourcingOrderNo:    in.OutsourcingOrderNo,
+		SupplierID:            in.SupplierID,
+		SupplierSnapshot:      in.SupplierSnapshot,
+		ContractPartySnapshot: in.ContractPartySnapshot,
+		SourceOrderNo:         in.SourceOrderNo,
+		SourceSalesOrderID:    in.SourceSalesOrderID,
+		OrderDate:             in.OrderDate,
+		ExpectedReturnDate:    in.ExpectedReturnDate,
+		LifecycleStatus:       status,
+		Note:                  in.Note,
+		CreatedAt:             time.Unix(1, 0),
+		UpdatedAt:             time.Unix(1, 0),
 	}
 }
 

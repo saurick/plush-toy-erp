@@ -959,7 +959,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/rollback-rehearsal-repor
   --step "verify rollback command path=pass" \
   --step "verify forward-fix owner path=pass" \
   --post-smoke-report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json \
-  --customer-config-revision yoyoosun-customer-package-v1.runtime-manifest-v1 \
+  --customer-config-revision yoyoosun-customer-package-v3.runtime-manifest-v1 \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
 

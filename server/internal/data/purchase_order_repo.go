@@ -35,6 +35,7 @@ func (r *purchaseOrderRepo) CreatePurchaseOrder(ctx context.Context, in *biz.Pur
 		SetSupplierID(in.SupplierID).
 		SetNillableSupplierPurchaseOrderNo(in.SupplierPurchaseOrderNo).
 		SetSupplierSnapshot(in.SupplierSnapshot).
+		SetContractPartySnapshot(in.ContractPartySnapshot).
 		SetPurchaseDate(in.PurchaseDate).
 		SetNillableExpectedArrivalDate(in.ExpectedArrivalDate).
 		SetLifecycleStatus(biz.PurchaseOrderStatusDraft).
@@ -51,6 +52,7 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrder(ctx context.Context, id int, in 
 		SetPurchaseOrderNo(in.PurchaseOrderNo).
 		SetSupplierID(in.SupplierID).
 		SetSupplierSnapshot(in.SupplierSnapshot).
+		SetContractPartySnapshot(in.ContractPartySnapshot).
 		SetPurchaseDate(in.PurchaseDate)
 	if in.SupplierPurchaseOrderNo == nil {
 		update.ClearSupplierPurchaseOrderNo()
@@ -320,6 +322,7 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 			SetPurchaseOrderNo(in.PurchaseOrderNo).
 			SetSupplierID(in.SupplierID).
 			SetSupplierSnapshot(in.SupplierSnapshot).
+			SetContractPartySnapshot(in.ContractPartySnapshot).
 			SetPurchaseDate(in.PurchaseDate)
 		if in.SupplierPurchaseOrderNo == nil {
 			update.ClearSupplierPurchaseOrderNo()
@@ -349,6 +352,7 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 			SetSupplierID(in.SupplierID).
 			SetNillableSupplierPurchaseOrderNo(in.SupplierPurchaseOrderNo).
 			SetSupplierSnapshot(in.SupplierSnapshot).
+			SetContractPartySnapshot(in.ContractPartySnapshot).
 			SetPurchaseDate(in.PurchaseDate).
 			SetNillableExpectedArrivalDate(in.ExpectedArrivalDate).
 			SetLifecycleStatus(biz.PurchaseOrderStatusDraft).
@@ -557,6 +561,7 @@ func entPurchaseOrderToBiz(row *ent.PurchaseOrder) *biz.PurchaseOrder {
 		SupplierID:              row.SupplierID,
 		SupplierPurchaseOrderNo: row.SupplierPurchaseOrderNo,
 		SupplierSnapshot:        row.SupplierSnapshot,
+		ContractPartySnapshot:   row.ContractPartySnapshot,
 		PurchaseDate:            row.PurchaseDate,
 		ExpectedArrivalDate:     row.ExpectedArrivalDate,
 		LifecycleStatus:         row.LifecycleStatus,

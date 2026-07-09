@@ -57,6 +57,7 @@ import {
   buildPurchaseOrderItemParams,
   buildPurchaseOrderParams,
   buildSequentialDraftCode,
+  contractPartySnapshotFromPrintTemplateDefaults,
   buildSupplierSnapshot,
   buildSupplierSnapshotWithContacts,
   canRunPurchaseOrderLifecycleAction,
@@ -288,6 +289,28 @@ export default function V1PurchaseOrdersPage() {
     }
   }, [])
 
+  const loadPrintReferenceData = useCallback(async () => {
+    const [materialData, unitData] = await Promise.all([
+      listMaterials({ active_only: true, limit: 200 }),
+      listUnits({ limit: 500 }),
+    ])
+    const nextMaterials = materialData?.materials || []
+    const nextUnits = unitData?.units || []
+    if (nextMaterials.length > 0) {
+      setMaterials(nextMaterials)
+    }
+    if (nextUnits.length > 0) {
+      setUnits(nextUnits)
+    }
+    return {
+      materials: nextMaterials.length > 0 ? nextMaterials : materials,
+      unitOptions:
+        nextUnits.length > 0
+          ? uniqueReferenceOptions(nextUnits, unitOption)
+          : unitOptions,
+    }
+  }, [materials, unitOptions])
+
   useEffect(() => {
     loadReferenceData()
   }, [loadReferenceData])
@@ -320,6 +343,10 @@ export default function V1PurchaseOrdersPage() {
       supplier_purchase_order_no: '',
       purchase_date: todayInputValue(),
       expected_arrival_date: '',
+      contract_party_snapshot: contractPartySnapshotFromPrintTemplateDefaults(
+        purchasePrintTemplateDefaults,
+        MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY
+      ),
       note: '',
       items: [createBlankPurchaseLine(1)],
     })
@@ -336,6 +363,14 @@ export default function V1PurchaseOrdersPage() {
       supplier_purchase_order_no: record.supplier_purchase_order_no || '',
       purchase_date: unixToDateInputValue(record.purchase_date),
       expected_arrival_date: unixToDateInputValue(record.expected_arrival_date),
+      contract_party_snapshot:
+        record.contract_party_snapshot &&
+        typeof record.contract_party_snapshot === 'object'
+          ? record.contract_party_snapshot
+          : contractPartySnapshotFromPrintTemplateDefaults(
+              purchasePrintTemplateDefaults,
+              MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY
+            ),
       note: record.note || '',
       items:
         lines
@@ -625,6 +660,7 @@ export default function V1PurchaseOrdersPage() {
   const { printPurchaseContract, printingContract } =
     usePurchaseOrderContractPrint({
       loadOrderItems,
+      loadPrintReferenceData,
       materials,
       printTemplateDefaults: purchasePrintTemplateDefaults,
       resolveSupplierSnapshot,

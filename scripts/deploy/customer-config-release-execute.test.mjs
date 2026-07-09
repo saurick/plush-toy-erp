@@ -63,7 +63,7 @@ function writeManifestEvidence(root, evidenceDir, manifest) {
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        revision: "yoyoosun-customer-package-v1.runtime-manifest-v1",
+        revision: "yoyoosun-customer-package-v4.runtime-manifest-v1",
         manifestSha256: `sha256:${manifestSha256(root, manifest)}`,
         reviewStatus: "approved",
         redaction: {
@@ -423,7 +423,7 @@ test("默认只生成发布计划报告，不调用真实后端", async () => {
         "utf8",
       ),
     );
-    assert.equal(saved.revision, "yoyoosun-customer-package-v1.runtime-manifest-v1");
+    assert.equal(saved.revision, "yoyoosun-customer-package-v4.runtime-manifest-v1");
     assert.equal(saved.manifest, manifest);
     const markdown = await readFile(
       path.join(out, "customer-config-release-report.md"),
@@ -674,10 +674,10 @@ test("execute activate 通过 JSON-RPC 调用 validate、publish、activate", as
     );
     assert.equal(calls[0].url, "http://127.0.0.1:8300/rpc/customer_config");
     assert.equal(calls[0].auth, "Bearer test-token");
-    assert.equal(calls[2].params.revision, "yoyoosun-customer-package-v1.runtime-manifest-v1");
+    assert.equal(calls[2].params.revision, "yoyoosun-customer-package-v4.runtime-manifest-v1");
     assert.equal(report.backendEndpointAlias, "http://127.0.0.1:8300");
     assert.equal(report.effectiveSessionVerification.status, "verified");
-    assert.equal(report.effectiveSessionVerification.configRevision, "yoyoosun-customer-package-v1.runtime-manifest-v1");
+    assert.equal(report.effectiveSessionVerification.configRevision, "yoyoosun-customer-package-v4.runtime-manifest-v1");
   } finally {
     globalThis.fetch = originalFetch;
     if (originalConfirm === undefined) {
@@ -758,7 +758,7 @@ test("execute rollback 只调用 rollback_customer_config", async () => {
       calls.map((call) => call.method),
       ["rollback_customer_config", "get_effective_session"],
     );
-    assert.equal(calls[0].params.target_revision, "yoyoosun-customer-package-v1.runtime-manifest-v1");
+    assert.equal(calls[0].params.target_revision, "yoyoosun-customer-package-v4.runtime-manifest-v1");
     assert.equal(calls[0].auth, "Bearer test-token");
     assert.equal(report.backendEndpointAlias, "http://127.0.0.1:8300");
     assert.equal(report.effectiveSessionVerification.status, "verified");
@@ -843,7 +843,7 @@ test("execute activate-only 只调用 activate_customer_config", async () => {
       calls.map((call) => call.method),
       ["activate_customer_config", "get_effective_session"],
     );
-    assert.equal(calls[0].params.revision, "yoyoosun-customer-package-v1.runtime-manifest-v1");
+    assert.equal(calls[0].params.revision, "yoyoosun-customer-package-v4.runtime-manifest-v1");
     assert.equal(report.backendEndpointAlias, "http://127.0.0.1:8300");
     assert.equal(report.effectiveSessionVerification.status, "verified");
   } finally {

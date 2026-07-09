@@ -35,6 +35,8 @@ func (OutsourcingOrder) Fields() []ent.Field {
 		// Snapshot preserves contract-time display data; Supplier remains the master truth.
 		field.JSON("supplier_snapshot", map[string]any{}).
 			Optional(),
+		field.JSON("contract_party_snapshot", map[string]any{}).
+			Optional(),
 		field.String("source_order_no").
 			Optional().
 			Nillable().

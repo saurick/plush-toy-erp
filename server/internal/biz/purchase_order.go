@@ -37,6 +37,7 @@ type PurchaseOrder struct {
 	SupplierID              int
 	SupplierPurchaseOrderNo *string
 	SupplierSnapshot        map[string]any
+	ContractPartySnapshot   map[string]any
 	PurchaseDate            time.Time
 	ExpectedArrivalDate     *time.Time
 	LifecycleStatus         string
@@ -72,6 +73,7 @@ type PurchaseOrderMutation struct {
 	SupplierID              int
 	SupplierPurchaseOrderNo *string
 	SupplierSnapshot        map[string]any
+	ContractPartySnapshot   map[string]any
 	PurchaseDate            time.Time
 	ExpectedArrivalDate     *time.Time
 	Note                    *string
@@ -440,6 +442,9 @@ func normalizePurchaseOrderMutation(in PurchaseOrderMutation) (PurchaseOrderMuta
 	in.Note = normalizeOptionalString(in.Note)
 	if in.SupplierSnapshot == nil {
 		in.SupplierSnapshot = map[string]any{}
+	}
+	if in.ContractPartySnapshot == nil {
+		in.ContractPartySnapshot = map[string]any{}
 	}
 	if in.PurchaseOrderNo == "" || in.SupplierID <= 0 || in.PurchaseDate.IsZero() {
 		return PurchaseOrderMutation{}, ErrBadParam

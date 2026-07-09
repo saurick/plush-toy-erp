@@ -70,6 +70,18 @@ func (_u *OutsourcingOrderUpdate) ClearSupplierSnapshot() *OutsourcingOrderUpdat
 	return _u
 }
 
+// SetContractPartySnapshot sets the "contract_party_snapshot" field.
+func (_u *OutsourcingOrderUpdate) SetContractPartySnapshot(v map[string]interface{}) *OutsourcingOrderUpdate {
+	_u.mutation.SetContractPartySnapshot(v)
+	return _u
+}
+
+// ClearContractPartySnapshot clears the value of the "contract_party_snapshot" field.
+func (_u *OutsourcingOrderUpdate) ClearContractPartySnapshot() *OutsourcingOrderUpdate {
+	_u.mutation.ClearContractPartySnapshot()
+	return _u
+}
+
 // SetSourceOrderNo sets the "source_order_no" field.
 func (_u *OutsourcingOrderUpdate) SetSourceOrderNo(v string) *OutsourcingOrderUpdate {
 	_u.mutation.SetSourceOrderNo(v)
@@ -338,6 +350,12 @@ func (_u *OutsourcingOrderUpdate) sqlSave(ctx context.Context) (_node int, err e
 	if _u.mutation.SupplierSnapshotCleared() {
 		_spec.ClearField(outsourcingorder.FieldSupplierSnapshot, field.TypeJSON)
 	}
+	if value, ok := _u.mutation.ContractPartySnapshot(); ok {
+		_spec.SetField(outsourcingorder.FieldContractPartySnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.ContractPartySnapshotCleared() {
+		_spec.ClearField(outsourcingorder.FieldContractPartySnapshot, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.SourceOrderNo(); ok {
 		_spec.SetField(outsourcingorder.FieldSourceOrderNo, field.TypeString, value)
 	}
@@ -505,6 +523,18 @@ func (_u *OutsourcingOrderUpdateOne) SetSupplierSnapshot(v map[string]interface{
 // ClearSupplierSnapshot clears the value of the "supplier_snapshot" field.
 func (_u *OutsourcingOrderUpdateOne) ClearSupplierSnapshot() *OutsourcingOrderUpdateOne {
 	_u.mutation.ClearSupplierSnapshot()
+	return _u
+}
+
+// SetContractPartySnapshot sets the "contract_party_snapshot" field.
+func (_u *OutsourcingOrderUpdateOne) SetContractPartySnapshot(v map[string]interface{}) *OutsourcingOrderUpdateOne {
+	_u.mutation.SetContractPartySnapshot(v)
+	return _u
+}
+
+// ClearContractPartySnapshot clears the value of the "contract_party_snapshot" field.
+func (_u *OutsourcingOrderUpdateOne) ClearContractPartySnapshot() *OutsourcingOrderUpdateOne {
+	_u.mutation.ClearContractPartySnapshot()
 	return _u
 }
 
@@ -805,6 +835,12 @@ func (_u *OutsourcingOrderUpdateOne) sqlSave(ctx context.Context) (_node *Outsou
 	}
 	if _u.mutation.SupplierSnapshotCleared() {
 		_spec.ClearField(outsourcingorder.FieldSupplierSnapshot, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.ContractPartySnapshot(); ok {
+		_spec.SetField(outsourcingorder.FieldContractPartySnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.ContractPartySnapshotCleared() {
+		_spec.ClearField(outsourcingorder.FieldContractPartySnapshot, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.SourceOrderNo(); ok {
 		_spec.SetField(outsourcingorder.FieldSourceOrderNo, field.TypeString, value)

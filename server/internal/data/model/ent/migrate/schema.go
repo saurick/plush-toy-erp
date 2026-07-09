@@ -787,6 +787,7 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "outsourcing_order_no", Type: field.TypeString, Size: 64},
 		{Name: "supplier_snapshot", Type: field.TypeJSON, Nullable: true},
+		{Name: "contract_party_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "source_order_no", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "source_sales_order_id", Type: field.TypeInt, Nullable: true},
 		{Name: "order_date", Type: field.TypeTime},
@@ -805,7 +806,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "outsourcing_orders_suppliers_outsourcing_orders",
-				Columns:    []*schema.Column{OutsourcingOrdersColumns[11]},
+				Columns:    []*schema.Column{OutsourcingOrdersColumns[12]},
 				RefColumns: []*schema.Column{SuppliersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -819,32 +820,32 @@ var (
 			{
 				Name:    "outsourcingorder_supplier_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[11]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[12]},
 			},
 			{
 				Name:    "outsourcingorder_source_order_no",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[3]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[4]},
 			},
 			{
 				Name:    "outsourcingorder_source_sales_order_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[4]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[5]},
 			},
 			{
 				Name:    "outsourcingorder_lifecycle_status",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[7]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[8]},
 			},
 			{
 				Name:    "outsourcingorder_order_date",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[5]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[6]},
 			},
 			{
 				Name:    "outsourcingorder_expected_return_date",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[6]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[7]},
 			},
 		},
 	}
@@ -1357,6 +1358,7 @@ var (
 		{Name: "purchase_order_no", Type: field.TypeString, Size: 64},
 		{Name: "supplier_purchase_order_no", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "supplier_snapshot", Type: field.TypeJSON, Nullable: true},
+		{Name: "contract_party_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "purchase_date", Type: field.TypeTime},
 		{Name: "expected_arrival_date", Type: field.TypeTime, Nullable: true},
 		{Name: "lifecycle_status", Type: field.TypeString, Size: 32, Default: "draft"},
@@ -1373,7 +1375,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "purchase_orders_suppliers_purchase_orders",
-				Columns:    []*schema.Column{PurchaseOrdersColumns[10]},
+				Columns:    []*schema.Column{PurchaseOrdersColumns[11]},
 				RefColumns: []*schema.Column{SuppliersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1387,7 +1389,7 @@ var (
 			{
 				Name:    "purchaseorder_supplier_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[10]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[11]},
 			},
 			{
 				Name:    "purchaseorder_supplier_purchase_order_no",
@@ -1397,17 +1399,17 @@ var (
 			{
 				Name:    "purchaseorder_lifecycle_status",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[6]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[7]},
 			},
 			{
 				Name:    "purchaseorder_purchase_date",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[4]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[5]},
 			},
 			{
 				Name:    "purchaseorder_expected_arrival_date",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[5]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[6]},
 			},
 		},
 	}

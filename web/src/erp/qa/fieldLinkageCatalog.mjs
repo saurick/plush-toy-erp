@@ -715,6 +715,14 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     testFile: 'web/src/erp/utils/masterDataOrderView.test.mjs',
   },
   {
+    caseId: 'FL_material_purchase_print_dates__keeps_string_date_snapshots',
+    title: '采购合同打印草稿保留源单字符串日期快照',
+    fieldKeys: ['orderDate'],
+    scenarioKey: 'source_snapshot_retained',
+    layer: 'web',
+    testFile: 'web/src/erp/utils/masterDataOrderView.test.mjs',
+  },
+  {
     caseId:
       'FL_sales_order_item_source_snapshot__retains_product_sku_snapshots',
     title: '销售订单明细保存参数保留 SKU 产品编号名称颜色快照',
@@ -843,6 +851,15 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
   },
   {
     caseId:
+      'FL_material_purchase_print_party_snapshot__order_snapshot_overrides_customer_defaults',
+    title: '采购合同打印草稿优先读取采购源单合同方快照',
+    fieldKeys: ['printPartyDefaults'],
+    scenarioKey: 'source_snapshot_retained',
+    layer: 'web',
+    testFile: 'web/src/erp/utils/masterDataOrderView.test.mjs',
+  },
+  {
+    caseId:
       'FL_processing_contract_product_order_no__retains_source_order_no_snapshot',
     title: '加工合同明细保留委外来源销售订单号快照',
     fieldKeys: ['productOrderNo'],
@@ -892,6 +909,23 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     title: '加工合同打印草稿只使用客户配置委托方默认值且不覆盖加工方快照',
     fieldKeys: ['printPartyDefaults', 'supplierContactSnapshot'],
     scenarioKey: 'print_party_defaults_do_not_override_supplier_snapshot',
+    layer: 'web',
+    testFile: 'web/src/erp/data/processingContractTemplate.test.mjs',
+  },
+  {
+    caseId:
+      'FL_processing_contract_print_party_snapshot__order_snapshot_overrides_customer_defaults',
+    title: '加工合同打印草稿优先读取委外源单委托方快照',
+    fieldKeys: ['printPartyDefaults'],
+    scenarioKey: 'source_snapshot_retained',
+    layer: 'web',
+    testFile: 'web/src/erp/data/processingContractTemplate.test.mjs',
+  },
+  {
+    caseId: 'FL_processing_contract_supplier_name__falls_back_to_short_name',
+    title: '加工合同加工方名称优先读取全称，短名仅作缺失兜底',
+    fieldKeys: ['supplierContactSnapshot'],
+    scenarioKey: 'source_snapshot_retained',
     layer: 'web',
     testFile: 'web/src/erp/data/processingContractTemplate.test.mjs',
   },

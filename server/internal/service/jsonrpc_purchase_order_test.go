@@ -177,7 +177,12 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 		"purchase_order_no": "PO-JSONRPC-001",
 		"supplier_id":       float64(1),
 		"supplier_snapshot": map[string]any{"name": "布料供应商"},
-		"purchase_date":     "2026-06-15",
+		"contract_party_snapshot": map[string]any{
+			"buyerCompany": "永绅",
+			"buyerContact": "采购负责人",
+			"buyerPhone":   "13500000000",
+		},
+		"purchase_date": "2026-06-15",
 		"items": []any{
 			map[string]any{
 				"line_no":                   float64(1),
@@ -204,6 +209,10 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 	orderID := jsonRPCInt(t, order, "id")
 	if status := order["lifecycle_status"]; status != biz.PurchaseOrderStatusDraft {
 		t.Fatalf("expected draft purchase order, got %#v", status)
+	}
+	partySnapshot, ok := order["contract_party_snapshot"].(map[string]any)
+	if !ok || partySnapshot["buyerCompany"] != "永绅" || partySnapshot["buyerContact"] != "采购负责人" {
+		t.Fatalf("expected contract party snapshot on purchase order, got %#v", order["contract_party_snapshot"])
 	}
 	items, ok := saveRes.Data.AsMap()["purchase_order_items"].([]any)
 	if !ok || len(items) != 1 {
@@ -495,6 +504,7 @@ func purchaseOrderFromMutation(id int, status string, in *biz.PurchaseOrderMutat
 		SupplierID:              in.SupplierID,
 		SupplierPurchaseOrderNo: in.SupplierPurchaseOrderNo,
 		SupplierSnapshot:        in.SupplierSnapshot,
+		ContractPartySnapshot:   in.ContractPartySnapshot,
 		PurchaseDate:            in.PurchaseDate,
 		ExpectedArrivalDate:     in.ExpectedArrivalDate,
 		LifecycleStatus:         status,

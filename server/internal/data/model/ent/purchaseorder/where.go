@@ -270,6 +270,16 @@ func SupplierSnapshotNotNil() predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldNotNull(FieldSupplierSnapshot))
 }
 
+// ContractPartySnapshotIsNil applies the IsNil predicate on the "contract_party_snapshot" field.
+func ContractPartySnapshotIsNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldIsNull(FieldContractPartySnapshot))
+}
+
+// ContractPartySnapshotNotNil applies the NotNil predicate on the "contract_party_snapshot" field.
+func ContractPartySnapshotNotNil() predicate.PurchaseOrder {
+	return predicate.PurchaseOrder(sql.FieldNotNull(FieldContractPartySnapshot))
+}
+
 // PurchaseDateEQ applies the EQ predicate on the "purchase_date" field.
 func PurchaseDateEQ(v time.Time) predicate.PurchaseOrder {
 	return predicate.PurchaseOrder(sql.FieldEQ(FieldPurchaseDate, v))

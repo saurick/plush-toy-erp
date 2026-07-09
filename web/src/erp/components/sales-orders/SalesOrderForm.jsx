@@ -397,7 +397,7 @@ export function SalesOrderFormFields({
         />
       </Form.Item>
       <Form.Item
-        className="erp-business-action-form__field"
+        className="erp-business-action-form__field erp-business-action-form__field--full"
         label="报价备注"
         name="price_condition_note"
       >

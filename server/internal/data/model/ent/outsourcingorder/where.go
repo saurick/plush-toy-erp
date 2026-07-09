@@ -200,6 +200,16 @@ func SupplierSnapshotNotNil() predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldNotNull(FieldSupplierSnapshot))
 }
 
+// ContractPartySnapshotIsNil applies the IsNil predicate on the "contract_party_snapshot" field.
+func ContractPartySnapshotIsNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIsNull(FieldContractPartySnapshot))
+}
+
+// ContractPartySnapshotNotNil applies the NotNil predicate on the "contract_party_snapshot" field.
+func ContractPartySnapshotNotNil() predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotNull(FieldContractPartySnapshot))
+}
+
 // SourceOrderNoEQ applies the EQ predicate on the "source_order_no" field.
 func SourceOrderNoEQ(v string) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSourceOrderNo, v))

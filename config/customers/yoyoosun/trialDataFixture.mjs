@@ -35,6 +35,7 @@ export const yoyoosunTrialDataFixture = Object.freeze({
       supplierType: "material",
       contactName: "成慧怡",
       contactPhone: "13900000001",
+      address: "东莞虎门富民皮料市场A216号",
       sourceIds: Object.freeze(["yoyoosun-raw-material-purchase-summary-20260602"]),
     }),
     Object.freeze({
@@ -43,6 +44,7 @@ export const yoyoosunTrialDataFixture = Object.freeze({
       supplierType: "outsourcing",
       contactName: "子淳",
       contactPhone: "13900000002",
+      address: "东莞市茶山镇",
       sourceIds: Object.freeze(["yoyoosun-raw-outsourcing-summary-20260602", "yoyoosun-raw-outsourcing-contract-pdf-zichun"]),
     }),
     Object.freeze({
@@ -51,6 +53,7 @@ export const yoyoosunTrialDataFixture = Object.freeze({
       supplierType: "material",
       contactName: "包材联系人",
       contactPhone: "13900000003",
+      address: "东莞茶山",
       sourceIds: Object.freeze(["yoyoosun-raw-material-purchase-summary-20260602"]),
     }),
   ]),
@@ -175,8 +178,16 @@ export const yoyoosunTrialDataFixture = Object.freeze({
     Object.freeze({
       purchaseOrderNo: "PO-YOYO-TRIAL-001",
       supplierCode: "SUP-FABRIC-TRIAL",
-      expectedArrivalDate: "2026-07-15",
+      orderDate: "2026-06-13",
+      expectedArrivalDate: "2026-06-24",
       printTemplateKey: "material-purchase-contract",
+      contractPartySnapshot: Object.freeze({
+        buyerCompany: "永绅",
+        buyerContact: "郭改玉",
+        buyerPhone: "13537313218",
+        buyerAddress: "东莞-茶山",
+        buyerSigner: "郭改玉",
+      }),
       lines: Object.freeze([
         Object.freeze({
           productOrderNo: "SO-YOYO-TRIAL-001",
@@ -188,6 +199,7 @@ export const yoyoosunTrialDataFixture = Object.freeze({
           quantity: "96",
           unitPrice: "8.500",
           amount: "816.00",
+          note: "按批次分包并标明产品编号。",
         }),
         Object.freeze({
           productOrderNo: "SO-YOYO-TRIAL-002",
@@ -199,6 +211,7 @@ export const yoyoosunTrialDataFixture = Object.freeze({
           quantity: "20",
           unitPrice: "4.200",
           amount: "84.00",
+          note: "外箱按产品订单单独打包。",
         }),
       ]),
       sourceIds: Object.freeze(["yoyoosun-raw-material-purchase-summary-20260602", "yoyoosun-raw-purchase-contract-photo-20260421-jpeg"]),
@@ -206,8 +219,16 @@ export const yoyoosunTrialDataFixture = Object.freeze({
     Object.freeze({
       purchaseOrderNo: "PO-YOYO-TRIAL-002",
       supplierCode: "SUP-PACKING-TRIAL",
-      expectedArrivalDate: "2026-07-18",
+      orderDate: "2026-06-13",
+      expectedArrivalDate: "2026-06-24",
       printTemplateKey: "material-purchase-contract",
+      contractPartySnapshot: Object.freeze({
+        buyerCompany: "永绅",
+        buyerContact: "郭改玉",
+        buyerPhone: "13537313218",
+        buyerAddress: "东莞-茶山",
+        buyerSigner: "郭改玉",
+      }),
       lines: Object.freeze([
         Object.freeze({
           productOrderNo: "SO-YOYO-TRIAL-002",
@@ -219,6 +240,7 @@ export const yoyoosunTrialDataFixture = Object.freeze({
           quantity: "260",
           unitPrice: "0.120",
           amount: "31.20",
+          note: "洗水标随主料分包交付。",
         }),
       ]),
       sourceIds: Object.freeze(["yoyoosun-raw-material-purchase-summary-20260602"]),
@@ -228,8 +250,16 @@ export const yoyoosunTrialDataFixture = Object.freeze({
     Object.freeze({
       outsourcingOrderNo: "OS-YOYO-TRIAL-001",
       processorCode: "SUP-PROCESS-TRIAL",
-      returnDate: "2026-07-20",
+      orderDate: "2026-06-19",
+      returnDate: "2026-06-26",
       printTemplateKey: "processing-contract",
+      contractPartySnapshot: Object.freeze({
+        buyerCompany: "永绅",
+        buyerContact: "刘志强",
+        buyerPhone: "13694972987",
+        buyerAddress: "东莞茶山",
+        buyerSigner: "刘志强",
+      }),
       lines: Object.freeze([
         Object.freeze({
           productOrderNo: "SO-YOYO-TRIAL-001",
@@ -241,6 +271,7 @@ export const yoyoosunTrialDataFixture = Object.freeze({
           quantity: "120",
           unitPrice: "3.200",
           amount: "384.00",
+          note: "按车缝工序分包回货。",
         }),
       ]),
       sourceIds: Object.freeze(["yoyoosun-raw-outsourcing-summary-20260602", "yoyoosun-raw-outsourcing-contract-pdf-zichun"]),
@@ -248,8 +279,16 @@ export const yoyoosunTrialDataFixture = Object.freeze({
     Object.freeze({
       outsourcingOrderNo: "OS-YOYO-TRIAL-002",
       processorCode: "SUP-PROCESS-TRIAL",
-      returnDate: "2026-07-25",
+      orderDate: "2026-06-19",
+      returnDate: "2026-06-26",
       printTemplateKey: "processing-contract",
+      contractPartySnapshot: Object.freeze({
+        buyerCompany: "永绅",
+        buyerContact: "刘志强",
+        buyerPhone: "13694972987",
+        buyerAddress: "东莞茶山",
+        buyerSigner: "刘志强",
+      }),
       lines: Object.freeze([
         Object.freeze({
           productOrderNo: "SO-YOYO-TRIAL-002",
@@ -261,6 +300,7 @@ export const yoyoosunTrialDataFixture = Object.freeze({
           quantity: "240",
           unitPrice: "0.850",
           amount: "204.00",
+          note: "裁片检验后按产品编号回传。",
         }),
         Object.freeze({
           productOrderNo: "SO-YOYO-TRIAL-002",
@@ -272,6 +312,7 @@ export const yoyoosunTrialDataFixture = Object.freeze({
           quantity: "240",
           unitPrice: "1.100",
           amount: "264.00",
+          note: "贴合后单独标注工序名称。",
         }),
       ]),
       sourceIds: Object.freeze(["yoyoosun-raw-outsourcing-summary-20260602"]),

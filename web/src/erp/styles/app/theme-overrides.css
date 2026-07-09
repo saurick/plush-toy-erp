@@ -146,7 +146,12 @@
 
 [data-erp-theme='dark'] .erp-admin-page-head,
 [data-erp-theme='dark'] .erp-admin-page-head__pill,
-[data-erp-theme='dark'] .erp-product-core-data-guard__body > div,
+[data-erp-theme='dark'] .erp-product-core-capability-review__header,
+[data-erp-theme='dark'] .erp-product-core-capability-review__panel,
+[data-erp-theme='dark'] .erp-product-core-capability-review__scope,
+[data-erp-theme='dark'] .erp-product-core-metric,
+[data-erp-theme='dark'] .erp-product-core-panel,
+[data-erp-theme='dark'] .erp-product-core-entry,
 [data-erp-theme='dark'] .erp-dashboard-card.ant-card,
 [data-erp-theme='dark'] .erp-dashboard-status-card.ant-card,
 [data-erp-theme='dark'] .erp-command-center-rail,
@@ -176,6 +181,22 @@
   box-shadow:
     0 1px 2px rgb(0 0 0 / 0.18),
     0 14px 32px rgb(0 0 0 / 0.26);
+}
+
+[data-erp-theme='dark'] .erp-product-core-capability-review__header h2,
+[data-erp-theme='dark'] .erp-product-core-capability-review__panel strong,
+[data-erp-theme='dark'] .erp-product-core-metric strong,
+[data-erp-theme='dark'] .erp-product-core-entry strong {
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark']
+  .erp-product-core-capability-review__header
+  .ant-typography,
+[data-erp-theme='dark'] .erp-product-core-capability-review__panel span,
+[data-erp-theme='dark'] .erp-product-core-metric span,
+[data-erp-theme='dark'] .erp-product-core-entry span {
+  color: var(--erp-muted-text);
 }
 
 [data-erp-theme='dark'] .erp-metric-readonly-card__badge,

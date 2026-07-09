@@ -1486,15 +1486,15 @@ func init() {
 	// outsourcingorder.SupplierIDValidator is a validator for the "supplier_id" field. It is called by the builders before save.
 	outsourcingorder.SupplierIDValidator = outsourcingorderDescSupplierID.Validators[0].(func(int) error)
 	// outsourcingorderDescSourceOrderNo is the schema descriptor for source_order_no field.
-	outsourcingorderDescSourceOrderNo := outsourcingorderFields[3].Descriptor()
+	outsourcingorderDescSourceOrderNo := outsourcingorderFields[4].Descriptor()
 	// outsourcingorder.SourceOrderNoValidator is a validator for the "source_order_no" field. It is called by the builders before save.
 	outsourcingorder.SourceOrderNoValidator = outsourcingorderDescSourceOrderNo.Validators[0].(func(string) error)
 	// outsourcingorderDescSourceSalesOrderID is the schema descriptor for source_sales_order_id field.
-	outsourcingorderDescSourceSalesOrderID := outsourcingorderFields[4].Descriptor()
+	outsourcingorderDescSourceSalesOrderID := outsourcingorderFields[5].Descriptor()
 	// outsourcingorder.SourceSalesOrderIDValidator is a validator for the "source_sales_order_id" field. It is called by the builders before save.
 	outsourcingorder.SourceSalesOrderIDValidator = outsourcingorderDescSourceSalesOrderID.Validators[0].(func(int) error)
 	// outsourcingorderDescLifecycleStatus is the schema descriptor for lifecycle_status field.
-	outsourcingorderDescLifecycleStatus := outsourcingorderFields[7].Descriptor()
+	outsourcingorderDescLifecycleStatus := outsourcingorderFields[8].Descriptor()
 	// outsourcingorder.DefaultLifecycleStatus holds the default value on creation for the lifecycle_status field.
 	outsourcingorder.DefaultLifecycleStatus = outsourcingorderDescLifecycleStatus.Default.(string)
 	// outsourcingorder.LifecycleStatusValidator is a validator for the "lifecycle_status" field. It is called by the builders before save.
@@ -1514,15 +1514,15 @@ func init() {
 		}
 	}()
 	// outsourcingorderDescNote is the schema descriptor for note field.
-	outsourcingorderDescNote := outsourcingorderFields[8].Descriptor()
+	outsourcingorderDescNote := outsourcingorderFields[9].Descriptor()
 	// outsourcingorder.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	outsourcingorder.NoteValidator = outsourcingorderDescNote.Validators[0].(func(string) error)
 	// outsourcingorderDescCreatedAt is the schema descriptor for created_at field.
-	outsourcingorderDescCreatedAt := outsourcingorderFields[9].Descriptor()
+	outsourcingorderDescCreatedAt := outsourcingorderFields[10].Descriptor()
 	// outsourcingorder.DefaultCreatedAt holds the default value on creation for the created_at field.
 	outsourcingorder.DefaultCreatedAt = outsourcingorderDescCreatedAt.Default.(func() time.Time)
 	// outsourcingorderDescUpdatedAt is the schema descriptor for updated_at field.
-	outsourcingorderDescUpdatedAt := outsourcingorderFields[10].Descriptor()
+	outsourcingorderDescUpdatedAt := outsourcingorderFields[11].Descriptor()
 	// outsourcingorder.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	outsourcingorder.DefaultUpdatedAt = outsourcingorderDescUpdatedAt.Default.(func() time.Time)
 	// outsourcingorder.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -2362,7 +2362,7 @@ func init() {
 	// purchaseorder.SupplierPurchaseOrderNoValidator is a validator for the "supplier_purchase_order_no" field. It is called by the builders before save.
 	purchaseorder.SupplierPurchaseOrderNoValidator = purchaseorderDescSupplierPurchaseOrderNo.Validators[0].(func(string) error)
 	// purchaseorderDescLifecycleStatus is the schema descriptor for lifecycle_status field.
-	purchaseorderDescLifecycleStatus := purchaseorderFields[6].Descriptor()
+	purchaseorderDescLifecycleStatus := purchaseorderFields[7].Descriptor()
 	// purchaseorder.DefaultLifecycleStatus holds the default value on creation for the lifecycle_status field.
 	purchaseorder.DefaultLifecycleStatus = purchaseorderDescLifecycleStatus.Default.(string)
 	// purchaseorder.LifecycleStatusValidator is a validator for the "lifecycle_status" field. It is called by the builders before save.
@@ -2382,15 +2382,15 @@ func init() {
 		}
 	}()
 	// purchaseorderDescNote is the schema descriptor for note field.
-	purchaseorderDescNote := purchaseorderFields[7].Descriptor()
+	purchaseorderDescNote := purchaseorderFields[8].Descriptor()
 	// purchaseorder.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	purchaseorder.NoteValidator = purchaseorderDescNote.Validators[0].(func(string) error)
 	// purchaseorderDescCreatedAt is the schema descriptor for created_at field.
-	purchaseorderDescCreatedAt := purchaseorderFields[8].Descriptor()
+	purchaseorderDescCreatedAt := purchaseorderFields[9].Descriptor()
 	// purchaseorder.DefaultCreatedAt holds the default value on creation for the created_at field.
 	purchaseorder.DefaultCreatedAt = purchaseorderDescCreatedAt.Default.(func() time.Time)
 	// purchaseorderDescUpdatedAt is the schema descriptor for updated_at field.
-	purchaseorderDescUpdatedAt := purchaseorderFields[9].Descriptor()
+	purchaseorderDescUpdatedAt := purchaseorderFields[10].Descriptor()
 	// purchaseorder.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	purchaseorder.DefaultUpdatedAt = purchaseorderDescUpdatedAt.Default.(func() time.Time)
 	// purchaseorder.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

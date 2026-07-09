@@ -22,6 +22,8 @@ const (
 	FieldSupplierPurchaseOrderNo = "supplier_purchase_order_no"
 	// FieldSupplierSnapshot holds the string denoting the supplier_snapshot field in the database.
 	FieldSupplierSnapshot = "supplier_snapshot"
+	// FieldContractPartySnapshot holds the string denoting the contract_party_snapshot field in the database.
+	FieldContractPartySnapshot = "contract_party_snapshot"
 	// FieldPurchaseDate holds the string denoting the purchase_date field in the database.
 	FieldPurchaseDate = "purchase_date"
 	// FieldExpectedArrivalDate holds the string denoting the expected_arrival_date field in the database.
@@ -63,6 +65,7 @@ var Columns = []string{
 	FieldSupplierID,
 	FieldSupplierPurchaseOrderNo,
 	FieldSupplierSnapshot,
+	FieldContractPartySnapshot,
 	FieldPurchaseDate,
 	FieldExpectedArrivalDate,
 	FieldLifecycleStatus,

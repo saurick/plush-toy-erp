@@ -98,6 +98,67 @@ export function createBusinessFormalScenarios(deps) {
     )
   }
 
+  const assertNonItemTextareaFullRow = async (
+    modal,
+    { labels, scenarioName }
+  ) => {
+    const metrics = await modal.evaluate((node, expectedLabels) => {
+      const normalizeText = (value) =>
+        String(value || '')
+          .replace(/\s+/gu, '')
+          .trim()
+      const form = node.querySelector('.erp-business-action-form')
+      const formRect = form?.getBoundingClientRect()
+      return expectedLabels.map((label) => {
+        const normalizedLabel = normalizeText(label)
+        const candidates = Array.from(node.querySelectorAll('.ant-form-item'))
+          .filter(
+            (item) =>
+              !item.closest('.erp-sales-order-lines-form__grid') &&
+              !item.closest('.erp-master-contact-list__grid') &&
+              !item.closest('.erp-purchase-receipt-inline-item-form') &&
+              item.querySelector('textarea')
+          )
+          .filter((item) => {
+            const itemLabel = item.querySelector('.ant-form-item-label')
+            return normalizeText(itemLabel?.textContent) === normalizedLabel
+          })
+        const item = candidates[0]
+        const rect = item?.getBoundingClientRect()
+        const style = item ? window.getComputedStyle(item) : null
+        return {
+          label,
+          found: Boolean(item),
+          className: item?.className || '',
+          gridColumnStart: style?.gridColumnStart || '',
+          gridColumnEnd: style?.gridColumnEnd || '',
+          itemLeft: rect?.left || 0,
+          itemRight: rect?.right || 0,
+          itemWidth: rect?.width || 0,
+          formLeft: formRect?.left || 0,
+          formRight: formRect?.right || 0,
+          formWidth: formRect?.width || 0,
+          scrollWidth: item?.scrollWidth || 0,
+          clientWidth: item?.clientWidth || 0,
+        }
+      })
+    }, labels)
+
+    for (const metric of metrics) {
+      assert(
+        metric.found &&
+          metric.className.includes('erp-business-action-form__field--full') &&
+          metric.gridColumnStart === '1' &&
+          metric.gridColumnEnd === '-1' &&
+          Math.abs(metric.itemLeft - metric.formLeft) <= 2 &&
+          Math.abs(metric.itemRight - metric.formRight) <= 2 &&
+          metric.itemWidth >= metric.formWidth - 2 &&
+          metric.scrollWidth <= metric.clientWidth + 1,
+        `${scenarioName} 非 item 备注应独占表单整行: ${JSON.stringify(metric)}`
+      )
+    }
+  }
+
   const waitForMasterDataRequest = async (
     page,
     masterDataMethods,
@@ -671,6 +732,10 @@ export function createBusinessFormalScenarios(deps) {
           expectedTexts: ['SKU / 产品来源', '带出产品 / 单位'],
           absentTexts: ['产品引用 ID', '单位引用 ID'],
           afterOpen: async (modal) => {
+            await assertNonItemTextareaFullRow(modal, {
+              labels: ['报价备注', '备注'],
+              scenarioName: 'business-v1-sales-order-form-modal',
+            })
             await assertLineQuantityUnitSuffix(modal, {
               label: '订单数量',
               expectedText: '件（PCS）',
@@ -1516,6 +1581,12 @@ export function createBusinessFormalScenarios(deps) {
           screenshotName: 'business-v1-quality-inspection-create-form-modal',
           expectedTexts: ['采购入库单', '采购入库行', '批次', '材料', '仓库'],
           absentTexts: ['采购入库单 ID', '批次 ID', '材料 ID', '仓库 ID'],
+          afterOpen: async (modal) => {
+            await assertNonItemTextareaFullRow(modal, {
+              labels: ['备注'],
+              scenarioName: 'business-v1-quality-inspection-create-form-modal',
+            })
+          },
         })
         await assertNoHorizontalOverflow(
           page,
@@ -1800,6 +1871,10 @@ export function createBusinessFormalScenarios(deps) {
             '查货只表示加工环节',
           ],
           afterOpen: async (modal) => {
+            await assertNonItemTextareaFullRow(modal, {
+              labels: ['备注'],
+              scenarioName: 'business-v1-processing-contracts-form-modal',
+            })
             await assertOutsourcingProcessSelectOptions(page, modal, {
               scenarioName: 'business-v1-processing-contracts',
             })

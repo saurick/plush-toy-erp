@@ -7,6 +7,7 @@ import {
 } from './businessModules.mjs'
 import {
   getNavigationSections,
+  getProductCoreNavigationSections,
   getRoleWorkbench,
   roleWorkbenches,
 } from './seedData.mjs'
@@ -140,6 +141,37 @@ test('businessModules: Product Core 评审态阻断客户业务数据页', () =>
   assert.equal(isCustomerBusinessDataPageKey('print-center'), false)
   assert.equal(isCustomerBusinessDataPageKey('permission-center'), false)
   assert.equal(isCustomerBusinessDataPageKey('system-audit-logs'), false)
+})
+
+test('seedData: Product Core 无客户态只显示控制面导航', () => {
+  const productCoreSections = getProductCoreNavigationSections()
+  const productCorePaths = productCoreSections.flatMap((section) =>
+    section.items.map((item) => item.path)
+  )
+  const productCoreLabels = productCoreSections.flatMap((section) =>
+    section.items.map((item) => item.label)
+  )
+
+  assert.deepEqual(
+    productCoreSections.map((section) => section.title),
+    ['产品核心', '控制面']
+  )
+  assert.deepEqual(productCorePaths, [
+    '/erp/dashboard',
+    '/erp/print-center',
+    '/erp/system/permissions',
+    '/erp/system/audit-logs',
+  ])
+  assert(productCoreLabels.includes('产品核心总览'))
+  assert(!productCoreLabels.includes('工作台'))
+  assert(productCoreLabels.includes('模板打印中心'))
+  assert(productCoreLabels.includes('权限管理'))
+  assert(productCoreLabels.includes('审计日志'))
+  assert(!productCorePaths.includes('/erp/business-dashboard'))
+  assert(!productCorePaths.includes('/erp/task-board'))
+  assert(!productCorePaths.includes('/erp/purchase/material-bom'))
+  assert(!productCorePaths.includes('/erp/operations/exceptions'))
+  assert(!productCorePaths.includes('/erp/warehouse/shipments'))
 })
 
 test('customerMenuConfig: 客户菜单配置可控制桌面菜单显隐、排序和文案', () => {

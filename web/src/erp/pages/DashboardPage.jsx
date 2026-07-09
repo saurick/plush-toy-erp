@@ -97,6 +97,169 @@ const WORKBENCH_QUEUE_OPTIONS = Object.freeze([
   { key: 'waiting', label: '等待交接', hint: '非终态任务' },
 ])
 
+const PRODUCT_CORE_METRICS = Object.freeze([
+  {
+    label: '业务内核',
+    value: '11',
+    note: '主数据、销售、采购、BOM、库存、质检、出货、财务等核心域',
+  },
+  {
+    label: '控制面',
+    value: '4',
+    note: '权限、审计、打印模板、客户配置发布门禁',
+  },
+  {
+    label: '客户运行态',
+    value: '隔离',
+    note: '无 customer key 不读取客户订单、库存、Workflow 或财务事实',
+  },
+])
+
+const PRODUCT_CORE_REVIEW_ENTRIES = Object.freeze([
+  {
+    key: 'business-dashboard',
+    title: '业务看板能力',
+    path: '/erp/business-dashboard',
+    description: '审阅指标、风险和业务运行总览的能力边界。',
+  },
+  {
+    key: 'sales-orders',
+    title: '销售订单核心',
+    path: '/erp/sales/project-orders/sales-orders',
+    description: '审阅源单据业务状态、权限、动作和字段边界。',
+  },
+  {
+    key: 'bom',
+    title: 'BOM / 产品工程',
+    path: '/erp/purchase/material-bom',
+    description: '审阅产品结构、用量、损耗和生效边界。',
+  },
+  {
+    key: 'purchase',
+    title: '采购与入库',
+    path: '/erp/purchase/accessories',
+    description: '审阅采购 source document 与入库事实进入条件。',
+  },
+  {
+    key: 'outsourcing',
+    title: '委外加工',
+    path: '/erp/outsourcing/orders',
+    description: '审阅加工合同、工序、回货和质检衔接能力。',
+  },
+  {
+    key: 'shipment',
+    title: '出货与库存',
+    path: '/erp/warehouse/shipments',
+    description: '审阅放行、出库、库存和应收前置边界。',
+  },
+])
+
+const PRODUCT_CORE_CONTROL_ENTRIES = Object.freeze([
+  {
+    key: 'print',
+    title: '模板打印中心',
+    path: '/erp/print-center',
+    description: '查看 Product Core 已登记打印模板和客户默认值投影边界。',
+  },
+  {
+    key: 'permissions',
+    title: '权限管理',
+    path: '/erp/system/permissions',
+    description: '维护角色、权限码和管理员账号；后端 RBAC 仍是真门禁。',
+  },
+  {
+    key: 'audit',
+    title: '审计日志',
+    path: '/erp/system/audit-logs',
+    description: '查看客户配置发布、激活、回滚和系统管理审计。',
+  },
+])
+
+function ProductCoreDashboard({ onNavigate }) {
+  return (
+    <Card
+      className="erp-dashboard-card erp-product-core-dashboard"
+      variant="borderless"
+      data-product-core-dashboard="true"
+    >
+      <div className="erp-product-core-dashboard__hero">
+        <div>
+          <Text type="secondary">Product Core</Text>
+          <Title level={3} className="erp-command-center-hero-title">
+            产品核心总览
+          </Title>
+          <Paragraph className="erp-dashboard-summary">
+            这里审阅通用 ERP
+            内核、控制面和客户配置进入条件；不加载客户订单、库存、Workflow
+            任务或财务事实。
+          </Paragraph>
+        </div>
+        <Space wrap>
+          <Tag color="blue">不挂载客户业务数据</Tag>
+          <Tag color="green">能力审阅</Tag>
+          <Tag>无 customer key</Tag>
+        </Space>
+      </div>
+
+      <div className="erp-product-core-dashboard__metrics">
+        {PRODUCT_CORE_METRICS.map((metric) => (
+          <section key={metric.label} className="erp-product-core-metric">
+            <Text type="secondary">{metric.label}</Text>
+            <strong>{metric.value}</strong>
+            <span>{metric.note}</span>
+          </section>
+        ))}
+      </div>
+
+      <div className="erp-product-core-dashboard__grid">
+        <section className="erp-product-core-panel">
+          <div className="erp-product-core-panel__head">
+            <Title level={5}>能力审阅入口</Title>
+            <Text type="secondary">
+              进入后只看页面能力、字段、动作和边界；不会读取客户业务记录。
+            </Text>
+          </div>
+          <div className="erp-product-core-entry-grid">
+            {PRODUCT_CORE_REVIEW_ENTRIES.map((entry) => (
+              <button
+                type="button"
+                key={entry.key}
+                className="erp-product-core-entry"
+                onClick={() => onNavigate(entry.path)}
+              >
+                <strong>{entry.title}</strong>
+                <span>{entry.description}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="erp-product-core-panel">
+          <div className="erp-product-core-panel__head">
+            <Title level={5}>控制面</Title>
+            <Text type="secondary">
+              控制面只管理配置、权限和审计，不替代客户运行态业务处理。
+            </Text>
+          </div>
+          <Space direction="vertical" size={10} className="erp-dashboard-block">
+            {PRODUCT_CORE_CONTROL_ENTRIES.map((entry) => (
+              <div className="erp-command-center-focus-item" key={entry.key}>
+                <div className="erp-command-center-focus-copy">
+                  <Text strong>{entry.title}</Text>
+                  <Text type="secondary">{entry.description}</Text>
+                </div>
+                <Button size="small" onClick={() => onNavigate(entry.path)}>
+                  进入
+                </Button>
+              </div>
+            ))}
+          </Space>
+        </section>
+      </div>
+    </Card>
+  )
+}
+
 function buildSourceOptions(tasks = []) {
   const sourceTypes = [
     ...new Set(
@@ -280,8 +443,21 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
   )
+  const effectiveSessionCustomerKey =
+    typeof adminProfile?.effective_session?.customer?.key === 'string'
+      ? adminProfile.effective_session.customer.key.trim()
+      : ''
+  const shouldShowProductCoreDashboard =
+    initialView === 'workbench' &&
+    adminProfile?.is_super_admin === true &&
+    !effectiveSessionCustomerKey
 
   const loadDashboardStats = useCallback(async () => {
+    if (shouldShowProductCoreDashboard) {
+      setWorkflowTasks([])
+      setLoading(false)
+      return true
+    }
     setLoading(true)
     try {
       const workflowResult = await listWorkflowTasks({ limit: 200 })
@@ -297,7 +473,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         setLoading(false)
       }
     }
-  }, [])
+  }, [shouldShowProductCoreDashboard])
 
   useEffect(() => {
     mountedRef.current = true
@@ -521,6 +697,15 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     }
   }
 
+  const openProductCoreEntry = useCallback(
+    (path) => {
+      if (path) {
+        navigate(path)
+      }
+    },
+    [navigate]
+  )
+
   const getTaskReadonlyNotice = useCallback(
     (task) => getWorkflowTaskReadonlyReason(adminProfile, task),
     [adminProfile]
@@ -717,7 +902,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       size={16}
       className="erp-dashboard-page erp-command-center-page"
     >
-      {activeView === 'workbench' ? (
+      {shouldShowProductCoreDashboard ? (
+        <ProductCoreDashboard onNavigate={openProductCoreEntry} />
+      ) : null}
+
+      {!shouldShowProductCoreDashboard && activeView === 'workbench' ? (
         <Card
           className="erp-dashboard-card erp-workbench-command-card"
           variant="borderless"

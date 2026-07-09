@@ -25,6 +25,8 @@ type OutsourcingOrder struct {
 	SupplierID int `json:"supplier_id,omitempty"`
 	// SupplierSnapshot holds the value of the "supplier_snapshot" field.
 	SupplierSnapshot map[string]interface{} `json:"supplier_snapshot,omitempty"`
+	// ContractPartySnapshot holds the value of the "contract_party_snapshot" field.
+	ContractPartySnapshot map[string]interface{} `json:"contract_party_snapshot,omitempty"`
 	// SourceOrderNo holds the value of the "source_order_no" field.
 	SourceOrderNo *string `json:"source_order_no,omitempty"`
 	// SourceSalesOrderID holds the value of the "source_sales_order_id" field.
@@ -83,7 +85,7 @@ func (*OutsourcingOrder) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case outsourcingorder.FieldSupplierSnapshot:
+		case outsourcingorder.FieldSupplierSnapshot, outsourcingorder.FieldContractPartySnapshot:
 			values[i] = new([]byte)
 		case outsourcingorder.FieldID, outsourcingorder.FieldSupplierID, outsourcingorder.FieldSourceSalesOrderID:
 			values[i] = new(sql.NullInt64)
@@ -130,6 +132,14 @@ func (_m *OutsourcingOrder) assignValues(columns []string, values []any) error {
 			} else if value != nil && len(*value) > 0 {
 				if err := json.Unmarshal(*value, &_m.SupplierSnapshot); err != nil {
 					return fmt.Errorf("unmarshal field supplier_snapshot: %w", err)
+				}
+			}
+		case outsourcingorder.FieldContractPartySnapshot:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field contract_party_snapshot", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.ContractPartySnapshot); err != nil {
+					return fmt.Errorf("unmarshal field contract_party_snapshot: %w", err)
 				}
 			}
 		case outsourcingorder.FieldSourceOrderNo:
@@ -238,6 +248,9 @@ func (_m *OutsourcingOrder) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("supplier_snapshot=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SupplierSnapshot))
+	builder.WriteString(", ")
+	builder.WriteString("contract_party_snapshot=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ContractPartySnapshot))
 	builder.WriteString(", ")
 	if v := _m.SourceOrderNo; v != nil {
 		builder.WriteString("source_order_no=")

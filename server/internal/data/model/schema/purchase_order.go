@@ -39,6 +39,8 @@ func (PurchaseOrder) Fields() []ent.Field {
 		// Snapshot preserves order-time display data; Supplier remains the master truth.
 		field.JSON("supplier_snapshot", map[string]any{}).
 			Optional(),
+		field.JSON("contract_party_snapshot", map[string]any{}).
+			Optional(),
 		field.Time("purchase_date"),
 		field.Time("expected_arrival_date").
 			Optional().

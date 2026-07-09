@@ -67,6 +67,7 @@ import {
   buildOutsourcingOrderItemParams,
   buildOutsourcingOrderParams,
   buildSequentialDraftCode,
+  contractPartySnapshotFromPrintTemplateDefaults,
   buildSupplierSnapshot,
   buildSupplierSnapshotWithContacts,
   canRunOutsourcingOrderLifecycleAction,
@@ -92,7 +93,10 @@ import {
   WORK_INSTRUCTION_TEMPLATE_KEY,
   buildWorkInstructionDraftFromOutsourcingOrder,
 } from '../data/engineeringPrintTemplates.mjs'
-import { completeProcessingContractDraft } from '../utils/contractPrintDraftCompleteness.mjs'
+import {
+  completeProcessingContractDraft,
+  mergeSnapshotMissingFields,
+} from '../utils/contractPrintDraftCompleteness.mjs'
 import {
   DEFAULT_OUTSOURCING_ORDER_PAGINATION,
   OUTSOURCING_ORDER_DATE_FILTER_OPTIONS,
@@ -311,6 +315,10 @@ export default function V1OutsourcingOrdersPage() {
       source_order_no: '',
       order_date: todayInputValue(),
       expected_return_date: '',
+      contract_party_snapshot: contractPartySnapshotFromPrintTemplateDefaults(
+        processingPrintTemplateDefaults,
+        PROCESSING_CONTRACT_TEMPLATE_KEY
+      ),
       note: '',
       items: [createBlankOutsourcingLine(1)],
     })
@@ -328,6 +336,14 @@ export default function V1OutsourcingOrdersPage() {
         ...record,
         order_date: unixToDateInputValue(record.order_date),
         expected_return_date: unixToDateInputValue(record.expected_return_date),
+        contract_party_snapshot:
+          record.contract_party_snapshot &&
+          typeof record.contract_party_snapshot === 'object'
+            ? record.contract_party_snapshot
+            : contractPartySnapshotFromPrintTemplateDefaults(
+                processingPrintTemplateDefaults,
+                PROCESSING_CONTRACT_TEMPLATE_KEY
+              ),
         items:
           items.length > 0
             ? items.map((item) => normalizeOutsourcingLineFormValue(item))
@@ -538,8 +554,22 @@ export default function V1OutsourcingOrdersPage() {
     setPrintingAction(PROCESSING_CONTRACT_TEMPLATE_KEY)
     try {
       const items = await loadOrderItems(selectedRow)
+      const supplier = suppliers.find(
+        (item) => item.id === selectedRow.supplier_id
+      )
+      const liveSupplierSnapshot =
+        typeof resolveSupplierSnapshot === 'function' && supplier
+          ? await resolveSupplierSnapshot(supplier)
+          : {}
+      const printRecord = {
+        ...selectedRow,
+        supplier_snapshot: mergeSnapshotMissingFields(
+          selectedRow.supplier_snapshot,
+          liveSupplierSnapshot
+        ),
+      }
       const initialDraft = completeProcessingContractDraft(
-        buildProcessingContractDraftFromOutsourcingOrder(selectedRow, items, {
+        buildProcessingContractDraftFromOutsourcingOrder(printRecord, items, {
           printTemplateDefaults: processingPrintTemplateDefaults,
         })
       )

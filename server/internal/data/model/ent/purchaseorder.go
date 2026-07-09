@@ -27,6 +27,8 @@ type PurchaseOrder struct {
 	SupplierPurchaseOrderNo *string `json:"supplier_purchase_order_no,omitempty"`
 	// SupplierSnapshot holds the value of the "supplier_snapshot" field.
 	SupplierSnapshot map[string]interface{} `json:"supplier_snapshot,omitempty"`
+	// ContractPartySnapshot holds the value of the "contract_party_snapshot" field.
+	ContractPartySnapshot map[string]interface{} `json:"contract_party_snapshot,omitempty"`
 	// PurchaseDate holds the value of the "purchase_date" field.
 	PurchaseDate time.Time `json:"purchase_date,omitempty"`
 	// ExpectedArrivalDate holds the value of the "expected_arrival_date" field.
@@ -81,7 +83,7 @@ func (*PurchaseOrder) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case purchaseorder.FieldSupplierSnapshot:
+		case purchaseorder.FieldSupplierSnapshot, purchaseorder.FieldContractPartySnapshot:
 			values[i] = new([]byte)
 		case purchaseorder.FieldID, purchaseorder.FieldSupplierID:
 			values[i] = new(sql.NullInt64)
@@ -135,6 +137,14 @@ func (_m *PurchaseOrder) assignValues(columns []string, values []any) error {
 			} else if value != nil && len(*value) > 0 {
 				if err := json.Unmarshal(*value, &_m.SupplierSnapshot); err != nil {
 					return fmt.Errorf("unmarshal field supplier_snapshot: %w", err)
+				}
+			}
+		case purchaseorder.FieldContractPartySnapshot:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field contract_party_snapshot", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.ContractPartySnapshot); err != nil {
+					return fmt.Errorf("unmarshal field contract_party_snapshot: %w", err)
 				}
 			}
 		case purchaseorder.FieldPurchaseDate:
@@ -234,6 +244,9 @@ func (_m *PurchaseOrder) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("supplier_snapshot=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SupplierSnapshot))
+	builder.WriteString(", ")
+	builder.WriteString("contract_party_snapshot=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ContractPartySnapshot))
 	builder.WriteString(", ")
 	builder.WriteString("purchase_date=")
 	builder.WriteString(_m.PurchaseDate.Format(time.ANSIC))

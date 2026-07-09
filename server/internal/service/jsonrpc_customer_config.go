@@ -88,7 +88,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		}, nil
 
 	case "rollback_customer_config":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerConfigActivate); res != nil {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerConfigRollback); res != nil {
 			return id, res, nil
 		}
 		admin, res := d.CurrentAdmin(ctx)

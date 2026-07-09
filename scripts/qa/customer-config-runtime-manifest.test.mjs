@@ -33,7 +33,7 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
   const manifest = buildRuntimeManifest(yoyoosunCustomerPackage);
 
   assert.equal(manifest.customer_key, "yoyoosun");
-  assert.equal(manifest.revision, "yoyoosun-customer-package-v1.runtime-manifest-v1");
+  assert.equal(manifest.revision, "yoyoosun-customer-package-v4.runtime-manifest-v1");
   assert.equal(manifest.compiled_snapshot.package.runtimeEnabled, false);
   assert.equal(manifest.compiled_snapshot.package.previewOnly, true);
   assert(manifest.compiled_snapshot.pages.includes("sales-orders"));
@@ -84,13 +84,41 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
     manifest.compiled_snapshot.printTemplateDefaults.templates.map((item) => [
       item.template_key,
       item.party_defaults.buyerCompany,
+      item.party_defaults.buyerContact,
+      item.party_defaults.buyerPhone,
+      item.party_defaults.buyerAddress,
+      item.party_defaults.buyerSigner,
       item.runtime_consumed,
       item.supplier_defaults_allowed,
     ]),
     [
-      ["material-purchase-contract", "东莞市永绅玩具有限公司", true, false],
-      ["processing-contract", "东莞市永绅玩具有限公司", true, false],
+      [
+        "material-purchase-contract",
+        "永绅",
+        "郭改玉",
+        "13537313218",
+        "东莞-茶山",
+        "郭改玉",
+        true,
+        false,
+      ],
+      [
+        "processing-contract",
+        "永绅",
+        "刘志强",
+        "13694972987",
+        "东莞茶山",
+        "刘志强",
+        true,
+        false,
+      ],
     ],
+  );
+  assert(
+    manifest.compiled_snapshot.printTemplateDefaults.templates.every(
+      (item) => !Object.values(item.party_defaults).includes("待维护"),
+    ),
+    "print party defaults must not keep placeholder values",
   );
   assert.deepEqual(
     manifest.compiled_snapshot.extensionPointCatalog.blocked_reasons,
@@ -101,6 +129,17 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
     ],
   );
   assert(manifest.access_entitlements.length > manifest.role_profiles.length);
+  const purchasingCapabilities = manifest.access_entitlements
+    .filter((item) => item.role_key === "purchasing")
+    .map((item) => item.capability_key);
+  assert(
+    purchasingCapabilities.includes("purchase.order.read"),
+    "purchasing role must keep purchase order read entitlement",
+  );
+  assert(
+    purchasingCapabilities.includes("material.read"),
+    "purchasing role must read materials for purchase contract print spec/unit context",
+  );
   validateRuntimeManifest(manifest);
 });
 
@@ -172,7 +211,7 @@ test("customer-config-runtime-manifest: repeated customer flags compile every re
   assert.deepEqual(
     results.map((result) => result.manifest.revision),
     [
-      "yoyoosun-customer-package-v1.runtime-manifest-v1",
+      "yoyoosun-customer-package-v4.runtime-manifest-v1",
       "demo-customer-package-v1.runtime-manifest-v1",
     ],
   );

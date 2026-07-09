@@ -54,6 +54,12 @@ func (_c *PurchaseOrderCreate) SetSupplierSnapshot(v map[string]interface{}) *Pu
 	return _c
 }
 
+// SetContractPartySnapshot sets the "contract_party_snapshot" field.
+func (_c *PurchaseOrderCreate) SetContractPartySnapshot(v map[string]interface{}) *PurchaseOrderCreate {
+	_c.mutation.SetContractPartySnapshot(v)
+	return _c
+}
+
 // SetPurchaseDate sets the "purchase_date" field.
 func (_c *PurchaseOrderCreate) SetPurchaseDate(v time.Time) *PurchaseOrderCreate {
 	_c.mutation.SetPurchaseDate(v)
@@ -284,6 +290,10 @@ func (_c *PurchaseOrderCreate) createSpec() (*PurchaseOrder, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.SupplierSnapshot(); ok {
 		_spec.SetField(purchaseorder.FieldSupplierSnapshot, field.TypeJSON, value)
 		_node.SupplierSnapshot = value
+	}
+	if value, ok := _c.mutation.ContractPartySnapshot(); ok {
+		_spec.SetField(purchaseorder.FieldContractPartySnapshot, field.TypeJSON, value)
+		_node.ContractPartySnapshot = value
 	}
 	if value, ok := _c.mutation.PurchaseDate(); ok {
 		_spec.SetField(purchaseorder.FieldPurchaseDate, field.TypeTime, value)

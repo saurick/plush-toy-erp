@@ -31,18 +31,19 @@ var (
 )
 
 type OutsourcingOrder struct {
-	ID                 int
-	OutsourcingOrderNo string
-	SupplierID         int
-	SupplierSnapshot   map[string]any
-	SourceOrderNo      *string
-	SourceSalesOrderID *int
-	OrderDate          time.Time
-	ExpectedReturnDate *time.Time
-	LifecycleStatus    string
-	Note               *string
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                    int
+	OutsourcingOrderNo    string
+	SupplierID            int
+	SupplierSnapshot      map[string]any
+	ContractPartySnapshot map[string]any
+	SourceOrderNo         *string
+	SourceSalesOrderID    *int
+	OrderDate             time.Time
+	ExpectedReturnDate    *time.Time
+	LifecycleStatus       string
+	Note                  *string
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 type OutsourcingOrderItem struct {
@@ -69,14 +70,15 @@ type OutsourcingOrderItem struct {
 }
 
 type OutsourcingOrderMutation struct {
-	OutsourcingOrderNo string
-	SupplierID         int
-	SupplierSnapshot   map[string]any
-	SourceOrderNo      *string
-	SourceSalesOrderID *int
-	OrderDate          time.Time
-	ExpectedReturnDate *time.Time
-	Note               *string
+	OutsourcingOrderNo    string
+	SupplierID            int
+	SupplierSnapshot      map[string]any
+	ContractPartySnapshot map[string]any
+	SourceOrderNo         *string
+	SourceSalesOrderID    *int
+	OrderDate             time.Time
+	ExpectedReturnDate    *time.Time
+	Note                  *string
 }
 
 type OutsourcingOrderItemMutation struct {
@@ -328,6 +330,9 @@ func normalizeOutsourcingOrderMutation(in OutsourcingOrderMutation) (Outsourcing
 	in.Note = normalizeOptionalString(in.Note)
 	if in.SupplierSnapshot == nil {
 		in.SupplierSnapshot = map[string]any{}
+	}
+	if in.ContractPartySnapshot == nil {
+		in.ContractPartySnapshot = map[string]any{}
 	}
 	if in.OutsourcingOrderNo == "" || in.SupplierID <= 0 || in.OrderDate.IsZero() {
 		return OutsourcingOrderMutation{}, ErrBadParam

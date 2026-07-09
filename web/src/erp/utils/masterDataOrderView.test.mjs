@@ -15,6 +15,7 @@ import {
   buildOutsourcingOrderItemParams,
   buildOutsourcingOrderParams,
   buildPurchaseOrderItemSourceValuesFromMaterial,
+  contractPartySnapshotFromPrintTemplateDefaults,
   buildProcessParams,
   buildProductParams,
   buildSalesOrderCustomerSourceValues,
@@ -26,6 +27,7 @@ import {
   buildSequentialDraftCode,
   buildSupplierSnapshot,
   buildSupplierSnapshotWithContacts,
+  buildContractPartySnapshot,
   buildTextSelectOptions,
   buildUnitSelectOptions,
   canRunPurchaseOrderLifecycleAction,
@@ -47,6 +49,7 @@ import {
   summarizeSalesOrderLines,
   unixToDateInputValue,
 } from './masterDataOrderView.mjs'
+import { completeMaterialPurchaseContractDraft } from './contractPrintDraftCompleteness.mjs'
 
 function readERPSource(relativePath) {
   return readFileSync(
@@ -369,11 +372,58 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
   )
 
   assert.deepEqual(
+    buildContractPartySnapshot({
+      buyerCompany: ' 永绅 ',
+      buyerContact: ' 采购负责人 ',
+      buyerPhone: '13537313218',
+      buyerAddress: '',
+      supplierName: '不应进入源单甲方快照',
+    }),
+    {
+      buyerCompany: '永绅',
+      buyerContact: '采购负责人',
+      buyerPhone: '13537313218',
+    }
+  )
+
+  assert.deepEqual(
+    contractPartySnapshotFromPrintTemplateDefaults(
+      {
+        templates: [
+          {
+            template_key: 'material-purchase-contract',
+            party_defaults: {
+              buyerCompany: '永绅',
+              buyerContact: '采购负责人',
+              buyerPhone: '13537313218',
+              buyerAddress: '东莞-茶山',
+              buyerSigner: '郭改玉',
+            },
+          },
+        ],
+      },
+      'material-purchase-contract'
+    ),
+    {
+      buyerCompany: '永绅',
+      buyerContact: '采购负责人',
+      buyerPhone: '13537313218',
+      buyerAddress: '东莞-茶山',
+      buyerSigner: '郭改玉',
+    }
+  )
+
+  assert.deepEqual(
     buildPurchaseOrderParams({
       purchase_order_no: ' PO001 ',
       supplier_id: '7',
       supplier_purchase_order_no: '',
       supplier_snapshot: { id: 7, name: '供应商 A' },
+      contract_party_snapshot: {
+        buyerCompany: ' 永绅 ',
+        buyerContact: '采购负责人',
+        buyerPhone: '',
+      },
       purchase_date: '2026-06-16',
       expected_arrival_date: '',
     }),
@@ -381,6 +431,10 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       purchase_order_no: 'PO001',
       supplier_id: 7,
       supplier_snapshot: { id: 7, name: '供应商 A' },
+      contract_party_snapshot: {
+        buyerCompany: '永绅',
+        buyerContact: '采购负责人',
+      },
       purchase_date: '2026-06-16',
     }
   )
@@ -428,6 +482,10 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       outsourcing_order_no: ' OUT-001 ',
       supplier_id: '7',
       supplier_snapshot: { id: 7, name: '加工厂 A' },
+      contract_party_snapshot: {
+        buyerCompany: ' 永绅 ',
+        buyerContact: '委外负责人',
+      },
       source_order_no: ' SO-001 ',
       source_sales_order_id: '',
       order_date: '2026-06-17',
@@ -438,6 +496,10 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       outsourcing_order_no: 'OUT-001',
       supplier_id: 7,
       supplier_snapshot: { id: 7, name: '加工厂 A' },
+      contract_party_snapshot: {
+        buyerCompany: '永绅',
+        buyerContact: '委外负责人',
+      },
       source_order_no: 'SO-001',
       order_date: '2026-06-17',
     }
@@ -1098,6 +1160,41 @@ test('masterDataOrderView: purchase order print draft maps current purchase fact
   )
 })
 
+test('FL_material_purchase_print_dates__keeps_string_date_snapshots masterDataOrderView: purchase print draft retains string date snapshots', () => {
+  const draft = completeMaterialPurchaseContractDraft(
+    buildMaterialPurchaseContractDraftFromPurchaseOrder(
+      {
+        purchase_order_no: 'PO-YOYO-DATE',
+        supplier_snapshot: {
+          name: '永绅供应商',
+          contact_name: '供应商联系人',
+          contact_phone: '13800000000',
+          address: '东莞茶山',
+        },
+        purchase_date: '2026-06-13',
+        expected_arrival_date: '2026-06-24',
+      },
+      [
+        {
+          material_name_snapshot: '辅材',
+          product_order_no_snapshot: 'SO-YOYO-DATE',
+          product_no_snapshot: '26029',
+          product_name_snapshot: '夜樱烬色玩偶',
+          unit_name_snapshot: '米',
+          purchased_quantity: '1',
+          unit_price: '2',
+          amount: '2',
+          line_status: 'open',
+        },
+      ]
+    )
+  )
+
+  assert.equal(draft.orderDateText, '2026-06-13')
+  assert.equal(draft.returnDateText, '2026-06-24')
+  assert.equal(draft.signDateText, '2026-06-13')
+})
+
 test('FL_material_purchase_print_party_defaults__uses_customer_config_party_defaults_only masterDataOrderView: purchase print draft may use customer config buyer defaults without overriding supplier snapshots', () => {
   const draft = buildMaterialPurchaseContractDraftFromPurchaseOrder(
     {
@@ -1123,6 +1220,9 @@ test('FL_material_purchase_print_party_defaults__uses_customer_config_party_defa
             party_defaults: {
               buyerCompany: '客户配置买方公司',
               buyerContact: '采购负责人',
+              buyerPhone: '13537313218',
+              buyerAddress: '东莞-茶山',
+              buyerSigner: '郭改玉',
               supplierName: '不应覆盖供应商',
             },
           },
@@ -1140,11 +1240,62 @@ test('FL_material_purchase_print_party_defaults__uses_customer_config_party_defa
   assert.equal(draft.contractNo, 'PO-PRINT-CONFIG')
   assert.equal(draft.buyerCompany, '客户配置买方公司')
   assert.equal(draft.buyerContact, '采购负责人')
+  assert.equal(draft.buyerPhone, '13537313218')
+  assert.equal(draft.buyerAddress, '东莞-茶山')
+  assert.equal(draft.buyerSigner, '郭改玉')
   assert.equal(draft.supplierName, '真实供应商')
   assert.equal(draft.supplierContact, '供应商联系人')
   assert.equal(draft.supplierSigner, undefined)
   assert.equal(draft.lines[0].materialName, '拉毛布')
   assert.equal(draft.lines[0].amount, '6.00')
+})
+
+test('FL_material_purchase_print_party_snapshot__order_snapshot_overrides_customer_defaults masterDataOrderView: purchase print draft reads buyer fields from source order snapshot first', () => {
+  const draft = buildMaterialPurchaseContractDraftFromPurchaseOrder(
+    {
+      purchase_order_no: 'PO-PRINT-SNAPSHOT',
+      supplier_snapshot: {
+        name: '真实供应商',
+      },
+      contract_party_snapshot: {
+        buyerCompany: '本单订购单位',
+        buyerContact: '本单订购人',
+        buyerPhone: '本单电话',
+        buyerAddress: '本单地址',
+        buyerSigner: '本单签字人',
+      },
+    },
+    [
+      {
+        material_name_snapshot: '拉毛布',
+        purchased_quantity: '3',
+        unit_price: '2',
+        line_status: 'open',
+      },
+    ],
+    {
+      printTemplateDefaults: {
+        templates: [
+          {
+            template_key: 'material-purchase-contract',
+            party_defaults: {
+              buyerCompany: '客户配置买方公司',
+              buyerContact: '采购负责人',
+              buyerPhone: '13537313218',
+              buyerAddress: '东莞-茶山',
+              buyerSigner: '郭改玉',
+            },
+          },
+        ],
+      },
+    }
+  )
+
+  assert.equal(draft.buyerCompany, '本单订购单位')
+  assert.equal(draft.buyerContact, '本单订购人')
+  assert.equal(draft.buyerPhone, '本单电话')
+  assert.equal(draft.buyerAddress, '本单地址')
+  assert.equal(draft.buyerSigner, '本单签字人')
 })
 
 test('FL_material_purchase_print_snapshot__does_not_fallback_to_raw_ids masterDataOrderView: purchase print draft keeps missing line snapshots blank instead of raw ids', () => {

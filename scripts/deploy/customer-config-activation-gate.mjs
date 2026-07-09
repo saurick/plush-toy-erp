@@ -172,8 +172,8 @@ export function validateCustomerConfigActivationGate({
       errors,
     );
     assert(
-      manifestPayload.revision === "yoyoosun-customer-package-v1.runtime-manifest-v1",
-      "manifest revision must be yoyoosun-customer-package-v1.runtime-manifest-v1",
+      manifestPayload.revision === "yoyoosun-customer-package-v4.runtime-manifest-v1",
+      "manifest revision must be yoyoosun-customer-package-v4.runtime-manifest-v1",
       errors,
     );
   }

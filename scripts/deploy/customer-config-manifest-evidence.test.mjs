@@ -306,7 +306,7 @@ test("生成 manifest evidence 后 activation gate 可通过", async () => {
     manifest,
     evidenceDir,
   });
-  assert.equal(gate.revision, "yoyoosun-customer-package-v1.runtime-manifest-v1");
+  assert.equal(gate.revision, "yoyoosun-customer-package-v4.runtime-manifest-v1");
 
   await rm(root, { recursive: true, force: true });
 });
@@ -394,7 +394,7 @@ test("release report hash 不匹配时拒绝", async () => {
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        revision: "yoyoosun-customer-package-v1.runtime-manifest-v1",
+        revision: "yoyoosun-customer-package-v4.runtime-manifest-v1",
         manifestSha256: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
       },
       null,
