@@ -40,9 +40,17 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	}
 
 	_, draftRes, err := j.handleBOM(adminCtx, "create_bom_draft", "1", mustJSONRPCStruct(t, map[string]any{
-		"product_id": float64(fixtures.productID),
-		"version":    "V1",
-		"note":       "首版工程资料",
+		"product_id":      float64(fixtures.productID),
+		"version":         "V1",
+		"source_order_no": "WL260102",
+		"quantity_text":   "3030",
+		"spare_text":      "备品 30",
+		"print_date":      "2026-01-19",
+		"designer":        "罗伟",
+		"maker":           "成慧怡",
+		"auditor":         "审核人",
+		"hair_direction":  "单方向",
+		"note":            "首版工程资料",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -55,14 +63,21 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	if status := draft["status"]; status != biz.BOMStatusDraft {
 		t.Fatalf("expected draft status, got %#v", status)
 	}
+	if draft["source_order_no"] != "WL260102" || draft["designer"] != "罗伟" {
+		t.Fatalf("expected engineering header fields in BOM draft, got %#v", draft)
+	}
 
 	_, itemRes, err := j.handleBOM(adminCtx, "add_bom_item", "2", mustJSONRPCStruct(t, map[string]any{
-		"bom_header_id": float64(headerID),
-		"material_id":   float64(fixtures.materialID),
-		"quantity":      "1.25",
-		"unit_id":       float64(fixtures.unitID),
-		"loss_rate":     "0.10",
-		"position":      "面料",
+		"bom_header_id":        float64(headerID),
+		"material_id":          float64(fixtures.materialID),
+		"quantity":             "1.25",
+		"unit_id":              float64(fixtures.unitID),
+		"loss_rate":            "0.10",
+		"position":             "面料",
+		"piece_count":          "2",
+		"total_usage_snapshot": "378.75",
+		"process_base":         "布底贴12g纸朴",
+		"process_method":       "热裁",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -70,7 +85,11 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	if itemRes == nil || itemRes.Code != errcode.OK.Code {
 		t.Fatalf("expected add item OK, got %#v", itemRes)
 	}
-	itemID := jsonRPCInt(t, jsonRPCNestedMap(t, itemRes, "bom_item"), "id")
+	item := jsonRPCNestedMap(t, itemRes, "bom_item")
+	itemID := jsonRPCInt(t, item, "id")
+	if item["piece_count"] != "2" || item["process_method"] != "热裁" {
+		t.Fatalf("expected engineering item fields in BOM item, got %#v", item)
+	}
 
 	_, activeRes, err := j.handleBOM(adminCtx, "activate_bom_version", "3", mustJSONRPCStruct(t, map[string]any{"id": float64(headerID)}))
 	if err != nil {
@@ -108,9 +127,16 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	if status := copyVersion["status"]; status != biz.BOMStatusDraft {
 		t.Fatalf("expected copied version draft, got %#v", status)
 	}
+	if copyVersion["source_order_no"] != "WL260102" || copyVersion["designer"] != "罗伟" {
+		t.Fatalf("expected copied engineering header fields, got %#v", copyVersion)
+	}
 	items, ok := copyVersion["items"].([]any)
 	if !ok || len(items) != 1 {
 		t.Fatalf("expected copied item, got %#v", copyVersion["items"])
+	}
+	copiedItem, ok := items[0].(map[string]any)
+	if !ok || copiedItem["piece_count"] != "2" || copiedItem["process_base"] != "布底贴12g纸朴" {
+		t.Fatalf("expected copied engineering item fields, got %#v", items[0])
 	}
 
 	_, activateCopyRes, err := j.handleBOM(adminCtx, "activate_bom_version", "6", mustJSONRPCStruct(t, map[string]any{"id": float64(copyID)}))

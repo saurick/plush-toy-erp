@@ -306,6 +306,11 @@ export function shouldGuardCustomerBusinessPageRuntime({
   )
 }
 
+export function canMountCustomerRuntime(adminProfile) {
+  const customerKey = adminProfile?.effective_session?.customer?.key
+  return typeof customerKey === 'string' && customerKey.trim().length > 0
+}
+
 export function attachEffectiveSessionToAdminProfile(
   profile,
   effectiveSession

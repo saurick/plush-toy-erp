@@ -10,6 +10,7 @@ import {
   attachUnavailableEffectiveSessionToAdminProfile,
   applyEffectiveFieldPolicyFlags,
   buildEffectiveSessionDiagnosticSummary,
+  canMountCustomerRuntime,
   effectiveSessionAllowsAction,
   effectiveSessionAllowsPage,
   filterColumnsByEffectiveFieldPolicy,
@@ -480,6 +481,40 @@ test('adminProfileSync: 业务页挂载只看数据运行态，不复用 super a
     shouldGuardCustomerBusinessPageRuntime({
       effectiveSessionDiagnostic: superAdminNoCustomerSummary,
       isCustomerBusinessDataPage: false,
+    }),
+    false
+  )
+})
+
+test('adminProfileSync: 岗位任务端挂载只认客户运行态 customer key', () => {
+  const customerRuntimeProfile = attachEffectiveSessionToAdminProfile(
+    {
+      id: 1,
+      username: 'demo_boss',
+      permissions: ['mobile.boss.access'],
+    },
+    {
+      customer: { key: 'yoyoosun', name: '永绅' },
+      pages: ['global-dashboard'],
+      actions: ['workflow.task.read'],
+      workPools: ['boss'],
+      source: 'active_customer_config_revision',
+    }
+  )
+  assert.equal(canMountCustomerRuntime(customerRuntimeProfile), true)
+
+  const productCoreProfile = attachUnavailableEffectiveSessionToAdminProfile({
+    id: 2,
+    username: 'admin',
+    is_super_admin: true,
+    permissions: ['mobile.boss.access'],
+  })
+  assert.equal(canMountCustomerRuntime(productCoreProfile), false)
+  assert.equal(
+    canMountCustomerRuntime({
+      id: 3,
+      username: 'demo_boss',
+      permissions: ['mobile.boss.access'],
     }),
     false
   )

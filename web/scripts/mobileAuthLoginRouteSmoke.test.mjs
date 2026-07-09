@@ -209,3 +209,14 @@ test('mobile auth login route smoke keeps logout click guarded against route rer
     /getByTestId\('mobile-role-logout-button'\)\.click\(/u
   )
 })
+
+test('mobile auth login route smoke mocks customer runtime before loading task data', () => {
+  const source = fs.readFileSync(scriptPath, 'utf8')
+
+  assert.match(source, /__PLUSH_ERP_CUSTOMER_CONFIG__/u)
+  assert.match(source, /customerKey: 'yoyoosun'/u)
+  assert.match(source, /'\*\*\/rpc\/customer_config'/u)
+  assert.match(source, /method !== 'get_effective_session'/u)
+  assert.match(source, /customer: \{ key: 'yoyoosun', name: '永绅' \}/u)
+  assert.match(source, /source: 'mobile_auth_smoke_customer_runtime'/u)
+})

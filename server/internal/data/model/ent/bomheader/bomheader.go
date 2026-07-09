@@ -24,6 +24,22 @@ const (
 	FieldEffectiveFrom = "effective_from"
 	// FieldEffectiveTo holds the string denoting the effective_to field in the database.
 	FieldEffectiveTo = "effective_to"
+	// FieldSourceOrderNo holds the string denoting the source_order_no field in the database.
+	FieldSourceOrderNo = "source_order_no"
+	// FieldQuantityText holds the string denoting the quantity_text field in the database.
+	FieldQuantityText = "quantity_text"
+	// FieldSpareText holds the string denoting the spare_text field in the database.
+	FieldSpareText = "spare_text"
+	// FieldPrintDate holds the string denoting the print_date field in the database.
+	FieldPrintDate = "print_date"
+	// FieldDesigner holds the string denoting the designer field in the database.
+	FieldDesigner = "designer"
+	// FieldMaker holds the string denoting the maker field in the database.
+	FieldMaker = "maker"
+	// FieldAuditor holds the string denoting the auditor field in the database.
+	FieldAuditor = "auditor"
+	// FieldHairDirection holds the string denoting the hair_direction field in the database.
+	FieldHairDirection = "hair_direction"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -60,6 +76,14 @@ var Columns = []string{
 	FieldStatus,
 	FieldEffectiveFrom,
 	FieldEffectiveTo,
+	FieldSourceOrderNo,
+	FieldQuantityText,
+	FieldSpareText,
+	FieldPrintDate,
+	FieldDesigner,
+	FieldMaker,
+	FieldAuditor,
+	FieldHairDirection,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -84,6 +108,20 @@ var (
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	StatusValidator func(string) error
+	// SourceOrderNoValidator is a validator for the "source_order_no" field. It is called by the builders before save.
+	SourceOrderNoValidator func(string) error
+	// QuantityTextValidator is a validator for the "quantity_text" field. It is called by the builders before save.
+	QuantityTextValidator func(string) error
+	// SpareTextValidator is a validator for the "spare_text" field. It is called by the builders before save.
+	SpareTextValidator func(string) error
+	// DesignerValidator is a validator for the "designer" field. It is called by the builders before save.
+	DesignerValidator func(string) error
+	// MakerValidator is a validator for the "maker" field. It is called by the builders before save.
+	MakerValidator func(string) error
+	// AuditorValidator is a validator for the "auditor" field. It is called by the builders before save.
+	AuditorValidator func(string) error
+	// HairDirectionValidator is a validator for the "hair_direction" field. It is called by the builders before save.
+	HairDirectionValidator func(string) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -125,6 +163,46 @@ func ByEffectiveFrom(opts ...sql.OrderTermOption) OrderOption {
 // ByEffectiveTo orders the results by the effective_to field.
 func ByEffectiveTo(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldEffectiveTo, opts...).ToFunc()
+}
+
+// BySourceOrderNo orders the results by the source_order_no field.
+func BySourceOrderNo(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSourceOrderNo, opts...).ToFunc()
+}
+
+// ByQuantityText orders the results by the quantity_text field.
+func ByQuantityText(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldQuantityText, opts...).ToFunc()
+}
+
+// BySpareText orders the results by the spare_text field.
+func BySpareText(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSpareText, opts...).ToFunc()
+}
+
+// ByPrintDate orders the results by the print_date field.
+func ByPrintDate(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPrintDate, opts...).ToFunc()
+}
+
+// ByDesigner orders the results by the designer field.
+func ByDesigner(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDesigner, opts...).ToFunc()
+}
+
+// ByMaker orders the results by the maker field.
+func ByMaker(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMaker, opts...).ToFunc()
+}
+
+// ByAuditor orders the results by the auditor field.
+func ByAuditor(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAuditor, opts...).ToFunc()
+}
+
+// ByHairDirection orders the results by the hair_direction field.
+func ByHairDirection(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldHairDirection, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.

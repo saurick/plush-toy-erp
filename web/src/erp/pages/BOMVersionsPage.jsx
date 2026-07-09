@@ -146,11 +146,34 @@ function csvEscape(value) {
 }
 
 function downloadCSV({ filename, rows, productOptions = [] }) {
-  const header = ['产品', 'BOM版本', '状态', '生效开始', '生效结束', '备注']
+  const header = [
+    '产品',
+    'BOM版本',
+    '状态',
+    '来源订单号',
+    '订单数量',
+    '备品',
+    '制表日期',
+    '设计师',
+    '制表',
+    '审核',
+    '毛向',
+    '生效开始',
+    '生效结束',
+    '备注',
+  ]
   const body = rows.map((row) => [
     referenceLabel(productOptions, row.product_id, '产品'),
     row.version,
     bomStatusText(row.status),
+    row.source_order_no || '',
+    row.quantity_text || '',
+    row.spare_text || '',
+    formatUnixDate(row.print_date),
+    row.designer || '',
+    row.maker || '',
+    row.auditor || '',
+    row.hair_direction || '',
     formatUnixDate(row.effective_from),
     formatUnixDate(row.effective_to),
     row.note || '',
@@ -179,6 +202,10 @@ function createBlankBOMLine(headerID) {
     unit_id: undefined,
     loss_rate: '0',
     position: '',
+    piece_count: '',
+    total_usage_snapshot: '',
+    process_base: '',
+    process_method: '',
     note: '',
   }
 }
@@ -192,6 +219,10 @@ function normalizeBOMLineForForm(headerID, item = {}) {
     unit_id: item.unit_id || undefined,
     loss_rate: item.loss_rate ?? '0',
     position: item.position || '',
+    piece_count: item.piece_count || '',
+    total_usage_snapshot: item.total_usage_snapshot || '',
+    process_base: item.process_base || '',
+    process_method: item.process_method || '',
     note: item.note || '',
   }
 }
@@ -370,6 +401,39 @@ const BOMLineItemsForm = React.memo(
                   className="erp-line-item-field erp-line-item-field--date"
                   label="部位"
                   name={[field.name, 'position']}
+                >
+                  <Input allowClear autoComplete="off" disabled={!canEdit} />
+                </Form.Item>
+                <Form.Item
+                  className="erp-line-item-field erp-line-item-field--quantity"
+                  label="片数"
+                  name={[field.name, 'piece_count']}
+                >
+                  <Input allowClear autoComplete="off" disabled={!canEdit} />
+                </Form.Item>
+                <Form.Item
+                  className="erp-line-item-field erp-line-item-field--quantity"
+                  label="总用量"
+                  name={[field.name, 'total_usage_snapshot']}
+                >
+                  <Input
+                    allowClear
+                    autoComplete="off"
+                    disabled={!canEdit}
+                    placeholder="含损耗总用量"
+                  />
+                </Form.Item>
+                <Form.Item
+                  className="erp-line-item-field erp-line-item-field--date"
+                  label="加工基础"
+                  name={[field.name, 'process_base']}
+                >
+                  <Input allowClear autoComplete="off" disabled={!canEdit} />
+                </Form.Item>
+                <Form.Item
+                  className="erp-line-item-field erp-line-item-field--date"
+                  label="加工方式"
+                  name={[field.name, 'process_method']}
                 >
                   <Input allowClear autoComplete="off" disabled={!canEdit} />
                 </Form.Item>
@@ -750,6 +814,14 @@ export default function BOMVersionsPage() {
     headerForm.setFieldsValue({
       effective_from: '',
       effective_to: '',
+      source_order_no: '',
+      quantity_text: '',
+      spare_text: '',
+      print_date: '',
+      designer: '',
+      maker: '',
+      auditor: '',
+      hair_direction: '',
       items: [],
     })
     setHeaderProductIDForSuggestion(undefined)
@@ -763,6 +835,14 @@ export default function BOMVersionsPage() {
       version: record.version,
       effective_from: unixToDateInputValue(record.effective_from),
       effective_to: unixToDateInputValue(record.effective_to),
+      source_order_no: record.source_order_no || '',
+      quantity_text: record.quantity_text || '',
+      spare_text: record.spare_text || '',
+      print_date: unixToDateInputValue(record.print_date),
+      designer: record.designer || '',
+      maker: record.maker || '',
+      auditor: record.auditor || '',
+      hair_direction: record.hair_direction || '',
       note: record.note || '',
       items: normalizeBOMLinesForForm(record.id, record.items),
     })
@@ -808,6 +888,14 @@ export default function BOMVersionsPage() {
       version: nextVersionSuggestion || `${record.version || 'V'}-COPY`,
       effective_from: '',
       effective_to: '',
+      source_order_no: record.source_order_no || '',
+      quantity_text: record.quantity_text || '',
+      spare_text: record.spare_text || '',
+      print_date: unixToDateInputValue(record.print_date),
+      designer: record.designer || '',
+      maker: record.maker || '',
+      auditor: record.auditor || '',
+      hair_direction: record.hair_direction || '',
       note: '',
       items: [],
     })

@@ -26,12 +26,24 @@ func bomHeaderCreateFromParams(pm map[string]any) (*biz.BOMHeaderCreate, bool) {
 	if !ok {
 		return nil, false
 	}
+	printDate, ok := getOptionalJSONRPCTime(pm, "print_date")
+	if !ok {
+		return nil, false
+	}
 	return &biz.BOMHeaderCreate{
 		ProductID:     getInt(pm, "product_id", 0),
 		Version:       getString(pm, "version"),
 		Status:        biz.BOMStatusDraft,
 		EffectiveFrom: effectiveFrom,
 		EffectiveTo:   effectiveTo,
+		SourceOrderNo: getWorkflowStringPtr(pm, "source_order_no"),
+		QuantityText:  getWorkflowStringPtr(pm, "quantity_text"),
+		SpareText:     getWorkflowStringPtr(pm, "spare_text"),
+		PrintDate:     printDate,
+		Designer:      getWorkflowStringPtr(pm, "designer"),
+		Maker:         getWorkflowStringPtr(pm, "maker"),
+		Auditor:       getWorkflowStringPtr(pm, "auditor"),
+		HairDirection: getWorkflowStringPtr(pm, "hair_direction"),
 		Note:          getWorkflowStringPtr(pm, "note"),
 	}, true
 }
@@ -45,10 +57,22 @@ func bomHeaderUpdateFromParams(pm map[string]any) (*biz.BOMHeaderUpdate, bool) {
 	if !ok {
 		return nil, false
 	}
+	printDate, ok := getOptionalJSONRPCTime(pm, "print_date")
+	if !ok {
+		return nil, false
+	}
 	return &biz.BOMHeaderUpdate{
 		Version:       getString(pm, "version"),
 		EffectiveFrom: effectiveFrom,
 		EffectiveTo:   effectiveTo,
+		SourceOrderNo: getWorkflowStringPtr(pm, "source_order_no"),
+		QuantityText:  getWorkflowStringPtr(pm, "quantity_text"),
+		SpareText:     getWorkflowStringPtr(pm, "spare_text"),
+		PrintDate:     printDate,
+		Designer:      getWorkflowStringPtr(pm, "designer"),
+		Maker:         getWorkflowStringPtr(pm, "maker"),
+		Auditor:       getWorkflowStringPtr(pm, "auditor"),
+		HairDirection: getWorkflowStringPtr(pm, "hair_direction"),
 		Note:          getWorkflowStringPtr(pm, "note"),
 	}, true
 }
@@ -63,13 +87,17 @@ func bomItemCreateFromParams(pm map[string]any) (*biz.BOMItemCreate, bool) {
 		return nil, false
 	}
 	return &biz.BOMItemCreate{
-		BOMHeaderID: getInt(pm, "bom_header_id", 0),
-		MaterialID:  getInt(pm, "material_id", 0),
-		Quantity:    quantity,
-		UnitID:      getInt(pm, "unit_id", 0),
-		LossRate:    lossRate,
-		Position:    getWorkflowStringPtr(pm, "position"),
-		Note:        getWorkflowStringPtr(pm, "note"),
+		BOMHeaderID:        getInt(pm, "bom_header_id", 0),
+		MaterialID:         getInt(pm, "material_id", 0),
+		Quantity:           quantity,
+		UnitID:             getInt(pm, "unit_id", 0),
+		LossRate:           lossRate,
+		Position:           getWorkflowStringPtr(pm, "position"),
+		PieceCount:         getWorkflowStringPtr(pm, "piece_count"),
+		TotalUsageSnapshot: getWorkflowStringPtr(pm, "total_usage_snapshot"),
+		ProcessBase:        getWorkflowStringPtr(pm, "process_base"),
+		ProcessMethod:      getWorkflowStringPtr(pm, "process_method"),
+		Note:               getWorkflowStringPtr(pm, "note"),
 	}, true
 }
 
@@ -83,12 +111,16 @@ func bomItemUpdateFromParams(pm map[string]any) (*biz.BOMItemUpdate, bool) {
 		return nil, false
 	}
 	return &biz.BOMItemUpdate{
-		MaterialID: getInt(pm, "material_id", 0),
-		Quantity:   quantity,
-		UnitID:     getInt(pm, "unit_id", 0),
-		LossRate:   lossRate,
-		Position:   getWorkflowStringPtr(pm, "position"),
-		Note:       getWorkflowStringPtr(pm, "note"),
+		MaterialID:         getInt(pm, "material_id", 0),
+		Quantity:           quantity,
+		UnitID:             getInt(pm, "unit_id", 0),
+		LossRate:           lossRate,
+		Position:           getWorkflowStringPtr(pm, "position"),
+		PieceCount:         getWorkflowStringPtr(pm, "piece_count"),
+		TotalUsageSnapshot: getWorkflowStringPtr(pm, "total_usage_snapshot"),
+		ProcessBase:        getWorkflowStringPtr(pm, "process_base"),
+		ProcessMethod:      getWorkflowStringPtr(pm, "process_method"),
+		Note:               getWorkflowStringPtr(pm, "note"),
 	}, true
 }
 
@@ -168,15 +200,23 @@ func bomHeaderToAny(item *biz.BOMHeader) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":             item.ID,
-		"product_id":     item.ProductID,
-		"version":        item.Version,
-		"status":         item.Status,
-		"effective_from": optionalUnix(item.EffectiveFrom),
-		"effective_to":   optionalUnix(item.EffectiveTo),
-		"note":           optionalStringToAny(item.Note),
-		"created_at":     item.CreatedAt.Unix(),
-		"updated_at":     item.UpdatedAt.Unix(),
+		"id":              item.ID,
+		"product_id":      item.ProductID,
+		"version":         item.Version,
+		"status":          item.Status,
+		"effective_from":  optionalUnix(item.EffectiveFrom),
+		"effective_to":    optionalUnix(item.EffectiveTo),
+		"source_order_no": optionalStringToAny(item.SourceOrderNo),
+		"quantity_text":   optionalStringToAny(item.QuantityText),
+		"spare_text":      optionalStringToAny(item.SpareText),
+		"print_date":      optionalUnix(item.PrintDate),
+		"designer":        optionalStringToAny(item.Designer),
+		"maker":           optionalStringToAny(item.Maker),
+		"auditor":         optionalStringToAny(item.Auditor),
+		"hair_direction":  optionalStringToAny(item.HairDirection),
+		"note":            optionalStringToAny(item.Note),
+		"created_at":      item.CreatedAt.Unix(),
+		"updated_at":      item.UpdatedAt.Unix(),
 	}
 }
 
@@ -185,15 +225,19 @@ func bomItemToAny(item *biz.BOMItem) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":            item.ID,
-		"bom_header_id": item.BOMHeaderID,
-		"material_id":   item.MaterialID,
-		"quantity":      item.Quantity.String(),
-		"unit_id":       item.UnitID,
-		"loss_rate":     item.LossRate.String(),
-		"position":      optionalStringToAny(item.Position),
-		"note":          optionalStringToAny(item.Note),
-		"created_at":    item.CreatedAt.Unix(),
-		"updated_at":    item.UpdatedAt.Unix(),
+		"id":                   item.ID,
+		"bom_header_id":        item.BOMHeaderID,
+		"material_id":          item.MaterialID,
+		"quantity":             item.Quantity.String(),
+		"unit_id":              item.UnitID,
+		"loss_rate":            item.LossRate.String(),
+		"position":             optionalStringToAny(item.Position),
+		"piece_count":          optionalStringToAny(item.PieceCount),
+		"total_usage_snapshot": optionalStringToAny(item.TotalUsageSnapshot),
+		"process_base":         optionalStringToAny(item.ProcessBase),
+		"process_method":       optionalStringToAny(item.ProcessMethod),
+		"note":                 optionalStringToAny(item.Note),
+		"created_at":           item.CreatedAt.Unix(),
+		"updated_at":           item.UpdatedAt.Unix(),
 	}
 }

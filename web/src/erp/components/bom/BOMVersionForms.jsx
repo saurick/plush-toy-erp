@@ -27,6 +27,22 @@ export function buildHeaderParams(values = {}, extra = {}) {
     version: String(values.version || '').trim(),
     effective_from: dateInputToParam(values.effective_from),
     effective_to: dateInputToParam(values.effective_to),
+    source_order_no: values.source_order_no
+      ? String(values.source_order_no).trim()
+      : undefined,
+    quantity_text: values.quantity_text
+      ? String(values.quantity_text).trim()
+      : undefined,
+    spare_text: values.spare_text
+      ? String(values.spare_text).trim()
+      : undefined,
+    print_date: dateInputToParam(values.print_date),
+    designer: values.designer ? String(values.designer).trim() : undefined,
+    maker: values.maker ? String(values.maker).trim() : undefined,
+    auditor: values.auditor ? String(values.auditor).trim() : undefined,
+    hair_direction: values.hair_direction
+      ? String(values.hair_direction).trim()
+      : undefined,
     note: values.note ? String(values.note).trim() : undefined,
   }
 }
@@ -40,6 +56,18 @@ export function buildItemParams(values = {}, extra = {}) {
     unit_id: Number(values.unit_id || 0),
     loss_rate: String(values.loss_rate ?? '0').trim(),
     position: values.position ? String(values.position).trim() : undefined,
+    piece_count: values.piece_count
+      ? String(values.piece_count).trim()
+      : undefined,
+    total_usage_snapshot: values.total_usage_snapshot
+      ? String(values.total_usage_snapshot).trim()
+      : undefined,
+    process_base: values.process_base
+      ? String(values.process_base).trim()
+      : undefined,
+    process_method: values.process_method
+      ? String(values.process_method).trim()
+      : undefined,
     note: values.note ? String(values.note).trim() : undefined,
   }
 }
@@ -168,6 +196,72 @@ export function BOMHeaderFormFields({
         />
       </Form.Item>
       <Form.Item
+        className="erp-business-action-form__field"
+        label="来源订单号"
+        name="source_order_no"
+      >
+        <Input
+          allowClear
+          autoComplete="off"
+          disabled={disabled}
+          placeholder="例如 WL260102"
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="订单数量"
+        name="quantity_text"
+      >
+        <Input
+          allowClear
+          autoComplete="off"
+          disabled={disabled}
+          placeholder="例如 3030"
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="备品"
+        name="spare_text"
+      >
+        <Input allowClear autoComplete="off" disabled={disabled} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="制表日期"
+        name="print_date"
+      >
+        <DateInput disabled={disabled} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="设计师"
+        name="designer"
+      >
+        <Input allowClear autoComplete="off" disabled={disabled} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="制表"
+        name="maker"
+      >
+        <Input allowClear autoComplete="off" disabled={disabled} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="审核"
+        name="auditor"
+      >
+        <Input allowClear autoComplete="off" disabled={disabled} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="毛向"
+        name="hair_direction"
+      >
+        <Input allowClear autoComplete="off" disabled={disabled} />
+      </Form.Item>
+      <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
         label="备注"
         name="note"
@@ -235,6 +329,34 @@ export function BOMItemFormFields({ materialOptions = [], unitOptions = [] }) {
         className="erp-business-action-form__field"
         label="部位"
         name="position"
+      >
+        <Input allowClear autoComplete="off" />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="片数"
+        name="piece_count"
+      >
+        <Input allowClear autoComplete="off" />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="总用量"
+        name="total_usage_snapshot"
+      >
+        <Input allowClear autoComplete="off" placeholder="含损耗总用量" />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="加工基础"
+        name="process_base"
+      >
+        <Input allowClear autoComplete="off" />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="加工方式"
+        name="process_method"
       >
         <Input allowClear autoComplete="off" />
       </Form.Item>

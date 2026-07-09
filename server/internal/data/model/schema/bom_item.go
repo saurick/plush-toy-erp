@@ -40,6 +40,22 @@ func (BOMItem) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(128),
+		field.String("piece_count").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("total_usage_snapshot").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("process_base").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.String("process_method").
+			Optional().
+			Nillable().
+			MaxLen(128),
 		field.String("note").
 			Optional().
 			Nillable().

@@ -24,15 +24,25 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	))
 
 	header, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
-		ProductID: fixtures.productID,
-		Version:   "V1",
-		Status:    biz.BOMStatusDraft,
+		ProductID:     fixtures.productID,
+		Version:       "V1",
+		Status:        biz.BOMStatusDraft,
+		SourceOrderNo: stringPtr("WL260102"),
+		QuantityText:  stringPtr("3030"),
+		SpareText:     stringPtr("备品 30"),
+		Designer:      stringPtr("罗伟"),
+		Maker:         stringPtr("成慧怡"),
+		Auditor:       stringPtr("审核人"),
+		HairDirection: stringPtr("单方向"),
 	})
 	if err != nil {
 		t.Fatalf("create bom header failed: %v", err)
 	}
 	if header.Status != biz.BOMStatusDraft {
 		t.Fatalf("expected draft bom header, got %s", header.Status)
+	}
+	if header.SourceOrderNo == nil || *header.SourceOrderNo != "WL260102" || header.Designer == nil || *header.Designer != "罗伟" {
+		t.Fatalf("expected BOM engineering header fields, got %#v", header)
 	}
 	if _, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
 		ProductID: fixtures.productID,
@@ -52,18 +62,25 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 
 	position := "face"
 	item, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
-		BOMHeaderID: header.ID,
-		MaterialID:  fixtures.materialID,
-		Quantity:    mustDecimal(t, "1.250000"),
-		UnitID:      fixtures.unitID,
-		LossRate:    mustDecimal(t, "0.100000"),
-		Position:    &position,
+		BOMHeaderID:        header.ID,
+		MaterialID:         fixtures.materialID,
+		Quantity:           mustDecimal(t, "1.250000"),
+		UnitID:             fixtures.unitID,
+		LossRate:           mustDecimal(t, "0.100000"),
+		Position:           &position,
+		PieceCount:         stringPtr("2"),
+		TotalUsageSnapshot: stringPtr("378.75"),
+		ProcessBase:        stringPtr("布底贴12g纸朴"),
+		ProcessMethod:      stringPtr("热裁"),
 	})
 	if err != nil {
 		t.Fatalf("create bom item failed: %v", err)
 	}
 	assertDecimalEqual(t, item.Quantity, "1.250000")
 	assertDecimalEqual(t, item.LossRate, "0.100000")
+	if item.PieceCount == nil || *item.PieceCount != "2" || item.ProcessMethod == nil || *item.ProcessMethod != "热裁" {
+		t.Fatalf("expected BOM engineering item fields, got %#v", item)
+	}
 
 	activated, err := uc.ActivateBOMVersion(ctx, header.ID)
 	if err != nil {

@@ -222,3 +222,19 @@
 下一步：提交并推送当前全工作区改动；推送前继续确认远端未领先，推送后以 `origin/main...HEAD = 0 0` 收口。
 
 阻塞/风险：本次 closeout 修正的是测试目录、测试断言和用户可见文案，不改变 schema / migration / RBAC / Workflow / Fact usecase 的运行时语义。`qa:full` 仍保留当前 Node v26.5.0 高于仓库 engine `24.14.x` 的 warning，以及既有 `ProcessingContractPrintWorkspacePage.jsx` React Hook dependency warning；均未阻断全量验证。
+
+## 2026-07-10 岗位任务端客户运行态隔离
+
+完成：按 Product Core / 永绅客户运行态边界复核岗位任务端。新增 `canMountCustomerRuntime`，`MobileAppLayout` 在进入 `/m/<role>/tasks` 前按当前静态客户配置 key 拉取 `customer_config.get_effective_session`，只有 effective session 带 customer key 时才渲染岗位任务页；无客户 key、Product Core 中性入口或 sync-failed 空投影时显示客户运行环境拦截页，不挂载客户 Workflow 数据。`MobileRoleTasksPage` 在调用 `listWorkflowTasks` 前再次检查客户运行态，不满足时清空任务并短路。二次 review 后将移动端拦截页文案从 `Product Core / customer key / Workflow` 改成岗位用户可读的客户运行环境说明。同步补充 `formal-frontend-customer-config-boundary` 静态门禁、auth storage 拒绝读取时的登录态韧性、移动端 smoke 的 yoyoosun effective session mock，以及 `web/README.md`、`docs/当前真源与交接顺序.md`、`docs/product/自动化测试策略.md` 口径。
+
+下一步：如需验证所有岗位角色的移动端真实浏览器链路，可在当前本机代理 / loopback 环境稳定后去掉 `MOBILE_AUTH_SMOKE_ROLE_KEY='boss'` 跑完整 `smoke:mobile-auth-login-route`；目标环境仍需真实账号、active customer config revision 和目标 smoke 单独证明。
+
+阻塞/风险：本轮不改后端 schema / migration / RBAC / Workflow / Fact usecase，不导入或创建真实客户任务数据。已通过相关单测、lint、css 和 boss 岗位浏览器 smoke；浏览器 smoke 在本机 Vite 监听 `[::1]` 时需用 `MOBILE_AUTH_SMOKE_BASE_URL='http://[::1]:4193'` 复用已启动入口，直接走 `127.0.0.1` 会被当前代理 / 地址解析环境干扰。
+
+## 2026-07-10 永绅工程资料打印字段链路切片
+
+完成：按永绅 Excel 源表和 `docs/reference/第四次20260627` 的业务 / 流程 / 状态边界，先收口非合同打印模板中的 BOM 工程资料切片。BOM 版本新增并贯通 `来源订单号 / 订单数量 / 备品 / 制表日期 / 设计师 / 制表 / 审核 / 毛向`，BOM 明细新增并贯通 `片数 / 总用量含损耗 / 加工底料 / 加工方式`；后端 Ent schema、Atlas migration、biz/repo、JSON-RPC、前端 BOM 表单 / 明细 / 列表导出和三套工程打印模板 mapper 已同步。永绅 trial fixture 补齐材料类别、厂商料号、颜色和每行加工底料 / 加工方式测试值，`yoyoosun-customer-closure` 增加工程打印字段覆盖矩阵和业务页字段存在断言。Review 后修正了 `process_base` fixture 覆盖缺口，并把 `web/README.md` 中只提合同模板的过期口径改为合同和工程资料模板。
+
+下一步：继续按源表分批审计其它永绅表格字段、业务页表单 / 弹窗、单据状态、通知 / 审计 / 流程编排和字典状态树；每批都应先确认字段真源和业务边界，再决定是否进入 Product Core、客户配置、fixture、打印模板或 deferred 评审。
+
+阻塞/风险：本轮只完成 BOM 工程资料到 `物料分析明细表 / 色卡 / 作业指导书` 的可验证切片，不把 Excel 里的加工厂银行信息、财务信息、库存 / 出货 / 质检 / 通知 / 审计事实写入运行时，也不执行真实客户导入或目标环境发布。新增 schema / migration 尚未在本轮 apply 到本地 dev DB；当前验证覆盖本地代码生成、Go unit / service 测试、Node 字段链路测试和文档静态检查，不替代目标环境 migration、浏览器 PDF 版式回归或 release evidence。

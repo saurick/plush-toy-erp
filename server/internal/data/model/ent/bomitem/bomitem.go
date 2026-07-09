@@ -26,6 +26,14 @@ const (
 	FieldLossRate = "loss_rate"
 	// FieldPosition holds the string denoting the position field in the database.
 	FieldPosition = "position"
+	// FieldPieceCount holds the string denoting the piece_count field in the database.
+	FieldPieceCount = "piece_count"
+	// FieldTotalUsageSnapshot holds the string denoting the total_usage_snapshot field in the database.
+	FieldTotalUsageSnapshot = "total_usage_snapshot"
+	// FieldProcessBase holds the string denoting the process_base field in the database.
+	FieldProcessBase = "process_base"
+	// FieldProcessMethod holds the string denoting the process_method field in the database.
+	FieldProcessMethod = "process_method"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -72,6 +80,10 @@ var Columns = []string{
 	FieldUnitID,
 	FieldLossRate,
 	FieldPosition,
+	FieldPieceCount,
+	FieldTotalUsageSnapshot,
+	FieldProcessBase,
+	FieldProcessMethod,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -96,6 +108,14 @@ var (
 	UnitIDValidator func(int) error
 	// PositionValidator is a validator for the "position" field. It is called by the builders before save.
 	PositionValidator func(string) error
+	// PieceCountValidator is a validator for the "piece_count" field. It is called by the builders before save.
+	PieceCountValidator func(string) error
+	// TotalUsageSnapshotValidator is a validator for the "total_usage_snapshot" field. It is called by the builders before save.
+	TotalUsageSnapshotValidator func(string) error
+	// ProcessBaseValidator is a validator for the "process_base" field. It is called by the builders before save.
+	ProcessBaseValidator func(string) error
+	// ProcessMethodValidator is a validator for the "process_method" field. It is called by the builders before save.
+	ProcessMethodValidator func(string) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -142,6 +162,26 @@ func ByLossRate(opts ...sql.OrderTermOption) OrderOption {
 // ByPosition orders the results by the position field.
 func ByPosition(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPosition, opts...).ToFunc()
+}
+
+// ByPieceCount orders the results by the piece_count field.
+func ByPieceCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPieceCount, opts...).ToFunc()
+}
+
+// ByTotalUsageSnapshot orders the results by the total_usage_snapshot field.
+func ByTotalUsageSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTotalUsageSnapshot, opts...).ToFunc()
+}
+
+// ByProcessBase orders the results by the process_base field.
+func ByProcessBase(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProcessBase, opts...).ToFunc()
+}
+
+// ByProcessMethod orders the results by the process_method field.
+func ByProcessMethod(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProcessMethod, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.

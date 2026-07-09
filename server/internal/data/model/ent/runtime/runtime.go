@@ -303,16 +303,44 @@ func init() {
 			return nil
 		}
 	}()
+	// bomheaderDescSourceOrderNo is the schema descriptor for source_order_no field.
+	bomheaderDescSourceOrderNo := bomheaderFields[5].Descriptor()
+	// bomheader.SourceOrderNoValidator is a validator for the "source_order_no" field. It is called by the builders before save.
+	bomheader.SourceOrderNoValidator = bomheaderDescSourceOrderNo.Validators[0].(func(string) error)
+	// bomheaderDescQuantityText is the schema descriptor for quantity_text field.
+	bomheaderDescQuantityText := bomheaderFields[6].Descriptor()
+	// bomheader.QuantityTextValidator is a validator for the "quantity_text" field. It is called by the builders before save.
+	bomheader.QuantityTextValidator = bomheaderDescQuantityText.Validators[0].(func(string) error)
+	// bomheaderDescSpareText is the schema descriptor for spare_text field.
+	bomheaderDescSpareText := bomheaderFields[7].Descriptor()
+	// bomheader.SpareTextValidator is a validator for the "spare_text" field. It is called by the builders before save.
+	bomheader.SpareTextValidator = bomheaderDescSpareText.Validators[0].(func(string) error)
+	// bomheaderDescDesigner is the schema descriptor for designer field.
+	bomheaderDescDesigner := bomheaderFields[9].Descriptor()
+	// bomheader.DesignerValidator is a validator for the "designer" field. It is called by the builders before save.
+	bomheader.DesignerValidator = bomheaderDescDesigner.Validators[0].(func(string) error)
+	// bomheaderDescMaker is the schema descriptor for maker field.
+	bomheaderDescMaker := bomheaderFields[10].Descriptor()
+	// bomheader.MakerValidator is a validator for the "maker" field. It is called by the builders before save.
+	bomheader.MakerValidator = bomheaderDescMaker.Validators[0].(func(string) error)
+	// bomheaderDescAuditor is the schema descriptor for auditor field.
+	bomheaderDescAuditor := bomheaderFields[11].Descriptor()
+	// bomheader.AuditorValidator is a validator for the "auditor" field. It is called by the builders before save.
+	bomheader.AuditorValidator = bomheaderDescAuditor.Validators[0].(func(string) error)
+	// bomheaderDescHairDirection is the schema descriptor for hair_direction field.
+	bomheaderDescHairDirection := bomheaderFields[12].Descriptor()
+	// bomheader.HairDirectionValidator is a validator for the "hair_direction" field. It is called by the builders before save.
+	bomheader.HairDirectionValidator = bomheaderDescHairDirection.Validators[0].(func(string) error)
 	// bomheaderDescNote is the schema descriptor for note field.
-	bomheaderDescNote := bomheaderFields[5].Descriptor()
+	bomheaderDescNote := bomheaderFields[13].Descriptor()
 	// bomheader.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	bomheader.NoteValidator = bomheaderDescNote.Validators[0].(func(string) error)
 	// bomheaderDescCreatedAt is the schema descriptor for created_at field.
-	bomheaderDescCreatedAt := bomheaderFields[6].Descriptor()
+	bomheaderDescCreatedAt := bomheaderFields[14].Descriptor()
 	// bomheader.DefaultCreatedAt holds the default value on creation for the created_at field.
 	bomheader.DefaultCreatedAt = bomheaderDescCreatedAt.Default.(func() time.Time)
 	// bomheaderDescUpdatedAt is the schema descriptor for updated_at field.
-	bomheaderDescUpdatedAt := bomheaderFields[7].Descriptor()
+	bomheaderDescUpdatedAt := bomheaderFields[15].Descriptor()
 	// bomheader.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	bomheader.DefaultUpdatedAt = bomheaderDescUpdatedAt.Default.(func() time.Time)
 	// bomheader.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -335,16 +363,32 @@ func init() {
 	bomitemDescPosition := bomitemFields[5].Descriptor()
 	// bomitem.PositionValidator is a validator for the "position" field. It is called by the builders before save.
 	bomitem.PositionValidator = bomitemDescPosition.Validators[0].(func(string) error)
+	// bomitemDescPieceCount is the schema descriptor for piece_count field.
+	bomitemDescPieceCount := bomitemFields[6].Descriptor()
+	// bomitem.PieceCountValidator is a validator for the "piece_count" field. It is called by the builders before save.
+	bomitem.PieceCountValidator = bomitemDescPieceCount.Validators[0].(func(string) error)
+	// bomitemDescTotalUsageSnapshot is the schema descriptor for total_usage_snapshot field.
+	bomitemDescTotalUsageSnapshot := bomitemFields[7].Descriptor()
+	// bomitem.TotalUsageSnapshotValidator is a validator for the "total_usage_snapshot" field. It is called by the builders before save.
+	bomitem.TotalUsageSnapshotValidator = bomitemDescTotalUsageSnapshot.Validators[0].(func(string) error)
+	// bomitemDescProcessBase is the schema descriptor for process_base field.
+	bomitemDescProcessBase := bomitemFields[8].Descriptor()
+	// bomitem.ProcessBaseValidator is a validator for the "process_base" field. It is called by the builders before save.
+	bomitem.ProcessBaseValidator = bomitemDescProcessBase.Validators[0].(func(string) error)
+	// bomitemDescProcessMethod is the schema descriptor for process_method field.
+	bomitemDescProcessMethod := bomitemFields[9].Descriptor()
+	// bomitem.ProcessMethodValidator is a validator for the "process_method" field. It is called by the builders before save.
+	bomitem.ProcessMethodValidator = bomitemDescProcessMethod.Validators[0].(func(string) error)
 	// bomitemDescNote is the schema descriptor for note field.
-	bomitemDescNote := bomitemFields[6].Descriptor()
+	bomitemDescNote := bomitemFields[10].Descriptor()
 	// bomitem.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	bomitem.NoteValidator = bomitemDescNote.Validators[0].(func(string) error)
 	// bomitemDescCreatedAt is the schema descriptor for created_at field.
-	bomitemDescCreatedAt := bomitemFields[7].Descriptor()
+	bomitemDescCreatedAt := bomitemFields[11].Descriptor()
 	// bomitem.DefaultCreatedAt holds the default value on creation for the created_at field.
 	bomitem.DefaultCreatedAt = bomitemDescCreatedAt.Default.(func() time.Time)
 	// bomitemDescUpdatedAt is the schema descriptor for updated_at field.
-	bomitemDescUpdatedAt := bomitemFields[8].Descriptor()
+	bomitemDescUpdatedAt := bomitemFields[12].Descriptor()
 	// bomitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	bomitem.DefaultUpdatedAt = bomitemDescUpdatedAt.Default.(func() time.Time)
 	// bomitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

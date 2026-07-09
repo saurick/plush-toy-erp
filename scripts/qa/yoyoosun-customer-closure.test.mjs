@@ -8,6 +8,11 @@ import { yoyoosunProjectionMatrix } from '../../config/customers/yoyoosun/projec
 import { yoyoosunRawSourceFormMap } from '../../config/customers/yoyoosun/rawSourceFormMap.mjs'
 import { yoyoosunRoleFlowMatrix } from '../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 import { yoyoosunTrialDataFixture } from '../../config/customers/yoyoosun/trialDataFixture.mjs'
+import {
+  buildColorCardDraftFromBOMVersion,
+  buildMaterialDetailDraftFromBOMVersion,
+  buildWorkInstructionDraftFromBOMVersion,
+} from '../../web/src/erp/data/engineeringPrintTemplates.mjs'
 import { buildProcessingContractDraftFromOutsourcingOrder } from '../../web/src/erp/data/processingContractTemplate.mjs'
 import {
   completeMaterialPurchaseContractDraft,
@@ -144,6 +149,47 @@ const contractPartySnapshotCoverage = Object.freeze([
   ['buyerSigner', '源单合同方快照.buyerSigner'],
 ])
 
+const engineeringMaterialDetailPrintFieldCoverage = Object.freeze([
+  ['productNo', 'BOM版本页.product_id -> 产品编号'],
+  ['orderNo', 'BOM版本页.source_order_no'],
+  ['productName', 'BOM版本页.product_id -> 产品名称'],
+  ['quantityText', 'BOM版本页.quantity_text'],
+  ['spareText', 'BOM版本页.spare_text'],
+  ['dateText', 'BOM版本页.print_date'],
+  ['designer', 'BOM版本页.designer'],
+  ['maker', 'BOM版本页.maker'],
+  ['auditor', 'BOM版本页.auditor'],
+  ['hairDirection', 'BOM版本页.hair_direction'],
+])
+
+const engineeringMaterialDetailLinePrintFieldCoverage = Object.freeze([
+  ['category', '材料主数据.category'],
+  ['materialName', 'BOM明细.material_id -> 材料名称'],
+  ['vendorCode', '材料主数据.vendor_code'],
+  ['spec', '材料主数据.spec'],
+  ['color', '材料主数据.color'],
+  ['unit', 'BOM明细.unit_id -> 单位名称'],
+  ['position', 'BOM明细.position'],
+  ['pieces', 'BOM明细.piece_count'],
+  ['unitUsage', 'BOM明细.quantity'],
+  ['lossRate', 'BOM明细.loss_rate'],
+  ['totalUsage', 'BOM明细.total_usage_snapshot'],
+  ['processBase', 'BOM明细.process_base'],
+  ['processMethod', 'BOM明细.process_method'],
+])
+
+const engineeringWorkInstructionPrintFieldCoverage = Object.freeze([
+  ['productNo', 'BOM版本页.product_id -> 产品编号'],
+  ['orderNo', 'BOM版本页.source_order_no'],
+  ['productName', 'BOM版本页.product_id -> 产品名称'],
+  ['versionText', 'BOM版本页.version'],
+  ['processName', 'BOM明细.process_base/process_method 汇总'],
+  ['department', '工程打印模板固定部门口径'],
+  ['maker', 'BOM版本页.maker'],
+  ['designer', 'BOM版本页.designer'],
+  ['auditor', 'BOM版本页.auditor'],
+])
+
 function assertNonBlankFields(record, coverage, context) {
   for (const [key, source] of coverage) {
     assert.ok(
@@ -160,6 +206,15 @@ function assertSourceContainsAll(source, needles, context) {
 }
 
 function buildFixtureLookups() {
+  const units = yoyoosunTrialDataFixture.units.map((unit, index) => ({
+    id: index + 1,
+    value: index + 1,
+    code: unit.unitCode,
+    name: unit.unitName,
+    label: `${unit.unitCode} / ${unit.unitName}`,
+    suffixLabel: unit.unitName,
+  }))
+  const unitByCode = new Map(units.map((unit) => [unit.code, unit]))
   const suppliers = yoyoosunTrialDataFixture.suppliers.map((supplier, index) => ({
     id: index + 1,
     code: supplier.supplierCode,
@@ -173,16 +228,11 @@ function buildFixtureLookups() {
     id: index + 1,
     code: material.materialCode,
     name: material.materialName,
+    category: material.category,
+    vendor_code: material.vendorCode,
     spec: material.spec,
-    default_unit_id: index + 1,
-  }))
-  const units = yoyoosunTrialDataFixture.units.map((unit, index) => ({
-    id: index + 1,
-    value: index + 1,
-    code: unit.unitCode,
-    name: unit.unitName,
-    label: `${unit.unitCode} / ${unit.unitName}`,
-    suffixLabel: unit.unitName,
+    color: material.color,
+    default_unit_id: unitByCode.get(material.unitCode)?.id || 0,
   }))
   const products = yoyoosunTrialDataFixture.products.map((product, index) => ({
     id: index + 1,
@@ -192,10 +242,58 @@ function buildFixtureLookups() {
   return {
     supplierByCode: new Map(suppliers.map((supplier) => [supplier.code, supplier])),
     materialByCode: new Map(materials.map((material) => [material.code, material])),
-    unitByCode: new Map(units.map((unit) => [unit.code, unit])),
+    unitByCode,
     productByNo: new Map(products.map((product) => [product.code, product])),
     materials,
     units,
+    products,
+    productOptions: products.map((product) => ({
+      value: product.id,
+      label: `${product.code} / ${product.name}`,
+    })),
+  }
+}
+
+function unixFromDateText(value) {
+  const date = new Date(`${value}T00:00:00Z`)
+  assert.ok(!Number.isNaN(date.getTime()), `${value} must be a valid date`)
+  return Math.floor(date.getTime() / 1000)
+}
+
+function buildRuntimeBOMVersionFromFixture(bomVersion, lookups) {
+  const product = lookups.productByNo.get(bomVersion.productNo)
+  assert.ok(product, `${bomVersion.bomNo} product fixture required`)
+  return {
+    product_id: product.id,
+    version: bomVersion.versionNo,
+    source_order_no: bomVersion.sourceOrderNo,
+    quantity_text: bomVersion.quantityText,
+    spare_text: bomVersion.spareText,
+    print_date: unixFromDateText(bomVersion.printDate),
+    designer: bomVersion.designer,
+    maker: bomVersion.maker,
+    auditor: bomVersion.auditor,
+    hair_direction: bomVersion.hairDirection,
+    note: bomVersion.bomNo,
+    items: bomVersion.lines.map((line, index) => {
+      const material = lookups.materialByCode.get(line.materialCode)
+      const unit = lookups.unitByCode.get(line.unitCode)
+      assert.ok(material, `${bomVersion.bomNo} line ${index + 1} material fixture required`)
+      assert.ok(unit, `${bomVersion.bomNo} line ${index + 1} unit fixture required`)
+      return {
+        line_no: index + 1,
+        material_id: material.id,
+        unit_id: unit.id,
+        quantity: line.usageQty,
+        loss_rate: line.lossRate,
+        position: line.position,
+        piece_count: line.pieceCount,
+        total_usage_snapshot: line.totalUsage,
+        process_base: line.processBase,
+        process_method: line.processMethod,
+        note: line.note,
+      }
+    }),
   }
 }
 
@@ -445,6 +543,70 @@ test('yoyoosun trial print fixtures have no empty critical print fields', () => 
   for (const key of ['productOrderNo', 'productNo', 'productName', 'processName', 'unitCode', 'quantity', 'unitPrice', 'amount']) {
     assert.ok(String(outsourcingLine[key] || '').trim(), `outsourcing line ${key} must not be blank`)
   }
+
+  for (const bomVersion of yoyoosunTrialDataFixture.bomVersions) {
+    for (const key of ['sourceOrderNo', 'quantityText', 'spareText', 'printDate', 'designer', 'maker', 'auditor', 'hairDirection']) {
+      assert.ok(String(bomVersion[key] || '').trim(), `bom version ${bomVersion.bomNo} ${key} must not be blank`)
+    }
+    for (const [index, line] of bomVersion.lines.entries()) {
+      for (const key of ['materialCode', 'usageQty', 'unitCode', 'position', 'pieceCount', 'lossRate', 'totalUsage', 'processBase', 'processMethod']) {
+        assert.ok(String(line[key] || '').trim(), `bom version ${bomVersion.bomNo} line ${index + 1} ${key} must not be blank`)
+      }
+    }
+  }
+})
+
+test('yoyoosun engineering print field coverage maps every paper variable to BOM pages or master data', () => {
+  const lookups = buildFixtureLookups()
+
+  for (const bomVersion of yoyoosunTrialDataFixture.bomVersions) {
+    const runtimeVersion = buildRuntimeBOMVersionFromFixture(bomVersion, lookups)
+    const options = {
+      productOptions: lookups.productOptions,
+      products: lookups.products,
+      materials: lookups.materials,
+      units: lookups.units,
+      companyName: '永绅试用',
+    }
+
+    const materialDetailDraft = buildMaterialDetailDraftFromBOMVersion(runtimeVersion, options)
+    assertNonBlankFields(
+      materialDetailDraft,
+      engineeringMaterialDetailPrintFieldCoverage,
+      `${bomVersion.bomNo}.materialDetail`
+    )
+    materialDetailDraft.lines.forEach((line, index) =>
+      assertNonBlankFields(
+        line,
+        engineeringMaterialDetailLinePrintFieldCoverage,
+        `${bomVersion.bomNo}.materialDetail.lines[${index}]`
+      )
+    )
+
+    const colorCardDraft = buildColorCardDraftFromBOMVersion(runtimeVersion, options)
+    assert.ok(colorCardDraft.productNo, `${bomVersion.bomNo}.colorCard.productNo must not be blank`)
+    assert.ok(colorCardDraft.productName, `${bomVersion.bomNo}.colorCard.productName must not be blank`)
+    assert.ok(colorCardDraft.maker, `${bomVersion.bomNo}.colorCard.maker must not be blank`)
+    assert.ok(colorCardDraft.dateText, `${bomVersion.bomNo}.colorCard.dateText must not be blank`)
+    assert.ok(colorCardDraft.auditor, `${bomVersion.bomNo}.colorCard.auditor must not be blank`)
+    colorCardDraft.blocks.forEach((block, index) => {
+      assert.ok(block.materialName, `${bomVersion.bomNo}.colorCard.blocks[${index}].materialName must not be blank`)
+      assert.ok(block.vendor, `${bomVersion.bomNo}.colorCard.blocks[${index}].vendor must not be blank`)
+      assert.ok(block.lines.some((line) => line.position && line.method), `${bomVersion.bomNo}.colorCard.blocks[${index}] must include position and method`)
+    })
+
+    const workInstructionDraft = buildWorkInstructionDraftFromBOMVersion(runtimeVersion, options)
+    assertNonBlankFields(
+      workInstructionDraft,
+      engineeringWorkInstructionPrintFieldCoverage,
+      `${bomVersion.bomNo}.workInstruction`
+    )
+    assert.ok(workInstructionDraft.rows.length >= runtimeVersion.items.length, `${bomVersion.bomNo}.workInstruction rows must be generated from BOM items`)
+    for (const [index, row] of workInstructionDraft.rows.entries()) {
+      assert.ok(row.text.includes('用量：'), `${bomVersion.bomNo}.workInstruction.rows[${index}] must include quantity`)
+      assert.ok(row.text.includes('加工：'), `${bomVersion.bomNo}.workInstruction.rows[${index}] must include process`)
+    }
+  }
 })
 
 test('yoyoosun contract print field coverage maps every paper variable to business or config values', () => {
@@ -648,6 +810,56 @@ test('yoyoosun contract print source pages expose every business-owned print fie
     outsourcingPage.includes('加工合同打印') &&
       outsourcingPage.includes('openProcessingContractPrint'),
     'outsourcing order page must expose processing contract print action'
+  )
+})
+
+test('yoyoosun engineering print source pages expose every business-owned print field', () => {
+  const bomForm = readFileSync(
+    'web/src/erp/components/bom/BOMVersionForms.jsx',
+    'utf8'
+  )
+  const bomPage = readFileSync('web/src/erp/pages/BOMVersionsPage.jsx', 'utf8')
+  const bomColumns = readFileSync(
+    'web/src/erp/components/bom/BOMVersionColumns.jsx',
+    'utf8'
+  )
+
+  assertSourceContainsAll(
+    bomForm,
+    [
+      'name="source_order_no"',
+      'name="quantity_text"',
+      'name="spare_text"',
+      'name="print_date"',
+      'name="designer"',
+      'name="maker"',
+      'name="auditor"',
+      'name="hair_direction"',
+      'name="piece_count"',
+      'name="total_usage_snapshot"',
+      'name="process_base"',
+      'name="process_method"',
+    ],
+    'bom version form'
+  )
+  assertSourceContainsAll(
+    bomPage,
+    [
+      "name={[field.name, 'piece_count']}",
+      "name={[field.name, 'total_usage_snapshot']}",
+      "name={[field.name, 'process_base']}",
+      "name={[field.name, 'process_method']}",
+      'openPrintWorkspaceWindow',
+      'buildMaterialDetailDraftFromBOMVersion',
+      'buildColorCardDraftFromBOMVersion',
+      'buildWorkInstructionDraftFromBOMVersion',
+    ],
+    'bom version page'
+  )
+  assertSourceContainsAll(
+    bomColumns,
+    ['source_order_no', 'designer', 'print_date'],
+    'bom version columns'
   )
 })
 

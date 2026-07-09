@@ -68,6 +68,62 @@ func (_c *BOMItemCreate) SetNillablePosition(v *string) *BOMItemCreate {
 	return _c
 }
 
+// SetPieceCount sets the "piece_count" field.
+func (_c *BOMItemCreate) SetPieceCount(v string) *BOMItemCreate {
+	_c.mutation.SetPieceCount(v)
+	return _c
+}
+
+// SetNillablePieceCount sets the "piece_count" field if the given value is not nil.
+func (_c *BOMItemCreate) SetNillablePieceCount(v *string) *BOMItemCreate {
+	if v != nil {
+		_c.SetPieceCount(*v)
+	}
+	return _c
+}
+
+// SetTotalUsageSnapshot sets the "total_usage_snapshot" field.
+func (_c *BOMItemCreate) SetTotalUsageSnapshot(v string) *BOMItemCreate {
+	_c.mutation.SetTotalUsageSnapshot(v)
+	return _c
+}
+
+// SetNillableTotalUsageSnapshot sets the "total_usage_snapshot" field if the given value is not nil.
+func (_c *BOMItemCreate) SetNillableTotalUsageSnapshot(v *string) *BOMItemCreate {
+	if v != nil {
+		_c.SetTotalUsageSnapshot(*v)
+	}
+	return _c
+}
+
+// SetProcessBase sets the "process_base" field.
+func (_c *BOMItemCreate) SetProcessBase(v string) *BOMItemCreate {
+	_c.mutation.SetProcessBase(v)
+	return _c
+}
+
+// SetNillableProcessBase sets the "process_base" field if the given value is not nil.
+func (_c *BOMItemCreate) SetNillableProcessBase(v *string) *BOMItemCreate {
+	if v != nil {
+		_c.SetProcessBase(*v)
+	}
+	return _c
+}
+
+// SetProcessMethod sets the "process_method" field.
+func (_c *BOMItemCreate) SetProcessMethod(v string) *BOMItemCreate {
+	_c.mutation.SetProcessMethod(v)
+	return _c
+}
+
+// SetNillableProcessMethod sets the "process_method" field if the given value is not nil.
+func (_c *BOMItemCreate) SetNillableProcessMethod(v *string) *BOMItemCreate {
+	if v != nil {
+		_c.SetProcessMethod(*v)
+	}
+	return _c
+}
+
 // SetNote sets the "note" field.
 func (_c *BOMItemCreate) SetNote(v string) *BOMItemCreate {
 	_c.mutation.SetNote(v)
@@ -207,6 +263,26 @@ func (_c *BOMItemCreate) check() error {
 			return &ValidationError{Name: "position", err: fmt.Errorf(`ent: validator failed for field "BOMItem.position": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.PieceCount(); ok {
+		if err := bomitem.PieceCountValidator(v); err != nil {
+			return &ValidationError{Name: "piece_count", err: fmt.Errorf(`ent: validator failed for field "BOMItem.piece_count": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.TotalUsageSnapshot(); ok {
+		if err := bomitem.TotalUsageSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "total_usage_snapshot", err: fmt.Errorf(`ent: validator failed for field "BOMItem.total_usage_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ProcessBase(); ok {
+		if err := bomitem.ProcessBaseValidator(v); err != nil {
+			return &ValidationError{Name: "process_base", err: fmt.Errorf(`ent: validator failed for field "BOMItem.process_base": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ProcessMethod(); ok {
+		if err := bomitem.ProcessMethodValidator(v); err != nil {
+			return &ValidationError{Name: "process_method", err: fmt.Errorf(`ent: validator failed for field "BOMItem.process_method": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.Note(); ok {
 		if err := bomitem.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "BOMItem.note": %w`, err)}
@@ -264,6 +340,22 @@ func (_c *BOMItemCreate) createSpec() (*BOMItem, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Position(); ok {
 		_spec.SetField(bomitem.FieldPosition, field.TypeString, value)
 		_node.Position = &value
+	}
+	if value, ok := _c.mutation.PieceCount(); ok {
+		_spec.SetField(bomitem.FieldPieceCount, field.TypeString, value)
+		_node.PieceCount = &value
+	}
+	if value, ok := _c.mutation.TotalUsageSnapshot(); ok {
+		_spec.SetField(bomitem.FieldTotalUsageSnapshot, field.TypeString, value)
+		_node.TotalUsageSnapshot = &value
+	}
+	if value, ok := _c.mutation.ProcessBase(); ok {
+		_spec.SetField(bomitem.FieldProcessBase, field.TypeString, value)
+		_node.ProcessBase = &value
+	}
+	if value, ok := _c.mutation.ProcessMethod(); ok {
+		_spec.SetField(bomitem.FieldProcessMethod, field.TypeString, value)
+		_node.ProcessMethod = &value
 	}
 	if value, ok := _c.mutation.Note(); ok {
 		_spec.SetField(bomitem.FieldNote, field.TypeString, value)

@@ -2269,25 +2269,33 @@ func (m *AdminUserRoleMutation) ResetEdge(name string) error {
 // BOMHeaderMutation represents an operation that mutates the BOMHeader nodes in the graph.
 type BOMHeaderMutation struct {
 	config
-	op             Op
-	typ            string
-	id             *int
-	version        *string
-	status         *string
-	effective_from *time.Time
-	effective_to   *time.Time
-	note           *string
-	created_at     *time.Time
-	updated_at     *time.Time
-	clearedFields  map[string]struct{}
-	product        *int
-	clearedproduct bool
-	items          map[int]struct{}
-	removeditems   map[int]struct{}
-	cleareditems   bool
-	done           bool
-	oldValue       func(context.Context) (*BOMHeader, error)
-	predicates     []predicate.BOMHeader
+	op              Op
+	typ             string
+	id              *int
+	version         *string
+	status          *string
+	effective_from  *time.Time
+	effective_to    *time.Time
+	source_order_no *string
+	quantity_text   *string
+	spare_text      *string
+	print_date      *time.Time
+	designer        *string
+	maker           *string
+	auditor         *string
+	hair_direction  *string
+	note            *string
+	created_at      *time.Time
+	updated_at      *time.Time
+	clearedFields   map[string]struct{}
+	product         *int
+	clearedproduct  bool
+	items           map[int]struct{}
+	removeditems    map[int]struct{}
+	cleareditems    bool
+	done            bool
+	oldValue        func(context.Context) (*BOMHeader, error)
+	predicates      []predicate.BOMHeader
 }
 
 var _ ent.Mutation = (*BOMHeaderMutation)(nil)
@@ -2594,6 +2602,398 @@ func (m *BOMHeaderMutation) ResetEffectiveTo() {
 	delete(m.clearedFields, bomheader.FieldEffectiveTo)
 }
 
+// SetSourceOrderNo sets the "source_order_no" field.
+func (m *BOMHeaderMutation) SetSourceOrderNo(s string) {
+	m.source_order_no = &s
+}
+
+// SourceOrderNo returns the value of the "source_order_no" field in the mutation.
+func (m *BOMHeaderMutation) SourceOrderNo() (r string, exists bool) {
+	v := m.source_order_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceOrderNo returns the old "source_order_no" field's value of the BOMHeader entity.
+// If the BOMHeader object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BOMHeaderMutation) OldSourceOrderNo(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceOrderNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceOrderNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceOrderNo: %w", err)
+	}
+	return oldValue.SourceOrderNo, nil
+}
+
+// ClearSourceOrderNo clears the value of the "source_order_no" field.
+func (m *BOMHeaderMutation) ClearSourceOrderNo() {
+	m.source_order_no = nil
+	m.clearedFields[bomheader.FieldSourceOrderNo] = struct{}{}
+}
+
+// SourceOrderNoCleared returns if the "source_order_no" field was cleared in this mutation.
+func (m *BOMHeaderMutation) SourceOrderNoCleared() bool {
+	_, ok := m.clearedFields[bomheader.FieldSourceOrderNo]
+	return ok
+}
+
+// ResetSourceOrderNo resets all changes to the "source_order_no" field.
+func (m *BOMHeaderMutation) ResetSourceOrderNo() {
+	m.source_order_no = nil
+	delete(m.clearedFields, bomheader.FieldSourceOrderNo)
+}
+
+// SetQuantityText sets the "quantity_text" field.
+func (m *BOMHeaderMutation) SetQuantityText(s string) {
+	m.quantity_text = &s
+}
+
+// QuantityText returns the value of the "quantity_text" field in the mutation.
+func (m *BOMHeaderMutation) QuantityText() (r string, exists bool) {
+	v := m.quantity_text
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldQuantityText returns the old "quantity_text" field's value of the BOMHeader entity.
+// If the BOMHeader object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BOMHeaderMutation) OldQuantityText(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldQuantityText is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldQuantityText requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldQuantityText: %w", err)
+	}
+	return oldValue.QuantityText, nil
+}
+
+// ClearQuantityText clears the value of the "quantity_text" field.
+func (m *BOMHeaderMutation) ClearQuantityText() {
+	m.quantity_text = nil
+	m.clearedFields[bomheader.FieldQuantityText] = struct{}{}
+}
+
+// QuantityTextCleared returns if the "quantity_text" field was cleared in this mutation.
+func (m *BOMHeaderMutation) QuantityTextCleared() bool {
+	_, ok := m.clearedFields[bomheader.FieldQuantityText]
+	return ok
+}
+
+// ResetQuantityText resets all changes to the "quantity_text" field.
+func (m *BOMHeaderMutation) ResetQuantityText() {
+	m.quantity_text = nil
+	delete(m.clearedFields, bomheader.FieldQuantityText)
+}
+
+// SetSpareText sets the "spare_text" field.
+func (m *BOMHeaderMutation) SetSpareText(s string) {
+	m.spare_text = &s
+}
+
+// SpareText returns the value of the "spare_text" field in the mutation.
+func (m *BOMHeaderMutation) SpareText() (r string, exists bool) {
+	v := m.spare_text
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSpareText returns the old "spare_text" field's value of the BOMHeader entity.
+// If the BOMHeader object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BOMHeaderMutation) OldSpareText(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSpareText is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSpareText requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSpareText: %w", err)
+	}
+	return oldValue.SpareText, nil
+}
+
+// ClearSpareText clears the value of the "spare_text" field.
+func (m *BOMHeaderMutation) ClearSpareText() {
+	m.spare_text = nil
+	m.clearedFields[bomheader.FieldSpareText] = struct{}{}
+}
+
+// SpareTextCleared returns if the "spare_text" field was cleared in this mutation.
+func (m *BOMHeaderMutation) SpareTextCleared() bool {
+	_, ok := m.clearedFields[bomheader.FieldSpareText]
+	return ok
+}
+
+// ResetSpareText resets all changes to the "spare_text" field.
+func (m *BOMHeaderMutation) ResetSpareText() {
+	m.spare_text = nil
+	delete(m.clearedFields, bomheader.FieldSpareText)
+}
+
+// SetPrintDate sets the "print_date" field.
+func (m *BOMHeaderMutation) SetPrintDate(t time.Time) {
+	m.print_date = &t
+}
+
+// PrintDate returns the value of the "print_date" field in the mutation.
+func (m *BOMHeaderMutation) PrintDate() (r time.Time, exists bool) {
+	v := m.print_date
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPrintDate returns the old "print_date" field's value of the BOMHeader entity.
+// If the BOMHeader object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BOMHeaderMutation) OldPrintDate(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPrintDate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPrintDate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPrintDate: %w", err)
+	}
+	return oldValue.PrintDate, nil
+}
+
+// ClearPrintDate clears the value of the "print_date" field.
+func (m *BOMHeaderMutation) ClearPrintDate() {
+	m.print_date = nil
+	m.clearedFields[bomheader.FieldPrintDate] = struct{}{}
+}
+
+// PrintDateCleared returns if the "print_date" field was cleared in this mutation.
+func (m *BOMHeaderMutation) PrintDateCleared() bool {
+	_, ok := m.clearedFields[bomheader.FieldPrintDate]
+	return ok
+}
+
+// ResetPrintDate resets all changes to the "print_date" field.
+func (m *BOMHeaderMutation) ResetPrintDate() {
+	m.print_date = nil
+	delete(m.clearedFields, bomheader.FieldPrintDate)
+}
+
+// SetDesigner sets the "designer" field.
+func (m *BOMHeaderMutation) SetDesigner(s string) {
+	m.designer = &s
+}
+
+// Designer returns the value of the "designer" field in the mutation.
+func (m *BOMHeaderMutation) Designer() (r string, exists bool) {
+	v := m.designer
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDesigner returns the old "designer" field's value of the BOMHeader entity.
+// If the BOMHeader object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BOMHeaderMutation) OldDesigner(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDesigner is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDesigner requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDesigner: %w", err)
+	}
+	return oldValue.Designer, nil
+}
+
+// ClearDesigner clears the value of the "designer" field.
+func (m *BOMHeaderMutation) ClearDesigner() {
+	m.designer = nil
+	m.clearedFields[bomheader.FieldDesigner] = struct{}{}
+}
+
+// DesignerCleared returns if the "designer" field was cleared in this mutation.
+func (m *BOMHeaderMutation) DesignerCleared() bool {
+	_, ok := m.clearedFields[bomheader.FieldDesigner]
+	return ok
+}
+
+// ResetDesigner resets all changes to the "designer" field.
+func (m *BOMHeaderMutation) ResetDesigner() {
+	m.designer = nil
+	delete(m.clearedFields, bomheader.FieldDesigner)
+}
+
+// SetMaker sets the "maker" field.
+func (m *BOMHeaderMutation) SetMaker(s string) {
+	m.maker = &s
+}
+
+// Maker returns the value of the "maker" field in the mutation.
+func (m *BOMHeaderMutation) Maker() (r string, exists bool) {
+	v := m.maker
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMaker returns the old "maker" field's value of the BOMHeader entity.
+// If the BOMHeader object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BOMHeaderMutation) OldMaker(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMaker is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMaker requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMaker: %w", err)
+	}
+	return oldValue.Maker, nil
+}
+
+// ClearMaker clears the value of the "maker" field.
+func (m *BOMHeaderMutation) ClearMaker() {
+	m.maker = nil
+	m.clearedFields[bomheader.FieldMaker] = struct{}{}
+}
+
+// MakerCleared returns if the "maker" field was cleared in this mutation.
+func (m *BOMHeaderMutation) MakerCleared() bool {
+	_, ok := m.clearedFields[bomheader.FieldMaker]
+	return ok
+}
+
+// ResetMaker resets all changes to the "maker" field.
+func (m *BOMHeaderMutation) ResetMaker() {
+	m.maker = nil
+	delete(m.clearedFields, bomheader.FieldMaker)
+}
+
+// SetAuditor sets the "auditor" field.
+func (m *BOMHeaderMutation) SetAuditor(s string) {
+	m.auditor = &s
+}
+
+// Auditor returns the value of the "auditor" field in the mutation.
+func (m *BOMHeaderMutation) Auditor() (r string, exists bool) {
+	v := m.auditor
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAuditor returns the old "auditor" field's value of the BOMHeader entity.
+// If the BOMHeader object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BOMHeaderMutation) OldAuditor(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAuditor is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAuditor requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAuditor: %w", err)
+	}
+	return oldValue.Auditor, nil
+}
+
+// ClearAuditor clears the value of the "auditor" field.
+func (m *BOMHeaderMutation) ClearAuditor() {
+	m.auditor = nil
+	m.clearedFields[bomheader.FieldAuditor] = struct{}{}
+}
+
+// AuditorCleared returns if the "auditor" field was cleared in this mutation.
+func (m *BOMHeaderMutation) AuditorCleared() bool {
+	_, ok := m.clearedFields[bomheader.FieldAuditor]
+	return ok
+}
+
+// ResetAuditor resets all changes to the "auditor" field.
+func (m *BOMHeaderMutation) ResetAuditor() {
+	m.auditor = nil
+	delete(m.clearedFields, bomheader.FieldAuditor)
+}
+
+// SetHairDirection sets the "hair_direction" field.
+func (m *BOMHeaderMutation) SetHairDirection(s string) {
+	m.hair_direction = &s
+}
+
+// HairDirection returns the value of the "hair_direction" field in the mutation.
+func (m *BOMHeaderMutation) HairDirection() (r string, exists bool) {
+	v := m.hair_direction
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHairDirection returns the old "hair_direction" field's value of the BOMHeader entity.
+// If the BOMHeader object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BOMHeaderMutation) OldHairDirection(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHairDirection is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHairDirection requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHairDirection: %w", err)
+	}
+	return oldValue.HairDirection, nil
+}
+
+// ClearHairDirection clears the value of the "hair_direction" field.
+func (m *BOMHeaderMutation) ClearHairDirection() {
+	m.hair_direction = nil
+	m.clearedFields[bomheader.FieldHairDirection] = struct{}{}
+}
+
+// HairDirectionCleared returns if the "hair_direction" field was cleared in this mutation.
+func (m *BOMHeaderMutation) HairDirectionCleared() bool {
+	_, ok := m.clearedFields[bomheader.FieldHairDirection]
+	return ok
+}
+
+// ResetHairDirection resets all changes to the "hair_direction" field.
+func (m *BOMHeaderMutation) ResetHairDirection() {
+	m.hair_direction = nil
+	delete(m.clearedFields, bomheader.FieldHairDirection)
+}
+
 // SetNote sets the "note" field.
 func (m *BOMHeaderMutation) SetNote(s string) {
 	m.note = &s
@@ -2830,7 +3230,7 @@ func (m *BOMHeaderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BOMHeaderMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 16)
 	if m.product != nil {
 		fields = append(fields, bomheader.FieldProductID)
 	}
@@ -2845,6 +3245,30 @@ func (m *BOMHeaderMutation) Fields() []string {
 	}
 	if m.effective_to != nil {
 		fields = append(fields, bomheader.FieldEffectiveTo)
+	}
+	if m.source_order_no != nil {
+		fields = append(fields, bomheader.FieldSourceOrderNo)
+	}
+	if m.quantity_text != nil {
+		fields = append(fields, bomheader.FieldQuantityText)
+	}
+	if m.spare_text != nil {
+		fields = append(fields, bomheader.FieldSpareText)
+	}
+	if m.print_date != nil {
+		fields = append(fields, bomheader.FieldPrintDate)
+	}
+	if m.designer != nil {
+		fields = append(fields, bomheader.FieldDesigner)
+	}
+	if m.maker != nil {
+		fields = append(fields, bomheader.FieldMaker)
+	}
+	if m.auditor != nil {
+		fields = append(fields, bomheader.FieldAuditor)
+	}
+	if m.hair_direction != nil {
+		fields = append(fields, bomheader.FieldHairDirection)
 	}
 	if m.note != nil {
 		fields = append(fields, bomheader.FieldNote)
@@ -2873,6 +3297,22 @@ func (m *BOMHeaderMutation) Field(name string) (ent.Value, bool) {
 		return m.EffectiveFrom()
 	case bomheader.FieldEffectiveTo:
 		return m.EffectiveTo()
+	case bomheader.FieldSourceOrderNo:
+		return m.SourceOrderNo()
+	case bomheader.FieldQuantityText:
+		return m.QuantityText()
+	case bomheader.FieldSpareText:
+		return m.SpareText()
+	case bomheader.FieldPrintDate:
+		return m.PrintDate()
+	case bomheader.FieldDesigner:
+		return m.Designer()
+	case bomheader.FieldMaker:
+		return m.Maker()
+	case bomheader.FieldAuditor:
+		return m.Auditor()
+	case bomheader.FieldHairDirection:
+		return m.HairDirection()
 	case bomheader.FieldNote:
 		return m.Note()
 	case bomheader.FieldCreatedAt:
@@ -2898,6 +3338,22 @@ func (m *BOMHeaderMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldEffectiveFrom(ctx)
 	case bomheader.FieldEffectiveTo:
 		return m.OldEffectiveTo(ctx)
+	case bomheader.FieldSourceOrderNo:
+		return m.OldSourceOrderNo(ctx)
+	case bomheader.FieldQuantityText:
+		return m.OldQuantityText(ctx)
+	case bomheader.FieldSpareText:
+		return m.OldSpareText(ctx)
+	case bomheader.FieldPrintDate:
+		return m.OldPrintDate(ctx)
+	case bomheader.FieldDesigner:
+		return m.OldDesigner(ctx)
+	case bomheader.FieldMaker:
+		return m.OldMaker(ctx)
+	case bomheader.FieldAuditor:
+		return m.OldAuditor(ctx)
+	case bomheader.FieldHairDirection:
+		return m.OldHairDirection(ctx)
 	case bomheader.FieldNote:
 		return m.OldNote(ctx)
 	case bomheader.FieldCreatedAt:
@@ -2947,6 +3403,62 @@ func (m *BOMHeaderMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetEffectiveTo(v)
+		return nil
+	case bomheader.FieldSourceOrderNo:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceOrderNo(v)
+		return nil
+	case bomheader.FieldQuantityText:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetQuantityText(v)
+		return nil
+	case bomheader.FieldSpareText:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSpareText(v)
+		return nil
+	case bomheader.FieldPrintDate:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPrintDate(v)
+		return nil
+	case bomheader.FieldDesigner:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDesigner(v)
+		return nil
+	case bomheader.FieldMaker:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMaker(v)
+		return nil
+	case bomheader.FieldAuditor:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAuditor(v)
+		return nil
+	case bomheader.FieldHairDirection:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHairDirection(v)
 		return nil
 	case bomheader.FieldNote:
 		v, ok := value.(string)
@@ -3008,6 +3520,30 @@ func (m *BOMHeaderMutation) ClearedFields() []string {
 	if m.FieldCleared(bomheader.FieldEffectiveTo) {
 		fields = append(fields, bomheader.FieldEffectiveTo)
 	}
+	if m.FieldCleared(bomheader.FieldSourceOrderNo) {
+		fields = append(fields, bomheader.FieldSourceOrderNo)
+	}
+	if m.FieldCleared(bomheader.FieldQuantityText) {
+		fields = append(fields, bomheader.FieldQuantityText)
+	}
+	if m.FieldCleared(bomheader.FieldSpareText) {
+		fields = append(fields, bomheader.FieldSpareText)
+	}
+	if m.FieldCleared(bomheader.FieldPrintDate) {
+		fields = append(fields, bomheader.FieldPrintDate)
+	}
+	if m.FieldCleared(bomheader.FieldDesigner) {
+		fields = append(fields, bomheader.FieldDesigner)
+	}
+	if m.FieldCleared(bomheader.FieldMaker) {
+		fields = append(fields, bomheader.FieldMaker)
+	}
+	if m.FieldCleared(bomheader.FieldAuditor) {
+		fields = append(fields, bomheader.FieldAuditor)
+	}
+	if m.FieldCleared(bomheader.FieldHairDirection) {
+		fields = append(fields, bomheader.FieldHairDirection)
+	}
 	if m.FieldCleared(bomheader.FieldNote) {
 		fields = append(fields, bomheader.FieldNote)
 	}
@@ -3030,6 +3566,30 @@ func (m *BOMHeaderMutation) ClearField(name string) error {
 		return nil
 	case bomheader.FieldEffectiveTo:
 		m.ClearEffectiveTo()
+		return nil
+	case bomheader.FieldSourceOrderNo:
+		m.ClearSourceOrderNo()
+		return nil
+	case bomheader.FieldQuantityText:
+		m.ClearQuantityText()
+		return nil
+	case bomheader.FieldSpareText:
+		m.ClearSpareText()
+		return nil
+	case bomheader.FieldPrintDate:
+		m.ClearPrintDate()
+		return nil
+	case bomheader.FieldDesigner:
+		m.ClearDesigner()
+		return nil
+	case bomheader.FieldMaker:
+		m.ClearMaker()
+		return nil
+	case bomheader.FieldAuditor:
+		m.ClearAuditor()
+		return nil
+	case bomheader.FieldHairDirection:
+		m.ClearHairDirection()
 		return nil
 	case bomheader.FieldNote:
 		m.ClearNote()
@@ -3056,6 +3616,30 @@ func (m *BOMHeaderMutation) ResetField(name string) error {
 		return nil
 	case bomheader.FieldEffectiveTo:
 		m.ResetEffectiveTo()
+		return nil
+	case bomheader.FieldSourceOrderNo:
+		m.ResetSourceOrderNo()
+		return nil
+	case bomheader.FieldQuantityText:
+		m.ResetQuantityText()
+		return nil
+	case bomheader.FieldSpareText:
+		m.ResetSpareText()
+		return nil
+	case bomheader.FieldPrintDate:
+		m.ResetPrintDate()
+		return nil
+	case bomheader.FieldDesigner:
+		m.ResetDesigner()
+		return nil
+	case bomheader.FieldMaker:
+		m.ResetMaker()
+		return nil
+	case bomheader.FieldAuditor:
+		m.ResetAuditor()
+		return nil
+	case bomheader.FieldHairDirection:
+		m.ResetHairDirection()
 		return nil
 	case bomheader.FieldNote:
 		m.ResetNote()
@@ -3175,25 +3759,29 @@ func (m *BOMHeaderMutation) ResetEdge(name string) error {
 // BOMItemMutation represents an operation that mutates the BOMItem nodes in the graph.
 type BOMItemMutation struct {
 	config
-	op                Op
-	typ               string
-	id                *int
-	quantity          *decimal.Decimal
-	loss_rate         *decimal.Decimal
-	position          *string
-	note              *string
-	created_at        *time.Time
-	updated_at        *time.Time
-	clearedFields     map[string]struct{}
-	bom_header        *int
-	clearedbom_header bool
-	material          *int
-	clearedmaterial   bool
-	unit              *int
-	clearedunit       bool
-	done              bool
-	oldValue          func(context.Context) (*BOMItem, error)
-	predicates        []predicate.BOMItem
+	op                   Op
+	typ                  string
+	id                   *int
+	quantity             *decimal.Decimal
+	loss_rate            *decimal.Decimal
+	position             *string
+	piece_count          *string
+	total_usage_snapshot *string
+	process_base         *string
+	process_method       *string
+	note                 *string
+	created_at           *time.Time
+	updated_at           *time.Time
+	clearedFields        map[string]struct{}
+	bom_header           *int
+	clearedbom_header    bool
+	material             *int
+	clearedmaterial      bool
+	unit                 *int
+	clearedunit          bool
+	done                 bool
+	oldValue             func(context.Context) (*BOMItem, error)
+	predicates           []predicate.BOMItem
 }
 
 var _ ent.Mutation = (*BOMItemMutation)(nil)
@@ -3523,6 +4111,202 @@ func (m *BOMItemMutation) ResetPosition() {
 	delete(m.clearedFields, bomitem.FieldPosition)
 }
 
+// SetPieceCount sets the "piece_count" field.
+func (m *BOMItemMutation) SetPieceCount(s string) {
+	m.piece_count = &s
+}
+
+// PieceCount returns the value of the "piece_count" field in the mutation.
+func (m *BOMItemMutation) PieceCount() (r string, exists bool) {
+	v := m.piece_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPieceCount returns the old "piece_count" field's value of the BOMItem entity.
+// If the BOMItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BOMItemMutation) OldPieceCount(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPieceCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPieceCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPieceCount: %w", err)
+	}
+	return oldValue.PieceCount, nil
+}
+
+// ClearPieceCount clears the value of the "piece_count" field.
+func (m *BOMItemMutation) ClearPieceCount() {
+	m.piece_count = nil
+	m.clearedFields[bomitem.FieldPieceCount] = struct{}{}
+}
+
+// PieceCountCleared returns if the "piece_count" field was cleared in this mutation.
+func (m *BOMItemMutation) PieceCountCleared() bool {
+	_, ok := m.clearedFields[bomitem.FieldPieceCount]
+	return ok
+}
+
+// ResetPieceCount resets all changes to the "piece_count" field.
+func (m *BOMItemMutation) ResetPieceCount() {
+	m.piece_count = nil
+	delete(m.clearedFields, bomitem.FieldPieceCount)
+}
+
+// SetTotalUsageSnapshot sets the "total_usage_snapshot" field.
+func (m *BOMItemMutation) SetTotalUsageSnapshot(s string) {
+	m.total_usage_snapshot = &s
+}
+
+// TotalUsageSnapshot returns the value of the "total_usage_snapshot" field in the mutation.
+func (m *BOMItemMutation) TotalUsageSnapshot() (r string, exists bool) {
+	v := m.total_usage_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTotalUsageSnapshot returns the old "total_usage_snapshot" field's value of the BOMItem entity.
+// If the BOMItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BOMItemMutation) OldTotalUsageSnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTotalUsageSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTotalUsageSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTotalUsageSnapshot: %w", err)
+	}
+	return oldValue.TotalUsageSnapshot, nil
+}
+
+// ClearTotalUsageSnapshot clears the value of the "total_usage_snapshot" field.
+func (m *BOMItemMutation) ClearTotalUsageSnapshot() {
+	m.total_usage_snapshot = nil
+	m.clearedFields[bomitem.FieldTotalUsageSnapshot] = struct{}{}
+}
+
+// TotalUsageSnapshotCleared returns if the "total_usage_snapshot" field was cleared in this mutation.
+func (m *BOMItemMutation) TotalUsageSnapshotCleared() bool {
+	_, ok := m.clearedFields[bomitem.FieldTotalUsageSnapshot]
+	return ok
+}
+
+// ResetTotalUsageSnapshot resets all changes to the "total_usage_snapshot" field.
+func (m *BOMItemMutation) ResetTotalUsageSnapshot() {
+	m.total_usage_snapshot = nil
+	delete(m.clearedFields, bomitem.FieldTotalUsageSnapshot)
+}
+
+// SetProcessBase sets the "process_base" field.
+func (m *BOMItemMutation) SetProcessBase(s string) {
+	m.process_base = &s
+}
+
+// ProcessBase returns the value of the "process_base" field in the mutation.
+func (m *BOMItemMutation) ProcessBase() (r string, exists bool) {
+	v := m.process_base
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProcessBase returns the old "process_base" field's value of the BOMItem entity.
+// If the BOMItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BOMItemMutation) OldProcessBase(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProcessBase is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProcessBase requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProcessBase: %w", err)
+	}
+	return oldValue.ProcessBase, nil
+}
+
+// ClearProcessBase clears the value of the "process_base" field.
+func (m *BOMItemMutation) ClearProcessBase() {
+	m.process_base = nil
+	m.clearedFields[bomitem.FieldProcessBase] = struct{}{}
+}
+
+// ProcessBaseCleared returns if the "process_base" field was cleared in this mutation.
+func (m *BOMItemMutation) ProcessBaseCleared() bool {
+	_, ok := m.clearedFields[bomitem.FieldProcessBase]
+	return ok
+}
+
+// ResetProcessBase resets all changes to the "process_base" field.
+func (m *BOMItemMutation) ResetProcessBase() {
+	m.process_base = nil
+	delete(m.clearedFields, bomitem.FieldProcessBase)
+}
+
+// SetProcessMethod sets the "process_method" field.
+func (m *BOMItemMutation) SetProcessMethod(s string) {
+	m.process_method = &s
+}
+
+// ProcessMethod returns the value of the "process_method" field in the mutation.
+func (m *BOMItemMutation) ProcessMethod() (r string, exists bool) {
+	v := m.process_method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProcessMethod returns the old "process_method" field's value of the BOMItem entity.
+// If the BOMItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BOMItemMutation) OldProcessMethod(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProcessMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProcessMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProcessMethod: %w", err)
+	}
+	return oldValue.ProcessMethod, nil
+}
+
+// ClearProcessMethod clears the value of the "process_method" field.
+func (m *BOMItemMutation) ClearProcessMethod() {
+	m.process_method = nil
+	m.clearedFields[bomitem.FieldProcessMethod] = struct{}{}
+}
+
+// ProcessMethodCleared returns if the "process_method" field was cleared in this mutation.
+func (m *BOMItemMutation) ProcessMethodCleared() bool {
+	_, ok := m.clearedFields[bomitem.FieldProcessMethod]
+	return ok
+}
+
+// ResetProcessMethod resets all changes to the "process_method" field.
+func (m *BOMItemMutation) ResetProcessMethod() {
+	m.process_method = nil
+	delete(m.clearedFields, bomitem.FieldProcessMethod)
+}
+
 // SetNote sets the "note" field.
 func (m *BOMItemMutation) SetNote(s string) {
 	m.note = &s
@@ -3759,7 +4543,7 @@ func (m *BOMItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BOMItemMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 13)
 	if m.bom_header != nil {
 		fields = append(fields, bomitem.FieldBomHeaderID)
 	}
@@ -3777,6 +4561,18 @@ func (m *BOMItemMutation) Fields() []string {
 	}
 	if m.position != nil {
 		fields = append(fields, bomitem.FieldPosition)
+	}
+	if m.piece_count != nil {
+		fields = append(fields, bomitem.FieldPieceCount)
+	}
+	if m.total_usage_snapshot != nil {
+		fields = append(fields, bomitem.FieldTotalUsageSnapshot)
+	}
+	if m.process_base != nil {
+		fields = append(fields, bomitem.FieldProcessBase)
+	}
+	if m.process_method != nil {
+		fields = append(fields, bomitem.FieldProcessMethod)
 	}
 	if m.note != nil {
 		fields = append(fields, bomitem.FieldNote)
@@ -3807,6 +4603,14 @@ func (m *BOMItemMutation) Field(name string) (ent.Value, bool) {
 		return m.LossRate()
 	case bomitem.FieldPosition:
 		return m.Position()
+	case bomitem.FieldPieceCount:
+		return m.PieceCount()
+	case bomitem.FieldTotalUsageSnapshot:
+		return m.TotalUsageSnapshot()
+	case bomitem.FieldProcessBase:
+		return m.ProcessBase()
+	case bomitem.FieldProcessMethod:
+		return m.ProcessMethod()
 	case bomitem.FieldNote:
 		return m.Note()
 	case bomitem.FieldCreatedAt:
@@ -3834,6 +4638,14 @@ func (m *BOMItemMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldLossRate(ctx)
 	case bomitem.FieldPosition:
 		return m.OldPosition(ctx)
+	case bomitem.FieldPieceCount:
+		return m.OldPieceCount(ctx)
+	case bomitem.FieldTotalUsageSnapshot:
+		return m.OldTotalUsageSnapshot(ctx)
+	case bomitem.FieldProcessBase:
+		return m.OldProcessBase(ctx)
+	case bomitem.FieldProcessMethod:
+		return m.OldProcessMethod(ctx)
 	case bomitem.FieldNote:
 		return m.OldNote(ctx)
 	case bomitem.FieldCreatedAt:
@@ -3890,6 +4702,34 @@ func (m *BOMItemMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPosition(v)
+		return nil
+	case bomitem.FieldPieceCount:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPieceCount(v)
+		return nil
+	case bomitem.FieldTotalUsageSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTotalUsageSnapshot(v)
+		return nil
+	case bomitem.FieldProcessBase:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProcessBase(v)
+		return nil
+	case bomitem.FieldProcessMethod:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProcessMethod(v)
 		return nil
 	case bomitem.FieldNote:
 		v, ok := value.(string)
@@ -3948,6 +4788,18 @@ func (m *BOMItemMutation) ClearedFields() []string {
 	if m.FieldCleared(bomitem.FieldPosition) {
 		fields = append(fields, bomitem.FieldPosition)
 	}
+	if m.FieldCleared(bomitem.FieldPieceCount) {
+		fields = append(fields, bomitem.FieldPieceCount)
+	}
+	if m.FieldCleared(bomitem.FieldTotalUsageSnapshot) {
+		fields = append(fields, bomitem.FieldTotalUsageSnapshot)
+	}
+	if m.FieldCleared(bomitem.FieldProcessBase) {
+		fields = append(fields, bomitem.FieldProcessBase)
+	}
+	if m.FieldCleared(bomitem.FieldProcessMethod) {
+		fields = append(fields, bomitem.FieldProcessMethod)
+	}
 	if m.FieldCleared(bomitem.FieldNote) {
 		fields = append(fields, bomitem.FieldNote)
 	}
@@ -3967,6 +4819,18 @@ func (m *BOMItemMutation) ClearField(name string) error {
 	switch name {
 	case bomitem.FieldPosition:
 		m.ClearPosition()
+		return nil
+	case bomitem.FieldPieceCount:
+		m.ClearPieceCount()
+		return nil
+	case bomitem.FieldTotalUsageSnapshot:
+		m.ClearTotalUsageSnapshot()
+		return nil
+	case bomitem.FieldProcessBase:
+		m.ClearProcessBase()
+		return nil
+	case bomitem.FieldProcessMethod:
+		m.ClearProcessMethod()
 		return nil
 	case bomitem.FieldNote:
 		m.ClearNote()
@@ -3996,6 +4860,18 @@ func (m *BOMItemMutation) ResetField(name string) error {
 		return nil
 	case bomitem.FieldPosition:
 		m.ResetPosition()
+		return nil
+	case bomitem.FieldPieceCount:
+		m.ResetPieceCount()
+		return nil
+	case bomitem.FieldTotalUsageSnapshot:
+		m.ResetTotalUsageSnapshot()
+		return nil
+	case bomitem.FieldProcessBase:
+		m.ResetProcessBase()
+		return nil
+	case bomitem.FieldProcessMethod:
+		m.ResetProcessMethod()
 		return nil
 	case bomitem.FieldNote:
 		m.ResetNote()

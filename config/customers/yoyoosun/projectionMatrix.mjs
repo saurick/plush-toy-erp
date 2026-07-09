@@ -24,6 +24,8 @@ export const yoyoosunProjectionMatrix = Object.freeze({
     Object.freeze({ surfaceKey: "quality_inspections.default", status: "backend_runtime_allowed", fields: Object.freeze(["inspection_no", "source_no", "result", "decision_note"]) }),
     Object.freeze({ surfaceKey: "inventory_lots.default", status: "backend_runtime_allowed", fields: Object.freeze(["lot_no", "warehouse", "material", "quantity", "status"]) }),
     Object.freeze({ surfaceKey: "inventory_txns.default", status: "backend_runtime_allowed", fields: Object.freeze(["txn_no", "txn_type", "warehouse", "material", "quantity"]) }),
+    Object.freeze({ surfaceKey: "bom_versions.default", status: "runtime_enabled", fields: Object.freeze(["product", "version", "source_order_no", "quantity_text", "spare_text", "print_date", "designer", "maker", "auditor", "hair_direction", "status"]) }),
+    Object.freeze({ surfaceKey: "bom_items.default", status: "runtime_enabled", fields: Object.freeze(["material", "quantity", "unit", "loss_rate", "position", "piece_count", "total_usage_snapshot", "process_base", "process_method", "note"]) }),
     Object.freeze({ surfaceKey: "shipments.default", status: "backend_runtime_allowed", fields: Object.freeze(["shipment_no", "sales_order_no", "warehouse", "status", "shipped_at"]) }),
     Object.freeze({ surfaceKey: "outsourcing_orders.default", status: "backend_runtime_allowed", fields: Object.freeze(["outsourcing_order_no", "processor_snapshot", "expected_return_date", "lifecycle_status"]) }),
     Object.freeze({ surfaceKey: "finance_facts.default", status: "backend_runtime_allowed", fields: Object.freeze(["finance_fact_no", "source_no", "fact_type", "amount", "status"]) }),

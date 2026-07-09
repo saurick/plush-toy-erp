@@ -33,6 +33,14 @@ type BOMItem struct {
 	LossRate decimal.Decimal `json:"loss_rate,omitempty"`
 	// Position holds the value of the "position" field.
 	Position *string `json:"position,omitempty"`
+	// PieceCount holds the value of the "piece_count" field.
+	PieceCount *string `json:"piece_count,omitempty"`
+	// TotalUsageSnapshot holds the value of the "total_usage_snapshot" field.
+	TotalUsageSnapshot *string `json:"total_usage_snapshot,omitempty"`
+	// ProcessBase holds the value of the "process_base" field.
+	ProcessBase *string `json:"process_base,omitempty"`
+	// ProcessMethod holds the value of the "process_method" field.
+	ProcessMethod *string `json:"process_method,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -100,7 +108,7 @@ func (*BOMItem) scanValues(columns []string) ([]any, error) {
 			values[i] = new(decimal.Decimal)
 		case bomitem.FieldID, bomitem.FieldBomHeaderID, bomitem.FieldMaterialID, bomitem.FieldUnitID:
 			values[i] = new(sql.NullInt64)
-		case bomitem.FieldPosition, bomitem.FieldNote:
+		case bomitem.FieldPosition, bomitem.FieldPieceCount, bomitem.FieldTotalUsageSnapshot, bomitem.FieldProcessBase, bomitem.FieldProcessMethod, bomitem.FieldNote:
 			values[i] = new(sql.NullString)
 		case bomitem.FieldCreatedAt, bomitem.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -161,6 +169,34 @@ func (_m *BOMItem) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Position = new(string)
 				*_m.Position = value.String
+			}
+		case bomitem.FieldPieceCount:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field piece_count", values[i])
+			} else if value.Valid {
+				_m.PieceCount = new(string)
+				*_m.PieceCount = value.String
+			}
+		case bomitem.FieldTotalUsageSnapshot:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field total_usage_snapshot", values[i])
+			} else if value.Valid {
+				_m.TotalUsageSnapshot = new(string)
+				*_m.TotalUsageSnapshot = value.String
+			}
+		case bomitem.FieldProcessBase:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field process_base", values[i])
+			} else if value.Valid {
+				_m.ProcessBase = new(string)
+				*_m.ProcessBase = value.String
+			}
+		case bomitem.FieldProcessMethod:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field process_method", values[i])
+			} else if value.Valid {
+				_m.ProcessMethod = new(string)
+				*_m.ProcessMethod = value.String
 			}
 		case bomitem.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -249,6 +285,26 @@ func (_m *BOMItem) String() string {
 	builder.WriteString(", ")
 	if v := _m.Position; v != nil {
 		builder.WriteString("position=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.PieceCount; v != nil {
+		builder.WriteString("piece_count=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.TotalUsageSnapshot; v != nil {
+		builder.WriteString("total_usage_snapshot=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ProcessBase; v != nil {
+		builder.WriteString("process_base=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ProcessMethod; v != nil {
+		builder.WriteString("process_method=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

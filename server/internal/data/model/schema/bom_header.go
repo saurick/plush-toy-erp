@@ -31,6 +31,37 @@ func (BOMHeader) Fields() []ent.Field {
 		field.Time("effective_to").
 			Optional().
 			Nillable(),
+		field.String("source_order_no").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("quantity_text").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("spare_text").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.Time("print_date").
+			Optional().
+			Nillable(),
+		field.String("designer").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("maker").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("auditor").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("hair_direction").
+			Optional().
+			Nillable().
+			MaxLen(64),
 		field.String("note").
 			Optional().
 			Nillable().

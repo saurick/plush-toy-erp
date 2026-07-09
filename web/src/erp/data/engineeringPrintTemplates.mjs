@@ -85,6 +85,14 @@ const todayText = () => {
   ).padStart(2, '0')}`
 }
 
+const dateTextFromUnix = (value) => {
+  const numberValue = Number(value || 0)
+  if (!Number.isFinite(numberValue) || numberValue <= 0) return ''
+  const date = new Date(numberValue * 1000)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 10)
+}
+
 export const engineeringImageSlots = {
   materialDetail: [
     { key: 'header_left', label: '右上产品图 1' },
@@ -1174,9 +1182,10 @@ export function buildMaterialDetailDraftFromBOMVersion(
         color: material.color || item.color || '',
         unit: unit.name || unit.code || '',
         position: item.position || '',
+        pieces: item.piece_count || item.pieceCount || '',
         unitUsage: item.quantity ?? '',
         lossRate: item.loss_rate ?? '',
-        totalUsage: '',
+        totalUsage: item.total_usage_snapshot || item.totalUsageSnapshot || '',
         processBase: item.process_base || item.processBase || '',
         processMethod: item.process_method || item.processMethod || '',
         remark: item.note || '',
@@ -1188,13 +1197,16 @@ export function buildMaterialDetailDraftFromBOMVersion(
     companyName,
     productNo: product.productNo,
     productName: product.productName,
-    orderNo: version.version ? `BOM ${version.version}` : '',
-    quantityText: '',
-    spareText: '',
-    dateText: todayText(),
-    designer: '',
-    maker: '',
-    auditor: '',
+    orderNo:
+      version.source_order_no ||
+      (version.version ? `BOM ${version.version}` : ''),
+    quantityText: version.quantity_text || '',
+    spareText: version.spare_text || '',
+    dateText: dateTextFromUnix(version.print_date) || todayText(),
+    designer: version.designer || '',
+    maker: version.maker || '',
+    auditor: version.auditor || '',
+    hairDirection: version.hair_direction || '',
     topRemark: version.note || '',
     lines,
   })
@@ -1234,7 +1246,11 @@ export function buildColorCardDraftFromBOMVersion(
           {
             position: item.position || '',
             method: compactTextParts(
-              [item.process_method || item.processMethod, item.note],
+              [
+                item.process_base || item.processBase,
+                item.process_method || item.processMethod,
+                item.note,
+              ],
               '；'
             ),
           },
@@ -1247,9 +1263,9 @@ export function buildColorCardDraftFromBOMVersion(
     companyName,
     productNo: product.productNo,
     productName: product.productName,
-    maker: '',
-    dateText: todayText(),
-    auditor: '',
+    maker: version.maker || '',
+    dateText: dateTextFromUnix(version.print_date) || todayText(),
+    auditor: version.auditor || '',
     reviewer: '',
     blocks,
   })
@@ -1257,21 +1273,79 @@ export function buildColorCardDraftFromBOMVersion(
 
 export function buildWorkInstructionDraftFromBOMVersion(
   version = {},
-  { productOptions = [], products = [], companyName = '' } = {}
+  {
+    productOptions = [],
+    products = [],
+    materials = [],
+    units = [],
+    companyName = '',
+  } = {}
 ) {
   const product = sourceProductSnapshot(version, { productOptions, products })
+  const materialByID = new Map(
+    (Array.isArray(materials) ? materials : []).map((material) => [
+      Number(material?.id || 0),
+      material,
+    ])
+  )
+  const unitByID = new Map(
+    (Array.isArray(units) ? units : []).map((unit) => [
+      Number(unit?.id || 0),
+      unit,
+    ])
+  )
+  const activeItems = Array.isArray(version.items) ? version.items : []
+  const rows = activeItems.map((item, index) => {
+    const material = materialByID.get(Number(item?.material_id || 0)) || {}
+    const unit = unitByID.get(Number(item?.unit_id || 0)) || {}
+    const quantityText = compactTextParts(
+      [item.quantity, unit.name || unit.code],
+      ''
+    )
+    const processText = compactTextParts(
+      [
+        item.process_base || item.processBase,
+        item.process_method || item.processMethod,
+      ],
+      '；'
+    )
+    const parts = [
+      compactTextParts([material.name || material.code, item.position], ' / '),
+      quantityText ? `用量：${quantityText}` : '',
+      item.piece_count || item.pieceCount
+        ? `片数：${item.piece_count || item.pieceCount}`
+        : '',
+      processText ? `加工：${processText}` : '',
+      item.note ? `备注：${item.note}` : '',
+    ].filter(Boolean)
+    return {
+      type: WORK_INSTRUCTION_ROW_TYPES.step,
+      no: String(index + 1),
+      text: parts.join('；') || '按 BOM 明细、签样和工程资料执行。',
+      heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+    }
+  })
+  const processName = compactTextParts(
+    activeItems.flatMap((item) => [
+      item.process_method || item.processMethod,
+      item.process_base || item.processBase,
+    ])
+  )
   return createWorkInstructionDraft({
     companyName,
     productNo: product.productNo,
     productName: product.productName,
-    orderNo: version.version ? `BOM ${version.version}` : '',
-    processName: '',
-    department: '',
-    maker: '',
-    designer: '',
-    auditor: '',
+    orderNo:
+      version.source_order_no ||
+      (version.version ? `BOM ${version.version}` : ''),
+    versionText: version.version ? `BOM ${version.version}` : '',
+    processName,
+    department: '生产部 / 品质部',
+    maker: version.maker || '',
+    designer: version.designer || '',
+    auditor: version.auditor || '',
     remark: version.note || '',
-    rows: [],
+    rows: rows.length ? rows : [],
   })
 }
 

@@ -28,6 +28,22 @@ type BOMHeader struct {
 	EffectiveFrom *time.Time `json:"effective_from,omitempty"`
 	// EffectiveTo holds the value of the "effective_to" field.
 	EffectiveTo *time.Time `json:"effective_to,omitempty"`
+	// SourceOrderNo holds the value of the "source_order_no" field.
+	SourceOrderNo *string `json:"source_order_no,omitempty"`
+	// QuantityText holds the value of the "quantity_text" field.
+	QuantityText *string `json:"quantity_text,omitempty"`
+	// SpareText holds the value of the "spare_text" field.
+	SpareText *string `json:"spare_text,omitempty"`
+	// PrintDate holds the value of the "print_date" field.
+	PrintDate *time.Time `json:"print_date,omitempty"`
+	// Designer holds the value of the "designer" field.
+	Designer *string `json:"designer,omitempty"`
+	// Maker holds the value of the "maker" field.
+	Maker *string `json:"maker,omitempty"`
+	// Auditor holds the value of the "auditor" field.
+	Auditor *string `json:"auditor,omitempty"`
+	// HairDirection holds the value of the "hair_direction" field.
+	HairDirection *string `json:"hair_direction,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -78,9 +94,9 @@ func (*BOMHeader) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case bomheader.FieldID, bomheader.FieldProductID:
 			values[i] = new(sql.NullInt64)
-		case bomheader.FieldVersion, bomheader.FieldStatus, bomheader.FieldNote:
+		case bomheader.FieldVersion, bomheader.FieldStatus, bomheader.FieldSourceOrderNo, bomheader.FieldQuantityText, bomheader.FieldSpareText, bomheader.FieldDesigner, bomheader.FieldMaker, bomheader.FieldAuditor, bomheader.FieldHairDirection, bomheader.FieldNote:
 			values[i] = new(sql.NullString)
-		case bomheader.FieldEffectiveFrom, bomheader.FieldEffectiveTo, bomheader.FieldCreatedAt, bomheader.FieldUpdatedAt:
+		case bomheader.FieldEffectiveFrom, bomheader.FieldEffectiveTo, bomheader.FieldPrintDate, bomheader.FieldCreatedAt, bomheader.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -134,6 +150,62 @@ func (_m *BOMHeader) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.EffectiveTo = new(time.Time)
 				*_m.EffectiveTo = value.Time
+			}
+		case bomheader.FieldSourceOrderNo:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field source_order_no", values[i])
+			} else if value.Valid {
+				_m.SourceOrderNo = new(string)
+				*_m.SourceOrderNo = value.String
+			}
+		case bomheader.FieldQuantityText:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field quantity_text", values[i])
+			} else if value.Valid {
+				_m.QuantityText = new(string)
+				*_m.QuantityText = value.String
+			}
+		case bomheader.FieldSpareText:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field spare_text", values[i])
+			} else if value.Valid {
+				_m.SpareText = new(string)
+				*_m.SpareText = value.String
+			}
+		case bomheader.FieldPrintDate:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field print_date", values[i])
+			} else if value.Valid {
+				_m.PrintDate = new(time.Time)
+				*_m.PrintDate = value.Time
+			}
+		case bomheader.FieldDesigner:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field designer", values[i])
+			} else if value.Valid {
+				_m.Designer = new(string)
+				*_m.Designer = value.String
+			}
+		case bomheader.FieldMaker:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field maker", values[i])
+			} else if value.Valid {
+				_m.Maker = new(string)
+				*_m.Maker = value.String
+			}
+		case bomheader.FieldAuditor:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field auditor", values[i])
+			} else if value.Valid {
+				_m.Auditor = new(string)
+				*_m.Auditor = value.String
+			}
+		case bomheader.FieldHairDirection:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field hair_direction", values[i])
+			} else if value.Valid {
+				_m.HairDirection = new(string)
+				*_m.HairDirection = value.String
 			}
 		case bomheader.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -217,6 +289,46 @@ func (_m *BOMHeader) String() string {
 	if v := _m.EffectiveTo; v != nil {
 		builder.WriteString("effective_to=")
 		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.SourceOrderNo; v != nil {
+		builder.WriteString("source_order_no=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.QuantityText; v != nil {
+		builder.WriteString("quantity_text=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SpareText; v != nil {
+		builder.WriteString("spare_text=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.PrintDate; v != nil {
+		builder.WriteString("print_date=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.Designer; v != nil {
+		builder.WriteString("designer=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.Maker; v != nil {
+		builder.WriteString("maker=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.Auditor; v != nil {
+		builder.WriteString("auditor=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.HairDirection; v != nil {
+		builder.WriteString("hair_direction=")
+		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
 	if v := _m.Note; v != nil {

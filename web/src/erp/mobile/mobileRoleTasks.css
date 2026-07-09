@@ -20,6 +20,19 @@
   overflow: hidden;
 }
 
+.mobile-role-runtime-boundary {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.mobile-role-runtime-boundary .erp-mobile-card {
+  width: min(100%, 420px);
+}
+
 .mobile-role-tasks-page__scroll,
 .mobile-role-tasks-page__detail-main {
   min-height: 0;
@@ -645,6 +658,10 @@
   .mobile-role-tasks-page--tabs,
   .mobile-role-tasks-page--detail {
     height: calc(100vh - 32px);
+  }
+
+  .mobile-role-runtime-boundary {
+    min-height: calc(100vh - 32px);
   }
 }
 

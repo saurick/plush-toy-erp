@@ -330,6 +330,44 @@ async function runMobileAuthScenario(
   let authedWorkflowCalls = 0
   let passwordLoginCalls = 0
 
+  await page.addInitScript(() => {
+    window.__PLUSH_ERP_CUSTOMER_CONFIG__ = {
+      ...(window.__PLUSH_ERP_CUSTOMER_CONFIG__ || {}),
+      customerKey: 'yoyoosun',
+    }
+  })
+
+  await page.route('**/rpc/customer_config', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method } = body
+    if (method !== 'get_effective_session') {
+      await route.fallback()
+      return
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          code: 0,
+          message: 'OK',
+          data: {
+            session: {
+              config_revision: 'mobile-auth-smoke-yoyoosun',
+              customer: { key: 'yoyoosun', name: '永绅' },
+              pages: ['global-dashboard'],
+              actions: ['workflow.task.read'],
+              work_pools: [role.roleKey],
+              source: 'mobile_auth_smoke_customer_runtime',
+            },
+          },
+        },
+      }),
+    })
+  })
+
   await page.route('**/rpc/auth', async (route) => {
     const body = route.request().postDataJSON() || {}
     const { id = 'mock-id', method } = body
@@ -608,9 +646,13 @@ async function runMobileAuthScenario(
 
   await resetAuthStorage(page, roleBaseURL)
   assert.equal(
-    await evaluateAfterNavigationSettles(page, () =>
-      localStorage.getItem('admin_access_token')
-    ),
+    await evaluateAfterNavigationSettles(page, () => {
+      try {
+        return localStorage.getItem('admin_access_token')
+      } catch {
+        return null
+      }
+    }),
     null,
     `${role.roleKey} 未登录路径前应清空管理员 token`
   )
@@ -995,8 +1037,13 @@ async function resetAuthStorage(page, roleBaseURL) {
     )
   }
   await evaluateAfterNavigationSettles(page, () => {
-    localStorage.clear()
-    sessionStorage.clear()
+    try {
+      localStorage.clear()
+      sessionStorage.clear()
+      return true
+    } catch {
+      return false
+    }
   })
 }
 
@@ -1064,14 +1111,26 @@ async function waitForPath(page, expectedPath) {
     await delay(100)
   }
   const diagnostics = await page
-    .evaluate(() => ({
-      path: window.location.pathname,
-      href: window.location.href,
-      title: document.title,
-      bodyText: String(document.body?.innerText || '').slice(0, 1200),
-      storageKeys: Object.keys(localStorage).sort(),
-      adminTokenPresent: Boolean(localStorage.getItem('admin_access_token')),
-    }))
+    .evaluate(() => {
+      let storageKeys = []
+      let adminTokenPresent = false
+      let storageError = ''
+      try {
+        storageKeys = Object.keys(localStorage).sort()
+        adminTokenPresent = Boolean(localStorage.getItem('admin_access_token'))
+      } catch (error) {
+        storageError = error?.message || String(error)
+      }
+      return {
+        path: window.location.pathname,
+        href: window.location.href,
+        title: document.title,
+        bodyText: String(document.body?.innerText || '').slice(0, 1200),
+        storageKeys,
+        adminTokenPresent,
+        storageError,
+      }
+    })
     .catch((error) => ({ error: error.message }))
   diagnostics.browserLogs = Array.isArray(page._mobileAuthDiagnostics)
     ? page._mobileAuthDiagnostics.slice(-20)

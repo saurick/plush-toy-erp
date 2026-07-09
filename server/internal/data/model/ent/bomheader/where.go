@@ -80,6 +80,46 @@ func EffectiveTo(v time.Time) predicate.BOMHeader {
 	return predicate.BOMHeader(sql.FieldEQ(FieldEffectiveTo, v))
 }
 
+// SourceOrderNo applies equality check predicate on the "source_order_no" field. It's identical to SourceOrderNoEQ.
+func SourceOrderNo(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldSourceOrderNo, v))
+}
+
+// QuantityText applies equality check predicate on the "quantity_text" field. It's identical to QuantityTextEQ.
+func QuantityText(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldQuantityText, v))
+}
+
+// SpareText applies equality check predicate on the "spare_text" field. It's identical to SpareTextEQ.
+func SpareText(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldSpareText, v))
+}
+
+// PrintDate applies equality check predicate on the "print_date" field. It's identical to PrintDateEQ.
+func PrintDate(v time.Time) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldPrintDate, v))
+}
+
+// Designer applies equality check predicate on the "designer" field. It's identical to DesignerEQ.
+func Designer(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldDesigner, v))
+}
+
+// Maker applies equality check predicate on the "maker" field. It's identical to MakerEQ.
+func Maker(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldMaker, v))
+}
+
+// Auditor applies equality check predicate on the "auditor" field. It's identical to AuditorEQ.
+func Auditor(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldAuditor, v))
+}
+
+// HairDirection applies equality check predicate on the "hair_direction" field. It's identical to HairDirectionEQ.
+func HairDirection(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldHairDirection, v))
+}
+
 // Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
 func Note(v string) predicate.BOMHeader {
 	return predicate.BOMHeader(sql.FieldEQ(FieldNote, v))
@@ -343,6 +383,581 @@ func EffectiveToIsNil() predicate.BOMHeader {
 // EffectiveToNotNil applies the NotNil predicate on the "effective_to" field.
 func EffectiveToNotNil() predicate.BOMHeader {
 	return predicate.BOMHeader(sql.FieldNotNull(FieldEffectiveTo))
+}
+
+// SourceOrderNoEQ applies the EQ predicate on the "source_order_no" field.
+func SourceOrderNoEQ(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldSourceOrderNo, v))
+}
+
+// SourceOrderNoNEQ applies the NEQ predicate on the "source_order_no" field.
+func SourceOrderNoNEQ(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNEQ(FieldSourceOrderNo, v))
+}
+
+// SourceOrderNoIn applies the In predicate on the "source_order_no" field.
+func SourceOrderNoIn(vs ...string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIn(FieldSourceOrderNo, vs...))
+}
+
+// SourceOrderNoNotIn applies the NotIn predicate on the "source_order_no" field.
+func SourceOrderNoNotIn(vs ...string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotIn(FieldSourceOrderNo, vs...))
+}
+
+// SourceOrderNoGT applies the GT predicate on the "source_order_no" field.
+func SourceOrderNoGT(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGT(FieldSourceOrderNo, v))
+}
+
+// SourceOrderNoGTE applies the GTE predicate on the "source_order_no" field.
+func SourceOrderNoGTE(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGTE(FieldSourceOrderNo, v))
+}
+
+// SourceOrderNoLT applies the LT predicate on the "source_order_no" field.
+func SourceOrderNoLT(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLT(FieldSourceOrderNo, v))
+}
+
+// SourceOrderNoLTE applies the LTE predicate on the "source_order_no" field.
+func SourceOrderNoLTE(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLTE(FieldSourceOrderNo, v))
+}
+
+// SourceOrderNoContains applies the Contains predicate on the "source_order_no" field.
+func SourceOrderNoContains(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldContains(FieldSourceOrderNo, v))
+}
+
+// SourceOrderNoHasPrefix applies the HasPrefix predicate on the "source_order_no" field.
+func SourceOrderNoHasPrefix(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldHasPrefix(FieldSourceOrderNo, v))
+}
+
+// SourceOrderNoHasSuffix applies the HasSuffix predicate on the "source_order_no" field.
+func SourceOrderNoHasSuffix(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldHasSuffix(FieldSourceOrderNo, v))
+}
+
+// SourceOrderNoIsNil applies the IsNil predicate on the "source_order_no" field.
+func SourceOrderNoIsNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIsNull(FieldSourceOrderNo))
+}
+
+// SourceOrderNoNotNil applies the NotNil predicate on the "source_order_no" field.
+func SourceOrderNoNotNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotNull(FieldSourceOrderNo))
+}
+
+// SourceOrderNoEqualFold applies the EqualFold predicate on the "source_order_no" field.
+func SourceOrderNoEqualFold(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEqualFold(FieldSourceOrderNo, v))
+}
+
+// SourceOrderNoContainsFold applies the ContainsFold predicate on the "source_order_no" field.
+func SourceOrderNoContainsFold(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldContainsFold(FieldSourceOrderNo, v))
+}
+
+// QuantityTextEQ applies the EQ predicate on the "quantity_text" field.
+func QuantityTextEQ(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldQuantityText, v))
+}
+
+// QuantityTextNEQ applies the NEQ predicate on the "quantity_text" field.
+func QuantityTextNEQ(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNEQ(FieldQuantityText, v))
+}
+
+// QuantityTextIn applies the In predicate on the "quantity_text" field.
+func QuantityTextIn(vs ...string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIn(FieldQuantityText, vs...))
+}
+
+// QuantityTextNotIn applies the NotIn predicate on the "quantity_text" field.
+func QuantityTextNotIn(vs ...string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotIn(FieldQuantityText, vs...))
+}
+
+// QuantityTextGT applies the GT predicate on the "quantity_text" field.
+func QuantityTextGT(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGT(FieldQuantityText, v))
+}
+
+// QuantityTextGTE applies the GTE predicate on the "quantity_text" field.
+func QuantityTextGTE(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGTE(FieldQuantityText, v))
+}
+
+// QuantityTextLT applies the LT predicate on the "quantity_text" field.
+func QuantityTextLT(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLT(FieldQuantityText, v))
+}
+
+// QuantityTextLTE applies the LTE predicate on the "quantity_text" field.
+func QuantityTextLTE(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLTE(FieldQuantityText, v))
+}
+
+// QuantityTextContains applies the Contains predicate on the "quantity_text" field.
+func QuantityTextContains(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldContains(FieldQuantityText, v))
+}
+
+// QuantityTextHasPrefix applies the HasPrefix predicate on the "quantity_text" field.
+func QuantityTextHasPrefix(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldHasPrefix(FieldQuantityText, v))
+}
+
+// QuantityTextHasSuffix applies the HasSuffix predicate on the "quantity_text" field.
+func QuantityTextHasSuffix(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldHasSuffix(FieldQuantityText, v))
+}
+
+// QuantityTextIsNil applies the IsNil predicate on the "quantity_text" field.
+func QuantityTextIsNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIsNull(FieldQuantityText))
+}
+
+// QuantityTextNotNil applies the NotNil predicate on the "quantity_text" field.
+func QuantityTextNotNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotNull(FieldQuantityText))
+}
+
+// QuantityTextEqualFold applies the EqualFold predicate on the "quantity_text" field.
+func QuantityTextEqualFold(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEqualFold(FieldQuantityText, v))
+}
+
+// QuantityTextContainsFold applies the ContainsFold predicate on the "quantity_text" field.
+func QuantityTextContainsFold(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldContainsFold(FieldQuantityText, v))
+}
+
+// SpareTextEQ applies the EQ predicate on the "spare_text" field.
+func SpareTextEQ(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldSpareText, v))
+}
+
+// SpareTextNEQ applies the NEQ predicate on the "spare_text" field.
+func SpareTextNEQ(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNEQ(FieldSpareText, v))
+}
+
+// SpareTextIn applies the In predicate on the "spare_text" field.
+func SpareTextIn(vs ...string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIn(FieldSpareText, vs...))
+}
+
+// SpareTextNotIn applies the NotIn predicate on the "spare_text" field.
+func SpareTextNotIn(vs ...string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotIn(FieldSpareText, vs...))
+}
+
+// SpareTextGT applies the GT predicate on the "spare_text" field.
+func SpareTextGT(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGT(FieldSpareText, v))
+}
+
+// SpareTextGTE applies the GTE predicate on the "spare_text" field.
+func SpareTextGTE(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGTE(FieldSpareText, v))
+}
+
+// SpareTextLT applies the LT predicate on the "spare_text" field.
+func SpareTextLT(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLT(FieldSpareText, v))
+}
+
+// SpareTextLTE applies the LTE predicate on the "spare_text" field.
+func SpareTextLTE(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLTE(FieldSpareText, v))
+}
+
+// SpareTextContains applies the Contains predicate on the "spare_text" field.
+func SpareTextContains(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldContains(FieldSpareText, v))
+}
+
+// SpareTextHasPrefix applies the HasPrefix predicate on the "spare_text" field.
+func SpareTextHasPrefix(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldHasPrefix(FieldSpareText, v))
+}
+
+// SpareTextHasSuffix applies the HasSuffix predicate on the "spare_text" field.
+func SpareTextHasSuffix(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldHasSuffix(FieldSpareText, v))
+}
+
+// SpareTextIsNil applies the IsNil predicate on the "spare_text" field.
+func SpareTextIsNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIsNull(FieldSpareText))
+}
+
+// SpareTextNotNil applies the NotNil predicate on the "spare_text" field.
+func SpareTextNotNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotNull(FieldSpareText))
+}
+
+// SpareTextEqualFold applies the EqualFold predicate on the "spare_text" field.
+func SpareTextEqualFold(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEqualFold(FieldSpareText, v))
+}
+
+// SpareTextContainsFold applies the ContainsFold predicate on the "spare_text" field.
+func SpareTextContainsFold(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldContainsFold(FieldSpareText, v))
+}
+
+// PrintDateEQ applies the EQ predicate on the "print_date" field.
+func PrintDateEQ(v time.Time) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldPrintDate, v))
+}
+
+// PrintDateNEQ applies the NEQ predicate on the "print_date" field.
+func PrintDateNEQ(v time.Time) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNEQ(FieldPrintDate, v))
+}
+
+// PrintDateIn applies the In predicate on the "print_date" field.
+func PrintDateIn(vs ...time.Time) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIn(FieldPrintDate, vs...))
+}
+
+// PrintDateNotIn applies the NotIn predicate on the "print_date" field.
+func PrintDateNotIn(vs ...time.Time) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotIn(FieldPrintDate, vs...))
+}
+
+// PrintDateGT applies the GT predicate on the "print_date" field.
+func PrintDateGT(v time.Time) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGT(FieldPrintDate, v))
+}
+
+// PrintDateGTE applies the GTE predicate on the "print_date" field.
+func PrintDateGTE(v time.Time) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGTE(FieldPrintDate, v))
+}
+
+// PrintDateLT applies the LT predicate on the "print_date" field.
+func PrintDateLT(v time.Time) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLT(FieldPrintDate, v))
+}
+
+// PrintDateLTE applies the LTE predicate on the "print_date" field.
+func PrintDateLTE(v time.Time) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLTE(FieldPrintDate, v))
+}
+
+// PrintDateIsNil applies the IsNil predicate on the "print_date" field.
+func PrintDateIsNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIsNull(FieldPrintDate))
+}
+
+// PrintDateNotNil applies the NotNil predicate on the "print_date" field.
+func PrintDateNotNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotNull(FieldPrintDate))
+}
+
+// DesignerEQ applies the EQ predicate on the "designer" field.
+func DesignerEQ(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldDesigner, v))
+}
+
+// DesignerNEQ applies the NEQ predicate on the "designer" field.
+func DesignerNEQ(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNEQ(FieldDesigner, v))
+}
+
+// DesignerIn applies the In predicate on the "designer" field.
+func DesignerIn(vs ...string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIn(FieldDesigner, vs...))
+}
+
+// DesignerNotIn applies the NotIn predicate on the "designer" field.
+func DesignerNotIn(vs ...string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotIn(FieldDesigner, vs...))
+}
+
+// DesignerGT applies the GT predicate on the "designer" field.
+func DesignerGT(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGT(FieldDesigner, v))
+}
+
+// DesignerGTE applies the GTE predicate on the "designer" field.
+func DesignerGTE(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGTE(FieldDesigner, v))
+}
+
+// DesignerLT applies the LT predicate on the "designer" field.
+func DesignerLT(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLT(FieldDesigner, v))
+}
+
+// DesignerLTE applies the LTE predicate on the "designer" field.
+func DesignerLTE(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLTE(FieldDesigner, v))
+}
+
+// DesignerContains applies the Contains predicate on the "designer" field.
+func DesignerContains(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldContains(FieldDesigner, v))
+}
+
+// DesignerHasPrefix applies the HasPrefix predicate on the "designer" field.
+func DesignerHasPrefix(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldHasPrefix(FieldDesigner, v))
+}
+
+// DesignerHasSuffix applies the HasSuffix predicate on the "designer" field.
+func DesignerHasSuffix(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldHasSuffix(FieldDesigner, v))
+}
+
+// DesignerIsNil applies the IsNil predicate on the "designer" field.
+func DesignerIsNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIsNull(FieldDesigner))
+}
+
+// DesignerNotNil applies the NotNil predicate on the "designer" field.
+func DesignerNotNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotNull(FieldDesigner))
+}
+
+// DesignerEqualFold applies the EqualFold predicate on the "designer" field.
+func DesignerEqualFold(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEqualFold(FieldDesigner, v))
+}
+
+// DesignerContainsFold applies the ContainsFold predicate on the "designer" field.
+func DesignerContainsFold(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldContainsFold(FieldDesigner, v))
+}
+
+// MakerEQ applies the EQ predicate on the "maker" field.
+func MakerEQ(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldMaker, v))
+}
+
+// MakerNEQ applies the NEQ predicate on the "maker" field.
+func MakerNEQ(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNEQ(FieldMaker, v))
+}
+
+// MakerIn applies the In predicate on the "maker" field.
+func MakerIn(vs ...string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIn(FieldMaker, vs...))
+}
+
+// MakerNotIn applies the NotIn predicate on the "maker" field.
+func MakerNotIn(vs ...string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotIn(FieldMaker, vs...))
+}
+
+// MakerGT applies the GT predicate on the "maker" field.
+func MakerGT(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGT(FieldMaker, v))
+}
+
+// MakerGTE applies the GTE predicate on the "maker" field.
+func MakerGTE(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGTE(FieldMaker, v))
+}
+
+// MakerLT applies the LT predicate on the "maker" field.
+func MakerLT(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLT(FieldMaker, v))
+}
+
+// MakerLTE applies the LTE predicate on the "maker" field.
+func MakerLTE(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLTE(FieldMaker, v))
+}
+
+// MakerContains applies the Contains predicate on the "maker" field.
+func MakerContains(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldContains(FieldMaker, v))
+}
+
+// MakerHasPrefix applies the HasPrefix predicate on the "maker" field.
+func MakerHasPrefix(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldHasPrefix(FieldMaker, v))
+}
+
+// MakerHasSuffix applies the HasSuffix predicate on the "maker" field.
+func MakerHasSuffix(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldHasSuffix(FieldMaker, v))
+}
+
+// MakerIsNil applies the IsNil predicate on the "maker" field.
+func MakerIsNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIsNull(FieldMaker))
+}
+
+// MakerNotNil applies the NotNil predicate on the "maker" field.
+func MakerNotNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotNull(FieldMaker))
+}
+
+// MakerEqualFold applies the EqualFold predicate on the "maker" field.
+func MakerEqualFold(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEqualFold(FieldMaker, v))
+}
+
+// MakerContainsFold applies the ContainsFold predicate on the "maker" field.
+func MakerContainsFold(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldContainsFold(FieldMaker, v))
+}
+
+// AuditorEQ applies the EQ predicate on the "auditor" field.
+func AuditorEQ(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldAuditor, v))
+}
+
+// AuditorNEQ applies the NEQ predicate on the "auditor" field.
+func AuditorNEQ(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNEQ(FieldAuditor, v))
+}
+
+// AuditorIn applies the In predicate on the "auditor" field.
+func AuditorIn(vs ...string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIn(FieldAuditor, vs...))
+}
+
+// AuditorNotIn applies the NotIn predicate on the "auditor" field.
+func AuditorNotIn(vs ...string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotIn(FieldAuditor, vs...))
+}
+
+// AuditorGT applies the GT predicate on the "auditor" field.
+func AuditorGT(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGT(FieldAuditor, v))
+}
+
+// AuditorGTE applies the GTE predicate on the "auditor" field.
+func AuditorGTE(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGTE(FieldAuditor, v))
+}
+
+// AuditorLT applies the LT predicate on the "auditor" field.
+func AuditorLT(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLT(FieldAuditor, v))
+}
+
+// AuditorLTE applies the LTE predicate on the "auditor" field.
+func AuditorLTE(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLTE(FieldAuditor, v))
+}
+
+// AuditorContains applies the Contains predicate on the "auditor" field.
+func AuditorContains(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldContains(FieldAuditor, v))
+}
+
+// AuditorHasPrefix applies the HasPrefix predicate on the "auditor" field.
+func AuditorHasPrefix(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldHasPrefix(FieldAuditor, v))
+}
+
+// AuditorHasSuffix applies the HasSuffix predicate on the "auditor" field.
+func AuditorHasSuffix(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldHasSuffix(FieldAuditor, v))
+}
+
+// AuditorIsNil applies the IsNil predicate on the "auditor" field.
+func AuditorIsNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIsNull(FieldAuditor))
+}
+
+// AuditorNotNil applies the NotNil predicate on the "auditor" field.
+func AuditorNotNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotNull(FieldAuditor))
+}
+
+// AuditorEqualFold applies the EqualFold predicate on the "auditor" field.
+func AuditorEqualFold(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEqualFold(FieldAuditor, v))
+}
+
+// AuditorContainsFold applies the ContainsFold predicate on the "auditor" field.
+func AuditorContainsFold(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldContainsFold(FieldAuditor, v))
+}
+
+// HairDirectionEQ applies the EQ predicate on the "hair_direction" field.
+func HairDirectionEQ(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEQ(FieldHairDirection, v))
+}
+
+// HairDirectionNEQ applies the NEQ predicate on the "hair_direction" field.
+func HairDirectionNEQ(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNEQ(FieldHairDirection, v))
+}
+
+// HairDirectionIn applies the In predicate on the "hair_direction" field.
+func HairDirectionIn(vs ...string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIn(FieldHairDirection, vs...))
+}
+
+// HairDirectionNotIn applies the NotIn predicate on the "hair_direction" field.
+func HairDirectionNotIn(vs ...string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotIn(FieldHairDirection, vs...))
+}
+
+// HairDirectionGT applies the GT predicate on the "hair_direction" field.
+func HairDirectionGT(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGT(FieldHairDirection, v))
+}
+
+// HairDirectionGTE applies the GTE predicate on the "hair_direction" field.
+func HairDirectionGTE(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldGTE(FieldHairDirection, v))
+}
+
+// HairDirectionLT applies the LT predicate on the "hair_direction" field.
+func HairDirectionLT(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLT(FieldHairDirection, v))
+}
+
+// HairDirectionLTE applies the LTE predicate on the "hair_direction" field.
+func HairDirectionLTE(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldLTE(FieldHairDirection, v))
+}
+
+// HairDirectionContains applies the Contains predicate on the "hair_direction" field.
+func HairDirectionContains(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldContains(FieldHairDirection, v))
+}
+
+// HairDirectionHasPrefix applies the HasPrefix predicate on the "hair_direction" field.
+func HairDirectionHasPrefix(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldHasPrefix(FieldHairDirection, v))
+}
+
+// HairDirectionHasSuffix applies the HasSuffix predicate on the "hair_direction" field.
+func HairDirectionHasSuffix(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldHasSuffix(FieldHairDirection, v))
+}
+
+// HairDirectionIsNil applies the IsNil predicate on the "hair_direction" field.
+func HairDirectionIsNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldIsNull(FieldHairDirection))
+}
+
+// HairDirectionNotNil applies the NotNil predicate on the "hair_direction" field.
+func HairDirectionNotNil() predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldNotNull(FieldHairDirection))
+}
+
+// HairDirectionEqualFold applies the EqualFold predicate on the "hair_direction" field.
+func HairDirectionEqualFold(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldEqualFold(FieldHairDirection, v))
+}
+
+// HairDirectionContainsFold applies the ContainsFold predicate on the "hair_direction" field.
+func HairDirectionContainsFold(v string) predicate.BOMHeader {
+	return predicate.BOMHeader(sql.FieldContainsFold(FieldHairDirection, v))
 }
 
 // NoteEQ applies the EQ predicate on the "note" field.

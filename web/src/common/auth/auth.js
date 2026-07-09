@@ -62,14 +62,19 @@ function removeStorageItem(storage, key) {
 export function getToken(scope = AUTH_SCOPE.ADMIN) {
   const normalizedScope = normalizeScope(scope)
   const key = TOKEN_KEYS[normalizedScope]
-  const token = localStorage.getItem(key)
+  let token = ''
+  try {
+    token = localStorage.getItem(key)
+  } catch {
+    return ''
+  }
   if (token) return token
   return ''
 }
 
 export function setToken(token, scope = AUTH_SCOPE.ADMIN) {
   const normalizedScope = normalizeScope(scope)
-  localStorage.setItem(TOKEN_KEYS[normalizedScope], token)
+  setStorageItem(localStorage, TOKEN_KEYS[normalizedScope], token)
 }
 
 function setScopedMeta(scope, data) {
@@ -112,7 +117,12 @@ export function persistAuthMeta(data, scope = AUTH_SCOPE.ADMIN) {
 
 export function getAuthMeta(scope, key) {
   const normalizedScope = normalizeScope(scope)
-  const raw = localStorage.getItem(getScopedMetaKey(normalizedScope, key))
+  let raw = null
+  try {
+    raw = localStorage.getItem(getScopedMetaKey(normalizedScope, key))
+  } catch {
+    return null
+  }
   if (raw == null || raw === '') {
     return null
   }
@@ -132,7 +142,7 @@ export function getLoginPath(_scope = AUTH_SCOPE.ADMIN) {
 
 export function logout(scope = AUTH_SCOPE.ADMIN) {
   const normalizedScope = normalizeScope(scope)
-  localStorage.removeItem(TOKEN_KEYS[normalizedScope])
+  removeStorageItem(localStorage, TOKEN_KEYS[normalizedScope])
   clearScopedMeta(normalizedScope)
 
   try {

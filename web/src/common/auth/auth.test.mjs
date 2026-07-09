@@ -11,10 +11,17 @@ import {
   persistAuthMeta,
 } from './auth.js'
 
-function createStorage({ rejectSetItemKeys = new Set() } = {}) {
+function createStorage({
+  rejectGetItemKeys = new Set(),
+  rejectSetItemKeys = new Set(),
+  rejectRemoveItemKeys = new Set(),
+} = {}) {
   const store = new Map()
   return {
     getItem(key) {
+      if (rejectGetItemKeys.has(key)) {
+        throw new DOMException('access denied', 'SecurityError')
+      }
       return store.has(key) ? store.get(key) : null
     },
     setItem(key, value) {
@@ -24,6 +31,9 @@ function createStorage({ rejectSetItemKeys = new Set() } = {}) {
       store.set(key, String(value))
     },
     removeItem(key) {
+      if (rejectRemoveItemKeys.has(key)) {
+        throw new DOMException('access denied', 'SecurityError')
+      }
       store.delete(key)
     },
     clear() {
@@ -152,4 +162,15 @@ test('auth: logout 只清理当前 scope 认证信息，不清空项目其他 lo
   assert.equal(localStorage.getItem('admin_permissions'), null)
   assert.equal(localStorage.getItem('plush_erp_theme_mode'), 'dark')
   assert.equal(localStorage.getItem('erp:last_entry_target'), 'desktop')
+})
+
+test('auth: 浏览器拒绝 storage 读取时按未登录处理且不抛异常', () => {
+  installStorage({
+    rejectGetItemKeys: new Set(['admin_access_token', 'admin_permissions']),
+    rejectRemoveItemKeys: new Set(['admin_access_token']),
+  })
+
+  assert.equal(getStoredAdminProfile(), null)
+  assert.equal(getAuthMeta(AUTH_SCOPE.ADMIN, 'permissions'), null)
+  assert.doesNotThrow(() => logout(AUTH_SCOPE.ADMIN))
 })

@@ -238,22 +238,34 @@ type BOMHeader struct {
 	Status        string
 	EffectiveFrom *time.Time
 	EffectiveTo   *time.Time
+	SourceOrderNo *string
+	QuantityText  *string
+	SpareText     *string
+	PrintDate     *time.Time
+	Designer      *string
+	Maker         *string
+	Auditor       *string
+	HairDirection *string
 	Note          *string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
 
 type BOMItem struct {
-	ID          int
-	BOMHeaderID int
-	MaterialID  int
-	Quantity    decimal.Decimal
-	UnitID      int
-	LossRate    decimal.Decimal
-	Position    *string
-	Note        *string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID                 int
+	BOMHeaderID        int
+	MaterialID         int
+	Quantity           decimal.Decimal
+	UnitID             int
+	LossRate           decimal.Decimal
+	Position           *string
+	PieceCount         *string
+	TotalUsageSnapshot *string
+	ProcessBase        *string
+	ProcessMethod      *string
+	Note               *string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type BOMHeaderCreate struct {
@@ -262,6 +274,14 @@ type BOMHeaderCreate struct {
 	Status        string
 	EffectiveFrom *time.Time
 	EffectiveTo   *time.Time
+	SourceOrderNo *string
+	QuantityText  *string
+	SpareText     *string
+	PrintDate     *time.Time
+	Designer      *string
+	Maker         *string
+	Auditor       *string
+	HairDirection *string
 	Note          *string
 }
 
@@ -269,26 +289,42 @@ type BOMHeaderUpdate struct {
 	Version       string
 	EffectiveFrom *time.Time
 	EffectiveTo   *time.Time
+	SourceOrderNo *string
+	QuantityText  *string
+	SpareText     *string
+	PrintDate     *time.Time
+	Designer      *string
+	Maker         *string
+	Auditor       *string
+	HairDirection *string
 	Note          *string
 }
 
 type BOMItemCreate struct {
-	BOMHeaderID int
-	MaterialID  int
-	Quantity    decimal.Decimal
-	UnitID      int
-	LossRate    decimal.Decimal
-	Position    *string
-	Note        *string
+	BOMHeaderID        int
+	MaterialID         int
+	Quantity           decimal.Decimal
+	UnitID             int
+	LossRate           decimal.Decimal
+	Position           *string
+	PieceCount         *string
+	TotalUsageSnapshot *string
+	ProcessBase        *string
+	ProcessMethod      *string
+	Note               *string
 }
 
 type BOMItemUpdate struct {
-	MaterialID int
-	Quantity   decimal.Decimal
-	UnitID     int
-	LossRate   decimal.Decimal
-	Position   *string
-	Note       *string
+	MaterialID         int
+	Quantity           decimal.Decimal
+	UnitID             int
+	LossRate           decimal.Decimal
+	Position           *string
+	PieceCount         *string
+	TotalUsageSnapshot *string
+	ProcessBase        *string
+	ProcessMethod      *string
+	Note               *string
 }
 
 type BOMHeaderFilter struct {
@@ -813,6 +849,13 @@ func normalizeBOMHeaderCreate(in BOMHeaderCreate) (BOMHeaderCreate, error) {
 		in.Status = BOMStatusDraft
 	}
 	in.Note = normalizeOptionalString(in.Note)
+	in.SourceOrderNo = normalizeOptionalString(in.SourceOrderNo)
+	in.QuantityText = normalizeOptionalString(in.QuantityText)
+	in.SpareText = normalizeOptionalString(in.SpareText)
+	in.Designer = normalizeOptionalString(in.Designer)
+	in.Maker = normalizeOptionalString(in.Maker)
+	in.Auditor = normalizeOptionalString(in.Auditor)
+	in.HairDirection = normalizeOptionalString(in.HairDirection)
 	if in.ProductID <= 0 ||
 		in.Version == "" ||
 		!IsValidBOMStatus(in.Status) {
@@ -827,6 +870,13 @@ func normalizeBOMHeaderCreate(in BOMHeaderCreate) (BOMHeaderCreate, error) {
 func normalizeBOMHeaderUpdate(in BOMHeaderUpdate) (BOMHeaderUpdate, error) {
 	in.Version = strings.TrimSpace(in.Version)
 	in.Note = normalizeOptionalString(in.Note)
+	in.SourceOrderNo = normalizeOptionalString(in.SourceOrderNo)
+	in.QuantityText = normalizeOptionalString(in.QuantityText)
+	in.SpareText = normalizeOptionalString(in.SpareText)
+	in.Designer = normalizeOptionalString(in.Designer)
+	in.Maker = normalizeOptionalString(in.Maker)
+	in.Auditor = normalizeOptionalString(in.Auditor)
+	in.HairDirection = normalizeOptionalString(in.HairDirection)
 	if in.Version == "" {
 		return BOMHeaderUpdate{}, ErrBadParam
 	}
@@ -838,6 +888,10 @@ func normalizeBOMHeaderUpdate(in BOMHeaderUpdate) (BOMHeaderUpdate, error) {
 
 func normalizeBOMItemCreate(in BOMItemCreate) (BOMItemCreate, error) {
 	in.Position = normalizeOptionalString(in.Position)
+	in.PieceCount = normalizeOptionalString(in.PieceCount)
+	in.TotalUsageSnapshot = normalizeOptionalString(in.TotalUsageSnapshot)
+	in.ProcessBase = normalizeOptionalString(in.ProcessBase)
+	in.ProcessMethod = normalizeOptionalString(in.ProcessMethod)
 	in.Note = normalizeOptionalString(in.Note)
 	if in.BOMHeaderID <= 0 ||
 		in.MaterialID <= 0 ||
@@ -853,6 +907,10 @@ func normalizeBOMItemCreate(in BOMItemCreate) (BOMItemCreate, error) {
 
 func normalizeBOMItemUpdate(in BOMItemUpdate) (BOMItemUpdate, error) {
 	in.Position = normalizeOptionalString(in.Position)
+	in.PieceCount = normalizeOptionalString(in.PieceCount)
+	in.TotalUsageSnapshot = normalizeOptionalString(in.TotalUsageSnapshot)
+	in.ProcessBase = normalizeOptionalString(in.ProcessBase)
+	in.ProcessMethod = normalizeOptionalString(in.ProcessMethod)
 	in.Note = normalizeOptionalString(in.Note)
 	if in.MaterialID <= 0 ||
 		in.UnitID <= 0 ||

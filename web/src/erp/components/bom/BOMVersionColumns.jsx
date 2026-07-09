@@ -76,6 +76,35 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
       exportValue: (record) => bomStatusText(record.status),
     },
     {
+      title: '来源订单号',
+      exportTitle: '来源订单号',
+      dataIndex: 'source_order_no',
+      width: 150,
+      sorter: (a, b) =>
+        String(a?.source_order_no || '').localeCompare(
+          String(b?.source_order_no || '')
+        ),
+      render: (value) => value || '-',
+    },
+    {
+      title: '设计师',
+      exportTitle: '设计师',
+      dataIndex: 'designer',
+      width: 110,
+      sorter: (a, b) =>
+        String(a?.designer || '').localeCompare(String(b?.designer || '')),
+      render: (value) => value || '-',
+    },
+    {
+      title: '制表日期',
+      exportTitle: '制表日期',
+      dataIndex: 'print_date',
+      width: 130,
+      sortType: 'date',
+      render: formatUnixDate,
+      exportValue: (record) => formatUnixDate(record.print_date),
+    },
+    {
       title: '生效开始',
       exportTitle: '生效开始',
       dataIndex: 'effective_from',

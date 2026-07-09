@@ -86,6 +86,26 @@ func Position(v string) predicate.BOMItem {
 	return predicate.BOMItem(sql.FieldEQ(FieldPosition, v))
 }
 
+// PieceCount applies equality check predicate on the "piece_count" field. It's identical to PieceCountEQ.
+func PieceCount(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldEQ(FieldPieceCount, v))
+}
+
+// TotalUsageSnapshot applies equality check predicate on the "total_usage_snapshot" field. It's identical to TotalUsageSnapshotEQ.
+func TotalUsageSnapshot(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldEQ(FieldTotalUsageSnapshot, v))
+}
+
+// ProcessBase applies equality check predicate on the "process_base" field. It's identical to ProcessBaseEQ.
+func ProcessBase(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldEQ(FieldProcessBase, v))
+}
+
+// ProcessMethod applies equality check predicate on the "process_method" field. It's identical to ProcessMethodEQ.
+func ProcessMethod(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldEQ(FieldProcessMethod, v))
+}
+
 // Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
 func Note(v string) predicate.BOMItem {
 	return predicate.BOMItem(sql.FieldEQ(FieldNote, v))
@@ -314,6 +334,306 @@ func PositionEqualFold(v string) predicate.BOMItem {
 // PositionContainsFold applies the ContainsFold predicate on the "position" field.
 func PositionContainsFold(v string) predicate.BOMItem {
 	return predicate.BOMItem(sql.FieldContainsFold(FieldPosition, v))
+}
+
+// PieceCountEQ applies the EQ predicate on the "piece_count" field.
+func PieceCountEQ(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldEQ(FieldPieceCount, v))
+}
+
+// PieceCountNEQ applies the NEQ predicate on the "piece_count" field.
+func PieceCountNEQ(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNEQ(FieldPieceCount, v))
+}
+
+// PieceCountIn applies the In predicate on the "piece_count" field.
+func PieceCountIn(vs ...string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldIn(FieldPieceCount, vs...))
+}
+
+// PieceCountNotIn applies the NotIn predicate on the "piece_count" field.
+func PieceCountNotIn(vs ...string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNotIn(FieldPieceCount, vs...))
+}
+
+// PieceCountGT applies the GT predicate on the "piece_count" field.
+func PieceCountGT(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldGT(FieldPieceCount, v))
+}
+
+// PieceCountGTE applies the GTE predicate on the "piece_count" field.
+func PieceCountGTE(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldGTE(FieldPieceCount, v))
+}
+
+// PieceCountLT applies the LT predicate on the "piece_count" field.
+func PieceCountLT(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldLT(FieldPieceCount, v))
+}
+
+// PieceCountLTE applies the LTE predicate on the "piece_count" field.
+func PieceCountLTE(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldLTE(FieldPieceCount, v))
+}
+
+// PieceCountContains applies the Contains predicate on the "piece_count" field.
+func PieceCountContains(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldContains(FieldPieceCount, v))
+}
+
+// PieceCountHasPrefix applies the HasPrefix predicate on the "piece_count" field.
+func PieceCountHasPrefix(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldHasPrefix(FieldPieceCount, v))
+}
+
+// PieceCountHasSuffix applies the HasSuffix predicate on the "piece_count" field.
+func PieceCountHasSuffix(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldHasSuffix(FieldPieceCount, v))
+}
+
+// PieceCountIsNil applies the IsNil predicate on the "piece_count" field.
+func PieceCountIsNil() predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldIsNull(FieldPieceCount))
+}
+
+// PieceCountNotNil applies the NotNil predicate on the "piece_count" field.
+func PieceCountNotNil() predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNotNull(FieldPieceCount))
+}
+
+// PieceCountEqualFold applies the EqualFold predicate on the "piece_count" field.
+func PieceCountEqualFold(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldEqualFold(FieldPieceCount, v))
+}
+
+// PieceCountContainsFold applies the ContainsFold predicate on the "piece_count" field.
+func PieceCountContainsFold(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldContainsFold(FieldPieceCount, v))
+}
+
+// TotalUsageSnapshotEQ applies the EQ predicate on the "total_usage_snapshot" field.
+func TotalUsageSnapshotEQ(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldEQ(FieldTotalUsageSnapshot, v))
+}
+
+// TotalUsageSnapshotNEQ applies the NEQ predicate on the "total_usage_snapshot" field.
+func TotalUsageSnapshotNEQ(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNEQ(FieldTotalUsageSnapshot, v))
+}
+
+// TotalUsageSnapshotIn applies the In predicate on the "total_usage_snapshot" field.
+func TotalUsageSnapshotIn(vs ...string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldIn(FieldTotalUsageSnapshot, vs...))
+}
+
+// TotalUsageSnapshotNotIn applies the NotIn predicate on the "total_usage_snapshot" field.
+func TotalUsageSnapshotNotIn(vs ...string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNotIn(FieldTotalUsageSnapshot, vs...))
+}
+
+// TotalUsageSnapshotGT applies the GT predicate on the "total_usage_snapshot" field.
+func TotalUsageSnapshotGT(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldGT(FieldTotalUsageSnapshot, v))
+}
+
+// TotalUsageSnapshotGTE applies the GTE predicate on the "total_usage_snapshot" field.
+func TotalUsageSnapshotGTE(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldGTE(FieldTotalUsageSnapshot, v))
+}
+
+// TotalUsageSnapshotLT applies the LT predicate on the "total_usage_snapshot" field.
+func TotalUsageSnapshotLT(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldLT(FieldTotalUsageSnapshot, v))
+}
+
+// TotalUsageSnapshotLTE applies the LTE predicate on the "total_usage_snapshot" field.
+func TotalUsageSnapshotLTE(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldLTE(FieldTotalUsageSnapshot, v))
+}
+
+// TotalUsageSnapshotContains applies the Contains predicate on the "total_usage_snapshot" field.
+func TotalUsageSnapshotContains(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldContains(FieldTotalUsageSnapshot, v))
+}
+
+// TotalUsageSnapshotHasPrefix applies the HasPrefix predicate on the "total_usage_snapshot" field.
+func TotalUsageSnapshotHasPrefix(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldHasPrefix(FieldTotalUsageSnapshot, v))
+}
+
+// TotalUsageSnapshotHasSuffix applies the HasSuffix predicate on the "total_usage_snapshot" field.
+func TotalUsageSnapshotHasSuffix(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldHasSuffix(FieldTotalUsageSnapshot, v))
+}
+
+// TotalUsageSnapshotIsNil applies the IsNil predicate on the "total_usage_snapshot" field.
+func TotalUsageSnapshotIsNil() predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldIsNull(FieldTotalUsageSnapshot))
+}
+
+// TotalUsageSnapshotNotNil applies the NotNil predicate on the "total_usage_snapshot" field.
+func TotalUsageSnapshotNotNil() predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNotNull(FieldTotalUsageSnapshot))
+}
+
+// TotalUsageSnapshotEqualFold applies the EqualFold predicate on the "total_usage_snapshot" field.
+func TotalUsageSnapshotEqualFold(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldEqualFold(FieldTotalUsageSnapshot, v))
+}
+
+// TotalUsageSnapshotContainsFold applies the ContainsFold predicate on the "total_usage_snapshot" field.
+func TotalUsageSnapshotContainsFold(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldContainsFold(FieldTotalUsageSnapshot, v))
+}
+
+// ProcessBaseEQ applies the EQ predicate on the "process_base" field.
+func ProcessBaseEQ(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldEQ(FieldProcessBase, v))
+}
+
+// ProcessBaseNEQ applies the NEQ predicate on the "process_base" field.
+func ProcessBaseNEQ(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNEQ(FieldProcessBase, v))
+}
+
+// ProcessBaseIn applies the In predicate on the "process_base" field.
+func ProcessBaseIn(vs ...string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldIn(FieldProcessBase, vs...))
+}
+
+// ProcessBaseNotIn applies the NotIn predicate on the "process_base" field.
+func ProcessBaseNotIn(vs ...string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNotIn(FieldProcessBase, vs...))
+}
+
+// ProcessBaseGT applies the GT predicate on the "process_base" field.
+func ProcessBaseGT(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldGT(FieldProcessBase, v))
+}
+
+// ProcessBaseGTE applies the GTE predicate on the "process_base" field.
+func ProcessBaseGTE(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldGTE(FieldProcessBase, v))
+}
+
+// ProcessBaseLT applies the LT predicate on the "process_base" field.
+func ProcessBaseLT(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldLT(FieldProcessBase, v))
+}
+
+// ProcessBaseLTE applies the LTE predicate on the "process_base" field.
+func ProcessBaseLTE(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldLTE(FieldProcessBase, v))
+}
+
+// ProcessBaseContains applies the Contains predicate on the "process_base" field.
+func ProcessBaseContains(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldContains(FieldProcessBase, v))
+}
+
+// ProcessBaseHasPrefix applies the HasPrefix predicate on the "process_base" field.
+func ProcessBaseHasPrefix(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldHasPrefix(FieldProcessBase, v))
+}
+
+// ProcessBaseHasSuffix applies the HasSuffix predicate on the "process_base" field.
+func ProcessBaseHasSuffix(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldHasSuffix(FieldProcessBase, v))
+}
+
+// ProcessBaseIsNil applies the IsNil predicate on the "process_base" field.
+func ProcessBaseIsNil() predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldIsNull(FieldProcessBase))
+}
+
+// ProcessBaseNotNil applies the NotNil predicate on the "process_base" field.
+func ProcessBaseNotNil() predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNotNull(FieldProcessBase))
+}
+
+// ProcessBaseEqualFold applies the EqualFold predicate on the "process_base" field.
+func ProcessBaseEqualFold(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldEqualFold(FieldProcessBase, v))
+}
+
+// ProcessBaseContainsFold applies the ContainsFold predicate on the "process_base" field.
+func ProcessBaseContainsFold(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldContainsFold(FieldProcessBase, v))
+}
+
+// ProcessMethodEQ applies the EQ predicate on the "process_method" field.
+func ProcessMethodEQ(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldEQ(FieldProcessMethod, v))
+}
+
+// ProcessMethodNEQ applies the NEQ predicate on the "process_method" field.
+func ProcessMethodNEQ(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNEQ(FieldProcessMethod, v))
+}
+
+// ProcessMethodIn applies the In predicate on the "process_method" field.
+func ProcessMethodIn(vs ...string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldIn(FieldProcessMethod, vs...))
+}
+
+// ProcessMethodNotIn applies the NotIn predicate on the "process_method" field.
+func ProcessMethodNotIn(vs ...string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNotIn(FieldProcessMethod, vs...))
+}
+
+// ProcessMethodGT applies the GT predicate on the "process_method" field.
+func ProcessMethodGT(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldGT(FieldProcessMethod, v))
+}
+
+// ProcessMethodGTE applies the GTE predicate on the "process_method" field.
+func ProcessMethodGTE(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldGTE(FieldProcessMethod, v))
+}
+
+// ProcessMethodLT applies the LT predicate on the "process_method" field.
+func ProcessMethodLT(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldLT(FieldProcessMethod, v))
+}
+
+// ProcessMethodLTE applies the LTE predicate on the "process_method" field.
+func ProcessMethodLTE(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldLTE(FieldProcessMethod, v))
+}
+
+// ProcessMethodContains applies the Contains predicate on the "process_method" field.
+func ProcessMethodContains(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldContains(FieldProcessMethod, v))
+}
+
+// ProcessMethodHasPrefix applies the HasPrefix predicate on the "process_method" field.
+func ProcessMethodHasPrefix(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldHasPrefix(FieldProcessMethod, v))
+}
+
+// ProcessMethodHasSuffix applies the HasSuffix predicate on the "process_method" field.
+func ProcessMethodHasSuffix(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldHasSuffix(FieldProcessMethod, v))
+}
+
+// ProcessMethodIsNil applies the IsNil predicate on the "process_method" field.
+func ProcessMethodIsNil() predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldIsNull(FieldProcessMethod))
+}
+
+// ProcessMethodNotNil applies the NotNil predicate on the "process_method" field.
+func ProcessMethodNotNil() predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNotNull(FieldProcessMethod))
+}
+
+// ProcessMethodEqualFold applies the EqualFold predicate on the "process_method" field.
+func ProcessMethodEqualFold(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldEqualFold(FieldProcessMethod, v))
+}
+
+// ProcessMethodContainsFold applies the ContainsFold predicate on the "process_method" field.
+func ProcessMethodContainsFold(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldContainsFold(FieldProcessMethod, v))
 }
 
 // NoteEQ applies the EQ predicate on the "note" field.

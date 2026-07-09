@@ -834,6 +834,14 @@ func (r *inventoryRepo) CreateBOMHeader(ctx context.Context, in *biz.BOMHeaderCr
 		SetStatus(in.Status).
 		SetNillableEffectiveFrom(in.EffectiveFrom).
 		SetNillableEffectiveTo(in.EffectiveTo).
+		SetNillableSourceOrderNo(in.SourceOrderNo).
+		SetNillableQuantityText(in.QuantityText).
+		SetNillableSpareText(in.SpareText).
+		SetNillablePrintDate(in.PrintDate).
+		SetNillableDesigner(in.Designer).
+		SetNillableMaker(in.Maker).
+		SetNillableAuditor(in.Auditor).
+		SetNillableHairDirection(in.HairDirection).
 		SetNillableNote(in.Note).
 		Save(ctx)
 	if err != nil {
@@ -872,6 +880,10 @@ func (r *inventoryRepo) CreateBOMItem(ctx context.Context, in *biz.BOMItemCreate
 		SetUnitID(in.UnitID).
 		SetLossRate(in.LossRate).
 		SetNillablePosition(in.Position).
+		SetNillablePieceCount(in.PieceCount).
+		SetNillableTotalUsageSnapshot(in.TotalUsageSnapshot).
+		SetNillableProcessBase(in.ProcessBase).
+		SetNillableProcessMethod(in.ProcessMethod).
 		SetNillableNote(in.Note).
 		Save(ctx)
 	if err != nil {
@@ -902,6 +914,46 @@ func (r *inventoryRepo) UpdateBOMDraftHeader(ctx context.Context, id int, in *bi
 		update.ClearEffectiveTo()
 	} else {
 		update.SetEffectiveTo(*in.EffectiveTo)
+	}
+	if in.SourceOrderNo == nil {
+		update.ClearSourceOrderNo()
+	} else {
+		update.SetSourceOrderNo(*in.SourceOrderNo)
+	}
+	if in.QuantityText == nil {
+		update.ClearQuantityText()
+	} else {
+		update.SetQuantityText(*in.QuantityText)
+	}
+	if in.SpareText == nil {
+		update.ClearSpareText()
+	} else {
+		update.SetSpareText(*in.SpareText)
+	}
+	if in.PrintDate == nil {
+		update.ClearPrintDate()
+	} else {
+		update.SetPrintDate(*in.PrintDate)
+	}
+	if in.Designer == nil {
+		update.ClearDesigner()
+	} else {
+		update.SetDesigner(*in.Designer)
+	}
+	if in.Maker == nil {
+		update.ClearMaker()
+	} else {
+		update.SetMaker(*in.Maker)
+	}
+	if in.Auditor == nil {
+		update.ClearAuditor()
+	} else {
+		update.SetAuditor(*in.Auditor)
+	}
+	if in.HairDirection == nil {
+		update.ClearHairDirection()
+	} else {
+		update.SetHairDirection(*in.HairDirection)
 	}
 	if in.Note == nil {
 		update.ClearNote()
@@ -954,6 +1006,26 @@ func (r *inventoryRepo) UpdateBOMDraftItem(ctx context.Context, id int, in *biz.
 		update.ClearPosition()
 	} else {
 		update.SetPosition(*in.Position)
+	}
+	if in.PieceCount == nil {
+		update.ClearPieceCount()
+	} else {
+		update.SetPieceCount(*in.PieceCount)
+	}
+	if in.TotalUsageSnapshot == nil {
+		update.ClearTotalUsageSnapshot()
+	} else {
+		update.SetTotalUsageSnapshot(*in.TotalUsageSnapshot)
+	}
+	if in.ProcessBase == nil {
+		update.ClearProcessBase()
+	} else {
+		update.SetProcessBase(*in.ProcessBase)
+	}
+	if in.ProcessMethod == nil {
+		update.ClearProcessMethod()
+	} else {
+		update.SetProcessMethod(*in.ProcessMethod)
 	}
 	if in.Note == nil {
 		update.ClearNote()
@@ -1103,6 +1175,38 @@ func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, 
 	if in.ProductID != source.ProductID {
 		return nil, biz.ErrBadParam
 	}
+	sourceOrderNo := source.SourceOrderNo
+	if in.SourceOrderNo != nil {
+		sourceOrderNo = in.SourceOrderNo
+	}
+	quantityText := source.QuantityText
+	if in.QuantityText != nil {
+		quantityText = in.QuantityText
+	}
+	spareText := source.SpareText
+	if in.SpareText != nil {
+		spareText = in.SpareText
+	}
+	printDate := source.PrintDate
+	if in.PrintDate != nil {
+		printDate = in.PrintDate
+	}
+	designer := source.Designer
+	if in.Designer != nil {
+		designer = in.Designer
+	}
+	maker := source.Maker
+	if in.Maker != nil {
+		maker = in.Maker
+	}
+	auditor := source.Auditor
+	if in.Auditor != nil {
+		auditor = in.Auditor
+	}
+	hairDirection := source.HairDirection
+	if in.HairDirection != nil {
+		hairDirection = in.HairDirection
+	}
 	sourceItems, err := tx.BOMItem.Query().
 		Where(bomitem.BomHeaderID(sourceHeaderID)).
 		Order(ent.Asc(bomitem.FieldID)).
@@ -1116,6 +1220,14 @@ func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, 
 		SetStatus(biz.BOMStatusDraft).
 		SetNillableEffectiveFrom(in.EffectiveFrom).
 		SetNillableEffectiveTo(in.EffectiveTo).
+		SetNillableSourceOrderNo(sourceOrderNo).
+		SetNillableQuantityText(quantityText).
+		SetNillableSpareText(spareText).
+		SetNillablePrintDate(printDate).
+		SetNillableDesigner(designer).
+		SetNillableMaker(maker).
+		SetNillableAuditor(auditor).
+		SetNillableHairDirection(hairDirection).
 		SetNillableNote(in.Note).
 		Save(ctx)
 	if err != nil {
@@ -1130,6 +1242,10 @@ func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, 
 			SetUnitID(sourceItem.UnitID).
 			SetLossRate(sourceItem.LossRate).
 			SetNillablePosition(sourceItem.Position).
+			SetNillablePieceCount(sourceItem.PieceCount).
+			SetNillableTotalUsageSnapshot(sourceItem.TotalUsageSnapshot).
+			SetNillableProcessBase(sourceItem.ProcessBase).
+			SetNillableProcessMethod(sourceItem.ProcessMethod).
 			SetNillableNote(sourceItem.Note).
 			Save(ctx)
 		if err != nil {
@@ -1328,6 +1444,14 @@ func entBOMHeaderToBiz(row *ent.BOMHeader) *biz.BOMHeader {
 		Status:        row.Status,
 		EffectiveFrom: row.EffectiveFrom,
 		EffectiveTo:   row.EffectiveTo,
+		SourceOrderNo: row.SourceOrderNo,
+		QuantityText:  row.QuantityText,
+		SpareText:     row.SpareText,
+		PrintDate:     row.PrintDate,
+		Designer:      row.Designer,
+		Maker:         row.Maker,
+		Auditor:       row.Auditor,
+		HairDirection: row.HairDirection,
 		Note:          row.Note,
 		CreatedAt:     row.CreatedAt,
 		UpdatedAt:     row.UpdatedAt,
@@ -1339,15 +1463,19 @@ func entBOMItemToBiz(row *ent.BOMItem) *biz.BOMItem {
 		return nil
 	}
 	return &biz.BOMItem{
-		ID:          row.ID,
-		BOMHeaderID: row.BomHeaderID,
-		MaterialID:  row.MaterialID,
-		Quantity:    row.Quantity,
-		UnitID:      row.UnitID,
-		LossRate:    row.LossRate,
-		Position:    row.Position,
-		Note:        row.Note,
-		CreatedAt:   row.CreatedAt,
-		UpdatedAt:   row.UpdatedAt,
+		ID:                 row.ID,
+		BOMHeaderID:        row.BomHeaderID,
+		MaterialID:         row.MaterialID,
+		Quantity:           row.Quantity,
+		UnitID:             row.UnitID,
+		LossRate:           row.LossRate,
+		Position:           row.Position,
+		PieceCount:         row.PieceCount,
+		TotalUsageSnapshot: row.TotalUsageSnapshot,
+		ProcessBase:        row.ProcessBase,
+		ProcessMethod:      row.ProcessMethod,
+		Note:               row.Note,
+		CreatedAt:          row.CreatedAt,
+		UpdatedAt:          row.UpdatedAt,
 	}
 }

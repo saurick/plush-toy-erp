@@ -162,11 +162,31 @@ test("formal frontend customer config boundary: page, action, and field projecti
   assert(syncSource.includes("super_admin_product_core"));
   assert(syncSource.includes("dataRuntimeScope"));
   assert(syncSource.includes("canMountCustomerBusinessPages"));
+  assert(syncSource.includes("canMountCustomerRuntime"));
   assert(syncSource.includes("shouldGuardCustomerBusinessPageRuntime"));
   assert(syncSource.includes("hiddenFieldPolicies"));
   assert(syncSource.includes("filterNavigationSectionsByAdminProfile"));
   assert(syncSource.includes("filterColumnsByEffectiveFieldPolicy"));
   assert(syncSource.includes("effectiveSessionAllowsAction"));
+
+  const mobileLayoutSource = readRelative(
+    "web/src/erp/mobile/MobileAppLayout.jsx",
+  );
+  assert(mobileLayoutSource.includes("getEffectiveSession"));
+  assert(mobileLayoutSource.includes("attachEffectiveSessionToAdminProfile"));
+  assert(mobileLayoutSource.includes("attachUnavailableEffectiveSessionToAdminProfile"));
+  assert(mobileLayoutSource.includes("canMountCustomerRuntime"));
+  assert(mobileLayoutSource.includes("shouldBlockMissingCustomerRuntime"));
+  assert(mobileLayoutSource.includes('data-mobile-customer-runtime-guard="true"'));
+  assert(mobileLayoutSource.includes("岗位任务端需要客户运行环境"));
+
+  const mobileTasksSource = readRelative(
+    "web/src/erp/mobile/pages/MobileRoleTasksPage.jsx",
+  );
+  assert(mobileTasksSource.includes("canMountCustomerRuntime"));
+  assert(mobileTasksSource.includes("canMountCustomerTasks"));
+  assert(mobileTasksSource.includes("if (!canMountCustomerTasks)"));
+  assert(mobileTasksSource.includes("setTasks([])"));
 
   const actionSource = readRelative(
     "web/src/erp/utils/masterDataOrderView.mjs",

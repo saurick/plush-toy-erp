@@ -13,6 +13,7 @@ import {
   buildMobileWorkflowTaskQueryPlan,
   mergeWorkflowTaskResults,
 } from '../../utils/mobileTaskQueries.mjs'
+import { canMountCustomerRuntime } from '../../utils/adminProfileSync.mjs'
 import MobileTaskDetailScreen from '../components/MobileTaskDetailScreen.jsx'
 import MobileTaskListScreen from '../components/MobileTaskListScreen.jsx'
 import useMobileRoleTaskActions from '../hooks/useMobileRoleTaskActions'
@@ -53,6 +54,7 @@ export default function MobileRoleTasksPage() {
   const [activeFilterKey, setActiveFilterKey] = useState('all')
   const [selectedTaskID, setSelectedTaskID] = useState(null)
   const [detailAction, setDetailAction] = useState(null)
+  const canMountCustomerTasks = canMountCustomerRuntime(adminProfile)
 
   const taskViews = useMemo(
     () => buildMobileTaskListForRole(tasks, activeRoleKey),
@@ -195,6 +197,12 @@ export default function MobileRoleTasksPage() {
     async ({ showRefreshFeedback = false } = {}) => {
       const requestSeq = taskLoadRequestSeqRef.current + 1
       taskLoadRequestSeqRef.current = requestSeq
+      if (!canMountCustomerTasks) {
+        setTasks([])
+        setHasLoadedOnce(true)
+        setLoading(false)
+        return true
+      }
       setLoading(true)
       try {
         const queryResults = await Promise.all(
@@ -228,7 +236,7 @@ export default function MobileRoleTasksPage() {
         }
       }
     },
-    [activeRoleKey]
+    [activeRoleKey, canMountCustomerTasks]
   )
 
   useEffect(() => {

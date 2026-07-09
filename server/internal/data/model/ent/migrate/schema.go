@@ -114,6 +114,14 @@ var (
 		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
 		{Name: "effective_from", Type: field.TypeTime, Nullable: true},
 		{Name: "effective_to", Type: field.TypeTime, Nullable: true},
+		{Name: "source_order_no", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "quantity_text", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "spare_text", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "print_date", Type: field.TypeTime, Nullable: true},
+		{Name: "designer", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "maker", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "auditor", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "hair_direction", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -127,7 +135,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "bom_headers_products_bom_headers",
-				Columns:    []*schema.Column{BomHeadersColumns[8]},
+				Columns:    []*schema.Column{BomHeadersColumns[16]},
 				RefColumns: []*schema.Column{ProductsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -136,12 +144,12 @@ var (
 			{
 				Name:    "bomheader_product_id_version",
 				Unique:  true,
-				Columns: []*schema.Column{BomHeadersColumns[8], BomHeadersColumns[1]},
+				Columns: []*schema.Column{BomHeadersColumns[16], BomHeadersColumns[1]},
 			},
 			{
 				Name:    "bomheader_product_id",
 				Unique:  true,
-				Columns: []*schema.Column{BomHeadersColumns[8]},
+				Columns: []*schema.Column{BomHeadersColumns[16]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "status = 'ACTIVE'",
 				},
@@ -149,7 +157,7 @@ var (
 			{
 				Name:    "bomheader_product_id_status",
 				Unique:  false,
-				Columns: []*schema.Column{BomHeadersColumns[8], BomHeadersColumns[2]},
+				Columns: []*schema.Column{BomHeadersColumns[16], BomHeadersColumns[2]},
 			},
 		},
 	}
@@ -159,6 +167,10 @@ var (
 		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "loss_rate", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "position", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "piece_count", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "total_usage_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "process_base", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "process_method", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -174,19 +186,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "bom_items_bom_headers_items",
-				Columns:    []*schema.Column{BomItemsColumns[7]},
+				Columns:    []*schema.Column{BomItemsColumns[11]},
 				RefColumns: []*schema.Column{BomHeadersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "bom_items_materials_bom_items",
-				Columns:    []*schema.Column{BomItemsColumns[8]},
+				Columns:    []*schema.Column{BomItemsColumns[12]},
 				RefColumns: []*schema.Column{MaterialsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "bom_items_units_bom_items",
-				Columns:    []*schema.Column{BomItemsColumns[9]},
+				Columns:    []*schema.Column{BomItemsColumns[13]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -195,7 +207,7 @@ var (
 			{
 				Name:    "bomitem_bom_header_id_material_id",
 				Unique:  false,
-				Columns: []*schema.Column{BomItemsColumns[7], BomItemsColumns[8]},
+				Columns: []*schema.Column{BomItemsColumns[11], BomItemsColumns[12]},
 			},
 		},
 	}

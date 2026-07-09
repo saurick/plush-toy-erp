@@ -76,6 +76,118 @@ func (_c *BOMHeaderCreate) SetNillableEffectiveTo(v *time.Time) *BOMHeaderCreate
 	return _c
 }
 
+// SetSourceOrderNo sets the "source_order_no" field.
+func (_c *BOMHeaderCreate) SetSourceOrderNo(v string) *BOMHeaderCreate {
+	_c.mutation.SetSourceOrderNo(v)
+	return _c
+}
+
+// SetNillableSourceOrderNo sets the "source_order_no" field if the given value is not nil.
+func (_c *BOMHeaderCreate) SetNillableSourceOrderNo(v *string) *BOMHeaderCreate {
+	if v != nil {
+		_c.SetSourceOrderNo(*v)
+	}
+	return _c
+}
+
+// SetQuantityText sets the "quantity_text" field.
+func (_c *BOMHeaderCreate) SetQuantityText(v string) *BOMHeaderCreate {
+	_c.mutation.SetQuantityText(v)
+	return _c
+}
+
+// SetNillableQuantityText sets the "quantity_text" field if the given value is not nil.
+func (_c *BOMHeaderCreate) SetNillableQuantityText(v *string) *BOMHeaderCreate {
+	if v != nil {
+		_c.SetQuantityText(*v)
+	}
+	return _c
+}
+
+// SetSpareText sets the "spare_text" field.
+func (_c *BOMHeaderCreate) SetSpareText(v string) *BOMHeaderCreate {
+	_c.mutation.SetSpareText(v)
+	return _c
+}
+
+// SetNillableSpareText sets the "spare_text" field if the given value is not nil.
+func (_c *BOMHeaderCreate) SetNillableSpareText(v *string) *BOMHeaderCreate {
+	if v != nil {
+		_c.SetSpareText(*v)
+	}
+	return _c
+}
+
+// SetPrintDate sets the "print_date" field.
+func (_c *BOMHeaderCreate) SetPrintDate(v time.Time) *BOMHeaderCreate {
+	_c.mutation.SetPrintDate(v)
+	return _c
+}
+
+// SetNillablePrintDate sets the "print_date" field if the given value is not nil.
+func (_c *BOMHeaderCreate) SetNillablePrintDate(v *time.Time) *BOMHeaderCreate {
+	if v != nil {
+		_c.SetPrintDate(*v)
+	}
+	return _c
+}
+
+// SetDesigner sets the "designer" field.
+func (_c *BOMHeaderCreate) SetDesigner(v string) *BOMHeaderCreate {
+	_c.mutation.SetDesigner(v)
+	return _c
+}
+
+// SetNillableDesigner sets the "designer" field if the given value is not nil.
+func (_c *BOMHeaderCreate) SetNillableDesigner(v *string) *BOMHeaderCreate {
+	if v != nil {
+		_c.SetDesigner(*v)
+	}
+	return _c
+}
+
+// SetMaker sets the "maker" field.
+func (_c *BOMHeaderCreate) SetMaker(v string) *BOMHeaderCreate {
+	_c.mutation.SetMaker(v)
+	return _c
+}
+
+// SetNillableMaker sets the "maker" field if the given value is not nil.
+func (_c *BOMHeaderCreate) SetNillableMaker(v *string) *BOMHeaderCreate {
+	if v != nil {
+		_c.SetMaker(*v)
+	}
+	return _c
+}
+
+// SetAuditor sets the "auditor" field.
+func (_c *BOMHeaderCreate) SetAuditor(v string) *BOMHeaderCreate {
+	_c.mutation.SetAuditor(v)
+	return _c
+}
+
+// SetNillableAuditor sets the "auditor" field if the given value is not nil.
+func (_c *BOMHeaderCreate) SetNillableAuditor(v *string) *BOMHeaderCreate {
+	if v != nil {
+		_c.SetAuditor(*v)
+	}
+	return _c
+}
+
+// SetHairDirection sets the "hair_direction" field.
+func (_c *BOMHeaderCreate) SetHairDirection(v string) *BOMHeaderCreate {
+	_c.mutation.SetHairDirection(v)
+	return _c
+}
+
+// SetNillableHairDirection sets the "hair_direction" field if the given value is not nil.
+func (_c *BOMHeaderCreate) SetNillableHairDirection(v *string) *BOMHeaderCreate {
+	if v != nil {
+		_c.SetHairDirection(*v)
+	}
+	return _c
+}
+
 // SetNote sets the "note" field.
 func (_c *BOMHeaderCreate) SetNote(v string) *BOMHeaderCreate {
 	_c.mutation.SetNote(v)
@@ -213,6 +325,41 @@ func (_c *BOMHeaderCreate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "BOMHeader.status": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.SourceOrderNo(); ok {
+		if err := bomheader.SourceOrderNoValidator(v); err != nil {
+			return &ValidationError{Name: "source_order_no", err: fmt.Errorf(`ent: validator failed for field "BOMHeader.source_order_no": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.QuantityText(); ok {
+		if err := bomheader.QuantityTextValidator(v); err != nil {
+			return &ValidationError{Name: "quantity_text", err: fmt.Errorf(`ent: validator failed for field "BOMHeader.quantity_text": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SpareText(); ok {
+		if err := bomheader.SpareTextValidator(v); err != nil {
+			return &ValidationError{Name: "spare_text", err: fmt.Errorf(`ent: validator failed for field "BOMHeader.spare_text": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.Designer(); ok {
+		if err := bomheader.DesignerValidator(v); err != nil {
+			return &ValidationError{Name: "designer", err: fmt.Errorf(`ent: validator failed for field "BOMHeader.designer": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.Maker(); ok {
+		if err := bomheader.MakerValidator(v); err != nil {
+			return &ValidationError{Name: "maker", err: fmt.Errorf(`ent: validator failed for field "BOMHeader.maker": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.Auditor(); ok {
+		if err := bomheader.AuditorValidator(v); err != nil {
+			return &ValidationError{Name: "auditor", err: fmt.Errorf(`ent: validator failed for field "BOMHeader.auditor": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.HairDirection(); ok {
+		if err := bomheader.HairDirectionValidator(v); err != nil {
+			return &ValidationError{Name: "hair_direction", err: fmt.Errorf(`ent: validator failed for field "BOMHeader.hair_direction": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.Note(); ok {
 		if err := bomheader.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "BOMHeader.note": %w`, err)}
@@ -268,6 +415,38 @@ func (_c *BOMHeaderCreate) createSpec() (*BOMHeader, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.EffectiveTo(); ok {
 		_spec.SetField(bomheader.FieldEffectiveTo, field.TypeTime, value)
 		_node.EffectiveTo = &value
+	}
+	if value, ok := _c.mutation.SourceOrderNo(); ok {
+		_spec.SetField(bomheader.FieldSourceOrderNo, field.TypeString, value)
+		_node.SourceOrderNo = &value
+	}
+	if value, ok := _c.mutation.QuantityText(); ok {
+		_spec.SetField(bomheader.FieldQuantityText, field.TypeString, value)
+		_node.QuantityText = &value
+	}
+	if value, ok := _c.mutation.SpareText(); ok {
+		_spec.SetField(bomheader.FieldSpareText, field.TypeString, value)
+		_node.SpareText = &value
+	}
+	if value, ok := _c.mutation.PrintDate(); ok {
+		_spec.SetField(bomheader.FieldPrintDate, field.TypeTime, value)
+		_node.PrintDate = &value
+	}
+	if value, ok := _c.mutation.Designer(); ok {
+		_spec.SetField(bomheader.FieldDesigner, field.TypeString, value)
+		_node.Designer = &value
+	}
+	if value, ok := _c.mutation.Maker(); ok {
+		_spec.SetField(bomheader.FieldMaker, field.TypeString, value)
+		_node.Maker = &value
+	}
+	if value, ok := _c.mutation.Auditor(); ok {
+		_spec.SetField(bomheader.FieldAuditor, field.TypeString, value)
+		_node.Auditor = &value
+	}
+	if value, ok := _c.mutation.HairDirection(); ok {
+		_spec.SetField(bomheader.FieldHairDirection, field.TypeString, value)
+		_node.HairDirection = &value
 	}
 	if value, ok := _c.mutation.Note(); ok {
 		_spec.SetField(bomheader.FieldNote, field.TypeString, value)
