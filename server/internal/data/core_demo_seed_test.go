@@ -14,7 +14,7 @@ func TestDefaultCoreDemoSeedDatasetIsSimulatedAndComplete(t *testing.T) {
 	if dataset.Prefix != CoreDemoSeedPrefix {
 		t.Fatalf("unexpected prefix %q", dataset.Prefix)
 	}
-	if len(dataset.Units) < 3 || len(dataset.Materials) < 3 || len(dataset.Products) < 2 || len(dataset.Warehouses) < 3 || len(dataset.Processes) < 9 || len(dataset.BOMs) == 0 {
+	if len(dataset.Units) < 4 || len(dataset.Materials) < 7 || len(dataset.Products) < 4 || len(dataset.Warehouses) < 4 || len(dataset.Processes) < 9 || len(dataset.BOMs) < 2 {
 		t.Fatalf("default core demo dataset is too small: %#v", dataset)
 	}
 	if err := validateCoreDemoSeedDataset(dataset); err != nil {
@@ -45,6 +45,28 @@ func TestDefaultCoreDemoSeedDatasetIsSimulatedAndComplete(t *testing.T) {
 	}
 	if len(requiredProcesses) > 0 {
 		t.Fatalf("missing default plush processes: %#v", requiredProcesses)
+	}
+	requiredMaterialCategories := map[string]bool{
+		"fabric":    false,
+		"filling":   false,
+		"accessory": false,
+		"packing":   false,
+		"label":     false,
+	}
+	for _, material := range dataset.Materials {
+		if _, ok := requiredMaterialCategories[material.Category]; ok {
+			requiredMaterialCategories[material.Category] = true
+		}
+	}
+	for category, found := range requiredMaterialCategories {
+		if !found {
+			t.Fatalf("missing material category %q in default core demo dataset", category)
+		}
+	}
+	for _, bom := range dataset.BOMs {
+		if len(bom.Items) < 3 {
+			t.Fatalf("BOM %q should cover multiple materials, got %#v", bom.Version, bom.Items)
+		}
 	}
 	for _, product := range dataset.Products {
 		if !regexp.MustCompile(`^SIM-`).MatchString(product.Code) {

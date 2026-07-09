@@ -195,6 +195,20 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     ]),
   },
   {
+    key: 'engineering',
+    label: '工程',
+    description:
+      '保留任务看板、业务看板、主数据、产品工程和工程岗位任务端，不含采购、库存、生产、财务和权限管理。',
+    mobileRolePermissions: buildMobileRolePreset(['engineering']),
+    permissions: buildPreset([
+      '/erp/dashboard',
+      '/erp/task-board',
+      '/erp/business-dashboard',
+      ...masterModulePaths,
+      ...engineeringModulePaths,
+    ]),
+  },
+  {
     key: 'warehouse',
     label: '仓库',
     description:
@@ -246,6 +260,14 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       ...shipmentModulePaths,
       ...financeModulePaths,
     ]),
+  },
+  {
+    key: 'admin',
+    label: '系统管理员',
+    description:
+      '只保留权限管理入口；该角色不是 super admin，不天然拥有业务事实处理权。',
+    mobileRolePermissions: buildMobileRolePreset([]),
+    permissions: buildPreset([PERMISSION_CENTER_PATH]),
   },
 ])
 

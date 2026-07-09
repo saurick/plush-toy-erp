@@ -171,32 +171,58 @@ test('yoyoosun print projection protects supplier and processor snapshots', () =
 })
 
 test('yoyoosun trial fixture covers core and customer flow domains', () => {
-  const requiredCollections = [
-    'units',
-    'customers',
-    'suppliers',
-    'materials',
-    'products',
-    'warehouses',
-    'bomVersions',
-    'salesOrders',
-    'purchaseOrders',
-    'outsourcingOrders',
-    'purchaseReceipts',
-    'qualityInspections',
-    'inventoryLots',
-    'shipments',
-    'financeDrafts',
-    'workflowTasks',
-  ]
+  const requiredCollections = {
+    units: 4,
+    customers: 2,
+    suppliers: 3,
+    materials: 5,
+    products: 3,
+    warehouses: 3,
+    bomVersions: 2,
+    salesOrders: 3,
+    purchaseOrders: 2,
+    outsourcingOrders: 2,
+    purchaseReceipts: 2,
+    qualityInspections: 3,
+    inventoryLots: 3,
+    shipments: 3,
+    financeDrafts: 3,
+    workflowTasks: 5,
+  }
 
-  for (const collectionKey of requiredCollections) {
+  for (const [collectionKey, minCount] of Object.entries(requiredCollections)) {
     const records = yoyoosunTrialDataFixture[collectionKey]
-    assert.ok(Array.isArray(records) && records.length > 0, `${collectionKey} fixture required`)
+    assert.ok(Array.isArray(records) && records.length >= minCount, `${collectionKey} fixture should have at least ${minCount} records`)
     records.forEach((record, index) =>
       assertKnownSourceIds(record.sourceIds, `${collectionKey}[${index}]`)
     )
   }
+})
+
+test('yoyoosun trial fixture covers manual regression states without claiming real import', () => {
+  assert.equal(yoyoosunTrialDataFixture.status, 'preview_only')
+  assert.match(yoyoosunTrialDataFixture.boundary, /must not be applied to customer production data/)
+
+  assert.deepEqual(
+    new Set(yoyoosunTrialDataFixture.salesOrders.map((order) => order.lifecycleStatus)),
+    new Set(['draft', 'active', 'cancelled'])
+  )
+  assert.deepEqual(
+    new Set(yoyoosunTrialDataFixture.qualityInspections.map((inspection) => inspection.result)),
+    new Set(['pending', 'passed', 'rejected'])
+  )
+  assert.deepEqual(
+    new Set(yoyoosunTrialDataFixture.shipments.map((shipment) => shipment.status)),
+    new Set(['draft', 'shipped', 'cancelled'])
+  )
+  assert.deepEqual(
+    new Set(yoyoosunTrialDataFixture.workflowTasks.map((task) => task.ownerRoleKey)),
+    new Set(['sales', 'purchasing', 'boss', 'quality', 'warehouse'])
+  )
+  assert.deepEqual(
+    new Set(yoyoosunTrialDataFixture.workflowTasks.map((task) => task.taskStatusKey)),
+    new Set(['ready', 'blocked', 'done'])
+  )
 })
 
 test('yoyoosun trial print fixtures have no empty critical print fields', () => {

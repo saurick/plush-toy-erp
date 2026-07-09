@@ -597,6 +597,16 @@ export function getBusinessModule(moduleKey) {
   return businessModuleMap.get(String(moduleKey || '').trim()) || null
 }
 
+const productCoreReviewBlockedPageKeys = new Set([
+  'business-dashboard',
+  'exception-flow',
+  ...businessModuleDefinitions.map((moduleItem) => moduleItem.key),
+])
+
+export function isCustomerBusinessDataPageKey(pageKey = '') {
+  return productCoreReviewBlockedPageKeys.has(String(pageKey || '').trim())
+}
+
 export function getFormalBusinessShellModules() {
   return businessModuleDefinitions
     .filter((moduleItem) => moduleItem.pageKind === 'formal-shell')

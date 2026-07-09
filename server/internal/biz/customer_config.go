@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	DefaultCustomerKey = "yoyoosun"
+	DefaultCustomerKey = "demo"
 
 	CustomerConfigStatusPublished  = "published"
 	CustomerConfigStatusActive     = "active"

@@ -9,10 +9,7 @@ const erpSourceRoot = path.join(repoRoot, "web/src/erp");
 const sourceExtensions = new Set([".js", ".jsx", ".mjs"]);
 const skippedSuffixes = [".test.js", ".test.jsx", ".test.mjs"];
 
-const devOnlyPrefixes = [
-  "web/src/erp/config/dev",
-  "web/src/erp/pages/Dev",
-];
+const devOnlyPrefixes = ["web/src/erp/config/dev", "web/src/erp/pages/Dev"];
 
 const allowedRawConfigPaths = new Set([
   "web/src/erp/config/devCustomerConfig.mjs",
@@ -81,7 +78,9 @@ test("formal frontend customer config boundary: runtime reads effective session,
     }
   }
 
-  const devConfigSource = readRelative("web/src/erp/config/devCustomerConfig.mjs");
+  const devConfigSource = readRelative(
+    "web/src/erp/config/devCustomerConfig.mjs",
+  );
   assert(
     forbiddenRawConfigTokens.some((token) => devConfigSource.includes(token)),
     "dev-only customer config console should remain the only raw package preview surface",
@@ -89,7 +88,8 @@ test("formal frontend customer config boundary: runtime reads effective session,
   for (const relativePath of allowedRawConfigPaths) {
     const source = readRelative(relativePath);
     assert(
-      source.includes("config/customers/") || source.includes("yoyoosunCustomerPackage"),
+      source.includes("config/customers/") ||
+        source.includes("yoyoosunCustomerPackage"),
       `${relativePath} should be explicit dev-only raw customer config context`,
     );
   }
@@ -100,13 +100,19 @@ test("formal frontend customer config boundary: page, action, and field projecti
   assert(layoutSource.includes("getEffectiveSession"));
   assert(layoutSource.includes("attachEffectiveSessionToAdminProfile"));
   assert(layoutSource.includes("resolveEffectiveSessionCustomerKey"));
-  assert(layoutSource.includes("attachUnavailableEffectiveSessionToAdminProfile"));
   assert(
-    !layoutSource.includes("customer_key: activeBrand?.customerKey || 'yoyoosun'"),
+    layoutSource.includes("attachUnavailableEffectiveSessionToAdminProfile"),
+  );
+  assert(
+    !layoutSource.includes(
+      "customer_key: activeBrand?.customerKey || 'yoyoosun'",
+    ),
     "formal layout must not fallback effective session requests to yoyoosun",
   );
   assert(
-    !layoutSource.includes('customer_key: activeBrand?.customerKey || "yoyoosun"'),
+    !layoutSource.includes(
+      'customer_key: activeBrand?.customerKey || "yoyoosun"',
+    ),
     "formal layout must not fallback effective session requests to yoyoosun",
   );
   assert(layoutSource.includes("buildEffectiveSessionDiagnosticSummary"));
@@ -115,42 +121,81 @@ test("formal frontend customer config boundary: page, action, and field projecti
   assert(layoutSource.includes("filterNavigationSectionsByAdminProfile"));
   assert(layoutSource.includes("shouldRedirectFromCurrentNavigation"));
   assert(layoutSource.includes("当前账号暂无可见后台入口"));
+  assert(layoutSource.includes("isCustomerBusinessDataPageKey"));
+  assert(layoutSource.includes("shouldGuardCustomerBusinessPageRuntime"));
+  assert(layoutSource.includes("data-product-core-business-data-guard"));
+  assert(layoutSource.includes("产品核心评审不读取客户业务数据"));
+  assert(layoutSource.includes("data-effective-session-data-scope"));
+  assert(layoutSource.includes("当前没有有效客户运行环境"));
+
+  const businessModuleSource = readRelative(
+    "web/src/erp/config/businessModules.mjs",
+  );
+  assert(businessModuleSource.includes("isCustomerBusinessDataPageKey"));
+  assert(businessModuleSource.includes("business-dashboard"));
+  assert(businessModuleSource.includes("exception-flow"));
+  assert(businessModuleSource.includes("businessModuleDefinitions.map"));
 
   const syncSource = readRelative("web/src/erp/utils/adminProfileSync.mjs");
   assert(syncSource.includes("effective_session_sync_failed"));
   assert(syncSource.includes("super_admin_product_core"));
+  assert(syncSource.includes("dataRuntimeScope"));
+  assert(syncSource.includes("canMountCustomerBusinessPages"));
+  assert(syncSource.includes("shouldGuardCustomerBusinessPageRuntime"));
   assert(syncSource.includes("hiddenFieldPolicies"));
   assert(syncSource.includes("filterNavigationSectionsByAdminProfile"));
   assert(syncSource.includes("filterColumnsByEffectiveFieldPolicy"));
   assert(syncSource.includes("effectiveSessionAllowsAction"));
 
-  const actionSource = readRelative("web/src/erp/utils/masterDataOrderView.mjs");
+  const actionSource = readRelative(
+    "web/src/erp/utils/masterDataOrderView.mjs",
+  );
   assert(actionSource.includes("effectiveSessionAllowsAction"));
   assert(actionSource.includes("rbacAllowed && effectiveSessionAllowsAction"));
 
-  const masterDataSource = readRelative("web/src/erp/pages/V1MasterDataPage.jsx");
+  const masterDataSource = readRelative(
+    "web/src/erp/pages/V1MasterDataPage.jsx",
+  );
   assert(masterDataSource.includes("filterColumnsByEffectiveFieldPolicy"));
   assert(masterDataSource.includes("adminProfile"));
 
-  const salesOrderSource = readRelative("web/src/erp/pages/V1SalesOrdersPage.jsx");
+  const salesOrderSource = readRelative(
+    "web/src/erp/pages/V1SalesOrdersPage.jsx",
+  );
   assert(salesOrderSource.includes("filterColumnsByEffectiveFieldPolicy"));
   assert(salesOrderSource.includes("'sales_orders.default'"));
 
-  const purchaseOrderSource = readRelative("web/src/erp/pages/V1PurchaseOrdersPage.jsx");
+  const purchaseOrderSource = readRelative(
+    "web/src/erp/pages/V1PurchaseOrdersPage.jsx",
+  );
   assert(purchaseOrderSource.includes("getEffectivePrintTemplateDefaults"));
-  assert(purchaseOrderSource.includes("MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY"));
-  assert(purchaseOrderSource.includes("printTemplateDefaults: purchasePrintTemplateDefaults"));
+  assert(
+    purchaseOrderSource.includes("MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY"),
+  );
+  assert(
+    purchaseOrderSource.includes(
+      "printTemplateDefaults: purchasePrintTemplateDefaults",
+    ),
+  );
 
-  const outsourcingOrderSource = readRelative("web/src/erp/pages/V1OutsourcingOrdersPage.jsx");
+  const outsourcingOrderSource = readRelative(
+    "web/src/erp/pages/V1OutsourcingOrdersPage.jsx",
+  );
   assert(outsourcingOrderSource.includes("getEffectivePrintTemplateDefaults"));
   assert(outsourcingOrderSource.includes("PROCESSING_CONTRACT_TEMPLATE_KEY"));
-  assert(outsourcingOrderSource.includes("printTemplateDefaults: processingPrintTemplateDefaults"));
+  assert(
+    outsourcingOrderSource.includes(
+      "printTemplateDefaults: processingPrintTemplateDefaults",
+    ),
+  );
 
   const routerSource = readRelative("web/src/erp/router.jsx");
   assert(routerSource.includes("shouldUseRememberedDesktopEntry"));
   assert(routerSource.includes("isDesktopEntryEnabled(entryConfig)"));
   assert(
-    !routerSource.includes("adminProfile && lastEntryTarget === ENTRY_TARGET.DESKTOP"),
+    !routerSource.includes(
+      "adminProfile && lastEntryTarget === ENTRY_TARGET.DESKTOP",
+    ),
     "mobile route must not follow a remembered desktop entry unless the current admin has desktop menu access",
   );
 });

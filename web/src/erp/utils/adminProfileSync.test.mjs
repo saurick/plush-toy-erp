@@ -22,6 +22,7 @@ import {
   resolveEffectiveSessionCustomerKey,
   resolveEffectiveSessionPageAccess,
   shouldRedirectFromCurrentNavigation,
+  shouldGuardCustomerBusinessPageRuntime,
 } from './adminProfileSync.mjs'
 
 const erpRootDir = dirname(dirname(fileURLToPath(import.meta.url)))
@@ -325,6 +326,9 @@ test('adminProfileSync: 生成脱敏 effective session 诊断摘要', () => {
     customerKey: 'yoyoosun',
     configRevision: 'yoyoosun-customer-package-v1',
     projectionMode: 'formal_effective_session_projection',
+    visibilityMode: 'formal_effective_session_projection',
+    dataRuntimeScope: 'customer_runtime',
+    canMountCustomerBusinessPages: true,
     isSuperAdmin: false,
     isLocalDev: false,
     counts: {
@@ -364,6 +368,9 @@ test('adminProfileSync: 诊断摘要区分 super admin 看全和 sync failure �
       customerKey: '',
       configRevision: '',
       projectionMode: 'local_dev_sync_failed_diagnostic',
+      visibilityMode: 'local_dev_sync_failed_diagnostic',
+      dataRuntimeScope: 'sync_failed_diagnostic',
+      canMountCustomerBusinessPages: false,
       isSuperAdmin: false,
       isLocalDev: true,
       counts: {
@@ -394,8 +401,86 @@ test('adminProfileSync: 诊断摘要区分 super admin 看全和 sync failure �
     isLocalDev: false,
   })
   assert.equal(superAdminSummary.projectionMode, 'super_admin_product_core')
+  assert.equal(superAdminSummary.visibilityMode, 'super_admin_product_core')
+  assert.equal(superAdminSummary.dataRuntimeScope, 'sync_failed_diagnostic')
+  assert.equal(superAdminSummary.canMountCustomerBusinessPages, false)
   assert.equal(
     superAdminSummary.blockers.includes('no_visible_menu_items'),
+    false
+  )
+})
+
+test('adminProfileSync: 业务页挂载只看数据运行态，不复用 super admin 可见性 reason', () => {
+  const superAdminCustomerProfile = attachEffectiveSessionToAdminProfile(
+    {
+      id: 1,
+      username: 'admin',
+      is_super_admin: true,
+      menus: [],
+    },
+    {
+      customer: { key: 'yoyoosun', name: '永绅' },
+      pages: ['global-dashboard'],
+      actions: [],
+      fieldPolicies: {},
+      workPools: [],
+      source: 'active_customer_config_revision',
+    }
+  )
+  const superAdminCustomerSummary = buildEffectiveSessionDiagnosticSummary({
+    adminProfile: superAdminCustomerProfile,
+    allowedMenuPaths: [],
+    visibleSections: [],
+    isSuperAdmin: true,
+    isLocalDev: false,
+  })
+
+  assert.equal(
+    superAdminCustomerSummary.visibilityMode,
+    'super_admin_product_core'
+  )
+  assert.equal(superAdminCustomerSummary.dataRuntimeScope, 'customer_runtime')
+  assert.equal(superAdminCustomerSummary.canMountCustomerBusinessPages, true)
+  assert.equal(
+    shouldGuardCustomerBusinessPageRuntime({
+      effectiveSessionDiagnostic: superAdminCustomerSummary,
+      isCustomerBusinessDataPage: true,
+    }),
+    false
+  )
+
+  const superAdminNoCustomerSummary = buildEffectiveSessionDiagnosticSummary({
+    adminProfile: attachUnavailableEffectiveSessionToAdminProfile({
+      id: 2,
+      username: 'admin',
+      is_super_admin: true,
+    }),
+    allowedMenuPaths: [],
+    visibleSections: [],
+    isSuperAdmin: true,
+    isLocalDev: false,
+  })
+  assert.equal(
+    superAdminNoCustomerSummary.visibilityMode,
+    'super_admin_product_core'
+  )
+  assert.equal(
+    superAdminNoCustomerSummary.dataRuntimeScope,
+    'sync_failed_diagnostic'
+  )
+  assert.equal(superAdminNoCustomerSummary.canMountCustomerBusinessPages, false)
+  assert.equal(
+    shouldGuardCustomerBusinessPageRuntime({
+      effectiveSessionDiagnostic: superAdminNoCustomerSummary,
+      isCustomerBusinessDataPage: true,
+    }),
+    true
+  )
+  assert.equal(
+    shouldGuardCustomerBusinessPageRuntime({
+      effectiveSessionDiagnostic: superAdminNoCustomerSummary,
+      isCustomerBusinessDataPage: false,
+    }),
     false
   )
 })

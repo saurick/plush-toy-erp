@@ -28,6 +28,7 @@
 | `scripts/import/customerImportDryRun.mjs`              | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包                                             | yoyoosun 导入前人工 review / 数据映射检查                  |
 | `scripts/import/customerImportExecute.mjs`             | 永绅 yoyoosun 导入 execution loader 报告 / 门禁工具；真实 `--execute` 额外要求结构化 backup evidence 与 reviewed recovery plan 绑定同一 `backupId`，当前没有可执行客户真实数据时不执行真实导入 | import tooling 自检 / 单独数据治理评审                    |
 | `scripts/qa/test-data-isolation-boundary.mjs`          | 只读检查 Product Core demo seed、yoyoosun 模拟数据、真实导入 dry-run / freeze 和真实导入执行门禁是否分桶隔离，不连接后端或数据库 | 调整 seed、fixture、模拟数据或导入工具后                  |
+| `scripts/qa/manual-regression-data-plan.mjs`           | 只读汇总 Product Core 中性 seed、yoyoosun preview fixture、试用模拟数据、业务事实模拟和岗位任务模拟的手动回归数据入口；不连接后端、不写库、不执行真实导入 | 手动回归前梳理应准备哪些模拟数据和命令                    |
 | `scripts/qa/trial-simulated-data.mjs`           | 模拟试用数据入口，支持 `--print-input-template` 只读输出前置；真实执行只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据 | 试用环境演练                                               |
 | `scripts/qa/operational-fact-simulated-closure.mjs`    | 业务事实模拟闭环入口，支持 `--print-input-template` 只读输出前置；真实执行只使用显式模拟主数据覆盖生产 / 预留 / 委外 / 出货 / 财务链路 | 业务事实内部模拟验收 / 目标环境事实回归                  |
 | `scripts/qa/mobile-workflow-simulated-closure.mjs`       | 模拟岗位任务闭环入口，支持 `--print-input-template` 只读输出前置；真实执行只创建和更新显式模拟 workflow 任务，覆盖审批完成 / 退回、质检完成、入库完成、出货放行阻塞异常、跨角色催办和现场留痕 | 岗位任务端回归 / 目标环境移动任务闭环验收                  |
@@ -248,6 +249,13 @@ CUSTOMER_IMPORT_ADMIN_PASSWORD='replace-with-password' \
 ```bash
 node scripts/qa/test-data-isolation-boundary.mjs
 node --test scripts/qa/test-data-isolation-boundary.test.mjs
+```
+
+手动回归前先生成只读数据计划，确认 Product Core 中性 seed、永绅 preview fixture、试用主数据、业务事实模拟和岗位任务模拟要覆盖的状态与命令。该计划只读输出，不登录、不调用后端、不写数据库、不执行真实导入；真正写入本地或目标试用环境时，仍必须分别使用下方 seed / simulated apply 入口和对应确认环境变量：
+
+```bash
+node scripts/qa/manual-regression-data-plan.mjs
+node scripts/qa/manual-regression-data-plan.mjs --json
 ```
 
 试用数据入口只允许模拟数据试用。先生成报告，确认模拟数据边界：

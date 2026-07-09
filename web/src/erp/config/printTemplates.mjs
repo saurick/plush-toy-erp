@@ -43,8 +43,8 @@ export const printTemplateCatalog = [
     tags: ['固定版式', '采购合同', 'PDF / 打印', '纸质签字'],
     previewLines: ['普通合同头', '采购明细 / 合计', '条款 / 手写签字'],
     sourceFiles: [
-      '客户来源样本：模板-材料与加工合同.xlsx（C类辅料合同 / 原辅料采购汇总表 / 材料厂商编号）',
-      '客户来源样本：采购合同纸面照片',
+      '来源样本：材料与加工合同工作簿（C类辅料合同 / 原辅料采购汇总表 / 材料厂商编号）',
+      '来源样本：采购合同纸面照片',
     ],
     fieldTruth: [
       '采购订单号、产品订单编号、产品编号、产品名称来自采购订单或合同快照。',
@@ -164,7 +164,7 @@ export const printTemplateCatalog = [
     factBoundary: PRINT_TEMPLATE_FACT_BOUNDARY,
     moduleKeys: ['material_bom'],
     summary:
-      '基于 yoyoosun 原始 Excel 的 `材料分析明细表-1` 工作表，收口板房工程部给仓库发料核对的材料明细打印模板。',
+      '基于已评审材料分析样本的明细工作表，收口板房工程部给仓库发料核对的材料明细打印模板。',
     scene: '板房工程部整理物料明细，打印给仓库按物料、部位和工艺方式发料。',
     layout:
       'A4 竖版明细表，包含产品头信息、右上产品图、材料明细、审核制表和页底产品图槽。',
@@ -177,7 +177,7 @@ export const printTemplateCatalog = [
     tags: ['工程资料', '物料明细', '图片槽', 'PDF / 打印'],
     previewLines: ['产品头信息', '材料明细 / 用量', '右上与页底图片槽'],
     sourceFiles: [
-      '客户来源样本：docs/customers/yoyoosun/raw-source-files/26204#抱抱猴子材料明细表2026-4-10.xlsx（材料分析明细表-1）',
+      '来源样本：材料分析明细工作表（客户原始资料已隔离到客户资料目录）',
     ],
     fieldTruth: [
       '产品编号、产品名称、BOM 版本和材料明细优先来自 BOM 版本及其明细快照。',
@@ -220,7 +220,7 @@ export const printTemplateCatalog = [
     factBoundary: PRINT_TEMPLATE_FACT_BOUNDARY,
     moduleKeys: ['material_bom'],
     summary:
-      '基于 yoyoosun 原始 Excel 的 `色卡` 工作表，收口板房打印后贴布料和物料、给仓库对色发料的色卡模板。',
+      '基于已评审材料分析样本的色卡工作表，收口板房打印后贴布料和物料、给仓库对色发料的色卡模板。',
     scene: '板房工程部打印色卡，贴上布料和物料样本后交给仓库对照发料。',
     layout: 'A4 竖版双栏色卡，按物料分块列出厂商和部位 / 加工方式。',
     output: '在线预览 PDF / 下载 PDF / 打印',
@@ -230,9 +230,7 @@ export const printTemplateCatalog = [
     ],
     tags: ['工程资料', '色卡', '对色发料', 'PDF / 打印'],
     previewLines: ['产品信息', '物料分块', '制卡 / 审核 / 复核'],
-    sourceFiles: [
-      '客户来源样本：docs/customers/yoyoosun/raw-source-files/26204#抱抱猴子材料明细表2026-4-10.xlsx（色卡）',
-    ],
+    sourceFiles: ['来源样本：色卡工作表（客户原始资料已隔离到客户资料目录）'],
     fieldTruth: [
       '产品编号、产品名称来自 BOM 版本的产品快照或打印草稿。',
       '色卡分块来自 BOM 明细 / 材料快照或当前打印草稿，不反写材料主数据。',
@@ -265,7 +263,7 @@ export const printTemplateCatalog = [
     factBoundary: PRINT_TEMPLATE_FACT_BOUNDARY,
     moduleKeys: ['material_bom'],
     summary:
-      '基于 yoyoosun 原始 Excel 的 `Sheet1` 工作表，收口内部生产 / 品质参考和外发加工厂执行共用的作业指导书打印模板。',
+      '基于已评审材料分析样本的作业指导工作表，收口内部生产 / 品质参考和外发加工厂执行共用的作业指导书打印模板。',
     scene:
       '工程部准备产品作业资料，生产 / 品质内部参考；委外订单可按加工厂外发场景带入加工项目、数量和回货上下文。',
     layout:
@@ -278,7 +276,7 @@ export const printTemplateCatalog = [
     tags: ['工程资料', '作业指导', '加工厂', '图片槽'],
     previewLines: ['产品头信息', '可变正文行', '编号行 / 图片槽'],
     sourceFiles: [
-      '客户来源样本：docs/customers/yoyoosun/raw-source-files/26204#抱抱猴子材料明细表2026-4-10.xlsx（Sheet1 作业指导书）',
+      '来源样本：作业指导工作表（客户原始资料已隔离到客户资料目录）',
     ],
     fieldTruth: [
       '产品编号、产品名称和 BOM 版本来自 BOM 版本、委外订单明细、产品主数据或打印草稿；加工厂、加工项目、委外数量和回货日期只在委外入口作为外发打印上下文带入。',

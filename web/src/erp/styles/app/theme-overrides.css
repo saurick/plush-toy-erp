@@ -146,6 +146,7 @@
 
 [data-erp-theme='dark'] .erp-admin-page-head,
 [data-erp-theme='dark'] .erp-admin-page-head__pill,
+[data-erp-theme='dark'] .erp-product-core-data-guard__body > div,
 [data-erp-theme='dark'] .erp-dashboard-card.ant-card,
 [data-erp-theme='dark'] .erp-dashboard-status-card.ant-card,
 [data-erp-theme='dark'] .erp-command-center-rail,

@@ -136,6 +136,128 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
     ]),
   },
   {
+    id: "yoyoosun-trial-fixture-covers-manual-regression",
+    bucket: "customer-trial-simulated-data",
+    description:
+      "yoyoosun trial fixture remains preview-only while covering enough manual regression states.",
+    required: Object.freeze([
+      {
+        path: "config/customers/yoyoosun/trialDataFixture.mjs",
+        pattern: /fixtureKey:\s*"yoyoosun-trial-data-fixture-v1"/u,
+        message: "yoyoosun trial fixture must keep a stable fixture key",
+      },
+      {
+        path: "config/customers/yoyoosun/trialDataFixture.mjs",
+        pattern: /status:\s*"preview_only"/u,
+        message: "yoyoosun trial fixture must remain preview_only",
+      },
+      {
+        path: "config/customers/yoyoosun/trialDataFixture.mjs",
+        pattern: /must not be applied to customer production data/u,
+        message: "yoyoosun trial fixture must keep the production-data boundary",
+      },
+      {
+        path: "config/customers/yoyoosun/trialDataFixture.mjs",
+        pattern: /SO-YOYO-TRIAL-003/u,
+        message: "yoyoosun trial fixture must include cancelled sales order coverage",
+      },
+      {
+        path: "config/customers/yoyoosun/trialDataFixture.mjs",
+        pattern: /QI-YOYO-TRIAL-003/u,
+        message: "yoyoosun trial fixture must include rejected quality coverage",
+      },
+      {
+        path: "config/customers/yoyoosun/trialDataFixture.mjs",
+        pattern: /SH-YOYO-TRIAL-003/u,
+        message: "yoyoosun trial fixture must include cancelled shipment coverage",
+      },
+      {
+        path: "config/customers/yoyoosun/trialDataFixture.mjs",
+        pattern: /WF-YOYO-TRIAL-BOSS-001/u,
+        message: "yoyoosun trial fixture must include boss workflow coverage",
+      },
+    ]),
+    forbidden: Object.freeze([
+      {
+        path: "config/customers/yoyoosun/trialDataFixture.mjs",
+        pattern: /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|EXECUTE_YOYOOSUN_IMPORT/u,
+        message: "yoyoosun trial fixture must not become real import input",
+      },
+      {
+        path: "config/customers/yoyoosun/trialDataFixture.mjs",
+        pattern: NO_DIRECT_DB_PATTERN,
+        message: "yoyoosun trial fixture must not contain direct DB writes",
+      },
+    ]),
+  },
+  {
+    id: "manual-regression-data-plan-stays-read-only",
+    bucket: "customer-trial-simulated-data",
+    description:
+      "manual regression data plan aggregates Product Core and yoyoosun simulated entries without becoming an import executor.",
+    required: Object.freeze([
+      {
+        path: "scripts/qa/manual-regression-data-plan.mjs",
+        pattern: /scope:\s*"manual-regression-data-plan"/u,
+        message: "manual regression plan must keep a stable scope",
+      },
+      {
+        path: "scripts/qa/manual-regression-data-plan.mjs",
+        pattern: /readOnly:\s*true/u,
+        message: "manual regression plan must remain read-only",
+      },
+      {
+        path: "scripts/qa/manual-regression-data-plan.mjs",
+        pattern: /writesDatabase:\s*false/u,
+        message: "manual regression plan must not write database rows",
+      },
+      {
+        path: "scripts/qa/manual-regression-data-plan.mjs",
+        pattern: /realCustomerImport:\s*false/u,
+        message: "manual regression plan must keep realCustomerImport=false",
+      },
+      {
+        path: "scripts/qa/manual-regression-data-plan.mjs",
+        pattern: /SIM-PLUSH-CORE/u,
+        message: "manual regression plan must include Product Core neutral seed",
+      },
+      {
+        path: "scripts/qa/manual-regression-data-plan.mjs",
+        pattern: /SIM-YOYOOSUN-TRIAL/u,
+        message: "manual regression plan must include yoyoosun simulated trial data",
+      },
+      {
+        path: "scripts/qa/manual-regression-data-plan.mjs",
+        pattern: /APPLY_SIMULATED_TRIAL_DATA/u,
+        message: "manual regression plan must keep simulated trial apply confirmation",
+      },
+      {
+        path: "scripts/qa/manual-regression-data-plan.mjs",
+        pattern: /APPLY_SIMULATED_OPERATIONAL_FACTS/u,
+        message:
+          "manual regression plan must keep simulated operational fact confirmation",
+      },
+      {
+        path: "scripts/qa/manual-regression-data-plan.mjs",
+        pattern: /APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS/u,
+        message:
+          "manual regression plan must keep simulated mobile workflow confirmation",
+      },
+    ]),
+    forbidden: Object.freeze([
+      {
+        path: "scripts/qa/manual-regression-data-plan.mjs",
+        pattern: /CUSTOMER_IMPORT_CONFIRM|EXECUTE_YOYOOSUN_IMPORT/u,
+        message: "manual regression plan must not reuse real import approval gates",
+      },
+      {
+        path: "scripts/qa/manual-regression-data-plan.mjs",
+        pattern: NO_DIRECT_DB_PATTERN,
+        message: "manual regression plan must not connect to DB or write SQL directly",
+      },
+    ]),
+  },
+  {
     id: "operational-fact-simulated-closure-stays-simulated",
     bucket: "customer-trial-simulated-data",
     description:

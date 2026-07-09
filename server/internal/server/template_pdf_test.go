@@ -34,7 +34,7 @@ func TestParseRenderTemplatePDFRequest(t *testing.T) {
 	if parsed.TemplateKey != "material-purchase-contract" {
 		t.Fatalf("TemplateKey = %q", parsed.TemplateKey)
 	}
-	if parsed.CustomerKey != biz.DefaultCustomerKey {
+	if parsed.CustomerKey != "yoyoosun" {
 		t.Fatalf("CustomerKey = %q", parsed.CustomerKey)
 	}
 }

@@ -46,6 +46,7 @@ import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
+import { isCustomerBusinessDataPageKey } from '../config/businessModules.mjs'
 import { resolveMenuPermissionKey } from '../config/menuPermissions.mjs'
 import { getNavigationSections } from '../config/seedData.mjs'
 import { getEffectiveSession } from '../api/customerConfigApi.mjs'
@@ -61,6 +62,7 @@ import {
   getAdminProfileSyncErrorAction,
   resolveEffectiveSessionCustomerKey,
   shouldRedirectFromCurrentNavigation,
+  shouldGuardCustomerBusinessPageRuntime,
 } from '../utils/adminProfileSync.mjs'
 
 const { Content, Header, Sider } = Layout
@@ -94,6 +96,38 @@ const navIconRegistry = {
   'exception-flow': <AlertOutlined />,
   'permission-center': <SettingOutlined />,
   'system-audit-logs': <FileSearchOutlined />,
+}
+
+function ProductCoreBusinessDataGuard({ currentEntry }) {
+  const pageLabel = currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label
+
+  return (
+    <div
+      className="erp-product-core-data-guard"
+      data-product-core-business-data-guard="true"
+    >
+      <Alert
+        type="info"
+        showIcon
+        message="产品核心评审不读取客户业务数据"
+        description={`${pageLabel} 是客户运行时业务数据页；当前没有有效客户运行环境，只审阅菜单、权限、字段和动作边界，不读取或展示客户订单、库存、协同任务、财务或业务事实记录。`}
+      />
+      <div className="erp-product-core-data-guard__body">
+        <div>
+          <Text type="secondary">当前页</Text>
+          <strong>{pageLabel}</strong>
+        </div>
+        <div>
+          <Text type="secondary">评审范围</Text>
+          <strong>页面能力、权限、字段和动作边界</strong>
+        </div>
+        <div>
+          <Text type="secondary">客户数据</Text>
+          <strong>请切换到客户账号或客户运行态查看</strong>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 const SELF_CONTAINED_PAGE_HEAD_PATHS = new Set([
@@ -162,7 +196,11 @@ export default function ERPLayout() {
     []
   )
 
-  const navigationSections = useMemo(() => getNavigationSections(), [])
+  const isSuperAdmin = adminProfile?.is_super_admin === true
+  const navigationSections = useMemo(
+    () => getNavigationSections(isSuperAdmin ? null : undefined),
+    [isSuperAdmin]
+  )
   const currentNavigationEntry = useMemo(
     () =>
       resolveCurrentNavigationEntry({
@@ -328,7 +366,6 @@ export default function ERPLayout() {
     adminProfileRef.current = adminProfile
   }, [adminProfile])
 
-  const isSuperAdmin = adminProfile?.is_super_admin === true
   const allowedMenuPaths = useMemo(
     () => normalizeMenuPaths(adminProfile?.menus || []),
     [adminProfile?.menus]
@@ -593,6 +630,13 @@ export default function ERPLayout() {
     adminProfile?.username || tokenAdmin?.username || 'admin'
   const noVisibleMenus = visibleSections.length === 0
   const shouldBlockOutlet = noVisibleMenus && currentPageShouldRedirect
+  const shouldGuardProductCoreBusinessData =
+    shouldGuardCustomerBusinessPageRuntime({
+      effectiveSessionDiagnostic,
+      isCustomerBusinessDataPage: isCustomerBusinessDataPageKey(
+        currentNavigationEntry.pageKey
+      ),
+    })
 
   if (profileLoading && !adminProfile) {
     return (
@@ -609,7 +653,10 @@ export default function ERPLayout() {
     <Layout
       className="erp-admin-shell"
       data-effective-session-source={effectiveSessionDiagnostic.source}
-      data-effective-session-mode={effectiveSessionDiagnostic.projectionMode}
+      data-effective-session-mode={effectiveSessionDiagnostic.visibilityMode}
+      data-effective-session-data-scope={
+        effectiveSessionDiagnostic.dataRuntimeScope
+      }
     >
       <Sider width={320} className="erp-admin-sider">
         {sideNav}
@@ -696,6 +743,8 @@ export default function ERPLayout() {
                 message="当前账号暂无可见后台入口"
                 description="请确认账号角色权限和当前客户有效配置的页面清单；若客户配置同步失败，请稍后刷新或联系管理员复核当前有效配置版本。"
               />
+            ) : shouldGuardProductCoreBusinessData ? (
+              <ProductCoreBusinessDataGuard currentEntry={currentEntry} />
             ) : (
               <Outlet context={outletContext} />
             )}

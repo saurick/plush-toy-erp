@@ -1,6 +1,16 @@
 import { isAdminSessionUnavailableCode } from '../../common/consts/errorCodes.js'
 
 const EFFECTIVE_SESSION_SYNC_FAILED_SOURCE = 'effective_session_sync_failed'
+const VISIBILITY_MODE_SUPER_ADMIN_PRODUCT_CORE = 'super_admin_product_core'
+const VISIBILITY_MODE_LOCAL_DEV_SYNC_FAILED = 'local_dev_sync_failed_diagnostic'
+const VISIBILITY_MODE_LOCAL_DEV_CUSTOMER_CONFIG =
+  'local_dev_customer_config_diagnostic'
+const VISIBILITY_MODE_FORMAL_EFFECTIVE_SESSION =
+  'formal_effective_session_projection'
+const DATA_RUNTIME_SCOPE_CUSTOMER = 'customer_runtime'
+const DATA_RUNTIME_SCOPE_PRODUCT_CORE_REVIEW = 'product_core_review'
+const DATA_RUNTIME_SCOPE_SYNC_FAILED = 'sync_failed_diagnostic'
+const DATA_RUNTIME_SCOPE_CUSTOMER_MISSING = 'customer_runtime_missing'
 const PRINT_PARTY_DEFAULT_KEYS = new Set([
   'buyerCompany',
   'buyerContact',
@@ -174,6 +184,40 @@ function countVisibleMenuItems(visibleSections) {
   )
 }
 
+function resolveEffectiveSessionVisibilityMode({
+  isSuperAdmin = false,
+  isLocalDev = false,
+  source = '',
+} = {}) {
+  if (isSuperAdmin) {
+    return VISIBILITY_MODE_SUPER_ADMIN_PRODUCT_CORE
+  }
+  if (isLocalDev && source === EFFECTIVE_SESSION_SYNC_FAILED_SOURCE) {
+    return VISIBILITY_MODE_LOCAL_DEV_SYNC_FAILED
+  }
+  if (isLocalDev) {
+    return VISIBILITY_MODE_LOCAL_DEV_CUSTOMER_CONFIG
+  }
+  return VISIBILITY_MODE_FORMAL_EFFECTIVE_SESSION
+}
+
+function resolveEffectiveSessionDataRuntimeScope({
+  customerKey = '',
+  source = '',
+  isSuperAdmin = false,
+} = {}) {
+  if (typeof customerKey === 'string' && customerKey.trim()) {
+    return DATA_RUNTIME_SCOPE_CUSTOMER
+  }
+  if (source === EFFECTIVE_SESSION_SYNC_FAILED_SOURCE) {
+    return DATA_RUNTIME_SCOPE_SYNC_FAILED
+  }
+  if (isSuperAdmin) {
+    return DATA_RUNTIME_SCOPE_PRODUCT_CORE_REVIEW
+  }
+  return DATA_RUNTIME_SCOPE_CUSTOMER_MISSING
+}
+
 export function buildEffectiveSessionDiagnosticSummary({
   adminProfile = null,
   allowedMenuPaths = [],
@@ -208,19 +252,29 @@ export function buildEffectiveSessionDiagnosticSummary({
     blockers.push('no_visible_menu_items')
   }
 
-  const projectionMode = isSuperAdmin
-    ? 'super_admin_product_core'
-    : isLocalDev && session?.source === EFFECTIVE_SESSION_SYNC_FAILED_SOURCE
-      ? 'local_dev_sync_failed_diagnostic'
-      : isLocalDev
-        ? 'local_dev_customer_config_diagnostic'
-        : 'formal_effective_session_projection'
+  const source = hasSession ? session.source || 'unknown' : 'missing'
+  const customerKey = session?.customer?.key || ''
+  const visibilityMode = resolveEffectiveSessionVisibilityMode({
+    isSuperAdmin,
+    isLocalDev,
+    source,
+  })
+  const dataRuntimeScope = resolveEffectiveSessionDataRuntimeScope({
+    customerKey,
+    source,
+    isSuperAdmin,
+  })
+  const canMountCustomerBusinessPages =
+    dataRuntimeScope === DATA_RUNTIME_SCOPE_CUSTOMER
 
   return {
-    source: hasSession ? session.source || 'unknown' : 'missing',
-    customerKey: session?.customer?.key || '',
+    source,
+    customerKey,
     configRevision: session?.config_revision || '',
-    projectionMode,
+    projectionMode: visibilityMode,
+    visibilityMode,
+    dataRuntimeScope,
+    canMountCustomerBusinessPages,
     isSuperAdmin: isSuperAdmin === true,
     isLocalDev: isLocalDev === true,
     counts: {
@@ -239,6 +293,17 @@ export function buildEffectiveSessionDiagnosticSummary({
     },
     blockers,
   }
+}
+
+export function shouldGuardCustomerBusinessPageRuntime({
+  effectiveSessionDiagnostic = null,
+  isCustomerBusinessDataPage = false,
+} = {}) {
+  return Boolean(
+    isCustomerBusinessDataPage &&
+      effectiveSessionDiagnostic &&
+      effectiveSessionDiagnostic.canMountCustomerBusinessPages === false
+  )
 }
 
 export function attachEffectiveSessionToAdminProfile(

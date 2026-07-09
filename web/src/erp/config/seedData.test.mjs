@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { getBusinessNavigationSections } from './businessModules.mjs'
+import {
+  getBusinessNavigationSections,
+  isCustomerBusinessDataPageKey,
+} from './businessModules.mjs'
 import {
   getNavigationSections,
   getRoleWorkbench,
@@ -126,6 +129,19 @@ test('businessModules: 业务页菜单按毛绒业务收口且不依赖前端文
   assert(!navPaths.includes('/erp/sales/project-orders'))
 })
 
+test('businessModules: Product Core 评审态阻断客户业务数据页', () => {
+  assert.equal(isCustomerBusinessDataPageKey('business-dashboard'), true)
+  assert.equal(isCustomerBusinessDataPageKey('processing-contracts'), true)
+  assert.equal(isCustomerBusinessDataPageKey('shipments'), true)
+  assert.equal(isCustomerBusinessDataPageKey('customers'), true)
+  assert.equal(isCustomerBusinessDataPageKey('exception-flow'), true)
+
+  assert.equal(isCustomerBusinessDataPageKey('global-dashboard'), false)
+  assert.equal(isCustomerBusinessDataPageKey('print-center'), false)
+  assert.equal(isCustomerBusinessDataPageKey('permission-center'), false)
+  assert.equal(isCustomerBusinessDataPageKey('system-audit-logs'), false)
+})
+
 test('customerMenuConfig: 客户菜单配置可控制桌面菜单显隐、排序和文案', () => {
   const navigationSections = getNavigationSections({
     customerKey: 'demo',
@@ -165,7 +181,7 @@ test('customerMenuConfig: 客户菜单配置可控制桌面菜单显隐、排序
 })
 
 test('customerMenuConfig: runtime config keeps task board and hides advanced entries', () => {
-  const navigationSections = getNavigationSections({
+  const customerMenuConfig = {
     customerKey: 'demo-customer',
     desktopMenu: {
       hiddenItemKeys: [
@@ -194,8 +210,13 @@ test('customerMenuConfig: runtime config keeps task board and hides advanced ent
         },
       ],
     },
-  })
+  }
+  const navigationSections = getNavigationSections(customerMenuConfig)
   const navPaths = navigationSections.flatMap((section) =>
+    section.items.map((item) => item.path)
+  )
+  const productCoreReviewSections = getNavigationSections(null)
+  const productCoreReviewPaths = productCoreReviewSections.flatMap((section) =>
     section.items.map((item) => item.path)
   )
 
@@ -209,4 +230,10 @@ test('customerMenuConfig: runtime config keeps task board and hides advanced ent
   assert(!navPaths.includes('/erp/production/scheduling'))
   assert(!navPaths.includes('/erp/production/exceptions'))
   assert(!navPaths.includes('/erp/warehouse/shipping-release'))
+  assert(productCoreReviewPaths.includes('/erp/business-dashboard'))
+  assert(productCoreReviewPaths.includes('/erp/operations/exceptions'))
+  assert(productCoreReviewPaths.includes('/erp/production/scheduling'))
+  assert(productCoreReviewPaths.includes('/erp/production/exceptions'))
+  assert(productCoreReviewPaths.includes('/erp/warehouse/shipping-release'))
+  assert(productCoreReviewPaths.includes('/erp/system/audit-logs'))
 })

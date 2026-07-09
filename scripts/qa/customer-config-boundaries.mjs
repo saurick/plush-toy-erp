@@ -54,8 +54,8 @@ const BACKEND_CUSTOMER_SPECIFIC_TERMS = [
 const BACKEND_ALLOWED_CUSTOMER_REFERENCES = [
   {
     path: "server/internal/biz/customer_config.go",
-    pattern: /^\s*DefaultCustomerKey\s*=\s*"yoyoosun"\s*$/,
-    reason: "current single-customer private deployment default; not a business rule branch",
+    pattern: /^\s*DefaultCustomerKey\s*=\s*"demo"\s*$/,
+    reason: "neutral customer config fallback; private customer packages must be selected explicitly",
   },
 ];
 const CUSTOMER_ASSET_ROOT = "/customer-assets/yoyoosun/";

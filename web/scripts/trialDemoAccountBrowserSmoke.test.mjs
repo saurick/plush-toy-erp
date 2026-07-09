@@ -216,6 +216,30 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
   )
   assert.deepEqual(adminPlan.visibleExpectedMenus, ['权限管理'])
   assert.match(adminPlan.forbiddenMenus.join('\n'), /工作台/u)
+  for (const account of template.desktopAccounts) {
+    if (account.username === 'demo_admin') {
+      continue
+    }
+    assert(
+      !account.expectedMenus.includes('业务看板'),
+      `${account.username} must not expect yoyoosun hidden business dashboard`
+    )
+    assert(
+      !account.expectedMenus.includes('异常 / 阻塞闭环'),
+      `${account.username} must not expect yoyoosun hidden exception flow`
+    )
+  }
+  const engineeringPlan = template.menuProjectionPlan.desktopAccounts.find(
+    (account) => account.username === 'demo_engineering'
+  )
+  assert.deepEqual(engineeringPlan.visibleExpectedMenus, [
+    '工作台',
+    '任务看板',
+    '产品档案',
+    '材料档案',
+    '加工环节',
+    'BOM 管理',
+  ])
   assert.match(
     template.commands.join('\n'),
     /--preflight-report output\/trial-demo-account-browser-smoke\/preflight\.json/u
@@ -308,6 +332,19 @@ test('trial demo account browser smoke CLI preflight writes sanitized report', (
   assert.equal(report.menuProjectionCoverage.coversMobileDeniedAdmin, true)
   assert.equal(report.menuProjectionCoverage.allMobileAccountsHaveEntries, true)
   assert.deepEqual(report.menuProjectionCoverage.blockers, [])
+  for (const account of report.menuProjectionPlan.desktopAccounts) {
+    if (account.username === 'demo_admin') {
+      continue
+    }
+    assert(
+      !account.configuredExpectedMenus.includes('业务看板'),
+      `${account.username} must not configure yoyoosun hidden business dashboard as expected`
+    )
+    assert(
+      !account.configuredExpectedMenus.includes('异常 / 阻塞闭环'),
+      `${account.username} must not configure yoyoosun hidden exception flow as expected`
+    )
+  }
   assert(
     report.menuProjectionPlan.mobileAccounts.some(
       (account) =>

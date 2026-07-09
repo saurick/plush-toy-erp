@@ -922,7 +922,13 @@ test("dev entry boundary: customer config console stays preview or gated apply o
     "customer config console must surface print template field boundary",
   );
 
-  const summary = buildImportToolingSummary();
+  const defaultSummary = buildImportToolingSummary();
+  assert.equal(defaultSummary.canRunUiDryRun, false);
+  assert.equal(defaultSummary.canApplyTestConfig, false);
+  assert.equal(defaultSummary.canCheckReleaseReadiness, false);
+  assert.equal(defaultSummary.testApply.status, "blocked");
+
+  const summary = buildImportToolingSummary("yoyoosun");
   assert.equal(summary.canRunUiDryRun, true);
   assert.equal(summary.canExecuteRealImport, false);
   assert.equal(summary.writesBusinessData, false);

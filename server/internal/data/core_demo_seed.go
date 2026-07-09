@@ -104,13 +104,18 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 	pcs := prefix + "-PCS"
 	meter := prefix + "-M"
 	kg := prefix + "-KG"
+	box := prefix + "-BOX"
 	productA := prefix + "-PRODUCT-A"
+	productB := prefix + "-PRODUCT-B"
+	productC := prefix + "-PRODUCT-C"
+	productD := prefix + "-PRODUCT-D"
 	return CoreDemoSeedDataset{
 		Prefix: prefix,
 		Units: []CoreDemoUnitSeed{
 			{Code: pcs, Name: "核心演示单位-件", Precision: 0},
 			{Code: meter, Name: "核心演示单位-米", Precision: 2},
 			{Code: kg, Name: "核心演示单位-千克", Precision: 3},
+			{Code: box, Name: "核心演示单位-箱", Precision: 0},
 		},
 		Materials: []CoreDemoMaterialSeed{
 			{
@@ -130,10 +135,40 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 				DefaultUnitCode: kg,
 			},
 			{
+				Code:            prefix + "-MAT-EYE",
+				Name:            "核心演示安全眼",
+				Category:        "accessory",
+				Spec:            "12mm",
+				Color:           "黑",
+				DefaultUnitCode: pcs,
+			},
+			{
+				Code:            prefix + "-MAT-THREAD",
+				Name:            "核心演示绣花线",
+				Category:        "accessory",
+				Spec:            "120D",
+				Color:           "棕色",
+				DefaultUnitCode: meter,
+			},
+			{
 				Code:            prefix + "-MAT-PACKING",
 				Name:            "核心演示包装袋",
 				Category:        "packing",
 				Spec:            "单只装",
+				DefaultUnitCode: pcs,
+			},
+			{
+				Code:            prefix + "-MAT-CARTON",
+				Name:            "核心演示外箱",
+				Category:        "packing",
+				Spec:            "60x40x50cm",
+				DefaultUnitCode: box,
+			},
+			{
+				Code:            prefix + "-MAT-LABEL",
+				Name:            "核心演示洗水标",
+				Category:        "label",
+				Spec:            "双语",
 				DefaultUnitCode: pcs,
 			},
 		},
@@ -146,10 +181,24 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 				DefaultUnitCode: pcs,
 			},
 			{
-				Code:            prefix + "-PRODUCT-B",
+				Code:            productB,
 				Name:            "核心演示毛绒挂件",
 				StyleNo:         prefix + "-STYLE-B",
 				CustomerStyleNo: prefix + "-CUST-STYLE-B",
+				DefaultUnitCode: pcs,
+			},
+			{
+				Code:            productC,
+				Name:            "核心演示安抚熊",
+				StyleNo:         prefix + "-STYLE-C",
+				CustomerStyleNo: prefix + "-CUST-STYLE-C",
+				DefaultUnitCode: pcs,
+			},
+			{
+				Code:            productD,
+				Name:            "核心演示节日钥匙扣",
+				StyleNo:         prefix + "-STYLE-D",
+				CustomerStyleNo: prefix + "-CUST-STYLE-D",
 				DefaultUnitCode: pcs,
 			},
 		},
@@ -157,6 +206,7 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 			{Code: prefix + "-RM-WH", Name: "核心演示原料仓", Type: "RAW_MATERIAL"},
 			{Code: prefix + "-FG-WH", Name: "核心演示成品仓", Type: "FINISHED_GOODS"},
 			{Code: prefix + "-QC-HOLD", Name: "核心演示待检仓", Type: "QC_HOLD"},
+			{Code: prefix + "-WIP-WH", Name: "核心演示在制仓", Type: "WORK_IN_PROCESS"},
 		},
 		Processes: []CoreDemoProcessSeed{
 			{Code: prefix + "-PROC-CHECKING", Name: "查货", Category: "查货", OutsourcingEnabled: true, InhouseEnabled: true, QualityRequired: true, SortOrder: 10, Note: "毛绒玩具行业默认候选工序，可按实际工厂调整委外 / 内制 / 质检标记。"},
@@ -191,11 +241,62 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 						Position:     "填充",
 					},
 					{
+						MaterialCode: prefix + "-MAT-EYE",
+						Quantity:     "2.000000",
+						UnitCode:     pcs,
+						LossRate:     "0.010000",
+						Position:     "五金配件",
+					},
+					{
 						MaterialCode: prefix + "-MAT-PACKING",
 						Quantity:     "1.000000",
 						UnitCode:     pcs,
 						LossRate:     "0.000000",
 						Position:     "包装",
+					},
+				},
+			},
+			{
+				ProductCode: productC,
+				Version:     prefix + "-BOM-C-V1",
+				Status:      "ACTIVE",
+				Note:        "核心演示 BOM，用于覆盖多材料、多单位和包装箱场景。",
+				Items: []CoreDemoBOMItemSeed{
+					{
+						MaterialCode: prefix + "-MAT-FABRIC",
+						Quantity:     "0.950000",
+						UnitCode:     meter,
+						LossRate:     "0.060000",
+						Position:     "面料",
+					},
+					{
+						MaterialCode: prefix + "-MAT-FILLING",
+						Quantity:     "0.420000",
+						UnitCode:     kg,
+						LossRate:     "0.030000",
+						Position:     "填充",
+					},
+					{
+						MaterialCode: prefix + "-MAT-THREAD",
+						Quantity:     "3.500000",
+						UnitCode:     meter,
+						LossRate:     "0.020000",
+						Position:     "绣花",
+					},
+					{
+						MaterialCode: prefix + "-MAT-LABEL",
+						Quantity:     "1.000000",
+						UnitCode:     pcs,
+						LossRate:     "0.000000",
+						Position:     "标识",
+					},
+					{
+						MaterialCode: prefix + "-MAT-CARTON",
+						Quantity:     "0.083333",
+						UnitCode:     box,
+						LossRate:     "0.000000",
+						Position:     "外箱",
+						Note:         "12 只装外箱折算。",
 					},
 				},
 			},

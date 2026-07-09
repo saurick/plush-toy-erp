@@ -194,6 +194,30 @@ test('menuPermissions: 主数据与正式业务入口纳入角色预设', () => 
   assert(salesPreset.permissions.includes('/erp/warehouse/shipments'))
 })
 
+test('menuPermissions: 前端角色预设覆盖工程和系统管理员', () => {
+  const presetKeys = ERP_PERMISSION_PRESETS.map((preset) => preset.key)
+  assert(presetKeys.includes('engineering'))
+  assert(presetKeys.includes('admin'))
+
+  const engineeringPreset = ERP_PERMISSION_PRESETS.find(
+    (preset) => preset.key === 'engineering'
+  )
+  assert.deepEqual(engineeringPreset.mobileRolePermissions, ['engineering'])
+  assert(engineeringPreset.permissions.includes('/erp/task-board'))
+  assert(engineeringPreset.permissions.includes('/erp/business-dashboard'))
+  assert(engineeringPreset.permissions.includes('/erp/master/products'))
+  assert(engineeringPreset.permissions.includes('/erp/master/materials'))
+  assert(engineeringPreset.permissions.includes('/erp/purchase/material-bom'))
+  assert(engineeringPreset.permissions.includes('/erp/engineering/processes'))
+  assert(!engineeringPreset.permissions.includes(PERMISSION_CENTER_PATH))
+
+  const adminPreset = ERP_PERMISSION_PRESETS.find(
+    (preset) => preset.key === 'admin'
+  )
+  assert.deepEqual(adminPreset.mobileRolePermissions, [])
+  assert.deepEqual(adminPreset.permissions, [PERMISSION_CENTER_PATH])
+})
+
 test('menuPermissions: 当前权限项不包含前端文档或开发验收路径', () => {
   const permissionKeys = ERP_MENU_PERMISSION_OPTIONS.map((item) => item.key)
 

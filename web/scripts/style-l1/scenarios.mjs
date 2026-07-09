@@ -641,17 +641,93 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectText(page, '毛绒玩具 ERP')
         await expectText(page, 'style-l1-admin')
-        await expectHeading(page, '出货单')
+        await expectText(page, '出货单')
         await expectText(page, 'SHIP-STYLE-L1')
-
-        const createButton = page
-          .getByRole('button', { name: '新建草稿' })
-          .first()
-        await createButton.waitFor({ state: 'visible', timeout: 10_000 })
+        await assertTextAbsent(page, '产品核心评审不读取客户业务数据')
+        await expectButton(page, '新建草稿')
         assert.equal(
-          await createButton.isDisabled(),
+          await page.getByRole('button', { name: '新建草稿' }).isDisabled(),
           false,
-          'super admin 不应被 effective_session.actions=[] 收窄业务写按钮'
+          'super admin 客户运行态应保留业务页动作入口'
+        )
+        const pageMetrics = await page.evaluate(() => {
+          const shell = document.querySelector('.erp-admin-shell')
+          const guard = document.querySelector(
+            '[data-product-core-business-data-guard="true"]'
+          )
+          const table = document.querySelector('.ant-table')
+          const tableRect = table?.getBoundingClientRect()
+          return {
+            visibilityMode:
+              shell?.getAttribute('data-effective-session-mode') || '',
+            dataRuntimeScope:
+              shell?.getAttribute('data-effective-session-data-scope') || '',
+            hasGuard: Boolean(guard),
+            hasTable: Boolean(table),
+            tableWidth: tableRect?.width || 0,
+            scrollWidth: document.documentElement.scrollWidth,
+            clientWidth: document.documentElement.clientWidth,
+          }
+        })
+        assert.equal(pageMetrics.visibilityMode, 'super_admin_product_core')
+        assert.equal(pageMetrics.dataRuntimeScope, 'customer_runtime')
+        assert.equal(pageMetrics.hasGuard, false)
+        assert.equal(pageMetrics.hasTable, true)
+        assert(
+          pageMetrics.scrollWidth <= pageMetrics.clientWidth + 1,
+          `super admin 客户运行态业务页不应横向溢出: ${JSON.stringify(
+            pageMetrics
+          )}`
+        )
+      },
+    },
+    {
+      name: 'erp-effective-session-super-admin-product-core-no-customer-business-dashboard',
+      path: '/erp/business-dashboard',
+      auth: 'admin',
+      expectPath: '/erp/business-dashboard',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectText(page, '毛绒 ERP 管理后台')
+        await expectText(page, '超级管理员')
+        await expectText(page, '产品核心评审不读取客户业务数据')
+        await expectText(page, '业务看板 是客户运行时业务数据页')
+        await assertTextAbsent(page, '业务对象')
+        await assertTextAbsent(page, '对象总量')
+        await assertTextAbsent(page, '核心链路健康')
+        const pageMetrics = await page.evaluate(() => {
+          const guard = document.querySelector(
+            '[data-product-core-business-data-guard="true"]'
+          )
+          const dashboard = document.querySelector(
+            '.erp-business-dashboard-page'
+          )
+          const table = document.querySelector('.ant-table')
+          const guardRect = guard?.getBoundingClientRect()
+          return {
+            hasGuard: Boolean(guard),
+            hasBusinessDashboard: Boolean(dashboard),
+            hasTable: Boolean(table),
+            guardWidth: guardRect?.width || 0,
+            guardHeight: guardRect?.height || 0,
+            scrollWidth: document.documentElement.scrollWidth,
+            clientWidth: document.documentElement.clientWidth,
+          }
+        })
+        assert.equal(pageMetrics.hasGuard, true)
+        assert.equal(pageMetrics.hasBusinessDashboard, false)
+        assert.equal(pageMetrics.hasTable, false)
+        assert(
+          pageMetrics.guardWidth > 0 && pageMetrics.guardHeight > 0,
+          `无客户 Product Core guard 应有稳定占位: ${JSON.stringify(
+            pageMetrics
+          )}`
+        )
+        assert(
+          pageMetrics.scrollWidth <= pageMetrics.clientWidth + 1,
+          `无客户 Product Core guard 不应横向溢出: ${JSON.stringify(
+            pageMetrics
+          )}`
         )
       },
     },
@@ -2838,6 +2914,17 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '永绅 yoyoosun')
         await assertTextAbsent(page, '东莞市永绅玩具有限公司')
 
+        await gotoScenarioPath(page, '/__dev/customer-config', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(
+          page,
+          '客户配置包导入控制台 / Package Import Console'
+        )
+        await expectText(page, '未选择客户配置包')
+        await expectText(page, '已登记客户包 / Registered Packages')
+        await assertTextAbsent(page, '东莞市永绅玩具有限公司')
+
         await page.locator('.erp-dev-customer-selector .ant-select').click()
         await page
           .locator('.ant-select-dropdown .ant-select-item-option-content')
@@ -2880,7 +2967,7 @@ export function createStyleL1Scenarios(deps) {
     },
     {
       name: 'dev-customer-config-mobile',
-      path: '/__dev/customer-config',
+      path: '/__dev/customer-config?customer=yoyoosun',
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectHeading(

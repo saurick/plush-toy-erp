@@ -628,7 +628,7 @@ func workflowCustomerConfigUCWithMemberships(memberships []biz.WorkPoolMembershi
 				RoleKey:       roleKey,
 				CapabilityKey: capabilityKey,
 				ScopeType:     "customer",
-				ScopeValue:    "yoyoosun",
+				ScopeValue:    biz.DefaultCustomerKey,
 				Enabled:       true,
 			})
 		}
@@ -638,14 +638,14 @@ func workflowCustomerConfigUCWithMemberships(memberships []biz.WorkPoolMembershi
 
 func workflowCustomerConfigUCWithMembershipsAndEntitlements(memberships []biz.WorkPoolMembershipInput, entitlements []biz.AccessEntitlementInput) *biz.CustomerConfigUsecase {
 	repo := newServiceCustomerConfigRepo()
-	key := serviceCustomerConfigKey("yoyoosun", "workflow-visible-rev")
+	key := serviceCustomerConfigKey(biz.DefaultCustomerKey, "workflow-visible-rev")
 	repo.revisions[key] = &biz.CustomerConfigRevision{
-		CustomerKey:      "yoyoosun",
+		CustomerKey:      biz.DefaultCustomerKey,
 		Revision:         "workflow-visible-rev",
 		ProductVersion:   "test",
 		ConfigHash:       "workflow-visible-hash",
 		Status:           biz.CustomerConfigStatusActive,
-		CompiledSnapshot: map[string]any{"customer": map[string]any{"key": "yoyoosun"}},
+		CompiledSnapshot: map[string]any{"customer": map[string]any{"key": biz.DefaultCustomerKey}},
 	}
 	repo.memberships[key] = append([]biz.WorkPoolMembershipInput(nil), memberships...)
 	repo.entitlements[key] = append([]biz.AccessEntitlementInput(nil), entitlements...)
@@ -699,7 +699,7 @@ func TestJsonrpcDispatcher_WorkflowListTasksRequiresCustomerWorkPoolReadEntitlem
 			},
 			[]biz.AccessEntitlementInput{
 				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskRead, ScopeType: "customer", ScopeValue: "other_customer", Enabled: true},
-				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskUpdate, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
+				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskUpdate, ScopeType: "customer", ScopeValue: biz.DefaultCustomerKey, Enabled: true},
 			},
 		),
 	}
@@ -788,8 +788,8 @@ func TestJsonrpcDispatcher_WorkflowActionRequiresCustomerWorkPoolActionEntitleme
 				{PoolKey: "warehouse", RoleKey: biz.WarehouseRoleKey, UserID: 7, Strategy: "direct_user_pool", Enabled: true},
 			},
 			[]biz.AccessEntitlementInput{
-				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskRead, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
-				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskUpdate, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
+				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskRead, ScopeType: "customer", ScopeValue: biz.DefaultCustomerKey, Enabled: true},
+				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskUpdate, ScopeType: "customer", ScopeValue: biz.DefaultCustomerKey, Enabled: true},
 				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskComplete, ScopeType: "customer", ScopeValue: "other_customer", Enabled: true},
 			},
 		),
@@ -1463,8 +1463,8 @@ func TestJsonrpcDispatcher_WorkflowExplainActionAccessExplainsWorkPoolEntitlemen
 		{
 			name: "membership without same-scope action entitlement is visible for read but cannot complete",
 			entitlements: []biz.AccessEntitlementInput{
-				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskRead, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
-				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskUpdate, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
+				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskRead, ScopeType: "customer", ScopeValue: biz.DefaultCustomerKey, Enabled: true},
+				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskUpdate, ScopeType: "customer", ScopeValue: biz.DefaultCustomerKey, Enabled: true},
 				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskComplete, ScopeType: "customer", ScopeValue: "other_customer", Enabled: true},
 			},
 			wantAllowed:         false,
@@ -1476,9 +1476,9 @@ func TestJsonrpcDispatcher_WorkflowExplainActionAccessExplainsWorkPoolEntitlemen
 		{
 			name: "same-role action entitlement explains work pool match",
 			entitlements: []biz.AccessEntitlementInput{
-				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskRead, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
-				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskUpdate, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
-				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskComplete, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
+				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskRead, ScopeType: "customer", ScopeValue: biz.DefaultCustomerKey, Enabled: true},
+				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskUpdate, ScopeType: "customer", ScopeValue: biz.DefaultCustomerKey, Enabled: true},
+				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskComplete, ScopeType: "customer", ScopeValue: biz.DefaultCustomerKey, Enabled: true},
 			},
 			wantAllowed:         true,
 			wantActorRoleKey:    biz.WarehouseRoleKey,
@@ -1741,8 +1741,8 @@ func TestJsonrpcDispatcher_WorkflowExplainTaskAssignmentReportsActionScopeMatche
 				{PoolKey: "warehouse", RoleKey: biz.WarehouseRoleKey, UserID: 7, Strategy: "direct_user_pool", Enabled: true},
 			},
 			[]biz.AccessEntitlementInput{
-				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskRead, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
-				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskUpdate, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
+				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskRead, ScopeType: "customer", ScopeValue: biz.DefaultCustomerKey, Enabled: true},
+				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskUpdate, ScopeType: "customer", ScopeValue: biz.DefaultCustomerKey, Enabled: true},
 				{RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskComplete, ScopeType: "customer", ScopeValue: "other_customer", Enabled: true},
 			},
 		),

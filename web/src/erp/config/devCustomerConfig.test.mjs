@@ -124,15 +124,20 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
   assert(!summary.sections.some((section) => section.title === '采购/仓储'))
 })
 
-test('devCustomerConfig: 默认客户包为 yoyoosun', () => {
-  assert.equal(DEFAULT_DEV_CUSTOMER_KEY, 'yoyoosun')
-  assert.equal(readDevCustomerKeyFromSearch(''), 'yoyoosun')
+test('devCustomerConfig: 默认不自动进入任一客户包', () => {
+  assert.equal(DEFAULT_DEV_CUSTOMER_KEY, '')
+  assert.equal(readDevCustomerKeyFromSearch(''), '')
 
   const overview = buildCustomerConfigDevOverview()
-  assert.equal(overview.status, 'ready')
-  assert.equal(overview.customerKey, 'yoyoosun')
-  assert.equal(overview.requestedCustomerKey, 'yoyoosun')
+  assert.equal(overview.status, 'missing')
+  assert.equal(overview.customerKey, '')
+  assert.equal(overview.requestedCustomerKey, '')
+  assert.equal(overview.sourceLabel, '未选择客户配置包')
   assert.equal(overview.registeredCustomers.length, 1)
+  assert.equal(overview.blockedPieces[0].key, 'customer-package-not-selected')
+  assert.equal(overview.blockedPieces[0].title, '未选择客户配置包')
+  assert.equal(overview.blockedPieces[0].status, '未选择')
+  assert.match(overview.blockedPieces[0].boundary, /不会 fallback/)
 })
 
 test('devCustomerConfig: query customer=yoyoosun 能解析到登记客户包', () => {
@@ -157,7 +162,11 @@ test('devCustomerConfig: 未登记客户返回 missing 且不 fallback 到 yoyoo
   assert.equal(overview.status, 'missing')
   assert.equal(overview.customerKey, 'unknown-customer')
   assert.equal(overview.requestedCustomerKey, 'unknown-customer')
+  assert.equal(overview.sourceLabel, '未登记客户配置包')
   assert.equal(overview.menuSummary, undefined)
+  assert.equal(overview.blockedPieces[0].key, 'missing-customer-package')
+  assert.equal(overview.blockedPieces[0].title, '未登记客户配置包')
+  assert.equal(overview.blockedPieces[0].status, '未登记')
   assert.match(overview.blockedPieces[0].boundary, /不会 fallback/)
 })
 
@@ -201,7 +210,13 @@ test('devCustomerConfig: 字段编号配置保持 draft 且不放开边界', () 
 })
 
 test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
-  const summary = buildImportToolingSummary()
+  const defaultSummary = buildImportToolingSummary()
+  assert.equal(defaultSummary.canRunUiDryRun, false)
+  assert.equal(defaultSummary.canApplyTestConfig, false)
+  assert.equal(defaultSummary.canCheckReleaseReadiness, false)
+  assert.equal(defaultSummary.testApply.status, 'blocked')
+
+  const summary = buildImportToolingSummary('yoyoosun')
 
   assert.equal(summary.canExecuteRealImport, false)
   assert.equal(summary.writesBusinessData, false)
@@ -889,7 +904,7 @@ test('devCustomerConfig: 打印模板字段只读进入客户配置控制台', (
 })
 
 test('devCustomerConfig: 客户包打印默认方信息经 effective session 投影但不覆盖供应商', () => {
-  const overview = buildCustomerConfigDevOverview()
+  const overview = buildCustomerConfigDevOverview({ customerKey: 'yoyoosun' })
   const { customerPackageSummary } = overview
   const printReview = overview.packageConsoleSummary.reviewChecklist.find(
     (item) => item.key === 'print-template-field-review'
@@ -1044,7 +1059,7 @@ test('devCustomerConfig: 规则策略和打印默认方提供业务可读投影 
 })
 
 test('devCustomerConfig: 配置包预检控制台只展示 preview / blocked 门禁', () => {
-  const overview = buildCustomerConfigDevOverview()
+  const overview = buildCustomerConfigDevOverview({ customerKey: 'yoyoosun' })
   const summary = buildCustomerPackageConsoleSummary({
     menuSummary: overview.menuSummary,
     fieldNumberingSummary: overview.fieldNumberingSummary,
@@ -1240,7 +1255,7 @@ test('devCustomerConfig: 配置包预检控制台只展示 preview / blocked 门
 })
 
 test('devCustomerConfig: 总览区分 runtime、draft 和 blocked 能力', () => {
-  const overview = buildCustomerConfigDevOverview()
+  const overview = buildCustomerConfigDevOverview({ customerKey: 'yoyoosun' })
 
   assert.equal(overview.customerKey, 'yoyoosun')
   assert.equal(overview.sourceLabel, '客户配置包说明')

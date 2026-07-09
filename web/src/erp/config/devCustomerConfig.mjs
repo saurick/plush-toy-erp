@@ -7,7 +7,7 @@ import { printTemplateCatalog, printTemplateStats } from './printTemplates.mjs'
 
 export { DEV_CUSTOMER_CONFIG_ROUTE }
 export const DEV_CUSTOMER_CONFIG_QUERY_KEY = 'customer'
-export const DEFAULT_DEV_CUSTOMER_KEY = 'yoyoosun'
+export const DEFAULT_DEV_CUSTOMER_KEY = ''
 export const DEV_CUSTOMER_CONFIG_SOURCE_PATH =
   'config/customers/yoyoosun/README.md'
 export const DEV_CUSTOMER_MENU_CONFIG_SOURCE_PATH =
@@ -233,8 +233,7 @@ export function resolveDevCustomerConfigPackage(
   customerKey = DEFAULT_DEV_CUSTOMER_KEY,
   registry = DEV_CUSTOMER_CONFIG_REGISTRY
 ) {
-  const normalizedKey =
-    normalizeCustomerKey(customerKey) || DEFAULT_DEV_CUSTOMER_KEY
+  const normalizedKey = normalizeCustomerKey(customerKey)
   const matched = registry[normalizedKey]
   return {
     status: matched ? 'ready' : 'missing',
@@ -1946,25 +1945,34 @@ export function buildCustomerConfigDevOverview({
 } = {}) {
   const resolved = resolveDevCustomerConfigPackage(customerKey, registry)
   if (!resolved.packageConfig) {
+    const hasRequestedCustomerKey = Boolean(resolved.customerKey)
+    const missingPackageTitle = hasRequestedCustomerKey
+      ? '未登记客户配置包'
+      : '未选择客户配置包'
+    const missingPackageStatus = hasRequestedCustomerKey ? '未登记' : '未选择'
+    const missingPackageBoundary = hasRequestedCustomerKey
+      ? '当前 URL customer 参数没有对应客户配置包；开发态总控不会 fallback 到 yoyoosun 冒充，也不会创建 SaaS tenant。'
+      : '当前 URL 缺少 customer 参数；开发态总控必须显式选择客户配置包，不会 fallback 到 yoyoosun 冒充，也不会创建 SaaS tenant。'
     return {
       status: resolved.status,
       customerKey: resolved.customerKey,
       requestedCustomerKey: resolved.customerKey,
       route: DEV_CUSTOMER_CONFIG_ROUTE,
       sourcePath: '',
-      sourceLabel: '未登记客户配置包',
+      sourceLabel: missingPackageTitle,
       registeredCustomers: resolved.registeredCustomers,
       runtimePieces: [],
       draftPieces: [],
       blockedPieces: [
         {
-          key: 'missing-customer-package',
-          title: '未登记客户配置包',
+          key: hasRequestedCustomerKey
+            ? 'missing-customer-package'
+            : 'customer-package-not-selected',
+          title: missingPackageTitle,
           sourcePath: 'config/customers/<customer-key>/',
           sourceLabel: mapSourcePathLabel('config/customers/<customer-key>/'),
-          status: '未登记',
-          boundary:
-            '当前 URL customer 参数没有对应客户配置包；开发态总控不会 fallback 到 yoyoosun 冒充，也不会创建 SaaS tenant。',
+          status: missingPackageStatus,
+          boundary: missingPackageBoundary,
         },
       ],
     }

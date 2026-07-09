@@ -359,3 +359,37 @@
 .erp-admin-outlet {
   min-width: 0;
 }
+
+.erp-product-core-data-guard {
+  display: grid;
+  gap: 16px;
+}
+
+.erp-product-core-data-guard__body {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.erp-product-core-data-guard__body > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid #d8e3f0;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 14px 16px;
+}
+
+.erp-product-core-data-guard__body strong {
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 768px) {
+  .erp-product-core-data-guard__body {
+    grid-template-columns: 1fr;
+  }
+}

@@ -794,7 +794,7 @@ func publishAndActivateCustomerConfigForTest(t *testing.T, dispatcher *jsonrpcDi
 		t.Fatalf("publish %s code = %d msg=%s", revision, publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": "yoyoosun",
+		"customer_key": biz.DefaultCustomerKey,
 		"revision":     revision,
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate-"+revision, activateParams)
@@ -809,11 +809,11 @@ func publishAndActivateCustomerConfigForTest(t *testing.T, dispatcher *jsonrpcDi
 func customerConfigPublishParamsForRevision(t *testing.T, revision string) *structpb.Struct {
 	t.Helper()
 	params, err := structpb.NewStruct(map[string]any{
-		"customer_key":    "yoyoosun",
+		"customer_key":    biz.DefaultCustomerKey,
 		"revision":        revision,
 		"product_version": "test",
 		"compiled_snapshot": map[string]any{
-			"customer": map[string]any{"key": "yoyoosun", "name": "永绅"},
+			"customer": map[string]any{"key": biz.DefaultCustomerKey, "name": "永绅"},
 			"pages":    []any{"global-dashboard", "permission-center", "sales-orders"},
 			"workflows": []any{
 				map[string]any{
@@ -936,8 +936,8 @@ func customerConfigPublishParamsWithSalesOrderAcceptanceProcess(t *testing.T) *s
 		map[string]any{"role_key": biz.PMCRoleKey, "display_name": "PMC"},
 	)
 	payload["access_entitlements"] = append(payload["access_entitlements"].([]any),
-		map[string]any{"role_key": biz.BossRoleKey, "capability_key": biz.PermissionWorkflowTaskApprove, "scope_type": "customer", "scope_value": "yoyoosun", "enabled": true},
-		map[string]any{"role_key": biz.PMCRoleKey, "capability_key": biz.PermissionWorkflowTaskComplete, "scope_type": "customer", "scope_value": "yoyoosun", "enabled": true},
+		map[string]any{"role_key": biz.BossRoleKey, "capability_key": biz.PermissionWorkflowTaskApprove, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
+		map[string]any{"role_key": biz.PMCRoleKey, "capability_key": biz.PermissionWorkflowTaskComplete, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
 	)
 	payload["work_pools"] = append(payload["work_pools"].([]any),
 		map[string]any{"pool_key": "order_approval", "module_key": "sales_orders", "display_name": "订单审批"},
@@ -1009,9 +1009,9 @@ func customerConfigPublishParamsWithMaterialSupplyRuntimeProcess(t *testing.T) *
 		map[string]any{"role_key": biz.WarehouseRoleKey, "display_name": "仓库"},
 	)
 	payload["access_entitlements"] = append(payload["access_entitlements"].([]any),
-		map[string]any{"role_key": biz.PurchaseRoleKey, "capability_key": biz.PermissionPurchaseReceiptCreate, "scope_type": "customer", "scope_value": "yoyoosun", "enabled": true},
-		map[string]any{"role_key": biz.QualityRoleKey, "capability_key": biz.PermissionQualityInspectionUpdate, "scope_type": "customer", "scope_value": "yoyoosun", "enabled": true},
-		map[string]any{"role_key": biz.WarehouseRoleKey, "capability_key": biz.PermissionWarehouseInboundConfirm, "scope_type": "customer", "scope_value": "yoyoosun", "enabled": true},
+		map[string]any{"role_key": biz.PurchaseRoleKey, "capability_key": biz.PermissionPurchaseReceiptCreate, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
+		map[string]any{"role_key": biz.QualityRoleKey, "capability_key": biz.PermissionQualityInspectionUpdate, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
+		map[string]any{"role_key": biz.WarehouseRoleKey, "capability_key": biz.PermissionWarehouseInboundConfirm, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
 	)
 	params, err := structpb.NewStruct(payload)
 	if err != nil {
@@ -1136,9 +1136,9 @@ func customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t *testing.T
 		map[string]any{"role_key": biz.FinanceRoleKey, "display_name": "财务"},
 	)
 	payload["access_entitlements"] = append(payload["access_entitlements"].([]any),
-		map[string]any{"role_key": biz.QualityRoleKey, "capability_key": biz.PermissionQualityInspectionUpdate, "scope_type": "customer", "scope_value": "yoyoosun", "enabled": true},
-		map[string]any{"role_key": biz.WarehouseRoleKey, "capability_key": biz.PermissionShipmentShip, "scope_type": "customer", "scope_value": "yoyoosun", "enabled": true},
-		map[string]any{"role_key": biz.FinanceRoleKey, "capability_key": biz.PermissionFinanceReceivableConfirm, "scope_type": "customer", "scope_value": "yoyoosun", "enabled": true},
+		map[string]any{"role_key": biz.QualityRoleKey, "capability_key": biz.PermissionQualityInspectionUpdate, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
+		map[string]any{"role_key": biz.WarehouseRoleKey, "capability_key": biz.PermissionShipmentShip, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
+		map[string]any{"role_key": biz.FinanceRoleKey, "capability_key": biz.PermissionFinanceReceivableConfirm, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
 	)
 	params, err := structpb.NewStruct(payload)
 	if err != nil {
@@ -1228,11 +1228,11 @@ func TestCustomerConfigJSONRPCRequiresPublishPermission(t *testing.T) {
 func TestCustomerConfigJSONRPCRejectsUnsupportedFieldPolicy(t *testing.T) {
 	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "admin", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.AdminRoleKey})
 	params, err := structpb.NewStruct(map[string]any{
-		"customer_key":    "yoyoosun",
+		"customer_key":    biz.DefaultCustomerKey,
 		"revision":        "2026.06.28.invalid-field-policy",
 		"product_version": "test",
 		"compiled_snapshot": map[string]any{
-			"customer": map[string]any{"key": "yoyoosun", "name": "永绅"},
+			"customer": map[string]any{"key": biz.DefaultCustomerKey, "name": "永绅"},
 			"pages":    []any{"global-dashboard"},
 			"fieldPolicies": map[string]any{
 				"sales_order_items.default": map[string]any{
@@ -1303,7 +1303,7 @@ func TestCustomerConfigJSONRPCPublishActivateAndEffectiveSession(t *testing.T) {
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": "yoyoosun",
+		"customer_key": biz.DefaultCustomerKey,
 		"revision":     "2026.06.28.1",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "2", activateParams)
@@ -1313,7 +1313,7 @@ func TestCustomerConfigJSONRPCPublishActivateAndEffectiveSession(t *testing.T) {
 	if activateRes.Code != errcode.OK.Code {
 		t.Fatalf("activate code = %d msg=%s", activateRes.Code, activateRes.Message)
 	}
-	sessionParams, _ := structpb.NewStruct(map[string]any{"customer_key": "yoyoosun"})
+	sessionParams, _ := structpb.NewStruct(map[string]any{"customer_key": biz.DefaultCustomerKey})
 	_, sessionRes, err := dispatcher.handleCustomerConfig(ctx, "get_effective_session", "3", sessionParams)
 	if err != nil {
 		t.Fatalf("session err = %v", err)
@@ -1352,7 +1352,7 @@ func TestCustomerConfigJSONRPCExplainModuleStatus(t *testing.T) {
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": "yoyoosun",
+		"customer_key": biz.DefaultCustomerKey,
 		"revision":     "2026.06.28.1",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "2", activateParams)
@@ -1364,7 +1364,7 @@ func TestCustomerConfigJSONRPCExplainModuleStatus(t *testing.T) {
 	}
 
 	explainParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": "yoyoosun",
+		"customer_key": biz.DefaultCustomerKey,
 		"module_key":   "sales_orders",
 	})
 	_, explainRes, err := dispatcher.handleCustomerConfig(ctx, "explain_module_status", "3", explainParams)
@@ -1394,7 +1394,7 @@ func TestCustomerConfigJSONRPCExplainModuleStatus(t *testing.T) {
 
 func TestCustomerConfigJSONRPCExplainModuleStatusRequiresReadPermission(t *testing.T) {
 	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "sales", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.SalesRoleKey})
-	params, _ := structpb.NewStruct(map[string]any{"customer_key": "yoyoosun", "module_key": "sales_orders"})
+	params, _ := structpb.NewStruct(map[string]any{"customer_key": biz.DefaultCustomerKey, "module_key": "sales_orders"})
 	_, res, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, "sales"), "explain_module_status", "1", params)
 	if err != nil {
 		t.Fatalf("handleCustomerConfig err = %v", err)
@@ -1415,7 +1415,7 @@ func TestCustomerConfigJSONRPCExplainProcessDefinitionFinishedGoodsDelivery(t *t
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": "yoyoosun",
+		"customer_key": biz.DefaultCustomerKey,
 		"revision":     "2026.06.28.1",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "2", activateParams)
@@ -1427,7 +1427,7 @@ func TestCustomerConfigJSONRPCExplainProcessDefinitionFinishedGoodsDelivery(t *t
 	}
 
 	explainParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": "yoyoosun",
+		"customer_key": biz.DefaultCustomerKey,
 		"process_key":  biz.ProcessKeyFinishedGoodsDelivery,
 	})
 	_, explainRes, err := dispatcher.handleCustomerConfig(ctx, "explain_process_definition", "3", explainParams)
@@ -1471,7 +1471,7 @@ func TestCustomerConfigJSONRPCExplainProcessDefinitionFinishedGoodsDelivery(t *t
 
 func TestCustomerConfigJSONRPCExplainProcessDefinitionRequiresReadPermission(t *testing.T) {
 	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "sales", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.SalesRoleKey})
-	params, _ := structpb.NewStruct(map[string]any{"customer_key": "yoyoosun", "process_key": biz.ProcessKeyFinishedGoodsDelivery})
+	params, _ := structpb.NewStruct(map[string]any{"customer_key": biz.DefaultCustomerKey, "process_key": biz.ProcessKeyFinishedGoodsDelivery})
 	_, res, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, "sales"), "explain_process_definition", "1", params)
 	if err != nil {
 		t.Fatalf("handleCustomerConfig err = %v", err)
@@ -1492,7 +1492,7 @@ func TestCustomerConfigJSONRPCStartFinishedGoodsDeliveryProcess(t *testing.T) {
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": "yoyoosun",
+		"customer_key": biz.DefaultCustomerKey,
 		"revision":     "2026.06.28.1",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
@@ -1504,7 +1504,7 @@ func TestCustomerConfigJSONRPCStartFinishedGoodsDeliveryProcess(t *testing.T) {
 	}
 
 	startParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key":    "yoyoosun",
+		"customer_key":    biz.DefaultCustomerKey,
 		"shipment_id":     float64(9001),
 		"shipment_no":     "SHIP-9001",
 		"idempotency_key": "finished-goods-delivery/SHIP-9001",
@@ -1563,7 +1563,7 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideGuardedBy
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": "yoyoosun",
+		"customer_key": biz.DefaultCustomerKey,
 		"revision":     "2026.06.28.1",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
@@ -1574,7 +1574,7 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideGuardedBy
 		t.Fatalf("activate code = %d msg=%s", activateRes.Code, activateRes.Message)
 	}
 	startParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key":    "yoyoosun",
+		"customer_key":    biz.DefaultCustomerKey,
 		"shipment_id":     float64(9001),
 		"shipment_no":     "SHIP-9001",
 		"idempotency_key": "finished-goods-delivery/SHIP-9001",
@@ -1653,7 +1653,7 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideRunsRegis
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": "yoyoosun",
+		"customer_key": biz.DefaultCustomerKey,
 		"revision":     "2026.06.28.1",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
@@ -1664,7 +1664,7 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideRunsRegis
 		t.Fatalf("activate code = %d msg=%s", activateRes.Code, activateRes.Message)
 	}
 	startParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key":    "yoyoosun",
+		"customer_key":    biz.DefaultCustomerKey,
 		"shipment_id":     float64(9001),
 		"shipment_no":     "SHIP-9001",
 		"idempotency_key": "finished-goods-delivery/SHIP-9001/quality-handler",
@@ -2402,7 +2402,7 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadRequires
 
 func TestCustomerConfigJSONRPCStartFinishedGoodsDeliveryRequiresShipmentPermission(t *testing.T) {
 	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "quality", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.QualityRoleKey})
-	params, _ := structpb.NewStruct(map[string]any{"customer_key": "yoyoosun", "shipment_id": float64(9001), "idempotency_key": "finished-goods-delivery/SHIP-9001"})
+	params, _ := structpb.NewStruct(map[string]any{"customer_key": biz.DefaultCustomerKey, "shipment_id": float64(9001), "idempotency_key": "finished-goods-delivery/SHIP-9001"})
 	_, res, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, "quality"), "start_finished_goods_delivery_process", "start", params)
 	if err != nil {
 		t.Fatalf("handleCustomerConfig err = %v", err)
@@ -2423,7 +2423,7 @@ func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcess(t *testing.T) {
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": "yoyoosun",
+		"customer_key": biz.DefaultCustomerKey,
 		"revision":     "2026.06.28.1",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
@@ -2435,7 +2435,7 @@ func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcess(t *testing.T) {
 	}
 
 	startParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key":    "yoyoosun",
+		"customer_key":    biz.DefaultCustomerKey,
 		"sales_order_id":  float64(42),
 		"business_ref_no": "SO-42",
 		"idempotency_key": "sales-order-acceptance/SO-42",
@@ -2512,7 +2512,7 @@ func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcess(t *testing.T) {
 	}
 
 	duplicateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key":    "yoyoosun",
+		"customer_key":    biz.DefaultCustomerKey,
 		"sales_order_id":  float64(42),
 		"business_ref_no": "SO-42",
 		"idempotency_key": "sales-order-acceptance/SO-42/retry-with-different-key",
@@ -2540,7 +2540,7 @@ func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmit(t *testing.T) {
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": "yoyoosun",
+		"customer_key": biz.DefaultCustomerKey,
 		"revision":     "2026.06.28.1",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
@@ -2552,7 +2552,7 @@ func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmit(t *testing.T) {
 	}
 
 	startParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key":    "yoyoosun",
+		"customer_key":    biz.DefaultCustomerKey,
 		"sales_order_id":  float64(42),
 		"business_ref_no": "SO-42",
 		"idempotency_key": "sales-order-acceptance/SO-42",
@@ -2633,7 +2633,7 @@ func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmitRequiresEnabledMo
 	publishAndActivateCustomerConfigForTest(t, dispatcher, ctx, customerConfigPublishParamsWithSalesOrderAcceptanceProcess(t))
 
 	startParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key":    "yoyoosun",
+		"customer_key":    biz.DefaultCustomerKey,
 		"sales_order_id":  float64(42),
 		"business_ref_no": "SO-42",
 		"idempotency_key": "sales-order-acceptance/SO-42/module-gate",
@@ -2680,7 +2680,7 @@ func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmitRequiresEnabledMo
 func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcessRequiresSubmitPermission(t *testing.T) {
 	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "pmc", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.PMCRoleKey})
 	params, _ := structpb.NewStruct(map[string]any{
-		"customer_key":    "yoyoosun",
+		"customer_key":    biz.DefaultCustomerKey,
 		"sales_order_id":  float64(42),
 		"idempotency_key": "sales-order-acceptance/SO-42",
 	})
@@ -2708,7 +2708,7 @@ func TestCustomerConfigJSONRPCStartMaterialSupplyProcess(t *testing.T) {
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": "yoyoosun",
+		"customer_key": biz.DefaultCustomerKey,
 		"revision":     "2026.06.28.1",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
@@ -2720,7 +2720,7 @@ func TestCustomerConfigJSONRPCStartMaterialSupplyProcess(t *testing.T) {
 	}
 
 	startParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key":        "yoyoosun",
+		"customer_key":        biz.DefaultCustomerKey,
 		"purchase_receipt_id": float64(6001),
 		"business_ref_no":     "PR-6001",
 		"idempotency_key":     "material-supply/PR-6001",
@@ -2798,7 +2798,7 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyQualityAndInbound(t *testing.
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": "yoyoosun",
+		"customer_key": biz.DefaultCustomerKey,
 		"revision":     "2026.06.28.1",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
@@ -2809,7 +2809,7 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyQualityAndInbound(t *testing.
 		t.Fatalf("activate code = %d msg=%s", activateRes.Code, activateRes.Message)
 	}
 	startParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key":        "yoyoosun",
+		"customer_key":        biz.DefaultCustomerKey,
 		"purchase_receipt_id": float64(6001),
 		"business_ref_no":     "PR-6001",
 		"idempotency_key":     "material-supply/PR-6001",
@@ -2934,7 +2934,7 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyPurchaseOrderToQualityAndInbo
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": "yoyoosun",
+		"customer_key": biz.DefaultCustomerKey,
 		"revision":     "2026.06.28.1",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
@@ -2946,7 +2946,7 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyPurchaseOrderToQualityAndInbo
 	}
 
 	startParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key":       "yoyoosun",
+		"customer_key":       biz.DefaultCustomerKey,
 		"purchase_order_id":  float64(5001),
 		"purchase_order_no":  "PO-5001",
 		"idempotency_key":    "material-supply/PO-5001",
@@ -3092,7 +3092,7 @@ func TestCustomerConfigJSONRPCStartMaterialSupplyProcessRequiresPurchasePermissi
 		&serviceMaterialSupplyInventoryRepo{},
 	)
 	params, _ := structpb.NewStruct(map[string]any{
-		"customer_key":        "yoyoosun",
+		"customer_key":        biz.DefaultCustomerKey,
 		"purchase_receipt_id": float64(6001),
 		"idempotency_key":     "material-supply/PR-6001",
 	})
@@ -3120,7 +3120,7 @@ func TestCustomerConfigJSONRPCRollbackUsesTargetRevision(t *testing.T) {
 	}
 
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": "yoyoosun",
+		"customer_key": biz.DefaultCustomerKey,
 		"revision":     "2026.06.28.2",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
@@ -3132,7 +3132,7 @@ func TestCustomerConfigJSONRPCRollbackUsesTargetRevision(t *testing.T) {
 	}
 
 	rollbackParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key":    "yoyoosun",
+		"customer_key":    biz.DefaultCustomerKey,
 		"target_revision": "2026.06.28.1",
 	})
 	_, rollbackRes, err := dispatcher.handleCustomerConfig(ctx, "rollback_customer_config", "rollback", rollbackParams)

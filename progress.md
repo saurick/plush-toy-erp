@@ -62,3 +62,67 @@
 下一步：amend 当前提交后重新运行相关测试和 push hook，确认 `origin/main` 与本地提交同步。
 
 阻塞/风险：本次修正只调整测试格式鲁棒性和进度记录，不改变运行时代码、schema、migration、RBAC、Workflow / Fact 或客户配置语义。
+
+## 2026-07-09 永绅客户包与 Product Core 边界隔离
+
+完成：按 `Product Core 中性 + yoyoosun 客户包显式选择` 收口隔离边界。后端缺省客户 key 从 `yoyoosun` 改为中性 `demo`；开发态客户配置页不再在缺少 `customer` query 时自动进入永绅包，而是显示“未选择客户配置包”，只有显式 `?customer=yoyoosun` 或选择器切换才进入客户包。Product Core 打印目录和加工合同模板的可见来源文案改为中性来源样本，不再在通用模板 catalog 中直出 `docs/customers/yoyoosun/raw-source-files` 或“基于 yoyoosun”口径；客户 raw-source 引用保留在 `config/customers/yoyoosun` 和 `docs/customers/yoyoosun` 边界内。同步更新 `web/README.md`、`docs/当前真源与交接顺序.md` 和 `docs/customers/yoyoosun/客户交付矩阵.md`。
+
+下一步：若后续新增第二个客户包，优先补 `config/customers/<customer-key>/`、客户 runtime manifest、页面选择器和发布证据链；仍不把客户差异写进 Product Core 默认 key、schema 或通用 usecase。
+
+阻塞/风险：本轮不新增 `tenant_id`、不实现 SaaS 多租户、不做真实客户数据导入、不改 schema / migration / RBAC / Workflow / Fact / release 执行器。已通过 `/usr/local/bin/pnpm --dir web exec node --test src/erp/config/devCustomerConfig.test.mjs src/erp/config/printTemplates.test.mjs`、`node --test scripts/qa/dev-entry-boundary.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs`、`node scripts/qa/customer-config-boundaries.mjs`、`go test ./internal/biz ./internal/server`、`node --check web/scripts/style-l1/scenarios.mjs`、`STYLE_L1_SCENARIOS=dev-customer-config-dark-desktop,dev-customer-config-mobile /usr/local/bin/pnpm --dir web style:l1` 和 `git diff --check`；L1 验证覆盖缺省未选择、未知客户、显式 yoyoosun、选择器切换和移动端布局。focused runtime 扫描仅剩客户配置包目录内的 raw-source 引用，符合隔离边界。
+
+## 2026-07-09 super admin 永绅菜单审阅可见性
+
+完成：修正永绅静态客户菜单先隐藏 `business-dashboard` 等入口，导致 `admin` 超级管理员也无法审阅业务看板的问题。`ERPLayout` 现在在 `is_super_admin=true` 时使用 Product Core 默认导航，不再被客户静态菜单子集收窄；普通账号仍按永绅 `customer-config.js`、RBAC 菜单路径和 active effective session pages 交集收窄。同步更新 `web/README.md`，明确该行为只影响前端审阅可见性，不扩大后端写入口、Workflow / Fact 或业务动作权限。
+
+下一步：如果后续要让普通永绅业务角色也看到业务看板，需要单独评审客户试用菜单和培训口径；当前只修复 `admin` 超级管理员看全产品核心菜单。
+
+阻塞/风险：本轮不改后端 RBAC、schema、migration、客户配置 active revision、Workflow / Fact usecase 或 release evidence。已通过 `/usr/local/bin/pnpm --dir web exec node --test src/erp/config/seedData.test.mjs src/erp/utils/adminProfileSync.test.mjs`、`/usr/local/bin/pnpm --dir web exec eslint --ext .js --ext .jsx src/erp/config/customerMenuConfig.mjs src/erp/config/seedData.mjs src/erp/config/seedData.test.mjs src/erp/components/ERPLayout.jsx`、`node --test scripts/qa/formal-frontend-customer-config-boundary.test.mjs` 和 `git diff --check -- web/src/erp/config/customerMenuConfig.mjs web/src/erp/config/seedData.mjs web/src/erp/components/ERPLayout.jsx web/src/erp/config/seedData.test.mjs web/README.md`。未跑浏览器 `style:l1`，因为本轮只改菜单数据源分流与单元合同，不改 DOM 样式、布局或交互态。
+
+## 2026-07-09 永绅试用角色菜单合同收口
+
+完成：按 super admin 审阅结论继续收口普通试用角色菜单合同。`trialDemoAccountBrowserSmoke` 不再把永绅隐藏的 `业务看板`、`异常 / 阻塞闭环` 写成普通 demo 账号 expectedMenus，而是改为各岗位稳定可见的任务看板和代表性业务页；测试同步锁住普通账号不得把永绅隐藏项配置为期望菜单。前端 `ERP_PERMISSION_PRESETS` 补齐 `engineering` 和 `admin`，其中 `engineering` 对应产品工程和工程岗位任务端，`admin` 只对应权限管理，继续和 `is_super_admin=true` 的产品核心看全账号分开。
+
+下一步：如要做真实浏览器试用验收，先启动本地后端、已审计的永绅前端 runtime，并提供 `TRIAL_ACCOUNT_PASSWORD` 后运行 `pnpm --dir web smoke:trial-demo-browser`；当前本轮已把静态模板和合同测试收口。
+
+阻塞/风险：本轮不改后端 RBAC、角色 seed、schema、migration、客户配置 active revision、Workflow / Fact usecase、业务写入口或 release evidence。已通过 `node --test web/src/erp/config/entryConfig.test.mjs web/src/erp/config/menuPermissions.test.mjs web/src/erp/config/seedData.test.mjs web/src/erp/config/workflowStatus.test.mjs scripts/qa/trial-account-rbac.test.mjs web/scripts/trialDemoAccountBrowserSmoke.test.mjs`、`/usr/local/bin/pnpm --dir web exec node --test src/erp/utils/adminProfileSync.test.mjs`、`node --test scripts/qa/formal-frontend-customer-config-boundary.test.mjs`、`/usr/local/bin/pnpm --dir web exec eslint --ext .js --ext .jsx src/erp/config/menuPermissions.mjs src/erp/config/menuPermissions.test.mjs scripts/trialDemoAccountBrowserSmoke.mjs scripts/trialDemoAccountBrowserSmoke.test.mjs src/erp/components/ERPLayout.jsx src/erp/config/seedData.test.mjs`、`/usr/local/bin/pnpm --dir web exec prettier --check src/erp/config/menuPermissions.mjs src/erp/config/menuPermissions.test.mjs scripts/trialDemoAccountBrowserSmoke.mjs scripts/trialDemoAccountBrowserSmoke.test.mjs` 和 `git diff --check -- web/src/erp/config/menuPermissions.mjs web/src/erp/config/menuPermissions.test.mjs web/scripts/trialDemoAccountBrowserSmoke.mjs web/scripts/trialDemoAccountBrowserSmoke.test.mjs`。未跑真实浏览器 smoke 和 `style:l1`；本轮是菜单 / RBAC 数据合同调整，不改 DOM 样式和页面布局。
+
+## 2026-07-09 Product Core 业务数据隔离空态
+
+完成：在 super admin `super_admin_product_core` 投影下，`ERPLayout` 对客户业务数据页新增产品核心评审空态，不再挂载真实业务 `Outlet`，避免销售、采购、委外、库存、质检、出货、财务、主数据和异常闭环页面读取当前客户业务表。普通账号 / 客户有效投影仍按原业务 API 读取当前部署数据库；系统权限、审计日志、打印中心和工作台不进入该业务数据阻断。`businessModules` 新增 `isCustomerBusinessDataPageKey` 作为业务数据页单一判断，`style:l1` 的 super admin Product Core 场景改为断言不出现 `SHIP-STYLE-L1` 和写按钮，并用 DOM / scroll metrics 确认空态不溢出。同步更新 `docs/当前真源与交接顺序.md`、`web/README.md` 和正式前端客户配置边界测试。
+
+下一步：如果后续要让 Product Core 评审页展示能力矩阵或中性 demo 数据，应单独做只读产品能力页或 demo 数据源，不在客户业务页里读取当前客户表。
+
+阻塞/风险：本轮不新增 `tenant_id`、不实现 SaaS 多租户、不拆数据库、不清理已有本地 / 测试库里的 `SIM-*` 模拟业务数据，也不改 schema、migration、RBAC、Workflow / Fact usecase 或后端 JSON-RPC。已通过 `node --test web/src/erp/config/seedData.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs`、`/usr/local/bin/pnpm --dir web exec node --test src/erp/utils/adminProfileSync.test.mjs src/erp/config/seedData.test.mjs`、`/usr/local/bin/pnpm --dir web exec eslint --ext .js --ext .jsx --ext .mjs src/erp/components/ERPLayout.jsx src/erp/config/businessModules.mjs src/erp/config/seedData.test.mjs scripts/style-l1/scenarios.mjs`、`/usr/local/bin/pnpm --dir web css`、`STYLE_L1_PORT=5236 STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-action-projection-business-pages /usr/local/bin/pnpm --dir web style:l1` 和 `git diff --check`。首次 L1 复用旧 Vite 端口时遇到 HMR 导致的 `ERPWorkspaceProvider is missing`，换新端口重启干净服务后通过。
+
+## 2026-07-09 super admin 客户运行态误拦截修正
+
+完成：修正上一条 Product Core 空态判定过宽的问题。`super_admin_product_core` 只是 super admin 的前端投影诊断 reason，不等同无客户运行态；`ERPLayout` 现在只有在该 reason 且 `effectiveSessionDiagnostic.customerKey` 为空时才显示产品核心评审空态。带有 `yoyoosun` 等客户 key 的 super admin 仍按客户运行环境挂载业务页，`style:l1` 反向锁住出货页必须显示 `SHIP-STYLE-L1`、保留 `新建草稿` 动作且不出现隔离提示。同步更新 `web/README.md`、`docs/当前真源与交接顺序.md` 和正式前端客户配置边界测试。
+
+下一步：如果后续确实需要“纯 Product Core 能力矩阵”页面，应新建只读能力页或中性 demo 数据源，不复用客户业务页去表达产品核心。
+
+阻塞/风险：本轮不新增 `tenant_id`、不实现 SaaS 多租户、不拆客户数据库、不改 schema、migration、RBAC、Workflow / Fact usecase 或后端 JSON-RPC。已通过 `node --test web/src/erp/config/seedData.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs`、`/usr/local/bin/pnpm --dir web exec node --test src/erp/utils/adminProfileSync.test.mjs src/erp/config/seedData.test.mjs`、`/usr/local/bin/pnpm --dir web exec eslint --ext .js --ext .jsx --ext .mjs src/erp/components/ERPLayout.jsx src/erp/config/businessModules.mjs src/erp/config/seedData.test.mjs scripts/style-l1/scenarios.mjs`、`/usr/local/bin/pnpm --dir web css`、`STYLE_L1_PORT=5238 STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-action-projection-business-pages /usr/local/bin/pnpm --dir web style:l1` 和 `git diff --check`；pnpm/css 与 style:l1 仅保留当前 Node 版本高于仓库 engine 的 warning。
+
+## 2026-07-09 Product Core 无客户态业务看板隔离补漏
+
+完成：修正 Product Core 无客户态仍可挂载 `/erp/business-dashboard` 并读取真实业务统计的问题。`isCustomerBusinessDataPageKey` 现在把 `business-dashboard` 纳入客户业务数据页，`ERPLayout` 通过既有 `shouldGuardCustomerBusinessPageRuntime` 在无有效客户 key / sync-failed 空投影时显示产品核心评审空态，不再挂载业务看板 `Outlet`；带有 `yoyoosun` customer key 的 super admin 客户运行态仍可正常打开业务页。同步更新 `web/README.md`、`docs/当前真源与交接顺序.md`、正式前端客户配置边界测试和 `style:l1` 场景。
+
+下一步：如果后续需要 Product Core 的中性能力总览，应新建只读产品能力矩阵或 demo 数据源，不复用客户业务看板读取 `business.dashboard_stats`。
+
+阻塞/风险：本轮不改后端 RBAC、JSON-RPC、schema、migration、Workflow / Fact usecase、业务统计 API 或客户数据库隔离方式；只是阻止无客户 Product Core 前端挂载客户业务数据页。已通过 `/usr/local/bin/pnpm --dir web exec node --test src/erp/config/seedData.test.mjs src/erp/utils/adminProfileSync.test.mjs`、`node --test scripts/qa/formal-frontend-customer-config-boundary.test.mjs`、`/usr/local/bin/pnpm --dir web exec prettier --check src/erp/config/businessModules.mjs src/erp/config/seedData.test.mjs scripts/style-l1/scenarios.mjs ../scripts/qa/formal-frontend-customer-config-boundary.test.mjs`、`/usr/local/bin/pnpm --dir web exec eslint --ext .js --ext .jsx --ext .mjs src/erp/config/businessModules.mjs src/erp/config/seedData.test.mjs scripts/style-l1/scenarios.mjs`、`node --check scripts/qa/formal-frontend-customer-config-boundary.test.mjs`、`STYLE_L1_PORT=5241 STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core-no-customer-business-dashboard,erp-effective-session-super-admin-product-core /usr/local/bin/pnpm --dir web style:l1` 和 `git diff --check -- web/src/erp/config/businessModules.mjs web/src/erp/config/seedData.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs web/scripts/style-l1/scenarios.mjs web/README.md docs/当前真源与交接顺序.md`；当前 Node 版本仍高于仓库 engine，style:l1 仅保留 engine / typeless module warning。
+
+## 2026-07-09 super admin 可见性与客户运行态拆分及回归数据重建
+
+完成：将 `super_admin_product_core` 收口为前端可见性 `visibilityMode`，新增 `dataRuntimeScope` 与 `canMountCustomerBusinessPages` 作为客户业务页是否挂载的唯一数据运行态判断；`ERPLayout` 改为通过 `shouldGuardCustomerBusinessPageRuntime` 判断客户业务页空态，并在 shell 上暴露 `data-effective-session-data-scope` 供浏览器回归断言。带 `yoyoosun` customer key 的 super admin 仍进入客户运行态，sync-failed / 无客户 key 才阻止客户业务页挂载。Product Core demo seed 扩充为中性单位、材料、产品、仓库、工序和 BOM 数据；永绅 preview fixture 扩充到客户、供应商、材料、产品、仓库、BOM、销售、采购、委外、采购入库、质检、库存批次、出货、财务草稿和 Workflow 任务，并覆盖 draft / active / cancelled、pending / passed / rejected、ready / blocked / done 等手动回归状态。新增 `scripts/qa/manual-regression-data-plan.mjs` 只读总计划和测试，`test-data-isolation-boundary` 也纳入永绅 fixture 与手动回归计划守卫。同步更新 `web/README.md`、`docs/当前真源与交接顺序.md`、`docs/customers/yoyoosun/客户交付矩阵.md` 和 `scripts/README.md`。
+
+下一步：如果要把这些模拟数据真正写入本地或目标试用环境，先按 `manual-regression-data-plan` 输出准备 Product Core seed 结果中的 ID，再分别执行 trial / operational fact / mobile workflow 的 `--apply` 路径，并提供对应模拟确认环境变量；真实客户数据导入仍需单独 approval、备份和恢复计划。
+
+阻塞/风险：本轮不新增 `tenant_id`、不实现 SaaS 多租户、不拆客户数据库、不执行真实客户导入、不改 schema / migration / RBAC / Workflow / Fact usecase 或后端 JSON-RPC 写入口。已通过 `node --test web/src/erp/utils/adminProfileSync.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs scripts/qa/manual-regression-data-plan.test.mjs scripts/qa/test-data-isolation-boundary.test.mjs scripts/qa/yoyoosun-customer-closure.test.mjs scripts/qa/trial-simulated-data.test.mjs scripts/qa/operational-fact-simulated-closure.test.mjs scripts/qa/mobile-workflow-simulated-closure.test.mjs`、`go test ./internal/data`、`/usr/local/bin/pnpm --dir web exec eslint --ext .js --ext .jsx --ext .mjs src/erp/utils/adminProfileSync.mjs src/erp/utils/adminProfileSync.test.mjs src/erp/components/ERPLayout.jsx scripts/style-l1/scenarios.mjs`、`/usr/local/bin/pnpm --dir web css`、`STYLE_L1_PORT=5239 STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-action-projection-business-pages /usr/local/bin/pnpm --dir web style:l1`、`node --check scripts/qa/manual-regression-data-plan.mjs scripts/qa/manual-regression-data-plan.test.mjs scripts/qa/test-data-isolation-boundary.mjs`、`node scripts/qa/test-data-isolation-boundary.mjs --json`、`node scripts/qa/manual-regression-data-plan.mjs --json` 和 `git diff --check`。Node 仍有 typeless package warning，不影响本轮测试结果。
+
+## 2026-07-09 第二轮提交推送全量验证收口
+
+完成：继续按 full-worktree closeout 复跑提交前验证。`qa:full` 首次在 `server/internal/service` 暴露服务测试夹具仍写死旧 `yoyoosun` 默认客户 key；已将服务层客户配置测试中的默认客户 key / scope value 对齐到 `biz.DefaultCustomerKey`，避免后端默认客户从 `yoyoosun` 切到 `demo` 后，省略 `customer_key` 的业务 API 测试找不到 active revision。
+
+下一步：提交并推送当前全工作区改动，推送前继续确认远端未领先；如 pre-commit / pre-push 产生格式化或守卫问题，按 hook 反馈继续收口。
+
+阻塞/风险：本轮服务测试修正只改测试夹具，不改变 schema、migration、RBAC、Workflow / Fact、客户配置 usecase 或 JSON-RPC 运行时语义。已通过 `go test ./internal/service` 和 `bash scripts/qa/full.sh`；`qa:full` 最终显示 `[qa:full] 全部通过`。当前 Node 版本高于仓库 engine、`ProcessingContractPrintWorkspacePage.jsx` 仍有既有 React Hook dependency warning，不影响本轮 full QA 结果。

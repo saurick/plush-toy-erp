@@ -829,17 +829,23 @@ function AssetTile({ item }) {
 }
 
 function MissingCustomerPanel({ overview }) {
+  const requestedCustomerKey = overview.requestedCustomerKey || '未选择'
+  const missingTitle = overview.sourceLabel || '未登记客户配置包'
+  const missingDescription = overview.requestedCustomerKey
+    ? '当前 URL customer 参数没有对应客户配置包 / no registered package for this customer query. 开发态总控不会 fallback 到 yoyoosun 冒充，不创建 SaaS tenant，不新增 tenant_id，也不接后端或数据库。'
+    : '当前 URL 缺少 customer 参数 / no customer query selected. 开发态总控必须显式选择客户配置包，不会 fallback 到 yoyoosun 冒充，不创建 SaaS tenant，不新增 tenant_id，也不接后端或数据库。'
+
   return (
     <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-missing">
       <div className="erp-dev-customer-panel__head">
         <ExclamationCircleOutlined />
-        <Text strong>未登记客户配置包</Text>
+        <Text strong>{missingTitle}</Text>
       </div>
       <Alert
         type="warning"
         showIcon
-        message={`未登记客户配置包：${overview.requestedCustomerKey}`}
-        description="当前 URL customer 参数没有对应客户配置包 / no registered package for this customer query. 开发态总控不会 fallback 到 yoyoosun 冒充，不创建 SaaS tenant，不新增 tenant_id，也不接后端或数据库。"
+        message={`${missingTitle}：${requestedCustomerKey}`}
+        description={missingDescription}
       />
       <div className="erp-dev-customer-registered-list">
         <Text type="secondary">已登记客户包 / Registered Packages</Text>

@@ -76,19 +76,12 @@ const oldEntryLabels = [
 const desktopAccounts = [
   {
     username: 'demo_boss',
-    expectedMenus: [
-      '工作台',
-      '任务看板',
-      '业务看板',
-      '客户档案',
-      '供应商档案',
-      '销售订单',
-    ],
+    expectedMenus: ['工作台', '任务看板', '客户档案', '供应商档案', '销售订单'],
     forbiddenMenus: ['权限管理'],
   },
   {
     username: 'demo_sales',
-    expectedMenus: ['工作台', '任务看板', '业务看板', '客户档案', '销售订单'],
+    expectedMenus: ['工作台', '任务看板', '客户档案', '销售订单'],
     forbiddenMenus: ['权限管理'],
   },
   {
@@ -96,35 +89,41 @@ const desktopAccounts = [
     expectedMenus: [
       '工作台',
       '任务看板',
-      '业务看板',
       '供应商档案',
+      '采购订单',
       '模板打印中心',
     ],
     forbiddenMenus: ['权限管理'],
   },
   {
     username: 'demo_production',
-    expectedMenus: ['工作台', '任务看板', '业务看板', '异常 / 阻塞闭环'],
+    expectedMenus: ['工作台', '任务看板', '产品档案', '生产进度'],
     forbiddenMenus: ['权限管理'],
   },
   {
     username: 'demo_warehouse',
-    expectedMenus: ['工作台', '任务看板', '业务看板', '异常 / 阻塞闭环'],
+    expectedMenus: ['工作台', '任务看板', '入库管理', '库存台账', '出货单'],
     forbiddenMenus: ['权限管理'],
   },
   {
     username: 'demo_quality',
-    expectedMenus: ['工作台', '任务看板', '业务看板', '异常 / 阻塞闭环'],
+    expectedMenus: ['工作台', '任务看板', '来料质检'],
     forbiddenMenus: ['权限管理'],
   },
   {
     username: 'demo_finance',
-    expectedMenus: ['工作台', '任务看板', '业务看板', '模板打印中心'],
+    expectedMenus: [
+      '工作台',
+      '任务看板',
+      '对账管理',
+      '应收管理',
+      '模板打印中心',
+    ],
     forbiddenMenus: ['权限管理'],
   },
   {
     username: 'demo_pmc',
-    expectedMenus: ['工作台', '任务看板', '业务看板', '异常 / 阻塞闭环'],
+    expectedMenus: ['工作台', '任务看板', 'BOM 管理', '生产进度'],
     forbiddenMenus: ['权限管理'],
   },
   {
@@ -132,7 +131,6 @@ const desktopAccounts = [
     expectedMenus: [
       '工作台',
       '任务看板',
-      '业务看板',
       '产品档案',
       '材料档案',
       '加工环节',
