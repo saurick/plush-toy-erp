@@ -70,7 +70,7 @@ function writeCustomerConfigManifestEvidence(evidenceDir) {
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        revision: "yoyoosun-customer-package-v4.runtime-manifest-v1",
+        revision: "yoyoosun-customer-package-v5.runtime-manifest-v1",
         manifestSha256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         reviewStatus: "approved",
         redaction: {
@@ -297,7 +297,7 @@ test("closeout runner report-only keeps customer config smoke token sanitized", 
   assert.match(smokeCommand.displayCommand, /--backend-url https:\/\/backend\.example\.invalid/);
   assert.match(
     smokeCommand.displayCommand,
-    /--customer-config-revision yoyoosun-customer-package-v4\.runtime-manifest-v1/,
+    /--customer-config-revision yoyoosun-customer-package-v5\.runtime-manifest-v1/,
   );
 });
 

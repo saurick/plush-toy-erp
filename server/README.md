@@ -27,6 +27,8 @@ bash scripts/doctor.sh
 - `biz`：业务规约与 UseCase
 - `data`：数据库与外部依赖访问
 
+HTTP / gRPC transport 日志只记录 operation、JSON-RPC domain / method / id、结果码和耗时，不序列化请求体；密码、验证码、token、附件内容和客户业务参数必须留在脱敏后的业务日志边界内。
+
 ## 开发验收 debug 能力
 
 后端 JSON-RPC `debug` 域可生成和清理开发验收调试数据。前端业务链路调试页已移除，这组接口只作为受权限保护的后端调试能力保留；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，debug seed / cleanup 不再写旧通用业务记录：

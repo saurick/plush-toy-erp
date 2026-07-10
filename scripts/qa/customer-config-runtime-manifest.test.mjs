@@ -59,7 +59,7 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
   const manifest = buildRuntimeManifest(yoyoosunCustomerPackage);
 
   assert.equal(manifest.customer_key, "yoyoosun");
-  assert.equal(manifest.revision, "yoyoosun-customer-package-v4.runtime-manifest-v1");
+  assert.equal(manifest.revision, "yoyoosun-customer-package-v5.runtime-manifest-v1");
   assert.equal(manifest.compiled_snapshot.package.runtimeEnabled, false);
   assert.equal(manifest.compiled_snapshot.package.previewOnly, true);
   assert(manifest.compiled_snapshot.pages.includes("sales-orders"));
@@ -112,9 +112,9 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
       item.template_key,
       item.party_defaults.buyerCompany,
       item.party_defaults.buyerContact,
-      item.party_defaults.buyerPhone,
       item.party_defaults.buyerAddress,
-      item.party_defaults.buyerSigner,
+      Object.hasOwn(item.party_defaults, "buyerPhone"),
+      Object.hasOwn(item.party_defaults, "buyerSigner"),
       item.runtime_consumed,
       item.supplier_defaults_allowed,
     ]),
@@ -123,9 +123,9 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
         "material-purchase-contract",
         "永绅",
         "采购负责人",
-        "",
         "东莞-茶山",
-        "",
+        false,
+        false,
         true,
         false,
       ],
@@ -133,9 +133,9 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
         "processing-contract",
         "永绅",
         "委外负责人",
-        "",
         "东莞茶山",
-        "",
+        false,
+        false,
         true,
         false,
       ],
@@ -238,7 +238,7 @@ test("customer-config-runtime-manifest: repeated customer flags compile every re
   assert.deepEqual(
     results.map((result) => result.manifest.revision),
     [
-      "yoyoosun-customer-package-v4.runtime-manifest-v1",
+      "yoyoosun-customer-package-v5.runtime-manifest-v1",
       "demo-customer-package-v1.runtime-manifest-v1",
     ],
   );
@@ -887,6 +887,26 @@ test("customer-config-runtime-manifest: compiles yoyoosun entitlements as the on
     manifest.access_entitlements.some((item) => item.capability_key === "package.preview"),
     false,
     "catalog preview capabilities must not be published as business permissions",
+  );
+});
+
+test("customer-config-runtime-manifest: keeps yoyoosun master-data maintenance aligned with Product Core roles", () => {
+  const manifest = buildRuntimeManifest(yoyoosunCustomerPackage);
+  const capabilitiesByRole = Object.groupBy(
+    manifest.access_entitlements,
+    (item) => item.role_key,
+  );
+  assert.deepEqual(
+    ["customer.create", "customer.update", "contact.create", "contact.update"].filter(
+      (capability) => !capabilitiesByRole.sales.some((item) => item.capability_key === capability),
+    ),
+    [],
+  );
+  assert.deepEqual(
+    ["supplier.create", "supplier.update", "contact.create", "contact.update"].filter(
+      (capability) => !capabilitiesByRole.purchase.some((item) => item.capability_key === capability),
+    ),
+    [],
   );
 });
 

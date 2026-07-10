@@ -1,0 +1,20 @@
+{
+  "customerKey": "yoyoosun",
+  "revision": "yoyoosun-customer-package-v5.runtime-manifest-v1",
+  "productVersion": "local-customer-package",
+  "manifestSha256": "sha256:5edb5c89580cd7a52170ec457a9fd551130ab1aafdfe89516a33d1af5c024b4a",
+  "manifestPath": "output/customers/yoyoosun/customer-config-runtime-manifest.json",
+  "releaseReport": "",
+  "reviewStatus": "approved",
+  "reviewer": "codex-runtime-review-2026-07-10",
+  "generatedAt": "2026-07-10T09:36:23.922Z",
+  "redaction": {
+    "containsSecrets": false,
+    "containsRawCustomerRows": false,
+    "containsRawCustomerFiles": false
+  },
+  "noRawFileUpload": true,
+  "noDirectDatabaseWrite": true,
+  "noBusinessDataImport": true,
+  "noWorkflowFactRuntimeWrite": true
+}

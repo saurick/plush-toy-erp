@@ -53,7 +53,7 @@ case "$url" in
     ;;
   */rpc/customer_config)
     cat <<'JSON'
-{"result":{"code":0,"data":{"session":{"configRevision":"yoyoosun-customer-package-v4.runtime-manifest-v1","source":"active_customer_config_revision","pages":["global-dashboard"],"fieldPolicies":{"customers.default":{},"suppliers.default":{},"sales_orders.default":{}}}}}}
+{"result":{"code":0,"data":{"session":{"configRevision":"yoyoosun-customer-package-v5.runtime-manifest-v1","source":"active_customer_config_revision","pages":["global-dashboard"],"fieldPolicies":{"customers.default":{},"suppliers.default":{},"sales_orders.default":{}}}}}}
 JSON
     ;;
   *)
@@ -92,7 +92,7 @@ test("run smoke input template is no-write and does not require endpoint", () =>
   assert.equal(template.readsAdminToken, false);
   assert(template.checks.includes("customer-config-effective-session when --customer-config-revision is provided"));
   assert(template.requiredReadbackEvidence.includes("target=jsonrpc:customer_config.get_effective_session"));
-  assert.match(template.commands.join("\n"), /--customer-config-revision yoyoosun-customer-package-v4\.runtime-manifest-v1/);
+  assert.match(template.commands.join("\n"), /--customer-config-revision yoyoosun-customer-package-v5\.runtime-manifest-v1/);
   assert.match(template.commands.join("\n"), /--admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN/);
   assert.match(template.boundary, /does not call endpoints/);
   assert.match(template.boundary, /does not .*write smoke-test-report\.json/);
@@ -120,7 +120,7 @@ test("run smoke writes release-gate compatible report", async () => {
       "--report",
       reportPath,
       "--customer-config-revision",
-      "yoyoosun-customer-package-v4.runtime-manifest-v1",
+      "yoyoosun-customer-package-v5.runtime-manifest-v1",
       "--admin-token-env",
       "SMOKE_ADMIN_TOKEN",
     ],
@@ -151,7 +151,7 @@ test("run smoke writes release-gate compatible report", async () => {
   }
   const customerConfigCheck = report.checks.find((check) => check.name === "customer-config-effective-session");
   assert.equal(customerConfigCheck.target, "jsonrpc:customer_config.get_effective_session");
-  assert.equal(customerConfigCheck.expectedRevision, "yoyoosun-customer-package-v4.runtime-manifest-v1");
+  assert.equal(customerConfigCheck.expectedRevision, "yoyoosun-customer-package-v5.runtime-manifest-v1");
   assert.equal(customerConfigCheck.tokenSourceEnv, "SMOKE_ADMIN_TOKEN");
   assert.equal(customerConfigCheck.responseBodyStored, false);
   assert.equal(report.redaction.containsSecrets, false);

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -1000,19 +1001,19 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 	in.Revision = strings.TrimSpace(in.Revision)
 	in.ProductVersion = strings.TrimSpace(in.ProductVersion)
 	if in.CustomerKey == "" || in.Revision == "" || len(in.CompiledSnapshot) == 0 {
-		return CustomerConfigPublishInput{}, ErrBadParam
+		return CustomerConfigPublishInput{}, fmt.Errorf("%w: customer key, revision and compiled snapshot are required", ErrBadParam)
 	}
 	if containsForbiddenCustomerConfigPayload(in.CompiledSnapshot) {
-		return CustomerConfigPublishInput{}, ErrBadParam
+		return CustomerConfigPublishInput{}, fmt.Errorf("%w: compiled snapshot contains forbidden payload", ErrBadParam)
 	}
 	if !compiledSnapshotPagesAreAllowed(in.CompiledSnapshot) {
-		return CustomerConfigPublishInput{}, ErrBadParam
+		return CustomerConfigPublishInput{}, fmt.Errorf("%w: compiled snapshot pages are invalid", ErrBadParam)
 	}
 	if !compiledSnapshotFieldPoliciesAreAllowed(in.CompiledSnapshot) {
-		return CustomerConfigPublishInput{}, ErrBadParam
+		return CustomerConfigPublishInput{}, fmt.Errorf("%w: compiled snapshot field policies are invalid", ErrBadParam)
 	}
 	if !compiledSnapshotPrintTemplateDefaultsAreAllowed(in.CompiledSnapshot) {
-		return CustomerConfigPublishInput{}, ErrBadParam
+		return CustomerConfigPublishInput{}, fmt.Errorf("%w: compiled snapshot print template defaults are invalid", ErrBadParam)
 	}
 	for index := range in.ModuleStates {
 		item := &in.ModuleStates[index]
@@ -1021,17 +1022,17 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 		item.State = strings.TrimSpace(item.State)
 		item.Reason = strings.TrimSpace(item.Reason)
 		if item.ModuleKey == "" {
-			return CustomerConfigPublishInput{}, ErrBadParam
+			return CustomerConfigPublishInput{}, fmt.Errorf("%w: module state key is required", ErrBadParam)
 		}
 		if item.State == "" {
 			item.State = "enabled"
 		}
 		if item.State != "enabled" && item.State != "read_only" && item.State != "disabled" {
-			return CustomerConfigPublishInput{}, ErrBadParam
+			return CustomerConfigPublishInput{}, fmt.Errorf("%w: invalid module state for %s", ErrBadParam, item.ModuleKey)
 		}
 	}
 	if len(in.RoleProfiles) == 0 {
-		return CustomerConfigPublishInput{}, ErrBadParam
+		return CustomerConfigPublishInput{}, fmt.Errorf("%w: role profiles are required", ErrBadParam)
 	}
 	roleProfileKeys := map[string]struct{}{}
 	for index := range in.RoleProfiles {
@@ -1041,15 +1042,15 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 		item.BundleKeys = normalizeStringList(item.BundleKeys)
 		item.Revokes = normalizeStringList(item.Revokes)
 		if item.RoleKey == "" || item.DisplayName == "" {
-			return CustomerConfigPublishInput{}, ErrBadParam
+			return CustomerConfigPublishInput{}, fmt.Errorf("%w: role profile key and display name are required", ErrBadParam)
 		}
 		if _, exists := roleProfileKeys[item.RoleKey]; exists {
-			return CustomerConfigPublishInput{}, ErrBadParam
+			return CustomerConfigPublishInput{}, fmt.Errorf("%w: duplicate role profile %s", ErrBadParam, item.RoleKey)
 		}
 		roleProfileKeys[item.RoleKey] = struct{}{}
 	}
 	if !compiledSnapshotRolePageProjectionsAreAllowed(in.CompiledSnapshot, roleProfileKeys) {
-		return CustomerConfigPublishInput{}, ErrBadParam
+		return CustomerConfigPublishInput{}, fmt.Errorf("%w: compiled snapshot role page projections are invalid", ErrBadParam)
 	}
 	for index := range in.AccessEntitlements {
 		item := &in.AccessEntitlements[index]
@@ -1064,13 +1065,13 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 			item.ScopeValue = "*"
 		}
 		if item.RoleKey == "" || item.CapabilityKey == "" {
-			return CustomerConfigPublishInput{}, ErrBadParam
+			return CustomerConfigPublishInput{}, fmt.Errorf("%w: entitlement role and capability are required", ErrBadParam)
 		}
 		if _, exists := roleProfileKeys[item.RoleKey]; !exists {
-			return CustomerConfigPublishInput{}, ErrBadParam
+			return CustomerConfigPublishInput{}, fmt.Errorf("%w: entitlement role profile %s is missing", ErrBadParam, item.RoleKey)
 		}
 		if !builtinRoleHasPermission(item.RoleKey, item.CapabilityKey) {
-			return CustomerConfigPublishInput{}, ErrBadParam
+			return CustomerConfigPublishInput{}, fmt.Errorf("%w: role %s does not own capability %s", ErrBadParam, item.RoleKey, item.CapabilityKey)
 		}
 	}
 	workPoolKeys := map[string]struct{}{}
@@ -1081,10 +1082,10 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 		item.DisplayName = strings.TrimSpace(item.DisplayName)
 		item.Description = strings.TrimSpace(item.Description)
 		if item.PoolKey == "" || item.ModuleKey == "" || item.DisplayName == "" {
-			return CustomerConfigPublishInput{}, ErrBadParam
+			return CustomerConfigPublishInput{}, fmt.Errorf("%w: work pool key, module and display name are required", ErrBadParam)
 		}
 		if _, exists := workPoolKeys[item.PoolKey]; exists {
-			return CustomerConfigPublishInput{}, ErrBadParam
+			return CustomerConfigPublishInput{}, fmt.Errorf("%w: duplicate work pool %s", ErrBadParam, item.PoolKey)
 		}
 		workPoolKeys[item.PoolKey] = struct{}{}
 	}
@@ -1097,14 +1098,14 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 			item.Strategy = "role_pool"
 		}
 		if item.PoolKey == "" || (item.RoleKey == "" && item.UserID <= 0) {
-			return CustomerConfigPublishInput{}, ErrBadParam
+			return CustomerConfigPublishInput{}, fmt.Errorf("%w: work pool membership target is required", ErrBadParam)
 		}
 		if _, exists := workPoolKeys[item.PoolKey]; !exists {
-			return CustomerConfigPublishInput{}, ErrBadParam
+			return CustomerConfigPublishInput{}, fmt.Errorf("%w: membership work pool %s is missing", ErrBadParam, item.PoolKey)
 		}
 		if item.RoleKey != "" {
 			if _, exists := roleProfileKeys[item.RoleKey]; !exists {
-				return CustomerConfigPublishInput{}, ErrBadParam
+				return CustomerConfigPublishInput{}, fmt.Errorf("%w: membership role profile %s is missing", ErrBadParam, item.RoleKey)
 			}
 		}
 	}

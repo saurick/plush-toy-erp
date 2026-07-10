@@ -160,6 +160,7 @@ export function buildInputTemplate(customer = DEFAULT_CUSTOMER) {
     validatesReleaseEvidence: false,
     secretInputs: [
       "CUSTOMER_CONFIG_ADMIN_TOKEN or CUSTOMER_CONFIG_ADMIN_USERNAME/CUSTOMER_CONFIG_ADMIN_PASSWORD",
+      "CUSTOMER_CONFIG_VERIFY_TOKEN when activation is executed by a technical admin whose customer role has no business pages",
     ],
     requiredInputs: [
       "runtime manifest path",
@@ -501,7 +502,11 @@ async function executeOperations({ backendURL, operations, manifest, activate, r
   }
   const effectiveSessionVerification =
     activate || rollback
-      ? await verifyEffectiveSession({ backendURL, token, manifest })
+      ? await verifyEffectiveSession({
+          backendURL,
+          token: process.env.CUSTOMER_CONFIG_VERIFY_TOKEN || token,
+          manifest,
+        })
       : null;
   return { results, effectiveSessionVerification };
 }

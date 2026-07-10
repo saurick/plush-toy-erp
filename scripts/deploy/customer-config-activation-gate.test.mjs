@@ -33,12 +33,13 @@ function manifestSha256(root, manifest) {
 }
 
 function writeManifestEvidence(root, evidenceDir, manifest, overrides = {}) {
+  const manifestPayload = JSON.parse(fs.readFileSync(path.join(root, manifest), "utf8"));
   fs.writeFileSync(
     path.join(root, evidenceDir, "customer-config-manifest-evidence.json"),
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        revision: "yoyoosun-customer-package-v4.runtime-manifest-v1",
+        revision: manifestPayload.revision,
         manifestSha256: `sha256:${manifestSha256(root, manifest)}`,
         reviewStatus: overrides.reviewStatus ?? "approved",
         redaction: {
@@ -285,7 +286,7 @@ test("customer config activation gate accepts manifest with filled release evide
   });
 
   assert.equal(result.customer, "yoyoosun");
-  assert.equal(result.revision, "yoyoosun-customer-package-v4.runtime-manifest-v1");
+  assert.equal(result.revision, "yoyoosun-customer-package-v5.runtime-manifest-v1");
   assert.equal(result.scope.evidenceOnly, true);
 });
 

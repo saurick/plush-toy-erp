@@ -250,3 +250,11 @@
 下一步：如果要进入真实客户验收，必须准备经客户确认的真实数据和目标环境授权，然后按客户配置 validate/publish/activate、导入 dry-run/批次 usecase、backup/restore、migration、目标 smoke 和签收 evidence 执行；不得把本地模拟 fixture 写成客户真实导入。
 
 阻塞/风险：本轮没有真实客户数据、目标环境发布权限或客户签收，因此只声明本地产品核心/永绅模拟闭环可验证，不声明 release-ready 或客户可交付。已通过 `bash scripts/qa/full.sh`、`bash scripts/qa/strict.sh`（含 secrets、shellcheck、shfmt、govulncheck）、Atlas migration validate、真实 PostgreSQL migration/关键并发事务、前端 652 项测试与 production build、五岗位移动端/只读态/BOM 宽表/业务表单/加工合同浏览器回归。未提交、未推送。
+
+## 2026-07-10 133 多场景模拟数据与短信登录准备
+
+完成：盘点 133 测试库后确认采购单、采购入库和质检为空，销售、出货、财务与 Workflow 也只有少量终态；新增 `purchase-quality-simulated-matrix.mjs`，通过正式 JSON-RPC 和岗位账号生成带 `SIM-YOYOOSUN-PQ` 前缀的采购单五生命周期、采购入库 / 质检五场景，并接入手动回归计划和测试数据隔离门禁。133 已写入 `SIM-PLUSH-CORE` 中性单位、材料、产品、仓库、工序和 BOM，并重置 10 个岗位演示账号。修正客户配置编译器把未确认空电话 / 签字人发布到合同默认值的问题，空值现在不发布；yoyoosun 包升级到 v5，并补回销售客户 / 联系人维护、采购联系人维护的既有 Product Core 权限投影。发现 Kratos transport logging 会序列化原始 JSON-RPC params，已改为只记录 domain / method / id、结果码和耗时，并立即轮换已进入旧日志的演示密码。
+
+下一步：完成本地全量 QA、提交推送并部署带安全日志修复的新 server 镜像；部署后再次轮换演示密码，发布 / 激活 yoyoosun v5，再执行销售、采购 / 质检、生产 / 库存 / 出货 / 财务和岗位任务模拟数据 apply，最后做 133 API、数据库和浏览器回归。短信 provider 仍需目标 `.env` 注入阿里云 PNVS AccessKey ID / Secret、签名和模板号后才能开启并做真实验证码 smoke。
+
+阻塞/风险：133 当前四项阿里云 PNVS 必填配置均为空，不能用生产禁止的 mock 冒充短信登录；在供应商 secret 到位前只能保留 `disabled`，否则生产启动门禁会拒绝启动。当前 yoyoosun v4 已临时激活用于验证配置链路，但 v5 尚未发布；新演示密码在安全日志修复部署前不再用于登录，避免再次进入旧 transport 日志。模拟数据不是真实客户导入，不声明甲方真实出货、库存、质检或财务事实。

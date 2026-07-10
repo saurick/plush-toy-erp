@@ -190,6 +190,46 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
     ]),
   },
   {
+    id: "purchase-quality-simulated-matrix-stays-out-of-real-import",
+    bucket: "customer-trial-simulated-data",
+    description:
+      "purchase and quality manual-regression matrix uses formal JSON-RPC with a simulation prefix and an explicit confirmation gate.",
+    required: Object.freeze([
+      {
+        path: "scripts/qa/purchase-quality-simulated-matrix.mjs",
+        pattern: /const PREFIX = "SIM-YOYOOSUN-PQ"/u,
+        message: "purchase/quality matrix must keep its simulation prefix",
+      },
+      {
+        path: "scripts/qa/purchase-quality-simulated-matrix.mjs",
+        pattern: /simulatedOnly:\s*true/u,
+        message: "purchase/quality matrix must declare simulatedOnly=true",
+      },
+      {
+        path: "scripts/qa/purchase-quality-simulated-matrix.mjs",
+        pattern: /realCustomerImport:\s*false/u,
+        message: "purchase/quality matrix must declare realCustomerImport=false",
+      },
+      {
+        path: "scripts/qa/purchase-quality-simulated-matrix.mjs",
+        pattern: /APPLY_SIMULATED_PURCHASE_QUALITY_MATRIX/u,
+        message: "purchase/quality apply path must require an explicit simulation confirmation",
+      },
+    ]),
+    forbidden: Object.freeze([
+      {
+        path: "scripts/qa/purchase-quality-simulated-matrix.mjs",
+        pattern: /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|EXECUTE_YOYOOSUN_IMPORT/u,
+        message: "purchase/quality matrix must not reuse real import approval gates",
+      },
+      {
+        path: "scripts/qa/purchase-quality-simulated-matrix.mjs",
+        pattern: NO_DIRECT_DB_PATTERN,
+        message: "purchase/quality matrix must not connect to DB or write SQL directly",
+      },
+    ]),
+  },
+  {
     id: "manual-regression-data-plan-stays-read-only",
     bucket: "customer-trial-simulated-data",
     description:

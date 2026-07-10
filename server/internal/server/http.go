@@ -11,7 +11,6 @@ import (
 	"server/internal/service"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/go-kratos/kratos/v2/middleware/logging"
 	"github.com/go-kratos/kratos/v2/middleware/ratelimit"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
@@ -34,7 +33,7 @@ func NewHTTPServer(
 		httpx.Middleware(
 			recovery.Recovery(),
 			tracing.Server(tracing.WithTracerProvider(tp)),
-			logging.Server(log.With(logger, "logger.name", "server.http")),
+			safeServerLogging(log.With(logger, "logger.name", "server.http")),
 			// 默认 bbr limiter
 			ratelimit.Server(),
 			// 统一从请求头解析 JWT，并把 AuthClaims 写入请求上下文。

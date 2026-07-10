@@ -7,7 +7,6 @@ import (
 	"server/internal/service"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/go-kratos/kratos/v2/middleware/logging"
 	"github.com/go-kratos/kratos/v2/middleware/ratelimit"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
@@ -32,7 +31,7 @@ func NewGRPCServer(
 			tracing.Server(
 				tracing.WithTracerProvider(tracerProvider),
 			),
-			logging.Server(logger),
+			safeServerLogging(log.With(logger, "logger.name", "server.grpc")),
 			ratelimit.Server(),
 		),
 	)

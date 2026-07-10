@@ -101,11 +101,16 @@ test("manual-regression-data-plan: apply commands keep explicit simulated confir
     commands.mobileWorkflowApplySimulated,
     /MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS/u,
   );
+  assert.match(
+    commands.purchaseQualityApplySimulated,
+    /PURCHASE_QUALITY_SIM_CONFIRM=APPLY_SIMULATED_PURCHASE_QUALITY_MATRIX/u,
+  );
   assert.doesNotMatch(
     [
       commands.trialApplySimulated,
       commands.operationalApplySimulated,
       commands.mobileWorkflowApplySimulated,
+      commands.purchaseQualityApplySimulated,
     ].join("\n"),
     /CUSTOMER_IMPORT_CONFIRM|EXECUTE_YOYOOSUN_IMPORT/u,
   );

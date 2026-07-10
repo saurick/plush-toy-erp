@@ -1365,7 +1365,11 @@ function printTemplateDefaultsFromPackage(config) {
     template_key: item.templateKey,
     status: "effective_session_projected",
     runtime_consumed: true,
-    party_defaults: { ...(item.partyDefaults || {}) },
+    party_defaults: Object.fromEntries(
+      Object.entries(item.partyDefaults || {}).filter(
+        ([, value]) => typeof value === "string" && value.trim() !== "",
+      ),
+    ),
     supplier_defaults_allowed: false,
     guardrail: item.guardrail,
   }));
@@ -2068,6 +2072,12 @@ function validateRuntimeManifest(manifest) {
     assert(item.supplier_defaults_allowed === false, `${item.template_key} must not override supplier business snapshots`);
     assert(item.party_defaults && typeof item.party_defaults === "object", `${item.template_key} party_defaults must be an object`);
     assert(Object.keys(item.party_defaults).length > 0, `${item.template_key} party_defaults must not be empty`);
+    assert(
+      Object.values(item.party_defaults).every(
+        (value) => typeof value === "string" && value.trim() !== "",
+      ),
+      `${item.template_key} party_defaults must omit unconfirmed empty values`,
+    );
     assert(typeof item.guardrail === "string" && item.guardrail.trim() !== "", `${item.template_key} guardrail must be set`);
   }
   assertNoForbiddenKeys(manifest);

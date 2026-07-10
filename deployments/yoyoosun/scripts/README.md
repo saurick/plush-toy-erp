@@ -21,7 +21,7 @@ bash deployments/yoyoosun/scripts/run-smoke.sh \
   --release-version <release-version> \
   --environment customer-trial \
   --report output/yoyoosun-smoke.json \
-  --customer-config-revision yoyoosun-customer-package-v4.runtime-manifest-v1 \
+  --customer-config-revision yoyoosun-customer-package-v5.runtime-manifest-v1 \
   --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN
 bash deployments/yoyoosun/scripts/collect-evidence.sh --release-version <release-version> --output deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 node scripts/deploy/image-digests-evidence.mjs \

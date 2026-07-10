@@ -175,6 +175,10 @@ function buildYoyoosunPlan() {
       mobileWorkflowReportOnly: mobileWorkflowTemplate.commands.reportOnly,
       mobileWorkflowApplySimulated:
         mobileWorkflowTemplate.commands.applySimulated,
+      purchaseQualityReportOnly:
+        "PATH=/usr/local/bin:$PATH node scripts/qa/purchase-quality-simulated-matrix.mjs --supplier-id <active_supplier_id> --material-id <active_material_id> --unit-id <active_unit_id> --warehouse-id <active_warehouse_id>",
+      purchaseQualityApplySimulated:
+        "PURCHASE_QUALITY_SIM_CONFIRM=APPLY_SIMULATED_PURCHASE_QUALITY_MATRIX PURCHASE_QUALITY_SIM_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/purchase-quality-simulated-matrix.mjs --apply --backend-url http://127.0.0.1:8300 --supplier-id <active_supplier_id> --material-id <active_material_id> --unit-id <active_unit_id> --warehouse-id <active_warehouse_id>",
     },
   };
 }
