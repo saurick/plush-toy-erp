@@ -4,11 +4,11 @@
 
 ## 2026-07-10 133 多状态模拟数据生成器接口对齐
 
-完成：133 试用造数运行时发现 `trial-simulated-data.mjs` 仍调用已退出主路径的拆分式 `create_sales_order / add_sales_order_item`，已改为当前销售订单唯一写入入口 `save_sales_order_with_items`，订单和明细原子创建；重复运行继续按模拟单号和行号复用，若发现历史模拟订单缺失预期明细则显式阻断，避免静默覆盖未知现场。同步修正 focused mock 测试，锁住工具只使用当前 V1 masterdata 与 sales_order API。事实矩阵继续运行时确认 yoyoosun 仓库角色只有 `shipment.ship`、没有创建和取消出货单的权限，导致正式出货主路径不可闭环；已按 Product Core 既有权限补入 `shipment.create / shipment.cancel`，客户包升级为 v6，并新增角色投影断言。
+完成：133 试用造数运行时发现 `trial-simulated-data.mjs` 仍调用已退出主路径的拆分式 `create_sales_order / add_sales_order_item`，已改为当前销售订单唯一写入入口 `save_sales_order_with_items`，订单和明细原子创建；重复运行继续按模拟单号和行号复用，若发现历史模拟订单缺失预期明细则显式阻断，避免静默覆盖未知现场。同步修正 focused mock 测试，锁住工具只使用当前 V1 masterdata 与 sales_order API。事实矩阵继续运行时确认 yoyoosun 仓库角色只有 `shipment.ship`、没有创建和取消出货单的权限，导致正式出货主路径不可闭环；已按 Product Core 既有权限补入 `shipment.create / shipment.cancel`。岗位任务造数继续确认客户投影未给任何岗位 `workflow.task.create`，已按 PMC 的计划与协同发起职责补入 Product Core 既有 `workflow.task.create`，客户包升级为 v7，并新增角色投影断言。真实写入还发现生成器允许 26 字符 run-id，但最长场景 task code 会超过 schema 的 64 字符合同；现已按最终编号长度把 run-id 上限收紧为 19，并补最大长度断言，不放宽 schema 或静默截断编号。
 
-下一步：重新生成并激活 yoyoosun v6 runtime manifest，继续覆盖库存 / 出货 / 财务 / Workflow 多状态并核对数据库状态分布。
+下一步：由甲方通过受控渠道补齐阿里云号码认证短信的 access key id / secret、签名和模板 code，再把 133 `APP_AUTH_SMS_MODE` 切到 `provider`，执行短信发送 / 登录真实回归；不得用 mock 代替。
 
-阻塞/风险：本轮修复测试数据工具，不改销售订单 usecase、schema、migration、RBAC、客户配置或真实客户数据；所有生成记录继续使用 `SIM-*` 前缀并明确标记为模拟数据。
+阻塞/风险：yoyoosun v7 已在 133 激活；数据库现有销售、采购、收货、质检、库存、出货、财务和 Workflow 多状态模拟记录，10 个 demo 账号真实登录 / RBAC 通过，浏览器已核对老板采购五状态、仓库任务看板和出货草稿 / 已出货 / 已取消列表。短信仍为 `disabled`，四项阿里云 provider 配置均缺失，当前不能声明短信登录可用。本轮不导入真实客户数据、不改 schema / migration，所有新增业务记录均使用 `SIM-*` 前缀并明确标记为模拟数据。
 
 ## 归档索引
 

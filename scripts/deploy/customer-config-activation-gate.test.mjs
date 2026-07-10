@@ -286,7 +286,7 @@ test("customer config activation gate accepts manifest with filled release evide
   });
 
   assert.equal(result.customer, "yoyoosun");
-  assert.equal(result.revision, "yoyoosun-customer-package-v6.runtime-manifest-v1");
+  assert.equal(result.revision, "yoyoosun-customer-package-v7.runtime-manifest-v1");
   assert.equal(result.scope.evidenceOnly, true);
 });
 

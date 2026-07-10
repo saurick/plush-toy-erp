@@ -61,7 +61,7 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
   assert.equal(manifest.customer_key, "yoyoosun");
   assert.equal(
     manifest.revision,
-    "yoyoosun-customer-package-v6.runtime-manifest-v1",
+    "yoyoosun-customer-package-v7.runtime-manifest-v1",
   );
   assert.equal(manifest.compiled_snapshot.package.runtimeEnabled, false);
   assert.equal(manifest.compiled_snapshot.package.previewOnly, true);
@@ -251,7 +251,7 @@ test("customer-config-runtime-manifest: repeated customer flags compile every re
   assert.deepEqual(
     results.map((result) => result.manifest.revision),
     [
-      "yoyoosun-customer-package-v6.runtime-manifest-v1",
+      "yoyoosun-customer-package-v7.runtime-manifest-v1",
       "demo-customer-package-v1.runtime-manifest-v1",
     ],
   );
@@ -1007,6 +1007,11 @@ test("customer-config-runtime-manifest: keeps yoyoosun master-data maintenance a
         ),
     ),
     [],
+  );
+  assert(
+    capabilitiesByRole.pmc.some(
+      (item) => item.capability_key === "workflow.task.create",
+    ),
   );
 });
 

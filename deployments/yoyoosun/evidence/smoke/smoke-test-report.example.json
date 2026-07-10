@@ -46,7 +46,7 @@
       "name": "customer-config-effective-session",
       "status": "pass",
       "target": "jsonrpc:customer_config.get_effective_session",
-      "expectedRevision": "yoyoosun-customer-package-v6.runtime-manifest-v1",
+      "expectedRevision": "yoyoosun-customer-package-v7.runtime-manifest-v1",
       "tokenSourceEnv": "CUSTOMER_CONFIG_ADMIN_TOKEN",
       "responseBodyStored": false
     }

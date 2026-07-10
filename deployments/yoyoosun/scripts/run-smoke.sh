@@ -10,7 +10,7 @@ print_help() {
     --release-version 20260629T1200 \
     --environment customer-trial \
     --report output/yoyoosun-smoke.json \
-    --customer-config-revision yoyoosun-customer-package-v6.runtime-manifest-v1 \
+    --customer-config-revision yoyoosun-customer-package-v7.runtime-manifest-v1 \
     --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN
 
 Input template only:
@@ -54,7 +54,7 @@ print_input_template() {
   ],
   "commands": [
     "bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json",
-    "CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --customer-config-revision yoyoosun-customer-package-v6.runtime-manifest-v1 --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN"
+    "CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --customer-config-revision yoyoosun-customer-package-v7.runtime-manifest-v1 --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN"
   ],
   "requiredReadbackEvidence": [
     "check name=customer-config-effective-session",

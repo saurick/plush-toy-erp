@@ -33,7 +33,13 @@ test("mobile workflow simulated mobile closure plan stays simulated and workflow
   assert.equal(plan.realCustomerImport, false);
   assert.equal(plan.factPosting, false);
   assert.equal(plan.customerAcceptanceRequiredForClosure, false);
-  assert.match(plan.tasks.approval.task_code, /^SIM-YOYOOSUN-MOBILE-WORKFLOW-/u);
+  assert.match(
+    plan.tasks.approval.task_code,
+    /^SIM-YOYOOSUN-MOBILE-WORKFLOW-/u,
+  );
+  assert(
+    Object.values(plan.tasks).every((task) => task.task_code.length <= 64),
+  );
   assert.equal(plan.tasks.approval.task_group, "order_approval");
   assert.equal(plan.tasks.approvalRejected.task_group, "order_approval");
   assert.equal(plan.tasks.quality.task_group, "finished_goods_qc");
@@ -59,13 +65,17 @@ test("mobile workflow simulated mobile closure refuses real import flags", () =>
   assert.throws(() => parseCliArgs(["--real-import"]), /refuses real import/u);
 });
 
+test("mobile workflow simulated run id preserves the 64 character task code contract", () => {
+  assert.equal(sanitizeRunId("1234567890123456789"), "1234567890123456789");
+  assert.throws(
+    () => sanitizeRunId("12345678901234567890"),
+    /runId must be 1-19 safe characters/u,
+  );
+});
+
 test("mobile workflow simulated mobile closure rejects credentialed backend URL", () => {
   assert.throws(
-    () =>
-      parseCliArgs([
-        "--backend-url",
-        "http://demo:secret@127.0.0.1:8300",
-      ]),
+    () => parseCliArgs(["--backend-url", "http://demo:secret@127.0.0.1:8300"]),
     /backend URL must not contain username or password/u,
   );
 });
@@ -216,8 +226,14 @@ test("mobile workflow simulated mobile closure input template is no-write", () =
     ),
   );
   assert.match(template.commands.printInputTemplate, /--print-input-template/u);
-  assert.match(template.commands.reportOnly, /output\/custom\/mobile-workflow/u);
-  assert.match(template.commands.applySimulated, /MOBILE_WORKFLOW_SIM_CONFIRM/u);
+  assert.match(
+    template.commands.reportOnly,
+    /output\/custom\/mobile-workflow/u,
+  );
+  assert.match(
+    template.commands.applySimulated,
+    /MOBILE_WORKFLOW_SIM_CONFIRM/u,
+  );
   assert.match(template.boundary, /does not write reports/u);
   assert.match(template.boundary, /post operational facts/u);
 });

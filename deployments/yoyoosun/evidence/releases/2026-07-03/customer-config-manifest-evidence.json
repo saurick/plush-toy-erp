@@ -1,13 +1,13 @@
 {
   "customerKey": "yoyoosun",
-  "revision": "yoyoosun-customer-package-v6.runtime-manifest-v1",
+  "revision": "yoyoosun-customer-package-v7.runtime-manifest-v1",
   "productVersion": "local-customer-package",
-  "manifestSha256": "sha256:817e4e15ba7e0e37cb82b055876821bd3a9efff33d90d9de2e1fe1d17ca5a1d9",
+  "manifestSha256": "sha256:2cf5289cc48eb2be17146ba3fed9281d0cd31a60c448f1783ec8efd908b953a7",
   "manifestPath": "output/customers/yoyoosun/customer-config-runtime-manifest.json",
   "releaseReport": "",
   "reviewStatus": "approved",
   "reviewer": "codex-runtime-review-2026-07-10",
-  "generatedAt": "2026-07-10T09:49:43.071Z",
+  "generatedAt": "2026-07-10T09:53:18.663Z",
   "redaction": {
     "containsSecrets": false,
     "containsRawCustomerRows": false,

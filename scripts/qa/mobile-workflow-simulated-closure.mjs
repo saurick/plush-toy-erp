@@ -92,8 +92,8 @@ function sanitizeRunId(value) {
     .replace(/[^A-Z0-9_-]/gu, "-")
     .replace(/-+/gu, "-")
     .replace(/^-|-$/gu, "");
-  if (!text || text.length > 26) {
-    throw new CliError("runId must be 1-26 safe characters");
+  if (!text || text.length > 19) {
+    throw new CliError("runId must be 1-19 safe characters");
   }
   return text;
 }
@@ -104,7 +104,8 @@ function parseCliArgs(argv) {
     help: false,
     printInputTemplate: false,
     out: DEFAULT_OUT_DIR,
-    backendURL: process.env.MOBILE_WORKFLOW_SIM_BACKEND_URL || DEFAULT_BACKEND_URL,
+    backendURL:
+      process.env.MOBILE_WORKFLOW_SIM_BACKEND_URL || DEFAULT_BACKEND_URL,
     runId: process.env.MOBILE_WORKFLOW_SIM_RUN_ID || buildTimestampRunId(),
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -158,13 +159,18 @@ function parseCliArgs(argv) {
   options.backendURL = normalizeBaseURL(options.backendURL);
   options.runId = sanitizeRunId(options.runId);
   if (options.printInputTemplate && options.apply) {
-    throw new CliError("--print-input-template cannot be combined with --apply", 2);
+    throw new CliError(
+      "--print-input-template cannot be combined with --apply",
+      2,
+    );
   }
   return options;
 }
 
 function buildInputTemplate(options = {}) {
-  const backendURL = normalizeBaseURL(options.backendURL || DEFAULT_BACKEND_URL);
+  const backendURL = normalizeBaseURL(
+    options.backendURL || DEFAULT_BACKEND_URL,
+  );
   const out = optionalText(options.out) || DEFAULT_OUT_DIR;
   const runId = sanitizeRunId(options.runId || "DEV-TESTING-REPORT");
   return {
@@ -215,8 +221,7 @@ function buildInputTemplate(options = {}) {
     commands: {
       printInputTemplate:
         "PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --print-input-template",
-      reportOnly:
-        `PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --run-id ${runId} --out ${out}`,
+      reportOnly: `PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --run-id ${runId} --out ${out}`,
       applySimulated:
         "MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS MOBILE_WORKFLOW_SIM_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --apply --backend-url http://127.0.0.1:8300",
     },
@@ -374,8 +379,7 @@ function buildPlan(options) {
         ownerRole: "warehouse",
         priority: 3,
         dueAt,
-        completeCondition:
-          "PMC 只能催办仓库任务，不能代办完成、阻塞或退回。",
+        completeCondition: "PMC 只能催办仓库任务，不能代办完成、阻塞或退回。",
         payload: {
           shipment_release: true,
           notification_type: "shipment_release_pending",
@@ -560,7 +564,9 @@ function buildTaskStatusActionParams(task, action) {
   };
   const actionKey = actionKeyByStatus[action.nextStatus];
   if (!actionKey) {
-    throw new CliError(`unsupported workflow task status action: ${action.nextStatus}`);
+    throw new CliError(
+      `unsupported workflow task status action: ${action.nextStatus}`,
+    );
   }
   return {
     task_id: task.id,
@@ -581,7 +587,9 @@ async function updateTask(plan, tokens, task, action) {
   };
   const method = methodByStatus[action.nextStatus];
   if (!method) {
-    throw new CliError(`unsupported workflow task status action: ${action.nextStatus}`);
+    throw new CliError(
+      `unsupported workflow task status action: ${action.nextStatus}`,
+    );
   }
   const data = await rpcCall({
     backendURL: plan.backendURL,
@@ -758,12 +766,16 @@ async function main() {
     return;
   }
   if (options.printInputTemplate) {
-    process.stdout.write(`${JSON.stringify(buildInputTemplate(options), null, 2)}\n`);
+    process.stdout.write(
+      `${JSON.stringify(buildInputTemplate(options), null, 2)}\n`,
+    );
     return;
   }
   const plan = buildPlan(options);
   const report = {
-    mode: options.apply ? "apply-simulated-mobile-workflow-mobile-tasks" : "report-only",
+    mode: options.apply
+      ? "apply-simulated-mobile-workflow-mobile-tasks"
+      : "report-only",
     generatedAt: new Date().toISOString(),
     plan,
     steps: [],

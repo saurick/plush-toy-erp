@@ -156,6 +156,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "pmc.risk.read",
         "pmc.risk.handle",
         "workflow.task.read",
+        "workflow.task.create",
         "workflow.task.update",
         "workflow.task.complete",
         "mobile.pmc.access",

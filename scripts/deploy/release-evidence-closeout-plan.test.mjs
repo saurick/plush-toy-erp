@@ -189,7 +189,7 @@ test("closeout plan requires target backend and token for customer config effect
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        revision: "yoyoosun-customer-package-v6.runtime-manifest-v1",
+        revision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
         manifestSha256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         reviewStatus: "approved",
         redaction: {
@@ -225,7 +225,7 @@ test("closeout plan deduplicates missing prerequisites for composite actions", (
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        revision: "yoyoosun-customer-package-v6.runtime-manifest-v1",
+        revision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
         manifestSha256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         reviewStatus: "approved",
         redaction: {
