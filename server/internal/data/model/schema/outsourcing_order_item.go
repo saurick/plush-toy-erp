@@ -24,6 +24,10 @@ func (OutsourcingOrderItem) Annotations() []schema.Annotation {
 				"outsourcing_order_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
 				"outsourcing_order_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
 				"outsourcing_order_items_line_status_allowed":     "line_status IN ('open', 'closed', 'canceled')",
+				"outsourcing_order_items_subject_type_allowed":    "subject_type IN ('PRODUCT', 'MATERIAL')",
+				"outsourcing_order_items_subject_exactly_one":     "((subject_type = 'PRODUCT' AND product_id IS NOT NULL AND material_id IS NULL) OR (subject_type = 'MATERIAL' AND product_id IS NULL AND material_id IS NOT NULL))",
+				"outsourcing_order_items_product_id_positive":     "product_id IS NULL OR product_id > 0",
+				"outsourcing_order_items_material_id_positive":    "material_id IS NULL OR material_id > 0",
 			},
 		},
 	}
@@ -35,8 +39,17 @@ func (OutsourcingOrderItem) Fields() []ent.Field {
 			Positive(),
 		field.Int("line_no").
 			Positive(),
+		field.String("subject_type").
+			NotEmpty().
+			MaxLen(16),
 		field.Int("product_id").
-			Positive(),
+			Positive().
+			Optional().
+			Nillable(),
+		field.Int("material_id").
+			Positive().
+			Optional().
+			Nillable(),
 		field.Int("process_id").
 			Positive(),
 		field.Int("unit_id").
@@ -51,6 +64,14 @@ func (OutsourcingOrderItem) Fields() []ent.Field {
 			Nillable().
 			MaxLen(128),
 		field.String("product_name_snapshot").
+			Optional().
+			Nillable().
+			MaxLen(255),
+		field.String("material_code_snapshot").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("material_name_snapshot").
 			Optional().
 			Nillable().
 			MaxLen(255),
@@ -99,8 +120,13 @@ func (OutsourcingOrderItem) Edges() []ent.Edge {
 		edge.From("product", Product.Type).
 			Ref("outsourcing_order_items").
 			Field("product_id").
-			Required().
-			Unique(),
+			Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.From("material", Material.Type).
+			Ref("outsourcing_order_items").
+			Field("material_id").
+			Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("process", Process.Type).
 			Ref("outsourcing_order_items").
 			Field("process_id").
@@ -117,7 +143,9 @@ func (OutsourcingOrderItem) Edges() []ent.Edge {
 func (OutsourcingOrderItem) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("outsourcing_order_id", "line_no").Unique(),
+		index.Fields("subject_type"),
 		index.Fields("product_id"),
+		index.Fields("material_id"),
 		index.Fields("process_id"),
 		index.Fields("unit_id"),
 		index.Fields("line_status"),

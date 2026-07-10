@@ -46,6 +46,8 @@ const (
 	EdgePurchaseReceiptAdjustmentItems = "purchase_receipt_adjustment_items"
 	// EdgeQualityInspections holds the string denoting the quality_inspections edge name in mutations.
 	EdgeQualityInspections = "quality_inspections"
+	// EdgeOutsourcingOrderItems holds the string denoting the outsourcing_order_items edge name in mutations.
+	EdgeOutsourcingOrderItems = "outsourcing_order_items"
 	// Table holds the table name of the material in the database.
 	Table = "materials"
 	// DefaultUnitTable is the table that holds the default_unit relation/edge.
@@ -97,6 +99,13 @@ const (
 	QualityInspectionsInverseTable = "quality_inspections"
 	// QualityInspectionsColumn is the table column denoting the quality_inspections relation/edge.
 	QualityInspectionsColumn = "material_id"
+	// OutsourcingOrderItemsTable is the table that holds the outsourcing_order_items relation/edge.
+	OutsourcingOrderItemsTable = "outsourcing_order_items"
+	// OutsourcingOrderItemsInverseTable is the table name for the OutsourcingOrderItem entity.
+	// It exists in this package in order to avoid circular dependency with the "outsourcingorderitem" package.
+	OutsourcingOrderItemsInverseTable = "outsourcing_order_items"
+	// OutsourcingOrderItemsColumn is the table column denoting the outsourcing_order_items relation/edge.
+	OutsourcingOrderItemsColumn = "material_id"
 )
 
 // Columns holds all SQL columns for material fields.
@@ -289,6 +298,20 @@ func ByQualityInspections(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOptio
 		sqlgraph.OrderByNeighborTerms(s, newQualityInspectionsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByOutsourcingOrderItemsCount orders the results by outsourcing_order_items count.
+func ByOutsourcingOrderItemsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newOutsourcingOrderItemsStep(), opts...)
+	}
+}
+
+// ByOutsourcingOrderItems orders the results by outsourcing_order_items terms.
+func ByOutsourcingOrderItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newOutsourcingOrderItemsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newDefaultUnitStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -336,5 +359,12 @@ func newQualityInspectionsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(QualityInspectionsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, QualityInspectionsTable, QualityInspectionsColumn),
+	)
+}
+func newOutsourcingOrderItemsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(OutsourcingOrderItemsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, OutsourcingOrderItemsTable, OutsourcingOrderItemsColumn),
 	)
 }

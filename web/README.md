@@ -168,7 +168,7 @@ cd /Users/simon/projects/plush-toy-erp
 docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
 ```
 
-默认命令构建中性产品包。客户私有化前端包必须在本地或 CI 构建时显式传入客户 key，Dockerfile 会把 `config/customers/<customer-key>/customer-config.example.js` 覆盖到构建产物的 `customer-config.js`，并复制客户资产到 `customer-assets/<customer-key>/`：
+默认命令构建中性产品包。客户私有化前端包必须在本地或 CI 构建时显式传入客户 key，Dockerfile 会把经过审查的 `config/customers/<customer-key>/customer-config.example.js` 覆盖到构建产物的 `customer-config.js`，并且只复制 `public-assets/` 到 `customer-assets/<customer-key>/`。原始表格、工程图和员工信息不会进入公开产物：
 
 ```bash
 docker build \
@@ -217,7 +217,7 @@ node ../scripts/qa/customer-config-effective-session-probe.mjs --json
 node ../scripts/qa/customer-config-effective-session-probe.mjs --json --report output/customers/yoyoosun/customer-config-effective-session-probe/current.json
 ```
 
-本地开发调试永绅前端时使用热更新入口。它不打包，直接启动 Vite dev server，并通过 dev-only middleware 提供永绅 `/customer-config.js` 和 `/customer-assets/yoyoosun/*`：
+本地开发调试永绅前端时使用热更新入口。它不打包，直接启动 Vite dev server，并通过 dev-only middleware 提供永绅 `/customer-config.js` 和 `public-assets/` 下的 `/customer-assets/yoyoosun/*`：
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web
@@ -335,7 +335,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 桌面后台继续只保留一个入口
 - 桌面后台不再保留角色切换、角色首页或角色入口菜单；统一登录页和 `/entry` 只做后台 / 岗位任务端入口选择
 - 桌面后台管理员已接入 RBAC 权限中心；普通管理员通过 `roles` 获得 `permissions`，后端返回 `menus`，桌面菜单、岗位任务端入口和后端接口统一消费 permission code
-- 桌面后台主业务菜单按当前产品设计保留看板中心、主数据、销售管理、产品工程、采购管理、质检管理、库存管理、委外管理、生产管理、出货管理、财务业务、运营工具和系统管理；系统管理当前包含权限管理和审计日志。客户档案 / 供应商档案走正式 MasterData V1 API，销售订单走正式 SalesOrder V1 API，采购订单走正式 PurchaseOrder V1 API。正式业务列表统一为单击行选中、双击行进入编辑 / 主操作弹窗；详情抽屉只由显式详情入口打开。采购订单页面支持列表、关键词 / 状态 / 采购日期或预计到货日期范围筛选、详情、订单头与明细保存、提交、审批、关闭和取消，但只表达采购承诺，不写库存、批次或财务事实。入库、来料质检、库存台账、委外订单、出货单、生产进度、生产排程、生产异常、出货放行、出库管理和财务业务已分别接入正式 V1、Workflow V1 或收窄 Operational Fact V1 页面；出货单页面支持状态 / 计划出货或实际出货日期范围筛选、草稿、加行、确认出货和已出货取消冲正，`SHIPPED` 才是真实出货事实。审计日志页面只读展示启动初始化和账号 / 角色 / 权限等系统控制面事件，不替代业务事实流水。当前 `formal-shell` 模块清零；生产排程、生产异常和出货放行改为 Workflow V1 协同页，读取 / 创建 / 完成 / 阻塞 / 催办各自 `workflow_tasks`，其中出货放行限定 `source_type=shipping-release + task_group=shipment_release`。三者不读取或写入旧 `business_records`，也不提供删除、回收站、业务数据导出或生产 / 出货 / 库存 / 财务领域事实写入主路径；出货放行任务完成仍不等于 `SHIPPED`。旧通用业务页、旧业务模块路由和旧入口退出页已删除。
+- 桌面后台主业务菜单按当前产品设计保留看板中心、主数据、销售管理、产品工程、采购管理、质检管理、库存管理、委外管理、生产管理、出货管理、财务业务、运营工具和系统管理；系统管理当前包含权限管理和审计日志。客户档案 / 供应商档案走正式 MasterData V1 API，销售订单走正式 SalesOrder V1 API，采购订单走正式 PurchaseOrder V1 API。正式业务列表统一为单击行选中、双击行进入编辑 / 主操作弹窗；详情抽屉只由显式详情入口打开。采购订单页面支持列表、关键词 / 状态 / 采购日期或预计到货日期范围筛选、详情、订单头与明细保存、提交、审批、关闭和取消，但只表达采购承诺，不写库存、批次或财务事实。入库、来料质检、库存台账、委外订单、出货单、生产进度、生产排程、生产异常、出货放行、出库管理和财务业务已分别接入正式 V1、Workflow V1 或收窄 Operational Fact V1 页面；出货单页面支持状态 / 计划出货或实际出货日期范围筛选、草稿、加行、确认出货和已出货取消冲正，`SHIPPED` 才是真实出货事实。审计日志页面只读展示启动初始化和账号 / 角色 / 权限等系统控制面事件，不替代业务事实流水。生产排程、生产异常和出货放行由 Workflow V1 协同页承接，读取 / 创建 / 完成 / 阻塞 / 催办各自 `workflow_tasks`，其中出货放行限定 `source_type=shipping-release + task_group=shipment_release`。三者不读取或写入旧 `business_records`，也不提供删除、回收站、业务数据导出或生产 / 出货 / 库存 / 财务领域事实写入主路径；出货放行任务完成仍不等于 `SHIPPED`。旧预览壳页、旧通用业务页、旧业务模块路由和旧入口退出页已删除。
 - P0/P1 业务页已接入共享业务附件面板：销售订单、采购订单、委外订单、采购入库、来料质检、出货单、收窄财务 / 生产 / 委外事实、SKU、BOM、Workflow V1 桌面页和岗位任务端详情可上传、下载、删除附件。单个附件上限 50MB；允许格式覆盖常见图片、HEIC / HEIF、PDF、Word、Excel、CSV、文本、ZIP、邮件证据和 WPS 文件；PNG / JPG / WEBP / GIF / PDF 支持轻量预览，其他格式下载后查看。单据编辑弹窗中的附件默认作为备注 / 交付 / 合同资料 / 凭证附近的紧凑证据行放在明细区之前，页面级选中记录附件仍可保留独立区块。附件必须挂到已保存业务记录，只作为证据，不改变 Source Document、Fact、Workflow、库存、质检或财务状态。
 - 桌面后台已移除 `帮助中心`、`开发与验收` 和 `高级文档` 分组；前端不再承接 Markdown 文档页、业务链路调试页或协同任务调试页
 - 岗位任务端本地和生产环境统一走 `5175` 的 `/m/<role>/tasks`；不再保留按角色拆端口入口，也不拆第二个仓库

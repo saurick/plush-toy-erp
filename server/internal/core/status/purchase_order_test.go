@@ -57,3 +57,14 @@ func TestIsPurchaseOrderSettled(t *testing.T) {
 		}
 	}
 }
+
+func TestIsPurchaseOrderEditableOnlyAllowsDraft(t *testing.T) {
+	if !IsPurchaseOrderEditable(PurchaseOrderDraft) {
+		t.Fatal("draft purchase order must be editable")
+	}
+	for _, value := range []string{PurchaseOrderSubmitted, PurchaseOrderApproved, PurchaseOrderClosed, PurchaseOrderCanceled} {
+		if IsPurchaseOrderEditable(value) {
+			t.Fatalf("expected %q to be frozen", value)
+		}
+	}
+}

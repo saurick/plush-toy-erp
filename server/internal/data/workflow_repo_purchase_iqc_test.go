@@ -137,14 +137,15 @@ func TestWorkflowRepo_PurchaseIQCDoneSideEffectsAreTransactionalAndIdempotent(t 
 	}
 }
 
-func TestWorkflowRepo_PurchaseIQCExceptionIdempotencyAllowsNextRoundAfterDone(t *testing.T) {
+func TestWorkflowRepo_PurchaseIQCExceptionIdempotencyHonorsRejectedTerminalState(t *testing.T) {
 	cases := []struct {
-		status    string
-		reasonKey string
-		sourceID  int
+		status     string
+		reasonKey  string
+		sourceID   int
+		wantRounds int
 	}{
-		{status: "blocked", reasonKey: "blocked_reason", sourceID: 3201},
-		{status: "rejected", reasonKey: "rejected_reason", sourceID: 3202},
+		{status: "blocked", reasonKey: "blocked_reason", sourceID: 3201, wantRounds: 2},
+		{status: "rejected", reasonKey: "rejected_reason", sourceID: 3202, wantRounds: 1},
 	}
 
 	for _, tc := range cases {
@@ -275,8 +276,8 @@ func TestWorkflowRepo_PurchaseIQCExceptionIdempotencyAllowsNextRoundAfterDone(t 
 			if err != nil {
 				t.Fatalf("count exception tasks failed: %v", err)
 			}
-			if count != 2 {
-				t.Fatalf("expected completed exception to allow next round, got %d exception tasks", count)
+			if count != tc.wantRounds {
+				t.Fatalf("expected %s source task to produce %d exception round(s), got %d", tc.status, tc.wantRounds, count)
 			}
 		})
 	}

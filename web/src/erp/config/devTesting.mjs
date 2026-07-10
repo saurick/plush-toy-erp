@@ -161,7 +161,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
       '客户配置预检、moduleStates、导入 tooling 或 /__dev/customer-config 页面改动时复制；只证明 dev-only 控制台和本地证据。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test web/src/erp/config/devCustomerConfig.test.mjs web/src/erp/config/printTemplates.test.mjs scripts/qa/dev-entry-boundary.test.mjs scripts/qa/multi-client-role-workflow-priority-audit.test.mjs',
+      'PATH=/usr/local/bin:$PATH node --test web/src/erp/config/devCustomerConfig.test.mjs web/src/erp/config/printTemplates.test.mjs scripts/qa/dev-entry-boundary.test.mjs',
       'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-customer-config-dark-desktop STYLE_L1_PORT=5235 pnpm --dir web style:l1',
     ],
   },
@@ -217,10 +217,10 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     key: 'customer-import-tooling',
     label: '客户导入 tooling / Customer Import Tooling',
     description:
-      '客户 source manifest、extract、freeze、dry-run 或 execute loader 门禁改动时复制；只跑无后端测试，不执行真实客户导入、不连接目标环境。',
+      '客户 source manifest、extract、freeze 或 dry-run 门禁改动时复制；只跑无后端测试，不执行真实客户导入、不连接目标环境，仓库也不提供真实导入执行入口。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test scripts/import/customerSourceManifestCheck.test.mjs scripts/import/customerSourceExtract.test.mjs scripts/import/customerSourceSnapshotFreezeCheck.test.mjs scripts/import/customerImportDryRun.test.mjs scripts/import/customerImportExecute.test.mjs',
+      'PATH=/usr/local/bin:$PATH node --test scripts/import/customerSourceManifestCheck.test.mjs scripts/import/customerSourceExtract.test.mjs scripts/import/customerSourceSnapshotFreezeCheck.test.mjs scripts/import/customerImportDryRun.test.mjs',
     ],
   },
   {
@@ -230,7 +230,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
       '正式前端 effective session、菜单、动作、字段投影或脱敏诊断改动时复制；只证明本地投影合同，不读取 raw customer package。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test web/src/erp/utils/adminProfileSync.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs scripts/qa/multi-client-role-workflow-priority-audit.test.mjs',
+      'PATH=/usr/local/bin:$PATH node --test web/src/erp/utils/adminProfileSync.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs',
       'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-direct-url-local-dev-diagnostic,erp-effective-session-sync-failure-local-dev-diagnostic,erp-effective-session-empty-pages-local-dev-diagnostic,erp-no-visible-menu-blocks-outlet,erp-effective-session-action-projection-business-pages STYLE_L1_PORT=5235 pnpm --dir web style:l1',
     ],
   },

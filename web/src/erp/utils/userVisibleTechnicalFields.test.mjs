@@ -370,6 +370,7 @@ test('委外订单表单引用选项缺字段时保留业务可读 fallback', ()
 
   assert.match(content, /供应商已关联/u)
   assert.match(content, /产品已关联/u)
+  assert.match(content, /材料已关联/u)
   assert.match(content, /工序已关联/u)
   assert.match(content, /单位已关联/u)
 })
@@ -394,10 +395,14 @@ test('采购和委外订单行表单初始化保留显式 0 值', () => {
     join(rootDir, 'components/outsourcing-orders/OutsourcingOrderForm.jsx'),
     'utf8'
   )
+  const orderView = readFileSync(
+    join(rootDir, 'utils/masterDataOrderView.mjs'),
+    'utf8'
+  )
 
   for (const [content, quantityField] of [
     [purchaseForm, 'purchased_quantity'],
-    [outsourcingForm, 'outsourcing_quantity'],
+    [orderView, 'outsourcing_quantity'],
   ]) {
     assert.match(content, /function optionalFormValue\(value\)/u)
     assert.match(
@@ -416,6 +421,9 @@ test('采购和委外订单行表单初始化保留显式 0 值', () => {
     assert.doesNotMatch(content, /unit_price: item\.unit_price \|\| ''/u)
     assert.doesNotMatch(content, /amount: item\.amount \|\| ''/u)
   }
+  assert.match(outsourcingForm, /label="金额预览"/u)
+  assert.match(outsourcingForm, /<Input\s+readOnly/u)
+  assert.doesNotMatch(outsourcingForm, /name=\{\[field\.name, 'amount'\]\}/u)
 })
 
 test('采购订单生成入库草稿弹窗不把订单 ID 当来源单号 fallback', () => {
@@ -690,7 +698,6 @@ test('业务可见文案不暴露架构状态机术语', () => {
 test('正式业务边界文案不展示后端实现术语', () => {
   const files = [
     'pages/PermissionCenterPage.jsx',
-    'pages/FormalBusinessModulePage.jsx',
     'pages/V1OperationalFactPage.jsx',
     'pages/OperationalFactsPage.jsx',
     'pages/V1OutsourcingOrdersPage.jsx',
@@ -727,7 +734,7 @@ test('正式业务边界文案不展示后端实现术语', () => {
   for (const readableText of [
     '角色权限模型',
     '后台接口',
-    '权限控制',
+    '按权限码控制',
     '后端业务规则',
     '后端财务规则',
     '后端采购入库规则',
@@ -794,11 +801,7 @@ test('出货和入库正式页头不展示底层表名或状态 key', () => {
   }
 })
 
-test('Formal 业务壳不把内部表名当用户可见业务范围', () => {
-  const formalShellContent = readFileSync(
-    join(rootDir, 'pages/FormalBusinessModulePage.jsx'),
-    'utf8'
-  )
+test('正式质量页和业务模块文案不暴露内部表名', () => {
   const qualityInspectionPageContent = readFileSync(
     join(rootDir, 'pages/V1QualityInspectionsPage.jsx'),
     'utf8'
@@ -808,18 +811,6 @@ test('Formal 业务壳不把内部表名当用户可见业务范围', () => {
     'utf8'
   )
 
-  for (const staleShellPattern of [
-    /label: '主事实 \/ 真源'/u,
-    /label: '来源表'/u,
-    /moduleItem\.factSource\s*\|\|\s*moduleItem\.primaryEntity/u,
-    /moduleItem\.primaryEntity\s*\|\|\s*moduleItem\.title/u,
-    /moduleItem\.sourceRefs/u,
-    /business_records/u,
-    /领域真源待评审/u,
-    /领域表待评审/u,
-  ]) {
-    assert.doesNotMatch(formalShellContent, staleShellPattern)
-  }
   for (const staleQualityHeaderPattern of [
     /description="[^"]*quality_inspections/u,
     /description="[^"]*HOLD/u,
@@ -832,15 +823,6 @@ test('Formal 业务壳不把内部表名当用户可见业务范围', () => {
     assert.doesNotMatch(qualityInspectionPageContent, staleQualityHeaderPattern)
   }
 
-  for (const readableShellText of [
-    '当前业务范围',
-    '关联业务',
-    '后端规则待接入',
-    '旧业务记录壳',
-    '后端规则与接口',
-  ]) {
-    assert.match(formalShellContent, new RegExp(readableShellText, 'u'))
-  }
   for (const readableQualityHeaderText of [
     '来料质检当前承接质检判定',
     '已提交：批次冻结',

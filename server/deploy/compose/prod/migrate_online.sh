@@ -1,15 +1,16 @@
 #!/usr/bin/env sh
 set -eu
+umask 077
 
 # 设计意图：低配生产服务器只调用宿主机 Atlas 二进制，避免迁移时拉起额外 Docker 镜像导致内存压力。
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 COMPOSE_FILE="${COMPOSE_FILE:-$SCRIPT_DIR/compose.yml}"
-SERVER_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../../.." && pwd)
+SERVER_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/../../.." && pwd)
 MIG_DIR="${MIG_DIR:-$SERVER_ROOT/internal/data/model/migrate}"
 ATLAS_BIN="${ATLAS_BIN:-/usr/local/bin/atlas}"
 POSTGRES_SERVICE="${POSTGRES_SERVICE:-postgres}"
 POSTGRES_HOST="${POSTGRES_HOST:-127.0.0.1}"
-MIGRATION_LOCK_FILE="${MIGRATION_LOCK_FILE:-/tmp/atlas-migrate.lock}"
+MIGRATION_LOCK_FILE="${MIGRATION_LOCK_FILE:-/run/lock/plush-toy-erp/atlas-migrate.lock}"
 
 APPLY_MODE=0
 STATUS_ONLY=0
@@ -31,7 +32,8 @@ usage() {
   ATLAS_BIN      宿主机 Atlas 二进制路径（默认 /usr/local/bin/atlas）
   POSTGRES_HOST  宿主机访问 PostgreSQL 的地址（默认 127.0.0.1）
   POSTGRES_HOST_PORT  宿主机映射的 PostgreSQL 端口（未设置时从容器端口绑定推导）
-  MIGRATION_LOCK_FILE 迁移串行锁文件（默认 /tmp/atlas-migrate.lock）
+  MIGRATION_LOCK_FILE 迁移整段串行锁文件（默认 /run/lock/plush-toy-erp/atlas-migrate.lock）
+                      必须使用绝对路径，其父目录专用于迁移锁且不得为符号链接
   DB_URL         手动覆盖数据库连接串（未设置时自动从 Postgres 容器和宿主机端口推导）
 EOF
 }
@@ -77,6 +79,116 @@ if ! command -v flock >/dev/null 2>&1; then
 	echo "ERROR: 未找到 flock，无法串行化线上迁移。" >&2
 	exit 1
 fi
+
+reject_symlink_components() {
+	check_path=$1
+	while [ "$check_path" != "/" ]; do
+		if [ -L "$check_path" ]; then
+			echo "ERROR: migration lock 路径不得包含符号链接: $check_path" >&2
+			exit 1
+		fi
+		check_path=$(dirname -- "$check_path")
+	done
+}
+
+path_owner_uid() {
+	owner_uid=$(stat -c '%u' "$1" 2>/dev/null || true)
+	if [ -z "$owner_uid" ]; then
+		owner_uid=$(stat -f '%u' "$1" 2>/dev/null || true)
+	fi
+	if [ -z "$owner_uid" ]; then
+		echo "ERROR: 无法读取 migration lock 路径所有者: $1" >&2
+		exit 1
+	fi
+	printf '%s' "$owner_uid"
+}
+
+path_mode() {
+	mode=$(stat -c '%a' "$1" 2>/dev/null || true)
+	if [ -z "$mode" ]; then
+		mode=$(stat -f '%Lp' "$1" 2>/dev/null || true)
+	fi
+	if [ -z "$mode" ]; then
+		echo "ERROR: 无法读取 migration lock 路径权限: $1" >&2
+		exit 1
+	fi
+	printf '%s' "$mode"
+}
+
+prepare_migration_lock() {
+	case "$MIGRATION_LOCK_FILE" in
+	/*) ;;
+	*)
+		echo "ERROR: MIGRATION_LOCK_FILE 必须是绝对路径: $MIGRATION_LOCK_FILE" >&2
+		exit 1
+		;;
+	esac
+	case "$MIGRATION_LOCK_FILE" in
+	*/../* | */.. | */./* | */.)
+		echo "ERROR: MIGRATION_LOCK_FILE 不得包含 . 或 .. 路径段: $MIGRATION_LOCK_FILE" >&2
+		exit 1
+		;;
+	esac
+
+	lock_dir=$(dirname -- "$MIGRATION_LOCK_FILE")
+	if [ "$lock_dir" = "/" ]; then
+		echo "ERROR: MIGRATION_LOCK_FILE 必须放在专用私有目录中: $MIGRATION_LOCK_FILE" >&2
+		exit 1
+	fi
+
+	reject_symlink_components "$lock_dir"
+	if [ ! -e "$lock_dir" ]; then
+		mkdir -p -- "$lock_dir" || {
+			echo "ERROR: 无法创建 migration lock 目录: $lock_dir" >&2
+			exit 1
+		}
+	fi
+	reject_symlink_components "$lock_dir"
+	if [ ! -d "$lock_dir" ]; then
+		echo "ERROR: migration lock 父路径不是目录: $lock_dir" >&2
+		exit 1
+	fi
+	current_uid=$(id -u)
+	lock_dir_uid=$(path_owner_uid "$lock_dir")
+	if [ "$lock_dir_uid" != "$current_uid" ]; then
+		echo "ERROR: migration lock 目录必须归当前执行用户所有: $lock_dir" >&2
+		exit 1
+	fi
+	lock_dir_mode=$(path_mode "$lock_dir")
+	if [ "$lock_dir_mode" != "700" ]; then
+		echo "ERROR: migration lock 目录权限必须是 0700: $lock_dir (mode=$lock_dir_mode)" >&2
+		exit 1
+	fi
+
+	if [ -L "$MIGRATION_LOCK_FILE" ]; then
+		echo "ERROR: MIGRATION_LOCK_FILE 不得是符号链接: $MIGRATION_LOCK_FILE" >&2
+		exit 1
+	fi
+	if [ -e "$MIGRATION_LOCK_FILE" ] && [ ! -f "$MIGRATION_LOCK_FILE" ]; then
+		echo "ERROR: MIGRATION_LOCK_FILE 必须是普通文件: $MIGRATION_LOCK_FILE" >&2
+		exit 1
+	fi
+	: >>"$MIGRATION_LOCK_FILE"
+	if [ -L "$MIGRATION_LOCK_FILE" ]; then
+		echo "ERROR: MIGRATION_LOCK_FILE 不得是符号链接: $MIGRATION_LOCK_FILE" >&2
+		exit 1
+	fi
+	lock_file_uid=$(path_owner_uid "$MIGRATION_LOCK_FILE")
+	if [ "$lock_file_uid" != "$current_uid" ]; then
+		echo "ERROR: migration lock 文件必须归当前执行用户所有: $MIGRATION_LOCK_FILE" >&2
+		exit 1
+	fi
+	chmod 600 "$MIGRATION_LOCK_FILE" || {
+		echo "ERROR: 无法将 migration lock 文件设为私有权限: $MIGRATION_LOCK_FILE" >&2
+		exit 1
+	}
+}
+
+prepare_migration_lock
+echo "==> 等待 migration 串行锁: $MIGRATION_LOCK_FILE"
+exec 9>>"$MIGRATION_LOCK_FILE"
+flock 9
+echo "==> 已取得 migration 串行锁"
 
 compose() {
 	if docker compose version >/dev/null 2>&1; then
@@ -143,7 +255,7 @@ if [ -z "${DB_URL:-}" ]; then
 fi
 
 atlas_run() {
-	flock "$MIGRATION_LOCK_FILE" "$ATLAS_BIN" "$@"
+	"$ATLAS_BIN" "$@"
 }
 
 echo "==> 迁移目录: $MIG_DIR"

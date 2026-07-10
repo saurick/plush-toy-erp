@@ -59,6 +59,11 @@ export const customerPackageSchema = Object.freeze({
     "buyerAddress",
     "buyerSigner",
   ]),
+  requiredPrintPartyDefaultKeys: Object.freeze([
+    "buyerCompany",
+    "buyerContact",
+    "buyerAddress",
+  ]),
   requiredBoundaryFalseKeys: Object.freeze([
     "createsTenant",
     "changesSchema",

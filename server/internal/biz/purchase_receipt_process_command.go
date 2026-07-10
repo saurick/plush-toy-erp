@@ -79,11 +79,30 @@ func (h *purchaseReceiptCreateProcessCommandHandler) ExecuteProcessDomainCommand
 		value := strings.TrimSpace(receipt.ReceiptNo)
 		receiptNo = &value
 	}
+	linkedRefs := []ProcessBusinessRef{
+		{RefType: "purchase_receipt", RefID: receipt.ID, RefNo: receiptNo},
+	}
+	for _, inspection := range receipt.QualityInspections {
+		if inspection == nil || inspection.ID <= 0 {
+			return nil, ErrBadParam
+		}
+		inspectionNo := strings.TrimSpace(inspection.InspectionNo)
+		var inspectionNoPtr *string
+		if inspectionNo != "" {
+			inspectionNoPtr = &inspectionNo
+		}
+		linkedRefs = append(linkedRefs, ProcessBusinessRef{
+			RefType: "quality_inspection",
+			RefID:   inspection.ID,
+			RefNo:   inspectionNoPtr,
+		})
+	}
+	if len(linkedRefs) != len(receipt.Items)+1 {
+		return nil, ErrBadParam
+	}
 	return &ProcessDomainCommandResult{
-		Outcome: PurchaseReceiptProcessCommandOutcomeCreated,
-		LinkedBusinessRefs: []ProcessBusinessRef{
-			{RefType: "purchase_receipt", RefID: receipt.ID, RefNo: receiptNo},
-		},
+		Outcome:            PurchaseReceiptProcessCommandOutcomeCreated,
+		LinkedBusinessRefs: linkedRefs,
 	}, nil
 }
 

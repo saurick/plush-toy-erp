@@ -28,29 +28,28 @@ print_help() {
   16) sales-order-field-chain-boundary
   17) dev-entry-boundary
   18) frontend-error-message-boundary
-  19) multi-client-role-workflow-priority-audit
-  20) docs-inventory
-  21) industry-template-boundaries
-  22) private-deployment-boundaries
-  23) customer-web-config-overlay
-  24) deployment-package-lint
-  25) run-smoke-script（CLI + 输入模板 + release gate 兼容报告）
-  26) immutable-version-evidence
-  27) release-evidence-gate
-  28) production-preflight
-  29) backup-restore-rehearsal-script
-  30) rollback-rehearsal-report
-  31) customer-config-manifest-evidence
-  32) customer-config-activation-gate
-  33) customer-config-release-execute
-  34) customer-config-release-readiness（聚合门禁 + 输入模板）
-  35) customer-config-boundaries
-  36) customer-package-lint
-  37) customer-package-preview-boundary
-  38) customer-config-runtime-manifest
-  39) customer-import-tooling
-  40) test-data-isolation-boundary
-  41) trial-simulated-data
+  19) docs-inventory
+  20) industry-template-boundaries
+  21) private-deployment-boundaries
+  22) customer-web-config-overlay
+  23) deployment-package-lint
+  24) run-smoke-script（CLI + 输入模板 + release gate 兼容报告）
+  25) immutable-version-evidence
+  26) release-evidence-gate
+  27) production-preflight
+  28) backup-restore-rehearsal-script
+  29) rollback-rehearsal-report
+  30) customer-config-manifest-evidence
+  31) customer-config-activation-gate
+  32) customer-config-release-execute
+  33) customer-config-release-readiness（聚合门禁 + 输入模板）
+  34) customer-config-boundaries
+  35) customer-package-lint
+  36) customer-package-preview-boundary
+  37) customer-config-runtime-manifest
+  38) customer-import-tooling
+  39) test-data-isolation-boundary
+  40) trial-simulated-data
   41) operational-fact-simulated-closure
   42) mobile-workflow-simulated-closure
   43) mobile-workflow-runtime-browser-smoke
@@ -59,9 +58,9 @@ print_help() {
   46) industry-template-closure
   47) private-deployment-package-closure
   48) shellcheck + shfmt（可选）
-  49) govulncheck（可选）
-  50) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
-  51) server: go test ./... + make build
+  49) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
+  50) server: local PostgreSQL critical transaction gate + go test ./... + make build
+  51) govulncheck（可选，最后运行，避免网络扫描扰动本地数据库并发门禁）
 
 环境变量:
   SKIP_DB_GUARD=1           跳过 DB 守卫
@@ -71,6 +70,7 @@ print_help() {
   STRICT_SKIP_SHFMT=1       跳过 shfmt
   STRICT_SKIP_GOVULNCHECK=1 跳过 govulncheck
   QA_BASE_RANGE=...         指定 diff 范围供 db-guard/secrets 使用
+  PURCHASE_RECEIPT_PG_DB_URL=...  本地隔离 PostgreSQL 关键事务测试库；只允许防呆脚本接受的本地/test DSN
 USAGE
 }
 
@@ -94,6 +94,7 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 source "$ROOT_DIR/scripts/lib/pnpm.sh"
+require_project_node "$ROOT_DIR"
 PNPM_BIN="$(resolve_project_pnpm "$ROOT_DIR")"
 
 if ! command -v go >/dev/null 2>&1; then
@@ -218,11 +219,6 @@ if [ -f "$ROOT_DIR/scripts/qa/frontend-error-message-boundary.test.mjs" ]; then
   node --test "$ROOT_DIR/scripts/qa/frontend-error-message-boundary.test.mjs"
 fi
 
-if [ -f "$ROOT_DIR/scripts/qa/multi-client-role-workflow-priority-audit.test.mjs" ]; then
-  echo "[qa:strict] 运行多甲方角色能力优先级落地证据审计"
-  node --test "$ROOT_DIR/scripts/qa/multi-client-role-workflow-priority-audit.test.mjs"
-fi
-
 if [ -f "$ROOT_DIR/scripts/qa/docs-inventory.test.mjs" ]; then
   echo "[qa:strict] 运行文档清单登记测试"
   node --test "$ROOT_DIR/scripts/qa/docs-inventory.test.mjs"
@@ -281,6 +277,11 @@ fi
 if [ -f "$ROOT_DIR/scripts/deploy/production-preflight.test.mjs" ]; then
   echo "[qa:strict] 运行生产发布 preflight 测试"
   node --test "$ROOT_DIR/scripts/deploy/production-preflight.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/deploy/migrate-online.test.mjs" ]; then
+  echo "[qa:strict] 运行线上 migration 整段串行锁测试"
+  node --test "$ROOT_DIR/scripts/deploy/migrate-online.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/deploy/backup-restore-rehearsal-script.test.mjs" ]; then
@@ -386,6 +387,11 @@ if [ -f "$ROOT_DIR/scripts/qa/purchase-receipt-real-write-e2e.test.mjs" ]; then
   node --test "$ROOT_DIR/scripts/qa/purchase-receipt-real-write-e2e.test.mjs"
 fi
 
+if [ -f "$ROOT_DIR/scripts/qa/critical-postgres-gate.test.mjs" ]; then
+  echo "[qa:strict] 运行 PostgreSQL 关键事务门禁合同测试"
+  node --test "$ROOT_DIR/scripts/qa/critical-postgres-gate.test.mjs"
+fi
+
 if [ -f "$ROOT_DIR/scripts/qa/mvp-closure.test.mjs" ]; then
   echo "[qa:strict] 运行 ERP MVP 闭环验收工具测试"
   node --test "$ROOT_DIR/scripts/qa/mvp-closure.test.mjs"
@@ -409,10 +415,6 @@ if [[ "${STRICT_SKIP_SHFMT:-0}" != "1" ]] && [ -x "$ROOT_DIR/scripts/qa/shfmt.sh
   SHFMT_STRICT=1 SHFMT_CHECK=1 bash "$ROOT_DIR/scripts/qa/shfmt.sh"
 fi
 
-if [[ "${STRICT_SKIP_GOVULNCHECK:-0}" != "1" ]] && [ -x "$ROOT_DIR/scripts/qa/govulncheck.sh" ]; then
-  GOVULNCHECK_STRICT=1 bash "$ROOT_DIR/scripts/qa/govulncheck.sh"
-fi
-
 echo "[qa:strict] 运行 web 严格检查"
 (
   cd "$ROOT_DIR/web"
@@ -432,8 +434,17 @@ echo "[qa:strict] 运行 web 严格检查"
 echo "[qa:strict] 运行 server 严格检查"
 (
   cd "$ROOT_DIR/server"
+  make purchase_receipt_pg_createdb
+  make purchase_receipt_migrate_apply
+  make critical_transactions_pg_test
   go test ./...
   make build
 )
+
+# govulncheck 可能走外部网络，放在所有本地编译与 PostgreSQL 门禁之后，
+# 避免代理或系统网络异常占满本地端口时误报业务并发失败。
+if [[ "${STRICT_SKIP_GOVULNCHECK:-0}" != "1" ]] && [ -x "$ROOT_DIR/scripts/qa/govulncheck.sh" ]; then
+  GOVULNCHECK_STRICT=1 bash "$ROOT_DIR/scripts/qa/govulncheck.sh"
+fi
 
 echo "[qa:strict] 全部通过"

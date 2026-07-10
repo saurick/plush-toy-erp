@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -51,7 +52,8 @@ func (Product) Edges() []ent.Edge {
 			Unique(),
 		edge.To("product_skus", ProductSKU.Type),
 		edge.To("bom_headers", BOMHeader.Type),
-		edge.To("outsourcing_order_items", OutsourcingOrderItem.Type),
+		edge.To("outsourcing_order_items", OutsourcingOrderItem.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("shipment_items", ShipmentItem.Type),
 		edge.To("stock_reservations", StockReservation.Type),
 	}

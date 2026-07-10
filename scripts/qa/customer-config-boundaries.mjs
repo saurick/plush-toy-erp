@@ -125,8 +125,8 @@ function validateProductRuntimeDoesNotBundleCustomerPackages() {
     "yoyoosun customer package must keep a deployment injection example",
   );
   assert(
-    existsSync(repoPath("config/customers/yoyoosun/assets/favicon-yoyoosun.svg")),
-    "yoyoosun customer favicon must stay in the customer package assets",
+    existsSync(repoPath("config/customers/yoyoosun/public-assets/favicon-yoyoosun.svg")),
+    "yoyoosun customer favicon must stay in the explicit public customer assets",
   );
 }
 
@@ -242,8 +242,13 @@ function validateYoyoosunRuntimeInjectionExample() {
   const faviconAssetName = faviconHref.slice(CUSTOMER_ASSET_ROOT.length);
   assertNonEmptyString(faviconAssetName, "brand.faviconHref asset name");
   assert(
-    existsSync(repoPath(path.join("config/customers/yoyoosun/assets", faviconAssetName))),
+    existsSync(repoPath(path.join("config/customers/yoyoosun/public-assets", faviconAssetName))),
     "customer favicon asset referenced by runtime config must exist",
+  );
+
+  assert(
+    !Object.prototype.hasOwnProperty.call(exampleConfig, "engineeringPrintSamples"),
+    "public customer config must not expose engineering samples or source data",
   );
 }
 

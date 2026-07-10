@@ -573,6 +573,38 @@ func TestAdminManageUsecase_SetRolesReplacesUserRoles(t *testing.T) {
 	}
 }
 
+func TestAdminManageUsecase_SetRolesComposesFinanceAndPurchaseResponsibilities(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	repo.adminsByID[2] = &AdminUser{ID: 2, Username: "finance-buyer"}
+	repo.adminsByName["finance-buyer"] = repo.adminsByID[2]
+
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{
+		UserID:   1,
+		Username: "root",
+		Role:     RoleAdmin,
+	})
+
+	updated, err := uc.SetRoles(ctx, 2, []string{FinanceRoleKey, PurchaseRoleKey})
+	if err != nil {
+		t.Fatalf("SetRoles() error = %v", err)
+	}
+	if !AdminHasRole(updated, FinanceRoleKey) || !AdminHasRole(updated, PurchaseRoleKey) {
+		t.Fatalf("expected finance and purchase roles, got %#v", updated.Roles)
+	}
+	if !AdminHasPermission(updated, PermissionFinancePayableRead) {
+		t.Fatalf("expected finance permission from finance role")
+	}
+	if !AdminHasPermission(updated, PermissionPurchaseOrderCreate) {
+		t.Fatalf("expected purchase permission from purchase role")
+	}
+	if AdminHasPermission(updated, PermissionPurchaseOrderApprove) {
+		t.Fatalf("finance plus purchase operator must not inherit boss approval permission")
+	}
+}
+
 func TestAdminManageUsecase_SetRolesAllowsConfiguredCustomRole(t *testing.T) {
 	repo := newStubAdminManageRepo()
 	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}

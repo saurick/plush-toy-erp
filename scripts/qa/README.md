@@ -11,11 +11,11 @@
 | 入口 | 用途 | 建议时机 |
 | --- | --- | --- |
 | `bash scripts/qa/fast.sh` | 高频快速检查，覆盖文档清单、命名边界、客户配置、菜单和核心脚本守卫 | 日常开发后 |
-| `bash scripts/qa/strict.sh` | 严格检查，面向发版前或大范围收口 | 发版前 / 大改后 |
-| `bash scripts/qa/full.sh` | 推送前全量检查，包含 fast、前端测试 / 构建和后端测试 / 构建 | 提交推送前 |
+| `bash scripts/qa/strict.sh` | 严格检查，包含本地 PostgreSQL 关键事务门禁，面向发版前或大范围收口 | 发版前 / 大改后 |
+| `bash scripts/qa/full.sh` | 推送前全量检查，包含 fast、前端测试 / 构建、本地 PostgreSQL 关键事务测试和后端测试 / 构建 | 提交推送前 |
 | `node scripts/qa/docs-inventory.test.mjs` | 检查当前维护 Markdown 是否登记到 `docs/文档清单.md` | 新增、删除、重命名 README 或长期文档后 |
 | `node scripts/qa/phase-label-boundaries.mjs` | 扫描活跃运行时代码、脚本和正式文档入口的历史阶段命名残留 | 改脚本、API、命名或治理文档后 |
-| `node scripts/qa/test-data-isolation-boundary.mjs --json` | 只读检查 Product Core demo seed、yoyoosun 模拟数据、真实导入预检和真实导入执行门禁是否隔离 | 改 seed、fixture、模拟数据或导入工具后 |
+| `node scripts/qa/test-data-isolation-boundary.mjs --json` | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备边界，并锁住 dry-run 不具备执行能力 | 改 seed、fixture、模拟数据或导入准备工具后 |
 | `node scripts/qa/customer-config-effective-session-probe.mjs --json` | 无 Authorization 探测本地 `customer_config.get_effective_session`，确认后端可达和 `40302 未登录` 边界 | yoyoosun 静态入口已命中、但还没有真实登录证据时 |
 | `node --test scripts/qa/customer-package-preview-boundary.test.mjs` | 锁住客户配置包 businessFlows / stateMachines / processPolicies 仍为 preview-only，不写 Fact、不覆盖 usecase 生命周期 | 调整客户包流程、状态机或策略预览后 |
 

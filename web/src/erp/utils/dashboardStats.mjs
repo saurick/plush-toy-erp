@@ -1,7 +1,7 @@
 import { dashboardStatusGroups } from '../config/dashboardModules.mjs'
-import { BUSINESS_WORKFLOW_STATES } from '../config/workflowStatus.mjs'
+import { BUSINESS_STATUS_OPTIONS } from '../config/workflowStatus.mjs'
 
-const BUSINESS_STATUS_KEYS = BUSINESS_WORKFLOW_STATES.map((state) => state.key)
+const BUSINESS_STATUS_KEYS = BUSINESS_STATUS_OPTIONS.map((state) => state.key)
 
 function normalizeNonNegativeNumber(value) {
   const parsed = Number(value)

@@ -59,3 +59,14 @@ func TestIsSalesOrderSettled(t *testing.T) {
 		}
 	}
 }
+
+func TestIsSalesOrderEditableOnlyAllowsDraft(t *testing.T) {
+	if !IsSalesOrderEditable(SalesOrderDraft) {
+		t.Fatal("draft sales order must be editable")
+	}
+	for _, value := range []string{SalesOrderSubmitted, SalesOrderActive, SalesOrderClosed, SalesOrderCanceled} {
+		if IsSalesOrderEditable(value) {
+			t.Fatalf("expected %q to be frozen", value)
+		}
+	}
+}

@@ -2,43 +2,27 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  BUSINESS_WORKFLOW_STATES,
+  BUSINESS_STATUS_OPTIONS,
   getBusinessStatusLabel,
-  getBusinessStatusTransitionOptions,
-  requiresBusinessStatusReason,
 } from './workflowStatus.mjs'
 
-test('workflowStatus: 立项待确认可流转到放行、阻塞或取消', () => {
-  assert.deepEqual(
-    getBusinessStatusTransitionOptions('project_pending').map(
-      (option) => option.value
-    ),
-    ['project_approved', 'blocked', 'cancelled']
-  )
-})
+test('workflowStatus: 业务状态展示项 key 唯一且覆盖看板关键状态', () => {
+  const keys = BUSINESS_STATUS_OPTIONS.map((state) => state.key)
 
-test('workflowStatus: 已出货进入对账或归档，不回退生产链路', () => {
-  assert.deepEqual(
-    getBusinessStatusTransitionOptions('shipped').map((option) => option.value),
-    ['reconciling', 'closed']
-  )
-})
-
-test('workflowStatus: 待出货状态前后端闭环前置可见', () => {
-  assert.equal(
-    BUSINESS_WORKFLOW_STATES.some((state) => state.key === 'shipment_pending'),
-    true
-  )
-  assert.deepEqual(
-    getBusinessStatusTransitionOptions('shipment_pending').map(
-      (option) => option.value
-    ),
-    ['shipped', 'blocked', 'cancelled']
-  )
-})
-
-test('workflowStatus: 未知状态不返回误导性流转项', () => {
-  assert.deepEqual(getBusinessStatusTransitionOptions('missing'), [])
+  assert.equal(new Set(keys).size, keys.length)
+  for (const key of [
+    'project_pending',
+    'material_preparing',
+    'production_processing',
+    'shipment_pending',
+    'shipping_released',
+    'shipped',
+    'reconciling',
+    'blocked',
+    'closed',
+  ]) {
+    assert(keys.includes(key), `missing business status display option: ${key}`)
+  }
 })
 
 test('workflowStatus: 业务状态展示文案不透出内部 key', () => {
@@ -50,8 +34,8 @@ test('workflowStatus: 业务状态展示文案不透出内部 key', () => {
   assert.equal(getBusinessStatusLabel('', '-'), '-')
 })
 
-test('workflowStatus: 阻塞和取消需要填写原因', () => {
-  assert.equal(requiresBusinessStatusReason('blocked'), true)
-  assert.equal(requiresBusinessStatusReason('cancelled'), true)
-  assert.equal(requiresBusinessStatusReason('project_approved'), false)
+test('workflowStatus: 协同状态文案不冒充库存出货和财务事实', () => {
+  assert.equal(getBusinessStatusLabel('inbound_done'), '入库协同已完成')
+  assert.equal(getBusinessStatusLabel('shipped'), '出货协同已完成')
+  assert.equal(getBusinessStatusLabel('settled'), '结算协同已完成')
 })

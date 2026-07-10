@@ -9,7 +9,7 @@
 | 看仓库与品质业务口径 | `仓库与品质第一版.md` | `docs/当前真源与交接顺序.md` |
 | 改库存、批次或质检事实 | `docs/architecture/材料成品物料清单与库存专表模型评审.md` | Ent schema、Inventory / Quality usecase 和测试 |
 | 改入库或出库协同 | `docs/architecture/仓库入库工作流用例评审.md`、`docs/architecture/成品入库工作流用例评审.md` | WorkflowUsecase 和事实 usecase 边界 |
-| 改出货库存扣减 | `docs/architecture/出货事实与库存边界评审.md` | Shipment / Inventory usecase、RBAC、UI 回归 |
+| 改出货库存扣减 | `docs/architecture/状态工作流事实边界.md` | `OperationalFactUsecase`、Inventory usecase、RBAC、UI 回归 |
 
 ## 真源边界 / Source Boundary
 

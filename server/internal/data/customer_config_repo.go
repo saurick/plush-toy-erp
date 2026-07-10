@@ -162,19 +162,15 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 		if err != nil {
 			return err
 		}
-		grants, err := json.Marshal(item.Grants)
-		if err != nil {
-			return err
-		}
 		revokes, err := json.Marshal(item.Revokes)
 		if err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `
 INSERT INTO role_profiles
-  (customer_key, config_revision, role_key, display_name, disabled, bundle_keys, grants, revokes, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10)`,
-			in.CustomerKey, in.Revision, item.RoleKey, item.DisplayName, item.Disabled, string(bundles), string(grants), string(revokes), now, now,
+  (customer_key, config_revision, role_key, display_name, disabled, bundle_keys, revokes, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)`,
+			in.CustomerKey, in.Revision, item.RoleKey, item.DisplayName, item.Disabled, string(bundles), string(revokes), now, now,
 		); err != nil {
 			return err
 		}
@@ -352,7 +348,7 @@ ORDER BY module_key ASC`, customerKey, revision)
 
 func (r *customerConfigRepo) ListRoleProfiles(ctx context.Context, customerKey, revision string) ([]biz.RoleProfileInput, error) {
 	rows, err := r.data.sqldb.QueryContext(ctx, `
-SELECT role_key, display_name, disabled, bundle_keys, grants, revokes
+SELECT role_key, display_name, disabled, bundle_keys, revokes
 FROM role_profiles
 WHERE customer_key = $1 AND config_revision = $2
 ORDER BY role_key ASC`, customerKey, revision)
@@ -364,12 +360,11 @@ ORDER BY role_key ASC`, customerKey, revision)
 	out := []biz.RoleProfileInput{}
 	for rows.Next() {
 		var item biz.RoleProfileInput
-		var bundlesRaw, grantsRaw, revokesRaw []byte
-		if err := rows.Scan(&item.RoleKey, &item.DisplayName, &item.Disabled, &bundlesRaw, &grantsRaw, &revokesRaw); err != nil {
+		var bundlesRaw, revokesRaw []byte
+		if err := rows.Scan(&item.RoleKey, &item.DisplayName, &item.Disabled, &bundlesRaw, &revokesRaw); err != nil {
 			return nil, err
 		}
 		item.BundleKeys = decodeStringListJSON(bundlesRaw)
-		item.Grants = decodeStringListJSON(grantsRaw)
 		item.Revokes = decodeStringListJSON(revokesRaw)
 		out = append(out, item)
 	}

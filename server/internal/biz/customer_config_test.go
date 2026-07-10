@@ -207,7 +207,7 @@ func validCustomerConfigInput() CustomerConfigPublishInput {
 			},
 			"fieldPolicies": map[string]any{
 				"sales_orders.default": map[string]any{
-					"source_no": map[string]any{"visible": false, "editable": false},
+					"source_no": map[string]any{"visible": false},
 				},
 			},
 			"printTemplateDefaults": map[string]any{
@@ -236,7 +236,9 @@ func validCustomerConfigInput() CustomerConfigPublishInput {
 		},
 		ModuleStates: []DeploymentModuleStateInput{
 			{ModuleKey: "customers", State: "enabled"},
+			{ModuleKey: "suppliers", State: "enabled"},
 			{ModuleKey: "products", State: "enabled"},
+			{ModuleKey: "materials", State: "enabled"},
 			{ModuleKey: "sales_orders", State: "enabled"},
 			{ModuleKey: "workflow_tasks", State: "enabled"},
 			{ModuleKey: "purchase_orders", State: "enabled"},
@@ -340,8 +342,8 @@ func validMaterialSupplyRuntimeProcessDefinition() map[string]any {
 				"node_type":               ProcessNodeTypeDomainCommand,
 				"required_capability_key": PermissionQualityInspectionUpdate,
 				"policy_snapshot": map[string]any{
-					"command_key":              ProcessDomainCommandQualityInspectionDecide,
-					"handler":                  "InventoryUsecase.PassQualityInspection/RejectQualityInspection",
+					"command_key":              ProcessDomainCommandIncomingQualityGate,
+					"handler":                  "InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
 					"idempotency_key_required": true,
 					"writes_fact":              false,
 				},
@@ -395,8 +397,8 @@ func validMaterialSupplyPurchaseOrderRuntimeProcessDefinition() map[string]any {
 				"node_type":               ProcessNodeTypeDomainCommand,
 				"required_capability_key": PermissionQualityInspectionUpdate,
 				"policy_snapshot": map[string]any{
-					"command_key":              ProcessDomainCommandQualityInspectionDecide,
-					"handler":                  "InventoryUsecase.PassQualityInspection/RejectQualityInspection",
+					"command_key":              ProcessDomainCommandIncomingQualityGate,
+					"handler":                  "InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
 					"idempotency_key_required": true,
 					"writes_fact":              false,
 				},
@@ -591,6 +593,271 @@ func TestCustomerConfigUsecasePublishActivateAndEffectiveSession(t *testing.T) {
 	}
 }
 
+func TestCustomerConfigUsecaseEffectiveSessionAppliesEntitlementAndRoleRevokeWithinRBAC(t *testing.T) {
+	ctx := context.Background()
+	repo := newMemCustomerConfigRepo()
+	uc := NewCustomerConfigUsecase(repo)
+	in := validCustomerConfigInput()
+	in.RoleProfiles[0].Revokes = []string{PermissionSalesOrderRead}
+	in.AccessEntitlements = append(in.AccessEntitlements, AccessEntitlementInput{
+		RoleKey:       SalesRoleKey,
+		CapabilityKey: PermissionSalesOrderUpdate,
+		Enabled:       true,
+	})
+
+	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
+		t.Fatalf("PublishCustomerConfig error = %v", err)
+	}
+	if _, err := uc.ActivateCustomerConfig(ctx, "yoyoosun", "2026.06.28.1", 99); err != nil {
+		t.Fatalf("ActivateCustomerConfig error = %v", err)
+	}
+	session, err := uc.GetEffectiveSession(ctx, "yoyoosun", &AdminUser{
+		ID:          7,
+		Roles:       []AdminRole{{Key: SalesRoleKey}},
+		Permissions: []string{PermissionSalesOrderRead, PermissionSalesOrderUpdate},
+	})
+	if err != nil {
+		t.Fatalf("GetEffectiveSession error = %v", err)
+	}
+	if len(session.Actions) != 1 || session.Actions[0] != PermissionSalesOrderUpdate {
+		t.Fatalf("role revoke must narrow entitlement actions without exceeding RBAC, got %#v", session.Actions)
+	}
+}
+
+func TestCustomerConfigUsecaseEffectiveActionEntitlementsLeaveModuleStateToDomainGate(t *testing.T) {
+	ctx := context.Background()
+	repo := newMemCustomerConfigRepo()
+	uc := NewCustomerConfigUsecase(repo)
+	in := validCustomerConfigInput()
+	for index := range in.ModuleStates {
+		if in.ModuleStates[index].ModuleKey == "sales_orders" {
+			in.ModuleStates[index].State = "read_only"
+		}
+		if in.ModuleStates[index].ModuleKey == "shipments" {
+			in.ModuleStates[index].State = "read_only"
+		}
+	}
+	in.AccessEntitlements = append(in.AccessEntitlements, AccessEntitlementInput{
+		RoleKey:       SalesRoleKey,
+		CapabilityKey: PermissionSalesOrderUpdate,
+		Enabled:       true,
+	}, AccessEntitlementInput{
+		RoleKey:       SalesRoleKey,
+		CapabilityKey: PermissionSalesOrderActivate,
+		ScopeType:     "customer",
+		ScopeValue:    "other_customer",
+		Enabled:       true,
+	})
+	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
+		t.Fatalf("PublishCustomerConfig error = %v", err)
+	}
+	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+		t.Fatalf("ActivateCustomerConfig error = %v", err)
+	}
+	admin := &AdminUser{
+		ID:          7,
+		Roles:       []AdminRole{{Key: SalesRoleKey}},
+		Permissions: []string{PermissionSalesOrderRead, PermissionSalesOrderUpdate, PermissionSalesOrderActivate},
+	}
+	entitlements, err := uc.GetEffectiveActionEntitlements(ctx, in.CustomerKey, admin)
+	if err != nil {
+		t.Fatalf("GetEffectiveActionEntitlements error = %v", err)
+	}
+	if !PermissionSetHasAll(PermissionKeySet(entitlements), PermissionSalesOrderRead, PermissionSalesOrderUpdate) {
+		t.Fatalf("customer role entitlement must retain read/update before module gate, got %#v", entitlements)
+	}
+	if PermissionSetHasAny(PermissionKeySet(entitlements), PermissionSalesOrderActivate) {
+		t.Fatalf("other-customer action entitlement must not cross customer boundary, got %#v", entitlements)
+	}
+	session, err := uc.GetEffectiveSession(ctx, in.CustomerKey, admin)
+	if err != nil {
+		t.Fatalf("GetEffectiveSession error = %v", err)
+	}
+	if PermissionSetHasAny(PermissionKeySet(session.Actions), PermissionSalesOrderUpdate) {
+		t.Fatalf("read_only effective session must hide update action, got %#v", session.Actions)
+	}
+}
+
+func TestCustomerConfigUsecaseEffectiveSessionRevokesStayWithinTheirRole(t *testing.T) {
+	ctx := context.Background()
+	repo := newMemCustomerConfigRepo()
+	uc := NewCustomerConfigUsecase(repo)
+	in := validCustomerConfigInput()
+	in.RoleProfiles = append(in.RoleProfiles, RoleProfileInput{
+		RoleKey:     PurchaseRoleKey,
+		DisplayName: "采购",
+	})
+	in.AccessEntitlements = append(in.AccessEntitlements,
+		AccessEntitlementInput{RoleKey: PurchaseRoleKey, CapabilityKey: PermissionPurchaseOrderRead, Enabled: true},
+	)
+	for index := range in.RoleProfiles {
+		if in.RoleProfiles[index].RoleKey == FinanceRoleKey {
+			in.RoleProfiles[index].Revokes = []string{PermissionPurchaseOrderRead}
+		}
+	}
+
+	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
+		t.Fatalf("PublishCustomerConfig error = %v", err)
+	}
+	if _, err := uc.ActivateCustomerConfig(ctx, "yoyoosun", "2026.06.28.1", 99); err != nil {
+		t.Fatalf("ActivateCustomerConfig error = %v", err)
+	}
+	session, err := uc.GetEffectiveSession(ctx, "yoyoosun", &AdminUser{
+		ID: 7,
+		Roles: []AdminRole{
+			{Key: FinanceRoleKey},
+			{Key: PurchaseRoleKey},
+		},
+		Permissions: []string{PermissionFinancePayableRead, PermissionPurchaseOrderRead},
+	})
+	if err != nil {
+		t.Fatalf("GetEffectiveSession error = %v", err)
+	}
+	if !PermissionSetHasAny(PermissionKeySet(session.Actions), PermissionPurchaseOrderRead) {
+		t.Fatalf("finance revoke must not remove purchase role grant, got %#v", session.Actions)
+	}
+}
+
+func TestCustomerConfigUsecaseEffectiveSessionDisablesCustomerRoleProjection(t *testing.T) {
+	ctx := context.Background()
+	repo := newMemCustomerConfigRepo()
+	uc := NewCustomerConfigUsecase(repo)
+	in := validCustomerConfigInput()
+	in.RoleProfiles[0].Disabled = true
+
+	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
+		t.Fatalf("PublishCustomerConfig error = %v", err)
+	}
+	if _, err := uc.ActivateCustomerConfig(ctx, "yoyoosun", "2026.06.28.1", 99); err != nil {
+		t.Fatalf("ActivateCustomerConfig error = %v", err)
+	}
+	session, err := uc.GetEffectiveSession(ctx, "yoyoosun", &AdminUser{
+		ID:          7,
+		Roles:       []AdminRole{{Key: SalesRoleKey}},
+		Permissions: []string{PermissionSalesOrderRead},
+	})
+	if err != nil {
+		t.Fatalf("GetEffectiveSession error = %v", err)
+	}
+	if len(session.Roles) != 0 || len(session.Pages) != 0 || len(session.Actions) != 0 || len(session.WorkPools) != 0 {
+		t.Fatalf("disabled customer role must have no effective role/pages/actions/pools, got roles=%#v pages=%#v actions=%#v pools=%#v", session.Roles, session.Pages, session.Actions, session.WorkPools)
+	}
+}
+
+func TestCustomerConfigUsecaseRejectsEntitlementAboveBackendRole(t *testing.T) {
+	ctx := context.Background()
+	uc := NewCustomerConfigUsecase(newMemCustomerConfigRepo())
+
+	in := validCustomerConfigInput()
+	in.AccessEntitlements = append(in.AccessEntitlements, AccessEntitlementInput{
+		RoleKey:       SalesRoleKey,
+		CapabilityKey: PermissionFinancePayableRead,
+		Enabled:       true,
+	})
+	if _, err := uc.PublishCustomerConfig(ctx, in, 99); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("customer entitlement must not exceed backend role RBAC, got %v", err)
+	}
+}
+
+func TestCustomerConfigUsecaseEffectiveSessionNarrowsReferenceReadsToRolePages(t *testing.T) {
+	ctx := context.Background()
+	repo := newMemCustomerConfigRepo()
+	uc := NewCustomerConfigUsecase(repo)
+	in := validCustomerConfigInput()
+	in.CompiledSnapshot["pages"] = []any{"materials", "sales-orders"}
+	in.CompiledSnapshot["rolePageProjections"] = map[string]any{
+		SalesRoleKey:   []any{"sales-orders"},
+		FinanceRoleKey: []any{"materials"},
+	}
+	in.AccessEntitlements = append(in.AccessEntitlements, AccessEntitlementInput{
+		RoleKey:       SalesRoleKey,
+		CapabilityKey: PermissionMaterialRead,
+		ScopeType:     "customer",
+		ScopeValue:    "yoyoosun",
+		Enabled:       true,
+	})
+	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
+		t.Fatalf("PublishCustomerConfig error = %v", err)
+	}
+	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+		t.Fatalf("ActivateCustomerConfig error = %v", err)
+	}
+	session, err := uc.GetEffectiveSession(ctx, in.CustomerKey, &AdminUser{
+		ID:          7,
+		Roles:       []AdminRole{{Key: SalesRoleKey}},
+		Permissions: []string{PermissionSalesOrderRead, PermissionMaterialRead},
+	})
+	if err != nil {
+		t.Fatalf("GetEffectiveSession error = %v", err)
+	}
+	if !PermissionSetHasAny(PermissionKeySet(session.Actions), PermissionMaterialRead) {
+		t.Fatalf("reference read must remain available to the sales order page, got %#v", session.Actions)
+	}
+	if len(session.Pages) != 1 || session.Pages[0] != "sales-orders" {
+		t.Fatalf("reference read must not expose the materials page, got %#v", session.Pages)
+	}
+}
+
+func TestCustomerConfigActionContactUsesAnyEnabledOwnerModule(t *testing.T) {
+	customersOnly := map[string]struct{}{"customers": {}}
+	suppliersOnly := map[string]struct{}{"suppliers": {}}
+	readOnlyCustomers := map[string]struct{}{"customers": {}}
+
+	if !customerConfigActionAllowedByModuleState(PermissionContactRead, customersOnly, customersOnly) {
+		t.Fatal("contact read must remain available when customers is the only readable owner module")
+	}
+	if !customerConfigActionAllowedByModuleState(PermissionContactCreate, suppliersOnly, suppliersOnly) {
+		t.Fatal("contact create must remain available when suppliers is the only enabled owner module")
+	}
+	if customerConfigActionAllowedByModuleState(PermissionContactCreate, map[string]struct{}{}, readOnlyCustomers) {
+		t.Fatal("contact write must not use a read-only owner module")
+	}
+	if !customerConfigActionAllowedByModuleState(PermissionContactRead, map[string]struct{}{}, readOnlyCustomers) {
+		t.Fatal("contact read must use a read-only owner module")
+	}
+}
+
+func TestEnsureCustomerConfigModuleKeysEnabledExpandsPurchaseReceiptDependencies(t *testing.T) {
+	modules := validCustomerConfigInput().ModuleStates
+	if err := ensureCustomerConfigModuleKeysEnabled([]string{"purchase_receipts"}, modules); err != nil {
+		t.Fatalf("complete purchase receipt closure must pass, got %v", err)
+	}
+	for _, missingModuleKey := range []string{"quality_inspections", "inventory"} {
+		mutated := append([]DeploymentModuleStateInput(nil), modules...)
+		for index := range mutated {
+			if mutated[index].ModuleKey == missingModuleKey {
+				mutated[index].State = "disabled"
+			}
+		}
+		if err := ensureCustomerConfigModuleKeysEnabled([]string{"purchase_receipts"}, mutated); !errors.Is(err, ErrBadParam) {
+			t.Fatalf("purchase receipt action must require %s, got %v", missingModuleKey, err)
+		}
+	}
+}
+
+func TestCustomerConfigUsecaseRejectsDanglingRoleAndWorkPoolReferences(t *testing.T) {
+	ctx := context.Background()
+	uc := NewCustomerConfigUsecase(newMemCustomerConfigRepo())
+
+	for _, mutate := range []func(*CustomerConfigPublishInput){
+		func(in *CustomerConfigPublishInput) {
+			in.AccessEntitlements[0].RoleKey = "missing-role"
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.WorkPoolMemberships[0].RoleKey = "missing-role"
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.WorkPoolMemberships[0].PoolKey = "missing-pool"
+		},
+	} {
+		in := validCustomerConfigInput()
+		mutate(&in)
+		if _, err := uc.PublishCustomerConfig(ctx, in, 99); !errors.Is(err, ErrBadParam) {
+			t.Fatalf("dangling customer config reference error = %v, want ErrBadParam", err)
+		}
+	}
+}
+
 func TestCustomerConfigUsecaseEffectiveSessionFiltersProjectionByEnabledModules(t *testing.T) {
 	ctx := context.Background()
 	repo := newMemCustomerConfigRepo()
@@ -600,10 +867,12 @@ func TestCustomerConfigUsecaseEffectiveSessionFiltersProjectionByEnabledModules(
 		if in.ModuleStates[index].ModuleKey == "sales_orders" {
 			in.ModuleStates[index].State = "read_only"
 		}
+		if in.ModuleStates[index].ModuleKey == "shipments" {
+			in.ModuleStates[index].State = "read_only"
+		}
 	}
 	in.AccessEntitlements = append(in.AccessEntitlements,
-		AccessEntitlementInput{RoleKey: SalesRoleKey, CapabilityKey: "page.sales-orders.read", Enabled: true},
-		AccessEntitlementInput{RoleKey: SalesRoleKey, CapabilityKey: PermissionSystemUserRead, Enabled: true},
+		AccessEntitlementInput{RoleKey: SalesRoleKey, CapabilityKey: PermissionSalesOrderUpdate, Enabled: true},
 	)
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
@@ -617,7 +886,7 @@ func TestCustomerConfigUsecaseEffectiveSessionFiltersProjectionByEnabledModules(
 		Roles: []AdminRole{
 			{Key: SalesRoleKey},
 		},
-		Permissions: []string{PermissionSalesOrderRead, PermissionSystemUserRead},
+		Permissions: []string{PermissionSalesOrderRead, PermissionSalesOrderUpdate},
 	})
 	if err != nil {
 		t.Fatalf("GetEffectiveSession error = %v", err)
@@ -625,17 +894,17 @@ func TestCustomerConfigUsecaseEffectiveSessionFiltersProjectionByEnabledModules(
 	if session.Modules["sales_orders"] != "read_only" {
 		t.Fatalf("sales_orders module state = %s", session.Modules["sales_orders"])
 	}
-	if len(session.Pages) != 1 || session.Pages[0] != "permission-center" {
-		t.Fatalf("module-owned sales page must be filtered while system page remains, got %#v", session.Pages)
+	if len(session.Pages) != 1 || session.Pages[0] != "sales-orders" {
+		t.Fatalf("read-only business page must remain visible, got %#v", session.Pages)
 	}
-	if len(session.Actions) != 1 || session.Actions[0] != PermissionSystemUserRead {
-		t.Fatalf("module-owned sales actions must be filtered while system action remains, got %#v", session.Actions)
+	if len(session.Actions) != 1 || session.Actions[0] != PermissionSalesOrderRead {
+		t.Fatalf("read-only module must retain only its read action, got %#v", session.Actions)
 	}
 	if len(session.WorkPools) != 0 {
 		t.Fatalf("sales work pool must be filtered when sales_orders is read_only, got %#v", session.WorkPools)
 	}
-	if _, ok := session.FieldPolicies["sales_orders.default"]; ok {
-		t.Fatalf("sales order field policy must be filtered when sales_orders is read_only: %#v", session.FieldPolicies)
+	if _, ok := session.FieldPolicies["sales_orders.default"]; !ok {
+		t.Fatalf("read-only module must retain field labels and visibility policy: %#v", session.FieldPolicies)
 	}
 }
 
@@ -756,7 +1025,7 @@ func TestCustomerConfigUsecaseBuildsMaterialSupplyProcessInstanceCreateFromActiv
 	}
 	if create.Nodes[0].NodeKey != "incoming_qc" ||
 		create.Nodes[0].NodeType != ProcessNodeTypeDomainCommand ||
-		create.Nodes[0].PolicySnapshot["command_key"] != ProcessDomainCommandQualityInspectionDecide {
+		create.Nodes[0].PolicySnapshot["command_key"] != ProcessDomainCommandIncomingQualityGate {
 		t.Fatalf("incoming qc node = %#v", create.Nodes[0])
 	}
 	if create.Nodes[1].NodeKey != "warehouse_inbound" ||
@@ -808,7 +1077,7 @@ func TestCustomerConfigUsecaseBuildsMaterialSupplyPurchaseOrderProcessInstanceCr
 		t.Fatalf("purchase receipt source node = %#v", create.Nodes[0])
 	}
 	if create.Nodes[1].NodeKey != "incoming_qc" ||
-		create.Nodes[1].PolicySnapshot["command_key"] != ProcessDomainCommandQualityInspectionDecide {
+		create.Nodes[1].PolicySnapshot["command_key"] != ProcessDomainCommandIncomingQualityGate {
 		t.Fatalf("incoming qc node = %#v", create.Nodes[1])
 	}
 	if create.Nodes[2].NodeKey != "warehouse_inbound" ||
@@ -942,6 +1211,9 @@ func TestCustomerConfigUsecaseRejectsProcessStartWhenReferencedModuleNotEnabled(
 					if items[index].ModuleKey == "sales_orders" {
 						items[index].State = "read_only"
 					}
+					if items[index].ModuleKey == "shipments" {
+						items[index].State = "read_only"
+					}
 				}
 				return items
 			},
@@ -964,7 +1236,7 @@ func TestCustomerConfigUsecaseRejectsProcessStartWhenReferencedModuleNotEnabled(
 			mutateModules: func(items []DeploymentModuleStateInput) []DeploymentModuleStateInput {
 				out := []DeploymentModuleStateInput{}
 				for _, item := range items {
-					if item.ModuleKey != "sales_orders" {
+					if item.ModuleKey != "sales_orders" && item.ModuleKey != "shipments" {
 						out = append(out, item)
 					}
 				}
@@ -1055,10 +1327,6 @@ func TestCustomerConfigUsecaseExplainModuleStatus(t *testing.T) {
 	repo := newMemCustomerConfigRepo()
 	uc := NewCustomerConfigUsecase(repo)
 	in := validCustomerConfigInput()
-	in.ModuleStates = append(in.ModuleStates,
-		DeploymentModuleStateInput{ModuleKey: "customers", State: "enabled"},
-		DeploymentModuleStateInput{ModuleKey: "products", State: "enabled"},
-	)
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
@@ -1265,7 +1533,7 @@ func TestCustomerConfigUsecaseBuildFinishedGoodsDeliveryStartOnlyProcess(t *test
 	}
 }
 
-func TestCustomerConfigUsecaseExplainModuleStatusReportsMissingDependencies(t *testing.T) {
+func TestCustomerConfigUsecaseActivationRejectsMissingModuleDependencies(t *testing.T) {
 	ctx := context.Background()
 	repo := newMemCustomerConfigRepo()
 	uc := NewCustomerConfigUsecase(repo)
@@ -1280,22 +1548,49 @@ func TestCustomerConfigUsecaseExplainModuleStatusReportsMissingDependencies(t *t
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
-		t.Fatalf("ActivateCustomerConfig error = %v", err)
+	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("activation must reject missing sales order dependencies, got %v", err)
 	}
+}
 
-	status, err := uc.ExplainModuleStatus(ctx, in.CustomerKey, "sales_orders")
-	if err != nil {
-		t.Fatalf("ExplainModuleStatus error = %v", err)
+func TestCustomerConfigUsecaseActivationRejectsReadOnlyDependencyForWritableModule(t *testing.T) {
+	ctx := context.Background()
+	repo := newMemCustomerConfigRepo()
+	uc := NewCustomerConfigUsecase(repo)
+	in := validCustomerConfigInput()
+	for index := range in.ModuleStates {
+		if in.ModuleStates[index].ModuleKey == "customers" {
+			in.ModuleStates[index].State = "read_only"
+			in.ModuleStates[index].Reason = "historical customer records only"
+		}
 	}
-	if status.DependenciesSatisfied {
-		t.Fatalf("dependencies should be missing")
+	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
+		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if len(status.MissingDependencies) != 2 || status.MissingDependencies[0] != "customers" || status.MissingDependencies[1] != "products" {
-		t.Fatalf("missing dependencies = %#v", status.MissingDependencies)
+	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("activation must reject read-only dependency for writable sales orders, got %v", err)
 	}
-	if status.CanEnable {
-		t.Fatalf("cannot enable with missing dependencies")
+}
+
+func TestCustomerConfigUsecaseActivationRejectsPurchaseReceiptWithoutQualityOrInventory(t *testing.T) {
+	for _, missingModuleKey := range []string{"quality_inspections", "inventory"} {
+		t.Run(missingModuleKey, func(t *testing.T) {
+			ctx := context.Background()
+			repo := newMemCustomerConfigRepo()
+			uc := NewCustomerConfigUsecase(repo)
+			in := validCustomerConfigInput()
+			for index := range in.ModuleStates {
+				if in.ModuleStates[index].ModuleKey == missingModuleKey {
+					in.ModuleStates[index].State = "disabled"
+				}
+			}
+			if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
+				t.Fatalf("PublishCustomerConfig error = %v", err)
+			}
+			if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); !errors.Is(err, ErrBadParam) {
+				t.Fatalf("activation must reject purchase_receipts without %s, got %v", missingModuleKey, err)
+			}
+		})
 	}
 }
 
@@ -1472,6 +1767,8 @@ func TestCustomerConfigUsecaseWorkflowVisibleOwnerRoleKeysIncludesWorkPoolMember
 	repo := newMemCustomerConfigRepo()
 	uc := NewCustomerConfigUsecase(repo)
 	in := validCustomerConfigInput()
+	in.RoleProfiles = append(in.RoleProfiles, RoleProfileInput{RoleKey: WarehouseRoleKey, DisplayName: "仓库"})
+	in.WorkPools = append(in.WorkPools, WorkPoolInput{PoolKey: "warehouse", ModuleKey: "inventory", DisplayName: "仓库池"})
 	in.WorkPoolMemberships = append(in.WorkPoolMemberships, WorkPoolMembershipInput{
 		PoolKey:  "warehouse",
 		RoleKey:  WarehouseRoleKey,
@@ -1529,6 +1826,8 @@ func TestCustomerConfigUsecaseWorkflowVisibleOwnerRoleKeysRequiresTaskEntitlemen
 	repo := newMemCustomerConfigRepo()
 	uc := NewCustomerConfigUsecase(repo)
 	in := validCustomerConfigInput()
+	in.RoleProfiles = append(in.RoleProfiles, RoleProfileInput{RoleKey: WarehouseRoleKey, DisplayName: "仓库"})
+	in.WorkPools = append(in.WorkPools, WorkPoolInput{PoolKey: "warehouse", ModuleKey: "inventory", DisplayName: "仓库池"})
 	in.WorkPoolMemberships = append(in.WorkPoolMemberships, WorkPoolMembershipInput{
 		PoolKey:  "warehouse",
 		RoleKey:  WarehouseRoleKey,
@@ -1564,6 +1863,8 @@ func TestCustomerConfigUsecaseWorkflowVisibleOwnerRoleKeysRequiresMatchingEntitl
 	repo := newMemCustomerConfigRepo()
 	uc := NewCustomerConfigUsecase(repo)
 	in := validCustomerConfigInput()
+	in.RoleProfiles = append(in.RoleProfiles, RoleProfileInput{RoleKey: WarehouseRoleKey, DisplayName: "仓库"})
+	in.WorkPools = append(in.WorkPools, WorkPoolInput{PoolKey: "warehouse", ModuleKey: "inventory", DisplayName: "仓库池"})
 	in.WorkPoolMemberships = append(in.WorkPoolMemberships, WorkPoolMembershipInput{
 		PoolKey:  "warehouse",
 		RoleKey:  WarehouseRoleKey,
@@ -1606,6 +1907,8 @@ func TestCustomerConfigUsecaseWorkflowCandidateOwnerRoleKeysRequiresCapabilityAn
 	repo := newMemCustomerConfigRepo()
 	uc := NewCustomerConfigUsecase(repo)
 	in := validCustomerConfigInput()
+	in.RoleProfiles = append(in.RoleProfiles, RoleProfileInput{RoleKey: WarehouseRoleKey, DisplayName: "仓库"})
+	in.WorkPools = append(in.WorkPools, WorkPoolInput{PoolKey: "warehouse", ModuleKey: "inventory", DisplayName: "仓库池"})
 	in.WorkPoolMemberships = append(in.WorkPoolMemberships,
 		WorkPoolMembershipInput{PoolKey: "warehouse", RoleKey: WarehouseRoleKey, UserID: 7, Strategy: "direct_user_pool", Enabled: true},
 		WorkPoolMembershipInput{PoolKey: "warehouse", RoleKey: FinanceRoleKey, UserID: 0, Strategy: "role_pool", Enabled: true},

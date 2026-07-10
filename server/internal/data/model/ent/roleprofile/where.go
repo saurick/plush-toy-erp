@@ -369,16 +369,6 @@ func BundleKeysNotNil() predicate.RoleProfile {
 	return predicate.RoleProfile(sql.FieldNotNull(FieldBundleKeys))
 }
 
-// GrantsIsNil applies the IsNil predicate on the "grants" field.
-func GrantsIsNil() predicate.RoleProfile {
-	return predicate.RoleProfile(sql.FieldIsNull(FieldGrants))
-}
-
-// GrantsNotNil applies the NotNil predicate on the "grants" field.
-func GrantsNotNil() predicate.RoleProfile {
-	return predicate.RoleProfile(sql.FieldNotNull(FieldGrants))
-}
-
 // RevokesIsNil applies the IsNil predicate on the "revokes" field.
 func RevokesIsNil() predicate.RoleProfile {
 	return predicate.RoleProfile(sql.FieldIsNull(FieldRevokes))

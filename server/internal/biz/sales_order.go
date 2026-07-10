@@ -183,7 +183,7 @@ func (uc *SalesOrderUsecase) UpdateSalesOrder(ctx context.Context, id int, in *S
 	if err != nil {
 		return nil, err
 	}
-	if isSalesOrderSettled(current.LifecycleStatus) {
+	if !corestatus.IsSalesOrderEditable(current.LifecycleStatus) {
 		return nil, ErrBadParam
 	}
 	normalized, err := normalizeSalesOrderMutation(*in)
@@ -308,7 +308,7 @@ func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int
 		if err != nil {
 			return nil, err
 		}
-		if isSalesOrderSettled(current.LifecycleStatus) {
+		if !corestatus.IsSalesOrderEditable(current.LifecycleStatus) {
 			return nil, ErrBadParam
 		}
 	}
@@ -419,7 +419,7 @@ func (uc *SalesOrderUsecase) openSalesOrder(ctx context.Context, id int) (*Sales
 	if err != nil {
 		return nil, err
 	}
-	if isSalesOrderSettled(order.LifecycleStatus) {
+	if !corestatus.IsSalesOrderEditable(order.LifecycleStatus) {
 		return nil, ErrBadParam
 	}
 	return order, nil
@@ -498,6 +498,11 @@ func normalizeSalesOrderItemFields(in SalesOrderItemMutation) (SalesOrderItemMut
 	if err := value.ValidateOptionalNonNegativeMoney(in.Amount); err != nil {
 		return SalesOrderItemMutation{}, ErrBadParam
 	}
+	normalizedAmount, err := normalizeCalculatedLineAmount(in.OrderedQuantity, in.UnitPrice, in.Amount)
+	if err != nil {
+		return SalesOrderItemMutation{}, ErrBadParam
+	}
+	in.Amount = normalizedAmount
 	return in, nil
 }
 

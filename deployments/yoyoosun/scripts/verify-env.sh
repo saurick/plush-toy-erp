@@ -58,6 +58,7 @@ fi
 
 required_keys=(
   PROJECT_SLUG
+  ERP_CUSTOMER_KEY
   APP_IMAGE
   WEB_IMAGE
   TZ
@@ -66,6 +67,7 @@ required_keys=(
   POSTGRES_DB
   POSTGRES_USER
   POSTGRES_DATA_DIR
+  MIGRATION_LOCK_FILE
   TRACE_ENDPOINT
   WEB_API_ORIGIN
   APP_JWT_SECRET
@@ -97,6 +99,23 @@ if [[ "$mode" == "runtime" ]]; then
     [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
     values["$key"]="$value"
   done <<<"$content"
+
+  if [[ "${values[ERP_CUSTOMER_KEY]:-}" != "yoyoosun" ]]; then
+    echo "[verify-env] yoyoosun 部署的 ERP_CUSTOMER_KEY 必须为 yoyoosun"
+    exit 1
+  fi
+
+  migration_lock_file="${values[MIGRATION_LOCK_FILE]:-}"
+  if [[ "$migration_lock_file" != /* ]]; then
+    echo "[verify-env] MIGRATION_LOCK_FILE 必须是绝对路径"
+    exit 1
+  fi
+  case "$migration_lock_file" in
+  /tmp/* | /var/tmp/* | /dev/shm/*)
+    echo "[verify-env] MIGRATION_LOCK_FILE 不得位于共享临时目录"
+    exit 1
+    ;;
+  esac
 
   if [[ "${values[ERP_DEBUG_ENV]:-}" != "prod" ]]; then
     echo "[verify-env] ERP_DEBUG_ENV 必须为 prod"

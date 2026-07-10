@@ -4,7 +4,7 @@
 
 - `compose.yml`：PostgreSQL + Jaeger + 业务服务 + 前端单入口静态服务
 - `.env.example`：推荐环境变量
-- `migrate_online.sh`：通过宿主机 `/usr/local/bin/atlas` 执行 migration
+- `migrate_online.sh`：通过宿主机 `/usr/local/bin/atlas` 执行 migration，并用同一个 `flock` 锁住完整 `status -> dry-run -> apply` 序列
 
 ## 快速开始
 
@@ -207,7 +207,7 @@ open http://127.0.0.1:16687
 
 ## 迁移脚本
 
-低配服务器上不要使用 `arigaio/atlas:*` 临时容器，也不要把 Atlas 写入 Compose。先把 Atlas 安装到宿主机 `/usr/local/bin/atlas`；脚本会通过宿主机映射端口访问 PostgreSQL，并用 `/tmp/atlas-migrate.lock` 串行化迁移。
+低配服务器上不要使用 `arigaio/atlas:*` 临时容器，也不要把 Atlas 写入 Compose。先把 Atlas 安装到宿主机 `/usr/local/bin/atlas`；脚本会通过宿主机映射端口访问 PostgreSQL，并在同一个 `/run/lock/plush-toy-erp/atlas-migrate.lock` 锁内完成 `status -> dry-run -> apply`，锁由脚本进程持有到序列结束或失败退出。脚本使用 `umask 077` 创建 `0700 / 0600` 锁目录和文件；已有目录必须本来就是 `0700`，脚本不会修改其他目录的权限。相对路径、符号链接和非当前执行用户所有的路径会被拒绝，锁文件以追加方式打开，不截断已有内容。
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/server/deploy/compose/prod
@@ -225,7 +225,10 @@ export POSTGRES_SERVICE=postgres
 export POSTGRES_HOST=127.0.0.1
 export POSTGRES_HOST_PORT=5435
 export ATLAS_BIN=/usr/local/bin/atlas
+export MIGRATION_LOCK_FILE=/run/lock/plush-toy-erp/atlas-migrate.lock
 ```
+
+`MIGRATION_LOCK_FILE` 必须是绝对路径，父目录必须专用于迁移锁并归当前迁移执行用户所有。自定义路径时在调用脚本前显式 `export`；`migrate_online.sh` 不会 source Compose `.env`，避免把生产 secret 当作 shell 代码解析。
 
 ## 最小校验
 

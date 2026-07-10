@@ -27,9 +27,7 @@ import {
   isPayableReconciliationTask,
 } from '../../utils/payableReconciliationFlow.mjs'
 import {
-  canOperateTask,
   canOpenMobileTaskDetailAction,
-  canUrgeTask,
   getMobileTaskActionReasonDraftKey,
   normalizeMobileTaskActionKey,
   requiresMobileActionFeedback,
@@ -38,11 +36,20 @@ import {
   resolveMobileUrgeAction,
 } from '../utils/mobileRoleTaskModel.mjs'
 import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../../utils/workflowTaskActionSubmitGuard.mjs'
+import { canRunWorkflowTaskAction } from '../../utils/workflowTaskBoard.mjs'
 
 function compactActionPayload(payload = {}) {
   return Object.fromEntries(
     Object.entries(payload).filter(([, value]) => value !== undefined)
   )
+}
+
+function resolveWorkflowTaskActionMode(action = '') {
+  if (action === 'done') return 'complete'
+  if (action === 'blocked') return 'block'
+  if (action === 'rejected') return 'reject'
+  if (action === 'urge') return 'urge'
+  return ''
 }
 
 function buildMobileWorkflowActionPayload({
@@ -99,6 +106,7 @@ function buildMobileWorkflowActionPayload({
 
 export default function useMobileRoleTaskActions({
   activeRoleKey,
+  adminProfile,
   selectedTask,
   detailAction,
   setDetailAction,
@@ -111,8 +119,17 @@ export default function useMobileRoleTaskActions({
   const [urgeReasonByTaskID, setUrgeReasonByTaskID] = useState({})
   const [evidenceTextByTaskID, setEvidenceTextByTaskID] = useState({})
 
+  const canRunMobileTaskAction = (task, action) => {
+    const actionMode = resolveWorkflowTaskActionMode(action)
+    return Boolean(
+      actionMode &&
+        canOpenMobileTaskDetailAction(activeRoleKey, task, action) &&
+        canRunWorkflowTaskAction(adminProfile, task, actionMode)
+    )
+  }
+
   const moveTask = async (task, taskStatusKey) => {
-    if (!canOpenMobileTaskDetailAction(activeRoleKey, task, taskStatusKey)) {
+    if (!canRunMobileTaskAction(task, taskStatusKey)) {
       message.warning(
         `当前角色不能${resolveMobileActionLabel(taskStatusKey)}该任务`
       )
@@ -213,7 +230,7 @@ export default function useMobileRoleTaskActions({
   }
 
   const urgeTask = async (task) => {
-    if (!canUrgeTask(activeRoleKey, task)) {
+    if (!canRunMobileTaskAction(task, 'urge')) {
       message.warning('当前角色没有催办该任务的权限')
       return false
     }
@@ -272,7 +289,7 @@ export default function useMobileRoleTaskActions({
   const handleTaskAction = async (task, action) => {
     setSelectedTaskID(task.id)
     if (['done', 'blocked', 'rejected', 'urge'].includes(action)) {
-      if (!canOpenMobileTaskDetailAction(activeRoleKey, task, action)) {
+      if (!canRunMobileTaskAction(task, action)) {
         message.warning(`当前角色不能${resolveMobileActionLabel(action)}该任务`)
         return
       }
@@ -294,11 +311,19 @@ export default function useMobileRoleTaskActions({
     }
   }
 
-  const selectedCanOperate = selectedTask
-    ? canOperateTask(activeRoleKey, selectedTask)
+  const selectedCanBlock = selectedTask
+    ? canRunMobileTaskAction(selectedTask, 'blocked')
     : false
+  const selectedCanComplete = selectedTask
+    ? canRunMobileTaskAction(selectedTask, 'done')
+    : false
+  const selectedCanReject = selectedTask
+    ? canRunMobileTaskAction(selectedTask, 'rejected')
+    : false
+  const selectedCanOperate =
+    selectedCanBlock || selectedCanComplete || selectedCanReject
   const selectedCanUrge = selectedTask
-    ? canUrgeTask(activeRoleKey, selectedTask)
+    ? canRunMobileTaskAction(selectedTask, 'urge')
     : false
   const detailReasonValue = selectedTask
     ? detailAction === 'urge'
@@ -360,6 +385,9 @@ export default function useMobileRoleTaskActions({
     handleTaskAction,
     savedEvidenceRefs,
     selectedCanOperate,
+    selectedCanBlock,
+    selectedCanComplete,
+    selectedCanReject,
     selectedCanUrge,
     submitDetailAction,
     updateDetailReason,

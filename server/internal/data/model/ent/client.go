@@ -3109,6 +3109,22 @@ func (c *MaterialClient) QueryQualityInspections(_m *Material) *QualityInspectio
 	return query
 }
 
+// QueryOutsourcingOrderItems queries the outsourcing_order_items edge of a Material.
+func (c *MaterialClient) QueryOutsourcingOrderItems(_m *Material) *OutsourcingOrderItemQuery {
+	query := (&OutsourcingOrderItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(material.Table, material.FieldID, id),
+			sqlgraph.To(outsourcingorderitem.Table, outsourcingorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, material.OutsourcingOrderItemsTable, material.OutsourcingOrderItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *MaterialClient) Hooks() []Hook {
 	return c.hooks.Material
@@ -3614,6 +3630,22 @@ func (c *OutsourcingOrderItemClient) QueryProduct(_m *OutsourcingOrderItem) *Pro
 			sqlgraph.From(outsourcingorderitem.Table, outsourcingorderitem.FieldID, id),
 			sqlgraph.To(product.Table, product.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, outsourcingorderitem.ProductTable, outsourcingorderitem.ProductColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryMaterial queries the material edge of a OutsourcingOrderItem.
+func (c *OutsourcingOrderItemClient) QueryMaterial(_m *OutsourcingOrderItem) *MaterialQuery {
+	query := (&MaterialClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingorderitem.Table, outsourcingorderitem.FieldID, id),
+			sqlgraph.To(material.Table, material.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, outsourcingorderitem.MaterialTable, outsourcingorderitem.MaterialColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil

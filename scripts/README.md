@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | `scripts/qa/` | [scripts/qa/README.md](qa/README.md) | fast / strict / full、边界守卫、测试选择和本地验收入口 |
 | `scripts/deploy/` | [scripts/deploy/README.md](deploy/README.md) | 生产 preflight、release evidence、closeout、客户配置发布和部署证据工具 |
-| `scripts/import/` | [scripts/import/README.md](import/README.md) | yoyoosun source manifest、freeze、dry-run 和受控导入执行边界 |
+| `scripts/import/` | [scripts/import/README.md](import/README.md) | 客户来源 manifest、只读提取、freeze 和 dry-run 准备边界 |
 
 ## 总览
 
@@ -18,7 +18,7 @@
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | `scripts/bootstrap.sh`                                 | 安装依赖、启用 hooks、跑快速自检                                                                                  | 新机器 / 首次拉仓库                                        |
 | `scripts/project-scan.sh`                              | 扫描项目名、默认密钥、部署地址和页面文案残留                                                                      | 改名后 / 配置收口后                                        |
-| `scripts/build/apply-customer-web-config.mjs`          | 本地 / CI 构建后按 `ERP_CUSTOMER_KEY` 把客户 `customer-config.js` 和 assets overlay 到前端静态产物，并带脚本测试锁定复制行为 | 构建客户私有化前端或服务端镜像时                            |
+| `scripts/build/apply-customer-web-config.mjs`          | 本地 / CI 构建后按 `ERP_CUSTOMER_KEY` 发布经过审查的 `customer-config.js`，并且只复制客户 `public-assets/` 到前端静态产物 | 构建客户私有化前端或服务端镜像时                            |
 | `scripts/seed-role-demo-admins.sh`                     | 显式生成 dev/test/demo 角色演示管理员账号，绑定真实 RBAC 角色                                                     | 需要多角色登录 / 岗位任务端验收                            |
 | `scripts/seed-core-demo-data.sh`                       | 显式生成核心产品模拟基础资料：单位、材料、产品、仓库和 BOM，并输出试用模拟 / 业务事实模拟可复用 ID                | 需要产品主数据、BOM 或业务事实前置 ID 的本地 / 试用演练前 |
 | `scripts/seed-trial-sim-masterdata.sh`                | 显式生成试用模拟产品 / 单位主数据，供模拟销售订单行引用                                                          | 试用环境模拟演练前                                         |
@@ -26,8 +26,7 @@
 | `scripts/import/customerSourceExtract.mjs`             | 按永绅 yoyoosun source manifest 只读提取允许结构化的原始 Excel，生成本地 source snapshot、空 existing preview、配置候选和报告 | yoyoosun 原始文件整理成导入前 evidence                     |
 | `scripts/import/customerSourceSnapshotFreezeCheck.mjs` | customer source snapshot freeze checker，只读取 JSON snapshot 并生成 freeze evidence                              | yoyoosun 导入前 source freeze / 人工 review evidence       |
 | `scripts/import/customerImportDryRun.mjs`              | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包                                             | yoyoosun 导入前人工 review / 数据映射检查                  |
-| `scripts/import/customerImportExecute.mjs`             | 永绅 yoyoosun 导入 execution loader 报告 / 门禁工具；真实 `--execute` 额外要求结构化 backup evidence 与 reviewed recovery plan 绑定同一 `backupId`，当前没有可执行客户真实数据时不执行真实导入 | import tooling 自检 / 单独数据治理评审                    |
-| `scripts/qa/test-data-isolation-boundary.mjs`          | 只读检查 Product Core demo seed、yoyoosun 模拟数据、真实导入 dry-run / freeze 和真实导入执行门禁是否分桶隔离，不连接后端或数据库 | 调整 seed、fixture、模拟数据或导入工具后                  |
+| `scripts/qa/test-data-isolation-boundary.mjs`          | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备是否分桶隔离，并锁住 dry-run 不具备执行能力 | 调整 seed、fixture、模拟数据或导入准备工具后                  |
 | `scripts/qa/manual-regression-data-plan.mjs`           | 只读汇总 Product Core 中性 seed、yoyoosun preview fixture、试用模拟数据、业务事实模拟和岗位任务模拟的手动回归数据入口；不连接后端、不写库、不执行真实导入 | 手动回归前梳理应准备哪些模拟数据和命令                    |
 | `scripts/qa/trial-simulated-data.mjs`           | 模拟试用数据入口，支持 `--print-input-template` 只读输出前置；真实执行只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据 | 试用环境演练                                               |
 | `scripts/qa/operational-fact-simulated-closure.mjs`    | 业务事实模拟闭环入口，支持 `--print-input-template` 只读输出前置；真实执行只使用显式模拟主数据覆盖生产 / 预留 / 委外 / 出货 / 财务链路 | 业务事实内部模拟验收 / 目标环境事实回归                  |
@@ -53,9 +52,9 @@
 | `scripts/deploy/customer-config-release-execute.mjs`   | 客户配置发布执行器，默认只出报告；支持 `--print-input-template` 输出 publish / activate / get_effective_session 读回输入模板；显式确认后才通过 JSON-RPC validate / publish / activate / rollback | 客户配置 revision 发布 / 激活 / 受控回滚执行前              |
 | `scripts/deploy/customer-config-release-readiness.mjs` | 客户配置发布就绪聚合门禁，复核 manifest、manifest evidence、release evidence、activation gate 和可选执行报告；支持 `--print-input-template` 输出 active revision 读回证据前置清单，支持 `--readback-preflight-report` 写 no-write 读回缺口报告，支持 `--json` 输出 evidence-only scope，失败时会带 release evidence status / closeout next actions，明确 readiness 只聚合证据、不执行发布或后端写入 | 客户配置 revision 发布前或执行后声明 ready 前              |
 | `scripts/deploy/production-preflight.sh`                | 产品级生产发布前门禁，检查运行时 env、一次性 admin bootstrap、固定镜像 tag、SMS mock、debug 写入开关、Compose、migration 脚本、PostgreSQL / 后端 / Jaeger loopback 和低配部署边界；对应测试已接入 fast / strict | 每次生产发布 / 部署后运行态复核前                          |
+| `scripts/deploy/migrate-online.test.mjs`                | 用 fake Docker / Atlas 锁住线上 migration 的 `status -> dry-run -> apply` 顺序、dry-run 失败不 apply 和整段 `flock` 串行；本机无 `flock` 时仅跳过并发行为断言 | 调整 `migrate_online.sh` 后                              |
 | `scripts/qa/core-boundary.test.mjs`                    | 自动扫描 `server/internal/core`，防止纯产品规则层 import `biz/data/service`、Ent、SQL、HTTP、配置或文件系统依赖 | 调整 `server/internal/core` 后                              |
 | `scripts/qa/workflow-fact-boundary.test.mjs`           | 自动扫描 Workflow runtime，防止任务完成链路直接引用 Operational Fact、库存、出货或财务事实写入口               | 调整 Workflow usecase、repo 或 JSON-RPC 后                  |
-| `scripts/qa/multi-client-role-workflow-priority-audit.mjs` | 只读审计 `多甲方角色能力流程编排优先级` 的可执行证据，区分已落地、必须 guarded 和仍需目标环境 evidence 的项；支持 `--json`、`--release-evidence-dir`、`--fail-on-release-not-ready` 和 `--fail-on-completion-not-ready` 输出 read-only scope / 强门禁，并摘出指定 release evidence status、blockers、next actions、completion blocking category 和第一缺口输入清单；明确 audit 不执行目标环境动作或真实导入 | 按参考文档继续实现或收口前                                  |
 | `scripts/qa/formal-frontend-customer-config-boundary.test.mjs` | 自动扫描正式前端 runtime，防止业务页面直接消费 raw 客户配置包，并锁住页面 / 动作 / 字段策略必须来自 `get_effective_session` 投影 | 调整客户配置运行时投影、正式菜单、字段策略或业务页面动作权限后 |
 | `web/src/erp/config/entryConfig.test.mjs` + `menuPermissions.test.mjs` + `seedData.test.mjs` + `workflowStatus.test.mjs` | 锁住角色菜单、岗位任务端入口、桌面 seedData、正式菜单权限和前端业务状态配置合同；已纳入 fast / strict，不替代后端 RBAC 或真实登录 | 调整角色入口、菜单权限、seedData、试用角色入口或前端状态流转配置后 |
 | `web/src/erp/config/devHub.test.mjs` + dev-only config tests | 锁住 `/__dev` 导航、测试入口、文档查看器、治理地图、原型查看器、能力台账、客户配置控制台和打印模板字段预检配置合同；已纳入 fast / strict，不进入正式菜单 | 调整 `/__dev` 页面、测试入口、原型 / 文档 / 台账查看器、客户配置控制台或打印模板字段预检后 |
@@ -68,10 +67,10 @@
 | `scripts/qa/docs-inventory.test.mjs`                   | 自动扫描当前维护 Markdown，确认已登记到 `docs/文档清单.md`                                                     | 新增、删除、重命名或调整长期维护 Markdown 后                |
 | `scripts/inventory-pg.sh`                              | 库存事实本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证库存流水、余额、冲正和防负库存                         |
 | `scripts/bom-lot-pg.sh`                                | BOM 与批次库存本地 PostgreSQL migration / 集成测试防呆入口                                                       | 验证 BOM schema 和批次库存行为                            |
-| `scripts/purchase-receipt-pg.sh`                       | 采购入库本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证采购入库 schema、IN 入库、REVERSAL 取消和批次追溯      |
+| `scripts/purchase-receipt-pg.sh`                       | 采购入库本地 PostgreSQL migration / 关键事务并发测试防呆入口                                                      | 验证采购入库、调整、源单聚合保存和 Workflow 终态并发       |
 | `scripts/purchase-return-pg.sh`                        | 采购退货本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
 | `scripts/doctor.sh`                                    | 检查本机依赖和 hooks 是否齐全                                                                                     | 环境初始化 / 异常排查                                      |
-| `scripts/qa/fast.sh`                                   | 高频快速检查，包含多甲方角色能力优先级审计、正式前端客户配置投影边界、角色菜单 / seedData 配置合同、开发入口配置合同、试用账号 RBAC 单测 / 浏览器 smoke 输入模板边界测试、真实登录 smoke 共享 URL 边界、客户导入、客户配置运行时 manifest、文档清单、模拟数据工具和阶段编号命名边界守卫 | 日常开发                                                   |
+| `scripts/qa/fast.sh`                                   | 高频快速检查，包含正式前端客户配置投影、角色菜单 / seedData、开发入口、试用账号、客户导入、运行时 manifest、文档清单和模拟数据边界 | 日常开发                                                   |
 | `scripts/qa/trial-account-rbac.mjs`                    | 只读验证角色演示账号的真实登录、角色、岗位任务端入口权限和 debug 权限边界；`--preflight-report` 会先写本地 no-write 前置报告，核对后端健康、密码 env 和静态角色投影；真实运行可选 `--report` 写本地脱敏报告，不保存密码或 token | 生成试用 / 演示账号后                                      |
 | `scripts/qa/customer-config-boundaries.mjs`            | 只读验证 customer config 草案仍是 draft，未放开 runtime / schema / import / RBAC 边界，并扫描后端 Product Core 运行时代码没有嵌入 yoyoosun / 永绅客户专属规则 | 调整客户配置草案、客户配置 runtime 或后端客户差异边界后 |
 | `scripts/qa/customer-config-effective-session-probe.mjs` | 无 Authorization 的 `customer_config.get_effective_session` 本地只读探针；可写 `output/customers/yoyoosun/customer-config-effective-session-probe/current.json`，确认本地后端可达和 `40302 未登录` / 缺真实登录证据边界，不读取 token、不证明 active revision | yoyoosun 本地入口已命中但还没有演示密码 / token，需要解释为什么不能证明后端 active revision 时 |
@@ -79,8 +78,8 @@
 | `scripts/qa/customer-package-preview-boundary.test.mjs` | 锁住 yoyoosun 客户包 `businessFlows / stateMachines / processPolicies` 仍为 preview-only，不执行 runtime command、不写 Fact、不覆盖 usecase 生命周期 | 调整客户包流程、状态机或策略预览后 |
 | `scripts/qa/customer-config-runtime-manifest.mjs`      | 将已跟踪客户包编译为后端 `customer_config` 可验证的 runtime manifest，检查 moduleStates、role key 映射、页面 / 字段投影、`sales_order_acceptance` 受控 `runtime_loader_ready` 流程定义、preview-only 打印 party defaults snapshot 和 forbidden payload；只允许白名单 ProcessRuntime 读取，不写 Fact，不声明销售订单打印模板启用 | 调整客户包 catalog、模块状态、角色池、页面投影、字段策略、打印配置草案、流程定义证据或 runtime 发布输入后 |
 | `scripts/qa/erp-field-linkage.mjs`                     | 字段联动专项测试并刷新 latest 覆盖报告                                                                            | 改字段真源、保存转换、合同金额、打印快照后                 |
-| `scripts/qa/full.sh`                                   | 推送前全量检查，先执行 `fast.sh`，再补 secrets / govulncheck、前端 test / build 和服务端 `go test ./...` / `make build` | 提交前 / 推送前                                            |
-| `scripts/qa/strict.sh`                                 | 严格检查，包含多甲方角色能力优先级审计、正式前端客户配置投影边界、角色菜单 / seedData 配置合同、开发入口配置合同、试用账号 RBAC 单测 / 浏览器 smoke 输入模板边界测试、真实登录 smoke 共享 URL 边界、客户导入、客户配置运行时 manifest、文档清单、模拟数据工具和阶段编号命名边界守卫 | 发版前                                                     |
+| `scripts/qa/full.sh`                                   | 推送前全量检查，先执行 `fast.sh`，再补安全扫描、前端 test / build、本地 PostgreSQL 关键事务门禁和服务端 test / build | 提交前 / 推送前                                            |
+| `scripts/qa/strict.sh`                                 | 严格检查，在 fast 边界上补零 warning、完整前后端构建和本地 PostgreSQL 关键事务门禁 | 发版前                                                     |
 | `scripts/qa/db-guard.sh`                               | 约束 schema 变更必须带 migration                                                                                  | 改数据模型后                                               |
 | `scripts/qa/error-code-sync.sh`                        | 校验前后端错误码同步                                                                                              | 改错误码后                                                 |
 | `scripts/qa/error-codes.sh`                            | 阻止业务代码裸写已注册错误码                                                                                      | 改接口 / 鉴权 / 前端错误处理后                             |
@@ -211,40 +210,9 @@ node scripts/import/customerImportDryRun.mjs \
   --format json,md
 ```
 
-`output/customers/yoyoosun/source-snapshot-freeze/` 和 `output/customers/yoyoosun/real-dry-run-evidence/` 是本地 evidence 输出，不纳入 git；它们仍不是 import approval。由 fixture / sample 生成的 dry-run package 只允许用于 report-only 自检，不能进入 `--execute`。
+`output/customers/yoyoosun/source-snapshot-freeze/` 和 `output/customers/yoyoosun/real-dry-run-evidence/` 是本地 evidence 输出，不纳入 git，也不代表 import approval。当前仓库不提供真实客户导入执行器；以后如有真实数据，必须另行实现通用批次 usecase、RBAC、审计、幂等、失败恢复和对账，不能给 dry-run 增加隐藏执行开关。
 
-真实执行器已提供受控报告模式，默认不调用后端：
-
-```bash
-node scripts/import/customerImportExecute.mjs \
-  --dry-run-package output/customers/yoyoosun/real-dry-run-evidence \
-  --approval scripts/import/fixtures/customers/yoyoosun/import-approval.sample.json \
-  --backup-evidence output/customers/yoyoosun/backup-evidence.txt \
-  --recovery-plan output/customers/yoyoosun/import-recovery-plan.json \
-  --out output/customers/yoyoosun/import-execution
-```
-
-该命令会生成 `import-execution-report.json` 和 `import-execution-report.md`，并校验 approval、backup evidence、unresolved block、forbidden auto-import、supported target 和 approval.moduleStates。approval 必须声明每个目标模块状态，只有 `enabled` 模块才会进入 JSON-RPC 操作计划，`read_only`、`disabled` 或缺失都会拒绝；联系人会按 owner type 映射到客户或供应商模块，销售订单明细映射到销售订单模块。没有 `--execute` 时不会连接数据库或后端；`scripts/import/fixtures/**` 下的 sample approval 只允许 report-only 自检，进入 `--execute` 会被脚本拒绝。
-
-当前 yoyoosun 没有可执行客户真实数据，不使用该 loader 执行真实导入。即使未来另开数据治理评审，真实写入也只能显式开启，并且只走 JSON-RPC V1 API，不直接写表、不写 `business_records`、不生成 schema / migration，也不创建出货、库存或财务事实：
-
-```bash
-CUSTOMER_IMPORT_CONFIRM=EXECUTE_YOYOOSUN_IMPORT \
-CUSTOMER_IMPORT_ADMIN_USERNAME='admin' \
-CUSTOMER_IMPORT_ADMIN_PASSWORD='replace-with-password' \
-  node scripts/import/customerImportExecute.mjs \
-    --dry-run-package output/customers/yoyoosun/real-dry-run-evidence \
-    --approval output/customers/yoyoosun/import-approval.json \
-    --backup-evidence output/customers/yoyoosun/backup-evidence.txt \
-    --recovery-plan output/customers/yoyoosun/import-recovery-plan.json \
-    --out output/customers/yoyoosun/import-execution \
-    --backend-url http://127.0.0.1:8300 \
-    --execute
-```
-
-执行前必须已有客户确认、数据库备份、reviewed recovery plan 和目标环境信息；`--backend-url` / `CUSTOMER_IMPORT_BACKEND_URL` 不得包含 URL 账号密码；`--backup-evidence` 必须是结构化 key/value 文本，至少包含 `backupId`、`releaseVersion`、`databaseSnapshot`、ISO `backupTime`、正数 `databaseBackupSize`、合法 `databaseBackupHash` 和 `operator`；`--recovery-plan` 必须是 JSON，并包含 `recoveryPlanApproved=true`、owner、backup evidence、rollback target、forward-fix path、failure triggers、post-recovery verification 和脱敏声明，且 `recoveryPlan.backupEvidence` 必须等于 `backupEvidence.backupId`。不要把 fixture approval 当真实客户批准，脚本层也会拒绝路径或内容含 fixture / sample / placeholder 的 approval、dry-run report、backup evidence 或 recovery plan 进入 `--execute`。当前 yoyoosun 不满足这些条件，不能执行该真实写入命令。
-
-测试业务数据隔离守卫用于统一检查四类入口：Product Core demo seed、yoyoosun 试用 / 业务事实 / 岗位任务模拟数据、真实导入 dry-run / freeze 预检、真实导入 execute 门禁。它只读扫描源码和文档化输出标记，不连接后端、不登录、不写数据库、不执行真实导入：
+测试业务数据隔离守卫统一检查 Product Core demo seed、yoyoosun 试用 / 业务事实 / 岗位任务模拟数据，以及真实导入准备边界。它只读扫描源码和输出标记，不连接后端、不登录、不写数据库：
 
 ```bash
 node scripts/qa/test-data-isolation-boundary.mjs
@@ -658,7 +626,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-mani
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-config-runtime-manifest.json
 ```
 
-该脚本不读取 raw 客户文件、不上传文件、不调用后端、不 activate、不 rollback、不导入业务数据，也不写 Workflow / Fact runtime；它只把 tracked catalog / schema / package 编译为受控 JSON-RPC payload 形状，锁住 `purchase -> purchasing` 等后端角色 key 映射、模块状态、页面投影、字段策略、打印默认值、授权和责任池输入。可以重复传入 `--customer` 一次性编译多个 runtime manifest，输出会逐客户打印；`--out` 只能在 `--mode preview` 下写入 `output/`，且只支持单客户 manifest，不能用一个文件覆盖多个客户结果。客户包可选 `moduleStates` 只允许 catalog 内模块和 `enabled / read_only / disabled`，非 `enabled` 必须写 reason；编译器会把它转成后端 `module_states`，但不提供运行时安装 / 卸载模块，也不证明完整模块关闭已 ready。`demo` manifest 的 entitlement `scope_value` 必须保持 `demo`，不能串到 `yoyoosun`；`yoyoosun` manifest 仍用于永绅受控发布链路。`demo` 包可以通过受控 `workPoolRoleOverrides` 证明同一 runtime 责任池在不同客户配置中映射给不同角色，例如 `order_review -> sales`，而 yoyoosun 仍保持 `order_review -> pmc`；流程定义仍引用同一个 `owner_pool_key`，差异只落在编译后的 `work_pool_memberships`，不 fork 核心代码、不复制流程、不扩大后端 RBAC。页面投影必须来自已登记正式菜单 key，manifest 编译器和后端 `validate_customer_config / publish_customer_config` 都会拒绝缺失、空列表或未知 page key 的 `compiled_snapshot.pages`，`get_effective_session` 对旧 revision 缺 pages 或无有效 pages 不回退 RBAC 全量页面。字段策略只发布当前前端已消费的 `customers.default`、`suppliers.default` 和 `sales_orders.default`；`sales_order_items` 的产品 / 款式 / 颜色尺码候选仍是导入 / 客户评审草案，不进入 active field policy。`printTemplateDefaults` 只允许登记当前正式 `material-purchase-contract / processing-contract` 的甲方 party defaults，编译后通过 active revision 的 `get_effective_session` 受控投影；当前正式前端消费采购订单页 `material-purchase-contract` 和委外订单页 `processing-contract` 的买方 / 委托方默认值，不启用销售订单打印，也不允许 supplier defaults 覆盖业务快照。后端 `validate_customer_config / publish_customer_config` 也会拒绝未登记 surface / field key，`get_effective_session` 会过滤旧 revision 中的非法字段策略。
+该脚本不读取 raw 客户文件、不上传文件、不调用后端、不 activate、不 rollback、不导入业务数据，也不写 Workflow / Fact runtime；它只把 tracked catalog / schema / package 编译为受控 JSON-RPC payload 形状，锁住后端角色 key 映射、模块状态、页面投影、字段策略、打印默认值、授权和责任池输入。可以重复传入 `--customer` 一次性编译多个 runtime manifest，输出会逐客户打印；`--out` 只能在 `--mode preview` 下写入 `output/`，且只支持单客户 manifest，不能用一个文件覆盖多个客户结果。客户包可选 `moduleStates` 只允许 catalog 内模块和 `enabled / read_only / disabled`，非 `enabled` 必须写 reason；编译器会把它转成后端 `module_states`，但不提供运行时安装 / 卸载模块，也不证明完整模块关闭已 ready。`demo` manifest 的 entitlement `scope_value` 必须保持 `demo`，不能串到 `yoyoosun`；`yoyoosun` manifest 仍用于永绅受控发布链路。`demo` 包可以通过受控 `workPoolRoleOverrides` 证明同一 runtime 责任池在不同客户配置中映射给不同角色，例如 `order_review -> sales`，而 yoyoosun 仍保持 `order_review -> pmc`；流程定义仍引用同一个 `owner_pool_key`，差异只落在编译后的 `work_pool_memberships`，不 fork 核心代码、不复制流程、不扩大后端 RBAC。页面投影必须来自已登记正式菜单 key，manifest 编译器和后端 `validate_customer_config / publish_customer_config` 都会拒绝缺失、空列表或未知 page key 的 `compiled_snapshot.pages`，`get_effective_session` 对旧 revision 缺 pages 或无有效 pages 不回退 RBAC 全量页面。字段策略只发布 `customers.default`、`suppliers.default` 和 `sales_orders.default`，且仅包含前端列表 / CSV 导出实际消费的 `visible`；当前 manifest 对 demo / yoyoosun 都使用 Product Core catalog 的 `visible=true` 默认值，不等于已存在客户专属字段差异。BOM、采购、委外、质检、库存、出货和财务字段只保留为正式业务字段合同，不进入 active field policy；款式 / 颜色尺码仍是导入 / 客户评审草案。`printTemplateDefaults` 只允许登记当前正式 `material-purchase-contract / processing-contract` 的甲方 party defaults，编译后通过 active revision 的 `get_effective_session` 受控投影；当前正式前端消费采购订单页 `material-purchase-contract` 和委外订单页 `processing-contract` 的买方 / 委托方默认值，不启用销售订单打印，也不允许 supplier defaults 覆盖业务快照。后端 `validate_customer_config / publish_customer_config` 会拒绝其他 field surface / field key，`get_effective_session` 会过滤旧 revision 中的非法字段策略。
 
 客户配置 revision 进入 release evidence 前，先生成 manifest fingerprint evidence：
 
@@ -862,20 +830,6 @@ STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-
 
 `adminProfileSync` 测试负责证明正式普通账号按 RBAC 菜单与 active revision 页面清单交集收窄，隐藏 URL 需要跳转，active revision 空页面清单不回退 RBAC-only，以及模块 disabled 后端投影隐藏业务页时正式账号需要跳转。`style:l1` 运行在前端 DEV 构建态，只证明本地开发诊断、super admin 产品核心看全、sync failure 诊断、无可见菜单空态，以及普通账号页面可见但 `effective_session.actions=[]` 时出货 / 质检 / 采购入库写按钮禁用的真实页面渲染；不要把本地 DEV 诊断场景当成正式客户放开证据，也不要把前端 helper 跳转或按钮禁用当成后端 RBAC / usecase 授权边界。
 
-按 `docs/product/多甲方角色能力流程编排优先级.md` 继续实现或收口前，执行：
-
-```bash
-node --test /Users/simon/projects/plush-toy-erp/scripts/qa/multi-client-role-workflow-priority-audit.test.mjs
-```
-
-该测试只读审计优先级文档的可执行证据，确认 Workflow action 合同、任务责任池、engineering 最小入口、客户配置 schema / migration、usecase / repo / JSON-RPC / RBAC / 审计测试、正式前端 `get_effective_session` 投影、客户配置 `sales_order_acceptance` 受控 `runtime_loader_ready` 流程定义和后端 `ProcessInstanceCreate` 构造 helper、Workflow / Fact guarded 边界、release evidence target 盲区和 production preflight fast / strict 门禁仍与当前仓库一致；它不调用后端、不执行 migration、不发布客户配置、不导入真实数据、不自动启动 ProcessInstance、不跑目标环境 smoke，也不把领域事实过账或目标环境发布证据伪造成完成。需要机器读取时可执行脚本本体并追加 `--json`，输出中的 `scope.readOnly`、`scope.executableEvidenceOnly`、`readyMeaning` 和 `notProvenByThisAudit` 会明确 audit 只证明当前仓库可执行证据仍对齐，不证明目标环境发布、migration、smoke、恢复 / 回滚演练、客户配置激活 / 回滚或真实客户导入已发生；`referenceCoverage` 会把参考图里的 schema / migration、usecase / repo / API / RBAC、正式前端 effective session 投影、release preflight / 目标 evidence 四类要求映射到具体 check ids、证据路径和 release action ids，并用 `localState` / `targetState` 拆开本地代码测试证据与目标环境证据，避免只看 `10/10 passed` 就误以为目标环境证据也已完成；`completionAudit` 则把 `referenceCoverage` 和 release closeout 队列汇总为“是否可按优先级执行、是否可在本机完成、当前 blocking category / reason、哪些本地要求已 ready、哪些目标 evidence 仍缺、第一条 blocked release action（含已解析输入、完整缺失项、env 模板、gate 摘要、runner report / execute 命令）、`firstBlockedInputChecklist` 下一步输入清单、剩余前置按 env / file / manual / evidence 分组、gate error / warning 总数和第一组未验证 gate 详情”，用于回答当前是否能收口以及下一组真实证据该补什么。`releaseEvidenceProgress` 默认摘出当前 `deployments/yoyoosun/evidence/releases/2026-06-29` 的 status、ready、closeoutSummary、blockers 和 closeoutNextActions，并给出 `release-evidence-closeout-plan.mjs` 的只读执行前置检查命令、`release-evidence-closeout-runner.mjs` 的 report-only 检查命令、`priorityAuditCommands` 中的 JSON 审计 / release evidence 强门禁 / 整体闭环强门禁命令，以及 `closeoutGateSummary`、`closeoutPlanSummary` / `closeoutActionQueue`。`closeoutGateSummary` 按证据组列出 gate error / warning 数量和样例，帮助定位已经 present 但仍 unverified 的文件字段；`closeoutActionQueue` 按 release closeout 顺序列出每个证据组的 `runnable / blocked / manual` 状态、缺失 env / file / manual 前置、env 模板、人工核对项和该组 runner report-only / execute 命令；`closeoutPlanSummary.firstBlockedAction` 和 `completionAudit.firstBlockedReleaseAction` 都保留第一条 blocked action，方便终端文本和 JSON 快速定位，且 `completionAudit.firstBlockedReleaseAction` 会透出该 action 的 `resolvedInputs` 和 `missingPrerequisites`。`firstBlockedInputChecklist` 会把同一 action 的 `resolvedInputIds`、`missingInputIds`、`missingInputIdsByKind`、`missingInputEnvTemplate`、下一条 runner report / execute 命令拆成稳定 JSON 字段，方便执行者先补真实输入再重跑 report-only。`completionAudit.remainingPrerequisites` 会保留每个缺口的 `kind / id / message / actionIds`，`remainingPrerequisitesByKind` 会把缺口按 `env / file / manual / evidence` 分组，避免把本机文件、环境变量和人工签收混成同一种外部输入。execute 命令仍需要真实 env 值和 `RELEASE_CLOSEOUT_CONFIRM=RUN_YOYOOSUN_RELEASE_CLOSEOUT`，且只执行 closeout plan 判定可运行的机器步骤。真实发布批次应追加 `--release-evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>` 指向对应 evidence 目录；如生产 runtime env 不是默认路径，再追加 `--runtime-env-file <path>`。默认 audit 即使 release evidence 未 ready 也仍可用于优先级证据审计；作为 release evidence 强门禁时追加 `--fail-on-release-not-ready`，作为“参考实现整体闭环”强门禁时追加 `--fail-on-completion-not-ready`，此时 `completionAudit.canCompleteLocally=false` 会返回非 0，但 JSON 中仍保留 `ok=true` 表示优先级文档证据本身对齐。该字段仍来自只读 status / closeout plan / closeout runner，不执行任何目标动作，也不输出真实 env 值、token、DSN 或命令原始输出。
-
-补充：`firstBlockedInputChecklist.nextInputTemplateCommand` 与 runner report 中的 `inputTemplateCommand` 都会保留同一条只读输入模板命令，用于先核对真实 release batch 输入；它们不是 execute 命令，也不会写 evidence。`operatorChecklist` 由 `release-evidence-closeout-plan.mjs` 统一生成，priority audit 的 `firstBlockedInputChecklist.operatorChecklist` / `closeoutActionQueue[*].operatorChecklist` 和 runner report 只透传同一份字段级清单。该清单会把同一 action 的 resolved / missing 输入拆成真实来源、证据落点、校验规则和 secret 标记，说明真实值应从 release batch、镜像构建 / registry、Atlas migration 状态、备份证据、目标 endpoint 或人工签收取得；其中 DSN、admin token 和 runtime env file 只标记为 secret 输入来源，不保存真实值。
-
-补充：priority audit 会为每组 closeout action 生成默认脱敏报告路径 `output/release-evidence-closeout/<release>/<action-id>-runner-report.json`，并在 `closeoutRunnerReportFileCommand` / `firstBlockedInputChecklist.nextRunnerReportFileCommand` 中给出带 `--report` 的 report-only 命令。该命令不拼接待填写 env 模板，可直接落盘当前 blocked / manual / runnable 状态、缺失输入和字段级 checklist；真实 env 只出现在 `missingInputEnvTemplate` 和 execute 模板里，由执行者在后续写 evidence 或执行可运行 action 时提供。这个路径用于保存操作前审计报告，不属于 release evidence gate 的目标证据目录；只有对应 evidence 文件、目标 smoke、恢复 / 回滚演练和签收证据通过 gate 后，才算该 release action 完成。
-
-如果只需要收集 P5 release batch 输入，不需要完整审计 JSON，可用 priority audit 的轻量输入清单模式。`--input-checklist-json` 输出机器可读 `implementationBreakdown` 和 `closeoutInputChecklist`，适合接外部收集表；前者给出 P0-P5 阶段目标、本地状态、目标证据状态、下一条只读 closeout action 和阶段执行合同（allowed paths / forbidden paths / not doing / validation commands），后者给出具体 release closeout 输入。`collectionGroups` 会按镜像 / 版本、preflight、备份恢复、目标 smoke、客户配置读回、回滚处置和签收等收集责任面聚合 action 与缺失输入。`--input-checklist-markdown` 输出人工可读表格，并包含 `Implementation Breakdown`、`Collection Groups` 分组表和 `Collection Input Details` 逐 action 明细，列出每个阶段的执行合同和每个 closeout action 的 input、source、evidence target 和 validation。`--input-checklist-csv` 输出可导入电子表格的平铺行，字段包含 `evidence_dir / runtime_env_file / release_ready / completion_state / blocking_category` 和 `phase_*` 上下文，以及 group / action / input / source / evidence target / validation，只用于外部 release batch 收集，不包含 report command、execute command、真实 DSN、token 或任何 secret 值。三种模式都只读、不写 release evidence、不输出 `executeCommand`、不包含 `--execute` 或 `RELEASE_CLOSEOUT_CONFIRM`；真实目标证据仍必须由对应 closeout action 在具备真实输入后受控执行并重新通过 release evidence gate。
-
 调整长期维护 Markdown 后，执行：
 
 ```bash
@@ -944,7 +898,7 @@ bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh 
 `scripts/deploy/release-evidence-closeout-runner.test.mjs` 已接入 `fast.sh`，用于锁住 `release-evidence-closeout-runner.mjs` 的 report-only 默认行为、`--only <action-id>` 选择、`--report` 脱敏报告落盘且拒绝写入 `deployments/<customer>/evidence/**`、显式确认短语、execute 模式拒绝 blocked action、可运行 action 的实际执行路径，以及 report / 文本输出保留 action 的 `inputTemplateCommand` 和 `operatorChecklist`。不带 `--execute` 时只输出计划，不写 evidence，可报告 blocked / manual action 的缺失前置；带 `--execute` 时必须设置 `RELEASE_CLOSEOUT_CONFIRM=RUN_YOYOOSUN_RELEASE_CLOSEOUT`，且只 materialize closeout plan 已判定 `canRun=true` 且非人工的 action。runner JSON / report 会输出 display command、env key 名、非敏感 release batch `resolvedInputs`、只读 input template 命令、字段级 operator checklist 和 stdout / stderr 行数，不输出 `SOURCE_POSTGRES_DSN`、`CUSTOMER_CONFIG_ADMIN_TOKEN` 或命令原始输出。即使执行模式开启，runner 也不会执行 `release-signoff` 这种人工步骤，不会绕过 release evidence gate，也不会把 blocked action 当成可执行。
 `scripts/deploy/image-digests-evidence.test.mjs` 已接入 `fast.sh`，用于锁住 `image-digests-evidence.mjs` 的 CLI、digest 格式、`image-digests.txt` key-value 输出和与已填 `release-evidence.md` 的 digest 一致性；该生成器只写脱敏 artifact，不构建镜像、不访问 registry、不读取 `.env`。
 
-`scripts/deploy/immutable-version-evidence.test.mjs` 已接入 `fast.sh` 和 `strict.sh`，用于锁住 `immutable-version-evidence.mjs` 的 CLI、release batch 字段校验、Atlas migration version 格式、只更新 `release-evidence.md` 第一组基本信息字段，以及同步写入 `image-digests.txt`。该写入器只消费显式传入的 releaseVersion、environment、operatorRole、gitCommit、server / web image ref、sha256 digest、migrationBefore、migrationAfter 和 backupId；`--print-input-template` 只打印这些输入的 shell 模板和写入命令，不要求 evidence 目录存在，也不写 `release-evidence.md` 或 `image-digests.txt`。priority audit 的 `firstBlockedInputChecklist.nextInputTemplateCommand` 会指向该只读模板命令，方便从第一缺口跳到专用输入清单。它不构建镜像、不访问 registry、不读取 `.env`、不执行 migration、不跑 smoke、不恢复备份、不接触目标环境。
+`scripts/deploy/immutable-version-evidence.test.mjs` 已接入 `fast.sh` 和 `strict.sh`，用于锁住 `immutable-version-evidence.mjs` 的 CLI、release batch 字段校验、Atlas migration version 格式、只更新 `release-evidence.md` 第一组基本信息字段，以及同步写入 `image-digests.txt`。该写入器只消费显式传入的 releaseVersion、environment、operatorRole、gitCommit、server / web image ref、sha256 digest、migrationBefore、migrationAfter 和 backupId；`--print-input-template` 只打印这些输入的 shell 模板和写入命令，不要求 evidence 目录存在，也不写 evidence。它不构建镜像、不访问 registry、不读取 `.env`、不执行 migration、不跑 smoke、不恢复备份、不接触目标环境。
 `scripts/deploy/backup-restore-rehearsal-script.test.mjs` 也已接入 `fast.sh` / `strict.sh`，用于锁住恢复演练脚本的 help、缺少 source DSN 时提前拒绝、目标库 DSN 默认防呆、`--backup-purpose` 必须是 pre-migration / pre-deploy / 发布前 / migration 前语义、`--evidence-dir` 必须指向已存在 release evidence 目录、恢复后会先记录 `migration-status-before-apply.txt`、执行 `atlas migrate apply`，以及 `backup-restore-report.json` 中 release evidence gate 需要的脱敏字段；提供 `--evidence-dir` 时脚本只会复制 `backup-evidence.md`、`migration-status-before-apply.txt`、`migration-status.txt`、`command-summary.txt` 和 `backup-restore-report.json`，不会复制 dump。release evidence gate 会进一步要求 `backup-restore-report.json` 里的 `artifacts.backupEvidence`、`artifacts.preMigrationStatus`、`artifacts.migrationStatus` 和 `artifacts.commandSummary` 是当前 evidence 目录内真实存在的相对路径且文件内容不含完整 DSN / secret，并会解析 pre / post migration artifact 的 `Current Version` 和 `Pending Files`，以及 command summary 的 `backupId / releaseVersion / sourceAlias / restoreTarget / steps`，避免引用外部目录、绝对路径、完整 DSN、不存在的命令摘要、不同批次或不同恢复目标的命令摘要、缺少 pg_dump / restore / atlas / smoke 步骤，或与 release migration 不一致的 artifact；该测试不启动 Docker、不执行 `pg_dump`、不恢复数据库。
 rollback / forward-fix 演练完成并取得 post-smoke report 后，用报告生成器收口 release gate 需要的 JSON：
 

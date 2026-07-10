@@ -1,47 +1,4 @@
-export const TASK_WORKFLOW_STATES = Object.freeze([
-  {
-    key: 'pending',
-    label: '待开始',
-    summary: '任务已创建，但前置条件还没齐，暂时不能开工。',
-  },
-  {
-    key: 'ready',
-    label: '可执行',
-    summary: '上游单据、资料或齐套条件已满足，可以正式开始。',
-  },
-  {
-    key: 'processing',
-    label: '处理中',
-    summary: '已有责任人接手，当前任务正在推进。',
-  },
-  {
-    key: 'blocked',
-    label: '阻塞',
-    summary: '被缺料、缺资料、未放行或异常等外部条件卡住。',
-  },
-  {
-    key: 'done',
-    label: '已完成',
-    summary: '当前任务的完成条件已经达到，可进入下游节点。',
-  },
-  {
-    key: 'rejected',
-    label: '已退回',
-    summary: '审批、检验或确认动作未通过，需要回退上一责任人。',
-  },
-  {
-    key: 'cancelled',
-    label: '已取消',
-    summary: '因订单取消、方案切换或需求撤销而失效。',
-  },
-  {
-    key: 'closed',
-    label: '已关闭',
-    summary: '主链闭环后归档关闭，不再继续推进。',
-  },
-])
-
-export const BUSINESS_WORKFLOW_STATES = Object.freeze([
+export const BUSINESS_STATUS_OPTIONS = Object.freeze([
   {
     key: 'project_pending',
     label: '立项待确认',
@@ -100,8 +57,8 @@ export const BUSINESS_WORKFLOW_STATES = Object.freeze([
   },
   {
     key: 'inbound_done',
-    label: '已入库',
-    summary: '仓库已确认入库事实；库存余额和库存流水后续按专表评审落地。',
+    label: '入库协同已完成',
+    summary: '相关交接任务已经完成；实际库存以入库单过账结果为准。',
   },
   {
     key: 'shipment_pending',
@@ -115,8 +72,8 @@ export const BUSINESS_WORKFLOW_STATES = Object.freeze([
   },
   {
     key: 'shipped',
-    label: '已出货',
-    summary: '出库事实已形成，可进入对账和结算链路。',
+    label: '出货协同已完成',
+    summary: '出货链路已完成；实际出货数量和库存扣减以出货单为准。',
   },
   {
     key: 'reconciling',
@@ -125,8 +82,8 @@ export const BUSINESS_WORKFLOW_STATES = Object.freeze([
   },
   {
     key: 'settled',
-    label: '已结算',
-    summary: '当前订单或批次对应的结算义务已经闭环。',
+    label: '结算协同已完成',
+    summary: '对账交接已经完成；实际应收应付和收付款以业务财务记录为准。',
   },
   {
     key: 'blocked',
@@ -145,132 +102,12 @@ export const BUSINESS_WORKFLOW_STATES = Object.freeze([
   },
 ])
 
-const BUSINESS_STATUS_TRANSITION_KEYS = Object.freeze({
-  project_pending: ['project_approved', 'blocked', 'cancelled'],
-  project_approved: [
-    'engineering_preparing',
-    'material_preparing',
-    'blocked',
-    'cancelled',
-  ],
-  engineering_preparing: ['material_preparing', 'blocked', 'cancelled'],
-  material_preparing: [
-    'iqc_pending',
-    'production_ready',
-    'blocked',
-    'cancelled',
-  ],
-  production_ready: ['production_processing', 'blocked', 'cancelled'],
-  production_processing: [
-    'qc_pending',
-    'warehouse_processing',
-    'blocked',
-    'cancelled',
-  ],
-  qc_pending: [
-    'warehouse_processing',
-    'production_processing',
-    'blocked',
-    'cancelled',
-  ],
-  iqc_pending: [
-    'warehouse_inbound_pending',
-    'qc_failed',
-    'blocked',
-    'cancelled',
-  ],
-  qc_failed: ['material_preparing', 'iqc_pending', 'blocked', 'cancelled'],
-  warehouse_processing: [
-    'shipping_released',
-    'shipped',
-    'blocked',
-    'cancelled',
-  ],
-  warehouse_inbound_pending: ['inbound_done', 'blocked', 'cancelled'],
-  inbound_done: [
-    'material_preparing',
-    'production_ready',
-    'shipment_pending',
-    'closed',
-  ],
-  shipment_pending: ['shipped', 'blocked', 'cancelled'],
-  shipping_released: ['shipped', 'blocked', 'cancelled'],
-  shipped: ['reconciling', 'closed'],
-  reconciling: ['settled', 'blocked', 'closed'],
-  settled: ['closed'],
-  blocked: [
-    'material_preparing',
-    'production_ready',
-    'production_processing',
-    'qc_pending',
-    'warehouse_processing',
-    'shipment_pending',
-    'reconciling',
-    'cancelled',
-  ],
-  cancelled: ['closed'],
-})
-
 const BUSINESS_STATUS_BY_KEY = new Map(
-  BUSINESS_WORKFLOW_STATES.map((state) => [state.key, state])
+  BUSINESS_STATUS_OPTIONS.map((state) => [state.key, state])
 )
-
-const BUSINESS_STATUS_REASON_REQUIRED_KEYS = new Set(['blocked', 'cancelled'])
 
 export function getBusinessStatusLabel(statusKey, fallback = '未知业务状态') {
   const normalizedStatusKey = String(statusKey || '').trim()
   if (!normalizedStatusKey) return fallback
   return BUSINESS_STATUS_BY_KEY.get(normalizedStatusKey)?.label || fallback
 }
-
-export function getBusinessStatusTransitionOptions(currentStatusKey) {
-  const transitionKeys = BUSINESS_STATUS_TRANSITION_KEYS[currentStatusKey] || []
-  return transitionKeys
-    .map((key) => BUSINESS_STATUS_BY_KEY.get(key))
-    .filter(Boolean)
-    .map((state) => ({
-      label: state.label,
-      value: state.key,
-      summary: state.summary,
-    }))
-}
-
-export function requiresBusinessStatusReason(statusKey) {
-  return BUSINESS_STATUS_REASON_REQUIRED_KEYS.has(statusKey)
-}
-
-export const WORKFLOW_PLANNING_PHASES = Object.freeze([
-  {
-    key: 'source_locked',
-    label: '真源已收口',
-    summary: '先明确当前唯一真源字段、单据和业务节点。',
-  },
-  {
-    key: 'page_defined',
-    label: '页面已收口',
-    summary: '菜单、角色入口和工作台卡片范围已确定。',
-  },
-  {
-    key: 'status_defined',
-    label: '状态已统一',
-    summary: '任务状态、业务状态和阻塞原因已形成统一字典。',
-  },
-  {
-    key: 'schema_v1_ready',
-    label: 'Schema v1 已落地',
-    summary:
-      'workflow、V1 主数据和事实层表已通过 Ent + Atlas 管理；旧通用业务记录表族已删除。',
-  },
-  {
-    key: 'api_v1_ready',
-    label: 'API v1 已接通',
-    summary:
-      'workflow 与 business JSON-RPC 已支持当前表格、弹窗和任务池主路径。',
-  },
-  {
-    key: 'save_link_v1_ready',
-    label: '保存链路 v1 已接通',
-    summary:
-      '正式 V1 页面写对应领域表；Workflow 只写协同任务和状态投影，不再写旧通用业务记录。',
-  },
-])

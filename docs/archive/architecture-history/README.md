@@ -4,11 +4,11 @@
 
 这些文件只用于追溯当时的设计过程和历史取舍，不作为当前 runtime、schema、migration、API、UI、测试或产品路线真源。当前实现状态必须回到：
 
-- `docs/current-source-of-truth.md`
+- `docs/当前真源与交接顺序.md`
 - 当前代码、Ent schema、Atlas migration 和测试
 - 活跃 `docs/architecture/` 下的长期边界评审文档
-- `docs/product/product-completion-roadmap.md`
-- `docs/product/product-delivery-ledgers.md`
+- `docs/product/产品完成路线图.md`
+- `docs/product/产品能力进度台账.md`
 
 ## 已归档文件
 
@@ -20,9 +20,13 @@
 | `purchase-receipt-adjustment-review.md` | 采购入库差异 / 入库后更正实现评审 | 历史实现评审归档 |
 | `quality-inspection-entry-review.md` | 来料质检入口 / 批次状态 / 冻结库存边界实现评审 | 历史实现评审归档 |
 | `quality-inspection-schema-review.md` | `quality_inspections` 最小主表实现评审 | 历史实现评审归档 |
+| `工作流用例统一编排评审.md` | 七条局部 Workflow rule 的迁移期评审 | 公开 API、Process Runtime、终态与并发边界已演进，转为历史证据 |
+| `出货放行工作流用例评审.md` | `shipment_release` 最小协同规则落地评审 | 当前真实出货事实已接入，转为历史证据 |
+| `出货事实与库存边界评审.md` | 出货事实与库存最小闭环落地评审 | 含已删除页面和阶段性建议，转为历史证据 |
+| `出货事实最小模型评审.md` | 独立 ShipmentUsecase 落地前的最小模型评审 | 当前由 `OperationalFactUsecase` + Inventory 承接出货事实，转为历史证据 |
 
 ## 使用规则
 
 - 新任务不应把本目录文件当作当前架构入口。
-- 若需要追溯旧实现决策，可读取本目录文件，但结论必须再与当前代码和 `docs/current-source-of-truth.md` 复核。
+- 若需要追溯旧实现决策，可读取本目录文件，但结论必须再与当前代码和 `docs/当前真源与交接顺序.md` 复核。
 - 如果归档文件中的某条结论仍需长期使用，应先抽到活跃边界文档或当前真源索引，再继续执行。

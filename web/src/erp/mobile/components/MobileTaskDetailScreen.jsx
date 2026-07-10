@@ -14,6 +14,7 @@ import { formatMobileTaskTime } from '../../utils/mobileTaskView.mjs'
 import {
   QUICK_REASONS,
   buildTaskFactRows,
+  canOperateTask,
   getMobileRoleLabel,
   resolveDetailActionLabel,
   resolveMobileActionDisplayLabel,
@@ -42,7 +43,10 @@ export default function MobileTaskDetailScreen({
   handleTaskAction,
   roleLabel,
   savedEvidenceRefs,
+  selectedCanBlock,
+  selectedCanComplete,
   selectedCanOperate,
+  selectedCanReject,
   selectedCanUrge,
   selectedSeverity,
   selectedTask,
@@ -70,6 +74,7 @@ export default function MobileTaskDetailScreen({
   const isUrging = urgingID === selectedTask.id
   const isDoneDetailAction = detailAction === 'done'
   const ownerRoleLabel = getMobileRoleLabel(selectedTask.owner_role_key)
+  const currentRoleOwnsTask = canOperateTask(activeRoleKey, selectedTask)
   const taskReason = resolveTaskReason(selectedTask)
   const taskReasonLabel = resolveTaskReasonLabel(selectedTask)
   const taskStatusLabel = resolveMobileTaskStatusLabel(selectedTask)
@@ -78,9 +83,11 @@ export default function MobileTaskDetailScreen({
     ''
   )
   const actionGuidance = !selectedCanOperate
-    ? selectedCanUrge
-      ? `当前岗位可查看并催办，阻塞 / 完成 / 退回由${ownerRoleLabel}负责。`
-      : `当前岗位仅可查看，阻塞 / 完成 / 退回由${ownerRoleLabel}负责。`
+    ? currentRoleOwnsTask
+      ? '当前配置未授予阻塞、完成或退回动作；本页只供查看。'
+      : selectedCanUrge
+        ? `当前岗位可查看并催办，阻塞 / 完成 / 退回由${ownerRoleLabel}负责。`
+        : `当前岗位仅可查看，阻塞 / 完成 / 退回由${ownerRoleLabel}负责。`
     : ''
 
   return (
@@ -364,7 +371,7 @@ export default function MobileTaskDetailScreen({
         <button
           type="button"
           className="mobile-role-action-bar__button mobile-role-action-bar__button--blocked rounded-xl bg-orange-500 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
-          disabled={!selectedCanOperate || isUpdating}
+          disabled={!selectedCanBlock || isUpdating}
           onClick={() => handleTaskAction(selectedTask, 'blocked')}
         >
           <PauseOutlined className="mr-2" />
@@ -373,7 +380,7 @@ export default function MobileTaskDetailScreen({
         <button
           type="button"
           className="mobile-role-action-bar__button mobile-role-action-bar__button--done rounded-xl bg-emerald-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
-          disabled={!selectedCanOperate || isUpdating}
+          disabled={!selectedCanComplete || isUpdating}
           onClick={() => handleTaskAction(selectedTask, 'done')}
         >
           <CheckOutlined className="mr-2" />
@@ -392,7 +399,7 @@ export default function MobileTaskDetailScreen({
           <button
             type="button"
             className="mobile-role-action-bar__button mobile-role-action-bar__button--rejected col-span-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-base font-semibold text-red-600 disabled:opacity-50"
-            disabled={!selectedCanOperate || isUpdating}
+            disabled={!selectedCanReject || isUpdating}
             onClick={() => handleTaskAction(selectedTask, 'rejected')}
           >
             退回当前任务

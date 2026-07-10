@@ -1,13 +1,13 @@
-const { FlatCompat } = require('@eslint/eslintrc')
-const js = require('@eslint/js')
+import { FlatCompat } from '@eslint/eslintrc'
+import js from '@eslint/js'
 
 const compat = new FlatCompat({
-  baseDirectory: __dirname,
+  baseDirectory: import.meta.dirname,
   recommendedConfig: js.configs.recommended,
   allConfig: js.configs.all,
 })
 
-module.exports = [
+export default [
   ...compat.config({
     env: {
       browser: true,

@@ -238,8 +238,16 @@ test('moduleTableColumns: 主业务列表页使用共享排序入口', () => {
   assert.match(purchaseOrderColumns, /applyBusinessColumnSorters\(/u)
 })
 
-test('moduleTableColumns: planned field policy surfaces map to real business columns', () => {
+test('moduleTableColumns: formal field contracts do not retain inactive field policy aliases', () => {
   const files = {
+    masterDataColumns: readFileSync(
+      resolve(erpSourceRoot, 'components/master-data/masterDataColumns.jsx'),
+      'utf8'
+    ),
+    salesOrderColumns: readFileSync(
+      resolve(erpSourceRoot, 'components/sales-orders/salesOrderColumns.jsx'),
+      'utf8'
+    ),
     purchaseOrderColumns: readFileSync(
       resolve(
         erpSourceRoot,
@@ -267,21 +275,15 @@ test('moduleTableColumns: planned field policy surfaces map to real business col
     ),
   }
 
+  assert.doesNotMatch(files.purchaseOrderColumns, /effectiveFieldKey/u)
+  assert.doesNotMatch(files.outsourcingOrderColumns, /effectiveFieldKey/u)
+  assert.doesNotMatch(files.shipmentColumns, /effectiveFieldKey/u)
+  assert.doesNotMatch(files.qualityInspectionColumns, /effectiveFieldKey/u)
+  assert.match(files.masterDataColumns, /effectiveFieldKey:\s*'supplier_type'/u)
+  assert.doesNotMatch(files.masterDataColumns, /effectiveFieldKey:\s*'tax_no'/u)
+  assert.match(files.salesOrderColumns, /effectiveFieldKey:\s*'source_no'/u)
   assert.match(
-    files.purchaseOrderColumns,
-    /effectiveFieldKey:\s*'supplier_snapshot'/u
-  )
-  assert.match(
-    files.outsourcingOrderColumns,
-    /effectiveFieldKey:\s*'processor_snapshot'/u
-  )
-  assert.match(
-    files.outsourcingOrderColumns,
-    /effectiveFieldKey:\s*'expected_return_date'/u
-  )
-  assert.match(files.shipmentColumns, /effectiveFieldKey:\s*'sales_order_no'/u)
-  assert.match(
-    files.qualityInspectionColumns,
-    /effectiveFieldKey:\s*'source_no'/u
+    files.salesOrderColumns,
+    /effectiveFieldKey:\s*'expected_ship_date'/u
   )
 })

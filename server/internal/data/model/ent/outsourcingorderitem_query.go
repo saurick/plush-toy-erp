@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/predicate"
@@ -28,6 +29,7 @@ type OutsourcingOrderItemQuery struct {
 	predicates           []predicate.OutsourcingOrderItem
 	withOutsourcingOrder *OutsourcingOrderQuery
 	withProduct          *ProductQuery
+	withMaterial         *MaterialQuery
 	withProcess          *ProcessQuery
 	withUnit             *UnitQuery
 	// intermediate query (i.e. traversal path).
@@ -103,6 +105,28 @@ func (_q *OutsourcingOrderItemQuery) QueryProduct() *ProductQuery {
 			sqlgraph.From(outsourcingorderitem.Table, outsourcingorderitem.FieldID, selector),
 			sqlgraph.To(product.Table, product.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, outsourcingorderitem.ProductTable, outsourcingorderitem.ProductColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryMaterial chains the current query on the "material" edge.
+func (_q *OutsourcingOrderItemQuery) QueryMaterial() *MaterialQuery {
+	query := (&MaterialClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingorderitem.Table, outsourcingorderitem.FieldID, selector),
+			sqlgraph.To(material.Table, material.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, outsourcingorderitem.MaterialTable, outsourcingorderitem.MaterialColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -348,6 +372,7 @@ func (_q *OutsourcingOrderItemQuery) Clone() *OutsourcingOrderItemQuery {
 		predicates:           append([]predicate.OutsourcingOrderItem{}, _q.predicates...),
 		withOutsourcingOrder: _q.withOutsourcingOrder.Clone(),
 		withProduct:          _q.withProduct.Clone(),
+		withMaterial:         _q.withMaterial.Clone(),
 		withProcess:          _q.withProcess.Clone(),
 		withUnit:             _q.withUnit.Clone(),
 		// clone intermediate query.
@@ -375,6 +400,17 @@ func (_q *OutsourcingOrderItemQuery) WithProduct(opts ...func(*ProductQuery)) *O
 		opt(query)
 	}
 	_q.withProduct = query
+	return _q
+}
+
+// WithMaterial tells the query-builder to eager-load the nodes that are connected to
+// the "material" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *OutsourcingOrderItemQuery) WithMaterial(opts ...func(*MaterialQuery)) *OutsourcingOrderItemQuery {
+	query := (&MaterialClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withMaterial = query
 	return _q
 }
 
@@ -478,9 +514,10 @@ func (_q *OutsourcingOrderItemQuery) sqlAll(ctx context.Context, hooks ...queryH
 	var (
 		nodes       = []*OutsourcingOrderItem{}
 		_spec       = _q.querySpec()
-		loadedTypes = [4]bool{
+		loadedTypes = [5]bool{
 			_q.withOutsourcingOrder != nil,
 			_q.withProduct != nil,
+			_q.withMaterial != nil,
 			_q.withProcess != nil,
 			_q.withUnit != nil,
 		}
@@ -512,6 +549,12 @@ func (_q *OutsourcingOrderItemQuery) sqlAll(ctx context.Context, hooks ...queryH
 	if query := _q.withProduct; query != nil {
 		if err := _q.loadProduct(ctx, query, nodes, nil,
 			func(n *OutsourcingOrderItem, e *Product) { n.Edges.Product = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withMaterial; query != nil {
+		if err := _q.loadMaterial(ctx, query, nodes, nil,
+			func(n *OutsourcingOrderItem, e *Material) { n.Edges.Material = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -563,7 +606,10 @@ func (_q *OutsourcingOrderItemQuery) loadProduct(ctx context.Context, query *Pro
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*OutsourcingOrderItem)
 	for i := range nodes {
-		fk := nodes[i].ProductID
+		if nodes[i].ProductID == nil {
+			continue
+		}
+		fk := *nodes[i].ProductID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -581,6 +627,38 @@ func (_q *OutsourcingOrderItemQuery) loadProduct(ctx context.Context, query *Pro
 		nodes, ok := nodeids[n.ID]
 		if !ok {
 			return fmt.Errorf(`unexpected foreign-key "product_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (_q *OutsourcingOrderItemQuery) loadMaterial(ctx context.Context, query *MaterialQuery, nodes []*OutsourcingOrderItem, init func(*OutsourcingOrderItem), assign func(*OutsourcingOrderItem, *Material)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*OutsourcingOrderItem)
+	for i := range nodes {
+		if nodes[i].MaterialID == nil {
+			continue
+		}
+		fk := *nodes[i].MaterialID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(material.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "material_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -677,6 +755,9 @@ func (_q *OutsourcingOrderItemQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if _q.withProduct != nil {
 			_spec.Node.AddColumnOnce(outsourcingorderitem.FieldProductID)
+		}
+		if _q.withMaterial != nil {
+			_spec.Node.AddColumnOnce(outsourcingorderitem.FieldMaterialID)
 		}
 		if _q.withProcess != nil {
 			_spec.Node.AddColumnOnce(outsourcingorderitem.FieldProcessID)

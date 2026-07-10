@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
@@ -33,6 +34,11 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderDocument(
 		items, ok := outsourcingOrderItemSaveMutationsFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
+		}
+		if subjectModules := outsourcingOrderSubjectModuleKeys(items); len(subjectModules) > 0 {
+			if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), subjectModules...); res != nil {
+				return id, res, nil
+			}
 		}
 		result, err := d.outsourcingOrderUC.SaveOutsourcingOrderWithItems(ctx, orderID, in, items)
 		return id, outsourcingOrderWithItemsMutationResult(ctx, d, result, err), nil
@@ -78,4 +84,30 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderDocument(
 	default:
 		return id, unknownOutsourcingOrderResult(method), nil
 	}
+}
+
+func outsourcingOrderSubjectModuleKeys(items []*biz.OutsourcingOrderItemSaveMutation) []string {
+	seen := map[string]struct{}{}
+	out := []string{}
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		moduleKey := ""
+		switch strings.ToUpper(strings.TrimSpace(item.SubjectType)) {
+		case biz.OutsourcingOrderSubjectProduct:
+			moduleKey = "products"
+		case biz.OutsourcingOrderSubjectMaterial:
+			moduleKey = "materials"
+		}
+		if moduleKey == "" {
+			continue
+		}
+		if _, ok := seen[moduleKey]; ok {
+			continue
+		}
+		seen[moduleKey] = struct{}{}
+		out = append(out, moduleKey)
+	}
+	return out
 }

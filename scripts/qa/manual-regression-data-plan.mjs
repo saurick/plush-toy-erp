@@ -163,7 +163,7 @@ function buildYoyoosunPlan() {
       "inventory pending, qc hold, and available lot states",
       "shipment draft, shipped, and cancelled states",
       "finance receivable/payable draft and posted preview states",
-      "workflow sales, purchasing, boss, quality, and warehouse task roles",
+      "workflow sales, purchase, boss, quality, and warehouse task roles",
     ],
     commands: {
       fixtureBoundary:

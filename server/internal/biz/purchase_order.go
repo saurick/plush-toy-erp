@@ -176,7 +176,7 @@ func (uc *PurchaseOrderUsecase) UpdatePurchaseOrder(ctx context.Context, id int,
 	if err != nil {
 		return nil, err
 	}
-	if isPurchaseOrderSettled(current.LifecycleStatus) {
+	if !corestatus.IsPurchaseOrderEditable(current.LifecycleStatus) {
 		return nil, ErrBadParam
 	}
 	normalized, err := normalizePurchaseOrderMutation(*in)
@@ -301,7 +301,7 @@ func (uc *PurchaseOrderUsecase) SavePurchaseOrderWithItems(ctx context.Context, 
 		if err != nil {
 			return nil, err
 		}
-		if isPurchaseOrderSettled(current.LifecycleStatus) {
+		if !corestatus.IsPurchaseOrderEditable(current.LifecycleStatus) {
 			return nil, ErrBadParam
 		}
 	}
@@ -412,7 +412,7 @@ func (uc *PurchaseOrderUsecase) openPurchaseOrder(ctx context.Context, id int) (
 	if err != nil {
 		return nil, err
 	}
-	if isPurchaseOrderSettled(order.LifecycleStatus) {
+	if !corestatus.IsPurchaseOrderEditable(order.LifecycleStatus) {
 		return nil, ErrBadParam
 	}
 	return order, nil
@@ -486,6 +486,11 @@ func normalizePurchaseOrderItemFields(in PurchaseOrderItemMutation) (PurchaseOrd
 	if err := value.ValidateOptionalNonNegativeMoney(in.Amount); err != nil {
 		return PurchaseOrderItemMutation{}, ErrBadParam
 	}
+	normalizedAmount, err := normalizeCalculatedLineAmount(in.PurchasedQuantity, in.UnitPrice, in.Amount)
+	if err != nil {
+		return PurchaseOrderItemMutation{}, ErrBadParam
+	}
+	in.Amount = normalizedAmount
 	return in, nil
 }
 

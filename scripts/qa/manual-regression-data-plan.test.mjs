@@ -46,7 +46,7 @@ test("manual-regression-data-plan: fixture coverage is broad enough for manual r
   assert.ok(counts.suppliers >= 3);
   assert.ok(counts.materials >= 5);
   assert.ok(counts.products >= 3);
-  assert.ok(counts.warehouses >= 3);
+  assert.ok(counts.warehouses >= 4);
   assert.ok(counts.bomVersions >= 2);
   assert.ok(counts.salesOrders >= 3);
   assert.ok(counts.purchaseOrders >= 2);
@@ -75,7 +75,7 @@ test("manual-regression-data-plan: fixture coverage is broad enough for manual r
   );
   expectContainsAll(
     plan.yoyoosun.fixtureStateCoverage.workflowOwnerRoles,
-    ["boss", "purchasing", "quality", "sales", "warehouse"],
+    ["boss", "purchase", "quality", "sales", "warehouse"],
     "workflow roles",
   );
   expectContainsAll(

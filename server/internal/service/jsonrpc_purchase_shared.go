@@ -150,6 +150,10 @@ func (d *jsonrpcDispatcher) mapPurchaseError(ctx context.Context, err error) *v1
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库单不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptItemNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库行不存在"}
+	case errors.Is(err, biz.ErrPurchaseReceiptQualityPending):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来料质检尚未逐行完成，不能入库过账"}
+	case errors.Is(err, biz.ErrPurchaseReceiptQualityRejected):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来料质检存在拒收行，不能入库过账"}
 	case errors.Is(err, biz.ErrPurchaseOrderNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单不存在"}
 	case errors.Is(err, biz.ErrMaterialNotFound), errors.Is(err, biz.ErrMaterialInactive):
@@ -188,17 +192,22 @@ func purchaseReceiptToAny(item *biz.PurchaseReceipt) map[string]any {
 	for _, line := range item.Items {
 		lines = append(lines, purchaseReceiptItemToAny(line))
 	}
+	qualityInspections := make([]any, 0, len(item.QualityInspections))
+	for _, inspection := range item.QualityInspections {
+		qualityInspections = append(qualityInspections, qualityInspectionToAny(inspection))
+	}
 	return map[string]any{
-		"id":            item.ID,
-		"receipt_no":    item.ReceiptNo,
-		"supplier_name": item.SupplierName,
-		"status":        item.Status,
-		"received_at":   item.ReceivedAt.Unix(),
-		"posted_at":     optionalUnix(item.PostedAt),
-		"note":          optionalStringToAny(item.Note),
-		"items":         lines,
-		"created_at":    item.CreatedAt.Unix(),
-		"updated_at":    item.UpdatedAt.Unix(),
+		"id":                  item.ID,
+		"receipt_no":          item.ReceiptNo,
+		"supplier_name":       item.SupplierName,
+		"status":              item.Status,
+		"received_at":         item.ReceivedAt.Unix(),
+		"posted_at":           optionalUnix(item.PostedAt),
+		"note":                optionalStringToAny(item.Note),
+		"items":               lines,
+		"quality_inspections": qualityInspections,
+		"created_at":          item.CreatedAt.Unix(),
+		"updated_at":          item.UpdatedAt.Unix(),
 	}
 }
 

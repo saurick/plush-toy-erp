@@ -38,8 +38,7 @@ import {
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import OutsourcingOrderForm, {
-  createBlankOutsourcingLine,
-  normalizeOutsourcingLineFormValue,
+  materialLabel,
   productLabel,
   processLabel,
   supplierLabel,
@@ -53,6 +52,7 @@ import {
 import {
   listOutsourcingOrderItems,
   listOutsourcingOrders,
+  listMaterials,
   listProcesses,
   listProducts,
   listContactsByOwner,
@@ -64,14 +64,20 @@ import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
   OUTSOURCING_ORDER_STATUS_LABELS,
+  OUTSOURCING_ORDER_SUBJECT_TYPES,
+  buildOutsourcingOrderItemSourceValuesFromMaterial,
+  buildOutsourcingOrderItemSourceValuesFromProduct,
+  buildOutsourcingOrderSubjectSwitchValues,
   buildOutsourcingOrderItemParams,
   buildOutsourcingOrderParams,
   buildSequentialDraftCode,
   contractPartySnapshotFromPrintTemplateDefaults,
+  createBlankOutsourcingLine,
   buildSupplierSnapshot,
   buildSupplierSnapshotWithContacts,
   canRunOutsourcingOrderLifecycleAction,
   hasActionPermission,
+  normalizeOutsourcingLineFormValue,
   SUPPLIER_CONTACT_OWNER_TYPE,
   statusText,
   unixToDateInputValue,
@@ -146,6 +152,7 @@ export default function V1OutsourcingOrdersPage() {
   const orderAttachmentRef = useRef(null)
   const [suppliers, setSuppliers] = useState([])
   const [products, setProducts] = useState([])
+  const [materials, setMaterials] = useState([])
   const [processes, setProcesses] = useState([])
   const [units, setUnits] = useState([])
 
@@ -167,6 +174,16 @@ export default function V1OutsourcingOrdersPage() {
         item,
       })),
     [products]
+  )
+
+  const materialOptions = useMemo(
+    () =>
+      materials.map((item) => ({
+        value: item.id,
+        label: materialLabel(item),
+        item,
+      })),
+    [materials]
   )
 
   const processOptions = useMemo(
@@ -203,19 +220,21 @@ export default function V1OutsourcingOrdersPage() {
 
   const loadReferenceData = useCallback(async () => {
     try {
-      const [supplierData, productData, processData, unitData] =
+      const [supplierData, productData, materialData, processData, unitData] =
         await Promise.all([
           listSuppliers({ active_only: true, limit: 200 }),
           listProducts({ active_only: true, limit: 200 }),
+          listMaterials({ active_only: true, limit: 200 }),
           listProcesses({ active_only: true, limit: 200 }),
           listUnits({ limit: 200 }),
         ])
       setSuppliers(supplierData?.suppliers || [])
       setProducts(productData?.products || [])
+      setMaterials(materialData?.materials || [])
       setProcesses(processData?.processes || [])
       setUnits(unitData?.units || [])
     } catch (error) {
-      message.error(getActionErrorMessage(error, '加载委外基础资料失败'))
+      message.error(getActionErrorMessage(error, '加载加工基础资料失败'))
     }
   }, [])
 
@@ -393,22 +412,37 @@ export default function V1OutsourcingOrdersPage() {
     return outletContext?.registerPageRefresh?.(refreshPageData)
   }, [outletContext, refreshPageData])
 
+  const setLineValues = (fieldName, values = {}) => {
+    form.setFields(
+      Object.entries(values).map(([key, value]) => ({
+        name: ['items', fieldName, key],
+        value,
+      }))
+    )
+  }
+
+  const handleSubjectTypeChange = (fieldName, subjectType) => {
+    setLineValues(
+      fieldName,
+      buildOutsourcingOrderSubjectSwitchValues(subjectType)
+    )
+  }
+
   const handleProductChange = (fieldName, productID) => {
     const product = products.find((item) => item.id === productID)
-    if (!product) return
-    const unit = unitByID.get(product.default_unit_id)
-    form.setFieldValue(
-      ['items', fieldName, 'product_no_snapshot'],
-      product.code
+    const unit = unitByID.get(product?.default_unit_id)
+    setLineValues(
+      fieldName,
+      buildOutsourcingOrderItemSourceValuesFromProduct(product, unit)
     )
-    form.setFieldValue(
-      ['items', fieldName, 'product_name_snapshot'],
-      product.name
-    )
-    form.setFieldValue(['items', fieldName, 'unit_id'], product.default_unit_id)
-    form.setFieldValue(
-      ['items', fieldName, 'unit_name_snapshot'],
-      unit?.name || ''
+  }
+
+  const handleMaterialChange = (fieldName, materialID) => {
+    const material = materials.find((item) => item.id === materialID)
+    const unit = unitByID.get(material?.default_unit_id)
+    setLineValues(
+      fieldName,
+      buildOutsourcingOrderItemSourceValuesFromMaterial(material, unit)
     )
   }
 
@@ -599,10 +633,16 @@ export default function V1OutsourcingOrdersPage() {
         const status = String(item?.line_status || '')
           .trim()
           .toLowerCase()
-        return status !== 'canceled' && status !== 'cancelled'
+        return (
+          status !== 'canceled' &&
+          status !== 'cancelled' &&
+          String(item?.subject_type || '')
+            .trim()
+            .toUpperCase() === OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT
+        )
       })
       if (activeItems.length === 0) {
-        message.warning('当前委外订单没有可带入作业指导书的明细')
+        message.warning('当前加工合同没有可带入作业指导书的产品 / 半成品明细')
         return
       }
       const initialDraft = buildWorkInstructionDraftFromOutsourcingOrder(
@@ -1089,7 +1129,7 @@ export default function V1OutsourcingOrdersPage() {
       <BusinessFormModal
         icon={<FileTextOutlined />}
         title={editingRow ? '编辑加工合同' : '新建加工合同'}
-        description="只维护委外源单和工序明细；查货、手工、车缝、包装都只是加工环节，结果判定、库存和应付由后续事实模块处理。"
+        description="只维护委外源单和加工明细；车缝、手工等选产品 / 半成品，布料加工选材料。结果判定、库存和应付由后续业务处理。"
         open={modalOpen}
         onCancel={closeModal}
         onOk={submitForm}
@@ -1101,9 +1141,12 @@ export default function V1OutsourcingOrdersPage() {
           supplierOptions={supplierOptions}
           onSupplierChange={handleSupplierChange}
           productOptions={productOptions}
+          materialOptions={materialOptions}
           processOptions={processOptions}
           unitOptions={unitOptions}
+          onSubjectTypeChange={handleSubjectTypeChange}
           onProductChange={handleProductChange}
+          onMaterialChange={handleMaterialChange}
           onProcessChange={handleProcessChange}
           onUnitChange={handleUnitChange}
           attachmentPanel={

@@ -59,12 +59,16 @@ func outsourcingOrderItemMutationFromParams(pm map[string]any) (*biz.Outsourcing
 	return &biz.OutsourcingOrderItemMutation{
 		OutsourcingOrderID:      getInt(pm, "outsourcing_order_id", 0),
 		LineNo:                  getInt(pm, "line_no", 0),
-		ProductID:               getInt(pm, "product_id", 0),
+		SubjectType:             getString(pm, "subject_type"),
+		ProductID:               getOptionalPositiveIntPtr(pm, "product_id"),
+		MaterialID:              getOptionalPositiveIntPtr(pm, "material_id"),
 		ProcessID:               getInt(pm, "process_id", 0),
 		UnitID:                  getInt(pm, "unit_id", 0),
 		ProductNoSnapshot:       getWorkflowStringPtr(pm, "product_no_snapshot"),
 		ProductOrderNoSnapshot:  getWorkflowStringPtr(pm, "product_order_no_snapshot"),
 		ProductNameSnapshot:     getWorkflowStringPtr(pm, "product_name_snapshot"),
+		MaterialCodeSnapshot:    getWorkflowStringPtr(pm, "material_code_snapshot"),
+		MaterialNameSnapshot:    getWorkflowStringPtr(pm, "material_name_snapshot"),
 		ProcessNameSnapshot:     getWorkflowStringPtr(pm, "process_name_snapshot"),
 		ProcessCategorySnapshot: getWorkflowStringPtr(pm, "process_category_snapshot"),
 		UnitNameSnapshot:        getWorkflowStringPtr(pm, "unit_name_snapshot"),
@@ -117,6 +121,8 @@ func (d *jsonrpcDispatcher) mapOutsourcingOrderError(ctx context.Context, err er
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "加工厂不存在或已停用"}
 	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductInactive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "产品不存在或已停用"}
+	case errors.Is(err, biz.ErrMaterialNotFound), errors.Is(err, biz.ErrMaterialInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "材料不存在或已停用"}
 	case errors.Is(err, biz.ErrProcessNotFound), errors.Is(err, biz.ErrProcessInactive), errors.Is(err, biz.ErrProcessNotOutsourcingEnabled):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "工序不存在、已停用或未启用委外"}
 	case errors.Is(err, biz.ErrUnitNotFound), errors.Is(err, biz.ErrUnitInactive):
@@ -181,12 +187,16 @@ func outsourcingOrderItemToMap(item *biz.OutsourcingOrderItem) map[string]any {
 		"id":                        item.ID,
 		"outsourcing_order_id":      item.OutsourcingOrderID,
 		"line_no":                   item.LineNo,
-		"product_id":                item.ProductID,
+		"subject_type":              item.SubjectType,
+		"product_id":                optionalIntValue(item.ProductID),
+		"material_id":               optionalIntValue(item.MaterialID),
 		"process_id":                item.ProcessID,
 		"unit_id":                   item.UnitID,
 		"product_no_snapshot":       optionalStringValue(item.ProductNoSnapshot),
 		"product_order_no_snapshot": optionalStringValue(item.ProductOrderNoSnapshot),
 		"product_name_snapshot":     optionalStringValue(item.ProductNameSnapshot),
+		"material_code_snapshot":    optionalStringValue(item.MaterialCodeSnapshot),
+		"material_name_snapshot":    optionalStringValue(item.MaterialNameSnapshot),
 		"process_name_snapshot":     optionalStringValue(item.ProcessNameSnapshot),
 		"process_category_snapshot": optionalStringValue(item.ProcessCategorySnapshot),
 		"unit_name_snapshot":        optionalStringValue(item.UnitNameSnapshot),

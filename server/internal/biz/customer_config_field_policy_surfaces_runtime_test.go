@@ -2,74 +2,62 @@ package biz
 
 import "testing"
 
-func TestExpandedRuntimeFieldPolicySurfacesAreAllowed(t *testing.T) {
-	snapshot := map[string]any{
-		"pages": []any{"sales-orders"},
-		"fieldPolicies": map[string]any{
-			"sales_order_items.default": map[string]any{
-				"product_no": map[string]any{"visible": false},
-				"amount":     map[string]any{"visible": true},
-			},
-			"purchase_orders.default": map[string]any{
-				"purchase_order_no":     map[string]any{"visible": true},
-				"expected_arrival_date": map[string]any{"visible": false},
-			},
-			"purchase_order_items.default": map[string]any{
-				"material_name": map[string]any{"visible": true},
-				"quantity":      map[string]any{"visible": true},
-			},
-			"purchase_receipts.default": map[string]any{
-				"receipt_no": map[string]any{"visible": true},
-				"status":     map[string]any{"visible": false},
-			},
-			"quality_inspections.default": map[string]any{
-				"inspection_no": map[string]any{"visible": true},
-				"result":        map[string]any{"visible": false},
-			},
-			"inventory_lots.default": map[string]any{
-				"lot_no":   map[string]any{"visible": true},
-				"quantity": map[string]any{"visible": false},
-			},
-			"inventory_txns.default": map[string]any{
-				"txn_no":   map[string]any{"visible": true},
-				"txn_type": map[string]any{"visible": false},
-			},
-			"shipments.default": map[string]any{
-				"shipment_no": map[string]any{"visible": true},
-				"status":      map[string]any{"visible": false},
-			},
-			"outsourcing_orders.default": map[string]any{
-				"outsourcing_order_no": map[string]any{"visible": true},
-				"expected_return_date": map[string]any{"visible": false},
-			},
-			"finance_facts.default": map[string]any{
-				"finance_fact_no": map[string]any{"visible": true},
-				"amount":          map[string]any{"visible": false},
-			},
-		},
+func TestFormalFieldContractsAreNotRuntimeFieldPolicySurfaces(t *testing.T) {
+	unsupportedSurfaces := map[string]string{
+		"sales_order_items.default":    "product_no",
+		"purchase_orders.default":      "purchase_order_no",
+		"purchase_order_items.default": "material_name",
+		"purchase_receipts.default":    "receipt_no",
+		"quality_inspections.default":  "inspection_no",
+		"inventory_lots.default":       "lot_no",
+		"inventory_txns.default":       "txn_no",
+		"bom_versions.default":         "version",
+		"bom_items.default":            "material",
+		"shipments.default":            "shipment_no",
+		"outsourcing_orders.default":   "outsourcing_order_no",
+		"finance_facts.default":        "finance_fact_no",
 	}
-
-	if !compiledSnapshotFieldPoliciesAreAllowed(snapshot) {
-		t.Fatal("expanded field policy surfaces should be allowed")
-	}
-	policies := effectiveFieldPoliciesFromSnapshot(snapshot)
-	for surfaceKey := range snapshot["fieldPolicies"].(map[string]any) {
-		if _, ok := policies[surfaceKey]; !ok {
-			t.Fatalf("surface %s missing from effective policies", surfaceKey)
-		}
+	for surfaceKey, fieldKey := range unsupportedSurfaces {
+		t.Run(surfaceKey, func(t *testing.T) {
+			snapshot := map[string]any{
+				"pages": []any{"sales-orders"},
+				"fieldPolicies": map[string]any{
+					surfaceKey: map[string]any{
+						fieldKey: map[string]any{"visible": false},
+					},
+				},
+			}
+			if compiledSnapshotFieldPoliciesAreAllowed(snapshot) {
+				t.Fatalf("formal field contract %s must not be accepted as a runtime field policy", surfaceKey)
+			}
+		})
 	}
 }
 
-func TestExpandedRuntimeFieldPolicySurfacesRejectUnknownFields(t *testing.T) {
-	snapshot := map[string]any{
-		"pages": []any{"sales-orders"},
-		"fieldPolicies": map[string]any{
-			"purchase_orders.default": map[string]any{
-				"not_a_purchase_field": map[string]any{"visible": false},
-			},
-		},
+func TestRuntimeFieldPolicyOnlyAcceptsBooleanVisibility(t *testing.T) {
+	tests := []struct {
+		name   string
+		policy map[string]any
+	}{
+		{name: "label is not a runtime policy", policy: map[string]any{"label": "客户单号"}},
+		{name: "editable is not a runtime policy", policy: map[string]any{"visible": true, "editable": false}},
+		{name: "required is not a runtime policy", policy: map[string]any{"required": true}},
+		{name: "visible must be boolean", policy: map[string]any{"visible": "false"}},
+		{name: "empty policy is invalid", policy: map[string]any{}},
 	}
-	if compiledSnapshotFieldPoliciesAreAllowed(snapshot) {
-		t.Fatal("unknown field key must be rejected")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			snapshot := map[string]any{
+				"pages": []any{"sales-orders"},
+				"fieldPolicies": map[string]any{
+					"sales_orders.default": map[string]any{
+						"source_no": tt.policy,
+					},
+				},
+			}
+			if compiledSnapshotFieldPoliciesAreAllowed(snapshot) {
+				t.Fatalf("unsupported policy must be rejected: %#v", tt.policy)
+			}
+		})
 	}
 }

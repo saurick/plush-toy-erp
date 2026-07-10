@@ -6,10 +6,9 @@ import (
 )
 
 const (
-	ProcessDomainCommandQualityInspectionDecide              = "quality_inspection.decide"
-	QualityInspectionProcessCommandOutcomePassed             = "quality_inspection.passed"
-	QualityInspectionProcessCommandOutcomeRejected           = "quality_inspection.rejected"
-	QualityInspectionProcessCommandOutcomeConcession         = "quality_inspection.concession_accepted"
+	ProcessDomainCommandIncomingQualityGate                  = "quality_inspection.aggregate_gate"
+	IncomingQualityGateProcessCommandOutcomePassed           = "quality_inspection.aggregate_passed"
+	IncomingQualityGateProcessCommandOutcomeRejected         = "quality_inspection.aggregate_rejected"
 	FinishedGoodsQualityProcessCommandOutcomePassed          = "finished_goods_quality.passed"
 	FinishedGoodsQualityProcessCommandOutcomeRejected        = "finished_goods_quality.rejected"
 	FinishedGoodsQualityProcessCommandOutcomeConcession      = "finished_goods_quality.concession_accepted"
@@ -17,7 +16,6 @@ const (
 	finishedGoodsQualityProcessCommandBusinessRefType        = "shipment"
 	qualityInspectionProcessCommandPayloadInspectionID       = "quality_inspection_id"
 	qualityInspectionProcessCommandPayloadPurchaseReceiptID  = "purchase_receipt_id"
-	qualityInspectionProcessCommandPayloadInventoryLotID     = "inventory_lot_id"
 	qualityInspectionProcessCommandPayloadShipmentID         = "shipment_id"
 	qualityInspectionProcessCommandPayloadFinishedGoodsLotID = "finished_goods_lot_id"
 	qualityInspectionProcessCommandPayloadResult             = "result"
@@ -26,7 +24,7 @@ const (
 	qualityInspectionProcessCommandPayloadDecisionNote       = "decision_note"
 )
 
-type qualityInspectionDecideProcessCommandHandler struct {
+type incomingQualityGateProcessCommandHandler struct {
 	uc *InventoryUsecase
 }
 
@@ -39,8 +37,8 @@ func RegisterQualityInspectionProcessDomainCommandHandlers(processRuntimeUC *Pro
 		return ErrBadParam
 	}
 	if err := processRuntimeUC.RegisterDomainCommandHandler(
-		ProcessDomainCommandQualityInspectionDecide,
-		&qualityInspectionDecideProcessCommandHandler{uc: inventoryUC},
+		ProcessDomainCommandIncomingQualityGate,
+		&incomingQualityGateProcessCommandHandler{uc: inventoryUC},
 	); err != nil {
 		return err
 	}
@@ -50,73 +48,49 @@ func RegisterQualityInspectionProcessDomainCommandHandlers(processRuntimeUC *Pro
 	)
 }
 
-func (h *qualityInspectionDecideProcessCommandHandler) ExecuteProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) (*ProcessDomainCommandResult, error) {
+func (h *incomingQualityGateProcessCommandHandler) ExecuteProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) (*ProcessDomainCommandResult, error) {
 	if h == nil || h.uc == nil || in == nil || in.ProcessInstance == nil {
 		return nil, ErrBadParam
 	}
-	if strings.TrimSpace(in.CommandKey) != ProcessDomainCommandQualityInspectionDecide {
+	if strings.TrimSpace(in.CommandKey) != ProcessDomainCommandIncomingQualityGate {
 		return nil, ErrBadParam
 	}
-	inspectionID, err := qualityInspectionIDFromProcessCommandPayload(in.Payload)
-	if err != nil {
-		return nil, err
-	}
-	result := strings.ToUpper(processCommandStringFromPayload(in.Payload, qualityInspectionProcessCommandPayloadResult))
-	if !IsValidQualityInspectionResult(result) {
-		return nil, ErrBadParam
-	}
-	inspection, err := h.uc.GetQualityInspection(ctx, inspectionID)
-	if err != nil {
-		return nil, err
-	}
-	if inspection == nil || !ProcessInstanceHasBusinessRef(in.ProcessInstance, qualityInspectionProcessCommandBusinessRefType, inspection.PurchaseReceiptID) {
-		return nil, ErrBadParam
-	}
-	payloadPurchaseReceiptID, hasPurchaseReceiptID, err := processCommandPositiveIntFromPayload(in.Payload, qualityInspectionProcessCommandPayloadPurchaseReceiptID)
-	if err != nil {
-		return nil, err
-	}
-	if hasPurchaseReceiptID && payloadPurchaseReceiptID != inspection.PurchaseReceiptID {
-		return nil, ErrBadParam
-	}
-	payloadInventoryLotID, hasInventoryLotID, err := processCommandPositiveIntFromPayload(in.Payload, qualityInspectionProcessCommandPayloadInventoryLotID)
-	if err != nil {
-		return nil, err
-	}
-	if hasInventoryLotID && payloadInventoryLotID != inspection.InventoryLotID {
-		return nil, ErrBadParam
-	}
-	inspectedAt, err := processCommandOptionalTimeFromPayload(in.Payload, qualityInspectionProcessCommandPayloadInspectedAt)
-	if err != nil {
-		return nil, err
-	}
-	inspectorID, err := processCommandOptionalPositiveIntPtrFromPayload(in.Payload, qualityInspectionProcessCommandPayloadInspectorID)
-	if err != nil {
-		return nil, err
-	}
-	decision := &QualityInspectionDecision{
-		InspectionID: inspectionID,
-		Result:       result,
-		InspectedAt:  inspectedAt,
-		InspectorID:  inspectorID,
-		DecisionNote: processCommandOptionalStringPtrFromPayload(in.Payload, qualityInspectionProcessCommandPayloadDecisionNote),
-	}
-	switch result {
-	case QualityInspectionResultPass:
-		if _, err := h.uc.PassQualityInspection(ctx, decision); err != nil {
-			return nil, err
+	for _, legacyDecisionKey := range []string{
+		qualityInspectionProcessCommandPayloadInspectionID,
+		qualityInspectionProcessCommandPayloadResult,
+		qualityInspectionProcessCommandPayloadInspectedAt,
+		qualityInspectionProcessCommandPayloadInspectorID,
+		qualityInspectionProcessCommandPayloadDecisionNote,
+		"inventory_lot_id",
+	} {
+		if _, exists := in.Payload[legacyDecisionKey]; exists {
+			return nil, ErrBadParam
 		}
-		return &ProcessDomainCommandResult{Outcome: QualityInspectionProcessCommandOutcomePassed}, nil
-	case QualityInspectionResultConcession:
-		if _, err := h.uc.PassQualityInspection(ctx, decision); err != nil {
-			return nil, err
-		}
-		return &ProcessDomainCommandResult{Outcome: QualityInspectionProcessCommandOutcomeConcession}, nil
-	case QualityInspectionResultReject:
-		if _, err := h.uc.RejectQualityInspection(ctx, decision); err != nil {
-			return nil, err
-		}
-		return &ProcessDomainCommandResult{Outcome: QualityInspectionProcessCommandOutcomeRejected}, nil
+	}
+	receiptID, hasReceiptID, err := processCommandPositiveIntFromPayload(in.Payload, qualityInspectionProcessCommandPayloadPurchaseReceiptID)
+	if err != nil {
+		return nil, err
+	}
+	if !hasReceiptID || !ProcessInstanceHasBusinessRef(in.ProcessInstance, qualityInspectionProcessCommandBusinessRefType, receiptID) {
+		return nil, ErrBadParam
+	}
+	gate, err := h.uc.EvaluatePurchaseReceiptQualityGate(ctx, receiptID)
+	if err != nil {
+		return nil, err
+	}
+	if gate == nil || gate.PurchaseReceiptID != receiptID || gate.TotalLines <= 0 {
+		return nil, ErrBadParam
+	}
+	switch gate.Outcome {
+	case PurchaseReceiptQualityGateReady:
+		return &ProcessDomainCommandResult{Outcome: IncomingQualityGateProcessCommandOutcomePassed}, nil
+	case PurchaseReceiptQualityGateRejected:
+		return &ProcessDomainCommandResult{
+			Outcome:     IncomingQualityGateProcessCommandOutcomeRejected,
+			BlockReason: "来料质检存在拒收行，采购入库流程已阻塞",
+		}, nil
+	case PurchaseReceiptQualityGatePending:
+		return nil, ErrPurchaseReceiptQualityPending
 	default:
 		return nil, ErrBadParam
 	}

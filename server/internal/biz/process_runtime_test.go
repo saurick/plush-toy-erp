@@ -49,6 +49,14 @@ type recordingWorkflowRepo struct {
 	createTaskInputs []*WorkflowTaskCreate
 }
 
+type retryWorkflowRepo struct {
+	stubWorkflowRepo
+	remainingFailures int
+	failureErr        error
+	createCalls       int
+	createdByCode     map[string]*WorkflowTask
+}
+
 func processTestIntPtr(value int) *int {
 	return &value
 }
@@ -56,6 +64,40 @@ func processTestIntPtr(value int) *int {
 func (s *recordingWorkflowRepo) CreateWorkflowTask(ctx context.Context, in *WorkflowTaskCreate, actorID int) (*WorkflowTask, error) {
 	s.createTaskInputs = append(s.createTaskInputs, in)
 	return s.stubWorkflowRepo.CreateWorkflowTask(ctx, in, actorID)
+}
+
+func (s *retryWorkflowRepo) CreateWorkflowTask(_ context.Context, in *WorkflowTaskCreate, _ int) (*WorkflowTask, error) {
+	s.createCalls++
+	if s.remainingFailures > 0 {
+		s.remainingFailures--
+		return nil, s.failureErr
+	}
+	if s.createdByCode == nil {
+		s.createdByCode = map[string]*WorkflowTask{}
+	}
+	if _, exists := s.createdByCode[in.TaskCode]; exists {
+		return nil, ErrWorkflowTaskExists
+	}
+	created := &WorkflowTask{
+		TaskCode:              in.TaskCode,
+		TaskStatusKey:         in.TaskStatusKey,
+		OwnerRoleKey:          in.OwnerRoleKey,
+		OwnerPoolKey:          in.OwnerPoolKey,
+		RequiredCapabilityKey: in.RequiredCapabilityKey,
+		ConfigRevision:        in.ConfigRevision,
+		ProcessInstanceID:     in.ProcessInstanceID,
+		ProcessNodeInstanceID: in.ProcessNodeInstanceID,
+		Payload:               in.Payload,
+	}
+	s.createdByCode[in.TaskCode] = created
+	return created, nil
+}
+
+func (s *retryWorkflowRepo) GetWorkflowTaskByTaskCode(_ context.Context, taskCode string) (*WorkflowTask, error) {
+	if task, ok := s.createdByCode[taskCode]; ok {
+		return task, nil
+	}
+	return nil, ErrWorkflowTaskNotFound
 }
 
 func (h *stubProcessDomainCommandHandler) ExecuteProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) (*ProcessDomainCommandResult, error) {
@@ -1081,6 +1123,417 @@ func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskCompletesNode(t *testing
 	}
 }
 
+func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskRejectedBlocksProcessWithoutRoute(t *testing.T) {
+	processID := 10
+	nodeID := 20
+	reason := "订单资料不完整"
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: processID, Status: ProcessStatusActive},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID:                nodeID,
+				ProcessInstanceID: processID,
+				NodeKey:           "order_approval",
+				NodeType:          ProcessNodeTypeApproval,
+				Status:            ProcessNodeStatusActive,
+				Version:           3,
+			},
+			{
+				ID:                21,
+				ProcessInstanceID: processID,
+				NodeKey:           "order_review",
+				NodeType:          ProcessNodeTypeHumanTask,
+				Status:            ProcessNodeStatusWaiting,
+				Version:           1,
+			},
+		},
+	}
+	workflowRepo := &stubWorkflowRepo{
+		currentTask: &WorkflowTask{
+			ID:                    99,
+			TaskStatusKey:         "rejected",
+			BlockedReason:         &reason,
+			ProcessInstanceID:     &processID,
+			ProcessNodeInstanceID: &nodeID,
+			Payload:               map[string]any{"outcome": "APPROVED"},
+		},
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo)
+
+	node, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{
+		WorkflowTaskID: 99,
+	}, 7)
+	if err != nil {
+		t.Fatalf("expected rejected linked task settlement, got %v", err)
+	}
+	if node.Status != ProcessNodeStatusCompleted || node.Outcome == nil || *node.Outcome != "rejected" {
+		t.Fatalf("expected completed decision node with rejected outcome, got %#v", node)
+	}
+	if processRepo.blockedProcess == nil || processRepo.blockedProcess.ID != processID {
+		t.Fatalf("rejected node without explicit route must block process, got %#v", processRepo.blockedProcess)
+	}
+	if processRepo.process.Status != ProcessStatusBlocked {
+		t.Fatalf("expected process blocked after unhandled rejection, got %#v", processRepo.process)
+	}
+	if processRepo.activatedNode != nil || processRepo.nodes[1].Status != ProcessNodeStatusWaiting {
+		t.Fatalf("unhandled rejection must not advance along success sequence, next=%#v activation=%#v", processRepo.nodes[1], processRepo.activatedNode)
+	}
+}
+
+func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskRejectedPassesReasonToExplicitBranch(t *testing.T) {
+	processID := 10
+	nodeID := 20
+	targetNodeID := 21
+	reason := "缺少客户确认的交期"
+	branchPolicyKey := "order_approval.decision"
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID:              processID,
+			Status:          ProcessStatusActive,
+			BusinessRefType: "sales_order",
+			BusinessRefID:   1001,
+			ConfigRevision:  "yoyoosun-rev-1",
+		},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID:                nodeID,
+				ProcessInstanceID: processID,
+				NodeKey:           "order_approval",
+				NodeType:          ProcessNodeTypeApproval,
+				Status:            ProcessNodeStatusActive,
+				Version:           3,
+				PolicySnapshot: map[string]any{
+					"branch_policy_key": branchPolicyKey,
+				},
+			},
+			{
+				ID:                    targetNodeID,
+				ProcessInstanceID:     processID,
+				NodeKey:               "order_revision",
+				NodeType:              ProcessNodeTypeHumanTask,
+				Status:                ProcessNodeStatusWaiting,
+				OwnerPoolKey:          ptrString("order_review"),
+				RequiredCapabilityKey: ptrString(PermissionWorkflowTaskComplete),
+				Version:               1,
+			},
+		},
+	}
+	workflowRepo := &stubWorkflowRepo{
+		currentTask: &WorkflowTask{
+			ID:                    99,
+			TaskStatusKey:         "rejected",
+			BlockedReason:         &reason,
+			ProcessInstanceID:     &processID,
+			ProcessNodeInstanceID: &nodeID,
+		},
+	}
+	branchHandler := &stubProcessBranchPolicyHandler{
+		result: &ProcessBranchPolicyResult{NextNodeKey: "order_revision"},
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, &stubProcessOwnerRoleResolver{
+		explanation: &WorkflowTaskCandidateExplanation{
+			ConfigRevision:         "yoyoosun-rev-1",
+			CandidateOwnerRoleKeys: []string{SalesRoleKey},
+			Source:                 "active_customer_config",
+		},
+	})
+	if err := uc.RegisterBranchPolicyHandler(branchPolicyKey, branchHandler); err != nil {
+		t.Fatalf("register branch policy failed: %v", err)
+	}
+
+	if _, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{
+		WorkflowTaskID: 99,
+	}, 7); err != nil {
+		t.Fatalf("expected rejected branch settlement, got %v", err)
+	}
+	if branchHandler.input == nil || branchHandler.input.Outcome != "rejected" || branchHandler.input.Reason != reason {
+		t.Fatalf("expected rejected outcome and reason passed to branch policy, got %#v", branchHandler.input)
+	}
+	if processRepo.nodes[1].Status != ProcessNodeStatusActive {
+		t.Fatalf("expected explicit rejection branch target active, got %#v", processRepo.nodes[1])
+	}
+	if processRepo.blockedProcess != nil {
+		t.Fatalf("explicit rejection branch must not block process, got %#v", processRepo.blockedProcess)
+	}
+}
+
+func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskRejectedRetryIsIdempotent(t *testing.T) {
+	processID := 10
+	nodeID := 20
+	reason := "审批资料缺失"
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: processID, Status: ProcessStatusActive},
+		node: &ProcessNodeInstance{
+			ID:                nodeID,
+			ProcessInstanceID: processID,
+			NodeType:          ProcessNodeTypeApproval,
+			Status:            ProcessNodeStatusActive,
+			Version:           1,
+		},
+	}
+	workflowRepo := &stubWorkflowRepo{currentTask: &WorkflowTask{
+		ID:                    99,
+		TaskStatusKey:         "rejected",
+		BlockedReason:         &reason,
+		ProcessInstanceID:     &processID,
+		ProcessNodeInstanceID: &nodeID,
+	}}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo)
+
+	for attempt := 0; attempt < 2; attempt++ {
+		node, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{
+			WorkflowTaskID: 99,
+		}, 7)
+		if err != nil {
+			t.Fatalf("rejected settlement attempt %d failed: %v", attempt+1, err)
+		}
+		if node.Status != ProcessNodeStatusCompleted || node.Outcome == nil || *node.Outcome != "rejected" {
+			t.Fatalf("unexpected settled node on attempt %d: %#v", attempt+1, node)
+		}
+	}
+	if len(processRepo.completedNodes) != 1 {
+		t.Fatalf("repeated rejection must complete node once, got %d writes", len(processRepo.completedNodes))
+	}
+	if processRepo.process.Status != ProcessStatusBlocked {
+		t.Fatalf("repeated rejection must keep process blocked, got %#v", processRepo.process)
+	}
+}
+
+func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskRejectedRequiresReason(t *testing.T) {
+	processID := 10
+	nodeID := 20
+	processRepo := &memProcessRuntimeRepo{node: &ProcessNodeInstance{
+		ID:                nodeID,
+		ProcessInstanceID: processID,
+		NodeType:          ProcessNodeTypeApproval,
+		Status:            ProcessNodeStatusActive,
+		Version:           1,
+	}}
+	workflowRepo := &stubWorkflowRepo{currentTask: &WorkflowTask{
+		ID:                    99,
+		TaskStatusKey:         "rejected",
+		ProcessInstanceID:     &processID,
+		ProcessNodeInstanceID: &nodeID,
+	}}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo)
+
+	_, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{
+		WorkflowTaskID: 99,
+	}, 7)
+	if !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected rejected task without reason to fail, got %v", err)
+	}
+	if processRepo.completedNode != nil {
+		t.Fatalf("rejected task without reason must not settle process node")
+	}
+}
+
+func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskDoneRetryIsIdempotent(t *testing.T) {
+	processID := 10
+	nodeID := 20
+	outcome := "CONFIRMED"
+	processRepo := &memProcessRuntimeRepo{node: &ProcessNodeInstance{
+		ID:                nodeID,
+		ProcessInstanceID: processID,
+		NodeType:          ProcessNodeTypeHumanTask,
+		Status:            ProcessNodeStatusCompleted,
+		Outcome:           &outcome,
+		Version:           2,
+	}}
+	workflowRepo := &stubWorkflowRepo{currentTask: &WorkflowTask{
+		ID:                    99,
+		TaskStatusKey:         "done",
+		ProcessInstanceID:     &processID,
+		ProcessNodeInstanceID: &nodeID,
+		Payload:               map[string]any{"outcome": outcome},
+	}}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo)
+
+	node, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{
+		WorkflowTaskID: 99,
+	}, 7)
+	if err != nil {
+		t.Fatalf("expected repeated done settlement to succeed, got %v", err)
+	}
+	if node != processRepo.node || processRepo.completedNode != nil {
+		t.Fatalf("repeated done settlement must return existing node without rewriting, node=%#v write=%#v", node, processRepo.completedNode)
+	}
+}
+
+func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskDoneRetryReconcilesMissingNextTask(t *testing.T) {
+	processID := 10
+	nodeID := 20
+	nextNodeID := 21
+	downstreamErr := errors.New("workflow task storage temporarily unavailable")
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID:              processID,
+			Status:          ProcessStatusActive,
+			BusinessRefType: "sales_order",
+			BusinessRefID:   1001,
+			ConfigRevision:  "yoyoosun-rev-1",
+		},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID:                nodeID,
+				ProcessInstanceID: processID,
+				NodeKey:           "prepare_engineering_data",
+				NodeType:          ProcessNodeTypeHumanTask,
+				Attempt:           1,
+				Status:            ProcessNodeStatusActive,
+				Version:           3,
+			},
+			{
+				ID:                    nextNodeID,
+				ProcessInstanceID:     processID,
+				NodeKey:               "engineering_release_approval",
+				NodeType:              ProcessNodeTypeApproval,
+				Attempt:               1,
+				Status:                ProcessNodeStatusWaiting,
+				OwnerPoolKey:          ptrString("boss_approval"),
+				RequiredCapabilityKey: ptrString(PermissionWorkflowTaskApprove),
+				Version:               1,
+			},
+		},
+	}
+	workflowRepo := &retryWorkflowRepo{
+		stubWorkflowRepo: stubWorkflowRepo{currentTask: &WorkflowTask{
+			ID:                    99,
+			TaskStatusKey:         "done",
+			ProcessInstanceID:     &processID,
+			ProcessNodeInstanceID: &nodeID,
+			Payload:               map[string]any{"outcome": "CONFIRMED"},
+		}},
+		remainingFailures: 1,
+		failureErr:        downstreamErr,
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, &stubProcessOwnerRoleResolver{
+		explanation: &WorkflowTaskCandidateExplanation{
+			ConfigRevision:         "yoyoosun-rev-1",
+			CandidateOwnerRoleKeys: []string{BossRoleKey},
+			Source:                 "active_customer_config",
+		},
+	})
+
+	_, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{WorkflowTaskID: 99}, 7)
+	if !errors.Is(err, downstreamErr) {
+		t.Fatalf("expected first completion to fail after node activation, got %v", err)
+	}
+	if processRepo.nodes[0].Status != ProcessNodeStatusCompleted || processRepo.nodes[1].Status != ProcessNodeStatusActive {
+		t.Fatalf("expected completed source and active target after partial failure, got %#v / %#v", processRepo.nodes[0], processRepo.nodes[1])
+	}
+	if len(workflowRepo.createdByCode) != 0 {
+		t.Fatalf("failed target task write must not be treated as persisted, got %#v", workflowRepo.createdByCode)
+	}
+
+	if _, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{WorkflowTaskID: 99}, 7); err != nil {
+		t.Fatalf("expected retry to reconcile active target task, got %v", err)
+	}
+	if len(processRepo.completedNodes) != 1 {
+		t.Fatalf("retry must not complete source node twice, got %d writes", len(processRepo.completedNodes))
+	}
+	if processRepo.nodes[1].Version != 2 {
+		t.Fatalf("retry must not activate target node twice, got %#v", processRepo.nodes[1])
+	}
+	if len(workflowRepo.createdByCode) != 1 {
+		t.Fatalf("retry must persist exactly one target task, got %#v", workflowRepo.createdByCode)
+	}
+
+	if _, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{WorkflowTaskID: 99}, 7); err != nil {
+		t.Fatalf("expected repeated reconciliation to reuse target task, got %v", err)
+	}
+	if len(workflowRepo.createdByCode) != 1 {
+		t.Fatalf("repeated reconciliation must not duplicate target task, got %#v", workflowRepo.createdByCode)
+	}
+}
+
+func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskRejectedRetryReconcilesExplicitBranchTask(t *testing.T) {
+	processID := 10
+	nodeID := 20
+	targetNodeID := 21
+	reason := "客户交期依据不足"
+	branchPolicyKey := "order_approval.decision"
+	downstreamErr := errors.New("workflow task storage temporarily unavailable")
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID:              processID,
+			Status:          ProcessStatusActive,
+			BusinessRefType: "sales_order",
+			BusinessRefID:   1001,
+			ConfigRevision:  "yoyoosun-rev-1",
+		},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID:                nodeID,
+				ProcessInstanceID: processID,
+				NodeKey:           "order_approval",
+				NodeType:          ProcessNodeTypeApproval,
+				Attempt:           1,
+				Status:            ProcessNodeStatusActive,
+				Version:           3,
+				PolicySnapshot:    map[string]any{"branch_policy_key": branchPolicyKey},
+			},
+			{
+				ID:                    targetNodeID,
+				ProcessInstanceID:     processID,
+				NodeKey:               "order_revision",
+				NodeType:              ProcessNodeTypeHumanTask,
+				Attempt:               1,
+				Status:                ProcessNodeStatusWaiting,
+				OwnerPoolKey:          ptrString("order_review"),
+				RequiredCapabilityKey: ptrString(PermissionWorkflowTaskComplete),
+				Version:               1,
+			},
+		},
+	}
+	workflowRepo := &retryWorkflowRepo{
+		stubWorkflowRepo: stubWorkflowRepo{currentTask: &WorkflowTask{
+			ID:                    99,
+			TaskStatusKey:         "rejected",
+			BlockedReason:         &reason,
+			ProcessInstanceID:     &processID,
+			ProcessNodeInstanceID: &nodeID,
+		}},
+		remainingFailures: 1,
+		failureErr:        downstreamErr,
+	}
+	branchHandler := &stubProcessBranchPolicyHandler{result: &ProcessBranchPolicyResult{NextNodeKey: "order_revision"}}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, &stubProcessOwnerRoleResolver{
+		explanation: &WorkflowTaskCandidateExplanation{
+			ConfigRevision:         "yoyoosun-rev-1",
+			CandidateOwnerRoleKeys: []string{SalesRoleKey},
+			Source:                 "active_customer_config",
+		},
+	})
+	if err := uc.RegisterBranchPolicyHandler(branchPolicyKey, branchHandler); err != nil {
+		t.Fatalf("register branch policy failed: %v", err)
+	}
+
+	_, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{WorkflowTaskID: 99}, 7)
+	if !errors.Is(err, downstreamErr) {
+		t.Fatalf("expected first rejection routing to fail after target activation, got %v", err)
+	}
+	if processRepo.process.Status != ProcessStatusActive || processRepo.blockedProcess != nil {
+		t.Fatalf("explicit rejection route failure must remain retryable, process=%#v block=%#v", processRepo.process, processRepo.blockedProcess)
+	}
+	if processRepo.nodes[0].Status != ProcessNodeStatusCompleted || processRepo.nodes[1].Status != ProcessNodeStatusActive {
+		t.Fatalf("expected completed decision and active revision target, got %#v / %#v", processRepo.nodes[0], processRepo.nodes[1])
+	}
+
+	if _, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{WorkflowTaskID: 99}, 7); err != nil {
+		t.Fatalf("expected rejection retry to reconcile explicit branch task, got %v", err)
+	}
+	if len(processRepo.completedNodes) != 1 || processRepo.nodes[1].Version != 2 {
+		t.Fatalf("rejection retry must not repeat node transitions, completions=%d target=%#v", len(processRepo.completedNodes), processRepo.nodes[1])
+	}
+	if len(workflowRepo.createdByCode) != 1 {
+		t.Fatalf("rejection retry must create exactly one revision task, got %#v", workflowRepo.createdByCode)
+	}
+	if branchHandler.input == nil || branchHandler.input.Reason != reason || branchHandler.input.Outcome != "rejected" {
+		t.Fatalf("reconciliation must retain rejected reason and outcome, got %#v", branchHandler.input)
+	}
+}
+
 func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskActivatesNextWaitingNode(t *testing.T) {
 	processID := 10
 	nodeID := 20
@@ -1726,6 +2179,79 @@ func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskReturnToCreatesNextAttem
 	}
 }
 
+func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskReturnRetryReusesCreatedAttempt(t *testing.T) {
+	ownerPoolKey := "engineering_data"
+	requiredCapabilityKey := PermissionWorkflowTaskComplete
+	downstreamErr := errors.New("workflow task storage temporarily unavailable")
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID:              1,
+			BusinessRefType: "sales_order",
+			BusinessRefID:   1001,
+			ConfigRevision:  "yoyoosun-rev-1",
+			Status:          ProcessStatusActive,
+		},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID:                    10,
+				ProcessInstanceID:     1,
+				NodeKey:               "prepare_engineering_data",
+				NodeType:              ProcessNodeTypeHumanTask,
+				Attempt:               1,
+				Status:                ProcessNodeStatusCompleted,
+				OwnerPoolKey:          &ownerPoolKey,
+				RequiredCapabilityKey: &requiredCapabilityKey,
+				PolicySnapshot:        map[string]any{},
+				Version:               2,
+			},
+			{
+				ID:                11,
+				ProcessInstanceID: 1,
+				NodeKey:           "engineering_release_approval",
+				NodeType:          ProcessNodeTypeApproval,
+				Attempt:           1,
+				Status:            ProcessNodeStatusActive,
+				PolicySnapshot: map[string]any{
+					"return_to_node_key":  "prepare_engineering_data",
+					"return_outcomes":     []string{"return"},
+					"return_max_attempts": 2,
+				},
+				Version: 1,
+			},
+		},
+	}
+	workflowRepo := &retryWorkflowRepo{
+		stubWorkflowRepo: stubWorkflowRepo{currentTask: &WorkflowTask{
+			ID:                    501,
+			TaskStatusKey:         "done",
+			ProcessInstanceID:     processTestIntPtr(1),
+			ProcessNodeInstanceID: processTestIntPtr(11),
+			Payload:               map[string]any{"outcome": "return"},
+		}},
+		remainingFailures: 1,
+		failureErr:        downstreamErr,
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, &stubProcessOwnerRoleResolver{})
+
+	_, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{WorkflowTaskID: 501}, 7)
+	if !errors.Is(err, downstreamErr) {
+		t.Fatalf("expected first return routing to fail after attempt activation, got %v", err)
+	}
+	if len(processRepo.nodes) != 3 || processRepo.nodes[2].Attempt != 2 || processRepo.nodes[2].Status != ProcessNodeStatusActive {
+		t.Fatalf("expected one active returned attempt after partial failure, got %#v", processRepo.nodes)
+	}
+
+	if _, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{WorkflowTaskID: 501}, 7); err != nil {
+		t.Fatalf("expected return retry to reconcile created attempt, got %v", err)
+	}
+	if len(processRepo.nodes) != 3 || processRepo.createdAttempt == nil || processRepo.createdAttempt.Attempt != 2 {
+		t.Fatalf("return retry must not create a third attempt, got nodes=%#v create=%#v", processRepo.nodes, processRepo.createdAttempt)
+	}
+	if len(workflowRepo.createdByCode) != 1 {
+		t.Fatalf("return retry must persist exactly one task, got %#v", workflowRepo.createdByCode)
+	}
+}
+
 func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskReturnToRejectsAttemptLimit(t *testing.T) {
 	processRepo := &memProcessRuntimeRepo{
 		process: &ProcessInstance{
@@ -2276,15 +2802,17 @@ func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskRejectsUnfinishedTask(t 
 	}
 }
 
-func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskRejectsSettledNode(t *testing.T) {
+func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskRejectsSettledNodeWithDifferentOutcome(t *testing.T) {
 	processID := 10
 	nodeID := 20
+	storedOutcome := "APPROVED"
 	processRepo := &memProcessRuntimeRepo{
 		node: &ProcessNodeInstance{
 			ID:                nodeID,
 			ProcessInstanceID: processID,
 			NodeType:          ProcessNodeTypeHumanTask,
 			Status:            ProcessNodeStatusCompleted,
+			Outcome:           &storedOutcome,
 			Version:           2,
 		},
 	}
@@ -2294,6 +2822,7 @@ func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskRejectsSettledNode(t *te
 			TaskStatusKey:         "done",
 			ProcessInstanceID:     &processID,
 			ProcessNodeInstanceID: &nodeID,
+			Payload:               map[string]any{"outcome": "CONFIRMED"},
 		},
 	}
 	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo)

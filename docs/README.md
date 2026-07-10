@@ -49,7 +49,7 @@
 | yoyoosun 客户投影 / Yoyoosun Customer Projection | [yoyoosun 客户资料](customers/yoyoosun/README.md) | 说明 yoyoosun 原始资料、客户配置、模拟 seed、模板候选、Product Core、tenant 和事实表边界。 |
 | 出货放行边界 / Shipment Release Boundary | [状态 / Workflow / Fact 边界](architecture/状态工作流事实边界.md) | 锁住 `shipment_release done -> shipping_released`，避免把放行误判成 shipment、inventory 或 finance facts。 |
 | 各类流程建模边界 / Flow Modeling Boundary | [各类流程建模边界评审](architecture/各类流程建模边界评审.md) | 将 reference 中的业务流、状态流、工作流、审批流、任务流、异常流、通知流和自动流转映射到 plush 当前 Product Core、Workflow / Fact、页面和客户配置边界。 |
-| T1-T8 主任务树 / Main Task Flow | [工作流主任务树第一版](workflow/工作流主任务树第一版.md) | 作为 Workflow 协同主链和事实 usecase 落账边界的可视化索引。 |
+| 业务与协同流程 / Business and Collaboration Flow | [业务与协同流程地图](workflow/业务与协同流程地图.md) | 连接 Source Document、协同任务和事实 usecase，并避免与测试 T0-T8 混用。 |
 | 标准实施门禁 / Standard Delivery Gate | [模块实施治理](product/模块实施治理.md) | 说明从 docs-only review 到 schema、usecase、API、UI、测试、文档和交付的门禁。 |
 
 ## 文档写法 / Writing Rules

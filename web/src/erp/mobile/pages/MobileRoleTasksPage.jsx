@@ -259,7 +259,10 @@ export default function MobileRoleTasksPage() {
     detailReasonValue,
     handleTaskAction,
     savedEvidenceRefs,
+    selectedCanBlock,
+    selectedCanComplete,
     selectedCanOperate,
+    selectedCanReject,
     selectedCanUrge,
     submitDetailAction,
     updateDetailReason,
@@ -268,6 +271,7 @@ export default function MobileRoleTasksPage() {
     urgingID,
   } = useMobileRoleTaskActions({
     activeRoleKey,
+    adminProfile,
     detailAction,
     loadTasks,
     selectedTask,
@@ -300,7 +304,10 @@ export default function MobileRoleTasksPage() {
         handleTaskAction={handleTaskAction}
         roleLabel={roleLabel}
         savedEvidenceRefs={savedEvidenceRefs}
+        selectedCanBlock={selectedCanBlock}
+        selectedCanComplete={selectedCanComplete}
         selectedCanOperate={selectedCanOperate}
+        selectedCanReject={selectedCanReject}
         selectedCanUrge={selectedCanUrge}
         selectedSeverity={selectedSeverity}
         selectedTask={selectedTask}

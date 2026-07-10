@@ -500,7 +500,9 @@ func TestPurchaseReturnPostgresReceiptItemCumulativeLimit(t *testing.T) {
 	}
 
 	extraStockReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PRTN-CUM-IN-EXTRA-"+fixtures.suffix, invFixtures, stringPtr("PG-PRTN-CUM-LOT-"+fixtures.suffix), mustDecimal(t, "10"))
-	assertOptionalIntEqual(t, extraStockReceipt.Items[0].LotID, *receiptItem.LotID)
+	if extraStockReceipt.Items[0].LotID == nil || *extraStockReceipt.Items[0].LotID == *receiptItem.LotID {
+		t.Fatalf("same supplier lot snapshot must keep postgres receipt-line stock isolated")
+	}
 	overOriginal := createLinkedReturn("PG-PRTN-CUM-OVER-"+fixtures.suffix, mustDecimal(t, "1"))
 	if _, err := uc.PostPurchaseReturn(ctx, overOriginal.ID); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("expected postgres cumulative over-return to be rejected even with stock available, got %v", err)

@@ -13,17 +13,25 @@
 
 当前已接入：
 
-- `menuConfig.mjs`：永绅 yoyoosun 前端品牌和桌面菜单配置源。该配置不再被默认产品前端静态 import；部署 yoyoosun 时应把 `customer-config.example.js` 复制或渲染为前端静态根路径的 `customer-config.js`，并发布 `assets/favicon-yoyoosun.svg` 到 `/customer-assets/yoyoosun/favicon-yoyoosun.svg`。该配置只控制登录页 / 入口页 / 后台侧栏的客户品牌展示，以及前端桌面菜单的分组、排序、隐藏和文案；菜单隐藏不是安全边界，后端仍以 RBAC action permission 和业务 usecase 校验为准。
+- `menuConfig.mjs`：永绅前端品牌和桌面菜单配置源。部署时把经过审查的 `customer-config.example.js` 发布为静态根路径 `customer-config.js`，并只复制 `public-assets/` 到 `/customer-assets/yoyoosun/`。菜单隐藏不是安全边界，后端仍以 RBAC、active revision、模块状态和业务 usecase 校验为准。
 
 - `customer-config.example.js`：永绅 yoyoosun 前端部署注入示例。默认产品 Web 包只带中性的 `web/public/customer-config.js` 占位，不能把本示例复制进 Product Core 默认产物。
 
-- `assets/engineering-work-instruction/sheet1/`：从 `docs/customers/yoyoosun/raw-source-files/26204#抱抱猴子材料明细表2026-4-10.xlsx` 的 `Sheet1` / `drawing4.xml` 抽取的作业指导书图片资产，用于 yoyoosun 客户静态配置下的工程打印样例预览。`customer-config.example.js` 只声明图片 URL、对应行锚点、`draftPatch` 文本覆盖和来源 workbook，不把 raw 客户照片、公司名或作业文本写进 Product Core 默认模板，也不代表真实 Excel 导入、图片附件归档、PDF 留档或业务事实写入已完成。
+- `public-assets/`：唯一允许复制到公开前端产物的客户静态资源，目前只含 favicon 等经过审查的品牌资源。
+- `assets/engineering-work-instruction/`：客户工程表来源证据，只用于受控人工评审和模板设计，不由 dev server/生产 overlay 发布，也不再注入无鉴权的工程打印草稿。
+- 版本化配置和试用 fixture 不保存真实员工姓名、手机号或签字人；真实合同经办信息由客户 active revision 或本单 `contract_party_snapshot` 受控维护并审计。
 
 - `fieldNumberingConfig.mjs`：永绅 yoyoosun 字段显示和编号规则配置草案。该文件当前 `runtimeEnabled=false`，只作为 Customer Config 评审清单；不接前端运行时、不改后端、不改 schema、不执行导入。
 
 - `importConfig.mjs`：永绅 yoyoosun 导入与客户差异配置草案。该文件根据已提取的 Excel evidence、产品核心边界和客户台账收口导入顺序、字段映射分组、人工 review 队列、禁止自动导入目标和 deferred runtime 项；当前 `runtimeEnabled=false`，不嵌入 raw rows，不接 loader，不执行真实导入。
 
-- `customerPackage.mjs`：永绅 yoyoosun 客户配置包结构草案，按 `workflows / businessFlows / stateMachines / processPolicies` 收口流程相关配置预览。当前接入 `scripts/qa/customer-package-lint.mjs`、`scripts/qa/customer-config-runtime-manifest.mjs` 和开发态 `/__dev/customer-config` 预检展示；开发页可触发测试版 UI Dry Run 生成 ignored `output/customers/yoyoosun/ui-import-dry-run` evidence，也可编译受控 runtime manifest 后用当前管理员登录态调用后端 `customer_config.validate_customer_config / publish_customer_config / activate_customer_config` 应用到测试环境。当前 manifest 会生成 9 个责任池 / role profile，包含 engineering 责任池和工程岗位端 access entitlement；可选 `moduleStates` 只允许声明 catalog 内模块的 `enabled / read_only / disabled`，非 `enabled` 必须写 reason，并只编译为后端 `module_states` 输入，不提供运行时安装 / 卸载模块，也不证明完整模块关闭已 ready；页面投影必须来自已登记正式菜单 key，manifest 编译器和后端 validate / publish 都会拒绝缺失、空列表或未知 page key 的 `compiled_snapshot.pages`，旧 active revision 缺 pages 或无有效 pages 时 `get_effective_session` 不回退 RBAC 全量页面；字段策略只发布前端已消费的 `customers.default`、`suppliers.default` 和 `sales_orders.default`，`sales_order_items` 的产品 / 款式 / 颜色尺码候选仍停留在导入 / 客户评审草案；`printTemplateDefaults` 只允许对当前正式 `material-purchase-contract / processing-contract` 声明甲方 party defaults，runtime manifest 会把它编译进 `compiled_snapshot.printTemplateDefaults`，后端 `publish_customer_config` 会拒绝销售订单打印模板、未知模板、未知 party 字段和 supplier defaults，`get_effective_session` 只在 active module enabled 且 `formal_runtime_consumed=true` 时输出受控投影；当前已接入的正式消费方是采购订单页的 `material-purchase-contract` 打印入口和委外订单页的 `processing-contract` 打印入口，仅读取甲方 / 委托方字段，不覆盖供应商 / 加工方业务快照，不启用销售订单打印模板；后端 `validate_customer_config / publish_customer_config` 也会拒绝未登记 surface / field key，`get_effective_session` 输出会过滤旧 revision 中的非法字段策略；Dry Run 不写数据库；测试环境应用只写客户配置控制面表并由后端 RBAC / JSON-RPC 守住，不上传 raw 包、不直写数据库、不导入真实客户业务数据；正式版入口必须先通过 release readiness gate，门禁通过后才允许用同一后端受控 API 发布 / 激活；后端 `rollback_customer_config` 只对已发布的 compiled revision 做受控版本回滚并写 `customer_config.rollback` 审计，不等于 raw 包回滚、真实导入失败恢复或备份恢复演练；`runtimeEnabled=false`，`previewOnly=true`，raw 包不 publish、不 activate、不 rollback。只有经过 runtime manifest 编译后的受控 JSON 才可作为后端 `customer_config.validate_customer_config / publish_customer_config` 输入，且不改变 WorkflowUsecase、Fact usecase、schema、migration 或真实导入。
+- `customerPackage.mjs`：永绅客户包声明源。raw 包保持 `runtimeEnabled=false / previewOnly=true`；只有编译后的受控 manifest 才能走后端 validate / publish / activate，且不改变 schema、RBAC 或 Workflow / Fact 底线。
+  - 模块、页面、角色和责任池由 catalog、active revision 与后端 RBAC 共同收窄；客户包不安装代码或模块。
+  - `roleFlowMatrix.mjs` 中每个角色的 `menuSurfaces` 使用真实 runtime page key；其 `capabilityKeys` 必须覆盖页面 catalog 登记的全部读取合同。仅为页面联查补充的客户、供应商、材料、产品、库存等窄读取权限不会自动开放对应独立菜单，最终菜单由编译后的 `rolePageProjections` 继续收窄。
+  - 客户包角色能力只编译为 `access_entitlements`；`role_profiles` 没有加权字段，角色撤权使用 `revokes`，后端 RBAC 是不可突破的上限。
+  - 字段投影只发布 `customers.default`、`suppliers.default`、`sales_orders.default` 的列表 / CSV 列 `visible`。当前是 Product Core 的 `visible=true` 默认值，没有永绅专属隐藏，也不控制表单 label / editable / required；详见 `docs/customers/yoyoosun/配置投影覆盖矩阵.md`。
+  - 打印默认值只覆盖采购合同、加工合同的买方 / 委托方抬头，供应商 / 加工方和明细继续来自业务快照。
+  - Dry Run 不写数据库；测试应用只写客户配置控制面。正式发布仍需 release readiness，rollback 只回滚配置 revision，不回滚业务数据或数据库备份。
 
 未来可继续放：
 

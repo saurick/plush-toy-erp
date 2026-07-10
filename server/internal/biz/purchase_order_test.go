@@ -190,6 +190,7 @@ func TestPurchaseOrderUsecaseItemGuards(t *testing.T) {
 		orders: map[int]*PurchaseOrder{
 			1: {ID: 1, LifecycleStatus: PurchaseOrderStatusDraft},
 			2: {ID: 2, LifecycleStatus: PurchaseOrderStatusClosed},
+			3: {ID: 3, LifecycleStatus: PurchaseOrderStatusSubmitted},
 		},
 		items: map[int]*PurchaseOrderItem{
 			10: {ID: 10, PurchaseOrderID: 1, LineStatus: PurchaseOrderItemStatusOpen},
@@ -250,6 +251,7 @@ func TestPurchaseOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 		orders: map[int]*PurchaseOrder{
 			1: {ID: 1, LifecycleStatus: PurchaseOrderStatusDraft},
 			2: {ID: 2, LifecycleStatus: PurchaseOrderStatusClosed},
+			3: {ID: 3, LifecycleStatus: PurchaseOrderStatusSubmitted},
 		},
 		items: map[int]*PurchaseOrderItem{
 			10: {ID: 10, PurchaseOrderID: 1, LineStatus: PurchaseOrderItemStatusOpen},
@@ -299,6 +301,9 @@ func TestPurchaseOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 
 	if _, err := uc.SavePurchaseOrderWithItems(ctx, 2, &PurchaseOrderMutation{PurchaseOrderNo: "PO-CLOSED", SupplierID: 1000, PurchaseDate: orderDate}, nil); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected closed order save rejected, got %v", err)
+	}
+	if _, err := uc.SavePurchaseOrderWithItems(ctx, 3, &PurchaseOrderMutation{PurchaseOrderNo: "PO-SUBMITTED", SupplierID: 1000, PurchaseDate: orderDate}, nil); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected submitted purchase contract to be frozen, got %v", err)
 	}
 	if _, err := uc.SavePurchaseOrderWithItems(ctx, 1, &PurchaseOrderMutation{PurchaseOrderNo: "PO-WRONG-ITEM", SupplierID: 1000, PurchaseDate: orderDate}, []*PurchaseOrderItemSaveMutation{
 		{ID: 20, PurchaseOrderItemMutation: PurchaseOrderItemMutation{LineNo: 1, MaterialID: 100, UnitID: 200, PurchasedQuantity: qty}},

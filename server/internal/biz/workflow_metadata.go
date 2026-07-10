@@ -81,12 +81,12 @@ var workflowBusinessStates = []WorkflowStateOption{
 	{Key: "qc_failed", Label: "质检不合格", Summary: "来料、回货或成品检验未通过，等待责任角色处理退货、返工、补做或让步接收。"},
 	{Key: "warehouse_processing", Label: "待入库 / 待出货", Summary: "仓库正在做回仓、入库、备货和待出货准备。"},
 	{Key: "warehouse_inbound_pending", Label: "待确认入库", Summary: "品质已放行，等待仓库确认入库数量、库位和经手人。"},
-	{Key: "inbound_done", Label: "已入库", Summary: "仓库已确认入库事实；库存余额和库存流水后续按专表评审落地。"},
+	{Key: "inbound_done", Label: "入库协同已完成", Summary: "相关交接任务已经完成；实际库存以入库单过账结果为准。"},
 	{Key: "shipment_pending", Label: "待出货", Summary: "成品已入库或放行，等待出货准备、装箱、唛头和出库确认。"},
 	{Key: "shipping_released", Label: "已放行待出库", Summary: "业务确认和财务放行已完成，等待仓库出库执行。"},
-	{Key: "shipped", Label: "已出货", Summary: "出库事实已形成，可进入对账和结算链路。"},
+	{Key: "shipped", Label: "出货协同已完成", Summary: "出货链路已完成；实际出货数量和库存扣减以出货单为准。"},
 	{Key: "reconciling", Label: "对账中", Summary: "加工费、辅包材费用和异常费用正在核对。"},
-	{Key: "settled", Label: "已结算", Summary: "当前订单或批次对应的结算义务已经闭环。"},
+	{Key: "settled", Label: "结算协同已完成", Summary: "对账交接已经完成；实际应收应付和收付款以业务财务记录为准。"},
 	{Key: "blocked", Label: "业务阻塞", Summary: "主链被缺料、延期、未放行、数量差异或异常问题卡住。"},
 	{Key: "cancelled", Label: "业务取消", Summary: "订单或批次被整体取消，不再继续推进。"},
 	{Key: "closed", Label: "业务归档", Summary: "主链已完成并归档，保留历史快照与追溯记录。"},
@@ -156,7 +156,7 @@ func IsValidWorkflowTaskUrgeAction(action string) bool {
 
 func IsTerminalWorkflowTaskStatus(statusKey string) bool {
 	switch strings.TrimSpace(statusKey) {
-	case "done", "cancelled", "closed":
+	case "done", "rejected", "cancelled", "closed":
 		return true
 	default:
 		return false

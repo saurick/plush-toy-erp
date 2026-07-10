@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 
@@ -164,8 +165,11 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 	if rejected.BlockedReason == nil || *rejected.BlockedReason != rejectedReason {
 		t.Fatalf("expected rejected reason to replace blocked reason, got %#v", rejected.BlockedReason)
 	}
+	if rejected.CompletedAt == nil {
+		t.Fatalf("terminal rejected task must set completed_at")
+	}
 
-	done, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+	_, err = repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
 		ID:                task.ID,
 		TaskStatusKey:     "done",
 		BusinessStatusKey: "project_approved",
@@ -174,14 +178,8 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 			"evidence_refs": []any{"note://approved"},
 		},
 	}, 8, biz.BossRoleKey)
-	if err != nil {
-		t.Fatalf("complete task failed: %v", err)
-	}
-	if done.TaskStatusKey != "done" || done.CompletedAt == nil {
-		t.Fatalf("expected completed task, got %#v", done)
-	}
-	if done.BlockedReason != nil {
-		t.Fatalf("done task must clear stale blocked/rejected reason, got %#v", done.BlockedReason)
+	if !errors.Is(err, biz.ErrWorkflowTaskSettled) {
+		t.Fatalf("terminal rejected task must reject later completion, got %v", err)
 	}
 
 	events, err := client.WorkflowTaskEvent.Query().
@@ -191,8 +189,8 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("query events failed: %v", err)
 	}
-	if len(events) != 4 {
-		t.Fatalf("expected created + blocked + rejected + done events, got %d", len(events))
+	if len(events) != 3 {
+		t.Fatalf("expected created + blocked + rejected events only, got %d", len(events))
 	}
 
 	assertEvent := func(index int, from string, to string, reason *string, mobileAction string) {
@@ -225,7 +223,6 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 
 	assertEvent(1, "ready", "blocked", &blockedReason, "blocked")
 	assertEvent(2, "blocked", "rejected", &rejectedReason, "rejected")
-	assertEvent(3, "rejected", "done", nil, "done")
 }
 
 func TestWorkflowRepo_GetWorkflowTaskByID(t *testing.T) {
@@ -503,8 +500,8 @@ func TestWorkflowRepo_UpdateTaskStatusSideEffectsAreTransactionalAndIdempotent(t
 		BusinessStatusKey: "project_approved",
 		Payload:           map[string]any{"approval_result": "approved"},
 		SideEffects:       sideEffects,
-	}, 8, "boss"); err != nil {
-		t.Fatalf("repeat update with side effects failed: %v", err)
+	}, 8, "boss"); !errors.Is(err, biz.ErrWorkflowTaskSettled) {
+		t.Fatalf("repeat terminal update must be rejected before replaying side effects, got %v", err)
 	}
 
 	count, err := client.WorkflowTask.Query().
@@ -615,15 +612,20 @@ func TestWorkflowRepo_OrderRevisionIdempotencyAllowsNextRoundAfterDone(t *testin
 			}, 8, "boss"); err != nil {
 				t.Fatalf("first %s update failed: %v", tc.status, err)
 			}
-			if _, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+			_, repeatErr := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
 				ID:                approvalTask.ID,
 				TaskStatusKey:     tc.status,
 				BusinessStatusKey: tc.businessStatusKey,
 				Reason:            reason,
 				Payload:           map[string]any{tc.reasonKey: reason},
 				SideEffects:       sideEffects,
-			}, 8, "boss"); err != nil {
-				t.Fatalf("repeat %s update failed: %v", tc.status, err)
+			}, 8, "boss")
+			if tc.status == "rejected" {
+				if !errors.Is(repeatErr, biz.ErrWorkflowTaskSettled) {
+					t.Fatalf("repeat rejected update must be terminal, got %v", repeatErr)
+				}
+			} else if repeatErr != nil {
+				t.Fatalf("repeat %s update failed: %v", tc.status, repeatErr)
 			}
 
 			revisionTasks, err := client.WorkflowTask.Query().
@@ -655,15 +657,20 @@ func TestWorkflowRepo_OrderRevisionIdempotencyAllowsNextRoundAfterDone(t *testin
 			}
 
 			sideEffects.DerivedTask.TaskCode = "ORDER-REVISION-" + tc.status + "-002"
-			if _, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+			_, nextRoundErr := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
 				ID:                approvalTask.ID,
 				TaskStatusKey:     tc.status,
 				BusinessStatusKey: tc.businessStatusKey,
 				Reason:            reason,
 				Payload:           map[string]any{tc.reasonKey: reason},
 				SideEffects:       sideEffects,
-			}, 8, "boss"); err != nil {
-				t.Fatalf("next-round %s update failed: %v", tc.status, err)
+			}, 8, "boss")
+			if tc.status == "rejected" {
+				if !errors.Is(nextRoundErr, biz.ErrWorkflowTaskSettled) {
+					t.Fatalf("terminal rejected approval requires a new approval attempt, got %v", nextRoundErr)
+				}
+			} else if nextRoundErr != nil {
+				t.Fatalf("next-round %s update failed: %v", tc.status, nextRoundErr)
 			}
 
 			count, err := client.WorkflowTask.Query().
@@ -677,8 +684,12 @@ func TestWorkflowRepo_OrderRevisionIdempotencyAllowsNextRoundAfterDone(t *testin
 			if err != nil {
 				t.Fatalf("count revision tasks failed: %v", err)
 			}
-			if count != 2 {
-				t.Fatalf("expected completed revision to allow next round, got %d revision tasks", count)
+			wantCount := 2
+			if tc.status == "rejected" {
+				wantCount = 1
+			}
+			if count != wantCount {
+				t.Fatalf("revision task count = %d, want %d for %s", count, wantCount, tc.status)
 			}
 		})
 	}

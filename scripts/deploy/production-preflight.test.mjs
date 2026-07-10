@@ -6,9 +6,16 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
-const scriptPath = path.join(repoRoot, "scripts/deploy/production-preflight.sh");
+const scriptPath = path.join(
+  repoRoot,
+  "scripts/deploy/production-preflight.sh",
+);
 
-function writeFixture({ appImage = "plush-toy-erp-server:20260628", composeBuild = false } = {}) {
+function writeFixture({
+  appImage = "plush-toy-erp-server:20260628",
+  composeBuild = false,
+  insecureMigrationLock = false,
+} = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "production-preflight-"));
   const composeDir = path.join(root, "compose");
   fs.mkdirSync(composeDir, { recursive: true });
@@ -20,6 +27,7 @@ function writeFixture({ appImage = "plush-toy-erp-server:20260628", composeBuild
     envFile,
     [
       "PROJECT_SLUG=plush-toy-erp",
+      "ERP_CUSTOMER_KEY=demo",
       `APP_IMAGE=${appImage}`,
       "WEB_IMAGE=plush-toy-erp-web:20260628",
       "POSTGRES_IMAGE=postgres:18.1",
@@ -30,6 +38,7 @@ function writeFixture({ appImage = "plush-toy-erp-server:20260628", composeBuild
       "POSTGRES_DB=plush_erp",
       "POSTGRES_USER=plush",
       "POSTGRES_DATA_DIR=/data/plush/postgres",
+      "MIGRATION_LOCK_FILE=/run/lock/plush-toy-erp/atlas-migrate.lock",
       "POSTGRES_BIND_ADDR=127.0.0.1",
       "TRACE_ENDPOINT=http://jaeger:4318/v1/traces",
       "TRACE_RATIO=0.1",
@@ -77,12 +86,24 @@ function writeFixture({ appImage = "plush-toy-erp-server:20260628", composeBuild
   const migrateScript = path.join(composeDir, "migrate_online.sh");
   fs.writeFileSync(
     migrateScript,
-    [
-      "#!/usr/bin/env bash",
-      "set -euo pipefail",
-      "flock /tmp/atlas-migrate.lock /usr/local/bin/atlas migrate apply",
-      "",
-    ].join("\n"),
+    insecureMigrationLock
+      ? [
+          "#!/usr/bin/env bash",
+          "set -euo pipefail",
+          "flock /tmp/atlas-migrate.lock /usr/local/bin/atlas migrate apply",
+          "",
+        ].join("\n")
+      : [
+          "#!/usr/bin/env bash",
+          "set -euo pipefail",
+          "umask 077",
+          'MIGRATION_LOCK_FILE="${MIGRATION_LOCK_FILE:-/run/lock/plush-toy-erp/atlas-migrate.lock}"',
+          'if [ -L "$MIGRATION_LOCK_FILE" ]; then exit 1; fi',
+          'exec 9>>"$MIGRATION_LOCK_FILE"',
+          "flock 9",
+          "/usr/local/bin/atlas migrate apply",
+          "",
+        ].join("\n"),
     "utf8",
   );
   fs.chmodSync(migrateScript, 0o755);
@@ -116,7 +137,11 @@ test("production preflight accepts a prepared runtime env without docker config"
 
 test("production preflight writes sanitized report to out file", () => {
   const fixture = writeFixture();
-  const reportPath = path.join(fixture.root, "evidence", "production-preflight-report.txt");
+  const reportPath = path.join(
+    fixture.root,
+    "evidence",
+    "production-preflight-report.txt",
+  );
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   const result = runPreflight(fixture, ["--out", reportPath]);
 
@@ -129,7 +154,11 @@ test("production preflight writes sanitized report to out file", () => {
 
 test("production preflight rejects missing out directory before writing report", () => {
   const fixture = writeFixture();
-  const reportPath = path.join(fixture.root, "missing", "production-preflight-report.txt");
+  const reportPath = path.join(
+    fixture.root,
+    "missing",
+    "production-preflight-report.txt",
+  );
   const result = runPreflight(fixture, ["--out", reportPath]);
 
   assert.notEqual(result.status, 0);
@@ -143,6 +172,45 @@ test("production preflight rejects floating app image tags", () => {
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /APP_IMAGE 不能使用 :dev 或 :latest/);
+});
+
+test("production preflight rejects unstable runtime customer keys", () => {
+  const fixture = writeFixture();
+  fs.writeFileSync(
+    fixture.envFile,
+    fs
+      .readFileSync(fixture.envFile, "utf8")
+      .replace("ERP_CUSTOMER_KEY=demo", "ERP_CUSTOMER_KEY=current"),
+  );
+  const result = runPreflight(fixture);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /ERP_CUSTOMER_KEY 不能使用旧 current 别名/);
+});
+
+test("production preflight rejects migration locks in shared temporary directories", () => {
+  const fixture = writeFixture();
+  fs.writeFileSync(
+    fixture.envFile,
+    fs
+      .readFileSync(fixture.envFile, "utf8")
+      .replace(
+        "MIGRATION_LOCK_FILE=/run/lock/plush-toy-erp/atlas-migrate.lock",
+        "MIGRATION_LOCK_FILE=/tmp/atlas-migrate.lock",
+      ),
+  );
+  const result = runPreflight(fixture);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /MIGRATION_LOCK_FILE 不得位于共享临时目录/);
+});
+
+test("production preflight rejects migration scripts that truncate a shared lock file", () => {
+  const fixture = writeFixture({ insecureMigrationLock: true });
+  const result = runPreflight(fixture);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /migration 脚本必须使用 umask 077 创建私有锁/);
 });
 
 test("production preflight rejects build sections in production compose", () => {

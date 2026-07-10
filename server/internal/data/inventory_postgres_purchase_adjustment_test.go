@@ -252,7 +252,9 @@ func TestPurchaseReceiptAdjustmentPostgresEffectiveReceiptQuantityAndConcurrentA
 		t.Fatalf("post postgres effective decrease adjustment failed: %v", err)
 	}
 	extraStock := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PRA-EFF-EXTRA-"+fixtures.suffix, invFixtures, stringPtr("PG-PRA-EFF-LOT-"+fixtures.suffix), mustDecimal(t, "10"))
-	assertOptionalIntEqual(t, extraStock.Items[0].LotID, *effectiveItem.LotID)
+	if extraStock.Items[0].LotID == nil || *extraStock.Items[0].LotID == *effectiveItem.LotID {
+		t.Fatalf("same supplier lot snapshot must keep postgres receipt-line stock isolated")
+	}
 	overEffectiveReturn := createLinkedPurchaseReturn(t, ctx, uc, "PG-PRA-EFF-RET-71-"+fixtures.suffix, effectiveReceipt.ID, effectiveItem, invFixtures, mustDecimal(t, "71"))
 	if _, err := uc.PostPurchaseReturn(ctx, overEffectiveReturn.ID); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("expected postgres return over effective receipt quantity to be rejected, got %v", err)
@@ -410,6 +412,184 @@ func TestPurchaseReceiptAdjustmentPostgresEffectiveReceiptQuantityAndConcurrentA
 		t.Fatalf("postgres concurrent adjustments produced negative balance: %s", balance.Quantity)
 	}
 	assertDecimalEqual(t, balance.Quantity, fmt.Sprintf("%d", 10-successes))
+}
+
+func TestPurchaseReceiptAdjustmentPostgresAddItemVsPostConcurrency(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseOperationalPostgresTestData(t)
+
+	fixtures := createPurchaseOperationalPostgresFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+	invFixtures := inventoryTestFixtures{
+		unitID:      fixtures.unitID,
+		materialID:  fixtures.materialID,
+		productID:   fixtures.productID,
+		warehouseID: fixtures.warehouseID,
+	}
+
+	receipt := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PRA-ADD-POST-IN-"+fixtures.suffix, invFixtures, stringPtr("PG-PRA-ADD-POST-LOT-"+fixtures.suffix), mustDecimal(t, "10"))
+	receiptItem := receipt.Items[0]
+	if receiptItem.LotID == nil {
+		t.Fatalf("expected postgres add-vs-post receipt lot_id")
+	}
+	adjustment := createPurchaseReceiptAdjustmentDraft(t, ctx, uc, "PG-PRA-ADD-POST-ADJ-"+fixtures.suffix, receipt.ID)
+	firstItem := addPurchaseReceiptAdjustmentItem(t, ctx, uc, adjustment.ID, receiptItem, biz.PurchaseReceiptAdjustmentQuantityIncrease, fixtures.warehouseID, receiptItem.LotID, mustDecimal(t, "1"), nil)
+
+	// Hold the material row so the item insert pauses while retaining the
+	// adjustment lock. Posting must wait until that item transaction commits.
+	blocker, err := data.sqldb.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin postgres add-vs-post blocker failed: %v", err)
+	}
+	blockerOpen := true
+	t.Cleanup(func() {
+		if blockerOpen {
+			_ = blocker.Rollback()
+		}
+	})
+	var lockedMaterialID int
+	if err := blocker.QueryRowContext(ctx, `SELECT id FROM materials WHERE id = $1 FOR UPDATE`, fixtures.materialID).Scan(&lockedMaterialID); err != nil {
+		t.Fatalf("lock postgres add-vs-post material failed: %v", err)
+	}
+
+	type addResult struct {
+		item *biz.PurchaseReceiptAdjustmentItem
+		err  error
+	}
+	addDone := make(chan addResult, 1)
+	go func() {
+		item, err := uc.AddPurchaseReceiptAdjustmentItem(ctx, &biz.PurchaseReceiptAdjustmentItemCreate{
+			AdjustmentID:          adjustment.ID,
+			PurchaseReceiptItemID: receiptItem.ID,
+			AdjustType:            biz.PurchaseReceiptAdjustmentQuantityIncrease,
+			MaterialID:            fixtures.materialID,
+			WarehouseID:           fixtures.warehouseID,
+			UnitID:                fixtures.unitID,
+			LotID:                 receiptItem.LotID,
+			Quantity:              mustDecimal(t, "2"),
+			SourceLineNo:          stringPtr("concurrent-add"),
+		})
+		addDone <- addResult{item: item, err: err}
+	}()
+
+	waitForBlockedQuery := func(fragment string) error {
+		deadline, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		ticker := time.NewTicker(10 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			var waiting bool
+			err := data.sqldb.QueryRowContext(deadline, `
+SELECT EXISTS (
+  SELECT 1
+  FROM pg_stat_activity
+  WHERE pid <> pg_backend_pid()
+    AND datname = current_database()
+    AND wait_event_type = 'Lock'
+    AND query ILIKE '%' || $1 || '%'
+)`, fragment).Scan(&waiting)
+			if err != nil {
+				return err
+			}
+			if waiting {
+				return nil
+			}
+			select {
+			case <-deadline.Done():
+				return fmt.Errorf("timed out waiting for blocked postgres query containing %q", fragment)
+			case <-ticker.C:
+			}
+		}
+	}
+
+	if err := waitForBlockedQuery(`INSERT INTO "purchase_receipt_adjustment_items"`); err != nil {
+		_ = blocker.Rollback()
+		blockerOpen = false
+		<-addDone
+		t.Fatalf("concurrent adjustment item did not reach blocked insert: %v", err)
+	}
+
+	postDone := make(chan error, 1)
+	go func() {
+		_, err := uc.PostPurchaseReceiptAdjustment(ctx, adjustment.ID)
+		postDone <- err
+	}()
+	if err := waitForBlockedQuery("SELECT id FROM purchase_receipt_adjustments"); err != nil {
+		_ = blocker.Rollback()
+		blockerOpen = false
+		<-addDone
+		<-postDone
+		t.Fatalf("posting did not wait for the item-add parent lock: %v", err)
+	}
+
+	if err := blocker.Rollback(); err != nil {
+		t.Fatalf("release postgres add-vs-post blocker failed: %v", err)
+	}
+	blockerOpen = false
+	added := <-addDone
+	if added.err != nil {
+		t.Fatalf("concurrent adjustment item add failed: %v", added.err)
+	}
+	if added.item == nil {
+		t.Fatalf("concurrent adjustment item add returned nil item")
+	}
+	if err := <-postDone; err != nil {
+		t.Fatalf("concurrent adjustment post failed: %v", err)
+	}
+
+	posted, err := uc.GetPurchaseReceiptAdjustment(ctx, adjustment.ID)
+	if err != nil {
+		t.Fatalf("get postgres add-vs-post adjustment failed: %v", err)
+	}
+	if posted.Status != biz.PurchaseReceiptAdjustmentStatusPosted {
+		t.Fatalf("expected add-vs-post adjustment POSTED, got %s", posted.Status)
+	}
+	if len(posted.Items) != 2 {
+		t.Fatalf("expected both adjustment items to be posted, got %d", len(posted.Items))
+	}
+
+	for _, itemID := range []int{firstItem.ID, added.item.ID} {
+		count, err := client.InventoryTxn.Query().
+			Where(
+				inventorytxn.SourceType(biz.PurchaseReceiptAdjustmentSourceType),
+				inventorytxn.SourceID(adjustment.ID),
+				inventorytxn.SourceLineID(itemID),
+				inventorytxn.TxnType(biz.InventoryTxnAdjustIn),
+			).
+			Count(ctx)
+		if err != nil {
+			t.Fatalf("count postgres add-vs-post inventory txn for item %d failed: %v", itemID, err)
+		}
+		if count != 1 {
+			t.Fatalf("posted adjustment item %d must have exactly one inventory txn, got %d", itemID, count)
+		}
+	}
+	adjustmentTxnCount, err := client.InventoryTxn.Query().
+		Where(
+			inventorytxn.SourceType(biz.PurchaseReceiptAdjustmentSourceType),
+			inventorytxn.SourceID(adjustment.ID),
+		).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count postgres add-vs-post adjustment txns failed: %v", err)
+	}
+	if adjustmentTxnCount != len(posted.Items) {
+		t.Fatalf("posted adjustment cannot retain unposted orphan items: items=%d txns=%d", len(posted.Items), adjustmentTxnCount)
+	}
+	balance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		WarehouseID: fixtures.warehouseID,
+		LotID:       receiptItem.LotID,
+		UnitID:      fixtures.unitID,
+	})
+	if err != nil {
+		t.Fatalf("get postgres add-vs-post balance failed: %v", err)
+	}
+	assertDecimalEqual(t, balance.Quantity, "13")
 }
 
 func TestPurchaseReceiptAdjustmentPostgresLotStatusGuardAndReturnException(t *testing.T) {

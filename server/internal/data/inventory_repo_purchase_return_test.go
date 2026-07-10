@@ -284,13 +284,14 @@ func TestInventoryRepo_PurchaseReturnLotIsolationAndReceiptItemValidation(t *tes
 	}
 	nonLotReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PR-RET-NOLOT-IN", fixtures, nil, mustDecimal(t, "10"))
 	nonLotReceiptItem := nonLotReceipt.Items[0]
-	if nonLotReceiptItem.LotID != nil {
-		t.Fatalf("expected non-lot receipt item lot_id nil")
+	if nonLotReceiptItem.LotID == nil {
+		t.Fatalf("expected generated receipt-line lot identity")
 	}
 	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectMaterial,
 		SubjectID:      fixtures.materialID,
 		WarehouseID:    fixtures.warehouseID,
+		LotID:          nonLotReceiptItem.LotID,
 		TxnType:        biz.InventoryTxnOut,
 		Direction:      -1,
 		Quantity:       mustDecimal(t, "5"),
@@ -346,6 +347,7 @@ func TestInventoryRepo_PurchaseReturnLotIsolationAndReceiptItemValidation(t *tes
 		MaterialID:            fixtures.materialID,
 		WarehouseID:           fixtures.warehouseID,
 		UnitID:                fixtures.unitID,
+		LotID:                 nonLotReceiptItem.LotID,
 		Quantity:              mustDecimal(t, "6"),
 	}); err != nil {
 		t.Fatalf("add non-lot over return item failed: %v", err)
@@ -379,6 +381,7 @@ func TestInventoryRepo_PurchaseReturnLotIsolationAndReceiptItemValidation(t *tes
 		MaterialID:            fixtures.materialID,
 		WarehouseID:           fixtures.warehouseID,
 		UnitID:                fixtures.unitID,
+		LotID:                 nonLotReceiptItem.LotID,
 		Quantity:              mustDecimal(t, "4"),
 	}); err != nil {
 		t.Fatalf("add non-lot return item failed: %v", err)
@@ -390,6 +393,7 @@ func TestInventoryRepo_PurchaseReturnLotIsolationAndReceiptItemValidation(t *tes
 		SubjectType: biz.InventorySubjectMaterial,
 		SubjectID:   fixtures.materialID,
 		WarehouseID: fixtures.warehouseID,
+		LotID:       nonLotReceiptItem.LotID,
 		UnitID:      fixtures.unitID,
 	})
 	if err != nil {
@@ -488,7 +492,9 @@ func TestInventoryRepo_PurchaseReturnReceiptItemCumulativeLimit(t *testing.T) {
 	}
 
 	extraStockReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PR-RET-CUM-IN-EXTRA", fixtures, stringPtr("RET-CUM-LOT-A"), mustDecimal(t, "10"))
-	assertOptionalIntEqual(t, extraStockReceipt.Items[0].LotID, *receiptItem.LotID)
+	if extraStockReceipt.Items[0].LotID == nil || *extraStockReceipt.Items[0].LotID == *receiptItem.LotID {
+		t.Fatalf("same supplier lot snapshot must keep receipt-line stock isolated")
+	}
 	overOriginal := createLinkedReturn("PR-RET-CUM-OVER-001", mustDecimal(t, "1"))
 	if _, err := uc.PostPurchaseReturn(ctx, overOriginal.ID); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("expected cumulative over-return to be rejected even with stock available, got %v", err)
@@ -690,7 +696,9 @@ func TestInventoryRepo_PurchaseReturnAllowsHoldRejectedLots(t *testing.T) {
 		t.Fatalf("expected effective status lot_id")
 	}
 	extraStock := createAndPostPurchaseReceipt(t, ctx, uc, "PR-RET-STATUS-EFFECTIVE-EXTRA", fixtures, stringPtr("PR-RET-STATUS-EFFECTIVE-LOT"), mustDecimal(t, "3"))
-	assertOptionalIntEqual(t, extraStock.Items[0].LotID, *effectiveItem.LotID)
+	if extraStock.Items[0].LotID == nil || *extraStock.Items[0].LotID == *effectiveItem.LotID {
+		t.Fatalf("same supplier lot snapshot must keep effective receipt quantities isolated")
+	}
 	if _, err := uc.ChangeInventoryLotStatus(ctx, *effectiveItem.LotID, biz.InventoryLotHold, "待判有效入库上限"); err != nil {
 		t.Fatalf("change effective lot to HOLD failed: %v", err)
 	}

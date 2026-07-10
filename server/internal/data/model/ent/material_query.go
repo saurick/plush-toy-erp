@@ -9,6 +9,7 @@ import (
 	"math"
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
@@ -37,6 +38,7 @@ type MaterialQuery struct {
 	withPurchaseReturnItems            *PurchaseReturnItemQuery
 	withPurchaseReceiptAdjustmentItems *PurchaseReceiptAdjustmentItemQuery
 	withQualityInspections             *QualityInspectionQuery
+	withOutsourcingOrderItems          *OutsourcingOrderItemQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -220,6 +222,28 @@ func (_q *MaterialQuery) QueryQualityInspections() *QualityInspectionQuery {
 			sqlgraph.From(material.Table, material.FieldID, selector),
 			sqlgraph.To(qualityinspection.Table, qualityinspection.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, material.QualityInspectionsTable, material.QualityInspectionsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryOutsourcingOrderItems chains the current query on the "outsourcing_order_items" edge.
+func (_q *MaterialQuery) QueryOutsourcingOrderItems() *OutsourcingOrderItemQuery {
+	query := (&OutsourcingOrderItemClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(material.Table, material.FieldID, selector),
+			sqlgraph.To(outsourcingorderitem.Table, outsourcingorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, material.OutsourcingOrderItemsTable, material.OutsourcingOrderItemsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -426,6 +450,7 @@ func (_q *MaterialQuery) Clone() *MaterialQuery {
 		withPurchaseReturnItems:            _q.withPurchaseReturnItems.Clone(),
 		withPurchaseReceiptAdjustmentItems: _q.withPurchaseReceiptAdjustmentItems.Clone(),
 		withQualityInspections:             _q.withQualityInspections.Clone(),
+		withOutsourcingOrderItems:          _q.withOutsourcingOrderItems.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -509,6 +534,17 @@ func (_q *MaterialQuery) WithQualityInspections(opts ...func(*QualityInspectionQ
 	return _q
 }
 
+// WithOutsourcingOrderItems tells the query-builder to eager-load the nodes that are connected to
+// the "outsourcing_order_items" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *MaterialQuery) WithOutsourcingOrderItems(opts ...func(*OutsourcingOrderItemQuery)) *MaterialQuery {
+	query := (&OutsourcingOrderItemClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withOutsourcingOrderItems = query
+	return _q
+}
+
 // GroupBy is used to group vertices by one or more fields/columns.
 // It is often used with aggregate functions, like: count, max, mean, min, sum.
 //
@@ -587,7 +623,7 @@ func (_q *MaterialQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Mat
 	var (
 		nodes       = []*Material{}
 		_spec       = _q.querySpec()
-		loadedTypes = [7]bool{
+		loadedTypes = [8]bool{
 			_q.withDefaultUnit != nil,
 			_q.withBomItems != nil,
 			_q.withPurchaseOrderItems != nil,
@@ -595,6 +631,7 @@ func (_q *MaterialQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Mat
 			_q.withPurchaseReturnItems != nil,
 			_q.withPurchaseReceiptAdjustmentItems != nil,
 			_q.withQualityInspections != nil,
+			_q.withOutsourcingOrderItems != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -669,6 +706,15 @@ func (_q *MaterialQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Mat
 			func(n *Material) { n.Edges.QualityInspections = []*QualityInspection{} },
 			func(n *Material, e *QualityInspection) {
 				n.Edges.QualityInspections = append(n.Edges.QualityInspections, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withOutsourcingOrderItems; query != nil {
+		if err := _q.loadOutsourcingOrderItems(ctx, query, nodes,
+			func(n *Material) { n.Edges.OutsourcingOrderItems = []*OutsourcingOrderItem{} },
+			func(n *Material, e *OutsourcingOrderItem) {
+				n.Edges.OutsourcingOrderItems = append(n.Edges.OutsourcingOrderItems, e)
 			}); err != nil {
 			return nil, err
 		}
@@ -870,6 +916,39 @@ func (_q *MaterialQuery) loadQualityInspections(ctx context.Context, query *Qual
 	}
 	query.Where(predicate.QualityInspection(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(material.QualityInspectionsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.MaterialID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "material_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "material_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *MaterialQuery) loadOutsourcingOrderItems(ctx context.Context, query *OutsourcingOrderItemQuery, nodes []*Material, init func(*Material), assign func(*Material, *OutsourcingOrderItem)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Material)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(outsourcingorderitem.FieldMaterialID)
+	}
+	query.Where(predicate.OutsourcingOrderItem(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(material.OutsourcingOrderItemsColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

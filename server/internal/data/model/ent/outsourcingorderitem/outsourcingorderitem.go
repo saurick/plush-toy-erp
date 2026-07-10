@@ -18,8 +18,12 @@ const (
 	FieldOutsourcingOrderID = "outsourcing_order_id"
 	// FieldLineNo holds the string denoting the line_no field in the database.
 	FieldLineNo = "line_no"
+	// FieldSubjectType holds the string denoting the subject_type field in the database.
+	FieldSubjectType = "subject_type"
 	// FieldProductID holds the string denoting the product_id field in the database.
 	FieldProductID = "product_id"
+	// FieldMaterialID holds the string denoting the material_id field in the database.
+	FieldMaterialID = "material_id"
 	// FieldProcessID holds the string denoting the process_id field in the database.
 	FieldProcessID = "process_id"
 	// FieldUnitID holds the string denoting the unit_id field in the database.
@@ -30,6 +34,10 @@ const (
 	FieldProductOrderNoSnapshot = "product_order_no_snapshot"
 	// FieldProductNameSnapshot holds the string denoting the product_name_snapshot field in the database.
 	FieldProductNameSnapshot = "product_name_snapshot"
+	// FieldMaterialCodeSnapshot holds the string denoting the material_code_snapshot field in the database.
+	FieldMaterialCodeSnapshot = "material_code_snapshot"
+	// FieldMaterialNameSnapshot holds the string denoting the material_name_snapshot field in the database.
+	FieldMaterialNameSnapshot = "material_name_snapshot"
 	// FieldProcessNameSnapshot holds the string denoting the process_name_snapshot field in the database.
 	FieldProcessNameSnapshot = "process_name_snapshot"
 	// FieldProcessCategorySnapshot holds the string denoting the process_category_snapshot field in the database.
@@ -56,6 +64,8 @@ const (
 	EdgeOutsourcingOrder = "outsourcing_order"
 	// EdgeProduct holds the string denoting the product edge name in mutations.
 	EdgeProduct = "product"
+	// EdgeMaterial holds the string denoting the material edge name in mutations.
+	EdgeMaterial = "material"
 	// EdgeProcess holds the string denoting the process edge name in mutations.
 	EdgeProcess = "process"
 	// EdgeUnit holds the string denoting the unit edge name in mutations.
@@ -76,6 +86,13 @@ const (
 	ProductInverseTable = "products"
 	// ProductColumn is the table column denoting the product relation/edge.
 	ProductColumn = "product_id"
+	// MaterialTable is the table that holds the material relation/edge.
+	MaterialTable = "outsourcing_order_items"
+	// MaterialInverseTable is the table name for the Material entity.
+	// It exists in this package in order to avoid circular dependency with the "material" package.
+	MaterialInverseTable = "materials"
+	// MaterialColumn is the table column denoting the material relation/edge.
+	MaterialColumn = "material_id"
 	// ProcessTable is the table that holds the process relation/edge.
 	ProcessTable = "outsourcing_order_items"
 	// ProcessInverseTable is the table name for the Process entity.
@@ -97,12 +114,16 @@ var Columns = []string{
 	FieldID,
 	FieldOutsourcingOrderID,
 	FieldLineNo,
+	FieldSubjectType,
 	FieldProductID,
+	FieldMaterialID,
 	FieldProcessID,
 	FieldUnitID,
 	FieldProductNoSnapshot,
 	FieldProductOrderNoSnapshot,
 	FieldProductNameSnapshot,
+	FieldMaterialCodeSnapshot,
+	FieldMaterialNameSnapshot,
 	FieldProcessNameSnapshot,
 	FieldProcessCategorySnapshot,
 	FieldUnitNameSnapshot,
@@ -131,8 +152,12 @@ var (
 	OutsourcingOrderIDValidator func(int) error
 	// LineNoValidator is a validator for the "line_no" field. It is called by the builders before save.
 	LineNoValidator func(int) error
+	// SubjectTypeValidator is a validator for the "subject_type" field. It is called by the builders before save.
+	SubjectTypeValidator func(string) error
 	// ProductIDValidator is a validator for the "product_id" field. It is called by the builders before save.
 	ProductIDValidator func(int) error
+	// MaterialIDValidator is a validator for the "material_id" field. It is called by the builders before save.
+	MaterialIDValidator func(int) error
 	// ProcessIDValidator is a validator for the "process_id" field. It is called by the builders before save.
 	ProcessIDValidator func(int) error
 	// UnitIDValidator is a validator for the "unit_id" field. It is called by the builders before save.
@@ -143,6 +168,10 @@ var (
 	ProductOrderNoSnapshotValidator func(string) error
 	// ProductNameSnapshotValidator is a validator for the "product_name_snapshot" field. It is called by the builders before save.
 	ProductNameSnapshotValidator func(string) error
+	// MaterialCodeSnapshotValidator is a validator for the "material_code_snapshot" field. It is called by the builders before save.
+	MaterialCodeSnapshotValidator func(string) error
+	// MaterialNameSnapshotValidator is a validator for the "material_name_snapshot" field. It is called by the builders before save.
+	MaterialNameSnapshotValidator func(string) error
 	// ProcessNameSnapshotValidator is a validator for the "process_name_snapshot" field. It is called by the builders before save.
 	ProcessNameSnapshotValidator func(string) error
 	// ProcessCategorySnapshotValidator is a validator for the "process_category_snapshot" field. It is called by the builders before save.
@@ -181,9 +210,19 @@ func ByLineNo(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLineNo, opts...).ToFunc()
 }
 
+// BySubjectType orders the results by the subject_type field.
+func BySubjectType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSubjectType, opts...).ToFunc()
+}
+
 // ByProductID orders the results by the product_id field.
 func ByProductID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProductID, opts...).ToFunc()
+}
+
+// ByMaterialID orders the results by the material_id field.
+func ByMaterialID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMaterialID, opts...).ToFunc()
 }
 
 // ByProcessID orders the results by the process_id field.
@@ -209,6 +248,16 @@ func ByProductOrderNoSnapshot(opts ...sql.OrderTermOption) OrderOption {
 // ByProductNameSnapshot orders the results by the product_name_snapshot field.
 func ByProductNameSnapshot(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProductNameSnapshot, opts...).ToFunc()
+}
+
+// ByMaterialCodeSnapshot orders the results by the material_code_snapshot field.
+func ByMaterialCodeSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMaterialCodeSnapshot, opts...).ToFunc()
+}
+
+// ByMaterialNameSnapshot orders the results by the material_name_snapshot field.
+func ByMaterialNameSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMaterialNameSnapshot, opts...).ToFunc()
 }
 
 // ByProcessNameSnapshot orders the results by the process_name_snapshot field.
@@ -280,6 +329,13 @@ func ByProductField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
+// ByMaterialField orders the results by material field.
+func ByMaterialField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newMaterialStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByProcessField orders the results by process field.
 func ByProcessField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -305,6 +361,13 @@ func newProductStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(ProductInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, ProductTable, ProductColumn),
+	)
+}
+func newMaterialStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(MaterialInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, MaterialTable, MaterialColumn),
 	)
 }
 func newProcessStep() *sqlgraph.Step {

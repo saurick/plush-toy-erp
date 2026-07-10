@@ -11,7 +11,6 @@ export const TEST_DATA_ISOLATION_BUCKETS = Object.freeze([
   "product-core-demo-seed",
   "customer-trial-simulated-data",
   "real-import-prep",
-  "real-import-execute",
 ]);
 
 const NO_FORMAL_FACT_SQL_PATTERN =
@@ -389,53 +388,6 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       },
     ]),
   },
-  {
-    id: "real-import-execute-keeps-explicit-gates",
-    bucket: "real-import-execute",
-    description:
-      "real import execution remains a separate, explicitly approved JSON-RPC loader.",
-    required: Object.freeze([
-      {
-        path: "scripts/import/customerImportExecute.mjs",
-        pattern: /const CONFIRM_PHRASE = "EXECUTE_YOYOOSUN_IMPORT"/u,
-        message: "real import execution must keep its explicit confirmation phrase",
-      },
-      {
-        path: "scripts/import/customerImportExecute.mjs",
-        pattern: /approval\.realImportApproved !== true/u,
-        message: "real import execution must require approved real import plan",
-      },
-      {
-        path: "scripts/import/customerImportExecute.mjs",
-        pattern: /assertExecutionBackupEvidence/u,
-        message: "real import execution must require backup evidence",
-      },
-      {
-        path: "scripts/import/customerImportExecute.mjs",
-        pattern: /assertExecutionRecoveryPlan/u,
-        message: "real import execution must require reviewed recovery plan",
-      },
-      {
-        path: "scripts/import/customerImportExecute.mjs",
-        pattern: /FORBIDDEN_TARGET_PATTERN/u,
-        message: "real import execution must keep forbidden fact-domain guard",
-      },
-      {
-        path: "scripts/import/customerImportExecute.mjs",
-        pattern: /never writes database tables directly, never writes business_records/u,
-        message: "real import execution must stay JSON-RPC only",
-      },
-    ]),
-    forbidden: Object.freeze([
-      {
-        path: "scripts/import/customerImportExecute.mjs",
-        pattern:
-          /method:\s*["'](?:create_shipment|post_shipment|create_inventory|post_inventory|create_finance_fact|post_finance_fact)["']/u,
-        message:
-          "real import execution must not add shipment, inventory, or finance fact RPC operations",
-      },
-    ]),
-  },
 ]);
 
 function normalizePath(relativePath) {
@@ -595,8 +547,8 @@ function printHelp() {
   console.log(`Usage:
   node scripts/qa/test-data-isolation-boundary.mjs [--json]
 
-Checks Product Core demo seed, yoyoosun simulated test data, real import dry-run/freeze,
-and real import execute gates. The check is read-only and never connects to backend or DB.`);
+Checks Product Core demo seed, yoyoosun simulated test data, and real import
+preparation boundaries. No tracked script may execute real customer imports.`);
 }
 
 async function main(argv) {

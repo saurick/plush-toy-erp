@@ -93,6 +93,20 @@ export const OUTSOURCING_ORDER_ITEM_STATUS_LABELS = Object.freeze({
   canceled: '已取消',
 })
 
+export const OUTSOURCING_ORDER_SUBJECT_TYPES = Object.freeze({
+  PRODUCT: 'PRODUCT',
+  MATERIAL: 'MATERIAL',
+})
+
+export function normalizeOutsourcingOrderSubjectType(value) {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase()
+  return Object.values(OUTSOURCING_ORDER_SUBJECT_TYPES).includes(normalized)
+    ? normalized
+    : undefined
+}
+
 const SALES_ORDER_LIFECYCLE_ACTIONS = Object.freeze({
   draft: Object.freeze(['submitted', 'canceled']),
   submitted: Object.freeze(['active', 'canceled']),
@@ -369,6 +383,65 @@ export function unixToDateInputValue(value) {
     return ''
   }
   return new Date(timestamp * 1000).toISOString().slice(0, 10)
+}
+
+function optionalFormValue(value) {
+  return value === null || value === undefined ? '' : value
+}
+
+export function createBlankOutsourcingLine(lineNo = 1) {
+  return {
+    line_no: lineNo,
+    subject_type: OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT,
+    product_id: undefined,
+    material_id: undefined,
+    process_id: undefined,
+    unit_id: undefined,
+    product_no_snapshot: '',
+    product_order_no_snapshot: '',
+    product_name_snapshot: '',
+    material_code_snapshot: '',
+    material_name_snapshot: '',
+    process_name_snapshot: '',
+    process_category_snapshot: '',
+    unit_name_snapshot: '',
+    outsourcing_quantity: '',
+    unit_price: '',
+    amount: '',
+    expected_return_date: '',
+    note: '',
+  }
+}
+
+export function normalizeOutsourcingLineFormValue(item = {}) {
+  const subjectType = normalizeOutsourcingOrderSubjectType(item.subject_type)
+  const isProduct = subjectType === OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT
+  const isMaterial = subjectType === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
+  return {
+    id: item.id,
+    line_no: item.line_no,
+    subject_type: subjectType,
+    product_id: isProduct ? item.product_id : undefined,
+    material_id: isMaterial ? item.material_id : undefined,
+    process_id: item.process_id,
+    unit_id: item.unit_id,
+    product_no_snapshot: isProduct ? item.product_no_snapshot || '' : '',
+    product_order_no_snapshot: isProduct
+      ? item.product_order_no_snapshot || ''
+      : '',
+    product_name_snapshot: isProduct ? item.product_name_snapshot || '' : '',
+    material_code_snapshot: isMaterial ? item.material_code_snapshot || '' : '',
+    material_name_snapshot: isMaterial ? item.material_name_snapshot || '' : '',
+    process_name_snapshot: item.process_name_snapshot || '',
+    process_category_snapshot: item.process_category_snapshot || '',
+    unit_name_snapshot: item.unit_name_snapshot || '',
+    outsourcing_quantity: optionalFormValue(item.outsourcing_quantity),
+    unit_price: optionalFormValue(item.unit_price),
+    amount: optionalFormValue(item.amount),
+    expected_return_date: unixToDateInputValue(item.expected_return_date),
+    note: item.note || '',
+    line_status: item.line_status,
+  }
 }
 
 export function statusText(status, labels = {}, fallback = '业务状态') {
@@ -949,6 +1022,61 @@ export function buildPurchaseOrderItemSourceValuesFromMaterial(material = {}) {
   }
 }
 
+export function buildOutsourcingOrderSubjectSwitchValues(subjectType) {
+  return {
+    subject_type: normalizeOutsourcingOrderSubjectType(subjectType),
+    product_id: undefined,
+    material_id: undefined,
+    product_no_snapshot: '',
+    product_order_no_snapshot: '',
+    product_name_snapshot: '',
+    material_code_snapshot: '',
+    material_name_snapshot: '',
+    unit_id: undefined,
+    unit_name_snapshot: '',
+  }
+}
+
+export function buildOutsourcingOrderItemSourceValuesFromProduct(
+  product = {},
+  unit = {}
+) {
+  const resetValues = buildOutsourcingOrderSubjectSwitchValues(
+    OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT
+  )
+  if (!product?.id) {
+    return resetValues
+  }
+  return {
+    ...resetValues,
+    product_id: Number(product.id || 0) || undefined,
+    product_no_snapshot: trimOptional(product.code) || '',
+    product_name_snapshot: trimOptional(product.name) || '',
+    unit_id: Number(product.default_unit_id || 0) || undefined,
+    unit_name_snapshot: trimOptional(unit.name) || '',
+  }
+}
+
+export function buildOutsourcingOrderItemSourceValuesFromMaterial(
+  material = {},
+  unit = {}
+) {
+  const resetValues = buildOutsourcingOrderSubjectSwitchValues(
+    OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
+  )
+  if (!material?.id) {
+    return resetValues
+  }
+  return {
+    ...resetValues,
+    material_id: Number(material.id || 0) || undefined,
+    material_code_snapshot: trimOptional(material.code) || '',
+    material_name_snapshot: trimOptional(material.name) || '',
+    unit_id: Number(material.default_unit_id || 0) || undefined,
+    unit_name_snapshot: trimOptional(unit.name) || '',
+  }
+}
+
 export function buildBOMItemSourceValuesFromMaterial(material = {}) {
   if (!material?.id) {
     return {
@@ -1023,21 +1151,42 @@ export function buildOutsourcingOrderParams(values = {}, extra = {}) {
 }
 
 export function buildOutsourcingOrderItemParams(values = {}, extra = {}) {
+  const subjectType = normalizeOutsourcingOrderSubjectType(values.subject_type)
+  const productSubject = subjectType === OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT
+  const materialSubject =
+    subjectType === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
   return compactParams({
     ...extra,
     line_no: normalizeLineNo(extra.line_no, values.line_no),
-    product_id: Number(values.product_id || 0),
+    subject_type: subjectType,
+    product_id: productSubject
+      ? normalizeOptionalPositiveInteger(values.product_id)
+      : undefined,
+    material_id: materialSubject
+      ? normalizeOptionalPositiveInteger(values.material_id)
+      : undefined,
     process_id: Number(values.process_id || 0),
     unit_id: Number(values.unit_id || 0),
-    product_no_snapshot: trimOptional(values.product_no_snapshot),
-    product_order_no_snapshot: trimOptional(values.product_order_no_snapshot),
-    product_name_snapshot: trimOptional(values.product_name_snapshot),
+    product_no_snapshot: productSubject
+      ? trimOptional(values.product_no_snapshot)
+      : undefined,
+    product_order_no_snapshot: productSubject
+      ? trimOptional(values.product_order_no_snapshot)
+      : undefined,
+    product_name_snapshot: productSubject
+      ? trimOptional(values.product_name_snapshot)
+      : undefined,
+    material_code_snapshot: materialSubject
+      ? trimOptional(values.material_code_snapshot)
+      : undefined,
+    material_name_snapshot: materialSubject
+      ? trimOptional(values.material_name_snapshot)
+      : undefined,
     process_name_snapshot: trimOptional(values.process_name_snapshot),
     process_category_snapshot: trimOptional(values.process_category_snapshot),
     unit_name_snapshot: trimOptional(values.unit_name_snapshot),
     outsourcing_quantity: trimOptional(values.outsourcing_quantity),
     unit_price: trimOptional(values.unit_price),
-    amount: deriveOutsourcingOrderItemAmount(values),
     expected_return_date: trimOptional(values.expected_return_date),
     note: trimOptional(values.note),
   })

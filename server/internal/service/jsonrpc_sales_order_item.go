@@ -14,41 +14,6 @@ func (d *jsonrpcDispatcher) handleSalesOrderItem(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "add_sales_order_item", "addSalesOrderItem":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderItemCreate); res != nil {
-			return id, res, nil
-		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
-			return id, res, nil
-		}
-		in, ok := salesOrderItemMutationFromParams(pm)
-		if !ok {
-			return id, invalidParamResult(), nil
-		}
-		item, err := d.salesOrderUC.AddSalesOrderItem(ctx, in)
-		return id, salesOrderItemMutationResult(ctx, d, item, err), nil
-	case "update_sales_order_item", "updateSalesOrderItem":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderItemUpdate); res != nil {
-			return id, res, nil
-		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
-			return id, res, nil
-		}
-		in, ok := salesOrderItemMutationFromParams(pm)
-		if !ok {
-			return id, invalidParamResult(), nil
-		}
-		item, err := d.salesOrderUC.UpdateSalesOrderItem(ctx, getInt(pm, "id", 0), in)
-		return id, salesOrderItemMutationResult(ctx, d, item, err), nil
-	case "remove_sales_order_item", "removeSalesOrderItem":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderItemCancel); res != nil {
-			return id, res, nil
-		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
-			return id, res, nil
-		}
-		item, err := d.salesOrderUC.RemoveSalesOrderItem(ctx, getInt(pm, "id", 0))
-		return id, salesOrderItemMutationResult(ctx, d, item, err), nil
 	case "list_sales_order_items", "listSalesOrderItems":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderItemRead); res != nil {
 			return id, res, nil

@@ -6,11 +6,11 @@ import {
   parseBusinessModuleQuery,
 } from './businessModuleNavigation.mjs'
 import {
+  businessModuleDefinitions,
   getBusinessModule,
-  getFormalBusinessShellModules,
 } from '../config/businessModules.mjs'
 
-test('businessModuleNavigation: 单状态钻取使用兼容查询参数', () => {
+test('businessModuleNavigation: 单状态钻取使用单值查询参数', () => {
   const query = buildBusinessModuleQuery({
     businessStatusKeys: ['project_pending'],
   })
@@ -41,22 +41,13 @@ test('businessModuleNavigation: 多状态钻取收口为业务页筛选参数', 
   ])
 })
 
-test('formal business shell: 三个遗留 shell 已收口为 Workflow V1 页面', () => {
-  const formalShellModules = getFormalBusinessShellModules()
-
-  assert.deepEqual(formalShellModules, [])
-  assert.equal(getBusinessModule('materials')?.pageKind, 'formal-v1')
-  assert.equal(getBusinessModule('material-bom')?.pageKind, 'formal-v1')
-  assert.equal(getBusinessModule('processes')?.pageKind, 'formal-v1')
-  assert.equal(getBusinessModule('accessories-purchase')?.pageKind, 'formal-v1')
-  assert.equal(getBusinessModule('inventory')?.pageKind, 'formal-v1')
-  assert.equal(getBusinessModule('processing-contracts')?.pageKind, 'formal-v1')
-  assert.equal(getBusinessModule('production-progress')?.pageKind, 'formal-v1')
-  assert.equal(getBusinessModule('outbound')?.pageKind, 'formal-v1')
-  assert.equal(getBusinessModule('receivables')?.pageKind, 'formal-v1')
-  assert.equal(getBusinessModule('payables')?.pageKind, 'formal-v1')
-  assert.equal(getBusinessModule('invoices')?.pageKind, 'formal-v1')
-  assert.equal(getBusinessModule('reconciliation')?.pageKind, 'formal-v1')
+test('business modules: 正式入口不再登记预览壳页', () => {
+  assert(businessModuleDefinitions.length > 0)
+  assert(
+    businessModuleDefinitions.every(
+      (moduleItem) => moduleItem.pageKind === 'formal-v1'
+    )
+  )
   assert.equal(
     getBusinessModule('production-scheduling')?.pageKind,
     'formal-v1'
@@ -66,22 +57,6 @@ test('formal business shell: 三个遗留 shell 已收口为 Workflow V1 页面'
     'formal-v1'
   )
   assert.equal(getBusinessModule('shipping-release')?.pageKind, 'formal-v1')
-  assert.equal(
-    formalShellModules.some((item) => item.key === 'accessories-purchase'),
-    false
-  )
-  assert.equal(
-    formalShellModules.some((item) => item.key === 'processing-contracts'),
-    false
-  )
-  assert.equal(
-    formalShellModules.some((item) => item.key === 'receivables'),
-    false
-  )
-  assert.equal(
-    formalShellModules.some((item) => item.key === 'production-scheduling'),
-    false
-  )
 })
 
 test('workflow business modules: 三页不冒充事实写入', () => {

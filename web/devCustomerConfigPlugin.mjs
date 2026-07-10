@@ -43,7 +43,7 @@ export function createDevCustomerConfigPlugin({ projectRoot } = {}) {
     customerDir,
     'customer-config.example.js'
   )
-  const customerAssetsDir = path.join(customerDir, 'assets')
+  const customerAssetsDir = path.join(customerDir, 'public-assets')
 
   return {
     name: 'plush-dev-customer-config',

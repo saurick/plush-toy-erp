@@ -4,6 +4,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import {
+  OUTSOURCING_ORDER_SUBJECT_TYPES,
   V1_ROUTE_PATHS,
   buildPaymentConditionOptions,
   buildBOMItemSourceValuesFromMaterial,
@@ -13,7 +14,10 @@ import {
   buildMaterialDraftCode,
   buildOrderContactSnapshot,
   buildOutsourcingOrderItemParams,
+  buildOutsourcingOrderItemSourceValuesFromMaterial,
+  buildOutsourcingOrderItemSourceValuesFromProduct,
   buildOutsourcingOrderParams,
+  buildOutsourcingOrderSubjectSwitchValues,
   buildPurchaseOrderItemSourceValuesFromMaterial,
   contractPartySnapshotFromPrintTemplateDefaults,
   buildProcessParams,
@@ -33,6 +37,7 @@ import {
   canRunPurchaseOrderLifecycleAction,
   canRunSalesOrderLifecycleAction,
   canRunOutsourcingOrderLifecycleAction,
+  createBlankOutsourcingLine,
   deriveOutsourcingOrderItemAmount,
   deriveSalesOrderItemAmount,
   formatUnitDisplayName,
@@ -42,6 +47,7 @@ import {
   formatUnixDateTime,
   hasActionPermission,
   inferDefaultUnitID,
+  normalizeOutsourcingLineFormValue,
   paymentConditionCompleteness,
   resolvePaymentTermDays,
   statusText,
@@ -375,14 +381,14 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
     buildContractPartySnapshot({
       buyerCompany: ' 永绅 ',
       buyerContact: ' 采购负责人 ',
-      buyerPhone: '13537313218',
+      buyerPhone: '0769-00000001',
       buyerAddress: '',
       supplierName: '不应进入源单甲方快照',
     }),
     {
       buyerCompany: '永绅',
       buyerContact: '采购负责人',
-      buyerPhone: '13537313218',
+      buyerPhone: '0769-00000001',
     }
   )
 
@@ -395,9 +401,9 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
             party_defaults: {
               buyerCompany: '永绅',
               buyerContact: '采购负责人',
-              buyerPhone: '13537313218',
+              buyerPhone: '0769-00000001',
               buyerAddress: '东莞-茶山',
-              buyerSigner: '郭改玉',
+              buyerSigner: '试用采购负责人',
             },
           },
         ],
@@ -407,9 +413,9 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
     {
       buyerCompany: '永绅',
       buyerContact: '采购负责人',
-      buyerPhone: '13537313218',
+      buyerPhone: '0769-00000001',
       buyerAddress: '东莞-茶山',
-      buyerSigner: '郭改玉',
+      buyerSigner: '试用采购负责人',
     }
   )
 
@@ -508,6 +514,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
   assert.deepEqual(
     buildOutsourcingOrderItemParams({
       line_no: '1',
+      subject_type: ' product ',
       product_id: '12',
       process_id: '8',
       unit_id: '2',
@@ -522,6 +529,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
     }),
     {
       line_no: 1,
+      subject_type: 'PRODUCT',
       product_id: 12,
       process_id: 8,
       unit_id: 2,
@@ -531,7 +539,6 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       process_category_snapshot: '委外',
       outsourcing_quantity: '10',
       unit_price: '3.5',
-      amount: '35.00',
     }
   )
 
@@ -539,6 +546,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
     buildOutsourcingOrderItemParams(
       {
         line_no: '7',
+        subject_type: 'PRODUCT',
         product_id: '12',
         process_id: '8',
         unit_id: '2',
@@ -548,6 +556,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
     ),
     {
       line_no: 2,
+      subject_type: 'PRODUCT',
       product_id: 12,
       process_id: 8,
       unit_id: 2,
@@ -570,6 +579,212 @@ test('masterDataOrderView: payment condition options keep zero-day defaults and 
       payment_term_days: 30,
     }),
     '30天月结 / 30天'
+  )
+})
+
+test('FL_outsourcing_subject_switch__clears_other_subject_and_snapshots masterDataOrderView: 加工对象切换不保留上一个主体残值', () => {
+  assert.deepEqual(createBlankOutsourcingLine(3), {
+    line_no: 3,
+    subject_type: OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT,
+    product_id: undefined,
+    material_id: undefined,
+    process_id: undefined,
+    unit_id: undefined,
+    product_no_snapshot: '',
+    product_order_no_snapshot: '',
+    product_name_snapshot: '',
+    material_code_snapshot: '',
+    material_name_snapshot: '',
+    process_name_snapshot: '',
+    process_category_snapshot: '',
+    unit_name_snapshot: '',
+    outsourcing_quantity: '',
+    unit_price: '',
+    amount: '',
+    expected_return_date: '',
+    note: '',
+  })
+
+  assert.deepEqual(buildOutsourcingOrderSubjectSwitchValues(' material '), {
+    subject_type: OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL,
+    product_id: undefined,
+    material_id: undefined,
+    product_no_snapshot: '',
+    product_order_no_snapshot: '',
+    product_name_snapshot: '',
+    material_code_snapshot: '',
+    material_name_snapshot: '',
+    unit_id: undefined,
+    unit_name_snapshot: '',
+  })
+
+  assert.deepEqual(
+    buildOutsourcingOrderItemSourceValuesFromProduct(
+      {
+        id: 12,
+        code: ' PROD-012 ',
+        name: ' 玩具熊半成品 ',
+        default_unit_id: 2,
+      },
+      { id: 2, name: ' 只 ' }
+    ),
+    {
+      subject_type: OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT,
+      product_id: 12,
+      material_id: undefined,
+      product_no_snapshot: 'PROD-012',
+      product_order_no_snapshot: '',
+      product_name_snapshot: '玩具熊半成品',
+      material_code_snapshot: '',
+      material_name_snapshot: '',
+      unit_id: 2,
+      unit_name_snapshot: '只',
+    }
+  )
+
+  assert.deepEqual(
+    buildOutsourcingOrderItemSourceValuesFromMaterial(
+      {
+        id: 18,
+        code: ' MAT-018 ',
+        name: ' 短毛绒布 ',
+        default_unit_id: 4,
+      },
+      { id: 4, name: ' 米 ' }
+    ),
+    {
+      subject_type: OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL,
+      product_id: undefined,
+      material_id: 18,
+      product_no_snapshot: '',
+      product_order_no_snapshot: '',
+      product_name_snapshot: '',
+      material_code_snapshot: 'MAT-018',
+      material_name_snapshot: '短毛绒布',
+      unit_id: 4,
+      unit_name_snapshot: '米',
+    }
+  )
+})
+
+test('FL_outsourcing_subject_echo__uses_migrated_subject_type masterDataOrderView: 既有加工行按迁移后主体类型回显', () => {
+  assert.deepEqual(
+    normalizeOutsourcingLineFormValue({
+      id: 9,
+      line_no: 1,
+      subject_type: 'PRODUCT',
+      product_id: 12,
+      material_id: 88,
+      product_no_snapshot: 'PROD-012',
+      product_order_no_snapshot: 'SO-001',
+      product_name_snapshot: '玩具熊半成品',
+      material_code_snapshot: 'STALE-MAT',
+      material_name_snapshot: '残留材料',
+      process_id: 5,
+      unit_id: 2,
+      outsourcing_quantity: '10',
+      unit_price: '1.5',
+      amount: '15',
+      expected_return_date: 1782259200,
+      line_status: 'open',
+    }),
+    {
+      id: 9,
+      line_no: 1,
+      subject_type: 'PRODUCT',
+      product_id: 12,
+      material_id: undefined,
+      process_id: 5,
+      unit_id: 2,
+      product_no_snapshot: 'PROD-012',
+      product_order_no_snapshot: 'SO-001',
+      product_name_snapshot: '玩具熊半成品',
+      material_code_snapshot: '',
+      material_name_snapshot: '',
+      process_name_snapshot: '',
+      process_category_snapshot: '',
+      unit_name_snapshot: '',
+      outsourcing_quantity: '10',
+      unit_price: '1.5',
+      amount: '15',
+      expected_return_date: '2026-06-24',
+      note: '',
+      line_status: 'open',
+    }
+  )
+
+  const materialLine = normalizeOutsourcingLineFormValue({
+    subject_type: 'MATERIAL',
+    product_id: 12,
+    material_id: 18,
+    product_no_snapshot: 'STALE-PRODUCT',
+    product_name_snapshot: '残留产品',
+    material_code_snapshot: 'MAT-018',
+    material_name_snapshot: '短毛绒布',
+  })
+  assert.equal(materialLine.product_id, undefined)
+  assert.equal(materialLine.product_no_snapshot, '')
+  assert.equal(materialLine.product_name_snapshot, '')
+  assert.equal(materialLine.material_id, 18)
+  assert.equal(materialLine.material_code_snapshot, 'MAT-018')
+  assert.equal(materialLine.material_name_snapshot, '短毛绒布')
+})
+
+test('FL_outsourcing_subject_payload__serializes_exactly_one_subject masterDataOrderView: 加工保存只提交当前主体且金额由后端核算', () => {
+  assert.deepEqual(
+    buildOutsourcingOrderItemParams({
+      line_no: 2,
+      subject_type: ' material ',
+      product_id: 12,
+      material_id: 18,
+      product_no_snapshot: 'STALE-PRODUCT',
+      product_order_no_snapshot: 'STALE-ORDER',
+      product_name_snapshot: '残留产品',
+      material_code_snapshot: ' MAT-018 ',
+      material_name_snapshot: ' 短毛绒布 ',
+      process_id: 6,
+      unit_id: 4,
+      outsourcing_quantity: '20',
+      unit_price: '2.5',
+      amount: '999',
+    }),
+    {
+      line_no: 2,
+      subject_type: 'MATERIAL',
+      material_id: 18,
+      process_id: 6,
+      unit_id: 4,
+      material_code_snapshot: 'MAT-018',
+      material_name_snapshot: '短毛绒布',
+      outsourcing_quantity: '20',
+      unit_price: '2.5',
+    }
+  )
+
+  assert.deepEqual(
+    buildOutsourcingOrderItemParams({
+      line_no: 3,
+      subject_type: 'PRODUCT',
+      product_id: 12,
+      material_id: 18,
+      product_no_snapshot: ' PROD-012 ',
+      product_name_snapshot: ' 玩具熊半成品 ',
+      material_code_snapshot: 'STALE-MAT',
+      material_name_snapshot: '残留材料',
+      process_id: 5,
+      unit_id: 2,
+      outsourcing_quantity: '10',
+    }),
+    {
+      line_no: 3,
+      subject_type: 'PRODUCT',
+      product_id: 12,
+      process_id: 5,
+      unit_id: 2,
+      product_no_snapshot: 'PROD-012',
+      product_name_snapshot: '玩具熊半成品',
+      outsourcing_quantity: '10',
+    }
   )
 })
 
@@ -831,6 +1046,7 @@ test('FL_outsourcing_return_date__retains_expected_return_date_snapshot masterDa
   assert.deepEqual(
     buildOutsourcingOrderItemParams({
       line_no: '1',
+      subject_type: 'PRODUCT',
       product_id: '12',
       process_id: '8',
       unit_id: '2',
@@ -839,6 +1055,7 @@ test('FL_outsourcing_return_date__retains_expected_return_date_snapshot masterDa
     }),
     {
       line_no: 1,
+      subject_type: 'PRODUCT',
       product_id: 12,
       process_id: 8,
       unit_id: 2,
@@ -1220,9 +1437,9 @@ test('FL_material_purchase_print_party_defaults__uses_customer_config_party_defa
             party_defaults: {
               buyerCompany: '客户配置买方公司',
               buyerContact: '采购负责人',
-              buyerPhone: '13537313218',
+              buyerPhone: '0769-00000001',
               buyerAddress: '东莞-茶山',
-              buyerSigner: '郭改玉',
+              buyerSigner: '试用采购负责人',
               supplierName: '不应覆盖供应商',
             },
           },
@@ -1240,9 +1457,9 @@ test('FL_material_purchase_print_party_defaults__uses_customer_config_party_defa
   assert.equal(draft.contractNo, 'PO-PRINT-CONFIG')
   assert.equal(draft.buyerCompany, '客户配置买方公司')
   assert.equal(draft.buyerContact, '采购负责人')
-  assert.equal(draft.buyerPhone, '13537313218')
+  assert.equal(draft.buyerPhone, '0769-00000001')
   assert.equal(draft.buyerAddress, '东莞-茶山')
-  assert.equal(draft.buyerSigner, '郭改玉')
+  assert.equal(draft.buyerSigner, '试用采购负责人')
   assert.equal(draft.supplierName, '真实供应商')
   assert.equal(draft.supplierContact, '供应商联系人')
   assert.equal(draft.supplierSigner, undefined)
@@ -1281,9 +1498,9 @@ test('FL_material_purchase_print_party_snapshot__order_snapshot_overrides_custom
             party_defaults: {
               buyerCompany: '客户配置买方公司',
               buyerContact: '采购负责人',
-              buyerPhone: '13537313218',
+              buyerPhone: '0769-00000001',
               buyerAddress: '东莞-茶山',
-              buyerSigner: '郭改玉',
+              buyerSigner: '试用采购负责人',
             },
           },
         ],
@@ -1774,6 +1991,51 @@ test('FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_fetch_s
 
   assert.match(outsourcingFormSource, /onSupplierChange/u)
   assert.match(outsourcingFormSource, /onChange=\{onSupplierChange\}/u)
+})
+
+test('FL_outsourcing_subject_form__wires_product_and_material_sources masterDataOrderView: 加工表单显式选择产品或材料', () => {
+  const pageSource = readERPSource('../pages/V1OutsourcingOrdersPage.jsx')
+  const formSource = readERPSource(
+    '../components/outsourcing-orders/OutsourcingOrderForm.jsx'
+  )
+
+  for (const sourceText of [
+    'listMaterials',
+    'buildOutsourcingOrderSubjectSwitchValues',
+    'buildOutsourcingOrderItemSourceValuesFromProduct',
+    'buildOutsourcingOrderItemSourceValuesFromMaterial',
+    'materialOptions={materialOptions}',
+    'onSubjectTypeChange={handleSubjectTypeChange}',
+    'onMaterialChange={handleMaterialChange}',
+  ]) {
+    assert.match(
+      pageSource,
+      new RegExp(sourceText.replace(/[{}]/gu, '\\$&'), 'u')
+    )
+  }
+
+  for (const visibleText of [
+    '加工对象类型',
+    '产品 / 半成品（车缝、手工等）',
+    '材料（布料加工等）',
+    '金额预览',
+    '保存时由系统按数量和单价核算',
+  ]) {
+    assert.match(formSource, new RegExp(visibleText, 'u'))
+  }
+  for (const fieldName of [
+    'subject_type',
+    'product_id',
+    'material_id',
+    'product_no_snapshot',
+    'product_name_snapshot',
+    'material_code_snapshot',
+    'material_name_snapshot',
+  ]) {
+    assert.match(formSource, new RegExp(`'${fieldName}'`, 'u'))
+  }
+  assert.match(formSource, /<Input\s+readOnly/u)
+  assert.doesNotMatch(formSource, /name=\{\[field\.name, 'amount'\]\}/u)
 })
 
 test('FL_sales_order_source_no__retains_customer_order_no_snapshot masterDataOrderView: sales order params retain customer source no', () => {

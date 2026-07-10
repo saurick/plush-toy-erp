@@ -2,7 +2,6 @@
 
 let originalFetch = null
 let mockWorkflowTaskID = 1
-let mockWorkflowBusinessStateID = 1
 const mockWorkflowTasks = []
 const mockWorkflowBusinessStates = []
 const mockBusinessDashboardProjectionModuleKeys = [
@@ -193,9 +192,17 @@ const mockBusinessStates = [
     label: '已放行待出库',
     summary: '等待仓库出库。',
   },
-  { key: 'shipped', label: '已出货', summary: '出库事实已形成。' },
+  {
+    key: 'shipped',
+    label: '出货协同已完成',
+    summary: '实际出货数量和库存扣减以出货单为准。',
+  },
   { key: 'reconciling', label: '对账中', summary: '费用正在核对。' },
-  { key: 'settled', label: '已结算', summary: '结算已闭环。' },
+  {
+    key: 'settled',
+    label: '结算协同已完成',
+    summary: '实际应收应付和收付款以业务财务记录为准。',
+  },
   { key: 'blocked', label: '业务阻塞', summary: '主链被异常卡住。' },
   { key: 'cancelled', label: '业务取消', summary: '业务已取消。' },
   { key: 'closed', label: '业务归档', summary: '业务已归档。' },
@@ -888,39 +895,6 @@ export function setupJsonRpcMockServer() {
             limit: Number(params.limit || 50),
             offset: Number(params.offset || 0),
           }),
-          error: '',
-        }
-      } else if (method === 'upsert_business_state') {
-        let businessState = mockWorkflowBusinessStates.find(
-          (item) =>
-            item.source_type === params.source_type &&
-            Number(item.source_id) === Number(params.source_id)
-        )
-        const nextBusinessState = {
-          id: businessState?.id || mockWorkflowBusinessStateID++,
-          source_type: params.source_type || 'mock',
-          source_id: Number(params.source_id || Date.now()),
-          source_no: params.source_no || '',
-          order_id: params.order_id || null,
-          batch_id: params.batch_id || null,
-          business_status_key: params.business_status_key || 'project_pending',
-          owner_role_key: params.owner_role_key || 'sales',
-          blocked_reason: params.blocked_reason || '',
-          status_changed_at: nowUnix(),
-          payload: params.payload || {},
-          created_at: businessState?.created_at || nowUnix(),
-          updated_at: nowUnix(),
-        }
-        if (businessState) {
-          Object.assign(businessState, nextBusinessState)
-        } else {
-          businessState = nextBusinessState
-          mockWorkflowBusinessStates.unshift(businessState)
-        }
-        responseBody = {
-          jsonrpc: '2.0',
-          id,
-          result: makeBizResult({ business_state: businessState }),
           error: '',
         }
       } else {

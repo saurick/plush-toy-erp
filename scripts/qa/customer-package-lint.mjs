@@ -114,6 +114,7 @@ function validatePrintTemplateDefaults(config, schema = customerPackageSchema) {
   assert(Array.isArray(config.printTemplateDefaults), "printTemplateDefaults must be an array");
   const allowedTemplateKeys = new Set(schema.allowedPrintTemplateKeys || []);
   const allowedPartyKeys = new Set(schema.allowedPrintPartyDefaultKeys || []);
+  const requiredPartyKeys = new Set(schema.requiredPrintPartyDefaultKeys || []);
   const seen = new Set();
   config.printTemplateDefaults.forEach((item, index) => {
     const itemPath = `printTemplateDefaults[${index}]`;
@@ -132,11 +133,40 @@ function validatePrintTemplateDefaults(config, schema = customerPackageSchema) {
     assert(partyDefaultEntries.length > 0, `${itemPath}.partyDefaults must not be empty`);
     partyDefaultEntries.forEach(([key, value]) => {
       assert(allowedPartyKeys.has(key), `${itemPath}.partyDefaults.${key} is not an allowed print party default`);
-      assertNonEmptyString(value, `${itemPath}.partyDefaults.${key}`);
+      assert(typeof value === "string", `${itemPath}.partyDefaults.${key} must be a string`);
     });
+    requiredPartyKeys.forEach((key) =>
+      assertNonEmptyString(item.partyDefaults[key], `${itemPath}.partyDefaults.${key}`),
+    );
     assert(
       item.supplierDefaults == null,
       `${itemPath}.supplierDefaults must not override supplier snapshots from business records`,
+    );
+  });
+}
+
+function validateRoleProfiles(config, catalog) {
+  if (config.roleProfiles == null) {
+    return;
+  }
+  assert(Array.isArray(config.roleProfiles), "roleProfiles must be an array");
+  const knownPools = toKeySet(catalog.workPools);
+  const seenRoles = new Set();
+  config.roleProfiles.forEach((profile, index) => {
+    const path = `roleProfiles[${index}]`;
+    assert(profile && typeof profile === "object" && !Array.isArray(profile), `${path} must be an object`);
+    assertNonEmptyString(profile.roleKey, `${path}.roleKey`);
+    assert(!seenRoles.has(profile.roleKey), `${path}.roleKey must not be duplicated`);
+    seenRoles.add(profile.roleKey);
+    assertNonEmptyString(profile.displayName, `${path}.displayName`);
+    assertStringList(profile.ownerPools, `${path}.ownerPools`);
+    profile.ownerPools.forEach((poolKey) =>
+      assert(knownPools.has(poolKey), `${path}.ownerPools contains unknown pool ${poolKey}`),
+    );
+    assertStringList(profile.capabilityKeys, `${path}.capabilityKeys`);
+    assert(
+      profile.capabilityKeys.includes("workflow.task.read"),
+      `${path}.capabilityKeys must include workflow.task.read`,
     );
   });
 }
@@ -247,6 +277,7 @@ function validatePackage(config, catalog = customerPackageCatalog, schema = cust
 
   validateModuleStates(config, moduleKeys);
   validatePrintTemplateDefaults(config, schema);
+  validateRoleProfiles(config, catalog);
 
   assert(Array.isArray(config.workflows), "workflows must be an array");
   assert(config.workflows.length >= 3, "workflows must include the initial three preview workflows");

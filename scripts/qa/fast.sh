@@ -29,7 +29,6 @@ print_help() {
   sales-order-field-chain-boundary: 销售订单列表 / 导出 / 打印字段边界一致性
   dev-entry-boundary: /__dev、测试入口和客户配置预检控制台边界
   frontend-error-message-boundary: 正式前端错误提示禁止透传底层 message
-  multi-client-role-workflow-priority-audit: 多甲方角色能力优先级落地证据审计
   docs-inventory: 当前维护 Markdown 必须登记到 docs/文档清单.md
   industry-template-boundaries: 行业模板候选边界检查
   private-deployment-boundaries: 多客户私有化复制边界检查
@@ -53,7 +52,7 @@ print_help() {
   customer-package-lint: 客户配置包结构、流程预览和禁止项检查
   customer-package-preview-boundary: 客户配置包 preview-only 流程边界测试
   customer-config-runtime-manifest: 客户配置运行时 manifest 编译和门禁检查
-  customer-import-tooling: 客户导入 dry-run / freeze / execution loader 测试
+  customer-import-tooling: 客户来源 manifest / extract / freeze / dry-run 测试
   test-data-isolation-boundary: 测试业务数据隔离边界守卫
   trial-simulated-data: 试用模拟数据工具测试
   operational-fact-simulated-closure: 业务事实模拟闭环工具测试
@@ -91,6 +90,7 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 source "$ROOT_DIR/scripts/lib/pnpm.sh"
+require_project_node "$ROOT_DIR"
 PNPM_BIN="$(resolve_project_pnpm "$ROOT_DIR")"
 
 if ! command -v go >/dev/null 2>&1; then
@@ -221,11 +221,6 @@ if [ -f "$ROOT_DIR/scripts/qa/frontend-error-message-boundary.test.mjs" ]; then
   node --test "$ROOT_DIR/scripts/qa/frontend-error-message-boundary.test.mjs"
 fi
 
-if [ -f "$ROOT_DIR/scripts/qa/multi-client-role-workflow-priority-audit.test.mjs" ]; then
-  echo "[qa:fast] 运行多甲方角色能力优先级落地证据审计"
-  node --test "$ROOT_DIR/scripts/qa/multi-client-role-workflow-priority-audit.test.mjs"
-fi
-
 if [ -f "$ROOT_DIR/scripts/qa/docs-inventory.test.mjs" ]; then
   echo "[qa:fast] 运行文档清单登记测试"
   node --test "$ROOT_DIR/scripts/qa/docs-inventory.test.mjs"
@@ -304,6 +299,11 @@ fi
 if [ -f "$ROOT_DIR/scripts/deploy/production-preflight.test.mjs" ]; then
   echo "[qa:fast] 运行生产发布 preflight 测试"
   node --test "$ROOT_DIR/scripts/deploy/production-preflight.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/deploy/migrate-online.test.mjs" ]; then
+  echo "[qa:fast] 运行线上 migration 整段串行锁测试"
+  node --test "$ROOT_DIR/scripts/deploy/migrate-online.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/deploy/backup-restore-rehearsal-script.test.mjs" ]; then
@@ -407,6 +407,11 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/purchase-receipt-real-write-e2e.test.mjs" ]; then
   echo "[qa:fast] 运行采购入库服务层真实写入 e2e 边界测试"
   node --test "$ROOT_DIR/scripts/qa/purchase-receipt-real-write-e2e.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/critical-postgres-gate.test.mjs" ]; then
+  echo "[qa:fast] 运行 PostgreSQL 关键事务门禁合同测试"
+  node --test "$ROOT_DIR/scripts/qa/critical-postgres-gate.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/mvp-closure.test.mjs" ]; then

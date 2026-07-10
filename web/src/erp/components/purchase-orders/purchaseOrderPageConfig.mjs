@@ -5,6 +5,7 @@ import {
   submitPurchaseOrder,
 } from '../../api/masterDataOrderApi.mjs'
 import { decimalNumber } from '../../utils/businessLineItems.mjs'
+import { isDraftSourceDocument } from '../../utils/sourceDocumentEditing.mjs'
 import {
   PURCHASE_ORDER_STATUS_LABELS,
   statusText,
@@ -193,11 +194,7 @@ export function buildSelectedPurchaseOrderItems({
 }
 
 export function canEditPurchaseOrderSelection({ canUpdate = false, order }) {
-  return (
-    order &&
-    canUpdate &&
-    !['closed', 'canceled'].includes(order.lifecycle_status)
-  )
+  return order && canUpdate && isDraftSourceDocument(order)
 }
 
 export function canCreateInboundDraftFromPurchaseOrder({

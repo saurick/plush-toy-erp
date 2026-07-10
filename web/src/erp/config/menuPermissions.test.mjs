@@ -9,6 +9,7 @@ import {
   ERP_MENU_PERMISSION_OPTIONS,
   ERP_PERMISSION_PRESETS,
   PERMISSION_CENTER_PATH,
+  SYSTEM_AUDIT_LOGS_PATH,
   defaultMenuPermissions,
   getMobileRolePermissionLabel,
   getPermissionLabel,
@@ -23,10 +24,15 @@ function readRepoFile(relativePath) {
   return readFileSync(path.join(repoRoot, relativePath), 'utf8')
 }
 
-test('menuPermissions: 包含权限管理入口', () => {
+test('menuPermissions: 包含权限管理和审计日志入口', () => {
   assert(
     ERP_MENU_PERMISSION_OPTIONS.some(
       (item) => item.key === PERMISSION_CENTER_PATH
+    )
+  )
+  assert(
+    ERP_MENU_PERMISSION_OPTIONS.some(
+      (item) => item.key === SYSTEM_AUDIT_LOGS_PATH
     )
   )
 })
@@ -62,10 +68,17 @@ test('menuPermissions: 权限分组顺序跟随当前桌面菜单顺序', () => 
     )?.items.map((item) => item.key),
     ['/erp/print-center', '/erp/operations/exceptions']
   )
+  assert.deepEqual(
+    ERP_MENU_PERMISSION_GROUPS.find(
+      (section) => section.title === '系统管理'
+    )?.items.map((item) => item.key),
+    [PERMISSION_CENTER_PATH, SYSTEM_AUDIT_LOGS_PATH]
+  )
 })
 
-test('menuPermissions: 默认权限不包含权限管理', () => {
+test('menuPermissions: 默认权限不包含系统控制面入口', () => {
   assert(!defaultMenuPermissions().includes(PERMISSION_CENTER_PATH))
+  assert(!defaultMenuPermissions().includes(SYSTEM_AUDIT_LOGS_PATH))
 })
 
 test('menuPermissions: 岗位任务端角色权限只保留有效角色并保持端口顺序', () => {
@@ -96,7 +109,7 @@ test('menuPermissions: 未知菜单和岗位权限标签不透出 raw key', () =
   )
 })
 
-test('menuPermissions: 只保留有效权限并把旧入口权限归一到看板', () => {
+test('menuPermissions: 只保留正式权限并拒绝已取消的旧入口', () => {
   assert.deepEqual(
     normalizeMenuPermissions([
       '/erp/source-readiness',
@@ -140,16 +153,11 @@ test('menuPermissions: 打印预览子路由按打印中心权限归属', () => 
   )
 })
 
-test('menuPermissions: 旧帮助与文档路径不再生成独立权限项', () => {
-  assert.equal(
-    resolveMenuPermissionKey('/erp/mobile-workbenches'),
-    '/erp/dashboard'
-  )
-  assert.equal(
-    resolveMenuPermissionKey('/erp/docs/mobile-roles'),
-    '/erp/dashboard'
-  )
-  assert.equal(resolveMenuPermissionKey('/erp/qa/reports'), '/erp/dashboard')
+test('menuPermissions: 旧帮助、文档和验收路径不再映射到正式权限', () => {
+  assert.equal(resolveMenuPermissionKey('/erp/mobile-workbenches'), '')
+  assert.equal(resolveMenuPermissionKey('/erp/help-center'), '')
+  assert.equal(resolveMenuPermissionKey('/erp/docs/mobile-roles'), '')
+  assert.equal(resolveMenuPermissionKey('/erp/qa/reports'), '')
 })
 
 test('menuPermissions: 主数据与正式业务入口纳入角色预设', () => {
@@ -215,7 +223,10 @@ test('menuPermissions: 前端角色预设覆盖工程和系统管理员', () => 
     (preset) => preset.key === 'admin'
   )
   assert.deepEqual(adminPreset.mobileRolePermissions, [])
-  assert.deepEqual(adminPreset.permissions, [PERMISSION_CENTER_PATH])
+  assert.deepEqual(adminPreset.permissions, [
+    PERMISSION_CENTER_PATH,
+    SYSTEM_AUDIT_LOGS_PATH,
+  ])
 })
 
 test('menuPermissions: 当前权限项不包含前端文档或开发验收路径', () => {

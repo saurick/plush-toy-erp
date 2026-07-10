@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
@@ -222,6 +223,21 @@ func (_c *MaterialCreate) AddQualityInspections(v ...*QualityInspection) *Materi
 		ids[i] = v[i].ID
 	}
 	return _c.AddQualityInspectionIDs(ids...)
+}
+
+// AddOutsourcingOrderItemIDs adds the "outsourcing_order_items" edge to the OutsourcingOrderItem entity by IDs.
+func (_c *MaterialCreate) AddOutsourcingOrderItemIDs(ids ...int) *MaterialCreate {
+	_c.mutation.AddOutsourcingOrderItemIDs(ids...)
+	return _c
+}
+
+// AddOutsourcingOrderItems adds the "outsourcing_order_items" edges to the OutsourcingOrderItem entity.
+func (_c *MaterialCreate) AddOutsourcingOrderItems(v ...*OutsourcingOrderItem) *MaterialCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddOutsourcingOrderItemIDs(ids...)
 }
 
 // Mutation returns the MaterialMutation object of the builder.
@@ -490,6 +506,22 @@ func (_c *MaterialCreate) createSpec() (*Material, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.OutsourcingOrderItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.OutsourcingOrderItemsTable,
+			Columns: []string{material.OutsourcingOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorderitem.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

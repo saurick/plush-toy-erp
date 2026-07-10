@@ -177,7 +177,6 @@ function getScenarios() {
     verifyBusinessActionFormModal,
     verifyBusinessModuleColumnOrderDialog,
     verifyBusinessRowDoubleClickEditModal,
-    verifyFormalShellRowDoubleClickEditModal,
     verifySourceImportPicker,
     waitForPath,
     webDir,
@@ -456,7 +455,7 @@ async function runScenario(browser, scenario) {
   }
 
   throw new Error(
-    `[style:l1] 场景失败: ${scenario.name}\n${lastError?.message || lastError}\n最近 vite 输出：\n${tailLogs(devServerLogs)}`
+    `[style:l1] 场景失败: ${scenario.name}\n${lastError?.stack || lastError?.message || lastError}\n最近 vite 输出：\n${tailLogs(devServerLogs)}`
   )
 }
 
@@ -499,7 +498,7 @@ async function runScenarioOnce(browser, scenario) {
       })
     }
     await page.addInitScript(
-      (mockToken, profileOverride, entryTarget) => {
+      ({ mockToken, profileOverride, entryTarget }) => {
         const fallbackProfile = {
           is_super_admin: true,
           roles: [
@@ -553,9 +552,13 @@ async function runScenarioOnce(browser, scenario) {
           JSON.stringify(profile.erp_preferences || { column_orders: {} })
         )
       },
-      token,
-      scenario.adminProfile || null,
-      String(scenario.path || '').startsWith('/m/') ? 'mobileTasks' : 'desktop'
+      {
+        mockToken: token,
+        profileOverride: scenario.adminProfile || null,
+        entryTarget: String(scenario.path || '').startsWith('/m/')
+          ? 'mobileTasks'
+          : 'desktop',
+      }
     )
   }
 
@@ -5243,92 +5246,6 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     compactText(restoredMetrics.toggleText).includes('展开'),
     `${scenarioName} 收起后按钮应恢复展开: ${JSON.stringify(restoredMetrics)}`
   )
-}
-
-async function verifyFormalShellRowDoubleClickEditModal(
-  page,
-  { rowText, scenarioName, expectedTexts = [] }
-) {
-  const row = page
-    .locator('.erp-business-data-table-card .ant-table-tbody tr')
-    .filter({ hasText: rowText })
-    .first()
-  await row.waitFor({ timeout: 10_000 })
-  await row.dblclick()
-
-  const modal = page
-    .locator('.erp-business-action-modal--form.ant-modal:visible')
-    .filter({ hasText: '当前边界' })
-    .last()
-  await modal.waitFor({ timeout: 10_000 })
-  await expectText(page, '当前页面仍是待接入预览页')
-  await expectText(page, rowText)
-
-  const modalMetrics = await page.evaluate(() => {
-    const isVisible = (node) => {
-      if (!(node instanceof HTMLElement)) return false
-      const rect = node.getBoundingClientRect()
-      const style = window.getComputedStyle(node)
-      return (
-        rect.width > 0 &&
-        rect.height > 0 &&
-        style.display !== 'none' &&
-        style.visibility !== 'hidden'
-      )
-    }
-    return {
-      visibleEditModals: Array.from(document.querySelectorAll('.ant-modal'))
-        .filter(isVisible)
-        .filter((node) =>
-          String(node.textContent || '').includes('当前页面仍是待接入预览页')
-        ).length,
-      visibleFormModals: Array.from(
-        document.querySelectorAll('.erp-business-action-modal--form.ant-modal')
-      ).filter(isVisible).length,
-      textContent: Array.from(
-        document.querySelectorAll('.erp-business-action-modal--form.ant-modal')
-      )
-        .filter(isVisible)
-        .map((node) => String(node.textContent || ''))
-        .join(' ')
-        .replace(/\s+/g, ' ')
-        .trim(),
-      formFieldCount: document.querySelectorAll(
-        '.erp-business-action-modal--form .erp-business-action-form__field'
-      ).length,
-      visibleDetailDrawers: Array.from(document.querySelectorAll('.ant-drawer'))
-        .filter(isVisible)
-        .filter((node) => String(node.textContent || '').includes('旧入口关系'))
-        .length,
-    }
-  })
-  assert.equal(
-    modalMetrics.visibleEditModals,
-    1,
-    `${scenarioName} 双击行应打开编辑动作弹窗: ${JSON.stringify(modalMetrics)}`
-  )
-  assert.equal(
-    modalMetrics.visibleDetailDrawers,
-    0,
-    `${scenarioName} 双击行不应再打开详情抽屉: ${JSON.stringify(modalMetrics)}`
-  )
-  assert.equal(
-    modalMetrics.visibleFormModals,
-    1,
-    `${scenarioName} 双击行应使用业务表单弹窗: ${JSON.stringify(modalMetrics)}`
-  )
-  assert(
-    modalMetrics.formFieldCount >= 8,
-    `${scenarioName} 正式业务壳编辑弹窗字段不足: ${JSON.stringify(modalMetrics)}`
-  )
-  for (const expectedText of expectedTexts) {
-    assert(
-      modalMetrics.textContent.includes(expectedText),
-      `${scenarioName} 编辑弹窗缺少产品核心字段 ${expectedText}: ${JSON.stringify(modalMetrics)}`
-    )
-  }
-
-  await closeBusinessFormModal(page, modal)
 }
 
 async function assertDashboardWorkbenchLayout(page, { scenarioName }) {

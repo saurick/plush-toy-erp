@@ -87,6 +87,7 @@ services:
       - "${APP_GRPC_BIND_ADDR:-127.0.0.1}:${APP_GRPC_PORT:-9300}:9300"
     environment:
       TZ: "${TZ:-Asia/Shanghai}"
+      ERP_CUSTOMER_KEY: "${ERP_CUSTOMER_KEY:-demo}"
       ERP_PDF_CHROME_PATH: "${ERP_PDF_CHROME_PATH:-/usr/bin/chromium}"
       ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-2}"
       ERP_PDF_WARMUP: "${ERP_PDF_WARMUP:-}"

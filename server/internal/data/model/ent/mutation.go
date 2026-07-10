@@ -16392,6 +16392,9 @@ type MaterialMutation struct {
 	quality_inspections                      map[int]struct{}
 	removedquality_inspections               map[int]struct{}
 	clearedquality_inspections               bool
+	outsourcing_order_items                  map[int]struct{}
+	removedoutsourcing_order_items           map[int]struct{}
+	clearedoutsourcing_order_items           bool
 	done                                     bool
 	oldValue                                 func(context.Context) (*Material, error)
 	predicates                               []predicate.Material
@@ -17209,6 +17212,60 @@ func (m *MaterialMutation) ResetQualityInspections() {
 	m.removedquality_inspections = nil
 }
 
+// AddOutsourcingOrderItemIDs adds the "outsourcing_order_items" edge to the OutsourcingOrderItem entity by ids.
+func (m *MaterialMutation) AddOutsourcingOrderItemIDs(ids ...int) {
+	if m.outsourcing_order_items == nil {
+		m.outsourcing_order_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.outsourcing_order_items[ids[i]] = struct{}{}
+	}
+}
+
+// ClearOutsourcingOrderItems clears the "outsourcing_order_items" edge to the OutsourcingOrderItem entity.
+func (m *MaterialMutation) ClearOutsourcingOrderItems() {
+	m.clearedoutsourcing_order_items = true
+}
+
+// OutsourcingOrderItemsCleared reports if the "outsourcing_order_items" edge to the OutsourcingOrderItem entity was cleared.
+func (m *MaterialMutation) OutsourcingOrderItemsCleared() bool {
+	return m.clearedoutsourcing_order_items
+}
+
+// RemoveOutsourcingOrderItemIDs removes the "outsourcing_order_items" edge to the OutsourcingOrderItem entity by IDs.
+func (m *MaterialMutation) RemoveOutsourcingOrderItemIDs(ids ...int) {
+	if m.removedoutsourcing_order_items == nil {
+		m.removedoutsourcing_order_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.outsourcing_order_items, ids[i])
+		m.removedoutsourcing_order_items[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedOutsourcingOrderItems returns the removed IDs of the "outsourcing_order_items" edge to the OutsourcingOrderItem entity.
+func (m *MaterialMutation) RemovedOutsourcingOrderItemsIDs() (ids []int) {
+	for id := range m.removedoutsourcing_order_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// OutsourcingOrderItemsIDs returns the "outsourcing_order_items" edge IDs in the mutation.
+func (m *MaterialMutation) OutsourcingOrderItemsIDs() (ids []int) {
+	for id := range m.outsourcing_order_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetOutsourcingOrderItems resets all changes to the "outsourcing_order_items" edge.
+func (m *MaterialMutation) ResetOutsourcingOrderItems() {
+	m.outsourcing_order_items = nil
+	m.clearedoutsourcing_order_items = false
+	m.removedoutsourcing_order_items = nil
+}
+
 // Where appends a list predicates to the MaterialMutation builder.
 func (m *MaterialMutation) Where(ps ...predicate.Material) {
 	m.predicates = append(m.predicates, ps...)
@@ -17502,7 +17559,7 @@ func (m *MaterialMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *MaterialMutation) AddedEdges() []string {
-	edges := make([]string, 0, 7)
+	edges := make([]string, 0, 8)
 	if m.default_unit != nil {
 		edges = append(edges, material.EdgeDefaultUnit)
 	}
@@ -17523,6 +17580,9 @@ func (m *MaterialMutation) AddedEdges() []string {
 	}
 	if m.quality_inspections != nil {
 		edges = append(edges, material.EdgeQualityInspections)
+	}
+	if m.outsourcing_order_items != nil {
+		edges = append(edges, material.EdgeOutsourcingOrderItems)
 	}
 	return edges
 }
@@ -17571,13 +17631,19 @@ func (m *MaterialMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case material.EdgeOutsourcingOrderItems:
+		ids := make([]ent.Value, 0, len(m.outsourcing_order_items))
+		for id := range m.outsourcing_order_items {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *MaterialMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 7)
+	edges := make([]string, 0, 8)
 	if m.removedbom_items != nil {
 		edges = append(edges, material.EdgeBomItems)
 	}
@@ -17595,6 +17661,9 @@ func (m *MaterialMutation) RemovedEdges() []string {
 	}
 	if m.removedquality_inspections != nil {
 		edges = append(edges, material.EdgeQualityInspections)
+	}
+	if m.removedoutsourcing_order_items != nil {
+		edges = append(edges, material.EdgeOutsourcingOrderItems)
 	}
 	return edges
 }
@@ -17639,13 +17708,19 @@ func (m *MaterialMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case material.EdgeOutsourcingOrderItems:
+		ids := make([]ent.Value, 0, len(m.removedoutsourcing_order_items))
+		for id := range m.removedoutsourcing_order_items {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *MaterialMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 7)
+	edges := make([]string, 0, 8)
 	if m.cleareddefault_unit {
 		edges = append(edges, material.EdgeDefaultUnit)
 	}
@@ -17666,6 +17741,9 @@ func (m *MaterialMutation) ClearedEdges() []string {
 	}
 	if m.clearedquality_inspections {
 		edges = append(edges, material.EdgeQualityInspections)
+	}
+	if m.clearedoutsourcing_order_items {
+		edges = append(edges, material.EdgeOutsourcingOrderItems)
 	}
 	return edges
 }
@@ -17688,6 +17766,8 @@ func (m *MaterialMutation) EdgeCleared(name string) bool {
 		return m.clearedpurchase_receipt_adjustment_items
 	case material.EdgeQualityInspections:
 		return m.clearedquality_inspections
+	case material.EdgeOutsourcingOrderItems:
+		return m.clearedoutsourcing_order_items
 	}
 	return false
 }
@@ -17727,6 +17807,9 @@ func (m *MaterialMutation) ResetEdge(name string) error {
 		return nil
 	case material.EdgeQualityInspections:
 		m.ResetQualityInspections()
+		return nil
+	case material.EdgeOutsourcingOrderItems:
+		m.ResetOutsourcingOrderItems()
 		return nil
 	}
 	return fmt.Errorf("unknown Material edge %s", name)
@@ -20757,9 +20840,12 @@ type OutsourcingOrderItemMutation struct {
 	id                        *int
 	line_no                   *int
 	addline_no                *int
+	subject_type              *string
 	product_no_snapshot       *string
 	product_order_no_snapshot *string
 	product_name_snapshot     *string
+	material_code_snapshot    *string
+	material_name_snapshot    *string
 	process_name_snapshot     *string
 	process_category_snapshot *string
 	unit_name_snapshot        *string
@@ -20776,6 +20862,8 @@ type OutsourcingOrderItemMutation struct {
 	clearedoutsourcing_order  bool
 	product                   *int
 	clearedproduct            bool
+	material                  *int
+	clearedmaterial           bool
 	process                   *int
 	clearedprocess            bool
 	unit                      *int
@@ -20975,6 +21063,42 @@ func (m *OutsourcingOrderItemMutation) ResetLineNo() {
 	m.addline_no = nil
 }
 
+// SetSubjectType sets the "subject_type" field.
+func (m *OutsourcingOrderItemMutation) SetSubjectType(s string) {
+	m.subject_type = &s
+}
+
+// SubjectType returns the value of the "subject_type" field in the mutation.
+func (m *OutsourcingOrderItemMutation) SubjectType() (r string, exists bool) {
+	v := m.subject_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubjectType returns the old "subject_type" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldSubjectType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubjectType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubjectType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubjectType: %w", err)
+	}
+	return oldValue.SubjectType, nil
+}
+
+// ResetSubjectType resets all changes to the "subject_type" field.
+func (m *OutsourcingOrderItemMutation) ResetSubjectType() {
+	m.subject_type = nil
+}
+
 // SetProductID sets the "product_id" field.
 func (m *OutsourcingOrderItemMutation) SetProductID(i int) {
 	m.product = &i
@@ -20992,7 +21116,7 @@ func (m *OutsourcingOrderItemMutation) ProductID() (r int, exists bool) {
 // OldProductID returns the old "product_id" field's value of the OutsourcingOrderItem entity.
 // If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *OutsourcingOrderItemMutation) OldProductID(ctx context.Context) (v int, err error) {
+func (m *OutsourcingOrderItemMutation) OldProductID(ctx context.Context) (v *int, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldProductID is only allowed on UpdateOne operations")
 	}
@@ -21006,9 +21130,71 @@ func (m *OutsourcingOrderItemMutation) OldProductID(ctx context.Context) (v int,
 	return oldValue.ProductID, nil
 }
 
+// ClearProductID clears the value of the "product_id" field.
+func (m *OutsourcingOrderItemMutation) ClearProductID() {
+	m.product = nil
+	m.clearedFields[outsourcingorderitem.FieldProductID] = struct{}{}
+}
+
+// ProductIDCleared returns if the "product_id" field was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) ProductIDCleared() bool {
+	_, ok := m.clearedFields[outsourcingorderitem.FieldProductID]
+	return ok
+}
+
 // ResetProductID resets all changes to the "product_id" field.
 func (m *OutsourcingOrderItemMutation) ResetProductID() {
 	m.product = nil
+	delete(m.clearedFields, outsourcingorderitem.FieldProductID)
+}
+
+// SetMaterialID sets the "material_id" field.
+func (m *OutsourcingOrderItemMutation) SetMaterialID(i int) {
+	m.material = &i
+}
+
+// MaterialID returns the value of the "material_id" field in the mutation.
+func (m *OutsourcingOrderItemMutation) MaterialID() (r int, exists bool) {
+	v := m.material
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMaterialID returns the old "material_id" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldMaterialID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMaterialID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMaterialID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMaterialID: %w", err)
+	}
+	return oldValue.MaterialID, nil
+}
+
+// ClearMaterialID clears the value of the "material_id" field.
+func (m *OutsourcingOrderItemMutation) ClearMaterialID() {
+	m.material = nil
+	m.clearedFields[outsourcingorderitem.FieldMaterialID] = struct{}{}
+}
+
+// MaterialIDCleared returns if the "material_id" field was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) MaterialIDCleared() bool {
+	_, ok := m.clearedFields[outsourcingorderitem.FieldMaterialID]
+	return ok
+}
+
+// ResetMaterialID resets all changes to the "material_id" field.
+func (m *OutsourcingOrderItemMutation) ResetMaterialID() {
+	m.material = nil
+	delete(m.clearedFields, outsourcingorderitem.FieldMaterialID)
 }
 
 // SetProcessID sets the "process_id" field.
@@ -21228,6 +21414,104 @@ func (m *OutsourcingOrderItemMutation) ProductNameSnapshotCleared() bool {
 func (m *OutsourcingOrderItemMutation) ResetProductNameSnapshot() {
 	m.product_name_snapshot = nil
 	delete(m.clearedFields, outsourcingorderitem.FieldProductNameSnapshot)
+}
+
+// SetMaterialCodeSnapshot sets the "material_code_snapshot" field.
+func (m *OutsourcingOrderItemMutation) SetMaterialCodeSnapshot(s string) {
+	m.material_code_snapshot = &s
+}
+
+// MaterialCodeSnapshot returns the value of the "material_code_snapshot" field in the mutation.
+func (m *OutsourcingOrderItemMutation) MaterialCodeSnapshot() (r string, exists bool) {
+	v := m.material_code_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMaterialCodeSnapshot returns the old "material_code_snapshot" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldMaterialCodeSnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMaterialCodeSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMaterialCodeSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMaterialCodeSnapshot: %w", err)
+	}
+	return oldValue.MaterialCodeSnapshot, nil
+}
+
+// ClearMaterialCodeSnapshot clears the value of the "material_code_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ClearMaterialCodeSnapshot() {
+	m.material_code_snapshot = nil
+	m.clearedFields[outsourcingorderitem.FieldMaterialCodeSnapshot] = struct{}{}
+}
+
+// MaterialCodeSnapshotCleared returns if the "material_code_snapshot" field was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) MaterialCodeSnapshotCleared() bool {
+	_, ok := m.clearedFields[outsourcingorderitem.FieldMaterialCodeSnapshot]
+	return ok
+}
+
+// ResetMaterialCodeSnapshot resets all changes to the "material_code_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ResetMaterialCodeSnapshot() {
+	m.material_code_snapshot = nil
+	delete(m.clearedFields, outsourcingorderitem.FieldMaterialCodeSnapshot)
+}
+
+// SetMaterialNameSnapshot sets the "material_name_snapshot" field.
+func (m *OutsourcingOrderItemMutation) SetMaterialNameSnapshot(s string) {
+	m.material_name_snapshot = &s
+}
+
+// MaterialNameSnapshot returns the value of the "material_name_snapshot" field in the mutation.
+func (m *OutsourcingOrderItemMutation) MaterialNameSnapshot() (r string, exists bool) {
+	v := m.material_name_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMaterialNameSnapshot returns the old "material_name_snapshot" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldMaterialNameSnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMaterialNameSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMaterialNameSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMaterialNameSnapshot: %w", err)
+	}
+	return oldValue.MaterialNameSnapshot, nil
+}
+
+// ClearMaterialNameSnapshot clears the value of the "material_name_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ClearMaterialNameSnapshot() {
+	m.material_name_snapshot = nil
+	m.clearedFields[outsourcingorderitem.FieldMaterialNameSnapshot] = struct{}{}
+}
+
+// MaterialNameSnapshotCleared returns if the "material_name_snapshot" field was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) MaterialNameSnapshotCleared() bool {
+	_, ok := m.clearedFields[outsourcingorderitem.FieldMaterialNameSnapshot]
+	return ok
+}
+
+// ResetMaterialNameSnapshot resets all changes to the "material_name_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ResetMaterialNameSnapshot() {
+	m.material_name_snapshot = nil
+	delete(m.clearedFields, outsourcingorderitem.FieldMaterialNameSnapshot)
 }
 
 // SetProcessNameSnapshot sets the "process_name_snapshot" field.
@@ -21752,7 +22036,7 @@ func (m *OutsourcingOrderItemMutation) ClearProduct() {
 
 // ProductCleared reports if the "product" edge to the Product entity was cleared.
 func (m *OutsourcingOrderItemMutation) ProductCleared() bool {
-	return m.clearedproduct
+	return m.ProductIDCleared() || m.clearedproduct
 }
 
 // ProductIDs returns the "product" edge IDs in the mutation.
@@ -21769,6 +22053,33 @@ func (m *OutsourcingOrderItemMutation) ProductIDs() (ids []int) {
 func (m *OutsourcingOrderItemMutation) ResetProduct() {
 	m.product = nil
 	m.clearedproduct = false
+}
+
+// ClearMaterial clears the "material" edge to the Material entity.
+func (m *OutsourcingOrderItemMutation) ClearMaterial() {
+	m.clearedmaterial = true
+	m.clearedFields[outsourcingorderitem.FieldMaterialID] = struct{}{}
+}
+
+// MaterialCleared reports if the "material" edge to the Material entity was cleared.
+func (m *OutsourcingOrderItemMutation) MaterialCleared() bool {
+	return m.MaterialIDCleared() || m.clearedmaterial
+}
+
+// MaterialIDs returns the "material" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// MaterialID instead. It exists only for internal usage by the builders.
+func (m *OutsourcingOrderItemMutation) MaterialIDs() (ids []int) {
+	if id := m.material; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetMaterial resets all changes to the "material" edge.
+func (m *OutsourcingOrderItemMutation) ResetMaterial() {
+	m.material = nil
+	m.clearedmaterial = false
 }
 
 // ClearProcess clears the "process" edge to the Process entity.
@@ -21859,15 +22170,21 @@ func (m *OutsourcingOrderItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OutsourcingOrderItemMutation) Fields() []string {
-	fields := make([]string, 0, 19)
+	fields := make([]string, 0, 23)
 	if m.outsourcing_order != nil {
 		fields = append(fields, outsourcingorderitem.FieldOutsourcingOrderID)
 	}
 	if m.line_no != nil {
 		fields = append(fields, outsourcingorderitem.FieldLineNo)
 	}
+	if m.subject_type != nil {
+		fields = append(fields, outsourcingorderitem.FieldSubjectType)
+	}
 	if m.product != nil {
 		fields = append(fields, outsourcingorderitem.FieldProductID)
+	}
+	if m.material != nil {
+		fields = append(fields, outsourcingorderitem.FieldMaterialID)
 	}
 	if m.process != nil {
 		fields = append(fields, outsourcingorderitem.FieldProcessID)
@@ -21883,6 +22200,12 @@ func (m *OutsourcingOrderItemMutation) Fields() []string {
 	}
 	if m.product_name_snapshot != nil {
 		fields = append(fields, outsourcingorderitem.FieldProductNameSnapshot)
+	}
+	if m.material_code_snapshot != nil {
+		fields = append(fields, outsourcingorderitem.FieldMaterialCodeSnapshot)
+	}
+	if m.material_name_snapshot != nil {
+		fields = append(fields, outsourcingorderitem.FieldMaterialNameSnapshot)
 	}
 	if m.process_name_snapshot != nil {
 		fields = append(fields, outsourcingorderitem.FieldProcessNameSnapshot)
@@ -21929,8 +22252,12 @@ func (m *OutsourcingOrderItemMutation) Field(name string) (ent.Value, bool) {
 		return m.OutsourcingOrderID()
 	case outsourcingorderitem.FieldLineNo:
 		return m.LineNo()
+	case outsourcingorderitem.FieldSubjectType:
+		return m.SubjectType()
 	case outsourcingorderitem.FieldProductID:
 		return m.ProductID()
+	case outsourcingorderitem.FieldMaterialID:
+		return m.MaterialID()
 	case outsourcingorderitem.FieldProcessID:
 		return m.ProcessID()
 	case outsourcingorderitem.FieldUnitID:
@@ -21941,6 +22268,10 @@ func (m *OutsourcingOrderItemMutation) Field(name string) (ent.Value, bool) {
 		return m.ProductOrderNoSnapshot()
 	case outsourcingorderitem.FieldProductNameSnapshot:
 		return m.ProductNameSnapshot()
+	case outsourcingorderitem.FieldMaterialCodeSnapshot:
+		return m.MaterialCodeSnapshot()
+	case outsourcingorderitem.FieldMaterialNameSnapshot:
+		return m.MaterialNameSnapshot()
 	case outsourcingorderitem.FieldProcessNameSnapshot:
 		return m.ProcessNameSnapshot()
 	case outsourcingorderitem.FieldProcessCategorySnapshot:
@@ -21976,8 +22307,12 @@ func (m *OutsourcingOrderItemMutation) OldField(ctx context.Context, name string
 		return m.OldOutsourcingOrderID(ctx)
 	case outsourcingorderitem.FieldLineNo:
 		return m.OldLineNo(ctx)
+	case outsourcingorderitem.FieldSubjectType:
+		return m.OldSubjectType(ctx)
 	case outsourcingorderitem.FieldProductID:
 		return m.OldProductID(ctx)
+	case outsourcingorderitem.FieldMaterialID:
+		return m.OldMaterialID(ctx)
 	case outsourcingorderitem.FieldProcessID:
 		return m.OldProcessID(ctx)
 	case outsourcingorderitem.FieldUnitID:
@@ -21988,6 +22323,10 @@ func (m *OutsourcingOrderItemMutation) OldField(ctx context.Context, name string
 		return m.OldProductOrderNoSnapshot(ctx)
 	case outsourcingorderitem.FieldProductNameSnapshot:
 		return m.OldProductNameSnapshot(ctx)
+	case outsourcingorderitem.FieldMaterialCodeSnapshot:
+		return m.OldMaterialCodeSnapshot(ctx)
+	case outsourcingorderitem.FieldMaterialNameSnapshot:
+		return m.OldMaterialNameSnapshot(ctx)
 	case outsourcingorderitem.FieldProcessNameSnapshot:
 		return m.OldProcessNameSnapshot(ctx)
 	case outsourcingorderitem.FieldProcessCategorySnapshot:
@@ -22033,12 +22372,26 @@ func (m *OutsourcingOrderItemMutation) SetField(name string, value ent.Value) er
 		}
 		m.SetLineNo(v)
 		return nil
+	case outsourcingorderitem.FieldSubjectType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubjectType(v)
+		return nil
 	case outsourcingorderitem.FieldProductID:
 		v, ok := value.(int)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetProductID(v)
+		return nil
+	case outsourcingorderitem.FieldMaterialID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMaterialID(v)
 		return nil
 	case outsourcingorderitem.FieldProcessID:
 		v, ok := value.(int)
@@ -22074,6 +22427,20 @@ func (m *OutsourcingOrderItemMutation) SetField(name string, value ent.Value) er
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetProductNameSnapshot(v)
+		return nil
+	case outsourcingorderitem.FieldMaterialCodeSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMaterialCodeSnapshot(v)
+		return nil
+	case outsourcingorderitem.FieldMaterialNameSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMaterialNameSnapshot(v)
 		return nil
 	case outsourcingorderitem.FieldProcessNameSnapshot:
 		v, ok := value.(string)
@@ -22197,6 +22564,12 @@ func (m *OutsourcingOrderItemMutation) AddField(name string, value ent.Value) er
 // mutation.
 func (m *OutsourcingOrderItemMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(outsourcingorderitem.FieldProductID) {
+		fields = append(fields, outsourcingorderitem.FieldProductID)
+	}
+	if m.FieldCleared(outsourcingorderitem.FieldMaterialID) {
+		fields = append(fields, outsourcingorderitem.FieldMaterialID)
+	}
 	if m.FieldCleared(outsourcingorderitem.FieldProductNoSnapshot) {
 		fields = append(fields, outsourcingorderitem.FieldProductNoSnapshot)
 	}
@@ -22205,6 +22578,12 @@ func (m *OutsourcingOrderItemMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(outsourcingorderitem.FieldProductNameSnapshot) {
 		fields = append(fields, outsourcingorderitem.FieldProductNameSnapshot)
+	}
+	if m.FieldCleared(outsourcingorderitem.FieldMaterialCodeSnapshot) {
+		fields = append(fields, outsourcingorderitem.FieldMaterialCodeSnapshot)
+	}
+	if m.FieldCleared(outsourcingorderitem.FieldMaterialNameSnapshot) {
+		fields = append(fields, outsourcingorderitem.FieldMaterialNameSnapshot)
 	}
 	if m.FieldCleared(outsourcingorderitem.FieldProcessNameSnapshot) {
 		fields = append(fields, outsourcingorderitem.FieldProcessNameSnapshot)
@@ -22241,6 +22620,12 @@ func (m *OutsourcingOrderItemMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *OutsourcingOrderItemMutation) ClearField(name string) error {
 	switch name {
+	case outsourcingorderitem.FieldProductID:
+		m.ClearProductID()
+		return nil
+	case outsourcingorderitem.FieldMaterialID:
+		m.ClearMaterialID()
+		return nil
 	case outsourcingorderitem.FieldProductNoSnapshot:
 		m.ClearProductNoSnapshot()
 		return nil
@@ -22249,6 +22634,12 @@ func (m *OutsourcingOrderItemMutation) ClearField(name string) error {
 		return nil
 	case outsourcingorderitem.FieldProductNameSnapshot:
 		m.ClearProductNameSnapshot()
+		return nil
+	case outsourcingorderitem.FieldMaterialCodeSnapshot:
+		m.ClearMaterialCodeSnapshot()
+		return nil
+	case outsourcingorderitem.FieldMaterialNameSnapshot:
+		m.ClearMaterialNameSnapshot()
 		return nil
 	case outsourcingorderitem.FieldProcessNameSnapshot:
 		m.ClearProcessNameSnapshot()
@@ -22285,8 +22676,14 @@ func (m *OutsourcingOrderItemMutation) ResetField(name string) error {
 	case outsourcingorderitem.FieldLineNo:
 		m.ResetLineNo()
 		return nil
+	case outsourcingorderitem.FieldSubjectType:
+		m.ResetSubjectType()
+		return nil
 	case outsourcingorderitem.FieldProductID:
 		m.ResetProductID()
+		return nil
+	case outsourcingorderitem.FieldMaterialID:
+		m.ResetMaterialID()
 		return nil
 	case outsourcingorderitem.FieldProcessID:
 		m.ResetProcessID()
@@ -22302,6 +22699,12 @@ func (m *OutsourcingOrderItemMutation) ResetField(name string) error {
 		return nil
 	case outsourcingorderitem.FieldProductNameSnapshot:
 		m.ResetProductNameSnapshot()
+		return nil
+	case outsourcingorderitem.FieldMaterialCodeSnapshot:
+		m.ResetMaterialCodeSnapshot()
+		return nil
+	case outsourcingorderitem.FieldMaterialNameSnapshot:
+		m.ResetMaterialNameSnapshot()
 		return nil
 	case outsourcingorderitem.FieldProcessNameSnapshot:
 		m.ResetProcessNameSnapshot()
@@ -22342,12 +22745,15 @@ func (m *OutsourcingOrderItemMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *OutsourcingOrderItemMutation) AddedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.outsourcing_order != nil {
 		edges = append(edges, outsourcingorderitem.EdgeOutsourcingOrder)
 	}
 	if m.product != nil {
 		edges = append(edges, outsourcingorderitem.EdgeProduct)
+	}
+	if m.material != nil {
+		edges = append(edges, outsourcingorderitem.EdgeMaterial)
 	}
 	if m.process != nil {
 		edges = append(edges, outsourcingorderitem.EdgeProcess)
@@ -22370,6 +22776,10 @@ func (m *OutsourcingOrderItemMutation) AddedIDs(name string) []ent.Value {
 		if id := m.product; id != nil {
 			return []ent.Value{*id}
 		}
+	case outsourcingorderitem.EdgeMaterial:
+		if id := m.material; id != nil {
+			return []ent.Value{*id}
+		}
 	case outsourcingorderitem.EdgeProcess:
 		if id := m.process; id != nil {
 			return []ent.Value{*id}
@@ -22384,7 +22794,7 @@ func (m *OutsourcingOrderItemMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *OutsourcingOrderItemMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	return edges
 }
 
@@ -22396,12 +22806,15 @@ func (m *OutsourcingOrderItemMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *OutsourcingOrderItemMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.clearedoutsourcing_order {
 		edges = append(edges, outsourcingorderitem.EdgeOutsourcingOrder)
 	}
 	if m.clearedproduct {
 		edges = append(edges, outsourcingorderitem.EdgeProduct)
+	}
+	if m.clearedmaterial {
+		edges = append(edges, outsourcingorderitem.EdgeMaterial)
 	}
 	if m.clearedprocess {
 		edges = append(edges, outsourcingorderitem.EdgeProcess)
@@ -22420,6 +22833,8 @@ func (m *OutsourcingOrderItemMutation) EdgeCleared(name string) bool {
 		return m.clearedoutsourcing_order
 	case outsourcingorderitem.EdgeProduct:
 		return m.clearedproduct
+	case outsourcingorderitem.EdgeMaterial:
+		return m.clearedmaterial
 	case outsourcingorderitem.EdgeProcess:
 		return m.clearedprocess
 	case outsourcingorderitem.EdgeUnit:
@@ -22437,6 +22852,9 @@ func (m *OutsourcingOrderItemMutation) ClearEdge(name string) error {
 		return nil
 	case outsourcingorderitem.EdgeProduct:
 		m.ClearProduct()
+		return nil
+	case outsourcingorderitem.EdgeMaterial:
+		m.ClearMaterial()
 		return nil
 	case outsourcingorderitem.EdgeProcess:
 		m.ClearProcess()
@@ -22457,6 +22875,9 @@ func (m *OutsourcingOrderItemMutation) ResetEdge(name string) error {
 		return nil
 	case outsourcingorderitem.EdgeProduct:
 		m.ResetProduct()
+		return nil
+	case outsourcingorderitem.EdgeMaterial:
+		m.ResetMaterial()
 		return nil
 	case outsourcingorderitem.EdgeProcess:
 		m.ResetProcess()
@@ -45165,8 +45586,6 @@ type RoleProfileMutation struct {
 	disabled          *bool
 	bundle_keys       *[]string
 	appendbundle_keys []string
-	grants            *[]string
-	appendgrants      []string
 	revokes           *[]string
 	appendrevokes     []string
 	created_at        *time.Time
@@ -45520,71 +45939,6 @@ func (m *RoleProfileMutation) ResetBundleKeys() {
 	delete(m.clearedFields, roleprofile.FieldBundleKeys)
 }
 
-// SetGrants sets the "grants" field.
-func (m *RoleProfileMutation) SetGrants(s []string) {
-	m.grants = &s
-	m.appendgrants = nil
-}
-
-// Grants returns the value of the "grants" field in the mutation.
-func (m *RoleProfileMutation) Grants() (r []string, exists bool) {
-	v := m.grants
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldGrants returns the old "grants" field's value of the RoleProfile entity.
-// If the RoleProfile object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *RoleProfileMutation) OldGrants(ctx context.Context) (v []string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldGrants is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldGrants requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldGrants: %w", err)
-	}
-	return oldValue.Grants, nil
-}
-
-// AppendGrants adds s to the "grants" field.
-func (m *RoleProfileMutation) AppendGrants(s []string) {
-	m.appendgrants = append(m.appendgrants, s...)
-}
-
-// AppendedGrants returns the list of values that were appended to the "grants" field in this mutation.
-func (m *RoleProfileMutation) AppendedGrants() ([]string, bool) {
-	if len(m.appendgrants) == 0 {
-		return nil, false
-	}
-	return m.appendgrants, true
-}
-
-// ClearGrants clears the value of the "grants" field.
-func (m *RoleProfileMutation) ClearGrants() {
-	m.grants = nil
-	m.appendgrants = nil
-	m.clearedFields[roleprofile.FieldGrants] = struct{}{}
-}
-
-// GrantsCleared returns if the "grants" field was cleared in this mutation.
-func (m *RoleProfileMutation) GrantsCleared() bool {
-	_, ok := m.clearedFields[roleprofile.FieldGrants]
-	return ok
-}
-
-// ResetGrants resets all changes to the "grants" field.
-func (m *RoleProfileMutation) ResetGrants() {
-	m.grants = nil
-	m.appendgrants = nil
-	delete(m.clearedFields, roleprofile.FieldGrants)
-}
-
 // SetRevokes sets the "revokes" field.
 func (m *RoleProfileMutation) SetRevokes(s []string) {
 	m.revokes = &s
@@ -45756,7 +46110,7 @@ func (m *RoleProfileMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *RoleProfileMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 9)
 	if m.customer_key != nil {
 		fields = append(fields, roleprofile.FieldCustomerKey)
 	}
@@ -45774,9 +46128,6 @@ func (m *RoleProfileMutation) Fields() []string {
 	}
 	if m.bundle_keys != nil {
 		fields = append(fields, roleprofile.FieldBundleKeys)
-	}
-	if m.grants != nil {
-		fields = append(fields, roleprofile.FieldGrants)
 	}
 	if m.revokes != nil {
 		fields = append(fields, roleprofile.FieldRevokes)
@@ -45807,8 +46158,6 @@ func (m *RoleProfileMutation) Field(name string) (ent.Value, bool) {
 		return m.Disabled()
 	case roleprofile.FieldBundleKeys:
 		return m.BundleKeys()
-	case roleprofile.FieldGrants:
-		return m.Grants()
 	case roleprofile.FieldRevokes:
 		return m.Revokes()
 	case roleprofile.FieldCreatedAt:
@@ -45836,8 +46185,6 @@ func (m *RoleProfileMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldDisabled(ctx)
 	case roleprofile.FieldBundleKeys:
 		return m.OldBundleKeys(ctx)
-	case roleprofile.FieldGrants:
-		return m.OldGrants(ctx)
 	case roleprofile.FieldRevokes:
 		return m.OldRevokes(ctx)
 	case roleprofile.FieldCreatedAt:
@@ -45895,13 +46242,6 @@ func (m *RoleProfileMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetBundleKeys(v)
 		return nil
-	case roleprofile.FieldGrants:
-		v, ok := value.([]string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetGrants(v)
-		return nil
 	case roleprofile.FieldRevokes:
 		v, ok := value.([]string)
 		if !ok {
@@ -45956,9 +46296,6 @@ func (m *RoleProfileMutation) ClearedFields() []string {
 	if m.FieldCleared(roleprofile.FieldBundleKeys) {
 		fields = append(fields, roleprofile.FieldBundleKeys)
 	}
-	if m.FieldCleared(roleprofile.FieldGrants) {
-		fields = append(fields, roleprofile.FieldGrants)
-	}
 	if m.FieldCleared(roleprofile.FieldRevokes) {
 		fields = append(fields, roleprofile.FieldRevokes)
 	}
@@ -45978,9 +46315,6 @@ func (m *RoleProfileMutation) ClearField(name string) error {
 	switch name {
 	case roleprofile.FieldBundleKeys:
 		m.ClearBundleKeys()
-		return nil
-	case roleprofile.FieldGrants:
-		m.ClearGrants()
 		return nil
 	case roleprofile.FieldRevokes:
 		m.ClearRevokes()
@@ -46010,9 +46344,6 @@ func (m *RoleProfileMutation) ResetField(name string) error {
 		return nil
 	case roleprofile.FieldBundleKeys:
 		m.ResetBundleKeys()
-		return nil
-	case roleprofile.FieldGrants:
-		m.ResetGrants()
 		return nil
 	case roleprofile.FieldRevokes:
 		m.ResetRevokes()

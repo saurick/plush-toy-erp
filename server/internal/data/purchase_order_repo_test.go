@@ -110,6 +110,7 @@ func TestPurchaseOrderRepoSaveLifecycleAndReceiptLink(t *testing.T) {
 	if receiptLine.PurchaseOrderItemID == nil || *receiptLine.PurchaseOrderItemID != result.Items[0].ID {
 		t.Fatalf("expected receipt line linked to purchase order item, got %#v", receiptLine)
 	}
+	passAllPurchaseReceiptQualityInspections(t, ctx, inventoryUC, receipt.ID)
 	posted, err := inventoryUC.PostPurchaseReceipt(ctx, receipt.ID)
 	if err != nil {
 		t.Fatalf("post receipt linked to historical purchase order line should allow inactive material/unit: %v", err)

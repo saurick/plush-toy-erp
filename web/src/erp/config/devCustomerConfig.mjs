@@ -1297,13 +1297,6 @@ export function buildImportToolingSummary(
         note: '只生成候选、冲突和未决队列预览，不写客户业务表。',
       },
       {
-        key: 'execute-report',
-        title: '导入执行报告',
-        command: `node scripts/import/customerImportExecute.mjs --dry-run-package ${outputBasePath}/import-dry-run --approval ${fixtureBasePath}/import-approval.sample.json --backup-evidence ${outputBasePath}/backup-evidence.txt --out ${outputBasePath}/import-execution`,
-        status: 'report_gate_only',
-        note: '默认报告模式，不执行真实导入；真实执行必须另行具备批准、备份和确认短语。',
-      },
-      {
         key: 'release-readback-preflight',
         title: '客户配置读回预检',
         command: releaseReadbackPreflightCommand,

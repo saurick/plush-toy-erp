@@ -617,9 +617,9 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
     getPresetCopyText('customer-import-tooling'),
     /customerSourceManifestCheck\.test\.mjs/
   )
-  assert.match(
+  assert.doesNotMatch(
     getPresetCopyText('customer-import-tooling'),
-    /customerImportExecute\.test\.mjs/
+    /customerImportExecute|--execute/
   )
   assert.match(
     getPreset('customer-import-tooling').description,

@@ -195,6 +195,7 @@ func createDebugOutsourcingOrderWithProcess(t *testing.T, ctx context.Context, c
 	if _, err := client.OutsourcingOrderItem.Create().
 		SetOutsourcingOrderID(order.ID).
 		SetLineNo(1).
+		SetSubjectType(biz.OutsourcingOrderSubjectProduct).
 		SetProductID(fixtures.productID).
 		SetProcessID(process.ID).
 		SetUnitID(fixtures.unitID).

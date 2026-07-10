@@ -26,7 +26,7 @@ const ALLOWED_MODES = Object.freeze(["validate", "compile", "preview"]);
 const ROLE_KEY_BY_POOL = Object.freeze({
   boss: "boss",
   sales: "sales",
-  purchase: "purchasing",
+  purchase: "purchase",
   warehouse: "warehouse",
   quality: "quality",
   finance: "finance",
@@ -49,6 +49,14 @@ const MODULE_KEY_BY_POOL = Object.freeze({
 
 const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
   boss: Object.freeze([
+    "erp.dashboard.read",
+    "erp.print_template.read",
+    "supplier.read",
+    "contact.read",
+    "material.read",
+    "warehouse.inventory.read",
+    "purchase.order.read",
+    "purchase.order.approve",
     "workflow.task.read",
     "workflow.task.update",
     "workflow.task.approve",
@@ -56,12 +64,17 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "mobile.boss.access",
   ]),
   sales: Object.freeze([
+    "erp.dashboard.read",
+    "erp.print_template.read",
     "customer.read",
     "customer.create",
     "customer.update",
     "contact.read",
     "contact.create",
     "contact.update",
+    "material.read",
+    "product.read",
+    "product_sku.read",
     "sales_order.read",
     "sales_order.create",
     "sales_order.update",
@@ -70,9 +83,7 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "sales_order.close",
     "sales_order.cancel",
     "sales_order_item.read",
-    "sales_order_item.create",
-    "sales_order_item.update",
-    "sales_order_item.cancel",
+    "warehouse.inventory.read",
     "shipment.read",
     "shipment.create",
     "workflow.task.read",
@@ -81,6 +92,8 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "mobile.sales.access",
   ]),
   purchase: Object.freeze([
+    "erp.dashboard.read",
+    "erp.print_template.read",
     "supplier.read",
     "supplier.create",
     "supplier.update",
@@ -90,12 +103,22 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "purchase.order.update",
     "purchase.receipt.read",
     "purchase.receipt.create",
+    "warehouse.inventory.read",
     "workflow.task.read",
     "workflow.task.update",
     "workflow.task.complete",
     "mobile.purchase.access",
   ]),
   warehouse: Object.freeze([
+    "erp.dashboard.read",
+    "customer.read",
+    "supplier.read",
+    "material.read",
+    "product.read",
+    "product_sku.read",
+    "sales_order.read",
+    "sales_order_item.read",
+    "purchase.receipt.read",
     "warehouse.inventory.read",
     "warehouse.inbound.read",
     "warehouse.inbound.confirm",
@@ -112,6 +135,11 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "mobile.warehouse.access",
   ]),
   quality: Object.freeze([
+    "erp.dashboard.read",
+    "supplier.read",
+    "material.read",
+    "purchase.receipt.read",
+    "warehouse.inventory.read",
     "quality.inspection.read",
     "quality.inspection.create",
     "quality.inspection.update",
@@ -123,6 +151,16 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "mobile.quality.access",
   ]),
   finance: Object.freeze([
+    "erp.dashboard.read",
+    "erp.print_template.read",
+    "customer.read",
+    "material.read",
+    "product.read",
+    "product_sku.read",
+    "sales_order.read",
+    "sales_order_item.read",
+    "warehouse.inventory.read",
+    "shipment.read",
     "finance.payable.read",
     "finance.payable.confirm",
     "finance.receivable.read",
@@ -135,6 +173,8 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "mobile.finance.access",
   ]),
   pmc: Object.freeze([
+    "erp.dashboard.read",
+    "material.read",
     "product.read",
     "product.create",
     "product.update",
@@ -156,6 +196,8 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "mobile.pmc.access",
   ]),
   engineering: Object.freeze([
+    "erp.dashboard.read",
+    "erp.print_template.read",
     "material.read",
     "process.read",
     "process.create",
@@ -176,9 +218,17 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "mobile.engineering.access",
   ]),
   production: Object.freeze([
+    "erp.dashboard.read",
+    "erp.print_template.read",
+    "supplier.read",
     "outsourcing.order.read",
     "outsourcing.order.create",
     "outsourcing.order.update",
+    "outsourcing.order.confirm",
+    "contact.read",
+    "material.read",
+    "process.read",
+    "product.read",
     "pmc.plan.read",
     "pmc.plan.update",
     "pmc.risk.read",
@@ -232,7 +282,7 @@ const RUNTIME_FIELD_POLICY_SURFACES = Object.freeze({
 const RUNTIME_DOMAIN_COMMAND_KEYS = Object.freeze([
   "sales_order.submit",
   "purchase_receipt.create",
-  "quality_inspection.decide",
+  "quality_inspection.aggregate_gate",
   "inventory.post_inbound",
   "finance.receivable_lead",
 ]);
@@ -262,6 +312,13 @@ const SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS = Object.freeze([
     module_key: "workflow_tasks",
     display_name: "销售订单审批责任池",
     description: "derived from sales order acceptance process definition",
+  }),
+  Object.freeze({
+    pool_key: "engineering_data",
+    source_pool_key: "engineering",
+    module_key: "products",
+    display_name: "销售订单工程资料责任池",
+    description: "derived from customer sales order acceptance process definition",
   }),
   Object.freeze({
     pool_key: "order_review",
@@ -355,30 +412,33 @@ const MATERIAL_SUPPLY_FACT_COMMAND_CONTRACTS = Object.freeze({
       "server/internal/service/jsonrpc_purchase_test.go: TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresDomainPermissions",
     ]),
     runtime_loader_blockers: Object.freeze([]),
+    runtime_execute_blockers: Object.freeze([]),
   }),
   incoming_qc: Object.freeze({
-    command_key: "quality_inspection.decide",
+    command_key: "quality_inspection.aggregate_gate",
     required_before_runtime_loader: false,
     writes_fact: false,
     runtime_binding_status: "process_runtime_handler_registered",
     process_runtime_handler_registered: true,
-    domain_owner: "Quality / InventoryUsecase",
-    domain_usecase_binding: "InventoryUsecase.PassQualityInspection / InventoryUsecase.RejectQualityInspection",
-    jsonrpc_method: "quality.pass_quality_inspection / quality.reject_quality_inspection",
+    domain_owner: "Quality gate / InventoryUsecase",
+    domain_usecase_binding: "InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
+    jsonrpc_method: "customer_config.execute_material_supply_quality_gate",
     required_permission_key: "quality.inspection.update",
     jsonrpc_allowed_permission_keys: Object.freeze(["quality.inspection.update"]),
-    stable_business_ref: "quality_inspection_id + purchase_receipt_id + inventory_lot_id",
+    stable_business_ref: "purchase_receipt_id -> every purchase_receipt_item + quality_inspection + inventory_lot",
     idempotency_boundary:
-      "quality inspection decision replay is idempotent; future runtime command must still provide process idempotency key",
+      "gate evaluation never decides line inspections or writes domain facts; ProcessRuntime still requires active node, expected version and idempotency key",
     required_test_anchors: Object.freeze([
-      "server/internal/biz/quality_inspection_process_command_test.go: TestQualityInspectionProcessDomainCommandDecidePassBindsUsecase",
-      "server/internal/biz/quality_inspection_process_command_test.go: TestQualityInspectionProcessDomainCommandDecideRejectBindsUsecase",
-      "server/internal/biz/quality_inspection_process_command_test.go: TestQualityInspectionProcessDomainCommandDecideRejectsMismatchedStableRefs",
-      "server/internal/data/inventory_repo_quality_inspection_test.go: TestInventoryRepo_QualityInspectionLifecycleAndLotStatus",
-      "server/internal/service/jsonrpc_quality_test.go: TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryTxn",
-      "server/internal/service/jsonrpc_quality_test.go: TestJsonrpcDispatcher_QualityInspectionAPIRequiresDomainPermissions",
+      "server/internal/biz/quality_inspection_process_command_test.go: TestIncomingQualityGateProcessDomainCommandPassesOnlyAfterAggregateReady",
+      "server/internal/biz/quality_inspection_process_command_test.go: TestIncomingQualityGateProcessDomainCommandRejectBlocksProcess",
+      "server/internal/biz/quality_inspection_process_command_test.go: TestIncomingQualityGateProcessDomainCommandKeepsPendingNodeActive",
+      "server/internal/biz/quality_inspection_process_command_test.go: TestIncomingQualityGateProcessDomainCommandRejectsLegacyInspectionID",
+      "server/internal/data/purchase_receipt_order_quantity_test.go: TestMaterialSupplyReceiptCreatesLineQualityGateBeforeInventoryPost",
+      "server/internal/data/inventory_postgres_purchase_receipt_test.go: TestPurchaseReceiptPostgresMaterialSupplyMultiLineQualityGate",
+      "server/internal/service/jsonrpc_customer_config_test.go: TestCustomerConfigJSONRPCExecuteMaterialSupplyQualityAndInbound",
     ]),
     runtime_loader_blockers: Object.freeze([]),
+    runtime_execute_blockers: Object.freeze([]),
   }),
   warehouse_inbound: Object.freeze({
     command_key: "inventory.post_inbound",
@@ -403,6 +463,7 @@ const MATERIAL_SUPPLY_FACT_COMMAND_CONTRACTS = Object.freeze({
       "server/internal/service/jsonrpc_purchase_test.go: TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresDomainPermissions",
     ]),
     runtime_loader_blockers: Object.freeze([]),
+    runtime_execute_blockers: Object.freeze([]),
   }),
 });
 
@@ -531,6 +592,7 @@ function materialSupplyFactCommandContract(nodeKey) {
     jsonrpc_allowed_permission_keys: [...contract.jsonrpc_allowed_permission_keys],
     required_test_anchors: [...contract.required_test_anchors],
     runtime_loader_blockers: [...contract.runtime_loader_blockers],
+    runtime_execute_blockers: [...contract.runtime_execute_blockers],
   };
 }
 
@@ -673,20 +735,63 @@ function roleKeyForPool(poolKey, overrides = {}) {
   return overrides[poolKey] || ROLE_KEY_BY_POOL[poolKey];
 }
 
-function roleProfilesFromCatalog(catalog) {
+function configuredRoleProfiles(config) {
+  if (!Array.isArray(config.roleProfiles)) {
+    return new Map();
+  }
+  return new Map(config.roleProfiles.map((profile) => [profile.roleKey, profile]));
+}
+
+function rolePageProjectionsFromPackage(config, catalog) {
+  const pagesByKey = new Map(catalog.pages.map((page) => [page.key, page]));
+  const configuredProfiles = configuredRoleProfiles(config);
+  const projections = {};
+  for (const pool of catalog.workPools) {
+    const roleKey = ROLE_KEY_BY_POOL[pool.key];
+    assert(roleKey, `work pool ${pool.key} does not have a role key mapping`);
+    const profile = configuredProfiles.get(roleKey);
+    const capabilityKeys = new Set(
+      uniqueSorted(profile?.capabilityKeys || ROLE_CAPABILITY_KEYS_BY_POOL[roleKey] || []),
+    );
+    const pageKeys = profile
+      ? uniqueSorted(profile.menuSurfaces || [])
+      : uniqueSorted(
+        catalog.pages
+          .filter((page) =>
+            uniqueSorted(page.requiredCapabilityKeys || []).every((capabilityKey) =>
+              capabilityKeys.has(capabilityKey),
+            ),
+          )
+          .map((page) => page.key),
+      );
+    assert(pageKeys.length > 0, `${roleKey} role profile must resolve at least one runtime page`);
+    for (const pageKey of pageKeys) {
+      const page = pagesByKey.get(pageKey);
+      assert(page, `${roleKey}.menuSurfaces contains unknown runtime page: ${pageKey}`);
+      for (const capabilityKey of uniqueSorted(page.requiredCapabilityKeys || [])) {
+        assert(
+          capabilityKeys.has(capabilityKey),
+          `${roleKey} page ${pageKey} requires capability ${capabilityKey}`,
+        );
+      }
+    }
+    projections[roleKey] = pageKeys;
+  }
+  return projections;
+}
+
+function roleProfilesFromPackage(config, catalog) {
+  const configuredProfiles = configuredRoleProfiles(config);
   return catalog.workPools.map((pool) => {
     const roleKey = ROLE_KEY_BY_POOL[pool.key];
     assert(roleKey, `work pool ${pool.key} does not have a role key mapping`);
+    const configured = configuredProfiles.get(roleKey);
     return {
       role_key: roleKey,
-      display_name: pool.label,
-      disabled: false,
-      bundle_keys: [pool.key],
-      grants: uniqueSorted([
-        ...catalog.capabilities.map((item) => item.key),
-        ...(ROLE_CAPABILITY_KEYS_BY_POOL[pool.key] || []),
-      ]),
-      revokes: [],
+      display_name: configured?.displayName || pool.label,
+      disabled: configured?.disabled === true,
+      bundle_keys: uniqueSorted(configured?.ownerPools || [pool.key]),
+      revokes: uniqueSorted(configured?.revokes || []),
     };
   });
 }
@@ -694,7 +799,16 @@ function roleProfilesFromCatalog(catalog) {
 function processWorkPoolsFromDefinitions(processDefinitions = {}) {
   const processPools = [];
   if (processDefinitions[SALES_ORDER_ACCEPTANCE_PROCESS_KEY]) {
-    processPools.push(...SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS);
+    const runtimePoolKeys = new Set(
+      processDefinitions[SALES_ORDER_ACCEPTANCE_PROCESS_KEY].nodes
+        .map((node) => node.owner_pool_key)
+        .filter(Boolean),
+    );
+    processPools.push(
+      ...SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS.filter((pool) =>
+        runtimePoolKeys.has(pool.pool_key),
+      ),
+    );
   }
   if (processDefinitions[MATERIAL_SUPPLY_PROCESS_KEY]) {
     processPools.push(...MATERIAL_SUPPLY_EVIDENCE_OWNER_POOLS);
@@ -732,7 +846,16 @@ function processWorkPoolMembershipsFromDefinitions(
 ) {
   const processPools = [];
   if (processDefinitions[SALES_ORDER_ACCEPTANCE_PROCESS_KEY]) {
-    processPools.push(...SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS);
+    const runtimePoolKeys = new Set(
+      processDefinitions[SALES_ORDER_ACCEPTANCE_PROCESS_KEY].nodes
+        .map((node) => node.owner_pool_key)
+        .filter(Boolean),
+    );
+    processPools.push(
+      ...SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS.filter((pool) =>
+        runtimePoolKeys.has(pool.pool_key),
+      ),
+    );
   }
   if (processDefinitions[MATERIAL_SUPPLY_PROCESS_KEY]) {
     processPools.push(...MATERIAL_SUPPLY_EVIDENCE_OWNER_POOLS);
@@ -776,16 +899,12 @@ function workPoolMembershipsFromCatalog(catalog, processDefinitions = {}, overri
   ];
 }
 
-function accessEntitlementsFromCatalog(catalog, customerKey) {
-  const capabilities = catalog.capabilities.map((item) => item.key);
-  const pageCapabilities = catalog.pages.map((item) => `page.${item.key}.read`);
+function accessEntitlementsFromPackage(config, catalog, customerKey) {
+  const configuredProfiles = configuredRoleProfiles(config);
   return catalog.workPools.flatMap((pool) => {
     const roleKey = ROLE_KEY_BY_POOL[pool.key];
-    const capabilityKeys = uniqueSorted([
-      ...capabilities,
-      ...pageCapabilities,
-      ...(ROLE_CAPABILITY_KEYS_BY_POOL[pool.key] || []),
-    ]);
+    const configured = configuredProfiles.get(roleKey);
+    const capabilityKeys = uniqueSorted(configured?.capabilityKeys || ROLE_CAPABILITY_KEYS_BY_POOL[pool.key] || []);
     return capabilityKeys.map((capabilityKey) => ({
       role_key: roleKey,
       capability_key: capabilityKey,
@@ -793,7 +912,7 @@ function accessEntitlementsFromCatalog(catalog, customerKey) {
       scope_value: customerKey,
       constraints: {
         source: "compiled_customer_package",
-        preview_only_source: true,
+        runtime_enforced: true,
       },
       enabled: true,
     }));
@@ -810,10 +929,7 @@ function fieldPoliciesFromCatalog(catalog) {
     const surfaceKey = runtimeSurface.surfaceKey;
     policies[surfaceKey] = policies[surfaceKey] || {};
     policies[surfaceKey][field.key] = {
-      label: field.label,
       visible: true,
-      editable: false,
-      source: "customer_package_catalog",
     };
   }
   return policies;
@@ -863,6 +979,12 @@ function salesOrderAcceptanceProcessDefinitionFromPackage(config) {
     (node) => node.type === "approval" && node.ownerPool === "boss",
     "boss approval node",
   );
+  const engineeringNode = (Array.isArray(workflow.nodes) ? workflow.nodes : []).find(
+    (node) => node.type === "human_task" && node.ownerPool === "engineering",
+  );
+  if (workflow.ownerPools.includes("engineering")) {
+    assert(engineeringNode, "sales order acceptance engineering owner pool must have an engineering task node");
+  }
   const reviewNode = findWorkflowNode(
     workflow,
     (node) => node.type === "human_task" && node.ownerPool === "pmc",
@@ -911,6 +1033,20 @@ function salesOrderAcceptanceProcessDefinitionFromPackage(config) {
         form_profile_key: "sales_order_approval.default",
         action_set_key: "sales_order_approval",
       },
+      ...(engineeringNode
+        ? [
+            {
+              node_key: "engineering_data",
+              source_node_key: engineeringNode.key,
+              node_type: "human_task",
+              source_owner_pool_key: "engineering",
+              owner_pool_key: "engineering_data",
+              required_capability_key: "workflow.task.complete",
+              form_profile_key: "engineering_data.default",
+              action_set_key: "engineering_data",
+            },
+          ]
+        : []),
       {
         node_key: "order_review",
         source_node_key: reviewNode.key,
@@ -928,7 +1064,7 @@ function salesOrderAcceptanceProcessDefinitionFromPackage(config) {
       },
     ],
     guardrail:
-      "Controlled runtime loader ready: sales_order_acceptance may submit the sales order source document, then create boss approval and PMC review tasks; it does not post inventory, shipment, quality or finance facts.",
+      "Controlled runtime loader ready: sales_order_acceptance may submit the sales order source document, then create the configured approval, engineering-data and PMC review tasks; it does not post inventory, shipment, quality or finance facts.",
   };
 }
 
@@ -991,8 +1127,8 @@ function materialSupplyProcessDefinitionFromPackage(config) {
         form_profile_key: "incoming_qc.default",
         action_set_key: "incoming_qc",
         policy_snapshot: {
-          command_key: "quality_inspection.decide",
-          handler: "InventoryUsecase.PassQualityInspection/RejectQualityInspection",
+          command_key: "quality_inspection.aggregate_gate",
+          handler: "InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
           idempotency_key_required: true,
           writes_fact: false,
         },
@@ -1020,7 +1156,7 @@ function materialSupplyProcessDefinitionFromPackage(config) {
       },
     ],
     guardrail:
-      "Runtime loader ready: material_supply can construct purchase_order process instances with explicit domain_command nodes; it still does not let Workflow task completion create purchase_receipts, decide quality_inspections or post inventory_txns.",
+      "Runtime loader ready: material_supply can construct purchase_order process instances with explicit domain_command nodes; incoming_qc only aggregates formal line decisions, and Workflow task completion still cannot create purchase_receipts, decide quality_inspections or post inventory_txns.",
   };
 }
 
@@ -1263,6 +1399,7 @@ function compiledSnapshotFromPackage(config, catalog, processDefinitions = {}) {
       previewOnly: true,
     },
     pages: runtimePagesFromCatalog(catalog),
+    rolePageProjections: rolePageProjectionsFromPackage(config, catalog),
     modules: catalog.modules.map((item) => ({
       key: item.key,
       label: item.label,
@@ -1290,8 +1427,8 @@ function buildRuntimeManifest(config, catalog = customerPackageCatalog) {
     product_version: "local-customer-package",
     compiled_snapshot: compiledSnapshotFromPackage(config, catalog, processDefinitions),
     module_states: moduleStatesFromCatalog(catalog, config),
-    role_profiles: roleProfilesFromCatalog(catalog),
-    access_entitlements: accessEntitlementsFromCatalog(catalog, config.customerKey),
+    role_profiles: roleProfilesFromPackage(config, catalog),
+    access_entitlements: accessEntitlementsFromPackage(config, catalog, config.customerKey),
     work_pools: workPoolsFromCatalog(catalog, processDefinitions),
     work_pool_memberships: workPoolMembershipsFromCatalog(catalog, processDefinitions, workPoolRoleOverrides),
   };
@@ -1345,10 +1482,14 @@ function validateProcessDefinitions(manifest, { workPoolKeys } = {}) {
   assert(salesOrderProcess.business_ref_type === "sales_order", "sales_order_acceptance must stay bound to sales_order refs");
   assert(salesOrderProcess.fact_boundary === "no_fact_posting", "sales_order_acceptance must not post domain facts");
   assert(Array.isArray(salesOrderProcess.nodes), "sales_order_acceptance.nodes must be an array");
+  const salesNodeKeys = salesOrderProcess.nodes.map((node) => node.node_key);
+  const allowedSalesChains = [
+    ["submit_sales_order", "order_approval", "order_review", "end"],
+    ["submit_sales_order", "order_approval", "engineering_data", "order_review", "end"],
+  ];
   assert(
-    JSON.stringify(salesOrderProcess.nodes.map((node) => node.node_key)) ===
-      JSON.stringify(["submit_sales_order", "order_approval", "order_review", "end"]),
-    "sales_order_acceptance nodes must match the reviewed minimum chain",
+    allowedSalesChains.some((candidate) => JSON.stringify(candidate) === JSON.stringify(salesNodeKeys)),
+    "sales_order_acceptance nodes must match the reviewed base chain or customer engineering-data variant",
   );
   const roleByRuntimePool = new Map(
     manifest.work_pool_memberships.map((membership) => [
@@ -1412,7 +1553,7 @@ function validateProcessDefinitions(manifest, { workPoolKeys } = {}) {
   );
   const expectedMaterialSupplyCommandKeys = new Map([
     ["purchase_receipt_source", "purchase_receipt.create"],
-    ["incoming_qc", "quality_inspection.decide"],
+    ["incoming_qc", "quality_inspection.aggregate_gate"],
     ["warehouse_inbound", "inventory.post_inbound"],
   ]);
   for (const node of materialSupplyProcess.nodes) {
@@ -1490,11 +1631,16 @@ function validateProcessDefinitions(manifest, { workPoolKeys } = {}) {
       `${node.node_key}.fact_command_contract.required_test_anchors must reference existing tests`,
     );
     assert(Array.isArray(node.fact_command_contract?.runtime_loader_blockers), `${node.node_key}.fact_command_contract.runtime_loader_blockers must be an array`);
+    assert(Array.isArray(node.fact_command_contract?.runtime_execute_blockers), `${node.node_key}.fact_command_contract.runtime_execute_blockers must be an array`);
     if (handlerRegisteredNodeKeys.has(node.node_key)) {
       assert(
         !node.fact_command_contract.runtime_loader_blockers.includes("domain_command_handler_not_registered") &&
           node.fact_command_contract.runtime_loader_blockers.length === 0,
         `${node.node_key}.fact_command_contract must not keep loader blockers after explicit APIs are implemented`,
+      );
+      assert(
+        node.fact_command_contract.runtime_execute_blockers.length === 0,
+        `${node.node_key}.fact_command_contract must not keep execute blockers after explicit APIs are implemented`,
       );
     } else {
       assert(
@@ -1806,9 +1952,26 @@ function validateRuntimeManifest(manifest) {
     "work_pool_memberships must not be empty",
   );
   const roleKeys = new Set(manifest.role_profiles.map((item) => item.role_key));
-  assert(roleKeys.has("purchasing"), "purchase work pool must map to backend purchasing role key");
+  for (const profile of manifest.role_profiles) {
+    assert(profile.grants == null, `${profile.role_key} role profile must not duplicate entitlement grants`);
+    assert(Array.isArray(profile.bundle_keys), `${profile.role_key} role profile bundle_keys must be an array`);
+    assert(Array.isArray(profile.revokes), `${profile.role_key} role profile revokes must be an array`);
+  }
+  const rolePageProjections = manifest.compiled_snapshot.rolePageProjections;
+  assert(
+    rolePageProjections && typeof rolePageProjections === "object" && !Array.isArray(rolePageProjections),
+    "compiled_snapshot.rolePageProjections must be an object",
+  );
+  for (const [roleKey, projectedPages] of Object.entries(rolePageProjections)) {
+    assert(roleKeys.has(roleKey), `rolePageProjections contains unknown role: ${roleKey}`);
+    assert(Array.isArray(projectedPages) && projectedPages.length > 0, `${roleKey} page projection must not be empty`);
+    for (const pageKey of projectedPages) {
+      assert(allowedPageKeys.has(pageKey), `${roleKey} page projection contains unsupported page: ${pageKey}`);
+    }
+  }
+  assert(roleKeys.has("purchase"), "purchase work pool must map to backend purchase role key");
   assert(roleKeys.has("engineering"), "engineering work pool must map to backend engineering role key");
-  assert(!roleKeys.has("purchase"), "runtime manifest must not publish frontend-only purchase role key");
+  assert(!roleKeys.has("purchasing"), "runtime manifest must not publish frontend-only purchasing app key");
   const workPoolKeys = new Set(manifest.work_pools.map((item) => item.pool_key));
   const membershipPoolKeys = new Set(manifest.work_pool_memberships.map((item) => item.pool_key));
   const entitlementRoleKeys = new Set(manifest.access_entitlements.map((item) => item.role_key));

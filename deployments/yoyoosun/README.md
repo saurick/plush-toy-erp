@@ -18,7 +18,7 @@ server/deploy/compose/prod
 | database | PostgreSQL |
 | front-end entry | single `web-desktop` service, port `5175`; mobile roles use `/m/<role>/tasks` |
 | backend | HTTP `8300`, gRPC `9300` |
-| migration | host Atlas at `/usr/local/bin/atlas` through `server/deploy/compose/prod/migrate_online.sh` |
+| migration | host Atlas at `/usr/local/bin/atlas` through `server/deploy/compose/prod/migrate_online.sh`; private lock defaults to `/run/lock/plush-toy-erp/atlas-migrate.lock` |
 | build boundary | build images locally or in CI; target server only runs `docker load`, Compose, migration and smoke |
 
 ## 目录说明 / Package Contents

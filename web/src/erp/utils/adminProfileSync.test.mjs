@@ -170,7 +170,9 @@ test('adminProfileSync: effective session 作为当前 profile 投影，不覆�
     pages: ['global-dashboard'],
     actions: ['customer_config.read'],
     workPools: ['admin'],
-    fieldPolicies: { 'sales_order.form': { cost_price: { visible: false } } },
+    fieldPolicies: {
+      'sales_orders.default': { source_no: { visible: false } },
+    },
     printTemplateDefaults: {
       templates: [
         {
@@ -205,7 +207,7 @@ test('adminProfileSync: effective session 作为当前 profile 投影，不覆�
     false
   )
   assert.deepEqual(
-    getEffectiveFieldPolicy(next, 'sales_order.form', 'cost_price'),
+    getEffectiveFieldPolicy(next, 'sales_orders.default', 'source_no'),
     { visible: false }
   )
   assert.deepEqual(
@@ -848,7 +850,7 @@ test('adminProfileSync: master data field policy 可映射客户和供应商页�
       adminProfile,
       'customers.default'
     ).map((column) => column.dataIndex),
-    ['name', 'short_name']
+    ['name', 'short_name', 'tax_no']
   )
   assert.deepEqual(
     filterColumnsByEffectiveFieldPolicy(
@@ -860,7 +862,7 @@ test('adminProfileSync: master data field policy 可映射客户和供应商页�
   )
 })
 
-test('adminProfileSync: planned runtime field policy aliases can hide current business columns', () => {
+test('adminProfileSync: unsupported formal field contracts cannot become runtime policies through local aliases', () => {
   const adminProfile = {
     effective_session: {
       field_policies: {
@@ -924,7 +926,7 @@ test('adminProfileSync: planned runtime field policy aliases can hide current bu
   ]
 
   for (const item of cases) {
-    assert.equal(resolveDefaultFieldPolicySurface(item.moduleKey), item.surface)
+    assert.equal(resolveDefaultFieldPolicySurface(item.moduleKey), '')
     const columns = [{ dataIndex: 'always_visible' }, item.column]
     applyEffectiveFieldPolicyFlags({
       adminProfile,
@@ -932,7 +934,15 @@ test('adminProfileSync: planned runtime field policy aliases can hide current bu
       columns,
     })
     assert.equal(columns[0].hiddenByEffectiveFieldPolicy, undefined)
-    assert.equal(columns[1].hiddenByEffectiveFieldPolicy, true)
+    assert.equal(columns[1].hiddenByEffectiveFieldPolicy, undefined)
+    assert.equal(
+      getEffectiveFieldPolicy(
+        adminProfile,
+        item.surface,
+        item.column.effectiveFieldKey
+      ),
+      null
+    )
   }
 })
 

@@ -7,7 +7,7 @@ module.exports = {
       {
         libraryName: 'lodash',
         libraryDirectory: '',
-        camel2DashComponentName: false, // default: true
+        camel2DashComponentName: false,
       },
     ],
   ],

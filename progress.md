@@ -9,9 +9,9 @@
 
 ## 当前活跃事项
 
-- 多甲方角色能力流程编排以 `docs/product/多甲方角色能力流程编排优先级.md` 和 `node scripts/qa/multi-client-role-workflow-priority-audit.mjs --json` 的 `implementationOrder` 为本地优先级入口；GPT/reference 资料只作输入，当前真源仍回到代码、migration、测试和正式文档。
-- 当前审计显示 P0-P4 本地证据为 ready；P5 的 133 内部验证证据已收口到 `deployments/yoyoosun/evidence/releases/2026-07-03/`，`release-evidence-status` 为 `ready`，closeoutSummary 为 `gateVerified=6/6`、`blockers=0`。
-- 本次 133 发布验证已完成本地构建镜像、远端 `docker load`、运行时 `.env` 脱敏 preflight、migration before/after、pre-migration backup、隔离恢复 + migration 演练、真实库 migration、业务容器重建、目标 smoke、rollback / forward-fix evidence 和 internal-only sign-off。
+- 当前真源入口为 `docs/当前真源与交接顺序.md`、`docs/product/多甲方角色能力与流程编排.md`、`docs/workflow/业务与协同流程地图.md`、产品能力台账、当前代码/migration/测试。`docs/reference/**`、客户 PDF/Excel 和 GPT 对话只作输入线索。
+- Product Core / 永绅客户包、角色页面和动作投影、模块依赖、窄版 Process Runtime、Source Document / Workflow / Fact 边界、客户导入与发布门禁已完成本地综合收口；后续改动不得恢复旧业务记录、拆分单据写 API、formal-shell 假页或客户分支。
+- 当前只能声明本地代码、模拟数据、测试库和浏览器回归通过；本轮没有执行永绅真实客户数据导入、目标环境发布/配置激活、备份恢复演练或客户签收，不将旧 evidence 冒充为本轮结果。
 
 ## 2026-07-09 Product Core 首页总览修正
 
@@ -238,3 +238,15 @@
 下一步：继续按源表分批审计其它永绅表格字段、业务页表单 / 弹窗、单据状态、通知 / 审计 / 流程编排和字典状态树；每批都应先确认字段真源和业务边界，再决定是否进入 Product Core、客户配置、fixture、打印模板或 deferred 评审。
 
 阻塞/风险：本轮只完成 BOM 工程资料到 `物料分析明细表 / 色卡 / 作业指导书` 的可验证切片，不把 Excel 里的加工厂银行信息、财务信息、库存 / 出货 / 质检 / 通知 / 审计事实写入运行时，也不执行真实客户导入或目标环境发布。新增 schema / migration 尚未在本轮 apply 到本地 dev DB；当前验证覆盖本地代码生成、Go unit / service 测试、Node 字段链路测试和文档静态检查，不替代目标环境 migration、浏览器 PDF 版式回归或 release evidence。
+
+## 2026-07-10 Product Core / 永绅全链审查与实现收口
+
+完成：以当前代码、`docs/reference/第四次20260627`、永绅 PDF/Excel 和客户新增合同/仓库线索为输入，重新审查前后端、领域边界、角色/RBAC、模块组合、流程编排、字段残值/缺值、模拟数据、导入、打印、部署和文档。Product Core 与永绅客户包改为显式运行时投影：页面取 RBAC/模块/角色页面交集，动作以 `access_entitlements` 为唯一客户配置加法真源并受后端 RBAC 上限、模块状态和角色 revoke 收窄；窄联查权限不再误开独立菜单，多角色账号先逐角色计算再取并集。已从 Ent、Atlas migration、repo 和 RPC 输入物理删除失效 `role_profiles.grants`，不保留新系统兼容列。
+
+完成：业务与协同主路收口。销售/采购 Source Document 只保留表头+明细聚合事务保存，提交后只读；公开 Workflow API 不再允许客户端写流程锚点或任意业务状态。Process Runtime 只支持人工任务、审批、白名单领域命令、等待事件和结束节点，Workflow done 不冒充 Fact posted。来料链路实现采购单数量约束、并发入库防超收、HOLD 批次、多行 IQC 聚合放行/拒收/让步接收和库存过账；采购调整新增明细与过账并发锁。加工合同统一承接车缝、手工和布料加工，每行产品/材料二选一并清除切换残值；永绅主料仓、成品仓、其他仓作为仓库主数据，财务下采购合同通过 `finance + purchase` 多角色表达，不污染通用财务角色。
+
+完成：文档和页面降噪。删除旧业务记录系列文档/实现、过大的一次性多客户审计脚本、formal-shell 假页和真实导入执行器，历史架构评审移入 archive；活跃文档收口为真源索引、角色流程专文、流程地图、能力台账和测试策略。前端用户可见文案不显示 Workflow/Fact/raw key/底层错误；无权移动端动作使用明确只读说明和中性禁用态。Node 包改为明确 ESM，清理 typeless package warning；`lint` 不再自动修改代码，另保留 `lint:fix`。
+
+下一步：如果要进入真实客户验收，必须准备经客户确认的真实数据和目标环境授权，然后按客户配置 validate/publish/activate、导入 dry-run/批次 usecase、backup/restore、migration、目标 smoke 和签收 evidence 执行；不得把本地模拟 fixture 写成客户真实导入。
+
+阻塞/风险：本轮没有真实客户数据、目标环境发布权限或客户签收，因此只声明本地产品核心/永绅模拟闭环可验证，不声明 release-ready 或客户可交付。已通过 `bash scripts/qa/full.sh`、`bash scripts/qa/strict.sh`（含 secrets、shellcheck、shfmt、govulncheck）、Atlas migration validate、真实 PostgreSQL migration/关键并发事务、前端 652 项测试与 production build、五岗位移动端/只读态/BOM 宽表/业务表单/加工合同浏览器回归。未提交、未推送。

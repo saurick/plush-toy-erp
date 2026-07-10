@@ -30,8 +30,6 @@ func (RoleProfile) Fields() []ent.Field {
 			Default(false),
 		field.JSON("bundle_keys", []string{}).
 			Optional(),
-		field.JSON("grants", []string{}).
-			Optional(),
 		field.JSON("revokes", []string{}).
 			Optional(),
 		field.Time("created_at").

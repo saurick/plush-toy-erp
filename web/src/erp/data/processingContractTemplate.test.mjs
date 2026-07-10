@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   PROCESSING_CONTRACT_DRAFT_VERSION,
+  PROCESSING_CONTRACT_TABLE_COLUMNS,
   buildProcessingContractDraftFromOutsourcingFact,
   buildProcessingContractDraftFromOutsourcingOrder,
   calculateProcessingContractTotals,
@@ -241,6 +242,7 @@ test('processingContractTemplate: 委外订单按加工合同源单带入工序�
     },
     [
       {
+        subject_type: 'PRODUCT',
         line_status: 'open',
         product_order_no_snapshot: ' SO-LINE-26017 ',
         product_no_snapshot: ' P-001 ',
@@ -281,6 +283,78 @@ test('processingContractTemplate: 委外订单按加工合同源单带入工序�
   })
 })
 
+test('FL_processing_contract_material_subject__maps_material_snapshots processingContractTemplate: 布料加工合同显示材料编码和名称', () => {
+  const columnLabels = Object.fromEntries(
+    PROCESSING_CONTRACT_TABLE_COLUMNS.map((column) => [
+      column.key,
+      column.label,
+    ])
+  )
+  assert.equal(columnLabels.productOrderNo, '来源订单编号')
+  assert.equal(columnLabels.productNo, '加工对象编号')
+  assert.equal(columnLabels.productName, '加工对象名称')
+
+  const draft = buildProcessingContractDraftFromOutsourcingOrder(
+    {
+      outsourcing_order_no: ' OUT-FABRIC-001 ',
+      source_order_no: ' ENG-26001 ',
+      supplier_snapshot: { name: ' 布料复合加工厂 ' },
+    },
+    [
+      {
+        subject_type: 'MATERIAL',
+        material_code_snapshot: ' MAT-FABRIC-018 ',
+        material_name_snapshot: ' 短毛绒布 ',
+        product_no_snapshot: 'STALE-PRODUCT',
+        product_name_snapshot: '残留产品',
+        product_order_no_snapshot: 'STALE-SO',
+        process_name_snapshot: ' 布料复合 ',
+        process_category_snapshot: ' 布料加工 ',
+        unit_name_snapshot: ' 米 ',
+        outsourcing_quantity: '20',
+        unit_price: '2.5',
+        note: ' 核对色号和克重 ',
+      },
+    ]
+  )
+
+  assert.deepEqual(draft.lines[0], {
+    contractNo: 'OUT-FABRIC-001',
+    productOrderNo: 'ENG-26001',
+    productNo: 'MAT-FABRIC-018',
+    productName: '短毛绒布',
+    processName: '布料复合',
+    supplierAlias: '布料复合加工厂',
+    processCategory: '布料加工',
+    unit: '米',
+    unitPrice: '2.5',
+    quantity: '20',
+    amount: '50',
+    remark: '核对色号和克重',
+  })
+  assert.notEqual(draft.lines[0].productNo, 'STALE-PRODUCT')
+  assert.notEqual(draft.lines[0].productName, '残留产品')
+  assert.notEqual(draft.lines[0].productOrderNo, 'STALE-SO')
+})
+
+test('FL_processing_contract_subject_type__does_not_guess_missing_subject processingContractTemplate: 加工合同不根据残留 ID 猜测主体类型', () => {
+  const draft = buildProcessingContractDraftFromOutsourcingOrder(
+    { source_order_no: 'SRC-001' },
+    [
+      {
+        product_no_snapshot: 'STALE-PRODUCT',
+        product_name_snapshot: '残留产品',
+        material_code_snapshot: 'STALE-MATERIAL',
+        material_name_snapshot: '残留材料',
+      },
+    ]
+  )
+
+  assert.equal(draft.lines[0].productOrderNo, 'SRC-001')
+  assert.equal(draft.lines[0].productNo, '')
+  assert.equal(draft.lines[0].productName, '')
+})
+
 test('FL_processing_contract_print_party_defaults__uses_customer_config_party_defaults_only processingContractTemplate: 加工合同打印草稿只从客户配置带入委托方默认值', () => {
   const draft = buildProcessingContractDraftFromOutsourcingOrder(
     {
@@ -293,6 +367,7 @@ test('FL_processing_contract_print_party_defaults__uses_customer_config_party_de
     },
     [
       {
+        subject_type: 'PRODUCT',
         process_name_snapshot: '车缝',
         outsourcing_quantity: '5',
         unit_price: '3',
@@ -312,9 +387,9 @@ test('FL_processing_contract_print_party_defaults__uses_customer_config_party_de
             party_defaults: {
               buyerCompany: '客户配置委托方',
               buyerContact: '委外负责人',
-              buyerPhone: '13694972987',
+              buyerPhone: '0769-00000002',
               buyerAddress: '东莞茶山',
-              buyerSigner: '刘志强',
+              buyerSigner: '试用委外负责人',
               supplierName: '不应覆盖加工厂',
             },
           },
@@ -326,9 +401,9 @@ test('FL_processing_contract_print_party_defaults__uses_customer_config_party_de
   assert.equal(draft.contractNo, 'OUT-ORDER-CONFIG')
   assert.equal(draft.buyerCompany, '客户配置委托方')
   assert.equal(draft.buyerContact, '委外负责人')
-  assert.equal(draft.buyerPhone, '13694972987')
+  assert.equal(draft.buyerPhone, '0769-00000002')
   assert.equal(draft.buyerAddress, '东莞茶山')
-  assert.equal(draft.buyerSigner, '刘志强')
+  assert.equal(draft.buyerSigner, '试用委外负责人')
   assert.equal(draft.supplierName, '真实加工厂全称')
   assert.equal(draft.supplierContact, '加工厂联系人')
   assert.equal(draft.supplierSigner, '')
@@ -353,6 +428,7 @@ test('FL_processing_contract_print_party_snapshot__order_snapshot_overrides_cust
     },
     [
       {
+        subject_type: 'PRODUCT',
         process_name_snapshot: '车缝',
         outsourcing_quantity: '5',
         unit_price: '3',
@@ -366,9 +442,9 @@ test('FL_processing_contract_print_party_snapshot__order_snapshot_overrides_cust
             party_defaults: {
               buyerCompany: '客户配置委托方',
               buyerContact: '委外负责人',
-              buyerPhone: '13694972987',
+              buyerPhone: '0769-00000002',
               buyerAddress: '东莞茶山',
-              buyerSigner: '刘志强',
+              buyerSigner: '试用委外负责人',
             },
           },
         ],
@@ -393,6 +469,7 @@ test('FL_processing_contract_supplier_name__falls_back_to_short_name processingC
     },
     [
       {
+        subject_type: 'PRODUCT',
         process_name_snapshot: '车缝',
         outsourcing_quantity: '5',
         unit_price: '3',
@@ -412,10 +489,12 @@ test('FL_processing_contract_product_order_no__retains_source_order_no_snapshot 
     },
     [
       {
+        subject_type: 'PRODUCT',
         product_no_snapshot: ' P-001 ',
         product_name_snapshot: ' 毛绒兔半成品 ',
       },
       {
+        subject_type: 'PRODUCT',
         product_no_snapshot: ' P-002 ',
         product_name_snapshot: ' 毛绒熊半成品 ',
       },
@@ -460,6 +539,7 @@ test('FL_processing_contract_print_lines__filters_canceled_outsourcing_items pro
     },
     [
       {
+        subject_type: 'PRODUCT',
         line_status: 'canceled',
         product_no_snapshot: ' P-CANCELED ',
         product_name_snapshot: ' 已取消产品 ',
@@ -469,6 +549,7 @@ test('FL_processing_contract_print_lines__filters_canceled_outsourcing_items pro
         note: '不应进入打印',
       },
       {
+        subject_type: 'PRODUCT',
         line_status: 'CANCELLED',
         product_no_snapshot: ' P-LEGACY-CANCELED ',
         product_name_snapshot: ' 旧状态取消产品 ',
@@ -478,6 +559,7 @@ test('FL_processing_contract_print_lines__filters_canceled_outsourcing_items pro
         note: '旧状态不应进入打印',
       },
       {
+        subject_type: 'PRODUCT',
         line_status: 'open',
         product_no_snapshot: ' P-OPEN ',
         product_name_snapshot: ' 有效半成品 ',
@@ -516,6 +598,7 @@ test('FL_processing_contract_print_lines__filters_canceled_outsourcing_items pro
     },
     [
       {
+        subject_type: 'PRODUCT',
         line_status: 'cancelled',
         product_no_snapshot: ' P-CANCELED ',
         process_name_snapshot: ' 已取消工序 ',

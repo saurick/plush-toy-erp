@@ -78,6 +78,7 @@ import {
   parseBusinessSortValue,
   writeStoredColumnOrder,
 } from '../utils/businessTableActions.mjs'
+import { isDraftSourceDocument } from '../utils/sourceDocumentEditing.mjs'
 import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
@@ -160,18 +161,13 @@ export default function V1SalesOrdersPage() {
 
   const canCreateOrder = hasActionPermission(adminProfile, 'sales_order.create')
   const canUpdateOrder = hasActionPermission(adminProfile, 'sales_order.update')
-  const canCreateItem = hasActionPermission(
-    adminProfile,
-    'sales_order_item.create'
+  const selectedOrderCanEdit = Boolean(
+    canUpdateOrder && isDraftSourceDocument(selectedOrder)
   )
-  const canUpdateItem = hasActionPermission(
-    adminProfile,
-    'sales_order_item.update'
-  )
-  const canCancelItem = hasActionPermission(
-    adminProfile,
-    'sales_order_item.cancel'
-  )
+  // 订单头和明细共用一个聚合保存事务；明细编辑不能再投影旧分拆写接口权限。
+  const canCreateItem = canCreateOrder || canUpdateOrder
+  const canUpdateItem = canUpdateOrder
+  const canCancelItem = canUpdateOrder
   const customerOptions = useMemo(
     () => uniqueReferenceOptions(customers, customerOption),
     [customers]
@@ -372,6 +368,10 @@ export default function V1SalesOrdersPage() {
 
   const openEditOrder = async (order) => {
     if (!order?.id) return
+    if (!isDraftSourceDocument(order)) {
+      message.warning('订单提交后已冻结；如需调整，请取消后重新建立订单。')
+      return
+    }
     orderAttachmentRef.current?.clearPendingAttachments()
     setSelectedOrder(order)
     setEditingOrder(order)
@@ -825,7 +825,7 @@ export default function V1SalesOrdersPage() {
             <Button
               size="small"
               icon={<EditOutlined />}
-              disabled={!selectedOrder}
+              disabled={!selectedOrderCanEdit}
               onClick={() => openEditOrder(selectedOrder)}
             >
               编辑订单
@@ -898,7 +898,7 @@ export default function V1SalesOrdersPage() {
         onRow={(record) => ({
           onClick: () => setSelectedOrder(record),
           onDoubleClick: () => {
-            if (canUpdateOrder) {
+            if (canUpdateOrder && isDraftSourceDocument(record)) {
               openEditOrder(record)
             }
           },

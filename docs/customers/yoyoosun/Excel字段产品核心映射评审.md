@@ -4,13 +4,15 @@
 
 ## 当前结论
 
-本轮唯一进入 Product Core 的新增字段是采购订单明细的 3 个可选产品展示快照：
+当前进入 Product Core 的新增字段分为两组：采购订单明细的 3 个可选产品展示快照，以及加工合同明细的产品 / 材料双主体：
 
 | 字段 | 产品核心落点 | 原因 | 边界 |
 | --- | --- | --- | --- |
 | 产品订单编号 | `purchase_order_items.product_order_no_snapshot` | 采购合同和辅材 / 包材采购汇总都需要按采购行追溯对应产品订单。采购订单是 Source Document，保存当时采购上下文合理。 | 只是采购源单据快照，不新增销售订单外键，不自动生成采购入库、库存、应付或 Workflow 事实。 |
 | 产品编号 | `purchase_order_items.product_no_snapshot` | 采购行需要展示“为哪个产品采购材料”，且合同打印已要求带出产品编号。 | 只是展示快照，不自动创建产品、SKU 或 BOM。 |
 | 产品名称 | `purchase_order_items.product_name_snapshot` | 采购、打印和人工核对都需要读得懂采购行所属产品。 | 只是展示快照，产品主数据仍以 `products` 为真源。 |
+| 加工主体类型 | `outsourcing_order_items.subject_type` | 车缝、手工通常加工成品，布料加工的真实主体是材料，不能用产品快照伪装。 | 只允许 `PRODUCT / MATERIAL`；不代表回货、质检、库存或应付事实。 |
+| 加工产品 / 材料 | `product_id` 或 `material_id` 二选一，并保存对应编号 / 名称快照 | 同一加工合同模型即可覆盖产品加工与布料加工，不需要按合同类型复制三套表。 | 后端校验 exactly-one、主数据启用状态、单位和工序；切换主体必须清除另一侧 ID 与旧快照。 |
 
 其余 Excel 字段先按现有 Product Core 真源、客户配置、导入 review 或 deferred 处理，不在本轮新增 schema。
 
@@ -34,7 +36,7 @@
 | 规格 | `materials.spec` 或后续材料评审 | 当前打印从材料主数据取规格。 | 不在采购订单行重复新建规格快照。 |
 | 单位 | `units` | 沿用 `unit_id`，打印按现有单位文案映射。 | 不用 Excel 单位文本绕过单位真源。 |
 | 单价 / 数量 / 金额 / 回货日期 | `purchase_order_items` | 沿用 `unit_price / purchased_quantity / amount / expected_arrival_date`。 | 不生成采购入库、库存、应付或付款事实。 |
-| 委外单号 / 产品订单编号 / 加工项目 / 工序类别 / 加工金额 | `outsourcing_orders / outsourcing_order_items` 和 `processes` 候选 | 委外明细保存 `product_order_no_snapshot` 并用于加工合同逐行追溯；加工项目和工序类别仍按 `processes` 候选选择和快照带出。 | 不从 Excel 自动生成委外发料、回货、质检、库存或应付；不把产品订单编号升级为销售订单外键。 |
+| 委外单号 / 产品订单编号 / 加工主体 / 加工项目 / 工序类别 / 加工金额 | `outsourcing_orders / outsourcing_order_items`、`products / materials` 和 `processes` | 委外明细保存 `subject_type`，按产品或材料二选一保存主数据引用与快照；产品订单编号用于逐行追溯，工序仍从 `processes` 选择。 | 不从 Excel 自动生成委外发料、回货、质检、库存或应付；不把产品订单编号升级为销售订单外键。 |
 | 供应商 / 加工厂 / 联系人 / 电话 / 地址 | `suppliers / contacts` | 作为主数据候选或业务快照回补来源。 | 不把加工厂习惯分类写死成 Product Core 枚举。 |
 
 ## 不进 Product Core 的字段
@@ -58,7 +60,9 @@
 | 列表回显 | 间接覆盖 | 采购订单列表仍是订单头，不展示行级产品快照；行级明细通过 `list_purchase_order_items` 回显。 |
 | 打印回显 | 覆盖 | 采购合同草稿优先读取采购订单行产品快照。 |
 | 导出 / 搜索 | 未扩展 | 采购订单头列表导出不展开明细；后续若新增明细导出，再复用同一字段。 |
-| 历史旧数据 | 覆盖为安全空值 | migration 新增 nullable 字段；旧采购行没有快照时打印显示“未关联...”提示，不伪造值。 |
+| 历史采购明细 | 覆盖为安全空值 | migration 新增 nullable 字段；旧采购行没有快照时打印显示“未关联...”提示，不伪造值。 |
+| 加工主体切换 | 覆盖 | 从产品切到材料或从材料切回产品时，后端和前端映射都清空另一侧主键及编号 / 名称快照，避免残值继续打印。 |
+| 历史加工明细 | 覆盖 | migration 将既有加工明细一次性标为 `PRODUCT`；新写入必须显式提交 `subject_type`，不保留运行时默认兼容。 |
 
 ## 后续单独评审
 
@@ -67,3 +71,4 @@
 3. 材料主数据是否需要独立页面承接厂商料号、供应商优先级、规格和类别。
 4. 供应商 / 加工厂财务资料是否进入 future finance 或客户配置。
 5. 色卡和作业指导书是否进入工程附件或产品资料附件链路。
+6. 布料加工回货如何关联质检、材料入库和应付，必须作为 Fact 链路单独评审，不能由加工合同确认自动过账。

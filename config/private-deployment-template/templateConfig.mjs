@@ -40,7 +40,6 @@ export const privateDeploymentPackageTemplate = Object.freeze({
     "差异登记.md",
     "导入来源清单.md",
     "导入字段分类.md",
-    "导入试跑计划.md",
     "导入待确认队列.md",
     "导入风险登记.md",
     "试用账号角色菜单核对清单.md",

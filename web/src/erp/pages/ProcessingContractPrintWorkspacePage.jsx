@@ -291,6 +291,7 @@ export default function ProcessingContractPrintWorkspacePage() {
     draftStorageKey,
     entrySource,
     resetDraftOnOpen,
+    setContract,
     sourceTag,
     templateKey,
     workspaceStateID,

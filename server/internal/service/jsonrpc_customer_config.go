@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	v1 "server/api/jsonrpc/v1"
@@ -35,6 +36,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
+		resolvedCustomerKey, err := runtimeCustomerKey(in.CustomerKey)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		in.CustomerKey = resolvedCustomerKey
 		result, err := d.customerConfigUC.ValidateCustomerConfig(ctx, in)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
@@ -57,6 +63,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
+		resolvedCustomerKey, err := runtimeCustomerKey(in.CustomerKey)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		in.CustomerKey = resolvedCustomerKey
 		revision, err := d.customerConfigUC.PublishCustomerConfig(ctx, in, admin.ID)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
@@ -75,7 +86,10 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if res != nil {
 			return id, res, nil
 		}
-		customerKey := getString(pm, "customer_key")
+		customerKey, err := runtimeCustomerKey(getString(pm, "customer_key"))
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
 		revision := getString(pm, "revision")
 		item, err := d.customerConfigUC.ActivateCustomerConfig(ctx, customerKey, revision, admin.ID)
 		if err != nil {
@@ -95,7 +109,10 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if res != nil {
 			return id, res, nil
 		}
-		customerKey := getString(pm, "customer_key")
+		customerKey, err := runtimeCustomerKey(getString(pm, "customer_key"))
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
 		targetRevision := getString(pm, "target_revision")
 		if strings.TrimSpace(targetRevision) == "" {
 			targetRevision = getString(pm, "revision")
@@ -115,7 +132,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if res != nil {
 			return id, res, nil
 		}
-		session, err := d.customerConfigUC.GetEffectiveSession(ctx, getString(pm, "customer_key"), admin)
+		customerKey, err := runtimeCustomerKey(getString(pm, "customer_key"))
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		session, err := d.customerConfigUC.GetEffectiveSession(ctx, customerKey, admin)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
@@ -129,7 +150,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerConfigRead); res != nil {
 			return id, res, nil
 		}
-		status, err := d.customerConfigUC.ExplainModuleStatus(ctx, getString(pm, "customer_key"), getString(pm, "module_key"))
+		customerKey, err := runtimeCustomerKey(getString(pm, "customer_key"))
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		status, err := d.customerConfigUC.ExplainModuleStatus(ctx, customerKey, getString(pm, "module_key"))
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
@@ -143,7 +168,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerConfigRead); res != nil {
 			return id, res, nil
 		}
-		definition, err := d.customerConfigUC.ExplainProcessDefinition(ctx, getString(pm, "customer_key"), getString(pm, "process_key"))
+		customerKey, err := runtimeCustomerKey(getString(pm, "customer_key"))
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		definition, err := d.customerConfigUC.ExplainProcessDefinition(ctx, customerKey, getString(pm, "process_key"))
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
@@ -165,6 +194,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
+		resolvedCustomerKey, err := runtimeCustomerKey(createIn.CustomerKey)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		createIn.CustomerKey = resolvedCustomerKey
 		processCreate, err := d.customerConfigUC.BuildProcessInstanceCreateFromActiveCustomerConfig(ctx, createIn)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
@@ -252,6 +286,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
+		resolvedCustomerKey, err := runtimeCustomerKey(createIn.CustomerKey)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		createIn.CustomerKey = resolvedCustomerKey
 		processCreate, err := d.customerConfigUC.BuildProcessInstanceCreateFromActiveCustomerConfig(ctx, createIn)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
@@ -300,6 +339,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
+		resolvedCustomerKey, err := runtimeCustomerKey(createIn.CustomerKey)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		createIn.CustomerKey = resolvedCustomerKey
 		processCreate, err := d.customerConfigUC.BuildProcessInstanceCreateFromActiveCustomerConfig(ctx, createIn)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
@@ -351,6 +395,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
+		resolvedCustomerKey, err := runtimeCustomerKey(createIn.CustomerKey)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		createIn.CustomerKey = resolvedCustomerKey
 		processCreate, err := d.customerConfigUC.BuildProcessInstanceCreateFromActiveCustomerConfig(ctx, createIn)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
@@ -592,21 +641,23 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 				"completed_node":   processNodeInstanceToMap(completedNode),
 				"nodes":            processNodeInstancesToMaps(nodes),
 				"runtime_boundary": map[string]any{
-					"source":                             "active_customer_config",
-					"process_key":                        biz.ProcessKeyMaterialSupply,
-					"command_key":                        biz.ProcessDomainCommandPurchaseReceiptCreate,
-					"executes_domain_command":            true,
-					"writes_purchase_receipt_source_doc": true,
-					"writes_quality_decision":            false,
-					"writes_inventory_fact":              false,
-					"writes_shipment_or_finance_fact":    false,
-					"workflow_task_done_posts_fact":      false,
-					"linked_business_ref_source":         "process_runtime_result",
+					"source":                                "active_customer_config",
+					"process_key":                           biz.ProcessKeyMaterialSupply,
+					"command_key":                           biz.ProcessDomainCommandPurchaseReceiptCreate,
+					"executes_domain_command":               true,
+					"writes_purchase_receipt_source_doc":    true,
+					"creates_submitted_quality_inspections": true,
+					"creates_zero_balance_hold_lots":        true,
+					"writes_quality_decision":               false,
+					"writes_inventory_quantity_fact":        false,
+					"writes_shipment_or_finance_fact":       false,
+					"workflow_task_done_posts_fact":         false,
+					"linked_business_ref_source":            "process_runtime_result",
 				},
 			}),
 		}, nil
 
-	case "execute_material_supply_quality_decide":
+	case "execute_material_supply_quality_gate":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionUpdate); res != nil {
 			return id, res, nil
 		}
@@ -614,7 +665,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if res != nil {
 			return id, res, nil
 		}
-		in, ok := materialSupplyQualityDecisionExecutionFromParams(pm)
+		in, ok := materialSupplyQualityGateExecutionFromParams(pm)
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
@@ -633,15 +684,15 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			Code:    errcode.OK.Code,
 			Message: errcode.OK.Message,
 			Data: newDataStruct(map[string]any{
-				"completed_node": processNodeInstanceToMap(completedNode),
+				"evaluated_node": processNodeInstanceToMap(completedNode),
 				"nodes":          processNodeInstancesToMaps(nodes),
 				"runtime_boundary": map[string]any{
 					"source":                             "active_customer_config",
 					"process_key":                        biz.ProcessKeyMaterialSupply,
-					"command_key":                        biz.ProcessDomainCommandQualityInspectionDecide,
+					"command_key":                        biz.ProcessDomainCommandIncomingQualityGate,
 					"executes_domain_command":            true,
 					"writes_purchase_receipt_source_doc": false,
-					"writes_quality_decision":            true,
+					"writes_quality_decision":            false,
 					"writes_inventory_fact":              false,
 					"writes_shipment_or_finance_fact":    false,
 					"workflow_task_done_posts_fact":      false,
@@ -704,7 +755,11 @@ func (d *jsonrpcDispatcher) requireCustomerConfigDomainCommandModulesEnabled(ctx
 	if in == nil {
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
 	}
-	if err := d.customerConfigUC.EnsureProcessDomainCommandModulesEnabled(ctx, customerKey, in.CommandKey); err != nil {
+	resolvedCustomerKey, err := runtimeCustomerKey(customerKey)
+	if err != nil {
+		return d.mapCustomerConfigError(ctx, err)
+	}
+	if err := d.customerConfigUC.EnsureProcessDomainCommandModulesEnabled(ctx, resolvedCustomerKey, in.CommandKey); err != nil {
 		return d.mapCustomerConfigError(ctx, err)
 	}
 	return nil
@@ -714,10 +769,29 @@ func (d *jsonrpcDispatcher) requireCustomerConfigModulesEnabled(ctx context.Cont
 	if d == nil || d.customerConfigUC == nil {
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
 	}
-	if err := d.customerConfigUC.EnsureModuleKeysEnabled(ctx, customerKey, moduleKeys...); err != nil {
+	resolvedCustomerKey, err := runtimeCustomerKey(customerKey)
+	if err != nil {
+		return d.mapCustomerConfigError(ctx, err)
+	}
+	if err := d.customerConfigUC.EnsureModuleKeysEnabled(ctx, resolvedCustomerKey, moduleKeys...); err != nil {
 		return d.mapCustomerConfigError(ctx, err)
 	}
 	return nil
+}
+
+func runtimeCustomerKey(requested string) (string, error) {
+	requested = biz.NormalizeCustomerKey(requested)
+	configured := biz.NormalizeCustomerKey(os.Getenv("ERP_CUSTOMER_KEY"))
+	if configured == "" {
+		if requested == "" {
+			return biz.DefaultCustomerKey, nil
+		}
+		return requested, nil
+	}
+	if requested != "" && requested != configured {
+		return "", biz.ErrForbidden
+	}
+	return configured, nil
 }
 
 func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err error) *v1.JsonrpcResult {
@@ -756,6 +830,9 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 	case errors.Is(err, biz.ErrQualityInspectionNotFound):
 		l.Warnf("[customer_config] quality inspection not found err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "质检单不存在"}
+	case errors.Is(err, biz.ErrPurchaseReceiptQualityPending):
+		l.Warnf("[customer_config] purchase receipt quality gate pending err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来料质检尚未逐行完成"}
 	case errors.Is(err, biz.ErrShipmentNotFound), errors.Is(err, biz.ErrShipmentItemNotFound):
 		l.Warnf("[customer_config] shipment not found err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货单不存在"}
@@ -1038,33 +1115,23 @@ func materialSupplyPurchaseReceiptCreateExecutionFromParams(pm map[string]any) (
 	}, true
 }
 
-func materialSupplyQualityDecisionExecutionFromParams(pm map[string]any) (*biz.ProcessDomainCommandExecution, bool) {
+func materialSupplyQualityGateExecutionFromParams(pm map[string]any) (*biz.ProcessDomainCommandExecution, bool) {
 	processInstanceID := getInt(pm, "process_instance_id", 0)
 	processNodeInstanceID := getInt(pm, "process_node_instance_id", 0)
 	expectedVersion := getInt(pm, "expected_version", 0)
-	inspectionID := getInt(pm, "quality_inspection_id", 0)
-	if inspectionID <= 0 {
-		inspectionID = getInt(pm, "id", 0)
-	}
-	result := strings.TrimSpace(getString(pm, "result"))
+	purchaseReceiptID := getInt(pm, "purchase_receipt_id", 0)
 	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
-	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || inspectionID <= 0 || result == "" || idempotencyKey == "" {
+	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || purchaseReceiptID <= 0 || idempotencyKey == "" {
 		return nil, false
 	}
 	payload := map[string]any{
-		"quality_inspection_id": inspectionID,
-		"result":                result,
+		"purchase_receipt_id": purchaseReceiptID,
 	}
-	putPositiveIntPayload(payload, "purchase_receipt_id", getInt(pm, "purchase_receipt_id", 0))
-	putPositiveIntPayload(payload, "inventory_lot_id", getInt(pm, "inventory_lot_id", 0))
-	putPositiveIntPayload(payload, "inspector_id", getInt(pm, "inspector_id", 0))
-	putStringPayload(payload, "inspected_at", getString(pm, "inspected_at"))
-	putStringPayload(payload, "decision_note", getString(pm, "decision_note"))
 	return &biz.ProcessDomainCommandExecution{
 		ProcessInstanceID:     processInstanceID,
 		ProcessNodeInstanceID: processNodeInstanceID,
 		ExpectedVersion:       expectedVersion,
-		CommandKey:            biz.ProcessDomainCommandQualityInspectionDecide,
+		CommandKey:            biz.ProcessDomainCommandIncomingQualityGate,
 		IdempotencyKey:        idempotencyKey,
 		Payload:               payload,
 	}, true
@@ -1128,6 +1195,9 @@ func customerConfigPublishInputFromParams(pm map[string]any) (biz.CustomerConfig
 	if len(snapshot) == 0 {
 		snapshot = getMap(raw, "compiledSnapshot")
 	}
+	if roleProfilesContainRemovedGrants(raw["role_profiles"]) {
+		return biz.CustomerConfigPublishInput{}, false
+	}
 	in := biz.CustomerConfigPublishInput{
 		CustomerKey:         getString(raw, "customer_key"),
 		Revision:            getString(raw, "revision"),
@@ -1182,11 +1252,23 @@ func roleProfilesFromAny(value any) []biz.RoleProfileInput {
 			DisplayName: getString(m, "display_name"),
 			Disabled:    getBool(m, "disabled", false),
 			BundleKeys:  getStringSlice(m, "bundle_keys"),
-			Grants:      getStringSlice(m, "grants"),
 			Revokes:     getStringSlice(m, "revokes"),
 		})
 	}
 	return out
+}
+
+func roleProfilesContainRemovedGrants(value any) bool {
+	for _, item := range anySlice(value) {
+		profile, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, exists := profile["grants"]; exists {
+			return true
+		}
+	}
+	return false
 }
 
 func accessEntitlementsFromAny(value any) []biz.AccessEntitlementInput {

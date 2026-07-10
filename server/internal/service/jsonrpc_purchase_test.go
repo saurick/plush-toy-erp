@@ -69,6 +69,13 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	if !ok || len(atomicItems) != 1 {
 		t.Fatalf("expected atomic receipt to include one line, got %#v", atomicReceipt["items"])
 	}
+	atomicQualityInspections, ok := atomicReceipt["quality_inspections"].([]any)
+	if !ok || len(atomicQualityInspections) != 1 {
+		t.Fatalf("expected atomic receipt to include one generated line inspection, got %#v", atomicReceipt["quality_inspections"])
+	}
+	if atomicQualityInspections[0].(map[string]any)["status"] != biz.QualityInspectionStatusSubmitted {
+		t.Fatalf("expected generated inspection submitted, got %#v", atomicQualityInspections[0])
+	}
 	if count := client.InventoryTxn.Query().CountX(ctx); count != 0 {
 		t.Fatalf("atomic draft purchase receipt must not write inventory txns, got %d", count)
 	}
@@ -155,6 +162,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	if invalidLineRes == nil || invalidLineRes.Code != errcode.InvalidParam.Code {
 		t.Fatalf("expected invalid quantity rejected, got %#v", invalidLineRes)
 	}
+	passPurchaseReceiptQualityForServiceTest(t, ctx, j.inventoryUC, receiptID)
 
 	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin(
 		[]string{biz.WarehouseRoleKey},

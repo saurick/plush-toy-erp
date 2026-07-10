@@ -436,12 +436,17 @@ test("mobile task actions explain backend access before submitting actions", () 
   );
   assert.match(
     source,
-    /if \(!canOpenMobileTaskDetailAction\(activeRoleKey, task, taskStatusKey\)\)/u,
+    /const canRunMobileTaskAction = \(task, action\) => \{[\s\S]*canOpenMobileTaskDetailAction\(activeRoleKey, task, action\)[\s\S]*canRunWorkflowTaskAction\(adminProfile, task, actionMode\)/u,
+    "mobile action permission helper must intersect the role-specific action contract with the current RBAC projection",
+  );
+  assert.match(
+    source,
+    /if \(!canRunMobileTaskAction\(task, taskStatusKey\)\)/u,
     "mobile complete/block/reject submit path must re-check the selected action permission",
   );
   assert.match(
     source,
-    /if \(!canOpenMobileTaskDetailAction\(activeRoleKey, task, action\)\)/u,
+    /if \(!canRunMobileTaskAction\(task, action\)\)/u,
     "mobile detail action entry must not rely only on hidden buttons for action permission",
   );
   assert(
@@ -575,16 +580,6 @@ test("desktop workflow task actions explain backend access before submitting act
       forbiddenLegacyIDPattern: /^\s*id:\s*task\.id,/mu,
     },
     {
-      relativePath: "web/src/erp/pages/FormalBusinessModulePage.jsx",
-      actionCalls: [
-        "await completeWorkflowTaskAction",
-        "await blockWorkflowTaskAction",
-        "await rejectWorkflowTaskAction",
-        "await urgeWorkflowTask",
-      ],
-      forbiddenLegacyIDPattern: /^\s*id:\s*task\.id,/mu,
-    },
-    {
       relativePath:
         "web/src/erp/components/purchase-orders/usePurchaseOrderWorkflowActions.mjs",
       actionCalls: [
@@ -648,8 +643,7 @@ test("desktop workflow task actions explain backend access before submitting act
       expectation.relativePath.includes("usePurchaseOrderWorkflowActions") ||
       expectation.relativePath.includes("useOutsourcingOrderWorkflowActions") ||
       expectation.relativePath.includes("DashboardPage") ||
-      expectation.relativePath.includes("WorkflowBusinessModulePage") ||
-      expectation.relativePath.includes("FormalBusinessModulePage")
+      expectation.relativePath.includes("WorkflowBusinessModulePage")
     ) {
       assert(
         !source.includes("workflowPayloadOf(task)") &&
@@ -667,7 +661,6 @@ test("workflow urge payloads do not replay frontend task source fields", () => {
     "web/src/erp/mobile/hooks/useMobileRoleTaskActions.js",
     "web/src/erp/pages/DashboardPage.jsx",
     "web/src/erp/pages/WorkflowBusinessModulePage.jsx",
-    "web/src/erp/pages/FormalBusinessModulePage.jsx",
     "web/src/erp/components/purchase-orders/usePurchaseOrderWorkflowActions.mjs",
     "web/src/erp/components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs",
   ];
@@ -751,6 +744,13 @@ test("sales order page keeps write buttons behind projected actions", () => {
       "const canCreateOrder = hasActionPermission(adminProfile, 'sales_order.create')",
     ),
     "sales order page must derive create permission through projected action helper",
+  );
+  assert(
+    pageSource.includes("const canCreateItem = canCreateOrder || canUpdateOrder") &&
+      pageSource.includes("const canUpdateItem = canUpdateOrder") &&
+      pageSource.includes("const canCancelItem = canUpdateOrder") &&
+      !/sales_order_item\.(create|update|cancel)/u.test(pageSource),
+    "sales order lines must use the aggregate order save permission instead of removed split-write actions",
   );
   assert(
     pageSource.includes("primaryAction={") &&
@@ -997,11 +997,11 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
       actions: [
         {
           key: "close",
-          requiredTokens: ["停止", "不会自动写", "出货", "库存", "财务", "Workflow"],
+          requiredTokens: ["停止", "不会自动写", "出货", "库存", "财务", "协同任务"],
         },
         {
           key: "cancel",
-          requiredTokens: ["源单", "不会自动取消", "出货", "库存", "财务", "Workflow"],
+          requiredTokens: ["源单", "不会自动取消", "出货", "库存", "财务", "协同任务"],
         },
       ],
     },
@@ -1060,40 +1060,5 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
         );
       }
     }
-  }
-});
-
-test("formal module shell exposes action boundaries instead of fake unavailable actions", () => {
-  const modulePagePath = path.join(
-    erpSourceRoot,
-    "pages/FormalBusinessModulePage.jsx",
-  );
-  const source = readFileSync(modulePagePath, "utf8");
-
-  assert(
-    source.includes("label: '状态动作边界'"),
-    "formal module shell should frame preview-only status actions as boundaries",
-  );
-  assert(
-    source.includes("label: '提交前置边界'"),
-    "formal module shell should expose submit as a boundary review entry",
-  );
-  assert(
-    source.includes("label: '确认前置边界'"),
-    "formal module shell should expose approval as a boundary review entry",
-  );
-  assert(
-    source.includes("label: '退回处理边界'"),
-    "formal module shell should expose return as a boundary review entry",
-  );
-  for (const forbiddenLabel of [
-    "提交动作未接入",
-    "确认动作未接入",
-    "退回动作未接入",
-  ]) {
-    assert(
-      !source.includes(forbiddenLabel),
-      `formal module shell must not expose fake unavailable action label: ${forbiddenLabel}`,
-    );
   }
 });

@@ -654,6 +654,15 @@
   line-height: 1.45;
 }
 
+.mobile-role-action-bar__button:disabled {
+  border-color: #e2e8f0;
+  background: #f1f5f9;
+  box-shadow: none;
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
 @media (min-width: 768px) {
   .mobile-role-tasks-page--tabs,
   .mobile-role-tasks-page--detail {

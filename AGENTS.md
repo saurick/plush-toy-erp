@@ -44,8 +44,8 @@
 
 常见专题文档包括但不限于：
 
-- Workflow 协同层：`docs/architecture/工作流用例统一编排评审.md`
-- Shipment / 出货边界：`docs/architecture/出货放行工作流用例评审.md`、`docs/architecture/出货事实与库存边界评审.md`、`docs/architecture/出货事实最小模型评审.md`
+- Workflow 协同层：`docs/architecture/状态工作流事实边界.md`、`docs/workflow/业务与协同流程地图.md`、`docs/product/多甲方角色能力与流程编排.md`
+- Shipment / 出货边界：`docs/architecture/状态工作流事实边界.md`、当前 `OperationalFactUsecase` / Inventory usecase、对应 RBAC 与测试
 - Inventory / Purchase / BOM / Quality 事实层：`docs/当前真源与交接顺序.md`、`docs/architecture/材料成品物料清单与库存专表模型评审.md`、`docs/architecture/产品款号物料清单边界评审.md`、`docs/architecture/订单采购边界评审.md`
 - 开发与验收 / 帮助文档：`docs/product/自动化测试策略.md`、`web/README.md`、`scripts/README.md`
 

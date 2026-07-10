@@ -135,12 +135,12 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   assertIncludes(
     scriptReadme,
-    "高频快速检查，包含多甲方角色能力优先级审计、正式前端客户配置投影边界、角色菜单 / seedData 配置合同、开发入口配置合同、试用账号 RBAC 单测 / 浏览器 smoke 输入模板边界测试",
+    "高频快速检查，包含正式前端客户配置投影、角色菜单 / seedData、开发入口、试用账号、客户导入、运行时 manifest、文档清单和模拟数据边界",
     "scripts README fast QA summary",
   );
   assertIncludes(
     scriptReadme,
-    "严格检查，包含多甲方角色能力优先级审计、正式前端客户配置投影边界、角色菜单 / seedData 配置合同、开发入口配置合同、试用账号 RBAC 单测 / 浏览器 smoke 输入模板边界测试",
+    "严格检查，在 fast 边界上补零 warning、完整前后端构建和本地 PostgreSQL 关键事务门禁",
     "scripts README strict QA summary",
   );
   assertIncludes(

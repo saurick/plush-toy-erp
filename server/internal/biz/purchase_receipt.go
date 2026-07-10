@@ -23,6 +23,9 @@ type PurchaseReceipt struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	Items        []*PurchaseReceiptItem
+	// QualityInspections is populated by the receipt preparation command so the
+	// process runtime can record every generated line inspection as a linked ref.
+	QualityInspections []*QualityInspection
 }
 
 type PurchaseReceiptItem struct {

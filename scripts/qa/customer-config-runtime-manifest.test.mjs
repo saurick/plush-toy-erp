@@ -6,6 +6,8 @@ import test from "node:test";
 
 import { demoCustomerPackage } from "../../config/customers/demo/customerPackage.mjs";
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
+import { yoyoosunMenuConfig } from "../../config/customers/yoyoosun/menuConfig.mjs";
+import { customerPackageCatalog } from "../../config/catalog/customerPackageCatalog.mjs";
 import { getNavigationSections } from "../../web/src/erp/config/seedData.mjs";
 import {
   RUNTIME_PAGE_KEYS,
@@ -25,8 +27,32 @@ test("customer-config-runtime-manifest: runtime page allowlist follows desktop n
   assert.deepEqual(RUNTIME_PAGE_KEYS, navigationPageKeys());
   assert(RUNTIME_PAGE_KEYS.includes("sales-orders"));
   assert(RUNTIME_PAGE_KEYS.includes("permission-center"));
+  assert(RUNTIME_PAGE_KEYS.includes("system-audit-logs"));
   assert(!RUNTIME_PAGE_KEYS.includes("help-center"));
   assert(!RUNTIME_PAGE_KEYS.includes("operations-facts"));
+});
+
+test("customer-config-runtime-manifest: publishes every visible yoyoosun menu page", () => {
+  const manifest = buildRuntimeManifest(yoyoosunCustomerPackage);
+  const hidden = new Set(yoyoosunMenuConfig.desktopMenu.hiddenItemKeys);
+  const visibleMenuKeys = yoyoosunMenuConfig.desktopMenu.sections
+    .flatMap((section) => section.items)
+    .filter((key) => !hidden.has(key));
+
+  for (const key of visibleMenuKeys) {
+    assert(
+      manifest.compiled_snapshot.pages.includes(key),
+      `visible yoyoosun menu page must be published by effective config: ${key}`,
+    );
+  }
+  assert(manifest.compiled_snapshot.pages.includes("system-audit-logs"));
+});
+
+test("customer-config-runtime-manifest: customer catalog does not duplicate route paths", () => {
+  assert(
+    customerPackageCatalog.pages.every((item) => item.path === undefined),
+    "page routes must stay owned by the frontend navigation registry",
+  );
 });
 
 test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shape", () => {
@@ -49,10 +75,11 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
   );
   assert(manifest.compiled_snapshot.pages.includes("material-bom"));
   assert(manifest.compiled_snapshot.pages.includes("processes"));
-  assert.equal(manifest.module_states.length, 15);
+  assert.equal(manifest.module_states.length, 16);
+  assert(manifest.module_states.some((item) => item.module_key === "production"));
   assert.equal(manifest.role_profiles.length, 9);
-  assert.equal(manifest.work_pools.length, 18);
-  assert.equal(manifest.work_pool_memberships.length, 18);
+  assert.equal(manifest.work_pools.length, 19);
+  assert.equal(manifest.work_pool_memberships.length, 19);
   assert.equal(manifest.compiled_snapshot.flowCatalog.runtime_enabled, false);
   assert.equal(manifest.compiled_snapshot.policyCatalog.runtime_enabled, false);
   assert.equal(
@@ -95,20 +122,20 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
       [
         "material-purchase-contract",
         "永绅",
-        "郭改玉",
-        "13537313218",
+        "采购负责人",
+        "",
         "东莞-茶山",
-        "郭改玉",
+        "",
         true,
         false,
       ],
       [
         "processing-contract",
         "永绅",
-        "刘志强",
-        "13694972987",
+        "委外负责人",
+        "",
         "东莞茶山",
-        "刘志强",
+        "",
         true,
         false,
       ],
@@ -129,16 +156,16 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
     ],
   );
   assert(manifest.access_entitlements.length > manifest.role_profiles.length);
-  const purchasingCapabilities = manifest.access_entitlements
-    .filter((item) => item.role_key === "purchasing")
+  const purchaseCapabilities = manifest.access_entitlements
+    .filter((item) => item.role_key === "purchase")
     .map((item) => item.capability_key);
   assert(
-    purchasingCapabilities.includes("purchase.order.read"),
-    "purchasing role must keep purchase order read entitlement",
+    purchaseCapabilities.includes("purchase.order.read"),
+    "purchase role must keep purchase order read entitlement",
   );
   assert(
-    purchasingCapabilities.includes("material.read"),
-    "purchasing role must read materials for purchase contract print spec/unit context",
+    purchaseCapabilities.includes("material.read"),
+    "purchase role must read materials for purchase contract print spec/unit context",
   );
   validateRuntimeManifest(manifest);
 });
@@ -235,13 +262,15 @@ test("customer-config-runtime-manifest: proves same responsibility pool can map 
   assert.equal(demoOrderReview?.role_key, "sales");
   assert.equal(yoyoosunOrderReview?.role_key, "pmc");
   assert.equal(
-    demoManifest.compiled_snapshot.processDefinitions.sales_order_acceptance.nodes[2]
-      .owner_pool_key,
+    demoManifest.compiled_snapshot.processDefinitions.sales_order_acceptance.nodes.find(
+      (node) => node.node_key === "order_review",
+    )?.owner_pool_key,
     "order_review",
   );
   assert.equal(
-    yoyoosunManifest.compiled_snapshot.processDefinitions.sales_order_acceptance.nodes[2]
-      .owner_pool_key,
+    yoyoosunManifest.compiled_snapshot.processDefinitions.sales_order_acceptance.nodes.find(
+      (node) => node.node_key === "order_review",
+    )?.owner_pool_key,
     "order_review",
   );
   assert(
@@ -275,11 +304,11 @@ test("customer-config-runtime-manifest: compiles sales order acceptance process 
   assert.equal(processDefinition.fact_boundary, "no_fact_posting");
   assert.deepEqual(
     processDefinition.nodes.map((node) => node.node_key),
-    ["submit_sales_order", "order_approval", "order_review", "end"],
+    ["submit_sales_order", "order_approval", "engineering_data", "order_review", "end"],
   );
   assert.deepEqual(
     processDefinition.nodes.map((node) => node.node_type),
-    ["domain_command", "approval", "human_task", "end"],
+    ["domain_command", "approval", "human_task", "human_task", "end"],
   );
   assert.equal(
     processDefinition.nodes[0].policy_snapshot.command_key,
@@ -288,8 +317,10 @@ test("customer-config-runtime-manifest: compiles sales order acceptance process 
   assert.equal(processDefinition.nodes[0].policy_snapshot.writes_fact, false);
   assert.equal(processDefinition.nodes[1].owner_pool_key, "order_approval");
   assert.equal(processDefinition.nodes[1].source_owner_pool_key, "boss");
-  assert.equal(processDefinition.nodes[2].owner_pool_key, "order_review");
-  assert.equal(processDefinition.nodes[2].source_owner_pool_key, "pmc");
+  assert.equal(processDefinition.nodes[2].owner_pool_key, "engineering_data");
+  assert.equal(processDefinition.nodes[2].source_owner_pool_key, "engineering");
+  assert.equal(processDefinition.nodes[3].owner_pool_key, "order_review");
+  assert.equal(processDefinition.nodes[3].source_owner_pool_key, "pmc");
   assert(
     manifest.work_pools.some(
       (pool) =>
@@ -302,6 +333,13 @@ test("customer-config-runtime-manifest: compiles sales order acceptance process 
       (membership) =>
         membership.pool_key === "order_review" &&
         membership.role_key === "pmc",
+    ),
+  );
+  assert(
+    manifest.work_pool_memberships.some(
+      (membership) =>
+        membership.pool_key === "engineering_data" &&
+        membership.role_key === "engineering",
     ),
   );
   assert(
@@ -342,7 +380,7 @@ test("customer-config-runtime-manifest: compiles material supply as loader-ready
     ]),
     [
       ["purchase_receipt.create", false, true],
-      ["quality_inspection.decide", false, true],
+      ["quality_inspection.aggregate_gate", false, true],
       ["inventory.post_inbound", false, true],
     ],
   );
@@ -373,11 +411,11 @@ test("customer-config-runtime-manifest: compiles material supply as loader-ready
       [
         "incoming_qc",
         "quality.inspection.update",
-        "quality_inspection.decide",
+        "quality_inspection.aggregate_gate",
         "process_runtime_handler_registered",
         true,
-        "InventoryUsecase.PassQualityInspection / InventoryUsecase.RejectQualityInspection",
-        "quality.pass_quality_inspection / quality.reject_quality_inspection",
+        "InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
+        "customer_config.execute_material_supply_quality_gate",
         "quality.inspection.update",
         false,
       ],
@@ -419,9 +457,18 @@ test("customer-config-runtime-manifest: compiles material supply as loader-ready
   assert.equal(qualityContract.process_runtime_handler_registered, true);
   assert(
     qualityContract.required_test_anchors.some((item) =>
-      item.includes("TestQualityInspectionProcessDomainCommandDecidePassBindsUsecase"),
+      item.includes("TestIncomingQualityGateProcessDomainCommandPassesOnlyAfterAggregateReady"),
     ),
   );
+  assert.equal(
+    qualityContract.domain_usecase_binding,
+    "InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
+  );
+  assert.equal(
+    qualityContract.jsonrpc_method,
+    "customer_config.execute_material_supply_quality_gate",
+  );
+  assert.equal(qualityContract.writes_fact, false);
   assert.equal(
     qualityContract.runtime_loader_blockers.includes(
       "domain_command_handler_not_registered",
@@ -429,6 +476,7 @@ test("customer-config-runtime-manifest: compiles material supply as loader-ready
     false,
   );
   assert.deepEqual(qualityContract.runtime_loader_blockers, []);
+  assert.deepEqual(qualityContract.runtime_execute_blockers, []);
   assert.equal(inboundContract.process_runtime_handler_registered, true);
   assert(
     inboundContract.required_test_anchors.some((item) =>
@@ -455,7 +503,7 @@ test("customer-config-runtime-manifest: compiles material supply as loader-ready
     manifest.work_pool_memberships.some(
       (membership) =>
         membership.pool_key === "purchase_receipt_source" &&
-        membership.role_key === "purchasing",
+        membership.role_key === "purchase",
     ),
   );
   assert(
@@ -645,6 +693,7 @@ test("customer-config-runtime-manifest: compiles finished goods delivery as star
 
 test("customer-config-runtime-manifest: publishes only currently consumed field policy surfaces", () => {
   const manifest = buildRuntimeManifest(yoyoosunCustomerPackage);
+  const demoManifest = buildRuntimeManifest(demoCustomerPackage);
   const fieldPolicies = manifest.compiled_snapshot.fieldPolicies;
 
   assert.deepEqual(Object.keys(fieldPolicies).sort(), [
@@ -665,6 +714,20 @@ test("customer-config-runtime-manifest: publishes only currently consumed field 
     "order_no",
     "source_no",
   ]);
+  for (const surface of Object.values(fieldPolicies)) {
+    for (const policy of Object.values(surface)) {
+      assert.deepEqual(
+        policy,
+        { visible: true },
+        "runtime manifest must not publish unconsumed label/editable/required metadata",
+      );
+    }
+  }
+  assert.deepEqual(
+    fieldPolicies,
+    demoManifest.compiled_snapshot.fieldPolicies,
+    "current field policies are Product Core visibility defaults, not a yoyoosun-specific override",
+  );
   assert.equal(fieldPolicies["sales_order_items.default"], undefined);
   assert.equal(
     Object.values(fieldPolicies).some((surface) => surface.style_no),
@@ -769,16 +832,61 @@ test("customer-config-runtime-manifest: maps customer work pools to backend role
   const bossEntitlements = manifest.access_entitlements.filter(
     (item) => item.role_key === "boss",
   );
+  const financeEntitlements = manifest.access_entitlements.filter(
+    (item) => item.role_key === "finance",
+  );
 
-  assert(roleKeys.includes("purchasing"));
+  assert(roleKeys.includes("purchase"));
   assert(roleKeys.includes("engineering"));
-  assert.equal(roleKeys.includes("purchase"), false);
-  assert.equal(purchaseMembership.role_key, "purchasing");
+  assert.equal(roleKeys.includes("purchasing"), false);
+  assert.equal(purchaseMembership.role_key, "purchase");
   assert.equal(engineeringMembership.role_key, "engineering");
   assert(engineeringEntitlements.some((item) => item.capability_key === "mobile.engineering.access"));
+  assert(bossEntitlements.some((item) => item.capability_key === "purchase.order.read"));
+  assert(bossEntitlements.some((item) => item.capability_key === "purchase.order.approve"));
   assert.equal(
     bossEntitlements.some((item) => item.capability_key === "mobile.engineering.access"),
     false,
+  );
+  assert.equal(
+    financeEntitlements.some((item) => item.capability_key.startsWith("purchase.order.")),
+    false,
+    "finance role must acquire purchase responsibilities through a second role assignment, not implicit grants",
+  );
+});
+
+test("customer-config-runtime-manifest: compiles yoyoosun entitlements as the only additive action source", () => {
+  const manifest = buildRuntimeManifest(yoyoosunCustomerPackage);
+  const profilesByRole = new Map(manifest.role_profiles.map((item) => [item.role_key, item]));
+  const entitlementsByRole = new Map();
+  for (const item of manifest.access_entitlements) {
+    const keys = entitlementsByRole.get(item.role_key) || [];
+    keys.push(item.capability_key);
+    entitlementsByRole.set(item.role_key, keys);
+  }
+
+  for (const configured of yoyoosunCustomerPackage.roleProfiles) {
+    assert.equal(profilesByRole.get(configured.roleKey)?.grants, undefined);
+    assert.deepEqual(profilesByRole.get(configured.roleKey)?.revokes, []);
+    assert.deepEqual(
+      (entitlementsByRole.get(configured.roleKey) || []).sort(),
+      [...configured.capabilityKeys].sort(),
+      `${configured.roleKey} entitlements must come from the customer role matrix`,
+    );
+  }
+  assert.deepEqual(
+    manifest.compiled_snapshot.rolePageProjections.sales,
+    [...yoyoosunCustomerPackage.roleProfiles.find((item) => item.roleKey === "sales").menuSurfaces].sort(),
+  );
+  assert.equal(
+    manifest.access_entitlements.some((item) => item.capability_key.startsWith("page.")),
+    false,
+    "page pseudo-capabilities must not be published as backend permissions",
+  );
+  assert.equal(
+    manifest.access_entitlements.some((item) => item.capability_key === "package.preview"),
+    false,
+    "catalog preview capabilities must not be published as business permissions",
   );
 });
 

@@ -18,15 +18,15 @@ import {
   completeMaterialPurchaseContractDraft,
   completeProcessingContractDraft,
 } from '../../web/src/erp/utils/contractPrintDraftCompleteness.mjs'
-import {
-  buildMaterialPurchaseContractDraftFromPurchaseOrder,
-} from '../../web/src/erp/utils/masterDataOrderView.mjs'
+import { buildMaterialPurchaseContractDraftFromPurchaseOrder } from '../../web/src/erp/utils/masterDataOrderView.mjs'
 
 const sourceManifest = JSON.parse(
   readFileSync('docs/customers/yoyoosun/source-manifest.json', 'utf8')
 )
 
-const manifestSourceIds = new Set(sourceManifest.sources.map((source) => source.sourceId))
+const manifestSourceIds = new Set(
+  sourceManifest.sources.map((source) => source.sourceId)
+)
 const syntheticSourceIds = new Set(['__synthetic_yoyoosun_trial__'])
 const forbiddenRuntimeFactCommitClaims =
   /自动过账|直接过账|直接写库存|直接写出货|直接写财务/
@@ -352,10 +352,12 @@ test('yoyoosun role flow matrix covers every workflow owner pool', () => {
 })
 
 test('yoyoosun role flow matrix keeps workflow handling separate from facts', () => {
+  assert.equal(yoyoosunRoleFlowMatrix.status, 'runtime_manifest_source')
   for (const role of yoyoosunRoleFlowMatrix.roles) {
     assert.ok(role.roleKey)
     assert.ok(role.displayName)
     assert.ok(role.ownerPools.length > 0)
+    assert.ok(role.capabilityKeys.includes('erp.dashboard.read'), `${role.roleKey} needs dashboard access`)
     assert.ok(role.capabilityKeys.includes('workflow.task.read'), `${role.roleKey} needs workflow.task.read`)
     assert.match(role.guardrail, /不|不能|只有|必须/)
     assertNoPositiveRuntimeFactCommitClaim(
@@ -363,6 +365,53 @@ test('yoyoosun role flow matrix keeps workflow handling separate from facts', ()
       `${role.roleKey} guardrail must not promise runtime fact commits`
     )
   }
+})
+
+test('yoyoosun production owns processing contract confirmation', () => {
+  const roleByKey = new Map(
+    yoyoosunRoleFlowMatrix.roles.map((role) => [role.roleKey, role])
+  )
+  const productionRole = roleByKey.get('production')
+  const purchaseRole = roleByKey.get('purchase')
+
+  assert.ok(productionRole.capabilityKeys.includes('outsourcing.order.confirm'))
+  assert.ok(productionRole.printTemplates.includes('processing-contract'))
+  assert.equal(
+    purchaseRole.capabilityKeys.some((key) => key.startsWith('outsourcing.order.')),
+    false,
+    '永绅采购岗位不应越权确认生产 / 委外加工合同'
+  )
+})
+
+test('yoyoosun finance purchase-contract responsibility uses role composition', () => {
+  const roleByKey = new Map(
+    yoyoosunRoleFlowMatrix.roles.map((role) => [role.roleKey, role])
+  )
+  const bossRole = roleByKey.get('boss')
+  const purchaseRole = roleByKey.get('purchase')
+  const financeRole = roleByKey.get('finance')
+  const assignmentProfile = yoyoosunRoleFlowMatrix.roleAssignmentProfiles.find(
+    (profile) => profile.profileKey === 'finance_purchase_contract_operator'
+  )
+
+  assert.ok(bossRole.capabilityKeys.includes('purchase.order.read'))
+  assert.ok(bossRole.capabilityKeys.includes('purchase.order.approve'))
+  assert.ok(purchaseRole.capabilityKeys.includes('purchase.order.create'))
+  assert.ok(purchaseRole.capabilityKeys.includes('purchase.order.update'))
+  assert.equal(
+    purchaseRole.capabilityKeys.includes('purchase.order.approve'),
+    false
+  )
+  assert.equal(
+    financeRole.capabilityKeys.some((key) => key.startsWith('purchase.order.')),
+    false,
+    'finance core role must not absorb purchase source-document permissions'
+  )
+  assert.deepEqual(
+    new Set(assignmentProfile.roleKeys),
+    new Set(['finance', 'purchase'])
+  )
+  assert.match(assignmentProfile.guardrail, /不把 purchase\.order\.\* 权限并入/)
 })
 
 test('yoyoosun flow orchestration coverage records runtime and preview layers', () => {
@@ -377,43 +426,117 @@ test('yoyoosun flow orchestration coverage records runtime and preview layers', 
 })
 
 test('yoyoosun flow orchestration coverage includes all configured preview flows', () => {
-  const businessFlowKeys = new Set(yoyoosunCustomerPackage.businessFlows.map((flow) => flow.key))
-  const stateMachineKeys = new Set(yoyoosunCustomerPackage.stateMachines.map((machine) => machine.key))
-  const processPolicyKeys = new Set(yoyoosunCustomerPackage.processPolicies.map((policy) => policy.key))
+  const businessFlowKeys = new Set(
+    yoyoosunCustomerPackage.businessFlows.map((flow) => flow.key)
+  )
+  const stateMachineKeys = new Set(
+    yoyoosunCustomerPackage.stateMachines.map((machine) => machine.key)
+  )
+  const processPolicyKeys = new Set(
+    yoyoosunCustomerPackage.processPolicies.map((policy) => policy.key)
+  )
   const coverage = new Map(
-    yoyoosunFlowOrchestrationCoverage.layers.map((layer) => [layer.key, new Set(layer.evidence)])
+    yoyoosunFlowOrchestrationCoverage.layers.map((layer) => [
+      layer.key,
+      new Set(layer.evidence),
+    ])
   )
 
-  for (const key of businessFlowKeys) assert.ok(coverage.get('business_flows').has(key), `${key} business flow must be covered`)
-  for (const key of stateMachineKeys) assert.ok(coverage.get('state_machines').has(key), `${key} state machine must be covered`)
-  for (const key of processPolicyKeys) assert.ok(coverage.get('process_policies').has(key), `${key} process policy must be covered`)
+  for (const key of businessFlowKeys)
+    assert.ok(
+      coverage.get('business_flows').has(key),
+      `${key} business flow must be covered`
+    )
+  for (const key of stateMachineKeys)
+    assert.ok(
+      coverage.get('state_machines').has(key),
+      `${key} state machine must be covered`
+    )
+  for (const key of processPolicyKeys)
+    assert.ok(
+      coverage.get('process_policies').has(key),
+      `${key} process policy must be covered`
+    )
 })
 
 test('yoyoosun flow orchestration coverage includes required runtime processes and UI entries', () => {
   const runtimeProcesses = new Set(
-    yoyoosunFlowOrchestrationCoverage.runtimeProcesses.map((process) => process.key)
+    yoyoosunFlowOrchestrationCoverage.runtimeProcesses.map(
+      (process) => process.key
+    )
   )
-  for (const key of ['sales_order_acceptance', 'material_supply', 'finished_goods_delivery']) {
-    assert.ok(runtimeProcesses.has(key), `${key} runtime process coverage required`)
+  for (const key of [
+    'sales_order_acceptance',
+    'material_supply',
+    'finished_goods_delivery',
+  ]) {
+    assert.ok(
+      runtimeProcesses.has(key),
+      `${key} runtime process coverage required`
+    )
   }
-  for (const uiKey of ['desktop_task_board', 'mobile_role_tasks', 'customer_config_preview', 'purchase_contract_print', 'processing_contract_print']) {
-    assert.ok(yoyoosunFlowOrchestrationCoverage.uiEntrypoints.includes(uiKey), `${uiKey} UI entry coverage required`)
+  for (const uiKey of [
+    'desktop_task_board',
+    'mobile_role_tasks',
+    'customer_config_preview',
+    'purchase_contract_print',
+    'processing_contract_print',
+  ]) {
+    assert.ok(
+      yoyoosunFlowOrchestrationCoverage.uiEntrypoints.includes(uiKey),
+      `${uiKey} UI entry coverage required`
+    )
   }
 })
 
-test('yoyoosun projection matrix separates consumed and backend-allowed field surfaces', () => {
+test('yoyoosun projection matrix separates runtime visibility from formal field contracts', () => {
   const consumedSurfaces = yoyoosunProjectionMatrix.fieldSurfaces.filter(
-    (surface) => surface.status === 'runtime_enabled'
+    (surface) => surface.status === 'runtime_visibility_consumed'
   )
-  const backendAllowedSurfaces = yoyoosunProjectionMatrix.fieldSurfaces.filter(
-    (surface) => surface.status === 'backend_runtime_allowed'
+  const formalFieldContracts = yoyoosunProjectionMatrix.fieldSurfaces.filter(
+    (surface) => surface.status === 'formal_field_contract'
   )
 
-  assert.ok(consumedSurfaces.length >= 3, 'runtime consumed surfaces must stay explicit')
-  assert.ok(backendAllowedSurfaces.length >= 8, 'backend-allowed surfaces must stay visible')
+  assert.deepEqual(
+    consumedSurfaces.map((surface) => surface.surfaceKey).sort(),
+    ['customers.default', 'sales_orders.default', 'suppliers.default']
+  )
+  assert.deepEqual(yoyoosunProjectionMatrix.fieldProjection.consumedPolicyKeys, [
+    'visible',
+  ])
+  assert.equal(
+    yoyoosunProjectionMatrix.fieldProjection.currentPolicySource,
+    'product_core_catalog_defaults'
+  )
+  assert.equal(
+    yoyoosunProjectionMatrix.fieldProjection.customerSpecificOverrideDefined,
+    false
+  )
+  assert.ok(formalFieldContracts.length >= 10, 'formal field contracts must stay explicit')
+  assert.ok(
+    consumedSurfaces.every(
+      (surface) =>
+        surface.policyKeys.length === 1 && surface.policyKeys[0] === 'visible'
+    ),
+    'runtime field policy may only claim the currently consumed visibility key'
+  )
   for (const surface of yoyoosunProjectionMatrix.fieldSurfaces) {
     assert.ok(surface.surfaceKey.endsWith('.default'))
     assert.ok(surface.fields.length > 0)
+  }
+  for (const surfaceKey of [
+    'bom_versions.default',
+    'bom_items.default',
+    'purchase_orders.default',
+    'outsourcing_orders.default',
+  ]) {
+    assert.equal(
+      yoyoosunProjectionMatrix.fieldSurfaces.find(
+        (surface) => surface.surfaceKey === surfaceKey
+      )?.status,
+      'formal_field_contract',
+      `${surfaceKey} must not be presented as an active customer field policy`
+    )
   }
   const outsourcingSurface = yoyoosunProjectionMatrix.fieldSurfaces.find(
     (surface) => surface.surfaceKey === 'outsourcing_orders.default'
@@ -431,7 +554,7 @@ test('yoyoosun print projection protects supplier and processor snapshots', () =
   }
 })
 
-test('yoyoosun customer package print party defaults are complete source-backed values', () => {
+test('yoyoosun customer package keeps public buyer defaults free of personal contact data', () => {
   const defaultsByTemplate = new Map(
     yoyoosunCustomerPackage.printTemplateDefaults.map((item) => [
       item.templateKey,
@@ -440,27 +563,25 @@ test('yoyoosun customer package print party defaults are complete source-backed 
   )
   assert.deepEqual(defaultsByTemplate.get('material-purchase-contract'), {
     buyerCompany: '永绅',
-    buyerContact: '郭改玉',
-    buyerPhone: '13537313218',
+    buyerContact: '采购负责人',
+    buyerPhone: '',
     buyerAddress: '东莞-茶山',
-    buyerSigner: '郭改玉',
+    buyerSigner: '',
   })
   assert.deepEqual(defaultsByTemplate.get('processing-contract'), {
     buyerCompany: '永绅',
-    buyerContact: '刘志强',
-    buyerPhone: '13694972987',
+    buyerContact: '委外负责人',
+    buyerPhone: '',
     buyerAddress: '东莞茶山',
-    buyerSigner: '刘志强',
+    buyerSigner: '',
   })
   for (const defaults of defaultsByTemplate.values()) {
-    assert.ok(
-      Object.values(defaults).every((value) => String(value || '').trim()),
-      'print party defaults must not include blank values'
-    )
     assert.ok(
       Object.values(defaults).every((value) => value !== '待维护'),
       'print party defaults must not keep placeholder values'
     )
+    assert.equal(defaults.buyerPhone, '')
+    assert.equal(defaults.buyerSigner, '')
   }
 })
 
@@ -471,7 +592,7 @@ test('yoyoosun trial fixture covers core and customer flow domains', () => {
     suppliers: 3,
     materials: 5,
     products: 3,
-    warehouses: 3,
+    warehouses: 4,
     bomVersions: 2,
     salesOrders: 3,
     purchaseOrders: 2,
@@ -493,36 +614,128 @@ test('yoyoosun trial fixture covers core and customer flow domains', () => {
   }
 })
 
+test('yoyoosun processing-contract fixture covers sewing fabric and handwork subjects', () => {
+  const lines = yoyoosunTrialDataFixture.outsourcingOrders.flatMap(
+    (order) => order.lines
+  )
+  const sewing = lines.find((line) => line.processName.includes('车缝'))
+  const fabric = lines.find((line) => line.processName.includes('布料'))
+  const handwork = lines.find((line) => line.processName.includes('手工'))
+
+  assert.equal(sewing?.subjectType || 'PRODUCT', 'PRODUCT')
+  assert.ok(sewing?.productNo)
+  assert.equal(fabric?.subjectType, 'MATERIAL')
+  assert.ok(fabric?.materialCode)
+  assert.equal(handwork?.subjectType, 'PRODUCT')
+  assert.ok(handwork?.productNo)
+})
+
 test('yoyoosun trial fixture covers manual regression states without claiming real import', () => {
   assert.equal(yoyoosunTrialDataFixture.status, 'preview_only')
-  assert.match(yoyoosunTrialDataFixture.boundary, /must not be applied to customer production data/)
+  assert.match(
+    yoyoosunTrialDataFixture.boundary,
+    /must not be applied to customer production data/
+  )
 
   assert.deepEqual(
-    new Set(yoyoosunTrialDataFixture.salesOrders.map((order) => order.lifecycleStatus)),
+    new Set(
+      yoyoosunTrialDataFixture.salesOrders.map((order) => order.lifecycleStatus)
+    ),
     new Set(['draft', 'active', 'cancelled'])
   )
   assert.deepEqual(
-    new Set(yoyoosunTrialDataFixture.qualityInspections.map((inspection) => inspection.result)),
+    new Set(
+      yoyoosunTrialDataFixture.qualityInspections.map(
+        (inspection) => inspection.result
+      )
+    ),
     new Set(['pending', 'passed', 'rejected'])
   )
   assert.deepEqual(
-    new Set(yoyoosunTrialDataFixture.shipments.map((shipment) => shipment.status)),
+    new Set(
+      yoyoosunTrialDataFixture.shipments.map((shipment) => shipment.status)
+    ),
     new Set(['draft', 'shipped', 'cancelled'])
   )
   assert.deepEqual(
-    new Set(yoyoosunTrialDataFixture.workflowTasks.map((task) => task.ownerRoleKey)),
-    new Set(['sales', 'purchasing', 'boss', 'quality', 'warehouse'])
+    new Set(
+      yoyoosunTrialDataFixture.workflowTasks.map((task) => task.ownerRoleKey)
+    ),
+    new Set(['sales', 'purchase', 'boss', 'quality', 'warehouse'])
   )
   assert.deepEqual(
-    new Set(yoyoosunTrialDataFixture.workflowTasks.map((task) => task.taskStatusKey)),
+    new Set(
+      yoyoosunTrialDataFixture.workflowTasks.map((task) => task.taskStatusKey)
+    ),
     new Set(['ready', 'blocked', 'done'])
+  )
+})
+
+test('yoyoosun warehouse fixture uses typed master data and valid references', () => {
+  const warehouseByCode = new Map(
+    yoyoosunTrialDataFixture.warehouses.map((warehouse) => [
+      warehouse.warehouseCode,
+      warehouse,
+    ])
+  )
+
+  assert.deepEqual(
+    new Set(
+      yoyoosunTrialDataFixture.warehouses.map(
+        (warehouse) => warehouse.warehouseType
+      )
+    ),
+    new Set(['RAW_MATERIAL', 'FINISHED_GOODS', 'OTHER', 'QC_HOLD'])
+  )
+  for (const collectionKey of [
+    'purchaseReceipts',
+    'inventoryLots',
+    'shipments',
+  ]) {
+    for (const record of yoyoosunTrialDataFixture[collectionKey]) {
+      assert.ok(
+        warehouseByCode.has(record.warehouseCode),
+        `${collectionKey} references unknown warehouse ${record.warehouseCode}`
+      )
+    }
+  }
+
+  assert.equal(
+    warehouseByCode.get(
+      yoyoosunTrialDataFixture.purchaseReceipts[0].warehouseCode
+    )?.warehouseType,
+    'RAW_MATERIAL'
+  )
+  assert.equal(
+    warehouseByCode.get(
+      yoyoosunTrialDataFixture.inventoryLots.find(
+        (lot) => lot.materialCode === 'MAT-26204-CARTON'
+      )?.warehouseCode
+    )?.warehouseType,
+    'OTHER'
+  )
+  assert.ok(
+    yoyoosunTrialDataFixture.shipments.every(
+      (shipment) =>
+        warehouseByCode.get(shipment.warehouseCode)?.warehouseType ===
+        'FINISHED_GOODS'
+    ),
+    'finished-product shipments must use the finished-goods warehouse'
   )
 })
 
 test('yoyoosun trial print fixtures have no empty critical print fields', () => {
   for (const supplier of yoyoosunTrialDataFixture.suppliers) {
-    for (const key of ['displayName', 'contactName', 'contactPhone', 'address']) {
-      assert.ok(String(supplier[key] || '').trim(), `supplier ${supplier.supplierCode} ${key} must not be blank`)
+    for (const key of [
+      'displayName',
+      'contactName',
+      'contactPhone',
+      'address',
+    ]) {
+      assert.ok(
+        String(supplier[key] || '').trim(),
+        `supplier ${supplier.supplierCode} ${key} must not be blank`
+      )
     }
   }
 
@@ -531,8 +744,20 @@ test('yoyoosun trial print fixtures have no empty critical print fields', () => 
   assert.ok(purchaseOrder.purchaseOrderNo)
   assert.ok(purchaseOrder.supplierCode)
   assert.ok(purchaseOrder.printTemplateKey === 'material-purchase-contract')
-  for (const key of ['productOrderNo', 'productNo', 'productName', 'materialName', 'unitCode', 'quantity', 'unitPrice', 'amount']) {
-    assert.ok(String(purchaseLine[key] || '').trim(), `purchase line ${key} must not be blank`)
+  for (const key of [
+    'productOrderNo',
+    'productNo',
+    'productName',
+    'materialName',
+    'unitCode',
+    'quantity',
+    'unitPrice',
+    'amount',
+  ]) {
+    assert.ok(
+      String(purchaseLine[key] || '').trim(),
+      `purchase line ${key} must not be blank`
+    )
   }
 
   const outsourcingOrder = yoyoosunTrialDataFixture.outsourcingOrders[0]
@@ -540,17 +765,54 @@ test('yoyoosun trial print fixtures have no empty critical print fields', () => 
   assert.ok(outsourcingOrder.outsourcingOrderNo)
   assert.ok(outsourcingOrder.processorCode)
   assert.ok(outsourcingOrder.printTemplateKey === 'processing-contract')
-  for (const key of ['productOrderNo', 'productNo', 'productName', 'processName', 'unitCode', 'quantity', 'unitPrice', 'amount']) {
-    assert.ok(String(outsourcingLine[key] || '').trim(), `outsourcing line ${key} must not be blank`)
+  for (const key of [
+    'productOrderNo',
+    'productNo',
+    'productName',
+    'processName',
+    'unitCode',
+    'quantity',
+    'unitPrice',
+    'amount',
+  ]) {
+    assert.ok(
+      String(outsourcingLine[key] || '').trim(),
+      `outsourcing line ${key} must not be blank`
+    )
   }
 
   for (const bomVersion of yoyoosunTrialDataFixture.bomVersions) {
-    for (const key of ['sourceOrderNo', 'quantityText', 'spareText', 'printDate', 'designer', 'maker', 'auditor', 'hairDirection']) {
-      assert.ok(String(bomVersion[key] || '').trim(), `bom version ${bomVersion.bomNo} ${key} must not be blank`)
+    for (const key of [
+      'sourceOrderNo',
+      'quantityText',
+      'spareText',
+      'printDate',
+      'designer',
+      'maker',
+      'auditor',
+      'hairDirection',
+    ]) {
+      assert.ok(
+        String(bomVersion[key] || '').trim(),
+        `bom version ${bomVersion.bomNo} ${key} must not be blank`
+      )
     }
     for (const [index, line] of bomVersion.lines.entries()) {
-      for (const key of ['materialCode', 'usageQty', 'unitCode', 'position', 'pieceCount', 'lossRate', 'totalUsage', 'processBase', 'processMethod']) {
-        assert.ok(String(line[key] || '').trim(), `bom version ${bomVersion.bomNo} line ${index + 1} ${key} must not be blank`)
+      for (const key of [
+        'materialCode',
+        'usageQty',
+        'unitCode',
+        'position',
+        'pieceCount',
+        'lossRate',
+        'totalUsage',
+        'processBase',
+        'processMethod',
+      ]) {
+        assert.ok(
+          String(line[key] || '').trim(),
+          `bom version ${bomVersion.bomNo} line ${index + 1} ${key} must not be blank`
+        )
       }
     }
   }
@@ -624,6 +886,7 @@ test('yoyoosun contract print field coverage maps every paper variable to busine
     const order = {
       purchase_order_no: purchaseOrder.purchaseOrderNo,
       supplier_id: supplier.id,
+      contract_party_snapshot: purchaseOrder.contractPartySnapshot,
       supplier_snapshot: {
         name: supplier.name,
         short_name: supplier.short_name,
@@ -677,10 +940,14 @@ test('yoyoosun contract print field coverage maps every paper variable to busine
 
   for (const outsourcingOrder of yoyoosunTrialDataFixture.outsourcingOrders) {
     const supplier = lookups.supplierByCode.get(outsourcingOrder.processorCode)
-    assert.ok(supplier, `${outsourcingOrder.outsourcingOrderNo} processor fixture required`)
+    assert.ok(
+      supplier,
+      `${outsourcingOrder.outsourcingOrderNo} processor fixture required`
+    )
     const order = {
       outsourcing_order_no: outsourcingOrder.outsourcingOrderNo,
       supplier_id: supplier.id,
+      contract_party_snapshot: outsourcingOrder.contractPartySnapshot,
       supplier_snapshot: {
         name: supplier.name,
         short_name: supplier.short_name,
@@ -688,23 +955,45 @@ test('yoyoosun contract print field coverage maps every paper variable to busine
         contact_phone: supplier.contact_phone,
         address: supplier.address,
       },
-      source_order_no: outsourcingOrder.lines[0]?.productOrderNo,
+      source_order_no:
+        outsourcingOrder.sourceOrderNo || outsourcingOrder.lines[0]?.productOrderNo,
       order_date: outsourcingOrder.orderDate,
       expected_return_date: outsourcingOrder.returnDate,
     }
     const items = outsourcingOrder.lines.map((line, index) => {
       const unit = lookups.unitByCode.get(line.unitCode)
-      const product = lookups.productByNo.get(line.productNo)
-      assert.ok(product, `${outsourcingOrder.outsourcingOrderNo} product fixture required`)
+      const subjectType = line.subjectType || 'PRODUCT'
+      const product =
+        subjectType === 'PRODUCT'
+          ? lookups.productByNo.get(line.productNo)
+          : undefined
+      const material =
+        subjectType === 'MATERIAL'
+          ? lookups.materialByCode.get(line.materialCode)
+          : undefined
+      assert.ok(
+        subjectType === 'PRODUCT' ? product : material,
+        `${outsourcingOrder.outsourcingOrderNo} ${subjectType.toLowerCase()} fixture required`
+      )
       assert.ok(unit, `${outsourcingOrder.outsourcingOrderNo} unit fixture required`)
       return {
         line_no: index + 1,
-        product_id: product.id,
+        subject_type: subjectType,
+        product_id: product?.id,
+        material_id: material?.id,
         process_id: index + 1,
         unit_id: unit.id,
-        product_order_no_snapshot: line.productOrderNo,
-        product_no_snapshot: line.productNo,
-        product_name_snapshot: line.productName,
+        product_order_no_snapshot:
+          subjectType === 'PRODUCT' ? line.productOrderNo : undefined,
+        product_no_snapshot: subjectType === 'PRODUCT' ? line.productNo : undefined,
+        product_name_snapshot:
+          subjectType === 'PRODUCT' ? line.productName : undefined,
+        material_code_snapshot:
+          subjectType === 'MATERIAL' ? line.materialCode : undefined,
+        material_name_snapshot:
+          subjectType === 'MATERIAL' ? line.materialName : undefined,
+        material_category_snapshot:
+          subjectType === 'MATERIAL' ? material?.category : undefined,
         process_name_snapshot: line.processName,
         process_category_snapshot: line.processCategory,
         unit_name_snapshot: unit.name,
@@ -792,19 +1081,30 @@ test('yoyoosun contract print source pages expose every business-owned print fie
       "name={['contract_party_snapshot', 'buyerPhone']}",
       "name={['contract_party_snapshot', 'buyerAddress']}",
       "name={['contract_party_snapshot', 'buyerSigner']}",
+      "name={[field.name, 'subject_type']}",
+      "name={[field.name, 'product_id']}",
+      "name={[field.name, 'material_id']}",
       "name={[field.name, 'product_order_no_snapshot']}",
       "name={[field.name, 'product_no_snapshot']}",
       "name={[field.name, 'product_name_snapshot']}",
+      "name={[field.name, 'material_code_snapshot']}",
+      "name={[field.name, 'material_name_snapshot']}",
       "name={[field.name, 'process_id']}",
       "name={[field.name, 'process_name_snapshot']}",
       "name={[field.name, 'process_category_snapshot']}",
       "name={[field.name, 'unit_id']}",
       "name={[field.name, 'outsourcing_quantity']}",
       "name={[field.name, 'unit_price']}",
-      "name={[field.name, 'amount']}",
+      'label="金额预览"',
       "name={[field.name, 'note']}",
     ],
     'outsourcing order form'
+  )
+  assert.ok(
+    outsourcingForm.includes('<Input') &&
+      outsourcingForm.includes('readOnly') &&
+      !outsourcingForm.includes("name={[field.name, 'amount']}"),
+    'outsourcing amount must remain a read-only preview while backend derives the saved amount'
   )
   assert.ok(
     outsourcingPage.includes('加工合同打印') &&
@@ -939,23 +1239,45 @@ test('yoyoosun contract print drafts from trial business sources do not emit mis
         address: supplier.address,
       },
       contract_party_snapshot: outsourcingOrder.contractPartySnapshot,
-      source_order_no: outsourcingOrder.lines[0]?.productOrderNo,
+      source_order_no:
+        outsourcingOrder.sourceOrderNo || outsourcingOrder.lines[0]?.productOrderNo,
       order_date: outsourcingOrder.orderDate,
       expected_return_date: outsourcingOrder.returnDate,
     }
     const items = outsourcingOrder.lines.map((line, index) => {
       const unit = lookups.unitByCode.get(line.unitCode)
-      const product = lookups.productByNo.get(line.productNo)
-      assert.ok(product, `${outsourcingOrder.outsourcingOrderNo} product fixture required`)
+      const subjectType = line.subjectType || 'PRODUCT'
+      const product =
+        subjectType === 'PRODUCT'
+          ? lookups.productByNo.get(line.productNo)
+          : undefined
+      const material =
+        subjectType === 'MATERIAL'
+          ? lookups.materialByCode.get(line.materialCode)
+          : undefined
+      assert.ok(
+        subjectType === 'PRODUCT' ? product : material,
+        `${outsourcingOrder.outsourcingOrderNo} ${subjectType.toLowerCase()} fixture required`
+      )
       assert.ok(unit, `${outsourcingOrder.outsourcingOrderNo} unit fixture required`)
       return {
         line_no: index + 1,
-        product_id: product.id,
+        subject_type: subjectType,
+        product_id: product?.id,
+        material_id: material?.id,
         process_id: index + 1,
         unit_id: unit.id,
-        product_order_no_snapshot: line.productOrderNo,
-        product_no_snapshot: line.productNo,
-        product_name_snapshot: line.productName,
+        product_order_no_snapshot:
+          subjectType === 'PRODUCT' ? line.productOrderNo : undefined,
+        product_no_snapshot: subjectType === 'PRODUCT' ? line.productNo : undefined,
+        product_name_snapshot:
+          subjectType === 'PRODUCT' ? line.productName : undefined,
+        material_code_snapshot:
+          subjectType === 'MATERIAL' ? line.materialCode : undefined,
+        material_name_snapshot:
+          subjectType === 'MATERIAL' ? line.materialName : undefined,
+        material_category_snapshot:
+          subjectType === 'MATERIAL' ? material?.category : undefined,
         process_name_snapshot: line.processName,
         process_category_snapshot: line.processCategory,
         unit_name_snapshot: unit.name,

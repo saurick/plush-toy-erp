@@ -251,6 +251,17 @@ purchase_receipt_pg_test:
 purchase_receipt_pg_dropdb:
 	@PURCHASE_RECEIPT_PG_DB_URL="$(PURCHASE_RECEIPT_PG_DB_URL)" bash ../scripts/purchase-receipt-pg.sh dropdb
 
+# Reuse the guarded local transactional test database for workflow terminal-race tests.
+.PHONY: workflow_pg_test critical_transactions_pg_test
+workflow_pg_test:
+	@PURCHASE_RECEIPT_PG_DB_URL="$(PURCHASE_RECEIPT_PG_DB_URL)" bash ../scripts/purchase-receipt-pg.sh test-workflow
+
+# Mandatory transaction/concurrency gate for Source Documents, purchase receipts,
+# receipt adjustments, and Workflow terminal updates. The script sets the PG
+# test flag so these tests cannot silently pass through t.Skip.
+critical_transactions_pg_test:
+	@PURCHASE_RECEIPT_PG_DB_URL="$(PURCHASE_RECEIPT_PG_DB_URL)" bash ../scripts/purchase-receipt-pg.sh test-critical
+
 .PHONY: purchase_return_pg_createdb purchase_return_migrate_status purchase_return_migrate_apply purchase_return_pg_test purchase_return_pg_dropdb
 purchase_return_pg_createdb:
 	@PURCHASE_RETURN_PG_DB_URL="$(PURCHASE_RETURN_PG_DB_URL)" bash ../scripts/purchase-return-pg.sh createdb

@@ -83,6 +83,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskApprove,
 				PermissionWorkflowTaskReject,
+				PermissionPurchaseOrderApprove,
 				PermissionShipmentRead,
 				PermissionMobileBossAccess,
 			},
@@ -116,16 +117,22 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 		{
 			roleKey: ProductionRoleKey,
 			has: []string{
+				PermissionERPPrintTemplateRead,
+				PermissionOutsourcingOrderRead,
+				PermissionOutsourcingOrderCreate,
+				PermissionOutsourcingOrderUpdate,
+				PermissionOutsourcingOrderConfirm,
 				PermissionWorkflowTaskRead,
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
 				PermissionMobileProductionAccess,
 			},
-			omits: []string{PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionPurchaseOrderApprove, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: EngineeringRoleKey,
 			has: []string{
+				PermissionERPPrintTemplateRead,
 				PermissionProcessRead,
 				PermissionProcessCreate,
 				PermissionProductRead,
@@ -150,7 +157,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionMaterialUpdate,
 				PermissionMobilePurchaseAccess,
 			},
-			omits: []string{PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionPurchaseOrderApprove, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: FinanceRoleKey,
@@ -162,7 +169,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionShipmentRead,
 				PermissionMobileFinanceAccess,
 			},
-			omits: []string{PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionWorkflowTaskApprove, PermissionPurchaseOrderRead, PermissionPurchaseOrderCreate, PermissionPurchaseOrderUpdate, PermissionPurchaseOrderApprove, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: PMCRoleKey,
@@ -170,10 +177,11 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskRead,
 				PermissionWorkflowTaskCreate,
 				PermissionWorkflowTaskUpdate,
+				PermissionWorkflowTaskComplete,
 				PermissionShipmentRead,
 				PermissionMobilePMCAccess,
 			},
-			omits: []string{PermissionWorkflowTaskComplete, PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: SalesRoleKey,

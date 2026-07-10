@@ -155,14 +155,15 @@ func TestWorkflowRepo_FinishedGoodsQCDoneCreatesInboundIdempotently(t *testing.T
 	}
 }
 
-func TestWorkflowRepo_FinishedGoodsQCReworkIdempotencyAllowsNextRoundAfterDone(t *testing.T) {
+func TestWorkflowRepo_FinishedGoodsQCReworkIdempotencyHonorsRejectedTerminalState(t *testing.T) {
 	cases := []struct {
-		status    string
-		reasonKey string
-		sourceID  int
+		status     string
+		reasonKey  string
+		sourceID   int
+		wantRounds int
 	}{
-		{status: "blocked", reasonKey: "blocked_reason", sourceID: 4601},
-		{status: "rejected", reasonKey: "rejected_reason", sourceID: 4602},
+		{status: "blocked", reasonKey: "blocked_reason", sourceID: 4601, wantRounds: 2},
+		{status: "rejected", reasonKey: "rejected_reason", sourceID: 4602, wantRounds: 1},
 	}
 
 	for _, tc := range cases {
@@ -276,8 +277,8 @@ func TestWorkflowRepo_FinishedGoodsQCReworkIdempotencyAllowsNextRoundAfterDone(t
 			if err != nil {
 				t.Fatalf("count rework tasks failed: %v", err)
 			}
-			if count != 2 {
-				t.Fatalf("expected completed rework to allow next round, got %d rework tasks", count)
+			if count != tc.wantRounds {
+				t.Fatalf("expected %s source task to produce %d rework round(s), got %d", tc.status, tc.wantRounds, count)
 			}
 		})
 	}

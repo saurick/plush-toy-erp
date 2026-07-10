@@ -391,7 +391,7 @@ test("sales order item field policy remains unpublished until detail and print c
   );
 });
 
-test("compiled customer packages expose only the sales order runtime surface", () => {
+test("compiled customer packages expose only the three current runtime visibility surfaces", () => {
   for (const customerPackage of [yoyoosunCustomerPackage, demoCustomerPackage]) {
     const manifest = buildRuntimeManifest(customerPackage);
     const fieldPolicies = manifest.compiled_snapshot.fieldPolicies;

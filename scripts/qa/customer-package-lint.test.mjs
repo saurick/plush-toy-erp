@@ -261,6 +261,24 @@ test("customer-package-lint: moduleStates stay catalog-bound and explain non-ena
 test("customer-package-lint: print template defaults stay bounded to party defaults", () => {
   validatePackage(demoCustomerPackage);
 
+  validatePackage({
+    ...demoCustomerPackage,
+    printTemplateDefaults: [
+      {
+        templateKey: "material-purchase-contract",
+        status: "preview_only",
+        partyDefaults: {
+          buyerCompany: "演示买方公司",
+          buyerContact: "采购负责人",
+          buyerPhone: "",
+          buyerAddress: "演示地址",
+          buyerSigner: "",
+        },
+        guardrail: "个人电话与签名由启用后的有效配置或源单快照提供",
+      },
+    ],
+  });
+
   assert.throws(
     () =>
       validatePackage({
@@ -299,13 +317,37 @@ test("customer-package-lint: print template defaults stay bounded to party defau
           {
             templateKey: "material-purchase-contract",
             status: "preview_only",
-            partyDefaults: { buyerCompany: "演示买方公司" },
+            partyDefaults: {
+              buyerCompany: "演示买方公司",
+              buyerContact: "采购负责人",
+              buyerAddress: "演示地址",
+            },
             supplierDefaults: { supplierName: "不允许覆盖供应商" },
             guardrail: "invalid supplier default",
           },
         ],
       }),
     /supplierDefaults must not override supplier snapshots from business records/,
+  );
+  assert.throws(
+    () =>
+      validatePackage({
+        ...demoCustomerPackage,
+        printTemplateDefaults: [
+          {
+            templateKey: "material-purchase-contract",
+            status: "preview_only",
+            partyDefaults: {
+              buyerCompany: "演示买方公司",
+              buyerContact: "采购负责人",
+              buyerPhone: "",
+              buyerSigner: "",
+            },
+            guardrail: "缺少机构地址",
+          },
+        ],
+      }),
+    /partyDefaults\.buyerAddress must be a non-empty string/,
   );
 });
 

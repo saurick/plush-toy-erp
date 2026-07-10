@@ -63,23 +63,30 @@ test('release evidence still marks readback boundary', () => {
   assert.match(releaseEvidence, /internal-only/)
 })
 
-test('backend-allowed field surfaces stay separate from consumed field surfaces', () => {
+test('formal field contracts stay separate from runtime visibility surfaces', () => {
   const consumedSurfaces = new Set(
     yoyoosunProjectionMatrix.fieldSurfaces
-      .filter((surface) => surface.status === 'runtime_enabled')
+      .filter((surface) => surface.status === 'runtime_visibility_consumed')
       .map((surface) => surface.surfaceKey)
   )
-  const backendAllowedSurfaces = new Set(
+  const formalFieldContracts = new Set(
     yoyoosunProjectionMatrix.fieldSurfaces
-      .filter((surface) => surface.status === 'backend_runtime_allowed')
+      .filter((surface) => surface.status === 'formal_field_contract')
       .map((surface) => surface.surfaceKey)
   )
 
   for (const surface of ['customers.default', 'suppliers.default', 'sales_orders.default']) {
     assert.ok(consumedSurfaces.has(surface), `${surface} must remain consumed`)
   }
-  for (const surface of ['purchase_orders.default', 'outsourcing_orders.default', 'shipments.default', 'finance_facts.default']) {
-    assert.ok(backendAllowedSurfaces.has(surface), `${surface} must be backend allowed`)
+  for (const surface of [
+    'bom_versions.default',
+    'bom_items.default',
+    'purchase_orders.default',
+    'outsourcing_orders.default',
+    'shipments.default',
+    'finance_facts.default',
+  ]) {
+    assert.ok(formalFieldContracts.has(surface), `${surface} must remain a formal field contract only`)
   }
   const outsourcingSurface = yoyoosunProjectionMatrix.fieldSurfaces.find(
     (surface) => surface.surfaceKey === 'outsourcing_orders.default'

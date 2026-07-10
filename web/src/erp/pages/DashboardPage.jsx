@@ -407,7 +407,7 @@ function TaskMetricAction({
 function WorkbenchQueueEmpty({ activeOption, fallbackOption, onSwitchQueue }) {
   const description = fallbackOption
     ? `${activeOption.label}暂无任务，可切到${fallbackOption.label}继续处理。`
-    : '当前没有需要处理的 Workflow 任务。'
+    : '当前没有需要处理的协同任务。'
 
   return (
     <div className="erp-workbench-queue-empty">
@@ -1017,9 +1017,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   <div className="erp-workbench-panel-head">
                     <div>
                       <Title level={5}>当前任务上下文</Title>
-                      <Text type="secondary">
-                        只展示当前队列选中的 Workflow 任务
-                      </Text>
+                      <Text type="secondary">只展示当前队列选中的协同任务</Text>
                     </div>
                     {selectedWorkbenchStatusMeta ? (
                       <Tag color={selectedWorkbenchStatusMeta.color}>
@@ -1365,7 +1363,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             </Title>
             <Paragraph type="secondary" className="erp-dashboard-summary">
               定义阻塞、责任分派、处理跟进、验证恢复和关闭归档的用户路径；所有状态更新仍通过
-              Workflow 任务动作完成。
+              协同任务处理完成。
             </Paragraph>
             <div className="erp-exception-flow-steps">
               {EXCEPTION_FLOW_STEPS.map((step, index) => (

@@ -14,32 +14,6 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "create_sales_order", "createSalesOrder":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderCreate); res != nil {
-			return id, res, nil
-		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
-			return id, res, nil
-		}
-		in, ok := salesOrderMutationFromParams(pm)
-		if !ok {
-			return id, invalidParamResult(), nil
-		}
-		item, err := d.salesOrderUC.CreateSalesOrder(ctx, in)
-		return id, salesOrderMutationResult(ctx, d, item, err), nil
-	case "update_sales_order", "updateSalesOrder":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderUpdate); res != nil {
-			return id, res, nil
-		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
-			return id, res, nil
-		}
-		in, ok := salesOrderMutationFromParams(pm)
-		if !ok {
-			return id, invalidParamResult(), nil
-		}
-		item, err := d.salesOrderUC.UpdateSalesOrder(ctx, getInt(pm, "id", 0), in)
-		return id, salesOrderMutationResult(ctx, d, item, err), nil
 	case "save_sales_order_with_items", "saveSalesOrderWithItems":
 		orderID := getInt(pm, "id", 0)
 		orderPermission := biz.PermissionSalesOrderCreate
@@ -59,9 +33,6 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 		items, ok := salesOrderItemSaveMutationsFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
-		}
-		if res := d.requireSalesOrderWithItemsPermissions(ctx, orderID, items); res != nil {
-			return id, res, nil
 		}
 		result, err := d.salesOrderUC.SaveSalesOrderWithItems(ctx, orderID, in, items)
 		return id, salesOrderWithItemsMutationResult(ctx, d, result, err), nil
@@ -107,35 +78,4 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 	default:
 		return id, unknownSalesOrderResult(method), nil
 	}
-}
-
-func (d *jsonrpcDispatcher) requireSalesOrderWithItemsPermissions(ctx context.Context, orderID int, items []*biz.SalesOrderItemSaveMutation) *v1.JsonrpcResult {
-	needsItemCreate := false
-	needsItemUpdate := false
-	for _, item := range items {
-		if item == nil {
-			continue
-		}
-		if item.ID > 0 {
-			needsItemUpdate = true
-		} else {
-			needsItemCreate = true
-		}
-	}
-	if needsItemCreate {
-		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderItemCreate); res != nil {
-			return res
-		}
-	}
-	if needsItemUpdate {
-		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderItemUpdate); res != nil {
-			return res
-		}
-	}
-	if orderID > 0 {
-		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderItemCancel); res != nil {
-			return res
-		}
-	}
-	return nil
 }

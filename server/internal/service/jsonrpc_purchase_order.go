@@ -26,9 +26,7 @@ func (d *jsonrpcDispatcher) handlePurchaseOrder(
 	}
 
 	switch method {
-	case "create_purchase_order", "createPurchaseOrder",
-		"update_purchase_order", "updatePurchaseOrder",
-		"save_purchase_order_with_items", "savePurchaseOrderWithItems",
+	case "save_purchase_order_with_items", "savePurchaseOrderWithItems",
 		"get_purchase_order", "getPurchaseOrder",
 		"list_purchase_orders", "listPurchaseOrders":
 		return d.handlePurchaseOrderDocument(ctx, method, id, pm)
@@ -37,10 +35,7 @@ func (d *jsonrpcDispatcher) handlePurchaseOrder(
 		"close_purchase_order", "closePurchaseOrder",
 		"cancel_purchase_order", "cancelPurchaseOrder":
 		return d.handlePurchaseOrderLifecycle(ctx, method, id, pm)
-	case "add_purchase_order_item", "addPurchaseOrderItem",
-		"update_purchase_order_item", "updatePurchaseOrderItem",
-		"remove_purchase_order_item", "removePurchaseOrderItem",
-		"list_purchase_order_items", "listPurchaseOrderItems":
+	case "list_purchase_order_items", "listPurchaseOrderItems":
 		return d.handlePurchaseOrderItem(ctx, method, id, pm)
 	default:
 		return id, unknownPurchaseOrderResult(method), nil

@@ -20,6 +20,7 @@ type stubOutsourcingOrderJSONRPCRepo struct {
 	nextItemID         int
 	supplierActive     bool
 	productActive      bool
+	materialActive     bool
 	unitActive         bool
 	processActive      bool
 	processOutsourcing bool
@@ -36,6 +37,7 @@ func newStubOutsourcingOrderJSONRPCRepo() *stubOutsourcingOrderJSONRPCRepo {
 		nextItemID:         1,
 		supplierActive:     true,
 		productActive:      true,
+		materialActive:     true,
 		unitActive:         true,
 		processActive:      true,
 		processOutsourcing: true,
@@ -120,6 +122,10 @@ func (s *stubOutsourcingOrderJSONRPCRepo) ProductIsActive(context.Context, int) 
 	return s.productActive, nil
 }
 
+func (s *stubOutsourcingOrderJSONRPCRepo) MaterialIsActive(context.Context, int) (bool, error) {
+	return s.materialActive, nil
+}
+
 func (s *stubOutsourcingOrderJSONRPCRepo) UnitIsActive(context.Context, int) (bool, error) {
 	return s.unitActive, nil
 }
@@ -153,6 +159,7 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 		"items": []any{
 			map[string]any{
 				"line_no":                   float64(1),
+				"subject_type":              biz.OutsourcingOrderSubjectProduct,
 				"product_id":                float64(2),
 				"process_id":                float64(3),
 				"unit_id":                   float64(4),
@@ -193,6 +200,9 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	}
 	if productOrderNo := item["product_order_no_snapshot"]; productOrderNo != "SO-JSONRPC-001" {
 		t.Fatalf("expected product order no snapshot, got %#v", productOrderNo)
+	}
+	if subjectType := item["subject_type"]; subjectType != biz.OutsourcingOrderSubjectProduct || item["material_id"] != nil {
+		t.Fatalf("expected product subject DTO with nil material id, got %#v", item)
 	}
 
 	_, listRes, err := j.handleOutsourcingOrder(ctx, "list_outsourcing_orders", "2", mustJSONRPCStruct(t, map[string]any{
@@ -261,6 +271,80 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 		if got != tc.want {
 			t.Fatalf("%s expected status %s, got %#v", tc.method, tc.want, got)
 		}
+	}
+}
+
+func TestJsonrpcDispatcher_OutsourcingOrderAPISavesMaterialSubjectAndRequiresMaterialModule(t *testing.T) {
+	repo := newStubOutsourcingOrderJSONRPCRepo()
+	j := newOutsourcingOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.PurchaseRoleKey},
+		biz.PermissionOutsourcingOrderCreate,
+		biz.PermissionOutsourcingOrderRead,
+	))
+	ctx := workflowJSONRPCAdminContext()
+
+	readOnlyMaterials := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.07.10.outsourcing-materials-read-only",
+		"outsourcing_orders",
+		"enabled",
+	)
+	readOnlyMaterials = customerConfigPublishParamsWithRevisionAndModuleState(t, readOnlyMaterials, "", "materials", "read_only")
+	activateOperationalFactTestCustomerConfig(t, j, readOnlyMaterials)
+	_, blocked, err := j.handleOutsourcingOrder(ctx, "save_outsourcing_order_with_items", "material-read-only", outsourcingOrderMaterialJSONRPCSaveParams(t, "OUT-MATERIAL-BLOCKED"))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if blocked == nil || blocked.Code != errcode.InvalidParam.Code || len(repo.orders) != 0 {
+		t.Fatalf("expected material subject blocked when materials module is read_only, res=%#v orders=%#v", blocked, repo.orders)
+	}
+
+	enabledMaterials := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.07.10.outsourcing-materials-enabled",
+		"outsourcing_orders",
+		"enabled",
+	)
+	enabledMaterials = customerConfigPublishParamsWithRevisionAndModuleState(t, enabledMaterials, "", "materials", "enabled")
+	activateOperationalFactTestCustomerConfig(t, j, enabledMaterials)
+	_, saved, err := j.handleOutsourcingOrder(ctx, "save_outsourcing_order_with_items", "material-enabled", outsourcingOrderMaterialJSONRPCSaveParams(t, "OUT-MATERIAL-001"))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if saved == nil || saved.Code != errcode.OK.Code {
+		t.Fatalf("expected material outsourcing order save OK, got %#v", saved)
+	}
+	rawItems, ok := saved.Data.AsMap()["outsourcing_order_items"].([]any)
+	if !ok || len(rawItems) != 1 {
+		t.Fatalf("expected one material outsourcing item, got %#v", saved.Data.AsMap()["outsourcing_order_items"])
+	}
+	item, ok := rawItems[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected material item map, got %#v", rawItems[0])
+	}
+	if item["subject_type"] != biz.OutsourcingOrderSubjectMaterial || item["product_id"] != nil || jsonRPCInt(t, item, "material_id") != 7 {
+		t.Fatalf("expected material subject DTO with exactly one material id, got %#v", item)
+	}
+	if item["material_code_snapshot"] != "MAT-FABRIC-007" || item["material_name_snapshot"] != "短毛绒布料" || item["product_name_snapshot"] != nil {
+		t.Fatalf("expected material print snapshots without product residue, got %#v", item)
+	}
+
+	invalidBoth := outsourcingOrderMaterialJSONRPCSaveParams(t, "OUT-MATERIAL-BOTH")
+	payload := invalidBoth.AsMap()
+	items := payload["items"].([]any)
+	items[0].(map[string]any)["product_id"] = float64(9)
+	invalidBoth, err = structpb.NewStruct(payload)
+	if err != nil {
+		t.Fatalf("NewStruct invalid both ids: %v", err)
+	}
+	_, rejected, err := j.handleOutsourcingOrder(ctx, "save_outsourcing_order_with_items", "material-both-ids", invalidBoth)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if rejected == nil || rejected.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected both subject ids rejected, got %#v", rejected)
 	}
 }
 
@@ -383,6 +467,7 @@ func outsourcingOrderJSONRPCSaveParams(t *testing.T, orderNo string) *structpb.S
 		"items": []any{
 			map[string]any{
 				"line_no":               float64(1),
+				"subject_type":          biz.OutsourcingOrderSubjectProduct,
 				"product_id":            float64(1),
 				"process_id":            float64(1),
 				"unit_id":               float64(1),
@@ -391,6 +476,34 @@ func outsourcingOrderJSONRPCSaveParams(t *testing.T, orderNo string) *structpb.S
 				"product_name_snapshot": "半成品",
 				"process_name_snapshot": "车缝",
 				"unit_name_snapshot":    "只",
+			},
+		},
+	})
+}
+
+func outsourcingOrderMaterialJSONRPCSaveParams(t *testing.T, orderNo string) *structpb.Struct {
+	t.Helper()
+	return mustJSONRPCStruct(t, map[string]any{
+		"outsourcing_order_no": orderNo,
+		"supplier_id":          float64(1),
+		"source_order_no":      "ENG-MATERIAL-001",
+		"order_date":           "2026-07-10",
+		"items": []any{
+			map[string]any{
+				"line_no":                   float64(1),
+				"subject_type":              biz.OutsourcingOrderSubjectMaterial,
+				"material_id":               float64(7),
+				"process_id":                float64(3),
+				"unit_id":                   float64(4),
+				"material_code_snapshot":    " MAT-FABRIC-007 ",
+				"material_name_snapshot":    " 短毛绒布料 ",
+				"product_name_snapshot":     "不应保留",
+				"outsourcing_quantity":      "20",
+				"unit_price":                "2.5",
+				"amount":                    "50",
+				"process_name_snapshot":     "布料加工",
+				"process_category_snapshot": "委外布料加工",
+				"unit_name_snapshot":        "米",
 			},
 		},
 	})
@@ -419,12 +532,16 @@ func outsourcingOrderItemFromMutation(id int, orderID int, in *biz.OutsourcingOr
 		ID:                      id,
 		OutsourcingOrderID:      orderID,
 		LineNo:                  in.LineNo,
+		SubjectType:             in.SubjectType,
 		ProductID:               in.ProductID,
+		MaterialID:              in.MaterialID,
 		ProcessID:               in.ProcessID,
 		UnitID:                  in.UnitID,
 		ProductNoSnapshot:       in.ProductNoSnapshot,
 		ProductOrderNoSnapshot:  in.ProductOrderNoSnapshot,
 		ProductNameSnapshot:     in.ProductNameSnapshot,
+		MaterialCodeSnapshot:    in.MaterialCodeSnapshot,
+		MaterialNameSnapshot:    in.MaterialNameSnapshot,
 		ProcessNameSnapshot:     in.ProcessNameSnapshot,
 		ProcessCategorySnapshot: in.ProcessCategorySnapshot,
 		UnitNameSnapshot:        in.UnitNameSnapshot,

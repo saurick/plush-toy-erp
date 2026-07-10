@@ -10,15 +10,18 @@ async function setupCustomerPackage() {
   const root = await mkdtemp(path.join(os.tmpdir(), "customer-web-config-"));
   const configRoot = path.join(root, "config");
   const customerDir = path.join(configRoot, "customers", "yoyoosun");
-  const assetsDir = path.join(customerDir, "assets");
+  const assetsDir = path.join(customerDir, "public-assets");
+  const privateAssetsDir = path.join(customerDir, "assets");
   const webBuildDir = path.join(root, "web", "build");
   fs.mkdirSync(assetsDir, { recursive: true });
+  fs.mkdirSync(privateAssetsDir, { recursive: true });
   fs.mkdirSync(webBuildDir, { recursive: true });
   fs.writeFileSync(
     path.join(customerDir, "customer-config.example.js"),
     "window.__PLUSH_ERP_CUSTOMER_CONFIG__={customerKey:'yoyoosun'};\n",
   );
   fs.writeFileSync(path.join(assetsDir, "favicon-yoyoosun.svg"), "<svg />\n");
+  fs.writeFileSync(path.join(privateAssetsDir, "customer-process-photo.png"), "private\n");
   return { root, configRoot, webBuildDir };
 }
 
@@ -54,6 +57,18 @@ test("applyCustomerWebConfig overlays customer-config.js and assets", async () =
       ),
       true,
     );
+    assert.equal(
+      fs.existsSync(
+        path.join(
+          webBuildDir,
+          "customer-assets",
+          "yoyoosun",
+          "customer-process-photo.png",
+        ),
+      ),
+      false,
+      "production overlay must not publish private customer evidence assets",
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -63,7 +78,7 @@ test("applyCustomerWebConfig rejects missing customer config", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "customer-web-config-"));
   const configRoot = path.join(root, "config");
   const webBuildDir = path.join(root, "web", "build");
-  fs.mkdirSync(path.join(configRoot, "customers", "yoyoosun", "assets"), {
+  fs.mkdirSync(path.join(configRoot, "customers", "yoyoosun", "public-assets"), {
     recursive: true,
   });
   fs.mkdirSync(webBuildDir, { recursive: true });

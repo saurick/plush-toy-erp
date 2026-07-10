@@ -25,6 +25,8 @@ export function createBusinessFormalScenarios(deps) {
     expectNoButton,
     expectText,
     gotoScenarioPath,
+    outputDir,
+    path,
     verifyBusinessActionFormModal,
     verifyBusinessModuleColumnOrderDialog,
     verifyBusinessRowDoubleClickEditModal,
@@ -583,9 +585,19 @@ export function createBusinessFormalScenarios(deps) {
 
   return [
     {
-      name: 'business-formal-module-shells-desktop',
+      name: 'business-core-pages-desktop',
       path: '/erp/master/partners/suppliers',
       auth: 'admin',
+      effectiveSession: {
+        configRevision: 'style-l1-business-core-pages',
+        configHash: 'style-l1-business-core-pages-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        pages: [],
+        actions: [],
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '供应商档案')
@@ -1093,6 +1105,8 @@ export function createBusinessFormalScenarios(deps) {
             noteTextareaVisible: visible(noteTextarea),
             listOverflowX: listStyle?.overflowX || '',
             listOverflowY: listStyle?.overflowY || '',
+            listClientWidth: list instanceof HTMLElement ? list.clientWidth : 0,
+            listScrollWidth: list instanceof HTMLElement ? list.scrollWidth : 0,
             gridAutoFlow: gridStyle?.gridAutoFlow || '',
             gridOverflowX: gridStyle?.overflowX || '',
             rowCount: rows.length,
@@ -1267,6 +1281,8 @@ export function createBusinessFormalScenarios(deps) {
             lastRowVisible: visible(lastRow),
             listOverflowX: listStyle?.overflowX || '',
             listOverflowY: listStyle?.overflowY || '',
+            listClientWidth: list instanceof HTMLElement ? list.clientWidth : 0,
+            listScrollWidth: list instanceof HTMLElement ? list.scrollWidth : 0,
             gridAutoFlow: gridStyle?.gridAutoFlow || '',
             gridOverflowX: gridStyle?.overflowX || '',
             labelsSameLine:
@@ -1287,6 +1303,9 @@ export function createBusinessFormalScenarios(deps) {
             bodyRight: bodyRect?.right || 0,
             footerTop: footerRect?.top || 0,
             footerBottom: footerRect?.bottom || 0,
+            documentOverflowX:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
             visibleLabels: labels.map((item) => item.text),
           }
         })
@@ -1324,8 +1343,13 @@ export function createBusinessFormalScenarios(deps) {
           )}`
         )
         assert(
-          bomLineMetrics.lastRowOverflowX <= 1,
-          `BOM 新增行不应横向溢出: ${JSON.stringify(bomLineMetrics)}`
+          bomLineMetrics.lastRowOverflowX > 1 &&
+            bomLineMetrics.listScrollWidth >
+              bomLineMetrics.listClientWidth + 1 &&
+            bomLineMetrics.documentOverflowX <= 1,
+          `BOM 宽明细应只在明细列表内横向滚动，不得推宽弹窗或页面: ${JSON.stringify(
+            bomLineMetrics
+          )}`
         )
         assert(
           bomLineMetrics.rowLeft >= bomLineMetrics.bodyLeft - 1 &&
@@ -1353,6 +1377,10 @@ export function createBusinessFormalScenarios(deps) {
             )}`
           )
         }
+        await page.screenshot({
+          path: path.join(outputDir, 'business-v1-bom-wide-line-scroll.png'),
+          fullPage: true,
+        })
         await assertLineItemAddActionScrollsToNewRow(bomEditModal, {
           scenarioName: 'business-standard-bom-edit-form-modal',
           targetRowCount: 7,
@@ -1820,7 +1848,7 @@ export function createBusinessFormalScenarios(deps) {
         await assertTextAbsent(page, '生成委外合同')
         await expectButton(page, '加工合同打印')
         await expectNoButton(page, '作业指导书打印')
-        await assertTextAbsent(page, '打印作业指导书')
+        await expectNoButton(page, '打印作业指导书')
         const processingContractPrintButton = page.getByRole('button', {
           name: '加工合同打印',
         })

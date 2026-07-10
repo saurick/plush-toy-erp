@@ -702,7 +702,6 @@ export async function installFactRpcMocks(page, context) {
   const workflowTasks = []
   const workflowBusinessStates = []
   let workflowTaskID = 1
-  let workflowBusinessStateID = 1
   await page.route('**/rpc/business', async (route) => {
     const body = route.request().postDataJSON() || {}
     const { id = 'mock-id', method } = body
@@ -749,33 +748,6 @@ export async function installFactRpcMocks(page, context) {
           offset: Number(params.offset || 0),
         }
         break
-      case 'upsert_business_state': {
-        const existing = workflowBusinessStates.find(
-          (item) =>
-            item.source_type === params.source_type &&
-            Number(item.source_id) === Number(params.source_id)
-        )
-        const businessState = {
-          id: existing?.id || workflowBusinessStateID++,
-          source_type: params.source_type,
-          source_id: Number(params.source_id || Date.now()),
-          source_no: params.source_no || '',
-          business_status_key: params.business_status_key || 'project_pending',
-          owner_role_key: params.owner_role_key || 'business',
-          blocked_reason: params.blocked_reason || '',
-          payload: params.payload || {},
-          status_changed_at: nowUnix(),
-          created_at: existing?.created_at || nowUnix(),
-          updated_at: nowUnix(),
-        }
-        if (existing) {
-          Object.assign(existing, businessState)
-        } else {
-          workflowBusinessStates.unshift(businessState)
-        }
-        data = { business_state: existing || businessState }
-        break
-      }
       case 'list_tasks': {
         const listDelayMs = resolveDelayFromReferer(
           route.request(),

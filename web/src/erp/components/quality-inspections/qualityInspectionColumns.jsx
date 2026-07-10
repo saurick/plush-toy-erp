@@ -146,7 +146,6 @@ export function buildQualityInspectionExportColumns({
       title: '采购入库单',
       exportTitle: '采购入库单',
       dataIndex: 'purchase_receipt_id',
-      effectiveFieldKey: 'source_no',
       width: 120,
       sortType: 'number',
       render: (value) =>
@@ -276,7 +275,6 @@ export function buildQualityInspectionDataColumns({
       title: '采购来源',
       exportTitle: '采购来源',
       dataIndex: 'purchase_receipt_id',
-      effectiveFieldKey: 'source_no',
       width: 210,
       sortType: 'number',
       render: (_value, record) =>

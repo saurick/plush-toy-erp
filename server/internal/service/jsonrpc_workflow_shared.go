@@ -33,6 +33,15 @@ func (d *jsonrpcDispatcher) mapWorkflowError(ctx context.Context, err error) *v1
 	case errors.Is(err, biz.ErrWorkflowTaskExists):
 		l.Warnf("[workflow] task exists err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务编码已存在"}
+	case errors.Is(err, biz.ErrWorkflowTaskSettled):
+		l.Warnf("[workflow] task settled err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务已结束，不能再次变更状态"}
+	case errors.Is(err, biz.ErrProcessInstanceSettled),
+		errors.Is(err, biz.ErrProcessNodeInstanceConflict),
+		errors.Is(err, biz.ErrProcessNodeInstanceSettled),
+		errors.Is(err, biz.ErrProcessNodeInstanceNotActive):
+		l.Warnf("[workflow] linked process state conflict err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "关联流程状态冲突，请刷新后重试"}
 	case errors.Is(err, biz.ErrWorkflowBusinessStateFound):
 		l.Warnf("[workflow] business state exists err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "业务状态快照已存在"}

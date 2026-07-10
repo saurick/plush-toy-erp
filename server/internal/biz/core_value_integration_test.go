@@ -116,6 +116,7 @@ func TestNormalizePurchaseItemsUseCoreMoneyAndQuantityGuards(t *testing.T) {
 
 func TestNormalizeSalesOrderItemUsesCoreMoneyAndQuantityGuards(t *testing.T) {
 	price := decimal.NewFromInt(3)
+	amount := decimal.NewFromInt(12)
 	negative := decimal.NewFromInt(-1)
 	in := SalesOrderItemMutation{
 		SalesOrderID:    1,
@@ -124,7 +125,7 @@ func TestNormalizeSalesOrderItemUsesCoreMoneyAndQuantityGuards(t *testing.T) {
 		UnitID:          3,
 		OrderedQuantity: decimal.NewFromInt(4),
 		UnitPrice:       &price,
-		Amount:          &price,
+		Amount:          &amount,
 	}
 	if _, err := normalizeSalesOrderItemMutation(in); err != nil {
 		t.Fatalf("normalizeSalesOrderItemMutation() error = %v", err)

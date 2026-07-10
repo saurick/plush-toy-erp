@@ -68,7 +68,6 @@ type RoleProfileInput struct {
 	DisplayName string
 	Disabled    bool
 	BundleKeys  []string
-	Grants      []string
 	Revokes     []string
 }
 
@@ -289,6 +288,9 @@ func (uc *CustomerConfigUsecase) ActivateCustomerConfig(ctx context.Context, cus
 	if customerKey == "" || revision == "" || activatedBy <= 0 {
 		return nil, ErrBadParam
 	}
+	if err := uc.validateCustomerConfigModuleClosure(ctx, customerKey, revision); err != nil {
+		return nil, err
+	}
 	return uc.repo.ActivateCustomerConfig(ctx, customerKey, revision, activatedBy, time.Now())
 }
 
@@ -301,7 +303,21 @@ func (uc *CustomerConfigUsecase) RollbackCustomerConfig(ctx context.Context, cus
 	if customerKey == "" || targetRevision == "" || actorID <= 0 {
 		return nil, ErrBadParam
 	}
+	if err := uc.validateCustomerConfigModuleClosure(ctx, customerKey, targetRevision); err != nil {
+		return nil, err
+	}
 	return uc.repo.RollbackCustomerConfig(ctx, customerKey, targetRevision, actorID, time.Now())
+}
+
+func (uc *CustomerConfigUsecase) validateCustomerConfigModuleClosure(ctx context.Context, customerKey, revision string) error {
+	if _, err := uc.repo.GetCustomerConfigRevision(ctx, customerKey, revision); err != nil {
+		return err
+	}
+	modules, err := uc.repo.ListDeploymentModuleStates(ctx, customerKey, revision)
+	if err != nil {
+		return err
+	}
+	return validateCustomerConfigModuleClosure(modules)
 }
 
 func (uc *CustomerConfigUsecase) GetEffectiveSession(ctx context.Context, customerKey string, admin *AdminUser) (*EffectiveSession, error) {
@@ -332,7 +348,12 @@ func (uc *CustomerConfigUsecase) GetEffectiveSession(ctx context.Context, custom
 	if err != nil {
 		return nil, err
 	}
-	entitlements, err := uc.repo.ListAccessEntitlements(ctx, customerKey, active.Revision, roleKeys)
+	roleProfiles, err := uc.repo.ListRoleProfiles(ctx, customerKey, active.Revision)
+	if err != nil {
+		return nil, err
+	}
+	effectiveRoleKeys := enabledCustomerRoleKeys(roleKeys, roleProfiles)
+	entitlements, err := uc.repo.ListAccessEntitlements(ctx, customerKey, active.Revision, effectiveRoleKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -340,11 +361,11 @@ func (uc *CustomerConfigUsecase) GetEffectiveSession(ctx context.Context, custom
 	if err != nil {
 		return nil, err
 	}
-	memberships, err := uc.repo.ListWorkPoolMemberships(ctx, customerKey, active.Revision, roleKeys, admin.ID)
+	memberships, err := uc.repo.ListWorkPoolMemberships(ctx, customerKey, active.Revision, effectiveRoleKeys, admin.ID)
 	if err != nil {
 		return nil, err
 	}
-	return buildEffectiveSessionFromRevision(customerKey, active, admin, roleKeys, modules, entitlements, workPools, memberships), nil
+	return buildEffectiveSessionFromRevision(customerKey, active, admin, effectiveRoleKeys, modules, roleProfiles, entitlements, workPools, memberships), nil
 }
 
 func (uc *CustomerConfigUsecase) BuildProcessInstanceCreateFromActiveCustomerConfig(ctx context.Context, in ProcessInstanceFromCustomerConfigInput) (*ProcessInstanceCreate, error) {
@@ -817,11 +838,11 @@ var productModuleCatalog = map[string]productModuleCatalogItem{
 	"material_bom":        {Name: "BOM 管理", Layer: "MasterData", Maturity: "runtime_v1", Dependencies: []string{"products", "materials"}, PageKeys: []string{"material-bom"}},
 	"sales_orders":        {Name: "销售订单", Layer: "SourceDocument", Maturity: "runtime_v1", Dependencies: []string{"customers", "products"}, PageKeys: []string{"sales-orders"}},
 	"purchase_orders":     {Name: "采购订单", Layer: "SourceDocument", Maturity: "runtime_v1", Dependencies: []string{"suppliers", "materials"}, PageKeys: []string{"accessories-purchase"}},
-	"purchase_receipts":   {Name: "采购入库", Layer: "Fact", Maturity: "runtime_v1", Dependencies: []string{"purchase_orders"}, PageKeys: []string{"inbound"}},
-	"quality_inspections": {Name: "质检", Layer: "Fact", Maturity: "runtime_v1", PageKeys: []string{"quality-inspections"}},
-	"outsourcing_orders":  {Name: "委外订单", Layer: "SourceDocument", Maturity: "runtime_v1", Dependencies: []string{"suppliers", "products"}, PageKeys: []string{"processing-contracts"}},
+	"purchase_receipts":   {Name: "采购入库", Layer: "Fact", Maturity: "runtime_v1", Dependencies: []string{"purchase_orders", "quality_inspections", "inventory"}, PageKeys: []string{"inbound"}},
+	"quality_inspections": {Name: "质检", Layer: "Fact", Maturity: "runtime_v1", Dependencies: []string{"inventory"}, PageKeys: []string{"quality-inspections"}},
+	"outsourcing_orders":  {Name: "委外订单", Layer: "SourceDocument", Maturity: "runtime_v1", Dependencies: []string{"suppliers", "processes"}, PageKeys: []string{"processing-contracts"}},
 	"inventory":           {Name: "库存台账", Layer: "FactReadModel", Maturity: "runtime_v1", PageKeys: []string{"inventory", "inbound", "outbound"}},
-	"shipments":           {Name: "出货单", Layer: "Fact", Maturity: "runtime_v1", Dependencies: []string{"sales_orders"}, PageKeys: []string{"shipments", "outbound"}},
+	"shipments":           {Name: "出货单", Layer: "Fact", Maturity: "runtime_v1", Dependencies: []string{"sales_orders", "inventory"}, PageKeys: []string{"shipments", "outbound"}},
 	"finance":             {Name: "财务业务", Layer: "FactCandidate", Maturity: "workflow_assisted", PageKeys: []string{"finance-dashboard", "payable-reconciliation", "shipment-finance"}},
 	"workflow_tasks":      {Name: "协同任务", Layer: "Workflow", Maturity: "runtime_v1", PageKeys: []string{"task-board"}},
 	"production":          {Name: "生产协同", Layer: "Workflow", Maturity: "workflow_assisted", PageKeys: []string{"production-progress"}},
@@ -844,11 +865,48 @@ func missingModuleDependencies(dependencies []string, modules map[string]Deploym
 			continue
 		}
 		state := strings.TrimSpace(modules[dependency].State)
-		if state != "enabled" && state != "read_only" {
+		if state != "enabled" {
 			missing = append(missing, dependency)
 		}
 	}
 	return normalizeStringList(missing)
+}
+
+func validateCustomerConfigModuleClosure(modules []DeploymentModuleStateInput) error {
+	moduleStates := map[string]string{}
+	for _, item := range modules {
+		moduleKey := normalizeModuleKey(item.ModuleKey)
+		if moduleKey == "" {
+			return ErrBadParam
+		}
+		if _, known := productModuleCatalogItemForKey(moduleKey); !known {
+			return ErrBadParam
+		}
+		if _, duplicate := moduleStates[moduleKey]; duplicate {
+			return ErrBadParam
+		}
+		state := strings.TrimSpace(item.State)
+		if state == "" {
+			state = "enabled"
+		}
+		moduleStates[moduleKey] = state
+	}
+	for moduleKey, state := range moduleStates {
+		if state == "disabled" {
+			continue
+		}
+		catalog, _ := productModuleCatalogItemForKey(moduleKey)
+		for _, dependency := range catalog.Dependencies {
+			dependencyState := moduleStates[normalizeModuleKey(dependency)]
+			if state == "enabled" && dependencyState != "enabled" {
+				return ErrBadParam
+			}
+			if state == "read_only" && dependencyState != "enabled" && dependencyState != "read_only" {
+				return ErrBadParam
+			}
+		}
+	}
+	return nil
 }
 
 func normalizeWorkflowTaskRequiredCapabilities(values []string) []string {
@@ -972,16 +1030,26 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 			return CustomerConfigPublishInput{}, ErrBadParam
 		}
 	}
+	if len(in.RoleProfiles) == 0 {
+		return CustomerConfigPublishInput{}, ErrBadParam
+	}
+	roleProfileKeys := map[string]struct{}{}
 	for index := range in.RoleProfiles {
 		item := &in.RoleProfiles[index]
 		item.RoleKey = NormalizeRoleKey(item.RoleKey)
 		item.DisplayName = strings.TrimSpace(item.DisplayName)
 		item.BundleKeys = normalizeStringList(item.BundleKeys)
-		item.Grants = normalizeStringList(item.Grants)
 		item.Revokes = normalizeStringList(item.Revokes)
 		if item.RoleKey == "" || item.DisplayName == "" {
 			return CustomerConfigPublishInput{}, ErrBadParam
 		}
+		if _, exists := roleProfileKeys[item.RoleKey]; exists {
+			return CustomerConfigPublishInput{}, ErrBadParam
+		}
+		roleProfileKeys[item.RoleKey] = struct{}{}
+	}
+	if !compiledSnapshotRolePageProjectionsAreAllowed(in.CompiledSnapshot, roleProfileKeys) {
+		return CustomerConfigPublishInput{}, ErrBadParam
 	}
 	for index := range in.AccessEntitlements {
 		item := &in.AccessEntitlements[index]
@@ -998,7 +1066,14 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 		if item.RoleKey == "" || item.CapabilityKey == "" {
 			return CustomerConfigPublishInput{}, ErrBadParam
 		}
+		if _, exists := roleProfileKeys[item.RoleKey]; !exists {
+			return CustomerConfigPublishInput{}, ErrBadParam
+		}
+		if !builtinRoleHasPermission(item.RoleKey, item.CapabilityKey) {
+			return CustomerConfigPublishInput{}, ErrBadParam
+		}
 	}
+	workPoolKeys := map[string]struct{}{}
 	for index := range in.WorkPools {
 		item := &in.WorkPools[index]
 		item.PoolKey = strings.TrimSpace(item.PoolKey)
@@ -1008,6 +1083,10 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 		if item.PoolKey == "" || item.ModuleKey == "" || item.DisplayName == "" {
 			return CustomerConfigPublishInput{}, ErrBadParam
 		}
+		if _, exists := workPoolKeys[item.PoolKey]; exists {
+			return CustomerConfigPublishInput{}, ErrBadParam
+		}
+		workPoolKeys[item.PoolKey] = struct{}{}
 	}
 	for index := range in.WorkPoolMemberships {
 		item := &in.WorkPoolMemberships[index]
@@ -1020,8 +1099,27 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 		if item.PoolKey == "" || (item.RoleKey == "" && item.UserID <= 0) {
 			return CustomerConfigPublishInput{}, ErrBadParam
 		}
+		if _, exists := workPoolKeys[item.PoolKey]; !exists {
+			return CustomerConfigPublishInput{}, ErrBadParam
+		}
+		if item.RoleKey != "" {
+			if _, exists := roleProfileKeys[item.RoleKey]; !exists {
+				return CustomerConfigPublishInput{}, ErrBadParam
+			}
+		}
 	}
 	return in, nil
+}
+
+func builtinRoleHasPermission(roleKey, permissionKey string) bool {
+	roleKey = NormalizeRoleKey(roleKey)
+	permissionKey = strings.TrimSpace(permissionKey)
+	for _, role := range BuiltinRoles() {
+		if role.Key == roleKey {
+			return PermissionSetHasAny(PermissionKeySet(role.Permissions), permissionKey)
+		}
+	}
+	return false
 }
 
 func containsForbiddenCustomerConfigPayload(value any) bool {
@@ -1089,6 +1187,63 @@ func compiledSnapshotPagesAreAllowed(snapshot map[string]any) bool {
 	return true
 }
 
+func compiledSnapshotRolePageProjectionsAreAllowed(snapshot map[string]any, roleProfileKeys map[string]struct{}) bool {
+	raw, exists := snapshot["rolePageProjections"]
+	if !exists {
+		return true
+	}
+	projections, ok := raw.(map[string]any)
+	if !ok {
+		return false
+	}
+	allowedPages := runtimePageKeySet()
+	configuredPages := map[string]struct{}{}
+	for _, pageKey := range allowedRuntimePagesFromSnapshot(snapshot) {
+		configuredPages[pageKey] = struct{}{}
+	}
+	for rawRoleKey, rawPageKeys := range projections {
+		roleKey := NormalizeRoleKey(rawRoleKey)
+		if roleKey == "" {
+			return false
+		}
+		if _, exists := roleProfileKeys[roleKey]; !exists {
+			return false
+		}
+		pageKeys, ok := customerConfigStringSlice(rawPageKeys)
+		if !ok || len(pageKeys) == 0 {
+			return false
+		}
+		for _, pageKey := range pageKeys {
+			if _, allowed := allowedPages[pageKey]; !allowed {
+				return false
+			}
+			if _, configured := configuredPages[pageKey]; !configured {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func customerConfigStringSlice(value any) ([]string, bool) {
+	switch typed := value.(type) {
+	case []string:
+		return normalizeStringList(typed), true
+	case []any:
+		out := make([]string, 0, len(typed))
+		for _, item := range typed {
+			text, ok := item.(string)
+			if !ok || strings.TrimSpace(text) == "" {
+				return nil, false
+			}
+			out = append(out, text)
+		}
+		return normalizeStringList(out), true
+	default:
+		return nil, false
+	}
+}
+
 func compiledSnapshotFieldPoliciesAreAllowed(snapshot map[string]any) bool {
 	raw, exists := snapshot["fieldPolicies"]
 	if !exists {
@@ -1113,7 +1268,11 @@ func compiledSnapshotFieldPoliciesAreAllowed(snapshot map[string]any) bool {
 			if _, ok := allowedFields[fieldKey]; !ok {
 				return false
 			}
-			if _, ok := rawPolicy.(map[string]any); !ok {
+			policy, ok := rawPolicy.(map[string]any)
+			if !ok || len(policy) != 1 {
+				return false
+			}
+			if _, ok := policy["visible"].(bool); !ok {
 				return false
 			}
 		}
@@ -1135,7 +1294,9 @@ func effectiveFieldPoliciesFromSnapshot(snapshot map[string]any) map[string]any 
 		surface := map[string]any{}
 		for fieldKey := range allowedFields {
 			if policy, ok := rawSurface[fieldKey].(map[string]any); ok {
-				surface[fieldKey] = policy
+				if visible, ok := policy["visible"].(bool); ok {
+					surface[fieldKey] = map[string]any{"visible": visible}
+				}
 			}
 		}
 		if len(surface) > 0 {
@@ -1204,6 +1365,7 @@ func buildEffectiveSessionFromRevision(
 	admin *AdminUser,
 	roleKeys []string,
 	modules []DeploymentModuleStateInput,
+	roleProfiles []RoleProfileInput,
 	entitlements []AccessEntitlementInput,
 	workPools []WorkPoolInput,
 	memberships []WorkPoolMembershipInput,
@@ -1214,18 +1376,19 @@ func buildEffectiveSessionFromRevision(
 			moduleMap[item.ModuleKey] = item.State
 		}
 	}
-	enabledModules := enabledCustomerConfigModuleSet(modules)
-	actionSet := map[string]struct{}{}
-	for _, item := range entitlements {
-		if item.Enabled && customerConfigActionAllowedByModules(item.CapabilityKey, enabledModules) {
-			actionSet[item.CapabilityKey] = struct{}{}
-		}
-	}
-	actions := make([]string, 0, len(actionSet))
-	for key := range actionSet {
-		actions = append(actions, key)
-	}
-	sort.Strings(actions)
+	enabledModules := customerConfigModuleSetByStates(modules, "enabled")
+	readableModules := customerConfigModuleSetByStates(modules, "enabled", "read_only")
+	baseActions := PermissionKeySet(effectiveActionKeys(admin))
+	actions := sortedPermissionKeys(customerConfigRoleActionSet(
+		baseActions,
+		roleKeys,
+		roleProfiles,
+		entitlements,
+		customerKey,
+		func(capabilityKey string) bool {
+			return customerConfigActionAllowedByModuleState(capabilityKey, enabledModules, readableModules)
+		},
+	))
 	allowedWorkPools := customerConfigWorkPoolEnabledModuleSet(workPools, enabledModules)
 	poolSet := map[string]struct{}{}
 	for _, item := range memberships {
@@ -1246,9 +1409,17 @@ func buildEffectiveSessionFromRevision(
 				customerName = strings.TrimSpace(name)
 			}
 		}
-		fieldPolicies = effectiveFieldPoliciesFromSnapshotForEnabledModules(revision.CompiledSnapshot, enabledModules)
+		fieldPolicies = effectiveFieldPoliciesFromSnapshotForEnabledModules(revision.CompiledSnapshot, readableModules)
 	}
-	printTemplateDefaults := effectivePrintTemplateDefaultsFromSnapshotForEnabledModules(revision.CompiledSnapshot, enabledModules)
+	printTemplateDefaults := effectivePrintTemplateDefaultsFromSnapshotForEnabledModules(revision.CompiledSnapshot, readableModules)
+	// Page projection must follow the already narrowed effective actions. Using the
+	// original admin permissions here would keep pages from a customer-disabled
+	// role visible even though its actions and work pools were removed.
+	pageProjectionAdmin := &AdminUser{Permissions: actions, IsSuperAdmin: admin.IsSuperAdmin}
+	pages := effectivePageKeysForEnabledModules(pageProjectionAdmin, revision.CompiledSnapshot, readableModules)
+	if !admin.IsSuperAdmin {
+		pages = effectivePageKeysForRoles(pages, revision.CompiledSnapshot, roleKeys)
+	}
 	return &EffectiveSession{
 		ConfigRevision: revision.Revision,
 		ConfigHash:     revision.ConfigHash,
@@ -1258,13 +1429,36 @@ func buildEffectiveSessionFromRevision(
 		},
 		Modules:               moduleMap,
 		Roles:                 roleKeys,
-		Pages:                 effectivePageKeysForEnabledModules(admin, revision.CompiledSnapshot, enabledModules),
+		Pages:                 pages,
 		Actions:               actions,
 		WorkPools:             pools,
 		FieldPolicies:         fieldPolicies,
 		PrintTemplateDefaults: printTemplateDefaults,
 		Source:                "active_customer_config_revision",
 	}
+}
+
+func customerRoleProfileMap(profiles []RoleProfileInput) map[string]RoleProfileInput {
+	out := make(map[string]RoleProfileInput, len(profiles))
+	for _, profile := range profiles {
+		roleKey := NormalizeRoleKey(profile.RoleKey)
+		if roleKey != "" {
+			out[roleKey] = profile
+		}
+	}
+	return out
+}
+
+func enabledCustomerRoleKeys(roleKeys []string, profiles []RoleProfileInput) []string {
+	profileByRole := customerRoleProfileMap(profiles)
+	out := make([]string, 0, len(roleKeys))
+	for _, roleKey := range NormalizeAdminRoleKeys(roleKeys) {
+		profile, exists := profileByRole[roleKey]
+		if exists && !profile.Disabled {
+			out = append(out, roleKey)
+		}
+	}
+	return out
 }
 
 var runtimePrintTemplateModuleKeys = map[string][]string{
@@ -1438,8 +1632,42 @@ func effectivePageKeysForEnabledModules(admin *AdminUser, snapshot map[string]an
 	return normalizeStringList(out)
 }
 
-func enabledCustomerConfigModuleSet(modules []DeploymentModuleStateInput) map[string]struct{} {
+func effectivePageKeysForRoles(pageKeys []string, snapshot map[string]any, roleKeys []string) []string {
+	raw, exists := snapshot["rolePageProjections"]
+	if !exists {
+		return normalizeStringList(pageKeys)
+	}
+	projections, ok := raw.(map[string]any)
+	if !ok {
+		return []string{}
+	}
+	allowed := map[string]struct{}{}
+	for _, roleKey := range NormalizeAdminRoleKeys(roleKeys) {
+		projected, ok := customerConfigStringSlice(projections[roleKey])
+		if !ok {
+			continue
+		}
+		for _, pageKey := range projected {
+			allowed[pageKey] = struct{}{}
+		}
+	}
+	out := make([]string, 0, len(pageKeys))
+	for _, pageKey := range pageKeys {
+		if _, ok := allowed[pageKey]; ok {
+			out = append(out, pageKey)
+		}
+	}
+	return normalizeStringList(out)
+}
+
+func customerConfigModuleSetByStates(modules []DeploymentModuleStateInput, allowedStates ...string) map[string]struct{} {
 	out := map[string]struct{}{}
+	allowed := map[string]struct{}{}
+	for _, raw := range allowedStates {
+		if state := strings.TrimSpace(raw); state != "" {
+			allowed[state] = struct{}{}
+		}
+	}
 	for _, item := range modules {
 		key := normalizeModuleKey(item.ModuleKey)
 		if key == "" {
@@ -1449,7 +1677,7 @@ func enabledCustomerConfigModuleSet(modules []DeploymentModuleStateInput) map[st
 		if state == "" {
 			state = "enabled"
 		}
-		if state == "enabled" {
+		if _, ok := allowed[state]; ok {
 			out[key] = struct{}{}
 		}
 	}
@@ -1479,20 +1707,78 @@ func customerConfigPageAllowedByModules(pageKey string, enabledModules map[strin
 	return customerConfigModulesEnabled(moduleKeys, enabledModules)
 }
 
-func customerConfigActionAllowedByModules(actionKey string, enabledModules map[string]struct{}) bool {
+func customerConfigActionAllowedByModuleState(actionKey string, enabledModules, readableModules map[string]struct{}) bool {
 	actionKey = strings.TrimSpace(actionKey)
 	if actionKey == "" {
 		return false
 	}
 	if strings.HasPrefix(actionKey, "page.") && strings.HasSuffix(actionKey, ".read") {
 		pageKey := strings.TrimSuffix(strings.TrimPrefix(actionKey, "page."), ".read")
-		return customerConfigPageAllowedByModules(pageKey, enabledModules)
+		return customerConfigPageAllowedByModules(pageKey, readableModules)
+	}
+	if strings.HasPrefix(actionKey, "contact.") {
+		moduleSet := enabledModules
+		if customerConfigActionIsReadOnly(actionKey) {
+			moduleSet = readableModules
+		}
+		return customerConfigAnyModuleEnabled([]string{"customers", "suppliers"}, moduleSet)
 	}
 	moduleKeys := customerConfigModulesForAction(actionKey)
 	if len(moduleKeys) == 0 {
 		return true
 	}
+	moduleKeys = customerConfigModuleDependencyClosure(moduleKeys)
+	if customerConfigActionIsReadOnly(actionKey) {
+		return customerConfigModulesEnabled(moduleKeys, readableModules)
+	}
 	return customerConfigModulesEnabled(moduleKeys, enabledModules)
+}
+
+func customerConfigAnyModuleEnabled(moduleKeys []string, modules map[string]struct{}) bool {
+	for _, raw := range moduleKeys {
+		if _, ok := modules[normalizeModuleKey(raw)]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func customerConfigModuleDependencyClosure(moduleKeys []string) []string {
+	seen := map[string]struct{}{}
+	var add func(string)
+	add = func(raw string) {
+		moduleKey := normalizeModuleKey(raw)
+		if moduleKey == "" {
+			return
+		}
+		if _, exists := seen[moduleKey]; exists {
+			return
+		}
+		seen[moduleKey] = struct{}{}
+		if catalog, ok := productModuleCatalogItemForKey(moduleKey); ok {
+			for _, dependency := range catalog.Dependencies {
+				add(dependency)
+			}
+		}
+	}
+	for _, moduleKey := range moduleKeys {
+		add(moduleKey)
+	}
+	out := make([]string, 0, len(seen))
+	for moduleKey := range seen {
+		out = append(out, moduleKey)
+	}
+	return normalizeStringList(out)
+}
+
+func customerConfigActionIsReadOnly(actionKey string) bool {
+	actionKey = strings.TrimSpace(actionKey)
+	for _, permission := range BuiltinPermissions() {
+		if permission.Key == actionKey {
+			return permission.Action == "read"
+		}
+	}
+	return false
 }
 
 func customerConfigModulesEnabled(moduleKeys []string, enabledModules map[string]struct{}) bool {
@@ -1659,7 +1945,7 @@ func ensureCustomerConfigModuleKeysEnabled(moduleKeys []string, modules []Deploy
 		}
 		moduleStates[key] = state
 	}
-	for _, moduleKey := range moduleKeys {
+	for _, moduleKey := range customerConfigModuleDependencyClosure(moduleKeys) {
 		if moduleStates[moduleKey] != "enabled" {
 			return ErrBadParam
 		}
@@ -1672,8 +1958,8 @@ func processDomainCommandReferencedModuleKeys(commandKey string) []string {
 	case ProcessDomainCommandSalesOrderSubmit:
 		return []string{"sales_orders", "workflow_tasks"}
 	case ProcessDomainCommandPurchaseReceiptCreate:
-		return []string{"purchase_orders", "purchase_receipts"}
-	case ProcessDomainCommandQualityInspectionDecide:
+		return []string{"purchase_orders", "purchase_receipts", "quality_inspections", "inventory"}
+	case ProcessDomainCommandIncomingQualityGate:
 		return []string{"purchase_receipts", "quality_inspections"}
 	case ProcessDomainCommandInventoryPostInbound:
 		return []string{"purchase_receipts", "inventory"}
@@ -1881,7 +2167,7 @@ func customerConfigDomainCommandNodeAllowed(processKey, businessRefType, nodeKey
 		case "purchase_receipt_source":
 			return businessRefType == "purchase_order" && commandKey == ProcessDomainCommandPurchaseReceiptCreate
 		case "incoming_qc":
-			return (businessRefType == "purchase_order" || businessRefType == "purchase_receipt") && commandKey == ProcessDomainCommandQualityInspectionDecide
+			return (businessRefType == "purchase_order" || businessRefType == "purchase_receipt") && commandKey == ProcessDomainCommandIncomingQualityGate
 		case "warehouse_inbound":
 			return (businessRefType == "purchase_order" || businessRefType == "purchase_receipt") && commandKey == ProcessDomainCommandInventoryPostInbound
 		default:

@@ -437,6 +437,7 @@ func createPostedQualityReceipt(t *testing.T, ctx context.Context, uc *biz.Inven
 	}); err != nil {
 		t.Fatalf("add receipt item %s failed: %v", receiptNo, err)
 	}
+	passPurchaseReceiptQualityForServiceTest(t, ctx, uc, receipt.ID)
 	posted, err := uc.PostPurchaseReceipt(ctx, receipt.ID)
 	if err != nil {
 		t.Fatalf("post receipt %s failed: %v", receiptNo, err)
@@ -445,6 +446,27 @@ func createPostedQualityReceipt(t *testing.T, ctx context.Context, uc *biz.Inven
 		t.Fatalf("expected one posted receipt item with lot, got %#v", posted.Items)
 	}
 	return posted, posted.Items[0], *posted.Items[0].LotID
+}
+
+func passPurchaseReceiptQualityForServiceTest(t *testing.T, ctx context.Context, uc *biz.InventoryUsecase, receiptID int) {
+	t.Helper()
+	inspections, _, err := uc.ListQualityInspections(ctx, biz.QualityInspectionFilter{
+		PurchaseReceiptID: receiptID,
+		SourceType:        biz.QualityInspectionSourcePurchaseReceipt,
+		InspectionType:    biz.QualityInspectionTypeIncoming,
+		Limit:             200,
+	})
+	if err != nil || len(inspections) == 0 {
+		t.Fatalf("load generated incoming inspections for receipt %d failed: count=%d err=%v", receiptID, len(inspections), err)
+	}
+	for _, inspection := range inspections {
+		if _, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{
+			InspectionID: inspection.ID,
+			Result:       biz.QualityInspectionResultPass,
+		}); err != nil {
+			t.Fatalf("pass generated incoming inspection %d failed: %v", inspection.ID, err)
+		}
+	}
 }
 
 func createQualityDraftViaRPC(t *testing.T, ctx context.Context, j *jsonrpcDispatcher, inspectionNo string, receiptID, itemID, lotID int, fixtures inventoryTestFixtures) int {

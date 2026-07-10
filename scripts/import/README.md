@@ -1,27 +1,21 @@
-# 导入脚本 / Import Scripts
+# 导入准备脚本 / Import Preparation
 
-本文是 `scripts/import/` 的目录入口。客户资料和导入边界仍以 [docs/customers/yoyoosun/README.md](../../docs/customers/yoyoosun/README.md)、[docs/customers/yoyoosun/导入策略.md](../../docs/customers/yoyoosun/导入策略.md) 和 [scripts/README.md](../README.md) 为准。
-
-## 目录职责
-
-`scripts/import/` 放 yoyoosun source manifest 检查、只读 source extract、snapshot freeze、dry-run preview 和受控导入执行器。当前没有可直接执行的 yoyoosun 客户真实数据；真实写入必须另有客户确认、备份证据、恢复计划和显式执行确认。
+本目录只负责客户资料的来源登记、只读提取、快照冻结和 dry-run。当前仓库没有真实客户数据导入执行器，也不授权把模拟数据写成客户真实数据。
 
 ## 主路径
 
-| 步骤 | 脚本 | 输出 / 作用 |
+| 目的 | 脚本 | 边界 |
 | --- | --- | --- |
-| 1. 来源清单校验 | `customerSourceManifestCheck.mjs` | 校验 tracked manifest、sha256、size 和未登记来源文件 |
-| 2. 只读结构化提取 | `customerSourceExtract.mjs` | 从允许结构化的 Excel 生成本地 source snapshot 和报告 |
-| 3. 冻结检查 | `customerSourceSnapshotFreezeCheck.mjs` | 生成 freeze metadata、summary 和 report |
-| 4. dry-run preview | `customerImportDryRun.mjs` | 生成候选、冲突、未解决队列、禁止自动导入项和 dry-run 报告 |
-| 5. 受控执行报告 | `customerImportExecute.mjs` | 默认 report-only；真实 `--execute` 需满足审批、备份、恢复和确认条件 |
+| 来源清单校验 | `customerSourceManifestCheck.mjs` | 校验路径、hash、大小和未登记文件 |
+| 结构化提取 | `customerSourceExtract.mjs` | 只提取 manifest 允许的 Excel，PDF / 图片保留人工复核 |
+| 快照冻结 | `customerSourceSnapshotFreezeCheck.mjs` | 生成可复查的 freeze evidence |
+| 导入预演 | `customerImportDryRun.mjs` | 输出候选、重复、冲突、未决项和禁止自动导入项 |
 
-## 写入边界
+这些脚本都不得连接后端或数据库，不写正式表，不生成 migration，不创建库存、出货、财务或 Workflow 事实。输出写入 ignored 的 `output/customers/<customer-key>/`；原始客户行、凭据和 DSN 不得进入仓库。
 
-- manifest check、extract、freeze 和 dry-run 不连接数据库、不读取 server config、不调用 web runtime、不写正式表、不写 `business_records`。
-- `fixtures/**` 只用于 report-only 自检，不能作为真实客户批准或真实导入证据。
-- `customerImportExecute.mjs` 没有 `--execute` 时只生成报告；进入 `--execute` 必须使用 JSON-RPC V1 API，不直接写表、不生成 schema / migration、不创建出货、库存或财务事实。
-- 输出默认写到 ignored `output/customers/yoyoosun/**`，不得把 raw rows、真实凭据、完整 DSN 或未脱敏客户原始内容写入仓库。
+## 真实导入边界
+
+以后拿到经客户确认的真实数据时，应单独评审通用导入批次能力：通过正式 usecase/API 写入，具备幂等批次、逐行结果、失败恢复、审计和导入后对账。它不能在本目录以某个客户名硬编码，也不能由 dry-run 参数偷偷开启。
 
 ## 常用命令
 
@@ -37,13 +31,12 @@ node scripts/import/customerImportDryRun.mjs \
   --format json,md
 ```
 
-## 修改后验证
-
-调整导入脚本后，优先运行对应测试：
+## 验证
 
 ```bash
-node --test scripts/import/customerSourceManifestCheck.test.mjs
-node --test scripts/import/customerImportDryRun.test.mjs
-node --test scripts/import/customerImportExecute.test.mjs
-git diff --check
+node --test scripts/import/customerSourceManifestCheck.test.mjs \
+  scripts/import/customerSourceExtract.test.mjs \
+  scripts/import/customerSourceSnapshotFreezeCheck.test.mjs \
+  scripts/import/customerImportDryRun.test.mjs
+node --test scripts/qa/test-data-isolation-boundary.test.mjs
 ```

@@ -1,7 +1,7 @@
-import { BUSINESS_WORKFLOW_STATES } from '../config/workflowStatus.mjs'
+import { BUSINESS_STATUS_OPTIONS } from '../config/workflowStatus.mjs'
 
 const BUSINESS_STATUS_KEY_SET = new Set(
-  BUSINESS_WORKFLOW_STATES.map((state) => state.key)
+  BUSINESS_STATUS_OPTIONS.map((state) => state.key)
 )
 
 function toText(value) {

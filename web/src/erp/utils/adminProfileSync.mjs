@@ -24,19 +24,15 @@ const DEFAULT_FIELD_POLICY_SURFACE_BY_MODULE = Object.freeze({
   suppliers: 'suppliers.default',
   sales_orders: 'sales_orders.default',
   'sales-orders': 'sales_orders.default',
-  sales_order_items: 'sales_order_items.default',
-  purchase_orders: 'purchase_orders.default',
-  'accessories-purchase': 'purchase_orders.default',
-  purchase_order_items: 'purchase_order_items.default',
-  purchase_receipts: 'purchase_receipts.default',
-  quality_inspections: 'quality_inspections.default',
-  'quality-inspections': 'quality_inspections.default',
-  inventory_lots: 'inventory_lots.default',
-  inventory_txns: 'inventory_txns.default',
-  shipments: 'shipments.default',
-  outsourcing_orders: 'outsourcing_orders.default',
-  'processing-contracts': 'outsourcing_orders.default',
-  finance_facts: 'finance_facts.default',
+})
+const RUNTIME_FIELD_POLICY_KEYS_BY_SURFACE = Object.freeze({
+  'customers.default': new Set(['customer_code', 'display_name']),
+  'suppliers.default': new Set(['supplier_code', 'supplier_type']),
+  'sales_orders.default': new Set([
+    'order_no',
+    'source_no',
+    'expected_ship_date',
+  ]),
 })
 
 const PRODUCT_CORE_ACTION_KEYS = new Set([
@@ -109,10 +105,7 @@ const PRODUCT_CORE_ACTION_KEYS = new Set([
   'sales_order.read',
   'sales_order.submit',
   'sales_order.update',
-  'sales_order_item.cancel',
-  'sales_order_item.create',
   'sales_order_item.read',
-  'sales_order_item.update',
   'shipment.cancel',
   'shipment.create',
   'shipment.read',
@@ -543,7 +536,11 @@ export function effectiveSessionAllowsAction(adminProfile, actionKey) {
 export function getEffectiveFieldPolicy(adminProfile, surfaceKey, fieldKey) {
   const surface = typeof surfaceKey === 'string' ? surfaceKey.trim() : ''
   const field = typeof fieldKey === 'string' ? fieldKey.trim() : ''
-  if (!surface || !field) {
+  if (
+    !surface ||
+    !field ||
+    !RUNTIME_FIELD_POLICY_KEYS_BY_SURFACE[surface]?.has(field)
+  ) {
     return null
   }
   const policies = adminProfile?.effective_session?.field_policies
@@ -572,10 +569,7 @@ export function isEffectiveFieldVisible(adminProfile, surfaceKey, fieldKey) {
 export function resolveDefaultFieldPolicySurface(moduleKey = '') {
   const normalizedModuleKey = String(moduleKey || '').trim()
   if (!normalizedModuleKey) return ''
-  return (
-    DEFAULT_FIELD_POLICY_SURFACE_BY_MODULE[normalizedModuleKey] ||
-    `${normalizedModuleKey}.default`
-  )
+  return DEFAULT_FIELD_POLICY_SURFACE_BY_MODULE[normalizedModuleKey] || ''
 }
 
 export function getEffectivePrintTemplateDefaults(adminProfile, templateKey) {

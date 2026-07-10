@@ -117,24 +117,6 @@ func (_u *RoleProfileUpdate) ClearBundleKeys() *RoleProfileUpdate {
 	return _u
 }
 
-// SetGrants sets the "grants" field.
-func (_u *RoleProfileUpdate) SetGrants(v []string) *RoleProfileUpdate {
-	_u.mutation.SetGrants(v)
-	return _u
-}
-
-// AppendGrants appends value to the "grants" field.
-func (_u *RoleProfileUpdate) AppendGrants(v []string) *RoleProfileUpdate {
-	_u.mutation.AppendGrants(v)
-	return _u
-}
-
-// ClearGrants clears the value of the "grants" field.
-func (_u *RoleProfileUpdate) ClearGrants() *RoleProfileUpdate {
-	_u.mutation.ClearGrants()
-	return _u
-}
-
 // SetRevokes sets the "revokes" field.
 func (_u *RoleProfileUpdate) SetRevokes(v []string) *RoleProfileUpdate {
 	_u.mutation.SetRevokes(v)
@@ -263,17 +245,6 @@ func (_u *RoleProfileUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	if _u.mutation.BundleKeysCleared() {
 		_spec.ClearField(roleprofile.FieldBundleKeys, field.TypeJSON)
 	}
-	if value, ok := _u.mutation.Grants(); ok {
-		_spec.SetField(roleprofile.FieldGrants, field.TypeJSON, value)
-	}
-	if value, ok := _u.mutation.AppendedGrants(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, roleprofile.FieldGrants, value)
-		})
-	}
-	if _u.mutation.GrantsCleared() {
-		_spec.ClearField(roleprofile.FieldGrants, field.TypeJSON)
-	}
 	if value, ok := _u.mutation.Revokes(); ok {
 		_spec.SetField(roleprofile.FieldRevokes, field.TypeJSON, value)
 	}
@@ -393,24 +364,6 @@ func (_u *RoleProfileUpdateOne) AppendBundleKeys(v []string) *RoleProfileUpdateO
 // ClearBundleKeys clears the value of the "bundle_keys" field.
 func (_u *RoleProfileUpdateOne) ClearBundleKeys() *RoleProfileUpdateOne {
 	_u.mutation.ClearBundleKeys()
-	return _u
-}
-
-// SetGrants sets the "grants" field.
-func (_u *RoleProfileUpdateOne) SetGrants(v []string) *RoleProfileUpdateOne {
-	_u.mutation.SetGrants(v)
-	return _u
-}
-
-// AppendGrants appends value to the "grants" field.
-func (_u *RoleProfileUpdateOne) AppendGrants(v []string) *RoleProfileUpdateOne {
-	_u.mutation.AppendGrants(v)
-	return _u
-}
-
-// ClearGrants clears the value of the "grants" field.
-func (_u *RoleProfileUpdateOne) ClearGrants() *RoleProfileUpdateOne {
-	_u.mutation.ClearGrants()
 	return _u
 }
 
@@ -571,17 +524,6 @@ func (_u *RoleProfileUpdateOne) sqlSave(ctx context.Context) (_node *RoleProfile
 	}
 	if _u.mutation.BundleKeysCleared() {
 		_spec.ClearField(roleprofile.FieldBundleKeys, field.TypeJSON)
-	}
-	if value, ok := _u.mutation.Grants(); ok {
-		_spec.SetField(roleprofile.FieldGrants, field.TypeJSON, value)
-	}
-	if value, ok := _u.mutation.AppendedGrants(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, roleprofile.FieldGrants, value)
-		})
-	}
-	if _u.mutation.GrantsCleared() {
-		_spec.ClearField(roleprofile.FieldGrants, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.Revokes(); ok {
 		_spec.SetField(roleprofile.FieldRevokes, field.TypeJSON, value)

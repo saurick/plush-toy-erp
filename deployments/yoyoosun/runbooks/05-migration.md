@@ -10,7 +10,8 @@
 2. 确认 `.env` 的 `POSTGRES_DSN` 指向目标库，输出时必须脱敏。
 3. 确认 migration 目录随 release 同步。
 4. 确认 pre-migration 备份 evidence 存在。
-5. 确认停机窗口和回滚策略。
+5. 确认 `MIGRATION_LOCK_FILE` 为绝对路径，位于专用私有目录且归当前 migration 执行用户所有；生产默认为 `/run/lock/plush-toy-erp/atlas-migrate.lock`。
+6. 确认停机窗口和回滚策略。
 
 ## 状态检查
 
@@ -18,6 +19,8 @@
 cd /opt/plush-toy-erp/current/server/deploy/compose/prod
 sh migrate_online.sh --status-only
 ```
+
+如果生产 `.env` 使用了非默认 `MIGRATION_LOCK_FILE`，在执行上述命令前单独 `export MIGRATION_LOCK_FILE=<absolute-path>`；不要为此 source 整个 `.env`。
 
 记录：
 
@@ -42,6 +45,7 @@ sh migrate_online.sh --apply
 | --- | --- |
 | Atlas 不存在 | 停止；按运维规范安装宿主机 Atlas |
 | DSN 连接失败 | 停止；核对 `.env`、端口、容器状态和网络 |
+| migration lock 路径 / 权限 / symlink 检查失败 | 停止；修正专用 lock 目录的 owner 和权限，不要改回共享 `/tmp` |
 | migration dirty / failed | 停止业务写入；保留日志摘要；评审恢复备份或修复 migration |
 | apply 后服务异常 | 先收集 health、ready、日志和 migration status，再决定回滚或 forward-fix |
 

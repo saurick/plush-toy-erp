@@ -70,6 +70,7 @@ func TestInventoryRepo_PurchaseReceiptLifecycle(t *testing.T) {
 		t.Fatalf("draft purchase receipt should not affect inventory, txn count=%d", txnCountBeforePost)
 	}
 
+	passAllPurchaseReceiptQualityInspections(t, ctx, uc, receipt.ID)
 	posted, err := uc.PostPurchaseReceipt(ctx, receipt.ID)
 	if err != nil {
 		t.Fatalf("post purchase receipt failed: %v", err)
@@ -268,6 +269,7 @@ func TestInventoryRepo_PurchaseReceiptTraceProtection(t *testing.T) {
 		t.Fatalf("draft receipt must not be cancellable, got %v", err)
 	}
 
+	passAllPurchaseReceiptQualityInspections(t, ctx, uc, receipt.ID)
 	posted, err := uc.PostPurchaseReceipt(ctx, receipt.ID)
 	if err != nil {
 		t.Fatalf("post trace receipt failed: %v", err)
@@ -400,7 +402,9 @@ func TestInventoryRepo_PurchaseReceiptLotsAndNonLotSeparation(t *testing.T) {
 		t.Fatalf("expected first lot_id")
 	}
 	secondReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PR-LOT-002", fixtures, stringPtr("LOT-SAME"), mustDecimal(t, "2"))
-	assertOptionalIntEqual(t, secondReceipt.Items[0].LotID, *firstLotID)
+	if secondReceipt.Items[0].LotID == nil || *secondReceipt.Items[0].LotID == *firstLotID {
+		t.Fatalf("each receipt line must own a distinct inventory lot identity")
+	}
 	sameLotBalance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
 		SubjectType: biz.InventorySubjectMaterial,
 		SubjectID:   fixtures.materialID,
@@ -411,7 +415,7 @@ func TestInventoryRepo_PurchaseReceiptLotsAndNonLotSeparation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get same lot balance failed: %v", err)
 	}
-	assertDecimalEqual(t, sameLotBalance.Quantity, "7")
+	assertDecimalEqual(t, sameLotBalance.Quantity, "5")
 
 	otherReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PR-LOT-003", fixtures, stringPtr("LOT-OTHER"), mustDecimal(t, "3"))
 	otherLotID := otherReceipt.Items[0].LotID
@@ -434,13 +438,14 @@ func TestInventoryRepo_PurchaseReceiptLotsAndNonLotSeparation(t *testing.T) {
 	assertDecimalEqual(t, otherLotBalance.Quantity, "3")
 
 	nonLotReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PR-NO-LOT-001", fixtures, nil, mustDecimal(t, "4"))
-	if nonLotReceipt.Items[0].LotID != nil {
-		t.Fatalf("expected non-lot receipt item lot_id nil, got %v", *nonLotReceipt.Items[0].LotID)
+	if nonLotReceipt.Items[0].LotID == nil {
+		t.Fatalf("every receipt line must have a generated lot identity")
 	}
 	nonLotBalance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
 		SubjectType: biz.InventorySubjectMaterial,
 		SubjectID:   fixtures.materialID,
 		WarehouseID: fixtures.warehouseID,
+		LotID:       nonLotReceipt.Items[0].LotID,
 		UnitID:      fixtures.unitID,
 	})
 	if err != nil {
@@ -457,13 +462,13 @@ func TestInventoryRepo_PurchaseReceiptLotsAndNonLotSeparation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get same lot balance after non-lot receipt failed: %v", err)
 	}
-	assertDecimalEqual(t, sameLotBalanceAfterNonLot.Quantity, "7")
+	assertDecimalEqual(t, sameLotBalanceAfterNonLot.Quantity, "5")
 
 	lotCount, err := client.InventoryLot.Query().Count(ctx)
 	if err != nil {
 		t.Fatalf("count lots after purchase receipts failed: %v", err)
 	}
-	if lotCount != 2 {
-		t.Fatalf("expected two material lots for two lot_no values, got %d", lotCount)
+	if lotCount != 4 {
+		t.Fatalf("expected one material lot identity per receipt line, got %d", lotCount)
 	}
 }

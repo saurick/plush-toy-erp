@@ -2,6 +2,7 @@ package biz
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"strings"
 )
@@ -60,6 +61,12 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 	current, err := uc.repo.GetWorkflowTask(ctx, in.ID)
 	if err != nil {
 		return nil, err
+	}
+	if IsTerminalWorkflowTaskStatus(current.TaskStatusKey) {
+		if strings.TrimSpace(current.TaskStatusKey) == in.TaskStatusKey && workflowTerminalRetryMatches(current, in) {
+			return current, nil
+		}
+		return nil, ErrWorkflowTaskSettled
 	}
 	if isBossOrderApprovalTask(current) {
 		if err := uc.applyBossApprovalTransition(current, in); err != nil {
@@ -128,7 +135,30 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 	if workflowStatusUpdateHasNumberedPhaseLabel(in) {
 		return nil, ErrBadParam
 	}
-	return uc.repo.UpdateWorkflowTaskStatus(ctx, in, actorID, strings.TrimSpace(actorRoleKey))
+	updated, err := uc.repo.UpdateWorkflowTaskStatus(ctx, in, actorID, strings.TrimSpace(actorRoleKey))
+	if !errors.Is(err, ErrWorkflowTaskSettled) {
+		return updated, err
+	}
+	// Another request may have settled the task after the read above. Preserve
+	// same-terminal retries as idempotent reads without replaying side effects.
+	latest, getErr := uc.repo.GetWorkflowTask(ctx, in.ID)
+	if getErr != nil {
+		return nil, getErr
+	}
+	if workflowTerminalRetryMatches(latest, in) {
+		return latest, nil
+	}
+	return nil, ErrWorkflowTaskSettled
+}
+
+func workflowTerminalRetryMatches(current *WorkflowTask, in *WorkflowTaskStatusUpdate) bool {
+	if current == nil || in == nil || strings.TrimSpace(current.TaskStatusKey) != strings.TrimSpace(in.TaskStatusKey) {
+		return false
+	}
+	if strings.TrimSpace(current.TaskStatusKey) != "rejected" {
+		return true
+	}
+	return workflowTaskRejectionReason(current) != "" && workflowTaskRejectionReason(current) == strings.TrimSpace(in.Reason)
 }
 
 func (uc *WorkflowUsecase) applyBossApprovalTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {

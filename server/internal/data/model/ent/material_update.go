@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
@@ -252,6 +253,21 @@ func (_u *MaterialUpdate) AddQualityInspections(v ...*QualityInspection) *Materi
 	return _u.AddQualityInspectionIDs(ids...)
 }
 
+// AddOutsourcingOrderItemIDs adds the "outsourcing_order_items" edge to the OutsourcingOrderItem entity by IDs.
+func (_u *MaterialUpdate) AddOutsourcingOrderItemIDs(ids ...int) *MaterialUpdate {
+	_u.mutation.AddOutsourcingOrderItemIDs(ids...)
+	return _u
+}
+
+// AddOutsourcingOrderItems adds the "outsourcing_order_items" edges to the OutsourcingOrderItem entity.
+func (_u *MaterialUpdate) AddOutsourcingOrderItems(v ...*OutsourcingOrderItem) *MaterialUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOutsourcingOrderItemIDs(ids...)
+}
+
 // Mutation returns the MaterialMutation object of the builder.
 func (_u *MaterialUpdate) Mutation() *MaterialMutation {
 	return _u.mutation
@@ -387,6 +403,27 @@ func (_u *MaterialUpdate) RemoveQualityInspections(v ...*QualityInspection) *Mat
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveQualityInspectionIDs(ids...)
+}
+
+// ClearOutsourcingOrderItems clears all "outsourcing_order_items" edges to the OutsourcingOrderItem entity.
+func (_u *MaterialUpdate) ClearOutsourcingOrderItems() *MaterialUpdate {
+	_u.mutation.ClearOutsourcingOrderItems()
+	return _u
+}
+
+// RemoveOutsourcingOrderItemIDs removes the "outsourcing_order_items" edge to OutsourcingOrderItem entities by IDs.
+func (_u *MaterialUpdate) RemoveOutsourcingOrderItemIDs(ids ...int) *MaterialUpdate {
+	_u.mutation.RemoveOutsourcingOrderItemIDs(ids...)
+	return _u
+}
+
+// RemoveOutsourcingOrderItems removes "outsourcing_order_items" edges to OutsourcingOrderItem entities.
+func (_u *MaterialUpdate) RemoveOutsourcingOrderItems(v ...*OutsourcingOrderItem) *MaterialUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOutsourcingOrderItemIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -804,6 +841,51 @@ func (_u *MaterialUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.OutsourcingOrderItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.OutsourcingOrderItemsTable,
+			Columns: []string{material.OutsourcingOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorderitem.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOutsourcingOrderItemsIDs(); len(nodes) > 0 && !_u.mutation.OutsourcingOrderItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.OutsourcingOrderItemsTable,
+			Columns: []string{material.OutsourcingOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorderitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OutsourcingOrderItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.OutsourcingOrderItemsTable,
+			Columns: []string{material.OutsourcingOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorderitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{material.Label}
@@ -1041,6 +1123,21 @@ func (_u *MaterialUpdateOne) AddQualityInspections(v ...*QualityInspection) *Mat
 	return _u.AddQualityInspectionIDs(ids...)
 }
 
+// AddOutsourcingOrderItemIDs adds the "outsourcing_order_items" edge to the OutsourcingOrderItem entity by IDs.
+func (_u *MaterialUpdateOne) AddOutsourcingOrderItemIDs(ids ...int) *MaterialUpdateOne {
+	_u.mutation.AddOutsourcingOrderItemIDs(ids...)
+	return _u
+}
+
+// AddOutsourcingOrderItems adds the "outsourcing_order_items" edges to the OutsourcingOrderItem entity.
+func (_u *MaterialUpdateOne) AddOutsourcingOrderItems(v ...*OutsourcingOrderItem) *MaterialUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOutsourcingOrderItemIDs(ids...)
+}
+
 // Mutation returns the MaterialMutation object of the builder.
 func (_u *MaterialUpdateOne) Mutation() *MaterialMutation {
 	return _u.mutation
@@ -1176,6 +1273,27 @@ func (_u *MaterialUpdateOne) RemoveQualityInspections(v ...*QualityInspection) *
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveQualityInspectionIDs(ids...)
+}
+
+// ClearOutsourcingOrderItems clears all "outsourcing_order_items" edges to the OutsourcingOrderItem entity.
+func (_u *MaterialUpdateOne) ClearOutsourcingOrderItems() *MaterialUpdateOne {
+	_u.mutation.ClearOutsourcingOrderItems()
+	return _u
+}
+
+// RemoveOutsourcingOrderItemIDs removes the "outsourcing_order_items" edge to OutsourcingOrderItem entities by IDs.
+func (_u *MaterialUpdateOne) RemoveOutsourcingOrderItemIDs(ids ...int) *MaterialUpdateOne {
+	_u.mutation.RemoveOutsourcingOrderItemIDs(ids...)
+	return _u
+}
+
+// RemoveOutsourcingOrderItems removes "outsourcing_order_items" edges to OutsourcingOrderItem entities.
+func (_u *MaterialUpdateOne) RemoveOutsourcingOrderItems(v ...*OutsourcingOrderItem) *MaterialUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOutsourcingOrderItemIDs(ids...)
 }
 
 // Where appends a list predicates to the MaterialUpdate builder.
@@ -1616,6 +1734,51 @@ func (_u *MaterialUpdateOne) sqlSave(ctx context.Context) (_node *Material, err 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OutsourcingOrderItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.OutsourcingOrderItemsTable,
+			Columns: []string{material.OutsourcingOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorderitem.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOutsourcingOrderItemsIDs(); len(nodes) > 0 && !_u.mutation.OutsourcingOrderItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.OutsourcingOrderItemsTable,
+			Columns: []string{material.OutsourcingOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorderitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OutsourcingOrderItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.OutsourcingOrderItemsTable,
+			Columns: []string{material.OutsourcingOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorderitem.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

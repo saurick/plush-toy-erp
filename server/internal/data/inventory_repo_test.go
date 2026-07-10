@@ -309,6 +309,7 @@ func createAndPostPurchaseReceipt(t *testing.T, ctx context.Context, uc *biz.Inv
 	}); err != nil {
 		t.Fatalf("add purchase receipt %s item failed: %v", receiptNo, err)
 	}
+	passAllPurchaseReceiptQualityInspections(t, ctx, uc, receipt.ID)
 	posted, err := uc.PostPurchaseReceipt(ctx, receipt.ID)
 	if err != nil {
 		t.Fatalf("post purchase receipt %s failed: %v", receiptNo, err)
@@ -317,6 +318,37 @@ func createAndPostPurchaseReceipt(t *testing.T, ctx context.Context, uc *biz.Inv
 		t.Fatalf("expected purchase receipt %s to have one item, got %d", receiptNo, len(posted.Items))
 	}
 	return posted
+}
+
+func passAllPurchaseReceiptQualityInspections(t *testing.T, ctx context.Context, uc *biz.InventoryUsecase, receiptID int) {
+	t.Helper()
+	inspections, _, err := uc.ListQualityInspections(ctx, biz.QualityInspectionFilter{
+		PurchaseReceiptID: receiptID,
+		SourceType:        biz.QualityInspectionSourcePurchaseReceipt,
+		InspectionType:    biz.QualityInspectionTypeIncoming,
+		Limit:             200,
+	})
+	if err != nil {
+		t.Fatalf("list purchase receipt %d quality inspections failed: %v", receiptID, err)
+	}
+	if len(inspections) == 0 {
+		t.Fatalf("purchase receipt %d must have generated incoming quality inspections", receiptID)
+	}
+	for _, inspection := range inspections {
+		if inspection.Status == biz.QualityInspectionStatusPassed {
+			continue
+		}
+		if inspection.Status != biz.QualityInspectionStatusSubmitted {
+			t.Fatalf("purchase receipt %d inspection %d not decidable: %s", receiptID, inspection.ID, inspection.Status)
+		}
+		if _, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{
+			InspectionID: inspection.ID,
+			Result:       biz.QualityInspectionResultPass,
+			DecisionNote: stringPtr("测试来料质检通过"),
+		}); err != nil {
+			t.Fatalf("pass purchase receipt %d inspection %d failed: %v", receiptID, inspection.ID, err)
+		}
+	}
 }
 
 func createLinkedPurchaseReturn(t *testing.T, ctx context.Context, uc *biz.InventoryUsecase, returnNo string, receiptID int, receiptItem *biz.PurchaseReceiptItem, fixtures inventoryTestFixtures, quantity decimal.Decimal) *biz.PurchaseReturn {

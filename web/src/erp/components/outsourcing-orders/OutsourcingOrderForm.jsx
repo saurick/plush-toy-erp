@@ -17,7 +17,11 @@ import {
   isDateInputAfter,
   isDateInputBefore,
 } from '../../utils/dateRange.mjs'
-import { unixToDateInputValue } from '../../utils/masterDataOrderView.mjs'
+import {
+  OUTSOURCING_ORDER_SUBJECT_TYPES,
+  createBlankOutsourcingLine,
+  deriveOutsourcingOrderItemAmount,
+} from '../../utils/masterDataOrderView.mjs'
 import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
 
 function decimalNumber(value) {
@@ -39,11 +43,7 @@ function formatSummaryNumber(value, fractionDigits = 0) {
 }
 
 function lineAmount(line = {}) {
-  const explicitAmount = decimalNumber(line.amount)
-  if (explicitAmount > 0) return explicitAmount
-  return (
-    decimalNumber(line.outsourcing_quantity) * decimalNumber(line.unit_price)
-  )
+  return decimalNumber(deriveOutsourcingOrderItemAmount(line))
 }
 
 function summarizeLines(lines = []) {
@@ -82,52 +82,6 @@ export function todayInputValue() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export function createBlankOutsourcingLine(lineNo = 1) {
-  return {
-    line_no: lineNo,
-    product_id: undefined,
-    process_id: undefined,
-    unit_id: undefined,
-    product_no_snapshot: '',
-    product_order_no_snapshot: '',
-    product_name_snapshot: '',
-    process_name_snapshot: '',
-    process_category_snapshot: '',
-    unit_name_snapshot: '',
-    outsourcing_quantity: '',
-    unit_price: '',
-    amount: '',
-    expected_return_date: '',
-    note: '',
-  }
-}
-
-function optionalFormValue(value) {
-  return value === null || value === undefined ? '' : value
-}
-
-export function normalizeOutsourcingLineFormValue(item = {}) {
-  return {
-    id: item.id,
-    line_no: item.line_no,
-    product_id: item.product_id,
-    process_id: item.process_id,
-    unit_id: item.unit_id,
-    product_no_snapshot: item.product_no_snapshot || '',
-    product_order_no_snapshot: item.product_order_no_snapshot || '',
-    product_name_snapshot: item.product_name_snapshot || '',
-    process_name_snapshot: item.process_name_snapshot || '',
-    process_category_snapshot: item.process_category_snapshot || '',
-    unit_name_snapshot: item.unit_name_snapshot || '',
-    outsourcing_quantity: optionalFormValue(item.outsourcing_quantity),
-    unit_price: optionalFormValue(item.unit_price),
-    amount: optionalFormValue(item.amount),
-    expected_return_date: unixToDateInputValue(item.expected_return_date),
-    note: item.note || '',
-    line_status: item.line_status,
-  }
-}
-
 export function supplierLabel(supplier = {}) {
   return (
     [supplier.code, supplier.short_name || supplier.name]
@@ -139,6 +93,12 @@ export function supplierLabel(supplier = {}) {
 export function productLabel(product = {}) {
   return (
     [product.code, product.name].filter(Boolean).join(' / ') || '产品已关联'
+  )
+}
+
+export function materialLabel(material = {}) {
+  return (
+    [material.code, material.name].filter(Boolean).join(' / ') || '材料已关联'
   )
 }
 
@@ -159,10 +119,13 @@ export default function OutsourcingOrderForm({
   supplierOptions,
   onSupplierChange,
   productOptions,
+  materialOptions,
   processOptions,
   unitOptions,
   attachmentPanel,
+  onSubjectTypeChange,
   onProductChange,
+  onMaterialChange,
   onProcessChange,
   onUnitChange,
 }) {
@@ -307,7 +270,7 @@ export default function OutsourcingOrderForm({
 
       <BusinessLineItemsSection
         title="加工明细"
-        description="同一份加工合同内维护产品、工序、数量、单价和预计回货。"
+        description="同一份加工合同内维护产品、工序、数量、单价和预计回货。布料等材料加工可将加工对象切换为“材料”。"
         emptyDescription="暂无加工明细"
         renderRow={({ add, field, fields, index, remove }) => (
           <div
@@ -356,28 +319,101 @@ export default function OutsourcingOrderForm({
               </Form.Item>
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--source"
-                name={[field.name, 'product_id']}
-                label="产品"
-                rules={[{ required: true, message: '请选择产品' }]}
+                name={[field.name, 'subject_type']}
+                label="加工对象类型"
+                rules={[{ required: true, message: '请选择加工对象类型' }]}
               >
                 <Select
-                  showSearch
-                  options={productOptions}
-                  optionFilterProp="label"
-                  onChange={(value) => onProductChange(field.name, value)}
+                  options={[
+                    {
+                      value: OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT,
+                      label: '产品 / 半成品（车缝、手工等）',
+                    },
+                    {
+                      value: OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL,
+                      label: '材料（布料加工等）',
+                    },
+                  ]}
+                  onChange={(value) => onSubjectTypeChange(field.name, value)}
                 />
               </Form.Item>
               <Form.Item
-                className="erp-line-item-field erp-line-item-field--source"
-                name={[field.name, 'product_order_no_snapshot']}
-                label="产品订单编号"
-                extra="来自销售订单、客户产品订单或甲方加工汇总；用于加工合同逐行追溯。"
+                noStyle
+                shouldUpdate={(previous, current) =>
+                  previous?.items?.[field.name]?.subject_type !==
+                  current?.items?.[field.name]?.subject_type
+                }
               >
-                <Input
-                  allowClear
-                  maxLength={128}
-                  placeholder="如 SO-YOYO-TRIAL-001"
-                />
+                {({ getFieldValue }) => {
+                  const subjectType = getFieldValue([
+                    'items',
+                    field.name,
+                    'subject_type',
+                  ])
+                  if (
+                    subjectType === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
+                  ) {
+                    return (
+                      <Form.Item
+                        className="erp-line-item-field erp-line-item-field--source"
+                        name={[field.name, 'material_id']}
+                        label="材料"
+                        rules={[{ required: true, message: '请选择材料' }]}
+                      >
+                        <Select
+                          showSearch
+                          options={materialOptions}
+                          optionFilterProp="label"
+                          onChange={(value) =>
+                            onMaterialChange(field.name, value)
+                          }
+                        />
+                      </Form.Item>
+                    )
+                  }
+                  return (
+                    <Form.Item
+                      className="erp-line-item-field erp-line-item-field--source"
+                      name={[field.name, 'product_id']}
+                      label="产品 / 半成品"
+                      rules={[
+                        { required: true, message: '请选择产品或半成品' },
+                      ]}
+                    >
+                      <Select
+                        showSearch
+                        options={productOptions}
+                        optionFilterProp="label"
+                        onChange={(value) => onProductChange(field.name, value)}
+                      />
+                    </Form.Item>
+                  )
+                }}
+              </Form.Item>
+              <Form.Item
+                noStyle
+                shouldUpdate={(previous, current) =>
+                  previous?.items?.[field.name]?.subject_type !==
+                  current?.items?.[field.name]?.subject_type
+                }
+              >
+                {({ getFieldValue }) =>
+                  getFieldValue(['items', field.name, 'subject_type']) ===
+                  OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT ? (
+                    <Form.Item
+                      className="erp-line-item-field erp-line-item-field--source"
+                      name={[field.name, 'product_order_no_snapshot']}
+                      label="产品订单编号"
+                      extra="来自销售订单、客户产品订单或甲方加工汇总；用于加工合同逐行追溯。"
+                    >
+                      <Input
+                        allowClear
+                        maxLength={128}
+                        placeholder="如 SO-YOYO-TRIAL-001"
+                      />
+                    </Form.Item>
+                  ) : null
+                }
               </Form.Item>
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--source"
@@ -417,6 +453,12 @@ export default function OutsourcingOrderForm({
                 <Input />
               </Form.Item>
               <Form.Item name={[field.name, 'product_name_snapshot']} hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item name={[field.name, 'material_code_snapshot']} hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item name={[field.name, 'material_name_snapshot']} hidden>
                 <Input />
               </Form.Item>
               <Form.Item name={[field.name, 'process_name_snapshot']} hidden>
@@ -477,11 +519,30 @@ export default function OutsourcingOrderForm({
                 <Input />
               </Form.Item>
               <Form.Item
-                className="erp-line-item-field erp-line-item-field--money"
-                name={[field.name, 'amount']}
-                label="金额"
+                noStyle
+                shouldUpdate={(previous, current) =>
+                  previous?.items?.[field.name]?.outsourcing_quantity !==
+                    current?.items?.[field.name]?.outsourcing_quantity ||
+                  previous?.items?.[field.name]?.unit_price !==
+                    current?.items?.[field.name]?.unit_price
+                }
               >
-                <Input />
+                {({ getFieldValue }) => (
+                  <Form.Item
+                    className="erp-line-item-field erp-line-item-field--money"
+                    label="金额预览"
+                    extra="仅供录入核对，保存时由系统按数量和单价核算。"
+                  >
+                    <Input
+                      readOnly
+                      value={
+                        deriveOutsourcingOrderItemAmount(
+                          getFieldValue(['items', field.name]) || {}
+                        ) || ''
+                      }
+                    />
+                  </Form.Item>
+                )}
               </Form.Item>
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--date"

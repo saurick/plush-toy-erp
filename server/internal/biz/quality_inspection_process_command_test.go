@@ -4,18 +4,16 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 )
 
-func TestQualityInspectionProcessDomainCommandDecidePassBindsUsecase(t *testing.T) {
+func TestIncomingQualityGateProcessDomainCommandPassesOnlyAfterAggregateReady(t *testing.T) {
 	ctx := context.Background()
-	inspectedAt := time.Date(2026, 7, 1, 8, 30, 0, 0, time.UTC)
 	inventoryRepo := &qualityInspectionProcessInventoryRepoStub{
-		inspection: &QualityInspection{
-			ID:                5001,
+		qualityGate: &PurchaseReceiptQualityGate{
 			PurchaseReceiptID: 6001,
-			InventoryLotID:    7001,
-			Status:            QualityInspectionStatusSubmitted,
+			Outcome:           PurchaseReceiptQualityGateReady,
+			TotalLines:        2,
+			PassedLines:       2,
 		},
 	}
 	processRepo := &memProcessRuntimeRepo{
@@ -37,7 +35,7 @@ func TestQualityInspectionProcessDomainCommandDecidePassBindsUsecase(t *testing.
 				Status:            ProcessNodeStatusActive,
 				Version:           1,
 				PolicySnapshot: map[string]any{
-					"command_key": ProcessDomainCommandQualityInspectionDecide,
+					"command_key": ProcessDomainCommandIncomingQualityGate,
 				},
 			},
 		},
@@ -51,105 +49,128 @@ func TestQualityInspectionProcessDomainCommandDecidePassBindsUsecase(t *testing.
 		ProcessInstanceID:     10,
 		ProcessNodeInstanceID: 20,
 		ExpectedVersion:       1,
-		CommandKey:            ProcessDomainCommandQualityInspectionDecide,
-		IdempotencyKey:        "process:10:node:20:quality-inspection-decide",
+		CommandKey:            ProcessDomainCommandIncomingQualityGate,
+		IdempotencyKey:        "process:10:node:20:quality-inspection-aggregate-gate",
 		Payload: map[string]any{
-			"quality_inspection_id": float64(5001),
-			"purchase_receipt_id":   float64(6001),
-			"inventory_lot_id":      float64(7001),
-			"result":                QualityInspectionResultConcession,
-			"inspected_at":          "2026-07-01T08:30:00Z",
-			"inspector_id":          float64(9001),
-			"decision_note":         "让步接收，后续仓库按入库规则处理",
+			"purchase_receipt_id": float64(6001),
 		},
 	}, 7)
 	if err != nil {
-		t.Fatalf("execute quality inspection decide domain command failed: %v", err)
+		t.Fatalf("execute incoming quality aggregate gate failed: %v", err)
 	}
-	if inventoryRepo.passInput == nil {
-		t.Fatal("expected quality pass usecase input")
-	}
-	if inventoryRepo.passInput.InspectionID != 5001 {
-		t.Fatalf("expected inspection id 5001, got %d", inventoryRepo.passInput.InspectionID)
-	}
-	if inventoryRepo.passInput.Result != QualityInspectionResultConcession {
-		t.Fatalf("expected concession result, got %q", inventoryRepo.passInput.Result)
-	}
-	if !inventoryRepo.passInput.InspectedAt.Equal(inspectedAt) {
-		t.Fatalf("expected inspected_at parsed as %s, got %s", inspectedAt, inventoryRepo.passInput.InspectedAt)
-	}
-	if inventoryRepo.passInput.InspectorID == nil || *inventoryRepo.passInput.InspectorID != 9001 {
-		t.Fatalf("expected inspector id from payload, got %#v", inventoryRepo.passInput.InspectorID)
-	}
-	if inventoryRepo.passInput.DecisionNote == nil || *inventoryRepo.passInput.DecisionNote != "让步接收，后续仓库按入库规则处理" {
-		t.Fatalf("expected decision note from payload, got %#v", inventoryRepo.passInput.DecisionNote)
-	}
-	if inventoryRepo.rejectInput != nil {
-		t.Fatalf("concession decision must not call reject usecase, got %#v", inventoryRepo.rejectInput)
+	if inventoryRepo.passInput != nil || inventoryRepo.rejectInput != nil {
+		t.Fatalf("aggregate gate must not decide line inspections, pass=%#v reject=%#v", inventoryRepo.passInput, inventoryRepo.rejectInput)
 	}
 	if inventoryRepo.postCalled {
-		t.Fatal("quality_inspection.decide must not post inbound inventory")
+		t.Fatal("quality aggregate gate must not post inbound inventory")
 	}
-	if node == nil || node.Outcome == nil || *node.Outcome != QualityInspectionProcessCommandOutcomeConcession {
-		t.Fatalf("expected quality concession process outcome, got %#v", node)
+	if node == nil || node.Outcome == nil || *node.Outcome != IncomingQualityGateProcessCommandOutcomePassed {
+		t.Fatalf("expected quality aggregate passed outcome, got %#v", node)
 	}
-	if processRepo.completedNode == nil || processRepo.completedNode.Outcome != QualityInspectionProcessCommandOutcomeConcession {
-		t.Fatalf("expected process node completed with quality concession outcome, got %#v", processRepo.completedNode)
+	if processRepo.completedNode == nil || processRepo.completedNode.Outcome != IncomingQualityGateProcessCommandOutcomePassed {
+		t.Fatalf("expected process node completed with aggregate passed outcome, got %#v", processRepo.completedNode)
 	}
 }
 
-func TestQualityInspectionProcessDomainCommandDecideRejectBindsUsecase(t *testing.T) {
+func TestIncomingQualityGateProcessDomainCommandRejectBlocksProcess(t *testing.T) {
 	ctx := context.Background()
 	inventoryRepo := &qualityInspectionProcessInventoryRepoStub{
-		inspection: &QualityInspection{
-			ID:                5002,
+		qualityGate: &PurchaseReceiptQualityGate{
 			PurchaseReceiptID: 6002,
-			InventoryLotID:    7002,
-			Status:            QualityInspectionStatusSubmitted,
+			Outcome:           PurchaseReceiptQualityGateRejected,
+			TotalLines:        2,
+			PassedLines:       1,
+			RejectedLineIDs:   []int{12},
 		},
 	}
-	handler := &qualityInspectionDecideProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
+	handler := &incomingQualityGateProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
 
 	result, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_receipt", BusinessRefID: 6002},
-		CommandKey:      ProcessDomainCommandQualityInspectionDecide,
-		IdempotencyKey:  "process:10:node:20:quality-inspection-decide",
+		CommandKey:      ProcessDomainCommandIncomingQualityGate,
+		IdempotencyKey:  "process:10:node:20:quality-inspection-aggregate-gate",
 		Payload: map[string]any{
-			"quality_inspection_id": float64(5002),
-			"purchase_receipt_id":   float64(6002),
-			"inventory_lot_id":      float64(7002),
-			"result":                QualityInspectionResultReject,
-			"decision_note":         "拒收",
+			"purchase_receipt_id": float64(6002),
 		},
 	}, 7)
 	if err != nil {
-		t.Fatalf("execute quality reject domain command failed: %v", err)
+		t.Fatalf("execute aggregate rejected gate failed: %v", err)
 	}
-	if inventoryRepo.rejectInput == nil {
-		t.Fatal("expected quality reject usecase input")
+	if inventoryRepo.passInput != nil || inventoryRepo.rejectInput != nil {
+		t.Fatalf("aggregate gate must not decide line inspections")
 	}
-	if inventoryRepo.rejectInput.InspectionID != 5002 {
-		t.Fatalf("expected inspection id 5002, got %d", inventoryRepo.rejectInput.InspectionID)
-	}
-	if inventoryRepo.rejectInput.Result != QualityInspectionResultReject {
-		t.Fatalf("expected reject result, got %q", inventoryRepo.rejectInput.Result)
-	}
-	if inventoryRepo.passInput != nil {
-		t.Fatalf("reject decision must not call pass usecase, got %#v", inventoryRepo.passInput)
-	}
-	if result == nil || result.Outcome != QualityInspectionProcessCommandOutcomeRejected {
-		t.Fatalf("expected quality rejected outcome, got %#v", result)
+	if result == nil || result.Outcome != IncomingQualityGateProcessCommandOutcomeRejected || result.BlockReason == "" {
+		t.Fatalf("expected explicit rejected blocking result, got %#v", result)
 	}
 }
 
-func TestQualityInspectionProcessDomainCommandDecideRejectsLegacyID(t *testing.T) {
+func TestIncomingQualityGateProcessDomainCommandKeepsPendingNodeActive(t *testing.T) {
+	handler := &incomingQualityGateProcessCommandHandler{uc: NewInventoryUsecase(&qualityInspectionProcessInventoryRepoStub{
+		qualityGate: &PurchaseReceiptQualityGate{
+			PurchaseReceiptID: 6003,
+			Outcome:           PurchaseReceiptQualityGatePending,
+			TotalLines:        2,
+			PassedLines:       1,
+			PendingLineIDs:    []int{22},
+		},
+	})}
+	_, err := handler.ExecuteProcessDomainCommand(context.Background(), &ProcessDomainCommandInput{
+		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_receipt", BusinessRefID: 6003},
+		CommandKey:      ProcessDomainCommandIncomingQualityGate,
+		IdempotencyKey:  "process:10:node:20:quality-inspection-aggregate-gate",
+		Payload:         map[string]any{"purchase_receipt_id": float64(6003)},
+	}, 7)
+	if !errors.Is(err, ErrPurchaseReceiptQualityPending) {
+		t.Fatalf("expected pending aggregate gate, got %v", err)
+	}
+}
+
+func TestIncomingQualityGateProcessRuntimeBlocksRejectedReceiptWithoutAdvancing(t *testing.T) {
+	ctx := context.Background()
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, BusinessRefType: "purchase_receipt", BusinessRefID: 6002, Status: ProcessStatusActive},
+		nodes: []*ProcessNodeInstance{
+			{ID: 20, ProcessInstanceID: 10, NodeKey: "incoming_qc", NodeType: ProcessNodeTypeDomainCommand, Status: ProcessNodeStatusActive, Version: 1, PolicySnapshot: map[string]any{"command_key": ProcessDomainCommandIncomingQualityGate}},
+			{ID: 21, ProcessInstanceID: 10, NodeKey: "warehouse_inbound", NodeType: ProcessNodeTypeDomainCommand, Status: ProcessNodeStatusWaiting, Version: 1},
+		},
+	}
+	inventoryRepo := &qualityInspectionProcessInventoryRepoStub{qualityGate: &PurchaseReceiptQualityGate{
+		PurchaseReceiptID: 6002,
+		Outcome:           PurchaseReceiptQualityGateRejected,
+		TotalLines:        2,
+		RejectedLineIDs:   []int{12},
+	}}
+	uc := NewProcessRuntimeUsecase(processRepo, nil)
+	if err := RegisterQualityInspectionProcessDomainCommandHandlers(uc, NewInventoryUsecase(inventoryRepo)); err != nil {
+		t.Fatalf("register quality handlers failed: %v", err)
+	}
+	node, err := uc.ExecuteDomainCommandNode(ctx, &ProcessDomainCommandExecution{
+		ProcessInstanceID:     10,
+		ProcessNodeInstanceID: 20,
+		ExpectedVersion:       1,
+		CommandKey:            ProcessDomainCommandIncomingQualityGate,
+		IdempotencyKey:        "process:10:node:20:quality-inspection-aggregate-gate",
+		Payload:               map[string]any{"purchase_receipt_id": float64(6002)},
+	}, 7)
+	if err != nil {
+		t.Fatalf("execute rejected aggregate gate failed: %v", err)
+	}
+	if node == nil || node.Status != ProcessNodeStatusBlocked || node.Outcome == nil || *node.Outcome != IncomingQualityGateProcessCommandOutcomeRejected {
+		t.Fatalf("expected blocked quality node, got %#v", node)
+	}
+	if processRepo.process.Status != ProcessStatusBlocked || processRepo.nodes[1].Status != ProcessNodeStatusWaiting || processRepo.completedNode != nil {
+		t.Fatalf("rejected gate must block process without advancing, process=%#v next=%#v complete=%#v", processRepo.process, processRepo.nodes[1], processRepo.completedNode)
+	}
+}
+
+func TestIncomingQualityGateProcessDomainCommandRejectsLegacyInspectionID(t *testing.T) {
 	ctx := context.Background()
 	inventoryRepo := &qualityInspectionProcessInventoryRepoStub{}
-	handler := &qualityInspectionDecideProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
+	handler := &incomingQualityGateProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_receipt", BusinessRefID: 6002},
-		CommandKey:      ProcessDomainCommandQualityInspectionDecide,
+		CommandKey:      ProcessDomainCommandIncomingQualityGate,
 		IdempotencyKey:  "process:10:node:20:quality-inspection-decide",
 		Payload: map[string]any{
 			"id":                  float64(5002),
@@ -165,25 +186,24 @@ func TestQualityInspectionProcessDomainCommandDecideRejectsLegacyID(t *testing.T
 	}
 }
 
-func TestQualityInspectionProcessDomainCommandDecideRejectsMismatchedStableRefs(t *testing.T) {
+func TestIncomingQualityGateProcessDomainCommandRejectsMismatchedStableRefs(t *testing.T) {
 	ctx := context.Background()
 	inventoryRepo := &qualityInspectionProcessInventoryRepoStub{
-		inspection: &QualityInspection{
-			ID:                5001,
+		qualityGate: &PurchaseReceiptQualityGate{
 			PurchaseReceiptID: 6001,
-			InventoryLotID:    7001,
-			Status:            QualityInspectionStatusSubmitted,
+			Outcome:           PurchaseReceiptQualityGateReady,
+			TotalLines:        1,
+			PassedLines:       1,
 		},
 	}
-	handler := &qualityInspectionDecideProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
+	handler := &incomingQualityGateProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_order", BusinessRefID: 6001},
-		CommandKey:      ProcessDomainCommandQualityInspectionDecide,
+		CommandKey:      ProcessDomainCommandIncomingQualityGate,
 		IdempotencyKey:  "process:10:node:20:quality-inspection-decide",
 		Payload: map[string]any{
-			"quality_inspection_id": float64(5001),
-			"result":                QualityInspectionResultPass,
+			"purchase_receipt_id": float64(6001),
 		},
 	}, 7); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected business ref type mismatch rejected, got %v", err)
@@ -191,11 +211,10 @@ func TestQualityInspectionProcessDomainCommandDecideRejectsMismatchedStableRefs(
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_receipt", BusinessRefID: 6002},
-		CommandKey:      ProcessDomainCommandQualityInspectionDecide,
+		CommandKey:      ProcessDomainCommandIncomingQualityGate,
 		IdempotencyKey:  "process:10:node:20:quality-inspection-decide",
 		Payload: map[string]any{
-			"quality_inspection_id": float64(5001),
-			"result":                QualityInspectionResultPass,
+			"purchase_receipt_id": float64(6001),
 		},
 	}, 7); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected process purchase receipt mismatch rejected, got %v", err)
@@ -203,13 +222,10 @@ func TestQualityInspectionProcessDomainCommandDecideRejectsMismatchedStableRefs(
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_receipt", BusinessRefID: 6001},
-		CommandKey:      ProcessDomainCommandQualityInspectionDecide,
+		CommandKey:      ProcessDomainCommandIncomingQualityGate,
 		IdempotencyKey:  "process:10:node:20:quality-inspection-decide",
 		Payload: map[string]any{
 			"quality_inspection_id": float64(5001),
-			"purchase_receipt_id":   float64(6001),
-			"inventory_lot_id":      float64(7002),
-			"result":                QualityInspectionResultPass,
 		},
 	}, 7); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected payload inventory lot mismatch rejected, got %v", err)
@@ -219,14 +235,14 @@ func TestQualityInspectionProcessDomainCommandDecideRejectsMismatchedStableRefs(
 	}
 }
 
-func TestQualityInspectionProcessDomainCommandDecideRequiresInspectionAndResult(t *testing.T) {
+func TestIncomingQualityGateProcessDomainCommandRequiresReceipt(t *testing.T) {
 	ctx := context.Background()
 	inventoryRepo := &qualityInspectionProcessInventoryRepoStub{}
-	handler := &qualityInspectionDecideProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
+	handler := &incomingQualityGateProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_receipt", BusinessRefID: 6001},
-		CommandKey:      ProcessDomainCommandQualityInspectionDecide,
+		CommandKey:      ProcessDomainCommandIncomingQualityGate,
 		IdempotencyKey:  "process:10:node:20:quality-inspection-decide",
 		Payload:         map[string]any{"result": QualityInspectionResultPass},
 	}, 7); !errors.Is(err, ErrBadParam) {
@@ -235,7 +251,7 @@ func TestQualityInspectionProcessDomainCommandDecideRequiresInspectionAndResult(
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_receipt", BusinessRefID: 6001},
-		CommandKey:      ProcessDomainCommandQualityInspectionDecide,
+		CommandKey:      ProcessDomainCommandIncomingQualityGate,
 		IdempotencyKey:  "process:10:node:20:quality-inspection-decide",
 		Payload:         map[string]any{"quality_inspection_id": float64(5001)},
 	}, 7); !errors.Is(err, ErrBadParam) {
@@ -382,10 +398,19 @@ func TestFinishedGoodsQualityProcessDomainCommandDecideRejectsMismatchedShipment
 type qualityInspectionProcessInventoryRepoStub struct {
 	InventoryRepo
 	inspection  *QualityInspection
+	qualityGate *PurchaseReceiptQualityGate
 	getCalled   bool
 	passInput   *QualityInspectionDecision
 	rejectInput *QualityInspectionDecision
 	postCalled  bool
+}
+
+func (r *qualityInspectionProcessInventoryRepoStub) EvaluatePurchaseReceiptQualityGate(_ context.Context, receiptID int) (*PurchaseReceiptQualityGate, error) {
+	if r.qualityGate == nil || r.qualityGate.PurchaseReceiptID != receiptID {
+		return nil, ErrPurchaseReceiptNotFound
+	}
+	cloned := *r.qualityGate
+	return &cloned, nil
 }
 
 func (r *qualityInspectionProcessInventoryRepoStub) GetQualityInspection(_ context.Context, id int) (*QualityInspection, error) {
@@ -435,5 +460,5 @@ func (r *qualityInspectionProcessInventoryRepoStub) RejectQualityInspection(_ co
 
 func (r *qualityInspectionProcessInventoryRepoStub) PostPurchaseReceipt(context.Context, int) (*PurchaseReceipt, error) {
 	r.postCalled = true
-	return nil, errors.New("post purchase receipt must not be called by quality_inspection.decide")
+	return nil, errors.New("post purchase receipt must not be called by quality_inspection.aggregate_gate")
 }

@@ -64,12 +64,6 @@ func (_c *RoleProfileCreate) SetBundleKeys(v []string) *RoleProfileCreate {
 	return _c
 }
 
-// SetGrants sets the "grants" field.
-func (_c *RoleProfileCreate) SetGrants(v []string) *RoleProfileCreate {
-	_c.mutation.SetGrants(v)
-	return _c
-}
-
 // SetRevokes sets the "revokes" field.
 func (_c *RoleProfileCreate) SetRevokes(v []string) *RoleProfileCreate {
 	_c.mutation.SetRevokes(v)
@@ -245,10 +239,6 @@ func (_c *RoleProfileCreate) createSpec() (*RoleProfile, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.BundleKeys(); ok {
 		_spec.SetField(roleprofile.FieldBundleKeys, field.TypeJSON, value)
 		_node.BundleKeys = value
-	}
-	if value, ok := _c.mutation.Grants(); ok {
-		_spec.SetField(roleprofile.FieldGrants, field.TypeJSON, value)
-		_node.Grants = value
 	}
 	if value, ok := _c.mutation.Revokes(); ok {
 		_spec.SetField(roleprofile.FieldRevokes, field.TypeJSON, value)

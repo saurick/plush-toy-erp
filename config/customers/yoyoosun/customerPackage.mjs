@@ -1,3 +1,5 @@
+import { yoyoosunRoleFlowMatrix } from "./roleFlowMatrix.mjs";
+
 export const yoyoosunCustomerPackage = Object.freeze({
   customerKey: "yoyoosun",
   packageKey: "yoyoosun-customer-package-v4",
@@ -30,16 +32,17 @@ export const yoyoosunCustomerPackage = Object.freeze({
     writesShipmentFacts: false,
     writesFinanceFacts: false,
   }),
+  roleProfiles: yoyoosunRoleFlowMatrix.roles,
   printTemplateDefaults: Object.freeze([
     Object.freeze({
       templateKey: "material-purchase-contract",
       status: "preview_only",
       partyDefaults: Object.freeze({
         buyerCompany: "永绅",
-        buyerContact: "郭改玉",
-        buyerPhone: "13537313218",
+        buyerContact: "采购负责人",
+        buyerPhone: "",
         buyerAddress: "东莞-茶山",
-        buyerSigner: "郭改玉",
+        buyerSigner: "",
       }),
       guardrail:
         "仅作为 yoyoosun 客户配置草案里的采购合同买方抬头默认值，不进入 Product Core 默认样例，不自动生成签章、签收、采购事实或财务事实。",
@@ -49,10 +52,10 @@ export const yoyoosunCustomerPackage = Object.freeze({
       status: "preview_only",
       partyDefaults: Object.freeze({
         buyerCompany: "永绅",
-        buyerContact: "刘志强",
-        buyerPhone: "13694972987",
+        buyerContact: "委外负责人",
+        buyerPhone: "",
         buyerAddress: "东莞茶山",
-        buyerSigner: "刘志强",
+        buyerSigner: "",
       }),
       guardrail:
         "仅作为 yoyoosun 客户配置草案里的加工合同委托方抬头默认值，不进入 Product Core 默认样例，不自动生成签章、签收、委外事实或财务事实。",

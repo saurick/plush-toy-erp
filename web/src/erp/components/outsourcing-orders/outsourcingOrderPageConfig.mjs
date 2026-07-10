@@ -4,6 +4,7 @@ import {
   confirmOutsourcingOrder,
   submitOutsourcingOrder,
 } from '../../api/masterDataOrderApi.mjs'
+import { isDraftSourceDocument } from '../../utils/sourceDocumentEditing.mjs'
 
 export const OUTSOURCING_ORDER_STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -87,9 +88,7 @@ export function workflowPayloadOf(task = {}) {
 }
 
 export function canEditOutsourcingOrder(record) {
-  return Boolean(
-    record && !['closed', 'canceled'].includes(record.lifecycle_status)
-  )
+  return Boolean(isDraftSourceDocument(record))
 }
 
 export function getOutsourcingOrderDisplayNo(record = {}) {

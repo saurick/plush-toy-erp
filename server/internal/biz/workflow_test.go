@@ -390,6 +390,54 @@ func TestWorkflowStatusActionPermissionMapsUpdateCompleteApproveReject(t *testin
 	}
 }
 
+func TestWorkflowRejectedIsTerminalAndCannotTransitionAgain(t *testing.T) {
+	if !IsTerminalWorkflowTaskStatus("rejected") {
+		t.Fatalf("rejected task must be terminal")
+	}
+	repo := &stubWorkflowRepo{currentTask: &WorkflowTask{
+		ID:            1,
+		TaskStatusKey: "rejected",
+		OwnerRoleKey:  QualityRoleKey,
+		Payload:       map[string]any{"rejected_reason": "尺寸不符"},
+	}}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1,
+		TaskStatusKey: "done",
+		Payload:       map[string]any{},
+	}, 7, QualityRoleKey)
+	if !errors.Is(err, ErrWorkflowTaskSettled) {
+		t.Fatalf("expected terminal rejected task to reject later transition, got %v", err)
+	}
+	if repo.updateTaskInput != nil {
+		t.Fatalf("terminal task must not reach repository update, got %#v", repo.updateTaskInput)
+	}
+
+	current, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1,
+		TaskStatusKey: "rejected",
+		Reason:        "尺寸不符",
+		Payload:       map[string]any{"rejected_reason": "尺寸不符"},
+	}, 7, QualityRoleKey)
+	if err != nil || current != repo.currentTask {
+		t.Fatalf("same terminal status retry must be an idempotent read, task=%#v err=%v", current, err)
+	}
+	if repo.updateTaskInput != nil {
+		t.Fatalf("same terminal status retry must not duplicate repository side effects")
+	}
+
+	_, err = uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1,
+		TaskStatusKey: "rejected",
+		Reason:        "另一个原因",
+		Payload:       map[string]any{"rejected_reason": "另一个原因"},
+	}, 7, QualityRoleKey)
+	if !errors.Is(err, ErrWorkflowTaskSettled) {
+		t.Fatalf("same terminal status with different reason must be rejected, got %v", err)
+	}
+}
+
 func TestCanAdminHandleWorkflowTaskEnforcesOwnerAssigneeAndStatus(t *testing.T) {
 	assigneeID := 8
 	task := &WorkflowTask{

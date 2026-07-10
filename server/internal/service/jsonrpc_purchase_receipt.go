@@ -38,7 +38,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts"); res != nil {
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "quality_inspections", "inventory"); res != nil {
 			return id, res, nil
 		}
 		item, err := d.inventoryUC.CreatePurchaseReceiptWithItems(ctx, in, items)
@@ -51,7 +51,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_orders", "purchase_receipts"); res != nil {
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_orders", "purchase_receipts", "quality_inspections", "inventory"); res != nil {
 			return id, res, nil
 		}
 		item, err := d.inventoryUC.CreatePurchaseReceiptFromPurchaseOrder(ctx, in)
@@ -64,7 +64,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts"); res != nil {
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "quality_inspections", "inventory"); res != nil {
 			return id, res, nil
 		}
 		item, err := d.inventoryUC.AddPurchaseReceiptItem(ctx, in)
@@ -73,7 +73,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptCreate, biz.PermissionWarehouseInboundConfirm); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "inventory"); res != nil {
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "quality_inspections", "inventory"); res != nil {
 			return id, res, nil
 		}
 		item, err := d.inventoryUC.PostPurchaseReceipt(ctx, getInt(pm, "id", 0))

@@ -9,6 +9,7 @@ import (
 var (
 	ErrWorkflowTaskNotFound       = errors.New("workflow task not found")
 	ErrWorkflowTaskExists         = errors.New("workflow task already exists")
+	ErrWorkflowTaskSettled        = errors.New("workflow task already settled")
 	ErrWorkflowBusinessStateFound = errors.New("workflow business state already exists")
 )
 

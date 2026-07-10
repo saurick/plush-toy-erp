@@ -26,6 +26,8 @@ var (
 	ErrPurchaseReceiptAdjustmentNotFound     = errors.New("purchase receipt adjustment not found")
 	ErrPurchaseReceiptAdjustmentItemNotFound = errors.New("purchase receipt adjustment item not found")
 	ErrQualityInspectionNotFound             = errors.New("quality inspection not found")
+	ErrPurchaseReceiptQualityPending         = errors.New("purchase receipt quality inspection is not complete")
+	ErrPurchaseReceiptQualityRejected        = errors.New("purchase receipt quality inspection is rejected")
 	ErrInventoryInsufficientStock            = errors.New("inventory insufficient stock")
 	ErrInventoryLotStatusBlocked             = errors.New("inventory lot status blocks stock deduction")
 	ErrInventoryTxnAlreadyReversed           = errors.New("inventory txn already reversed")
@@ -399,6 +401,7 @@ type InventoryRepo interface {
 	CancelQualityInspection(ctx context.Context, inspectionID int, decisionNote *string) (*QualityInspection, error)
 	GetQualityInspection(ctx context.Context, id int) (*QualityInspection, error)
 	ListQualityInspections(ctx context.Context, filter QualityInspectionFilter) ([]*QualityInspection, int, error)
+	EvaluatePurchaseReceiptQualityGate(ctx context.Context, receiptID int) (*PurchaseReceiptQualityGate, error)
 }
 
 type InventoryUsecase struct {

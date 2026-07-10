@@ -1,5 +1,35 @@
 #!/usr/bin/env bash
 
+project_expected_node_range() {
+  local root_dir="$1"
+  node -e "const pkg=require(process.argv[1]); process.stdout.write(String(pkg.engines?.node || ''))" "$root_dir/web/package.json"
+}
+
+require_project_node() {
+  local root_dir="$1"
+  local expected actual prefix
+  expected="$(project_expected_node_range "$root_dir")"
+  actual="$(node -p 'process.versions.node')"
+
+  if [[ -z "$expected" ]]; then
+    echo "[node] web/package.json engines.node 未设置" >&2
+    return 1
+  fi
+
+  if [[ "$expected" == *.x ]]; then
+    prefix="${expected%x}"
+    if [[ "$actual" == "$prefix"* ]]; then
+      return 0
+    fi
+  elif [[ "$actual" == "$expected" ]]; then
+    return 0
+  fi
+
+  echo "[node] 当前 Node ${actual} 不符合项目要求 ${expected}" >&2
+  echo "[node] 请使用 scripts/doctor.sh 核对 PATH 后重试" >&2
+  return 1
+}
+
 project_expected_pnpm_version() {
   local root_dir="$1"
   node -e "const pkg=require(process.argv[1]); const pm=pkg.packageManager || ''; const match=pm.match(/^pnpm@(.+)$/); process.stdout.write(match ? match[1] : '')" "$root_dir/web/package.json"

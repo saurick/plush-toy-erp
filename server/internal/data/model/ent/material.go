@@ -58,9 +58,11 @@ type MaterialEdges struct {
 	PurchaseReceiptAdjustmentItems []*PurchaseReceiptAdjustmentItem `json:"purchase_receipt_adjustment_items,omitempty"`
 	// QualityInspections holds the value of the quality_inspections edge.
 	QualityInspections []*QualityInspection `json:"quality_inspections,omitempty"`
+	// OutsourcingOrderItems holds the value of the outsourcing_order_items edge.
+	OutsourcingOrderItems []*OutsourcingOrderItem `json:"outsourcing_order_items,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [7]bool
+	loadedTypes [8]bool
 }
 
 // DefaultUnitOrErr returns the DefaultUnit value or an error if the edge
@@ -126,6 +128,15 @@ func (e MaterialEdges) QualityInspectionsOrErr() ([]*QualityInspection, error) {
 		return e.QualityInspections, nil
 	}
 	return nil, &NotLoadedError{edge: "quality_inspections"}
+}
+
+// OutsourcingOrderItemsOrErr returns the OutsourcingOrderItems value or an error if the edge
+// was not loaded in eager-loading.
+func (e MaterialEdges) OutsourcingOrderItemsOrErr() ([]*OutsourcingOrderItem, error) {
+	if e.loadedTypes[7] {
+		return e.OutsourcingOrderItems, nil
+	}
+	return nil, &NotLoadedError{edge: "outsourcing_order_items"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -265,6 +276,11 @@ func (_m *Material) QueryPurchaseReceiptAdjustmentItems() *PurchaseReceiptAdjust
 // QueryQualityInspections queries the "quality_inspections" edge of the Material entity.
 func (_m *Material) QueryQualityInspections() *QualityInspectionQuery {
 	return NewMaterialClient(_m.config).QueryQualityInspections(_m)
+}
+
+// QueryOutsourcingOrderItems queries the "outsourcing_order_items" edge of the Material entity.
+func (_m *Material) QueryOutsourcingOrderItems() *OutsourcingOrderItemQuery {
+	return NewMaterialClient(_m.config).QueryOutsourcingOrderItems(_m)
 }
 
 // Update returns a builder for updating this Material.

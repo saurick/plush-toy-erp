@@ -28,6 +28,7 @@
 
 - [ ] Docker / Compose 可用。
 - [ ] `/usr/local/bin/atlas` 可用。
+- [ ] `MIGRATION_LOCK_FILE` 使用专用私有绝对路径，不在 `/tmp` / `/var/tmp` / `/dev/shm`。
 - [ ] 数据目录、附件目录和备份目录存在。
 - [ ] 磁盘空间充足。
 - [ ] 不在目标服务器执行构建命令。

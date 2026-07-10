@@ -56,7 +56,7 @@ export function applyCustomerWebConfig({
     customerDir,
     "customer-config.example.js",
   );
-  const customerAssetsDir = path.join(customerDir, "assets");
+  const customerAssetsDir = path.join(customerDir, "public-assets");
   const targetConfigPath = path.join(webBuildDir, "customer-config.js");
   const targetAssetsDir = path.join(
     webBuildDir,
@@ -65,7 +65,7 @@ export function applyCustomerWebConfig({
   );
 
   assertPathExists(customerConfigPath, "customer web config");
-  assertPathExists(customerAssetsDir, "customer web assets");
+  assertPathExists(customerAssetsDir, "customer public web assets");
   assertPathExists(webBuildDir, "web build directory");
 
   mkdirSync(path.dirname(targetConfigPath), { recursive: true });

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	v1 "server/api/jsonrpc/v1"
@@ -12,9 +13,11 @@ import (
 type adminPermissionCacheKey struct{}
 
 type adminPermissionCache struct {
-	admin      *biz.AdminUser
-	permission []string
-	loaded     bool
+	admin               *biz.AdminUser
+	permission          []string
+	effectivePermission []string
+	loaded              bool
+	effectiveLoaded     bool
 }
 
 func withAdminPermissionCache(ctx context.Context) context.Context {
@@ -91,12 +94,72 @@ func (d *jsonrpcDispatcher) CurrentAdmin(ctx context.Context) (*biz.AdminUser, *
 }
 
 func (d *jsonrpcDispatcher) AdminHasPermission(ctx context.Context, permissionKey string) (bool, *v1.JsonrpcResult) {
-	permissions, res := d.CurrentAdminPermissions(ctx)
+	permissions, res := d.CurrentEffectiveAdminPermissions(ctx)
 	if res != nil {
 		return false, res
 	}
 	permissionSet := biz.PermissionKeySet(permissions)
 	return biz.PermissionSetHasAny(permissionSet, permissionKey), nil
+}
+
+// CurrentEffectiveAdminPermissions keeps backend RBAC as the upper bound and
+// applies the active customer revision as a narrower business-action boundary.
+// Control-plane permissions stay governed by RBAC so an administrator cannot
+// lock the deployment out of configuration repair or audit access.
+func (d *jsonrpcDispatcher) CurrentEffectiveAdminPermissions(ctx context.Context) ([]string, *v1.JsonrpcResult) {
+	permissions, res := d.CurrentAdminPermissions(ctx)
+	if res != nil {
+		return nil, res
+	}
+	cache := getAdminPermissionCache(ctx)
+	if cache != nil && cache.effectiveLoaded {
+		return append([]string(nil), cache.effectivePermission...), nil
+	}
+	admin, res := d.CurrentAdmin(ctx)
+	if res != nil {
+		return nil, res
+	}
+	if admin.IsSuperAdmin || d == nil || d.customerConfigUC == nil {
+		cacheEffectiveAdminPermissions(cache, permissions)
+		return permissions, nil
+	}
+	customerKey, err := runtimeCustomerKey("")
+	if err != nil {
+		return nil, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	}
+	actionEntitlements, err := d.customerConfigUC.GetEffectiveActionEntitlements(ctx, customerKey, admin)
+	if err != nil {
+		if d.log == nil {
+			return nil, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+		}
+		return nil, d.mapCustomerConfigError(ctx, err)
+	}
+	effectiveActions := biz.PermissionKeySet(actionEntitlements)
+	effective := make([]string, 0, len(permissions))
+	for _, permissionKey := range permissions {
+		if !customerConfigEntitlementApplies(permissionKey) || biz.PermissionSetHasAny(effectiveActions, permissionKey) {
+			effective = append(effective, permissionKey)
+		}
+	}
+	cacheEffectiveAdminPermissions(cache, effective)
+	return effective, nil
+}
+
+func cacheEffectiveAdminPermissions(cache *adminPermissionCache, permissions []string) {
+	if cache == nil {
+		return
+	}
+	cache.effectivePermission = append([]string(nil), permissions...)
+	cache.effectiveLoaded = true
+}
+
+func customerConfigEntitlementApplies(permissionKey string) bool {
+	permissionKey = strings.TrimSpace(permissionKey)
+	return permissionKey != "" &&
+		!strings.HasPrefix(permissionKey, "system.") &&
+		!strings.HasPrefix(permissionKey, "customer_config.") &&
+		!strings.HasPrefix(permissionKey, "debug.") &&
+		permissionKey != biz.PermissionERPBusinessChainDebugRead
 }
 
 func (d *jsonrpcDispatcher) RequireAdminPermission(ctx context.Context, permissionKey string) *v1.JsonrpcResult {
@@ -111,7 +174,7 @@ func (d *jsonrpcDispatcher) RequireAdminPermission(ctx context.Context, permissi
 }
 
 func (d *jsonrpcDispatcher) RequireAdminAnyPermission(ctx context.Context, permissionKeys ...string) *v1.JsonrpcResult {
-	permissions, res := d.CurrentAdminPermissions(ctx)
+	permissions, res := d.CurrentEffectiveAdminPermissions(ctx)
 	if res != nil {
 		return res
 	}

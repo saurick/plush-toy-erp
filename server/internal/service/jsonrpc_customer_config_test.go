@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -88,6 +89,7 @@ func newCustomerConfigTestDispatcherWithRepos(admin *biz.AdminUser, roleKeys []s
 type serviceCustomerConfigRepo struct {
 	revisions    map[string]*biz.CustomerConfigRevision
 	modules      map[string][]biz.DeploymentModuleStateInput
+	profiles     map[string][]biz.RoleProfileInput
 	pools        map[string][]biz.WorkPoolInput
 	entitlements map[string][]biz.AccessEntitlementInput
 	memberships  map[string][]biz.WorkPoolMembershipInput
@@ -116,6 +118,7 @@ type serviceMaterialSupplyInventoryRepo struct {
 	biz.InventoryRepo
 
 	inspection      *biz.QualityInspection
+	qualityGate     *biz.PurchaseReceiptQualityGate
 	createdReceipt  *biz.PurchaseReceipt
 	postedReceipt   *biz.PurchaseReceipt
 	createInput     *biz.PurchaseReceiptFromPurchaseOrderCreate
@@ -128,6 +131,7 @@ func newServiceCustomerConfigRepo() *serviceCustomerConfigRepo {
 	return &serviceCustomerConfigRepo{
 		revisions:    map[string]*biz.CustomerConfigRevision{},
 		modules:      map[string][]biz.DeploymentModuleStateInput{},
+		profiles:     map[string][]biz.RoleProfileInput{},
 		pools:        map[string][]biz.WorkPoolInput{},
 		entitlements: map[string][]biz.AccessEntitlementInput{},
 		memberships:  map[string][]biz.WorkPoolMembershipInput{},
@@ -498,6 +502,14 @@ func (r *serviceMaterialSupplyInventoryRepo) GetQualityInspection(_ context.Cont
 	return &cloned, nil
 }
 
+func (r *serviceMaterialSupplyInventoryRepo) EvaluatePurchaseReceiptQualityGate(_ context.Context, receiptID int) (*biz.PurchaseReceiptQualityGate, error) {
+	if r.qualityGate == nil || r.qualityGate.PurchaseReceiptID != receiptID {
+		return nil, biz.ErrPurchaseReceiptNotFound
+	}
+	cloned := *r.qualityGate
+	return &cloned, nil
+}
+
 func (r *serviceMaterialSupplyInventoryRepo) WarehouseIsActive(_ context.Context, id int) (bool, error) {
 	if id <= 0 {
 		return false, biz.ErrBadParam
@@ -634,6 +646,7 @@ func (r *serviceCustomerConfigRepo) PublishCustomerConfig(_ context.Context, in 
 	key := serviceCustomerConfigKey(in.CustomerKey, in.Revision)
 	r.revisions[key] = item
 	r.modules[key] = append([]biz.DeploymentModuleStateInput(nil), in.ModuleStates...)
+	r.profiles[key] = append([]biz.RoleProfileInput(nil), in.RoleProfiles...)
 	r.pools[key] = append([]biz.WorkPoolInput(nil), in.WorkPools...)
 	r.entitlements[key] = append([]biz.AccessEntitlementInput(nil), in.AccessEntitlements...)
 	r.memberships[key] = append([]biz.WorkPoolMembershipInput(nil), in.WorkPoolMemberships...)
@@ -671,7 +684,7 @@ func (r *serviceCustomerConfigRepo) ListDeploymentModuleStates(_ context.Context
 }
 
 func (r *serviceCustomerConfigRepo) ListRoleProfiles(_ context.Context, customerKey, revision string) ([]biz.RoleProfileInput, error) {
-	return []biz.RoleProfileInput{}, nil
+	return append([]biz.RoleProfileInput(nil), r.profiles[serviceCustomerConfigKey(customerKey, revision)]...), nil
 }
 
 func (r *serviceCustomerConfigRepo) ListAccessEntitlements(_ context.Context, customerKey, revision string, roleKeys []string) ([]biz.AccessEntitlementInput, error) {
@@ -757,21 +770,45 @@ func customerConfigPublishParamsWithRevisionAndModuleState(t *testing.T, params 
 	if !ok {
 		t.Fatalf("module_states missing: %#v", payload["module_states"])
 	}
-	found := false
+	byKey := map[string]map[string]any{}
 	for _, raw := range moduleStates {
 		item, ok := raw.(map[string]any)
 		if !ok {
 			t.Fatalf("module state item = %#v", raw)
 		}
-		if item["module_key"] == moduleKey {
-			item["state"] = state
-			found = true
+		key, _ := item["module_key"].(string)
+		byKey[key] = item
+	}
+	dependentModules := map[string][]string{
+		"customers":           {"sales_orders"},
+		"suppliers":           {"purchase_orders", "outsourcing_orders"},
+		"products":            {"material_bom", "sales_orders"},
+		"materials":           {"material_bom", "purchase_orders"},
+		"processes":           {"outsourcing_orders"},
+		"sales_orders":        {"shipments"},
+		"purchase_orders":     {"purchase_receipts"},
+		"quality_inspections": {"purchase_receipts"},
+		"inventory":           {"purchase_receipts", "quality_inspections", "shipments"},
+	}
+	queue := []string{moduleKey}
+	seen := map[string]struct{}{}
+	for len(queue) > 0 {
+		key := queue[0]
+		queue = queue[1:]
+		if _, done := seen[key]; done {
+			continue
 		}
+		seen[key] = struct{}{}
+		item := byKey[key]
+		if item == nil {
+			item = map[string]any{"module_key": key}
+			moduleStates = append(moduleStates, item)
+			byKey[key] = item
+		}
+		item["state"] = state
+		queue = append(queue, dependentModules[key]...)
 	}
-	if !found {
-		moduleStates = append(moduleStates, map[string]any{"module_key": moduleKey, "state": state})
-		payload["module_states"] = moduleStates
-	}
+	payload["module_states"] = moduleStates
 	out, err := structpb.NewStruct(payload)
 	if err != nil {
 		t.Fatalf("NewStruct error = %v", err)
@@ -808,6 +845,23 @@ func publishAndActivateCustomerConfigForTest(t *testing.T, dispatcher *jsonrpcDi
 
 func customerConfigPublishParamsForRevision(t *testing.T, revision string) *structpb.Struct {
 	t.Helper()
+	roleProfiles := make([]any, 0, len(biz.BuiltinRoles()))
+	accessEntitlements := make([]any, 0, len(biz.AllPermissionKeys()))
+	for _, role := range biz.BuiltinRoles() {
+		roleProfiles = append(roleProfiles, map[string]any{
+			"role_key":     role.Key,
+			"display_name": role.Name,
+		})
+		for _, capabilityKey := range role.Permissions {
+			accessEntitlements = append(accessEntitlements, map[string]any{
+				"role_key":       role.Key,
+				"capability_key": capabilityKey,
+				"scope_type":     "customer",
+				"scope_value":    biz.DefaultCustomerKey,
+				"enabled":        true,
+			})
+		}
+	}
 	params, err := structpb.NewStruct(map[string]any{
 		"customer_key":    biz.DefaultCustomerKey,
 		"revision":        revision,
@@ -823,7 +877,7 @@ func customerConfigPublishParamsForRevision(t *testing.T, revision string) *stru
 			},
 			"fieldPolicies": map[string]any{
 				"sales_orders.default": map[string]any{
-					"source_no": map[string]any{"visible": false, "editable": false},
+					"source_no": map[string]any{"visible": false},
 				},
 			},
 			"printTemplateDefaults": map[string]any{
@@ -844,7 +898,10 @@ func customerConfigPublishParamsForRevision(t *testing.T, revision string) *stru
 		},
 		"module_states": []any{
 			map[string]any{"module_key": "customers", "state": "enabled"},
+			map[string]any{"module_key": "suppliers", "state": "enabled"},
 			map[string]any{"module_key": "products", "state": "enabled"},
+			map[string]any{"module_key": "materials", "state": "enabled"},
+			map[string]any{"module_key": "processes", "state": "enabled"},
 			map[string]any{"module_key": "sales_orders", "state": "enabled"},
 			map[string]any{"module_key": "workflow_tasks", "state": "enabled"},
 			map[string]any{"module_key": "purchase_orders", "state": "enabled"},
@@ -854,13 +911,8 @@ func customerConfigPublishParamsForRevision(t *testing.T, revision string) *stru
 			map[string]any{"module_key": "shipments", "state": "enabled"},
 			map[string]any{"module_key": "finance", "state": "enabled"},
 		},
-		"role_profiles": []any{
-			map[string]any{"role_key": biz.AdminRoleKey, "display_name": "系统管理员"},
-			map[string]any{"role_key": biz.SalesRoleKey, "display_name": "业务"},
-		},
-		"access_entitlements": []any{
-			map[string]any{"role_key": biz.AdminRoleKey, "capability_key": biz.PermissionCustomerConfigRead, "enabled": true},
-		},
+		"role_profiles":       roleProfiles,
+		"access_entitlements": accessEntitlements,
 		"work_pools": []any{
 			map[string]any{"pool_key": "admin", "module_key": "system", "display_name": "配置管理员"},
 			map[string]any{"pool_key": "sales", "module_key": "sales_orders", "display_name": "业务池"},
@@ -931,14 +983,6 @@ func customerConfigPublishParamsWithSalesOrderAcceptanceProcess(t *testing.T) *s
 			},
 		},
 	}
-	payload["role_profiles"] = append(payload["role_profiles"].([]any),
-		map[string]any{"role_key": biz.BossRoleKey, "display_name": "老板"},
-		map[string]any{"role_key": biz.PMCRoleKey, "display_name": "PMC"},
-	)
-	payload["access_entitlements"] = append(payload["access_entitlements"].([]any),
-		map[string]any{"role_key": biz.BossRoleKey, "capability_key": biz.PermissionWorkflowTaskApprove, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
-		map[string]any{"role_key": biz.PMCRoleKey, "capability_key": biz.PermissionWorkflowTaskComplete, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
-	)
 	payload["work_pools"] = append(payload["work_pools"].([]any),
 		map[string]any{"pool_key": "order_approval", "module_key": "sales_orders", "display_name": "订单审批"},
 		map[string]any{"pool_key": "order_review", "module_key": "sales_orders", "display_name": "订单评审"},
@@ -979,8 +1023,8 @@ func customerConfigPublishParamsWithMaterialSupplyRuntimeProcess(t *testing.T) *
 					"node_type":               biz.ProcessNodeTypeDomainCommand,
 					"required_capability_key": biz.PermissionQualityInspectionUpdate,
 					"policy_snapshot": map[string]any{
-						"command_key":              biz.ProcessDomainCommandQualityInspectionDecide,
-						"handler":                  "InventoryUsecase.PassQualityInspection/RejectQualityInspection",
+						"command_key":              biz.ProcessDomainCommandIncomingQualityGate,
+						"handler":                  "InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
 						"idempotency_key_required": true,
 						"writes_fact":              false,
 					},
@@ -1003,16 +1047,6 @@ func customerConfigPublishParamsWithMaterialSupplyRuntimeProcess(t *testing.T) *
 			},
 		},
 	}
-	payload["role_profiles"] = append(payload["role_profiles"].([]any),
-		map[string]any{"role_key": biz.PurchaseRoleKey, "display_name": "采购"},
-		map[string]any{"role_key": biz.QualityRoleKey, "display_name": "品质"},
-		map[string]any{"role_key": biz.WarehouseRoleKey, "display_name": "仓库"},
-	)
-	payload["access_entitlements"] = append(payload["access_entitlements"].([]any),
-		map[string]any{"role_key": biz.PurchaseRoleKey, "capability_key": biz.PermissionPurchaseReceiptCreate, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
-		map[string]any{"role_key": biz.QualityRoleKey, "capability_key": biz.PermissionQualityInspectionUpdate, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
-		map[string]any{"role_key": biz.WarehouseRoleKey, "capability_key": biz.PermissionWarehouseInboundConfirm, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
-	)
 	params, err := structpb.NewStruct(payload)
 	if err != nil {
 		t.Fatalf("NewStruct error = %v", err)
@@ -1130,16 +1164,6 @@ func customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t *testing.T
 			},
 		},
 	}
-	payload["role_profiles"] = append(payload["role_profiles"].([]any),
-		map[string]any{"role_key": biz.QualityRoleKey, "display_name": "品质"},
-		map[string]any{"role_key": biz.WarehouseRoleKey, "display_name": "仓库"},
-		map[string]any{"role_key": biz.FinanceRoleKey, "display_name": "财务"},
-	)
-	payload["access_entitlements"] = append(payload["access_entitlements"].([]any),
-		map[string]any{"role_key": biz.QualityRoleKey, "capability_key": biz.PermissionQualityInspectionUpdate, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
-		map[string]any{"role_key": biz.WarehouseRoleKey, "capability_key": biz.PermissionShipmentShip, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
-		map[string]any{"role_key": biz.FinanceRoleKey, "capability_key": biz.PermissionFinanceReceivableConfirm, "scope_type": "customer", "scope_value": biz.DefaultCustomerKey, "enabled": true},
-	)
 	params, err := structpb.NewStruct(payload)
 	if err != nil {
 		t.Fatalf("NewStruct error = %v", err)
@@ -1183,8 +1207,8 @@ func customerConfigPublishParamsWithMaterialSupplyPurchaseOrderRuntimeProcess(t 
 					"node_type":               biz.ProcessNodeTypeDomainCommand,
 					"required_capability_key": biz.PermissionQualityInspectionUpdate,
 					"policy_snapshot": map[string]any{
-						"command_key":              biz.ProcessDomainCommandQualityInspectionDecide,
-						"handler":                  "InventoryUsecase.PassQualityInspection/RejectQualityInspection",
+						"command_key":              biz.ProcessDomainCommandIncomingQualityGate,
+						"handler":                  "InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
 						"idempotency_key_required": true,
 						"writes_fact":              false,
 					},
@@ -1222,6 +1246,32 @@ func TestCustomerConfigJSONRPCRequiresPublishPermission(t *testing.T) {
 	}
 	if res.Code != errcode.PermissionDenied.Code {
 		t.Fatalf("code = %d, want permission denied", res.Code)
+	}
+}
+
+func TestCustomerConfigJSONRPCRejectsRemovedRoleProfileGrants(t *testing.T) {
+	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "admin", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.AdminRoleKey})
+	payload := customerConfigPublishParams(t).AsMap()
+	profiles, ok := payload["role_profiles"].([]any)
+	if !ok || len(profiles) == 0 {
+		t.Fatalf("role_profiles missing: %#v", payload["role_profiles"])
+	}
+	profile, ok := profiles[0].(map[string]any)
+	if !ok {
+		t.Fatalf("role profile invalid: %#v", profiles[0])
+	}
+	profile["grants"] = []any{biz.PermissionSalesOrderRead}
+	params, err := structpb.NewStruct(payload)
+	if err != nil {
+		t.Fatalf("NewStruct error = %v", err)
+	}
+
+	_, res, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, "admin"), "publish_customer_config", "1", params)
+	if err != nil {
+		t.Fatalf("handleCustomerConfig err = %v", err)
+	}
+	if res.Code != errcode.InvalidParam.Code {
+		t.Fatalf("code = %d, want invalid param", res.Code)
 	}
 }
 
@@ -2140,6 +2190,63 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRequiresEn
 	}
 }
 
+func TestRuntimeCustomerKeyRejectsBusinessRequestCustomerOverride(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", "yoyoosun")
+
+	resolved, err := runtimeCustomerKey("")
+	if err != nil || resolved != "yoyoosun" {
+		t.Fatalf("runtimeCustomerKey empty = %q, %v", resolved, err)
+	}
+	resolved, err = runtimeCustomerKey("yoyoosun")
+	if err != nil || resolved != "yoyoosun" {
+		t.Fatalf("runtimeCustomerKey matching = %q, %v", resolved, err)
+	}
+	if _, err := runtimeCustomerKey("demo"); !errors.Is(err, biz.ErrForbidden) {
+		t.Fatalf("runtimeCustomerKey override error = %v, want ErrForbidden", err)
+	}
+}
+
+func TestCustomerConfigJSONRPCEveryCustomerScopedEntryRejectsRuntimeCustomerOverride(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", "yoyoosun")
+	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "admin", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.AdminRoleKey})
+	ctx := customerConfigAdminCtx(1, "admin")
+
+	publishPayload := customerConfigPublishParams(t).AsMap()
+	publishPayload["customer_key"] = "demo"
+	tests := []struct {
+		method  string
+		payload map[string]any
+	}{
+		{method: "validate_customer_config", payload: publishPayload},
+		{method: "publish_customer_config", payload: publishPayload},
+		{method: "activate_customer_config", payload: map[string]any{"customer_key": "demo", "revision": "v1"}},
+		{method: "rollback_customer_config", payload: map[string]any{"customer_key": "demo", "target_revision": "v1"}},
+		{method: "get_effective_session", payload: map[string]any{"customer_key": "demo"}},
+		{method: "explain_module_status", payload: map[string]any{"customer_key": "demo", "module_key": "sales_orders"}},
+		{method: "explain_process_definition", payload: map[string]any{"customer_key": "demo", "process_key": biz.ProcessKeySalesOrderAcceptance}},
+		{method: "start_sales_order_acceptance_process", payload: map[string]any{"customer_key": "demo", "sales_order_id": float64(1), "idempotency_key": "guard/sales"}},
+		{method: "start_material_supply_process", payload: map[string]any{"customer_key": "demo", "purchase_receipt_id": float64(1), "idempotency_key": "guard/receipt"}},
+		{method: "start_material_supply_purchase_order_process", payload: map[string]any{"customer_key": "demo", "purchase_order_id": float64(1), "idempotency_key": "guard/purchase"}},
+		{method: "start_finished_goods_delivery_process", payload: map[string]any{"customer_key": "demo", "shipment_id": float64(1), "idempotency_key": "guard/shipment"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.method, func(t *testing.T) {
+			params, err := structpb.NewStruct(tt.payload)
+			if err != nil {
+				t.Fatalf("NewStruct error = %v", err)
+			}
+			_, res, err := dispatcher.handleCustomerConfig(ctx, tt.method, "runtime-customer-guard", params)
+			if err != nil {
+				t.Fatalf("handleCustomerConfig error = %v", err)
+			}
+			if res.Code != errcode.PermissionDenied.Code {
+				t.Fatalf("code = %d message=%q, want permission denied", res.Code, res.Message)
+			}
+		})
+	}
+}
+
 func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRequiresShipmentPermission(t *testing.T) {
 	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "quality", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.QualityRoleKey})
 	params, _ := structpb.NewStruct(map[string]any{
@@ -2776,11 +2883,11 @@ func TestCustomerConfigJSONRPCStartMaterialSupplyProcess(t *testing.T) {
 
 func TestCustomerConfigJSONRPCExecuteMaterialSupplyQualityAndInbound(t *testing.T) {
 	inventoryRepo := &serviceMaterialSupplyInventoryRepo{
-		inspection: &biz.QualityInspection{
-			ID:                7001,
+		qualityGate: &biz.PurchaseReceiptQualityGate{
 			PurchaseReceiptID: 6001,
-			InventoryLotID:    8001,
-			Status:            biz.QualityInspectionStatusSubmitted,
+			Outcome:           biz.PurchaseReceiptQualityGateReady,
+			TotalLines:        1,
+			PassedLines:       1,
 		},
 		postedReceipt: &biz.PurchaseReceipt{ID: 6001, ReceiptNo: "PR-6001", Status: biz.PurchaseReceiptStatusDraft},
 	}
@@ -2829,28 +2936,22 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyQualityAndInbound(t *testing.
 		"process_instance_id":      instance["id"],
 		"process_node_instance_id": startedNode["id"],
 		"expected_version":         startedNode["version"],
-		"quality_inspection_id":    float64(7001),
 		"purchase_receipt_id":      float64(6001),
-		"inventory_lot_id":         float64(8001),
-		"result":                   biz.QualityInspectionResultPass,
 		"idempotency_key":          "material-supply/PR-6001/iqc",
 	})
-	_, qualityRes, err := dispatcher.handleCustomerConfig(ctx, "execute_material_supply_quality_decide", "quality", qualityParams)
+	_, qualityRes, err := dispatcher.handleCustomerConfig(ctx, "execute_material_supply_quality_gate", "quality", qualityParams)
 	if err != nil {
 		t.Fatalf("quality err = %v", err)
 	}
 	if qualityRes.Code != errcode.OK.Code {
 		t.Fatalf("quality code = %d msg=%s", qualityRes.Code, qualityRes.Message)
 	}
-	if inventoryRepo.passInput == nil || inventoryRepo.passInput.InspectionID != 7001 || inventoryRepo.passInput.Result != biz.QualityInspectionResultPass {
-		t.Fatalf("quality decision input = %#v", inventoryRepo.passInput)
-	}
 	qualityData := qualityRes.Data.AsMap()
-	completedQualityNode, ok := qualityData["completed_node"].(map[string]any)
+	completedQualityNode, ok := qualityData["evaluated_node"].(map[string]any)
 	if !ok ||
 		completedQualityNode["node_key"] != "incoming_qc" ||
-		completedQualityNode["outcome"] != biz.QualityInspectionProcessCommandOutcomePassed {
-		t.Fatalf("completed quality node = %#v", qualityData["completed_node"])
+		completedQualityNode["outcome"] != biz.IncomingQualityGateProcessCommandOutcomePassed {
+		t.Fatalf("evaluated quality node = %#v", qualityData["evaluated_node"])
 	}
 	qualityNodes, ok := qualityData["nodes"].([]any)
 	if !ok || len(qualityNodes) != 3 {
@@ -2863,7 +2964,7 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyQualityAndInbound(t *testing.
 		t.Fatalf("inbound node = %#v", qualityNodes[1])
 	}
 	qualityBoundary := qualityData["runtime_boundary"].(map[string]any)
-	if qualityBoundary["writes_quality_decision"] != true || qualityBoundary["writes_inventory_fact"] != false {
+	if qualityBoundary["writes_quality_decision"] != false || qualityBoundary["writes_inventory_fact"] != false {
 		t.Fatalf("quality boundary = %#v", qualityBoundary)
 	}
 
@@ -2910,13 +3011,26 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyQualityAndInbound(t *testing.
 }
 
 func TestCustomerConfigJSONRPCExecuteMaterialSupplyPurchaseOrderToQualityAndInbound(t *testing.T) {
+	lotID := 8001
 	inventoryRepo := &serviceMaterialSupplyInventoryRepo{
-		createdReceipt: &biz.PurchaseReceipt{ID: 6001, ReceiptNo: "PR-6001", Status: biz.PurchaseReceiptStatusDraft},
-		inspection: &biz.QualityInspection{
-			ID:                7001,
+		createdReceipt: &biz.PurchaseReceipt{
+			ID:        6001,
+			ReceiptNo: "PR-6001",
+			Status:    biz.PurchaseReceiptStatusDraft,
+			Items:     []*biz.PurchaseReceiptItem{{ID: 6101, ReceiptID: 6001, LotID: &lotID}},
+			QualityInspections: []*biz.QualityInspection{{
+				ID:                7001,
+				InspectionNo:      "IQC-PR-6001-ITEM-6101",
+				PurchaseReceiptID: 6001,
+				InventoryLotID:    8001,
+				Status:            biz.QualityInspectionStatusSubmitted,
+			}},
+		},
+		qualityGate: &biz.PurchaseReceiptQualityGate{
 			PurchaseReceiptID: 6001,
-			InventoryLotID:    8001,
-			Status:            biz.QualityInspectionStatusSubmitted,
+			Outcome:           biz.PurchaseReceiptQualityGateReady,
+			TotalLines:        1,
+			PassedLines:       1,
 		},
 		postedReceipt: &biz.PurchaseReceipt{ID: 6001, ReceiptNo: "PR-6001", Status: biz.PurchaseReceiptStatusDraft},
 	}
@@ -3009,7 +3123,7 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyPurchaseOrderToQualityAndInbo
 	createInstance := createData["process_instance"].(map[string]any)
 	snapshot := createInstance["module_contract_snapshot"].(map[string]any)
 	linkedRefs, ok := snapshot["linked_business_refs"].([]any)
-	if !ok || len(linkedRefs) != 1 {
+	if !ok || len(linkedRefs) != 2 {
 		t.Fatalf("linked refs = %#v", snapshot["linked_business_refs"])
 	}
 	linkedRef := linkedRefs[0].(map[string]any)
@@ -3028,7 +3142,9 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyPurchaseOrderToQualityAndInbo
 	}
 	createBoundary := createData["runtime_boundary"].(map[string]any)
 	if createBoundary["writes_purchase_receipt_source_doc"] != true ||
-		createBoundary["writes_inventory_fact"] != false ||
+		createBoundary["creates_submitted_quality_inspections"] != true ||
+		createBoundary["creates_zero_balance_hold_lots"] != true ||
+		createBoundary["writes_inventory_quantity_fact"] != false ||
 		createBoundary["linked_business_ref_source"] != "process_runtime_result" {
 		t.Fatalf("create boundary = %#v", createBoundary)
 	}
@@ -3037,13 +3153,10 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyPurchaseOrderToQualityAndInbo
 		"process_instance_id":      instance["id"],
 		"process_node_instance_id": incomingNode["id"],
 		"expected_version":         incomingNode["version"],
-		"quality_inspection_id":    float64(7001),
 		"purchase_receipt_id":      float64(6001),
-		"inventory_lot_id":         float64(8001),
-		"result":                   biz.QualityInspectionResultPass,
 		"idempotency_key":          "material-supply/PO-5001/iqc",
 	})
-	_, qualityRes, err := dispatcher.handleCustomerConfig(ctx, "execute_material_supply_quality_decide", "quality", qualityParams)
+	_, qualityRes, err := dispatcher.handleCustomerConfig(ctx, "execute_material_supply_quality_gate", "quality", qualityParams)
 	if err != nil {
 		t.Fatalf("quality err = %v", err)
 	}

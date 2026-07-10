@@ -726,7 +726,7 @@ func TestJsonrpcDispatcher_ProcessAPIRequiresEnabledModule(t *testing.T) {
 		"inhouse_enabled":     false,
 	})
 	admin := workflowJSONRPCAdmin(
-		[]string{biz.ProductionRoleKey},
+		[]string{biz.EngineeringRoleKey},
 		biz.PermissionProcessCreate,
 		biz.PermissionProcessUpdate,
 		biz.PermissionProcessDisable,
@@ -1133,7 +1133,7 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresPermissionAndRejectsShipmentVerb
 		"order_date":           "2026-05-31",
 	})
 
-	_, okRes, err := j.handleSalesOrder(workflowJSONRPCAdminContext(), "create_sales_order", "1", params)
+	_, okRes, err := j.handleSalesOrder(workflowJSONRPCAdminContext(), "save_sales_order_with_items", "1", params)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -1152,6 +1152,22 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresPermissionAndRejectsShipmentVerb
 	}
 	if orderData["sales_owner"] != "张三" || orderData["contact_snapshot"] == nil {
 		t.Fatalf("expected owner and contact snapshot in response, got %#v", orderData)
+	}
+
+	for _, removedMethod := range []string{
+		"create_sales_order",
+		"update_sales_order",
+		"add_sales_order_item",
+		"update_sales_order_item",
+		"remove_sales_order_item",
+	} {
+		_, removedRes, removedErr := j.handleSalesOrder(workflowJSONRPCAdminContext(), removedMethod, "removed", params)
+		if removedErr != nil {
+			t.Fatalf("%s expected nil err, got %v", removedMethod, removedErr)
+		}
+		if removedRes == nil || removedRes.Code != errcode.UnknownMethod.Code {
+			t.Fatalf("legacy split write method %s must stay removed, got %#v", removedMethod, removedRes)
+		}
 	}
 
 	_, unknownRes, err := j.handleSalesOrder(workflowJSONRPCAdminContext(), "ship"+"SalesOrder", "2", mustJSONRPCStruct(t, map[string]any{"id": float64(1)}))
@@ -1227,15 +1243,8 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresEnabledModule(t *testing.T) {
 		biz.PermissionSalesOrderSubmit,
 		biz.PermissionSalesOrderCancel,
 		biz.PermissionSalesOrderItemRead,
-		biz.PermissionSalesOrderItemCreate,
-		biz.PermissionSalesOrderItemCancel,
 	))
 	ctx := workflowJSONRPCAdminContext()
-	createParams := mustJSONRPCStruct(t, map[string]any{
-		"order_no":    "SO-MODULE-GATE-001",
-		"customer_id": float64(1),
-		"order_date":  "2026-06-15",
-	})
 	saveParams := mustJSONRPCStruct(t, map[string]any{
 		"order_no":    "SO-MODULE-GATE-SAVE",
 		"customer_id": float64(1),
@@ -1259,16 +1268,6 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresEnabledModule(t *testing.T) {
 	)
 	activateOperationalFactTestCustomerConfig(t, j, readOnlyConfig)
 
-	_, createRes, err := j.handleSalesOrder(ctx, "create_sales_order", "read-only-create", createParams)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected read_only sales_orders create rejected, got %#v", createRes)
-	}
-	if repo.savedOrder != nil {
-		t.Fatalf("read_only sales_orders must not create order, got %#v", repo.savedOrder)
-	}
 	_, saveRes, err := j.handleSalesOrder(ctx, "save_sales_order_with_items", "read-only-save", saveParams)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -1295,15 +1294,15 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresEnabledModule(t *testing.T) {
 		"enabled",
 	)
 	activateOperationalFactTestCustomerConfig(t, j, enabledConfig)
-	_, createRes, err = j.handleSalesOrder(ctx, "create_sales_order", "enabled-create", createParams)
+	_, saveRes, err = j.handleSalesOrder(ctx, "save_sales_order_with_items", "enabled-save", saveParams)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if createRes == nil || createRes.Code != errcode.OK.Code {
-		t.Fatalf("expected enabled sales_orders create OK, got %#v", createRes)
+	if saveRes == nil || saveRes.Code != errcode.OK.Code {
+		t.Fatalf("expected enabled sales_orders save OK, got %#v", saveRes)
 	}
-	if repo.savedOrder == nil || repo.savedOrder.OrderNo != "SO-MODULE-GATE-001" {
-		t.Fatalf("enabled sales_orders must reach create usecase, got %#v", repo.savedOrder)
+	if repo.savedOrder == nil || repo.savedOrder.OrderNo != "SO-MODULE-GATE-SAVE" || len(repo.savedItems) != 1 {
+		t.Fatalf("enabled sales_orders must reach aggregate save usecase, order=%#v items=%#v", repo.savedOrder, repo.savedItems)
 	}
 	_, submitRes, err := j.handleSalesOrder(ctx, "submit_sales_order", "enabled-submit", mustJSONRPCStruct(t, map[string]any{"id": float64(1)}))
 	if err != nil {
@@ -1321,22 +1320,17 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresEnabledModule(t *testing.T) {
 		"disabled",
 	)
 	activateOperationalFactTestCustomerConfig(t, j, disabledConfig)
-	repo.addedItem = nil
-	_, addItemRes, err := j.handleSalesOrder(ctx, "add_sales_order_item", "disabled-add-item", mustJSONRPCStruct(t, map[string]any{
-		"sales_order_id":   float64(1),
-		"line_no":          float64(1),
-		"product_id":       float64(1),
-		"unit_id":          float64(1),
-		"ordered_quantity": "12.5",
-	}))
+	repo.savedOrder = nil
+	repo.savedItems = nil
+	_, saveRes, err = j.handleSalesOrder(ctx, "save_sales_order_with_items", "disabled-save", saveParams)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if addItemRes == nil || addItemRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected disabled sales_orders item add rejected, got %#v", addItemRes)
+	if saveRes == nil || saveRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected disabled sales_orders aggregate save rejected, got %#v", saveRes)
 	}
-	if repo.addedItem != nil {
-		t.Fatalf("disabled sales_orders must not add item, got %#v", repo.addedItem)
+	if repo.savedOrder != nil || len(repo.savedItems) != 0 {
+		t.Fatalf("disabled sales_orders must not reach aggregate save, order=%#v items=%#v", repo.savedOrder, repo.savedItems)
 	}
 	_, itemListRes, err := j.handleSalesOrder(ctx, "list_sales_order_items", "read-items-after-disabled", mustJSONRPCStruct(t, map[string]any{"sales_order_id": float64(1)}))
 	if err != nil {
@@ -1362,7 +1356,6 @@ func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesSingleUsecase(t *testing.T
 	j := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
 		[]string{biz.SalesRoleKey},
 		biz.PermissionSalesOrderCreate,
-		biz.PermissionSalesOrderItemCreate,
 	))
 	params := mustJSONRPCStruct(t, map[string]any{
 		"order_no":             "SO-TX-JSONRPC",
@@ -1421,26 +1414,62 @@ func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesSingleUsecase(t *testing.T
 	}
 }
 
-func TestJsonrpcDispatcher_SalesOrderItemAPIUsesUsecaseProductUnitGuard(t *testing.T) {
-	repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: false, unitActive: true}
-	j := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionSalesOrderItemCreate))
+func TestJsonrpcDispatcher_SaveExistingSalesOrderDoesNotRequireRemovedItemWritePermissions(t *testing.T) {
+	repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: true, unitActive: true}
+	j := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.SalesRoleKey},
+		biz.PermissionSalesOrderUpdate,
+	))
 	params := mustJSONRPCStruct(t, map[string]any{
-		"sales_order_id":   float64(1),
-		"line_no":          float64(1),
-		"product_id":       float64(404),
-		"unit_id":          float64(1),
-		"ordered_quantity": "12.5",
+		"id":          float64(1),
+		"order_no":    "SO-TX-JSONRPC-UPDATE",
+		"customer_id": float64(1),
+		"order_date":  "2026-06-15",
+		"items": []any{map[string]any{
+			"id":               float64(1),
+			"line_no":          float64(1),
+			"product_id":       float64(1),
+			"unit_id":          float64(1),
+			"ordered_quantity": "12.5",
+		}},
 	})
 
-	_, res, err := j.handleSalesOrder(workflowJSONRPCAdminContext(), "add_sales_order_item", "1", params)
+	_, res, err := j.handleSalesOrder(workflowJSONRPCAdminContext(), "save_sales_order_with_items", "update", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected aggregate update OK with sales_order.update only, got %#v", res)
+	}
+	if repo.savedOrder == nil || repo.savedOrder.OrderNo != "SO-TX-JSONRPC-UPDATE" || len(repo.savedItems) != 1 {
+		t.Fatalf("expected aggregate update usecase call, order=%#v items=%#v", repo.savedOrder, repo.savedItems)
+	}
+}
+
+func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesUsecaseProductUnitGuard(t *testing.T) {
+	repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: false, unitActive: true}
+	j := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionSalesOrderCreate))
+	params := mustJSONRPCStruct(t, map[string]any{
+		"order_no":    "SO-MISSING-PRODUCT",
+		"customer_id": float64(1),
+		"order_date":  "2026-06-15",
+		"items": []any{map[string]any{
+			"line_no":          float64(1),
+			"product_id":       float64(404),
+			"unit_id":          float64(1),
+			"ordered_quantity": "12.5",
+		}},
+	})
+
+	_, res, err := j.handleSalesOrder(workflowJSONRPCAdminContext(), "save_sales_order_with_items", "1", params)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
 	if res == nil || res.Code != errcode.InvalidParam.Code {
 		t.Fatalf("expected invalid param for missing product, got %#v", res)
 	}
-	if repo.addedItem != nil {
-		t.Fatalf("sales order item API must not bypass product/unit guard")
+	if repo.savedOrder != nil || len(repo.savedItems) != 0 {
+		t.Fatalf("aggregate sales order save must not bypass product/unit guard")
 	}
 }
 
@@ -1452,7 +1481,6 @@ func TestJsonrpcDispatcher_RBACIncludesV1MasterDataAndOrderPermissions(t *testin
 		biz.PermissionContactSetPrimary,
 		biz.PermissionSalesOrderRead,
 		biz.PermissionSalesOrderSubmit,
-		biz.PermissionSalesOrderItemCancel,
 	)
 	jsonrpcAssertPermissionSetOmits(t, salesPermissions, biz.PermissionSupplierCreate)
 

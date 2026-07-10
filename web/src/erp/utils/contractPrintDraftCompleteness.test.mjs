@@ -74,15 +74,15 @@ test('contractPrintDraftCompleteness: configured party fields stay visible after
     supplierPhone: '13802376786',
     supplierAddress: '东莞虎门富民皮料市场A216号',
     buyerCompany: '永绅',
-    buyerContact: '郭改玉',
-    buyerPhone: '13537313218',
+    buyerContact: '试用采购负责人',
+    buyerPhone: '0769-00000001',
     buyerAddress: '东莞-茶山',
-    buyerSigner: '郭改玉',
+    buyerSigner: '试用采购负责人',
   })
-  assert.equal(purchaseDraft.buyerContact, '郭改玉')
-  assert.equal(purchaseDraft.buyerPhone, '13537313218')
+  assert.equal(purchaseDraft.buyerContact, '试用采购负责人')
+  assert.equal(purchaseDraft.buyerPhone, '0769-00000001')
   assert.equal(purchaseDraft.buyerAddress, '东莞-茶山')
-  assert.equal(purchaseDraft.buyerSigner, '郭改玉')
+  assert.equal(purchaseDraft.buyerSigner, '试用采购负责人')
   assert.equal(purchaseDraft.supplierAddress, '东莞虎门富民皮料市场A216号')
 
   const processingDraft = completeProcessingContractDraft({
@@ -92,14 +92,14 @@ test('contractPrintDraftCompleteness: configured party fields stay visible after
     supplierPhone: '0769-86862121',
     supplierAddress: '东莞市茶山镇',
     buyerCompany: '永绅',
-    buyerContact: '刘志强',
-    buyerPhone: '13694972987',
+    buyerContact: '试用委外负责人',
+    buyerPhone: '0769-00000002',
     buyerAddress: '东莞茶山',
-    buyerSigner: '刘志强',
+    buyerSigner: '试用委外负责人',
   })
-  assert.equal(processingDraft.buyerContact, '刘志强')
-  assert.equal(processingDraft.buyerPhone, '13694972987')
+  assert.equal(processingDraft.buyerContact, '试用委外负责人')
+  assert.equal(processingDraft.buyerPhone, '0769-00000002')
   assert.equal(processingDraft.buyerAddress, '东莞茶山')
-  assert.equal(processingDraft.buyerSigner, '刘志强')
+  assert.equal(processingDraft.buyerSigner, '试用委外负责人')
   assert.equal(processingDraft.supplierAddress, '东莞市茶山镇')
 })

@@ -183,14 +183,29 @@ func salesOrderSortOrder(filter biz.SalesOrderFilter) salesorder.OrderOption {
 }
 
 func (r *salesOrderRepo) UpdateSalesOrderLifecycle(ctx context.Context, id int, lifecycleStatus string) (*biz.SalesOrder, error) {
-	row, err := r.data.postgres.SalesOrder.UpdateOneID(id).
+	allowedCurrent := salesOrderLifecyclePredecessors(lifecycleStatus)
+	if len(allowedCurrent) == 0 {
+		return nil, biz.ErrBadParam
+	}
+	affected, err := r.data.postgres.SalesOrder.Update().
+		Where(
+			salesorder.ID(id),
+			salesorder.LifecycleStatusIn(allowedCurrent...),
+		).
 		SetLifecycleStatus(lifecycleStatus).
 		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	row, err := r.data.postgres.SalesOrder.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrSalesOrderNotFound
 		}
 		return nil, err
+	}
+	if affected == 0 && row.LifecycleStatus != lifecycleStatus {
+		return nil, biz.ErrBadParam
 	}
 	return entSalesOrderToBiz(row), nil
 }
@@ -332,7 +347,11 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 
 	var orderRow *ent.SalesOrder
 	if id > 0 {
-		update := tx.SalesOrder.UpdateOneID(id).
+		update := tx.SalesOrder.Update().
+			Where(
+				salesorder.ID(id),
+				salesorder.LifecycleStatus(biz.SalesOrderStatusDraft),
+			).
 			SetOrderNo(in.OrderNo).
 			SetCustomerID(in.CustomerID).
 			SetCustomerSnapshot(in.CustomerSnapshot).
@@ -373,11 +392,21 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 		} else {
 			update.SetNote(*in.Note)
 		}
-		orderRow, err = update.Save(ctx)
+		affected, err := update.Save(ctx)
 		if err != nil {
-			if ent.IsNotFound(err) {
-				return nil, biz.ErrSalesOrderNotFound
+			return nil, err
+		}
+		if affected == 0 {
+			if _, err := tx.SalesOrder.Get(ctx, id); err != nil {
+				if ent.IsNotFound(err) {
+					return nil, biz.ErrSalesOrderNotFound
+				}
+				return nil, err
 			}
+			return nil, biz.ErrBadParam
+		}
+		orderRow, err = tx.SalesOrder.Get(ctx, id)
+		if err != nil {
 			return nil, err
 		}
 	} else {
@@ -479,6 +508,23 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 		Order: entSalesOrderToBiz(orderRow),
 		Items: entSalesOrderItemsToBiz(itemRows),
 	}, nil
+}
+
+func salesOrderLifecyclePredecessors(next string) []string {
+	statuses := []string{
+		biz.SalesOrderStatusDraft,
+		biz.SalesOrderStatusSubmitted,
+		biz.SalesOrderStatusActive,
+		biz.SalesOrderStatusClosed,
+		biz.SalesOrderStatusCanceled,
+	}
+	allowed := make([]string, 0, len(statuses))
+	for _, current := range statuses {
+		if biz.IsSalesOrderLifecycleTransitionAllowed(current, next) {
+			allowed = append(allowed, current)
+		}
+	}
+	return allowed
 }
 
 func (r *salesOrderRepo) CustomerIsActive(ctx context.Context, id int) (bool, error) {

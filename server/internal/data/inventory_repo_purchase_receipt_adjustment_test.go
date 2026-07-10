@@ -329,7 +329,9 @@ func TestInventoryRepo_PurchaseReceiptAdjustmentEffectiveQuantityAndReturnLimit(
 		t.Fatalf("post quantity increase 10 failed: %v", err)
 	}
 	extraIncreaseStock := createAndPostPurchaseReceipt(t, ctx, uc, "PRA-EFF-INCREASE-EXTRA-STOCK", fixtures, stringPtr("PRA-EFF-INCREASE-LOT"), mustDecimal(t, "1"))
-	assertOptionalIntEqual(t, extraIncreaseStock.Items[0].LotID, *increaseItem.LotID)
+	if extraIncreaseStock.Items[0].LotID == nil || *extraIncreaseStock.Items[0].LotID == *increaseItem.LotID {
+		t.Fatalf("same supplier lot snapshot must not merge receipt-line inventory identities")
+	}
 	return110 := createLinkedPurchaseReturn(t, ctx, uc, "PRA-EFF-RETURN-110", increaseReceipt.ID, increaseItem, fixtures, mustDecimal(t, "110"))
 	if _, err := uc.PostPurchaseReturn(ctx, return110.ID); err != nil {
 		t.Fatalf("post return up to increased effective quantity failed: %v", err)
@@ -370,7 +372,9 @@ func TestInventoryRepo_PurchaseReceiptAdjustmentEffectiveQuantityAndReturnLimit(
 		t.Fatalf("cancel adjustment before effective check failed: %v", err)
 	}
 	extraStock := createAndPostPurchaseReceipt(t, ctx, uc, "PRA-EFF-CANCELLED-EXTRA-STOCK", fixtures, stringPtr("PRA-EFF-CANCELLED-LOT"), mustDecimal(t, "20"))
-	assertOptionalIntEqual(t, extraStock.Items[0].LotID, *cancelledAdjItem.LotID)
+	if extraStock.Items[0].LotID == nil || *extraStock.Items[0].LotID == *cancelledAdjItem.LotID {
+		t.Fatalf("same supplier lot snapshot must keep receipt-line stock isolated")
+	}
 	cancelledAdjReturn := createLinkedPurchaseReturn(t, ctx, uc, "PRA-EFF-CANCELLED-RETURN-120", cancelledAdjReceipt.ID, cancelledAdjItem, fixtures, mustDecimal(t, "120"))
 	if _, err := uc.PostPurchaseReturn(ctx, cancelledAdjReturn.ID); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("expected cancelled adjustment to be ignored by effective quantity, got %v", err)
@@ -394,7 +398,9 @@ func TestInventoryRepo_PurchaseReceiptAdjustmentEffectiveQuantityAndReturnLimit(
 		t.Fatalf("post return-link decrease failed: %v", err)
 	}
 	extraReturnStock := createAndPostPurchaseReceipt(t, ctx, uc, "PRA-EFF-RETURN-LINK-EXTRA", fixtures, stringPtr("PRA-EFF-RETURN-LINK-LOT"), mustDecimal(t, "10"))
-	assertOptionalIntEqual(t, extraReturnStock.Items[0].LotID, *returnEffectiveItem.LotID)
+	if extraReturnStock.Items[0].LotID == nil || *extraReturnStock.Items[0].LotID == *returnEffectiveItem.LotID {
+		t.Fatalf("same supplier lot snapshot must keep receipt-line stock isolated")
+	}
 	overEffectiveReturn := createLinkedPurchaseReturn(t, ctx, uc, "PRA-EFF-RETURN-LINK-71", returnEffectiveReceipt.ID, returnEffectiveItem, fixtures, mustDecimal(t, "71"))
 	if _, err := uc.PostPurchaseReturn(ctx, overEffectiveReturn.ID); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("expected purchase return to use effective receipt quantity, got %v", err)
@@ -407,7 +413,9 @@ func TestInventoryRepo_PurchaseReceiptAdjustmentEffectiveQuantityAndReturnLimit(
 	unlinkedReturnReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PRA-EFF-UNLINKED-RECEIPT", fixtures, stringPtr("PRA-EFF-UNLINKED-LOT"), mustDecimal(t, "100"))
 	unlinkedReturnItem := unlinkedReturnReceipt.Items[0]
 	unlinkedExtraStock := createAndPostPurchaseReceipt(t, ctx, uc, "PRA-EFF-UNLINKED-EXTRA", fixtures, stringPtr("PRA-EFF-UNLINKED-LOT"), mustDecimal(t, "50"))
-	assertOptionalIntEqual(t, unlinkedExtraStock.Items[0].LotID, *unlinkedReturnItem.LotID)
+	if unlinkedExtraStock.Items[0].LotID == nil || *unlinkedExtraStock.Items[0].LotID == *unlinkedReturnItem.LotID {
+		t.Fatalf("same supplier lot snapshot must keep unlinked return stock isolated")
+	}
 	unlinkedReturn, err := uc.CreatePurchaseReturnDraft(ctx, &biz.PurchaseReturnCreate{
 		ReturnNo:     "PRA-EFF-UNLINKED-RETURN-120",
 		SupplierName: "采购供应商",
@@ -422,7 +430,7 @@ func TestInventoryRepo_PurchaseReceiptAdjustmentEffectiveQuantityAndReturnLimit(
 		WarehouseID: fixtures.warehouseID,
 		UnitID:      fixtures.unitID,
 		LotID:       unlinkedReturnItem.LotID,
-		Quantity:    mustDecimal(t, "120"),
+		Quantity:    mustDecimal(t, "100"),
 	}); err != nil {
 		t.Fatalf("add unlinked return item failed: %v", err)
 	}
@@ -774,8 +782,8 @@ func TestInventoryRepo_PurchaseReceiptAdjustmentCorrectionGuardsAndLotIsolation(
 
 	nonLotReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PRA-GUARD-NONLOT-RECEIPT", fixtures, nil, mustDecimal(t, "10"))
 	nonLotItem := nonLotReceipt.Items[0]
-	if nonLotItem.LotID != nil {
-		t.Fatalf("expected non-lot receipt item")
+	if nonLotItem.LotID == nil {
+		t.Fatalf("expected generated receipt-line lot identity")
 	}
 	lotStockReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PRA-GUARD-LOT-STOCK", fixtures, stringPtr("PRA-GUARD-ISOLATED-LOT"), mustDecimal(t, "10"))
 	if lotStockReceipt.Items[0].LotID == nil {
@@ -785,6 +793,7 @@ func TestInventoryRepo_PurchaseReceiptAdjustmentCorrectionGuardsAndLotIsolation(
 		SubjectType:    biz.InventorySubjectMaterial,
 		SubjectID:      fixtures.materialID,
 		WarehouseID:    fixtures.warehouseID,
+		LotID:          nonLotItem.LotID,
 		TxnType:        biz.InventoryTxnOut,
 		Direction:      -1,
 		Quantity:       mustDecimal(t, "8"),
@@ -795,7 +804,7 @@ func TestInventoryRepo_PurchaseReceiptAdjustmentCorrectionGuardsAndLotIsolation(
 		t.Fatalf("consume non-lot stock before adjustment failed: %v", err)
 	}
 	nonLotDecrease := createPurchaseReceiptAdjustmentDraft(t, ctx, uc, "PRA-GUARD-NONLOT-DECREASE", nonLotReceipt.ID)
-	addPurchaseReceiptAdjustmentItem(t, ctx, uc, nonLotDecrease.ID, nonLotItem, biz.PurchaseReceiptAdjustmentQuantityDecrease, fixtures.warehouseID, nil, mustDecimal(t, "3"), nil)
+	addPurchaseReceiptAdjustmentItem(t, ctx, uc, nonLotDecrease.ID, nonLotItem, biz.PurchaseReceiptAdjustmentQuantityDecrease, fixtures.warehouseID, nonLotItem.LotID, mustDecimal(t, "3"), nil)
 	if _, err := uc.PostPurchaseReceiptAdjustment(ctx, nonLotDecrease.ID); !errors.Is(err, biz.ErrInventoryInsufficientStock) {
 		t.Fatalf("expected non-lot decrease to ignore lot stock, got %v", err)
 	}

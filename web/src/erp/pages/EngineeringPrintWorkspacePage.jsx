@@ -17,7 +17,6 @@ import {
   MATERIAL_DETAIL_TEMPLATE_KEY,
   WORK_INSTRUCTION_TEMPLATE_KEY,
   WORK_INSTRUCTION_ROW_TYPES,
-  applyEngineeringPrintRuntimeSample,
   createEmptyEngineeringImageSlot,
   createEngineeringPrintDraft,
   engineeringImageSlots,
@@ -1006,25 +1005,10 @@ function createImageLayoutStyle(layout = null) {
   }
 }
 
-function readRuntimeEngineeringPrintSample(templateKey) {
-  if (typeof window === 'undefined') return null
-  const samples = window.__PLUSH_ERP_CUSTOMER_CONFIG__?.engineeringPrintSamples
-  const sample = samples?.[templateKey]
-  return sample && typeof sample === 'object' ? sample : null
-}
-
 function createFallbackDraft({ templateKey, businessInput }) {
-  const draft = businessInput
+  return businessInput
     ? createEngineeringPrintDraft(templateKey, {})
     : createEngineeringPrintDraft(templateKey)
-  if (businessInput) {
-    return draft
-  }
-  return applyEngineeringPrintRuntimeSample(
-    templateKey,
-    draft,
-    readRuntimeEngineeringPrintSample(templateKey)
-  )
 }
 
 function loadDraft({

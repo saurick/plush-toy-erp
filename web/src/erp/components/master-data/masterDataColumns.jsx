@@ -270,11 +270,7 @@ function baseColumns({ type, unitDisplay }) {
             exportTitle: '简称',
             dataIndex: 'short_name',
             effectiveFieldKey:
-              type === 'customers'
-                ? 'display_name'
-                : type === 'suppliers'
-                  ? 'display_name'
-                  : undefined,
+              type === 'customers' ? 'display_name' : undefined,
             width: 160,
             sorter: (a, b) => compareText(a?.short_name, b?.short_name),
             render: (value) => value || '-',
@@ -358,7 +354,6 @@ function baseColumns({ type, unitDisplay }) {
             title: '税号',
             exportTitle: '税号',
             dataIndex: 'tax_no',
-            effectiveFieldKey: 'tax_no',
             width: 180,
             sorter: (a, b) => compareText(a?.tax_no, b?.tax_no),
             render: (value) => value || '-',

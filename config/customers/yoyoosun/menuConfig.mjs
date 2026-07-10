@@ -70,7 +70,7 @@ export const yoyoosunMenuConfig = Object.freeze({
       },
       {
         title: "系统管理",
-        items: ["permission-center"],
+        items: ["permission-center", "system-audit-logs"],
       },
     ],
   },

@@ -14,6 +14,7 @@ type outsourcingOrderRepoStub struct {
 	items              map[int]*OutsourcingOrderItem
 	supplierActive     map[int]bool
 	productActive      map[int]bool
+	materialActive     map[int]bool
 	unitActive         map[int]bool
 	processActive      map[int]bool
 	processOutsourcing map[int]bool
@@ -79,6 +80,14 @@ func (s *outsourcingOrderRepoStub) ProductIsActive(_ context.Context, id int) (b
 	return active, nil
 }
 
+func (s *outsourcingOrderRepoStub) MaterialIsActive(_ context.Context, id int) (bool, error) {
+	active, ok := s.materialActive[id]
+	if !ok {
+		return false, ErrMaterialNotFound
+	}
+	return active, nil
+}
+
 func (s *outsourcingOrderRepoStub) UnitIsActive(_ context.Context, id int) (bool, error) {
 	active, ok := s.unitActive[id]
 	if !ok {
@@ -95,11 +104,12 @@ func (s *outsourcingOrderRepoStub) ProcessIsUsableForOutsourcing(_ context.Conte
 	return active, s.processOutsourcing[id], nil
 }
 
-func TestOutsourcingOrderUsecaseSaveGuardsSupplierProductProcessAndUnit(t *testing.T) {
+func TestOutsourcingOrderUsecaseSaveGuardsSupplierSubjectProcessAndUnit(t *testing.T) {
 	ctx := context.Background()
 	repo := &outsourcingOrderRepoStub{
 		supplierActive:     map[int]bool{1: true, 2: false},
 		productActive:      map[int]bool{10: true, 11: false},
+		materialActive:     map[int]bool{40: true, 41: false},
 		unitActive:         map[int]bool{20: true, 21: false},
 		processActive:      map[int]bool{30: true, 31: false, 32: true},
 		processOutsourcing: map[int]bool{30: true, 32: false},
@@ -110,6 +120,10 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierProductProcessAndUnit(t *testi
 	qty := decimal.NewFromInt(12)
 	price := decimal.NewFromFloat(3.2)
 	productOrderNo := " SO-26001 "
+	productID := 10
+	inactiveProductID := 11
+	materialID := 40
+	inactiveMaterialID := 41
 
 	result, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{
 		OutsourcingOrderNo: " OUT-001 ",
@@ -121,7 +135,8 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierProductProcessAndUnit(t *testi
 		{
 			OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{
 				LineNo:                 1,
-				ProductID:              10,
+				SubjectType:            OutsourcingOrderSubjectProduct,
+				ProductID:              &productID,
 				ProcessID:              30,
 				UnitID:                 20,
 				ProductOrderNoSnapshot: &productOrderNo,
@@ -142,28 +157,70 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierProductProcessAndUnit(t *testi
 	if repo.savedItems[0].ProductOrderNoSnapshot == nil || *repo.savedItems[0].ProductOrderNoSnapshot != "SO-26001" {
 		t.Fatalf("expected normalized product order no snapshot, got %#v", repo.savedItems[0].ProductOrderNoSnapshot)
 	}
+	if repo.savedItems[0].SubjectType != OutsourcingOrderSubjectProduct || repo.savedItems[0].ProductID == nil || *repo.savedItems[0].ProductID != productID || repo.savedItems[0].MaterialID != nil {
+		t.Fatalf("expected product subject to remain exactly-one, got %#v", repo.savedItems[0].OutsourcingOrderItemMutation)
+	}
 
-	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-002", SupplierID: 2, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, ProductID: 10, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrSupplierInactive) {
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-002", SupplierID: 2, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, SubjectType: OutsourcingOrderSubjectProduct, ProductID: &productID, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrSupplierInactive) {
 		t.Fatalf("expected inactive supplier rejected, got %v", err)
 	}
-	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-003", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, ProductID: 11, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrProductInactive) {
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-003", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, SubjectType: OutsourcingOrderSubjectProduct, ProductID: &inactiveProductID, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrProductInactive) {
 		t.Fatalf("expected inactive product rejected, got %v", err)
 	}
-	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-004", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, ProductID: 10, ProcessID: 31, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrProcessInactive) {
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-004", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, SubjectType: OutsourcingOrderSubjectProduct, ProductID: &productID, ProcessID: 31, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrProcessInactive) {
 		t.Fatalf("expected inactive process rejected, got %v", err)
 	}
-	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-005", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, ProductID: 10, ProcessID: 32, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrProcessNotOutsourcingEnabled) {
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-005", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, SubjectType: OutsourcingOrderSubjectProduct, ProductID: &productID, ProcessID: 32, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrProcessNotOutsourcingEnabled) {
 		t.Fatalf("expected non-outsourcing process rejected, got %v", err)
 	}
-	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-006", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, ProductID: 10, ProcessID: 30, UnitID: 21, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrUnitInactive) {
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-006", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, SubjectType: OutsourcingOrderSubjectProduct, ProductID: &productID, ProcessID: 30, UnitID: 21, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrUnitInactive) {
 		t.Fatalf("expected inactive unit rejected, got %v", err)
 	}
 	beforeOrderDate := orderDate.AddDate(0, 0, -1)
-	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-BAD-DATE", SupplierID: 1, OrderDate: orderDate, ExpectedReturnDate: &beforeOrderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, ProductID: 10, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-BAD-DATE", SupplierID: 1, OrderDate: orderDate, ExpectedReturnDate: &beforeOrderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, SubjectType: OutsourcingOrderSubjectProduct, ProductID: &productID, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected expected return before order date rejected, got %v", err)
 	}
-	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-BAD-LINE-DATE", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, ProductID: 10, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty, ExpectedReturnDate: &beforeOrderDate}}}); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-BAD-LINE-DATE", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, SubjectType: OutsourcingOrderSubjectProduct, ProductID: &productID, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty, ExpectedReturnDate: &beforeOrderDate}}}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected line expected return before order date rejected, got %v", err)
+	}
+
+	materialCode := " MAT-FABRIC-01 "
+	materialName := " 短毛绒布料 "
+	staleProductName := "不应残留的产品名"
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-MATERIAL", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{
+		LineNo:               1,
+		SubjectType:          " material ",
+		MaterialID:           &materialID,
+		ProcessID:            30,
+		UnitID:               20,
+		ProductNameSnapshot:  &staleProductName,
+		MaterialCodeSnapshot: &materialCode,
+		MaterialNameSnapshot: &materialName,
+		OutsourcingQuantity:  qty,
+	}}}); err != nil {
+		t.Fatalf("expected material outsourcing line accepted, got %v", err)
+	}
+	materialItem := repo.savedItems[0]
+	if materialItem.SubjectType != OutsourcingOrderSubjectMaterial || materialItem.MaterialID == nil || *materialItem.MaterialID != materialID || materialItem.ProductID != nil {
+		t.Fatalf("expected normalized material subject exactly-one, got %#v", materialItem.OutsourcingOrderItemMutation)
+	}
+	if materialItem.MaterialCodeSnapshot == nil || *materialItem.MaterialCodeSnapshot != "MAT-FABRIC-01" || materialItem.MaterialNameSnapshot == nil || *materialItem.MaterialNameSnapshot != "短毛绒布料" || materialItem.ProductNameSnapshot != nil {
+		t.Fatalf("expected material snapshots normalized and product snapshots cleared, got %#v", materialItem.OutsourcingOrderItemMutation)
+	}
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-MATERIAL-INACTIVE", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, SubjectType: OutsourcingOrderSubjectMaterial, MaterialID: &inactiveMaterialID, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrMaterialInactive) {
+		t.Fatalf("expected inactive material rejected, got %v", err)
+	}
+	for name, invalid := range map[string]OutsourcingOrderItemMutation{
+		"missing subject type": {LineNo: 1, ProductID: &productID, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty},
+		"product without id":   {LineNo: 1, SubjectType: OutsourcingOrderSubjectProduct, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty},
+		"material without id":  {LineNo: 1, SubjectType: OutsourcingOrderSubjectMaterial, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty},
+		"both subject ids":     {LineNo: 1, SubjectType: OutsourcingOrderSubjectProduct, ProductID: &productID, MaterialID: &materialID, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-INVALID-SUBJECT", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: invalid}}); !errors.Is(err, ErrBadParam) {
+				t.Fatalf("expected invalid subject rejected, got %v", err)
+			}
+		})
 	}
 }
 
@@ -199,5 +256,8 @@ func TestOutsourcingOrderUsecaseLifecycleGuards(t *testing.T) {
 	}
 	if _, err := uc.CancelOutsourcingOrder(ctx, 4); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected settled order transition rejected, got %v", err)
+	}
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 2, &OutsourcingOrderMutation{}, nil); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected submitted outsourcing contract to be frozen, got %v", err)
 	}
 }

@@ -199,7 +199,9 @@ func TestPurchaseReceiptPostgresFlow(t *testing.T) {
 	}
 
 	second := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PR-FLOW-REUSE-"+fixtures.suffix, invFixtures, stringPtr("PG-LOT-FLOW-"+fixtures.suffix), mustDecimal(t, "2"))
-	assertOptionalIntEqual(t, second.Items[0].LotID, *lotID)
+	if second.Items[0].LotID == nil || *second.Items[0].LotID == *lotID {
+		t.Fatalf("same supplier lot snapshot must keep postgres receipt-line lot identities distinct")
+	}
 	reusedBalance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
 		SubjectType: biz.InventorySubjectMaterial,
 		SubjectID:   fixtures.materialID,
@@ -210,16 +212,17 @@ func TestPurchaseReceiptPostgresFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get postgres reused lot balance failed: %v", err)
 	}
-	assertDecimalEqual(t, reusedBalance.Quantity, "12")
+	assertDecimalEqual(t, reusedBalance.Quantity, "10")
 
 	nonLot := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PR-FLOW-NOLOT-"+fixtures.suffix, invFixtures, nil, mustDecimal(t, "4"))
-	if nonLot.Items[0].LotID != nil {
-		t.Fatalf("expected postgres non-lot purchase receipt item lot_id nil")
+	if nonLot.Items[0].LotID == nil {
+		t.Fatalf("expected postgres generated receipt-line lot identity")
 	}
 	nonLotBalance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
 		SubjectType: biz.InventorySubjectMaterial,
 		SubjectID:   fixtures.materialID,
 		WarehouseID: fixtures.warehouseID,
+		LotID:       nonLot.Items[0].LotID,
 		UnitID:      fixtures.unitID,
 	})
 	if err != nil {
@@ -268,7 +271,18 @@ func TestPurchaseReceiptPostgresFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get postgres lot balance after cancel failed: %v", err)
 	}
-	assertDecimalEqual(t, afterCancel.Quantity, "2")
+	assertDecimalEqual(t, afterCancel.Quantity, "0")
+	secondBalance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		WarehouseID: fixtures.warehouseID,
+		LotID:       second.Items[0].LotID,
+		UnitID:      fixtures.unitID,
+	})
+	if err != nil {
+		t.Fatalf("get postgres second receipt-line lot balance after first receipt cancel failed: %v", err)
+	}
+	assertDecimalEqual(t, secondBalance.Quantity, "2")
 	reversalCount, err := client.InventoryTxn.Query().
 		Where(inventorytxn.ReversalOfTxnID(inboundTxn.ID)).
 		Count(ctx)
@@ -316,5 +330,87 @@ func TestPurchaseReceiptPostgresFlow(t *testing.T) {
 	}
 	if reversalCount != 1 {
 		t.Fatalf("expected one postgres reversal after repeat cancel, got %d", reversalCount)
+	}
+}
+
+func TestPurchaseReceiptPostgresMaterialSupplyMultiLineQualityGate(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+	postgresFixtures := createPurchaseReceiptPostgresFixtures(t, ctx, client)
+	fixtures := inventoryTestFixtures{
+		unitID:      postgresFixtures.unitID,
+		materialID:  postgresFixtures.materialID,
+		productID:   postgresFixtures.productID,
+		warehouseID: postgresFixtures.warehouseID,
+	}
+	orderItem := createApprovedPurchaseOrderItemForReceiptTest(t, ctx, client, fixtures, "PG-QUALITY-"+postgresFixtures.suffix, mustDecimal(t, "6"))
+	secondMaterial := createTestMaterial(t, ctx, client, fixtures.unitID, "PG-MAT-QUALITY-2-"+postgresFixtures.suffix)
+	if _, err := client.PurchaseOrderItem.Create().
+		SetPurchaseOrderID(orderItem.PurchaseOrderID).
+		SetLineNo(2).
+		SetMaterialID(secondMaterial.ID).
+		SetUnitID(fixtures.unitID).
+		SetPurchasedQuantity(mustDecimal(t, "3")).
+		SetLineStatus(biz.PurchaseOrderItemStatusOpen).
+		Save(ctx); err != nil {
+		t.Fatalf("create postgres second purchase order line failed: %v", err)
+	}
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	receipt, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		PurchaseOrderID: orderItem.PurchaseOrderID,
+		ReceiptNo:       "PG-PR-QUALITY-" + postgresFixtures.suffix,
+		WarehouseID:     fixtures.warehouseID,
+	})
+	if err != nil {
+		t.Fatalf("create postgres material supply receipt failed: %v", err)
+	}
+	if len(receipt.Items) != 2 || len(receipt.QualityInspections) != 2 {
+		t.Fatalf("expected postgres two-line quality preparation, receipt=%#v", receipt)
+	}
+	if _, err := uc.PostPurchaseReceipt(ctx, receipt.ID); !errors.Is(err, biz.ErrPurchaseReceiptQualityPending) {
+		t.Fatalf("postgres pending quality must block post, got %v", err)
+	}
+	cancelledInspection := receipt.QualityInspections[0]
+	if _, err := uc.CancelQualityInspection(ctx, cancelledInspection.ID, nil); err != nil {
+		t.Fatalf("cancel postgres initial line inspection failed: %v", err)
+	}
+	replacement, err := uc.CreateQualityInspectionDraft(ctx, &biz.QualityInspectionCreate{
+		InspectionNo:          "PG-QI-REPLACEMENT-" + postgresFixtures.suffix,
+		PurchaseReceiptID:     receipt.ID,
+		PurchaseReceiptItemID: cancelledInspection.PurchaseReceiptItemID,
+		InventoryLotID:        cancelledInspection.InventoryLotID,
+		MaterialID:            cancelledInspection.MaterialID,
+		WarehouseID:           cancelledInspection.WarehouseID,
+		SourceType:            biz.QualityInspectionSourcePurchaseReceipt,
+		SourceID:              receipt.ID,
+		InspectionType:        biz.QualityInspectionTypeIncoming,
+		SubjectType:           biz.QualityInspectionSubjectMaterial,
+		SubjectID:             cancelledInspection.MaterialID,
+	})
+	if err != nil {
+		t.Fatalf("create postgres replacement line inspection failed: %v", err)
+	}
+	replacement, err = uc.SubmitQualityInspection(ctx, replacement.ID)
+	if err != nil {
+		t.Fatalf("submit postgres replacement line inspection failed: %v", err)
+	}
+	for _, inspection := range []*biz.QualityInspection{replacement, receipt.QualityInspections[1]} {
+		if _, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{
+			InspectionID: inspection.ID,
+			Result:       biz.QualityInspectionResultPass,
+		}); err != nil {
+			t.Fatalf("pass postgres line inspection %d failed: %v", inspection.ID, err)
+		}
+	}
+	if _, err := uc.PostPurchaseReceipt(ctx, receipt.ID); err != nil {
+		t.Fatalf("postgres qualified multi-line receipt post failed: %v", err)
+	}
+	count := client.InventoryTxn.Query().Where(
+		inventorytxn.SourceType(biz.PurchaseReceiptSourceType),
+		inventorytxn.SourceID(receipt.ID),
+		inventorytxn.TxnType(biz.InventoryTxnIn),
+	).CountX(ctx)
+	if count != 2 {
+		t.Fatalf("expected two postgres inbound txns, got %d", count)
 	}
 }

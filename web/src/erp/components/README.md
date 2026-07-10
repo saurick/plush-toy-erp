@@ -40,5 +40,5 @@ git diff --check
 如果改动共享列表、表单弹窗、打印壳、移动可见入口或布局样式，应补对应浏览器级回归，例如：
 
 ```bash
-STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1
+STYLE_L1_SCENARIOS=business-core-pages-desktop pnpm --dir web style:l1
 ```

@@ -72,7 +72,7 @@ import {
 } from '../components/operational-facts/operationalFactPageConfig.mjs'
 
 export function OperationalFactWorkspace({
-  pageTitle = '业务事实处理',
+  pageTitle = '业务记录处理',
   pageSummary = DEFAULT_OPERATIONAL_FACT_SUMMARY,
   toolbarModuleKey = 'operational-facts',
   initialActiveKey = 'production',
@@ -328,7 +328,7 @@ export function OperationalFactWorkspace({
   )
   const activeBoundaryText =
     activeConfig.selectionBoundaryText ||
-    '当前操作只调用后端业务事实规则；前端不本地写库存、出货、财务或协同任务事实。'
+    '当前操作由后端业务规则校验和过账；前端不会直接修改库存、出货、财务记录或协同任务。'
   const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
     useBusinessColumnOrder({
       adminProfile,
@@ -458,13 +458,13 @@ export function OperationalFactWorkspace({
             {activeConfig.title}
           </Tag>,
           <Tag color="blue" key="fact">
-            业务事实
+            正式业务记录
           </Tag>,
           <Tag color="green" key="backend">
-            后端规则过账 / 冲正
+            后端过账 / 冲正
           </Tag>,
           <Tag color="gold" key="boundary">
-            Workflow 不直接落事实
+            协同完成不等于过账
           </Tag>,
         ]}
         stats={pageStats}

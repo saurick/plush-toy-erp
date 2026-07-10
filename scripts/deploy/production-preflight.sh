@@ -111,6 +111,7 @@ migrate_script="$compose_dir/migrate_online.sh"
 
 required_keys=(
   PROJECT_SLUG
+  ERP_CUSTOMER_KEY
   APP_IMAGE
   WEB_IMAGE
   POSTGRES_IMAGE
@@ -121,6 +122,7 @@ required_keys=(
   POSTGRES_DB
   POSTGRES_USER
   POSTGRES_DATA_DIR
+  MIGRATION_LOCK_FILE
   POSTGRES_BIND_ADDR
   TRACE_ENDPOINT
   TRACE_RATIO
@@ -199,7 +201,19 @@ else
   app_admin_password="$(value_of APP_ADMIN_PASSWORD)"
   bootstrap_admin_once="$(value_of BOOTSTRAP_ADMIN_ONCE)"
   trace_ratio="$(value_of TRACE_RATIO)"
+  erp_customer_key="$(value_of ERP_CUSTOMER_KEY)"
+  migration_lock_file="$(value_of MIGRATION_LOCK_FILE)"
 
+  [[ "$erp_customer_key" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || fail "ERP_CUSTOMER_KEY 必须是稳定小写 customer key"
+  [[ "$erp_customer_key" != "current" ]] || fail "ERP_CUSTOMER_KEY 不能使用旧 current 别名"
+  [[ "$migration_lock_file" == /* ]] || fail "MIGRATION_LOCK_FILE 必须是绝对路径"
+  case "$migration_lock_file" in
+  /tmp/* | /var/tmp/* | /dev/shm/*)
+    fail "MIGRATION_LOCK_FILE 不得位于共享临时目录"
+    ;;
+  esac
+  migration_lock_dir="$(dirname "$migration_lock_file")"
+  [[ "$migration_lock_dir" != "/" && "$migration_lock_dir" != "/run/lock" ]] || fail "MIGRATION_LOCK_FILE 必须放在专用私有目录"
   [[ "${#app_jwt_secret}" -ge 32 ]] || fail "APP_JWT_SECRET 至少需要 32 字符"
   [[ "$app_image" != *":dev" && "$app_image" != *":latest" ]] || fail "APP_IMAGE 不能使用 :dev 或 :latest"
   [[ "$web_image" != *":dev" && "$web_image" != *":latest" ]] || fail "WEB_IMAGE 不能使用 :dev 或 :latest"
@@ -261,6 +275,10 @@ grep -q 'APP_HTTP_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose app HTT
 grep -q 'APP_GRPC_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose app gRPC 端口必须默认绑定 127.0.0.1"
 grep -q '/usr/local/bin/atlas' "$migrate_script" || fail "migration 脚本必须使用宿主机 /usr/local/bin/atlas"
 grep -q 'flock' "$migrate_script" || fail "migration 脚本必须使用 flock 串行化"
+grep -q '^umask 077$' "$migrate_script" || fail "migration 脚本必须使用 umask 077 创建私有锁"
+grep -Fq '/run/lock/plush-toy-erp/atlas-migrate.lock' "$migrate_script" || fail "migration 脚本默认锁必须位于专用 /run/lock 子目录"
+grep -Fq "[ -L \"\$MIGRATION_LOCK_FILE\" ]" "$migrate_script" || fail "migration 脚本必须拒绝符号链接锁文件"
+grep -Fq "exec 9>>\"\$MIGRATION_LOCK_FILE\"" "$migrate_script" || fail "migration 脚本锁文件不得被截断"
 [[ -x "$migrate_script" ]] || fail "migration 脚本不可执行: $migrate_script"
 ok "Compose、低配部署边界和 migration 脚本通过"
 

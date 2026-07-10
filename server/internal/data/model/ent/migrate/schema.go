@@ -865,9 +865,12 @@ var (
 	OutsourcingOrderItemsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "line_no", Type: field.TypeInt},
+		{Name: "subject_type", Type: field.TypeString, Size: 16},
 		{Name: "product_no_snapshot", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "product_order_no_snapshot", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "product_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "material_code_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "material_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "process_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "process_category_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "unit_name_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
@@ -879,9 +882,10 @@ var (
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "material_id", Type: field.TypeInt, Nullable: true},
 		{Name: "outsourcing_order_id", Type: field.TypeInt},
 		{Name: "process_id", Type: field.TypeInt},
-		{Name: "product_id", Type: field.TypeInt},
+		{Name: "product_id", Type: field.TypeInt, Nullable: true},
 		{Name: "unit_id", Type: field.TypeInt},
 	}
 	// OutsourcingOrderItemsTable holds the schema information for the "outsourcing_order_items" table.
@@ -891,26 +895,32 @@ var (
 		PrimaryKey: []*schema.Column{OutsourcingOrderItemsColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
+				Symbol:     "outsourcing_order_items_materials_outsourcing_order_items",
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[19]},
+				RefColumns: []*schema.Column{MaterialsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
 				Symbol:     "outsourcing_order_items_outsourcing_orders_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[16]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[20]},
 				RefColumns: []*schema.Column{OutsourcingOrdersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_order_items_processes_outsourcing_order_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[17]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[21]},
 				RefColumns: []*schema.Column{ProcessesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_order_items_products_outsourcing_order_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[18]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[22]},
 				RefColumns: []*schema.Column{ProductsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_order_items_units_outsourcing_order_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[19]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[23]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -919,32 +929,42 @@ var (
 			{
 				Name:    "outsourcingorderitem_outsourcing_order_id_line_no",
 				Unique:  true,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[16], OutsourcingOrderItemsColumns[1]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[20], OutsourcingOrderItemsColumns[1]},
+			},
+			{
+				Name:    "outsourcingorderitem_subject_type",
+				Unique:  false,
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[2]},
 			},
 			{
 				Name:    "outsourcingorderitem_product_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[18]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[22]},
 			},
 			{
-				Name:    "outsourcingorderitem_process_id",
-				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[17]},
-			},
-			{
-				Name:    "outsourcingorderitem_unit_id",
+				Name:    "outsourcingorderitem_material_id",
 				Unique:  false,
 				Columns: []*schema.Column{OutsourcingOrderItemsColumns[19]},
 			},
 			{
+				Name:    "outsourcingorderitem_process_id",
+				Unique:  false,
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[21]},
+			},
+			{
+				Name:    "outsourcingorderitem_unit_id",
+				Unique:  false,
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[23]},
+			},
+			{
 				Name:    "outsourcingorderitem_line_status",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[12]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[15]},
 			},
 			{
 				Name:    "outsourcingorderitem_expected_return_date",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[11]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[14]},
 			},
 		},
 	}
@@ -2122,7 +2142,6 @@ var (
 		{Name: "display_name", Type: field.TypeString, Size: 128},
 		{Name: "disabled", Type: field.TypeBool, Default: false},
 		{Name: "bundle_keys", Type: field.TypeJSON, Nullable: true},
-		{Name: "grants", Type: field.TypeJSON, Nullable: true},
 		{Name: "revokes", Type: field.TypeJSON, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -3046,16 +3065,21 @@ func init() {
 	OutsourcingOrdersTable.Annotation.Checks = map[string]string{
 		"outsourcing_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'confirmed', 'closed', 'canceled')",
 	}
-	OutsourcingOrderItemsTable.ForeignKeys[0].RefTable = OutsourcingOrdersTable
-	OutsourcingOrderItemsTable.ForeignKeys[1].RefTable = ProcessesTable
-	OutsourcingOrderItemsTable.ForeignKeys[2].RefTable = ProductsTable
-	OutsourcingOrderItemsTable.ForeignKeys[3].RefTable = UnitsTable
+	OutsourcingOrderItemsTable.ForeignKeys[0].RefTable = MaterialsTable
+	OutsourcingOrderItemsTable.ForeignKeys[1].RefTable = OutsourcingOrdersTable
+	OutsourcingOrderItemsTable.ForeignKeys[2].RefTable = ProcessesTable
+	OutsourcingOrderItemsTable.ForeignKeys[3].RefTable = ProductsTable
+	OutsourcingOrderItemsTable.ForeignKeys[4].RefTable = UnitsTable
 	OutsourcingOrderItemsTable.Annotation = &entsql.Annotation{}
 	OutsourcingOrderItemsTable.Annotation.Checks = map[string]string{
 		"outsourcing_order_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
 		"outsourcing_order_items_line_no_positive":        "line_no > 0",
 		"outsourcing_order_items_line_status_allowed":     "line_status IN ('open', 'closed', 'canceled')",
+		"outsourcing_order_items_material_id_positive":    "material_id IS NULL OR material_id > 0",
+		"outsourcing_order_items_product_id_positive":     "product_id IS NULL OR product_id > 0",
 		"outsourcing_order_items_quantity_positive":       "outsourcing_quantity > 0",
+		"outsourcing_order_items_subject_exactly_one":     "((subject_type = 'PRODUCT' AND product_id IS NOT NULL AND material_id IS NULL) OR (subject_type = 'MATERIAL' AND product_id IS NULL AND material_id IS NOT NULL))",
+		"outsourcing_order_items_subject_type_allowed":    "subject_type IN ('PRODUCT', 'MATERIAL')",
 		"outsourcing_order_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
 	}
 	ProcessesTable.Annotation = &entsql.Annotation{}

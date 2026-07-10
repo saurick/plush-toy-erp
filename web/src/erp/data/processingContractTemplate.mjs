@@ -2,12 +2,12 @@ export const PROCESSING_CONTRACT_TEMPLATE_KEY = 'processing-contract'
 export const PROCESSING_CONTRACT_DRAFT_VERSION = 2
 export const PROCESSING_CONTRACT_TABLE_COLUMNS = [
   { key: 'contractNo', fieldKey: 'contractNo', label: '委外加工订单号' },
-  { key: 'productOrderNo', fieldKey: 'productOrderNo', label: '产品订单编号' },
-  { key: 'productNo', fieldKey: 'productNo', label: '产品编号' },
+  { key: 'productOrderNo', fieldKey: 'productOrderNo', label: '来源订单编号' },
+  { key: 'productNo', fieldKey: 'productNo', label: '加工对象编号' },
   {
     key: 'productName',
     fieldKey: 'productName',
-    label: '产品名称',
+    label: '加工对象名称',
     multiline: true,
   },
   {
@@ -650,13 +650,26 @@ export function buildProcessingContractDraftFromOutsourcingOrder(
     orderDateText: formatProcessingDraftDate(order.order_date),
     returnDateText: formatProcessingDraftDate(order.expected_return_date),
     buyerSignDateText: formatProcessingDraftDate(order.order_date),
-    lines: activeItems.map((item) =>
-      normalizeProcessingLine({
+    lines: activeItems.map((item) => {
+      const subjectType = normalizeText(item.subject_type).toUpperCase()
+      const productSubject = subjectType === 'PRODUCT'
+      const materialSubject = subjectType === 'MATERIAL'
+      return normalizeProcessingLine({
         contractNo,
         productOrderNo:
-          normalizeText(item.product_order_no_snapshot) || sourceOrderNo,
-        productNo: normalizeText(item.product_no_snapshot),
-        productName: normalizeText(item.product_name_snapshot),
+          (productSubject
+            ? normalizeText(item.product_order_no_snapshot)
+            : '') || sourceOrderNo,
+        productNo: materialSubject
+          ? normalizeText(item.material_code_snapshot)
+          : productSubject
+            ? normalizeText(item.product_no_snapshot)
+            : '',
+        productName: materialSubject
+          ? normalizeText(item.material_name_snapshot)
+          : productSubject
+            ? normalizeText(item.product_name_snapshot)
+            : '',
         processName: normalizeText(item.process_name_snapshot),
         processCategory: normalizeText(item.process_category_snapshot),
         supplierAlias: supplierName,
@@ -666,6 +679,6 @@ export function buildProcessingContractDraftFromOutsourcingOrder(
         amount: normalizeText(item.amount),
         remark: normalizeText(item.note),
       })
-    ),
+    }),
   }
 }

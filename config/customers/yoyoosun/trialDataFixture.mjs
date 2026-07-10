@@ -130,9 +130,30 @@ export const yoyoosunTrialDataFixture = Object.freeze({
     }),
   ]),
   warehouses: Object.freeze([
-    Object.freeze({ warehouseCode: "YOYOO-MAIN", warehouseName: "永绅试用仓", sourceIds: Object.freeze(["__synthetic_yoyoosun_trial__"]) }),
-    Object.freeze({ warehouseCode: "YOYOO-QC-HOLD", warehouseName: "永绅试用待检仓", sourceIds: Object.freeze(["__synthetic_yoyoosun_trial__"]) }),
-    Object.freeze({ warehouseCode: "YOYOO-FINISHED", warehouseName: "永绅试用成品仓", sourceIds: Object.freeze(["__synthetic_yoyoosun_trial__"]) }),
+    Object.freeze({
+      warehouseCode: "YOYOO-RAW-MATERIAL",
+      warehouseName: "永绅试用主料仓",
+      warehouseType: "RAW_MATERIAL",
+      sourceIds: Object.freeze(["__synthetic_yoyoosun_trial__"]),
+    }),
+    Object.freeze({
+      warehouseCode: "YOYOO-FINISHED-GOODS",
+      warehouseName: "永绅试用成品仓",
+      warehouseType: "FINISHED_GOODS",
+      sourceIds: Object.freeze(["__synthetic_yoyoosun_trial__"]),
+    }),
+    Object.freeze({
+      warehouseCode: "YOYOO-OTHER",
+      warehouseName: "永绅试用其他仓",
+      warehouseType: "OTHER",
+      sourceIds: Object.freeze(["__synthetic_yoyoosun_trial__"]),
+    }),
+    Object.freeze({
+      warehouseCode: "YOYOO-QC-HOLD",
+      warehouseName: "永绅试用待检仓",
+      warehouseType: "QC_HOLD",
+      sourceIds: Object.freeze(["__synthetic_yoyoosun_trial__"]),
+    }),
   ]),
   bomVersions: Object.freeze([
     Object.freeze({
@@ -275,13 +296,14 @@ export const yoyoosunTrialDataFixture = Object.freeze({
       printTemplateKey: "material-purchase-contract",
       contractPartySnapshot: Object.freeze({
         buyerCompany: "永绅",
-        buyerContact: "郭改玉",
-        buyerPhone: "13537313218",
+        buyerContact: "试用采购负责人",
+        buyerPhone: "0769-00000001",
         buyerAddress: "东莞-茶山",
-        buyerSigner: "郭改玉",
+        buyerSigner: "试用采购负责人",
       }),
       lines: Object.freeze([
         Object.freeze({
+          subjectType: "PRODUCT",
           productOrderNo: "SO-YOYO-TRIAL-001",
           productNo: "26029",
           productName: "夜樱烬色玩偶",
@@ -294,6 +316,7 @@ export const yoyoosunTrialDataFixture = Object.freeze({
           note: "按批次分包并标明产品编号。",
         }),
         Object.freeze({
+          subjectType: "PRODUCT",
           productOrderNo: "SO-YOYO-TRIAL-002",
           productNo: "26204",
           productName: "抱抱猴子玩偶",
@@ -316,13 +339,14 @@ export const yoyoosunTrialDataFixture = Object.freeze({
       printTemplateKey: "material-purchase-contract",
       contractPartySnapshot: Object.freeze({
         buyerCompany: "永绅",
-        buyerContact: "郭改玉",
-        buyerPhone: "13537313218",
+        buyerContact: "试用采购负责人",
+        buyerPhone: "0769-00000001",
         buyerAddress: "东莞-茶山",
-        buyerSigner: "郭改玉",
+        buyerSigner: "试用采购负责人",
       }),
       lines: Object.freeze([
         Object.freeze({
+          subjectType: "PRODUCT",
           productOrderNo: "SO-YOYO-TRIAL-002",
           productNo: "26204",
           productName: "抱抱猴子玩偶",
@@ -347,10 +371,10 @@ export const yoyoosunTrialDataFixture = Object.freeze({
       printTemplateKey: "processing-contract",
       contractPartySnapshot: Object.freeze({
         buyerCompany: "永绅",
-        buyerContact: "刘志强",
-        buyerPhone: "13694972987",
+        buyerContact: "试用委外负责人",
+        buyerPhone: "0769-00000002",
         buyerAddress: "东莞茶山",
-        buyerSigner: "刘志强",
+        buyerSigner: "试用委外负责人",
       }),
       lines: Object.freeze([
         Object.freeze({
@@ -376,10 +400,10 @@ export const yoyoosunTrialDataFixture = Object.freeze({
       printTemplateKey: "processing-contract",
       contractPartySnapshot: Object.freeze({
         buyerCompany: "永绅",
-        buyerContact: "刘志强",
-        buyerPhone: "13694972987",
+        buyerContact: "试用委外负责人",
+        buyerPhone: "0769-00000002",
         buyerAddress: "东莞茶山",
-        buyerSigner: "刘志强",
+        buyerSigner: "试用委外负责人",
       }),
       lines: Object.freeze([
         Object.freeze({
@@ -409,12 +433,73 @@ export const yoyoosunTrialDataFixture = Object.freeze({
       ]),
       sourceIds: Object.freeze(["yoyoosun-raw-outsourcing-summary-20260602"]),
     }),
+    Object.freeze({
+      outsourcingOrderNo: "OS-YOYO-TRIAL-003",
+      sourceOrderNo: "PO-YOYO-TRIAL-001",
+      processorCode: "SUP-PROCESS-TRIAL",
+      orderDate: "2026-06-20",
+      returnDate: "2026-06-27",
+      printTemplateKey: "processing-contract",
+      contractPartySnapshot: Object.freeze({
+        buyerCompany: "永绅",
+        buyerContact: "试用委外负责人",
+        buyerPhone: "0769-00000002",
+        buyerAddress: "东莞茶山",
+        buyerSigner: "试用委外负责人",
+      }),
+      lines: Object.freeze([
+        Object.freeze({
+          subjectType: "MATERIAL",
+          materialCode: "MAT-26029-FABRIC",
+          materialName: "夜樱烬色主面料",
+          processName: "布料复合加工",
+          processCategory: "布料加工",
+          unitCode: "M",
+          quantity: "180",
+          unitPrice: "1.600",
+          amount: "288.00",
+          note: "按面料批次加工，回货后进入来料质检。",
+        }),
+      ]),
+      sourceIds: Object.freeze(["__synthetic_yoyoosun_trial__"]),
+    }),
+    Object.freeze({
+      outsourcingOrderNo: "OS-YOYO-TRIAL-004",
+      sourceOrderNo: "SO-YOYO-TRIAL-002",
+      processorCode: "SUP-PROCESS-TRIAL",
+      orderDate: "2026-06-20",
+      returnDate: "2026-06-28",
+      printTemplateKey: "processing-contract",
+      contractPartySnapshot: Object.freeze({
+        buyerCompany: "永绅",
+        buyerContact: "试用委外负责人",
+        buyerPhone: "0769-00000002",
+        buyerAddress: "东莞茶山",
+        buyerSigner: "试用委外负责人",
+      }),
+      lines: Object.freeze([
+        Object.freeze({
+          subjectType: "PRODUCT",
+          productOrderNo: "SO-YOYO-TRIAL-002",
+          productNo: "26204",
+          productName: "抱抱猴子玩偶",
+          processName: "手工缝制加工",
+          processCategory: "手工加工",
+          unitCode: "PCS",
+          quantity: "240",
+          unitPrice: "1.250",
+          amount: "300.00",
+          note: "手工收口与装饰件固定，按产品订单分批回货。",
+        }),
+      ]),
+      sourceIds: Object.freeze(["__synthetic_yoyoosun_trial__"]),
+    }),
   ]),
   purchaseReceipts: Object.freeze([
     Object.freeze({
       receiptNo: "PR-YOYO-TRIAL-001",
       purchaseOrderNo: "PO-YOYO-TRIAL-001",
-      warehouseCode: "YOYOO-MAIN",
+      warehouseCode: "YOYOO-RAW-MATERIAL",
       status: "draft",
       sourceIds: Object.freeze(["yoyoosun-raw-material-purchase-summary-20260602"]),
     }),
@@ -450,7 +535,7 @@ export const yoyoosunTrialDataFixture = Object.freeze({
     Object.freeze({
       lotNo: "LOT-YOYO-TRIAL-001",
       materialCode: "MAT-26029-FABRIC",
-      warehouseCode: "YOYOO-MAIN",
+      warehouseCode: "YOYOO-RAW-MATERIAL",
       quantity: "0",
       status: "pending_inbound",
       sourceIds: Object.freeze(["__synthetic_yoyoosun_trial__"]),
@@ -466,7 +551,7 @@ export const yoyoosunTrialDataFixture = Object.freeze({
     Object.freeze({
       lotNo: "LOT-YOYO-TRIAL-003",
       materialCode: "MAT-26204-CARTON",
-      warehouseCode: "YOYOO-MAIN",
+      warehouseCode: "YOYOO-OTHER",
       quantity: "20",
       status: "available",
       sourceIds: Object.freeze(["__synthetic_yoyoosun_trial__"]),
@@ -476,21 +561,21 @@ export const yoyoosunTrialDataFixture = Object.freeze({
     Object.freeze({
       shipmentNo: "SH-YOYO-TRIAL-001",
       salesOrderNo: "SO-YOYO-TRIAL-001",
-      warehouseCode: "YOYOO-MAIN",
+      warehouseCode: "YOYOO-FINISHED-GOODS",
       status: "draft",
       sourceIds: Object.freeze(["__synthetic_yoyoosun_trial__"]),
     }),
     Object.freeze({
       shipmentNo: "SH-YOYO-TRIAL-002",
       salesOrderNo: "SO-YOYO-TRIAL-002",
-      warehouseCode: "YOYOO-FINISHED",
+      warehouseCode: "YOYOO-FINISHED-GOODS",
       status: "shipped",
       sourceIds: Object.freeze(["__synthetic_yoyoosun_trial__"]),
     }),
     Object.freeze({
       shipmentNo: "SH-YOYO-TRIAL-003",
       salesOrderNo: "SO-YOYO-TRIAL-003",
-      warehouseCode: "YOYOO-FINISHED",
+      warehouseCode: "YOYOO-FINISHED-GOODS",
       status: "cancelled",
       sourceIds: Object.freeze(["__synthetic_yoyoosun_trial__"]),
     }),
@@ -531,7 +616,7 @@ export const yoyoosunTrialDataFixture = Object.freeze({
       taskCode: "WF-YOYO-TRIAL-PURCHASE-001",
       taskGroup: "purchase_order_approval",
       sourceNo: "PO-YOYO-TRIAL-001",
-      ownerRoleKey: "purchasing",
+      ownerRoleKey: "purchase",
       taskStatusKey: "ready",
       sourceIds: Object.freeze(["yoyoosun-raw-role-workflow-v3-20260413"]),
     }),

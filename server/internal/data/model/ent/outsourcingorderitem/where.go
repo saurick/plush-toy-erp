@@ -66,9 +66,19 @@ func LineNo(v int) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldLineNo, v))
 }
 
+// SubjectType applies equality check predicate on the "subject_type" field. It's identical to SubjectTypeEQ.
+func SubjectType(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldSubjectType, v))
+}
+
 // ProductID applies equality check predicate on the "product_id" field. It's identical to ProductIDEQ.
 func ProductID(v int) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldProductID, v))
+}
+
+// MaterialID applies equality check predicate on the "material_id" field. It's identical to MaterialIDEQ.
+func MaterialID(v int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldMaterialID, v))
 }
 
 // ProcessID applies equality check predicate on the "process_id" field. It's identical to ProcessIDEQ.
@@ -94,6 +104,16 @@ func ProductOrderNoSnapshot(v string) predicate.OutsourcingOrderItem {
 // ProductNameSnapshot applies equality check predicate on the "product_name_snapshot" field. It's identical to ProductNameSnapshotEQ.
 func ProductNameSnapshot(v string) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldProductNameSnapshot, v))
+}
+
+// MaterialCodeSnapshot applies equality check predicate on the "material_code_snapshot" field. It's identical to MaterialCodeSnapshotEQ.
+func MaterialCodeSnapshot(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldMaterialCodeSnapshot, v))
+}
+
+// MaterialNameSnapshot applies equality check predicate on the "material_name_snapshot" field. It's identical to MaterialNameSnapshotEQ.
+func MaterialNameSnapshot(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldMaterialNameSnapshot, v))
 }
 
 // ProcessNameSnapshot applies equality check predicate on the "process_name_snapshot" field. It's identical to ProcessNameSnapshotEQ.
@@ -211,6 +231,71 @@ func LineNoLTE(v int) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldLTE(FieldLineNo, v))
 }
 
+// SubjectTypeEQ applies the EQ predicate on the "subject_type" field.
+func SubjectTypeEQ(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldSubjectType, v))
+}
+
+// SubjectTypeNEQ applies the NEQ predicate on the "subject_type" field.
+func SubjectTypeNEQ(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNEQ(FieldSubjectType, v))
+}
+
+// SubjectTypeIn applies the In predicate on the "subject_type" field.
+func SubjectTypeIn(vs ...string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIn(FieldSubjectType, vs...))
+}
+
+// SubjectTypeNotIn applies the NotIn predicate on the "subject_type" field.
+func SubjectTypeNotIn(vs ...string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotIn(FieldSubjectType, vs...))
+}
+
+// SubjectTypeGT applies the GT predicate on the "subject_type" field.
+func SubjectTypeGT(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldGT(FieldSubjectType, v))
+}
+
+// SubjectTypeGTE applies the GTE predicate on the "subject_type" field.
+func SubjectTypeGTE(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldGTE(FieldSubjectType, v))
+}
+
+// SubjectTypeLT applies the LT predicate on the "subject_type" field.
+func SubjectTypeLT(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldLT(FieldSubjectType, v))
+}
+
+// SubjectTypeLTE applies the LTE predicate on the "subject_type" field.
+func SubjectTypeLTE(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldLTE(FieldSubjectType, v))
+}
+
+// SubjectTypeContains applies the Contains predicate on the "subject_type" field.
+func SubjectTypeContains(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldContains(FieldSubjectType, v))
+}
+
+// SubjectTypeHasPrefix applies the HasPrefix predicate on the "subject_type" field.
+func SubjectTypeHasPrefix(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldHasPrefix(FieldSubjectType, v))
+}
+
+// SubjectTypeHasSuffix applies the HasSuffix predicate on the "subject_type" field.
+func SubjectTypeHasSuffix(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldHasSuffix(FieldSubjectType, v))
+}
+
+// SubjectTypeEqualFold applies the EqualFold predicate on the "subject_type" field.
+func SubjectTypeEqualFold(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEqualFold(FieldSubjectType, v))
+}
+
+// SubjectTypeContainsFold applies the ContainsFold predicate on the "subject_type" field.
+func SubjectTypeContainsFold(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldContainsFold(FieldSubjectType, v))
+}
+
 // ProductIDEQ applies the EQ predicate on the "product_id" field.
 func ProductIDEQ(v int) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldProductID, v))
@@ -229,6 +314,46 @@ func ProductIDIn(vs ...int) predicate.OutsourcingOrderItem {
 // ProductIDNotIn applies the NotIn predicate on the "product_id" field.
 func ProductIDNotIn(vs ...int) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldNotIn(FieldProductID, vs...))
+}
+
+// ProductIDIsNil applies the IsNil predicate on the "product_id" field.
+func ProductIDIsNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIsNull(FieldProductID))
+}
+
+// ProductIDNotNil applies the NotNil predicate on the "product_id" field.
+func ProductIDNotNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotNull(FieldProductID))
+}
+
+// MaterialIDEQ applies the EQ predicate on the "material_id" field.
+func MaterialIDEQ(v int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldMaterialID, v))
+}
+
+// MaterialIDNEQ applies the NEQ predicate on the "material_id" field.
+func MaterialIDNEQ(v int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNEQ(FieldMaterialID, v))
+}
+
+// MaterialIDIn applies the In predicate on the "material_id" field.
+func MaterialIDIn(vs ...int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIn(FieldMaterialID, vs...))
+}
+
+// MaterialIDNotIn applies the NotIn predicate on the "material_id" field.
+func MaterialIDNotIn(vs ...int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotIn(FieldMaterialID, vs...))
+}
+
+// MaterialIDIsNil applies the IsNil predicate on the "material_id" field.
+func MaterialIDIsNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIsNull(FieldMaterialID))
+}
+
+// MaterialIDNotNil applies the NotNil predicate on the "material_id" field.
+func MaterialIDNotNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotNull(FieldMaterialID))
 }
 
 // ProcessIDEQ applies the EQ predicate on the "process_id" field.
@@ -494,6 +619,156 @@ func ProductNameSnapshotEqualFold(v string) predicate.OutsourcingOrderItem {
 // ProductNameSnapshotContainsFold applies the ContainsFold predicate on the "product_name_snapshot" field.
 func ProductNameSnapshotContainsFold(v string) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldContainsFold(FieldProductNameSnapshot, v))
+}
+
+// MaterialCodeSnapshotEQ applies the EQ predicate on the "material_code_snapshot" field.
+func MaterialCodeSnapshotEQ(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldMaterialCodeSnapshot, v))
+}
+
+// MaterialCodeSnapshotNEQ applies the NEQ predicate on the "material_code_snapshot" field.
+func MaterialCodeSnapshotNEQ(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNEQ(FieldMaterialCodeSnapshot, v))
+}
+
+// MaterialCodeSnapshotIn applies the In predicate on the "material_code_snapshot" field.
+func MaterialCodeSnapshotIn(vs ...string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIn(FieldMaterialCodeSnapshot, vs...))
+}
+
+// MaterialCodeSnapshotNotIn applies the NotIn predicate on the "material_code_snapshot" field.
+func MaterialCodeSnapshotNotIn(vs ...string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotIn(FieldMaterialCodeSnapshot, vs...))
+}
+
+// MaterialCodeSnapshotGT applies the GT predicate on the "material_code_snapshot" field.
+func MaterialCodeSnapshotGT(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldGT(FieldMaterialCodeSnapshot, v))
+}
+
+// MaterialCodeSnapshotGTE applies the GTE predicate on the "material_code_snapshot" field.
+func MaterialCodeSnapshotGTE(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldGTE(FieldMaterialCodeSnapshot, v))
+}
+
+// MaterialCodeSnapshotLT applies the LT predicate on the "material_code_snapshot" field.
+func MaterialCodeSnapshotLT(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldLT(FieldMaterialCodeSnapshot, v))
+}
+
+// MaterialCodeSnapshotLTE applies the LTE predicate on the "material_code_snapshot" field.
+func MaterialCodeSnapshotLTE(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldLTE(FieldMaterialCodeSnapshot, v))
+}
+
+// MaterialCodeSnapshotContains applies the Contains predicate on the "material_code_snapshot" field.
+func MaterialCodeSnapshotContains(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldContains(FieldMaterialCodeSnapshot, v))
+}
+
+// MaterialCodeSnapshotHasPrefix applies the HasPrefix predicate on the "material_code_snapshot" field.
+func MaterialCodeSnapshotHasPrefix(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldHasPrefix(FieldMaterialCodeSnapshot, v))
+}
+
+// MaterialCodeSnapshotHasSuffix applies the HasSuffix predicate on the "material_code_snapshot" field.
+func MaterialCodeSnapshotHasSuffix(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldHasSuffix(FieldMaterialCodeSnapshot, v))
+}
+
+// MaterialCodeSnapshotIsNil applies the IsNil predicate on the "material_code_snapshot" field.
+func MaterialCodeSnapshotIsNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIsNull(FieldMaterialCodeSnapshot))
+}
+
+// MaterialCodeSnapshotNotNil applies the NotNil predicate on the "material_code_snapshot" field.
+func MaterialCodeSnapshotNotNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotNull(FieldMaterialCodeSnapshot))
+}
+
+// MaterialCodeSnapshotEqualFold applies the EqualFold predicate on the "material_code_snapshot" field.
+func MaterialCodeSnapshotEqualFold(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEqualFold(FieldMaterialCodeSnapshot, v))
+}
+
+// MaterialCodeSnapshotContainsFold applies the ContainsFold predicate on the "material_code_snapshot" field.
+func MaterialCodeSnapshotContainsFold(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldContainsFold(FieldMaterialCodeSnapshot, v))
+}
+
+// MaterialNameSnapshotEQ applies the EQ predicate on the "material_name_snapshot" field.
+func MaterialNameSnapshotEQ(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldMaterialNameSnapshot, v))
+}
+
+// MaterialNameSnapshotNEQ applies the NEQ predicate on the "material_name_snapshot" field.
+func MaterialNameSnapshotNEQ(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNEQ(FieldMaterialNameSnapshot, v))
+}
+
+// MaterialNameSnapshotIn applies the In predicate on the "material_name_snapshot" field.
+func MaterialNameSnapshotIn(vs ...string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIn(FieldMaterialNameSnapshot, vs...))
+}
+
+// MaterialNameSnapshotNotIn applies the NotIn predicate on the "material_name_snapshot" field.
+func MaterialNameSnapshotNotIn(vs ...string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotIn(FieldMaterialNameSnapshot, vs...))
+}
+
+// MaterialNameSnapshotGT applies the GT predicate on the "material_name_snapshot" field.
+func MaterialNameSnapshotGT(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldGT(FieldMaterialNameSnapshot, v))
+}
+
+// MaterialNameSnapshotGTE applies the GTE predicate on the "material_name_snapshot" field.
+func MaterialNameSnapshotGTE(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldGTE(FieldMaterialNameSnapshot, v))
+}
+
+// MaterialNameSnapshotLT applies the LT predicate on the "material_name_snapshot" field.
+func MaterialNameSnapshotLT(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldLT(FieldMaterialNameSnapshot, v))
+}
+
+// MaterialNameSnapshotLTE applies the LTE predicate on the "material_name_snapshot" field.
+func MaterialNameSnapshotLTE(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldLTE(FieldMaterialNameSnapshot, v))
+}
+
+// MaterialNameSnapshotContains applies the Contains predicate on the "material_name_snapshot" field.
+func MaterialNameSnapshotContains(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldContains(FieldMaterialNameSnapshot, v))
+}
+
+// MaterialNameSnapshotHasPrefix applies the HasPrefix predicate on the "material_name_snapshot" field.
+func MaterialNameSnapshotHasPrefix(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldHasPrefix(FieldMaterialNameSnapshot, v))
+}
+
+// MaterialNameSnapshotHasSuffix applies the HasSuffix predicate on the "material_name_snapshot" field.
+func MaterialNameSnapshotHasSuffix(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldHasSuffix(FieldMaterialNameSnapshot, v))
+}
+
+// MaterialNameSnapshotIsNil applies the IsNil predicate on the "material_name_snapshot" field.
+func MaterialNameSnapshotIsNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIsNull(FieldMaterialNameSnapshot))
+}
+
+// MaterialNameSnapshotNotNil applies the NotNil predicate on the "material_name_snapshot" field.
+func MaterialNameSnapshotNotNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotNull(FieldMaterialNameSnapshot))
+}
+
+// MaterialNameSnapshotEqualFold applies the EqualFold predicate on the "material_name_snapshot" field.
+func MaterialNameSnapshotEqualFold(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEqualFold(FieldMaterialNameSnapshot, v))
+}
+
+// MaterialNameSnapshotContainsFold applies the ContainsFold predicate on the "material_name_snapshot" field.
+func MaterialNameSnapshotContainsFold(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldContainsFold(FieldMaterialNameSnapshot, v))
 }
 
 // ProcessNameSnapshotEQ applies the EQ predicate on the "process_name_snapshot" field.
@@ -1169,6 +1444,29 @@ func HasProduct() predicate.OutsourcingOrderItem {
 func HasProductWith(preds ...predicate.Product) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(func(s *sql.Selector) {
 		step := newProductStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasMaterial applies the HasEdge predicate on the "material" edge.
+func HasMaterial() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, MaterialTable, MaterialColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasMaterialWith applies the HasEdge predicate on the "material" edge with a given conditions (other predicates).
+func HasMaterialWith(preds ...predicate.Material) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(func(s *sql.Selector) {
+		step := newMaterialStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

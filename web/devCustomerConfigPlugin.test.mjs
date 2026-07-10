@@ -43,7 +43,7 @@ async function createFixtureProject(t) {
   })
 
   const customerDir = path.join(projectRoot, 'config/customers/yoyoosun')
-  const assetsDir = path.join(customerDir, 'assets')
+  const assetsDir = path.join(customerDir, 'public-assets')
 
   await fsp.mkdir(assetsDir, {
     recursive: true,

@@ -25,8 +25,6 @@ const (
 	FieldDisabled = "disabled"
 	// FieldBundleKeys holds the string denoting the bundle_keys field in the database.
 	FieldBundleKeys = "bundle_keys"
-	// FieldGrants holds the string denoting the grants field in the database.
-	FieldGrants = "grants"
 	// FieldRevokes holds the string denoting the revokes field in the database.
 	FieldRevokes = "revokes"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -46,7 +44,6 @@ var Columns = []string{
 	FieldDisplayName,
 	FieldDisabled,
 	FieldBundleKeys,
-	FieldGrants,
 	FieldRevokes,
 	FieldCreatedAt,
 	FieldUpdatedAt,

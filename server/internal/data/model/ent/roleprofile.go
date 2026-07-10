@@ -30,8 +30,6 @@ type RoleProfile struct {
 	Disabled bool `json:"disabled,omitempty"`
 	// BundleKeys holds the value of the "bundle_keys" field.
 	BundleKeys []string `json:"bundle_keys,omitempty"`
-	// Grants holds the value of the "grants" field.
-	Grants []string `json:"grants,omitempty"`
 	// Revokes holds the value of the "revokes" field.
 	Revokes []string `json:"revokes,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -46,7 +44,7 @@ func (*RoleProfile) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case roleprofile.FieldBundleKeys, roleprofile.FieldGrants, roleprofile.FieldRevokes:
+		case roleprofile.FieldBundleKeys, roleprofile.FieldRevokes:
 			values[i] = new([]byte)
 		case roleprofile.FieldDisabled:
 			values[i] = new(sql.NullBool)
@@ -113,14 +111,6 @@ func (_m *RoleProfile) assignValues(columns []string, values []any) error {
 			} else if value != nil && len(*value) > 0 {
 				if err := json.Unmarshal(*value, &_m.BundleKeys); err != nil {
 					return fmt.Errorf("unmarshal field bundle_keys: %w", err)
-				}
-			}
-		case roleprofile.FieldGrants:
-			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field grants", values[i])
-			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &_m.Grants); err != nil {
-					return fmt.Errorf("unmarshal field grants: %w", err)
 				}
 			}
 		case roleprofile.FieldRevokes:
@@ -196,9 +186,6 @@ func (_m *RoleProfile) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("bundle_keys=")
 	builder.WriteString(fmt.Sprintf("%v", _m.BundleKeys))
-	builder.WriteString(", ")
-	builder.WriteString("grants=")
-	builder.WriteString(fmt.Sprintf("%v", _m.Grants))
 	builder.WriteString(", ")
 	builder.WriteString("revokes=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Revokes))

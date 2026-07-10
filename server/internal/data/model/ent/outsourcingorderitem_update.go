@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/predicate"
@@ -68,6 +69,20 @@ func (_u *OutsourcingOrderItemUpdate) AddLineNo(v int) *OutsourcingOrderItemUpda
 	return _u
 }
 
+// SetSubjectType sets the "subject_type" field.
+func (_u *OutsourcingOrderItemUpdate) SetSubjectType(v string) *OutsourcingOrderItemUpdate {
+	_u.mutation.SetSubjectType(v)
+	return _u
+}
+
+// SetNillableSubjectType sets the "subject_type" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdate) SetNillableSubjectType(v *string) *OutsourcingOrderItemUpdate {
+	if v != nil {
+		_u.SetSubjectType(*v)
+	}
+	return _u
+}
+
 // SetProductID sets the "product_id" field.
 func (_u *OutsourcingOrderItemUpdate) SetProductID(v int) *OutsourcingOrderItemUpdate {
 	_u.mutation.SetProductID(v)
@@ -79,6 +94,32 @@ func (_u *OutsourcingOrderItemUpdate) SetNillableProductID(v *int) *OutsourcingO
 	if v != nil {
 		_u.SetProductID(*v)
 	}
+	return _u
+}
+
+// ClearProductID clears the value of the "product_id" field.
+func (_u *OutsourcingOrderItemUpdate) ClearProductID() *OutsourcingOrderItemUpdate {
+	_u.mutation.ClearProductID()
+	return _u
+}
+
+// SetMaterialID sets the "material_id" field.
+func (_u *OutsourcingOrderItemUpdate) SetMaterialID(v int) *OutsourcingOrderItemUpdate {
+	_u.mutation.SetMaterialID(v)
+	return _u
+}
+
+// SetNillableMaterialID sets the "material_id" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdate) SetNillableMaterialID(v *int) *OutsourcingOrderItemUpdate {
+	if v != nil {
+		_u.SetMaterialID(*v)
+	}
+	return _u
+}
+
+// ClearMaterialID clears the value of the "material_id" field.
+func (_u *OutsourcingOrderItemUpdate) ClearMaterialID() *OutsourcingOrderItemUpdate {
+	_u.mutation.ClearMaterialID()
 	return _u
 }
 
@@ -167,6 +208,46 @@ func (_u *OutsourcingOrderItemUpdate) SetNillableProductNameSnapshot(v *string) 
 // ClearProductNameSnapshot clears the value of the "product_name_snapshot" field.
 func (_u *OutsourcingOrderItemUpdate) ClearProductNameSnapshot() *OutsourcingOrderItemUpdate {
 	_u.mutation.ClearProductNameSnapshot()
+	return _u
+}
+
+// SetMaterialCodeSnapshot sets the "material_code_snapshot" field.
+func (_u *OutsourcingOrderItemUpdate) SetMaterialCodeSnapshot(v string) *OutsourcingOrderItemUpdate {
+	_u.mutation.SetMaterialCodeSnapshot(v)
+	return _u
+}
+
+// SetNillableMaterialCodeSnapshot sets the "material_code_snapshot" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdate) SetNillableMaterialCodeSnapshot(v *string) *OutsourcingOrderItemUpdate {
+	if v != nil {
+		_u.SetMaterialCodeSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearMaterialCodeSnapshot clears the value of the "material_code_snapshot" field.
+func (_u *OutsourcingOrderItemUpdate) ClearMaterialCodeSnapshot() *OutsourcingOrderItemUpdate {
+	_u.mutation.ClearMaterialCodeSnapshot()
+	return _u
+}
+
+// SetMaterialNameSnapshot sets the "material_name_snapshot" field.
+func (_u *OutsourcingOrderItemUpdate) SetMaterialNameSnapshot(v string) *OutsourcingOrderItemUpdate {
+	_u.mutation.SetMaterialNameSnapshot(v)
+	return _u
+}
+
+// SetNillableMaterialNameSnapshot sets the "material_name_snapshot" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdate) SetNillableMaterialNameSnapshot(v *string) *OutsourcingOrderItemUpdate {
+	if v != nil {
+		_u.SetMaterialNameSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearMaterialNameSnapshot clears the value of the "material_name_snapshot" field.
+func (_u *OutsourcingOrderItemUpdate) ClearMaterialNameSnapshot() *OutsourcingOrderItemUpdate {
+	_u.mutation.ClearMaterialNameSnapshot()
 	return _u
 }
 
@@ -354,6 +435,11 @@ func (_u *OutsourcingOrderItemUpdate) SetProduct(v *Product) *OutsourcingOrderIt
 	return _u.SetProductID(v.ID)
 }
 
+// SetMaterial sets the "material" edge to the Material entity.
+func (_u *OutsourcingOrderItemUpdate) SetMaterial(v *Material) *OutsourcingOrderItemUpdate {
+	return _u.SetMaterialID(v.ID)
+}
+
 // SetProcess sets the "process" edge to the Process entity.
 func (_u *OutsourcingOrderItemUpdate) SetProcess(v *Process) *OutsourcingOrderItemUpdate {
 	return _u.SetProcessID(v.ID)
@@ -378,6 +464,12 @@ func (_u *OutsourcingOrderItemUpdate) ClearOutsourcingOrder() *OutsourcingOrderI
 // ClearProduct clears the "product" edge to the Product entity.
 func (_u *OutsourcingOrderItemUpdate) ClearProduct() *OutsourcingOrderItemUpdate {
 	_u.mutation.ClearProduct()
+	return _u
+}
+
+// ClearMaterial clears the "material" edge to the Material entity.
+func (_u *OutsourcingOrderItemUpdate) ClearMaterial() *OutsourcingOrderItemUpdate {
+	_u.mutation.ClearMaterial()
 	return _u
 }
 
@@ -441,9 +533,19 @@ func (_u *OutsourcingOrderItemUpdate) check() error {
 			return &ValidationError{Name: "line_no", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.line_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SubjectType(); ok {
+		if err := outsourcingorderitem.SubjectTypeValidator(v); err != nil {
+			return &ValidationError{Name: "subject_type", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.subject_type": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ProductID(); ok {
 		if err := outsourcingorderitem.ProductIDValidator(v); err != nil {
 			return &ValidationError{Name: "product_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.MaterialID(); ok {
+		if err := outsourcingorderitem.MaterialIDValidator(v); err != nil {
+			return &ValidationError{Name: "material_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.material_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.ProcessID(); ok {
@@ -469,6 +571,16 @@ func (_u *OutsourcingOrderItemUpdate) check() error {
 	if v, ok := _u.mutation.ProductNameSnapshot(); ok {
 		if err := outsourcingorderitem.ProductNameSnapshotValidator(v); err != nil {
 			return &ValidationError{Name: "product_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_name_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.MaterialCodeSnapshot(); ok {
+		if err := outsourcingorderitem.MaterialCodeSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "material_code_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.material_code_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.MaterialNameSnapshot(); ok {
+		if err := outsourcingorderitem.MaterialNameSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "material_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.material_name_snapshot": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.ProcessNameSnapshot(); ok {
@@ -499,9 +611,6 @@ func (_u *OutsourcingOrderItemUpdate) check() error {
 	if _u.mutation.OutsourcingOrderCleared() && len(_u.mutation.OutsourcingOrderIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "OutsourcingOrderItem.outsourcing_order"`)
 	}
-	if _u.mutation.ProductCleared() && len(_u.mutation.ProductIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "OutsourcingOrderItem.product"`)
-	}
 	if _u.mutation.ProcessCleared() && len(_u.mutation.ProcessIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "OutsourcingOrderItem.process"`)
 	}
@@ -529,6 +638,9 @@ func (_u *OutsourcingOrderItemUpdate) sqlSave(ctx context.Context) (_node int, e
 	if value, ok := _u.mutation.AddedLineNo(); ok {
 		_spec.AddField(outsourcingorderitem.FieldLineNo, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.SubjectType(); ok {
+		_spec.SetField(outsourcingorderitem.FieldSubjectType, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.ProductNoSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProductNoSnapshot, field.TypeString, value)
 	}
@@ -546,6 +658,18 @@ func (_u *OutsourcingOrderItemUpdate) sqlSave(ctx context.Context) (_node int, e
 	}
 	if _u.mutation.ProductNameSnapshotCleared() {
 		_spec.ClearField(outsourcingorderitem.FieldProductNameSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.MaterialCodeSnapshot(); ok {
+		_spec.SetField(outsourcingorderitem.FieldMaterialCodeSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.MaterialCodeSnapshotCleared() {
+		_spec.ClearField(outsourcingorderitem.FieldMaterialCodeSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.MaterialNameSnapshot(); ok {
+		_spec.SetField(outsourcingorderitem.FieldMaterialNameSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.MaterialNameSnapshotCleared() {
+		_spec.ClearField(outsourcingorderitem.FieldMaterialNameSnapshot, field.TypeString)
 	}
 	if value, ok := _u.mutation.ProcessNameSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProcessNameSnapshot, field.TypeString, value)
@@ -649,6 +773,35 @@ func (_u *OutsourcingOrderItemUpdate) sqlSave(ctx context.Context) (_node int, e
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(product.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.MaterialCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   outsourcingorderitem.MaterialTable,
+			Columns: []string{outsourcingorderitem.MaterialColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(material.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.MaterialIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   outsourcingorderitem.MaterialTable,
+			Columns: []string{outsourcingorderitem.MaterialColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(material.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -769,6 +922,20 @@ func (_u *OutsourcingOrderItemUpdateOne) AddLineNo(v int) *OutsourcingOrderItemU
 	return _u
 }
 
+// SetSubjectType sets the "subject_type" field.
+func (_u *OutsourcingOrderItemUpdateOne) SetSubjectType(v string) *OutsourcingOrderItemUpdateOne {
+	_u.mutation.SetSubjectType(v)
+	return _u
+}
+
+// SetNillableSubjectType sets the "subject_type" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdateOne) SetNillableSubjectType(v *string) *OutsourcingOrderItemUpdateOne {
+	if v != nil {
+		_u.SetSubjectType(*v)
+	}
+	return _u
+}
+
 // SetProductID sets the "product_id" field.
 func (_u *OutsourcingOrderItemUpdateOne) SetProductID(v int) *OutsourcingOrderItemUpdateOne {
 	_u.mutation.SetProductID(v)
@@ -780,6 +947,32 @@ func (_u *OutsourcingOrderItemUpdateOne) SetNillableProductID(v *int) *Outsourci
 	if v != nil {
 		_u.SetProductID(*v)
 	}
+	return _u
+}
+
+// ClearProductID clears the value of the "product_id" field.
+func (_u *OutsourcingOrderItemUpdateOne) ClearProductID() *OutsourcingOrderItemUpdateOne {
+	_u.mutation.ClearProductID()
+	return _u
+}
+
+// SetMaterialID sets the "material_id" field.
+func (_u *OutsourcingOrderItemUpdateOne) SetMaterialID(v int) *OutsourcingOrderItemUpdateOne {
+	_u.mutation.SetMaterialID(v)
+	return _u
+}
+
+// SetNillableMaterialID sets the "material_id" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdateOne) SetNillableMaterialID(v *int) *OutsourcingOrderItemUpdateOne {
+	if v != nil {
+		_u.SetMaterialID(*v)
+	}
+	return _u
+}
+
+// ClearMaterialID clears the value of the "material_id" field.
+func (_u *OutsourcingOrderItemUpdateOne) ClearMaterialID() *OutsourcingOrderItemUpdateOne {
+	_u.mutation.ClearMaterialID()
 	return _u
 }
 
@@ -868,6 +1061,46 @@ func (_u *OutsourcingOrderItemUpdateOne) SetNillableProductNameSnapshot(v *strin
 // ClearProductNameSnapshot clears the value of the "product_name_snapshot" field.
 func (_u *OutsourcingOrderItemUpdateOne) ClearProductNameSnapshot() *OutsourcingOrderItemUpdateOne {
 	_u.mutation.ClearProductNameSnapshot()
+	return _u
+}
+
+// SetMaterialCodeSnapshot sets the "material_code_snapshot" field.
+func (_u *OutsourcingOrderItemUpdateOne) SetMaterialCodeSnapshot(v string) *OutsourcingOrderItemUpdateOne {
+	_u.mutation.SetMaterialCodeSnapshot(v)
+	return _u
+}
+
+// SetNillableMaterialCodeSnapshot sets the "material_code_snapshot" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdateOne) SetNillableMaterialCodeSnapshot(v *string) *OutsourcingOrderItemUpdateOne {
+	if v != nil {
+		_u.SetMaterialCodeSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearMaterialCodeSnapshot clears the value of the "material_code_snapshot" field.
+func (_u *OutsourcingOrderItemUpdateOne) ClearMaterialCodeSnapshot() *OutsourcingOrderItemUpdateOne {
+	_u.mutation.ClearMaterialCodeSnapshot()
+	return _u
+}
+
+// SetMaterialNameSnapshot sets the "material_name_snapshot" field.
+func (_u *OutsourcingOrderItemUpdateOne) SetMaterialNameSnapshot(v string) *OutsourcingOrderItemUpdateOne {
+	_u.mutation.SetMaterialNameSnapshot(v)
+	return _u
+}
+
+// SetNillableMaterialNameSnapshot sets the "material_name_snapshot" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdateOne) SetNillableMaterialNameSnapshot(v *string) *OutsourcingOrderItemUpdateOne {
+	if v != nil {
+		_u.SetMaterialNameSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearMaterialNameSnapshot clears the value of the "material_name_snapshot" field.
+func (_u *OutsourcingOrderItemUpdateOne) ClearMaterialNameSnapshot() *OutsourcingOrderItemUpdateOne {
+	_u.mutation.ClearMaterialNameSnapshot()
 	return _u
 }
 
@@ -1055,6 +1288,11 @@ func (_u *OutsourcingOrderItemUpdateOne) SetProduct(v *Product) *OutsourcingOrde
 	return _u.SetProductID(v.ID)
 }
 
+// SetMaterial sets the "material" edge to the Material entity.
+func (_u *OutsourcingOrderItemUpdateOne) SetMaterial(v *Material) *OutsourcingOrderItemUpdateOne {
+	return _u.SetMaterialID(v.ID)
+}
+
 // SetProcess sets the "process" edge to the Process entity.
 func (_u *OutsourcingOrderItemUpdateOne) SetProcess(v *Process) *OutsourcingOrderItemUpdateOne {
 	return _u.SetProcessID(v.ID)
@@ -1079,6 +1317,12 @@ func (_u *OutsourcingOrderItemUpdateOne) ClearOutsourcingOrder() *OutsourcingOrd
 // ClearProduct clears the "product" edge to the Product entity.
 func (_u *OutsourcingOrderItemUpdateOne) ClearProduct() *OutsourcingOrderItemUpdateOne {
 	_u.mutation.ClearProduct()
+	return _u
+}
+
+// ClearMaterial clears the "material" edge to the Material entity.
+func (_u *OutsourcingOrderItemUpdateOne) ClearMaterial() *OutsourcingOrderItemUpdateOne {
+	_u.mutation.ClearMaterial()
 	return _u
 }
 
@@ -1155,9 +1399,19 @@ func (_u *OutsourcingOrderItemUpdateOne) check() error {
 			return &ValidationError{Name: "line_no", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.line_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SubjectType(); ok {
+		if err := outsourcingorderitem.SubjectTypeValidator(v); err != nil {
+			return &ValidationError{Name: "subject_type", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.subject_type": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ProductID(); ok {
 		if err := outsourcingorderitem.ProductIDValidator(v); err != nil {
 			return &ValidationError{Name: "product_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.MaterialID(); ok {
+		if err := outsourcingorderitem.MaterialIDValidator(v); err != nil {
+			return &ValidationError{Name: "material_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.material_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.ProcessID(); ok {
@@ -1183,6 +1437,16 @@ func (_u *OutsourcingOrderItemUpdateOne) check() error {
 	if v, ok := _u.mutation.ProductNameSnapshot(); ok {
 		if err := outsourcingorderitem.ProductNameSnapshotValidator(v); err != nil {
 			return &ValidationError{Name: "product_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_name_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.MaterialCodeSnapshot(); ok {
+		if err := outsourcingorderitem.MaterialCodeSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "material_code_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.material_code_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.MaterialNameSnapshot(); ok {
+		if err := outsourcingorderitem.MaterialNameSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "material_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.material_name_snapshot": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.ProcessNameSnapshot(); ok {
@@ -1212,9 +1476,6 @@ func (_u *OutsourcingOrderItemUpdateOne) check() error {
 	}
 	if _u.mutation.OutsourcingOrderCleared() && len(_u.mutation.OutsourcingOrderIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "OutsourcingOrderItem.outsourcing_order"`)
-	}
-	if _u.mutation.ProductCleared() && len(_u.mutation.ProductIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "OutsourcingOrderItem.product"`)
 	}
 	if _u.mutation.ProcessCleared() && len(_u.mutation.ProcessIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "OutsourcingOrderItem.process"`)
@@ -1260,6 +1521,9 @@ func (_u *OutsourcingOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *Ou
 	if value, ok := _u.mutation.AddedLineNo(); ok {
 		_spec.AddField(outsourcingorderitem.FieldLineNo, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.SubjectType(); ok {
+		_spec.SetField(outsourcingorderitem.FieldSubjectType, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.ProductNoSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProductNoSnapshot, field.TypeString, value)
 	}
@@ -1277,6 +1541,18 @@ func (_u *OutsourcingOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *Ou
 	}
 	if _u.mutation.ProductNameSnapshotCleared() {
 		_spec.ClearField(outsourcingorderitem.FieldProductNameSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.MaterialCodeSnapshot(); ok {
+		_spec.SetField(outsourcingorderitem.FieldMaterialCodeSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.MaterialCodeSnapshotCleared() {
+		_spec.ClearField(outsourcingorderitem.FieldMaterialCodeSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.MaterialNameSnapshot(); ok {
+		_spec.SetField(outsourcingorderitem.FieldMaterialNameSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.MaterialNameSnapshotCleared() {
+		_spec.ClearField(outsourcingorderitem.FieldMaterialNameSnapshot, field.TypeString)
 	}
 	if value, ok := _u.mutation.ProcessNameSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProcessNameSnapshot, field.TypeString, value)
@@ -1380,6 +1656,35 @@ func (_u *OutsourcingOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *Ou
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(product.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.MaterialCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   outsourcingorderitem.MaterialTable,
+			Columns: []string{outsourcingorderitem.MaterialColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(material.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.MaterialIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   outsourcingorderitem.MaterialTable,
+			Columns: []string{outsourcingorderitem.MaterialColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(material.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

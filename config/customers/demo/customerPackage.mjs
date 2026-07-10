@@ -39,6 +39,10 @@ export const demoCustomerPackage = Object.freeze({
       status: "preview_only",
       partyDefaults: Object.freeze({
         buyerCompany: "演示买方公司",
+        buyerContact: "采购负责人",
+        buyerPhone: "",
+        buyerAddress: "演示地址",
+        buyerSigner: "",
       }),
       guardrail:
         "仅作为 demo 客户配置草案里的采购合同买方抬头默认值，不进入 Product Core 默认样例，不自动生成签章、签收、采购事实或财务事实。",
@@ -48,6 +52,10 @@ export const demoCustomerPackage = Object.freeze({
       status: "preview_only",
       partyDefaults: Object.freeze({
         buyerCompany: "演示买方公司",
+        buyerContact: "委外负责人",
+        buyerPhone: "",
+        buyerAddress: "演示地址",
+        buyerSigner: "",
       }),
       guardrail:
         "仅作为 demo 客户配置草案里的加工合同委托方抬头默认值，不进入 Product Core 默认样例，不自动生成签章、签收、委外事实或财务事实。",

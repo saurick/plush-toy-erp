@@ -200,7 +200,11 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 	}
 
 	now := time.Now()
-	update := tx.WorkflowTask.UpdateOneID(in.ID).
+	update := tx.WorkflowTask.Update().
+		Where(
+			workflowtask.IDEQ(in.ID),
+			workflowtask.TaskStatusKeyNotIn("done", "rejected", "cancelled", "closed"),
+		).
 		SetTaskStatusKey(in.TaskStatusKey).
 		SetPayload(in.Payload)
 	if actorID > 0 {
@@ -215,7 +219,7 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 		if current.StartedAt == nil {
 			update.SetStartedAt(now)
 		}
-	case "done":
+	case "done", "rejected":
 		update.SetCompletedAt(now)
 	case "closed":
 		update.SetClosedAt(now)
@@ -227,7 +231,14 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 		update.ClearBlockedReason()
 	}
 
-	row, err := update.Save(ctx)
+	updatedCount, err := update.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if updatedCount == 0 {
+		return nil, biz.ErrWorkflowTaskSettled
+	}
+	row, err := tx.WorkflowTask.Get(ctx, in.ID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrWorkflowTaskNotFound

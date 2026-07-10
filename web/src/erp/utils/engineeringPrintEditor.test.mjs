@@ -671,7 +671,7 @@ test('engineeringPrintEditor: 客户样例覆盖 Sheet1 文本但不预置作业
       },
       headerImage: {
         name: 'Sheet1 页眉图',
-        url: '/customer-assets/yoyoosun/engineering-work-instruction/sheet1/header-product.png',
+        url: '/test-assets/engineering/header-product.png',
         mimeType: 'image/png',
         crop: { left: 8.696, top: 26.615, right: 17.073, bottom: 38.995 },
       },
@@ -725,7 +725,7 @@ test('engineeringPrintEditor: 客户样例覆盖 Sheet1 文本但不预置作业
   assert.match(withSample.rows[4].text, /面部打好折/u)
   assert.equal(
     withSample.images.header.dataURL,
-    '/customer-assets/yoyoosun/engineering-work-instruction/sheet1/header-product.png'
+    '/test-assets/engineering/header-product.png'
   )
   assert.deepEqual(withSample.images.header.crop, {
     left: 8.696,

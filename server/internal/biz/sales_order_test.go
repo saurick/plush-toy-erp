@@ -472,6 +472,7 @@ func TestSalesOrderUsecaseItemGuards(t *testing.T) {
 		orders: map[int]*SalesOrder{
 			1: {ID: 1, LifecycleStatus: SalesOrderStatusDraft},
 			2: {ID: 2, LifecycleStatus: SalesOrderStatusClosed},
+			3: {ID: 3, LifecycleStatus: SalesOrderStatusSubmitted},
 		},
 		items: map[int]*SalesOrderItem{
 			10: {ID: 10, SalesOrderID: 1, LineStatus: SalesOrderItemStatusOpen},
@@ -532,6 +533,7 @@ func TestSalesOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 		orders: map[int]*SalesOrder{
 			1: {ID: 1, LifecycleStatus: SalesOrderStatusDraft},
 			2: {ID: 2, LifecycleStatus: SalesOrderStatusClosed},
+			3: {ID: 3, LifecycleStatus: SalesOrderStatusSubmitted},
 		},
 		items: map[int]*SalesOrderItem{
 			10: {ID: 10, SalesOrderID: 1, LineStatus: SalesOrderItemStatusOpen},
@@ -564,6 +566,9 @@ func TestSalesOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 
 	if _, err := uc.SaveSalesOrderWithItems(ctx, 2, &SalesOrderMutation{OrderNo: "SO-CLOSED", CustomerID: 1000, OrderDate: orderDate}, nil); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected closed order save rejected, got %v", err)
+	}
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 3, &SalesOrderMutation{OrderNo: "SO-SUBMITTED", CustomerID: 1000, OrderDate: orderDate}, nil); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected submitted sales order to be frozen, got %v", err)
 	}
 	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{OrderNo: "SO-WRONG-ITEM", CustomerID: 1000, OrderDate: orderDate}, []*SalesOrderItemSaveMutation{
 		{ID: 20, SalesOrderItemMutation: SalesOrderItemMutation{LineNo: 1, ProductID: 100, UnitID: 200, OrderedQuantity: qty}},

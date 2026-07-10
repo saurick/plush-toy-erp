@@ -5,6 +5,7 @@ import (
 	stdsql "database/sql"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -335,6 +336,230 @@ func (r *inventoryRepo) ListQualityInspections(ctx context.Context, filter biz.Q
 	return out, total, nil
 }
 
+func (r *inventoryRepo) EvaluatePurchaseReceiptQualityGate(ctx context.Context, receiptID int) (*biz.PurchaseReceiptQualityGate, error) {
+	tx, err := r.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	receipt, err := tx.client.PurchaseReceipt.Get(ctx, receiptID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrPurchaseReceiptNotFound
+		}
+		return nil, err
+	}
+	items, err := tx.client.PurchaseReceiptItem.Query().Where(
+		purchasereceiptitem.ReceiptID(receipt.ID),
+	).Order(ent.Asc(purchasereceiptitem.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	gate, err := evaluatePurchaseReceiptQualityGateInTx(ctx, tx, receipt, items, false)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return gate, nil
+}
+
+func evaluatePurchaseReceiptQualityGateInTx(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	receipt *ent.PurchaseReceipt,
+	items []*ent.PurchaseReceiptItem,
+	lockRows bool,
+) (*biz.PurchaseReceiptQualityGate, error) {
+	if tx == nil || receipt == nil || receipt.ID <= 0 || len(items) == 0 {
+		return nil, biz.ErrBadParam
+	}
+	if receipt.Status != biz.PurchaseReceiptStatusDraft && receipt.Status != biz.PurchaseReceiptStatusPosted {
+		return nil, biz.ErrBadParam
+	}
+	if lockRows {
+		if err := lockPurchaseReceiptIncomingQualityInspections(ctx, tx, receipt.ID); err != nil {
+			return nil, err
+		}
+		lotIDs := make([]int, 0, len(items))
+		for _, item := range items {
+			if item != nil && item.LotID != nil {
+				lotIDs = append(lotIDs, *item.LotID)
+			}
+		}
+		if err := lockInventoryLots(ctx, tx, lotIDs); err != nil {
+			return nil, err
+		}
+	}
+
+	inspections, err := tx.client.QualityInspection.Query().Where(
+		qualityinspection.PurchaseReceiptID(receipt.ID),
+		qualityinspection.SourceType(biz.QualityInspectionSourcePurchaseReceipt),
+		qualityinspection.InspectionType(biz.QualityInspectionTypeIncoming),
+	).Order(ent.Asc(qualityinspection.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byItemID := make(map[int][]*ent.QualityInspection, len(items))
+	for _, inspection := range inspections {
+		if inspection.PurchaseReceiptItemID == nil {
+			return nil, biz.ErrBadParam
+		}
+		byItemID[*inspection.PurchaseReceiptItemID] = append(byItemID[*inspection.PurchaseReceiptItemID], inspection)
+	}
+
+	gate := &biz.PurchaseReceiptQualityGate{
+		PurchaseReceiptID: receipt.ID,
+		Outcome:           biz.PurchaseReceiptQualityGateReady,
+		TotalLines:        len(items),
+		PendingLineIDs:    []int{},
+		RejectedLineIDs:   []int{},
+	}
+	for _, item := range items {
+		if item == nil || item.ReceiptID != receipt.ID || item.LotID == nil {
+			gate.PendingLineIDs = append(gate.PendingLineIDs, itemIDOrZero(item))
+			continue
+		}
+		lot, err := tx.client.InventoryLot.Get(ctx, *item.LotID)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return nil, biz.ErrInventoryLotNotFound
+			}
+			return nil, err
+		}
+		if lot.SubjectType != biz.InventorySubjectMaterial || lot.SubjectID != item.MaterialID {
+			return nil, biz.ErrBadParam
+		}
+
+		linePassed := false
+		linePending := false
+		lineRejected := false
+		for _, inspection := range byItemID[item.ID] {
+			if inspection.PurchaseReceiptID == nil || *inspection.PurchaseReceiptID != receipt.ID ||
+				inspection.InventoryLotID != *item.LotID ||
+				inspection.MaterialID == nil || *inspection.MaterialID != item.MaterialID ||
+				inspection.WarehouseID != item.WarehouseID {
+				return nil, biz.ErrBadParam
+			}
+			switch inspection.Status {
+			case biz.QualityInspectionStatusPassed:
+				if inspection.Result == nil || (*inspection.Result != biz.QualityInspectionResultPass && *inspection.Result != biz.QualityInspectionResultConcession) {
+					return nil, biz.ErrBadParam
+				}
+				linePassed = true
+			case biz.QualityInspectionStatusRejected:
+				if inspection.Result == nil || *inspection.Result != biz.QualityInspectionResultReject {
+					return nil, biz.ErrBadParam
+				}
+				lineRejected = true
+			case biz.QualityInspectionStatusDraft, biz.QualityInspectionStatusSubmitted:
+				linePending = true
+			case biz.QualityInspectionStatusCancelled:
+				// Cancelled inspections are historical attempts. A replacement
+				// submitted/passed inspection on the same receipt line owns the gate.
+			default:
+				return nil, biz.ErrBadParam
+			}
+		}
+		switch {
+		case lineRejected:
+			gate.RejectedLineIDs = append(gate.RejectedLineIDs, item.ID)
+		case linePending || !linePassed || lot.Status != biz.InventoryLotActive:
+			gate.PendingLineIDs = append(gate.PendingLineIDs, item.ID)
+		default:
+			gate.PassedLines++
+		}
+	}
+	switch {
+	case len(gate.RejectedLineIDs) > 0:
+		gate.Outcome = biz.PurchaseReceiptQualityGateRejected
+	case len(gate.PendingLineIDs) > 0:
+		gate.Outcome = biz.PurchaseReceiptQualityGatePending
+	default:
+		gate.Outcome = biz.PurchaseReceiptQualityGateReady
+	}
+	return gate, nil
+}
+
+func itemIDOrZero(item *ent.PurchaseReceiptItem) int {
+	if item == nil {
+		return 0
+	}
+	return item.ID
+}
+
+func lockPurchaseReceiptIncomingQualityInspections(ctx context.Context, tx *inventoryDBTx, receiptID int) error {
+	if tx.dialect != dialect.Postgres {
+		return nil
+	}
+	rows, err := tx.sqlTx.QueryContext(ctx, `
+SELECT id
+FROM quality_inspections
+WHERE purchase_receipt_id = $1
+  AND source_type = $2
+  AND inspection_type = $3
+ORDER BY id
+FOR UPDATE`, receiptID, biz.QualityInspectionSourcePurchaseReceipt, biz.QualityInspectionTypeIncoming)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+	}
+	return rows.Err()
+}
+
+func lockInventoryLots(ctx context.Context, tx *inventoryDBTx, lotIDs []int) error {
+	if tx.dialect != dialect.Postgres || len(lotIDs) == 0 {
+		return nil
+	}
+	unique := make(map[int]struct{}, len(lotIDs))
+	for _, id := range lotIDs {
+		if id > 0 {
+			unique[id] = struct{}{}
+		}
+	}
+	ordered := make([]int, 0, len(unique))
+	for id := range unique {
+		ordered = append(ordered, id)
+	}
+	sort.Ints(ordered)
+	placeholders := inventorySQLPlaceholders(tx.dialect, len(ordered))
+	args := make([]any, 0, len(ordered))
+	for _, id := range ordered {
+		args = append(args, id)
+	}
+	rows, err := tx.sqlTx.QueryContext(ctx, fmt.Sprintf(
+		`SELECT id FROM inventory_lots WHERE id IN (%s) ORDER BY id FOR UPDATE`,
+		strings.Join(placeholders, ", "),
+	), args...)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	locked := 0
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		locked++
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if locked != len(ordered) {
+		return biz.ErrInventoryLotNotFound
+	}
+	return nil
+}
+
 func (r *inventoryRepo) decideSubmittedQualityInspection(ctx context.Context, in *biz.QualityInspectionDecision, targetInspectionStatus, targetLotStatus string) (*biz.QualityInspection, error) {
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
@@ -422,7 +647,7 @@ func validateIncomingQualityInspectionReferences(ctx context.Context, client *en
 		}
 		return err
 	}
-	if !corestatus.IsPurchaseReceiptPosted(receipt.Status) {
+	if receipt.Status != biz.PurchaseReceiptStatusDraft && !corestatus.IsPurchaseReceiptPosted(receipt.Status) {
 		return biz.ErrBadParam
 	}
 	lot, err := client.InventoryLot.Get(ctx, in.InventoryLotID)

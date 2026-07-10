@@ -103,6 +103,23 @@ type QualityInspectionFilter struct {
 	Offset                int
 }
 
+const (
+	PurchaseReceiptQualityGateReady    = "READY"
+	PurchaseReceiptQualityGatePending  = "PENDING"
+	PurchaseReceiptQualityGateRejected = "REJECTED"
+)
+
+// PurchaseReceiptQualityGate is a read model over line-level incoming quality
+// facts. It does not decide inspections and does not write inventory facts.
+type PurchaseReceiptQualityGate struct {
+	PurchaseReceiptID int
+	Outcome           string
+	TotalLines        int
+	PassedLines       int
+	PendingLineIDs    []int
+	RejectedLineIDs   []int
+}
+
 func (uc *InventoryUsecase) CreateQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
@@ -195,6 +212,13 @@ func (uc *InventoryUsecase) ListFinishedGoodsQualityInspections(ctx context.Cont
 		return nil, 0, err
 	}
 	return uc.repo.ListQualityInspections(ctx, normalized)
+}
+
+func (uc *InventoryUsecase) EvaluatePurchaseReceiptQualityGate(ctx context.Context, receiptID int) (*PurchaseReceiptQualityGate, error) {
+	if uc == nil || uc.repo == nil || receiptID <= 0 {
+		return nil, ErrBadParam
+	}
+	return uc.repo.EvaluatePurchaseReceiptQualityGate(ctx, receiptID)
 }
 
 func IsValidQualityInspectionStatus(value string) bool {

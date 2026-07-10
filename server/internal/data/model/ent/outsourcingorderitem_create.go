@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/process"
@@ -37,9 +38,37 @@ func (_c *OutsourcingOrderItemCreate) SetLineNo(v int) *OutsourcingOrderItemCrea
 	return _c
 }
 
+// SetSubjectType sets the "subject_type" field.
+func (_c *OutsourcingOrderItemCreate) SetSubjectType(v string) *OutsourcingOrderItemCreate {
+	_c.mutation.SetSubjectType(v)
+	return _c
+}
+
 // SetProductID sets the "product_id" field.
 func (_c *OutsourcingOrderItemCreate) SetProductID(v int) *OutsourcingOrderItemCreate {
 	_c.mutation.SetProductID(v)
+	return _c
+}
+
+// SetNillableProductID sets the "product_id" field if the given value is not nil.
+func (_c *OutsourcingOrderItemCreate) SetNillableProductID(v *int) *OutsourcingOrderItemCreate {
+	if v != nil {
+		_c.SetProductID(*v)
+	}
+	return _c
+}
+
+// SetMaterialID sets the "material_id" field.
+func (_c *OutsourcingOrderItemCreate) SetMaterialID(v int) *OutsourcingOrderItemCreate {
+	_c.mutation.SetMaterialID(v)
+	return _c
+}
+
+// SetNillableMaterialID sets the "material_id" field if the given value is not nil.
+func (_c *OutsourcingOrderItemCreate) SetNillableMaterialID(v *int) *OutsourcingOrderItemCreate {
+	if v != nil {
+		_c.SetMaterialID(*v)
+	}
 	return _c
 }
 
@@ -93,6 +122,34 @@ func (_c *OutsourcingOrderItemCreate) SetProductNameSnapshot(v string) *Outsourc
 func (_c *OutsourcingOrderItemCreate) SetNillableProductNameSnapshot(v *string) *OutsourcingOrderItemCreate {
 	if v != nil {
 		_c.SetProductNameSnapshot(*v)
+	}
+	return _c
+}
+
+// SetMaterialCodeSnapshot sets the "material_code_snapshot" field.
+func (_c *OutsourcingOrderItemCreate) SetMaterialCodeSnapshot(v string) *OutsourcingOrderItemCreate {
+	_c.mutation.SetMaterialCodeSnapshot(v)
+	return _c
+}
+
+// SetNillableMaterialCodeSnapshot sets the "material_code_snapshot" field if the given value is not nil.
+func (_c *OutsourcingOrderItemCreate) SetNillableMaterialCodeSnapshot(v *string) *OutsourcingOrderItemCreate {
+	if v != nil {
+		_c.SetMaterialCodeSnapshot(*v)
+	}
+	return _c
+}
+
+// SetMaterialNameSnapshot sets the "material_name_snapshot" field.
+func (_c *OutsourcingOrderItemCreate) SetMaterialNameSnapshot(v string) *OutsourcingOrderItemCreate {
+	_c.mutation.SetMaterialNameSnapshot(v)
+	return _c
+}
+
+// SetNillableMaterialNameSnapshot sets the "material_name_snapshot" field if the given value is not nil.
+func (_c *OutsourcingOrderItemCreate) SetNillableMaterialNameSnapshot(v *string) *OutsourcingOrderItemCreate {
+	if v != nil {
+		_c.SetMaterialNameSnapshot(*v)
 	}
 	return _c
 }
@@ -253,6 +310,11 @@ func (_c *OutsourcingOrderItemCreate) SetProduct(v *Product) *OutsourcingOrderIt
 	return _c.SetProductID(v.ID)
 }
 
+// SetMaterial sets the "material" edge to the Material entity.
+func (_c *OutsourcingOrderItemCreate) SetMaterial(v *Material) *OutsourcingOrderItemCreate {
+	return _c.SetMaterialID(v.ID)
+}
+
 // SetProcess sets the "process" edge to the Process entity.
 func (_c *OutsourcingOrderItemCreate) SetProcess(v *Process) *OutsourcingOrderItemCreate {
 	return _c.SetProcessID(v.ID)
@@ -330,12 +392,22 @@ func (_c *OutsourcingOrderItemCreate) check() error {
 			return &ValidationError{Name: "line_no", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.line_no": %w`, err)}
 		}
 	}
-	if _, ok := _c.mutation.ProductID(); !ok {
-		return &ValidationError{Name: "product_id", err: errors.New(`ent: missing required field "OutsourcingOrderItem.product_id"`)}
+	if _, ok := _c.mutation.SubjectType(); !ok {
+		return &ValidationError{Name: "subject_type", err: errors.New(`ent: missing required field "OutsourcingOrderItem.subject_type"`)}
+	}
+	if v, ok := _c.mutation.SubjectType(); ok {
+		if err := outsourcingorderitem.SubjectTypeValidator(v); err != nil {
+			return &ValidationError{Name: "subject_type", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.subject_type": %w`, err)}
+		}
 	}
 	if v, ok := _c.mutation.ProductID(); ok {
 		if err := outsourcingorderitem.ProductIDValidator(v); err != nil {
 			return &ValidationError{Name: "product_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.MaterialID(); ok {
+		if err := outsourcingorderitem.MaterialIDValidator(v); err != nil {
+			return &ValidationError{Name: "material_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.material_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.ProcessID(); !ok {
@@ -367,6 +439,16 @@ func (_c *OutsourcingOrderItemCreate) check() error {
 	if v, ok := _c.mutation.ProductNameSnapshot(); ok {
 		if err := outsourcingorderitem.ProductNameSnapshotValidator(v); err != nil {
 			return &ValidationError{Name: "product_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_name_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.MaterialCodeSnapshot(); ok {
+		if err := outsourcingorderitem.MaterialCodeSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "material_code_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.material_code_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.MaterialNameSnapshot(); ok {
+		if err := outsourcingorderitem.MaterialNameSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "material_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.material_name_snapshot": %w`, err)}
 		}
 	}
 	if v, ok := _c.mutation.ProcessNameSnapshot(); ok {
@@ -409,9 +491,6 @@ func (_c *OutsourcingOrderItemCreate) check() error {
 	if len(_c.mutation.OutsourcingOrderIDs()) == 0 {
 		return &ValidationError{Name: "outsourcing_order", err: errors.New(`ent: missing required edge "OutsourcingOrderItem.outsourcing_order"`)}
 	}
-	if len(_c.mutation.ProductIDs()) == 0 {
-		return &ValidationError{Name: "product", err: errors.New(`ent: missing required edge "OutsourcingOrderItem.product"`)}
-	}
 	if len(_c.mutation.ProcessIDs()) == 0 {
 		return &ValidationError{Name: "process", err: errors.New(`ent: missing required edge "OutsourcingOrderItem.process"`)}
 	}
@@ -448,6 +527,10 @@ func (_c *OutsourcingOrderItemCreate) createSpec() (*OutsourcingOrderItem, *sqlg
 		_spec.SetField(outsourcingorderitem.FieldLineNo, field.TypeInt, value)
 		_node.LineNo = value
 	}
+	if value, ok := _c.mutation.SubjectType(); ok {
+		_spec.SetField(outsourcingorderitem.FieldSubjectType, field.TypeString, value)
+		_node.SubjectType = value
+	}
 	if value, ok := _c.mutation.ProductNoSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProductNoSnapshot, field.TypeString, value)
 		_node.ProductNoSnapshot = &value
@@ -459,6 +542,14 @@ func (_c *OutsourcingOrderItemCreate) createSpec() (*OutsourcingOrderItem, *sqlg
 	if value, ok := _c.mutation.ProductNameSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProductNameSnapshot, field.TypeString, value)
 		_node.ProductNameSnapshot = &value
+	}
+	if value, ok := _c.mutation.MaterialCodeSnapshot(); ok {
+		_spec.SetField(outsourcingorderitem.FieldMaterialCodeSnapshot, field.TypeString, value)
+		_node.MaterialCodeSnapshot = &value
+	}
+	if value, ok := _c.mutation.MaterialNameSnapshot(); ok {
+		_spec.SetField(outsourcingorderitem.FieldMaterialNameSnapshot, field.TypeString, value)
+		_node.MaterialNameSnapshot = &value
 	}
 	if value, ok := _c.mutation.ProcessNameSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProcessNameSnapshot, field.TypeString, value)
@@ -535,7 +626,24 @@ func (_c *OutsourcingOrderItemCreate) createSpec() (*OutsourcingOrderItem, *sqlg
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.ProductID = nodes[0]
+		_node.ProductID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.MaterialIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   outsourcingorderitem.MaterialTable,
+			Columns: []string{outsourcingorderitem.MaterialColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(material.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.MaterialID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.ProcessIDs(); len(nodes) > 0 {

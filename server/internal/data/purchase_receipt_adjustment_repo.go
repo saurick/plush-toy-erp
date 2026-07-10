@@ -16,6 +16,7 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
+	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
 
@@ -49,7 +50,16 @@ func (r *inventoryRepo) CreatePurchaseReceiptAdjustmentDraft(ctx context.Context
 }
 
 func (r *inventoryRepo) AddPurchaseReceiptAdjustmentItem(ctx context.Context, in *biz.PurchaseReceiptAdjustmentItemCreate) (*biz.PurchaseReceiptAdjustmentItem, error) {
-	adjustment, err := r.data.postgres.PurchaseReceiptAdjustment.Get(ctx, in.AdjustmentID)
+	tx, err := r.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+
+	if err := lockPurchaseReceiptAdjustment(ctx, tx, in.AdjustmentID); err != nil {
+		return nil, err
+	}
+	adjustment, err := tx.client.PurchaseReceiptAdjustment.Get(ctx, in.AdjustmentID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrPurchaseReceiptAdjustmentNotFound
@@ -59,10 +69,10 @@ func (r *inventoryRepo) AddPurchaseReceiptAdjustmentItem(ctx context.Context, in
 	if !corestatus.CanAddPurchaseReceiptAdjustmentItem(adjustment.Status) {
 		return nil, biz.ErrBadParam
 	}
-	if err := validatePurchaseReceiptAdjustmentItemReferences(ctx, r.data.postgres, adjustment.PurchaseReceiptID, in); err != nil {
+	if err := validatePurchaseReceiptAdjustmentItemReferences(ctx, tx.client, adjustment.PurchaseReceiptID, in); err != nil {
 		return nil, err
 	}
-	row, err := r.data.postgres.PurchaseReceiptAdjustmentItem.Create().
+	row, err := tx.client.PurchaseReceiptAdjustmentItem.Create().
 		SetAdjustmentID(in.AdjustmentID).
 		SetPurchaseReceiptItemID(in.PurchaseReceiptItemID).
 		SetAdjustType(in.AdjustType).
@@ -78,7 +88,12 @@ func (r *inventoryRepo) AddPurchaseReceiptAdjustmentItem(ctx context.Context, in
 	if err != nil {
 		return nil, err
 	}
-	return entPurchaseReceiptAdjustmentItemToBiz(row), nil
+	out := entPurchaseReceiptAdjustmentItemToBiz(row)
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return out, nil
 }
 
 func (r *inventoryRepo) PostPurchaseReceiptAdjustment(ctx context.Context, adjustmentID int) (*biz.PurchaseReceiptAdjustment, error) {
@@ -97,6 +112,22 @@ func (r *inventoryRepo) PostPurchaseReceiptAdjustment(ctx context.Context, adjus
 			return nil, biz.ErrPurchaseReceiptAdjustmentNotFound
 		}
 		return nil, err
+	}
+	// Parent receipt cancellation and adjustment posting share this lock. The
+	// adjustment may affect inventory only while its source receipt is still a
+	// posted fact.
+	if err := lockPurchaseReceipt(ctx, tx, adjustment.PurchaseReceiptID); err != nil {
+		return nil, err
+	}
+	receipt, err := tx.client.PurchaseReceipt.Get(ctx, adjustment.PurchaseReceiptID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrPurchaseReceiptNotFound
+		}
+		return nil, err
+	}
+	if !corestatus.IsPurchaseReceiptPosted(receipt.Status) {
+		return nil, biz.ErrBadParam
 	}
 	transition, ok := corestatus.PostPurchaseReceiptAdjustment(adjustment.Status)
 	if !ok {
@@ -454,7 +485,11 @@ func validatePurchaseReceiptAdjustmentEffectiveQuantities(ctx context.Context, t
 			return biz.ErrBadParam
 		}
 	}
-	return nil
+	orderDeltas, err := purchaseOrderQuantityDeltasForReceiptItems(ctx, tx.client, currentDeltaByReceiptItem)
+	if err != nil {
+		return err
+	}
+	return validatePurchaseOrderReceivedQuantityDeltas(ctx, tx, 0, adjustmentID, orderDeltas, false)
 }
 
 func validatePurchaseReceiptAdjustmentCancelEffectiveQuantities(ctx context.Context, tx *inventoryDBTx, adjustmentID int, items []*ent.PurchaseReceiptAdjustmentItem) error {
@@ -488,7 +523,47 @@ func validatePurchaseReceiptAdjustmentCancelEffectiveQuantities(ctx context.Cont
 			return biz.ErrBadParam
 		}
 	}
-	return nil
+	removedAdjustmentDeltas := make(map[int]decimal.Decimal, len(receiptItemIDs))
+	for _, receiptItemID := range receiptItemIDs {
+		removedAdjustmentDeltas[receiptItemID] = decimal.Zero
+	}
+	orderDeltas, err := purchaseOrderQuantityDeltasForReceiptItems(ctx, tx.client, removedAdjustmentDeltas)
+	if err != nil {
+		return err
+	}
+	return validatePurchaseOrderReceivedQuantityDeltas(ctx, tx, 0, adjustmentID, orderDeltas, false)
+}
+
+func purchaseOrderQuantityDeltasForReceiptItems(
+	ctx context.Context,
+	client *ent.Client,
+	deltaByReceiptItemID map[int]decimal.Decimal,
+) (map[int]decimal.Decimal, error) {
+	orderDeltas := make(map[int]decimal.Decimal)
+	if len(deltaByReceiptItemID) == 0 {
+		return orderDeltas, nil
+	}
+	receiptItemIDs := make([]int, 0, len(deltaByReceiptItemID))
+	for receiptItemID := range deltaByReceiptItemID {
+		receiptItemIDs = append(receiptItemIDs, receiptItemID)
+	}
+	rows, err := client.PurchaseReceiptItem.Query().
+		Where(purchasereceiptitem.IDIn(receiptItemIDs...)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) != len(receiptItemIDs) {
+		return nil, biz.ErrPurchaseReceiptItemNotFound
+	}
+	for _, row := range rows {
+		if row.PurchaseOrderItemID == nil {
+			continue
+		}
+		orderItemID := *row.PurchaseOrderItemID
+		orderDeltas[orderItemID] = orderDeltas[orderItemID].Add(deltaByReceiptItemID[row.ID])
+	}
+	return orderDeltas, nil
 }
 
 func effectivePurchaseReceiptItemQuantity(ctx context.Context, client *ent.Client, receiptItemID, excludeAdjustmentID int, currentDelta decimal.Decimal) (decimal.Decimal, error) {

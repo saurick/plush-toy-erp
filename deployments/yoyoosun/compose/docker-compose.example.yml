@@ -77,6 +77,7 @@ services:
       - "${APP_GRPC_PORT:-9300}:9300"
     environment:
       TZ: "${TZ:-Asia/Shanghai}"
+      ERP_CUSTOMER_KEY: "${ERP_CUSTOMER_KEY:-yoyoosun}"
       POSTGRES_DSN: "${POSTGRES_DSN:-postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_erp?sslmode=disable}"
       TRACE_ENDPOINT: "${TRACE_ENDPOINT:-jaeger:4318}"
       APP_JWT_SECRET: "${APP_JWT_SECRET:-change-this-prod-jwt-secret}"

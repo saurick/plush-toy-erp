@@ -218,7 +218,10 @@ type ProcessDomainCommandInput struct {
 }
 
 type ProcessDomainCommandResult struct {
-	Outcome            string
+	Outcome string
+	// BlockReason lets a domain gate settle the current node and process as
+	// blocked without pretending that the business fact command succeeded.
+	BlockReason        string
 	LinkedBusinessRefs []ProcessBusinessRef
 }
 
@@ -227,6 +230,7 @@ type ProcessBranchPolicyInput struct {
 	CompletedNode   *ProcessNodeInstance
 	PolicyKey       string
 	Outcome         string
+	Reason          string
 	PolicySnapshot  map[string]any
 }
 
@@ -544,8 +548,23 @@ func (uc *ProcessRuntimeUsecase) CompleteLinkedWorkflowTask(ctx context.Context,
 	if task.ProcessInstanceID == nil || task.ProcessNodeInstanceID == nil {
 		return nil, ErrBadParam
 	}
-	if task.TaskStatusKey != "done" {
+	taskStatusKey := strings.TrimSpace(task.TaskStatusKey)
+	if taskStatusKey != "done" && taskStatusKey != "rejected" {
 		return nil, ErrBadParam
+	}
+	outcome := normalized.Outcome
+	reason := ""
+	if taskStatusKey == "rejected" {
+		if outcome != "" && !strings.EqualFold(outcome, "rejected") {
+			return nil, ErrBadParam
+		}
+		outcome = "rejected"
+		reason = workflowTaskRejectionReason(task)
+		if reason == "" {
+			return nil, ErrBadParam
+		}
+	} else if outcome == "" {
+		outcome = workflowTaskPayloadOutcome(task)
 	}
 	node, err := uc.repo.GetProcessNodeInstance(ctx, *task.ProcessNodeInstanceID)
 	if err != nil {
@@ -558,14 +577,16 @@ func (uc *ProcessRuntimeUsecase) CompleteLinkedWorkflowTask(ctx context.Context,
 		return nil, ErrBadParam
 	}
 	if isSettledProcessNodeStatus(node.Status) {
-		return nil, ErrProcessNodeInstanceSettled
+		if node.Status != ProcessNodeStatusCompleted || !processNodeOutcomeMatches(node, outcome) {
+			return nil, ErrProcessNodeInstanceSettled
+		}
+		if err := uc.reconcileLinkedWorkflowTaskCompletion(ctx, node, taskStatusKey, reason, actorID); err != nil {
+			return nil, err
+		}
+		return node, nil
 	}
 	if node.Status != ProcessNodeStatusActive {
 		return nil, ErrProcessNodeInstanceNotActive
-	}
-	outcome := normalized.Outcome
-	if outcome == "" {
-		outcome = workflowTaskPayloadOutcome(task)
 	}
 	completedNode, err := uc.repo.CompleteProcessNodeInstance(ctx, &ProcessNodeInstanceComplete{
 		ID:                node.ID,
@@ -576,10 +597,243 @@ func (uc *ProcessRuntimeUsecase) CompleteLinkedWorkflowTask(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.advanceAfterNodeCompletion(ctx, completedNode, actorID); err != nil {
-		return nil, err
+	if taskStatusKey == "rejected" {
+		if err := uc.settleRejectedProcessAfterNodeCompletion(ctx, completedNode, reason, actorID); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := uc.advanceAfterNodeCompletion(ctx, completedNode, actorID); err != nil {
+			return nil, err
+		}
 	}
 	return completedNode, nil
+}
+
+func (uc *ProcessRuntimeUsecase) settleRejectedProcessAfterNodeCompletion(ctx context.Context, completedNode *ProcessNodeInstance, reason string, actorID int) error {
+	if uc == nil || uc.repo == nil || completedNode == nil || completedNode.ProcessInstanceID <= 0 || strings.TrimSpace(reason) == "" {
+		return ErrBadParam
+	}
+	returnRoute, err := processReturnRouteFromNode(completedNode)
+	if err == nil && returnRoute != nil && returnRoute.matchesOutcome(completedNode.Outcome) {
+		var activatedNode *ProcessNodeInstance
+		activatedNode, err = uc.activateReturnToNodeAttempt(ctx, completedNode, returnRoute, actorID)
+		if err == nil {
+			err = uc.handleActivatedSequentialNode(ctx, activatedNode, actorID)
+		}
+	} else if err == nil {
+		branchPolicyKey := processBranchPolicyKeyFromNode(completedNode)
+		if branchPolicyKey != "" {
+			var activatedNode *ProcessNodeInstance
+			activatedNode, err = uc.activateNamedPolicyBranchNodeWithReason(ctx, completedNode, branchPolicyKey, reason, actorID)
+			if err == nil {
+				err = uc.handleActivatedSequentialNode(ctx, activatedNode, actorID)
+			}
+		} else {
+			return uc.ensureRejectedProcessBlocked(ctx, completedNode.ProcessInstanceID, actorID)
+		}
+	}
+	return err
+}
+
+func (uc *ProcessRuntimeUsecase) reconcileLinkedWorkflowTaskCompletion(ctx context.Context, completedNode *ProcessNodeInstance, taskStatusKey string, reason string, actorID int) error {
+	if uc == nil || uc.repo == nil || completedNode == nil || completedNode.ProcessInstanceID <= 0 {
+		return ErrBadParam
+	}
+	if taskStatusKey == "rejected" && !processRejectedNodeHasExplicitRoute(completedNode) {
+		return uc.ensureRejectedProcessBlocked(ctx, completedNode.ProcessInstanceID, actorID)
+	}
+	activatedNodes, err := uc.reconcileNextNodesAfterCompletion(ctx, completedNode, reason, actorID)
+	if err != nil {
+		return err
+	}
+	for _, activatedNode := range activatedNodes {
+		if err := uc.reconcileActivatedSequentialNode(ctx, activatedNode, actorID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (uc *ProcessRuntimeUsecase) reconcileNextNodesAfterCompletion(ctx context.Context, completedNode *ProcessNodeInstance, reason string, actorID int) ([]*ProcessNodeInstance, error) {
+	returnRoute, err := processReturnRouteFromNode(completedNode)
+	if err != nil {
+		return nil, err
+	}
+	if returnRoute != nil && returnRoute.matchesOutcome(completedNode.Outcome) {
+		node, err := uc.reconcileReturnToNodeAttempt(ctx, completedNode, returnRoute, actorID)
+		if err != nil {
+			return nil, err
+		}
+		return []*ProcessNodeInstance{node}, nil
+	}
+	branchPolicyKey := processBranchPolicyKeyFromNode(completedNode)
+	if branchPolicyKey != "" {
+		nodeKey, err := uc.resolveNamedPolicyBranchNodeKey(ctx, completedNode, branchPolicyKey, reason, actorID)
+		if err != nil {
+			return nil, err
+		}
+		node, err := uc.reconcileNamedProcessNode(ctx, completedNode.ProcessInstanceID, nodeKey, actorID)
+		if err != nil {
+			return nil, err
+		}
+		return []*ProcessNodeInstance{node}, nil
+	}
+	fanOutNodeKeys, err := processFanOutNodeKeysFromNode(completedNode)
+	if err != nil {
+		return nil, err
+	}
+	if len(fanOutNodeKeys) > 0 {
+		nodes := make([]*ProcessNodeInstance, 0, len(fanOutNodeKeys))
+		for _, nodeKey := range fanOutNodeKeys {
+			node, err := uc.reconcileNamedProcessNode(ctx, completedNode.ProcessInstanceID, nodeKey, actorID)
+			if err != nil {
+				return nil, err
+			}
+			nodes = append(nodes, node)
+		}
+		return nodes, nil
+	}
+	joinRoute, err := processJoinRouteFromNode(completedNode)
+	if err != nil {
+		return nil, err
+	}
+	if joinRoute != nil {
+		node, err := uc.reconcileJoinNodeIfReady(ctx, completedNode, joinRoute, actorID)
+		if err != nil || node == nil {
+			return nil, err
+		}
+		return []*ProcessNodeInstance{node}, nil
+	}
+	node, err := uc.reconcileNextSequentialNode(ctx, completedNode, actorID)
+	if err != nil || node == nil {
+		return nil, err
+	}
+	return []*ProcessNodeInstance{node}, nil
+}
+
+func (uc *ProcessRuntimeUsecase) reconcileNamedProcessNode(ctx context.Context, processInstanceID int, nodeKey string, actorID int) (*ProcessNodeInstance, error) {
+	if uc == nil || uc.repo == nil || processInstanceID <= 0 || strings.TrimSpace(nodeKey) == "" {
+		return nil, ErrBadParam
+	}
+	nodes, err := uc.repo.ListProcessNodeInstances(ctx, processInstanceID)
+	if err != nil {
+		return nil, err
+	}
+	var target *ProcessNodeInstance
+	for _, node := range nodes {
+		if node == nil || node.ProcessInstanceID != processInstanceID || node.NodeKey != nodeKey {
+			continue
+		}
+		if target != nil {
+			return nil, ErrProcessNodeInstanceConflict
+		}
+		target = node
+	}
+	if target == nil {
+		return nil, ErrProcessNodeInstanceNotFound
+	}
+	return uc.reconcileProcessNodeActivation(ctx, target, actorID)
+}
+
+func (uc *ProcessRuntimeUsecase) reconcileProcessNodeActivation(ctx context.Context, node *ProcessNodeInstance, actorID int) (*ProcessNodeInstance, error) {
+	if node == nil || node.ID <= 0 || node.ProcessInstanceID <= 0 {
+		return nil, ErrBadParam
+	}
+	if node.Status != ProcessNodeStatusWaiting {
+		return node, nil
+	}
+	activated, err := uc.repo.ActivateProcessNodeInstance(ctx, &ProcessNodeInstanceActivate{
+		ID:                node.ID,
+		ProcessInstanceID: node.ProcessInstanceID,
+		ExpectedVersion:   node.Version,
+	}, actorID)
+	if err == nil || !errors.Is(err, ErrProcessNodeInstanceConflict) {
+		return activated, err
+	}
+	current, getErr := uc.repo.GetProcessNodeInstance(ctx, node.ID)
+	if getErr != nil {
+		return nil, getErr
+	}
+	if current.ProcessInstanceID == node.ProcessInstanceID && current.Status != ProcessNodeStatusWaiting {
+		return current, nil
+	}
+	return nil, err
+}
+
+func (uc *ProcessRuntimeUsecase) reconcileActivatedSequentialNode(ctx context.Context, node *ProcessNodeInstance, actorID int) error {
+	if node == nil {
+		return nil
+	}
+	if node.NodeType == ProcessNodeTypeEnd && node.Status == ProcessNodeStatusCompleted {
+		return uc.ensureProcessInstanceCompleted(ctx, node.ProcessInstanceID, actorID)
+	}
+	if node.Status != ProcessNodeStatusActive {
+		return nil
+	}
+	return uc.handleActivatedSequentialNode(ctx, node, actorID)
+}
+
+func (uc *ProcessRuntimeUsecase) ensureProcessInstanceCompleted(ctx context.Context, processInstanceID int, actorID int) error {
+	instance, err := uc.repo.GetProcessInstance(ctx, processInstanceID)
+	if err != nil {
+		return err
+	}
+	if instance.Status == ProcessStatusCompleted {
+		return nil
+	}
+	if instance.Status != ProcessStatusActive {
+		return ErrProcessInstanceSettled
+	}
+	_, err = uc.repo.CompleteProcessInstance(ctx, &ProcessInstanceComplete{ID: processInstanceID}, actorID)
+	if !errors.Is(err, ErrProcessInstanceSettled) {
+		return err
+	}
+	instance, getErr := uc.repo.GetProcessInstance(ctx, processInstanceID)
+	if getErr != nil {
+		return getErr
+	}
+	if instance.Status != ProcessStatusCompleted {
+		return err
+	}
+	return nil
+}
+
+func (uc *ProcessRuntimeUsecase) ensureRejectedProcessBlocked(ctx context.Context, processInstanceID int, actorID int) error {
+	if uc == nil || uc.repo == nil || processInstanceID <= 0 {
+		return ErrBadParam
+	}
+	if _, err := uc.repo.BlockProcessInstance(ctx, &ProcessInstanceBlock{ID: processInstanceID}, actorID); err != nil {
+		if !errors.Is(err, ErrProcessInstanceSettled) {
+			return err
+		}
+		instance, getErr := uc.repo.GetProcessInstance(ctx, processInstanceID)
+		if getErr != nil {
+			return getErr
+		}
+		if instance.Status != ProcessStatusBlocked {
+			return ErrProcessInstanceSettled
+		}
+	}
+	return nil
+}
+
+func processNodeOutcomeMatches(node *ProcessNodeInstance, outcome string) bool {
+	if node == nil {
+		return false
+	}
+	stored := ""
+	if node.Outcome != nil {
+		stored = strings.TrimSpace(*node.Outcome)
+	}
+	return stored == strings.TrimSpace(outcome)
+}
+
+func processRejectedNodeHasExplicitRoute(node *ProcessNodeInstance) bool {
+	if processBranchPolicyKeyFromNode(node) != "" {
+		return true
+	}
+	returnRoute, err := processReturnRouteFromNode(node)
+	return err == nil && returnRoute != nil && returnRoute.matchesOutcome(node.Outcome)
 }
 
 func (uc *ProcessRuntimeUsecase) ExecuteDomainCommandNode(ctx context.Context, in *ProcessDomainCommandExecution, actorID int) (*ProcessNodeInstance, error) {
@@ -634,6 +888,15 @@ func (uc *ProcessRuntimeUsecase) ExecuteDomainCommandNode(ctx context.Context, i
 	outcome := nodeCommandKey
 	if result != nil && strings.TrimSpace(result.Outcome) != "" {
 		outcome = strings.TrimSpace(result.Outcome)
+	}
+	if result != nil && strings.TrimSpace(result.BlockReason) != "" {
+		return uc.blockActiveProcessNodeInstance(ctx, &ProcessNodeInstanceBlock{
+			ProcessInstanceID:     node.ProcessInstanceID,
+			ProcessNodeInstanceID: node.ID,
+			ExpectedVersion:       node.Version,
+			Reason:                strings.TrimSpace(result.BlockReason),
+			Outcome:               outcome,
+		}, actorID)
 	}
 	if result != nil {
 		for _, ref := range result.LinkedBusinessRefs {
@@ -931,16 +1194,28 @@ func (uc *ProcessRuntimeUsecase) activateNextNodesAfterCompletion(ctx context.Co
 }
 
 func (uc *ProcessRuntimeUsecase) activateNamedPolicyBranchNode(ctx context.Context, completedNode *ProcessNodeInstance, branchPolicyKey string, actorID int) (*ProcessNodeInstance, error) {
+	return uc.activateNamedPolicyBranchNodeWithReason(ctx, completedNode, branchPolicyKey, "", actorID)
+}
+
+func (uc *ProcessRuntimeUsecase) activateNamedPolicyBranchNodeWithReason(ctx context.Context, completedNode *ProcessNodeInstance, branchPolicyKey string, reason string, actorID int) (*ProcessNodeInstance, error) {
+	nextNodeKey, err := uc.resolveNamedPolicyBranchNodeKey(ctx, completedNode, branchPolicyKey, reason, actorID)
+	if err != nil {
+		return nil, err
+	}
+	return uc.activateNamedWaitingNode(ctx, completedNode.ProcessInstanceID, nextNodeKey, actorID)
+}
+
+func (uc *ProcessRuntimeUsecase) resolveNamedPolicyBranchNodeKey(ctx context.Context, completedNode *ProcessNodeInstance, branchPolicyKey string, reason string, actorID int) (string, error) {
 	if uc == nil || uc.repo == nil {
-		return nil, ErrBadParam
+		return "", ErrBadParam
 	}
 	handler := uc.branchPolicyHandlers[branchPolicyKey]
 	if handler == nil {
-		return nil, ErrProcessBranchPolicyHandlerNotFound
+		return "", ErrProcessBranchPolicyHandlerNotFound
 	}
 	instance, err := uc.repo.GetProcessInstance(ctx, completedNode.ProcessInstanceID)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	outcome := ""
 	if completedNode.Outcome != nil {
@@ -951,19 +1226,20 @@ func (uc *ProcessRuntimeUsecase) activateNamedPolicyBranchNode(ctx context.Conte
 		CompletedNode:   completedNode,
 		PolicyKey:       branchPolicyKey,
 		Outcome:         outcome,
+		Reason:          strings.TrimSpace(reason),
 		PolicySnapshot:  completedNode.PolicySnapshot,
 	}, actorID)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	nextNodeKey := ""
 	if result != nil {
 		nextNodeKey = strings.TrimSpace(result.NextNodeKey)
 	}
 	if nextNodeKey == "" {
-		return nil, ErrBadParam
+		return "", ErrBadParam
 	}
-	return uc.activateNamedWaitingNode(ctx, completedNode.ProcessInstanceID, nextNodeKey, actorID)
+	return nextNodeKey, nil
 }
 
 func (uc *ProcessRuntimeUsecase) activateFanOutNodes(ctx context.Context, completedNode *ProcessNodeInstance, nodeKeys []string, actorID int) ([]*ProcessNodeInstance, error) {
@@ -1032,6 +1308,42 @@ func (uc *ProcessRuntimeUsecase) activateReturnToNodeAttempt(ctx context.Context
 	}, actorID)
 }
 
+func (uc *ProcessRuntimeUsecase) reconcileReturnToNodeAttempt(ctx context.Context, completedNode *ProcessNodeInstance, route *processReturnRoute, actorID int) (*ProcessNodeInstance, error) {
+	if uc == nil || uc.repo == nil || completedNode == nil || route == nil || completedNode.ProcessInstanceID <= 0 {
+		return nil, ErrBadParam
+	}
+	nodes, err := uc.repo.ListProcessNodeInstances(ctx, completedNode.ProcessInstanceID)
+	if err != nil {
+		return nil, err
+	}
+	var routedAttempt *ProcessNodeInstance
+	for _, node := range nodes {
+		if node == nil || node.ProcessInstanceID != completedNode.ProcessInstanceID || node.NodeKey != route.NodeKey || node.ID <= completedNode.ID {
+			continue
+		}
+		if routedAttempt == nil || node.ID < routedAttempt.ID {
+			routedAttempt = node
+		}
+	}
+	if routedAttempt != nil {
+		return uc.reconcileProcessNodeActivation(ctx, routedAttempt, actorID)
+	}
+	activatedNode, err := uc.activateReturnToNodeAttempt(ctx, completedNode, route, actorID)
+	if err == nil || (!errors.Is(err, ErrProcessInstanceExists) && !errors.Is(err, ErrProcessNodeInstanceConflict)) {
+		return activatedNode, err
+	}
+	nodes, listErr := uc.repo.ListProcessNodeInstances(ctx, completedNode.ProcessInstanceID)
+	if listErr != nil {
+		return nil, listErr
+	}
+	for _, node := range nodes {
+		if node != nil && node.ProcessInstanceID == completedNode.ProcessInstanceID && node.NodeKey == route.NodeKey && node.ID > completedNode.ID {
+			return uc.reconcileProcessNodeActivation(ctx, node, actorID)
+		}
+	}
+	return nil, err
+}
+
 func (uc *ProcessRuntimeUsecase) activateJoinNodeIfReady(ctx context.Context, completedNode *ProcessNodeInstance, route *processJoinRoute, actorID int) (*ProcessNodeInstance, error) {
 	if uc == nil || uc.repo == nil || completedNode == nil || route == nil || completedNode.ProcessInstanceID <= 0 {
 		return nil, ErrBadParam
@@ -1070,10 +1382,10 @@ func (uc *ProcessRuntimeUsecase) activateJoinNodeIfReady(ctx context.Context, co
 	if !ready {
 		return nil, nil
 	}
+	if targetNode.Status == ProcessNodeStatusActive || targetNode.Status == ProcessNodeStatusCompleted {
+		return nil, nil
+	}
 	if targetNode.Status != ProcessNodeStatusWaiting {
-		if targetNode.Status == ProcessNodeStatusActive || targetNode.Status == ProcessNodeStatusCompleted {
-			return nil, nil
-		}
 		return nil, ErrProcessNodeInstanceConflict
 	}
 	return uc.repo.ActivateProcessNodeInstance(ctx, &ProcessNodeInstanceActivate{
@@ -1081,6 +1393,36 @@ func (uc *ProcessRuntimeUsecase) activateJoinNodeIfReady(ctx context.Context, co
 		ProcessInstanceID: targetNode.ProcessInstanceID,
 		ExpectedVersion:   targetNode.Version,
 	}, actorID)
+}
+
+func (uc *ProcessRuntimeUsecase) reconcileJoinNodeIfReady(ctx context.Context, completedNode *ProcessNodeInstance, route *processJoinRoute, actorID int) (*ProcessNodeInstance, error) {
+	if uc == nil || uc.repo == nil || completedNode == nil || route == nil || completedNode.ProcessInstanceID <= 0 {
+		return nil, ErrBadParam
+	}
+	nodes, err := uc.repo.ListProcessNodeInstances(ctx, completedNode.ProcessInstanceID)
+	if err != nil {
+		return nil, err
+	}
+	sourceStatuses, targetNode, err := collectJoinRouteNodes(nodes, completedNode.ProcessInstanceID, route)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := sourceStatuses[completedNode.NodeKey]; !ok {
+		return nil, ErrBadParam
+	}
+	ready := route.Policy == "all"
+	for _, status := range sourceStatuses {
+		if route.Policy == "all" && status != ProcessNodeStatusCompleted {
+			ready = false
+		}
+		if route.Policy == "any" && status == ProcessNodeStatusCompleted {
+			ready = true
+		}
+	}
+	if !ready {
+		return nil, nil
+	}
+	return uc.reconcileProcessNodeActivation(ctx, targetNode, actorID)
 }
 
 func (uc *ProcessRuntimeUsecase) activateNamedWaitingNode(ctx context.Context, processInstanceID int, nodeKey string, actorID int) (*ProcessNodeInstance, error) {
@@ -1138,6 +1480,26 @@ func (uc *ProcessRuntimeUsecase) activateNextSequentialNode(ctx context.Context,
 			ProcessInstanceID: next.ProcessInstanceID,
 			ExpectedVersion:   next.Version,
 		}, actorID)
+	}
+	return nil, ErrProcessNodeInstanceNotFound
+}
+
+func (uc *ProcessRuntimeUsecase) reconcileNextSequentialNode(ctx context.Context, completedNode *ProcessNodeInstance, actorID int) (*ProcessNodeInstance, error) {
+	if uc == nil || uc.repo == nil || completedNode == nil || completedNode.ProcessInstanceID <= 0 || completedNode.ID <= 0 {
+		return nil, ErrBadParam
+	}
+	nodes, err := uc.repo.ListProcessNodeInstances(ctx, completedNode.ProcessInstanceID)
+	if err != nil {
+		return nil, err
+	}
+	for index, node := range nodes {
+		if node == nil || node.ID != completedNode.ID {
+			continue
+		}
+		if index+1 >= len(nodes) || nodes[index+1] == nil {
+			return nil, nil
+		}
+		return uc.reconcileProcessNodeActivation(ctx, nodes[index+1], actorID)
 	}
 	return nil, ErrProcessNodeInstanceNotFound
 }
@@ -1371,6 +1733,26 @@ func workflowTaskPayloadOutcome(task *WorkflowTask) string {
 		return ""
 	}
 	for _, key := range []string{"outcome", "decision", "transition_status"} {
+		if value, ok := task.Payload[key].(string); ok && strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func workflowTaskRejectionReason(task *WorkflowTask) string {
+	if task == nil {
+		return ""
+	}
+	if task.BlockedReason != nil {
+		if reason := strings.TrimSpace(*task.BlockedReason); reason != "" {
+			return reason
+		}
+	}
+	if task.Payload == nil {
+		return ""
+	}
+	for _, key := range []string{"rejected_reason", "reason"} {
 		if value, ok := task.Payload[key].(string); ok && strings.TrimSpace(value) != "" {
 			return strings.TrimSpace(value)
 		}

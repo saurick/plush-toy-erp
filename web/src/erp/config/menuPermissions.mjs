@@ -3,14 +3,7 @@ import { mobileRoleDefinitions } from './appRegistry.mjs'
 import { normalizeRoleKey } from '../utils/roleKeys.mjs'
 
 export const PERMISSION_CENTER_PATH = '/erp/system/permissions'
-
-const PERMISSION_ALIAS_MAP = Object.freeze({
-  '/erp/flows/overview': '/erp/dashboard',
-  '/erp/source-readiness': '/erp/dashboard',
-  '/erp/mobile-workbenches': '/erp/dashboard',
-  '/erp/help-center': '/erp/dashboard',
-  '/erp/changes/current': '/erp/dashboard',
-})
+export const SYSTEM_AUDIT_LOGS_PATH = '/erp/system/audit-logs'
 
 const BUSINESS_SECTION_TITLES = Object.freeze([
   '主数据',
@@ -78,14 +71,6 @@ const productionModulePaths = collectSectionPaths(['生产管理'])
 const shipmentModulePaths = collectSectionPaths(['出货管理'])
 const financeModulePaths = collectSectionPaths(['财务业务'])
 const businessModulePaths = collectSectionPaths(BUSINESS_SECTION_TITLES)
-
-function normalizePermissionAlias(path = '') {
-  const key = String(path || '').trim()
-  if (key.startsWith('/erp/docs/') || key.startsWith('/erp/qa/')) {
-    return '/erp/dashboard'
-  }
-  return PERMISSION_ALIAS_MAP[key] || key
-}
 
 function buildPreset(paths = []) {
   return uniquePaths(paths).filter((path) =>
@@ -265,9 +250,9 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'admin',
     label: '系统管理员',
     description:
-      '只保留权限管理入口；该角色不是 super admin，不天然拥有业务事实处理权。',
+      '只保留权限管理和审计日志入口；该角色不是 super admin，不天然拥有业务事实处理权。',
     mobileRolePermissions: buildMobileRolePreset([]),
-    permissions: buildPreset([PERMISSION_CENTER_PATH]),
+    permissions: buildPreset([PERMISSION_CENTER_PATH, SYSTEM_AUDIT_LOGS_PATH]),
   },
 ])
 
@@ -288,7 +273,7 @@ export const normalizeMenuPermissions = (permissions = []) => {
 
   const selected = new Set()
   permissions.forEach((rawKey) => {
-    const normalizedKey = normalizePermissionAlias(rawKey)
+    const normalizedKey = String(rawKey || '').trim()
     if (!normalizedKey || !permissionSet.has(normalizedKey)) {
       return
     }
@@ -302,7 +287,8 @@ export const normalizeMenuPermissions = (permissions = []) => {
 
 export const defaultMenuPermissions = () =>
   ERP_MENU_PERMISSION_OPTIONS.filter(
-    (item) => item.key !== PERMISSION_CENTER_PATH
+    (item) =>
+      item.key !== PERMISSION_CENTER_PATH && item.key !== SYSTEM_AUDIT_LOGS_PATH
   ).map((item) => item.key)
 
 export const normalizeMobileRolePermissions = (permissions = []) => {
@@ -355,7 +341,7 @@ export const matchPermissionPreset = (permissions = []) => {
 }
 
 export const resolveMenuPermissionKey = (pathname = '') => {
-  const normalizedPath = normalizePermissionAlias(pathname)
+  const normalizedPath = String(pathname || '').trim()
   if (!normalizedPath) {
     return ''
   }

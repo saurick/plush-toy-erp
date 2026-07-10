@@ -92,7 +92,6 @@ export function createStyleL1Scenarios(deps) {
     verifyBusinessActionFormModal,
     verifyBusinessModuleColumnOrderDialog,
     verifyBusinessRowDoubleClickEditModal,
-    verifyFormalShellRowDoubleClickEditModal,
     verifySourceImportPicker,
     waitForPath,
     webDir,
@@ -665,6 +664,102 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'erp-yoyo-global-dashboard-desktop',
+      path: '/erp/dashboard',
+      auth: 'admin',
+      effectiveSession: {
+        configRevision: 'style-l1-yoyo-global-dashboard',
+        configHash: 'style-l1-yoyo-global-dashboard-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        pages: ['global-dashboard', 'task-board'],
+        actions: [
+          'erp.dashboard.read',
+          'workflow.task.read',
+          'workflow.task.update',
+          'workflow.task.complete',
+        ],
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
+      adminProfile: {
+        username: 'style-l1-yoyo-boss',
+        is_super_admin: false,
+        roles: [{ role_key: 'boss', name: '老板' }],
+        permissions: [
+          'erp.dashboard.read',
+          'workflow.task.read',
+          'workflow.task.update',
+          'workflow.task.complete',
+        ],
+        menus: [
+          {
+            key: 'global-dashboard',
+            label: '全局看板',
+            path: '/erp/dashboard',
+            required_permissions: ['erp.dashboard.read'],
+          },
+          {
+            key: 'task-board',
+            label: '任务看板',
+            path: '/erp/task-board',
+            required_permissions: ['workflow.task.read'],
+          },
+        ],
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '工作台')
+        await expectText(page, '待我处理')
+        await expectText(page, '阻塞/逾期')
+        await expectText(page, '等待交接')
+        await expectText(page, '优先处理队列')
+        await expectText(page, '当前任务上下文')
+        for (const engineeringText of [
+          'Product Core',
+          'customer key',
+          'Workflow',
+          'RBAC',
+          'source document',
+          '内部来源',
+        ]) {
+          await assertTextAbsent(page, engineeringText)
+        }
+        const metrics = await page.evaluate(() => {
+          const dashboard = document.querySelector('.erp-workbench-command')
+          const queue = document.querySelector('.erp-workbench-queue-panel')
+          const detail = document.querySelector('.erp-workbench-task-detail')
+          const dashboardRect = dashboard?.getBoundingClientRect()
+          const queueRect = queue?.getBoundingClientRect()
+          const detailRect = detail?.getBoundingClientRect()
+          return {
+            dashboardWidth: dashboardRect?.width || 0,
+            queueWidth: queueRect?.width || 0,
+            detailWidth: detailRect?.width || 0,
+            queueOverlapsDetail: Boolean(
+              queueRect &&
+                detailRect &&
+                queueRect.right > detailRect.left + 1 &&
+                queueRect.left < detailRect.right - 1
+            ),
+            documentOverflowX:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          metrics.dashboardWidth > 0 &&
+            metrics.queueWidth > 0 &&
+            metrics.detailWidth > 0 &&
+            !metrics.queueOverlapsDetail &&
+            metrics.documentOverflowX <= 1,
+          `永绅全局工作台队列与上下文不得重叠或推宽页面: ${JSON.stringify(
+            metrics
+          )}`
+        )
+      },
+    },
+    {
       name: 'erp-effective-session-super-admin-product-core',
       path: '/erp/warehouse/shipments',
       auth: 'admin',
@@ -1133,6 +1228,20 @@ export function createStyleL1Scenarios(deps) {
       name: 'erp-task-board-desktop',
       path: '/erp/task-board',
       auth: 'admin',
+      effectiveSession: {
+        configRevision: 'style-l1-task-board-customer-runtime',
+        configHash: 'style-l1-task-board-customer-runtime-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        pages: ['global-dashboard', 'task-board', 'shipping-release'],
+        actions: [
+          'workflow.task.read',
+          'workflow.task.update',
+          'workflow.task.complete',
+        ],
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '毛绒玩具 ERP')
@@ -1684,6 +1793,323 @@ export function createStyleL1Scenarios(deps) {
               index: 1,
             },
           ],
+        })
+      },
+    },
+    {
+      name: 'mobile-yoyo-role-task-projection',
+      path: '/m/engineering/tasks',
+      auth: 'admin',
+      customerKey: 'yoyoosun',
+      effectiveSession: {
+        configRevision: 'style-l1-mobile-yoyo-role-task-projection',
+        configHash: 'style-l1-mobile-yoyo-role-task-projection-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        pages: [],
+        actions: [
+          'workflow.task.read',
+          'workflow.task.update',
+          'workflow.task.complete',
+        ],
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
+      adminProfile: {
+        username: 'style-l1-yoyo-role-user',
+        is_super_admin: false,
+        roles: [
+          { role_key: 'engineering', name: '工程' },
+          { role_key: 'production', name: '生产' },
+          { role_key: 'warehouse', name: '仓库' },
+          { role_key: 'quality', name: '品质' },
+          { role_key: 'finance', name: '财务' },
+        ],
+        permissions: [
+          'mobile.engineering.access',
+          'mobile.production.access',
+          'mobile.warehouse.access',
+          'mobile.quality.access',
+          'mobile.finance.access',
+          'workflow.task.read',
+          'workflow.task.update',
+          'workflow.task.complete',
+        ],
+        menus: [],
+      },
+      viewport: { width: 430, height: 900 },
+      verify: async (page) => {
+        const roles = [
+          {
+            key: 'engineering',
+            label: '工程',
+            taskName: '工程资料与 BOM 待补齐核对任务',
+          },
+          {
+            key: 'production',
+            label: '生产',
+            taskName: '车缝加工交期与现场进度核对任务',
+          },
+          {
+            key: 'warehouse',
+            label: '仓库',
+            taskName: '主料仓到料与待检批次交接任务',
+          },
+          {
+            key: 'quality',
+            label: '品质',
+            taskName: '来料检验判定与不合格品返馈任务',
+          },
+          {
+            key: 'finance',
+            label: '财务',
+            taskName: '加工合同对账与应付确认任务',
+          },
+        ]
+
+        await expectText(page, '工程')
+        await page.evaluate(async (roleEntries) => {
+          const createTask = async (role, index) => {
+            const response = await fetch('/rpc/workflow', {
+              method: 'POST',
+              headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: `mobile-role-projection-${role.key}`,
+                method: 'create_task',
+                params: {
+                  task_code: `STYLE-L1-YOYO-${role.key.toUpperCase()}`,
+                  task_group: 'project-orders',
+                  task_name: role.taskName,
+                  source_type: 'project-orders',
+                  source_id: 12_000 + index,
+                  source_no: `YOYO-${role.key.toUpperCase()}-超长来源单号-20260710`,
+                  business_status_key: 'project_pending',
+                  task_status_key: 'ready',
+                  owner_role_key: role.key,
+                  priority: index + 1,
+                  payload: {
+                    customer_name: '永绅试用模拟客户（非真实客户数据）',
+                    style_no: `STYLE-${role.key.toUpperCase()}-LONG-VALUE`,
+                    due_date: '2026-07-16',
+                  },
+                },
+              }),
+            })
+            const payload = await response.json()
+            if (!response.ok || payload?.result?.code !== 0) {
+              throw new Error(`create_task failed: ${JSON.stringify(payload)}`)
+            }
+          }
+          await Promise.all(
+            roleEntries.map((role, index) => createTask(role, index))
+          )
+        }, roles)
+
+        for (const role of roles) {
+          await gotoScenarioPath(page, `/m/${role.key}/tasks`, {
+            waitUntil: 'domcontentloaded',
+          })
+          await waitForPath(page, `/m/${role.key}/tasks`)
+          await expectText(page, role.label)
+          await expectText(page, role.taskName)
+          const metrics = await page.evaluate(() => {
+            const root = document.querySelector('.mobile-role-tasks-page')
+            const scroller = document.querySelector(
+              '.mobile-role-tasks-page__scroll'
+            )
+            const taskRows = Array.from(
+              document.querySelectorAll('.erp-mobile-list-item')
+            )
+            const rootRect = root?.getBoundingClientRect()
+            return {
+              rootWidth: rootRect?.width || 0,
+              rootLeft: rootRect?.left || 0,
+              rootRight: rootRect?.right || 0,
+              viewportWidth: window.innerWidth,
+              documentOverflowX:
+                document.documentElement.scrollWidth -
+                document.documentElement.clientWidth,
+              scrollerOverflowX:
+                scroller instanceof HTMLElement
+                  ? scroller.scrollWidth - scroller.clientWidth
+                  : 0,
+              taskRowOverflowX: taskRows.map((row) =>
+                row instanceof HTMLElement
+                  ? row.scrollWidth - row.clientWidth
+                  : 0
+              ),
+            }
+          })
+          assert(
+            metrics.rootWidth > 0 &&
+              metrics.rootLeft >= -1 &&
+              metrics.rootRight <= metrics.viewportWidth + 1 &&
+              metrics.documentOverflowX <= 1 &&
+              metrics.scrollerOverflowX <= 1 &&
+              metrics.taskRowOverflowX.every((value) => value <= 1),
+            `${role.label}岗位任务端长文字不应推宽页面或任务行: ${JSON.stringify(
+              metrics
+            )}`
+          )
+          await page.screenshot({
+            path: path.join(outputDir, `mobile-yoyo-${role.key}-task-list.png`),
+            fullPage: true,
+          })
+          await page
+            .locator('.erp-mobile-list-item')
+            .filter({ hasText: role.taskName })
+            .click()
+          await expectText(page, role.taskName)
+          const actionDiagnostic = await page.evaluate(async (taskName) => {
+            const call = async (domain, method, params = {}) => {
+              const response = await fetch(`/rpc/${domain}`, {
+                method: 'POST',
+                headers: {
+                  Accept: 'application/json',
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: `mobile-action-diagnostic-${method}`,
+                  method,
+                  params,
+                }),
+              })
+              return response.json()
+            }
+            const [sessionPayload, taskPayload] = await Promise.all([
+              call('customer_config', 'get_effective_session', {
+                customer_key: 'yoyoosun',
+              }),
+              call('workflow', 'list_tasks', { limit: 200 }),
+            ])
+            const tasks = taskPayload?.result?.data?.tasks || []
+            const selected = tasks.find((task) => task.task_name === taskName)
+            return {
+              roles: JSON.parse(localStorage.getItem('admin_roles') || '[]'),
+              permissions: JSON.parse(
+                localStorage.getItem('admin_permissions') || '[]'
+              ),
+              sessionActions:
+                sessionPayload?.result?.data?.session?.actions || [],
+              task: selected
+                ? {
+                    ownerRoleKey: selected.owner_role_key,
+                    statusKey: selected.task_status_key,
+                  }
+                : null,
+            }
+          }, role.taskName)
+          assert.equal(
+            await page
+              .locator('.mobile-role-action-bar__button--blocked')
+              .isDisabled(),
+            false,
+            `${role.label}岗位有角色、RBAC 与 effective-session 动作时应可阻塞本岗位任务: ${JSON.stringify(
+              actionDiagnostic
+            )}`
+          )
+          assert.equal(
+            await page
+              .locator('.mobile-role-action-bar__button--done')
+              .isDisabled(),
+            false,
+            `${role.label}岗位有角色、RBAC 与 effective-session 动作时应可完成本岗位任务: ${JSON.stringify(
+              actionDiagnostic
+            )}`
+          )
+          await page.getByRole('button', { name: '任务列表' }).click()
+          await expectText(page, role.taskName)
+        }
+      },
+    },
+    {
+      name: 'mobile-yoyo-role-task-readonly-actions',
+      path: '/m/engineering/tasks',
+      auth: 'admin',
+      customerKey: 'yoyoosun',
+      effectiveSession: {
+        configRevision: 'style-l1-mobile-yoyo-role-task-readonly-actions',
+        configHash: 'style-l1-mobile-yoyo-role-task-readonly-actions-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        pages: [],
+        actions: ['workflow.task.read'],
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
+      adminProfile: {
+        username: 'style-l1-yoyo-engineering-readonly',
+        is_super_admin: false,
+        roles: [{ role_key: 'engineering', name: '工程' }],
+        permissions: [
+          'mobile.engineering.access',
+          'workflow.task.read',
+          'workflow.task.update',
+          'workflow.task.complete',
+        ],
+        menus: [],
+      },
+      viewport: { width: 430, height: 900 },
+      verify: async (page) => {
+        await page.evaluate(async () => {
+          const response = await fetch('/rpc/workflow', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 'mobile-role-readonly-engineering',
+              method: 'create_task',
+              params: {
+                task_code: 'STYLE-L1-YOYO-ENGINEERING-READONLY',
+                task_group: 'project-orders',
+                task_name: '工程资料只读核对任务',
+                source_type: 'project-orders',
+                source_id: 12_100,
+                source_no: 'YOYO-ENGINEERING-READONLY',
+                business_status_key: 'project_pending',
+                task_status_key: 'ready',
+                owner_role_key: 'engineering',
+                priority: 1,
+                payload: { due_date: '2026-07-16' },
+              },
+            }),
+          })
+          const payload = await response.json()
+          if (!response.ok || payload?.result?.code !== 0) {
+            throw new Error(`create_task failed: ${JSON.stringify(payload)}`)
+          }
+        })
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await expectText(page, '工程资料只读核对任务')
+        await page
+          .locator('.erp-mobile-list-item')
+          .filter({ hasText: '工程资料只读核对任务' })
+          .click()
+        for (const selector of [
+          '.mobile-role-action-bar__button--blocked',
+          '.mobile-role-action-bar__button--done',
+          '.mobile-role-action-bar__button--urge',
+        ]) {
+          assert.equal(
+            await page.locator(selector).isDisabled(),
+            true,
+            `effective-session 只读时岗位动作应禁用: ${selector}`
+          )
+        }
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'mobile-yoyo-engineering-readonly-actions.png'
+          ),
+          fullPage: true,
         })
       },
     },
@@ -9413,458 +9839,6 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
-      name: 'engineering-print-workspace-yoyoosun-sheet1-assets',
-      path: '/erp/print-workspace/engineering-work-instruction?draft=fresh',
-      auth: 'admin',
-      customerKey: 'yoyoosun',
-      viewport: { width: 1600, height: 1100 },
-      beforeNavigate: async (page) => {
-        await page.route('**/customer-config.js', async (route) => {
-          await route.fulfill({
-            path: path.resolve(
-              webDir,
-              '..',
-              'config',
-              'customers',
-              'yoyoosun',
-              'customer-config.example.js'
-            ),
-            contentType: 'text/javascript; charset=utf-8',
-          })
-        })
-        await page.route('**/customer-assets/yoyoosun/**', async (route) => {
-          const requestUrl = new URL(route.request().url())
-          const relativeAssetPath = decodeURIComponent(
-            requestUrl.pathname.replace('/customer-assets/yoyoosun/', '')
-          )
-          const assetPath = path.resolve(
-            webDir,
-            '..',
-            'config',
-            'customers',
-            'yoyoosun',
-            'assets',
-            relativeAssetPath
-          )
-          const contentType = assetPath.endsWith('.jpeg')
-            ? 'image/jpeg'
-            : assetPath.endsWith('.jpg')
-              ? 'image/jpeg'
-              : assetPath.endsWith('.png')
-                ? 'image/png'
-                : 'application/octet-stream'
-          await route.fulfill({ path: assetPath, contentType })
-        })
-      },
-      verify: async (page) => {
-        await page.locator('.erp-work-instruction-paper').waitFor({
-          state: 'visible',
-          timeout: 10_000,
-        })
-        await page.waitForFunction(
-          () =>
-            document.querySelectorAll(
-              '.erp-work-instruction-paper__header .erp-engineering-print-image-slot img'
-            ).length === 1
-        )
-        const sampleAssetState = await page.evaluate(() => {
-          const sheets = [
-            ...document.querySelectorAll('.erp-work-instruction-paper__sheet'),
-          ]
-          const mainSheet = sheets.find(
-            (sheet) =>
-              !sheet.classList.contains(
-                'erp-work-instruction-paper__sheet--continuation'
-              )
-          )
-          const continuationSheets = sheets.filter((sheet) =>
-            sheet.classList.contains(
-              'erp-work-instruction-paper__sheet--continuation'
-            )
-          )
-          const stepRows = (sheet) => [
-            ...(sheet?.querySelectorAll(
-              '.erp-work-instruction-paper__step-row--text, .erp-work-instruction-paper__step-row--image'
-            ) || []),
-          ]
-          const row3 = stepRows(mainSheet)[2]
-          const row2 = stepRows(mainSheet)[1]
-          const bodySewingRows = stepRows(continuationSheets[0])
-          const bodySewingRow2 = bodySewingRows[1]
-          const continuationRow18 = stepRows(continuationSheets[1])[5]
-          const manualRow2 = stepRows(continuationSheets[2])[1]
-          const textContent = (node) =>
-            String(node?.textContent || '')
-              .replace(/\s+/gu, ' ')
-              .trim()
-          const rowImages = (row) => [
-            ...(row?.querySelectorAll(
-              '.erp-engineering-print-image-slot img'
-            ) || []),
-          ]
-          const rowImageContainer = continuationRow18?.querySelector(
-            '.erp-work-instruction-paper__row-images'
-          )
-          const cropState = (slot) => {
-            const image = slot?.querySelector('img')
-            return {
-              crop: slot?.getAttribute('data-image-crop') || '',
-              left: slot?.style.getPropertyValue('--image-crop-left') || '',
-              top: slot?.style.getPropertyValue('--image-crop-top') || '',
-              right: slot?.style.getPropertyValue('--image-crop-right') || '',
-              bottom: slot?.style.getPropertyValue('--image-crop-bottom') || '',
-              imageLeft: image?.style.left || '',
-              imageTop: image?.style.top || '',
-              imageWidth: image?.style.width || '',
-              imageHeight: image?.style.height || '',
-            }
-          }
-          const headerCropSlot = mainSheet?.querySelector(
-            '.erp-work-instruction-paper__header .erp-engineering-print-image-slot'
-          )
-          const row3CropSlot = row3?.querySelector(
-            '.erp-engineering-print-image-slot'
-          )
-          const continuationRow18CropSlot = continuationRow18?.querySelector(
-            '.erp-engineering-print-image-slot'
-          )
-          const defaultRedStrongMarks = [
-            ...(document.querySelectorAll(
-              '.erp-work-instruction-paper span[style*="red"] strong, .erp-work-instruction-paper span[style*="rgb(255, 0, 0)"] strong'
-            ) || []),
-          ]
-          const defaultStrongMarks = [
-            ...(document.querySelectorAll(
-              '.erp-work-instruction-paper strong, .erp-work-instruction-paper b'
-            ) || []),
-          ]
-          const defaultRedTextNodes = [
-            ...(document.querySelectorAll(
-              '.erp-work-instruction-paper span[style*="red"], .erp-work-instruction-paper span[style*="rgb(255, 0, 0)"]'
-            ) || []),
-          ]
-          const defaultRedColors = defaultRedTextNodes.map(
-            (node) => window.getComputedStyle(node).color
-          )
-          const bodySewingRow2Content = bodySewingRow2?.querySelector(
-            '.erp-work-instruction-paper__step-content-cell'
-          )
-          const bodySewingRow2No = bodySewingRow2?.querySelector(
-            '.erp-work-instruction-paper__step-no'
-          )
-          const sheetSummaries = sheets.map((sheet, sheetIndex) => {
-            const rows = stepRows(sheet)
-            const rect = sheet.getBoundingClientRect()
-            return {
-              sheetIndex,
-              productName: textContent(
-                sheet.querySelectorAll(
-                  '.erp-work-instruction-paper__summary-value'
-                )[2]
-              ),
-              hasHeader: Boolean(
-                sheet.querySelector('.erp-work-instruction-paper__header')
-              ),
-              isBodyOnly: sheet.classList.contains(
-                'erp-work-instruction-paper__sheet--body-only'
-              ),
-              firstRowNo: textContent(
-                rows[0]?.querySelector('.erp-work-instruction-paper__step-no')
-              ),
-              rowCount: rows.length,
-              imageRowCount: rows.filter(
-                (row) =>
-                  row.querySelectorAll('.erp-engineering-print-image-slot img')
-                    .length > 0
-              ).length,
-              height: rect.height,
-            }
-          })
-          return {
-            customerKey:
-              window.__PLUSH_ERP_CUSTOMER_CONFIG__?.customerKey || '',
-            sheetCount: sheets.length,
-            continuationSheetCount: continuationSheets.length,
-            paperText: textContent(
-              document.querySelector('.erp-work-instruction-paper')
-            ),
-            sheetSummaries,
-            sheetHeaderImageCounts: sheets.map(
-              (sheet) =>
-                sheet.querySelectorAll(
-                  '.erp-work-instruction-paper__header .erp-engineering-print-image-slot img'
-                ).length
-            ),
-            headerSources: [
-              ...document.querySelectorAll(
-                '.erp-work-instruction-paper__header .erp-engineering-print-image-slot img'
-              ),
-            ].map((img) => img.getAttribute('src') || ''),
-            row3ImageSources: rowImages(row3).map(
-              (img) => img.getAttribute('src') || ''
-            ),
-            continuationRow18ImageSources: rowImages(continuationRow18).map(
-              (img) => img.getAttribute('src') || ''
-            ),
-            continuationRow18LabelTexts: [
-              ...(continuationRow18?.querySelectorAll(
-                '.erp-work-instruction-paper__annotation-label'
-              ) || []),
-            ].map((node) => textContent(node)),
-            continuationRow18CalloutCount:
-              continuationRow18?.querySelectorAll(
-                '.erp-work-instruction-paper__annotation-callouts line'
-              ).length || 0,
-            manualRow2ImageSources: rowImages(manualRow2).map(
-              (img) => img.getAttribute('src') || ''
-            ),
-            headerCrop: cropState(headerCropSlot),
-            row3Crop: cropState(row3CropSlot),
-            row3ImageBox: (() => {
-              const rect = row3CropSlot?.getBoundingClientRect()
-              return rect ? { width: rect.width, height: rect.height } : null
-            })(),
-            continuationRow18FirstCrop: cropState(continuationRow18CropSlot),
-            continuationRow18ImageLayout:
-              rowImageContainer?.classList.contains(
-                'erp-work-instruction-paper__row-images--positioned'
-              ) || false,
-            continuationRow18LayoutSlots: [
-              ...(continuationRow18?.querySelectorAll(
-                '.erp-engineering-print-image-slot--positioned'
-              ) || []),
-            ].map((slot) => ({
-              left: slot.style.left,
-              top: slot.style.top,
-              width: slot.style.width,
-              height: slot.style.height,
-            })),
-            continuationRow18Display: rowImageContainer
-              ? window.getComputedStyle(rowImageContainer).flexWrap
-              : '',
-            continuationRow18Height:
-              continuationRow18?.getBoundingClientRect().height || 0,
-            continuationRow18MinHeight:
-              continuationRow18?.style.getPropertyValue(
-                '--instruction-row-min-height'
-              ) || '',
-            companyText: textContent(
-              mainSheet?.querySelector('.erp-work-instruction-paper__company')
-            ),
-            productNameText: textContent(
-              mainSheet?.querySelectorAll(
-                '.erp-work-instruction-paper__summary-value'
-              )[2]
-            ),
-            sewingTitleText:
-              [
-                ...(mainSheet?.querySelectorAll(
-                  '.erp-work-instruction-paper__section-title-row'
-                ) || []),
-              ]
-                .map((node) => textContent(node))
-                .find((text) => text.includes('针型号')) || '',
-            sewingIntroText: textContent(stepRows(mainSheet)[4]),
-            row1Text: textContent(stepRows(mainSheet)[0]),
-            row2Text: textContent(row2),
-            row3Text: textContent(row3),
-            processRow1Text: textContent(stepRows(mainSheet)[5]),
-            processRow5Text: textContent(stepRows(mainSheet)[9]),
-            defaultRedStrongCount: defaultRedStrongMarks.length,
-            defaultStrongCount: defaultStrongMarks.length,
-            defaultRedColors,
-            bodySewingRow2ContentFontSize: bodySewingRow2Content
-              ? window.getComputedStyle(bodySewingRow2Content).fontSize
-              : '',
-            bodySewingRow2NoFontSize: bodySewingRow2No
-              ? window.getComputedStyle(bodySewingRow2No).fontSize
-              : '',
-            bodySewingRow2FontSizeVar:
-              bodySewingRow2?.style.getPropertyValue(
-                '--instruction-row-font-size'
-              ) || '',
-            continuationProductNameText: textContent(
-              continuationSheets[0]?.querySelectorAll(
-                '.erp-work-instruction-paper__summary-value'
-              )[2]
-            ),
-            bodySewingPage1MetaValues: [
-              ...(continuationSheets[0]?.querySelectorAll(
-                '.erp-work-instruction-paper__meta-value'
-              ) || []),
-            ].map((node) => textContent(node)),
-            continuationRow17Text: textContent(
-              stepRows(continuationSheets[1])[4]
-            ),
-            manualRow1Text: textContent(stepRows(continuationSheets[2])[0]),
-            stageLeftGap: (() => {
-              const stageRect = document
-                .querySelector('.erp-print-shell__stage')
-                ?.getBoundingClientRect()
-              const paperRect = document
-                .querySelector('.erp-work-instruction-paper')
-                ?.getBoundingClientRect()
-              return stageRect && paperRect
-                ? paperRect.left - stageRect.left
-                : -1
-            })(),
-            stageRightGap: (() => {
-              const stageRect = document
-                .querySelector('.erp-print-shell__stage')
-                ?.getBoundingClientRect()
-              const paperRect = document
-                .querySelector('.erp-work-instruction-paper')
-                ?.getBoundingClientRect()
-              return stageRect && paperRect
-                ? stageRect.right - paperRect.right
-                : -1
-            })(),
-            stageCenterDelta: (() => {
-              const stageRect = document
-                .querySelector('.erp-print-shell__stage')
-                ?.getBoundingClientRect()
-              const paperRect = document
-                .querySelector('.erp-work-instruction-paper')
-                ?.getBoundingClientRect()
-              return stageRect && paperRect
-                ? Math.abs(
-                    stageRect.left +
-                      stageRect.width / 2 -
-                      (paperRect.left + paperRect.width / 2)
-                  )
-                : -1
-            })(),
-            paperMarginLeft: window.getComputedStyle(
-              document.querySelector('.erp-work-instruction-paper')
-            ).marginLeft,
-            paperMarginRight: window.getComputedStyle(
-              document.querySelector('.erp-work-instruction-paper')
-            ).marginRight,
-            paperImageActionCount: document.querySelectorAll(
-              '.erp-work-instruction-paper .erp-engineering-print-image-slot__actions'
-            ).length,
-            paperUploadStatusTextCount: [
-              ...document.querySelectorAll('.erp-work-instruction-paper'),
-            ].filter((paper) => textContent(paper).includes('已上传')).length,
-          }
-        })
-        assert(
-          sampleAssetState.customerKey === 'yoyoosun' &&
-            sampleAssetState.sheetCount === 1 &&
-            sampleAssetState.continuationSheetCount === 0 &&
-            sampleAssetState.sheetSummaries.length === 1 &&
-            sampleAssetState.sheetSummaries[0]?.productName.includes(
-              '猴子抱抱-头'
-            ) &&
-            sampleAssetState.sheetSummaries[0]?.rowCount === 10 &&
-            sampleAssetState.sheetSummaries[0]?.imageRowCount === 0 &&
-            JSON.stringify(sampleAssetState.sheetHeaderImageCounts) ===
-              JSON.stringify([1]) &&
-            sampleAssetState.headerSources.every((source) =>
-              source.includes(
-                '/customer-assets/yoyoosun/engineering-work-instruction/sheet1/header-product.png'
-              )
-            ) &&
-            sampleAssetState.row3ImageSources.length === 0 &&
-            sampleAssetState.continuationRow18ImageSources.length === 0 &&
-            sampleAssetState.continuationRow18LabelTexts.length === 0 &&
-            sampleAssetState.continuationRow18CalloutCount === 0 &&
-            sampleAssetState.manualRow2ImageSources.length === 0 &&
-            sampleAssetState.headerCrop.crop === 'excel-src-rect' &&
-            sampleAssetState.headerCrop.left === '8.696' &&
-            sampleAssetState.headerCrop.top === '26.615' &&
-            sampleAssetState.row3Crop.crop === '' &&
-            sampleAssetState.row3ImageBox === null &&
-            sampleAssetState.continuationRow18FirstCrop.crop === '' &&
-            sampleAssetState.continuationRow18ImageLayout === false &&
-            sampleAssetState.continuationRow18LayoutSlots.length === 0 &&
-            sampleAssetState.continuationRow18Height === 0 &&
-            sampleAssetState.continuationRow18MinHeight === '' &&
-            sampleAssetState.companyText.includes('东莞市永绅玩具有限公司') &&
-            sampleAssetState.productNameText.includes('猴子抱抱-头') &&
-            sampleAssetState.sewingTitleText.includes('针型号:12#针') &&
-            sampleAssetState.sewingIntroText.includes('止口必须一致') &&
-            sampleAssetState.row1Text.includes('核对资料') &&
-            sampleAssetState.row2Text.includes('拉布前先松布') &&
-            sampleAssetState.row3Text.includes('要试裁刀模版') &&
-            sampleAssetState.processRow1Text.includes('面打折') &&
-            sampleAssetState.processRow5Text.includes('头下面折边') &&
-            !sampleAssetState.paperText.includes('猴子抱抱-身体') &&
-            !sampleAssetState.paperText.includes('订按扣') &&
-            !sampleAssetState.paperText.includes(
-              'Sheet1 作业行 18 肩带扣位组合图'
-            ) &&
-            sampleAssetState.defaultRedStrongCount === 0 &&
-            sampleAssetState.defaultStrongCount === 0 &&
-            sampleAssetState.defaultRedColors.length === 0 &&
-            sampleAssetState.bodySewingRow2FontSizeVar === '' &&
-            sampleAssetState.continuationProductNameText === '' &&
-            sampleAssetState.bodySewingPage1MetaValues.length === 0 &&
-            sampleAssetState.continuationRow17Text === '' &&
-            sampleAssetState.manualRow1Text === '' &&
-            sampleAssetState.stageCenterDelta >= 0 &&
-            sampleAssetState.stageCenterDelta <= 2 &&
-            Math.abs(
-              sampleAssetState.stageLeftGap - sampleAssetState.stageRightGap
-            ) <= 4 &&
-            sampleAssetState.paperImageActionCount === 0 &&
-            sampleAssetState.paperUploadStatusTextCount === 0,
-          `yoyoosun Sheet1 客户样例应只保留第一个备注前模板，不渲染备注后的重复表块: ${JSON.stringify(sampleAssetState)}`
-        )
-        {
-          const fs = await import('node:fs/promises')
-          const workInstructionOutputDir = path.join(
-            outputDir,
-            'engineering-work-instruction-review',
-            'yoyoosun-sheet1'
-          )
-          await fs.mkdir(workInstructionOutputDir, { recursive: true })
-          await fs.writeFile(
-            path.join(
-              workInstructionOutputDir,
-              'yoyoosun-sheet1-runtime-metrics-latest.json'
-            ),
-            `${JSON.stringify(sampleAssetState, null, 2)}\n`
-          )
-          const sheetLocators = page.locator(
-            '.erp-work-instruction-paper__sheet'
-          )
-          const sheetCount = await sheetLocators.count()
-          for (let sheetIndex = 0; sheetIndex < sheetCount; sheetIndex += 1) {
-            const sheetLocator = sheetLocators.nth(sheetIndex)
-            await sheetLocator.evaluate((node) => {
-              node.scrollIntoView({ block: 'center', inline: 'nearest' })
-            })
-            await page.waitForTimeout(100)
-            const box = await sheetLocator.boundingBox()
-            assert(
-              box && box.width > 0 && box.height > 0,
-              `yoyoosun Sheet1 第 ${sheetIndex + 1} 页应能计算截图区域`
-            )
-            await page.screenshot({
-              path: path.join(
-                workInstructionOutputDir,
-                `yoyoosun-sheet1-sheet-${String(sheetIndex + 1).padStart(2, '0')}-latest.png`
-              ),
-              clip: {
-                x: Math.max(0, box.x),
-                y: Math.max(0, box.y),
-                width: box.width,
-                height: Math.min(
-                  box.height,
-                  page.viewportSize()?.height || box.height
-                ),
-              },
-            })
-          }
-        }
-        await assertNoHorizontalOverflow(
-          page,
-          'engineering-print-workspace-yoyoosun-sheet1-assets'
-        )
-      },
-    },
-    {
       name: 'print-workspace-material-row-selection-reset',
       path: '/erp/print-workspace/material-purchase-contract',
       auth: 'admin',
@@ -10440,9 +10414,47 @@ export function createStyleL1Scenarios(deps) {
       name: 'processing-contract-form-modal-title-desktop',
       path: '/erp/purchase/processing-contracts',
       auth: 'admin',
+      effectiveSession: {
+        configRevision: 'style-l1-processing-contract-form',
+        configHash: 'style-l1-processing-contract-form-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        pages: ['processing-contracts'],
+        actions: [
+          'outsourcing.order.read',
+          'outsourcing.order.create',
+          'outsourcing.order.update',
+          'outsourcing.order.confirm',
+          'workflow.task.read',
+          'workflow.task.update',
+          'workflow.task.complete',
+        ],
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '委外订单')
+        const createActionMetrics = await page.evaluate(() => ({
+          bodyText: String(document.body?.textContent || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 1200),
+          buttons: Array.from(document.querySelectorAll('button')).map(
+            (button) => ({
+              text: String(button.textContent || '')
+                .replace(/\s+/g, ' ')
+                .trim(),
+              disabled: button.disabled,
+            })
+          ),
+        }))
+        assert(
+          createActionMetrics.buttons.some(
+            (button) => button.text === '新建加工合同' && !button.disabled
+          ),
+          `加工合同页应展示可用的新建入口: ${JSON.stringify(createActionMetrics)}`
+        )
         await verifyBusinessActionFormModal(page, {
           buttonName: '新建加工合同',
           titleText: '新建加工合同',
@@ -10465,6 +10477,64 @@ export function createStyleL1Scenarios(deps) {
           afterOpen: async (modal) => {
             await assertOutsourcingProcessSelectOptions(page, modal, {
               scenarioName: 'processing-contract-form-modal-title-desktop',
+            })
+            const subjectTypeField = modal
+              .locator('.ant-form-item')
+              .filter({ hasText: '加工对象类型' })
+              .first()
+            const subjectTypeInput = subjectTypeField.locator(
+              '.ant-select-selection-search-input'
+            )
+            await subjectTypeInput.click()
+            await subjectTypeInput.press('ArrowDown')
+            await subjectTypeInput.press('Enter')
+            const materialInput = modal
+              .locator('input[id$="_material_id"]')
+              .first()
+            await materialInput.click()
+            await materialInput.press('ArrowDown')
+            await materialInput.press('Enter')
+            await modal.locator('input[id$="_unit_price"]').first().click()
+            await page.waitForFunction(
+              () =>
+                document.querySelectorAll(
+                  '.ant-select-dropdown:not(.ant-select-dropdown-hidden)'
+                ).length === 0
+            )
+            await page.waitForTimeout(350)
+            assert.equal(
+              await modal.getByText('产品 / 半成品', { exact: true }).count(),
+              0,
+              '材料加工态不应继续显示产品选择字段'
+            )
+            const materialRowMetrics = await modal
+              .locator('.erp-sales-order-lines-form__row')
+              .first()
+              .evaluate((row) => ({
+                found: true,
+                clientWidth: row.clientWidth,
+                scrollWidth: row.scrollWidth,
+                text: String(row.textContent || '')
+                  .replace(/\s+/g, ' ')
+                  .trim(),
+              }))
+            assert(
+              materialRowMetrics.found &&
+                materialRowMetrics.scrollWidth <=
+                  materialRowMetrics.clientWidth + 1 &&
+                materialRowMetrics.text.includes('材料（布料加工等）') &&
+                materialRowMetrics.text.includes('MAT-STYLE-L') &&
+                materialRowMetrics.text.includes('样式材料'),
+              `材料加工行应完整显示并不溢出: ${JSON.stringify(
+                materialRowMetrics
+              )}`
+            )
+            await page.screenshot({
+              path: path.join(
+                outputDir,
+                'processing-contract-material-subject-form.png'
+              ),
+              fullPage: true,
             })
             const titleMetrics = await modal
               .locator('.erp-sales-order-lines-form__head strong')
@@ -10712,10 +10782,11 @@ export function createStyleL1Scenarios(deps) {
       expectNoButton,
       expectText,
       gotoScenarioPath,
+      outputDir,
+      path,
       verifyBusinessActionFormModal,
       verifyBusinessModuleColumnOrderDialog,
       verifyBusinessRowDoubleClickEditModal,
-      verifyFormalShellRowDoubleClickEditModal,
       verifySourceImportPicker,
     }),
   ]

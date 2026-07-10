@@ -14,41 +14,6 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderItem(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "add_purchase_order_item", "addPurchaseOrderItem":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderCreate); res != nil {
-			return id, res, nil
-		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_orders"); res != nil {
-			return id, res, nil
-		}
-		in, ok := purchaseOrderItemMutationFromParams(pm)
-		if !ok {
-			return id, invalidParamResult(), nil
-		}
-		item, err := d.purchaseOrderUC.AddPurchaseOrderItem(ctx, in)
-		return id, purchaseOrderItemMutationResult(ctx, d, item, err), nil
-	case "update_purchase_order_item", "updatePurchaseOrderItem":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderUpdate); res != nil {
-			return id, res, nil
-		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_orders"); res != nil {
-			return id, res, nil
-		}
-		in, ok := purchaseOrderItemMutationFromParams(pm)
-		if !ok {
-			return id, invalidParamResult(), nil
-		}
-		item, err := d.purchaseOrderUC.UpdatePurchaseOrderItem(ctx, getInt(pm, "id", 0), in)
-		return id, purchaseOrderItemMutationResult(ctx, d, item, err), nil
-	case "remove_purchase_order_item", "removePurchaseOrderItem":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderUpdate); res != nil {
-			return id, res, nil
-		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_orders"); res != nil {
-			return id, res, nil
-		}
-		item, err := d.purchaseOrderUC.RemovePurchaseOrderItem(ctx, getInt(pm, "id", 0))
-		return id, purchaseOrderItemMutationResult(ctx, d, item, err), nil
 	case "list_purchase_order_items", "listPurchaseOrderItems":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderRead); res != nil {
 			return id, res, nil

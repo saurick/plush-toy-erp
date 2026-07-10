@@ -82,7 +82,7 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
   assert.equal(summary.sourceLabel, '客户菜单配置')
   assert.equal(summary.runtimeStatus, 'runtime_frontend_only')
   assert.equal(summary.sectionCount, 13)
-  assert.equal(summary.itemCount, 28)
+  assert.equal(summary.itemCount, 29)
   assert.deepEqual(
     summary.sections.map((section) => section.title),
     [
@@ -435,24 +435,15 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
       'evidence_only',
       'preview_only',
       'report_gate_only',
-      'report_gate_only',
       'release_gate_required',
       'release_gate_required',
     ]
   )
   assert(
     summary.tools
-      .filter((item) =>
-        ['freeze', 'dry-run', 'execute-report'].includes(item.key)
-      )
+      .filter((item) => ['freeze', 'dry-run'].includes(item.key))
       .every((item) => item.command.includes('scripts/import'))
   )
-  const executeReport = summary.tools.find(
-    (item) => item.key === 'execute-report'
-  )
-  assert(executeReport.command.includes('--dry-run-package'))
-  assert(!executeReport.command.includes('--dry-run '))
-  assert(executeReport.command.includes('--backup-evidence'))
   const readbackPreflight = summary.tools.find(
     (item) => item.key === 'release-readback-preflight'
   )
@@ -664,9 +655,15 @@ test('devCustomerConfig: 客户配置包流程结构只作为 preview', () => {
         item.handlerAllowedLabel === '禁止客户包处理器'
     )
   )
-  assert.equal(summary.moduleStateCatalogCount, 15)
+  assert.equal(
+    summary.moduleStateCatalogCount,
+    customerPackageCatalog.modules.length
+  )
   assert.equal(summary.moduleStateOverrideCount, 0)
-  assert.equal(summary.moduleStateCounts.enabled, 15)
+  assert.equal(
+    summary.moduleStateCounts.enabled,
+    customerPackageCatalog.modules.length
+  )
   assert.deepEqual(summary.nonEnabledModuleStates, [])
   assert.equal(
     summary.workflows.find((item) => item.key === 'sales_order_approval')
@@ -946,9 +943,15 @@ test('devCustomerConfig: moduleStates 进入控制台预检但不改变默认客
     ]),
   })
 
-  assert.equal(summary.moduleStateCatalogCount, 15)
+  assert.equal(
+    summary.moduleStateCatalogCount,
+    customerPackageCatalog.modules.length
+  )
   assert.equal(summary.moduleStateOverrideCount, 2)
-  assert.equal(summary.moduleStateCounts.enabled, 13)
+  assert.equal(
+    summary.moduleStateCounts.enabled,
+    customerPackageCatalog.modules.length - 2
+  )
   assert.equal(summary.moduleStateCounts.read_only, 1)
   assert.equal(summary.moduleStateCounts.disabled, 1)
   assert.deepEqual(

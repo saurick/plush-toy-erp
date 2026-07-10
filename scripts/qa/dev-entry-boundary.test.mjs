@@ -766,10 +766,9 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "customerSourceManifestCheck.test.mjs",
     "customer import tooling preset",
   );
-  assertIncludes(
+  assert.doesNotMatch(
     buildDevTestingCopyPresetSource(customerImportPreset),
-    "customerImportExecute.test.mjs",
-    "customer import tooling preset",
+    /customerImportExecute|--execute/u,
   );
   assertIncludes(
     buildDevTestingCopyPresetSource(customerImportPreset),

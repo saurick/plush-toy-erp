@@ -25,6 +25,12 @@ var workflowTaskActionPayloadSystemKeys = map[string]struct{}{
 	"task_status_key":     {},
 }
 
+var workflowTaskCreateProcessRuntimeAnchorKeys = []string{
+	"config_revision",
+	"process_instance_id",
+	"process_node_instance_id",
+}
+
 func (d *jsonrpcDispatcher) handleWorkflowTask(
 	ctx context.Context,
 	method, id string,
@@ -73,6 +79,9 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskCreate); res != nil {
 			return id, res, nil
 		}
+		if res := validateWorkflowTaskCreatePublicParams(pm); res != nil {
+			return id, res, nil
+		}
 		payload, ok := getWorkflowPayload(pm, "payload")
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "payload 必须是对象"}, nil
@@ -97,9 +106,6 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			OwnerRoleKey:          getString(pm, "owner_role_key"),
 			OwnerPoolKey:          getWorkflowStringPtr(pm, "owner_pool_key"),
 			RequiredCapabilityKey: getWorkflowStringPtr(pm, "required_capability_key"),
-			ConfigRevision:        getWorkflowStringPtr(pm, "config_revision"),
-			ProcessInstanceID:     getWorkflowPositiveIntPtr(pm, "process_instance_id"),
-			ProcessNodeInstanceID: getWorkflowPositiveIntPtr(pm, "process_node_instance_id"),
 			AssigneeID:            getWorkflowPositiveIntPtr(pm, "assignee_id"),
 			Priority:              priority,
 			BlockedReason:         getWorkflowStringPtr(pm, "blocked_reason"),
@@ -201,6 +207,18 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 	}
 }
 
+func validateWorkflowTaskCreatePublicParams(pm map[string]any) *v1.JsonrpcResult {
+	for _, key := range workflowTaskCreateProcessRuntimeAnchorKeys {
+		if _, exists := pm[key]; exists {
+			return &v1.JsonrpcResult{
+				Code:    errcode.InvalidParam.Code,
+				Message: "create_task 不接收 " + key + "；流程运行时锚点由服务端受控生成",
+			}
+		}
+	}
+	return nil
+}
+
 type workflowTaskActionContract struct {
 	Method           string
 	StatusKey        string
@@ -266,7 +284,16 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 		return id, adminRes, nil
 	}
 	visibleOwnerRoleKeys := d.workflowVisibleOwnerRoleKeys(ctx, admin, actionPermission)
+	terminalReconcile := currentTask.TaskStatusKey == contract.StatusKey &&
+		biz.IsTerminalWorkflowTaskStatus(currentTask.TaskStatusKey) &&
+		currentTask.ProcessInstanceID != nil && currentTask.ProcessNodeInstanceID != nil
+	if terminalReconcile && contract.RequireReason && !workflowTaskTerminalReasonMatches(currentTask, reason) {
+		return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务已按其他原因结束，请刷新后查看"}, nil
+	}
 	canHandle := workflowAdminCanHandleTask(admin, currentTask, contract.StatusKey, visibleOwnerRoleKeys)
+	if terminalReconcile {
+		canHandle = workflowAdminCanReconcileLinkedTask(admin, currentTask, visibleOwnerRoleKeys)
+	}
 	useBreakGlass := false
 	if breakGlass != nil {
 		if !workflowAdminCanUseBreakGlass(admin, currentTask, contract.StatusKey) {
@@ -295,6 +322,16 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 			return id, d.mapWorkflowError(ctx, err), nil
 		}
 	}
+	if terminalReconcile {
+		if res := d.settleLinkedProcessNodeAfterTask(ctx, currentTask, actorID); res != nil {
+			return id, res, nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: contract.SuccessMessage,
+			Data:    newDataStruct(map[string]any{"task": workflowTaskToMap(currentTask)}),
+		}, nil
+	}
 	task, err := d.workflowUC.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
 		ID:                taskID,
 		TaskStatusKey:     contract.StatusKey,
@@ -305,8 +342,8 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 	if err != nil {
 		return id, d.mapWorkflowError(ctx, err), nil
 	}
-	if contract.StatusKey == "done" {
-		if res := d.completeLinkedProcessNodeAfterTaskDone(ctx, task, actorID); res != nil {
+	if contract.StatusKey == "done" || contract.StatusKey == "rejected" {
+		if res := d.settleLinkedProcessNodeAfterTask(ctx, task, actorID); res != nil {
 			return id, res, nil
 		}
 	}
@@ -337,7 +374,7 @@ func getRequiredWorkflowTaskID(pm map[string]any) (int, *v1.JsonrpcResult) {
 	return taskID, nil
 }
 
-func (d *jsonrpcDispatcher) completeLinkedProcessNodeAfterTaskDone(ctx context.Context, task *biz.WorkflowTask, actorID int) *v1.JsonrpcResult {
+func (d *jsonrpcDispatcher) settleLinkedProcessNodeAfterTask(ctx context.Context, task *biz.WorkflowTask, actorID int) *v1.JsonrpcResult {
 	if d == nil || d.processRuntimeUC == nil || task == nil {
 		return nil
 	}
@@ -351,6 +388,37 @@ func (d *jsonrpcDispatcher) completeLinkedProcessNodeAfterTaskDone(ctx context.C
 		return nil
 	}
 	return d.mapWorkflowError(ctx, err)
+}
+
+func workflowAdminCanReconcileLinkedTask(admin *biz.AdminUser, task *biz.WorkflowTask, visibleOwnerRoleKeys []string) bool {
+	if admin == nil || admin.Disabled || task == nil ||
+		task.ProcessInstanceID == nil || task.ProcessNodeInstanceID == nil ||
+		!biz.IsTerminalWorkflowTaskStatus(task.TaskStatusKey) {
+		return false
+	}
+	if task.AssigneeID != nil {
+		return *task.AssigneeID == admin.ID
+	}
+	return biz.AdminHasRole(admin, task.OwnerRoleKey) || workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys)
+}
+
+func workflowTaskTerminalReasonMatches(task *biz.WorkflowTask, reason string) bool {
+	reason = strings.TrimSpace(reason)
+	if task == nil || reason == "" {
+		return false
+	}
+	if task.BlockedReason != nil && strings.TrimSpace(*task.BlockedReason) == reason {
+		return true
+	}
+	if task.Payload == nil {
+		return false
+	}
+	for _, key := range []string{"rejected_reason", "reason"} {
+		if value, ok := task.Payload[key].(string); ok && strings.TrimSpace(value) == reason {
+			return true
+		}
+	}
+	return false
 }
 
 type workflowBreakGlassGrant struct {
@@ -441,7 +509,8 @@ func (d *jsonrpcDispatcher) workflowVisibleOwnerRoleKeys(ctx context.Context, ad
 	if admin == nil || admin.Disabled || admin.IsSuperAdmin || d.customerConfigUC == nil {
 		return baseRoleKeys
 	}
-	roleKeys, err := d.customerConfigUC.WorkflowVisibleOwnerRoleKeys(ctx, "", admin, requiredCapabilities...)
+	customerKey, _ := runtimeCustomerKey("")
+	roleKeys, err := d.customerConfigUC.WorkflowVisibleOwnerRoleKeys(ctx, customerKey, admin, requiredCapabilities...)
 	if err != nil {
 		d.log.WithContext(ctx).Warnf("[workflow] customer config visibility fallback admin_id=%d err=%v", admin.ID, err)
 		return baseRoleKeys
@@ -819,7 +888,8 @@ func (d *jsonrpcDispatcher) workflowTaskConfiguredCandidateExplanation(ctx conte
 	if d.customerConfigUC == nil {
 		return out
 	}
-	explanation, err := d.customerConfigUC.WorkflowCandidateOwnerRoleKeys(ctx, "", ownerPoolKey, capabilityKey)
+	customerKey, _ := runtimeCustomerKey("")
+	explanation, err := d.customerConfigUC.WorkflowCandidateOwnerRoleKeys(ctx, customerKey, ownerPoolKey, capabilityKey)
 	if err != nil {
 		d.log.WithContext(ctx).Warnf("[workflow] configured candidate explain fallback owner_pool_key=%s capability=%s err=%v", ownerPoolKey, capabilityKey, err)
 		out.Source = "customer_config_error"

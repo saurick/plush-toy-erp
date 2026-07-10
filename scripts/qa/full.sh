@@ -13,7 +13,7 @@ print_help() {
   fast: 先执行 scripts/qa/fast.sh，包含高频边界、客户配置、导入、发布证据和 web/server 快速检查
   secrets / govulncheck: 推送前补充安全扫描（存在即跑）
   web: fast 已跑 lint/css，这里补充 (若存在 test 脚本则 pnpm test) -> pnpm build
-  server: go test ./... -> make build
+  server: local PostgreSQL critical transaction gate -> go test ./... -> make build
 
 环境变量:
   SKIP_DB_GUARD=1      跳过 DB 迁移守卫
@@ -21,6 +21,7 @@ print_help() {
   SKIP_GOVULNCHECK=1   跳过 Go 漏洞扫描
   SECRETS_STRICT=1     secrets 命中时阻断
   QA_BASE_RANGE=...    指定 diff 范围供 db-guard/secrets 使用
+  PURCHASE_RECEIPT_PG_DB_URL=...  本地隔离 PostgreSQL 关键事务测试库；只允许防呆脚本接受的本地/test DSN
 USAGE
 }
 
@@ -44,6 +45,7 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 source "$ROOT_DIR/scripts/lib/pnpm.sh"
+require_project_node "$ROOT_DIR"
 PNPM_BIN="$(resolve_project_pnpm "$ROOT_DIR")"
 
 if ! command -v go >/dev/null 2>&1; then
@@ -83,6 +85,9 @@ echo "[qa:full] 运行 web 测试与构建"
 echo "[qa:full] 运行 server 全量检查"
 (
   cd "$ROOT_DIR/server"
+  make purchase_receipt_pg_createdb
+  make purchase_receipt_migrate_apply
+  make critical_transactions_pg_test
   go test ./...
   make build
 )

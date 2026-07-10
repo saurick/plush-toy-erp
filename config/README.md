@@ -18,7 +18,9 @@
 - 客户配置先进入 `config/customers/<customer-key>/`；中性 demo 只用于本地验证，真实客户配置还必须同步客户资料文档和客户差异台账。
 - 客户包流程结构当前只能进入 lint / preview；如需进入后端 `customer_config`，必须先通过 `customer-config-runtime-manifest` 生成受控 manifest，再走后端 validate / publish / activate。raw 客户包不直接 publish、不 activate、不 rollback，也不接 Workflow / Fact runtime。
 - Runtime manifest 的页面投影必须来自已登记正式菜单 key；manifest 编译器和后端 `validate_customer_config / publish_customer_config` 都会拒绝缺失、空列表或未知 page key 的 `compiled_snapshot.pages`，旧 active revision 缺 pages 或无有效 pages 时 `get_effective_session` 不回退 RBAC 全量页面。
-- Runtime manifest 的字段策略不是 catalog fields 全量发布；当前只发布前端已消费的 `customers.default`、`suppliers.default` 和 `sales_orders.default`，`sales_order_items` 的产品 / 款式 / 颜色尺码候选仍停留在导入 / 客户评审草案。后端 `validate_customer_config / publish_customer_config` 也会拒绝未登记 surface / field key，`get_effective_session` 输出会过滤旧 revision 中的非法字段策略。
+- 每个正式页面还必须在 `config/catalog/customerPackageCatalog.mjs` 登记 `requiredCapabilityKeys`。客户角色的 `menuSurfaces` 只有在其能力集合覆盖页面全部读取合同后才能编译；编译结果写入 `compiled_snapshot.rolePageProjections`，用于把“页面所需的窄引用读取权限”和“角色真正可见的菜单”分开，避免补一个引用读取权限就意外开放整个主数据页面。
+- 动作能力只有一个客户配置加法真源：`access_entitlements`。`role_profiles` 只保留角色启停、能力包标记和 `revokes`；最终动作集合按 `后端 RBAC ∩ 模块状态 ∩ access_entitlements - role_profiles.revokes` 逐角色计算，再对多角取并集。
+- Runtime manifest 的字段策略不是 catalog fields 全量发布；当前只发布 `customers.default`、`suppliers.default` 和 `sales_orders.default`，前端仅消费列表 / CSV 导出列的 `visible`。当前 manifest 只是从 Product Core catalog 为这三个 surface 生成通用 `visible=true` 默认值，尚无 yoyoosun 专属隐藏规则，也不驱动表单 label、editable、required。BOM、采购、委外、质检、库存、出货和财务字段只属于正式业务字段合同，不是 active field policy；`sales_order_items` 的款式 / 颜色尺码仍是导入 / 客户评审草案。后端 `validate_customer_config / publish_customer_config` 会拒绝其他 surface / field key，`get_effective_session` 输出会过滤旧 revision 中的非法字段策略。
 - 行业通用能力进入 Product Core 前，必须回到代码、测试、产品 / 架构文档和客户差异边界复核。
 - 私有化部署资料进入 `deployments/<customer-key>/`；当前产品部署真源仍是 `server/deploy/compose/prod`。
 

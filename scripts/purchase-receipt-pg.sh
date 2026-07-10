@@ -3,7 +3,7 @@ set -euo pipefail
 
 cmd="${1:-}"
 if [ -z "$cmd" ]; then
-  echo "usage: $0 {createdb|status|apply|test|dropdb}" >&2
+  echo "usage: $0 {createdb|status|apply|test|test-workflow|test-critical|dropdb}" >&2
   exit 2
 fi
 
@@ -74,6 +74,15 @@ apply)
   ;;
 test)
   PURCHASE_RECEIPT_PG_TEST=1 PURCHASE_RECEIPT_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" go test ./internal/data -run TestPurchaseReceiptPostgres -count=1
+  ;;
+test-workflow)
+  PURCHASE_RECEIPT_PG_TEST=1 PURCHASE_RECEIPT_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" go test ./internal/data -run '^TestWorkflowPostgres' -count=1
+  ;;
+test-critical)
+  PURCHASE_RECEIPT_PG_TEST=1 PURCHASE_RECEIPT_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" \
+    go test ./internal/data \
+    -run '^(TestPurchaseReceiptPostgres|TestPurchaseReceiptAdjustmentPostgres|TestWorkflowPostgres|TestSourceDocumentPostgres)' \
+    -count=1
   ;;
 dropdb)
   psql "$PURCHASE_RECEIPT_PG_ADMIN_DB_URL" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"${PURCHASE_RECEIPT_PG_DB_NAME}\" WITH (FORCE)"

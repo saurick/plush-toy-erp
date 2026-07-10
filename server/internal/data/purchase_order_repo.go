@@ -157,14 +157,29 @@ func purchaseOrderSortOrder(filter biz.PurchaseOrderFilter) purchaseorder.OrderO
 }
 
 func (r *purchaseOrderRepo) UpdatePurchaseOrderLifecycle(ctx context.Context, id int, lifecycleStatus string) (*biz.PurchaseOrder, error) {
-	row, err := r.data.postgres.PurchaseOrder.UpdateOneID(id).
+	allowedCurrent := purchaseOrderLifecyclePredecessors(lifecycleStatus)
+	if len(allowedCurrent) == 0 {
+		return nil, biz.ErrBadParam
+	}
+	affected, err := r.data.postgres.PurchaseOrder.Update().
+		Where(
+			purchaseorder.ID(id),
+			purchaseorder.LifecycleStatusIn(allowedCurrent...),
+		).
 		SetLifecycleStatus(lifecycleStatus).
 		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	row, err := r.data.postgres.PurchaseOrder.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrPurchaseOrderNotFound
 		}
 		return nil, err
+	}
+	if affected == 0 && row.LifecycleStatus != lifecycleStatus {
+		return nil, biz.ErrBadParam
 	}
 	return entPurchaseOrderToBiz(row), nil
 }
@@ -318,7 +333,11 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 
 	var orderRow *ent.PurchaseOrder
 	if id > 0 {
-		update := tx.PurchaseOrder.UpdateOneID(id).
+		update := tx.PurchaseOrder.Update().
+			Where(
+				purchaseorder.ID(id),
+				purchaseorder.LifecycleStatus(biz.PurchaseOrderStatusDraft),
+			).
 			SetPurchaseOrderNo(in.PurchaseOrderNo).
 			SetSupplierID(in.SupplierID).
 			SetSupplierSnapshot(in.SupplierSnapshot).
@@ -339,11 +358,21 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 		} else {
 			update.SetNote(*in.Note)
 		}
-		orderRow, err = update.Save(ctx)
+		affected, err := update.Save(ctx)
 		if err != nil {
-			if ent.IsNotFound(err) {
-				return nil, biz.ErrPurchaseOrderNotFound
+			return nil, err
+		}
+		if affected == 0 {
+			if _, err := tx.PurchaseOrder.Get(ctx, id); err != nil {
+				if ent.IsNotFound(err) {
+					return nil, biz.ErrPurchaseOrderNotFound
+				}
+				return nil, err
 			}
+			return nil, biz.ErrBadParam
+		}
+		orderRow, err = tx.PurchaseOrder.Get(ctx, id)
+		if err != nil {
 			return nil, err
 		}
 	} else {
@@ -443,6 +472,23 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 		Order: entPurchaseOrderToBiz(orderRow),
 		Items: entPurchaseOrderItemsToBiz(itemRows),
 	}, nil
+}
+
+func purchaseOrderLifecyclePredecessors(next string) []string {
+	statuses := []string{
+		biz.PurchaseOrderStatusDraft,
+		biz.PurchaseOrderStatusSubmitted,
+		biz.PurchaseOrderStatusApproved,
+		biz.PurchaseOrderStatusClosed,
+		biz.PurchaseOrderStatusCanceled,
+	}
+	allowed := make([]string, 0, len(statuses))
+	for _, current := range statuses {
+		if biz.IsPurchaseOrderLifecycleTransitionAllowed(current, next) {
+			allowed = append(allowed, current)
+		}
+	}
+	return allowed
 }
 
 func (r *purchaseOrderRepo) SupplierIsActive(ctx context.Context, id int) (bool, error) {
