@@ -198,7 +198,7 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
             name: "customer-config-effective-session",
             status: "pass",
             target: "jsonrpc:customer_config.get_effective_session",
-            expectedRevision: "yoyoosun-customer-package-v5.runtime-manifest-v1",
+            expectedRevision: "yoyoosun-customer-package-v6.runtime-manifest-v1",
             tokenSourceEnv: "CUSTOMER_CONFIG_ADMIN_TOKEN",
             responseBodyStored: false,
           },
@@ -252,7 +252,7 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
           customerConfigEffectiveSession: {
             status: "verified",
             target: "jsonrpc:customer_config.get_effective_session",
-            expectedRevision: "yoyoosun-customer-package-v5.runtime-manifest-v1",
+            expectedRevision: "yoyoosun-customer-package-v6.runtime-manifest-v1",
             tokenSourceEnv: "CUSTOMER_CONFIG_ADMIN_TOKEN",
             responseBodyStored: false,
           },
@@ -298,7 +298,7 @@ function writeCustomerConfigManifestEvidence(absoluteDir) {
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        revision: "yoyoosun-customer-package-v5.runtime-manifest-v1",
+        revision: "yoyoosun-customer-package-v6.runtime-manifest-v1",
         manifestSha256: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         reviewStatus: "approved",
         reviewer: "release-reviewer",
@@ -575,7 +575,7 @@ test("release evidence status suggests customer config smoke when manifest evide
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        revision: "yoyoosun-customer-package-v5.runtime-manifest-v1",
+        revision: "yoyoosun-customer-package-v6.runtime-manifest-v1",
         manifestSha256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         reviewStatus: "approved",
         redaction: {
@@ -597,12 +597,12 @@ test("release evidence status suggests customer config smoke when manifest evide
   assert.equal(status.customerConfigManifestEvidence.exists, true);
   assert.equal(
     status.customerConfigManifestEvidence.revision,
-    "yoyoosun-customer-package-v5.runtime-manifest-v1",
+    "yoyoosun-customer-package-v6.runtime-manifest-v1",
   );
   const nextCommands = status.nextCommands.join("\n");
   assert.match(nextCommands, /run-smoke\.sh/);
   assert.match(nextCommands, /--backend-url <backend-endpoint>/);
-  assert.match(nextCommands, /--customer-config-revision yoyoosun-customer-package-v5\.runtime-manifest-v1/);
+  assert.match(nextCommands, /--customer-config-revision yoyoosun-customer-package-v6\.runtime-manifest-v1/);
   assert.match(nextCommands, /--admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN/);
   assert.match(nextCommands, /--report deployments\/yoyoosun\/evidence\/releases\/2026-06-29\/smoke-test-report\.json/);
   const customerConfigAction = status.closeoutNextActions.find(
@@ -611,7 +611,7 @@ test("release evidence status suggests customer config smoke when manifest evide
   assert.match(customerConfigAction.commands.join("\n"), /run-smoke\.sh/);
   assert.match(
     customerConfigAction.commands.join("\n"),
-    /--customer-config-revision yoyoosun-customer-package-v5\.runtime-manifest-v1/,
+    /--customer-config-revision yoyoosun-customer-package-v6\.runtime-manifest-v1/,
   );
   assert.match(customerConfigAction.commands.join("\n"), /rollback-rehearsal-report\.mjs/);
 });
@@ -624,7 +624,7 @@ test("release evidence status suggests customer config smoke when smoke exists w
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        revision: "yoyoosun-customer-package-v5.runtime-manifest-v1",
+        revision: "yoyoosun-customer-package-v6.runtime-manifest-v1",
         manifestSha256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         reviewStatus: "approved",
         redaction: {
@@ -651,7 +651,7 @@ test("release evidence status suggests customer config smoke when smoke exists w
   const nextCommands = status.nextCommands.join("\n");
   assert.match(nextCommands, /run-smoke\.sh/);
   assert.match(nextCommands, /--backend-url <backend-endpoint>/);
-  assert.match(nextCommands, /--customer-config-revision yoyoosun-customer-package-v5\.runtime-manifest-v1/);
+  assert.match(nextCommands, /--customer-config-revision yoyoosun-customer-package-v6\.runtime-manifest-v1/);
   assert.match(nextCommands, /--admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN/);
   assert.match(nextCommands, /--report deployments\/yoyoosun\/evidence\/releases\/2026-06-29\/smoke-test-report\.json/);
 });
@@ -711,7 +711,7 @@ test("release evidence status cross-checks customer config smoke and manifest ev
     name: "customer-config-effective-session",
     status: "pass",
     target: "jsonrpc:customer_config.get_effective_session",
-    expectedRevision: "yoyoosun-customer-package-v5.runtime-manifest-v1",
+    expectedRevision: "yoyoosun-customer-package-v6.runtime-manifest-v1",
     tokenSourceEnv: "CUSTOMER_CONFIG_ADMIN_TOKEN",
     responseBodyStored: false,
   });
@@ -724,7 +724,7 @@ test("release evidence status cross-checks customer config smoke and manifest ev
   assert.equal(missingManifestStatus.customerConfigSmokeEvidence.hasCustomerConfigCheck, true);
   assert.equal(
     missingManifestStatus.customerConfigSmokeEvidence.expectedRevision,
-    "yoyoosun-customer-package-v5.runtime-manifest-v1",
+    "yoyoosun-customer-package-v6.runtime-manifest-v1",
   );
   assert.match(
     missingManifestStatus.warnings.join("\n"),
@@ -752,7 +752,7 @@ test("release evidence status cross-checks customer config smoke and manifest ev
   const mismatchedStatus = buildReleaseEvidenceStatus({ repoRoot: root, evidenceDir });
   assert.match(
     mismatchedStatus.warnings.join("\n"),
-    /revision different-runtime-manifest does not match smoke-test-report\.json expectedRevision yoyoosun-customer-package-v5\.runtime-manifest-v1/,
+    /revision different-runtime-manifest does not match smoke-test-report\.json expectedRevision yoyoosun-customer-package-v6\.runtime-manifest-v1/,
   );
   assert.match(
     mismatchedStatus.nextCommands.join("\n"),

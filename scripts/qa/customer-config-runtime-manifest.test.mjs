@@ -59,7 +59,10 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
   const manifest = buildRuntimeManifest(yoyoosunCustomerPackage);
 
   assert.equal(manifest.customer_key, "yoyoosun");
-  assert.equal(manifest.revision, "yoyoosun-customer-package-v5.runtime-manifest-v1");
+  assert.equal(
+    manifest.revision,
+    "yoyoosun-customer-package-v6.runtime-manifest-v1",
+  );
   assert.equal(manifest.compiled_snapshot.package.runtimeEnabled, false);
   assert.equal(manifest.compiled_snapshot.package.previewOnly, true);
   assert(manifest.compiled_snapshot.pages.includes("sales-orders"));
@@ -76,7 +79,9 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
   assert(manifest.compiled_snapshot.pages.includes("material-bom"));
   assert(manifest.compiled_snapshot.pages.includes("processes"));
   assert.equal(manifest.module_states.length, 16);
-  assert(manifest.module_states.some((item) => item.module_key === "production"));
+  assert(
+    manifest.module_states.some((item) => item.module_key === "production"),
+  );
   assert.equal(manifest.role_profiles.length, 9);
   assert.equal(manifest.work_pools.length, 19);
   assert.equal(manifest.work_pool_memberships.length, 19);
@@ -90,9 +95,13 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
     manifest.compiled_snapshot.extensionPointCatalog.implementation_source,
     "registered_deployment_package_required",
   );
-  assert.equal(manifest.compiled_snapshot.extensionPointCatalog.handler_allowed, false);
   assert.equal(
-    manifest.compiled_snapshot.extensionPointCatalog.customer_package_handler_allowed,
+    manifest.compiled_snapshot.extensionPointCatalog.handler_allowed,
+    false,
+  );
+  assert.equal(
+    manifest.compiled_snapshot.extensionPointCatalog
+      .customer_package_handler_allowed,
     false,
   );
   assert.equal(
@@ -104,7 +113,8 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
     true,
   );
   assert.equal(
-    manifest.compiled_snapshot.printTemplateDefaults.sales_order_print_template_enabled,
+    manifest.compiled_snapshot.printTemplateDefaults
+      .sales_order_print_template_enabled,
     false,
   );
   assert.deepEqual(
@@ -204,7 +214,10 @@ test("customer-config-runtime-manifest: compiles neutral demo package without yo
   const manifest = buildRuntimeManifest(demoCustomerPackage);
 
   assert.equal(manifest.customer_key, "demo");
-  assert.equal(manifest.revision, "demo-customer-package-v1.runtime-manifest-v1");
+  assert.equal(
+    manifest.revision,
+    "demo-customer-package-v1.runtime-manifest-v1",
+  );
   assert.equal(manifest.compiled_snapshot.customer.key, "demo");
   assert(
     manifest.access_entitlements.every((item) => item.scope_value === "demo"),
@@ -238,7 +251,7 @@ test("customer-config-runtime-manifest: repeated customer flags compile every re
   assert.deepEqual(
     results.map((result) => result.manifest.revision),
     [
-      "yoyoosun-customer-package-v5.runtime-manifest-v1",
+      "yoyoosun-customer-package-v6.runtime-manifest-v1",
       "demo-customer-package-v1.runtime-manifest-v1",
     ],
   );
@@ -258,7 +271,10 @@ test("customer-config-runtime-manifest: proves same responsibility pool can map 
     (membership) => membership.pool_key === "order_review",
   );
 
-  assert.equal(demoManifest.compiled_snapshot.workPoolRoleOverrides.order_review, "sales");
+  assert.equal(
+    demoManifest.compiled_snapshot.workPoolRoleOverrides.order_review,
+    "sales",
+  );
   assert.equal(demoOrderReview?.role_key, "sales");
   assert.equal(yoyoosunOrderReview?.role_key, "pmc");
   assert.equal(
@@ -300,11 +316,20 @@ test("customer-config-runtime-manifest: compiles sales order acceptance process 
 
   assert.equal(processDefinition.process_key, "sales_order_acceptance");
   assert.equal(processDefinition.business_ref_type, "sales_order");
-  assert.equal(processDefinition.domain_boundary, "source_document_command_only");
+  assert.equal(
+    processDefinition.domain_boundary,
+    "source_document_command_only",
+  );
   assert.equal(processDefinition.fact_boundary, "no_fact_posting");
   assert.deepEqual(
     processDefinition.nodes.map((node) => node.node_key),
-    ["submit_sales_order", "order_approval", "engineering_data", "order_review", "end"],
+    [
+      "submit_sales_order",
+      "order_approval",
+      "engineering_data",
+      "order_review",
+      "end",
+    ],
   );
   assert.deepEqual(
     processDefinition.nodes.map((node) => node.node_type),
@@ -324,15 +349,13 @@ test("customer-config-runtime-manifest: compiles sales order acceptance process 
   assert(
     manifest.work_pools.some(
       (pool) =>
-        pool.pool_key === "order_approval" &&
-        pool.source_pool_key === "boss",
+        pool.pool_key === "order_approval" && pool.source_pool_key === "boss",
     ),
   );
   assert(
     manifest.work_pool_memberships.some(
       (membership) =>
-        membership.pool_key === "order_review" &&
-        membership.role_key === "pmc",
+        membership.pool_key === "order_review" && membership.role_key === "pmc",
     ),
   );
   assert(
@@ -358,7 +381,10 @@ test("customer-config-runtime-manifest: compiles material supply as loader-ready
 
   assert.equal(processDefinition.process_key, "material_supply");
   assert.equal(processDefinition.variant_key, "purchase_receipt_iqc_inbound");
-  assert.equal(processDefinition.source_workflow_key, "purchase_order_approval");
+  assert.equal(
+    processDefinition.source_workflow_key,
+    "purchase_order_approval",
+  );
   assert.equal(processDefinition.manifest_status, "runtime_loader_ready");
   assert.equal(processDefinition.runtime_loader_enabled, true);
   assert.equal(processDefinition.business_ref_type, "purchase_order");
@@ -373,11 +399,13 @@ test("customer-config-runtime-manifest: compiles material supply as loader-ready
     ["domain_command", "domain_command", "domain_command", "end"],
   );
   assert.deepEqual(
-    processDefinition.nodes.slice(0, 3).map((node) => [
-      node.policy_snapshot.command_key,
-      node.policy_snapshot.writes_fact,
-      node.policy_snapshot.idempotency_key_required,
-    ]),
+    processDefinition.nodes
+      .slice(0, 3)
+      .map((node) => [
+        node.policy_snapshot.command_key,
+        node.policy_snapshot.writes_fact,
+        node.policy_snapshot.idempotency_key_required,
+      ]),
     [
       ["purchase_receipt.create", false, true],
       ["quality_inspection.aggregate_gate", false, true],
@@ -385,17 +413,19 @@ test("customer-config-runtime-manifest: compiles material supply as loader-ready
     ],
   );
   assert.deepEqual(
-    processDefinition.nodes.slice(0, 3).map((node) => [
-      node.owner_pool_key,
-      node.required_capability_key,
-      node.fact_command_contract.command_key,
-      node.fact_command_contract.runtime_binding_status,
-      node.fact_command_contract.process_runtime_handler_registered,
-      node.fact_command_contract.domain_usecase_binding,
-      node.fact_command_contract.jsonrpc_method,
-      node.fact_command_contract.required_permission_key,
-      node.fact_command_contract.writes_fact,
-    ]),
+    processDefinition.nodes
+      .slice(0, 3)
+      .map((node) => [
+        node.owner_pool_key,
+        node.required_capability_key,
+        node.fact_command_contract.command_key,
+        node.fact_command_contract.runtime_binding_status,
+        node.fact_command_contract.process_runtime_handler_registered,
+        node.fact_command_contract.domain_usecase_binding,
+        node.fact_command_contract.jsonrpc_method,
+        node.fact_command_contract.required_permission_key,
+        node.fact_command_contract.writes_fact,
+      ]),
     [
       [
         "purchase_receipt_source",
@@ -444,7 +474,9 @@ test("customer-config-runtime-manifest: compiles material supply as loader-ready
   assert.equal(purchaseContract.process_runtime_handler_registered, true);
   assert(
     purchaseContract.required_test_anchors.some((item) =>
-      item.includes("TestPurchaseReceiptProcessDomainCommandCreateBindsUsecase"),
+      item.includes(
+        "TestPurchaseReceiptProcessDomainCommandCreateBindsUsecase",
+      ),
     ),
   );
   assert.equal(
@@ -457,7 +489,9 @@ test("customer-config-runtime-manifest: compiles material supply as loader-ready
   assert.equal(qualityContract.process_runtime_handler_registered, true);
   assert(
     qualityContract.required_test_anchors.some((item) =>
-      item.includes("TestIncomingQualityGateProcessDomainCommandPassesOnlyAfterAggregateReady"),
+      item.includes(
+        "TestIncomingQualityGateProcessDomainCommandPassesOnlyAfterAggregateReady",
+      ),
     ),
   );
   assert.equal(
@@ -528,8 +562,14 @@ test("customer-config-runtime-manifest: compiles finished goods delivery as star
     manifest.compiled_snapshot.processDefinitions.finished_goods_delivery;
 
   assert.equal(processDefinition.process_key, "finished_goods_delivery");
-  assert.equal(processDefinition.variant_key, "quality_finance_ship_receivable");
-  assert.equal(processDefinition.source_workflow_key, "finished_goods_delivery");
+  assert.equal(
+    processDefinition.variant_key,
+    "quality_finance_ship_receivable",
+  );
+  assert.equal(
+    processDefinition.source_workflow_key,
+    "finished_goods_delivery",
+  );
   assert.equal(processDefinition.manifest_status, "runtime_loader_start_ready");
   assert.equal(processDefinition.runtime_loader_enabled, true);
   assert.equal(processDefinition.business_ref_type, "shipment");
@@ -547,22 +587,30 @@ test("customer-config-runtime-manifest: compiles finished goods delivery as star
   );
   assert.deepEqual(
     processDefinition.nodes.map((node) => node.node_type),
-    ["domain_command", "domain_command", "domain_command", "domain_command", "end"],
+    [
+      "domain_command",
+      "domain_command",
+      "domain_command",
+      "domain_command",
+      "end",
+    ],
   );
   assert.deepEqual(
-    processDefinition.nodes.slice(0, 4).map((node) => [
-      node.owner_pool_key,
-      node.required_capability_key,
-      node.policy_snapshot.command_key,
-      node.policy_snapshot.handler,
-      node.policy_snapshot.writes_fact,
-      node.fact_command_contract.runtime_binding_status,
-      node.fact_command_contract.process_runtime_handler_registered,
-      node.fact_command_contract.command_key,
-      node.fact_command_contract.required_before_runtime_loader,
-      node.fact_command_contract.writes_fact,
-      node.fact_command_contract.jsonrpc_method,
-    ]),
+    processDefinition.nodes
+      .slice(0, 4)
+      .map((node) => [
+        node.owner_pool_key,
+        node.required_capability_key,
+        node.policy_snapshot.command_key,
+        node.policy_snapshot.handler,
+        node.policy_snapshot.writes_fact,
+        node.fact_command_contract.runtime_binding_status,
+        node.fact_command_contract.process_runtime_handler_registered,
+        node.fact_command_contract.command_key,
+        node.fact_command_contract.required_before_runtime_loader,
+        node.fact_command_contract.writes_fact,
+        node.fact_command_contract.jsonrpc_method,
+      ]),
     [
       [
         "finished_goods_quality",
@@ -619,47 +667,51 @@ test("customer-config-runtime-manifest: compiles finished goods delivery as star
     ],
   );
   for (const node of processDefinition.nodes.slice(0, 4)) {
-    assert(
-      node.fact_command_contract.runtime_loader_blockers.length === 0,
+    assert(node.fact_command_contract.runtime_loader_blockers.length === 0);
+    if (
+      node.node_key === "finished_goods_quality" ||
+      node.node_key === "shipment_finance_release" ||
+      node.node_key === "shipment_execution" ||
+      node.node_key === "receivable_lead"
+    ) {
+      assert(
+        !node.fact_command_contract.runtime_execute_blockers.includes(
+          "domain_command_handler_not_registered",
+        ),
+      );
+    } else {
+      assert(
+        node.fact_command_contract.runtime_execute_blockers.includes(
+          "domain_command_handler_not_registered",
+        ),
+      );
+    }
+    if (
+      node.node_key === "finished_goods_quality" ||
+      node.node_key === "shipment_finance_release" ||
+      node.node_key === "shipment_execution" ||
+      node.node_key === "receivable_lead"
+    ) {
+      assert(
+        !node.fact_command_contract.runtime_execute_blockers.includes(
+          "explicit_runtime_execute_api_not_implemented",
+        ),
+      );
+    } else {
+      assert(
+        node.fact_command_contract.runtime_execute_blockers.includes(
+          "explicit_runtime_execute_api_not_implemented",
+        ),
+      );
+    }
+    assert.equal(
+      node.fact_command_contract.required_before_runtime_execute,
+      true,
     );
-    if (
-      node.node_key === "finished_goods_quality" ||
-      node.node_key === "shipment_finance_release" ||
-      node.node_key === "shipment_execution" ||
-      node.node_key === "receivable_lead"
-    ) {
-      assert(
-        !node.fact_command_contract.runtime_execute_blockers.includes(
-          "domain_command_handler_not_registered",
-        ),
-      );
-    } else {
-      assert(
-        node.fact_command_contract.runtime_execute_blockers.includes(
-          "domain_command_handler_not_registered",
-        ),
-      );
-    }
-    if (
-      node.node_key === "finished_goods_quality" ||
-      node.node_key === "shipment_finance_release" ||
-      node.node_key === "shipment_execution" ||
-      node.node_key === "receivable_lead"
-    ) {
-      assert(
-        !node.fact_command_contract.runtime_execute_blockers.includes(
-          "explicit_runtime_execute_api_not_implemented",
-        ),
-      );
-    } else {
-      assert(
-        node.fact_command_contract.runtime_execute_blockers.includes(
-          "explicit_runtime_execute_api_not_implemented",
-        ),
-      );
-    }
-    assert.equal(node.fact_command_contract.required_before_runtime_execute, true);
-    assert.equal(node.fact_command_contract.required_test_anchors.length >= 2, true);
+    assert.equal(
+      node.fact_command_contract.required_test_anchors.length >= 2,
+      true,
+    );
   }
   assert(
     manifest.work_pool_memberships.some(
@@ -744,15 +796,12 @@ test("customer-config-runtime-manifest: publishes preview-only flow, policy and 
   const { flowCatalog, policyCatalog, extensionPointCatalog } =
     manifest.compiled_snapshot;
 
-  assert.deepEqual(
-    flowCatalog.business_flows.map((flow) => flow.key).sort(),
-    [
-      "delivery_to_settlement",
-      "production_to_inventory",
-      "purchase_to_inventory",
-      "sales_to_production",
-    ],
-  );
+  assert.deepEqual(flowCatalog.business_flows.map((flow) => flow.key).sort(), [
+    "delivery_to_settlement",
+    "production_to_inventory",
+    "purchase_to_inventory",
+    "sales_to_production",
+  ]);
   assert.deepEqual(
     flowCatalog.state_machines.map((stateMachine) => stateMachine.key).sort(),
     [
@@ -841,15 +890,31 @@ test("customer-config-runtime-manifest: maps customer work pools to backend role
   assert.equal(roleKeys.includes("purchasing"), false);
   assert.equal(purchaseMembership.role_key, "purchase");
   assert.equal(engineeringMembership.role_key, "engineering");
-  assert(engineeringEntitlements.some((item) => item.capability_key === "mobile.engineering.access"));
-  assert(bossEntitlements.some((item) => item.capability_key === "purchase.order.read"));
-  assert(bossEntitlements.some((item) => item.capability_key === "purchase.order.approve"));
+  assert(
+    engineeringEntitlements.some(
+      (item) => item.capability_key === "mobile.engineering.access",
+    ),
+  );
+  assert(
+    bossEntitlements.some(
+      (item) => item.capability_key === "purchase.order.read",
+    ),
+  );
+  assert(
+    bossEntitlements.some(
+      (item) => item.capability_key === "purchase.order.approve",
+    ),
+  );
   assert.equal(
-    bossEntitlements.some((item) => item.capability_key === "mobile.engineering.access"),
+    bossEntitlements.some(
+      (item) => item.capability_key === "mobile.engineering.access",
+    ),
     false,
   );
   assert.equal(
-    financeEntitlements.some((item) => item.capability_key.startsWith("purchase.order.")),
+    financeEntitlements.some((item) =>
+      item.capability_key.startsWith("purchase.order."),
+    ),
     false,
     "finance role must acquire purchase responsibilities through a second role assignment, not implicit grants",
   );
@@ -857,7 +922,9 @@ test("customer-config-runtime-manifest: maps customer work pools to backend role
 
 test("customer-config-runtime-manifest: compiles yoyoosun entitlements as the only additive action source", () => {
   const manifest = buildRuntimeManifest(yoyoosunCustomerPackage);
-  const profilesByRole = new Map(manifest.role_profiles.map((item) => [item.role_key, item]));
+  const profilesByRole = new Map(
+    manifest.role_profiles.map((item) => [item.role_key, item]),
+  );
   const entitlementsByRole = new Map();
   for (const item of manifest.access_entitlements) {
     const keys = entitlementsByRole.get(item.role_key) || [];
@@ -876,15 +943,23 @@ test("customer-config-runtime-manifest: compiles yoyoosun entitlements as the on
   }
   assert.deepEqual(
     manifest.compiled_snapshot.rolePageProjections.sales,
-    [...yoyoosunCustomerPackage.roleProfiles.find((item) => item.roleKey === "sales").menuSurfaces].sort(),
+    [
+      ...yoyoosunCustomerPackage.roleProfiles.find(
+        (item) => item.roleKey === "sales",
+      ).menuSurfaces,
+    ].sort(),
   );
   assert.equal(
-    manifest.access_entitlements.some((item) => item.capability_key.startsWith("page.")),
+    manifest.access_entitlements.some((item) =>
+      item.capability_key.startsWith("page."),
+    ),
     false,
     "page pseudo-capabilities must not be published as backend permissions",
   );
   assert.equal(
-    manifest.access_entitlements.some((item) => item.capability_key === "package.preview"),
+    manifest.access_entitlements.some(
+      (item) => item.capability_key === "package.preview",
+    ),
     false,
     "catalog preview capabilities must not be published as business permissions",
   );
@@ -897,14 +972,39 @@ test("customer-config-runtime-manifest: keeps yoyoosun master-data maintenance a
     (item) => item.role_key,
   );
   assert.deepEqual(
-    ["customer.create", "customer.update", "contact.create", "contact.update"].filter(
-      (capability) => !capabilitiesByRole.sales.some((item) => item.capability_key === capability),
+    [
+      "customer.create",
+      "customer.update",
+      "contact.create",
+      "contact.update",
+    ].filter(
+      (capability) =>
+        !capabilitiesByRole.sales.some(
+          (item) => item.capability_key === capability,
+        ),
     ),
     [],
   );
   assert.deepEqual(
-    ["supplier.create", "supplier.update", "contact.create", "contact.update"].filter(
-      (capability) => !capabilitiesByRole.purchase.some((item) => item.capability_key === capability),
+    [
+      "supplier.create",
+      "supplier.update",
+      "contact.create",
+      "contact.update",
+    ].filter(
+      (capability) =>
+        !capabilitiesByRole.purchase.some(
+          (item) => item.capability_key === capability,
+        ),
+    ),
+    [],
+  );
+  assert.deepEqual(
+    ["shipment.create", "shipment.ship", "shipment.cancel"].filter(
+      (capability) =>
+        !capabilitiesByRole.warehouse.some(
+          (item) => item.capability_key === capability,
+        ),
     ),
     [],
   );
@@ -914,25 +1014,28 @@ test("customer-config-runtime-manifest: enforces entitlement and work pool integ
   const manifest = buildRuntimeManifest(yoyoosunCustomerPackage);
 
   const orphanPoolManifest = structuredClone(manifest);
-  orphanPoolManifest.work_pool_memberships = orphanPoolManifest.work_pool_memberships.filter(
-    (item) => item.pool_key !== "engineering",
-  );
+  orphanPoolManifest.work_pool_memberships =
+    orphanPoolManifest.work_pool_memberships.filter(
+      (item) => item.pool_key !== "engineering",
+    );
   assert.throws(
     () => validateRuntimeManifest(orphanPoolManifest),
     /work pool engineering must have at least one membership/,
   );
 
   const unknownRoleMembershipManifest = structuredClone(manifest);
-  unknownRoleMembershipManifest.work_pool_memberships[0].role_key = "ghost_role";
+  unknownRoleMembershipManifest.work_pool_memberships[0].role_key =
+    "ghost_role";
   assert.throws(
     () => validateRuntimeManifest(unknownRoleMembershipManifest),
     /work pool membership references unknown role: ghost_role/,
   );
 
   const missingEntitlementManifest = structuredClone(manifest);
-  missingEntitlementManifest.access_entitlements = missingEntitlementManifest.access_entitlements.filter(
-    (item) => item.role_key !== "engineering",
-  );
+  missingEntitlementManifest.access_entitlements =
+    missingEntitlementManifest.access_entitlements.filter(
+      (item) => item.role_key !== "engineering",
+    );
   assert.throws(
     () => validateRuntimeManifest(missingEntitlementManifest),
     /role profile engineering must have access entitlements/,
@@ -941,7 +1044,8 @@ test("customer-config-runtime-manifest: enforces entitlement and work pool integ
   const crossCustomerScopeManifest = structuredClone(manifest);
   crossCustomerScopeManifest.access_entitlements[0].scope_value = "yoyoosun";
   crossCustomerScopeManifest.customer_key = "demo";
-  crossCustomerScopeManifest.revision = "demo-customer-package-v1.runtime-manifest-v1";
+  crossCustomerScopeManifest.revision =
+    "demo-customer-package-v1.runtime-manifest-v1";
   crossCustomerScopeManifest.compiled_snapshot.customer.key = "demo";
   assert.throws(
     () => validateRuntimeManifest(crossCustomerScopeManifest),
@@ -952,7 +1056,10 @@ test("customer-config-runtime-manifest: enforces entitlement and work pool integ
   missingWorkflowCapabilityManifest.access_entitlements =
     missingWorkflowCapabilityManifest.access_entitlements.filter(
       (item) =>
-        !(item.role_key === "engineering" && item.capability_key === "workflow.task.read"),
+        !(
+          item.role_key === "engineering" &&
+          item.capability_key === "workflow.task.read"
+        ),
     );
   assert.throws(
     () => validateRuntimeManifest(missingWorkflowCapabilityManifest),
@@ -963,7 +1070,10 @@ test("customer-config-runtime-manifest: enforces entitlement and work pool integ
   missingProcessCapabilityManifest.access_entitlements =
     missingProcessCapabilityManifest.access_entitlements.filter(
       (item) =>
-        !(item.role_key === "pmc" && item.capability_key === "workflow.task.complete"),
+        !(
+          item.role_key === "pmc" &&
+          item.capability_key === "workflow.task.complete"
+        ),
     );
   assert.throws(
     () => validateRuntimeManifest(missingProcessCapabilityManifest),
@@ -989,20 +1099,22 @@ test("customer-config-runtime-manifest: rejects runtime-enabled policy and exten
   );
 
   const emptyPolicyRulesManifest = structuredClone(manifest);
-  emptyPolicyRulesManifest.compiled_snapshot.policyCatalog.process_policies[0].rules = [];
+  emptyPolicyRulesManifest.compiled_snapshot.policyCatalog.process_policies[0].rules =
+    [];
   assert.throws(
     () => validateRuntimeManifest(emptyPolicyRulesManifest),
     /skip_policy\.rules must match rule_count/,
   );
 
   const executablePolicyRulesManifest = structuredClone(manifest);
-  executablePolicyRulesManifest.compiled_snapshot.policyCatalog.process_policies[0].rules = [
-    {
-      key: "skip_optional_review_when_unconfigured",
-      decision: "manual_review_required",
-      handler: "customerPolicyHandler",
-    },
-  ];
+  executablePolicyRulesManifest.compiled_snapshot.policyCatalog.process_policies[0].rules =
+    [
+      {
+        key: "skip_optional_review_when_unconfigured",
+        decision: "manual_review_required",
+        handler: "customerPolicyHandler",
+      },
+    ];
   assert.throws(
     () => validateRuntimeManifest(executablePolicyRulesManifest),
     /skip_policy\.rules\[0\]\.handler is not an allowed policy rule field/,
@@ -1011,16 +1123,17 @@ test("customer-config-runtime-manifest: rejects runtime-enabled policy and exten
   const runtimeExtensionManifest = structuredClone(manifest);
   runtimeExtensionManifest.compiled_snapshot.extensionPointCatalog.catalog_status =
     "contract_preview_only";
-  runtimeExtensionManifest.compiled_snapshot.extensionPointCatalog.extension_points = [
-    {
-      key: "customer_code_hook",
-      label: "客户代码扩展",
-      status: "preview_only",
-      runtime_enabled: true,
-      handler: "customerSpecificHandler",
-      guardrail: "invalid",
-    },
-  ];
+  runtimeExtensionManifest.compiled_snapshot.extensionPointCatalog.extension_points =
+    [
+      {
+        key: "customer_code_hook",
+        label: "客户代码扩展",
+        status: "preview_only",
+        runtime_enabled: true,
+        handler: "customerSpecificHandler",
+        guardrail: "invalid",
+      },
+    ];
   assert.throws(
     () => validateRuntimeManifest(runtimeExtensionManifest),
     /customer_code_hook\.runtime_enabled must stay false/,
@@ -1040,7 +1153,8 @@ test("customer-config-runtime-manifest: extension points stay preview-only and n
       }),
     ]),
   });
-  const extensionPointCatalog = manifest.compiled_snapshot.extensionPointCatalog;
+  const extensionPointCatalog =
+    manifest.compiled_snapshot.extensionPointCatalog;
   const [extensionPoint] = extensionPointCatalog.extension_points;
 
   assert.equal(extensionPointCatalog.runtime_enabled, false);
@@ -1109,14 +1223,16 @@ test("customer-config-runtime-manifest: rejects unsafe process definition change
   );
 
   const factPostingManifest = structuredClone(manifest);
-  factPostingManifest.compiled_snapshot.processDefinitions.sales_order_acceptance.fact_boundary = "fact_posting";
+  factPostingManifest.compiled_snapshot.processDefinitions.sales_order_acceptance.fact_boundary =
+    "fact_posting";
   assert.throws(
     () => validateRuntimeManifest(factPostingManifest),
     /sales_order_acceptance must not post domain facts/,
   );
 
   const wrongCommandManifest = structuredClone(manifest);
-  wrongCommandManifest.compiled_snapshot.processDefinitions.sales_order_acceptance.nodes[0].policy_snapshot.command_key = "inventory.post";
+  wrongCommandManifest.compiled_snapshot.processDefinitions.sales_order_acceptance.nodes[0].policy_snapshot.command_key =
+    "inventory.post";
   assert.throws(
     () => validateRuntimeManifest(wrongCommandManifest),
     /submit_sales_order\.policy_snapshot\.command_key must be a registered runtime domain command/,
@@ -1137,14 +1253,16 @@ test("customer-config-runtime-manifest: rejects unsafe process definition change
   );
 
   const materialRuntimeBindingManifest = structuredClone(manifest);
-  materialRuntimeBindingManifest.compiled_snapshot.processDefinitions.material_supply.nodes[1].fact_command_contract.runtime_binding_status = "runtime_loader_ready";
+  materialRuntimeBindingManifest.compiled_snapshot.processDefinitions.material_supply.nodes[1].fact_command_contract.runtime_binding_status =
+    "runtime_loader_ready";
   assert.throws(
     () => validateRuntimeManifest(materialRuntimeBindingManifest),
     /incoming_qc\.fact_command_contract\.runtime_binding_status must stay process_runtime_handler_registered/,
   );
 
   const materialContractTestAnchorManifest = structuredClone(manifest);
-  materialContractTestAnchorManifest.compiled_snapshot.processDefinitions.material_supply.nodes[2].fact_command_contract.required_test_anchors = [];
+  materialContractTestAnchorManifest.compiled_snapshot.processDefinitions.material_supply.nodes[2].fact_command_contract.required_test_anchors =
+    [];
   assert.throws(
     () => validateRuntimeManifest(materialContractTestAnchorManifest),
     /warehouse_inbound\.fact_command_contract\.required_test_anchors must reference existing tests/,
@@ -1158,17 +1276,16 @@ test("customer-config-runtime-manifest: rejects unsafe process definition change
   );
 
   const finishedGoodsRuntimeBindingManifest = structuredClone(manifest);
-  finishedGoodsRuntimeBindingManifest.compiled_snapshot.processDefinitions.finished_goods_delivery.nodes[1].fact_command_contract.runtime_binding_status = "contract_preflight_only";
+  finishedGoodsRuntimeBindingManifest.compiled_snapshot.processDefinitions.finished_goods_delivery.nodes[1].fact_command_contract.runtime_binding_status =
+    "contract_preflight_only";
   assert.throws(
     () => validateRuntimeManifest(finishedGoodsRuntimeBindingManifest),
     /shipment_finance_release\.fact_command_contract\.runtime_binding_status must stay process_runtime_handler_registered/,
   );
 
   const finishedGoodsBlockerManifest = structuredClone(manifest);
-  finishedGoodsBlockerManifest.compiled_snapshot.processDefinitions.finished_goods_delivery.nodes[1].fact_command_contract.runtime_execute_blockers = [
-    "domain_command_handler_not_registered",
-    "target_evidence_missing",
-  ];
+  finishedGoodsBlockerManifest.compiled_snapshot.processDefinitions.finished_goods_delivery.nodes[1].fact_command_contract.runtime_execute_blockers =
+    ["domain_command_handler_not_registered", "target_evidence_missing"];
   assert.throws(
     () => validateRuntimeManifest(finishedGoodsBlockerManifest),
     /shipment_finance_release\.fact_command_contract must not keep handler registration as an execute blocker after registration/,
@@ -1176,7 +1293,8 @@ test("customer-config-runtime-manifest: rejects unsafe process definition change
 });
 
 test("customer-config-runtime-manifest: preview output is bounded to output directory", async () => {
-  const outPath = "output/customers/yoyoosun/customer-config-runtime-manifest.test.json";
+  const outPath =
+    "output/customers/yoyoosun/customer-config-runtime-manifest.test.json";
   rmSync(path.resolve(outPath), { force: true });
 
   const result = runCustomerConfigRuntimeManifest({

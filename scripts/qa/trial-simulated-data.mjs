@@ -6,8 +6,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
-const DEFAULT_OUT_DIR =
-  "output/customers/yoyoosun/trial-simulated-data";
+const DEFAULT_OUT_DIR = "output/customers/yoyoosun/trial-simulated-data";
 const SIMULATION_PREFIX = "SIM-YOYOOSUN-TRIAL";
 const INPUT_TEMPLATE_SCOPE = "trial-simulated-data-input-template";
 const CONFIRM_PHRASE = "APPLY_SIMULATED_TRIAL_DATA";
@@ -181,13 +180,18 @@ function parseCliArgs(argv) {
   }
   options.backendURL = normalizeBaseURL(options.backendURL);
   if (options.printInputTemplate && options.apply) {
-    throw new CliError("--print-input-template cannot be combined with --apply", 2);
+    throw new CliError(
+      "--print-input-template cannot be combined with --apply",
+      2,
+    );
   }
   return options;
 }
 
 function buildInputTemplate(options = {}) {
-  const backendURL = normalizeBaseURL(options.backendURL || DEFAULT_BACKEND_URL);
+  const backendURL = normalizeBaseURL(
+    options.backendURL || DEFAULT_BACKEND_URL,
+  );
   const out = optionalText(options.out) || DEFAULT_OUT_DIR;
   return {
     scope: INPUT_TEMPLATE_SCOPE,
@@ -383,20 +387,23 @@ async function rpcCall({
   if (FORBIDDEN_METHOD_PATTERN.test(method)) {
     throw new CliError(`forbidden trial method ${method}`);
   }
-  const response = await fetchImpl(new URL(rpcPath, `${backendURL}/`).toString(), {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  const response = await fetchImpl(
+    new URL(rpcPath, `${backendURL}/`).toString(),
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: `trial-sim-${method}-${Date.now()}`,
+        method,
+        params,
+      }),
     },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: `trial-sim-${method}-${Date.now()}`,
-      method,
-      params,
-    }),
-  });
+  );
   if (!response.ok) {
     throw new CliError(`${method} HTTP ${response.status}`);
   }
@@ -452,7 +459,10 @@ async function resolveAdminToken({ backendURL, fetchImpl }) {
 }
 
 async function resolveApplyTokens({ backendURL, fetchImpl }) {
-  if (process.env.TRIAL_SIM_ADMIN_TOKEN || process.env.TRIAL_SIM_ADMIN_USERNAME) {
+  if (
+    process.env.TRIAL_SIM_ADMIN_TOKEN ||
+    process.env.TRIAL_SIM_ADMIN_USERNAME
+  ) {
     const token = await resolveAdminToken({ backendURL, fetchImpl });
     return {
       customer: token,
@@ -660,67 +670,74 @@ async function applyDataset({ options, dataset, fetchImpl = fetch }) {
       id: customer.id,
     },
   };
-  const salesOrder = await findOrCreate({
-    backendURL: options.backendURL,
-    token: tokens.sales,
-    fetchImpl,
-    list: {
-      rpcPath: "/rpc/sales_order",
-      method: "list_sales_orders",
-      params: { keyword: dataset.records.salesOrder.order_no, limit: 50 },
-    },
-    create: {
-      rpcPath: "/rpc/sales_order",
-      method: "create_sales_order",
-      resultKey: "sales_order",
-    },
-    listKey: "sales_orders",
-    idKey: "id",
-    match: (item) => item?.order_no === dataset.records.salesOrder.order_no,
-    createParams: salesOrderParams,
-  });
-  results.push({ target: "sales_order", ...salesOrder });
-
-  const itemList = await rpcCall({
+  const salesOrderList = await rpcCall({
     backendURL: options.backendURL,
     token: tokens.sales,
     fetchImpl,
     rpcPath: "/rpc/sales_order",
-    method: "list_sales_order_items",
-    params: { sales_order_id: salesOrder.id, limit: 50 },
+    method: "list_sales_orders",
+    params: { keyword: dataset.records.salesOrder.order_no, limit: 50 },
   });
-  const existingItem = firstBy(
-    itemList.sales_order_items,
-    (item) => Number(item?.line_no) === dataset.records.salesOrderItem.line_no,
+  const existingSalesOrder = firstBy(
+    salesOrderList.sales_orders,
+    (item) => item?.order_no === dataset.records.salesOrder.order_no,
   );
-  if (existingItem) {
-    results.push({
-      target: "sales_order_item",
-      action: "reuse",
-      item: existingItem,
-      id: asPositiveInt(existingItem.id, "sales_order_item.id"),
-    });
-  } else {
-    const salesOrderItemParams = {
-      ...dataset.records.salesOrderItem,
-      sales_order_id: salesOrder.id,
-    };
-    const createdItem = await rpcCall({
+
+  if (existingSalesOrder) {
+    const salesOrderID = asPositiveInt(existingSalesOrder.id, "sales_order.id");
+    const itemList = await rpcCall({
       backendURL: options.backendURL,
       token: tokens.sales,
       fetchImpl,
       rpcPath: "/rpc/sales_order",
-      method: "add_sales_order_item",
-      params: salesOrderItemParams,
+      method: "list_sales_order_items",
+      params: { sales_order_id: salesOrderID, limit: 50 },
+    });
+    const existingItem = firstBy(
+      itemList.sales_order_items,
+      (item) =>
+        Number(item?.line_no) === dataset.records.salesOrderItem.line_no,
+    );
+    results.push({ target: "sales_order", action: "reuse", id: salesOrderID });
+    if (!existingItem) {
+      throw new CliError(
+        `${dataset.records.salesOrder.order_no}: existing simulated order is missing its expected line`,
+      );
+    }
+    results.push({
+      target: "sales_order_item",
+      action: "reuse",
+      id: asPositiveInt(existingItem.id, "sales_order_item.id"),
+    });
+  } else {
+    const saved = await rpcCall({
+      backendURL: options.backendURL,
+      token: tokens.sales,
+      fetchImpl,
+      rpcPath: "/rpc/sales_order",
+      method: "save_sales_order_with_items",
+      params: {
+        ...salesOrderParams,
+        items: [dataset.records.salesOrderItem],
+      },
+    });
+    const savedItem = firstBy(
+      saved.sales_order_items,
+      (item) =>
+        Number(item?.line_no) === dataset.records.salesOrderItem.line_no,
+    );
+    results.push({
+      target: "sales_order",
+      action: "create",
+      id: asPositiveInt(saved.sales_order?.id, "sales_order.id"),
     });
     results.push({
       target: "sales_order_item",
       action: "create",
-      item: createdItem.sales_order_item,
-      id: asPositiveInt(createdItem.sales_order_item?.id, "sales_order_item.id"),
+      id: asPositiveInt(savedItem?.id, "sales_order_item.id"),
     });
   }
-  return results.map(({ item: _item, ...result }) => result);
+  return results;
 }
 
 async function writeReport({ options, dataset, results }) {
@@ -769,7 +786,11 @@ async function runTrialSimulatedData(options, deps = {}) {
   assertDatasetBoundary(dataset);
   requireApplyInputs(options, dataset);
   const results = options.apply
-    ? await applyDataset({ options, dataset, fetchImpl: deps.fetchImpl || fetch })
+    ? await applyDataset({
+        options,
+        dataset,
+        fetchImpl: deps.fetchImpl || fetch,
+      })
     : [];
   return writeReport({ options, dataset, results });
 }

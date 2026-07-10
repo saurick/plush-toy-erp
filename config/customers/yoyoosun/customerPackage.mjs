@@ -2,7 +2,7 @@ import { yoyoosunRoleFlowMatrix } from "./roleFlowMatrix.mjs";
 
 export const yoyoosunCustomerPackage = Object.freeze({
   customerKey: "yoyoosun",
-  packageKey: "yoyoosun-customer-package-v5",
+  packageKey: "yoyoosun-customer-package-v6",
   label: "永绅 yoyoosun 客户配置包",
   status: "draft",
   runtimeEnabled: false,

@@ -2,6 +2,14 @@
 
 本文件只保留当前活跃事项、最近完成记录和归档索引；历史流水已归档到 `docs/archive/`。`progress.md` 是过程交接线索，不是正式需求、数据模型或部署真源。
 
+## 2026-07-10 133 多状态模拟数据生成器接口对齐
+
+完成：133 试用造数运行时发现 `trial-simulated-data.mjs` 仍调用已退出主路径的拆分式 `create_sales_order / add_sales_order_item`，已改为当前销售订单唯一写入入口 `save_sales_order_with_items`，订单和明细原子创建；重复运行继续按模拟单号和行号复用，若发现历史模拟订单缺失预期明细则显式阻断，避免静默覆盖未知现场。同步修正 focused mock 测试，锁住工具只使用当前 V1 masterdata 与 sales_order API。事实矩阵继续运行时确认 yoyoosun 仓库角色只有 `shipment.ship`、没有创建和取消出货单的权限，导致正式出货主路径不可闭环；已按 Product Core 既有权限补入 `shipment.create / shipment.cancel`，客户包升级为 v6，并新增角色投影断言。
+
+下一步：重新生成并激活 yoyoosun v6 runtime manifest，继续覆盖库存 / 出货 / 财务 / Workflow 多状态并核对数据库状态分布。
+
+阻塞/风险：本轮修复测试数据工具，不改销售订单 usecase、schema、migration、RBAC、客户配置或真实客户数据；所有生成记录继续使用 `SIM-*` 前缀并明确标记为模拟数据。
+
 ## 归档索引
 
 - `docs/archive/progress-2026-06-28-before-runtime-manifest.md` 至 `docs/archive/progress-2026-07-06-before-print-restore-sample.md`：历史过程记录索引见归档文件本身、`docs/archive/README.md` 和 git history。

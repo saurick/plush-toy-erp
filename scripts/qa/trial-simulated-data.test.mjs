@@ -181,11 +181,11 @@ test("trial apply uses only V1 masterdata and sales_order RPC methods", async ()
           ? { contact: { id: counters.customerContact } }
           : { contact: { id: counters.supplierContact } },
       list_sales_orders: { sales_orders: [] },
-      create_sales_order: { sales_order: { id: counters.salesOrder } },
-      list_sales_order_items: { sales_order_items: [] },
-      add_sales_order_item: {
-        sales_order_item: { id: counters.salesOrderItem },
+      save_sales_order_with_items: {
+        sales_order: { id: counters.salesOrder },
+        sales_order_items: [{ id: counters.salesOrderItem, line_no: 1 }],
       },
+      list_sales_order_items: { sales_order_items: [] },
     };
     return {
       ok: true,
@@ -220,9 +220,7 @@ test("trial apply uses only V1 masterdata and sales_order RPC methods", async ()
         "list_contacts_by_owner",
         "create_contact",
         "list_sales_orders",
-        "create_sales_order",
-        "list_sales_order_items",
-        "add_sales_order_item",
+        "save_sales_order_with_items",
       ],
     );
     assert.equal(
@@ -233,8 +231,8 @@ test("trial apply uses only V1 masterdata and sales_order RPC methods", async ()
       ),
       false,
     );
-    assert.equal(calls.at(-1).params.product_id, 1);
-    assert.equal(calls.at(-1).params.unit_id, 2);
+    assert.equal(calls.at(-1).params.items[0].product_id, 1);
+    assert.equal(calls.at(-1).params.items[0].unit_id, 2);
   } finally {
     if (previousConfirm === undefined) {
       delete process.env.TRIAL_SIM_CONFIRM;

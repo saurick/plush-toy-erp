@@ -20,7 +20,12 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       displayName: "销售",
       productCoreRole: "sales",
       ownerPools: Object.freeze(["sales"]),
-      menuSurfaces: Object.freeze(["customers", "sales-orders", "shipments", "task-board"]),
+      menuSurfaces: Object.freeze([
+        "customers",
+        "sales-orders",
+        "shipments",
+        "task-board",
+      ]),
       capabilityKeys: Object.freeze([
         "erp.dashboard.read",
         "erp.print_template.read",
@@ -57,7 +62,12 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       displayName: "老板 / 管理审批",
       productCoreRole: "boss",
       ownerPools: Object.freeze(["boss"]),
-      menuSurfaces: Object.freeze(["global-dashboard", "task-board", "accessories-purchase", "print-center"]),
+      menuSurfaces: Object.freeze([
+        "global-dashboard",
+        "task-board",
+        "accessories-purchase",
+        "print-center",
+      ]),
       capabilityKeys: Object.freeze([
         "erp.dashboard.read",
         "erp.print_template.read",
@@ -86,7 +96,14 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       displayName: "工程",
       productCoreRole: "engineering",
       ownerPools: Object.freeze(["engineering"]),
-      menuSurfaces: Object.freeze(["products", "materials", "processes", "material-bom", "task-board", "print-center"]),
+      menuSurfaces: Object.freeze([
+        "products",
+        "materials",
+        "processes",
+        "material-bom",
+        "task-board",
+        "print-center",
+      ]),
       capabilityKeys: Object.freeze([
         "erp.dashboard.read",
         "erp.print_template.read",
@@ -121,7 +138,12 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       displayName: "PMC",
       productCoreRole: "pmc",
       ownerPools: Object.freeze(["pmc"]),
-      menuSurfaces: Object.freeze(["products", "material-bom", "production-progress", "task-board"]),
+      menuSurfaces: Object.freeze([
+        "products",
+        "material-bom",
+        "production-progress",
+        "task-board",
+      ]),
       capabilityKeys: Object.freeze([
         "erp.dashboard.read",
         "material.read",
@@ -150,7 +172,13 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       displayName: "采购",
       productCoreRole: "purchase",
       ownerPools: Object.freeze(["purchase"]),
-      menuSurfaces: Object.freeze(["suppliers", "accessories-purchase", "inbound", "task-board", "print-center"]),
+      menuSurfaces: Object.freeze([
+        "suppliers",
+        "accessories-purchase",
+        "inbound",
+        "task-board",
+        "print-center",
+      ]),
       capabilityKeys: Object.freeze([
         "erp.dashboard.read",
         "erp.print_template.read",
@@ -185,7 +213,13 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       displayName: "仓库",
       productCoreRole: "warehouse",
       ownerPools: Object.freeze(["warehouse"]),
-      menuSurfaces: Object.freeze(["inventory", "inbound", "outbound", "shipments", "task-board"]),
+      menuSurfaces: Object.freeze([
+        "inventory",
+        "inbound",
+        "outbound",
+        "shipments",
+        "task-board",
+      ]),
       capabilityKeys: Object.freeze([
         "erp.dashboard.read",
         "customer.read",
@@ -202,7 +236,9 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "warehouse.outbound.read",
         "warehouse.outbound.confirm",
         "shipment.read",
+        "shipment.create",
         "shipment.ship",
+        "shipment.cancel",
         "workflow.task.read",
         "workflow.task.update",
         "workflow.task.complete",
@@ -222,7 +258,11 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       displayName: "品质",
       productCoreRole: "quality",
       ownerPools: Object.freeze(["quality"]),
-      menuSurfaces: Object.freeze(["quality-inspections", "inbound", "task-board"]),
+      menuSurfaces: Object.freeze([
+        "quality-inspections",
+        "inbound",
+        "task-board",
+      ]),
       capabilityKeys: Object.freeze([
         "erp.dashboard.read",
         "supplier.read",
@@ -252,7 +292,15 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       displayName: "财务",
       productCoreRole: "finance",
       ownerPools: Object.freeze(["finance"]),
-      menuSurfaces: Object.freeze(["reconciliation", "payables", "receivables", "invoices", "shipments", "task-board", "print-center"]),
+      menuSurfaces: Object.freeze([
+        "reconciliation",
+        "payables",
+        "receivables",
+        "invoices",
+        "shipments",
+        "task-board",
+        "print-center",
+      ]),
       capabilityKeys: Object.freeze([
         "erp.dashboard.read",
         "erp.print_template.read",
@@ -289,7 +337,12 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       displayName: "生产 / 委外",
       productCoreRole: "production",
       ownerPools: Object.freeze(["production"]),
-      menuSurfaces: Object.freeze(["processing-contracts", "production-progress", "task-board", "print-center"]),
+      menuSurfaces: Object.freeze([
+        "processing-contracts",
+        "production-progress",
+        "task-board",
+        "print-center",
+      ]),
       capabilityKeys: Object.freeze([
         "erp.dashboard.read",
         "erp.print_template.read",

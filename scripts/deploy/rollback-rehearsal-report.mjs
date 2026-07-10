@@ -111,7 +111,7 @@ function printHelp() {
     --step "verify rollback command path=pass" \\
     --step "verify forward-fix owner path=pass" \\
     --post-smoke-report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json \\
-    --customer-config-revision yoyoosun-customer-package-v5.runtime-manifest-v1 \\
+    --customer-config-revision yoyoosun-customer-package-v6.runtime-manifest-v1 \\
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 
 Purpose:
