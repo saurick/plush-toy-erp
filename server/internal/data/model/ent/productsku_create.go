@@ -6,8 +6,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipmentitem"
@@ -230,6 +234,66 @@ func (_c *ProductSKUCreate) AddInventoryLots(v ...*InventoryLot) *ProductSKUCrea
 		ids[i] = v[i].ID
 	}
 	return _c.AddInventoryLotIDs(ids...)
+}
+
+// AddInventoryTxnIDs adds the "inventory_txns" edge to the InventoryTxn entity by IDs.
+func (_c *ProductSKUCreate) AddInventoryTxnIDs(ids ...int) *ProductSKUCreate {
+	_c.mutation.AddInventoryTxnIDs(ids...)
+	return _c
+}
+
+// AddInventoryTxns adds the "inventory_txns" edges to the InventoryTxn entity.
+func (_c *ProductSKUCreate) AddInventoryTxns(v ...*InventoryTxn) *ProductSKUCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddInventoryTxnIDs(ids...)
+}
+
+// AddInventoryBalanceIDs adds the "inventory_balances" edge to the InventoryBalance entity by IDs.
+func (_c *ProductSKUCreate) AddInventoryBalanceIDs(ids ...int) *ProductSKUCreate {
+	_c.mutation.AddInventoryBalanceIDs(ids...)
+	return _c
+}
+
+// AddInventoryBalances adds the "inventory_balances" edges to the InventoryBalance entity.
+func (_c *ProductSKUCreate) AddInventoryBalances(v ...*InventoryBalance) *ProductSKUCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddInventoryBalanceIDs(ids...)
+}
+
+// AddProductionFactIDs adds the "production_facts" edge to the ProductionFact entity by IDs.
+func (_c *ProductSKUCreate) AddProductionFactIDs(ids ...int) *ProductSKUCreate {
+	_c.mutation.AddProductionFactIDs(ids...)
+	return _c
+}
+
+// AddProductionFacts adds the "production_facts" edges to the ProductionFact entity.
+func (_c *ProductSKUCreate) AddProductionFacts(v ...*ProductionFact) *ProductSKUCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddProductionFactIDs(ids...)
+}
+
+// AddOutsourcingFactIDs adds the "outsourcing_facts" edge to the OutsourcingFact entity by IDs.
+func (_c *ProductSKUCreate) AddOutsourcingFactIDs(ids ...int) *ProductSKUCreate {
+	_c.mutation.AddOutsourcingFactIDs(ids...)
+	return _c
+}
+
+// AddOutsourcingFacts adds the "outsourcing_facts" edges to the OutsourcingFact entity.
+func (_c *ProductSKUCreate) AddOutsourcingFacts(v ...*OutsourcingFact) *ProductSKUCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddOutsourcingFactIDs(ids...)
 }
 
 // AddShipmentItemIDs adds the "shipment_items" edge to the ShipmentItem entity by IDs.
@@ -510,6 +574,70 @@ func (_c *ProductSKUCreate) createSpec() (*ProductSKU, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(inventorylot.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.InventoryTxnsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.InventoryTxnsTable,
+			Columns: []string{productsku.InventoryTxnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorytxn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.InventoryBalancesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.InventoryBalancesTable,
+			Columns: []string{productsku.InventoryBalancesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorybalance.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProductionFactsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.ProductionFactsTable,
+			Columns: []string{productsku.ProductionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.OutsourcingFactsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.OutsourcingFactsTable,
+			Columns: []string{productsku.OutsourcingFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingfact.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

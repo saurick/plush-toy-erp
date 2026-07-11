@@ -365,7 +365,7 @@ export const businessModuleDefinitions = Object.freeze([
     primaryEntity: 'shipments / shipment_items / stock_reservations',
     factSource: 'shipments, shipment_items, stock_reservations, inventory_txns',
     boundary:
-      '出货放行和任务完成不等于出库；库存预留释放 / 消耗不写库存流水，取消已发货才按后端规则写冲正追溯。',
+      '出货放行和任务完成不等于出库；库存预留释放不写库存流水，预留消耗只随真实出货事务完成，取消已发货才按后端规则写冲正追溯。',
     sourceRefs: [
       'shipments',
       'shipment_items',
@@ -374,7 +374,7 @@ export const businessModuleDefinitions = Object.freeze([
     ],
     currentScope: [
       '出货单草稿和发货',
-      '库存预留创建 / 释放 / 消耗',
+      '库存预留创建 / 释放与出货原子消耗',
       '出货取消冲正边界',
     ],
   },

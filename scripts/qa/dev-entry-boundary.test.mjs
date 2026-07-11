@@ -34,7 +34,12 @@ function assertIncludes(source, token, context) {
 }
 
 function buildDevTestingCopyPresetSource(preset = {}) {
-  return [preset.key, preset.label, preset.description, ...(preset.commands || [])]
+  return [
+    preset.key,
+    preset.label,
+    preset.description,
+    ...(preset.commands || []),
+  ]
     .filter(Boolean)
     .join("\n");
 }
@@ -69,6 +74,7 @@ function extractLocalCommandScriptPaths(command = "", currentCwd = repoRoot) {
 }
 
 test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV", () => {
+  const devDocsPageSource = read("web/src/erp/pages/DevDocsPage.jsx");
   assert.equal(DEV_HUB_ROUTE, "/__dev");
   assert.equal(DEV_TESTING_ROUTE, "/__dev/testing");
   assert.equal(DEV_CUSTOMER_CONFIG_ROUTE, "/__dev/customer-config");
@@ -79,10 +85,13 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   assert.equal(isDevCustomerConfigEnabled({ DEV: true }), true);
   assert.equal(isDevCustomerConfigEnabled({ DEV: false }), false);
   assert(
-    DEV_HUB_ITEMS.every((item) => String(item.route || "").startsWith("/__dev")),
+    DEV_HUB_ITEMS.every((item) =>
+      String(item.route || "").startsWith("/__dev"),
+    ),
     "all dev hub child entries must stay under /__dev",
   );
   const testingItem = DEV_HUB_ITEMS.find((item) => item.key === "testing");
+  const docsItem = DEV_HUB_ITEMS.find((item) => item.key === "docs");
   const customerConfigItem = DEV_HUB_ITEMS.find(
     (item) => item.key === "customer-config",
   );
@@ -92,12 +101,30 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
     ),
     "testing dev entry must reject reference commands",
   );
+  assert.match(
+    docsItem?.truthSource || "",
+    /当前工作区 Markdown/,
+    "dev docs entry must describe the Vite workspace glob instead of Git tracked state",
+  );
+  assert.doesNotMatch(docsItem?.description || "", /tracked Markdown/);
+  assertIncludes(
+    devDocsPageSource,
+    "当前工作区内已匹配的 Markdown",
+    "dev docs workspace source copy",
+  );
+  assert(
+    !devDocsPageSource.includes("浏览全量 Markdown"),
+    "dev docs page must not claim completeness beyond the current Vite glob",
+  );
   assert(
     (customerConfigItem?.guardrails || []).some((guardrail) =>
       String(guardrail).includes("No real import"),
     ),
     "customer config dev entry must reject real import",
   );
+  assert.match(customerConfigItem?.title || "", /预检与发布/);
+  assert.match(customerConfigItem?.truthSource || "", /已登记客户配置包/);
+  assert.doesNotMatch(customerConfigItem?.title || "", /导入/);
 });
 
 test("dev entry boundary: dev testing indexes only current maintained docs", () => {
@@ -893,6 +920,20 @@ test("dev entry boundary: indexed testing doc command scripts exist", () => {
 
 test("dev entry boundary: customer config console stays preview or gated apply only", () => {
   const pageSource = read("web/src/erp/pages/DevCustomerConfigPage.jsx");
+  assertIncludes(
+    pageSource,
+    "客户配置包预检与发布控制台",
+    "customer config console heading",
+  );
+  assertIncludes(
+    pageSource,
+    "不提供原始包上传",
+    "customer config console package-source boundary",
+  );
+  assert(
+    !pageSource.includes("客户配置包导入控制台"),
+    "customer config console must not imply an arbitrary package upload/import surface",
+  );
   const missingOverview = buildCustomerConfigDevOverviewFromSearch(
     "?customer=unknown-customer",
   );
@@ -901,14 +942,13 @@ test("dev entry boundary: customer config console stays preview or gated apply o
   assert.equal(missingOverview.menuSummary, undefined);
   assert.match(missingOverview.blockedPieces[0].boundary, /不会 fallback/);
 
-  const overview = buildCustomerConfigDevOverviewFromSearch(
-    "?customer=yoyoosun",
-  );
+  const overview =
+    buildCustomerConfigDevOverviewFromSearch("?customer=yoyoosun");
   assert.equal(overview.printTemplateSummary.templateCount, 5);
   assert.equal(overview.printTemplateSummary.sourceGroundedCount, 5);
   assert.deepEqual(
     overview.printTemplateSummary.templates.map((item) => item.title),
-    ['采购合同', '加工合同', '物料分析明细表', '色卡', '作业指导书'],
+    ["采购合同", "加工合同", "物料分析明细表", "色卡", "作业指导书"],
   );
   assert.match(
     overview.printTemplateSummary.boundary,
@@ -966,7 +1006,9 @@ test("dev entry boundary: customer config console stays preview or gated apply o
     ),
     "business data import must not be folded into customer config apply",
   );
-  const devConsoleCommands = summary.tools.map((item) => item.command).join("\n");
+  const devConsoleCommands = summary.tools
+    .map((item) => item.command)
+    .join("\n");
   assert(
     !devConsoleCommands.includes("CUSTOMER_CONFIG_ADMIN_TOKEN"),
     "dev customer config console must not render admin token placeholders",

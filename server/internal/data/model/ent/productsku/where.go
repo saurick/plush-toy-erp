@@ -942,6 +942,98 @@ func HasInventoryLotsWith(preds ...predicate.InventoryLot) predicate.ProductSKU 
 	})
 }
 
+// HasInventoryTxns applies the HasEdge predicate on the "inventory_txns" edge.
+func HasInventoryTxns() predicate.ProductSKU {
+	return predicate.ProductSKU(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, InventoryTxnsTable, InventoryTxnsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasInventoryTxnsWith applies the HasEdge predicate on the "inventory_txns" edge with a given conditions (other predicates).
+func HasInventoryTxnsWith(preds ...predicate.InventoryTxn) predicate.ProductSKU {
+	return predicate.ProductSKU(func(s *sql.Selector) {
+		step := newInventoryTxnsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasInventoryBalances applies the HasEdge predicate on the "inventory_balances" edge.
+func HasInventoryBalances() predicate.ProductSKU {
+	return predicate.ProductSKU(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, InventoryBalancesTable, InventoryBalancesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasInventoryBalancesWith applies the HasEdge predicate on the "inventory_balances" edge with a given conditions (other predicates).
+func HasInventoryBalancesWith(preds ...predicate.InventoryBalance) predicate.ProductSKU {
+	return predicate.ProductSKU(func(s *sql.Selector) {
+		step := newInventoryBalancesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasProductionFacts applies the HasEdge predicate on the "production_facts" edge.
+func HasProductionFacts() predicate.ProductSKU {
+	return predicate.ProductSKU(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ProductionFactsTable, ProductionFactsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProductionFactsWith applies the HasEdge predicate on the "production_facts" edge with a given conditions (other predicates).
+func HasProductionFactsWith(preds ...predicate.ProductionFact) predicate.ProductSKU {
+	return predicate.ProductSKU(func(s *sql.Selector) {
+		step := newProductionFactsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasOutsourcingFacts applies the HasEdge predicate on the "outsourcing_facts" edge.
+func HasOutsourcingFacts() predicate.ProductSKU {
+	return predicate.ProductSKU(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, OutsourcingFactsTable, OutsourcingFactsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasOutsourcingFactsWith applies the HasEdge predicate on the "outsourcing_facts" edge with a given conditions (other predicates).
+func HasOutsourcingFactsWith(preds ...predicate.OutsourcingFact) predicate.ProductSKU {
+	return predicate.ProductSKU(func(s *sql.Selector) {
+		step := newOutsourcingFactsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasShipmentItems applies the HasEdge predicate on the "shipment_items" edge.
 func HasShipmentItems() predicate.ProductSKU {
 	return predicate.ProductSKU(func(s *sql.Selector) {

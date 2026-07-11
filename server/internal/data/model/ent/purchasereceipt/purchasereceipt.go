@@ -25,6 +25,12 @@ const (
 	FieldReceivedAt = "received_at"
 	// FieldPostedAt holds the string denoting the posted_at field in the database.
 	FieldPostedAt = "posted_at"
+	// FieldIdempotencyKey holds the string denoting the idempotency_key field in the database.
+	FieldIdempotencyKey = "idempotency_key"
+	// FieldIdempotencyPayloadHash holds the string denoting the idempotency_payload_hash field in the database.
+	FieldIdempotencyPayloadHash = "idempotency_payload_hash"
+	// FieldIdempotencyItemCount holds the string denoting the idempotency_item_count field in the database.
+	FieldIdempotencyItemCount = "idempotency_item_count"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -79,6 +85,9 @@ var Columns = []string{
 	FieldStatus,
 	FieldReceivedAt,
 	FieldPostedAt,
+	FieldIdempotencyKey,
+	FieldIdempotencyPayloadHash,
+	FieldIdempotencyItemCount,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -109,6 +118,12 @@ var (
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	StatusValidator func(string) error
+	// IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
+	IdempotencyKeyValidator func(string) error
+	// IdempotencyPayloadHashValidator is a validator for the "idempotency_payload_hash" field. It is called by the builders before save.
+	IdempotencyPayloadHashValidator func(string) error
+	// IdempotencyItemCountValidator is a validator for the "idempotency_item_count" field. It is called by the builders before save.
+	IdempotencyItemCountValidator func(int) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -150,6 +165,21 @@ func ByReceivedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByPostedAt orders the results by the posted_at field.
 func ByPostedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPostedAt, opts...).ToFunc()
+}
+
+// ByIdempotencyKey orders the results by the idempotency_key field.
+func ByIdempotencyKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIdempotencyKey, opts...).ToFunc()
+}
+
+// ByIdempotencyPayloadHash orders the results by the idempotency_payload_hash field.
+func ByIdempotencyPayloadHash(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIdempotencyPayloadHash, opts...).ToFunc()
+}
+
+// ByIdempotencyItemCount orders the results by the idempotency_item_count field.
+func ByIdempotencyItemCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIdempotencyItemCount, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.

@@ -62,12 +62,18 @@ const (
 )
 
 var (
-	ErrProductionFactNotFound   = errors.New("production fact not found")
-	ErrOutsourcingFactNotFound  = errors.New("outsourcing fact not found")
-	ErrShipmentNotFound         = errors.New("shipment not found")
-	ErrShipmentItemNotFound     = errors.New("shipment item not found")
-	ErrStockReservationNotFound = errors.New("stock reservation not found")
-	ErrFinanceFactNotFound      = errors.New("finance fact not found")
+	ErrProductionFactNotFound           = errors.New("production fact not found")
+	ErrOutsourcingFactNotFound          = errors.New("outsourcing fact not found")
+	ErrShipmentNotFound                 = errors.New("shipment not found")
+	ErrShipmentItemNotFound             = errors.New("shipment item not found")
+	ErrShipmentSourceMismatch           = errors.New("shipment source mismatch")
+	ErrShipmentOrderNotActive           = errors.New("shipment sales order not active")
+	ErrShipmentQuantityExceeded         = errors.New("shipment quantity exceeds sales order")
+	ErrShipmentReservationSplit         = errors.New("shipment requires partial reservation consumption")
+	ErrStockReservationNotFound         = errors.New("stock reservation not found")
+	ErrStockReservationSourceMismatch   = errors.New("stock reservation source mismatch")
+	ErrStockReservationQuantityExceeded = errors.New("stock reservation quantity exceeds sales order")
+	ErrFinanceFactNotFound              = errors.New("finance fact not found")
 )
 
 type ProductionFact struct {
@@ -77,6 +83,7 @@ type ProductionFact struct {
 	Status         string
 	SubjectType    string
 	SubjectID      int
+	ProductSkuID   *int
 	WarehouseID    int
 	UnitID         int
 	LotID          *int
@@ -99,6 +106,7 @@ type OutsourcingFact struct {
 	Status         string
 	SubjectType    string
 	SubjectID      int
+	ProductSkuID   *int
 	WarehouseID    int
 	UnitID         int
 	LotID          *int
@@ -154,6 +162,7 @@ type StockReservation struct {
 	SalesOrderID     *int
 	SalesOrderItemID *int
 	ProductID        int
+	ProductSkuID     *int
 	WarehouseID      int
 	UnitID           int
 	LotID            *int
@@ -194,22 +203,24 @@ type FinanceFact struct {
 }
 
 type OperationalFactMutation struct {
-	FactNo         string
-	FactType       string
-	SubjectType    string
-	SubjectID      int
-	WarehouseID    int
-	UnitID         int
-	LotID          *int
-	Quantity       decimal.Decimal
-	SupplierID     *int
-	SupplierName   *string
-	SourceType     *string
-	SourceID       *int
-	SourceLineID   *int
-	IdempotencyKey string
-	OccurredAt     time.Time
-	Note           *string
+	FactNo              string
+	FactType            string
+	SubjectType         string
+	SubjectID           int
+	ProductSkuID        *int
+	WarehouseID         int
+	UnitID              int
+	LotID               *int
+	Quantity            decimal.Decimal
+	SupplierID          *int
+	SupplierName        *string
+	SourceType          *string
+	SourceID            *int
+	SourceLineID        *int
+	IdempotencyKey      string
+	OccurredAt          time.Time
+	OccurredAtSpecified bool
+	Note                *string
 }
 
 type ShipmentCreate struct {
@@ -240,37 +251,40 @@ type ShipmentCreateWithItems struct {
 }
 
 type StockReservationCreate struct {
-	ReservationNo    string
-	SalesOrderID     *int
-	SalesOrderItemID *int
-	ProductID        int
-	WarehouseID      int
-	UnitID           int
-	LotID            *int
-	Quantity         decimal.Decimal
-	IdempotencyKey   string
-	ReservedAt       time.Time
-	Note             *string
+	ReservationNo       string
+	SalesOrderID        *int
+	SalesOrderItemID    *int
+	ProductID           int
+	ProductSkuID        *int
+	WarehouseID         int
+	UnitID              int
+	LotID               *int
+	Quantity            decimal.Decimal
+	IdempotencyKey      string
+	ReservedAt          time.Time
+	ReservedAtSpecified bool
+	Note                *string
 }
 
 type FinanceFactCreate struct {
-	FactNo           string
-	FactType         string
-	CounterpartyType string
-	CounterpartyID   *int
-	Amount           decimal.Decimal
-	FeeAmount        decimal.Decimal
-	Currency         string
-	CollectionType   *string
-	PaymentTerm      *string
-	PaymentTermDays  *int
-	InvoiceCategory  *string
-	SourceType       *string
-	SourceID         *int
-	SourceLineID     *int
-	IdempotencyKey   string
-	OccurredAt       time.Time
-	Note             *string
+	FactNo              string
+	FactType            string
+	CounterpartyType    string
+	CounterpartyID      *int
+	Amount              decimal.Decimal
+	FeeAmount           decimal.Decimal
+	Currency            string
+	CollectionType      *string
+	PaymentTerm         *string
+	PaymentTermDays     *int
+	InvoiceCategory     *string
+	SourceType          *string
+	SourceID            *int
+	SourceLineID        *int
+	IdempotencyKey      string
+	OccurredAt          time.Time
+	OccurredAtSpecified bool
+	Note                *string
 }
 
 type OperationalFactFilter struct {
@@ -322,7 +336,6 @@ type OperationalFactRepo interface {
 
 	CreateStockReservation(ctx context.Context, in *StockReservationCreate) (*StockReservation, error)
 	ReleaseStockReservation(ctx context.Context, id int) (*StockReservation, error)
-	ConsumeStockReservation(ctx context.Context, id int) (*StockReservation, error)
 	ListStockReservations(ctx context.Context, filter OperationalFactFilter) ([]*StockReservation, int, error)
 
 	CreateFinanceFactDraft(ctx context.Context, in *FinanceFactCreate) (*FinanceFact, error)
@@ -330,6 +343,13 @@ type OperationalFactRepo interface {
 	SettleFinanceFact(ctx context.Context, id int) (*FinanceFact, error)
 	CancelPostedFinanceFact(ctx context.Context, id int) (*FinanceFact, error)
 	ListFinanceFacts(ctx context.Context, filter OperationalFactFilter) ([]*FinanceFact, int, error)
+}
+
+// OperationalFactCancellationActorRepo is the authenticated path for shipment
+// and finance cancellation compensation evidence.
+type OperationalFactCancellationActorRepo interface {
+	CancelShippedShipmentWithActor(ctx context.Context, id int, actorID int) (*Shipment, error)
+	CancelPostedFinanceFactWithActor(ctx context.Context, id int, actorID int) (*FinanceFact, error)
 }
 
 type OperationalFactUsecase struct {
@@ -349,6 +369,9 @@ func (uc *OperationalFactUsecase) CreateProductionFactDraft(ctx context.Context,
 		return nil, err
 	}
 	if err := uc.validateOperationalSubjectActive(ctx, normalized.SubjectType, normalized.SubjectID); err != nil {
+		return nil, err
+	}
+	if err := requireOptionalActiveReference(ctx, normalized.ProductSkuID, uc.repo.ProductSKUIsActive, ErrProductSKUInactive); err != nil {
 		return nil, err
 	}
 	if err := requireActiveReference(ctx, normalized.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
@@ -395,6 +418,9 @@ func (uc *OperationalFactUsecase) CreateOutsourcingFactDraft(ctx context.Context
 	}
 	normalized.SupplierName = normalizeOptionalString(normalized.SupplierName)
 	if err := uc.validateOperationalSubjectActive(ctx, normalized.SubjectType, normalized.SubjectID); err != nil {
+		return nil, err
+	}
+	if err := requireOptionalActiveReference(ctx, normalized.ProductSkuID, uc.repo.ProductSKUIsActive, ErrProductSKUInactive); err != nil {
 		return nil, err
 	}
 	if err := requireActiveReference(ctx, normalized.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
@@ -502,6 +528,17 @@ func (uc *OperationalFactUsecase) CancelShippedShipment(ctx context.Context, id 
 	return uc.repo.CancelShippedShipment(ctx, id)
 }
 
+func (uc *OperationalFactUsecase) CancelShippedShipmentWithActor(ctx context.Context, id int, actorID int) (*Shipment, error) {
+	if uc == nil || uc.repo == nil || id <= 0 || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(OperationalFactCancellationActorRepo)
+	if !ok {
+		return nil, ErrActorAwareCancellationUnavailable
+	}
+	return repo.CancelShippedShipmentWithActor(ctx, id, actorID)
+}
+
 func (uc *OperationalFactUsecase) ListShipments(ctx context.Context, filter OperationalFactFilter) ([]*Shipment, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
@@ -532,13 +569,6 @@ func (uc *OperationalFactUsecase) ReleaseStockReservation(ctx context.Context, i
 		return nil, ErrBadParam
 	}
 	return uc.repo.ReleaseStockReservation(ctx, id)
-}
-
-func (uc *OperationalFactUsecase) ConsumeStockReservation(ctx context.Context, id int) (*StockReservation, error) {
-	if uc == nil || uc.repo == nil || id <= 0 {
-		return nil, ErrBadParam
-	}
-	return uc.repo.ConsumeStockReservation(ctx, id)
 }
 
 func (uc *OperationalFactUsecase) ListStockReservations(ctx context.Context, filter OperationalFactFilter) ([]*StockReservation, int, error) {
@@ -588,6 +618,17 @@ func (uc *OperationalFactUsecase) CancelPostedFinanceFact(ctx context.Context, i
 		return nil, ErrBadParam
 	}
 	return uc.repo.CancelPostedFinanceFact(ctx, id)
+}
+
+func (uc *OperationalFactUsecase) CancelPostedFinanceFactWithActor(ctx context.Context, id int, actorID int) (*FinanceFact, error) {
+	if uc == nil || uc.repo == nil || id <= 0 || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(OperationalFactCancellationActorRepo)
+	if !ok {
+		return nil, ErrActorAwareCancellationUnavailable
+	}
+	return repo.CancelPostedFinanceFactWithActor(ctx, id, actorID)
 }
 
 func (uc *OperationalFactUsecase) ListFinanceFacts(ctx context.Context, filter OperationalFactFilter) ([]*FinanceFact, int, error) {
@@ -695,6 +736,9 @@ func normalizeOperationalFactMutation(in *OperationalFactMutation, allowedTypes 
 	if out.LotID != nil && *out.LotID <= 0 {
 		out.LotID = nil
 	}
+	if out.ProductSkuID != nil && (*out.ProductSkuID <= 0 || out.SubjectType != InventorySubjectProduct) {
+		return nil, ErrBadParam
+	}
 	if out.SupplierID != nil && *out.SupplierID <= 0 {
 		out.SupplierID = nil
 	}
@@ -719,9 +763,7 @@ func normalizeOperationalFactMutation(in *OperationalFactMutation, allowedTypes 
 	if _, err := value.NewPositiveQuantity(out.Quantity); err != nil {
 		return nil, ErrBadParam
 	}
-	if out.OccurredAt.IsZero() {
-		out.OccurredAt = time.Now()
-	}
+	out.OccurredAt, out.OccurredAtSpecified = normalizeIdempotencyIntentTime(out.OccurredAt)
 	return &out, nil
 }
 
@@ -743,6 +785,10 @@ func normalizeShipmentCreate(in *ShipmentCreate) (*ShipmentCreate, error) {
 	}
 	if out.CustomerID != nil && *out.CustomerID <= 0 {
 		out.CustomerID = nil
+	}
+	if out.PlannedShipAt != nil {
+		plannedShipAt := out.PlannedShipAt.UTC().Truncate(time.Microsecond)
+		out.PlannedShipAt = &plannedShipAt
 	}
 	if out.ShipmentNo == "" {
 		return nil, ErrBadParam
@@ -818,12 +864,13 @@ func normalizeStockReservationCreate(in *StockReservationCreate) (*StockReservat
 	if out.SalesOrderItemID != nil && *out.SalesOrderItemID <= 0 {
 		out.SalesOrderItemID = nil
 	}
+	if out.ProductSkuID != nil && *out.ProductSkuID <= 0 {
+		return nil, ErrBadParam
+	}
 	if out.LotID != nil && *out.LotID <= 0 {
 		out.LotID = nil
 	}
-	if out.ReservedAt.IsZero() {
-		out.ReservedAt = time.Now()
-	}
+	out.ReservedAt, out.ReservedAtSpecified = normalizeIdempotencyIntentTime(out.ReservedAt)
 	if out.ReservationNo == "" || out.ProductID <= 0 || out.WarehouseID <= 0 || out.UnitID <= 0 {
 		return nil, ErrBadParam
 	}
@@ -904,9 +951,7 @@ func normalizeFinanceFactCreate(in *FinanceFactCreate) (*FinanceFactCreate, erro
 	if _, err := value.NewNonNegativeMoney(out.FeeAmount); err != nil {
 		return nil, ErrBadParam
 	}
-	if out.OccurredAt.IsZero() {
-		out.OccurredAt = time.Now()
-	}
+	out.OccurredAt, out.OccurredAtSpecified = normalizeIdempotencyIntentTime(out.OccurredAt)
 	return &out, nil
 }
 
@@ -924,6 +969,11 @@ func (uc *OperationalFactUsecase) validateFinanceFactSource(ctx context.Context,
 			return err
 		}
 		if shipment.Status != ShipmentStatusShipped {
+			return ErrBadParam
+		}
+		if shipment.CustomerID == nil || *shipment.CustomerID <= 0 ||
+			in.CounterpartyType != FinanceCounterpartyCustomer ||
+			in.CounterpartyID == nil || *in.CounterpartyID != *shipment.CustomerID {
 			return ErrBadParam
 		}
 	}
@@ -1129,6 +1179,9 @@ func (uc *OperationalFactUsecase) validateStockReservationActiveReferences(ctx c
 	}
 	if in.SalesOrderItemID == nil {
 		if err := requireActiveReference(ctx, in.ProductID, uc.repo.ProductIsActive, ErrProductInactive); err != nil {
+			return err
+		}
+		if err := requireOptionalActiveReference(ctx, in.ProductSkuID, uc.repo.ProductSKUIsActive, ErrProductSKUInactive); err != nil {
 			return err
 		}
 		if err := requireActiveReference(ctx, in.UnitID, uc.repo.UnitIsActive, ErrUnitInactive); err != nil {

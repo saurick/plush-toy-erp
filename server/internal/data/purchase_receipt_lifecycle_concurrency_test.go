@@ -152,6 +152,145 @@ func TestPurchaseReceiptPostgresConcurrentAutomaticDraftGeneration(t *testing.T)
 	}
 }
 
+func TestPurchaseReceiptPostgresConcurrentCommandReplayReturnsOneFactSet(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+	postgresFixtures := createPurchaseReceiptPostgresFixtures(t, ctx, client)
+	fixtures := inventoryTestFixtures{
+		unitID:      postgresFixtures.unitID,
+		materialID:  postgresFixtures.materialID,
+		productID:   postgresFixtures.productID,
+		warehouseID: postgresFixtures.warehouseID,
+	}
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	orderItem := createApprovedPurchaseOrderItemForReceiptTest(
+		t,
+		ctx,
+		client,
+		fixtures,
+		"PG-COMMAND-IDEMPOTENCY-"+postgresFixtures.suffix,
+		mustDecimal(t, "10"),
+	)
+	input := biz.PurchaseReceiptFromPurchaseOrderCreate{
+		PurchaseOrderID: orderItem.PurchaseOrderID,
+		ReceiptNo:       "PR-PG-COMMAND-IDEMPOTENCY-" + postgresFixtures.suffix,
+		WarehouseID:     fixtures.warehouseID,
+		IdempotencyKey:  "process:pg:" + postgresFixtures.suffix + ":purchase-receipt-create",
+	}
+
+	start := make(chan struct{})
+	results := make([]purchaseReceiptDraftResult, 2)
+	var wg sync.WaitGroup
+	for index := range results {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			<-start
+			next := input
+			results[index].receipt, results[index].err = uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &next)
+		}(index)
+	}
+	close(start)
+	wg.Wait()
+
+	for index, result := range results {
+		if result.err != nil {
+			t.Fatalf("concurrent command replay %d failed: %v", index, result.err)
+		}
+		if result.receipt == nil || len(result.receipt.Items) != 1 || len(result.receipt.QualityInspections) != 1 {
+			t.Fatalf("concurrent command replay %d returned incomplete fact set: %#v", index, result.receipt)
+		}
+	}
+	if results[0].receipt.ID != results[1].receipt.ID ||
+		results[0].receipt.Items[0].ID != results[1].receipt.Items[0].ID ||
+		results[0].receipt.QualityInspections[0].ID != results[1].receipt.QualityInspections[0].ID {
+		t.Fatalf("concurrent command replays returned different fact refs: %#v %#v", results[0].receipt, results[1].receipt)
+	}
+	receiptCount, err := client.PurchaseReceipt.Query().
+		Where(purchasereceipt.IdempotencyKey(input.IdempotencyKey)).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count postgres command receipt facts failed: %v", err)
+	}
+	if receiptCount != 1 {
+		t.Fatalf("concurrent command replay must persist one receipt fact, got %d", receiptCount)
+	}
+}
+
+func TestPurchaseReceiptPostgresConcurrentCommandPayloadConflictPersistsOneFactSet(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+	postgresFixtures := createPurchaseReceiptPostgresFixtures(t, ctx, client)
+	fixtures := inventoryTestFixtures{
+		unitID:      postgresFixtures.unitID,
+		materialID:  postgresFixtures.materialID,
+		productID:   postgresFixtures.productID,
+		warehouseID: postgresFixtures.warehouseID,
+	}
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	firstOrderItem := createApprovedPurchaseOrderItemForReceiptTest(
+		t, ctx, client, fixtures, "PG-COMMAND-CONFLICT-A-"+postgresFixtures.suffix, mustDecimal(t, "3"),
+	)
+	secondOrderItem := createApprovedPurchaseOrderItemForReceiptTest(
+		t, ctx, client, fixtures, "PG-COMMAND-CONFLICT-B-"+postgresFixtures.suffix, mustDecimal(t, "4"),
+	)
+	key := "process:pg:" + postgresFixtures.suffix + ":purchase-receipt-conflict"
+	inputs := []biz.PurchaseReceiptFromPurchaseOrderCreate{
+		{
+			PurchaseOrderID: firstOrderItem.PurchaseOrderID,
+			ReceiptNo:       "PR-PG-COMMAND-CONFLICT-A-" + postgresFixtures.suffix,
+			WarehouseID:     fixtures.warehouseID,
+			IdempotencyKey:  key,
+		},
+		{
+			PurchaseOrderID: secondOrderItem.PurchaseOrderID,
+			ReceiptNo:       "PR-PG-COMMAND-CONFLICT-B-" + postgresFixtures.suffix,
+			WarehouseID:     fixtures.warehouseID,
+			IdempotencyKey:  key,
+		},
+	}
+
+	start := make(chan struct{})
+	results := make([]purchaseReceiptDraftResult, len(inputs))
+	var wg sync.WaitGroup
+	for index := range inputs {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			<-start
+			results[index].receipt, results[index].err = uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &inputs[index])
+		}(index)
+	}
+	close(start)
+	wg.Wait()
+
+	successes := 0
+	conflicts := 0
+	for _, result := range results {
+		switch {
+		case result.err == nil:
+			successes++
+			if result.receipt == nil || len(result.receipt.Items) != 1 || len(result.receipt.QualityInspections) != 1 {
+				t.Fatalf("successful conflicting command returned incomplete facts: %#v", result.receipt)
+			}
+		case errors.Is(result.err, biz.ErrIdempotencyConflict):
+			conflicts++
+		default:
+			t.Fatalf("unexpected concurrent idempotency conflict result: %v", result.err)
+		}
+	}
+	if successes != 1 || conflicts != 1 {
+		t.Fatalf("expected one command success and one payload conflict, successes=%d conflicts=%d", successes, conflicts)
+	}
+	receiptCount, err := client.PurchaseReceipt.Query().Where(purchasereceipt.IdempotencyKey(key)).Count(ctx)
+	if err != nil {
+		t.Fatalf("count postgres conflicting command facts failed: %v", err)
+	}
+	if receiptCount != 1 {
+		t.Fatalf("concurrent payload conflict must persist one receipt fact, got %d", receiptCount)
+	}
+}
+
 func TestPurchaseReceiptPostgresAdjustmentPostAndReceiptCancelSerialize(t *testing.T) {
 	ctx := context.Background()
 	data, client := openPurchaseReceiptPostgresTestData(t)

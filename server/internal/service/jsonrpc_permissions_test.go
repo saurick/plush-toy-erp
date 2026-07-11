@@ -64,3 +64,47 @@ func TestRequireAdminPermissionIntersectsRBACWithActiveCustomerEntitlement(t *te
 		t.Fatalf("control-plane repair permission must stay under RBAC, got %#v", got)
 	}
 }
+
+func TestRequireAdminPermissionFailsClosedWithoutFixedCustomerActiveRevision(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", "yoyoosun")
+	dispatcher := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(
+			log.NewStdLogger(io.Discard),
+			"module", "service.jsonrpc.permissions.test",
+		)),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin(
+			[]string{biz.SalesRoleKey},
+			biz.PermissionSalesOrderRead,
+			biz.PermissionCustomerConfigRead,
+		)},
+		customerConfigUC: biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo()),
+	}
+
+	ctx := withAdminPermissionCache(workflowJSONRPCAdminContext())
+	if got := dispatcher.RequireAdminPermission(ctx, biz.PermissionSalesOrderRead); got == nil || got.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("business permission must fail closed without active revision, got %#v", got)
+	}
+	ctx = withAdminPermissionCache(workflowJSONRPCAdminContext())
+	if got := dispatcher.RequireAdminPermission(ctx, biz.PermissionCustomerConfigRead); got != nil {
+		t.Fatalf("customer config repair permission must remain available under RBAC, got %#v", got)
+	}
+}
+
+func TestSuperAdminBusinessPermissionFailsClosedWithoutFixedCustomerActiveRevision(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", "yoyoosun")
+	dispatcher := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.permissions.test")),
+		adminReader: stubAdminAccountReader{admin: &biz.AdminUser{
+			ID: 7, Username: "admin", IsSuperAdmin: true,
+		}},
+		customerConfigUC: biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo()),
+	}
+	ctx := withAdminPermissionCache(workflowJSONRPCAdminContext())
+	if got := dispatcher.RequireAdminPermission(ctx, biz.PermissionShipmentShip); got == nil || got.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("super admin business permission must fail closed without active revision, got %#v", got)
+	}
+	ctx = withAdminPermissionCache(workflowJSONRPCAdminContext())
+	if got := dispatcher.RequireAdminPermission(ctx, biz.PermissionCustomerConfigPublish); got != nil {
+		t.Fatalf("super admin customer config repair permission must stay available, got %#v", got)
+	}
+}

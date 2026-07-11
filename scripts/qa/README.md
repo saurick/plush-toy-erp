@@ -10,9 +10,11 @@
 
 | 入口 | 用途 | 建议时机 |
 | --- | --- | --- |
+| `bash scripts/qa/affected.sh --plan` | 读取当前工作树、staged、指定 base 或显式文件，按 T0-T8 和受影响领域输出最小必要测试；默认只计划，未知路径保守升级为 `full.sh` | 开发过程中、准备验证前 |
+| `bash scripts/qa/affected.sh --run` | 执行 affected 选出的安全本地命令并记录逐项耗时；浏览器 L1、`make data` 和目标环境证据仍作为 required follow-up 单列 | 完成一个可验证切片后 |
 | `bash scripts/qa/fast.sh` | 高频快速检查，覆盖文档清单、命名边界、客户配置、菜单和核心脚本守卫 | 日常开发后 |
 | `bash scripts/qa/strict.sh` | 严格检查，包含本地 PostgreSQL 关键事务门禁，面向发版前或大范围收口 | 发版前 / 大改后 |
-| `bash scripts/qa/full.sh` | 推送前全量检查，包含 fast、前端测试 / 构建、本地 PostgreSQL 关键事务测试和后端测试 / 构建 | 提交推送前 |
+| `bash scripts/qa/full.sh` | 推送前全量检查，包含 fast、secrets、前端测试 / 构建、本地 PostgreSQL 关键事务测试和后端测试 / 构建；govulncheck 最后运行，避免外部网络扰动本地并发门禁 | 提交推送前 |
 | `node scripts/qa/docs-inventory.test.mjs` | 检查当前维护 Markdown 是否登记到 `docs/文档清单.md` | 新增、删除、重命名 README 或长期文档后 |
 | `node scripts/qa/phase-label-boundaries.mjs` | 扫描活跃运行时代码、脚本和正式文档入口的历史阶段命名残留 | 改脚本、API、命名或治理文档后 |
 | `node scripts/qa/test-data-isolation-boundary.mjs --json` | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备边界，并锁住 dry-run 不具备执行能力 | 改 seed、fixture、模拟数据或导入准备工具后 |
@@ -27,7 +29,7 @@
 | 文档与命名守卫 | `docs-inventory.test.mjs`、`phase-label-boundaries.mjs` | 只证明路径、命名和登记未漂移，不证明文档内容是 runtime truth |
 | 客户配置与私有化边界 | `customer-config-boundaries.mjs`、`customer-config-effective-session-probe.mjs`、`customer-package-lint.mjs`、`customer-package-preview-boundary.test.mjs`、`customer-config-runtime-manifest.mjs` | 只做 lint / preview / manifest 编译、无凭据读回探针和边界检查，不写 Fact |
 | Workflow / Fact 边界 | `workflow-fact-boundary.test.mjs`、`workflow-ui-action-boundary.test.mjs` | 防止协同任务路径越界写入事实层 |
-| 测试数据隔离 | `test-data-isolation-boundary.mjs`、`trial-simulated-data.mjs`、`mobile-workflow-simulated-closure.mjs`、`operational-fact-simulated-closure.mjs` | Product Core demo seed、yoyoosun 模拟数据、真实导入预检和真实执行门禁分桶检查；不连接后端、不写 DB、不执行导入 |
+| 测试数据隔离 | `test-data-isolation-boundary.mjs`、`trial-simulated-data.mjs`、`purchase-quality-simulated-matrix.mjs`、`mobile-workflow-simulated-closure.mjs`、`operational-fact-simulated-closure.mjs` | Product Core demo seed、yoyoosun 中文手工回归矩阵、真实导入预检和真实执行门禁分桶检查；静态守卫本身不连接后端、不写 DB、不执行导入，带显式确认的模拟脚本才会经 JSON-RPC 写测试环境 |
 | 代码质量和安全 | `secrets.sh`、`error-codes.sh`、`go-vet.sh`、`govulncheck.sh`、`shellcheck.sh`、`shfmt.sh`、`yamllint.sh` | 按对应语言 / 配置类型补充检查，不替代业务回归 |
 
 ## 输出与写入边界
@@ -35,3 +37,18 @@
 - 脱敏报告和模拟 evidence 默认写到 `output/**` 或调用方显式指定的 ignored 目录。
 - 脚本不得把真实密码、token、完整 DSN、URL userinfo、原始客户文件内容或未脱敏输出写入仓库。
 - 调整 QA 脚本后，至少运行对应 `node --check` / `node --test`，并按影响面补 `fast.sh`、`strict.sh` 或专题命令。
+
+## 按影响面选择 / Affected Tests
+
+`affected.sh` 默认收集 unstaged、staged 和未跟踪文件，也支持只看 staged、指定 Git base 或显式文件：
+
+```bash
+bash scripts/qa/affected.sh --plan
+bash scripts/qa/affected.sh --staged --plan
+bash scripts/qa/affected.sh --base origin/main --plan
+bash scripts/qa/affected.sh --file web/src/erp/utils/dateRange.mjs --run
+```
+
+选择器优先复用同名 `*.test.mjs`；页面、共享布局和样式会提示补定向 `STYLE_L1_SCENARIOS`；业务事实 repo/usecase 会升级到本地隔离 PostgreSQL 关键事务门禁；schema/migration 会运行只读守卫和数据层测试，但不会自动执行可能改写生成文件的 `make data`；部署、全局入口、无独立测试的 QA 脚本和未知路径会保守升级到 `full.sh`。
+
+`affected` 是开发期快速反馈入口，不修改 Git hooks。`pre-push` 仍固定运行 `full.sh`，发版前仍需 `strict.sh` 和目标环境 migration、health/smoke、备份恢复及回滚 evidence。

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/productionfact"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/warehouse"
 	"time"
@@ -59,6 +60,20 @@ func (_c *ProductionFactCreate) SetSubjectType(v string) *ProductionFactCreate {
 // SetSubjectID sets the "subject_id" field.
 func (_c *ProductionFactCreate) SetSubjectID(v int) *ProductionFactCreate {
 	_c.mutation.SetSubjectID(v)
+	return _c
+}
+
+// SetProductSkuID sets the "product_sku_id" field.
+func (_c *ProductionFactCreate) SetProductSkuID(v int) *ProductionFactCreate {
+	_c.mutation.SetProductSkuID(v)
+	return _c
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_c *ProductionFactCreate) SetNillableProductSkuID(v *int) *ProductionFactCreate {
+	if v != nil {
+		_c.SetProductSkuID(*v)
+	}
 	return _c
 }
 
@@ -156,6 +171,20 @@ func (_c *ProductionFactCreate) SetNillableOccurredAt(v *time.Time) *ProductionF
 	return _c
 }
 
+// SetOccurredAtSpecified sets the "occurred_at_specified" field.
+func (_c *ProductionFactCreate) SetOccurredAtSpecified(v bool) *ProductionFactCreate {
+	_c.mutation.SetOccurredAtSpecified(v)
+	return _c
+}
+
+// SetNillableOccurredAtSpecified sets the "occurred_at_specified" field if the given value is not nil.
+func (_c *ProductionFactCreate) SetNillableOccurredAtSpecified(v *bool) *ProductionFactCreate {
+	if v != nil {
+		_c.SetOccurredAtSpecified(*v)
+	}
+	return _c
+}
+
 // SetPostedAt sets the "posted_at" field.
 func (_c *ProductionFactCreate) SetPostedAt(v time.Time) *ProductionFactCreate {
 	_c.mutation.SetPostedAt(v)
@@ -220,6 +249,11 @@ func (_c *ProductionFactCreate) SetWarehouse(v *Warehouse) *ProductionFactCreate
 // SetUnit sets the "unit" edge to the Unit entity.
 func (_c *ProductionFactCreate) SetUnit(v *Unit) *ProductionFactCreate {
 	return _c.SetUnitID(v.ID)
+}
+
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_c *ProductionFactCreate) SetProductSku(v *ProductSKU) *ProductionFactCreate {
+	return _c.SetProductSkuID(v.ID)
 }
 
 // SetInventoryLotID sets the "inventory_lot" edge to the InventoryLot entity by ID.
@@ -289,6 +323,10 @@ func (_c *ProductionFactCreate) defaults() error {
 		v := productionfact.DefaultOccurredAt()
 		_c.mutation.SetOccurredAt(v)
 	}
+	if _, ok := _c.mutation.OccurredAtSpecified(); !ok {
+		v := productionfact.DefaultOccurredAtSpecified
+		_c.mutation.SetOccurredAtSpecified(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		if productionfact.DefaultCreatedAt == nil {
 			return fmt.Errorf("ent: uninitialized productionfact.DefaultCreatedAt (forgotten import ent/runtime?)")
@@ -348,6 +386,11 @@ func (_c *ProductionFactCreate) check() error {
 			return &ValidationError{Name: "subject_id", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.subject_id": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.ProductSkuID(); ok {
+		if err := productionfact.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.product_sku_id": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.WarehouseID(); !ok {
 		return &ValidationError{Name: "warehouse_id", err: errors.New(`ent: missing required field "ProductionFact.warehouse_id"`)}
 	}
@@ -397,6 +440,9 @@ func (_c *ProductionFactCreate) check() error {
 	}
 	if _, ok := _c.mutation.OccurredAt(); !ok {
 		return &ValidationError{Name: "occurred_at", err: errors.New(`ent: missing required field "ProductionFact.occurred_at"`)}
+	}
+	if _, ok := _c.mutation.OccurredAtSpecified(); !ok {
+		return &ValidationError{Name: "occurred_at_specified", err: errors.New(`ent: missing required field "ProductionFact.occurred_at_specified"`)}
 	}
 	if v, ok := _c.mutation.Note(); ok {
 		if err := productionfact.NoteValidator(v); err != nil {
@@ -485,6 +531,10 @@ func (_c *ProductionFactCreate) createSpec() (*ProductionFact, *sqlgraph.CreateS
 		_spec.SetField(productionfact.FieldOccurredAt, field.TypeTime, value)
 		_node.OccurredAt = value
 	}
+	if value, ok := _c.mutation.OccurredAtSpecified(); ok {
+		_spec.SetField(productionfact.FieldOccurredAtSpecified, field.TypeBool, value)
+		_node.OccurredAtSpecified = value
+	}
 	if value, ok := _c.mutation.PostedAt(); ok {
 		_spec.SetField(productionfact.FieldPostedAt, field.TypeTime, value)
 		_node.PostedAt = &value
@@ -533,6 +583,23 @@ func (_c *ProductionFactCreate) createSpec() (*ProductionFact, *sqlgraph.CreateS
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.UnitID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   productionfact.ProductSkuTable,
+			Columns: []string{productionfact.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ProductSkuID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.InventoryLotIDs(); len(nodes) > 0 {

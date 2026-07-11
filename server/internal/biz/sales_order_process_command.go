@@ -17,6 +17,13 @@ type salesOrderSubmitProcessCommandHandler struct {
 	uc *SalesOrderUsecase
 }
 
+// SalesOrderSubmitProcessCommandRepo is implemented by the production data
+// repository so the lifecycle transition and durable ProcessRuntime result are
+// committed by one database transaction.
+type SalesOrderSubmitProcessCommandRepo interface {
+	SubmitSalesOrderForProcessCommand(ctx context.Context, salesOrderID int, command *ProcessDomainCommandInput, result *ProcessDomainCommandResult, actorID int) (*SalesOrder, error)
+}
+
 func RegisterSalesOrderProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, salesOrderUC *SalesOrderUsecase) error {
 	if processRuntimeUC == nil || salesOrderUC == nil {
 		return ErrBadParam
@@ -27,27 +34,56 @@ func RegisterSalesOrderProcessDomainCommandHandlers(processRuntimeUC *ProcessRun
 	)
 }
 
-func (h *salesOrderSubmitProcessCommandHandler) ExecuteProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) (*ProcessDomainCommandResult, error) {
+func (h *salesOrderSubmitProcessCommandHandler) ValidateProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) error {
 	if h == nil || h.uc == nil || in == nil || in.ProcessInstance == nil {
-		return nil, ErrBadParam
+		return ErrBadParam
 	}
 	if strings.TrimSpace(in.CommandKey) != ProcessDomainCommandSalesOrderSubmit {
-		return nil, ErrBadParam
+		return ErrBadParam
+	}
+	if err := validateProcessDomainCommandPayloadKeys(in.Payload, salesOrderProcessCommandPayloadSalesOrderID); err != nil {
+		return err
 	}
 	if in.ProcessInstance.BusinessRefType != salesOrderProcessCommandBusinessRefType || in.ProcessInstance.BusinessRefID <= 0 {
-		return nil, ErrBadParam
+		return ErrBadParam
 	}
 	payloadSalesOrderID, hasPayloadSalesOrderID, err := salesOrderIDFromProcessCommandPayload(in.Payload)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if hasPayloadSalesOrderID && payloadSalesOrderID != in.ProcessInstance.BusinessRefID {
-		return nil, ErrBadParam
+		return ErrBadParam
 	}
-	if _, err := h.uc.SubmitSalesOrder(ctx, in.ProcessInstance.BusinessRefID); err != nil {
+	order, err := h.uc.GetSalesOrder(ctx, in.ProcessInstance.BusinessRefID)
+	if err != nil {
+		return err
+	}
+	if order == nil || (order.LifecycleStatus != SalesOrderStatusDraft && order.LifecycleStatus != SalesOrderStatusSubmitted) {
+		return ErrBadParam
+	}
+	return nil
+}
+
+func (h *salesOrderSubmitProcessCommandHandler) ExecuteProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) (*ProcessDomainCommandResult, error) {
+	if err := h.ValidateProcessDomainCommand(ctx, in, actorID); err != nil {
 		return nil, err
 	}
-	return &ProcessDomainCommandResult{Outcome: SalesOrderProcessCommandOutcomeSubmitted}, nil
+	orderID := in.ProcessInstance.BusinessRefID
+	result := &ProcessDomainCommandResult{
+		Outcome:     SalesOrderProcessCommandOutcomeSubmitted,
+		EffectState: ProcessDomainCommandEffectStateApplied,
+		EffectRef:   &ProcessBusinessRef{RefType: salesOrderProcessCommandBusinessRefType, RefID: orderID},
+	}
+	if repo, ok := h.uc.repo.(SalesOrderSubmitProcessCommandRepo); ok {
+		if _, err := repo.SubmitSalesOrderForProcessCommand(ctx, orderID, in, result, actorID); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+	if _, err := h.uc.SubmitSalesOrder(ctx, orderID); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func salesOrderIDFromProcessCommandPayload(payload map[string]any) (int, bool, error) {

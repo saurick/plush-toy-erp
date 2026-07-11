@@ -6,21 +6,10 @@ import (
 )
 
 const (
-	ShipmentProcessCommandOutcomeShipped          = "shipment.shipped"
-	ShipmentProcessCommandOutcomeFinanceReleased  = "shipment.finance_released"
-	shipmentProcessCommandBusinessRefType         = "shipment"
-	shipmentProcessCommandPayloadShipmentID       = "shipment_id"
-	shipmentProcessCommandPayloadShipmentNo       = "shipment_no"
-	shipmentProcessCommandPayloadWarehouseID      = "warehouse_id"
-	shipmentProcessCommandPayloadOperatorID       = "operator_id"
-	shipmentProcessCommandPayloadShippedAt        = "shipped_at"
-	shipmentProcessCommandPayloadCarrier          = "carrier"
-	shipmentProcessCommandPayloadTrackingNo       = "tracking_no"
-	shipmentProcessCommandPayloadShipmentNote     = "ship_note"
-	shipmentProcessCommandPayloadFinanceReleaseNo = "finance_release_no"
-	shipmentProcessCommandPayloadApprovedByID     = "approved_by_id"
-	shipmentProcessCommandPayloadReleasedAt       = "released_at"
-	shipmentProcessCommandPayloadReleaseNote      = "release_note"
+	ShipmentProcessCommandOutcomeShipped         = "shipment.shipped"
+	ShipmentProcessCommandOutcomeFinanceReleased = "shipment.finance_released"
+	shipmentProcessCommandBusinessRefType        = "shipment"
+	shipmentProcessCommandPayloadShipmentID      = "shipment_id"
 )
 
 type shipmentFinanceReleaseProcessCommandHandler struct {
@@ -29,6 +18,11 @@ type shipmentFinanceReleaseProcessCommandHandler struct {
 
 type shipmentShipProcessCommandHandler struct {
 	uc *OperationalFactUsecase
+}
+
+type ShipmentProcessCommandRepo interface {
+	RecordShipmentFinanceReleaseProcessCommand(ctx context.Context, shipmentID int, command *ProcessDomainCommandInput, result *ProcessDomainCommandResult, actorID int) (*Shipment, error)
+	ShipShipmentForProcessCommand(ctx context.Context, shipmentID int, command *ProcessDomainCommandInput, result *ProcessDomainCommandResult, actorID int) (*Shipment, error)
 }
 
 func RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, operationalFactUC *OperationalFactUsecase) error {
@@ -47,77 +41,97 @@ func RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC *ProcessRunti
 	)
 }
 
-func (h *shipmentFinanceReleaseProcessCommandHandler) ExecuteProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) (*ProcessDomainCommandResult, error) {
+func (h *shipmentFinanceReleaseProcessCommandHandler) ValidateProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) error {
 	if h == nil || h.uc == nil || in == nil || in.ProcessInstance == nil {
-		return nil, ErrBadParam
+		return ErrBadParam
 	}
 	if strings.TrimSpace(in.CommandKey) != ProcessDomainCommandShipmentFinanceRelease {
-		return nil, ErrBadParam
+		return ErrBadParam
+	}
+	if err := validateProcessDomainCommandPayloadKeys(in.Payload, shipmentProcessCommandPayloadShipmentID); err != nil {
+		return err
 	}
 	shipmentID, err := shipmentIDFromProcessCommandPayload(in.Payload)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if !ProcessInstanceHasBusinessRef(in.ProcessInstance, shipmentProcessCommandBusinessRefType, shipmentID) {
-		return nil, ErrBadParam
+		return ErrBadParam
 	}
-	if _, hasReleaseNo := in.Payload[shipmentProcessCommandPayloadFinanceReleaseNo]; hasReleaseNo {
-		if processCommandStringFromPayload(in.Payload, shipmentProcessCommandPayloadFinanceReleaseNo) == "" {
-			return nil, ErrBadParam
-		}
-	}
-	if _, _, err := processCommandPositiveIntFromPayload(in.Payload, shipmentProcessCommandPayloadApprovedByID); err != nil {
-		return nil, err
-	}
-	if _, err := processCommandOptionalTimeFromPayload(in.Payload, shipmentProcessCommandPayloadReleasedAt); err != nil {
-		return nil, err
-	}
-	_ = processCommandOptionalStringPtrFromPayload(in.Payload, shipmentProcessCommandPayloadReleaseNote)
 	shipment, err := h.uc.GetShipment(ctx, shipmentID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if shipment == nil || shipment.ID != shipmentID || shipment.Status != ShipmentStatusDraft {
-		return nil, ErrBadParam
+		return ErrBadParam
 	}
-	return &ProcessDomainCommandResult{Outcome: ShipmentProcessCommandOutcomeFinanceReleased}, nil
+	return nil
+}
+
+func (h *shipmentFinanceReleaseProcessCommandHandler) ExecuteProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) (*ProcessDomainCommandResult, error) {
+	if err := h.ValidateProcessDomainCommand(ctx, in, actorID); err != nil {
+		return nil, err
+	}
+	shipmentID, _ := shipmentIDFromProcessCommandPayload(in.Payload)
+	result := &ProcessDomainCommandResult{
+		Outcome:     ShipmentProcessCommandOutcomeFinanceReleased,
+		EffectState: ProcessDomainCommandEffectStateNone,
+	}
+	if repo, ok := h.uc.repo.(ShipmentProcessCommandRepo); ok {
+		if _, err := repo.RecordShipmentFinanceReleaseProcessCommand(ctx, shipmentID, in, result, actorID); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
+}
+
+func (h *shipmentShipProcessCommandHandler) ValidateProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) error {
+	if h == nil || h.uc == nil || in == nil || in.ProcessInstance == nil {
+		return ErrBadParam
+	}
+	if strings.TrimSpace(in.CommandKey) != ProcessDomainCommandShipmentShip {
+		return ErrBadParam
+	}
+	if err := validateProcessDomainCommandPayloadKeys(in.Payload, shipmentProcessCommandPayloadShipmentID); err != nil {
+		return err
+	}
+	shipmentID, err := shipmentIDFromProcessCommandPayload(in.Payload)
+	if err != nil {
+		return err
+	}
+	if !ProcessInstanceHasBusinessRef(in.ProcessInstance, shipmentProcessCommandBusinessRefType, shipmentID) {
+		return ErrBadParam
+	}
+	shipment, err := h.uc.GetShipment(ctx, shipmentID)
+	if err != nil {
+		return err
+	}
+	if shipment == nil || shipment.ID != shipmentID || (shipment.Status != ShipmentStatusDraft && shipment.Status != ShipmentStatusShipped) {
+		return ErrBadParam
+	}
+	return nil
 }
 
 func (h *shipmentShipProcessCommandHandler) ExecuteProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) (*ProcessDomainCommandResult, error) {
-	if h == nil || h.uc == nil || in == nil || in.ProcessInstance == nil {
-		return nil, ErrBadParam
-	}
-	if strings.TrimSpace(in.CommandKey) != ProcessDomainCommandShipmentShip {
-		return nil, ErrBadParam
-	}
-	shipmentID, err := shipmentIDFromProcessCommandPayload(in.Payload)
-	if err != nil {
+	if err := h.ValidateProcessDomainCommand(ctx, in, actorID); err != nil {
 		return nil, err
 	}
-	if !ProcessInstanceHasBusinessRef(in.ProcessInstance, shipmentProcessCommandBusinessRefType, shipmentID) {
-		return nil, ErrBadParam
+	shipmentID, _ := shipmentIDFromProcessCommandPayload(in.Payload)
+	result := &ProcessDomainCommandResult{
+		Outcome:     ShipmentProcessCommandOutcomeShipped,
+		EffectState: ProcessDomainCommandEffectStateApplied,
+		EffectRef:   &ProcessBusinessRef{RefType: shipmentProcessCommandBusinessRefType, RefID: shipmentID},
 	}
-	if _, hasShipmentNo := in.Payload[shipmentProcessCommandPayloadShipmentNo]; hasShipmentNo {
-		if processCommandStringFromPayload(in.Payload, shipmentProcessCommandPayloadShipmentNo) == "" {
-			return nil, ErrBadParam
+	if repo, ok := h.uc.repo.(ShipmentProcessCommandRepo); ok {
+		if _, err := repo.ShipShipmentForProcessCommand(ctx, shipmentID, in, result, actorID); err != nil {
+			return nil, err
 		}
+		return result, nil
 	}
-	if _, _, err := processCommandPositiveIntFromPayload(in.Payload, shipmentProcessCommandPayloadWarehouseID); err != nil {
-		return nil, err
-	}
-	if _, _, err := processCommandPositiveIntFromPayload(in.Payload, shipmentProcessCommandPayloadOperatorID); err != nil {
-		return nil, err
-	}
-	if _, err := processCommandOptionalTimeFromPayload(in.Payload, shipmentProcessCommandPayloadShippedAt); err != nil {
-		return nil, err
-	}
-	_ = processCommandOptionalStringPtrFromPayload(in.Payload, shipmentProcessCommandPayloadCarrier)
-	_ = processCommandOptionalStringPtrFromPayload(in.Payload, shipmentProcessCommandPayloadTrackingNo)
-	_ = processCommandOptionalStringPtrFromPayload(in.Payload, shipmentProcessCommandPayloadShipmentNote)
 	if _, err := h.uc.ShipShipment(ctx, shipmentID); err != nil {
 		return nil, err
 	}
-	return &ProcessDomainCommandResult{Outcome: ShipmentProcessCommandOutcomeShipped}, nil
+	return result, nil
 }
 
 func shipmentIDFromProcessCommandPayload(payload map[string]any) (int, error) {

@@ -15,6 +15,8 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/shipment"
+	"server/internal/data/model/ent/stockreservation"
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
@@ -42,11 +44,177 @@ func TestInventoryPostgresMigrationShape(t *testing.T) {
 	assertPostgresUniqueIndex(t, data.sqldb, "inventory_txns", "inventorytxn_idempotency_key")
 	assertPostgresUniqueIndex(t, data.sqldb, "inventory_txns", "inventorytxn_reversal_of_txn_id")
 	assertPostgresUniqueIndex(t, data.sqldb, "inventory_balances", "inventorybalance_subject_type_subject_id_warehouse_id_unit_id")
+	for table, column := range map[string]string{
+		"inventory_txns":     "occurred_at_specified",
+		"production_facts":   "occurred_at_specified",
+		"outsourcing_facts":  "occurred_at_specified",
+		"finance_facts":      "occurred_at_specified",
+		"stock_reservations": "reserved_at_specified",
+	} {
+		assertPostgresColumnExists(t, data.sqldb, table, column)
+	}
 
 	suffix := postgresTestSuffix()
 	unit := createTestUnit(t, ctx, client, "PGU"+suffix)
 	if _, err := client.Unit.Create().SetCode(unit.Code).SetName("重复单位").Save(ctx); !ent.IsConstraintError(err) {
 		t.Fatalf("expected postgres unit code unique constraint, got %v", err)
+	}
+}
+
+func TestInventoryPostgresFactTimeIdempotency(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryPostgresTestData(t)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
+	logger := log.NewStdLogger(io.Discard)
+	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, logger))
+	operationalUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
+	explicit := time.Date(2026, 7, 10, 10, 11, 12, 345678901, time.FixedZone("UTC+8", 8*60*60))
+	wantExplicit := explicit.UTC().Truncate(time.Microsecond)
+
+	inventoryKey := "pg-time-inventory-" + fixtures.suffix
+	createInventory := func(at time.Time) (*biz.InventoryTxnApplyResult, error) {
+		return inventoryUC.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+			SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
+			WarehouseID: fixtures.warehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
+			Quantity: decimal.NewFromInt(20), UnitID: fixtures.unitID,
+			SourceType: "PG_TIME_TEST", IdempotencyKey: inventoryKey, OccurredAt: at,
+		})
+	}
+	inventoryResult, err := createInventory(explicit)
+	if err != nil {
+		t.Fatalf("create explicit-time inventory txn: %v", err)
+	}
+	if replay, err := createInventory(explicit); err != nil || !replay.IdempotentReplay || replay.Txn.ID != inventoryResult.Txn.ID {
+		t.Fatalf("explicit same-time inventory replay = %#v, err=%v", replay, err)
+	}
+	inventoryRow := client.InventoryTxn.GetX(ctx, inventoryResult.Txn.ID)
+	if !inventoryRow.OccurredAtSpecified || !inventoryRow.OccurredAt.Equal(wantExplicit) {
+		t.Fatalf("inventory marker=%v time=%v, want true/%v", inventoryRow.OccurredAtSpecified, inventoryRow.OccurredAt, wantExplicit)
+	}
+	if _, err := createInventory(explicit.Add(time.Second)); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("changed inventory occurred_at error = %v, want ErrIdempotencyConflict", err)
+	}
+	if _, err := createInventory(time.Time{}); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("explicit then omitted inventory occurred_at error = %v, want ErrIdempotencyConflict", err)
+	}
+
+	type factTimeCase struct {
+		name   string
+		create func(key string, at time.Time) (int, error)
+		load   func(id int) (bool, time.Time, error)
+	}
+	cases := []factTimeCase{
+		{
+			name: "production",
+			create: func(key string, at time.Time) (int, error) {
+				row, err := operationalUC.CreateProductionFactDraft(ctx, &biz.OperationalFactMutation{
+					FactNo: key, FactType: biz.ProductionFactFinishedGoodsReceipt,
+					SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
+					WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+					Quantity: decimal.NewFromInt(1), IdempotencyKey: key, OccurredAt: at,
+				})
+				if err != nil {
+					return 0, err
+				}
+				return row.ID, nil
+			},
+			load: func(id int) (bool, time.Time, error) {
+				row, err := client.ProductionFact.Get(ctx, id)
+				if err != nil {
+					return false, time.Time{}, err
+				}
+				return row.OccurredAtSpecified, row.OccurredAt, nil
+			},
+		},
+		{
+			name: "outsourcing",
+			create: func(key string, at time.Time) (int, error) {
+				row, err := operationalUC.CreateOutsourcingFactDraft(ctx, &biz.OperationalFactMutation{
+					FactNo: key, FactType: biz.OutsourcingFactReturnReceipt,
+					SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
+					WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+					Quantity: decimal.NewFromInt(1), IdempotencyKey: key, OccurredAt: at,
+				})
+				if err != nil {
+					return 0, err
+				}
+				return row.ID, nil
+			},
+			load: func(id int) (bool, time.Time, error) {
+				row, err := client.OutsourcingFact.Get(ctx, id)
+				if err != nil {
+					return false, time.Time{}, err
+				}
+				return row.OccurredAtSpecified, row.OccurredAt, nil
+			},
+		},
+		{
+			name: "finance",
+			create: func(key string, at time.Time) (int, error) {
+				row, err := operationalUC.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
+					FactNo: key, FactType: biz.FinanceFactPayable,
+					CounterpartyType: biz.FinanceCounterpartyOther,
+					Amount:           decimal.NewFromInt(1), IdempotencyKey: key, OccurredAt: at,
+				})
+				if err != nil {
+					return 0, err
+				}
+				return row.ID, nil
+			},
+			load: func(id int) (bool, time.Time, error) {
+				row, err := client.FinanceFact.Get(ctx, id)
+				if err != nil {
+					return false, time.Time{}, err
+				}
+				return row.OccurredAtSpecified, row.OccurredAt, nil
+			},
+		},
+		{
+			name: "stock_reservation",
+			create: func(key string, at time.Time) (int, error) {
+				row, err := operationalUC.CreateStockReservation(ctx, &biz.StockReservationCreate{
+					ReservationNo: key, ProductID: fixtures.productID,
+					WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+					Quantity: decimal.NewFromInt(1), IdempotencyKey: key, ReservedAt: at,
+				})
+				if err != nil {
+					return 0, err
+				}
+				return row.ID, nil
+			},
+			load: func(id int) (bool, time.Time, error) {
+				row, err := client.StockReservation.Get(ctx, id)
+				if err != nil {
+					return false, time.Time{}, err
+				}
+				return row.ReservedAtSpecified, row.ReservedAt, nil
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			key := "PG-TIME-" + tc.name + "-" + fixtures.suffix
+			id, err := tc.create(key, explicit)
+			if err != nil {
+				t.Fatalf("create explicit-time fact: %v", err)
+			}
+			if replayID, err := tc.create(key, explicit); err != nil || replayID != id {
+				t.Fatalf("explicit same-time replay id=%d, want %d, err=%v", replayID, id, err)
+			}
+			specified, persistedAt, err := tc.load(id)
+			if err != nil {
+				t.Fatalf("load explicit-time fact: %v", err)
+			}
+			if !specified || !persistedAt.Equal(wantExplicit) {
+				t.Fatalf("persisted marker=%v time=%v, want true/%v", specified, persistedAt, wantExplicit)
+			}
+			if _, err := tc.create(key, explicit.Add(time.Second)); !errors.Is(err, biz.ErrIdempotencyConflict) {
+				t.Fatalf("changed explicit time error = %v, want ErrIdempotencyConflict", err)
+			}
+			if _, err := tc.create(key, time.Time{}); !errors.Is(err, biz.ErrIdempotencyConflict) {
+				t.Fatalf("explicit then omitted time error = %v, want ErrIdempotencyConflict", err)
+			}
+		})
 	}
 }
 
@@ -392,6 +560,540 @@ func TestInventoryPostgresConcurrentOutbound(t *testing.T) {
 	if txnCount != successes {
 		t.Fatalf("postgres outbound txn count=%d, successes=%d", txnCount, successes)
 	}
+}
+
+func TestOperationalFactPostgresConcurrentStockReservationDoesNotOversubscribe(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryPostgresTestData(t)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
+	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	operationalRepo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		TxnType:        biz.InventoryTxnIn,
+		Direction:      1,
+		Quantity:       decimal.NewFromInt(10),
+		UnitID:         fixtures.unitID,
+		SourceType:     "RESERVATION_PG_CONCURRENT",
+		IdempotencyKey: "reservation-pg-concurrent-in-" + fixtures.suffix,
+	}); err != nil {
+		t.Fatalf("seed postgres product inventory failed: %v", err)
+	}
+
+	const attempts = 20
+	start := make(chan struct{})
+	errs := make(chan error, attempts)
+	var wg sync.WaitGroup
+	for i := 0; i < attempts; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := operationalRepo.CreateStockReservation(ctx, &biz.StockReservationCreate{
+				ReservationNo:  fmt.Sprintf("PG-RSV-%s-%02d", fixtures.suffix, i),
+				ProductID:      fixtures.productID,
+				WarehouseID:    fixtures.warehouseID,
+				UnitID:         fixtures.unitID,
+				Quantity:       decimal.NewFromInt(1),
+				IdempotencyKey: fmt.Sprintf("reservation-pg-concurrent-%s-%02d", fixtures.suffix, i),
+			})
+			errs <- err
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+
+	successes := 0
+	failures := 0
+	for err := range errs {
+		switch {
+		case err == nil:
+			successes++
+		case errors.Is(err, biz.ErrInventoryInsufficientStock):
+			failures++
+		default:
+			t.Fatalf("unexpected concurrent reservation error: %v", err)
+		}
+	}
+	if successes != 10 || failures != 10 {
+		t.Fatalf("concurrent reservations successes=%d failures=%d, want 10/10", successes, failures)
+	}
+	rows, err := client.StockReservation.Query().
+		Where(
+			stockreservation.ProductID(fixtures.productID),
+			stockreservation.WarehouseID(fixtures.warehouseID),
+			stockreservation.UnitID(fixtures.unitID),
+			stockreservation.Status(biz.StockReservationStatusActive),
+		).
+		All(ctx)
+	if err != nil {
+		t.Fatalf("list concurrent reservations failed: %v", err)
+	}
+	total := decimal.Zero
+	for _, row := range rows {
+		total = total.Add(row.Quantity)
+	}
+	if !total.Equal(decimal.NewFromInt(10)) {
+		t.Fatalf("active reservation total=%s, want 10", total)
+	}
+}
+
+func TestOperationalFactPostgresConcurrentShipmentsDoNotExceedSalesOrderLine(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryPostgresTestData(t)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
+	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	operationalRepo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
+	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(3), UnitID: fixtures.unitID,
+		SourceType: "SHIPMENT_PG_CONCURRENT", IdempotencyKey: "shipment-pg-concurrent-in-" + fixtures.suffix,
+	}); err != nil {
+		t.Fatalf("seed postgres shipment inventory failed: %v", err)
+	}
+	customer := createSalesOrderTestCustomer(t, ctx, client, "PG-C-SHIP-"+fixtures.suffix, true)
+	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
+		OrderNo: "PG-SO-SHIP-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("create postgres sales order failed: %v", err)
+	}
+	item, err := salesUC.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
+		SalesOrderID: order.ID, LineNo: 1, ProductID: fixtures.productID, UnitID: fixtures.unitID, OrderedQuantity: decimal.NewFromInt(3),
+	})
+	if err != nil {
+		t.Fatalf("create postgres sales order item failed: %v", err)
+	}
+	if _, err := salesUC.SubmitSalesOrder(ctx, order.ID); err != nil {
+		t.Fatalf("submit postgres sales order failed: %v", err)
+	}
+	if _, err := salesUC.ActivateSalesOrder(ctx, order.ID); err != nil {
+		t.Fatalf("activate postgres sales order failed: %v", err)
+	}
+	shipmentIDs := make([]int, 0, 2)
+	for index := 0; index < 2; index++ {
+		no := fmt.Sprintf("PG-SHP-%s-%d", fixtures.suffix, index)
+		created, err := operationalRepo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+			Shipment: &biz.ShipmentCreate{ShipmentNo: no, SalesOrderID: &order.ID, CustomerID: &customer.ID, IdempotencyKey: no},
+			Items:    []*biz.ShipmentItemCreate{{SalesOrderItemID: &item.ID, ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2)}},
+		})
+		if err != nil {
+			t.Fatalf("create postgres shipment %d failed: %v", index, err)
+		}
+		shipmentIDs = append(shipmentIDs, created.ID)
+	}
+
+	start := make(chan struct{})
+	errs := make(chan error, len(shipmentIDs))
+	var wg sync.WaitGroup
+	for _, shipmentID := range shipmentIDs {
+		shipmentID := shipmentID
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := operationalRepo.ShipShipment(ctx, shipmentID)
+			errs <- err
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+	successes, quantityFailures := 0, 0
+	for err := range errs {
+		switch {
+		case err == nil:
+			successes++
+		case errors.Is(err, biz.ErrShipmentQuantityExceeded):
+			quantityFailures++
+		default:
+			t.Fatalf("unexpected concurrent shipment error: %v", err)
+		}
+	}
+	if successes != 1 || quantityFailures != 1 {
+		t.Fatalf("concurrent shipments successes=%d quantity_failures=%d, want 1/1", successes, quantityFailures)
+	}
+	if shippedCount := client.Shipment.Query().Where(shipment.IDIn(shipmentIDs...), shipment.Status(biz.ShipmentStatusShipped)).CountX(ctx); shippedCount != 1 {
+		t.Fatalf("shipped count=%d, want 1", shippedCount)
+	}
+	if draftCount := client.Shipment.Query().Where(shipment.IDIn(shipmentIDs...), shipment.Status(biz.ShipmentStatusDraft)).CountX(ctx); draftCount != 1 {
+		t.Fatalf("draft count=%d, want 1", draftCount)
+	}
+	balance, err := inventoryRepo.GetInventoryBalance(ctx, biz.InventoryBalanceKey{SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID})
+	if err != nil {
+		t.Fatalf("get postgres shipment balance failed: %v", err)
+	}
+	if !balance.Quantity.Equal(decimal.NewFromInt(1)) {
+		t.Fatalf("shipment balance=%s, want 1", balance.Quantity)
+	}
+}
+
+func TestInventoryPostgresConcurrentReservationAndOutboundPreserveAvailableStock(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryPostgresTestData(t)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
+	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	operationalRepo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(10), UnitID: fixtures.unitID,
+		SourceType: "RESERVE_OUT_PG", IdempotencyKey: "reserve-out-pg-in-" + fixtures.suffix,
+	}); err != nil {
+		t.Fatalf("seed postgres product inventory failed: %v", err)
+	}
+	type operationResult struct {
+		kind string
+		err  error
+	}
+	const perKind = 10
+	start := make(chan struct{})
+	results := make(chan operationResult, perKind*2)
+	var wg sync.WaitGroup
+	for index := 0; index < perKind; index++ {
+		index := index
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := operationalRepo.CreateStockReservation(ctx, &biz.StockReservationCreate{
+				ReservationNo: fmt.Sprintf("PG-MIX-RSV-%s-%02d", fixtures.suffix, index), ProductID: fixtures.productID,
+				WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
+				IdempotencyKey: fmt.Sprintf("pg-mix-rsv-%s-%02d", fixtures.suffix, index),
+			})
+			results <- operationResult{kind: "reservation", err: err}
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+				SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+				TxnType: biz.InventoryTxnOut, Direction: -1, Quantity: decimal.NewFromInt(1), UnitID: fixtures.unitID,
+				SourceType: "RESERVE_OUT_PG", IdempotencyKey: fmt.Sprintf("pg-mix-out-%s-%02d", fixtures.suffix, index),
+			})
+			results <- operationResult{kind: "outbound", err: err}
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(results)
+	successes := map[string]int{"reservation": 0, "outbound": 0}
+	for result := range results {
+		if result.err == nil {
+			successes[result.kind]++
+			continue
+		}
+		if !errors.Is(result.err, biz.ErrInventoryInsufficientStock) {
+			t.Fatalf("unexpected mixed %s error: %v", result.kind, result.err)
+		}
+	}
+	if successes["reservation"]+successes["outbound"] > 10 {
+		t.Fatalf("mixed successes exceed inventory: %#v", successes)
+	}
+	balance, err := inventoryRepo.GetInventoryBalance(ctx, biz.InventoryBalanceKey{SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID})
+	if err != nil {
+		t.Fatalf("get mixed-operation balance failed: %v", err)
+	}
+	active, err := client.StockReservation.Query().Where(
+		stockreservation.ProductID(fixtures.productID), stockreservation.WarehouseID(fixtures.warehouseID),
+		stockreservation.UnitID(fixtures.unitID), stockreservation.Status(biz.StockReservationStatusActive),
+	).All(ctx)
+	if err != nil {
+		t.Fatalf("list mixed-operation reservations failed: %v", err)
+	}
+	reserved := decimal.Zero
+	for _, row := range active {
+		reserved = reserved.Add(row.Quantity)
+	}
+	if balance.Quantity.LessThan(reserved) {
+		t.Fatalf("mixed operations produced negative available stock: balance=%s reserved=%s successes=%#v", balance.Quantity, reserved, successes)
+	}
+	if !balance.Quantity.Equal(decimal.NewFromInt(int64(10-successes["outbound"]))) || !reserved.Equal(decimal.NewFromInt(int64(successes["reservation"]))) {
+		t.Fatalf("mixed operation facts mismatch balance=%s reserved=%s successes=%#v", balance.Quantity, reserved, successes)
+	}
+}
+
+func TestOperationalFactPostgresConcurrentReservationReleaseAndShipmentPreserveReleasedStatus(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryPostgresTestData(t)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
+	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	operationalUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(5), UnitID: fixtures.unitID,
+		SourceType: "RELEASE_SHIP_PG", IdempotencyKey: "release-ship-pg-in-" + fixtures.suffix,
+	}); err != nil {
+		t.Fatalf("seed postgres product inventory failed: %v", err)
+	}
+	customer := createSalesOrderTestCustomer(t, ctx, client, "PG-C-RELEASE-SHIP-"+fixtures.suffix, true)
+	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{OrderNo: "PG-SO-RELEASE-SHIP-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now()})
+	if err != nil {
+		t.Fatalf("create postgres sales order failed: %v", err)
+	}
+	item, err := salesUC.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
+		SalesOrderID: order.ID, LineNo: 1, ProductID: fixtures.productID, UnitID: fixtures.unitID, OrderedQuantity: decimal.NewFromInt(5),
+	})
+	if err != nil {
+		t.Fatalf("create postgres sales order item failed: %v", err)
+	}
+	if _, err := salesUC.SubmitSalesOrder(ctx, order.ID); err != nil {
+		t.Fatalf("submit postgres sales order failed: %v", err)
+	}
+	if _, err := salesUC.ActivateSalesOrder(ctx, order.ID); err != nil {
+		t.Fatalf("activate postgres sales order failed: %v", err)
+	}
+	reservation, err := operationalUC.CreateStockReservation(ctx, &biz.StockReservationCreate{
+		ReservationNo: "PG-RSV-RELEASE-SHIP-" + fixtures.suffix, SalesOrderID: &order.ID, SalesOrderItemID: &item.ID,
+		ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+		Quantity: decimal.NewFromInt(5), IdempotencyKey: "pg-rsv-release-ship-" + fixtures.suffix,
+	})
+	if err != nil {
+		t.Fatalf("create postgres reservation failed: %v", err)
+	}
+	shipmentRow, err := operationalUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{ShipmentNo: "PG-SHP-RELEASE-SHIP-" + fixtures.suffix, SalesOrderID: &order.ID, CustomerID: &customer.ID, IdempotencyKey: "pg-shp-release-ship-" + fixtures.suffix},
+		Items: []*biz.ShipmentItemCreate{{
+			SalesOrderItemID: &item.ID, ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+			UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(5),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("create postgres shipment failed: %v", err)
+	}
+
+	releaseTx, err := data.sqldb.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin postgres release transaction failed: %v", err)
+	}
+	defer func() { _ = releaseTx.Rollback() }()
+	var releaseBackendPID int
+	if err := releaseTx.QueryRowContext(ctx, `SELECT pg_backend_pid()`).Scan(&releaseBackendPID); err != nil {
+		t.Fatalf("read release backend pid failed: %v", err)
+	}
+	var lockedReservationID int
+	if err := releaseTx.QueryRowContext(ctx, `SELECT id FROM stock_reservations WHERE id = $1 FOR UPDATE`, reservation.ID).Scan(&lockedReservationID); err != nil {
+		t.Fatalf("lock reservation for concurrent release failed: %v", err)
+	}
+	shipResult := make(chan error, 1)
+	go func() {
+		_, shipErr := operationalUC.ShipShipment(ctx, shipmentRow.ID)
+		shipResult <- shipErr
+	}()
+	_ = waitForPostgresSessionBlockedByPID(t, ctx, data.sqldb, releaseBackendPID)
+	now := time.Now()
+	if _, err := releaseTx.ExecContext(ctx, `
+UPDATE stock_reservations
+SET status = $1, released_at = $2, updated_at = $2
+WHERE id = $3 AND status = $4`, biz.StockReservationStatusReleased, now, reservation.ID, biz.StockReservationStatusActive); err != nil {
+		t.Fatalf("release reservation in concurrent transaction failed: %v", err)
+	}
+	if err := releaseTx.Commit(); err != nil {
+		t.Fatalf("commit concurrent release failed: %v", err)
+	}
+	if err := <-shipResult; err != nil {
+		t.Fatalf("shipment after concurrent release failed: %v", err)
+	}
+	if got := client.StockReservation.GetX(ctx, reservation.ID).Status; got != biz.StockReservationStatusReleased {
+		t.Fatalf("concurrently released reservation status = %s, want RELEASED", got)
+	}
+	if got := client.Shipment.GetX(ctx, shipmentRow.ID).Status; got != biz.ShipmentStatusShipped {
+		t.Fatalf("shipment status = %s, want SHIPPED", got)
+	}
+}
+
+func TestOperationalFactPostgresShipmentRejectsRemainingReservationAcrossInventoryGrains(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryPostgresTestData(t)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
+	otherWarehouse := createTestWarehouse(t, ctx, client, "PG-WH-CROSS-"+fixtures.suffix)
+	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	operationalUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
+	for index, warehouseID := range []int{fixtures.warehouseID, otherWarehouse.ID} {
+		if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+			SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: warehouseID,
+			TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(5), UnitID: fixtures.unitID,
+			SourceType: "CROSS_GRAIN_PG", IdempotencyKey: fmt.Sprintf("cross-grain-pg-in-%s-%d", fixtures.suffix, index),
+		}); err != nil {
+			t.Fatalf("seed postgres cross-grain inventory failed: %v", err)
+		}
+	}
+	customer := createSalesOrderTestCustomer(t, ctx, client, "PG-C-CROSS-"+fixtures.suffix, true)
+	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{OrderNo: "PG-SO-CROSS-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now()})
+	if err != nil {
+		t.Fatalf("create postgres sales order failed: %v", err)
+	}
+	item, err := salesUC.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
+		SalesOrderID: order.ID, LineNo: 1, ProductID: fixtures.productID, UnitID: fixtures.unitID, OrderedQuantity: decimal.NewFromInt(5),
+	})
+	if err != nil {
+		t.Fatalf("create postgres sales order item failed: %v", err)
+	}
+	if _, err := salesUC.SubmitSalesOrder(ctx, order.ID); err != nil {
+		t.Fatalf("submit postgres sales order failed: %v", err)
+	}
+	if _, err := salesUC.ActivateSalesOrder(ctx, order.ID); err != nil {
+		t.Fatalf("activate postgres sales order failed: %v", err)
+	}
+	reservation, err := operationalUC.CreateStockReservation(ctx, &biz.StockReservationCreate{
+		ReservationNo: "PG-RSV-CROSS-" + fixtures.suffix, SalesOrderID: &order.ID, SalesOrderItemID: &item.ID,
+		ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+		Quantity: decimal.NewFromInt(5), IdempotencyKey: "pg-rsv-cross-" + fixtures.suffix,
+	})
+	if err != nil {
+		t.Fatalf("create postgres source reservation failed: %v", err)
+	}
+	shipmentRow, err := operationalUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{ShipmentNo: "PG-SHP-CROSS-" + fixtures.suffix, SalesOrderID: &order.ID, CustomerID: &customer.ID, IdempotencyKey: "pg-shp-cross-" + fixtures.suffix},
+		Items: []*biz.ShipmentItemCreate{{
+			SalesOrderItemID: &item.ID, ProductID: fixtures.productID, WarehouseID: otherWarehouse.ID,
+			UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(5),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("create postgres cross-grain shipment failed: %v", err)
+	}
+	if _, err := operationalUC.ShipShipment(ctx, shipmentRow.ID); !errors.Is(err, biz.ErrShipmentQuantityExceeded) {
+		t.Fatalf("postgres cross-grain shipment error = %v, want ErrShipmentQuantityExceeded", err)
+	}
+	if got := client.StockReservation.GetX(ctx, reservation.ID).Status; got != biz.StockReservationStatusActive {
+		t.Fatalf("postgres cross-grain reservation status = %s, want ACTIVE", got)
+	}
+	if got := client.Shipment.GetX(ctx, shipmentRow.ID).Status; got != biz.ShipmentStatusDraft {
+		t.Fatalf("postgres cross-grain shipment status = %s, want DRAFT", got)
+	}
+}
+
+func TestOperationalFactPostgresAddShipmentItemCannotRaceShippedItemsSnapshot(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryPostgresTestData(t)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
+	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	operationalUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(5), UnitID: fixtures.unitID,
+		SourceType: "ADD_SHIP_RACE_PG", IdempotencyKey: "add-ship-race-pg-in-" + fixtures.suffix,
+	}); err != nil {
+		t.Fatalf("seed postgres shipment inventory failed: %v", err)
+	}
+	shipmentRow, err := operationalUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{ShipmentNo: "PG-SHP-ADD-RACE-" + fixtures.suffix, IdempotencyKey: "pg-shp-add-race-" + fixtures.suffix},
+		Items: []*biz.ShipmentItemCreate{{
+			ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+			UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("create postgres shipment failed: %v", err)
+	}
+
+	balanceBlocker, err := data.sqldb.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin postgres balance blocker failed: %v", err)
+	}
+	defer func() { _ = balanceBlocker.Rollback() }()
+	var blockerPID int
+	if err := balanceBlocker.QueryRowContext(ctx, `SELECT pg_backend_pid()`).Scan(&blockerPID); err != nil {
+		t.Fatalf("read balance blocker pid failed: %v", err)
+	}
+	var balanceID int
+	if err := balanceBlocker.QueryRowContext(ctx, `
+SELECT id
+FROM inventory_balances
+WHERE subject_type = $1
+  AND subject_id = $2
+  AND warehouse_id = $3
+  AND unit_id = $4
+  AND lot_id IS NULL
+FOR UPDATE`, biz.InventorySubjectProduct, fixtures.productID, fixtures.warehouseID, fixtures.unitID).Scan(&balanceID); err != nil {
+		t.Fatalf("lock shipment inventory balance failed: %v", err)
+	}
+	shipResult := make(chan error, 1)
+	go func() {
+		_, shipErr := operationalUC.ShipShipment(ctx, shipmentRow.ID)
+		shipResult <- shipErr
+	}()
+	shipBackendPID := waitForPostgresSessionBlockedByPID(t, ctx, data.sqldb, blockerPID)
+	type addResult struct {
+		item *biz.ShipmentItem
+		err  error
+	}
+	addResults := make(chan addResult, 1)
+	go func() {
+		item, addErr := operationalUC.AddShipmentItem(ctx, &biz.ShipmentItemCreate{
+			ShipmentID: shipmentRow.ID, ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+			UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
+		})
+		addResults <- addResult{item: item, err: addErr}
+	}()
+	_ = waitForPostgresSessionBlockedByPID(t, ctx, data.sqldb, shipBackendPID)
+	if err := balanceBlocker.Commit(); err != nil {
+		t.Fatalf("release shipment inventory balance lock failed: %v", err)
+	}
+	if err := <-shipResult; err != nil {
+		t.Fatalf("ship postgres shipment failed: %v", err)
+	}
+	added := <-addResults
+	if !errors.Is(added.err, biz.ErrBadParam) || added.item != nil {
+		t.Fatalf("concurrent add result = item %#v err %v, want ErrBadParam", added.item, added.err)
+	}
+	finalShipment, err := operationalUC.GetShipment(ctx, shipmentRow.ID)
+	if err != nil {
+		t.Fatalf("get final postgres shipment failed: %v", err)
+	}
+	if finalShipment.Status != biz.ShipmentStatusShipped || len(finalShipment.Items) != 1 {
+		t.Fatalf("final shipment = %#v, want SHIPPED with exactly one deducted line", finalShipment)
+	}
+	if txnCount := client.InventoryTxn.Query().Where(
+		inventorytxn.SourceType(biz.ShipmentSourceType),
+		inventorytxn.SourceID(shipmentRow.ID),
+	).CountX(ctx); txnCount != 1 {
+		t.Fatalf("shipment inventory txn count = %d, want 1", txnCount)
+	}
+	balance, err := inventoryRepo.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
+		WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+	})
+	if err != nil {
+		t.Fatalf("get final shipment balance failed: %v", err)
+	}
+	if !balance.Quantity.Equal(decimal.NewFromInt(4)) {
+		t.Fatalf("final shipment balance = %s, want 4", balance.Quantity)
+	}
+}
+
+func waitForPostgresSessionBlockedByPID(t *testing.T, ctx context.Context, db *stdsql.DB, blockerPID int) int {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		var blockedPID int
+		err := db.QueryRowContext(ctx, `
+SELECT COALESCE((
+  SELECT pid
+  FROM pg_stat_activity
+  WHERE pid <> $1
+    AND wait_event_type = 'Lock'
+    AND $1 = ANY(pg_blocking_pids(pid))
+  ORDER BY pid
+  LIMIT 1
+), 0)`, blockerPID).Scan(&blockedPID)
+		if err != nil {
+			t.Fatalf("inspect postgres blocked session failed: %v", err)
+		}
+		if blockedPID > 0 {
+			return blockedPID
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("database session did not block on the expected transaction lock")
+	return 0
 }
 
 type inventoryPostgresFixtures struct {

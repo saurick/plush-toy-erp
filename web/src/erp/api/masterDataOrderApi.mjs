@@ -229,8 +229,8 @@ export async function disableContact(params = {}) {
   return dataOf(result)?.contact || null
 }
 
-export async function listSalesOrders(params = {}) {
-  const result = await salesOrderRpc.call('list_sales_orders', params)
+export async function listSalesOrders(params = {}, options = {}) {
+  const result = await salesOrderRpc.call('list_sales_orders', params, options)
   return dataOf(result)
 }
 
@@ -294,8 +294,12 @@ export async function removeSalesOrderItem(params = {}) {
   return dataOf(result)?.sales_order_item || null
 }
 
-export async function listPurchaseOrders(params = {}) {
-  const result = await purchaseOrderRpc.call('list_purchase_orders', params)
+export async function listPurchaseOrders(params = {}, options = {}) {
+  const result = await purchaseOrderRpc.call(
+    'list_purchase_orders',
+    params,
+    options
+  )
   return dataOf(result)
 }
 
@@ -340,10 +344,11 @@ export async function listPurchaseOrderItems(params = {}) {
   return dataOf(result)
 }
 
-export async function listOutsourcingOrders(params = {}) {
+export async function listOutsourcingOrders(params = {}, options = {}) {
   const result = await outsourcingOrderRpc.call(
     'list_outsourcing_orders',
-    params
+    params,
+    options
   )
   return dataOf(result)
 }

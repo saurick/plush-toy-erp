@@ -29,6 +29,8 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 		biz.PermissionPurchaseReceiptRead,
 		biz.PermissionERPDashboardRead,
 	))
+	actorCaptureRepo := &purchaseReceiptActorCaptureRepo{InventoryRepo: datarepo.NewInventoryRepo(data, log.NewStdLogger(io.Discard))}
+	j.inventoryUC = biz.NewInventoryUsecase(actorCaptureRepo)
 	adminCtx := workflowJSONRPCAdminContext()
 
 	_, legacyRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_draft", "legacy", mustJSONRPCStruct(t, map[string]any{
@@ -287,6 +289,9 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	if cancelledRes == nil || cancelledRes.Code != errcode.OK.Code {
 		t.Fatalf("expected cancel OK, got %#v", cancelledRes)
 	}
+	if actorCaptureRepo.actorID != 7 {
+		t.Fatalf("expected authenticated purchase receipt cancellation actor 7, got %d", actorCaptureRepo.actorID)
+	}
 	balanceAfterCancel, err := j.inventoryUC.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
 		SubjectType: biz.InventorySubjectMaterial,
 		SubjectID:   fixtures.materialID,
@@ -305,6 +310,20 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.PurchaseReceiptSourceType), inventorytxn.TxnType(biz.InventoryTxnReversal)).CountX(ctx); count != 1 {
 		t.Fatalf("repeat cancel must keep one reversal txn, got %d", count)
 	}
+}
+
+type purchaseReceiptActorCaptureRepo struct {
+	biz.InventoryRepo
+	actorID int
+}
+
+func (r *purchaseReceiptActorCaptureRepo) CancelPostedPurchaseReceiptWithActor(ctx context.Context, receiptID int, actorID int) (*biz.PurchaseReceipt, error) {
+	r.actorID = actorID
+	repo, ok := r.InventoryRepo.(biz.PurchaseReceiptCancellationActorRepo)
+	if !ok {
+		return nil, biz.ErrActorAwareCancellationUnavailable
+	}
+	return repo.CancelPostedPurchaseReceiptWithActor(ctx, receiptID, actorID)
 }
 
 func TestPurchaseReceiptFilterFromParamsForwardsContextFilters(t *testing.T) {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -113,11 +113,16 @@ export default function useMobileRoleTaskActions({
   setSelectedTaskID,
   loadTasks,
 }) {
-  const [updatingID, setUpdatingID] = useState(null)
-  const [urgingID, setUrgingID] = useState(null)
+  const [updatingTaskIDs, setUpdatingTaskIDs] = useState(() => new Set())
+  const [urgingTaskIDs, setUrgingTaskIDs] = useState(() => new Set())
   const [taskActionReasonDrafts, setTaskActionReasonDrafts] = useState({})
   const [urgeReasonByTaskID, setUrgeReasonByTaskID] = useState({})
   const [evidenceTextByTaskID, setEvidenceTextByTaskID] = useState({})
+  const actionInFlightTaskIDsRef = useRef(new Set())
+  const selectedTaskIDRef = useRef(selectedTask?.id ?? null)
+  const detailActionRef = useRef(detailAction)
+  selectedTaskIDRef.current = selectedTask?.id ?? null
+  detailActionRef.current = detailAction
 
   const canRunMobileTaskAction = (task, action) => {
     const actionMode = resolveWorkflowTaskActionMode(action)
@@ -129,57 +134,65 @@ export default function useMobileRoleTaskActions({
   }
 
   const moveTask = async (task, taskStatusKey) => {
-    if (!canRunMobileTaskAction(task, taskStatusKey)) {
-      message.warning(
-        `当前角色不能${resolveMobileActionLabel(taskStatusKey)}该任务`
-      )
+    const taskID = task?.id ?? null
+    if (actionInFlightTaskIDsRef.current.has(taskID)) {
       return false
     }
-    const actionReason = String(
-      resolveMobileTaskActionReason({
-        task,
-        action: taskStatusKey,
-        reasonDrafts: taskActionReasonDrafts,
-      })
-    ).trim()
-    const reasonRequired = ['blocked', 'rejected'].includes(taskStatusKey)
-    if (reasonRequired && !actionReason) {
-      message.warning('请先填写阻塞或退回原因')
-      return false
-    }
-    const evidenceText = String(evidenceTextByTaskID[task.id] || '').trim()
-    if (requiresMobileActionFeedback(taskStatusKey) && !evidenceText) {
-      message.warning('请先填写完成反馈或附件线索')
-      return false
-    }
-    const explainActionKey =
-      taskStatusKey === 'done'
-        ? 'complete'
-        : taskStatusKey === 'blocked'
-          ? 'block'
-          : taskStatusKey === 'rejected'
-            ? 'reject'
-            : taskStatusKey
-    const explainAllowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
-      task,
-      actionKey: explainActionKey,
-      reason: actionReason,
-      onWarning: message.warning,
-      onError: message.error,
+    actionInFlightTaskIDsRef.current.add(taskID)
+    setUpdatingTaskIDs((current) => {
+      const next = new Set(current)
+      next.add(taskID)
+      return next
     })
-    if (!explainAllowed) return false
-
-    const payload = buildMobileWorkflowActionPayload({
-      activeRoleKey,
-      actionReason,
-      evidenceText,
-      reasonRequired,
-      task,
-      taskStatusKey,
-    })
-
-    setUpdatingID(task.id)
     try {
+      if (!canRunMobileTaskAction(task, taskStatusKey)) {
+        message.warning(
+          `当前角色不能${resolveMobileActionLabel(taskStatusKey)}该任务`
+        )
+        return false
+      }
+      const actionReason = String(
+        resolveMobileTaskActionReason({
+          task,
+          action: taskStatusKey,
+          reasonDrafts: taskActionReasonDrafts,
+        })
+      ).trim()
+      const reasonRequired = ['blocked', 'rejected'].includes(taskStatusKey)
+      if (reasonRequired && !actionReason) {
+        message.warning('请先填写阻塞或退回原因')
+        return false
+      }
+      const evidenceText = String(evidenceTextByTaskID[task.id] || '').trim()
+      if (requiresMobileActionFeedback(taskStatusKey) && !evidenceText) {
+        message.warning('请先填写完成反馈或附件线索')
+        return false
+      }
+      const explainActionKey =
+        taskStatusKey === 'done'
+          ? 'complete'
+          : taskStatusKey === 'blocked'
+            ? 'block'
+            : taskStatusKey === 'rejected'
+              ? 'reject'
+              : taskStatusKey
+      const explainAllowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
+        task,
+        actionKey: explainActionKey,
+        reason: actionReason,
+        onWarning: message.warning,
+        onError: message.error,
+      })
+      if (!explainAllowed) return false
+
+      const payload = buildMobileWorkflowActionPayload({
+        activeRoleKey,
+        actionReason,
+        evidenceText,
+        reasonRequired,
+        task,
+        taskStatusKey,
+      })
       const actionParams = {
         task_id: task.id,
         reason: reasonRequired ? actionReason : '',
@@ -225,31 +238,46 @@ export default function useMobileRoleTaskActions({
       )
       return false
     } finally {
-      setUpdatingID(null)
+      actionInFlightTaskIDsRef.current.delete(taskID)
+      setUpdatingTaskIDs((current) => {
+        if (!current.has(taskID)) return current
+        const next = new Set(current)
+        next.delete(taskID)
+        return next
+      })
     }
   }
 
   const urgeTask = async (task) => {
-    if (!canRunMobileTaskAction(task, 'urge')) {
-      message.warning('当前角色没有催办该任务的权限')
+    const taskID = task?.id ?? null
+    if (actionInFlightTaskIDsRef.current.has(taskID)) {
       return false
     }
-    const reason = String(urgeReasonByTaskID[task.id] || '').trim()
-    if (!reason) {
-      message.warning('请先填写催办原因')
-      return false
-    }
-    const explainAllowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
-      task,
-      actionKey: 'urge',
-      reason,
-      onWarning: message.warning,
-      onError: message.error,
+    actionInFlightTaskIDsRef.current.add(taskID)
+    setUrgingTaskIDs((current) => {
+      const next = new Set(current)
+      next.add(taskID)
+      return next
     })
-    if (!explainAllowed) return false
-
-    setUrgingID(task.id)
     try {
+      if (!canRunMobileTaskAction(task, 'urge')) {
+        message.warning('当前角色没有催办该任务的权限')
+        return false
+      }
+      const reason = String(urgeReasonByTaskID[task.id] || '').trim()
+      if (!reason) {
+        message.warning('请先填写催办原因')
+        return false
+      }
+      const explainAllowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
+        task,
+        actionKey: 'urge',
+        reason,
+        onWarning: message.warning,
+        onError: message.error,
+      })
+      if (!explainAllowed) return false
+
       const mobileActionEvidence = buildMobileTaskActionEvidence({
         roleKey: activeRoleKey,
         actionKey: 'urge',
@@ -282,31 +310,47 @@ export default function useMobileRoleTaskActions({
       message.error(getActionErrorMessage(error, '催办失败，请稍后重试'))
       return false
     } finally {
-      setUrgingID(null)
+      actionInFlightTaskIDsRef.current.delete(taskID)
+      setUrgingTaskIDs((current) => {
+        if (!current.has(taskID)) return current
+        const next = new Set(current)
+        next.delete(taskID)
+        return next
+      })
     }
   }
 
   const handleTaskAction = async (task, action) => {
+    selectedTaskIDRef.current = task.id
     setSelectedTaskID(task.id)
     if (['done', 'blocked', 'rejected', 'urge'].includes(action)) {
       if (!canRunMobileTaskAction(task, action)) {
         message.warning(`当前角色不能${resolveMobileActionLabel(action)}该任务`)
         return
       }
+      detailActionRef.current = action
       setDetailAction(action)
       return
     }
+    detailActionRef.current = null
     setDetailAction(null)
     await moveTask(task, action)
   }
 
   const submitDetailAction = async () => {
     if (!selectedTask || !detailAction) return
+    const submittedTaskID = selectedTask.id
+    const submittedAction = detailAction
     const actionCompleted =
-      detailAction === 'urge'
+      submittedAction === 'urge'
         ? await urgeTask(selectedTask)
-        : await moveTask(selectedTask, detailAction)
-    if (actionCompleted) {
+        : await moveTask(selectedTask, submittedAction)
+    if (
+      actionCompleted &&
+      selectedTaskIDRef.current === submittedTaskID &&
+      detailActionRef.current === submittedAction
+    ) {
+      detailActionRef.current = null
       setDetailAction(null)
     }
   }
@@ -342,6 +386,12 @@ export default function useMobileRoleTaskActions({
         selectedTask.mobile_action_evidence_refs
       )
     : []
+  const updatingID =
+    selectedTask && updatingTaskIDs.has(selectedTask.id)
+      ? selectedTask.id
+      : null
+  const urgingID =
+    selectedTask && urgingTaskIDs.has(selectedTask.id) ? selectedTask.id : null
 
   const updateDetailReason = (value) => {
     if (!selectedTask) return

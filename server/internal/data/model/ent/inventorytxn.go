@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/warehouse"
 	"strings"
@@ -25,6 +26,8 @@ type InventoryTxn struct {
 	SubjectType string `json:"subject_type,omitempty"`
 	// SubjectID holds the value of the "subject_id" field.
 	SubjectID int `json:"subject_id,omitempty"`
+	// ProductSkuID holds the value of the "product_sku_id" field.
+	ProductSkuID *int `json:"product_sku_id,omitempty"`
 	// WarehouseID holds the value of the "warehouse_id" field.
 	WarehouseID int `json:"warehouse_id,omitempty"`
 	// LotID holds the value of the "lot_id" field.
@@ -49,6 +52,8 @@ type InventoryTxn struct {
 	ReversalOfTxnID *int `json:"reversal_of_txn_id,omitempty"`
 	// OccurredAt holds the value of the "occurred_at" field.
 	OccurredAt time.Time `json:"occurred_at,omitempty"`
+	// OccurredAtSpecified holds the value of the "occurred_at_specified" field.
+	OccurredAtSpecified bool `json:"occurred_at_specified,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// CreatedBy holds the value of the "created_by" field.
@@ -67,11 +72,13 @@ type InventoryTxnEdges struct {
 	Warehouse *Warehouse `json:"warehouse,omitempty"`
 	// Unit holds the value of the unit edge.
 	Unit *Unit `json:"unit,omitempty"`
+	// ProductSku holds the value of the product_sku edge.
+	ProductSku *ProductSKU `json:"product_sku,omitempty"`
 	// InventoryLot holds the value of the inventory_lot edge.
 	InventoryLot *InventoryLot `json:"inventory_lot,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [4]bool
 }
 
 // WarehouseOrErr returns the Warehouse value or an error if the edge
@@ -96,12 +103,23 @@ func (e InventoryTxnEdges) UnitOrErr() (*Unit, error) {
 	return nil, &NotLoadedError{edge: "unit"}
 }
 
+// ProductSkuOrErr returns the ProductSku value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e InventoryTxnEdges) ProductSkuOrErr() (*ProductSKU, error) {
+	if e.ProductSku != nil {
+		return e.ProductSku, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: productsku.Label}
+	}
+	return nil, &NotLoadedError{edge: "product_sku"}
+}
+
 // InventoryLotOrErr returns the InventoryLot value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e InventoryTxnEdges) InventoryLotOrErr() (*InventoryLot, error) {
 	if e.InventoryLot != nil {
 		return e.InventoryLot, nil
-	} else if e.loadedTypes[2] {
+	} else if e.loadedTypes[3] {
 		return nil, &NotFoundError{label: inventorylot.Label}
 	}
 	return nil, &NotLoadedError{edge: "inventory_lot"}
@@ -114,7 +132,9 @@ func (*InventoryTxn) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case inventorytxn.FieldQuantity:
 			values[i] = new(decimal.Decimal)
-		case inventorytxn.FieldID, inventorytxn.FieldSubjectID, inventorytxn.FieldWarehouseID, inventorytxn.FieldLotID, inventorytxn.FieldDirection, inventorytxn.FieldUnitID, inventorytxn.FieldSourceID, inventorytxn.FieldSourceLineID, inventorytxn.FieldReversalOfTxnID, inventorytxn.FieldCreatedBy:
+		case inventorytxn.FieldOccurredAtSpecified:
+			values[i] = new(sql.NullBool)
+		case inventorytxn.FieldID, inventorytxn.FieldSubjectID, inventorytxn.FieldProductSkuID, inventorytxn.FieldWarehouseID, inventorytxn.FieldLotID, inventorytxn.FieldDirection, inventorytxn.FieldUnitID, inventorytxn.FieldSourceID, inventorytxn.FieldSourceLineID, inventorytxn.FieldReversalOfTxnID, inventorytxn.FieldCreatedBy:
 			values[i] = new(sql.NullInt64)
 		case inventorytxn.FieldSubjectType, inventorytxn.FieldTxnType, inventorytxn.FieldSourceType, inventorytxn.FieldIdempotencyKey, inventorytxn.FieldNote:
 			values[i] = new(sql.NullString)
@@ -152,6 +172,13 @@ func (_m *InventoryTxn) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field subject_id", values[i])
 			} else if value.Valid {
 				_m.SubjectID = int(value.Int64)
+			}
+		case inventorytxn.FieldProductSkuID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field product_sku_id", values[i])
+			} else if value.Valid {
+				_m.ProductSkuID = new(int)
+				*_m.ProductSkuID = int(value.Int64)
 			}
 		case inventorytxn.FieldWarehouseID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -229,6 +256,12 @@ func (_m *InventoryTxn) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.OccurredAt = value.Time
 			}
+		case inventorytxn.FieldOccurredAtSpecified:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field occurred_at_specified", values[i])
+			} else if value.Valid {
+				_m.OccurredAtSpecified = value.Bool
+			}
 		case inventorytxn.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -272,6 +305,11 @@ func (_m *InventoryTxn) QueryUnit() *UnitQuery {
 	return NewInventoryTxnClient(_m.config).QueryUnit(_m)
 }
 
+// QueryProductSku queries the "product_sku" edge of the InventoryTxn entity.
+func (_m *InventoryTxn) QueryProductSku() *ProductSKUQuery {
+	return NewInventoryTxnClient(_m.config).QueryProductSku(_m)
+}
+
 // QueryInventoryLot queries the "inventory_lot" edge of the InventoryTxn entity.
 func (_m *InventoryTxn) QueryInventoryLot() *InventoryLotQuery {
 	return NewInventoryTxnClient(_m.config).QueryInventoryLot(_m)
@@ -305,6 +343,11 @@ func (_m *InventoryTxn) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("subject_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SubjectID))
+	builder.WriteString(", ")
+	if v := _m.ProductSkuID; v != nil {
+		builder.WriteString("product_sku_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("warehouse_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.WarehouseID))
@@ -349,6 +392,9 @@ func (_m *InventoryTxn) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("occurred_at=")
 	builder.WriteString(_m.OccurredAt.Format(time.ANSIC))
+	builder.WriteString(", ")
+	builder.WriteString("occurred_at_specified=")
+	builder.WriteString(fmt.Sprintf("%v", _m.OccurredAtSpecified))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

@@ -52,9 +52,6 @@ func TestInventoryProcessDomainCommandPostInboundBindsUsecase(t *testing.T) {
 		IdempotencyKey:        "process:10:node:20:inventory-post-inbound",
 		Payload: map[string]any{
 			"purchase_receipt_id": float64(6001),
-			"receipt_no":          "PR-PROCESS-INBOUND-001",
-			"warehouse_id":        float64(7001),
-			"inventory_lot_id":    float64(8001),
 		},
 	}, 7)
 	if err != nil {
@@ -151,4 +148,24 @@ func (r *inventoryPostInboundProcessInventoryRepoStub) PostPurchaseReceipt(_ con
 	}
 	copied := *r.postedReceipt
 	return &copied, nil
+}
+
+func (r *inventoryPostInboundProcessInventoryRepoStub) GetPurchaseReceipt(_ context.Context, receiptID int) (*PurchaseReceipt, error) {
+	if r.postedReceipt == nil || r.postedReceipt.ID != receiptID {
+		return nil, ErrPurchaseReceiptNotFound
+	}
+	copied := *r.postedReceipt
+	return &copied, nil
+}
+
+func (r *inventoryPostInboundProcessInventoryRepoStub) EvaluatePurchaseReceiptQualityGate(_ context.Context, receiptID int) (*PurchaseReceiptQualityGate, error) {
+	if r.postedReceipt == nil || r.postedReceipt.ID != receiptID {
+		return nil, ErrPurchaseReceiptNotFound
+	}
+	return &PurchaseReceiptQualityGate{
+		PurchaseReceiptID: receiptID,
+		Outcome:           PurchaseReceiptQualityGateReady,
+		TotalLines:        1,
+		PassedLines:       1,
+	}, nil
 }

@@ -61,13 +61,21 @@ type ProductSKUEdges struct {
 	SalesOrderItems []*SalesOrderItem `json:"sales_order_items,omitempty"`
 	// InventoryLots holds the value of the inventory_lots edge.
 	InventoryLots []*InventoryLot `json:"inventory_lots,omitempty"`
+	// InventoryTxns holds the value of the inventory_txns edge.
+	InventoryTxns []*InventoryTxn `json:"inventory_txns,omitempty"`
+	// InventoryBalances holds the value of the inventory_balances edge.
+	InventoryBalances []*InventoryBalance `json:"inventory_balances,omitempty"`
+	// ProductionFacts holds the value of the production_facts edge.
+	ProductionFacts []*ProductionFact `json:"production_facts,omitempty"`
+	// OutsourcingFacts holds the value of the outsourcing_facts edge.
+	OutsourcingFacts []*OutsourcingFact `json:"outsourcing_facts,omitempty"`
 	// ShipmentItems holds the value of the shipment_items edge.
 	ShipmentItems []*ShipmentItem `json:"shipment_items,omitempty"`
 	// StockReservations holds the value of the stock_reservations edge.
 	StockReservations []*StockReservation `json:"stock_reservations,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [6]bool
+	loadedTypes [10]bool
 }
 
 // ProductOrErr returns the Product value or an error if the edge
@@ -110,10 +118,46 @@ func (e ProductSKUEdges) InventoryLotsOrErr() ([]*InventoryLot, error) {
 	return nil, &NotLoadedError{edge: "inventory_lots"}
 }
 
+// InventoryTxnsOrErr returns the InventoryTxns value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductSKUEdges) InventoryTxnsOrErr() ([]*InventoryTxn, error) {
+	if e.loadedTypes[4] {
+		return e.InventoryTxns, nil
+	}
+	return nil, &NotLoadedError{edge: "inventory_txns"}
+}
+
+// InventoryBalancesOrErr returns the InventoryBalances value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductSKUEdges) InventoryBalancesOrErr() ([]*InventoryBalance, error) {
+	if e.loadedTypes[5] {
+		return e.InventoryBalances, nil
+	}
+	return nil, &NotLoadedError{edge: "inventory_balances"}
+}
+
+// ProductionFactsOrErr returns the ProductionFacts value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductSKUEdges) ProductionFactsOrErr() ([]*ProductionFact, error) {
+	if e.loadedTypes[6] {
+		return e.ProductionFacts, nil
+	}
+	return nil, &NotLoadedError{edge: "production_facts"}
+}
+
+// OutsourcingFactsOrErr returns the OutsourcingFacts value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductSKUEdges) OutsourcingFactsOrErr() ([]*OutsourcingFact, error) {
+	if e.loadedTypes[7] {
+		return e.OutsourcingFacts, nil
+	}
+	return nil, &NotLoadedError{edge: "outsourcing_facts"}
+}
+
 // ShipmentItemsOrErr returns the ShipmentItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e ProductSKUEdges) ShipmentItemsOrErr() ([]*ShipmentItem, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[8] {
 		return e.ShipmentItems, nil
 	}
 	return nil, &NotLoadedError{edge: "shipment_items"}
@@ -122,7 +166,7 @@ func (e ProductSKUEdges) ShipmentItemsOrErr() ([]*ShipmentItem, error) {
 // StockReservationsOrErr returns the StockReservations value or an error if the edge
 // was not loaded in eager-loading.
 func (e ProductSKUEdges) StockReservationsOrErr() ([]*StockReservation, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[9] {
 		return e.StockReservations, nil
 	}
 	return nil, &NotLoadedError{edge: "stock_reservations"}
@@ -279,6 +323,26 @@ func (_m *ProductSKU) QuerySalesOrderItems() *SalesOrderItemQuery {
 // QueryInventoryLots queries the "inventory_lots" edge of the ProductSKU entity.
 func (_m *ProductSKU) QueryInventoryLots() *InventoryLotQuery {
 	return NewProductSKUClient(_m.config).QueryInventoryLots(_m)
+}
+
+// QueryInventoryTxns queries the "inventory_txns" edge of the ProductSKU entity.
+func (_m *ProductSKU) QueryInventoryTxns() *InventoryTxnQuery {
+	return NewProductSKUClient(_m.config).QueryInventoryTxns(_m)
+}
+
+// QueryInventoryBalances queries the "inventory_balances" edge of the ProductSKU entity.
+func (_m *ProductSKU) QueryInventoryBalances() *InventoryBalanceQuery {
+	return NewProductSKUClient(_m.config).QueryInventoryBalances(_m)
+}
+
+// QueryProductionFacts queries the "production_facts" edge of the ProductSKU entity.
+func (_m *ProductSKU) QueryProductionFacts() *ProductionFactQuery {
+	return NewProductSKUClient(_m.config).QueryProductionFacts(_m)
+}
+
+// QueryOutsourcingFacts queries the "outsourcing_facts" edge of the ProductSKU entity.
+func (_m *ProductSKU) QueryOutsourcingFacts() *OutsourcingFactQuery {
+	return NewProductSKUClient(_m.config).QueryOutsourcingFacts(_m)
 }
 
 // QueryShipmentItems queries the "shipment_items" edge of the ProductSKU entity.

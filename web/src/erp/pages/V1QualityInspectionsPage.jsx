@@ -27,6 +27,8 @@ import {
 } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   cancelQualityInspection,
   createQualityInspectionDraft,
@@ -226,6 +228,8 @@ export default function V1QualityInspectionsPage() {
     searchParams,
     'purchase_receipt_id'
   )
+
+  const beginLatestRequest = useLatestRequestCoordinator()
   const selectedPurchaseReceiptID = Form.useWatch(
     'purchase_receipt_id',
     inspectionForm
@@ -353,6 +357,7 @@ export default function V1QualityInspectionsPage() {
   }
 
   const loadRows = useCallback(async () => {
+    const request = beginLatestRequest('rows')
     setLoading(true)
     try {
       const data = await listQualityInspections(
@@ -370,8 +375,12 @@ export default function V1QualityInspectionsPage() {
           warehouse_id: warehouseFilter || undefined,
           inventory_lot_id: lotFilter || undefined,
           ...getBusinessPaginationParams(pagination),
-        })
+        }),
+        { signal: request.signal }
       )
+      if (!request.isCurrent()) {
+        return
+      }
       const nextRows = Array.isArray(data?.quality_inspections)
         ? data.quality_inspections
         : []
@@ -383,11 +392,18 @@ export default function V1QualityInspectionsPage() {
       )
       setTotal(Number(data?.total || 0))
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return
+      }
       message.error(getActionErrorMessage(error, '加载来料质检单'))
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
     }
   }, [
+    beginLatestRequest,
     dateFilterEnd,
     dateFilterField,
     dateFilterStart,

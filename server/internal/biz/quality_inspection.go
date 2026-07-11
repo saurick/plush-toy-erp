@@ -78,8 +78,10 @@ type QualityInspectionDecision struct {
 	InspectionID int
 	Result       string
 	InspectedAt  time.Time
-	InspectorID  *int
-	DecisionNote *string
+	// InspectedAtDefaulted means the input omitted inspected_at and this value was generated locally.
+	InspectedAtDefaulted bool
+	InspectorID          *int
+	DecisionNote         *string
 }
 
 type QualityInspectionFilter struct {
@@ -321,8 +323,10 @@ func normalizeQualityInspectionDecision(in QualityInspectionDecision, defaultRes
 		return QualityInspectionDecision{}, ErrBadParam
 	}
 	if in.InspectedAt.IsZero() {
+		in.InspectedAtDefaulted = true
 		in.InspectedAt = time.Now()
 	}
+	in.InspectedAt = in.InspectedAt.UTC().Truncate(time.Microsecond)
 	return in, nil
 }
 

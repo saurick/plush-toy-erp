@@ -18,7 +18,8 @@ func (d *jsonrpcDispatcher) handleSalesOrder(
 	if params != nil {
 		pm = params.AsMap()
 	}
-	if _, res := d.requireAdmin(ctx); res != nil {
+	claims, res := d.requireAdmin(ctx)
+	if res != nil {
 		return id, res, nil
 	}
 	if d.salesOrderUC == nil {
@@ -34,7 +35,7 @@ func (d *jsonrpcDispatcher) handleSalesOrder(
 		"activate_sales_order", "activateSalesOrder",
 		"close_sales_order", "closeSalesOrder",
 		"cancel_sales_order", "cancelSalesOrder":
-		return d.handleSalesOrderLifecycle(ctx, method, id, pm)
+		return d.handleSalesOrderLifecycle(ctx, method, id, pm, claims.UserID)
 	case "list_sales_order_items", "listSalesOrderItems":
 		return d.handleSalesOrderItem(ctx, method, id, pm)
 	default:

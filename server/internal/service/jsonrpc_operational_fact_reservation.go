@@ -35,15 +35,6 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 		}
 		item, err := d.operationalFactUC.ReleaseStockReservation(ctx, getInt(pm, "id", 0))
 		return id, operationalFactStockReservationResult(ctx, d, item, err), nil
-	case "consume_stock_reservation", "consumeStockReservation":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseOutboundConfirm); res != nil {
-			return id, res, nil
-		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "inventory"); res != nil {
-			return id, res, nil
-		}
-		item, err := d.operationalFactUC.ConsumeStockReservation(ctx, getInt(pm, "id", 0))
-		return id, operationalFactStockReservationResult(ctx, d, item, err), nil
 	case "list_stock_reservations", "listStockReservations":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionWarehouseInventoryRead, biz.PermissionSalesOrderRead); res != nil {
 			return id, res, nil
@@ -76,6 +67,7 @@ func stockReservationCreateFromParams(pm map[string]any) (*biz.StockReservationC
 		SalesOrderID:     getOptionalInt(pm, "sales_order_id"),
 		SalesOrderItemID: getOptionalInt(pm, "sales_order_item_id"),
 		ProductID:        getInt(pm, "product_id", 0),
+		ProductSkuID:     getOptionalInt(pm, "product_sku_id"),
 		WarehouseID:      getInt(pm, "warehouse_id", 0),
 		UnitID:           getInt(pm, "unit_id", 0),
 		LotID:            getOptionalInt(pm, "lot_id"),
@@ -105,5 +97,5 @@ func stockReservationToAny(item *biz.StockReservation) map[string]any {
 	if item == nil {
 		return map[string]any{}
 	}
-	return map[string]any{"id": item.ID, "reservation_no": item.ReservationNo, "status": item.Status, "sales_order_id": optionalIntToAny(item.SalesOrderID), "sales_order_item_id": optionalIntToAny(item.SalesOrderItemID), "product_id": item.ProductID, "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "idempotency_key": item.IdempotencyKey, "reserved_at": item.ReservedAt.Unix(), "released_at": optionalUnix(item.ReleasedAt), "consumed_at": optionalUnix(item.ConsumedAt), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+	return map[string]any{"id": item.ID, "reservation_no": item.ReservationNo, "status": item.Status, "sales_order_id": optionalIntToAny(item.SalesOrderID), "sales_order_item_id": optionalIntToAny(item.SalesOrderItemID), "product_id": item.ProductID, "product_sku_id": optionalIntToAny(item.ProductSkuID), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "idempotency_key": item.IdempotencyKey, "reserved_at": item.ReservedAt.Unix(), "released_at": optionalUnix(item.ReleasedAt), "consumed_at": optionalUnix(item.ConsumedAt), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
 }

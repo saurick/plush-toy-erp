@@ -140,6 +140,11 @@ func OccurredAt(v time.Time) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldEQ(FieldOccurredAt, v))
 }
 
+// OccurredAtSpecified applies equality check predicate on the "occurred_at_specified" field. It's identical to OccurredAtSpecifiedEQ.
+func OccurredAtSpecified(v bool) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldOccurredAtSpecified, v))
+}
+
 // PostedAt applies equality check predicate on the "posted_at" field. It's identical to PostedAtEQ.
 func PostedAt(v time.Time) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldEQ(FieldPostedAt, v))
@@ -1173,6 +1178,16 @@ func OccurredAtLT(v time.Time) predicate.FinanceFact {
 // OccurredAtLTE applies the LTE predicate on the "occurred_at" field.
 func OccurredAtLTE(v time.Time) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldLTE(FieldOccurredAt, v))
+}
+
+// OccurredAtSpecifiedEQ applies the EQ predicate on the "occurred_at_specified" field.
+func OccurredAtSpecifiedEQ(v bool) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldOccurredAtSpecified, v))
+}
+
+// OccurredAtSpecifiedNEQ applies the NEQ predicate on the "occurred_at_specified" field.
+func OccurredAtSpecifiedNEQ(v bool) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNEQ(FieldOccurredAtSpecified, v))
 }
 
 // PostedAtEQ applies the EQ predicate on the "posted_at" field.

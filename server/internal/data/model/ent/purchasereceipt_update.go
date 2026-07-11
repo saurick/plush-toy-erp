@@ -108,6 +108,73 @@ func (_u *PurchaseReceiptUpdate) ClearPostedAt() *PurchaseReceiptUpdate {
 	return _u
 }
 
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (_u *PurchaseReceiptUpdate) SetIdempotencyKey(v string) *PurchaseReceiptUpdate {
+	_u.mutation.SetIdempotencyKey(v)
+	return _u
+}
+
+// SetNillableIdempotencyKey sets the "idempotency_key" field if the given value is not nil.
+func (_u *PurchaseReceiptUpdate) SetNillableIdempotencyKey(v *string) *PurchaseReceiptUpdate {
+	if v != nil {
+		_u.SetIdempotencyKey(*v)
+	}
+	return _u
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (_u *PurchaseReceiptUpdate) ClearIdempotencyKey() *PurchaseReceiptUpdate {
+	_u.mutation.ClearIdempotencyKey()
+	return _u
+}
+
+// SetIdempotencyPayloadHash sets the "idempotency_payload_hash" field.
+func (_u *PurchaseReceiptUpdate) SetIdempotencyPayloadHash(v string) *PurchaseReceiptUpdate {
+	_u.mutation.SetIdempotencyPayloadHash(v)
+	return _u
+}
+
+// SetNillableIdempotencyPayloadHash sets the "idempotency_payload_hash" field if the given value is not nil.
+func (_u *PurchaseReceiptUpdate) SetNillableIdempotencyPayloadHash(v *string) *PurchaseReceiptUpdate {
+	if v != nil {
+		_u.SetIdempotencyPayloadHash(*v)
+	}
+	return _u
+}
+
+// ClearIdempotencyPayloadHash clears the value of the "idempotency_payload_hash" field.
+func (_u *PurchaseReceiptUpdate) ClearIdempotencyPayloadHash() *PurchaseReceiptUpdate {
+	_u.mutation.ClearIdempotencyPayloadHash()
+	return _u
+}
+
+// SetIdempotencyItemCount sets the "idempotency_item_count" field.
+func (_u *PurchaseReceiptUpdate) SetIdempotencyItemCount(v int) *PurchaseReceiptUpdate {
+	_u.mutation.ResetIdempotencyItemCount()
+	_u.mutation.SetIdempotencyItemCount(v)
+	return _u
+}
+
+// SetNillableIdempotencyItemCount sets the "idempotency_item_count" field if the given value is not nil.
+func (_u *PurchaseReceiptUpdate) SetNillableIdempotencyItemCount(v *int) *PurchaseReceiptUpdate {
+	if v != nil {
+		_u.SetIdempotencyItemCount(*v)
+	}
+	return _u
+}
+
+// AddIdempotencyItemCount adds value to the "idempotency_item_count" field.
+func (_u *PurchaseReceiptUpdate) AddIdempotencyItemCount(v int) *PurchaseReceiptUpdate {
+	_u.mutation.AddIdempotencyItemCount(v)
+	return _u
+}
+
+// ClearIdempotencyItemCount clears the value of the "idempotency_item_count" field.
+func (_u *PurchaseReceiptUpdate) ClearIdempotencyItemCount() *PurchaseReceiptUpdate {
+	_u.mutation.ClearIdempotencyItemCount()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *PurchaseReceiptUpdate) SetNote(v string) *PurchaseReceiptUpdate {
 	_u.mutation.SetNote(v)
@@ -342,6 +409,21 @@ func (_u *PurchaseReceiptUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.IdempotencyKey(); ok {
+		if err := purchasereceipt.IdempotencyKeyValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.idempotency_key": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.IdempotencyPayloadHash(); ok {
+		if err := purchasereceipt.IdempotencyPayloadHashValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_payload_hash", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.idempotency_payload_hash": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.IdempotencyItemCount(); ok {
+		if err := purchasereceipt.IdempotencyItemCountValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_item_count", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.idempotency_item_count": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := purchasereceipt.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.note": %w`, err)}
@@ -379,6 +461,27 @@ func (_u *PurchaseReceiptUpdate) sqlSave(ctx context.Context) (_node int, err er
 	}
 	if _u.mutation.PostedAtCleared() {
 		_spec.ClearField(purchasereceipt.FieldPostedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.IdempotencyKey(); ok {
+		_spec.SetField(purchasereceipt.FieldIdempotencyKey, field.TypeString, value)
+	}
+	if _u.mutation.IdempotencyKeyCleared() {
+		_spec.ClearField(purchasereceipt.FieldIdempotencyKey, field.TypeString)
+	}
+	if value, ok := _u.mutation.IdempotencyPayloadHash(); ok {
+		_spec.SetField(purchasereceipt.FieldIdempotencyPayloadHash, field.TypeString, value)
+	}
+	if _u.mutation.IdempotencyPayloadHashCleared() {
+		_spec.ClearField(purchasereceipt.FieldIdempotencyPayloadHash, field.TypeString)
+	}
+	if value, ok := _u.mutation.IdempotencyItemCount(); ok {
+		_spec.SetField(purchasereceipt.FieldIdempotencyItemCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedIdempotencyItemCount(); ok {
+		_spec.AddField(purchasereceipt.FieldIdempotencyItemCount, field.TypeInt, value)
+	}
+	if _u.mutation.IdempotencyItemCountCleared() {
+		_spec.ClearField(purchasereceipt.FieldIdempotencyItemCount, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(purchasereceipt.FieldNote, field.TypeString, value)
@@ -665,6 +768,73 @@ func (_u *PurchaseReceiptUpdateOne) ClearPostedAt() *PurchaseReceiptUpdateOne {
 	return _u
 }
 
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (_u *PurchaseReceiptUpdateOne) SetIdempotencyKey(v string) *PurchaseReceiptUpdateOne {
+	_u.mutation.SetIdempotencyKey(v)
+	return _u
+}
+
+// SetNillableIdempotencyKey sets the "idempotency_key" field if the given value is not nil.
+func (_u *PurchaseReceiptUpdateOne) SetNillableIdempotencyKey(v *string) *PurchaseReceiptUpdateOne {
+	if v != nil {
+		_u.SetIdempotencyKey(*v)
+	}
+	return _u
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (_u *PurchaseReceiptUpdateOne) ClearIdempotencyKey() *PurchaseReceiptUpdateOne {
+	_u.mutation.ClearIdempotencyKey()
+	return _u
+}
+
+// SetIdempotencyPayloadHash sets the "idempotency_payload_hash" field.
+func (_u *PurchaseReceiptUpdateOne) SetIdempotencyPayloadHash(v string) *PurchaseReceiptUpdateOne {
+	_u.mutation.SetIdempotencyPayloadHash(v)
+	return _u
+}
+
+// SetNillableIdempotencyPayloadHash sets the "idempotency_payload_hash" field if the given value is not nil.
+func (_u *PurchaseReceiptUpdateOne) SetNillableIdempotencyPayloadHash(v *string) *PurchaseReceiptUpdateOne {
+	if v != nil {
+		_u.SetIdempotencyPayloadHash(*v)
+	}
+	return _u
+}
+
+// ClearIdempotencyPayloadHash clears the value of the "idempotency_payload_hash" field.
+func (_u *PurchaseReceiptUpdateOne) ClearIdempotencyPayloadHash() *PurchaseReceiptUpdateOne {
+	_u.mutation.ClearIdempotencyPayloadHash()
+	return _u
+}
+
+// SetIdempotencyItemCount sets the "idempotency_item_count" field.
+func (_u *PurchaseReceiptUpdateOne) SetIdempotencyItemCount(v int) *PurchaseReceiptUpdateOne {
+	_u.mutation.ResetIdempotencyItemCount()
+	_u.mutation.SetIdempotencyItemCount(v)
+	return _u
+}
+
+// SetNillableIdempotencyItemCount sets the "idempotency_item_count" field if the given value is not nil.
+func (_u *PurchaseReceiptUpdateOne) SetNillableIdempotencyItemCount(v *int) *PurchaseReceiptUpdateOne {
+	if v != nil {
+		_u.SetIdempotencyItemCount(*v)
+	}
+	return _u
+}
+
+// AddIdempotencyItemCount adds value to the "idempotency_item_count" field.
+func (_u *PurchaseReceiptUpdateOne) AddIdempotencyItemCount(v int) *PurchaseReceiptUpdateOne {
+	_u.mutation.AddIdempotencyItemCount(v)
+	return _u
+}
+
+// ClearIdempotencyItemCount clears the value of the "idempotency_item_count" field.
+func (_u *PurchaseReceiptUpdateOne) ClearIdempotencyItemCount() *PurchaseReceiptUpdateOne {
+	_u.mutation.ClearIdempotencyItemCount()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *PurchaseReceiptUpdateOne) SetNote(v string) *PurchaseReceiptUpdateOne {
 	_u.mutation.SetNote(v)
@@ -912,6 +1082,21 @@ func (_u *PurchaseReceiptUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.IdempotencyKey(); ok {
+		if err := purchasereceipt.IdempotencyKeyValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.idempotency_key": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.IdempotencyPayloadHash(); ok {
+		if err := purchasereceipt.IdempotencyPayloadHashValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_payload_hash", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.idempotency_payload_hash": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.IdempotencyItemCount(); ok {
+		if err := purchasereceipt.IdempotencyItemCountValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_item_count", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.idempotency_item_count": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := purchasereceipt.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.note": %w`, err)}
@@ -966,6 +1151,27 @@ func (_u *PurchaseReceiptUpdateOne) sqlSave(ctx context.Context) (_node *Purchas
 	}
 	if _u.mutation.PostedAtCleared() {
 		_spec.ClearField(purchasereceipt.FieldPostedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.IdempotencyKey(); ok {
+		_spec.SetField(purchasereceipt.FieldIdempotencyKey, field.TypeString, value)
+	}
+	if _u.mutation.IdempotencyKeyCleared() {
+		_spec.ClearField(purchasereceipt.FieldIdempotencyKey, field.TypeString)
+	}
+	if value, ok := _u.mutation.IdempotencyPayloadHash(); ok {
+		_spec.SetField(purchasereceipt.FieldIdempotencyPayloadHash, field.TypeString, value)
+	}
+	if _u.mutation.IdempotencyPayloadHashCleared() {
+		_spec.ClearField(purchasereceipt.FieldIdempotencyPayloadHash, field.TypeString)
+	}
+	if value, ok := _u.mutation.IdempotencyItemCount(); ok {
+		_spec.SetField(purchasereceipt.FieldIdempotencyItemCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedIdempotencyItemCount(); ok {
+		_spec.AddField(purchasereceipt.FieldIdempotencyItemCount, field.TypeInt, value)
+	}
+	if _u.mutation.IdempotencyItemCountCleared() {
+		_spec.ClearField(purchasereceipt.FieldIdempotencyItemCount, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(purchasereceipt.FieldNote, field.TypeString, value)

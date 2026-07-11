@@ -132,6 +132,10 @@ func (s *salesOrderRepoStub) ProductIsActive(_ context.Context, id int) (bool, e
 	return active, nil
 }
 
+func (s *salesOrderRepoStub) ProductSKUIsActiveForProduct(context.Context, int, int) (bool, error) {
+	return true, nil
+}
+
 func (s *salesOrderRepoStub) UnitIsActive(_ context.Context, id int) (bool, error) {
 	active, ok := s.unitActive[id]
 	if !ok {

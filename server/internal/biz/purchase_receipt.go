@@ -2,6 +2,9 @@ package biz
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -54,11 +57,13 @@ type PurchaseReceiptCreate struct {
 }
 
 type PurchaseReceiptFromPurchaseOrderCreate struct {
-	PurchaseOrderID int
-	ReceiptNo       string
-	WarehouseID     int
-	ReceivedAt      time.Time
-	Note            *string
+	PurchaseOrderID        int
+	ReceiptNo              string
+	WarehouseID            int
+	ReceivedAt             time.Time
+	Note                   *string
+	IdempotencyKey         string
+	IdempotencyPayloadHash string
 }
 
 type PurchaseReceiptItemCreate struct {
@@ -135,6 +140,15 @@ func (uc *InventoryUsecase) CreatePurchaseReceiptFromPurchaseOrder(ctx context.C
 	if err != nil {
 		return nil, err
 	}
+	if normalized.IdempotencyKey != "" {
+		replayed, found, err := uc.repo.ResolvePurchaseReceiptFromPurchaseOrderReplay(ctx, &normalized)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			return replayed, nil
+		}
+	}
 	if err := requireActiveReference(ctx, normalized.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
 		return nil, err
 	}
@@ -167,6 +181,17 @@ func (uc *InventoryUsecase) CancelPostedPurchaseReceipt(ctx context.Context, rec
 		return nil, ErrBadParam
 	}
 	return uc.repo.CancelPostedPurchaseReceipt(ctx, receiptID)
+}
+
+func (uc *InventoryUsecase) CancelPostedPurchaseReceiptWithActor(ctx context.Context, receiptID int, actorID int) (*PurchaseReceipt, error) {
+	if uc == nil || uc.repo == nil || receiptID <= 0 || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(PurchaseReceiptCancellationActorRepo)
+	if !ok {
+		return nil, ErrActorAwareCancellationUnavailable
+	}
+	return repo.CancelPostedPurchaseReceiptWithActor(ctx, receiptID, actorID)
 }
 
 func (uc *InventoryUsecase) GetPurchaseReceipt(ctx context.Context, id int) (*PurchaseReceipt, error) {
@@ -215,6 +240,14 @@ func normalizePurchaseReceiptCreate(in PurchaseReceiptCreate) (PurchaseReceiptCr
 func normalizePurchaseReceiptFromPurchaseOrderCreate(in PurchaseReceiptFromPurchaseOrderCreate) (PurchaseReceiptFromPurchaseOrderCreate, error) {
 	in.ReceiptNo = strings.TrimSpace(in.ReceiptNo)
 	in.Note = normalizeOptionalString(in.Note)
+	in.IdempotencyKey = strings.TrimSpace(in.IdempotencyKey)
+	in.IdempotencyPayloadHash = ""
+	if len(in.IdempotencyKey) > 128 {
+		return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
+	}
+	if in.IdempotencyKey != "" {
+		in.IdempotencyPayloadHash = purchaseReceiptFromPurchaseOrderPayloadHash(in)
+	}
 	if in.ReceivedAt.IsZero() {
 		in.ReceivedAt = time.Now()
 	}
@@ -222,6 +255,29 @@ func normalizePurchaseReceiptFromPurchaseOrderCreate(in PurchaseReceiptFromPurch
 		return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
 	}
 	return in, nil
+}
+
+func purchaseReceiptFromPurchaseOrderPayloadHash(in PurchaseReceiptFromPurchaseOrderCreate) string {
+	receivedAt := ""
+	if !in.ReceivedAt.IsZero() {
+		receivedAt = in.ReceivedAt.UTC().Format(time.RFC3339Nano)
+	}
+	payload := struct {
+		PurchaseOrderID int     `json:"purchase_order_id"`
+		ReceiptNo       string  `json:"receipt_no"`
+		WarehouseID     int     `json:"warehouse_id"`
+		ReceivedAt      string  `json:"received_at"`
+		Note            *string `json:"note"`
+	}{
+		PurchaseOrderID: in.PurchaseOrderID,
+		ReceiptNo:       in.ReceiptNo,
+		WarehouseID:     in.WarehouseID,
+		ReceivedAt:      receivedAt,
+		Note:            in.Note,
+	}
+	encoded, _ := json.Marshal(payload)
+	sum := sha256.Sum256(encoded)
+	return hex.EncodeToString(sum[:])
 }
 
 func normalizePurchaseReceiptItemCreate(in PurchaseReceiptItemCreate) (PurchaseReceiptItemCreate, error) {

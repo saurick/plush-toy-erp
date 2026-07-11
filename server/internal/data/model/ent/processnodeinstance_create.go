@@ -185,6 +185,186 @@ func (_c *ProcessNodeInstanceCreate) SetNillableOutcome(v *string) *ProcessNodeI
 	return _c
 }
 
+// SetDomainCommandFingerprint sets the "domain_command_fingerprint" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandFingerprint(v string) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandFingerprint(v)
+	return _c
+}
+
+// SetNillableDomainCommandFingerprint sets the "domain_command_fingerprint" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandFingerprint(v *string) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandFingerprint(*v)
+	}
+	return _c
+}
+
+// SetDomainCommandProtocolVersion sets the "domain_command_protocol_version" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandProtocolVersion(v int) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandProtocolVersion(v)
+	return _c
+}
+
+// SetNillableDomainCommandProtocolVersion sets the "domain_command_protocol_version" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandProtocolVersion(v *int) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandProtocolVersion(*v)
+	}
+	return _c
+}
+
+// SetDomainCommandResultState sets the "domain_command_result_state" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandResultState(v string) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandResultState(v)
+	return _c
+}
+
+// SetNillableDomainCommandResultState sets the "domain_command_result_state" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandResultState(v *string) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandResultState(*v)
+	}
+	return _c
+}
+
+// SetDomainCommandResult sets the "domain_command_result" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandResult(v map[string]interface{}) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandResult(v)
+	return _c
+}
+
+// SetDomainCommandResultHash sets the "domain_command_result_hash" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandResultHash(v string) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandResultHash(v)
+	return _c
+}
+
+// SetNillableDomainCommandResultHash sets the "domain_command_result_hash" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandResultHash(v *string) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandResultHash(*v)
+	}
+	return _c
+}
+
+// SetDomainCommandEffectState sets the "domain_command_effect_state" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandEffectState(v string) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandEffectState(v)
+	return _c
+}
+
+// SetNillableDomainCommandEffectState sets the "domain_command_effect_state" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandEffectState(v *string) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandEffectState(*v)
+	}
+	return _c
+}
+
+// SetDomainCommandEffectRefType sets the "domain_command_effect_ref_type" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandEffectRefType(v string) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandEffectRefType(v)
+	return _c
+}
+
+// SetNillableDomainCommandEffectRefType sets the "domain_command_effect_ref_type" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandEffectRefType(v *string) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandEffectRefType(*v)
+	}
+	return _c
+}
+
+// SetDomainCommandEffectRefID sets the "domain_command_effect_ref_id" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandEffectRefID(v int) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandEffectRefID(v)
+	return _c
+}
+
+// SetNillableDomainCommandEffectRefID sets the "domain_command_effect_ref_id" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandEffectRefID(v *int) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandEffectRefID(*v)
+	}
+	return _c
+}
+
+// SetDomainCommandResultRecordedAt sets the "domain_command_result_recorded_at" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandResultRecordedAt(v time.Time) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandResultRecordedAt(v)
+	return _c
+}
+
+// SetNillableDomainCommandResultRecordedAt sets the "domain_command_result_recorded_at" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandResultRecordedAt(v *time.Time) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandResultRecordedAt(*v)
+	}
+	return _c
+}
+
+// SetDomainCommandResultRecordedBy sets the "domain_command_result_recorded_by" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandResultRecordedBy(v int) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandResultRecordedBy(v)
+	return _c
+}
+
+// SetNillableDomainCommandResultRecordedBy sets the "domain_command_result_recorded_by" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandResultRecordedBy(v *int) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandResultRecordedBy(*v)
+	}
+	return _c
+}
+
+// SetDomainCommandCompensation sets the "domain_command_compensation" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandCompensation(v map[string]interface{}) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandCompensation(v)
+	return _c
+}
+
+// SetDomainCommandCompensationHash sets the "domain_command_compensation_hash" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandCompensationHash(v string) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandCompensationHash(v)
+	return _c
+}
+
+// SetNillableDomainCommandCompensationHash sets the "domain_command_compensation_hash" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandCompensationHash(v *string) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandCompensationHash(*v)
+	}
+	return _c
+}
+
+// SetDomainCommandCompensatedAt sets the "domain_command_compensated_at" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandCompensatedAt(v time.Time) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandCompensatedAt(v)
+	return _c
+}
+
+// SetNillableDomainCommandCompensatedAt sets the "domain_command_compensated_at" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandCompensatedAt(v *time.Time) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandCompensatedAt(*v)
+	}
+	return _c
+}
+
+// SetDomainCommandCompensatedBy sets the "domain_command_compensated_by" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandCompensatedBy(v int) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandCompensatedBy(v)
+	return _c
+}
+
+// SetNillableDomainCommandCompensatedBy sets the "domain_command_compensated_by" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandCompensatedBy(v *int) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandCompensatedBy(*v)
+	}
+	return _c
+}
+
 // SetVersion sets the "version" field.
 func (_c *ProcessNodeInstanceCreate) SetVersion(v int) *ProcessNodeInstanceCreate {
 	_c.mutation.SetVersion(v)
@@ -356,6 +536,56 @@ func (_c *ProcessNodeInstanceCreate) check() error {
 			return &ValidationError{Name: "outcome", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.outcome": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.DomainCommandFingerprint(); ok {
+		if err := processnodeinstance.DomainCommandFingerprintValidator(v); err != nil {
+			return &ValidationError{Name: "domain_command_fingerprint", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.domain_command_fingerprint": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DomainCommandProtocolVersion(); ok {
+		if err := processnodeinstance.DomainCommandProtocolVersionValidator(v); err != nil {
+			return &ValidationError{Name: "domain_command_protocol_version", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.domain_command_protocol_version": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DomainCommandResultState(); ok {
+		if err := processnodeinstance.DomainCommandResultStateValidator(v); err != nil {
+			return &ValidationError{Name: "domain_command_result_state", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.domain_command_result_state": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DomainCommandResultHash(); ok {
+		if err := processnodeinstance.DomainCommandResultHashValidator(v); err != nil {
+			return &ValidationError{Name: "domain_command_result_hash", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.domain_command_result_hash": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DomainCommandEffectState(); ok {
+		if err := processnodeinstance.DomainCommandEffectStateValidator(v); err != nil {
+			return &ValidationError{Name: "domain_command_effect_state", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.domain_command_effect_state": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DomainCommandEffectRefType(); ok {
+		if err := processnodeinstance.DomainCommandEffectRefTypeValidator(v); err != nil {
+			return &ValidationError{Name: "domain_command_effect_ref_type", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.domain_command_effect_ref_type": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DomainCommandEffectRefID(); ok {
+		if err := processnodeinstance.DomainCommandEffectRefIDValidator(v); err != nil {
+			return &ValidationError{Name: "domain_command_effect_ref_id", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.domain_command_effect_ref_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DomainCommandResultRecordedBy(); ok {
+		if err := processnodeinstance.DomainCommandResultRecordedByValidator(v); err != nil {
+			return &ValidationError{Name: "domain_command_result_recorded_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.domain_command_result_recorded_by": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DomainCommandCompensationHash(); ok {
+		if err := processnodeinstance.DomainCommandCompensationHashValidator(v); err != nil {
+			return &ValidationError{Name: "domain_command_compensation_hash", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.domain_command_compensation_hash": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DomainCommandCompensatedBy(); ok {
+		if err := processnodeinstance.DomainCommandCompensatedByValidator(v); err != nil {
+			return &ValidationError{Name: "domain_command_compensated_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.domain_command_compensated_by": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.Version(); !ok {
 		return &ValidationError{Name: "version", err: errors.New(`ent: missing required field "ProcessNodeInstance.version"`)}
 	}
@@ -450,6 +680,62 @@ func (_c *ProcessNodeInstanceCreate) createSpec() (*ProcessNodeInstance, *sqlgra
 	if value, ok := _c.mutation.Outcome(); ok {
 		_spec.SetField(processnodeinstance.FieldOutcome, field.TypeString, value)
 		_node.Outcome = &value
+	}
+	if value, ok := _c.mutation.DomainCommandFingerprint(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandFingerprint, field.TypeString, value)
+		_node.DomainCommandFingerprint = &value
+	}
+	if value, ok := _c.mutation.DomainCommandProtocolVersion(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandProtocolVersion, field.TypeInt, value)
+		_node.DomainCommandProtocolVersion = &value
+	}
+	if value, ok := _c.mutation.DomainCommandResultState(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandResultState, field.TypeString, value)
+		_node.DomainCommandResultState = &value
+	}
+	if value, ok := _c.mutation.DomainCommandResult(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandResult, field.TypeJSON, value)
+		_node.DomainCommandResult = value
+	}
+	if value, ok := _c.mutation.DomainCommandResultHash(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandResultHash, field.TypeString, value)
+		_node.DomainCommandResultHash = &value
+	}
+	if value, ok := _c.mutation.DomainCommandEffectState(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandEffectState, field.TypeString, value)
+		_node.DomainCommandEffectState = &value
+	}
+	if value, ok := _c.mutation.DomainCommandEffectRefType(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandEffectRefType, field.TypeString, value)
+		_node.DomainCommandEffectRefType = &value
+	}
+	if value, ok := _c.mutation.DomainCommandEffectRefID(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandEffectRefID, field.TypeInt, value)
+		_node.DomainCommandEffectRefID = &value
+	}
+	if value, ok := _c.mutation.DomainCommandResultRecordedAt(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandResultRecordedAt, field.TypeTime, value)
+		_node.DomainCommandResultRecordedAt = &value
+	}
+	if value, ok := _c.mutation.DomainCommandResultRecordedBy(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandResultRecordedBy, field.TypeInt, value)
+		_node.DomainCommandResultRecordedBy = &value
+	}
+	if value, ok := _c.mutation.DomainCommandCompensation(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandCompensation, field.TypeJSON, value)
+		_node.DomainCommandCompensation = value
+	}
+	if value, ok := _c.mutation.DomainCommandCompensationHash(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandCompensationHash, field.TypeString, value)
+		_node.DomainCommandCompensationHash = &value
+	}
+	if value, ok := _c.mutation.DomainCommandCompensatedAt(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandCompensatedAt, field.TypeTime, value)
+		_node.DomainCommandCompensatedAt = &value
+	}
+	if value, ok := _c.mutation.DomainCommandCompensatedBy(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandCompensatedBy, field.TypeInt, value)
+		_node.DomainCommandCompensatedBy = &value
 	}
 	if value, ok := _c.mutation.Version(); ok {
 		_spec.SetField(processnodeinstance.FieldVersion, field.TypeInt, value)

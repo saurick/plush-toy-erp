@@ -219,6 +219,20 @@ func (_c *FinanceFactCreate) SetNillableOccurredAt(v *time.Time) *FinanceFactCre
 	return _c
 }
 
+// SetOccurredAtSpecified sets the "occurred_at_specified" field.
+func (_c *FinanceFactCreate) SetOccurredAtSpecified(v bool) *FinanceFactCreate {
+	_c.mutation.SetOccurredAtSpecified(v)
+	return _c
+}
+
+// SetNillableOccurredAtSpecified sets the "occurred_at_specified" field if the given value is not nil.
+func (_c *FinanceFactCreate) SetNillableOccurredAtSpecified(v *bool) *FinanceFactCreate {
+	if v != nil {
+		_c.SetOccurredAtSpecified(*v)
+	}
+	return _c
+}
+
 // SetPostedAt sets the "posted_at" field.
 func (_c *FinanceFactCreate) SetPostedAt(v time.Time) *FinanceFactCreate {
 	_c.mutation.SetPostedAt(v)
@@ -345,6 +359,10 @@ func (_c *FinanceFactCreate) defaults() error {
 		v := financefact.DefaultOccurredAt()
 		_c.mutation.SetOccurredAt(v)
 	}
+	if _, ok := _c.mutation.OccurredAtSpecified(); !ok {
+		v := financefact.DefaultOccurredAtSpecified
+		_c.mutation.SetOccurredAtSpecified(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		if financefact.DefaultCreatedAt == nil {
 			return fmt.Errorf("ent: uninitialized financefact.DefaultCreatedAt (forgotten import ent/runtime?)")
@@ -461,6 +479,9 @@ func (_c *FinanceFactCreate) check() error {
 	if _, ok := _c.mutation.OccurredAt(); !ok {
 		return &ValidationError{Name: "occurred_at", err: errors.New(`ent: missing required field "FinanceFact.occurred_at"`)}
 	}
+	if _, ok := _c.mutation.OccurredAtSpecified(); !ok {
+		return &ValidationError{Name: "occurred_at_specified", err: errors.New(`ent: missing required field "FinanceFact.occurred_at_specified"`)}
+	}
 	if v, ok := _c.mutation.Note(); ok {
 		if err := financefact.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.note": %w`, err)}
@@ -565,6 +586,10 @@ func (_c *FinanceFactCreate) createSpec() (*FinanceFact, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.OccurredAt(); ok {
 		_spec.SetField(financefact.FieldOccurredAt, field.TypeTime, value)
 		_node.OccurredAt = value
+	}
+	if value, ok := _c.mutation.OccurredAtSpecified(); ok {
+		_spec.SetField(financefact.FieldOccurredAtSpecified, field.TypeBool, value)
+		_node.OccurredAtSpecified = value
 	}
 	if value, ok := _c.mutation.PostedAt(); ok {
 		_spec.SetField(financefact.FieldPostedAt, field.TypeTime, value)

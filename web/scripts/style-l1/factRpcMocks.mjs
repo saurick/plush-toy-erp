@@ -217,11 +217,6 @@ export async function installFactRpcMocks(page, context) {
           stock_reservation: { ...stockReservation, status: 'RELEASED' },
         }
         break
-      case 'consume_stock_reservation':
-        data = {
-          stock_reservation: { ...stockReservation, status: 'CONSUMED' },
-        }
-        break
       case 'list_finance_facts':
         data = { finance_facts: [financeFact], total: 1, limit: 100, offset: 0 }
         break
@@ -564,8 +559,9 @@ export async function installFactRpcMocks(page, context) {
       id: 301,
       subject_type: 'PRODUCT',
       subject_id: 1,
+      product_sku_id: 1,
       warehouse_id: 1,
-      lot_id: 401,
+      lot_id: 402,
       unit_id: 1,
       quantity: '12.5',
       active_reserved_quantity: '4',
@@ -585,14 +581,29 @@ export async function installFactRpcMocks(page, context) {
       received_at: nowUnix(),
       updated_at: nowUnix(),
     }
+    const skuInventoryLot = {
+      id: 402,
+      subject_type: 'PRODUCT',
+      subject_id: 1,
+      product_sku_id: 1,
+      lot_no: 'SKU-LOT-STYLE-L1',
+      supplier_lot_no: '',
+      color_no: 'C01',
+      dye_lot_no: '',
+      production_lot_no: 'PROD-LOT-STYLE-L1',
+      status: 'ACTIVE',
+      received_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
     const inventoryTxn = {
       id: 501,
       txn_type: 'REVERSAL',
       direction: -1,
-      subject_type: 'MATERIAL',
+      subject_type: 'PRODUCT',
       subject_id: 1,
+      product_sku_id: 1,
       warehouse_id: 1,
-      lot_id: 401,
+      lot_id: 402,
       quantity: '1.5',
       unit_id: 1,
       source_type: 'MANUAL_SEED',
@@ -619,17 +630,25 @@ export async function installFactRpcMocks(page, context) {
       case 'list_inventory_balances':
       case 'listInventoryBalances':
         {
-          const inventoryBalances = matchesKeyword(
-            inventoryBalance.id,
-            inventoryBalance.subject_type,
-            inventoryBalance.subject_id,
-            inventoryBalance.warehouse_id,
-            inventoryBalance.lot_id,
-            inventoryBalance.quantity,
-            inventoryBalance.available_quantity
-          )
-            ? [inventoryBalance]
-            : []
+          const inventoryBalances =
+            (!params.subject_type ||
+              inventoryBalance.subject_type === params.subject_type) &&
+            (!params.subject_id ||
+              inventoryBalance.subject_id === Number(params.subject_id)) &&
+            (!params.product_sku_id ||
+              inventoryBalance.product_sku_id ===
+                Number(params.product_sku_id)) &&
+            matchesKeyword(
+              inventoryBalance.id,
+              inventoryBalance.subject_type,
+              inventoryBalance.subject_id,
+              inventoryBalance.warehouse_id,
+              inventoryBalance.lot_id,
+              inventoryBalance.quantity,
+              inventoryBalance.available_quantity
+            )
+              ? [inventoryBalance]
+              : []
           data = {
             inventory_balances: inventoryBalances,
             total: inventoryBalances.length,
@@ -641,16 +660,23 @@ export async function installFactRpcMocks(page, context) {
       case 'list_inventory_lots':
       case 'listInventoryLots':
         {
-          const inventoryLots = matchesKeyword(
-            inventoryLot.id,
-            inventoryLot.lot_no,
-            inventoryLot.supplier_lot_no,
-            inventoryLot.color_no,
-            inventoryLot.dye_lot_no,
-            inventoryLot.status
+          const inventoryLots = [inventoryLot, skuInventoryLot].filter(
+            (item) =>
+              (!params.subject_type ||
+                item.subject_type === params.subject_type) &&
+              (!params.subject_id ||
+                item.subject_id === Number(params.subject_id)) &&
+              (!params.product_sku_id ||
+                item.product_sku_id === Number(params.product_sku_id)) &&
+              matchesKeyword(
+                item.id,
+                item.lot_no,
+                item.supplier_lot_no,
+                item.color_no,
+                item.dye_lot_no,
+                item.status
+              )
           )
-            ? [inventoryLot]
-            : []
           data = {
             inventory_lots: inventoryLots,
             total: inventoryLots.length,
@@ -662,15 +688,22 @@ export async function installFactRpcMocks(page, context) {
       case 'list_inventory_txns':
       case 'listInventoryTxns':
         {
-          const inventoryTxns = matchesKeyword(
-            inventoryTxn.id,
-            inventoryTxn.txn_type,
-            inventoryTxn.source_type,
-            inventoryTxn.idempotency_key,
-            inventoryTxn.note
-          )
-            ? [inventoryTxn]
-            : []
+          const inventoryTxns =
+            (!params.subject_type ||
+              inventoryTxn.subject_type === params.subject_type) &&
+            (!params.subject_id ||
+              inventoryTxn.subject_id === Number(params.subject_id)) &&
+            (!params.product_sku_id ||
+              inventoryTxn.product_sku_id === Number(params.product_sku_id)) &&
+            matchesKeyword(
+              inventoryTxn.id,
+              inventoryTxn.txn_type,
+              inventoryTxn.source_type,
+              inventoryTxn.idempotency_key,
+              inventoryTxn.note
+            )
+              ? [inventoryTxn]
+              : []
           data = {
             inventory_txns: inventoryTxns,
             total: inventoryTxns.length,

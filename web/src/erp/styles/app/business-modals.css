@@ -706,6 +706,7 @@
   line-height: 1;
 }
 
+/* 列表、行和网格共同持有横向滚动合同；业务页只调整字段宽度。 */
 .erp-sales-order-lines-form__list {
   display: grid;
   width: 100%;
@@ -924,11 +925,6 @@
 
 .erp-bom-modal-items {
   margin-top: 16px;
-}
-
-.erp-bom-modal-items .erp-sales-order-lines-form__row {
-  width: 100%;
-  max-width: 100%;
 }
 
 .erp-bom-modal-items

@@ -60,6 +60,100 @@ func TestPurchaseReceiptOrderQuantityGuard(t *testing.T) {
 	}
 }
 
+func TestCreatePurchaseReceiptFromPurchaseOrderIdempotencyReturnsOriginalFacts(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "purchase_receipt_order_idempotency")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	orderItem := createApprovedPurchaseOrderItemForReceiptTest(t, ctx, client, fixtures, "IDEMPOTENCY", mustDecimal(t, "10"))
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	note := "流程自动生成"
+	input := &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		PurchaseOrderID: orderItem.PurchaseOrderID,
+		ReceiptNo:       "PR-PO-IDEMPOTENCY",
+		WarehouseID:     fixtures.warehouseID,
+		Note:            &note,
+		IdempotencyKey:  "process:10:node:20:purchase-receipt-create",
+	}
+
+	created, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, input)
+	if err != nil {
+		t.Fatalf("create idempotent purchase receipt failed: %v", err)
+	}
+	if len(created.Items) != 1 || len(created.QualityInspections) != 1 {
+		t.Fatalf("expected one generated receipt line and quality fact, got %#v", created)
+	}
+	originalInspectionID := created.QualityInspections[0].ID
+	originalInspection := created.QualityInspections[0]
+	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
+		ReceiptID:   created.ID,
+		MaterialID:  fixtures.materialID,
+		WarehouseID: fixtures.warehouseID,
+		UnitID:      fixtures.unitID,
+		Quantity:    mustDecimal(t, "1"),
+	}); err != nil {
+		t.Fatalf("append later draft line failed: %v", err)
+	}
+	if _, err := client.QualityInspection.Create().
+		SetInspectionNo("QI-REPLACEMENT-IDEMPOTENCY").
+		SetPurchaseReceiptID(created.ID).
+		SetPurchaseReceiptItemID(created.Items[0].ID).
+		SetInventoryLotID(originalInspection.InventoryLotID).
+		SetMaterialID(originalInspection.MaterialID).
+		SetWarehouseID(originalInspection.WarehouseID).
+		SetSourceType(biz.QualityInspectionSourcePurchaseReceipt).
+		SetSourceID(created.ID).
+		SetInspectionType(biz.QualityInspectionTypeIncoming).
+		SetSubjectType(biz.QualityInspectionSubjectMaterial).
+		SetSubjectID(originalInspection.MaterialID).
+		SetStatus(biz.QualityInspectionStatusDraft).
+		Save(ctx); err != nil {
+		t.Fatalf("create later replacement quality fact failed: %v", err)
+	}
+
+	if _, err := client.Warehouse.UpdateOneID(fixtures.warehouseID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("deactivate warehouse after first creation failed: %v", err)
+	}
+	replayed, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, input)
+	if err != nil {
+		t.Fatalf("same-payload replay must return the original facts even after reference deactivation: %v", err)
+	}
+	if replayed.ID != created.ID || len(replayed.Items) != 1 || replayed.Items[0].ID != created.Items[0].ID {
+		t.Fatalf("same-payload replay returned different receipt facts: created=%#v replayed=%#v", created, replayed)
+	}
+	if len(replayed.QualityInspections) != 1 || replayed.QualityInspections[0].ID != originalInspectionID {
+		t.Fatalf("same-payload replay returned different quality refs: %#v", replayed.QualityInspections)
+	}
+
+	changedNote := "相同 key 的不同内容"
+	conflict := *input
+	conflict.Note = &changedNote
+	if _, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &conflict); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("same key with different payload must conflict, got %v", err)
+	}
+
+	receiptCount, err := client.PurchaseReceipt.Query().
+		Where(purchasereceipt.IdempotencyKey("process:10:node:20:purchase-receipt-create")).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count idempotent purchase receipts failed: %v", err)
+	}
+	if receiptCount != 1 {
+		t.Fatalf("idempotent retries must persist one receipt, got %d", receiptCount)
+	}
+	persisted, err := client.PurchaseReceipt.Query().
+		Where(purchasereceipt.IdempotencyKey("process:10:node:20:purchase-receipt-create")).
+		Only(ctx)
+	if err != nil {
+		t.Fatalf("load persisted idempotency intent failed: %v", err)
+	}
+	if persisted.IdempotencyPayloadHash == nil || len(*persisted.IdempotencyPayloadHash) != 64 {
+		t.Fatalf("expected persisted SHA-256 payload hash, got %#v", persisted.IdempotencyPayloadHash)
+	}
+	if persisted.IdempotencyItemCount == nil || *persisted.IdempotencyItemCount != 1 {
+		t.Fatalf("expected persisted initial item result boundary, got %#v", persisted.IdempotencyItemCount)
+	}
+}
+
 func TestCreatePurchaseReceiptFromPurchaseOrderReservesDraftWithoutCountingItAsPosted(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "purchase_receipt_order_remaining")

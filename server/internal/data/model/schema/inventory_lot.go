@@ -7,6 +7,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -16,6 +17,13 @@ type InventoryLot struct {
 	ent.Schema
 }
 
+var inventoryLotLockedFields = map[string]struct{}{
+	"subject_type":   {},
+	"subject_id":     {},
+	"product_sku_id": {},
+	"lot_no":         {},
+}
+
 func (InventoryLot) Hooks() []ent.Hook {
 	return []ent.Hook{
 		func(next ent.Mutator) ent.Mutator {
@@ -23,9 +31,21 @@ func (InventoryLot) Hooks() []ent.Hook {
 				if m.Op().Is(ent.OpDelete | ent.OpDeleteOne) {
 					return nil, errors.New("inventory_lots are batch identity facts; disable the lot instead of deleting it")
 				}
+				if m.Op().Is(ent.OpUpdate|ent.OpUpdateOne) &&
+					(mutationTouchesAny(m, inventoryLotLockedFields) || mutationTouchesEdges(m)) {
+					return nil, errors.New("inventory_lot identity fields are immutable after creation")
+				}
 				return next.Mutate(ctx, m)
 			})
 		},
+	}
+}
+
+func (InventoryLot) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{Checks: map[string]string{
+			"inventory_lots_sku_subject_allowed": "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
+		}},
 	}
 }
 

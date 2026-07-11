@@ -1,7 +1,9 @@
 package data
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -26,6 +28,7 @@ func NewProcessRuntimeRepo(d *Data, logger log.Logger) *processRuntimeRepo {
 }
 
 var _ biz.ProcessRuntimeRepo = (*processRuntimeRepo)(nil)
+var _ biz.ProcessRuntimeDomainCommandResultRepo = (*processRuntimeRepo)(nil)
 
 func (r *processRuntimeRepo) CreateProcessInstance(ctx context.Context, in *biz.ProcessInstanceCreate, actorID int) (*biz.ProcessInstance, []*biz.ProcessNodeInstance, error) {
 	if in == nil {
@@ -34,7 +37,10 @@ func (r *processRuntimeRepo) CreateProcessInstance(ctx context.Context, in *biz.
 	existing, existingNodes, err := r.getProcessInstanceByBusinessRef(ctx, in.ProcessKey, in.BusinessRefType, in.BusinessRefID)
 	if err == nil {
 		if existing.IdempotencyKey == in.IdempotencyKey {
-			return existing, existingNodes, nil
+			if processInstanceMatchesCreate(existing, existingNodes, in) {
+				return existing, existingNodes, nil
+			}
+			return nil, nil, biz.ErrIdempotencyConflict
 		}
 		return nil, nil, biz.ErrProcessInstanceExists
 	}
@@ -69,7 +75,10 @@ func (r *processRuntimeRepo) CreateProcessInstance(ctx context.Context, in *biz.
 		if ent.IsConstraintError(err) {
 			existing, existingNodes, findErr := r.getProcessInstanceByBusinessRef(ctx, in.ProcessKey, in.BusinessRefType, in.BusinessRefID)
 			if findErr == nil && existing.IdempotencyKey == in.IdempotencyKey {
-				return existing, existingNodes, nil
+				if processInstanceMatchesCreate(existing, existingNodes, in) {
+					return existing, existingNodes, nil
+				}
+				return nil, nil, biz.ErrIdempotencyConflict
 			}
 			return nil, nil, biz.ErrProcessInstanceExists
 		}
@@ -105,6 +114,136 @@ func (r *processRuntimeRepo) CreateProcessInstance(ctx context.Context, in *biz.
 	}
 	tx = nil
 	return entProcessInstanceToBiz(row), nodes, nil
+}
+
+func processInstanceMatchesCreate(existing *biz.ProcessInstance, existingNodes []*biz.ProcessNodeInstance, in *biz.ProcessInstanceCreate) bool {
+	if existing == nil || in == nil ||
+		existing.ProcessKey != in.ProcessKey ||
+		existing.ProcessVersion != in.ProcessVersion ||
+		!processOptionalStringMatches(existing.VariantKey, in.VariantKey) ||
+		existing.ConfigRevision != in.ConfigRevision ||
+		existing.DefinitionHash != in.DefinitionHash ||
+		existing.BusinessRefType != in.BusinessRefType ||
+		existing.BusinessRefID != in.BusinessRefID ||
+		!processOptionalStringMatches(existing.BusinessRefNo, in.BusinessRefNo) ||
+		!processOptionalStringMatches(existing.CorrelationKey, in.CorrelationKey) ||
+		existing.IdempotencyKey != in.IdempotencyKey ||
+		!processInstanceStatusCanEvolveFrom(in.Status, existing.Status) ||
+		!processJSONMatches(
+			processCreationModuleContractSnapshot(existing.ModuleContractSnapshot),
+			processCreationModuleContractSnapshot(in.ModuleContractSnapshot),
+		) {
+		return false
+	}
+	type nodeIdentity struct {
+		key     string
+		attempt int
+	}
+	initialNodes := make(map[nodeIdentity]*biz.ProcessNodeInstanceCreate, len(in.Nodes))
+	maxInitialAttempt := make(map[string]int, len(in.Nodes))
+	for i := range in.Nodes {
+		identity := nodeIdentity{key: in.Nodes[i].NodeKey, attempt: in.Nodes[i].Attempt}
+		if _, exists := initialNodes[identity]; exists {
+			return false
+		}
+		initialNodes[identity] = &in.Nodes[i]
+		if in.Nodes[i].Attempt > maxInitialAttempt[in.Nodes[i].NodeKey] {
+			maxInitialAttempt[in.Nodes[i].NodeKey] = in.Nodes[i].Attempt
+		}
+	}
+	matched := make(map[nodeIdentity]bool, len(initialNodes))
+	for _, existingNode := range existingNodes {
+		if existingNode == nil {
+			return false
+		}
+		identity := nodeIdentity{key: existingNode.NodeKey, attempt: existingNode.Attempt}
+		if initial, exists := initialNodes[identity]; exists {
+			if matched[identity] || !processNodeInstanceMatchesCreate(existingNode, initial) {
+				return false
+			}
+			matched[identity] = true
+			continue
+		}
+		if maxAttempt, exists := maxInitialAttempt[existingNode.NodeKey]; !exists || existingNode.Attempt <= maxAttempt {
+			return false
+		}
+	}
+	return len(matched) == len(initialNodes)
+}
+
+func processNodeInstanceMatchesCreate(existing *biz.ProcessNodeInstance, in *biz.ProcessNodeInstanceCreate) bool {
+	return existing != nil && in != nil &&
+		existing.NodeKey == in.NodeKey &&
+		existing.NodeType == in.NodeType &&
+		existing.Attempt == in.Attempt &&
+		processNodeStatusCanEvolveFrom(in.Status, existing.Status) &&
+		processOptionalStringMatches(existing.OwnerPoolKey, in.OwnerPoolKey) &&
+		processOptionalStringMatches(existing.RequiredCapabilityKey, in.RequiredCapabilityKey) &&
+		processOptionalStringMatches(existing.FormProfileKey, in.FormProfileKey) &&
+		processOptionalStringMatches(existing.ActionSetKey, in.ActionSetKey) &&
+		processJSONMatches(existing.PolicySnapshot, in.PolicySnapshot) &&
+		processOptionalTimeMatches(existing.DueAt, in.DueAt)
+}
+
+// linked_business_refs 是领域命令完成后追加的运行时证据，不属于实例创建意图。
+func processCreationModuleContractSnapshot(snapshot map[string]any) map[string]any {
+	if snapshot == nil {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(snapshot))
+	for key, value := range snapshot {
+		if key != "linked_business_refs" {
+			out[key] = value
+		}
+	}
+	return out
+}
+
+func processJSONMatches(left any, right any) bool {
+	leftJSON, leftErr := json.Marshal(left)
+	rightJSON, rightErr := json.Marshal(right)
+	return leftErr == nil && rightErr == nil && bytes.Equal(leftJSON, rightJSON)
+}
+
+func processOptionalStringMatches(left *string, right *string) bool {
+	return (left == nil && right == nil) || (left != nil && right != nil && *left == *right)
+}
+
+func processOptionalIntMatches(left *int, right *int) bool {
+	return (left == nil && right == nil) || (left != nil && right != nil && *left == *right)
+}
+
+func processOptionalTimeMatches(left *time.Time, right *time.Time) bool {
+	return (left == nil && right == nil) || (left != nil && right != nil && left.Equal(*right))
+}
+
+func processInstanceStatusCanEvolveFrom(initial string, current string) bool {
+	if initial == current {
+		return true
+	}
+	return initial == biz.ProcessStatusActive &&
+		(current == biz.ProcessStatusCompleted || current == biz.ProcessStatusCancelled || current == biz.ProcessStatusBlocked)
+}
+
+func processNodeStatusCanEvolveFrom(initial string, current string) bool {
+	if initial == current {
+		return true
+	}
+	switch initial {
+	case biz.ProcessNodeStatusWaiting:
+		return current == biz.ProcessNodeStatusActive ||
+			current == biz.ProcessNodeStatusCompleted ||
+			current == biz.ProcessNodeStatusSkipped ||
+			current == biz.ProcessNodeStatusFailed ||
+			current == biz.ProcessNodeStatusBlocked
+	case biz.ProcessNodeStatusActive:
+		return current == biz.ProcessNodeStatusCompleted ||
+			current == biz.ProcessNodeStatusSkipped ||
+			current == biz.ProcessNodeStatusFailed ||
+			current == biz.ProcessNodeStatusBlocked
+	default:
+		return false
+	}
 }
 
 func (r *processRuntimeRepo) getProcessInstanceByBusinessRef(ctx context.Context, processKey string, businessRefType string, businessRefID int) (*biz.ProcessInstance, []*biz.ProcessNodeInstance, error) {
@@ -166,8 +305,306 @@ func (r *processRuntimeRepo) ListProcessNodeInstances(ctx context.Context, proce
 	return out, nil
 }
 
+func (r *processRuntimeRepo) ClaimProcessNodeDomainCommand(ctx context.Context, in *biz.ProcessNodeDomainCommandClaim) (*biz.ProcessNodeInstance, error) {
+	if in == nil || in.ProcessInstanceID <= 0 || in.ProcessNodeInstanceID <= 0 || in.ExpectedVersion <= 0 || in.DomainCommandFingerprint == "" {
+		return nil, biz.ErrBadParam
+	}
+	row, err := r.data.postgres.ProcessNodeInstance.UpdateOneID(in.ProcessNodeInstanceID).
+		Where(
+			processnodeinstance.ProcessInstanceID(in.ProcessInstanceID),
+			processnodeinstance.NodeType(biz.ProcessNodeTypeDomainCommand),
+			processnodeinstance.Status(biz.ProcessNodeStatusActive),
+			processnodeinstance.Version(in.ExpectedVersion),
+			processnodeinstance.Or(
+				processnodeinstance.And(
+					processnodeinstance.DomainCommandFingerprintIsNil(),
+					processnodeinstance.DomainCommandProtocolVersionIsNil(),
+				),
+				processnodeinstance.And(
+					processnodeinstance.DomainCommandFingerprint(in.DomainCommandFingerprint),
+					processnodeinstance.DomainCommandProtocolVersion(biz.ProcessDomainCommandProtocolVersionCurrent),
+				),
+			),
+		).
+		SetDomainCommandFingerprint(in.DomainCommandFingerprint).
+		SetDomainCommandProtocolVersion(biz.ProcessDomainCommandProtocolVersionCurrent).
+		Save(ctx)
+	if err == nil {
+		return entProcessNodeInstanceToBiz(row), nil
+	}
+	if !ent.IsNotFound(err) {
+		return nil, err
+	}
+	existing, err := r.GetProcessNodeInstance(ctx, in.ProcessNodeInstanceID)
+	if err != nil {
+		return nil, err
+	}
+	if existing.ProcessInstanceID != in.ProcessInstanceID {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	if existing.NodeType != biz.ProcessNodeTypeDomainCommand {
+		return nil, biz.ErrBadParam
+	}
+	if existing.DomainCommandFingerprint != nil &&
+		(existing.DomainCommandProtocolVersion == nil || *existing.DomainCommandProtocolVersion != biz.ProcessDomainCommandProtocolVersionCurrent) {
+		return nil, biz.ErrProcessDomainCommandRecoveryRequired
+	}
+	if existing.DomainCommandFingerprint != nil && *existing.DomainCommandFingerprint != in.DomainCommandFingerprint {
+		return nil, biz.ErrIdempotencyConflict
+	}
+	if existing.Status != biz.ProcessNodeStatusActive || existing.Version != in.ExpectedVersion {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	if existing.DomainCommandFingerprint != nil {
+		return existing, nil
+	}
+	return nil, biz.ErrProcessNodeInstanceConflict
+}
+
+func (r *processRuntimeRepo) GetProcessNodeDomainCommandResult(
+	ctx context.Context,
+	processInstanceID int,
+	processNodeInstanceID int,
+	domainCommandFingerprint string,
+) (*biz.ProcessNodeInstance, bool, error) {
+	if processInstanceID <= 0 || processNodeInstanceID <= 0 || len(domainCommandFingerprint) != 64 {
+		return nil, false, biz.ErrBadParam
+	}
+	node, err := r.GetProcessNodeInstance(ctx, processNodeInstanceID)
+	if err != nil {
+		return nil, false, err
+	}
+	if node.ProcessInstanceID != processInstanceID || node.NodeType != biz.ProcessNodeTypeDomainCommand {
+		return nil, false, biz.ErrBadParam
+	}
+	if node.DomainCommandFingerprint == nil {
+		return node, false, nil
+	}
+	if node.DomainCommandProtocolVersion == nil || *node.DomainCommandProtocolVersion != biz.ProcessDomainCommandProtocolVersionCurrent {
+		return nil, false, biz.ErrProcessDomainCommandRecoveryRequired
+	}
+	if *node.DomainCommandFingerprint != domainCommandFingerprint {
+		return nil, false, biz.ErrIdempotencyConflict
+	}
+	if node.DomainCommandResultHash == nil {
+		if node.DomainCommandResultState != nil || node.DomainCommandEffectState != nil || node.DomainCommandResult != nil {
+			return nil, false, biz.ErrProcessDomainCommandRecoveryRequired
+		}
+		return node, false, nil
+	}
+	if node.DomainCommandResultState == nil || node.DomainCommandEffectState == nil || node.DomainCommandResult == nil || node.DomainCommandResultRecordedAt == nil {
+		return nil, false, biz.ErrProcessDomainCommandRecoveryRequired
+	}
+	return node, true, nil
+}
+
+func (r *processRuntimeRepo) RecordProcessNodeDomainCommandResult(
+	ctx context.Context,
+	in *biz.ProcessNodeDomainCommandResultRecord,
+	actorID int,
+) (*biz.ProcessNodeInstance, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil {
+		return nil, biz.ErrBadParam
+	}
+	return recordProcessNodeDomainCommandResultWithClient(ctx, r.data.postgres, in, actorID)
+}
+
+func recordProcessNodeDomainCommandResultWithClient(
+	ctx context.Context,
+	client *ent.Client,
+	in *biz.ProcessNodeDomainCommandResultRecord,
+	actorID int,
+) (*biz.ProcessNodeInstance, error) {
+	if in == nil || in.ProcessInstanceID <= 0 || in.ProcessNodeInstanceID <= 0 || in.ExpectedVersion <= 0 ||
+		len(in.DomainCommandFingerprint) != 64 || in.ProtocolVersion != biz.ProcessDomainCommandProtocolVersionCurrent ||
+		len(in.ResultHash) != 64 || in.Result == nil || !biz.IsValidProcessDomainCommandResultState(in.ResultState) ||
+		!biz.IsValidProcessDomainCommandEffectState(in.EffectState) ||
+		(in.EffectRefType == nil) != (in.EffectRefID == nil) || client == nil {
+		return nil, biz.ErrBadParam
+	}
+	now := time.Now()
+	update := client.ProcessNodeInstance.Update().
+		Where(
+			processnodeinstance.ID(in.ProcessNodeInstanceID),
+			processnodeinstance.ProcessInstanceID(in.ProcessInstanceID),
+			processnodeinstance.NodeType(biz.ProcessNodeTypeDomainCommand),
+			processnodeinstance.Status(biz.ProcessNodeStatusActive),
+			processnodeinstance.Version(in.ExpectedVersion),
+			processnodeinstance.DomainCommandFingerprint(in.DomainCommandFingerprint),
+			processnodeinstance.DomainCommandProtocolVersion(in.ProtocolVersion),
+			processnodeinstance.DomainCommandResultHashIsNil(),
+		).
+		SetDomainCommandResultState(in.ResultState).
+		SetDomainCommandResult(in.Result).
+		SetDomainCommandResultHash(in.ResultHash).
+		SetDomainCommandEffectState(in.EffectState).
+		SetNillableDomainCommandEffectRefType(in.EffectRefType).
+		SetNillableDomainCommandEffectRefID(in.EffectRefID).
+		SetDomainCommandResultRecordedAt(now)
+	if actorID > 0 {
+		update.SetDomainCommandResultRecordedBy(actorID)
+	}
+	affected, err := update.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if affected == 1 {
+		return getProcessNodeInstanceWithClient(ctx, client, in.ProcessNodeInstanceID)
+	}
+	existing, err := getProcessNodeInstanceWithClient(ctx, client, in.ProcessNodeInstanceID)
+	if err != nil {
+		return nil, err
+	}
+	if existing.ProcessInstanceID != in.ProcessInstanceID || existing.NodeType != biz.ProcessNodeTypeDomainCommand {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	if existing.DomainCommandFingerprint == nil || *existing.DomainCommandFingerprint != in.DomainCommandFingerprint {
+		return nil, biz.ErrIdempotencyConflict
+	}
+	if existing.DomainCommandProtocolVersion == nil || *existing.DomainCommandProtocolVersion != in.ProtocolVersion {
+		return nil, biz.ErrProcessDomainCommandRecoveryRequired
+	}
+	if existing.DomainCommandResultHash == nil {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	storedInitialEffectState, _ := existing.DomainCommandResult["effect_state"].(string)
+	if *existing.DomainCommandResultHash != in.ResultHash || existing.DomainCommandResultState == nil || *existing.DomainCommandResultState != in.ResultState ||
+		existing.DomainCommandEffectState == nil || storedInitialEffectState != in.EffectState ||
+		!processOptionalStringMatches(existing.DomainCommandEffectRefType, in.EffectRefType) ||
+		!processOptionalIntMatches(existing.DomainCommandEffectRefID, in.EffectRefID) ||
+		!processJSONMatches(existing.DomainCommandResult, in.Result) {
+		return nil, biz.ErrIdempotencyConflict
+	}
+	return existing, nil
+}
+
+func (r *processRuntimeRepo) MarkProcessNodeDomainCommandCompensated(
+	ctx context.Context,
+	in *biz.ProcessNodeDomainCommandCompensationMark,
+	actorID int,
+) (*biz.ProcessNodeInstance, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil {
+		return nil, biz.ErrBadParam
+	}
+	return markProcessNodeDomainCommandCompensatedWithClient(ctx, r.data.postgres, in, actorID)
+}
+
+func markProcessNodeDomainCommandCompensatedWithClient(
+	ctx context.Context,
+	client *ent.Client,
+	in *biz.ProcessNodeDomainCommandCompensationMark,
+	actorID int,
+) (*biz.ProcessNodeInstance, error) {
+	if in == nil || in.ProcessInstanceID <= 0 || in.ProcessNodeInstanceID <= 0 || in.ExpectedVersion <= 0 ||
+		len(in.DomainCommandFingerprint) != 64 || len(in.ExpectedResultHash) != 64 ||
+		len(in.CompensationHash) != 64 || in.Compensation == nil || client == nil {
+		return nil, biz.ErrBadParam
+	}
+	now := time.Now()
+	update := client.ProcessNodeInstance.Update().
+		Where(
+			processnodeinstance.ID(in.ProcessNodeInstanceID),
+			processnodeinstance.ProcessInstanceID(in.ProcessInstanceID),
+			processnodeinstance.NodeType(biz.ProcessNodeTypeDomainCommand),
+			processnodeinstance.Version(in.ExpectedVersion),
+			processnodeinstance.DomainCommandFingerprint(in.DomainCommandFingerprint),
+			processnodeinstance.DomainCommandProtocolVersion(biz.ProcessDomainCommandProtocolVersionCurrent),
+			processnodeinstance.DomainCommandResultHash(in.ExpectedResultHash),
+			processnodeinstance.DomainCommandCompensationHashIsNil(),
+		).
+		SetDomainCommandEffectState(biz.ProcessDomainCommandEffectStateCompensated).
+		SetDomainCommandCompensation(in.Compensation).
+		SetDomainCommandCompensationHash(in.CompensationHash).
+		SetDomainCommandCompensatedAt(now)
+	if actorID > 0 {
+		update.SetDomainCommandCompensatedBy(actorID)
+	}
+	affected, err := update.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if affected == 1 {
+		return getProcessNodeInstanceWithClient(ctx, client, in.ProcessNodeInstanceID)
+	}
+	existing, err := getProcessNodeInstanceWithClient(ctx, client, in.ProcessNodeInstanceID)
+	if err != nil {
+		return nil, err
+	}
+	if existing.ProcessInstanceID != in.ProcessInstanceID || existing.DomainCommandFingerprint == nil || *existing.DomainCommandFingerprint != in.DomainCommandFingerprint ||
+		existing.DomainCommandResultHash == nil || *existing.DomainCommandResultHash != in.ExpectedResultHash {
+		return nil, biz.ErrIdempotencyConflict
+	}
+	if existing.DomainCommandProtocolVersion == nil || *existing.DomainCommandProtocolVersion != biz.ProcessDomainCommandProtocolVersionCurrent {
+		return nil, biz.ErrProcessDomainCommandRecoveryRequired
+	}
+	if existing.DomainCommandCompensationHash == nil {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	if *existing.DomainCommandCompensationHash != in.CompensationHash || existing.DomainCommandEffectState == nil ||
+		*existing.DomainCommandEffectState != biz.ProcessDomainCommandEffectStateCompensated ||
+		!processJSONMatches(existing.DomainCommandCompensation, in.Compensation) {
+		return nil, biz.ErrIdempotencyConflict
+	}
+	return existing, nil
+}
+
+func getProcessNodeInstanceWithClient(ctx context.Context, client *ent.Client, id int) (*biz.ProcessNodeInstance, error) {
+	if client == nil || id <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	row, err := client.ProcessNodeInstance.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProcessNodeInstanceNotFound
+		}
+		return nil, err
+	}
+	return entProcessNodeInstanceToBiz(row), nil
+}
+
+func markProcessDomainCommandEffectCompensatedWithClient(
+	ctx context.Context,
+	client *ent.Client,
+	commandKey string,
+	effectRefType string,
+	effectRefID int,
+	reason string,
+	actorID int,
+) error {
+	if client == nil || commandKey == "" || effectRefType == "" || effectRefID <= 0 || reason == "" {
+		return biz.ErrBadParam
+	}
+	rows, err := client.ProcessNodeInstance.Query().
+		Where(
+			processnodeinstance.DomainCommandProtocolVersion(biz.ProcessDomainCommandProtocolVersionCurrent),
+			processnodeinstance.DomainCommandResultHashNotNil(),
+			processnodeinstance.DomainCommandEffectRefType(effectRefType),
+			processnodeinstance.DomainCommandEffectRefID(effectRefID),
+		).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		node := entProcessNodeInstanceToBiz(row)
+		storedCommandKey, _ := node.PolicySnapshot["command_key"].(string)
+		if storedCommandKey != commandKey {
+			continue
+		}
+		mark, err := biz.BuildProcessNodeDomainCommandCompensationMark(node, reason)
+		if err != nil {
+			return err
+		}
+		if _, err := markProcessNodeDomainCommandCompensatedWithClient(ctx, client, mark, actorID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *processRuntimeRepo) CompleteProcessNodeInstance(ctx context.Context, in *biz.ProcessNodeInstanceComplete, actorID int) (*biz.ProcessNodeInstance, error) {
-	if in == nil || in.ID <= 0 || in.ProcessInstanceID <= 0 || in.ExpectedVersion <= 0 {
+	if in == nil || in.ID <= 0 || in.ProcessInstanceID <= 0 || in.ExpectedVersion <= 0 ||
+		(in.ExpectedDomainCommandResultHash == nil) != (in.ExpectedDomainCommandEffectState == nil) {
 		return nil, biz.ErrBadParam
 	}
 	now := time.Now()
@@ -184,6 +621,20 @@ func (r *processRuntimeRepo) CompleteProcessNodeInstance(ctx context.Context, in
 		update.SetOutcome(in.Outcome)
 	} else {
 		update.ClearOutcome()
+	}
+	if in.DomainCommandFingerprint != nil {
+		update.Where(processnodeinstance.DomainCommandFingerprint(*in.DomainCommandFingerprint))
+		update.SetDomainCommandFingerprint(*in.DomainCommandFingerprint)
+	}
+	if in.ExpectedDomainCommandResultHash != nil {
+		if len(*in.ExpectedDomainCommandResultHash) != 64 || !biz.IsValidProcessDomainCommandEffectState(*in.ExpectedDomainCommandEffectState) ||
+			*in.ExpectedDomainCommandEffectState == biz.ProcessDomainCommandEffectStateCompensated {
+			return nil, biz.ErrBadParam
+		}
+		update.Where(
+			processnodeinstance.DomainCommandResultHash(*in.ExpectedDomainCommandResultHash),
+			processnodeinstance.DomainCommandEffectState(*in.ExpectedDomainCommandEffectState),
+		)
 	}
 	affected, err := update.Save(ctx)
 	if err != nil {
@@ -230,27 +681,43 @@ func (r *processRuntimeRepo) RecordProcessInstanceLinkedBusinessRef(ctx context.
 	if in == nil || in.ProcessInstanceID <= 0 {
 		return nil, biz.ErrBadParam
 	}
-	current, err := r.GetProcessInstance(ctx, in.ProcessInstanceID)
-	if err != nil {
-		return nil, err
-	}
-	snapshot, err := biz.ApplyProcessLinkedBusinessRefToSnapshot(current.ModuleContractSnapshot, in)
-	if err != nil {
-		return nil, err
-	}
-	update := r.data.postgres.ProcessInstance.UpdateOneID(in.ProcessInstanceID).
-		SetModuleContractSnapshot(snapshot)
-	if actorID > 0 {
-		update.SetUpdatedBy(actorID)
-	}
-	row, err := update.Save(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, biz.ErrProcessInstanceNotFound
+	const maxAttempts = 64
+	for range maxAttempts {
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
-		return nil, err
+		current, err := r.GetProcessInstance(ctx, in.ProcessInstanceID)
+		if err != nil {
+			return nil, err
+		}
+		snapshot, err := biz.ApplyProcessLinkedBusinessRefToSnapshot(current.ModuleContractSnapshot, in)
+		if err != nil {
+			return nil, err
+		}
+		nextUpdatedAt := time.Now()
+		minimumUpdatedAt := current.UpdatedAt.Add(time.Microsecond)
+		if nextUpdatedAt.Before(minimumUpdatedAt) {
+			nextUpdatedAt = minimumUpdatedAt
+		}
+		update := r.data.postgres.ProcessInstance.Update().
+			Where(
+				processinstance.ID(in.ProcessInstanceID),
+				processinstance.UpdatedAtEQ(current.UpdatedAt),
+			).
+			SetModuleContractSnapshot(snapshot).
+			SetUpdatedAt(nextUpdatedAt)
+		if actorID > 0 {
+			update.SetUpdatedBy(actorID)
+		}
+		affected, err := update.Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if affected == 1 {
+			return r.GetProcessInstance(ctx, in.ProcessInstanceID)
+		}
 	}
-	return entProcessInstanceToBiz(row), nil
+	return nil, biz.ErrProcessNodeInstanceConflict
 }
 
 func (r *processRuntimeRepo) BlockProcessNodeInstance(ctx context.Context, in *biz.ProcessNodeInstanceBlock, actorID int) (*biz.ProcessNodeInstance, error) {
@@ -274,6 +741,10 @@ func (r *processRuntimeRepo) BlockProcessNodeInstance(ctx context.Context, in *b
 		update.SetOutcome(outcome)
 	} else {
 		update.ClearOutcome()
+	}
+	if in.DomainCommandFingerprint != nil {
+		update.Where(processnodeinstance.DomainCommandFingerprint(*in.DomainCommandFingerprint))
+		update.SetDomainCommandFingerprint(*in.DomainCommandFingerprint)
 	}
 	affected, err := update.Save(ctx)
 	if err != nil {
@@ -416,23 +887,37 @@ func entProcessNodeInstanceToBiz(row *ent.ProcessNodeInstance) *biz.ProcessNodeI
 		return nil
 	}
 	return &biz.ProcessNodeInstance{
-		ID:                    row.ID,
-		ProcessInstanceID:     row.ProcessInstanceID,
-		NodeKey:               row.NodeKey,
-		NodeType:              row.NodeType,
-		Attempt:               row.Attempt,
-		Status:                row.Status,
-		OwnerPoolKey:          row.OwnerPoolKey,
-		RequiredCapabilityKey: row.RequiredCapabilityKey,
-		FormProfileKey:        row.FormProfileKey,
-		ActionSetKey:          row.ActionSetKey,
-		PolicySnapshot:        row.PolicySnapshot,
-		DueAt:                 row.DueAt,
-		StartedAt:             row.StartedAt,
-		CompletedAt:           row.CompletedAt,
-		Outcome:               row.Outcome,
-		Version:               row.Version,
-		CreatedAt:             row.CreatedAt,
-		UpdatedAt:             row.UpdatedAt,
+		ID:                            row.ID,
+		ProcessInstanceID:             row.ProcessInstanceID,
+		NodeKey:                       row.NodeKey,
+		NodeType:                      row.NodeType,
+		Attempt:                       row.Attempt,
+		Status:                        row.Status,
+		OwnerPoolKey:                  row.OwnerPoolKey,
+		RequiredCapabilityKey:         row.RequiredCapabilityKey,
+		FormProfileKey:                row.FormProfileKey,
+		ActionSetKey:                  row.ActionSetKey,
+		PolicySnapshot:                row.PolicySnapshot,
+		DueAt:                         row.DueAt,
+		StartedAt:                     row.StartedAt,
+		CompletedAt:                   row.CompletedAt,
+		Outcome:                       row.Outcome,
+		DomainCommandFingerprint:      row.DomainCommandFingerprint,
+		DomainCommandProtocolVersion:  row.DomainCommandProtocolVersion,
+		DomainCommandResultState:      row.DomainCommandResultState,
+		DomainCommandResult:           row.DomainCommandResult,
+		DomainCommandResultHash:       row.DomainCommandResultHash,
+		DomainCommandEffectState:      row.DomainCommandEffectState,
+		DomainCommandEffectRefType:    row.DomainCommandEffectRefType,
+		DomainCommandEffectRefID:      row.DomainCommandEffectRefID,
+		DomainCommandResultRecordedAt: row.DomainCommandResultRecordedAt,
+		DomainCommandResultRecordedBy: row.DomainCommandResultRecordedBy,
+		DomainCommandCompensation:     row.DomainCommandCompensation,
+		DomainCommandCompensationHash: row.DomainCommandCompensationHash,
+		DomainCommandCompensatedAt:    row.DomainCommandCompensatedAt,
+		DomainCommandCompensatedBy:    row.DomainCommandCompensatedBy,
+		Version:                       row.Version,
+		CreatedAt:                     row.CreatedAt,
+		UpdatedAt:                     row.UpdatedAt,
 	}
 }

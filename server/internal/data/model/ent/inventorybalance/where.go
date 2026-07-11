@@ -66,6 +66,11 @@ func SubjectID(v int) predicate.InventoryBalance {
 	return predicate.InventoryBalance(sql.FieldEQ(FieldSubjectID, v))
 }
 
+// ProductSkuID applies equality check predicate on the "product_sku_id" field. It's identical to ProductSkuIDEQ.
+func ProductSkuID(v int) predicate.InventoryBalance {
+	return predicate.InventoryBalance(sql.FieldEQ(FieldProductSkuID, v))
+}
+
 // WarehouseID applies equality check predicate on the "warehouse_id" field. It's identical to WarehouseIDEQ.
 func WarehouseID(v int) predicate.InventoryBalance {
 	return predicate.InventoryBalance(sql.FieldEQ(FieldWarehouseID, v))
@@ -194,6 +199,36 @@ func SubjectIDLT(v int) predicate.InventoryBalance {
 // SubjectIDLTE applies the LTE predicate on the "subject_id" field.
 func SubjectIDLTE(v int) predicate.InventoryBalance {
 	return predicate.InventoryBalance(sql.FieldLTE(FieldSubjectID, v))
+}
+
+// ProductSkuIDEQ applies the EQ predicate on the "product_sku_id" field.
+func ProductSkuIDEQ(v int) predicate.InventoryBalance {
+	return predicate.InventoryBalance(sql.FieldEQ(FieldProductSkuID, v))
+}
+
+// ProductSkuIDNEQ applies the NEQ predicate on the "product_sku_id" field.
+func ProductSkuIDNEQ(v int) predicate.InventoryBalance {
+	return predicate.InventoryBalance(sql.FieldNEQ(FieldProductSkuID, v))
+}
+
+// ProductSkuIDIn applies the In predicate on the "product_sku_id" field.
+func ProductSkuIDIn(vs ...int) predicate.InventoryBalance {
+	return predicate.InventoryBalance(sql.FieldIn(FieldProductSkuID, vs...))
+}
+
+// ProductSkuIDNotIn applies the NotIn predicate on the "product_sku_id" field.
+func ProductSkuIDNotIn(vs ...int) predicate.InventoryBalance {
+	return predicate.InventoryBalance(sql.FieldNotIn(FieldProductSkuID, vs...))
+}
+
+// ProductSkuIDIsNil applies the IsNil predicate on the "product_sku_id" field.
+func ProductSkuIDIsNil() predicate.InventoryBalance {
+	return predicate.InventoryBalance(sql.FieldIsNull(FieldProductSkuID))
+}
+
+// ProductSkuIDNotNil applies the NotNil predicate on the "product_sku_id" field.
+func ProductSkuIDNotNil() predicate.InventoryBalance {
+	return predicate.InventoryBalance(sql.FieldNotNull(FieldProductSkuID))
 }
 
 // WarehouseIDEQ applies the EQ predicate on the "warehouse_id" field.
@@ -384,6 +419,29 @@ func HasUnit() predicate.InventoryBalance {
 func HasUnitWith(preds ...predicate.Unit) predicate.InventoryBalance {
 	return predicate.InventoryBalance(func(s *sql.Selector) {
 		step := newUnitStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasProductSku applies the HasEdge predicate on the "product_sku" edge.
+func HasProductSku() predicate.InventoryBalance {
+	return predicate.InventoryBalance(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, ProductSkuTable, ProductSkuColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProductSkuWith applies the HasEdge predicate on the "product_sku" edge with a given conditions (other predicates).
+func HasProductSkuWith(preds ...predicate.ProductSKU) predicate.InventoryBalance {
+	return predicate.InventoryBalance(func(s *sql.Selector) {
+		step := newProductSkuStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

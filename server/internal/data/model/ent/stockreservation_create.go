@@ -148,6 +148,20 @@ func (_c *StockReservationCreate) SetNillableReservedAt(v *time.Time) *StockRese
 	return _c
 }
 
+// SetReservedAtSpecified sets the "reserved_at_specified" field.
+func (_c *StockReservationCreate) SetReservedAtSpecified(v bool) *StockReservationCreate {
+	_c.mutation.SetReservedAtSpecified(v)
+	return _c
+}
+
+// SetNillableReservedAtSpecified sets the "reserved_at_specified" field if the given value is not nil.
+func (_c *StockReservationCreate) SetNillableReservedAtSpecified(v *bool) *StockReservationCreate {
+	if v != nil {
+		_c.SetReservedAtSpecified(*v)
+	}
+	return _c
+}
+
 // SetReleasedAt sets the "released_at" field.
 func (_c *StockReservationCreate) SetReleasedAt(v time.Time) *StockReservationCreate {
 	_c.mutation.SetReleasedAt(v)
@@ -315,6 +329,10 @@ func (_c *StockReservationCreate) defaults() error {
 		v := stockreservation.DefaultReservedAt()
 		_c.mutation.SetReservedAt(v)
 	}
+	if _, ok := _c.mutation.ReservedAtSpecified(); !ok {
+		v := stockreservation.DefaultReservedAtSpecified
+		_c.mutation.SetReservedAtSpecified(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		if stockreservation.DefaultCreatedAt == nil {
 			return fmt.Errorf("ent: uninitialized stockreservation.DefaultCreatedAt (forgotten import ent/runtime?)")
@@ -408,6 +426,9 @@ func (_c *StockReservationCreate) check() error {
 	if _, ok := _c.mutation.ReservedAt(); !ok {
 		return &ValidationError{Name: "reserved_at", err: errors.New(`ent: missing required field "StockReservation.reserved_at"`)}
 	}
+	if _, ok := _c.mutation.ReservedAtSpecified(); !ok {
+		return &ValidationError{Name: "reserved_at_specified", err: errors.New(`ent: missing required field "StockReservation.reserved_at_specified"`)}
+	}
 	if v, ok := _c.mutation.Note(); ok {
 		if err := stockreservation.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "StockReservation.note": %w`, err)}
@@ -473,6 +494,10 @@ func (_c *StockReservationCreate) createSpec() (*StockReservation, *sqlgraph.Cre
 	if value, ok := _c.mutation.ReservedAt(); ok {
 		_spec.SetField(stockreservation.FieldReservedAt, field.TypeTime, value)
 		_node.ReservedAt = value
+	}
+	if value, ok := _c.mutation.ReservedAtSpecified(); ok {
+		_spec.SetField(stockreservation.FieldReservedAtSpecified, field.TypeBool, value)
+		_node.ReservedAtSpecified = value
 	}
 	if value, ok := _c.mutation.ReleasedAt(); ok {
 		_spec.SetField(stockreservation.FieldReleasedAt, field.TypeTime, value)

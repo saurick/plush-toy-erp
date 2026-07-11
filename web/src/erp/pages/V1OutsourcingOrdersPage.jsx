@@ -14,6 +14,8 @@ import { Button, Dropdown, Form, Space, Tag } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   BusinessDataTable,
   BusinessOperationPanel,
@@ -155,6 +157,7 @@ export default function V1OutsourcingOrdersPage() {
   const [materials, setMaterials] = useState([])
   const [processes, setProcesses] = useState([])
   const [units, setUnits] = useState([])
+  const beginLatestRequest = useLatestRequestCoordinator()
 
   const supplierOptions = useMemo(
     () =>
@@ -239,22 +242,29 @@ export default function V1OutsourcingOrdersPage() {
   }, [])
 
   const loadOrders = useCallback(async () => {
+    const request = beginLatestRequest('orders')
     setLoading(true)
     try {
       const { sortBy, sortDirection } =
         parseOutsourcingOrderSortValue(sortValue)
-      const data = await listOutsourcingOrders({
-        keyword,
-        supplier_id: supplierFilter || undefined,
-        lifecycle_status: statusFilter,
-        date_field: dateField,
-        date_from: dateRange?.[0] || undefined,
-        date_to: dateRange?.[1] || undefined,
-        sort_by: sortBy,
-        sort_direction: sortDirection,
-        limit: pagination.pageSize,
-        offset: (pagination.current - 1) * pagination.pageSize,
-      })
+      const data = await listOutsourcingOrders(
+        {
+          keyword,
+          supplier_id: supplierFilter || undefined,
+          lifecycle_status: statusFilter,
+          date_field: dateField,
+          date_from: dateRange?.[0] || undefined,
+          date_to: dateRange?.[1] || undefined,
+          sort_by: sortBy,
+          sort_direction: sortDirection,
+          limit: pagination.pageSize,
+          offset: (pagination.current - 1) * pagination.pageSize,
+        },
+        { signal: request.signal }
+      )
+      if (!request.isCurrent()) {
+        return
+      }
       const nextRows = data?.outsourcing_orders || []
       setRows(nextRows)
       setTotal(Number(data?.total || 0))
@@ -262,11 +272,18 @@ export default function V1OutsourcingOrdersPage() {
         prev ? nextRows.find((item) => item.id === prev.id) || null : null
       )
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return
+      }
       message.error(getActionErrorMessage(error, '加载委外订单失败'))
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
     }
   }, [
+    beginLatestRequest,
     dateField,
     dateRange,
     keyword,

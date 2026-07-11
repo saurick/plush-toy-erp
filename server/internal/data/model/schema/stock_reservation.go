@@ -18,20 +18,21 @@ type StockReservation struct {
 }
 
 var stockReservationLockedFields = map[string]struct{}{
-	"reservation_no":      {},
-	"status":              {},
-	"sales_order_id":      {},
-	"sales_order_item_id": {},
-	"product_id":          {},
-	"product_sku_id":      {},
-	"warehouse_id":        {},
-	"unit_id":             {},
-	"lot_id":              {},
-	"quantity":            {},
-	"idempotency_key":     {},
-	"reserved_at":         {},
-	"released_at":         {},
-	"consumed_at":         {},
+	"reservation_no":        {},
+	"status":                {},
+	"sales_order_id":        {},
+	"sales_order_item_id":   {},
+	"product_id":            {},
+	"product_sku_id":        {},
+	"warehouse_id":          {},
+	"unit_id":               {},
+	"lot_id":                {},
+	"quantity":              {},
+	"idempotency_key":       {},
+	"reserved_at":           {},
+	"reserved_at_specified": {},
+	"released_at":           {},
+	"consumed_at":           {},
 }
 
 func (StockReservation) Hooks() []ent.Hook {
@@ -43,7 +44,7 @@ func (StockReservation) Hooks() []ent.Hook {
 				}
 				if m.Op().Is(ent.OpUpdate|ent.OpUpdateOne) &&
 					(mutationTouchesAny(m, stockReservationLockedFields) || mutationTouchesEdges(m)) {
-					return nil, errors.New("stock_reservation protected fields are immutable; use ReleaseStockReservation or ConsumeStockReservation for status changes")
+					return nil, errors.New("stock_reservation protected fields are immutable; release reservations explicitly or consume them through the shipment transaction")
 				}
 				return next.Mutate(ctx, m)
 			})
@@ -77,6 +78,7 @@ func (StockReservation) Fields() []ent.Field {
 		decimalQuantityField("quantity"),
 		field.String("idempotency_key").NotEmpty().MaxLen(128),
 		field.Time("reserved_at").Default(time.Now),
+		field.Bool("reserved_at_specified").Default(false),
 		field.Time("released_at").Optional().Nillable(),
 		field.Time("consumed_at").Optional().Nillable(),
 		field.String("note").Optional().Nillable().MaxLen(255),

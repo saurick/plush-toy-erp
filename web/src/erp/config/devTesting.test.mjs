@@ -45,12 +45,17 @@ pnpm style:l1
 \`\`\`
 `
 
-const currentStrategyMarkdown = strategyMarkdown
-  .replace('## 3. 测试分层', '## 4. 验证层级 T0-T8')
-  .replace(
-    '| 层级 | 改动类型 | 必跑或优先命令 | 说明 |',
-    '| 验证层级 | 改动类型 | 必跑或优先命令 | 说明 |'
-  )
+const currentStrategyMarkdown = `
+# 自动化测试策略 / Test Strategy
+
+## 验证层级 T0-T8
+
+| 层级 | 适用改动 | 最小验证 |
+| --- | --- | --- |
+| T0 现场与静态 | 所有改动 | \`git status --short\`、\`git diff --check\` |
+| T5 Frontend/UI | 页面、路由、样式 | \`cd web && pnpm lint\`、\`cd web && pnpm style:l1\` |
+| T7 Business Integration/E2E | 库存、出货、Workflow/Fact | \`bash scripts/qa/full.sh\` |
+`
 
 const deliveryEvidenceMarkdown = `
 # 岗位任务端目标环境发布证据 / Mobile Workflow Target Release Evidence
@@ -158,7 +163,8 @@ test('devTesting: 兼容当前自动化测试策略的验证层级标题', () =>
 
   assert.equal(tiers.length, 3)
   assert.equal(tiers[1].key, 'T5')
-  assert.equal(tiers[1].level, 'T5 Frontend UI / 样式')
+  assert.equal(tiers[1].level, 'T5 Frontend/UI')
+  assert.equal(tiers[1].changeType, '页面、路由、样式')
   assert(tiers[1].commands.includes('cd web && pnpm style:l1'))
 })
 

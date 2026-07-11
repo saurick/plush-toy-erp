@@ -45,6 +45,94 @@ func TestNormalizeInventoryTxnCreateUsesCoreValueGuards(t *testing.T) {
 	}
 }
 
+func TestNormalizeFactCreateTracksExplicitIntentTimes(t *testing.T) {
+	explicit := time.Date(2026, 7, 10, 9, 8, 7, 654321987, time.FixedZone("UTC+8", 8*60*60))
+	wantExplicit := explicit.UTC().Truncate(time.Microsecond)
+
+	inventoryBase := InventoryTxnCreate{
+		SubjectType: InventorySubjectProduct, SubjectID: 1, WarehouseID: 2,
+		TxnType: InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(1),
+		UnitID: 3, SourceType: "TEST", IdempotencyKey: "inventory-time",
+	}
+	inventoryOmitted, err := normalizeInventoryTxnCreate(inventoryBase)
+	if err != nil {
+		t.Fatalf("normalize omitted inventory time: %v", err)
+	}
+	if inventoryOmitted.OccurredAtSpecified || inventoryOmitted.OccurredAt.IsZero() {
+		t.Fatalf("omitted inventory time marker=%v time=%v", inventoryOmitted.OccurredAtSpecified, inventoryOmitted.OccurredAt)
+	}
+	inventoryBase.OccurredAt = explicit
+	inventoryExplicit, err := normalizeInventoryTxnCreate(inventoryBase)
+	if err != nil {
+		t.Fatalf("normalize explicit inventory time: %v", err)
+	}
+	if !inventoryExplicit.OccurredAtSpecified || !inventoryExplicit.OccurredAt.Equal(wantExplicit) {
+		t.Fatalf("explicit inventory time marker=%v time=%v, want %v", inventoryExplicit.OccurredAtSpecified, inventoryExplicit.OccurredAt, wantExplicit)
+	}
+
+	operationalBase := &OperationalFactMutation{
+		FactNo: "PF-TIME", FactType: ProductionFactFinishedGoodsReceipt,
+		SubjectType: InventorySubjectProduct, SubjectID: 1, WarehouseID: 2, UnitID: 3,
+		Quantity: decimal.NewFromInt(1), IdempotencyKey: "operational-time",
+	}
+	operationalOmitted, err := normalizeOperationalFactMutation(operationalBase, productionFactTypes)
+	if err != nil {
+		t.Fatalf("normalize omitted operational fact time: %v", err)
+	}
+	if operationalOmitted.OccurredAtSpecified || operationalOmitted.OccurredAt.IsZero() {
+		t.Fatalf("omitted operational fact time marker=%v time=%v", operationalOmitted.OccurredAtSpecified, operationalOmitted.OccurredAt)
+	}
+	operationalBase.OccurredAt = explicit
+	operationalExplicit, err := normalizeOperationalFactMutation(operationalBase, productionFactTypes)
+	if err != nil {
+		t.Fatalf("normalize explicit operational fact time: %v", err)
+	}
+	if !operationalExplicit.OccurredAtSpecified || !operationalExplicit.OccurredAt.Equal(wantExplicit) {
+		t.Fatalf("explicit operational fact time marker=%v time=%v, want %v", operationalExplicit.OccurredAtSpecified, operationalExplicit.OccurredAt, wantExplicit)
+	}
+
+	reservationBase := &StockReservationCreate{
+		ReservationNo: "RSV-TIME", ProductID: 1, WarehouseID: 2, UnitID: 3,
+		Quantity: decimal.NewFromInt(1), IdempotencyKey: "reservation-time",
+	}
+	reservationOmitted, err := normalizeStockReservationCreate(reservationBase)
+	if err != nil {
+		t.Fatalf("normalize omitted reservation time: %v", err)
+	}
+	if reservationOmitted.ReservedAtSpecified || reservationOmitted.ReservedAt.IsZero() {
+		t.Fatalf("omitted reservation time marker=%v time=%v", reservationOmitted.ReservedAtSpecified, reservationOmitted.ReservedAt)
+	}
+	reservationBase.ReservedAt = explicit
+	reservationExplicit, err := normalizeStockReservationCreate(reservationBase)
+	if err != nil {
+		t.Fatalf("normalize explicit reservation time: %v", err)
+	}
+	if !reservationExplicit.ReservedAtSpecified || !reservationExplicit.ReservedAt.Equal(wantExplicit) {
+		t.Fatalf("explicit reservation time marker=%v time=%v, want %v", reservationExplicit.ReservedAtSpecified, reservationExplicit.ReservedAt, wantExplicit)
+	}
+
+	financeBase := &FinanceFactCreate{
+		FactNo: "FIN-TIME", FactType: FinanceFactReceivable,
+		CounterpartyType: FinanceCounterpartyOther, Amount: decimal.NewFromInt(1),
+		IdempotencyKey: "finance-time",
+	}
+	financeOmitted, err := normalizeFinanceFactCreate(financeBase)
+	if err != nil {
+		t.Fatalf("normalize omitted finance fact time: %v", err)
+	}
+	if financeOmitted.OccurredAtSpecified || financeOmitted.OccurredAt.IsZero() {
+		t.Fatalf("omitted finance fact time marker=%v time=%v", financeOmitted.OccurredAtSpecified, financeOmitted.OccurredAt)
+	}
+	financeBase.OccurredAt = explicit
+	financeExplicit, err := normalizeFinanceFactCreate(financeBase)
+	if err != nil {
+		t.Fatalf("normalize explicit finance fact time: %v", err)
+	}
+	if !financeExplicit.OccurredAtSpecified || !financeExplicit.OccurredAt.Equal(wantExplicit) {
+		t.Fatalf("explicit finance fact time marker=%v time=%v, want %v", financeExplicit.OccurredAtSpecified, financeExplicit.OccurredAt, wantExplicit)
+	}
+}
+
 func TestNormalizeBOMItemCreateUsesCoreQuantityGuard(t *testing.T) {
 	in := BOMItemCreate{
 		BOMHeaderID: 1,
@@ -164,13 +252,18 @@ func TestNormalizeOperationalFactInputsUseCoreValueGuards(t *testing.T) {
 		t.Fatalf("expected zero production quantity rejected, got %v", err)
 	}
 
-	shipment := &ShipmentCreate{ShipmentNo: "SHIP-1", IdempotencyKey: "  SHIPMENT:1:create  "}
+	plannedShipAt := time.Date(2026, 7, 10, 12, 34, 56, 123456789, time.FixedZone("UTC+8", 8*60*60))
+	shipment := &ShipmentCreate{ShipmentNo: "SHIP-1", IdempotencyKey: "  SHIPMENT:1:create  ", PlannedShipAt: &plannedShipAt}
 	normalizedShipment, err := normalizeShipmentCreate(shipment)
 	if err != nil {
 		t.Fatalf("normalizeShipmentCreate() error = %v", err)
 	}
 	if normalizedShipment.IdempotencyKey != "SHIPMENT:1:create" {
 		t.Fatalf("expected shipment idempotency key trimmed, got %q", normalizedShipment.IdempotencyKey)
+	}
+	expectedPlannedShipAt := plannedShipAt.UTC().Truncate(time.Microsecond)
+	if normalizedShipment.PlannedShipAt == nil || normalizedShipment.PlannedShipAt.Location() != time.UTC || !normalizedShipment.PlannedShipAt.Equal(expectedPlannedShipAt) || normalizedShipment.PlannedShipAt.Nanosecond()%1000 != 0 {
+		t.Fatalf("planned_ship_at must canonicalize to UTC microseconds, got %#v", normalizedShipment.PlannedShipAt)
 	}
 	shipment.IdempotencyKey = " "
 	if _, err := normalizeShipmentCreate(shipment); !errors.Is(err, ErrBadParam) {

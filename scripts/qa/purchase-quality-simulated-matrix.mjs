@@ -139,7 +139,15 @@ async function rpcCall({ backendURL, domain, method, params = {}, token }) {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ jsonrpc: "2.0", id: `pq-sim-${method}-${Date.now()}`, method, params }),
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: `pq-sim-${method}-${Date.now()}`,
+      method,
+      params:
+        domain === "auth"
+          ? params
+          : { customer_key: "yoyoosun", ...params },
+    }),
   });
   if (!response.ok) throw new CliError(`${domain}.${method} HTTP ${response.status}`);
   const json = await response.json();
@@ -165,19 +173,29 @@ async function loginRoles(backendURL, password) {
 }
 
 function orderParams(plan, status, index) {
+  const labels = {
+    DRAFT: "草稿待补充",
+    SUBMITTED: "已提交待审批",
+    APPROVED: "已审批待到货",
+    CLOSED: "已关闭",
+    CANCELLED: "已取消",
+  };
   return {
     purchase_order_no: `${plan.prefix}-PO-${String(index + 1).padStart(2, "0")}-${status}`,
     supplier_id: plan.ids.supplierId,
-    supplier_snapshot: { name: "模拟回归供应商", simulated_only: true },
+    supplier_snapshot: {
+      name: `【手工测试】采购供应商-${labels[status]}`,
+      simulated_only: true,
+    },
     purchase_date: new Date().toISOString().slice(0, 10),
     expected_arrival_date: new Date(Date.now() + (index + 2) * 86400000).toISOString().slice(0, 10),
-    note: `模拟采购单 ${status} 状态；非甲方真实数据。`,
+    note: `【手工测试】采购订单-${labels[status]}；用于甲方员工和测试人员手动回归，不是真实业务数据。`,
     items: [{
       line_no: 1,
       material_id: plan.ids.materialId,
       unit_id: plan.ids.unitId,
       material_code_snapshot: `${plan.prefix}-MAT`,
-      material_name_snapshot: "模拟短毛绒材料",
+      material_name_snapshot: `【手工测试】短毛绒材料-${labels[status]}`,
       purchased_quantity: String(20 + index * 5),
       unit_price: "3.20",
       amount: String((20 + index * 5) * 3.2),
@@ -214,9 +232,16 @@ async function createOrderMatrix(plan, tokens, steps) {
 }
 
 function receiptParams(plan, scenario, index) {
+  const labels = {
+    DRAFT: "草稿待检",
+    PASSED: "质检通过待入库",
+    REJECTED: "质检拒收",
+    POSTED: "已过账入库",
+    CANCELLED: "已取消并冲回",
+  };
   return {
     receipt_no: `${plan.prefix}-PR-${String(index + 1).padStart(2, "0")}-${scenario.key}`,
-    supplier_name: "模拟回归供应商",
+    supplier_name: `【手工测试】入库供应商-${labels[scenario.key]}`,
     received_at: new Date().toISOString().slice(0, 10),
     items: [{
       material_id: plan.ids.materialId,
@@ -225,6 +250,7 @@ function receiptParams(plan, scenario, index) {
       lot_no: `${plan.prefix}-LOT-${String(index + 1).padStart(2, "0")}`,
       quantity: String(10 + index * 2),
       source_line_no: String(index + 1),
+      note: `【手工测试】采购入库-${labels[scenario.key]}`,
     }],
   };
 }
@@ -246,7 +272,7 @@ async function createReceiptMatrix(plan, tokens, steps) {
         backendURL: plan.backendURL,
         domain: "quality",
         method: "pass_quality_inspection",
-        params: { id: inspection.id, result: index % 2 === 0 ? "PASS" : "CONCESSION", inspected_at: new Date().toISOString().slice(0, 10), decision_note: "模拟检验通过；非真实质检结论。" },
+        params: { id: inspection.id, result: index % 2 === 0 ? "PASS" : "CONCESSION", inspected_at: new Date().toISOString().slice(0, 10), decision_note: "【手工测试】检验通过或让步接收；不是真实质检结论。" },
         token: tokens.quality,
       });
     } else if (scenario.inspectionAction === "reject") {
@@ -254,7 +280,7 @@ async function createReceiptMatrix(plan, tokens, steps) {
         backendURL: plan.backendURL,
         domain: "quality",
         method: "reject_quality_inspection",
-        params: { id: inspection.id, result: "REJECT", inspected_at: new Date().toISOString().slice(0, 10), decision_note: "模拟尺寸偏差拒收；非真实质检结论。" },
+        params: { id: inspection.id, result: "REJECT", inspected_at: new Date().toISOString().slice(0, 10), decision_note: "【手工测试】尺寸偏差，执行拒收；不是真实质检结论。" },
         token: tokens.quality,
       });
     }
@@ -311,4 +337,3 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(currentFil
     process.exitCode = error.exitCode || 1;
   });
 }
-

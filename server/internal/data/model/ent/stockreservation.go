@@ -49,6 +49,8 @@ type StockReservation struct {
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
 	// ReservedAt holds the value of the "reserved_at" field.
 	ReservedAt time.Time `json:"reserved_at,omitempty"`
+	// ReservedAtSpecified holds the value of the "reserved_at_specified" field.
+	ReservedAtSpecified bool `json:"reserved_at_specified,omitempty"`
 	// ReleasedAt holds the value of the "released_at" field.
 	ReleasedAt *time.Time `json:"released_at,omitempty"`
 	// ConsumedAt holds the value of the "consumed_at" field.
@@ -170,6 +172,8 @@ func (*StockReservation) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case stockreservation.FieldQuantity:
 			values[i] = new(decimal.Decimal)
+		case stockreservation.FieldReservedAtSpecified:
+			values[i] = new(sql.NullBool)
 		case stockreservation.FieldID, stockreservation.FieldSalesOrderID, stockreservation.FieldSalesOrderItemID, stockreservation.FieldProductID, stockreservation.FieldProductSkuID, stockreservation.FieldWarehouseID, stockreservation.FieldUnitID, stockreservation.FieldLotID:
 			values[i] = new(sql.NullInt64)
 		case stockreservation.FieldReservationNo, stockreservation.FieldStatus, stockreservation.FieldIdempotencyKey, stockreservation.FieldNote:
@@ -272,6 +276,12 @@ func (_m *StockReservation) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field reserved_at", values[i])
 			} else if value.Valid {
 				_m.ReservedAt = value.Time
+			}
+		case stockreservation.FieldReservedAtSpecified:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field reserved_at_specified", values[i])
+			} else if value.Valid {
+				_m.ReservedAtSpecified = value.Bool
 			}
 		case stockreservation.FieldReleasedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -420,6 +430,9 @@ func (_m *StockReservation) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("reserved_at=")
 	builder.WriteString(_m.ReservedAt.Format(time.ANSIC))
+	builder.WriteString(", ")
+	builder.WriteString("reserved_at_specified=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ReservedAtSpecified))
 	builder.WriteString(", ")
 	if v := _m.ReleasedAt; v != nil {
 		builder.WriteString("released_at=")

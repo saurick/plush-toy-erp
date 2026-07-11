@@ -136,7 +136,12 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
-		session, err := d.customerConfigUC.GetEffectiveSession(ctx, customerKey, admin)
+		var session *biz.EffectiveSession
+		if runtimeCustomerConfigRequiresActiveRevision() {
+			session, err = d.customerConfigUC.GetEffectiveSessionRequiringActiveRevision(ctx, customerKey, admin)
+		} else {
+			session, err = d.customerConfigUC.GetEffectiveSession(ctx, customerKey, admin)
+		}
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
@@ -794,6 +799,11 @@ func runtimeCustomerKey(requested string) (string, error) {
 	return configured, nil
 }
 
+func runtimeCustomerConfigRequiresActiveRevision() bool {
+	configured := biz.NormalizeCustomerKey(os.Getenv("ERP_CUSTOMER_KEY"))
+	return configured != "" && configured != biz.DefaultCustomerKey
+}
+
 func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 	switch {
@@ -806,9 +816,18 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 	case errors.Is(err, biz.ErrCustomerConfigNotFound):
 		l.Warnf("[customer_config] revision not found err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "客户配置版本不存在"}
+	case errors.Is(err, biz.ErrCustomerConfigActiveRevisionRequired):
+		l.Warnf("[customer_config] active revision required for fixed customer runtime err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "当前部署客户尚未激活配置，业务权限已关闭"}
 	case errors.Is(err, biz.ErrCustomerConfigActiveRevision):
 		l.Warnf("[customer_config] active revision overwrite rejected err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "已激活客户配置版本不能被覆盖发布"}
+	case errors.Is(err, biz.ErrIdempotencyConflict):
+		l.Warnf("[customer_config] idempotency payload conflict err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
+	case errors.Is(err, biz.ErrProcessDomainCommandRecoveryRequired):
+		l.Warnf("[customer_config] process domain command recovery required err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.ProcessDomainCommandRecoveryRequired.Code, Message: errcode.ProcessDomainCommandRecoveryRequired.Message}
 	case errors.Is(err, biz.ErrProcessInstanceExists):
 		l.Warnf("[customer_config] process instance exists err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "流程实例已存在"}
@@ -972,17 +991,17 @@ func finishedGoodsDeliveryQualityDecisionExecutionFromParams(pm map[string]any) 
 		shipmentID = getInt(pm, "business_ref_id", 0)
 	}
 	result := strings.TrimSpace(getString(pm, "result"))
+	qualityInspectionID := getInt(pm, "quality_inspection_id", 0)
 	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
-	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || shipmentID <= 0 || result == "" || idempotencyKey == "" {
+	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || shipmentID <= 0 || qualityInspectionID <= 0 || result == "" || idempotencyKey == "" {
 		return nil, false
 	}
 	payload := map[string]any{
-		"shipment_id": shipmentID,
-		"result":      result,
+		"shipment_id":           shipmentID,
+		"quality_inspection_id": qualityInspectionID,
+		"result":                result,
 	}
 	putPositiveIntPayload(payload, "finished_goods_lot_id", getInt(pm, "finished_goods_lot_id", 0))
-	putPositiveIntPayload(payload, "quality_inspection_id", getInt(pm, "quality_inspection_id", 0))
-	putPositiveIntPayload(payload, "inspector_id", getInt(pm, "inspector_id", 0))
 	putStringPayload(payload, "inspected_at", getString(pm, "inspected_at"))
 	putStringPayload(payload, "decision_note", getString(pm, "decision_note"))
 	return &biz.ProcessDomainCommandExecution{
@@ -1010,10 +1029,6 @@ func finishedGoodsDeliveryFinanceReleaseExecutionFromParams(pm map[string]any) (
 	payload := map[string]any{
 		"shipment_id": shipmentID,
 	}
-	putStringPayload(payload, "finance_release_no", getString(pm, "finance_release_no"))
-	putPositiveIntPayload(payload, "approved_by_id", getInt(pm, "approved_by_id", 0))
-	putStringPayload(payload, "released_at", getString(pm, "released_at"))
-	putStringPayload(payload, "release_note", getString(pm, "release_note"))
 	return &biz.ProcessDomainCommandExecution{
 		ProcessInstanceID:     processInstanceID,
 		ProcessNodeInstanceID: processNodeInstanceID,
@@ -1039,13 +1054,6 @@ func finishedGoodsDeliveryShipmentShipExecutionFromParams(pm map[string]any) (*b
 	payload := map[string]any{
 		"shipment_id": shipmentID,
 	}
-	putStringPayload(payload, "shipment_no", getString(pm, "shipment_no"))
-	putPositiveIntPayload(payload, "warehouse_id", getInt(pm, "warehouse_id", 0))
-	putPositiveIntPayload(payload, "operator_id", getInt(pm, "operator_id", 0))
-	putStringPayload(payload, "shipped_at", getString(pm, "shipped_at"))
-	putStringPayload(payload, "carrier", getString(pm, "carrier"))
-	putStringPayload(payload, "tracking_no", getString(pm, "tracking_no"))
-	putStringPayload(payload, "ship_note", getString(pm, "ship_note"))
 	return &biz.ProcessDomainCommandExecution{
 		ProcessInstanceID:     processInstanceID,
 		ProcessNodeInstanceID: processNodeInstanceID,
@@ -1064,18 +1072,18 @@ func finishedGoodsDeliveryReceivableLeadExecutionFromParams(pm map[string]any) (
 	if shipmentID <= 0 {
 		shipmentID = getInt(pm, "business_ref_id", 0)
 	}
+	receivableSourceNo := strings.TrimSpace(getString(pm, "receivable_source_no"))
+	expectedAmount := strings.TrimSpace(getString(pm, "expected_amount"))
 	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
-	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || shipmentID <= 0 || idempotencyKey == "" {
+	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || shipmentID <= 0 || receivableSourceNo == "" || expectedAmount == "" || idempotencyKey == "" {
 		return nil, false
 	}
 	payload := map[string]any{
-		"shipment_id": shipmentID,
+		"shipment_id":          shipmentID,
+		"receivable_source_no": receivableSourceNo,
+		"expected_amount":      expectedAmount,
 	}
-	putPositiveIntPayload(payload, "customer_id", getInt(pm, "customer_id", 0))
-	putStringPayload(payload, "receivable_source_no", getString(pm, "receivable_source_no"))
 	putStringPayload(payload, "currency", getString(pm, "currency"))
-	putStringPayload(payload, "expected_amount", getString(pm, "expected_amount"))
-	putStringPayload(payload, "due_date", getString(pm, "due_date"))
 	putStringPayload(payload, "lead_note", getString(pm, "lead_note"))
 	return &biz.ProcessDomainCommandExecution{
 		ProcessInstanceID:     processInstanceID,
@@ -1152,9 +1160,6 @@ func materialSupplyPostInboundExecutionFromParams(pm map[string]any) (*biz.Proce
 	payload := map[string]any{
 		"purchase_receipt_id": purchaseReceiptID,
 	}
-	putStringPayload(payload, "receipt_no", getString(pm, "receipt_no"))
-	putPositiveIntPayload(payload, "warehouse_id", getInt(pm, "warehouse_id", 0))
-	putPositiveIntPayload(payload, "inventory_lot_id", getInt(pm, "inventory_lot_id", 0))
 	return &biz.ProcessDomainCommandExecution{
 		ProcessInstanceID:     processInstanceID,
 		ProcessNodeInstanceID: processNodeInstanceID,

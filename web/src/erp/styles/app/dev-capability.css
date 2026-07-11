@@ -500,6 +500,10 @@
 }
 
 .erp-dev-customer-header__copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
   min-width: 0;
 }
 

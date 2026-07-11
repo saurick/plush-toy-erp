@@ -3,23 +3,31 @@ package biz
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
 
 type memProcessRuntimeRepo struct {
-	created          *ProcessInstanceCreate
-	process          *ProcessInstance
-	node             *ProcessNodeInstance
-	nodes            []*ProcessNodeInstance
-	completedNode    *ProcessNodeInstanceComplete
-	completedNodes   []*ProcessNodeInstanceComplete
-	completedProcess *ProcessInstanceComplete
-	linkedRef        *ProcessInstanceLinkedBusinessRefRecord
-	blockedNode      *ProcessNodeInstanceBlock
-	blockedProcess   *ProcessInstanceBlock
-	activatedNode    *ProcessNodeInstanceActivate
-	createdAttempt   *ProcessNodeInstanceAttemptCreate
+	created              *ProcessInstanceCreate
+	process              *ProcessInstance
+	node                 *ProcessNodeInstance
+	nodes                []*ProcessNodeInstance
+	completedNode        *ProcessNodeInstanceComplete
+	completedNodes       []*ProcessNodeInstanceComplete
+	completedProcess     *ProcessInstanceComplete
+	linkedRef            *ProcessInstanceLinkedBusinessRefRecord
+	blockedNode          *ProcessNodeInstanceBlock
+	blockedProcess       *ProcessInstanceBlock
+	activatedNode        *ProcessNodeInstanceActivate
+	createdAttempt       *ProcessNodeInstanceAttemptCreate
+	claimedDomainCommand *ProcessNodeDomainCommandClaim
+	claimCalls           int
+	resultRecordCalls    int
+	compensationCalls    int
+	settleDuringClaim    bool
+	completeNodeFailures int
+	completeNodeErr      error
 }
 
 type stubProcessOwnerRoleResolver struct {
@@ -31,10 +39,12 @@ type stubProcessOwnerRoleResolver struct {
 }
 
 type stubProcessDomainCommandHandler struct {
-	input  *ProcessDomainCommandInput
-	result *ProcessDomainCommandResult
-	err    error
-	calls  int
+	input         *ProcessDomainCommandInput
+	result        *ProcessDomainCommandResult
+	err           error
+	validateErr   error
+	validateCalls int
+	calls         int
 }
 
 type stubProcessBranchPolicyHandler struct {
@@ -98,6 +108,12 @@ func (s *retryWorkflowRepo) GetWorkflowTaskByTaskCode(_ context.Context, taskCod
 		return task, nil
 	}
 	return nil, ErrWorkflowTaskNotFound
+}
+
+func (h *stubProcessDomainCommandHandler) ValidateProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) error {
+	h.validateCalls++
+	h.input = in
+	return h.validateErr
 }
 
 func (h *stubProcessDomainCommandHandler) ExecuteProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) (*ProcessDomainCommandResult, error) {
@@ -202,9 +218,174 @@ func (r *memProcessRuntimeRepo) ListProcessNodeInstances(ctx context.Context, pr
 	return nil, errors.New("unexpected process")
 }
 
+func (r *memProcessRuntimeRepo) ClaimProcessNodeDomainCommand(ctx context.Context, in *ProcessNodeDomainCommandClaim) (*ProcessNodeInstance, error) {
+	r.claimedDomainCommand = in
+	r.claimCalls++
+	claim := func(node *ProcessNodeInstance) (*ProcessNodeInstance, error) {
+		if node == nil || node.ID != in.ProcessNodeInstanceID {
+			return nil, ErrProcessNodeInstanceNotFound
+		}
+		if node.ProcessInstanceID != in.ProcessInstanceID || node.Status != ProcessNodeStatusActive || node.Version != in.ExpectedVersion {
+			return nil, ErrProcessNodeInstanceConflict
+		}
+		if node.NodeType != ProcessNodeTypeDomainCommand {
+			return nil, ErrBadParam
+		}
+		if node.DomainCommandFingerprint != nil && (node.DomainCommandProtocolVersion == nil || *node.DomainCommandProtocolVersion != ProcessDomainCommandProtocolVersionCurrent) {
+			return nil, ErrProcessDomainCommandRecoveryRequired
+		}
+		if node.DomainCommandFingerprint != nil && *node.DomainCommandFingerprint != in.DomainCommandFingerprint {
+			return nil, ErrIdempotencyConflict
+		}
+		fingerprint := in.DomainCommandFingerprint
+		protocolVersion := ProcessDomainCommandProtocolVersionCurrent
+		node.DomainCommandFingerprint = &fingerprint
+		node.DomainCommandProtocolVersion = &protocolVersion
+		if r.settleDuringClaim {
+			out := *node
+			out.Status = ProcessNodeStatusCompleted
+			out.Version = in.ExpectedVersion + 1
+			outcome := "settled_by_concurrent_execution"
+			out.Outcome = &outcome
+			record, err := processDomainCommandResultRecord(node, processDomainCommandKeyFromNode(node), in.DomainCommandFingerprint, &ProcessDomainCommandResult{Outcome: outcome})
+			if err != nil {
+				return nil, err
+			}
+			out.DomainCommandResultState = &record.ResultState
+			out.DomainCommandResult = record.Result
+			out.DomainCommandResultHash = &record.ResultHash
+			out.DomainCommandEffectState = &record.EffectState
+			out.DomainCommandEffectRefType = record.EffectRefType
+			out.DomainCommandEffectRefID = record.EffectRefID
+			now := time.Now()
+			out.DomainCommandResultRecordedAt = &now
+			if r.node == node {
+				r.node = &out
+			}
+			for index, stored := range r.nodes {
+				if stored == node {
+					r.nodes[index] = &out
+				}
+			}
+			return &out, nil
+		}
+		return node, nil
+	}
+	for _, node := range r.nodes {
+		if node != nil && node.ID == in.ProcessNodeInstanceID {
+			return claim(node)
+		}
+	}
+	return claim(r.node)
+}
+
+func (r *memProcessRuntimeRepo) GetProcessNodeDomainCommandResult(_ context.Context, processInstanceID int, processNodeInstanceID int, fingerprint string) (*ProcessNodeInstance, bool, error) {
+	node := r.memProcessNode(processNodeInstanceID)
+	if node == nil {
+		return nil, false, ErrProcessNodeInstanceNotFound
+	}
+	if node.ProcessInstanceID != processInstanceID {
+		return nil, false, ErrProcessNodeInstanceConflict
+	}
+	if node.DomainCommandFingerprint == nil {
+		return node, false, nil
+	}
+	if *node.DomainCommandFingerprint != fingerprint {
+		return nil, false, ErrIdempotencyConflict
+	}
+	if node.DomainCommandProtocolVersion == nil || *node.DomainCommandProtocolVersion != ProcessDomainCommandProtocolVersionCurrent {
+		return nil, false, ErrProcessDomainCommandRecoveryRequired
+	}
+	if node.DomainCommandResultHash == nil {
+		return node, false, nil
+	}
+	return node, true, nil
+}
+
+func (r *memProcessRuntimeRepo) RecordProcessNodeDomainCommandResult(_ context.Context, in *ProcessNodeDomainCommandResultRecord, actorID int) (*ProcessNodeInstance, error) {
+	r.resultRecordCalls++
+	node := r.memProcessNode(in.ProcessNodeInstanceID)
+	if node == nil {
+		return nil, ErrProcessNodeInstanceNotFound
+	}
+	if node.ProcessInstanceID != in.ProcessInstanceID || node.DomainCommandFingerprint == nil || *node.DomainCommandFingerprint != in.DomainCommandFingerprint {
+		return nil, ErrIdempotencyConflict
+	}
+	if node.DomainCommandResultHash != nil {
+		if *node.DomainCommandResultHash != in.ResultHash {
+			return nil, ErrIdempotencyConflict
+		}
+		return node, nil
+	}
+	state := in.ResultState
+	hash := in.ResultHash
+	effectState := in.EffectState
+	protocolVersion := in.ProtocolVersion
+	now := time.Now()
+	node.DomainCommandProtocolVersion = &protocolVersion
+	node.DomainCommandResultState = &state
+	node.DomainCommandResult = in.Result
+	node.DomainCommandResultHash = &hash
+	node.DomainCommandEffectState = &effectState
+	node.DomainCommandEffectRefType = in.EffectRefType
+	node.DomainCommandEffectRefID = in.EffectRefID
+	node.DomainCommandResultRecordedAt = &now
+	if actorID > 0 {
+		value := actorID
+		node.DomainCommandResultRecordedBy = &value
+	}
+	return node, nil
+}
+
+func (r *memProcessRuntimeRepo) MarkProcessNodeDomainCommandCompensated(_ context.Context, in *ProcessNodeDomainCommandCompensationMark, actorID int) (*ProcessNodeInstance, error) {
+	r.compensationCalls++
+	node := r.memProcessNode(in.ProcessNodeInstanceID)
+	if node == nil {
+		return nil, ErrProcessNodeInstanceNotFound
+	}
+	if node.ProcessInstanceID != in.ProcessInstanceID || node.DomainCommandFingerprint == nil || *node.DomainCommandFingerprint != in.DomainCommandFingerprint ||
+		node.DomainCommandResultHash == nil || *node.DomainCommandResultHash != in.ExpectedResultHash {
+		return nil, ErrIdempotencyConflict
+	}
+	if node.DomainCommandCompensationHash != nil {
+		if *node.DomainCommandCompensationHash != in.CompensationHash {
+			return nil, ErrIdempotencyConflict
+		}
+		return node, nil
+	}
+	effectState := ProcessDomainCommandEffectStateCompensated
+	hash := in.CompensationHash
+	now := time.Now()
+	node.DomainCommandEffectState = &effectState
+	node.DomainCommandCompensation = in.Compensation
+	node.DomainCommandCompensationHash = &hash
+	node.DomainCommandCompensatedAt = &now
+	if actorID > 0 {
+		value := actorID
+		node.DomainCommandCompensatedBy = &value
+	}
+	return node, nil
+}
+
+func (r *memProcessRuntimeRepo) memProcessNode(id int) *ProcessNodeInstance {
+	for _, node := range r.nodes {
+		if node != nil && node.ID == id {
+			return node
+		}
+	}
+	if r.node != nil && r.node.ID == id {
+		return r.node
+	}
+	return nil
+}
+
 func (r *memProcessRuntimeRepo) CompleteProcessNodeInstance(ctx context.Context, in *ProcessNodeInstanceComplete, actorID int) (*ProcessNodeInstance, error) {
 	r.completedNode = in
 	r.completedNodes = append(r.completedNodes, in)
+	if r.completeNodeFailures > 0 {
+		r.completeNodeFailures--
+		return nil, r.completeNodeErr
+	}
 	for index, node := range r.nodes {
 		if node == nil || node.ID != in.ID {
 			continue
@@ -212,9 +393,13 @@ func (r *memProcessRuntimeRepo) CompleteProcessNodeInstance(ctx context.Context,
 		if node.Version != in.ExpectedVersion {
 			return nil, ErrProcessNodeInstanceConflict
 		}
+		if in.DomainCommandFingerprint != nil && (node.DomainCommandFingerprint == nil || *node.DomainCommandFingerprint != *in.DomainCommandFingerprint) {
+			return nil, ErrIdempotencyConflict
+		}
 		out := *node
 		out.Status = ProcessNodeStatusCompleted
 		out.Outcome = &in.Outcome
+		out.DomainCommandFingerprint = in.DomainCommandFingerprint
 		out.Version = in.ExpectedVersion + 1
 		r.nodes[index] = &out
 		return &out, nil
@@ -225,9 +410,13 @@ func (r *memProcessRuntimeRepo) CompleteProcessNodeInstance(ctx context.Context,
 	if r.node.Version != in.ExpectedVersion {
 		return nil, ErrProcessNodeInstanceConflict
 	}
+	if in.DomainCommandFingerprint != nil && (r.node.DomainCommandFingerprint == nil || *r.node.DomainCommandFingerprint != *in.DomainCommandFingerprint) {
+		return nil, ErrIdempotencyConflict
+	}
 	out := *r.node
 	out.Status = ProcessNodeStatusCompleted
 	out.Outcome = &in.Outcome
+	out.DomainCommandFingerprint = in.DomainCommandFingerprint
 	out.Version = in.ExpectedVersion + 1
 	r.node = &out
 	return &out, nil
@@ -286,9 +475,13 @@ func (r *memProcessRuntimeRepo) BlockProcessNodeInstance(ctx context.Context, in
 		if node.Status != ProcessNodeStatusActive || node.Version != in.ExpectedVersion {
 			return nil, ErrProcessNodeInstanceConflict
 		}
+		if in.DomainCommandFingerprint != nil && (node.DomainCommandFingerprint == nil || *node.DomainCommandFingerprint != *in.DomainCommandFingerprint) {
+			return nil, ErrIdempotencyConflict
+		}
 		out := *node
 		out.Status = ProcessNodeStatusBlocked
 		out.Outcome = &in.Outcome
+		out.DomainCommandFingerprint = in.DomainCommandFingerprint
 		out.Version = in.ExpectedVersion + 1
 		r.nodes[index] = &out
 		return &out, nil
@@ -299,9 +492,13 @@ func (r *memProcessRuntimeRepo) BlockProcessNodeInstance(ctx context.Context, in
 	if r.node.Status != ProcessNodeStatusActive || r.node.Version != in.ExpectedVersion {
 		return nil, ErrProcessNodeInstanceConflict
 	}
+	if in.DomainCommandFingerprint != nil && (r.node.DomainCommandFingerprint == nil || *r.node.DomainCommandFingerprint != *in.DomainCommandFingerprint) {
+		return nil, ErrIdempotencyConflict
+	}
 	out := *r.node
 	out.Status = ProcessNodeStatusBlocked
 	out.Outcome = &in.Outcome
+	out.DomainCommandFingerprint = in.DomainCommandFingerprint
 	out.Version = in.ExpectedVersion + 1
 	r.node = &out
 	return &out, nil
@@ -2583,6 +2780,10 @@ func TestProcessRuntimeUsecaseExecuteDomainCommandNodeCompletesAndAdvances(t *te
 	if processRepo.completedNode == nil || processRepo.completedNode.ExpectedVersion != 3 {
 		t.Fatalf("expected domain node completed with version guard, got %#v", processRepo.completedNode)
 	}
+	if node.DomainCommandFingerprint == nil || processRepo.completedNode.DomainCommandFingerprint == nil ||
+		*node.DomainCommandFingerprint != *processRepo.completedNode.DomainCommandFingerprint || len(*node.DomainCommandFingerprint) != 64 {
+		t.Fatalf("expected atomic domain command fingerprint persistence, node=%#v complete=%#v", node.DomainCommandFingerprint, processRepo.completedNode.DomainCommandFingerprint)
+	}
 	if processRepo.activatedNode == nil || processRepo.activatedNode.ID != nextNodeID {
 		t.Fatalf("expected next waiting node activation, got %#v", processRepo.activatedNode)
 	}
@@ -2594,6 +2795,473 @@ func TestProcessRuntimeUsecaseExecuteDomainCommandNodeCompletesAndAdvances(t *te
 	}
 	if workflowRepo.createTaskInput.OwnerRoleKey != BossRoleKey {
 		t.Fatalf("expected next linked task owner resolved from active config, got %q", workflowRepo.createTaskInput.OwnerRoleKey)
+	}
+}
+
+func TestProcessRuntimeUsecaseExecuteDomainCommandNodeValidatesBeforeClaim(t *testing.T) {
+	commandKey := "engineering_package.publish"
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, Status: ProcessStatusActive, BusinessRefType: "sales_order", BusinessRefID: 1001},
+		node: &ProcessNodeInstance{
+			ID: 20, ProcessInstanceID: 10, NodeKey: "publish_engineering_package", NodeType: ProcessNodeTypeDomainCommand,
+			Status: ProcessNodeStatusActive, Version: 3, PolicySnapshot: map[string]any{"command_key": commandKey},
+		},
+	}
+	handler := &stubProcessDomainCommandHandler{validateErr: ErrBadParam, result: &ProcessDomainCommandResult{Outcome: "published"}}
+	uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
+	if err := uc.RegisterDomainCommandHandler(commandKey, handler); err != nil {
+		t.Fatalf("register handler failed: %v", err)
+	}
+	execution := &ProcessDomainCommandExecution{
+		ProcessInstanceID: 10, ProcessNodeInstanceID: 20, ExpectedVersion: 3,
+		CommandKey: commandKey, IdempotencyKey: "process:10:node:20:publish", Payload: map[string]any{"source": "invalid"},
+	}
+	if _, err := uc.ExecuteDomainCommandNode(context.Background(), execution, 7); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("invalid command must fail before claim, got %v", err)
+	}
+	if processRepo.claimCalls != 0 || processRepo.node.DomainCommandFingerprint != nil || handler.calls != 0 {
+		t.Fatalf("validation failure must not bind fingerprint or execute side effect, claims=%d node=%#v calls=%d", processRepo.claimCalls, processRepo.node, handler.calls)
+	}
+
+	handler.validateErr = nil
+	execution.Payload = map[string]any{"source": "corrected"}
+	completed, err := uc.ExecuteDomainCommandNode(context.Background(), execution, 7)
+	if err != nil {
+		t.Fatalf("corrected command should remain executable: %v", err)
+	}
+	if completed.Status != ProcessNodeStatusCompleted || processRepo.claimCalls != 1 || handler.calls != 1 {
+		t.Fatalf("corrected command did not complete exactly once, node=%#v claims=%d calls=%d", completed, processRepo.claimCalls, handler.calls)
+	}
+}
+
+func TestProcessRuntimeUsecaseExecuteDomainCommandNodeReconcilesNodeSettledDuringClaim(t *testing.T) {
+	commandKey := "engineering_package.publish"
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, Status: ProcessStatusActive, BusinessRefType: "sales_order", BusinessRefID: 1001},
+		node: &ProcessNodeInstance{
+			ID: 20, ProcessInstanceID: 10, NodeKey: "publish_engineering_package", NodeType: ProcessNodeTypeDomainCommand,
+			Status: ProcessNodeStatusActive, Version: 3, PolicySnapshot: map[string]any{"command_key": commandKey},
+		},
+		settleDuringClaim: true,
+	}
+	handler := &stubProcessDomainCommandHandler{result: &ProcessDomainCommandResult{Outcome: "published"}}
+	uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
+	if err := uc.RegisterDomainCommandHandler(commandKey, handler); err != nil {
+		t.Fatalf("register handler failed: %v", err)
+	}
+
+	settled, err := uc.ExecuteDomainCommandNode(context.Background(), &ProcessDomainCommandExecution{
+		ProcessInstanceID: 10, ProcessNodeInstanceID: 20, ExpectedVersion: 3,
+		CommandKey: commandKey, IdempotencyKey: "process:10:node:20:publish", Payload: map[string]any{"source": "same-intent"},
+	}, 7)
+	if err != nil {
+		t.Fatalf("claim returning the same settled intent should reconcile: %v", err)
+	}
+	if settled.Status != ProcessNodeStatusCompleted || settled.Version != 4 || handler.calls != 0 {
+		t.Fatalf("settled claim must not execute the handler again, node=%#v calls=%d", settled, handler.calls)
+	}
+	if processRepo.claimCalls != 1 || processRepo.completedNode != nil {
+		t.Fatalf("settled claim must reuse the terminal node without a second completion, claims=%d complete=%#v", processRepo.claimCalls, processRepo.completedNode)
+	}
+}
+
+func TestProcessRuntimeUsecaseExecuteDomainCommandNodeReconcilesAdvanceWithoutRepeatingSideEffect(t *testing.T) {
+	processID := 10
+	nodeID := 20
+	nextNodeID := 21
+	commandKey := "engineering_package.publish"
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: processID, Status: ProcessStatusActive, BusinessRefType: "sales_order", BusinessRefID: 1001, ConfigRevision: "yoyoosun-rev-1"},
+		nodes: []*ProcessNodeInstance{
+			{ID: nodeID, ProcessInstanceID: processID, NodeKey: "publish_engineering_package", NodeType: ProcessNodeTypeDomainCommand, Status: ProcessNodeStatusActive, Version: 3, PolicySnapshot: map[string]any{"command_key": commandKey}},
+			{ID: nextNodeID, ProcessInstanceID: processID, NodeKey: "engineering_release_approval", NodeType: ProcessNodeTypeApproval, Attempt: 1, Status: ProcessNodeStatusWaiting, OwnerPoolKey: ptrString("boss_approval"), RequiredCapabilityKey: ptrString(PermissionWorkflowTaskApprove), Version: 1},
+		},
+	}
+	advanceErr := errors.New("workflow task store unavailable")
+	workflowRepo := &retryWorkflowRepo{remainingFailures: 1, failureErr: advanceErr}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, &stubProcessOwnerRoleResolver{explanation: &WorkflowTaskCandidateExplanation{
+		ConfigRevision: "yoyoosun-rev-1", OwnerPoolKey: "boss_approval", RequiredCapabilities: []string{PermissionWorkflowTaskApprove}, CandidateOwnerRoleKeys: []string{BossRoleKey}, Source: "active_customer_config",
+	}})
+	handler := &stubProcessDomainCommandHandler{result: &ProcessDomainCommandResult{Outcome: "published"}}
+	if err := uc.RegisterDomainCommandHandler(commandKey, handler); err != nil {
+		t.Fatalf("register handler failed: %v", err)
+	}
+	execution := &ProcessDomainCommandExecution{
+		ProcessInstanceID: processID, ProcessNodeInstanceID: nodeID, ExpectedVersion: 3,
+		CommandKey: commandKey, IdempotencyKey: "process:10:node:20:engineering_package.publish", Payload: map[string]any{"source": "test"},
+	}
+	if _, err := uc.ExecuteDomainCommandNode(context.Background(), execution, 7); !errors.Is(err, advanceErr) {
+		t.Fatalf("first execution error = %v, want advance failure", err)
+	}
+	if handler.calls != 1 || processRepo.nodes[0].Status != ProcessNodeStatusCompleted || processRepo.nodes[1].Status != ProcessNodeStatusActive {
+		t.Fatalf("expected committed side effect/node and active next node, calls=%d nodes=%#v", handler.calls, processRepo.nodes)
+	}
+	changedKey := *execution
+	changedKey.IdempotencyKey = execution.IdempotencyKey + ":changed"
+	if _, err := uc.ExecuteDomainCommandNode(context.Background(), &changedKey, 7); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("settled recovery with another idempotency key must conflict, got %v", err)
+	}
+	changedPayload := *execution
+	changedPayload.Payload = map[string]any{"source": "changed"}
+	if _, err := uc.ExecuteDomainCommandNode(context.Background(), &changedPayload, 7); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("settled recovery with another payload must conflict, got %v", err)
+	}
+	changedCommand := *execution
+	changedCommand.CommandKey = "inventory.post_inbound"
+	if _, err := uc.ExecuteDomainCommandNode(context.Background(), &changedCommand, 7); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("settled recovery with another command must conflict, got %v", err)
+	}
+	if handler.calls != 1 || workflowRepo.createCalls != 1 {
+		t.Fatalf("conflicting recovery must not rerun the handler or advance, handler=%d advances=%d", handler.calls, workflowRepo.createCalls)
+	}
+	reconciled, err := uc.ExecuteDomainCommandNode(context.Background(), execution, 7)
+	if err != nil {
+		t.Fatalf("retry should reconcile process advance: %v", err)
+	}
+	if reconciled.Status != ProcessNodeStatusCompleted || handler.calls != 1 {
+		t.Fatalf("retry must not repeat domain side effect, node=%#v calls=%d", reconciled, handler.calls)
+	}
+	if workflowRepo.createCalls != 2 || workflowRepo.createdByCode["PROC-10-NODE-21-A1"] == nil {
+		t.Fatalf("expected linked task reconciled on retry, calls=%d tasks=%#v", workflowRepo.createCalls, workflowRepo.createdByCode)
+	}
+}
+
+func TestProcessDomainCommandFingerprintCanonicalizesPayloadMapOrder(t *testing.T) {
+	first, err := processDomainCommandFingerprint("shipment.ship", "ship/42", map[string]any{
+		"shipment_id": 42,
+		"options": map[string]any{
+			"warehouse_id": 3,
+			"note":         "ready",
+		},
+	})
+	if err != nil {
+		t.Fatalf("first fingerprint failed: %v", err)
+	}
+	second, err := processDomainCommandFingerprint("shipment.ship", "ship/42", map[string]any{
+		"options": map[string]any{
+			"note":         "ready",
+			"warehouse_id": 3,
+		},
+		"shipment_id": 42,
+	})
+	if err != nil {
+		t.Fatalf("second fingerprint failed: %v", err)
+	}
+	if first != second || len(first) != 64 {
+		t.Fatalf("canonical payload order must produce one sha256 fingerprint, first=%q second=%q", first, second)
+	}
+	changed, err := processDomainCommandFingerprint("shipment.ship", "ship/42", map[string]any{"shipment_id": 43})
+	if err != nil {
+		t.Fatalf("changed fingerprint failed: %v", err)
+	}
+	if changed == first {
+		t.Fatalf("changed business intent must change fingerprint")
+	}
+}
+
+func TestNormalizeProcessNodeInstanceCreateCanonicalizesDueAtToPostgresPrecision(t *testing.T) {
+	dueAt := time.Date(2026, 7, 10, 12, 34, 56, 123456789, time.FixedZone("UTC+8", 8*60*60))
+	normalized, err := normalizeProcessNodeInstanceCreate(ProcessNodeInstanceCreate{
+		NodeKey: "approval", NodeType: ProcessNodeTypeApproval, Attempt: 1,
+		Status: ProcessNodeStatusWaiting, DueAt: &dueAt,
+	})
+	if err != nil {
+		t.Fatalf("normalize process node failed: %v", err)
+	}
+	expected := dueAt.UTC().Truncate(time.Microsecond)
+	if normalized.DueAt == nil || normalized.DueAt.Location() != time.UTC || !normalized.DueAt.Equal(expected) || normalized.DueAt.Nanosecond()%1000 != 0 {
+		t.Fatalf("due_at must canonicalize to UTC microseconds, got %#v want %v", normalized.DueAt, expected)
+	}
+}
+
+func TestProcessRuntimeUsecaseExecuteDomainCommandNodePersistsFingerprintWhenBlocked(t *testing.T) {
+	commandKey := "quality_inspection.aggregate_gate"
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, Status: ProcessStatusActive, BusinessRefType: "purchase_receipt", BusinessRefID: 1001, ConfigRevision: "yoyoosun-rev-1"},
+		node: &ProcessNodeInstance{
+			ID: 20, ProcessInstanceID: 10, NodeKey: "incoming_quality_gate", NodeType: ProcessNodeTypeDomainCommand,
+			Status: ProcessNodeStatusActive, Version: 3, PolicySnapshot: map[string]any{"command_key": commandKey},
+		},
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
+	handler := &stubProcessDomainCommandHandler{result: &ProcessDomainCommandResult{Outcome: "rejected", BlockReason: "quality_rejected"}}
+	if err := uc.RegisterDomainCommandHandler(commandKey, handler); err != nil {
+		t.Fatalf("register handler failed: %v", err)
+	}
+	execution := &ProcessDomainCommandExecution{
+		ProcessInstanceID: 10, ProcessNodeInstanceID: 20, ExpectedVersion: 3,
+		CommandKey: commandKey, IdempotencyKey: "process:10:node:20:quality_gate", Payload: map[string]any{"receipt_id": 1001},
+	}
+	blocked, err := uc.ExecuteDomainCommandNode(context.Background(), execution, 7)
+	if err != nil {
+		t.Fatalf("block domain command failed: %v", err)
+	}
+	if blocked.Status != ProcessNodeStatusBlocked || blocked.DomainCommandFingerprint == nil || len(*blocked.DomainCommandFingerprint) != 64 {
+		t.Fatalf("blocked domain node must persist fingerprint, got %#v", blocked)
+	}
+	if _, err := uc.ExecuteDomainCommandNode(context.Background(), execution, 7); err != nil {
+		t.Fatalf("same blocked command fingerprint should reconcile: %v", err)
+	}
+	changed := *execution
+	changed.Payload = map[string]any{"receipt_id": 1002}
+	if _, err := uc.ExecuteDomainCommandNode(context.Background(), &changed, 7); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("changed blocked command intent must conflict, got %v", err)
+	}
+	if handler.calls != 1 {
+		t.Fatalf("blocked reconciliation must not rerun domain side effect, calls=%d", handler.calls)
+	}
+}
+
+func TestProcessRuntimeUsecaseExecuteDomainCommandNodeRejectsSettledNodeWithoutFingerprint(t *testing.T) {
+	commandKey := "engineering_package.publish"
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, Status: ProcessStatusActive, BusinessRefType: "sales_order", BusinessRefID: 1001, ConfigRevision: "yoyoosun-rev-1"},
+		node: &ProcessNodeInstance{
+			ID: 20, ProcessInstanceID: 10, NodeKey: "publish_engineering_package", NodeType: ProcessNodeTypeDomainCommand,
+			Status: ProcessNodeStatusCompleted, Version: 4, PolicySnapshot: map[string]any{"command_key": commandKey},
+		},
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
+
+	_, err := uc.ExecuteDomainCommandNode(context.Background(), &ProcessDomainCommandExecution{
+		ProcessInstanceID: 10, ProcessNodeInstanceID: 20, ExpectedVersion: 3,
+		CommandKey: commandKey, IdempotencyKey: "process:10:node:20:engineering_package.publish",
+	}, 7)
+	if !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("settled node without persisted fingerprint must fail closed, got %v", err)
+	}
+}
+
+func TestProcessRuntimeUsecaseExecuteDomainCommandNodeReplaysStoredResultAfterNodeCommitFailure(t *testing.T) {
+	commandKey := "engineering_package.publish"
+	commitErr := errors.New("process node commit unavailable")
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, Status: ProcessStatusActive, BusinessRefType: "sales_order", BusinessRefID: 1001, ConfigRevision: "yoyoosun-rev-1"},
+		nodes: []*ProcessNodeInstance{
+			{ID: 20, ProcessInstanceID: 10, NodeKey: "publish_engineering_package", NodeType: ProcessNodeTypeDomainCommand, Status: ProcessNodeStatusActive, Version: 3, PolicySnapshot: map[string]any{"command_key": commandKey}},
+			{ID: 21, ProcessInstanceID: 10, NodeKey: "done", NodeType: ProcessNodeTypeEnd, Attempt: 1, Status: ProcessNodeStatusWaiting, Version: 1},
+		},
+		completeNodeFailures: 1,
+		completeNodeErr:      commitErr,
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
+	handler := &stubProcessDomainCommandHandler{result: &ProcessDomainCommandResult{Outcome: "published"}}
+	if err := uc.RegisterDomainCommandHandler(commandKey, handler); err != nil {
+		t.Fatalf("register handler failed: %v", err)
+	}
+	execution := &ProcessDomainCommandExecution{ProcessInstanceID: 10, ProcessNodeInstanceID: 20, ExpectedVersion: 3, CommandKey: commandKey, IdempotencyKey: "process:10:node:20:engineering_package.publish"}
+	if _, err := uc.ExecuteDomainCommandNode(context.Background(), execution, 7); !errors.Is(err, commitErr) {
+		t.Fatalf("first execution error = %v, want node commit failure", err)
+	}
+	if processRepo.nodes[0].Status != ProcessNodeStatusActive || processRepo.nodes[0].Version != 3 ||
+		processRepo.nodes[0].DomainCommandFingerprint == nil || handler.calls != 1 || processRepo.claimCalls != 1 || processRepo.resultRecordCalls != 1 {
+		t.Fatalf("node should remain active after commit failure, node=%#v calls=%d", processRepo.nodes[0], handler.calls)
+	}
+	changedKey := *execution
+	changedKey.IdempotencyKey = execution.IdempotencyKey + ":changed"
+	if _, err := uc.ExecuteDomainCommandNode(context.Background(), &changedKey, 7); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("changed key after side effect/node commit split must conflict before handler, got %v", err)
+	}
+	changedPayload := *execution
+	changedPayload.Payload = map[string]any{"source": "changed"}
+	if _, err := uc.ExecuteDomainCommandNode(context.Background(), &changedPayload, 7); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("changed payload after side effect/node commit split must conflict before handler, got %v", err)
+	}
+	if handler.calls != 1 {
+		t.Fatalf("conflicting active retries must not rerun handler, calls=%d", handler.calls)
+	}
+	if _, err := uc.ExecuteDomainCommandNode(context.Background(), execution, 7); err != nil {
+		t.Fatalf("retry should replay the stored result and finish: %v", err)
+	}
+	if handler.calls != 1 || handler.validateCalls != 1 || processRepo.resultRecordCalls != 1 || processRepo.nodes[0].Status != ProcessNodeStatusCompleted || processRepo.process.Status != ProcessStatusCompleted {
+		t.Fatalf("unexpected recovered process state, calls=%d node=%#v process=%#v", handler.calls, processRepo.nodes[0], processRepo.process)
+	}
+}
+
+func TestProcessRuntimeUsecaseStoredCompensationBlocksWithoutReplayingHandler(t *testing.T) {
+	commandKey := "shipment.ship"
+	commitErr := errors.New("process node commit unavailable")
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, Status: ProcessStatusActive, BusinessRefType: "shipment", BusinessRefID: 88, ConfigRevision: "rev-1"},
+		nodes: []*ProcessNodeInstance{
+			{ID: 20, ProcessInstanceID: 10, NodeKey: "ship", NodeType: ProcessNodeTypeDomainCommand, Status: ProcessNodeStatusActive, Version: 3, PolicySnapshot: map[string]any{"command_key": commandKey}},
+			{ID: 21, ProcessInstanceID: 10, NodeKey: "done", NodeType: ProcessNodeTypeEnd, Attempt: 1, Status: ProcessNodeStatusWaiting, Version: 1},
+		},
+		completeNodeFailures: 1,
+		completeNodeErr:      commitErr,
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
+	effectRef := ProcessBusinessRef{RefType: "shipment", RefID: 88}
+	handler := &stubProcessDomainCommandHandler{result: &ProcessDomainCommandResult{
+		Outcome:     ShipmentProcessCommandOutcomeShipped,
+		EffectState: ProcessDomainCommandEffectStateApplied,
+		EffectRef:   &effectRef,
+	}}
+	if err := uc.RegisterDomainCommandHandler(commandKey, handler); err != nil {
+		t.Fatalf("register handler: %v", err)
+	}
+	execution := &ProcessDomainCommandExecution{
+		ProcessInstanceID: 10, ProcessNodeInstanceID: 20, ExpectedVersion: 3,
+		CommandKey: commandKey, IdempotencyKey: "process:10:node:20:shipment.ship", Payload: map[string]any{"shipment_id": 88},
+	}
+	if _, err := uc.ExecuteDomainCommandNode(context.Background(), execution, 7); !errors.Is(err, commitErr) {
+		t.Fatalf("first execution error = %v, want node commit failure", err)
+	}
+	stored := processRepo.nodes[0]
+	if stored.DomainCommandResultHash == nil || stored.DomainCommandFingerprint == nil {
+		t.Fatalf("expected durable result before compensation, got %#v", stored)
+	}
+	compensation := map[string]any{"reason": "出货单已取消并写入库存冲正", "ref_type": "shipment", "ref_id": 88}
+	compensationHash, err := processCanonicalSHA256(compensation)
+	if err != nil {
+		t.Fatalf("hash compensation: %v", err)
+	}
+	if _, err := processRepo.MarkProcessNodeDomainCommandCompensated(context.Background(), &ProcessNodeDomainCommandCompensationMark{
+		ProcessInstanceID:        10,
+		ProcessNodeInstanceID:    20,
+		ExpectedVersion:          3,
+		DomainCommandFingerprint: *stored.DomainCommandFingerprint,
+		ExpectedResultHash:       *stored.DomainCommandResultHash,
+		Compensation:             compensation,
+		CompensationHash:         compensationHash,
+	}, 9); err != nil {
+		t.Fatalf("mark compensation: %v", err)
+	}
+	blocked, err := uc.ExecuteDomainCommandNode(context.Background(), execution, 7)
+	if err != nil {
+		t.Fatalf("replay compensated result: %v", err)
+	}
+	if blocked.Status != ProcessNodeStatusBlocked || blocked.Outcome == nil || *blocked.Outcome != "domain_command.compensated" || processRepo.process.Status != ProcessStatusBlocked {
+		t.Fatalf("compensated result must block the active process, node=%#v process=%#v", blocked, processRepo.process)
+	}
+	if handler.calls != 1 || handler.validateCalls != 1 {
+		t.Fatalf("compensated recovery must not revalidate or replay handler, validate=%d execute=%d", handler.validateCalls, handler.calls)
+	}
+}
+
+func TestProcessRuntimeUsecaseCompletedCompensatedCommandFailsClosedWithoutAdvancing(t *testing.T) {
+	commandKey := "shipment.ship"
+	idempotencyKey := "process:10:node:20:shipment.ship"
+	payload := map[string]any{"shipment_id": 88}
+	fingerprint, err := processDomainCommandFingerprint(commandKey, idempotencyKey, payload)
+	if err != nil {
+		t.Fatalf("fingerprint: %v", err)
+	}
+	protocolVersion := ProcessDomainCommandProtocolVersionCurrent
+	effectState := ProcessDomainCommandEffectStateCompensated
+	resultHash := strings.Repeat("a", 64)
+	compensationHash := strings.Repeat("b", 64)
+	outcome := ShipmentProcessCommandOutcomeShipped
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, Status: ProcessStatusActive, BusinessRefType: "shipment", BusinessRefID: 88, ConfigRevision: "rev-1"},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID: 20, ProcessInstanceID: 10, NodeKey: "ship", NodeType: ProcessNodeTypeDomainCommand,
+				Status: ProcessNodeStatusCompleted, Version: 4, Outcome: &outcome, PolicySnapshot: map[string]any{"command_key": commandKey},
+				DomainCommandFingerprint: &fingerprint, DomainCommandProtocolVersion: &protocolVersion,
+				DomainCommandResultHash: &resultHash, DomainCommandEffectState: &effectState,
+				DomainCommandCompensationHash: &compensationHash,
+			},
+			{ID: 21, ProcessInstanceID: 10, NodeKey: "downstream", NodeType: ProcessNodeTypeHumanTask, Attempt: 1, Status: ProcessNodeStatusActive, Version: 1},
+		},
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
+	handler := &stubProcessDomainCommandHandler{}
+	if err := uc.RegisterDomainCommandHandler(commandKey, handler); err != nil {
+		t.Fatalf("register handler: %v", err)
+	}
+
+	_, err = uc.ExecuteDomainCommandNode(context.Background(), &ProcessDomainCommandExecution{
+		ProcessInstanceID: 10, ProcessNodeInstanceID: 20, ExpectedVersion: 3,
+		CommandKey: commandKey, IdempotencyKey: idempotencyKey, Payload: payload,
+	}, 7)
+	if !errors.Is(err, ErrProcessDomainCommandRecoveryRequired) {
+		t.Fatalf("completed compensated command must fail closed, got %v", err)
+	}
+	if handler.validateCalls != 0 || handler.calls != 0 || processRepo.completedNode != nil || processRepo.activatedNode != nil {
+		t.Fatalf("completed compensated replay must not validate, execute, settle, or advance: handler=%#v completed=%#v activated=%#v", handler, processRepo.completedNode, processRepo.activatedNode)
+	}
+}
+
+func TestProcessRuntimeUsecaseLegacyClaimedDomainCommandFailsClosedBeforeValidation(t *testing.T) {
+	commandKey := "shipment.ship"
+	fingerprint, err := processDomainCommandFingerprint(commandKey, "legacy-key", map[string]any{"shipment_id": 88})
+	if err != nil {
+		t.Fatalf("fingerprint: %v", err)
+	}
+	legacyProtocol := 0
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, Status: ProcessStatusActive, BusinessRefType: "shipment", BusinessRefID: 88},
+		node: &ProcessNodeInstance{
+			ID: 20, ProcessInstanceID: 10, NodeKey: "ship", NodeType: ProcessNodeTypeDomainCommand,
+			Status: ProcessNodeStatusActive, Version: 3, PolicySnapshot: map[string]any{"command_key": commandKey},
+			DomainCommandFingerprint: &fingerprint, DomainCommandProtocolVersion: &legacyProtocol,
+		},
+	}
+	handler := &stubProcessDomainCommandHandler{result: &ProcessDomainCommandResult{Outcome: ShipmentProcessCommandOutcomeShipped}}
+	uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
+	if err := uc.RegisterDomainCommandHandler(commandKey, handler); err != nil {
+		t.Fatalf("register handler: %v", err)
+	}
+	_, err = uc.ExecuteDomainCommandNode(context.Background(), &ProcessDomainCommandExecution{
+		ProcessInstanceID: 10, ProcessNodeInstanceID: 20, ExpectedVersion: 3,
+		CommandKey: commandKey, IdempotencyKey: "legacy-key", Payload: map[string]any{"shipment_id": 88},
+	}, 7)
+	if !errors.Is(err, ErrProcessDomainCommandRecoveryRequired) {
+		t.Fatalf("legacy claimed node must fail closed, got %v", err)
+	}
+	if handler.validateCalls != 0 || handler.calls != 0 || processRepo.claimCalls != 0 {
+		t.Fatalf("legacy recovery must stop before validation/claim/execute, validate=%d claim=%d execute=%d", handler.validateCalls, processRepo.claimCalls, handler.calls)
+	}
+}
+
+func TestProcessRuntimeUsecaseSettledDomainCommandWithoutCurrentDurableResultFailsClosedBeforeReconcile(t *testing.T) {
+	commandKey := "shipment.ship"
+	idempotencyKey := "process:10:node:20:shipment.ship"
+	payload := map[string]any{"shipment_id": 88}
+	fingerprint, err := processDomainCommandFingerprint(commandKey, idempotencyKey, payload)
+	if err != nil {
+		t.Fatalf("fingerprint: %v", err)
+	}
+
+	for _, tt := range []struct {
+		name            string
+		protocolVersion int
+	}{
+		{name: "legacy protocol", protocolVersion: 0},
+		{name: "current protocol missing result", protocolVersion: ProcessDomainCommandProtocolVersionCurrent},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			outcome := ShipmentProcessCommandOutcomeShipped
+			processRepo := &memProcessRuntimeRepo{
+				process: &ProcessInstance{ID: 10, Status: ProcessStatusActive, BusinessRefType: "shipment", BusinessRefID: 88},
+				nodes: []*ProcessNodeInstance{
+					{
+						ID: 20, ProcessInstanceID: 10, NodeKey: "ship", NodeType: ProcessNodeTypeDomainCommand,
+						Status: ProcessNodeStatusCompleted, Version: 4, Outcome: &outcome,
+						PolicySnapshot:           map[string]any{"command_key": commandKey},
+						DomainCommandFingerprint: &fingerprint, DomainCommandProtocolVersion: &tt.protocolVersion,
+					},
+					{ID: 21, ProcessInstanceID: 10, NodeKey: "done", NodeType: ProcessNodeTypeEnd, Attempt: 1, Status: ProcessNodeStatusWaiting, Version: 1},
+				},
+			}
+			handler := &stubProcessDomainCommandHandler{}
+			uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
+			if err := uc.RegisterDomainCommandHandler(commandKey, handler); err != nil {
+				t.Fatalf("register handler: %v", err)
+			}
+
+			_, err := uc.ExecuteDomainCommandNode(context.Background(), &ProcessDomainCommandExecution{
+				ProcessInstanceID: 10, ProcessNodeInstanceID: 20, ExpectedVersion: 3,
+				CommandKey: commandKey, IdempotencyKey: idempotencyKey, Payload: payload,
+			}, 7)
+			if !errors.Is(err, ErrProcessDomainCommandRecoveryRequired) {
+				t.Fatalf("settled command without current durable result must fail closed, got %v", err)
+			}
+			if handler.validateCalls != 0 || handler.calls != 0 || processRepo.activatedNode != nil || processRepo.completedProcess != nil {
+				t.Fatalf("unsafe settled replay must not validate, execute, activate downstream, or complete process: handler=%#v activated=%#v completed=%#v", handler, processRepo.activatedNode, processRepo.completedProcess)
+			}
+		})
 	}
 }
 
@@ -2666,6 +3334,36 @@ func TestProcessRuntimeUsecaseExecuteDomainCommandNodeRejectsCommandMismatch(t *
 	}
 	if processRepo.completedNode != nil {
 		t.Fatalf("mismatched command must not complete domain command node")
+	}
+}
+
+func TestApplyProcessLinkedBusinessRefRejectsMetadataDrift(t *testing.T) {
+	refNo := "FIN-001"
+	base := &ProcessInstanceLinkedBusinessRefRecord{
+		ProcessInstanceID: 10,
+		RefType:           "finance_fact",
+		RefID:             3001,
+		RefNo:             &refNo,
+		SourceNodeKey:     "receivable_lead",
+		SourceCommandKey:  ProcessDomainCommandFinanceReceivableLead,
+	}
+	snapshot, err := ApplyProcessLinkedBusinessRefToSnapshot(nil, base)
+	if err != nil {
+		t.Fatalf("record base linked ref: %v", err)
+	}
+	if _, err := ApplyProcessLinkedBusinessRefToSnapshot(snapshot, base); err != nil {
+		t.Fatalf("exact linked ref replay must remain idempotent: %v", err)
+	}
+	changed := *base
+	changedRefNo := "FIN-CHANGED"
+	changed.RefNo = &changedRefNo
+	if _, err := ApplyProcessLinkedBusinessRefToSnapshot(snapshot, &changed); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("same linked ref identity with changed metadata must conflict, got %v", err)
+	}
+	changed = *base
+	changed.SourceNodeKey = "another_node"
+	if _, err := ApplyProcessLinkedBusinessRefToSnapshot(snapshot, &changed); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("same linked ref identity with changed source must conflict, got %v", err)
 	}
 }
 

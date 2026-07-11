@@ -39,6 +39,8 @@ const (
 	FieldIdempotencyKey = "idempotency_key"
 	// FieldReservedAt holds the string denoting the reserved_at field in the database.
 	FieldReservedAt = "reserved_at"
+	// FieldReservedAtSpecified holds the string denoting the reserved_at_specified field in the database.
+	FieldReservedAtSpecified = "reserved_at_specified"
 	// FieldReleasedAt holds the string denoting the released_at field in the database.
 	FieldReleasedAt = "released_at"
 	// FieldConsumedAt holds the string denoting the consumed_at field in the database.
@@ -131,6 +133,7 @@ var Columns = []string{
 	FieldQuantity,
 	FieldIdempotencyKey,
 	FieldReservedAt,
+	FieldReservedAtSpecified,
 	FieldReleasedAt,
 	FieldConsumedAt,
 	FieldNote,
@@ -179,6 +182,8 @@ var (
 	IdempotencyKeyValidator func(string) error
 	// DefaultReservedAt holds the default value on creation for the "reserved_at" field.
 	DefaultReservedAt func() time.Time
+	// DefaultReservedAtSpecified holds the default value on creation for the "reserved_at_specified" field.
+	DefaultReservedAtSpecified bool
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -255,6 +260,11 @@ func ByIdempotencyKey(opts ...sql.OrderTermOption) OrderOption {
 // ByReservedAt orders the results by the reserved_at field.
 func ByReservedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldReservedAt, opts...).ToFunc()
+}
+
+// ByReservedAtSpecified orders the results by the reserved_at_specified field.
+func ByReservedAtSpecified(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReservedAtSpecified, opts...).ToFunc()
 }
 
 // ByReleasedAt orders the results by the released_at field.

@@ -156,6 +156,24 @@ func newServiceWorkflowRepo() *serviceWorkflowRepo {
 	}
 }
 
+func TestMapCustomerConfigError_IdempotencyConflict(t *testing.T) {
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{log: log.NewHelper(logger)}
+	result := dispatcher.mapCustomerConfigError(context.Background(), biz.ErrIdempotencyConflict)
+	if result.Code != errcode.IdempotencyConflict.Code || result.Message != errcode.IdempotencyConflict.Message {
+		t.Fatalf("unexpected idempotency conflict result: %#v", result)
+	}
+}
+
+func TestMapCustomerConfigError_ProcessDomainCommandRecoveryRequired(t *testing.T) {
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{log: log.NewHelper(logger)}
+	result := dispatcher.mapCustomerConfigError(context.Background(), biz.ErrProcessDomainCommandRecoveryRequired)
+	if result.Code != errcode.ProcessDomainCommandRecoveryRequired.Code || result.Message != errcode.ProcessDomainCommandRecoveryRequired.Message {
+		t.Fatalf("unexpected process recovery result: %#v", result)
+	}
+}
+
 func newServiceSalesOrderRepo(orders map[int]*biz.SalesOrder) *serviceSalesOrderRepo {
 	if orders == nil {
 		orders = map[int]*biz.SalesOrder{}
@@ -262,6 +280,25 @@ func (r *serviceProcessRuntimeRepo) ListProcessNodeInstances(_ context.Context, 
 	return out, nil
 }
 
+func (r *serviceProcessRuntimeRepo) ClaimProcessNodeDomainCommand(_ context.Context, in *biz.ProcessNodeDomainCommandClaim) (*biz.ProcessNodeInstance, error) {
+	item := r.nodes[in.ProcessNodeInstanceID]
+	if item == nil {
+		return nil, biz.ErrProcessNodeInstanceNotFound
+	}
+	if item.ProcessInstanceID != in.ProcessInstanceID || item.Status != biz.ProcessNodeStatusActive || item.Version != in.ExpectedVersion {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	if item.NodeType != biz.ProcessNodeTypeDomainCommand {
+		return nil, biz.ErrBadParam
+	}
+	if item.DomainCommandFingerprint != nil && *item.DomainCommandFingerprint != in.DomainCommandFingerprint {
+		return nil, biz.ErrIdempotencyConflict
+	}
+	fingerprint := in.DomainCommandFingerprint
+	item.DomainCommandFingerprint = &fingerprint
+	return cloneServiceProcessNodeInstance(item), nil
+}
+
 func (r *serviceProcessRuntimeRepo) ActivateProcessNodeInstance(_ context.Context, in *biz.ProcessNodeInstanceActivate, actorID int) (*biz.ProcessNodeInstance, error) {
 	item := r.nodes[in.ID]
 	if item == nil {
@@ -291,6 +328,7 @@ func (r *serviceProcessRuntimeRepo) CompleteProcessNodeInstance(_ context.Contex
 	item.Status = biz.ProcessNodeStatusCompleted
 	item.CompletedAt = &now
 	item.Outcome = &outcome
+	item.DomainCommandFingerprint = in.DomainCommandFingerprint
 	item.Version++
 	item.UpdatedAt = now
 	return cloneServiceProcessNodeInstance(item), nil
@@ -490,6 +528,10 @@ func (r *serviceSalesOrderRepo) ProductIsActive(context.Context, int) (bool, err
 	return false, biz.ErrBadParam
 }
 
+func (r *serviceSalesOrderRepo) ProductSKUIsActiveForProduct(context.Context, int, int) (bool, error) {
+	return false, biz.ErrBadParam
+}
+
 func (r *serviceSalesOrderRepo) UnitIsActive(context.Context, int) (bool, error) {
 	return false, biz.ErrBadParam
 }
@@ -510,11 +552,33 @@ func (r *serviceMaterialSupplyInventoryRepo) EvaluatePurchaseReceiptQualityGate(
 	return &cloned, nil
 }
 
+func (r *serviceMaterialSupplyInventoryRepo) GetPurchaseReceipt(_ context.Context, receiptID int) (*biz.PurchaseReceipt, error) {
+	if r.postedReceipt == nil || r.postedReceipt.ID != receiptID {
+		return nil, biz.ErrPurchaseReceiptNotFound
+	}
+	cloned := *r.postedReceipt
+	return &cloned, nil
+}
+
 func (r *serviceMaterialSupplyInventoryRepo) WarehouseIsActive(_ context.Context, id int) (bool, error) {
 	if id <= 0 {
 		return false, biz.ErrBadParam
 	}
 	return true, nil
+}
+
+func (r *serviceMaterialSupplyInventoryRepo) ResolvePurchaseReceiptFromPurchaseOrderReplay(_ context.Context, in *biz.PurchaseReceiptFromPurchaseOrderCreate) (*biz.PurchaseReceipt, bool, error) {
+	if in == nil || r.createInput == nil || r.createInput.IdempotencyKey != in.IdempotencyKey {
+		return nil, false, nil
+	}
+	if r.createInput.IdempotencyPayloadHash != in.IdempotencyPayloadHash {
+		return nil, true, biz.ErrIdempotencyConflict
+	}
+	if r.createdReceipt == nil {
+		return nil, true, biz.ErrBadParam
+	}
+	cloned := *r.createdReceipt
+	return &cloned, true, nil
 }
 
 func (r *serviceMaterialSupplyInventoryRepo) CreatePurchaseReceiptFromPurchaseOrder(_ context.Context, in *biz.PurchaseReceiptFromPurchaseOrderCreate) (*biz.PurchaseReceipt, error) {
@@ -523,15 +587,15 @@ func (r *serviceMaterialSupplyInventoryRepo) CreatePurchaseReceiptFromPurchaseOr
 	}
 	clonedInput := *in
 	r.createInput = &clonedInput
-	if r.createdReceipt != nil {
-		cloned := *r.createdReceipt
-		return &cloned, nil
+	if r.createdReceipt == nil {
+		r.createdReceipt = &biz.PurchaseReceipt{
+			ID:        6001,
+			ReceiptNo: in.ReceiptNo,
+			Status:    biz.PurchaseReceiptStatusDraft,
+		}
 	}
-	return &biz.PurchaseReceipt{
-		ID:        6001,
-		ReceiptNo: in.ReceiptNo,
-		Status:    biz.PurchaseReceiptStatusDraft,
-	}, nil
+	cloned := *r.createdReceipt
+	return &cloned, nil
 }
 
 func (r *serviceMaterialSupplyInventoryRepo) PassQualityInspection(_ context.Context, in *biz.QualityInspectionDecision) (*biz.QualityInspection, error) {
@@ -565,8 +629,8 @@ func (r *serviceMaterialSupplyInventoryRepo) PostPurchaseReceipt(_ context.Conte
 		return nil, biz.ErrPurchaseReceiptNotFound
 	}
 	r.postedReceiptID = receiptID
+	r.postedReceipt.Status = biz.PurchaseReceiptStatusPosted
 	cloned := *r.postedReceipt
-	cloned.Status = biz.PurchaseReceiptStatusPosted
 	return &cloned, nil
 }
 
@@ -1391,6 +1455,53 @@ func TestCustomerConfigJSONRPCPublishActivateAndEffectiveSession(t *testing.T) {
 	}
 }
 
+func TestCustomerConfigJSONRPCEffectiveSessionRequiresActiveRevisionForFixedRealCustomer(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", "yoyoosun")
+	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "admin", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.AdminRoleKey})
+	params, _ := structpb.NewStruct(map[string]any{"customer_key": "yoyoosun"})
+	_, res, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, "admin"), "get_effective_session", "1", params)
+	if err != nil {
+		t.Fatalf("get_effective_session err = %v", err)
+	}
+	if res.Code != errcode.PermissionDenied.Code || res.Message != "当前部署客户尚未激活配置，业务权限已关闭" {
+		t.Fatalf("fixed customer missing active revision result = %#v", res)
+	}
+}
+
+func TestCustomerConfigJSONRPCEffectiveSessionKeepsBuiltinFallbackOutsideFixedRealCustomer(t *testing.T) {
+	tests := []struct {
+		name          string
+		configuredKey string
+		requestedKey  string
+		wantKey       string
+	}{
+		{name: "unfixed explicit customer", configuredKey: "", requestedKey: "yoyoosun", wantKey: "yoyoosun"},
+		{name: "fixed demo", configuredKey: biz.DefaultCustomerKey, requestedKey: "", wantKey: biz.DefaultCustomerKey},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("ERP_CUSTOMER_KEY", tt.configuredKey)
+			dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "admin", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.AdminRoleKey})
+			params, _ := structpb.NewStruct(map[string]any{"customer_key": tt.requestedKey})
+			_, res, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, "admin"), "get_effective_session", "1", params)
+			if err != nil {
+				t.Fatalf("get_effective_session err = %v", err)
+			}
+			if res.Code != errcode.OK.Code {
+				t.Fatalf("result = %#v", res)
+			}
+			session, ok := res.Data.AsMap()["session"].(map[string]any)
+			if !ok || session["source"] != "builtin_rbac_fallback" {
+				t.Fatalf("session = %#v", session)
+			}
+			customer, ok := session["customer"].(map[string]any)
+			if !ok || customer["key"] != tt.wantKey {
+				t.Fatalf("customer = %#v, want key %s", customer, tt.wantKey)
+			}
+		})
+	}
+}
+
 func TestCustomerConfigJSONRPCExplainModuleStatus(t *testing.T) {
 	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "admin", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.AdminRoleKey})
 	ctx := customerConfigAdminCtx(1, "admin")
@@ -1752,7 +1863,8 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideRunsRegis
 	if executeRes.Code != errcode.OK.Code {
 		t.Fatalf("execute code = %d msg=%s", executeRes.Code, executeRes.Message)
 	}
-	if inventoryRepo.passInput == nil || inventoryRepo.passInput.InspectionID != 8001 {
+	if inventoryRepo.passInput == nil || inventoryRepo.passInput.InspectionID != 8001 ||
+		!inventoryRepo.passInput.InspectedAtDefaulted {
 		t.Fatalf("expected quality pass input for inspection 8001, got %#v", inventoryRepo.passInput)
 	}
 	data := executeRes.Data.AsMap()
@@ -1941,10 +2053,6 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryFinanceReleaseRunsRegi
 		"process_node_instance_id": float64(financeNode.ID),
 		"expected_version":         float64(financeNode.Version),
 		"shipment_id":              float64(9001),
-		"finance_release_no":       "FR-9001",
-		"approved_by_id":           float64(1),
-		"released_at":              "2026-06-30",
-		"release_note":             "流程财务放行",
 		"idempotency_key":          "finished-goods-delivery/SHIP-9001/finance-release",
 	})
 	_, executeRes, err := dispatcher.handleCustomerConfig(ctx, "execute_finished_goods_delivery_finance_release", "execute", executeParams)
@@ -2091,13 +2199,6 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRunsRegist
 		"process_node_instance_id": float64(shipmentNode.ID),
 		"expected_version":         float64(shipmentNode.Version),
 		"shipment_id":              float64(9001),
-		"shipment_no":              "SHIP-9001",
-		"warehouse_id":             float64(11),
-		"operator_id":              float64(1),
-		"shipped_at":               "2026-06-30",
-		"carrier":                  "测试承运商",
-		"tracking_no":              "TRACK-9001",
-		"ship_note":                "registered handler",
 		"idempotency_key":          "finished-goods-delivery/SHIP-9001/shipment-ship",
 	})
 	_, executeRes, err := dispatcher.handleCustomerConfig(ctx, "execute_finished_goods_delivery_shipment_ship", "execute", executeParams)
@@ -2172,10 +2273,6 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRequiresEn
 		"process_node_instance_id": float64(shipmentNode.ID),
 		"expected_version":         float64(shipmentNode.Version),
 		"shipment_id":              float64(9001),
-		"shipment_no":              "SHIP-9001",
-		"warehouse_id":             float64(11),
-		"operator_id":              float64(1),
-		"shipped_at":               "2026-06-30",
 		"idempotency_key":          "finished-goods-delivery/SHIP-9001/shipment-ship/module-gate",
 	})
 	_, executeRes, err := dispatcher.handleCustomerConfig(ctx, "execute_finished_goods_delivery_shipment_ship", "execute", executeParams)
@@ -2403,10 +2500,12 @@ func createFinishedGoodsDeliveryReceivableLeadActiveFixture(t *testing.T, dispat
 }
 
 func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadCreatesDraft(t *testing.T) {
+	customerID := 501
 	operationalFactRepo := &customerConfigShipmentOperationalFactRepo{
 		shipment: &biz.Shipment{
-			ID:     9001,
-			Status: biz.ShipmentStatusShipped,
+			ID:         9001,
+			CustomerID: &customerID,
+			Status:     biz.ShipmentStatusShipped,
 		},
 	}
 	dispatcher := newCustomerConfigTestDispatcherWithOperationalFactRepo(
@@ -2424,11 +2523,9 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadCreatesD
 		"process_node_instance_id": float64(receivableNode.ID),
 		"expected_version":         float64(receivableNode.Version),
 		"shipment_id":              float64(9001),
-		"customer_id":              float64(501),
 		"receivable_source_no":     "AR-LEAD-9001",
 		"currency":                 "CNY",
 		"expected_amount":          "12888.00",
-		"due_date":                 "2026-07-31",
 		"lead_note":                "guard only",
 		"idempotency_key":          "finished-goods-delivery/SHIP-9001/receivable-lead",
 	})
@@ -2729,6 +2826,27 @@ func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmit(t *testing.T) {
 		boundary["writes_shipment_or_finance_fact"] != false {
 		t.Fatalf("runtime_boundary = %#v", boundary)
 	}
+	_, retryRes, err := dispatcher.handleCustomerConfig(ctx, "execute_sales_order_acceptance_submit", "execute-retry", executeParams)
+	if err != nil {
+		t.Fatalf("same fingerprint retry err = %v", err)
+	}
+	if retryRes.Code != errcode.OK.Code {
+		t.Fatalf("same fingerprint retry code=%d msg=%s", retryRes.Code, retryRes.Message)
+	}
+	changedKeyParams, _ := structpb.NewStruct(map[string]any{
+		"process_instance_id":      instance["id"],
+		"process_node_instance_id": startedNode["id"],
+		"expected_version":         startedNode["version"],
+		"sales_order_id":           float64(42),
+		"idempotency_key":          "sales-order-acceptance/SO-42/submit-changed",
+	})
+	_, changedKeyRes, err := dispatcher.handleCustomerConfig(ctx, "execute_sales_order_acceptance_submit", "execute-changed-key", changedKeyParams)
+	if err != nil {
+		t.Fatalf("changed fingerprint retry err = %v", err)
+	}
+	if changedKeyRes.Code != errcode.IdempotencyConflict.Code || changedKeyRes.Message != errcode.IdempotencyConflict.Message {
+		t.Fatalf("changed fingerprint retry must conflict, code=%d msg=%s", changedKeyRes.Code, changedKeyRes.Message)
+	}
 }
 
 func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmitRequiresEnabledModules(t *testing.T) {
@@ -2973,8 +3091,6 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyQualityAndInbound(t *testing.
 		"process_node_instance_id": inboundNode["id"],
 		"expected_version":         inboundNode["version"],
 		"purchase_receipt_id":      float64(6001),
-		"inventory_lot_id":         float64(8001),
-		"receipt_no":               "PR-6001",
 		"idempotency_key":          "material-supply/PR-6001/inbound",
 	})
 	_, inboundRes, err := dispatcher.handleCustomerConfig(ctx, "execute_material_supply_post_inbound", "inbound", inboundParams)
@@ -3176,8 +3292,6 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyPurchaseOrderToQualityAndInbo
 		"process_node_instance_id": inboundNode["id"],
 		"expected_version":         inboundNode["version"],
 		"purchase_receipt_id":      float64(6001),
-		"inventory_lot_id":         float64(8001),
-		"receipt_no":               "PR-6001",
 		"idempotency_key":          "material-supply/PO-5001/inbound",
 	})
 	_, inboundRes, err := dispatcher.handleCustomerConfig(ctx, "execute_material_supply_post_inbound", "inbound", inboundParams)

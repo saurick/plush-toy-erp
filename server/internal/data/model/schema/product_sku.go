@@ -23,9 +23,10 @@ func (ProductSKU) Annotations() []schema.Annotation {
 
 func (ProductSKU) Fields() []ent.Field {
 	return []ent.Field{
-		// Product remains the required runtime identity; SKU adds optional specification traceability.
+		// Product remains required; an explicit SKU is the exact specification grain for downstream inventory facts.
 		field.Int("product_id").
-			Positive(),
+			Positive().
+			Immutable(),
 		field.String("sku_code").
 			NotEmpty().
 			MaxLen(64),
@@ -78,13 +79,22 @@ func (ProductSKU) Edges() []ent.Edge {
 			Ref("product_skus").
 			Field("product_id").
 			Required().
-			Unique(),
+			Unique().
+			Immutable(),
 		edge.From("default_unit", Unit.Type).
 			Ref("product_skus").
 			Field("default_unit_id").
 			Unique(),
 		edge.To("sales_order_items", SalesOrderItem.Type),
 		edge.To("inventory_lots", InventoryLot.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("inventory_txns", InventoryTxn.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("inventory_balances", InventoryBalance.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("production_facts", ProductionFact.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("outsourcing_facts", OutsourcingFact.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("shipment_items", ShipmentItem.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),

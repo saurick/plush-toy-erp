@@ -20,6 +20,7 @@ export function createPurchaseReceiptScenarios(deps) {
     openPurchaseReceiptAddItemEditor,
     selectPurchaseReceiptRow,
     verifyBusinessModuleColumnOrderDialog,
+    customerRuntimeEffectiveSession,
   } = deps
   const { assertPageAttachmentModalEntrypoint } =
     createBusinessAttachmentAssertions({
@@ -258,6 +259,7 @@ export function createPurchaseReceiptScenarios(deps) {
       name: 'purchase-receipts-table-control-columns-desktop',
       path: '/erp/warehouse/inbound',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '入库管理')
@@ -388,6 +390,7 @@ export function createPurchaseReceiptScenarios(deps) {
       name: 'purchase-receipt-add-item-inline-draft-desktop',
       path: '/erp/warehouse/inbound',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '入库管理')
@@ -444,6 +447,7 @@ export function createPurchaseReceiptScenarios(deps) {
       name: 'purchase-receipt-add-item-inline-dark-desktop',
       path: '/erp/warehouse/inbound',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       themeMode: 'dark',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
@@ -477,6 +481,7 @@ export function createPurchaseReceiptScenarios(deps) {
       name: 'purchase-receipt-add-item-inline-mobile',
       path: '/erp/warehouse/inbound',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectHeading(page, '入库管理')

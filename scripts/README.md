@@ -30,7 +30,7 @@
 | `scripts/qa/manual-regression-data-plan.mjs`           | 只读汇总 Product Core 中性 seed、yoyoosun preview fixture、试用模拟数据、业务事实模拟和岗位任务模拟的手动回归数据入口；不连接后端、不写库、不执行真实导入 | 手动回归前梳理应准备哪些模拟数据和命令                    |
 | `scripts/qa/purchase-quality-simulated-matrix.mjs`     | 通过正式 JSON-RPC 和岗位演示账号生成带 `SIM-YOYOOSUN-PQ` 前缀的采购单、采购入库与质检多状态矩阵；显式确认后才写入，不执行真实客户导入 | 目标试用环境需要覆盖草稿、提交、审批、关闭、取消、检验通过/拒收、入库过账/取消等人工回归状态 |
 | `scripts/qa/trial-simulated-data.mjs`           | 模拟试用数据入口，支持 `--print-input-template` 只读输出前置；真实执行只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据 | 试用环境演练                                               |
-| `scripts/qa/operational-fact-simulated-closure.mjs`    | 业务事实模拟闭环入口，支持 `--print-input-template` 只读输出前置；真实执行只使用显式模拟主数据覆盖生产 / 预留 / 委外 / 出货 / 财务链路 | 业务事实内部模拟验收 / 目标环境事实回归                  |
+| `scripts/qa/operational-fact-simulated-closure.mjs`    | 业务事实模拟矩阵入口，支持 `--print-input-template` 只读输出前置；真实执行只使用显式模拟主数据和客户覆盖生产 / 预留 / 委外 / 出货 / 财务的草稿、生效、取消、释放、结清等页面可见状态 | 业务事实内部模拟验收 / 目标环境事实回归                  |
 | `scripts/qa/mobile-workflow-simulated-closure.mjs`       | 模拟岗位任务闭环入口，支持 `--print-input-template` 只读输出前置；真实执行只创建和更新显式模拟 workflow 任务，覆盖审批完成 / 退回、质检完成、入库完成、出货放行阻塞异常、跨角色催办和现场留痕 | 岗位任务端回归 / 目标环境移动任务闭环验收                  |
 | `web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs`      | 真实浏览器岗位任务端模拟任务回归，创建 `simulated_only` 老板审批 / 退回 / 完成、品质完成、仓库入库完成和仓库放行任务，分别登录 boss / quality / warehouse 岗位端验证完成、阻塞、退回、催办反馈和内部提醒线索 | 本地 / 试用岗位任务端真实页面验收                         |
 | `scripts/qa/mvp-closure.mjs`                    | ERP MVP 闭环验收入口，默认只生成计划和本地 evidence，可选运行现有 no-write report-only 工具                     | MVP 主链路验收口径收口 / 试用前证据整理                  |
@@ -79,7 +79,7 @@
 | `scripts/qa/customer-package-preview-boundary.test.mjs` | 锁住 yoyoosun 客户包 `businessFlows / stateMachines / processPolicies` 仍为 preview-only，不执行 runtime command、不写 Fact、不覆盖 usecase 生命周期 | 调整客户包流程、状态机或策略预览后 |
 | `scripts/qa/customer-config-runtime-manifest.mjs`      | 将已跟踪客户包编译为后端 `customer_config` 可验证的 runtime manifest，检查 moduleStates、role key 映射、页面 / 字段投影、`sales_order_acceptance` 受控 `runtime_loader_ready` 流程定义、preview-only 打印 party defaults snapshot 和 forbidden payload；只允许白名单 ProcessRuntime 读取，不写 Fact，不声明销售订单打印模板启用 | 调整客户包 catalog、模块状态、角色池、页面投影、字段策略、打印配置草案、流程定义证据或 runtime 发布输入后 |
 | `scripts/qa/erp-field-linkage.mjs`                     | 字段联动专项测试并刷新 latest 覆盖报告                                                                            | 改字段真源、保存转换、合同金额、打印快照后                 |
-| `scripts/qa/full.sh`                                   | 推送前全量检查，先执行 `fast.sh`，再补安全扫描、前端 test / build、本地 PostgreSQL 关键事务门禁和服务端 test / build | 提交前 / 推送前                                            |
+| `scripts/qa/full.sh`                                   | 推送前全量检查，先执行 `fast.sh`、secrets、前端 test / build、本地 PostgreSQL 关键事务门禁和服务端 test / build，最后运行外部网络型 govulncheck | 提交前 / 推送前                                            |
 | `scripts/qa/strict.sh`                                 | 严格检查，在 fast 边界上补零 warning、完整前后端构建和本地 PostgreSQL 关键事务门禁 | 发版前                                                     |
 | `scripts/qa/db-guard.sh`                               | 约束 schema 变更必须带 migration                                                                                  | 改数据模型后                                               |
 | `scripts/qa/error-code-sync.sh`                        | 校验前后端错误码同步                                                                                              | 改错误码后                                                 |
@@ -273,15 +273,16 @@ TRIAL_SIM_PASSWORD='replace-with-demo-password' \
 node scripts/qa/operational-fact-simulated-closure.mjs --print-input-template
 
 node scripts/qa/operational-fact-simulated-closure.mjs \
+  --customer-id 1 \
   --product-id 1 \
   --unit-id 1 \
   --warehouse-id 1 \
   --out output/customers/yoyoosun/operational-fact-simulated-closure
 ```
 
-`--print-input-template` 只输出 report-only / apply simulated operational facts 所需的产品、单位、仓库 ID、演示账号密码来源、核心 demo seed 和后续真实命令，不登录、不调用后端、不写报告、不写数据库，也不证明业务事实模拟闭环已写入。
+`--print-input-template` 只输出 report-only / apply simulated operational facts 所需的客户、产品、单位、仓库 ID、演示账号密码来源、核心 demo seed 和后续真实命令，不登录、不调用后端、不写报告、不写数据库，也不证明业务事实模拟矩阵已写入。
 
-若要写入本地或目标试用环境，只能显式 `--apply`，并提供已有模拟产品、单位和仓库 ID。缺少这些前置 ID 时先执行 `bash scripts/seed-core-demo-data.sh`，并复用输出中的 `operational_fact_args`。该脚本使用 `demo_pmc`、`demo_purchase`、`demo_warehouse` 和 `demo_finance` 角色账号覆盖生产、库存预留、委外、出货和财务五条最小事实链；所有编号固定带 `SIM-YOYOOSUN-OPFACT` 前缀，不写真实客户数据，不执行 import，不绕过 `OperationalFactUsecase` 直接写事实表：
+若要写入本地或目标试用环境，只能显式 `--apply`，并提供已有模拟客户、产品、单位和仓库 ID。缺少核心主数据时先执行 `bash scripts/seed-core-demo-data.sh`；客户必须来自 `trial-simulated-data.mjs` 等受控模拟数据入口。该脚本使用 `demo_pmc`、`demo_purchase`、`demo_warehouse` 和 `demo_finance` 角色账号，分别保留生产草稿 / 已过账 / 已取消、预留生效 / 已释放、委外草稿 / 已过账 / 已取消、出货草稿 / 已出货 / 已取消，以及财务草稿 / 已过账 / 已结清 / 已取消记录；所有编号固定带 `SIM-YOYOOSUN-OPFACT` 前缀，不写真实客户数据，不执行 import，不绕过 `OperationalFactUsecase` 直接写事实表：
 
 ```bash
 OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS \
@@ -289,6 +290,7 @@ OPERATIONAL_FACT_SIM_PASSWORD='replace-with-demo-password' \
   node scripts/qa/operational-fact-simulated-closure.mjs \
     --apply \
     --backend-url http://127.0.0.1:8300 \
+    --customer-id 1 \
     --product-id 1 \
     --unit-id 1 \
     --warehouse-id 1 \
@@ -826,7 +828,7 @@ node --test /Users/simon/projects/plush-toy-erp/web/src/erp/utils/adminProfileSy
 node --test /Users/simon/projects/plush-toy-erp/scripts/qa/formal-frontend-customer-config-boundary.test.mjs
 
 cd /Users/simon/projects/plush-toy-erp/web
-STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-direct-url-local-dev-diagnostic,erp-effective-session-sync-failure-local-dev-diagnostic,erp-effective-session-empty-pages-local-dev-diagnostic,erp-no-visible-menu-blocks-outlet,erp-effective-session-action-projection-business-pages pnpm style:l1
+STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-direct-url-local-dev-diagnostic,erp-effective-session-configured-customer-sync-failure-blocked,erp-effective-session-empty-pages-local-dev-diagnostic,erp-no-visible-menu-blocks-outlet,erp-effective-session-action-projection-business-pages pnpm style:l1
 ```
 
 `adminProfileSync` 测试负责证明正式普通账号按 RBAC 菜单与 active revision 页面清单交集收窄，隐藏 URL 需要跳转，active revision 空页面清单不回退 RBAC-only，以及模块 disabled 后端投影隐藏业务页时正式账号需要跳转。`style:l1` 运行在前端 DEV 构建态，只证明本地开发诊断、super admin 产品核心看全、sync failure 诊断、无可见菜单空态，以及普通账号页面可见但 `effective_session.actions=[]` 时出货 / 质检 / 采购入库写按钮禁用的真实页面渲染；不要把本地 DEV 诊断场景当成正式客户放开证据，也不要把前端 helper 跳转或按钮禁用当成后端 RBAC / usecase 授权边界。
@@ -945,6 +947,14 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/rollback-rehearsal-repor
 - 检查 `gitleaks`、`shellcheck`、`golangci-lint`、`yamllint`、`shfmt`、`govulncheck`
 - 检查 hooks 和关键脚本是否可执行
 
+### `affected.sh`
+
+- 默认只打印当前 unstaged、staged、未跟踪文件对应的 T0-T8 验证计划，`--run` 才执行。
+- 支持 `--staged`、`--base <ref-or-range>`、重复 `--file <path>` 和 `--json`，适合开发过程中按影响面取得快速反馈。
+- 优先运行同名 Node 测试；前端、服务端 API、业务事实 PostgreSQL、客户配置 / 导入、schema 和发布路径按风险逐级升级。
+- 页面 L1、`make data` 和目标环境证据作为 required follow-up 明示；未知路径保守升级到 `full.sh`。
+- 不修改 hooks，也不替代 pre-push 的 `full.sh` 或发版前的 `strict.sh`。
+
 ### `fast.sh`
 
 - 前端：`pnpm lint && pnpm css`
@@ -955,7 +965,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/rollback-rehearsal-repor
 ### `full.sh`
 
 - 包含 `fast.sh`
-- 补充 secrets / govulncheck、前端 test / build 和服务端 `go test ./...` / `make build`
+- 补充 secrets、前端 test / build、本地 PostgreSQL 关键事务门禁和服务端 `go test ./...` / `make build`；最后运行 govulncheck，避免外部网络异常先扰动本地并发测试
 - 若定义了前端 `test`，会一并执行；它仍不替代浏览器里的样式 / box 模型回归
 
 ### npm registry token 边界

@@ -51,6 +51,17 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     ),
     'all dev hub entries must expose truth source and guardrail metadata'
   )
+
+  const docsItem = DEV_HUB_ITEMS.find((item) => item.key === 'docs')
+  assert.match(docsItem?.truthSource || '', /当前工作区 Markdown/)
+  assert.doesNotMatch(docsItem?.description || '', /tracked Markdown/)
+
+  const customerConfigItem = DEV_HUB_ITEMS.find(
+    (item) => item.key === 'customer-config'
+  )
+  assert.match(customerConfigItem?.title || '', /预检与发布/)
+  assert.match(customerConfigItem?.truthSource || '', /已登记客户配置包/)
+  assert.doesNotMatch(customerConfigItem?.title || '', /导入/)
 })
 
 test('devHub: summary records dev-only boundary', () => {
@@ -66,7 +77,7 @@ test('devHub: summary records dev-only boundary', () => {
 
 test('devHub: filters by title, group, source and route', () => {
   assert.deepEqual(
-    filterDevHubItems(DEV_HUB_ITEMS, '测试').map((item) => item.key),
+    filterDevHubItems(DEV_HUB_ITEMS, '测试入口').map((item) => item.key),
     ['testing']
   )
   assert.deepEqual(

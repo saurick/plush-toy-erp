@@ -400,7 +400,10 @@ async function rpcCall({
         jsonrpc: "2.0",
         id: `trial-sim-${method}-${Date.now()}`,
         method,
-        params,
+        params:
+          rpcPath === "/rpc/auth"
+            ? params
+            : { customer_key: "yoyoosun", ...params },
       }),
     },
   );

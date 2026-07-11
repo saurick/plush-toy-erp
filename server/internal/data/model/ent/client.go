@@ -2356,6 +2356,22 @@ func (c *InventoryBalanceClient) QueryUnit(_m *InventoryBalance) *UnitQuery {
 	return query
 }
 
+// QueryProductSku queries the product_sku edge of a InventoryBalance.
+func (c *InventoryBalanceClient) QueryProductSku(_m *InventoryBalance) *ProductSKUQuery {
+	query := (&ProductSKUClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(inventorybalance.Table, inventorybalance.FieldID, id),
+			sqlgraph.To(productsku.Table, productsku.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, inventorybalance.ProductSkuTable, inventorybalance.ProductSkuColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryInventoryLot queries the inventory_lot edge of a InventoryBalance.
 func (c *InventoryBalanceClient) QueryInventoryLot(_m *InventoryBalance) *InventoryLotQuery {
 	query := (&InventoryLotClient{config: c.config}).Query()
@@ -2847,6 +2863,22 @@ func (c *InventoryTxnClient) QueryUnit(_m *InventoryTxn) *UnitQuery {
 	return query
 }
 
+// QueryProductSku queries the product_sku edge of a InventoryTxn.
+func (c *InventoryTxnClient) QueryProductSku(_m *InventoryTxn) *ProductSKUQuery {
+	query := (&ProductSKUClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(inventorytxn.Table, inventorytxn.FieldID, id),
+			sqlgraph.To(productsku.Table, productsku.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, inventorytxn.ProductSkuTable, inventorytxn.ProductSkuColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryInventoryLot queries the inventory_lot edge of a InventoryTxn.
 func (c *InventoryTxnClient) QueryInventoryLot(_m *InventoryTxn) *InventoryLotQuery {
 	query := (&InventoryLotClient{config: c.config}).Query()
@@ -3283,6 +3315,22 @@ func (c *OutsourcingFactClient) QueryUnit(_m *OutsourcingFact) *UnitQuery {
 			sqlgraph.From(outsourcingfact.Table, outsourcingfact.FieldID, id),
 			sqlgraph.To(unit.Table, unit.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, outsourcingfact.UnitTable, outsourcingfact.UnitColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProductSku queries the product_sku edge of a OutsourcingFact.
+func (c *OutsourcingFactClient) QueryProductSku(_m *OutsourcingFact) *ProductSKUQuery {
+	query := (&ProductSKUClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingfact.Table, outsourcingfact.FieldID, id),
+			sqlgraph.To(productsku.Table, productsku.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, outsourcingfact.ProductSkuTable, outsourcingfact.ProductSkuColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -4691,6 +4739,70 @@ func (c *ProductSKUClient) QueryInventoryLots(_m *ProductSKU) *InventoryLotQuery
 	return query
 }
 
+// QueryInventoryTxns queries the inventory_txns edge of a ProductSKU.
+func (c *ProductSKUClient) QueryInventoryTxns(_m *ProductSKU) *InventoryTxnQuery {
+	query := (&InventoryTxnClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productsku.Table, productsku.FieldID, id),
+			sqlgraph.To(inventorytxn.Table, inventorytxn.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productsku.InventoryTxnsTable, productsku.InventoryTxnsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryInventoryBalances queries the inventory_balances edge of a ProductSKU.
+func (c *ProductSKUClient) QueryInventoryBalances(_m *ProductSKU) *InventoryBalanceQuery {
+	query := (&InventoryBalanceClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productsku.Table, productsku.FieldID, id),
+			sqlgraph.To(inventorybalance.Table, inventorybalance.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productsku.InventoryBalancesTable, productsku.InventoryBalancesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProductionFacts queries the production_facts edge of a ProductSKU.
+func (c *ProductSKUClient) QueryProductionFacts(_m *ProductSKU) *ProductionFactQuery {
+	query := (&ProductionFactClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productsku.Table, productsku.FieldID, id),
+			sqlgraph.To(productionfact.Table, productionfact.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productsku.ProductionFactsTable, productsku.ProductionFactsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryOutsourcingFacts queries the outsourcing_facts edge of a ProductSKU.
+func (c *ProductSKUClient) QueryOutsourcingFacts(_m *ProductSKU) *OutsourcingFactQuery {
+	query := (&OutsourcingFactClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productsku.Table, productsku.FieldID, id),
+			sqlgraph.To(outsourcingfact.Table, outsourcingfact.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productsku.OutsourcingFactsTable, productsku.OutsourcingFactsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryShipmentItems queries the shipment_items edge of a ProductSKU.
 func (c *ProductSKUClient) QueryShipmentItems(_m *ProductSKU) *ShipmentItemQuery {
 	query := (&ShipmentItemClient{config: c.config}).Query()
@@ -4881,6 +4993,22 @@ func (c *ProductionFactClient) QueryUnit(_m *ProductionFact) *UnitQuery {
 			sqlgraph.From(productionfact.Table, productionfact.FieldID, id),
 			sqlgraph.To(unit.Table, unit.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, productionfact.UnitTable, productionfact.UnitColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProductSku queries the product_sku edge of a ProductionFact.
+func (c *ProductionFactClient) QueryProductSku(_m *ProductionFact) *ProductSKUQuery {
+	query := (&ProductSKUClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionfact.Table, productionfact.FieldID, id),
+			sqlgraph.To(productsku.Table, productsku.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionfact.ProductSkuTable, productionfact.ProductSkuColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil

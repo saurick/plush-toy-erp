@@ -119,7 +119,8 @@ func (d *jsonrpcDispatcher) CurrentEffectiveAdminPermissions(ctx context.Context
 	if res != nil {
 		return nil, res
 	}
-	if admin.IsSuperAdmin || d == nil || d.customerConfigUC == nil {
+	requireActiveRevision := runtimeCustomerConfigRequiresActiveRevision()
+	if (admin.IsSuperAdmin && !requireActiveRevision) || d == nil || d.customerConfigUC == nil {
 		cacheEffectiveAdminPermissions(cache, permissions)
 		return permissions, nil
 	}
@@ -127,7 +128,12 @@ func (d *jsonrpcDispatcher) CurrentEffectiveAdminPermissions(ctx context.Context
 	if err != nil {
 		return nil, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
 	}
-	actionEntitlements, err := d.customerConfigUC.GetEffectiveActionEntitlements(ctx, customerKey, admin)
+	var actionEntitlements []string
+	if requireActiveRevision {
+		actionEntitlements, err = d.customerConfigUC.GetEffectiveActionEntitlementsRequiringActiveRevision(ctx, customerKey, admin)
+	} else {
+		actionEntitlements, err = d.customerConfigUC.GetEffectiveActionEntitlements(ctx, customerKey, admin)
+	}
 	if err != nil {
 		if d.log == nil {
 			return nil, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}

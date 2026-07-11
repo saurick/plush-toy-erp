@@ -49,6 +49,8 @@ const (
 	FieldIdempotencyKey = "idempotency_key"
 	// FieldOccurredAt holds the string denoting the occurred_at field in the database.
 	FieldOccurredAt = "occurred_at"
+	// FieldOccurredAtSpecified holds the string denoting the occurred_at_specified field in the database.
+	FieldOccurredAtSpecified = "occurred_at_specified"
 	// FieldPostedAt holds the string denoting the posted_at field in the database.
 	FieldPostedAt = "posted_at"
 	// FieldSettledAt holds the string denoting the settled_at field in the database.
@@ -83,6 +85,7 @@ var Columns = []string{
 	FieldSourceLineID,
 	FieldIdempotencyKey,
 	FieldOccurredAt,
+	FieldOccurredAtSpecified,
 	FieldPostedAt,
 	FieldSettledAt,
 	FieldNote,
@@ -143,6 +146,8 @@ var (
 	IdempotencyKeyValidator func(string) error
 	// DefaultOccurredAt holds the default value on creation for the "occurred_at" field.
 	DefaultOccurredAt func() time.Time
+	// DefaultOccurredAtSpecified holds the default value on creation for the "occurred_at_specified" field.
+	DefaultOccurredAtSpecified bool
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -244,6 +249,11 @@ func ByIdempotencyKey(opts ...sql.OrderTermOption) OrderOption {
 // ByOccurredAt orders the results by the occurred_at field.
 func ByOccurredAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldOccurredAt, opts...).ToFunc()
+}
+
+// ByOccurredAtSpecified orders the results by the occurred_at_specified field.
+func ByOccurredAtSpecified(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOccurredAtSpecified, opts...).ToFunc()
 }
 
 // ByPostedAt orders the results by the posted_at field.

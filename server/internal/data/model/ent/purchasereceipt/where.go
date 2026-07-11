@@ -80,6 +80,21 @@ func PostedAt(v time.Time) predicate.PurchaseReceipt {
 	return predicate.PurchaseReceipt(sql.FieldEQ(FieldPostedAt, v))
 }
 
+// IdempotencyKey applies equality check predicate on the "idempotency_key" field. It's identical to IdempotencyKeyEQ.
+func IdempotencyKey(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldEQ(FieldIdempotencyKey, v))
+}
+
+// IdempotencyPayloadHash applies equality check predicate on the "idempotency_payload_hash" field. It's identical to IdempotencyPayloadHashEQ.
+func IdempotencyPayloadHash(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldEQ(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyItemCount applies equality check predicate on the "idempotency_item_count" field. It's identical to IdempotencyItemCountEQ.
+func IdempotencyItemCount(v int) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldEQ(FieldIdempotencyItemCount, v))
+}
+
 // Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
 func Note(v string) predicate.PurchaseReceipt {
 	return predicate.PurchaseReceipt(sql.FieldEQ(FieldNote, v))
@@ -378,6 +393,206 @@ func PostedAtIsNil() predicate.PurchaseReceipt {
 // PostedAtNotNil applies the NotNil predicate on the "posted_at" field.
 func PostedAtNotNil() predicate.PurchaseReceipt {
 	return predicate.PurchaseReceipt(sql.FieldNotNull(FieldPostedAt))
+}
+
+// IdempotencyKeyEQ applies the EQ predicate on the "idempotency_key" field.
+func IdempotencyKeyEQ(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldEQ(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyNEQ applies the NEQ predicate on the "idempotency_key" field.
+func IdempotencyKeyNEQ(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldNEQ(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyIn applies the In predicate on the "idempotency_key" field.
+func IdempotencyKeyIn(vs ...string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldIn(FieldIdempotencyKey, vs...))
+}
+
+// IdempotencyKeyNotIn applies the NotIn predicate on the "idempotency_key" field.
+func IdempotencyKeyNotIn(vs ...string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldNotIn(FieldIdempotencyKey, vs...))
+}
+
+// IdempotencyKeyGT applies the GT predicate on the "idempotency_key" field.
+func IdempotencyKeyGT(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldGT(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyGTE applies the GTE predicate on the "idempotency_key" field.
+func IdempotencyKeyGTE(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldGTE(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyLT applies the LT predicate on the "idempotency_key" field.
+func IdempotencyKeyLT(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldLT(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyLTE applies the LTE predicate on the "idempotency_key" field.
+func IdempotencyKeyLTE(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldLTE(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyContains applies the Contains predicate on the "idempotency_key" field.
+func IdempotencyKeyContains(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldContains(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyHasPrefix applies the HasPrefix predicate on the "idempotency_key" field.
+func IdempotencyKeyHasPrefix(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldHasPrefix(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyHasSuffix applies the HasSuffix predicate on the "idempotency_key" field.
+func IdempotencyKeyHasSuffix(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldHasSuffix(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyIsNil applies the IsNil predicate on the "idempotency_key" field.
+func IdempotencyKeyIsNil() predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldIsNull(FieldIdempotencyKey))
+}
+
+// IdempotencyKeyNotNil applies the NotNil predicate on the "idempotency_key" field.
+func IdempotencyKeyNotNil() predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldNotNull(FieldIdempotencyKey))
+}
+
+// IdempotencyKeyEqualFold applies the EqualFold predicate on the "idempotency_key" field.
+func IdempotencyKeyEqualFold(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldEqualFold(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyContainsFold applies the ContainsFold predicate on the "idempotency_key" field.
+func IdempotencyKeyContainsFold(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldContainsFold(FieldIdempotencyKey, v))
+}
+
+// IdempotencyPayloadHashEQ applies the EQ predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashEQ(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldEQ(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashNEQ applies the NEQ predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashNEQ(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldNEQ(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashIn applies the In predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashIn(vs ...string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldIn(FieldIdempotencyPayloadHash, vs...))
+}
+
+// IdempotencyPayloadHashNotIn applies the NotIn predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashNotIn(vs ...string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldNotIn(FieldIdempotencyPayloadHash, vs...))
+}
+
+// IdempotencyPayloadHashGT applies the GT predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashGT(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldGT(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashGTE applies the GTE predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashGTE(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldGTE(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashLT applies the LT predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashLT(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldLT(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashLTE applies the LTE predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashLTE(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldLTE(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashContains applies the Contains predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashContains(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldContains(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashHasPrefix applies the HasPrefix predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashHasPrefix(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldHasPrefix(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashHasSuffix applies the HasSuffix predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashHasSuffix(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldHasSuffix(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashIsNil applies the IsNil predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashIsNil() predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldIsNull(FieldIdempotencyPayloadHash))
+}
+
+// IdempotencyPayloadHashNotNil applies the NotNil predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashNotNil() predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldNotNull(FieldIdempotencyPayloadHash))
+}
+
+// IdempotencyPayloadHashEqualFold applies the EqualFold predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashEqualFold(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldEqualFold(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashContainsFold applies the ContainsFold predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashContainsFold(v string) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldContainsFold(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyItemCountEQ applies the EQ predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountEQ(v int) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldEQ(FieldIdempotencyItemCount, v))
+}
+
+// IdempotencyItemCountNEQ applies the NEQ predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountNEQ(v int) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldNEQ(FieldIdempotencyItemCount, v))
+}
+
+// IdempotencyItemCountIn applies the In predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountIn(vs ...int) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldIn(FieldIdempotencyItemCount, vs...))
+}
+
+// IdempotencyItemCountNotIn applies the NotIn predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountNotIn(vs ...int) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldNotIn(FieldIdempotencyItemCount, vs...))
+}
+
+// IdempotencyItemCountGT applies the GT predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountGT(v int) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldGT(FieldIdempotencyItemCount, v))
+}
+
+// IdempotencyItemCountGTE applies the GTE predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountGTE(v int) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldGTE(FieldIdempotencyItemCount, v))
+}
+
+// IdempotencyItemCountLT applies the LT predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountLT(v int) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldLT(FieldIdempotencyItemCount, v))
+}
+
+// IdempotencyItemCountLTE applies the LTE predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountLTE(v int) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldLTE(FieldIdempotencyItemCount, v))
+}
+
+// IdempotencyItemCountIsNil applies the IsNil predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountIsNil() predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldIsNull(FieldIdempotencyItemCount))
+}
+
+// IdempotencyItemCountNotNil applies the NotNil predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountNotNil() predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldNotNull(FieldIdempotencyItemCount))
 }
 
 // NoteEQ applies the EQ predicate on the "note" field.

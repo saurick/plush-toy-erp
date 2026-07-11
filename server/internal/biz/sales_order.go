@@ -150,7 +150,14 @@ type SalesOrderRepo interface {
 
 	CustomerIsActive(ctx context.Context, id int) (bool, error)
 	ProductIsActive(ctx context.Context, id int) (bool, error)
+	ProductSKUIsActiveForProduct(ctx context.Context, skuID int, productID int) (bool, error)
 	UnitIsActive(ctx context.Context, id int) (bool, error)
+}
+
+// SalesOrderCancellationActorRepo is the authenticated cancellation path used
+// when compensation evidence must retain the operator who caused the change.
+type SalesOrderCancellationActorRepo interface {
+	CancelSalesOrderWithActor(ctx context.Context, id int, actorID int) (*SalesOrder, error)
 }
 
 type SalesOrderUsecase struct {
@@ -230,6 +237,24 @@ func (uc *SalesOrderUsecase) CancelSalesOrder(ctx context.Context, id int) (*Sal
 	return uc.changeSalesOrderLifecycle(ctx, id, SalesOrderStatusCanceled)
 }
 
+func (uc *SalesOrderUsecase) CancelSalesOrderWithActor(ctx context.Context, id int, actorID int) (*SalesOrder, error) {
+	if uc == nil || uc.repo == nil || id <= 0 || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	current, err := uc.repo.GetSalesOrder(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if !IsSalesOrderLifecycleTransitionAllowed(current.LifecycleStatus, SalesOrderStatusCanceled) {
+		return nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(SalesOrderCancellationActorRepo)
+	if !ok {
+		return nil, ErrActorAwareCancellationUnavailable
+	}
+	return repo.CancelSalesOrderWithActor(ctx, id, actorID)
+}
+
 func (uc *SalesOrderUsecase) AddSalesOrderItem(ctx context.Context, in *SalesOrderItemMutation) (*SalesOrderItem, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
@@ -245,7 +270,7 @@ func (uc *SalesOrderUsecase) AddSalesOrderItem(ctx context.Context, in *SalesOrd
 	if err := validateOptionalDateNotBefore(order.OrderDate, normalized.PlannedDeliveryDate); err != nil {
 		return nil, err
 	}
-	if err := uc.validateProductAndUnitActive(ctx, normalized.ProductID, normalized.UnitID); err != nil {
+	if err := uc.validateProductAndUnitActive(ctx, normalized.ProductID, normalized.ProductSkuID, normalized.UnitID); err != nil {
 		return nil, err
 	}
 	return uc.repo.AddSalesOrderItem(ctx, &normalized)
@@ -273,7 +298,7 @@ func (uc *SalesOrderUsecase) UpdateSalesOrderItem(ctx context.Context, id int, i
 	if err := validateOptionalDateNotBefore(order.OrderDate, normalized.PlannedDeliveryDate); err != nil {
 		return nil, err
 	}
-	if err := uc.validateProductAndUnitActive(ctx, normalized.ProductID, normalized.UnitID); err != nil {
+	if err := uc.validateProductAndUnitActive(ctx, normalized.ProductID, normalized.ProductSkuID, normalized.UnitID); err != nil {
 		return nil, err
 	}
 	return uc.repo.UpdateSalesOrderItem(ctx, id, &normalized)
@@ -358,7 +383,7 @@ func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int
 		if err := validateOptionalDateNotBefore(normalizedOrder.OrderDate, normalizedItem.PlannedDeliveryDate); err != nil {
 			return nil, err
 		}
-		if err := uc.validateProductAndUnitActive(ctx, normalizedItem.ProductID, normalizedItem.UnitID); err != nil {
+		if err := uc.validateProductAndUnitActive(ctx, normalizedItem.ProductID, normalizedItem.ProductSkuID, normalizedItem.UnitID); err != nil {
 			return nil, err
 		}
 		normalizedItems = append(normalizedItems, &SalesOrderItemSaveMutation{
@@ -425,13 +450,22 @@ func (uc *SalesOrderUsecase) openSalesOrder(ctx context.Context, id int) (*Sales
 	return order, nil
 }
 
-func (uc *SalesOrderUsecase) validateProductAndUnitActive(ctx context.Context, productID int, unitID int) error {
+func (uc *SalesOrderUsecase) validateProductAndUnitActive(ctx context.Context, productID int, productSkuID *int, unitID int) error {
 	productActive, err := uc.repo.ProductIsActive(ctx, productID)
 	if err != nil {
 		return err
 	}
 	if !productActive {
 		return ErrProductInactive
+	}
+	if productSkuID != nil {
+		active, err := uc.repo.ProductSKUIsActiveForProduct(ctx, *productSkuID, productID)
+		if err != nil {
+			return err
+		}
+		if !active {
+			return ErrProductSKUInactive
+		}
 	}
 	unitActive, err := uc.repo.UnitIsActive(ctx, unitID)
 	if err != nil {

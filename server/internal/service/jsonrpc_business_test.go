@@ -175,6 +175,10 @@ func (s *stubBusinessDashboardOperationalFactRepo) CancelShippedShipment(context
 	return nil, biz.ErrBadParam
 }
 
+func (s *stubBusinessDashboardOperationalFactRepo) CancelShippedShipmentWithActor(ctx context.Context, id int, _ int) (*biz.Shipment, error) {
+	return s.CancelShippedShipment(ctx, id)
+}
+
 func (s *stubBusinessDashboardOperationalFactRepo) GetShipment(context.Context, int) (*biz.Shipment, error) {
 	return nil, biz.ErrBadParam
 }
@@ -188,10 +192,6 @@ func (s *stubBusinessDashboardOperationalFactRepo) CreateStockReservation(contex
 }
 
 func (s *stubBusinessDashboardOperationalFactRepo) ReleaseStockReservation(context.Context, int) (*biz.StockReservation, error) {
-	return nil, biz.ErrBadParam
-}
-
-func (s *stubBusinessDashboardOperationalFactRepo) ConsumeStockReservation(context.Context, int) (*biz.StockReservation, error) {
 	return nil, biz.ErrBadParam
 }
 
@@ -213,6 +213,10 @@ func (s *stubBusinessDashboardOperationalFactRepo) SettleFinanceFact(context.Con
 
 func (s *stubBusinessDashboardOperationalFactRepo) CancelPostedFinanceFact(context.Context, int) (*biz.FinanceFact, error) {
 	return nil, biz.ErrBadParam
+}
+
+func (s *stubBusinessDashboardOperationalFactRepo) CancelPostedFinanceFactWithActor(ctx context.Context, id int, _ int) (*biz.FinanceFact, error) {
+	return s.CancelPostedFinanceFact(ctx, id)
 }
 
 func (s *stubBusinessDashboardOperationalFactRepo) ListFinanceFacts(context.Context, biz.OperationalFactFilter) ([]*biz.FinanceFact, int, error) {

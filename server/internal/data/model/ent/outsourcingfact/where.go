@@ -81,6 +81,11 @@ func SubjectID(v int) predicate.OutsourcingFact {
 	return predicate.OutsourcingFact(sql.FieldEQ(FieldSubjectID, v))
 }
 
+// ProductSkuID applies equality check predicate on the "product_sku_id" field. It's identical to ProductSkuIDEQ.
+func ProductSkuID(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldEQ(FieldProductSkuID, v))
+}
+
 // WarehouseID applies equality check predicate on the "warehouse_id" field. It's identical to WarehouseIDEQ.
 func WarehouseID(v int) predicate.OutsourcingFact {
 	return predicate.OutsourcingFact(sql.FieldEQ(FieldWarehouseID, v))
@@ -134,6 +139,11 @@ func IdempotencyKey(v string) predicate.OutsourcingFact {
 // OccurredAt applies equality check predicate on the "occurred_at" field. It's identical to OccurredAtEQ.
 func OccurredAt(v time.Time) predicate.OutsourcingFact {
 	return predicate.OutsourcingFact(sql.FieldEQ(FieldOccurredAt, v))
+}
+
+// OccurredAtSpecified applies equality check predicate on the "occurred_at_specified" field. It's identical to OccurredAtSpecifiedEQ.
+func OccurredAtSpecified(v bool) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldEQ(FieldOccurredAtSpecified, v))
 }
 
 // PostedAt applies equality check predicate on the "posted_at" field. It's identical to PostedAtEQ.
@@ -454,6 +464,36 @@ func SubjectIDLT(v int) predicate.OutsourcingFact {
 // SubjectIDLTE applies the LTE predicate on the "subject_id" field.
 func SubjectIDLTE(v int) predicate.OutsourcingFact {
 	return predicate.OutsourcingFact(sql.FieldLTE(FieldSubjectID, v))
+}
+
+// ProductSkuIDEQ applies the EQ predicate on the "product_sku_id" field.
+func ProductSkuIDEQ(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldEQ(FieldProductSkuID, v))
+}
+
+// ProductSkuIDNEQ applies the NEQ predicate on the "product_sku_id" field.
+func ProductSkuIDNEQ(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNEQ(FieldProductSkuID, v))
+}
+
+// ProductSkuIDIn applies the In predicate on the "product_sku_id" field.
+func ProductSkuIDIn(vs ...int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldIn(FieldProductSkuID, vs...))
+}
+
+// ProductSkuIDNotIn applies the NotIn predicate on the "product_sku_id" field.
+func ProductSkuIDNotIn(vs ...int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNotIn(FieldProductSkuID, vs...))
+}
+
+// ProductSkuIDIsNil applies the IsNil predicate on the "product_sku_id" field.
+func ProductSkuIDIsNil() predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldIsNull(FieldProductSkuID))
+}
+
+// ProductSkuIDNotNil applies the NotNil predicate on the "product_sku_id" field.
+func ProductSkuIDNotNil() predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNotNull(FieldProductSkuID))
 }
 
 // WarehouseIDEQ applies the EQ predicate on the "warehouse_id" field.
@@ -971,6 +1011,16 @@ func OccurredAtLTE(v time.Time) predicate.OutsourcingFact {
 	return predicate.OutsourcingFact(sql.FieldLTE(FieldOccurredAt, v))
 }
 
+// OccurredAtSpecifiedEQ applies the EQ predicate on the "occurred_at_specified" field.
+func OccurredAtSpecifiedEQ(v bool) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldEQ(FieldOccurredAtSpecified, v))
+}
+
+// OccurredAtSpecifiedNEQ applies the NEQ predicate on the "occurred_at_specified" field.
+func OccurredAtSpecifiedNEQ(v bool) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNEQ(FieldOccurredAtSpecified, v))
+}
+
 // PostedAtEQ applies the EQ predicate on the "posted_at" field.
 func PostedAtEQ(v time.Time) predicate.OutsourcingFact {
 	return predicate.OutsourcingFact(sql.FieldEQ(FieldPostedAt, v))
@@ -1214,6 +1264,29 @@ func HasUnit() predicate.OutsourcingFact {
 func HasUnitWith(preds ...predicate.Unit) predicate.OutsourcingFact {
 	return predicate.OutsourcingFact(func(s *sql.Selector) {
 		step := newUnitStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasProductSku applies the HasEdge predicate on the "product_sku" edge.
+func HasProductSku() predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, ProductSkuTable, ProductSkuColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProductSkuWith applies the HasEdge predicate on the "product_sku" edge with a given conditions (other predicates).
+func HasProductSkuWith(preds ...predicate.ProductSKU) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(func(s *sql.Selector) {
+		step := newProductSkuStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

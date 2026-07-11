@@ -52,6 +52,8 @@ type FinanceFact struct {
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
 	// OccurredAt holds the value of the "occurred_at" field.
 	OccurredAt time.Time `json:"occurred_at,omitempty"`
+	// OccurredAtSpecified holds the value of the "occurred_at_specified" field.
+	OccurredAtSpecified bool `json:"occurred_at_specified,omitempty"`
 	// PostedAt holds the value of the "posted_at" field.
 	PostedAt *time.Time `json:"posted_at,omitempty"`
 	// SettledAt holds the value of the "settled_at" field.
@@ -72,6 +74,8 @@ func (*FinanceFact) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case financefact.FieldAmount, financefact.FieldFeeAmount:
 			values[i] = new(decimal.Decimal)
+		case financefact.FieldOccurredAtSpecified:
+			values[i] = new(sql.NullBool)
 		case financefact.FieldID, financefact.FieldCounterpartyID, financefact.FieldPaymentTermDays, financefact.FieldSourceID, financefact.FieldSourceLineID:
 			values[i] = new(sql.NullInt64)
 		case financefact.FieldFactNo, financefact.FieldFactType, financefact.FieldStatus, financefact.FieldCounterpartyType, financefact.FieldCurrency, financefact.FieldCollectionType, financefact.FieldPaymentTerm, financefact.FieldInvoiceCategory, financefact.FieldSourceType, financefact.FieldIdempotencyKey, financefact.FieldNote:
@@ -209,6 +213,12 @@ func (_m *FinanceFact) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.OccurredAt = value.Time
 			}
+		case financefact.FieldOccurredAtSpecified:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field occurred_at_specified", values[i])
+			} else if value.Valid {
+				_m.OccurredAtSpecified = value.Bool
+			}
 		case financefact.FieldPostedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field posted_at", values[i])
@@ -344,6 +354,9 @@ func (_m *FinanceFact) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("occurred_at=")
 	builder.WriteString(_m.OccurredAt.Format(time.ANSIC))
+	builder.WriteString(", ")
+	builder.WriteString("occurred_at_specified=")
+	builder.WriteString(fmt.Sprintf("%v", _m.OccurredAtSpecified))
 	builder.WriteString(", ")
 	if v := _m.PostedAt; v != nil {
 		builder.WriteString("posted_at=")

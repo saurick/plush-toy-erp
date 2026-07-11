@@ -135,6 +135,13 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 	if submitted.LifecycleStatus != biz.SalesOrderStatusSubmitted {
 		t.Fatalf("expected submitted order, got %#v", submitted)
 	}
+	replayedSubmitted, err := uc.SubmitSalesOrder(ctx, order.ID)
+	if err != nil {
+		t.Fatalf("repeat sales order submit failed: %v", err)
+	}
+	if replayedSubmitted.LifecycleStatus != biz.SalesOrderStatusSubmitted {
+		t.Fatalf("repeat sales order submit must keep one submitted state, got %#v", replayedSubmitted)
+	}
 	active, err := uc.ActivateSalesOrder(ctx, order.ID)
 	if err != nil {
 		t.Fatalf("activate sales order failed: %v", err)

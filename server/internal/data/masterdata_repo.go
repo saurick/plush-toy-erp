@@ -655,7 +655,6 @@ func (r *masterDataRepo) CreateProductSKU(ctx context.Context, in *biz.ProductSK
 
 func (r *masterDataRepo) UpdateProductSKU(ctx context.Context, id int, in *biz.ProductSKUMutation) (*biz.ProductSKU, error) {
 	update := r.data.postgres.ProductSKU.UpdateOneID(id).
-		SetProductID(in.ProductID).
 		SetSkuCode(in.SKUCode)
 	if in.SKUName == nil {
 		update.ClearSkuName()

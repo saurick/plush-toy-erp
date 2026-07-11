@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/warehouse"
 	"time"
@@ -64,6 +65,26 @@ func (_u *InventoryBalanceUpdate) SetNillableSubjectID(v *int) *InventoryBalance
 // AddSubjectID adds value to the "subject_id" field.
 func (_u *InventoryBalanceUpdate) AddSubjectID(v int) *InventoryBalanceUpdate {
 	_u.mutation.AddSubjectID(v)
+	return _u
+}
+
+// SetProductSkuID sets the "product_sku_id" field.
+func (_u *InventoryBalanceUpdate) SetProductSkuID(v int) *InventoryBalanceUpdate {
+	_u.mutation.SetProductSkuID(v)
+	return _u
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_u *InventoryBalanceUpdate) SetNillableProductSkuID(v *int) *InventoryBalanceUpdate {
+	if v != nil {
+		_u.SetProductSkuID(*v)
+	}
+	return _u
+}
+
+// ClearProductSkuID clears the value of the "product_sku_id" field.
+func (_u *InventoryBalanceUpdate) ClearProductSkuID() *InventoryBalanceUpdate {
+	_u.mutation.ClearProductSkuID()
 	return _u
 }
 
@@ -145,6 +166,11 @@ func (_u *InventoryBalanceUpdate) SetUnit(v *Unit) *InventoryBalanceUpdate {
 	return _u.SetUnitID(v.ID)
 }
 
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_u *InventoryBalanceUpdate) SetProductSku(v *ProductSKU) *InventoryBalanceUpdate {
+	return _u.SetProductSkuID(v.ID)
+}
+
 // SetInventoryLotID sets the "inventory_lot" edge to the InventoryLot entity by ID.
 func (_u *InventoryBalanceUpdate) SetInventoryLotID(id int) *InventoryBalanceUpdate {
 	_u.mutation.SetInventoryLotID(id)
@@ -178,6 +204,12 @@ func (_u *InventoryBalanceUpdate) ClearWarehouse() *InventoryBalanceUpdate {
 // ClearUnit clears the "unit" edge to the Unit entity.
 func (_u *InventoryBalanceUpdate) ClearUnit() *InventoryBalanceUpdate {
 	_u.mutation.ClearUnit()
+	return _u
+}
+
+// ClearProductSku clears the "product_sku" edge to the ProductSKU entity.
+func (_u *InventoryBalanceUpdate) ClearProductSku() *InventoryBalanceUpdate {
+	_u.mutation.ClearProductSku()
 	return _u
 }
 
@@ -233,6 +265,11 @@ func (_u *InventoryBalanceUpdate) check() error {
 	if v, ok := _u.mutation.SubjectID(); ok {
 		if err := inventorybalance.SubjectIDValidator(v); err != nil {
 			return &ValidationError{Name: "subject_id", err: fmt.Errorf(`ent: validator failed for field "InventoryBalance.subject_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProductSkuID(); ok {
+		if err := inventorybalance.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "InventoryBalance.product_sku_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.WarehouseID(); ok {
@@ -344,6 +381,35 @@ func (_u *InventoryBalanceUpdate) sqlSave(ctx context.Context) (_node int, err e
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.ProductSkuCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   inventorybalance.ProductSkuTable,
+			Columns: []string{inventorybalance.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   inventorybalance.ProductSkuTable,
+			Columns: []string{inventorybalance.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _u.mutation.InventoryLotCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -428,6 +494,26 @@ func (_u *InventoryBalanceUpdateOne) AddSubjectID(v int) *InventoryBalanceUpdate
 	return _u
 }
 
+// SetProductSkuID sets the "product_sku_id" field.
+func (_u *InventoryBalanceUpdateOne) SetProductSkuID(v int) *InventoryBalanceUpdateOne {
+	_u.mutation.SetProductSkuID(v)
+	return _u
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_u *InventoryBalanceUpdateOne) SetNillableProductSkuID(v *int) *InventoryBalanceUpdateOne {
+	if v != nil {
+		_u.SetProductSkuID(*v)
+	}
+	return _u
+}
+
+// ClearProductSkuID clears the value of the "product_sku_id" field.
+func (_u *InventoryBalanceUpdateOne) ClearProductSkuID() *InventoryBalanceUpdateOne {
+	_u.mutation.ClearProductSkuID()
+	return _u
+}
+
 // SetWarehouseID sets the "warehouse_id" field.
 func (_u *InventoryBalanceUpdateOne) SetWarehouseID(v int) *InventoryBalanceUpdateOne {
 	_u.mutation.SetWarehouseID(v)
@@ -506,6 +592,11 @@ func (_u *InventoryBalanceUpdateOne) SetUnit(v *Unit) *InventoryBalanceUpdateOne
 	return _u.SetUnitID(v.ID)
 }
 
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_u *InventoryBalanceUpdateOne) SetProductSku(v *ProductSKU) *InventoryBalanceUpdateOne {
+	return _u.SetProductSkuID(v.ID)
+}
+
 // SetInventoryLotID sets the "inventory_lot" edge to the InventoryLot entity by ID.
 func (_u *InventoryBalanceUpdateOne) SetInventoryLotID(id int) *InventoryBalanceUpdateOne {
 	_u.mutation.SetInventoryLotID(id)
@@ -539,6 +630,12 @@ func (_u *InventoryBalanceUpdateOne) ClearWarehouse() *InventoryBalanceUpdateOne
 // ClearUnit clears the "unit" edge to the Unit entity.
 func (_u *InventoryBalanceUpdateOne) ClearUnit() *InventoryBalanceUpdateOne {
 	_u.mutation.ClearUnit()
+	return _u
+}
+
+// ClearProductSku clears the "product_sku" edge to the ProductSKU entity.
+func (_u *InventoryBalanceUpdateOne) ClearProductSku() *InventoryBalanceUpdateOne {
+	_u.mutation.ClearProductSku()
 	return _u
 }
 
@@ -607,6 +704,11 @@ func (_u *InventoryBalanceUpdateOne) check() error {
 	if v, ok := _u.mutation.SubjectID(); ok {
 		if err := inventorybalance.SubjectIDValidator(v); err != nil {
 			return &ValidationError{Name: "subject_id", err: fmt.Errorf(`ent: validator failed for field "InventoryBalance.subject_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProductSkuID(); ok {
+		if err := inventorybalance.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "InventoryBalance.product_sku_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.WarehouseID(); ok {
@@ -728,6 +830,35 @@ func (_u *InventoryBalanceUpdateOne) sqlSave(ctx context.Context) (_node *Invent
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(unit.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductSkuCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   inventorybalance.ProductSkuTable,
+			Columns: []string{inventorybalance.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   inventorybalance.ProductSkuTable,
+			Columns: []string{inventorybalance.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

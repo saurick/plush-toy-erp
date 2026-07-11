@@ -123,6 +123,32 @@ export function createPurchaseReceiptAssertions(deps) {
       '备注',
       '添加入库明细 L1 长备注 ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789，验证内联编辑区不伪装批量维护。'
     )
+    await page.waitForFunction(
+      () => {
+        const editorNode = document.querySelector(
+          '.erp-purchase-receipt-inline-item-editor'
+        )
+        if (!editorNode) return false
+        const visibleErrors = [
+          ...editorNode.querySelectorAll('.ant-form-item-explain-error'),
+        ].filter((error) => {
+          const rect = error.getBoundingClientRect()
+          const style = window.getComputedStyle(error)
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== 'none' &&
+            style.visibility !== 'hidden'
+          )
+        })
+        return (
+          editorNode.querySelector('.ant-form-item-has-error') === null &&
+          visibleErrors.length === 0
+        )
+      },
+      null,
+      { timeout: 10_000 }
+    )
   }
 
   async function choosePurchaseReceiptAddItemEditorOption(

@@ -609,6 +609,13 @@ func (uc *MasterDataUsecase) UpdateProductSKU(ctx context.Context, id int, in *P
 	if err != nil {
 		return nil, err
 	}
+	current, err := uc.repo.GetProductSKU(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if current.ProductID != normalized.ProductID {
+		return nil, ErrBadParam
+	}
 	if err := uc.validateProductSKURefs(ctx, normalized); err != nil {
 		return nil, err
 	}

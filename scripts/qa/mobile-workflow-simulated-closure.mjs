@@ -504,7 +504,10 @@ async function rpcCall({ backendURL, domain, method, params = {}, token }) {
         jsonrpc: "2.0",
         id: `mobile-workflow-sim-${method}-${Date.now()}`,
         method,
-        params,
+        params:
+          domain === "auth"
+            ? params
+            : { customer_key: "yoyoosun", ...params },
       }),
     });
   } catch (error) {

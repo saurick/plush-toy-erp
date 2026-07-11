@@ -663,61 +663,32 @@ export function OperationalFactWorkspace({
             </Popconfirm>
           ) : null}
           {currentActiveKey === 'reservations' ? (
-            <>
-              <Popconfirm
-                title="确认释放库存预留？"
-                onConfirm={() =>
-                  runRowAction(
-                    activeConfig,
-                    activeSelectedRow,
-                    'release',
-                    '释放预留'
-                  )
+            <Popconfirm
+              title="确认释放库存预留？"
+              onConfirm={() =>
+                runRowAction(
+                  activeConfig,
+                  activeSelectedRow,
+                  'release',
+                  '释放预留'
+                )
+              }
+              okText="确认"
+              cancelText="取消"
+            >
+              <Button
+                size="small"
+                icon={<RollbackOutlined />}
+                disabled={
+                  !activeSelectedRow ||
+                  activeSelectedRow.status !== 'ACTIVE' ||
+                  !canWriteActive ||
+                  saving
                 }
-                okText="确认"
-                cancelText="取消"
               >
-                <Button
-                  size="small"
-                  icon={<RollbackOutlined />}
-                  disabled={
-                    !activeSelectedRow ||
-                    activeSelectedRow.status !== 'ACTIVE' ||
-                    !canWriteActive ||
-                    saving
-                  }
-                >
-                  释放
-                </Button>
-              </Popconfirm>
-              <Popconfirm
-                title="确认消耗库存预留？"
-                onConfirm={() =>
-                  runRowAction(
-                    activeConfig,
-                    activeSelectedRow,
-                    'consume',
-                    '消耗预留'
-                  )
-                }
-                okText="确认"
-                cancelText="取消"
-              >
-                <Button
-                  size="small"
-                  type="primary"
-                  icon={<CheckCircleOutlined />}
-                  disabled={
-                    !activeSelectedRow ||
-                    activeSelectedRow.status !== 'ACTIVE' ||
-                    !canConfirmActive ||
-                    saving
-                  }
-                >
-                  消耗
-                </Button>
-              </Popconfirm>
-            </>
+                释放
+              </Button>
+            </Popconfirm>
           ) : null}
           {currentActiveKey === 'finance' ? (
             <Popconfirm

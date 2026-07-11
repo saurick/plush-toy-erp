@@ -15,6 +15,8 @@ import {
 } from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   BusinessDataTable,
   BusinessOperationPanel,
@@ -158,6 +160,7 @@ export default function V1SalesOrdersPage() {
   )
   const orderAttachmentRef = useRef(null)
   const contactLoadSeqRef = useRef(0)
+  const beginLatestRequest = useLatestRequestCoordinator()
 
   const canCreateOrder = hasActionPermission(adminProfile, 'sales_order.create')
   const canUpdateOrder = hasActionPermission(adminProfile, 'sales_order.update')
@@ -292,20 +295,27 @@ export default function V1SalesOrdersPage() {
   }, [])
 
   const loadOrders = useCallback(async () => {
+    const request = beginLatestRequest('orders')
     setLoading(true)
     try {
       const { sortBy, sortDirection } = parseBusinessSortValue(sortFilter)
-      const result = await listSalesOrders({
-        keyword,
-        customer_id: customerFilter || undefined,
-        lifecycle_status: statusFilter,
-        date_field: dateFilterField,
-        date_from: dateFilterStart || undefined,
-        date_to: dateFilterEnd || undefined,
-        sort_by: sortBy,
-        sort_direction: sortDirection,
-        ...getBusinessPaginationParams(pagination),
-      })
+      const result = await listSalesOrders(
+        {
+          keyword,
+          customer_id: customerFilter || undefined,
+          lifecycle_status: statusFilter,
+          date_field: dateFilterField,
+          date_from: dateFilterStart || undefined,
+          date_to: dateFilterEnd || undefined,
+          sort_by: sortBy,
+          sort_direction: sortDirection,
+          ...getBusinessPaginationParams(pagination),
+        },
+        { signal: request.signal }
+      )
+      if (!request.isCurrent()) {
+        return false
+      }
       const nextOrders = Array.isArray(result?.sales_orders)
         ? result.sales_orders
         : []
@@ -321,12 +331,19 @@ export default function V1SalesOrdersPage() {
       })
       return true
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return false
+      }
       message.error(getActionErrorMessage(error, '加载销售订单'))
       return false
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
     }
   }, [
+    beginLatestRequest,
     customerFilter,
     dateFilterEnd,
     dateFilterField,

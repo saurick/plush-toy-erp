@@ -510,9 +510,9 @@ export default function DevDocsPage() {
             <Tag color="green">DEV ONLY</Tag>
           </Space>
           <Paragraph className="erp-dev-docs-summary">
-            左侧专用于仓库目录树浏览全量 Markdown / browse repo Markdown by
-            directory tree；不进入 ERP 菜单、权限、seedData 或产品文档
-            registry。
+            左侧按仓库目录树浏览当前工作区内已匹配的 Markdown / browse workspace
+            Markdown by directory tree；不保证文件已纳入 Git，也不进入 ERP
+            菜单、权限、seedData 或产品文档 registry。
           </Paragraph>
         </div>
       </header>

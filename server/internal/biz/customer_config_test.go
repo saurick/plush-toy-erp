@@ -1746,11 +1746,12 @@ func TestCustomerConfigUsecaseRollbackActivatesTargetRevision(t *testing.T) {
 
 func TestCustomerConfigUsecaseFallsBackWhenNoActiveRevision(t *testing.T) {
 	uc := NewCustomerConfigUsecase(newMemCustomerConfigRepo())
-	session, err := uc.GetEffectiveSession(context.Background(), "", &AdminUser{
+	admin := &AdminUser{
 		ID:          1,
 		Roles:       []AdminRole{{Key: AdminRoleKey}},
-		Permissions: []string{PermissionSystemUserRead},
-	})
+		Permissions: []string{PermissionSystemUserRead, PermissionSalesOrderRead},
+	}
+	session, err := uc.GetEffectiveSession(context.Background(), "", admin)
 	if err != nil {
 		t.Fatalf("GetEffectiveSession error = %v", err)
 	}
@@ -1759,6 +1760,20 @@ func TestCustomerConfigUsecaseFallsBackWhenNoActiveRevision(t *testing.T) {
 	}
 	if session.Customer.Key != DefaultCustomerKey {
 		t.Fatalf("customer key = %s", session.Customer.Key)
+	}
+	if _, err := uc.GetEffectiveSessionRequiringActiveRevision(context.Background(), "yoyoosun", admin); !errors.Is(err, ErrCustomerConfigActiveRevisionRequired) {
+		t.Fatalf("strict effective session error = %v, want ErrCustomerConfigActiveRevisionRequired", err)
+	}
+	fallbackActions, err := uc.GetEffectiveActionEntitlements(context.Background(), "yoyoosun", admin)
+	if err != nil || !PermissionSetHasAny(PermissionKeySet(fallbackActions), PermissionSalesOrderRead) {
+		t.Fatalf("unfixed runtime fallback actions = %#v, err=%v", fallbackActions, err)
+	}
+	strictActions, err := uc.GetEffectiveActionEntitlementsRequiringActiveRevision(context.Background(), "yoyoosun", admin)
+	if err != nil {
+		t.Fatalf("strict action entitlements error = %v", err)
+	}
+	if len(strictActions) != 0 {
+		t.Fatalf("fixed runtime without active revision must expose no business actions, got %#v", strictActions)
 	}
 }
 

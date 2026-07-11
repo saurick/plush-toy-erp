@@ -338,7 +338,7 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
   )
   assert.deepEqual(
     summary.importFlow.map((item) => item.title),
-    ['上传解析', '校验', '差异对比', '测试试跑', '导入草稿版本', '发布']
+    ['读取已登记包', '校验', '差异对比', '测试试跑', '应用测试配置', '发布']
   )
   assert.deepEqual(
     summary.databaseTargets.map((item) => item.status),

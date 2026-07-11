@@ -12,6 +12,7 @@ print_help() {
 检查内容:
   error-code-sync: 前端生成错误码同步检查
   error-codes: 统一错误码魔法数字检查
+  affected-planner: 按改动影响面选择测试的映射、保守升级和 full 兜底测试
   phase-label-boundaries: 活跃实现路径禁止使用编号 Phase 标签
   core-boundary: server/internal/core 纯领域规则边界检查
   workflow-fact-boundary: Workflow 运行时禁止直接写领域事实
@@ -110,6 +111,11 @@ if [ -x "$ROOT_DIR/scripts/qa/error-codes.sh" ]; then
   # 先拦截错误码魔法数字，避免在明显违规代码上继续跑后续检查。
   echo "[qa:fast] 运行错误码魔法数字检查"
   bash "$ROOT_DIR/scripts/qa/error-codes.sh"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/affected.test.mjs" ]; then
+  echo "[qa:fast] 运行受影响测试选择器合同测试"
+  node --test "$ROOT_DIR/scripts/qa/affected.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/core-boundary.test.mjs" ]; then

@@ -11,9 +11,10 @@ print_help() {
 
 检查内容:
   fast: 先执行 scripts/qa/fast.sh，包含高频边界、客户配置、导入、发布证据和 web/server 快速检查
-  secrets / govulncheck: 推送前补充安全扫描（存在即跑）
+  secrets: 推送前补充密钥扫描（存在即跑）
   web: fast 已跑 lint/css，这里补充 (若存在 test 脚本则 pnpm test) -> pnpm build
   server: local PostgreSQL critical transaction gate -> go test ./... -> make build
+  govulncheck: 最后执行 Go 漏洞扫描，避免外部网络扰动本地 PostgreSQL 并发门禁
 
 环境变量:
   SKIP_DB_GUARD=1      跳过 DB 迁移守卫
@@ -65,10 +66,6 @@ if [ -x "$ROOT_DIR/scripts/qa/secrets.sh" ]; then
   bash "$ROOT_DIR/scripts/qa/secrets.sh"
 fi
 
-if [ -x "$ROOT_DIR/scripts/qa/govulncheck.sh" ]; then
-  bash "$ROOT_DIR/scripts/qa/govulncheck.sh"
-fi
-
 echo "[qa:full] 运行 web 测试与构建"
 (
   cd "$ROOT_DIR/web"
@@ -91,5 +88,11 @@ echo "[qa:full] 运行 server 全量检查"
   go test ./...
   make build
 )
+
+# govulncheck 可能走外部网络，放在本地 PostgreSQL 门禁和编译之后，
+# 避免代理或系统网络异常占满本地端口时误报业务并发失败。
+if [ -x "$ROOT_DIR/scripts/qa/govulncheck.sh" ]; then
+  bash "$ROOT_DIR/scripts/qa/govulncheck.sh"
+fi
 
 echo "[qa:full] 全部通过"

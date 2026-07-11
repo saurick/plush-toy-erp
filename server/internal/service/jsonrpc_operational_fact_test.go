@@ -51,6 +51,40 @@ func activateOperationalFactTestCustomerConfig(t *testing.T, dispatcher *jsonrpc
 	}
 }
 
+func TestMapOperationalFactError_IdempotencyConflict(t *testing.T) {
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{log: log.NewHelper(logger)}
+	result := dispatcher.mapOperationalFactError(context.Background(), biz.ErrIdempotencyConflict)
+	if result.Code != errcode.IdempotencyConflict.Code || result.Message != errcode.IdempotencyConflict.Message {
+		t.Fatalf("unexpected idempotency conflict result: %#v", result)
+	}
+}
+
+func TestMapOperationalFactError_ShipmentAndReservationGuards(t *testing.T) {
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{log: log.NewHelper(logger)}
+	tests := []struct {
+		name    string
+		err     error
+		message string
+	}{
+		{name: "shipment source", err: biz.ErrShipmentSourceMismatch, message: "出货来源与销售订单、客户或订单行不一致，请刷新来源后重试"},
+		{name: "order inactive", err: biz.ErrShipmentOrderNotActive, message: "销售订单尚未生效或已关闭，不能确认出货"},
+		{name: "shipment quantity", err: biz.ErrShipmentQuantityExceeded, message: "本次出货将超过销售订单行剩余可出货数量"},
+		{name: "reservation split", err: biz.ErrShipmentReservationSplit, message: "本次出货小于对应的原子预留数量，请先释放并按本次出货数量重建预留"},
+		{name: "reservation source", err: biz.ErrStockReservationSourceMismatch, message: "库存预留与销售订单或订单行不一致，请刷新来源后重试"},
+		{name: "reservation quantity", err: biz.ErrStockReservationQuantityExceeded, message: "预留数量与已出货数量合计超过销售订单行数量"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := dispatcher.mapOperationalFactError(context.Background(), tt.err)
+			if result.Code != errcode.InvalidParam.Code || result.Message != tt.message {
+				t.Fatalf("unexpected result: %#v", result)
+			}
+		})
+	}
+}
+
 func TestShipmentItemParamsPreserveProductSKUTraceability(t *testing.T) {
 	in, ok := shipmentItemCreateFromParams(map[string]any{
 		"shipment_id":         float64(9),
@@ -80,6 +114,45 @@ func TestShipmentItemParamsPreserveProductSKUTraceability(t *testing.T) {
 	})
 	if !reflect.DeepEqual(out["product_sku_id"], 11) {
 		t.Fatalf("expected product_sku_id in response, got %#v", out)
+	}
+}
+
+func TestStockReservationParamsPreserveProductSKUTraceability(t *testing.T) {
+	in, ok := stockReservationCreateFromParams(map[string]any{
+		"reservation_no":      "RSV-SKU-TRACE",
+		"sales_order_id":      float64(8),
+		"sales_order_item_id": float64(31),
+		"product_id":          float64(7),
+		"product_sku_id":      float64(11),
+		"warehouse_id":        float64(3),
+		"unit_id":             float64(2),
+		"quantity":            "5",
+		"idempotency_key":     "RSV-SKU-TRACE",
+	})
+	if !ok {
+		t.Fatal("expected stock reservation params to parse")
+	}
+	if in.ProductSkuID == nil || *in.ProductSkuID != 11 {
+		t.Fatalf("expected reservation product sku id 11, got %#v", in.ProductSkuID)
+	}
+	out := stockReservationToAny(&biz.StockReservation{
+		ID:               1,
+		ReservationNo:    in.ReservationNo,
+		Status:           biz.StockReservationStatusActive,
+		SalesOrderID:     in.SalesOrderID,
+		SalesOrderItemID: in.SalesOrderItemID,
+		ProductID:        in.ProductID,
+		ProductSkuID:     in.ProductSkuID,
+		WarehouseID:      in.WarehouseID,
+		UnitID:           in.UnitID,
+		Quantity:         in.Quantity,
+		IdempotencyKey:   in.IdempotencyKey,
+		ReservedAt:       time.Now(),
+		CreatedAt:        time.Now(),
+		UpdatedAt:        time.Now(),
+	})
+	if out["product_sku_id"] != 11 {
+		t.Fatalf("expected reservation response product_sku_id 11, got %#v", out["product_sku_id"])
 	}
 }
 
@@ -277,6 +350,9 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresEnabledModules(t *testing.T) {
 	if cancelRes == nil || cancelRes.Code != errcode.OK.Code {
 		t.Fatalf("expected enabled cancel OK, got %#v", cancelRes)
 	}
+	if repo.cancelShipmentActorID != 7 {
+		t.Fatalf("expected authenticated shipment cancellation actor 7, got %d", repo.cancelShipmentActorID)
+	}
 
 	readOnlyInventoryConfig := customerConfigPublishParamsWithRevisionAndModuleState(
 		t,
@@ -395,6 +471,9 @@ func TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule(t *testing.T) {
 	}
 	if repo.postFinanceFactCalls != 1 || repo.settleFinanceFactCalls != 1 || repo.cancelFinanceFactCalls != 1 {
 		t.Fatalf("disabled finance must not call post/settle/cancel again, post=%d settle=%d cancel=%d", repo.postFinanceFactCalls, repo.settleFinanceFactCalls, repo.cancelFinanceFactCalls)
+	}
+	if repo.cancelFinanceFactActorID != 7 {
+		t.Fatalf("expected authenticated finance cancellation actor 7, got %d", repo.cancelFinanceFactActorID)
 	}
 }
 
@@ -670,8 +749,8 @@ func TestJsonrpcDispatcher_StockReservationAPIRequiresEnabledInventoryModule(t *
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if consumeRes == nil || consumeRes.Code != errcode.OK.Code {
-		t.Fatalf("expected enabled consume stock reservation OK, got %#v", consumeRes)
+	if consumeRes == nil || consumeRes.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("expected independent reservation consume API removed, got %#v", consumeRes)
 	}
 
 	disabledInventoryConfig := customerConfigPublishParamsWithRevisionAndModuleState(
@@ -682,23 +761,15 @@ func TestJsonrpcDispatcher_StockReservationAPIRequiresEnabledInventoryModule(t *
 		"disabled",
 	)
 	activateOperationalFactTestCustomerConfig(t, j, disabledInventoryConfig)
-	for _, tc := range []struct {
-		method string
-		id     string
-	}{
-		{method: "release_stock_reservation", id: "disabled-release"},
-		{method: "consume_stock_reservation", id: "disabled-consume"},
-	} {
-		_, res, err := j.handleOperationalFact(ctx, tc.method, tc.id, mustJSONRPCStruct(t, map[string]any{"id": 400}))
-		if err != nil {
-			t.Fatalf("%s expected nil err, got %v", tc.method, err)
-		}
-		if res == nil || res.Code != errcode.InvalidParam.Code {
-			t.Fatalf("%s expected disabled inventory rejected, got %#v", tc.method, res)
-		}
+	_, disabledReleaseRes, err := j.handleOperationalFact(ctx, "release_stock_reservation", "disabled-release", mustJSONRPCStruct(t, map[string]any{"id": 400}))
+	if err != nil {
+		t.Fatalf("release_stock_reservation expected nil err, got %v", err)
 	}
-	if repo.releaseStockReservationCalls != 1 || repo.consumeStockReservationCalls != 1 {
-		t.Fatalf("disabled inventory must not call release/consume again, release=%d consume=%d", repo.releaseStockReservationCalls, repo.consumeStockReservationCalls)
+	if disabledReleaseRes == nil || disabledReleaseRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("release_stock_reservation expected disabled inventory rejected, got %#v", disabledReleaseRes)
+	}
+	if repo.releaseStockReservationCalls != 1 {
+		t.Fatalf("disabled inventory must not call release again, release=%d", repo.releaseStockReservationCalls)
 	}
 }
 
@@ -820,6 +891,7 @@ type shipmentModuleGateOperationalFactRepo struct {
 	addShipmentItemCalls         int
 	shipShipmentCalls            int
 	cancelShipmentCalls          int
+	cancelShipmentActorID        int
 }
 
 func (r *shipmentModuleGateOperationalFactRepo) ProductIsActive(context.Context, int) (bool, error) {
@@ -919,12 +991,18 @@ func (r *shipmentModuleGateOperationalFactRepo) CancelShippedShipment(_ context.
 	}, nil
 }
 
+func (r *shipmentModuleGateOperationalFactRepo) CancelShippedShipmentWithActor(ctx context.Context, shipmentID int, actorID int) (*biz.Shipment, error) {
+	r.cancelShipmentActorID = actorID
+	return r.CancelShippedShipment(ctx, shipmentID)
+}
+
 func financeFactModuleGateParams(t *testing.T) *structpb.Struct {
 	t.Helper()
 	return mustJSONRPCStruct(t, map[string]any{
 		"fact_no":           "FIN-MODULE-GATE",
 		"fact_type":         biz.FinanceFactReceivable,
 		"counterparty_type": biz.FinanceCounterpartyCustomer,
+		"counterparty_id":   float64(501),
 		"amount":            "128.50",
 		"currency":          biz.FinanceCurrencyCNY,
 		"source_type":       biz.ShipmentSourceType,
@@ -935,16 +1013,19 @@ func financeFactModuleGateParams(t *testing.T) *structpb.Struct {
 
 type financeModuleGateOperationalFactRepo struct {
 	stubBusinessDashboardOperationalFactRepo
-	createFinanceFactCalls int
-	postFinanceFactCalls   int
-	settleFinanceFactCalls int
-	cancelFinanceFactCalls int
+	createFinanceFactCalls   int
+	postFinanceFactCalls     int
+	settleFinanceFactCalls   int
+	cancelFinanceFactCalls   int
+	cancelFinanceFactActorID int
 }
 
 func (r *financeModuleGateOperationalFactRepo) GetShipment(_ context.Context, shipmentID int) (*biz.Shipment, error) {
+	customerID := 501
 	return &biz.Shipment{
-		ID:     shipmentID,
-		Status: biz.ShipmentStatusShipped,
+		ID:         shipmentID,
+		CustomerID: &customerID,
+		Status:     biz.ShipmentStatusShipped,
 	}, nil
 }
 
@@ -1021,6 +1102,11 @@ func (r *financeModuleGateOperationalFactRepo) CancelPostedFinanceFact(_ context
 	}, nil
 }
 
+func (r *financeModuleGateOperationalFactRepo) CancelPostedFinanceFactWithActor(ctx context.Context, id int, actorID int) (*biz.FinanceFact, error) {
+	r.cancelFinanceFactActorID = actorID
+	return r.CancelPostedFinanceFact(ctx, id)
+}
+
 func stockReservationModuleGateParams(t *testing.T) *structpb.Struct {
 	t.Helper()
 	return mustJSONRPCStruct(t, map[string]any{
@@ -1037,7 +1123,6 @@ type stockReservationModuleGateOperationalFactRepo struct {
 	stubBusinessDashboardOperationalFactRepo
 	createStockReservationCalls  int
 	releaseStockReservationCalls int
-	consumeStockReservationCalls int
 }
 
 func (r *stockReservationModuleGateOperationalFactRepo) ProductIsActive(context.Context, int) (bool, error) {
@@ -1080,20 +1165,6 @@ func (r *stockReservationModuleGateOperationalFactRepo) ReleaseStockReservation(
 		Quantity:   decimal.RequireFromString("8"),
 		ReservedAt: now,
 		ReleasedAt: &now,
-		CreatedAt:  now,
-		UpdatedAt:  now,
-	}, nil
-}
-
-func (r *stockReservationModuleGateOperationalFactRepo) ConsumeStockReservation(_ context.Context, id int) (*biz.StockReservation, error) {
-	r.consumeStockReservationCalls++
-	now := time.Now()
-	return &biz.StockReservation{
-		ID:         id,
-		Status:     biz.StockReservationStatusConsumed,
-		Quantity:   decimal.RequireFromString("8"),
-		ReservedAt: now,
-		ConsumedAt: &now,
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}, nil

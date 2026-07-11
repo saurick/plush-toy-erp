@@ -30,24 +30,26 @@ var (
 	PayloadTooLarge    = Definition{Name: "PayloadTooLarge", Code: 41300, Message: "请求体过大"}
 	TemplateRenderBusy = Definition{Name: "TemplateRenderBusy", Code: 42953, Message: "当前 PDF 预览人数较多，请稍后重试"}
 
-	AuthUserNotFound            = Definition{Name: "AuthUserNotFound", Code: 10001, Message: "用户不存在"}
-	AuthInvalidPassword         = Definition{Name: "AuthInvalidPassword", Code: 10002, Message: "密码错误"}
-	AuthUserDisabled            = Definition{Name: "AuthUserDisabled", Code: 10003, Message: "用户已被禁用"}
-	AuthUserExists              = Definition{Name: "AuthUserExists", Code: 10004, Message: "用户名已存在"}
-	AuthExpired                 = Definition{Name: "AuthExpired", Code: 10005, Message: "登录已过期，请重新登录"}
-	AuthInvalid                 = Definition{Name: "AuthInvalid", Code: 10006, Message: "登录无效，请重新登录"}
-	AuthInvalidPhone            = Definition{Name: "AuthInvalidPhone", Code: 10007, Message: "手机号格式不正确"}
-	AuthInvalidSMSCode          = Definition{Name: "AuthInvalidSMSCode", Code: 10008, Message: "验证码错误"}
-	AuthSMSCodeExpired          = Definition{Name: "AuthSMSCodeExpired", Code: 10009, Message: "验证码已过期，请重新获取"}
-	AuthSMSCodeTooFrequent      = Definition{Name: "AuthSMSCodeTooFrequent", Code: 10010, Message: "验证码发送过于频繁，请稍后再试"}
-	AuthSMSCodeAttemptsExceeded = Definition{Name: "AuthSMSCodeAttemptsExceeded", Code: 10011, Message: "验证码错误次数过多，请重新获取"}
-	AuthPhoneNotBound           = Definition{Name: "AuthPhoneNotBound", Code: 10012, Message: "该手机号未开通登录权限，请联系管理员"}
-	AuthMobileRoleDenied        = Definition{Name: "AuthMobileRoleDenied", Code: 10013, Message: "该账号暂无当前岗位任务端登录权限，请联系管理员"}
-	AuthSMSLoginDisabled        = Definition{Name: "AuthSMSLoginDisabled", Code: 10014, Message: "当前部署未启用短信登录"}
-	AuthSMSServiceUnavailable   = Definition{Name: "AuthSMSServiceUnavailable", Code: 10015, Message: "短信服务暂不可用，请稍后再试或联系管理员"}
-	AuthSMSServiceQuotaExceeded = Definition{Name: "AuthSMSServiceQuotaExceeded", Code: 10016, Message: "短信服务额度已用完，请联系管理员处理"}
-	AdminExists                 = Definition{Name: "AdminExists", Code: 40910, Message: "管理员账号已存在"}
-	AdminPhoneExists            = Definition{Name: "AdminPhoneExists", Code: 40911, Message: "手机号已绑定其他管理员"}
+	AuthUserNotFound                     = Definition{Name: "AuthUserNotFound", Code: 10001, Message: "用户不存在"}
+	AuthInvalidPassword                  = Definition{Name: "AuthInvalidPassword", Code: 10002, Message: "密码错误"}
+	AuthUserDisabled                     = Definition{Name: "AuthUserDisabled", Code: 10003, Message: "用户已被禁用"}
+	AuthUserExists                       = Definition{Name: "AuthUserExists", Code: 10004, Message: "用户名已存在"}
+	AuthExpired                          = Definition{Name: "AuthExpired", Code: 10005, Message: "登录已过期，请重新登录"}
+	AuthInvalid                          = Definition{Name: "AuthInvalid", Code: 10006, Message: "登录无效，请重新登录"}
+	AuthInvalidPhone                     = Definition{Name: "AuthInvalidPhone", Code: 10007, Message: "手机号格式不正确"}
+	AuthInvalidSMSCode                   = Definition{Name: "AuthInvalidSMSCode", Code: 10008, Message: "验证码错误"}
+	AuthSMSCodeExpired                   = Definition{Name: "AuthSMSCodeExpired", Code: 10009, Message: "验证码已过期，请重新获取"}
+	AuthSMSCodeTooFrequent               = Definition{Name: "AuthSMSCodeTooFrequent", Code: 10010, Message: "验证码发送过于频繁，请稍后再试"}
+	AuthSMSCodeAttemptsExceeded          = Definition{Name: "AuthSMSCodeAttemptsExceeded", Code: 10011, Message: "验证码错误次数过多，请重新获取"}
+	AuthPhoneNotBound                    = Definition{Name: "AuthPhoneNotBound", Code: 10012, Message: "该手机号未开通登录权限，请联系管理员"}
+	AuthMobileRoleDenied                 = Definition{Name: "AuthMobileRoleDenied", Code: 10013, Message: "该账号暂无当前岗位任务端登录权限，请联系管理员"}
+	AuthSMSLoginDisabled                 = Definition{Name: "AuthSMSLoginDisabled", Code: 10014, Message: "当前部署未启用短信登录"}
+	AuthSMSServiceUnavailable            = Definition{Name: "AuthSMSServiceUnavailable", Code: 10015, Message: "短信服务暂不可用，请稍后再试或联系管理员"}
+	AuthSMSServiceQuotaExceeded          = Definition{Name: "AuthSMSServiceQuotaExceeded", Code: 10016, Message: "短信服务额度已用完，请联系管理员处理"}
+	AdminExists                          = Definition{Name: "AdminExists", Code: 40910, Message: "管理员账号已存在"}
+	AdminPhoneExists                     = Definition{Name: "AdminPhoneExists", Code: 40911, Message: "手机号已绑定其他管理员"}
+	IdempotencyConflict                  = Definition{Name: "IdempotencyConflict", Code: 40920, Message: "重复请求内容与首次提交不一致，请刷新后重试"}
+	ProcessDomainCommandRecoveryRequired = Definition{Name: "ProcessDomainCommandRecoveryRequired", Code: 40921, Message: "此前业务处理结果需要人工核对，当前流程暂时无法继续，请联系管理员"}
 
 	Internal              = Definition{Name: "Internal", Code: 50000, Message: "服务器内部错误"}
 	AuthCurrentUserFailed = Definition{Name: "AuthCurrentUserFailed", Code: 50001, Message: "获取用户信息失败"}
@@ -90,6 +92,8 @@ var definitions = []Definition{
 	AuthSMSServiceQuotaExceeded,
 	AdminExists,
 	AdminPhoneExists,
+	IdempotencyConflict,
+	ProcessDomainCommandRecoveryRequired,
 	Internal,
 	AuthCurrentUserFailed,
 	UserListFailed,

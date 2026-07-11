@@ -228,6 +228,20 @@ func (_u *StockReservationUpdate) SetNillableReservedAt(v *time.Time) *StockRese
 	return _u
 }
 
+// SetReservedAtSpecified sets the "reserved_at_specified" field.
+func (_u *StockReservationUpdate) SetReservedAtSpecified(v bool) *StockReservationUpdate {
+	_u.mutation.SetReservedAtSpecified(v)
+	return _u
+}
+
+// SetNillableReservedAtSpecified sets the "reserved_at_specified" field if the given value is not nil.
+func (_u *StockReservationUpdate) SetNillableReservedAtSpecified(v *bool) *StockReservationUpdate {
+	if v != nil {
+		_u.SetReservedAtSpecified(*v)
+	}
+	return _u
+}
+
 // SetReleasedAt sets the "released_at" field.
 func (_u *StockReservationUpdate) SetReleasedAt(v time.Time) *StockReservationUpdate {
 	_u.mutation.SetReleasedAt(v)
@@ -527,6 +541,9 @@ func (_u *StockReservationUpdate) sqlSave(ctx context.Context) (_node int, err e
 	}
 	if value, ok := _u.mutation.ReservedAt(); ok {
 		_spec.SetField(stockreservation.FieldReservedAt, field.TypeTime, value)
+	}
+	if value, ok := _u.mutation.ReservedAtSpecified(); ok {
+		_spec.SetField(stockreservation.FieldReservedAtSpecified, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.ReleasedAt(); ok {
 		_spec.SetField(stockreservation.FieldReleasedAt, field.TypeTime, value)
@@ -964,6 +981,20 @@ func (_u *StockReservationUpdateOne) SetNillableReservedAt(v *time.Time) *StockR
 	return _u
 }
 
+// SetReservedAtSpecified sets the "reserved_at_specified" field.
+func (_u *StockReservationUpdateOne) SetReservedAtSpecified(v bool) *StockReservationUpdateOne {
+	_u.mutation.SetReservedAtSpecified(v)
+	return _u
+}
+
+// SetNillableReservedAtSpecified sets the "reserved_at_specified" field if the given value is not nil.
+func (_u *StockReservationUpdateOne) SetNillableReservedAtSpecified(v *bool) *StockReservationUpdateOne {
+	if v != nil {
+		_u.SetReservedAtSpecified(*v)
+	}
+	return _u
+}
+
 // SetReleasedAt sets the "released_at" field.
 func (_u *StockReservationUpdateOne) SetReleasedAt(v time.Time) *StockReservationUpdateOne {
 	_u.mutation.SetReleasedAt(v)
@@ -1293,6 +1324,9 @@ func (_u *StockReservationUpdateOne) sqlSave(ctx context.Context) (_node *StockR
 	}
 	if value, ok := _u.mutation.ReservedAt(); ok {
 		_spec.SetField(stockreservation.FieldReservedAt, field.TypeTime, value)
+	}
+	if value, ok := _u.mutation.ReservedAtSpecified(); ok {
+		_spec.SetField(stockreservation.FieldReservedAtSpecified, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.ReleasedAt(); ok {
 		_spec.SetField(stockreservation.FieldReleasedAt, field.TypeTime, value)

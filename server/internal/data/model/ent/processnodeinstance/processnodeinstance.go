@@ -42,6 +42,34 @@ const (
 	FieldCompletedAt = "completed_at"
 	// FieldOutcome holds the string denoting the outcome field in the database.
 	FieldOutcome = "outcome"
+	// FieldDomainCommandFingerprint holds the string denoting the domain_command_fingerprint field in the database.
+	FieldDomainCommandFingerprint = "domain_command_fingerprint"
+	// FieldDomainCommandProtocolVersion holds the string denoting the domain_command_protocol_version field in the database.
+	FieldDomainCommandProtocolVersion = "domain_command_protocol_version"
+	// FieldDomainCommandResultState holds the string denoting the domain_command_result_state field in the database.
+	FieldDomainCommandResultState = "domain_command_result_state"
+	// FieldDomainCommandResult holds the string denoting the domain_command_result field in the database.
+	FieldDomainCommandResult = "domain_command_result"
+	// FieldDomainCommandResultHash holds the string denoting the domain_command_result_hash field in the database.
+	FieldDomainCommandResultHash = "domain_command_result_hash"
+	// FieldDomainCommandEffectState holds the string denoting the domain_command_effect_state field in the database.
+	FieldDomainCommandEffectState = "domain_command_effect_state"
+	// FieldDomainCommandEffectRefType holds the string denoting the domain_command_effect_ref_type field in the database.
+	FieldDomainCommandEffectRefType = "domain_command_effect_ref_type"
+	// FieldDomainCommandEffectRefID holds the string denoting the domain_command_effect_ref_id field in the database.
+	FieldDomainCommandEffectRefID = "domain_command_effect_ref_id"
+	// FieldDomainCommandResultRecordedAt holds the string denoting the domain_command_result_recorded_at field in the database.
+	FieldDomainCommandResultRecordedAt = "domain_command_result_recorded_at"
+	// FieldDomainCommandResultRecordedBy holds the string denoting the domain_command_result_recorded_by field in the database.
+	FieldDomainCommandResultRecordedBy = "domain_command_result_recorded_by"
+	// FieldDomainCommandCompensation holds the string denoting the domain_command_compensation field in the database.
+	FieldDomainCommandCompensation = "domain_command_compensation"
+	// FieldDomainCommandCompensationHash holds the string denoting the domain_command_compensation_hash field in the database.
+	FieldDomainCommandCompensationHash = "domain_command_compensation_hash"
+	// FieldDomainCommandCompensatedAt holds the string denoting the domain_command_compensated_at field in the database.
+	FieldDomainCommandCompensatedAt = "domain_command_compensated_at"
+	// FieldDomainCommandCompensatedBy holds the string denoting the domain_command_compensated_by field in the database.
+	FieldDomainCommandCompensatedBy = "domain_command_compensated_by"
 	// FieldVersion holds the string denoting the version field in the database.
 	FieldVersion = "version"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -78,6 +106,20 @@ var Columns = []string{
 	FieldStartedAt,
 	FieldCompletedAt,
 	FieldOutcome,
+	FieldDomainCommandFingerprint,
+	FieldDomainCommandProtocolVersion,
+	FieldDomainCommandResultState,
+	FieldDomainCommandResult,
+	FieldDomainCommandResultHash,
+	FieldDomainCommandEffectState,
+	FieldDomainCommandEffectRefType,
+	FieldDomainCommandEffectRefID,
+	FieldDomainCommandResultRecordedAt,
+	FieldDomainCommandResultRecordedBy,
+	FieldDomainCommandCompensation,
+	FieldDomainCommandCompensationHash,
+	FieldDomainCommandCompensatedAt,
+	FieldDomainCommandCompensatedBy,
 	FieldVersion,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -118,6 +160,26 @@ var (
 	ActionSetKeyValidator func(string) error
 	// OutcomeValidator is a validator for the "outcome" field. It is called by the builders before save.
 	OutcomeValidator func(string) error
+	// DomainCommandFingerprintValidator is a validator for the "domain_command_fingerprint" field. It is called by the builders before save.
+	DomainCommandFingerprintValidator func(string) error
+	// DomainCommandProtocolVersionValidator is a validator for the "domain_command_protocol_version" field. It is called by the builders before save.
+	DomainCommandProtocolVersionValidator func(int) error
+	// DomainCommandResultStateValidator is a validator for the "domain_command_result_state" field. It is called by the builders before save.
+	DomainCommandResultStateValidator func(string) error
+	// DomainCommandResultHashValidator is a validator for the "domain_command_result_hash" field. It is called by the builders before save.
+	DomainCommandResultHashValidator func(string) error
+	// DomainCommandEffectStateValidator is a validator for the "domain_command_effect_state" field. It is called by the builders before save.
+	DomainCommandEffectStateValidator func(string) error
+	// DomainCommandEffectRefTypeValidator is a validator for the "domain_command_effect_ref_type" field. It is called by the builders before save.
+	DomainCommandEffectRefTypeValidator func(string) error
+	// DomainCommandEffectRefIDValidator is a validator for the "domain_command_effect_ref_id" field. It is called by the builders before save.
+	DomainCommandEffectRefIDValidator func(int) error
+	// DomainCommandResultRecordedByValidator is a validator for the "domain_command_result_recorded_by" field. It is called by the builders before save.
+	DomainCommandResultRecordedByValidator func(int) error
+	// DomainCommandCompensationHashValidator is a validator for the "domain_command_compensation_hash" field. It is called by the builders before save.
+	DomainCommandCompensationHashValidator func(string) error
+	// DomainCommandCompensatedByValidator is a validator for the "domain_command_compensated_by" field. It is called by the builders before save.
+	DomainCommandCompensatedByValidator func(int) error
 	// DefaultVersion holds the default value on creation for the "version" field.
 	DefaultVersion int
 	// VersionValidator is a validator for the "version" field. It is called by the builders before save.
@@ -201,6 +263,66 @@ func ByCompletedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByOutcome orders the results by the outcome field.
 func ByOutcome(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldOutcome, opts...).ToFunc()
+}
+
+// ByDomainCommandFingerprint orders the results by the domain_command_fingerprint field.
+func ByDomainCommandFingerprint(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandFingerprint, opts...).ToFunc()
+}
+
+// ByDomainCommandProtocolVersion orders the results by the domain_command_protocol_version field.
+func ByDomainCommandProtocolVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandProtocolVersion, opts...).ToFunc()
+}
+
+// ByDomainCommandResultState orders the results by the domain_command_result_state field.
+func ByDomainCommandResultState(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandResultState, opts...).ToFunc()
+}
+
+// ByDomainCommandResultHash orders the results by the domain_command_result_hash field.
+func ByDomainCommandResultHash(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandResultHash, opts...).ToFunc()
+}
+
+// ByDomainCommandEffectState orders the results by the domain_command_effect_state field.
+func ByDomainCommandEffectState(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandEffectState, opts...).ToFunc()
+}
+
+// ByDomainCommandEffectRefType orders the results by the domain_command_effect_ref_type field.
+func ByDomainCommandEffectRefType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandEffectRefType, opts...).ToFunc()
+}
+
+// ByDomainCommandEffectRefID orders the results by the domain_command_effect_ref_id field.
+func ByDomainCommandEffectRefID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandEffectRefID, opts...).ToFunc()
+}
+
+// ByDomainCommandResultRecordedAt orders the results by the domain_command_result_recorded_at field.
+func ByDomainCommandResultRecordedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandResultRecordedAt, opts...).ToFunc()
+}
+
+// ByDomainCommandResultRecordedBy orders the results by the domain_command_result_recorded_by field.
+func ByDomainCommandResultRecordedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandResultRecordedBy, opts...).ToFunc()
+}
+
+// ByDomainCommandCompensationHash orders the results by the domain_command_compensation_hash field.
+func ByDomainCommandCompensationHash(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandCompensationHash, opts...).ToFunc()
+}
+
+// ByDomainCommandCompensatedAt orders the results by the domain_command_compensated_at field.
+func ByDomainCommandCompensatedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandCompensatedAt, opts...).ToFunc()
+}
+
+// ByDomainCommandCompensatedBy orders the results by the domain_command_compensated_by field.
+func ByDomainCommandCompensatedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandCompensatedBy, opts...).ToFunc()
 }
 
 // ByVersion orders the results by the version field.

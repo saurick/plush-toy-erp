@@ -11,11 +11,22 @@ import (
 // evaluated by the domain API's module gate so callers can distinguish
 // read-only/disabled modules from missing role capability.
 func (uc *CustomerConfigUsecase) GetEffectiveActionEntitlements(ctx context.Context, customerKey string, admin *AdminUser) ([]string, error) {
+	return uc.getEffectiveActionEntitlements(ctx, customerKey, admin, true)
+}
+
+// GetEffectiveActionEntitlementsRequiringActiveRevision prevents a deployment
+// pinned to a real customer key from widening business actions to builtin RBAC
+// when that customer's active revision is missing.
+func (uc *CustomerConfigUsecase) GetEffectiveActionEntitlementsRequiringActiveRevision(ctx context.Context, customerKey string, admin *AdminUser) ([]string, error) {
+	return uc.getEffectiveActionEntitlements(ctx, customerKey, admin, false)
+}
+
+func (uc *CustomerConfigUsecase) getEffectiveActionEntitlements(ctx context.Context, customerKey string, admin *AdminUser, allowBuiltinFallback bool) ([]string, error) {
 	if uc == nil || uc.repo == nil || admin == nil || admin.Disabled {
 		return nil, ErrForbidden
 	}
 	baseActions := PermissionKeySet(effectiveActionKeys(admin))
-	if admin.IsSuperAdmin {
+	if admin.IsSuperAdmin && allowBuiltinFallback {
 		return sortedPermissionKeys(baseActions), nil
 	}
 	customerKey = NormalizeCustomerKey(customerKey)
@@ -25,9 +36,17 @@ func (uc *CustomerConfigUsecase) GetEffectiveActionEntitlements(ctx context.Cont
 	active, err := uc.repo.GetActiveCustomerConfigRevision(ctx, customerKey)
 	if err != nil {
 		if errors.Is(err, ErrCustomerConfigNotFound) {
-			return sortedPermissionKeys(baseActions), nil
+			if allowBuiltinFallback {
+				return sortedPermissionKeys(baseActions), nil
+			}
+			// Keep system/customer-config repair permissions in the service RBAC
+			// layer, but expose no customer-scoped business action entitlement.
+			return []string{}, nil
 		}
 		return nil, err
+	}
+	if admin.IsSuperAdmin {
+		return sortedPermissionKeys(baseActions), nil
 	}
 	roleProfiles, err := uc.repo.ListRoleProfiles(ctx, customerKey, active.Revision)
 	if err != nil {

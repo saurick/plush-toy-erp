@@ -86,13 +86,14 @@ func (d *jsonrpcDispatcher) handleInventory(
 
 func inventoryBalanceFilterFromParams(pm map[string]any) biz.InventoryBalanceFilter {
 	return biz.InventoryBalanceFilter{
-		SubjectType: getString(pm, "subject_type"),
-		SubjectID:   getInt(pm, "subject_id", 0),
-		WarehouseID: getInt(pm, "warehouse_id", 0),
-		LotID:       getInt(pm, "lot_id", 0),
-		Keyword:     getString(pm, "keyword"),
-		Limit:       getInt(pm, "limit", 50),
-		Offset:      getInt(pm, "offset", 0),
+		SubjectType:  getString(pm, "subject_type"),
+		SubjectID:    getInt(pm, "subject_id", 0),
+		ProductSkuID: getInt(pm, "product_sku_id", 0),
+		WarehouseID:  getInt(pm, "warehouse_id", 0),
+		LotID:        getInt(pm, "lot_id", 0),
+		Keyword:      getString(pm, "keyword"),
+		Limit:        getInt(pm, "limit", 50),
+		Offset:       getInt(pm, "offset", 0),
 	}
 }
 
@@ -106,15 +107,16 @@ func inventoryLotFilterFromParams(pm map[string]any) (biz.InventoryLotFilter, bo
 		return biz.InventoryLotFilter{}, false
 	}
 	return biz.InventoryLotFilter{
-		SubjectType: getString(pm, "subject_type"),
-		SubjectID:   getInt(pm, "subject_id", 0),
-		WarehouseID: getInt(pm, "warehouse_id", 0),
-		Status:      getString(pm, "status"),
-		Keyword:     getString(pm, "keyword"),
-		DateFrom:    dateFrom,
-		DateTo:      dateTo,
-		Limit:       getInt(pm, "limit", 50),
-		Offset:      getInt(pm, "offset", 0),
+		SubjectType:  getString(pm, "subject_type"),
+		SubjectID:    getInt(pm, "subject_id", 0),
+		ProductSkuID: getInt(pm, "product_sku_id", 0),
+		WarehouseID:  getInt(pm, "warehouse_id", 0),
+		Status:       getString(pm, "status"),
+		Keyword:      getString(pm, "keyword"),
+		DateFrom:     dateFrom,
+		DateTo:       dateTo,
+		Limit:        getInt(pm, "limit", 50),
+		Offset:       getInt(pm, "offset", 0),
 	}, true
 }
 
@@ -128,18 +130,19 @@ func inventoryTxnFilterFromParams(pm map[string]any) (biz.InventoryTxnFilter, bo
 		return biz.InventoryTxnFilter{}, false
 	}
 	return biz.InventoryTxnFilter{
-		SubjectType: getString(pm, "subject_type"),
-		SubjectID:   getInt(pm, "subject_id", 0),
-		WarehouseID: getInt(pm, "warehouse_id", 0),
-		LotID:       getInt(pm, "lot_id", 0),
-		TxnType:     getString(pm, "txn_type"),
-		SourceType:  getString(pm, "source_type"),
-		SourceID:    getInt(pm, "source_id", 0),
-		Keyword:     getString(pm, "keyword"),
-		DateFrom:    dateFrom,
-		DateTo:      dateTo,
-		Limit:       getInt(pm, "limit", 50),
-		Offset:      getInt(pm, "offset", 0),
+		SubjectType:  getString(pm, "subject_type"),
+		SubjectID:    getInt(pm, "subject_id", 0),
+		ProductSkuID: getInt(pm, "product_sku_id", 0),
+		WarehouseID:  getInt(pm, "warehouse_id", 0),
+		LotID:        getInt(pm, "lot_id", 0),
+		TxnType:      getString(pm, "txn_type"),
+		SourceType:   getString(pm, "source_type"),
+		SourceID:     getInt(pm, "source_id", 0),
+		Keyword:      getString(pm, "keyword"),
+		DateFrom:     dateFrom,
+		DateTo:       dateTo,
+		Limit:        getInt(pm, "limit", 50),
+		Offset:       getInt(pm, "offset", 0),
 	}, true
 }
 
@@ -171,6 +174,7 @@ func inventoryBalanceToAny(item *biz.InventoryBalance) map[string]any {
 		"id":                       item.ID,
 		"subject_type":             item.SubjectType,
 		"subject_id":               item.SubjectID,
+		"product_sku_id":           optionalIntToAny(item.ProductSkuID),
 		"warehouse_id":             item.WarehouseID,
 		"lot_id":                   optionalIntToAny(item.LotID),
 		"unit_id":                  item.UnitID,
@@ -197,6 +201,7 @@ func inventoryLotToAny(item *biz.InventoryLot) map[string]any {
 		"id":                item.ID,
 		"subject_type":      item.SubjectType,
 		"subject_id":        item.SubjectID,
+		"product_sku_id":    optionalIntToAny(item.ProductSkuID),
 		"lot_no":            item.LotNo,
 		"supplier_lot_no":   optionalStringToAny(item.SupplierLotNo),
 		"color_no":          optionalStringToAny(item.ColorNo),
@@ -225,6 +230,7 @@ func inventoryTxnToAny(item *biz.InventoryTxn) map[string]any {
 		"id":                 item.ID,
 		"subject_type":       item.SubjectType,
 		"subject_id":         item.SubjectID,
+		"product_sku_id":     optionalIntToAny(item.ProductSkuID),
 		"warehouse_id":       item.WarehouseID,
 		"lot_id":             optionalIntToAny(item.LotID),
 		"txn_type":           item.TxnType,

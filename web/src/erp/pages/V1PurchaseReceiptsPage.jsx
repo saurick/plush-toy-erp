@@ -13,6 +13,8 @@ import {
 } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   addPurchaseReceiptItem,
   cancelPurchaseReceipt,
@@ -459,6 +461,8 @@ export default function V1PurchaseReceiptsPage() {
       ? searchParamPositiveIntText(searchParams, 'source_id')
       : '')
 
+  const beginLatestRequest = useLatestRequestCoordinator()
+
   const canCreate = hasActionPermission(adminProfile, 'purchase.receipt.create')
   const canPost =
     canCreate || hasActionPermission(adminProfile, 'warehouse.inbound.confirm')
@@ -530,6 +534,7 @@ export default function V1PurchaseReceiptsPage() {
   }
 
   const loadRows = useCallback(async () => {
+    const request = beginLatestRequest('rows')
     setLoading(true)
     try {
       const data = await listPurchaseReceipts(
@@ -545,8 +550,12 @@ export default function V1PurchaseReceiptsPage() {
           lot_id: lotFilter || undefined,
           purchase_order_id: routePurchaseOrderID || undefined,
           ...getBusinessPaginationParams(pagination),
-        })
+        }),
+        { signal: request.signal }
       )
+      if (!request.isCurrent()) {
+        return
+      }
       const nextRows = Array.isArray(data?.purchase_receipts)
         ? data.purchase_receipts
         : []
@@ -562,11 +571,18 @@ export default function V1PurchaseReceiptsPage() {
       })
       setTotal(Number(data?.total || 0))
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return
+      }
       message.error(getActionErrorMessage(error, '加载采购入库单'))
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
     }
   }, [
+    beginLatestRequest,
     dateFilterEnd,
     dateFilterField,
     dateFilterStart,

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/outsourcingfact"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/warehouse"
 	"time"
@@ -59,6 +60,20 @@ func (_c *OutsourcingFactCreate) SetSubjectType(v string) *OutsourcingFactCreate
 // SetSubjectID sets the "subject_id" field.
 func (_c *OutsourcingFactCreate) SetSubjectID(v int) *OutsourcingFactCreate {
 	_c.mutation.SetSubjectID(v)
+	return _c
+}
+
+// SetProductSkuID sets the "product_sku_id" field.
+func (_c *OutsourcingFactCreate) SetProductSkuID(v int) *OutsourcingFactCreate {
+	_c.mutation.SetProductSkuID(v)
+	return _c
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_c *OutsourcingFactCreate) SetNillableProductSkuID(v *int) *OutsourcingFactCreate {
+	if v != nil {
+		_c.SetProductSkuID(*v)
+	}
 	return _c
 }
 
@@ -184,6 +199,20 @@ func (_c *OutsourcingFactCreate) SetNillableOccurredAt(v *time.Time) *Outsourcin
 	return _c
 }
 
+// SetOccurredAtSpecified sets the "occurred_at_specified" field.
+func (_c *OutsourcingFactCreate) SetOccurredAtSpecified(v bool) *OutsourcingFactCreate {
+	_c.mutation.SetOccurredAtSpecified(v)
+	return _c
+}
+
+// SetNillableOccurredAtSpecified sets the "occurred_at_specified" field if the given value is not nil.
+func (_c *OutsourcingFactCreate) SetNillableOccurredAtSpecified(v *bool) *OutsourcingFactCreate {
+	if v != nil {
+		_c.SetOccurredAtSpecified(*v)
+	}
+	return _c
+}
+
 // SetPostedAt sets the "posted_at" field.
 func (_c *OutsourcingFactCreate) SetPostedAt(v time.Time) *OutsourcingFactCreate {
 	_c.mutation.SetPostedAt(v)
@@ -248,6 +277,11 @@ func (_c *OutsourcingFactCreate) SetWarehouse(v *Warehouse) *OutsourcingFactCrea
 // SetUnit sets the "unit" edge to the Unit entity.
 func (_c *OutsourcingFactCreate) SetUnit(v *Unit) *OutsourcingFactCreate {
 	return _c.SetUnitID(v.ID)
+}
+
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_c *OutsourcingFactCreate) SetProductSku(v *ProductSKU) *OutsourcingFactCreate {
+	return _c.SetProductSkuID(v.ID)
 }
 
 // SetInventoryLotID sets the "inventory_lot" edge to the InventoryLot entity by ID.
@@ -317,6 +351,10 @@ func (_c *OutsourcingFactCreate) defaults() error {
 		v := outsourcingfact.DefaultOccurredAt()
 		_c.mutation.SetOccurredAt(v)
 	}
+	if _, ok := _c.mutation.OccurredAtSpecified(); !ok {
+		v := outsourcingfact.DefaultOccurredAtSpecified
+		_c.mutation.SetOccurredAtSpecified(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		if outsourcingfact.DefaultCreatedAt == nil {
 			return fmt.Errorf("ent: uninitialized outsourcingfact.DefaultCreatedAt (forgotten import ent/runtime?)")
@@ -374,6 +412,11 @@ func (_c *OutsourcingFactCreate) check() error {
 	if v, ok := _c.mutation.SubjectID(); ok {
 		if err := outsourcingfact.SubjectIDValidator(v); err != nil {
 			return &ValidationError{Name: "subject_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.subject_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ProductSkuID(); ok {
+		if err := outsourcingfact.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.product_sku_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.WarehouseID(); !ok {
@@ -435,6 +478,9 @@ func (_c *OutsourcingFactCreate) check() error {
 	}
 	if _, ok := _c.mutation.OccurredAt(); !ok {
 		return &ValidationError{Name: "occurred_at", err: errors.New(`ent: missing required field "OutsourcingFact.occurred_at"`)}
+	}
+	if _, ok := _c.mutation.OccurredAtSpecified(); !ok {
+		return &ValidationError{Name: "occurred_at_specified", err: errors.New(`ent: missing required field "OutsourcingFact.occurred_at_specified"`)}
 	}
 	if v, ok := _c.mutation.Note(); ok {
 		if err := outsourcingfact.NoteValidator(v); err != nil {
@@ -531,6 +577,10 @@ func (_c *OutsourcingFactCreate) createSpec() (*OutsourcingFact, *sqlgraph.Creat
 		_spec.SetField(outsourcingfact.FieldOccurredAt, field.TypeTime, value)
 		_node.OccurredAt = value
 	}
+	if value, ok := _c.mutation.OccurredAtSpecified(); ok {
+		_spec.SetField(outsourcingfact.FieldOccurredAtSpecified, field.TypeBool, value)
+		_node.OccurredAtSpecified = value
+	}
 	if value, ok := _c.mutation.PostedAt(); ok {
 		_spec.SetField(outsourcingfact.FieldPostedAt, field.TypeTime, value)
 		_node.PostedAt = &value
@@ -579,6 +629,23 @@ func (_c *OutsourcingFactCreate) createSpec() (*OutsourcingFact, *sqlgraph.Creat
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.UnitID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   outsourcingfact.ProductSkuTable,
+			Columns: []string{outsourcingfact.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ProductSkuID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.InventoryLotIDs(); len(nodes) > 0 {

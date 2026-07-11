@@ -7,6 +7,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -14,6 +15,14 @@ import (
 
 type InventoryTxn struct {
 	ent.Schema
+}
+
+func (InventoryTxn) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{Checks: map[string]string{
+			"inventory_txns_sku_subject_allowed": "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
+		}},
+	}
 }
 
 func (InventoryTxn) Hooks() []ent.Hook {
@@ -37,6 +46,11 @@ func (InventoryTxn) Fields() []ent.Field {
 			MaxLen(16).
 			Immutable(),
 		field.Int("subject_id").
+			Positive().
+			Immutable(),
+		field.Int("product_sku_id").
+			Optional().
+			Nillable().
 			Positive().
 			Immutable(),
 		field.Int("warehouse_id").
@@ -84,6 +98,9 @@ func (InventoryTxn) Fields() []ent.Field {
 		field.Time("occurred_at").
 			Default(time.Now).
 			Immutable(),
+		field.Bool("occurred_at_specified").
+			Default(false).
+			Immutable(),
 		field.Time("created_at").
 			Default(time.Now).
 			Immutable(),
@@ -114,6 +131,12 @@ func (InventoryTxn) Edges() []ent.Edge {
 			Required().
 			Unique().
 			Immutable(),
+		edge.From("product_sku", ProductSKU.Type).
+			Ref("inventory_txns").
+			Field("product_sku_id").
+			Unique().
+			Immutable().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("inventory_lot", InventoryLot.Type).
 			Ref("inventory_txns").
 			Field("lot_id").
@@ -126,6 +149,7 @@ func (InventoryTxn) Edges() []ent.Edge {
 func (InventoryTxn) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("idempotency_key").Unique(),
+		index.Fields("product_sku_id"),
 		index.Fields("subject_type", "subject_id", "warehouse_id", "lot_id", "occurred_at"),
 		index.Fields("source_type", "source_id", "source_line_id"),
 		index.Fields("reversal_of_txn_id").Unique(),

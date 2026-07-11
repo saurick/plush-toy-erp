@@ -258,10 +258,52 @@ function validateCustomerConfigReleaseOverlay() {
     "customer web config overlay script must exist",
   );
   const dockerignore = readFileSync(repoPath(".dockerignore"), "utf8");
+  const dockerignoreEntries = new Set(
+    dockerignore
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#")),
+  );
   assert(
     dockerignore.includes("!scripts/build/**"),
     ".dockerignore must keep scripts/build/** in the Docker build context",
   );
+  for (const privateBuildContextPath of [
+    "docs",
+    "deployments",
+    "config/customers/**/assets",
+    "**/.env",
+    "**/.env.*",
+    "**/.npmrc.local",
+  ]) {
+    assert(
+      dockerignoreEntries.has(privateBuildContextPath),
+      `.dockerignore must exclude ${privateBuildContextPath} from the Docker build context`,
+    );
+  }
+  for (const publicBuildContextPath of [
+    "!**/.env.example",
+    "!web/.env.development",
+    "!web/.env.production",
+  ]) {
+    assert(
+      dockerignoreEntries.has(publicBuildContextPath),
+      `.dockerignore must keep ${publicBuildContextPath.slice(1)} in the Docker build context`,
+    );
+  }
+  const gitAttributes = readFileSync(repoPath(".gitattributes"), "utf8");
+  for (const privateArchivePath of [
+    "docs/customers/** export-ignore",
+    "config/customers/*/assets/** export-ignore",
+  ]) {
+    assert(
+      gitAttributes
+        .split(/\r?\n/u)
+        .map((line) => line.trim())
+        .includes(privateArchivePath),
+      `.gitattributes must exclude ${privateArchivePath.split(" ")[0]} from git archives`,
+    );
+  }
   for (const dockerfile of ["web/Dockerfile", "server/Dockerfile"]) {
     const source = readFileSync(repoPath(dockerfile), "utf8");
     assert(

@@ -25,6 +25,7 @@ func operationalFactMutationFromParams(pm map[string]any) (*biz.OperationalFactM
 		FactType:       getString(pm, "fact_type"),
 		SubjectType:    getString(pm, "subject_type"),
 		SubjectID:      getInt(pm, "subject_id", 0),
+		ProductSkuID:   getOptionalInt(pm, "product_sku_id"),
 		WarehouseID:    getInt(pm, "warehouse_id", 0),
 		UnitID:         getInt(pm, "unit_id", 0),
 		LotID:          getOptionalInt(pm, "lot_id"),
@@ -120,6 +121,9 @@ func unknownOperationalFactResult(method string) *v1.JsonrpcResult {
 func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrIdempotencyConflict):
+		l.Warnf("[operational_fact] idempotency payload conflict err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[operational_fact] invalid param err=%v", err)
 		return invalidParamResult()
@@ -147,8 +151,20 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外事实不存在"}
 	case errors.Is(err, biz.ErrShipmentNotFound), errors.Is(err, biz.ErrShipmentItemNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货单或出货行不存在"}
+	case errors.Is(err, biz.ErrShipmentSourceMismatch):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货来源与销售订单、客户或订单行不一致，请刷新来源后重试"}
+	case errors.Is(err, biz.ErrShipmentOrderNotActive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单尚未生效或已关闭，不能确认出货"}
+	case errors.Is(err, biz.ErrShipmentQuantityExceeded):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次出货将超过销售订单行剩余可出货数量"}
+	case errors.Is(err, biz.ErrShipmentReservationSplit):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次出货小于对应的原子预留数量，请先释放并按本次出货数量重建预留"}
 	case errors.Is(err, biz.ErrStockReservationNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存预留不存在"}
+	case errors.Is(err, biz.ErrStockReservationSourceMismatch):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存预留与销售订单或订单行不一致，请刷新来源后重试"}
+	case errors.Is(err, biz.ErrStockReservationQuantityExceeded):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "预留数量与已出货数量合计超过销售订单行数量"}
 	case errors.Is(err, biz.ErrFinanceFactNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "财务事实不存在"}
 	default:

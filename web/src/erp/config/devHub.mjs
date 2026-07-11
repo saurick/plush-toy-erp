@@ -36,7 +36,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
     group: '文档治理 / Docs',
     route: DEV_DOCS_ROUTE,
     source: 'docs/**/*.md',
-    truthSource: '仓库 tracked Markdown / Repo Markdown',
+    truthSource: '当前工作区 Markdown / Workspace Markdown',
     status: '本地只读 / Local read-only',
     guardrails: Object.freeze([
       '不进菜单 / No menu',
@@ -44,7 +44,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不进生产构建 / No prod build',
     ]),
     description:
-      '按真实目录树浏览仓库 tracked Markdown；browse repo Markdown by real directory tree.',
+      '按真实目录树浏览当前工作区内的 Markdown；browse workspace Markdown by real directory tree.',
   }),
   Object.freeze({
     key: 'testing',
@@ -97,19 +97,19 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'customer-config',
-    title: '客户配置包导入 / Package Import',
+    title: '客户配置包预检与发布 / Package Preflight & Release',
     group: '客户治理 / Customer Governance',
     route: DEV_CUSTOMER_CONFIG_ROUTE,
     source: 'config/customers/yoyoosun',
-    truthSource: '客户配置包与导入 tooling / Customer package',
-    status: '导入控制台 / Import console',
+    truthSource: '已登记客户配置包 / Registered customer package',
+    status: '预检与发布控制台 / Preflight & release console',
     guardrails: Object.freeze([
-      '受控导入 / Controlled import',
+      '发布前预检 / Preflight before release',
       '不做真实导入 / No real import',
       '不写核心规则 / No core rules',
     ]),
     description:
-      '汇总 yoyoosun 客户配置包、菜单品牌、字段编号草案、打印模板字段、差异、Dry Run、版本回滚、审计和导入边界；review package import boundaries.',
+      '读取已登记的 yoyoosun 客户配置包，完成预检、差异、Dry Run 证据、测试配置应用和发布门禁；review registered package before controlled release.',
   }),
 ])
 

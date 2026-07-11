@@ -126,6 +126,7 @@ function buildPermissionGroups(permissions = []) {
     }
     const moduleKey = String(permission.module || 'other').trim() || 'other'
     const group = groups.get(moduleKey) || {
+      key: moduleKey,
       title: getPermissionModuleTitle(moduleKey),
       items: [],
     }
@@ -297,7 +298,7 @@ function PermissionChecklist({
       <div className="erp-permission-checklist">
         {visibleGroups.map((section) => {
           const originalSection =
-            groups.find((item) => item.title === section.title) || section
+            groups.find((item) => item.key === section.key) || section
           const sectionKeys = section.items.map((item) => item.key)
           const originalSectionKeys = originalSection.items.map(
             (item) => item.key
@@ -316,7 +317,7 @@ function PermissionChecklist({
           return (
             <section
               className="erp-permission-checklist__section"
-              key={section.title}
+              key={section.key}
             >
               <div className="erp-permission-checklist__header">
                 <span className="erp-permission-checklist__title">

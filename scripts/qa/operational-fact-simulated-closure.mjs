@@ -9,7 +9,8 @@ const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR =
   "output/customers/yoyoosun/operational-fact-simulated-closure";
 const SIMULATION_PREFIX = "SIM-YOYOOSUN-OPFACT";
-const INPUT_TEMPLATE_SCOPE = "operational-fact-simulated-closure-input-template";
+const INPUT_TEMPLATE_SCOPE =
+  "operational-fact-simulated-closure-input-template";
 const CONFIRM_PHRASE = "APPLY_SIMULATED_OPERATIONAL_FACTS";
 const FORBIDDEN_ARG_PATTERN =
   /--(?:execute|import|real|real-import|customer-data)/u;
@@ -29,7 +30,7 @@ Usage:
 
 Report-only mode:
   node scripts/qa/operational-fact-simulated-closure.mjs \\
-    --product-id 1 --unit-id 1 --warehouse-id 1
+    --customer-id 1 --product-id 1 --unit-id 1 --warehouse-id 1
 
 Apply simulated operational fact data through JSON-RPC:
   OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS \\
@@ -37,6 +38,7 @@ Apply simulated operational fact data through JSON-RPC:
     node scripts/qa/operational-fact-simulated-closure.mjs \\
       --apply \\
       --backend-url http://127.0.0.1:8300 \\
+      --customer-id 1 \\
       --product-id 1 \\
       --unit-id 1 \\
       --warehouse-id 1
@@ -46,6 +48,7 @@ Options:
   --apply                Write simulated records through /rpc/operational_fact.
   --backend-url <url>    Backend base URL. Default ${DEFAULT_BACKEND_URL}.
   --out <dir>            Output report directory. Default ${DEFAULT_OUT_DIR}.
+  --customer-id <id>     Active customer ID linked to shipment and receivable facts.
   --product-id <id>      Active product ID used for simulated fact lines.
   --unit-id <id>         Active unit ID used for simulated quantities.
   --warehouse-id <id>    Active warehouse ID used for inventory-affecting facts.
@@ -107,7 +110,8 @@ function parseCliArgs(argv) {
     help: false,
     printInputTemplate: false,
     out: DEFAULT_OUT_DIR,
-    backendURL: process.env.OPERATIONAL_FACT_SIM_BACKEND_URL || DEFAULT_BACKEND_URL,
+    backendURL:
+      process.env.OPERATIONAL_FACT_SIM_BACKEND_URL || DEFAULT_BACKEND_URL,
     runId: process.env.OPERATIONAL_FACT_SIM_RUN_ID || buildTimestampRunId(),
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -154,6 +158,9 @@ function parseCliArgs(argv) {
       case "product-id":
         options.productId = asPositiveInt(value, "--product-id");
         break;
+      case "customer-id":
+        options.customerId = asPositiveInt(value, "--customer-id");
+        break;
       case "unit-id":
         options.unitId = asPositiveInt(value, "--unit-id");
         break;
@@ -170,13 +177,18 @@ function parseCliArgs(argv) {
   options.backendURL = normalizeBaseURL(options.backendURL);
   options.runId = sanitizeRunId(options.runId);
   if (options.printInputTemplate && options.apply) {
-    throw new CliError("--print-input-template cannot be combined with --apply", 2);
+    throw new CliError(
+      "--print-input-template cannot be combined with --apply",
+      2,
+    );
   }
   return options;
 }
 
 function buildInputTemplate(options = {}) {
-  const backendURL = normalizeBaseURL(options.backendURL || DEFAULT_BACKEND_URL);
+  const backendURL = normalizeBaseURL(
+    options.backendURL || DEFAULT_BACKEND_URL,
+  );
   const out = optionalText(options.out) || DEFAULT_OUT_DIR;
   const runId = sanitizeRunId(options.runId || "DEV-TESTING-REPORT");
   return {
@@ -199,6 +211,7 @@ function buildInputTemplate(options = {}) {
     out,
     runId,
     requiredReportInputs: [
+      "--customer-id <active_customer_id>",
       "--product-id <active_product_id>",
       "--unit-id <active_unit_id>",
       "--warehouse-id <active_warehouse_id>",
@@ -206,6 +219,7 @@ function buildInputTemplate(options = {}) {
     requiredApplyInputs: [
       "OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS",
       "OPERATIONAL_FACT_SIM_PASSWORD or TRIAL_ACCOUNT_PASSWORD or ERP_ROLE_DEMO_PASSWORD",
+      "--customer-id <active_customer_id>",
       "--product-id <active_product_id>",
       "--unit-id <active_unit_id>",
       "--warehouse-id <active_warehouse_id>",
@@ -214,10 +228,9 @@ function buildInputTemplate(options = {}) {
     commands: {
       printInputTemplate:
         "PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --print-input-template",
-      reportOnly:
-        `PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --product-id <active_product_id> --unit-id <active_unit_id> --warehouse-id <active_warehouse_id> --run-id ${runId} --out ${out}`,
+      reportOnly: `PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --customer-id <active_customer_id> --product-id <active_product_id> --unit-id <active_unit_id> --warehouse-id <active_warehouse_id> --run-id ${runId} --out ${out}`,
       applySimulated:
-        "OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS OPERATIONAL_FACT_SIM_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --apply --backend-url http://127.0.0.1:8300 --product-id <active_product_id> --unit-id <active_unit_id> --warehouse-id <active_warehouse_id>",
+        "OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS OPERATIONAL_FACT_SIM_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --apply --backend-url http://127.0.0.1:8300 --customer-id <active_customer_id> --product-id <active_product_id> --unit-id <active_unit_id> --warehouse-id <active_warehouse_id>",
       seedCoreDemo:
         "PATH=/usr/local/bin:$PATH bash scripts/seed-core-demo-data.sh",
     },
@@ -247,6 +260,7 @@ function sanitizeRunId(value) {
 
 function ensureIDs(options) {
   return {
+    customerId: asPositiveInt(options.customerId, "customerId"),
     productId: asPositiveInt(options.productId, "productId"),
     unitId: asPositiveInt(options.unitId, "unitId"),
     warehouseId: asPositiveInt(options.warehouseId, "warehouseId"),
@@ -277,7 +291,7 @@ function buildPlan(options) {
         quantity: "20",
         source_type: "SIMULATED_OPERATIONAL_FACT",
         idempotency_key: `${prefix}:PRODUCTION:RECEIPT`,
-        note: "Operational fact simulated closure stock seed; not real customer data.",
+        note: "【手工测试】生产完工入库：用于验证草稿、过账、取消和库存恢复。",
       },
       outsourcingIssue: {
         fact_no: `${prefix}-OUT-MAT`,
@@ -290,7 +304,7 @@ function buildPlan(options) {
         supplier_name: "模拟委外供应商",
         source_type: "SIMULATED_OPERATIONAL_FACT",
         idempotency_key: `${prefix}:OUTSOURCING:ISSUE`,
-        note: "Operational fact simulated outsourcing issue; not real customer data.",
+        note: "【手工测试】委外发料：用于验证过账后取消和库存冲回。",
       },
       stockReservationRelease: {
         reservation_no: `${prefix}-RSV-REL`,
@@ -299,49 +313,43 @@ function buildPlan(options) {
         unit_id: ids.unitId,
         quantity: "1",
         idempotency_key: `${prefix}:RESERVATION:RELEASE`,
-        note: "Operational fact simulated reservation release path.",
-      },
-      stockReservationConsume: {
-        reservation_no: `${prefix}-RSV-CON`,
-        product_id: ids.productId,
-        warehouse_id: ids.warehouseId,
-        unit_id: ids.unitId,
-        quantity: "1",
-        idempotency_key: `${prefix}:RESERVATION:CONSUME`,
-        note: "Operational fact simulated reservation consume path.",
+        note: "【手工测试】库存预留：创建后主动释放，不占用后续可用库存。",
       },
       shipment: {
         shipment_no: `${prefix}-SHP`,
-        customer_snapshot: "Operational fact simulated shipment customer",
+        customer_id: ids.customerId,
+        customer_snapshot: "【手工测试客户】成品出货与应收联动",
         idempotency_key: `${prefix}:SHIPMENT`,
-        note: "Operational fact simulated shipment; not real customer data.",
+        note: "【手工测试】出货单：已出货后生成应收和发票场景，最后取消以验证库存冲回。",
       },
       shipmentItem: {
         product_id: ids.productId,
         warehouse_id: ids.warehouseId,
         unit_id: ids.unitId,
         quantity: "3",
-        note: "Operational fact simulated shipment line.",
+        note: "【手工测试】出货明细：3 件成品。",
       },
       financeSettle: {
         fact_no: `${prefix}-FIN-SET`,
         fact_type: "RECEIVABLE",
-        counterparty_type: "OTHER",
+        counterparty_type: "CUSTOMER",
+        counterparty_id: ids.customerId,
         amount: "128.50",
         currency: "CNY",
         source_type: "SIMULATED_OPERATIONAL_FACT",
         idempotency_key: `${prefix}:FINANCE:SETTLE`,
-        note: "Operational fact simulated finance settle path.",
+        note: "【手工测试】应收款：由已出货单产生，依次过账并结清。",
       },
       financeCancel: {
         fact_no: `${prefix}-FIN-CAN`,
         fact_type: "INVOICE",
-        counterparty_type: "OTHER",
+        counterparty_type: "CUSTOMER",
+        counterparty_id: ids.customerId,
         amount: "36.80",
         currency: "CNY",
         source_type: "SIMULATED_OPERATIONAL_FACT",
         idempotency_key: `${prefix}:FINANCE:CANCEL`,
-        note: "Operational fact simulated finance cancel path.",
+        note: "【手工测试】发票：由已出货单产生，过账后取消。",
       },
     },
   };
@@ -363,7 +371,8 @@ async function rpcCall({ backendURL, domain, method, params = {}, token }) {
       jsonrpc: "2.0",
       id: `operational-fact-sim-${method}-${Date.now()}`,
       method,
-      params,
+      params:
+        domain === "auth" ? params : { customer_key: "yoyoosun", ...params },
     }),
   });
   if (!response.ok) {
@@ -404,7 +413,9 @@ async function loginRoles({ backendURL, password }) {
 
 function expectStatus(item, expected, label) {
   if (item?.status !== expected) {
-    throw new CliError(`${label}: expected status ${expected}, got ${item?.status}`);
+    throw new CliError(
+      `${label}: expected status ${expected}, got ${item?.status}`,
+    );
   }
   return item;
 }
@@ -424,9 +435,196 @@ async function applyPlan(plan, tokens) {
     if (expectedStatus) {
       expectStatus(item, expectedStatus, label);
     }
-    steps.push({ label, method, status: item?.status || "OK", id: item?.id || null });
+    steps.push({
+      label,
+      method,
+      status: item?.status || "OK",
+      id: item?.id || null,
+    });
     return item;
   };
+
+  await call(
+    "production draft sample",
+    "pmc",
+    "create_production_fact",
+    {
+      ...records.productionReceipt,
+      fact_no: `${records.productionReceipt.fact_no}-DRAFT`,
+      idempotency_key: `${records.productionReceipt.idempotency_key}:DRAFT`,
+      note: "【手工测试】生产事实-草稿：保留草稿，供测试人员检查可编辑和待过账状态。",
+    },
+    (data) => data.production_fact,
+    "DRAFT",
+  );
+
+  const productionPosted = await call(
+    "production posted sample create",
+    "pmc",
+    "create_production_fact",
+    {
+      ...records.productionReceipt,
+      fact_no: `${records.productionReceipt.fact_no}-POSTED`,
+      idempotency_key: `${records.productionReceipt.idempotency_key}:POSTED`,
+      note: "【手工测试】生产事实-已过账：保留已过账状态，库存中可看到成品增加。",
+    },
+    (data) => data.production_fact,
+    "DRAFT",
+  );
+  await call(
+    "production posted sample",
+    "pmc",
+    "post_production_fact",
+    { id: productionPosted.id },
+    (data) => data.production_fact,
+    "POSTED",
+  );
+
+  await call(
+    "reservation active sample",
+    "warehouse",
+    "create_stock_reservation",
+    {
+      ...records.stockReservationRelease,
+      reservation_no: `${records.stockReservationRelease.reservation_no}-ACTIVE`,
+      idempotency_key: `${records.stockReservationRelease.idempotency_key}:ACTIVE`,
+      note: "【手工测试】库存预留-生效中：保留 ACTIVE 状态，供查看当前占用。",
+    },
+    (data) => data.stock_reservation,
+    "ACTIVE",
+  );
+
+  await call(
+    "outsourcing draft sample",
+    "purchase",
+    "create_outsourcing_fact",
+    {
+      ...records.outsourcingIssue,
+      fact_no: `${records.outsourcingIssue.fact_no}-DRAFT`,
+      idempotency_key: `${records.outsourcingIssue.idempotency_key}:DRAFT`,
+      note: "【手工测试】委外事实-草稿：保留草稿，尚未扣减库存。",
+    },
+    (data) => data.outsourcing_fact,
+    "DRAFT",
+  );
+
+  const outsourcingPosted = await call(
+    "outsourcing posted sample create",
+    "purchase",
+    "create_outsourcing_fact",
+    {
+      ...records.outsourcingIssue,
+      fact_no: `${records.outsourcingIssue.fact_no}-POSTED`,
+      idempotency_key: `${records.outsourcingIssue.idempotency_key}:POSTED`,
+      note: "【手工测试】委外事实-已过账：保留已过账状态，库存已扣减。",
+    },
+    (data) => data.outsourcing_fact,
+    "DRAFT",
+  );
+  await call(
+    "outsourcing posted sample",
+    "purchase",
+    "post_outsourcing_fact",
+    { id: outsourcingPosted.id },
+    (data) => data.outsourcing_fact,
+    "POSTED",
+  );
+
+  const shipmentDraft = await call(
+    "shipment draft sample",
+    "warehouse",
+    "create_shipment",
+    {
+      ...records.shipment,
+      shipment_no: `${records.shipment.shipment_no}-DRAFT`,
+      idempotency_key: `${records.shipment.idempotency_key}:DRAFT`,
+      note: "【手工测试】出货单-草稿：保留草稿，尚未扣减库存。",
+    },
+    (data) => data.shipment,
+    "DRAFT",
+  );
+  await call(
+    "shipment draft sample add item",
+    "warehouse",
+    "add_shipment_item",
+    { ...records.shipmentItem, shipment_id: shipmentDraft.id },
+    (data) => data.shipment_item,
+  );
+
+  const shipmentShipped = await call(
+    "shipment shipped sample create",
+    "warehouse",
+    "create_shipment",
+    {
+      ...records.shipment,
+      shipment_no: `${records.shipment.shipment_no}-SHIPPED`,
+      idempotency_key: `${records.shipment.idempotency_key}:SHIPPED`,
+      note: "【手工测试】出货单-已出货：保留已出货状态，库存已扣减。",
+    },
+    (data) => data.shipment,
+    "DRAFT",
+  );
+  await call(
+    "shipment shipped sample add item",
+    "warehouse",
+    "add_shipment_item",
+    { ...records.shipmentItem, shipment_id: shipmentShipped.id },
+    (data) => data.shipment_item,
+  );
+  await call(
+    "shipment shipped sample",
+    "warehouse",
+    "ship_shipment",
+    { id: shipmentShipped.id },
+    (data) => data.shipment,
+    "SHIPPED",
+  );
+
+  await call(
+    "finance draft sample",
+    "finance",
+    "create_finance_fact",
+    {
+      ...records.financeSettle,
+      fact_no: `${records.financeSettle.fact_no}-DRAFT`,
+      fact_type: "PAYMENT",
+      counterparty_type: "OTHER",
+      counterparty_id: undefined,
+      source_type: "SIMULATED_OPERATIONAL_FACT",
+      source_id: undefined,
+      idempotency_key: `${records.financeSettle.idempotency_key}:DRAFT`,
+      note: "【手工测试】财务事实-草稿：保留草稿，尚未过账。",
+    },
+    (data) => data.finance_fact,
+    "DRAFT",
+  );
+
+  const financePosted = await call(
+    "finance posted sample create",
+    "finance",
+    "create_finance_fact",
+    {
+      ...records.financeSettle,
+      fact_no: `${records.financeSettle.fact_no}-POSTED`,
+      fact_type: "RECONCILIATION",
+      counterparty_type: "OTHER",
+      counterparty_id: undefined,
+      source_type: "SIMULATED_OPERATIONAL_FACT",
+      source_id: undefined,
+      idempotency_key: `${records.financeSettle.idempotency_key}:POSTED`,
+      note: "【手工测试】财务事实-已过账：保留已过账、待结算状态。",
+    },
+    (data) => data.finance_fact,
+    "DRAFT",
+  );
+  await call(
+    "finance posted sample",
+    "finance",
+    "post_finance_fact",
+    { id: financePosted.id },
+    (data) => data.finance_fact,
+    "POSTED",
+  );
 
   const production = await call(
     "production create",
@@ -460,23 +658,6 @@ async function applyPlan(plan, tokens) {
     { id: reservationRelease.id },
     (data) => data.stock_reservation,
     "RELEASED",
-  );
-
-  const reservationConsume = await call(
-    "reservation create consume path",
-    "warehouse",
-    "create_stock_reservation",
-    records.stockReservationConsume,
-    (data) => data.stock_reservation,
-    "ACTIVE",
-  );
-  await call(
-    "reservation consume",
-    "warehouse",
-    "consume_stock_reservation",
-    { id: reservationConsume.id },
-    (data) => data.stock_reservation,
-    "CONSUMED",
   );
 
   const outsourcing = await call(
@@ -620,6 +801,7 @@ function buildMarkdownReport(report) {
     "",
     "## IDs",
     "",
+    `- customer_id: ${report.plan.ids.customerId}`,
     `- product_id: ${report.plan.ids.productId}`,
     `- unit_id: ${report.plan.ids.unitId}`,
     `- warehouse_id: ${report.plan.ids.warehouseId}`,
@@ -631,7 +813,9 @@ function buildMarkdownReport(report) {
     lines.push("- report-only: no JSON-RPC writes executed");
   } else {
     for (const step of report.steps) {
-      lines.push(`- ${step.label}: ${step.status}${step.id ? ` id=${step.id}` : ""}`);
+      lines.push(
+        `- ${step.label}: ${step.status}${step.id ? ` id=${step.id}` : ""}`,
+      );
     }
   }
   lines.push(
@@ -646,7 +830,10 @@ function buildMarkdownReport(report) {
 
 async function writeReports(outDir, report) {
   await mkdir(outDir, { recursive: true });
-  const jsonPath = path.join(outDir, "operational-fact-simulated-closure-report.json");
+  const jsonPath = path.join(
+    outDir,
+    "operational-fact-simulated-closure-report.json",
+  );
   const markdownPath = path.join(
     outDir,
     "operational-fact-simulated-closure-report.md",
@@ -663,7 +850,9 @@ async function main() {
     return;
   }
   if (options.printInputTemplate) {
-    process.stdout.write(`${JSON.stringify(buildInputTemplate(options), null, 2)}\n`);
+    process.stdout.write(
+      `${JSON.stringify(buildInputTemplate(options), null, 2)}\n`,
+    );
     return;
   }
   const plan = buildPlan(options);

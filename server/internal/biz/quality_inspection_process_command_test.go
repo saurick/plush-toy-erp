@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
 
 func TestIncomingQualityGateProcessDomainCommandPassesOnlyAfterAggregateReady(t *testing.T) {
@@ -69,6 +70,135 @@ func TestIncomingQualityGateProcessDomainCommandPassesOnlyAfterAggregateReady(t 
 	}
 	if processRepo.completedNode == nil || processRepo.completedNode.Outcome != IncomingQualityGateProcessCommandOutcomePassed {
 		t.Fatalf("expected process node completed with aggregate passed outcome, got %#v", processRepo.completedNode)
+	}
+}
+
+func TestFinishedGoodsQualityProcessDomainCommandReplaysPostgresMicrosecondTime(t *testing.T) {
+	result := QualityInspectionResultPass
+	sourceType := QualityInspectionSourceShipment
+	inspectionType := QualityInspectionTypeFinishedGoods
+	sourceID := 9001
+	inspectorID := 7
+	storedTime := time.Date(2026, 7, 10, 4, 34, 56, 123456000, time.UTC)
+	handler := &finishedGoodsQualityDecideProcessCommandHandler{uc: NewInventoryUsecase(&qualityInspectionProcessInventoryRepoStub{
+		inspection: &QualityInspection{
+			ID: 8001, SourceType: &sourceType, SourceID: &sourceID, InspectionType: &inspectionType,
+			InventoryLotID: 7001, Status: QualityInspectionStatusPassed, Result: &result,
+			InspectedAt: &storedTime, InspectorID: &inspectorID,
+		},
+	})}
+	in := &ProcessDomainCommandInput{
+		ProcessInstance: &ProcessInstance{ID: 11, BusinessRefType: "shipment", BusinessRefID: 9001},
+		CommandKey:      ProcessDomainCommandFinishedGoodsQualityDecide,
+		IdempotencyKey:  "process:11:node:21:finished-goods-quality-decide",
+		Payload: map[string]any{
+			"shipment_id": 9001, "quality_inspection_id": 8001, "finished_goods_lot_id": 7001,
+			"result": result, "inspected_at": "2026-07-10T12:34:56.123456789+08:00",
+		},
+	}
+	if err := handler.ValidateProcessDomainCommand(context.Background(), in, inspectorID); err != nil {
+		t.Fatalf("same explicit nanosecond timestamp must replay after PostgreSQL microsecond storage: %v", err)
+	}
+	parsed, err := processCommandOptionalTimeFromPayload(in.Payload, qualityInspectionProcessCommandPayloadInspectedAt)
+	if err != nil || !parsed.Equal(storedTime) || parsed.Nanosecond()%1000 != 0 {
+		t.Fatalf("process command time must canonicalize to UTC microseconds, parsed=%v err=%v", parsed, err)
+	}
+	normalized, err := normalizeQualityInspectionDecision(QualityInspectionDecision{
+		InspectionID: 8001,
+		Result:       result,
+		InspectedAt:  parsed,
+	}, result)
+	if err != nil || normalized.InspectedAtDefaulted {
+		t.Fatalf("explicit inspected_at must remain strict after normalization, decision=%#v err=%v", normalized, err)
+	}
+}
+
+func TestFinishedGoodsQualityProcessDomainCommandLegacyResultWithoutInspectedAtRequiresRecovery(t *testing.T) {
+	tests := []struct {
+		name   string
+		status string
+		result string
+	}{
+		{name: "passed", status: QualityInspectionStatusPassed, result: QualityInspectionResultPass},
+		{name: "rejected", status: QualityInspectionStatusRejected, result: QualityInspectionResultReject},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sourceType := QualityInspectionSourceShipment
+			inspectionType := QualityInspectionTypeFinishedGoods
+			sourceID := 9001
+			inspectorID := 7
+			storedTime := time.Date(2026, 7, 10, 4, 34, 56, 123456000, time.UTC)
+			repo := &qualityInspectionProcessInventoryRepoStub{
+				inspection: &QualityInspection{
+					ID: 8001, SourceType: &sourceType, SourceID: &sourceID, InspectionType: &inspectionType,
+					InventoryLotID: 7001, Status: tt.status, Result: &tt.result,
+					InspectedAt: &storedTime, InspectorID: &inspectorID,
+				},
+			}
+			handler := &finishedGoodsQualityDecideProcessCommandHandler{uc: NewInventoryUsecase(repo)}
+			_, err := handler.ExecuteProcessDomainCommand(context.Background(), &ProcessDomainCommandInput{
+				ProcessInstance: &ProcessInstance{ID: 11, BusinessRefType: "shipment", BusinessRefID: 9001},
+				CommandKey:      ProcessDomainCommandFinishedGoodsQualityDecide,
+				IdempotencyKey:  "process:11:node:21:finished-goods-quality-decide",
+				Payload: map[string]any{
+					"shipment_id": 9001, "quality_inspection_id": 8001, "finished_goods_lot_id": 7001,
+					"result": tt.result,
+				},
+			}, inspectorID)
+			if !errors.Is(err, ErrProcessDomainCommandRecoveryRequired) {
+				t.Fatalf("legacy decided inspection without inspected_at must require recovery, got %v", err)
+			}
+			if repo.passInput != nil || repo.rejectInput != nil {
+				t.Fatalf("legacy recovery must stop before fact execution, pass=%#v reject=%#v", repo.passInput, repo.rejectInput)
+			}
+		})
+	}
+}
+
+func TestFinishedGoodsQualityProcessDomainCommandCurrentClaimReconcilesDefaultedInspectedAt(t *testing.T) {
+	result := QualityInspectionResultPass
+	sourceType := QualityInspectionSourceShipment
+	inspectionType := QualityInspectionTypeFinishedGoods
+	sourceID := 9001
+	inspectorID := 7
+	storedTime := time.Date(2026, 7, 10, 4, 34, 56, 123456000, time.UTC)
+	repo := &qualityInspectionProcessInventoryRepoStub{
+		inspection: &QualityInspection{
+			ID: 8001, SourceType: &sourceType, SourceID: &sourceID, InspectionType: &inspectionType,
+			InventoryLotID: 7001, Status: QualityInspectionStatusPassed, Result: &result,
+			InspectedAt: &storedTime, InspectorID: &inspectorID,
+		},
+	}
+	payload := map[string]any{
+		"shipment_id": 9001, "quality_inspection_id": 8001, "finished_goods_lot_id": 7001,
+		"result": result,
+	}
+	idempotencyKey := "process:11:node:21:finished-goods-quality-decide"
+	fingerprint, err := processDomainCommandFingerprint(ProcessDomainCommandFinishedGoodsQualityDecide, idempotencyKey, payload)
+	if err != nil {
+		t.Fatalf("build current command fingerprint: %v", err)
+	}
+	protocolVersion := ProcessDomainCommandProtocolVersionCurrent
+	in := &ProcessDomainCommandInput{
+		ProcessInstance: &ProcessInstance{ID: 11, BusinessRefType: "shipment", BusinessRefID: 9001},
+		Node: &ProcessNodeInstance{
+			ID: 21, ProcessInstanceID: 11, NodeKey: "finished_goods_quality",
+			NodeType: ProcessNodeTypeDomainCommand, Status: ProcessNodeStatusActive, Version: 1,
+			PolicySnapshot:               map[string]any{"command_key": ProcessDomainCommandFinishedGoodsQualityDecide},
+			DomainCommandFingerprint:     &fingerprint,
+			DomainCommandProtocolVersion: &protocolVersion,
+		},
+		CommandKey:     ProcessDomainCommandFinishedGoodsQualityDecide,
+		IdempotencyKey: idempotencyKey,
+		Payload:        payload,
+	}
+	handler := &finishedGoodsQualityDecideProcessCommandHandler{uc: NewInventoryUsecase(repo)}
+	if _, err := handler.ExecuteProcessDomainCommand(context.Background(), in, inspectorID); err != nil {
+		t.Fatalf("current claimed command must reconcile omitted inspected_at: %v", err)
+	}
+	if repo.passInput == nil || !repo.passInput.InspectedAtDefaulted || repo.passInput.InspectedAt.IsZero() {
+		t.Fatalf("omitted inspected_at must keep defaulted-time metadata through normalization, input=%#v", repo.passInput)
 	}
 }
 
@@ -342,6 +472,9 @@ func TestFinishedGoodsQualityProcessDomainCommandDecideBindsShipmentLinkedInspec
 	}
 	if inventoryRepo.passInput.Result != QualityInspectionResultPass {
 		t.Fatalf("expected pass result, got %q", inventoryRepo.passInput.Result)
+	}
+	if inventoryRepo.passInput.InspectorID == nil || *inventoryRepo.passInput.InspectorID != 7 {
+		t.Fatalf("expected authenticated actor 7 as inspector truth, got %#v", inventoryRepo.passInput.InspectorID)
 	}
 	if inventoryRepo.rejectInput != nil {
 		t.Fatalf("pass decision must not call reject usecase, got %#v", inventoryRepo.rejectInput)

@@ -31,6 +31,7 @@ export function createBusinessFormalScenarios(deps) {
     verifyBusinessModuleColumnOrderDialog,
     verifyBusinessRowDoubleClickEditModal,
     verifySourceImportPicker,
+    customerRuntimeEffectiveSession,
   } = deps
   const {
     assertLineItemAddActionScrollsToNewRow,
@@ -1253,12 +1254,14 @@ export function createBusinessFormalScenarios(deps) {
           )
           const listStyle =
             list instanceof HTMLElement ? window.getComputedStyle(list) : null
+          const listRect = list?.getBoundingClientRect()
           const grid =
             lastRow instanceof HTMLElement
               ? lastRow.querySelector('.erp-sales-order-lines-form__grid')
               : null
           const gridStyle =
             grid instanceof HTMLElement ? window.getComputedStyle(grid) : null
+          const gridRect = grid?.getBoundingClientRect()
           const labels = Array.from(
             lastRow?.querySelectorAll('.ant-form-item-label label') || []
           )
@@ -1293,10 +1296,15 @@ export function createBusinessFormalScenarios(deps) {
               lastRow instanceof HTMLElement
                 ? lastRow.scrollWidth - lastRow.clientWidth
                 : 0,
+            rowWidth: rowRect?.width || 0,
             rowTop: rowRect?.top || 0,
             rowBottom: rowRect?.bottom || 0,
             rowLeft: rowRect?.left || 0,
             rowRight: rowRect?.right || 0,
+            gridLeft: gridRect?.left || 0,
+            gridRight: gridRect?.right || 0,
+            listLeft: listRect?.left || 0,
+            listRight: listRect?.right || 0,
             bodyTop: bodyRect?.top || 0,
             bodyBottom: bodyRect?.bottom || 0,
             bodyLeft: bodyRect?.left || 0,
@@ -1343,17 +1351,20 @@ export function createBusinessFormalScenarios(deps) {
           )}`
         )
         assert(
-          bomLineMetrics.lastRowOverflowX > 1 &&
+          bomLineMetrics.lastRowOverflowX <= 1 &&
+            bomLineMetrics.gridLeft >= bomLineMetrics.rowLeft - 1 &&
+            bomLineMetrics.gridRight <= bomLineMetrics.rowRight + 1 &&
+            bomLineMetrics.rowWidth > bomLineMetrics.listClientWidth + 1 &&
             bomLineMetrics.listScrollWidth >
               bomLineMetrics.listClientWidth + 1 &&
             bomLineMetrics.documentOverflowX <= 1,
-          `BOM 宽明细应只在明细列表内横向滚动，不得推宽弹窗或页面: ${JSON.stringify(
+          `BOM 行卡片应完整包住字段网格，并只由明细列表承接横向滚动: ${JSON.stringify(
             bomLineMetrics
           )}`
         )
         assert(
-          bomLineMetrics.rowLeft >= bomLineMetrics.bodyLeft - 1 &&
-            bomLineMetrics.rowRight <= bomLineMetrics.bodyRight + 1 &&
+          bomLineMetrics.listLeft >= bomLineMetrics.bodyLeft - 1 &&
+            bomLineMetrics.listRight <= bomLineMetrics.bodyRight + 1 &&
             bomLineMetrics.rowTop >= bomLineMetrics.bodyTop - 1 &&
             bomLineMetrics.rowBottom <= bomLineMetrics.bodyBottom + 1 &&
             bomLineMetrics.footerTop >= bomLineMetrics.bodyTop - 1 &&
@@ -1381,6 +1392,70 @@ export function createBusinessFormalScenarios(deps) {
           path: path.join(outputDir, 'business-v1-bom-wide-line-scroll.png'),
           fullPage: true,
         })
+        const bomRightEdgeMetrics = await bomEditModal.evaluate(
+          async (node) => {
+            const list = node.querySelector(
+              '.erp-bom-modal-items .erp-sales-order-lines-form__list'
+            )
+            const rows = Array.from(
+              node.querySelectorAll(
+                '.erp-bom-modal-items .erp-sales-order-lines-form__row'
+              )
+            )
+            const lastRow = rows.at(-1)
+            const grid = lastRow?.querySelector(
+              '.erp-sales-order-lines-form__grid'
+            )
+            const note = lastRow?.querySelector('.erp-line-item-field--note')
+
+            if (list instanceof HTMLElement) {
+              list.scrollLeft = list.scrollWidth - list.clientWidth
+              await new Promise((resolve) =>
+                window.requestAnimationFrame(() => resolve())
+              )
+            }
+
+            const listRect = list?.getBoundingClientRect()
+            const rowRect = lastRow?.getBoundingClientRect()
+            const gridRect = grid?.getBoundingClientRect()
+            const noteRect = note?.getBoundingClientRect()
+            return {
+              listScrollLeft: list instanceof HTMLElement ? list.scrollLeft : 0,
+              listMaxScrollLeft:
+                list instanceof HTMLElement
+                  ? list.scrollWidth - list.clientWidth
+                  : 0,
+              listLeft: listRect?.left || 0,
+              listRight: listRect?.right || 0,
+              rowRight: rowRect?.right || 0,
+              gridRight: gridRect?.right || 0,
+              noteLeft: noteRect?.left || 0,
+              noteRight: noteRect?.right || 0,
+            }
+          }
+        )
+        assert(
+          bomRightEdgeMetrics.listScrollLeft > 1 &&
+            Math.abs(
+              bomRightEdgeMetrics.listScrollLeft -
+                bomRightEdgeMetrics.listMaxScrollLeft
+            ) <= 1 &&
+            bomRightEdgeMetrics.noteLeft >= bomRightEdgeMetrics.listLeft - 1 &&
+            bomRightEdgeMetrics.noteRight <=
+              bomRightEdgeMetrics.listRight + 1 &&
+            bomRightEdgeMetrics.gridRight <= bomRightEdgeMetrics.rowRight + 1 &&
+            bomRightEdgeMetrics.rowRight <= bomRightEdgeMetrics.listRight + 1,
+          `BOM 明细滚到最右侧时，备注字段和行卡片右边界都应完整可见: ${JSON.stringify(
+            bomRightEdgeMetrics
+          )}`
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-v1-bom-wide-line-scroll-right-edge.png'
+          ),
+          fullPage: true,
+        })
         await assertLineItemAddActionScrollsToNewRow(bomEditModal, {
           scenarioName: 'business-standard-bom-edit-form-modal',
           targetRowCount: 7,
@@ -1399,6 +1474,145 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '4')
         await expectText(page, '可用量')
         await expectText(page, '8.5')
+        await expectText(page, 'SKU-STYLE-L1')
+        const inventoryFilterSelects = page.locator(
+          '.erp-v1-inventory-ledger-page .erp-business-operation-panel__filters .ant-select'
+        )
+        assert.equal(
+          await inventoryFilterSelects.count(),
+          5,
+          '库存余额筛选区应包含对象类型、具体对象、产品规格、仓库和批次'
+        )
+        assert.equal(
+          await inventoryFilterSelects
+            .nth(2)
+            .getAttribute('class')
+            .then((value) =>
+              String(value || '').includes('ant-select-disabled')
+            ),
+          true,
+          '未选择成品对象时产品规格筛选应禁用'
+        )
+        await inventoryFilterSelects.nth(0).click()
+        await page
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: '成品' })
+          .click()
+        await page.waitForFunction(() => {
+          const selects = document.querySelectorAll(
+            '.erp-v1-inventory-ledger-page .erp-business-operation-panel__filters .ant-select'
+          )
+          return (
+            selects.length === 5 &&
+            !selects[2]?.classList.contains('ant-select-disabled')
+          )
+        })
+        await inventoryFilterSelects.nth(2).click()
+        await page
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: 'SKU-STYLE-L1' })
+          .click()
+        await expectText(page, 'SKU-STYLE-L1')
+        const inventorySKUMetrics = await page.evaluate(() => {
+          const filters = document.querySelector(
+            '.erp-v1-inventory-ledger-page .erp-business-operation-panel__filters'
+          )
+          const table = document.querySelector(
+            '.erp-v1-inventory-ledger-page .ant-table-content'
+          )
+          const filterRect = filters?.getBoundingClientRect()
+          const controls = Array.from(filters?.children || []).map((node) => {
+            const rect = node.getBoundingClientRect()
+            return {
+              left: rect.left,
+              right: rect.right,
+              top: rect.top,
+              bottom: rect.bottom,
+            }
+          })
+          return {
+            filterOverflowX: filters
+              ? filters.scrollWidth - filters.clientWidth
+              : -1,
+            controlsInsideFilters: controls.every(
+              (rect) =>
+                rect.left >= (filterRect?.left || 0) - 1 &&
+                rect.right <= (filterRect?.right || 0) + 1
+            ),
+            tableOverflowX: table ? table.scrollWidth - table.clientWidth : -1,
+            documentOverflowX:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          inventorySKUMetrics.filterOverflowX <= 1 &&
+            inventorySKUMetrics.controlsInsideFilters &&
+            inventorySKUMetrics.tableOverflowX > 1 &&
+            inventorySKUMetrics.documentOverflowX === 0,
+          `库存 SKU 筛选应在筛选区内换行，宽表只在表格内滚动: ${JSON.stringify(
+            inventorySKUMetrics
+          )}`
+        )
+        await page.screenshot({
+          path: path.join(outputDir, 'business-v1-inventory-sku-grain.png'),
+          fullPage: true,
+        })
+        await page.getByRole('button', { name: '清空筛选' }).click()
+        await page.setViewportSize({ width: 390, height: 844 })
+        await page.waitForTimeout(160)
+        const inventoryNarrowMetrics = await page.evaluate(() => {
+          const filters = document.querySelector(
+            '.erp-v1-inventory-ledger-page .erp-business-operation-panel__filters'
+          )
+          const table = document.querySelector(
+            '.erp-v1-inventory-ledger-page .ant-table-content'
+          )
+          const filterRect = filters?.getBoundingClientRect()
+          const controls = Array.from(filters?.children || []).map((node) => {
+            const rect = node.getBoundingClientRect()
+            return {
+              left: rect.left,
+              right: rect.right,
+              width: rect.width,
+            }
+          })
+          return {
+            filterWidth: filterRect?.width || 0,
+            filterOverflowX: filters
+              ? filters.scrollWidth - filters.clientWidth
+              : -1,
+            controlsInsideFilters: controls.every(
+              (rect) =>
+                rect.left >= (filterRect?.left || 0) - 1 &&
+                rect.right <= (filterRect?.right || 0) + 1 &&
+                rect.width <= (filterRect?.width || 0) + 1
+            ),
+            tableOverflowX: table ? table.scrollWidth - table.clientWidth : -1,
+            documentOverflowX:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          inventoryNarrowMetrics.filterWidth > 0 &&
+            inventoryNarrowMetrics.filterOverflowX <= 1 &&
+            inventoryNarrowMetrics.controlsInsideFilters &&
+            inventoryNarrowMetrics.tableOverflowX > 1 &&
+            inventoryNarrowMetrics.documentOverflowX === 0,
+          `库存 SKU 筛选在窄视口应留在筛选卡片内，宽表继续内部滚动: ${JSON.stringify(
+            inventoryNarrowMetrics
+          )}`
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-v1-inventory-sku-grain-narrow.png'
+          ),
+          fullPage: true,
+        })
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await page.waitForTimeout(160)
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-standard-inventory',
         })
@@ -2251,7 +2465,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '生产进度')
         await expectText(page, 'PROD-FACT-L1')
-        await expectText(page, '生产发料、成品入库和返工事实')
+        await expectText(page, '生产发料、成品入库和返工记录')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-production-progress',
         })
@@ -2282,13 +2496,14 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '出库管理')
         await expectText(page, 'RSV-STYLE-L1')
-        await expectText(page, '库存预留释放 / 消耗')
+        await expectText(page, '库存预留消耗随出货事实原子完成')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-outbound-reservations',
         })
         await assertTextAbsent(page, '登记库存预留')
         await assertTextAbsent(page, '新建出货单')
         await assertTextAbsent(page, '生成出库')
+        await expectNoButton(page, '消耗')
         await assertNoHorizontalOverflow(page, 'business-v1-outbound')
 
         await gotoScenarioPath(page, '/erp/finance/receivables', {
@@ -2296,7 +2511,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '应收管理')
         await expectText(page, 'AR-STYLE-L1')
-        await expectText(page, '应收业务事实')
+        await expectText(page, '应收至少应来自真实出货后的核对')
         await assertTextAbsent(page, 'finance_facts')
         await assertTextAbsent(page, 'RECEIVABLE')
         await assertUnifiedListToolbarShell(page, {
@@ -2466,6 +2681,11 @@ export function createBusinessFormalScenarios(deps) {
           column_orders: {},
         },
       },
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        pages: ['shipping-release'],
+        actions: [],
+      },
       verify: async (page) => {
         let shippingReleaseListTaskCalls = 0
         await page.route('**/rpc/workflow', async (route) => {
@@ -2527,6 +2747,7 @@ export function createBusinessFormalScenarios(deps) {
       name: 'sales-order-acceptance-submit-action-desktop',
       path: '/erp/sales/project-orders/sales-orders',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       beforeNavigate: async (page) => {
         await page.unroute('**/rpc/customer_config')
@@ -2535,7 +2756,7 @@ export function createBusinessFormalScenarios(deps) {
           const { id = 'mock-id', method, params = {} } = body
           let data = {}
           if (method === 'get_effective_session') {
-            data = { session: null }
+            data = { session: customerRuntimeEffectiveSession }
           } else if (method === 'start_sales_order_acceptance_process') {
             assert.equal(
               Number(params.sales_order_id),
@@ -2704,7 +2925,7 @@ export function createBusinessFormalScenarios(deps) {
           },
         },
         effectiveSession: {
-          source: 'style_l1_customer_config_projection',
+          ...customerRuntimeEffectiveSession,
           pages: ['shipping-release'],
           actions: ['workflow.task.read'],
         },
@@ -2842,6 +3063,23 @@ export function createBusinessFormalScenarios(deps) {
         },
         verify: async (page) => {
           await expectHeading(page, '出货放行')
+          const pageShell = await page.evaluate(() => ({
+            path: location.pathname,
+            workflowPageCount: document.querySelectorAll(
+              '.erp-workflow-business-page'
+            ).length,
+            headings: Array.from(document.querySelectorAll('h1, h2, h3, h4'))
+              .map((node) => String(node.textContent || '').trim())
+              .filter(Boolean),
+            buttons: Array.from(document.querySelectorAll('button'))
+              .map((node) => String(node.textContent || '').trim())
+              .filter(Boolean),
+          }))
+          assert.equal(
+            pageShell.workflowPageCount,
+            1,
+            `只读出货放行场景必须进入正式 Workflow 页面: ${JSON.stringify(pageShell)}`
+          )
           await assertUnifiedListToolbarShell(page, {
             scenarioName:
               'business-formal-shipping-release-readonly-actions-desktop',

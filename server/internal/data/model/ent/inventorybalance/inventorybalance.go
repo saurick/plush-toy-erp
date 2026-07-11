@@ -18,6 +18,8 @@ const (
 	FieldSubjectType = "subject_type"
 	// FieldSubjectID holds the string denoting the subject_id field in the database.
 	FieldSubjectID = "subject_id"
+	// FieldProductSkuID holds the string denoting the product_sku_id field in the database.
+	FieldProductSkuID = "product_sku_id"
 	// FieldWarehouseID holds the string denoting the warehouse_id field in the database.
 	FieldWarehouseID = "warehouse_id"
 	// FieldLotID holds the string denoting the lot_id field in the database.
@@ -32,6 +34,8 @@ const (
 	EdgeWarehouse = "warehouse"
 	// EdgeUnit holds the string denoting the unit edge name in mutations.
 	EdgeUnit = "unit"
+	// EdgeProductSku holds the string denoting the product_sku edge name in mutations.
+	EdgeProductSku = "product_sku"
 	// EdgeInventoryLot holds the string denoting the inventory_lot edge name in mutations.
 	EdgeInventoryLot = "inventory_lot"
 	// Table holds the table name of the inventorybalance in the database.
@@ -50,6 +54,13 @@ const (
 	UnitInverseTable = "units"
 	// UnitColumn is the table column denoting the unit relation/edge.
 	UnitColumn = "unit_id"
+	// ProductSkuTable is the table that holds the product_sku relation/edge.
+	ProductSkuTable = "inventory_balances"
+	// ProductSkuInverseTable is the table name for the ProductSKU entity.
+	// It exists in this package in order to avoid circular dependency with the "productsku" package.
+	ProductSkuInverseTable = "product_skus"
+	// ProductSkuColumn is the table column denoting the product_sku relation/edge.
+	ProductSkuColumn = "product_sku_id"
 	// InventoryLotTable is the table that holds the inventory_lot relation/edge.
 	InventoryLotTable = "inventory_balances"
 	// InventoryLotInverseTable is the table name for the InventoryLot entity.
@@ -64,6 +75,7 @@ var Columns = []string{
 	FieldID,
 	FieldSubjectType,
 	FieldSubjectID,
+	FieldProductSkuID,
 	FieldWarehouseID,
 	FieldLotID,
 	FieldUnitID,
@@ -86,6 +98,8 @@ var (
 	SubjectTypeValidator func(string) error
 	// SubjectIDValidator is a validator for the "subject_id" field. It is called by the builders before save.
 	SubjectIDValidator func(int) error
+	// ProductSkuIDValidator is a validator for the "product_sku_id" field. It is called by the builders before save.
+	ProductSkuIDValidator func(int) error
 	// WarehouseIDValidator is a validator for the "warehouse_id" field. It is called by the builders before save.
 	WarehouseIDValidator func(int) error
 	// LotIDValidator is a validator for the "lot_id" field. It is called by the builders before save.
@@ -114,6 +128,11 @@ func BySubjectType(opts ...sql.OrderTermOption) OrderOption {
 // BySubjectID orders the results by the subject_id field.
 func BySubjectID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSubjectID, opts...).ToFunc()
+}
+
+// ByProductSkuID orders the results by the product_sku_id field.
+func ByProductSkuID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProductSkuID, opts...).ToFunc()
 }
 
 // ByWarehouseID orders the results by the warehouse_id field.
@@ -155,6 +174,13 @@ func ByUnitField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
+// ByProductSkuField orders the results by product_sku field.
+func ByProductSkuField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProductSkuStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByInventoryLotField orders the results by inventory_lot field.
 func ByInventoryLotField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -173,6 +199,13 @@ func newUnitStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(UnitInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, UnitTable, UnitColumn),
+	)
+}
+func newProductSkuStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProductSkuInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, ProductSkuTable, ProductSkuColumn),
 	)
 }
 func newInventoryLotStep() *sqlgraph.Step {

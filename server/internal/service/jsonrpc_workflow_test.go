@@ -195,6 +195,26 @@ func (s *stubProcessRuntimeJSONRPCRepo) ListProcessNodeInstances(context.Context
 	return []*biz.ProcessNodeInstance{}, nil
 }
 
+func (s *stubProcessRuntimeJSONRPCRepo) ClaimProcessNodeDomainCommand(_ context.Context, in *biz.ProcessNodeDomainCommandClaim) (*biz.ProcessNodeInstance, error) {
+	if s.node == nil || s.node.ID != in.ProcessNodeInstanceID {
+		return nil, biz.ErrProcessNodeInstanceNotFound
+	}
+	if s.node.ProcessInstanceID != in.ProcessInstanceID || s.node.Status != biz.ProcessNodeStatusActive || s.node.Version != in.ExpectedVersion {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	if s.node.NodeType != biz.ProcessNodeTypeDomainCommand {
+		return nil, biz.ErrBadParam
+	}
+	if s.node.DomainCommandFingerprint != nil && *s.node.DomainCommandFingerprint != in.DomainCommandFingerprint {
+		return nil, biz.ErrIdempotencyConflict
+	}
+	out := *s.node
+	fingerprint := in.DomainCommandFingerprint
+	out.DomainCommandFingerprint = &fingerprint
+	s.node = &out
+	return &out, nil
+}
+
 func (s *stubProcessRuntimeJSONRPCRepo) CompleteProcessNodeInstance(_ context.Context, in *biz.ProcessNodeInstanceComplete, actorID int) (*biz.ProcessNodeInstance, error) {
 	s.completedNode = in
 	if s.node == nil || s.node.ID != in.ID {
@@ -207,6 +227,7 @@ func (s *stubProcessRuntimeJSONRPCRepo) CompleteProcessNodeInstance(_ context.Co
 	out.Status = biz.ProcessNodeStatusCompleted
 	out.Version = in.ExpectedVersion + 1
 	out.Outcome = &in.Outcome
+	out.DomainCommandFingerprint = in.DomainCommandFingerprint
 	s.node = &out
 	return &out, nil
 }
@@ -238,6 +259,7 @@ func (s *stubProcessRuntimeJSONRPCRepo) BlockProcessNodeInstance(_ context.Conte
 	out := *s.node
 	out.Status = biz.ProcessNodeStatusBlocked
 	out.Outcome = &in.Outcome
+	out.DomainCommandFingerprint = in.DomainCommandFingerprint
 	s.node = &out
 	return &out, nil
 }

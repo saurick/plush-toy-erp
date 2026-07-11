@@ -19,6 +19,7 @@ import (
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/warehouse"
@@ -48,6 +49,10 @@ func NewInventoryRepo(d *Data, logger log.Logger) *inventoryRepo {
 }
 
 var _ biz.InventoryRepo = (*inventoryRepo)(nil)
+var _ biz.PurchaseReceiptCancellationActorRepo = (*inventoryRepo)(nil)
+var _ biz.PurchaseReceiptCreateProcessCommandRepo = (*inventoryRepo)(nil)
+var _ biz.InventoryPostInboundProcessCommandRepo = (*inventoryRepo)(nil)
+var _ biz.QualityInspectionProcessCommandRepo = (*inventoryRepo)(nil)
 
 func (r *inventoryRepo) MaterialIsActive(ctx context.Context, id int) (bool, error) {
 	row, err := r.data.postgres.Material.Query().
@@ -102,12 +107,13 @@ func (r *inventoryRepo) WarehouseIsActive(ctx context.Context, id int) (bool, er
 }
 
 func (r *inventoryRepo) CreateInventoryLot(ctx context.Context, in *biz.InventoryLotCreate) (*biz.InventoryLot, error) {
-	if err := validateInventoryLotSubject(ctx, r.data.postgres, in.SubjectType, in.SubjectID); err != nil {
+	if err := validateInventorySubjectSKU(ctx, r.data.postgres, in.SubjectType, in.SubjectID, in.ProductSkuID); err != nil {
 		return nil, err
 	}
 	row, err := r.data.postgres.InventoryLot.Create().
 		SetSubjectType(in.SubjectType).
 		SetSubjectID(in.SubjectID).
+		SetNillableProductSkuID(in.ProductSkuID).
 		SetLotNo(in.LotNo).
 		SetNillableSupplierLotNo(in.SupplierLotNo).
 		SetNillableColorNo(in.ColorNo).
@@ -182,6 +188,9 @@ func (r *inventoryRepo) CreateInventoryTxn(ctx context.Context, in *biz.Inventor
 		Where(inventorytxn.IdempotencyKey(in.IdempotencyKey)).
 		Only(ctx)
 	if err == nil {
+		if !inventoryTxnMatchesCreate(existing, in) {
+			return nil, biz.ErrIdempotencyConflict
+		}
 		return entInventoryTxnToBiz(existing), nil
 	}
 	if err != nil && !ent.IsNotFound(err) {
@@ -198,6 +207,9 @@ func (r *inventoryRepo) CreateInventoryTxn(ctx context.Context, in *biz.Inventor
 				Where(inventorytxn.IdempotencyKey(in.IdempotencyKey)).
 				Only(ctx)
 			if lookupErr == nil {
+				if !inventoryTxnMatchesCreate(existing, in) {
+					return nil, biz.ErrIdempotencyConflict
+				}
 				return entInventoryTxnToBiz(existing), nil
 			}
 			if reversed, lookupErr := inventoryTxnAlreadyReversed(ctx, r.data.postgres, in); lookupErr != nil {
@@ -222,6 +234,9 @@ func (r *inventoryRepo) ApplyInventoryTxnAndUpdateBalance(ctx context.Context, i
 		Where(inventorytxn.IdempotencyKey(in.IdempotencyKey)).
 		Only(ctx)
 	if err == nil {
+		if !inventoryTxnMatchesCreate(existing, in) {
+			return nil, biz.ErrIdempotencyConflict
+		}
 		balance, balanceErr := getInventoryBalance(ctx, tx.client.InventoryBalance.Query(), inventoryBalanceKeyFromEntTxn(existing))
 		if balanceErr != nil && !ent.IsNotFound(balanceErr) {
 			return nil, balanceErr
@@ -254,6 +269,9 @@ func (r *inventoryRepo) ApplyInventoryTxnAndUpdateBalance(ctx context.Context, i
 				Where(inventorytxn.IdempotencyKey(in.IdempotencyKey)).
 				Only(ctx)
 			if lookupErr == nil {
+				if !inventoryTxnMatchesCreate(existing, in) {
+					return nil, biz.ErrIdempotencyConflict
+				}
 				balance, balanceErr := r.GetInventoryBalance(ctx, inventoryBalanceKeyFromEntTxn(existing))
 				if balanceErr != nil && !errors.Is(balanceErr, biz.ErrInventoryBalanceNotFound) {
 					return nil, balanceErr
@@ -306,6 +324,9 @@ func (r *inventoryRepo) ListInventoryBalances(ctx context.Context, filter biz.In
 	if filter.SubjectID > 0 {
 		query = query.Where(inventorybalance.SubjectIDEQ(filter.SubjectID))
 	}
+	if filter.ProductSkuID > 0 {
+		query = query.Where(inventorybalance.ProductSkuID(filter.ProductSkuID))
+	}
 	if filter.WarehouseID > 0 {
 		query = query.Where(inventorybalance.WarehouseIDEQ(filter.WarehouseID))
 	}
@@ -317,6 +338,7 @@ func (r *inventoryRepo) ListInventoryBalances(ctx context.Context, filter biz.In
 			inventorybalance.SubjectTypeContainsFold(filter.Keyword),
 			inventorybalance.IDEQ(parsePositiveIntOrZero(filter.Keyword)),
 			inventorybalance.SubjectIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			inventorybalance.ProductSkuIDEQ(parsePositiveIntOrZero(filter.Keyword)),
 			inventorybalance.WarehouseIDEQ(parsePositiveIntOrZero(filter.Keyword)),
 			inventorybalance.LotIDEQ(parsePositiveIntOrZero(filter.Keyword)),
 			inventorybalance.UnitIDEQ(parsePositiveIntOrZero(filter.Keyword)),
@@ -349,30 +371,17 @@ func (r *inventoryRepo) ListInventoryBalances(ctx context.Context, filter biz.In
 }
 
 func activeReservedQuantityForBalance(ctx context.Context, client *ent.Client, row *ent.InventoryBalance) (decimal.Decimal, error) {
-	if row == nil || row.SubjectType != biz.InventorySubjectProduct {
+	if row == nil {
 		return decimal.Zero, nil
 	}
-	query := client.StockReservation.Query().
-		Where(
-			stockreservation.Status(biz.StockReservationStatusActive),
-			stockreservation.ProductID(row.SubjectID),
-			stockreservation.WarehouseID(row.WarehouseID),
-			stockreservation.UnitID(row.UnitID),
-		)
-	if row.LotID == nil {
-		query = query.Where(stockreservation.LotIDIsNil())
-	} else {
-		query = query.Where(stockreservation.LotID(*row.LotID))
-	}
-	rows, err := query.All(ctx)
-	if err != nil {
-		return decimal.Zero, err
-	}
-	total := decimal.Zero
-	for _, item := range rows {
-		total = total.Add(item.Quantity)
-	}
-	return total, nil
+	return activeReservedQuantityForInventoryKey(ctx, client, biz.InventoryBalanceKey{
+		SubjectType:  row.SubjectType,
+		SubjectID:    row.SubjectID,
+		ProductSkuID: row.ProductSkuID,
+		WarehouseID:  row.WarehouseID,
+		LotID:        row.LotID,
+		UnitID:       row.UnitID,
+	})
 }
 
 func (r *inventoryRepo) ListInventoryLots(ctx context.Context, filter biz.InventoryLotFilter) ([]*biz.InventoryLot, int, error) {
@@ -382,6 +391,9 @@ func (r *inventoryRepo) ListInventoryLots(ctx context.Context, filter biz.Invent
 	}
 	if filter.SubjectID > 0 {
 		query = query.Where(inventorylot.SubjectIDEQ(filter.SubjectID))
+	}
+	if filter.ProductSkuID > 0 {
+		query = query.Where(inventorylot.ProductSkuID(filter.ProductSkuID))
 	}
 	if filter.Status != "" {
 		query = query.Where(inventorylot.StatusEQ(filter.Status))
@@ -439,6 +451,9 @@ func (r *inventoryRepo) ListInventoryTxns(ctx context.Context, filter biz.Invent
 	if filter.SubjectID > 0 {
 		query = query.Where(inventorytxn.SubjectIDEQ(filter.SubjectID))
 	}
+	if filter.ProductSkuID > 0 {
+		query = query.Where(inventorytxn.ProductSkuID(filter.ProductSkuID))
+	}
 	if filter.WarehouseID > 0 {
 		query = query.Where(inventorytxn.WarehouseIDEQ(filter.WarehouseID))
 	}
@@ -463,6 +478,7 @@ func (r *inventoryRepo) ListInventoryTxns(ctx context.Context, filter biz.Invent
 			inventorytxn.NoteContainsFold(filter.Keyword),
 			inventorytxn.IDEQ(parsePositiveIntOrZero(filter.Keyword)),
 			inventorytxn.SubjectIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			inventorytxn.ProductSkuIDEQ(parsePositiveIntOrZero(filter.Keyword)),
 			inventorytxn.WarehouseIDEQ(parsePositiveIntOrZero(filter.Keyword)),
 			inventorytxn.LotIDEQ(parsePositiveIntOrZero(filter.Keyword)),
 			inventorytxn.UnitIDEQ(parsePositiveIntOrZero(filter.Keyword)),
@@ -520,6 +536,7 @@ func createInventoryTxn(ctx context.Context, builder *ent.InventoryTxnCreate, in
 	create := builder.
 		SetSubjectType(in.SubjectType).
 		SetSubjectID(in.SubjectID).
+		SetNillableProductSkuID(in.ProductSkuID).
 		SetWarehouseID(in.WarehouseID).
 		SetNillableLotID(in.LotID).
 		SetTxnType(in.TxnType).
@@ -532,6 +549,7 @@ func createInventoryTxn(ctx context.Context, builder *ent.InventoryTxnCreate, in
 		SetIdempotencyKey(in.IdempotencyKey).
 		SetNillableReversalOfTxnID(in.ReversalOfTxnID).
 		SetOccurredAt(in.OccurredAt).
+		SetOccurredAtSpecified(in.OccurredAtSpecified).
 		SetNillableCreatedBy(in.CreatedBy).
 		SetNillableNote(in.Note)
 	return create.Save(ctx)
@@ -549,7 +567,18 @@ func applyInventoryBalanceDelta(ctx context.Context, tx *inventoryDBTx, in *biz.
 			return nil, err
 		}
 	} else {
-		affected, err := updateInventoryBalanceDelta(ctx, tx, key, delta, true)
+		minimumRemaining := decimal.Zero
+		if key.SubjectType == biz.InventorySubjectProduct {
+			if err := lockInventoryBalanceRow(ctx, tx, key); err != nil {
+				return nil, err
+			}
+			var err error
+			minimumRemaining, err = activeReservedQuantityForInventoryKey(ctx, tx.client, key)
+			if err != nil {
+				return nil, err
+			}
+		}
+		affected, err := updateInventoryBalanceDelta(ctx, tx, key, delta, minimumRemaining)
 		if err != nil {
 			return nil, err
 		}
@@ -560,13 +589,78 @@ func applyInventoryBalanceDelta(ctx context.Context, tx *inventoryDBTx, in *biz.
 	return getInventoryBalance(ctx, tx.client.InventoryBalance.Query(), key)
 }
 
+func activeReservedQuantityForInventoryKey(ctx context.Context, client *ent.Client, key biz.InventoryBalanceKey) (decimal.Decimal, error) {
+	if key.SubjectType != biz.InventorySubjectProduct {
+		return decimal.Zero, nil
+	}
+	query := client.StockReservation.Query().Where(
+		stockreservation.Status(biz.StockReservationStatusActive),
+		stockreservation.ProductID(key.SubjectID),
+		stockreservation.WarehouseID(key.WarehouseID),
+		stockreservation.UnitID(key.UnitID),
+	)
+	if key.ProductSkuID == nil {
+		query = query.Where(stockreservation.ProductSkuIDIsNil())
+	} else {
+		query = query.Where(stockreservation.ProductSkuID(*key.ProductSkuID))
+	}
+	if key.LotID == nil {
+		query = query.Where(stockreservation.LotIDIsNil())
+	} else {
+		query = query.Where(stockreservation.LotID(*key.LotID))
+	}
+	rows, err := query.All(ctx)
+	if err != nil {
+		return decimal.Zero, err
+	}
+	total := decimal.Zero
+	for _, row := range rows {
+		total = total.Add(row.Quantity)
+	}
+	return total, nil
+}
+
+func lockInventoryBalanceRow(ctx context.Context, tx *inventoryDBTx, key biz.InventoryBalanceKey) error {
+	if tx == nil || tx.dialect != dialect.Postgres {
+		return nil
+	}
+	var id int
+	query := `
+SELECT id
+FROM inventory_balances
+WHERE subject_type = $1
+  AND subject_id = $2
+  AND warehouse_id = $3
+	  AND unit_id = $4`
+	args := []any{key.SubjectType, key.SubjectID, key.WarehouseID, key.UnitID}
+	if key.ProductSkuID == nil {
+		query += " AND product_sku_id IS NULL"
+	} else {
+		query += fmt.Sprintf(" AND product_sku_id = $%d", len(args)+1)
+		args = append(args, *key.ProductSkuID)
+	}
+	if key.LotID == nil {
+		query += " AND lot_id IS NULL"
+	} else {
+		query += fmt.Sprintf(" AND lot_id = $%d", len(args)+1)
+		args = append(args, *key.LotID)
+	}
+	query += " FOR UPDATE"
+	err := tx.sqlTx.QueryRowContext(ctx, query, args...).Scan(&id)
+	if errors.Is(err, stdsql.ErrNoRows) {
+		return biz.ErrInventoryInsufficientStock
+	}
+	return err
+}
+
 func inventoryBalanceKeyFromTxn(in *biz.InventoryTxnCreate) biz.InventoryBalanceKey {
 	return biz.InventoryBalanceKey{
-		SubjectType: in.SubjectType,
-		SubjectID:   in.SubjectID,
-		WarehouseID: in.WarehouseID,
-		LotID:       in.LotID,
-		UnitID:      in.UnitID,
+		SubjectType:  in.SubjectType,
+		SubjectID:    in.SubjectID,
+		ProductSkuID: in.ProductSkuID,
+		WarehouseID:  in.WarehouseID,
+		LotID:        in.LotID,
+		UnitID:       in.UnitID,
 	}
 }
 
@@ -575,12 +669,35 @@ func inventoryBalanceKeyFromEntTxn(row *ent.InventoryTxn) biz.InventoryBalanceKe
 		return biz.InventoryBalanceKey{}
 	}
 	return biz.InventoryBalanceKey{
-		SubjectType: row.SubjectType,
-		SubjectID:   row.SubjectID,
-		WarehouseID: row.WarehouseID,
-		LotID:       row.LotID,
-		UnitID:      row.UnitID,
+		SubjectType:  row.SubjectType,
+		SubjectID:    row.SubjectID,
+		ProductSkuID: row.ProductSkuID,
+		WarehouseID:  row.WarehouseID,
+		LotID:        row.LotID,
+		UnitID:       row.UnitID,
 	}
+}
+
+func inventoryTxnMatchesCreate(row *ent.InventoryTxn, in *biz.InventoryTxnCreate) bool {
+	if row == nil || in == nil {
+		return false
+	}
+	return row.SubjectType == in.SubjectType &&
+		row.SubjectID == in.SubjectID &&
+		sameOptionalInt(row.ProductSkuID, in.ProductSkuID) &&
+		row.WarehouseID == in.WarehouseID &&
+		sameOptionalInt(row.LotID, in.LotID) &&
+		row.TxnType == in.TxnType &&
+		row.Direction == in.Direction &&
+		row.Quantity.Cmp(in.Quantity) == 0 &&
+		row.UnitID == in.UnitID &&
+		row.SourceType == in.SourceType &&
+		sameOptionalInt(row.SourceID, in.SourceID) &&
+		sameOptionalInt(row.SourceLineID, in.SourceLineID) &&
+		sameOptionalInt(row.ReversalOfTxnID, in.ReversalOfTxnID) &&
+		sameIdempotencyIntentTime(row.OccurredAtSpecified, row.OccurredAt, in.OccurredAtSpecified, in.OccurredAt) &&
+		sameOptionalInt(row.CreatedBy, in.CreatedBy) &&
+		sameOptionalString(row.Note, in.Note)
 }
 
 func getInventoryBalance(ctx context.Context, query *ent.InventoryBalanceQuery, key biz.InventoryBalanceKey) (*ent.InventoryBalance, error) {
@@ -589,6 +706,11 @@ func getInventoryBalance(ctx context.Context, query *ent.InventoryBalanceQuery, 
 		inventorybalance.SubjectID(key.SubjectID),
 		inventorybalance.WarehouseID(key.WarehouseID),
 		inventorybalance.UnitID(key.UnitID),
+	}
+	if key.ProductSkuID == nil {
+		predicates = append(predicates, inventorybalance.ProductSkuIDIsNil())
+	} else {
+		predicates = append(predicates, inventorybalance.ProductSkuID(*key.ProductSkuID))
 	}
 	if key.LotID == nil {
 		predicates = append(predicates, inventorybalance.LotIDIsNil())
@@ -609,7 +731,30 @@ func validateInventoryTxnReferences(ctx context.Context, client *ent.Client, in 
 }
 
 func validateInventorySubject(ctx context.Context, client *ent.Client, in *biz.InventoryTxnCreate) error {
-	return validateInventoryLotSubject(ctx, client, in.SubjectType, in.SubjectID)
+	return validateInventorySubjectSKU(ctx, client, in.SubjectType, in.SubjectID, in.ProductSkuID)
+}
+
+func validateInventorySubjectSKU(ctx context.Context, client *ent.Client, subjectType string, subjectID int, productSkuID *int) error {
+	if err := validateInventoryLotSubject(ctx, client, subjectType, subjectID); err != nil {
+		return err
+	}
+	if productSkuID == nil {
+		return nil
+	}
+	if subjectType != biz.InventorySubjectProduct {
+		return biz.ErrBadParam
+	}
+	sku, err := client.ProductSKU.Query().Where(productsku.ID(*productSkuID)).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrProductSKUNotFound
+		}
+		return err
+	}
+	if sku.ProductID != subjectID {
+		return biz.ErrBadParam
+	}
+	return nil
 }
 
 func validateInventoryLotSubject(ctx context.Context, client *ent.Client, subjectType string, subjectID int) error {
@@ -645,7 +790,7 @@ func validateInventoryLotForTxn(ctx context.Context, client *ent.Client, in *biz
 		}
 		return err
 	}
-	if lot.SubjectType != in.SubjectType || lot.SubjectID != in.SubjectID {
+	if lot.SubjectType != in.SubjectType || lot.SubjectID != in.SubjectID || !sameOptionalInt(lot.ProductSkuID, in.ProductSkuID) {
 		return biz.ErrBadParam
 	}
 	if err := validateInventoryLotStatusForTxn(lot.Status, in); err != nil {
@@ -689,6 +834,7 @@ func validateInventoryReversal(ctx context.Context, client *ent.Client, in *biz.
 	if original.TxnType == biz.InventoryTxnReversal ||
 		original.SubjectType != in.SubjectType ||
 		original.SubjectID != in.SubjectID ||
+		!sameOptionalInt(original.ProductSkuID, in.ProductSkuID) ||
 		original.WarehouseID != in.WarehouseID ||
 		original.UnitID != in.UnitID ||
 		original.Direction != -in.Direction ||
@@ -767,32 +913,53 @@ func upsertInventoryBalanceDelta(ctx context.Context, tx *inventoryDBTx, key biz
 	now := time.Now()
 	var query string
 	var args []any
-	if key.LotID == nil {
+	switch {
+	case key.ProductSkuID == nil && key.LotID == nil:
 		p := inventorySQLPlaceholders(tx.dialect, 6)
 		query = fmt.Sprintf(
-			`INSERT INTO inventory_balances (subject_type, subject_id, warehouse_id, lot_id, unit_id, quantity, updated_at)
-VALUES (%s, %s, %s, NULL, %s, %s, %s)
-ON CONFLICT (subject_type, subject_id, warehouse_id, unit_id) WHERE lot_id IS NULL
+			`INSERT INTO inventory_balances (subject_type, subject_id, product_sku_id, warehouse_id, lot_id, unit_id, quantity, updated_at)
+VALUES (%s, %s, NULL, %s, NULL, %s, %s, %s)
+ON CONFLICT (subject_type, subject_id, warehouse_id, unit_id) WHERE product_sku_id IS NULL AND lot_id IS NULL
 DO UPDATE SET quantity = inventory_balances.quantity + EXCLUDED.quantity, updated_at = EXCLUDED.updated_at`,
 			p[0], p[1], p[2], p[3], p[4], p[5],
 		)
 		args = []any{key.SubjectType, key.SubjectID, key.WarehouseID, key.UnitID, delta, now}
-	} else {
+	case key.ProductSkuID == nil && key.LotID != nil:
 		p := inventorySQLPlaceholders(tx.dialect, 7)
 		query = fmt.Sprintf(
-			`INSERT INTO inventory_balances (subject_type, subject_id, warehouse_id, lot_id, unit_id, quantity, updated_at)
-VALUES (%s, %s, %s, %s, %s, %s, %s)
-ON CONFLICT (subject_type, subject_id, warehouse_id, unit_id, lot_id) WHERE lot_id IS NOT NULL
+			`INSERT INTO inventory_balances (subject_type, subject_id, product_sku_id, warehouse_id, lot_id, unit_id, quantity, updated_at)
+VALUES (%s, %s, NULL, %s, %s, %s, %s, %s)
+ON CONFLICT (subject_type, subject_id, warehouse_id, unit_id, lot_id) WHERE product_sku_id IS NULL AND lot_id IS NOT NULL
 DO UPDATE SET quantity = inventory_balances.quantity + EXCLUDED.quantity, updated_at = EXCLUDED.updated_at`,
 			p[0], p[1], p[2], p[3], p[4], p[5], p[6],
 		)
 		args = []any{key.SubjectType, key.SubjectID, key.WarehouseID, *key.LotID, key.UnitID, delta, now}
+	case key.ProductSkuID != nil && key.LotID == nil:
+		p := inventorySQLPlaceholders(tx.dialect, 7)
+		query = fmt.Sprintf(
+			`INSERT INTO inventory_balances (subject_type, subject_id, product_sku_id, warehouse_id, lot_id, unit_id, quantity, updated_at)
+VALUES (%s, %s, %s, %s, NULL, %s, %s, %s)
+ON CONFLICT (subject_type, subject_id, product_sku_id, warehouse_id, unit_id) WHERE product_sku_id IS NOT NULL AND lot_id IS NULL
+DO UPDATE SET quantity = inventory_balances.quantity + EXCLUDED.quantity, updated_at = EXCLUDED.updated_at`,
+			p[0], p[1], p[2], p[3], p[4], p[5], p[6],
+		)
+		args = []any{key.SubjectType, key.SubjectID, *key.ProductSkuID, key.WarehouseID, key.UnitID, delta, now}
+	default:
+		p := inventorySQLPlaceholders(tx.dialect, 8)
+		query = fmt.Sprintf(
+			`INSERT INTO inventory_balances (subject_type, subject_id, product_sku_id, warehouse_id, lot_id, unit_id, quantity, updated_at)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+ON CONFLICT (subject_type, subject_id, product_sku_id, warehouse_id, unit_id, lot_id) WHERE product_sku_id IS NOT NULL AND lot_id IS NOT NULL
+DO UPDATE SET quantity = inventory_balances.quantity + EXCLUDED.quantity, updated_at = EXCLUDED.updated_at`,
+			p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7],
+		)
+		args = []any{key.SubjectType, key.SubjectID, *key.ProductSkuID, key.WarehouseID, *key.LotID, key.UnitID, delta, now}
 	}
 	_, err := tx.sqlTx.ExecContext(ctx, query, args...)
 	return err
 }
 
-func updateInventoryBalanceDelta(ctx context.Context, tx *inventoryDBTx, key biz.InventoryBalanceKey, delta decimal.Decimal, preventNegative bool) (int64, error) {
+func updateInventoryBalanceDelta(ctx context.Context, tx *inventoryDBTx, key biz.InventoryBalanceKey, delta decimal.Decimal, minimumRemaining decimal.Decimal) (int64, error) {
 	now := time.Now()
 	p := inventorySQLPlaceholders(tx.dialect, 6)
 	query := fmt.Sprintf(
@@ -802,18 +969,23 @@ WHERE subject_type = %s AND subject_id = %s AND warehouse_id = %s AND unit_id = 
 		p[0], p[1], p[2], p[3], p[4], p[5],
 	)
 	args := []any{delta, now, key.SubjectType, key.SubjectID, key.WarehouseID, key.UnitID}
+	if key.ProductSkuID == nil {
+		query += " AND product_sku_id IS NULL"
+	} else {
+		p = inventorySQLPlaceholders(tx.dialect, len(args)+1)
+		query += fmt.Sprintf(" AND product_sku_id = %s", p[len(args)])
+		args = append(args, *key.ProductSkuID)
+	}
 	if key.LotID == nil {
 		query += " AND lot_id IS NULL"
 	} else {
 		p = inventorySQLPlaceholders(tx.dialect, len(args)+1)
-		query += fmt.Sprintf(" AND lot_id = %s", p[6])
+		query += fmt.Sprintf(" AND lot_id = %s", p[len(args)])
 		args = append(args, *key.LotID)
 	}
-	if preventNegative {
-		p = inventorySQLPlaceholders(tx.dialect, len(args)+1)
-		query += fmt.Sprintf(" AND quantity + %s >= 0", p[len(args)])
-		args = append(args, delta)
-	}
+	p = inventorySQLPlaceholders(tx.dialect, len(args)+2)
+	query += fmt.Sprintf(" AND quantity + %s >= CAST(%s AS DECIMAL)", p[len(args)], p[len(args)+1])
+	args = append(args, delta, minimumRemaining.String())
 	result, err := tx.sqlTx.ExecContext(ctx, query, args...)
 	if err != nil {
 		return 0, err
@@ -1371,6 +1543,27 @@ func sameOptionalInt(a, b *int) bool {
 	}
 }
 
+func sameOptionalString(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
+func sameOptionalTime(a, b *time.Time) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.Equal(*b)
+}
+
+func sameIdempotencyIntentTime(rowSpecified bool, rowTime time.Time, inputSpecified bool, inputTime time.Time) bool {
+	if rowSpecified != inputSpecified {
+		return false
+	}
+	return !rowSpecified || rowTime.Equal(inputTime)
+}
+
 func entInventoryLotToBiz(row *ent.InventoryLot) *biz.InventoryLot {
 	if row == nil {
 		return nil
@@ -1379,6 +1572,7 @@ func entInventoryLotToBiz(row *ent.InventoryLot) *biz.InventoryLot {
 		ID:              row.ID,
 		SubjectType:     row.SubjectType,
 		SubjectID:       row.SubjectID,
+		ProductSkuID:    row.ProductSkuID,
 		LotNo:           row.LotNo,
 		SupplierLotNo:   row.SupplierLotNo,
 		ColorNo:         row.ColorNo,
@@ -1399,6 +1593,7 @@ func entInventoryTxnToBiz(row *ent.InventoryTxn) *biz.InventoryTxn {
 		ID:              row.ID,
 		SubjectType:     row.SubjectType,
 		SubjectID:       row.SubjectID,
+		ProductSkuID:    row.ProductSkuID,
 		WarehouseID:     row.WarehouseID,
 		LotID:           row.LotID,
 		TxnType:         row.TxnType,
@@ -1422,14 +1617,15 @@ func entInventoryBalanceToBiz(row *ent.InventoryBalance) *biz.InventoryBalance {
 		return nil
 	}
 	return &biz.InventoryBalance{
-		ID:          row.ID,
-		SubjectType: row.SubjectType,
-		SubjectID:   row.SubjectID,
-		WarehouseID: row.WarehouseID,
-		LotID:       row.LotID,
-		UnitID:      row.UnitID,
-		Quantity:    row.Quantity,
-		UpdatedAt:   row.UpdatedAt,
+		ID:           row.ID,
+		SubjectType:  row.SubjectType,
+		SubjectID:    row.SubjectID,
+		ProductSkuID: row.ProductSkuID,
+		WarehouseID:  row.WarehouseID,
+		LotID:        row.LotID,
+		UnitID:       row.UnitID,
+		Quantity:     row.Quantity,
+		UpdatedAt:    row.UpdatedAt,
 	}
 }
 

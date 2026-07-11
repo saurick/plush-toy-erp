@@ -75,6 +75,9 @@ func TestPurchaseReceiptProcessDomainCommandCreateBindsUsecase(t *testing.T) {
 	if inventoryRepo.createInput.Note == nil || *inventoryRepo.createInput.Note != "到货来源流程生成" {
 		t.Fatalf("expected note from payload, got %#v", inventoryRepo.createInput.Note)
 	}
+	if inventoryRepo.createInput.IdempotencyKey != "process:10:node:20:purchase-receipt-create" || inventoryRepo.createInput.IdempotencyPayloadHash == "" {
+		t.Fatalf("expected command idempotency intent forwarded, got %#v", inventoryRepo.createInput)
+	}
 	if inventoryRepo.postCalled {
 		t.Fatal("purchase_receipt.create must not post inbound inventory")
 	}
@@ -150,6 +153,88 @@ func TestPurchaseReceiptProcessDomainCommandCreateRequiresWarehouse(t *testing.T
 	if inventoryRepo.createInput != nil {
 		t.Fatalf("invalid command must not create purchase receipt, got %#v", inventoryRepo.createInput)
 	}
+
+	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
+		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_order", BusinessRefID: 3001},
+		CommandKey:      ProcessDomainCommandPurchaseReceiptCreate,
+		Payload: map[string]any{
+			"receipt_no":   "PR-PROCESS-001",
+			"warehouse_id": float64(7001),
+		},
+	}, 7); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected missing idempotency key rejected, got %v", err)
+	}
+}
+
+func TestNormalizePurchaseReceiptFromPurchaseOrderCreateIdempotencyPayload(t *testing.T) {
+	note := "首批到货"
+	base := PurchaseReceiptFromPurchaseOrderCreate{
+		PurchaseOrderID: 3001,
+		ReceiptNo:       " PR-IDEMPOTENCY-001 ",
+		WarehouseID:     7001,
+		ReceivedAt:      time.Date(2026, 7, 10, 8, 0, 0, 0, time.FixedZone("UTC+8", 8*60*60)),
+		Note:            &note,
+		IdempotencyKey:  " process:10:node:20:purchase-receipt-create ",
+	}
+	normalized, err := normalizePurchaseReceiptFromPurchaseOrderCreate(base)
+	if err != nil {
+		t.Fatalf("normalize base idempotency payload failed: %v", err)
+	}
+	if normalized.IdempotencyKey != "process:10:node:20:purchase-receipt-create" || normalized.IdempotencyPayloadHash == "" {
+		t.Fatalf("unexpected normalized idempotency intent: %#v", normalized)
+	}
+	sameInstant := base
+	sameInstant.ReceiptNo = "PR-IDEMPOTENCY-001"
+	sameInstant.ReceivedAt = base.ReceivedAt.UTC()
+	sameInstantNormalized, err := normalizePurchaseReceiptFromPurchaseOrderCreate(sameInstant)
+	if err != nil {
+		t.Fatalf("normalize equivalent payload failed: %v", err)
+	}
+	if sameInstantNormalized.IdempotencyPayloadHash != normalized.IdempotencyPayloadHash {
+		t.Fatal("trimmed receipt number and equivalent time zone must keep the same idempotency payload hash")
+	}
+
+	mutations := []struct {
+		name   string
+		mutate func(*PurchaseReceiptFromPurchaseOrderCreate)
+	}{
+		{name: "purchase_order", mutate: func(in *PurchaseReceiptFromPurchaseOrderCreate) { in.PurchaseOrderID++ }},
+		{name: "receipt_no", mutate: func(in *PurchaseReceiptFromPurchaseOrderCreate) { in.ReceiptNo = "PR-IDEMPOTENCY-002" }},
+		{name: "warehouse", mutate: func(in *PurchaseReceiptFromPurchaseOrderCreate) { in.WarehouseID++ }},
+		{name: "received_at", mutate: func(in *PurchaseReceiptFromPurchaseOrderCreate) { in.ReceivedAt = in.ReceivedAt.Add(time.Second) }},
+		{name: "note", mutate: func(in *PurchaseReceiptFromPurchaseOrderCreate) { changed := "第二批到货"; in.Note = &changed }},
+	}
+	for _, test := range mutations {
+		t.Run(test.name, func(t *testing.T) {
+			changed := base
+			test.mutate(&changed)
+			got, err := normalizePurchaseReceiptFromPurchaseOrderCreate(changed)
+			if err != nil {
+				t.Fatalf("normalize changed payload failed: %v", err)
+			}
+			if got.IdempotencyPayloadHash == normalized.IdempotencyPayloadHash {
+				t.Fatalf("%s change must alter idempotency payload hash", test.name)
+			}
+		})
+	}
+
+	withoutReceivedAt := base
+	withoutReceivedAt.ReceivedAt = time.Time{}
+	firstDefaulted, err := normalizePurchaseReceiptFromPurchaseOrderCreate(withoutReceivedAt)
+	if err != nil {
+		t.Fatalf("normalize first server-time payload failed: %v", err)
+	}
+	time.Sleep(time.Millisecond)
+	secondDefaulted, err := normalizePurchaseReceiptFromPurchaseOrderCreate(withoutReceivedAt)
+	if err != nil {
+		t.Fatalf("normalize second server-time payload failed: %v", err)
+	}
+	if firstDefaulted.ReceivedAt.Equal(secondDefaulted.ReceivedAt) {
+		t.Fatal("test requires distinct server-generated received_at values")
+	}
+	if firstDefaulted.IdempotencyPayloadHash != secondDefaulted.IdempotencyPayloadHash {
+		t.Fatal("omitted received_at must keep a stable idempotency payload hash")
+	}
 }
 
 type purchaseReceiptProcessInventoryRepoStub struct {
@@ -161,6 +246,10 @@ type purchaseReceiptProcessInventoryRepoStub struct {
 
 func (r *purchaseReceiptProcessInventoryRepoStub) WarehouseIsActive(context.Context, int) (bool, error) {
 	return r.warehouseActive, nil
+}
+
+func (r *purchaseReceiptProcessInventoryRepoStub) ResolvePurchaseReceiptFromPurchaseOrderReplay(context.Context, *PurchaseReceiptFromPurchaseOrderCreate) (*PurchaseReceipt, bool, error) {
+	return nil, false, nil
 }
 
 func (r *purchaseReceiptProcessInventoryRepoStub) CreatePurchaseReceiptFromPurchaseOrder(_ context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) (*PurchaseReceipt, error) {

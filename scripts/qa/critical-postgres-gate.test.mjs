@@ -22,6 +22,13 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
     assert.match(source, /make purchase_receipt_pg_createdb/u, `${name} must prepare the isolated test database`)
     assert.match(source, /make purchase_receipt_migrate_apply/u, `${name} must apply current migrations before concurrency tests`)
     assert.match(source, /make critical_transactions_pg_test/u, `${name} must run the non-skippable transaction gate`)
+    const vulnerabilityScanIndex = source.lastIndexOf('scripts/qa/govulncheck.sh')
+    for (const gate of ['make critical_transactions_pg_test', 'go test ./...', 'make build']) {
+      assert(
+        source.lastIndexOf(gate) < vulnerabilityScanIndex,
+        `${name} must finish ${gate} before the external-network vulnerability scan`,
+      )
+    }
   }
 
   assert.match(makefile, /^critical_transactions_pg_test:/mu)

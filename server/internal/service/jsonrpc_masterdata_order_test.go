@@ -292,6 +292,7 @@ type stubSalesOrderJSONRPCRepo struct {
 	savedOrder           *biz.SalesOrderMutation
 	savedItems           []*biz.SalesOrderItemSaveMutation
 	lifecycleStatus      string
+	cancelActorID        int
 	lastSalesOrderFilter biz.SalesOrderFilter
 }
 
@@ -320,6 +321,12 @@ func (s *stubSalesOrderJSONRPCRepo) ListSalesOrders(_ context.Context, filter bi
 func (s *stubSalesOrderJSONRPCRepo) UpdateSalesOrderLifecycle(_ context.Context, id int, lifecycleStatus string) (*biz.SalesOrder, error) {
 	s.lifecycleStatus = lifecycleStatus
 	return &biz.SalesOrder{ID: id, OrderNo: "SO001", CustomerID: 1, OrderDate: time.Unix(1, 0), LifecycleStatus: lifecycleStatus}, nil
+}
+
+func (s *stubSalesOrderJSONRPCRepo) CancelSalesOrderWithActor(_ context.Context, id int, actorID int) (*biz.SalesOrder, error) {
+	s.cancelActorID = actorID
+	s.lifecycleStatus = biz.SalesOrderStatusCanceled
+	return &biz.SalesOrder{ID: id, OrderNo: "SO001", CustomerID: 1, OrderDate: time.Unix(1, 0), LifecycleStatus: biz.SalesOrderStatusCanceled}, nil
 }
 
 func (s *stubSalesOrderJSONRPCRepo) AddSalesOrderItem(_ context.Context, in *biz.SalesOrderItemMutation) (*biz.SalesOrderItem, error) {
@@ -380,6 +387,10 @@ func (s *stubSalesOrderJSONRPCRepo) ProductIsActive(context.Context, int) (bool,
 	if !s.productActive {
 		return false, biz.ErrProductNotFound
 	}
+	return true, nil
+}
+
+func (s *stubSalesOrderJSONRPCRepo) ProductSKUIsActiveForProduct(context.Context, int, int) (bool, error) {
 	return true, nil
 }
 
@@ -1311,6 +1322,14 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresEnabledModule(t *testing.T) {
 	if submitRes == nil || submitRes.Code != errcode.OK.Code || repo.lifecycleStatus != biz.SalesOrderStatusSubmitted {
 		t.Fatalf("expected enabled sales_orders submit OK, res=%#v lifecycle=%s", submitRes, repo.lifecycleStatus)
 	}
+	_, enabledCancelRes, err := j.handleSalesOrder(ctx, "cancel_sales_order", "enabled-cancel", mustJSONRPCStruct(t, map[string]any{"id": float64(1)}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if enabledCancelRes == nil || enabledCancelRes.Code != errcode.OK.Code || repo.cancelActorID != 7 {
+		t.Fatalf("expected authenticated sales cancellation actor 7, res=%#v actor=%d", enabledCancelRes, repo.cancelActorID)
+	}
+	repo.lifecycleStatus = biz.SalesOrderStatusSubmitted
 
 	disabledConfig := customerConfigPublishParamsWithRevisionAndModuleState(
 		t,

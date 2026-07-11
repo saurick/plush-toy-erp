@@ -11,6 +11,7 @@ func (d *jsonrpcDispatcher) handleSalesOrderLifecycle(
 	ctx context.Context,
 	method, id string,
 	pm map[string]any,
+	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
 	case "submit_sales_order", "submitSalesOrder":
@@ -20,7 +21,9 @@ func (d *jsonrpcDispatcher) handleSalesOrderLifecycle(
 	case "close_sales_order", "closeSalesOrder":
 		return d.handleSalesOrderLifecycleAction(ctx, id, pm, biz.PermissionSalesOrderClose, d.salesOrderUC.CloseSalesOrder)
 	case "cancel_sales_order", "cancelSalesOrder":
-		return d.handleSalesOrderLifecycleAction(ctx, id, pm, biz.PermissionSalesOrderCancel, d.salesOrderUC.CancelSalesOrder)
+		return d.handleSalesOrderLifecycleAction(ctx, id, pm, biz.PermissionSalesOrderCancel, func(ctx context.Context, id int) (*biz.SalesOrder, error) {
+			return d.salesOrderUC.CancelSalesOrderWithActor(ctx, id, actorID)
+		})
 	default:
 		return id, unknownSalesOrderResult(method), nil
 	}

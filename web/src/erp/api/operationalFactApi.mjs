@@ -58,8 +58,12 @@ export async function cancelOutsourcingFact(params = {}) {
   return dataOf(result)?.outsourcing_fact || null
 }
 
-export async function listShipments(params = {}) {
-  const result = await operationalFactRpc.call('list_shipments', params)
+export async function listShipments(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(
+    'list_shipments',
+    params,
+    options
+  )
   return dataOf(result)
 }
 
@@ -110,14 +114,6 @@ export async function createStockReservation(params = {}) {
 export async function releaseStockReservation(params = {}) {
   const result = await operationalFactRpc.call(
     'release_stock_reservation',
-    params
-  )
-  return dataOf(result)?.stock_reservation || null
-}
-
-export async function consumeStockReservation(params = {}) {
-  const result = await operationalFactRpc.call(
-    'consume_stock_reservation',
     params
   )
   return dataOf(result)?.stock_reservation || null

@@ -61,6 +61,59 @@ func (ProcessNodeInstance) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(64),
+		field.String("domain_command_fingerprint").
+			Optional().
+			Nillable().
+			MinLen(64).
+			MaxLen(64),
+		field.Int("domain_command_protocol_version").
+			Optional().
+			Nillable().
+			NonNegative(),
+		field.String("domain_command_result_state").
+			Optional().
+			Nillable().
+			MaxLen(32),
+		field.JSON("domain_command_result", map[string]any{}).
+			Optional(),
+		field.String("domain_command_result_hash").
+			Optional().
+			Nillable().
+			MinLen(64).
+			MaxLen(64),
+		field.String("domain_command_effect_state").
+			Optional().
+			Nillable().
+			MaxLen(32),
+		field.String("domain_command_effect_ref_type").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.Int("domain_command_effect_ref_id").
+			Optional().
+			Nillable().
+			Positive(),
+		field.Time("domain_command_result_recorded_at").
+			Optional().
+			Nillable(),
+		field.Int("domain_command_result_recorded_by").
+			Optional().
+			Nillable().
+			Positive(),
+		field.JSON("domain_command_compensation", map[string]any{}).
+			Optional(),
+		field.String("domain_command_compensation_hash").
+			Optional().
+			Nillable().
+			MinLen(64).
+			MaxLen(64),
+		field.Time("domain_command_compensated_at").
+			Optional().
+			Nillable(),
+		field.Int("domain_command_compensated_by").
+			Optional().
+			Nillable().
+			Positive(),
 		field.Int("version").
 			Default(1).
 			Positive(),
@@ -89,6 +142,7 @@ func (ProcessNodeInstance) Indexes() []ent.Index {
 		index.Fields("process_instance_id", "status"),
 		index.Fields("owner_pool_key", "status"),
 		index.Fields("required_capability_key", "status"),
+		index.Fields("domain_command_effect_ref_type", "domain_command_effect_ref_id"),
 		index.Fields("due_at"),
 	}
 }

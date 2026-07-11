@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/warehouse"
 	"time"
@@ -106,6 +107,26 @@ func (_u *OutsourcingFactUpdate) SetNillableSubjectID(v *int) *OutsourcingFactUp
 // AddSubjectID adds value to the "subject_id" field.
 func (_u *OutsourcingFactUpdate) AddSubjectID(v int) *OutsourcingFactUpdate {
 	_u.mutation.AddSubjectID(v)
+	return _u
+}
+
+// SetProductSkuID sets the "product_sku_id" field.
+func (_u *OutsourcingFactUpdate) SetProductSkuID(v int) *OutsourcingFactUpdate {
+	_u.mutation.SetProductSkuID(v)
+	return _u
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_u *OutsourcingFactUpdate) SetNillableProductSkuID(v *int) *OutsourcingFactUpdate {
+	if v != nil {
+		_u.SetProductSkuID(*v)
+	}
+	return _u
+}
+
+// ClearProductSkuID clears the value of the "product_sku_id" field.
+func (_u *OutsourcingFactUpdate) ClearProductSkuID() *OutsourcingFactUpdate {
+	_u.mutation.ClearProductSkuID()
 	return _u
 }
 
@@ -320,6 +341,20 @@ func (_u *OutsourcingFactUpdate) SetNillableOccurredAt(v *time.Time) *Outsourcin
 	return _u
 }
 
+// SetOccurredAtSpecified sets the "occurred_at_specified" field.
+func (_u *OutsourcingFactUpdate) SetOccurredAtSpecified(v bool) *OutsourcingFactUpdate {
+	_u.mutation.SetOccurredAtSpecified(v)
+	return _u
+}
+
+// SetNillableOccurredAtSpecified sets the "occurred_at_specified" field if the given value is not nil.
+func (_u *OutsourcingFactUpdate) SetNillableOccurredAtSpecified(v *bool) *OutsourcingFactUpdate {
+	if v != nil {
+		_u.SetOccurredAtSpecified(*v)
+	}
+	return _u
+}
+
 // SetPostedAt sets the "posted_at" field.
 func (_u *OutsourcingFactUpdate) SetPostedAt(v time.Time) *OutsourcingFactUpdate {
 	_u.mutation.SetPostedAt(v)
@@ -376,6 +411,11 @@ func (_u *OutsourcingFactUpdate) SetUnit(v *Unit) *OutsourcingFactUpdate {
 	return _u.SetUnitID(v.ID)
 }
 
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_u *OutsourcingFactUpdate) SetProductSku(v *ProductSKU) *OutsourcingFactUpdate {
+	return _u.SetProductSkuID(v.ID)
+}
+
 // SetInventoryLotID sets the "inventory_lot" edge to the InventoryLot entity by ID.
 func (_u *OutsourcingFactUpdate) SetInventoryLotID(id int) *OutsourcingFactUpdate {
 	_u.mutation.SetInventoryLotID(id)
@@ -409,6 +449,12 @@ func (_u *OutsourcingFactUpdate) ClearWarehouse() *OutsourcingFactUpdate {
 // ClearUnit clears the "unit" edge to the Unit entity.
 func (_u *OutsourcingFactUpdate) ClearUnit() *OutsourcingFactUpdate {
 	_u.mutation.ClearUnit()
+	return _u
+}
+
+// ClearProductSku clears the "product_sku" edge to the ProductSKU entity.
+func (_u *OutsourcingFactUpdate) ClearProductSku() *OutsourcingFactUpdate {
+	_u.mutation.ClearProductSku()
 	return _u
 }
 
@@ -485,6 +531,11 @@ func (_u *OutsourcingFactUpdate) check() error {
 	if v, ok := _u.mutation.SubjectID(); ok {
 		if err := outsourcingfact.SubjectIDValidator(v); err != nil {
 			return &ValidationError{Name: "subject_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.subject_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProductSkuID(); ok {
+		if err := outsourcingfact.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.product_sku_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.WarehouseID(); ok {
@@ -624,6 +675,9 @@ func (_u *OutsourcingFactUpdate) sqlSave(ctx context.Context) (_node int, err er
 	if value, ok := _u.mutation.OccurredAt(); ok {
 		_spec.SetField(outsourcingfact.FieldOccurredAt, field.TypeTime, value)
 	}
+	if value, ok := _u.mutation.OccurredAtSpecified(); ok {
+		_spec.SetField(outsourcingfact.FieldOccurredAtSpecified, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.PostedAt(); ok {
 		_spec.SetField(outsourcingfact.FieldPostedAt, field.TypeTime, value)
 	}
@@ -690,6 +744,35 @@ func (_u *OutsourcingFactUpdate) sqlSave(ctx context.Context) (_node int, err er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(unit.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductSkuCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   outsourcingfact.ProductSkuTable,
+			Columns: []string{outsourcingfact.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   outsourcingfact.ProductSkuTable,
+			Columns: []string{outsourcingfact.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -820,6 +903,26 @@ func (_u *OutsourcingFactUpdateOne) SetNillableSubjectID(v *int) *OutsourcingFac
 // AddSubjectID adds value to the "subject_id" field.
 func (_u *OutsourcingFactUpdateOne) AddSubjectID(v int) *OutsourcingFactUpdateOne {
 	_u.mutation.AddSubjectID(v)
+	return _u
+}
+
+// SetProductSkuID sets the "product_sku_id" field.
+func (_u *OutsourcingFactUpdateOne) SetProductSkuID(v int) *OutsourcingFactUpdateOne {
+	_u.mutation.SetProductSkuID(v)
+	return _u
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_u *OutsourcingFactUpdateOne) SetNillableProductSkuID(v *int) *OutsourcingFactUpdateOne {
+	if v != nil {
+		_u.SetProductSkuID(*v)
+	}
+	return _u
+}
+
+// ClearProductSkuID clears the value of the "product_sku_id" field.
+func (_u *OutsourcingFactUpdateOne) ClearProductSkuID() *OutsourcingFactUpdateOne {
+	_u.mutation.ClearProductSkuID()
 	return _u
 }
 
@@ -1034,6 +1137,20 @@ func (_u *OutsourcingFactUpdateOne) SetNillableOccurredAt(v *time.Time) *Outsour
 	return _u
 }
 
+// SetOccurredAtSpecified sets the "occurred_at_specified" field.
+func (_u *OutsourcingFactUpdateOne) SetOccurredAtSpecified(v bool) *OutsourcingFactUpdateOne {
+	_u.mutation.SetOccurredAtSpecified(v)
+	return _u
+}
+
+// SetNillableOccurredAtSpecified sets the "occurred_at_specified" field if the given value is not nil.
+func (_u *OutsourcingFactUpdateOne) SetNillableOccurredAtSpecified(v *bool) *OutsourcingFactUpdateOne {
+	if v != nil {
+		_u.SetOccurredAtSpecified(*v)
+	}
+	return _u
+}
+
 // SetPostedAt sets the "posted_at" field.
 func (_u *OutsourcingFactUpdateOne) SetPostedAt(v time.Time) *OutsourcingFactUpdateOne {
 	_u.mutation.SetPostedAt(v)
@@ -1090,6 +1207,11 @@ func (_u *OutsourcingFactUpdateOne) SetUnit(v *Unit) *OutsourcingFactUpdateOne {
 	return _u.SetUnitID(v.ID)
 }
 
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_u *OutsourcingFactUpdateOne) SetProductSku(v *ProductSKU) *OutsourcingFactUpdateOne {
+	return _u.SetProductSkuID(v.ID)
+}
+
 // SetInventoryLotID sets the "inventory_lot" edge to the InventoryLot entity by ID.
 func (_u *OutsourcingFactUpdateOne) SetInventoryLotID(id int) *OutsourcingFactUpdateOne {
 	_u.mutation.SetInventoryLotID(id)
@@ -1123,6 +1245,12 @@ func (_u *OutsourcingFactUpdateOne) ClearWarehouse() *OutsourcingFactUpdateOne {
 // ClearUnit clears the "unit" edge to the Unit entity.
 func (_u *OutsourcingFactUpdateOne) ClearUnit() *OutsourcingFactUpdateOne {
 	_u.mutation.ClearUnit()
+	return _u
+}
+
+// ClearProductSku clears the "product_sku" edge to the ProductSKU entity.
+func (_u *OutsourcingFactUpdateOne) ClearProductSku() *OutsourcingFactUpdateOne {
+	_u.mutation.ClearProductSku()
 	return _u
 }
 
@@ -1212,6 +1340,11 @@ func (_u *OutsourcingFactUpdateOne) check() error {
 	if v, ok := _u.mutation.SubjectID(); ok {
 		if err := outsourcingfact.SubjectIDValidator(v); err != nil {
 			return &ValidationError{Name: "subject_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.subject_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProductSkuID(); ok {
+		if err := outsourcingfact.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.product_sku_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.WarehouseID(); ok {
@@ -1368,6 +1501,9 @@ func (_u *OutsourcingFactUpdateOne) sqlSave(ctx context.Context) (_node *Outsour
 	if value, ok := _u.mutation.OccurredAt(); ok {
 		_spec.SetField(outsourcingfact.FieldOccurredAt, field.TypeTime, value)
 	}
+	if value, ok := _u.mutation.OccurredAtSpecified(); ok {
+		_spec.SetField(outsourcingfact.FieldOccurredAtSpecified, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.PostedAt(); ok {
 		_spec.SetField(outsourcingfact.FieldPostedAt, field.TypeTime, value)
 	}
@@ -1434,6 +1570,35 @@ func (_u *OutsourcingFactUpdateOne) sqlSave(ctx context.Context) (_node *Outsour
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(unit.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductSkuCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   outsourcingfact.ProductSkuTable,
+			Columns: []string{outsourcingfact.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   outsourcingfact.ProductSkuTable,
+			Columns: []string{outsourcingfact.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

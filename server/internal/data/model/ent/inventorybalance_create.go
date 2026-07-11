@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/warehouse"
 	"time"
@@ -33,6 +34,20 @@ func (_c *InventoryBalanceCreate) SetSubjectType(v string) *InventoryBalanceCrea
 // SetSubjectID sets the "subject_id" field.
 func (_c *InventoryBalanceCreate) SetSubjectID(v int) *InventoryBalanceCreate {
 	_c.mutation.SetSubjectID(v)
+	return _c
+}
+
+// SetProductSkuID sets the "product_sku_id" field.
+func (_c *InventoryBalanceCreate) SetProductSkuID(v int) *InventoryBalanceCreate {
+	_c.mutation.SetProductSkuID(v)
+	return _c
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_c *InventoryBalanceCreate) SetNillableProductSkuID(v *int) *InventoryBalanceCreate {
+	if v != nil {
+		_c.SetProductSkuID(*v)
+	}
 	return _c
 }
 
@@ -90,6 +105,11 @@ func (_c *InventoryBalanceCreate) SetWarehouse(v *Warehouse) *InventoryBalanceCr
 // SetUnit sets the "unit" edge to the Unit entity.
 func (_c *InventoryBalanceCreate) SetUnit(v *Unit) *InventoryBalanceCreate {
 	return _c.SetUnitID(v.ID)
+}
+
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_c *InventoryBalanceCreate) SetProductSku(v *ProductSKU) *InventoryBalanceCreate {
+	return _c.SetProductSkuID(v.ID)
 }
 
 // SetInventoryLotID sets the "inventory_lot" edge to the InventoryLot entity by ID.
@@ -168,6 +188,11 @@ func (_c *InventoryBalanceCreate) check() error {
 	if v, ok := _c.mutation.SubjectID(); ok {
 		if err := inventorybalance.SubjectIDValidator(v); err != nil {
 			return &ValidationError{Name: "subject_id", err: fmt.Errorf(`ent: validator failed for field "InventoryBalance.subject_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ProductSkuID(); ok {
+		if err := inventorybalance.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "InventoryBalance.product_sku_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.WarehouseID(); !ok {
@@ -277,6 +302,23 @@ func (_c *InventoryBalanceCreate) createSpec() (*InventoryBalance, *sqlgraph.Cre
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.UnitID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   inventorybalance.ProductSkuTable,
+			Columns: []string{inventorybalance.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ProductSkuID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.InventoryLotIDs(); len(nodes) > 0 {

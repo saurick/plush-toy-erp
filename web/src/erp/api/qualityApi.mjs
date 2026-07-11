@@ -12,8 +12,12 @@ function dataOf(result) {
   return result?.data || {}
 }
 
-export async function listQualityInspections(params = {}) {
-  const result = await qualityRpc.call('list_quality_inspections', params)
+export async function listQualityInspections(params = {}, options = {}) {
+  const result = await qualityRpc.call(
+    'list_quality_inspections',
+    params,
+    options
+  )
   return dataOf(result)
 }
 

@@ -14,6 +14,7 @@ import {
   listInventoryTxns,
 } from '../api/inventoryApi.mjs'
 import {
+  listProductSKUs,
   listUnits,
   listMaterials,
   listProducts,
@@ -49,6 +50,7 @@ import {
   inventoryLotOption,
   materialOption,
   productOption,
+  productSKUOption,
   referenceLabel,
   uniqueReferenceOptions,
   unitOption,
@@ -325,6 +327,7 @@ export default function V1InventoryLedgerPage() {
   const [keyword, setKeyword] = useState('')
   const [subjectType, setSubjectType] = useState('')
   const [subjectID, setSubjectID] = useState('')
+  const [productSkuID, setProductSkuID] = useState('')
   const [warehouseID, setWarehouseID] = useState('')
   const [lotID, setLotID] = useState('')
   const [lotStatus, setLotStatus] = useState('')
@@ -334,6 +337,7 @@ export default function V1InventoryLedgerPage() {
   const [dateFilterEnd, setDateFilterEnd] = useState('')
   const [materials, setMaterials] = useState([])
   const [products, setProducts] = useState([])
+  const [productSKUs, setProductSKUs] = useState([])
   const [units, setUnits] = useState([])
   const [warehouses, setWarehouses] = useState([])
   const [inventoryLots, setInventoryLots] = useState([])
@@ -382,6 +386,7 @@ export default function V1InventoryLedgerPage() {
       const commonParams = compactParams({
         subject_type: subjectType,
         subject_id: subjectID || undefined,
+        product_sku_id: productSkuID || undefined,
         warehouse_id: warehouseID || undefined,
         lot_id: lotID || routeLotID || undefined,
         keyword: trimOptional(keyword),
@@ -449,6 +454,7 @@ export default function V1InventoryLedgerPage() {
     lotStatus,
     lotID,
     pagination,
+    productSkuID,
     routeLotID,
     routeSourceID,
     routeSourceType,
@@ -536,6 +542,7 @@ export default function V1InventoryLedgerPage() {
       const [
         materialResult,
         productResult,
+        productSKUResult,
         unitResult,
         warehouseResult,
         lotResult,
@@ -548,6 +555,7 @@ export default function V1InventoryLedgerPage() {
           { limit: 500, active_only: true },
           { signal: request.signal }
         ),
+        listProductSKUs({ limit: 500 }, { signal: request.signal }),
         listUnits({ limit: 500 }, { signal: request.signal }),
         listWarehouses(
           { limit: 500, active_only: true },
@@ -563,6 +571,11 @@ export default function V1InventoryLedgerPage() {
       )
       setProducts(
         Array.isArray(productResult?.products) ? productResult.products : []
+      )
+      setProductSKUs(
+        Array.isArray(productSKUResult?.product_skus)
+          ? productSKUResult.product_skus
+          : []
       )
       setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
       setWarehouses(
@@ -580,6 +593,7 @@ export default function V1InventoryLedgerPage() {
       message.error(getActionErrorMessage(error, '加载库存筛选引用数据'))
       setMaterials([])
       setProducts([])
+      setProductSKUs([])
       setUnits([])
       setWarehouses([])
       setInventoryLots([])
@@ -602,6 +616,16 @@ export default function V1InventoryLedgerPage() {
     () => uniqueReferenceOptions(products, productOption),
     [products]
   )
+  const productSKUOptions = useMemo(() => {
+    const selectedProductID = Number(subjectID || 0)
+    const source =
+      selectedProductID > 0
+        ? productSKUs.filter(
+            (item) => Number(item?.product_id || 0) === selectedProductID
+          )
+        : productSKUs
+    return uniqueReferenceOptions(source, productSKUOption)
+  }, [productSKUs, subjectID])
   const unitOptions = useMemo(
     () => uniqueReferenceOptions(units, unitOption),
     [units]
@@ -641,6 +665,14 @@ export default function V1InventoryLedgerPage() {
   const renderWarehouseReference = useCallback(
     (value) => referenceLabel(warehouseOptions, value, '仓库'),
     [warehouseOptions]
+  )
+  const renderProductSKUReference = useCallback(
+    (value, record) => {
+      if (record?.subject_type !== 'PRODUCT') return '-'
+      if (!Number(value || 0)) return '未分规格'
+      return referenceLabel(productSKUOptions, value, '产品规格')
+    },
+    [productSKUOptions]
   )
   const renderLotReference = useCallback(
     (value) => referenceLabel(inventoryLotOptions, value, '批次'),
@@ -685,6 +717,14 @@ export default function V1InventoryLedgerPage() {
           render: renderSubjectReference,
           exportValue: (record) =>
             renderSubjectReference(record?.subject_id, record),
+        },
+        {
+          title: '产品规格',
+          dataIndex: 'product_sku_id',
+          width: 220,
+          render: renderProductSKUReference,
+          exportValue: (record) =>
+            renderProductSKUReference(record?.product_sku_id, record),
         },
         {
           title: '供应商批次',
@@ -759,6 +799,14 @@ export default function V1InventoryLedgerPage() {
           render: renderSubjectReference,
           exportValue: (record) =>
             renderSubjectReference(record?.subject_id, record),
+        },
+        {
+          title: '产品规格',
+          dataIndex: 'product_sku_id',
+          width: 220,
+          render: renderProductSKUReference,
+          exportValue: (record) =>
+            renderProductSKUReference(record?.product_sku_id, record),
         },
         {
           title: '仓库',
@@ -858,6 +906,14 @@ export default function V1InventoryLedgerPage() {
           renderSubjectReference(record?.subject_id, record),
       },
       {
+        title: '产品规格',
+        dataIndex: 'product_sku_id',
+        width: 220,
+        render: renderProductSKUReference,
+        exportValue: (record) =>
+          renderProductSKUReference(record?.product_sku_id, record),
+      },
+      {
         title: '仓库',
         dataIndex: 'warehouse_id',
         width: 180,
@@ -907,6 +963,7 @@ export default function V1InventoryLedgerPage() {
   }, [
     activeView,
     renderLotReference,
+    renderProductSKUReference,
     renderSubjectReference,
     renderUnitReference,
     renderWarehouseReference,
@@ -930,6 +987,7 @@ export default function V1InventoryLedgerPage() {
     keyword.trim() ||
       subjectType ||
       subjectID ||
+      productSkuID ||
       warehouseID ||
       lotID ||
       lotStatus ||
@@ -945,6 +1003,7 @@ export default function V1InventoryLedgerPage() {
     setKeyword('')
     setSubjectType('')
     setSubjectID('')
+    setProductSkuID('')
     setWarehouseID('')
     setLotID('')
     setLotStatus('')
@@ -1007,6 +1066,7 @@ export default function V1InventoryLedgerPage() {
               onChange={(nextType) => {
                 setSubjectType(nextType || '')
                 setSubjectID('')
+                setProductSkuID('')
                 resetCurrentPage()
               }}
             />
@@ -1023,6 +1083,25 @@ export default function V1InventoryLedgerPage() {
               optionFilterProp="label"
               onChange={(nextID) => {
                 setSubjectID(nextID || '')
+                setProductSkuID('')
+                resetCurrentPage()
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={productSkuID}
+              options={[
+                { label: '全部产品规格', value: '' },
+                ...productSKUOptions,
+              ]}
+              placeholder={
+                subjectType === 'PRODUCT' ? '全部产品规格' : '仅成品可选规格'
+              }
+              disabled={subjectType !== 'PRODUCT'}
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextID) => {
+                setProductSkuID(nextID || '')
                 resetCurrentPage()
               }}
             />

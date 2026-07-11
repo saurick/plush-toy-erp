@@ -17,11 +17,14 @@ type PurchaseReceipt struct {
 }
 
 var purchaseReceiptLockedFields = map[string]struct{}{
-	"receipt_no":    {},
-	"supplier_name": {},
-	"status":        {},
-	"received_at":   {},
-	"posted_at":     {},
+	"receipt_no":               {},
+	"supplier_name":            {},
+	"status":                   {},
+	"received_at":              {},
+	"posted_at":                {},
+	"idempotency_key":          {},
+	"idempotency_payload_hash": {},
+	"idempotency_item_count":   {},
 }
 
 func (PurchaseReceipt) Hooks() []ent.Hook {
@@ -58,6 +61,18 @@ func (PurchaseReceipt) Fields() []ent.Field {
 		field.Time("posted_at").
 			Optional().
 			Nillable(),
+		field.String("idempotency_key").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.String("idempotency_payload_hash").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.Int("idempotency_item_count").
+			Optional().
+			Nillable().
+			Positive(),
 		field.String("note").
 			Optional().
 			Nillable().
@@ -86,6 +101,7 @@ func (PurchaseReceipt) Edges() []ent.Edge {
 func (PurchaseReceipt) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("receipt_no").Unique(),
+		index.Fields("idempotency_key").Unique(),
 		index.Fields("supplier_name"),
 		index.Fields("status"),
 		index.Fields("received_at"),

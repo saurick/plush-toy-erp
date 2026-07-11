@@ -62,14 +62,7 @@ func TestShipmentProcessDomainCommandShipBindsUsecase(t *testing.T) {
 		CommandKey:            ProcessDomainCommandShipmentShip,
 		IdempotencyKey:        "process:10:node:20:shipment-ship",
 		Payload: map[string]any{
-			"shipment_id":  float64(9001),
-			"shipment_no":  "SHIP-PROCESS-001",
-			"warehouse_id": float64(7001),
-			"operator_id":  float64(8001),
-			"shipped_at":   "2026-06-30",
-			"carrier":      "测试承运商",
-			"tracking_no":  "TRACK-PROCESS-001",
-			"ship_note":    "流程显式出货",
+			"shipment_id": float64(9001),
 		},
 	}, 7)
 	if err != nil {
@@ -145,11 +138,7 @@ func TestShipmentProcessDomainCommandFinanceReleaseBindsUsecase(t *testing.T) {
 		CommandKey:            ProcessDomainCommandShipmentFinanceRelease,
 		IdempotencyKey:        "process:10:node:20:shipment-finance-release",
 		Payload: map[string]any{
-			"shipment_id":        float64(9001),
-			"finance_release_no": "FR-PROCESS-001",
-			"approved_by_id":     float64(7001),
-			"released_at":        "2026-06-30",
-			"release_note":       "流程显式财务放行",
+			"shipment_id": float64(9001),
 		},
 	}, 7)
 	if err != nil {

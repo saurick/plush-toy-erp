@@ -13,6 +13,7 @@ import (
 	"server/internal/biz"
 	corestatus "server/internal/core/status"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
@@ -161,11 +162,31 @@ func (r *inventoryRepo) SubmitQualityInspection(ctx context.Context, inspectionI
 }
 
 func (r *inventoryRepo) PassQualityInspection(ctx context.Context, in *biz.QualityInspectionDecision) (*biz.QualityInspection, error) {
-	return r.decideSubmittedQualityInspection(ctx, in, biz.QualityInspectionStatusPassed, biz.InventoryLotActive)
+	return r.decideSubmittedQualityInspection(ctx, in, biz.QualityInspectionStatusPassed, biz.InventoryLotActive, nil, nil, 0)
 }
 
 func (r *inventoryRepo) RejectQualityInspection(ctx context.Context, in *biz.QualityInspectionDecision) (*biz.QualityInspection, error) {
-	return r.decideSubmittedQualityInspection(ctx, in, biz.QualityInspectionStatusRejected, biz.InventoryLotRejected)
+	return r.decideSubmittedQualityInspection(ctx, in, biz.QualityInspectionStatusRejected, biz.InventoryLotRejected, nil, nil, 0)
+}
+
+func (r *inventoryRepo) PassQualityInspectionForProcessCommand(
+	ctx context.Context,
+	in *biz.QualityInspectionDecision,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+) (*biz.QualityInspection, error) {
+	return r.decideSubmittedQualityInspection(ctx, in, biz.QualityInspectionStatusPassed, biz.InventoryLotActive, command, result, actorID)
+}
+
+func (r *inventoryRepo) RejectQualityInspectionForProcessCommand(
+	ctx context.Context,
+	in *biz.QualityInspectionDecision,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+) (*biz.QualityInspection, error) {
+	return r.decideSubmittedQualityInspection(ctx, in, biz.QualityInspectionStatusRejected, biz.InventoryLotRejected, command, result, actorID)
 }
 
 func (r *inventoryRepo) CancelQualityInspection(ctx context.Context, inspectionID int, decisionNote *string) (*biz.QualityInspection, error) {
@@ -357,6 +378,55 @@ func (r *inventoryRepo) EvaluatePurchaseReceiptQualityGate(ctx context.Context, 
 	}
 	gate, err := evaluatePurchaseReceiptQualityGateInTx(ctx, tx, receipt, items, false)
 	if err != nil {
+		return nil, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return gate, nil
+}
+
+func (r *inventoryRepo) EvaluatePurchaseReceiptQualityGateForProcessCommand(
+	ctx context.Context,
+	receiptID int,
+	command *biz.ProcessDomainCommandInput,
+	actorID int,
+) (*biz.PurchaseReceiptQualityGate, error) {
+	if command == nil {
+		return nil, biz.ErrBadParam
+	}
+	tx, err := r.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockPurchaseReceipt(ctx, tx, receiptID); err != nil {
+		return nil, err
+	}
+	receipt, err := tx.client.PurchaseReceipt.Get(ctx, receiptID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrPurchaseReceiptNotFound
+		}
+		return nil, err
+	}
+	items, err := tx.client.PurchaseReceiptItem.Query().
+		Where(purchasereceiptitem.ReceiptID(receipt.ID)).
+		Order(ent.Asc(purchasereceiptitem.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	gate, err := evaluatePurchaseReceiptQualityGateInTx(ctx, tx, receipt, items, true)
+	if err != nil {
+		return nil, err
+	}
+	result, err := biz.IncomingQualityGateProcessCommandResult(gate)
+	if err != nil {
+		return nil, err
+	}
+	if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, result, actorID); err != nil {
 		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {
@@ -560,7 +630,15 @@ func lockInventoryLots(ctx context.Context, tx *inventoryDBTx, lotIDs []int) err
 	return nil
 }
 
-func (r *inventoryRepo) decideSubmittedQualityInspection(ctx context.Context, in *biz.QualityInspectionDecision, targetInspectionStatus, targetLotStatus string) (*biz.QualityInspection, error) {
+func (r *inventoryRepo) decideSubmittedQualityInspection(
+	ctx context.Context,
+	in *biz.QualityInspectionDecision,
+	targetInspectionStatus string,
+	targetLotStatus string,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+) (*biz.QualityInspection, error) {
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -576,6 +654,14 @@ func (r *inventoryRepo) decideSubmittedQualityInspection(ctx context.Context, in
 		return nil, biz.ErrBadParam
 	}
 	if !transition.Changed {
+		if command != nil {
+			if !qualityInspectionDecisionMatches(row, in, targetInspectionStatus) {
+				return nil, biz.ErrIdempotencyConflict
+			}
+			if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, result, actorID); err != nil {
+				return nil, err
+			}
+		}
 		if err := tx.sqlTx.Commit(); err != nil {
 			return nil, err
 		}
@@ -618,11 +704,35 @@ func (r *inventoryRepo) decideSubmittedQualityInspection(ctx context.Context, in
 		}
 		return nil, err
 	}
+	if command != nil {
+		if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, result, actorID); err != nil {
+			return nil, err
+		}
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
 	tx = nil
 	return entQualityInspectionToBiz(row), nil
+}
+
+func qualityInspectionDecisionMatches(row *ent.QualityInspection, in *biz.QualityInspectionDecision, targetStatus string) bool {
+	if row == nil || in == nil || row.Status != targetStatus || row.Result == nil || *row.Result != in.Result ||
+		row.InspectedAt == nil || (!in.InspectedAtDefaulted && !row.InspectedAt.Equal(in.InspectedAt)) {
+		return false
+	}
+	inspectorID := in.InspectorID
+	if inspectorID == nil {
+		inspectorID = row.InspectorID
+	}
+	if !sameOptionalInt(row.InspectorID, inspectorID) {
+		return false
+	}
+	decisionNote := in.DecisionNote
+	if decisionNote == nil {
+		decisionNote = row.DecisionNote
+	}
+	return sameOptionalString(row.DecisionNote, decisionNote)
 }
 
 func validateQualityInspectionReferences(ctx context.Context, client *ent.Client, in *biz.QualityInspectionCreate) error {
@@ -725,14 +835,21 @@ func validateFinishedGoodsQualityInspectionReferences(ctx context.Context, clien
 	if err := validateFinishedGoodsQualityInspectionLot(lot, in.SubjectID); err != nil {
 		return err
 	}
-	matched, err := client.ShipmentItem.Query().
-		Where(
-			shipmentitem.ShipmentID(in.SourceID),
-			shipmentitem.ProductID(in.SubjectID),
-			shipmentitem.WarehouseID(in.WarehouseID),
-			shipmentitem.LotID(in.InventoryLotID),
-		).
-		Exist(ctx)
+	if err := validateInventorySubjectSKU(ctx, client, biz.InventorySubjectProduct, in.SubjectID, lot.ProductSkuID); err != nil {
+		return err
+	}
+	predicates := []predicate.ShipmentItem{
+		shipmentitem.ShipmentID(in.SourceID),
+		shipmentitem.ProductID(in.SubjectID),
+		shipmentitem.WarehouseID(in.WarehouseID),
+		shipmentitem.LotID(in.InventoryLotID),
+	}
+	if lot.ProductSkuID == nil {
+		predicates = append(predicates, shipmentitem.ProductSkuIDIsNil())
+	} else {
+		predicates = append(predicates, shipmentitem.ProductSkuID(*lot.ProductSkuID))
+	}
+	matched, err := client.ShipmentItem.Query().Where(predicates...).Exist(ctx)
 	if err != nil {
 		return err
 	}

@@ -21,8 +21,9 @@ const (
 )
 
 var (
-	ErrCustomerConfigNotFound       = errors.New("customer config not found")
-	ErrCustomerConfigActiveRevision = errors.New("customer config active revision cannot be overwritten")
+	ErrCustomerConfigNotFound               = errors.New("customer config not found")
+	ErrCustomerConfigActiveRevision         = errors.New("customer config active revision cannot be overwritten")
+	ErrCustomerConfigActiveRevisionRequired = errors.New("customer config active revision required")
 )
 
 var runtimeFieldPolicySurfaceKeys = map[string]map[string]struct{}{
@@ -322,6 +323,17 @@ func (uc *CustomerConfigUsecase) validateCustomerConfigModuleClosure(ctx context
 }
 
 func (uc *CustomerConfigUsecase) GetEffectiveSession(ctx context.Context, customerKey string, admin *AdminUser) (*EffectiveSession, error) {
+	return uc.getEffectiveSession(ctx, customerKey, admin, true)
+}
+
+// GetEffectiveSessionRequiringActiveRevision is used by a deployment pinned to
+// a real customer key. It keeps control-plane repair available while refusing
+// to project builtin RBAC as that customer's active configuration.
+func (uc *CustomerConfigUsecase) GetEffectiveSessionRequiringActiveRevision(ctx context.Context, customerKey string, admin *AdminUser) (*EffectiveSession, error) {
+	return uc.getEffectiveSession(ctx, customerKey, admin, false)
+}
+
+func (uc *CustomerConfigUsecase) getEffectiveSession(ctx context.Context, customerKey string, admin *AdminUser, allowBuiltinFallback bool) (*EffectiveSession, error) {
 	if uc == nil || uc.repo == nil || admin == nil || admin.Disabled {
 		return nil, ErrForbidden
 	}
@@ -341,7 +353,10 @@ func (uc *CustomerConfigUsecase) GetEffectiveSession(ctx context.Context, custom
 	active, err := uc.repo.GetActiveCustomerConfigRevision(ctx, customerKey)
 	if err != nil {
 		if errors.Is(err, ErrCustomerConfigNotFound) {
-			return builtinEffectiveSession(customerKey, admin, roleKeys), nil
+			if allowBuiltinFallback {
+				return builtinEffectiveSession(customerKey, admin, roleKeys), nil
+			}
+			return nil, ErrCustomerConfigActiveRevisionRequired
 		}
 		return nil, err
 	}

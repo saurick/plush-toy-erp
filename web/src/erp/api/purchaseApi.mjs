@@ -12,8 +12,12 @@ function dataOf(result) {
   return result?.data || {}
 }
 
-export async function listPurchaseReceipts(params = {}) {
-  const result = await purchaseRpc.call('list_purchase_receipts', params)
+export async function listPurchaseReceipts(params = {}, options = {}) {
+  const result = await purchaseRpc.call(
+    'list_purchase_receipts',
+    params,
+    options
+  )
   return dataOf(result)
 }
 

@@ -7,6 +7,8 @@ import {
 } from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   BusinessDataTable,
   CollaborationTaskPanel,
@@ -164,6 +166,8 @@ export default function V1PurchaseOrdersPage() {
     setSelectedRowKeys(normalizedKeys)
   }, [])
 
+  const beginLatestRequest = useLatestRequestCoordinator()
+
   const unitOptions = useMemo(
     () => uniqueReferenceOptions(units, unitOption),
     [units]
@@ -193,21 +197,28 @@ export default function V1PurchaseOrdersPage() {
   }, [])
 
   const loadOrders = useCallback(async () => {
+    const request = beginLatestRequest('orders')
     setLoading(true)
     try {
       const { sortBy, sortDirection } = parseBusinessSortValue(sortValue)
-      const data = await listPurchaseOrders({
-        keyword,
-        supplier_id: supplierFilter || undefined,
-        lifecycle_status: status,
-        date_field: dateFilterField,
-        date_from: dateFilterStart || undefined,
-        date_to: dateFilterEnd || undefined,
-        sort_by: sortBy,
-        sort_direction: sortDirection,
-        limit: pagination.pageSize,
-        offset: (pagination.current - 1) * pagination.pageSize,
-      })
+      const data = await listPurchaseOrders(
+        {
+          keyword,
+          supplier_id: supplierFilter || undefined,
+          lifecycle_status: status,
+          date_field: dateFilterField,
+          date_from: dateFilterStart || undefined,
+          date_to: dateFilterEnd || undefined,
+          sort_by: sortBy,
+          sort_direction: sortDirection,
+          limit: pagination.pageSize,
+          offset: (pagination.current - 1) * pagination.pageSize,
+        },
+        { signal: request.signal }
+      )
+      if (!request.isCurrent()) {
+        return
+      }
       const nextOrders = data?.purchase_orders || []
       setOrders(nextOrders)
       setTotal(Number(data?.total || 0))
@@ -229,12 +240,19 @@ export default function V1PurchaseOrdersPage() {
         setSelectedOrder(null)
       }
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return
+      }
       message.error(getActionErrorMessage(error, '加载采购订单失败'))
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
     }
   }, [
     applySelectedRowKeys,
+    beginLatestRequest,
     dateFilterEnd,
     dateFilterField,
     dateFilterStart,

@@ -18,7 +18,8 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 	if params != nil {
 		pm = params.AsMap()
 	}
-	if _, res := d.requireAdmin(ctx); res != nil {
+	claims, res := d.requireAdmin(ctx)
+	if res != nil {
 		return id, res, nil
 	}
 	if d.operationalFactUC == nil {
@@ -42,10 +43,9 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"ship_shipment", "shipShipment",
 		"cancel_shipment", "cancelShipment",
 		"list_shipments", "listShipments":
-		return d.handleOperationalFactShipment(ctx, method, id, pm)
+		return d.handleOperationalFactShipment(ctx, method, id, pm, claims.UserID)
 	case "create_stock_reservation", "createStockReservation",
 		"release_stock_reservation", "releaseStockReservation",
-		"consume_stock_reservation", "consumeStockReservation",
 		"list_stock_reservations", "listStockReservations":
 		return d.handleOperationalFactReservation(ctx, method, id, pm)
 	case "create_finance_fact", "createFinanceFact",
@@ -53,7 +53,7 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"settle_finance_fact", "settleFinanceFact",
 		"cancel_finance_fact", "cancelFinanceFact",
 		"list_finance_facts", "listFinanceFacts":
-		return d.handleOperationalFactFinance(ctx, method, id, pm)
+		return d.handleOperationalFactFinance(ctx, method, id, pm, claims.UserID)
 	default:
 		return id, unknownOperationalFactResult(method), nil
 	}

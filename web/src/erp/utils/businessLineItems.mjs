@@ -166,6 +166,113 @@ export function createShipmentItemFromSalesOrderItem(
   }
 }
 
+function recordByID(records, id) {
+  const normalizedID = positiveInt(id)
+  if (!normalizedID) return null
+  return (
+    (Array.isArray(records) ? records : []).find(
+      (record) => positiveInt(record?.id) === normalizedID
+    ) || null
+  )
+}
+
+export function buildShipmentSourceItemChangePatch(
+  salesOrderItemID,
+  salesOrderItems = []
+) {
+  const sourceItem = recordByID(salesOrderItems, salesOrderItemID)
+  if (!sourceItem) {
+    return {
+      sales_order_item_id: undefined,
+      product_id: undefined,
+      product_sku_id: undefined,
+      unit_id: undefined,
+      lot_id: undefined,
+      quantity: '',
+      note: '',
+    }
+  }
+  const { shipment_id: _shipmentID, ...patch } =
+    createShipmentItemFromSalesOrderItem(sourceItem, undefined, {
+      quantity:
+        sourceItem.remainingQuantity === undefined
+          ? sourceItem.ordered_quantity
+          : sourceItem.remainingQuantity,
+    })
+  return patch
+}
+
+export function buildShipmentProductChangePatch(productID, products = []) {
+  const normalizedProductID = positiveInt(productID)
+  const product = recordByID(products, normalizedProductID)
+  return {
+    sales_order_item_id: undefined,
+    product_id: normalizedProductID,
+    product_sku_id: undefined,
+    unit_id: positiveInt(product?.default_unit_id),
+    lot_id: undefined,
+  }
+}
+
+export function buildShipmentSKUChangePatch(productSkuID, productSKUs = []) {
+  const normalizedSkuID = positiveInt(productSkuID)
+  const sku = recordByID(productSKUs, normalizedSkuID)
+  const patch = {
+    product_sku_id: normalizedSkuID,
+    lot_id: undefined,
+  }
+  const defaultUnitID = positiveInt(sku?.default_unit_id)
+  if (defaultUnitID) patch.unit_id = defaultUnitID
+  return patch
+}
+
+export function filterShipmentProductSKUOptions(
+  options,
+  productSKUs,
+  productID
+) {
+  const normalizedProductID = positiveInt(productID)
+  if (!normalizedProductID) return []
+  const allowedIDs = new Set(
+    (Array.isArray(productSKUs) ? productSKUs : [])
+      .filter((sku) => positiveInt(sku?.product_id) === normalizedProductID)
+      .map((sku) => positiveInt(sku?.id))
+      .filter(Boolean)
+  )
+  return (Array.isArray(options) ? options : []).filter((option) =>
+    allowedIDs.has(positiveInt(option?.value))
+  )
+}
+
+export function filterShipmentInventoryLotOptions(
+  options,
+  inventoryLots,
+  { productID, productSkuID } = {}
+) {
+  const normalizedProductID = positiveInt(productID)
+  const normalizedSkuID = positiveInt(productSkuID)
+  if (!normalizedProductID) return []
+  const allowedIDs = new Set(
+    (Array.isArray(inventoryLots) ? inventoryLots : [])
+      .filter(
+        (lot) =>
+          String(lot?.subject_type || '')
+            .trim()
+            .toUpperCase() === 'PRODUCT' &&
+          positiveInt(lot?.subject_id) === normalizedProductID &&
+          positiveInt(lot?.product_sku_id) === normalizedSkuID &&
+          String(lot?.status || '')
+            .trim()
+            .toUpperCase() === 'ACTIVE'
+      )
+      .map((lot) => positiveInt(lot?.id || lot?.lot_id))
+      .filter(Boolean)
+  )
+  return (Array.isArray(options) ? options : []).filter((option) =>
+    allowedIDs.has(positiveInt(option?.value))
+  )
+}
+
 export function isBlankShipmentItem(item = {}) {
   return [
     item.sales_order_item_id,

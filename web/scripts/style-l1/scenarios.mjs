@@ -124,6 +124,34 @@ export function createStyleL1Scenarios(deps) {
       `effective session 诊断模式应为 ${mode}`
     )
   }
+  const assertDevCustomerHeaderStacked = async (page, scenarioName) => {
+    const metrics = await page.evaluate(() => {
+      const copy = document.querySelector('.erp-dev-customer-header__copy')
+      const title = document.querySelector('.erp-dev-customer-title')
+      const summary = document.querySelector('.erp-dev-customer-summary')
+      const titleRect = title?.getBoundingClientRect()
+      const summaryRect = summary?.getBoundingClientRect()
+      return {
+        copyDisplay: copy ? getComputedStyle(copy).display : '',
+        copyDirection: copy ? getComputedStyle(copy).flexDirection : '',
+        titleBottom: titleRect?.bottom || 0,
+        summaryTop: summaryRect?.top || 0,
+        summaryWidth: summaryRect?.width || 0,
+        summaryScrollWidth: summary?.scrollWidth || 0,
+        summaryClientWidth: summary?.clientWidth || 0,
+      }
+    })
+    assert(
+      metrics.copyDisplay === 'flex' &&
+        metrics.copyDirection === 'column' &&
+        metrics.summaryTop >= metrics.titleBottom + 2 &&
+        metrics.summaryWidth > 0 &&
+        metrics.summaryScrollWidth <= metrics.summaryClientWidth + 1,
+      `${scenarioName} 客户配置控制台标题和摘要应纵向分层且不重叠: ${JSON.stringify(
+        metrics
+      )}`
+    )
+  }
   const assertPrintEditableFocusBorderStyle = async (
     page,
     { selector, scenarioLabel }
@@ -314,6 +342,17 @@ export function createStyleL1Scenarios(deps) {
       })
     }
   }
+
+  const customerRuntimeEffectiveSession = Object.freeze({
+    configRevision: 'style-l1-customer-runtime',
+    configHash: 'style-l1-customer-runtime-hash',
+    customer: { key: 'yoyoosun', name: '永绅' },
+    pages: [],
+    actions: [],
+    fieldPolicies: {},
+    workPools: [],
+    source: 'active_customer_config_revision',
+  })
 
   return [
     {
@@ -935,7 +974,7 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
-      name: 'erp-effective-session-sync-failure-local-dev-diagnostic',
+      name: 'erp-effective-session-configured-customer-sync-failure-blocked',
       path: '/erp/system/permissions',
       auth: 'admin',
       adminProfile: {
@@ -975,14 +1014,44 @@ export function createStyleL1Scenarios(deps) {
         })
       },
       verify: async (page) => {
-        await expectText(page, '毛绒玩具 ERP')
-        await expectEffectiveSessionMode(
-          page,
-          'local_dev_sync_failed_diagnostic'
+        await expectText(page, '暂时无法进入客户工作台')
+        await expectText(page, '为避免显示错误内容，系统没有加载业务页面')
+        await assertTextAbsent(page, '权限管理')
+        await assertTextAbsent(page, '角色模板')
+        const boundaryMetrics = await page.evaluate(() => {
+          const boundary = document.querySelector(
+            '[data-customer-runtime-boundary="true"]'
+          )
+          const menu = document.querySelector('.erp-admin-menu')
+          const visibleButtonTexts = [...document.querySelectorAll('button')]
+            .filter(
+              (button) => button.offsetWidth > 0 && button.offsetHeight > 0
+            )
+            .map((button) =>
+              String(button.textContent || '').replace(/\s+/gu, '')
+            )
+          const rect = boundary?.getBoundingClientRect()
+          return {
+            boundaryWidth: rect?.width || 0,
+            boundaryHeight: rect?.height || 0,
+            hasMenu: Boolean(menu),
+            visibleButtonTexts,
+            overflow:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          boundaryMetrics.boundaryWidth > 0 &&
+            boundaryMetrics.boundaryHeight > 0 &&
+            boundaryMetrics.hasMenu === false &&
+            boundaryMetrics.visibleButtonTexts.includes('重试') &&
+            boundaryMetrics.visibleButtonTexts.includes('退出登录') &&
+            boundaryMetrics.overflow <= 1,
+          `配置客户 effective session 同步失败时应 fail closed 且不挂载业务壳: ${JSON.stringify(
+            boundaryMetrics
+          )}`
         )
-        await expectHeading(page, '权限管理')
-        await expectText(page, '角色模板')
-        await assertTextAbsent(page, '当前账号暂无可见后台入口')
       },
     },
     {
@@ -1080,6 +1149,8 @@ export function createStyleL1Scenarios(deps) {
             '销售订单',
             '采购订单',
             '委外订单',
+            '权限管理',
+            '审计日志',
           ]) {
             assert(
               menuText.includes(label),
@@ -1087,8 +1158,6 @@ export function createStyleL1Scenarios(deps) {
             )
           }
           for (const label of [
-            '权限管理',
-            '系统审计日志',
             '模板打印中心',
             '客户档案',
             '供应商档案',
@@ -1413,6 +1482,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'erp-exception-flow-desktop',
       path: '/erp/operations/exceptions',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '毛绒玩具 ERP')
@@ -1435,6 +1505,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'erp-business-dashboard-desktop',
       path: '/erp/business-dashboard',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '毛绒玩具 ERP')
@@ -1470,6 +1541,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'erp-business-dashboard-dark-desktop',
       path: '/erp/business-dashboard',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       themeMode: 'dark',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
@@ -1583,6 +1655,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'erp-task-board-mobile',
       path: '/erp/task-board',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectText(page, '超级管理员')
@@ -1641,6 +1714,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'erp-task-board-dark-wide-desktop',
       path: '/erp/task-board',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       themeMode: 'dark',
       viewport: { width: 2048, height: 1024 },
       verify: async (page) => {
@@ -1739,6 +1813,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'business-module-dark-customers-desktop',
       path: '/erp/master/partners/customers',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       themeMode: 'dark',
       viewport: { width: 2048, height: 1024 },
       verify: async (page) => {
@@ -2117,6 +2192,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'mobile-tasks-dark',
       path: '/m/sales/tasks?__style_l1_workflow_list_delay=1300',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       themeMode: 'dark',
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
@@ -2311,6 +2387,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'mobile-tasks-browser-back-stays-mobile',
       path: '/erp/dashboard',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectHeading(page, '工作台')
@@ -2955,7 +3032,7 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectHeading(
           page,
-          '客户配置包导入控制台 / Package Import Console'
+          '客户配置包预检与发布控制台 / Package Preflight & Release Console'
         )
         await expectText(page, '当前 URL customer / Query')
         await expectText(page, 'yoyoosun')
@@ -3042,7 +3119,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '包边界 / Package Guards')
         await expectText(page, '运行时启用')
         await expectText(page, '预检步骤 / Preflight Gates')
-        await expectText(page, '导入资产范围 / Import Asset Scope')
+        await expectText(page, '客户包资产范围 / Package Asset Scope')
         await expectText(page, '客户包对象 / Package Objects')
         await expectText(page, '策略与扩展点登记')
         await expectText(page, '模块状态投影 / Module States')
@@ -3093,14 +3170,14 @@ export function createStyleL1Scenarios(deps) {
             enabledTags: moduleStateMetrics.enabledTags,
           },
           {
-            itemCount: 15,
+            itemCount: 16,
             hasCatalogDefaultCopy: true,
             hasInstallCopy: true,
             hasShipmentModuleLabel: true,
             hasRawShipmentModuleKey: false,
-            enabledTags: 15,
+            enabledTags: 16,
           },
-          `客户配置控制台应展示 15 个模块状态预览项且不直出 raw module key: ${JSON.stringify(moduleStateMetrics)}`
+          `客户配置控制台应展示 16 个模块状态预览项且不直出 raw module key: ${JSON.stringify(moduleStateMetrics)}`
         )
         assert(
           moduleStateMetrics.panelWidth <= moduleStateMetrics.viewportWidth,
@@ -3151,7 +3228,7 @@ export function createStyleL1Scenarios(deps) {
           .click()
         await expectText(page, '差异对比 / Diff Preview')
         await expectText(page, '版本门禁 / Version Gates')
-        await expectText(page, '当前不可正式导入')
+        await expectText(page, '当前不可执行真实业务数据导入')
 
         await page
           .locator('.erp-dev-customer-view-switch .ant-segmented-item')
@@ -3241,10 +3318,13 @@ export function createStyleL1Scenarios(deps) {
 
         await page
           .locator('.erp-dev-customer-view-switch .ant-segmented-item')
-          .filter({ hasText: '导入工作台 / Import' })
+          .filter({ hasText: '预检与发布 / Release' })
           .click()
-        await expectText(page, '导入工作台 / Import Workbench')
-        await expectText(page, '可视化导入流程 / Visual Import Flow')
+        await expectText(page, '配置预检与发布 / Config Preflight & Release')
+        await expectText(
+          page,
+          '配置预检与发布流程 / Config Preflight & Release Flow'
+        )
         await expectText(page, '本地/测试后端应用只写客户配置控制面')
         await expectText(page, '本地/测试后端应用 / Local Or Test Apply')
         await expectText(page, '应用到当前后端')
@@ -3314,7 +3394,7 @@ export function createStyleL1Scenarios(deps) {
             disabledReleaseApplyButtons: 1,
             rawFormalImportButtons: 0,
           },
-          `导入工作台应提供测试版和发布版控件，并在门禁前禁用正式发布执行: ${JSON.stringify(importWorkbenchMetrics)}`
+          `预检与发布工作台应提供测试版和发布版控件，并在门禁前禁用正式发布执行: ${JSON.stringify(importWorkbenchMetrics)}`
         )
         await page.getByRole('button', { name: '运行测试试跑' }).click()
         await expectText(page, '试跑已生成')
@@ -3401,7 +3481,7 @@ export function createStyleL1Scenarios(deps) {
         )
         await expectHeading(
           page,
-          '客户配置包导入控制台 / Package Import Console'
+          '客户配置包预检与发布控制台 / Package Preflight & Release Console'
         )
         await expectText(page, '未登记客户配置包')
         await expectText(page, 'missing-customer')
@@ -3414,7 +3494,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await expectHeading(
           page,
-          '客户配置包导入控制台 / Package Import Console'
+          '客户配置包预检与发布控制台 / Package Preflight & Release Console'
         )
         await expectText(page, '未选择客户配置包')
         await expectText(page, '已登记客户包 / Registered Packages')
@@ -3448,7 +3528,7 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectHeading(
           page,
-          '客户配置包导入控制台 / Package Import Console'
+          '客户配置包预检与发布控制台 / Package Preflight & Release Console'
         )
         await expectText(page, '当前 URL customer / Query')
         await expectText(page, 'yoyoosun')
@@ -3458,6 +3538,10 @@ export function createStyleL1Scenarios(deps) {
           expectedMode: 'light',
           expectedEffectiveTheme: 'light',
         })
+        await assertDevCustomerHeaderStacked(
+          page,
+          'dev-customer-config-light-desktop'
+        )
       },
     },
     {
@@ -3467,8 +3551,9 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectHeading(
           page,
-          '客户配置包导入控制台 / Package Import Console'
+          '客户配置包预检与发布控制台 / Package Preflight & Release Console'
         )
+        await assertDevCustomerHeaderStacked(page, 'dev-customer-config-mobile')
         await expectText(page, '决策卡 / Decision Cards')
         const overviewMetrics = await page.evaluate(() => {
           const decisionGrid = document.querySelector(
@@ -3551,7 +3636,10 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '测试入口 / Test Entry')
         await expectText(page, '产品原型 / Prototypes')
         await expectText(page, '能力台账 / Capability Ledger')
-        await expectText(page, '客户配置包导入 / Package Import')
+        await expectText(
+          page,
+          '客户配置包预检与发布 / Package Preflight & Release'
+        )
         await expectText(page, '本地 dev-only 入口')
         const defaultMetrics = await page.evaluate(() => ({
           path: location.pathname,
@@ -3701,7 +3789,16 @@ export function createStyleL1Scenarios(deps) {
           )
           .filter({ hasText: '产品治理 / Product Governance' })
           .click()
-        await expectText(page, '1 / 6')
+        await page.waitForFunction(
+          () =>
+            document
+              .querySelector(
+                '.erp-dev-hub-toolbar > .erp-dev-hub-toolbar__note'
+              )
+              ?.textContent?.replace(/\s+/gu, '') === '1/6' &&
+            document.querySelectorAll('.erp-dev-hub-grid .erp-dev-hub-card')
+              .length === 1
+        )
         const groupMetrics = await page.evaluate(() => ({
           cardCount: document.querySelectorAll(
             '.erp-dev-hub-grid .erp-dev-hub-card'
@@ -3709,6 +3806,12 @@ export function createStyleL1Scenarios(deps) {
           onlyHref: document
             .querySelector('.erp-dev-hub-grid .erp-dev-hub-card__link')
             ?.getAttribute('href'),
+          countText:
+            document
+              .querySelector(
+                '.erp-dev-hub-toolbar > .erp-dev-hub-toolbar__note'
+              )
+              ?.textContent?.replace(/\s+/gu, '') || '',
           overflow:
             document.documentElement.scrollWidth >
             document.documentElement.clientWidth + 1,
@@ -3718,6 +3821,7 @@ export function createStyleL1Scenarios(deps) {
           {
             cardCount: 1,
             onlyHref: '/__dev/capability-ledger',
+            countText: '1/6',
             overflow: false,
           },
           `开发导航分组筛选应只保留能力台账: ${JSON.stringify(groupMetrics)}`
@@ -3732,8 +3836,17 @@ export function createStyleL1Scenarios(deps) {
           )
           .filter({ hasText: '全部 / All' })
           .click()
-        await page.getByPlaceholder('搜索入口或路径').fill('测试')
-        await expectText(page, '1 / 6')
+        await page.getByPlaceholder('搜索入口或路径').fill('测试入口')
+        await page.waitForFunction(
+          () =>
+            document
+              .querySelector(
+                '.erp-dev-hub-toolbar > .erp-dev-hub-toolbar__note'
+              )
+              ?.textContent?.replace(/\s+/gu, '') === '1/6' &&
+            document.querySelectorAll('.erp-dev-hub-grid .erp-dev-hub-card')
+              .length === 1
+        )
         const filteredMetrics = await page.evaluate(() => ({
           cardCount: document.querySelectorAll(
             '.erp-dev-hub-grid .erp-dev-hub-card'
@@ -3741,10 +3854,17 @@ export function createStyleL1Scenarios(deps) {
           onlyHref: document
             .querySelector('.erp-dev-hub-grid .erp-dev-hub-card__link')
             ?.getAttribute('href'),
+          countText:
+            document
+              .querySelector(
+                '.erp-dev-hub-toolbar > .erp-dev-hub-toolbar__note'
+              )
+              ?.textContent?.replace(/\s+/gu, '') || '',
         }))
         assert.deepEqual(filteredMetrics, {
           cardCount: 1,
           onlyHref: '/__dev/testing',
+          countText: '1/6',
         })
         await assertERPThemeMode(page, {
           scenarioName: 'dev-hub-dark-desktop',
@@ -3795,7 +3915,8 @@ export function createStyleL1Scenarios(deps) {
           },
           {
             path: '/__dev/customer-config?customer=yoyoosun',
-            heading: '客户配置包导入控制台 / Package Import Console',
+            heading:
+              '客户配置包预检与发布控制台 / Package Preflight & Release Console',
             rootSelector: '.erp-dev-customer-page',
           },
         ]
@@ -4006,7 +4127,7 @@ export function createStyleL1Scenarios(deps) {
         )
         await expectHeading(
           page,
-          '客户配置包导入控制台 / Package Import Console'
+          '客户配置包预检与发布控制台 / Package Preflight & Release Console'
         )
         const customerDecision = await readSurfaceStyle(
           '.erp-dev-customer-decision-card'
@@ -4107,7 +4228,7 @@ export function createStyleL1Scenarios(deps) {
 
         await expectHeading(
           page,
-          '客户配置包导入控制台 / Package Import Console'
+          '客户配置包预检与发布控制台 / Package Preflight & Release Console'
         )
         assertButtonGroup(
           '客户配置视图切换',
@@ -4960,15 +5081,16 @@ export function createStyleL1Scenarios(deps) {
         )
         await page
           .locator('.erp-dev-testing-tier')
-          .filter({ hasText: 'T5 Frontend UI / 样式' })
+          .filter({ hasText: 'T5 Frontend/UI' })
           .getByRole('button', { name: '复制' })
           .click()
         const tierClipboard = await page.evaluate(() =>
           navigator.clipboard.readText()
         )
         assert(
-          tierClipboard.includes('cd web && pnpm style:l1'),
-          `T5 层级复制内容应包含前端 L1 命令: ${tierClipboard}`
+          tierClipboard.includes('pnpm --dir web lint') &&
+            tierClipboard.includes('pnpm --dir web test'),
+          `T5 层级复制内容应来自当前测试策略最小验证命令: ${tierClipboard}`
         )
 
         await page
@@ -5020,6 +5142,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'erp-business-dashboard-mobile',
       path: '/erp/business-dashboard',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectText(page, '超级管理员')
@@ -9943,6 +10066,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'business-menu-groups-desktop',
       path: '/erp/sales/project-orders/sales-orders',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectButton(page, '新建订单')
@@ -10032,6 +10156,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'print-template-business-entry-ownership',
       path: '/erp/purchase/material-bom',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, 'BOM 管理')
@@ -10123,11 +10248,13 @@ export function createStyleL1Scenarios(deps) {
       openPurchaseReceiptAddItemEditor,
       selectPurchaseReceiptRow,
       verifyBusinessModuleColumnOrderDialog,
+      customerRuntimeEffectiveSession,
     }),
     {
       name: 'material-master-header-desktop',
       path: '/erp/master/materials',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '材料档案')
@@ -10220,6 +10347,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'purchase-order-date-filter-desktop',
       path: '/erp/purchase/accessories',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '采购订单')
@@ -10306,6 +10434,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'purchase-order-inbound-draft-modal-controls-desktop',
       path: '/erp/purchase/accessories',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       beforeNavigate: async (page) => {
         await page.route('**/rpc/purchase_order', async (route) => {
@@ -10568,6 +10697,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'business-collaboration-supplier-desktop',
       path: '/erp/master/partners/suppliers',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '供应商档案')
@@ -10591,6 +10721,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'business-collaboration-purchase-selected-desktop',
       path: '/erp/purchase/accessories',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await seedBusinessCollaborationOverflowTasks(page, {
@@ -10629,6 +10760,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'shipment-date-filter-desktop',
       path: '/erp/warehouse/shipments',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '出货单')
@@ -10663,6 +10795,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'shipment-date-filter-mobile',
       path: '/erp/warehouse/shipments',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectHeading(page, '出货单')
@@ -10717,6 +10850,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'business-collaboration-mobile',
       path: '/erp/master/partners/suppliers',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectHeading(page, '供应商档案')
@@ -10737,6 +10871,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'textarea-show-count-layout-desktop',
       path: '/erp/master/partners/suppliers',
       auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '供应商档案')
@@ -10788,6 +10923,7 @@ export function createStyleL1Scenarios(deps) {
       verifyBusinessModuleColumnOrderDialog,
       verifyBusinessRowDoubleClickEditModal,
       verifySourceImportPicker,
+      customerRuntimeEffectiveSession,
     }),
   ]
 }

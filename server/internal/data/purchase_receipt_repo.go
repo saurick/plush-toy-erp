@@ -81,7 +81,97 @@ func (r *inventoryRepo) CreatePurchaseReceiptWithItems(ctx context.Context, in *
 	return out, nil
 }
 
+func (r *inventoryRepo) ResolvePurchaseReceiptFromPurchaseOrderReplay(ctx context.Context, in *biz.PurchaseReceiptFromPurchaseOrderCreate) (*biz.PurchaseReceipt, bool, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || in == nil || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
+		return nil, false, biz.ErrBadParam
+	}
+	return resolvePurchaseReceiptFromPurchaseOrderReplay(ctx, r.data.postgres, in)
+}
+
+// ValidatePurchaseReceiptFromPurchaseOrder is the read-only preflight used by
+// Process Runtime before it binds an immutable command fingerprint. The create
+// transaction repeats every check under locks and remains the final authority.
+func (r *inventoryRepo) ValidatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *biz.PurchaseReceiptFromPurchaseOrderCreate) error {
+	if r == nil || r.data == nil || r.data.postgres == nil || in == nil {
+		return biz.ErrBadParam
+	}
+	exists, err := r.data.postgres.PurchaseReceipt.Query().Where(purchasereceipt.ReceiptNo(in.ReceiptNo)).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return biz.ErrIdempotencyConflict
+	}
+	order, err := r.data.postgres.PurchaseOrder.Get(ctx, in.PurchaseOrderID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrPurchaseOrderNotFound
+		}
+		return err
+	}
+	if order.LifecycleStatus != biz.PurchaseOrderStatusApproved || supplierNameFromSnapshot(order.SupplierSnapshot) == "" {
+		return biz.ErrBadParam
+	}
+	if _, err := r.data.postgres.Warehouse.Get(ctx, in.WarehouseID); err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrBadParam
+		}
+		return err
+	}
+	items, err := r.data.postgres.PurchaseOrderItem.Query().Where(
+		purchaseorderitem.PurchaseOrderID(order.ID),
+		purchaseorderitem.LineStatus(biz.PurchaseOrderItemStatusOpen),
+	).All(ctx)
+	if err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return biz.ErrBadParam
+	}
+	remainingByItemID, err := purchaseOrderItemRemainingQuantities(ctx, r.data.postgres, items)
+	if err != nil {
+		return err
+	}
+	for _, item := range items {
+		if remainingByItemID[item.ID].IsPositive() {
+			return nil
+		}
+	}
+	return biz.ErrBadParam
+}
+
 func (r *inventoryRepo) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *biz.PurchaseReceiptFromPurchaseOrderCreate) (*biz.PurchaseReceipt, error) {
+	return r.createPurchaseReceiptFromPurchaseOrder(ctx, in, nil, 0)
+}
+
+func (r *inventoryRepo) CreatePurchaseReceiptFromPurchaseOrderForProcessCommand(
+	ctx context.Context,
+	in *biz.PurchaseReceiptFromPurchaseOrderCreate,
+	command *biz.ProcessDomainCommandInput,
+	actorID int,
+) (*biz.PurchaseReceipt, error) {
+	if command == nil {
+		return nil, biz.ErrBadParam
+	}
+	return r.createPurchaseReceiptFromPurchaseOrder(ctx, in, command, actorID)
+}
+
+func (r *inventoryRepo) createPurchaseReceiptFromPurchaseOrder(
+	ctx context.Context,
+	in *biz.PurchaseReceiptFromPurchaseOrderCreate,
+	command *biz.ProcessDomainCommandInput,
+	actorID int,
+) (*biz.PurchaseReceipt, error) {
+	if in == nil {
+		return nil, biz.ErrBadParam
+	}
+	if command == nil && in.IdempotencyKey != "" {
+		if replayed, found, err := resolvePurchaseReceiptFromPurchaseOrderReplay(ctx, r.data.postgres, in); err != nil {
+			return nil, err
+		} else if found {
+			return replayed, nil
+		}
+	}
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -93,6 +183,22 @@ func (r *inventoryRepo) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Conte
 	// same pre-draft snapshot.
 	if err := lockPurchaseOrderForReceipt(ctx, tx, in.PurchaseOrderID); err != nil {
 		return nil, err
+	}
+	if in.IdempotencyKey != "" {
+		if replayed, found, err := resolvePurchaseReceiptFromPurchaseOrderReplay(ctx, tx.client, in); err != nil {
+			return nil, err
+		} else if found {
+			if command != nil {
+				if err := recordPurchaseReceiptProcessCommandResultInTx(ctx, tx, replayed, command, actorID); err != nil {
+					return nil, err
+				}
+				if err := tx.sqlTx.Commit(); err != nil {
+					return nil, err
+				}
+				tx = nil
+			}
+			return replayed, nil
+		}
 	}
 
 	order, err := tx.client.PurchaseOrder.Query().
@@ -107,11 +213,15 @@ func (r *inventoryRepo) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Conte
 	if order.LifecycleStatus != biz.PurchaseOrderStatusApproved {
 		return nil, biz.ErrBadParam
 	}
-	if _, err := tx.client.Warehouse.Get(ctx, in.WarehouseID); err != nil {
+	warehouseRow, err := tx.client.Warehouse.Get(ctx, in.WarehouseID)
+	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrBadParam
 		}
 		return nil, err
+	}
+	if !warehouseRow.IsActive {
+		return nil, biz.ErrWarehouseInactive
 	}
 
 	orderItems, err := tx.client.PurchaseOrderItem.Query().
@@ -152,19 +262,50 @@ func (r *inventoryRepo) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
+	plannedLineCount := 0
+	for _, item := range orderItems {
+		if remainingByItemID[item.ID].IsPositive() {
+			plannedLineCount++
+		}
+	}
+	if plannedLineCount == 0 {
+		return nil, biz.ErrBadParam
+	}
 
 	supplierName := supplierNameFromSnapshot(order.SupplierSnapshot)
 	if supplierName == "" {
 		return nil, biz.ErrBadParam
 	}
-	receipt, err := tx.client.PurchaseReceipt.Create().
+	receiptCreate := tx.client.PurchaseReceipt.Create().
 		SetReceiptNo(in.ReceiptNo).
 		SetSupplierName(supplierName).
 		SetStatus(biz.PurchaseReceiptStatusDraft).
 		SetReceivedAt(in.ReceivedAt).
-		SetNillableNote(in.Note).
-		Save(ctx)
+		SetNillableNote(in.Note)
+	if in.IdempotencyKey != "" {
+		receiptCreate.
+			SetIdempotencyKey(in.IdempotencyKey).
+			SetIdempotencyPayloadHash(in.IdempotencyPayloadHash).
+			SetIdempotencyItemCount(plannedLineCount)
+	}
+	receipt, err := receiptCreate.Save(ctx)
 	if err != nil {
+		if in.IdempotencyKey != "" {
+			originalErr := err
+			if rollbackErr := tx.sqlTx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, stdsql.ErrTxDone) {
+				r.log.WithContext(ctx).Warnf("rollback purchase receipt idempotency conflict failed err=%v", rollbackErr)
+			}
+			tx = nil
+			if replayed, found, replayErr := resolvePurchaseReceiptFromPurchaseOrderReplay(ctx, r.data.postgres, in); replayErr != nil {
+				return nil, replayErr
+			} else if found {
+				if command != nil {
+					return r.createPurchaseReceiptFromPurchaseOrder(ctx, in, command, actorID)
+				}
+				return replayed, nil
+			}
+			return nil, originalErr
+		}
 		return nil, err
 	}
 
@@ -193,8 +334,8 @@ func (r *inventoryRepo) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Conte
 		}
 		createdLineCount++
 	}
-	if createdLineCount == 0 {
-		return nil, biz.ErrBadParam
+	if createdLineCount != plannedLineCount {
+		return nil, fmt.Errorf("purchase receipt planned line count %d does not match created line count %d", plannedLineCount, createdLineCount)
 	}
 
 	out, err := purchaseReceiptWithItems(ctx, tx.client, receipt)
@@ -205,11 +346,38 @@ func (r *inventoryRepo) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
+	if command != nil {
+		if err := recordPurchaseReceiptProcessCommandResultInTx(ctx, tx, out, command, actorID); err != nil {
+			return nil, err
+		}
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
 	tx = nil
 	return out, nil
+}
+
+func recordPurchaseReceiptProcessCommandResultInTx(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	receipt *biz.PurchaseReceipt,
+	command *biz.ProcessDomainCommandInput,
+	actorID int,
+) error {
+	if tx == nil || tx.client == nil || command == nil {
+		return biz.ErrBadParam
+	}
+	result, err := biz.PurchaseReceiptProcessCommandResult(receipt)
+	if err != nil {
+		return err
+	}
+	record, err := biz.BuildProcessNodeDomainCommandResultRecord(command, result)
+	if err != nil {
+		return err
+	}
+	_, err = recordProcessNodeDomainCommandResultWithClient(ctx, tx.client, record, actorID)
+	return err
 }
 
 func (r *inventoryRepo) AddPurchaseReceiptItem(ctx context.Context, in *biz.PurchaseReceiptItemCreate) (*biz.PurchaseReceiptItem, error) {
@@ -247,6 +415,29 @@ func (r *inventoryRepo) AddPurchaseReceiptItem(ctx context.Context, in *biz.Purc
 }
 
 func (r *inventoryRepo) PostPurchaseReceipt(ctx context.Context, receiptID int) (*biz.PurchaseReceipt, error) {
+	return r.postPurchaseReceipt(ctx, receiptID, nil, nil, 0)
+}
+
+func (r *inventoryRepo) PostPurchaseReceiptForProcessCommand(
+	ctx context.Context,
+	receiptID int,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+) (*biz.PurchaseReceipt, error) {
+	if command == nil || result == nil {
+		return nil, biz.ErrBadParam
+	}
+	return r.postPurchaseReceipt(ctx, receiptID, command, result, actorID)
+}
+
+func (r *inventoryRepo) postPurchaseReceipt(
+	ctx context.Context,
+	receiptID int,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+) (*biz.PurchaseReceipt, error) {
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -271,6 +462,14 @@ func (r *inventoryRepo) PostPurchaseReceipt(ctx context.Context, receiptID int) 
 		out, err := purchaseReceiptWithItems(ctx, tx.client, receipt)
 		if err != nil {
 			return nil, err
+		}
+		if command != nil {
+			if err := verifyPurchaseReceiptInboundEvidence(ctx, tx, receipt); err != nil {
+				return nil, err
+			}
+			if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, result, actorID); err != nil {
+				return nil, err
+			}
 		}
 		if err := tx.sqlTx.Commit(); err != nil {
 			return nil, err
@@ -340,6 +539,11 @@ func (r *inventoryRepo) PostPurchaseReceipt(ctx context.Context, receiptID int) 
 	if err != nil {
 		return nil, err
 	}
+	if command != nil {
+		if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, result, actorID); err != nil {
+			return nil, err
+		}
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
@@ -347,7 +551,84 @@ func (r *inventoryRepo) PostPurchaseReceipt(ctx context.Context, receiptID int) 
 	return out, nil
 }
 
+func recordProcessDomainCommandResultInInventoryTx(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+) error {
+	if tx == nil || tx.client == nil || command == nil || result == nil {
+		return biz.ErrBadParam
+	}
+	record, err := biz.BuildProcessNodeDomainCommandResultRecord(command, result)
+	if err != nil {
+		return err
+	}
+	_, err = recordProcessNodeDomainCommandResultWithClient(ctx, tx.client, record, actorID)
+	return err
+}
+
+func verifyPurchaseReceiptInboundEvidence(ctx context.Context, tx *inventoryDBTx, receipt *ent.PurchaseReceipt) error {
+	if tx == nil || tx.client == nil || receipt == nil || receipt.Status != biz.PurchaseReceiptStatusPosted {
+		return biz.ErrProcessDomainCommandRecoveryRequired
+	}
+	items, err := tx.client.PurchaseReceiptItem.Query().
+		Where(purchasereceiptitem.ReceiptID(receipt.ID)).
+		Order(ent.Asc(purchasereceiptitem.FieldID)).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return biz.ErrProcessDomainCommandRecoveryRequired
+	}
+	for _, item := range items {
+		row, err := tx.client.InventoryTxn.Query().
+			Where(inventorytxn.IdempotencyKey(biz.PurchaseReceiptInboundIdempotencyKey(receipt.ID, item.ID))).
+			Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return biz.ErrProcessDomainCommandRecoveryRequired
+			}
+			return err
+		}
+		sourceID := receipt.ID
+		sourceLineID := item.ID
+		expected := &biz.InventoryTxnCreate{
+			SubjectType:    biz.InventorySubjectMaterial,
+			SubjectID:      item.MaterialID,
+			WarehouseID:    item.WarehouseID,
+			LotID:          item.LotID,
+			TxnType:        biz.InventoryTxnIn,
+			Direction:      1,
+			Quantity:       item.Quantity,
+			UnitID:         item.UnitID,
+			SourceType:     biz.PurchaseReceiptSourceType,
+			SourceID:       &sourceID,
+			SourceLineID:   &sourceLineID,
+			IdempotencyKey: biz.PurchaseReceiptInboundIdempotencyKey(receipt.ID, item.ID),
+			OccurredAt:     receipt.ReceivedAt,
+		}
+		if !inventoryTxnMatchesCreate(row, expected) {
+			return biz.ErrIdempotencyConflict
+		}
+	}
+	return nil
+}
+
 func (r *inventoryRepo) CancelPostedPurchaseReceipt(ctx context.Context, receiptID int) (*biz.PurchaseReceipt, error) {
+	return r.cancelPostedPurchaseReceipt(ctx, receiptID, 0)
+}
+
+func (r *inventoryRepo) CancelPostedPurchaseReceiptWithActor(ctx context.Context, receiptID int, actorID int) (*biz.PurchaseReceipt, error) {
+	if actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	return r.cancelPostedPurchaseReceipt(ctx, receiptID, actorID)
+}
+
+func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receiptID int, actorID int) (*biz.PurchaseReceipt, error) {
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -371,6 +652,17 @@ func (r *inventoryRepo) CancelPostedPurchaseReceipt(ctx context.Context, receipt
 	if !transition.Changed {
 		out, err := purchaseReceiptWithItems(ctx, tx.client, receipt)
 		if err != nil {
+			return nil, err
+		}
+		if err := markProcessDomainCommandEffectCompensatedWithClient(
+			ctx,
+			tx.client,
+			biz.ProcessDomainCommandInventoryPostInbound,
+			"purchase_receipt",
+			receipt.ID,
+			"采购收货已取消并完成库存冲正，原入库流程结果需要核对",
+			actorID,
+		); err != nil {
 			return nil, err
 		}
 		if err := tx.sqlTx.Commit(); err != nil {
@@ -440,6 +732,17 @@ func (r *inventoryRepo) CancelPostedPurchaseReceipt(ctx context.Context, receipt
 	}
 	out, err := purchaseReceiptWithItems(ctx, tx.client, receipt)
 	if err != nil {
+		return nil, err
+	}
+	if err := markProcessDomainCommandEffectCompensatedWithClient(
+		ctx,
+		tx.client,
+		biz.ProcessDomainCommandInventoryPostInbound,
+		"purchase_receipt",
+		receipt.ID,
+		"采购收货已取消并完成库存冲正，原入库流程结果需要核对",
+		actorID,
+	); err != nil {
 		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {
@@ -775,6 +1078,48 @@ func purchaseReceiptPriceAndAmount(item *ent.PurchaseOrderItem, quantity decimal
 	return nil, nil
 }
 
+func resolvePurchaseReceiptFromPurchaseOrderReplay(
+	ctx context.Context,
+	client *ent.Client,
+	in *biz.PurchaseReceiptFromPurchaseOrderCreate,
+) (*biz.PurchaseReceipt, bool, error) {
+	if client == nil || in == nil || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
+		return nil, false, biz.ErrBadParam
+	}
+	receipt, err := client.PurchaseReceipt.Query().
+		Where(purchasereceipt.IdempotencyKey(in.IdempotencyKey)).
+		Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	if receipt.IdempotencyPayloadHash == nil || *receipt.IdempotencyPayloadHash != in.IdempotencyPayloadHash {
+		return nil, true, biz.ErrIdempotencyConflict
+	}
+	if receipt.IdempotencyItemCount == nil || *receipt.IdempotencyItemCount <= 0 {
+		return nil, true, fmt.Errorf("purchase receipt %d idempotency result boundary is missing", receipt.ID)
+	}
+	items, err := client.PurchaseReceiptItem.Query().
+		Where(purchasereceiptitem.ReceiptID(receipt.ID)).
+		Order(ent.Asc(purchasereceiptitem.FieldID)).
+		Limit(*receipt.IdempotencyItemCount).
+		All(ctx)
+	if err != nil {
+		return nil, true, err
+	}
+	if len(items) != *receipt.IdempotencyItemCount {
+		return nil, true, fmt.Errorf("purchase receipt %d idempotency result item set is incomplete", receipt.ID)
+	}
+	out := entPurchaseReceiptToBiz(receipt, items)
+	out.QualityInspections, err = purchaseReceiptInitialQualityInspectionsForItems(ctx, client, receipt.ID, items)
+	if err != nil {
+		return nil, true, err
+	}
+	return out, true, nil
+}
+
 func supplierNameFromSnapshot(snapshot map[string]any) string {
 	if snapshot == nil {
 		return ""
@@ -792,6 +1137,9 @@ func (r *inventoryRepo) applyInventoryTxnAndUpdateBalanceInTx(ctx context.Contex
 		Where(inventorytxn.IdempotencyKey(in.IdempotencyKey)).
 		Only(ctx)
 	if err == nil {
+		if !inventoryTxnMatchesCreate(existing, in) {
+			return nil, biz.ErrIdempotencyConflict
+		}
 		balance, balanceErr := getInventoryBalance(ctx, tx.client.InventoryBalance.Query(), inventoryBalanceKeyFromEntTxn(existing))
 		if balanceErr != nil && !ent.IsNotFound(balanceErr) {
 			return nil, balanceErr
@@ -988,16 +1336,40 @@ func createPreparedPurchaseReceiptItem(
 }
 
 func purchaseReceiptIncomingQualityInspections(ctx context.Context, client *ent.Client, receiptID int) ([]*biz.QualityInspection, error) {
+	items, err := client.PurchaseReceiptItem.Query().Where(
+		purchasereceiptitem.ReceiptID(receiptID),
+	).Order(ent.Asc(purchasereceiptitem.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return purchaseReceiptInitialQualityInspectionsForItems(ctx, client, receiptID, items)
+}
+
+func purchaseReceiptInitialQualityInspectionsForItems(ctx context.Context, client *ent.Client, receiptID int, items []*ent.PurchaseReceiptItem) ([]*biz.QualityInspection, error) {
+	if len(items) == 0 {
+		return []*biz.QualityInspection{}, nil
+	}
+	expectedNos := make([]string, 0, len(items))
+	for _, item := range items {
+		expectedNos = append(expectedNos, fmt.Sprintf("IQC-PR-%d-ITEM-%d", receiptID, item.ID))
+	}
 	rows, err := client.QualityInspection.Query().Where(
 		qualityinspection.PurchaseReceiptID(receiptID),
 		qualityinspection.SourceType(biz.QualityInspectionSourcePurchaseReceipt),
 		qualityinspection.InspectionType(biz.QualityInspectionTypeIncoming),
+		qualityinspection.InspectionNoIn(expectedNos...),
 	).Order(ent.Asc(qualityinspection.FieldPurchaseReceiptItemID), ent.Asc(qualityinspection.FieldID)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
+	if len(rows) != len(items) {
+		return nil, fmt.Errorf("purchase receipt %d initial quality inspection set is incomplete", receiptID)
+	}
 	out := make([]*biz.QualityInspection, 0, len(rows))
-	for _, row := range rows {
+	for index, row := range rows {
+		if row.PurchaseReceiptItemID == nil || *row.PurchaseReceiptItemID != items[index].ID || row.InspectionNo != expectedNos[index] {
+			return nil, fmt.Errorf("purchase receipt %d initial quality inspection set is inconsistent", receiptID)
+		}
 		out = append(out, entQualityInspectionToBiz(row))
 	}
 	return out, nil

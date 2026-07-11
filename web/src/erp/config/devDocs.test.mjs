@@ -45,7 +45,7 @@ test('devDocs: 只通过开发态独立路径暴露', () => {
   assert(!DEV_DOCS_ROUTE.startsWith('/erp/'))
 })
 
-test('devDocs: 全量开发文档列表不恢复产品内文档 registry', () => {
+test('devDocs: 当前工作区开发文档列表不恢复产品内文档 registry', () => {
   const docs = buildDevDocsItems({
     '../../../../README.md': '# 仓库 README',
     '../../../../AGENTS.md': '# 协作约定',

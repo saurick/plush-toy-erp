@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	stdsql "database/sql"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -99,6 +100,185 @@ func createInventoryTestFixtures(t *testing.T, ctx context.Context, client *ent.
 		materialID:  material.ID,
 		productID:   product.ID,
 		warehouseID: warehouse.ID,
+	}
+}
+
+func TestInventoryUsecase_IdempotencyKeyRequiresSamePayload(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_idempotency_payload")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	input := &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		TxnType:        biz.InventoryTxnIn,
+		Direction:      1,
+		Quantity:       decimal.NewFromInt(2),
+		UnitID:         fixtures.unitID,
+		SourceType:     "IDEMPOTENCY_TEST",
+		IdempotencyKey: "inventory-idempotency-same-payload",
+	}
+	first, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, input)
+	if err != nil {
+		t.Fatalf("first inventory apply failed: %v", err)
+	}
+	replayed, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, input)
+	if err != nil {
+		t.Fatalf("same-payload replay failed: %v", err)
+	}
+	if !replayed.IdempotentReplay || replayed.Txn.ID != first.Txn.ID {
+		t.Fatalf("expected same-payload replay of txn %d, got %#v", first.Txn.ID, replayed)
+	}
+	conflict := *input
+	conflict.Quantity = decimal.NewFromInt(3)
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &conflict); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("different-payload replay error = %v, want ErrIdempotencyConflict", err)
+	}
+	balance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectProduct,
+		SubjectID:   fixtures.productID,
+		WarehouseID: fixtures.warehouseID,
+		UnitID:      fixtures.unitID,
+	})
+	if err != nil {
+		t.Fatalf("get inventory balance failed: %v", err)
+	}
+	assertDecimalEqual(t, balance.Quantity, "2")
+	if count := client.InventoryTxn.Query().Where(inventorytxn.IdempotencyKey(input.IdempotencyKey)).CountX(ctx); count != 1 {
+		t.Fatalf("expected one persisted txn, got %d", count)
+	}
+}
+
+func TestInventoryUsecase_IdempotencyDistinguishesExplicitOccurredAt(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_idempotency_explicit_occurred_at")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	create := func(key string, occurredAt time.Time) (*biz.InventoryTxnApplyResult, error) {
+		return uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+			SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
+			WarehouseID: fixtures.warehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
+			Quantity: decimal.NewFromInt(1), UnitID: fixtures.unitID,
+			SourceType: "IDEMPOTENCY_TIME_TEST", IdempotencyKey: key, OccurredAt: occurredAt,
+		})
+	}
+
+	omitted, err := create("inventory-time-omitted", time.Time{})
+	if err != nil {
+		t.Fatalf("create omitted-time inventory txn: %v", err)
+	}
+	omittedReplay, err := create("inventory-time-omitted", time.Time{})
+	if err != nil || !omittedReplay.IdempotentReplay || omittedReplay.Txn.ID != omitted.Txn.ID {
+		t.Fatalf("omitted-time replay = %#v, err=%v", omittedReplay, err)
+	}
+	omittedRow := client.InventoryTxn.GetX(ctx, omitted.Txn.ID)
+	if omittedRow.OccurredAtSpecified {
+		t.Fatal("omitted occurred_at must persist occurred_at_specified=false")
+	}
+	explicit := time.Date(2026, 7, 10, 10, 11, 12, 345678901, time.FixedZone("UTC+8", 8*60*60))
+	if _, err := create("inventory-time-omitted", explicit); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("omitted then explicit replay error = %v, want ErrIdempotencyConflict", err)
+	}
+
+	explicitTxn, err := create("inventory-time-explicit", explicit)
+	if err != nil {
+		t.Fatalf("create explicit-time inventory txn: %v", err)
+	}
+	explicitReplay, err := create("inventory-time-explicit", explicit)
+	if err != nil || !explicitReplay.IdempotentReplay || explicitReplay.Txn.ID != explicitTxn.Txn.ID {
+		t.Fatalf("explicit same-time replay = %#v, err=%v", explicitReplay, err)
+	}
+	explicitRow := client.InventoryTxn.GetX(ctx, explicitTxn.Txn.ID)
+	wantExplicit := explicit.UTC().Truncate(time.Microsecond)
+	if !explicitRow.OccurredAtSpecified || !explicitRow.OccurredAt.Equal(wantExplicit) {
+		t.Fatalf("explicit persisted marker=%v time=%v, want true/%v", explicitRow.OccurredAtSpecified, explicitRow.OccurredAt, wantExplicit)
+	}
+	if _, err := create("inventory-time-explicit", explicit.Add(time.Second)); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("changed explicit occurred_at error = %v, want ErrIdempotencyConflict", err)
+	}
+	if _, err := create("inventory-time-explicit", time.Time{}); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("explicit then omitted replay error = %v, want ErrIdempotencyConflict", err)
+	}
+
+	historicalAt := time.Date(2026, 6, 1, 8, 0, 0, 0, time.UTC)
+	historicalRow, err := client.InventoryTxn.Create().
+		SetSubjectType(biz.InventorySubjectProduct).
+		SetSubjectID(fixtures.productID).
+		SetWarehouseID(fixtures.warehouseID).
+		SetTxnType(biz.InventoryTxnIn).
+		SetDirection(1).
+		SetQuantity(decimal.NewFromInt(1)).
+		SetUnitID(fixtures.unitID).
+		SetSourceType("IDEMPOTENCY_TIME_HISTORY").
+		SetIdempotencyKey("inventory-time-history").
+		SetOccurredAt(historicalAt).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create historical inventory txn without marker: %v", err)
+	}
+	if historicalRow.OccurredAtSpecified {
+		t.Fatal("historical row must default occurred_at_specified=false")
+	}
+	historicalReplay, err := uc.CreateInventoryTxn(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
+		WarehouseID: fixtures.warehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
+		Quantity: decimal.NewFromInt(1), UnitID: fixtures.unitID,
+		SourceType: "IDEMPOTENCY_TIME_HISTORY", IdempotencyKey: "inventory-time-history",
+	})
+	if err != nil || historicalReplay.ID != historicalRow.ID {
+		t.Fatalf("omitted-time historical replay = %#v, want id %d, err=%v", historicalReplay, historicalRow.ID, err)
+	}
+	if _, err := uc.CreateInventoryTxn(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
+		WarehouseID: fixtures.warehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
+		Quantity: decimal.NewFromInt(1), UnitID: fixtures.unitID,
+		SourceType: "IDEMPOTENCY_TIME_HISTORY", IdempotencyKey: "inventory-time-history",
+		OccurredAt: historicalAt,
+	}); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("explicit input must not impersonate historical omitted marker, err=%v", err)
+	}
+}
+
+func TestInventoryRepo_ProductOutboundProtectsActiveReservations(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_product_outbound_reservation_guard")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	operationalRepo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(5), UnitID: fixtures.unitID,
+		SourceType: "RESERVATION_GUARD", IdempotencyKey: "RESERVATION_GUARD:IN",
+	}); err != nil {
+		t.Fatalf("seed product inventory failed: %v", err)
+	}
+	if _, err := operationalRepo.CreateStockReservation(ctx, &biz.StockReservationCreate{
+		ReservationNo: "RSV-GUARD", ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(4), IdempotencyKey: "RSV-GUARD",
+	}); err != nil {
+		t.Fatalf("create stock reservation failed: %v", err)
+	}
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		TxnType: biz.InventoryTxnOut, Direction: -1, Quantity: decimal.NewFromInt(2), UnitID: fixtures.unitID,
+		SourceType: "RESERVATION_GUARD", IdempotencyKey: "RESERVATION_GUARD:OUT-REJECTED",
+	}); !errors.Is(err, biz.ErrInventoryInsufficientStock) {
+		t.Fatalf("outbound consuming reserved stock error = %v, want insufficient stock", err)
+	}
+	if count := client.InventoryTxn.Query().Where(inventorytxn.IdempotencyKey("RESERVATION_GUARD:OUT-REJECTED")).CountX(ctx); count != 0 {
+		t.Fatalf("rejected outbound persisted %d inventory txns", count)
+	}
+	result, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		TxnType: biz.InventoryTxnOut, Direction: -1, Quantity: decimal.NewFromInt(1), UnitID: fixtures.unitID,
+		SourceType: "RESERVATION_GUARD", IdempotencyKey: "RESERVATION_GUARD:OUT-ALLOWED",
+	})
+	if err != nil {
+		t.Fatalf("outbound within free quantity failed: %v", err)
+	}
+	if !result.Balance.Quantity.Equal(decimal.NewFromInt(4)) {
+		t.Fatalf("balance after free outbound = %s, want 4", result.Balance.Quantity)
 	}
 }
 

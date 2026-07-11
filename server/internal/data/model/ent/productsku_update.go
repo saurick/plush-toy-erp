@@ -6,9 +6,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/predicate"
-	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipmentitem"
@@ -31,20 +34,6 @@ type ProductSKUUpdate struct {
 // Where appends a list predicates to the ProductSKUUpdate builder.
 func (_u *ProductSKUUpdate) Where(ps ...predicate.ProductSKU) *ProductSKUUpdate {
 	_u.mutation.Where(ps...)
-	return _u
-}
-
-// SetProductID sets the "product_id" field.
-func (_u *ProductSKUUpdate) SetProductID(v int) *ProductSKUUpdate {
-	_u.mutation.SetProductID(v)
-	return _u
-}
-
-// SetNillableProductID sets the "product_id" field if the given value is not nil.
-func (_u *ProductSKUUpdate) SetNillableProductID(v *int) *ProductSKUUpdate {
-	if v != nil {
-		_u.SetProductID(*v)
-	}
 	return _u
 }
 
@@ -242,11 +231,6 @@ func (_u *ProductSKUUpdate) SetUpdatedAt(v time.Time) *ProductSKUUpdate {
 	return _u
 }
 
-// SetProduct sets the "product" edge to the Product entity.
-func (_u *ProductSKUUpdate) SetProduct(v *Product) *ProductSKUUpdate {
-	return _u.SetProductID(v.ID)
-}
-
 // SetDefaultUnit sets the "default_unit" edge to the Unit entity.
 func (_u *ProductSKUUpdate) SetDefaultUnit(v *Unit) *ProductSKUUpdate {
 	return _u.SetDefaultUnitID(v.ID)
@@ -282,6 +266,66 @@ func (_u *ProductSKUUpdate) AddInventoryLots(v ...*InventoryLot) *ProductSKUUpda
 	return _u.AddInventoryLotIDs(ids...)
 }
 
+// AddInventoryTxnIDs adds the "inventory_txns" edge to the InventoryTxn entity by IDs.
+func (_u *ProductSKUUpdate) AddInventoryTxnIDs(ids ...int) *ProductSKUUpdate {
+	_u.mutation.AddInventoryTxnIDs(ids...)
+	return _u
+}
+
+// AddInventoryTxns adds the "inventory_txns" edges to the InventoryTxn entity.
+func (_u *ProductSKUUpdate) AddInventoryTxns(v ...*InventoryTxn) *ProductSKUUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddInventoryTxnIDs(ids...)
+}
+
+// AddInventoryBalanceIDs adds the "inventory_balances" edge to the InventoryBalance entity by IDs.
+func (_u *ProductSKUUpdate) AddInventoryBalanceIDs(ids ...int) *ProductSKUUpdate {
+	_u.mutation.AddInventoryBalanceIDs(ids...)
+	return _u
+}
+
+// AddInventoryBalances adds the "inventory_balances" edges to the InventoryBalance entity.
+func (_u *ProductSKUUpdate) AddInventoryBalances(v ...*InventoryBalance) *ProductSKUUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddInventoryBalanceIDs(ids...)
+}
+
+// AddProductionFactIDs adds the "production_facts" edge to the ProductionFact entity by IDs.
+func (_u *ProductSKUUpdate) AddProductionFactIDs(ids ...int) *ProductSKUUpdate {
+	_u.mutation.AddProductionFactIDs(ids...)
+	return _u
+}
+
+// AddProductionFacts adds the "production_facts" edges to the ProductionFact entity.
+func (_u *ProductSKUUpdate) AddProductionFacts(v ...*ProductionFact) *ProductSKUUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductionFactIDs(ids...)
+}
+
+// AddOutsourcingFactIDs adds the "outsourcing_facts" edge to the OutsourcingFact entity by IDs.
+func (_u *ProductSKUUpdate) AddOutsourcingFactIDs(ids ...int) *ProductSKUUpdate {
+	_u.mutation.AddOutsourcingFactIDs(ids...)
+	return _u
+}
+
+// AddOutsourcingFacts adds the "outsourcing_facts" edges to the OutsourcingFact entity.
+func (_u *ProductSKUUpdate) AddOutsourcingFacts(v ...*OutsourcingFact) *ProductSKUUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOutsourcingFactIDs(ids...)
+}
+
 // AddShipmentItemIDs adds the "shipment_items" edge to the ShipmentItem entity by IDs.
 func (_u *ProductSKUUpdate) AddShipmentItemIDs(ids ...int) *ProductSKUUpdate {
 	_u.mutation.AddShipmentItemIDs(ids...)
@@ -315,12 +359,6 @@ func (_u *ProductSKUUpdate) AddStockReservations(v ...*StockReservation) *Produc
 // Mutation returns the ProductSKUMutation object of the builder.
 func (_u *ProductSKUUpdate) Mutation() *ProductSKUMutation {
 	return _u.mutation
-}
-
-// ClearProduct clears the "product" edge to the Product entity.
-func (_u *ProductSKUUpdate) ClearProduct() *ProductSKUUpdate {
-	_u.mutation.ClearProduct()
-	return _u
 }
 
 // ClearDefaultUnit clears the "default_unit" edge to the Unit entity.
@@ -369,6 +407,90 @@ func (_u *ProductSKUUpdate) RemoveInventoryLots(v ...*InventoryLot) *ProductSKUU
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveInventoryLotIDs(ids...)
+}
+
+// ClearInventoryTxns clears all "inventory_txns" edges to the InventoryTxn entity.
+func (_u *ProductSKUUpdate) ClearInventoryTxns() *ProductSKUUpdate {
+	_u.mutation.ClearInventoryTxns()
+	return _u
+}
+
+// RemoveInventoryTxnIDs removes the "inventory_txns" edge to InventoryTxn entities by IDs.
+func (_u *ProductSKUUpdate) RemoveInventoryTxnIDs(ids ...int) *ProductSKUUpdate {
+	_u.mutation.RemoveInventoryTxnIDs(ids...)
+	return _u
+}
+
+// RemoveInventoryTxns removes "inventory_txns" edges to InventoryTxn entities.
+func (_u *ProductSKUUpdate) RemoveInventoryTxns(v ...*InventoryTxn) *ProductSKUUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveInventoryTxnIDs(ids...)
+}
+
+// ClearInventoryBalances clears all "inventory_balances" edges to the InventoryBalance entity.
+func (_u *ProductSKUUpdate) ClearInventoryBalances() *ProductSKUUpdate {
+	_u.mutation.ClearInventoryBalances()
+	return _u
+}
+
+// RemoveInventoryBalanceIDs removes the "inventory_balances" edge to InventoryBalance entities by IDs.
+func (_u *ProductSKUUpdate) RemoveInventoryBalanceIDs(ids ...int) *ProductSKUUpdate {
+	_u.mutation.RemoveInventoryBalanceIDs(ids...)
+	return _u
+}
+
+// RemoveInventoryBalances removes "inventory_balances" edges to InventoryBalance entities.
+func (_u *ProductSKUUpdate) RemoveInventoryBalances(v ...*InventoryBalance) *ProductSKUUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveInventoryBalanceIDs(ids...)
+}
+
+// ClearProductionFacts clears all "production_facts" edges to the ProductionFact entity.
+func (_u *ProductSKUUpdate) ClearProductionFacts() *ProductSKUUpdate {
+	_u.mutation.ClearProductionFacts()
+	return _u
+}
+
+// RemoveProductionFactIDs removes the "production_facts" edge to ProductionFact entities by IDs.
+func (_u *ProductSKUUpdate) RemoveProductionFactIDs(ids ...int) *ProductSKUUpdate {
+	_u.mutation.RemoveProductionFactIDs(ids...)
+	return _u
+}
+
+// RemoveProductionFacts removes "production_facts" edges to ProductionFact entities.
+func (_u *ProductSKUUpdate) RemoveProductionFacts(v ...*ProductionFact) *ProductSKUUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductionFactIDs(ids...)
+}
+
+// ClearOutsourcingFacts clears all "outsourcing_facts" edges to the OutsourcingFact entity.
+func (_u *ProductSKUUpdate) ClearOutsourcingFacts() *ProductSKUUpdate {
+	_u.mutation.ClearOutsourcingFacts()
+	return _u
+}
+
+// RemoveOutsourcingFactIDs removes the "outsourcing_facts" edge to OutsourcingFact entities by IDs.
+func (_u *ProductSKUUpdate) RemoveOutsourcingFactIDs(ids ...int) *ProductSKUUpdate {
+	_u.mutation.RemoveOutsourcingFactIDs(ids...)
+	return _u
+}
+
+// RemoveOutsourcingFacts removes "outsourcing_facts" edges to OutsourcingFact entities.
+func (_u *ProductSKUUpdate) RemoveOutsourcingFacts(v ...*OutsourcingFact) *ProductSKUUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOutsourcingFactIDs(ids...)
 }
 
 // ClearShipmentItems clears all "shipment_items" edges to the ShipmentItem entity.
@@ -451,11 +573,6 @@ func (_u *ProductSKUUpdate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *ProductSKUUpdate) check() error {
-	if v, ok := _u.mutation.ProductID(); ok {
-		if err := productsku.ProductIDValidator(v); err != nil {
-			return &ValidationError{Name: "product_id", err: fmt.Errorf(`ent: validator failed for field "ProductSKU.product_id": %w`, err)}
-		}
-	}
 	if v, ok := _u.mutation.SkuCode(); ok {
 		if err := productsku.SkuCodeValidator(v); err != nil {
 			return &ValidationError{Name: "sku_code", err: fmt.Errorf(`ent: validator failed for field "ProductSKU.sku_code": %w`, err)}
@@ -569,35 +686,6 @@ func (_u *ProductSKUUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(productsku.FieldUpdatedAt, field.TypeTime, value)
-	}
-	if _u.mutation.ProductCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   productsku.ProductTable,
-			Columns: []string{productsku.ProductColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(product.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.ProductIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   productsku.ProductTable,
-			Columns: []string{productsku.ProductColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(product.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.DefaultUnitCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -718,6 +806,186 @@ func (_u *ProductSKUUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.InventoryTxnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.InventoryTxnsTable,
+			Columns: []string{productsku.InventoryTxnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorytxn.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedInventoryTxnsIDs(); len(nodes) > 0 && !_u.mutation.InventoryTxnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.InventoryTxnsTable,
+			Columns: []string{productsku.InventoryTxnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorytxn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.InventoryTxnsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.InventoryTxnsTable,
+			Columns: []string{productsku.InventoryTxnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorytxn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.InventoryBalancesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.InventoryBalancesTable,
+			Columns: []string{productsku.InventoryBalancesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorybalance.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedInventoryBalancesIDs(); len(nodes) > 0 && !_u.mutation.InventoryBalancesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.InventoryBalancesTable,
+			Columns: []string{productsku.InventoryBalancesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorybalance.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.InventoryBalancesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.InventoryBalancesTable,
+			Columns: []string{productsku.InventoryBalancesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorybalance.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductionFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.ProductionFactsTable,
+			Columns: []string{productsku.ProductionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductionFactsIDs(); len(nodes) > 0 && !_u.mutation.ProductionFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.ProductionFactsTable,
+			Columns: []string{productsku.ProductionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductionFactsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.ProductionFactsTable,
+			Columns: []string{productsku.ProductionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OutsourcingFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.OutsourcingFactsTable,
+			Columns: []string{productsku.OutsourcingFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingfact.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOutsourcingFactsIDs(); len(nodes) > 0 && !_u.mutation.OutsourcingFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.OutsourcingFactsTable,
+			Columns: []string{productsku.OutsourcingFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OutsourcingFactsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.OutsourcingFactsTable,
+			Columns: []string{productsku.OutsourcingFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _u.mutation.ShipmentItemsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -826,20 +1094,6 @@ type ProductSKUUpdateOne struct {
 	fields   []string
 	hooks    []Hook
 	mutation *ProductSKUMutation
-}
-
-// SetProductID sets the "product_id" field.
-func (_u *ProductSKUUpdateOne) SetProductID(v int) *ProductSKUUpdateOne {
-	_u.mutation.SetProductID(v)
-	return _u
-}
-
-// SetNillableProductID sets the "product_id" field if the given value is not nil.
-func (_u *ProductSKUUpdateOne) SetNillableProductID(v *int) *ProductSKUUpdateOne {
-	if v != nil {
-		_u.SetProductID(*v)
-	}
-	return _u
 }
 
 // SetSkuCode sets the "sku_code" field.
@@ -1036,11 +1290,6 @@ func (_u *ProductSKUUpdateOne) SetUpdatedAt(v time.Time) *ProductSKUUpdateOne {
 	return _u
 }
 
-// SetProduct sets the "product" edge to the Product entity.
-func (_u *ProductSKUUpdateOne) SetProduct(v *Product) *ProductSKUUpdateOne {
-	return _u.SetProductID(v.ID)
-}
-
 // SetDefaultUnit sets the "default_unit" edge to the Unit entity.
 func (_u *ProductSKUUpdateOne) SetDefaultUnit(v *Unit) *ProductSKUUpdateOne {
 	return _u.SetDefaultUnitID(v.ID)
@@ -1076,6 +1325,66 @@ func (_u *ProductSKUUpdateOne) AddInventoryLots(v ...*InventoryLot) *ProductSKUU
 	return _u.AddInventoryLotIDs(ids...)
 }
 
+// AddInventoryTxnIDs adds the "inventory_txns" edge to the InventoryTxn entity by IDs.
+func (_u *ProductSKUUpdateOne) AddInventoryTxnIDs(ids ...int) *ProductSKUUpdateOne {
+	_u.mutation.AddInventoryTxnIDs(ids...)
+	return _u
+}
+
+// AddInventoryTxns adds the "inventory_txns" edges to the InventoryTxn entity.
+func (_u *ProductSKUUpdateOne) AddInventoryTxns(v ...*InventoryTxn) *ProductSKUUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddInventoryTxnIDs(ids...)
+}
+
+// AddInventoryBalanceIDs adds the "inventory_balances" edge to the InventoryBalance entity by IDs.
+func (_u *ProductSKUUpdateOne) AddInventoryBalanceIDs(ids ...int) *ProductSKUUpdateOne {
+	_u.mutation.AddInventoryBalanceIDs(ids...)
+	return _u
+}
+
+// AddInventoryBalances adds the "inventory_balances" edges to the InventoryBalance entity.
+func (_u *ProductSKUUpdateOne) AddInventoryBalances(v ...*InventoryBalance) *ProductSKUUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddInventoryBalanceIDs(ids...)
+}
+
+// AddProductionFactIDs adds the "production_facts" edge to the ProductionFact entity by IDs.
+func (_u *ProductSKUUpdateOne) AddProductionFactIDs(ids ...int) *ProductSKUUpdateOne {
+	_u.mutation.AddProductionFactIDs(ids...)
+	return _u
+}
+
+// AddProductionFacts adds the "production_facts" edges to the ProductionFact entity.
+func (_u *ProductSKUUpdateOne) AddProductionFacts(v ...*ProductionFact) *ProductSKUUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductionFactIDs(ids...)
+}
+
+// AddOutsourcingFactIDs adds the "outsourcing_facts" edge to the OutsourcingFact entity by IDs.
+func (_u *ProductSKUUpdateOne) AddOutsourcingFactIDs(ids ...int) *ProductSKUUpdateOne {
+	_u.mutation.AddOutsourcingFactIDs(ids...)
+	return _u
+}
+
+// AddOutsourcingFacts adds the "outsourcing_facts" edges to the OutsourcingFact entity.
+func (_u *ProductSKUUpdateOne) AddOutsourcingFacts(v ...*OutsourcingFact) *ProductSKUUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOutsourcingFactIDs(ids...)
+}
+
 // AddShipmentItemIDs adds the "shipment_items" edge to the ShipmentItem entity by IDs.
 func (_u *ProductSKUUpdateOne) AddShipmentItemIDs(ids ...int) *ProductSKUUpdateOne {
 	_u.mutation.AddShipmentItemIDs(ids...)
@@ -1109,12 +1418,6 @@ func (_u *ProductSKUUpdateOne) AddStockReservations(v ...*StockReservation) *Pro
 // Mutation returns the ProductSKUMutation object of the builder.
 func (_u *ProductSKUUpdateOne) Mutation() *ProductSKUMutation {
 	return _u.mutation
-}
-
-// ClearProduct clears the "product" edge to the Product entity.
-func (_u *ProductSKUUpdateOne) ClearProduct() *ProductSKUUpdateOne {
-	_u.mutation.ClearProduct()
-	return _u
 }
 
 // ClearDefaultUnit clears the "default_unit" edge to the Unit entity.
@@ -1163,6 +1466,90 @@ func (_u *ProductSKUUpdateOne) RemoveInventoryLots(v ...*InventoryLot) *ProductS
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveInventoryLotIDs(ids...)
+}
+
+// ClearInventoryTxns clears all "inventory_txns" edges to the InventoryTxn entity.
+func (_u *ProductSKUUpdateOne) ClearInventoryTxns() *ProductSKUUpdateOne {
+	_u.mutation.ClearInventoryTxns()
+	return _u
+}
+
+// RemoveInventoryTxnIDs removes the "inventory_txns" edge to InventoryTxn entities by IDs.
+func (_u *ProductSKUUpdateOne) RemoveInventoryTxnIDs(ids ...int) *ProductSKUUpdateOne {
+	_u.mutation.RemoveInventoryTxnIDs(ids...)
+	return _u
+}
+
+// RemoveInventoryTxns removes "inventory_txns" edges to InventoryTxn entities.
+func (_u *ProductSKUUpdateOne) RemoveInventoryTxns(v ...*InventoryTxn) *ProductSKUUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveInventoryTxnIDs(ids...)
+}
+
+// ClearInventoryBalances clears all "inventory_balances" edges to the InventoryBalance entity.
+func (_u *ProductSKUUpdateOne) ClearInventoryBalances() *ProductSKUUpdateOne {
+	_u.mutation.ClearInventoryBalances()
+	return _u
+}
+
+// RemoveInventoryBalanceIDs removes the "inventory_balances" edge to InventoryBalance entities by IDs.
+func (_u *ProductSKUUpdateOne) RemoveInventoryBalanceIDs(ids ...int) *ProductSKUUpdateOne {
+	_u.mutation.RemoveInventoryBalanceIDs(ids...)
+	return _u
+}
+
+// RemoveInventoryBalances removes "inventory_balances" edges to InventoryBalance entities.
+func (_u *ProductSKUUpdateOne) RemoveInventoryBalances(v ...*InventoryBalance) *ProductSKUUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveInventoryBalanceIDs(ids...)
+}
+
+// ClearProductionFacts clears all "production_facts" edges to the ProductionFact entity.
+func (_u *ProductSKUUpdateOne) ClearProductionFacts() *ProductSKUUpdateOne {
+	_u.mutation.ClearProductionFacts()
+	return _u
+}
+
+// RemoveProductionFactIDs removes the "production_facts" edge to ProductionFact entities by IDs.
+func (_u *ProductSKUUpdateOne) RemoveProductionFactIDs(ids ...int) *ProductSKUUpdateOne {
+	_u.mutation.RemoveProductionFactIDs(ids...)
+	return _u
+}
+
+// RemoveProductionFacts removes "production_facts" edges to ProductionFact entities.
+func (_u *ProductSKUUpdateOne) RemoveProductionFacts(v ...*ProductionFact) *ProductSKUUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductionFactIDs(ids...)
+}
+
+// ClearOutsourcingFacts clears all "outsourcing_facts" edges to the OutsourcingFact entity.
+func (_u *ProductSKUUpdateOne) ClearOutsourcingFacts() *ProductSKUUpdateOne {
+	_u.mutation.ClearOutsourcingFacts()
+	return _u
+}
+
+// RemoveOutsourcingFactIDs removes the "outsourcing_facts" edge to OutsourcingFact entities by IDs.
+func (_u *ProductSKUUpdateOne) RemoveOutsourcingFactIDs(ids ...int) *ProductSKUUpdateOne {
+	_u.mutation.RemoveOutsourcingFactIDs(ids...)
+	return _u
+}
+
+// RemoveOutsourcingFacts removes "outsourcing_facts" edges to OutsourcingFact entities.
+func (_u *ProductSKUUpdateOne) RemoveOutsourcingFacts(v ...*OutsourcingFact) *ProductSKUUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOutsourcingFactIDs(ids...)
 }
 
 // ClearShipmentItems clears all "shipment_items" edges to the ShipmentItem entity.
@@ -1258,11 +1645,6 @@ func (_u *ProductSKUUpdateOne) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *ProductSKUUpdateOne) check() error {
-	if v, ok := _u.mutation.ProductID(); ok {
-		if err := productsku.ProductIDValidator(v); err != nil {
-			return &ValidationError{Name: "product_id", err: fmt.Errorf(`ent: validator failed for field "ProductSKU.product_id": %w`, err)}
-		}
-	}
 	if v, ok := _u.mutation.SkuCode(); ok {
 		if err := productsku.SkuCodeValidator(v); err != nil {
 			return &ValidationError{Name: "sku_code", err: fmt.Errorf(`ent: validator failed for field "ProductSKU.sku_code": %w`, err)}
@@ -1394,35 +1776,6 @@ func (_u *ProductSKUUpdateOne) sqlSave(ctx context.Context) (_node *ProductSKU, 
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(productsku.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if _u.mutation.ProductCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   productsku.ProductTable,
-			Columns: []string{productsku.ProductColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(product.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.ProductIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   productsku.ProductTable,
-			Columns: []string{productsku.ProductColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(product.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
 	if _u.mutation.DefaultUnitCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -1535,6 +1888,186 @@ func (_u *ProductSKUUpdateOne) sqlSave(ctx context.Context) (_node *ProductSKU, 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(inventorylot.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.InventoryTxnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.InventoryTxnsTable,
+			Columns: []string{productsku.InventoryTxnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorytxn.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedInventoryTxnsIDs(); len(nodes) > 0 && !_u.mutation.InventoryTxnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.InventoryTxnsTable,
+			Columns: []string{productsku.InventoryTxnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorytxn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.InventoryTxnsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.InventoryTxnsTable,
+			Columns: []string{productsku.InventoryTxnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorytxn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.InventoryBalancesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.InventoryBalancesTable,
+			Columns: []string{productsku.InventoryBalancesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorybalance.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedInventoryBalancesIDs(); len(nodes) > 0 && !_u.mutation.InventoryBalancesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.InventoryBalancesTable,
+			Columns: []string{productsku.InventoryBalancesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorybalance.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.InventoryBalancesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.InventoryBalancesTable,
+			Columns: []string{productsku.InventoryBalancesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorybalance.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductionFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.ProductionFactsTable,
+			Columns: []string{productsku.ProductionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductionFactsIDs(); len(nodes) > 0 && !_u.mutation.ProductionFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.ProductionFactsTable,
+			Columns: []string{productsku.ProductionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductionFactsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.ProductionFactsTable,
+			Columns: []string{productsku.ProductionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OutsourcingFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.OutsourcingFactsTable,
+			Columns: []string{productsku.OutsourcingFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingfact.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOutsourcingFactsIDs(); len(nodes) > 0 && !_u.mutation.OutsourcingFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.OutsourcingFactsTable,
+			Columns: []string{productsku.OutsourcingFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OutsourcingFactsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productsku.OutsourcingFactsTable,
+			Columns: []string{productsku.OutsourcingFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingfact.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

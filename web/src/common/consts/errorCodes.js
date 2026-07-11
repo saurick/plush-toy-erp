@@ -54,4 +54,8 @@ export const DEFAULT_RPC_ERROR_MESSAGES = Object.freeze({
     '短信服务额度已用完，请联系管理员处理',
   [RpcErrorCode.ADMIN_EXISTS]: '管理员账号已存在',
   [RpcErrorCode.ADMIN_PHONE_EXISTS]: '手机号已绑定其他管理员',
+  [RpcErrorCode.IDEMPOTENCY_CONFLICT]:
+    '重复请求内容与首次提交不一致，请刷新后重试',
+  [RpcErrorCode.PROCESS_DOMAIN_COMMAND_RECOVERY_REQUIRED]:
+    '此前业务处理结果需要人工核对，当前流程暂时无法继续，请联系管理员',
 })

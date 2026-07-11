@@ -7,9 +7,13 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"math"
+	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipmentitem"
@@ -33,6 +37,10 @@ type ProductSKUQuery struct {
 	withDefaultUnit       *UnitQuery
 	withSalesOrderItems   *SalesOrderItemQuery
 	withInventoryLots     *InventoryLotQuery
+	withInventoryTxns     *InventoryTxnQuery
+	withInventoryBalances *InventoryBalanceQuery
+	withProductionFacts   *ProductionFactQuery
+	withOutsourcingFacts  *OutsourcingFactQuery
 	withShipmentItems     *ShipmentItemQuery
 	withStockReservations *StockReservationQuery
 	// intermediate query (i.e. traversal path).
@@ -152,6 +160,94 @@ func (_q *ProductSKUQuery) QueryInventoryLots() *InventoryLotQuery {
 			sqlgraph.From(productsku.Table, productsku.FieldID, selector),
 			sqlgraph.To(inventorylot.Table, inventorylot.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, productsku.InventoryLotsTable, productsku.InventoryLotsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryInventoryTxns chains the current query on the "inventory_txns" edge.
+func (_q *ProductSKUQuery) QueryInventoryTxns() *InventoryTxnQuery {
+	query := (&InventoryTxnClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productsku.Table, productsku.FieldID, selector),
+			sqlgraph.To(inventorytxn.Table, inventorytxn.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productsku.InventoryTxnsTable, productsku.InventoryTxnsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryInventoryBalances chains the current query on the "inventory_balances" edge.
+func (_q *ProductSKUQuery) QueryInventoryBalances() *InventoryBalanceQuery {
+	query := (&InventoryBalanceClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productsku.Table, productsku.FieldID, selector),
+			sqlgraph.To(inventorybalance.Table, inventorybalance.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productsku.InventoryBalancesTable, productsku.InventoryBalancesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryProductionFacts chains the current query on the "production_facts" edge.
+func (_q *ProductSKUQuery) QueryProductionFacts() *ProductionFactQuery {
+	query := (&ProductionFactClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productsku.Table, productsku.FieldID, selector),
+			sqlgraph.To(productionfact.Table, productionfact.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productsku.ProductionFactsTable, productsku.ProductionFactsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryOutsourcingFacts chains the current query on the "outsourcing_facts" edge.
+func (_q *ProductSKUQuery) QueryOutsourcingFacts() *OutsourcingFactQuery {
+	query := (&OutsourcingFactClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productsku.Table, productsku.FieldID, selector),
+			sqlgraph.To(outsourcingfact.Table, outsourcingfact.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productsku.OutsourcingFactsTable, productsku.OutsourcingFactsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -399,6 +495,10 @@ func (_q *ProductSKUQuery) Clone() *ProductSKUQuery {
 		withDefaultUnit:       _q.withDefaultUnit.Clone(),
 		withSalesOrderItems:   _q.withSalesOrderItems.Clone(),
 		withInventoryLots:     _q.withInventoryLots.Clone(),
+		withInventoryTxns:     _q.withInventoryTxns.Clone(),
+		withInventoryBalances: _q.withInventoryBalances.Clone(),
+		withProductionFacts:   _q.withProductionFacts.Clone(),
+		withOutsourcingFacts:  _q.withOutsourcingFacts.Clone(),
 		withShipmentItems:     _q.withShipmentItems.Clone(),
 		withStockReservations: _q.withStockReservations.Clone(),
 		// clone intermediate query.
@@ -448,6 +548,50 @@ func (_q *ProductSKUQuery) WithInventoryLots(opts ...func(*InventoryLotQuery)) *
 		opt(query)
 	}
 	_q.withInventoryLots = query
+	return _q
+}
+
+// WithInventoryTxns tells the query-builder to eager-load the nodes that are connected to
+// the "inventory_txns" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductSKUQuery) WithInventoryTxns(opts ...func(*InventoryTxnQuery)) *ProductSKUQuery {
+	query := (&InventoryTxnClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withInventoryTxns = query
+	return _q
+}
+
+// WithInventoryBalances tells the query-builder to eager-load the nodes that are connected to
+// the "inventory_balances" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductSKUQuery) WithInventoryBalances(opts ...func(*InventoryBalanceQuery)) *ProductSKUQuery {
+	query := (&InventoryBalanceClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withInventoryBalances = query
+	return _q
+}
+
+// WithProductionFacts tells the query-builder to eager-load the nodes that are connected to
+// the "production_facts" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductSKUQuery) WithProductionFacts(opts ...func(*ProductionFactQuery)) *ProductSKUQuery {
+	query := (&ProductionFactClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withProductionFacts = query
+	return _q
+}
+
+// WithOutsourcingFacts tells the query-builder to eager-load the nodes that are connected to
+// the "outsourcing_facts" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductSKUQuery) WithOutsourcingFacts(opts ...func(*OutsourcingFactQuery)) *ProductSKUQuery {
+	query := (&OutsourcingFactClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withOutsourcingFacts = query
 	return _q
 }
 
@@ -551,11 +695,15 @@ func (_q *ProductSKUQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*P
 	var (
 		nodes       = []*ProductSKU{}
 		_spec       = _q.querySpec()
-		loadedTypes = [6]bool{
+		loadedTypes = [10]bool{
 			_q.withProduct != nil,
 			_q.withDefaultUnit != nil,
 			_q.withSalesOrderItems != nil,
 			_q.withInventoryLots != nil,
+			_q.withInventoryTxns != nil,
+			_q.withInventoryBalances != nil,
+			_q.withProductionFacts != nil,
+			_q.withOutsourcingFacts != nil,
 			_q.withShipmentItems != nil,
 			_q.withStockReservations != nil,
 		}
@@ -601,6 +749,38 @@ func (_q *ProductSKUQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*P
 		if err := _q.loadInventoryLots(ctx, query, nodes,
 			func(n *ProductSKU) { n.Edges.InventoryLots = []*InventoryLot{} },
 			func(n *ProductSKU, e *InventoryLot) { n.Edges.InventoryLots = append(n.Edges.InventoryLots, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withInventoryTxns; query != nil {
+		if err := _q.loadInventoryTxns(ctx, query, nodes,
+			func(n *ProductSKU) { n.Edges.InventoryTxns = []*InventoryTxn{} },
+			func(n *ProductSKU, e *InventoryTxn) { n.Edges.InventoryTxns = append(n.Edges.InventoryTxns, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withInventoryBalances; query != nil {
+		if err := _q.loadInventoryBalances(ctx, query, nodes,
+			func(n *ProductSKU) { n.Edges.InventoryBalances = []*InventoryBalance{} },
+			func(n *ProductSKU, e *InventoryBalance) {
+				n.Edges.InventoryBalances = append(n.Edges.InventoryBalances, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withProductionFacts; query != nil {
+		if err := _q.loadProductionFacts(ctx, query, nodes,
+			func(n *ProductSKU) { n.Edges.ProductionFacts = []*ProductionFact{} },
+			func(n *ProductSKU, e *ProductionFact) { n.Edges.ProductionFacts = append(n.Edges.ProductionFacts, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withOutsourcingFacts; query != nil {
+		if err := _q.loadOutsourcingFacts(ctx, query, nodes,
+			func(n *ProductSKU) { n.Edges.OutsourcingFacts = []*OutsourcingFact{} },
+			func(n *ProductSKU, e *OutsourcingFact) {
+				n.Edges.OutsourcingFacts = append(n.Edges.OutsourcingFacts, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -732,6 +912,138 @@ func (_q *ProductSKUQuery) loadInventoryLots(ctx context.Context, query *Invento
 	}
 	query.Where(predicate.InventoryLot(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(productsku.InventoryLotsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProductSkuID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "product_sku_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "product_sku_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProductSKUQuery) loadInventoryTxns(ctx context.Context, query *InventoryTxnQuery, nodes []*ProductSKU, init func(*ProductSKU), assign func(*ProductSKU, *InventoryTxn)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*ProductSKU)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(inventorytxn.FieldProductSkuID)
+	}
+	query.Where(predicate.InventoryTxn(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(productsku.InventoryTxnsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProductSkuID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "product_sku_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "product_sku_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProductSKUQuery) loadInventoryBalances(ctx context.Context, query *InventoryBalanceQuery, nodes []*ProductSKU, init func(*ProductSKU), assign func(*ProductSKU, *InventoryBalance)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*ProductSKU)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(inventorybalance.FieldProductSkuID)
+	}
+	query.Where(predicate.InventoryBalance(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(productsku.InventoryBalancesColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProductSkuID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "product_sku_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "product_sku_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProductSKUQuery) loadProductionFacts(ctx context.Context, query *ProductionFactQuery, nodes []*ProductSKU, init func(*ProductSKU), assign func(*ProductSKU, *ProductionFact)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*ProductSKU)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productionfact.FieldProductSkuID)
+	}
+	query.Where(predicate.ProductionFact(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(productsku.ProductionFactsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProductSkuID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "product_sku_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "product_sku_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProductSKUQuery) loadOutsourcingFacts(ctx context.Context, query *OutsourcingFactQuery, nodes []*ProductSKU, init func(*ProductSKU), assign func(*ProductSKU, *OutsourcingFact)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*ProductSKU)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(outsourcingfact.FieldProductSkuID)
+	}
+	query.Where(predicate.OutsourcingFact(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(productsku.OutsourcingFactsColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

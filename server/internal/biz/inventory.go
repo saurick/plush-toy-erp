@@ -112,6 +112,7 @@ type InventoryLot struct {
 	ID              int
 	SubjectType     string
 	SubjectID       int
+	ProductSkuID    *int
 	LotNo           string
 	SupplierLotNo   *string
 	ColorNo         *string
@@ -127,6 +128,7 @@ type InventoryTxn struct {
 	ID              int
 	SubjectType     string
 	SubjectID       int
+	ProductSkuID    *int
 	WarehouseID     int
 	LotID           *int
 	TxnType         string
@@ -148,6 +150,7 @@ type InventoryBalance struct {
 	ID                     int
 	SubjectType            string
 	SubjectID              int
+	ProductSkuID           *int
 	WarehouseID            int
 	LotID                  *int
 	UnitID                 int
@@ -160,6 +163,7 @@ type InventoryBalance struct {
 type InventoryLotCreate struct {
 	SubjectType     string
 	SubjectID       int
+	ProductSkuID    *int
 	LotNo           string
 	SupplierLotNo   *string
 	ColorNo         *string
@@ -170,67 +174,73 @@ type InventoryLotCreate struct {
 }
 
 type InventoryTxnCreate struct {
-	SubjectType     string
-	SubjectID       int
-	WarehouseID     int
-	LotID           *int
-	TxnType         string
-	Direction       int
-	Quantity        decimal.Decimal
-	UnitID          int
-	SourceType      string
-	SourceID        *int
-	SourceLineID    *int
-	IdempotencyKey  string
-	ReversalOfTxnID *int
-	OccurredAt      time.Time
-	CreatedBy       *int
-	Note            *string
+	SubjectType         string
+	SubjectID           int
+	ProductSkuID        *int
+	WarehouseID         int
+	LotID               *int
+	TxnType             string
+	Direction           int
+	Quantity            decimal.Decimal
+	UnitID              int
+	SourceType          string
+	SourceID            *int
+	SourceLineID        *int
+	IdempotencyKey      string
+	ReversalOfTxnID     *int
+	OccurredAt          time.Time
+	OccurredAtSpecified bool
+	CreatedBy           *int
+	Note                *string
 }
 
 type InventoryBalanceKey struct {
-	SubjectType string
-	SubjectID   int
-	WarehouseID int
-	LotID       *int
-	UnitID      int
+	SubjectType  string
+	SubjectID    int
+	ProductSkuID *int
+	WarehouseID  int
+	LotID        *int
+	UnitID       int
 }
 
 type InventoryBalanceFilter struct {
-	SubjectType string
-	SubjectID   int
-	WarehouseID int
-	LotID       int
-	Keyword     string
-	Limit       int
-	Offset      int
+	SubjectType  string
+	SubjectID    int
+	ProductSkuID int
+	WarehouseID  int
+	LotID        int
+	Keyword      string
+	Limit        int
+	Offset       int
 }
 
 type InventoryLotFilter struct {
-	SubjectType string
-	SubjectID   int
-	WarehouseID int
-	Status      string
-	Keyword     string
-	DateFrom    *time.Time
-	DateTo      *time.Time
-	Limit       int
-	Offset      int
+	SubjectType  string
+	SubjectID    int
+	ProductSkuID int
+	WarehouseID  int
+	Status       string
+	Keyword      string
+	DateFrom     *time.Time
+	DateTo       *time.Time
+	Limit        int
+	Offset       int
 }
 
 type InventoryTxnFilter struct {
-	SubjectType string
-	SubjectID   int
-	WarehouseID int
-	LotID       int
-	TxnType     string
-	SourceType  string
-	SourceID    int
-	Keyword     string
-	DateFrom    *time.Time
-	DateTo      *time.Time
-	Limit       int
-	Offset      int
+	SubjectType  string
+	SubjectID    int
+	ProductSkuID int
+	WarehouseID  int
+	LotID        int
+	TxnType      string
+	SourceType   string
+	SourceID     int
+	Keyword      string
+	DateFrom     *time.Time
+	DateTo       *time.Time
+	Limit        int
+	Offset       int
 }
 
 type BOMHeader struct {
@@ -377,6 +387,7 @@ type InventoryRepo interface {
 	ArchiveBOMVersion(ctx context.Context, id int) (*BOMHeader, error)
 	CreatePurchaseReceiptDraft(ctx context.Context, in *PurchaseReceiptCreate) (*PurchaseReceipt, error)
 	CreatePurchaseReceiptWithItems(ctx context.Context, in *PurchaseReceiptCreate, items []*PurchaseReceiptItemCreate) (*PurchaseReceipt, error)
+	ResolvePurchaseReceiptFromPurchaseOrderReplay(ctx context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) (*PurchaseReceipt, bool, error)
 	CreatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) (*PurchaseReceipt, error)
 	AddPurchaseReceiptItem(ctx context.Context, in *PurchaseReceiptItemCreate) (*PurchaseReceiptItem, error)
 	PostPurchaseReceipt(ctx context.Context, receiptID int) (*PurchaseReceipt, error)
@@ -402,6 +413,12 @@ type InventoryRepo interface {
 	GetQualityInspection(ctx context.Context, id int) (*QualityInspection, error)
 	ListQualityInspections(ctx context.Context, filter QualityInspectionFilter) ([]*QualityInspection, int, error)
 	EvaluatePurchaseReceiptQualityGate(ctx context.Context, receiptID int) (*PurchaseReceiptQualityGate, error)
+}
+
+// PurchaseReceiptCancellationActorRepo keeps the authenticated operator on the
+// process-command compensation written with a posted receipt reversal.
+type PurchaseReceiptCancellationActorRepo interface {
+	CancelPostedPurchaseReceiptWithActor(ctx context.Context, receiptID int, actorID int) (*PurchaseReceipt, error)
 }
 
 type InventoryUsecase struct {
@@ -679,6 +696,9 @@ func normalizeInventoryLotCreate(in InventoryLotCreate) (InventoryLotCreate, err
 		!IsValidInventoryLotStatus(in.Status) {
 		return InventoryLotCreate{}, ErrBadParam
 	}
+	if in.ProductSkuID != nil && (*in.ProductSkuID <= 0 || in.SubjectType != InventorySubjectProduct) {
+		return InventoryLotCreate{}, ErrBadParam
+	}
 	return in, nil
 }
 
@@ -692,9 +712,7 @@ func normalizeInventoryTxnCreate(in InventoryTxnCreate) (InventoryTxnCreate, err
 		return InventoryTxnCreate{}, ErrBadParam
 	}
 	in.IdempotencyKey = idempotencyKey.String()
-	if in.OccurredAt.IsZero() {
-		in.OccurredAt = time.Now()
-	}
+	in.OccurredAt, in.OccurredAtSpecified = normalizeIdempotencyIntentTime(in.OccurredAt)
 	if in.SourceID != nil && *in.SourceID <= 0 {
 		in.SourceID = nil
 	}
@@ -709,6 +727,9 @@ func normalizeInventoryTxnCreate(in InventoryTxnCreate) (InventoryTxnCreate, err
 	}
 	if in.LotID != nil && *in.LotID <= 0 {
 		in.LotID = nil
+	}
+	if in.ProductSkuID != nil && (*in.ProductSkuID <= 0 || in.SubjectType != InventorySubjectProduct) {
+		return InventoryTxnCreate{}, ErrBadParam
 	}
 	if !IsValidInventorySubjectType(in.SubjectType) ||
 		!IsValidInventoryTxnType(in.TxnType) ||
@@ -733,6 +754,13 @@ func normalizeInventoryTxnCreate(in InventoryTxnCreate) (InventoryTxnCreate, err
 	return in, nil
 }
 
+func normalizeIdempotencyIntentTime(value time.Time) (time.Time, bool) {
+	if value.IsZero() {
+		return time.Now(), false
+	}
+	return value.UTC().Truncate(time.Microsecond), true
+}
+
 func normalizeInventoryBalanceKey(key InventoryBalanceKey) InventoryBalanceKey {
 	key.SubjectType = strings.ToUpper(strings.TrimSpace(key.SubjectType))
 	if key.LotID != nil && *key.LotID <= 0 {
@@ -744,6 +772,7 @@ func normalizeInventoryBalanceKey(key InventoryBalanceKey) InventoryBalanceKey {
 func isValidInventoryBalanceKey(key InventoryBalanceKey) bool {
 	return IsValidInventorySubjectType(key.SubjectType) &&
 		key.SubjectID > 0 &&
+		(key.ProductSkuID == nil || (*key.ProductSkuID > 0 && key.SubjectType == InventorySubjectProduct)) &&
 		key.WarehouseID > 0 &&
 		key.UnitID > 0
 }
@@ -751,7 +780,7 @@ func isValidInventoryBalanceKey(key InventoryBalanceKey) bool {
 func normalizeInventoryBalanceFilter(in InventoryBalanceFilter) (InventoryBalanceFilter, error) {
 	in.SubjectType = strings.ToUpper(strings.TrimSpace(in.SubjectType))
 	in.Keyword = strings.TrimSpace(in.Keyword)
-	if in.SubjectType != "" && !IsValidInventorySubjectType(in.SubjectType) {
+	if (in.SubjectType != "" && !IsValidInventorySubjectType(in.SubjectType)) || in.ProductSkuID < 0 {
 		return InventoryBalanceFilter{}, ErrBadParam
 	}
 	normalizeInventoryListPagination(&in.Limit, &in.Offset)
@@ -762,7 +791,7 @@ func normalizeInventoryLotFilter(in InventoryLotFilter) (InventoryLotFilter, err
 	in.SubjectType = strings.ToUpper(strings.TrimSpace(in.SubjectType))
 	in.Status = strings.ToUpper(strings.TrimSpace(in.Status))
 	in.Keyword = strings.TrimSpace(in.Keyword)
-	if in.SubjectType != "" && !IsValidInventorySubjectType(in.SubjectType) {
+	if (in.SubjectType != "" && !IsValidInventorySubjectType(in.SubjectType)) || in.ProductSkuID < 0 {
 		return InventoryLotFilter{}, ErrBadParam
 	}
 	if in.Status != "" && !IsValidInventoryLotStatus(in.Status) {
@@ -780,7 +809,7 @@ func normalizeInventoryTxnFilter(in InventoryTxnFilter) (InventoryTxnFilter, err
 	in.TxnType = strings.ToUpper(strings.TrimSpace(in.TxnType))
 	in.SourceType = strings.ToUpper(strings.TrimSpace(in.SourceType))
 	in.Keyword = strings.TrimSpace(in.Keyword)
-	if in.SubjectType != "" && !IsValidInventorySubjectType(in.SubjectType) {
+	if (in.SubjectType != "" && !IsValidInventorySubjectType(in.SubjectType)) || in.ProductSkuID < 0 {
 		return InventoryTxnFilter{}, ErrBadParam
 	}
 	if in.TxnType != "" && !IsValidInventoryTxnType(in.TxnType) {

@@ -19,6 +19,8 @@ const (
 	FieldSubjectType = "subject_type"
 	// FieldSubjectID holds the string denoting the subject_id field in the database.
 	FieldSubjectID = "subject_id"
+	// FieldProductSkuID holds the string denoting the product_sku_id field in the database.
+	FieldProductSkuID = "product_sku_id"
 	// FieldWarehouseID holds the string denoting the warehouse_id field in the database.
 	FieldWarehouseID = "warehouse_id"
 	// FieldLotID holds the string denoting the lot_id field in the database.
@@ -43,6 +45,8 @@ const (
 	FieldReversalOfTxnID = "reversal_of_txn_id"
 	// FieldOccurredAt holds the string denoting the occurred_at field in the database.
 	FieldOccurredAt = "occurred_at"
+	// FieldOccurredAtSpecified holds the string denoting the occurred_at_specified field in the database.
+	FieldOccurredAtSpecified = "occurred_at_specified"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldCreatedBy holds the string denoting the created_by field in the database.
@@ -53,6 +57,8 @@ const (
 	EdgeWarehouse = "warehouse"
 	// EdgeUnit holds the string denoting the unit edge name in mutations.
 	EdgeUnit = "unit"
+	// EdgeProductSku holds the string denoting the product_sku edge name in mutations.
+	EdgeProductSku = "product_sku"
 	// EdgeInventoryLot holds the string denoting the inventory_lot edge name in mutations.
 	EdgeInventoryLot = "inventory_lot"
 	// Table holds the table name of the inventorytxn in the database.
@@ -71,6 +77,13 @@ const (
 	UnitInverseTable = "units"
 	// UnitColumn is the table column denoting the unit relation/edge.
 	UnitColumn = "unit_id"
+	// ProductSkuTable is the table that holds the product_sku relation/edge.
+	ProductSkuTable = "inventory_txns"
+	// ProductSkuInverseTable is the table name for the ProductSKU entity.
+	// It exists in this package in order to avoid circular dependency with the "productsku" package.
+	ProductSkuInverseTable = "product_skus"
+	// ProductSkuColumn is the table column denoting the product_sku relation/edge.
+	ProductSkuColumn = "product_sku_id"
 	// InventoryLotTable is the table that holds the inventory_lot relation/edge.
 	InventoryLotTable = "inventory_txns"
 	// InventoryLotInverseTable is the table name for the InventoryLot entity.
@@ -85,6 +98,7 @@ var Columns = []string{
 	FieldID,
 	FieldSubjectType,
 	FieldSubjectID,
+	FieldProductSkuID,
 	FieldWarehouseID,
 	FieldLotID,
 	FieldTxnType,
@@ -97,6 +111,7 @@ var Columns = []string{
 	FieldIdempotencyKey,
 	FieldReversalOfTxnID,
 	FieldOccurredAt,
+	FieldOccurredAtSpecified,
 	FieldCreatedAt,
 	FieldCreatedBy,
 	FieldNote,
@@ -123,6 +138,8 @@ var (
 	SubjectTypeValidator func(string) error
 	// SubjectIDValidator is a validator for the "subject_id" field. It is called by the builders before save.
 	SubjectIDValidator func(int) error
+	// ProductSkuIDValidator is a validator for the "product_sku_id" field. It is called by the builders before save.
+	ProductSkuIDValidator func(int) error
 	// WarehouseIDValidator is a validator for the "warehouse_id" field. It is called by the builders before save.
 	WarehouseIDValidator func(int) error
 	// LotIDValidator is a validator for the "lot_id" field. It is called by the builders before save.
@@ -143,6 +160,8 @@ var (
 	ReversalOfTxnIDValidator func(int) error
 	// DefaultOccurredAt holds the default value on creation for the "occurred_at" field.
 	DefaultOccurredAt func() time.Time
+	// DefaultOccurredAtSpecified holds the default value on creation for the "occurred_at_specified" field.
+	DefaultOccurredAtSpecified bool
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
@@ -167,6 +186,11 @@ func BySubjectType(opts ...sql.OrderTermOption) OrderOption {
 // BySubjectID orders the results by the subject_id field.
 func BySubjectID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSubjectID, opts...).ToFunc()
+}
+
+// ByProductSkuID orders the results by the product_sku_id field.
+func ByProductSkuID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProductSkuID, opts...).ToFunc()
 }
 
 // ByWarehouseID orders the results by the warehouse_id field.
@@ -229,6 +253,11 @@ func ByOccurredAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldOccurredAt, opts...).ToFunc()
 }
 
+// ByOccurredAtSpecified orders the results by the occurred_at_specified field.
+func ByOccurredAtSpecified(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOccurredAtSpecified, opts...).ToFunc()
+}
+
 // ByCreatedAt orders the results by the created_at field.
 func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCreatedAt, opts...).ToFunc()
@@ -258,6 +287,13 @@ func ByUnitField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
+// ByProductSkuField orders the results by product_sku field.
+func ByProductSkuField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProductSkuStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByInventoryLotField orders the results by inventory_lot field.
 func ByInventoryLotField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -276,6 +312,13 @@ func newUnitStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(UnitInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, UnitTable, UnitColumn),
+	)
+}
+func newProductSkuStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProductSkuInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, ProductSkuTable, ProductSkuColumn),
 	)
 }
 func newInventoryLotStep() *sqlgraph.Step {

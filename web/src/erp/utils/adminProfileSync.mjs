@@ -11,6 +11,10 @@ const DATA_RUNTIME_SCOPE_CUSTOMER = 'customer_runtime'
 const DATA_RUNTIME_SCOPE_PRODUCT_CORE_REVIEW = 'product_core_review'
 const DATA_RUNTIME_SCOPE_SYNC_FAILED = 'sync_failed_diagnostic'
 const DATA_RUNTIME_SCOPE_CUSTOMER_MISSING = 'customer_runtime_missing'
+const CUSTOMER_CONFIG_INDEPENDENT_PAGE_KEYS = new Set([
+  'permission-center',
+  'system-audit-logs',
+])
 const PRINT_PARTY_DEFAULT_KEYS = new Set([
   'buyerCompany',
   'buyerContact',
@@ -238,7 +242,12 @@ export function buildEffectiveSessionDiagnosticSummary({
   if (session?.source === EFFECTIVE_SESSION_SYNC_FAILED_SOURCE) {
     blockers.push('effective_session_sync_failed')
   }
-  if (hasSession && Array.isArray(session?.pages) && pages.length === 0) {
+  if (
+    hasSession &&
+    Array.isArray(session?.pages) &&
+    pages.length === 0 &&
+    visibleMenuItems === 0
+  ) {
     blockers.push('effective_session_pages_empty')
   }
   if (!isSuperAdmin && visibleMenuItems === 0) {
@@ -302,6 +311,19 @@ export function shouldGuardCustomerBusinessPageRuntime({
 export function canMountCustomerRuntime(adminProfile) {
   const customerKey = adminProfile?.effective_session?.customer?.key
   return typeof customerKey === 'string' && customerKey.trim().length > 0
+}
+
+export function hasExpectedCustomerRuntime(
+  adminProfile,
+  expectedCustomerKey = ''
+) {
+  const expectedKey =
+    typeof expectedCustomerKey === 'string' ? expectedCustomerKey.trim() : ''
+  if (!expectedKey) {
+    return true
+  }
+  const customerKey = adminProfile?.effective_session?.customer?.key
+  return typeof customerKey === 'string' && customerKey.trim() === expectedKey
 }
 
 export function attachEffectiveSessionToAdminProfile(
@@ -392,6 +414,9 @@ export function resolveEffectiveSessionPageAccess(
   const normalizedPageKey = typeof pageKey === 'string' ? pageKey.trim() : ''
   if (!normalizedPageKey) {
     return { allowed: true, reason: 'empty_page_key' }
+  }
+  if (CUSTOMER_CONFIG_INDEPENDENT_PAGE_KEYS.has(normalizedPageKey)) {
+    return { allowed: true, reason: 'system_page_rbac_scope' }
   }
   const session = adminProfile?.effective_session
   const pages = session?.pages

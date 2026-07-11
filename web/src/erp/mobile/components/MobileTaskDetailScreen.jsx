@@ -72,6 +72,7 @@ export default function MobileTaskDetailScreen({
   const showRejected = supportsRejectedAction(activeRoleKey, selectedTask)
   const isUpdating = updatingID === selectedTask.id
   const isUrging = urgingID === selectedTask.id
+  const isActionPending = isUpdating || isUrging
   const isDoneDetailAction = detailAction === 'done'
   const ownerRoleLabel = getMobileRoleLabel(selectedTask.owner_role_key)
   const currentRoleOwnsTask = canOperateTask(activeRoleKey, selectedTask)
@@ -348,7 +349,7 @@ export default function MobileTaskDetailScreen({
               <button
                 type="button"
                 className="rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white disabled:opacity-50"
-                disabled={isUpdating || isUrging}
+                disabled={isActionPending}
                 onClick={submitDetailAction}
               >
                 提交
@@ -371,7 +372,7 @@ export default function MobileTaskDetailScreen({
         <button
           type="button"
           className="mobile-role-action-bar__button mobile-role-action-bar__button--blocked rounded-xl bg-orange-500 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
-          disabled={!selectedCanBlock || isUpdating}
+          disabled={!selectedCanBlock || isActionPending}
           onClick={() => handleTaskAction(selectedTask, 'blocked')}
         >
           <PauseOutlined className="mr-2" />
@@ -380,7 +381,7 @@ export default function MobileTaskDetailScreen({
         <button
           type="button"
           className="mobile-role-action-bar__button mobile-role-action-bar__button--done rounded-xl bg-emerald-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
-          disabled={!selectedCanComplete || isUpdating}
+          disabled={!selectedCanComplete || isActionPending}
           onClick={() => handleTaskAction(selectedTask, 'done')}
         >
           <CheckOutlined className="mr-2" />
@@ -389,7 +390,7 @@ export default function MobileTaskDetailScreen({
         <button
           type="button"
           className="mobile-role-action-bar__button mobile-role-action-bar__button--urge rounded-xl border border-slate-200 bg-white px-3 py-4 text-lg font-semibold text-slate-700 disabled:opacity-50"
-          disabled={!selectedCanUrge || isUrging}
+          disabled={!selectedCanUrge || isActionPending}
           onClick={() => handleTaskAction(selectedTask, 'urge')}
         >
           <BellOutlined className="mr-2" />
@@ -399,7 +400,7 @@ export default function MobileTaskDetailScreen({
           <button
             type="button"
             className="mobile-role-action-bar__button mobile-role-action-bar__button--rejected col-span-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-base font-semibold text-red-600 disabled:opacity-50"
-            disabled={!selectedCanReject || isUpdating}
+            disabled={!selectedCanReject || isActionPending}
             onClick={() => handleTaskAction(selectedTask, 'rejected')}
           >
             退回当前任务

@@ -8,6 +8,8 @@ import { Button, Form, Popconfirm, Tag, Typography } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   addShipmentItem,
   cancelShipment,
@@ -172,6 +174,8 @@ export default function ShipmentsPage() {
       ? searchParamPositiveIntText(searchParams, 'source_id')
       : '')
 
+  const beginLatestRequest = useLatestRequestCoordinator()
+
   const canCreate = hasActionPermission(adminProfile, 'shipment.create')
   const canShip = hasActionPermission(adminProfile, 'shipment.ship')
   const canCancel = hasActionPermission(adminProfile, 'shipment.cancel')
@@ -231,6 +235,7 @@ export default function ShipmentsPage() {
   )
 
   const loadRows = useCallback(async () => {
+    const request = beginLatestRequest('rows')
     setLoading(true)
     try {
       const data = await listShipments(
@@ -245,8 +250,12 @@ export default function ShipmentsPage() {
           date_from: dateFilterStart || undefined,
           date_to: dateFilterEnd || undefined,
           ...getBusinessPaginationParams(pagination),
-        })
+        }),
+        { signal: request.signal }
       )
+      if (!request.isCurrent()) {
+        return
+      }
       const nextRows = Array.isArray(data?.shipments) ? data.shipments : []
       setRows(nextRows)
       setSelectedRow((current) => {
@@ -260,11 +269,18 @@ export default function ShipmentsPage() {
       })
       setTotal(Number(data?.total || 0))
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return
+      }
       message.error(getActionErrorMessage(error, '加载出货单'))
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
     }
   }, [
+    beginLatestRequest,
     dateFilterEnd,
     dateFilterField,
     dateFilterStart,
@@ -395,6 +411,18 @@ export default function ShipmentsPage() {
   const selectedSalesOrder = useMemo(
     () => salesOrdersByID.get(Number(selectedSalesOrderID || 0)) || null,
     [salesOrdersByID, selectedSalesOrderID]
+  )
+  const handleShipmentSalesOrderChange = useCallback(
+    (nextSalesOrderID) => {
+      const order = salesOrdersByID.get(Number(nextSalesOrderID || 0)) || null
+      setSalesOrderItems([])
+      shipmentForm.setFieldsValue({
+        customer_id: order?.customer_id,
+        customer_snapshot: order ? salesOrderCustomerText(order) : '',
+        items: [createBlankShipmentItem()],
+      })
+    },
+    [salesOrdersByID, shipmentForm]
   )
   const salesOrderImportColumns = useMemo(
     () => [
@@ -979,6 +1007,7 @@ export default function ShipmentsPage() {
         customerOptions={customerOptions}
         form={shipmentForm}
         importSalesOrderToShipment={importSalesOrderToShipment}
+        inventoryLots={inventoryLots}
         inventoryLotOptions={inventoryLotOptions}
         isAppendModal={isAppendModal}
         isCreateModal={isCreateModal}
@@ -986,10 +1015,14 @@ export default function ShipmentsPage() {
         onCancel={closeShipmentModal}
         onOk={submitShipmentModal}
         onOpenSalesOrderImport={openSalesOrderImport}
+        onSalesOrderChange={handleShipmentSalesOrderChange}
+        products={products}
         productOptions={productOptions}
+        productSKUs={productSKUs}
         productSKUOptions={productSKUOptions}
         salesOrderImportColumns={salesOrderImportColumns}
         salesOrderImportOpen={salesOrderImportOpen}
+        salesOrderItems={salesOrderItems}
         salesOrderItemOptions={salesOrderItemOptions}
         salesOrderOptions={salesOrderOptions}
         salesOrderSources={salesOrderSources}

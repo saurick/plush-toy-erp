@@ -20,8 +20,13 @@ import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.js
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import {
+  buildShipmentProductChangePatch,
+  buildShipmentSKUChangePatch,
+  buildShipmentSourceItemChangePatch,
   createBlankShipmentItem,
   decimalNumber,
+  filterShipmentInventoryLotOptions,
+  filterShipmentProductSKUOptions,
   formatQuantity,
 } from '../../utils/businessLineItems.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
@@ -59,7 +64,9 @@ export function sourceLineProductText(
 function ShipmentFormFields({
   disabled = false,
   customerOptions = [],
+  onSalesOrderChange,
   salesOrderOptions = [],
+  sourceLocked = false,
 }) {
   return (
     <>
@@ -88,6 +95,7 @@ function ShipmentFormFields({
           options={salesOrderOptions}
           placeholder="请选择销售订单"
           showSearch
+          onChange={onSalesOrderChange}
         />
       </Form.Item>
       <Form.Item
@@ -97,7 +105,7 @@ function ShipmentFormFields({
       >
         <Select
           allowClear
-          disabled={disabled}
+          disabled={disabled || sourceLocked}
           optionFilterProp="label"
           options={customerOptions}
           placeholder="请选择客户"
@@ -109,7 +117,11 @@ function ShipmentFormFields({
         label="客户快照"
         name="customer_snapshot"
       >
-        <Input allowClear autoComplete="off" disabled={disabled} />
+        <Input
+          allowClear
+          autoComplete="off"
+          disabled={disabled || sourceLocked}
+        />
       </Form.Item>
       <Form.Item name="idempotency_key" hidden rules={[{ required: true }]}>
         <Input disabled={disabled} />
@@ -188,8 +200,8 @@ function ShipmentSelectedSourceAlert({
                   )}`}
                 </Text>
                 <Text type="secondary">
-                  出货弹窗只做来源预览和默认数量；后端当前保存销售订单行追溯，
-                  剩余量强校验仍需后续后端规则补齐。
+                  出货草稿不占用剩余量；确认出货时后端会强校验来源、产品 / SKU、
+                  单位、累计出货和库存可用量。
                 </Text>
               </Space>
             }
@@ -202,10 +214,15 @@ function ShipmentSelectedSourceAlert({
 
 function ShipmentItemFormFields({
   field,
+  form,
   showShipmentID = false,
+  inventoryLots = [],
   inventoryLotOptions = [],
+  products = [],
   productOptions = [],
+  productSKUs = [],
   productSKUOptions = [],
+  salesOrderItems = [],
   salesOrderItemOptions = [],
   shipmentOptions = [],
   unitOptions = [],
@@ -213,6 +230,35 @@ function ShipmentItemFormFields({
 }) {
   const namePrefix = field ? field.name : undefined
   const fieldName = (key) => (field ? [namePrefix, key] : key)
+  const itemPath = field ? ['items', namePrefix] : []
+  const sourceItemID = Form.useWatch(
+    field ? [...itemPath, 'sales_order_item_id'] : 'sales_order_item_id',
+    form
+  )
+  const productID = Form.useWatch(
+    field ? [...itemPath, 'product_id'] : 'product_id',
+    form
+  )
+  const productSkuID = Form.useWatch(
+    field ? [...itemPath, 'product_sku_id'] : 'product_sku_id',
+    form
+  )
+  const sourceLocked = Number(sourceItemID || 0) > 0
+  const filteredProductSKUOptions = filterShipmentProductSKUOptions(
+    productSKUOptions,
+    productSKUs,
+    productID
+  )
+  const filteredInventoryLotOptions = filterShipmentInventoryLotOptions(
+    inventoryLotOptions,
+    inventoryLots,
+    { productID, productSkuID }
+  )
+  const applyItemPatch = (patch) => {
+    if (!form || !field) return
+    const current = form.getFieldValue(itemPath) || {}
+    form.setFieldValue(itemPath, { ...current, ...patch })
+  }
   return (
     <>
       {showShipmentID ? (
@@ -233,7 +279,7 @@ function ShipmentItemFormFields({
       ) : null}
       <Form.Item
         className="erp-business-action-form__field"
-        label="销售订单行"
+        label="销售订单行追溯"
         name={fieldName('sales_order_item_id')}
       >
         <Select
@@ -242,6 +288,11 @@ function ShipmentItemFormFields({
           options={salesOrderItemOptions}
           placeholder="请选择销售订单行"
           showSearch
+          onChange={(nextID) =>
+            applyItemPatch(
+              buildShipmentSourceItemChangePatch(nextID, salesOrderItems)
+            )
+          }
         />
       </Form.Item>
       <Form.Item
@@ -252,10 +303,14 @@ function ShipmentItemFormFields({
       >
         <Select
           allowClear
+          disabled={sourceLocked}
           optionFilterProp="label"
           options={productOptions}
           placeholder="请选择产品"
           showSearch
+          onChange={(nextID) =>
+            applyItemPatch(buildShipmentProductChangePatch(nextID, products))
+          }
         />
       </Form.Item>
       <Form.Item
@@ -265,10 +320,14 @@ function ShipmentItemFormFields({
       >
         <Select
           allowClear
+          disabled={sourceLocked || !Number(productID || 0)}
           optionFilterProp="label"
-          options={productSKUOptions}
+          options={filteredProductSKUOptions}
           placeholder="请选择 SKU"
           showSearch
+          onChange={(nextID) =>
+            applyItemPatch(buildShipmentSKUChangePatch(nextID, productSKUs))
+          }
         />
       </Form.Item>
       <Form.Item
@@ -292,8 +351,9 @@ function ShipmentItemFormFields({
       >
         <Select
           allowClear
+          disabled={!Number(productID || 0)}
           optionFilterProp="label"
-          options={inventoryLotOptions}
+          options={filteredInventoryLotOptions}
           placeholder="请选择批次"
           showSearch
         />
@@ -306,6 +366,7 @@ function ShipmentItemFormFields({
       >
         <Select
           allowClear
+          disabled={sourceLocked}
           optionFilterProp="label"
           options={unitOptions}
           placeholder="请选择单位"
@@ -396,6 +457,7 @@ export default function ShipmentBusinessModal({
   customerOptions = [],
   form,
   importSalesOrderToShipment,
+  inventoryLots = [],
   inventoryLotOptions = [],
   isAppendModal = false,
   isCreateModal = false,
@@ -403,10 +465,14 @@ export default function ShipmentBusinessModal({
   onCancel,
   onOk,
   onOpenSalesOrderImport,
+  onSalesOrderChange,
+  products = [],
   productOptions = [],
+  productSKUs = [],
   productSKUOptions = [],
   salesOrderImportColumns = [],
   salesOrderImportOpen = false,
+  salesOrderItems = [],
   salesOrderItemOptions = [],
   salesOrderOptions = [],
   salesOrderSources = [],
@@ -447,7 +513,9 @@ export default function ShipmentBusinessModal({
         <ShipmentFormFields
           customerOptions={customerOptions}
           disabled={!isCreateModal}
+          onSalesOrderChange={onSalesOrderChange}
           salesOrderOptions={salesOrderOptions}
+          sourceLocked={Boolean(selectedSalesOrder)}
         />
         <BusinessAttachmentPanel
           ref={shipmentAttachmentRef}
@@ -499,8 +567,8 @@ export default function ShipmentBusinessModal({
                 <div className="erp-line-items-form__import-copy">
                   <strong>从销售订单导入</strong>
                   <span>
-                    先选择销售订单来源；产品、单位和订单行追溯带回主弹窗，仓库 /
-                    批次仍在出货明细里补齐。
+                    先选择销售订单来源；产品、SKU、单位和订单行追溯带回主弹窗，
+                    仓库 / 批次仍在出货明细里补齐。
                   </span>
                 </div>
                 <Button
@@ -553,9 +621,14 @@ export default function ShipmentBusinessModal({
                     <div className="erp-master-contact-list__grid">
                       <ShipmentItemFormFields
                         field={field}
+                        form={form}
+                        inventoryLots={inventoryLots}
                         inventoryLotOptions={inventoryLotOptions}
+                        products={products}
                         productOptions={productOptions}
+                        productSKUs={productSKUs}
                         productSKUOptions={productSKUOptions}
+                        salesOrderItems={salesOrderItems}
                         salesOrderItemOptions={salesOrderItemOptions}
                         shipmentOptions={shipmentOptions}
                         unitOptions={unitOptions}

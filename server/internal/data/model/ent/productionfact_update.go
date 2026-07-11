@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/productionfact"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/warehouse"
 	"time"
@@ -106,6 +107,26 @@ func (_u *ProductionFactUpdate) SetNillableSubjectID(v *int) *ProductionFactUpda
 // AddSubjectID adds value to the "subject_id" field.
 func (_u *ProductionFactUpdate) AddSubjectID(v int) *ProductionFactUpdate {
 	_u.mutation.AddSubjectID(v)
+	return _u
+}
+
+// SetProductSkuID sets the "product_sku_id" field.
+func (_u *ProductionFactUpdate) SetProductSkuID(v int) *ProductionFactUpdate {
+	_u.mutation.SetProductSkuID(v)
+	return _u
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_u *ProductionFactUpdate) SetNillableProductSkuID(v *int) *ProductionFactUpdate {
+	if v != nil {
+		_u.SetProductSkuID(*v)
+	}
+	return _u
+}
+
+// ClearProductSkuID clears the value of the "product_sku_id" field.
+func (_u *ProductionFactUpdate) ClearProductSkuID() *ProductionFactUpdate {
+	_u.mutation.ClearProductSkuID()
 	return _u
 }
 
@@ -273,6 +294,20 @@ func (_u *ProductionFactUpdate) SetNillableOccurredAt(v *time.Time) *ProductionF
 	return _u
 }
 
+// SetOccurredAtSpecified sets the "occurred_at_specified" field.
+func (_u *ProductionFactUpdate) SetOccurredAtSpecified(v bool) *ProductionFactUpdate {
+	_u.mutation.SetOccurredAtSpecified(v)
+	return _u
+}
+
+// SetNillableOccurredAtSpecified sets the "occurred_at_specified" field if the given value is not nil.
+func (_u *ProductionFactUpdate) SetNillableOccurredAtSpecified(v *bool) *ProductionFactUpdate {
+	if v != nil {
+		_u.SetOccurredAtSpecified(*v)
+	}
+	return _u
+}
+
 // SetPostedAt sets the "posted_at" field.
 func (_u *ProductionFactUpdate) SetPostedAt(v time.Time) *ProductionFactUpdate {
 	_u.mutation.SetPostedAt(v)
@@ -329,6 +364,11 @@ func (_u *ProductionFactUpdate) SetUnit(v *Unit) *ProductionFactUpdate {
 	return _u.SetUnitID(v.ID)
 }
 
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_u *ProductionFactUpdate) SetProductSku(v *ProductSKU) *ProductionFactUpdate {
+	return _u.SetProductSkuID(v.ID)
+}
+
 // SetInventoryLotID sets the "inventory_lot" edge to the InventoryLot entity by ID.
 func (_u *ProductionFactUpdate) SetInventoryLotID(id int) *ProductionFactUpdate {
 	_u.mutation.SetInventoryLotID(id)
@@ -362,6 +402,12 @@ func (_u *ProductionFactUpdate) ClearWarehouse() *ProductionFactUpdate {
 // ClearUnit clears the "unit" edge to the Unit entity.
 func (_u *ProductionFactUpdate) ClearUnit() *ProductionFactUpdate {
 	_u.mutation.ClearUnit()
+	return _u
+}
+
+// ClearProductSku clears the "product_sku" edge to the ProductSKU entity.
+func (_u *ProductionFactUpdate) ClearProductSku() *ProductionFactUpdate {
+	_u.mutation.ClearProductSku()
 	return _u
 }
 
@@ -438,6 +484,11 @@ func (_u *ProductionFactUpdate) check() error {
 	if v, ok := _u.mutation.SubjectID(); ok {
 		if err := productionfact.SubjectIDValidator(v); err != nil {
 			return &ValidationError{Name: "subject_id", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.subject_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProductSkuID(); ok {
+		if err := productionfact.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.product_sku_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.WarehouseID(); ok {
@@ -552,6 +603,9 @@ func (_u *ProductionFactUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if value, ok := _u.mutation.OccurredAt(); ok {
 		_spec.SetField(productionfact.FieldOccurredAt, field.TypeTime, value)
 	}
+	if value, ok := _u.mutation.OccurredAtSpecified(); ok {
+		_spec.SetField(productionfact.FieldOccurredAtSpecified, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.PostedAt(); ok {
 		_spec.SetField(productionfact.FieldPostedAt, field.TypeTime, value)
 	}
@@ -618,6 +672,35 @@ func (_u *ProductionFactUpdate) sqlSave(ctx context.Context) (_node int, err err
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(unit.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductSkuCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   productionfact.ProductSkuTable,
+			Columns: []string{productionfact.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   productionfact.ProductSkuTable,
+			Columns: []string{productionfact.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -748,6 +831,26 @@ func (_u *ProductionFactUpdateOne) SetNillableSubjectID(v *int) *ProductionFactU
 // AddSubjectID adds value to the "subject_id" field.
 func (_u *ProductionFactUpdateOne) AddSubjectID(v int) *ProductionFactUpdateOne {
 	_u.mutation.AddSubjectID(v)
+	return _u
+}
+
+// SetProductSkuID sets the "product_sku_id" field.
+func (_u *ProductionFactUpdateOne) SetProductSkuID(v int) *ProductionFactUpdateOne {
+	_u.mutation.SetProductSkuID(v)
+	return _u
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_u *ProductionFactUpdateOne) SetNillableProductSkuID(v *int) *ProductionFactUpdateOne {
+	if v != nil {
+		_u.SetProductSkuID(*v)
+	}
+	return _u
+}
+
+// ClearProductSkuID clears the value of the "product_sku_id" field.
+func (_u *ProductionFactUpdateOne) ClearProductSkuID() *ProductionFactUpdateOne {
+	_u.mutation.ClearProductSkuID()
 	return _u
 }
 
@@ -915,6 +1018,20 @@ func (_u *ProductionFactUpdateOne) SetNillableOccurredAt(v *time.Time) *Producti
 	return _u
 }
 
+// SetOccurredAtSpecified sets the "occurred_at_specified" field.
+func (_u *ProductionFactUpdateOne) SetOccurredAtSpecified(v bool) *ProductionFactUpdateOne {
+	_u.mutation.SetOccurredAtSpecified(v)
+	return _u
+}
+
+// SetNillableOccurredAtSpecified sets the "occurred_at_specified" field if the given value is not nil.
+func (_u *ProductionFactUpdateOne) SetNillableOccurredAtSpecified(v *bool) *ProductionFactUpdateOne {
+	if v != nil {
+		_u.SetOccurredAtSpecified(*v)
+	}
+	return _u
+}
+
 // SetPostedAt sets the "posted_at" field.
 func (_u *ProductionFactUpdateOne) SetPostedAt(v time.Time) *ProductionFactUpdateOne {
 	_u.mutation.SetPostedAt(v)
@@ -971,6 +1088,11 @@ func (_u *ProductionFactUpdateOne) SetUnit(v *Unit) *ProductionFactUpdateOne {
 	return _u.SetUnitID(v.ID)
 }
 
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_u *ProductionFactUpdateOne) SetProductSku(v *ProductSKU) *ProductionFactUpdateOne {
+	return _u.SetProductSkuID(v.ID)
+}
+
 // SetInventoryLotID sets the "inventory_lot" edge to the InventoryLot entity by ID.
 func (_u *ProductionFactUpdateOne) SetInventoryLotID(id int) *ProductionFactUpdateOne {
 	_u.mutation.SetInventoryLotID(id)
@@ -1004,6 +1126,12 @@ func (_u *ProductionFactUpdateOne) ClearWarehouse() *ProductionFactUpdateOne {
 // ClearUnit clears the "unit" edge to the Unit entity.
 func (_u *ProductionFactUpdateOne) ClearUnit() *ProductionFactUpdateOne {
 	_u.mutation.ClearUnit()
+	return _u
+}
+
+// ClearProductSku clears the "product_sku" edge to the ProductSKU entity.
+func (_u *ProductionFactUpdateOne) ClearProductSku() *ProductionFactUpdateOne {
+	_u.mutation.ClearProductSku()
 	return _u
 }
 
@@ -1093,6 +1221,11 @@ func (_u *ProductionFactUpdateOne) check() error {
 	if v, ok := _u.mutation.SubjectID(); ok {
 		if err := productionfact.SubjectIDValidator(v); err != nil {
 			return &ValidationError{Name: "subject_id", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.subject_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProductSkuID(); ok {
+		if err := productionfact.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.product_sku_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.WarehouseID(); ok {
@@ -1224,6 +1357,9 @@ func (_u *ProductionFactUpdateOne) sqlSave(ctx context.Context) (_node *Producti
 	if value, ok := _u.mutation.OccurredAt(); ok {
 		_spec.SetField(productionfact.FieldOccurredAt, field.TypeTime, value)
 	}
+	if value, ok := _u.mutation.OccurredAtSpecified(); ok {
+		_spec.SetField(productionfact.FieldOccurredAtSpecified, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.PostedAt(); ok {
 		_spec.SetField(productionfact.FieldPostedAt, field.TypeTime, value)
 	}
@@ -1290,6 +1426,35 @@ func (_u *ProductionFactUpdateOne) sqlSave(ctx context.Context) (_node *Producti
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(unit.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductSkuCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   productionfact.ProductSkuTable,
+			Columns: []string{productionfact.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   productionfact.ProductSkuTable,
+			Columns: []string{productionfact.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

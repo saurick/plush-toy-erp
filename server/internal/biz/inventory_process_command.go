@@ -6,17 +6,18 @@ import (
 )
 
 const (
-	ProcessDomainCommandInventoryPostInbound              = "inventory.post_inbound"
-	InventoryProcessCommandOutcomeInboundPosted           = "inventory.inbound_posted"
-	inventoryPostInboundProcessCommandBusinessRefType     = "purchase_receipt"
-	inventoryPostInboundProcessCommandPayloadReceiptID    = "purchase_receipt_id"
-	inventoryPostInboundProcessCommandPayloadReceiptNo    = "receipt_no"
-	inventoryPostInboundProcessCommandPayloadWarehouseID  = "warehouse_id"
-	inventoryPostInboundProcessCommandPayloadInventoryLot = "inventory_lot_id"
+	ProcessDomainCommandInventoryPostInbound           = "inventory.post_inbound"
+	InventoryProcessCommandOutcomeInboundPosted        = "inventory.inbound_posted"
+	inventoryPostInboundProcessCommandBusinessRefType  = "purchase_receipt"
+	inventoryPostInboundProcessCommandPayloadReceiptID = "purchase_receipt_id"
 )
 
 type inventoryPostInboundProcessCommandHandler struct {
 	uc *InventoryUsecase
+}
+
+type InventoryPostInboundProcessCommandRepo interface {
+	PostPurchaseReceiptForProcessCommand(ctx context.Context, receiptID int, command *ProcessDomainCommandInput, result *ProcessDomainCommandResult, actorID int) (*PurchaseReceipt, error)
 }
 
 func RegisterInventoryProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, inventoryUC *InventoryUsecase) error {
@@ -29,35 +30,71 @@ func RegisterInventoryProcessDomainCommandHandlers(processRuntimeUC *ProcessRunt
 	)
 }
 
-func (h *inventoryPostInboundProcessCommandHandler) ExecuteProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) (*ProcessDomainCommandResult, error) {
+func (h *inventoryPostInboundProcessCommandHandler) ValidateProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) error {
 	if h == nil || h.uc == nil || in == nil || in.ProcessInstance == nil {
-		return nil, ErrBadParam
+		return ErrBadParam
 	}
 	if strings.TrimSpace(in.CommandKey) != ProcessDomainCommandInventoryPostInbound {
-		return nil, ErrBadParam
+		return ErrBadParam
+	}
+	if err := validateProcessDomainCommandPayloadKeys(in.Payload, inventoryPostInboundProcessCommandPayloadReceiptID); err != nil {
+		return err
 	}
 	receiptID, err := purchaseReceiptIDFromProcessCommandPayload(in.Payload)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if !ProcessInstanceHasBusinessRef(in.ProcessInstance, inventoryPostInboundProcessCommandBusinessRefType, receiptID) {
-		return nil, ErrBadParam
+		return ErrBadParam
 	}
-	if _, hasReceiptNo := in.Payload[inventoryPostInboundProcessCommandPayloadReceiptNo]; hasReceiptNo {
-		if processCommandStringFromPayload(in.Payload, inventoryPostInboundProcessCommandPayloadReceiptNo) == "" {
-			return nil, ErrBadParam
+	receipt, err := h.uc.GetPurchaseReceipt(ctx, receiptID)
+	if err != nil {
+		return err
+	}
+	if receipt == nil || (receipt.Status != PurchaseReceiptStatusDraft && receipt.Status != PurchaseReceiptStatusPosted) {
+		return ErrBadParam
+	}
+	if receipt.Status == PurchaseReceiptStatusDraft {
+		gate, err := h.uc.EvaluatePurchaseReceiptQualityGate(ctx, receiptID)
+		if err != nil {
+			return err
+		}
+		if gate == nil || gate.PurchaseReceiptID != receiptID || gate.TotalLines <= 0 {
+			return ErrBadParam
+		}
+		switch gate.Outcome {
+		case PurchaseReceiptQualityGateReady:
+		case PurchaseReceiptQualityGatePending:
+			return ErrPurchaseReceiptQualityPending
+		case PurchaseReceiptQualityGateRejected:
+			return ErrPurchaseReceiptQualityRejected
+		default:
+			return ErrBadParam
 		}
 	}
-	if _, _, err := processCommandPositiveIntFromPayload(in.Payload, inventoryPostInboundProcessCommandPayloadWarehouseID); err != nil {
+	return nil
+}
+
+func (h *inventoryPostInboundProcessCommandHandler) ExecuteProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) (*ProcessDomainCommandResult, error) {
+	if err := h.ValidateProcessDomainCommand(ctx, in, actorID); err != nil {
 		return nil, err
 	}
-	if _, _, err := processCommandPositiveIntFromPayload(in.Payload, inventoryPostInboundProcessCommandPayloadInventoryLot); err != nil {
-		return nil, err
+	receiptID, _ := purchaseReceiptIDFromProcessCommandPayload(in.Payload)
+	result := &ProcessDomainCommandResult{
+		Outcome:     InventoryProcessCommandOutcomeInboundPosted,
+		EffectState: ProcessDomainCommandEffectStateApplied,
+		EffectRef:   &ProcessBusinessRef{RefType: inventoryPostInboundProcessCommandBusinessRefType, RefID: receiptID},
+	}
+	if repo, ok := h.uc.repo.(InventoryPostInboundProcessCommandRepo); ok {
+		if _, err := repo.PostPurchaseReceiptForProcessCommand(ctx, receiptID, in, result, actorID); err != nil {
+			return nil, err
+		}
+		return result, nil
 	}
 	if _, err := h.uc.PostPurchaseReceipt(ctx, receiptID); err != nil {
 		return nil, err
 	}
-	return &ProcessDomainCommandResult{Outcome: InventoryProcessCommandOutcomeInboundPosted}, nil
+	return result, nil
 }
 
 func purchaseReceiptIDFromProcessCommandPayload(payload map[string]any) (int, error) {

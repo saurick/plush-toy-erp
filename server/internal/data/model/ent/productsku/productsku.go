@@ -48,6 +48,14 @@ const (
 	EdgeSalesOrderItems = "sales_order_items"
 	// EdgeInventoryLots holds the string denoting the inventory_lots edge name in mutations.
 	EdgeInventoryLots = "inventory_lots"
+	// EdgeInventoryTxns holds the string denoting the inventory_txns edge name in mutations.
+	EdgeInventoryTxns = "inventory_txns"
+	// EdgeInventoryBalances holds the string denoting the inventory_balances edge name in mutations.
+	EdgeInventoryBalances = "inventory_balances"
+	// EdgeProductionFacts holds the string denoting the production_facts edge name in mutations.
+	EdgeProductionFacts = "production_facts"
+	// EdgeOutsourcingFacts holds the string denoting the outsourcing_facts edge name in mutations.
+	EdgeOutsourcingFacts = "outsourcing_facts"
 	// EdgeShipmentItems holds the string denoting the shipment_items edge name in mutations.
 	EdgeShipmentItems = "shipment_items"
 	// EdgeStockReservations holds the string denoting the stock_reservations edge name in mutations.
@@ -82,6 +90,34 @@ const (
 	InventoryLotsInverseTable = "inventory_lots"
 	// InventoryLotsColumn is the table column denoting the inventory_lots relation/edge.
 	InventoryLotsColumn = "product_sku_id"
+	// InventoryTxnsTable is the table that holds the inventory_txns relation/edge.
+	InventoryTxnsTable = "inventory_txns"
+	// InventoryTxnsInverseTable is the table name for the InventoryTxn entity.
+	// It exists in this package in order to avoid circular dependency with the "inventorytxn" package.
+	InventoryTxnsInverseTable = "inventory_txns"
+	// InventoryTxnsColumn is the table column denoting the inventory_txns relation/edge.
+	InventoryTxnsColumn = "product_sku_id"
+	// InventoryBalancesTable is the table that holds the inventory_balances relation/edge.
+	InventoryBalancesTable = "inventory_balances"
+	// InventoryBalancesInverseTable is the table name for the InventoryBalance entity.
+	// It exists in this package in order to avoid circular dependency with the "inventorybalance" package.
+	InventoryBalancesInverseTable = "inventory_balances"
+	// InventoryBalancesColumn is the table column denoting the inventory_balances relation/edge.
+	InventoryBalancesColumn = "product_sku_id"
+	// ProductionFactsTable is the table that holds the production_facts relation/edge.
+	ProductionFactsTable = "production_facts"
+	// ProductionFactsInverseTable is the table name for the ProductionFact entity.
+	// It exists in this package in order to avoid circular dependency with the "productionfact" package.
+	ProductionFactsInverseTable = "production_facts"
+	// ProductionFactsColumn is the table column denoting the production_facts relation/edge.
+	ProductionFactsColumn = "product_sku_id"
+	// OutsourcingFactsTable is the table that holds the outsourcing_facts relation/edge.
+	OutsourcingFactsTable = "outsourcing_facts"
+	// OutsourcingFactsInverseTable is the table name for the OutsourcingFact entity.
+	// It exists in this package in order to avoid circular dependency with the "outsourcingfact" package.
+	OutsourcingFactsInverseTable = "outsourcing_facts"
+	// OutsourcingFactsColumn is the table column denoting the outsourcing_facts relation/edge.
+	OutsourcingFactsColumn = "product_sku_id"
 	// ShipmentItemsTable is the table that holds the shipment_items relation/edge.
 	ShipmentItemsTable = "shipment_items"
 	// ShipmentItemsInverseTable is the table name for the ShipmentItem entity.
@@ -272,6 +308,62 @@ func ByInventoryLots(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByInventoryTxnsCount orders the results by inventory_txns count.
+func ByInventoryTxnsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newInventoryTxnsStep(), opts...)
+	}
+}
+
+// ByInventoryTxns orders the results by inventory_txns terms.
+func ByInventoryTxns(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newInventoryTxnsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByInventoryBalancesCount orders the results by inventory_balances count.
+func ByInventoryBalancesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newInventoryBalancesStep(), opts...)
+	}
+}
+
+// ByInventoryBalances orders the results by inventory_balances terms.
+func ByInventoryBalances(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newInventoryBalancesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByProductionFactsCount orders the results by production_facts count.
+func ByProductionFactsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newProductionFactsStep(), opts...)
+	}
+}
+
+// ByProductionFacts orders the results by production_facts terms.
+func ByProductionFacts(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProductionFactsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByOutsourcingFactsCount orders the results by outsourcing_facts count.
+func ByOutsourcingFactsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newOutsourcingFactsStep(), opts...)
+	}
+}
+
+// ByOutsourcingFacts orders the results by outsourcing_facts terms.
+func ByOutsourcingFacts(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newOutsourcingFactsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByShipmentItemsCount orders the results by shipment_items count.
 func ByShipmentItemsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -325,6 +417,34 @@ func newInventoryLotsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(InventoryLotsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, InventoryLotsTable, InventoryLotsColumn),
+	)
+}
+func newInventoryTxnsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(InventoryTxnsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, InventoryTxnsTable, InventoryTxnsColumn),
+	)
+}
+func newInventoryBalancesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(InventoryBalancesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, InventoryBalancesTable, InventoryBalancesColumn),
+	)
+}
+func newProductionFactsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProductionFactsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ProductionFactsTable, ProductionFactsColumn),
+	)
+}
+func newOutsourcingFactsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(OutsourcingFactsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, OutsourcingFactsTable, OutsourcingFactsColumn),
 	)
 }
 func newShipmentItemsStep() *sqlgraph.Step {

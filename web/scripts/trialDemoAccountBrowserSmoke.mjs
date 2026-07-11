@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 
 import { chromium } from 'playwright'
 import { yoyoosunMenuConfig } from '../../config/customers/yoyoosun/menuConfig.mjs'
+import { yoyoosunRoleFlowMatrix } from '../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 import { businessModuleDefinitions } from '../src/erp/config/businessModules.mjs'
 import { navigationItemRegistry } from '../src/erp/config/seedData.mjs'
 import { getRoleDisplayName } from '../src/erp/utils/roleKeys.mjs'
@@ -73,69 +74,68 @@ const oldEntryLabels = [
   '高级文档',
 ]
 
+const menuLabelByKey = new Map([
+  ...Object.values(navigationItemRegistry).map((item) => [
+    item.key,
+    item.label,
+  ]),
+  ...businessModuleDefinitions.map((item) => [item.key, item.label]),
+])
+
+function expectedMenusForRole(roleKey) {
+  const profile = yoyoosunRoleFlowMatrix.roles.find(
+    (item) => item.roleKey === roleKey
+  )
+  assert(profile, `missing yoyoosun role projection: ${roleKey}`)
+  return profile.menuSurfaces
+    .map((pageKey) => menuLabelByKey.get(pageKey))
+    .filter(Boolean)
+}
+
 const desktopAccounts = [
   {
     username: 'demo_boss',
-    expectedMenus: ['工作台', '任务看板', '客户档案', '供应商档案', '销售订单'],
+    expectedMenus: expectedMenusForRole('boss'),
     forbiddenMenus: ['权限管理'],
   },
   {
     username: 'demo_sales',
-    expectedMenus: ['工作台', '任务看板', '客户档案', '销售订单'],
+    expectedMenus: expectedMenusForRole('sales'),
     forbiddenMenus: ['权限管理'],
   },
   {
     username: 'demo_purchase',
-    expectedMenus: [
-      '工作台',
-      '任务看板',
-      '供应商档案',
-      '采购订单',
-      '模板打印中心',
-    ],
+    expectedMenus: expectedMenusForRole('purchase'),
     forbiddenMenus: ['权限管理'],
   },
   {
     username: 'demo_production',
-    expectedMenus: ['工作台', '任务看板', '产品档案', '生产进度'],
+    expectedMenus: expectedMenusForRole('production'),
     forbiddenMenus: ['权限管理'],
   },
   {
     username: 'demo_warehouse',
-    expectedMenus: ['工作台', '任务看板', '入库管理', '库存台账', '出货单'],
+    expectedMenus: expectedMenusForRole('warehouse'),
     forbiddenMenus: ['权限管理'],
   },
   {
     username: 'demo_quality',
-    expectedMenus: ['工作台', '任务看板', '来料质检'],
+    expectedMenus: expectedMenusForRole('quality'),
     forbiddenMenus: ['权限管理'],
   },
   {
     username: 'demo_finance',
-    expectedMenus: [
-      '工作台',
-      '任务看板',
-      '对账管理',
-      '应收管理',
-      '模板打印中心',
-    ],
+    expectedMenus: expectedMenusForRole('finance'),
     forbiddenMenus: ['权限管理'],
   },
   {
     username: 'demo_pmc',
-    expectedMenus: ['工作台', '任务看板', 'BOM 管理', '生产进度'],
+    expectedMenus: expectedMenusForRole('pmc'),
     forbiddenMenus: ['权限管理'],
   },
   {
     username: 'demo_engineering',
-    expectedMenus: [
-      '工作台',
-      '任务看板',
-      '产品档案',
-      '材料档案',
-      '加工环节',
-      'BOM 管理',
-    ],
+    expectedMenus: expectedMenusForRole('engineering'),
     forbiddenMenus: ['权限管理'],
   },
   {
@@ -167,13 +167,6 @@ const mobileAccounts = [
   ['demo_engineering', 'engineering'],
 ]
 
-const menuLabelByKey = new Map([
-  ...Object.values(navigationItemRegistry).map((item) => [
-    item.key,
-    item.label,
-  ]),
-  ...businessModuleDefinitions.map((item) => [item.key, item.label]),
-])
 const hiddenCustomerMenuLabels = (
   yoyoosunMenuConfig.desktopMenu?.hiddenItemKeys || []
 )

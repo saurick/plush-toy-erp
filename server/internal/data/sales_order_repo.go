@@ -7,6 +7,7 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/unit"
@@ -28,6 +29,8 @@ func NewSalesOrderRepo(d *Data, logger log.Logger) *salesOrderRepo {
 }
 
 var _ biz.SalesOrderRepo = (*salesOrderRepo)(nil)
+var _ biz.SalesOrderSubmitProcessCommandRepo = (*salesOrderRepo)(nil)
+var _ biz.SalesOrderCancellationActorRepo = (*salesOrderRepo)(nil)
 
 func (r *salesOrderRepo) CreateSalesOrder(ctx context.Context, in *biz.SalesOrderMutation) (*biz.SalesOrder, error) {
 	row, err := r.data.postgres.SalesOrder.Create().
@@ -183,6 +186,9 @@ func salesOrderSortOrder(filter biz.SalesOrderFilter) salesorder.OrderOption {
 }
 
 func (r *salesOrderRepo) UpdateSalesOrderLifecycle(ctx context.Context, id int, lifecycleStatus string) (*biz.SalesOrder, error) {
+	if lifecycleStatus == biz.SalesOrderStatusCanceled {
+		return r.cancelSalesOrderLifecycle(ctx, id, 0)
+	}
 	allowedCurrent := salesOrderLifecyclePredecessors(lifecycleStatus)
 	if len(allowedCurrent) == 0 {
 		return nil, biz.ErrBadParam
@@ -206,6 +212,113 @@ func (r *salesOrderRepo) UpdateSalesOrderLifecycle(ctx context.Context, id int, 
 	}
 	if affected == 0 && row.LifecycleStatus != lifecycleStatus {
 		return nil, biz.ErrBadParam
+	}
+	return entSalesOrderToBiz(row), nil
+}
+
+func (r *salesOrderRepo) CancelSalesOrderWithActor(ctx context.Context, id int, actorID int) (*biz.SalesOrder, error) {
+	if actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	return r.cancelSalesOrderLifecycle(ctx, id, actorID)
+}
+
+func (r *salesOrderRepo) SubmitSalesOrderForProcessCommand(
+	ctx context.Context,
+	salesOrderID int,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+) (*biz.SalesOrder, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || salesOrderID <= 0 || command == nil || result == nil {
+		return nil, biz.ErrBadParam
+	}
+	record, err := biz.BuildProcessNodeDomainCommandResultRecord(command, result)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+	affected, err := tx.SalesOrder.Update().
+		Where(salesorder.ID(salesOrderID), salesorder.LifecycleStatus(biz.SalesOrderStatusDraft)).
+		SetLifecycleStatus(biz.SalesOrderStatusSubmitted).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	row, err := tx.SalesOrder.Get(ctx, salesOrderID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSalesOrderNotFound
+		}
+		return nil, err
+	}
+	if affected == 0 {
+		if row.LifecycleStatus != biz.SalesOrderStatusSubmitted {
+			return nil, biz.ErrBadParam
+		}
+		node, err := getProcessNodeInstanceWithClient(ctx, tx.Client(), record.ProcessNodeInstanceID)
+		if err != nil {
+			return nil, err
+		}
+		if node.DomainCommandResultHash == nil {
+			// A submitted order alone cannot prove that this exact command caused
+			// the transition; legacy result-missing rows require explicit review.
+			return nil, biz.ErrProcessDomainCommandRecoveryRequired
+		}
+	}
+	if _, err := recordProcessNodeDomainCommandResultWithClient(ctx, tx.Client(), record, actorID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return entSalesOrderToBiz(row), nil
+}
+
+func (r *salesOrderRepo) cancelSalesOrderLifecycle(ctx context.Context, id int, actorID int) (*biz.SalesOrder, error) {
+	allowedCurrent := salesOrderLifecyclePredecessors(biz.SalesOrderStatusCanceled)
+	if len(allowedCurrent) == 0 {
+		return nil, biz.ErrBadParam
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+	affected, err := tx.SalesOrder.Update().
+		Where(salesorder.ID(id), salesorder.LifecycleStatusIn(allowedCurrent...)).
+		SetLifecycleStatus(biz.SalesOrderStatusCanceled).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	row, err := tx.SalesOrder.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSalesOrderNotFound
+		}
+		return nil, err
+	}
+	if affected == 0 && row.LifecycleStatus != biz.SalesOrderStatusCanceled {
+		return nil, biz.ErrBadParam
+	}
+	if err := markProcessDomainCommandEffectCompensatedWithClient(
+		ctx,
+		tx.Client(),
+		biz.ProcessDomainCommandSalesOrderSubmit,
+		"sales_order",
+		id,
+		"销售订单已取消，原提交流程结果需要核对",
+		actorID,
+	); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 	return entSalesOrderToBiz(row), nil
 }
@@ -547,6 +660,17 @@ func (r *salesOrderRepo) ProductIsActive(ctx context.Context, id int) (bool, err
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return false, biz.ErrProductNotFound
+		}
+		return false, err
+	}
+	return row.IsActive, nil
+}
+
+func (r *salesOrderRepo) ProductSKUIsActiveForProduct(ctx context.Context, skuID int, productID int) (bool, error) {
+	row, err := r.data.postgres.ProductSKU.Query().Where(productsku.ID(skuID), productsku.ProductID(productID)).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return false, biz.ErrProductSKUNotFound
 		}
 		return false, err
 	}

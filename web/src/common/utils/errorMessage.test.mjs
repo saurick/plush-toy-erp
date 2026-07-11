@@ -93,6 +93,26 @@ test('errorMessage: 已知错误码优先走现有中文码表', () => {
     ),
     DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_REQUIRED]
   )
+  assert.equal(
+    getUserFacingErrorMessage(
+      {
+        message: 'idempotency key payload conflict',
+        code: RpcErrorCode.IDEMPOTENCY_CONFLICT,
+      },
+      '保存失败，请稍后重试'
+    ),
+    '重复请求内容与首次提交不一致，请刷新后重试'
+  )
+  assert.equal(
+    getUserFacingErrorMessage(
+      {
+        message: 'process domain command recovery requires explicit review',
+        code: RpcErrorCode.PROCESS_DOMAIN_COMMAND_RECOVERY_REQUIRED,
+      },
+      '提交失败，请稍后重试'
+    ),
+    '此前业务处理结果需要人工核对，当前流程暂时无法继续，请联系管理员'
+  )
 })
 
 test('errorMessage: 短信登录错误码显示精确中文提示', () => {

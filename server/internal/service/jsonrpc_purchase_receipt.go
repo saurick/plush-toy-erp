@@ -11,6 +11,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 	ctx context.Context,
 	method, id string,
 	pm map[string]any,
+	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
 	case "create_purchase_receipt_draft", "createPurchaseReceiptDraft":
@@ -85,7 +86,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "inventory"); res != nil {
 			return id, res, nil
 		}
-		item, err := d.inventoryUC.CancelPostedPurchaseReceipt(ctx, getInt(pm, "id", 0))
+		item, err := d.inventoryUC.CancelPostedPurchaseReceiptWithActor(ctx, getInt(pm, "id", 0), actorID)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
 	case "get_purchase_receipt", "getPurchaseReceipt":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptRead, biz.PermissionWarehouseInboundRead); res != nil {

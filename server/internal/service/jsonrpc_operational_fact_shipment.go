@@ -11,6 +11,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 	ctx context.Context,
 	method, id string,
 	pm map[string]any,
+	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
 	case "create_shipment", "createShipment":
@@ -64,7 +65,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments", "inventory"); res != nil {
 			return id, res, nil
 		}
-		item, err := d.operationalFactUC.CancelShippedShipment(ctx, getInt(pm, "id", 0))
+		item, err := d.operationalFactUC.CancelShippedShipmentWithActor(ctx, getInt(pm, "id", 0), actorID)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "list_shipments", "listShipments":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentRead); res != nil {

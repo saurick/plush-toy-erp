@@ -233,12 +233,12 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
     (account) => account.username === 'demo_engineering'
   )
   assert.deepEqual(engineeringPlan.visibleExpectedMenus, [
-    '工作台',
-    '任务看板',
     '产品档案',
     '材料档案',
     '加工环节',
     'BOM 管理',
+    '任务看板',
+    '模板打印中心',
   ])
   assert.match(
     template.commands.join('\n'),

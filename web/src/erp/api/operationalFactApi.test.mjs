@@ -31,7 +31,6 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
     'list_stock_reservations',
     'create_stock_reservation',
     'release_stock_reservation',
-    'consume_stock_reservation',
     'list_finance_facts',
     'create_finance_fact',
     'post_finance_fact',
@@ -40,6 +39,8 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
   ]) {
     assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
   }
+
+  assert.doesNotMatch(source, /consume_stock_reservation/)
 
   for (const forbiddenName of [
     'business_records',

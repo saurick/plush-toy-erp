@@ -7008,6 +7008,9 @@ async function assertBusinessHeaderStatsSingleLine(
     allowWrappedStats = false,
   }
 ) {
+  await page
+    .locator('.erp-business-page-header-card .erp-business-module-stats')
+    .waitFor({ state: 'visible', timeout: 20000 })
   const metrics = await page.evaluate(() => {
     const header = document.querySelector('.erp-business-page-header-card')
     const headerRect = header?.getBoundingClientRect()

@@ -25,6 +25,7 @@ func TestFinishedGoodsDeliveryProcessRunsLocalGoldenChain(t *testing.T) {
 		shipment: &Shipment{
 			ID:         9001,
 			ShipmentNo: "SHIP-GOLDEN-001",
+			CustomerID: processTestIntPtr(501),
 			Status:     ShipmentStatusDraft,
 		},
 	}
@@ -137,11 +138,7 @@ func TestFinishedGoodsDeliveryProcessRunsLocalGoldenChain(t *testing.T) {
 		CommandKey:            ProcessDomainCommandShipmentFinanceRelease,
 		IdempotencyKey:        "process:31:node:42:finance-release",
 		Payload: map[string]any{
-			"shipment_id":        float64(9001),
-			"finance_release_no": "FR-GOLDEN-001",
-			"approved_by_id":     float64(7001),
-			"released_at":        "2026-06-30",
-			"release_note":       "本地黄金链路财务放行",
+			"shipment_id": float64(9001),
 		},
 	})
 	if financeReleaseNode.Outcome == nil || *financeReleaseNode.Outcome != ShipmentProcessCommandOutcomeFinanceReleased {
@@ -159,14 +156,7 @@ func TestFinishedGoodsDeliveryProcessRunsLocalGoldenChain(t *testing.T) {
 		CommandKey:            ProcessDomainCommandShipmentShip,
 		IdempotencyKey:        "process:31:node:43:shipment-ship",
 		Payload: map[string]any{
-			"shipment_id":  float64(9001),
-			"shipment_no":  "SHIP-GOLDEN-001",
-			"warehouse_id": float64(7001),
-			"operator_id":  float64(7002),
-			"shipped_at":   "2026-06-30",
-			"carrier":      "本地测试承运商",
-			"tracking_no":  "TRACK-GOLDEN-001",
-			"ship_note":    "本地黄金链路显式出货",
+			"shipment_id": float64(9001),
 		},
 	})
 	if shipmentNode.Outcome == nil || *shipmentNode.Outcome != ShipmentProcessCommandOutcomeShipped {
@@ -185,11 +175,9 @@ func TestFinishedGoodsDeliveryProcessRunsLocalGoldenChain(t *testing.T) {
 		IdempotencyKey:        "process:31:node:44:receivable-lead",
 		Payload: map[string]any{
 			"shipment_id":          float64(9001),
-			"customer_id":          float64(501),
 			"receivable_source_no": "AR-GOLDEN-001",
 			"currency":             "CNY",
 			"expected_amount":      "12888.00",
-			"due_date":             "2026-07-31",
 			"lead_note":            "本地黄金链路应收草稿",
 		},
 	})

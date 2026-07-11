@@ -1,6 +1,19 @@
 .git
 .DS_Store
 
+# 客户资料、交付证据和仓库文档不参与镜像构建上下文。
+docs
+deployments
+config/customers/**/assets
+
+# 本机运行配置和私有 registry 配置不得进入镜像构建上下文。
+**/.env
+**/.env.*
+!**/.env.example
+!web/.env.development
+!web/.env.production
+**/.npmrc.local
+
 # 本地依赖、构建产物和 QA 输出不进入镜像构建上下文。
 **/node_modules
 **/.vite-cache

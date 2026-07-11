@@ -47,6 +47,34 @@ type ProcessNodeInstance struct {
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	// Outcome holds the value of the "outcome" field.
 	Outcome *string `json:"outcome,omitempty"`
+	// DomainCommandFingerprint holds the value of the "domain_command_fingerprint" field.
+	DomainCommandFingerprint *string `json:"domain_command_fingerprint,omitempty"`
+	// DomainCommandProtocolVersion holds the value of the "domain_command_protocol_version" field.
+	DomainCommandProtocolVersion *int `json:"domain_command_protocol_version,omitempty"`
+	// DomainCommandResultState holds the value of the "domain_command_result_state" field.
+	DomainCommandResultState *string `json:"domain_command_result_state,omitempty"`
+	// DomainCommandResult holds the value of the "domain_command_result" field.
+	DomainCommandResult map[string]interface{} `json:"domain_command_result,omitempty"`
+	// DomainCommandResultHash holds the value of the "domain_command_result_hash" field.
+	DomainCommandResultHash *string `json:"domain_command_result_hash,omitempty"`
+	// DomainCommandEffectState holds the value of the "domain_command_effect_state" field.
+	DomainCommandEffectState *string `json:"domain_command_effect_state,omitempty"`
+	// DomainCommandEffectRefType holds the value of the "domain_command_effect_ref_type" field.
+	DomainCommandEffectRefType *string `json:"domain_command_effect_ref_type,omitempty"`
+	// DomainCommandEffectRefID holds the value of the "domain_command_effect_ref_id" field.
+	DomainCommandEffectRefID *int `json:"domain_command_effect_ref_id,omitempty"`
+	// DomainCommandResultRecordedAt holds the value of the "domain_command_result_recorded_at" field.
+	DomainCommandResultRecordedAt *time.Time `json:"domain_command_result_recorded_at,omitempty"`
+	// DomainCommandResultRecordedBy holds the value of the "domain_command_result_recorded_by" field.
+	DomainCommandResultRecordedBy *int `json:"domain_command_result_recorded_by,omitempty"`
+	// DomainCommandCompensation holds the value of the "domain_command_compensation" field.
+	DomainCommandCompensation map[string]interface{} `json:"domain_command_compensation,omitempty"`
+	// DomainCommandCompensationHash holds the value of the "domain_command_compensation_hash" field.
+	DomainCommandCompensationHash *string `json:"domain_command_compensation_hash,omitempty"`
+	// DomainCommandCompensatedAt holds the value of the "domain_command_compensated_at" field.
+	DomainCommandCompensatedAt *time.Time `json:"domain_command_compensated_at,omitempty"`
+	// DomainCommandCompensatedBy holds the value of the "domain_command_compensated_by" field.
+	DomainCommandCompensatedBy *int `json:"domain_command_compensated_by,omitempty"`
 	// Version holds the value of the "version" field.
 	Version int `json:"version,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -84,13 +112,13 @@ func (*ProcessNodeInstance) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case processnodeinstance.FieldPolicySnapshot:
+		case processnodeinstance.FieldPolicySnapshot, processnodeinstance.FieldDomainCommandResult, processnodeinstance.FieldDomainCommandCompensation:
 			values[i] = new([]byte)
-		case processnodeinstance.FieldID, processnodeinstance.FieldProcessInstanceID, processnodeinstance.FieldAttempt, processnodeinstance.FieldVersion:
+		case processnodeinstance.FieldID, processnodeinstance.FieldProcessInstanceID, processnodeinstance.FieldAttempt, processnodeinstance.FieldDomainCommandProtocolVersion, processnodeinstance.FieldDomainCommandEffectRefID, processnodeinstance.FieldDomainCommandResultRecordedBy, processnodeinstance.FieldDomainCommandCompensatedBy, processnodeinstance.FieldVersion:
 			values[i] = new(sql.NullInt64)
-		case processnodeinstance.FieldNodeKey, processnodeinstance.FieldNodeType, processnodeinstance.FieldStatus, processnodeinstance.FieldOwnerPoolKey, processnodeinstance.FieldRequiredCapabilityKey, processnodeinstance.FieldFormProfileKey, processnodeinstance.FieldActionSetKey, processnodeinstance.FieldOutcome:
+		case processnodeinstance.FieldNodeKey, processnodeinstance.FieldNodeType, processnodeinstance.FieldStatus, processnodeinstance.FieldOwnerPoolKey, processnodeinstance.FieldRequiredCapabilityKey, processnodeinstance.FieldFormProfileKey, processnodeinstance.FieldActionSetKey, processnodeinstance.FieldOutcome, processnodeinstance.FieldDomainCommandFingerprint, processnodeinstance.FieldDomainCommandResultState, processnodeinstance.FieldDomainCommandResultHash, processnodeinstance.FieldDomainCommandEffectState, processnodeinstance.FieldDomainCommandEffectRefType, processnodeinstance.FieldDomainCommandCompensationHash:
 			values[i] = new(sql.NullString)
-		case processnodeinstance.FieldDueAt, processnodeinstance.FieldStartedAt, processnodeinstance.FieldCompletedAt, processnodeinstance.FieldCreatedAt, processnodeinstance.FieldUpdatedAt:
+		case processnodeinstance.FieldDueAt, processnodeinstance.FieldStartedAt, processnodeinstance.FieldCompletedAt, processnodeinstance.FieldDomainCommandResultRecordedAt, processnodeinstance.FieldDomainCommandCompensatedAt, processnodeinstance.FieldCreatedAt, processnodeinstance.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -207,6 +235,106 @@ func (_m *ProcessNodeInstance) assignValues(columns []string, values []any) erro
 				_m.Outcome = new(string)
 				*_m.Outcome = value.String
 			}
+		case processnodeinstance.FieldDomainCommandFingerprint:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_fingerprint", values[i])
+			} else if value.Valid {
+				_m.DomainCommandFingerprint = new(string)
+				*_m.DomainCommandFingerprint = value.String
+			}
+		case processnodeinstance.FieldDomainCommandProtocolVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_protocol_version", values[i])
+			} else if value.Valid {
+				_m.DomainCommandProtocolVersion = new(int)
+				*_m.DomainCommandProtocolVersion = int(value.Int64)
+			}
+		case processnodeinstance.FieldDomainCommandResultState:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_result_state", values[i])
+			} else if value.Valid {
+				_m.DomainCommandResultState = new(string)
+				*_m.DomainCommandResultState = value.String
+			}
+		case processnodeinstance.FieldDomainCommandResult:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_result", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.DomainCommandResult); err != nil {
+					return fmt.Errorf("unmarshal field domain_command_result: %w", err)
+				}
+			}
+		case processnodeinstance.FieldDomainCommandResultHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_result_hash", values[i])
+			} else if value.Valid {
+				_m.DomainCommandResultHash = new(string)
+				*_m.DomainCommandResultHash = value.String
+			}
+		case processnodeinstance.FieldDomainCommandEffectState:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_effect_state", values[i])
+			} else if value.Valid {
+				_m.DomainCommandEffectState = new(string)
+				*_m.DomainCommandEffectState = value.String
+			}
+		case processnodeinstance.FieldDomainCommandEffectRefType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_effect_ref_type", values[i])
+			} else if value.Valid {
+				_m.DomainCommandEffectRefType = new(string)
+				*_m.DomainCommandEffectRefType = value.String
+			}
+		case processnodeinstance.FieldDomainCommandEffectRefID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_effect_ref_id", values[i])
+			} else if value.Valid {
+				_m.DomainCommandEffectRefID = new(int)
+				*_m.DomainCommandEffectRefID = int(value.Int64)
+			}
+		case processnodeinstance.FieldDomainCommandResultRecordedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_result_recorded_at", values[i])
+			} else if value.Valid {
+				_m.DomainCommandResultRecordedAt = new(time.Time)
+				*_m.DomainCommandResultRecordedAt = value.Time
+			}
+		case processnodeinstance.FieldDomainCommandResultRecordedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_result_recorded_by", values[i])
+			} else if value.Valid {
+				_m.DomainCommandResultRecordedBy = new(int)
+				*_m.DomainCommandResultRecordedBy = int(value.Int64)
+			}
+		case processnodeinstance.FieldDomainCommandCompensation:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_compensation", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.DomainCommandCompensation); err != nil {
+					return fmt.Errorf("unmarshal field domain_command_compensation: %w", err)
+				}
+			}
+		case processnodeinstance.FieldDomainCommandCompensationHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_compensation_hash", values[i])
+			} else if value.Valid {
+				_m.DomainCommandCompensationHash = new(string)
+				*_m.DomainCommandCompensationHash = value.String
+			}
+		case processnodeinstance.FieldDomainCommandCompensatedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_compensated_at", values[i])
+			} else if value.Valid {
+				_m.DomainCommandCompensatedAt = new(time.Time)
+				*_m.DomainCommandCompensatedAt = value.Time
+			}
+		case processnodeinstance.FieldDomainCommandCompensatedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_compensated_by", values[i])
+			} else if value.Valid {
+				_m.DomainCommandCompensatedBy = new(int)
+				*_m.DomainCommandCompensatedBy = int(value.Int64)
+			}
 		case processnodeinstance.FieldVersion:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field version", values[i])
@@ -322,6 +450,72 @@ func (_m *ProcessNodeInstance) String() string {
 	if v := _m.Outcome; v != nil {
 		builder.WriteString("outcome=")
 		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DomainCommandFingerprint; v != nil {
+		builder.WriteString("domain_command_fingerprint=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DomainCommandProtocolVersion; v != nil {
+		builder.WriteString("domain_command_protocol_version=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.DomainCommandResultState; v != nil {
+		builder.WriteString("domain_command_result_state=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	builder.WriteString("domain_command_result=")
+	builder.WriteString(fmt.Sprintf("%v", _m.DomainCommandResult))
+	builder.WriteString(", ")
+	if v := _m.DomainCommandResultHash; v != nil {
+		builder.WriteString("domain_command_result_hash=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DomainCommandEffectState; v != nil {
+		builder.WriteString("domain_command_effect_state=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DomainCommandEffectRefType; v != nil {
+		builder.WriteString("domain_command_effect_ref_type=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DomainCommandEffectRefID; v != nil {
+		builder.WriteString("domain_command_effect_ref_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.DomainCommandResultRecordedAt; v != nil {
+		builder.WriteString("domain_command_result_recorded_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.DomainCommandResultRecordedBy; v != nil {
+		builder.WriteString("domain_command_result_recorded_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("domain_command_compensation=")
+	builder.WriteString(fmt.Sprintf("%v", _m.DomainCommandCompensation))
+	builder.WriteString(", ")
+	if v := _m.DomainCommandCompensationHash; v != nil {
+		builder.WriteString("domain_command_compensation_hash=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DomainCommandCompensatedAt; v != nil {
+		builder.WriteString("domain_command_compensated_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.DomainCommandCompensatedBy; v != nil {
+		builder.WriteString("domain_command_compensated_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
 	builder.WriteString("version=")

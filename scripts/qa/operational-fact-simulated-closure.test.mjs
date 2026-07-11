@@ -23,6 +23,8 @@ const execFile = promisify(execFileWithCallback);
 
 test("operational fact simulated closure plan marks data as simulated and excludes customer acceptance blocker", () => {
   const options = parseCliArgs([
+    "--customer-id",
+    "4",
     "--product-id",
     "1",
     "--unit-id",
@@ -39,21 +41,33 @@ test("operational fact simulated closure plan marks data as simulated and exclud
   assert.equal(plan.realCustomerImport, false);
   assert.equal(plan.customerAcceptanceRequiredForClosure, false);
   assert.deepEqual(plan.ids, {
+    customerId: 4,
     productId: 1,
     unitId: 2,
     warehouseId: 3,
   });
-  assert.match(plan.records.productionReceipt.fact_no, /^SIM-YOYOOSUN-OPFACT-/u);
-  assert.equal(plan.records.productionReceipt.fact_type, "FINISHED_GOODS_RECEIPT");
+  assert.match(
+    plan.records.productionReceipt.fact_no,
+    /^SIM-YOYOOSUN-OPFACT-/u,
+  );
+  assert.equal(
+    plan.records.productionReceipt.fact_type,
+    "FINISHED_GOODS_RECEIPT",
+  );
   assert.equal(plan.records.outsourcingIssue.fact_type, "MATERIAL_ISSUE");
   assert.equal(plan.records.financeSettle.fact_type, "RECEIVABLE");
   assert.equal(plan.records.financeCancel.fact_type, "INVOICE");
+  assert.equal(plan.records.shipment.customer_id, 4);
+  assert.equal(plan.records.financeSettle.counterparty_id, 4);
+  assert.match(plan.records.shipment.note, /手工测试/u);
 });
 
 test("operational fact simulated closure refuses real import style flags", () => {
   assert.throws(
     () =>
       parseCliArgs([
+        "--customer-id",
+        "1",
         "--product-id",
         "1",
         "--unit-id",
@@ -72,6 +86,8 @@ test("operational fact simulated closure rejects credentialed backend URL", () =
       parseCliArgs([
         "--backend-url",
         "http://demo:secret@127.0.0.1:8300",
+        "--customer-id",
+        "1",
         "--product-id",
         "1",
         "--unit-id",
@@ -89,6 +105,7 @@ test("operational fact simulated closure requires positive ids", () => {
       buildPlan({
         backendURL: "http://127.0.0.1:8300",
         runId: "T",
+        customerId: 1,
         productId: 1,
         unitId: 1,
       }),
@@ -119,8 +136,18 @@ test("operational fact simulated closure input template is no-write", () => {
   assert.equal(template.downstreamReportOnlyWritesReports, true);
   assert.equal(template.downstreamApplyWritesDatabase, true);
   assert.match(template.commands.printInputTemplate, /--print-input-template/u);
-  assert.match(template.commands.reportOnly, /--product-id <active_product_id>/u);
-  assert.match(template.commands.applySimulated, /OPERATIONAL_FACT_SIM_CONFIRM/u);
+  assert.match(
+    template.commands.reportOnly,
+    /--product-id <active_product_id>/u,
+  );
+  assert.match(
+    template.commands.reportOnly,
+    /--customer-id <active_customer_id>/u,
+  );
+  assert.match(
+    template.commands.applySimulated,
+    /OPERATIONAL_FACT_SIM_CONFIRM/u,
+  );
   assert.match(template.boundary, /does not write reports/u);
 });
 
@@ -137,7 +164,16 @@ test("operational fact simulated closure CLI input template does not require IDs
 
   assert.equal(template.scope, INPUT_TEMPLATE_SCOPE);
   assert.equal(template.writesReports, false);
-  assert.equal(template.requiredReportInputs.includes("--product-id <active_product_id>"), true);
+  assert.equal(
+    template.requiredReportInputs.includes("--product-id <active_product_id>"),
+    true,
+  );
+  assert.equal(
+    template.requiredReportInputs.includes(
+      "--customer-id <active_customer_id>",
+    ),
+    true,
+  );
   await assert.rejects(() => access(out), /ENOENT/u);
 });
 

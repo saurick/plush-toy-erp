@@ -66,6 +66,7 @@ import {
   buildEffectiveSessionDiagnosticSummary,
   filterNavigationSectionsByAdminProfile,
   getAdminProfileSyncErrorAction,
+  hasExpectedCustomerRuntime,
   resolveEffectiveSessionCustomerKey,
   shouldRedirectFromCurrentNavigation,
   shouldGuardCustomerBusinessPageRuntime,
@@ -200,6 +201,36 @@ function ProductCoreCapabilityReview({ currentEntry }) {
   )
 }
 
+function CustomerRuntimeUnavailable({
+  customerName,
+  loggingOut,
+  onRetry,
+  onLogout,
+}) {
+  return (
+    <Layout className="erp-admin-shell" data-customer-runtime-boundary="true">
+      <Content className="erp-admin-content">
+        <div className="erp-admin-outlet">
+          <Alert
+            type="error"
+            showIcon
+            message="暂时无法进入客户工作台"
+            description={`尚未确认${customerName}的访问范围和业务数据。为避免显示错误内容，系统没有加载业务页面；请重试或退出后重新登录。`}
+            action={
+              <Space size={8} wrap>
+                <Button onClick={onRetry}>重试</Button>
+                <Button loading={loggingOut} onClick={onLogout}>
+                  退出登录
+                </Button>
+              </Space>
+            }
+          />
+        </div>
+      </Content>
+    </Layout>
+  )
+}
+
 const SELF_CONTAINED_PAGE_HEAD_PATHS = new Set([
   DEFAULT_DESKTOP_ENTRY.path,
   '/erp/task-board',
@@ -267,12 +298,26 @@ export default function ERPLayout() {
   )
 
   const isSuperAdmin = adminProfile?.is_super_admin === true
+  const configuredCustomerKey = resolveEffectiveSessionCustomerKey(activeBrand)
+  const requiresConfiguredCustomerRuntime = Boolean(configuredCustomerKey)
   const effectiveSessionCustomerKey =
     typeof adminProfile?.effective_session?.customer?.key === 'string'
       ? adminProfile.effective_session.customer.key.trim()
       : ''
+  const hasConfiguredCustomerRuntime = hasExpectedCustomerRuntime(
+    adminProfile,
+    configuredCustomerKey
+  )
+  const customerRuntimeBootstrapPending =
+    requiresConfiguredCustomerRuntime && !profileSyncCompleted
+  const customerRuntimeUnavailable =
+    requiresConfiguredCustomerRuntime &&
+    profileSyncCompleted &&
+    !hasConfiguredCustomerRuntime
   const shouldUseProductCoreNavigation =
-    isSuperAdmin && !effectiveSessionCustomerKey
+    isSuperAdmin &&
+    !requiresConfiguredCustomerRuntime &&
+    !effectiveSessionCustomerKey
   const routeNavigationSections = useMemo(
     () => getNavigationSections(isSuperAdmin ? null : undefined),
     [isSuperAdmin]
@@ -728,6 +773,30 @@ export default function ERPLayout() {
         description="正在确认当前账号的菜单和访问范围，请稍候..."
         fullscreen
         className="loading-page--erp"
+      />
+    )
+  }
+
+  if (customerRuntimeBootstrapPending) {
+    return (
+      <div data-customer-runtime-bootstrap="true">
+        <Loading
+          title="正在进入客户工作台"
+          description="正在确认当前客户的访问范围和业务数据，请稍候..."
+          fullscreen
+          className="loading-page--erp"
+        />
+      </div>
+    )
+  }
+
+  if (customerRuntimeUnavailable) {
+    return (
+      <CustomerRuntimeUnavailable
+        customerName={activeBrand.companyName || '当前客户'}
+        loggingOut={loggingOut}
+        onRetry={() => loadProfile({ showLoading: true })}
+        onLogout={handleLogout}
       />
     )
   }

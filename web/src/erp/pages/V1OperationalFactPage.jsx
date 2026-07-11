@@ -22,7 +22,7 @@ const PAGE_CONFIGS = Object.freeze({
     initialActiveKey: 'reservations',
     enabledViews: ['reservations'],
     pageSummary:
-      '出库管理当前只处理库存预留释放 / 消耗；出货单新建、确认出货和取消出货统一回到正式出货单页面。',
+      '出库管理当前只处理库存预留释放；库存预留消耗随出货事实原子完成，出货单新建、确认出货和取消出货统一回到正式出货单页面。',
     viewOverrides: {
       reservations: {
         title: '库存预留',

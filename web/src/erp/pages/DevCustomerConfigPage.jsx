@@ -48,7 +48,7 @@ const VIEW_OPTIONS = [
   { label: '包预检 / Preflight', value: VIEW_PREFLIGHT },
   { label: '差异预览 / Diff', value: VIEW_DIFF },
   { label: '菜单字段 / Assets', value: VIEW_ASSETS },
-  { label: '导入工作台 / Import', value: VIEW_IMPORT },
+  { label: '预检与发布 / Release', value: VIEW_IMPORT },
 ]
 
 const STATUS_LABELS = Object.freeze({
@@ -907,7 +907,7 @@ function OverviewPanel({ overview, onNavigate }) {
           <QuickAction
             icon={<ApartmentOutlined />}
             title="看差异"
-            note="当前值、待导入、影响范围"
+            note="当前值、候选配置、影响范围"
             status="preview_only"
             onClick={() => onNavigate(VIEW_DIFF)}
           />
@@ -1119,7 +1119,7 @@ function PreflightPanel({ consoleSummary, customerPackageSummary }) {
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <DatabaseOutlined />
-          <Text strong>导入资产范围 / Import Asset Scope</Text>
+          <Text strong>客户包资产范围 / Package Asset Scope</Text>
         </div>
         <div className="erp-dev-customer-asset-grid">
           {consoleSummary.assetSummary.map((item) => (
@@ -1135,8 +1135,8 @@ function PreflightPanel({ consoleSummary, customerPackageSummary }) {
         <Alert
           type="info"
           showIcon
-          message="只导入配置对象，不导入任意代码、SQL 或业务事实"
-          description="本页覆盖配置、规则、流程编排、策略绑定、扩展点绑定、模板和导入映射；策略实现与扩展点实现必须来自产品核心、行业模板或已注册客户部署包。"
+          message="只读取已登记配置对象，不接收任意代码、SQL 或业务事实"
+          description="本页预检配置、规则、流程编排、策略绑定、扩展点绑定、模板和导入映射；策略实现与扩展点实现必须来自产品核心、行业模板或已登记客户部署包。"
         />
         <div className="erp-dev-customer-db-targets">
           {consoleSummary.packageAssetScope.map((item) => (
@@ -1388,7 +1388,7 @@ function DiffPanel({ consoleSummary }) {
                 <Text strong>{item.current}</Text>
               </div>
               <div className="erp-dev-customer-diff__value">
-                <Text type="secondary">待导入 / Incoming</Text>
+                <Text type="secondary">候选配置 / Candidate</Text>
                 <Text strong>{item.incoming}</Text>
               </div>
               <Paragraph>{item.impact}</Paragraph>
@@ -1415,12 +1415,12 @@ function DiffPanel({ consoleSummary }) {
       <section className="erp-dev-customer-panel">
         <div className="erp-dev-customer-panel__head">
           <ExclamationCircleOutlined />
-          <Text strong>导入结论 / Import Decision</Text>
+          <Text strong>发布边界 / Release Boundary</Text>
         </div>
         <Alert
           type="warning"
           showIcon
-          message="当前不可正式导入"
+          message="当前不可执行真实业务数据导入"
           description="试跑和执行报告只能生成评审证据；没有客户确认、备份证据、未匹配队列清零和单独真实导入任务前，不允许写数据库。"
         />
       </section>
@@ -1441,21 +1441,21 @@ function ImportPanel({
   return (
     <div
       className="erp-dev-customer-panel-grid"
-      data-dev-customer-view="导入工作台"
+      data-dev-customer-view="预检与发布"
     >
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-import-hero">
         <div className="erp-dev-customer-panel__head">
           <DeploymentUnitOutlined />
-          <Text strong>导入工作台 / Import Workbench</Text>
+          <Text strong>配置预检与发布 / Config Preflight & Release</Text>
         </div>
         <div className="erp-dev-customer-import-hero__copy">
           <Text strong>
             当前页支持测试版试跑和本地/测试后端应用；正式发布必须通过发布证据门禁。
           </Text>
           <Text type="secondary">
-            这里把参考文档里的上传、解析、预检、Dry
-            Run、正式导入、发布和审计流程压缩成当前可执行的开发态工作台；不会上传
-            原始包，不会直接写业务事实。
+            当前工作台只从已登记 customer package
+            读取配置，执行结构预检、差异预览、Dry Run
+            证据、本地/测试配置应用和受控发布；不提供原始包上传，也不把配置发布写成业务数据导入。
           </Text>
         </div>
         <Alert
@@ -1468,7 +1468,9 @@ function ImportPanel({
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <CheckCircleOutlined />
-          <Text strong>可视化导入流程 / Visual Import Flow</Text>
+          <Text strong>
+            配置预检与发布流程 / Config Preflight & Release Flow
+          </Text>
         </div>
         <div className="erp-dev-customer-import-flow">
           {importSummary.importFlow.map((step) => (
@@ -2061,12 +2063,12 @@ export default function DevCustomerConfigPage() {
           <Space align="center" size={10}>
             <SettingOutlined className="erp-dev-customer-header__icon" />
             <Title className="erp-dev-customer-title" level={1}>
-              客户配置包导入控制台 / Package Import Console
+              客户配置包预检与发布控制台 / Package Preflight & Release Console
             </Title>
           </Space>
           <Text className="erp-dev-customer-summary">
-            dev-only，受控评审客户配置包；按上传解析、校验、差异、Dry
-            Run、草稿版本和发布推进，不上传任意代码、SQL 或脚本。
+            dev-only，从已登记客户配置包读取候选配置；按预检、差异、Dry Run
+            证据、测试配置应用和发布门禁推进，不接收任意代码、SQL 或脚本。
           </Text>
           <CustomerPackageSelector
             overview={overview}

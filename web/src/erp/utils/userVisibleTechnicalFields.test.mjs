@@ -562,6 +562,23 @@ test('库存台账引用列不把内部 ID 当来源单号或对象编号 fallba
   assert.match(content, /relationRef\('来源行', record\?\.source_line_id\)/u)
 })
 
+test('库存台账按真实 SKU grain 查询并区分未分规格库存', () => {
+  const filePath = join(rootDir, 'pages/V1InventoryLedgerPage.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(content, /product_sku_id:\s*productSkuID \|\| undefined/u)
+  assert.match(content, /listProductSKUs/u)
+  assert.match(content, /dataIndex:\s*'product_sku_id'/u)
+  assert.match(content, /return '未分规格'/u)
+  assert.match(content, /disabled=\{subjectType !== 'PRODUCT'\}/u)
+  assert.match(
+    content,
+    /listProductSKUs\(\s*\{\s*limit:\s*500\s*\}/u,
+    '库存历史台账应加载停用 SKU 引用，保证旧规格库存仍可读和可筛选'
+  )
+  assert.doesNotMatch(content, /product_sku_id:\s*subjectID/u)
+})
+
 test('路由来源筛选标签使用业务口径并可按上下文单独清除', () => {
   const inventoryLedgerContent = readFileSync(
     join(rootDir, 'pages/V1InventoryLedgerPage.jsx'),

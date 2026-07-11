@@ -116,6 +116,11 @@ func ReservedAt(v time.Time) predicate.StockReservation {
 	return predicate.StockReservation(sql.FieldEQ(FieldReservedAt, v))
 }
 
+// ReservedAtSpecified applies equality check predicate on the "reserved_at_specified" field. It's identical to ReservedAtSpecifiedEQ.
+func ReservedAtSpecified(v bool) predicate.StockReservation {
+	return predicate.StockReservation(sql.FieldEQ(FieldReservedAtSpecified, v))
+}
+
 // ReleasedAt applies equality check predicate on the "released_at" field. It's identical to ReleasedAtEQ.
 func ReleasedAt(v time.Time) predicate.StockReservation {
 	return predicate.StockReservation(sql.FieldEQ(FieldReleasedAt, v))
@@ -594,6 +599,16 @@ func ReservedAtLT(v time.Time) predicate.StockReservation {
 // ReservedAtLTE applies the LTE predicate on the "reserved_at" field.
 func ReservedAtLTE(v time.Time) predicate.StockReservation {
 	return predicate.StockReservation(sql.FieldLTE(FieldReservedAt, v))
+}
+
+// ReservedAtSpecifiedEQ applies the EQ predicate on the "reserved_at_specified" field.
+func ReservedAtSpecifiedEQ(v bool) predicate.StockReservation {
+	return predicate.StockReservation(sql.FieldEQ(FieldReservedAtSpecified, v))
+}
+
+// ReservedAtSpecifiedNEQ applies the NEQ predicate on the "reserved_at_specified" field.
+func ReservedAtSpecifiedNEQ(v bool) predicate.StockReservation {
+	return predicate.StockReservation(sql.FieldNEQ(FieldReservedAtSpecified, v))
 }
 
 // ReleasedAtEQ applies the EQ predicate on the "released_at" field.

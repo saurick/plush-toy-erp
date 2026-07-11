@@ -751,7 +751,7 @@ export function buildCustomerPackagePreviewSummary(
         IMPLEMENTATION_SOURCE_LABELS.registered_deployment_package_required,
       note: catalogPolicyKeys.has(item.key)
         ? '只允许绑定已登记策略 key；策略实现不得由客户包上传。'
-        : '策略 key 未登记，必须阻断导入。',
+        : '策略 key 未登记，必须阻断客户配置发布。',
     })),
     commandBindingChecks: workflowCommandKeys.map((key) => ({
       key,
@@ -765,7 +765,7 @@ export function buildCustomerPackagePreviewSummary(
         IMPLEMENTATION_SOURCE_LABELS.registered_deployment_package_required,
       note: catalogCommandKeys.has(key)
         ? '流程节点只绑定已登记命令锚点；运行时执行仍由部署包 / 后端处理器决定。'
-        : '流程节点命令未登记，必须阻断导入。',
+        : '流程节点命令未登记，必须阻断客户配置发布。',
     })),
     extensionRegistryChecks:
       extensionPoints.length > 0
@@ -1041,7 +1041,7 @@ export function buildImportToolingSummary(
       withWriteBoundaryLabels({
         key: 'tracked-package',
         step: '1',
-        title: '上传解析',
+        title: '读取已登记包',
         status: 'passed',
         outcome: '读取已登记客户包并解析资产清单',
         target:
@@ -1075,7 +1075,7 @@ export function buildImportToolingSummary(
         step: '3',
         title: '差异对比',
         status: 'preview_only',
-        outcome: '行业模板 / 当前生效配置 / 待导入包三方口径',
+        outcome: '行业模板 / 当前生效配置 / 候选客户包三方口径',
         target: '页面只读差异，不写库',
         writesDatabase: false,
         writesConfigControl: false,
@@ -1104,7 +1104,7 @@ export function buildImportToolingSummary(
       withWriteBoundaryLabels({
         key: 'import-draft-revision',
         step: '5',
-        title: '导入草稿版本',
+        title: '应用测试配置',
         status:
           normalizedCustomerKey === 'yoyoosun' ? 'test_apply_ready' : 'blocked',
         outcome: '校验并发布受控配置版本',
@@ -1414,7 +1414,7 @@ export function buildCustomerPackageConsoleSummary({
         status: 'release_gate_required',
         outcome: '门禁后可执行',
         note: '发布版必须先通过清单指纹、发布证据和管理员确认。',
-        nextAction: '在导入工作台检查发布门禁；通过后再发布到正式版。',
+        nextAction: '在预检与发布工作台检查发布门禁；通过后再发布到正式版。',
       },
     ],
     preflightStages: [
@@ -1422,7 +1422,7 @@ export function buildCustomerPackageConsoleSummary({
         key: 'registered-package',
         label: '读取已登记客户包',
         status: 'passed',
-        note: '只读取 tracked config，不接上传入口。',
+        note: '只读取 registry 已登记配置，不接上传入口。',
       },
       {
         key: 'schema-lint',
@@ -1648,7 +1648,7 @@ export function buildCustomerPackageConsoleSummary({
         value: processPolicyCount,
         unit: '条',
         status: 'preview_only',
-        note: '只允许绑定检查，不导入代码。',
+        note: '只允许绑定检查，不接收客户包代码。',
       },
     ],
     validationChecks: [
@@ -1666,7 +1666,7 @@ export function buildCustomerPackageConsoleSummary({
         level: '高',
         note:
           unregisteredStrategyCount > 0
-            ? `${unregisteredStrategyCount} 个策略或命令绑定未登记，必须阻断导入。`
+            ? `${unregisteredStrategyCount} 个策略或命令绑定未登记，必须阻断客户配置发布。`
             : '流程策略和命令只允许绑定 catalog 已登记 key；实现不得由客户包上传。',
       },
       {
@@ -1676,7 +1676,7 @@ export function buildCustomerPackageConsoleSummary({
         level: '高',
         note:
           unregisteredExtensionCount > 0
-            ? `${unregisteredExtensionCount} 个扩展点处理器未登记或来自客户包，必须阻断导入。`
+            ? `${unregisteredExtensionCount} 个扩展点处理器未登记或来自客户包，必须阻断客户配置发布。`
             : '当前扩展点目录为受控空目录；后续处理器必须来自已注册部署包。',
       },
       {
@@ -1686,7 +1686,7 @@ export function buildCustomerPackageConsoleSummary({
         level: '高',
         note:
           missingWorkflowEndCount > 0
-            ? `${missingWorkflowEndCount} 条流程缺少结束节点，必须阻断导入。`
+            ? `${missingWorkflowEndCount} 条流程缺少结束节点，必须阻断客户配置发布。`
             : '已检查每条流程预览都有结束节点；流程运行仍需后端运行时清单校验。',
       },
       {
@@ -1696,7 +1696,7 @@ export function buildCustomerPackageConsoleSummary({
         level: '高',
         note:
           missingWorkflowRoleCount > 0
-            ? `${missingWorkflowRoleCount} 个流程节点责任池未登记，必须阻断导入。`
+            ? `${missingWorkflowRoleCount} 个流程节点责任池未登记，必须阻断客户配置发布。`
             : '流程节点责任池均来自登记目录；运行时清单还会映射为后端角色画像和授权。',
       },
       {
@@ -1706,7 +1706,7 @@ export function buildCustomerPackageConsoleSummary({
         level: '高',
         note:
           illegalStateTransitionCount > 0
-            ? `${illegalStateTransitionCount} 条状态跳转命中禁止回退规则，必须阻断导入。`
+            ? `${illegalStateTransitionCount} 条状态跳转命中禁止回退规则，必须阻断客户配置发布。`
             : '当前状态机预览未包含已出货退回草稿、已结算退回已提交、已关闭退回处理中等非法跳转。',
       },
       {
@@ -1779,7 +1779,7 @@ export function buildCustomerPackageConsoleSummary({
         label: '规则资产',
         value: policyBindingCount,
         status: 'registered_binding',
-        note: '只导入规则 / 策略绑定和参数，不上传策略实现代码。',
+        note: '客户包只声明规则 / 策略绑定和参数，不接收策略实现代码。',
       },
       {
         key: 'workflow-assets',

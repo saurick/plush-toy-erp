@@ -18,22 +18,25 @@ type OutsourcingFact struct {
 }
 
 var outsourcingFactLockedFields = map[string]struct{}{
-	"fact_no":         {},
-	"fact_type":       {},
-	"status":          {},
-	"subject_type":    {},
-	"subject_id":      {},
-	"warehouse_id":    {},
-	"unit_id":         {},
-	"lot_id":          {},
-	"quantity":        {},
-	"supplier_id":     {},
-	"supplier_name":   {},
-	"source_type":     {},
-	"source_id":       {},
-	"source_line_id":  {},
-	"idempotency_key": {},
-	"posted_at":       {},
+	"fact_no":               {},
+	"fact_type":             {},
+	"status":                {},
+	"subject_type":          {},
+	"subject_id":            {},
+	"product_sku_id":        {},
+	"warehouse_id":          {},
+	"unit_id":               {},
+	"lot_id":                {},
+	"quantity":              {},
+	"supplier_id":           {},
+	"supplier_name":         {},
+	"source_type":           {},
+	"source_id":             {},
+	"source_line_id":        {},
+	"idempotency_key":       {},
+	"occurred_at":           {},
+	"occurred_at_specified": {},
+	"posted_at":             {},
 }
 
 func (OutsourcingFact) Hooks() []ent.Hook {
@@ -57,10 +60,11 @@ func (OutsourcingFact) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"outsourcing_facts_type_allowed":      "fact_type IN ('MATERIAL_ISSUE', 'RETURN_RECEIPT')",
-				"outsourcing_facts_status_allowed":    "status IN ('DRAFT', 'POSTED', 'CANCELLED')",
-				"outsourcing_facts_subject_allowed":   "subject_type IN ('MATERIAL', 'PRODUCT')",
-				"outsourcing_facts_quantity_positive": "quantity > 0",
+				"outsourcing_facts_type_allowed":        "fact_type IN ('MATERIAL_ISSUE', 'RETURN_RECEIPT')",
+				"outsourcing_facts_status_allowed":      "status IN ('DRAFT', 'POSTED', 'CANCELLED')",
+				"outsourcing_facts_subject_allowed":     "subject_type IN ('MATERIAL', 'PRODUCT')",
+				"outsourcing_facts_sku_subject_allowed": "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
+				"outsourcing_facts_quantity_positive":   "quantity > 0",
 			},
 		},
 	}
@@ -74,6 +78,7 @@ func (OutsourcingFact) Fields() []ent.Field {
 		field.String("status").NotEmpty().Default("DRAFT").MaxLen(32),
 		field.String("subject_type").NotEmpty().MaxLen(16),
 		field.Int("subject_id").Positive(),
+		field.Int("product_sku_id").Optional().Nillable().Positive(),
 		field.Int("warehouse_id").Positive(),
 		field.Int("unit_id").Positive(),
 		field.Int("lot_id").Optional().Nillable().Positive(),
@@ -87,6 +92,7 @@ func (OutsourcingFact) Fields() []ent.Field {
 		field.Int("source_line_id").Optional().Nillable().Positive(),
 		field.String("idempotency_key").NotEmpty().MaxLen(128),
 		field.Time("occurred_at").Default(time.Now),
+		field.Bool("occurred_at_specified").Default(false),
 		field.Time("posted_at").Optional().Nillable(),
 		field.String("note").Optional().Nillable().MaxLen(255),
 		field.Time("created_at").Default(time.Now).Immutable(),
@@ -98,6 +104,7 @@ func (OutsourcingFact) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.From("warehouse", Warehouse.Type).Ref("outsourcing_facts").Field("warehouse_id").Required().Unique(),
 		edge.From("unit", Unit.Type).Ref("outsourcing_facts").Field("unit_id").Required().Unique(),
+		edge.From("product_sku", ProductSKU.Type).Ref("outsourcing_facts").Field("product_sku_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("inventory_lot", InventoryLot.Type).Ref("outsourcing_facts").Field("lot_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
 	}
 }
@@ -107,6 +114,7 @@ func (OutsourcingFact) Indexes() []ent.Index {
 		index.Fields("fact_no").Unique(),
 		index.Fields("idempotency_key").Unique(),
 		index.Fields("fact_type", "status"),
+		index.Fields("product_sku_id"),
 		index.Fields("supplier_id"),
 		index.Fields("source_type", "source_id", "source_line_id"),
 		index.Fields("subject_type", "subject_id", "warehouse_id", "lot_id"),

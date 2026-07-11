@@ -18,7 +18,8 @@ func (d *jsonrpcDispatcher) handlePurchase(
 	if params != nil {
 		pm = params.AsMap()
 	}
-	if _, res := d.requireAdmin(ctx); res != nil {
+	claims, res := d.requireAdmin(ctx)
+	if res != nil {
 		return id, res, nil
 	}
 	if d.inventoryUC == nil {
@@ -34,7 +35,7 @@ func (d *jsonrpcDispatcher) handlePurchase(
 		"cancel_purchase_receipt", "cancelPurchaseReceipt",
 		"get_purchase_receipt", "getPurchaseReceipt",
 		"list_purchase_receipts", "listPurchaseReceipts":
-		return d.handlePurchaseReceipt(ctx, method, id, pm)
+		return d.handlePurchaseReceipt(ctx, method, id, pm, claims.UserID)
 	default:
 		return id, unknownPurchaseResult(method), nil
 	}

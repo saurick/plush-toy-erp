@@ -231,7 +231,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH node --test web/src/erp/utils/adminProfileSync.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs',
-      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-direct-url-local-dev-diagnostic,erp-effective-session-sync-failure-local-dev-diagnostic,erp-effective-session-empty-pages-local-dev-diagnostic,erp-no-visible-menu-blocks-outlet,erp-effective-session-action-projection-business-pages STYLE_L1_PORT=5235 pnpm --dir web style:l1',
+      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-direct-url-local-dev-diagnostic,erp-effective-session-configured-customer-sync-failure-blocked,erp-effective-session-empty-pages-local-dev-diagnostic,erp-no-visible-menu-blocks-outlet,erp-effective-session-action-projection-business-pages STYLE_L1_PORT=5235 pnpm --dir web style:l1',
     ],
   },
   {
@@ -277,6 +277,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
 ])
 
 const DEV_TESTING_TIER_HEADINGS = Object.freeze([
+  '## 验证层级 T0-T8',
   '## 4. 验证层级 T0-T8',
   '## 3. 测试分层',
 ])
@@ -459,10 +460,11 @@ export function parseDevTestingStrategyTiers(source = '') {
       getMarkdownTableCell(cells, headerIndex, ['层级', '验证层级'])
     )
     const changeType = stripMarkdownInline(
-      getMarkdownTableCell(cells, headerIndex, ['改动类型'])
+      getMarkdownTableCell(cells, headerIndex, ['改动类型', '适用改动'])
     )
     const commandText = getMarkdownTableCell(cells, headerIndex, [
       '必跑或优先命令',
+      '最小验证',
     ])
     const description = stripMarkdownInline(
       getMarkdownTableCell(cells, headerIndex, ['说明'])
