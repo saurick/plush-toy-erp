@@ -160,13 +160,13 @@ ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
 
 ## PDF 运行环境变量
 
-在线 PDF 使用后端 `/templates/render-pdf` 和 Headless Chromium。生产镜像已内置 Debian `chromium` 与 `fonts-noto-cjk`，Compose 默认设置：
+在线 PDF 使用后端 `/templates/render-pdf` 和 Headless Chromium。生产镜像已内置 Debian `chromium` 与 `fonts-noto-cjk`；Chromium 精确固定为已在目标宿主验证的 `150.0.7871.100-1~deb12u1`，构建时校验包版本，升级必须显式修改 pin 并重跑目标 PDF smoke。Compose 默认设置：
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `ERP_PDF_CHROME_PATH` | `/usr/bin/chromium` | Chrome / Chromium 可执行文件路径；本地开发可留空由服务自动探测系统 Chrome |
 | `ERP_PDF_RENDER_CONCURRENCY` | `2` | 同时渲染 PDF 的上限；低配服务器优先通过降低并发控制内存峰值 |
-| `ERP_PDF_WARMUP` | `async` | 推荐预热开关，支持 `async/off`；服务启动后异步跑一次中文合同 PDF 渲染，提前启动共享 Chromium 并加载 CJK 字体；`/readyz` 在预热完成前保持未就绪，避免首个真实预览请求承担冷启动成本；排障或极低内存场景可设为 `off` |
+| `ERP_PDF_WARMUP` | `async` | 正式发布预热开关；服务启动后异步跑一次中文合同 PDF 渲染，提前启动共享 Chromium 并加载 CJK 字体；`/readyz` 在预热完成前或预热失败后保持未就绪。`off` 只用于临时故障隔离，会被 production preflight 判为非 release-ready，且不能替代真实 PDF smoke |
 安全边界：
 
 - seed、debugRunId cleanup 和业务数据清空默认面向当前 SQL 连接开启，只有显式关闭环境变量、权限不足或清理范围不匹配时拒绝。

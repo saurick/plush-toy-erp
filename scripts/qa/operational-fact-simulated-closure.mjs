@@ -530,46 +530,34 @@ async function applyPlan(plan, tokens) {
     "POSTED",
   );
 
-  const shipmentDraft = await call(
+  await call(
     "shipment draft sample",
     "warehouse",
-    "create_shipment",
+    "create_shipment_with_items",
     {
       ...records.shipment,
       shipment_no: `${records.shipment.shipment_no}-DRAFT`,
       idempotency_key: `${records.shipment.idempotency_key}:DRAFT`,
       note: "【手工测试】出货单-草稿：保留草稿，尚未扣减库存。",
+      items: [records.shipmentItem],
     },
     (data) => data.shipment,
     "DRAFT",
-  );
-  await call(
-    "shipment draft sample add item",
-    "warehouse",
-    "add_shipment_item",
-    { ...records.shipmentItem, shipment_id: shipmentDraft.id },
-    (data) => data.shipment_item,
   );
 
   const shipmentShipped = await call(
     "shipment shipped sample create",
     "warehouse",
-    "create_shipment",
+    "create_shipment_with_items",
     {
       ...records.shipment,
       shipment_no: `${records.shipment.shipment_no}-SHIPPED`,
       idempotency_key: `${records.shipment.idempotency_key}:SHIPPED`,
       note: "【手工测试】出货单-已出货：保留已出货状态，库存已扣减。",
+      items: [records.shipmentItem],
     },
     (data) => data.shipment,
     "DRAFT",
-  );
-  await call(
-    "shipment shipped sample add item",
-    "warehouse",
-    "add_shipment_item",
-    { ...records.shipmentItem, shipment_id: shipmentShipped.id },
-    (data) => data.shipment_item,
   );
   await call(
     "shipment shipped sample",
@@ -688,17 +676,10 @@ async function applyPlan(plan, tokens) {
   const shipment = await call(
     "shipment create",
     "warehouse",
-    "create_shipment",
-    records.shipment,
+    "create_shipment_with_items",
+    { ...records.shipment, items: [records.shipmentItem] },
     (data) => data.shipment,
     "DRAFT",
-  );
-  await call(
-    "shipment add item",
-    "warehouse",
-    "add_shipment_item",
-    { ...records.shipmentItem, shipment_id: shipment.id },
-    (data) => data.shipment_item,
   );
   await call(
     "shipment ship",

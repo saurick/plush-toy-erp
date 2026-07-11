@@ -14,17 +14,6 @@ func TestShipmentStatusValues(t *testing.T) {
 	}
 }
 
-func TestCanAddShipmentItem(t *testing.T) {
-	if !CanAddShipmentItem(ShipmentDraft) {
-		t.Fatal("draft shipment should accept item additions")
-	}
-	for _, current := range []string{ShipmentShipped, ShipmentCancelled, "", "READY"} {
-		if CanAddShipmentItem(current) {
-			t.Fatalf("status %q should not accept item additions", current)
-		}
-	}
-}
-
 func TestShipShipmentTransition(t *testing.T) {
 	tests := []struct {
 		name        string

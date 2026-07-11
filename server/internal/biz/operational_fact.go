@@ -234,7 +234,6 @@ type ShipmentCreate struct {
 }
 
 type ShipmentItemCreate struct {
-	ShipmentID       int
 	SalesOrderItemID *int
 	ProductID        int
 	ProductSkuID     *int
@@ -326,8 +325,6 @@ type OperationalFactRepo interface {
 	CancelPostedOutsourcingFact(ctx context.Context, id int) (*OutsourcingFact, error)
 	ListOutsourcingFacts(ctx context.Context, filter OperationalFactFilter) ([]*OutsourcingFact, int, error)
 
-	CreateShipmentDraft(ctx context.Context, in *ShipmentCreate) (*Shipment, error)
-	AddShipmentItem(ctx context.Context, in *ShipmentItemCreate) (*ShipmentItem, error)
 	CreateShipmentDraftWithItems(ctx context.Context, in *ShipmentCreateWithItems) (*Shipment, error)
 	ShipShipment(ctx context.Context, id int) (*Shipment, error)
 	CancelShippedShipment(ctx context.Context, id int) (*Shipment, error)
@@ -458,34 +455,6 @@ func (uc *OperationalFactUsecase) ListOutsourcingFacts(ctx context.Context, filt
 		return nil, 0, err
 	}
 	return uc.repo.ListOutsourcingFacts(ctx, normalized)
-}
-
-func (uc *OperationalFactUsecase) CreateShipmentDraft(ctx context.Context, in *ShipmentCreate) (*Shipment, error) {
-	if uc == nil || uc.repo == nil {
-		return nil, ErrBadParam
-	}
-	normalized, err := normalizeShipmentCreate(in)
-	if err != nil {
-		return nil, err
-	}
-	if err := uc.validateShipmentHeaderActiveReferences(ctx, normalized); err != nil {
-		return nil, err
-	}
-	return uc.repo.CreateShipmentDraft(ctx, normalized)
-}
-
-func (uc *OperationalFactUsecase) AddShipmentItem(ctx context.Context, in *ShipmentItemCreate) (*ShipmentItem, error) {
-	if uc == nil || uc.repo == nil {
-		return nil, ErrBadParam
-	}
-	normalized, err := normalizeShipmentItemCreate(in)
-	if err != nil {
-		return nil, err
-	}
-	if err := uc.validateShipmentItemActiveReferences(ctx, normalized); err != nil {
-		return nil, err
-	}
-	return uc.repo.AddShipmentItem(ctx, normalized)
 }
 
 func (uc *OperationalFactUsecase) CreateShipmentDraftWithItems(ctx context.Context, in *ShipmentCreateWithItems) (*Shipment, error) {
@@ -797,10 +766,6 @@ func normalizeShipmentCreate(in *ShipmentCreate) (*ShipmentCreate, error) {
 }
 
 func normalizeShipmentItemCreate(in *ShipmentItemCreate) (*ShipmentItemCreate, error) {
-	return normalizeShipmentItemCreateWithOptions(in, true)
-}
-
-func normalizeShipmentItemCreateWithOptions(in *ShipmentItemCreate, requireShipmentID bool) (*ShipmentItemCreate, error) {
 	if in == nil {
 		return nil, ErrBadParam
 	}
@@ -815,7 +780,7 @@ func normalizeShipmentItemCreateWithOptions(in *ShipmentItemCreate, requireShipm
 	if out.LotID != nil && *out.LotID <= 0 {
 		out.LotID = nil
 	}
-	if (requireShipmentID && out.ShipmentID <= 0) || out.ProductID <= 0 || out.WarehouseID <= 0 || out.UnitID <= 0 {
+	if out.ProductID <= 0 || out.WarehouseID <= 0 || out.UnitID <= 0 {
 		return nil, ErrBadParam
 	}
 	if _, err := value.NewPositiveQuantity(out.Quantity); err != nil {
@@ -837,7 +802,7 @@ func normalizeShipmentCreateWithItems(in *ShipmentCreateWithItems) (*ShipmentCre
 		if item == nil {
 			return nil, ErrBadParam
 		}
-		normalizedItem, err := normalizeShipmentItemCreateWithOptions(item, false)
+		normalizedItem, err := normalizeShipmentItemCreate(item)
 		if err != nil {
 			return nil, err
 		}

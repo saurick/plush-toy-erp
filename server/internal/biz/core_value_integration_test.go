@@ -270,7 +270,7 @@ func TestNormalizeOperationalFactInputsUseCoreValueGuards(t *testing.T) {
 		t.Fatalf("expected blank shipment idempotency key rejected, got %v", err)
 	}
 
-	if _, err := normalizeShipmentItemCreate(&ShipmentItemCreate{ShipmentID: 1, ProductID: 2, WarehouseID: 3, UnitID: 4, Quantity: decimal.Zero}); !errors.Is(err, ErrBadParam) {
+	if _, err := normalizeShipmentItemCreate(&ShipmentItemCreate{ProductID: 2, WarehouseID: 3, UnitID: 4, Quantity: decimal.Zero}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected zero shipment item quantity rejected, got %v", err)
 	}
 

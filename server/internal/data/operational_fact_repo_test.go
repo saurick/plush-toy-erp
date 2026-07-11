@@ -395,30 +395,29 @@ func TestOperationalFactUsecase_ShipmentRejectsInactiveManualReferences(t *testi
 	if err != nil {
 		t.Fatalf("create inactive customer failed: %v", err)
 	}
-	if _, err := uc.CreateShipmentDraft(ctx, &biz.ShipmentCreate{
-		ShipmentNo:     "SHP-INACTIVE-CUSTOMER",
-		CustomerID:     &customer.ID,
-		IdempotencyKey: "SHP-INACTIVE-CUSTOMER",
+	if _, err := uc.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{
+			ShipmentNo:     "SHP-INACTIVE-CUSTOMER",
+			CustomerID:     &customer.ID,
+			IdempotencyKey: "SHP-INACTIVE-CUSTOMER",
+		},
+		Items: []*biz.ShipmentItemCreate{{
+			ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+			UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
+		}},
 	}); !errors.Is(err, biz.ErrCustomerInactive) {
 		t.Fatalf("expected inactive customer rejected for manual shipment, got %v", err)
 	}
 
-	shipment, err := uc.CreateShipmentDraft(ctx, &biz.ShipmentCreate{
-		ShipmentNo:     "SHP-INACTIVE-ITEM",
-		IdempotencyKey: "SHP-INACTIVE-ITEM",
-	})
-	if err != nil {
-		t.Fatalf("create shipment failed: %v", err)
-	}
 	if _, err := client.Product.UpdateOneID(fixtures.productID).SetIsActive(false).Save(ctx); err != nil {
 		t.Fatalf("disable product failed: %v", err)
 	}
-	if _, err := uc.AddShipmentItem(ctx, &biz.ShipmentItemCreate{
-		ShipmentID:  shipment.ID,
-		ProductID:   fixtures.productID,
-		WarehouseID: fixtures.warehouseID,
-		UnitID:      fixtures.unitID,
-		Quantity:    decimal.NewFromInt(1),
+	if _, err := uc.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHP-INACTIVE-ITEM", IdempotencyKey: "SHP-INACTIVE-ITEM"},
+		Items: []*biz.ShipmentItemCreate{{
+			ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+			UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
+		}},
 	}); !errors.Is(err, biz.ErrProductInactive) {
 		t.Fatalf("expected inactive product rejected for manual shipment item, got %v", err)
 	}
@@ -434,13 +433,13 @@ func TestOperationalFactUsecase_ShipmentRejectsInactiveManualReferences(t *testi
 	if err != nil {
 		t.Fatalf("create inactive product SKU failed: %v", err)
 	}
-	if _, err := uc.AddShipmentItem(ctx, &biz.ShipmentItemCreate{
-		ShipmentID:   shipment.ID,
-		ProductID:    activeProduct.ID,
-		ProductSkuID: &inactiveSKU.ID,
-		WarehouseID:  fixtures.warehouseID,
-		UnitID:       fixtures.unitID,
-		Quantity:     decimal.NewFromInt(1),
+	if _, err := uc.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHP-INACTIVE-SKU", IdempotencyKey: "SHP-INACTIVE-SKU"},
+		Items: []*biz.ShipmentItemCreate{{
+			ProductID: activeProduct.ID, ProductSkuID: &inactiveSKU.ID,
+			WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+			Quantity: decimal.NewFromInt(1),
+		}},
 	}); !errors.Is(err, biz.ErrProductSKUInactive) {
 		t.Fatalf("expected inactive product SKU rejected for manual shipment item, got %v", err)
 	}
@@ -518,25 +517,18 @@ func TestOperationalFactUsecase_SourceLinkedShipmentAndReservationAllowInactiveO
 		t.Fatalf("internal inventory source write should keep historical inactive references readable: %v", err)
 	}
 
-	shipment, err := uc.CreateShipmentDraft(ctx, &biz.ShipmentCreate{
-		ShipmentNo:     "SHP-SOURCE-INACTIVE",
-		SalesOrderID:   &order.ID,
-		CustomerID:     &customer.ID,
-		IdempotencyKey: "SHP-SOURCE-INACTIVE",
-	})
-	if err != nil {
-		t.Fatalf("source-linked shipment header should allow inactive historical customer: %v", err)
-	}
-	if _, err := uc.AddShipmentItem(ctx, &biz.ShipmentItemCreate{
-		ShipmentID:       shipment.ID,
-		SalesOrderItemID: &item.ID,
-		ProductID:        fixtures.productID,
-		ProductSkuID:     &productSKU.ID,
-		WarehouseID:      fixtures.warehouseID,
-		UnitID:           fixtures.unitID,
-		Quantity:         decimal.NewFromInt(1),
+	if _, err := uc.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{
+			ShipmentNo: "SHP-SOURCE-INACTIVE", SalesOrderID: &order.ID,
+			CustomerID: &customer.ID, IdempotencyKey: "SHP-SOURCE-INACTIVE",
+		},
+		Items: []*biz.ShipmentItemCreate{{
+			SalesOrderItemID: &item.ID, ProductID: fixtures.productID,
+			ProductSkuID: &productSKU.ID, WarehouseID: fixtures.warehouseID,
+			UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
+		}},
 	}); err != nil {
-		t.Fatalf("source-linked shipment item should allow inactive historical product/SKU/unit: %v", err)
+		t.Fatalf("source-linked shipment should allow inactive historical customer/product/SKU/unit: %v", err)
 	}
 	if _, err := uc.CreateStockReservation(ctx, &biz.StockReservationCreate{
 		ReservationNo:    "RSV-SOURCE-MISSING-SKU",
@@ -1376,7 +1368,8 @@ func TestOperationalFactRepo_CreateShipmentWithItemsIdempotencyRequiresSamePaylo
 
 func TestOperationalFactRepo_ListShipmentsFiltersByPlannedShipDate(t *testing.T) {
 	ctx := context.Background()
-	data, _ := openInventoryRepoTestData(t, "operational_fact_shipment_date_filter")
+	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_date_filter")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	earlyDate := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 	targetDate := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
@@ -1391,10 +1384,14 @@ func TestOperationalFactRepo_ListShipmentsFiltersByPlannedShipDate(t *testing.T)
 		{no: "SHP-DATE-LATE", plannedShipAt: lateDate},
 	} {
 		plannedShipAt := item.plannedShipAt
-		if _, err := repo.CreateShipmentDraft(ctx, &biz.ShipmentCreate{
-			ShipmentNo:     item.no,
-			PlannedShipAt:  &plannedShipAt,
-			IdempotencyKey: item.no,
+		if _, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+			Shipment: &biz.ShipmentCreate{
+				ShipmentNo: item.no, PlannedShipAt: &plannedShipAt, IdempotencyKey: item.no,
+			},
+			Items: []*biz.ShipmentItemCreate{{
+				ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+				UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
+			}},
 		}); err != nil {
 			t.Fatalf("create shipment %s failed: %v", item.no, err)
 		}
@@ -1446,22 +1443,17 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 	if err != nil {
 		t.Fatalf("create finance source customer failed: %v", err)
 	}
-	shipment, err := uc.CreateShipmentDraft(ctx, &biz.ShipmentCreate{
-		ShipmentNo:     "SHP-FIN-001",
-		CustomerID:     &customer.ID,
-		IdempotencyKey: "SHP-FIN-001",
+	shipment, err := uc.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{
+			ShipmentNo: "SHP-FIN-001", CustomerID: &customer.ID, IdempotencyKey: "SHP-FIN-001",
+		},
+		Items: []*biz.ShipmentItemCreate{{
+			ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+			UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2),
+		}},
 	})
 	if err != nil {
-		t.Fatalf("create shipment failed: %v", err)
-	}
-	if _, err := uc.AddShipmentItem(ctx, &biz.ShipmentItemCreate{
-		ShipmentID:  shipment.ID,
-		ProductID:   fixtures.productID,
-		WarehouseID: fixtures.warehouseID,
-		UnitID:      fixtures.unitID,
-		Quantity:    decimal.NewFromInt(2),
-	}); err != nil {
-		t.Fatalf("add shipment item failed: %v", err)
+		t.Fatalf("create shipment with items failed: %v", err)
 	}
 
 	if _, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{

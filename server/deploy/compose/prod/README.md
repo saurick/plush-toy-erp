@@ -104,13 +104,13 @@ export JAEGER_BIND_ADDR=127.0.0.1
 - 前端容器默认将 `/rpc` 和 `/templates` 反代到 `WEB_API_ORIGIN`，外部网关只需把前端流量映射到 `5175`
 - 前端默认以根路径构建；如果网关使用路径前缀且不剥离前缀，需要先评审构建期 `VITE_BASE_URL`
 - 如果后续要重新开放公网域名或网关入口，必须先补新的正式部署方案，再更新本 README、Compose 环境说明和对应 smoke；不要沿用已经撤销的阿里云 / Cloudflare 旧口径。
-- PDF 运行依赖：服务端镜像内置 Debian `chromium` 与 `fonts-noto-cjk`，默认浏览器路径为 `/usr/bin/chromium`；如需自定义可通过 `ERP_PDF_CHROME_PATH` 覆盖。
-- PDF 资源建议：默认 `APP_MEM_LIMIT=896m`、`ERP_PDF_RENDER_CONCURRENCY=2`，使用 `ERP_PDF_WARMUP=async/off` 控制预热。服务启动后异步预热共享 Chromium 和 CJK 字体，日志使用 `template pdf warmup started / success / failed / disabled` 口径；`/readyz` 在预热完成前保持未就绪，优先稳住在线 PDF 首次预览。如果同机项目较多或极低内存排障，先降低并发，必要时再临时关闭预热。
+- PDF 运行依赖：服务端镜像内置 Debian `chromium` 与 `fonts-noto-cjk`，默认浏览器路径为 `/usr/bin/chromium`。Chromium 包固定为已在目标宿主验证的 `150.0.7871.100-1~deb12u1`，构建时会校验实际安装版本；升级时必须显式修改 pin，并重新执行容器 CDP、warmup 和真实 PDF smoke，不能让 `apt-get` 静默漂移浏览器版本。
+- PDF 资源建议：默认 `APP_MEM_LIMIT=896m`、`ERP_PDF_RENDER_CONCURRENCY=2`，正式发布使用 `ERP_PDF_WARMUP=async`。服务启动后异步预热共享 Chromium 和 CJK 字体，日志使用 `template pdf warmup started / success / failed` 口径；`/readyz` 在预热完成前或预热失败后保持未就绪。`off` 只用于短时故障隔离，不是 release-ready 状态；正式 smoke 还必须用受控 token 调真实 `/templates/render-pdf` 并校验非空 PDF。
 
 ## 镜像构建
 
 目标服务器配置较低，镜像构建必须在本地开发机或 CI 完成。服务器侧只负责接收镜像包、`docker load`、`docker compose up`、migration 和部署后检查；不要在服务器上执行 `docker build`、`pnpm build`、`go build` 或 `make build_server`。
-服务端 Dockerfile 已把 Go 依赖 / 编译缓存、Chromium 与 CJK 字体安装层分开；同一源码和依赖下重复构建时，应复用这些缓存层。
+服务端 Dockerfile 已把 Go 依赖 / 编译缓存、固定 Chromium 与 CJK 字体安装层分开；同一源码和依赖下重复构建时，应复用这些缓存层。若固定 Chromium 版本已退出当前 Debian 仓库，构建应明确失败并要求评审新版本，不能自动回退旧版或升级到未验证版本。
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp

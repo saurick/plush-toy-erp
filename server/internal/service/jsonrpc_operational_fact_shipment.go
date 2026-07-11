@@ -14,15 +14,6 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "create_shipment", "createShipment":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
-			return id, res, nil
-		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments"); res != nil {
-			return id, res, nil
-		}
-		item, err := d.operationalFactUC.CreateShipmentDraft(ctx, shipmentCreateFromParams(pm))
-		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "create_shipment_with_items", "createShipmentWithItems":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
 			return id, res, nil
@@ -36,19 +27,6 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		}
 		item, err := d.operationalFactUC.CreateShipmentDraftWithItems(ctx, in)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
-	case "add_shipment_item", "addShipmentItem":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
-			return id, res, nil
-		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments"); res != nil {
-			return id, res, nil
-		}
-		in, ok := shipmentItemCreateFromParams(pm)
-		if !ok {
-			return id, invalidParamResult(), nil
-		}
-		item, err := d.operationalFactUC.AddShipmentItem(ctx, in)
-		return id, operationalFactShipmentItemResult(ctx, d, item, err), nil
 	case "ship_shipment", "shipShipment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentShip); res != nil {
 			return id, res, nil
@@ -104,7 +82,6 @@ func shipmentItemCreateFromParams(pm map[string]any) (*biz.ShipmentItemCreate, b
 		return nil, false
 	}
 	return &biz.ShipmentItemCreate{
-		ShipmentID:       getInt(pm, "shipment_id", 0),
 		SalesOrderItemID: getOptionalInt(pm, "sales_order_item_id"),
 		ProductID:        getInt(pm, "product_id", 0),
 		ProductSkuID:     getOptionalInt(pm, "product_sku_id"),
@@ -131,7 +108,6 @@ func shipmentCreateWithItemsFromParams(pm map[string]any) (*biz.ShipmentCreateWi
 		if !ok {
 			return nil, false
 		}
-		item.ShipmentID = 0
 		items = append(items, item)
 	}
 	return &biz.ShipmentCreateWithItems{
@@ -145,13 +121,6 @@ func operationalFactShipmentResult(ctx context.Context, d *jsonrpcDispatcher, it
 		return d.mapOperationalFactError(ctx, err)
 	}
 	return okData(map[string]any{"shipment": shipmentToAny(item)})
-}
-
-func operationalFactShipmentItemResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.ShipmentItem, err error) *v1.JsonrpcResult {
-	if err != nil {
-		return d.mapOperationalFactError(ctx, err)
-	}
-	return okData(map[string]any{"shipment_item": shipmentItemToAny(item)})
 }
 
 func shipmentsToAny(items []*biz.Shipment) []any {

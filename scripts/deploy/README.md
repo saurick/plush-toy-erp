@@ -10,7 +10,7 @@
 
 | 入口 | 用途 | 是否执行目标动作 |
 | --- | --- | --- |
-| `bash scripts/deploy/production-preflight.sh` | 检查生产运行时 env、Compose、固定镜像 tag、migration 和低配部署边界 | 否，只检查 |
+| `bash scripts/deploy/production-preflight.sh` | 检查生产运行时 env、Compose、固定镜像 tag、migration、PDF warmup / Chromium 版本和低配部署边界 | 否，只检查 |
 | `node scripts/deploy/release-evidence-status.mjs` | 只读汇总 release evidence 目录状态、缺口和下一步 | 否，只读 |
 | `node scripts/deploy/release-evidence-gate.mjs` | 校验 release evidence 是否满足门禁 | 否，只校验证据 |
 | `node scripts/deploy/release-evidence-closeout-plan.mjs` | 从 status 生成分组 closeout action 和缺失输入 | 否，只生成计划 |

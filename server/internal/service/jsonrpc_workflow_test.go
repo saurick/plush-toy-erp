@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -719,6 +720,14 @@ func workflowCustomerConfigUCWithMemberships(memberships []biz.WorkPoolMembershi
 }
 
 func workflowCustomerConfigUCWithMembershipsAndEntitlements(memberships []biz.WorkPoolMembershipInput, entitlements []biz.AccessEntitlementInput) *biz.CustomerConfigUsecase {
+	return workflowCustomerConfigUCWithMembershipsEntitlementsAndProfiles(memberships, entitlements, nil)
+}
+
+func workflowCustomerConfigUCWithMembershipsEntitlementsAndProfiles(
+	memberships []biz.WorkPoolMembershipInput,
+	entitlements []biz.AccessEntitlementInput,
+	profiles []biz.RoleProfileInput,
+) *biz.CustomerConfigUsecase {
 	repo := newServiceCustomerConfigRepo()
 	key := serviceCustomerConfigKey(biz.DefaultCustomerKey, "workflow-visible-rev")
 	roleKeys := map[string]struct{}{}
@@ -747,8 +756,18 @@ func workflowCustomerConfigUCWithMembershipsAndEntitlements(memberships []biz.Wo
 			roleKeys[roleKey] = struct{}{}
 		}
 	}
+	profileByRole := map[string]biz.RoleProfileInput{}
+	for _, profile := range profiles {
+		if roleKey := biz.NormalizeRoleKey(profile.RoleKey); roleKey != "" {
+			profileByRole[roleKey] = profile
+		}
+	}
 	for roleKey := range roleKeys {
-		repo.profiles[key] = append(repo.profiles[key], biz.RoleProfileInput{RoleKey: roleKey, DisplayName: roleKey})
+		profile, ok := profileByRole[roleKey]
+		if !ok {
+			profile = biz.RoleProfileInput{RoleKey: roleKey, DisplayName: roleKey}
+		}
+		repo.profiles[key] = append(repo.profiles[key], profile)
 	}
 	repo.revisions[key] = &biz.CustomerConfigRevision{
 		CustomerKey:      biz.DefaultCustomerKey,
@@ -762,6 +781,196 @@ func workflowCustomerConfigUCWithMembershipsAndEntitlements(memberships []biz.Wo
 	repo.entitlements[key] = append([]biz.AccessEntitlementInput(nil), entitlements...)
 	repo.modules[key] = []biz.DeploymentModuleStateInput{{ModuleKey: workflowModuleKeyTasks, State: "enabled"}}
 	return biz.NewCustomerConfigUsecase(repo)
+}
+
+func TestJsonrpcDispatcherWorkflowVisibleOwnerRoleKeysFixedCustomerFailsClosed(t *testing.T) {
+	admin := workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWorkflowTaskRead)
+
+	t.Run("fixed customer missing active revision", func(t *testing.T) {
+		t.Setenv("ERP_CUSTOMER_KEY", "yoyoosun")
+		j := &jsonrpcDispatcher{
+			log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+			customerConfigUC: biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo()),
+		}
+		if roleKeys := j.workflowVisibleOwnerRoleKeys(context.Background(), admin, biz.PermissionWorkflowTaskRead); len(roleKeys) != 0 {
+			t.Fatalf("fixed customer without active revision must fail closed, got %#v", roleKeys)
+		}
+	})
+
+	t.Run("fixed customer repository error", func(t *testing.T) {
+		t.Setenv("ERP_CUSTOMER_KEY", "yoyoosun")
+		repo := newServiceCustomerConfigRepo()
+		repo.activeErr = errors.New("customer config repository unavailable")
+		j := &jsonrpcDispatcher{
+			log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+			customerConfigUC: biz.NewCustomerConfigUsecase(repo),
+		}
+		if roleKeys := j.workflowVisibleOwnerRoleKeys(context.Background(), admin, biz.PermissionWorkflowTaskRead); len(roleKeys) != 0 {
+			t.Fatalf("fixed customer repository error must fail closed, got %#v", roleKeys)
+		}
+	})
+
+	t.Run("demo runtime keeps explicit builtin fallback", func(t *testing.T) {
+		t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
+		j := &jsonrpcDispatcher{
+			log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+			customerConfigUC: biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo()),
+		}
+		roleKeys := j.workflowVisibleOwnerRoleKeys(context.Background(), admin, biz.PermissionWorkflowTaskRead)
+		if len(roleKeys) != 1 || roleKeys[0] != biz.WarehouseRoleKey {
+			t.Fatalf("demo fallback roles = %#v", roleKeys)
+		}
+	})
+}
+
+func TestWorkflowTaskAccessRequiresEligibleOwnerRoleOrExactAssignee(t *testing.T) {
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.WarehouseRoleKey},
+		biz.PermissionWorkflowTaskRead,
+		biz.PermissionWorkflowTaskUpdate,
+		biz.PermissionWorkflowTaskComplete,
+	)
+	task := &biz.WorkflowTask{
+		ID:            701,
+		TaskStatusKey: "ready",
+		OwnerRoleKey:  biz.WarehouseRoleKey,
+	}
+
+	if workflowAdminCanViewTask(admin, task, nil) ||
+		workflowAdminCanHandleTask(admin, task, "done", nil) ||
+		workflowAdminCanUrgeTask(admin, task, nil) {
+		t.Fatal("raw owner role must not bypass an empty customer-eligible role set")
+	}
+
+	processID, nodeID := 11, 12
+	terminalTask := *task
+	terminalTask.TaskStatusKey = "done"
+	terminalTask.ProcessInstanceID = &processID
+	terminalTask.ProcessNodeInstanceID = &nodeID
+	if workflowAdminCanReconcileLinkedTask(admin, &terminalTask, nil) {
+		t.Fatal("raw owner role must not bypass customer eligibility during linked-task reconciliation")
+	}
+	pmcAdmin := workflowJSONRPCAdmin([]string{biz.PMCRoleKey}, biz.PermissionWorkflowTaskRead, biz.PermissionWorkflowTaskUpdate)
+	if workflowAdminCanViewTask(pmcAdmin, task, nil) {
+		t.Fatal("PMC oversight view must still require an eligible customer role")
+	}
+	if !workflowAdminCanViewTask(pmcAdmin, task, []string{biz.PMCRoleKey}) {
+		t.Fatal("eligible PMC role must keep oversight view access")
+	}
+
+	if !workflowAdminCanViewTask(admin, task, []string{biz.WarehouseRoleKey}) ||
+		!workflowAdminCanHandleTask(admin, task, "done", []string{biz.WarehouseRoleKey}) ||
+		!workflowAdminCanUrgeTask(admin, task, []string{biz.WarehouseRoleKey}) {
+		t.Fatal("matching customer-eligible warehouse role must keep ordinary workflow access")
+	}
+
+	assigneeID := admin.ID
+	assignedTask := *task
+	assignedTask.AssigneeID = &assigneeID
+	if !workflowAdminCanViewTask(admin, &assignedTask, nil) ||
+		!workflowAdminCanHandleTask(admin, &assignedTask, "done", nil) ||
+		!workflowAdminCanUrgeTask(admin, &assignedTask, nil) {
+		t.Fatal("exact assignee must remain allowed without owner-role eligibility")
+	}
+	assignedTerminalTask := terminalTask
+	assignedTerminalTask.AssigneeID = &assigneeID
+	if !workflowAdminCanReconcileLinkedTask(admin, &assignedTerminalTask, nil) {
+		t.Fatal("exact assignee must remain allowed to reconcile its linked terminal task")
+	}
+}
+
+func TestWorkflowTaskUrgeAndBreakGlassSpecialRolesRemainAvailable(t *testing.T) {
+	task := &biz.WorkflowTask{ID: 702, TaskStatusKey: "ready", OwnerRoleKey: biz.WarehouseRoleKey}
+	for _, roleKey := range []string{biz.PMCRoleKey, biz.BossRoleKey} {
+		admin := workflowJSONRPCAdmin([]string{roleKey}, biz.PermissionWorkflowTaskUpdate)
+		if !workflowAdminCanUrgeTask(admin, task, nil) {
+			t.Fatalf("%s must keep oversight urge access", roleKey)
+		}
+	}
+	superAdmin := workflowJSONRPCAdmin([]string{biz.AdminRoleKey}, biz.PermissionWorkflowTaskUpdate, biz.PermissionWorkflowTaskComplete)
+	superAdmin.IsSuperAdmin = true
+	if !workflowAdminCanUrgeTask(superAdmin, task, nil) {
+		t.Fatal("super admin must keep urge access")
+	}
+	if !workflowAdminCanUseBreakGlass(superAdmin, task, "done") {
+		t.Fatal("super admin must keep explicit break-glass access")
+	}
+	if workflowAdminCanUseBreakGlass(workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWorkflowTaskComplete), task, "done") {
+		t.Fatal("ordinary workflow owner must not gain break-glass access")
+	}
+}
+
+func TestJsonrpcDispatcherWorkflowExplainUsesCustomerEligibleOwnerDecision(t *testing.T) {
+	tests := []struct {
+		name         string
+		profile      biz.RoleProfileInput
+		wantAllowed  bool
+		wantActorKey string
+	}{
+		{
+			name:         "matching warehouse profile remains effective",
+			profile:      biz.RoleProfileInput{RoleKey: biz.WarehouseRoleKey, DisplayName: "仓库"},
+			wantAllowed:  true,
+			wantActorKey: biz.WarehouseRoleKey,
+		},
+		{
+			name:    "revoked warehouse profile is not reported as effective owner",
+			profile: biz.RoleProfileInput{RoleKey: biz.WarehouseRoleKey, DisplayName: "仓库", Revokes: []string{biz.PermissionWorkflowTaskComplete}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
+			task := &biz.WorkflowTask{
+				ID:            703,
+				TaskGroup:     "warehouse_inbound",
+				SourceType:    "inbound",
+				SourceID:      1,
+				TaskStatusKey: "ready",
+				OwnerRoleKey:  biz.WarehouseRoleKey,
+				Payload:       map[string]any{},
+			}
+			admin := workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWorkflowTaskComplete)
+			j := &jsonrpcDispatcher{
+				log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+				adminReader: stubAdminAccountReader{admin: admin},
+				customerConfigUC: workflowCustomerConfigUCWithMembershipsEntitlementsAndProfiles(
+					[]biz.WorkPoolMembershipInput{{PoolKey: biz.WarehouseRoleKey, RoleKey: biz.WarehouseRoleKey, Enabled: true}},
+					[]biz.AccessEntitlementInput{{
+						RoleKey:       biz.WarehouseRoleKey,
+						CapabilityKey: biz.PermissionWorkflowTaskComplete,
+						ScopeType:     "customer",
+						ScopeValue:    biz.DefaultCustomerKey,
+						Enabled:       true,
+					}},
+					[]biz.RoleProfileInput{tt.profile},
+				),
+			}
+			action := j.workflowTaskActionAccessToMap(workflowJSONRPCAdminContext(), admin, task, workflowTaskActionExplainContract{
+				ActionKey:          "complete",
+				StatusKey:          "done",
+				RequiredPermission: biz.PermissionWorkflowTaskComplete,
+			})
+			if action["allowed"] != tt.wantAllowed {
+				t.Fatalf("allowed = %#v, want %v; action=%#v", action["allowed"], tt.wantAllowed, action)
+			}
+			if action["owner_role_matched"] != tt.wantAllowed {
+				t.Fatalf("owner_role_matched = %#v, want %v; action=%#v", action["owner_role_matched"], tt.wantAllowed, action)
+			}
+			if action["actor_role_key"] != tt.wantActorKey {
+				t.Fatalf("actor_role_key = %#v, want %q; action=%#v", action["actor_role_key"], tt.wantActorKey, action)
+			}
+			visibleRoleKeys, ok := action["visible_owner_role_keys"].([]any)
+			if !ok || anyStringSliceContains(visibleRoleKeys, biz.WarehouseRoleKey) != tt.wantAllowed {
+				t.Fatalf("visible owner roles must reuse effective decision, got %#v", action["visible_owner_role_keys"])
+			}
+			configuredRoleKeys, ok := action["configured_candidate_owner_role_keys"].([]any)
+			if !ok || anyStringSliceContains(configuredRoleKeys, biz.WarehouseRoleKey) != tt.wantAllowed {
+				t.Fatalf("configured candidates must honor the same profile decision, got %#v", action["configured_candidate_owner_role_keys"])
+			}
+		})
+	}
 }
 
 func TestJsonrpcDispatcher_WorkflowListTasksIncludesCustomerWorkPoolScope(t *testing.T) {

@@ -87,6 +87,7 @@ func newCustomerConfigTestDispatcherWithRepos(admin *biz.AdminUser, roleKeys []s
 }
 
 type serviceCustomerConfigRepo struct {
+	activeErr    error
 	revisions    map[string]*biz.CustomerConfigRevision
 	modules      map[string][]biz.DeploymentModuleStateInput
 	profiles     map[string][]biz.RoleProfileInput
@@ -684,6 +685,9 @@ func (r *serviceCustomerConfigRepo) GetCustomerConfigRevision(_ context.Context,
 }
 
 func (r *serviceCustomerConfigRepo) GetActiveCustomerConfigRevision(_ context.Context, customerKey string) (*biz.CustomerConfigRevision, error) {
+	if r.activeErr != nil {
+		return nil, r.activeErr
+	}
 	for _, item := range r.revisions {
 		if item.CustomerKey == customerKey && item.Status == biz.CustomerConfigStatusActive {
 			cloned := *item

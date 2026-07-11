@@ -257,8 +257,9 @@ workflow_pg_test:
 	@PURCHASE_RECEIPT_PG_DB_URL="$(PURCHASE_RECEIPT_PG_DB_URL)" bash ../scripts/purchase-receipt-pg.sh test-workflow
 
 # Mandatory transaction/concurrency gate for Source Documents, purchase receipts,
-# receipt adjustments, and Workflow terminal updates. The script sets the PG
-# test flag so these tests cannot silently pass through t.Skip.
+# receipt adjustments, inventory/SKU/reservation/shipment facts, ProcessRuntime
+# domain commands, and Workflow terminal updates. The script sets both guarded PG
+# test flags so these tests cannot silently pass through t.Skip.
 critical_transactions_pg_test:
 	@PURCHASE_RECEIPT_PG_DB_URL="$(PURCHASE_RECEIPT_PG_DB_URL)" bash ../scripts/purchase-receipt-pg.sh test-critical
 

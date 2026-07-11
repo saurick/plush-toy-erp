@@ -8,6 +8,9 @@ ARG GO_TARGETARCH=amd64
 ARG NODE_BUILDER_IMAGE=node:24.14.0
 ARG GO_BUILDER_IMAGE=golang:1.26.4
 ARG RUNTIME_BASE_IMAGE=debian:bookworm-slim
+# Debian 12 的 Chromium 150.0.7871.46 在部分宿主运行时会 SIGTRAP。
+# 版本升级必须显式修改本参数，并重新通过容器启动与真实 PDF 发布烟测。
+ARG CHROMIUM_VERSION=150.0.7871.100-1~deb12u1
 
 # ======================
 # 1) 构建前端静态文件
@@ -82,6 +85,8 @@ RUN --mount=type=cache,id=plush-gomod,target=/go/pkg/mod \
 # ======================
 FROM --platform=$RUNTIMEPLATFORM ${RUNTIME_BASE_IMAGE}
 
+ARG CHROMIUM_VERSION
+
 ENV TZ=Asia/Shanghai
 ENV ERP_PDF_CHROME_PATH=/usr/bin/chromium
 
@@ -89,8 +94,13 @@ RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       tzdata \
       ca-certificates \
-      chromium \
+      "chromium=${CHROMIUM_VERSION}" \
+      "chromium-common=${CHROMIUM_VERSION}" \
       fonts-noto-cjk && \
+    installed_chromium_version="$(dpkg-query -W -f='${Version}' chromium)" && \
+    installed_chromium_common_version="$(dpkg-query -W -f='${Version}' chromium-common)" && \
+    test "$installed_chromium_version" = "$CHROMIUM_VERSION" && \
+    test "$installed_chromium_common_version" = "$CHROMIUM_VERSION" && \
     rm -rf /var/lib/apt/lists/*
 
 ARG GIT_SHA

@@ -53,6 +53,7 @@ function writeFixture({
       "ERP_DEBUG_SEED_ENABLED=false",
       "ERP_DEBUG_CLEANUP_ENABLED=false",
       "ERP_DEBUG_CLEANUP_SCOPE=none",
+      "ERP_PDF_WARMUP=async",
       "JAEGER_BIND_ADDR=127.0.0.1",
       "",
     ].join("\n"),
@@ -111,7 +112,7 @@ function writeFixture({
   return { root, envFile, composeDir };
 }
 
-function runPreflight(fixture, extraArgs = []) {
+function runPreflight(fixture, extraArgs = [], { env = {} } = {}) {
   return spawnSync(
     "bash",
     [
@@ -123,8 +124,46 @@ function runPreflight(fixture, extraArgs = []) {
       "--skip-compose-config",
       ...extraArgs,
     ],
-    { cwd: repoRoot, encoding: "utf8" },
+    { cwd: repoRoot, encoding: "utf8", env: { ...process.env, ...env } },
   );
+}
+
+function createFakeRuntimeBin(root) {
+  const binDir = path.join(root, "bin");
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(binDir, "docker"),
+    `#!/usr/bin/env bash
+set -euo pipefail
+if [[ "\${1:-}" == "compose" && "\${2:-}" == "version" ]]; then
+  exit 0
+fi
+if [[ "\${1:-}" == "compose" ]]; then
+  service="\${@: -1}"
+  printf '%s-cid\n' "$service"
+  exit 0
+fi
+if [[ "\${1:-}" == "exec" ]]; then
+  package="\${@: -1}"
+  if [[ "$package" == "chromium-common" ]]; then
+    printf '%s\n' "\${FAKE_CHROMIUM_COMMON_VERSION:-150.0.7871.100-1~deb12u1}"
+  else
+    printf '%s\n' "\${FAKE_CHROMIUM_VERSION:-150.0.7871.100-1~deb12u1}"
+  fi
+  exit 0
+fi
+exit 1
+`,
+    "utf8",
+  );
+  fs.writeFileSync(
+    path.join(binDir, "curl"),
+    "#!/usr/bin/env bash\nexit 0\n",
+    "utf8",
+  );
+  fs.chmodSync(path.join(binDir, "docker"), 0o755);
+  fs.chmodSync(path.join(binDir, "curl"), 0o755);
+  return binDir;
 }
 
 test("production preflight accepts a prepared runtime env without docker config", () => {
@@ -174,6 +213,47 @@ test("production preflight rejects floating app image tags", () => {
   assert.match(result.stderr, /APP_IMAGE 不能使用 :dev 或 :latest/);
 });
 
+test("production preflight rejects PDF warmup fault-isolation mode", () => {
+  const fixture = writeFixture();
+  fs.writeFileSync(
+    fixture.envFile,
+    fs
+      .readFileSync(fixture.envFile, "utf8")
+      .replace("ERP_PDF_WARMUP=async", "ERP_PDF_WARMUP=off"),
+  );
+  const result = runPreflight(fixture);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /ERP_PDF_WARMUP 生产发布必须显式为 async/);
+});
+
+test("production preflight verifies the runtime Chromium package exact pin", () => {
+  const fixture = writeFixture();
+  const fakeBin = createFakeRuntimeBin(fixture.root);
+  const result = runPreflight(fixture, ["--runtime"], {
+    env: { PATH: `${fakeBin}:${process.env.PATH ?? ""}` },
+  });
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /运行态 Chromium \/ chromium-common 版本与 Docker exact pin 一致: 150\.0\.7871\.100-1~deb12u1/);
+  assert.match(result.stdout, /healthz \/ readyz 通过/);
+});
+
+test("production preflight rejects a stale runtime Chromium package", () => {
+  const fixture = writeFixture();
+  const fakeBin = createFakeRuntimeBin(fixture.root);
+  const result = runPreflight(fixture, ["--runtime"], {
+    env: {
+      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+      FAKE_CHROMIUM_VERSION: "150.0.7871.46-1~deb12u1",
+    },
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /app-server Chromium 版本不匹配/);
+  assert.match(result.stderr, /runtime=150\.0\.7871\.46-1~deb12u1/);
+});
+
 test("production preflight rejects unstable runtime customer keys", () => {
   const fixture = writeFixture();
   fs.writeFileSync(
@@ -219,4 +299,33 @@ test("production preflight rejects build sections in production compose", () => 
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /生产 Compose 不允许包含 build:/);
+});
+
+test("production artifacts pin the verified Chromium build and async warmup", () => {
+  const dockerfile = fs.readFileSync(path.join(repoRoot, "server/Dockerfile"), "utf8");
+  const prodEnv = fs.readFileSync(
+    path.join(repoRoot, "server/deploy/compose/prod/.env.example"),
+    "utf8",
+  );
+  const customerEnv = fs.readFileSync(
+    path.join(repoRoot, "deployments/yoyoosun/env/.env.example"),
+    "utf8",
+  );
+  const customerCompose = fs.readFileSync(
+    path.join(repoRoot, "deployments/yoyoosun/compose/docker-compose.example.yml"),
+    "utf8",
+  );
+
+  assert.match(dockerfile, /^ARG CHROMIUM_VERSION=150\.0\.7871\.100-1~deb12u1$/m);
+  assert(dockerfile.includes('"chromium=${CHROMIUM_VERSION}"'));
+  assert(dockerfile.includes('"chromium-common=${CHROMIUM_VERSION}"'));
+  assert(dockerfile.includes("dpkg-query -W -f='${Version}' chromium"));
+  assert(dockerfile.includes("dpkg-query -W -f='${Version}' chromium-common"));
+  assert(dockerfile.includes('test "$installed_chromium_version" = "$CHROMIUM_VERSION"'));
+  assert(dockerfile.includes('test "$installed_chromium_common_version" = "$CHROMIUM_VERSION"'));
+  for (const envExample of [prodEnv, customerEnv]) {
+    assert.match(envExample, /^ERP_PDF_WARMUP=async$/m);
+    assert.doesNotMatch(envExample, /ERP_PDF_WARMUP_ENABLED/);
+  }
+  assert.match(customerCompose, /ERP_PDF_WARMUP: "\$\{ERP_PDF_WARMUP:-async\}"/);
 });

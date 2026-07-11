@@ -490,31 +490,6 @@ func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter b
 	return out, total, nil
 }
 
-func (r *operationalFactRepo) CreateShipmentDraft(ctx context.Context, in *biz.ShipmentCreate) (*biz.Shipment, error) {
-	if replay, found, err := findShipmentReplay(ctx, r.data.postgres, in, nil); err != nil || found {
-		return replay, err
-	}
-	row, err := r.data.postgres.Shipment.Create().
-		SetShipmentNo(in.ShipmentNo).
-		SetNillableSalesOrderID(in.SalesOrderID).
-		SetNillableCustomerID(in.CustomerID).
-		SetNillableCustomerSnapshot(in.CustomerSnapshot).
-		SetStatus(biz.ShipmentStatusDraft).
-		SetIdempotencyKey(in.IdempotencyKey).
-		SetNillablePlannedShipAt(in.PlannedShipAt).
-		SetNillableNote(in.Note).
-		Save(ctx)
-	if err != nil {
-		if ent.IsConstraintError(err) {
-			if replay, found, replayErr := findShipmentReplay(ctx, r.data.postgres, in, nil); replayErr != nil || found {
-				return replay, replayErr
-			}
-		}
-		return nil, err
-	}
-	return shipmentWithItems(ctx, r.data.postgres, row)
-}
-
 func (r *operationalFactRepo) CreateShipmentDraftWithItems(ctx context.Context, in *biz.ShipmentCreateWithItems) (*biz.Shipment, error) {
 	if replay, found, err := findShipmentReplay(ctx, r.data.postgres, in.Shipment, in.Items); err != nil || found {
 		return replay, err
@@ -553,36 +528,6 @@ func (r *operationalFactRepo) CreateShipmentDraftWithItems(ctx context.Context, 
 		}
 	}
 	return commitShipment(ctx, tx, row)
-}
-
-func (r *operationalFactRepo) AddShipmentItem(ctx context.Context, in *biz.ShipmentItemCreate) (*biz.ShipmentItem, error) {
-	tx, err := r.inv.beginInventoryDBTx(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	if err := lockOperationalFactRow(ctx, tx, "shipments", in.ShipmentID, biz.ErrShipmentNotFound); err != nil {
-		return nil, err
-	}
-	parent, err := tx.client.Shipment.Get(ctx, in.ShipmentID)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, biz.ErrShipmentNotFound
-		}
-		return nil, err
-	}
-	if !corestatus.CanAddShipmentItem(parent.Status) {
-		return nil, biz.ErrBadParam
-	}
-	row, err := createShipmentItem(ctx, tx.client, in.ShipmentID, in)
-	if err != nil {
-		return nil, err
-	}
-	if err := tx.sqlTx.Commit(); err != nil {
-		return nil, err
-	}
-	tx = nil
-	return entShipmentItemToBiz(row), nil
 }
 
 func createShipmentItem(ctx context.Context, client *ent.Client, shipmentID int, in *biz.ShipmentItemCreate) (*ent.ShipmentItem, error) {

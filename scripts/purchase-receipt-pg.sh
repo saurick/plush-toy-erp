@@ -80,8 +80,9 @@ test-workflow)
   ;;
 test-critical)
   PURCHASE_RECEIPT_PG_TEST=1 PURCHASE_RECEIPT_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" \
+    INVENTORY_PG_TEST=1 INVENTORY_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" \
     go test ./internal/data \
-    -run '^(TestPurchaseReceiptPostgres|TestPurchaseReceiptAdjustmentPostgres|TestWorkflowPostgres|TestSourceDocumentPostgres)' \
+    -run '^(TestPurchaseReceiptPostgres|TestPurchaseReceiptAdjustmentPostgres|TestWorkflowPostgres|TestSourceDocumentPostgres|TestInventoryPostgres|TestOperationalFactPostgres|TestProcessRuntimePostgres|TestFinanceProcessCommandPostgres|TestSalesProcessCommandPostgres)' \
     -count=1
   ;;
 dropdb)

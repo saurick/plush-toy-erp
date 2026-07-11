@@ -155,14 +155,6 @@ func (s *stubBusinessDashboardOperationalFactRepo) ListOutsourcingFacts(context.
 	return nil, 2, nil
 }
 
-func (s *stubBusinessDashboardOperationalFactRepo) CreateShipmentDraft(context.Context, *biz.ShipmentCreate) (*biz.Shipment, error) {
-	return nil, biz.ErrBadParam
-}
-
-func (s *stubBusinessDashboardOperationalFactRepo) AddShipmentItem(context.Context, *biz.ShipmentItemCreate) (*biz.ShipmentItem, error) {
-	return nil, biz.ErrBadParam
-}
-
 func (s *stubBusinessDashboardOperationalFactRepo) CreateShipmentDraftWithItems(context.Context, *biz.ShipmentCreateWithItems) (*biz.Shipment, error) {
 	return nil, biz.ErrBadParam
 }

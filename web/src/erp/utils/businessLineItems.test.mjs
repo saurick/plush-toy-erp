@@ -294,22 +294,18 @@ test('businessLineItems: duplicated draft line item clears identity and status f
 })
 
 test('businessLineItems: shipment item preserves SKU traceability from sales order line', () => {
-  const item = createShipmentItemFromSalesOrderItem(
-    {
-      id: 31,
-      product_id: 7,
-      product_sku_id: 11,
-      unit_id: 2,
-      ordered_quantity: '20',
-      product_name_snapshot: '小熊',
-    },
-    5
-  )
+  const item = createShipmentItemFromSalesOrderItem({
+    id: 31,
+    product_id: 7,
+    product_sku_id: 11,
+    unit_id: 2,
+    ordered_quantity: '20',
+    product_name_snapshot: '小熊',
+  })
 
   assert.equal(item.product_sku_id, 11)
   assert.equal(isBlankShipmentItem(item), false)
   assert.deepEqual(buildShipmentItemParams(item), {
-    shipment_id: 5,
     sales_order_item_id: 31,
     product_id: 7,
     product_sku_id: 11,
@@ -359,18 +355,15 @@ test('businessLineItems: shipment source rows show shipped and remaining quantit
 })
 
 test('businessLineItems: shipment import defaults to remaining source quantity', () => {
-  const item = createShipmentItemFromSalesOrderItem(
-    {
-      id: 31,
-      product_id: 7,
-      product_sku_id: 11,
-      unit_id: 2,
-      ordered_quantity: '20',
-      remainingQuantity: 11.5,
-      product_name_snapshot: '小熊',
-    },
-    5
-  )
+  const item = createShipmentItemFromSalesOrderItem({
+    id: 31,
+    product_id: 7,
+    product_sku_id: 11,
+    unit_id: 2,
+    ordered_quantity: '20',
+    remainingQuantity: 11.5,
+    product_name_snapshot: '小熊',
+  })
 
   assert.equal(item.quantity, 11.5)
 })

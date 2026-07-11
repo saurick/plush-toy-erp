@@ -911,12 +911,14 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "const canShip = hasActionPermission(adminProfile, 'shipment.ship')",
         "const canCancel = hasActionPermission(adminProfile, 'shipment.cancel')",
         "disabled={!canCreate}",
-        "selectedRow.status !== 'DRAFT' ||\n              !canCreate",
+        "disabled={!selectedRow || saving}",
+        "onClick={() => openShipmentDetails(selectedRow)}",
         "selectedRow.status !== 'DRAFT' ||\n                !canShip",
         "selectedRow.status !== 'SHIPPED' ||\n                !canCancel",
         "canCreate={canCreate}",
-        "canShip={canShip}",
+        "isViewModal={isViewModal}",
       ],
+      forbiddenTokens: ["addShipmentItem", "mode: 'append'", "维护明细"],
     },
     {
       relativePath: "web/src/erp/pages/V1PurchaseReceiptsPage.jsx",
@@ -958,6 +960,12 @@ test("fact pages keep write buttons behind projected actions and status guards",
       assert(
         source.includes(token),
         `${expectation.name} must keep projected action/status guard token: ${token}`,
+      );
+    }
+    for (const token of expectation.forbiddenTokens || []) {
+      assert(
+        !source.includes(token),
+        `${expectation.name} must not restore retired write entry: ${token}`,
       );
     }
     assert(

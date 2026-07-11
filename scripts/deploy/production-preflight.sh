@@ -137,6 +137,7 @@ required_keys=(
   ERP_DEBUG_SEED_ENABLED
   ERP_DEBUG_CLEANUP_ENABLED
   ERP_DEBUG_CLEANUP_SCOPE
+  ERP_PDF_WARMUP
   JAEGER_BIND_ADDR
 )
 
@@ -193,6 +194,7 @@ else
   erp_debug_env="$(value_of ERP_DEBUG_ENV)"
   erp_debug_seed_enabled="$(value_of ERP_DEBUG_SEED_ENABLED)"
   erp_debug_cleanup_enabled="$(value_of ERP_DEBUG_CLEANUP_ENABLED)"
+  erp_pdf_warmup="$(value_of ERP_PDF_WARMUP | tr '[:upper:]' '[:lower:]')"
   jaeger_bind_addr="$(value_of JAEGER_BIND_ADDR)"
   postgres_bind_addr="$(value_of POSTGRES_BIND_ADDR)"
   app_http_bind_addr="$(value_of APP_HTTP_BIND_ADDR)"
@@ -239,6 +241,7 @@ else
   [[ "$erp_debug_env" == "prod" ]] || fail "ERP_DEBUG_ENV 必须为 prod"
   [[ "$erp_debug_seed_enabled" == "false" ]] || fail "ERP_DEBUG_SEED_ENABLED 必须为 false"
   [[ "$erp_debug_cleanup_enabled" == "false" ]] || fail "ERP_DEBUG_CLEANUP_ENABLED 必须为 false"
+  [[ "$erp_pdf_warmup" == "async" ]] || fail "ERP_PDF_WARMUP 生产发布必须显式为 async；off 只允许故障隔离，不能作为 release-ready 配置"
   [[ "$postgres_bind_addr" == "127.0.0.1" ]] || fail "POSTGRES_BIND_ADDR 必须为 127.0.0.1，避免 PostgreSQL 暴露到公网或办公网"
   [[ "$app_http_bind_addr" == "127.0.0.1" ]] || fail "APP_HTTP_BIND_ADDR 必须为 127.0.0.1，外部流量应先进入前端 / 网关"
   [[ "$app_grpc_bind_addr" == "127.0.0.1" ]] || fail "APP_GRPC_BIND_ADDR 必须为 127.0.0.1，避免 gRPC 直接暴露到公网或办公网"
@@ -261,6 +264,7 @@ else
     fail "TRACE_RATIO 必须在 0 到 1 之间"
   fi
   ok "生产 secret、镜像 tag、debug、后端端口和 PostgreSQL / Jaeger 暴露边界通过"
+  ok "PDF warmup=async 发布边界通过"
 fi
 
 if grep -Eq '^[[:space:]]+build:' "$compose_file"; then
@@ -306,11 +310,29 @@ if [[ "$runtime_check" -eq 1 ]]; then
     fail "--runtime 需要 docker compose / docker-compose"
   fi
 
+  app_cid=""
   for service in postgres jaeger app-server web-desktop; do
     cid="$("${compose_cmd[@]}" ps -q "$service" 2>/dev/null | head -n1 || true)"
     [[ -n "$cid" ]] || fail "运行态缺少 Compose 服务: $service"
+    if [[ "$service" == "app-server" ]]; then
+      app_cid="$cid"
+    fi
   done
   ok "Compose 运行服务存在"
+
+  chromium_dockerfile="$root_dir/server/Dockerfile"
+  [[ -f "$chromium_dockerfile" ]] || fail "缺少 Chromium 版本真源: $chromium_dockerfile"
+  expected_chromium_version="$(sed -nE 's/^ARG CHROMIUM_VERSION=([^[:space:]]+)$/\1/p' "$chromium_dockerfile" | head -n1)"
+  [[ -n "$expected_chromium_version" ]] || fail "server/Dockerfile 缺少 CHROMIUM_VERSION exact pin"
+  runtime_chromium_version="$(docker exec "$app_cid" dpkg-query -W '-f=${Version}' chromium 2>/dev/null || true)"
+  runtime_chromium_version="$(trim "$runtime_chromium_version")"
+  runtime_chromium_common_version="$(docker exec "$app_cid" dpkg-query -W '-f=${Version}' chromium-common 2>/dev/null || true)"
+  runtime_chromium_common_version="$(trim "$runtime_chromium_common_version")"
+  [[ -n "$runtime_chromium_version" ]] || fail "app-server 无法读取 Chromium dpkg 版本"
+  [[ -n "$runtime_chromium_common_version" ]] || fail "app-server 无法读取 chromium-common dpkg 版本"
+  [[ "$runtime_chromium_version" == "$expected_chromium_version" ]] || fail "app-server Chromium 版本不匹配：runtime=$runtime_chromium_version expected=$expected_chromium_version"
+  [[ "$runtime_chromium_common_version" == "$expected_chromium_version" ]] || fail "app-server chromium-common 版本不匹配：runtime=$runtime_chromium_common_version expected=$expected_chromium_version"
+  ok "运行态 Chromium / chromium-common 版本与 Docker exact pin 一致: $runtime_chromium_version"
 
   if command -v curl >/dev/null 2>&1; then
     app_port="$(value_of APP_HTTP_PORT)"

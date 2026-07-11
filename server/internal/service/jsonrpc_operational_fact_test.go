@@ -85,19 +85,23 @@ func TestMapOperationalFactError_ShipmentAndReservationGuards(t *testing.T) {
 	}
 }
 
-func TestShipmentItemParamsPreserveProductSKUTraceability(t *testing.T) {
-	in, ok := shipmentItemCreateFromParams(map[string]any{
-		"shipment_id":         float64(9),
-		"sales_order_item_id": float64(31),
-		"product_id":          float64(7),
-		"product_sku_id":      float64(11),
-		"warehouse_id":        float64(3),
-		"unit_id":             float64(2),
-		"quantity":            "5",
+func TestShipmentAggregateItemParamsPreserveProductSKUTraceability(t *testing.T) {
+	aggregate, ok := shipmentCreateWithItemsFromParams(map[string]any{
+		"shipment_no":     "SHP-SKU-TRACE",
+		"idempotency_key": "SHP-SKU-TRACE",
+		"items": []any{map[string]any{
+			"sales_order_item_id": float64(31),
+			"product_id":          float64(7),
+			"product_sku_id":      float64(11),
+			"warehouse_id":        float64(3),
+			"unit_id":             float64(2),
+			"quantity":            "5",
+		}},
 	})
 	if !ok {
-		t.Fatal("expected shipment item params to parse")
+		t.Fatal("expected shipment aggregate params to parse")
 	}
+	in := aggregate.Items[0]
 	if in.ProductSkuID == nil || *in.ProductSkuID != 11 {
 		t.Fatalf("expected product sku id 11, got %#v", in.ProductSkuID)
 	}
@@ -179,28 +183,7 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresDedicatedShipmentPermissions(t *te
 		t.Fatalf("expected shipment read OK, got %#v", listRes)
 	}
 
-	createParams := mustJSONRPCStruct(t, map[string]any{
-		"shipment_no":     "SHP-JSONRPC-001",
-		"idempotency_key": "SHP-JSONRPC-001",
-	})
-	_, createRes, err := j.handleOperationalFact(ctx, "create_shipment", "3", createParams)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if createRes == nil || createRes.Code != errcode.PermissionDenied.Code {
-		t.Fatalf("expected shipment create permission denied, got %#v", createRes)
-	}
-
 	createAdmin := workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionShipmentCreate)
-	j = newOperationalFactJSONRPCTestData(t, createAdmin)
-	_, createRes, err = j.handleOperationalFact(ctx, "create_shipment", "4", createParams)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected usecase to run after shipment create permission, got %#v", createRes)
-	}
-
 	withItemsParams := mustJSONRPCStruct(t, map[string]any{
 		"shipment_no":     "SHP-JSONRPC-WITH-ITEMS-001",
 		"idempotency_key": "SHP-JSONRPC-WITH-ITEMS-001",
@@ -251,6 +234,24 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresDedicatedShipmentPermissions(t *te
 	}
 }
 
+func TestJsonrpcDispatcher_ShipmentSplitWriteMethodsAreRemoved(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	admin := workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionShipmentCreate)
+	j := newOperationalFactJSONRPCTestData(t, admin)
+
+	for _, method := range []string{"create_shipment", "createShipment", "add_shipment_item", "addShipmentItem"} {
+		t.Run(method, func(t *testing.T) {
+			_, res, err := j.handleOperationalFact(ctx, method, "removed-shipment-split-write", mustJSONRPCStruct(t, map[string]any{}))
+			if err != nil {
+				t.Fatalf("expected nil err, got %v", err)
+			}
+			if res == nil || res.Code != errcode.UnknownMethod.Code || res.Code != 40020 {
+				t.Fatalf("expected removed method %s to return UnknownMethod 40020, got %#v", method, res)
+			}
+		})
+	}
+}
+
 func TestJsonrpcDispatcher_ShipmentAPIRequiresEnabledModules(t *testing.T) {
 	ctx := workflowJSONRPCAdminContext()
 	admin := workflowJSONRPCAdmin(
@@ -272,9 +273,12 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresEnabledModules(t *testing.T) {
 	)
 	activateOperationalFactTestCustomerConfig(t, j, readOnlyShipmentConfig)
 
-	_, createRes, err := j.handleOperationalFact(ctx, "create_shipment", "read-only-create", mustJSONRPCStruct(t, map[string]any{
+	_, createRes, err := j.handleOperationalFact(ctx, "create_shipment_with_items", "read-only-create", mustJSONRPCStruct(t, map[string]any{
 		"shipment_no":     "SHIP-MODULE-READONLY",
 		"idempotency_key": "SHIP-MODULE-READONLY",
+		"items": []any{map[string]any{
+			"product_id": 1, "warehouse_id": 1, "unit_id": 1, "quantity": "1",
+		}},
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -282,8 +286,8 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresEnabledModules(t *testing.T) {
 	if createRes == nil || createRes.Code != errcode.InvalidParam.Code {
 		t.Fatalf("expected read_only shipments create rejected, got %#v", createRes)
 	}
-	if repo.createShipmentCalls != 0 {
-		t.Fatalf("read_only shipments must not create shipment, got %d calls", repo.createShipmentCalls)
+	if repo.createShipmentWithItemsCalls != 0 {
+		t.Fatalf("read_only shipments must not create shipment aggregate, got %d calls", repo.createShipmentWithItemsCalls)
 	}
 	_, listRes, err := j.handleOperationalFact(ctx, "list_shipments", "read-after-read-only", mustJSONRPCStruct(t, map[string]any{"limit": 20}))
 	if err != nil {
@@ -295,16 +299,6 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresEnabledModules(t *testing.T) {
 
 	enabledConfig := customerConfigPublishParamsForRevision(t, "2026.06.28.shipments-enabled")
 	activateOperationalFactTestCustomerConfig(t, j, enabledConfig)
-	_, createEnabledRes, err := j.handleOperationalFact(ctx, "create_shipment", "enabled-create", mustJSONRPCStruct(t, map[string]any{
-		"shipment_no":     "SHIP-MODULE-ENABLED",
-		"idempotency_key": "SHIP-MODULE-ENABLED",
-	}))
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if createEnabledRes == nil || createEnabledRes.Code != errcode.OK.Code {
-		t.Fatalf("expected enabled create OK, got %#v", createEnabledRes)
-	}
 	_, createWithItemsRes, err := j.handleOperationalFact(ctx, "create_shipment_with_items", "enabled-create-with-items", mustJSONRPCStruct(t, map[string]any{
 		"shipment_no":     "SHIP-MODULE-WITH-ITEMS",
 		"idempotency_key": "SHIP-MODULE-WITH-ITEMS",
@@ -322,19 +316,6 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresEnabledModules(t *testing.T) {
 	}
 	if createWithItemsRes == nil || createWithItemsRes.Code != errcode.OK.Code {
 		t.Fatalf("expected enabled create-with-items OK, got %#v", createWithItemsRes)
-	}
-	_, addItemRes, err := j.handleOperationalFact(ctx, "add_shipment_item", "enabled-add-item", mustJSONRPCStruct(t, map[string]any{
-		"shipment_id":  100,
-		"product_id":   1,
-		"warehouse_id": 1,
-		"unit_id":      1,
-		"quantity":     "1",
-	}))
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if addItemRes == nil || addItemRes.Code != errcode.OK.Code {
-		t.Fatalf("expected enabled add item OK, got %#v", addItemRes)
 	}
 	_, shipRes, err := j.handleOperationalFact(ctx, "ship_shipment", "enabled-ship", mustJSONRPCStruct(t, map[string]any{"id": 100}))
 	if err != nil {
@@ -886,9 +867,7 @@ func TestJsonrpcDispatcher_OperationalFactListsRejectInvalidEnums(t *testing.T) 
 
 type shipmentModuleGateOperationalFactRepo struct {
 	stubBusinessDashboardOperationalFactRepo
-	createShipmentCalls          int
 	createShipmentWithItemsCalls int
-	addShipmentItemCalls         int
 	shipShipmentCalls            int
 	cancelShipmentCalls          int
 	cancelShipmentActorID        int
@@ -904,20 +883,6 @@ func (r *shipmentModuleGateOperationalFactRepo) UnitIsActive(context.Context, in
 
 func (r *shipmentModuleGateOperationalFactRepo) WarehouseIsActive(context.Context, int) (bool, error) {
 	return true, nil
-}
-
-func (r *shipmentModuleGateOperationalFactRepo) CreateShipmentDraft(_ context.Context, in *biz.ShipmentCreate) (*biz.Shipment, error) {
-	r.createShipmentCalls++
-	now := time.Now()
-	return &biz.Shipment{
-		ID:             100,
-		ShipmentNo:     in.ShipmentNo,
-		Status:         biz.ShipmentStatusDraft,
-		IdempotencyKey: in.IdempotencyKey,
-		PlannedShipAt:  in.PlannedShipAt,
-		CreatedAt:      now,
-		UpdatedAt:      now,
-	}, nil
 }
 
 func (r *shipmentModuleGateOperationalFactRepo) CreateShipmentDraftWithItems(_ context.Context, in *biz.ShipmentCreateWithItems) (*biz.Shipment, error) {
@@ -948,24 +913,6 @@ func (r *shipmentModuleGateOperationalFactRepo) CreateShipmentDraftWithItems(_ c
 		})
 	}
 	return out, nil
-}
-
-func (r *shipmentModuleGateOperationalFactRepo) AddShipmentItem(_ context.Context, in *biz.ShipmentItemCreate) (*biz.ShipmentItem, error) {
-	r.addShipmentItemCalls++
-	now := time.Now()
-	return &biz.ShipmentItem{
-		ID:               201,
-		ShipmentID:       in.ShipmentID,
-		SalesOrderItemID: in.SalesOrderItemID,
-		ProductID:        in.ProductID,
-		ProductSkuID:     in.ProductSkuID,
-		WarehouseID:      in.WarehouseID,
-		UnitID:           in.UnitID,
-		LotID:            in.LotID,
-		Quantity:         in.Quantity,
-		CreatedAt:        now,
-		UpdatedAt:        now,
-	}, nil
 }
 
 func (r *shipmentModuleGateOperationalFactRepo) ShipShipment(_ context.Context, shipmentID int) (*biz.Shipment, error) {

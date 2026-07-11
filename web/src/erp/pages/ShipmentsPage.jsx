@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
+  EyeOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
 import { Button, Form, Popconfirm, Tag, Typography } from 'antd'
@@ -11,7 +12,6 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
-  addShipmentItem,
   cancelShipment,
   createShipmentWithItems,
   listShipments,
@@ -79,7 +79,6 @@ import {
   productSKUOption,
   salesOrderItemOption,
   salesOrderOption,
-  shipmentOption,
   uniqueReferenceOptions,
   unitOption,
   warehouseOptionFromRecord,
@@ -211,10 +210,6 @@ export default function ShipmentsPage() {
   const salesOrderItemOptions = useMemo(
     () => uniqueReferenceOptions(salesOrderItems, salesOrderItemOption),
     [salesOrderItems]
-  )
-  const shipmentOptions = useMemo(
-    () => uniqueReferenceOptions(rows, shipmentOption),
-    [rows]
   )
   const unitOptions = useMemo(
     () => uniqueReferenceOptions(units, unitOption),
@@ -407,7 +402,7 @@ export default function ShipmentsPage() {
 
   const shipmentModalMode = shipmentModal?.mode || ''
   const isCreateModal = shipmentModalMode === 'create'
-  const isAppendModal = shipmentModalMode === 'append'
+  const isViewModal = shipmentModalMode === 'view'
   const selectedSalesOrder = useMemo(
     () => salesOrdersByID.get(Number(selectedSalesOrderID || 0)) || null,
     [salesOrdersByID, selectedSalesOrderID]
@@ -593,11 +588,9 @@ export default function ShipmentsPage() {
         items: [
           ...currentItems,
           ...importableItems.map((item) =>
-            createShipmentItemFromSalesOrderItem(
-              item,
-              modalSelectedShipment?.id,
-              { quantity: item.remainingQuantity }
-            )
+            createShipmentItemFromSalesOrderItem(item, {
+              quantity: item.remainingQuantity,
+            })
           ),
         ],
       })
@@ -625,14 +618,14 @@ export default function ShipmentsPage() {
     setShipmentModal({ mode: 'create', shipment: null })
   }
 
-  const openAppendItems = (shipment) => {
+  const openShipmentDetails = (shipment) => {
     shipmentAttachmentRef.current?.clearPendingAttachments()
     shipmentForm.resetFields()
     shipmentForm.setFieldsValue({
       ...shipmentFormValues(shipment),
-      items: [createBlankShipmentItem(shipment?.id)],
+      items: Array.isArray(shipment?.items) ? shipment.items : [],
     })
-    setShipmentModal({ mode: 'append', shipment })
+    setShipmentModal({ mode: 'view', shipment })
   }
 
   const closeShipmentModal = () => {
@@ -642,39 +635,20 @@ export default function ShipmentsPage() {
     shipmentForm.resetFields()
   }
 
-  const addShipmentItems = async (shipmentID, items = []) => {
-    if (!positiveInt(shipmentID)) {
-      throw new Error('缺少出货单，无法保存出货明细')
-    }
-    const normalizedItems = items.map((item) =>
-      buildShipmentItemParams({ ...item, shipment_id: shipmentID })
-    )
-    for (const item of normalizedItems) {
-      await addShipmentItem(item)
-    }
-  }
-
   const submitShipmentModal = async () => {
     try {
       const values = await shipmentForm.validateFields()
       setSaving(true)
-      let savedShipment = modalSelectedShipment
-      if (isCreateModal) {
-        savedShipment = await createShipmentWithItems(
-          buildShipmentWithItemsParams(values)
-        )
-      } else if (isAppendModal) {
-        await addShipmentItems(modalSelectedShipment?.id, values.items || [])
-      }
+      const savedShipment = await createShipmentWithItems(
+        buildShipmentWithItemsParams(values)
+      )
       const attachmentSaved =
         (await shipmentAttachmentRef.current?.flushPendingAttachments(
           savedShipment?.id
         )) !== false
       message.success(
         attachmentSaved
-          ? isCreateModal
-            ? '出货单草稿和明细已保存'
-            : '出货明细已保存'
+          ? '出货单草稿和明细已保存'
           : '出货单已保存，未上传的附件请重新选择'
       )
       closeShipmentModal()
@@ -916,16 +890,11 @@ export default function ShipmentsPage() {
           </Button>
           <Button
             size="small"
-            icon={<PlusOutlined />}
-            disabled={
-              !selectedRow ||
-              selectedRow.status !== 'DRAFT' ||
-              !canCreate ||
-              saving
-            }
-            onClick={() => openAppendItems(selectedRow)}
+            icon={<EyeOutlined />}
+            disabled={!selectedRow || saving}
+            onClick={() => openShipmentDetails(selectedRow)}
           >
-            维护明细
+            查看明细
           </Button>
           <Popconfirm
             title="确认出货并写库存 OUT？"
@@ -1003,14 +972,13 @@ export default function ShipmentsPage() {
 
       <ShipmentBusinessModal
         canCreate={canCreate}
-        canShip={canShip}
         customerOptions={customerOptions}
         form={shipmentForm}
         importSalesOrderToShipment={importSalesOrderToShipment}
         inventoryLots={inventoryLots}
         inventoryLotOptions={inventoryLotOptions}
-        isAppendModal={isAppendModal}
         isCreateModal={isCreateModal}
+        isViewModal={isViewModal}
         modalSelectedShipment={modalSelectedShipment}
         onCancel={closeShipmentModal}
         onOk={submitShipmentModal}
@@ -1031,7 +999,6 @@ export default function ShipmentsPage() {
         setSalesOrderImportOpen={setSalesOrderImportOpen}
         shipmentAttachmentRef={shipmentAttachmentRef}
         shipmentSourceRows={shipmentSourceRows}
-        shipmentOptions={shipmentOptions}
         sourceLoading={sourceLoading}
         unitOptions={unitOptions}
         warehouseOptions={warehouseOptions}

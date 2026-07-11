@@ -17,7 +17,7 @@ Input template only:
   bash deployments/yoyoosun/scripts/run-smoke.sh --print-input-template
 
 说明:
-  只做轻量 health / route / customer_config effective session smoke，不创建业务事实。
+  做轻量 health / route / customer_config effective session smoke；带管理员 token 时还会真实生成最小 PDF，不创建业务事实。
 USAGE
 }
 
@@ -50,7 +50,8 @@ print_input_template() {
     "server-readyz when --backend-url is provided",
     "login-page",
     "mobile-role-route",
-    "customer-config-effective-session when --customer-config-revision is provided"
+    "customer-config-effective-session when --customer-config-revision is provided",
+    "template-pdf-render when --customer-config-revision and an admin token are provided"
   ],
   "commands": [
     "bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json",
@@ -62,6 +63,7 @@ print_input_template() {
     "expectedRevision matches the activated customer config revision",
     "tokenSourceEnv is recorded",
     "responseBodyStored=false",
+    "template-pdf-render returns HTTP 200 with application/pdf, starts with %PDF, and records only contentType/sha256/sizeBytes with responseBodyStored=false",
     "report backendEndpointAlias matches the release executor report backendEndpointAlias"
   ],
   "boundary": "This template does not call endpoints, read admin tokens, call customer_config, write smoke-test-report.json, write database rows, import business data, or prove active revision readback. Real proof requires running the smoke command against the target backend with an admin token env and storing only the redacted customer-config-effective-session check."
@@ -163,6 +165,8 @@ checks+=(
 passed=0
 failed=0
 items=()
+pdf_body=""
+trap 'if [[ -n "${pdf_body:-}" ]]; then rm -f "$pdf_body"; fi' EXIT
 
 for check in "${checks[@]}"; do
   name="${check%%:*}"
@@ -236,6 +240,51 @@ NODE
   fi
   checks+=("customer-config-effective-session")
   items+=("{\"name\":\"customer-config-effective-session\",\"status\":\"$status\",\"target\":\"jsonrpc:customer_config.get_effective_session\",\"expectedRevision\":\"$customer_config_revision\",\"tokenSourceEnv\":\"$admin_token_env\",\"responseBodyStored\":false}")
+
+  pdf_status="fail"
+  pdf_http_code=""
+  pdf_content_type=""
+  pdf_size_bytes=0
+  pdf_sha256=""
+  pdf_body="$(mktemp "${TMPDIR:-/tmp}/yoyoosun-pdf-smoke.XXXXXX")"
+  if [[ -n "$token" ]]; then
+    pdf_payload='{"title":"Release PDF Smoke","file_name":"release-pdf-smoke.pdf","template_key":"material-purchase-contract","customer_key":"yoyoosun","html":"<!doctype html><html><body><p>release-pdf-smoke</p></body></html>"}'
+    pdf_curl_meta="$(
+      curl -k --connect-timeout 2 --max-time 45 --retry 1 --retry-delay 1 --retry-connrefused \
+        -sS \
+        -o "$pdf_body" \
+        -w '%{http_code}|%{content_type}' \
+        -H "Content-Type: application/json" \
+        -H "Accept: application/pdf" \
+        -H "Authorization: Bearer $token" \
+        -d "$pdf_payload" \
+        "$rpc_base_url/templates/render-pdf" || true
+    )"
+    pdf_http_code="${pdf_curl_meta%%|*}"
+    pdf_content_type="${pdf_curl_meta#*|}"
+    pdf_content_type="$(printf '%s' "$pdf_content_type" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+    pdf_signature="$(LC_ALL=C dd if="$pdf_body" bs=4 count=1 2>/dev/null || true)"
+    if [[ "$pdf_http_code" == "200" && "$pdf_content_type" == "application/pdf" && -s "$pdf_body" && "$pdf_signature" == "%PDF" ]]; then
+      pdf_size_bytes="$(wc -c <"$pdf_body" | tr -d '[:space:]')"
+      pdf_sha256="$(node - "$pdf_body" <<'NODE'
+const fs = require("node:fs");
+const crypto = require("node:crypto");
+const file = process.argv[2];
+process.stdout.write(crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex"));
+NODE
+)"
+      pdf_status="pass"
+    fi
+  fi
+  rm -f "$pdf_body"
+  pdf_body=""
+  if [[ "$pdf_status" == "pass" ]]; then
+    passed=$((passed + 1))
+  else
+    failed=$((failed + 1))
+  fi
+  checks+=("template-pdf-render")
+  items+=("{\"name\":\"template-pdf-render\",\"status\":\"$pdf_status\",\"target\":\"/templates/render-pdf\",\"httpCode\":\"$pdf_http_code\",\"contentType\":\"$pdf_content_type\",\"sha256\":\"$pdf_sha256\",\"sizeBytes\":$pdf_size_bytes,\"tokenSourceEnv\":\"$admin_token_env\",\"responseBodyStored\":false}")
 fi
 
 {

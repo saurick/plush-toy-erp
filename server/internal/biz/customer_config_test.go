@@ -8,6 +8,7 @@ import (
 )
 
 type memCustomerConfigRepo struct {
+	activeErr     error
 	revisions     map[string]*CustomerConfigRevision
 	modules       map[string][]DeploymentModuleStateInput
 	roles         map[string][]RoleProfileInput
@@ -47,6 +48,9 @@ func (r *memCustomerConfigRepo) GetCustomerConfigRevision(_ context.Context, cus
 }
 
 func (r *memCustomerConfigRepo) GetActiveCustomerConfigRevision(_ context.Context, customerKey string) (*CustomerConfigRevision, error) {
+	if r.activeErr != nil {
+		return nil, r.activeErr
+	}
 	for _, item := range r.revisions {
 		if item.CustomerKey == customerKey && item.Status == CustomerConfigStatusActive {
 			cloned := *item
@@ -1792,6 +1796,8 @@ func TestCustomerConfigUsecaseWorkflowVisibleOwnerRoleKeysIncludesWorkPoolMember
 		Enabled:  true,
 	})
 	in.AccessEntitlements = append(in.AccessEntitlements,
+		AccessEntitlementInput{RoleKey: SalesRoleKey, CapabilityKey: PermissionWorkflowTaskRead, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
+		AccessEntitlementInput{RoleKey: SalesRoleKey, CapabilityKey: PermissionWorkflowTaskUpdate, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
 		AccessEntitlementInput{RoleKey: WarehouseRoleKey, CapabilityKey: PermissionWorkflowTaskRead, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
 		AccessEntitlementInput{RoleKey: WarehouseRoleKey, CapabilityKey: PermissionWorkflowTaskUpdate, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
 	)
@@ -1912,8 +1918,116 @@ func TestCustomerConfigUsecaseWorkflowVisibleOwnerRoleKeysRequiresMatchingEntitl
 	if got[WarehouseRoleKey] {
 		t.Fatalf("warehouse must not be visible when workflow.task.read only matches another customer scope: %#v", roleKeys)
 	}
-	if !got[SalesRoleKey] {
-		t.Fatalf("base admin role visibility must remain available, got %#v", roleKeys)
+	if got[SalesRoleKey] {
+		t.Fatalf("base admin role must also require same-role same-customer workflow entitlement, got %#v", roleKeys)
+	}
+}
+
+func TestCustomerConfigUsecaseWorkflowVisibleOwnerRoleKeysComposesProfilesEntitlementsAndRevokes(t *testing.T) {
+	tests := []struct {
+		name             string
+		warehouseProfile RoleProfileInput
+		warehouseGrant   *AccessEntitlementInput
+		wantWarehouse    bool
+	}{
+		{
+			name:             "sales entitlement cannot qualify warehouse membership",
+			warehouseProfile: RoleProfileInput{RoleKey: WarehouseRoleKey, DisplayName: "仓库"},
+		},
+		{
+			name:             "matching warehouse profile and entitlement allow membership",
+			warehouseProfile: RoleProfileInput{RoleKey: WarehouseRoleKey, DisplayName: "仓库"},
+			warehouseGrant:   &AccessEntitlementInput{RoleKey: WarehouseRoleKey, CapabilityKey: PermissionWorkflowTaskComplete, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
+			wantWarehouse:    true,
+		},
+		{
+			name:             "disabled warehouse profile denies matching entitlement",
+			warehouseProfile: RoleProfileInput{RoleKey: WarehouseRoleKey, DisplayName: "仓库", Disabled: true},
+			warehouseGrant:   &AccessEntitlementInput{RoleKey: WarehouseRoleKey, CapabilityKey: PermissionWorkflowTaskComplete, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
+		},
+		{
+			name:             "warehouse profile revoke denies matching entitlement",
+			warehouseProfile: RoleProfileInput{RoleKey: WarehouseRoleKey, DisplayName: "仓库", Revokes: []string{PermissionWorkflowTaskComplete}},
+			warehouseGrant:   &AccessEntitlementInput{RoleKey: WarehouseRoleKey, CapabilityKey: PermissionWorkflowTaskComplete, ScopeType: "customer", ScopeValue: "yoyoosun", Enabled: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			repo := newMemCustomerConfigRepo()
+			uc := NewCustomerConfigUsecase(repo)
+			in := validCustomerConfigInput()
+			in.RoleProfiles = append(in.RoleProfiles, tt.warehouseProfile)
+			in.WorkPools = append(in.WorkPools, WorkPoolInput{PoolKey: "warehouse", ModuleKey: "inventory", DisplayName: "仓库池"})
+			in.WorkPoolMemberships = append(in.WorkPoolMemberships, WorkPoolMembershipInput{
+				PoolKey:  "warehouse",
+				RoleKey:  WarehouseRoleKey,
+				UserID:   7,
+				Strategy: "direct_user_pool",
+				Enabled:  true,
+			})
+			in.AccessEntitlements = append(in.AccessEntitlements, AccessEntitlementInput{
+				RoleKey:       SalesRoleKey,
+				CapabilityKey: PermissionWorkflowTaskComplete,
+				ScopeType:     "customer",
+				ScopeValue:    "yoyoosun",
+				Enabled:       true,
+			})
+			if tt.warehouseGrant != nil {
+				in.AccessEntitlements = append(in.AccessEntitlements, *tt.warehouseGrant)
+			}
+			if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
+				t.Fatalf("PublishCustomerConfig error = %v", err)
+			}
+			if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+				t.Fatalf("ActivateCustomerConfig error = %v", err)
+			}
+
+			roleKeys, err := uc.WorkflowVisibleOwnerRoleKeys(ctx, "yoyoosun", &AdminUser{
+				ID:    7,
+				Roles: []AdminRole{{Key: SalesRoleKey}},
+			}, PermissionWorkflowTaskComplete)
+			if err != nil {
+				t.Fatalf("WorkflowVisibleOwnerRoleKeys error = %v", err)
+			}
+			got := map[string]bool{}
+			for _, roleKey := range roleKeys {
+				got[roleKey] = true
+			}
+			if !got[SalesRoleKey] {
+				t.Fatalf("sales base role with matching profile and entitlement must remain eligible: %#v", roleKeys)
+			}
+			if got[WarehouseRoleKey] != tt.wantWarehouse {
+				t.Fatalf("warehouse eligible = %v, want %v; roles=%#v", got[WarehouseRoleKey], tt.wantWarehouse, roleKeys)
+			}
+		})
+	}
+}
+
+func TestCustomerConfigUsecaseWorkflowVisibleOwnerRoleKeysFixedCustomerFailsClosed(t *testing.T) {
+	admin := &AdminUser{ID: 7, Roles: []AdminRole{{Key: WarehouseRoleKey}}}
+	repo := newMemCustomerConfigRepo()
+	uc := NewCustomerConfigUsecase(repo)
+
+	fallbackRoleKeys, err := uc.WorkflowVisibleOwnerRoleKeys(context.Background(), DefaultCustomerKey, admin, PermissionWorkflowTaskRead)
+	if err != nil {
+		t.Fatalf("demo fallback error = %v", err)
+	}
+	if len(fallbackRoleKeys) != 1 || fallbackRoleKeys[0] != WarehouseRoleKey {
+		t.Fatalf("demo fallback roles = %#v", fallbackRoleKeys)
+	}
+
+	strictRoleKeys, err := uc.WorkflowVisibleOwnerRoleKeysRequiringActiveRevision(context.Background(), "yoyoosun", admin, PermissionWorkflowTaskRead)
+	if !errors.Is(err, ErrCustomerConfigActiveRevisionRequired) || len(strictRoleKeys) != 0 {
+		t.Fatalf("fixed missing revision roles=%#v err=%v", strictRoleKeys, err)
+	}
+
+	repoErr := errors.New("role projection repo unavailable")
+	repo.activeErr = repoErr
+	strictRoleKeys, err = uc.WorkflowVisibleOwnerRoleKeysRequiringActiveRevision(context.Background(), "yoyoosun", admin, PermissionWorkflowTaskRead)
+	if !errors.Is(err, repoErr) || len(strictRoleKeys) != 0 {
+		t.Fatalf("fixed repo error roles=%#v err=%v", strictRoleKeys, err)
 	}
 }
 

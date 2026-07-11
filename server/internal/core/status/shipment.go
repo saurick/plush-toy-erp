@@ -11,10 +11,6 @@ type ShipmentTransition struct {
 	Changed bool
 }
 
-func CanAddShipmentItem(current string) bool {
-	return current == ShipmentDraft
-}
-
 func ShipShipment(current string) (ShipmentTransition, bool) {
 	switch current {
 	case ShipmentDraft:

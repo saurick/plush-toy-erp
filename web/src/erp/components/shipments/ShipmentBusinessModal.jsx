@@ -215,7 +215,6 @@ function ShipmentSelectedSourceAlert({
 function ShipmentItemFormFields({
   field,
   form,
-  showShipmentID = false,
   inventoryLots = [],
   inventoryLotOptions = [],
   products = [],
@@ -224,7 +223,6 @@ function ShipmentItemFormFields({
   productSKUOptions = [],
   salesOrderItems = [],
   salesOrderItemOptions = [],
-  shipmentOptions = [],
   unitOptions = [],
   warehouseOptions = [],
 }) {
@@ -261,22 +259,6 @@ function ShipmentItemFormFields({
   }
   return (
     <>
-      {showShipmentID ? (
-        <Form.Item
-          className="erp-business-action-form__field"
-          label="出货单"
-          name={fieldName('shipment_id')}
-          rules={[{ required: true, message: '请选择出货单' }]}
-        >
-          <Select
-            allowClear
-            optionFilterProp="label"
-            options={shipmentOptions}
-            placeholder="请选择出货单"
-            showSearch
-          />
-        </Form.Item>
-      ) : null}
       <Form.Item
         className="erp-business-action-form__field"
         label="销售订单行追溯"
@@ -453,14 +435,13 @@ function ShipmentItemsTable({
 
 export default function ShipmentBusinessModal({
   canCreate = false,
-  canShip = false,
   customerOptions = [],
   form,
   importSalesOrderToShipment,
   inventoryLots = [],
   inventoryLotOptions = [],
-  isAppendModal = false,
   isCreateModal = false,
+  isViewModal = false,
   modalSelectedShipment,
   onCancel,
   onOk,
@@ -481,7 +462,6 @@ export default function ShipmentBusinessModal({
   setSalesOrderImportOpen,
   shipmentAttachmentRef,
   shipmentSourceRows = [],
-  shipmentOptions = [],
   sourceLoading = false,
   unitOptions = [],
   warehouseOptions = [],
@@ -491,21 +471,19 @@ export default function ShipmentBusinessModal({
 
   return (
     <BusinessFormModal
-      title={
+      title={isCreateModal ? '新建出货单' : '查看出货明细'}
+      description={
         isCreateModal
-          ? '新建出货单'
-          : isAppendModal
-            ? '维护出货明细'
-            : '维护出货明细'
+          ? '单头和出货明细由后端事务一次写入。'
+          : '只读查看当前出货单头和已保存明细。'
       }
-      description="出货单弹窗上方维护主表字段，下方维护出货明细；新建保存由后端事务一次写入。"
-      open={Boolean(isCreateModal || isAppendModal)}
+      open={Boolean(isCreateModal || isViewModal)}
       onCancel={onCancel}
-      onOk={onOk}
+      onOk={isCreateModal ? onOk : undefined}
       okText="保存"
-      cancelText="取消"
+      cancelText={isCreateModal ? '取消' : '关闭'}
       confirmLoading={saving}
-      okButtonProps={{ disabled: !canCreate }}
+      okButtonProps={{ disabled: !canCreate, hidden: isViewModal }}
       forceRender
       destroyOnHidden={false}
     >
@@ -523,14 +501,16 @@ export default function ShipmentBusinessModal({
           ownerId={modalSelectedShipment?.id}
           title="出货附件"
           description="上传装箱照片、物流单、签收回单、交付或出口凭证；附件不替代确认出货动作。"
-          canUpload={canCreate || canShip}
-          canDelete={canCreate || canShip}
+          canUpload={isCreateModal && canCreate}
+          canDelete={isCreateModal && canCreate}
           variant="inline"
         />
-        <ShipmentSelectedSourceAlert
-          selectedSalesOrder={selectedSalesOrder}
-          shipmentSourceRows={shipmentSourceRows}
-        />
+        {isCreateModal ? (
+          <ShipmentSelectedSourceAlert
+            selectedSalesOrder={selectedSalesOrder}
+            shipmentSourceRows={shipmentSourceRows}
+          />
+        ) : null}
         {modalSelectedShipment ? (
           <section className="erp-master-contact-list erp-shipment-modal-items">
             <div className="erp-master-contact-list__head">
@@ -551,111 +531,112 @@ export default function ShipmentBusinessModal({
             />
           </section>
         ) : null}
-        <Form.List name="items">
-          {(fields, { add, remove }) => (
-            <section className="erp-master-contact-list erp-shipment-modal-items">
-              <div className="erp-master-contact-list__head">
-                <div>
-                  <strong>{isCreateModal ? '出货明细' : '新增出货明细'}</strong>
-                  <span>
-                    明细随当前弹窗保存；可从销售订单导入来源，库存 OUT
-                    仍由确认出货动作写入。
-                  </span>
-                </div>
-              </div>
-              <div className="erp-line-items-form__import-row">
-                <div className="erp-line-items-form__import-copy">
-                  <strong>从销售订单导入</strong>
-                  <span>
-                    先选择销售订单来源；产品、SKU、单位和订单行追溯带回主弹窗，
-                    仓库 / 批次仍在出货明细里补齐。
-                  </span>
-                </div>
-                <Button
-                  className="erp-line-items-form__import-button"
-                  onClick={onOpenSalesOrderImport}
-                >
-                  从销售订单导入
-                </Button>
-              </div>
-              <SourceImportPickerModal
-                open={salesOrderImportOpen}
-                title="从销售订单导入出货明细"
-                description="选择同一张销售订单的来源行；导入后回到主弹窗维护仓库和批次。"
-                rows={salesOrderSources}
-                columns={salesOrderImportColumns}
-                multiple
-                loading={sourceLoading}
-                getSelectedLabel={(item) =>
-                  `第 ${item?.line_no || '-'} 行 / ${formatQuantity(
-                    item?.remainingQuantity
-                  )}`
-                }
-                getRowDisabledReason={(item) => item.disabledReason}
-                isRowDisabled={(item) => Boolean(item.disabledReason)}
-                searchPlaceholder="搜索订单"
-                searchHint="可搜索：销售订单号、客户订单号、客户、产品"
-                emptyDescription="暂无可导入销售订单行"
-                onCancel={() => setSalesOrderImportOpen(false)}
-                onImport={importSalesOrderToShipment}
-              />
-              <div className="erp-master-contact-list__items">
-                {fields.map((field, index) => (
-                  <div
-                    className="erp-master-contact-list__row"
-                    key={field.key}
-                    ref={(node) => registerLineItemRow(index, node)}
-                  >
-                    <div className="erp-master-contact-list__row-head">
-                      <strong>明细 {field.name + 1}</strong>
-                      <Button
-                        danger
-                        size="small"
-                        icon={<DeleteOutlined />}
-                        disabled={fields.length <= 1}
-                        onClick={() => remove(field.name)}
-                      >
-                        移除明细
-                      </Button>
-                    </div>
-                    <div className="erp-master-contact-list__grid">
-                      <ShipmentItemFormFields
-                        field={field}
-                        form={form}
-                        inventoryLots={inventoryLots}
-                        inventoryLotOptions={inventoryLotOptions}
-                        products={products}
-                        productOptions={productOptions}
-                        productSKUs={productSKUs}
-                        productSKUOptions={productSKUOptions}
-                        salesOrderItems={salesOrderItems}
-                        salesOrderItemOptions={salesOrderItemOptions}
-                        shipmentOptions={shipmentOptions}
-                        unitOptions={unitOptions}
-                        warehouseOptions={warehouseOptions}
-                      />
-                    </div>
+        {isCreateModal ? (
+          <Form.List name="items">
+            {(fields, { add, remove }) => (
+              <section className="erp-master-contact-list erp-shipment-modal-items">
+                <div className="erp-master-contact-list__head">
+                  <div>
+                    <strong>出货明细</strong>
+                    <span>
+                      明细随当前弹窗保存；可从销售订单导入来源，库存 OUT
+                      仍由确认出货动作写入。
+                    </span>
                   </div>
-                ))}
-              </div>
-              <BusinessLineItemsFooter
-                addLabel="添加条目"
-                onAdd={() => {
-                  add(createBlankShipmentItem(modalSelectedShipment?.id))
-                  requestLineItemScroll(fields.length)
-                }}
-                stats={[
-                  {
-                    key: 'count',
-                    label: '已录入',
-                    value: fields.length,
-                    suffix: '条',
-                  },
-                ]}
-              />
-            </section>
-          )}
-        </Form.List>
+                </div>
+                <div className="erp-line-items-form__import-row">
+                  <div className="erp-line-items-form__import-copy">
+                    <strong>从销售订单导入</strong>
+                    <span>
+                      先选择销售订单来源；产品、SKU、单位和订单行追溯带回主弹窗，
+                      仓库 / 批次仍在出货明细里补齐。
+                    </span>
+                  </div>
+                  <Button
+                    className="erp-line-items-form__import-button"
+                    onClick={onOpenSalesOrderImport}
+                  >
+                    从销售订单导入
+                  </Button>
+                </div>
+                <SourceImportPickerModal
+                  open={salesOrderImportOpen}
+                  title="从销售订单导入出货明细"
+                  description="选择同一张销售订单的来源行；导入后回到主弹窗维护仓库和批次。"
+                  rows={salesOrderSources}
+                  columns={salesOrderImportColumns}
+                  multiple
+                  loading={sourceLoading}
+                  getSelectedLabel={(item) =>
+                    `第 ${item?.line_no || '-'} 行 / ${formatQuantity(
+                      item?.remainingQuantity
+                    )}`
+                  }
+                  getRowDisabledReason={(item) => item.disabledReason}
+                  isRowDisabled={(item) => Boolean(item.disabledReason)}
+                  searchPlaceholder="搜索订单"
+                  searchHint="可搜索：销售订单号、客户订单号、客户、产品"
+                  emptyDescription="暂无可导入销售订单行"
+                  onCancel={() => setSalesOrderImportOpen(false)}
+                  onImport={importSalesOrderToShipment}
+                />
+                <div className="erp-master-contact-list__items">
+                  {fields.map((field, index) => (
+                    <div
+                      className="erp-master-contact-list__row"
+                      key={field.key}
+                      ref={(node) => registerLineItemRow(index, node)}
+                    >
+                      <div className="erp-master-contact-list__row-head">
+                        <strong>明细 {field.name + 1}</strong>
+                        <Button
+                          danger
+                          size="small"
+                          icon={<DeleteOutlined />}
+                          disabled={fields.length <= 1}
+                          onClick={() => remove(field.name)}
+                        >
+                          移除明细
+                        </Button>
+                      </div>
+                      <div className="erp-master-contact-list__grid">
+                        <ShipmentItemFormFields
+                          field={field}
+                          form={form}
+                          inventoryLots={inventoryLots}
+                          inventoryLotOptions={inventoryLotOptions}
+                          products={products}
+                          productOptions={productOptions}
+                          productSKUs={productSKUs}
+                          productSKUOptions={productSKUOptions}
+                          salesOrderItems={salesOrderItems}
+                          salesOrderItemOptions={salesOrderItemOptions}
+                          unitOptions={unitOptions}
+                          warehouseOptions={warehouseOptions}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <BusinessLineItemsFooter
+                  addLabel="添加条目"
+                  onAdd={() => {
+                    add(createBlankShipmentItem())
+                    requestLineItemScroll(fields.length)
+                  }}
+                  stats={[
+                    {
+                      key: 'count',
+                      label: '已录入',
+                      value: fields.length,
+                      suffix: '条',
+                    },
+                  ]}
+                />
+              </section>
+            )}
+          </Form.List>
+        ) : null}
       </Form>
     </BusinessFormModal>
   )

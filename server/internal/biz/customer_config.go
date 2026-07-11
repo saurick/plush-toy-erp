@@ -708,20 +708,26 @@ func (uc *CustomerConfigUsecase) ExplainProcessDefinition(ctx context.Context, c
 }
 
 func (uc *CustomerConfigUsecase) WorkflowVisibleOwnerRoleKeys(ctx context.Context, customerKey string, admin *AdminUser, requiredCapabilities ...string) ([]string, error) {
+	return uc.workflowVisibleOwnerRoleKeys(ctx, customerKey, admin, true, requiredCapabilities...)
+}
+
+// WorkflowVisibleOwnerRoleKeysRequiringActiveRevision is the fixed-customer
+// runtime variant. It never widens task responsibility back to builtin roles
+// when the active customer revision cannot be read.
+func (uc *CustomerConfigUsecase) WorkflowVisibleOwnerRoleKeysRequiringActiveRevision(ctx context.Context, customerKey string, admin *AdminUser, requiredCapabilities ...string) ([]string, error) {
+	return uc.workflowVisibleOwnerRoleKeys(ctx, customerKey, admin, false, requiredCapabilities...)
+}
+
+func (uc *CustomerConfigUsecase) workflowVisibleOwnerRoleKeys(ctx context.Context, customerKey string, admin *AdminUser, allowBuiltinFallback bool, requiredCapabilities ...string) ([]string, error) {
 	if admin == nil || admin.Disabled {
 		return []string{}, ErrForbidden
 	}
-	roleKeys := AdminRoleKeys(admin)
-	if admin.IsSuperAdmin {
-		for _, role := range BuiltinRoles() {
-			if !role.Disabled {
-				roleKeys = append(roleKeys, role.Key)
-			}
-		}
-		return NormalizeAdminRoleKeys(roleKeys), nil
-	}
+	baseRoleKeys := AdminRoleKeys(admin)
 	if uc == nil || uc.repo == nil {
-		return NormalizeAdminRoleKeys(roleKeys), nil
+		if allowBuiltinFallback {
+			return NormalizeAdminRoleKeys(baseRoleKeys), nil
+		}
+		return []string{}, ErrCustomerConfigActiveRevisionRequired
 	}
 	customerKey = NormalizeCustomerKey(customerKey)
 	if customerKey == "" {
@@ -730,13 +736,21 @@ func (uc *CustomerConfigUsecase) WorkflowVisibleOwnerRoleKeys(ctx context.Contex
 	active, err := uc.repo.GetActiveCustomerConfigRevision(ctx, customerKey)
 	if err != nil {
 		if errors.Is(err, ErrCustomerConfigNotFound) {
-			return NormalizeAdminRoleKeys(roleKeys), nil
+			if allowBuiltinFallback {
+				return NormalizeAdminRoleKeys(baseRoleKeys), nil
+			}
+			return []string{}, ErrCustomerConfigActiveRevisionRequired
 		}
-		return NormalizeAdminRoleKeys(roleKeys), err
+		return []string{}, err
 	}
-	memberships, err := uc.repo.ListWorkPoolMemberships(ctx, customerKey, active.Revision, roleKeys, admin.ID)
+	roleProfiles, err := uc.repo.ListRoleProfiles(ctx, customerKey, active.Revision)
 	if err != nil {
-		return NormalizeAdminRoleKeys(roleKeys), err
+		return []string{}, err
+	}
+	enabledBaseRoleKeys := enabledCustomerRoleKeys(baseRoleKeys, roleProfiles)
+	memberships, err := uc.repo.ListWorkPoolMemberships(ctx, customerKey, active.Revision, enabledBaseRoleKeys, admin.ID)
+	if err != nil {
+		return []string{}, err
 	}
 	membershipRoleKeys := []string{}
 	for _, item := range memberships {
@@ -748,17 +762,19 @@ func (uc *CustomerConfigUsecase) WorkflowVisibleOwnerRoleKeys(ctx context.Contex
 		}
 	}
 	requiredCapabilities = normalizeWorkflowTaskRequiredCapabilities(requiredCapabilities)
-	entitlements, err := uc.repo.ListAccessEntitlements(ctx, customerKey, active.Revision, append(roleKeys, membershipRoleKeys...))
+	candidateRoleKeys := enabledCustomerRoleKeys(append(enabledBaseRoleKeys, membershipRoleKeys...), roleProfiles)
+	entitlements, err := uc.repo.ListAccessEntitlements(ctx, customerKey, active.Revision, candidateRoleKeys)
 	if err != nil {
-		return NormalizeAdminRoleKeys(roleKeys), err
+		return []string{}, err
 	}
-	eligibleMembershipRoles := workflowEntitlementRoleKeysWithCapabilities(entitlements, requiredCapabilities, customerKey)
-	for _, roleKey := range membershipRoleKeys {
-		if _, ok := eligibleMembershipRoles[roleKey]; ok {
-			roleKeys = append(roleKeys, roleKey)
+	eligibleRoles := workflowEligibleRoleKeysWithCapabilities(candidateRoleKeys, roleProfiles, entitlements, requiredCapabilities, customerKey)
+	visibleRoleKeys := make([]string, 0, len(candidateRoleKeys))
+	for _, roleKey := range candidateRoleKeys {
+		if _, ok := eligibleRoles[roleKey]; ok {
+			visibleRoleKeys = append(visibleRoleKeys, roleKey)
 		}
 	}
-	return NormalizeAdminRoleKeys(roleKeys), nil
+	return NormalizeAdminRoleKeys(visibleRoleKeys), nil
 }
 
 type WorkflowTaskCandidateExplanation struct {
@@ -802,6 +818,11 @@ func (uc *CustomerConfigUsecase) WorkflowCandidateOwnerRoleKeys(ctx context.Cont
 		return out, err
 	}
 	out.ConfigRevision = active.Revision
+	roleProfiles, err := uc.repo.ListRoleProfiles(ctx, customerKey, active.Revision)
+	if err != nil {
+		out.Source = "customer_config_error"
+		return out, err
+	}
 	memberships, err := uc.repo.ListWorkPoolMembershipsByPools(ctx, customerKey, active.Revision, []string{ownerPoolKey})
 	if err != nil {
 		out.Source = "customer_config_error"
@@ -816,13 +837,13 @@ func (uc *CustomerConfigUsecase) WorkflowCandidateOwnerRoleKeys(ctx context.Cont
 			membershipRoleKeys = append(membershipRoleKeys, roleKey)
 		}
 	}
-	out.MembershipRoleKeys = NormalizeAdminRoleKeys(membershipRoleKeys)
+	out.MembershipRoleKeys = enabledCustomerRoleKeys(membershipRoleKeys, roleProfiles)
 	entitlements, err := uc.repo.ListAccessEntitlements(ctx, customerKey, active.Revision, out.MembershipRoleKeys)
 	if err != nil {
 		out.Source = "customer_config_error"
 		return out, err
 	}
-	entitledRoleKeys := workflowEntitlementRoleKeysWithCapabilities(entitlements, out.RequiredCapabilities, customerKey)
+	entitledRoleKeys := workflowEligibleRoleKeysWithCapabilities(out.MembershipRoleKeys, roleProfiles, entitlements, out.RequiredCapabilities, customerKey)
 	for roleKey := range entitledRoleKeys {
 		out.EntitledRoleKeys = append(out.EntitledRoleKeys, roleKey)
 	}
@@ -933,6 +954,40 @@ func normalizeWorkflowTaskRequiredCapabilities(values []string) []string {
 	return []string{PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate}
 }
 
+func workflowEligibleRoleKeysWithCapabilities(
+	roleKeys []string,
+	roleProfiles []RoleProfileInput,
+	entitlements []AccessEntitlementInput,
+	requiredCapabilities []string,
+	customerKey string,
+) map[string]struct{} {
+	requiredCapabilities = normalizeWorkflowTaskRequiredCapabilities(requiredCapabilities)
+	entitledRoleKeys := workflowEntitlementRoleKeysWithCapabilities(entitlements, requiredCapabilities, customerKey)
+	profileByRole := customerRoleProfileMap(roleProfiles)
+	out := map[string]struct{}{}
+	for _, roleKey := range enabledCustomerRoleKeys(roleKeys, roleProfiles) {
+		if _, entitled := entitledRoleKeys[roleKey]; !entitled {
+			continue
+		}
+		profile := profileByRole[roleKey]
+		if workflowRoleProfileRevokesAny(profile, requiredCapabilities) {
+			continue
+		}
+		out[roleKey] = struct{}{}
+	}
+	return out
+}
+
+func workflowRoleProfileRevokesAny(profile RoleProfileInput, requiredCapabilities []string) bool {
+	revoked := PermissionKeySet(profile.Revokes)
+	for _, capabilityKey := range requiredCapabilities {
+		if _, exists := revoked[strings.TrimSpace(capabilityKey)]; exists {
+			return true
+		}
+	}
+	return false
+}
+
 func workflowEntitlementRoleKeysWithCapabilities(entitlements []AccessEntitlementInput, requiredCapabilities []string, customerKey string) map[string]struct{} {
 	required := map[string]struct{}{}
 	for _, capabilityKey := range normalizeWorkflowTaskRequiredCapabilities(requiredCapabilities) {
@@ -949,7 +1004,7 @@ func workflowEntitlementRoleKeysWithCapabilities(entitlements []AccessEntitlemen
 		if roleKey == "" || capabilityKey == "" {
 			continue
 		}
-		if !workflowEntitlementScopeMatchesCustomer(item, customerKey) {
+		if !workflowEntitlementScopeMatchesExactCustomer(item, customerKey) {
 			continue
 		}
 		if byRole[roleKey] == nil {
@@ -971,6 +1026,11 @@ func workflowEntitlementRoleKeysWithCapabilities(entitlements []AccessEntitlemen
 		}
 	}
 	return out
+}
+
+func workflowEntitlementScopeMatchesExactCustomer(item AccessEntitlementInput, customerKey string) bool {
+	return strings.EqualFold(strings.TrimSpace(item.ScopeType), "customer") &&
+		NormalizeCustomerKey(item.ScopeValue) == NormalizeCustomerKey(customerKey)
 }
 
 func workflowEntitlementScopeMatchesCustomer(item AccessEntitlementInput, customerKey string) bool {

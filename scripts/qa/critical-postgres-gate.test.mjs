@@ -34,11 +34,22 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
   assert.match(makefile, /^critical_transactions_pg_test:/mu)
   assert.match(pgScript, /test-critical\)/u)
   assert.match(pgScript, /PURCHASE_RECEIPT_PG_TEST=1/u)
+  assert.match(pgScript, /INVENTORY_PG_TEST=1/u)
+  assert.match(
+    pgScript,
+    /INVENTORY_PG_TEST_DB_URL="\$PURCHASE_RECEIPT_PG_DB_URL"/u,
+    'critical PostgreSQL gate must reuse the same guarded, migrated test database',
+  )
   for (const testPrefix of [
     'TestPurchaseReceiptPostgres',
     'TestPurchaseReceiptAdjustmentPostgres',
     'TestWorkflowPostgres',
     'TestSourceDocumentPostgres',
+    'TestInventoryPostgres',
+    'TestOperationalFactPostgres',
+    'TestProcessRuntimePostgres',
+    'TestFinanceProcessCommandPostgres',
+    'TestSalesProcessCommandPostgres',
   ]) {
     assert(pgScript.includes(testPrefix), `critical PostgreSQL gate must include ${testPrefix}`)
   }

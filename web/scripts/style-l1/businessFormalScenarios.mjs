@@ -1957,15 +1957,48 @@ export function createBusinessFormalScenarios(deps) {
           },
         })
         await page.getByText('SHIP-STYLE-L1', { exact: true }).click()
-        await page.getByRole('button', { name: '维护明细' }).click()
-        await expectText(page, '维护出货明细')
+        await assertBusinessFormModalKeyboardRecovery(page, {
+          triggerName: '查看明细',
+          titleText: '查看出货明细',
+          scenarioName: 'business-v1-shipment-readonly-detail',
+        })
+        const shipmentDetailTrigger = page.getByRole('button', {
+          name: '查看明细',
+        })
+        await shipmentDetailTrigger.click()
+        await expectText(page, '查看出货明细')
         await expectText(page, '已保存出货明细')
-        await expectText(page, '新增出货明细')
+        await assertTextAbsent(page, '新增出货明细')
         const shipmentDetailModal = page
           .locator('.erp-business-action-modal:visible')
           .last()
-        await shipmentDetailModal.locator('.ant-modal-close').click()
+        assert.equal(
+          await shipmentDetailModal
+            .getByRole('button', { name: '保存', exact: true })
+            .count(),
+          0,
+          '出货只读明细弹窗不应提供保存动作'
+        )
+        assert.equal(
+          await shipmentDetailModal
+            .locator(
+              'input:visible:not([type="hidden"]):not([disabled]), textarea:visible:not([disabled]), .ant-select:visible:not(.ant-select-disabled)'
+            )
+            .count(),
+          0,
+          '出货只读明细弹窗不应暴露可编辑表单控件'
+        )
+        await shipmentDetailModal
+          .getByRole('button', { name: /关\s*闭/u })
+          .click()
         await shipmentDetailModal.waitFor({ state: 'hidden', timeout: 10_000 })
+        assert.equal(
+          await shipmentDetailTrigger.evaluate(
+            (node) => document.activeElement === node
+          ),
+          true,
+          '关闭出货只读明细弹窗后焦点应回到查看明细按钮'
+        )
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'business-v1-shipments',
         })

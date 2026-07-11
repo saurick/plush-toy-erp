@@ -399,7 +399,7 @@ func workflowAdminCanReconcileLinkedTask(admin *biz.AdminUser, task *biz.Workflo
 	if task.AssigneeID != nil {
 		return *task.AssigneeID == admin.ID
 	}
-	return biz.AdminHasRole(admin, task.OwnerRoleKey) || workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys)
+	return workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys)
 }
 
 func workflowTaskTerminalReasonMatches(task *biz.WorkflowTask, reason string) bool {
@@ -483,9 +483,6 @@ func workflowActorRoleKeyForAdminInScope(admin *biz.AdminUser, task *biz.Workflo
 	if admin == nil || task == nil {
 		return ""
 	}
-	if biz.AdminHasRole(admin, task.OwnerRoleKey) {
-		return task.OwnerRoleKey
-	}
 	if workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys) {
 		return task.OwnerRoleKey
 	}
@@ -495,24 +492,49 @@ func workflowActorRoleKeyForAdminInScope(admin *biz.AdminUser, task *biz.Workflo
 	if biz.AdminHasRole(admin, biz.BossRoleKey) {
 		return biz.BossRoleKey
 	}
-	for _, roleKey := range biz.AdminRoleKeys(admin) {
-		return roleKey
-	}
 	if admin.IsSuperAdmin {
 		return biz.AdminRoleKey
+	}
+	if workflowTaskAssignedToAdmin(admin, task) {
+		for _, roleKey := range biz.AdminRoleKeys(admin) {
+			return roleKey
+		}
+	}
+	for _, roleKey := range biz.AdminRoleKeys(admin) {
+		if biz.NormalizeRoleKey(roleKey) != biz.NormalizeRoleKey(task.OwnerRoleKey) {
+			return roleKey
+		}
 	}
 	return ""
 }
 
 func (d *jsonrpcDispatcher) workflowVisibleOwnerRoleKeys(ctx context.Context, admin *biz.AdminUser, requiredCapabilities ...string) []string {
 	baseRoleKeys := biz.AdminRoleKeys(admin)
-	if admin == nil || admin.Disabled || admin.IsSuperAdmin || d.customerConfigUC == nil {
+	if admin == nil || admin.Disabled {
+		return []string{}
+	}
+	requireActiveRevision := runtimeCustomerConfigRequiresActiveRevision()
+	if d == nil || d.customerConfigUC == nil {
+		if requireActiveRevision {
+			return []string{}
+		}
 		return baseRoleKeys
 	}
 	customerKey, _ := runtimeCustomerKey("")
-	roleKeys, err := d.customerConfigUC.WorkflowVisibleOwnerRoleKeys(ctx, customerKey, admin, requiredCapabilities...)
+	var roleKeys []string
+	var err error
+	if requireActiveRevision {
+		roleKeys, err = d.customerConfigUC.WorkflowVisibleOwnerRoleKeysRequiringActiveRevision(ctx, customerKey, admin, requiredCapabilities...)
+	} else {
+		roleKeys, err = d.customerConfigUC.WorkflowVisibleOwnerRoleKeys(ctx, customerKey, admin, requiredCapabilities...)
+	}
 	if err != nil {
-		d.log.WithContext(ctx).Warnf("[workflow] customer config visibility fallback admin_id=%d err=%v", admin.ID, err)
+		if d.log != nil {
+			d.log.WithContext(ctx).Warnf("[workflow] customer config visibility unavailable admin_id=%d fixed_customer=%t err=%v", admin.ID, requireActiveRevision, err)
+		}
+		if requireActiveRevision {
+			return []string{}
+		}
 		return baseRoleKeys
 	}
 	return roleKeys
@@ -606,7 +628,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskAssignmentExplain(
 	}
 
 	assigned := workflowTaskAssignedToAdmin(admin, currentTask)
-	ownerMatched := biz.AdminHasRole(admin, currentTask.OwnerRoleKey)
+	ownerMatched := workflowEffectiveOwnerRoleMatched(admin, currentTask, readVisibleOwnerRoleKeys)
 	workPoolMatched := workflowWorkPoolEntitlementMatched(admin, currentTask, readVisibleOwnerRoleKeys)
 	canHandle := workflowAdminCanHandleTask(admin, currentTask, "done", d.workflowVisibleOwnerRoleKeys(ctx, admin, biz.WorkflowStatusActionPermission("done", currentTask))) ||
 		workflowAdminCanHandleTask(admin, currentTask, "blocked", d.workflowVisibleOwnerRoleKeys(ctx, admin, biz.WorkflowStatusActionPermission("blocked", currentTask))) ||
@@ -728,8 +750,12 @@ func (d *jsonrpcDispatcher) workflowTaskActionAccessToMap(
 	contract workflowTaskActionExplainContract,
 ) map[string]any {
 	visibleOwnerRoleKeys := d.workflowVisibleOwnerRoleKeys(ctx, admin, contract.RequiredPermission)
-	allowed, reasonCode, reason := workflowTaskActionAccessDecision(admin, task, contract, visibleOwnerRoleKeys)
-	ownerMatched := biz.AdminHasRole(admin, task.OwnerRoleKey)
+	permissionAllowed, permissionResult := d.AdminHasPermission(ctx, contract.RequiredPermission)
+	if permissionResult != nil {
+		permissionAllowed = false
+	}
+	allowed, reasonCode, reason := workflowTaskActionAccessDecision(admin, task, contract, visibleOwnerRoleKeys, permissionAllowed)
+	ownerMatched := workflowEffectiveOwnerRoleMatched(admin, task, visibleOwnerRoleKeys)
 	workPoolMatched := workflowWorkPoolEntitlementMatched(admin, task, visibleOwnerRoleKeys)
 	configuredCandidates := d.workflowTaskConfiguredCandidateExplanation(ctx, task, contract.RequiredPermission)
 	return map[string]any{
@@ -938,11 +964,18 @@ func workflowWorkPoolEntitlementMatched(admin *biz.AdminUser, task *biz.Workflow
 	return workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys)
 }
 
+func workflowEffectiveOwnerRoleMatched(admin *biz.AdminUser, task *biz.WorkflowTask, visibleOwnerRoleKeys []string) bool {
+	return admin != nil && task != nil &&
+		biz.AdminHasRole(admin, task.OwnerRoleKey) &&
+		workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys)
+}
+
 func workflowTaskActionAccessDecision(
 	admin *biz.AdminUser,
 	task *biz.WorkflowTask,
 	contract workflowTaskActionExplainContract,
 	visibleOwnerRoleKeys []string,
+	permissionAllowed bool,
 ) (bool, string, string) {
 	if admin == nil || admin.Disabled {
 		return false, "admin_disabled", "当前账号已停用，不能处理任务。"
@@ -953,7 +986,7 @@ func workflowTaskActionAccessDecision(
 	if biz.IsTerminalWorkflowTaskStatus(task.TaskStatusKey) {
 		return false, "terminal_task", "该任务已结束，只能查看上下文。"
 	}
-	if !biz.AdminHasPermission(admin, contract.RequiredPermission) {
+	if !permissionAllowed {
 		return false, "missing_permission", "当前账号缺少执行该动作所需权限。"
 	}
 	if contract.Urge {
@@ -978,17 +1011,15 @@ func workflowAdminCanViewTask(admin *biz.AdminUser, task *biz.WorkflowTask, visi
 	if workflowTaskAssignedToAdmin(admin, task) {
 		return true
 	}
-	if biz.AdminHasRole(admin, biz.PMCRoleKey) || biz.AdminHasRole(admin, biz.BossRoleKey) {
+	if (biz.AdminHasRole(admin, biz.PMCRoleKey) && workflowOwnerRoleVisible(biz.PMCRoleKey, visibleOwnerRoleKeys)) ||
+		(biz.AdminHasRole(admin, biz.BossRoleKey) && workflowOwnerRoleVisible(biz.BossRoleKey, visibleOwnerRoleKeys)) {
 		return true
 	}
-	return biz.AdminHasRole(admin, task.OwnerRoleKey) || workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys)
+	return workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys)
 }
 
 func workflowAdminCanHandleTask(admin *biz.AdminUser, task *biz.WorkflowTask, nextStatusKey string, visibleOwnerRoleKeys []string) bool {
-	if biz.CanAdminHandleWorkflowTask(admin, task, nextStatusKey) {
-		return true
-	}
-	if admin == nil || admin.Disabled || task == nil || task.AssigneeID != nil {
+	if admin == nil || admin.Disabled || task == nil {
 		return false
 	}
 	if biz.IsTerminalWorkflowTaskStatus(task.TaskStatusKey) {
@@ -998,18 +1029,24 @@ func workflowAdminCanHandleTask(admin *biz.AdminUser, task *biz.WorkflowTask, ne
 	if nextStatusKey == "" || !biz.IsValidWorkflowTaskState(nextStatusKey) {
 		return false
 	}
+	if task.AssigneeID != nil {
+		return *task.AssigneeID == admin.ID
+	}
 	return workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys)
 }
 
 func workflowAdminCanUrgeTask(admin *biz.AdminUser, task *biz.WorkflowTask, visibleOwnerRoleKeys []string) bool {
-	if biz.CanAdminUrgeWorkflowTask(admin, task) {
-		return true
-	}
-	if admin == nil || admin.Disabled || task == nil || task.AssigneeID != nil {
+	if admin == nil || admin.Disabled || task == nil {
 		return false
 	}
 	if biz.IsTerminalWorkflowTaskStatus(task.TaskStatusKey) {
 		return false
+	}
+	if admin.IsSuperAdmin || biz.AdminHasRole(admin, biz.PMCRoleKey) || biz.AdminHasRole(admin, biz.BossRoleKey) {
+		return true
+	}
+	if task.AssigneeID != nil {
+		return *task.AssigneeID == admin.ID
 	}
 	return workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys)
 }

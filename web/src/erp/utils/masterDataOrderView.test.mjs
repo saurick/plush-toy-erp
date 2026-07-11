@@ -1070,17 +1070,14 @@ test('FL_shipment_ship_date__retains_planned_and_actual_ship_dates masterDataOrd
   const shipmentColumnsSource = readERPSource(
     '../components/shipments/shipmentColumns.jsx'
   )
-  const operationalFactFormsSource = readERPSource(
-    '../components/operational-facts/OperationalFactForms.jsx'
-  )
 
   assert.match(
     shipmentsPageSource,
     /planned_ship_at:\s*trimOptional\(values\.planned_ship_at\)/u
   )
   assert.match(
-    operationalFactFormsSource,
-    /planned_ship_at:\s*dateValue\(values\.planned_ship_at\)/u
+    shipmentsPageSource,
+    /function buildShipmentWithItemsParams\(values = \{\}\)[\s\S]*\.\.\.buildShipmentParams\(values\)/u
   )
   assert.match(
     shipmentColumnsSource,

@@ -73,7 +73,8 @@ apply)
   atlas migrate apply --dir "file://internal/data/model/migrate" --url "$INVENTORY_PG_DB_URL"
   ;;
 test)
-  INVENTORY_PG_TEST=1 INVENTORY_PG_TEST_DB_URL="$INVENTORY_PG_DB_URL" go test ./internal/data -run TestInventoryPostgres -count=1
+  INVENTORY_PG_TEST=1 INVENTORY_PG_TEST_DB_URL="$INVENTORY_PG_DB_URL" \
+    go test ./internal/data -run '^(TestInventoryPostgres|TestOperationalFactPostgres)' -count=1
   ;;
 dropdb)
   psql "$INVENTORY_PG_ADMIN_DB_URL" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"${INVENTORY_PG_DB_NAME}\" WITH (FORCE)"

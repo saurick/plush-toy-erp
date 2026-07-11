@@ -129,7 +129,6 @@ export function createDuplicatedDraftLineItem(item = {}) {
 
 export function buildShipmentItemParams(values = {}) {
   return compactParams({
-    shipment_id: requiredInt(values.shipment_id),
     sales_order_item_id: positiveInt(values.sales_order_item_id),
     product_id: requiredInt(values.product_id),
     product_sku_id: positiveInt(values.product_sku_id),
@@ -141,18 +140,13 @@ export function buildShipmentItemParams(values = {}) {
   })
 }
 
-export function createShipmentItemFromSalesOrderItem(
-  item,
-  shipmentID,
-  { quantity } = {}
-) {
+export function createShipmentItemFromSalesOrderItem(item, { quantity } = {}) {
   const sourceItem = item || {}
   const nextQuantity =
     quantity === undefined || quantity === null || quantity === ''
       ? sourceItem.remainingQuantity || sourceItem.ordered_quantity || ''
       : quantity
   return {
-    shipment_id: shipmentID,
     sales_order_item_id: sourceItem.id,
     product_id: sourceItem.product_id,
     product_sku_id: sourceItem.product_sku_id,
@@ -192,14 +186,12 @@ export function buildShipmentSourceItemChangePatch(
       note: '',
     }
   }
-  const { shipment_id: _shipmentID, ...patch } =
-    createShipmentItemFromSalesOrderItem(sourceItem, undefined, {
-      quantity:
-        sourceItem.remainingQuantity === undefined
-          ? sourceItem.ordered_quantity
-          : sourceItem.remainingQuantity,
-    })
-  return patch
+  return createShipmentItemFromSalesOrderItem(sourceItem, {
+    quantity:
+      sourceItem.remainingQuantity === undefined
+        ? sourceItem.ordered_quantity
+        : sourceItem.remainingQuantity,
+  })
 }
 
 export function buildShipmentProductChangePatch(productID, products = []) {
@@ -286,9 +278,8 @@ export function isBlankShipmentItem(item = {}) {
   ].every((value) => value === undefined || value === null || value === '')
 }
 
-export function createBlankShipmentItem(shipmentID) {
+export function createBlankShipmentItem() {
   return {
-    shipment_id: shipmentID,
     sales_order_item_id: undefined,
     product_id: undefined,
     product_sku_id: undefined,

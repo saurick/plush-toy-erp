@@ -13,7 +13,11 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent/inventorybalance"
+	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/qualityinspection"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
@@ -555,6 +559,139 @@ func TestInventoryPostgresConcurrentQualityProcessCommandDefaultedTimesConverge(
 	}
 	if _, err := inventoryRepo.PassQualityInspectionForProcessCommand(ctx, explicitMismatch, command, result, inspectorID); !errors.Is(err, biz.ErrIdempotencyConflict) {
 		t.Fatalf("explicit inspected_at mismatch must remain strict, got %v", err)
+	}
+}
+
+func TestPurchaseReceiptPostgresProcessCommandCreateRollsBackReceiptLotsAndInspectionsOnResultConflict(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+	logger := log.NewStdLogger(io.Discard)
+	inventoryRepo := NewInventoryRepo(data, logger)
+	processRepo := NewProcessRuntimeRepo(data, logger)
+	fixtures := createPurchaseReceiptPostgresFixtures(t, ctx, client)
+	orderItem := createApprovedPurchaseOrderItemForReceiptTest(
+		t,
+		ctx,
+		client,
+		inventoryTestFixtures{
+			unitID:      fixtures.unitID,
+			materialID:  fixtures.materialID,
+			productID:   fixtures.productID,
+			warehouseID: fixtures.warehouseID,
+		},
+		"ATOMIC-CREATE-"+fixtures.suffix,
+		decimal.NewFromInt(7),
+	)
+	receiptNo := "PR-ATOMIC-CREATE-" + fixtures.suffix
+	idempotencyKey := "purchase-create-rollback/" + fixtures.suffix
+	receivedAt := time.Date(2026, 7, 11, 0, 0, 0, 0, time.UTC)
+	payload := map[string]any{
+		"purchase_order_id": orderItem.PurchaseOrderID,
+		"receipt_no":        receiptNo,
+		"warehouse_id":      fixtures.warehouseID,
+		"received_at":       "2026-07-11",
+	}
+	command := claimedPostgresProcessCommandForBusinessRef(
+		t,
+		ctx,
+		processRepo,
+		biz.ProcessDomainCommandPurchaseReceiptCreate,
+		idempotencyKey,
+		payload,
+		"purchase_order",
+		orderItem.PurchaseOrderID,
+	)
+	recordConflictingPostgresProcessResult(t, ctx, processRepo, command)
+	conflictBefore, err := processRepo.GetProcessNodeInstance(ctx, command.Node.ID)
+	if err != nil || conflictBefore.DomainCommandResultHash == nil ||
+		conflictBefore.DomainCommandResultState == nil || conflictBefore.DomainCommandEffectState == nil ||
+		conflictBefore.DomainCommandResultRecordedAt == nil {
+		t.Fatalf("read preexisting process result before receipt creation: node=%#v err=%v", conflictBefore, err)
+	}
+	conflictHash := *conflictBefore.DomainCommandResultHash
+	conflictRecordedAt := *conflictBefore.DomainCommandResultRecordedAt
+	payloadBytes, err := json.Marshal(struct {
+		PurchaseOrderID int     `json:"purchase_order_id"`
+		ReceiptNo       string  `json:"receipt_no"`
+		WarehouseID     int     `json:"warehouse_id"`
+		ReceivedAt      string  `json:"received_at"`
+		Note            *string `json:"note"`
+	}{
+		PurchaseOrderID: orderItem.PurchaseOrderID,
+		ReceiptNo:       receiptNo,
+		WarehouseID:     fixtures.warehouseID,
+		ReceivedAt:      receivedAt.Format(time.RFC3339Nano),
+	})
+	if err != nil {
+		t.Fatalf("marshal normalized purchase receipt intent: %v", err)
+	}
+	payloadHash := fmt.Sprintf("%x", sha256.Sum256(payloadBytes))
+
+	countReceiptFacts := func() (int, int, int, int) {
+		t.Helper()
+		receiptCount, countErr := client.PurchaseReceipt.Query().Where(
+			purchasereceipt.ReceiptNo(receiptNo),
+		).Count(ctx)
+		if countErr != nil {
+			t.Fatalf("count atomic-create receipt headers: %v", countErr)
+		}
+		itemCount, countErr := client.PurchaseReceiptItem.Query().Where(
+			purchasereceiptitem.PurchaseOrderItemID(orderItem.ID),
+		).Count(ctx)
+		if countErr != nil {
+			t.Fatalf("count atomic-create receipt items: %v", countErr)
+		}
+		lotCount, countErr := client.InventoryLot.Query().Where(
+			inventorylot.SubjectType(biz.InventorySubjectMaterial),
+			inventorylot.SubjectID(fixtures.materialID),
+		).Count(ctx)
+		if countErr != nil {
+			t.Fatalf("count atomic-create inventory lots: %v", countErr)
+		}
+		inspectionCount, countErr := client.QualityInspection.Query().Where(
+			qualityinspection.MaterialID(fixtures.materialID),
+			qualityinspection.SourceType(biz.QualityInspectionSourcePurchaseReceipt),
+		).Count(ctx)
+		if countErr != nil {
+			t.Fatalf("count atomic-create quality inspections: %v", countErr)
+		}
+		return receiptCount, itemCount, lotCount, inspectionCount
+	}
+	beforeReceiptCount, beforeItemCount, beforeLotCount, beforeInspectionCount := countReceiptFacts()
+
+	if _, err := inventoryRepo.CreatePurchaseReceiptFromPurchaseOrderForProcessCommand(ctx, &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		PurchaseOrderID:        orderItem.PurchaseOrderID,
+		ReceiptNo:              receiptNo,
+		WarehouseID:            fixtures.warehouseID,
+		ReceivedAt:             receivedAt,
+		IdempotencyKey:         idempotencyKey,
+		IdempotencyPayloadHash: payloadHash,
+	}, command, 7); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("conflicting result must roll back purchase receipt creation, got %v", err)
+	}
+
+	afterReceiptCount, afterItemCount, afterLotCount, afterInspectionCount := countReceiptFacts()
+	if afterReceiptCount != beforeReceiptCount || afterItemCount != beforeItemCount ||
+		afterLotCount != beforeLotCount || afterInspectionCount != beforeInspectionCount {
+		t.Fatalf(
+			"receipt creation facts must roll back together, before=(%d,%d,%d,%d) after=(%d,%d,%d,%d)",
+			beforeReceiptCount,
+			beforeItemCount,
+			beforeLotCount,
+			beforeInspectionCount,
+			afterReceiptCount,
+			afterItemCount,
+			afterLotCount,
+			afterInspectionCount,
+		)
+	}
+	conflictAfter, err := processRepo.GetProcessNodeInstance(ctx, command.Node.ID)
+	if err != nil || conflictAfter.DomainCommandResultHash == nil || *conflictAfter.DomainCommandResultHash != conflictHash ||
+		conflictAfter.DomainCommandResultState == nil || *conflictAfter.DomainCommandResultState != *conflictBefore.DomainCommandResultState ||
+		conflictAfter.DomainCommandEffectState == nil || *conflictAfter.DomainCommandEffectState != *conflictBefore.DomainCommandEffectState ||
+		conflictAfter.DomainCommandResultRecordedAt == nil || !conflictAfter.DomainCommandResultRecordedAt.Equal(conflictRecordedAt) ||
+		conflictAfter.DomainCommandResult["outcome"] != "preexisting.result" {
+		t.Fatalf("preexisting conflicting process result must remain unchanged, before=%#v after=%#v err=%v", conflictBefore, conflictAfter, err)
 	}
 }
 

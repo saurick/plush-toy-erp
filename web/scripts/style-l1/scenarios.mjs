@@ -1195,9 +1195,17 @@ export function createStyleL1Scenarios(deps) {
           '出货页页面可见但 actions 为空时不应允许新建出货草稿'
         )
         await page.getByText('SHIP-STYLE-L1', { exact: true }).click()
-        await expectProjectedActionDisabled(
-          '维护明细',
-          '出货页 actions 为空时不应允许维护明细'
+        const shipmentDetailButton = page
+          .getByRole('button', { name: '查看明细' })
+          .first()
+        await shipmentDetailButton.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        assert.equal(
+          await shipmentDetailButton.isDisabled(),
+          false,
+          '出货详情是只读能力，不应被写动作投影禁用'
         )
         await expectProjectedActionDisabled(
           '确认出货',

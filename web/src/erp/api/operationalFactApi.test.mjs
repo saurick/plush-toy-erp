@@ -24,8 +24,7 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
     'post_outsourcing_fact',
     'cancel_outsourcing_fact',
     'list_shipments',
-    'create_shipment',
-    'add_shipment_item',
+    'create_shipment_with_items',
     'ship_shipment',
     'cancel_shipment',
     'list_stock_reservations',
@@ -41,6 +40,8 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
   }
 
   assert.doesNotMatch(source, /consume_stock_reservation/)
+  assert.doesNotMatch(source, /call\(\s*'create_shipment'/)
+  assert.doesNotMatch(source, /call\(\s*'add_shipment_item'/)
 
   for (const forbiddenName of [
     'business_records',

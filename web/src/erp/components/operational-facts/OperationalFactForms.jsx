@@ -238,32 +238,6 @@ export function buildFactParams(values = {}) {
   })
 }
 
-export function buildShipmentParams(values = {}) {
-  return compactParams({
-    shipment_no: trimOptional(values.shipment_no),
-    sales_order_id: positiveInt(values.sales_order_id),
-    customer_id: positiveInt(values.customer_id),
-    customer_snapshot: trimOptional(values.customer_snapshot),
-    idempotency_key: trimOptional(values.idempotency_key),
-    planned_ship_at: dateValue(values.planned_ship_at),
-    note: trimOptional(values.note),
-  })
-}
-
-export function buildShipmentItemParams(values = {}) {
-  return compactParams({
-    shipment_id: requiredInt(values.shipment_id),
-    sales_order_item_id: positiveInt(values.sales_order_item_id),
-    product_id: requiredInt(values.product_id),
-    product_sku_id: positiveInt(values.product_sku_id),
-    warehouse_id: requiredInt(values.warehouse_id),
-    unit_id: requiredInt(values.unit_id),
-    lot_id: positiveInt(values.lot_id),
-    quantity: trimOptional(values.quantity),
-    note: trimOptional(values.note),
-  })
-}
-
 export function buildReservationParams(values = {}) {
   return compactParams({
     reservation_no: trimOptional(values.reservation_no),

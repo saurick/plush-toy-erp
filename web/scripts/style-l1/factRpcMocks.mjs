@@ -187,11 +187,20 @@ export async function installFactRpcMocks(page, context) {
           }
         }
         break
-      case 'create_shipment':
-        data = { shipment: { ...shipment, id: 2, ...params, items: [] } }
-        break
-      case 'add_shipment_item':
-        data = { shipment_item: { ...shipmentItem, ...params } }
+      case 'create_shipment_with_items':
+        data = {
+          shipment: {
+            ...shipment,
+            id: 2,
+            ...params,
+            items: (params.items || []).map((item, index) => ({
+              ...shipmentItem,
+              ...item,
+              id: index + 2,
+              shipment_id: 2,
+            })),
+          },
+        }
         break
       case 'ship_shipment':
         data = { shipment: { ...shipment, status: 'SHIPPED' } }
