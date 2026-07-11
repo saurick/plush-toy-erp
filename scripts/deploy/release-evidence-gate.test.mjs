@@ -34,6 +34,10 @@ function writeValidEvidence(dir, overrides = {}) {
 [production-preflight] ok: 生产 secret、镜像 tag、debug、后端端口和 PostgreSQL / Jaeger 暴露边界通过
 [production-preflight] ok: Compose、低配部署边界和 migration 脚本通过
 [production-preflight] ok: docker compose config -q 通过
+[production-preflight] ok: Compose 运行服务存在
+[production-preflight] ok: 运行态 ERP_PDF_WARMUP=async
+[production-preflight] ok: 运行态 Chromium / chromium-common 版本与 Docker exact pin 一致: 150.0.7871.100-1~deb12u1
+[production-preflight] ok: healthz / readyz 通过
 [production-preflight] all checks passed
 `,
   );
@@ -83,7 +87,8 @@ webImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
         },
         backup: {
           databaseBackupSize: 123456,
-          databaseBackupHash: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          databaseBackupHash:
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
           storageLocationAlias: "controlled-backup-store",
           migrationVersion: "20260601000000",
         },
@@ -156,11 +161,37 @@ Pending Files: 0
         releaseVersion: overrides.smokeReleaseVersion ?? "20260616T1200-test",
         endpointAlias: "https://erp.example.invalid",
         backendEndpointAlias: "https://api.example.invalid",
-        summary: { total: 3, passed: 3, failed: 0 },
+        summary: { total: 4, passed: 4, failed: 0 },
         checks: [
-          { name: "server-healthz", status: "pass", target: "https://erp.example.invalid/healthz", httpCode: "200" },
-          { name: "server-readyz", status: "pass", target: "https://erp.example.invalid/readyz", httpCode: "200" },
-          { name: "web-healthz", status: "pass", target: "https://erp.example.invalid/", httpCode: "200" },
+          {
+            name: "server-healthz",
+            status: "pass",
+            target: "https://erp.example.invalid/healthz",
+            httpCode: "200",
+          },
+          {
+            name: "server-readyz",
+            status: "pass",
+            target: "https://erp.example.invalid/readyz",
+            httpCode: "200",
+          },
+          {
+            name: "web-healthz",
+            status: "pass",
+            target: "https://erp.example.invalid/",
+            httpCode: "200",
+          },
+          {
+            name: "template-pdf-render",
+            status: "pass",
+            target: "/templates/render-pdf",
+            httpCode: "200",
+            contentType: "application/pdf",
+            sha256:
+              "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            sizeBytes: 1024,
+            responseBodyStored: false,
+          },
         ],
         redaction: { containsSecrets: false, containsRawCustomerRows: false },
       },
@@ -205,8 +236,9 @@ Pending Files: 0
         ],
         postCheck: {
           smokeStatus: "passed",
-          smokeReport: "deployments/yoyoosun/evidence/releases/2026-06-16/smoke-test-report.json",
-          smokeCheckCount: 3,
+          smokeReport:
+            "deployments/yoyoosun/evidence/releases/2026-06-16/smoke-test-report.json",
+          smokeCheckCount: 4,
           evidenceReviewStatus: "passed",
         },
         summary: {
@@ -243,7 +275,10 @@ Pending Files: 0
   );
 }
 
-function writeCustomerConfigManifestEvidence(dir, revision = "yoyoosun-customer-package-v7.runtime-manifest-v1") {
+function writeCustomerConfigManifestEvidence(
+  dir,
+  revision = "yoyoosun-customer-package-v7.runtime-manifest-v1",
+) {
   fs.writeFileSync(
     path.join(dir, "customer-config-manifest-evidence.json"),
     JSON.stringify(
@@ -251,7 +286,8 @@ function writeCustomerConfigManifestEvidence(dir, revision = "yoyoosun-customer-
         customerKey: "yoyoosun",
         revision,
         productVersion: "2026.06.test",
-        manifestSha256: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        manifestSha256:
+          "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         reviewStatus: "approved",
         reviewer: "release-reviewer",
         generatedAt: "2026-06-16T04:00:00Z",
@@ -273,7 +309,10 @@ function writeCustomerConfigManifestEvidence(dir, revision = "yoyoosun-customer-
 
 test("release evidence gate accepts filled yoyoosun evidence", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const result = validateReleaseEvidenceGate({
@@ -286,13 +325,18 @@ test("release evidence gate accepts filled yoyoosun evidence", () => {
   assert.equal(result.scope.evidenceOnly, true);
   assert.match(result.scope.readyMeaning, /filled release evidence directory/);
   assert.ok(
-    result.scope.notProvenByThisGate.includes("target smoke was run by this gate"),
+    result.scope.notProvenByThisGate.includes(
+      "target smoke was run by this gate",
+    ),
   );
 });
 
 test("release evidence gate CLI supports JSON and text scope output", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-cli-"));
-  const relativeEvidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-16";
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-cli-"),
+  );
+  const relativeEvidenceDir =
+    "deployments/yoyoosun/evidence/releases/2026-06-16";
   const evidenceDir = path.join(root, relativeEvidenceDir);
   writeValidEvidence(evidenceDir);
 
@@ -301,10 +345,17 @@ test("release evidence gate CLI supports JSON and text scope output", () => {
     [gateCli, "--evidence-dir", relativeEvidenceDir, "--json"],
     { cwd: root, encoding: "utf8" },
   );
-  assert.equal(jsonResult.status, 0, `${jsonResult.stdout}\n${jsonResult.stderr}`);
+  assert.equal(
+    jsonResult.status,
+    0,
+    `${jsonResult.stdout}\n${jsonResult.stderr}`,
+  );
   const parsed = JSON.parse(jsonResult.stdout);
   assert.equal(parsed.scope.evidenceOnly, true);
-  assert.match(parsed.scope.readyMeaning, /consistency, redaction, and placeholder checks/);
+  assert.match(
+    parsed.scope.readyMeaning,
+    /consistency, redaction, and placeholder checks/,
+  );
   assert.ok(
     parsed.scope.notProvenByThisGate.includes(
       "backup restore rehearsal was performed by this gate",
@@ -316,19 +367,36 @@ test("release evidence gate CLI supports JSON and text scope output", () => {
     [gateCli, "--evidence-dir", relativeEvidenceDir],
     { cwd: root, encoding: "utf8" },
   );
-  assert.equal(textResult.status, 0, `${textResult.stdout}\n${textResult.stderr}`);
-  assert.match(textResult.stdout, /ready means: filled release evidence directory/);
+  assert.equal(
+    textResult.status,
+    0,
+    `${textResult.stdout}\n${textResult.stderr}`,
+  );
+  assert.match(
+    textResult.stdout,
+    /ready means: filled release evidence directory/,
+  );
   assert.match(textResult.stdout, /not proven by this gate:/);
-  assert.match(textResult.stdout, /target environment release was executed by this gate/);
+  assert.match(
+    textResult.stdout,
+    /target environment release was executed by this gate/,
+  );
 });
 
 test("release evidence gate rejects invalid release git commit", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-git-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-git-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const releasePath = path.join(evidenceDir, "release-evidence.md");
-  const release = fs.readFileSync(releasePath, "utf8").replace("| gitCommit | abc1234 |", "| gitCommit | main |");
+  const release = fs
+    .readFileSync(releasePath, "utf8")
+    .replace("| gitCommit | abc1234 |", "| gitCommit | main |");
   fs.writeFileSync(releasePath, release);
 
   assert.throws(
@@ -342,8 +410,13 @@ test("release evidence gate rejects invalid release git commit", () => {
 });
 
 test("release evidence gate rejects invalid release image digest", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-image-digest-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-image-digest-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const releasePath = path.join(evidenceDir, "release-evidence.md");
@@ -366,8 +439,13 @@ test("release evidence gate rejects invalid release image digest", () => {
 });
 
 test("release evidence gate rejects missing production preflight report", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-preflight-missing-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-preflight-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
   fs.unlinkSync(path.join(evidenceDir, "production-preflight-report.txt"));
 
@@ -382,8 +460,13 @@ test("release evidence gate rejects missing production preflight report", () => 
 });
 
 test("release evidence gate rejects example-mode production preflight report", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-preflight-example-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-preflight-example-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
   fs.writeFileSync(
     path.join(evidenceDir, "production-preflight-report.txt"),
@@ -403,9 +486,64 @@ test("release evidence gate rejects example-mode production preflight report", (
   );
 });
 
+for (const [label, line, expectedError] of [
+  [
+    "runtime Compose",
+    "[production-preflight] ok: Compose 运行服务存在\n",
+    /runtime Compose services check/,
+  ],
+  [
+    "runtime PDF warmup",
+    "[production-preflight] ok: 运行态 ERP_PDF_WARMUP=async\n",
+    /runtime ERP_PDF_WARMUP=async check/,
+  ],
+  [
+    "runtime Chromium exact pin",
+    "[production-preflight] ok: 运行态 Chromium \/ chromium-common 版本与 Docker exact pin 一致: 150.0.7871.100-1~deb12u1\n",
+    /runtime Chromium\/chromium-common exact pin check/,
+  ],
+  [
+    "runtime health and readiness",
+    "[production-preflight] ok: healthz / readyz 通过\n",
+    /runtime healthz\/readyz check/,
+  ],
+]) {
+  test(`release evidence gate rejects preflight without ${label}`, () => {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), "release-evidence-gate-preflight-runtime-bad-"),
+    );
+    const evidenceDir = path.join(
+      root,
+      "deployments/yoyoosun/evidence/releases/2026-06-16",
+    );
+    writeValidEvidence(evidenceDir);
+
+    const preflightPath = path.join(
+      evidenceDir,
+      "production-preflight-report.txt",
+    );
+    const preflight = fs.readFileSync(preflightPath, "utf8").replace(line, "");
+    fs.writeFileSync(preflightPath, preflight);
+
+    assert.throws(
+      () =>
+        validateReleaseEvidenceGate({
+          repoRoot: root,
+          evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+        }),
+      expectedError,
+    );
+  });
+}
+
 test("release evidence gate rejects missing image digest artifact", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-image-digest-missing-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-image-digest-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
   fs.unlinkSync(path.join(evidenceDir, "image-digests.txt"));
 
@@ -420,8 +558,13 @@ test("release evidence gate rejects missing image digest artifact", () => {
 });
 
 test("release evidence gate rejects image digest artifact mismatch", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-image-digest-mismatch-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-image-digest-mismatch-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   fs.writeFileSync(
@@ -444,8 +587,13 @@ webImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 });
 
 test("release evidence gate rejects credentialed image refs in digest artifact", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-image-ref-credential-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-image-ref-credential-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   fs.writeFileSync(
@@ -468,9 +616,17 @@ webImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 });
 
 test("release evidence gate rejects placeholders and failed smoke", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
-  writeValidEvidence(evidenceDir, { releaseVersion: "<release-version>", smokeReleaseVersion: "<release-version>" });
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir, {
+    releaseVersion: "<release-version>",
+    smokeReleaseVersion: "<release-version>",
+  });
 
   const smokePath = path.join(evidenceDir, "smoke-test-report.json");
   const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
@@ -488,8 +644,13 @@ test("release evidence gate rejects placeholders and failed smoke", () => {
 });
 
 test("release evidence gate rejects empty smoke checks", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-smoke-empty-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-empty-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const smokePath = path.join(evidenceDir, "smoke-test-report.json");
@@ -508,14 +669,102 @@ test("release evidence gate rejects empty smoke checks", () => {
   );
 });
 
-test("release evidence gate rejects non-pass smoke check", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-smoke-check-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+test("release evidence gate rejects web-only smoke without PDF evidence", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-pdf-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const smokePath = path.join(evidenceDir, "smoke-test-report.json");
   const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
-  smoke.summary = { total: 3, passed: 3, failed: 0 };
+  smoke.checks = smoke.checks.filter(
+    (check) => check.name !== "template-pdf-render",
+  );
+  smoke.summary = {
+    total: smoke.checks.length,
+    passed: smoke.checks.length,
+    failed: 0,
+  };
+  const rehearsalPath = path.join(
+    evidenceDir,
+    "rollback-rehearsal-report.json",
+  );
+  const rehearsal = JSON.parse(fs.readFileSync(rehearsalPath, "utf8"));
+  rehearsal.postCheck.smokeCheckCount = smoke.checks.length;
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+  fs.writeFileSync(rehearsalPath, JSON.stringify(rehearsal, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /must include exactly one template-pdf-render check/,
+  );
+});
+
+for (const [field, value, expectedError] of [
+  ["httpCode", "500", /template-pdf-render httpCode must be 200/],
+  [
+    "contentType",
+    "text\/html",
+    /template-pdf-render contentType must be application\/pdf/,
+  ],
+  ["sha256", "not-a-sha", /template-pdf-render sha256 must be 64-hex/],
+  ["sizeBytes", 0, /template-pdf-render sizeBytes must be a positive integer/],
+  [
+    "responseBodyStored",
+    true,
+    /template-pdf-render responseBodyStored must be false/,
+  ],
+]) {
+  test(`release evidence gate rejects invalid PDF ${field}`, () => {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), "release-evidence-gate-smoke-pdf-invalid-"),
+    );
+    const evidenceDir = path.join(
+      root,
+      "deployments/yoyoosun/evidence/releases/2026-06-16",
+    );
+    writeValidEvidence(evidenceDir);
+
+    const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+    const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+    const pdfCheck = smoke.checks.find(
+      (check) => check.name === "template-pdf-render",
+    );
+    pdfCheck[field] = value;
+    fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+    assert.throws(
+      () =>
+        validateReleaseEvidenceGate({
+          repoRoot: root,
+          evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+        }),
+      expectedError,
+    );
+  });
+}
+
+test("release evidence gate rejects non-pass smoke check", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-check-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  smoke.summary = { total: 4, passed: 4, failed: 0 };
   smoke.checks[1].status = "skipped";
   fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
 
@@ -530,8 +779,13 @@ test("release evidence gate rejects non-pass smoke check", () => {
 });
 
 test("release evidence gate rejects untraceable smoke check target", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-smoke-target-missing-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-target-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const smokePath = path.join(evidenceDir, "smoke-test-report.json");
@@ -550,8 +804,13 @@ test("release evidence gate rejects untraceable smoke check target", () => {
 });
 
 test("release evidence gate rejects URL smoke check without HTTP status", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-smoke-http-code-missing-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-http-code-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const smokePath = path.join(evidenceDir, "smoke-test-report.json");
@@ -570,8 +829,13 @@ test("release evidence gate rejects URL smoke check without HTTP status", () => 
 });
 
 test("release evidence gate rejects smoke report without endpoint alias", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-smoke-endpoint-missing-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-endpoint-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const smokePath = path.join(evidenceDir, "smoke-test-report.json");
@@ -590,8 +854,13 @@ test("release evidence gate rejects smoke report without endpoint alias", () => 
 });
 
 test("release evidence gate rejects credentialed smoke endpoint aliases", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-smoke-endpoint-credential-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-endpoint-credential-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const smokePath = path.join(evidenceDir, "smoke-test-report.json");
@@ -611,8 +880,13 @@ test("release evidence gate rejects credentialed smoke endpoint aliases", () => 
 });
 
 test("release evidence gate rejects credentialed smoke check target", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-smoke-target-credential-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-target-credential-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const smokePath = path.join(evidenceDir, "smoke-test-report.json");
@@ -631,8 +905,13 @@ test("release evidence gate rejects credentialed smoke check target", () => {
 });
 
 test("release evidence gate rejects missing restore rehearsal success", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-restore-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const restorePath = path.join(evidenceDir, "backup-restore-report.json");
@@ -651,14 +930,22 @@ test("release evidence gate rejects missing restore rehearsal success", () => {
 });
 
 test("release evidence gate rejects invalid backup evidence time", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-backup-time-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-time-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const backupPath = path.join(evidenceDir, "backup-evidence.md");
   const backup = fs
     .readFileSync(backupPath, "utf8")
-    .replace("| backupTime | 2026-06-16T12:00:00+08:00 |", "| backupTime | 2026/06/16 12:00 |");
+    .replace(
+      "| backupTime | 2026-06-16T12:00:00+08:00 |",
+      "| backupTime | 2026/06/16 12:00 |",
+    );
   fs.writeFileSync(backupPath, backup);
 
   assert.throws(
@@ -672,8 +959,13 @@ test("release evidence gate rejects invalid backup evidence time", () => {
 });
 
 test("release evidence gate rejects invalid backup evidence size", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-backup-size-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-size-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir, { databaseBackupSize: "0" });
 
   assert.throws(
@@ -687,9 +979,17 @@ test("release evidence gate rejects invalid backup evidence size", () => {
 });
 
 test("release evidence gate rejects failed backup evidence verification statuses", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-backup-status-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
-  writeValidEvidence(evidenceDir, { restoreTestStatus: "failed", smokeQueryStatus: "skipped" });
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-status-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir, {
+    restoreTestStatus: "failed",
+    smokeQueryStatus: "skipped",
+  });
 
   assert.throws(
     () =>
@@ -702,8 +1002,13 @@ test("release evidence gate rejects failed backup evidence verification statuses
 });
 
 test("release evidence gate rejects missing restore target context", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-restore-target-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-target-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const restorePath = path.join(evidenceDir, "backup-restore-report.json");
@@ -722,8 +1027,13 @@ test("release evidence gate rejects missing restore target context", () => {
 });
 
 test("release evidence gate rejects invalid backup restore hash", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-restore-hash-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-hash-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const restorePath = path.join(evidenceDir, "backup-restore-report.json");
@@ -742,8 +1052,13 @@ test("release evidence gate rejects invalid backup restore hash", () => {
 });
 
 test("release evidence gate rejects missing backup restore artifact path", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-restore-artifact-missing-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-artifact-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   fs.unlinkSync(path.join(evidenceDir, "artifacts/command-summary.txt"));
@@ -759,8 +1074,13 @@ test("release evidence gate rejects missing backup restore artifact path", () =>
 });
 
 test("release evidence gate rejects backup restore artifact path outside evidence dir", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-restore-artifact-outside-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-artifact-outside-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const restorePath = path.join(evidenceDir, "backup-restore-report.json");
@@ -779,11 +1099,18 @@ test("release evidence gate rejects backup restore artifact path outside evidenc
 });
 
 test("release evidence gate rejects missing pre-apply migration artifact", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-restore-pre-apply-missing-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-pre-apply-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
-  fs.unlinkSync(path.join(evidenceDir, "artifacts/migration-status-before-apply.txt"));
+  fs.unlinkSync(
+    path.join(evidenceDir, "artifacts/migration-status-before-apply.txt"),
+  );
 
   assert.throws(
     () =>
@@ -796,8 +1123,16 @@ test("release evidence gate rejects missing pre-apply migration artifact", () =>
 });
 
 test("release evidence gate rejects mismatched restore migration before apply", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-restore-before-migration-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(
+      os.tmpdir(),
+      "release-evidence-gate-restore-before-migration-bad-",
+    ),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const restorePath = path.join(evidenceDir, "backup-restore-report.json");
@@ -816,8 +1151,13 @@ test("release evidence gate rejects mismatched restore migration before apply", 
 });
 
 test("release evidence gate rejects mismatched pre-apply migration status content", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-restore-before-status-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-before-status-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   fs.writeFileSync(
@@ -836,8 +1176,13 @@ test("release evidence gate rejects mismatched pre-apply migration status conten
 });
 
 test("release evidence gate rejects mismatched post-apply migration artifact content", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-restore-after-status-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-after-status-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   fs.writeFileSync(
@@ -856,8 +1201,13 @@ test("release evidence gate rejects mismatched post-apply migration artifact con
 });
 
 test("release evidence gate rejects pending post-apply migration artifact content", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-restore-after-pending-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-after-pending-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   fs.writeFileSync(
@@ -876,8 +1226,13 @@ test("release evidence gate rejects pending post-apply migration artifact conten
 });
 
 test("release evidence gate rejects full DSN inside backup restore artifacts", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-restore-artifact-dsn-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-artifact-dsn-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   fs.writeFileSync(
@@ -896,8 +1251,13 @@ test("release evidence gate rejects full DSN inside backup restore artifacts", (
 });
 
 test("release evidence gate rejects mismatched command summary identity", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-command-summary-id-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-command-summary-id-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   fs.writeFileSync(
@@ -921,8 +1281,13 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
 });
 
 test("release evidence gate rejects mismatched command summary restore target", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-command-summary-target-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-command-summary-target-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   fs.writeFileSync(
@@ -946,8 +1311,13 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
 });
 
 test("release evidence gate rejects command summary without migration or smoke steps", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-command-summary-steps-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-command-summary-steps-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   fs.writeFileSync(
@@ -971,8 +1341,13 @@ steps=pg_dump source alias -> restore isolated target
 });
 
 test("release evidence gate rejects pending restore migrations", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-restore-pending-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-pending-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const restorePath = path.join(evidenceDir, "backup-restore-report.json");
@@ -991,8 +1366,13 @@ test("release evidence gate rejects pending restore migrations", () => {
 });
 
 test("release evidence gate rejects mismatched migration status current version", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-migration-version-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-migration-version-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   fs.writeFileSync(
@@ -1014,8 +1394,16 @@ Pending Files: 0
 });
 
 test("release evidence gate rejects mismatched restore migration version", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-restore-migration-version-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(
+      os.tmpdir(),
+      "release-evidence-gate-restore-migration-version-bad-",
+    ),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const restorePath = path.join(evidenceDir, "backup-restore-report.json");
@@ -1034,8 +1422,13 @@ test("release evidence gate rejects mismatched restore migration version", () =>
 });
 
 test("release evidence gate rejects mismatched release versions", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-version-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-version-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const smokePath = path.join(evidenceDir, "smoke-test-report.json");
@@ -1054,9 +1447,16 @@ test("release evidence gate rejects mismatched release versions", () => {
 });
 
 test("release evidence gate rejects mismatched backup evidence release version", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-backup-version-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
-  writeValidEvidence(evidenceDir, { backupReleaseVersion: "20260617T1200-other" });
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-version-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir, {
+    backupReleaseVersion: "20260617T1200-other",
+  });
 
   assert.throws(
     () =>
@@ -1069,8 +1469,13 @@ test("release evidence gate rejects mismatched backup evidence release version",
 });
 
 test("release evidence gate rejects mismatched backup ids", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-backup-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const restorePath = path.join(evidenceDir, "backup-restore-report.json");
@@ -1089,8 +1494,13 @@ test("release evidence gate rejects mismatched backup ids", () => {
 });
 
 test("release evidence gate rejects mismatched backup migration version", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-backup-migration-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-migration-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir, { backupMigrationVersion: "20260616000000" });
 
   assert.throws(
@@ -1104,13 +1514,19 @@ test("release evidence gate rejects mismatched backup migration version", () => 
 });
 
 test("release evidence gate rejects mismatched backup hashes", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-backup-hash-mismatch-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-hash-mismatch-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const restorePath = path.join(evidenceDir, "backup-restore-report.json");
   const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
-  restoreReport.backup.databaseBackupHash = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+  restoreReport.backup.databaseBackupHash =
+    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
   fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
 
   assert.throws(
@@ -1124,8 +1540,13 @@ test("release evidence gate rejects mismatched backup hashes", () => {
 });
 
 test("release evidence gate rejects mismatched evidence environments", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-environment-mismatch-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-environment-mismatch-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const smokePath = path.join(evidenceDir, "smoke-test-report.json");
@@ -1144,8 +1565,13 @@ test("release evidence gate rejects mismatched evidence environments", () => {
 });
 
 test("release evidence gate rejects mismatched backup evidence environment", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-backup-environment-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-environment-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir, { backupEnvironment: "staging-other" });
 
   assert.throws(
@@ -1159,8 +1585,13 @@ test("release evidence gate rejects mismatched backup evidence environment", () 
 });
 
 test("release evidence gate rejects mismatched rollback rehearsal release version", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-rollback-version-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-version-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const reportPath = path.join(evidenceDir, "rollback-rehearsal-report.json");
@@ -1179,14 +1610,22 @@ test("release evidence gate rejects mismatched rollback rehearsal release versio
 });
 
 test("release evidence gate rejects mismatched signoff release version", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-signoff-version-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-signoff-version-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const signoffPath = path.join(evidenceDir, "release-signoff-checklist.md");
   const signoff = fs
     .readFileSync(signoffPath, "utf8")
-    .replace("| releaseVersion | 20260616T1200-test |", "| releaseVersion | 20260617T1200-other |");
+    .replace(
+      "| releaseVersion | 20260616T1200-test |",
+      "| releaseVersion | 20260617T1200-other |",
+    );
   fs.writeFileSync(signoffPath, signoff);
 
   assert.throws(
@@ -1200,8 +1639,13 @@ test("release evidence gate rejects mismatched signoff release version", () => {
 });
 
 test("release evidence gate rejects missing rollback plan", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-rollback-missing-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
   fs.unlinkSync(path.join(evidenceDir, "rollback-forward-fix-plan.md"));
 
@@ -1216,8 +1660,13 @@ test("release evidence gate rejects missing rollback plan", () => {
 });
 
 test("release evidence gate rejects placeholder rollback plan", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-rollback-placeholder-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-placeholder-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir, { rollbackDecision: "todo" });
 
   assert.throws(
@@ -1231,8 +1680,13 @@ test("release evidence gate rejects placeholder rollback plan", () => {
 });
 
 test("release evidence gate rejects missing rollback rehearsal report", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-rollback-rehearsal-missing-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-rehearsal-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
   fs.unlinkSync(path.join(evidenceDir, "rollback-rehearsal-report.json"));
 
@@ -1247,8 +1701,13 @@ test("release evidence gate rejects missing rollback rehearsal report", () => {
 });
 
 test("release evidence gate rejects failed rollback rehearsal step", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-rollback-rehearsal-failed-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-rehearsal-failed-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const reportPath = path.join(evidenceDir, "rollback-rehearsal-report.json");
@@ -1267,8 +1726,13 @@ test("release evidence gate rejects failed rollback rehearsal step", () => {
 });
 
 test("release evidence gate rejects rollback rehearsal without traceable post smoke report", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-rollback-smoke-missing-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-smoke-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const reportPath = path.join(evidenceDir, "rollback-rehearsal-report.json");
@@ -1287,8 +1751,13 @@ test("release evidence gate rejects rollback rehearsal without traceable post sm
 });
 
 test("release evidence gate rejects rollback rehearsal smoke count mismatch", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-rollback-smoke-count-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-smoke-count-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const reportPath = path.join(evidenceDir, "rollback-rehearsal-report.json");
@@ -1307,13 +1776,19 @@ test("release evidence gate rejects rollback rehearsal smoke count mismatch", ()
 });
 
 test("release evidence gate rejects rollback rehearsal smoke report outside current evidence dir", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-rollback-smoke-path-bad-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-smoke-path-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const reportPath = path.join(evidenceDir, "rollback-rehearsal-report.json");
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-  report.postCheck.smokeReport = "deployments/yoyoosun/evidence/releases/2026-06-15/smoke-test-report.json";
+  report.postCheck.smokeReport =
+    "deployments/yoyoosun/evidence/releases/2026-06-15/smoke-test-report.json";
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
 
   assert.throws(
@@ -1327,8 +1802,16 @@ test("release evidence gate rejects rollback rehearsal smoke report outside curr
 });
 
 test("release evidence gate requires rollback rehearsal effective session when smoke has customer config check", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-rollback-effective-session-missing-"));
-  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  const root = fs.mkdtempSync(
+    path.join(
+      os.tmpdir(),
+      "release-evidence-gate-rollback-effective-session-missing-",
+    ),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
   writeValidEvidence(evidenceDir);
 
   const smokePath = path.join(evidenceDir, "smoke-test-report.json");
@@ -1341,7 +1824,11 @@ test("release evidence gate requires rollback rehearsal effective session when s
     tokenSourceEnv: "CUSTOMER_CONFIG_ADMIN_TOKEN",
     responseBodyStored: false,
   });
-  smoke.summary = { total: smoke.checks.length, passed: smoke.checks.length, failed: 0 };
+  smoke.summary = {
+    total: smoke.checks.length,
+    passed: smoke.checks.length,
+    failed: 0,
+  };
   fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
 
   const reportPath = path.join(evidenceDir, "rollback-rehearsal-report.json");
@@ -1375,7 +1862,10 @@ test("release evidence gate requires rollback rehearsal effective session when s
     /customer-config-manifest-evidence\.json is required when smoke-test-report\.json contains customer-config-effective-session/,
   );
 
-  writeCustomerConfigManifestEvidence(evidenceDir, "different-runtime-manifest");
+  writeCustomerConfigManifestEvidence(
+    evidenceDir,
+    "different-runtime-manifest",
+  );
 
   assert.throws(
     () =>

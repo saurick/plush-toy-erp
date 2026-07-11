@@ -4,11 +4,20 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { buildReleaseEvidenceStatus, parseCliArgs } from "./release-evidence-status.mjs";
+import {
+  buildReleaseEvidenceStatus,
+  parseCliArgs,
+} from "./release-evidence-status.mjs";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
-const scriptPath = path.join(repoRoot, "scripts/deploy/release-evidence-status.mjs");
-const collectEvidencePath = path.join(repoRoot, "deployments/yoyoosun/scripts/collect-evidence.sh");
+const scriptPath = path.join(
+  repoRoot,
+  "scripts/deploy/release-evidence-status.mjs",
+);
+const collectEvidencePath = path.join(
+  repoRoot,
+  "deployments/yoyoosun/scripts/collect-evidence.sh",
+);
 
 function runStatus(args = [], options = {}) {
   return spawnSync("node", [scriptPath, ...args], {
@@ -62,6 +71,10 @@ function writeGatePassingEvidence(root) {
 [production-preflight] ok: 生产 secret、镜像 tag、debug、后端端口和 PostgreSQL / Jaeger 暴露边界通过
 [production-preflight] ok: Compose、低配部署边界和 migration 脚本通过
 [production-preflight] ok: docker compose config -q 通过
+[production-preflight] ok: Compose 运行服务存在
+[production-preflight] ok: 运行态 ERP_PDF_WARMUP=async
+[production-preflight] ok: 运行态 Chromium / chromium-common 版本与 Docker exact pin 一致: 150.0.7871.100-1~deb12u1
+[production-preflight] ok: healthz / readyz 通过
 [production-preflight] all checks passed
 `,
   );
@@ -145,7 +158,8 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
         },
         backup: {
           databaseBackupSize: 123456,
-          databaseBackupHash: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          databaseBackupHash:
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
           storageLocationAlias: "controlled-backup-store",
           migrationVersion: "20260601000000",
         },
@@ -189,16 +203,43 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
         releaseVersion: "20260616T1200-test",
         endpointAlias: "https://erp.example.invalid",
         backendEndpointAlias: "https://api.example.invalid",
-        summary: { total: 4, passed: 4, failed: 0 },
+        summary: { total: 5, passed: 5, failed: 0 },
         checks: [
-          { name: "server-healthz", status: "pass", target: "https://erp.example.invalid/healthz", httpCode: "200" },
-          { name: "server-readyz", status: "pass", target: "https://erp.example.invalid/readyz", httpCode: "200" },
-          { name: "web-healthz", status: "pass", target: "https://erp.example.invalid/", httpCode: "200" },
+          {
+            name: "server-healthz",
+            status: "pass",
+            target: "https://erp.example.invalid/healthz",
+            httpCode: "200",
+          },
+          {
+            name: "server-readyz",
+            status: "pass",
+            target: "https://erp.example.invalid/readyz",
+            httpCode: "200",
+          },
+          {
+            name: "web-healthz",
+            status: "pass",
+            target: "https://erp.example.invalid/",
+            httpCode: "200",
+          },
+          {
+            name: "template-pdf-render",
+            status: "pass",
+            target: "/templates/render-pdf",
+            httpCode: "200",
+            contentType: "application/pdf",
+            sha256:
+              "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            sizeBytes: 1024,
+            responseBodyStored: false,
+          },
           {
             name: "customer-config-effective-session",
             status: "pass",
             target: "jsonrpc:customer_config.get_effective_session",
-            expectedRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+            expectedRevision:
+              "yoyoosun-customer-package-v7.runtime-manifest-v1",
             tokenSourceEnv: "CUSTOMER_CONFIG_ADMIN_TOKEN",
             responseBodyStored: false,
           },
@@ -247,12 +288,13 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
         postCheck: {
           smokeStatus: "passed",
           smokeReport: evidenceDir + "/smoke-test-report.json",
-          smokeCheckCount: 4,
+          smokeCheckCount: 5,
           evidenceReviewStatus: "passed",
           customerConfigEffectiveSession: {
             status: "verified",
             target: "jsonrpc:customer_config.get_effective_session",
-            expectedRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+            expectedRevision:
+              "yoyoosun-customer-package-v7.runtime-manifest-v1",
             tokenSourceEnv: "CUSTOMER_CONFIG_ADMIN_TOKEN",
             responseBodyStored: false,
           },
@@ -299,7 +341,8 @@ function writeCustomerConfigManifestEvidence(absoluteDir) {
       {
         customerKey: "yoyoosun",
         revision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
-        manifestSha256: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        manifestSha256:
+          "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         reviewStatus: "approved",
         reviewer: "release-reviewer",
         redaction: {
@@ -344,7 +387,9 @@ test("parseCliArgs supports status options", () => {
 });
 
 test("release evidence status reports missing evidence directory without throwing", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-missing-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-missing-"),
+  );
   const status = buildReleaseEvidenceStatus({
     repoRoot: root,
     evidenceDir: "deployments/yoyoosun/evidence/releases/missing",
@@ -356,7 +401,9 @@ test("release evidence status reports missing evidence directory without throwin
   assert.equal(status.scope.evidenceOnly, true);
   assert.match(status.scope.readyMeaning, /release evidence gate passed/);
   assert.ok(
-    status.scope.notProvenByThisHelper.includes("target environment release was executed"),
+    status.scope.notProvenByThisHelper.includes(
+      "target environment release was executed",
+    ),
   );
   assert.equal(status.directoryExists, false);
   assert.equal(status.missingFiles.length, status.requiredFileCount);
@@ -381,14 +428,17 @@ test("release evidence status reports missing evidence directory without throwin
     ),
   );
   assert.deepEqual(
-    status.closeoutChecklist.find((item) => item.id === "target-smoke").missingFiles,
+    status.closeoutChecklist.find((item) => item.id === "target-smoke")
+      .missingFiles,
     ["smoke-test-report.json"],
   );
   assert.match(status.nextCommands[0], /collect-evidence\.sh/);
 });
 
 test("release evidence status reports gate-verified closeout checklist", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-checklist-ready-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-checklist-ready-"),
+  );
   const { evidenceDir, absoluteDir } = writeGatePassingEvidence(root);
   writeCustomerConfigManifestEvidence(absoluteDir);
 
@@ -437,7 +487,9 @@ test("release evidence status reports gate-verified closeout checklist", () => {
 });
 
 test("release evidence status exposes credentialed image digest gate errors", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-image-secret-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-image-secret-"),
+  );
   const { evidenceDir, absoluteDir } = writeGatePassingEvidence(root);
   const { imageDigestsPath, credentialedImageDigests } =
     writeCredentialedImageDigestsEvidence(absoluteDir);
@@ -447,7 +499,10 @@ test("release evidence status exposes credentialed image digest gate errors", ()
   assert.equal(status.status, "draft");
   assert.equal(status.ready, false);
   assert.equal(status.gateReady, false);
-  assert.match(status.gate.errors.join("\n"), /image-digests\.txt contains a credentialed URL/);
+  assert.match(
+    status.gate.errors.join("\n"),
+    /image-digests\.txt contains a credentialed URL/,
+  );
   const immutableVersion = status.closeoutChecklist.find(
     (item) => item.id === "immutable-version",
   );
@@ -461,24 +516,38 @@ test("release evidence status exposes credentialed image digest gate errors", ()
     immutableGate.sampleErrors.join("\n"),
     /image-digests\.txt contains a credentialed URL/,
   );
-  assert.equal(fs.readFileSync(imageDigestsPath, "utf8"), credentialedImageDigests);
+  assert.equal(
+    fs.readFileSync(imageDigestsPath, "utf8"),
+    credentialedImageDigests,
+  );
 });
 
 test("release evidence status JSON redacts credentialed image digest values", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-json-image-secret-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-json-image-secret-"),
+  );
   const { evidenceDir, absoluteDir } = writeGatePassingEvidence(root);
   const { imageDigestsPath, credentialedImageDigests } =
     writeCredentialedImageDigestsEvidence(absoluteDir);
 
-  const jsonResult = runStatus(["--evidence-dir", evidenceDir, "--json"], { cwd: root });
+  const jsonResult = runStatus(["--evidence-dir", evidenceDir, "--json"], {
+    cwd: root,
+  });
 
-  assert.equal(jsonResult.status, 0, `${jsonResult.stdout}\n${jsonResult.stderr}`);
+  assert.equal(
+    jsonResult.status,
+    0,
+    `${jsonResult.stdout}\n${jsonResult.stderr}`,
+  );
   assert.doesNotMatch(jsonResult.stdout, /deploy:secret/);
   assert.doesNotMatch(jsonResult.stdout, /secret@registry/);
   const parsed = JSON.parse(jsonResult.stdout);
   assert.equal(parsed.status, "draft");
   assert.equal(parsed.ready, false);
-  assert.match(parsed.gate.errors.join("\n"), /image-digests\.txt contains a credentialed URL/);
+  assert.match(
+    parsed.gate.errors.join("\n"),
+    /image-digests\.txt contains a credentialed URL/,
+  );
   const immutableGate = parsed.closeoutGateSummary.find(
     (item) => item.id === "immutable-version",
   );
@@ -486,11 +555,16 @@ test("release evidence status JSON redacts credentialed image digest values", ()
     immutableGate.sampleErrors.join("\n"),
     /image-digests\.txt contains a credentialed URL/,
   );
-  assert.equal(fs.readFileSync(imageDigestsPath, "utf8"), credentialedImageDigests);
+  assert.equal(
+    fs.readFileSync(imageDigestsPath, "utf8"),
+    credentialedImageDigests,
+  );
 });
 
 test("release evidence status reports draft evidence gate errors", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-draft-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-draft-"),
+  );
   const { evidenceDir } = writeDraftEvidence(root);
   const status = buildReleaseEvidenceStatus({ repoRoot: root, evidenceDir });
 
@@ -499,22 +573,34 @@ test("release evidence status reports draft evidence gate errors", () => {
   assert.equal(status.directoryExists, true);
   assert.equal(status.missingFiles.length, 0);
   assert.ok(status.gate.errorCount > 0);
-  assert.match(status.gate.errors.join("\n"), /placeholder|待填写|release evidence gate/i);
+  assert.match(
+    status.gate.errors.join("\n"),
+    /placeholder|待填写|release evidence gate/i,
+  );
   const immutableGate = status.closeoutGateSummary.find(
     (item) => item.id === "immutable-version",
   );
   assert.equal(immutableGate.errorCount >= 1, true);
-  assert.match(immutableGate.sampleErrors.join("\n"), /release-evidence\.md|image-digests\.txt/);
+  assert.match(
+    immutableGate.sampleErrors.join("\n"),
+    /release-evidence\.md|image-digests\.txt/,
+  );
   const preflightGate = status.closeoutGateSummary.find(
     (item) => item.id === "production-preflight",
   );
   assert.equal(preflightGate.errorCount >= 1, true);
-  assert.match(preflightGate.sampleErrors.join("\n"), /production-preflight-report\.txt/);
+  assert.match(
+    preflightGate.sampleErrors.join("\n"),
+    /production-preflight-report\.txt/,
+  );
   const backupGate = status.closeoutGateSummary.find(
     (item) => item.id === "backup-restore-rehearsal",
   );
   assert.equal(backupGate.errorCount >= 1, true);
-  assert.match(backupGate.sampleErrors.join("\n"), /backup-evidence\.md|backup-restore-report\.json/);
+  assert.match(
+    backupGate.sampleErrors.join("\n"),
+    /backup-evidence\.md|backup-restore-report\.json/,
+  );
   assert.match(status.nextCommands.at(-1), /release-evidence-gate\.mjs/);
   assert.deepEqual(
     status.closeoutNextActions.map((item) => item.id),
@@ -530,29 +616,59 @@ test("release evidence status reports draft evidence gate errors", () => {
   const immutableVersion = status.closeoutNextActions.find(
     (item) => item.id === "immutable-version",
   );
-  assert.match(immutableVersion.commands.join("\n"), /immutable-version-evidence\.mjs/);
-  assert.match(immutableVersion.commands.join("\n"), /--migration-before <migration-before>/);
+  assert.match(
+    immutableVersion.commands.join("\n"),
+    /immutable-version-evidence\.mjs/,
+  );
+  assert.match(
+    immutableVersion.commands.join("\n"),
+    /--migration-before <migration-before>/,
+  );
   assert.match(immutableVersion.manualChecks.join("\n"), /gitCommit/);
   const productionPreflight = status.closeoutNextActions.find(
     (item) => item.id === "production-preflight",
   );
-  assert.match(productionPreflight.commands.join("\n"), /production-preflight\.sh/);
-  assert.match(productionPreflight.manualChecks.join("\n"), /real runtime \.env/);
+  assert.match(
+    productionPreflight.commands.join("\n"),
+    /production-preflight\.sh/,
+  );
+  assert.match(productionPreflight.commands.join("\n"), /--runtime/);
+  assert.match(
+    productionPreflight.manualChecks.join("\n"),
+    /real runtime \.env/,
+  );
   const backupRestore = status.closeoutNextActions.find(
     (item) => item.id === "backup-restore-rehearsal",
   );
-  assert.match(backupRestore.commands.join("\n"), /run-backup-restore-rehearsal\.sh/);
-  assert.match(backupRestore.commands.join("\n"), /--backup-purpose pre-migration/);
-  const targetSmoke = status.closeoutNextActions.find((item) => item.id === "target-smoke");
+  assert.match(
+    backupRestore.commands.join("\n"),
+    /run-backup-restore-rehearsal\.sh/,
+  );
+  assert.match(
+    backupRestore.commands.join("\n"),
+    /--backup-purpose pre-migration/,
+  );
+  const targetSmoke = status.closeoutNextActions.find(
+    (item) => item.id === "target-smoke",
+  );
   assert.match(targetSmoke.commands.join("\n"), /run-smoke\.sh/);
-  const rollback = status.closeoutNextActions.find((item) => item.id === "rollback-forward-fix");
+  const rollback = status.closeoutNextActions.find(
+    (item) => item.id === "rollback-forward-fix",
+  );
   assert.match(rollback.commands.join("\n"), /rollback-rehearsal-report\.mjs/);
-  const signoff = status.closeoutNextActions.find((item) => item.id === "release-signoff");
-  assert.match(signoff.manualChecks.join("\n"), /release-signoff-checklist\.md/);
+  const signoff = status.closeoutNextActions.find(
+    (item) => item.id === "release-signoff",
+  );
+  assert.match(
+    signoff.manualChecks.join("\n"),
+    /release-signoff-checklist\.md/,
+  );
 });
 
 test("release evidence status reports incomplete evidence artifacts", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-incomplete-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-incomplete-"),
+  );
   const { evidenceDir, absoluteDir } = writeDraftEvidence(root);
   fs.unlinkSync(path.join(absoluteDir, "smoke-test-report.json"));
 
@@ -563,12 +679,17 @@ test("release evidence status reports incomplete evidence artifacts", () => {
   assert.deepEqual(status.missingFiles, ["smoke-test-report.json"]);
   const nextCommands = status.nextCommands.join("\n");
   assert.match(nextCommands, /run-smoke\.sh/);
-  assert.match(nextCommands, /--report deployments\/yoyoosun\/evidence\/releases\/2026-06-29\/smoke-test-report\.json/);
+  assert.match(
+    nextCommands,
+    /--report deployments\/yoyoosun\/evidence\/releases\/2026-06-29\/smoke-test-report\.json/,
+  );
   assert.doesNotMatch(nextCommands, /run-smoke\.sh[^\n]+--out/);
 });
 
 test("release evidence status suggests customer config smoke when manifest evidence exists", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-config-smoke-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-config-smoke-"),
+  );
   const { evidenceDir, absoluteDir } = writeDraftEvidence(root);
   fs.writeFileSync(
     path.join(absoluteDir, "customer-config-manifest-evidence.json"),
@@ -576,7 +697,8 @@ test("release evidence status suggests customer config smoke when manifest evide
       {
         customerKey: "yoyoosun",
         revision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
-        manifestSha256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        manifestSha256:
+          "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         reviewStatus: "approved",
         redaction: {
           containsSecrets: false,
@@ -602,9 +724,15 @@ test("release evidence status suggests customer config smoke when manifest evide
   const nextCommands = status.nextCommands.join("\n");
   assert.match(nextCommands, /run-smoke\.sh/);
   assert.match(nextCommands, /--backend-url <backend-endpoint>/);
-  assert.match(nextCommands, /--customer-config-revision yoyoosun-customer-package-v7\.runtime-manifest-v1/);
+  assert.match(
+    nextCommands,
+    /--customer-config-revision yoyoosun-customer-package-v7\.runtime-manifest-v1/,
+  );
   assert.match(nextCommands, /--admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN/);
-  assert.match(nextCommands, /--report deployments\/yoyoosun\/evidence\/releases\/2026-06-29\/smoke-test-report\.json/);
+  assert.match(
+    nextCommands,
+    /--report deployments\/yoyoosun\/evidence\/releases\/2026-06-29\/smoke-test-report\.json/,
+  );
   const customerConfigAction = status.closeoutNextActions.find(
     (item) => item.id === "customer-config-effective-session",
   );
@@ -613,11 +741,16 @@ test("release evidence status suggests customer config smoke when manifest evide
     customerConfigAction.commands.join("\n"),
     /--customer-config-revision yoyoosun-customer-package-v7\.runtime-manifest-v1/,
   );
-  assert.match(customerConfigAction.commands.join("\n"), /rollback-rehearsal-report\.mjs/);
+  assert.match(
+    customerConfigAction.commands.join("\n"),
+    /rollback-rehearsal-report\.mjs/,
+  );
 });
 
 test("release evidence status suggests customer config smoke when smoke exists without effective session check", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-config-smoke-existing-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-config-smoke-existing-"),
+  );
   const { evidenceDir, absoluteDir } = writeDraftEvidence(root);
   fs.writeFileSync(
     path.join(absoluteDir, "customer-config-manifest-evidence.json"),
@@ -625,7 +758,8 @@ test("release evidence status suggests customer config smoke when smoke exists w
       {
         customerKey: "yoyoosun",
         revision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
-        manifestSha256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        manifestSha256:
+          "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         reviewStatus: "approved",
         redaction: {
           containsSecrets: false,
@@ -643,7 +777,10 @@ test("release evidence status suggests customer config smoke when smoke exists w
   assert.equal(status.status, "draft");
   assert.equal(status.customerConfigManifestEvidence.exists, true);
   assert.equal(status.customerConfigSmokeEvidence.exists, true);
-  assert.equal(status.customerConfigSmokeEvidence.hasCustomerConfigCheck, false);
+  assert.equal(
+    status.customerConfigSmokeEvidence.hasCustomerConfigCheck,
+    false,
+  );
   assert.match(
     status.warnings.join("\n"),
     /smoke-test-report\.json does not contain customer-config-effective-session/,
@@ -651,13 +788,21 @@ test("release evidence status suggests customer config smoke when smoke exists w
   const nextCommands = status.nextCommands.join("\n");
   assert.match(nextCommands, /run-smoke\.sh/);
   assert.match(nextCommands, /--backend-url <backend-endpoint>/);
-  assert.match(nextCommands, /--customer-config-revision yoyoosun-customer-package-v7\.runtime-manifest-v1/);
+  assert.match(
+    nextCommands,
+    /--customer-config-revision yoyoosun-customer-package-v7\.runtime-manifest-v1/,
+  );
   assert.match(nextCommands, /--admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN/);
-  assert.match(nextCommands, /--report deployments\/yoyoosun\/evidence\/releases\/2026-06-29\/smoke-test-report\.json/);
+  assert.match(
+    nextCommands,
+    /--report deployments\/yoyoosun\/evidence\/releases\/2026-06-29\/smoke-test-report\.json/,
+  );
 });
 
 test("release evidence status warns when customer config manifest evidence cannot provide revision", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-config-warning-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-config-warning-"),
+  );
   const { evidenceDir, absoluteDir } = writeDraftEvidence(root);
   fs.writeFileSync(
     path.join(absoluteDir, "customer-config-manifest-evidence.json"),
@@ -665,7 +810,10 @@ test("release evidence status warns when customer config manifest evidence canno
   );
   fs.unlinkSync(path.join(absoluteDir, "smoke-test-report.json"));
 
-  const invalidStatus = buildReleaseEvidenceStatus({ repoRoot: root, evidenceDir });
+  const invalidStatus = buildReleaseEvidenceStatus({
+    repoRoot: root,
+    evidenceDir,
+  });
   assert.equal(invalidStatus.status, "incomplete");
   assert.equal(invalidStatus.customerConfigManifestEvidence.exists, true);
   assert.match(invalidStatus.customerConfigManifestEvidence.parseError, /JSON/);
@@ -684,7 +832,8 @@ test("release evidence status warns when customer config manifest evidence canno
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        manifestSha256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        manifestSha256:
+          "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         reviewStatus: "approved",
       },
       null,
@@ -692,7 +841,10 @@ test("release evidence status warns when customer config manifest evidence canno
     ),
   );
 
-  const missingRevisionStatus = buildReleaseEvidenceStatus({ repoRoot: root, evidenceDir });
+  const missingRevisionStatus = buildReleaseEvidenceStatus({
+    repoRoot: root,
+    evidenceDir,
+  });
   assert.equal(missingRevisionStatus.status, "incomplete");
   assert.match(missingRevisionStatus.warnings.join("\n"), /missing revision/);
   assert.match(
@@ -702,7 +854,9 @@ test("release evidence status warns when customer config manifest evidence canno
 });
 
 test("release evidence status cross-checks customer config smoke and manifest evidence", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-config-cross-check-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-config-cross-check-"),
+  );
   const { evidenceDir, absoluteDir } = writeDraftEvidence(root);
   const smokePath = path.join(absoluteDir, "smoke-test-report.json");
   const smokeReport = JSON.parse(fs.readFileSync(smokePath, "utf8"));
@@ -720,8 +874,14 @@ test("release evidence status cross-checks customer config smoke and manifest ev
   smokeReport.summary.failed = 0;
   fs.writeFileSync(smokePath, `${JSON.stringify(smokeReport, null, 2)}\n`);
 
-  const missingManifestStatus = buildReleaseEvidenceStatus({ repoRoot: root, evidenceDir });
-  assert.equal(missingManifestStatus.customerConfigSmokeEvidence.hasCustomerConfigCheck, true);
+  const missingManifestStatus = buildReleaseEvidenceStatus({
+    repoRoot: root,
+    evidenceDir,
+  });
+  assert.equal(
+    missingManifestStatus.customerConfigSmokeEvidence.hasCustomerConfigCheck,
+    true,
+  );
   assert.equal(
     missingManifestStatus.customerConfigSmokeEvidence.expectedRevision,
     "yoyoosun-customer-package-v7.runtime-manifest-v1",
@@ -741,7 +901,8 @@ test("release evidence status cross-checks customer config smoke and manifest ev
       {
         customerKey: "yoyoosun",
         revision: "different-runtime-manifest",
-        manifestSha256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        manifestSha256:
+          "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         reviewStatus: "approved",
       },
       null,
@@ -749,7 +910,10 @@ test("release evidence status cross-checks customer config smoke and manifest ev
     ),
   );
 
-  const mismatchedStatus = buildReleaseEvidenceStatus({ repoRoot: root, evidenceDir });
+  const mismatchedStatus = buildReleaseEvidenceStatus({
+    repoRoot: root,
+    evidenceDir,
+  });
   assert.match(
     mismatchedStatus.warnings.join("\n"),
     /revision different-runtime-manifest does not match smoke-test-report\.json expectedRevision yoyoosun-customer-package-v7\.runtime-manifest-v1/,
@@ -761,12 +925,20 @@ test("release evidence status cross-checks customer config smoke and manifest ev
 });
 
 test("release evidence status is not ready when gate passes with warnings", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-attention-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-attention-"),
+  );
   const { evidenceDir, absoluteDir } = writeGatePassingEvidence(root);
   const smokePath = path.join(absoluteDir, "smoke-test-report.json");
   const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
-  smoke.checks = smoke.checks.filter((check) => check.name !== "customer-config-effective-session");
-  smoke.summary = { total: smoke.checks.length, passed: smoke.checks.length, failed: 0 };
+  smoke.checks = smoke.checks.filter(
+    (check) => check.name !== "customer-config-effective-session",
+  );
+  smoke.summary = {
+    total: smoke.checks.length,
+    passed: smoke.checks.length,
+    failed: 0,
+  };
   fs.writeFileSync(smokePath, `${JSON.stringify(smoke, null, 2)}\n`);
   const reportPath = path.join(absoluteDir, "rollback-rehearsal-report.json");
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
@@ -789,16 +961,21 @@ test("release evidence status is not ready when gate passes with warnings", () =
     /customer-config-manifest-evidence\.json is not valid JSON/,
   );
 
-  const failResult = runStatus(["--evidence-dir", evidenceDir, "--fail-on-not-ready"], {
-    cwd: root,
-  });
+  const failResult = runStatus(
+    ["--evidence-dir", evidenceDir, "--fail-on-not-ready"],
+    {
+      cwd: root,
+    },
+  );
   assert.equal(failResult.status, 1);
   assert.match(failResult.stdout, /release evidence status: attention/);
   assert.match(failResult.stdout, /warnings:/);
 });
 
 test("release evidence status suggests restore rehearsal for missing supporting artifacts", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-supporting-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-supporting-"),
+  );
   const { evidenceDir, absoluteDir } = writeDraftEvidence(root);
   fs.unlinkSync(path.join(absoluteDir, "migration-status-before-apply.txt"));
   fs.unlinkSync(path.join(absoluteDir, "command-summary.txt"));
@@ -814,11 +991,16 @@ test("release evidence status suggests restore rehearsal for missing supporting 
   const nextCommands = status.nextCommands.join("\n");
   assert.match(nextCommands, /run-backup-restore-rehearsal\.sh/);
   assert.match(nextCommands, /--backup-purpose pre-migration/);
-  assert.match(nextCommands, /--evidence-dir deployments\/yoyoosun\/evidence\/releases\/2026-06-29/);
+  assert.match(
+    nextCommands,
+    /--evidence-dir deployments\/yoyoosun\/evidence\/releases\/2026-06-29/,
+  );
 });
 
 test("release evidence status suggests templates for missing plan and signoff artifacts", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-templates-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-templates-"),
+  );
   const { evidenceDir, absoluteDir } = writeDraftEvidence(root);
   fs.unlinkSync(path.join(absoluteDir, "rollback-forward-fix-plan.md"));
   fs.unlinkSync(path.join(absoluteDir, "release-signoff-checklist.md"));
@@ -843,7 +1025,9 @@ test("release evidence status suggests templates for missing plan and signoff ar
 });
 
 test("release evidence status suggests release template for missing release evidence file", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-release-template-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-release-template-"),
+  );
   const { evidenceDir, absoluteDir } = writeDraftEvidence(root);
   fs.unlinkSync(path.join(absoluteDir, "release-evidence.md"));
 
@@ -860,16 +1044,27 @@ test("release evidence status suggests release template for missing release evid
 });
 
 test("release evidence status CLI supports JSON and fail-on-not-ready", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-cli-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-cli-"),
+  );
   const { evidenceDir } = writeDraftEvidence(root);
 
-  const jsonResult = runStatus(["--evidence-dir", evidenceDir, "--json"], { cwd: root });
-  assert.equal(jsonResult.status, 0, `${jsonResult.stdout}\n${jsonResult.stderr}`);
+  const jsonResult = runStatus(["--evidence-dir", evidenceDir, "--json"], {
+    cwd: root,
+  });
+  assert.equal(
+    jsonResult.status,
+    0,
+    `${jsonResult.stdout}\n${jsonResult.stderr}`,
+  );
   const parsed = JSON.parse(jsonResult.stdout);
   assert.equal(parsed.status, "draft");
   assert.equal(parsed.ready, false);
 
-  const failResult = runStatus(["--evidence-dir", evidenceDir, "--fail-on-not-ready"], { cwd: root });
+  const failResult = runStatus(
+    ["--evidence-dir", evidenceDir, "--fail-on-not-ready"],
+    { cwd: root },
+  );
   assert.equal(failResult.status, 1);
   assert.match(failResult.stdout, /release evidence status: draft/);
   assert.match(failResult.stdout, /ready means: release evidence gate passed/);
@@ -883,18 +1078,26 @@ test("release evidence status CLI supports JSON and fail-on-not-ready", () => {
   assert.match(failResult.stdout, /error: release-evidence\.md/);
   assert.match(failResult.stdout, /closeout next actions:/);
   assert.match(failResult.stdout, /production-preflight: present-unverified/);
-  assert.match(failResult.stdout, /command: bash scripts\/deploy\/production-preflight\.sh/);
+  assert.match(
+    failResult.stdout,
+    /command: bash scripts\/deploy\/production-preflight\.sh/,
+  );
 });
 
 test("release evidence status CLI can fail not-ready while keeping JSON output machine-readable", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-cli-json-fail-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-cli-json-fail-"),
+  );
   const { evidenceDir, absoluteDir } = writeGatePassingEvidence(root);
   const { imageDigestsPath, credentialedImageDigests } =
     writeCredentialedImageDigestsEvidence(absoluteDir);
 
-  const result = runStatus(["--evidence-dir", evidenceDir, "--json", "--fail-on-not-ready"], {
-    cwd: root,
-  });
+  const result = runStatus(
+    ["--evidence-dir", evidenceDir, "--json", "--fail-on-not-ready"],
+    {
+      cwd: root,
+    },
+  );
 
   assert.equal(result.status, 1);
   assert.equal(result.stderr, "");
@@ -906,7 +1109,10 @@ test("release evidence status CLI can fail not-ready while keeping JSON output m
   assert.equal(parsed.ready, false);
   assert.equal(parsed.readOnly, true);
   assert.equal(parsed.gateReady, false);
-  assert.match(parsed.gate.errors.join("\n"), /image-digests\.txt contains a credentialed URL/);
+  assert.match(
+    parsed.gate.errors.join("\n"),
+    /image-digests\.txt contains a credentialed URL/,
+  );
   const immutableGate = parsed.closeoutGateSummary.find(
     (item) => item.id === "immutable-version",
   );
@@ -914,24 +1120,35 @@ test("release evidence status CLI can fail not-ready while keeping JSON output m
     immutableGate.sampleErrors.join("\n"),
     /image-digests\.txt contains a credentialed URL/,
   );
-  assert.equal(fs.readFileSync(imageDigestsPath, "utf8"), credentialedImageDigests);
+  assert.equal(
+    fs.readFileSync(imageDigestsPath, "utf8"),
+    credentialedImageDigests,
+  );
 });
 
 test("release evidence status CLI exposes credentialed image digest gate errors", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-status-cli-image-secret-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-status-cli-image-secret-"),
+  );
   const { evidenceDir, absoluteDir } = writeGatePassingEvidence(root);
   const { imageDigestsPath, credentialedImageDigests } =
     writeCredentialedImageDigestsEvidence(absoluteDir);
 
-  const failResult = runStatus(["--evidence-dir", evidenceDir, "--fail-on-not-ready"], {
-    cwd: root,
-  });
+  const failResult = runStatus(
+    ["--evidence-dir", evidenceDir, "--fail-on-not-ready"],
+    {
+      cwd: root,
+    },
+  );
 
   assert.equal(failResult.status, 1);
   assert.match(failResult.stdout, /release evidence status: draft/);
   assert.match(failResult.stdout, /gate: failed \(\d+\)/);
   assert.match(failResult.stdout, /gate errors:/);
-  assert.match(failResult.stdout, /image-digests\.txt contains a credentialed URL/);
+  assert.match(
+    failResult.stdout,
+    /image-digests\.txt contains a credentialed URL/,
+  );
   assert.match(failResult.stdout, /closeout evidence checklist:/);
   assert.match(failResult.stdout, /immutable-version: present-unverified/);
   assert.match(failResult.stdout, /closeout gate summary:/);
@@ -940,5 +1157,8 @@ test("release evidence status CLI exposes credentialed image digest gate errors"
     failResult.stdout,
     /error: image-digests\.txt contains a credentialed URL/,
   );
-  assert.equal(fs.readFileSync(imageDigestsPath, "utf8"), credentialedImageDigests);
+  assert.equal(
+    fs.readFileSync(imageDigestsPath, "utf8"),
+    credentialedImageDigests,
+  );
 });

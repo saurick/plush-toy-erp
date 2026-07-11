@@ -9,7 +9,9 @@ import { buildRuntimeManifest } from "../qa/customer-config-runtime-manifest.mjs
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
 import { validateCustomerConfigActivationGate } from "./customer-config-activation-gate.mjs";
 
-const scriptPath = path.resolve(new URL("customer-config-activation-gate.mjs", import.meta.url).pathname);
+const scriptPath = path.resolve(
+  new URL("customer-config-activation-gate.mjs", import.meta.url).pathname,
+);
 
 function runActivationGate(root, args) {
   return spawnSync(process.execPath, [scriptPath, ...args], {
@@ -19,9 +21,15 @@ function runActivationGate(root, args) {
 }
 
 function writeRuntimeManifest(root) {
-  const manifestPath = path.join(root, "output/customers/yoyoosun/customer-config-runtime-manifest.json");
+  const manifestPath = path.join(
+    root,
+    "output/customers/yoyoosun/customer-config-runtime-manifest.json",
+  );
   fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
-  fs.writeFileSync(manifestPath, JSON.stringify(buildRuntimeManifest(yoyoosunCustomerPackage), null, 2));
+  fs.writeFileSync(
+    manifestPath,
+    JSON.stringify(buildRuntimeManifest(yoyoosunCustomerPackage), null, 2),
+  );
   return "output/customers/yoyoosun/customer-config-runtime-manifest.json";
 }
 
@@ -33,7 +41,9 @@ function manifestSha256(root, manifest) {
 }
 
 function writeManifestEvidence(root, evidenceDir, manifest, overrides = {}) {
-  const manifestPayload = JSON.parse(fs.readFileSync(path.join(root, manifest), "utf8"));
+  const manifestPayload = JSON.parse(
+    fs.readFileSync(path.join(root, manifest), "utf8"),
+  );
   fs.writeFileSync(
     path.join(root, evidenceDir, "customer-config-manifest-evidence.json"),
     JSON.stringify(
@@ -79,6 +89,10 @@ function writeReleaseEvidence(dir, overrides = {}) {
 [production-preflight] ok: 生产 secret、镜像 tag、debug、后端端口和 PostgreSQL / Jaeger 暴露边界通过
 [production-preflight] ok: Compose、低配部署边界和 migration 脚本通过
 [production-preflight] ok: docker compose config -q 通过
+[production-preflight] ok: Compose 运行服务存在
+[production-preflight] ok: 运行态 ERP_PDF_WARMUP=async
+[production-preflight] ok: 运行态 Chromium / chromium-common 版本与 Docker exact pin 一致: 150.0.7871.100-1~deb12u1
+[production-preflight] ok: healthz / readyz 通过
 [production-preflight] all checks passed
 `,
   );
@@ -128,7 +142,8 @@ webImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
         },
         backup: {
           databaseBackupSize: 123456,
-          databaseBackupHash: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          databaseBackupHash:
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
           storageLocationAlias: "controlled-backup-store",
           migrationVersion: "20260601000000",
         },
@@ -164,9 +179,18 @@ webImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     ),
   );
   fs.mkdirSync(path.join(dir, "artifacts"), { recursive: true });
-  fs.writeFileSync(path.join(dir, "artifacts/backup-evidence.md"), "backupId=backup-20260628\n");
-  fs.writeFileSync(path.join(dir, "artifacts/migration-status-before-apply.txt"), "Current Version: 20260601000000\nPending Files: 1\n");
-  fs.writeFileSync(path.join(dir, "artifacts/migration-status.txt"), "Current Version: 20260628123354\nPending Files: 0\n");
+  fs.writeFileSync(
+    path.join(dir, "artifacts/backup-evidence.md"),
+    "backupId=backup-20260628\n",
+  );
+  fs.writeFileSync(
+    path.join(dir, "artifacts/migration-status-before-apply.txt"),
+    "Current Version: 20260601000000\nPending Files: 1\n",
+  );
+  fs.writeFileSync(
+    path.join(dir, "artifacts/migration-status.txt"),
+    "Current Version: 20260628123354\nPending Files: 0\n",
+  );
   fs.writeFileSync(
     path.join(dir, "artifacts/command-summary.txt"),
     `backupId=backup-20260628
@@ -192,11 +216,37 @@ Pending Files: 0
         releaseVersion: "20260628T2100-config-runtime",
         endpointAlias: "https://erp.example.invalid",
         backendEndpointAlias: "https://api.example.invalid",
-        summary: { total: 3, passed: 3, failed: overrides.smokeFailed ?? 0 },
+        summary: { total: 4, passed: 4, failed: overrides.smokeFailed ?? 0 },
         checks: [
-          { name: "server-healthz", status: "pass", target: "https://erp.example.invalid/healthz", httpCode: "200" },
-          { name: "server-readyz", status: "pass", target: "https://erp.example.invalid/readyz", httpCode: "200" },
-          { name: "web-healthz", status: "pass", target: "https://erp.example.invalid/", httpCode: "200" },
+          {
+            name: "server-healthz",
+            status: "pass",
+            target: "https://erp.example.invalid/healthz",
+            httpCode: "200",
+          },
+          {
+            name: "server-readyz",
+            status: "pass",
+            target: "https://erp.example.invalid/readyz",
+            httpCode: "200",
+          },
+          {
+            name: "web-healthz",
+            status: "pass",
+            target: "https://erp.example.invalid/",
+            httpCode: "200",
+          },
+          {
+            name: "template-pdf-render",
+            status: "pass",
+            target: "/templates/render-pdf",
+            httpCode: "200",
+            contentType: "application/pdf",
+            sha256:
+              "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            sizeBytes: 1024,
+            responseBodyStored: false,
+          },
         ],
         redaction: { containsSecrets: false, containsRawCustomerRows: false },
       },
@@ -241,12 +291,17 @@ Pending Files: 0
         ],
         postCheck: {
           smokeStatus: "passed",
-          smokeReport: "deployments/yoyoosun/evidence/releases/2026-06-28/smoke-test-report.json",
-          smokeCheckCount: 3,
+          smokeReport:
+            "deployments/yoyoosun/evidence/releases/2026-06-28/smoke-test-report.json",
+          smokeCheckCount: 4,
           evidenceReviewStatus: "passed",
         },
         summary: { rehearsalCompleted: true, rollbackPathStatus: "passed" },
-        redaction: { containsSecrets: false, containsRawCustomerRows: false, containsFullDsn: false },
+        redaction: {
+          containsSecrets: false,
+          containsRawCustomerRows: false,
+          containsFullDsn: false,
+        },
       },
       null,
       2,
@@ -273,7 +328,9 @@ Pending Files: 0
 }
 
 test("customer config activation gate accepts manifest with filled release evidence", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "customer-config-activation-gate-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "customer-config-activation-gate-"),
+  );
   const manifest = writeRuntimeManifest(root);
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
   writeReleaseEvidence(path.join(root, evidenceDir));
@@ -286,12 +343,17 @@ test("customer config activation gate accepts manifest with filled release evide
   });
 
   assert.equal(result.customer, "yoyoosun");
-  assert.equal(result.revision, "yoyoosun-customer-package-v7.runtime-manifest-v1");
+  assert.equal(
+    result.revision,
+    "yoyoosun-customer-package-v7.runtime-manifest-v1",
+  );
   assert.equal(result.scope.evidenceOnly, true);
 });
 
 test("customer config activation gate CLI JSON reports ok success scope", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "customer-config-activation-gate-json-ok-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "customer-config-activation-gate-json-ok-"),
+  );
   const manifest = writeRuntimeManifest(root);
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
   writeReleaseEvidence(path.join(root, evidenceDir));
@@ -317,10 +379,14 @@ test("customer config activation gate CLI JSON reports ok success scope", () => 
 });
 
 test("customer config activation gate rejects missing restore rehearsal", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "customer-config-activation-gate-restore-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "customer-config-activation-gate-restore-"),
+  );
   const manifest = writeRuntimeManifest(root);
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
-  writeReleaseEvidence(path.join(root, evidenceDir), { restoreCompleted: false });
+  writeReleaseEvidence(path.join(root, evidenceDir), {
+    restoreCompleted: false,
+  });
   writeManifestEvidence(root, evidenceDir, manifest);
 
   assert.throws(
@@ -335,13 +401,17 @@ test("customer config activation gate rejects missing restore rehearsal", () => 
 });
 
 test("customer config activation gate CLI JSON failure includes release evidence closeout next actions", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "customer-config-activation-gate-json-fail-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "customer-config-activation-gate-json-fail-"),
+  );
   const manifest = writeRuntimeManifest(root);
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
   const absoluteEvidenceDir = path.join(root, evidenceDir);
   writeReleaseEvidence(absoluteEvidenceDir);
   writeManifestEvidence(root, evidenceDir, manifest);
-  fs.unlinkSync(path.join(absoluteEvidenceDir, "production-preflight-report.txt"));
+  fs.unlinkSync(
+    path.join(absoluteEvidenceDir, "production-preflight-report.txt"),
+  );
 
   const result = runActivationGate(root, [
     "--manifest",
@@ -361,13 +431,17 @@ test("customer config activation gate CLI JSON failure includes release evidence
     payload.releaseEvidenceStatus.closeoutNextActions.some(
       (action) =>
         action.id === "production-preflight" &&
-        action.commands.some((command) => command.includes("production-preflight.sh")),
+        action.commands.some((command) =>
+          command.includes("production-preflight.sh"),
+        ),
     ),
   );
 });
 
 test("customer config activation gate rejects invalid manifest payload", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "customer-config-activation-gate-manifest-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "customer-config-activation-gate-manifest-"),
+  );
   const manifest = writeRuntimeManifest(root);
   const absoluteManifest = path.join(root, manifest);
   const payload = JSON.parse(fs.readFileSync(absoluteManifest, "utf8"));
@@ -389,7 +463,9 @@ test("customer config activation gate rejects invalid manifest payload", () => {
 });
 
 test("customer config activation gate rejects missing manifest fingerprint evidence", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "customer-config-activation-gate-fingerprint-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "customer-config-activation-gate-fingerprint-"),
+  );
   const manifest = writeRuntimeManifest(root);
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
   writeReleaseEvidence(path.join(root, evidenceDir));
@@ -406,12 +482,16 @@ test("customer config activation gate rejects missing manifest fingerprint evide
 });
 
 test("customer config activation gate rejects stale manifest fingerprint", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "customer-config-activation-gate-stale-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "customer-config-activation-gate-stale-"),
+  );
   const manifest = writeRuntimeManifest(root);
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
   writeReleaseEvidence(path.join(root, evidenceDir));
   writeManifestEvidence(root, evidenceDir, manifest);
-  const payload = JSON.parse(fs.readFileSync(path.join(root, manifest), "utf8"));
+  const payload = JSON.parse(
+    fs.readFileSync(path.join(root, manifest), "utf8"),
+  );
   payload.product_version = "local-customer-package";
   payload.compiled_snapshot.customer.name = "stale-hash";
   fs.writeFileSync(path.join(root, manifest), JSON.stringify(payload, null, 2));

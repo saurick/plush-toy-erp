@@ -1,0 +1,4 @@
+serverImage=plush-toy-erp-server:yoyoosun-20260711-20c96d38-amd64
+serverImageDigest=sha256:dcd886ecae24e9b8abbdfee5b19e4d6261c1002ff18cebf9d3b823a600d11678
+webImage=plush-toy-erp-web:yoyoosun-20260711-20c96d38-amd64
+webImageDigest=sha256:53a926c1b64290b505e07049f362b9bc0300ed1bc8a4c775a718373c23740e91

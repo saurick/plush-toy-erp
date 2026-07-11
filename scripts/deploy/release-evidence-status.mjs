@@ -3,10 +3,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { REQUIRED_FILES, validateReleaseEvidenceGate } from "./release-evidence-gate.mjs";
+import {
+  REQUIRED_FILES,
+  validateReleaseEvidenceGate,
+} from "./release-evidence-gate.mjs";
 
 const DEFAULT_CUSTOMER = "yoyoosun";
-const CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE = "customer-config-manifest-evidence.json";
+const CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE =
+  "customer-config-manifest-evidence.json";
 
 const USAGE = `Release evidence status
 
@@ -75,7 +79,8 @@ const CLOSEOUT_EVIDENCE_GROUPS = [
       REQUIRED_FILES.migration,
       "command-summary.txt",
     ],
-    reason: "证明 migration 前备份、隔离恢复、pre/post migration 状态和命令摘要来自同一批次",
+    reason:
+      "证明 migration 前备份、隔离恢复、pre/post migration 状态和命令摘要来自同一批次",
   },
   {
     id: "target-smoke",
@@ -131,7 +136,8 @@ export function parseCliArgs(argv) {
     }
     const equalIndex = token.indexOf("=");
     const key = token.slice(2, equalIndex === -1 ? undefined : equalIndex);
-    const inlineValue = equalIndex === -1 ? undefined : token.slice(equalIndex + 1);
+    const inlineValue =
+      equalIndex === -1 ? undefined : token.slice(equalIndex + 1);
     const value = inlineValue ?? argv[index + 1];
     if (inlineValue === undefined) {
       index += 1;
@@ -154,27 +160,32 @@ export function parseCliArgs(argv) {
 }
 
 function collectFileStatus(absoluteDir) {
-  return [...Object.values(REQUIRED_FILES), ...SUPPORTING_ARTIFACT_FILES].map((relativePath) => {
-    const absolutePath = path.join(absoluteDir, relativePath);
-    if (!fs.existsSync(absolutePath)) {
+  return [...Object.values(REQUIRED_FILES), ...SUPPORTING_ARTIFACT_FILES].map(
+    (relativePath) => {
+      const absolutePath = path.join(absoluteDir, relativePath);
+      if (!fs.existsSync(absolutePath)) {
+        return {
+          path: relativePath,
+          exists: false,
+          bytes: 0,
+        };
+      }
+      const stat = fs.statSync(absolutePath);
       return {
         path: relativePath,
-        exists: false,
-        bytes: 0,
+        exists: true,
+        bytes: stat.size,
+        mtime: stat.mtime.toISOString(),
       };
-    }
-    const stat = fs.statSync(absolutePath);
-    return {
-      path: relativePath,
-      exists: true,
-      bytes: stat.size,
-      mtime: stat.mtime.toISOString(),
-    };
-  });
+    },
+  );
 }
 
 function readCustomerConfigManifestEvidence(absoluteDir) {
-  const absolutePath = path.join(absoluteDir, CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE);
+  const absolutePath = path.join(
+    absoluteDir,
+    CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE,
+  );
   if (!fs.existsSync(absolutePath)) {
     return {
       path: CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE,
@@ -226,7 +237,8 @@ function readCustomerConfigSmokeEvidence(absoluteDir) {
       path: REQUIRED_FILES.smoke,
       exists: true,
       hasCustomerConfigCheck: true,
-      expectedRevision: String(check.expectedRevision || "").trim() || undefined,
+      expectedRevision:
+        String(check.expectedRevision || "").trim() || undefined,
       target: check.target,
     };
   } catch (error) {
@@ -246,7 +258,10 @@ function buildSmokeCommand({ evidenceDir, customerConfigRevision = "" }) {
   return `bash deployments/yoyoosun/scripts/run-smoke.sh --release-version <release-version> --environment <environment> --endpoint <public-endpoint>${customerConfigSmokeArgs} --report ${evidenceDir}/smoke-test-report.json`;
 }
 
-function buildRollbackRehearsalCommand({ evidenceDir, customerConfigRevision = "" }) {
+function buildRollbackRehearsalCommand({
+  evidenceDir,
+  customerConfigRevision = "",
+}) {
   const customerConfigArg = customerConfigRevision
     ? ` --customer-config-revision ${customerConfigRevision}`
     : "";
@@ -270,10 +285,12 @@ function buildNextCommands({
   const missing = new Set(missingFiles);
   if (
     (customerConfigManifestEvidence?.exists &&
-      (customerConfigManifestEvidence.parseError || !customerConfigManifestEvidence.revision)) ||
+      (customerConfigManifestEvidence.parseError ||
+        !customerConfigManifestEvidence.revision)) ||
     (customerConfigSmokeEvidence?.hasCustomerConfigCheck &&
       (!customerConfigManifestEvidence?.exists ||
-        customerConfigManifestEvidence.revision !== customerConfigSmokeEvidence.expectedRevision))
+        customerConfigManifestEvidence.revision !==
+          customerConfigSmokeEvidence.expectedRevision))
   ) {
     commands.push(
       `node scripts/deploy/customer-config-manifest-evidence.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir ${evidenceDir} --reviewer <reviewer-name>`,
@@ -281,7 +298,7 @@ function buildNextCommands({
   }
   if (missing.has(REQUIRED_FILES.preflight)) {
     commands.push(
-      `bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env --out ${evidenceDir}/production-preflight-report.txt`,
+      `bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env --runtime --out ${evidenceDir}/production-preflight-report.txt`,
     );
   }
   if (missing.has(REQUIRED_FILES.imageDigests)) {
@@ -367,10 +384,10 @@ function buildCloseoutNextActions({
           break;
         case "production-preflight":
           action.commands.push(
-            `bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env --out ${evidenceDir}/production-preflight-report.txt`,
+            `bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env --runtime --out ${evidenceDir}/production-preflight-report.txt`,
           );
           action.manualChecks.push(
-            "Use the real runtime .env; do not use .env.example or example-mode output.",
+            "Run after the target Compose services start, using the real runtime .env; do not use .env.example, example-mode output, or an env-only preflight report.",
           );
           break;
         case "backup-restore-rehearsal":
@@ -421,7 +438,8 @@ function buildCloseoutNextActions({
           if (
             customerConfigManifestEvidence?.revision &&
             (!customerConfigSmokeEvidence?.hasCustomerConfigCheck ||
-              customerConfigSmokeEvidence.expectedRevision !== customerConfigManifestEvidence.revision)
+              customerConfigSmokeEvidence.expectedRevision !==
+                customerConfigManifestEvidence.revision)
           ) {
             action.commands.push(
               buildSmokeCommand({
@@ -441,7 +459,9 @@ function buildCloseoutNextActions({
           );
           break;
         default:
-          action.manualChecks.push("Review the listed files and release evidence gate errors for this group.");
+          action.manualChecks.push(
+            "Review the listed files and release evidence gate errors for this group.",
+          );
           break;
       }
 
@@ -492,25 +512,37 @@ function buildCloseoutChecklist({
   }));
 
   const customerConfigRequired =
-    customerConfigManifestEvidence?.exists || customerConfigSmokeEvidence?.hasCustomerConfigCheck;
+    customerConfigManifestEvidence?.exists ||
+    customerConfigSmokeEvidence?.hasCustomerConfigCheck;
   if (customerConfigRequired) {
     const item = {
       id: "customer-config-effective-session",
       label: "客户配置 active revision 读回",
-      files: [CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE, REQUIRED_FILES.smoke, REQUIRED_FILES.rollbackRehearsal],
+      files: [
+        CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE,
+        REQUIRED_FILES.smoke,
+        REQUIRED_FILES.rollbackRehearsal,
+      ],
       reason:
         "绑定 runtime manifest fingerprint、目标 smoke get_effective_session 和 rollback rehearsal post-check",
       ...baseStatus([REQUIRED_FILES.smoke, REQUIRED_FILES.rollbackRehearsal]),
     };
     if (!customerConfigManifestEvidence.exists) {
       item.status = "missing";
-      item.missingFiles = [CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE, ...item.missingFiles];
-    } else if (customerConfigManifestEvidence.parseError || !customerConfigManifestEvidence.revision) {
+      item.missingFiles = [
+        CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE,
+        ...item.missingFiles,
+      ];
+    } else if (
+      customerConfigManifestEvidence.parseError ||
+      !customerConfigManifestEvidence.revision
+    ) {
       item.status = "attention";
     } else if (
       customerConfigSmokeEvidence.hasCustomerConfigCheck &&
       customerConfigSmokeEvidence.expectedRevision &&
-      customerConfigManifestEvidence.revision !== customerConfigSmokeEvidence.expectedRevision
+      customerConfigManifestEvidence.revision !==
+        customerConfigSmokeEvidence.expectedRevision
     ) {
       item.status = "attention";
     }
@@ -539,11 +571,15 @@ function buildCloseoutSummary(checklist) {
       summary.gateVerified += 1;
     }
   }
-  const blockers = summary.missing + summary.presentUnverified + summary.attention;
+  const blockers =
+    summary.missing + summary.presentUnverified + summary.attention;
   return {
     ...summary,
     blockers,
-    ready: summary.total > 0 && blockers === 0 && summary.gateVerified === summary.total,
+    ready:
+      summary.total > 0 &&
+      blockers === 0 &&
+      summary.gateVerified === summary.total,
   };
 }
 
@@ -582,9 +618,14 @@ export function buildReleaseEvidenceStatus({
     throw new CliError("Missing required --evidence-dir", 2);
   }
   const absoluteDir = path.resolve(repoRoot, evidenceDir);
-  const directoryExists = fs.existsSync(absoluteDir) && fs.statSync(absoluteDir).isDirectory();
-  const files = directoryExists ? collectFileStatus(absoluteDir) : collectFileStatus(absoluteDir);
-  const missingFiles = files.filter((file) => !file.exists).map((file) => file.path);
+  const directoryExists =
+    fs.existsSync(absoluteDir) && fs.statSync(absoluteDir).isDirectory();
+  const files = directoryExists
+    ? collectFileStatus(absoluteDir)
+    : collectFileStatus(absoluteDir);
+  const missingFiles = files
+    .filter((file) => !file.exists)
+    .map((file) => file.path);
   const customerConfigManifestEvidence = directoryExists
     ? readCustomerConfigManifestEvidence(absoluteDir)
     : {
@@ -624,13 +665,17 @@ export function buildReleaseEvidenceStatus({
       );
     } else if (
       customerConfigManifestEvidence.revision &&
-      customerConfigManifestEvidence.revision !== customerConfigSmokeEvidence.expectedRevision
+      customerConfigManifestEvidence.revision !==
+        customerConfigSmokeEvidence.expectedRevision
     ) {
       warnings.push(
         `${CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE} revision ${customerConfigManifestEvidence.revision} does not match ${REQUIRED_FILES.smoke} expectedRevision ${customerConfigSmokeEvidence.expectedRevision}`,
       );
     }
-  } else if (customerConfigManifestEvidence.exists && customerConfigManifestEvidence.revision) {
+  } else if (
+    customerConfigManifestEvidence.exists &&
+    customerConfigManifestEvidence.revision
+  ) {
     warnings.push(
       `${CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE} exists for ${customerConfigManifestEvidence.revision}, but ${REQUIRED_FILES.smoke} does not contain customer-config-effective-session; rerun target smoke with --customer-config-revision ${customerConfigManifestEvidence.revision}`,
     );
@@ -652,7 +697,9 @@ export function buildReleaseEvidenceStatus({
     } catch (error) {
       const gateErrors = Array.isArray(error.errors)
         ? error.errors
-        : String(error.message || "").split("\n").filter(Boolean);
+        : String(error.message || "")
+            .split("\n")
+            .filter(Boolean);
       gate = {
         passed: false,
         errorCount: gateErrors.length,
@@ -764,14 +811,19 @@ function formatText(status) {
   if (status.closeoutChecklist.length > 0) {
     lines.push("closeout evidence checklist:");
     for (const item of status.closeoutChecklist) {
-      const missing = item.missingFiles.length > 0 ? `; missing: ${item.missingFiles.join(", ")}` : "";
+      const missing =
+        item.missingFiles.length > 0
+          ? `; missing: ${item.missingFiles.join(", ")}`
+          : "";
       lines.push(`- ${item.id}: ${item.status}${missing}`);
     }
   }
   if (status.closeoutGateSummary.length > 0) {
     lines.push("closeout gate summary:");
     for (const item of status.closeoutGateSummary) {
-      lines.push(`- ${item.id}: errors=${item.errorCount}, warnings=${item.warningCount}`);
+      lines.push(
+        `- ${item.id}: errors=${item.errorCount}, warnings=${item.warningCount}`,
+      );
       for (const error of item.sampleErrors.slice(0, 2)) {
         lines.push(`  error: ${error}`);
       }

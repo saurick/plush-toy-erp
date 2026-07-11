@@ -10,7 +10,7 @@
 
 | 入口 | 用途 | 是否执行目标动作 |
 | --- | --- | --- |
-| `bash scripts/deploy/production-preflight.sh` | 检查生产运行时 env、Compose、固定镜像 tag、migration、PDF warmup / Chromium 版本和低配部署边界 | 否，只检查 |
+| `bash scripts/deploy/production-preflight.sh` | 检查生产 env、Compose、固定镜像 tag、migration、PDF warmup / Chromium 版本和低配部署边界；release evidence 必须用 `--runtime` 复核容器实际 warmup、包版本和 health / ready | 否，只检查 |
 | `node scripts/deploy/release-evidence-status.mjs` | 只读汇总 release evidence 目录状态、缺口和下一步 | 否，只读 |
 | `node scripts/deploy/release-evidence-gate.mjs` | 校验 release evidence 是否满足门禁 | 否，只校验证据 |
 | `node scripts/deploy/release-evidence-closeout-plan.mjs` | 从 status 生成分组 closeout action 和缺失输入 | 否，只生成计划 |
@@ -30,6 +30,8 @@
 4. 每次写入证据后重新跑 status / gate。
 5. release gate 通过只说明 evidence 文件满足门禁，不替代真实目标环境执行记录、人工签收或回滚演练。
 
+正式 `production-preflight-report.txt` 必须在目标 Compose 服务启动后使用 `production-preflight.sh --runtime --out ...` 生成，并包含运行态 Compose、`ERP_PDF_WARMUP=async`、Chromium / chromium-common exact pin 和 health / ready 通过记录。正式 `smoke-test-report.json` 还必须包含唯一 `template-pdf-render` 检查，记录 `200`、`application/pdf`、64 位 hex SHA-256、正数字节数和 `responseBodyStored=false`。`run-smoke.sh` 不带 backend / revision / token 时的 web-only 输出只用于快速诊断，不得作为 release evidence，release gate 会因缺少真实 PDF 证据而拒绝。
+
 ## 安全边界
 
 - 不在低配目标服务器上构建镜像、前端包或 Go 二进制；目标服务器只负责加载制品、启动服务、执行 migration 和部署后检查。
@@ -44,6 +46,8 @@
 ```bash
 node --test scripts/deploy/release-evidence-status.test.mjs
 node --test scripts/deploy/release-evidence-closeout-plan.test.mjs
+node --test scripts/deploy/production-preflight.test.mjs
+node --test scripts/deploy/run-smoke-script.test.mjs
 node --test scripts/deploy/customer-config-release-readiness.test.mjs
 ```
 

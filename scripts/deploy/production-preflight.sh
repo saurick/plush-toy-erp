@@ -320,6 +320,12 @@ if [[ "$runtime_check" -eq 1 ]]; then
   done
   ok "Compose 运行服务存在"
 
+  runtime_app_env="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$app_cid" 2>/dev/null || true)"
+  runtime_pdf_warmup="$(printf '%s\n' "$runtime_app_env" | awk -F= '$1 == "ERP_PDF_WARMUP" { value = $0; sub(/^[^=]*=/, "", value) } END { print value }')"
+  runtime_pdf_warmup="$(trim "$runtime_pdf_warmup" | tr '[:upper:]' '[:lower:]')"
+  [[ "$runtime_pdf_warmup" == "async" ]] || fail "app-server 运行态 ERP_PDF_WARMUP 必须为 async：runtime=${runtime_pdf_warmup:-missing}"
+  ok "运行态 ERP_PDF_WARMUP=async"
+
   chromium_dockerfile="$root_dir/server/Dockerfile"
   [[ -f "$chromium_dockerfile" ]] || fail "缺少 Chromium 版本真源: $chromium_dockerfile"
   expected_chromium_version="$(sed -nE 's/^ARG CHROMIUM_VERSION=([^[:space:]]+)$/\1/p' "$chromium_dockerfile" | head -n1)"

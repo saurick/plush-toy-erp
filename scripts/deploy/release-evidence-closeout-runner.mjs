@@ -71,7 +71,12 @@ export function parseCliArgs(argv) {
         options.reportPath = value;
         break;
       case "only":
-        options.only.push(...String(value).split(",").map((item) => item.trim()).filter(Boolean));
+        options.only.push(
+          ...String(value)
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean),
+        );
         break;
       default:
         throw new CliError(`Unknown option --${key}`, 2);
@@ -106,7 +111,10 @@ Purpose:
 
 function requireOption(options, key) {
   if (!options[key]) {
-    throw new CliError(`Missing required --${key.replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`)}`, 2);
+    throw new CliError(
+      `Missing required --${key.replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`)}`,
+      2,
+    );
   }
 }
 
@@ -150,13 +158,20 @@ function extractCustomerConfigRevision(action) {
 }
 
 function buildDisplayCommand(cmd, args, envKeys = []) {
-  const envPrefix = envKeys.length > 0
-    ? `${envKeys.map((key) => `${key}=<redacted>`).join(" ")} `
-    : "";
+  const envPrefix =
+    envKeys.length > 0
+      ? `${envKeys.map((key) => `${key}=<redacted>`).join(" ")} `
+      : "";
   return `${envPrefix}${[cmd, ...args].join(" ")}`;
 }
 
-function materializeCommandFromText({ commandText, action, evidenceDir, envFile, env }) {
+function materializeCommandFromText({
+  commandText,
+  action,
+  evidenceDir,
+  envFile,
+  env,
+}) {
   const revision = extractCustomerConfigRevision(action);
   if (commandText.includes("immutable-version-evidence.mjs")) {
     const cmd = process.execPath;
@@ -212,6 +227,7 @@ function materializeCommandFromText({ commandText, action, evidenceDir, envFile,
       "scripts/deploy/production-preflight.sh",
       "--env-file",
       envFile,
+      "--runtime",
       "--out",
       path.join(evidenceDir, "production-preflight-report.txt"),
     ];
@@ -262,9 +278,20 @@ function materializeCommandFromText({ commandText, action, evidenceDir, envFile,
       cmd,
       args,
       env: commandText.includes("--admin-token-env")
-        ? { CUSTOMER_CONFIG_ADMIN_TOKEN: requireEnv(env, "CUSTOMER_CONFIG_ADMIN_TOKEN") }
+        ? {
+            CUSTOMER_CONFIG_ADMIN_TOKEN: requireEnv(
+              env,
+              "CUSTOMER_CONFIG_ADMIN_TOKEN",
+            ),
+          }
         : {},
-      displayCommand: buildDisplayCommand(cmd, args, commandText.includes("--admin-token-env") ? ["CUSTOMER_CONFIG_ADMIN_TOKEN"] : []),
+      displayCommand: buildDisplayCommand(
+        cmd,
+        args,
+        commandText.includes("--admin-token-env")
+          ? ["CUSTOMER_CONFIG_ADMIN_TOKEN"]
+          : [],
+      ),
     };
   }
   if (commandText.includes("rollback-rehearsal-report.mjs")) {
@@ -352,19 +379,24 @@ export function buildCloseoutRunPlan({
     env,
   });
   const onlySet = new Set(only);
-  const selectedActions = onlySet.size > 0
-    ? closeoutPlan.actions.filter((action) => onlySet.has(action.id))
-    : closeoutPlan.actions;
+  const selectedActions =
+    onlySet.size > 0
+      ? closeoutPlan.actions.filter((action) => onlySet.has(action.id))
+      : closeoutPlan.actions;
   const missingOnly = [...onlySet].filter(
     (id) => !closeoutPlan.actions.some((action) => action.id === id),
   );
   if (missingOnly.length > 0) {
-    throw new CliError(`Unknown or not-needed action id(s): ${missingOnly.join(", ")}`, 2);
+    throw new CliError(
+      `Unknown or not-needed action id(s): ${missingOnly.join(", ")}`,
+      2,
+    );
   }
   const actions = selectedActions.map((action) => {
-    const executionCommands = action.canRun && !action.manualOnly
-      ? materializeAction({ action, evidenceDir, envFile, env })
-      : [];
+    const executionCommands =
+      action.canRun && !action.manualOnly
+        ? materializeAction({ action, evidenceDir, envFile, env })
+        : [];
     return attachExecutionCommands(
       {
         id: action.id,
@@ -384,7 +416,9 @@ export function buildCloseoutRunPlan({
     customer,
     evidenceDir,
     envFile,
-    executeReady: actions.length > 0 && actions.every((action) => action.canRun && !action.manualOnly),
+    executeReady:
+      actions.length > 0 &&
+      actions.every((action) => action.canRun && !action.manualOnly),
     closeoutStatus: closeoutPlan.status,
     selectedActionCount: actions.length,
     actions,
@@ -409,32 +443,44 @@ function runMaterializedCommand(command, repoRoot) {
   return {
     command: command.displayCommand,
     exitCode: result.status,
-    stdoutLineCount: result.stdout ? result.stdout.trimEnd().split("\n").length : 0,
-    stderrLineCount: result.stderr ? result.stderr.trimEnd().split("\n").length : 0,
+    stdoutLineCount: result.stdout
+      ? result.stdout.trimEnd().split("\n").length
+      : 0,
+    stderrLineCount: result.stderr
+      ? result.stderr.trimEnd().split("\n").length
+      : 0,
     ok: result.status === 0,
   };
 }
 
 function isSameOrInsidePath(childPath, parentPath) {
   const relativePath = path.relative(parentPath, childPath);
-  return relativePath === "" || (
-    relativePath &&
-    !relativePath.startsWith("..") &&
-    !path.isAbsolute(relativePath)
+  return (
+    relativePath === "" ||
+    (relativePath &&
+      !relativePath.startsWith("..") &&
+      !path.isAbsolute(relativePath))
   );
 }
 
 function isInsideDeploymentsEvidenceTree(absolutePath) {
   const segments = absolutePath.split(path.sep).filter(Boolean);
   for (let index = 0; index < segments.length - 2; index += 1) {
-    if (segments[index] === "deployments" && segments[index + 2] === "evidence") {
+    if (
+      segments[index] === "deployments" &&
+      segments[index + 2] === "evidence"
+    ) {
       return true;
     }
   }
   return false;
 }
 
-function assertReportPathOutsideEvidenceDir({ repoRoot, reportPath, evidenceDir }) {
+function assertReportPathOutsideEvidenceDir({
+  repoRoot,
+  reportPath,
+  evidenceDir,
+}) {
   if (!reportPath) return;
   const absoluteReportPath = path.resolve(repoRoot, reportPath);
   const absoluteEvidenceDir = path.resolve(repoRoot, evidenceDir);
@@ -537,10 +583,18 @@ export function runCloseoutActions({
 }
 
 function printText(report) {
-  console.log(`release evidence closeout runner: executed=${report.executed}, ok=${report.ok}`);
-  console.log(`selected actions: ${report.plan.actions.map((action) => action.id).join(", ") || "(none)"}`);
+  console.log(
+    `release evidence closeout runner: executed=${report.executed}, ok=${report.ok}`,
+  );
+  console.log(
+    `selected actions: ${report.plan.actions.map((action) => action.id).join(", ") || "(none)"}`,
+  );
   for (const action of report.plan.actions) {
-    const state = action.canRun ? "runnable" : action.manualOnly ? "manual" : "blocked";
+    const state = action.canRun
+      ? "runnable"
+      : action.manualOnly
+        ? "manual"
+        : "blocked";
     console.log(`- ${action.order}. ${action.id}: ${state}`);
     for (const missing of action.missingPrerequisites) {
       console.log(`  missing: ${missing.message}`);

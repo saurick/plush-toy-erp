@@ -1,0 +1,52 @@
+{
+  "customerCode": "yoyoosun",
+  "environment": "customer-trial-133",
+  "releaseVersion": "yoyoosun-20260711-20c96d38-amd64",
+  "backupId": "predeploy-20c96d38-20260711T052623Z",
+  "verifiedAt": "2026-07-11T05:44:00Z",
+  "sourceAlias": "plush-133-compose-postgres-loopback",
+  "restoreTarget": "isolated-postgres-db-plush_restore_20c96d38-removed",
+  "artifacts": {
+    "backupEvidence": "backup-evidence.md",
+    "preMigrationStatus": "migration-status-before-apply.txt",
+    "migrationStatus": "migration-status.txt",
+    "commandSummary": "command-summary.txt"
+  },
+  "backup": {
+    "storageLocationAlias": "plush-133:/opt/plush-toy-erp/backups/predeploy-20c96d38-20260711T052623Z.dump",
+    "databaseBackupSize": 337813,
+    "databaseBackupHash": "sha256:2b3fe0e0eb5677ec2db9ffab91e09caaf81a3378262b30ccb0800a9ab2c6fef3",
+    "migrationVersion": "20260710150001"
+  },
+  "restore": {
+    "restoreTestStatus": "passed",
+    "migrationBeforeApply": "20260710150001",
+    "restoreMigrationVersion": "20260710150001",
+    "pendingFiles": "0",
+    "isolatedDatabaseRemoved": true
+  },
+  "smoke": {
+    "smokeQueryStatus": "passed",
+    "publicTableCount": 52,
+    "adminUserCount": 12,
+    "salesOrderCount": 42,
+    "workflowTaskCount": 126,
+    "shipmentCount": 23,
+    "shipmentItemCount": 23,
+    "backendHealthStatus": "passed",
+    "backendReadyStatus": "passed",
+    "webSmokeStatus": "passed"
+  },
+  "summary": {
+    "backupCreated": true,
+    "restoreCompleted": true,
+    "migrationStatus": "ok",
+    "smokeQueryStatus": "passed"
+  },
+  "redaction": {
+    "containsSecrets": false,
+    "containsRawCustomerRows": false,
+    "containsDumpContent": false,
+    "containsFullDsn": false
+  }
+}

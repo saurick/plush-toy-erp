@@ -1,0 +1,70 @@
+{
+  "customerCode": "yoyoosun",
+  "environment": "customer-trial-133",
+  "releaseVersion": "yoyoosun-20260711-20c96d38-amd64",
+  "generatedAt": "2026-07-11T05:29:22Z",
+  "operatorRole": "codex-local-build-133-deploy",
+  "endpointAlias": "http://192.168.0.133:5175",
+  "backendEndpointAlias": "http://192.168.0.133:5175",
+  "summary": {
+    "total": 7,
+    "passed": 7,
+    "failed": 0
+  },
+  "checks": [
+    {
+      "name": "web-healthz",
+      "status": "pass",
+      "target": "http://192.168.0.133:5175/healthz",
+      "httpCode": "200"
+    },
+    {
+      "name": "server-healthz",
+      "status": "pass",
+      "target": "http://192.168.0.133:5175/healthz",
+      "httpCode": "200"
+    },
+    {
+      "name": "server-readyz",
+      "status": "pass",
+      "target": "http://192.168.0.133:5175/readyz",
+      "httpCode": "200"
+    },
+    {
+      "name": "login-page",
+      "status": "pass",
+      "target": "http://192.168.0.133:5175/admin-login",
+      "httpCode": "200"
+    },
+    {
+      "name": "mobile-role-route",
+      "status": "pass",
+      "target": "http://192.168.0.133:5175/m/warehouse/tasks",
+      "httpCode": "200"
+    },
+    {
+      "name": "customer-config-effective-session",
+      "status": "pass",
+      "target": "jsonrpc:customer_config.get_effective_session",
+      "expectedRevision": "yoyoosun-customer-package-v7.runtime-manifest-v1",
+      "tokenSourceEnv": "CUSTOMER_CONFIG_ADMIN_TOKEN",
+      "responseBodyStored": false
+    },
+    {
+      "name": "template-pdf-render",
+      "status": "pass",
+      "target": "/templates/render-pdf",
+      "httpCode": "200",
+      "contentType": "application/pdf",
+      "sha256": "deda9a2cf88b798ada56ace3f39fa0a8591ffcf6c3ee1dfde2b374df0929af42",
+      "sizeBytes": 8128,
+      "tokenSourceEnv": "CUSTOMER_CONFIG_ADMIN_TOKEN",
+      "responseBodyStored": false
+    }
+  ],
+  "redaction": {
+    "containsSecrets": false,
+    "containsRawCustomerRows": false,
+    "responseBodiesStored": false
+  }
+}

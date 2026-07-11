@@ -143,6 +143,10 @@ if [[ "\${1:-}" == "compose" ]]; then
   printf '%s-cid\n' "$service"
   exit 0
 fi
+if [[ "\${1:-}" == "inspect" ]]; then
+  printf 'ERP_PDF_WARMUP=%s\n' "\${FAKE_RUNTIME_PDF_WARMUP:-async}"
+  exit 0
+fi
 if [[ "\${1:-}" == "exec" ]]; then
   package="\${@: -1}"
   if [[ "$package" == "chromium-common" ]]; then
@@ -235,8 +239,28 @@ test("production preflight verifies the runtime Chromium package exact pin", () 
   });
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /运行态 Chromium \/ chromium-common 版本与 Docker exact pin 一致: 150\.0\.7871\.100-1~deb12u1/);
+  assert.match(result.stdout, /Compose 运行服务存在/);
+  assert.match(result.stdout, /运行态 ERP_PDF_WARMUP=async/);
+  assert.match(
+    result.stdout,
+    /运行态 Chromium \/ chromium-common 版本与 Docker exact pin 一致: 150\.0\.7871\.100-1~deb12u1/,
+  );
   assert.match(result.stdout, /healthz \/ readyz 通过/);
+});
+
+test("production preflight rejects runtime PDF warmup fault-isolation mode", () => {
+  const fixture = writeFixture();
+  const fakeBin = createFakeRuntimeBin(fixture.root);
+  const result = runPreflight(fixture, ["--runtime"], {
+    env: {
+      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+      FAKE_RUNTIME_PDF_WARMUP: "off",
+    },
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /app-server 运行态 ERP_PDF_WARMUP 必须为 async/);
+  assert.match(result.stderr, /runtime=off/);
 });
 
 test("production preflight rejects a stale runtime Chromium package", () => {
@@ -302,7 +326,10 @@ test("production preflight rejects build sections in production compose", () => 
 });
 
 test("production artifacts pin the verified Chromium build and async warmup", () => {
-  const dockerfile = fs.readFileSync(path.join(repoRoot, "server/Dockerfile"), "utf8");
+  const dockerfile = fs.readFileSync(
+    path.join(repoRoot, "server/Dockerfile"),
+    "utf8",
+  );
   const prodEnv = fs.readFileSync(
     path.join(repoRoot, "server/deploy/compose/prod/.env.example"),
     "utf8",
@@ -312,20 +339,37 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
     "utf8",
   );
   const customerCompose = fs.readFileSync(
-    path.join(repoRoot, "deployments/yoyoosun/compose/docker-compose.example.yml"),
+    path.join(
+      repoRoot,
+      "deployments/yoyoosun/compose/docker-compose.example.yml",
+    ),
     "utf8",
   );
 
-  assert.match(dockerfile, /^ARG CHROMIUM_VERSION=150\.0\.7871\.100-1~deb12u1$/m);
+  assert.match(
+    dockerfile,
+    /^ARG CHROMIUM_VERSION=150\.0\.7871\.100-1~deb12u1$/m,
+  );
   assert(dockerfile.includes('"chromium=${CHROMIUM_VERSION}"'));
   assert(dockerfile.includes('"chromium-common=${CHROMIUM_VERSION}"'));
   assert(dockerfile.includes("dpkg-query -W -f='${Version}' chromium"));
   assert(dockerfile.includes("dpkg-query -W -f='${Version}' chromium-common"));
-  assert(dockerfile.includes('test "$installed_chromium_version" = "$CHROMIUM_VERSION"'));
-  assert(dockerfile.includes('test "$installed_chromium_common_version" = "$CHROMIUM_VERSION"'));
+  assert(
+    dockerfile.includes(
+      'test "$installed_chromium_version" = "$CHROMIUM_VERSION"',
+    ),
+  );
+  assert(
+    dockerfile.includes(
+      'test "$installed_chromium_common_version" = "$CHROMIUM_VERSION"',
+    ),
+  );
   for (const envExample of [prodEnv, customerEnv]) {
     assert.match(envExample, /^ERP_PDF_WARMUP=async$/m);
     assert.doesNotMatch(envExample, /ERP_PDF_WARMUP_ENABLED/);
   }
-  assert.match(customerCompose, /ERP_PDF_WARMUP: "\$\{ERP_PDF_WARMUP:-async\}"/);
+  assert.match(
+    customerCompose,
+    /ERP_PDF_WARMUP: "\$\{ERP_PDF_WARMUP:-async\}"/,
+  );
 });

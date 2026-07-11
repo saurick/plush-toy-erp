@@ -12,11 +12,17 @@
 
 完成：公开 `create_shipment / add_shipment_item` 头行拆分写入口已退役并固定返回 `UnknownMethod 40020`；前后端、模拟数据和 L1 统一使用严格幂等的 `create_shipment_with_items` 聚合创建，既有明细只读。133 只读盘点确认 7 张 DRAFT 均恰有 1 条明细，零明细 DRAFT 为 0，无待补数据。Debian Chromium `150.0.7871.46` 在 133 真实触发 SIGTRAP，已收敛为上游版本回归；Dockerfile 精确固定 `chromium / chromium-common 150.0.7871.100-1~deb12u1`，生产要求 `ERP_PDF_WARMUP=async`，preflight 校验运行时包版本，authenticated smoke 真实校验 HTTP 200、`application/pdf`、`%PDF` 和非空响应并只保存脱敏 hash / size。linux/amd64 本地镜像及容器内 PDF 已通过。
 
-验证：Node `24.14.0` / pnpm `10.13.1` 下 `scripts/qa/full.sh` 与 `scripts/qa/strict.sh` 全部通过；前端 676 项测试和 production build、全包 Go test / build、shipment 两个 L1 场景、真实隔离 PostgreSQL 关键事务门禁、脚本 / 客户包 / 文档 / secrets / migration / release evidence 守卫均通过。`govulncheck` 报告当前代码调用路径受影响漏洞 0；`gofmt`、shell syntax 和 `git diff --check` 通过。全量门禁首轮还发现并清理了两处仍引用旧 shipment split builder / 按钮条件的测试残留，重跑后全绿。
+完成：固定 runtime revision `20c96d3819429361a35d2551b63b211f055de37e` 已部署到 133；server / web 运行时 image ID 分别为 `sha256:dcd886ecae24e9b8abbdfee5b19e4d6261c1002ff18cebf9d3b823a600d11678` 与 `sha256:53a926c1b64290b505e07049f362b9bc0300ed1bc8a4c775a718373c23740e91`，传输 bundle SHA-256 为 `fbf76224479c546675106f074911a2a38c3f0805c088875489eae11be62223b6`。发布前备份 `predeploy-20c96d38-20260711T052623Z` 为 337813 bytes，SHA-256 `2b3fe0e0eb5677ec2db9ffab91e09caaf81a3378262b30ccb0800a9ab2c6fef3`；隔离恢复、Atlas pending 0、最小统计 `12|42|126|23|23` 均通过且临时库已删除。migration 保持 `20260710150001`，active revision 保持 `yoyoosun-customer-package-v7.runtime-manifest-v1`。
 
-下一步：在 Node `24.14.0` / pnpm `10.13.1` 下完成全量 `full / strict`，提交推送新固定 revision；从该 revision 本地构建 immutable linux/amd64 镜像，133 恢复 `ERP_PDF_WARMUP=async` 后重新部署，执行 runtime preflight、真实 PDF、账号 / RBAC、出货退役负测、页面 / API / DB smoke，并生成新的独立 release evidence 与最终 GO / NO-GO。
+完成：133 runtime preflight 真实确认 Compose、容器实际 `ERP_PDF_WARMUP=async`、Chromium / `chromium-common 150.0.7871.100-1~deb12u1`、health / ready；真实 PDF 两次均为 HTTP 200、`application/pdf`、非空 `%PDF`，未出现 50053。10 个桌面账号、9 个岗位移动端、1 个拒绝态、Shipment 只读页面、四个退役 RPC `40020`、普通 sales Workflow 投影、短信 provider 非 mock、12 张关键业务表发布前后守恒均通过。安全清理只处理 dangling image / build cache，回收 0B，保留当前、`71144182` 回滚镜像及诊断镜像，服务 restart count 保持 0。
 
-阻塞/风险：旧 `7114418` 目标运行态为了从 Chromium `.46` 故障中恢复 ready 暂时使用 `ERP_PDF_WARMUP=off`，因此不是最终 release-ready 状态；必须由新 revision / `.100` 镜像和目标真实 PDF 证据替换。当前修改尚未提交推送或发布，不能把本地通过写成 133 已完成。
+完成：`deployments/yoyoosun/evidence/releases/2026-07-11/` 已绑定 git commit、133 runtime image ID、备份恢复、migration、客户配置 effective session、目标 smoke、真实 PDF、RBAC / 浏览器、数据守恒和回滚点；release status 为 `ready=true`、7/7 gate-verified，activation / readiness、资料包 lint、JSON 与 gitleaks 均通过。正式 closeout 现强制 `production-preflight --runtime` 和唯一 `template-pdf-render` 完整元数据，web-only smoke 只能诊断，不能再误判为 release-ready。
+
+验证：Node `24.14.0` / pnpm `10.13.1` 下完整发布脚本测试 260 项中 259 项通过、1 项因本机无 `flock` 跳过；`scripts/qa/full.sh` 与 `scripts/qa/strict.sh` 在仅含本发布范围的隔离 worktree 全部通过，覆盖前端 676 项测试 / production build、全包 Go test / build、真实隔离 PostgreSQL 关键事务、文档清单、secrets、migration、客户包和 release evidence；`govulncheck` 当前代码调用路径受影响漏洞 0，`git diff --check` 通过。
+
+下一步：本 goal 无剩余代码或发布动作。客户最终签收和真实客户数据导入属于后续独立授权与执行，不以本次技术试用 GO 冒充完成。
+
+阻塞/风险：无技术试用阻塞。133 当前运行镜像绑定 runtime revision `20c96d38`；本次后续 release-gate 治理提交不改变 server / web runtime 内容，因此不重建镜像。技术试用 GO 不等于客户最终验收或真实客户数据导入完成。
 
 ## 2026-07-11 手工回归数据与发布收口
 

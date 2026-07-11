@@ -1,0 +1,6 @@
+Target: customer-trial-133 and isolated restore verification
+Migration Status: OK
+  -- Current Version: 20260710150001
+  -- Next Version:    Already at latest version
+  -- Executed Files:  51
+  -- Pending Files:   0

@@ -1,0 +1,10 @@
+{
+  "scope": "render-pdf-second-runtime-smoke",
+  "status": "pass",
+  "httpCode": 200,
+  "contentType": "application/pdf",
+  "pdfMagic": true,
+  "sizeBytes": 9856,
+  "sha256": "0059c5cd94c38bfde60663139d287aee2c455d7eea07804429d79fbebbd8f593",
+  "responseBodyStored": false
+}

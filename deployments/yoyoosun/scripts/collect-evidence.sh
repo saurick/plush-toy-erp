@@ -112,9 +112,10 @@ cat >"$output_dir/production-preflight-report.txt" <<EOF
 
 bash scripts/deploy/production-preflight.sh \\
   --env-file server/deploy/compose/prod/.env \\
+  --runtime \\
   --out "$output_dir/production-preflight-report.txt"
 
-该文件必须来自非 --example 模式；不要写入真实 .env、secret、token、完整 DSN 或客户 raw data。
+该文件必须在目标 Compose 服务启动后由 --runtime 模式生成，并记录运行态 PDF warmup、Chromium exact pin 和 health / ready 通过；不要写入真实 .env、secret、token、完整 DSN 或客户 raw data。
 EOF
 
 cat >"$output_dir/image-digests.txt" <<'EOF'

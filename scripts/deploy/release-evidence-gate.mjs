@@ -5,7 +5,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_CUSTOMER = "yoyoosun";
-const CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE = "customer-config-manifest-evidence.json";
+const CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE =
+  "customer-config-manifest-evidence.json";
 
 export const REQUIRED_FILES = {
   release: "release-evidence.md",
@@ -29,7 +30,8 @@ const SECRET_CONTENT_PATTERNS = [
   /(APP_JWT_SECRET|POSTGRES_PASSWORD|APP_ADMIN_PASSWORD)\s*=\s*(?!change-this|<|replace-|example)(?=.{12,})[^\s#]+/i,
 ];
 
-const PLACEHOLDER_PATTERN = /^(|待填写|todo|tbd|n\/a|unknown|replace.*|<.*>|-+)$/i;
+const PLACEHOLDER_PATTERN =
+  /^(|待填写|todo|tbd|n\/a|unknown|replace.*|<.*>|-+)$/i;
 
 const RELEASE_EVIDENCE_GATE_SCOPE = {
   evidenceOnly: true,
@@ -102,11 +104,15 @@ function isMeaningful(value) {
 }
 
 function hasFullDsn(value) {
-  return /(postgres(?:ql)?:\/\/|mysql:\/\/|mongodb(?:\+srv)?:\/\/|:\/\/[^:\s]+:[^@\s]+@)/i.test(String(value ?? ""));
+  return /(postgres(?:ql)?:\/\/|mysql:\/\/|mongodb(?:\+srv)?:\/\/|:\/\/[^:\s]+:[^@\s]+@)/i.test(
+    String(value ?? ""),
+  );
 }
 
 function hasCredentialedUrl(value) {
-  return /[a-z][a-z0-9+.-]*:\/\/[^/?#\s]*:[^/?#@\s]+@/i.test(String(value ?? ""));
+  return /[a-z][a-z0-9+.-]*:\/\/[^/?#\s]*:[^/?#@\s]+@/i.test(
+    String(value ?? ""),
+  );
 }
 
 function normalizeSha256(value) {
@@ -117,34 +123,66 @@ function normalizeSha256(value) {
 }
 
 function requireMeaningfulJsonField(report, fileName, fieldPath, errors) {
-  const value = fieldPath.split(".").reduce((current, key) => current?.[key], report);
-  assert(isMeaningful(value), `${fileName} ${fieldPath} is missing or placeholder`, errors);
+  const value = fieldPath
+    .split(".")
+    .reduce((current, key) => current?.[key], report);
+  assert(
+    isMeaningful(value),
+    `${fileName} ${fieldPath} is missing or placeholder`,
+    errors,
+  );
   return value;
 }
 
-function validateEvidenceArtifactPath({ report, fileName, fieldPath, absoluteDir, errors }) {
+function validateEvidenceArtifactPath({
+  report,
+  fileName,
+  fieldPath,
+  absoluteDir,
+  errors,
+}) {
   const value = requireMeaningfulJsonField(report, fileName, fieldPath, errors);
   const artifactPath = String(value ?? "").trim();
   const resolved = path.resolve(absoluteDir, artifactPath);
   const relativeToEvidence = path.relative(absoluteDir, resolved);
 
-  assert(!path.isAbsolute(artifactPath), `${fileName} ${fieldPath} must be relative to evidence dir`, errors);
-  assert(!hasFullDsn(artifactPath), `${fileName} ${fieldPath} must not contain a full DSN`, errors);
   assert(
-    Boolean(relativeToEvidence) && !relativeToEvidence.startsWith("..") && !path.isAbsolute(relativeToEvidence),
+    !path.isAbsolute(artifactPath),
+    `${fileName} ${fieldPath} must be relative to evidence dir`,
+    errors,
+  );
+  assert(
+    !hasFullDsn(artifactPath),
+    `${fileName} ${fieldPath} must not contain a full DSN`,
+    errors,
+  );
+  assert(
+    Boolean(relativeToEvidence) &&
+      !relativeToEvidence.startsWith("..") &&
+      !path.isAbsolute(relativeToEvidence),
     `${fileName} ${fieldPath} must stay inside evidence dir`,
     errors,
   );
-  assert(fs.existsSync(resolved), `${fileName} ${fieldPath} file not found in evidence dir: ${artifactPath}`, errors);
+  assert(
+    fs.existsSync(resolved),
+    `${fileName} ${fieldPath} file not found in evidence dir: ${artifactPath}`,
+    errors,
+  );
   if (fs.existsSync(resolved)) {
     const artifactContent = readText(resolved);
     validateNoSecrets(`${fileName} ${fieldPath}`, artifactContent, errors);
-    assert(!hasFullDsn(artifactContent), `${fileName} ${fieldPath} file must not contain a full DSN`, errors);
+    assert(
+      !hasFullDsn(artifactContent),
+      `${fileName} ${fieldPath} file must not contain a full DSN`,
+      errors,
+    );
   }
 }
 
 function readEvidenceArtifactText({ report, fieldPath, absoluteDir }) {
-  const artifactPath = String(fieldPath.split(".").reduce((current, key) => current?.[key], report) ?? "").trim();
+  const artifactPath = String(
+    fieldPath.split(".").reduce((current, key) => current?.[key], report) ?? "",
+  ).trim();
   const resolved = path.resolve(absoluteDir, artifactPath);
   const relativeToEvidence = path.relative(absoluteDir, resolved);
   if (
@@ -165,13 +203,19 @@ function escapeRegExp(value) {
 
 function findMarkdownField(content, fieldName) {
   const label = escapeRegExp(fieldName);
-  const tablePattern = new RegExp(`^\\|\\s*${label}\\s*\\|\\s*([^|]+?)\\s*\\|`, "mi");
+  const tablePattern = new RegExp(
+    `^\\|\\s*${label}\\s*\\|\\s*([^|]+?)\\s*\\|`,
+    "mi",
+  );
   const tableMatch = content.match(tablePattern);
   if (tableMatch) {
     return tableMatch[1].trim();
   }
 
-  const linePattern = new RegExp(`^(?:[-*]\\s*)?${label}\\s*[:：]\\s*(.+)$`, "mi");
+  const linePattern = new RegExp(
+    `^(?:[-*]\\s*)?${label}\\s*[:：]\\s*(.+)$`,
+    "mi",
+  );
   const lineMatch = content.match(linePattern);
   return lineMatch ? lineMatch[1].trim() : "";
 }
@@ -186,15 +230,27 @@ function findKeyValueField(content, fieldName) {
 function requireMarkdownFields(content, fileName, fields, errors) {
   for (const field of fields) {
     const value = findMarkdownField(content, field);
-    assert(isMeaningful(value), `${fileName} missing or placeholder field: ${field}`, errors);
+    assert(
+      isMeaningful(value),
+      `${fileName} missing or placeholder field: ${field}`,
+      errors,
+    );
   }
 }
 
 function validateNoSecrets(fileName, content, errors) {
   for (const pattern of SECRET_CONTENT_PATTERNS) {
-    assert(!pattern.test(content), `${fileName} contains a forbidden secret-like pattern`, errors);
+    assert(
+      !pattern.test(content),
+      `${fileName} contains a forbidden secret-like pattern`,
+      errors,
+    );
   }
-  assert(!hasCredentialedUrl(content), `${fileName} contains a credentialed URL`, errors);
+  assert(
+    !hasCredentialedUrl(content),
+    `${fileName} contains a credentialed URL`,
+    errors,
+  );
 }
 
 function validateReleaseEvidence(content, errors) {
@@ -222,7 +278,11 @@ function validateReleaseEvidence(content, errors) {
     `${REQUIRED_FILES.release} customerCode must be ${DEFAULT_CUSTOMER}`,
     errors,
   );
-  assert(/^[a-f0-9]{7,40}$/i.test(gitCommit), `${REQUIRED_FILES.release} gitCommit must be a git hash`, errors);
+  assert(
+    /^[a-f0-9]{7,40}$/i.test(gitCommit),
+    `${REQUIRED_FILES.release} gitCommit must be a git hash`,
+    errors,
+  );
   assert(
     /^sha256:[a-f0-9]{64}$/i.test(serverImageDigest),
     `${REQUIRED_FILES.release} serverImageDigest must be sha256:<64-hex>`,
@@ -242,13 +302,41 @@ function validatePreflightReport(content, errors) {
     errors,
   );
   assert(
-    /\[production-preflight\]\s+ok:\s+生产 secret、镜像 tag、debug、后端端口和 PostgreSQL \/ Jaeger 暴露边界通过/.test(content),
+    /\[production-preflight\]\s+ok:\s+生产 secret、镜像 tag、debug、后端端口和 PostgreSQL \/ Jaeger 暴露边界通过/.test(
+      content,
+    ),
     `${REQUIRED_FILES.preflight} must include production secret/image/debug/exposure boundary check`,
     errors,
   );
   assert(
-    /\[production-preflight\]\s+ok:\s+Compose、低配部署边界和 migration 脚本通过/.test(content),
+    /\[production-preflight\]\s+ok:\s+Compose、低配部署边界和 migration 脚本通过/.test(
+      content,
+    ),
     `${REQUIRED_FILES.preflight} must include compose and low-spec deployment boundary check`,
+    errors,
+  );
+  assert(
+    /\[production-preflight\]\s+ok:\s+Compose 运行服务存在/.test(content),
+    `${REQUIRED_FILES.preflight} must include runtime Compose services check`,
+    errors,
+  );
+  assert(
+    /\[production-preflight\]\s+ok:\s+运行态 ERP_PDF_WARMUP=async/.test(
+      content,
+    ),
+    `${REQUIRED_FILES.preflight} must include runtime ERP_PDF_WARMUP=async check`,
+    errors,
+  );
+  assert(
+    /\[production-preflight\]\s+ok:\s+运行态 Chromium \/ chromium-common 版本与 Docker exact pin 一致:\s+\S+/.test(
+      content,
+    ),
+    `${REQUIRED_FILES.preflight} must include runtime Chromium/chromium-common exact pin check`,
+    errors,
+  );
+  assert(
+    /\[production-preflight\]\s+ok:\s+healthz \/ readyz 通过/.test(content),
+    `${REQUIRED_FILES.preflight} must include runtime healthz/readyz check`,
     errors,
   );
   assert(
@@ -309,7 +397,9 @@ function validateBackupEvidence(content, errors) {
   const restoreTestStatus = findMarkdownField(content, "restoreTestStatus");
   const smokeQueryStatus = findMarkdownField(content, "smokeQueryStatus");
   assert(
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/.test(backupTime),
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$/.test(
+      backupTime,
+    ),
     `${REQUIRED_FILES.backup} backupTime must be an ISO timestamp`,
     errors,
   );
@@ -324,7 +414,9 @@ function validateBackupEvidence(content, errors) {
     errors,
   );
   assert(
-    /^(sha256:)?[a-f0-9]{64}$/i.test(findMarkdownField(content, "databaseBackupHash")),
+    /^(sha256:)?[a-f0-9]{64}$/i.test(
+      findMarkdownField(content, "databaseBackupHash"),
+    ),
     `${REQUIRED_FILES.backup} databaseBackupHash must be sha256`,
     errors,
   );
@@ -345,7 +437,9 @@ function validateBackupRestoreReport(content, errors, absoluteDir) {
   try {
     report = JSON.parse(content);
   } catch (error) {
-    errors.push(`${REQUIRED_FILES.backupRestore} must be valid JSON: ${error.message}`);
+    errors.push(
+      `${REQUIRED_FILES.backupRestore} must be valid JSON: ${error.message}`,
+    );
     return;
   }
 
@@ -354,7 +448,11 @@ function validateBackupRestoreReport(content, errors, absoluteDir) {
     `${REQUIRED_FILES.backupRestore} customerCode must be ${DEFAULT_CUSTOMER}`,
     errors,
   );
-  assert(isMeaningful(report.backupId), `${REQUIRED_FILES.backupRestore} backupId is missing`, errors);
+  assert(
+    isMeaningful(report.backupId),
+    `${REQUIRED_FILES.backupRestore} backupId is missing`,
+    errors,
+  );
   for (const fieldPath of [
     "environment",
     "releaseVersion",
@@ -368,7 +466,12 @@ function validateBackupRestoreReport(content, errors, absoluteDir) {
     "restore.restoreMigrationVersion",
     "smoke.smokeQueryStatus",
   ]) {
-    requireMeaningfulJsonField(report, REQUIRED_FILES.backupRestore, fieldPath, errors);
+    requireMeaningfulJsonField(
+      report,
+      REQUIRED_FILES.backupRestore,
+      fieldPath,
+      errors,
+    );
   }
   for (const fieldPath of [
     "artifacts.backupEvidence",
@@ -389,25 +492,39 @@ function validateBackupRestoreReport(content, errors, absoluteDir) {
     `${REQUIRED_FILES.backupRestore} verifiedAt must be an ISO timestamp`,
     errors,
   );
-  assert(!hasFullDsn(report.sourceAlias), `${REQUIRED_FILES.backupRestore} sourceAlias must not contain a full DSN`, errors);
-  assert(!hasFullDsn(report.restoreTarget), `${REQUIRED_FILES.backupRestore} restoreTarget must not contain a full DSN`, errors);
+  assert(
+    !hasFullDsn(report.sourceAlias),
+    `${REQUIRED_FILES.backupRestore} sourceAlias must not contain a full DSN`,
+    errors,
+  );
+  assert(
+    !hasFullDsn(report.restoreTarget),
+    `${REQUIRED_FILES.backupRestore} restoreTarget must not contain a full DSN`,
+    errors,
+  );
   assert(
     Number(report.backup?.databaseBackupSize) > 0,
     `${REQUIRED_FILES.backupRestore} backup.databaseBackupSize must be a positive number`,
     errors,
   );
   assert(
-    /^(sha256:)?[a-f0-9]{64}$/i.test(String(report.backup?.databaseBackupHash ?? "").trim()),
+    /^(sha256:)?[a-f0-9]{64}$/i.test(
+      String(report.backup?.databaseBackupHash ?? "").trim(),
+    ),
     `${REQUIRED_FILES.backupRestore} backup.databaseBackupHash must be sha256`,
     errors,
   );
   assert(
-    /pass|success|verified|ok/i.test(String(report.restore?.restoreTestStatus ?? "")),
+    /pass|success|verified|ok/i.test(
+      String(report.restore?.restoreTestStatus ?? ""),
+    ),
     `${REQUIRED_FILES.backupRestore} restore.restoreTestStatus must show a passed restore rehearsal`,
     errors,
   );
   assert(
-    String(report.restore?.restoreMigrationVersion ?? "").trim().toLowerCase() !== "unknown",
+    String(report.restore?.restoreMigrationVersion ?? "")
+      .trim()
+      .toLowerCase() !== "unknown",
     `${REQUIRED_FILES.backupRestore} restore.restoreMigrationVersion must not be unknown`,
     errors,
   );
@@ -426,19 +543,31 @@ function validateBackupRestoreReport(content, errors, absoluteDir) {
     `${REQUIRED_FILES.backupRestore} smoke.publicTableCount must be a positive number`,
     errors,
   );
-  assert(report.summary?.backupCreated === true, `${REQUIRED_FILES.backupRestore} summary.backupCreated must be true`, errors);
+  assert(
+    report.summary?.backupCreated === true,
+    `${REQUIRED_FILES.backupRestore} summary.backupCreated must be true`,
+    errors,
+  );
   assert(
     report.summary?.restoreCompleted === true,
     `${REQUIRED_FILES.backupRestore} summary.restoreCompleted must be true`,
     errors,
   );
-  assert(report.summary?.migrationStatus === "ok", `${REQUIRED_FILES.backupRestore} summary.migrationStatus must be ok`, errors);
+  assert(
+    report.summary?.migrationStatus === "ok",
+    `${REQUIRED_FILES.backupRestore} summary.migrationStatus must be ok`,
+    errors,
+  );
   assert(
     report.summary?.smokeQueryStatus === "passed",
     `${REQUIRED_FILES.backupRestore} summary.smokeQueryStatus must be passed`,
     errors,
   );
-  assert(report.redaction?.containsSecrets === false, `${REQUIRED_FILES.backupRestore} must declare containsSecrets=false`, errors);
+  assert(
+    report.redaction?.containsSecrets === false,
+    `${REQUIRED_FILES.backupRestore} must declare containsSecrets=false`,
+    errors,
+  );
   assert(
     report.redaction?.containsRawCustomerRows === false,
     `${REQUIRED_FILES.backupRestore} must declare containsRawCustomerRows=false`,
@@ -466,8 +595,10 @@ function parseJsonEvidence(fileName, content, errors) {
 }
 
 function parseMigrationStatus(content) {
-  const currentVersion = content.match(/Current Version:\s*([^\s]+)/i)?.[1]?.trim() || "";
-  const pendingFiles = content.match(/Pending Files:\s*(\d+)/i)?.[1]?.trim() || "";
+  const currentVersion =
+    content.match(/Current Version:\s*([^\s]+)/i)?.[1]?.trim() || "";
+  const pendingFiles =
+    content.match(/Pending Files:\s*(\d+)/i)?.[1]?.trim() || "";
   return { currentVersion, pendingFiles };
 }
 
@@ -480,11 +611,18 @@ function findCustomerConfigEffectiveSessionCheck(report) {
   );
 }
 
-function validateCustomerConfigManifestEvidence({ absoluteDir, customerConfigCheck, errors }) {
+function validateCustomerConfigManifestEvidence({
+  absoluteDir,
+  customerConfigCheck,
+  errors,
+}) {
   if (!customerConfigCheck) {
     return;
   }
-  const evidencePath = path.join(absoluteDir, CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE);
+  const evidencePath = path.join(
+    absoluteDir,
+    CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE,
+  );
   assert(
     fs.existsSync(evidencePath),
     `${CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE} is required when ${REQUIRED_FILES.smoke} contains customer-config-effective-session`,
@@ -538,7 +676,12 @@ function validateCustomerConfigManifestEvidence({ absoluteDir, customerConfigChe
   );
 }
 
-function validateRollbackSmokeReportPath({ report, repoRoot, absoluteDir, errors }) {
+function validateRollbackSmokeReportPath({
+  report,
+  repoRoot,
+  absoluteDir,
+  errors,
+}) {
   const smokeReportPath = String(report?.postCheck?.smokeReport ?? "").trim();
   const expectedSmokePath = path.resolve(absoluteDir, REQUIRED_FILES.smoke);
   const repoRelativeSmokePath = path.resolve(repoRoot, smokeReportPath);
@@ -555,7 +698,8 @@ function validateRollbackSmokeReportPath({ report, repoRoot, absoluteDir, errors
     errors,
   );
   assert(
-    repoRelativeSmokePath === expectedSmokePath || evidenceRelativeSmokePath === expectedSmokePath,
+    repoRelativeSmokePath === expectedSmokePath ||
+      evidenceRelativeSmokePath === expectedSmokePath,
     `${REQUIRED_FILES.rollbackRehearsal} postCheck.smokeReport must point to ${REQUIRED_FILES.smoke} in the same evidence dir`,
     errors,
   );
@@ -579,24 +723,48 @@ function validateEvidenceConsistency(
   const releaseVersion = findMarkdownField(releaseContent, "releaseVersion");
   const releaseEnvironment = findMarkdownField(releaseContent, "environment");
   const releaseBackupId = findMarkdownField(releaseContent, "backupId");
-  const releaseServerImageDigest = findMarkdownField(releaseContent, "serverImageDigest");
-  const releaseWebImageDigest = findMarkdownField(releaseContent, "webImageDigest");
-  const artifactServerImageDigest = findKeyValueField(imageDigestsContent, "serverImageDigest");
-  const artifactWebImageDigest = findKeyValueField(imageDigestsContent, "webImageDigest");
+  const releaseServerImageDigest = findMarkdownField(
+    releaseContent,
+    "serverImageDigest",
+  );
+  const releaseWebImageDigest = findMarkdownField(
+    releaseContent,
+    "webImageDigest",
+  );
+  const artifactServerImageDigest = findKeyValueField(
+    imageDigestsContent,
+    "serverImageDigest",
+  );
+  const artifactWebImageDigest = findKeyValueField(
+    imageDigestsContent,
+    "webImageDigest",
+  );
   const migrationBefore = findMarkdownField(releaseContent, "migrationBefore");
   const migrationAfter = findMarkdownField(releaseContent, "migrationAfter");
-  const backupReleaseVersion = findMarkdownField(backupContent, "releaseVersion");
+  const backupReleaseVersion = findMarkdownField(
+    backupContent,
+    "releaseVersion",
+  );
   const backupEnvironment = findMarkdownField(backupContent, "environment");
   const backupId = findMarkdownField(backupContent, "backupId");
-  const backupMigrationVersion = findMarkdownField(backupContent, "migrationVersion");
-  const backupHash = normalizeSha256(findMarkdownField(backupContent, "databaseBackupHash"));
+  const backupMigrationVersion = findMarkdownField(
+    backupContent,
+    "migrationVersion",
+  );
+  const backupHash = normalizeSha256(
+    findMarkdownField(backupContent, "databaseBackupHash"),
+  );
   const migrationStatus = parseMigrationStatus(migrationContent);
   const backupRestoreReport = parseJsonEvidence(
     REQUIRED_FILES.backupRestore,
     backupRestoreContent,
     errors,
   );
-  const smokeReport = parseJsonEvidence(REQUIRED_FILES.smoke, smokeContent, errors);
+  const smokeReport = parseJsonEvidence(
+    REQUIRED_FILES.smoke,
+    smokeContent,
+    errors,
+  );
   const rollbackRehearsalReport = parseJsonEvidence(
     REQUIRED_FILES.rollbackRehearsal,
     rollbackRehearsalContent,
@@ -623,7 +791,10 @@ function validateEvidenceConsistency(
       fieldPath: "artifacts.commandSummary",
       absoluteDir,
     });
-    const commandSummarySteps = findKeyValueField(commandSummaryContent, "steps");
+    const commandSummarySteps = findKeyValueField(
+      commandSummaryContent,
+      "steps",
+    );
     assert(
       backupRestoreReport.releaseVersion === releaseVersion,
       `${REQUIRED_FILES.backupRestore} releaseVersion must match ${REQUIRED_FILES.release}`,
@@ -640,7 +811,8 @@ function validateEvidenceConsistency(
       errors,
     );
     assert(
-      normalizeSha256(backupRestoreReport.backup?.databaseBackupHash) === backupHash,
+      normalizeSha256(backupRestoreReport.backup?.databaseBackupHash) ===
+        backupHash,
       `${REQUIRED_FILES.backupRestore} backup.databaseBackupHash must match ${REQUIRED_FILES.backup}`,
       errors,
     );
@@ -680,17 +852,20 @@ function validateEvidenceConsistency(
       errors,
     );
     assert(
-      findKeyValueField(commandSummaryContent, "releaseVersion") === releaseVersion,
+      findKeyValueField(commandSummaryContent, "releaseVersion") ===
+        releaseVersion,
       `${REQUIRED_FILES.backupRestore} artifacts.commandSummary releaseVersion must match ${REQUIRED_FILES.release}`,
       errors,
     );
     assert(
-      findKeyValueField(commandSummaryContent, "sourceAlias") === backupRestoreReport.sourceAlias,
+      findKeyValueField(commandSummaryContent, "sourceAlias") ===
+        backupRestoreReport.sourceAlias,
       `${REQUIRED_FILES.backupRestore} artifacts.commandSummary sourceAlias must match ${REQUIRED_FILES.backupRestore}`,
       errors,
     );
     assert(
-      findKeyValueField(commandSummaryContent, "restoreTarget") === backupRestoreReport.restoreTarget,
+      findKeyValueField(commandSummaryContent, "restoreTarget") ===
+        backupRestoreReport.restoreTarget,
       `${REQUIRED_FILES.backupRestore} artifacts.commandSummary restoreTarget must match ${REQUIRED_FILES.backupRestore}`,
       errors,
     );
@@ -733,27 +908,34 @@ function validateEvidenceConsistency(
       absoluteDir,
       errors,
     });
-    const smokeCheckCount = Array.isArray(smokeReport?.checks) ? smokeReport.checks.length : 0;
+    const smokeCheckCount = Array.isArray(smokeReport?.checks)
+      ? smokeReport.checks.length
+      : 0;
     assert(
-      Number(rollbackRehearsalReport.postCheck?.smokeCheckCount) === smokeCheckCount,
+      Number(rollbackRehearsalReport.postCheck?.smokeCheckCount) ===
+        smokeCheckCount,
       `${REQUIRED_FILES.rollbackRehearsal} postCheck.smokeCheckCount must match ${REQUIRED_FILES.smoke} checks length`,
       errors,
     );
-    const customerConfigSmokeCheck = findCustomerConfigEffectiveSessionCheck(smokeReport);
+    const customerConfigSmokeCheck =
+      findCustomerConfigEffectiveSessionCheck(smokeReport);
     if (customerConfigSmokeCheck) {
-      const rollbackEffectiveSession = rollbackRehearsalReport.postCheck?.customerConfigEffectiveSession;
+      const rollbackEffectiveSession =
+        rollbackRehearsalReport.postCheck?.customerConfigEffectiveSession;
       assert(
         rollbackEffectiveSession?.status === "verified",
         `${REQUIRED_FILES.rollbackRehearsal} postCheck.customerConfigEffectiveSession.status must be verified when ${REQUIRED_FILES.smoke} contains customer-config-effective-session`,
         errors,
       );
       assert(
-        rollbackEffectiveSession?.target === "jsonrpc:customer_config.get_effective_session",
+        rollbackEffectiveSession?.target ===
+          "jsonrpc:customer_config.get_effective_session",
         `${REQUIRED_FILES.rollbackRehearsal} postCheck.customerConfigEffectiveSession.target must be jsonrpc:customer_config.get_effective_session`,
         errors,
       );
       assert(
-        rollbackEffectiveSession?.expectedRevision === customerConfigSmokeCheck.expectedRevision,
+        rollbackEffectiveSession?.expectedRevision ===
+          customerConfigSmokeCheck.expectedRevision,
         `${REQUIRED_FILES.rollbackRehearsal} postCheck.customerConfigEffectiveSession.expectedRevision must match ${REQUIRED_FILES.smoke}`,
         errors,
       );
@@ -761,12 +943,14 @@ function validateEvidenceConsistency(
   }
 
   assert(
-    normalizeSha256(artifactServerImageDigest) === normalizeSha256(releaseServerImageDigest),
+    normalizeSha256(artifactServerImageDigest) ===
+      normalizeSha256(releaseServerImageDigest),
     `${REQUIRED_FILES.imageDigests} serverImageDigest must match ${REQUIRED_FILES.release}`,
     errors,
   );
   assert(
-    normalizeSha256(artifactWebImageDigest) === normalizeSha256(releaseWebImageDigest),
+    normalizeSha256(artifactWebImageDigest) ===
+      normalizeSha256(releaseWebImageDigest),
     `${REQUIRED_FILES.imageDigests} webImageDigest must match ${REQUIRED_FILES.release}`,
     errors,
   );
@@ -828,7 +1012,11 @@ function validateMigrationStatus(content, errors) {
     `${REQUIRED_FILES.migration} must include Pending Files`,
     errors,
   );
-  assert(!/(dirty|failed|panic|fatal|error)/i.test(content), `${REQUIRED_FILES.migration} contains failure text`, errors);
+  assert(
+    !/(dirty|failed|panic|fatal|error)/i.test(content),
+    `${REQUIRED_FILES.migration} contains failure text`,
+    errors,
+  );
 }
 
 function validateSmokeReport(content, errors, absoluteDir) {
@@ -840,11 +1028,27 @@ function validateSmokeReport(content, errors, absoluteDir) {
     return;
   }
 
-  assert(report.customerCode === DEFAULT_CUSTOMER, `${REQUIRED_FILES.smoke} customerCode must be ${DEFAULT_CUSTOMER}`, errors);
-  assert(isMeaningful(report.releaseVersion), `${REQUIRED_FILES.smoke} releaseVersion is missing or placeholder`, errors);
-  assert(isMeaningful(report.endpointAlias), `${REQUIRED_FILES.smoke} endpointAlias is missing or placeholder`, errors);
+  assert(
+    report.customerCode === DEFAULT_CUSTOMER,
+    `${REQUIRED_FILES.smoke} customerCode must be ${DEFAULT_CUSTOMER}`,
+    errors,
+  );
+  assert(
+    isMeaningful(report.releaseVersion),
+    `${REQUIRED_FILES.smoke} releaseVersion is missing or placeholder`,
+    errors,
+  );
+  assert(
+    isMeaningful(report.endpointAlias),
+    `${REQUIRED_FILES.smoke} endpointAlias is missing or placeholder`,
+    errors,
+  );
   if (isMeaningful(report.endpointAlias)) {
-    assert(!hasCredentialedUrl(report.endpointAlias), `${REQUIRED_FILES.smoke} endpointAlias must not contain URL credentials`, errors);
+    assert(
+      !hasCredentialedUrl(report.endpointAlias),
+      `${REQUIRED_FILES.smoke} endpointAlias must not contain URL credentials`,
+      errors,
+    );
   }
   if (isMeaningful(report.backendEndpointAlias)) {
     assert(
@@ -857,14 +1061,38 @@ function validateSmokeReport(content, errors, absoluteDir) {
   const total = Number(report.summary?.total ?? 0);
   const passed = Number(report.summary?.passed ?? 0);
   const failed = Number(report.summary?.failed ?? 0);
-  assert(checks.length > 0, `${REQUIRED_FILES.smoke} checks must not be empty`, errors);
-  assert(total === checks.length, `${REQUIRED_FILES.smoke} summary.total must match checks length`, errors);
-  assert(passed === checks.length, `${REQUIRED_FILES.smoke} summary.passed must match checks length`, errors);
-  assert(failed === 0, `${REQUIRED_FILES.smoke} summary.failed must be 0`, errors);
+  assert(
+    checks.length > 0,
+    `${REQUIRED_FILES.smoke} checks must not be empty`,
+    errors,
+  );
+  assert(
+    total === checks.length,
+    `${REQUIRED_FILES.smoke} summary.total must match checks length`,
+    errors,
+  );
+  assert(
+    passed === checks.length,
+    `${REQUIRED_FILES.smoke} summary.passed must match checks length`,
+    errors,
+  );
+  assert(
+    failed === 0,
+    `${REQUIRED_FILES.smoke} summary.failed must be 0`,
+    errors,
+  );
   for (const [index, check] of checks.entries()) {
-    assert(isMeaningful(check?.name), `${REQUIRED_FILES.smoke} checks[${index}].name is missing`, errors);
+    assert(
+      isMeaningful(check?.name),
+      `${REQUIRED_FILES.smoke} checks[${index}].name is missing`,
+      errors,
+    );
     const target = String(check?.target ?? "").trim();
-    assert(isMeaningful(target), `${REQUIRED_FILES.smoke} checks[${index}].target is missing`, errors);
+    assert(
+      isMeaningful(target),
+      `${REQUIRED_FILES.smoke} checks[${index}].target is missing`,
+      errors,
+    );
     assert(
       !hasCredentialedUrl(target),
       `${REQUIRED_FILES.smoke} checks[${index}].target must not contain URL credentials`,
@@ -883,10 +1111,55 @@ function validateSmokeReport(content, errors, absoluteDir) {
       errors,
     );
   }
+  const pdfChecks = checks.filter(
+    (check) => check?.name === "template-pdf-render",
+  );
+  assert(
+    pdfChecks.length === 1,
+    `${REQUIRED_FILES.smoke} must include exactly one template-pdf-render check`,
+    errors,
+  );
+  const pdfCheck = pdfChecks[0];
+  if (pdfCheck) {
+    assert(
+      pdfCheck.target === "/templates/render-pdf",
+      `${REQUIRED_FILES.smoke} template-pdf-render target must be /templates/render-pdf`,
+      errors,
+    );
+    assert(
+      String(pdfCheck.httpCode ?? "").trim() === "200",
+      `${REQUIRED_FILES.smoke} template-pdf-render httpCode must be 200`,
+      errors,
+    );
+    assert(
+      String(pdfCheck.contentType ?? "")
+        .trim()
+        .toLowerCase() === "application/pdf",
+      `${REQUIRED_FILES.smoke} template-pdf-render contentType must be application/pdf`,
+      errors,
+    );
+    assert(
+      /^[a-f0-9]{64}$/i.test(String(pdfCheck.sha256 ?? "").trim()),
+      `${REQUIRED_FILES.smoke} template-pdf-render sha256 must be 64-hex`,
+      errors,
+    );
+    const pdfSizeBytes = Number(pdfCheck.sizeBytes);
+    assert(
+      Number.isSafeInteger(pdfSizeBytes) && pdfSizeBytes > 0,
+      `${REQUIRED_FILES.smoke} template-pdf-render sizeBytes must be a positive integer`,
+      errors,
+    );
+    assert(
+      pdfCheck.responseBodyStored === false,
+      `${REQUIRED_FILES.smoke} template-pdf-render responseBodyStored must be false`,
+      errors,
+    );
+  }
   const customerConfigCheck = findCustomerConfigEffectiveSessionCheck(report);
   if (customerConfigCheck) {
     assert(
-      customerConfigCheck.target === "jsonrpc:customer_config.get_effective_session",
+      customerConfigCheck.target ===
+        "jsonrpc:customer_config.get_effective_session",
       `${REQUIRED_FILES.smoke} customer-config-effective-session target must be jsonrpc:customer_config.get_effective_session`,
       errors,
     );
@@ -905,9 +1178,17 @@ function validateSmokeReport(content, errors, absoluteDir) {
       `${REQUIRED_FILES.smoke} customer-config-effective-session responseBodyStored must be false`,
       errors,
     );
-    validateCustomerConfigManifestEvidence({ absoluteDir, customerConfigCheck, errors });
+    validateCustomerConfigManifestEvidence({
+      absoluteDir,
+      customerConfigCheck,
+      errors,
+    });
   }
-  assert(report.redaction?.containsSecrets === false, `${REQUIRED_FILES.smoke} must declare containsSecrets=false`, errors);
+  assert(
+    report.redaction?.containsSecrets === false,
+    `${REQUIRED_FILES.smoke} must declare containsSecrets=false`,
+    errors,
+  );
   assert(
     report.redaction?.containsRawCustomerRows === false,
     `${REQUIRED_FILES.smoke} must declare containsRawCustomerRows=false`,
@@ -931,7 +1212,9 @@ function validateRollbackPlan(content, errors) {
   );
   const decision = findMarkdownField(content, "rollbackDecision");
   assert(
-    /^(rollback-ready|forward-fix-ready|rollback-or-forward-fix-ready)$/i.test(decision),
+    /^(rollback-ready|forward-fix-ready|rollback-or-forward-fix-ready)$/i.test(
+      decision,
+    ),
     `${REQUIRED_FILES.rollbackPlan} rollbackDecision must be rollback-ready, forward-fix-ready or rollback-or-forward-fix-ready`,
     errors,
   );
@@ -957,7 +1240,9 @@ function validateRollbackRehearsalReport(content, errors) {
   try {
     report = JSON.parse(content);
   } catch (error) {
-    errors.push(`${REQUIRED_FILES.rollbackRehearsal} must be valid JSON: ${error.message}`);
+    errors.push(
+      `${REQUIRED_FILES.rollbackRehearsal} must be valid JSON: ${error.message}`,
+    );
     return;
   }
 
@@ -976,7 +1261,12 @@ function validateRollbackRehearsalReport(content, errors) {
     "postCheck.smokeStatus",
     "postCheck.smokeReport",
   ]) {
-    requireMeaningfulJsonField(report, REQUIRED_FILES.rollbackRehearsal, fieldPath, errors);
+    requireMeaningfulJsonField(
+      report,
+      REQUIRED_FILES.rollbackRehearsal,
+      fieldPath,
+      errors,
+    );
   }
   assert(
     /^\d{4}-\d{2}-\d{2}T/.test(String(report.rehearsedAt ?? "")),
@@ -984,14 +1274,24 @@ function validateRollbackRehearsalReport(content, errors) {
     errors,
   );
   assert(
-    /^(rollback|forward-fix|rollback-forward-fix)$/i.test(String(report.rehearsalType ?? "")),
+    /^(rollback|forward-fix|rollback-forward-fix)$/i.test(
+      String(report.rehearsalType ?? ""),
+    ),
     `${REQUIRED_FILES.rollbackRehearsal} rehearsalType must be rollback, forward-fix or rollback-forward-fix`,
     errors,
   );
   const steps = Array.isArray(report.steps) ? report.steps : [];
-  assert(steps.length > 0, `${REQUIRED_FILES.rollbackRehearsal} steps must not be empty`, errors);
+  assert(
+    steps.length > 0,
+    `${REQUIRED_FILES.rollbackRehearsal} steps must not be empty`,
+    errors,
+  );
   for (const [index, step] of steps.entries()) {
-    assert(isMeaningful(step?.name), `${REQUIRED_FILES.rollbackRehearsal} steps[${index}].name is missing`, errors);
+    assert(
+      isMeaningful(step?.name),
+      `${REQUIRED_FILES.rollbackRehearsal} steps[${index}].name is missing`,
+      errors,
+    );
     assert(
       /^(pass|passed|ok)$/i.test(String(step?.status ?? "").trim()),
       `${REQUIRED_FILES.rollbackRehearsal} steps[${index}].status must be pass`,
@@ -999,7 +1299,9 @@ function validateRollbackRehearsalReport(content, errors) {
     );
   }
   assert(
-    /^(pass|passed|ok)$/i.test(String(report.postCheck?.smokeStatus ?? "").trim()),
+    /^(pass|passed|ok)$/i.test(
+      String(report.postCheck?.smokeStatus ?? "").trim(),
+    ),
     `${REQUIRED_FILES.rollbackRehearsal} postCheck.smokeStatus must be pass`,
     errors,
   );
@@ -1014,11 +1316,17 @@ function validateRollbackRehearsalReport(content, errors) {
     errors,
   );
   assert(
-    /^(pass|passed|ok)$/i.test(String(report.summary?.rollbackPathStatus ?? "").trim()),
+    /^(pass|passed|ok)$/i.test(
+      String(report.summary?.rollbackPathStatus ?? "").trim(),
+    ),
     `${REQUIRED_FILES.rollbackRehearsal} summary.rollbackPathStatus must be pass`,
     errors,
   );
-  assert(report.redaction?.containsSecrets === false, `${REQUIRED_FILES.rollbackRehearsal} must declare containsSecrets=false`, errors);
+  assert(
+    report.redaction?.containsSecrets === false,
+    `${REQUIRED_FILES.rollbackRehearsal} must declare containsSecrets=false`,
+    errors,
+  );
   assert(
     report.redaction?.containsRawCustomerRows === false,
     `${REQUIRED_FILES.rollbackRehearsal} must declare containsRawCustomerRows=false`,
@@ -1048,7 +1356,9 @@ function validateSignoff(content, errors) {
   );
   const conclusion = findMarkdownField(content, "releaseConclusion");
   assert(
-    /^(customer-trial-approved|internal-only|rollback-or-forward-fix)$/.test(conclusion),
+    /^(customer-trial-approved|internal-only|rollback-or-forward-fix)$/.test(
+      conclusion,
+    ),
     `${REQUIRED_FILES.signoff} releaseConclusion must be customer-trial-approved, internal-only or rollback-or-forward-fix`,
     errors,
   );
@@ -1071,29 +1381,59 @@ export function validateReleaseEvidenceGate({
 } = {}) {
   const errors = [];
 
-  assert(customer === DEFAULT_CUSTOMER, `Only ${DEFAULT_CUSTOMER} is supported by this gate today`, errors);
+  assert(
+    customer === DEFAULT_CUSTOMER,
+    `Only ${DEFAULT_CUSTOMER} is supported by this gate today`,
+    errors,
+  );
   assert(Boolean(evidenceDir), "--evidence-dir is required", errors);
 
   const absoluteDir = evidenceDir ? path.resolve(repoRoot, evidenceDir) : "";
-  assert(Boolean(absoluteDir) && fs.existsSync(absoluteDir), `evidence dir not found: ${evidenceDir}`, errors);
+  assert(
+    Boolean(absoluteDir) && fs.existsSync(absoluteDir),
+    `evidence dir not found: ${evidenceDir}`,
+    errors,
+  );
 
   if (errors.length === 0) {
     for (const relativePath of Object.values(REQUIRED_FILES)) {
-      assert(fs.existsSync(path.join(absoluteDir, relativePath)), `Missing ${relativePath}`, errors);
+      assert(
+        fs.existsSync(path.join(absoluteDir, relativePath)),
+        `Missing ${relativePath}`,
+        errors,
+      );
     }
   }
 
   if (errors.length === 0) {
-    const releaseContent = readText(path.join(absoluteDir, REQUIRED_FILES.release));
-    const preflightContent = readText(path.join(absoluteDir, REQUIRED_FILES.preflight));
-    const imageDigestsContent = readText(path.join(absoluteDir, REQUIRED_FILES.imageDigests));
-    const backupContent = readText(path.join(absoluteDir, REQUIRED_FILES.backup));
-    const backupRestoreContent = readText(path.join(absoluteDir, REQUIRED_FILES.backupRestore));
-    const migrationContent = readText(path.join(absoluteDir, REQUIRED_FILES.migration));
+    const releaseContent = readText(
+      path.join(absoluteDir, REQUIRED_FILES.release),
+    );
+    const preflightContent = readText(
+      path.join(absoluteDir, REQUIRED_FILES.preflight),
+    );
+    const imageDigestsContent = readText(
+      path.join(absoluteDir, REQUIRED_FILES.imageDigests),
+    );
+    const backupContent = readText(
+      path.join(absoluteDir, REQUIRED_FILES.backup),
+    );
+    const backupRestoreContent = readText(
+      path.join(absoluteDir, REQUIRED_FILES.backupRestore),
+    );
+    const migrationContent = readText(
+      path.join(absoluteDir, REQUIRED_FILES.migration),
+    );
     const smokeContent = readText(path.join(absoluteDir, REQUIRED_FILES.smoke));
-    const rollbackPlanContent = readText(path.join(absoluteDir, REQUIRED_FILES.rollbackPlan));
-    const rollbackRehearsalContent = readText(path.join(absoluteDir, REQUIRED_FILES.rollbackRehearsal));
-    const signoffContent = readText(path.join(absoluteDir, REQUIRED_FILES.signoff));
+    const rollbackPlanContent = readText(
+      path.join(absoluteDir, REQUIRED_FILES.rollbackPlan),
+    );
+    const rollbackRehearsalContent = readText(
+      path.join(absoluteDir, REQUIRED_FILES.rollbackRehearsal),
+    );
+    const signoffContent = readText(
+      path.join(absoluteDir, REQUIRED_FILES.signoff),
+    );
 
     for (const [fileName, content] of [
       [REQUIRED_FILES.release, releaseContent],
@@ -1138,7 +1478,9 @@ export function validateReleaseEvidenceGate({
   }
 
   if (errors.length > 0) {
-    const error = new Error(`release evidence gate failed:\n- ${errors.join("\n- ")}`);
+    const error = new Error(
+      `release evidence gate failed:\n- ${errors.join("\n- ")}`,
+    );
     error.errors = errors;
     throw error;
   }

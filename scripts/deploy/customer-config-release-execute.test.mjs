@@ -39,7 +39,9 @@ function manifestSha256(root, manifest) {
 }
 
 function effectiveSessionPayload(root, manifest) {
-  const payload = JSON.parse(fs.readFileSync(path.join(root, manifest), "utf8"));
+  const payload = JSON.parse(
+    fs.readFileSync(path.join(root, manifest), "utf8"),
+  );
   return {
     configRevision: payload.revision,
     configHash: `sha256:${manifestSha256(root, manifest)}`,
@@ -103,6 +105,10 @@ function writeReleaseEvidence(dir) {
 [production-preflight] ok: 生产 secret、镜像 tag、debug、后端端口和 PostgreSQL / Jaeger 暴露边界通过
 [production-preflight] ok: Compose、低配部署边界和 migration 脚本通过
 [production-preflight] ok: docker compose config -q 通过
+[production-preflight] ok: Compose 运行服务存在
+[production-preflight] ok: 运行态 ERP_PDF_WARMUP=async
+[production-preflight] ok: 运行态 Chromium / chromium-common 版本与 Docker exact pin 一致: 150.0.7871.100-1~deb12u1
+[production-preflight] ok: healthz / readyz 通过
 [production-preflight] all checks passed
 `,
   );
@@ -152,7 +158,8 @@ webImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
         },
         backup: {
           databaseBackupSize: 123456,
-          databaseBackupHash: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          databaseBackupHash:
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
           storageLocationAlias: "controlled-backup-store",
           migrationVersion: "20260601000000",
         },
@@ -188,9 +195,18 @@ webImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     ),
   );
   fs.mkdirSync(path.join(dir, "artifacts"), { recursive: true });
-  fs.writeFileSync(path.join(dir, "artifacts/backup-evidence.md"), "backupId=backup-20260628\n");
-  fs.writeFileSync(path.join(dir, "artifacts/migration-status-before-apply.txt"), "Current Version: 20260601000000\nPending Files: 1\n");
-  fs.writeFileSync(path.join(dir, "artifacts/migration-status.txt"), "Current Version: 20260628123354\nPending Files: 0\n");
+  fs.writeFileSync(
+    path.join(dir, "artifacts/backup-evidence.md"),
+    "backupId=backup-20260628\n",
+  );
+  fs.writeFileSync(
+    path.join(dir, "artifacts/migration-status-before-apply.txt"),
+    "Current Version: 20260601000000\nPending Files: 1\n",
+  );
+  fs.writeFileSync(
+    path.join(dir, "artifacts/migration-status.txt"),
+    "Current Version: 20260628123354\nPending Files: 0\n",
+  );
   fs.writeFileSync(
     path.join(dir, "artifacts/command-summary.txt"),
     `backupId=backup-20260628
@@ -216,11 +232,37 @@ Pending Files: 0
         releaseVersion: "20260628T2200-config-release",
         endpointAlias: "https://erp.example.invalid",
         backendEndpointAlias: "https://api.example.invalid",
-        summary: { total: 3, passed: 3, failed: 0 },
+        summary: { total: 4, passed: 4, failed: 0 },
         checks: [
-          { name: "server-healthz", status: "pass", target: "https://erp.example.invalid/healthz", httpCode: "200" },
-          { name: "server-readyz", status: "pass", target: "https://erp.example.invalid/readyz", httpCode: "200" },
-          { name: "web-healthz", status: "pass", target: "https://erp.example.invalid/", httpCode: "200" },
+          {
+            name: "server-healthz",
+            status: "pass",
+            target: "https://erp.example.invalid/healthz",
+            httpCode: "200",
+          },
+          {
+            name: "server-readyz",
+            status: "pass",
+            target: "https://erp.example.invalid/readyz",
+            httpCode: "200",
+          },
+          {
+            name: "web-healthz",
+            status: "pass",
+            target: "https://erp.example.invalid/",
+            httpCode: "200",
+          },
+          {
+            name: "template-pdf-render",
+            status: "pass",
+            target: "/templates/render-pdf",
+            httpCode: "200",
+            contentType: "application/pdf",
+            sha256:
+              "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            sizeBytes: 1024,
+            responseBodyStored: false,
+          },
         ],
         redaction: { containsSecrets: false, containsRawCustomerRows: false },
       },
@@ -265,12 +307,17 @@ Pending Files: 0
         ],
         postCheck: {
           smokeStatus: "passed",
-          smokeReport: "deployments/yoyoosun/evidence/releases/2026-06-28/smoke-test-report.json",
-          smokeCheckCount: 3,
+          smokeReport:
+            "deployments/yoyoosun/evidence/releases/2026-06-28/smoke-test-report.json",
+          smokeCheckCount: 4,
           evidenceReviewStatus: "passed",
         },
         summary: { rehearsalCompleted: true, rollbackPathStatus: "passed" },
-        redaction: { containsSecrets: false, containsRawCustomerRows: false, containsFullDsn: false },
+        redaction: {
+          containsSecrets: false,
+          containsRawCustomerRows: false,
+          containsFullDsn: false,
+        },
       },
       null,
       2,
@@ -310,7 +357,10 @@ test("help 输出可运行", () => {
 test("input template 只输出前置清单且不读取目标文件", () => {
   const template = buildInputTemplate();
 
-  assert.equal(template.scope, "customer-config-release-execute-input-template");
+  assert.equal(
+    template.scope,
+    "customer-config-release-execute-input-template",
+  );
   assert.equal(template.writesDatabase, false);
   assert.equal(template.callsBackend, false);
   assert.equal(template.readsManifest, false);
@@ -322,24 +372,41 @@ test("input template 只输出前置清单且不读取目标文件", () => {
   assert.equal(template.confirmPhrases.publish, "PUBLISH_YOYOOSUN_CONFIG");
   assert.equal(template.confirmPhrases.activate, "ACTIVATE_YOYOOSUN_CONFIG");
   assert.equal(template.confirmPhrases.rollback, "ROLLBACK_YOYOOSUN_CONFIG");
-  assert(template.operations.includes("get_effective_session after activate or rollback"));
+  assert(
+    template.operations.includes(
+      "get_effective_session after activate or rollback",
+    ),
+  );
   assert.match(template.commands.join("\n"), /--execute --activate/);
-  assert.match(template.commands.join("\n"), /--require-executed --require-activated/);
+  assert.match(
+    template.commands.join("\n"),
+    /--require-executed --require-activated/,
+  );
   assert.match(template.boundary, /does not publish/);
   assert.match(template.boundary, /effectiveSessionVerification/);
   assert.match(template.boundary, /customer-config-effective-session/);
 });
 
 test("CLI input template 不要求 manifest 或 out", () => {
-  const result = spawnSync(process.execPath, [releaseCli, "--print-input-template"], {
-    encoding: "utf8",
-  });
+  const result = spawnSync(
+    process.execPath,
+    [releaseCli, "--print-input-template"],
+    {
+      encoding: "utf8",
+    },
+  );
   assert.equal(result.status, 0);
   const template = JSON.parse(result.stdout);
-  assert.equal(template.scope, "customer-config-release-execute-input-template");
+  assert.equal(
+    template.scope,
+    "customer-config-release-execute-input-template",
+  );
   assert.equal(template.callsBackend, false);
   assert.equal(template.writesDatabase, false);
-  assert.match(template.commands.join("\n"), /customer-config-release-readiness\.mjs/);
+  assert.match(
+    template.commands.join("\n"),
+    /customer-config-release-readiness\.mjs/,
+  );
 });
 
 test("parseCliArgs 支持发布和激活参数", () => {
@@ -396,7 +463,9 @@ test("parseCliArgs 支持 rollback 路径", () => {
 });
 
 test("默认只生成发布计划报告，不调用真实后端", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-release-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-release-"),
+  );
   const manifest = writeRuntimeManifest(root);
   const out = path.join(root, "out");
   const originalFetch = globalThis.fetch;
@@ -424,13 +493,19 @@ test("默认只生成发布计划报告，不调用真实后端", async () => {
         "utf8",
       ),
     );
-    assert.equal(saved.revision, "yoyoosun-customer-package-v7.runtime-manifest-v1");
+    assert.equal(
+      saved.revision,
+      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    );
     assert.equal(saved.manifest, manifest);
     const markdown = await readFile(
       path.join(out, "customer-config-release-report.md"),
       "utf8",
     );
-    assert.match(markdown, /\| manifest \| output\/customers\/yoyoosun\/customer-config-runtime-manifest\.json \|/);
+    assert.match(
+      markdown,
+      /\| manifest \| output\/customers\/yoyoosun\/customer-config-runtime-manifest\.json \|/,
+    );
     assert.equal(markdown.includes(root), false);
   } finally {
     globalThis.fetch = originalFetch;
@@ -439,7 +514,9 @@ test("默认只生成发布计划报告，不调用真实后端", async () => {
 });
 
 test("拒绝把 release executor 报告写入 deployments evidence 目录", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-release-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-release-"),
+  );
   const manifest = writeRuntimeManifest(root);
   try {
     await assert.rejects(
@@ -459,7 +536,9 @@ test("拒绝把 release executor 报告写入 deployments evidence 目录", asyn
 });
 
 test("execute 模式没有确认短语时拒绝", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-release-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-release-"),
+  );
   const manifest = writeRuntimeManifest(root);
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => {
@@ -486,7 +565,9 @@ test("execute 模式没有确认短语时拒绝", async () => {
 });
 
 test("execute 模式拒绝带账号密码的 backend URL", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-release-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-release-"),
+  );
   const manifest = writeRuntimeManifest(root);
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
   writeReleaseEvidence(path.join(root, evidenceDir));
@@ -526,7 +607,9 @@ test("execute 模式拒绝带账号密码的 backend URL", async () => {
 });
 
 test("activate 模式要求 release evidence gate", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-release-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-release-"),
+  );
   const manifest = writeRuntimeManifest(root);
   try {
     await assert.rejects(
@@ -547,7 +630,9 @@ test("activate 模式要求 release evidence gate", async () => {
 });
 
 test("rollback 模式要求 release evidence gate", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-release-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-release-"),
+  );
   const manifest = writeRuntimeManifest(root);
   try {
     await assert.rejects(
@@ -568,7 +653,9 @@ test("rollback 模式要求 release evidence gate", async () => {
 });
 
 test("rollback 不能和 activate 合并", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-release-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-release-"),
+  );
   const manifest = writeRuntimeManifest(root);
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
   writeReleaseEvidence(path.join(root, evidenceDir));
@@ -594,7 +681,9 @@ test("rollback 不能和 activate 合并", async () => {
 });
 
 test("execute activate 通过 JSON-RPC 调用 validate、publish、activate", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-release-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-release-"),
+  );
   const manifest = writeRuntimeManifest(root);
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
   writeReleaseEvidence(path.join(root, evidenceDir));
@@ -675,10 +764,16 @@ test("execute activate 通过 JSON-RPC 调用 validate、publish、activate", as
     );
     assert.equal(calls[0].url, "http://127.0.0.1:8300/rpc/customer_config");
     assert.equal(calls[0].auth, "Bearer test-token");
-    assert.equal(calls[2].params.revision, "yoyoosun-customer-package-v7.runtime-manifest-v1");
+    assert.equal(
+      calls[2].params.revision,
+      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    );
     assert.equal(report.backendEndpointAlias, "http://127.0.0.1:8300");
     assert.equal(report.effectiveSessionVerification.status, "verified");
-    assert.equal(report.effectiveSessionVerification.configRevision, "yoyoosun-customer-package-v7.runtime-manifest-v1");
+    assert.equal(
+      report.effectiveSessionVerification.configRevision,
+      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    );
   } finally {
     globalThis.fetch = originalFetch;
     if (originalConfirm === undefined) {
@@ -696,7 +791,9 @@ test("execute activate 通过 JSON-RPC 调用 validate、publish、activate", as
 });
 
 test("execute rollback 只调用 rollback_customer_config", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-release-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-release-"),
+  );
   const manifest = writeRuntimeManifest(root);
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
   writeReleaseEvidence(path.join(root, evidenceDir));
@@ -759,7 +856,10 @@ test("execute rollback 只调用 rollback_customer_config", async () => {
       calls.map((call) => call.method),
       ["rollback_customer_config", "get_effective_session"],
     );
-    assert.equal(calls[0].params.target_revision, "yoyoosun-customer-package-v7.runtime-manifest-v1");
+    assert.equal(
+      calls[0].params.target_revision,
+      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    );
     assert.equal(calls[0].auth, "Bearer test-token");
     assert.equal(report.backendEndpointAlias, "http://127.0.0.1:8300");
     assert.equal(report.effectiveSessionVerification.status, "verified");
@@ -780,7 +880,9 @@ test("execute rollback 只调用 rollback_customer_config", async () => {
 });
 
 test("execute activate-only 只调用 activate_customer_config", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-release-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-release-"),
+  );
   const manifest = writeRuntimeManifest(root);
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
   writeReleaseEvidence(path.join(root, evidenceDir));
@@ -844,7 +946,10 @@ test("execute activate-only 只调用 activate_customer_config", async () => {
       calls.map((call) => call.method),
       ["activate_customer_config", "get_effective_session"],
     );
-    assert.equal(calls[0].params.revision, "yoyoosun-customer-package-v7.runtime-manifest-v1");
+    assert.equal(
+      calls[0].params.revision,
+      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    );
     assert.equal(report.backendEndpointAlias, "http://127.0.0.1:8300");
     assert.equal(report.effectiveSessionVerification.status, "verified");
   } finally {

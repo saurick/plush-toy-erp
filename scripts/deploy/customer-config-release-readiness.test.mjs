@@ -17,12 +17,18 @@ import {
 } from "./customer-config-release-readiness.mjs";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
-const readinessCli = path.join(testDir, "customer-config-release-readiness.mjs");
+const readinessCli = path.join(
+  testDir,
+  "customer-config-release-readiness.mjs",
+);
 
 test("input template 只输出 readiness 前置清单且不读取证据", () => {
   const template = buildInputTemplate();
 
-  assert.equal(template.scope, "customer-config-release-readiness-input-template");
+  assert.equal(
+    template.scope,
+    "customer-config-release-readiness-input-template",
+  );
   assert.equal(template.writesDatabase, false);
   assert.equal(template.callsBackend, false);
   assert.equal(template.readsManifest, false);
@@ -30,26 +36,50 @@ test("input template 只输出 readiness 前置清单且不读取证据", () => 
   assert.equal(template.readsReleaseReport, false);
   assert.equal(template.validatesReleaseEvidence, false);
   assert.deepEqual(template.secretInputs, []);
-  assert.match(template.commands.join("\n"), /--require-executed --require-activated/);
-  assert.match(template.commands.join("\n"), /--require-executed --require-rollback/);
+  assert.match(
+    template.commands.join("\n"),
+    /--require-executed --require-activated/,
+  );
+  assert.match(
+    template.commands.join("\n"),
+    /--require-executed --require-rollback/,
+  );
   assert.match(template.commands.join("\n"), /--readback-preflight-report/);
-  assert(template.requiredReadbackEvidence.includes("release report effectiveSessionVerification.method=get_effective_session"));
-  assert(template.requiredReadbackEvidence.includes("target smoke check name=customer-config-effective-session"));
+  assert(
+    template.requiredReadbackEvidence.includes(
+      "release report effectiveSessionVerification.method=get_effective_session",
+    ),
+  );
+  assert(
+    template.requiredReadbackEvidence.includes(
+      "target smoke check name=customer-config-effective-session",
+    ),
+  );
   assert.match(template.boundary, /does not read manifest/);
   assert.match(template.boundary, /does not .*call customer_config/);
   assert.match(template.boundary, /does not .*prove active revision readback/);
 });
 
 test("CLI input template 不要求 manifest 或 evidence-dir", () => {
-  const result = spawnSync(process.execPath, [readinessCli, "--print-input-template"], {
-    encoding: "utf8",
-  });
+  const result = spawnSync(
+    process.execPath,
+    [readinessCli, "--print-input-template"],
+    {
+      encoding: "utf8",
+    },
+  );
   assert.equal(result.status, 0);
   const template = JSON.parse(result.stdout);
-  assert.equal(template.scope, "customer-config-release-readiness-input-template");
+  assert.equal(
+    template.scope,
+    "customer-config-release-readiness-input-template",
+  );
   assert.equal(template.callsBackend, false);
   assert.equal(template.readsReleaseEvidence, false);
-  assert.match(template.commands.join("\n"), /customer-config-release-readiness\.mjs/);
+  assert.match(
+    template.commands.join("\n"),
+    /customer-config-release-readiness\.mjs/,
+  );
   assert.match(template.boundary, /effectiveSessionVerification/);
 });
 
@@ -120,6 +150,10 @@ function writeReleaseEvidence(dir) {
 [production-preflight] ok: 生产 secret、镜像 tag、debug、后端端口和 PostgreSQL / Jaeger 暴露边界通过
 [production-preflight] ok: Compose、低配部署边界和 migration 脚本通过
 [production-preflight] ok: docker compose config -q 通过
+[production-preflight] ok: Compose 运行服务存在
+[production-preflight] ok: 运行态 ERP_PDF_WARMUP=async
+[production-preflight] ok: 运行态 Chromium / chromium-common 版本与 Docker exact pin 一致: 150.0.7871.100-1~deb12u1
+[production-preflight] ok: healthz / readyz 通过
 [production-preflight] all checks passed
 `,
   );
@@ -169,7 +203,8 @@ webImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
         },
         backup: {
           databaseBackupSize: 123456,
-          databaseBackupHash: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          databaseBackupHash:
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
           storageLocationAlias: "controlled-backup-store",
           migrationVersion: "20260601000000",
         },
@@ -205,9 +240,18 @@ webImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     ),
   );
   fs.mkdirSync(path.join(dir, "artifacts"), { recursive: true });
-  fs.writeFileSync(path.join(dir, "artifacts/backup-evidence.md"), "backupId=backup-20260628\n");
-  fs.writeFileSync(path.join(dir, "artifacts/migration-status-before-apply.txt"), "Current Version: 20260601000000\nPending Files: 1\n");
-  fs.writeFileSync(path.join(dir, "artifacts/migration-status.txt"), "Current Version: 20260628123354\nPending Files: 0\n");
+  fs.writeFileSync(
+    path.join(dir, "artifacts/backup-evidence.md"),
+    "backupId=backup-20260628\n",
+  );
+  fs.writeFileSync(
+    path.join(dir, "artifacts/migration-status-before-apply.txt"),
+    "Current Version: 20260601000000\nPending Files: 1\n",
+  );
+  fs.writeFileSync(
+    path.join(dir, "artifacts/migration-status.txt"),
+    "Current Version: 20260628123354\nPending Files: 0\n",
+  );
   fs.writeFileSync(
     path.join(dir, "artifacts/command-summary.txt"),
     `backupId=backup-20260628
@@ -233,16 +277,43 @@ Pending Files: 0
         releaseVersion: "20260628T2300-config-readiness",
         endpointAlias: "https://erp.example.invalid",
         backendEndpointAlias: "https://erp.example.invalid",
-        summary: { total: 4, passed: 4, failed: 0 },
+        summary: { total: 5, passed: 5, failed: 0 },
         checks: [
-          { name: "server-healthz", status: "pass", target: "https://erp.example.invalid/healthz", httpCode: "200" },
-          { name: "server-readyz", status: "pass", target: "https://erp.example.invalid/readyz", httpCode: "200" },
-          { name: "web-healthz", status: "pass", target: "https://erp.example.invalid/", httpCode: "200" },
+          {
+            name: "server-healthz",
+            status: "pass",
+            target: "https://erp.example.invalid/healthz",
+            httpCode: "200",
+          },
+          {
+            name: "server-readyz",
+            status: "pass",
+            target: "https://erp.example.invalid/readyz",
+            httpCode: "200",
+          },
+          {
+            name: "web-healthz",
+            status: "pass",
+            target: "https://erp.example.invalid/",
+            httpCode: "200",
+          },
+          {
+            name: "template-pdf-render",
+            status: "pass",
+            target: "/templates/render-pdf",
+            httpCode: "200",
+            contentType: "application/pdf",
+            sha256:
+              "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            sizeBytes: 1024,
+            responseBodyStored: false,
+          },
           {
             name: "customer-config-effective-session",
             status: "pass",
             target: "jsonrpc:customer_config.get_effective_session",
-            expectedRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+            expectedRevision:
+              "yoyoosun-customer-package-v7.runtime-manifest-v1",
             tokenSourceEnv: "CUSTOMER_CONFIG_ADMIN_TOKEN",
             responseBodyStored: false,
           },
@@ -290,17 +361,23 @@ Pending Files: 0
         ],
         postCheck: {
           smokeStatus: "passed",
-          smokeReport: "deployments/yoyoosun/evidence/releases/2026-06-28/smoke-test-report.json",
-          smokeCheckCount: 4,
+          smokeReport:
+            "deployments/yoyoosun/evidence/releases/2026-06-28/smoke-test-report.json",
+          smokeCheckCount: 5,
           evidenceReviewStatus: "passed",
           customerConfigEffectiveSession: {
             status: "verified",
-            expectedRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+            expectedRevision:
+              "yoyoosun-customer-package-v7.runtime-manifest-v1",
             target: "jsonrpc:customer_config.get_effective_session",
           },
         },
         summary: { rehearsalCompleted: true, rollbackPathStatus: "passed" },
-        redaction: { containsSecrets: false, containsRawCustomerRows: false, containsFullDsn: false },
+        redaction: {
+          containsSecrets: false,
+          containsRawCustomerRows: false,
+          containsFullDsn: false,
+        },
       },
       null,
       2,
@@ -330,7 +407,9 @@ function buildReleaseReport({ root, manifest, evidenceDir, overrides = {} }) {
   const executed = overrides.executed ?? false;
   const activate = overrides.activate ?? false;
   const rollback = overrides.rollback ?? false;
-  const manifestPayload = JSON.parse(fs.readFileSync(path.join(root, manifest), "utf8"));
+  const manifestPayload = JSON.parse(
+    fs.readFileSync(path.join(root, manifest), "utf8"),
+  );
   const defaultEffectiveSessionVerification =
     activate || rollback
       ? {
@@ -343,7 +422,9 @@ function buildReleaseReport({ root, manifest, evidenceDir, overrides = {} }) {
           pageCount: manifestPayload.compiled_snapshot.pages.length,
           actionCount: 1,
           workPoolCount: 1,
-          fieldPolicySurfaceCount: Object.keys(manifestPayload.compiled_snapshot.fieldPolicies).length,
+          fieldPolicySurfaceCount: Object.keys(
+            manifestPayload.compiled_snapshot.fieldPolicies,
+          ).length,
           pagesSubsetOfManifest: true,
           fieldPolicySurfacesMatchManifest: true,
         }
@@ -407,7 +488,9 @@ async function writeReleaseReport(root, report) {
 }
 
 async function setupReadyRoot() {
-  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-readiness-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-readiness-"),
+  );
   const manifest = writeRuntimeManifest(root);
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
   writeReleaseEvidence(path.join(root, evidenceDir));
@@ -465,20 +548,22 @@ test("parseCliArgs 支持 readback preflight report", () => {
   assert.equal(options.manifest, "manifest.json");
   assert.equal(options.evidenceDir, "evidence");
   assert.equal(options.releaseReport, "release-report.json");
-  assert.equal(options.readbackPreflightReport, "output/readback-preflight.json");
+  assert.equal(
+    options.readbackPreflightReport,
+    "output/readback-preflight.json",
+  );
 });
 
 test("readback preflight report summarizes missing evidence without backend calls", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-readback-missing-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-readback-missing-"),
+  );
   try {
-    const reportPath = "output/customers/yoyoosun/customer-config-readback-preflight.json";
+    const reportPath =
+      "output/customers/yoyoosun/customer-config-readback-preflight.json";
     const result = spawnSync(
       process.execPath,
-      [
-        readinessCli,
-        "--readback-preflight-report",
-        reportPath,
-      ],
+      [readinessCli, "--readback-preflight-report", reportPath],
       {
         cwd: root,
         encoding: "utf8",
@@ -486,8 +571,13 @@ test("readback preflight report summarizes missing evidence without backend call
     );
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
     assert.match(result.stdout, /readback preflight report/);
-    const report = JSON.parse(fs.readFileSync(path.join(root, reportPath), "utf8"));
-    assert.equal(report.scope, "customer-config-active-readback-preflight-report");
+    const report = JSON.parse(
+      fs.readFileSync(path.join(root, reportPath), "utf8"),
+    );
+    assert.equal(
+      report.scope,
+      "customer-config-active-readback-preflight-report",
+    );
     assert.equal(report.writesDatabase, false);
     assert.equal(report.writesReleaseEvidence, false);
     assert.equal(report.callsBackend, false);
@@ -500,7 +590,10 @@ test("readback preflight report summarizes missing evidence without backend call
     assert.match(report.blockers.join("\n"), /missing-release-report-option/);
     assert.match(report.blockers.join("\n"), /missing-evidence-dir-option/);
     assert.match(report.blockers.join("\n"), /missing-smoke-report-option/);
-    assert.doesNotMatch(JSON.stringify(report), /Bearer|access_token|CUSTOMER_CONFIG_ADMIN_TOKEN=.*[^']/);
+    assert.doesNotMatch(
+      JSON.stringify(report),
+      /Bearer|access_token|CUSTOMER_CONFIG_ADMIN_TOKEN=.*[^']/,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -525,17 +618,32 @@ test("readback preflight report accepts existing release and target smoke eviden
       },
       { repoRoot: root },
     );
-    assert.equal(report.scope, "customer-config-active-readback-preflight-report");
+    assert.equal(
+      report.scope,
+      "customer-config-active-readback-preflight-report",
+    );
     assert.equal(report.readyForReadinessGate, true);
     assert.deepEqual(report.blockers, []);
-    assert.equal(report.manifest.revision, "yoyoosun-customer-package-v7.runtime-manifest-v1");
-    assert.equal(report.releaseReport.effectiveSessionVerification.status, "verified");
+    assert.equal(
+      report.manifest.revision,
+      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    );
+    assert.equal(
+      report.releaseReport.effectiveSessionVerification.status,
+      "verified",
+    );
     assert.equal(
       report.targetSmoke.customerConfigEffectiveSession.target,
       "jsonrpc:customer_config.get_effective_session",
     );
-    assert.equal(report.targetSmoke.customerConfigEffectiveSession.responseBodyStored, false);
-    assert.equal(report.targetSmoke.customerConfigEffectiveSession.responseBodyNotStored, true);
+    assert.equal(
+      report.targetSmoke.customerConfigEffectiveSession.responseBodyStored,
+      false,
+    );
+    assert.equal(
+      report.targetSmoke.customerConfigEffectiveSession.responseBodyNotStored,
+      true,
+    );
     assert.equal(report.tokenEnv.expectedName, "CUSTOMER_CONFIG_ADMIN_TOKEN");
     assert.equal(report.storesResponseBody, false);
   } finally {
@@ -576,10 +684,24 @@ test("readback preflight report redacts credentialed backend aliases", async () 
     const serialized = JSON.stringify(report);
 
     assert.equal(report.readyForReadinessGate, false);
-    assert(report.blockers.includes("release-report-backend-endpoint-alias-contains-credentials"));
-    assert(report.blockers.includes("smoke-report-backend-endpoint-alias-contains-credentials"));
-    assert.equal(report.releaseReport.backendEndpointAlias, "https://erp.example.invalid/api");
-    assert.equal(report.targetSmoke.backendEndpointAlias, "https://erp.example.invalid/api");
+    assert(
+      report.blockers.includes(
+        "release-report-backend-endpoint-alias-contains-credentials",
+      ),
+    );
+    assert(
+      report.blockers.includes(
+        "smoke-report-backend-endpoint-alias-contains-credentials",
+      ),
+    );
+    assert.equal(
+      report.releaseReport.backendEndpointAlias,
+      "https://erp.example.invalid/api",
+    );
+    assert.equal(
+      report.targetSmoke.backendEndpointAlias,
+      "https://erp.example.invalid/api",
+    );
     assert(!serialized.includes("deploy:secret"));
     assert(!serialized.includes("smoke:secret"));
     assert(!serialized.includes("token=hidden"));
@@ -630,7 +752,11 @@ test("readback preflight report blocks customer mismatches across report and smo
 
     assert.equal(report.readyForReadinessGate, false);
     assert(report.blockers.includes("release-report-customer-mismatch"));
-    assert(report.blockers.includes("effective-session-verification-customer-mismatch"));
+    assert(
+      report.blockers.includes(
+        "effective-session-verification-customer-mismatch",
+      ),
+    );
     assert(report.blockers.includes("smoke-report-customer-mismatch"));
     assert.equal(report.releaseReport.customerKey, "other-customer");
     assert.equal(
@@ -651,7 +777,10 @@ test("接受发布前 readiness：manifest + manifest evidence + release evidenc
       { repoRoot: root },
     );
     assert.equal(result.customer, "yoyoosun");
-    assert.equal(result.revision, "yoyoosun-customer-package-v7.runtime-manifest-v1");
+    assert.equal(
+      result.revision,
+      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    );
     assert.equal(result.manifest, manifest);
     assert.equal(path.isAbsolute(result.manifest), false);
     assert.match(result.manifestSha256, /^sha256:[a-f0-9]{64}$/);
@@ -684,10 +813,17 @@ test("CLI 输出 JSON 和文本范围声明", async () => {
       ],
       { cwd: root, encoding: "utf8" },
     );
-    assert.equal(jsonResult.status, 0, `${jsonResult.stdout}\n${jsonResult.stderr}`);
+    assert.equal(
+      jsonResult.status,
+      0,
+      `${jsonResult.stdout}\n${jsonResult.stderr}`,
+    );
     const parsed = JSON.parse(jsonResult.stdout);
     assert.equal(parsed.scope.evidenceOnly, true);
-    assert.match(parsed.scope.readyMeaning, /requested executor evidence passed/);
+    assert.match(
+      parsed.scope.readyMeaning,
+      /requested executor evidence passed/,
+    );
     assert.ok(
       parsed.scope.notProvenByThisGate.includes(
         "business data import, Workflow fact posting, inventory, shipment, finance, or quality facts were written",
@@ -699,7 +835,11 @@ test("CLI 输出 JSON 和文本范围声明", async () => {
       [readinessCli, "--manifest", manifest, "--evidence-dir", evidenceDir],
       { cwd: root, encoding: "utf8" },
     );
-    assert.equal(textResult.status, 0, `${textResult.stdout}\n${textResult.stderr}`);
+    assert.equal(
+      textResult.status,
+      0,
+      `${textResult.stdout}\n${textResult.stderr}`,
+    );
     assert.match(textResult.stdout, /ready means: runtime manifest/);
     assert.match(textResult.stdout, /not proven by this gate:/);
     assert.match(textResult.stdout, /target migration, backup restore, smoke/);
@@ -711,7 +851,9 @@ test("CLI 输出 JSON 和文本范围声明", async () => {
 test("CLI JSON 失败时输出 release evidence closeout next actions", async () => {
   const { root, manifest, evidenceDir } = await setupReadyRoot();
   try {
-    fs.unlinkSync(path.join(root, evidenceDir, "production-preflight-report.txt"));
+    fs.unlinkSync(
+      path.join(root, evidenceDir, "production-preflight-report.txt"),
+    );
     const result = spawnSync(
       process.execPath,
       [
@@ -731,12 +873,19 @@ test("CLI JSON 失败时输出 release evidence closeout next actions", async ()
     assert.match(parsed.error, /customer config activation gate failed/);
     assert.equal(parsed.releaseEvidenceStatus.status, "incomplete");
     assert.equal(parsed.releaseEvidenceStatus.closeoutSummary.ready, false);
-    const productionPreflight = parsed.releaseEvidenceStatus.closeoutNextActions.find(
-      (item) => item.id === "production-preflight",
-    );
+    const productionPreflight =
+      parsed.releaseEvidenceStatus.closeoutNextActions.find(
+        (item) => item.id === "production-preflight",
+      );
     assert.ok(productionPreflight);
-    assert.match(productionPreflight.commands.join("\n"), /production-preflight\.sh/);
-    assert.match(productionPreflight.manualChecks.join("\n"), /real runtime \.env/);
+    assert.match(
+      productionPreflight.commands.join("\n"),
+      /production-preflight\.sh/,
+    );
+    assert.match(
+      productionPreflight.manualChecks.join("\n"),
+      /real runtime \.env/,
+    );
     assert.equal(parsed.scope.evidenceOnly, true);
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -914,9 +1063,7 @@ test("require-activated 要求 activate active 结果", async () => {
         overrides: {
           executed: true,
           activate: true,
-          operations: [
-            { key: "activate", method: "activate_customer_config" },
-          ],
+          operations: [{ key: "activate", method: "activate_customer_config" }],
           results: [
             {
               key: "activate",
@@ -959,9 +1106,7 @@ test("require-activated 要求 effective session 验证", async () => {
         overrides: {
           executed: true,
           activate: true,
-          operations: [
-            { key: "activate", method: "activate_customer_config" },
-          ],
+          operations: [{ key: "activate", method: "activate_customer_config" }],
           results: [
             {
               key: "activate",
@@ -998,14 +1143,29 @@ test("require-activated 要求目标 smoke 读回 effective session", async () =
   try {
     const smokePath = path.join(root, evidenceDir, "smoke-test-report.json");
     const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
-    smoke.checks = smoke.checks.filter((check) => check.name !== "customer-config-effective-session");
-    smoke.summary = { total: smoke.checks.length, passed: smoke.checks.length, failed: 0 };
+    smoke.checks = smoke.checks.filter(
+      (check) => check.name !== "customer-config-effective-session",
+    );
+    smoke.summary = {
+      total: smoke.checks.length,
+      passed: smoke.checks.length,
+      failed: 0,
+    };
     fs.writeFileSync(smokePath, `${JSON.stringify(smoke, null, 2)}\n`);
-    const rollbackReportPath = path.join(root, evidenceDir, "rollback-rehearsal-report.json");
-    const rollbackReport = JSON.parse(fs.readFileSync(rollbackReportPath, "utf8"));
+    const rollbackReportPath = path.join(
+      root,
+      evidenceDir,
+      "rollback-rehearsal-report.json",
+    );
+    const rollbackReport = JSON.parse(
+      fs.readFileSync(rollbackReportPath, "utf8"),
+    );
     rollbackReport.postCheck.smokeCheckCount = smoke.checks.length;
     delete rollbackReport.postCheck.customerConfigEffectiveSession;
-    fs.writeFileSync(rollbackReportPath, `${JSON.stringify(rollbackReport, null, 2)}\n`);
+    fs.writeFileSync(
+      rollbackReportPath,
+      `${JSON.stringify(rollbackReport, null, 2)}\n`,
+    );
     const reportPath = await writeReleaseReport(
       root,
       buildReleaseReport({
@@ -1015,9 +1175,7 @@ test("require-activated 要求目标 smoke 读回 effective session", async () =
         overrides: {
           executed: true,
           activate: true,
-          operations: [
-            { key: "activate", method: "activate_customer_config" },
-          ],
+          operations: [{ key: "activate", method: "activate_customer_config" }],
           results: [
             {
               key: "activate",
@@ -1053,13 +1211,25 @@ test("require-activated 拒绝目标 smoke revision 不匹配", async () => {
   try {
     const smokePath = path.join(root, evidenceDir, "smoke-test-report.json");
     const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
-    const smokeCheck = smoke.checks.find((check) => check.name === "customer-config-effective-session");
+    const smokeCheck = smoke.checks.find(
+      (check) => check.name === "customer-config-effective-session",
+    );
     smokeCheck.expectedRevision = "wrong-revision";
     fs.writeFileSync(smokePath, `${JSON.stringify(smoke, null, 2)}\n`);
-    const rollbackReportPath = path.join(root, evidenceDir, "rollback-rehearsal-report.json");
-    const rollbackReport = JSON.parse(fs.readFileSync(rollbackReportPath, "utf8"));
-    rollbackReport.postCheck.customerConfigEffectiveSession.expectedRevision = "wrong-revision";
-    fs.writeFileSync(rollbackReportPath, `${JSON.stringify(rollbackReport, null, 2)}\n`);
+    const rollbackReportPath = path.join(
+      root,
+      evidenceDir,
+      "rollback-rehearsal-report.json",
+    );
+    const rollbackReport = JSON.parse(
+      fs.readFileSync(rollbackReportPath, "utf8"),
+    );
+    rollbackReport.postCheck.customerConfigEffectiveSession.expectedRevision =
+      "wrong-revision";
+    fs.writeFileSync(
+      rollbackReportPath,
+      `${JSON.stringify(rollbackReport, null, 2)}\n`,
+    );
     const reportPath = await writeReleaseReport(
       root,
       buildReleaseReport({
@@ -1069,9 +1239,7 @@ test("require-activated 拒绝目标 smoke revision 不匹配", async () => {
         overrides: {
           executed: true,
           activate: true,
-          operations: [
-            { key: "activate", method: "activate_customer_config" },
-          ],
+          operations: [{ key: "activate", method: "activate_customer_config" }],
           results: [
             {
               key: "activate",
@@ -1115,9 +1283,7 @@ test("require-activated 拒绝执行报告与目标 smoke backend 不一致", as
           executed: true,
           activate: true,
           backendEndpointAlias: "https://local-dev.example.invalid",
-          operations: [
-            { key: "activate", method: "activate_customer_config" },
-          ],
+          operations: [{ key: "activate", method: "activate_customer_config" }],
           results: [
             {
               key: "activate",
@@ -1164,9 +1330,7 @@ test("require-activated 拒绝带账号密码的目标 smoke backend alias", asy
         overrides: {
           executed: true,
           activate: true,
-          operations: [
-            { key: "activate", method: "activate_customer_config" },
-          ],
+          operations: [{ key: "activate", method: "activate_customer_config" }],
           results: [
             {
               key: "activate",
@@ -1267,9 +1431,7 @@ test("require-rollback 要求 rollback active 结果", async () => {
         overrides: {
           executed: true,
           rollback: true,
-          operations: [
-            { key: "rollback", method: "rollback_customer_config" },
-          ],
+          operations: [{ key: "rollback", method: "rollback_customer_config" }],
           results: [
             {
               key: "rollback",
@@ -1312,9 +1474,7 @@ test("require-rollback 拒绝 effective session revision 不匹配", async () =>
         overrides: {
           executed: true,
           rollback: true,
-          operations: [
-            { key: "rollback", method: "rollback_customer_config" },
-          ],
+          operations: [{ key: "rollback", method: "rollback_customer_config" }],
           results: [
             {
               key: "rollback",
@@ -1368,9 +1528,7 @@ test("接受已回滚报告", async () => {
         overrides: {
           executed: true,
           rollback: true,
-          operations: [
-            { key: "rollback", method: "rollback_customer_config" },
-          ],
+          operations: [{ key: "rollback", method: "rollback_customer_config" }],
           results: [
             {
               key: "rollback",

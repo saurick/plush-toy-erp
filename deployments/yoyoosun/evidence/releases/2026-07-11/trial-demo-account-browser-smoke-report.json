@@ -1,0 +1,162 @@
+{
+  "scope": "trial-demo-account-browser-smoke-report",
+  "generatedAt": "2026-07-11T05:39:26.417Z",
+  "writesDatabase": false,
+  "callsJSONRPC": true,
+  "startsBrowser": true,
+  "startsDevServer": false,
+  "managedDevServer": false,
+  "readsCustomerConfigScript": true,
+  "readsEffectiveSessionDiagnostic": false,
+  "storesPasswordValue": false,
+  "storesAccessToken": false,
+  "storesAuthorizationHeader": false,
+  "storesRawCustomerPackage": false,
+  "storesActionList": false,
+  "baseURL": "http://192.168.0.133:5175",
+  "backendHealthURL": "http://192.168.0.133:5175/server-healthz",
+  "desktopAccounts": [
+    {
+      "username": "demo_boss",
+      "expectedMenuCount": 4,
+      "forbiddenMenuCount": 25,
+      "verified": true
+    },
+    {
+      "username": "demo_sales",
+      "expectedMenuCount": 4,
+      "forbiddenMenuCount": 25,
+      "verified": true
+    },
+    {
+      "username": "demo_purchase",
+      "expectedMenuCount": 5,
+      "forbiddenMenuCount": 25,
+      "verified": true
+    },
+    {
+      "username": "demo_production",
+      "expectedMenuCount": 4,
+      "forbiddenMenuCount": 25,
+      "verified": true
+    },
+    {
+      "username": "demo_warehouse",
+      "expectedMenuCount": 5,
+      "forbiddenMenuCount": 25,
+      "verified": true
+    },
+    {
+      "username": "demo_quality",
+      "expectedMenuCount": 3,
+      "forbiddenMenuCount": 25,
+      "verified": true
+    },
+    {
+      "username": "demo_finance",
+      "expectedMenuCount": 7,
+      "forbiddenMenuCount": 25,
+      "verified": true
+    },
+    {
+      "username": "demo_pmc",
+      "expectedMenuCount": 4,
+      "forbiddenMenuCount": 25,
+      "verified": true
+    },
+    {
+      "username": "demo_engineering",
+      "expectedMenuCount": 6,
+      "forbiddenMenuCount": 25,
+      "verified": true
+    },
+    {
+      "username": "demo_admin",
+      "expectedMenuCount": 1,
+      "forbiddenMenuCount": 33,
+      "verified": true
+    }
+  ],
+  "mobileAccounts": [
+    {
+      "username": "demo_boss",
+      "role": "老板",
+      "mobileTaskEntry": "老板岗位任务端",
+      "verified": true
+    },
+    {
+      "username": "demo_sales",
+      "role": "业务",
+      "mobileTaskEntry": "业务岗位任务端",
+      "verified": true
+    },
+    {
+      "username": "demo_purchase",
+      "role": "采购",
+      "mobileTaskEntry": "采购岗位任务端",
+      "verified": true
+    },
+    {
+      "username": "demo_production",
+      "role": "生产经理",
+      "mobileTaskEntry": "生产经理岗位任务端",
+      "verified": true
+    },
+    {
+      "username": "demo_warehouse",
+      "role": "仓库",
+      "mobileTaskEntry": "仓库岗位任务端",
+      "verified": true
+    },
+    {
+      "username": "demo_quality",
+      "role": "品质",
+      "mobileTaskEntry": "品质岗位任务端",
+      "verified": true
+    },
+    {
+      "username": "demo_finance",
+      "role": "财务",
+      "mobileTaskEntry": "财务岗位任务端",
+      "verified": true
+    },
+    {
+      "username": "demo_pmc",
+      "role": "PMC",
+      "mobileTaskEntry": "PMC岗位任务端",
+      "verified": true
+    },
+    {
+      "username": "demo_engineering",
+      "role": "工程",
+      "mobileTaskEntry": "工程岗位任务端",
+      "verified": true
+    }
+  ],
+  "mobileDeniedAccount": {
+    "username": "demo_admin",
+    "role": "业务",
+    "mobileTaskEntry": "业务岗位任务端",
+    "expectedDenied": true,
+    "verified": true,
+    "expectedMessage": "该账号暂无当前入口权限，请联系管理员。"
+  },
+  "desktopEffectiveSessionDiagnostics": [],
+  "summary": {
+    "desktopPassedCount": 10,
+    "mobilePassedCount": 9,
+    "mobileDeniedPassed": true,
+    "diagnosticAccountCount": 0,
+    "diagnosticBlockerCount": 0,
+    "diagnosticSources": [],
+    "projectionModes": []
+  },
+  "boundaries": {
+    "realCustomerImport": false,
+    "customerConfigPublish": false,
+    "customerConfigActivate": false,
+    "releaseEvidence": false,
+    "productionDeploy": false,
+    "provesTargetEnvironment": false
+  }
+}
