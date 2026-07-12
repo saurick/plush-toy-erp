@@ -42,15 +42,16 @@
 - 当前只收口上述真实缺口；不得回退其它已完成任务，也不把旧审查中的过期 / 超范围建议重新扩成产品功能。
 - 发布目标是内网测试机 `192.168.0.133`；低配目标只加载本地 fixed revision 构建产物、执行 migration、Compose 重启和部署后回归。
 
-## 2026-07-12 AGENTS 与自定义 Skills 治理
+## 2026-07-12 AGENTS 体积自动门禁
 
-完成：项目 skills 从 12 个收敛为 8 个，新增 `$plush-operations-governance` 统一运行诊断、可观测/错误、安全隐私、发布和回滚；删除项目 prompt 和被替代 skills，缩短 discovery description。项目 AGENTS 从 482 行 / 51,377 字节压缩为 148 行 / 10,143 字节，只保留 plush 真源、Product Core/客户差异、Workflow/Fact、事实表、生命周期、测试、模拟数据、文档和部署特例；同步根 README 与 skills 导航。全局 `$prompt-governance` 改为仅显式触发。
+完成：将上一轮 Skills/AGENTS 治理记录归档到 `docs/archive/progress-2026-07-12-before-agents-size-gate.md`，为全局和项目 AGENTS 增加 16 KiB 预警、超过 24 KiB 阻断和固定治理优先级；新增 `scripts/qa/agents-size.sh` 并接入 fast QA，检查只报告/阻断，不自动改写。
 
-下一步：通过真实任务观察触发准确性；项目特例优先写正式 docs 或专项 skill，只有每轮都必须自动生效的长期规则才进入根 AGENTS。
+下一步：新增长期规则前先判断属于 AGENTS、正式 docs、Skill 还是自动化门禁；达到预警线先治理再扩写。
 
-阻塞/风险：本轮不改变 runtime、schema、migration、业务事实、部署配置或客户数据；提交只包含治理文件，不吸收主工作区其他会话改动。
+阻塞/风险：本轮不改 runtime、schema、业务事实、部署配置或客户数据；大小门禁不能替代语义审查，提交不吸收主工作区其他会话改动。
 
 ## 归档索引
 
 - `docs/archive/progress-2026-06-28-before-runtime-manifest.md` 至 `docs/archive/progress-2026-07-08-before-runtime-lazy-import-retry.md`：历史过程记录索引见各归档、`docs/archive/README.md` 和 Git 历史。
 - `docs/archive/progress-2026-07-11-before-manual-regression-deploy.md`：本轮全场景手工回归数据、提交推送和 133 部署收口前的历史流水。
+- `docs/archive/progress-2026-07-12-before-agents-size-gate.md`：自定义 Skills 与项目 AGENTS 首轮治理过程记录。

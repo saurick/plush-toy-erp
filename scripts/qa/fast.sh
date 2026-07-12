@@ -10,6 +10,7 @@ print_help() {
   执行开发期高频快速检查
 
 检查内容:
+  agents-size: AGENTS.md 体积预警与阻断
   error-code-sync: 前端生成错误码同步检查
   error-codes: 统一错误码魔法数字检查
   affected-planner: 按改动影响面选择测试的映射、保守升级和 full 兜底测试
@@ -84,6 +85,8 @@ fi
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
+
+bash "$ROOT_DIR/scripts/qa/agents-size.sh"
 
 if ! command -v node >/dev/null 2>&1; then
   echo "[qa:fast] 未找到 node，请先安装 Node.js"

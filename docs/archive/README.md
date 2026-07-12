@@ -44,3 +44,4 @@
 | `docs/archive/progress-2026-07-03-before-p5-candidate-recovery.md` | P5 goal 恢复候选边界收口前的 `progress.md` 过程记录归档 |
 | `docs/archive/progress-2026-07-08-before-runtime-lazy-import-retry.md` | 路由动态模块加载恢复修复前的 `progress.md` 过程记录归档 |
 | `docs/archive/progress-2026-07-11-before-manual-regression-deploy.md` | 全场景手工回归数据、提交推送和 133 部署收口前的 `progress.md` 过程记录归档 |
+| `docs/archive/progress-2026-07-12-before-agents-size-gate.md` | AGENTS 体积自动门禁前的 Skills 与项目规则治理过程归档 |

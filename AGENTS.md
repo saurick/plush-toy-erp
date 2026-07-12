@@ -2,6 +2,11 @@
 
 本文件只记录 plush-toy-erp 的长期项目特例。通用工程、Git、删除、浏览器和文档规则使用全局 AGENTS；当前能力与业务事实必须回到正式 docs、代码、migration 和测试核对。
 
+## AGENTS 体积治理
+
+- 本仓库所有 `AGENTS.md` 目标小于 16 KiB；达到 16 KiB 先去重，超过 24 KiB 必须按全局治理顺序精简，`bash scripts/qa/agents-size.sh` 负责预警和阻断。
+- 检查脚本不得自动截断、删除、拆分或重写规则；安全、权限、Workflow/Fact、客户资料和真源边界不得为过门禁被弱化。
+
 ## 阅读顺序与当前真源
 
 新任务按相关性读取：
