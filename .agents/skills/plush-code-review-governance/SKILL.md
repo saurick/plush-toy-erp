@@ -1,6 +1,6 @@
 ---
 name: plush-code-review-governance
-description: 项目代码审查治理（plush-toy-erp）。Use when Codex reviews plush-toy-erp code changes in any conversation, including side chats, new main chats, post-implementation reviews, pre-commit reviews, PR-style reviews, current worktree review, staged/unstaged diff review, commit review, UI/print/layout review, screenshot debugging evidence review, or when the user mentions plush with code review, 审查代码, 查 bug, 独立审查, 缺测试, Workflow / Fact, RBAC, 文档漂移, 字段残值, 字段缺值, 删除/回收站, 页面治理, 截图调试, 反复截图, or 不要改只看.
+description: 项目代码审查治理（plush-toy-erp）。Use when reviewing plush diffs, commits, pull requests, or working-tree changes for correctness, project boundaries, regressions, and missing validation.
 ---
 
 # Plush 代码审查治理 Code Review Governance

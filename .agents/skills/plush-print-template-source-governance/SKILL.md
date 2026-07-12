@@ -1,6 +1,6 @@
 ---
 name: plush-print-template-source-governance
-description: 项目打印模板源文件治理（plush-toy-erp）。Use when Codex implements or reviews plush-toy-erp print templates, print workspaces, customer Excel/PDF/image sources, engineering material detail sheets, color cards, work instructions, purchase/processing contracts, yoyoosun customer print samples, repeated source blocks, source noise, scan artifacts, incidental marks, template source intent, cell layout, image upload behavior, row selection, rich text, PDF/print preview, screenshot debugging, visual evidence, performance/quality risks, or customer-vs-Product-Core print-template boundaries.
+description: 项目打印模板源治理（plush-toy-erp）。Use when turning customer Excel, PDF, image, or screenshot sources into plush print templates or reviewing template editing and output fidelity.
 ---
 
 # Plush Print Template Source Governance

@@ -1,6 +1,6 @@
 ---
 name: plush-test-governance
-description: 项目测试治理（plush-toy-erp）。Use when Codex chooses, runs, reviews, or explains validation scope for plush-toy-erp changes, including validation levels T0-T8, test shapes, evidence environments, unit tests, integration tests, JSON-RPC/RBAC tests, migration checks, browser/page regressions, style:l1, smoke tests, real-write E2E, import dry-runs, release checks, or when the user asks 验证层级/测试形态/测试分类/测试治理/怎么测/要不要补测试.
+description: 项目测试治理（plush-toy-erp）。Use when choosing, running, reviewing, or explaining validation scope, T0-T8 levels, test shapes, browser checks, migrations, or release evidence.
 ---
 
 # Plush Test Governance

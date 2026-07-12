@@ -9,7 +9,7 @@
 | `web/` | Vite + React 前端，包含桌面后台统一入口、登录入口选择和生产单端口 `/m/<role>/tasks` 岗位任务端路径，内部目录职责见 [`web/README.md`](web/README.md) |
 | `server/` | Kratos + Ent + Atlas 后端，当前承载管理员账号、鉴权、错误码、工作流协同、领域 usecase、业务看板 `dashboard_stats`、客户配置版本 `customer_config` JSON-RPC 域、采购订单 `purchase_order` JSON-RPC 域、采购入库 `purchase` JSON-RPC 域、库存台账只读 `inventory` JSON-RPC 域、来料质检 `quality` JSON-RPC 域、业务事实 `operational_fact` JSON-RPC 域、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
 | `scripts/` | 本地环境初始化、质量门禁和 Git hooks |
-| [`.agents/skills/`](.agents/skills/README.md) | Codex 项目专属 skills，维护 plush 文档治理、页面治理、打印模板源文件治理、代码审查、测试治理、提示词治理、发布治理、业务边界、运行诊断、seed/import、可观测错误和安全隐私工作流，并提供“按问题选 Skill”的使用场景速查；作为仓库内 canonical，不依赖个人本机 `~/.codex/skills` 副本 |
+| [`.agents/skills/`](.agents/skills/README.md) | Codex 项目专项 SOP：代码审查、文档、领域边界、页面、打印模板、seed/import、测试和统一 operations；通用提示词与 Git 收口使用全局 skills |
 | `docs/` | 仓库级约定、流程、数据模型、产品化架构、架构评审和部署文档 |
 | `config/` | 行业模板、客户配置包、客户配置 catalog / schema 和私有化复制模板落点；当前已有 yoyoosun 前端品牌 / 桌面菜单展示配置源、部署注入示例、字段 / 编号 / 导入草案和流程结构 preview，默认产品前端包不静态打包具体客户配置；后端只接收受控编译后的客户配置 revision 并生成 effective session，不代表 SaaS tenant，也不改变 Workflow / Fact 真源，内部目录职责见 [`config/README.md`](config/README.md) |
 | `deployments/` | 客户私有化部署实例资料落点；当前唯一部署真源仍在 `server/deploy/compose/prod`，私有化模板不创建第二套部署主路径 |

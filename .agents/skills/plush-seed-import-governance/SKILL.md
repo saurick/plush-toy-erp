@@ -1,6 +1,6 @@
 ---
 name: plush-seed-import-governance
-description: 项目seed、fixture、导入与清理治理（plush-toy-erp）。Use when Codex creates, changes, reviews, or explains plush-toy-erp seed data, fixtures, import scripts, customer data imports, demo data, reversible manual-test data, cleanup scripts, destructive dev resets, source snapshots, or import validation.
+description: 项目数据准备治理（plush-toy-erp）。Use when changing seed, fixture, trial simulation, import dry-run, cleanup, or customer-data boundaries.
 ---
 
 # Plush Seed / 导入治理 Seed Import Governance

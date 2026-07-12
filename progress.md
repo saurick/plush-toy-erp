@@ -42,6 +42,14 @@
 - 当前只收口上述真实缺口；不得回退其它已完成任务，也不把旧审查中的过期 / 超范围建议重新扩成产品功能。
 - 发布目标是内网测试机 `192.168.0.133`；低配目标只加载本地 fixed revision 构建产物、执行 migration、Compose 重启和部署后回归。
 
+## 2026-07-12 AGENTS 与自定义 Skills 治理
+
+完成：项目 skills 从 12 个收敛为 8 个，新增 `$plush-operations-governance` 统一运行诊断、可观测/错误、安全隐私、发布和回滚；删除项目 prompt 和被替代 skills，缩短 discovery description。项目 AGENTS 从 482 行 / 51,377 字节压缩为 148 行 / 10,143 字节，只保留 plush 真源、Product Core/客户差异、Workflow/Fact、事实表、生命周期、测试、模拟数据、文档和部署特例；同步根 README 与 skills 导航。全局 `$prompt-governance` 改为仅显式触发。
+
+下一步：通过真实任务观察触发准确性；项目特例优先写正式 docs 或专项 skill，只有每轮都必须自动生效的长期规则才进入根 AGENTS。
+
+阻塞/风险：本轮不改变 runtime、schema、migration、业务事实、部署配置或客户数据；提交只包含治理文件，不吸收主工作区其他会话改动。
+
 ## 归档索引
 
 - `docs/archive/progress-2026-06-28-before-runtime-manifest.md` 至 `docs/archive/progress-2026-07-08-before-runtime-lazy-import-retry.md`：历史过程记录索引见各归档、`docs/archive/README.md` 和 Git 历史。

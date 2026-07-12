@@ -1,6 +1,6 @@
 ---
 name: plush-page-design-governance
-description: 项目页面设计治理（plush-toy-erp）。Use when Codex designs, reviews, simplifies, or implements plush ERP pages, dashboards, workbenches, task boards, mobile role task pages, print center pages, lists, forms, detail pages, action modals, collaboration entries, page features, feature details, buttons, fields, filters, states, empty/error states, stale/missing field values, accessibility, keyboard/focus behavior, prototypes, prototype sync, Draft/To Implement/Current prototype states, screenshot debugging, visual evidence, or when the user mentions 简洁易用, 心智负担, 信息密度高, 一眼看不懂, 页面好看, 低密度, 严格按原型, 没意义的东西不要做, 功能评估, 功能细节, 按钮字段筛选状态, 字段残值, 字段缺值, 可访问性, 键盘焦点, 原型同步, 截图调试, 反复截图, 有原型, 无原型, or asks whether such page-design guidance should be made into a skill.
+description: 项目页面治理（plush-toy-erp）。Use when designing, reviewing, or changing plush pages, fields, actions, states, layouts, prototypes, accessibility, or browser regression scope.
 ---
 
 # Plush Page Design Governance

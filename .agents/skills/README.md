@@ -1,66 +1,21 @@
 # Codex 项目 Skills / Project Skills
 
-本目录保存 plush-toy-erp 的项目专属 Codex skills，是仓库内 canonical 版本。全局 `~/.codex/skills` 只放通用范式；涉及本项目时优先用这里的 `$plush-*` skills。
+本目录只保存 plush-toy-erp 的专项 SOP。长期规则在 `AGENTS.md`，项目事实在正式 docs、代码、migration 和测试；通用工作流使用 `~/.codex/skills`，不在项目版重复。
 
-## 使用入口 / Usage
-
-| Skill | 主要用途 |
+| Skill | 适用范围 |
 | --- | --- |
-| `$plush-docs-governance` | 文档治理、真源索引、文档清单、可读性、Mermaid、链接和 `progress.md` |
-| `$plush-page-design-governance` | 页面意义、功能细节、信息密度、原型同步、低心智负担和浏览器回归 |
-| `$plush-print-template-source-governance` | 客户 Excel / PDF / 截图源文件意图、重复模板块、打印模板版式和图片 / 行操作交互 |
-| `$plush-code-review-governance` | 独立代码审查、Workflow / Fact、RBAC、字段残值/缺值、删除语义和文档漂移 |
-| `$plush-test-governance` | 验证层级 T0-T8、测试形态、浏览器回归、migration、release checks |
-| `$plush-prompt-governance` | 新会话、side chat、review、实现、测试、部署和提交推送提示词 |
-| `$plush-release-governance` | 发布、部署、版本、migration、rollback、health/ready 和 release evidence |
-| `$plush-domain-boundary-governance` | schema、migration、repo、usecase、JSON-RPC、RBAC、Workflow / Fact 和字段真源 |
-| `$plush-runtime-diagnostics` | 页面报错、JSON-RPC、真实后端、DB/migration drift、浏览器证据和部署差异 |
-| `$plush-seed-import-governance` | seed、fixture、模拟试用数据、import dry-run、cleanup 和真实客户数据边界 |
-| `$plush-observability-error-governance` | request_id、结构化日志、错误码、前端中文错误提示和排障证据 |
-| `$plush-security-privacy-governance` | RBAC、secrets、客户资料、导出、生产 env、日志脱敏和权限边界 |
+| `$plush-code-review-governance` | review diff/commit/worktree；按触达面路由到领域、页面、打印和测试检查 |
+| `$plush-docs-governance` | 当前真源、文档清单、中文文件名、读者路径和 `progress.md` |
+| `$plush-domain-boundary-governance` | Workflow / Fact、Product Core、客户差异、schema/usecase/API/RBAC 和字段真源 |
+| `$plush-page-design-governance` | 页面业务语义、字段/动作/状态、原型和浏览器回归 |
+| `$plush-print-template-source-governance` | 客户 Excel/PDF/图片源、模板意图、字段映射、编辑与 PDF/打印验证 |
+| `$plush-seed-import-governance` | seed、fixture、模拟试用、import dry-run、cleanup 和真实客户数据边界 |
+| `$plush-test-governance` | T0-T8、测试形态、PostgreSQL/migration、browser、release evidence |
+| `$plush-operations-governance` | runtime 诊断、可观测/错误、安全/隐私、发布、迁移和回滚 |
 
-## 按问题选 Skill / Scenario Matrix
+## 选择规则
 
-| 你现在想做什么 | 优先使用 | 它解决什么 | 不负责什么 |
-| --- | --- | --- | --- |
-| 选中主会话一段话，简单问“是什么 / 为什么 / 合理吗 / 怎么办” | 全局 `$selected-context-analysis` | 片段理解、短问短答、上下文边界 | 不把片段当 plush 当前真源 |
-| 提交推送相关 / 所有代码、多会话同时收口、lint/test/hook 反复失败 | 全局 `$git-closeout-coordination` + `$plush-release-governance` | owner 判定、冻结范围、upstream/dirty 状态、hook 改写和 plush 收口证据 | 不替代具体 diff review 或业务测试判断 |
-| 写新主会话、side chat、review、测试、部署或提交推送提示词 | `$plush-prompt-governance` | 把目标、真源、范围、验收和风险写成可执行 prompt | 不替代实际执行或验证 |
-| 页面报错、JSON-RPC 失败、本地 / 线上不一致、migration drift | `$plush-runtime-diagnostics` | 分层排查 browser / API / backend / DB / deploy / config | 不在定位前直接补代码 |
-| 判断测试是否通过、范围是否足够、要不要跑 `style:l1` / E2E / migration | `$plush-test-governance` | 选择验证层级 T0-T8、测试形态和剩余风险 | 不替代代码审查结论 |
-| 实现后看问题是否真的解决、改动是否对、有没有 bug / 缺测试 | `$plush-code-review-governance` | 独立审查 diff、Workflow / Fact、RBAC、字段残值/缺值和文档漂移 | 不以实现总结为主 |
-| 文档不好读、信息密度高、链接/目录/表格/Mermaid/真源漂移 | `$plush-docs-governance` | 文档真源、读者路径、文档清单、可读性和跳转 | 不证明 runtime 行为正确 |
-| 页面太密、功能细节看不懂、按钮/字段/状态意义不清、原型是否同步 | `$plush-page-design-governance` | 页面意义、信息层级、功能细节、交互态和页面回归 | 不直接管后端事实写入 |
-| 甲方给 Excel / PDF / 截图，要求实现或评审打印模板、作业指导书、色卡、物料明细、合同样式 | `$plush-print-template-source-governance` | 先识别模板本体、重复块、样例数据、客户专属内容，再落版式、图片槽、行选择和 PDF / 打印验证 | 不把客户源文件直接提升为 Product Core 规则 |
-| 要新增或调整 schema / migration / repo / usecase / JSON-RPC / RBAC / 字段真源 | `$plush-domain-boundary-governance` | 业务边界、Workflow / Fact、读写真源和实现层级 | 不处理纯视觉或文案排版 |
-| 发布、部署、版本、Atlas migration、health/ready、rollback、旧镜像清理 | `$plush-release-governance` | 发布路径、低配服务器边界、回滚和 release evidence | 不替代 runtime 故障定位 |
-| seed、fixture、模拟试用数据、导入 dry-run、清理、真实客户数据边界 | `$plush-seed-import-governance` | 可逆数据、导入边界、cleanup 和客户资料隔离 | 不把模拟数据写成真实导入 |
-| request_id、错误码、中文错误提示、结构化日志、排障证据 | `$plush-observability-error-governance` | 可观测性、错误分类、用户提示和证据链 | 不替代安全审查 |
-| RBAC、secrets、客户资料、导出权限、生产 env、日志脱敏 | `$plush-security-privacy-governance` | 安全与隐私边界、敏感数据和权限风险 | 不替代普通业务 review |
-
-## 常用组合 / Pairings
-
-| 场景 | 建议同时使用 |
-| --- | --- |
-| 文档改动会影响页面口径、帮助入口或原型 | `$plush-docs-governance` + `$plush-page-design-governance` |
-| 页面改动涉及 schema、JSON-RPC、RBAC、Workflow / Fact 或字段真源 | `$plush-page-design-governance` + `$plush-domain-boundary-governance` |
-| 客户源 Excel / PDF 变成打印模板并涉及页面交互、图片上传或 PDF / 打印输出 | `$plush-print-template-source-governance` + `$plush-page-design-governance` + `$plush-test-governance` |
-| 实现完成后做独立 review 或提交前自查 | `$plush-code-review-governance` + `$plush-test-governance` |
-| 提交推送、hook 重试或多会话互相改工作区 | 全局 `$git-closeout-coordination` + `$plush-release-governance` |
-| 本地 / 线上故障排查后准备发布或回滚 | `$plush-runtime-diagnostics` + `$plush-release-governance` |
-| seed、导入、客户资料、权限或脱敏边界相关 | `$plush-seed-import-governance` + `$plush-security-privacy-governance` |
-
-## 使用规则 / Rules
-
-- 在 Codex 会话里直接写 `$skill-name` 即可触发，例如 `$plush-docs-governance`；一次任务经常跨边界时，可以在同一条消息里同时写多个 skill。
-- 先选最贴近本轮主任务的 skill，再按影响面补相邻 skill：文档 + 页面用 docs/page，页面 + 后端边界用 page/domain，发布故障用 release/runtime，涉及客户资料或权限再加 security。
-- 涉及 plush-toy-erp 时优先使用本目录 `$plush-*` 项目版；只有缺少项目专属能力，或任务明确跨项目通用，才退回 `~/.codex/skills` 的通用版。
-- 本 README 只负责选型和导航；真正执行前必须读对应 skill 的 `SKILL.md`，不要只按 README 摘要执行。
-- 修改 skill 本身时同步检查 `SKILL.md`、`agents/openai.yaml`、触发名和 UI 摘要；只改目录 README 不代表更新了任何 skill workflow。
-
-## 维护规则 / Maintenance
-
-- 单个 skill 的入口必须是它自己的 `SKILL.md`；不要在每个 skill 子目录再加 README、quick reference 或 changelog。
-- 新增或修改 skill 时保持 `name`、目录名和 UI `display_name` 英文稳定；`description`、正文、`short_description` 和 `default_prompt` 使用中文主体 + English anchors。
-- 只改 skill/docs 时默认跑 skill validator、YAML 解析、`git diff --check` 和必要引用扫描，不机械运行前后端全量测试。
-- 修改本目录后按项目约定更新 `/Users/simon/projects/plush-toy-erp/progress.md`。
+- 简单任务只选一个最贴近主目标的 skill；跨边界时再补相邻 skill。
+- 提示词整理使用全局显式 `$prompt-governance`；提交推送并发收口使用 `$git-closeout-coordination`。
+- 项目 skill 不重复高内聚、低耦合等通用常识，只保留项目真源、判断流程、命令和验收。
+- 修改 skill 后同步 `agents/openai.yaml`，运行 validator、YAML/metadata 扫描、引用扫描和 `git diff --check`，并更新 `progress.md`。

@@ -1,478 +1,148 @@
 # plush-toy-erp 协作约定
 
-## 过程记录与归档
-
-- 每次完成代码或正式文档改动后，Codex 必须更新 `/Users/simon/projects/plush-toy-erp/progress.md`。
-- 更新最少包含：完成、下一步、阻塞/风险（可空）。
-- 若本次仅讨论或无文件改动，可跳过更新。
-- `progress.md` 只作为过程流水和交接线索，不作为当前正式需求、数据模型或部署真源。
-- 每次需要更新 `progress.md` 前，必须先检查文件规模；若达到或超过 `600` 行，或文件大小达到或超过 `80KB`，必须先归档旧记录，再追加本轮记录。
-- `progress.md` 不应定时自动清空，也不允许通过 pre-commit、pre-push 或后台脚本静默自动改写；归档动作必须由当前执行者显式完成。
-- 当阶段完成或历史内容影响查找时，即使尚未达到阈值，也可以进行人工归档。
-- 归档时应优先保留当前活跃事项、未完成事项、阻塞/风险和最近完成事项；已完成且已同步到正式文档的旧流水，可移动到 `docs/archive/progress-YYYY-MM.md` 等归档文件。
-- 归档后应在 `progress.md` 保留归档索引或摘要，方便后续追溯。
-
-## 项目专属 Skill 维护约定
-
-- 本项目专属 Codex skill 统一放在 `.agents/skills/<skill-name>/`，并随本仓库 git 管理；`~/.codex/skills/` 只放跨项目通用 skill。
-- 项目专属 skill 只写 plush-toy-erp 的当前真源、边界、命令和验证要求，不把临时任务状态、聊天结论、客户未确认资料或一次性方案写成长期规则。
-- skill 的 `name`、目录名、UI `display_name` 保持英文；`SKILL.md description`、正文、`agents/openai.yaml short_description/default_prompt` 使用中文主体 + English anchors。
-- 项目版 skill 不能只是通用版复制，至少应包含 `Truth Chain / 必读真源`、`Project Rules / 项目边界`、`Workflow / 工作流`、`Output / 输出要求`，必要时补 `Validation / 验证要求`。
-- 新增、删除、重命名或调整项目 skill 职责时，同步检查根 `README.md`、相关 docs 索引和 `progress.md` 是否需要更新；只改正文且不改变职责时通常不需要改文档清单。
-- 修改 skill 后至少运行 skill validator、YAML 解析和 metadata 扫描，确认 `$skill-name`、中英摘要和英文 `display_name` 都符合规则。
-
-## Skill 自动选择规则
-
-- 当用户没有显式指定 skill 时，Codex 必须先根据任务类型评估是否存在明显匹配的 skill；如果存在项目专属 skill，优先使用项目专属 skill。
-- 如果任务明确匹配通用 skill，例如文档、PDF / Word / Excel / PPT、浏览器回归、OpenAI 文档、Figma、安全评审、GitHub PR / CI 等，按现有 skill 说明选择对应 skill。
-- 如果没有明显匹配，或使用 skill 会引入不必要流程、额外复杂度、偏离当前任务边界，可以不选择 skill，直接按本文件、README、正式 docs、代码和测试执行。
-- 禁止为了“必须使用 skill”而机械套用不相关 skill；选择或不选择 skill 时，应在开始工作前用一句话说明原因。若跳过一个看似相关的 skill，也应简短说明边界。
-
-## 阅读顺序
-
-遇到新任务时，优先按下面顺序收敛真源：
-
-1. `/Users/simon/projects/plush-toy-erp/README.md`
-2. `/Users/simon/projects/plush-toy-erp/docs/当前真源与交接顺序.md`
-3. `/Users/simon/projects/plush-toy-erp/server/README.md`
-4. `/Users/simon/projects/plush-toy-erp/server/deploy/README.md`
-5. `/Users/simon/projects/plush-toy-erp/scripts/README.md`
-
-如果任务已经明确落在某个子系统，再继续读对应专题文档，不要先凭印象补丁。
-
-历史 changes 文档不作为当前状态、当前能力或当前禁止事项的最终真源；当前状态必须以 `docs/当前真源与交接顺序.md`、正式能力账本（如后续新增 `docs/产品能力进度台账.md` 或等价文档）、当前代码和当前测试交叉确认为准。若历史记录与当前代码 / 测试 / 真源索引冲突，优先按当前代码、测试和真源索引收敛。
-
-常见专题文档包括但不限于：
-
-- Workflow 协同层：`docs/architecture/状态工作流事实边界.md`、`docs/workflow/业务与协同流程地图.md`、`docs/product/多甲方角色能力与流程编排.md`
-- Shipment / 出货边界：`docs/architecture/状态工作流事实边界.md`、当前 `OperationalFactUsecase` / Inventory usecase、对应 RBAC 与测试
-- Inventory / Purchase / BOM / Quality 事实层：`docs/当前真源与交接顺序.md`、`docs/architecture/材料成品物料清单与库存专表模型评审.md`、`docs/architecture/产品款号物料清单边界评审.md`、`docs/architecture/订单采购边界评审.md`
-- 开发与验收 / 帮助文档：`docs/product/自动化测试策略.md`、`web/README.md`、`scripts/README.md`
-
-如果后续新增 `docs/architecture/项目边界地图.md`、`docs/architecture/系统分层进度.md` 或等价正式文档，涉及系统层级、产品化、客户差异、部署交付、下一步规划时必须同步阅读。
-
-## 实施协作与任务边界
-
-- 本仓库不再使用单独执行规格目录、短任务模板或本地审查报告目录作为执行工作流。
-- GPT / ChatGPT 只作为需求澄清、架构讨论和方案比较的辅助输入；长期规则、当前状态和实施边界必须回到本仓库文件、真实代码、migration、测试和当前工作区确认。
-- `docs/product/产品完成路线图.md` 是产品完成路线图的可演进规划真源，用于判断产品长期能力路线、候选任务顺序和下一步大方向；它不替代 `docs/当前真源与交接顺序.md`、代码、migration、测试或本轮用户要求。
-- Roadmap 可以在执行过程中根据代码现状、客户反馈、验收结果、风险发现或 AI 规划复盘显式调整；调整时必须直接修改 roadmap，并写清调整原因、影响阶段、新的下一步，以及哪些旧编号或旧路线不再复用。
-- 试用模拟当前规则：不拆 A/B/C/D 或任何字母子阶段；当前没有可直接执行的 yoyoosun 客户真实数据，只能一次性用 seed、fixture 或手工构造的模拟客户、供应商、联系人和销售订单数据完成试用环境、账号、RBAC、菜单、V1 页面、岗位任务端和培训验收。真实客户数据导入在当前条件下不可执行，也不能作为后续半阶段、隐藏目标或完成条件；模拟数据不得写成真实导入、客户字段确认、出货、库存或财务事实。
-- 复杂实现应按 `docs/product/模块实施治理.md` 拆为可验证任务。任务边界可以写在当前会话、正式设计文档、roadmap 或台账中；不要恢复额外长期施工单目录。
-- 每个非平凡任务都必须先明确本轮目标、允许修改路径、禁止修改路径、明确不做的内容、验收命令、停止条件和剩余风险；不要让本文件代替具体任务的测试选择。
-- 任务开始和收口时都必须检查工作区状态。若运行期间出现其他会话写入的非本轮路径改动，Codex 只能记录并隔离这些改动，不得回退、删除、格式化、提交或写成本轮成果；需要提交时必须按本轮允许路径精确 stage。
-- 普通任务不生成、不覆盖、也不要求本地审查报告。如用户需要审查材料，应直接在最终回复或用户明确指定的正式文档中说明目标、范围、修改文件、验证命令和风险。
-- 所有长期规则以仓库文件为准，不依赖 ChatGPT 或 Codex 聊天记忆。长期规则优先参考：本文件、`docs/product/*`、`docs/architecture/*`、`docs/当前真源与交接顺序.md`、代码和测试。
-- plush-toy-erp 的产品边界、Workflow / Fact 边界、`tenant_id` 禁止项和客户资料边界，仍以本文件和正式产品 / 架构文档为准。当前永绅客户稳定 key 是 `yoyoosun`，不要恢复 `current` 客户目录或导入工作区别名。
-- 新任务组织主路径：按能力闭环、业务事实源、测试用例、验收标准和交付资料拆分；当前产品结构、代码结构、接口结构、菜单结构、测试结构和客户语言都使用真实业务领域命名。历史阶段编号只作为归档检索标签。
-- Runtime 命名主路径：使用 `shipment`、`inventory`、`purchase`、`quality`、`finance`、`workflow` 等业务领域词。新增运行时代码、API、路由、菜单、测试和配置由 `scripts/qa/phase-label-boundaries.mjs` 守卫阶段编号残留；活跃 PostgreSQL 本地验收脚本、测试环境变量、数据库名和 Make target 必须使用业务域命名，不再保留历史阶段编号兼容入口。
-- 处理任务时禁止：
-  - 新增 `tenant_id`。
-  - 实现 SaaS 多租户。
-  - 实现 license server、套餐计费或客户工单系统。
-  - 创建泛化 `ChangeUsecase` 或 `change_records`。
-  - 把任一客户资料写成 Product Core 规则。
-  - 混淆 Workflow / Fact。
-  - 让 `WorkflowUsecase` 写库存、出货、财务、应收、应付、发票或收付款事实。
-  - 把 `shipping_released` 写成 `shipped`。
-  - 把 workflow task done 当成 fact posted。
-  - 把 `business_records` 当长期事实真源。
-- 客户专属资料应进入 `docs/customers/<customer-key>/`、客户配置草案、seed/demo、打印模板或导入适配；除非经过 Product Core 评审，否则不能上升为产品内核规则。
-
-## 工程原则
-
-- 先理解现状、确认当前真源与主路径，再决定改动范围。
-- 改动应完整解决当前问题，并优先选择“完整且最简洁”的主路径修复；最小化的是无关影响、额外复杂度和无收益改动，不是靠局部最小补丁、临时兜底或 fallback 式修补蒙混过关。
-- 优先保留稳定、可维护、可观测的实现。
-- 能复用现有能力就不要额外造层。
-- 当页面、样式、usecase、repo、JSON-RPC 入口、seed、QA 脚本或其他运行时文件已经过大、职责混杂或频繁被多类任务同时触碰时，应按业务责任和变更边界拆分，而不是为了“拆文件”机械分层。前端优先拆为页面壳、表格、表单、详情 / 协同入口、状态展示和数据 / action hook；后端优先按业务域收口到 handler / usecase / repo / validator / types 等清晰边界。拆分必须保持现有真源、测试和对外接口稳定，避免新建只转发、不降复杂度的空壳层。拆前若触达页面或样式，还必须先确认页面主职责、可见模块语义、重复入口、未完成能力误导、空 / 长文本 / 无权限 / 错误态，以及焦点、键盘和可访问性回归范围；不能把纯视觉拆分当成页面治理完成。
-- 注释只写设计意图、边界条件和兼容性兜底，避免补丁口吻。
-- 代码行为、目录结构、脚本名称、部署方式、配置字段、客户 key 或正式文档口径变化时，必须同轮检查并按需更新相关 README、docs、`docs/当前真源与交接顺序.md`、`docs/文档清单.md`、产品 / 架构文档、帮助文档和 `progress.md`。
-- 能力实现层级变化时，必须同步清理正式文档里的旧状态口径。例如从 schema-only 进入 repo / usecase / API / RBAC / UI、从内部可用进入可试用、或某个 deferred 项被部分接入时，应明确写清“已接入的层级”和“仍未闭环的层级”，并按影响范围检查 README、当前真源索引（当前为 `docs/当前真源与交接顺序.md`；若后续重命名或替换，以本文件阅读顺序登记的等价真源入口为准）、产品能力台账、客户交付 / 差异文档和相关导入文档中的旧描述，发现旧口径时必须更新，避免继续保留 `schema 已有但 API/UI 未接`、`仍需 API/UI 评审` 这类过期判断。
-- 自动化测试通过是必要条件，不是充分条件；还必须确认架构边界、业务真源、权限边界、文档口径和产品化约束没有被破坏。
-- 不要为了让当前页面或当前测试通过而引入长期不可维护的特殊分支、局部兜底、重复真源或隐藏兼容路径。
-- 业务列表不提供通用“删除 / 回收站”壳能力。只有已经完成后端 usecase、RBAC、审计、引用检查和测试的对象，才允许在对应业务入口设计删除 / 恢复动作；不能为了 toolbar 视觉完整性补前端本地删除、软删除假状态或页面私有回收站。
-- 主数据退出使用默认走启用 / 停用；若确需删除误建主数据，必须先确认没有销售、采购、库存、BOM、出货、财务、Workflow 或审计链路引用，并通过后端 usecase 做引用检查。Source Document 走取消 / 关闭 / 归档，Fact / Ledger 走取消 / 冲正 / 调整或只读，Workflow 走任务状态和事件，不把这些对象放进通用回收站。
-- 表单内草稿明细行的删除只表示“当前草稿尚未形成事实前移除明细”，不等同于业务对象列表级删除 / 回收站；一旦过账、提交、被引用或进入审计链路，应按对应领域生命周期处理。
-- 如果某个对象经评审允许删除，交互主路径必须是：用户点击删除，前端调用后端 usecase，后端检查状态和引用关系；无引用且仍处于允许删除状态时才执行删除；已被引用、已生效、已过账或已进入审计链路时必须拒绝，并返回明确业务原因。前端提示应说明引用来源和替代动作，例如“该记录已被采购订单 / 库存流水引用，不能删除；可改为停用，历史单据仍保留当前名称”。
-- 业务对象退出和纠错按意图分流：以后不再使用，走停用 / 禁用 / 归档并保留历史引用可读；当前录错但尚未正式生效，且是草稿、无关键下游时，可允许删除或清空明细；已经生效、过账或被下游引用，不能删除，走取消、关闭、冲正、作废、红冲或版本归档；只是想从某个页面隐藏，走默认筛选、状态过滤或归档视图，不改历史数据；真的必须清理脏数据，走管理员级数据修复 / 合并 / 迁移专项，保留审计和脚本，不做普通页面按钮。
-- 归档不是回收站。归档表示对象不再活跃但仍是有效历史记录，应继续可查、可引用、可审计；列表可以提供“已归档”筛选 / 视图，默认隐藏已归档记录，但不得把归档记录放进“回收站”，也不得用“还原删除”语义表达取消归档。只有真实软删除且可恢复、并完成后端恢复 usecase 与审计边界的对象，才可单独设计回收站。
-
-## 反局部兜底与主路径修复约束
-
-本项目禁止为了让当前测试或当前页面“看起来通过”而引入局部兜底、临时 fallback、重复派生、双轨兼容或只服务单个场景的特殊分支。
-
-修复问题时必须优先定位真实主路径：
-
-- 数据来源是否正确。
-- usecase 边界是否正确。
-- 权限边界是否正确。
-- 状态机是否正确。
-- 幂等键和重复提交边界是否正确。
-- 前端是否只是展示和提交动作，而不是偷偷承接后端事实逻辑。
-- 当前修复是否复用了已有真源，而不是又造了一份语义相近的字段、配置、表或文档。
-
-只有在存在明确历史兼容需求、正式文档记录兼容边界、且有测试覆盖时，才允许保留 fallback 或兼容路径。否则不允许用 fallback 掩盖缺失的数据、错误的状态、未完成的 usecase 或不完整的 API。
-
-禁止模式：
-
-- 为单个页面硬编码特殊判断。
-- 在前端本地补造后端应该返回的业务事实。
-- 在 WorkflowUsecase 中直接写库存、出货、财务事实。
-- 已迁入后端的 workflow 又在前端保留真实运行时派生。
-- 为通过测试而放宽识别条件、权限条件或状态边界。
-- 新增与既有真源表语义重复的表、字段或配置。
-- 把当前甲方专属字段、名称、流程、报表写死进通用核心 usecase。
-- 把 workflow payload 当成库存、出货、财务事实真源。
-
-如果确实需要临时方案，必须同时满足：
-
-1. 在最终回复说明为什么是临时方案。
-2. 在正式文档记录边界和后续替换路径。
-3. 加测试锁住当前行为，避免临时方案扩散成长期主路径。
-
-## 测试与验收约束
+本文件只记录 plush-toy-erp 的长期项目特例。通用工程、Git、删除、浏览器和文档规则使用全局 AGENTS；当前能力与业务事实必须回到正式 docs、代码、migration 和测试核对。
 
-自动化测试通过是必要条件，不是充分条件。每轮改动必须根据改动类型补充或确认对应测试。
+## 阅读顺序与当前真源
 
-Workflow 规则改动必须覆盖：
+新任务按相关性读取：
 
-- done / blocked / rejected。
-- reason 必填。
-- 空字符串 / 全空格 reason 无效。
-- blocked_reason / rejected_reason 旧原因清理。
-- 重复提交幂等。
-- 同名但非目标任务不触发。
-- settled 状态不再触发特殊 rule。
-- 前端真实运行时不再双写或本地派生。
-- JSON-RPC / RBAC / owner_role_key / assignee_id / task_status_key 边界。
+1. `README.md`
+2. `docs/当前真源与交接顺序.md`
+3. `server/README.md`
+4. `server/deploy/README.md`
+5. `scripts/README.md`
+6. 对应产品/架构专题、代码和测试
 
-Fact / Inventory / Purchase / Quality / Shipment / Finance 改动必须覆盖：
+关键边界：
 
-- happy path。
-- 非法状态。
-- 重复提交。
-- 取消 / 冲正 / REVERSAL。
-- 幂等。
-- 防负数或越界。
-- 事务失败边界。
-- 已过账单据不可直接修改或物理删除。
-- 事实表与查询加速表的一致性边界。
+- `docs/product/产品完成路线图.md` 管长期路线，不替代当前实现真源。
+- `docs/reference/**` 是外部输入，`docs/archive/**` 和 `progress.md` 是历史/过程证据。
+- 历史 changes、GPT 规划、截图和客户样本不能单独证明当前 schema/API/UI/RBAC/部署能力。
+- 当前客户稳定 key 为 `yoyoosun`；不要恢复 `current` 客户目录或旧工作区别名。
 
-RBAC / API 改动必须覆盖：
+## 任务组织与工作区
 
-- 未登录。
-- disabled 管理员。
-- 非管理员。
-- 无权限。
-- 角色不匹配。
-- owner_role_key / assignee_id / task_status_key 边界。
-- super_admin 边界。
-- 前端隐藏菜单不是安全边界。
+- 非平凡任务先明确目标、先读文件、允许/禁止路径、不做内容、验收、停止条件和风险。
+- 按业务能力、事实源、测试形态和验收拆任务；不要用历史 Phase/P 编号组织当前代码、API、配置、seed、测试或正式文档。
+- `P0/P1/P2` 仅用于明确标注的风险优先级；`p50/p95/p99` 仅用于性能百分位。
+- 开始和收口均检查 worktree。其他会话的非本轮改动只记录和隔离，不回退、格式化、删除、stage 或宣称为成果。
+- 本仓库不恢复单独执行规格目录、短任务模板或本地审查报告目录。
 
-前端菜单 / 路由 / seed 改动必须覆盖：
+## 过程记录
 
-- 导航 seed 和后端内置菜单。
-- 对应测试断言。
-- 旧帮助中心、开发与验收和高级文档入口不再出现在导航；旧路径按兼容规则重定向。
-- 默认态、交互态、恢复态。
-- style:l1 相关场景。
-- 移动端角色 smoke 不破坏。
+- 完成代码或正式文档改动后更新 `progress.md`，至少包含完成、下一步、阻塞/风险；仅讨论可跳过。
+- 更新前检查规模；达到 600 行或 80KiB 时先显式归档，保留活跃事项、风险、最近事项和归档索引。
+- `progress.md` 不自动清空，也不由 hook 静默改写；它不是正式需求或运行真源。
 
-产品化 / 私有化交付改动必须覆盖：
+## 项目 Skills
 
-- 产品化与交付文档同步。
-- 没有写死当前甲方。
-- 客户差异优先配置、模板、feature flag 或扩展隔离。
-- 不引入每客户一套核心 schema 或核心 usecase 分叉。
-- 不提前实现复杂 SaaS、多租户、license server、套餐计费或客户工单系统，除非任务明确要求并有正式方案文档。
+- 项目 skills 位于 `.agents/skills/` 并随仓库管理；只承载 plush 专项 SOP。
+- 当前入口见 `.agents/skills/README.md`。默认只选一个主 skill，真实跨领域/页面/打印/测试/operations 时再组合。
+- 运行诊断、可观测/错误、安全隐私、发布和回滚统一使用 `$plush-operations-governance`。
+- 提示词整理仅在明确需要时显式使用全局 `$prompt-governance`；Git 收口使用 `$git-closeout-coordination`。
+- 修改 skill 时同步 README/metadata/引用，运行 validator、YAML/metadata 扫描和 `git diff --check`。
 
-如果某类测试暂时缺失，不允许在最终回复中只写“已通过测试”来暗示已完整验收；必须明确写出未覆盖项、原因和后续建议。
+## Product Core 与客户差异
 
-## 项目进度、分层边界与产品化约束
+- 当前形态是单仓库、单客户私有化部署；同一套 Product Core 通过客户配置、菜单开关、RBAC、角色模板和 Workflow 责任投影不同岗位界面。
+- 当前不实现 `tenant_id`、SaaS 多租户、license server、套餐计费或客户工单系统，除非用户明确要求且先完成正式评审。
+- 客户差异优先放在 config、feature flag、初始化/角色/权限模板、打印模板、字段显示/必填、编号规则、菜单开关或 customer extension。
+- 不把客户公司名、logo、特殊流程、字段、报表或资料硬编码进核心 usecase。
+- 客户资料进入 `docs/customers/<customer-key>/`、客户配置、seed/demo、打印模板或导入适配；移动现有资料前先评审引用、入口、测试和回滚。
+- 权限码表达业务能力和敏感动作，不扩成字段/文案配置系统；字段显示和低风险称谓差异优先使用配置。
 
-本项目长期目标是面向毛绒玩具及相近轻工制造企业的可私有化部署 ERP 产品。当前甲方是第一个标杆客户 / 种子客户，后续可能作为 SaaS / 私有化部署产品卖给同行，并按年收维护费。
+## 系统分层与 Workflow / Fact
 
-开发时必须优先沉淀通用行业能力，避免把当前甲方的名称、流程、字段、报表或特殊习惯硬编码进核心 usecase。客户差异应优先通过 tenant config、feature flag、初始化模板、打印模板、字段显示配置、菜单开关或客户扩展层处理。
+长期保持：
 
-项目长期分层包括：
+- Workflow：协同任务、事件、角色流转和业务状态。
+- MasterData：单位、材料、产品、仓库、客户、供应商、BOM。
+- Fact：采购、库存、质检、生产、出货、财务事实。
+- RBAC：权限码、角色、owner/assignee 和敏感动作边界。
+- API/UI、Help/QA、Productization/Delivery、Reporting/Audit/Integration 各自负责对应层。
 
-- Workflow 协同层：任务状态、角色流转、业务状态、下游协同任务派生。
-- MasterData 主数据层：单位、材料、产品、仓库、客户、供应商、BOM 等。
-- Fact 事实层：采购、库存、质检、生产、出货、财务等真实业务事实。
-- RBAC 权限层：权限码、角色、owner_role_key、assignee_id、任务处理边界。
-- API / UI 层：JSON-RPC/API、Web 页面、移动端页面。
-- Help / Debug / QA 层：正式文档、debug seed、验收报告、测试说明。
-- Productization / Delivery 层：SaaS、私有化部署、客户定制、通用产品能力、维护费交付。
-- Reporting / Audit / Integration 层：报表、审计、附件、导入导出、条码扫码、外部系统集成、数据归档与压测。
+硬边界：
 
-当改动以下内容时，必须同步检查并按需更新：
+- Workflow task done 不等于 Fact posted；workflow payload 是展示快照，不是事实真源。
+- `warehouse_inbound done` 不自动等于采购/库存入账。
+- `shipment_release done` 只能表示 `shipping_released`，不等于 `shipped`。
+- 应收/开票至少在真实 shipped 后再评审；质检任务 done 不等于质检事实完成。
+- `WorkflowUsecase` 不写库存、出货、财务、应收、应付、发票或收付款事实。
+- 已迁入后端的 Workflow 动作，前端不得保留真实运行时派生或双写。
 
-- `docs/当前真源与交接顺序.md`
-- `docs/architecture/项目边界地图.md` 或等价边界文档
-- `docs/architecture/系统分层进度.md` 或等价分层进度文档
-- `docs/product/产品台账索引.md`
-- `docs/product/自动化测试策略.md`
+## 已有真源与新增对象门禁
 
-必须同步检查的改动包括：
+不得无评审重复设计下列真源：
 
-- 新增或修改 WorkflowUsecase 规则。
-- 新增或修改 InventoryUsecase、PurchaseUsecase、QualityUsecase、ShipmentUsecase、FinanceUsecase 行为。
-- 新增或修改 Ent schema、migration、repo、usecase。
-- 新增或修改 RBAC 权限码、角色矩阵、JSON-RPC 权限守卫。
-- 新增或修改菜单入口、产品内文档入口或开发与验收页面。
-- 新增或修改 SaaS、私有化部署、产品化交付相关设计。
-- 改变“已完成 / 已评审 / 未开始 / 暂停 / 禁止事项 / 下一步建议”等项目状态。
-- 改变客户差异隔离方式、部署方式、初始化模板、打印模板、字段显示配置、菜单开关或 feature flag 规则。
+- 主数据：`units`、`materials`、`products`、`warehouses`
+- 库存：`inventory_txns`、`inventory_balances`、`inventory_lots`
+- BOM：`bom_headers`、`bom_items`
+- 采购：`purchase_receipts/items`、`purchase_returns/items`、`purchase_receipt_adjustments/items`
+- 质检：`quality_inspections`
+- RBAC：`roles`、`permissions`、`role_permissions`、`admin_user_roles`、`admin_users.is_super_admin`
 
-纯样式修复、局部文案修正、测试断言小修，如果不改变业务能力、架构边界、菜单入口或交付状态，可以不更新进度文档，但必须确认不影响上述真源。
-
-## 产品化与客户差异隔离约束
-
-当前代码库应优先作为通用 ERP 产品内核演进。当前甲方是第一个标杆客户，不应成为硬编码在核心 usecase 中的永久定制分支。
-
-推荐产品化路线：
-
-1. 第一阶段：单仓库、单租户、单客户私有化部署，通过 env、config、seed template、菜单开关和初始化模板区分客户。
-2. 第二阶段：多客户私有化部署，每个客户一套数据库 / 对象存储 / 配置，代码版本统一。
-3. 第三阶段：SaaS 多租户，再评审 tenant_id、租户隔离、套餐计费、license、统一升级等能力。
-
-当前阶段不要提前实现复杂 SaaS 多租户、license server、套餐计费、客户工单系统或多租户管理后台，除非任务明确要求并有正式方案文档。
-
-plush-toy-erp 不是“每个角色一套独立系统”。当前产品形态是同一套 Product Core，通过客户菜单配置、RBAC 权限码、岗位任务端入口和 Workflow 任务责任，把不同角色投影成不同工作界面。菜单显隐和岗位入口只影响可见性与操作入口，不改变后端 usecase、schema、Workflow / Fact 边界或事实落账规则。
-
-权限码不是通用 UI 配置系统。权限码主要表达用户能访问哪些业务能力、执行哪些敏感动作，以及后端是否允许本次操作；它可以辅助前端隐藏菜单、入口和业务动作按钮，但不应默认扩展为每个字段、每个普通按钮或每句文案一个权限码。字段显示、字段命名、客户叫法、菜单文案和低风险展示差异应优先走客户配置、字段显示配置或页面配置；真正影响业务事实、敏感数据、审批、冲正、出货、库存、财务等动作的能力才应进入 RBAC 权限码和后端 usecase 校验。
-
-客户差异优先通过以下方式隔离：
-
-- tenant config
-- feature flag
-- 初始化模板
-- 打印模板
-- 字段显示 / 必填配置
-- 菜单开关 / 模块开关
-- 编号规则
-- 角色模板 / 权限模板
-- 客户扩展层
-- customer-specific 文档或配置目录
-
-客户差异不应污染以下核心规则：
-
-- 库存流水语义。
-- 入库 / 出库 / 冲正 / 防负库存规则。
-- 出货事实规则。
-- 财务事实规则。
-- 核心状态含义。
-- 数据库迁移主路径。
-- Workflow 与 Fact 的边界。
-
-不建议每个客户复制一份完整代码仓库长期分叉维护。确需客户专属逻辑时，应放在明确的 customer-specific、extension、tenant config 或部署配置边界，并在产品化与交付文档中记录。
-
-## 当前甲方资料与通用产品资料边界
-
-当前仓库内已经存在与当前甲方深度耦合的文档、样本、截图、字段口径或业务说明时，不要在无明确任务时大规模移动、删除或重命名。
-
-处理原则：
-
-- 当前甲方资料可以作为种子客户样本，但不能自动升级为通用产品真源。
-- 通用产品规则必须沉淀到正式架构文档、usecase、schema、测试和产品内帮助或正式文档通用口径中。
-- 当前甲方专属资料后续应逐步隔离到明确目录或配置边界，例如 `docs/customers/<customer-key>/`、`deployments/<customer-key>/`、`config/tenants/<tenant-key>/` 或等价结构。
-- 本轮若只是补总控页面或 AGENTS 约束，不要顺手重构目录。
-- 若任务明确要求做客户资料隔离，必须先做目录隔离评审，列出要迁移的文件、引用关系、产品内文档入口、测试断言和回滚风险，再执行移动。
-- 移动文档或目录时，必须同步修复所有引用、导航注册、测试断言和产品内文档入口。
-- 不要把当前甲方公司名、logo、特殊流程、特殊报表、特殊字段硬编码进通用核心 usecase。
-- 当前甲方专属说明若仍在产品内业务帮助出现，必须确认它是否确实是通用业务规则；如果不是，应迁移到产品化 / 客户交付 / customer-specific 文档边界。
-
-## Workflow 与 Fact 边界
-
-本项目必须长期保持 Workflow 协同层与 Fact 事实层的边界。
-
-核心原则：
-
-- Workflow task done 不等于 Fact posted。
-- Business status 不等于 Inventory balance。
-- warehouse_inbound done 不等于 purchase_receipt posted，除非后续明确 usecase 对接。
-- shipment_release done 不等于 shipped。
-- shipped 后才评审 receivable / invoice。
-- workflow payload 是展示快照，不是库存、出货、财务事实真源。
-- WorkflowUsecase 只负责协同任务、事件、业务状态和必要的协同任务派生。
-- InventoryUsecase / PurchaseUsecase / QualityUsecase / ShipmentUsecase / FinanceUsecase 负责真实业务事实。
-- 不要在 WorkflowUsecase 中直接写库存、出货、财务事实，除非对应边界文档明确允许。
-- 已迁入后端 WorkflowUsecase 的真实业务动作，前端不得继续保留运行时本地派生或双写路径。
-
-当前已明确的边界示例：
-
-- 采购入库任务 done 只是协同任务完成，不自动等同 purchase_receipt posted。
-- 成品入库任务 done 只是协同状态 inbound_done，不自动等同库存入账。
-- shipment_release done 只是 shipping_released，不等于 shipped。
-- 应收 / 开票至少应在真实 shipped 后再评审。
-- 质检任务 done 不等于 quality_inspections 事实完成，后续需要 QualityUsecase 对接。
-
-## 已有事实真源禁止重复设计
-
-当前项目已经存在或已形成真源的能力，不要重复设计一套语义相近的新表、新配置或新字段，除非任务明确要求做重构评审。
-
-禁止重复设计的典型真源包括：
-
-- `units`
-- `materials`
-- `products`
-- `warehouses`
-- `inventory_txns`
-- `inventory_balances`
-- `inventory_lots`
-- `bom_headers`
-- `bom_items`
-- `purchase_receipts`
-- `purchase_receipt_items`
-- `purchase_returns`
-- `purchase_return_items`
-- `purchase_receipt_adjustments`
-- `purchase_receipt_adjustment_items`
-- `quality_inspections`
-- RBAC 相关的 `roles`、`permissions`、`role_permissions`、`admin_user_roles`、`admin_users.is_super_admin`
-
-如果发现当前任务似乎需要新增与上述对象语义相近的表或配置，必须先做边界评审：
-
-1. 现有真源是否可复用。
-2. 新增对象是否只是别名或重复。
-3. 是否应该扩展现有表，而不是新建表。
-4. 是否会破坏文档、测试、菜单或产品内帮助口径。
-5. 是否需要 migration，以及 migration 是否属于当前任务范围。
-
-## 旧项目迁移边界
-
-- 当前项目的唯一业务真源是 `plush-toy-erp` 自身的代码、正式文档和真实业务样本；旧项目只能作为迁移背景或经验来源，不能作为当前业务字段、流程、页面命名、测试基线或文案真源。
-- 运行时页面、产品内帮助、业务配置、种子数据、测试断言、错误信息和用户可见文案中默认不出现旧项目名，也不要用“对齐旧项目”“沿用旧项目”这类表述解释当前行为。
-- 若确实需要说明历史迁移背景，只允许集中写在正式真源文档的“迁移背景 / 禁止照搬旧模型”小节里，并且必须同时写清当前项目自己的主路径和不应照搬的旧语义。
-- 从旧项目复用过来的通用结构可以保留，但应改写成当前项目自己的命名、说明和验收口径；不要因为来源旧就删除已经稳定承接当前业务的通用实现。
-
-## 目录结构文档同步约定
-
-- 当本仓库新增、删除、重命名仓库一级目录，或新增/调整需要长期维护的关键子系统目录时，必须同步检查并按需更新相关目录说明文档，避免代码结构已变化而 `README / docs` 仍停留在旧口径。
-- `docs/` 下长期维护且容易误读职责的目录应有对应 `README.md`。新增、删除、重命名长期维护文档，或改变文档职责、归属目录、入口状态、真源状态时，必须同步检查该目录 README 是否需要更新；只改正文且不改变目录职责或入口状态时，通常不需要更新目录 README。
-- 当新增、删除、重命名长期维护的 Markdown 文档，或调整文档用途、归属目录、是否属于产品内入口 / 外部参考 / 归档 / 任务说明等分类时，必须同步更新 `docs/文档清单.md`。
-- 只修改现有文档正文内容、措辞、局部结论或表格数据，且不改变该文档的标题、职责、分类、路径或入口状态时，通常不需要更新 `docs/文档清单.md`；若修改导致清单中的“标题 / 当前用途”失真，则必须同步更新。
-- 长期维护 Markdown 文档默认使用中文文件名，方便人工在文件树中直接识别用途；英文名、英文术语和稳定 anchor 应放在 H1、metadata、摘要、正文或 `docs/文档清单.md` 中保留，用于检索、对照和跨工具引用。
-- 新增文档、重命名文档或调整文档职责时，必须同步修正相关 README、`docs/文档清单.md`、正文引用、原型入口、脚本引用和测试断言；不能只改文件名让引用断链。
-- 不要求机械中文改名的例外包括：`README.md`、`AGENTS.md`、`CHANGELOG.md` 等约定文件名；`docs/archive/**` 中作为历史证据的旧文件；`docs/reference/**` 中需要保持外部输入原貌的资料；被脚本、URL、原型查看器、生成流程或外部链接稳定引用且未完成迁移评审的文件；以及代码包名、API、表名、配置 key、状态 key 等必须保持英文稳定锚点的技术对象。
-- 现有英文文件名文档应按目录分批重命名并逐批验证；不要为了文件名治理在同一轮一次性重命名整个 `docs/`，除非用户明确要求并接受引用迁移、清单更新和回归成本。
-- `docs/文档清单.md` 的“标题 / 当前用途”列应使用中文主体 + English anchor；即使原文档标题为英文，也要补中文说明，方便人工审查时快速理解，不把清单退化成英文文件名索引。
-- 长期维护 Markdown 文档的 H1 标题和用于阅读的主要章节标题，也应优先使用中文主体 + English anchor；项目名、包名、工具名、表名、API 路径等英文专名可以保留，但应按需要补中文用途或语义说明，方便人工审查时直接理解文档职责。外部导入原文、归档日期标题、纯代码锚点可保留原样。
-- 根 `README.md` 只维护仓库级目录导航；`web/README.md`、`server/README.md` 等子目录 `README` 维护各自内部目录职责，不在多处重复展开同一份内部目录树。
-- 生成产物、缓存、依赖目录或临时目录（如 `build/`、`output/`、`tmp/`、`node_modules/`、`bin/`）默认不要求更新目录说明，除非它们已经成为正式入口或长期维护对象。
-- 若本轮调整了目录结构但判断无需更新 `README / docs`，最终回复中必须明确说明未更新的原因与边界。
-- 不要在补文档、补菜单入口、补 AGENTS 约束的同轮顺手大规模重构目录；目录隔离必须作为单独任务评审。
-
-## 当前部署边界
-
-- 当前唯一部署真源：`/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
-- 当前仓库没有初始化 `lab-ha`、Kubernetes 清单和 dashboard；未获明确需求前，不要补回第二套部署主路径。
-- 低配服务器只负责加载已构建镜像、启动 Compose、执行 migration 与部署后检查；发布时必须在本地或 CI 构建服务端/前端镜像并上传，禁止在服务器上执行 `docker build`、`pnpm build`、`go build`、`make build_server` 等重构建步骤。
-- 线上 / 低配服务器执行 Atlas migration 时，Atlas 是宿主机级运维工具，固定使用 `/usr/local/bin/atlas`；禁止用 `arigaio/atlas:*` 临时容器执行 migration，也不要把 Atlas 写进业务 Compose。migration 目录随 release 上传，执行时使用宿主机可达 DSN（如 `127.0.0.1:5435`）并用 `flock /tmp/atlas-migrate.lock` 串行化。
-- 多项目低配 Docker 宿主机发布完成、健康检查和必要回归通过后，应清理未被任何容器使用的旧镜像和构建缓存：优先执行 `docker image prune -a -f` 与 `docker builder prune -f`；清理前后记录 `df -h /`、`docker system df`、`docker ps --format '{{.Names}} {{.Status}} {{.Image}}'`。禁止在发布清理中执行 `docker system prune --volumes`、`docker volume prune`，也禁止删除 `/data`、数据库目录、compose `.env`、上传目录或运行中容器依赖的镜像。若需要保留回滚能力，应至少保留当前运行版本，磁盘允许时再额外保留上一版镜像。
-- Compose 基线默认保留 PostgreSQL、Jaeger、`/healthz`、`/readyz` 和 `depends_on: service_healthy`。
-- 如果后续确实要引入 Kubernetes 或其他部署方式，必须先补正式文档，再落代码和脚本。
-- 私有化部署相关能力应优先沉淀到产品化与交付文档、部署配置和初始化模板中，不要散落在业务 usecase 中。
-
-## 初始化与收口
-
-- 首次收口或大规模改名后，执行 `bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict`
-- 该脚本用于扫出项目名、服务名、默认密钥、远端发布地址和首页文案残留。
-- 不需要的目录、脚本和部署物默认移动到系统回收站，不做不可恢复删除。
-
-## 数据库与迁移
-
-- 结构变更走 Ent + Atlas，禁止手改 schema SQL。
-- 迁移前先确认命中的数据库：`cd /Users/simon/projects/plush-toy-erp/server && make print_db_url`
-- 生成迁移后执行：`cd /Users/simon/projects/plush-toy-erp/server && make data && make migrate_status`
-- 若服务逻辑依赖新表/新列，发布前先确认目标库 migration 已落地。
-- 不要因为文档、前端导航、产品内帮助入口、开发验收总控页面改动而运行或生成 migration。
-- 不要把与当前任务无关的 库存事实、BOM 批次、采购入库、采购退货、采购调整和来料质检 现场文件清理、回退或纳入本轮，除非任务明确要求。
-- `server/internal/data/model/schema` 注释只补关键业务边界，不做全量机械注释。普通字段优先靠命名、Ent 约束、DB check、hook、usecase 和测试表达；只有字段容易被误判为真源 / 快照 / 派生、涉及 Workflow / Fact 边界、状态机、不可变事实、冲正、历史兼容、跨模块追溯、删除限制、金额 / 数量精度或 SKU 过渡口径时，才补最小必要注释。
-- schema 注释必须描述当前行为、设计意图和边界条件，禁止保留“新增 / 修复 / 关键修复”等补丁历史口吻。若只是维护者阅读提示，优先使用 Go 注释，避免为说明文字触发 Ent 生成产物或 Atlas migration；只有确实需要数据库可见字段说明时，才评审使用 Ent `Comment(...)` 并同步 migration。
-
-## 前端与样式
-
-- 样式和布局问题优先在真实浏览器中定位，不靠静态代码猜。
-- 用户可见的业务列表、详情、表单、打印、导出和帮助文案，默认不把数据库自增主键、外键或裸 `id / *_id` 作为业务识别字段展示，也不把 `ID` 放成普通业务表格首列。优先展示业务编号、单据号、名称、快照名称、批次号、流水号或其他业务可读字段；确实属于开发验收、内部调试、审计追溯或排障视图时，可以显示内部 ID，但必须明确标注为“内部 ID / 调试 ID / 主键 ID”等，不得让业务用户误以为它是业务编号。
-- 业务主表、正式业务列表、导入选择弹窗和明细表格列默认禁止配置 AntD `ellipsis`，也不得通过表格列样式把表头或单元格做成 `text-overflow: ellipsis`。长编号、长客户 / 供应商名称、备注和组合字段应通过合理列宽、横向滚动、换行、业务语义合并或详情入口完整展示；确需在非表格列的小标签、导航项、下拉项中省略，必须不影响业务记录识别，并能通过弹层、标题或详情查看完整文本。共享业务表格运行时会剥离列配置中的 `ellipsis`，`pnpm test` 和 `style:l1` 必须继续守住该规则。
-- 桌面后台和岗位移动端支持「跟系统 / 浅色 / 暗色」三种主题模式，默认跟系统，手动选择持久化到浏览器本地；新增颜色、背景、边框、状态块、表格、表单、弹窗或卡片样式时，必须优先使用 ERP theme token / CSS 变量或补齐明确暗色覆盖，不能只保证浅色模式可读。
-- 涉及桌面后台或岗位移动端样式 / 字段 / 状态块变更时，前端回归必须按影响范围覆盖浅色和暗色；触达移动端时至少覆盖一个移动视口和对应岗位任务页，确认文字对比、背景、边框、输入框、提示文案、交互态和横向溢出都符合预期。
-- 打印、PDF、采购合同 / 加工合同纸面预览默认固定浅色，不跟随运行时暗色主题；如后续确实需要屏幕预览暗色，必须单独设计并保证导出物仍是浅色交付口径。
-- 桌面 ERP 业务对象的新建、编辑和只读查看默认统一使用 `Modal`，不把 `Drawer` 作为业务表单主路径；`Drawer` 仅用于岗位协同、导航侧栏、任务处理等不承接完整业务对象保存的上下文入口。新增业务对象表单优先复用共享弹窗尺寸常量：确认 / 删除 / 简单提示约 `420-520px`，基础资料新建 / 编辑约 `640-880px`，采购订单、销售订单、出货单、质检单、BOM、委外等业务单据约 `min(1720px, calc(100vw - 96px))` 并保持底部操作固定。复杂明细仍在同一业务弹窗内用分区、表格、横向滚动或第二层来源选择器解决，不另开业务编辑抽屉。
-- 主业务列表的数据列默认应提供表头排序，编号、名称、状态、客户 / 供应商、日期、数量、金额、创建 / 更新时间等列应优先接入排序；确实没有稳定比较口径时，必须显式标记不排序并说明原因。复杂展示列应通过共享 helper 或等价 `sortValue(record)` 提供稳定排序值。选择框、操作列、纯按钮列、备注长文本、附件 / 图片、无稳定比较口径的组合展示，以及表单内明细行 / 导入选择弹窗 / 回收站 / dashboard 汇总表，不强制纳入全局排序。排序只影响当前页面展示和导出行顺序，不改变领域表写入顺序、后端事实顺序或业务状态。
-- 前端样式改动至少执行：
-  - `cd /Users/simon/projects/plush-toy-erp/web && pnpm lint && pnpm css && pnpm test`
-  - `cd /Users/simon/projects/plush-toy-erp/web && pnpm style:l1`
-- 需要验证的状态至少包括默认态、交互态、恢复态和相邻区域。
-- 当前前端不再维护产品内 docs registry。未来若重新新增开发与验收或产品内文档入口，必须先正式设计 registry、seed navigation、菜单权限、路由和对应测试断言。
-- 新增文档页应优先复用重新设计后的 registry 和页面渲染机制，不要为了静态说明页新建复杂状态管理或后端 API。
-
-## 原型与 Product Design 协作
-
-- 涉及产品原型、PNG 草案、视觉探索、多方案比较、截图 / mockup 转原型或设计 QA 时，默认先判断当前任务属于 `起草阶段 / Draft`、`待实现 / To Implement` 还是 `当前实现 / Current`，并优先阅读 `docs/product/prototypes/README.md`。
-- 视觉探索、从 0 出 PNG 方向图、多方案比较、从截图 / mockup / Figma / URL 生成轻量原型、设计 QA 等任务，应优先使用 `@product-design` 插件；若只是整理仓库内已有原型资产、补 README、维护 `/__dev/prototypes` 查看器或把已选方案吸收到正式代码，不需要为了流程机械调用 Product Design。
-- 原型和 UI 简化默认遵循“简约、易用、尽量好看”的原则：少入口、少重复、少装饰，优先让用户快速找到今日任务、当前业务对象和下一步动作；不要为了视觉效果堆叠大屏式指标、重复看板、冗余说明、过多卡片或花哨装饰。
-- 极简不等于简陋。原型和 UI 在减少入口、减少信息和减少装饰的同时，仍必须保持视觉完成度：布局均衡、层级清楚、间距合理、对齐稳定、字体大小克制、按钮层级明确、状态颜色有语义且不过度使用。好看是验收条件之一，但“好看”应通过清晰布局、合理留白、一致组件、稳定节奏、适当对比和符合 ERP 场景的专业感实现；难看、拥挤、空洞、比例失衡、文字层级混乱、按钮过多、卡片堆叠、对齐不齐、移动端横向溢出，都不能因为“极简”而被接受。
-- 简化只能简化信息呈现和交互路径，不能擅自改变业务语义和当前真源；正式菜单、客户菜单配置、权限、路由、Workflow / Fact 边界、字段口径和后端能力仍以仓库当前真源为准。原型里如果需要突出少量高频入口，必须标明这是“快捷入口 / 常用入口”，不能写成替代正式菜单的新结构；如果目标是减少正式入口，应单独做菜单评审，明确隐藏、排序、改名或合并依据。
-- 当前推荐流程是 `起草阶段 PNG -> 待实现 HTML -> 当前实现`。复杂页面、信息架构、交互入口和多方案取舍应先进入 Draft 或 To Implement；小型文案、局部样式或用户已明确选定的目标可以跳过中间步骤，但必须说明跳过原因和验证方式。
-- 任一阶段都不是锁定状态，都可以继续调整；区别只在调整约束。Draft 调整成本最低，To Implement 需要同步原型和吸收范围，Current 属于正式代码变更，必须回到仓库真源、测试和浏览器回归，并按需同步正式文档。
-- 从 `起草阶段 / Draft` 收敛到 `待实现 / To Implement` 前，必须按 `docs/product/prototypes/README.md` 的“起草收敛提示 / Draft To Implement Checklist”核对输入来源、必须收敛项、禁止升级项和输出要求。
-- 从 `待实现 / To Implement` 原型吸收到真实页面前，必须按 `docs/product/prototypes/README.md` 的“待实现吸收提示 / To Implement Checklist”核对目标、必须对齐项、禁止照搬项、实现和验证范围。
-- `待实现 / To Implement` 晋级为 `当前实现 / Current` 必须有用户明确确认。Codex 不能仅凭自己完成了代码、测试、浏览器回归或“部分承接”就擅自把资产状态、registry、静态索引或 README 改成 Current；未获确认时，只能在 `progress.md` 或最终回复中建议候选晋级，并保留待实现队列。
-- `HTML / PNG` 只表示资产格式；`当前实现 / 待实现 / 起草阶段 / 参考资料` 是主阶段；`方案对比 / 截图证据 / 历史参考` 只作为辅助标签和追溯信息，不作为顶部筛选分类或实现承诺。
-- 原型不能替代仓库真源。进入正式实现时，Codex 必须回到真实代码、现有共享组件、API、RBAC、菜单、theme token、正式文档、测试和浏览器回归；不得直接复制静态原型数据、绕过权限 / 菜单边界，或把 Workflow 原型动作写成库存、出货、财务、应收、开票或收付款事实。
-- 原型结论改变业务能力、菜单入口、Workflow / Fact 边界、交付状态或产品化口径时，必须同步检查 `docs/当前真源与交接顺序.md`、相关产品 / 架构文档、`web/README.md` 和 `progress.md`，不能只改原型文件。
-
-## Ant Design 表单实例约定
-
-- 只要未来在 `plush-toy-erp` 前端创建了 `const [form] = Form.useForm()`，同一渲染树里就必须存在对应的 `<Form form={form}>` 真正承接该实例；禁止创建 form instance 后只在按钮、`onOk`、`submit()`、`resetFields()` 或其他 helper 里使用，却没有实际绑定到 `Form`。
-- `Modal`、`Drawer`、条件渲染表单默认把“表单是否已经真实挂载”当成必查项。凡是会在 `useEffect`、打开弹窗、关闭弹窗、切换编辑态时调用 `setFieldsValue`、`resetFields`、`validateFields`、`submit` 的链路，必须保证调用发生在表单挂载之后；必要时使用 `forceRender` 或保持稳定挂载，禁止在未挂载态访问 form instance。
-- 表单拆分成父子组件时，`form` 必须作为显式 prop 透传到最终的 `<Form form={form}>`；禁止父组件 `useForm()`、子组件忽略这份实例后又自己新建一份，造成父子各拿一份 form 或出现悬空实例。若只是表单内部子组件读取当前实例，优先使用 `Form.useFormInstance()`，不要额外创建新的 `useForm`。
-- 后续新增或重构 Ant Design 表单时，至少回归 `1)` 页面默认态初次渲染，`2)` 首次打开新建/编辑弹窗，`3)` 关闭后再次打开 这三种状态，确认浏览器控制台不出现 `Instance created by \`useForm\` is not connected to any Form element` 告警；如果该表单会长期存在，默认同步补一条最小回归测试，不要只做人工点按。
-- 这类问题按运行时回归缺陷处理，不能因为“功能表面还能用”或“只是 console warning”就忽略。当前仓库还没有 `useForm` 告警的既有示例文件；未来首个 Ant Design 表单接入点必须同时沉淀最小测试或浏览器回归脚本，避免同类错误重复出现。
-
-## 可观测性
-
-- 新增或修改服务端链路时，同时检查日志、trace 和健康检查。
-- 日志优先结构化字段，禁止输出密码、密钥、完整 token 等敏感明文。
-- `/readyz` 默认只检查 PostgreSQL 这一项通用硬依赖，项目特有依赖按真实需要再加。
-
-## 错误码与错误提示
-
-- 服务端错误码唯一来源：`server/internal/errcode/catalog.go`
-- 前端生成码表：`web/src/common/consts/errorCodes.generated.js`
-- 前端消费层：`web/src/common/consts/errorCodes.js`
-- 提交前如涉及错误码，执行：
-  - `bash /Users/simon/projects/plush-toy-erp/scripts/qa/error-code-sync.sh`
-  - `bash /Users/simon/projects/plush-toy-erp/scripts/qa/error-codes.sh`
-- 用户可见错误提示不要直接透传原始英文异常。
-
-## Git 约定
-
-- 提交信息默认使用简体中文。
-- 个人开发场景默认不要主动创建分支。
-- 用户明确要求提交时可直接 `git commit`。
-- 用户明确要求推送时可直接 `git push`。
-- 执行 `git push` 前，默认先执行 `git fetch` 并检查 `git status -sb` 或等价 upstream 状态，确认本地分支是否落后远端。
-- 若远端已有新提交，禁止直接强推覆盖。工作区干净时，优先使用 `git pull --ff-only`，或按项目规范 rebase / merge 后再推送；工作区不干净时，禁止为了 pull / push 默认 stash，优先用临时 `git worktree`、按路径精确提交 / 整合，或向用户说明分叉和风险。
-- 未经用户在当前轮明确要求，禁止把主工作区现场改动临时塞进 `git stash` 作为“为了提交 / 推送 / 切换上下文先藏起来”的默认手段。若需要隔离脏工作区，优先使用 `git worktree`、按路径精确提交 / 检查，或直接说明现场冲突。
-- 若已经误用 `git stash`，必须在同一轮继续完成：`1)` 列出 stash 内容；`2)` 判断哪些改动已落在当前代码树 / 提交里、哪些仍是唯一现场；`3)` 恢复仍有价值的唯一内容；`4)` 再删除不再需要的 stash。禁止把“待确认现场”长期沉在 stash 里。
-- 强制推送、重写历史、硬重置前必须先说明风险并获得同意。
-
-## GPT 与 Codex 协作
-
-本项目允许通过 GPT 进行需求澄清、架构讨论和方案比较，但 GPT 输出不能直接替代本仓库真源，也不再作为必须回传给 Codex 的执行 prompt 链路。
-
-当 Codex 参考来自 GPT 的规划或建议时，必须先审查：
-
-- 是否符合本项目 `AGENTS.md`
-- 是否符合当前 README、docs、Makefile、构建脚本和真实目录结构
-- 是否误改禁止路径、生成产物、敏感配置或扩大任务范围
-- 是否把规划、schema、迁移、runtime、前端接入、测试补齐、部署等多阶段内容混在一轮执行
-- 是否需要先拆成更小的可验证阶段
-
-Codex 应优先遵循本仓库真实代码、项目文档和当前工作区状态。若 GPT 建议与项目真源冲突，应收窄或修正执行范围，并在最终回复中说明原因。
-
-大型任务默认拆阶段执行，每一轮只完成一个可验证闭环。执行后应反馈已完成内容、未做内容、验证结果和剩余风险；是否继续让 GPT 辅助分析由用户决定。
+新增相近表、字段或配置前检查：能否复用、是否只是别名、应否扩展现有真源、migration 是否在范围、文档/测试/API/UI 会否形成双轨。
+
+## 字段与主路径修复
+
+- 遵循全局字段残值/缺值规则，并额外检查 Workflow 快照、Fact 真源、客户配置、打印和导入边界。
+- 不为单页硬编码特殊判断，不在前端补造后端业务事实，不以 workflow payload 替代事实表。
+- 不为测试放宽识别、权限、状态、幂等或命名条件。
+- 主路径反复不稳时修正真源/usecase/统一算法，删除或失效化误导性的旧锚点、动态层和后处理 bandage。
+- 临时方案必须有正式文档边界、测试和替换/退出路径。
+
+## 生命周期与删除语义
+
+- 业务列表不提供通用删除/回收站壳。只有后端 usecase、RBAC、审计、引用检查和测试闭环后才允许删除/恢复。
+- 主数据默认启用/停用；Source Document 取消/关闭/归档；Fact/Ledger 取消、冲正、调整或只读；Workflow 使用任务状态和事件。
+- 草稿明细移除不等于业务对象删除。已生效、过账或被引用对象不得物理删除。
+- 归档不是回收站：归档对象仍可查、可引用、可审计；只有真实软删除且有恢复 usecase 才设计回收站。
+
+## 测试与验收
+
+按 `docs/product/自动化测试策略.md` 和 `$plush-test-governance` 选择 T0-T8 与测试形态。
+
+- Workflow：done/blocked/rejected、reason、旧原因清理、幂等、任务匹配、settled、JSON-RPC/RBAC/owner/assignee/status。
+- Fact：happy path、非法状态、重复提交、取消/冲正、幂等、防负数、事务失败、过账不可改删和查询表一致性。
+- RBAC/API：未登录、disabled、非管理员、无权限、角色/owner/assignee/status、super_admin；前端隐藏不是安全边界。
+- 前端/menu/seed：菜单真源、默认/交互/恢复态、style:l1、移动角色 smoke 和旧开发入口边界。
+- 产品化：不写死客户，不分叉核心 schema/usecase，不把模拟数据说成真实事实。
+
+自动化通过不代表完整验收；缺失测试必须明确说明。
+
+## 试用模拟与数据
+
+- 当前没有可直接执行的 yoyoosun 真实数据导入；试用只使用 seed、fixture 或手工模拟客户、供应商、联系人、订单和岗位数据。
+- 不拆字母子阶段，不把真实导入作为隐藏目标或完成条件。
+- 模拟数据不得描述为真实客户确认、出货、库存或财务事实。
+- 自动 seed/fixture/Workflow 名称复用服务端 implementation naming validator；普通主数据不套开发阶段命名规则。
+
+## 文档与目录同步
+
+- 新增/删除/重命名一级目录或长期关键子系统时同步相关 README。
+- `docs/` 长期且易误读的目录应有 README；新增、删除、重命名或重分类长期 Markdown 时同步 `docs/文档清单.md`、目录 README、引用、入口和测试。
+- 仅改正文且标题/职责/分类不变时通常不更新文档清单。
+- 长期文档默认中文文件名和中文主体 + English anchor；README/AGENTS/CHANGELOG、archive/reference、生成/外部稳定路径除外。
+- 根 README 只管仓库导航，子目录 README 管内部职责。
+- 能力实现层级变化时同步当前真源、能力台账、客户交付/差异文档，明确已接层级和未闭环层级。
+
+## 部署、迁移与收口
+
+- 当前 Compose 真源是 `server/deploy/compose/prod`；低配目标机不构建，只 load 制品、migration、启动和检查。
+- 发布前确认 commit/image、migration、config、rollback；线上 Atlas 使用项目文档指定的宿主机工具和串行锁。
+- 镜像清理先保留当前及项目要求的回滚版本，再按 `$plush-operations-governance` 和发布文档执行。
+- schema 变更使用 Ent/Atlas 正式流程；开发库归属不清、共享/生产库或高风险 migration 必须先确认。
+- 代码/正式文档改动完成后更新 progress；提交推送只精确 stage 本轮范围，push 前 fetch 并确认 upstream。
+
+## 前端、原型与错误
+
+- 页面遵循现有设计系统和 `$plush-page-design-governance`；用户可见文案使用岗位语言，不暴露 schema/usecase/RBAC/API 等无必要术语。
+- 原型是设计输入，不自动证明 runtime；Draft/To Implement/Current 状态与代码、测试分别核对。
+- Ant Design 动态表单必须正确使用所属 form 实例，不依赖警告兜底或隐藏实例。
+- 错误码真源、生成前端码表、消费 wrapper 和同步守卫按项目现有实现维护；保持一码一义。
+- 前端错误通过统一 helper 翻译，调用点提供场景 fallback，不透传原始英文异常。
+
+## 旧项目与外部规划
+
+- 旧项目只能作迁移背景，不是 plush 字段、流程、页面、测试或文案真源；运行时用户界面不出现旧项目名或“对齐旧项目”说明。
+- GPT/ChatGPT 会话只作输入。执行前核对本文件、README、正式 docs、代码、migration、测试和 worktree；冲突时按仓库真源收窄。
