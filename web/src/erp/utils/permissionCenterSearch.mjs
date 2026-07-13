@@ -2,6 +2,7 @@ export const ADMIN_STATUS_FILTERS = Object.freeze({
   ALL: 'all',
   ENABLED: 'enabled',
   DISABLED: 'disabled',
+  REVOKED: 'revoked',
   SUPER: 'super',
 })
 
@@ -40,7 +41,8 @@ function getAdminStatusText(admin = {}) {
   if (admin.is_super_admin === true) {
     return '超级管理员 始终启用 启用 全部角色 全部权限'
   }
-  return admin.disabled ? '普通管理员 禁用' : '普通管理员 启用'
+  if (admin.account_status === 'revoked') return '普通管理员 已注销 离职'
+  return admin.disabled ? '普通管理员 禁用 暂停' : '普通管理员 启用'
 }
 
 export function matchesAdminStatus(
@@ -55,7 +57,14 @@ export function matchesAdminStatus(
     return admin.is_super_admin === true
   }
   if (normalizedStatus === ADMIN_STATUS_FILTERS.DISABLED) {
-    return admin.is_super_admin !== true && Boolean(admin.disabled)
+    return (
+      admin.is_super_admin !== true &&
+      Boolean(admin.disabled) &&
+      admin.account_status !== 'revoked'
+    )
+  }
+  if (normalizedStatus === ADMIN_STATUS_FILTERS.REVOKED) {
+    return admin.is_super_admin !== true && admin.account_status === 'revoked'
   }
   if (normalizedStatus === ADMIN_STATUS_FILTERS.ENABLED) {
     return admin.is_super_admin === true || !admin.disabled

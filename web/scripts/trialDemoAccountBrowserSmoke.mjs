@@ -1239,7 +1239,7 @@ async function login(
   if (await entryButton.isVisible().catch(() => false)) {
     await entryButton.click()
   }
-  await page.getByLabel('管理员账号').fill(username)
+  await page.getByLabel('账号').fill(username)
   await page.locator('input[type="password"]').fill(readDemoPassword())
   const submit = page.locator('button[type="submit"]').first()
   if (expectSuccess) {
@@ -1264,7 +1264,7 @@ async function ensureLoginFormReady(
     await page
       .waitForLoadState('networkidle', { timeout: 5_000 })
       .catch(() => {})
-    const accountInput = page.getByLabel('管理员账号')
+    const accountInput = page.getByLabel('账号')
     if (
       await accountInput
         .waitFor({ state: 'visible', timeout: 8_000 })

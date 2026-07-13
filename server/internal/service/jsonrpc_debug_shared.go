@@ -52,6 +52,9 @@ func (d *jsonrpcDispatcher) mapDebugError(ctx context.Context, err error) *v1.Js
 		}
 		l.Warnf("[debug] clear business data disabled err=%v reason=%s", err, reason)
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: reason}
+	case errors.Is(err, biz.ErrDebugBusinessDataClearConfirmationInvalid):
+		l.Warnf("[debug] clear business data confirmation invalid err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "全量清空业务数据必须提供精确确认短语"}
 	case errors.Is(err, biz.ErrDebugRunIDRequired):
 		l.Warnf("[debug] missing debugRunId err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "必须提供 debugRunId，本接口禁止无范围清理"}
@@ -88,22 +91,25 @@ func debugParamString(pm map[string]any, keys ...string) string {
 
 func debugCapabilitiesToMap(capabilities biz.DebugCapabilities) map[string]any {
 	return map[string]any{
-		"environment":                     capabilities.Environment,
-		"seedEnabled":                     capabilities.SeedEnabled,
-		"seedAllowed":                     capabilities.SeedAllowed,
-		"seedDisabledReason":              capabilities.SeedDisabledReason,
-		"cleanupEnabled":                  capabilities.CleanupEnabled,
-		"cleanupAllowed":                  capabilities.CleanupAllowed,
-		"cleanupDisabledReason":           capabilities.CleanupDisabledReason,
-		"businessDataClearEnabled":        capabilities.BusinessDataClearEnabled,
-		"businessDataClearAllowed":        capabilities.BusinessDataClearAllowed,
-		"businessDataClearDisabledReason": capabilities.BusinessDataClearDisabledReason,
-		"cleanupScope":                    capabilities.CleanupScope,
-		"supportedScenarios":              debugScenarioSummariesToAny(capabilities.SupportedScenarios),
-		"cleanupOnlyDebugData":            true,
-		"requiresDebugRunId":              true,
-		"requiresBackendGuard":            true,
-		"destructiveRemoteDenied":         false,
+		"environment":                          capabilities.Environment,
+		"seedEnabled":                          capabilities.SeedEnabled,
+		"seedAllowed":                          capabilities.SeedAllowed,
+		"seedDisabledReason":                   capabilities.SeedDisabledReason,
+		"cleanupEnabled":                       capabilities.CleanupEnabled,
+		"cleanupAllowed":                       capabilities.CleanupAllowed,
+		"cleanupDisabledReason":                capabilities.CleanupDisabledReason,
+		"businessDataClearEnabled":             capabilities.BusinessDataClearEnabled,
+		"businessDataClearAllowed":             capabilities.BusinessDataClearAllowed,
+		"businessDataClearDisabledReason":      capabilities.BusinessDataClearDisabledReason,
+		"businessDataClearDryRunDefault":       capabilities.BusinessDataClearDryRunDefault,
+		"businessDataClearConfirmation":        capabilities.BusinessDataClearConfirmation,
+		"businessDataClearAllowedEnvironments": []any{"local", "dev"},
+		"cleanupScope":                         capabilities.CleanupScope,
+		"supportedScenarios":                   debugScenarioSummariesToAny(capabilities.SupportedScenarios),
+		"cleanupOnlyDebugData":                 true,
+		"requiresDebugRunId":                   true,
+		"requiresBackendGuard":                 true,
+		"destructiveRemoteDenied":              true,
 	}
 }
 
@@ -160,6 +166,8 @@ func debugCleanupResultToMap(result *biz.DebugBusinessChainCleanupResult) map[st
 		"deletedTasks":          debugMatchedTasksToAny(result.DeletedTasks),
 		"deletedBusinessStates": result.DeletedBusinessStates,
 		"deletedTaskEvents":     result.DeletedTaskEvents,
+		"matchedAttachments":    result.MatchedAttachments,
+		"deletedAttachments":    result.DeletedAttachments,
 		"skippedItems":          debugSkippedItemsToAny(result.SkippedItems),
 		"warnings":              toAnySliceString(result.Warnings),
 	}
@@ -170,6 +178,9 @@ func debugBusinessDataClearResultToMap(result *biz.DebugBusinessDataClearResult)
 		return map[string]any{}
 	}
 	return map[string]any{
+		"dryRun":            result.DryRun,
+		"matchedCounts":     toAnyMapStringInt(result.MatchedCounts),
+		"matchedTotal":      result.MatchedTotal,
 		"deletedCounts":     toAnyMapStringInt(result.DeletedCounts),
 		"deletedTotal":      result.DeletedTotal,
 		"clearedTableNames": toAnySliceString(result.ClearedTableNames),

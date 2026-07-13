@@ -7,14 +7,19 @@ var ProviderSet = wire.NewSet(
 	NewAdminAuthUsecase,
 	NewAdminManageUsecase,
 	NewWorkflowUsecase,
-	NewProcessRuntimeUsecase,
+	NewProcessRuntimeUsecaseForWire,
 	NewDebugUsecase,
 	NewMasterDataUsecase,
 	NewSalesOrderUsecase,
 	NewPurchaseOrderUsecase,
+	NewProductionOrderUsecase,
 	NewOutsourcingOrderUsecase,
 	NewInventoryUsecase,
 	NewOperationalFactUsecase,
 	NewBusinessAttachmentUsecase,
 	NewCustomerConfigUsecase,
 )
+
+func NewProcessRuntimeUsecaseForWire(repo ProcessRuntimeRepo, workflowRepo WorkflowRepo) *ProcessRuntimeUsecase {
+	return NewProcessRuntimeUsecase(repo, workflowRepo)
+}

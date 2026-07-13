@@ -20,6 +20,18 @@ func (f AccessEntitlementFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AccessEntitlementMutation", m)
 }
 
+// The AdminSessionFunc type is an adapter to allow the use of ordinary
+// function as AdminSession mutator.
+type AdminSessionFunc func(context.Context, *ent.AdminSessionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f AdminSessionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.AdminSessionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AdminSessionMutation", m)
+}
+
 // The AdminUserFunc type is an adapter to allow the use of ordinary
 // function as AdminUser mutator.
 type AdminUserFunc func(context.Context, *ent.AdminUserMutation) (ent.Value, error)
@@ -306,6 +318,42 @@ func (f ProductionFactFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Val
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductionFactMutation", m)
+}
+
+// The ProductionOrderFunc type is an adapter to allow the use of ordinary
+// function as ProductionOrder mutator.
+type ProductionOrderFunc func(context.Context, *ent.ProductionOrderMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ProductionOrderFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ProductionOrderMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductionOrderMutation", m)
+}
+
+// The ProductionOrderEventFunc type is an adapter to allow the use of ordinary
+// function as ProductionOrderEvent mutator.
+type ProductionOrderEventFunc func(context.Context, *ent.ProductionOrderEventMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ProductionOrderEventFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ProductionOrderEventMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductionOrderEventMutation", m)
+}
+
+// The ProductionOrderItemFunc type is an adapter to allow the use of ordinary
+// function as ProductionOrderItem mutator.
+type ProductionOrderItemFunc func(context.Context, *ent.ProductionOrderItemMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ProductionOrderItemFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ProductionOrderItemMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductionOrderItemMutation", m)
 }
 
 // The PurchaseOrderFunc type is an adapter to allow the use of ordinary

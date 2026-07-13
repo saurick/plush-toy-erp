@@ -63,9 +63,9 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     },
     entityLabel: '客户',
     draftCodePrefix: 'CUS',
-    formBoundary: '只维护交易主体资料，不在此写订单、库存或财务事实。',
+    formBoundary: '只维护交易主体资料，不在此写订单、库存或财务记录。',
     summary:
-      '维护客户交易主体和联系人；订单、出货、库存和财务事实在对应业务模块处理。',
+      '维护客户交易主体和联系人；订单、出货、库存和财务记录在对应业务模块处理。',
   },
   suppliers: {
     title: '供应商档案',
@@ -88,9 +88,9 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     },
     entityLabel: '供应商',
     draftCodePrefix: 'SUP',
-    formBoundary: '只维护交易主体资料，不在此写采购、库存、质检或财务事实。',
+    formBoundary: '只维护交易主体资料，不在此写采购、库存、质检或财务记录。',
     summary:
-      '维护供应商和加工厂交易主体；采购入库、质检、库存和财务事实在对应业务模块处理。',
+      '维护供应商和加工厂交易主体；采购入库、质检、库存和财务记录在对应业务模块处理。',
   },
   materials: {
     title: '材料档案',
@@ -127,7 +127,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     formBoundary:
       '只维护委外订单和后续质检可引用的标准加工环节；需质检只是工序属性标记，不在此生成委外订单、生产任务、库存流水或质检判定。',
     summary:
-      '维护少量可复用加工环节，用于委外订单选择和后续质检提示；不管理完整工艺路线、排程、报工、质检结果或库存事实。',
+      '维护少量可复用加工环节，用于委外订单选择和后续质检提示；不管理完整工艺路线、排程、报工、质检结果或库存记录。',
     initialValues: {
       outsourcing_enabled: true,
       inhouse_enabled: false,
@@ -151,9 +151,9 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     createTitleLabel: '产品',
     draftCodePrefix: 'PRD',
     formBoundary:
-      '只维护产品基础信息，不在此写订单、库存、BOM、生产或出货事实。',
+      '只维护产品基础信息，不在此写订单、库存、BOM、生产或出货业务。',
     summary:
-      '维护产品基础信息；产品规格 / SKU、BOM、订单、库存和出货事实在对应业务模块处理。',
+      '维护产品基础信息；产品规格 / SKU、BOM、订单、库存和出货记录在对应业务模块处理。',
   },
   product_skus: {
     title: '产品档案',
@@ -172,9 +172,9 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     draftCodeField: 'sku_code',
     draftCodePrefix: 'SKU',
     formBoundary:
-      '只维护产品规格主数据，不在此写订单、库存、BOM、生产或出货事实。',
+      '只维护产品规格主数据，不在此写订单、库存、BOM、生产或出货业务。',
     summary:
-      '维护产品规格 / SKU；产品归属使用 product_id，订单、库存、BOM 和出货事实在对应业务模块处理。',
+      '维护产品规格 / SKU；产品规格归属到对应产品；订单、库存、BOM 和出货记录在对应业务模块处理。',
   },
 })
 

@@ -6,7 +6,7 @@ import (
 	"server/internal/conf"
 )
 
-func TestNewDebugSafetyConfigFromEnv_DefaultsEnabledForSQL(t *testing.T) {
+func TestNewDebugSafetyConfigFromEnv_DefaultsFailClosedForSQL(t *testing.T) {
 	config := newDebugSafetyConfigFromEnv(&conf.Data{
 		Postgres: &conf.Data_Postgres{Debug: false},
 	}, func(string) string { return "" })
@@ -14,12 +14,12 @@ func TestNewDebugSafetyConfigFromEnv_DefaultsEnabledForSQL(t *testing.T) {
 	if config.Environment != "sql" {
 		t.Fatalf("expected sql environment, got %q", config.Environment)
 	}
-	if !config.SeedEnabled || !config.CleanupEnabled {
-		t.Fatalf("expected SQL debug mutations enabled by default, got %#v", config)
+	if config.SeedEnabled || config.CleanupEnabled || config.BusinessDataClearEnabled {
+		t.Fatalf("expected SQL debug mutations disabled by default, got %#v", config)
 	}
 }
 
-func TestNewDebugSafetyConfigFromEnv_ExplicitEnvironmentDefaultsEnabled(t *testing.T) {
+func TestNewDebugSafetyConfigFromEnv_ExplicitEnvironmentStillDefaultsFailClosed(t *testing.T) {
 	config := newDebugSafetyConfigFromEnv(&conf.Data{
 		Postgres: &conf.Data_Postgres{Debug: false},
 	}, func(key string) string {
@@ -32,8 +32,27 @@ func TestNewDebugSafetyConfigFromEnv_ExplicitEnvironmentDefaultsEnabled(t *testi
 	if config.Environment != "remote" {
 		t.Fatalf("expected remote environment, got %q", config.Environment)
 	}
-	if !config.SeedEnabled || !config.CleanupEnabled {
-		t.Fatalf("expected debug mutations enabled by default for explicit environment, got %#v", config)
+	if config.SeedEnabled || config.CleanupEnabled || config.BusinessDataClearEnabled {
+		t.Fatalf("expected explicit environment to keep debug mutations disabled by default, got %#v", config)
+	}
+}
+
+func TestNewDebugSafetyConfigFromEnv_ExplicitTrueEnablesIndependentLocalCapabilities(t *testing.T) {
+	config := newDebugSafetyConfigFromEnv(&conf.Data{
+		Postgres: &conf.Data_Postgres{Debug: false},
+	}, func(key string) string {
+		switch key {
+		case "ERP_DEBUG_ENV":
+			return "local"
+		case "ERP_DEBUG_SEED_ENABLED", "ERP_DEBUG_CLEANUP_ENABLED", "ERP_DEBUG_BUSINESS_CLEAR_ENABLED":
+			return "true"
+		default:
+			return ""
+		}
+	})
+
+	if !config.SeedEnabled || !config.CleanupEnabled || !config.BusinessDataClearEnabled {
+		t.Fatalf("expected explicitly enabled local debug capabilities, got %#v", config)
 	}
 }
 
@@ -42,14 +61,14 @@ func TestNewDebugSafetyConfigFromEnv_ExplicitFalseKeepsDisabled(t *testing.T) {
 		Postgres: &conf.Data_Postgres{Debug: true},
 	}, func(key string) string {
 		switch key {
-		case "ERP_DEBUG_SEED_ENABLED", "ERP_DEBUG_CLEANUP_ENABLED":
+		case "ERP_DEBUG_SEED_ENABLED", "ERP_DEBUG_CLEANUP_ENABLED", "ERP_DEBUG_BUSINESS_CLEAR_ENABLED":
 			return "false"
 		default:
 			return ""
 		}
 	})
 
-	if config.SeedEnabled || config.CleanupEnabled {
+	if config.SeedEnabled || config.CleanupEnabled || config.BusinessDataClearEnabled {
 		t.Fatalf("expected explicit false to keep debug mutations disabled, got %#v", config)
 	}
 }

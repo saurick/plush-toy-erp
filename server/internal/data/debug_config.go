@@ -20,16 +20,16 @@ func newDebugSafetyConfigFromEnv(c *conf.Data, getenv func(string) string) biz.D
 	if environment == "" {
 		environment = "sql"
 	}
-	defaultMutationEnabled := true
 	cleanupScope := strings.TrimSpace(getenv("ERP_DEBUG_CLEANUP_SCOPE"))
 	if cleanupScope == "" {
 		cleanupScope = biz.DebugDefaultCleanupScope
 	}
 	return biz.NormalizeDebugSafetyConfig(biz.DebugSafetyConfig{
-		Environment:    environment,
-		SeedEnabled:    envBoolDefault(getenv("ERP_DEBUG_SEED_ENABLED"), defaultMutationEnabled),
-		CleanupEnabled: envBoolDefault(getenv("ERP_DEBUG_CLEANUP_ENABLED"), defaultMutationEnabled),
-		CleanupScope:   cleanupScope,
+		Environment:              environment,
+		SeedEnabled:              envBoolDefault(getenv("ERP_DEBUG_SEED_ENABLED"), false),
+		CleanupEnabled:           envBoolDefault(getenv("ERP_DEBUG_CLEANUP_ENABLED"), false),
+		BusinessDataClearEnabled: envBoolDefault(getenv("ERP_DEBUG_BUSINESS_CLEAR_ENABLED"), false),
+		CleanupScope:             cleanupScope,
 	})
 }
 

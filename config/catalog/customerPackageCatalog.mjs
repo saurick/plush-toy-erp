@@ -27,6 +27,7 @@ export const customerPackageCatalog = Object.freeze({
     { key: "shipments", label: "出货单", layer: "Fact" },
     { key: "finance", label: "财务业务", layer: "FactCandidate" },
     { key: "workflow_tasks", label: "协同任务", layer: "Workflow" },
+    { key: "production_orders", label: "生产订单", layer: "SourceDocument" },
     { key: "production", label: "生产协同", layer: "Workflow" },
   ]),
   capabilities: Object.freeze([
@@ -52,7 +53,10 @@ export const customerPackageCatalog = Object.freeze({
     { key: "inbound", label: "入库管理", requiredCapabilityKeys: ["purchase.receipt.read", "supplier.read", "material.read", "warehouse.inventory.read"] },
     { key: "inventory", label: "库存台账", requiredCapabilityKeys: ["warehouse.inventory.read", "material.read", "product.read"] },
     { key: "processing-contracts", label: "加工合同", requiredCapabilityKeys: ["outsourcing.order.read", "supplier.read", "contact.read", "material.read", "process.read", "product.read", "workflow.task.read"] },
+    { key: "production-orders", label: "生产订单", requiredCapabilityKeys: ["pmc.plan.read"] },
+    { key: "production-scheduling", label: "生产排程", requiredCapabilityKeys: ["pmc.plan.read"] },
     { key: "production-progress", label: "生产进度", requiredCapabilityKeys: ["pmc.plan.read"] },
+    { key: "production-exceptions", label: "生产异常", requiredCapabilityKeys: ["pmc.risk.read"] },
     { key: "outbound", label: "出库管理", requiredCapabilityKeys: ["warehouse.outbound.read", "warehouse.inventory.read"] },
     { key: "shipments", label: "出货单", requiredCapabilityKeys: ["shipment.read", "customer.read", "warehouse.inventory.read", "product.read", "product_sku.read", "sales_order.read", "sales_order_item.read", "material.read"] },
     { key: "reconciliation", label: "业务对账", requiredCapabilityKeys: ["finance.report.read", "finance.payable.read", "finance.receivable.read"] },

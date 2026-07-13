@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
+	"math"
 	"strings"
 	"time"
 
@@ -36,6 +36,12 @@ func (d *jsonrpcDispatcher) mapWorkflowError(ctx context.Context, err error) *v1
 	case errors.Is(err, biz.ErrWorkflowTaskSettled):
 		l.Warnf("[workflow] task settled err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务已结束，不能再次变更状态"}
+	case errors.Is(err, biz.ErrWorkflowTaskConflict):
+		l.Warnf("[workflow] task version conflict err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务已被其他人更新，请刷新后重试"}
+	case errors.Is(err, biz.ErrIdempotencyConflict):
+		l.Warnf("[workflow] idempotency intent conflict err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
 	case errors.Is(err, biz.ErrProcessInstanceSettled),
 		errors.Is(err, biz.ErrProcessNodeInstanceConflict),
 		errors.Is(err, biz.ErrProcessNodeInstanceSettled),
@@ -99,6 +105,7 @@ func workflowTaskToMap(task *biz.WorkflowTask) map[string]any {
 		"completed_at":             workflowUnixValue(task.CompletedAt),
 		"closed_at":                workflowUnixValue(task.ClosedAt),
 		"payload":                  workflowMapValue(task.Payload),
+		"version":                  task.Version,
 		"created_by":               workflowIntValue(task.CreatedBy),
 		"updated_by":               workflowIntValue(task.UpdatedBy),
 		"created_at":               task.CreatedAt.Unix(),
@@ -229,32 +236,11 @@ func getWorkflowUnixTimePtr(m map[string]any, key string) (*time.Time, bool) {
 	if !ok || raw == nil {
 		return nil, true
 	}
-
-	var unix int64
-	switch value := raw.(type) {
-	case float64:
-		unix = int64(value)
-	case int:
-		unix = int64(value)
-	case int64:
-		unix = value
-	case string:
-		trimmed := strings.TrimSpace(value)
-		if trimmed == "" {
-			return nil, true
-		}
-		parsed, err := strconv.ParseInt(trimmed, 10, 64)
-		if err != nil {
-			return nil, false
-		}
-		unix = parsed
-	default:
+	const maxPostgresUnixSecond = float64(9224318015999)
+	unixValue, ok := raw.(float64)
+	if !ok || unixValue <= 0 || unixValue > maxPostgresUnixSecond || math.Trunc(unixValue) != unixValue {
 		return nil, false
 	}
-
-	if unix <= 0 {
-		return nil, true
-	}
-	value := time.Unix(unix, 0)
+	value := time.Unix(int64(unixValue), 0)
 	return &value, true
 }

@@ -25,7 +25,7 @@ export default function PurchaseOrderBusinessModal({
     <BusinessFormModal
       open={open}
       title={editingOrder ? '编辑采购订单' : '新建采购订单'}
-      description="只维护采购承诺，不在此写库存、质检或应付事实。"
+      description="只维护采购承诺，入库、质检、库存或应付请到对应业务页面处理。"
       okText="保存"
       confirmLoading={saving || itemsLoading}
       onOk={onOk}
@@ -46,7 +46,7 @@ export default function PurchaseOrderBusinessModal({
             ownerType="purchase_order"
             ownerId={editingOrder?.id}
             title="采购附件"
-            description="上传供应商报价、签回采购单、到货要求或价格确认资料；附件不替代采购订单事实。"
+            description="上传供应商报价、签回采购单、到货要求或价格确认资料；上传附件不会改变采购订单状态。"
             canUpload={canUpdate || canCreate}
             canDelete={canUpdate}
             variant="inline"

@@ -11,31 +11,95 @@ export const DEFAULT_WORKFLOW_ACTION_MODES = Object.freeze([
   'urge',
 ])
 
-const ACTION_MODE_ALIASES = Object.freeze({
-  done: 'complete',
-  complete: 'complete',
-  blocked: 'block',
-  block: 'block',
-  rejected: 'reject',
-  reject: 'reject',
-  urge_task: 'urge',
-  urge_role: 'urge',
-  urge_assignee: 'urge',
-  escalate_to_pmc: 'urge',
-  escalate_to_boss: 'urge',
-  urge: 'urge',
-})
+const WORKFLOW_ACTION_MODE_SET = new Set(DEFAULT_WORKFLOW_ACTION_MODES)
+const WORKFLOW_TASK_EXPLAIN_PARAM_KEYS = new Set(['task_id'])
+const WORKFLOW_ACTION_EXPLAIN_PARAM_KEYS = new Set(['task_id', 'action_key'])
 
 const WORKFLOW_ACTION_ACCESS_FAILED_REASON =
-  '无法核对后端任务动作权限，请刷新后重试。'
-const WORKFLOW_ACTION_ACCESS_MISSING_REASON =
-  '后端未返回该动作权限，请刷新后重试。'
+  '暂时无法确认您是否可以处理此任务，请刷新后重试。'
+const WORKFLOW_ACTION_ACCESS_MISSING_REASON = '当前操作暂不可用，请刷新后重试。'
 const WORKFLOW_ACTION_ACCESS_CHECKING_REASON =
-  '正在核对后端任务动作权限，请稍后再提交。'
+  '正在确认操作权限，请稍后再提交。'
+
+function sortedIdentityStrings(values = [], mapValue = (value) => value) {
+  if (!Array.isArray(values)) return []
+  return values
+    .map(mapValue)
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .sort()
+}
+
+export function workflowTaskAdminAccessRequestIdentity(adminProfile = {}) {
+  const session =
+    adminProfile?.effective_session &&
+    typeof adminProfile.effective_session === 'object'
+      ? adminProfile.effective_session
+      : {}
+  return JSON.stringify([
+    Number(adminProfile?.id || 0),
+    adminProfile?.is_super_admin === true,
+    sortedIdentityStrings(
+      adminProfile?.roles,
+      (role) => role?.role_key || role?.key || ''
+    ),
+    sortedIdentityStrings(adminProfile?.permissions),
+    String(session?.customer?.key || session?.customer_key || '').trim(),
+    String(session?.config_revision || session?.configRevision || '').trim(),
+    String(session?.config_hash || session?.configHash || '').trim(),
+    sortedIdentityStrings(session?.actions),
+  ])
+}
+
+export function workflowTaskActionAccessRequestIdentity(task = null) {
+  const taskID = Number(task?.id || 0)
+  if (!Number.isSafeInteger(taskID) || taskID <= 0) {
+    return { taskID: 0, taskVersion: 0, requestKey: '' }
+  }
+  const rawTaskVersion = Number(task?.version || 0)
+  const taskVersion =
+    Number.isSafeInteger(rawTaskVersion) && rawTaskVersion > 0
+      ? rawTaskVersion
+      : 0
+  return {
+    taskID,
+    taskVersion,
+    requestKey: `${taskID}:${taskVersion}`,
+  }
+}
+
+export function requireWorkflowTaskExplainParams(
+  params = {},
+  { allowActionKey = false } = {}
+) {
+  if (!params || typeof params !== 'object' || Array.isArray(params)) {
+    throw new TypeError('task_id 必须是安全正整数')
+  }
+  const allowedKeys = allowActionKey
+    ? WORKFLOW_ACTION_EXPLAIN_PARAM_KEYS
+    : WORKFLOW_TASK_EXPLAIN_PARAM_KEYS
+  if (Object.keys(params).some((key) => !allowedKeys.has(key))) {
+    throw new TypeError('任务查询参数无效')
+  }
+  if (!Number.isSafeInteger(params.task_id) || params.task_id <= 0) {
+    throw new TypeError('task_id 必须是安全正整数')
+  }
+  if (!Object.hasOwn(params, 'action_key')) {
+    return { taskID: params.task_id, actionKey: '' }
+  }
+  if (
+    !allowActionKey ||
+    typeof params.action_key !== 'string' ||
+    !WORKFLOW_ACTION_MODE_SET.has(params.action_key)
+  ) {
+    throw new TypeError('action_key 不支持')
+  }
+  return { taskID: params.task_id, actionKey: params.action_key }
+}
 
 export function normalizeWorkflowActionMode(value = '') {
   const key = String(value || '').trim()
-  return ACTION_MODE_ALIASES[key] || ''
+  return WORKFLOW_ACTION_MODE_SET.has(key) ? key : ''
 }
 
 function normalizeStringList(values) {
@@ -44,17 +108,13 @@ function normalizeStringList(values) {
 }
 
 function normalizeDomainCommandEntry(item = {}) {
-  const rawReasons = Array.isArray(item.blocked_reasons)
-    ? item.blocked_reasons
-    : item.blockedReasons
-  const rawContract = Array.isArray(item.required_contract)
-    ? item.required_contract
-    : item.requiredContract
+  const rawReasons = item.blocked_reasons
+  const rawContract = item.required_contract
   return {
     enabled: item.enabled === true,
-    willWriteFact: item.will_write_fact === true || item.willWriteFact === true,
+    willWriteFact: item.will_write_fact === true,
     source: String(item.source || '').trim(),
-    commandKey: String(item.command_key || item.commandKey || '').trim(),
+    commandKey: String(item.command_key || '').trim(),
     blockedReasons: normalizeStringList(rawReasons),
     requiredContract: normalizeStringList(rawContract),
   }
@@ -72,8 +132,8 @@ function workflowActionFallbackDomainCommandEntry() {
 }
 
 function normalizeActionExplainItem(item = {}) {
-  const actionMode = normalizeWorkflowActionMode(item.action_key || item.action)
-  if (!actionMode) return null
+  const actionMode = String(item.action_key || '').trim()
+  if (!WORKFLOW_ACTION_MODE_SET.has(actionMode)) return null
   return {
     actionMode,
     allowed: item.allowed === true,
@@ -262,7 +322,7 @@ export function buildWorkflowActionAccessState({
 export function resolveWorkflowActionAccessRequestOutcome({
   currentRequestID = 0,
   requestID = 0,
-  taskKey = '',
+  requestKey = '',
   data = null,
   error = null,
   isAbortError = () => false,
@@ -271,14 +331,14 @@ export function resolveWorkflowActionAccessRequestOutcome({
   if (error) {
     if (isAbortError(error)) return null
     return {
-      taskKey,
+      requestKey,
       data: null,
       loading: false,
       failed: true,
     }
   }
   return {
-    taskKey,
+    requestKey,
     data,
     loading: false,
     failed: false,

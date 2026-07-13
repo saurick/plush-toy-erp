@@ -448,6 +448,10 @@ func (r *serviceWorkflowRepo) CreateWorkflowTask(_ context.Context, in *biz.Work
 	return cloneServiceWorkflowTask(task), nil
 }
 
+func (r *serviceWorkflowRepo) ResolveWorkflowTaskMutation(context.Context, int, string, string, string, int) (*biz.WorkflowTask, bool, error) {
+	return nil, false, nil
+}
+
 func (r *serviceWorkflowRepo) UpdateWorkflowTaskStatus(context.Context, *biz.WorkflowTaskStatusUpdate, int, string) (*biz.WorkflowTask, error) {
 	return nil, biz.ErrBadParam
 }
@@ -2431,7 +2435,7 @@ func (r *customerConfigShipmentOperationalFactRepo) SettleFinanceFact(_ context.
 	return nil, biz.ErrBadParam
 }
 
-func (r *customerConfigShipmentOperationalFactRepo) CancelPostedFinanceFact(_ context.Context, id int) (*biz.FinanceFact, error) {
+func (r *customerConfigShipmentOperationalFactRepo) CancelPostedFinanceFact(_ context.Context, id int, _ int, _ string) (*biz.FinanceFact, error) {
 	r.cancelledFinanceFactID = id
 	return nil, biz.ErrBadParam
 }

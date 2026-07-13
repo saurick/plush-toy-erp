@@ -22,15 +22,36 @@ import {
   normalizeDevPrototypePinnedKeys,
   normalizeDevPrototypeSelectedKey,
   normalizeDevPrototypeStatusFilter,
+  prepareDevPrototypeSandboxSource,
 } from './devPrototypes.mjs'
+import { printTemplateCatalog } from './printTemplates.mjs'
 
 const repoRoot = path.resolve(import.meta.dirname, '../../../..')
+const prototypesPageSource = readFileSync(
+  path.join(repoRoot, 'web/src/erp/pages/DevPrototypesPage.jsx'),
+  'utf8'
+)
 
 test('devPrototypes: 只通过开发态独立路径暴露', () => {
   assert.equal(DEV_PROTOTYPES_ROUTE, '/__dev/prototypes')
   assert.equal(isDevPrototypesEnabled({ DEV: true }), true)
   assert.equal(isDevPrototypesEnabled({ DEV: false }), false)
   assert(!DEV_PROTOTYPES_ROUTE.startsWith('/erp/'))
+})
+
+test('devPrototypes: sandbox preview uses in-memory storage without same-origin access', () => {
+  const prepared = prepareDevPrototypeSandboxSource(
+    '<!doctype html><html><head><title>Demo</title></head><body></body></html>'
+  )
+  assert.match(prepared, /Object\.defineProperty\(window, name/u)
+  assert.match(prepared, /createMemoryStorage/u)
+  assert.doesNotMatch(prepared, /window\[name\]\.getItem/u)
+  assert(
+    prepared.indexOf('createMemoryStorage') < prepared.indexOf('<title>Demo')
+  )
+  assert.match(prototypesPageSource, /sandbox="allow-scripts"/u)
+  assert.doesNotMatch(prototypesPageSource, /allow-same-origin/u)
+  assert.equal(prepareDevPrototypeSandboxSource(''), '')
 })
 
 test('devPrototypes: 登记当前原型与样板资产并区分类型和状态', () => {
@@ -209,6 +230,80 @@ test('devPrototypes: 岗位任务端 Current 参考不透出移动端旧动作�
   assert.doesNotMatch(html, /请填写原因，至少 5 个字/u)
 })
 
+test('devPrototypes: 业务表单样板使用真实单弹窗与完整键盘边界', () => {
+  const html = readFileSync(
+    path.join(
+      repoRoot,
+      'docs/product/prototypes/business-form-page-standard-v1/index.html'
+    ),
+    'utf8'
+  )
+
+  assert.equal([...html.matchAll(/<dialog\b/gu)].length, 1)
+  assert.equal([...html.matchAll(/<div class="footer"/gu)].length, 1)
+  assert.equal(
+    [...html.matchAll(/class="btn primary save-action"/gu)].length,
+    1
+  )
+  assert.match(html, /id="openFormModal"[^>]*aria-haspopup="dialog"/su)
+  assert.match(
+    html,
+    /<dialog[\s\S]*?aria-modal="true"[\s\S]*?aria-labelledby="businessFormTitle"[\s\S]*?aria-describedby="businessFormDescription"/u
+  )
+  assert.match(html, /businessFormDialog\.showModal\(\)/u)
+  assert.match(html, /querySelector\("\[data-initial-focus\]"\)\?\.focus/u)
+  assert.match(html, /businessFormDialog\.addEventListener\("keydown"/u)
+  assert.match(html, /event\.key === "Escape"/u)
+  assert.match(html, /event\.key !== "Tab"/u)
+  assert.match(html, /modalTrigger\?\.focus/u)
+  assert.doesNotMatch(html, /<dialog[^>]*\sopen(?:\s|>)/u)
+  const editableFields =
+    html.match(/const editableFieldIds = \[([\s\S]*?)\];/u)?.[1] || ''
+  assert.doesNotMatch(editableFields, /"lineAmount"/u)
+  assert.match(html, /<input id="lineAmount"[^>]*disabled/u)
+})
+
+test('devPrototypes: 模板打印中心样板覆盖当前五个正式模板', () => {
+  const html = readFileSync(
+    path.join(
+      repoRoot,
+      'docs/product/prototypes/print-template-center-v1/index.html'
+    ),
+    'utf8'
+  )
+  const prototypeTitles = [
+    ...html.matchAll(
+      /<button class="template-card"[\s\S]*?<h2>([^<]+)<\/h2>/gu
+    ),
+  ].map((match) => match[1].trim())
+
+  assert.deepEqual(
+    prototypeTitles,
+    printTemplateCatalog.map((template) => template.title)
+  )
+  assert.equal(new Set(prototypeTitles).size, printTemplateCatalog.length)
+})
+
+test('devPrototypes: 全屏预览将共享开发导航纳入 inert 背景', () => {
+  assert.match(
+    prototypesPageSource,
+    /const pageNavRef = React\.useRef\(null\)/u
+  )
+  assert.match(prototypesPageSource, /pageNavRef\.current/u)
+  assert.match(prototypesPageSource, /<DevPageNav\s+navRef=\{pageNavRef\}/u)
+  assert.match(prototypesPageSource, /aria-label="复制当前原型资产路径"/u)
+  assert.match(
+    prototypesPageSource,
+    /aria-label="在开发文档中打开当前原型说明"/u
+  )
+  assert.match(prototypesPageSource, /aria-label="全屏预览当前原型"/u)
+  assert.match(prototypesPageSource, /data-prototype-focus-guard/u)
+  assert.match(
+    prototypesPageSource,
+    /aria-current=\{selected \? 'true' : undefined\}/u
+  )
+})
+
 test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
   const items = buildDevPrototypeItems({
     htmlModules: {
@@ -366,6 +461,17 @@ test('devPrototypes: 支持按状态和关键词筛选', () => {
       keyword: '打印窗口',
     }).some((item) => item.key === 'print-template-center')
   )
+  for (const templateName of printTemplateCatalog.map(
+    (template) => template.title
+  )) {
+    assert(
+      filterDevPrototypeItems(items, {
+        status: DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT,
+        keyword: templateName,
+      }).some((item) => item.key === 'print-template-center'),
+      `${templateName} should find print-template-center`
+    )
+  }
   assert.deepEqual(
     filterDevPrototypeItems(items, {
       status: DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT,
@@ -502,5 +608,30 @@ test('devPrototypes: 按所属目录分组并清理无效展开目录', () => {
       groups.map((group) => group.key)
     ),
     ['mobile-role-tasks-v1/images/']
+  )
+})
+
+test('devPrototypes: asset、filter 和关键词由 canonical query 驱动', () => {
+  assert.match(prototypesPageSource, /useSearchParams\(\)/)
+  assert.match(prototypesPageSource, /const ASSET_QUERY_KEY = 'asset'/)
+  assert.match(prototypesPageSource, /const FILTER_QUERY_KEY = 'filter'/)
+  assert.match(prototypesPageSource, /const KEYWORD_QUERY_KEY = 'q'/)
+  assert.match(prototypesPageSource, /searchParams\.has\(FILTER_QUERY_KEY\)/)
+  assert.match(prototypesPageSource, /searchParams\.has\(ASSET_QUERY_KEY\)/)
+  assert.match(
+    prototypesPageSource,
+    /setSearchParams\(nextParams, \{ replace: true \}\)/
+  )
+  assert.doesNotMatch(
+    prototypesPageSource,
+    /\[\s*statusFilter\s*,\s*setStatusFilter\s*\]/
+  )
+  assert.doesNotMatch(
+    prototypesPageSource,
+    /\[\s*selectedKey\s*,\s*setSelectedKey\s*\]/
+  )
+  assert.doesNotMatch(
+    prototypesPageSource,
+    /\[\s*keyword\s*,\s*setKeyword\s*\]/
   )
 })

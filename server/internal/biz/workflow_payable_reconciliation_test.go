@@ -10,7 +10,7 @@ func TestWorkflowUsecase_PayableRegistrationDoneDerivesPurchaseReconciliationTas
 	repo := &stubWorkflowRepo{currentTask: purchasePayableRegistrationWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1701,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{"mobile_role_key": "finance"},
@@ -61,7 +61,7 @@ func TestWorkflowUsecase_PayableRegistrationDoneDerivesOutsourceReconciliationTa
 	repo := &stubWorkflowRepo{currentTask: outsourcePayableRegistrationWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1801,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{},
@@ -86,7 +86,7 @@ func TestWorkflowUsecase_PayableRegistrationRepeatedDoneUsesIdempotentDerivedTas
 	uc := NewWorkflowUsecase(repo)
 
 	for i := 0; i < 2; i++ {
-		_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 			ID:            1701,
 			TaskStatusKey: "done",
 			Payload:       map[string]any{},
@@ -104,7 +104,7 @@ func TestWorkflowUsecase_PayableReconciliationDoneWritesSettledState(t *testing.
 	repo := &stubWorkflowRepo{currentTask: purchaseReconciliationWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1901,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{"mobile_role_key": "finance"},
@@ -138,7 +138,7 @@ func TestWorkflowUsecase_PayableFinanceBlockedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: purchasePayableRegistrationWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1701,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": "\t"},
@@ -157,7 +157,7 @@ func TestWorkflowUsecase_PayableFinanceBlockedWritesBlockedState(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1901,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": "供应商账单未到"},
@@ -245,7 +245,7 @@ func TestWorkflowUsecase_SameNameNonPayableTaskDoesNotDerive(t *testing.T) {
 			repo := &stubWorkflowRepo{currentTask: tc.task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            tc.task.ID,
 				TaskStatusKey: "done",
 				Payload:       map[string]any{},

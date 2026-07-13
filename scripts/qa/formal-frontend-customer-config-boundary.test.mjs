@@ -178,7 +178,7 @@ test("formal frontend customer config boundary: page, action, and field projecti
   assert(mobileLayoutSource.includes("canMountCustomerRuntime"));
   assert(mobileLayoutSource.includes("shouldBlockMissingCustomerRuntime"));
   assert(mobileLayoutSource.includes('data-mobile-customer-runtime-guard="true"'));
-  assert(mobileLayoutSource.includes("岗位任务端需要客户运行环境"));
+  assert(mobileLayoutSource.includes("暂时无法进入岗位任务端"));
 
   const mobileTasksSource = readRelative(
     "web/src/erp/mobile/pages/MobileRoleTasksPage.jsx",
@@ -239,4 +239,80 @@ test("formal frontend customer config boundary: page, action, and field projecti
     ),
     "mobile route must not follow a remembered desktop entry unless the current admin has desktop menu access",
   );
+});
+
+test("formal customer frontend copy uses the current account and business perspective", () => {
+  const layoutSource = readRelative("web/src/erp/components/ERPLayout.jsx");
+  assert(layoutSource.includes("正在进入工作台"));
+  assert(layoutSource.includes("正在准备您的工作内容"));
+  assert(layoutSource.includes("暂时无法进入工作台"));
+
+  const mobileLayoutSource = readRelative(
+    "web/src/erp/mobile/MobileAppLayout.jsx",
+  );
+  assert(mobileLayoutSource.includes("正在准备岗位任务端"));
+  assert(mobileLayoutSource.includes("暂时无法进入岗位任务端"));
+
+  const permissionSource = readRelative(
+    "web/src/erp/pages/PermissionCenterPage.jsx",
+  );
+  assert(permissionSource.includes("自定义模板"));
+  assert(
+    permissionSource.includes(
+      "按岗位职责维护角色名称和默认权限组合",
+    ),
+  );
+
+  const printCenterSource = readRelative(
+    "web/src/erp/pages/PrintCenterPage.jsx",
+  );
+  assert(printCenterSource.includes("'委托方' : '订货方'"));
+
+  const loginSource = readRelative("web/src/pages/AdminLogin/index.jsx");
+  assert(loginSource.includes('label="账号"'));
+  assert(loginSource.includes("本次登录验证码"));
+
+  const routerSource = readRelative("web/src/erp/router.jsx");
+  const printTemplateSource = readRelative(
+    "web/src/erp/config/printTemplates.mjs",
+  );
+  const formalSources = [
+    layoutSource,
+    mobileLayoutSource,
+    permissionSource,
+    printCenterSource,
+    loginSource,
+    routerSource,
+    printTemplateSource,
+    readRelative(
+      "web/src/erp/components/outsourcing-orders/OutsourcingOrderForm.jsx",
+    ),
+  ].join("\n");
+
+  for (const forbiddenText of [
+    "正在进入客户工作台",
+    "暂时无法进入客户工作台",
+    "当前客户的访问范围",
+    "当前客户有效配置",
+    "岗位任务端需要客户运行环境",
+    "当前没有进入具体客户",
+    "正在确认当前客户运行环境",
+    "返回产品核心总览",
+    "当前客户角色模板",
+    "客户模板",
+    "不同甲方可以配置",
+    "客户/委托方",
+    "甲方加工汇总",
+    "当前部署未启用",
+    "当前未接入短信运营商",
+    "本地开发服务的页面模块",
+    "保留控制台错误继续排查",
+    "客户原始资料",
+    'label="管理员账号"',
+  ]) {
+    assert(
+      !formalSources.includes(forbiddenText),
+      `formal customer frontend must not expose platform-view copy: ${forbiddenText}`,
+    );
+  }
 });

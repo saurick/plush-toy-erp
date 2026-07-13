@@ -1,6 +1,10 @@
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
+import {
+  normalizeFinanceCancellationRequest,
+  validateFinanceCancellationResult,
+} from '../utils/financeCancellation.mjs'
 
 const operationalFactRpc = new JsonRpc({
   url: 'operational_fact',
@@ -130,6 +134,10 @@ export async function settleFinanceFact(params = {}) {
 }
 
 export async function cancelFinanceFact(params = {}) {
-  const result = await operationalFactRpc.call('cancel_finance_fact', params)
-  return dataOf(result)?.finance_fact || null
+  const request = normalizeFinanceCancellationRequest(params)
+  const result = await operationalFactRpc.call('cancel_finance_fact', request)
+  return validateFinanceCancellationResult(
+    dataOf(result)?.finance_fact,
+    request
+  )
 }

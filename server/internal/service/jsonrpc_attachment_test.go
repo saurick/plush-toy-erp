@@ -14,13 +14,14 @@ import (
 )
 
 type stubAttachmentJSONRPCRepo struct {
-	created     *biz.BusinessAttachmentCreate
-	current     *biz.BusinessAttachment
-	ownerExists bool
-	createCalls int
-	listCalls   int
-	getCalls    int
-	deleteCalls int
+	created      *biz.BusinessAttachmentCreate
+	current      *biz.BusinessAttachment
+	ownerExists  bool
+	createCalls  int
+	listCalls    int
+	getCalls     int
+	contentCalls int
+	deleteCalls  int
 }
 
 func newAttachmentJSONRPCTestDispatcher(t *testing.T, repo *stubAttachmentJSONRPCRepo, admin *biz.AdminUser) *jsonrpcDispatcher {
@@ -37,6 +38,18 @@ func newAttachmentJSONRPCTestDispatcher(t *testing.T, repo *stubAttachmentJSONRP
 		customerConfigUC: biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo()),
 	}
 	activateOperationalFactTestCustomerConfig(t, dispatcher, customerConfigPublishParams(t))
+	return dispatcher
+}
+
+func newWorkflowAttachmentJSONRPCTestDispatcher(
+	t *testing.T,
+	repo *stubAttachmentJSONRPCRepo,
+	admin *biz.AdminUser,
+	task *biz.WorkflowTask,
+) *jsonrpcDispatcher {
+	t.Helper()
+	dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, admin)
+	dispatcher.workflowUC = biz.NewWorkflowUsecase(&stubWorkflowJSONRPCRepo{currentTask: task})
 	return dispatcher
 }
 
@@ -78,7 +91,7 @@ func (r *stubAttachmentJSONRPCRepo) ListBusinessAttachments(_ context.Context, o
 	}, nil
 }
 
-func (r *stubAttachmentJSONRPCRepo) GetBusinessAttachment(_ context.Context, id int) (*biz.BusinessAttachment, error) {
+func (r *stubAttachmentJSONRPCRepo) GetBusinessAttachmentMetadata(_ context.Context, id int) (*biz.BusinessAttachment, error) {
 	r.getCalls++
 	if r.current != nil {
 		return r.current, nil
@@ -92,9 +105,16 @@ func (r *stubAttachmentJSONRPCRepo) GetBusinessAttachment(_ context.Context, id 
 		MimeType:       "application/pdf",
 		FileSize:       5,
 		SHA256:         "sha",
-		Content:        []byte("proof"),
 		CreatedAt:      time.Unix(3, 0),
 	}, nil
+}
+
+func (r *stubAttachmentJSONRPCRepo) GetBusinessAttachmentContent(_ context.Context, _ int, _ string, _ int) ([]byte, error) {
+	r.contentCalls++
+	if r.current != nil && r.current.Content != nil {
+		return append([]byte(nil), r.current.Content...), nil
+	}
+	return []byte("proof"), nil
 }
 
 func (r *stubAttachmentJSONRPCRepo) DeleteBusinessAttachment(context.Context, int) error {
@@ -225,10 +245,164 @@ func TestJsonrpcDispatcher_AttachmentWriteAPIRequiresOwnerModuleEnabled(t *testi
 	if err != nil {
 		t.Fatalf("expected nil err deleting with disabled owner module, got %v", err)
 	}
-	if deleteRes == nil || deleteRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected disabled owner module to reject delete, got %#v", deleteRes)
+	if deleteRes == nil || deleteRes.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("ordinary attachment delete must remain unavailable, got %#v", deleteRes)
 	}
 	if repo.deleteCalls != 0 {
 		t.Fatalf("disabled owner module must not delete attachment, got %d calls", repo.deleteCalls)
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowAttachmentEnforcesTaskRowScope(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	baseTask := &biz.WorkflowTask{
+		ID:            42,
+		TaskGroup:     "generic",
+		SourceType:    "generic-source",
+		SourceID:      1,
+		TaskStatusKey: "ready",
+		OwnerRoleKey:  biz.WarehouseRoleKey,
+		Version:       1,
+		Payload:       map[string]any{},
+	}
+	params := mustJSONRPCStruct(t, map[string]any{
+		"owner_type":       biz.BusinessAttachmentOwnerWorkflowTask,
+		"owner_id":         42,
+		"expected_version": 1,
+		"attachment_type":  "evidence",
+		"file_name":        "proof.pdf",
+		"mime_type":        "application/pdf",
+		"content_base64":   "cHJvb2Y=",
+	})
+
+	t.Run("wrong owner cannot list or upload", func(t *testing.T) {
+		repo := &stubAttachmentJSONRPCRepo{}
+		admin := workflowJSONRPCAdmin(
+			[]string{biz.SalesRoleKey},
+			biz.PermissionWorkflowTaskRead,
+			biz.PermissionWorkflowTaskUpdate,
+		)
+		dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, admin, baseTask)
+		_, listRes, _ := dispatcher.handleBusinessAttachment(ctx, "list_attachments", "list", mustJSONRPCStruct(t, map[string]any{
+			"owner_type": biz.BusinessAttachmentOwnerWorkflowTask,
+			"owner_id":   42,
+		}))
+		if listRes.Code != errcode.PermissionDenied.Code || repo.listCalls != 0 {
+			t.Fatalf("wrong owner list must be denied before repo access, res=%#v calls=%d", listRes, repo.listCalls)
+		}
+		_, uploadRes, _ := dispatcher.handleBusinessAttachment(ctx, "upload_attachment", "upload", params)
+		if uploadRes.Code != errcode.PermissionDenied.Code || repo.createCalls != 0 {
+			t.Fatalf("wrong owner upload must be denied before create, res=%#v calls=%d", uploadRes, repo.createCalls)
+		}
+	})
+
+	t.Run("owner may read assigned-other but cannot write", func(t *testing.T) {
+		task := *baseTask
+		otherID := 99
+		task.AssigneeID = &otherID
+		repo := &stubAttachmentJSONRPCRepo{}
+		admin := workflowJSONRPCAdmin(
+			[]string{biz.WarehouseRoleKey},
+			biz.PermissionWorkflowTaskRead,
+			biz.PermissionWorkflowTaskUpdate,
+		)
+		dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, admin, &task)
+		_, listRes, _ := dispatcher.handleBusinessAttachment(ctx, "list_attachments", "list", mustJSONRPCStruct(t, map[string]any{
+			"owner_type": biz.BusinessAttachmentOwnerWorkflowTask,
+			"owner_id":   42,
+		}))
+		if listRes.Code != errcode.OK.Code {
+			t.Fatalf("effective owner role should retain read visibility, got %#v", listRes)
+		}
+		_, uploadRes, _ := dispatcher.handleBusinessAttachment(ctx, "upload_attachment", "upload", params)
+		if uploadRes.Code != errcode.PermissionDenied.Code || repo.createCalls != 0 {
+			t.Fatalf("assigned-other upload must be denied, res=%#v calls=%d", uploadRes, repo.createCalls)
+		}
+	})
+
+	t.Run("terminal task rejects attachment upload", func(t *testing.T) {
+		task := *baseTask
+		task.TaskStatusKey = "done"
+		repo := &stubAttachmentJSONRPCRepo{}
+		admin := workflowJSONRPCAdmin(
+			[]string{biz.WarehouseRoleKey},
+			biz.PermissionWorkflowTaskRead,
+			biz.PermissionWorkflowTaskUpdate,
+		)
+		dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, admin, &task)
+		_, uploadRes, _ := dispatcher.handleBusinessAttachment(ctx, "upload_attachment", "upload", params)
+		if uploadRes.Code != errcode.PermissionDenied.Code || repo.createCalls != 0 {
+			t.Fatalf("terminal task upload must be denied, res=%#v calls=%d", uploadRes, repo.createCalls)
+		}
+	})
+}
+
+func TestJsonrpcDispatcher_WorkflowAttachmentRequiresExactPositiveVersion(t *testing.T) {
+	for _, version := range []any{nil, 0, -1, 1.5, "1"} {
+		repo := &stubAttachmentJSONRPCRepo{}
+		admin := workflowJSONRPCAdmin(
+			[]string{biz.WarehouseRoleKey},
+			biz.PermissionWorkflowTaskRead,
+			biz.PermissionWorkflowTaskUpdate,
+		)
+		dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, admin, &biz.WorkflowTask{
+			ID: 42, TaskStatusKey: "ready", OwnerRoleKey: biz.WarehouseRoleKey, Version: 1,
+		})
+		params := map[string]any{
+			"owner_type": biz.BusinessAttachmentOwnerWorkflowTask,
+			"owner_id":   42, "file_name": "proof.pdf", "mime_type": "application/pdf", "content_base64": "cHJvb2Y=",
+		}
+		if version != nil {
+			params["expected_version"] = version
+		}
+		_, res, _ := dispatcher.handleBusinessAttachment(
+			workflowJSONRPCAdminContext(), "upload_attachment", "strict-version", mustJSONRPCStruct(t, params),
+		)
+		if res.Code != errcode.InvalidParam.Code || repo.createCalls != 0 {
+			t.Fatalf("expected_version=%v must fail before create: res=%#v calls=%d", version, res, repo.createCalls)
+		}
+	}
+}
+
+func TestJsonrpcDispatcher_DownloadAuthorizesBeforeLoadingContent(t *testing.T) {
+	repo := &stubAttachmentJSONRPCRepo{current: &biz.BusinessAttachment{
+		ID: 71, OwnerType: biz.BusinessAttachmentOwnerSalesOrder, OwnerID: 7,
+		FileName: "proof.pdf", MimeType: "application/pdf", FileSize: 5,
+	}}
+	admin := workflowJSONRPCAdmin([]string{biz.SalesRoleKey})
+	dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, admin)
+	_, res, err := dispatcher.handleBusinessAttachment(
+		workflowJSONRPCAdminContext(),
+		"download_attachment",
+		"unauthorized-download",
+		mustJSONRPCStruct(t, map[string]any{"id": 71}),
+	)
+	if err != nil || res.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("download without owner read permission must be denied: res=%#v err=%v", res, err)
+	}
+	if repo.getCalls != 1 || repo.contentCalls != 0 {
+		t.Fatalf("authorization may read metadata but must not load content: metadata=%d content=%d", repo.getCalls, repo.contentCalls)
+	}
+}
+
+func TestJsonrpcDispatcher_AttachmentMethodsAreCanonicalAndDeleteIsUnavailable(t *testing.T) {
+	dispatcher := newAttachmentJSONRPCTestDispatcher(t, &stubAttachmentJSONRPCRepo{}, workflowJSONRPCAdmin(
+		[]string{biz.SalesRoleKey},
+		biz.PermissionSalesOrderRead,
+		biz.PermissionSalesOrderUpdate,
+	))
+	for _, method := range []string{
+		"listAttachments",
+		"uploadAttachment",
+		"downloadAttachment",
+		"get_attachment_content",
+		"getAttachmentContent",
+		"delete_attachment",
+		"deleteAttachment",
+	} {
+		_, res, err := dispatcher.handleBusinessAttachment(workflowJSONRPCAdminContext(), method, method, mustJSONRPCStruct(t, map[string]any{}))
+		if err != nil || res == nil || res.Code != errcode.UnknownMethod.Code {
+			t.Fatalf("method %s must fail closed as unknown, res=%#v err=%v", method, res, err)
+		}
 	}
 }

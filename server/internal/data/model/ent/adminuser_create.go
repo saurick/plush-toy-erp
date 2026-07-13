@@ -88,6 +88,76 @@ func (_c *AdminUserCreate) SetNillableDisabled(v *bool) *AdminUserCreate {
 	return _c
 }
 
+// SetAuthVersion sets the "auth_version" field.
+func (_c *AdminUserCreate) SetAuthVersion(v int64) *AdminUserCreate {
+	_c.mutation.SetAuthVersion(v)
+	return _c
+}
+
+// SetNillableAuthVersion sets the "auth_version" field if the given value is not nil.
+func (_c *AdminUserCreate) SetNillableAuthVersion(v *int64) *AdminUserCreate {
+	if v != nil {
+		_c.SetAuthVersion(*v)
+	}
+	return _c
+}
+
+// SetRevokedAt sets the "revoked_at" field.
+func (_c *AdminUserCreate) SetRevokedAt(v time.Time) *AdminUserCreate {
+	_c.mutation.SetRevokedAt(v)
+	return _c
+}
+
+// SetNillableRevokedAt sets the "revoked_at" field if the given value is not nil.
+func (_c *AdminUserCreate) SetNillableRevokedAt(v *time.Time) *AdminUserCreate {
+	if v != nil {
+		_c.SetRevokedAt(*v)
+	}
+	return _c
+}
+
+// SetStatusReason sets the "status_reason" field.
+func (_c *AdminUserCreate) SetStatusReason(v string) *AdminUserCreate {
+	_c.mutation.SetStatusReason(v)
+	return _c
+}
+
+// SetNillableStatusReason sets the "status_reason" field if the given value is not nil.
+func (_c *AdminUserCreate) SetNillableStatusReason(v *string) *AdminUserCreate {
+	if v != nil {
+		_c.SetStatusReason(*v)
+	}
+	return _c
+}
+
+// SetStatusChangedAt sets the "status_changed_at" field.
+func (_c *AdminUserCreate) SetStatusChangedAt(v time.Time) *AdminUserCreate {
+	_c.mutation.SetStatusChangedAt(v)
+	return _c
+}
+
+// SetNillableStatusChangedAt sets the "status_changed_at" field if the given value is not nil.
+func (_c *AdminUserCreate) SetNillableStatusChangedAt(v *time.Time) *AdminUserCreate {
+	if v != nil {
+		_c.SetStatusChangedAt(*v)
+	}
+	return _c
+}
+
+// SetStatusChangedBy sets the "status_changed_by" field.
+func (_c *AdminUserCreate) SetStatusChangedBy(v int) *AdminUserCreate {
+	_c.mutation.SetStatusChangedBy(v)
+	return _c
+}
+
+// SetNillableStatusChangedBy sets the "status_changed_by" field if the given value is not nil.
+func (_c *AdminUserCreate) SetNillableStatusChangedBy(v *int) *AdminUserCreate {
+	if v != nil {
+		_c.SetStatusChangedBy(*v)
+	}
+	return _c
+}
+
 // SetLastLoginAt sets the "last_login_at" field.
 func (_c *AdminUserCreate) SetLastLoginAt(v time.Time) *AdminUserCreate {
 	_c.mutation.SetLastLoginAt(v)
@@ -177,6 +247,10 @@ func (_c *AdminUserCreate) defaults() {
 		v := adminuser.DefaultDisabled
 		_c.mutation.SetDisabled(v)
 	}
+	if _, ok := _c.mutation.AuthVersion(); !ok {
+		v := adminuser.DefaultAuthVersion
+		_c.mutation.SetAuthVersion(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := adminuser.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -223,6 +297,24 @@ func (_c *AdminUserCreate) check() error {
 	}
 	if _, ok := _c.mutation.Disabled(); !ok {
 		return &ValidationError{Name: "disabled", err: errors.New(`ent: missing required field "AdminUser.disabled"`)}
+	}
+	if _, ok := _c.mutation.AuthVersion(); !ok {
+		return &ValidationError{Name: "auth_version", err: errors.New(`ent: missing required field "AdminUser.auth_version"`)}
+	}
+	if v, ok := _c.mutation.AuthVersion(); ok {
+		if err := adminuser.AuthVersionValidator(v); err != nil {
+			return &ValidationError{Name: "auth_version", err: fmt.Errorf(`ent: validator failed for field "AdminUser.auth_version": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.StatusReason(); ok {
+		if err := adminuser.StatusReasonValidator(v); err != nil {
+			return &ValidationError{Name: "status_reason", err: fmt.Errorf(`ent: validator failed for field "AdminUser.status_reason": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.StatusChangedBy(); ok {
+		if err := adminuser.StatusChangedByValidator(v); err != nil {
+			return &ValidationError{Name: "status_changed_by", err: fmt.Errorf(`ent: validator failed for field "AdminUser.status_changed_by": %w`, err)}
+		}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "AdminUser.created_at"`)}
@@ -279,6 +371,26 @@ func (_c *AdminUserCreate) createSpec() (*AdminUser, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Disabled(); ok {
 		_spec.SetField(adminuser.FieldDisabled, field.TypeBool, value)
 		_node.Disabled = value
+	}
+	if value, ok := _c.mutation.AuthVersion(); ok {
+		_spec.SetField(adminuser.FieldAuthVersion, field.TypeInt64, value)
+		_node.AuthVersion = value
+	}
+	if value, ok := _c.mutation.RevokedAt(); ok {
+		_spec.SetField(adminuser.FieldRevokedAt, field.TypeTime, value)
+		_node.RevokedAt = &value
+	}
+	if value, ok := _c.mutation.StatusReason(); ok {
+		_spec.SetField(adminuser.FieldStatusReason, field.TypeString, value)
+		_node.StatusReason = &value
+	}
+	if value, ok := _c.mutation.StatusChangedAt(); ok {
+		_spec.SetField(adminuser.FieldStatusChangedAt, field.TypeTime, value)
+		_node.StatusChangedAt = &value
+	}
+	if value, ok := _c.mutation.StatusChangedBy(); ok {
+		_spec.SetField(adminuser.FieldStatusChangedBy, field.TypeInt, value)
+		_node.StatusChangedBy = &value
 	}
 	if value, ok := _c.mutation.LastLoginAt(); ok {
 		_spec.SetField(adminuser.FieldLastLoginAt, field.TypeTime, value)

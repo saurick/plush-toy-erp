@@ -27,7 +27,6 @@ import {
   isPayableReconciliationTask,
 } from '../../utils/payableReconciliationFlow.mjs'
 import {
-  canOpenMobileTaskDetailAction,
   getMobileTaskActionReasonDraftKey,
   normalizeMobileTaskActionKey,
   requiresMobileActionFeedback,
@@ -36,7 +35,12 @@ import {
   resolveMobileUrgeAction,
 } from '../utils/mobileRoleTaskModel.mjs'
 import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../../utils/workflowTaskActionSubmitGuard.mjs'
-import { canRunWorkflowTaskAction } from '../../utils/workflowTaskBoard.mjs'
+import {
+  createTaskMutationAttemptStore,
+  createTaskMutationInFlightGuard,
+  isWorkflowTaskMutationResultUnknown,
+  verifyNewWorkflowTaskMutationAttempt,
+} from '../../utils/workflowTaskMutation.mjs'
 
 function compactActionPayload(payload = {}) {
   return Object.fromEntries(
@@ -106,8 +110,8 @@ function buildMobileWorkflowActionPayload({
 
 export default function useMobileRoleTaskActions({
   activeRoleKey,
-  adminProfile,
   selectedTask,
+  taskActionAccess,
   detailAction,
   setDetailAction,
   setSelectedTaskID,
@@ -118,7 +122,10 @@ export default function useMobileRoleTaskActions({
   const [taskActionReasonDrafts, setTaskActionReasonDrafts] = useState({})
   const [urgeReasonByTaskID, setUrgeReasonByTaskID] = useState({})
   const [evidenceTextByTaskID, setEvidenceTextByTaskID] = useState({})
-  const actionInFlightTaskIDsRef = useRef(new Set())
+  const mutationInFlightRef = useRef(null)
+  mutationInFlightRef.current ||= createTaskMutationInFlightGuard()
+  const mutationAttemptsRef = useRef(null)
+  mutationAttemptsRef.current ||= createTaskMutationAttemptStore()
   const selectedTaskIDRef = useRef(selectedTask?.id ?? null)
   const detailActionRef = useRef(detailAction)
   selectedTaskIDRef.current = selectedTask?.id ?? null
@@ -126,31 +133,28 @@ export default function useMobileRoleTaskActions({
 
   const canRunMobileTaskAction = (task, action) => {
     const actionMode = resolveWorkflowTaskActionMode(action)
+    const accessMatchesTask =
+      Number(task?.id) === Number(selectedTask?.id) &&
+      Number(task?.version) === Number(selectedTask?.version)
     return Boolean(
       actionMode &&
-        canOpenMobileTaskDetailAction(activeRoleKey, task, action) &&
-        canRunWorkflowTaskAction(adminProfile, task, actionMode)
+        accessMatchesTask &&
+        taskActionAccess?.canRun?.(actionMode) === true
     )
   }
 
   const moveTask = async (task, taskStatusKey) => {
     const taskID = task?.id ?? null
-    if (actionInFlightTaskIDsRef.current.has(taskID)) {
-      return false
-    }
-    actionInFlightTaskIDsRef.current.add(taskID)
+    const inFlightLease = mutationInFlightRef.current.acquire(
+      Number.isSafeInteger(taskID) && taskID > 0 ? `task:${taskID}` : ''
+    )
+    if (!inFlightLease) return false
     setUpdatingTaskIDs((current) => {
       const next = new Set(current)
       next.add(taskID)
       return next
     })
     try {
-      if (!canRunMobileTaskAction(task, taskStatusKey)) {
-        message.warning(
-          `当前角色不能${resolveMobileActionLabel(taskStatusKey)}该任务`
-        )
-        return false
-      }
       const actionReason = String(
         resolveMobileTaskActionReason({
           task,
@@ -168,23 +172,6 @@ export default function useMobileRoleTaskActions({
         message.warning('请先填写完成反馈或附件线索')
         return false
       }
-      const explainActionKey =
-        taskStatusKey === 'done'
-          ? 'complete'
-          : taskStatusKey === 'blocked'
-            ? 'block'
-            : taskStatusKey === 'rejected'
-              ? 'reject'
-              : taskStatusKey
-      const explainAllowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
-        task,
-        actionKey: explainActionKey,
-        reason: actionReason,
-        onWarning: message.warning,
-        onError: message.error,
-      })
-      if (!explainAllowed) return false
-
       const payload = buildMobileWorkflowActionPayload({
         activeRoleKey,
         actionReason,
@@ -195,26 +182,66 @@ export default function useMobileRoleTaskActions({
       })
       const actionParams = {
         task_id: task.id,
+        expected_version: task.version,
         reason: reasonRequired ? actionReason : '',
         payload,
       }
-      if (taskStatusKey === 'done') {
-        await completeWorkflowTaskAction({
-          ...actionParams,
-          action_key: 'complete',
-        })
-      } else if (taskStatusKey === 'blocked') {
-        await blockWorkflowTaskAction({
-          ...actionParams,
-          action_key: 'block',
-        })
-      } else if (taskStatusKey === 'rejected') {
-        await rejectWorkflowTaskAction({
-          ...actionParams,
-          action_key: 'reject',
-        })
-      } else {
+      const actionMode = resolveWorkflowTaskActionMode(taskStatusKey)
+      const mutate =
+        taskStatusKey === 'done'
+          ? completeWorkflowTaskAction
+          : taskStatusKey === 'blocked'
+            ? blockWorkflowTaskAction
+            : taskStatusKey === 'rejected'
+              ? rejectWorkflowTaskAction
+              : null
+      if (!mutate) {
         throw new Error('当前任务动作暂不支持')
+      }
+      const scope = `${task.id}:${actionMode}`
+      const params = {
+        ...actionParams,
+        action_key: actionMode,
+      }
+      const accessVerified = await verifyNewWorkflowTaskMutationAttempt({
+        attemptStore: mutationAttemptsRef.current,
+        scope,
+        operation: actionMode,
+        params,
+        verify: async () => {
+          if (!canRunMobileTaskAction(task, taskStatusKey)) {
+            message.warning(
+              `当前角色不能${resolveMobileActionLabel(taskStatusKey)}该任务`
+            )
+            return false
+          }
+          return verifyWorkflowTaskActionAccessBeforeSubmit({
+            task,
+            actionKey: actionMode,
+            reason: actionReason,
+            onWarning: message.warning,
+            onError: message.error,
+          })
+        },
+      })
+      if (!accessVerified) return false
+      try {
+        await mutationAttemptsRef.current.run({
+          scope,
+          operation: actionMode,
+          mutate,
+          params,
+        })
+      } catch (error) {
+        if (isWorkflowTaskMutationResultUnknown(error)) {
+          message.warning('提交结果暂未确认，已保留原因和证据，可直接重试')
+        } else {
+          message.error(
+            getActionErrorMessage(error, '更新任务状态失败，请稍后重试')
+          )
+          await loadTasks().catch(() => {})
+        }
+        return false
       }
       setTaskActionReasonDrafts((current) => {
         const next = { ...current }
@@ -230,7 +257,11 @@ export default function useMobileRoleTaskActions({
         return next
       })
       message.success('任务状态已更新')
-      await loadTasks()
+      try {
+        await loadTasks()
+      } catch {
+        message.warning('操作已成功但列表刷新失败，请手动刷新')
+      }
       return true
     } catch (error) {
       message.error(
@@ -238,7 +269,7 @@ export default function useMobileRoleTaskActions({
       )
       return false
     } finally {
-      actionInFlightTaskIDsRef.current.delete(taskID)
+      mutationInFlightRef.current.release(inFlightLease)
       setUpdatingTaskIDs((current) => {
         if (!current.has(taskID)) return current
         const next = new Set(current)
@@ -250,49 +281,75 @@ export default function useMobileRoleTaskActions({
 
   const urgeTask = async (task) => {
     const taskID = task?.id ?? null
-    if (actionInFlightTaskIDsRef.current.has(taskID)) {
-      return false
-    }
-    actionInFlightTaskIDsRef.current.add(taskID)
+    const inFlightLease = mutationInFlightRef.current.acquire(
+      Number.isSafeInteger(taskID) && taskID > 0 ? `task:${taskID}` : ''
+    )
+    if (!inFlightLease) return false
     setUrgingTaskIDs((current) => {
       const next = new Set(current)
       next.add(taskID)
       return next
     })
     try {
-      if (!canRunMobileTaskAction(task, 'urge')) {
-        message.warning('当前角色没有催办该任务的权限')
-        return false
-      }
       const reason = String(urgeReasonByTaskID[task.id] || '').trim()
       if (!reason) {
         message.warning('请先填写催办原因')
         return false
       }
-      const explainAllowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
-        task,
-        actionKey: 'urge',
-        reason,
-        onWarning: message.warning,
-        onError: message.error,
-      })
-      if (!explainAllowed) return false
-
       const mobileActionEvidence = buildMobileTaskActionEvidence({
         roleKey: activeRoleKey,
         actionKey: 'urge',
         reason,
         evidenceText: evidenceTextByTaskID[task.id] || '',
       })
-      await urgeWorkflowTask({
+      const scope = `${task.id}:urge`
+      const operation = 'urge'
+      const params = {
         task_id: task.id,
+        expected_version: task.version,
         action: resolveMobileUrgeAction(activeRoleKey, task),
         reason,
         payload: {
           mobile_role_key: activeRoleKey,
           ...mobileActionEvidence,
         },
+      }
+      const accessVerified = await verifyNewWorkflowTaskMutationAttempt({
+        attemptStore: mutationAttemptsRef.current,
+        scope,
+        operation,
+        params,
+        verify: async () => {
+          if (!canRunMobileTaskAction(task, operation)) {
+            message.warning('当前角色没有催办该任务的权限')
+            return false
+          }
+          return verifyWorkflowTaskActionAccessBeforeSubmit({
+            task,
+            actionKey: operation,
+            reason,
+            onWarning: message.warning,
+            onError: message.error,
+          })
+        },
       })
+      if (!accessVerified) return false
+      try {
+        await mutationAttemptsRef.current.run({
+          scope,
+          operation,
+          mutate: urgeWorkflowTask,
+          params,
+        })
+      } catch (error) {
+        if (isWorkflowTaskMutationResultUnknown(error)) {
+          message.warning('催办结果暂未确认，已保留本次操作，可直接重试')
+        } else {
+          message.error(getActionErrorMessage(error, '催办失败，请稍后重试'))
+          await loadTasks().catch(() => {})
+        }
+        return false
+      }
       setUrgeReasonByTaskID((current) => {
         const next = { ...current }
         delete next[task.id]
@@ -304,13 +361,17 @@ export default function useMobileRoleTaskActions({
         return next
       })
       message.success('催办已记录')
-      await loadTasks()
+      try {
+        await loadTasks()
+      } catch {
+        message.warning('操作已成功但列表刷新失败，请手动刷新')
+      }
       return true
     } catch (error) {
       message.error(getActionErrorMessage(error, '催办失败，请稍后重试'))
       return false
     } finally {
-      actionInFlightTaskIDsRef.current.delete(taskID)
+      mutationInFlightRef.current.release(inFlightLease)
       setUrgingTaskIDs((current) => {
         if (!current.has(taskID)) return current
         const next = new Set(current)

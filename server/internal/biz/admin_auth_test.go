@@ -16,6 +16,7 @@ type memAdminAuthRepo struct {
 	mu        sync.Mutex
 	admins    map[string]*AdminUser
 	phones    map[string]*AdminUser
+	sessions  map[string]*AdminSession
 	lastLogin map[int]time.Time
 }
 
@@ -23,8 +24,50 @@ func newMemAdminAuthRepo() *memAdminAuthRepo {
 	return &memAdminAuthRepo{
 		admins:    make(map[string]*AdminUser),
 		phones:    make(map[string]*AdminUser),
+		sessions:  make(map[string]*AdminSession),
 		lastLogin: make(map[int]time.Time),
 	}
+}
+
+func (r *memAdminAuthRepo) GetAdminByID(_ context.Context, id int) (*AdminUser, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, admin := range r.admins {
+		if admin.ID == id {
+			cp := *admin
+			return &cp, nil
+		}
+	}
+	return nil, ErrUserNotFound
+}
+
+func (r *memAdminAuthRepo) CreateAdminSession(_ context.Context, session *AdminSession) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	cp := *session
+	r.sessions[session.SessionKey] = &cp
+	return nil
+}
+
+func (r *memAdminAuthRepo) GetAdminSession(_ context.Context, sessionKey string) (*AdminSession, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	session := r.sessions[sessionKey]
+	if session == nil {
+		return nil, ErrSessionNotFound
+	}
+	cp := *session
+	return &cp, nil
+}
+
+func (r *memAdminAuthRepo) RevokeAdminSession(_ context.Context, sessionKey, reason string, revokedAt time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if session := r.sessions[sessionKey]; session != nil {
+		session.RevokedAt = &revokedAt
+		session.RevokeReason = reason
+	}
+	return nil
 }
 
 func (r *memAdminAuthRepo) GetAdminByUsername(_ context.Context, username string) (*AdminUser, error) {
@@ -65,9 +108,10 @@ func (r *memAdminAuthRepo) UpdateAdminLastLogin(_ context.Context, id int, t tim
 func TestAdminAuthUsecase_SMSLogin_Success(t *testing.T) {
 	repo := newMemAdminAuthRepo()
 	repo.admins["13800138000"] = &AdminUser{
-		ID:       1,
-		Username: "sms-admin",
-		Phone:    "13800138000",
+		ID:          1,
+		Username:    "sms-admin",
+		Phone:       "13800138000",
+		AuthVersion: 1,
 		Roles: []AdminRole{
 			{Key: PurchaseRoleKey, Name: "采购"},
 		},
@@ -77,9 +121,9 @@ func TestAdminAuthUsecase_SMSLogin_Success(t *testing.T) {
 
 	logger := log.NewStdLogger(io.Discard)
 	tp := tracesdk.NewTracerProvider()
-	uc := NewAdminAuthUsecase(repo, func(userID int, username string, role int8) (string, time.Time, error) {
+	uc := NewAdminAuthUsecase(repo, func(input AdminTokenInput) (string, time.Time, error) {
 		return "tok-admin-sms", time.Now().Add(time.Hour), nil
-	}, nil, logger, tp)
+	}, nil, nil, logger, tp)
 
 	challenge, err := uc.RequestSMSLoginCode(context.Background(), "13800138000", "purchase")
 	if err != nil {

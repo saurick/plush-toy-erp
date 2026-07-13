@@ -43,6 +43,54 @@ export const DEV_PROTOTYPE_FILTER_OPTIONS = Object.freeze([
   { value: DEV_PROTOTYPE_FILTERS.REFERENCE, label: '参考资料 / Reference' },
 ])
 
+const SANDBOX_STORAGE_SHIM = `<script>
+;(function () {
+  function createMemoryStorage() {
+    var values = Object.create(null)
+    var keys = []
+    return {
+      get length() { return keys.length },
+      key: function (index) { return keys[index] || null },
+      getItem: function (key) {
+        key = String(key)
+        return Object.prototype.hasOwnProperty.call(values, key) ? values[key] : null
+      },
+      setItem: function (key, value) {
+        key = String(key)
+        if (!Object.prototype.hasOwnProperty.call(values, key)) keys.push(key)
+        values[key] = String(value)
+      },
+      removeItem: function (key) {
+        key = String(key)
+        if (!Object.prototype.hasOwnProperty.call(values, key)) return
+        delete values[key]
+        keys = keys.filter(function (item) { return item !== key })
+      },
+      clear: function () { values = Object.create(null); keys = [] }
+    }
+  }
+  ;['localStorage', 'sessionStorage'].forEach(function (name) {
+    try {
+      Object.defineProperty(window, name, {
+        configurable: true,
+        value: createMemoryStorage()
+      })
+    } catch (_error) {}
+  })
+})()
+</script>`
+
+export function prepareDevPrototypeSandboxSource(source = '') {
+  const html = String(source || '')
+  if (!html) return ''
+  if (/<head(?:\s[^>]*)?>/i.test(html)) {
+    return html.replace(/<head(?:\s[^>]*)?>/i, (head) => {
+      return `${head}\n${SANDBOX_STORAGE_SHIM}`
+    })
+  }
+  return `${SANDBOX_STORAGE_SHIM}\n${html}`
+}
+
 export const DEV_PROTOTYPE_ASSETS = Object.freeze([
   {
     key: 'admin-command-center',
@@ -157,9 +205,9 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'print-template-center-v1/index.html',
     readmePath: 'print-template-center-v1/README.md',
     description:
-      '保留模板导航、纸面预览和打印窗口入口；字段编辑和明细确认回到独立打印窗口。',
+      '保留采购合同、加工合同、物料分析明细表、色卡和作业指导书五个正式模板的导航、纸面预览和打印窗口入口；字段编辑和明细确认回到独立打印窗口。',
     appliesTo:
-      '模板打印中心可参照；当前运行时正式模板包含合同和工程资料打印入口，不新增样品确认单、字段映射配置、后端 API、RBAC 或 Fact 写入。',
+      '模板打印中心可参照；当前运行时正式模板包含采购合同、加工合同、物料分析明细表、色卡和作业指导书，不新增样品确认单、字段映射配置、后端 API、RBAC 或 Fact 写入。',
   },
   {
     key: 'business-task-collab-entry',

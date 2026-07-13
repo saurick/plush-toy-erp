@@ -14,6 +14,8 @@ type Tx struct {
 	config
 	// AccessEntitlement is the client for interacting with the AccessEntitlement builders.
 	AccessEntitlement *AccessEntitlementClient
+	// AdminSession is the client for interacting with the AdminSession builders.
+	AdminSession *AdminSessionClient
 	// AdminUser is the client for interacting with the AdminUser builders.
 	AdminUser *AdminUserClient
 	// AdminUserRole is the client for interacting with the AdminUserRole builders.
@@ -62,6 +64,12 @@ type Tx struct {
 	ProductSKU *ProductSKUClient
 	// ProductionFact is the client for interacting with the ProductionFact builders.
 	ProductionFact *ProductionFactClient
+	// ProductionOrder is the client for interacting with the ProductionOrder builders.
+	ProductionOrder *ProductionOrderClient
+	// ProductionOrderEvent is the client for interacting with the ProductionOrderEvent builders.
+	ProductionOrderEvent *ProductionOrderEventClient
+	// ProductionOrderItem is the client for interacting with the ProductionOrderItem builders.
+	ProductionOrderItem *ProductionOrderItemClient
 	// PurchaseOrder is the client for interacting with the PurchaseOrder builders.
 	PurchaseOrder *PurchaseOrderClient
 	// PurchaseOrderItem is the client for interacting with the PurchaseOrderItem builders.
@@ -248,6 +256,7 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.AccessEntitlement = NewAccessEntitlementClient(tx.config)
+	tx.AdminSession = NewAdminSessionClient(tx.config)
 	tx.AdminUser = NewAdminUserClient(tx.config)
 	tx.AdminUserRole = NewAdminUserRoleClient(tx.config)
 	tx.BOMHeader = NewBOMHeaderClient(tx.config)
@@ -272,6 +281,9 @@ func (tx *Tx) init() {
 	tx.Product = NewProductClient(tx.config)
 	tx.ProductSKU = NewProductSKUClient(tx.config)
 	tx.ProductionFact = NewProductionFactClient(tx.config)
+	tx.ProductionOrder = NewProductionOrderClient(tx.config)
+	tx.ProductionOrderEvent = NewProductionOrderEventClient(tx.config)
+	tx.ProductionOrderItem = NewProductionOrderItemClient(tx.config)
 	tx.PurchaseOrder = NewPurchaseOrderClient(tx.config)
 	tx.PurchaseOrderItem = NewPurchaseOrderItemClient(tx.config)
 	tx.PurchaseReceipt = NewPurchaseReceiptClient(tx.config)

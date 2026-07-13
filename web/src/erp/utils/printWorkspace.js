@@ -610,6 +610,20 @@ export function resolvePrintWorkspaceEntrySource(searchParamsLike) {
     : PRINT_WORKSPACE_ENTRY_SOURCE.MENU
 }
 
+export function resolvePrintWorkspaceCustomerKey(
+  searchParamsLike,
+  fallbackCustomerKey = ''
+) {
+  const searchParams =
+    typeof searchParamsLike === 'string'
+      ? new URLSearchParams(searchParamsLike.replace(/^\?/, ''))
+      : searchParamsLike
+  const queryCustomerKey = String(
+    searchParams?.get?.('customer_key') || ''
+  ).trim()
+  return queryCustomerKey || String(fallbackCustomerKey || '').trim()
+}
+
 export function resolvePrintWorkspaceStateID(searchParamsLike) {
   if (!searchParamsLike) {
     return ''

@@ -3096,7 +3096,7 @@ export default function EngineeringPrintWorkspacePage() {
         ...current,
         images: { ...current.images, [slotKey]: snapshot },
       }))
-      setToolbarStatus('图片已更新，打印和 PDF 会使用当前图片快照。')
+      setToolbarStatus('图片已更新，打印和 PDF 会使用当前图片。')
     } catch (error) {
       message.error(getActionErrorMessage(error, '上传图片失败'))
     }

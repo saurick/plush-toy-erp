@@ -797,7 +797,7 @@ export default function V1PurchaseOrdersPage() {
     <BusinessPageLayout className="erp-v1-purchase-orders-page">
       <PageHeaderCard
         title="采购订单"
-        description="维护供应商采购承诺；采购订单不写库存，不替代采购入库、退货、质检或应付事实。"
+        description="维护供应商采购承诺；采购入库、退货、质检或应付请到对应业务页面处理。"
         stats={stats}
         compact
       />

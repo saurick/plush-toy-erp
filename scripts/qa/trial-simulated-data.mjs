@@ -269,7 +269,7 @@ function buildSimulatedDataset(options = {}) {
         name: "试用模拟客户 001",
         short_name: "模拟客户001",
         tax_no: "SIMULATED-NO-TAX",
-        note: "trial simulated/demo data only; not real customer data.",
+        note: "模拟试用数据，请勿用于正式业务。",
       },
       supplier: {
         code: `${SIMULATION_PREFIX}-S001`,
@@ -277,7 +277,7 @@ function buildSimulatedDataset(options = {}) {
         short_name: "模拟供应商001",
         supplier_type: "material",
         tax_no: "SIMULATED-NO-TAX",
-        note: "trial simulated/demo data only; not real supplier data.",
+        note: "模拟试用数据，请勿用于正式业务。",
       },
       customerContact: {
         owner_type: "CUSTOMER",
@@ -286,7 +286,7 @@ function buildSimulatedDataset(options = {}) {
         email: "trial-customer@example.invalid",
         title: "模拟联系人",
         is_primary: true,
-        note: "trial simulated/demo contact only.",
+        note: "模拟试用联系人，请勿用于正式业务。",
       },
       supplierContact: {
         owner_type: "SUPPLIER",
@@ -295,7 +295,7 @@ function buildSimulatedDataset(options = {}) {
         email: "trial-supplier@example.invalid",
         title: "模拟联系人",
         is_primary: true,
-        note: "trial simulated/demo contact only.",
+        note: "模拟试用联系人，请勿用于正式业务。",
       },
       salesOrder: {
         order_no: `${SIMULATION_PREFIX}-SO001`,
@@ -309,7 +309,7 @@ function buildSimulatedDataset(options = {}) {
           options.plannedDeliveryDate || "2026-06-22",
           "plannedDeliveryDate",
         ),
-        note: "trial simulated/demo sales order only; not shipped and not a fact posting.",
+        note: "模拟试用订单，尚未安排出货，请勿用于正式业务。",
       },
       salesOrderItem: {
         line_no: 1,
@@ -327,7 +327,7 @@ function buildSimulatedDataset(options = {}) {
           options.plannedDeliveryDate || "2026-06-22",
           "plannedDeliveryDate",
         ),
-        note: "trial simulated/demo order item only; requires an existing active product and unit.",
+        note: "模拟试用订单明细，请勿用于正式业务。",
       },
     },
   };

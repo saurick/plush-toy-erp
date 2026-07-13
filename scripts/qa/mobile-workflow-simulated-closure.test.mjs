@@ -120,6 +120,7 @@ test("mobile workflow simulated apply action params do not replay workflow paylo
   const plan = buildPlan(parseCliArgs(["--run-id", "action boundary"]));
   const task = {
     id: 42,
+    version: 7,
     source_type: "shipment",
     source_id: 9001,
     source_no: "SHIP-9001",
@@ -146,10 +147,20 @@ test("mobile workflow simulated apply action params do not replay workflow paylo
     task,
     plan.actions.shipmentReleaseBlocked,
   );
+  const rejectedParams = buildTaskStatusActionParams(
+    task,
+    plan.actions.approvalRejected,
+  );
   const urgeParams = buildUrgeTaskParams(task, plan.actions.warehouseUrged);
 
-  for (const params of [completeParams, blockedParams, urgeParams]) {
+  for (const params of [
+    completeParams,
+    blockedParams,
+    rejectedParams,
+    urgeParams,
+  ]) {
     assert.equal(params.task_id, 42);
+    assert.equal(params.expected_version, 7);
     assert(!("business_status_key" in params));
     assert(!("task_status_key" in params));
     assert(!("source_type" in params));
@@ -176,7 +187,67 @@ test("mobile workflow simulated apply action params do not replay workflow paylo
   assert.equal(urgeParams.payload.mobile_role_key, "pmc");
   assert.equal(completeParams.action_key, "complete");
   assert.equal(blockedParams.action_key, "block");
+  assert.equal(rejectedParams.action_key, "reject");
   assert.equal(urgeParams.action, "urge_task");
+});
+
+test("mobile workflow simulated apply rejects actions without a task version", () => {
+  const plan = buildPlan(parseCliArgs(["--run-id", "missing version"]));
+  const task = { id: 42 };
+
+  assert.throws(
+    () => buildTaskStatusActionParams(task, plan.actions.approvalDone),
+    /task version is required/u,
+  );
+  assert.throws(
+    () => buildUrgeTaskParams(task, plan.actions.warehouseUrged),
+    /task version is required/u,
+  );
+});
+
+test("mobile workflow simulated apply requires number-safe task identities", () => {
+  const plan = buildPlan(parseCliArgs(["--run-id", "invalid identity"]));
+  for (const id of [undefined, 0, "42", Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(
+      () =>
+        buildTaskStatusActionParams(
+          { id, version: 1 },
+          plan.actions.approvalDone,
+        ),
+      /task id is required/u,
+    );
+    assert.throws(
+      () =>
+        buildUrgeTaskParams({ id, version: 1 }, plan.actions.warehouseUrged),
+      /task id is required/u,
+    );
+  }
+  for (const version of [0, "1", Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(
+      () =>
+        buildTaskStatusActionParams(
+          { id: 42, version },
+          plan.actions.approvalDone,
+        ),
+      /task version is required/u,
+    );
+  }
+});
+
+test("mobile workflow simulated urge requires an explicit formal action", () => {
+  const plan = buildPlan(parseCliArgs(["--run-id", "invalid urge"]));
+  const task = { id: 42, version: 1 };
+
+  for (const action of [
+    { ...plan.actions.warehouseUrged, action: undefined },
+    { ...plan.actions.warehouseUrged, action: "" },
+    { ...plan.actions.warehouseUrged, action: "urge" },
+  ]) {
+    assert.throws(
+      () => buildUrgeTaskParams(task, action),
+      /urge action is required/u,
+    );
+  }
 });
 
 test("mobile workflow simulated apply report does not expose business status as action evidence", () => {
@@ -187,6 +258,15 @@ test("mobile workflow simulated apply report does not expose business status as 
   assert(
     source.includes("factPosting: false"),
     "report boundary must continue to state simulated actions do not post facts",
+  );
+});
+
+test("mobile workflow simulated workflow requests do not send a client customer key", () => {
+  const source = readFileSync(scriptPath, "utf8");
+
+  assert.doesNotMatch(
+    source,
+    /\{\s*customer_key:\s*["']yoyoosun["'],\s*\.\.\.params\s*\}/u,
   );
 });
 

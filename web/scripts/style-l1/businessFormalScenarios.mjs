@@ -594,7 +594,10 @@ export function createBusinessFormalScenarios(deps) {
         configHash: 'style-l1-business-core-pages-hash',
         customer: { key: 'yoyoosun', name: '永绅' },
         pages: [],
-        actions: [],
+        actions: ['workflow.task.create', 'workflow.task.read'],
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': ['production', 'warehouse', 'sales'],
+        },
         fieldPolicies: {},
         workPools: [],
         source: 'active_customer_config_revision',
@@ -2070,7 +2073,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectButton(page, '导出筛选结果')
         await expectButton(page, '列顺序')
         await assertNoListDeleteTrashToolbar(page)
-        await expectText(page, '源单：加工合同')
+        await expectText(page, '业务单据：加工合同')
         await assertTextAbsent(page, '加工合同只表达委外承诺和打印快照')
         await expectText(page, '查货只是工序候选')
         await assertTextAbsent(page, '判定结果回质检模块')
@@ -2191,8 +2194,8 @@ export function createBusinessFormalScenarios(deps) {
             waitUntil: 'domcontentloaded',
           })
           await expectHeading(page, heading)
-          await expectText(page, 'Workflow V1')
-          await expectText(page, '不写事实层')
+          await expectText(page, '协同任务')
+          await expectText(page, '业务处理分开完成')
           for (const text of absentTexts) {
             await assertTextAbsent(page, text)
           }
@@ -2205,7 +2208,7 @@ export function createBusinessFormalScenarios(deps) {
           await assertUnifiedListToolbarShell(page, {
             scenarioName,
             exportDisabled: true,
-            exportTooltip: '当前 Workflow V1 只处理协同任务，不导出业务数据。',
+            exportTooltip: '当前页面只处理协同任务，暂不提供业务数据导出。',
           })
           await page.getByRole('button', { name: '刷新当前页' }).click()
           const expectedRefreshMessage =
@@ -2214,6 +2217,27 @@ export function createBusinessFormalScenarios(deps) {
           await expectNoButton(page, '删除')
           await assertNoHorizontalOverflow(page, scenarioName)
         }
+
+        await gotoScenarioPath(page, '/erp/production/orders', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '生产订单')
+        await expectText(page, 'MO-STYLE-L1-20260713')
+        await expectText(page, '维护生产计划源单')
+        await expectButton(page, '新建生产订单')
+        await page.getByText('MO-STYLE-L1-20260713', { exact: true }).click()
+        await expectButton(page, '编辑')
+        await expectButton(page, /^发\s*布$/u)
+        await page.getByText('MO-STYLE-L1-20260713', { exact: true }).dblclick()
+        const productionOrderModal = page
+          .locator('.ant-modal:visible')
+          .filter({ hasText: '编辑生产订单' })
+        await expectText(page, '编辑生产订单')
+        await expectText(page, '销售订单行（可选）')
+        await expectText(page, 'BOM 版本（可选）')
+        await expectText(page, '明细 22')
+        await assertNoHorizontalOverflow(page, 'business-production-orders')
+        await closeBusinessFormModal(page, productionOrderModal)
 
         await verifyWorkflowV1Page({
           path: '/erp/production/scheduling',
@@ -2343,7 +2367,7 @@ export function createBusinessFormalScenarios(deps) {
             })
             await page.getByRole('button', { name: '刷新当前页' }).click()
             await expectText(page, '加载出货放行协同任务失败')
-            await expectText(page, '本页暂无待处理 Workflow 任务。')
+            await expectText(page, '本页暂无待处理协同任务。')
             await assertTextAbsent(page, '出货放行协同确认')
 
             await page.evaluate(async () => {
@@ -2390,7 +2414,7 @@ export function createBusinessFormalScenarios(deps) {
             await expectText(page, '出货放行刷新后协同确认')
             await expectText(
               page,
-              '完成、阻塞、退回和催办只处理协同任务；库存、出货、应收、开票、付款或其他事实仍回到对应业务模块。'
+              '完成、阻塞、退回和催办只处理协同任务；库存、出货、应收、开票和付款仍需进入对应业务模块处理。'
             )
 
             let emptiedListTasksOnce = false
@@ -2529,7 +2553,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '出库管理')
         await expectText(page, 'RSV-STYLE-L1')
-        await expectText(page, '库存预留消耗随出货事实原子完成')
+        await expectText(page, '库存预留仅在确认出货时随出库处理一并消耗')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-outbound-reservations',
         })
@@ -2613,13 +2637,13 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '生产异常')
-        await expectText(page, 'Workflow V1')
-        await expectText(page, '不写事实层')
+        await expectText(page, '协同任务')
+        await expectText(page, '业务处理分开完成')
         await assertTextAbsent(page, '登记异常协同')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-workflow-production-exceptions-dark',
           exportDisabled: true,
-          exportTooltip: '当前 Workflow V1 只处理协同任务，不导出业务数据。',
+          exportTooltip: '当前页面只处理协同任务，暂不提供业务数据导出。',
         })
         await assertTextAbsent(page, '新建异常单')
         await assertTextAbsent(page, '生成异常处理')
@@ -2642,13 +2666,13 @@ export function createBusinessFormalScenarios(deps) {
           expectedEffectiveTheme: 'light',
         })
         await expectHeading(page, '出货放行')
-        await expectText(page, 'Workflow V1')
-        await expectText(page, '不写事实层')
+        await expectText(page, '协同任务')
+        await expectText(page, '业务处理分开完成')
         await assertTextAbsent(page, '发起放行协同')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-workflow-shipping-release-mobile',
           exportDisabled: true,
-          exportTooltip: '当前 Workflow V1 只处理协同任务，不导出业务数据。',
+          exportTooltip: '当前页面只处理协同任务，暂不提供业务数据导出。',
         })
         await assertTextAbsent(page, '新建放行单')
         await assertTextAbsent(page, '生成出货放行')
@@ -2752,16 +2776,16 @@ export function createBusinessFormalScenarios(deps) {
         })
 
         await expectHeading(page, '出货放行')
-        await expectText(page, 'Workflow V1')
-        await expectText(page, '不写事实层')
+        await expectText(page, '协同任务')
+        await expectText(page, '业务处理分开完成')
         await assertTextAbsent(page, '发起放行协同')
         await assertUnifiedListToolbarShell(page, {
           scenarioName:
             'business-formal-shipping-release-no-permission-desktop',
           exportDisabled: true,
-          exportTooltip: '当前 Workflow V1 只处理协同任务，不导出业务数据。',
+          exportTooltip: '当前页面只处理协同任务，暂不提供业务数据导出。',
         })
-        await expectText(page, '当前账号没有 Workflow 任务读取权限。')
+        await expectText(page, '当前账号不能查看此类协同任务。')
         await page.getByRole('button', { name: '刷新当前页' }).click()
         assert.equal(
           shippingReleaseListTaskCalls,
@@ -3117,7 +3141,7 @@ export function createBusinessFormalScenarios(deps) {
             scenarioName:
               'business-formal-shipping-release-readonly-actions-desktop',
             exportDisabled: true,
-            exportTooltip: '当前 Workflow V1 只处理协同任务，不导出业务数据。',
+            exportTooltip: '当前页面只处理协同任务，暂不提供业务数据导出。',
           })
           await expectText(page, '待办')
           await page.getByRole('button', { name: '展开' }).first().click()

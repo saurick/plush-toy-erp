@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
 
@@ -7,9 +7,11 @@ const execFileAsync = promisify(execFile)
 
 const API_PATH = '/__dev/api/customer-import/dry-run'
 const RUNTIME_MANIFEST_API_PATH = '/__dev/api/customer-config/runtime-manifest'
+const RELEASE_BATCHES_API_PATH = '/__dev/api/customer-config/release-batches'
 const RELEASE_READINESS_API_PATH =
   '/__dev/api/customer-config/release-readiness'
 const SUPPORTED_CUSTOMERS = new Set(['yoyoosun'])
+const RELEASE_BATCH_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 function sendJson(res, statusCode, payload) {
   res.statusCode = statusCode
@@ -45,6 +47,10 @@ function normalizeCustomerKey(value) {
     .toLowerCase()
 }
 
+function normalizeReleaseBatch(value) {
+  return String(value || '').trim()
+}
+
 function buildDryRunPaths(projectRoot, customerKey) {
   const fixtureBasePath = path.join(
     'scripts',
@@ -69,15 +75,49 @@ function buildDryRunPaths(projectRoot, customerKey) {
   }
 }
 
-function buildReleaseReadinessPaths(customerKey) {
+export function buildReleaseReadinessPaths(customerKey, releaseBatch) {
+  const normalizedBatch = normalizeReleaseBatch(releaseBatch)
+  if (!RELEASE_BATCH_PATTERN.test(normalizedBatch)) {
+    throw new Error(`Invalid release batch: ${normalizedBatch || '(empty)'}`)
+  }
   const outputPath = path.join('output', 'customers', customerKey)
   return {
-    evidenceDir: path.join('deployments', customerKey, 'evidence', 'releases'),
+    releaseBatch: normalizedBatch,
+    evidenceDir: path.join(
+      'deployments',
+      customerKey,
+      'evidence',
+      'releases',
+      normalizedBatch
+    ),
     manifestPath: path.join(
       outputPath,
-      'customer-config-runtime-manifest.ui-release.json'
+      `customer-config-runtime-manifest.ui-release.${normalizedBatch}.json`
     ),
   }
+}
+
+export async function listReleaseBatches(projectRoot, customerKey) {
+  const releaseRoot = path.join(
+    projectRoot,
+    'deployments',
+    customerKey,
+    'evidence',
+    'releases'
+  )
+  let entries = []
+  try {
+    entries = await readdir(releaseRoot, { withFileTypes: true })
+  } catch (error) {
+    if (error?.code === 'ENOENT') return []
+    throw error
+  }
+  return entries
+    .filter(
+      (entry) => entry.isDirectory() && RELEASE_BATCH_PATTERN.test(entry.name)
+    )
+    .map((entry) => entry.name)
+    .sort((left, right) => right.localeCompare(left))
 }
 
 function summarizeValidation(summary = {}) {
@@ -198,8 +238,8 @@ function summarizeReleaseReadinessError(error) {
   return details
 }
 
-async function runReleaseReadiness(projectRoot, customerKey) {
-  const paths = buildReleaseReadinessPaths(customerKey)
+async function runReleaseReadiness(projectRoot, customerKey, releaseBatch) {
+  const paths = buildReleaseReadinessPaths(customerKey, releaseBatch)
   const manifestPayload = await compileRuntimeManifestTo(
     projectRoot,
     customerKey,
@@ -223,9 +263,9 @@ async function runReleaseReadiness(projectRoot, customerKey) {
     })
     return {
       customerKey,
+      releaseBatch: paths.releaseBatch,
       status: 'ready',
       generatedAt: new Date().toISOString(),
-      manifest: manifestPayload.manifest,
       manifestPath: manifestPayload.manifestPath,
       evidenceDir: paths.evidenceDir,
       summary: manifestPayload.summary,
@@ -235,9 +275,9 @@ async function runReleaseReadiness(projectRoot, customerKey) {
   } catch (error) {
     return {
       customerKey,
+      releaseBatch: paths.releaseBatch,
       status: 'blocked',
       generatedAt: new Date().toISOString(),
-      manifest: manifestPayload.manifest,
       manifestPath: manifestPayload.manifestPath,
       evidenceDir: paths.evidenceDir,
       summary: manifestPayload.summary,
@@ -249,6 +289,8 @@ async function runReleaseReadiness(projectRoot, customerKey) {
 
 export function createDevCustomerImportDryRunPlugin({
   projectRoot = path.resolve(process.cwd(), '..'),
+  releaseBatchLister = listReleaseBatches,
+  releaseReadinessRunner = runReleaseReadiness,
 } = {}) {
   return {
     name: 'plush-dev-customer-import-dry-run-api',
@@ -318,6 +360,43 @@ export function createDevCustomerImportDryRunPlugin({
         }
       })
 
+      server.middlewares.use(RELEASE_BATCHES_API_PATH, async (req, res) => {
+        if (req.method !== 'GET') {
+          sendJson(res, 405, {
+            status: 'error',
+            message: 'Only GET is allowed for customer config release batches.',
+          })
+          return
+        }
+
+        try {
+          const requestUrl = new URL(req.url || '/', 'http://127.0.0.1')
+          const customerKey = normalizeCustomerKey(
+            requestUrl.searchParams.get('customerKey')
+          )
+          if (!SUPPORTED_CUSTOMERS.has(customerKey)) {
+            sendJson(res, 400, {
+              status: 'error',
+              message: `Unsupported customer package: ${customerKey || '(empty)'}`,
+            })
+            return
+          }
+          const batches = await releaseBatchLister(projectRoot, customerKey)
+          sendJson(res, 200, {
+            status: 'success',
+            customerKey,
+            batches,
+          })
+        } catch (error) {
+          sendJson(res, 500, {
+            status: 'error',
+            message:
+              error?.message ||
+              'Customer config release batches failed unexpectedly.',
+          })
+        }
+      })
+
       server.middlewares.use(RELEASE_READINESS_API_PATH, async (req, res) => {
         if (req.method !== 'POST') {
           sendJson(res, 405, {
@@ -339,7 +418,24 @@ export function createDevCustomerImportDryRunPlugin({
             return
           }
 
-          const payload = await runReleaseReadiness(projectRoot, customerKey)
+          const releaseBatch = normalizeReleaseBatch(body.releaseBatch)
+          const registeredBatches = await releaseBatchLister(
+            projectRoot,
+            customerKey
+          )
+          if (!registeredBatches.includes(releaseBatch)) {
+            sendJson(res, 400, {
+              status: 'error',
+              message: `Unregistered release batch: ${releaseBatch || '(empty)'}`,
+            })
+            return
+          }
+
+          const payload = await releaseReadinessRunner(
+            projectRoot,
+            customerKey,
+            releaseBatch
+          )
           sendJson(res, 200, payload)
         } catch (error) {
           sendJson(res, 500, {

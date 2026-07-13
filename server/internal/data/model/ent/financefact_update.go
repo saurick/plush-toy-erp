@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/predicate"
 	"time"
@@ -397,6 +398,66 @@ func (_u *FinanceFactUpdate) ClearSettledAt() *FinanceFactUpdate {
 	return _u
 }
 
+// SetCancelledAt sets the "cancelled_at" field.
+func (_u *FinanceFactUpdate) SetCancelledAt(v time.Time) *FinanceFactUpdate {
+	_u.mutation.SetCancelledAt(v)
+	return _u
+}
+
+// SetNillableCancelledAt sets the "cancelled_at" field if the given value is not nil.
+func (_u *FinanceFactUpdate) SetNillableCancelledAt(v *time.Time) *FinanceFactUpdate {
+	if v != nil {
+		_u.SetCancelledAt(*v)
+	}
+	return _u
+}
+
+// ClearCancelledAt clears the value of the "cancelled_at" field.
+func (_u *FinanceFactUpdate) ClearCancelledAt() *FinanceFactUpdate {
+	_u.mutation.ClearCancelledAt()
+	return _u
+}
+
+// SetCancelledBy sets the "cancelled_by" field.
+func (_u *FinanceFactUpdate) SetCancelledBy(v int) *FinanceFactUpdate {
+	_u.mutation.SetCancelledBy(v)
+	return _u
+}
+
+// SetNillableCancelledBy sets the "cancelled_by" field if the given value is not nil.
+func (_u *FinanceFactUpdate) SetNillableCancelledBy(v *int) *FinanceFactUpdate {
+	if v != nil {
+		_u.SetCancelledBy(*v)
+	}
+	return _u
+}
+
+// ClearCancelledBy clears the value of the "cancelled_by" field.
+func (_u *FinanceFactUpdate) ClearCancelledBy() *FinanceFactUpdate {
+	_u.mutation.ClearCancelledBy()
+	return _u
+}
+
+// SetCancelReason sets the "cancel_reason" field.
+func (_u *FinanceFactUpdate) SetCancelReason(v string) *FinanceFactUpdate {
+	_u.mutation.SetCancelReason(v)
+	return _u
+}
+
+// SetNillableCancelReason sets the "cancel_reason" field if the given value is not nil.
+func (_u *FinanceFactUpdate) SetNillableCancelReason(v *string) *FinanceFactUpdate {
+	if v != nil {
+		_u.SetCancelReason(*v)
+	}
+	return _u
+}
+
+// ClearCancelReason clears the value of the "cancel_reason" field.
+func (_u *FinanceFactUpdate) ClearCancelReason() *FinanceFactUpdate {
+	_u.mutation.ClearCancelReason()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *FinanceFactUpdate) SetNote(v string) *FinanceFactUpdate {
 	_u.mutation.SetNote(v)
@@ -423,9 +484,34 @@ func (_u *FinanceFactUpdate) SetUpdatedAt(v time.Time) *FinanceFactUpdate {
 	return _u
 }
 
+// SetCancellerID sets the "canceller" edge to the AdminUser entity by ID.
+func (_u *FinanceFactUpdate) SetCancellerID(id int) *FinanceFactUpdate {
+	_u.mutation.SetCancellerID(id)
+	return _u
+}
+
+// SetNillableCancellerID sets the "canceller" edge to the AdminUser entity by ID if the given value is not nil.
+func (_u *FinanceFactUpdate) SetNillableCancellerID(id *int) *FinanceFactUpdate {
+	if id != nil {
+		_u = _u.SetCancellerID(*id)
+	}
+	return _u
+}
+
+// SetCanceller sets the "canceller" edge to the AdminUser entity.
+func (_u *FinanceFactUpdate) SetCanceller(v *AdminUser) *FinanceFactUpdate {
+	return _u.SetCancellerID(v.ID)
+}
+
 // Mutation returns the FinanceFactMutation object of the builder.
 func (_u *FinanceFactUpdate) Mutation() *FinanceFactMutation {
 	return _u.mutation
+}
+
+// ClearCanceller clears the "canceller" edge to the AdminUser entity.
+func (_u *FinanceFactUpdate) ClearCanceller() *FinanceFactUpdate {
+	_u.mutation.ClearCanceller()
+	return _u
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -540,6 +626,16 @@ func (_u *FinanceFactUpdate) check() error {
 	if v, ok := _u.mutation.IdempotencyKey(); ok {
 		if err := financefact.IdempotencyKeyValidator(v); err != nil {
 			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.idempotency_key": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelledBy(); ok {
+		if err := financefact.CancelledByValidator(v); err != nil {
+			return &ValidationError{Name: "cancelled_by", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.cancelled_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelReason(); ok {
+		if err := financefact.CancelReasonValidator(v); err != nil {
+			return &ValidationError{Name: "cancel_reason", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.cancel_reason": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.Note(); ok {
@@ -664,6 +760,18 @@ func (_u *FinanceFactUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	if _u.mutation.SettledAtCleared() {
 		_spec.ClearField(financefact.FieldSettledAt, field.TypeTime)
 	}
+	if value, ok := _u.mutation.CancelledAt(); ok {
+		_spec.SetField(financefact.FieldCancelledAt, field.TypeTime, value)
+	}
+	if _u.mutation.CancelledAtCleared() {
+		_spec.ClearField(financefact.FieldCancelledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CancelReason(); ok {
+		_spec.SetField(financefact.FieldCancelReason, field.TypeString, value)
+	}
+	if _u.mutation.CancelReasonCleared() {
+		_spec.ClearField(financefact.FieldCancelReason, field.TypeString)
+	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(financefact.FieldNote, field.TypeString, value)
 	}
@@ -672,6 +780,35 @@ func (_u *FinanceFactUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(financefact.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.CancellerCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   financefact.CancellerTable,
+			Columns: []string{financefact.CancellerColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.CancellerIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   financefact.CancellerTable,
+			Columns: []string{financefact.CancellerColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -1061,6 +1198,66 @@ func (_u *FinanceFactUpdateOne) ClearSettledAt() *FinanceFactUpdateOne {
 	return _u
 }
 
+// SetCancelledAt sets the "cancelled_at" field.
+func (_u *FinanceFactUpdateOne) SetCancelledAt(v time.Time) *FinanceFactUpdateOne {
+	_u.mutation.SetCancelledAt(v)
+	return _u
+}
+
+// SetNillableCancelledAt sets the "cancelled_at" field if the given value is not nil.
+func (_u *FinanceFactUpdateOne) SetNillableCancelledAt(v *time.Time) *FinanceFactUpdateOne {
+	if v != nil {
+		_u.SetCancelledAt(*v)
+	}
+	return _u
+}
+
+// ClearCancelledAt clears the value of the "cancelled_at" field.
+func (_u *FinanceFactUpdateOne) ClearCancelledAt() *FinanceFactUpdateOne {
+	_u.mutation.ClearCancelledAt()
+	return _u
+}
+
+// SetCancelledBy sets the "cancelled_by" field.
+func (_u *FinanceFactUpdateOne) SetCancelledBy(v int) *FinanceFactUpdateOne {
+	_u.mutation.SetCancelledBy(v)
+	return _u
+}
+
+// SetNillableCancelledBy sets the "cancelled_by" field if the given value is not nil.
+func (_u *FinanceFactUpdateOne) SetNillableCancelledBy(v *int) *FinanceFactUpdateOne {
+	if v != nil {
+		_u.SetCancelledBy(*v)
+	}
+	return _u
+}
+
+// ClearCancelledBy clears the value of the "cancelled_by" field.
+func (_u *FinanceFactUpdateOne) ClearCancelledBy() *FinanceFactUpdateOne {
+	_u.mutation.ClearCancelledBy()
+	return _u
+}
+
+// SetCancelReason sets the "cancel_reason" field.
+func (_u *FinanceFactUpdateOne) SetCancelReason(v string) *FinanceFactUpdateOne {
+	_u.mutation.SetCancelReason(v)
+	return _u
+}
+
+// SetNillableCancelReason sets the "cancel_reason" field if the given value is not nil.
+func (_u *FinanceFactUpdateOne) SetNillableCancelReason(v *string) *FinanceFactUpdateOne {
+	if v != nil {
+		_u.SetCancelReason(*v)
+	}
+	return _u
+}
+
+// ClearCancelReason clears the value of the "cancel_reason" field.
+func (_u *FinanceFactUpdateOne) ClearCancelReason() *FinanceFactUpdateOne {
+	_u.mutation.ClearCancelReason()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *FinanceFactUpdateOne) SetNote(v string) *FinanceFactUpdateOne {
 	_u.mutation.SetNote(v)
@@ -1087,9 +1284,34 @@ func (_u *FinanceFactUpdateOne) SetUpdatedAt(v time.Time) *FinanceFactUpdateOne 
 	return _u
 }
 
+// SetCancellerID sets the "canceller" edge to the AdminUser entity by ID.
+func (_u *FinanceFactUpdateOne) SetCancellerID(id int) *FinanceFactUpdateOne {
+	_u.mutation.SetCancellerID(id)
+	return _u
+}
+
+// SetNillableCancellerID sets the "canceller" edge to the AdminUser entity by ID if the given value is not nil.
+func (_u *FinanceFactUpdateOne) SetNillableCancellerID(id *int) *FinanceFactUpdateOne {
+	if id != nil {
+		_u = _u.SetCancellerID(*id)
+	}
+	return _u
+}
+
+// SetCanceller sets the "canceller" edge to the AdminUser entity.
+func (_u *FinanceFactUpdateOne) SetCanceller(v *AdminUser) *FinanceFactUpdateOne {
+	return _u.SetCancellerID(v.ID)
+}
+
 // Mutation returns the FinanceFactMutation object of the builder.
 func (_u *FinanceFactUpdateOne) Mutation() *FinanceFactMutation {
 	return _u.mutation
+}
+
+// ClearCanceller clears the "canceller" edge to the AdminUser entity.
+func (_u *FinanceFactUpdateOne) ClearCanceller() *FinanceFactUpdateOne {
+	_u.mutation.ClearCanceller()
+	return _u
 }
 
 // Where appends a list predicates to the FinanceFactUpdate builder.
@@ -1217,6 +1439,16 @@ func (_u *FinanceFactUpdateOne) check() error {
 	if v, ok := _u.mutation.IdempotencyKey(); ok {
 		if err := financefact.IdempotencyKeyValidator(v); err != nil {
 			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.idempotency_key": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelledBy(); ok {
+		if err := financefact.CancelledByValidator(v); err != nil {
+			return &ValidationError{Name: "cancelled_by", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.cancelled_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelReason(); ok {
+		if err := financefact.CancelReasonValidator(v); err != nil {
+			return &ValidationError{Name: "cancel_reason", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.cancel_reason": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.Note(); ok {
@@ -1358,6 +1590,18 @@ func (_u *FinanceFactUpdateOne) sqlSave(ctx context.Context) (_node *FinanceFact
 	if _u.mutation.SettledAtCleared() {
 		_spec.ClearField(financefact.FieldSettledAt, field.TypeTime)
 	}
+	if value, ok := _u.mutation.CancelledAt(); ok {
+		_spec.SetField(financefact.FieldCancelledAt, field.TypeTime, value)
+	}
+	if _u.mutation.CancelledAtCleared() {
+		_spec.ClearField(financefact.FieldCancelledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CancelReason(); ok {
+		_spec.SetField(financefact.FieldCancelReason, field.TypeString, value)
+	}
+	if _u.mutation.CancelReasonCleared() {
+		_spec.ClearField(financefact.FieldCancelReason, field.TypeString)
+	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(financefact.FieldNote, field.TypeString, value)
 	}
@@ -1366,6 +1610,35 @@ func (_u *FinanceFactUpdateOne) sqlSave(ctx context.Context) (_node *FinanceFact
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(financefact.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.CancellerCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   financefact.CancellerTable,
+			Columns: []string{financefact.CancellerColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.CancellerIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   financefact.CancellerTable,
+			Columns: []string{financefact.CancellerColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &FinanceFact{config: _u.config}
 	_spec.Assign = _node.assignValues

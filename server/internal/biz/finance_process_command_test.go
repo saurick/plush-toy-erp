@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/shopspring/decimal"
@@ -209,13 +210,44 @@ func TestFinanceProcessDomainCommandReceivableLeadRequiresShipmentCustomerTruth(
 	}
 }
 
+func TestOperationalFactUsecaseCancelFinanceRequiresActorAndTrimmedReason(t *testing.T) {
+	repo := &financeProcessOperationalFactRepoStub{}
+	uc := NewOperationalFactUsecase(repo)
+	for _, tc := range []struct {
+		name    string
+		id      int
+		actorID int
+		reason  string
+	}{
+		{name: "missing id", actorID: 7, reason: "客户撤销"},
+		{name: "missing actor", id: 9, reason: "客户撤销"},
+		{name: "empty reason", id: 9, actorID: 7},
+		{name: "blank reason", id: 9, actorID: 7, reason: "  \t "},
+		{name: "too long reason", id: 9, actorID: 7, reason: strings.Repeat("理", 256)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := uc.CancelPostedFinanceFact(context.Background(), tc.id, tc.actorID, tc.reason); !errors.Is(err, ErrBadParam) {
+				t.Fatalf("error=%v, want ErrBadParam", err)
+			}
+		})
+	}
+	if _, err := uc.CancelPostedFinanceFact(context.Background(), 9, 7, "  客户撤销账款  "); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("stub error=%v, want forwarded ErrBadParam", err)
+	}
+	if repo.cancelledFinanceFactID != 9 || repo.cancelledFinanceFactActorID != 7 || repo.cancelledFinanceFactReason != "客户撤销账款" {
+		t.Fatalf("unexpected normalized cancellation input: id=%d actor=%d reason=%q", repo.cancelledFinanceFactID, repo.cancelledFinanceFactActorID, repo.cancelledFinanceFactReason)
+	}
+}
+
 type financeProcessOperationalFactRepoStub struct {
 	OperationalFactRepo
-	shipment               *Shipment
-	createdFinanceFact     *FinanceFactCreate
-	postedFinanceFactID    int
-	settledFinanceFactID   int
-	cancelledFinanceFactID int
+	shipment                    *Shipment
+	createdFinanceFact          *FinanceFactCreate
+	postedFinanceFactID         int
+	settledFinanceFactID        int
+	cancelledFinanceFactID      int
+	cancelledFinanceFactActorID int
+	cancelledFinanceFactReason  string
 }
 
 func (r *financeProcessOperationalFactRepoStub) GetShipment(_ context.Context, shipmentID int) (*Shipment, error) {
@@ -262,7 +294,9 @@ func (r *financeProcessOperationalFactRepoStub) SettleFinanceFact(_ context.Cont
 	return nil, ErrBadParam
 }
 
-func (r *financeProcessOperationalFactRepoStub) CancelPostedFinanceFact(_ context.Context, id int) (*FinanceFact, error) {
+func (r *financeProcessOperationalFactRepoStub) CancelPostedFinanceFact(_ context.Context, id int, actorID int, reason string) (*FinanceFact, error) {
 	r.cancelledFinanceFactID = id
+	r.cancelledFinanceFactActorID = actorID
+	r.cancelledFinanceFactReason = reason
 	return nil, ErrBadParam
 }

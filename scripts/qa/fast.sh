@@ -56,11 +56,13 @@ print_help() {
   customer-config-runtime-manifest: 客户配置运行时 manifest 编译和门禁检查
   customer-import-tooling: 客户来源 manifest / extract / freeze / dry-run 测试
   test-data-isolation-boundary: 测试业务数据隔离边界守卫
+  manual-acceptance: 甲方手工验收目录、账号、源数据、事实数据、任务数据与退出边界测试
   trial-simulated-data: 试用模拟数据工具测试
   operational-fact-simulated-closure: 业务事实模拟闭环工具测试
   mobile-workflow-simulated-closure: 岗位任务端模拟闭环工具测试
   mobile-workflow-runtime-browser-smoke: 岗位任务端真实浏览器模拟任务回归边界测试
   purchase-receipt-real-write-e2e: 采购入库服务层真实写入 e2e 输入模板边界测试，不运行 Go 测试
+  finance-production-browser-e2e: 财务取消与生产订单真实后端浏览器脚本 CLI、localhost、无 mock 边界测试，不启动浏览器
   mvp-closure: ERP MVP 闭环验收工具测试
   industry-template-closure: 行业模板模拟闭环工具测试
   private-deployment-package-closure: 多客户私有化复制模拟闭环工具测试
@@ -236,8 +238,13 @@ if [ -f "$ROOT_DIR/scripts/qa/docs-inventory.test.mjs" ]; then
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/phase-label-boundaries.mjs" ]; then
-  echo "[qa:fast] 运行活跃路径 Phase 标签边界检查"
+  echo "[qa:fast] 运行活跃路径阶段编号命名边界检查"
   node "$ROOT_DIR/scripts/qa/phase-label-boundaries.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/phase-label-boundaries.test.mjs" ]; then
+  echo "[qa:fast] 运行阶段编号命名边界测试"
+  node --test "$ROOT_DIR/scripts/qa/phase-label-boundaries.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs" ]; then
@@ -393,6 +400,12 @@ if [ -f "$ROOT_DIR/scripts/qa/test-data-isolation-boundary.test.mjs" ]; then
   node --test "$ROOT_DIR/scripts/qa/test-data-isolation-boundary.test.mjs"
 fi
 
+manual_acceptance_tests=("$ROOT_DIR"/scripts/qa/manual-acceptance-*.test.mjs)
+if [ -f "${manual_acceptance_tests[0]}" ]; then
+  echo "[qa:fast] 运行甲方手工验收数据与写入边界测试"
+  node --test "${manual_acceptance_tests[@]}"
+fi
+
 if [ -f "$ROOT_DIR/scripts/qa/trial-simulated-data.test.mjs" ]; then
   echo "[qa:fast] 运行试用模拟数据工具测试"
   node --test "$ROOT_DIR/scripts/qa/trial-simulated-data.test.mjs"
@@ -418,9 +431,23 @@ if [ -f "$ROOT_DIR/scripts/qa/purchase-receipt-real-write-e2e.test.mjs" ]; then
   node --test "$ROOT_DIR/scripts/qa/purchase-receipt-real-write-e2e.test.mjs"
 fi
 
+browser_e2e_contract_tests=(
+  "$ROOT_DIR/scripts/qa/finance-cancellation-browser-e2e.test.mjs"
+  "$ROOT_DIR/scripts/qa/production-order-browser-e2e.test.mjs"
+)
+if [ -f "${browser_e2e_contract_tests[0]}" ] && [ -f "${browser_e2e_contract_tests[1]}" ]; then
+  echo "[qa:fast] 运行财务取消与生产订单真实后端浏览器脚本边界测试"
+  node --test "${browser_e2e_contract_tests[@]}"
+fi
+
 if [ -f "$ROOT_DIR/scripts/qa/critical-postgres-gate.test.mjs" ]; then
   echo "[qa:fast] 运行 PostgreSQL 关键事务门禁合同测试"
   node --test "$ROOT_DIR/scripts/qa/critical-postgres-gate.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/production-order-api-runtime.test.mjs" ]; then
+  echo "[qa:fast] 运行生产订单 API/RBAC runtime 合同测试"
+  node --test "$ROOT_DIR/scripts/qa/production-order-api-runtime.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/mvp-closure.test.mjs" ]; then

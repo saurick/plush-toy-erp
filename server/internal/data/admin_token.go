@@ -33,8 +33,22 @@ func NewAdminTokenGenerator(c *conf.Data, logger log.Logger) biz.AdminTokenGener
 
 	l.Infof("admin token generator init ok, expire=%s", exp)
 
-	return func(userID int, username string, role int8) (string, time.Time, error) {
-		l.Infof("gen admin token uid=%d uname=%s role=%d", userID, username, role)
-		return jwtutil.NewToken(cfg, userID, username, role)
+	return func(input biz.AdminTokenInput) (string, time.Time, error) {
+		l.Infof("gen admin token uid=%d", input.UserID)
+		return jwtutil.NewToken(cfg, input.UserID, input.SessionKey, input.AuthVersion, input.IssuedAt, input.ExpiresAt)
+	}
+}
+
+func NewAdminTokenParser(c *conf.Data) biz.AdminTokenParser {
+	if c == nil || c.Auth == nil || c.Auth.JwtSecret == "" {
+		panic("NewAdminTokenParser: missing data.auth.jwt_secret in config")
+	}
+	secret := []byte(c.Auth.JwtSecret)
+	return func(token string) (*biz.AuthClaims, error) {
+		claims, err := jwtutil.ParseToken(secret, token)
+		if err != nil {
+			return nil, err
+		}
+		return &biz.AuthClaims{UserID: claims.UserID, SessionKey: claims.SessionKey, AuthVersion: claims.AuthVersion}, nil
 	}
 }

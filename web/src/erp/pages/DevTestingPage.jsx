@@ -5,9 +5,12 @@ import {
   CopyOutlined,
   FileSearchOutlined,
   SafetyCertificateOutlined,
+  SearchOutlined,
 } from '@ant-design/icons'
 import { Button, Empty, Input, Segmented, Space, Tag, Typography } from 'antd'
+import { useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
+import DevPageNav from '../components/dev/DevPageNav.jsx'
 import {
   DEV_TESTING_COPY_PRESETS,
   DEV_TESTING_STRATEGY_SOURCE_PATH,
@@ -16,6 +19,7 @@ import {
   filterDevTestingDocs,
   getDevTestingCategoryOptions,
   parseDevTestingStrategyTiers,
+  resolveDevTestingSelectedDoc,
 } from '../config/devTesting.mjs'
 
 const { Paragraph, Text, Title } = Typography
@@ -23,12 +27,17 @@ const { Paragraph, Text, Title } = Typography
 const VIEW_TIERS = 'tiers'
 const VIEW_COMMANDS = 'commands'
 const VIEW_DOCS = 'docs'
+const VIEW_QUERY_KEY = 'view'
+const DOC_QUERY_KEY = 'doc'
 
 const VIEW_OPTIONS = [
   { label: '测试分层 / Tiers', value: VIEW_TIERS },
   { label: '命令入口 / Commands', value: VIEW_COMMANDS },
   { label: '相关文档 / Docs', value: VIEW_DOCS },
 ]
+const VIEW_VALUES = new Set(VIEW_OPTIONS.map((option) => option.value))
+
+const COPY_MESSAGE_KEY = 'dev-testing-command-copy'
 
 const markdownModules = import.meta.glob(
   [
@@ -40,6 +49,7 @@ const markdownModules = import.meta.glob(
     '../../../../server/deploy/compose/prod/README.md',
     '../../../../scripts/README.md',
     '../../../../web/README.md',
+    '../../../../web/scripts/README.md',
   ],
   {
     eager: true,
@@ -63,17 +73,30 @@ function MetricTile({ icon, label, value, note, tone = 'default' }) {
 
 function runCopy(text) {
   if (!String(text || '').trim()) {
-    message.warning('当前层级没有可复制命令')
+    message.warning({
+      key: COPY_MESSAGE_KEY,
+      content: '当前层级没有可复制命令',
+    })
     return
   }
   if (typeof navigator === 'undefined' || !navigator.clipboard) {
-    message.warning('当前浏览器不支持复制')
+    message.warning({
+      key: COPY_MESSAGE_KEY,
+      content: '当前浏览器不支持复制',
+    })
     return
   }
   navigator.clipboard
     .writeText(text)
-    .then(() => message.success('命令已复制'))
-    .catch(() => message.error('复制失败，请手动选择命令'))
+    .then(() =>
+      message.success({ key: COPY_MESSAGE_KEY, content: '命令已复制' })
+    )
+    .catch(() =>
+      message.error({
+        key: COPY_MESSAGE_KEY,
+        content: '复制失败，请手动选择命令',
+      })
+    )
 }
 
 function TierCard({ tier }) {
@@ -124,7 +147,10 @@ function QuickPreset({ preset }) {
 
 function CommandBlock({ block }) {
   return (
-    <article className="erp-dev-testing-command-block">
+    <article
+      className="erp-dev-testing-command-block"
+      data-command-lines={block.commands.length}
+    >
       <div className="erp-dev-testing-command-block__head">
         <div>
           <Text strong>{block.context || block.title}</Text>
@@ -156,6 +182,7 @@ function TestingDocRow({ doc, active, onSelect }) {
           ? 'erp-dev-testing-doc-row erp-dev-testing-doc-row--active'
           : 'erp-dev-testing-doc-row'
       }
+      aria-current={active ? 'true' : undefined}
       onClick={() => onSelect(doc.key)}
     >
       <span className="erp-dev-testing-doc-row__top">
@@ -217,6 +244,7 @@ function SelectedDocDetail({ doc }) {
 }
 
 export default function DevTestingPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const docs = useMemo(() => buildDevTestingDocs(markdownModules), [])
   const strategySource =
     docs.find((item) => item.path === DEV_TESTING_STRATEGY_SOURCE_PATH)
@@ -233,27 +261,75 @@ export default function DevTestingPage() {
     () => getDevTestingCategoryOptions(docs),
     [docs]
   )
-  const [view, setView] = useState(VIEW_TIERS)
+  const requestedView = searchParams.get(VIEW_QUERY_KEY) || ''
+  const view = VIEW_VALUES.has(requestedView) ? requestedView : VIEW_TIERS
   const [keyword, setKeyword] = useState('')
   const [category, setCategory] = useState('all')
   const filteredDocs = useMemo(
     () => filterDevTestingDocs(docs, { keyword, category }),
     [category, docs, keyword]
   )
-  const [selectedKey, setSelectedKey] = useState(() => docs[0]?.key || '')
-  const selectedDoc =
-    filteredDocs.find((item) => item.key === selectedKey) ||
-    filteredDocs[0] ||
-    docs[0]
+  const requestedDocKey = searchParams.get(DOC_QUERY_KEY) || ''
+  const requestedDoc = resolveDevTestingSelectedDoc(docs, requestedDocKey)
+  const selectedDoc = resolveDevTestingSelectedDoc(
+    filteredDocs,
+    requestedDoc?.key || ''
+  )
+  const canonicalDocKey = selectedDoc?.key || requestedDoc?.key || ''
   const allCommandBlocks = filteredDocs.flatMap((doc) => doc.commandBlocks)
 
+  React.useEffect(() => {
+    if (requestedView === view && requestedDocKey === canonicalDocKey) {
+      return
+    }
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set(VIEW_QUERY_KEY, view)
+    if (canonicalDocKey) {
+      nextParams.set(DOC_QUERY_KEY, canonicalDocKey)
+    } else {
+      nextParams.delete(DOC_QUERY_KEY)
+    }
+    setSearchParams(nextParams, { replace: true })
+  }, [
+    canonicalDocKey,
+    requestedDocKey,
+    requestedView,
+    searchParams,
+    setSearchParams,
+    view,
+  ])
+
+  const selectView = (nextView) => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set(
+      VIEW_QUERY_KEY,
+      VIEW_VALUES.has(nextView) ? nextView : VIEW_TIERS
+    )
+    setSearchParams(nextParams)
+  }
+
+  const selectDoc = (nextDocKey) => {
+    const nextParams = new URLSearchParams(searchParams)
+    const nextDoc = resolveDevTestingSelectedDoc(docs, nextDocKey)
+    if (nextDoc?.key) {
+      nextParams.set(DOC_QUERY_KEY, nextDoc.key)
+    } else {
+      nextParams.delete(DOC_QUERY_KEY)
+    }
+    setSearchParams(nextParams)
+  }
+
   return (
-    <div className="erp-dev-testing-page">
+    <div className="erp-dev-testing-page erp-dev-workspace-page">
+      <DevPageNav
+        sourcePath={selectedDoc?.path || DEV_TESTING_STRATEGY_SOURCE_PATH}
+      />
       <header className="erp-dev-testing-header">
         <div className="erp-dev-testing-header__copy">
           <Space align="center" size={10}>
             <SafetyCertificateOutlined className="erp-dev-testing-header__icon" />
-            <Title level={3} className="erp-dev-testing-title">
+            <Title level={1} className="erp-dev-testing-title">
               开发测试入口 / Dev Test Entry
             </Title>
           </Space>
@@ -287,10 +363,11 @@ export default function DevTestingPage() {
 
       <main className="erp-dev-testing-shell">
         <aside className="erp-dev-testing-sidebar">
-          <Input.Search
+          <Input
             allowClear
             className="erp-dev-testing-search"
             placeholder="搜索文档、命令、验收词"
+            prefix={<SearchOutlined aria-hidden="true" />}
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
           />
@@ -304,6 +381,7 @@ export default function DevTestingPage() {
                     ? 'erp-dev-testing-filter__item erp-dev-testing-filter__item--active'
                     : 'erp-dev-testing-filter__item'
                 }
+                aria-pressed={option.value === category}
                 onClick={() => setCategory(option.value)}
               >
                 {option.label}
@@ -316,7 +394,7 @@ export default function DevTestingPage() {
                 key={doc.key}
                 doc={doc}
                 active={doc.key === selectedDoc?.key}
-                onSelect={setSelectedKey}
+                onSelect={selectDoc}
               />
             ))}
           </div>
@@ -324,9 +402,13 @@ export default function DevTestingPage() {
 
         <section className="erp-dev-testing-reader">
           <div className="erp-dev-testing-reader__toolbar">
-            <Segmented options={VIEW_OPTIONS} value={view} onChange={setView} />
+            <Segmented
+              options={VIEW_OPTIONS}
+              value={view}
+              onChange={selectView}
+            />
             <Text type="secondary">
-              {selectedDoc?.path || DEV_TESTING_STRATEGY_SOURCE_PATH}
+              {selectedDoc?.path || '无匹配文档 / No matching docs'}
             </Text>
           </div>
 

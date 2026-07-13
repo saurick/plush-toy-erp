@@ -1,3 +1,5 @@
+import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
+
 export const PROJECT_ORDER_MODULE_KEY = 'project-orders'
 
 export const ORDER_APPROVAL_TASK_GROUP = 'order_approval'
@@ -14,9 +16,7 @@ function normalizeText(value) {
 }
 
 export function isOpenWorkflowTask(task = {}) {
-  return !['done', 'closed', 'cancelled'].includes(
-    normalizeText(task.task_status_key)
-  )
+  return !isTerminalWorkflowTask(task)
 }
 
 export function isOrderApprovalTask(task = {}) {

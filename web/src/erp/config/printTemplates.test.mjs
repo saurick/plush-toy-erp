@@ -197,6 +197,21 @@ test('FL_print_templates_processing_preview__uses_processing_signature_and_total
   assert.match(printCenterPage, /activeSample\.buyerSignDateText/u)
 })
 
+test('printTemplates: 打印中心模板选择以 URL 为单一真源', () => {
+  const printCenterPage = read('web/src/erp/pages/PrintCenterPage.jsx')
+
+  assert.match(
+    printCenterPage,
+    /const activeKey = isSupportedPrintWorkspaceTemplate\(requestedTemplateKey\)/u
+  )
+  assert.match(
+    printCenterPage,
+    /nextSearchParams\.set\('template', template\.key\)/u
+  )
+  assert.doesNotMatch(printCenterPage, /\[activeKey, setActiveKey\]/u)
+  assert.doesNotMatch(printCenterPage, /setActiveKey\(/u)
+})
+
 test('FL_print_templates_output_zero__does_not_use_falsy_fallback_for_paper_values printTemplates: 纸面输出层不使用 falsy fallback 吞掉 0 值', () => {
   const renderer = read(
     'web/src/erp/components/print/PrintTemplateRenderer.jsx'

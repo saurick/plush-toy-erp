@@ -30,9 +30,12 @@ func TestWorkflowRepo_ShipmentReleaseDoneUpsertsBusinessStateOnly(t *testing.T) 
 	shipmentTask := createShipmentReleaseTask(t, ctx, repo, 5801, map[string]any{})
 
 	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-		ID:            shipmentTask.ID,
-		TaskStatusKey: "done",
-		Payload:       map[string]any{"mobile_role_key": "warehouse"},
+		ID:              shipmentTask.ID,
+		ExpectedVersion: shipmentTask.Version,
+		CommandKey:      "complete_task_action",
+		IdempotencyKey:  "shipment-release-done",
+		TaskStatusKey:   "done",
+		Payload:         map[string]any{"mobile_role_key": "warehouse"},
 	}, 8, "warehouse"); err != nil {
 		t.Fatalf("done update failed: %v", err)
 	}
@@ -133,9 +136,12 @@ func TestWorkflowRepo_ShipmentReleaseDoneUpsertsBusinessStateOnly(t *testing.T) 
 	}
 
 	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-		ID:            shipmentTask.ID,
-		TaskStatusKey: "done",
-		Payload:       map[string]any{"mobile_role_key": "warehouse"},
+		ID:              shipmentTask.ID,
+		ExpectedVersion: shipmentTask.Version,
+		CommandKey:      "complete_task_action",
+		IdempotencyKey:  "shipment-release-done",
+		TaskStatusKey:   "done",
+		Payload:         map[string]any{"mobile_role_key": "warehouse"},
 	}, 8, "warehouse"); err != nil {
 		t.Fatalf("repeat done update failed: %v", err)
 	}
@@ -195,12 +201,12 @@ func TestWorkflowRepo_ShipmentReleaseBlockedAndRejectedPreserveReasonPayload(t *
 			}
 
 			reason := "出货放行资料待复核"
-			if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+			if _, err := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(shipmentTask.ID, shipmentTask.Version, "shipment-release-"+tc.status, &biz.WorkflowTaskStatusUpdate{
 				ID:            shipmentTask.ID,
 				TaskStatusKey: tc.status,
 				Reason:        reason,
 				Payload:       map[string]any{},
-			}, 8, "warehouse"); err != nil {
+			}), 8, "warehouse"); err != nil {
 				t.Fatalf("%s update failed: %v", tc.status, err)
 			}
 

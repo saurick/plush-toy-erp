@@ -451,6 +451,30 @@
                 <span class="chip">业务带值</span>
               </div>
             </button>
+            <button class="template-card" type="button" data-template="material-detail" aria-pressed="false">
+              <h2>物料分析明细表</h2>
+              <p>适用于工程资料和仓库发料核对。BOM 页面可带入产品与材料明细。</p>
+              <div class="chips">
+                <span class="chip green">正式模板</span>
+                <span class="chip">工程资料</span>
+              </div>
+            </button>
+            <button class="template-card" type="button" data-template="color-card" aria-pressed="false">
+              <h2>色卡</h2>
+              <p>适用于板房贴样和仓库对色发料。纸面按物料分块核对。</p>
+              <div class="chips">
+                <span class="chip green">正式模板</span>
+                <span class="chip">对色发料</span>
+              </div>
+            </button>
+            <button class="template-card" type="button" data-template="work-instruction" aria-pressed="false">
+              <h2>作业指导书</h2>
+              <p>适用于内部工程资料和外发加工说明。正文与图片在打印窗口确认。</p>
+              <div class="chips">
+                <span class="chip green">正式模板</span>
+                <span class="chip">作业指导</span>
+              </div>
+            </button>
           </aside>
 
           <section class="panel preview" aria-label="纸面预览">
@@ -545,6 +569,69 @@
             ['包装入袋', '透明袋', '1,200 只', '0.45', '随货清点'],
           ],
           notes: ['加工方按样品和工艺单执行。', '明细行、条款和签章栏在独立打印窗口确认。'],
+        },
+        'material-detail': {
+          title: '物料分析明细表',
+          subtitle: 'Material Detail Sheet',
+          source: 'BOM 快照样例',
+          record: '样例版本 BOM-2026-0032',
+          fields: [
+            ['产品编号', 'PT-2026-032'],
+            ['产品名称', '示例毛绒玩具'],
+            ['BOM 版本', 'V2'],
+            ['制表日期', '2026-07-12'],
+            ['制表', '工程部'],
+            ['审核', '待确认'],
+          ],
+          columns: ['物料', '规格 / 颜色', '部位', '单位用量', '备注'],
+          rows: [
+            ['短毛绒面料', '米白 / 1.6m', '主体', '0.42 米', '按样核对'],
+            ['PP 棉', 'A级', '填充', '0.18 kg', '均匀填充'],
+            ['绣花线', '深棕', '面部', '1 组', '颜色见色卡'],
+          ],
+          notes: ['本页只表达工程打印资料，不生成采购或库存记录。', '图片和材料明细以独立打印窗口中的当前草稿为准。'],
+        },
+        'color-card': {
+          title: '色卡',
+          subtitle: 'Color Card',
+          source: 'BOM 快照样例',
+          record: '样例版本 BOM-2026-0032',
+          fields: [
+            ['产品编号', 'PT-2026-032'],
+            ['产品名称', '示例毛绒玩具'],
+            ['版本', 'V2'],
+            ['制卡日期', '2026-07-12'],
+            ['制卡', '工程部'],
+            ['复核', '待确认'],
+          ],
+          columns: ['物料', '颜色 / 规格', '使用部位', '供应来源', '贴样'],
+          rows: [
+            ['短毛绒面料', '米白', '主体', '示例供应商', '线下贴样'],
+            ['绣花线', '深棕', '面部', '示例供应商', '线下贴样'],
+            ['织唛', '本白', '侧缝', '示例供应商', '线下贴样'],
+          ],
+          notes: ['色卡用于线下贴样和发料核对，不修改材料档案或库存。', '无法确认的颜色和加工方式应保持空白，不能由样例补造。'],
+        },
+        'work-instruction': {
+          title: '作业指导书',
+          subtitle: 'Work Instruction',
+          source: '工程资料样例',
+          record: '样例版本 WI-2026-0018',
+          fields: [
+            ['产品编号', 'PT-2026-032'],
+            ['产品名称', '示例毛绒玩具'],
+            ['版本', 'V2'],
+            ['加工项目', '车缝与填充'],
+            ['数量', '1,200 只'],
+            ['回货日期', '2026-07-30'],
+          ],
+          columns: ['序号', '工序 / 要求', '关键尺寸', '图片', '备注'],
+          rows: [
+            ['01', '裁片按纸样方向排版', '公差 ±2mm', '当前草稿', '避免倒毛'],
+            ['02', '车缝针距保持一致', '10-12 针/寸', '当前草稿', '转角顺滑'],
+            ['03', '填充后整理外形', '按确认样', '当前草稿', '左右对称'],
+          ],
+          notes: ['正文行和图片只属于当前打印草稿，不表示生产或质检已经完成。', '内部 BOM 和委外订单可以提供不同上下文，但共用同一正式模板。'],
         },
       }
 

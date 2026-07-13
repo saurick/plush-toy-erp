@@ -53,9 +53,12 @@ func TestWorkflowRepo_WarehouseInboundDoneUpsertsBusinessStateOnly(t *testing.T)
 	}
 
 	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-		ID:            warehouseTask.ID,
-		TaskStatusKey: "done",
-		Payload:       map[string]any{"mobile_role_key": "warehouse"},
+		ID:              warehouseTask.ID,
+		ExpectedVersion: warehouseTask.Version,
+		CommandKey:      "complete_task_action",
+		IdempotencyKey:  "warehouse-inbound-done",
+		TaskStatusKey:   "done",
+		Payload:         map[string]any{"mobile_role_key": "warehouse"},
 	}, 8, "warehouse"); err != nil {
 		t.Fatalf("done update failed: %v", err)
 	}
@@ -107,9 +110,12 @@ func TestWorkflowRepo_WarehouseInboundDoneUpsertsBusinessStateOnly(t *testing.T)
 	}
 
 	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-		ID:            warehouseTask.ID,
-		TaskStatusKey: "done",
-		Payload:       map[string]any{"mobile_role_key": "warehouse"},
+		ID:              warehouseTask.ID,
+		ExpectedVersion: warehouseTask.Version,
+		CommandKey:      "complete_task_action",
+		IdempotencyKey:  "warehouse-inbound-done",
+		TaskStatusKey:   "done",
+		Payload:         map[string]any{"mobile_role_key": "warehouse"},
 	}, 8, "warehouse"); err != nil {
 		t.Fatalf("repeat done update failed: %v", err)
 	}
@@ -178,12 +184,12 @@ func TestWorkflowRepo_WarehouseInboundBlockedAndRejectedPreserveReasonPayload(t 
 			if tc.status == "rejected" {
 				reason = "到货数量与单据不符"
 			}
-			if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+			if _, err := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(warehouseTask.ID, warehouseTask.Version, "warehouse-inbound-"+tc.status, &biz.WorkflowTaskStatusUpdate{
 				ID:            warehouseTask.ID,
 				TaskStatusKey: tc.status,
 				Reason:        reason,
 				Payload:       map[string]any{},
-			}, 8, "warehouse"); err != nil {
+			}), 8, "warehouse"); err != nil {
 				t.Fatalf("%s update failed: %v", tc.status, err)
 			}
 

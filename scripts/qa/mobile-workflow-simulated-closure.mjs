@@ -13,6 +13,13 @@ const INPUT_TEMPLATE_SCOPE = "mobile-workflow-simulated-closure-input-template";
 const CONFIRM_PHRASE = "APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS";
 const FORBIDDEN_ARG_PATTERN =
   /--(?:execute|import|real|real-import|customer-data)/u;
+const WORKFLOW_TASK_URGE_ACTIONS = new Set([
+  "urge_task",
+  "urge_role",
+  "urge_assignee",
+  "escalate_to_pmc",
+  "escalate_to_boss",
+]);
 
 const ROLE_USERS = {
   pmc: "demo_pmc",
@@ -504,10 +511,7 @@ async function rpcCall({ backendURL, domain, method, params = {}, token }) {
         jsonrpc: "2.0",
         id: `mobile-workflow-sim-${method}-${Date.now()}`,
         method,
-        params:
-          domain === "auth"
-            ? params
-            : { customer_key: "yoyoosun", ...params },
+        params,
       }),
     });
   } catch (error) {
@@ -571,8 +575,22 @@ function buildTaskStatusActionParams(task, action) {
       `unsupported workflow task status action: ${action.nextStatus}`,
     );
   }
+  const taskID = task?.id;
+  if (!Number.isSafeInteger(taskID) || taskID <= 0) {
+    throw new CliError(
+      "workflow task id is required before submitting a status action",
+    );
+  }
+  const expectedVersion = task?.version;
+  if (!Number.isSafeInteger(expectedVersion) || expectedVersion <= 0) {
+    throw new CliError(
+      "workflow task version is required before submitting a status action",
+    );
+  }
   return {
-    task_id: task.id,
+    task_id: taskID,
+    expected_version: expectedVersion,
+    idempotency_key: `mobile-workflow-closure:${taskID}:${actionKey}`,
     action_key: actionKey,
     reason: action.reason,
     payload: {
@@ -605,9 +623,30 @@ async function updateTask(plan, tokens, task, action) {
 }
 
 function buildUrgeTaskParams(task, action) {
+  const taskID = task?.id;
+  if (!Number.isSafeInteger(taskID) || taskID <= 0) {
+    throw new CliError(
+      "workflow task id is required before submitting an urge action",
+    );
+  }
+  const expectedVersion = task?.version;
+  if (!Number.isSafeInteger(expectedVersion) || expectedVersion <= 0) {
+    throw new CliError(
+      "workflow task version is required before submitting an urge action",
+    );
+  }
+  const urgeAction =
+    typeof action?.action === "string" ? action.action.trim() : "";
+  if (!WORKFLOW_TASK_URGE_ACTIONS.has(urgeAction)) {
+    throw new CliError(
+      "workflow urge action is required before submitting an urge action",
+    );
+  }
   return {
-    task_id: task.id,
-    action: action.action || "urge_task",
+    task_id: taskID,
+    expected_version: expectedVersion,
+    idempotency_key: `mobile-workflow-closure:${taskID}:urge`,
+    action: urgeAction,
     reason: action.reason,
     payload: {
       ...action.payload,

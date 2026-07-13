@@ -23,7 +23,6 @@ import (
 	"server/internal/biz"
 	"server/internal/conf"
 	"server/internal/errcode"
-	jwtutil "server/pkg/jwt"
 
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/page"
@@ -119,9 +118,7 @@ type templatePDFModuleGuard interface {
 	EnsureModuleKeysEnabled(ctx context.Context, customerKey string, moduleKeys ...string) error
 }
 
-type adminRequestVerifier struct {
-	jwtSecrets [][]byte
-}
+type adminRequestVerifier struct{}
 
 type templatePDFRenderGate struct {
 	slots chan struct{}
@@ -318,26 +315,8 @@ func (s *templatePDFWarmupState) WaitIfRunning(ctx context.Context) (time.Durati
 	}
 }
 
-func newAdminRequestVerifier(dc *conf.Data) *adminRequestVerifier {
-	secrets := make([][]byte, 0, 1)
-	seen := map[string]struct{}{}
-	addSecret := func(raw string) {
-		secret := strings.TrimSpace(raw)
-		if secret == "" {
-			return
-		}
-		if _, ok := seen[secret]; ok {
-			return
-		}
-		seen[secret] = struct{}{}
-		secrets = append(secrets, []byte(secret))
-	}
-
-	if dc != nil && dc.Auth != nil {
-		addSecret(dc.Auth.JwtSecret)
-	}
-
-	return &adminRequestVerifier{jwtSecrets: secrets}
+func newAdminRequestVerifier(_ *conf.Data) *adminRequestVerifier {
+	return &adminRequestVerifier{}
 }
 
 func (v *adminRequestVerifier) IsAdminRequest(r *stdhttp.Request) bool {
@@ -345,29 +324,8 @@ func (v *adminRequestVerifier) IsAdminRequest(r *stdhttp.Request) bool {
 		return false
 	}
 
-	if claims, ok := biz.GetClaimsFromContext(r.Context()); ok && claims != nil {
-		return claims.IsAdmin()
-	}
-
-	if v == nil || len(v.jwtSecrets) == 0 {
-		return false
-	}
-
-	token := bearerToken(r.Header.Get("Authorization"))
-	if token == "" {
-		return false
-	}
-
-	for _, secret := range v.jwtSecrets {
-		claims, err := jwtutil.ParseToken(secret, token)
-		if err != nil || claims == nil {
-			continue
-		}
-		if biz.Role(claims.Role) == biz.RoleAdmin {
-			return true
-		}
-	}
-	return false
+	claims, ok := biz.GetClaimsFromContext(r.Context())
+	return ok && claims != nil && claims.IsAdmin()
 }
 
 func newTemplatePDFRenderGate(limit int) *templatePDFRenderGate {

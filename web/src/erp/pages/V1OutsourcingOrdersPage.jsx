@@ -870,10 +870,10 @@ export default function V1OutsourcingOrdersPage() {
       <PageHeaderCard
         compact
         title="委外订单"
-        description="维护加工合同源单、工序明细、加工厂承诺和打印快照；查货只作为可选工序，查货结果、发料、回货、质检、应付仍由对应后端事实规则承接。"
+        description="维护加工合同、工序明细、加工厂承诺和打印内容；查货只作为可选工序，发料、回货、质检和应付仍需在对应业务模块处理。"
         tags={[
           <Tag color="blue" key="source">
-            源单：加工合同
+            业务单据：加工合同
           </Tag>,
           <Tag color="green" key="process">
             工序来自加工环节字典
@@ -991,7 +991,7 @@ export default function V1OutsourcingOrdersPage() {
           selectedCount={selectedRow ? 1 : 0}
           selectedLabel={selectedLabel}
           selectedItems={selectedItems}
-          boundaryText="加工合同只表达委外承诺和打印快照；查货只作为工序候选，判定结果回质检模块；确认下单不自动写库存、质检、应付或 Workflow 完成。"
+          boundaryText="加工合同只确认委外承诺和打印内容；查货只作为工序候选，判定结果在质检模块处理；确认下单不会自动更新库存、质检、应付或协同任务状态。"
         >
           <Button
             type="link"
@@ -1146,7 +1146,7 @@ export default function V1OutsourcingOrdersPage() {
       <BusinessFormModal
         icon={<FileTextOutlined />}
         title={editingRow ? '编辑加工合同' : '新建加工合同'}
-        description="只维护委外源单和加工明细；车缝、手工等选产品 / 半成品，布料加工选材料。结果判定、库存和应付由后续业务处理。"
+        description="只维护委外订单和加工明细；车缝、手工等选产品 / 半成品，布料加工选材料。结果判定、库存和应付由后续业务处理。"
         open={modalOpen}
         onCancel={closeModal}
         onOk={submitForm}
@@ -1172,7 +1172,7 @@ export default function V1OutsourcingOrdersPage() {
               ownerType="outsourcing_order"
               ownerId={editingRow?.id}
               title="加工合同附件"
-              description="上传纸样、图纸、签回合同、加工要求或报价结算依据；附件不写库存、质检或应付事实。"
+              description="上传纸样、图纸、签回合同、加工要求或报价结算依据；附件不会改变库存、质检或应付记录。"
               canUpload={canUpdate || canCreate}
               canDelete={canUpdate}
               variant="inline"

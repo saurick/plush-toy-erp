@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/shopspring/decimal"
 )
 
@@ -153,6 +154,26 @@ func PostedAt(v time.Time) predicate.FinanceFact {
 // SettledAt applies equality check predicate on the "settled_at" field. It's identical to SettledAtEQ.
 func SettledAt(v time.Time) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldEQ(FieldSettledAt, v))
+}
+
+// CancelledAt applies equality check predicate on the "cancelled_at" field. It's identical to CancelledAtEQ.
+func CancelledAt(v time.Time) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldCancelledAt, v))
+}
+
+// CancelledBy applies equality check predicate on the "cancelled_by" field. It's identical to CancelledByEQ.
+func CancelledBy(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldCancelledBy, v))
+}
+
+// CancelReason applies equality check predicate on the "cancel_reason" field. It's identical to CancelReasonEQ.
+func CancelReason(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldCancelReason, v))
+}
+
+// CancelAuditVersion applies equality check predicate on the "cancel_audit_version" field. It's identical to CancelAuditVersionEQ.
+func CancelAuditVersion(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldCancelAuditVersion, v))
 }
 
 // Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
@@ -1290,6 +1311,201 @@ func SettledAtNotNil() predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldNotNull(FieldSettledAt))
 }
 
+// CancelledAtEQ applies the EQ predicate on the "cancelled_at" field.
+func CancelledAtEQ(v time.Time) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldCancelledAt, v))
+}
+
+// CancelledAtNEQ applies the NEQ predicate on the "cancelled_at" field.
+func CancelledAtNEQ(v time.Time) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNEQ(FieldCancelledAt, v))
+}
+
+// CancelledAtIn applies the In predicate on the "cancelled_at" field.
+func CancelledAtIn(vs ...time.Time) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIn(FieldCancelledAt, vs...))
+}
+
+// CancelledAtNotIn applies the NotIn predicate on the "cancelled_at" field.
+func CancelledAtNotIn(vs ...time.Time) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotIn(FieldCancelledAt, vs...))
+}
+
+// CancelledAtGT applies the GT predicate on the "cancelled_at" field.
+func CancelledAtGT(v time.Time) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGT(FieldCancelledAt, v))
+}
+
+// CancelledAtGTE applies the GTE predicate on the "cancelled_at" field.
+func CancelledAtGTE(v time.Time) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGTE(FieldCancelledAt, v))
+}
+
+// CancelledAtLT applies the LT predicate on the "cancelled_at" field.
+func CancelledAtLT(v time.Time) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLT(FieldCancelledAt, v))
+}
+
+// CancelledAtLTE applies the LTE predicate on the "cancelled_at" field.
+func CancelledAtLTE(v time.Time) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLTE(FieldCancelledAt, v))
+}
+
+// CancelledAtIsNil applies the IsNil predicate on the "cancelled_at" field.
+func CancelledAtIsNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIsNull(FieldCancelledAt))
+}
+
+// CancelledAtNotNil applies the NotNil predicate on the "cancelled_at" field.
+func CancelledAtNotNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotNull(FieldCancelledAt))
+}
+
+// CancelledByEQ applies the EQ predicate on the "cancelled_by" field.
+func CancelledByEQ(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldCancelledBy, v))
+}
+
+// CancelledByNEQ applies the NEQ predicate on the "cancelled_by" field.
+func CancelledByNEQ(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNEQ(FieldCancelledBy, v))
+}
+
+// CancelledByIn applies the In predicate on the "cancelled_by" field.
+func CancelledByIn(vs ...int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIn(FieldCancelledBy, vs...))
+}
+
+// CancelledByNotIn applies the NotIn predicate on the "cancelled_by" field.
+func CancelledByNotIn(vs ...int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotIn(FieldCancelledBy, vs...))
+}
+
+// CancelledByIsNil applies the IsNil predicate on the "cancelled_by" field.
+func CancelledByIsNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIsNull(FieldCancelledBy))
+}
+
+// CancelledByNotNil applies the NotNil predicate on the "cancelled_by" field.
+func CancelledByNotNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotNull(FieldCancelledBy))
+}
+
+// CancelReasonEQ applies the EQ predicate on the "cancel_reason" field.
+func CancelReasonEQ(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldCancelReason, v))
+}
+
+// CancelReasonNEQ applies the NEQ predicate on the "cancel_reason" field.
+func CancelReasonNEQ(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNEQ(FieldCancelReason, v))
+}
+
+// CancelReasonIn applies the In predicate on the "cancel_reason" field.
+func CancelReasonIn(vs ...string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIn(FieldCancelReason, vs...))
+}
+
+// CancelReasonNotIn applies the NotIn predicate on the "cancel_reason" field.
+func CancelReasonNotIn(vs ...string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotIn(FieldCancelReason, vs...))
+}
+
+// CancelReasonGT applies the GT predicate on the "cancel_reason" field.
+func CancelReasonGT(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGT(FieldCancelReason, v))
+}
+
+// CancelReasonGTE applies the GTE predicate on the "cancel_reason" field.
+func CancelReasonGTE(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGTE(FieldCancelReason, v))
+}
+
+// CancelReasonLT applies the LT predicate on the "cancel_reason" field.
+func CancelReasonLT(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLT(FieldCancelReason, v))
+}
+
+// CancelReasonLTE applies the LTE predicate on the "cancel_reason" field.
+func CancelReasonLTE(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLTE(FieldCancelReason, v))
+}
+
+// CancelReasonContains applies the Contains predicate on the "cancel_reason" field.
+func CancelReasonContains(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldContains(FieldCancelReason, v))
+}
+
+// CancelReasonHasPrefix applies the HasPrefix predicate on the "cancel_reason" field.
+func CancelReasonHasPrefix(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldHasPrefix(FieldCancelReason, v))
+}
+
+// CancelReasonHasSuffix applies the HasSuffix predicate on the "cancel_reason" field.
+func CancelReasonHasSuffix(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldHasSuffix(FieldCancelReason, v))
+}
+
+// CancelReasonIsNil applies the IsNil predicate on the "cancel_reason" field.
+func CancelReasonIsNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIsNull(FieldCancelReason))
+}
+
+// CancelReasonNotNil applies the NotNil predicate on the "cancel_reason" field.
+func CancelReasonNotNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotNull(FieldCancelReason))
+}
+
+// CancelReasonEqualFold applies the EqualFold predicate on the "cancel_reason" field.
+func CancelReasonEqualFold(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEqualFold(FieldCancelReason, v))
+}
+
+// CancelReasonContainsFold applies the ContainsFold predicate on the "cancel_reason" field.
+func CancelReasonContainsFold(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldContainsFold(FieldCancelReason, v))
+}
+
+// CancelAuditVersionEQ applies the EQ predicate on the "cancel_audit_version" field.
+func CancelAuditVersionEQ(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldCancelAuditVersion, v))
+}
+
+// CancelAuditVersionNEQ applies the NEQ predicate on the "cancel_audit_version" field.
+func CancelAuditVersionNEQ(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNEQ(FieldCancelAuditVersion, v))
+}
+
+// CancelAuditVersionIn applies the In predicate on the "cancel_audit_version" field.
+func CancelAuditVersionIn(vs ...int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIn(FieldCancelAuditVersion, vs...))
+}
+
+// CancelAuditVersionNotIn applies the NotIn predicate on the "cancel_audit_version" field.
+func CancelAuditVersionNotIn(vs ...int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotIn(FieldCancelAuditVersion, vs...))
+}
+
+// CancelAuditVersionGT applies the GT predicate on the "cancel_audit_version" field.
+func CancelAuditVersionGT(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGT(FieldCancelAuditVersion, v))
+}
+
+// CancelAuditVersionGTE applies the GTE predicate on the "cancel_audit_version" field.
+func CancelAuditVersionGTE(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGTE(FieldCancelAuditVersion, v))
+}
+
+// CancelAuditVersionLT applies the LT predicate on the "cancel_audit_version" field.
+func CancelAuditVersionLT(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLT(FieldCancelAuditVersion, v))
+}
+
+// CancelAuditVersionLTE applies the LTE predicate on the "cancel_audit_version" field.
+func CancelAuditVersionLTE(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLTE(FieldCancelAuditVersion, v))
+}
+
 // NoteEQ applies the EQ predicate on the "note" field.
 func NoteEQ(v string) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldEQ(FieldNote, v))
@@ -1443,6 +1659,29 @@ func UpdatedAtLT(v time.Time) predicate.FinanceFact {
 // UpdatedAtLTE applies the LTE predicate on the "updated_at" field.
 func UpdatedAtLTE(v time.Time) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldLTE(FieldUpdatedAt, v))
+}
+
+// HasCanceller applies the HasEdge predicate on the "canceller" edge.
+func HasCanceller() predicate.FinanceFact {
+	return predicate.FinanceFact(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, CancellerTable, CancellerColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasCancellerWith applies the HasEdge predicate on the "canceller" edge with a given conditions (other predicates).
+func HasCancellerWith(preds ...predicate.AdminUser) predicate.FinanceFact {
+	return predicate.FinanceFact(func(s *sql.Selector) {
+		step := newCancellerStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // And groups predicates with the AND operator between them.

@@ -13,6 +13,27 @@ test("yoyoosun deployment package passes lint", () => {
   assert(result.checkedFiles >= result.requiredFiles);
 });
 
+test("deployment package lint rejects enabled business data clear", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-package-debug-clear-lint-"));
+  const sourcePackage = path.join(process.cwd(), "deployments/yoyoosun");
+  const targetPackage = path.join(root, "deployments/yoyoosun");
+  fs.cpSync(sourcePackage, targetPackage, { recursive: true });
+
+  const envPath = path.join(targetPackage, "env/.env.example");
+  const env = fs
+    .readFileSync(envPath, "utf8")
+    .replace(
+      "ERP_DEBUG_BUSINESS_CLEAR_ENABLED=false",
+      "ERP_DEBUG_BUSINESS_CLEAR_ENABLED=true",
+    );
+  fs.writeFileSync(envPath, env);
+
+  assert.throws(
+    () => validateDeploymentPackage({ repoRoot: root, customer: "yoyoosun" }),
+    /env\/.env\.example must disable ERP_DEBUG_BUSINESS_CLEAR_ENABLED/,
+  );
+});
+
 test("deployment package lint rejects runtime env files and raw customer files", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-package-lint-"));
   fs.mkdirSync(path.join(root, "deployments/yoyoosun"), { recursive: true });

@@ -279,6 +279,9 @@ func validateProductionBootstrapConfig(confPath string, dataCfg *conf.Data, gete
 	if !envValueIsExplicitFalse(productionEnvValue(getenv, "ERP_DEBUG_CLEANUP_ENABLED")) {
 		return fmt.Errorf("production preflight failed: ERP_DEBUG_CLEANUP_ENABLED must be false")
 	}
+	if !envValueIsExplicitFalse(productionEnvValue(getenv, "ERP_DEBUG_BUSINESS_CLEAR_ENABLED")) {
+		return fmt.Errorf("production preflight failed: ERP_DEBUG_BUSINESS_CLEAR_ENABLED must be false")
+	}
 	return nil
 }
 

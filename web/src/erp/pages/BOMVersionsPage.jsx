@@ -1380,7 +1380,7 @@ export default function BOMVersionsPage() {
                 ? '查看 BOM 版本'
                 : '新建 BOM 草稿'
         }
-        description="BOM 只维护产品结构和材料用量，不写库存、采购或成本事实。"
+        description="BOM 只维护产品结构和材料用量，库存、采购或成本变动请到对应业务页面处理。"
         okText="保存"
         cancelText="取消"
         confirmLoading={saving || detailLoading}
@@ -1433,7 +1433,7 @@ export default function BOMVersionsPage() {
                 : undefined
             }
             title="BOM 附件"
-            description="上传色卡、SOP、工艺图片或材料清单来源文件；附件不写库存、采购或成本事实。"
+            description="上传色卡、SOP、工艺图片或材料清单来源文件；附件不会改变库存、采购或成本记录。"
             canUpload={headerMode !== 'view' && (canCreate || canUpdate)}
             canDelete={canUpdate}
             variant="inline"

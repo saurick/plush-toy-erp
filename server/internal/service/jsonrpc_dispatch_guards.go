@@ -39,21 +39,17 @@ func (d *jsonrpcDispatcher) requireAdmin(ctx context.Context) (*biz.AuthClaims, 
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
 			return nil, &v1.JsonrpcResult{Code: errcode.AdminRequired.Code, Message: errcode.AdminRequired.Message}
-		case errors.Is(err, errAdminUsernameMismatch):
-			return nil, &v1.JsonrpcResult{Code: errcode.AdminRequired.Code, Message: errcode.AdminRequired.Message}
 		default:
 			d.log.WithContext(ctx).Errorf("[auth] requireAdmin verify current admin failed err=%v", err)
 			return nil, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
 		}
 	}
-	if admin.Disabled {
+	if !admin.IsActive() {
 		return nil, &v1.JsonrpcResult{Code: errcode.AdminDisabled.Code, Message: errcode.AdminDisabled.Message}
 	}
 
 	return c, nil
 }
-
-var errAdminUsernameMismatch = errors.New("admin username mismatch")
 
 func (d *jsonrpcDispatcher) getCurrentAdmin(ctx context.Context, claims *biz.AuthClaims) (*biz.AdminUser, error) {
 	if claims == nil {
@@ -69,10 +65,6 @@ func (d *jsonrpcDispatcher) getCurrentAdmin(ctx context.Context, claims *biz.Aut
 	}
 	if admin == nil {
 		return nil, sql.ErrNoRows
-	}
-	// 安全兜底：管理员 token 的 uid/uname 必须同时匹配，避免旧 token 在账号重建后误复用。
-	if admin.Username != claims.Username {
-		return nil, errAdminUsernameMismatch
 	}
 	return admin, nil
 }

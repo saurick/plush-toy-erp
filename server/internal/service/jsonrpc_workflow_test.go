@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
 	"time"
 
+	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/errcode"
 
@@ -23,12 +25,14 @@ type stubWorkflowJSONRPCRepo struct {
 	urgeActorID        int
 	urgeActorRoleKey   string
 	updateInput        *biz.WorkflowTaskStatusUpdate
+	updateCalls        int
 	updateActorID      int
 	updateActorRoleKey string
 	upsertStateInput   *biz.WorkflowBusinessStateUpsert
 	upsertStateActorID int
 	currentTask        *biz.WorkflowTask
 	listTaskFilter     biz.WorkflowTaskFilter
+	resolveMutation    func(taskID int, idempotencyKey string, intentHash string) (*biz.WorkflowTask, bool, error)
 }
 
 type stubProcessRuntimeJSONRPCRepo struct {
@@ -87,6 +91,9 @@ func workflowCustomerConfigUCWithWorkflowTasksState(t *testing.T, state string) 
 
 func (s *stubWorkflowJSONRPCRepo) GetWorkflowTask(_ context.Context, id int) (*biz.WorkflowTask, error) {
 	if s.currentTask != nil {
+		if s.currentTask.Version == 0 {
+			s.currentTask.Version = 1
+		}
 		return s.currentTask, nil
 	}
 	return &biz.WorkflowTask{
@@ -97,6 +104,7 @@ func (s *stubWorkflowJSONRPCRepo) GetWorkflowTask(_ context.Context, id int) (*b
 		TaskStatusKey: "ready",
 		OwnerRoleKey:  biz.SalesRoleKey,
 		Payload:       map[string]any{},
+		Version:       1,
 	}, nil
 }
 
@@ -118,11 +126,19 @@ func (s *stubWorkflowJSONRPCRepo) CreateWorkflowTask(_ context.Context, in *biz.
 	return &biz.WorkflowTask{ID: 1, TaskStatusKey: in.TaskStatusKey, Payload: in.Payload}, nil
 }
 
+func (s *stubWorkflowJSONRPCRepo) ResolveWorkflowTaskMutation(_ context.Context, taskID int, idempotencyKey string, intentHash string, _ string, _ int) (*biz.WorkflowTask, bool, error) {
+	if s.resolveMutation != nil {
+		return s.resolveMutation(taskID, idempotencyKey, intentHash)
+	}
+	return nil, false, nil
+}
+
 func (s *stubWorkflowJSONRPCRepo) UpdateWorkflowTaskStatus(_ context.Context, in *biz.WorkflowTaskStatusUpdate, actorID int, actorRoleKey string) (*biz.WorkflowTask, error) {
+	s.updateCalls++
 	s.updateInput = in
 	s.updateActorID = actorID
 	s.updateActorRoleKey = actorRoleKey
-	task := &biz.WorkflowTask{ID: in.ID, TaskStatusKey: in.TaskStatusKey, Payload: in.Payload}
+	task := &biz.WorkflowTask{ID: in.ID, TaskStatusKey: in.TaskStatusKey, Payload: in.Payload, Version: in.ExpectedVersion + 1}
 	if in.Reason != "" {
 		reason := in.Reason
 		task.BlockedReason = &reason
@@ -156,6 +172,7 @@ func (s *stubWorkflowJSONRPCRepo) UrgeWorkflowTask(_ context.Context, in *biz.Wo
 		SourceID:      1,
 		TaskStatusKey: "ready",
 		OwnerRoleKey:  "warehouse",
+		Version:       in.ExpectedVersion + 1,
 		Payload: map[string]any{
 			"urged":            true,
 			"urge_count":       1,
@@ -296,7 +313,7 @@ func TestJsonrpcDispatcher_WorkflowWriteAPIRequiresEnabledModule(t *testing.T) {
 	}
 	dispatcher := &jsonrpcDispatcher{
 		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
-		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.SalesRoleKey, biz.QualityRoleKey}, biz.PermissionWorkflowTaskCreate, biz.PermissionWorkflowTaskRead, biz.PermissionWorkflowTaskComplete, biz.PermissionWorkflowTaskUpdate)},
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.SalesRoleKey, biz.QualityRoleKey}, biz.PermissionWorkflowTaskCreate, biz.PermissionWorkflowTaskRead, biz.PermissionWorkflowTaskComplete, biz.PermissionWorkflowTaskUpdate, biz.PermissionWorkflowTaskReject)},
 		workflowUC:  biz.NewWorkflowUsecase(repo),
 		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(
 			t,
@@ -325,22 +342,32 @@ func TestJsonrpcDispatcher_WorkflowWriteAPIRequiresEnabledModule(t *testing.T) {
 	if repo.createInput != nil {
 		t.Fatalf("read_only workflow_tasks must not call create usecase, got %#v", repo.createInput)
 	}
-	completeParams := mustJSONRPCStruct(t, map[string]any{
+	readOnlyMutations := []struct {
+		method string
+		params map[string]any
+	}{
+		{method: "complete_task_action", params: map[string]any{"task_id": float64(42), "expected_version": float64(1), "idempotency_key": "read-only-complete-42", "action_key": "complete", "payload": map[string]any{}}},
+		{method: "block_task_action", params: map[string]any{"task_id": float64(42), "expected_version": float64(1), "idempotency_key": "read-only-block-42", "action_key": "block", "reason": "等待资料", "payload": map[string]any{}}},
+		{method: "reject_task_action", params: map[string]any{"task_id": float64(42), "expected_version": float64(1), "idempotency_key": "read-only-reject-42", "action_key": "reject", "reason": "资料不完整", "payload": map[string]any{}}},
+		{method: "urge_task", params: map[string]any{"task_id": float64(42), "expected_version": float64(1), "idempotency_key": "read-only-urge-42", "action": "urge_task", "reason": "请复核", "payload": map[string]any{}}},
+	}
+	for _, mutation := range readOnlyMutations {
+		_, result, callErr := dispatcher.handleWorkflow(ctx, mutation.method, "read-only-"+mutation.method, mustJSONRPCStruct(t, mutation.params))
+		if callErr != nil {
+			t.Fatalf("expected nil err for read_only %s gate, got %v", mutation.method, callErr)
+		}
+		if result == nil || result.Code != errcode.InvalidParam.Code {
+			t.Fatalf("expected read_only %s rejected, got %#v", mutation.method, result)
+		}
+	}
+	if repo.updateCalls != 0 || repo.updateInput != nil || repo.urgeInput != nil {
+		t.Fatalf("read_only workflow_tasks must not call mutation usecases, update_calls=%d update=%#v urge=%#v", repo.updateCalls, repo.updateInput, repo.urgeInput)
+	}
+	explainActionParams := mustJSONRPCStruct(t, map[string]any{
 		"task_id":    float64(42),
 		"action_key": "complete",
-		"payload":    map[string]any{},
 	})
-	_, completeReadOnlyRes, err := dispatcher.handleWorkflow(ctx, "complete_task_action", "read-only-complete", completeParams)
-	if err != nil {
-		t.Fatalf("expected nil err for read_only complete gate, got %v", err)
-	}
-	if completeReadOnlyRes == nil || completeReadOnlyRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected read_only complete rejected, got %#v", completeReadOnlyRes)
-	}
-	if repo.updateInput != nil {
-		t.Fatalf("read_only workflow_tasks must not call update usecase, got %#v", repo.updateInput)
-	}
-	_, explainReadOnlyRes, err := dispatcher.handleWorkflow(ctx, "explain_action_access", "read-only-explain-action", completeParams)
+	_, explainReadOnlyRes, err := dispatcher.handleWorkflow(ctx, "explain_action_access", "read-only-explain-action", explainActionParams)
 	if err != nil {
 		t.Fatalf("expected nil err for read_only explain action, got %v", err)
 	}
@@ -350,7 +377,8 @@ func TestJsonrpcDispatcher_WorkflowWriteAPIRequiresEnabledModule(t *testing.T) {
 	if repo.updateInput != nil {
 		t.Fatalf("read_only explain_action_access must not call update usecase, got %#v", repo.updateInput)
 	}
-	_, assignmentReadOnlyRes, err := dispatcher.handleWorkflow(ctx, "explain_task_assignment", "read-only-explain-assignment", completeParams)
+	explainAssignmentParams := mustJSONRPCStruct(t, map[string]any{"task_id": float64(42)})
+	_, assignmentReadOnlyRes, err := dispatcher.handleWorkflow(ctx, "explain_task_assignment", "read-only-explain-assignment", explainAssignmentParams)
 	if err != nil {
 		t.Fatalf("expected nil err for read_only explain assignment, got %v", err)
 	}
@@ -384,6 +412,28 @@ func TestJsonrpcDispatcher_WorkflowWriteAPIRequiresEnabledModule(t *testing.T) {
 		t.Fatalf("expected read_only list to stay readable, got %#v", listReadOnlyRes)
 	}
 
+	dispatcher.customerConfigUC = workflowCustomerConfigUCWithWorkflowTasksState(t, "disabled")
+	disabledWrites := append([]struct {
+		method string
+		params map[string]any
+	}{{method: "create_task", params: createParams.AsMap()}}, readOnlyMutations...)
+	for _, mutation := range disabledWrites {
+		repo.createInput = nil
+		repo.updateInput = nil
+		repo.updateCalls = 0
+		repo.urgeInput = nil
+		_, result, callErr := dispatcher.handleWorkflow(ctx, mutation.method, "disabled-"+mutation.method, mustJSONRPCStruct(t, mutation.params))
+		if callErr != nil {
+			t.Fatalf("expected nil err for disabled %s gate, got %v", mutation.method, callErr)
+		}
+		if result == nil || result.Code != errcode.InvalidParam.Code {
+			t.Fatalf("expected disabled %s rejected, got %#v", mutation.method, result)
+		}
+		if repo.createInput != nil || repo.updateCalls != 0 || repo.updateInput != nil || repo.urgeInput != nil {
+			t.Fatalf("disabled workflow_tasks must not call write usecases for %s, create=%#v update_calls=%d update=%#v urge=%#v", mutation.method, repo.createInput, repo.updateCalls, repo.updateInput, repo.urgeInput)
+		}
+	}
+
 	dispatcher.customerConfigUC = workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled")
 	_, createEnabledRes, err := dispatcher.handleWorkflow(ctx, "create_task", "enabled-create", createParams)
 	if err != nil {
@@ -394,24 +444,6 @@ func TestJsonrpcDispatcher_WorkflowWriteAPIRequiresEnabledModule(t *testing.T) {
 	}
 	if repo.createInput == nil || repo.createInput.TaskCode != "WF-MODULE-001" {
 		t.Fatalf("enabled workflow_tasks must call create usecase, got %#v", repo.createInput)
-	}
-	repo.urgeInput = nil
-	dispatcher.customerConfigUC = workflowCustomerConfigUCWithWorkflowTasksState(t, "disabled")
-	urgeParams := mustJSONRPCStruct(t, map[string]any{
-		"task_id": float64(42),
-		"action":  "urge_task",
-		"reason":  "请复核",
-		"payload": map[string]any{},
-	})
-	_, urgeDisabledRes, err := dispatcher.handleWorkflow(ctx, "urge_task", "disabled-urge", urgeParams)
-	if err != nil {
-		t.Fatalf("expected nil err for disabled urge gate, got %v", err)
-	}
-	if urgeDisabledRes == nil || urgeDisabledRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected disabled urge rejected, got %#v", urgeDisabledRes)
-	}
-	if repo.urgeInput != nil {
-		t.Fatalf("disabled workflow_tasks must not call urge usecase, got %#v", repo.urgeInput)
 	}
 }
 
@@ -470,6 +502,35 @@ func TestJsonrpcDispatcher_WorkflowCreateTaskRejectsProcessRuntimeAnchors(t *tes
 		})
 	}
 
+	for _, key := range []string{
+		"idempotency_key",
+		"expected_version",
+		"command_key",
+		"intent_hash",
+		"customer_key",
+		"unexpected",
+	} {
+		t.Run("rejects non-contract field "+key, func(t *testing.T) {
+			params := make(map[string]any, len(baseParams)+1)
+			for field, value := range baseParams {
+				params[field] = value
+			}
+			params[key] = "non-contract-value"
+			repo.createInput = nil
+
+			_, res, err := dispatcher.handleWorkflow(ctx, "create_task", key, mustJSONRPCStruct(t, params))
+			if err != nil {
+				t.Fatalf("expected nil err, got %v", err)
+			}
+			if res == nil || res.Code != errcode.InvalidParam.Code || !strings.Contains(res.Message, key) {
+				t.Fatalf("expected %s rejected as a non-contract field, got %#v", key, res)
+			}
+			if repo.createInput != nil {
+				t.Fatalf("rejected %s must not call create usecase, got %#v", key, repo.createInput)
+			}
+		})
+	}
+
 	_, res, err := dispatcher.handleWorkflow(ctx, "create_task", "manual-task", mustJSONRPCStruct(t, baseParams))
 	if err != nil {
 		t.Fatalf("expected nil err for manual task, got %v", err)
@@ -479,6 +540,35 @@ func TestJsonrpcDispatcher_WorkflowCreateTaskRejectsProcessRuntimeAnchors(t *tes
 	}
 	if repo.createInput == nil || repo.createInput.ProcessInstanceID != nil || repo.createInput.ProcessNodeInstanceID != nil || repo.createInput.ConfigRevision != nil {
 		t.Fatalf("expected manual task without process runtime anchors, got %#v", repo.createInput)
+	}
+}
+
+func TestGetWorkflowUnixTimePtrRequiresCanonicalPostgresUnixSecond(t *testing.T) {
+	valid, ok := getWorkflowUnixTimePtr(map[string]any{"due_at": float64(1_800_000_000)}, "due_at")
+	if !ok || valid == nil || valid.Unix() != 1_800_000_000 {
+		t.Fatalf("canonical Unix second must parse, value=%#v ok=%v", valid, ok)
+	}
+	for _, params := range []map[string]any{
+		{},
+		{"due_at": nil},
+	} {
+		value, valueOK := getWorkflowUnixTimePtr(params, "due_at")
+		if !valueOK || value != nil {
+			t.Fatalf("missing or null due_at must stay empty, params=%#v value=%#v ok=%v", params, value, valueOK)
+		}
+	}
+	for _, invalid := range []any{
+		"1800000000",
+		"",
+		float64(0),
+		float64(-1),
+		float64(1.5),
+		float64(9_224_318_016_000),
+		map[string]any{"not": "unix"},
+	} {
+		if value, valueOK := getWorkflowUnixTimePtr(map[string]any{"due_at": invalid}, "due_at"); valueOK || value != nil {
+			t.Fatalf("non-canonical due_at must fail closed, raw=%#v value=%#v ok=%v", invalid, value, valueOK)
+		}
 	}
 }
 
@@ -522,9 +612,11 @@ func TestJsonrpcDispatcher_WorkflowUrgeTaskRecordsEventIntent(t *testing.T) {
 		Role:     biz.RoleAdmin,
 	})
 	params, err := structpb.NewStruct(map[string]any{
-		"task_id": float64(1),
-		"action":  "urge_task",
-		"reason":  "请今天确认",
+		"task_id":          float64(1),
+		"expected_version": float64(1),
+		"idempotency_key":  "workflow-urge-intent-1",
+		"action":           "urge_task",
+		"reason":           "请今天确认",
 		"payload": map[string]any{
 			"entry": "mobile_role_task",
 		},
@@ -567,17 +659,19 @@ func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsClientControlledSystemFields(t
 		{
 			name: "rejects raw task status",
 			params: map[string]any{
-				"task_id":         float64(1),
-				"action":          "urge_task",
-				"reason":          "请今天确认",
-				"task_status_key": "done",
-				"payload":         map[string]any{},
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action":           "urge_task",
+				"reason":           "请今天确认",
+				"task_status_key":  "done",
+				"payload":          map[string]any{},
 			},
 		},
 		{
 			name: "rejects client business status",
 			params: map[string]any{
 				"task_id":             float64(1),
+				"expected_version":    float64(1),
 				"action":              "urge_task",
 				"reason":              "请今天确认",
 				"business_status_key": "project_approved",
@@ -587,19 +681,53 @@ func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsClientControlledSystemFields(t
 		{
 			name: "rejects client actor role",
 			params: map[string]any{
-				"task_id":        float64(1),
-				"action":         "urge_task",
-				"reason":         "请今天确认",
-				"actor_role_key": biz.FinanceRoleKey,
-				"payload":        map[string]any{},
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action":           "urge_task",
+				"reason":           "请今天确认",
+				"actor_role_key":   biz.FinanceRoleKey,
+				"payload":          map[string]any{},
+			},
+		},
+		{
+			name: "rejects unknown top level field",
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action":           "urge_task",
+				"reason":           "请今天确认",
+				"payload":          map[string]any{},
+				"unexpected":       true,
+			},
+		},
+		{
+			name: "rejects client customer key before module lookup",
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action":           "urge_task",
+				"reason":           "请今天确认",
+				"payload":          map[string]any{},
+				"customer_key":     "non-contract-customer",
+			},
+		},
+		{
+			name: "rejects padded action",
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action":           " urge_task ",
+				"reason":           "请今天确认",
+				"payload":          map[string]any{},
 			},
 		},
 		{
 			name: "rejects payload source fields",
 			params: map[string]any{
-				"task_id": float64(1),
-				"action":  "urge_task",
-				"reason":  "请今天确认",
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action":           "urge_task",
+				"reason":           "请今天确认",
 				"payload": map[string]any{
 					"source_type": "shipment",
 				},
@@ -608,9 +736,10 @@ func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsClientControlledSystemFields(t
 		{
 			name: "rejects payload domain command fields",
 			params: map[string]any{
-				"task_id": float64(1),
-				"action":  "urge_task",
-				"reason":  "请今天确认",
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action":           "urge_task",
+				"reason":           "请今天确认",
 				"payload": map[string]any{
 					"domain_command_key": "shipment.ship",
 				},
@@ -620,6 +749,7 @@ func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsClientControlledSystemFields(t
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.params["idempotency_key"] = "workflow-urge-system-" + strings.ReplaceAll(tt.name, " ", "-")
 			repo := &stubWorkflowJSONRPCRepo{}
 			j := &jsonrpcDispatcher{
 				log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
@@ -643,6 +773,9 @@ func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsClientControlledSystemFields(t
 			}
 			if res == nil || res.Code != errcode.InvalidParam.Code {
 				t.Fatalf("expected invalid param, got %#v", res)
+			}
+			if _, exists := tt.params["customer_key"]; exists && !strings.Contains(res.Message, "customer_key") {
+				t.Fatalf("expected customer_key rejected by the public contract before module lookup, got %#v", res)
 			}
 			if repo.urgeInput != nil {
 				t.Fatalf("invalid urge request must not call usecase, got %#v", repo.urgeInput)
@@ -842,14 +975,6 @@ func TestWorkflowTaskAccessRequiresEligibleOwnerRoleOrExactAssignee(t *testing.T
 		t.Fatal("raw owner role must not bypass an empty customer-eligible role set")
 	}
 
-	processID, nodeID := 11, 12
-	terminalTask := *task
-	terminalTask.TaskStatusKey = "done"
-	terminalTask.ProcessInstanceID = &processID
-	terminalTask.ProcessNodeInstanceID = &nodeID
-	if workflowAdminCanReconcileLinkedTask(admin, &terminalTask, nil) {
-		t.Fatal("raw owner role must not bypass customer eligibility during linked-task reconciliation")
-	}
 	pmcAdmin := workflowJSONRPCAdmin([]string{biz.PMCRoleKey}, biz.PermissionWorkflowTaskRead, biz.PermissionWorkflowTaskUpdate)
 	if workflowAdminCanViewTask(pmcAdmin, task, nil) {
 		t.Fatal("PMC oversight view must still require an eligible customer role")
@@ -871,11 +996,6 @@ func TestWorkflowTaskAccessRequiresEligibleOwnerRoleOrExactAssignee(t *testing.T
 		!workflowAdminCanHandleTask(admin, &assignedTask, "done", nil) ||
 		!workflowAdminCanUrgeTask(admin, &assignedTask, nil) {
 		t.Fatal("exact assignee must remain allowed without owner-role eligibility")
-	}
-	assignedTerminalTask := terminalTask
-	assignedTerminalTask.AssigneeID = &assigneeID
-	if !workflowAdminCanReconcileLinkedTask(admin, &assignedTerminalTask, nil) {
-		t.Fatal("exact assignee must remain allowed to reconcile its linked terminal task")
 	}
 }
 
@@ -1065,8 +1185,11 @@ func TestJsonrpcDispatcher_WorkflowActionAllowsCustomerWorkPoolScope(t *testing.
 		}),
 	}
 	params, err := structpb.NewStruct(map[string]any{
-		"task_id": float64(1),
-		"payload": map[string]any{},
+		"task_id":          float64(1),
+		"expected_version": float64(1),
+		"idempotency_key":  "workflow-work-pool-complete-1",
+		"action_key":       "complete",
+		"payload":          map[string]any{},
 	})
 	if err != nil {
 		t.Fatalf("build params failed: %v", err)
@@ -1115,8 +1238,11 @@ func TestJsonrpcDispatcher_WorkflowActionRequiresCustomerWorkPoolActionEntitleme
 		),
 	}
 	params, err := structpb.NewStruct(map[string]any{
-		"task_id": float64(1),
-		"payload": map[string]any{},
+		"task_id":          float64(1),
+		"expected_version": float64(1),
+		"idempotency_key":  "workflow-work-pool-denied-1",
+		"action_key":       "complete",
+		"payload":          map[string]any{},
 	})
 	if err != nil {
 		t.Fatalf("build params failed: %v", err)
@@ -1143,9 +1269,11 @@ func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsEmptyReason(t *testing.T) {
 		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
 	}
 	params, err := structpb.NewStruct(map[string]any{
-		"task_id": float64(1),
-		"action":  "urge_task",
-		"reason":  " \t ",
+		"task_id":          float64(1),
+		"expected_version": float64(1),
+		"idempotency_key":  "workflow-unrelated-urge-1",
+		"action":           "urge_task",
+		"reason":           " \t ",
 		"payload": map[string]any{
 			"source_no": "SHIP-001",
 		},
@@ -1185,10 +1313,12 @@ func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsUnrelatedOrdinaryRole(t *testi
 		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
 	}
 	params, err := structpb.NewStruct(map[string]any{
-		"task_id": float64(1),
-		"action":  "urge_task",
-		"reason":  "请今天确认",
-		"payload": map[string]any{},
+		"task_id":          float64(1),
+		"expected_version": float64(1),
+		"idempotency_key":  "workflow-unrelated-urge-1",
+		"action":           "urge_task",
+		"reason":           "请今天确认",
+		"payload":          map[string]any{},
 	})
 	if err != nil {
 		t.Fatalf("build params failed: %v", err)
@@ -1225,8 +1355,10 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionUsesDoneAndServerActorRole(
 		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
 	}
 	params, err := structpb.NewStruct(map[string]any{
-		"task_id":    float64(42),
-		"action_key": "complete",
+		"task_id":          float64(42),
+		"expected_version": float64(1),
+		"idempotency_key":  "workflow-complete-role-42",
+		"action_key":       "complete",
 		"payload": map[string]any{
 			"entry": "mobile_role_task",
 		},
@@ -1253,6 +1385,190 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionUsesDoneAndServerActorRole(
 	}
 	if repo.updateActorRoleKey != biz.QualityRoleKey {
 		t.Fatalf("expected server-derived actor role %q, got %q", biz.QualityRoleKey, repo.updateActorRoleKey)
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowTaskActionsRequireExpectedVersion(t *testing.T) {
+	repo := &stubWorkflowJSONRPCRepo{currentTask: &biz.WorkflowTask{
+		ID:            42,
+		TaskGroup:     "generic",
+		SourceType:    "generic-source",
+		SourceID:      1,
+		TaskStatusKey: "ready",
+		OwnerRoleKey:  biz.QualityRoleKey,
+		Payload:       map[string]any{},
+		Version:       3,
+	}}
+	j := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+		adminReader:      stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.QualityRoleKey}, biz.PermissionWorkflowTaskComplete)},
+		workflowUC:       biz.NewWorkflowUsecase(repo),
+		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
+	}
+	params := mustJSONRPCStruct(t, map[string]any{
+		"task_id":    float64(42),
+		"action_key": "complete",
+		"payload":    map[string]any{},
+	})
+
+	_, res, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "complete_task_action", "missing-version", params)
+	if err != nil {
+		t.Fatalf("expected nil transport error, got %v", err)
+	}
+	if res == nil || res.Code != errcode.InvalidParam.Code || res.Message != "任务版本信息缺失或已失效，请刷新后重试" {
+		t.Fatalf("missing task version must return refresh guidance, got %#v", res)
+	}
+	if repo.updateInput != nil {
+		t.Fatalf("missing task version must not mutate task, got %#v", repo.updateInput)
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowTaskActionsRequireIdempotencyKey(t *testing.T) {
+	repo := &stubWorkflowJSONRPCRepo{currentTask: &biz.WorkflowTask{
+		ID:            42,
+		TaskGroup:     "generic",
+		SourceType:    "generic-source",
+		SourceID:      1,
+		TaskStatusKey: "ready",
+		OwnerRoleKey:  biz.QualityRoleKey,
+		Payload:       map[string]any{},
+		Version:       3,
+	}}
+	j := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+		adminReader:      stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.QualityRoleKey}, biz.PermissionWorkflowTaskComplete)},
+		workflowUC:       biz.NewWorkflowUsecase(repo),
+		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
+	}
+	params := mustJSONRPCStruct(t, map[string]any{
+		"task_id":          float64(42),
+		"expected_version": float64(3),
+		"action_key":       "complete",
+		"payload":          map[string]any{},
+	})
+
+	_, res, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "complete_task_action", "missing-key", params)
+	if err != nil {
+		t.Fatalf("expected nil transport error, got %v", err)
+	}
+	if res == nil || res.Code != errcode.InvalidParam.Code || res.Message != "页面已更新，请刷新后重新操作" {
+		t.Fatalf("missing idempotency key must return refresh guidance, got %#v", res)
+	}
+	if repo.updateInput != nil {
+		t.Fatalf("missing idempotency key must not mutate task, got %#v", repo.updateInput)
+	}
+}
+
+func TestWorkflowMutationParamsRejectNonContractTypes(t *testing.T) {
+	integerCases := []struct {
+		name   string
+		key    string
+		value  any
+		parser func(map[string]any) (int, *v1.JsonrpcResult)
+	}{
+		{name: "task id string", key: "task_id", value: "1", parser: getRequiredWorkflowTaskID},
+		{name: "task id fraction", key: "task_id", value: float64(1.5), parser: getRequiredWorkflowTaskID},
+		{name: "task id unsafe integer", key: "task_id", value: float64(9007199254740992), parser: getRequiredWorkflowTaskID},
+		{name: "version string", key: "expected_version", value: "1", parser: getRequiredWorkflowExpectedVersion},
+		{name: "version fraction", key: "expected_version", value: float64(1.5), parser: getRequiredWorkflowExpectedVersion},
+	}
+	for _, tc := range integerCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if value, result := tc.parser(map[string]any{tc.key: tc.value}); value != 0 || result == nil || result.Code != errcode.InvalidParam.Code {
+				t.Fatalf("non-contract integer must fail closed, value=%d result=%#v", value, result)
+			}
+		})
+	}
+
+	keyCases := []any{float64(1), "   ", strings.Repeat("x", 129)}
+	for index, value := range keyCases {
+		t.Run(fmt.Sprintf("idempotency key case %d", index), func(t *testing.T) {
+			if key, result := getRequiredWorkflowIdempotencyKey(map[string]any{"idempotency_key": value}); key != "" || result == nil || result.Code != errcode.InvalidParam.Code {
+				t.Fatalf("non-contract idempotency key must fail closed, key=%q result=%#v", key, result)
+			}
+		})
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowTaskConflictReturnsRefreshGuidance(t *testing.T) {
+	dispatcher := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+	}
+
+	res := dispatcher.mapWorkflowError(context.Background(), biz.ErrWorkflowTaskConflict)
+	if res == nil || res.Code != errcode.InvalidParam.Code || res.Message != "任务已被其他人更新，请刷新后重试" {
+		t.Fatalf("workflow task conflict must return refresh guidance, got %#v", res)
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowIdempotencyConflictUsesRegisteredError(t *testing.T) {
+	dispatcher := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+	}
+	res := dispatcher.mapWorkflowError(context.Background(), biz.ErrIdempotencyConflict)
+	if res == nil || res.Code != errcode.IdempotencyConflict.Code || res.Message != errcode.IdempotencyConflict.Message {
+		t.Fatalf("workflow idempotency conflict must use 40920, got %#v", res)
+	}
+}
+
+func TestJsonrpcDispatcher_LinkedProcessReconciliationFailureKeepsMutationRetryable(t *testing.T) {
+	processID := 10
+	nodeID := 20
+	dispatcher := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+		processRuntimeUC: biz.NewProcessRuntimeUsecase(nil, nil),
+	}
+	res := dispatcher.settleLinkedProcessNodeAfterTask(context.Background(), &biz.WorkflowTask{
+		ID:                    99,
+		ProcessInstanceID:     &processID,
+		ProcessNodeInstanceID: &nodeID,
+	}, 7)
+	if res == nil || res.Code != errcode.Internal.Code || !strings.Contains(res.Message, "请保留本次操作并重试") {
+		t.Fatalf("post-commit process reconciliation failure must remain retryable, got %#v", res)
+	}
+}
+
+func TestJsonrpcDispatcher_LinkedProcessReconciliationFailsClosedWithoutRuntime(t *testing.T) {
+	dispatcher := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+	}
+	if res := dispatcher.settleLinkedProcessNodeAfterTask(context.Background(), &biz.WorkflowTask{ID: 100}, 7); res != nil {
+		t.Fatalf("ordinary task without process anchors must remain a no-op, got %#v", res)
+	}
+
+	processID := 10
+	nodeID := 20
+	tests := []struct {
+		name string
+		task *biz.WorkflowTask
+	}{
+		{
+			name: "both anchors",
+			task: &biz.WorkflowTask{ID: 101, ProcessInstanceID: &processID, ProcessNodeInstanceID: &nodeID},
+		},
+		{
+			name: "process anchor only",
+			task: &biz.WorkflowTask{ID: 102, ProcessInstanceID: &processID},
+		},
+		{
+			name: "process node anchor only",
+			task: &biz.WorkflowTask{ID: 103, ProcessNodeInstanceID: &nodeID},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := dispatcher.settleLinkedProcessNodeAfterTask(context.Background(), tt.task, 7)
+			if res == nil || res.Code != errcode.Internal.Code || !strings.Contains(res.Message, "请保留本次操作并重试") {
+				t.Fatalf("anchored task without process runtime must fail closed, got %#v", res)
+			}
+		})
+	}
+}
+
+func TestWorkflowTaskToMapIncludesInternalConcurrencyVersion(t *testing.T) {
+	mapped := workflowTaskToMap(&biz.WorkflowTask{ID: 1, Version: 7})
+	if mapped["version"] != 7 {
+		t.Fatalf("workflow task response must include version 7, got %#v", mapped["version"])
 	}
 }
 
@@ -1289,8 +1605,10 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionCompletesLinkedProcessNode(
 		processRuntimeUC: biz.NewProcessRuntimeUsecase(processRepo, repo),
 	}
 	params, err := structpb.NewStruct(map[string]any{
-		"task_id":    float64(42),
-		"action_key": "complete",
+		"task_id":          float64(42),
+		"expected_version": float64(1),
+		"idempotency_key":  "workflow-linked-complete-42",
+		"action_key":       "complete",
 		"payload": map[string]any{
 			"outcome": "ENGINEERING_DATA_READY",
 		},
@@ -1349,10 +1667,12 @@ func TestJsonrpcDispatcher_WorkflowRejectTaskActionSettlesLinkedProcessNode(t *t
 		processRuntimeUC: biz.NewProcessRuntimeUsecase(processRepo, repo),
 	}
 	params := mustJSONRPCStruct(t, map[string]any{
-		"task_id":    float64(42),
-		"action_key": "reject",
-		"reason":     "客户交期尚未确认",
-		"payload":    map[string]any{},
+		"task_id":          float64(42),
+		"expected_version": float64(1),
+		"idempotency_key":  "workflow-linked-reject-42",
+		"action_key":       "reject",
+		"reason":           "客户交期尚未确认",
+		"payload":          map[string]any{},
 	})
 
 	_, res, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "reject_task_action", "1", params)
@@ -1386,6 +1706,17 @@ func TestJsonrpcDispatcher_WorkflowRejectTaskActionRetryReconcilesWithoutTaskRew
 		ProcessNodeInstanceID: &nodeID,
 		Payload:               map[string]any{"rejected_reason": reason},
 	}}
+	var receiptHash string
+	repo.resolveMutation = func(_ int, _ string, intentHash string) (*biz.WorkflowTask, bool, error) {
+		if receiptHash == "" {
+			receiptHash = intentHash
+			return repo.currentTask, true, nil
+		}
+		if receiptHash != intentHash {
+			return nil, false, biz.ErrIdempotencyConflict
+		}
+		return repo.currentTask, true, nil
+	}
 	processRepo := &stubProcessRuntimeJSONRPCRepo{node: &biz.ProcessNodeInstance{
 		ID:                nodeID,
 		ProcessInstanceID: processID,
@@ -1401,10 +1732,12 @@ func TestJsonrpcDispatcher_WorkflowRejectTaskActionRetryReconcilesWithoutTaskRew
 		processRuntimeUC: biz.NewProcessRuntimeUsecase(processRepo, repo),
 	}
 	params := mustJSONRPCStruct(t, map[string]any{
-		"task_id":    float64(42),
-		"action_key": "reject",
-		"reason":     reason,
-		"payload":    map[string]any{},
+		"task_id":          float64(42),
+		"expected_version": float64(1),
+		"idempotency_key":  "workflow-linked-reject-replay-42",
+		"action_key":       "reject",
+		"reason":           reason,
+		"payload":          map[string]any{},
 	})
 
 	_, res, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "reject_task_action", "1", params)
@@ -1423,16 +1756,18 @@ func TestJsonrpcDispatcher_WorkflowRejectTaskActionRetryReconcilesWithoutTaskRew
 
 	processRepo.completedNode = nil
 	mismatchParams := mustJSONRPCStruct(t, map[string]any{
-		"task_id":    float64(42),
-		"action_key": "reject",
-		"reason":     "另一个退回原因",
-		"payload":    map[string]any{},
+		"task_id":          float64(42),
+		"expected_version": float64(1),
+		"idempotency_key":  "workflow-linked-reject-replay-42",
+		"action_key":       "reject",
+		"reason":           "另一个退回原因",
+		"payload":          map[string]any{},
 	})
 	_, mismatchRes, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "reject_task_action", "2", mismatchParams)
 	if err != nil {
 		t.Fatalf("expected nil err for mismatched retry, got %v", err)
 	}
-	if mismatchRes == nil || mismatchRes.Code != errcode.InvalidParam.Code {
+	if mismatchRes == nil || mismatchRes.Code != errcode.IdempotencyConflict.Code {
 		t.Fatalf("expected mismatched terminal retry rejected, got %#v", mismatchRes)
 	}
 	if processRepo.completedNode != nil || repo.updateInput != nil {
@@ -1492,9 +1827,11 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsUseServerStatusAndActorR
 				customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
 			}
 			params, err := structpb.NewStruct(map[string]any{
-				"task_id":    float64(43),
-				"action_key": tt.actionKey,
-				"reason":     tt.reason,
+				"task_id":          float64(43),
+				"expected_version": float64(1),
+				"idempotency_key":  "workflow-controlled-" + tt.actionKey,
+				"action_key":       tt.actionKey,
+				"reason":           tt.reason,
 				"payload": map[string]any{
 					"entry": "mobile_role_task",
 				},
@@ -1541,13 +1878,14 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsRejectRawStatusActorRole
 			method:     "complete_task_action",
 			permission: biz.PermissionWorkflowTaskComplete,
 			params: map[string]any{
-				"task_id":         float64(1),
-				"task_status_key": "done",
-				"payload":         map[string]any{},
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"task_status_key":  "done",
+				"payload":          map[string]any{},
 			},
 		},
 		{
-			name:       "complete rejects legacy id fallback",
+			name:       "complete rejects non-contract id field",
 			method:     "complete_task_action",
 			permission: biz.PermissionWorkflowTaskComplete,
 			params: map[string]any{
@@ -1571,6 +1909,7 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsRejectRawStatusActorRole
 			permission: biz.PermissionWorkflowTaskComplete,
 			params: map[string]any{
 				"task_id":             float64(1),
+				"expected_version":    float64(1),
 				"action_key":          "complete",
 				"business_status_key": "project_approved",
 				"payload":             map[string]any{},
@@ -1581,10 +1920,35 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsRejectRawStatusActorRole
 			method:     "complete_task_action",
 			permission: biz.PermissionWorkflowTaskComplete,
 			params: map[string]any{
-				"task_id":        float64(1),
-				"action_key":     "complete",
-				"actor_role_key": biz.FinanceRoleKey,
-				"payload":        map[string]any{},
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action_key":       "complete",
+				"actor_role_key":   biz.FinanceRoleKey,
+				"payload":          map[string]any{},
+			},
+		},
+		{
+			name:       "complete rejects unknown top level field",
+			method:     "complete_task_action",
+			permission: biz.PermissionWorkflowTaskComplete,
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action_key":       "complete",
+				"payload":          map[string]any{},
+				"unexpected":       true,
+			},
+		},
+		{
+			name:       "complete rejects client customer key before module lookup",
+			method:     "complete_task_action",
+			permission: biz.PermissionWorkflowTaskComplete,
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action_key":       "complete",
+				"payload":          map[string]any{},
+				"customer_key":     "non-contract-customer",
 			},
 		},
 		{
@@ -1592,9 +1956,43 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsRejectRawStatusActorRole
 			method:     "complete_task_action",
 			permission: biz.PermissionWorkflowTaskComplete,
 			params: map[string]any{
-				"task_id":    float64(1),
-				"action_key": "block",
-				"payload":    map[string]any{},
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action_key":       "block",
+				"payload":          map[string]any{},
+			},
+		},
+		{
+			name:       "complete rejects padded action key",
+			method:     "complete_task_action",
+			permission: biz.PermissionWorkflowTaskComplete,
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action_key":       " complete ",
+				"payload":          map[string]any{},
+			},
+		},
+		{
+			name:       "complete rejects action alias",
+			method:     "complete_task_action",
+			permission: biz.PermissionWorkflowTaskComplete,
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action":           "complete",
+				"payload":          map[string]any{},
+			},
+		},
+		{
+			name:       "complete rejects task status alias",
+			method:     "complete_task_action",
+			permission: biz.PermissionWorkflowTaskComplete,
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action_key":       "done",
+				"payload":          map[string]any{},
 			},
 		},
 		{
@@ -1602,8 +2000,9 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsRejectRawStatusActorRole
 			method:     "complete_task_action",
 			permission: biz.PermissionWorkflowTaskComplete,
 			params: map[string]any{
-				"task_id":    float64(1),
-				"action_key": "complete",
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action_key":       "complete",
 				"payload": map[string]any{
 					"source_type": "purchase_receipt",
 				},
@@ -1614,11 +2013,39 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsRejectRawStatusActorRole
 			method:     "complete_task_action",
 			permission: biz.PermissionWorkflowTaskComplete,
 			params: map[string]any{
-				"task_id":    float64(1),
-				"action_key": "complete",
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action_key":       "complete",
 				"payload": map[string]any{
 					"command_key": "inventory.post_inbound",
 				},
+			},
+		},
+		{
+			name:       "complete rejects nested idempotency key",
+			method:     "complete_task_action",
+			permission: biz.PermissionWorkflowTaskComplete,
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"idempotency_key":  "workflow-top-level-key",
+				"action_key":       "complete",
+				"payload": map[string]any{
+					"idempotency_key": "nested-key",
+				},
+			},
+		},
+		{
+			name:       "complete rejects client intent hash",
+			method:     "complete_task_action",
+			permission: biz.PermissionWorkflowTaskComplete,
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"idempotency_key":  "workflow-client-hash",
+				"intent_hash":      strings.Repeat("a", 64),
+				"action_key":       "complete",
+				"payload":          map[string]any{},
 			},
 		},
 		{
@@ -1626,9 +2053,10 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsRejectRawStatusActorRole
 			method:     "reject_task_action",
 			permission: biz.PermissionWorkflowTaskReject,
 			params: map[string]any{
-				"task_id":    float64(1),
-				"action_key": "reject",
-				"reason":     "资料不全",
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action_key":       "reject",
+				"reason":           "资料不全",
 				"payload": map[string]any{
 					"owner_role_key": biz.FinanceRoleKey,
 				},
@@ -1639,10 +2067,11 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsRejectRawStatusActorRole
 			method:     "block_task_action",
 			permission: biz.PermissionWorkflowTaskUpdate,
 			params: map[string]any{
-				"task_id":    float64(1),
-				"action_key": "block",
-				"reason":     " \t ",
-				"payload":    map[string]any{},
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action_key":       "block",
+				"reason":           " \t ",
+				"payload":          map[string]any{},
 			},
 		},
 		{
@@ -1650,17 +2079,21 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsRejectRawStatusActorRole
 			method:     "reject_task_action",
 			permission: biz.PermissionWorkflowTaskReject,
 			params: map[string]any{
-				"task_id":         float64(1),
-				"task_status_key": "done",
-				"action_key":      "reject",
-				"reason":          "资料不全",
-				"payload":         map[string]any{},
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"task_status_key":  "done",
+				"action_key":       "reject",
+				"reason":           "资料不全",
+				"payload":          map[string]any{},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if _, exists := tt.params["idempotency_key"]; !exists {
+				tt.params["idempotency_key"] = "workflow-controlled-" + strings.ReplaceAll(tt.name, " ", "-")
+			}
 			repo := &stubWorkflowJSONRPCRepo{
 				currentTask: &biz.WorkflowTask{ID: 1, TaskGroup: "purchase_iqc", TaskStatusKey: "ready", OwnerRoleKey: biz.QualityRoleKey, Payload: map[string]any{}},
 			}
@@ -1682,6 +2115,9 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsRejectRawStatusActorRole
 			if res == nil || res.Code != errcode.InvalidParam.Code {
 				t.Fatalf("expected invalid param, got %#v", res)
 			}
+			if _, exists := tt.params["customer_key"]; exists && !strings.Contains(res.Message, "customer_key") {
+				t.Fatalf("expected customer_key rejected by the public contract before module lookup, got %#v", res)
+			}
 			if repo.updateInput != nil {
 				t.Fatalf("expected no status update, got %#v", repo.updateInput)
 			}
@@ -1689,14 +2125,14 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsRejectRawStatusActorRole
 	}
 }
 
-func TestJsonrpcDispatcher_WorkflowReadOnlyTaskExplainRejectsLegacyIDParam(t *testing.T) {
+func TestJsonrpcDispatcher_WorkflowReadOnlyTaskExplainRequiresCanonicalTaskID(t *testing.T) {
 	tests := []struct {
 		name   string
 		method string
 		params map[string]any
 	}{
 		{
-			name:   "explain action rejects legacy id fallback",
+			name:   "explain action rejects non-contract id field",
 			method: "explain_action_access",
 			params: map[string]any{
 				"id":         float64(1),
@@ -1704,7 +2140,7 @@ func TestJsonrpcDispatcher_WorkflowReadOnlyTaskExplainRejectsLegacyIDParam(t *te
 			},
 		},
 		{
-			name:   "explain assignment rejects legacy id fallback",
+			name:   "explain assignment rejects non-contract id field",
 			method: "explain_task_assignment",
 			params: map[string]any{
 				"id": float64(1),
@@ -1714,6 +2150,34 @@ func TestJsonrpcDispatcher_WorkflowReadOnlyTaskExplainRejectsLegacyIDParam(t *te
 			name:   "explain action requires formal task id",
 			method: "explain_action_access",
 			params: map[string]any{
+				"action_key": "complete",
+			},
+		},
+		{
+			name:   "explain assignment requires formal task id",
+			method: "explain_task_assignment",
+			params: map[string]any{},
+		},
+		{
+			name:   "explain action rejects string task id",
+			method: "explain_action_access",
+			params: map[string]any{
+				"task_id":    "1",
+				"action_key": "complete",
+			},
+		},
+		{
+			name:   "explain assignment rejects fractional task id",
+			method: "explain_task_assignment",
+			params: map[string]any{
+				"task_id": float64(1.5),
+			},
+		},
+		{
+			name:   "explain assignment rejects unknown action key",
+			method: "explain_task_assignment",
+			params: map[string]any{
+				"task_id":    float64(1),
 				"action_key": "complete",
 			},
 		},
@@ -1776,6 +2240,16 @@ func TestJsonrpcDispatcher_WorkflowExplainActionAccess(t *testing.T) {
 			wantAllowed:      false,
 			wantReasonCode:   "missing_permission",
 			wantPermission:   biz.PermissionWorkflowTaskReject,
+			wantActorRoleKey: biz.QualityRoleKey,
+		},
+		{
+			name:             "owner can block with update permission",
+			admin:            workflowJSONRPCAdmin([]string{biz.QualityRoleKey}, biz.PermissionWorkflowTaskRead, biz.PermissionWorkflowTaskUpdate),
+			currentTask:      &biz.WorkflowTask{ID: 76, TaskGroup: "purchase_iqc", SourceType: "accessories-purchase", SourceID: 1, TaskStatusKey: "ready", OwnerRoleKey: biz.QualityRoleKey, Payload: map[string]any{}},
+			actionKey:        "block",
+			wantAllowed:      true,
+			wantReasonCode:   "allowed",
+			wantPermission:   biz.PermissionWorkflowTaskUpdate,
 			wantActorRoleKey: biz.QualityRoleKey,
 		},
 		{
@@ -1854,7 +2328,7 @@ func TestJsonrpcDispatcher_WorkflowExplainActionAccess(t *testing.T) {
 	}
 }
 
-func TestJsonrpcDispatcher_WorkflowExplainActionAccessReturnsAllActions(t *testing.T) {
+func TestJsonrpcDispatcher_WorkflowExplainActionAccessUsesOptionalCanonicalActionKey(t *testing.T) {
 	repo := &stubWorkflowJSONRPCRepo{
 		currentTask: &biz.WorkflowTask{
 			ID:            81,
@@ -1872,21 +2346,77 @@ func TestJsonrpcDispatcher_WorkflowExplainActionAccessReturnsAllActions(t *testi
 		workflowUC:       biz.NewWorkflowUsecase(repo),
 		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
 	}
-	params, err := structpb.NewStruct(map[string]any{"task_id": float64(81)})
+	_, allRes, err := j.handleWorkflow(
+		workflowJSONRPCAdminContext(),
+		"explain_action_access",
+		"all",
+		mustJSONRPCStruct(t, map[string]any{"task_id": float64(81)}),
+	)
 	if err != nil {
-		t.Fatalf("build params failed: %v", err)
+		t.Fatalf("expected nil transport error, got %v", err)
+	}
+	if allRes == nil || allRes.Code != errcode.OK.Code {
+		t.Fatalf("missing action_key must return all actions, got %#v", allRes)
+	}
+	actions, ok := allRes.Data.AsMap()["actions"].([]any)
+	if !ok || len(actions) != 4 {
+		t.Fatalf("missing action_key must return four actions, got %#v", allRes.Data.AsMap()["actions"])
 	}
 
-	_, res, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "explain_action_access", "1", params)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
+	tests := []struct {
+		name   string
+		params map[string]any
+	}{
+		{
+			name:   "non-contract action field",
+			params: map[string]any{"task_id": float64(81), "action": "complete"},
+		},
+		{
+			name:   "non-contract action field alongside canonical key",
+			params: map[string]any{"task_id": float64(81), "action": "complete", "action_key": "complete"},
+		},
+		{
+			name:   "non string action key",
+			params: map[string]any{"task_id": float64(81), "action_key": float64(1)},
+		},
+		{
+			name:   "empty action key",
+			params: map[string]any{"task_id": float64(81), "action_key": "   "},
+		},
+		{
+			name:   "padded action key",
+			params: map[string]any{"task_id": float64(81), "action_key": " complete "},
+		},
+		{
+			name:   "unknown field",
+			params: map[string]any{"task_id": float64(81), "action_key": "complete", "unexpected": true},
+		},
 	}
-	if res == nil || res.Code != errcode.OK.Code {
-		t.Fatalf("expected OK response, got %#v", res)
+	for _, alias := range []string{"done", "blocked", "rejected", "urge_task", "escalate", "escalate_to_pmc"} {
+		tests = append(tests, struct {
+			name   string
+			params map[string]any
+		}{
+			name:   "action alias " + alias,
+			params: map[string]any{"task_id": float64(81), "action_key": alias},
+		})
 	}
-	actions, ok := res.Data.AsMap()["actions"].([]any)
-	if !ok || len(actions) != 4 {
-		t.Fatalf("expected four action explanations, got %#v", res.Data.AsMap()["actions"])
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, res, err := j.handleWorkflow(
+				workflowJSONRPCAdminContext(),
+				"explain_action_access",
+				"1",
+				mustJSONRPCStruct(t, tt.params),
+			)
+			if err != nil {
+				t.Fatalf("expected nil transport error, got %v", err)
+			}
+			if res == nil || res.Code != errcode.InvalidParam.Code {
+				t.Fatalf("non-canonical explain action must return InvalidParam, got %#v", res)
+			}
+		})
 	}
 }
 
@@ -2382,9 +2912,11 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionRejectsSuperAdminWithoutBre
 		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
 	}
 	params, err := structpb.NewStruct(map[string]any{
-		"task_id":    float64(12),
-		"action_key": "complete",
-		"payload":    map[string]any{},
+		"task_id":          float64(12),
+		"expected_version": float64(1),
+		"idempotency_key":  "workflow-super-admin-denied-12",
+		"action_key":       "complete",
+		"payload":          map[string]any{},
 	})
 	if err != nil {
 		t.Fatalf("build params failed: %v", err)
@@ -2417,17 +2949,17 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionAllowsAuditedSuperAdminBrea
 	}
 	admin := workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, biz.PermissionWorkflowTaskComplete)
 	admin.IsSuperAdmin = true
-	auditRepo := newMemAdminManageRepoForData()
 	j := &jsonrpcDispatcher{
 		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
 		adminReader:      stubAdminAccountReader{admin: admin},
 		workflowUC:       biz.NewWorkflowUsecase(repo),
 		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
-		adminManageUC:    biz.NewAdminManageUsecase(auditRepo, log.NewStdLogger(io.Discard), nil),
 	}
 	expiresAt := time.Now().Add(time.Hour).Unix()
 	params, err := structpb.NewStruct(map[string]any{
 		"task_id":                float64(13),
+		"expected_version":       float64(1),
+		"idempotency_key":        "workflow-break-glass-13",
 		"action_key":             "complete",
 		"break_glass":            true,
 		"break_glass_reason":     "客户现场紧急放行排障",
@@ -2451,15 +2983,38 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionAllowsAuditedSuperAdminBrea
 	if repo.updateActorRoleKey != biz.AdminRoleKey {
 		t.Fatalf("break-glass actor role must stay admin, got %q", repo.updateActorRoleKey)
 	}
-	if len(auditRepo.auditLogs) != 1 {
-		t.Fatalf("expected one runtime audit event, got %#v", auditRepo.auditLogs)
+	if repo.updateInput.AuditEvent == nil {
+		t.Fatalf("expected break-glass audit to be attached to the task transaction")
 	}
-	event := biz.EnrichRuntimeAuditEvent(auditRepo.auditLogs[0])
+	event := biz.EnrichRuntimeAuditEvent(biz.RuntimeAuditEvent{
+		EventType: repo.updateInput.AuditEvent.EventType,
+		EventKey:  repo.updateInput.AuditEvent.EventKey,
+		Source:    repo.updateInput.AuditEvent.Source,
+		Payload:   repo.updateInput.AuditEvent.Payload,
+	})
 	if event.EventType != "workflow_break_glass" || event.EventKey != "workflow_task.break_glass" || event.Source != "workflow" {
 		t.Fatalf("unexpected audit event %#v", event)
 	}
 	if event.RiskLevel != "high" {
 		t.Fatalf("break-glass audit must be high risk, got %q", event.RiskLevel)
+	}
+	receiptHash := repo.updateInput.IntentHash
+	receiptTask := repo.currentTask
+	repo.resolveMutation = func(_ int, key string, intentHash string) (*biz.WorkflowTask, bool, error) {
+		if key != "workflow-break-glass-13" {
+			return nil, false, nil
+		}
+		if intentHash != receiptHash {
+			return nil, false, biz.ErrIdempotencyConflict
+		}
+		return receiptTask, true, nil
+	}
+	_, replayRes, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "complete_task_action", "2", params)
+	if err != nil || replayRes == nil || replayRes.Code != errcode.OK.Code {
+		t.Fatalf("break-glass exact replay must succeed, response=%#v err=%v", replayRes, err)
+	}
+	if repo.updateCalls != 1 {
+		t.Fatalf("break-glass replay must not rewrite task or duplicate its audit, update calls=%d", repo.updateCalls)
 	}
 	breakGlass, ok := event.Payload["break_glass"].(map[string]any)
 	if !ok {
@@ -2474,6 +3029,164 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionAllowsAuditedSuperAdminBrea
 	target, ok := event.Payload["target"].(map[string]any)
 	if !ok || target["type"] != "workflow_task" || target["key"] != "SHIP-REL-13" {
 		t.Fatalf("unexpected audit target %#v", event.Payload["target"])
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowBreakGlassRejectsNonCanonicalParamsBeforeWrite(t *testing.T) {
+	futureUnix := float64(time.Now().Add(time.Hour).Unix())
+	customerConfigUC := workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled")
+	admin := workflowJSONRPCAdmin([]string{biz.AdminRoleKey}, biz.PermissionWorkflowTaskComplete)
+	admin.IsSuperAdmin = true
+	tests := []struct {
+		name   string
+		fields map[string]any
+	}{
+		{
+			name: "string true",
+			fields: map[string]any{
+				"break_glass":            "true",
+				"break_glass_reason":     "紧急处理",
+				"break_glass_expires_at": futureUnix,
+			},
+		},
+		{
+			name: "numeric true",
+			fields: map[string]any{
+				"break_glass":            float64(1),
+				"break_glass_reason":     "紧急处理",
+				"break_glass_expires_at": futureUnix,
+			},
+		},
+		{
+			name: "null boolean",
+			fields: map[string]any{
+				"break_glass":            nil,
+				"break_glass_reason":     "紧急处理",
+				"break_glass_expires_at": futureUnix,
+			},
+		},
+		{
+			name:   "orphan reason",
+			fields: map[string]any{"break_glass_reason": "紧急处理"},
+		},
+		{
+			name:   "orphan expiry",
+			fields: map[string]any{"break_glass_expires_at": futureUnix},
+		},
+		{
+			name: "false with reason",
+			fields: map[string]any{
+				"break_glass":        false,
+				"break_glass_reason": "紧急处理",
+			},
+		},
+		{
+			name: "false with expiry",
+			fields: map[string]any{
+				"break_glass":            false,
+				"break_glass_expires_at": futureUnix,
+			},
+		},
+		{
+			name: "string expiry",
+			fields: map[string]any{
+				"break_glass":            true,
+				"break_glass_reason":     "紧急处理",
+				"break_glass_expires_at": fmt.Sprint(int64(futureUnix)),
+			},
+		},
+		{
+			name: "fractional expiry",
+			fields: map[string]any{
+				"break_glass":            true,
+				"break_glass_reason":     "紧急处理",
+				"break_glass_expires_at": futureUnix + 0.5,
+			},
+		},
+		{
+			name: "unsafe expiry",
+			fields: map[string]any{
+				"break_glass":            true,
+				"break_glass_reason":     "紧急处理",
+				"break_glass_expires_at": float64(9007199254740992),
+			},
+		},
+		{
+			name: "zero expiry",
+			fields: map[string]any{
+				"break_glass":            true,
+				"break_glass_reason":     "紧急处理",
+				"break_glass_expires_at": float64(0),
+			},
+		},
+		{
+			name: "negative expiry",
+			fields: map[string]any{
+				"break_glass":            true,
+				"break_glass_reason":     "紧急处理",
+				"break_glass_expires_at": float64(-1),
+			},
+		},
+		{
+			name: "non string reason",
+			fields: map[string]any{
+				"break_glass":            true,
+				"break_glass_reason":     float64(123),
+				"break_glass_expires_at": futureUnix,
+			},
+		},
+		{
+			name: "missing expiry",
+			fields: map[string]any{
+				"break_glass":        true,
+				"break_glass_reason": "紧急处理",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params := map[string]any{
+				"task_id":          float64(15),
+				"expected_version": float64(1),
+				"idempotency_key":  "workflow-break-glass-strict-" + strings.ReplaceAll(tt.name, " ", "-"),
+				"action_key":       "complete",
+				"payload":          map[string]any{},
+			}
+			for key, value := range tt.fields {
+				params[key] = value
+			}
+			repo := &stubWorkflowJSONRPCRepo{}
+			dispatcher := &jsonrpcDispatcher{
+				log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+				adminReader:      stubAdminAccountReader{admin: admin},
+				workflowUC:       biz.NewWorkflowUsecase(repo),
+				customerConfigUC: customerConfigUC,
+			}
+
+			_, res, err := dispatcher.handleWorkflow(
+				workflowJSONRPCAdminContext(),
+				"complete_task_action",
+				"1",
+				mustJSONRPCStruct(t, params),
+			)
+			if err != nil {
+				t.Fatalf("expected nil transport error, got %v", err)
+			}
+			if res == nil || res.Code != errcode.InvalidParam.Code {
+				t.Fatalf("non-canonical break-glass params must return InvalidParam, got %#v", res)
+			}
+			if repo.updateCalls != 0 || repo.updateInput != nil {
+				t.Fatalf("invalid break-glass params must not write, calls=%d input=%#v", repo.updateCalls, repo.updateInput)
+			}
+		})
+	}
+}
+
+func TestGetWorkflowBreakGlassGrantAllowsExplicitFalseWithoutAuxiliaryFields(t *testing.T) {
+	grant, res := getWorkflowBreakGlassGrant(map[string]any{"break_glass": false})
+	if grant != nil || res != nil {
+		t.Fatalf("explicit false without auxiliary fields must remain a no-op, grant=%#v result=%#v", grant, res)
 	}
 }
 
@@ -2492,6 +3205,7 @@ func TestJsonrpcDispatcher_WorkflowBreakGlassRejectsMissingOrInvalidScope(t *tes
 			}(),
 			params: map[string]any{
 				"task_id":                float64(14),
+				"expected_version":       float64(1),
 				"break_glass":            true,
 				"break_glass_expires_at": float64(time.Now().Add(time.Hour).Unix()),
 				"payload":                map[string]any{},
@@ -2506,6 +3220,7 @@ func TestJsonrpcDispatcher_WorkflowBreakGlassRejectsMissingOrInvalidScope(t *tes
 			}(),
 			params: map[string]any{
 				"task_id":                float64(14),
+				"expected_version":       float64(1),
 				"break_glass":            true,
 				"break_glass_reason":     "过期验证",
 				"break_glass_expires_at": float64(time.Now().Add(-time.Minute).Unix()),
@@ -2517,6 +3232,7 @@ func TestJsonrpcDispatcher_WorkflowBreakGlassRejectsMissingOrInvalidScope(t *tes
 			admin: workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, biz.PermissionWorkflowTaskComplete),
 			params: map[string]any{
 				"task_id":                float64(14),
+				"expected_version":       float64(1),
 				"break_glass":            true,
 				"break_glass_reason":     "普通账号不能使用",
 				"break_glass_expires_at": float64(time.Now().Add(time.Hour).Unix()),
@@ -2527,6 +3243,7 @@ func TestJsonrpcDispatcher_WorkflowBreakGlassRejectsMissingOrInvalidScope(t *tes
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.params["idempotency_key"] = "workflow-break-glass-invalid-14"
 			repo := &stubWorkflowJSONRPCRepo{
 				currentTask: &biz.WorkflowTask{
 					ID:            14,

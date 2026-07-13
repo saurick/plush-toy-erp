@@ -91,6 +91,7 @@ function groupForPath(path = '') {
   if (path.startsWith('docs/product/')) return '产品'
   if (path.startsWith('docs/architecture/')) return '架构'
   if (path.startsWith('docs/customers/')) return '客户'
+  if (path.startsWith('config/customers/')) return '客户配置'
   if (path.startsWith('docs/workflow/')) return 'Workflow'
   if (path.startsWith('docs/warehouse/')) return '仓库'
   if (path.startsWith('docs/finance/')) return '财务'

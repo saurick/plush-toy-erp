@@ -1,0 +1,656 @@
+#!/usr/bin/env node
+
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+
+import {
+  ROLE_USERS,
+  buildManualAcceptanceSourceDataPlan,
+} from "./manual-acceptance-source-data.mjs";
+
+const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
+const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/source-retire";
+const CUSTOMER_KEY = "yoyoosun";
+const CONFIRM_PHRASE = "RETIRE_SIMULATED_MANUAL_ACCEPTANCE_SOURCE_DATA";
+const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
+const REQUIRED_RETIREMENT_MODULES = Object.freeze([
+  "customers",
+  "suppliers",
+  "products",
+  "materials",
+  "processes",
+  "sales_orders",
+  "purchase_orders",
+  "outsourcing_orders",
+  "material_bom",
+]);
+
+const DATASET_SPECS = Object.freeze([
+  {
+    key: "salesOrders",
+    role: "sales",
+    domain: "sales_order",
+    method: "list_sales_orders",
+    listKey: "sales_orders",
+  },
+  {
+    key: "purchaseOrders",
+    role: "purchase",
+    domain: "purchase_order",
+    method: "list_purchase_orders",
+    listKey: "purchase_orders",
+  },
+  {
+    key: "outsourcingOrders",
+    role: "production",
+    domain: "outsourcing_order",
+    method: "list_outsourcing_orders",
+    listKey: "outsourcing_orders",
+  },
+  {
+    key: "bomVersions",
+    role: "engineering",
+    domain: "bom",
+    method: "list_bom_versions",
+    listKey: "bom_versions",
+  },
+  {
+    key: "productSkus",
+    role: "engineering",
+    domain: "masterdata",
+    method: "list_product_skus",
+    listKey: "product_skus",
+  },
+  {
+    key: "processes",
+    role: "engineering",
+    domain: "masterdata",
+    method: "list_processes",
+    listKey: "processes",
+  },
+  {
+    key: "materials",
+    role: "purchase",
+    domain: "masterdata",
+    method: "list_materials",
+    listKey: "materials",
+  },
+  {
+    key: "products",
+    role: "engineering",
+    domain: "masterdata",
+    method: "list_products",
+    listKey: "products",
+  },
+  {
+    key: "suppliers",
+    role: "purchase",
+    domain: "masterdata",
+    method: "list_suppliers",
+    listKey: "suppliers",
+  },
+  {
+    key: "customers",
+    role: "sales",
+    domain: "masterdata",
+    method: "list_customers",
+    listKey: "customers",
+  },
+]);
+
+const DOCUMENT_RETIREMENT = Object.freeze({
+  salesOrders: {
+    domain: "sales_order",
+    method: "cancel_sales_order",
+    role: "sales",
+    statusKey: "lifecycle_status",
+    terminal: new Set(["CLOSED", "CANCELLED", "CANCELED"]),
+    label: "销售订单",
+  },
+  purchaseOrders: {
+    domain: "purchase_order",
+    method: "cancel_purchase_order",
+    role: "purchase",
+    statusKey: "lifecycle_status",
+    terminal: new Set(["CLOSED", "CANCELLED", "CANCELED"]),
+    label: "采购订单",
+  },
+  outsourcingOrders: {
+    domain: "outsourcing_order",
+    method: "cancel_outsourcing_order",
+    role: "production",
+    statusKey: "lifecycle_status",
+    terminal: new Set(["CLOSED", "CANCELLED", "CANCELED"]),
+    label: "委外订单",
+  },
+  bomVersions: {
+    domain: "bom",
+    method: "archive_bom_version",
+    role: "engineering",
+    statusKey: "status",
+    terminal: new Set(["ARCHIVED"]),
+    label: "产品结构版本",
+  },
+});
+
+const MASTER_RETIREMENT = Object.freeze({
+  productSkus: {
+    domain: "masterdata",
+    method: "set_product_sku_active",
+    role: "engineering",
+    label: "产品规格",
+  },
+  processes: {
+    domain: "masterdata",
+    method: "set_process_active",
+    role: "engineering",
+    label: "加工环节",
+  },
+  materials: {
+    domain: "masterdata",
+    method: "set_material_active",
+    role: "purchase",
+    label: "材料",
+  },
+  products: {
+    domain: "masterdata",
+    method: "set_product_active",
+    role: "engineering",
+    label: "产品",
+  },
+  suppliers: {
+    domain: "masterdata",
+    method: "set_supplier_active",
+    role: "purchase",
+    label: "供应商",
+  },
+  customers: {
+    domain: "masterdata",
+    method: "set_customer_active",
+    role: "sales",
+    label: "客户",
+  },
+});
+
+class CliError extends Error {
+  constructor(message, exitCode = 1) {
+    super(message);
+    this.name = "CliError";
+    this.exitCode = exitCode;
+  }
+}
+
+function requiredText(value, name) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) throw new CliError(`${name} is required`);
+  return normalized;
+}
+
+function normalizeBackendURL(value) {
+  const url = new URL(String(value || DEFAULT_BACKEND_URL).trim());
+  if (url.username || url.password) {
+    throw new CliError("backend URL must not contain credentials", 2);
+  }
+  if (!LOCAL_HOSTS.has(url.hostname)) {
+    throw new CliError(
+      `refuse external backend ${url.origin}; source retirement is local-only`,
+      2,
+    );
+  }
+  url.pathname = url.pathname.replace(/\/+$/u, "");
+  url.search = "";
+  url.hash = "";
+  return url.toString().replace(/\/+$/u, "");
+}
+
+function rpcURL(backendURL, domain) {
+  return new URL(`/rpc/${domain}`, `${backendURL}/`).toString();
+}
+
+async function rpcCall({
+  backendURL,
+  domain,
+  method,
+  params = {},
+  token,
+  fetchImpl = fetch,
+}) {
+  const response = await fetchImpl(rpcURL(backendURL, domain), {
+    method: "POST",
+    redirect: "error",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: `manual-acceptance-retire-${domain}-${method}-${Date.now()}`,
+      method,
+      params:
+        domain === "auth" ? params : { customer_key: CUSTOMER_KEY, ...params },
+    }),
+  });
+  if (response.redirected === true) {
+    throw new CliError(`${domain}.${method} refused a redirected response`);
+  }
+  if (!response.ok) {
+    throw new CliError(`${domain}.${method} HTTP ${response.status}`);
+  }
+  const json = await response.json();
+  if (json?.result?.code !== 0) {
+    throw new CliError(
+      `${domain}.${method} code=${json?.result?.code} message=${json?.result?.message}`,
+    );
+  }
+  return json.result.data || {};
+}
+
+async function loginRoles({
+  backendURL,
+  password,
+  seedAdminPassword,
+  includeSeedAdmin,
+  fetchImpl,
+}) {
+  const roleEntries = Object.entries(ROLE_USERS).filter(
+    ([role]) => includeSeedAdmin || role !== "seedAdmin",
+  );
+  const entries = await Promise.all(
+    roleEntries.map(async ([role, username]) => {
+      const data = await rpcCall({
+        backendURL,
+        domain: "auth",
+        method: "admin_login",
+        params: {
+          username,
+          password: role === "seedAdmin" ? seedAdminPassword : password,
+        },
+        fetchImpl,
+      });
+      const token = data.access_token || data.token;
+      if (!token)
+        throw new CliError(`${username}: login response missing token`);
+      if (username === ROLE_USERS.seedAdmin && data.is_super_admin !== true) {
+        throw new CliError(
+          `${username}: manual acceptance retirement writer must be a local super admin`,
+        );
+      }
+      return [role, token];
+    }),
+  );
+  return Object.fromEntries(entries);
+}
+
+async function assertSafeRuntime({ backendURL, tokens, fetchImpl }) {
+  const capabilities = await rpcCall({
+    backendURL,
+    domain: "debug",
+    method: "capabilities",
+    token: tokens.seedAdmin || tokens.sales,
+    fetchImpl,
+  });
+  if (!new Set(["local", "dev"]).has(capabilities.environment)) {
+    throw new CliError(
+      `refuse source retirement in environment=${capabilities.environment || "unknown"}`,
+    );
+  }
+  const data = await rpcCall({
+    backendURL,
+    domain: "customer_config",
+    method: "get_effective_session",
+    token: tokens.sales,
+    fetchImpl,
+  });
+  const session = data.session || {};
+  const configRevision = String(
+    session.configRevision || session.config_revision || "",
+  ).trim();
+  if (
+    session?.customer?.key !== CUSTOMER_KEY ||
+    session.source !== "active_customer_config_revision" ||
+    !configRevision
+  ) {
+    throw new CliError(
+      "refuse source retirement: yoyoosun active customer configuration is not current",
+    );
+  }
+  const modules = session.modules || {};
+  const unavailableModules = REQUIRED_RETIREMENT_MODULES.filter(
+    (key) => modules[key] !== "enabled",
+  );
+  if (unavailableModules.length > 0) {
+    throw new CliError(
+      `refuse source retirement: required modules are not enabled: ${unavailableModules.join(", ")}`,
+    );
+  }
+  return {
+    environment: capabilities.environment,
+    customerKey: session.customer.key,
+    configRevision,
+    source: session.source,
+    requiredModules: REQUIRED_RETIREMENT_MODULES,
+  };
+}
+
+function upper(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase();
+}
+
+function itemIdentity(item) {
+  return (
+    item.order_no ||
+    item.purchase_order_no ||
+    item.outsourcing_order_no ||
+    item.version ||
+    item.sku_code ||
+    item.code ||
+    String(item.id)
+  );
+}
+
+export function buildManualAcceptanceRetirementActions(snapshot) {
+  const actions = [];
+  for (const [datasetKey, config] of Object.entries(DOCUMENT_RETIREMENT)) {
+    for (const item of snapshot[datasetKey] || []) {
+      const status = upper(item[config.statusKey]);
+      if (config.terminal.has(status)) continue;
+      actions.push({
+        datasetKey,
+        label: config.label,
+        key: itemIdentity(item),
+        currentStatus: status || "UNKNOWN",
+        role: config.role,
+        domain: config.domain,
+        method: config.method,
+        params: { id: item.id },
+      });
+    }
+  }
+  for (const [datasetKey, config] of Object.entries(MASTER_RETIREMENT)) {
+    for (const item of snapshot[datasetKey] || []) {
+      if (item.is_active === false) continue;
+      actions.push({
+        datasetKey,
+        label: config.label,
+        key: itemIdentity(item),
+        currentStatus: "ENABLED",
+        role: config.role,
+        domain: config.domain,
+        method: config.method,
+        params: { id: item.id, active: false },
+      });
+    }
+  }
+  return actions;
+}
+
+export function assertManualAcceptanceRetirementComplete(snapshot) {
+  const remaining = buildManualAcceptanceRetirementActions(snapshot);
+  if (remaining.length > 0) {
+    throw new CliError(
+      `source retirement verification found ${remaining.length} records still active or non-terminal`,
+    );
+  }
+  return true;
+}
+
+async function loadSnapshot({ plan, tokens, fetchImpl }) {
+  const entries = await Promise.all(
+    DATASET_SPECS.map(async (spec) => {
+      const data = await rpcCall({
+        backendURL: plan.backendURL,
+        domain: spec.domain,
+        method: spec.method,
+        params: { keyword: plan.prefix, active_only: false, limit: 200 },
+        token: tokens[spec.role],
+        fetchImpl,
+      });
+      return [spec.key, data[spec.listKey] || []];
+    }),
+  );
+  return Object.fromEntries(entries);
+}
+
+function summarize(snapshot, actions) {
+  const found = Object.fromEntries(
+    DATASET_SPECS.map((spec) => [spec.key, (snapshot[spec.key] || []).length]),
+  );
+  const planned = {};
+  for (const action of actions) {
+    planned[action.datasetKey] = (planned[action.datasetKey] || 0) + 1;
+  }
+  return { found, planned, totalActions: actions.length };
+}
+
+export async function retireManualAcceptanceSourceData(
+  plan,
+  { apply = false, password, adminPassword, fetchImpl = fetch } = {},
+) {
+  const backendURL = normalizeBackendURL(plan?.backendURL);
+  const safePlan = { ...plan, backendURL };
+  if (
+    apply &&
+    process.env.MANUAL_ACCEPTANCE_RETIRE_CONFIRM !== CONFIRM_PHRASE
+  ) {
+    throw new CliError(
+      `apply requires MANUAL_ACCEPTANCE_RETIRE_CONFIRM=${CONFIRM_PHRASE}`,
+      2,
+    );
+  }
+  const effectivePassword = requiredText(
+    password ||
+      process.env.MANUAL_ACCEPTANCE_PASSWORD ||
+      process.env.TRIAL_ACCOUNT_PASSWORD ||
+      process.env.ERP_ROLE_DEMO_PASSWORD,
+    "MANUAL_ACCEPTANCE_PASSWORD/TRIAL_ACCOUNT_PASSWORD/ERP_ROLE_DEMO_PASSWORD",
+  );
+  const effectiveAdminPassword = apply
+    ? requiredText(
+        adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
+        "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
+      )
+    : undefined;
+  const tokens = await loginRoles({
+    backendURL,
+    password: effectivePassword,
+    seedAdminPassword: effectiveAdminPassword,
+    includeSeedAdmin: apply,
+    fetchImpl,
+  });
+  const runtime = await assertSafeRuntime({
+    backendURL,
+    tokens,
+    fetchImpl,
+  });
+  const snapshot = await loadSnapshot({ plan: safePlan, tokens, fetchImpl });
+  const actions = buildManualAcceptanceRetirementActions(snapshot);
+  const executed = [];
+  let postApplySummary = null;
+  if (apply) {
+    for (const action of actions) {
+      await rpcCall({
+        backendURL,
+        domain: action.domain,
+        method: action.method,
+        params: action.params,
+        token: tokens.seedAdmin,
+        fetchImpl,
+      });
+      executed.push({
+        datasetKey: action.datasetKey,
+        key: action.key,
+        method: action.method,
+      });
+    }
+    const afterSnapshot = await loadSnapshot({
+      plan: safePlan,
+      tokens,
+      fetchImpl,
+    });
+    assertManualAcceptanceRetirementComplete(afterSnapshot);
+    postApplySummary = summarize(afterSnapshot, []);
+  }
+  return {
+    mode: apply ? "apply" : "dry-run",
+    generatedAt: new Date().toISOString(),
+    runId: safePlan.runId,
+    prefix: safePlan.prefix,
+    backendURL,
+    simulatedOnly: true,
+    physicalDelete: false,
+    runtime,
+    summary: summarize(snapshot, actions),
+    actions,
+    executed,
+    postApplySummary,
+    boundary:
+      "只取消或归档源单并停用主数据，不物理删除历史记录，也不处理已过账的库存、出货或财务记录。",
+  };
+}
+
+export function parseManualAcceptanceRetireArgs(argv) {
+  const options = {
+    apply: false,
+    help: false,
+    json: false,
+    backendURL:
+      process.env.MANUAL_ACCEPTANCE_BACKEND_URL || DEFAULT_BACKEND_URL,
+    out: DEFAULT_OUT_DIR,
+    runId: process.env.MANUAL_ACCEPTANCE_RUN_ID || "LOCAL-UAT",
+  };
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === "--apply") {
+      options.apply = true;
+      continue;
+    }
+    if (token === "--json") {
+      options.json = true;
+      continue;
+    }
+    if (token === "--help" || token === "-h") {
+      options.help = true;
+      continue;
+    }
+    if (!token.startsWith("--")) {
+      throw new CliError(`unexpected argument ${token}`, 2);
+    }
+    const value = argv[index + 1];
+    if (!value || value.startsWith("--")) {
+      throw new CliError(`missing value for ${token}`, 2);
+    }
+    index += 1;
+    switch (token) {
+      case "--backend-url":
+        options.backendURL = value;
+        break;
+      case "--out":
+        options.out = value;
+        break;
+      case "--run-id":
+        options.runId = value;
+        break;
+      default:
+        throw new CliError(`unknown option ${token}`, 2);
+    }
+  }
+  options.backendURL = normalizeBackendURL(options.backendURL);
+  return options;
+}
+
+function markdown(report) {
+  const lines = [
+    "# 试用源数据退出报告",
+    "",
+    `- 模式：${report.mode === "apply" ? "已执行" : "仅预览"}`,
+    `- 试用批次：${report.runId}`,
+    `- 编号前缀：${report.prefix}`,
+    `- 预计处理：${report.summary.totalActions}`,
+    "- 处理方式：取消或归档源单，停用主数据，不物理删除历史记录",
+    "",
+    "| 数据类别 | 找到 | 预计处理 |",
+    "| --- | ---: | ---: |",
+  ];
+  for (const spec of DATASET_SPECS) {
+    lines.push(
+      `| ${spec.key} | ${report.summary.found[spec.key] || 0} | ${report.summary.planned[spec.key] || 0} |`,
+    );
+  }
+  lines.push(
+    "",
+    "> 已形成的库存、出货和财务历史记录继续保留；需要完全清空时，只能在专用本地测试库按既有整库清理流程另行处理。",
+    "",
+  );
+  return lines.join("\n");
+}
+
+async function writeReport(outDir, report) {
+  await mkdir(outDir, { recursive: true });
+  const jsonPath = path.join(outDir, `${report.mode}-report.json`);
+  const markdownPath = path.join(outDir, `${report.mode}-report.md`);
+  await writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  await writeFile(markdownPath, `${markdown(report)}\n`, "utf8");
+  return { jsonPath, markdownPath };
+}
+
+function usage() {
+  return `试用源数据退出 / Manual Acceptance Source Retirement
+
+仅预览：
+  MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
+    node scripts/qa/manual-acceptance-source-retire.mjs --run-id LOCAL-UAT
+
+确认执行：
+  MANUAL_ACCEPTANCE_RETIRE_CONFIRM=${CONFIRM_PHRASE} \\
+  MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
+  MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \\
+    node scripts/qa/manual-acceptance-source-retire.mjs --apply --run-id LOCAL-UAT
+
+本入口只允许 localhost。默认仅预览，不物理删除历史记录；已过账记录不在本入口处理。`;
+}
+
+export async function runManualAcceptanceRetireCli(argv, deps = {}) {
+  const options = parseManualAcceptanceRetireArgs(argv);
+  if (options.help) return { text: `${usage()}\n`, exitCode: 0 };
+  const plan = buildManualAcceptanceSourceDataPlan({
+    runId: options.runId,
+    backendURL: options.backendURL,
+  });
+  const report = await retireManualAcceptanceSourceData(plan, {
+    ...deps,
+    apply: options.apply,
+  });
+  const output = await writeReport(options.out, report);
+  return {
+    text: options.json
+      ? `${JSON.stringify(report, null, 2)}\n`
+      : `[qa:manual-acceptance-source-retire] ${report.mode} complete json=${output.jsonPath} md=${output.markdownPath}\n`,
+    exitCode: 0,
+    plan,
+    report,
+    output,
+  };
+}
+
+const currentFile = fileURLToPath(import.meta.url);
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === path.resolve(currentFile)
+) {
+  runManualAcceptanceRetireCli(process.argv.slice(2))
+    .then((result) => {
+      process.stdout.write(result.text);
+      process.exitCode = result.exitCode;
+    })
+    .catch((error) => {
+      process.stderr.write(`${error?.stack || error?.message || error}\n`);
+      process.exitCode = error instanceof CliError ? error.exitCode : 1;
+    });
+}
+
+export { CONFIRM_PHRASE as MANUAL_ACCEPTANCE_RETIRE_CONFIRM_PHRASE };

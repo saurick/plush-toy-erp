@@ -51,7 +51,7 @@ export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [
     nextStatus: 'closed',
     confirmTitle: '确认关闭加工合同',
     confirmContent:
-      '关闭只停止加工合同后续推进，不会自动写发料、回货、库存或财务事实。',
+      '关闭只会停止这张加工合同继续执行；已登记的发料、回货、库存或财务记录不会自动改变。',
     okText: '确认关闭',
     run: closeOutsourcingOrder,
   },
@@ -63,7 +63,7 @@ export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [
     danger: true,
     confirmTitle: '确认取消加工合同',
     confirmContent:
-      '取消只终止合同源单，不会自动冲正已经登记的发料、回货或财务事实。',
+      '取消只会终止这张加工合同本身；已登记的发料、回货或财务记录不会自动冲正。',
     okText: '确认取消',
     run: cancelOutsourcingOrder,
   },

@@ -7,10 +7,8 @@ const (
 	PermissionSystemUserCreate       = "system.user.create"
 	PermissionSystemUserUpdate       = "system.user.update"
 	PermissionSystemUserDisable      = "system.user.disable"
+	PermissionSystemUserRevoke       = "system.user.revoke"
 	PermissionSystemRoleRead         = "system.role.read"
-	PermissionSystemRoleCreate       = "system.role.create"
-	PermissionSystemRoleUpdate       = "system.role.update"
-	PermissionSystemRoleDelete       = "system.role.delete"
 	PermissionSystemPermissionRead   = "system.permission.read"
 	PermissionSystemPermissionManage = "system.permission.manage"
 	PermissionSystemAuditRead        = "system.audit.read"
@@ -170,10 +168,11 @@ type AdminPermission struct {
 }
 
 type AdminMenu struct {
-	Key                 string
-	Label               string
-	Path                string
-	RequiredPermissions []string
+	Key         string
+	Label       string
+	Path        string
+	RequiredAny []string
+	RequiredAll []string
 }
 
 var builtinPermissions = []PermissionDefinition{
@@ -181,10 +180,8 @@ var builtinPermissions = []PermissionDefinition{
 	{Key: PermissionSystemUserCreate, Name: "创建管理员", Module: "system", Action: "create", Resource: "admin_user", Builtin: true},
 	{Key: PermissionSystemUserUpdate, Name: "更新管理员", Module: "system", Action: "update", Resource: "admin_user", Builtin: true},
 	{Key: PermissionSystemUserDisable, Name: "启停管理员", Module: "system", Action: "disable", Resource: "admin_user", Builtin: true},
+	{Key: PermissionSystemUserRevoke, Name: "注销管理员账号", Description: "用于员工离职等正式退出场景；保留历史身份并退回未完成个人待办。", Module: "system", Action: "revoke", Resource: "admin_user", Builtin: true},
 	{Key: PermissionSystemRoleRead, Name: "查看角色", Module: "system", Action: "read", Resource: "role", Builtin: true},
-	{Key: PermissionSystemRoleCreate, Name: "创建角色", Module: "system", Action: "create", Resource: "role", Builtin: true},
-	{Key: PermissionSystemRoleUpdate, Name: "更新角色", Module: "system", Action: "update", Resource: "role", Builtin: true},
-	{Key: PermissionSystemRoleDelete, Name: "删除角色", Module: "system", Action: "delete", Resource: "role", Builtin: true},
 	{Key: PermissionSystemPermissionRead, Name: "查看权限码", Module: "system", Action: "read", Resource: "permission", Builtin: true},
 	{Key: PermissionSystemPermissionManage, Name: "管理角色权限", Module: "system", Action: "manage", Resource: "permission", Builtin: true},
 	{Key: PermissionSystemAuditRead, Name: "查看系统审计日志", Module: "system", Action: "read", Resource: "audit_log", Builtin: true},
@@ -337,6 +334,19 @@ func NormalizePermissionKeys(input []string) []string {
 	return out
 }
 
+func NormalizePermissionKeysStrict(input []string) ([]string, error) {
+	for _, raw := range input {
+		key := strings.TrimSpace(raw)
+		if key == "" {
+			continue
+		}
+		if _, ok := builtinPermissionKeySet[key]; !ok {
+			return nil, ErrPermissionNotFound
+		}
+	}
+	return NormalizePermissionKeys(input), nil
+}
+
 func PermissionKeySet(keys []string) map[string]struct{} {
 	out := make(map[string]struct{}, len(keys))
 	for _, key := range NormalizePermissionKeys(keys) {
@@ -423,7 +433,7 @@ func BuiltinRoles() []RoleDefinition {
 		{Key: PMCRoleKey, Name: "PMC", Description: "生产计划、进度和风险跟进；可查看风险，不等于可代替其他角色完成任务。", Builtin: true, SortOrder: 70, Permissions: []string{PermissionERPDashboardRead, PermissionMaterialRead, PermissionProcessRead, PermissionProcessCreate, PermissionProcessUpdate, PermissionProcessDisable, PermissionProductRead, PermissionMaterialCreate, PermissionMaterialUpdate, PermissionProductCreate, PermissionProductUpdate, PermissionProductDisable, PermissionProductSKURead, PermissionProductSKUCreate, PermissionProductSKUUpdate, PermissionProductSKUDisable, PermissionBOMRead, PermissionBOMCreate, PermissionBOMUpdate, PermissionBOMActivate, PermissionShipmentRead, PermissionWorkflowTaskRead, PermissionWorkflowTaskCreate, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionPMCPlanRead, PermissionPMCPlanCreate, PermissionPMCPlanUpdate, PermissionPMCRiskRead, PermissionPMCRiskHandle, PermissionMobilePMCAccess}},
 		{Key: ProductionRoleKey, Name: "生产", Description: "排产、委外加工、进度、返工和生产异常处理，任务处理仍受生产 owner/assignee 约束。", Builtin: true, SortOrder: 80, Permissions: []string{PermissionERPDashboardRead, PermissionERPPrintTemplateRead, PermissionSupplierRead, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionProductSKURead, PermissionContactRead, PermissionOutsourcingOrderRead, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionOutsourcingOrderConfirm, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionPMCPlanRead, PermissionPMCPlanUpdate, PermissionPMCRiskRead, PermissionPMCRiskHandle, PermissionMobileProductionAccess}},
 		{Key: EngineeringRoleKey, Name: "工程", Description: "产品资料、工艺、BOM 和工程资料任务入口，任务处理仍受工程 owner/assignee 约束。", Builtin: true, SortOrder: 90, Permissions: []string{PermissionERPDashboardRead, PermissionERPPrintTemplateRead, PermissionMaterialRead, PermissionProcessRead, PermissionProcessCreate, PermissionProcessUpdate, PermissionProcessDisable, PermissionProductRead, PermissionProductCreate, PermissionProductUpdate, PermissionProductSKURead, PermissionProductSKUCreate, PermissionProductSKUUpdate, PermissionBOMRead, PermissionBOMCreate, PermissionBOMUpdate, PermissionBOMActivate, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionMobileEngineeringAccess}},
-		{Key: AdminRoleKey, Name: "系统管理员", Description: "管理管理员、角色、权限和基础配置，不天然拥有业务事实处理权。", Builtin: true, SortOrder: 100, Permissions: []string{PermissionSystemUserRead, PermissionSystemUserCreate, PermissionSystemUserUpdate, PermissionSystemUserDisable, PermissionSystemRoleRead, PermissionSystemRoleCreate, PermissionSystemRoleUpdate, PermissionSystemRoleDelete, PermissionSystemPermissionRead, PermissionSystemPermissionManage, PermissionSystemAuditRead, PermissionCustomerConfigRead, PermissionCustomerConfigPublish, PermissionCustomerConfigActivate, PermissionCustomerConfigRollback}},
+		{Key: AdminRoleKey, Name: "系统管理员", Description: "管理管理员、角色权限和基础配置，不天然拥有业务事实处理权。", Builtin: true, SortOrder: 100, Permissions: []string{PermissionSystemUserRead, PermissionSystemUserCreate, PermissionSystemUserUpdate, PermissionSystemUserDisable, PermissionSystemUserRevoke, PermissionSystemRoleRead, PermissionSystemPermissionRead, PermissionSystemPermissionManage, PermissionSystemAuditRead, PermissionCustomerConfigRead, PermissionCustomerConfigPublish, PermissionCustomerConfigActivate, PermissionCustomerConfigRollback}},
 		{Key: DebugOperatorRoleKey, Name: "调试操作员", Description: "仅限 local/dev/test 分配的 debug 操作角色。", Builtin: true, SortOrder: 110, Permissions: []string{PermissionERPBusinessChainDebugRead, PermissionDebugBusinessChainRead, PermissionDebugBusinessChainRun, PermissionDebugSeed, PermissionDebugCleanup, PermissionDebugBusinessClear}},
 	}
 }
@@ -445,7 +455,7 @@ func MobileRoleAccessPermission(roleKey string) string {
 }
 
 func AdminHasPermission(admin *AdminUser, permissionKey string) bool {
-	if admin == nil || admin.Disabled {
+	if !admin.IsActive() {
 		return false
 	}
 	permissionKey = strings.TrimSpace(permissionKey)
@@ -494,7 +504,7 @@ func AdminRoleKeys(admin *AdminUser) []string {
 
 func AdminHasRole(admin *AdminUser, roleKey string) bool {
 	normalized := NormalizeRoleKey(roleKey)
-	if normalized == "" || admin == nil || admin.Disabled {
+	if normalized == "" || !admin.IsActive() {
 		return false
 	}
 	for _, item := range AdminRoleKeys(admin) {
@@ -514,49 +524,51 @@ func AdminCanAccessMobileRole(admin *AdminUser, roleKey string) bool {
 }
 
 var builtinAdminMenus = []AdminMenu{
-	{Key: "global-dashboard", Label: "工作台", Path: "/erp/dashboard", RequiredPermissions: []string{PermissionERPDashboardRead}},
-	{Key: "task-board", Label: "任务看板", Path: "/erp/task-board", RequiredPermissions: []string{PermissionWorkflowTaskRead}},
-	{Key: "business-dashboard", Label: "业务看板", Path: "/erp/business-dashboard", RequiredPermissions: []string{PermissionERPDashboardRead}},
-	{Key: "customers", Label: "客户档案", Path: "/erp/master/partners/customers", RequiredPermissions: []string{PermissionCustomerRead}},
-	{Key: "suppliers", Label: "供应商档案", Path: "/erp/master/partners/suppliers", RequiredPermissions: []string{PermissionSupplierRead}},
-	{Key: "products", Label: "产品档案", Path: "/erp/master/products", RequiredPermissions: []string{PermissionProductRead, PermissionProductSKURead}},
-	{Key: "materials", Label: "材料档案", Path: "/erp/master/materials", RequiredPermissions: []string{PermissionMaterialRead}},
-	{Key: "processes", Label: "工序档案", Path: "/erp/engineering/processes", RequiredPermissions: []string{PermissionProcessRead}},
-	{Key: "sales-orders", Label: "销售订单", Path: "/erp/sales/project-orders/sales-orders", RequiredPermissions: []string{PermissionSalesOrderRead}},
-	{Key: "material-bom", Label: "BOM 管理", Path: "/erp/purchase/material-bom", RequiredPermissions: []string{PermissionBOMRead}},
-	{Key: "accessories-purchase", Label: "采购订单", Path: "/erp/purchase/accessories", RequiredPermissions: []string{PermissionPurchaseOrderRead}},
-	{Key: "inbound", Label: "入库管理", Path: "/erp/warehouse/inbound", RequiredPermissions: []string{PermissionWarehouseInboundRead, PermissionPurchaseReceiptRead}},
-	{Key: "quality-inspections", Label: "来料质检", Path: "/erp/production/quality-inspections", RequiredPermissions: []string{PermissionQualityInspectionRead}},
-	{Key: "inventory", Label: "库存台账", Path: "/erp/warehouse/inventory", RequiredPermissions: []string{PermissionWarehouseInventoryRead}},
-	{Key: "processing-contracts", Label: "委外订单", Path: "/erp/purchase/processing-contracts", RequiredPermissions: []string{PermissionOutsourcingOrderRead}},
-	{Key: "production-scheduling", Label: "生产排程", Path: "/erp/production/scheduling", RequiredPermissions: []string{PermissionPMCPlanRead}},
-	{Key: "production-progress", Label: "生产进度", Path: "/erp/production/progress", RequiredPermissions: []string{PermissionPMCPlanRead}},
-	{Key: "production-exceptions", Label: "生产异常", Path: "/erp/production/exceptions", RequiredPermissions: []string{PermissionPMCRiskRead, PermissionQualityInspectionRead}},
-	{Key: "shipping-release", Label: "出货放行", Path: "/erp/warehouse/shipping-release", RequiredPermissions: []string{PermissionWarehouseOutboundRead, PermissionFinanceReceivableRead, PermissionSalesOrderRead}},
-	{Key: "outbound", Label: "出库管理", Path: "/erp/warehouse/outbound", RequiredPermissions: []string{PermissionWarehouseOutboundRead}},
-	{Key: "shipments", Label: "出货单", Path: "/erp/warehouse/shipments", RequiredPermissions: []string{PermissionShipmentRead}},
-	{Key: "reconciliation", Label: "对账管理", Path: "/erp/finance/reconciliation", RequiredPermissions: []string{PermissionFinanceReportRead, PermissionFinancePayableRead, PermissionFinanceReceivableRead}},
-	{Key: "payables", Label: "应付管理", Path: "/erp/finance/payables", RequiredPermissions: []string{PermissionFinancePayableRead}},
-	{Key: "receivables", Label: "应收管理", Path: "/erp/finance/receivables", RequiredPermissions: []string{PermissionFinanceReceivableRead}},
-	{Key: "invoices", Label: "发票管理", Path: "/erp/finance/invoices", RequiredPermissions: []string{PermissionFinanceReceivableRead, PermissionFinancePayableRead}},
-	{Key: "print-center", Label: "模板打印中心", Path: "/erp/print-center", RequiredPermissions: []string{PermissionERPPrintTemplateRead}},
-	{Key: "exception-flow", Label: "异常 / 阻塞闭环", Path: "/erp/operations/exceptions", RequiredPermissions: []string{PermissionWorkflowTaskRead}},
-	{Key: "permission-center", Label: "权限管理", Path: "/erp/system/permissions", RequiredPermissions: []string{PermissionSystemUserRead, PermissionSystemRoleRead}},
-	{Key: "system-audit-logs", Label: "审计日志", Path: "/erp/system/audit-logs", RequiredPermissions: []string{PermissionSystemAuditRead}},
+	{Key: "global-dashboard", Label: "工作台", Path: "/erp/dashboard", RequiredAny: []string{PermissionERPDashboardRead}},
+	{Key: "task-board", Label: "任务看板", Path: "/erp/task-board", RequiredAny: []string{PermissionWorkflowTaskRead}},
+	{Key: "business-dashboard", Label: "业务看板", Path: "/erp/business-dashboard", RequiredAny: []string{PermissionERPDashboardRead}},
+	{Key: "customers", Label: "客户档案", Path: "/erp/master/partners/customers", RequiredAny: []string{PermissionCustomerRead}},
+	{Key: "suppliers", Label: "供应商档案", Path: "/erp/master/partners/suppliers", RequiredAny: []string{PermissionSupplierRead}},
+	{Key: "products", Label: "产品档案", Path: "/erp/master/products", RequiredAny: []string{PermissionProductRead, PermissionProductSKURead}},
+	{Key: "materials", Label: "材料档案", Path: "/erp/master/materials", RequiredAny: []string{PermissionMaterialRead}},
+	{Key: "processes", Label: "工序档案", Path: "/erp/engineering/processes", RequiredAny: []string{PermissionProcessRead}},
+	{Key: "sales-orders", Label: "销售订单", Path: "/erp/sales/project-orders/sales-orders", RequiredAny: []string{PermissionSalesOrderRead}},
+	{Key: "material-bom", Label: "BOM 管理", Path: "/erp/purchase/material-bom", RequiredAny: []string{PermissionBOMRead}},
+	{Key: "accessories-purchase", Label: "采购订单", Path: "/erp/purchase/accessories", RequiredAny: []string{PermissionPurchaseOrderRead}},
+	{Key: "inbound", Label: "入库管理", Path: "/erp/warehouse/inbound", RequiredAny: []string{PermissionWarehouseInboundRead, PermissionPurchaseReceiptRead}},
+	{Key: "quality-inspections", Label: "来料质检", Path: "/erp/production/quality-inspections", RequiredAny: []string{PermissionQualityInspectionRead}},
+	{Key: "inventory", Label: "库存台账", Path: "/erp/warehouse/inventory", RequiredAny: []string{PermissionWarehouseInventoryRead}},
+	{Key: "processing-contracts", Label: "委外订单", Path: "/erp/purchase/processing-contracts", RequiredAny: []string{PermissionOutsourcingOrderRead}},
+	{Key: "production-orders", Label: "生产订单", Path: "/erp/production/orders", RequiredAny: []string{PermissionPMCPlanRead}},
+	{Key: "production-scheduling", Label: "生产排程", Path: "/erp/production/scheduling", RequiredAny: []string{PermissionPMCPlanRead}},
+	{Key: "production-progress", Label: "生产进度", Path: "/erp/production/progress", RequiredAny: []string{PermissionPMCPlanRead}},
+	{Key: "production-exceptions", Label: "生产异常", Path: "/erp/production/exceptions", RequiredAny: []string{PermissionPMCRiskRead, PermissionQualityInspectionRead}},
+	{Key: "shipping-release", Label: "出货放行", Path: "/erp/warehouse/shipping-release", RequiredAny: []string{PermissionWarehouseOutboundRead, PermissionFinanceReceivableRead, PermissionSalesOrderRead}},
+	{Key: "outbound", Label: "出库管理", Path: "/erp/warehouse/outbound", RequiredAny: []string{PermissionWarehouseOutboundRead}},
+	{Key: "shipments", Label: "出货单", Path: "/erp/warehouse/shipments", RequiredAny: []string{PermissionShipmentRead}},
+	{Key: "reconciliation", Label: "对账管理", Path: "/erp/finance/reconciliation", RequiredAny: []string{PermissionFinanceReportRead, PermissionFinancePayableRead, PermissionFinanceReceivableRead}},
+	{Key: "payables", Label: "应付管理", Path: "/erp/finance/payables", RequiredAny: []string{PermissionFinancePayableRead}},
+	{Key: "receivables", Label: "应收管理", Path: "/erp/finance/receivables", RequiredAny: []string{PermissionFinanceReceivableRead}},
+	{Key: "invoices", Label: "发票管理", Path: "/erp/finance/invoices", RequiredAny: []string{PermissionFinanceReceivableRead, PermissionFinancePayableRead}},
+	{Key: "print-center", Label: "模板打印中心", Path: "/erp/print-center", RequiredAny: []string{PermissionERPPrintTemplateRead}},
+	{Key: "exception-flow", Label: "异常 / 阻塞闭环", Path: "/erp/operations/exceptions", RequiredAny: []string{PermissionWorkflowTaskRead}},
+	{Key: "permission-center", Label: "权限管理", Path: "/erp/system/permissions", RequiredAny: []string{PermissionSystemUserRead, PermissionSystemRoleRead}},
+	{Key: "system-audit-logs", Label: "审计日志", Path: "/erp/system/audit-logs", RequiredAny: []string{PermissionSystemAuditRead}},
 }
 
 func BuiltinAdminMenus() []AdminMenu {
 	out := make([]AdminMenu, 0, len(builtinAdminMenus))
 	for _, item := range builtinAdminMenus {
 		cloned := item
-		cloned.RequiredPermissions = append([]string(nil), item.RequiredPermissions...)
+		cloned.RequiredAny = append([]string(nil), item.RequiredAny...)
+		cloned.RequiredAll = append([]string(nil), item.RequiredAll...)
 		out = append(out, cloned)
 	}
 	return out
 }
 
 func AdminVisibleMenus(admin *AdminUser) []AdminMenu {
-	if admin == nil || admin.Disabled {
+	if !admin.IsActive() {
 		return []AdminMenu{}
 	}
 	if admin.IsSuperAdmin {
@@ -565,11 +577,18 @@ func AdminVisibleMenus(admin *AdminUser) []AdminMenu {
 	permissionSet := PermissionKeySet(admin.Permissions)
 	out := make([]AdminMenu, 0, len(builtinAdminMenus))
 	for _, item := range builtinAdminMenus {
-		if PermissionSetHasAny(permissionSet, item.RequiredPermissions...) {
+		if AdminMenuRequirementsSatisfied(permissionSet, item) {
 			cloned := item
-			cloned.RequiredPermissions = append([]string(nil), item.RequiredPermissions...)
+			cloned.RequiredAny = append([]string(nil), item.RequiredAny...)
+			cloned.RequiredAll = append([]string(nil), item.RequiredAll...)
 			out = append(out, cloned)
 		}
 	}
 	return out
+}
+
+func AdminMenuRequirementsSatisfied(permissionSet map[string]struct{}, menu AdminMenu) bool {
+	hasAny := len(menu.RequiredAny) == 0 || PermissionSetHasAny(permissionSet, menu.RequiredAny...)
+	hasAll := PermissionSetHasAll(permissionSet, menu.RequiredAll...)
+	return hasAny && hasAll
 }

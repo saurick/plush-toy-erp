@@ -97,10 +97,11 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 		log.NewStdLogger(io.Discard),
 	)
 	uc := biz.NewDebugUsecase(repo, biz.DebugSafetyConfig{
-		Environment:    "local",
-		SeedEnabled:    true,
-		CleanupEnabled: true,
-		CleanupScope:   biz.DebugDefaultCleanupScope,
+		Environment:              "local",
+		SeedEnabled:              true,
+		CleanupEnabled:           true,
+		BusinessDataClearEnabled: true,
+		CleanupScope:             biz.DebugDefaultCleanupScope,
 	})
 
 	if _, err := uc.SeedBusinessChainScenario(ctx, biz.DebugBusinessChainSeedInput{
@@ -137,9 +138,28 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 	createAndPostPurchaseReceipt(t, ctx, inventoryUC, "DBG-PR-CLEAR-001", fixtures, stringPtr("DBG-LOT-CLEAR-001"), mustDecimal(t, "8"))
 	createDebugOutsourcingOrderWithProcess(t, ctx, client, fixtures)
 
-	result, err := uc.ClearBusinessData(ctx)
+	preview, err := uc.ClearBusinessData(ctx, biz.DebugBusinessDataClearInput{DryRun: true})
+	if err != nil {
+		t.Fatalf("dry run clear business data failed: %v", err)
+	}
+	if !preview.DryRun || preview.MatchedTotal == 0 || preview.DeletedTotal != 0 || len(preview.ClearedTableNames) != 0 {
+		t.Fatalf("unexpected dry run clear result %#v", preview)
+	}
+	if preview.MatchedCounts["inventory_txns"] == 0 || preview.MatchedCounts["purchase_receipts"] == 0 {
+		t.Fatalf("dry run did not count expected business rows %#v", preview.MatchedCounts)
+	}
+	if count, err := client.InventoryTxn.Query().Count(ctx); err != nil || count == 0 {
+		t.Fatalf("dry run mutated inventory txns count=%d err=%v", count, err)
+	}
+
+	result, err := uc.ClearBusinessData(ctx, biz.DebugBusinessDataClearInput{
+		Confirmation: biz.DebugBusinessDataClearConfirmation,
+	})
 	if err != nil {
 		t.Fatalf("clear business data failed: %v", err)
+	}
+	if result.DryRun || result.MatchedTotal == 0 || result.MatchedTotal != result.DeletedTotal {
+		t.Fatalf("unexpected destructive clear totals %#v", result)
 	}
 	for _, tableName := range debugBusinessDataClearTables {
 		if _, ok := result.DeletedCounts[tableName]; !ok {

@@ -136,6 +136,7 @@ required_keys=(
   ERP_DEBUG_ENV
   ERP_DEBUG_SEED_ENABLED
   ERP_DEBUG_CLEANUP_ENABLED
+  ERP_DEBUG_BUSINESS_CLEAR_ENABLED
   ERP_DEBUG_CLEANUP_SCOPE
   ERP_PDF_WARMUP
   JAEGER_BIND_ADDR
@@ -194,6 +195,7 @@ else
   erp_debug_env="$(value_of ERP_DEBUG_ENV)"
   erp_debug_seed_enabled="$(value_of ERP_DEBUG_SEED_ENABLED)"
   erp_debug_cleanup_enabled="$(value_of ERP_DEBUG_CLEANUP_ENABLED)"
+  erp_debug_business_clear_enabled="$(value_of ERP_DEBUG_BUSINESS_CLEAR_ENABLED)"
   erp_pdf_warmup="$(value_of ERP_PDF_WARMUP | tr '[:upper:]' '[:lower:]')"
   jaeger_bind_addr="$(value_of JAEGER_BIND_ADDR)"
   postgres_bind_addr="$(value_of POSTGRES_BIND_ADDR)"
@@ -241,6 +243,7 @@ else
   [[ "$erp_debug_env" == "prod" ]] || fail "ERP_DEBUG_ENV 必须为 prod"
   [[ "$erp_debug_seed_enabled" == "false" ]] || fail "ERP_DEBUG_SEED_ENABLED 必须为 false"
   [[ "$erp_debug_cleanup_enabled" == "false" ]] || fail "ERP_DEBUG_CLEANUP_ENABLED 必须为 false"
+  [[ "$erp_debug_business_clear_enabled" == "false" ]] || fail "ERP_DEBUG_BUSINESS_CLEAR_ENABLED 必须为 false"
   [[ "$erp_pdf_warmup" == "async" ]] || fail "ERP_PDF_WARMUP 生产发布必须显式为 async；off 只允许故障隔离，不能作为 release-ready 配置"
   [[ "$postgres_bind_addr" == "127.0.0.1" ]] || fail "POSTGRES_BIND_ADDR 必须为 127.0.0.1，避免 PostgreSQL 暴露到公网或办公网"
   [[ "$app_http_bind_addr" == "127.0.0.1" ]] || fail "APP_HTTP_BIND_ADDR 必须为 127.0.0.1，外部流量应先进入前端 / 网关"

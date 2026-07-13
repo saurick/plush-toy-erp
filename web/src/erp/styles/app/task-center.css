@@ -16,7 +16,7 @@
 
 .erp-task-center-metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(132px, 1fr));
+  grid-template-columns: repeat(4, minmax(132px, 1fr));
   gap: 10px;
 }
 
@@ -155,10 +155,27 @@
   min-width: 88px;
 }
 
+.erp-task-board-filter-summary {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.erp-task-board-filter-summary .ant-btn {
+  min-width: 0;
+}
+
 .erp-task-board-lanes {
   display: grid;
   grid-template-columns: repeat(4, minmax(220px, 1fr));
   gap: 12px;
+}
+
+.erp-task-board-lanes--focused {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .erp-task-board-lane.ant-card {
@@ -181,6 +198,20 @@
 
 .erp-task-board-list {
   width: 100%;
+}
+
+.erp-task-board-lane-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  border-top: 1px solid #edf2ee;
+  padding-top: 10px;
+}
+
+.erp-task-board-lane-footer--focused {
+  flex-wrap: wrap;
 }
 
 .erp-task-board-card {

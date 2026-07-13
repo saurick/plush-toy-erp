@@ -116,6 +116,36 @@ func TestSeedRoleDemoAdminAccountsRejectsMissingPassword(t *testing.T) {
 	}
 }
 
+func TestResetRoleDemoAdminPasswordsOnlyUpdatesPassword(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE admin_users
+SET password_hash = $2, updated_at = $3
+WHERE username = $1`)).
+		WithArgs("demo_uat_disabled", sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectClose()
+
+	err = ResetRoleDemoAdminPasswords(
+		context.Background(),
+		db,
+		[]string{"demo_uat_disabled"},
+		"manual-acceptance-password",
+	)
+	if err != nil {
+		t.Fatalf("ResetRoleDemoAdminPasswords() error = %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
 func TestSeedBuiltinRBACIfNeededRejectsMissingDB(t *testing.T) {
 	err := SeedBuiltinRBACIfNeeded(context.Background(), nil, log.NewHelper(log.NewStdLogger(io.Discard)))
 	if err == nil || !strings.Contains(err.Error(), "missing db") {

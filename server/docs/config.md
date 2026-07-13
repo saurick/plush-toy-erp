@@ -149,13 +149,14 @@ ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
 
 ## debug seed / cleanup 环境变量
 
-业务链路调试的 seed（生成调试数据）、cleanup（清理调试数据）和业务数据清空不写入 `conf.proto`，当前只通过运行时环境变量显式关闭，避免把调试写入开关固化到公共配置文件：
+业务链路调试的 seed（生成调试数据）、按 debugRunId cleanup（清理调试数据）和全量业务数据清空不写入 `conf.proto`，只通过运行时环境变量显式启用，避免把调试写入开关固化到公共配置文件：
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `ERP_DEBUG_ENV` | `sql` | 仅用于能力面板展示，可显式设为 `local`、`dev`、`shared`、`remote`、`prod` 等环境名 |
-| `ERP_DEBUG_SEED_ENABLED` | `true` | 显式设为 `false` / `0` / `off` 可关闭生成调试数据 |
-| `ERP_DEBUG_CLEANUP_ENABLED` | `true` | 显式设为 `false` / `0` / `off` 可关闭清理调试数据和业务数据清空 |
+| `ERP_DEBUG_SEED_ENABLED` | `false` | 仅在受控调试环境显式设为 `true` 时允许生成调试数据 |
+| `ERP_DEBUG_CLEANUP_ENABLED` | `false` | 仅在受控调试环境显式设为 `true` 时允许按 debugRunId 清理；不再连带开启全量业务清空 |
+| `ERP_DEBUG_BUSINESS_CLEAR_ENABLED` | `false` | 全量业务清空独立开关；仅 `ERP_DEBUG_ENV=local|dev` 时可用，shared / remote / prod / 默认 `sql` 均拒绝 |
 | `ERP_DEBUG_CLEANUP_SCOPE` | `debug_run` | 当前只允许 `debug_run`，表示必须按 debugRunId 清理 |
 
 ## PDF 运行环境变量
@@ -169,9 +170,10 @@ ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
 | `ERP_PDF_WARMUP` | `async` | 正式发布预热开关；服务启动后异步跑一次中文合同 PDF 渲染，提前启动共享 Chromium 并加载 CJK 字体；`/readyz` 在预热完成前或预热失败后保持未就绪。`off` 只用于临时故障隔离，会被 production preflight 判为非 release-ready，且不能替代真实 PDF smoke |
 安全边界：
 
-- seed、debugRunId cleanup 和业务数据清空默认面向当前 SQL 连接开启，只有显式关闭环境变量、权限不足或清理范围不匹配时拒绝。
+- seed、debugRunId cleanup 和全量业务数据清空默认关闭，必须分别显式启用；开启 scoped cleanup 不会隐式开启全量清空。
 - cleanup 必须提供 debugRunId，后端只清理带 `DBG-<debugRunId>` 前缀且 payload 中包含 debug 标记的数据。
-- 业务数据清空不要求 debugRunId，但只会按本项目当前业务表 allowlist 清空业务链路、采购入库、库存、BOM、物料、成品、仓库和单位数据；不会删除账号、权限、管理员偏好、配置和数据库结构。
+- 全量业务清空不要求 debugRunId，但默认 `dryRun=true`，只统计 allowlist 中各表的匹配数量；实际删除必须传 `dryRun=false` 与精确确认短语 `CLEAR_ALL_PROJECT_BUSINESS_DATA`，并且只允许 local / dev。
+- 全量清空只覆盖本项目当前业务表 allowlist；不会删除账号、权限、管理员偏好、客户配置和数据库结构。
 - 前端隐藏按钮不作为安全边界；后端仍会检查管理员身份、业务链路调试菜单权限、环境开关和 debug 标记。
 
 ## 初始化后必须改的字段

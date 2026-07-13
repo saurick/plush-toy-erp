@@ -41,6 +41,44 @@ type RoleDemoAdminSeedResult struct {
 	Accounts []RoleDemoAdminSeededAccount
 }
 
+func ResetRoleDemoAdminPasswords(ctx context.Context, db *sql.DB, usernames []string, password string) error {
+	if db == nil {
+		return errors.New("ResetRoleDemoAdminPasswords: missing db")
+	}
+	password = strings.TrimSpace(password)
+	if password == "" {
+		return ErrRoleDemoPasswordRequired
+	}
+	if len(password) < 8 {
+		return ErrRoleDemoPasswordTooShort
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	for _, rawUsername := range usernames {
+		username := strings.TrimSpace(rawUsername)
+		if username == "" {
+			return biz.ErrBadParam
+		}
+		result, err := db.ExecContext(ctx, `
+UPDATE admin_users
+SET password_hash = $2, updated_at = $3
+WHERE username = $1`, username, string(hash), time.Now())
+		if err != nil {
+			return err
+		}
+		rows, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rows != 1 {
+			return fmt.Errorf("manual acceptance account not found: %s", username)
+		}
+	}
+	return nil
+}
+
 func DefaultRoleDemoAdminAccounts(includeDebug bool) []RoleDemoAdminAccountSpec {
 	accounts := []RoleDemoAdminAccountSpec{
 		{Username: "demo_boss", RoleKey: biz.BossRoleKey},

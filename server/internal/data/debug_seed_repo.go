@@ -9,6 +9,7 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/businessattachment"
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
@@ -32,6 +33,7 @@ func NewDebugSeedRepo(d *Data, logger log.Logger) *debugSeedRepo {
 var _ biz.DebugRepo = (*debugSeedRepo)(nil)
 
 var debugBusinessDataClearTables = []string{
+	"business_attachments",
 	"workflow_task_events",
 	"workflow_tasks",
 	"workflow_business_states",
@@ -204,6 +206,7 @@ func createDebugWorkflowTask(ctx context.Context, tx *ent.Tx, plan biz.DebugTask
 	}
 	eventBuilder := tx.WorkflowTaskEvent.Create().
 		SetTaskID(task.ID).
+		SetTaskVersion(task.Version).
 		SetEventType("debug_seeded").
 		SetToStatusKey(plan.TaskStatusKey).
 		SetActorRoleKey("admin").
@@ -257,6 +260,15 @@ func (r *debugSeedRepo) CleanupBusinessChainDebugData(ctx context.Context, in bi
 		taskIDs = append(taskIDs, row.ID)
 	}
 	if len(taskIDs) > 0 {
+		deletedAttachments, err := tx.BusinessAttachment.Delete().
+			Where(
+				businessattachment.OwnerType(biz.BusinessAttachmentOwnerWorkflowTask),
+				businessattachment.OwnerIDIn(taskIDs...),
+			).
+			Exec(ctx)
+		if err != nil {
+			return nil, err
+		}
 		deletedEvents, err := tx.WorkflowTaskEvent.Delete().
 			Where(workflowtaskevent.TaskIDIn(taskIDs...)).
 			Exec(ctx)
@@ -269,6 +281,7 @@ func (r *debugSeedRepo) CleanupBusinessChainDebugData(ctx context.Context, in bi
 			return nil, err
 		}
 		result.DeletedTaskEvents = deletedEvents
+		result.DeletedAttachments = deletedAttachments
 		result.DeletedTasks = append([]biz.DebugMatchedTask(nil), result.MatchedTasks...)
 	}
 
@@ -301,12 +314,13 @@ func (r *debugSeedRepo) CleanupBusinessChainDebugData(ctx context.Context, in bi
 		"deleted_tasks", len(result.DeletedTasks),
 		"deleted_business_states", result.DeletedBusinessStates,
 		"deleted_task_events", result.DeletedTaskEvents,
+		"deleted_attachments", result.DeletedAttachments,
 		"dry_run", false,
 	)
 	return result, nil
 }
 
-func (r *debugSeedRepo) ClearBusinessData(ctx context.Context) (*biz.DebugBusinessDataClearResult, error) {
+func (r *debugSeedRepo) ClearBusinessData(ctx context.Context, in biz.DebugBusinessDataClearInput) (*biz.DebugBusinessDataClearResult, error) {
 	if r == nil || r.data == nil || r.data.sqldb == nil {
 		return nil, biz.ErrBadParam
 	}
@@ -319,6 +333,8 @@ func (r *debugSeedRepo) ClearBusinessData(ctx context.Context) (*biz.DebugBusine
 	}()
 
 	result := &biz.DebugBusinessDataClearResult{
+		DryRun:        in.DryRun,
+		MatchedCounts: make(map[string]int),
 		DeletedCounts: make(map[string]int),
 	}
 	for _, tableName := range debugBusinessDataClearTables {
@@ -330,13 +346,25 @@ func (r *debugSeedRepo) ClearBusinessData(ctx context.Context) (*biz.DebugBusine
 			result.Warnings = append(result.Warnings, fmt.Sprintf("业务表 %s 不存在，已跳过。", tableName))
 			continue
 		}
-		count, err := deleteDebugBusinessDataTable(ctx, tx, tableName)
+		matched, err := countDebugBusinessDataTable(ctx, tx, tableName)
+		if err != nil {
+			return nil, fmt.Errorf("统计业务表 %s 失败: %w", tableName, err)
+		}
+		result.MatchedCounts[tableName] = matched
+		result.MatchedTotal += matched
+		if in.DryRun {
+			continue
+		}
+		deleted, err := deleteDebugBusinessDataTable(ctx, tx, tableName)
 		if err != nil {
 			return nil, fmt.Errorf("清空业务表 %s 失败: %w", tableName, err)
 		}
-		result.DeletedCounts[tableName] = count
-		result.DeletedTotal += count
+		result.DeletedCounts[tableName] = deleted
+		result.DeletedTotal += deleted
 		result.ClearedTableNames = append(result.ClearedTableNames, tableName)
+	}
+	if in.DryRun {
+		result.Warnings = append(result.Warnings, "dryRun=true，仅统计全量业务清空范围，没有删除数据。")
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -345,11 +373,24 @@ func (r *debugSeedRepo) ClearBusinessData(ctx context.Context) (*biz.DebugBusine
 	tx = nil
 
 	r.log.WithContext(ctx).Infow(
-		"msg", "debug business data cleared",
+		"msg", "debug business data clear completed",
+		"dry_run", result.DryRun,
+		"matched_total", result.MatchedTotal,
 		"deleted_total", result.DeletedTotal,
 		"cleared_tables", result.ClearedTableNames,
 	)
 	return result, nil
+}
+
+func countDebugBusinessDataTable(ctx context.Context, tx *stdsql.Tx, tableName string) (int, error) {
+	if !isDebugBusinessDataClearTable(tableName) {
+		return 0, fmt.Errorf("table %s is not in debug business data clear allowlist", tableName)
+	}
+	var count int
+	if err := tx.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s", quoteSQLIdentifier(tableName))).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 func debugBusinessDataTableExists(ctx context.Context, tx *stdsql.Tx, dialectName, tableName string) (bool, error) {
@@ -403,9 +444,10 @@ func rollbackSQLTx(ctx context.Context, tx *stdsql.Tx, logger *log.Helper) {
 }
 
 type debugCleanupMatches struct {
-	tasks          []*ent.WorkflowTask
-	businessStates []*ent.WorkflowBusinessState
-	skippedItems   []biz.DebugCleanupSkippedItem
+	tasks           []*ent.WorkflowTask
+	businessStates  []*ent.WorkflowBusinessState
+	attachmentCount int
+	skippedItems    []biz.DebugCleanupSkippedItem
 }
 
 func (r *debugSeedRepo) loadDebugCleanupMatches(ctx context.Context, prefix string, debugRunID string, scenarioKey string) (*debugCleanupMatches, error) {
@@ -432,6 +474,22 @@ func (r *debugSeedRepo) loadDebugCleanupMatches(ctx context.Context, prefix stri
 			ID:     row.ID,
 			Reason: "匹配 DBG 前缀但缺少本次 debug_run_id / scenario_key 标记，已跳过",
 		})
+	}
+	if len(out.tasks) > 0 {
+		taskIDs := make([]int, 0, len(out.tasks))
+		for _, row := range out.tasks {
+			taskIDs = append(taskIDs, row.ID)
+		}
+		count, err := r.data.postgres.BusinessAttachment.Query().
+			Where(
+				businessattachment.OwnerType(biz.BusinessAttachmentOwnerWorkflowTask),
+				businessattachment.OwnerIDIn(taskIDs...),
+			).
+			Count(ctx)
+		if err != nil {
+			return nil, err
+		}
+		out.attachmentCount = count
 	}
 
 	stateRows, err := r.data.postgres.WorkflowBusinessState.Query().
@@ -462,6 +520,7 @@ func (m *debugCleanupMatches) toResult(in biz.DebugBusinessChainCleanupInput) *b
 		MatchedRecords:        []biz.DebugMatchedRecord{},
 		MatchedTasks:          make([]biz.DebugMatchedTask, 0, len(m.tasks)),
 		MatchedBusinessStates: make([]biz.DebugMatchedBusinessState, 0, len(m.businessStates)),
+		MatchedAttachments:    m.attachmentCount,
 		SkippedItems:          append([]biz.DebugCleanupSkippedItem(nil), m.skippedItems...),
 	}
 	for _, row := range m.tasks {

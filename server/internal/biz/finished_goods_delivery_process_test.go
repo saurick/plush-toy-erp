@@ -307,7 +307,7 @@ func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) SettleFinanceFact(
 	return nil, ErrBadParam
 }
 
-func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) CancelPostedFinanceFact(_ context.Context, id int) (*FinanceFact, error) {
+func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) CancelPostedFinanceFact(_ context.Context, id int, _ int, _ string) (*FinanceFact, error) {
 	r.cancelledFinanceFactID = id
 	return nil, ErrBadParam
 }

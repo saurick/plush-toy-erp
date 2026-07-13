@@ -22,6 +22,7 @@ type memAdminManageRepoForData struct {
 	rolePerms       map[string][]string
 	auditLogs       []biz.RuntimeAuditEvent
 	lastAuditFilter biz.RuntimeAuditEventListFilter
+	lifecycleErr    error
 }
 
 func newMemAdminManageRepoForData() *memAdminManageRepoForData {
@@ -234,13 +235,26 @@ func (r *memAdminManageRepoForData) UpdateAdminERPColumnOrder(_ context.Context,
 	return nil
 }
 
-func (r *memAdminManageRepoForData) SetAdminDisabled(_ context.Context, id int, disabled bool) error {
-	admin, ok := r.admins[id]
-	if !ok {
-		return biz.ErrAdminNotFound
+func (r *memAdminManageRepoForData) ChangeAdminLifecycle(_ context.Context, change *biz.AdminLifecycleChange) (int, error) {
+	if change == nil {
+		return 0, biz.ErrBadParam
 	}
-	admin.Disabled = disabled
-	return nil
+	if r.lifecycleErr != nil {
+		return 0, r.lifecycleErr
+	}
+	admin, ok := r.admins[change.AdminID]
+	if !ok {
+		return 0, biz.ErrAdminNotFound
+	}
+	admin.Disabled = change.Disabled
+	admin.StatusReason = change.Reason
+	now := time.Now()
+	admin.StatusChangedAt = &now
+	admin.StatusChangedBy = &change.OperatorID
+	if change.Revoke {
+		admin.RevokedAt = &now
+	}
+	return 0, nil
 }
 
 func (r *memAdminManageRepoForData) UpdateAdminPasswordHash(_ context.Context, id int, passwordHash string) error {
@@ -426,6 +440,54 @@ func TestJsonrpcDispatcher_AdminResetPassword(t *testing.T) {
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(repo.admins[2].PasswordHash), []byte("new-secret")); err != nil {
 		t.Fatalf("stored hash does not match new password: %v", err)
+	}
+}
+
+func TestJsonrpcDispatcher_AdminRevokeRequiresDedicatedPermission(t *testing.T) {
+	newDispatcher := func(permissionKeys ...string) (*jsonrpcDispatcher, *memAdminManageRepoForData, context.Context) {
+		repo := newMemAdminManageRepoForData()
+		now := time.Now()
+		repo.admins[1] = &biz.AdminUser{ID: 1, Username: "operator", Permissions: permissionKeys, CreatedAt: now, UpdatedAt: now}
+		repo.admins[2] = &biz.AdminUser{ID: 2, Username: "leaver", CreatedAt: now, UpdatedAt: now}
+		logger := log.NewStdLogger(io.Discard)
+		dispatcher := &jsonrpcDispatcher{
+			log: log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")), adminReader: repo,
+			adminManageUC: biz.NewAdminManageUsecase(repo, logger, tracesdk.NewTracerProvider()),
+		}
+		ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{UserID: 1, Username: "operator", Role: biz.RoleAdmin})
+		return dispatcher, repo, ctx
+	}
+	params, _ := structpb.NewStruct(map[string]any{"id": 2, "reason": "员工离职"})
+
+	deniedDispatcher, deniedRepo, deniedCtx := newDispatcher(biz.PermissionSystemUserDisable)
+	_, denied, err := deniedDispatcher.handleAdmin(deniedCtx, "revoke", "1", params)
+	if err != nil || denied.Code != errcode.PermissionDenied.Code || deniedRepo.admins[2].RevokedAt != nil {
+		t.Fatalf("revoke without permission = %#v err=%v admin=%#v", denied, err, deniedRepo.admins[2])
+	}
+	allowedDispatcher, allowedRepo, allowedCtx := newDispatcher(biz.PermissionSystemUserRevoke)
+	_, allowed, err := allowedDispatcher.handleAdmin(allowedCtx, "revoke", "2", params)
+	if err != nil || allowed.Code != errcode.OK.Code || allowedRepo.admins[2].AccountStatus() != biz.AdminAccountStatusRevoked {
+		t.Fatalf("revoke with permission = %#v err=%v admin=%#v", allowed, err, allowedRepo.admins[2])
+	}
+}
+
+func TestJsonrpcDispatcher_AdminRevokeMapsConcurrentTaskChange(t *testing.T) {
+	repo := newMemAdminManageRepoForData()
+	now := time.Now()
+	repo.admins[1] = &biz.AdminUser{ID: 1, Username: "operator", Permissions: []string{biz.PermissionSystemUserRevoke}, CreatedAt: now, UpdatedAt: now}
+	repo.admins[2] = &biz.AdminUser{ID: 2, Username: "leaver", CreatedAt: now, UpdatedAt: now}
+	repo.lifecycleErr = biz.ErrWorkflowTaskConflict
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")), adminReader: repo,
+		adminManageUC: biz.NewAdminManageUsecase(repo, logger, tracesdk.NewTracerProvider()),
+	}
+	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{UserID: 1, Username: "operator", Role: biz.RoleAdmin})
+	params, _ := structpb.NewStruct(map[string]any{"id": 2, "reason": "员工离职"})
+
+	_, result, err := dispatcher.handleAdmin(ctx, "revoke", "conflict", params)
+	if err != nil || result.Code != errcode.ResourceVersionConflict.Code || repo.admins[2].RevokedAt != nil {
+		t.Fatalf("revoke task conflict = %#v err=%v admin=%#v", result, err, repo.admins[2])
 	}
 }
 
@@ -641,5 +703,47 @@ func TestJsonrpcDispatcher_AdminAuditLogsReturnsEvents(t *testing.T) {
 		repo.lastAuditFilter.CreatedFrom.IsZero() ||
 		repo.lastAuditFilter.CreatedTo.IsZero() {
 		t.Fatalf("audit filter was not passed through: %#v", repo.lastAuditFilter)
+	}
+}
+
+func TestJsonrpcDispatcher_AdminMutationsRejectUnknownParams(t *testing.T) {
+	repo := newMemAdminManageRepoForData()
+	now := time.Now()
+	repo.admins[1] = &biz.AdminUser{
+		ID: 1, Username: "admin", IsSuperAdmin: true, CreatedAt: now, UpdatedAt: now,
+	}
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{
+		log:           log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
+		adminReader:   repo,
+		adminManageUC: biz.NewAdminManageUsecase(repo, logger, tracesdk.NewTracerProvider()),
+	}
+	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{UserID: 1, Role: biz.RoleAdmin})
+
+	tests := []struct {
+		method string
+		params map[string]any
+	}{
+		{method: "create", params: map[string]any{"username": "worker", "password": "123456", "actor_id": 9}},
+		{method: "set_roles", params: map[string]any{"id": 2, "role_keys": []any{"sales"}, "permissions": []any{"system.audit.read"}}},
+		{method: "set_role_permissions", params: map[string]any{"role_key": "sales", "permission_keys": []any{}, "customer_key": "other"}},
+		{method: "set_disabled", params: map[string]any{"id": 2, "disabled": true, "reason": "离岗", "revoked_at": now.Format(time.RFC3339)}},
+		{method: "revoke", params: map[string]any{"id": 2, "reason": "离职", "released_task_count": 999}},
+		{method: "reset_password", params: map[string]any{"id": 2, "password": "123456", "auth_version": 999}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.method, func(t *testing.T) {
+			params, err := structpb.NewStruct(tt.params)
+			if err != nil {
+				t.Fatalf("params error = %v", err)
+			}
+			_, result, err := dispatcher.handleAdmin(ctx, tt.method, "1", params)
+			if err != nil {
+				t.Fatalf("handleAdmin() error = %v", err)
+			}
+			if result == nil || result.Code != errcode.InvalidParam.Code {
+				t.Fatalf("result = %#v, want invalid param", result)
+			}
+		})
 	}
 }

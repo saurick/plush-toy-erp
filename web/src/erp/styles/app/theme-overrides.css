@@ -447,6 +447,7 @@
 }
 
 [data-erp-theme='dark'] .erp-task-board-lane .ant-card-head,
+[data-erp-theme='dark'] .erp-task-board-lane-footer,
 [data-erp-theme='dark'] .erp-task-board-card,
 [data-erp-theme='dark'] .erp-task-board-action-panel.ant-card {
   border-color: var(--erp-border);
@@ -917,11 +918,19 @@
 [data-erp-theme='dark'] .erp-role-center-metrics > div,
 [data-erp-theme='dark'] .erp-role-center-impact > div,
 [data-erp-theme='dark'] .erp-role-center-footer,
+[data-erp-theme='dark'] .erp-role-capability-overview,
+[data-erp-theme='dark'] .erp-role-capability-card,
+[data-erp-theme='dark'] .erp-role-policy-boundary__grid > div,
 [data-erp-theme='dark'] .erp-permission-checklist-toolbar,
 [data-erp-theme='dark'] .erp-permission-checklist__section {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg);
   color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-role-capability-card--enabled {
+  border-color: #315f43;
+  background: #10271a;
 }
 
 [data-erp-theme='dark'] .erp-business-collaboration-task-panel.ant-card {
@@ -999,8 +1008,8 @@
 [data-erp-theme='dark'] .erp-business-action-modal__title small,
 [data-erp-theme='dark'] .erp-business-page-header-card p,
 [data-erp-theme='dark'] .erp-business-date-range-filter__range > span,
-[data-erp-theme='dark'] .erp-permission-option__key,
 [data-erp-theme='dark'] .erp-permission-checklist-filter,
+[data-erp-theme='dark'] .erp-permission-option__impact,
 [data-erp-theme='dark'] .erp-business-status-transition-option span,
 [data-erp-theme='dark'] .erp-business-module-task-item span,
 [data-erp-theme='dark'] .erp-business-filter-panel__summary,

@@ -574,7 +574,7 @@ export function ContactFormList({ form, entityLabel }) {
               <strong>联系人</strong>
               <span>
                 联系人随当前{entityLabel}
-                维护，不作为独立业务对象，也不生成订单、出货、库存或财务事实。
+                维护，不作为独立业务对象，也不会单独生成订单、出货、库存或财务记录。
               </span>
             </div>
           </div>

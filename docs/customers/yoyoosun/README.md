@@ -10,7 +10,7 @@
 | 判断客户差异归属 | `客户差异台账.md` | `docs/product/客户差异策略.md`、Product Core 评审 |
 | 判断 Excel 字段是否进 Product Core | `Excel字段产品核心映射评审.md` | `source-manifest.json`、当前代码、migration 和测试 |
 | 做导入 dry-run / freeze | `导入策略.md`、`导入试跑工具说明.md` | `source-manifest.json`、`来源快照冻结.md`、`真实试跑证据.md`、导入脚本测试 |
-| 准备试用或培训 | `试用培训说明.md`、`试用账号角色菜单核对清单.md`、`试用环境执行手册.md` | 真实环境账号、RBAC、菜单、岗位任务端回归 |
+| 准备试用或培训 | `试用培训说明.md`、`试用账号角色菜单核对清单.md`、`试用环境执行手册.md`、`试用人员全页面手工验收清单.md` | 真实环境账号、岗位、菜单和岗位任务端核对 |
 | 查原始资料来源 | `原始客户文件归档评审.md`、`raw-source-files/README.md` | `source-manifest.json`、checksum 和用途分类 |
 
 ## 客户投影边界图 / Customer Projection Boundary
@@ -51,7 +51,7 @@ flowchart TD
 | 客户交付与差异 | `客户交付矩阵.md`、`客户差异台账.md`、`差异登记.md`、`客户配置草案.md` |
 | 导入准备 | `导入来源清单.md`、`导入字段分类.md`、`导入待确认队列.md`、`导入验收清单.md`、`导入策略.md`、`导入风险登记.md`、`导入试跑工具说明.md` |
 | freeze / dry-run evidence | `source-manifest.json`、`来源快照冻结.md`、`来源快照人工复查清单.md`、`真实试跑证据.md` |
-| 试用和培训 | `试用培训说明.md`、`试用账号角色菜单核对清单.md`、`试用环境执行手册.md` |
+| 试用和培训 | `试用培训说明.md`、`试用账号角色菜单核对清单.md`、`试用环境执行手册.md`、`试用人员全页面手工验收清单.md` |
 | 字段和编号确认 | `字段编号确认清单.md`、`字段编号确认结果模板.md` |
 | 原始资料 | `raw-source-files/`、`原始客户文件归档评审.md` |
 | 历史 evidence | `docs/archive/customer-evidence/yoyoosun/` |

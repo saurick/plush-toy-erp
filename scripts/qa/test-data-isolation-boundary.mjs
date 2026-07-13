@@ -44,14 +44,16 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
         path: "server/cmd/seed-core-demo-data/main.go",
         pattern:
           /simulated_only=true real_customer_import=false no_business_records=true no_direct_fact_posting=true/u,
-        message: "core demo CLI output must declare simulated-only no-real-import boundary",
+        message:
+          "core demo CLI output must declare simulated-only no-real-import boundary",
       },
     ]),
     forbidden: Object.freeze([
       {
         path: "server/internal/data/core_demo_seed.go",
         pattern: /SIM-YOYOOSUN|realCustomerImport|CUSTOMER_IMPORT_CONFIRM/u,
-        message: "core demo dataset must not embed yoyoosun or real import gates",
+        message:
+          "core demo dataset must not embed yoyoosun or real import gates",
       },
       {
         path: "server/internal/data/core_demo_seed.go",
@@ -70,7 +72,8 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "server/cmd/seed-trial-sim-masterdata/main.go",
         pattern: /simulationPrefix = "SIM-YOYOOSUN-TRIAL"/u,
-        message: "trial masterdata seed must keep the SIM-YOYOOSUN-TRIAL prefix",
+        message:
+          "trial masterdata seed must keep the SIM-YOYOOSUN-TRIAL prefix",
       },
       {
         path: "server/cmd/seed-trial-sim-masterdata/main.go",
@@ -108,7 +111,8 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/trial-simulated-data.mjs",
         pattern: /simulatedOnly:\s*true/u,
-        message: "trial simulated data must mark reports/datasets as simulatedOnly",
+        message:
+          "trial simulated data must mark reports/datasets as simulatedOnly",
       },
       {
         path: "scripts/qa/trial-simulated-data.mjs",
@@ -118,19 +122,23 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/trial-simulated-data.mjs",
         pattern: /TRIAL_SIM_CONFIRM=APPLY_SIMULATED_TRIAL_DATA/u,
-        message: "trial simulated apply path must require the trial simulation confirmation",
+        message:
+          "trial simulated apply path must require the trial simulation confirmation",
       },
     ]),
     forbidden: Object.freeze([
       {
         path: "scripts/qa/trial-simulated-data.mjs",
-        pattern: /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|realImportApproved/u,
-        message: "trial simulated data must not reuse real import approval gates",
+        pattern:
+          /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|realImportApproved/u,
+        message:
+          "trial simulated data must not reuse real import approval gates",
       },
       {
         path: "scripts/qa/trial-simulated-data.mjs",
         pattern: NO_DIRECT_DB_PATTERN,
-        message: "trial simulated data must not connect to DB or write SQL directly",
+        message:
+          "trial simulated data must not connect to DB or write SQL directly",
       },
     ]),
   },
@@ -153,22 +161,26 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "config/customers/yoyoosun/trialDataFixture.mjs",
         pattern: /must not be applied to customer production data/u,
-        message: "yoyoosun trial fixture must keep the production-data boundary",
+        message:
+          "yoyoosun trial fixture must keep the production-data boundary",
       },
       {
         path: "config/customers/yoyoosun/trialDataFixture.mjs",
         pattern: /SO-YOYO-TRIAL-003/u,
-        message: "yoyoosun trial fixture must include cancelled sales order coverage",
+        message:
+          "yoyoosun trial fixture must include cancelled sales order coverage",
       },
       {
         path: "config/customers/yoyoosun/trialDataFixture.mjs",
         pattern: /QI-YOYO-TRIAL-003/u,
-        message: "yoyoosun trial fixture must include rejected quality coverage",
+        message:
+          "yoyoosun trial fixture must include rejected quality coverage",
       },
       {
         path: "config/customers/yoyoosun/trialDataFixture.mjs",
         pattern: /SH-YOYO-TRIAL-003/u,
-        message: "yoyoosun trial fixture must include cancelled shipment coverage",
+        message:
+          "yoyoosun trial fixture must include cancelled shipment coverage",
       },
       {
         path: "config/customers/yoyoosun/trialDataFixture.mjs",
@@ -179,7 +191,8 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
     forbidden: Object.freeze([
       {
         path: "config/customers/yoyoosun/trialDataFixture.mjs",
-        pattern: /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|EXECUTE_YOYOOSUN_IMPORT/u,
+        pattern:
+          /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|EXECUTE_YOYOOSUN_IMPORT/u,
         message: "yoyoosun trial fixture must not become real import input",
       },
       {
@@ -208,24 +221,424 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/purchase-quality-simulated-matrix.mjs",
         pattern: /realCustomerImport:\s*false/u,
-        message: "purchase/quality matrix must declare realCustomerImport=false",
+        message:
+          "purchase/quality matrix must declare realCustomerImport=false",
       },
       {
         path: "scripts/qa/purchase-quality-simulated-matrix.mjs",
         pattern: /APPLY_SIMULATED_PURCHASE_QUALITY_MATRIX/u,
-        message: "purchase/quality apply path must require an explicit simulation confirmation",
+        message:
+          "purchase/quality apply path must require an explicit simulation confirmation",
+      },
+      {
+        path: "scripts/qa/purchase-quality-simulated-matrix.mjs",
+        pattern:
+          /const LOCAL_HOSTS = new Set\(\["127\.0\.0\.1", "localhost", "::1"\]\)/u,
+        message:
+          "purchase/quality matrix must keep an explicit loopback-only host allowlist",
+      },
+      {
+        path: "scripts/qa/purchase-quality-simulated-matrix.mjs",
+        pattern:
+          /export async function applyPlan\(plan, password, deps = \{\}\)[\s\S]{0,700}normalizeBackendURL\(plan\?\.backendURL\)[\s\S]{0,1800}assertSafeRuntime\(\{/u,
+        message:
+          "purchase/quality exported apply must enforce URL and runtime guards itself",
+      },
+      {
+        path: "scripts/qa/purchase-quality-simulated-matrix.mjs",
+        pattern:
+          /method: "capabilities"[\s\S]{0,1200}active_customer_config_revision/u,
+        message:
+          "purchase/quality matrix must verify local runtime and active customer revision before writes",
+      },
+      {
+        path: "scripts/qa/purchase-quality-simulated-matrix.mjs",
+        pattern:
+          /REQUIRED_PURCHASE_QUALITY_MODULES[\s\S]{0,1800}required modules are not enabled/u,
+        message:
+          "purchase/quality matrix must require every downstream module before writes",
+      },
+      {
+        path: "scripts/qa/purchase-quality-simulated-matrix.mjs",
+        pattern: /assertPurchaseQualityRunIsEmpty\(\{/u,
+        message:
+          "purchase/quality matrix must reject a reused deterministic run before writes",
       },
     ]),
     forbidden: Object.freeze([
       {
         path: "scripts/qa/purchase-quality-simulated-matrix.mjs",
-        pattern: /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|EXECUTE_YOYOOSUN_IMPORT/u,
-        message: "purchase/quality matrix must not reuse real import approval gates",
+        pattern:
+          /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|EXECUTE_YOYOOSUN_IMPORT/u,
+        message:
+          "purchase/quality matrix must not reuse real import approval gates",
       },
       {
         path: "scripts/qa/purchase-quality-simulated-matrix.mjs",
         pattern: NO_DIRECT_DB_PATTERN,
-        message: "purchase/quality matrix must not connect to DB or write SQL directly",
+        message:
+          "purchase/quality matrix must not connect to DB or write SQL directly",
+      },
+    ]),
+  },
+  {
+    id: "manual-acceptance-source-data-stays-simulated-and-local",
+    bucket: "customer-trial-simulated-data",
+    description:
+      "full-page manual acceptance source data keeps a stable simulation prefix, explicit confirmation, and local runtime guard.",
+    required: Object.freeze([
+      {
+        path: "scripts/qa/manual-acceptance-source-data.mjs",
+        pattern: /const SIMULATION_PREFIX = "SIM-YOYOOSUN-UAT"/u,
+        message:
+          "manual acceptance source data must keep its stable simulation prefix",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-source-data.mjs",
+        pattern: /simulatedOnly:\s*true/u,
+        message:
+          "manual acceptance source data must declare simulatedOnly=true",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-source-data.mjs",
+        pattern: /realCustomerImport:\s*false/u,
+        message:
+          "manual acceptance source data must keep realCustomerImport=false",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-source-data.mjs",
+        pattern: /APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA/u,
+        message:
+          "manual acceptance source writes must require the exact confirmation phrase",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-source-data.mjs",
+        pattern: /LOCAL_HOSTS/u,
+        message:
+          "manual acceptance source data must keep its local backend guard",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-source-data.mjs",
+        pattern: /response missing lifecycle status/u,
+        message:
+          "source lifecycle writes must fail when a success payload omits its returned status",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-source-data.mjs",
+        pattern:
+          /export async function applyManualAcceptanceSourceData[\s\S]{0,350}assertLocalBackendURL\(/u,
+        message:
+          "source data exported apply must enforce its backend target guard itself",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-source-data.mjs",
+        pattern: /active_customer_config_revision[\s\S]{0,120}!configRevision/u,
+        message:
+          "source data writes must require a non-empty active customer revision",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-source-data.mjs",
+        pattern:
+          /REQUIRED_SOURCE_MODULES[\s\S]{0,1900}required modules are not enabled/u,
+        message:
+          "source data writes must require every source module before reads or writes",
+      },
+    ]),
+    forbidden: Object.freeze([
+      {
+        path: "scripts/qa/manual-acceptance-source-data.mjs",
+        pattern:
+          /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|EXECUTE_YOYOOSUN_IMPORT/u,
+        message:
+          "manual acceptance source data must not reuse real import approval gates",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-source-data.mjs",
+        pattern: NO_DIRECT_DB_PATTERN,
+        message:
+          "manual acceptance source data must not connect to DB or write SQL directly",
+      },
+    ]),
+  },
+  {
+    id: "manual-acceptance-task-data-stays-workflow-only-and-local",
+    bucket: "customer-trial-simulated-data",
+    description:
+      "manual acceptance task data remains a loopback-only workflow fixture with current runtime, module, CAS, and confirmation guards.",
+    required: Object.freeze([
+      {
+        path: "scripts/qa/manual-acceptance-task-data.mjs",
+        pattern: /const SIMULATION_PREFIX = "SIM-YOYOOSUN-UAT-TASK"/u,
+        message:
+          "manual acceptance task data must keep its stable simulation prefix",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-task-data.mjs",
+        pattern: /simulatedOnly:\s*true[\s\S]{0,120}writesFacts:\s*false/u,
+        message:
+          "manual acceptance task data must remain simulated workflow-only data",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-task-data.mjs",
+        pattern: /APPLY_SIMULATED_MANUAL_ACCEPTANCE_TASKS/u,
+        message:
+          "manual acceptance task writes must require the exact confirmation phrase",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-task-data.mjs",
+        pattern:
+          /const LOCAL_HOSTS = new Set\(\["127\.0\.0\.1", "localhost", "::1"\]\)/u,
+        message:
+          "manual acceptance task data must keep an explicit loopback-only host allowlist",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-task-data.mjs",
+        pattern:
+          /export async function applyManualAcceptanceTaskData[\s\S]{0,500}normalizeLocalBackendURL\(plan\.backendURL\)/u,
+        message:
+          "manual acceptance task exported apply must enforce its backend target guard itself",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-task-data.mjs",
+        pattern:
+          /method: "capabilities"[\s\S]{0,1300}active_customer_config_revision[\s\S]{0,500}workflow_tasks/u,
+        message:
+          "manual acceptance task writes must require local runtime, active revision, and workflow task module",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-task-data.mjs",
+        pattern:
+          /task_id:[\s\S]{0,180}expected_version:[\s\S]{0,180}idempotency_key:/u,
+        message:
+          "manual acceptance task mutations must use returned task identity, expected version, and idempotency key",
+      },
+    ]),
+    forbidden: Object.freeze([
+      {
+        path: "scripts/qa/manual-acceptance-task-data.mjs",
+        pattern:
+          /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|EXECUTE_YOYOOSUN_IMPORT/u,
+        message:
+          "manual acceptance task data must not reuse real import approval gates",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-task-data.mjs",
+        pattern: NO_DIRECT_DB_PATTERN,
+        message:
+          "manual acceptance task data must not connect to DB or write SQL directly",
+      },
+    ]),
+  },
+  {
+    id: "manual-acceptance-fact-data-stays-simulated-and-local",
+    bucket: "customer-trial-simulated-data",
+    description:
+      "full-page manual acceptance fact data reuses formal business actions and remains local simulated data.",
+    required: Object.freeze([
+      {
+        path: "scripts/qa/manual-acceptance-fact-data.mjs",
+        pattern: /simulatedOnly:\s*true/u,
+        message: "manual acceptance fact data must declare simulatedOnly=true",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-fact-data.mjs",
+        pattern: /realCustomerImport:\s*false/u,
+        message:
+          "manual acceptance fact data must keep realCustomerImport=false",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-fact-data.mjs",
+        pattern: /APPLY_SIMULATED_MANUAL_ACCEPTANCE_FACTS/u,
+        message:
+          "manual acceptance fact writes must require the exact confirmation phrase",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-fact-data.mjs",
+        pattern: /fact bulk apply is local-only/u,
+        message: "manual acceptance fact data must remain local-only",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-fact-data.mjs",
+        pattern:
+          /export async function applyManualAcceptanceFactPlan[\s\S]{0,500}source report backend does not match the fact apply backend/u,
+        message:
+          "manual acceptance fact apply must reject a source report from another backend before credentials are used",
+      },
+    ]),
+    forbidden: Object.freeze([
+      {
+        path: "scripts/qa/manual-acceptance-fact-data.mjs",
+        pattern:
+          /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|EXECUTE_YOYOOSUN_IMPORT/u,
+        message:
+          "manual acceptance fact data must not reuse real import approval gates",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-fact-data.mjs",
+        pattern: NO_DIRECT_DB_PATTERN,
+        message:
+          "manual acceptance fact data must not connect to DB or write SQL directly",
+      },
+    ]),
+  },
+  {
+    id: "manual-acceptance-attachment-data-stays-local-and-role-scoped",
+    bucket: "customer-trial-simulated-data",
+    description:
+      "manual acceptance attachments use loopback JSON-RPC, an active customer revision, explicit confirmation, and role-scoped actors.",
+    required: Object.freeze([
+      {
+        path: "scripts/qa/manual-acceptance-attachment-data.mjs",
+        pattern: /APPLY_SIMULATED_MANUAL_ACCEPTANCE_ATTACHMENTS/u,
+        message: "attachment apply must require its exact confirmation phrase",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-attachment-data.mjs",
+        pattern: /LOCAL_HOSTS[\s\S]{0,700}loopback HTTP backend/u,
+        message: "attachment apply must remain loopback-only",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-attachment-data.mjs",
+        pattern: /active_customer_config_revision[\s\S]{0,1300}actorUsers/u,
+        message: "attachment apply must verify active revision before role actor writes",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-attachment-data.mjs",
+        pattern: /workflow_task[\s\S]{0,900}expected_version/u,
+        message: "workflow attachment writes must preserve expected_version",
+      },
+    ]),
+    forbidden: Object.freeze([
+      {
+        path: "scripts/qa/manual-acceptance-attachment-data.mjs",
+        pattern: NO_DIRECT_DB_PATTERN,
+        message: "attachment fixture must not connect to DB or write SQL directly",
+      },
+    ]),
+  },
+  {
+    id: "manual-acceptance-pressure-requires-disposable-database",
+    bucket: "customer-trial-simulated-data",
+    description:
+      "capacity and stress execution only target a declared disposable capacity database and a loopback service.",
+    required: Object.freeze([
+      {
+        path: "scripts/qa/manual-acceptance-capacity-pressure.mjs",
+        pattern: /RUN_ISOLATED_MANUAL_ACCEPTANCE_PRESSURE/u,
+        message: "pressure execution must require its exact confirmation phrase",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-capacity-pressure.mjs",
+        pattern: /\^plush_erp_capacity_\[a-z0-9_\]\+\$/u,
+        message: "pressure execution must require a disposable capacity database name",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-capacity-pressure.mjs",
+        pattern: /parsedDatabaseURL\.pathname !== `\/\$\{databaseName\}`/u,
+        message: "pressure database URL must match the declared disposable database",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-capacity-pressure.mjs",
+        pattern: /concurrency:\s*100, requests:\s*5000/u,
+        message: "stress level must retain the 100-concurrency profile",
+      },
+    ]),
+    forbidden: Object.freeze([]),
+  },
+  {
+    id: "manual-acceptance-retirement-keeps-history",
+    bucket: "customer-trial-simulated-data",
+    description:
+      "manual acceptance source retirement is a separate dry-run-first lifecycle exit and never a physical delete shortcut.",
+    required: Object.freeze([
+      {
+        path: "scripts/qa/manual-acceptance-source-retire.mjs",
+        pattern: /RETIRE_SIMULATED_MANUAL_ACCEPTANCE_SOURCE_DATA/u,
+        message:
+          "manual acceptance retirement apply must require its exact confirmation phrase",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-source-retire.mjs",
+        pattern: /physicalDelete:\s*false/u,
+        message:
+          "manual acceptance retirement must declare physicalDelete=false",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-source-retire.mjs",
+        pattern: /source retirement is local-only/u,
+        message: "manual acceptance retirement must remain local-only",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-source-retire.mjs",
+        pattern:
+          /export async function retireManualAcceptanceSourceData[\s\S]{0,350}normalizeBackendURL\(plan\?\.backendURL\)/u,
+        message:
+          "manual acceptance exported retirement must enforce its local backend guard itself",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-source-retire.mjs",
+        pattern: /active_customer_config_revision[\s\S]{0,120}!configRevision/u,
+        message:
+          "manual acceptance retirement must require a non-empty active customer revision",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-source-retire.mjs",
+        pattern:
+          /REQUIRED_RETIREMENT_MODULES[\s\S]{0,1900}required modules are not enabled/u,
+        message:
+          "manual acceptance retirement must require every owned source module before reads",
+      },
+    ]),
+    forbidden: Object.freeze([
+      {
+        path: "scripts/qa/manual-acceptance-source-retire.mjs",
+        pattern: NO_DIRECT_DB_PATTERN,
+        message:
+          "manual acceptance retirement must not connect to DB or write SQL directly",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-source-retire.mjs",
+        pattern: /method:\s*"(?:delete|truncate|clear)[^"]*"/iu,
+        message:
+          "manual acceptance retirement must not introduce physical deletion methods",
+      },
+    ]),
+  },
+  {
+    id: "manual-acceptance-readiness-default-stays-no-write",
+    bucket: "customer-trial-simulated-data",
+    description:
+      "manual acceptance readiness remains a no-write plan by default and reports browser gaps honestly.",
+    required: Object.freeze([
+      {
+        path: "scripts/qa/manual-acceptance-readiness.mjs",
+        pattern: /readOnly:\s*true/u,
+        message: "manual acceptance readiness must stay read-only",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-readiness.mjs",
+        pattern: /writesBusinessData:\s*false/u,
+        message: "manual acceptance readiness must not write business data",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-readiness.mjs",
+        pattern: /callsBackend:\s*false/u,
+        message:
+          "manual acceptance readiness default plan must not call the backend",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-readiness.mjs",
+        pattern: /readyForManualAcceptance:\s*false/u,
+        message:
+          "readiness queries must not impersonate completed human acceptance",
+      },
+    ]),
+    forbidden: Object.freeze([
+      {
+        path: "scripts/qa/manual-acceptance-readiness.mjs",
+        pattern: NO_DIRECT_DB_PATTERN,
+        message:
+          "manual acceptance readiness must not connect to DB or write SQL directly",
       },
     ]),
   },
@@ -258,17 +671,20 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-regression-data-plan.mjs",
         pattern: /SIM-PLUSH-CORE/u,
-        message: "manual regression plan must include Product Core neutral seed",
+        message:
+          "manual regression plan must include Product Core neutral seed",
       },
       {
         path: "scripts/qa/manual-regression-data-plan.mjs",
         pattern: /SIM-YOYOOSUN-TRIAL/u,
-        message: "manual regression plan must include yoyoosun simulated trial data",
+        message:
+          "manual regression plan must include yoyoosun simulated trial data",
       },
       {
         path: "scripts/qa/manual-regression-data-plan.mjs",
         pattern: /APPLY_SIMULATED_TRIAL_DATA/u,
-        message: "manual regression plan must keep simulated trial apply confirmation",
+        message:
+          "manual regression plan must keep simulated trial apply confirmation",
       },
       {
         path: "scripts/qa/manual-regression-data-plan.mjs",
@@ -287,12 +703,14 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-regression-data-plan.mjs",
         pattern: /CUSTOMER_IMPORT_CONFIRM|EXECUTE_YOYOOSUN_IMPORT/u,
-        message: "manual regression plan must not reuse real import approval gates",
+        message:
+          "manual regression plan must not reuse real import approval gates",
       },
       {
         path: "scripts/qa/manual-regression-data-plan.mjs",
         pattern: NO_DIRECT_DB_PATTERN,
-        message: "manual regression plan must not connect to DB or write SQL directly",
+        message:
+          "manual regression plan must not connect to DB or write SQL directly",
       },
     ]),
   },
@@ -310,12 +728,14 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/operational-fact-simulated-closure.mjs",
         pattern: /simulatedOnly:\s*true/u,
-        message: "operational fact simulation must mark reports as simulatedOnly",
+        message:
+          "operational fact simulation must mark reports as simulatedOnly",
       },
       {
         path: "scripts/qa/operational-fact-simulated-closure.mjs",
         pattern: /realCustomerImport:\s*false/u,
-        message: "operational fact simulation must mark realCustomerImport=false",
+        message:
+          "operational fact simulation must mark realCustomerImport=false",
       },
       {
         path: "scripts/qa/operational-fact-simulated-closure.mjs",
@@ -324,12 +744,48 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
         message:
           "operational fact apply path must require the simulation confirmation",
       },
+      {
+        path: "scripts/qa/operational-fact-simulated-closure.mjs",
+        pattern:
+          /const LOCAL_HOSTS = new Set\(\["127\.0\.0\.1", "localhost", "::1"\]\)/u,
+        message:
+          "operational fact simulation must keep an explicit loopback-only host allowlist",
+      },
+      {
+        path: "scripts/qa/operational-fact-simulated-closure.mjs",
+        pattern:
+          /async function applyPlan\(plan, tokens,[\s\S]{0,1400}assertSafeRuntime\(\{/u,
+        message:
+          "operational fact exported apply must enforce the runtime guard itself",
+      },
+      {
+        path: "scripts/qa/operational-fact-simulated-closure.mjs",
+        pattern:
+          /method: "capabilities"[\s\S]{0,1200}active_customer_config_revision/u,
+        message:
+          "operational fact simulation must verify local runtime and active customer revision before writes",
+      },
+      {
+        path: "scripts/qa/operational-fact-simulated-closure.mjs",
+        pattern:
+          /REQUIRED_OPERATIONAL_MODULES[\s\S]{0,1800}required modules are not enabled/u,
+        message:
+          "operational fact simulation must require every downstream module before writes",
+      },
+      {
+        path: "scripts/qa/operational-fact-simulated-closure.mjs",
+        pattern: /assertOperationalRunIsEmpty\(\{/u,
+        message:
+          "operational fact simulation must reject a reused deterministic run before writes",
+      },
     ]),
     forbidden: Object.freeze([
       {
         path: "scripts/qa/operational-fact-simulated-closure.mjs",
-        pattern: /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|realImportApproved/u,
-        message: "operational fact simulation must not reuse real import approval gates",
+        pattern:
+          /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|realImportApproved/u,
+        message:
+          "operational fact simulation must not reuse real import approval gates",
       },
       {
         path: "scripts/qa/operational-fact-simulated-closure.mjs",
@@ -353,12 +809,14 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/mobile-workflow-simulated-closure.mjs",
         pattern: /simulatedOnly:\s*true/u,
-        message: "mobile workflow simulation must mark reports as simulatedOnly",
+        message:
+          "mobile workflow simulation must mark reports as simulatedOnly",
       },
       {
         path: "scripts/qa/mobile-workflow-simulated-closure.mjs",
         pattern: /realCustomerImport:\s*false/u,
-        message: "mobile workflow simulation must mark realCustomerImport=false",
+        message:
+          "mobile workflow simulation must mark realCustomerImport=false",
       },
       {
         path: "scripts/qa/mobile-workflow-simulated-closure.mjs",
@@ -376,8 +834,10 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
     forbidden: Object.freeze([
       {
         path: "scripts/qa/mobile-workflow-simulated-closure.mjs",
-        pattern: /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|realImportApproved/u,
-        message: "mobile workflow simulation must not reuse real import approval gates",
+        pattern:
+          /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|realImportApproved/u,
+        message:
+          "mobile workflow simulation must not reuse real import approval gates",
       },
       {
         path: "scripts/qa/mobile-workflow-simulated-closure.mjs",
@@ -418,20 +878,25 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
     forbidden: Object.freeze([
       {
         path: "scripts/import/customerImportDryRun.mjs",
-        pattern: /CUSTOMER_IMPORT_CONFIRM|--execute|fetch\(|POSTGRES_DSN|sql\.Open|pgx/u,
+        pattern:
+          /CUSTOMER_IMPORT_CONFIRM|--execute|fetch\(|POSTGRES_DSN|sql\.Open|pgx/u,
         message: "dry-run must not gain execution, backend, or DB entrypoints",
       },
       {
         path: "scripts/import/customerSourceSnapshotFreezeCheck.mjs",
-        pattern: /CUSTOMER_IMPORT_CONFIRM|--execute|fetch\(|POSTGRES_DSN|sql\.Open|pgx/u,
-        message: "source freeze must not gain execution, backend, or DB entrypoints",
+        pattern:
+          /CUSTOMER_IMPORT_CONFIRM|--execute|fetch\(|POSTGRES_DSN|sql\.Open|pgx/u,
+        message:
+          "source freeze must not gain execution, backend, or DB entrypoints",
       },
     ]),
   },
 ]);
 
 function normalizePath(relativePath) {
-  return String(relativePath || "").split(path.sep).join("/");
+  return String(relativePath || "")
+    .split(path.sep)
+    .join("/");
 }
 
 async function readRuleFile(root, relativePath, cache) {

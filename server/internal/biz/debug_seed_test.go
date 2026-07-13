@@ -9,6 +9,7 @@ import (
 type fakeDebugRepo struct {
 	seedPlan DebugSeedPlan
 	cleanup  DebugBusinessChainCleanupInput
+	clear    DebugBusinessDataClearInput
 	cleared  bool
 }
 
@@ -58,14 +59,24 @@ func (r *fakeDebugRepo) CleanupBusinessChainDebugData(_ context.Context, in Debu
 	}, nil
 }
 
-func (r *fakeDebugRepo) ClearBusinessData(_ context.Context) (*DebugBusinessDataClearResult, error) {
+func (r *fakeDebugRepo) ClearBusinessData(_ context.Context, in DebugBusinessDataClearInput) (*DebugBusinessDataClearResult, error) {
+	r.clear = in
 	r.cleared = true
+	deletedTotal := 1
+	deletedCounts := map[string]int{"workflow_tasks": 1}
+	clearedTableNames := []string{"workflow_tasks"}
+	if in.DryRun {
+		deletedTotal = 0
+		deletedCounts = map[string]int{}
+		clearedTableNames = nil
+	}
 	return &DebugBusinessDataClearResult{
-		DeletedCounts: map[string]int{
-			"workflow_tasks": 1,
-		},
-		DeletedTotal:      1,
-		ClearedTableNames: []string{"workflow_tasks"},
+		DryRun:            in.DryRun,
+		MatchedCounts:     map[string]int{"workflow_tasks": 1},
+		MatchedTotal:      1,
+		DeletedCounts:     deletedCounts,
+		DeletedTotal:      deletedTotal,
+		ClearedTableNames: clearedTableNames,
 	}, nil
 }
 
@@ -94,7 +105,7 @@ func TestDebugUsecase_DisabledConfigRejectsSeedAndCleanup(t *testing.T) {
 		t.Fatalf("expected cleanup disabled, got %v", err)
 	}
 
-	_, err = uc.ClearBusinessData(context.Background())
+	_, err = uc.ClearBusinessData(context.Background(), DebugBusinessDataClearInput{DryRun: true})
 	if !errors.Is(err, ErrDebugBusinessDataClearDisabled) {
 		t.Fatalf("expected business data clear disabled, got %v", err)
 	}
@@ -162,7 +173,7 @@ func TestDebugUsecase_SeedReturnsScenarioRunRecordsAndTasks(t *testing.T) {
 	}
 }
 
-func TestDebugUsecase_ClearBusinessDataUsesCleanupGuard(t *testing.T) {
+func TestDebugUsecase_ClearBusinessDataUsesIndependentGuard(t *testing.T) {
 	repo := &fakeDebugRepo{}
 	uc := NewDebugUsecase(repo, DebugSafetyConfig{
 		Environment:    "local",
@@ -170,12 +181,83 @@ func TestDebugUsecase_ClearBusinessDataUsesCleanupGuard(t *testing.T) {
 		CleanupScope:   DebugDefaultCleanupScope,
 	})
 
-	result, err := uc.ClearBusinessData(context.Background())
+	_, err := uc.ClearBusinessData(context.Background(), DebugBusinessDataClearInput{DryRun: true})
+	if !errors.Is(err, ErrDebugBusinessDataClearDisabled) {
+		t.Fatalf("expected independent business clear guard, got %v", err)
+	}
+	if repo.cleared {
+		t.Fatal("cleanup switch must not enable full business clear")
+	}
+}
+
+func TestDebugUsecase_ClearBusinessDataOnlyAllowsLocalAndDev(t *testing.T) {
+	for _, environment := range []string{"shared", "remote", "prod", "sql"} {
+		t.Run(environment, func(t *testing.T) {
+			repo := &fakeDebugRepo{}
+			uc := NewDebugUsecase(repo, DebugSafetyConfig{
+				Environment:              environment,
+				BusinessDataClearEnabled: true,
+			})
+			_, err := uc.ClearBusinessData(context.Background(), DebugBusinessDataClearInput{DryRun: true})
+			if !errors.Is(err, ErrDebugBusinessDataClearDisabled) {
+				t.Fatalf("expected %s business clear denied, got %v", environment, err)
+			}
+			if repo.cleared {
+				t.Fatalf("%s business clear reached repo", environment)
+			}
+		})
+	}
+
+	for _, environment := range []string{"local", "dev"} {
+		t.Run(environment, func(t *testing.T) {
+			repo := &fakeDebugRepo{}
+			uc := NewDebugUsecase(repo, DebugSafetyConfig{
+				Environment:              environment,
+				BusinessDataClearEnabled: true,
+			})
+			result, err := uc.ClearBusinessData(context.Background(), DebugBusinessDataClearInput{DryRun: true})
+			if err != nil {
+				t.Fatalf("expected %s dry run allowed, got %v", environment, err)
+			}
+			if !repo.cleared || !result.DryRun || result.DeletedTotal != 0 || result.MatchedTotal != 1 {
+				t.Fatalf("unexpected %s dry run result %#v", environment, result)
+			}
+		})
+	}
+}
+
+func TestDebugUsecase_ClearBusinessDataRequiresExactConfirmationForDeletion(t *testing.T) {
+	for _, confirmation := range []string{"", "CLEAR_ALL_BUSINESS_DATA", " CLEAR_ALL_PROJECT_BUSINESS_DATA", "CLEAR_ALL_PROJECT_BUSINESS_DATA "} {
+		repo := &fakeDebugRepo{}
+		uc := NewDebugUsecase(repo, DebugSafetyConfig{
+			Environment:              "local",
+			BusinessDataClearEnabled: true,
+		})
+		_, err := uc.ClearBusinessData(context.Background(), DebugBusinessDataClearInput{
+			DryRun:       false,
+			Confirmation: confirmation,
+		})
+		if !errors.Is(err, ErrDebugBusinessDataClearConfirmationInvalid) {
+			t.Fatalf("expected exact confirmation rejection for %q, got %v", confirmation, err)
+		}
+		if repo.cleared {
+			t.Fatalf("invalid confirmation %q reached repo", confirmation)
+		}
+	}
+
+	repo := &fakeDebugRepo{}
+	uc := NewDebugUsecase(repo, DebugSafetyConfig{
+		Environment:              "local",
+		BusinessDataClearEnabled: true,
+	})
+	result, err := uc.ClearBusinessData(context.Background(), DebugBusinessDataClearInput{
+		Confirmation: DebugBusinessDataClearConfirmation,
+	})
 	if err != nil {
 		t.Fatalf("clear business data failed: %v", err)
 	}
-	if !repo.cleared {
-		t.Fatalf("expected repo clear to be called")
+	if !repo.cleared || repo.clear.Confirmation != DebugBusinessDataClearConfirmation {
+		t.Fatalf("expected repo clear with exact confirmation, got %#v", repo.clear)
 	}
 	if result.DeletedTotal != 1 || result.DeletedCounts["workflow_tasks"] != 1 {
 		t.Fatalf("unexpected clear result %#v", result)

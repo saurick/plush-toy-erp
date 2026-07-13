@@ -12,9 +12,22 @@ var (
 	ErrMobileRoleDenied = errors.New("mobile role denied")
 	ErrInvalidPassword  = errors.New("invalid password")
 	ErrUserDisabled     = errors.New("user disabled")
+	ErrSessionNotFound  = errors.New("admin session not found")
+	ErrSessionRevoked   = errors.New("admin session revoked")
+	ErrSessionExpired   = errors.New("admin session expired")
+	ErrAuthVersionStale = errors.New("admin auth version stale")
 )
 
-type AdminTokenGenerator func(userID int, username string, role int8) (token string, expireAt time.Time, err error)
+type AdminTokenInput struct {
+	UserID      int
+	SessionKey  string
+	AuthVersion int64
+	IssuedAt    time.Time
+	ExpiresAt   time.Time
+}
+
+type AdminTokenGenerator func(input AdminTokenInput) (token string, expireAt time.Time, err error)
+type AdminTokenParser func(token string) (*AuthClaims, error)
 
 func maskPhone(phone string) string {
 	trimmed := strings.TrimSpace(phone)

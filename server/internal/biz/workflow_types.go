@@ -10,6 +10,8 @@ var (
 	ErrWorkflowTaskNotFound       = errors.New("workflow task not found")
 	ErrWorkflowTaskExists         = errors.New("workflow task already exists")
 	ErrWorkflowTaskSettled        = errors.New("workflow task already settled")
+	ErrWorkflowTaskConflict       = errors.New("workflow task version conflict")
+	ErrWorkflowTaskBoardStatus    = errors.New("workflow task board contains unsupported status")
 	ErrWorkflowBusinessStateFound = errors.New("workflow business state already exists")
 )
 
@@ -37,6 +39,7 @@ type WorkflowTask struct {
 	CompletedAt           *time.Time
 	ClosedAt              *time.Time
 	Payload               map[string]any
+	Version               int
 	CreatedBy             *int
 	UpdatedBy             *int
 	CreatedAt             time.Time
@@ -53,6 +56,43 @@ type WorkflowTaskFilter struct {
 	TaskGroup            string
 	SourceType           string
 	SourceID             int
+}
+
+type WorkflowTaskBoardQuery struct {
+	Keyword              string
+	Status               string
+	OwnerRoleKey         string
+	Due                  string
+	SourceType           string
+	LaneKey              string
+	Limit                int
+	Offset               int
+	VisibleOwnerRoleKeys []string
+	VisibleAssigneeID    *int
+	SnapshotAt           time.Time
+}
+
+type WorkflowTaskBoardCounts struct {
+	Actionable int
+	Exception  int
+	Due        int
+	Finished   int
+}
+
+type WorkflowTaskBoardLane struct {
+	Key    string
+	Total  int
+	Limit  int
+	Offset int
+	Tasks  []*WorkflowTask
+}
+
+type WorkflowTaskBoard struct {
+	SnapshotAt  time.Time
+	Total       int
+	Counts      WorkflowTaskBoardCounts
+	Lanes       []WorkflowTaskBoardLane
+	SourceTypes []string
 }
 
 type WorkflowTaskCreate struct {
@@ -79,11 +119,23 @@ type WorkflowTaskCreate struct {
 
 type WorkflowTaskStatusUpdate struct {
 	ID                int
+	ExpectedVersion   int
+	CommandKey        string
+	IdempotencyKey    string
+	IntentHash        string
 	TaskStatusKey     string
 	BusinessStatusKey string
 	Reason            string
 	Payload           map[string]any
 	SideEffects       *WorkflowTaskStatusSideEffects
+	BreakGlass        *WorkflowTaskBreakGlassIntent
+	AuditEvent        *RuntimeAuditEventCreate
+}
+
+type WorkflowTaskBreakGlassIntent struct {
+	ActionKey string
+	Reason    string
+	ExpiresAt time.Time
 }
 
 type WorkflowTaskStatusSideEffects struct {
@@ -95,10 +147,14 @@ type WorkflowTaskStatusSideEffects struct {
 }
 
 type WorkflowTaskUrge struct {
-	ID      int
-	Action  string
-	Reason  string
-	Payload map[string]any
+	ID              int
+	ExpectedVersion int
+	CommandKey      string
+	IdempotencyKey  string
+	IntentHash      string
+	Action          string
+	Reason          string
+	Payload         map[string]any
 }
 
 type WorkflowBusinessState struct {
@@ -142,7 +198,9 @@ type WorkflowRepo interface {
 	GetWorkflowTask(ctx context.Context, id int) (*WorkflowTask, error)
 	GetWorkflowTaskByTaskCode(ctx context.Context, taskCode string) (*WorkflowTask, error)
 	ListWorkflowTasks(ctx context.Context, filter WorkflowTaskFilter) ([]*WorkflowTask, int, error)
+	GetWorkflowTaskBoard(ctx context.Context, query WorkflowTaskBoardQuery) (*WorkflowTaskBoard, error)
 	CreateWorkflowTask(ctx context.Context, in *WorkflowTaskCreate, actorID int) (*WorkflowTask, error)
+	ResolveWorkflowTaskMutation(ctx context.Context, taskID int, idempotencyKey string, intentHash string, commandKey string, actorID int) (*WorkflowTask, bool, error)
 	UpdateWorkflowTaskStatus(ctx context.Context, in *WorkflowTaskStatusUpdate, actorID int, actorRoleKey string) (*WorkflowTask, error)
 	UrgeWorkflowTask(ctx context.Context, in *WorkflowTaskUrge, actorID int, actorRoleKey string) (*WorkflowTask, error)
 	ListWorkflowBusinessStates(ctx context.Context, filter WorkflowBusinessStateFilter) ([]*WorkflowBusinessState, int, error)

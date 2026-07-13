@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/biz"
 	"server/internal/devdbguard"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -46,6 +47,9 @@ func main() {
 	}
 	if !strings.HasPrefix(*unitCode, simulationPrefix) || !strings.HasPrefix(*productCode, simulationPrefix) {
 		fail("unit-code and product-code must start with %s", simulationPrefix)
+	}
+	if err := biz.ValidateNoNumberedImplementationStageLabels(*unitCode, *unitName, *productCode, *productName); err != nil {
+		fail("simulated masterdata naming rejected: %v", err)
 	}
 
 	dsn, err := resolvePostgresDSN(*confPath)

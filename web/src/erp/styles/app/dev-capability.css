@@ -218,6 +218,19 @@
   width: 100%;
 }
 
+.erp-dev-capability-filter-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.erp-dev-capability-filter-field > span {
+  color: #53645a;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
 .erp-dev-capability-panel__head {
   display: flex;
   min-height: 28px;
@@ -248,9 +261,7 @@
 
 .erp-dev-capability-bar__label {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .erp-dev-capability-bar__track {
@@ -265,6 +276,72 @@
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, #2b8a3e, #0e7490);
+}
+
+.erp-dev-capability-maturity-guide__summary.ant-typography,
+.erp-dev-capability-maturity-guide__note.ant-typography {
+  margin: 0;
+  color: #53645a;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-capability-maturity-guide__list {
+  display: grid;
+  gap: 8px;
+}
+
+.erp-dev-capability-maturity-guide__item {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  min-width: 0;
+  border-top: 1px solid #e4ece6;
+  padding-top: 8px;
+}
+
+.erp-dev-capability-maturity-guide__level {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: #e8f5ea;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.erp-dev-capability-maturity-guide__copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-capability-maturity-guide__copy strong {
+  color: #173f2a;
+}
+
+.erp-dev-capability-maturity-guide__copy small {
+  color: #647067;
+  font-size: 11px;
+}
+
+.erp-dev-capability-maturity-guide__note code {
+  border-radius: 4px;
+  background: #edf4ef;
+  padding: 1px 4px;
+}
+
+.erp-dev-capability-maturity-guide__source {
+  width: fit-content;
+  font-size: 12px;
 }
 
 .erp-dev-capability-results,
@@ -747,6 +824,10 @@
 .erp-dev-customer-diff-list {
   display: grid;
   gap: 10px;
+}
+
+.erp-dev-customer-package-guards .erp-dev-customer-guard-list {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .erp-dev-customer-decision-card,

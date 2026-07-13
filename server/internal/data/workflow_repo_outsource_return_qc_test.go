@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 
@@ -58,9 +59,12 @@ func TestWorkflowRepo_OutsourceReturnQCDoneCreatesWarehouseInboundIdempotently(t
 	}
 
 	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-		ID:            qcTask.ID,
-		TaskStatusKey: "done",
-		Payload:       map[string]any{"mobile_role_key": "quality", "qc_result": "accepted"},
+		ID:              qcTask.ID,
+		ExpectedVersion: qcTask.Version,
+		CommandKey:      "complete_task_action",
+		IdempotencyKey:  "outsource-qc-done",
+		TaskStatusKey:   "done",
+		Payload:         map[string]any{"mobile_role_key": "quality", "qc_result": "accepted"},
 	}, 8, "quality"); err != nil {
 		t.Fatalf("done update failed: %v", err)
 	}
@@ -130,9 +134,12 @@ func TestWorkflowRepo_OutsourceReturnQCDoneCreatesWarehouseInboundIdempotently(t
 	}
 
 	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-		ID:            qcTask.ID,
-		TaskStatusKey: "done",
-		Payload:       map[string]any{"mobile_role_key": "quality"},
+		ID:              qcTask.ID,
+		ExpectedVersion: qcTask.Version,
+		CommandKey:      "complete_task_action",
+		IdempotencyKey:  "outsource-qc-done",
+		TaskStatusKey:   "done",
+		Payload:         map[string]any{"mobile_role_key": "quality", "qc_result": "accepted"},
 	}, 8, "quality"); err != nil {
 		t.Fatalf("repeat done update failed: %v", err)
 	}
@@ -203,18 +210,24 @@ func TestWorkflowRepo_OutsourceReturnQCReworkIdempotencyHonorsRejectedTerminalSt
 
 			reason := "回货抽检不合格"
 			if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-				ID:            qcTask.ID,
-				TaskStatusKey: tc.status,
-				Reason:        reason,
-				Payload:       map[string]any{},
+				ID:              qcTask.ID,
+				ExpectedVersion: qcTask.Version,
+				CommandKey:      "outsource_qc_" + tc.status,
+				IdempotencyKey:  "outsource-qc-" + tc.status,
+				TaskStatusKey:   tc.status,
+				Reason:          reason,
+				Payload:         map[string]any{},
 			}, 8, "quality"); err != nil {
 				t.Fatalf("first %s update failed: %v", tc.status, err)
 			}
 			if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-				ID:            qcTask.ID,
-				TaskStatusKey: tc.status,
-				Reason:        reason,
-				Payload:       map[string]any{},
+				ID:              qcTask.ID,
+				ExpectedVersion: qcTask.Version,
+				CommandKey:      "outsource_qc_" + tc.status,
+				IdempotencyKey:  "outsource-qc-" + tc.status,
+				TaskStatusKey:   tc.status,
+				Reason:          reason,
+				Payload:         map[string]any{},
 			}, 8, "quality"); err != nil {
 				t.Fatalf("repeat %s update failed: %v", tc.status, err)
 			}
@@ -271,21 +284,26 @@ func TestWorkflowRepo_OutsourceReturnQCReworkIdempotencyHonorsRejectedTerminalSt
 				t.Fatalf("expected rework created event with workflow rule payload, got %#v", createdEvents)
 			}
 
-			if _, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+			if _, err := repo.UpdateWorkflowTaskStatus(ctx, workflowRepoTestStatusMutation(reworkTasks[0].ID, reworkTasks[0].Version, "outsource-return-rework-"+tc.status+"-complete", &biz.WorkflowTaskStatusUpdate{
 				ID:            reworkTasks[0].ID,
 				TaskStatusKey: "done",
 				Payload:       map[string]any{"done_by": "production"},
-			}, 9, "production"); err != nil {
+			}), 9, "production"); err != nil {
 				t.Fatalf("complete rework task failed: %v", err)
 			}
 
-			if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+			_, nextRoundErr := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(qcTask.ID, qcTask.Version+1, "outsource-qc-"+tc.status+"-next-round", &biz.WorkflowTaskStatusUpdate{
 				ID:            qcTask.ID,
 				TaskStatusKey: tc.status,
 				Reason:        reason,
 				Payload:       map[string]any{},
-			}, 8, "quality"); err != nil {
-				t.Fatalf("next-round %s update failed: %v", tc.status, err)
+			}), 8, "quality")
+			if tc.status == "rejected" {
+				if !errors.Is(nextRoundErr, biz.ErrWorkflowTaskSettled) {
+					t.Fatalf("terminal rejected task must reject a new round, got %v", nextRoundErr)
+				}
+			} else if nextRoundErr != nil {
+				t.Fatalf("next-round %s update failed: %v", tc.status, nextRoundErr)
 			}
 
 			count, err := client.WorkflowTask.Query().
@@ -344,12 +362,12 @@ func TestWorkflowRepo_OutsourceReturnQCBlockedThenRejectedReusesActiveRework(t *
 	}
 
 	blockedReason := "回货待判责"
-	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+	if _, err := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(qcTask.ID, qcTask.Version, "outsource-qc-blocked-then-rejected-blocked", &biz.WorkflowTaskStatusUpdate{
 		ID:            qcTask.ID,
 		TaskStatusKey: "blocked",
 		Reason:        blockedReason,
 		Payload:       map[string]any{},
-	}, 8, "quality"); err != nil {
+	}), 8, "quality"); err != nil {
 		t.Fatalf("blocked update failed: %v", err)
 	}
 
@@ -370,12 +388,12 @@ func TestWorkflowRepo_OutsourceReturnQCBlockedThenRejectedReusesActiveRework(t *
 	reworkTaskID := reworkTasks[0].ID
 
 	rejectedReason := "复检仍开线"
-	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+	if _, err := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(qcTask.ID, qcTask.Version+1, "outsource-qc-blocked-then-rejected-rejected", &biz.WorkflowTaskStatusUpdate{
 		ID:            qcTask.ID,
 		TaskStatusKey: "rejected",
 		Reason:        rejectedReason,
 		Payload:       map[string]any{},
-	}, 8, "quality"); err != nil {
+	}), 8, "quality"); err != nil {
 		t.Fatalf("rejected update failed: %v", err)
 	}
 

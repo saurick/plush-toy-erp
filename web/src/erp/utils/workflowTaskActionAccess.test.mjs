@@ -5,7 +5,9 @@ import {
   buildWorkflowActionAccessState,
   normalizeWorkflowActionExplainData,
   normalizeWorkflowActionMode,
+  requireWorkflowTaskExplainParams,
   resolveWorkflowActionAccessRequestOutcome,
+  workflowTaskActionAccessRequestIdentity,
 } from './workflowTaskActionAccess.mjs'
 
 function admin(overrides = {}) {
@@ -40,7 +42,7 @@ test('workflowTaskActionAccess: normalizes backend explain actions', () => {
   const normalized = normalizeWorkflowActionExplainData({
     actions: [
       {
-        action_key: 'done',
+        action_key: 'complete',
         allowed: true,
         reason: '可完成',
         required_permission: 'workflow.task.complete',
@@ -65,18 +67,18 @@ test('workflowTaskActionAccess: normalizes backend explain actions', () => {
         actor_role_key: 'warehouse',
       },
       {
-        action_key: 'blocked',
+        action_key: 'block',
         allowed: false,
         reason_code: 'missing_permission',
         reason: '缺少权限',
       },
       {
-        action_key: 'rejected',
+        action_key: 'reject',
         allowed: true,
         reason: '可退回',
       },
       {
-        action_key: 'urge_task',
+        action_key: 'urge',
         allowed: true,
         reason: '可催办',
       },
@@ -122,12 +124,94 @@ test('workflowTaskActionAccess: normalizes backend explain actions', () => {
   assert.equal(normalized.custom_backend_action_key, undefined)
 })
 
-test('workflowTaskActionAccess: normalizes action mode aliases for submit guards', () => {
-  assert.equal(normalizeWorkflowActionMode('done'), 'complete')
-  assert.equal(normalizeWorkflowActionMode('blocked'), 'block')
-  assert.equal(normalizeWorkflowActionMode('rejected'), 'reject')
-  assert.equal(normalizeWorkflowActionMode('urge_task'), 'urge')
+test('workflowTaskActionAccess: accepts formal action modes only', () => {
+  assert.equal(normalizeWorkflowActionMode('complete'), 'complete')
+  assert.equal(normalizeWorkflowActionMode('block'), 'block')
+  assert.equal(normalizeWorkflowActionMode('reject'), 'reject')
+  assert.equal(normalizeWorkflowActionMode('urge'), 'urge')
+  assert.equal(normalizeWorkflowActionMode('done'), '')
+  assert.equal(normalizeWorkflowActionMode('blocked'), '')
+  assert.equal(normalizeWorkflowActionMode('rejected'), '')
+  assert.equal(normalizeWorkflowActionMode('urge_task'), '')
   assert.equal(normalizeWorkflowActionMode('custom_backend_action_key'), '')
+})
+
+test('workflowTaskActionAccess: request identity changes with task version but keeps the same RPC task id', () => {
+  const first = workflowTaskActionAccessRequestIdentity(
+    task({ id: 42, version: 1 })
+  )
+  const second = workflowTaskActionAccessRequestIdentity(
+    task({ id: 42, version: 2 })
+  )
+
+  assert.deepEqual(first, {
+    taskID: 42,
+    taskVersion: 1,
+    requestKey: '42:1',
+  })
+  assert.deepEqual(second, {
+    taskID: 42,
+    taskVersion: 2,
+    requestKey: '42:2',
+  })
+  assert.equal(first.taskID, second.taskID)
+  assert.notEqual(first.requestKey, second.requestKey)
+  assert.deepEqual(workflowTaskActionAccessRequestIdentity(task({ id: 0 })), {
+    taskID: 0,
+    taskVersion: 0,
+    requestKey: '',
+  })
+})
+
+test('workflowTaskActionAccess: explain params allow an omitted action key and reject non-canonical inputs', () => {
+  assert.deepEqual(
+    requireWorkflowTaskExplainParams({ task_id: 42 }, { allowActionKey: true }),
+    { taskID: 42, actionKey: '' }
+  )
+  for (const actionKey of ['complete', 'block', 'reject', 'urge']) {
+    assert.deepEqual(
+      requireWorkflowTaskExplainParams(
+        { task_id: 42, action_key: actionKey },
+        { allowActionKey: true }
+      ),
+      { taskID: 42, actionKey }
+    )
+  }
+  for (const params of [
+    { id: 42 },
+    { task_id: 42, action: 'complete' },
+    { task_id: 42, action_key: '' },
+    { task_id: 42, action_key: '   ' },
+    { task_id: 42, action_key: 1 },
+    { task_id: 42, action_key: ' complete ' },
+    { task_id: 42, action_key: 'done' },
+    { task_id: 42, action_key: 'blocked' },
+    { task_id: 42, action_key: 'rejected' },
+    { task_id: 42, action_key: 'urge_task' },
+    { task_id: 42, action_key: 'escalate' },
+    { task_id: 42, action_key: 'complete', unknown: true },
+  ]) {
+    assert.throws(
+      () => requireWorkflowTaskExplainParams(params, { allowActionKey: true }),
+      TypeError
+    )
+  }
+  assert.throws(
+    () => requireWorkflowTaskExplainParams({ task_id: 42, action_key: 'urge' }),
+    TypeError
+  )
+})
+
+test('workflowTaskActionAccess: ignores non-contract backend action keys', () => {
+  const normalized = normalizeWorkflowActionExplainData({
+    actions: [
+      { action: 'complete', allowed: true },
+      { action_key: 'done', allowed: true },
+      { action_key: 'urge_task', allowed: true },
+    ],
+  })
+
+  assert.deepEqual(normalized, {})
 })
 
 test('workflowTaskActionAccess: backend explain overrides local fallback', () => {
@@ -154,11 +238,8 @@ test('workflowTaskActionAccess: backend explain overrides local fallback', () =>
   assert.equal(access.canRun('urge'), false)
   assert.deepEqual(access.allowedModes, ['block'])
   assert.equal(access.getReason('complete'), '后端判定不可完成')
-  assert.equal(
-    access.getReason('reject'),
-    '后端未返回该动作权限，请刷新后重试。'
-  )
-  assert.equal(access.getReason('urge'), '后端未返回该动作权限，请刷新后重试。')
+  assert.equal(access.getReason('reject'), '当前操作暂不可用，请刷新后重试。')
+  assert.equal(access.getReason('urge'), '当前操作暂不可用，请刷新后重试。')
   assert.equal(
     access.byAction.reject.reasonCode,
     'action_access_missing_from_backend'
@@ -208,10 +289,7 @@ test('workflowTaskActionAccess: missing backend explain does not expose local fa
   assert.equal(access.canRun('block'), false)
   assert.equal(access.canRun('reject'), false)
   assert.equal(access.canRun('urge'), false)
-  assert.equal(
-    access.readonlyReason,
-    '正在核对后端任务动作权限，请稍后再提交。'
-  )
+  assert.equal(access.readonlyReason, '正在确认操作权限，请稍后再提交。')
   assert.equal(access.byAction.complete.reasonCode, 'action_access_checking')
 })
 
@@ -230,11 +308,11 @@ test('workflowTaskActionAccess: failed backend explain disables local fallback a
   assert.equal(access.canRun('urge'), false)
   assert.equal(
     access.readonlyReason,
-    '无法核对后端任务动作权限，请刷新后重试。'
+    '暂时无法确认您是否可以处理此任务，请刷新后重试。'
   )
   assert.equal(
     access.getReason('complete'),
-    '无法核对后端任务动作权限，请刷新后重试。'
+    '暂时无法确认您是否可以处理此任务，请刷新后重试。'
   )
   assert.equal(
     access.byAction.complete.reasonCode,
@@ -256,10 +334,7 @@ test('workflowTaskActionAccess: loading backend explain does not expose fallback
   assert.equal(access.canRun('block'), false)
   assert.equal(access.canRun('reject'), false)
   assert.equal(access.canRun('urge'), false)
-  assert.equal(
-    access.readonlyReason,
-    '正在核对后端任务动作权限，请稍后再提交。'
-  )
+  assert.equal(access.readonlyReason, '正在确认操作权限，请稍后再提交。')
   assert.equal(access.byAction.complete.reasonCode, 'action_access_checking')
 })
 
@@ -267,7 +342,7 @@ test('workflowTaskActionAccess: request outcome ignores stale and aborted respon
   const staleSuccess = resolveWorkflowActionAccessRequestOutcome({
     currentRequestID: 2,
     requestID: 1,
-    taskKey: '42',
+    requestKey: '42:1',
     data: { actions: [{ action_key: 'complete', allowed: false }] },
   })
   assert.equal(staleSuccess, null)
@@ -275,7 +350,7 @@ test('workflowTaskActionAccess: request outcome ignores stale and aborted respon
   const abortedFailure = resolveWorkflowActionAccessRequestOutcome({
     currentRequestID: 2,
     requestID: 2,
-    taskKey: '42',
+    requestKey: '42:2',
     error: new Error('aborted'),
     isAbortError: () => true,
   })
@@ -286,11 +361,11 @@ test('workflowTaskActionAccess: current request outcome can update success or fa
   const success = resolveWorkflowActionAccessRequestOutcome({
     currentRequestID: 3,
     requestID: 3,
-    taskKey: '42',
+    requestKey: '42:3',
     data: { actions: [{ action_key: 'complete', allowed: true }] },
   })
   assert.deepEqual(success, {
-    taskKey: '42',
+    requestKey: '42:3',
     data: { actions: [{ action_key: 'complete', allowed: true }] },
     loading: false,
     failed: false,
@@ -299,12 +374,12 @@ test('workflowTaskActionAccess: current request outcome can update success or fa
   const failure = resolveWorkflowActionAccessRequestOutcome({
     currentRequestID: 3,
     requestID: 3,
-    taskKey: '42',
+    requestKey: '42:3',
     error: new Error('network failed'),
     isAbortError: () => false,
   })
   assert.deepEqual(failure, {
-    taskKey: '42',
+    requestKey: '42:3',
     data: null,
     loading: false,
     failed: true,

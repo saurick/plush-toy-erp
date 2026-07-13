@@ -261,7 +261,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
       }
       const nextHint =
         data.mock_delivery && data.mock_code
-          ? `当前未接入短信运营商，临时验证码：${data.mock_code}`
+          ? `本次登录验证码：${data.mock_code}`
           : '验证码已发送，请查看手机短信'
       setSmsHint(nextHint)
       if (data.mock_delivery && data.mock_code) {
@@ -292,7 +292,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
       return
     }
     if (activeLoginMode === LOGIN_MODE.SMS && !smsLoginEnabled) {
-      setError('当前部署未启用短信登录。')
+      setError('短信登录暂未开通，请使用密码登录。')
       return
     }
 
@@ -355,7 +355,11 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
 
           {error ? <Alert type="error" showIcon message={error} /> : null}
           {entryOptions.length === 0 ? (
-            <Alert type="warning" showIcon message="当前部署未启用登录入口" />
+            <Alert
+              type="warning"
+              showIcon
+              message="登录入口暂不可用，请联系管理员"
+            />
           ) : null}
 
           <Form
@@ -409,9 +413,9 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
             {activeLoginMode === LOGIN_MODE.PASSWORD ? (
               <>
                 <Form.Item
-                  label="管理员账号"
+                  label="账号"
                   name="username"
-                  rules={[{ required: true, message: '请输入管理员账号' }]}
+                  rules={[{ required: true, message: '请输入账号' }]}
                 >
                   <Input
                     placeholder="请输入账号"

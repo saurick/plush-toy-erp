@@ -1,0 +1,3337 @@
+{
+  "customer_key": "yoyoosun",
+  "revision": "yoyoosun-customer-package-v7.runtime-manifest-v1",
+  "product_version": "local-customer-package",
+  "compiled_snapshot": {
+    "customer": {
+      "key": "yoyoosun",
+      "name": "永绅 yoyoosun 客户配置包",
+      "packageKey": "yoyoosun-customer-package-v7"
+    },
+    "package": {
+      "key": "yoyoosun-customer-package-v7",
+      "status": "draft",
+      "runtimeEnabled": false,
+      "previewOnly": true
+    },
+    "pages": [
+      "global-dashboard",
+      "task-board",
+      "customers",
+      "suppliers",
+      "products",
+      "materials",
+      "material-bom",
+      "processes",
+      "sales-orders",
+      "accessories-purchase",
+      "quality-inspections",
+      "inbound",
+      "inventory",
+      "processing-contracts",
+      "production-progress",
+      "outbound",
+      "shipments",
+      "reconciliation",
+      "payables",
+      "receivables",
+      "invoices",
+      "print-center",
+      "permission-center",
+      "system-audit-logs"
+    ],
+    "rolePageProjections": {
+      "boss": [
+        "accessories-purchase",
+        "global-dashboard",
+        "print-center",
+        "task-board"
+      ],
+      "sales": [
+        "customers",
+        "sales-orders",
+        "shipments",
+        "task-board"
+      ],
+      "purchase": [
+        "accessories-purchase",
+        "inbound",
+        "print-center",
+        "suppliers",
+        "task-board"
+      ],
+      "warehouse": [
+        "inbound",
+        "inventory",
+        "outbound",
+        "shipments",
+        "task-board"
+      ],
+      "quality": [
+        "inbound",
+        "quality-inspections",
+        "task-board"
+      ],
+      "finance": [
+        "invoices",
+        "payables",
+        "print-center",
+        "receivables",
+        "reconciliation",
+        "shipments",
+        "task-board"
+      ],
+      "pmc": [
+        "material-bom",
+        "production-progress",
+        "products",
+        "task-board"
+      ],
+      "engineering": [
+        "material-bom",
+        "materials",
+        "print-center",
+        "processes",
+        "products",
+        "task-board"
+      ],
+      "production": [
+        "print-center",
+        "processing-contracts",
+        "production-progress",
+        "task-board"
+      ]
+    },
+    "modules": [
+      {
+        "key": "customers",
+        "label": "客户档案",
+        "layer": "MasterData"
+      },
+      {
+        "key": "suppliers",
+        "label": "供应商档案",
+        "layer": "MasterData"
+      },
+      {
+        "key": "products",
+        "label": "产品档案",
+        "layer": "MasterData"
+      },
+      {
+        "key": "materials",
+        "label": "材料档案",
+        "layer": "MasterData"
+      },
+      {
+        "key": "processes",
+        "label": "加工环节",
+        "layer": "MasterData"
+      },
+      {
+        "key": "material_bom",
+        "label": "BOM 管理",
+        "layer": "MasterData"
+      },
+      {
+        "key": "sales_orders",
+        "label": "销售订单",
+        "layer": "SourceDocument"
+      },
+      {
+        "key": "purchase_orders",
+        "label": "采购订单",
+        "layer": "SourceDocument"
+      },
+      {
+        "key": "purchase_receipts",
+        "label": "采购入库",
+        "layer": "Fact"
+      },
+      {
+        "key": "quality_inspections",
+        "label": "来料质检",
+        "layer": "Fact"
+      },
+      {
+        "key": "outsourcing_orders",
+        "label": "委外订单",
+        "layer": "SourceDocument"
+      },
+      {
+        "key": "inventory",
+        "label": "库存台账",
+        "layer": "FactReadModel"
+      },
+      {
+        "key": "shipments",
+        "label": "出货单",
+        "layer": "Fact"
+      },
+      {
+        "key": "finance",
+        "label": "财务业务",
+        "layer": "FactCandidate"
+      },
+      {
+        "key": "workflow_tasks",
+        "label": "协同任务",
+        "layer": "Workflow"
+      },
+      {
+        "key": "production",
+        "label": "生产协同",
+        "layer": "Workflow"
+      }
+    ],
+    "fieldPolicies": {
+      "customers.default": {
+        "customer_code": {
+          "visible": true
+        },
+        "display_name": {
+          "visible": true
+        }
+      },
+      "suppliers.default": {
+        "supplier_code": {
+          "visible": true
+        },
+        "supplier_type": {
+          "visible": true
+        }
+      },
+      "sales_orders.default": {
+        "order_no": {
+          "visible": true
+        },
+        "source_no": {
+          "visible": true
+        },
+        "expected_ship_date": {
+          "visible": true
+        }
+      }
+    },
+    "workPoolRoleOverrides": {},
+    "processDefinitions": {
+      "sales_order_acceptance": {
+        "process_key": "sales_order_acceptance",
+        "process_version": "v1",
+        "variant_key": "default",
+        "source_workflow_key": "sales_order_approval",
+        "source_status": "preview_only",
+        "manifest_status": "runtime_loader_ready",
+        "runtime_loader_enabled": true,
+        "business_ref_type": "sales_order",
+        "domain_boundary": "source_document_command_only",
+        "fact_boundary": "no_fact_posting",
+        "config_revision_source": "runtime_manifest",
+        "definition_hash_source": "compiled_customer_package",
+        "nodes": [
+          {
+            "node_key": "submit_sales_order",
+            "source_node_key": "sales_submit",
+            "node_type": "domain_command",
+            "source_owner_pool_key": "sales",
+            "required_capability_key": "sales_order.submit",
+            "policy_snapshot": {
+              "command_key": "sales_order.submit",
+              "source_command_key": "submit_sales_order",
+              "handler": "SalesOrderUsecase.SubmitSalesOrder",
+              "idempotency_key_required": true,
+              "writes_fact": false
+            }
+          },
+          {
+            "node_key": "order_approval",
+            "source_node_key": "boss_approval",
+            "node_type": "approval",
+            "source_owner_pool_key": "boss",
+            "owner_pool_key": "order_approval",
+            "required_capability_key": "workflow.task.approve",
+            "form_profile_key": "sales_order_approval.default",
+            "action_set_key": "sales_order_approval"
+          },
+          {
+            "node_key": "engineering_data",
+            "source_node_key": "engineering_data",
+            "node_type": "human_task",
+            "source_owner_pool_key": "engineering",
+            "owner_pool_key": "engineering_data",
+            "required_capability_key": "workflow.task.complete",
+            "form_profile_key": "engineering_data.default",
+            "action_set_key": "engineering_data"
+          },
+          {
+            "node_key": "order_review",
+            "source_node_key": "pmc_review",
+            "node_type": "human_task",
+            "source_owner_pool_key": "pmc",
+            "owner_pool_key": "order_review",
+            "required_capability_key": "workflow.task.complete",
+            "form_profile_key": "sales_order_review.default",
+            "action_set_key": "sales_order_review"
+          },
+          {
+            "node_key": "end",
+            "source_node_key": "end",
+            "node_type": "end"
+          }
+        ],
+        "guardrail": "Controlled runtime loader ready: sales_order_acceptance may submit the sales order source document, then create the configured approval, engineering-data and PMC review tasks; it does not post inventory, shipment, quality or finance facts."
+      },
+      "material_supply": {
+        "process_key": "material_supply",
+        "process_version": "v1",
+        "variant_key": "purchase_receipt_iqc_inbound",
+        "source_workflow_key": "purchase_order_approval",
+        "source_status": "preview_only",
+        "manifest_status": "runtime_loader_ready",
+        "runtime_loader_enabled": true,
+        "business_ref_type": "purchase_order",
+        "domain_boundary": "explicit_fact_command_api",
+        "fact_boundary": "no_fact_posting",
+        "config_revision_source": "runtime_manifest",
+        "definition_hash_source": "compiled_customer_package",
+        "nodes": [
+          {
+            "node_key": "purchase_receipt_source",
+            "node_type": "domain_command",
+            "source_owner_pool_key": "purchase",
+            "owner_pool_key": "purchase_receipt_source",
+            "required_capability_key": "purchase.receipt.create",
+            "form_profile_key": "purchase_receipt_source.default",
+            "action_set_key": "purchase_receipt_source",
+            "policy_snapshot": {
+              "command_key": "purchase_receipt.create",
+              "handler": "InventoryUsecase.CreatePurchaseReceiptFromPurchaseOrder",
+              "idempotency_key_required": true,
+              "writes_fact": false
+            },
+            "fact_command_contract": {
+              "command_key": "purchase_receipt.create",
+              "required_before_runtime_loader": false,
+              "writes_fact": false,
+              "runtime_binding_status": "process_runtime_handler_registered",
+              "process_runtime_handler_registered": true,
+              "domain_owner": "Purchase / InventoryUsecase",
+              "domain_usecase_binding": "InventoryUsecase.CreatePurchaseReceiptFromPurchaseOrder",
+              "jsonrpc_method": "purchase.create_purchase_receipt_from_purchase_order",
+              "required_permission_key": "purchase.receipt.create",
+              "jsonrpc_allowed_permission_keys": [
+                "purchase.receipt.create"
+              ],
+              "stable_business_ref": "purchase_order_id + purchase_order_item_id -> purchase_receipt_id",
+              "idempotency_boundary": "purchase receipt no and source line uniqueness exist; future runtime command must still provide process idempotency key",
+              "required_test_anchors": [
+                "server/internal/biz/purchase_receipt_process_command_test.go: TestPurchaseReceiptProcessDomainCommandCreateBindsUsecase",
+                "server/internal/biz/purchase_receipt_process_command_test.go: TestPurchaseReceiptProcessDomainCommandCreateRejectsMismatchedBusinessRef",
+                "server/internal/service/jsonrpc_purchase_test.go: TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnly",
+                "server/internal/service/jsonrpc_purchase_test.go: TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresDomainPermissions"
+              ],
+              "runtime_loader_blockers": [],
+              "runtime_execute_blockers": []
+            }
+          },
+          {
+            "node_key": "incoming_qc",
+            "node_type": "domain_command",
+            "source_owner_pool_key": "quality",
+            "owner_pool_key": "incoming_qc",
+            "required_capability_key": "quality.inspection.update",
+            "form_profile_key": "incoming_qc.default",
+            "action_set_key": "incoming_qc",
+            "policy_snapshot": {
+              "command_key": "quality_inspection.aggregate_gate",
+              "handler": "InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
+              "idempotency_key_required": true,
+              "writes_fact": false
+            },
+            "fact_command_contract": {
+              "command_key": "quality_inspection.aggregate_gate",
+              "required_before_runtime_loader": false,
+              "writes_fact": false,
+              "runtime_binding_status": "process_runtime_handler_registered",
+              "process_runtime_handler_registered": true,
+              "domain_owner": "Quality gate / InventoryUsecase",
+              "domain_usecase_binding": "InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
+              "jsonrpc_method": "customer_config.execute_material_supply_quality_gate",
+              "required_permission_key": "quality.inspection.update",
+              "jsonrpc_allowed_permission_keys": [
+                "quality.inspection.update"
+              ],
+              "stable_business_ref": "purchase_receipt_id -> every purchase_receipt_item + quality_inspection + inventory_lot",
+              "idempotency_boundary": "gate evaluation never decides line inspections or writes domain facts; ProcessRuntime still requires active node, expected version and idempotency key",
+              "required_test_anchors": [
+                "server/internal/biz/quality_inspection_process_command_test.go: TestIncomingQualityGateProcessDomainCommandPassesOnlyAfterAggregateReady",
+                "server/internal/biz/quality_inspection_process_command_test.go: TestIncomingQualityGateProcessDomainCommandRejectBlocksProcess",
+                "server/internal/biz/quality_inspection_process_command_test.go: TestIncomingQualityGateProcessDomainCommandKeepsPendingNodeActive",
+                "server/internal/biz/quality_inspection_process_command_test.go: TestIncomingQualityGateProcessDomainCommandRejectsLegacyInspectionID",
+                "server/internal/data/purchase_receipt_order_quantity_test.go: TestMaterialSupplyReceiptCreatesLineQualityGateBeforeInventoryPost",
+                "server/internal/data/inventory_postgres_purchase_receipt_test.go: TestPurchaseReceiptPostgresMaterialSupplyMultiLineQualityGate",
+                "server/internal/service/jsonrpc_customer_config_test.go: TestCustomerConfigJSONRPCExecuteMaterialSupplyQualityAndInbound"
+              ],
+              "runtime_loader_blockers": [],
+              "runtime_execute_blockers": []
+            }
+          },
+          {
+            "node_key": "warehouse_inbound",
+            "node_type": "domain_command",
+            "source_owner_pool_key": "warehouse",
+            "owner_pool_key": "warehouse_inbound",
+            "required_capability_key": "warehouse.inbound.confirm",
+            "form_profile_key": "warehouse_inbound.default",
+            "action_set_key": "warehouse_inbound",
+            "policy_snapshot": {
+              "command_key": "inventory.post_inbound",
+              "handler": "InventoryUsecase.PostPurchaseReceipt",
+              "idempotency_key_required": true,
+              "writes_fact": false
+            },
+            "fact_command_contract": {
+              "command_key": "inventory.post_inbound",
+              "required_before_runtime_loader": false,
+              "writes_fact": false,
+              "runtime_binding_status": "process_runtime_handler_registered",
+              "process_runtime_handler_registered": true,
+              "domain_owner": "Inventory / InventoryUsecase",
+              "domain_usecase_binding": "InventoryUsecase.PostPurchaseReceipt",
+              "jsonrpc_method": "purchase.post_purchase_receipt",
+              "required_permission_key": "warehouse.inbound.confirm",
+              "jsonrpc_allowed_permission_keys": [
+                "purchase.receipt.create",
+                "warehouse.inbound.confirm"
+              ],
+              "stable_business_ref": "purchase_receipt_id",
+              "idempotency_boundary": "purchase receipt posting replay keeps one inbound inventory transaction; future runtime command must still provide process idempotency key",
+              "required_test_anchors": [
+                "server/internal/biz/inventory_process_command_test.go: TestInventoryProcessDomainCommandPostInboundBindsUsecase",
+                "server/internal/biz/inventory_process_command_test.go: TestInventoryProcessDomainCommandPostInboundRejectsMismatchedBusinessRef",
+                "server/internal/data/inventory_repo_purchase_receipt_test.go: TestInventoryRepo_PurchaseReceiptLifecycle",
+                "server/internal/data/inventory_postgres_purchase_receipt_test.go: TestPurchaseReceiptPostgresFlow",
+                "server/internal/service/jsonrpc_purchase_test.go: TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact",
+                "server/internal/service/jsonrpc_purchase_test.go: TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresDomainPermissions"
+              ],
+              "runtime_loader_blockers": [],
+              "runtime_execute_blockers": []
+            }
+          },
+          {
+            "node_key": "end",
+            "node_type": "end"
+          }
+        ],
+        "guardrail": "Runtime loader ready: material_supply can construct purchase_order process instances with explicit domain_command nodes; incoming_qc only aggregates formal line decisions, and Workflow task completion still cannot create purchase_receipts, decide quality_inspections or post inventory_txns."
+      },
+      "finished_goods_delivery": {
+        "process_key": "finished_goods_delivery",
+        "process_version": "v1",
+        "variant_key": "quality_finance_ship_receivable",
+        "source_workflow_key": "finished_goods_delivery",
+        "source_status": "preview_only",
+        "manifest_status": "runtime_loader_start_ready",
+        "runtime_loader_enabled": true,
+        "business_ref_type": "shipment",
+        "domain_boundary": "contract_preflight_only",
+        "fact_boundary": "no_fact_posting",
+        "config_revision_source": "runtime_manifest",
+        "definition_hash_source": "compiled_customer_package",
+        "nodes": [
+          {
+            "node_key": "finished_goods_quality",
+            "node_type": "domain_command",
+            "source_owner_pool_key": "quality",
+            "owner_pool_key": "finished_goods_quality",
+            "required_capability_key": "quality.inspection.update",
+            "form_profile_key": "finished_goods_quality.default",
+            "action_set_key": "finished_goods_quality",
+            "policy_snapshot": {
+              "command_key": "finished_goods_quality.decide",
+              "handler": "InventoryUsecase.PassQualityInspection/RejectQualityInspection",
+              "idempotency_key_required": true,
+              "writes_fact": false
+            },
+            "fact_command_contract": {
+              "command_key": "finished_goods_quality.decide",
+              "required_before_runtime_loader": false,
+              "required_before_runtime_execute": true,
+              "writes_fact": false,
+              "runtime_binding_status": "process_runtime_handler_registered",
+              "process_runtime_handler_registered": true,
+              "domain_owner": "Quality / InventoryUsecase",
+              "domain_usecase_binding": "process_runtime_handler: InventoryUsecase.PassQualityInspection / RejectQualityInspection for source_type=SHIPMENT quality_inspection",
+              "jsonrpc_method": "customer_config.execute_finished_goods_delivery_quality_decide",
+              "required_permission_key": "quality.inspection.update",
+              "jsonrpc_allowed_permission_keys": [
+                "quality.inspection.update"
+              ],
+              "stable_business_ref": "shipment_id + finished_goods_lot_id + quality_inspection_id",
+              "idempotency_boundary": "ExecuteDomainCommandNode requires active node, expected_version and idempotency key; handler rejects mismatched shipment / inspection refs",
+              "required_test_anchors": [
+                "server/internal/biz/quality_inspection_process_command_test.go: TestFinishedGoodsQualityProcessDomainCommandDecideBindsShipmentLinkedInspection",
+                "server/internal/biz/quality_inspection_process_command_test.go: TestFinishedGoodsQualityProcessDomainCommandDecideRejectsMismatchedShipmentRefs",
+                "server/internal/service/jsonrpc_customer_config_test.go: TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideRunsRegisteredHandler",
+                "server/internal/service/jsonrpc_customer_config_test.go: TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideRequiresQualityPermission",
+                "server/internal/biz/workflow_shipment_release_test.go: TestWorkflowUsecase_ShipmentReleaseDoneUpsertsShippingReleasedOnly",
+                "server/internal/service/jsonrpc_workflow_test.go: TestJsonrpcDispatcher_WorkflowUpdateTaskStatusTriggersShipmentReleaseBusinessState"
+              ],
+              "runtime_loader_blockers": [],
+              "runtime_execute_blockers": [
+                "target_evidence_missing"
+              ]
+            }
+          },
+          {
+            "node_key": "shipment_finance_release",
+            "node_type": "domain_command",
+            "source_owner_pool_key": "finance",
+            "owner_pool_key": "shipment_finance_release",
+            "required_capability_key": "finance.receivable.confirm",
+            "form_profile_key": "shipment_finance_release.default",
+            "action_set_key": "shipment_finance_release",
+            "policy_snapshot": {
+              "command_key": "shipment.finance_release",
+              "handler": "OperationalFactUsecase.GetShipment",
+              "idempotency_key_required": true,
+              "writes_fact": false
+            },
+            "fact_command_contract": {
+              "command_key": "shipment.finance_release",
+              "required_before_runtime_loader": false,
+              "required_before_runtime_execute": true,
+              "writes_fact": false,
+              "runtime_binding_status": "process_runtime_handler_registered",
+              "process_runtime_handler_registered": true,
+              "domain_owner": "Shipment / OperationalFactUsecase",
+              "domain_usecase_binding": "process_runtime_handler: OperationalFactUsecase.GetShipment validates draft shipment finance release gate without shipping inventory or creating finance facts",
+              "jsonrpc_method": "customer_config.execute_finished_goods_delivery_finance_release",
+              "required_permission_key": "finance.receivable.confirm",
+              "jsonrpc_allowed_permission_keys": [
+                "finance.receivable.confirm"
+              ],
+              "stable_business_ref": "shipment_id",
+              "idempotency_boundary": "ProcessRuntime domain command carries process idempotency key and keeps finance release separate from shipment.ship",
+              "required_test_anchors": [
+                "server/internal/biz/shipment_process_command_test.go: TestShipmentProcessDomainCommandFinanceReleaseBindsUsecase",
+                "server/internal/biz/shipment_process_command_test.go: TestShipmentProcessDomainCommandFinanceReleaseRequiresDraftShipment",
+                "server/internal/service/jsonrpc_customer_config_test.go: TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryFinanceReleaseRunsRegisteredHandler",
+                "server/internal/service/jsonrpc_customer_config_test.go: TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryFinanceReleaseRequiresFinancePermission",
+                "server/internal/biz/workflow_shipment_release_test.go: TestWorkflowUsecase_ShipmentReleaseDoneUpsertsShippingReleasedOnly",
+                "server/internal/service/jsonrpc_operational_fact_test.go: TestFinanceFactCreateFromParamsParsesFeeAndCurrency"
+              ],
+              "runtime_loader_blockers": [],
+              "runtime_execute_blockers": [
+                "target_evidence_missing"
+              ]
+            }
+          },
+          {
+            "node_key": "shipment_execution",
+            "node_type": "domain_command",
+            "source_owner_pool_key": "warehouse",
+            "owner_pool_key": "shipment_execution",
+            "required_capability_key": "shipment.ship",
+            "form_profile_key": "shipment_execution.default",
+            "action_set_key": "shipment_execution",
+            "policy_snapshot": {
+              "command_key": "shipment.ship",
+              "handler": "OperationalFactUsecase.ShipShipment",
+              "idempotency_key_required": true,
+              "writes_fact": false
+            },
+            "fact_command_contract": {
+              "command_key": "shipment.ship",
+              "required_before_runtime_loader": false,
+              "required_before_runtime_execute": true,
+              "writes_fact": false,
+              "runtime_binding_status": "process_runtime_handler_registered",
+              "process_runtime_handler_registered": true,
+              "domain_owner": "Shipment / OperationalFactUsecase",
+              "domain_usecase_binding": "process_runtime_handler: OperationalFactUsecase.ShipShipment",
+              "jsonrpc_method": "customer_config.execute_finished_goods_delivery_shipment_ship",
+              "required_permission_key": "shipment.ship",
+              "jsonrpc_allowed_permission_keys": [
+                "shipment.ship"
+              ],
+              "stable_business_ref": "shipment_id",
+              "idempotency_boundary": "ExecuteDomainCommandNode requires active node, expected_version and idempotency key; after success the node is completed so duplicate calls cannot re-enter shipment.ship",
+              "required_test_anchors": [
+                "server/internal/biz/shipment_process_command_test.go: TestShipmentProcessDomainCommandShipBindsUsecase",
+                "server/internal/biz/shipment_process_command_test.go: TestShipmentProcessDomainCommandShipRejectsMismatchedBusinessRef",
+                "server/internal/service/jsonrpc_customer_config_test.go: TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRunsRegisteredHandler",
+                "server/internal/service/jsonrpc_customer_config_test.go: TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRequiresShipmentPermission",
+                "server/internal/service/jsonrpc_operational_fact_test.go: TestJsonrpcDispatcher_ShipmentAPIRequiresDedicatedShipmentPermissions",
+                "server/internal/service/jsonrpc_workflow_test.go: TestJsonrpcDispatcher_WorkflowUpdateTaskStatusTriggersShipmentReleaseBusinessState"
+              ],
+              "runtime_loader_blockers": [],
+              "runtime_execute_blockers": [
+                "target_evidence_missing"
+              ]
+            }
+          },
+          {
+            "node_key": "receivable_lead",
+            "node_type": "domain_command",
+            "source_owner_pool_key": "finance",
+            "owner_pool_key": "receivable_lead",
+            "required_capability_key": "finance.receivable.confirm",
+            "form_profile_key": "receivable_lead.default",
+            "action_set_key": "receivable_lead",
+            "policy_snapshot": {
+              "command_key": "finance.receivable_lead",
+              "handler": "OperationalFactUsecase.CreateFinanceFactDraft",
+              "idempotency_key_required": true,
+              "writes_fact": false
+            },
+            "fact_command_contract": {
+              "command_key": "finance.receivable_lead",
+              "required_before_runtime_loader": false,
+              "required_before_runtime_execute": true,
+              "writes_fact": false,
+              "runtime_binding_status": "process_runtime_handler_registered",
+              "process_runtime_handler_registered": true,
+              "domain_owner": "Finance / OperationalFactUsecase",
+              "domain_usecase_binding": "process_runtime_handler: OperationalFactUsecase.CreateFinanceFactDraft for RECEIVABLE from SHIPPED shipment",
+              "jsonrpc_method": "customer_config.execute_finished_goods_delivery_receivable_lead",
+              "required_permission_key": "finance.receivable.confirm",
+              "jsonrpc_allowed_permission_keys": [
+                "finance.receivable.confirm"
+              ],
+              "stable_business_ref": "shipment_id + customer_id + receivable_source_no",
+              "idempotency_boundary": "ExecuteDomainCommandNode requires active node, expected_version and idempotency key; finance fact draft uses the same process idempotency key",
+              "required_test_anchors": [
+                "server/internal/biz/finance_process_command_test.go: TestFinanceProcessDomainCommandReceivableLeadBindsUsecase",
+                "server/internal/biz/finance_process_command_test.go: TestFinanceProcessDomainCommandReceivableLeadRequiresShippedShipment",
+                "server/internal/service/jsonrpc_customer_config_test.go: TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadCreatesDraft",
+                "server/internal/service/jsonrpc_customer_config_test.go: TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadRequiresFinancePermission",
+                "server/internal/service/jsonrpc_operational_fact_test.go: TestFinanceFactCreateFromParamsParsesFeeAndCurrency",
+                "server/internal/service/jsonrpc_workflow_test.go: TestJsonrpcDispatcher_WorkflowUpdateTaskStatusTriggersShipmentReleaseBusinessState"
+              ],
+              "runtime_loader_blockers": [],
+              "runtime_execute_blockers": [
+                "target_evidence_missing"
+              ]
+            }
+          },
+          {
+            "node_key": "end",
+            "node_type": "end"
+          }
+        ],
+        "guardrail": "Start-only loader: finished_goods_delivery can create and start a ProcessInstance; finished_goods_quality, shipment_finance_release, shipment_execution, and receivable_lead now have explicit handlers, and target evidence is still required before release readiness."
+      }
+    },
+    "flowCatalog": {
+      "runtime_enabled": false,
+      "catalog_status": "preview_only",
+      "business_flows": [
+        {
+          "key": "sales_to_production",
+          "label": "销售到生产",
+          "status": "preview_only",
+          "modules": [
+            "sales_orders",
+            "products",
+            "workflow_tasks"
+          ],
+          "guardrail": "销售订单提交后只形成生产评审线索；真实生产事实仍由 OperationalFactUsecase 承接。"
+        },
+        {
+          "key": "purchase_to_inventory",
+          "label": "采购到库存",
+          "status": "preview_only",
+          "modules": [
+            "purchase_orders",
+            "purchase_receipts",
+            "inventory"
+          ],
+          "guardrail": "采购承诺、到货协同和库存入账分开；只有采购入库事实 usecase 可写库存。"
+        },
+        {
+          "key": "production_to_inventory",
+          "label": "生产到库存",
+          "status": "preview_only",
+          "modules": [
+            "workflow_tasks",
+            "inventory",
+            "quality_inspections"
+          ],
+          "guardrail": "生产完工协同不等于成品入库；质检和入库事实必须走对应 usecase。"
+        },
+        {
+          "key": "delivery_to_settlement",
+          "label": "交付到结算",
+          "status": "preview_only",
+          "modules": [
+            "shipments",
+            "finance"
+          ],
+          "guardrail": "出货单 SHIPPED 后才可评审应收 / 开票线索；出货放行不等于 shipped。"
+        }
+      ],
+      "state_machines": [
+        {
+          "key": "sales_order_lifecycle",
+          "label": "销售订单生命周期",
+          "status": "preview_only",
+          "states": [
+            "draft",
+            "submitted",
+            "approved",
+            "pmc_review",
+            "closed"
+          ],
+          "transitions": [
+            [
+              "draft",
+              "submitted"
+            ],
+            [
+              "submitted",
+              "approved"
+            ],
+            [
+              "approved",
+              "pmc_review"
+            ],
+            [
+              "pmc_review",
+              "closed"
+            ]
+          ],
+          "guardrail": "状态机只用于配置预览，不覆盖销售订单 usecase 当前状态规则。"
+        },
+        {
+          "key": "production_order_lifecycle",
+          "label": "生产任务生命周期",
+          "status": "preview_only",
+          "states": [
+            "planned",
+            "released",
+            "processing",
+            "qc_pending",
+            "closed"
+          ],
+          "transitions": [
+            [
+              "planned",
+              "released"
+            ],
+            [
+              "released",
+              "processing"
+            ],
+            [
+              "processing",
+              "qc_pending"
+            ],
+            [
+              "qc_pending",
+              "closed"
+            ]
+          ],
+          "guardrail": "生产状态预览不生成库存、质检或出货事实。"
+        },
+        {
+          "key": "purchase_order_lifecycle",
+          "label": "采购订单生命周期",
+          "status": "preview_only",
+          "states": [
+            "draft",
+            "submitted",
+            "approved",
+            "receiving",
+            "closed"
+          ],
+          "transitions": [
+            [
+              "draft",
+              "submitted"
+            ],
+            [
+              "submitted",
+              "approved"
+            ],
+            [
+              "approved",
+              "receiving"
+            ],
+            [
+              "receiving",
+              "closed"
+            ]
+          ],
+          "guardrail": "采购订单生命周期不替代采购入库、退货、调整或库存事实状态。"
+        }
+      ]
+    },
+    "policyCatalog": {
+      "runtime_enabled": false,
+      "catalog_status": "preview_only",
+      "process_policies": [
+        {
+          "key": "skip_policy",
+          "kind": "skip_policy",
+          "label": "跳过策略",
+          "status": "preview_only",
+          "runtime_enabled": false,
+          "rule_count": 1,
+          "rules": [
+            {
+              "key": "skip_optional_review_when_unconfigured",
+              "decision": "manual_review_required"
+            }
+          ],
+          "guardrail": "跳过只能进入人工评审，不允许绕过后端状态、权限或事实校验。"
+        },
+        {
+          "key": "auto_generate_policy",
+          "kind": "auto_generate_policy",
+          "label": "自动生成策略",
+          "status": "preview_only",
+          "runtime_enabled": false,
+          "rule_count": 1,
+          "rules": [
+            {
+              "key": "generate_downstream_task_preview",
+              "decision": "preview_only"
+            }
+          ],
+          "guardrail": "自动生成只预览协同任务结构，不自动生成事实单据或库存流水。"
+        },
+        {
+          "key": "close_policy",
+          "kind": "close_policy",
+          "label": "关闭策略",
+          "status": "preview_only",
+          "runtime_enabled": false,
+          "rule_count": 1,
+          "rules": [
+            {
+              "key": "close_after_required_nodes_done",
+              "decision": "requires_usecase_review"
+            }
+          ],
+          "guardrail": "关闭策略不能把 task done 写成 fact posted，也不能绕过冲正 / 取消规则。"
+        }
+      ]
+    },
+    "extensionPointCatalog": {
+      "runtime_enabled": false,
+      "catalog_status": "controlled_empty",
+      "implementation_source": "registered_deployment_package_required",
+      "handler_allowed": false,
+      "customer_package_handler_allowed": false,
+      "blocked_reasons": [
+        "no_reviewed_extension_contract",
+        "customer_package_handler_forbidden",
+        "registered_deployment_package_required"
+      ],
+      "extension_points": []
+    },
+    "printTemplateDefaults": {
+      "runtime_enabled": true,
+      "catalog_status": "effective_session_projected",
+      "source": "customer_package_print_template_defaults",
+      "formal_runtime_consumed": true,
+      "sales_order_print_template_enabled": false,
+      "templates": [
+        {
+          "template_key": "material-purchase-contract",
+          "status": "effective_session_projected",
+          "runtime_consumed": true,
+          "party_defaults": {
+            "buyerCompany": "永绅",
+            "buyerContact": "采购负责人",
+            "buyerAddress": "东莞-茶山"
+          },
+          "supplier_defaults_allowed": false,
+          "guardrail": "仅作为 yoyoosun 客户配置草案里的采购合同买方抬头默认值，不进入 Product Core 默认样例，不自动生成签章、签收、采购事实或财务事实。"
+        },
+        {
+          "template_key": "processing-contract",
+          "status": "effective_session_projected",
+          "runtime_consumed": true,
+          "party_defaults": {
+            "buyerCompany": "永绅",
+            "buyerContact": "委外负责人",
+            "buyerAddress": "东莞茶山"
+          },
+          "supplier_defaults_allowed": false,
+          "guardrail": "仅作为 yoyoosun 客户配置草案里的加工合同委托方抬头默认值，不进入 Product Core 默认样例，不自动生成签章、签收、委外事实或财务事实。"
+        }
+      ],
+      "guardrail": "Customer package print defaults provide customer-specific buyer party display defaults through the reviewed customer_config effective session projection; supplier snapshots still come from business records."
+    },
+    "preview": {
+      "identity": {
+        "customerKey": "yoyoosun",
+        "packageKey": "yoyoosun-customer-package-v7",
+        "label": "永绅 yoyoosun 客户配置包",
+        "status": "draft",
+        "runtimeEnabled": false,
+        "previewOnly": true
+      },
+      "workflows": [
+        {
+          "key": "sales_order_approval",
+          "label": "销售订单审批",
+          "nodeCount": 5,
+          "ownerPools": [
+            "sales",
+            "boss",
+            "engineering",
+            "pmc"
+          ],
+          "factBoundary": "workflow_only",
+          "guardrail": "销售订单审批只表达协同流转；工程资料补齐只维护产品、工序和 BOM 资料，不生成出货、库存、生产、成本、应收或发票事实。"
+        },
+        {
+          "key": "purchase_order_approval",
+          "label": "采购订单评审",
+          "nodeCount": 5,
+          "ownerPools": [
+            "purchase",
+            "boss",
+            "warehouse",
+            "quality"
+          ],
+          "factBoundary": "workflow_only",
+          "guardrail": "采购订单评审不等于采购入库，不写 purchase_receipts、inventory_txns 或应付事实。"
+        },
+        {
+          "key": "payment_approval",
+          "label": "付款放行",
+          "nodeCount": 3,
+          "ownerPools": [
+            "finance",
+            "boss"
+          ],
+          "factBoundary": "workflow_only",
+          "guardrail": "付款放行只作为候选协同结构，不生成付款、应付冲销、发票或总账事实。"
+        },
+        {
+          "key": "finished_goods_delivery",
+          "label": "成品质检到出货结算",
+          "nodeCount": 5,
+          "ownerPools": [
+            "quality",
+            "finance",
+            "warehouse"
+          ],
+          "factBoundary": "workflow_only",
+          "guardrail": "成品质检、财务放行、实际出货和应收线索必须分开；当前仅作为合同预检结构，不自动写质检、出货、库存、应收或开票事实。"
+        }
+      ],
+      "businessFlows": [
+        {
+          "key": "sales_to_production",
+          "label": "销售到生产",
+          "modules": [
+            "sales_orders",
+            "products",
+            "workflow_tasks"
+          ],
+          "guardrail": "销售订单提交后只形成生产评审线索；真实生产事实仍由 OperationalFactUsecase 承接。"
+        },
+        {
+          "key": "purchase_to_inventory",
+          "label": "采购到库存",
+          "modules": [
+            "purchase_orders",
+            "purchase_receipts",
+            "inventory"
+          ],
+          "guardrail": "采购承诺、到货协同和库存入账分开；只有采购入库事实 usecase 可写库存。"
+        },
+        {
+          "key": "production_to_inventory",
+          "label": "生产到库存",
+          "modules": [
+            "workflow_tasks",
+            "inventory",
+            "quality_inspections"
+          ],
+          "guardrail": "生产完工协同不等于成品入库；质检和入库事实必须走对应 usecase。"
+        },
+        {
+          "key": "delivery_to_settlement",
+          "label": "交付到结算",
+          "modules": [
+            "shipments",
+            "finance"
+          ],
+          "guardrail": "出货单 SHIPPED 后才可评审应收 / 开票线索；出货放行不等于 shipped。"
+        }
+      ],
+      "stateMachines": [
+        {
+          "key": "sales_order_lifecycle",
+          "label": "销售订单生命周期",
+          "stateCount": 5,
+          "transitionCount": 4,
+          "guardrail": "状态机只用于配置预览，不覆盖销售订单 usecase 当前状态规则。"
+        },
+        {
+          "key": "production_order_lifecycle",
+          "label": "生产任务生命周期",
+          "stateCount": 5,
+          "transitionCount": 4,
+          "guardrail": "生产状态预览不生成库存、质检或出货事实。"
+        },
+        {
+          "key": "purchase_order_lifecycle",
+          "label": "采购订单生命周期",
+          "stateCount": 5,
+          "transitionCount": 4,
+          "guardrail": "采购订单生命周期不替代采购入库、退货、调整或库存事实状态。"
+        }
+      ],
+      "processPolicies": [
+        {
+          "key": "skip_policy",
+          "kind": "skip_policy",
+          "label": "跳过策略",
+          "ruleCount": 1,
+          "rules": [
+            {
+              "key": "skip_optional_review_when_unconfigured",
+              "decision": "manual_review_required"
+            }
+          ],
+          "guardrail": "跳过只能进入人工评审，不允许绕过后端状态、权限或事实校验。"
+        },
+        {
+          "key": "auto_generate_policy",
+          "kind": "auto_generate_policy",
+          "label": "自动生成策略",
+          "ruleCount": 1,
+          "rules": [
+            {
+              "key": "generate_downstream_task_preview",
+              "decision": "preview_only"
+            }
+          ],
+          "guardrail": "自动生成只预览协同任务结构，不自动生成事实单据或库存流水。"
+        },
+        {
+          "key": "close_policy",
+          "kind": "close_policy",
+          "label": "关闭策略",
+          "ruleCount": 1,
+          "rules": [
+            {
+              "key": "close_after_required_nodes_done",
+              "decision": "requires_usecase_review"
+            }
+          ],
+          "guardrail": "关闭策略不能把 task done 写成 fact posted，也不能绕过冲正 / 取消规则。"
+        }
+      ],
+      "extensionPoints": [],
+      "printTemplateDefaults": [
+        {
+          "templateKey": "material-purchase-contract",
+          "status": "preview_only",
+          "defaultFieldCount": 5,
+          "guardrail": "仅作为 yoyoosun 客户配置草案里的采购合同买方抬头默认值，不进入 Product Core 默认样例，不自动生成签章、签收、采购事实或财务事实。"
+        },
+        {
+          "templateKey": "processing-contract",
+          "status": "preview_only",
+          "defaultFieldCount": 5,
+          "guardrail": "仅作为 yoyoosun 客户配置草案里的加工合同委托方抬头默认值，不进入 Product Core 默认样例，不自动生成签章、签收、委外事实或财务事实。"
+        }
+      ],
+      "guardrails": {
+        "boundaries": {
+          "createsTenant": false,
+          "changesSchema": false,
+          "changesMigration": false,
+          "changesBackendRbac": false,
+          "changesWorkflowFactRules": false,
+          "changesRuntimeLoader": false,
+          "executesImport": false,
+          "executesRealImport": false,
+          "writesBusinessRecords": false,
+          "writesFacts": false,
+          "writesInventoryFacts": false,
+          "writesShipmentFacts": false,
+          "writesFinanceFacts": false
+        },
+        "forbiddenTargets": [
+          "tenant_id",
+          "business_records",
+          "schema",
+          "migration",
+          "rbac",
+          "inventory_txns",
+          "inventory_balances",
+          "shipments",
+          "shipment_items",
+          "finance_facts",
+          "workflow_done_to_fact_posted",
+          "shipping_released_to_shipped"
+        ]
+      }
+    }
+  },
+  "module_states": [
+    {
+      "module_key": "customers",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    },
+    {
+      "module_key": "suppliers",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    },
+    {
+      "module_key": "products",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    },
+    {
+      "module_key": "materials",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    },
+    {
+      "module_key": "processes",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    },
+    {
+      "module_key": "material_bom",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    },
+    {
+      "module_key": "sales_orders",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    },
+    {
+      "module_key": "purchase_orders",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    },
+    {
+      "module_key": "purchase_receipts",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    },
+    {
+      "module_key": "quality_inspections",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    },
+    {
+      "module_key": "outsourcing_orders",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    },
+    {
+      "module_key": "inventory",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    },
+    {
+      "module_key": "shipments",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    },
+    {
+      "module_key": "finance",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    },
+    {
+      "module_key": "workflow_tasks",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    },
+    {
+      "module_key": "production",
+      "contract_version": "customer-package-catalog-v1",
+      "state": "enabled",
+      "reason": "compiled from tracked customer package catalog"
+    }
+  ],
+  "role_profiles": [
+    {
+      "role_key": "boss",
+      "display_name": "老板 / 管理审批",
+      "disabled": false,
+      "bundle_keys": [
+        "boss"
+      ],
+      "revokes": []
+    },
+    {
+      "role_key": "sales",
+      "display_name": "销售",
+      "disabled": false,
+      "bundle_keys": [
+        "sales"
+      ],
+      "revokes": []
+    },
+    {
+      "role_key": "purchase",
+      "display_name": "采购",
+      "disabled": false,
+      "bundle_keys": [
+        "purchase"
+      ],
+      "revokes": []
+    },
+    {
+      "role_key": "warehouse",
+      "display_name": "仓库",
+      "disabled": false,
+      "bundle_keys": [
+        "warehouse"
+      ],
+      "revokes": []
+    },
+    {
+      "role_key": "quality",
+      "display_name": "品质",
+      "disabled": false,
+      "bundle_keys": [
+        "quality"
+      ],
+      "revokes": []
+    },
+    {
+      "role_key": "finance",
+      "display_name": "财务",
+      "disabled": false,
+      "bundle_keys": [
+        "finance"
+      ],
+      "revokes": []
+    },
+    {
+      "role_key": "pmc",
+      "display_name": "PMC",
+      "disabled": false,
+      "bundle_keys": [
+        "pmc"
+      ],
+      "revokes": []
+    },
+    {
+      "role_key": "engineering",
+      "display_name": "工程",
+      "disabled": false,
+      "bundle_keys": [
+        "engineering"
+      ],
+      "revokes": []
+    },
+    {
+      "role_key": "production",
+      "display_name": "生产 / 委外",
+      "disabled": false,
+      "bundle_keys": [
+        "production"
+      ],
+      "revokes": []
+    }
+  ],
+  "access_entitlements": [
+    {
+      "role_key": "boss",
+      "capability_key": "contact.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "boss",
+      "capability_key": "erp.dashboard.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "boss",
+      "capability_key": "erp.print_template.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "boss",
+      "capability_key": "material.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "boss",
+      "capability_key": "mobile.boss.access",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "boss",
+      "capability_key": "purchase.order.approve",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "boss",
+      "capability_key": "purchase.order.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "boss",
+      "capability_key": "supplier.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "boss",
+      "capability_key": "warehouse.inventory.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "boss",
+      "capability_key": "workflow.task.approve",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "boss",
+      "capability_key": "workflow.task.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "boss",
+      "capability_key": "workflow.task.reject",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "boss",
+      "capability_key": "workflow.task.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "contact.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "contact.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "contact.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "customer.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "customer.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "customer.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "erp.dashboard.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "erp.print_template.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "material.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "mobile.sales.access",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "product.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "product_sku.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "sales_order.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "sales_order.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "sales_order.submit",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "sales_order.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "sales_order_item.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "shipment.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "warehouse.inventory.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "workflow.task.complete",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "workflow.task.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "sales",
+      "capability_key": "workflow.task.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "contact.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "contact.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "contact.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "erp.dashboard.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "erp.print_template.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "material.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "mobile.purchase.access",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "purchase.order.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "purchase.order.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "purchase.order.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "purchase.receipt.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "purchase.receipt.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "supplier.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "supplier.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "supplier.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "warehouse.inventory.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "workflow.task.complete",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "workflow.task.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "purchase",
+      "capability_key": "workflow.task.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "customer.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "erp.dashboard.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "material.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "mobile.warehouse.access",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "product.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "product_sku.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "purchase.receipt.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "sales_order.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "sales_order_item.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "shipment.cancel",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "shipment.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "shipment.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "shipment.ship",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "supplier.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "warehouse.inbound.confirm",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "warehouse.inbound.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "warehouse.inventory.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "warehouse.outbound.confirm",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "warehouse.outbound.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "workflow.task.complete",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "workflow.task.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "workflow.task.reject",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "warehouse",
+      "capability_key": "workflow.task.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "quality",
+      "capability_key": "erp.dashboard.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "quality",
+      "capability_key": "material.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "quality",
+      "capability_key": "mobile.quality.access",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "quality",
+      "capability_key": "purchase.receipt.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "quality",
+      "capability_key": "quality.exception.handle",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "quality",
+      "capability_key": "quality.inspection.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "quality",
+      "capability_key": "quality.inspection.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "quality",
+      "capability_key": "quality.inspection.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "quality",
+      "capability_key": "supplier.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "quality",
+      "capability_key": "warehouse.inventory.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "quality",
+      "capability_key": "workflow.task.complete",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "quality",
+      "capability_key": "workflow.task.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "quality",
+      "capability_key": "workflow.task.reject",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "quality",
+      "capability_key": "workflow.task.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "customer.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "erp.dashboard.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "erp.print_template.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "finance.payable.confirm",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "finance.payable.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "finance.receivable.confirm",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "finance.receivable.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "finance.report.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "material.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "mobile.finance.access",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "product.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "product_sku.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "sales_order.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "sales_order_item.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "shipment.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "warehouse.inventory.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "workflow.task.complete",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "workflow.task.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "workflow.task.reject",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "finance",
+      "capability_key": "workflow.task.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "pmc",
+      "capability_key": "bom.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "pmc",
+      "capability_key": "erp.dashboard.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "pmc",
+      "capability_key": "material.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "pmc",
+      "capability_key": "mobile.pmc.access",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "pmc",
+      "capability_key": "pmc.plan.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "pmc",
+      "capability_key": "pmc.plan.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "pmc",
+      "capability_key": "pmc.plan.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "pmc",
+      "capability_key": "pmc.risk.handle",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "pmc",
+      "capability_key": "pmc.risk.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "pmc",
+      "capability_key": "product.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "pmc",
+      "capability_key": "product_sku.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "pmc",
+      "capability_key": "workflow.task.complete",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "pmc",
+      "capability_key": "workflow.task.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "pmc",
+      "capability_key": "workflow.task.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "pmc",
+      "capability_key": "workflow.task.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "bom.activate",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "bom.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "bom.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "bom.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "erp.dashboard.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "erp.print_template.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "material.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "mobile.engineering.access",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "process.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "process.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "process.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "product.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "product.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "product.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "product_sku.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "product_sku.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "product_sku.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "workflow.task.complete",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "workflow.task.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "engineering",
+      "capability_key": "workflow.task.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "contact.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "erp.dashboard.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "erp.print_template.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "material.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "mobile.production.access",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "outsourcing.order.confirm",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "outsourcing.order.create",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "outsourcing.order.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "outsourcing.order.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "pmc.plan.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "pmc.plan.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "process.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "product.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "supplier.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "workflow.task.complete",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "workflow.task.read",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    },
+    {
+      "role_key": "production",
+      "capability_key": "workflow.task.update",
+      "scope_type": "customer",
+      "scope_value": "yoyoosun",
+      "constraints": {
+        "source": "compiled_customer_package",
+        "runtime_enforced": true
+      },
+      "enabled": true
+    }
+  ],
+  "work_pools": [
+    {
+      "pool_key": "boss",
+      "module_key": "workflow_tasks",
+      "display_name": "老板 / 管理层",
+      "description": "compiled responsibility pool from tracked customer package catalog"
+    },
+    {
+      "pool_key": "sales",
+      "module_key": "sales_orders",
+      "display_name": "业务",
+      "description": "compiled responsibility pool from tracked customer package catalog"
+    },
+    {
+      "pool_key": "purchase",
+      "module_key": "purchase_orders",
+      "display_name": "采购",
+      "description": "compiled responsibility pool from tracked customer package catalog"
+    },
+    {
+      "pool_key": "warehouse",
+      "module_key": "inventory",
+      "display_name": "仓库",
+      "description": "compiled responsibility pool from tracked customer package catalog"
+    },
+    {
+      "pool_key": "quality",
+      "module_key": "quality_inspections",
+      "display_name": "品质",
+      "description": "compiled responsibility pool from tracked customer package catalog"
+    },
+    {
+      "pool_key": "finance",
+      "module_key": "finance",
+      "display_name": "财务",
+      "description": "compiled responsibility pool from tracked customer package catalog"
+    },
+    {
+      "pool_key": "pmc",
+      "module_key": "workflow_tasks",
+      "display_name": "PMC",
+      "description": "compiled responsibility pool from tracked customer package catalog"
+    },
+    {
+      "pool_key": "engineering",
+      "module_key": "products",
+      "display_name": "工程",
+      "description": "compiled responsibility pool from tracked customer package catalog"
+    },
+    {
+      "pool_key": "production",
+      "module_key": "workflow_tasks",
+      "display_name": "生产经理",
+      "description": "compiled responsibility pool from tracked customer package catalog"
+    },
+    {
+      "pool_key": "order_approval",
+      "module_key": "workflow_tasks",
+      "display_name": "销售订单审批责任池",
+      "description": "derived from sales order acceptance process definition",
+      "source_pool_key": "boss"
+    },
+    {
+      "pool_key": "engineering_data",
+      "module_key": "products",
+      "display_name": "销售订单工程资料责任池",
+      "description": "derived from customer sales order acceptance process definition",
+      "source_pool_key": "engineering"
+    },
+    {
+      "pool_key": "order_review",
+      "module_key": "workflow_tasks",
+      "display_name": "销售订单 PMC 评审责任池",
+      "description": "derived from sales order acceptance process definition",
+      "source_pool_key": "pmc"
+    },
+    {
+      "pool_key": "purchase_receipt_source",
+      "module_key": "purchase_receipts",
+      "display_name": "采购收货来源责任池",
+      "description": "material supply runtime node; no automatic task fact posting",
+      "source_pool_key": "purchase"
+    },
+    {
+      "pool_key": "incoming_qc",
+      "module_key": "quality_inspections",
+      "display_name": "来料质检责任池",
+      "description": "material supply runtime node; no automatic task fact posting",
+      "source_pool_key": "quality"
+    },
+    {
+      "pool_key": "warehouse_inbound",
+      "module_key": "inventory",
+      "display_name": "仓库入库责任池",
+      "description": "material supply runtime node; no automatic task fact posting",
+      "source_pool_key": "warehouse"
+    },
+    {
+      "pool_key": "finished_goods_quality",
+      "module_key": "quality_inspections",
+      "display_name": "成品质检责任池",
+      "description": "finished goods delivery contract node; runtime loader start-only",
+      "source_pool_key": "quality"
+    },
+    {
+      "pool_key": "shipment_finance_release",
+      "module_key": "finance",
+      "display_name": "出货财务放行责任池",
+      "description": "finished goods delivery contract node; runtime loader start-only",
+      "source_pool_key": "finance"
+    },
+    {
+      "pool_key": "shipment_execution",
+      "module_key": "shipments",
+      "display_name": "仓库出货执行责任池",
+      "description": "finished goods delivery contract node; runtime loader start-only",
+      "source_pool_key": "warehouse"
+    },
+    {
+      "pool_key": "receivable_lead",
+      "module_key": "finance",
+      "display_name": "应收线索责任池",
+      "description": "finished goods delivery contract node; runtime loader start-only",
+      "source_pool_key": "finance"
+    }
+  ],
+  "work_pool_memberships": [
+    {
+      "pool_key": "boss",
+      "role_key": "boss",
+      "user_id": 0,
+      "strategy": "role_pool",
+      "priority": 1,
+      "enabled": true
+    },
+    {
+      "pool_key": "sales",
+      "role_key": "sales",
+      "user_id": 0,
+      "strategy": "role_pool",
+      "priority": 2,
+      "enabled": true
+    },
+    {
+      "pool_key": "purchase",
+      "role_key": "purchase",
+      "user_id": 0,
+      "strategy": "role_pool",
+      "priority": 3,
+      "enabled": true
+    },
+    {
+      "pool_key": "warehouse",
+      "role_key": "warehouse",
+      "user_id": 0,
+      "strategy": "role_pool",
+      "priority": 4,
+      "enabled": true
+    },
+    {
+      "pool_key": "quality",
+      "role_key": "quality",
+      "user_id": 0,
+      "strategy": "role_pool",
+      "priority": 5,
+      "enabled": true
+    },
+    {
+      "pool_key": "finance",
+      "role_key": "finance",
+      "user_id": 0,
+      "strategy": "role_pool",
+      "priority": 6,
+      "enabled": true
+    },
+    {
+      "pool_key": "pmc",
+      "role_key": "pmc",
+      "user_id": 0,
+      "strategy": "role_pool",
+      "priority": 7,
+      "enabled": true
+    },
+    {
+      "pool_key": "engineering",
+      "role_key": "engineering",
+      "user_id": 0,
+      "strategy": "role_pool",
+      "priority": 8,
+      "enabled": true
+    },
+    {
+      "pool_key": "production",
+      "role_key": "production",
+      "user_id": 0,
+      "strategy": "role_pool",
+      "priority": 9,
+      "enabled": true
+    },
+    {
+      "pool_key": "order_approval",
+      "role_key": "boss",
+      "user_id": 0,
+      "strategy": "process_role_pool",
+      "priority": 10,
+      "enabled": true
+    },
+    {
+      "pool_key": "engineering_data",
+      "role_key": "engineering",
+      "user_id": 0,
+      "strategy": "process_role_pool",
+      "priority": 11,
+      "enabled": true
+    },
+    {
+      "pool_key": "order_review",
+      "role_key": "pmc",
+      "user_id": 0,
+      "strategy": "process_role_pool",
+      "priority": 12,
+      "enabled": true
+    },
+    {
+      "pool_key": "purchase_receipt_source",
+      "role_key": "purchase",
+      "user_id": 0,
+      "strategy": "process_role_pool",
+      "priority": 13,
+      "enabled": true
+    },
+    {
+      "pool_key": "incoming_qc",
+      "role_key": "quality",
+      "user_id": 0,
+      "strategy": "process_role_pool",
+      "priority": 14,
+      "enabled": true
+    },
+    {
+      "pool_key": "warehouse_inbound",
+      "role_key": "warehouse",
+      "user_id": 0,
+      "strategy": "process_role_pool",
+      "priority": 15,
+      "enabled": true
+    },
+    {
+      "pool_key": "finished_goods_quality",
+      "role_key": "quality",
+      "user_id": 0,
+      "strategy": "process_role_pool",
+      "priority": 16,
+      "enabled": true
+    },
+    {
+      "pool_key": "shipment_finance_release",
+      "role_key": "finance",
+      "user_id": 0,
+      "strategy": "process_role_pool",
+      "priority": 17,
+      "enabled": true
+    },
+    {
+      "pool_key": "shipment_execution",
+      "role_key": "warehouse",
+      "user_id": 0,
+      "strategy": "process_role_pool",
+      "priority": 18,
+      "enabled": true
+    },
+    {
+      "pool_key": "receivable_lead",
+      "role_key": "finance",
+      "user_id": 0,
+      "strategy": "process_role_pool",
+      "priority": 19,
+      "enabled": true
+    }
+  ]
+}

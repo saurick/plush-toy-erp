@@ -58,6 +58,8 @@ const (
 	FieldClosedAt = "closed_at"
 	// FieldPayload holds the string denoting the payload field in the database.
 	FieldPayload = "payload"
+	// FieldVersion holds the string denoting the version field in the database.
+	FieldVersion = "version"
 	// FieldCreatedBy holds the string denoting the created_by field in the database.
 	FieldCreatedBy = "created_by"
 	// FieldUpdatedBy holds the string denoting the updated_by field in the database.
@@ -104,6 +106,7 @@ var Columns = []string{
 	FieldCompletedAt,
 	FieldClosedAt,
 	FieldPayload,
+	FieldVersion,
 	FieldCreatedBy,
 	FieldUpdatedBy,
 	FieldCreatedAt,
@@ -155,6 +158,10 @@ var (
 	DefaultPriority int16
 	// BlockedReasonValidator is a validator for the "blocked_reason" field. It is called by the builders before save.
 	BlockedReasonValidator func(string) error
+	// DefaultVersion holds the default value on creation for the "version" field.
+	DefaultVersion int
+	// VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	VersionValidator func(int) error
 	// CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
 	CreatedByValidator func(int) error
 	// UpdatedByValidator is a validator for the "updated_by" field. It is called by the builders before save.
@@ -278,6 +285,11 @@ func ByCompletedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByClosedAt orders the results by the closed_at field.
 func ByClosedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldClosedAt, opts...).ToFunc()
+}
+
+// ByVersion orders the results by the version field.
+func ByVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVersion, opts...).ToFunc()
 }
 
 // ByCreatedBy orders the results by the created_by field.

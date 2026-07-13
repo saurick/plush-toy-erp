@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -417,13 +418,41 @@ func TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule(t *testing.T) {
 		{method: "settle_finance_fact", id: "enabled-settle"},
 		{method: "cancel_finance_fact", id: "enabled-cancel"},
 	} {
-		_, res, err := j.handleOperationalFact(ctx, tc.method, tc.id, mustJSONRPCStruct(t, map[string]any{"id": 300}))
+		params := map[string]any{"id": 300}
+		if tc.method == "cancel_finance_fact" {
+			params["reason"] = "客户账款已撤销"
+		}
+		_, res, err := j.handleOperationalFact(ctx, tc.method, tc.id, mustJSONRPCStruct(t, params))
 		if err != nil {
 			t.Fatalf("%s expected nil err, got %v", tc.method, err)
 		}
 		if res == nil || res.Code != errcode.OK.Code {
 			t.Fatalf("%s expected enabled OK, got %#v", tc.method, res)
 		}
+	}
+	for _, tc := range []struct {
+		name   string
+		method string
+		params map[string]any
+	}{
+		{name: "missing reason", method: "cancel_finance_fact", params: map[string]any{"id": 300}},
+		{name: "blank reason", method: "cancel_finance_fact", params: map[string]any{"id": 300, "reason": "   "}},
+		{name: "too long reason", method: "cancel_finance_fact", params: map[string]any{"id": 300, "reason": strings.Repeat("理", 256)}},
+		{name: "unknown field", method: "cancel_finance_fact", params: map[string]any{"id": 300, "reason": "客户撤销", "actor_id": 99}},
+		{name: "legacy method alias", method: "cancelFinanceFact", params: map[string]any{"id": 300, "reason": "客户撤销"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, res, err := j.handleOperationalFact(ctx, tc.method, "strict-cancel", mustJSONRPCStruct(t, tc.params))
+			if err != nil {
+				t.Fatalf("unexpected transport error: %v", err)
+			}
+			if res == nil || res.Code == errcode.OK.Code {
+				t.Fatalf("invalid cancellation contract accepted: %#v", res)
+			}
+		})
+	}
+	if repo.cancelFinanceFactCalls != 1 {
+		t.Fatalf("invalid cancellation requests reached repo, calls=%d", repo.cancelFinanceFactCalls)
 	}
 
 	disabledFinanceConfig := customerConfigPublishParamsWithRevisionAndModuleState(
@@ -455,6 +484,38 @@ func TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule(t *testing.T) {
 	}
 	if repo.cancelFinanceFactActorID != 7 {
 		t.Fatalf("expected authenticated finance cancellation actor 7, got %d", repo.cancelFinanceFactActorID)
+	}
+	if repo.cancelFinanceFactReason != "客户账款已撤销" {
+		t.Fatalf("expected trimmed business cancellation reason, got %q", repo.cancelFinanceFactReason)
+	}
+}
+
+func TestJsonrpcDispatcher_CancelFinanceFactAuthAndPermissions(t *testing.T) {
+	params := mustJSONRPCStruct(t, map[string]any{"id": 300, "reason": "客户撤销账款"})
+	repo := &financeModuleGateOperationalFactRepo{}
+	j := newOperationalFactJSONRPCTestDataWithRepo(t, workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}), repo)
+	_, noLogin, _ := j.handleOperationalFact(context.Background(), "cancel_finance_fact", "no-login", params)
+	if noLogin.Code != errcode.AuthRequired.Code {
+		t.Fatalf("no login=%#v", noLogin)
+	}
+	nonAdminCtx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{UserID: 7, Username: "admin", Role: biz.RoleUser})
+	_, nonAdmin, _ := j.handleOperationalFact(nonAdminCtx, "cancel_finance_fact", "non-admin", params)
+	if nonAdmin.Code != errcode.AdminRequired.Code {
+		t.Fatalf("non admin=%#v", nonAdmin)
+	}
+	_, denied, _ := j.handleOperationalFact(workflowJSONRPCAdminContext(), "cancel_finance_fact", "denied", params)
+	if denied.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("permission denied=%#v", denied)
+	}
+	j.adminReader = stubAdminAccountReader{admin: &biz.AdminUser{ID: 7, Username: "admin", Disabled: true}}
+	_, disabled, _ := j.handleOperationalFact(workflowJSONRPCAdminContext(), "cancel_finance_fact", "disabled", params)
+	if disabled.Code != errcode.AdminDisabled.Code {
+		t.Fatalf("disabled=%#v", disabled)
+	}
+	j.adminReader = stubAdminAccountReader{admin: &biz.AdminUser{ID: 7, Username: "admin", IsSuperAdmin: true}}
+	_, superAdmin, _ := j.handleOperationalFact(workflowJSONRPCAdminContext(), "cancel_finance_fact", "super-admin", params)
+	if superAdmin.Code != errcode.OK.Code || repo.cancelFinanceFactCalls != 1 {
+		t.Fatalf("super admin cancellation=%#v calls=%d", superAdmin, repo.cancelFinanceFactCalls)
 	}
 }
 
@@ -965,6 +1026,7 @@ type financeModuleGateOperationalFactRepo struct {
 	settleFinanceFactCalls   int
 	cancelFinanceFactCalls   int
 	cancelFinanceFactActorID int
+	cancelFinanceFactReason  string
 }
 
 func (r *financeModuleGateOperationalFactRepo) GetShipment(_ context.Context, shipmentID int) (*biz.Shipment, error) {
@@ -1032,8 +1094,10 @@ func (r *financeModuleGateOperationalFactRepo) SettleFinanceFact(_ context.Conte
 	}, nil
 }
 
-func (r *financeModuleGateOperationalFactRepo) CancelPostedFinanceFact(_ context.Context, id int) (*biz.FinanceFact, error) {
+func (r *financeModuleGateOperationalFactRepo) CancelPostedFinanceFact(_ context.Context, id int, actorID int, reason string) (*biz.FinanceFact, error) {
 	r.cancelFinanceFactCalls++
+	r.cancelFinanceFactActorID = actorID
+	r.cancelFinanceFactReason = reason
 	now := time.Now()
 	return &biz.FinanceFact{
 		ID:               id,
@@ -1047,11 +1111,6 @@ func (r *financeModuleGateOperationalFactRepo) CancelPostedFinanceFact(_ context
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}, nil
-}
-
-func (r *financeModuleGateOperationalFactRepo) CancelPostedFinanceFactWithActor(ctx context.Context, id int, actorID int) (*biz.FinanceFact, error) {
-	r.cancelFinanceFactActorID = actorID
-	return r.CancelPostedFinanceFact(ctx, id)
 }
 
 func stockReservationModuleGateParams(t *testing.T) *structpb.Struct {

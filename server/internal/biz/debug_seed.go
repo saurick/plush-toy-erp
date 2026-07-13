@@ -13,28 +13,31 @@ import (
 )
 
 var (
-	ErrDebugSeedDisabled              = errors.New("debug seed disabled")
-	ErrDebugCleanupDisabled           = errors.New("debug cleanup disabled")
-	ErrDebugBusinessDataClearDisabled = errors.New("debug business data clear disabled")
-	ErrDebugScenarioNotFound          = errors.New("debug scenario not found")
-	ErrDebugRunIDRequired             = errors.New("debug run id required")
-	ErrDebugCleanupScopeInvalid       = errors.New("debug cleanup scope invalid")
-	ErrDebugPayloadMarkerMissing      = errors.New("debug payload marker missing")
+	ErrDebugSeedDisabled                         = errors.New("debug seed disabled")
+	ErrDebugCleanupDisabled                      = errors.New("debug cleanup disabled")
+	ErrDebugBusinessDataClearDisabled            = errors.New("debug business data clear disabled")
+	ErrDebugBusinessDataClearConfirmationInvalid = errors.New("debug business data clear confirmation invalid")
+	ErrDebugScenarioNotFound                     = errors.New("debug scenario not found")
+	ErrDebugRunIDRequired                        = errors.New("debug run id required")
+	ErrDebugCleanupScopeInvalid                  = errors.New("debug cleanup scope invalid")
+	ErrDebugPayloadMarkerMissing                 = errors.New("debug payload marker missing")
 )
 
 const (
-	DebugDefaultCleanupScope = "debug_run"
-	debugDocumentPrefix      = "DBG"
-	debugSeedVersion         = "business-chain-v1"
+	DebugDefaultCleanupScope           = "debug_run"
+	DebugBusinessDataClearConfirmation = "CLEAR_ALL_PROJECT_BUSINESS_DATA"
+	debugDocumentPrefix                = "DBG"
+	debugSeedVersion                   = "business-chain-v1"
 )
 
 var debugRunIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{6,64}$`)
 
 type DebugSafetyConfig struct {
-	Environment    string
-	SeedEnabled    bool
-	CleanupEnabled bool
-	CleanupScope   string
+	Environment              string
+	SeedEnabled              bool
+	CleanupEnabled           bool
+	BusinessDataClearEnabled bool
+	CleanupScope             string
 }
 
 type DebugCapabilities struct {
@@ -48,6 +51,8 @@ type DebugCapabilities struct {
 	BusinessDataClearEnabled        bool
 	BusinessDataClearAllowed        bool
 	BusinessDataClearDisabledReason string
+	BusinessDataClearDryRunDefault  bool
+	BusinessDataClearConfirmation   string
 	CleanupScope                    string
 	SupportedScenarios              []DebugScenarioSummary
 }
@@ -126,15 +131,25 @@ type DebugBusinessChainCleanupResult struct {
 	DeletedTasks          []DebugMatchedTask
 	DeletedBusinessStates int
 	DeletedTaskEvents     int
+	MatchedAttachments    int
+	DeletedAttachments    int
 	SkippedItems          []DebugCleanupSkippedItem
 	Warnings              []string
 }
 
 type DebugBusinessDataClearResult struct {
+	DryRun            bool
+	MatchedCounts     map[string]int
+	MatchedTotal      int
 	DeletedCounts     map[string]int
 	DeletedTotal      int
 	ClearedTableNames []string
 	Warnings          []string
+}
+
+type DebugBusinessDataClearInput struct {
+	DryRun       bool
+	Confirmation string
 }
 
 type DebugMatchedRecord struct {
@@ -243,7 +258,7 @@ type DebugBusinessStatePlan struct {
 type DebugRepo interface {
 	SeedBusinessChainDebugData(ctx context.Context, plan DebugSeedPlan, actorID int) (*DebugBusinessChainSeedResult, error)
 	CleanupBusinessChainDebugData(ctx context.Context, in DebugBusinessChainCleanupInput) (*DebugBusinessChainCleanupResult, error)
-	ClearBusinessData(ctx context.Context) (*DebugBusinessDataClearResult, error)
+	ClearBusinessData(ctx context.Context, in DebugBusinessDataClearInput) (*DebugBusinessDataClearResult, error)
 }
 
 type DebugUsecase struct {
@@ -283,9 +298,11 @@ func (uc *DebugUsecase) Capabilities() DebugCapabilities {
 		CleanupEnabled:                  config.CleanupEnabled,
 		CleanupAllowed:                  debugCleanupAllowed(config),
 		CleanupDisabledReason:           debugCleanupDisabledReason(config),
-		BusinessDataClearEnabled:        config.CleanupEnabled,
+		BusinessDataClearEnabled:        config.BusinessDataClearEnabled,
 		BusinessDataClearAllowed:        debugBusinessDataClearAllowed(config),
 		BusinessDataClearDisabledReason: debugBusinessDataClearDisabledReason(config),
+		BusinessDataClearDryRunDefault:  true,
+		BusinessDataClearConfirmation:   DebugBusinessDataClearConfirmation,
 		CleanupScope:                    config.CleanupScope,
 		SupportedScenarios:              ListDebugScenarioSummaries(),
 	}
@@ -344,7 +361,7 @@ func (uc *DebugUsecase) CleanupBusinessChainScenario(ctx context.Context, in Deb
 	return uc.repo.CleanupBusinessChainDebugData(ctx, in)
 }
 
-func (uc *DebugUsecase) ClearBusinessData(ctx context.Context) (*DebugBusinessDataClearResult, error) {
+func (uc *DebugUsecase) ClearBusinessData(ctx context.Context, in DebugBusinessDataClearInput) (*DebugBusinessDataClearResult, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -352,7 +369,10 @@ func (uc *DebugUsecase) ClearBusinessData(ctx context.Context) (*DebugBusinessDa
 	if !debugBusinessDataClearAllowed(config) {
 		return nil, ErrDebugBusinessDataClearDisabled
 	}
-	return uc.repo.ClearBusinessData(ctx)
+	if !in.DryRun && in.Confirmation != DebugBusinessDataClearConfirmation {
+		return nil, ErrDebugBusinessDataClearConfirmationInvalid
+	}
+	return uc.repo.ClearBusinessData(ctx, in)
 }
 
 func ListDebugScenarioSummaries() []DebugScenarioSummary {
@@ -403,7 +423,8 @@ func debugCleanupAllowed(config DebugSafetyConfig) bool {
 }
 
 func debugBusinessDataClearAllowed(config DebugSafetyConfig) bool {
-	return debugCleanupAllowed(config)
+	return config.BusinessDataClearEnabled &&
+		(config.Environment == "local" || config.Environment == "dev")
 }
 
 func debugSeedDisabledReason(config DebugSafetyConfig) string {
@@ -433,11 +454,11 @@ func debugBusinessDataClearDisabledReason(config DebugSafetyConfig) string {
 	if debugBusinessDataClearAllowed(config) {
 		return ""
 	}
-	if !config.CleanupEnabled {
-		return "后端未开启业务数据清空开关 ERP_DEBUG_CLEANUP_ENABLED"
+	if !config.BusinessDataClearEnabled {
+		return "后端未开启业务数据清空开关 ERP_DEBUG_BUSINESS_CLEAR_ENABLED"
 	}
-	if config.CleanupScope != DebugDefaultCleanupScope {
-		return fmt.Sprintf("清理范围 %s 不受支持，只允许 %s", config.CleanupScope, DebugDefaultCleanupScope)
+	if config.Environment != "local" && config.Environment != "dev" {
+		return fmt.Sprintf("业务数据清空只允许 local/dev，当前环境为 %s", config.Environment)
 	}
 	return "业务数据清空能力不可用"
 }

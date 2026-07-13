@@ -11,19 +11,12 @@ import {
   SafetyCertificateOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
-import {
-  Alert,
-  Button,
-  Segmented,
-  Select,
-  Space,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd'
+import { Alert, Button, Select, Space, Tag, Tooltip, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import DevPageNav from '../components/dev/DevPageNav.jsx'
+import DevTaskNav from '../components/dev/DevTaskNav.jsx'
 import {
   activateCustomerConfig,
   getEffectiveSession,
@@ -32,6 +25,10 @@ import {
 } from '../api/customerConfigApi.mjs'
 import {
   DEV_CUSTOMER_CONFIG_QUERY_KEY,
+  DEV_CUSTOMER_CONFIG_RELEASE_BATCH_QUERY_KEY,
+  DEV_CUSTOMER_CONFIG_SOURCE_PATH,
+  DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY,
+  assertCustomerConfigReadbackRevision,
   buildCustomerConfigDevOverviewFromSearch,
 } from '../config/devCustomerConfig.mjs'
 
@@ -44,12 +41,87 @@ const VIEW_ASSETS = 'assets'
 const VIEW_IMPORT = 'import'
 
 const VIEW_OPTIONS = [
-  { label: '总览 / Overview', value: VIEW_OVERVIEW },
-  { label: '包预检 / Preflight', value: VIEW_PREFLIGHT },
-  { label: '差异预览 / Diff', value: VIEW_DIFF },
-  { label: '菜单字段 / Assets', value: VIEW_ASSETS },
-  { label: '预检与发布 / Release', value: VIEW_IMPORT },
+  {
+    label: '总览',
+    description: '判断当前状态与下一步',
+    value: VIEW_OVERVIEW,
+  },
+  {
+    label: '配置预检',
+    description: '分组核对资产、运行态与流程',
+    value: VIEW_PREFLIGHT,
+  },
+  {
+    label: '差异',
+    description: '只看当前值与候选变化',
+    value: VIEW_DIFF,
+  },
+  {
+    label: '界面配置',
+    description: '菜单、字段与打印模板',
+    value: VIEW_ASSETS,
+  },
+  {
+    label: '执行发布',
+    description: 'Dry Run、测试应用与门禁',
+    value: VIEW_IMPORT,
+  },
 ]
+
+const PREFLIGHT_SECTION_QUERY_KEY = 'section'
+const PREFLIGHT_SECTION_PACKAGE = 'package'
+const PREFLIGHT_SECTION_RUNTIME = 'runtime'
+const PREFLIGHT_SECTION_FLOW = 'flow'
+const PREFLIGHT_SECTION_EVIDENCE = 'evidence'
+const PREFLIGHT_SECTION_OPTIONS = [
+  {
+    label: '包结构',
+    description: '边界、步骤与资产范围',
+    value: PREFLIGHT_SECTION_PACKAGE,
+  },
+  {
+    label: '运行投影',
+    description: '模块、打印默认值与编译目录',
+    value: PREFLIGHT_SECTION_RUNTIME,
+  },
+  {
+    label: '流程策略',
+    description: 'Workflow、业务流转与状态机',
+    value: PREFLIGHT_SECTION_FLOW,
+  },
+  {
+    label: '验证证据',
+    description: '评审、校验、命令与来源',
+    value: PREFLIGHT_SECTION_EVIDENCE,
+  },
+]
+const PREFLIGHT_SECTION_VALUES = new Set(
+  PREFLIGHT_SECTION_OPTIONS.map((item) => item.value)
+)
+const IMPORT_ACTION_QUERY_KEY = 'action'
+const IMPORT_ACTION_DRY_RUN = 'dry-run'
+const IMPORT_ACTION_TEST_APPLY = 'test-apply'
+const IMPORT_ACTION_RELEASE = 'release'
+const IMPORT_ACTION_OPTIONS = [
+  {
+    label: '生成试跑证据',
+    description: '只写本地输出，不写数据库',
+    value: IMPORT_ACTION_DRY_RUN,
+  },
+  {
+    label: '应用测试配置',
+    description: '写当前代理后端配置控制面',
+    value: IMPORT_ACTION_TEST_APPLY,
+  },
+  {
+    label: '检查正式发布',
+    description: '只读 readiness 与执行器模板',
+    value: IMPORT_ACTION_RELEASE,
+  },
+]
+const IMPORT_ACTION_VALUES = new Set(
+  IMPORT_ACTION_OPTIONS.map((item) => item.value)
+)
 
 const STATUS_LABELS = Object.freeze({
   已接前端运行时: '已接前端运行时',
@@ -217,14 +289,14 @@ function SourceReference({ item }) {
   )
 }
 
-function copyText(value) {
+function copyText(value, successMessage = '已复制命令') {
   if (typeof navigator === 'undefined' || !navigator.clipboard) {
     message.info('当前浏览器不支持直接复制')
     return
   }
   navigator.clipboard
     .writeText(value)
-    .then(() => message.success('已复制命令'))
+    .then(() => message.success(successMessage))
     .catch(() => message.error('复制失败，请手动选择命令'))
 }
 
@@ -482,7 +554,7 @@ function TestApplySummary({ applyState, onApplyTestConfig }) {
           icon={<CopyOutlined />}
           onClick={() => copyText(manifestSummary.revision || '')}
         >
-          复制 Revision
+          复制配置版本 / Revision
         </Button>
       </div>
       <div className="erp-dev-customer-test-apply-steps">
@@ -496,7 +568,7 @@ function TestApplySummary({ applyState, onApplyTestConfig }) {
       </div>
       <div className="erp-dev-customer-test-apply-facts">
         <div>
-          <Text type="secondary">Revision</Text>
+          <Text type="secondary">配置版本 / Revision</Text>
           <Text strong>{manifestSummary.revision || '-'}</Text>
         </div>
         <div>
@@ -528,18 +600,21 @@ function TestApplySummary({ applyState, onApplyTestConfig }) {
 
 function ReleaseApplySummary({
   releaseState,
+  releaseBatch,
+  executeTemplateCommand,
   onCheckReleaseReadiness,
-  onApplyReleaseConfig,
 }) {
-  const isReady = releaseState.status === 'ready'
-
   if (releaseState.status === 'idle') {
     return (
       <Alert
         type="info"
         showIcon
         message="尚未检查发布门禁"
-        description="先检查发布证据、清单指纹绑定和发布前证据；门禁通过后才允许发布到正式版。"
+        description={
+          releaseBatch
+            ? `已选择证据批次 ${releaseBatch}；可以检查该批次与当前清单的绑定。`
+            : '请先显式选择一个已登记的发布证据批次。页面不会自动猜测 latest。'
+        }
       />
     )
   }
@@ -551,17 +626,6 @@ function ReleaseApplySummary({
         showIcon
         message="正在检查发布门禁"
         description="正在编译正式版运行时清单，并校验发布证据。"
-      />
-    )
-  }
-
-  if (releaseState.status === 'publishing') {
-    return (
-      <Alert
-        type="info"
-        showIcon
-        message="正在发布正式配置"
-        description={releaseState.step || '正在调用后端 customer_config。'}
       />
     )
   }
@@ -585,7 +649,9 @@ function ReleaseApplySummary({
           <Button onClick={onCheckReleaseReadiness}>重新检查发布门禁</Button>
           <Button
             icon={<CopyOutlined />}
-            onClick={() => copyText(releaseState.result?.evidenceDir || '')}
+            onClick={() =>
+              copyText(releaseState.result?.evidenceDir || '', '已复制证据目录')
+            }
           >
             复制证据目录
           </Button>
@@ -599,54 +665,50 @@ function ReleaseApplySummary({
       <Alert
         type="error"
         showIcon
-        message="发布版操作失败"
-        description={
-          releaseState.error || '请确认发布门禁、本地后端和管理员权限。'
-        }
+        message="发布门禁检查失败"
+        description={releaseState.error || '请确认开发服务和证据批次。'}
       />
     )
   }
 
   const result = releaseState.result || {}
-  const summary = result.summary || result.manifestSummary || {}
-  const session = result.effectiveSession || {}
+  const summary = result.summary || {}
 
   return (
     <div className="erp-dev-customer-release-result">
       <Alert
-        type={isReady ? 'success' : 'success'}
+        type="success"
         showIcon
-        message={isReady ? '发布门禁已通过' : '正式配置已发布'}
-        description={
-          isReady
-            ? '可以发布到正式版；发布仍只调用后端 customer_config 控制面，不导入业务数据。'
-            : '正式版有效配置版本已切换；后台和岗位任务端会读取该配置投影。'
-        }
+        message="选定批次的发布门禁已通过"
+        description="这只证明当前清单与所选证据批次满足只读门禁。页面不直接发布或激活正式配置；下一步由统一执行器显式确认目标端点、令牌、确认短语，并生成 release report 与 authenticated readback。"
       />
       <div className="erp-dev-customer-release-actions">
         <Button onClick={onCheckReleaseReadiness}>重新检查发布门禁</Button>
         <Button
           type="primary"
-          disabled={!isReady}
-          loading={releaseState.status === 'publishing'}
-          onClick={onApplyReleaseConfig}
+          icon={<CopyOutlined />}
+          onClick={() => copyText(executeTemplateCommand)}
         >
-          发布到正式版
+          复制正式执行器输入模板
         </Button>
         <Button
           icon={<CopyOutlined />}
-          onClick={() => copyText(result.manifestPath || '')}
+          onClick={() => copyText(result.manifestPath || '', '已复制清单路径')}
         >
           复制清单路径
         </Button>
       </div>
       <div className="erp-dev-customer-release-facts">
         <div>
-          <Text type="secondary">Evidence</Text>
+          <Text type="secondary">发布批次 / Release Batch</Text>
+          <Text strong>{result.releaseBatch || releaseBatch || '-'}</Text>
+        </div>
+        <div>
+          <Text type="secondary">证据目录 / Evidence</Text>
           <Text strong>{result.evidenceDir || '-'}</Text>
         </div>
         <div>
-          <Text type="secondary">Revision</Text>
+          <Text type="secondary">配置版本 / Revision</Text>
           <Text strong>{summary.revision || '-'}</Text>
         </div>
         <div>
@@ -656,12 +718,6 @@ function ReleaseApplySummary({
         <div>
           <Text type="secondary">模块状态 / Module States</Text>
           <Text strong>{summary.moduleStateCount ?? '-'}</Text>
-        </div>
-        <div>
-          <Text type="secondary">当前有效配置投影</Text>
-          <Text strong>
-            {session.source || '-'} / {session.configRevision || '-'}
-          </Text>
         </div>
       </div>
     </div>
@@ -777,7 +833,7 @@ function CompiledCatalogItem({ item }) {
   )
 }
 
-function CustomerPackageSelector({ overview, onChange }) {
+function CustomerPackageSelector({ overview, onChange, disabled = false }) {
   const options = (overview.registeredCustomers || []).map((item) => ({
     value: item.customerKey,
     label: item.label,
@@ -788,13 +844,17 @@ function CustomerPackageSelector({ overview, onChange }) {
     <div className="erp-dev-customer-selector">
       <Text type="secondary">客户包选择</Text>
       <Select
+        aria-label="客户包选择"
         value={matched ? overview.customerKey : undefined}
         placeholder="选择已登记客户包 / Select registered package"
         options={options}
         onChange={onChange}
+        disabled={disabled}
       />
       <Text type="secondary" className="erp-dev-customer-selector__note">
-        只更新 URL，不写后端或正式运行配置。
+        {disabled
+          ? '配置写操作进行中，客户包已锁定。离开页面不会撤销已经发出的写请求。'
+          : '只更新 URL，不写后端或正式运行配置。'}
       </Text>
     </div>
   )
@@ -1082,285 +1142,330 @@ function AssetsPanel({
   )
 }
 
-function PreflightPanel({ consoleSummary, customerPackageSummary }) {
+function PreflightPanel({
+  consoleSummary,
+  customerPackageSummary,
+  activeSection,
+  onSectionChange,
+}) {
   return (
     <div
       className="erp-dev-customer-panel-grid"
       data-dev-customer-view="包预检"
     >
-      <section className="erp-dev-customer-panel">
-        <div className="erp-dev-customer-panel__head">
-          <SafetyCertificateOutlined />
-          <Text strong>包边界 / Package Guards</Text>
-        </div>
-        <div className="erp-dev-customer-guard-list">
-          {customerPackageSummary.boundaries.map((item) => (
-            <div className="erp-dev-customer-guard" key={item.key}>
-              <Text>{guardItemLabel(item, '客户配置包边界')}</Text>
-              <Tag color={item.ok ? 'green' : 'red'}>
-                {item.ok ? item.expectedLabel : item.valueLabel}
-              </Tag>
-            </div>
-          ))}
-        </div>
-        <CommandBlock command={customerPackageSummary.qaCommand} />
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <CheckCircleOutlined />
-          <Text strong>预检步骤 / Preflight Gates</Text>
-        </div>
-        <div className="erp-dev-customer-gate-list">
-          {consoleSummary.preflightStages.map((item) => (
-            <GateRow item={item} key={item.key} />
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <DatabaseOutlined />
-          <Text strong>客户包资产范围 / Package Asset Scope</Text>
-        </div>
-        <div className="erp-dev-customer-asset-grid">
-          {consoleSummary.assetSummary.map((item) => (
-            <AssetTile item={item} key={item.key} />
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <DatabaseOutlined />
-          <Text strong>客户包对象 / Package Objects</Text>
-        </div>
-        <Alert
-          type="info"
-          showIcon
-          message="只读取已登记配置对象，不接收任意代码、SQL 或业务事实"
-          description="本页预检配置、规则、流程编排、策略绑定、扩展点绑定、模板和导入映射；策略实现与扩展点实现必须来自产品核心、行业模板或已登记客户部署包。"
-        />
-        <div className="erp-dev-customer-db-targets">
-          {consoleSummary.packageAssetScope.map((item) => (
-            <ImportAssetScopeItem item={item} key={item.key} />
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--module-states">
-        <div className="erp-dev-customer-panel__head">
-          <DeploymentUnitOutlined />
-          <Text strong>模块状态投影 / Module States</Text>
-        </div>
-        <Alert
-          type="info"
-          showIcon
-          message="模块状态只编译为客户配置控制面输入"
-          description="默认登记模块会按启用编译；客户包若声明只读或关闭必须带原因。这里不安装或卸载模块，也不证明完整模块关闭流程已交付。"
-        />
-        <div className="erp-dev-customer-tool-list">
-          {customerPackageSummary.moduleStates.map((item) => (
-            <article className="erp-dev-customer-tool" key={item.moduleKey}>
-              <div className="erp-dev-customer-tool__head">
-                <Space wrap>
-                  <Text strong>{item.label}</Text>
-                  <Tag>{item.sourceLabel}</Tag>
-                  {item.overridden ? <Tag>已覆盖</Tag> : null}
-                </Space>
-                <StatusTag status={item.stateLabel} />
-              </div>
-              <Paragraph>{item.reason}</Paragraph>
-            </article>
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--print-template-defaults">
-        <div className="erp-dev-customer-panel__head">
-          <FileTextOutlined />
-          <Text strong>打印默认方信息 / Print Party Defaults</Text>
-        </div>
-        <Alert
-          type="info"
-          showIcon
-          message="客户包只声明打印默认方信息草案"
-          description="这些默认值只进入客户配置包预检和运行时清单快照；正式打印工作台仍需后续通过客户配置投影接入，不覆盖供应商业务快照，不启用销售订单打印模板。"
-        />
-        <div className="erp-dev-customer-tool-list">
-          {customerPackageSummary.printTemplateDefaults.map((item) => (
-            <article className="erp-dev-customer-tool" key={item.templateKey}>
-              <div className="erp-dev-customer-tool__head">
-                <Space wrap>
-                  <Text strong>{item.templateLabel}</Text>
-                  <Tag>{item.defaultFieldCountLabel}</Tag>
-                  <Tag>{item.supplierDefaultsAllowedLabel}</Tag>
-                </Space>
-                <StatusTag status={item.status} />
-              </div>
-              <Text type="secondary">
-                {item.partyDefaultKeysLabel || '默认方字段未声明'}
-              </Text>
-              <Paragraph>{item.guardrail}</Paragraph>
-            </article>
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <SafetyCertificateOutlined />
-          <Text strong>人工评审清单 / Review Checklist</Text>
-        </div>
-        <div className="erp-dev-customer-review-list">
-          {consoleSummary.reviewChecklist.map((item) => (
-            <ReviewChecklistItem item={item} key={item.key} />
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <SafetyCertificateOutlined />
-          <Text strong>校验结果 / Validation Checks</Text>
-        </div>
-        <div className="erp-dev-customer-tool-list">
-          {consoleSummary.validationChecks.map((check) => (
-            <article className="erp-dev-customer-tool" key={check.key}>
-              <div className="erp-dev-customer-tool__head">
-                <Space wrap>
-                  <Text strong>{check.label}</Text>
-                  <Tag>{check.level}</Tag>
-                </Space>
-                <StatusTag status={check.status} />
-              </div>
-              <Paragraph>{check.note}</Paragraph>
-            </article>
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <DeploymentUnitOutlined />
-          <Text strong>编译目录投影</Text>
-        </div>
-        <div className="erp-dev-customer-tool-list">
-          {customerPackageSummary.compiledCatalogSummary.map((item) => (
-            <CompiledCatalogItem item={item} key={item.key} />
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <SafetyCertificateOutlined />
-          <Text strong>策略与扩展点登记</Text>
-        </div>
-        <div className="erp-dev-customer-formal-gates">
-          {consoleSummary.registryChecks.map((item) => (
-            <RegistryCheckItem item={item} key={item.key} />
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <DeploymentUnitOutlined />
-          <Text strong>工作流预览</Text>
-        </div>
-        <div className="erp-dev-customer-tool-list">
-          {customerPackageSummary.workflows.map((workflow) => (
-            <article className="erp-dev-customer-tool" key={workflow.key}>
-              <div className="erp-dev-customer-tool__head">
-                <Text strong>{workflow.label}</Text>
-                <StatusTag status={workflow.status} />
-              </div>
-              <Space wrap>
-                <Tag>{workflow.nodeCount} 个节点</Tag>
-                <Tag>{workflow.factBoundaryLabel}</Tag>
-                {(workflow.ownerPoolLabels || []).map((poolLabel) => (
-                  <Tag key={poolLabel}>{poolLabel}</Tag>
-                ))}
-              </Space>
-              <Paragraph>{workflow.guardrail}</Paragraph>
-            </article>
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-section-nav">
         <div className="erp-dev-customer-panel__head">
           <ApartmentOutlined />
-          <Text strong>业务流转</Text>
+          <Text strong>当前核对任务</Text>
         </div>
-        <div className="erp-dev-customer-field-list">
-          {customerPackageSummary.businessFlows.map((flow) => (
-            <article className="erp-dev-customer-field" key={flow.key}>
-              <div className="erp-dev-customer-field__head">
-                <Text strong>{flow.label}</Text>
-                <StatusTag status={flow.status} />
-              </div>
-              <Text className="erp-dev-customer-field__key">
-                {flow.flowKeyLabel} / {flow.moduleRouteLabel}
-              </Text>
-              <Paragraph>{flow.guardrail}</Paragraph>
-            </article>
-          ))}
-        </div>
+        <DevTaskNav
+          compact
+          ariaLabel="配置预检任务"
+          items={PREFLIGHT_SECTION_OPTIONS}
+          value={activeSection}
+          onChange={onSectionChange}
+        />
       </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <CodeOutlined />
-          <Text strong>状态机与策略</Text>
-        </div>
-        <div className="erp-dev-customer-numbering-list">
-          {customerPackageSummary.stateMachines.map((item) => (
-            <article className="erp-dev-customer-numbering" key={item.key}>
-              <div>
-                <Text strong>{item.label}</Text>
-                <Text type="secondary">
-                  {item.stateCountLabel} / {item.transitionCountLabel}
-                </Text>
-              </div>
-              <StatusTag status={item.status} />
-              <Paragraph>{item.guardrail}</Paragraph>
-            </article>
-          ))}
-          {customerPackageSummary.processPolicies.map((item) => (
-            <article className="erp-dev-customer-numbering" key={item.key}>
-              <div>
-                <Text strong>{item.label}</Text>
-                <Text type="secondary">
-                  {item.kindLabel} / {item.ruleCountLabel}
-                </Text>
-                {(item.ruleItems || []).length > 0 ? (
-                  <div className="erp-dev-customer-policy-rule-list">
-                    {item.ruleItems.map((rule) => (
-                      <div
-                        className="erp-dev-customer-policy-rule"
-                        key={rule.key}
-                      >
-                        <Text>{rule.triggerLabel}</Text>
-                        <Text type="secondary">{rule.resultLabel}</Text>
-                      </div>
-                    ))}
+      {activeSection === PREFLIGHT_SECTION_PACKAGE ? (
+        <>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-package-guards">
+            <div className="erp-dev-customer-panel__head">
+              <SafetyCertificateOutlined />
+              <Text strong>包边界 / Package Guards</Text>
+            </div>
+            <div className="erp-dev-customer-guard-list">
+              {customerPackageSummary.boundaries.map((item) => (
+                <div className="erp-dev-customer-guard" key={item.key}>
+                  <Text>{guardItemLabel(item, '客户配置包边界')}</Text>
+                  <Tag color={item.ok ? 'green' : 'red'}>
+                    {item.ok ? item.expectedLabel : item.valueLabel}
+                  </Tag>
+                </div>
+              ))}
+            </div>
+            <CommandBlock command={customerPackageSummary.qaCommand} />
+          </section>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+            <div className="erp-dev-customer-panel__head">
+              <CheckCircleOutlined />
+              <Text strong>预检步骤 / Preflight Gates</Text>
+            </div>
+            <div className="erp-dev-customer-gate-list">
+              {consoleSummary.preflightStages.map((item) => (
+                <GateRow item={item} key={item.key} />
+              ))}
+            </div>
+          </section>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+            <div className="erp-dev-customer-panel__head">
+              <DatabaseOutlined />
+              <Text strong>客户包资产范围 / Package Asset Scope</Text>
+            </div>
+            <div className="erp-dev-customer-asset-grid">
+              {consoleSummary.assetSummary.map((item) => (
+                <AssetTile item={item} key={item.key} />
+              ))}
+            </div>
+          </section>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+            <div className="erp-dev-customer-panel__head">
+              <DatabaseOutlined />
+              <Text strong>客户包对象 / Package Objects</Text>
+            </div>
+            <Alert
+              type="info"
+              showIcon
+              message="只读取已登记配置对象，不接收任意代码、SQL 或业务事实"
+              description="本页预检配置、规则、流程编排、策略绑定、扩展点绑定、模板和导入映射；策略实现与扩展点实现必须来自产品核心、行业模板或已登记客户部署包。"
+            />
+            <div className="erp-dev-customer-db-targets">
+              {consoleSummary.packageAssetScope.map((item) => (
+                <ImportAssetScopeItem item={item} key={item.key} />
+              ))}
+            </div>
+          </section>
+        </>
+      ) : null}
+      {activeSection === PREFLIGHT_SECTION_RUNTIME ? (
+        <>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--module-states">
+            <div className="erp-dev-customer-panel__head">
+              <DeploymentUnitOutlined />
+              <Text strong>模块状态投影 / Module States</Text>
+            </div>
+            <Alert
+              type="info"
+              showIcon
+              message="模块状态只编译为客户配置控制面输入"
+              description="默认登记模块会按启用编译；客户包若声明只读或关闭必须带原因。这里不安装或卸载模块，也不证明完整模块关闭流程已交付。"
+            />
+            <div className="erp-dev-customer-tool-list">
+              {customerPackageSummary.moduleStates.map((item) => (
+                <article className="erp-dev-customer-tool" key={item.moduleKey}>
+                  <div className="erp-dev-customer-tool__head">
+                    <Space wrap>
+                      <Text strong>{item.label}</Text>
+                      <Tag>{item.sourceLabel}</Tag>
+                      {item.overridden ? <Tag>已覆盖</Tag> : null}
+                    </Space>
+                    <StatusTag status={item.stateLabel} />
                   </div>
-                ) : null}
-              </div>
-              <StatusTag status={item.status} />
-              <Paragraph>{item.guardrail}</Paragraph>
-            </article>
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <CopyOutlined />
-          <Text strong>预检命令</Text>
-        </div>
-        <CommandList commands={consoleSummary.qaCommands} />
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <CodeOutlined />
-          <Text strong>来源路径</Text>
-        </div>
-        <div className="erp-dev-customer-source-ref-list">
-          {consoleSummary.sourceReferences.map((item) => (
-            <SourceReference item={item} key={item.key} />
-          ))}
-        </div>
-      </section>
+                  <Paragraph>{item.reason}</Paragraph>
+                </article>
+              ))}
+            </div>
+          </section>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--print-template-defaults">
+            <div className="erp-dev-customer-panel__head">
+              <FileTextOutlined />
+              <Text strong>打印默认方信息 / Print Party Defaults</Text>
+            </div>
+            <Alert
+              type="info"
+              showIcon
+              message="客户包只声明打印默认方信息草案"
+              description="这些默认值只进入客户配置包预检和运行时清单快照；正式打印工作台仍需后续通过客户配置投影接入，不覆盖供应商业务快照，不启用销售订单打印模板。"
+            />
+            <div className="erp-dev-customer-tool-list">
+              {customerPackageSummary.printTemplateDefaults.map((item) => (
+                <article
+                  className="erp-dev-customer-tool"
+                  key={item.templateKey}
+                >
+                  <div className="erp-dev-customer-tool__head">
+                    <Space wrap>
+                      <Text strong>{item.templateLabel}</Text>
+                      <Tag>{item.defaultFieldCountLabel}</Tag>
+                      <Tag>{item.supplierDefaultsAllowedLabel}</Tag>
+                    </Space>
+                    <StatusTag status={item.status} />
+                  </div>
+                  <Text type="secondary">
+                    {item.partyDefaultKeysLabel || '默认方字段未声明'}
+                  </Text>
+                  <Paragraph>{item.guardrail}</Paragraph>
+                </article>
+              ))}
+            </div>
+          </section>
+        </>
+      ) : null}
+      {activeSection === PREFLIGHT_SECTION_EVIDENCE ? (
+        <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+          <div className="erp-dev-customer-panel__head">
+            <SafetyCertificateOutlined />
+            <Text strong>人工评审清单 / Review Checklist</Text>
+          </div>
+          <div className="erp-dev-customer-review-list">
+            {consoleSummary.reviewChecklist.map((item) => (
+              <ReviewChecklistItem item={item} key={item.key} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {activeSection === PREFLIGHT_SECTION_EVIDENCE ? (
+        <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+          <div className="erp-dev-customer-panel__head">
+            <SafetyCertificateOutlined />
+            <Text strong>校验结果 / Validation Checks</Text>
+          </div>
+          <div className="erp-dev-customer-tool-list">
+            {consoleSummary.validationChecks.map((check) => (
+              <article className="erp-dev-customer-tool" key={check.key}>
+                <div className="erp-dev-customer-tool__head">
+                  <Space wrap>
+                    <Text strong>{check.label}</Text>
+                    <Tag>{check.level}</Tag>
+                  </Space>
+                  <StatusTag status={check.status} />
+                </div>
+                <Paragraph>{check.note}</Paragraph>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {activeSection === PREFLIGHT_SECTION_RUNTIME ? (
+        <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+          <div className="erp-dev-customer-panel__head">
+            <DeploymentUnitOutlined />
+            <Text strong>编译目录投影</Text>
+          </div>
+          <div className="erp-dev-customer-tool-list">
+            {customerPackageSummary.compiledCatalogSummary.map((item) => (
+              <CompiledCatalogItem item={item} key={item.key} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {activeSection === PREFLIGHT_SECTION_FLOW ? (
+        <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+          <div className="erp-dev-customer-panel__head">
+            <SafetyCertificateOutlined />
+            <Text strong>策略与扩展点登记</Text>
+          </div>
+          <div className="erp-dev-customer-formal-gates">
+            {consoleSummary.registryChecks.map((item) => (
+              <RegistryCheckItem item={item} key={item.key} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {activeSection === PREFLIGHT_SECTION_FLOW ? (
+        <>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+            <div className="erp-dev-customer-panel__head">
+              <DeploymentUnitOutlined />
+              <Text strong>工作流预览</Text>
+            </div>
+            <div className="erp-dev-customer-tool-list">
+              {customerPackageSummary.workflows.map((workflow) => (
+                <article className="erp-dev-customer-tool" key={workflow.key}>
+                  <div className="erp-dev-customer-tool__head">
+                    <Text strong>{workflow.label}</Text>
+                    <StatusTag status={workflow.status} />
+                  </div>
+                  <Space wrap>
+                    <Tag>{workflow.nodeCount} 个节点</Tag>
+                    <Tag>{workflow.factBoundaryLabel}</Tag>
+                    {(workflow.ownerPoolLabels || []).map((poolLabel) => (
+                      <Tag key={poolLabel}>{poolLabel}</Tag>
+                    ))}
+                  </Space>
+                  <Paragraph>{workflow.guardrail}</Paragraph>
+                </article>
+              ))}
+            </div>
+          </section>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+            <div className="erp-dev-customer-panel__head">
+              <ApartmentOutlined />
+              <Text strong>业务流转</Text>
+            </div>
+            <div className="erp-dev-customer-field-list">
+              {customerPackageSummary.businessFlows.map((flow) => (
+                <article className="erp-dev-customer-field" key={flow.key}>
+                  <div className="erp-dev-customer-field__head">
+                    <Text strong>{flow.label}</Text>
+                    <StatusTag status={flow.status} />
+                  </div>
+                  <Text className="erp-dev-customer-field__key">
+                    {flow.flowKeyLabel} / {flow.moduleRouteLabel}
+                  </Text>
+                  <Paragraph>{flow.guardrail}</Paragraph>
+                </article>
+              ))}
+            </div>
+          </section>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+            <div className="erp-dev-customer-panel__head">
+              <CodeOutlined />
+              <Text strong>状态机与策略</Text>
+            </div>
+            <div className="erp-dev-customer-numbering-list">
+              {customerPackageSummary.stateMachines.map((item) => (
+                <article className="erp-dev-customer-numbering" key={item.key}>
+                  <div>
+                    <Text strong>{item.label}</Text>
+                    <Text type="secondary">
+                      {item.stateCountLabel} / {item.transitionCountLabel}
+                    </Text>
+                  </div>
+                  <StatusTag status={item.status} />
+                  <Paragraph>{item.guardrail}</Paragraph>
+                </article>
+              ))}
+              {customerPackageSummary.processPolicies.map((item) => (
+                <article className="erp-dev-customer-numbering" key={item.key}>
+                  <div>
+                    <Text strong>{item.label}</Text>
+                    <Text type="secondary">
+                      {item.kindLabel} / {item.ruleCountLabel}
+                    </Text>
+                    {(item.ruleItems || []).length > 0 ? (
+                      <div className="erp-dev-customer-policy-rule-list">
+                        {item.ruleItems.map((rule) => (
+                          <div
+                            className="erp-dev-customer-policy-rule"
+                            key={rule.key}
+                          >
+                            <Text>{rule.triggerLabel}</Text>
+                            <Text type="secondary">{rule.resultLabel}</Text>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <StatusTag status={item.status} />
+                  <Paragraph>{item.guardrail}</Paragraph>
+                </article>
+              ))}
+            </div>
+          </section>
+        </>
+      ) : null}
+      {activeSection === PREFLIGHT_SECTION_EVIDENCE ? (
+        <>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+            <div className="erp-dev-customer-panel__head">
+              <CopyOutlined />
+              <Text strong>预检命令</Text>
+            </div>
+            <CommandList commands={consoleSummary.qaCommands} />
+          </section>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+            <div className="erp-dev-customer-panel__head">
+              <CodeOutlined />
+              <Text strong>来源路径</Text>
+            </div>
+            <div className="erp-dev-customer-source-ref-list">
+              {consoleSummary.sourceReferences.map((item) => (
+                <SourceReference item={item} key={item.key} />
+              ))}
+            </div>
+          </section>
+        </>
+      ) : null}
     </div>
   )
 }
@@ -1433,10 +1538,14 @@ function ImportPanel({
   dryRunState,
   applyState,
   releaseState,
+  releaseBatchesState,
+  releaseBatch,
   onRunDryRun,
   onApplyTestConfig,
   onCheckReleaseReadiness,
-  onApplyReleaseConfig,
+  onReleaseBatchChange,
+  activeAction,
+  onActionChange,
 }) {
   return (
     <div
@@ -1450,186 +1559,246 @@ function ImportPanel({
         </div>
         <div className="erp-dev-customer-import-hero__copy">
           <Text strong>
-            当前页支持测试版试跑和本地/测试后端应用；正式发布必须通过发布证据门禁。
+            当前页支持测试版试跑和当前 Vite
+            代理后端应用；正式发布只交给统一执行器。
           </Text>
           <Text type="secondary">
             当前工作台只从已登记 customer package
             读取配置，执行结构预检、差异预览、Dry Run
-            证据、本地/测试配置应用和受控发布；不提供原始包上传，也不把配置发布写成业务数据导入。
+            证据、当前代理后端配置应用和发布门禁复核；不提供原始包上传，也不把配置发布写成业务数据导入。
           </Text>
         </div>
         <Alert
           type="info"
           showIcon
-          message="本地/测试后端应用只写客户配置控制面"
-          description="页面试跑不写数据库；应用到当前后端会调用客户配置校验、发布和激活。本地开发默认写 8300；若连接测试环境必须先确认后端目标。真实客户业务数据导入仍是单独专项。"
+          message="当前代理后端应用只写客户配置控制面"
+          description="页面试跑不写数据库；应用操作通过当前 Vite /rpc 代理调用客户配置校验、发布和激活，当前固定目标为 http://127.0.0.1:8300。真实客户业务数据导入与正式发布仍是单独专项。"
         />
       </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <CheckCircleOutlined />
-          <Text strong>
-            配置预检与发布流程 / Config Preflight & Release Flow
-          </Text>
-        </div>
-        <div className="erp-dev-customer-import-flow">
-          {importSummary.importFlow.map((step) => (
-            <ImportFlowStep item={step} key={step.key} />
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <CheckCircleOutlined />
-          <Text strong>测试版页面试跑</Text>
-        </div>
-        <Paragraph type="secondary">
-          直接在页面生成试跑证据；只写本地输出目录，不写数据库。
-        </Paragraph>
-        <Button
-          type="primary"
-          loading={dryRunState.status === 'running'}
-          disabled={!importSummary.canRunUiDryRun}
-          onClick={onRunDryRun}
-        >
-          运行测试试跑
-        </Button>
-        <DryRunSummary dryRunState={dryRunState} onRunDryRun={onRunDryRun} />
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-section-nav">
         <div className="erp-dev-customer-panel__head">
           <DeploymentUnitOutlined />
-          <Text strong>本地/测试后端应用 / Local Or Test Apply</Text>
+          <Text strong>选择当前操作</Text>
         </div>
-        <Paragraph type="secondary">
-          一键把已选甲方配置应用到当前后端的客户配置控制面；本地开发默认写
-          8300，若连接测试环境必须先确认后端目标。
-        </Paragraph>
-        <div className="erp-dev-customer-test-apply-primary">
+        <DevTaskNav
+          compact
+          ariaLabel="配置执行任务"
+          items={IMPORT_ACTION_OPTIONS}
+          value={activeAction}
+          onChange={onActionChange}
+        />
+      </section>
+      {activeAction === IMPORT_ACTION_DRY_RUN ? (
+        <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+          <div className="erp-dev-customer-panel__head">
+            <CheckCircleOutlined />
+            <Text strong>
+              配置预检与发布流程 / Config Preflight & Release Flow
+            </Text>
+          </div>
+          <div className="erp-dev-customer-import-flow">
+            {importSummary.importFlow.map((step) => (
+              <ImportFlowStep item={step} key={step.key} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {activeAction === IMPORT_ACTION_DRY_RUN ? (
+        <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+          <div className="erp-dev-customer-panel__head">
+            <CheckCircleOutlined />
+            <Text strong>测试版页面试跑</Text>
+          </div>
+          <Paragraph type="secondary">
+            直接在页面生成试跑证据；只写本地输出目录，不写数据库。
+          </Paragraph>
           <Button
             type="primary"
-            loading={applyState.status === 'running'}
-            disabled={!importSummary.canApplyTestConfig}
-            onClick={onApplyTestConfig}
+            loading={dryRunState.status === 'running'}
+            disabled={!importSummary.canRunUiDryRun}
+            onClick={onRunDryRun}
           >
-            应用到当前后端
+            运行测试试跑
           </Button>
-          <Text type="secondary">
-            校验 / 发布 / 激活 / 有效配置投影；不导入客户业务数据。
-          </Text>
-        </div>
-        <TestApplySummary
-          applyState={applyState}
-          onApplyTestConfig={onApplyTestConfig}
-        />
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <DatabaseOutlined />
-          <Text strong>写库目标 / Database Target</Text>
-        </div>
-        <div className="erp-dev-customer-db-targets">
-          {importSummary.databaseTargets.map((target) => (
-            <DatabaseTargetCard item={target} key={target.key} />
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <ExclamationCircleOutlined />
-          <Text strong>正式版发布 / Release Apply</Text>
-        </div>
-        <Alert
-          type="warning"
-          showIcon
-          message="正式版必须先过发布门禁"
-          description="发布版只写客户配置控制面；没有清单证据、发布证据、管理员确认、审计和回滚方案前，发布按钮不可执行。"
-        />
-        <div className="erp-dev-customer-release-primary">
-          <Button
-            type="default"
-            loading={releaseState.status === 'checking'}
-            disabled={!importSummary.canCheckReleaseReadiness}
-            onClick={onCheckReleaseReadiness}
-          >
-            检查发布门禁
-          </Button>
-          <Button
-            type="primary"
-            loading={releaseState.status === 'publishing'}
-            disabled={releaseState.status !== 'ready'}
-            onClick={onApplyReleaseConfig}
-          >
-            发布到正式版
-          </Button>
-          <Text type="secondary">
-            release readiness / validate / publish /
-            activate；不导入客户业务数据。
-          </Text>
-        </div>
-        <ReleaseApplySummary
-          releaseState={releaseState}
-          onCheckReleaseReadiness={onCheckReleaseReadiness}
-          onApplyReleaseConfig={onApplyReleaseConfig}
-        />
-        <div className="erp-dev-customer-formal-gates">
-          {importSummary.formalGates.map((gate) => (
-            <FormalGateItem item={gate} key={gate.key} />
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <SafetyCertificateOutlined />
-          <Text strong>版本快照 / 回滚 / 审计</Text>
-        </div>
-        <Alert
-          type="info"
-          showIcon
-          message="回滚只恢复配置版本，不删除业务事实"
-          description="客户配置版本写入配置控制面；发布 / 激活 / 回滚会记录脱敏运行审计。已产生的库存、出货、财务和业务单据必须走对应业务补偿，不能由配置回滚抹除。"
-        />
-        <div className="erp-dev-customer-formal-gates">
-          {importSummary.versionAuditSupport.map((item) => (
-            <FormalGateItem item={item} key={item.key} />
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <DatabaseOutlined />
-          <Text strong>执行边界 / Execution Boundary</Text>
-        </div>
-        <div className="erp-dev-customer-import-flags">
-          {importSummary.executionFlagSummary.map((item) => (
-            <div key={item.key}>
-              <Text type="secondary">{item.label}</Text>
-              <Tag color={item.value === true ? 'blue' : 'red'}>
-                {item.valueLabel}
-              </Tag>
+          <DryRunSummary dryRunState={dryRunState} onRunDryRun={onRunDryRun} />
+        </section>
+      ) : null}
+      {activeAction === IMPORT_ACTION_TEST_APPLY ? (
+        <>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+            <div className="erp-dev-customer-panel__head">
+              <DeploymentUnitOutlined />
+              <Text strong>当前代理后端应用 / Current Proxy Apply</Text>
             </div>
-          ))}
-        </div>
-        <CommandBlock command={importSummary.qaCommand} />
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
-          <DeploymentUnitOutlined />
-          <Text strong>备用命令 / Command Fallback</Text>
-        </div>
-        <div className="erp-dev-customer-tool-list">
-          {importSummary.tools.map((tool) => (
-            <article className="erp-dev-customer-tool" key={tool.key}>
-              <div className="erp-dev-customer-tool__head">
-                <Text strong>{tool.title}</Text>
-                <StatusTag status={tool.status} />
-              </div>
-              {tool.note ? <Text type="secondary">{tool.note}</Text> : null}
-              <CommandBlock command={tool.command} />
-            </article>
-          ))}
-        </div>
-      </section>
+            <Paragraph type="secondary">
+              一键把已选甲方配置应用到当前 Vite 代理后端的客户配置控制面；当前
+              /rpc 固定代理 http://127.0.0.1:8300。
+            </Paragraph>
+            <div className="erp-dev-customer-test-apply-primary">
+              <Button
+                type="primary"
+                loading={applyState.status === 'running'}
+                disabled={!importSummary.canApplyTestConfig}
+                onClick={onApplyTestConfig}
+              >
+                应用到当前后端
+              </Button>
+              <Text type="secondary">
+                校验 / 发布 / 激活 / 有效配置投影；不导入客户业务数据。
+              </Text>
+            </div>
+            <TestApplySummary
+              applyState={applyState}
+              onApplyTestConfig={onApplyTestConfig}
+            />
+          </section>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+            <div className="erp-dev-customer-panel__head">
+              <DatabaseOutlined />
+              <Text strong>写库目标 / Database Target</Text>
+            </div>
+            <div className="erp-dev-customer-db-targets">
+              {importSummary.databaseTargets.map((target) => (
+                <DatabaseTargetCard item={target} key={target.key} />
+              ))}
+            </div>
+          </section>
+        </>
+      ) : null}
+      {activeAction === IMPORT_ACTION_RELEASE ? (
+        <>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+            <div className="erp-dev-customer-panel__head">
+              <ExclamationCircleOutlined />
+              <Text strong>正式版发布 / Release Apply</Text>
+            </div>
+            <Alert
+              type="warning"
+              showIcon
+              message="正式发布只由统一执行器执行"
+              description="页面只对显式选择的证据批次做只读门禁检查，不直接 publish / activate。统一执行器继续要求目标端点、令牌、确认短语、审计报告和 authenticated readback。"
+            />
+            <div className="erp-dev-customer-release-primary">
+              <Select
+                aria-label="选择发布证据批次"
+                value={releaseBatch || undefined}
+                placeholder="选择已登记发布批次"
+                loading={releaseBatchesState.status === 'loading'}
+                options={(releaseBatchesState.batches || []).map((batch) => ({
+                  value: batch,
+                  label: batch,
+                }))}
+                onChange={onReleaseBatchChange}
+              />
+              <Text type="secondary">
+                必须选择具体批次；不会自动使用 latest 或父目录。
+              </Text>
+            </div>
+            {releaseBatchesState.status === 'error' ? (
+              <Alert
+                type="error"
+                showIcon
+                message="发布批次读取失败"
+                description={releaseBatchesState.error}
+              />
+            ) : null}
+            {releaseBatchesState.status === 'success' &&
+            (releaseBatchesState.batches || []).length === 0 ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="没有已登记的发布证据批次"
+                description="请先按发布治理生成批次目录和证据，再回到本页检查。"
+              />
+            ) : null}
+            <div className="erp-dev-customer-release-primary">
+              <Button
+                type="default"
+                loading={releaseState.status === 'checking'}
+                disabled={
+                  !importSummary.canCheckReleaseReadiness || !releaseBatch
+                }
+                onClick={onCheckReleaseReadiness}
+              >
+                检查发布门禁
+              </Button>
+              <Button
+                type="primary"
+                icon={<CopyOutlined />}
+                onClick={() => copyText(importSummary.releaseApply.command)}
+              >
+                复制正式执行器输入模板
+              </Button>
+              <Text type="secondary">
+                readiness 是只读检查；正式写入不在浏览器页面执行。
+              </Text>
+            </div>
+            <ReleaseApplySummary
+              releaseState={releaseState}
+              releaseBatch={releaseBatch}
+              executeTemplateCommand={importSummary.releaseApply.command}
+              onCheckReleaseReadiness={onCheckReleaseReadiness}
+            />
+            <div className="erp-dev-customer-formal-gates">
+              {importSummary.formalGates.map((gate) => (
+                <FormalGateItem item={gate} key={gate.key} />
+              ))}
+            </div>
+          </section>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+            <div className="erp-dev-customer-panel__head">
+              <SafetyCertificateOutlined />
+              <Text strong>版本快照 / 回滚 / 审计</Text>
+            </div>
+            <Alert
+              type="info"
+              showIcon
+              message="回滚只恢复配置版本，不删除业务事实"
+              description="客户配置版本写入配置控制面；发布 / 激活 / 回滚会记录脱敏运行审计。已产生的库存、出货、财务和业务单据必须走对应业务补偿，不能由配置回滚抹除。"
+            />
+            <div className="erp-dev-customer-formal-gates">
+              {importSummary.versionAuditSupport.map((item) => (
+                <FormalGateItem item={item} key={item.key} />
+              ))}
+            </div>
+          </section>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+            <div className="erp-dev-customer-panel__head">
+              <DatabaseOutlined />
+              <Text strong>执行边界 / Execution Boundary</Text>
+            </div>
+            <div className="erp-dev-customer-import-flags">
+              {importSummary.executionFlagSummary.map((item) => (
+                <div key={item.key}>
+                  <Text type="secondary">{item.label}</Text>
+                  <Tag color={item.value === true ? 'blue' : 'red'}>
+                    {item.valueLabel}
+                  </Tag>
+                </div>
+              ))}
+            </div>
+            <CommandBlock command={importSummary.qaCommand} />
+          </section>
+          <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+            <div className="erp-dev-customer-panel__head">
+              <DeploymentUnitOutlined />
+              <Text strong>备用命令 / Command Fallback</Text>
+            </div>
+            <div className="erp-dev-customer-tool-list">
+              {importSummary.tools.map((tool) => (
+                <article className="erp-dev-customer-tool" key={tool.key}>
+                  <div className="erp-dev-customer-tool__head">
+                    <Text strong>{tool.title}</Text>
+                    <StatusTag status={tool.status} />
+                  </div>
+                  {tool.note ? <Text type="secondary">{tool.note}</Text> : null}
+                  <CommandBlock command={tool.command} />
+                </article>
+              ))}
+            </div>
+          </section>
+        </>
+      ) : null}
     </div>
   )
 }
@@ -1640,10 +1809,18 @@ export default function DevCustomerConfigPage() {
     () => buildCustomerConfigDevOverviewFromSearch(searchParams),
     [searchParams]
   )
-  const [activeView, setActiveView] = useState(VIEW_OVERVIEW)
+  const {
+    customerKey: overviewCustomerKey,
+    importSummary: overviewImportSummary,
+  } = overview
+  const { uiReleaseBatchesApiPath } = overviewImportSummary || {}
   const [dryRunState, setDryRunState] = useState({ status: 'idle' })
   const [applyState, setApplyState] = useState({ status: 'idle' })
   const [releaseState, setReleaseState] = useState({ status: 'idle' })
+  const [releaseBatchesState, setReleaseBatchesState] = useState({
+    status: 'idle',
+    batches: [],
+  })
   const dryRunRequestRef = useRef(0)
   const dryRunAbortRef = useRef(null)
   const applyRequestRef = useRef(0)
@@ -1651,6 +1828,69 @@ export default function DevCustomerConfigPage() {
   const releaseRequestRef = useRef(0)
   const releaseAbortRef = useRef(null)
   const isMissingCustomer = overview.status === 'missing'
+  const requestedView = String(
+    searchParams.get(DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY) || ''
+  ).trim()
+  const activeView = VIEW_OPTIONS.some((item) => item.value === requestedView)
+    ? requestedView
+    : VIEW_OVERVIEW
+  const requestedPreflightSection = String(
+    searchParams.get(PREFLIGHT_SECTION_QUERY_KEY) || ''
+  ).trim()
+  const activePreflightSection = PREFLIGHT_SECTION_VALUES.has(
+    requestedPreflightSection
+  )
+    ? requestedPreflightSection
+    : PREFLIGHT_SECTION_PACKAGE
+  const requestedImportAction = String(
+    searchParams.get(IMPORT_ACTION_QUERY_KEY) || ''
+  ).trim()
+  const activeImportAction = IMPORT_ACTION_VALUES.has(requestedImportAction)
+    ? requestedImportAction
+    : IMPORT_ACTION_DRY_RUN
+  const searchParamsKey = searchParams.toString()
+  const requestedReleaseBatch = String(
+    searchParams.get(DEV_CUSTOMER_CONFIG_RELEASE_BATCH_QUERY_KEY) || ''
+  ).trim()
+  const releaseBatch =
+    releaseBatchesState.status === 'success' &&
+    releaseBatchesState.batches.includes(requestedReleaseBatch)
+      ? requestedReleaseBatch
+      : ''
+  const isMutationRunning = applyState.status === 'running'
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParamsKey)
+    let changed = false
+
+    if (
+      (activeView !== VIEW_PREFLIGHT ||
+        (requestedPreflightSection &&
+          !PREFLIGHT_SECTION_VALUES.has(requestedPreflightSection))) &&
+      nextParams.has(PREFLIGHT_SECTION_QUERY_KEY)
+    ) {
+      nextParams.delete(PREFLIGHT_SECTION_QUERY_KEY)
+      changed = true
+    }
+    if (
+      (activeView !== VIEW_IMPORT ||
+        (requestedImportAction &&
+          !IMPORT_ACTION_VALUES.has(requestedImportAction))) &&
+      nextParams.has(IMPORT_ACTION_QUERY_KEY)
+    ) {
+      nextParams.delete(IMPORT_ACTION_QUERY_KEY)
+      changed = true
+    }
+    if (changed) {
+      setSearchParams(nextParams, { replace: true })
+    }
+  }, [
+    activeView,
+    requestedImportAction,
+    requestedPreflightSection,
+    searchParamsKey,
+    setSearchParams,
+  ])
 
   useEffect(() => {
     dryRunAbortRef.current?.abort()
@@ -1662,7 +1902,43 @@ export default function DevCustomerConfigPage() {
     setDryRunState({ status: 'idle' })
     setApplyState({ status: 'idle' })
     setReleaseState({ status: 'idle' })
-  }, [overview.customerKey])
+    setReleaseBatchesState({ status: 'idle', batches: [] })
+  }, [overviewCustomerKey])
+
+  useEffect(() => {
+    if (isMissingCustomer) return undefined
+    const controller = new AbortController()
+    const customerKey = overviewCustomerKey
+    setReleaseBatchesState({ status: 'loading', batches: [] })
+    const url = new URL(uiReleaseBatchesApiPath, window.location.origin)
+    url.searchParams.set('customerKey', customerKey)
+
+    fetch(`${url.pathname}${url.search}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) {
+          const error = new Error('发布批次读取失败')
+          error.httpStatus = response.status
+          throw error
+        }
+        return response.json()
+      })
+      .then((payload) => {
+        setReleaseBatchesState({
+          status: 'success',
+          batches: Array.isArray(payload.batches) ? payload.batches : [],
+        })
+      })
+      .catch((error) => {
+        if (error?.name === 'AbortError') return
+        setReleaseBatchesState({
+          status: 'error',
+          batches: [],
+          error: getActionErrorMessage(error, '发布批次读取失败'),
+        })
+      })
+
+    return () => controller.abort()
+  }, [isMissingCustomer, overviewCustomerKey, uiReleaseBatchesApiPath])
 
   useEffect(
     () => () => {
@@ -1673,10 +1949,75 @@ export default function DevCustomerConfigPage() {
     []
   )
 
+  useEffect(() => {
+    if (!isMutationRunning) return undefined
+    const warnBeforeUnload = (event) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warnBeforeUnload)
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload)
+  }, [isMutationRunning])
+
   const handleCustomerChange = (customerKey) => {
+    if (isMutationRunning) return
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set(DEV_CUSTOMER_CONFIG_QUERY_KEY, customerKey)
+    nextParams.delete(DEV_CUSTOMER_CONFIG_RELEASE_BATCH_QUERY_KEY)
     setSearchParams(nextParams, { replace: true })
+  }
+
+  const handleReleaseBatchChange = (nextReleaseBatch) => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set(
+      DEV_CUSTOMER_CONFIG_RELEASE_BATCH_QUERY_KEY,
+      nextReleaseBatch
+    )
+    setSearchParams(nextParams, { replace: true })
+    setReleaseState({ status: 'idle' })
+  }
+
+  const handleViewChange = (nextView) => {
+    if (isMutationRunning) return
+    const nextParams = new URLSearchParams(searchParams)
+    if (nextView === VIEW_OVERVIEW) {
+      nextParams.delete(DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY)
+    } else {
+      nextParams.set(DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY, nextView)
+    }
+    if (nextView !== VIEW_PREFLIGHT) {
+      nextParams.delete(PREFLIGHT_SECTION_QUERY_KEY)
+    }
+    if (nextView !== VIEW_IMPORT) {
+      nextParams.delete(IMPORT_ACTION_QUERY_KEY)
+    }
+    setSearchParams(nextParams)
+  }
+
+  const handlePreflightSectionChange = (nextSection) => {
+    const normalizedSection = PREFLIGHT_SECTION_VALUES.has(nextSection)
+      ? nextSection
+      : PREFLIGHT_SECTION_PACKAGE
+    const nextParams = new URLSearchParams(searchParams)
+    if (normalizedSection === PREFLIGHT_SECTION_PACKAGE) {
+      nextParams.delete(PREFLIGHT_SECTION_QUERY_KEY)
+    } else {
+      nextParams.set(PREFLIGHT_SECTION_QUERY_KEY, normalizedSection)
+    }
+    setSearchParams(nextParams)
+  }
+
+  const handleImportActionChange = (nextAction) => {
+    const normalizedAction = IMPORT_ACTION_VALUES.has(nextAction)
+      ? nextAction
+      : IMPORT_ACTION_DRY_RUN
+    const nextParams = new URLSearchParams(searchParams)
+    if (normalizedAction === IMPORT_ACTION_DRY_RUN) {
+      nextParams.delete(IMPORT_ACTION_QUERY_KEY)
+    } else {
+      nextParams.set(IMPORT_ACTION_QUERY_KEY, normalizedAction)
+    }
+    setSearchParams(nextParams)
   }
 
   const handleRunDryRun = async () => {
@@ -1772,8 +2113,15 @@ export default function DevCustomerConfigPage() {
       try {
         publish = await publishCustomerConfig(manifest)
       } catch (publishError) {
-        const messageText = String(publishError?.message || '')
-        if (!messageText.includes('已激活客户配置版本')) {
+        let activeSession = null
+        try {
+          activeSession = await getEffectiveSession({
+            customer_key: manifest.customer_key,
+          })
+        } catch {
+          // 保留原始发布错误；读回失败不能作为重复发布成功证据。
+        }
+        if (activeSession?.configRevision !== manifest.revision) {
           throw publishError
         }
         publishSkipped = true
@@ -1784,12 +2132,16 @@ export default function DevCustomerConfigPage() {
 
       setApplyState({
         status: 'running',
-        step: '正在激活测试配置版本',
+        step: publishSkipped
+          ? '当前 revision 已激活，正在确认有效配置投影'
+          : '正在激活测试配置版本',
       })
-      const activated = await activateCustomerConfig({
-        customer_key: manifest.customer_key,
-        revision: manifest.revision,
-      })
+      const activated = publishSkipped
+        ? { status: 'already_active' }
+        : await activateCustomerConfig({
+            customer_key: manifest.customer_key,
+            revision: manifest.revision,
+          })
       if (!ensureCurrent()) {
         return
       }
@@ -1804,6 +2156,7 @@ export default function DevCustomerConfigPage() {
       if (!ensureCurrent()) {
         return
       }
+      assertCustomerConfigReadbackRevision(effectiveSession, manifest.revision)
 
       setApplyState({
         status: 'success',
@@ -1874,7 +2227,7 @@ export default function DevCustomerConfigPage() {
       centered: true,
       title: '确认应用测试配置？',
       content:
-        '该操作会用当前管理员登录态写入当前后端的客户配置控制面，并激活测试配置版本；本地开发默认写 8300，若连接测试环境必须先确认后端目标；不会导入客户业务数据，也不代表正式发布通过。',
+        '该操作会用当前管理员登录态，通过 Vite /rpc 代理写入 http://127.0.0.1:8300 的客户配置控制面并激活测试配置版本；不会导入客户业务数据，也不代表正式发布通过。',
       okText: '确认应用测试配置',
       cancelText: '取消',
       onOk: handleApplyTestConfig,
@@ -1882,6 +2235,10 @@ export default function DevCustomerConfigPage() {
   }
 
   const handleCheckReleaseReadiness = async () => {
+    if (!releaseBatch) {
+      message.warning('请先选择已登记的发布证据批次')
+      return
+    }
     const requestId = releaseRequestRef.current + 1
     releaseRequestRef.current = requestId
     releaseAbortRef.current?.abort()
@@ -1899,17 +2256,22 @@ export default function DevCustomerConfigPage() {
           headers: {
             'content-type': 'application/json',
           },
-          body: JSON.stringify({ customerKey: overview.customerKey }),
+          body: JSON.stringify({
+            customerKey: overview.customerKey,
+            releaseBatch,
+          }),
           signal: controller.signal,
         }
       )
-      const payload = await response.json()
       if (!ensureCurrent()) {
         return
       }
       if (!response.ok) {
-        throw new Error('发布门禁检查失败')
+        const error = new Error('发布门禁检查失败')
+        error.httpStatus = response.status
+        throw error
       }
+      const payload = await response.json()
       if (payload.status === 'ready') {
         setReleaseState({ status: 'ready', result: payload })
         message.success('发布门禁已通过')
@@ -1932,106 +2294,16 @@ export default function DevCustomerConfigPage() {
     }
   }
 
-  const handleApplyReleaseConfig = async () => {
-    const readiness = releaseState.result
-    if (releaseState.status !== 'ready' || !readiness?.manifest) {
-      setReleaseState({
-        status: 'blocked',
-        result: readiness,
-      })
-      message.warning('请先通过发布门禁')
-      return
-    }
-    const requestId = releaseRequestRef.current + 1
-    releaseRequestRef.current = requestId
-    setReleaseState({
-      status: 'publishing',
-      step: '正在校验客户配置',
-      result: readiness,
-    })
-    const ensureCurrent = () => releaseRequestRef.current === requestId
-    const { manifest } = readiness
-
-    try {
-      const validation = await validateCustomerConfig(manifest)
-      if (!ensureCurrent()) {
-        return
-      }
-      setReleaseState({
-        status: 'publishing',
-        step: '正在发布正式配置版本',
-        result: readiness,
-      })
-      const publish = await publishCustomerConfig(manifest)
-      if (!ensureCurrent()) {
-        return
-      }
-      setReleaseState({
-        status: 'publishing',
-        step: '正在激活正式配置版本',
-        result: readiness,
-      })
-      const activated = await activateCustomerConfig({
-        customer_key: manifest.customer_key,
-        revision: manifest.revision,
-      })
-      if (!ensureCurrent()) {
-        return
-      }
-      const effectiveSession = await getEffectiveSession({
-        customer_key: manifest.customer_key,
-      })
-      if (!ensureCurrent()) {
-        return
-      }
-      setReleaseState({
-        status: 'published',
-        result: {
-          ...readiness,
-          manifestSummary: readiness.summary,
-          validation,
-          publish,
-          activated,
-          effectiveSession,
-        },
-      })
-      message.success('正式配置已发布')
-    } catch (error) {
-      if (!ensureCurrent()) {
-        return
-      }
-      setReleaseState({
-        status: 'error',
-        result: readiness,
-        error: getCustomerConfigActionError(
-          error,
-          '正式配置发布失败，请确认发布门禁、本地后端和管理员权限。'
-        ),
-      })
-      message.error('正式配置发布失败')
-    }
-  }
-
-  const requestApplyReleaseConfig = () => {
-    modal.confirm({
-      centered: true,
-      title: '确认发布正式配置？',
-      content:
-        '仅在 release readiness 已通过后继续。该操作会写入并激活正式客户配置控制面，不导入客户业务数据，也不替代生产部署、备份恢复或客户签收。',
-      okText: '确认发布正式配置',
-      cancelText: '取消',
-      onOk: handleApplyReleaseConfig,
-    })
-  }
-
   const panel = {
     [VIEW_OVERVIEW]: (
-      <OverviewPanel overview={overview} onNavigate={setActiveView} />
+      <OverviewPanel overview={overview} onNavigate={handleViewChange} />
     ),
     [VIEW_PREFLIGHT]: (
       <PreflightPanel
         consoleSummary={overview.packageConsoleSummary}
         customerPackageSummary={overview.customerPackageSummary}
+        activeSection={activePreflightSection}
+        onSectionChange={handlePreflightSectionChange}
       />
     ),
     [VIEW_DIFF]: <DiffPanel consoleSummary={overview.packageConsoleSummary} />,
@@ -2048,16 +2320,23 @@ export default function DevCustomerConfigPage() {
         dryRunState={dryRunState}
         applyState={applyState}
         releaseState={releaseState}
+        releaseBatchesState={releaseBatchesState}
+        releaseBatch={releaseBatch}
         onRunDryRun={handleRunDryRun}
         onApplyTestConfig={requestApplyTestConfig}
         onCheckReleaseReadiness={handleCheckReleaseReadiness}
-        onApplyReleaseConfig={requestApplyReleaseConfig}
+        onReleaseBatchChange={handleReleaseBatchChange}
+        activeAction={activeImportAction}
+        onActionChange={handleImportActionChange}
       />
     ),
   }[activeView]
 
   return (
-    <main className="erp-dev-customer-page">
+    <main className="erp-dev-customer-page erp-dev-workspace-page">
+      <DevPageNav
+        sourcePath={overview.sourcePath || DEV_CUSTOMER_CONFIG_SOURCE_PATH}
+      />
       <header className="erp-dev-customer-header">
         <div className="erp-dev-customer-header__copy">
           <Space align="center" size={10}>
@@ -2073,13 +2352,17 @@ export default function DevCustomerConfigPage() {
           <CustomerPackageSelector
             overview={overview}
             onChange={handleCustomerChange}
+            disabled={isMutationRunning}
           />
           {isMissingCustomer ? null : (
-            <Segmented
+            <DevTaskNav
+              compact
               className="erp-dev-customer-view-switch"
-              options={VIEW_OPTIONS}
+              ariaLabel="客户配置工作任务"
+              items={VIEW_OPTIONS}
               value={activeView}
-              onChange={setActiveView}
+              onChange={handleViewChange}
+              disabled={isMutationRunning}
             />
           )}
         </div>

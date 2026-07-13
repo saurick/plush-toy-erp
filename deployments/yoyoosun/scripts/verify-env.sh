@@ -76,6 +76,7 @@ required_keys=(
   ERP_DEBUG_ENV
   ERP_DEBUG_SEED_ENABLED
   ERP_DEBUG_CLEANUP_ENABLED
+  ERP_DEBUG_BUSINESS_CLEAR_ENABLED
   ERP_DEBUG_CLEANUP_SCOPE
 )
 
@@ -127,6 +128,10 @@ if [[ "$mode" == "runtime" ]]; then
   fi
   if [[ "${values[ERP_DEBUG_CLEANUP_ENABLED]:-}" != "false" ]]; then
     echo "[verify-env] ERP_DEBUG_CLEANUP_ENABLED 必须为 false"
+    exit 1
+  fi
+  if [[ "${values[ERP_DEBUG_BUSINESS_CLEAR_ENABLED]:-}" != "false" ]]; then
+    echo "[verify-env] ERP_DEBUG_BUSINESS_CLEAR_ENABLED 必须为 false"
     exit 1
   fi
   if [[ "${values[BOOTSTRAP_ADMIN_ONCE]:-}" != "true" && "${values[BOOTSTRAP_ADMIN_ONCE]:-}" != "false" ]]; then

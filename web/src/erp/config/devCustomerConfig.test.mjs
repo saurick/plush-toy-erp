@@ -8,6 +8,7 @@ import {
   DEV_CUSTOMER_CONFIG_QA_COMMAND,
   DEV_CUSTOMER_CONFIG_REGISTRY,
   DEV_CUSTOMER_CONFIG_ROUTE,
+  assertCustomerConfigReadbackRevision,
   buildCustomerConfigDevOverview,
   buildCustomerConfigDevOverviewFromSearch,
   buildCustomerMenuRuntimeSummary,
@@ -71,6 +72,30 @@ test('devCustomerConfig: 只通过开发态独立路径暴露', () => {
   assert.equal(isDevCustomerConfigEnabled({ DEV: true }), true)
   assert.equal(isDevCustomerConfigEnabled({ DEV: false }), false)
   assert(!DEV_CUSTOMER_CONFIG_ROUTE.startsWith('/erp/'))
+})
+
+test('devCustomerConfig: 测试应用只接受与 manifest 完全一致的读回 revision', () => {
+  const session = { configRevision: 'yoyoosun-v7' }
+  assert.equal(
+    assertCustomerConfigReadbackRevision(session, 'yoyoosun-v7'),
+    session
+  )
+  assert.throws(
+    () =>
+      assertCustomerConfigReadbackRevision(
+        { configRevision: 'yoyoosun-v6' },
+        'yoyoosun-v7'
+      ),
+    /读回 revision 不一致/u
+  )
+  assert.throws(
+    () => assertCustomerConfigReadbackRevision({}, 'yoyoosun-v7'),
+    /实际 未返回/u
+  )
+  assert.throws(
+    () => assertCustomerConfigReadbackRevision(session, ''),
+    /清单缺少 revision/u
+  )
 })
 
 test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', () => {
@@ -250,17 +275,21 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
     '/__dev/api/customer-config/runtime-manifest'
   )
   assert.equal(
+    summary.uiReleaseBatchesApiPath,
+    '/__dev/api/customer-config/release-batches'
+  )
+  assert.equal(
     summary.uiReleaseReadinessApiPath,
     '/__dev/api/customer-config/release-readiness'
   )
   assert.equal(summary.testApply.status, 'test_apply_ready')
   assert.equal(
     summary.testApply.target,
-    '当前后端（本地或显式测试环境）ERP 应用数据库'
+    '当前 Vite /rpc 代理后端（http://127.0.0.1:8300）'
   )
-  assert.match(summary.testApply.note, /当前后端/)
-  assert.match(summary.testApply.note, /本地开发默认是 8300/)
-  assert.match(summary.testApply.note, /显式确认目标后端/)
+  assert.match(summary.testApply.note, /Vite \/rpc/)
+  assert.match(summary.testApply.note, /127\.0\.0\.1:8300/)
+  assert.match(summary.testApply.note, /正式目标环境不从此按钮选择/)
   assert.equal(summary.testApply.noBusinessDataImport, true)
   assert.deepEqual(summary.testApply.operations, [
     'compile_runtime_manifest',
@@ -270,15 +299,19 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
     'get_effective_session',
   ])
   assert.equal(summary.releaseApply.status, 'release_gate_required')
-  assert.equal(summary.releaseApply.target, '目标环境 ERP 应用数据库')
+  assert.equal(
+    summary.releaseApply.target,
+    '由正式执行器参数显式确认的目标环境'
+  )
   assert.equal(summary.releaseApply.noBusinessDataImport, true)
   assert.deepEqual(summary.releaseApply.operations, [
     'release_readiness_gate',
-    'validate_customer_config',
-    'publish_customer_config',
-    'activate_customer_config',
-    'get_effective_session',
+    'customer_config_release_execute',
+    'authenticated_readback',
+    'release_report',
   ])
+  assert.match(summary.releaseApply.evidenceDir, /<release-batch>$/)
+  assert.match(summary.releaseApply.note, /不直接发布或激活/)
   assert.equal(summary.releaseReadbackPreflight.status, 'report_gate_only')
   assert.equal(summary.releaseReadbackPreflight.writesDatabase, false)
   assert.equal(summary.releaseReadbackPreflight.writesConfigControl, false)
@@ -288,11 +321,11 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
     summary.releaseReadbackPreflight.requiresAdminConfirmation,
     false
   )
-  assert.match(
+  assert.equal(
     summary.releaseReadbackPreflight.command,
-    /--evidence-dir deployments\/yoyoosun\/evidence\/releases\/2026-06-29 .*--readback-preflight-report output\/customers\/yoyoosun\/customer-config-readback-preflight\.json/
+    'node scripts/deploy/customer-config-release-readiness.mjs --print-input-template'
   )
-  assert(!summary.releaseReadbackPreflight.command.includes('<YYYY-MM-DD>'))
+  assert(!summary.releaseReadbackPreflight.command.includes('<release-batch>'))
   assert(!summary.releaseReadbackPreflight.command.includes('--execute'))
   assert(
     !summary.releaseReadbackPreflight.command.includes(
@@ -354,7 +387,7 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
     summary.databaseTargets.some(
       (item) =>
         item.key === 'test-config-apply' &&
-        item.target === '当前后端（本地或显式测试环境）ERP 应用数据库' &&
+        item.target === '当前 Vite /rpc 代理后端（http://127.0.0.1:8300）' &&
         item.writeClass === 'test_config_control_write' &&
         item.writeClassLabel === '写当前后端配置控制面' &&
         item.writesLabel ===
@@ -366,8 +399,8 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
         item.writesConfigControlLabel === '写客户配置控制面' &&
         item.requiresReleaseEvidence === false &&
         item.requiresAdminConfirmation === true &&
-        item.reason.includes('本地默认 8300') &&
-        item.reason.includes('显式测试环境必须先确认后端目标')
+        item.reason.includes('127.0.0.1:8300') &&
+        item.reason.includes('正式目标环境由统一执行器显式确认')
     )
   )
   assert(
@@ -436,7 +469,6 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
       'preview_only',
       'report_gate_only',
       'release_gate_required',
-      'release_gate_required',
     ]
   )
   assert(
@@ -448,33 +480,20 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
     (item) => item.key === 'release-readback-preflight'
   )
   assert.equal(readbackPreflight.status, 'report_gate_only')
-  assert(readbackPreflight.command.includes('--readback-preflight-report'))
-  assert(
-    readbackPreflight.command.includes(
-      'customer-config-readback-preflight.json'
-    )
+  assert.equal(
+    readbackPreflight.command,
+    'node scripts/deploy/customer-config-release-readiness.mjs --print-input-template'
   )
-  assert(
-    readbackPreflight.command.includes(
-      'deployments/yoyoosun/evidence/releases/2026-06-29'
-    )
-  )
-  assert(!readbackPreflight.command.includes('<YYYY-MM-DD>'))
+  assert(!readbackPreflight.command.includes('<release-batch>'))
   assert(!readbackPreflight.command.includes('--execute'))
   assert(!readbackPreflight.command.includes('CUSTOMER_CONFIG_ADMIN_TOKEN'))
   assert.match(readbackPreflight.note, /不调用后端/)
   assert.match(readbackPreflight.note, /不读取令牌/)
   assert.match(readbackPreflight.note, /不证明真实 active revision/)
-  const rollbackReadiness = summary.tools.find(
-    (item) => item.key === 'release-rollback-readiness'
-  )
-  assert(rollbackReadiness.command.includes('--require-rollback'))
-  assert(rollbackReadiness.command.includes('--release-report'))
-  assert.match(rollbackReadiness.note, /不执行回滚/)
   const rollbackExecute = summary.tools.find(
     (item) => item.key === 'release-rollback-execute'
   )
-  assert.equal(rollbackExecute.title, '客户配置回滚输入模板')
+  assert.equal(rollbackExecute.title, '正式发布 / 回滚执行器输入模板')
   assert.equal(
     rollbackExecute.command,
     'node scripts/deploy/customer-config-release-execute.mjs --print-input-template'
@@ -488,6 +507,7 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
       (item) =>
         typeof item.note === 'string' &&
         item.note.trim().length > 0 &&
+        !item.command.includes('<release-batch>') &&
         !item.command.includes('CUSTOMER_CONFIG_ADMIN_TOKEN') &&
         !item.command.includes('--execute')
     )
@@ -799,6 +819,18 @@ test('devCustomerConfig: 页面只展示客户配置目录标签，不直出 raw
     'utf8'
   )
 
+  assert.match(source, /const PREFLIGHT_SECTION_QUERY_KEY = 'section'/)
+  assert.match(source, /const IMPORT_ACTION_QUERY_KEY = 'action'/)
+  assert.match(source, /ariaLabel="配置预检任务"/)
+  assert.match(source, /ariaLabel="配置执行任务"/)
+  assert.match(source, /activeSection === PREFLIGHT_SECTION_PACKAGE/)
+  assert.match(source, /activeSection === PREFLIGHT_SECTION_RUNTIME/)
+  assert.match(source, /activeSection === PREFLIGHT_SECTION_FLOW/)
+  assert.match(source, /activeSection === PREFLIGHT_SECTION_EVIDENCE/)
+  assert.match(source, /activeAction === IMPORT_ACTION_DRY_RUN/)
+  assert.match(source, /activeAction === IMPORT_ACTION_TEST_APPLY/)
+  assert.match(source, /activeAction === IMPORT_ACTION_RELEASE/)
+
   assert.doesNotMatch(source, />runtime off</)
   assert.doesNotMatch(source, />handler forbidden</)
   assert.doesNotMatch(source, /禁止客户包 handler/)
@@ -838,7 +870,12 @@ test('devCustomerConfig: 页面只展示客户配置目录标签，不直出 raw
   assert.doesNotMatch(source, /\{item\.ruleCount\} rules/)
   assert.doesNotMatch(source, /<Tag>\{template\.key\}<\/Tag>/)
   assert.doesNotMatch(source, /\(item\.partyDefaultKeys \|\| \[\]\)\.join/)
-  assert.doesNotMatch(source, /sourcePath/)
+  assert.match(
+    source,
+    /sourcePath=\{overview\.sourcePath \|\| DEV_CUSTOMER_CONFIG_SOURCE_PATH\}/
+  )
+  assert.doesNotMatch(source, /\{item\.sourcePath\}/)
+  assert.match(source, /<Select\s+aria-label="客户包选择"/u)
   assert.doesNotMatch(source, /customerKey\.slice/)
   assert.doesNotMatch(source, /\$\{item\.label\} \(\$\{item\.customerKey\}\)/)
   assert.doesNotMatch(source, /\{item\.label\} \/ \{item\.customerKey\}/)

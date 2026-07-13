@@ -22,35 +22,13 @@ export async function installAttachmentRpcMocks(page, context) {
 
     const dataByMethod = {
       list_attachments: { attachments: [] },
-      listAttachments: { attachments: [] },
       upload_attachment: { attachment },
-      uploadAttachment: { attachment },
       download_attachment: {
         attachment: {
           ...attachment,
           content_base64: 'c3R5bGUtbDE=',
         },
       },
-      downloadAttachment: {
-        attachment: {
-          ...attachment,
-          content_base64: 'c3R5bGUtbDE=',
-        },
-      },
-      get_attachment_content: {
-        attachment: {
-          ...attachment,
-          content_base64: 'c3R5bGUtbDE=',
-        },
-      },
-      getAttachmentContent: {
-        attachment: {
-          ...attachment,
-          content_base64: 'c3R5bGUtbDE=',
-        },
-      },
-      delete_attachment: { deleted: true },
-      deleteAttachment: { deleted: true },
     }
 
     await route.fulfill({
@@ -60,8 +38,12 @@ export async function installAttachmentRpcMocks(page, context) {
         jsonrpc: '2.0',
         id,
         result: {
-          code: 0,
-          message: 'OK',
+          code: Object.prototype.hasOwnProperty.call(dataByMethod, method)
+            ? 0
+            : 40010,
+          message: Object.prototype.hasOwnProperty.call(dataByMethod, method)
+            ? 'OK'
+            : `未知 attachment 接口 method=${String(method || '')}`,
           data: dataByMethod[method] || {},
         },
       }),

@@ -5,23 +5,7 @@ import path from "node:path";
 
 const ROOT = process.cwd();
 
-const SCAN_ROOTS = [
-  "AGENTS.md",
-  "README.md",
-  "config",
-  "deployments",
-  "scripts",
-  "scripts/qa",
-  "docs/当前真源与交接顺序.md",
-  "docs/product",
-  "server/Makefile",
-  "server/README.md",
-  "web/scripts",
-  "web/src",
-  "server/internal/biz",
-  "server/internal/data",
-  "docs/architecture",
-];
+const SCAN_ROOTS = ["."];
 
 const SKIP_PARTS = new Set([
   ".git",
@@ -29,7 +13,29 @@ const SKIP_PARTS = new Set([
   "dist",
   "build",
   "coverage",
+  "docs/archive",
+  "docs/reference",
+  "docs/customers/yoyoosun/raw-source-files",
+  "output",
+  "server/bin",
   "server/internal/data/model/ent",
+  "deployments/yoyoosun/evidence/releases",
+]);
+
+const SKIP_FILES = new Set([
+  "docs/文档清单.md",
+  "progress.md",
+  "scripts/qa/phase-label-boundaries.mjs",
+]);
+
+const SKIP_DIRECTORY_NAMES = new Set([
+  ".git",
+  "bin",
+  "build",
+  "coverage",
+  "dist",
+  "node_modules",
+  "output",
 ]);
 
 const TEXT_EXTENSIONS = new Set([
@@ -48,14 +54,30 @@ const TEXT_EXTENSIONS = new Set([
   ".css",
 ]);
 
-const FORBIDDEN = /Phase\s*\d+[A-Za-z0-9-]*|phase\d+[A-Za-z0-9-]*|PHASE\d+[A-Z0-9-]*|SIM-[A-Z0-9-]*PHASE\d+[A-Z0-9-]*|\/erp\/phase\d+|jsonrpc_phase\d*|\bphase\s*:/u;
+const NUMBERED_PHASE =
+  /Phase\s*\d+[A-Za-z0-9-]*|phase\d+[A-Za-z0-9-]*|PHASE\d+[A-Z0-9-]*|SIM-[A-Z0-9-]*PHASE\d+[A-Z0-9-]*|\/erp\/phase\d+|jsonrpc_phase\d*/u;
+const ABBREVIATED_STAGE =
+  /\bP\d+(?:-\d+)+\b|\bP\d+\s+(?:phase|stage|milestone|release|goal|chain|loader|handler|command|阶段|里程碑|发布阶段|目标阶段|实施链路)/iu;
+
+function hasForbiddenStageLabel(value) {
+  return NUMBERED_PHASE.test(value) || ABBREVIATED_STAGE.test(value);
+}
 
 function shouldSkip(relativePath) {
-  if (relativePath === "scripts/qa/phase-label-boundaries.mjs") {
+  const normalizedPath = relativePath.replace(/^\.\//u, "");
+  if (SKIP_FILES.has(normalizedPath)) {
+    return true;
+  }
+  if (
+    normalizedPath
+      .split(path.sep)
+      .some((part) => SKIP_DIRECTORY_NAMES.has(part))
+  ) {
     return true;
   }
   return [...SKIP_PARTS].some(
-    (part) => relativePath === part || relativePath.startsWith(`${part}/`),
+    (part) =>
+      normalizedPath === part || normalizedPath.startsWith(`${part}/`),
   );
 }
 
@@ -92,12 +114,12 @@ function walk(relativeRoot) {
 const hits = [];
 const scanFiles = [...new Set(SCAN_ROOTS.flatMap(walk))];
 for (const relativeFile of scanFiles) {
-  if (FORBIDDEN.test(relativeFile)) {
+  if (hasForbiddenStageLabel(relativeFile)) {
     hits.push(`${relativeFile}:1: forbidden phase label in file path`);
   }
   const content = fs.readFileSync(path.join(ROOT, relativeFile), "utf8");
   content.split(/\r?\n/u).forEach((line, index) => {
-    if (FORBIDDEN.test(line)) {
+    if (hasForbiddenStageLabel(line)) {
       hits.push(`${relativeFile}:${index + 1}: ${line.trim()}`);
     }
   });
@@ -112,7 +134,7 @@ if (hits.length > 0) {
     console.error(`  ... ${hits.length - 80} more`);
   }
   console.error(
-    "[phase-label-boundaries] use capability, domain, scenario, reviewMilestone, or evidence names instead.",
+    "[phase-label-boundaries] use capability, domain, module, test shape, layer, scenario, or evidence names instead.",
   );
   process.exit(1);
 }

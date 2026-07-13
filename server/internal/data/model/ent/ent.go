@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"server/internal/data/model/ent/accessentitlement"
+	"server/internal/data/model/ent/adminsession"
 	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/adminuserrole"
 	"server/internal/data/model/ent/bomheader"
@@ -31,6 +32,9 @@ import (
 	"server/internal/data/model/ent/processnodeinstance"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
+	"server/internal/data/model/ent/productionorder"
+	"server/internal/data/model/ent/productionorderevent"
+	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchaseorderitem"
@@ -125,6 +129,7 @@ func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
 			accessentitlement.Table:             accessentitlement.ValidColumn,
+			adminsession.Table:                  adminsession.ValidColumn,
 			adminuser.Table:                     adminuser.ValidColumn,
 			adminuserrole.Table:                 adminuserrole.ValidColumn,
 			bomheader.Table:                     bomheader.ValidColumn,
@@ -149,6 +154,9 @@ func checkColumn(t, c string) error {
 			product.Table:                       product.ValidColumn,
 			productsku.Table:                    productsku.ValidColumn,
 			productionfact.Table:                productionfact.ValidColumn,
+			productionorder.Table:               productionorder.ValidColumn,
+			productionorderevent.Table:          productionorderevent.ValidColumn,
+			productionorderitem.Table:           productionorderitem.ValidColumn,
 			purchaseorder.Table:                 purchaseorder.ValidColumn,
 			purchaseorderitem.Table:             purchaseorderitem.ValidColumn,
 			purchasereceipt.Table:               purchasereceipt.ValidColumn,

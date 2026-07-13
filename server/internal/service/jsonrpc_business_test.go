@@ -203,12 +203,8 @@ func (s *stubBusinessDashboardOperationalFactRepo) SettleFinanceFact(context.Con
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardOperationalFactRepo) CancelPostedFinanceFact(context.Context, int) (*biz.FinanceFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) CancelPostedFinanceFact(context.Context, int, int, string) (*biz.FinanceFact, error) {
 	return nil, biz.ErrBadParam
-}
-
-func (s *stubBusinessDashboardOperationalFactRepo) CancelPostedFinanceFactWithActor(ctx context.Context, id int, _ int) (*biz.FinanceFact, error) {
-	return s.CancelPostedFinanceFact(ctx, id)
 }
 
 func (s *stubBusinessDashboardOperationalFactRepo) ListFinanceFacts(context.Context, biz.OperationalFactFilter) ([]*biz.FinanceFact, int, error) {

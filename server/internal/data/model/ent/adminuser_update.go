@@ -118,6 +118,114 @@ func (_u *AdminUserUpdate) SetNillableDisabled(v *bool) *AdminUserUpdate {
 	return _u
 }
 
+// SetAuthVersion sets the "auth_version" field.
+func (_u *AdminUserUpdate) SetAuthVersion(v int64) *AdminUserUpdate {
+	_u.mutation.ResetAuthVersion()
+	_u.mutation.SetAuthVersion(v)
+	return _u
+}
+
+// SetNillableAuthVersion sets the "auth_version" field if the given value is not nil.
+func (_u *AdminUserUpdate) SetNillableAuthVersion(v *int64) *AdminUserUpdate {
+	if v != nil {
+		_u.SetAuthVersion(*v)
+	}
+	return _u
+}
+
+// AddAuthVersion adds value to the "auth_version" field.
+func (_u *AdminUserUpdate) AddAuthVersion(v int64) *AdminUserUpdate {
+	_u.mutation.AddAuthVersion(v)
+	return _u
+}
+
+// SetRevokedAt sets the "revoked_at" field.
+func (_u *AdminUserUpdate) SetRevokedAt(v time.Time) *AdminUserUpdate {
+	_u.mutation.SetRevokedAt(v)
+	return _u
+}
+
+// SetNillableRevokedAt sets the "revoked_at" field if the given value is not nil.
+func (_u *AdminUserUpdate) SetNillableRevokedAt(v *time.Time) *AdminUserUpdate {
+	if v != nil {
+		_u.SetRevokedAt(*v)
+	}
+	return _u
+}
+
+// ClearRevokedAt clears the value of the "revoked_at" field.
+func (_u *AdminUserUpdate) ClearRevokedAt() *AdminUserUpdate {
+	_u.mutation.ClearRevokedAt()
+	return _u
+}
+
+// SetStatusReason sets the "status_reason" field.
+func (_u *AdminUserUpdate) SetStatusReason(v string) *AdminUserUpdate {
+	_u.mutation.SetStatusReason(v)
+	return _u
+}
+
+// SetNillableStatusReason sets the "status_reason" field if the given value is not nil.
+func (_u *AdminUserUpdate) SetNillableStatusReason(v *string) *AdminUserUpdate {
+	if v != nil {
+		_u.SetStatusReason(*v)
+	}
+	return _u
+}
+
+// ClearStatusReason clears the value of the "status_reason" field.
+func (_u *AdminUserUpdate) ClearStatusReason() *AdminUserUpdate {
+	_u.mutation.ClearStatusReason()
+	return _u
+}
+
+// SetStatusChangedAt sets the "status_changed_at" field.
+func (_u *AdminUserUpdate) SetStatusChangedAt(v time.Time) *AdminUserUpdate {
+	_u.mutation.SetStatusChangedAt(v)
+	return _u
+}
+
+// SetNillableStatusChangedAt sets the "status_changed_at" field if the given value is not nil.
+func (_u *AdminUserUpdate) SetNillableStatusChangedAt(v *time.Time) *AdminUserUpdate {
+	if v != nil {
+		_u.SetStatusChangedAt(*v)
+	}
+	return _u
+}
+
+// ClearStatusChangedAt clears the value of the "status_changed_at" field.
+func (_u *AdminUserUpdate) ClearStatusChangedAt() *AdminUserUpdate {
+	_u.mutation.ClearStatusChangedAt()
+	return _u
+}
+
+// SetStatusChangedBy sets the "status_changed_by" field.
+func (_u *AdminUserUpdate) SetStatusChangedBy(v int) *AdminUserUpdate {
+	_u.mutation.ResetStatusChangedBy()
+	_u.mutation.SetStatusChangedBy(v)
+	return _u
+}
+
+// SetNillableStatusChangedBy sets the "status_changed_by" field if the given value is not nil.
+func (_u *AdminUserUpdate) SetNillableStatusChangedBy(v *int) *AdminUserUpdate {
+	if v != nil {
+		_u.SetStatusChangedBy(*v)
+	}
+	return _u
+}
+
+// AddStatusChangedBy adds value to the "status_changed_by" field.
+func (_u *AdminUserUpdate) AddStatusChangedBy(v int) *AdminUserUpdate {
+	_u.mutation.AddStatusChangedBy(v)
+	return _u
+}
+
+// ClearStatusChangedBy clears the value of the "status_changed_by" field.
+func (_u *AdminUserUpdate) ClearStatusChangedBy() *AdminUserUpdate {
+	_u.mutation.ClearStatusChangedBy()
+	return _u
+}
+
 // SetLastLoginAt sets the "last_login_at" field.
 func (_u *AdminUserUpdate) SetLastLoginAt(v time.Time) *AdminUserUpdate {
 	_u.mutation.SetLastLoginAt(v)
@@ -207,6 +315,21 @@ func (_u *AdminUserUpdate) check() error {
 			return &ValidationError{Name: "erp_preferences", err: fmt.Errorf(`ent: validator failed for field "AdminUser.erp_preferences": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.AuthVersion(); ok {
+		if err := adminuser.AuthVersionValidator(v); err != nil {
+			return &ValidationError{Name: "auth_version", err: fmt.Errorf(`ent: validator failed for field "AdminUser.auth_version": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.StatusReason(); ok {
+		if err := adminuser.StatusReasonValidator(v); err != nil {
+			return &ValidationError{Name: "status_reason", err: fmt.Errorf(`ent: validator failed for field "AdminUser.status_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.StatusChangedBy(); ok {
+		if err := adminuser.StatusChangedByValidator(v); err != nil {
+			return &ValidationError{Name: "status_changed_by", err: fmt.Errorf(`ent: validator failed for field "AdminUser.status_changed_by": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -242,6 +365,39 @@ func (_u *AdminUserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Disabled(); ok {
 		_spec.SetField(adminuser.FieldDisabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.AuthVersion(); ok {
+		_spec.SetField(adminuser.FieldAuthVersion, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedAuthVersion(); ok {
+		_spec.AddField(adminuser.FieldAuthVersion, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.RevokedAt(); ok {
+		_spec.SetField(adminuser.FieldRevokedAt, field.TypeTime, value)
+	}
+	if _u.mutation.RevokedAtCleared() {
+		_spec.ClearField(adminuser.FieldRevokedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.StatusReason(); ok {
+		_spec.SetField(adminuser.FieldStatusReason, field.TypeString, value)
+	}
+	if _u.mutation.StatusReasonCleared() {
+		_spec.ClearField(adminuser.FieldStatusReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.StatusChangedAt(); ok {
+		_spec.SetField(adminuser.FieldStatusChangedAt, field.TypeTime, value)
+	}
+	if _u.mutation.StatusChangedAtCleared() {
+		_spec.ClearField(adminuser.FieldStatusChangedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.StatusChangedBy(); ok {
+		_spec.SetField(adminuser.FieldStatusChangedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedStatusChangedBy(); ok {
+		_spec.AddField(adminuser.FieldStatusChangedBy, field.TypeInt, value)
+	}
+	if _u.mutation.StatusChangedByCleared() {
+		_spec.ClearField(adminuser.FieldStatusChangedBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.LastLoginAt(); ok {
 		_spec.SetField(adminuser.FieldLastLoginAt, field.TypeTime, value)
@@ -362,6 +518,114 @@ func (_u *AdminUserUpdateOne) SetNillableDisabled(v *bool) *AdminUserUpdateOne {
 	return _u
 }
 
+// SetAuthVersion sets the "auth_version" field.
+func (_u *AdminUserUpdateOne) SetAuthVersion(v int64) *AdminUserUpdateOne {
+	_u.mutation.ResetAuthVersion()
+	_u.mutation.SetAuthVersion(v)
+	return _u
+}
+
+// SetNillableAuthVersion sets the "auth_version" field if the given value is not nil.
+func (_u *AdminUserUpdateOne) SetNillableAuthVersion(v *int64) *AdminUserUpdateOne {
+	if v != nil {
+		_u.SetAuthVersion(*v)
+	}
+	return _u
+}
+
+// AddAuthVersion adds value to the "auth_version" field.
+func (_u *AdminUserUpdateOne) AddAuthVersion(v int64) *AdminUserUpdateOne {
+	_u.mutation.AddAuthVersion(v)
+	return _u
+}
+
+// SetRevokedAt sets the "revoked_at" field.
+func (_u *AdminUserUpdateOne) SetRevokedAt(v time.Time) *AdminUserUpdateOne {
+	_u.mutation.SetRevokedAt(v)
+	return _u
+}
+
+// SetNillableRevokedAt sets the "revoked_at" field if the given value is not nil.
+func (_u *AdminUserUpdateOne) SetNillableRevokedAt(v *time.Time) *AdminUserUpdateOne {
+	if v != nil {
+		_u.SetRevokedAt(*v)
+	}
+	return _u
+}
+
+// ClearRevokedAt clears the value of the "revoked_at" field.
+func (_u *AdminUserUpdateOne) ClearRevokedAt() *AdminUserUpdateOne {
+	_u.mutation.ClearRevokedAt()
+	return _u
+}
+
+// SetStatusReason sets the "status_reason" field.
+func (_u *AdminUserUpdateOne) SetStatusReason(v string) *AdminUserUpdateOne {
+	_u.mutation.SetStatusReason(v)
+	return _u
+}
+
+// SetNillableStatusReason sets the "status_reason" field if the given value is not nil.
+func (_u *AdminUserUpdateOne) SetNillableStatusReason(v *string) *AdminUserUpdateOne {
+	if v != nil {
+		_u.SetStatusReason(*v)
+	}
+	return _u
+}
+
+// ClearStatusReason clears the value of the "status_reason" field.
+func (_u *AdminUserUpdateOne) ClearStatusReason() *AdminUserUpdateOne {
+	_u.mutation.ClearStatusReason()
+	return _u
+}
+
+// SetStatusChangedAt sets the "status_changed_at" field.
+func (_u *AdminUserUpdateOne) SetStatusChangedAt(v time.Time) *AdminUserUpdateOne {
+	_u.mutation.SetStatusChangedAt(v)
+	return _u
+}
+
+// SetNillableStatusChangedAt sets the "status_changed_at" field if the given value is not nil.
+func (_u *AdminUserUpdateOne) SetNillableStatusChangedAt(v *time.Time) *AdminUserUpdateOne {
+	if v != nil {
+		_u.SetStatusChangedAt(*v)
+	}
+	return _u
+}
+
+// ClearStatusChangedAt clears the value of the "status_changed_at" field.
+func (_u *AdminUserUpdateOne) ClearStatusChangedAt() *AdminUserUpdateOne {
+	_u.mutation.ClearStatusChangedAt()
+	return _u
+}
+
+// SetStatusChangedBy sets the "status_changed_by" field.
+func (_u *AdminUserUpdateOne) SetStatusChangedBy(v int) *AdminUserUpdateOne {
+	_u.mutation.ResetStatusChangedBy()
+	_u.mutation.SetStatusChangedBy(v)
+	return _u
+}
+
+// SetNillableStatusChangedBy sets the "status_changed_by" field if the given value is not nil.
+func (_u *AdminUserUpdateOne) SetNillableStatusChangedBy(v *int) *AdminUserUpdateOne {
+	if v != nil {
+		_u.SetStatusChangedBy(*v)
+	}
+	return _u
+}
+
+// AddStatusChangedBy adds value to the "status_changed_by" field.
+func (_u *AdminUserUpdateOne) AddStatusChangedBy(v int) *AdminUserUpdateOne {
+	_u.mutation.AddStatusChangedBy(v)
+	return _u
+}
+
+// ClearStatusChangedBy clears the value of the "status_changed_by" field.
+func (_u *AdminUserUpdateOne) ClearStatusChangedBy() *AdminUserUpdateOne {
+	_u.mutation.ClearStatusChangedBy()
+	return _u
+}
+
 // SetLastLoginAt sets the "last_login_at" field.
 func (_u *AdminUserUpdateOne) SetLastLoginAt(v time.Time) *AdminUserUpdateOne {
 	_u.mutation.SetLastLoginAt(v)
@@ -464,6 +728,21 @@ func (_u *AdminUserUpdateOne) check() error {
 			return &ValidationError{Name: "erp_preferences", err: fmt.Errorf(`ent: validator failed for field "AdminUser.erp_preferences": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.AuthVersion(); ok {
+		if err := adminuser.AuthVersionValidator(v); err != nil {
+			return &ValidationError{Name: "auth_version", err: fmt.Errorf(`ent: validator failed for field "AdminUser.auth_version": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.StatusReason(); ok {
+		if err := adminuser.StatusReasonValidator(v); err != nil {
+			return &ValidationError{Name: "status_reason", err: fmt.Errorf(`ent: validator failed for field "AdminUser.status_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.StatusChangedBy(); ok {
+		if err := adminuser.StatusChangedByValidator(v); err != nil {
+			return &ValidationError{Name: "status_changed_by", err: fmt.Errorf(`ent: validator failed for field "AdminUser.status_changed_by": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -516,6 +795,39 @@ func (_u *AdminUserUpdateOne) sqlSave(ctx context.Context) (_node *AdminUser, er
 	}
 	if value, ok := _u.mutation.Disabled(); ok {
 		_spec.SetField(adminuser.FieldDisabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.AuthVersion(); ok {
+		_spec.SetField(adminuser.FieldAuthVersion, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedAuthVersion(); ok {
+		_spec.AddField(adminuser.FieldAuthVersion, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.RevokedAt(); ok {
+		_spec.SetField(adminuser.FieldRevokedAt, field.TypeTime, value)
+	}
+	if _u.mutation.RevokedAtCleared() {
+		_spec.ClearField(adminuser.FieldRevokedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.StatusReason(); ok {
+		_spec.SetField(adminuser.FieldStatusReason, field.TypeString, value)
+	}
+	if _u.mutation.StatusReasonCleared() {
+		_spec.ClearField(adminuser.FieldStatusReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.StatusChangedAt(); ok {
+		_spec.SetField(adminuser.FieldStatusChangedAt, field.TypeTime, value)
+	}
+	if _u.mutation.StatusChangedAtCleared() {
+		_spec.ClearField(adminuser.FieldStatusChangedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.StatusChangedBy(); ok {
+		_spec.SetField(adminuser.FieldStatusChangedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedStatusChangedBy(); ok {
+		_spec.AddField(adminuser.FieldStatusChangedBy, field.TypeInt, value)
+	}
+	if _u.mutation.StatusChangedByCleared() {
+		_spec.ClearField(adminuser.FieldStatusChangedBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.LastLoginAt(); ok {
 		_spec.SetField(adminuser.FieldLastLoginAt, field.TypeTime, value)

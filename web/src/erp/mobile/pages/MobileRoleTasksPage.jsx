@@ -17,6 +17,7 @@ import { canMountCustomerRuntime } from '../../utils/adminProfileSync.mjs'
 import MobileTaskDetailScreen from '../components/MobileTaskDetailScreen.jsx'
 import MobileTaskListScreen from '../components/MobileTaskListScreen.jsx'
 import useMobileRoleTaskActions from '../hooks/useMobileRoleTaskActions'
+import useWorkflowTaskActionAccess from '../../hooks/useWorkflowTaskActionAccess'
 import {
   MOBILE_MAIN_TAB_KEYS,
   MOBILE_MESSAGE_TAB_KEYS,
@@ -167,6 +168,11 @@ export default function MobileRoleTasksPage() {
       null,
     [activeTasks, selectedTaskID]
   )
+  const selectedTaskActionAccess = useWorkflowTaskActionAccess({
+    adminProfile,
+    task: selectedTask,
+    enabled: canMountCustomerTasks && Boolean(selectedTask),
+  })
 
   useEffect(() => {
     if (selectedTaskID === null) {
@@ -225,8 +231,8 @@ export default function MobileRoleTasksPage() {
           getActionErrorMessage(
             error,
             showRefreshFeedback
-              ? '刷新移动端任务失败，已保留上次数据'
-              : '加载移动端任务失败，请稍后重试'
+              ? '刷新任务失败，已保留上次数据'
+              : '加载任务失败，请稍后重试'
           )
         )
       } finally {
@@ -271,10 +277,10 @@ export default function MobileRoleTasksPage() {
     urgingID,
   } = useMobileRoleTaskActions({
     activeRoleKey,
-    adminProfile,
     detailAction,
     loadTasks,
     selectedTask,
+    taskActionAccess: selectedTaskActionAccess,
     setDetailAction,
     setSelectedTaskID,
   })

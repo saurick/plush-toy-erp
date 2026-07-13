@@ -731,16 +731,16 @@ export default function ShipmentsPage() {
       <PageHeaderCard
         compact
         title="出货单"
-        description="出货单维护出货单据和出货明细；只有确认出货后才是真实出货事实，并由后端写库存出库事实。"
+        description="出货单维护出货信息和明细；只有确认出货后才会记录实际出货并更新库存。"
         tags={[
           <Tag color="gold" key="release">
             出货放行：可发货
           </Tag>,
           <Tag color="blue" key="shipment">
-            出货单：已出货事实
+            出货单：实际出货记录
           </Tag>,
           <Tag color="green" key="inventory">
-            出库管理：库存出库事实
+            出库管理：库存出库记录
           </Tag>,
         ]}
         stats={[

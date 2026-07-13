@@ -26,6 +26,7 @@ import (
 func TestFinanceProcessCommandPostgresRecoversExactResultAndMarksCompensation(t *testing.T) {
 	ctx := context.Background()
 	data, client := openPurchaseReceiptPostgresTestData(t)
+	actor := client.AdminUser.Create().SetUsername("finance-cancel-actor-" + postgresTestSuffix()).SetPasswordHash("test-password-hash").SaveX(ctx)
 	processRepo := NewProcessRuntimeRepo(data, log.NewStdLogger(io.Discard))
 	factRepo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	suffix := postgresTestSuffix()
@@ -70,7 +71,7 @@ func TestFinanceProcessCommandPostgresRecoversExactResultAndMarksCompensation(t 
 	if _, err := factRepo.PostFinanceFact(ctx, created.ID); err != nil {
 		t.Fatalf("post finance fact before cancellation: %v", err)
 	}
-	if _, err := factRepo.CancelPostedFinanceFact(ctx, created.ID); err != nil {
+	if _, err := factRepo.CancelPostedFinanceFact(ctx, created.ID, actor.ID, "测试取消应收线索"); err != nil {
 		t.Fatalf("cancel finance fact: %v", err)
 	}
 	assertPostgresProcessEffect(t, ctx, processRepo, command.Node.ID, biz.ProcessDomainCommandEffectStateCompensated, "finance_fact", created.ID)
@@ -80,6 +81,7 @@ func TestFinanceProcessCommandPostgresRecoversExactResultAndMarksCompensation(t 
 func TestFinanceProcessCommandPostgresRejectsCancelledFactBeforeExactRecovery(t *testing.T) {
 	ctx := context.Background()
 	data, client := openPurchaseReceiptPostgresTestData(t)
+	actor := client.AdminUser.Create().SetUsername("finance-cancelled-recovery-actor-" + postgresTestSuffix()).SetPasswordHash("test-password-hash").SaveX(ctx)
 	processRepo := NewProcessRuntimeRepo(data, log.NewStdLogger(io.Discard))
 	factRepo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	suffix := postgresTestSuffix()
@@ -104,7 +106,7 @@ func TestFinanceProcessCommandPostgresRejectsCancelledFactBeforeExactRecovery(t 
 	if _, err := factRepo.PostFinanceFact(ctx, created.ID); err != nil {
 		t.Fatalf("post finance fact before cancelled recovery: %v", err)
 	}
-	cancelled, err := factRepo.CancelPostedFinanceFact(ctx, created.ID)
+	cancelled, err := factRepo.CancelPostedFinanceFact(ctx, created.ID, actor.ID, "测试取消后恢复")
 	if err != nil {
 		t.Fatalf("cancel finance fact before exact recovery: %v", err)
 	}

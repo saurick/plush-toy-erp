@@ -191,7 +191,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     key: 'customer-config-package-runtime',
     label: '客户配置包运行时 / Customer Config Runtime',
     description:
-      '客户配置包结构、moduleStates、角色池、页面 / 字段投影、runtime manifest 或 active revision 读回前置改动时复制；只做本地 validate / compile、输入模板和无后端测试，不发布、不激活、不调用后端。',
+      '客户配置包结构、moduleStates、角色池、页面 / 字段投影、runtime manifest 或 active revision 读回前置改动时复制；只做本地 validate / compile、输入模板和无后端测试，不发布、不激活、不调用后端；release readiness 必须在 /__dev/customer-config 显式选择证据批次后检查。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH /usr/local/bin/pnpm --dir web start:yoyoosun -- --print-plan',
@@ -209,7 +209,6 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
       'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-effective-session-probe.mjs --json --report output/customers/yoyoosun/customer-config-effective-session-probe/current.json',
       'PATH=/usr/local/bin:$PATH node scripts/deploy/customer-config-release-execute.mjs --print-input-template',
       'PATH=/usr/local/bin:$PATH node scripts/deploy/customer-config-release-readiness.mjs --print-input-template',
-      'PATH=/usr/local/bin:$PATH node scripts/deploy/customer-config-release-readiness.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/2026-06-29 --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --readback-preflight-report output/customers/yoyoosun/customer-config-readback-preflight.json',
       'PATH=/usr/local/bin:$PATH bash deployments/yoyoosun/scripts/run-smoke.sh --print-input-template',
     ],
   },
@@ -501,35 +500,67 @@ export function buildDevTestingCopyText(commands = []) {
 
 function isShellCommandLine(line = '') {
   const command = String(line || '').trim()
-  return /^((env|CI|APP_ID|STYLE_[A-Z0-9_]*|TRIAL_[A-Z0-9_]*|CUSTOMER_[A-Z0-9_]*|ERP_[A-Z0-9_]*|NODE_[A-Z0-9_]*|SKIP_[A-Z0-9_]*|STRICT_[A-Z0-9_]*|QA_[A-Z0-9_]*)=[^\s]+(\s+|$))*((cd|pnpm|npm|node|bash|go|make|git|grep|docker|curl|ssh|scp|rsync|atlas)\b|\/usr\/local\/bin\/(pnpm|atlas)\b)/.test(
+  return /^(?:[A-Z_][A-Z0-9_]*=(?:'[^']*'|"[^"]*"|[^\s]+)\s+)*(?:(?:cd|pnpm|npm|node|bash|go|make|git|grep|docker|curl|ssh|scp|rsync|atlas)\b|\/usr\/local\/bin\/(?:pnpm|atlas)\b)/.test(
     command
   )
 }
 
+function hasShellLineContinuation(line = '') {
+  const trailingBackslashes =
+    String(line || '')
+      .trimEnd()
+      .match(/(\\+)$/)?.[1] || ''
+  return trailingBackslashes.length % 2 === 1
+}
+
+function isShellEnvironmentContinuationLine(line = '') {
+  const command = String(line || '')
+    .trim()
+    .replace(/\\\s*$/, '')
+    .trim()
+  return /^(?:[A-Z_][A-Z0-9_]*=(?:'[^']*'|"[^"]*"|[^\s]+)\s*)+$/.test(command)
+}
+
 function extractShellCommandsFromBlock(rawBlock = '') {
   const commands = []
-  const lines = String(rawBlock || '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
+  let continuationStartIndex = -1
 
-  let previousKeptContinuation = false
-  lines.forEach((line) => {
-    if (line.startsWith('#')) {
-      previousKeptContinuation = false
-      return
-    }
-    const keep =
-      isShellCommandLine(line) ||
-      (previousKeptContinuation &&
-        /^(-{1,2}|\||&&|\|\||[A-Z0-9_]+=)/.test(line))
-    if (!keep) {
-      previousKeptContinuation = false
-      return
-    }
-    commands.push(line)
-    previousKeptContinuation = line.endsWith('\\')
-  })
+  String(rawBlock || '')
+    .split('\n')
+    .forEach((rawLine) => {
+      const line = rawLine.trim()
+      if (!line || line.startsWith('#')) {
+        if (continuationStartIndex >= 0) {
+          commands.splice(continuationStartIndex)
+          continuationStartIndex = -1
+        }
+        return
+      }
+
+      if (continuationStartIndex >= 0) {
+        commands.push(line)
+        if (!hasShellLineContinuation(line)) {
+          continuationStartIndex = -1
+        }
+        return
+      }
+
+      const startsCommand =
+        isShellCommandLine(line) ||
+        (hasShellLineContinuation(line) &&
+          isShellEnvironmentContinuationLine(line))
+      if (!startsCommand) return
+
+      const commandStartIndex = commands.length
+      commands.push(line)
+      if (hasShellLineContinuation(line)) {
+        continuationStartIndex = commandStartIndex
+      }
+    })
+
+  if (continuationStartIndex >= 0) {
+    commands.splice(continuationStartIndex)
+  }
 
   return commands
 }
@@ -689,6 +720,10 @@ export function filterDevTestingDocs(
     if (!query) return true
     return item.searchText.includes(query)
   })
+}
+
+export function resolveDevTestingSelectedDoc(docs = [], selectedKey = '') {
+  return docs.find((item) => item.key === selectedKey) || docs[0] || null
 }
 
 export function buildDevTestingSummary({ tiers = [], docs = [] } = {}) {

@@ -114,7 +114,7 @@ function ShipmentFormFields({
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="客户快照"
+        label="单据客户名称"
         name="customer_snapshot"
       >
         <Input
@@ -200,7 +200,7 @@ function ShipmentSelectedSourceAlert({
                   )}`}
                 </Text>
                 <Text type="secondary">
-                  出货草稿不占用剩余量；确认出货时后端会强校验来源、产品 / SKU、
+                  出货草稿不占用剩余量；确认出货时系统会校验来源、产品 / SKU、
                   单位、累计出货和库存可用量。
                 </Text>
               </Space>
@@ -474,7 +474,7 @@ export default function ShipmentBusinessModal({
       title={isCreateModal ? '新建出货单' : '查看出货明细'}
       description={
         isCreateModal
-          ? '单头和出货明细由后端事务一次写入。'
+          ? '单头和出货明细将一次保存完成。'
           : '只读查看当前出货单头和已保存明细。'
       }
       open={Boolean(isCreateModal || isViewModal)}

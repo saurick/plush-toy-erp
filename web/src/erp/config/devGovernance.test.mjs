@@ -20,6 +20,18 @@ const governanceSource = readFileSync(
   new URL('../../../../docs/项目治理地图.md', import.meta.url),
   'utf8'
 )
+const governancePageSource = readFileSync(
+  new URL('../pages/DevGovernancePage.jsx', import.meta.url),
+  'utf8'
+)
+const devPageNavSource = readFileSync(
+  new URL('../components/dev/DevPageNav.jsx', import.meta.url),
+  'utf8'
+)
+const devNavigationStyles = readFileSync(
+  new URL('../styles/app/dev-navigation.css', import.meta.url),
+  'utf8'
+)
 
 test('devGovernance: route and dev gate stay dev-only', () => {
   assert.equal(DEV_GOVERNANCE_ROUTE, '/__dev/governance')
@@ -28,6 +40,88 @@ test('devGovernance: route and dev gate stay dev-only', () => {
   assert.equal(isDevGovernanceEnabled({ DEV: false }), false)
   assert.equal(isDevGovernanceEnabled({}), false)
   assert(!DEV_GOVERNANCE_ROUTE.startsWith('/erp/'))
+})
+
+test('devGovernance: shared dev page nav exposes workspace routes and unique deep-link actions', () => {
+  assert.match(devPageNavSource, /useLocation/)
+  assert.match(devPageNavSource, /useNavigate/)
+  assert.match(devPageNavSource, /navigate\(DEV_HUB_ROUTE\)/)
+  assert.match(
+    devPageNavSource,
+    /`\$\{DEV_DOCS_ROUTE\}\?path=\$\{encodeURIComponent\(sourcePath\)\}`/
+  )
+  assert.match(devPageNavSource, /location\.pathname/)
+  assert.match(devPageNavSource, /location\.search/)
+  assert.match(devPageNavSource, /location\.hash/)
+  assert.match(
+    devPageNavSource,
+    /navigator\.clipboard\s*\.writeText\(currentDeepLink\)/
+  )
+  assert.match(devPageNavSource, /DEV_WORKSPACE_NAV_ITEMS\.map/)
+  assert.match(devPageNavSource, /currentPathname === DEV_HUB_ROUTE/)
+  assert.match(
+    devPageNavSource,
+    /location\.pathname\.replace\(\/\\\/\+\$\/, ''\)/
+  )
+  assert.match(devPageNavSource, /aria-current=\{isActive \? 'page'/)
+  assert.match(devPageNavSource, /aria-label="开发工作台页面"/)
+
+  for (const accessibleName of ['复制当前开发页深链', '在开发文档中打开来源']) {
+    assert.equal(
+      devPageNavSource.split(accessibleName).length - 1,
+      1,
+      `accessible name must stay unique: ${accessibleName}`
+    )
+  }
+
+  assert.match(
+    devNavigationStyles,
+    /grid-template-columns:\s*232px minmax\(0, 1fr\)/u
+  )
+  assert.match(devNavigationStyles, /position:\s*sticky/u)
+  assert.match(devNavigationStyles, /@media \(max-width: 980px\)/u)
+  assert.match(
+    devNavigationStyles,
+    /\.erp-dev-workspace-page\s*\{[\s\S]*?display:\s*block/u
+  )
+})
+
+test('devGovernance: axis and scope use canonical URL state for share and history restore', () => {
+  assert.match(governancePageSource, /useSearchParams\(\)/)
+  assert.match(
+    governancePageSource,
+    /const requestedAxisKey = searchParams\.get\(AXIS_QUERY_KEY\)/
+  )
+  assert.match(
+    governancePageSource,
+    /axes\.find\(\(axis\) => axis\.key === requestedAxisKey\) \|\| axes\[0\]/
+  )
+  assert.match(
+    governancePageSource,
+    /const taskScopeMode = normalizeTaskScope\(requestedTaskScope\)/
+  )
+  assert.match(
+    governancePageSource,
+    /setSearchParams\(nextParams, \{ replace: true \}\)/
+  )
+  assert.match(
+    governancePageSource,
+    /nextParams\.set\(AXIS_QUERY_KEY, axisKey\)[\s\S]*nextParams\.set\(SCOPE_QUERY_KEY, TASK_SCOPE_RELATED\)[\s\S]*setSearchParams\(nextParams\)/
+  )
+  assert.match(
+    governancePageSource,
+    /taskScopeMode === TASK_SCOPE_ALL \? TASK_SCOPE_RELATED : TASK_SCOPE_ALL/
+  )
+  assert.match(
+    governancePageSource,
+    /<DevPageNav sourcePath=\{DEV_GOVERNANCE_SOURCE_PATH\} \/>/
+  )
+  assert.doesNotMatch(governancePageSource, /setSelectedAxisKey/)
+  assert.doesNotMatch(governancePageSource, /setTaskScopeMode/)
+  assert.match(
+    governancePageSource,
+    /aria-current=\{axis\.key === selectedKey \? 'true' : undefined\}/u
+  )
 })
 
 test('devGovernance: parses governance axes and source links from Markdown', () => {

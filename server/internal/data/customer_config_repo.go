@@ -243,16 +243,35 @@ func (r *customerConfigRepo) switchActiveCustomerConfigRevision(
 	}
 	defer rollbackSQLTx(ctx, tx, r.log)
 
-	var targetID int
-	if err := tx.QueryRowContext(ctx, `
-SELECT id
+	rows, err := tx.QueryContext(ctx, `
+SELECT id, revision
 FROM customer_config_revisions
-WHERE customer_key = $1 AND revision = $2
-LIMIT 1`, customerKey, revision).Scan(&targetID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, biz.ErrCustomerConfigNotFound
-		}
+WHERE customer_key = $1
+ORDER BY id
+FOR UPDATE`, customerKey)
+	if err != nil {
 		return nil, err
+	}
+	targetFound := false
+	for rows.Next() {
+		var id int
+		var lockedRevision string
+		if err := rows.Scan(&id, &lockedRevision); err != nil {
+			return nil, err
+		}
+		if lockedRevision == revision {
+			targetFound = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if !targetFound {
+		return nil, biz.ErrCustomerConfigNotFound
 	}
 	now := time.Now()
 	if _, err := tx.ExecContext(ctx, `

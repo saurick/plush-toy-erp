@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Button, List, Modal, Popconfirm, Space, Tag, Typography } from 'antd'
+import { Button, List, Modal, Space, Tag, Typography } from 'antd'
 import {
   DeleteOutlined,
   DownloadOutlined,
@@ -19,15 +19,14 @@ import {
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { message } from '@/common/utils/antdApp'
 import {
-  deleteBusinessAttachment,
   downloadBusinessAttachment,
   listBusinessAttachments,
   uploadBusinessAttachment,
 } from '../../api/attachmentApi.mjs'
 import { resolveBusinessAttachmentPanelState } from '../../utils/businessAttachmentPanelState.mjs'
 
-const MAX_ATTACHMENT_SIZE = 50 * 1024 * 1024
-const MAX_ATTACHMENT_SIZE_LABEL = '50MB'
+const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024
+const MAX_ATTACHMENT_SIZE_LABEL = '5MB'
 
 const ACCEPTED_ATTACHMENT_MIME_TYPES = new Set([
   'image/png',
@@ -199,12 +198,12 @@ const BusinessAttachmentPanel = forwardRef(
     {
       ownerType,
       ownerId,
+      ownerVersion,
       title = '业务附件',
-      description = '上传合同、图片、单据或确认资料；附件仅作为业务证据，不改变业务事实状态。',
+      description = '上传合同、图片、单据或确认资料；附件仅作为业务证据，不改变对应业务状态。',
       attachmentType = 'evidence',
       slotKey,
       canUpload = true,
-      canDelete = true,
       className = '',
       variant = 'section',
       allowPendingAttachmentsWithoutOwner = true,
@@ -311,9 +310,12 @@ const BusinessAttachmentPanel = forwardRef(
           mime_type: item.mime_type,
           file_size: item.file_size,
           content_base64: item.content_base64,
+          ...(ownerType === 'workflow_task'
+            ? { expected_version: Number(ownerVersion || 0) }
+            : {}),
         })
       },
-      [attachmentType, ownerType, slotKey]
+      [attachmentType, ownerType, ownerVersion, slotKey]
     )
 
     function clearPendingAttachments() {
@@ -473,16 +475,6 @@ const BusinessAttachmentPanel = forwardRef(
       }
     }
 
-    async function handleDelete(item) {
-      try {
-        await deleteBusinessAttachment({ id: item.id })
-        message.success('附件已删除')
-        await reload()
-      } catch (error) {
-        message.error(getActionErrorMessage(error, '删除业务附件'))
-      }
-    }
-
     function handleRemovePending(item) {
       setPendingAttachments((current) =>
         current.filter((entry) => entry.uid !== item.uid)
@@ -586,26 +578,6 @@ const BusinessAttachmentPanel = forwardRef(
                     >
                       下载
                     </Button>,
-                      canDelete ? (
-                        <Popconfirm
-                          key="delete"
-                          title="删除附件"
-                          description="删除后不会影响业务事实状态。"
-                          okText="删除"
-                          cancelText="取消"
-                          onConfirm={() => handleDelete(item)}
-                        >
-                          <Button
-                            danger
-                            type="link"
-                            size="small"
-                            aria-label="删除附件"
-                            icon={<DeleteOutlined />}
-                          >
-                            删除
-                          </Button>
-                        </Popconfirm>
-                      ) : null,
                     ].filter(Boolean)
               }
             >

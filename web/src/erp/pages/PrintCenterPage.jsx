@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import { Button, Card, Space, Typography } from 'antd'
 import { ArrowRightOutlined, PrinterOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
@@ -32,26 +32,9 @@ export default function PrintCenterPage() {
     requestedEntrySource === PRINT_WORKSPACE_ENTRY_SOURCE.MENU
       ? PRINT_WORKSPACE_DRAFT_MODE.FRESH
       : resolvePrintWorkspaceDraftMode(searchParams)
-  const [activeKey, setActiveKey] = useState(() => {
-    if (isSupportedPrintWorkspaceTemplate(requestedTemplateKey)) {
-      return requestedTemplateKey
-    }
-    return printTemplateCatalog[0]?.key || ''
-  })
-
-  useEffect(() => {
-    if (
-      requestedTemplateKey &&
-      isSupportedPrintWorkspaceTemplate(requestedTemplateKey)
-    ) {
-      setActiveKey(requestedTemplateKey)
-      return
-    }
-
-    if (!activeKey && printTemplateCatalog[0]?.key) {
-      setActiveKey(printTemplateCatalog[0].key)
-    }
-  }, [activeKey, requestedTemplateKey])
+  const activeKey = isSupportedPrintWorkspaceTemplate(requestedTemplateKey)
+    ? requestedTemplateKey
+    : printTemplateCatalog[0]?.key || ''
 
   const activeTemplate = useMemo(
     () =>
@@ -76,7 +59,7 @@ export default function PrintCenterPage() {
       ? `供应商：${activeSample.supplierName}`
       : `模板场景：${activeTemplate?.scene || '-'}`,
     activeSample.buyerCompany
-      ? `客户/委托方：${activeSample.buyerCompany}`
+      ? `${activeTemplate?.key === 'processing-contract' ? '委托方' : '订货方'}：${activeSample.buyerCompany}`
       : `输出：${activeTemplate?.output || '-'}`,
     activeTemplate?.layout || activeTemplate?.output || '固定打印模板',
   ]
@@ -85,7 +68,6 @@ export default function PrintCenterPage() {
     if (!template?.enabled) {
       return
     }
-    setActiveKey(template.key)
     const nextSearchParams = new URLSearchParams(searchParams)
     nextSearchParams.set('template', template.key)
     setSearchParams(nextSearchParams, { replace: true })
@@ -187,7 +169,7 @@ export default function PrintCenterPage() {
             <div className="erp-print-center-nav-header">
               <Text className="erp-print-center-nav-title">纸面预览</Text>
               <Text className="erp-print-center-nav-description">
-                默认样例预览，实际输出以独立打印窗口中的纸面 DOM 为准。
+                当前显示默认示例，实际输出以独立打印窗口中的内容为准。
               </Text>
             </div>
             <div className="erp-print-center-paper-preview">

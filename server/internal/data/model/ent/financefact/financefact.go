@@ -7,6 +7,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/shopspring/decimal"
 )
 
@@ -55,14 +56,31 @@ const (
 	FieldPostedAt = "posted_at"
 	// FieldSettledAt holds the string denoting the settled_at field in the database.
 	FieldSettledAt = "settled_at"
+	// FieldCancelledAt holds the string denoting the cancelled_at field in the database.
+	FieldCancelledAt = "cancelled_at"
+	// FieldCancelledBy holds the string denoting the cancelled_by field in the database.
+	FieldCancelledBy = "cancelled_by"
+	// FieldCancelReason holds the string denoting the cancel_reason field in the database.
+	FieldCancelReason = "cancel_reason"
+	// FieldCancelAuditVersion holds the string denoting the cancel_audit_version field in the database.
+	FieldCancelAuditVersion = "cancel_audit_version"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
+	// EdgeCanceller holds the string denoting the canceller edge name in mutations.
+	EdgeCanceller = "canceller"
 	// Table holds the table name of the financefact in the database.
 	Table = "finance_facts"
+	// CancellerTable is the table that holds the canceller relation/edge.
+	CancellerTable = "finance_facts"
+	// CancellerInverseTable is the table name for the AdminUser entity.
+	// It exists in this package in order to avoid circular dependency with the "adminuser" package.
+	CancellerInverseTable = "admin_users"
+	// CancellerColumn is the table column denoting the canceller relation/edge.
+	CancellerColumn = "cancelled_by"
 )
 
 // Columns holds all SQL columns for financefact fields.
@@ -88,6 +106,10 @@ var Columns = []string{
 	FieldOccurredAtSpecified,
 	FieldPostedAt,
 	FieldSettledAt,
+	FieldCancelledAt,
+	FieldCancelledBy,
+	FieldCancelReason,
+	FieldCancelAuditVersion,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -148,6 +170,12 @@ var (
 	DefaultOccurredAt func() time.Time
 	// DefaultOccurredAtSpecified holds the default value on creation for the "occurred_at_specified" field.
 	DefaultOccurredAtSpecified bool
+	// CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
+	CancelledByValidator func(int) error
+	// CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
+	CancelReasonValidator func(string) error
+	// DefaultCancelAuditVersion holds the default value on creation for the "cancel_audit_version" field.
+	DefaultCancelAuditVersion int
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -266,6 +294,26 @@ func BySettledAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSettledAt, opts...).ToFunc()
 }
 
+// ByCancelledAt orders the results by the cancelled_at field.
+func ByCancelledAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCancelledAt, opts...).ToFunc()
+}
+
+// ByCancelledBy orders the results by the cancelled_by field.
+func ByCancelledBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCancelledBy, opts...).ToFunc()
+}
+
+// ByCancelReason orders the results by the cancel_reason field.
+func ByCancelReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCancelReason, opts...).ToFunc()
+}
+
+// ByCancelAuditVersion orders the results by the cancel_audit_version field.
+func ByCancelAuditVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCancelAuditVersion, opts...).ToFunc()
+}
+
 // ByNote orders the results by the note field.
 func ByNote(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldNote, opts...).ToFunc()
@@ -279,4 +327,18 @@ func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdatedAt orders the results by the updated_at field.
 func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
+}
+
+// ByCancellerField orders the results by canceller field.
+func ByCancellerField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newCancellerStep(), sql.OrderByField(field, opts...))
+	}
+}
+func newCancellerStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(CancellerInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, CancellerTable, CancellerColumn),
+	)
 }

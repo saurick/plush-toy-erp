@@ -491,6 +491,14 @@ func (uc *CustomerConfigUsecase) EnsureProcessDomainCommandModulesEnabled(ctx co
 }
 
 func (uc *CustomerConfigUsecase) EnsureModuleKeysEnabled(ctx context.Context, customerKey string, moduleKeys ...string) error {
+	return uc.ensureModuleKeysInStates(ctx, customerKey, []string{"enabled"}, moduleKeys...)
+}
+
+func (uc *CustomerConfigUsecase) EnsureModuleKeysReadable(ctx context.Context, customerKey string, moduleKeys ...string) error {
+	return uc.ensureModuleKeysInStates(ctx, customerKey, []string{"enabled", "read_only"}, moduleKeys...)
+}
+
+func (uc *CustomerConfigUsecase) ensureModuleKeysInStates(ctx context.Context, customerKey string, allowedStates []string, moduleKeys ...string) error {
 	if uc == nil || uc.repo == nil {
 		return ErrBadParam
 	}
@@ -510,7 +518,7 @@ func (uc *CustomerConfigUsecase) EnsureModuleKeysEnabled(ctx context.Context, cu
 	if err != nil {
 		return err
 	}
-	return ensureCustomerConfigModuleKeysEnabled(requiredModuleKeys, modules)
+	return ensureCustomerConfigModuleKeysInStates(requiredModuleKeys, modules, allowedStates)
 }
 
 func (uc *CustomerConfigUsecase) ExplainModuleStatus(ctx context.Context, customerKey, moduleKey string) (*CustomerModuleStatusExplanation, error) {
@@ -2009,6 +2017,10 @@ func ensureCustomerConfigProcessModulesEnabledForStart(
 }
 
 func ensureCustomerConfigModuleKeysEnabled(moduleKeys []string, modules []DeploymentModuleStateInput) error {
+	return ensureCustomerConfigModuleKeysInStates(moduleKeys, modules, []string{"enabled"})
+}
+
+func ensureCustomerConfigModuleKeysInStates(moduleKeys []string, modules []DeploymentModuleStateInput, allowedStates []string) error {
 	moduleStates := map[string]string{}
 	for _, item := range modules {
 		key := normalizeModuleKey(item.ModuleKey)
@@ -2022,11 +2034,20 @@ func ensureCustomerConfigModuleKeysEnabled(moduleKeys []string, modules []Deploy
 		moduleStates[key] = state
 	}
 	for _, moduleKey := range customerConfigModuleDependencyClosure(moduleKeys) {
-		if moduleStates[moduleKey] != "enabled" {
+		if !stringSliceContains(allowedStates, moduleStates[moduleKey]) {
 			return ErrBadParam
 		}
 	}
 	return nil
+}
+
+func stringSliceContains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func processDomainCommandReferencedModuleKeys(commandKey string) []string {

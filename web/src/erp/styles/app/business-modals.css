@@ -1351,6 +1351,38 @@ body
   background: #fff;
 }
 
+.erp-role-policy-tab-content,
+.erp-role-policy-boundary {
+  display: grid;
+  gap: 12px;
+}
+
+.erp-role-policy-tabs > .ant-tabs-nav {
+  margin-bottom: 12px;
+}
+
+.erp-role-policy-boundary__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.erp-role-policy-boundary__grid > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dfe9e1;
+  border-radius: 10px;
+  background: #fbfdfb;
+}
+
+.erp-role-policy-boundary__grid .ant-tag,
+.erp-role-policy-boundary__grid .ant-typography {
+  width: fit-content;
+  margin: 0;
+}
+
 .erp-permission-section__eyebrow.ant-typography {
   display: block;
   margin-bottom: 4px;
@@ -1450,6 +1482,79 @@ body
   display: grid;
   gap: 14px;
   min-width: 0;
+}
+
+.erp-role-capability-overview {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #cfe2d4;
+  border-radius: 12px;
+  background: #f7fbf8;
+}
+
+.erp-role-capability-overview__head,
+.erp-role-capability-card__title,
+.erp-permission-checklist-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.erp-role-capability-overview__head .ant-typography,
+.erp-permission-checklist-heading .ant-typography {
+  margin: 0;
+}
+
+.erp-role-capability-overview__head .ant-typography-secondary,
+.erp-permission-checklist-heading .ant-typography-secondary {
+  margin-top: 4px;
+}
+
+.erp-role-capability-overview__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.erp-role-capability-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dfe7e1;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.erp-role-capability-card--enabled {
+  border-color: #b7d9c1;
+  background: #f4fbf6;
+}
+
+.erp-role-capability-card__items {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  max-height: 168px;
+  overflow-y: auto;
+}
+
+.erp-role-capability-card__items .ant-tag {
+  margin: 0;
+  white-space: normal;
+}
+
+.erp-role-capability-card__items--muted {
+  opacity: 0.78;
+}
+
+.erp-permission-checklist-heading {
+  padding: 4px 2px 0;
 }
 
 .erp-role-center-detail__head {

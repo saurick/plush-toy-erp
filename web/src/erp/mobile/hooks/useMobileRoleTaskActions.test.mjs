@@ -3,6 +3,35 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import vm from 'node:vm'
 
+import {
+  createTaskMutationAttemptStore,
+  createTaskMutationInFlightGuard,
+  isWorkflowTaskMutationResultUnknown,
+  verifyNewWorkflowTaskMutationAttempt,
+} from '../../utils/workflowTaskMutation.mjs'
+
+test('mobile task page uses backend action projection and does not restore local reject gates', () => {
+  const pageSource = readFileSync(
+    new URL('../pages/MobileRoleTasksPage.jsx', import.meta.url),
+    'utf8'
+  )
+  const detailSource = readFileSync(
+    new URL('../components/MobileTaskDetailScreen.jsx', import.meta.url),
+    'utf8'
+  )
+  const hookSource = readFileSync(
+    new URL('./useMobileRoleTaskActions.js', import.meta.url),
+    'utf8'
+  )
+
+  assert.match(pageSource, /useWorkflowTaskActionAccess/u)
+  assert.match(pageSource, /taskActionAccess:\s*selectedTaskActionAccess/u)
+  assert.match(detailSource, /const showRejected = selectedCanReject/u)
+  assert.doesNotMatch(detailSource, /supportsRejectedAction/u)
+  assert.doesNotMatch(hookSource, /canOpenMobileTaskDetailAction/u)
+  assert.doesNotMatch(hookSource, /canRunWorkflowTaskAction/u)
+})
+
 function createDeferred() {
   let resolve
   let reject
@@ -123,7 +152,6 @@ module.exports = { useMobileRoleTaskActions }`,
           isPayableRegistrationTask: () => false,
         },
         '../utils/mobileRoleTaskModel.mjs': {
-          canOpenMobileTaskDetailAction: () => true,
           getMobileTaskActionReasonDraftKey: (task, action) =>
             `${task?.id || ''}:${action || ''}`,
           normalizeMobileTaskActionKey: (action) => action,
@@ -131,13 +159,16 @@ module.exports = { useMobileRoleTaskActions }`,
           resolveMobileActionLabel: (action) => action,
           resolveMobileTaskActionReason: ({ task, action, reasonDrafts }) =>
             reasonDrafts[`${task?.id || ''}:${action || ''}`] || '',
-          resolveMobileUrgeAction: () => 'urge',
+          resolveMobileUrgeAction: () => 'urge_task',
         },
         '../../utils/workflowTaskActionSubmitGuard.mjs': {
           verifyWorkflowTaskActionAccessBeforeSubmit,
         },
-        '../../utils/workflowTaskBoard.mjs': {
-          canRunWorkflowTaskAction: () => true,
+        '../../utils/workflowTaskMutation.mjs': {
+          createTaskMutationAttemptStore,
+          createTaskMutationInFlightGuard,
+          isWorkflowTaskMutationResultUnknown,
+          verifyNewWorkflowTaskMutationAttempt,
         },
       },
       module,
@@ -157,19 +188,25 @@ function createHookHarness(options = {}) {
   let selectedTask = options.selectedTask || {
     id: 42,
     owner_role_key: 'warehouse',
+    version: 5,
   }
   const { hook, reactRuntime } = loadMobileActionHook(options)
   const props = {
     activeRoleKey: 'warehouse',
-    adminProfile: {},
     selectedTask,
+    taskActionAccess: {
+      canRun: (actionMode) =>
+        options.allowedActionModes?.includes(actionMode) ?? true,
+    },
     setDetailAction: (value) => {
       detailAction = value
       detailActionChanges.push(value)
     },
     setSelectedTaskID: () => {},
     loadTasks: async () => {
-      loadCalls.push(selectedTask.id)
+      const taskID = selectedTask.id
+      loadCalls.push(taskID)
+      await options.loadTasks?.(taskID)
     },
   }
 
@@ -189,18 +226,40 @@ function createHookHarness(options = {}) {
   }
 }
 
+test('useMobileRoleTaskActions: backend action projection is the local execution gate', async () => {
+  let actionCalls = 0
+  const messages = { errors: [], successes: [], warnings: [] }
+  const harness = createHookHarness({
+    allowedActionModes: ['urge'],
+    messages,
+    completeWorkflowTaskAction: async () => {
+      actionCalls += 1
+    },
+  })
+
+  const view = harness.render()
+  assert.equal(view.selectedCanComplete, false)
+  assert.equal(view.selectedCanUrge, true)
+  await view.submitDetailAction()
+
+  assert.equal(actionCalls, 0)
+  assert.deepEqual(messages.warnings, ['当前角色不能done该任务'])
+})
+
 test('useMobileRoleTaskActions: rapid double submit runs one preflight and one action', async () => {
   const preflight = createDeferred()
   const action = createDeferred()
   let preflightCalls = 0
   let actionCalls = 0
+  let actionParams
   const harness = createHookHarness({
     verifyWorkflowTaskActionAccessBeforeSubmit: async () => {
       preflightCalls += 1
       return preflight.promise
     },
-    completeWorkflowTaskAction: async () => {
+    completeWorkflowTaskAction: async (params) => {
       actionCalls += 1
+      actionParams = params
       return action.promise
     },
   })
@@ -219,6 +278,8 @@ test('useMobileRoleTaskActions: rapid double submit runs one preflight and one a
   preflight.resolve(true)
   await new Promise((resolve) => setImmediate(resolve))
   assert.equal(actionCalls, 1)
+  assert.equal(actionParams.expected_version, 5)
+  assert.match(actionParams.idempotency_key, /^wf:42:complete:/u)
 
   action.resolve()
   await firstSubmit
@@ -227,17 +288,56 @@ test('useMobileRoleTaskActions: rapid double submit runs one preflight and one a
   assert.deepEqual(harness.loadCalls, [42])
 })
 
+test('useMobileRoleTaskActions: one task cannot start a different action during preflight', async () => {
+  const preflight = createDeferred()
+  let preflightCalls = 0
+  let completeCalls = 0
+  let urgeCalls = 0
+  const harness = createHookHarness({
+    verifyWorkflowTaskActionAccessBeforeSubmit: async () => {
+      preflightCalls += 1
+      return preflight.promise
+    },
+    completeWorkflowTaskAction: async () => {
+      completeCalls += 1
+    },
+    urgeWorkflowTask: async () => {
+      urgeCalls += 1
+    },
+  })
+
+  let view = harness.render()
+  const completeSubmit = view.submitDetailAction()
+  harness.setDetailAction('urge')
+  view = harness.render()
+  view.updateDetailReason('请尽快处理')
+  view = harness.render()
+
+  const urgeSubmit = view.submitDetailAction()
+  await urgeSubmit
+  assert.equal(preflightCalls, 1)
+  assert.equal(completeCalls, 0)
+  assert.equal(urgeCalls, 0)
+
+  preflight.resolve(true)
+  await completeSubmit
+  assert.equal(completeCalls, 1)
+  assert.equal(urgeCalls, 0)
+})
+
 test('useMobileRoleTaskActions: failed urge preflight releases lock for retry', async () => {
   let preflightCalls = 0
   let urgeCalls = 0
+  let urgeParams
   const harness = createHookHarness({
     detailAction: 'urge',
     verifyWorkflowTaskActionAccessBeforeSubmit: async () => {
       preflightCalls += 1
       return preflightCalls > 1
     },
-    urgeWorkflowTask: async () => {
+    urgeWorkflowTask: async (params) => {
       urgeCalls += 1
+      urgeParams = params
     },
   })
 
@@ -255,6 +355,40 @@ test('useMobileRoleTaskActions: failed urge preflight releases lock for retry', 
   assert.equal(view.urgingID, null)
   assert.equal(preflightCalls, 2)
   assert.equal(urgeCalls, 1)
+  assert.equal(urgeParams.expected_version, 5)
+  assert.match(urgeParams.idempotency_key, /^wf:42:urge:/u)
+  assert.deepEqual(harness.loadCalls, [42])
+})
+
+test('useMobileRoleTaskActions: unknown network result reuses frozen key and payload', async () => {
+  const submitted = []
+  const networkError = Object.assign(new Error('network result unknown'), {
+    isNetworkError: true,
+  })
+  const messages = { errors: [], successes: [], warnings: [] }
+  const harness = createHookHarness({
+    messages,
+    completeWorkflowTaskAction: async (params) => {
+      submitted.push(params)
+      if (submitted.length <= 2) throw networkError
+    },
+  })
+
+  let view = harness.render()
+  await view.submitDetailAction()
+  view = harness.render()
+  assert.equal(submitted.length, 2)
+  assert.equal(submitted[0].idempotency_key, submitted[1].idempotency_key)
+  assert.deepEqual(submitted[0], submitted[1])
+  assert.deepEqual(harness.loadCalls, [])
+  assert.deepEqual(messages.warnings, [
+    '提交结果暂未确认，已保留原因和证据，可直接重试',
+  ])
+
+  await view.submitDetailAction()
+  assert.equal(submitted.length, 3)
+  assert.equal(submitted[0].idempotency_key, submitted[2].idempotency_key)
+  assert.deepEqual(submitted[0], submitted[2])
   assert.deepEqual(harness.loadCalls, [42])
 })
 
@@ -276,15 +410,85 @@ test('useMobileRoleTaskActions: action failure restores idle state and allows re
   view = harness.render()
   assert.equal(view.updatingID, null)
   assert.equal(actionCalls, 1)
-  assert.deepEqual(harness.loadCalls, [])
+  assert.deepEqual(harness.loadCalls, [42])
   assert.deepEqual(messages.errors, ['更新任务状态失败，请稍后重试'])
 
   await view.submitDetailAction()
   view = harness.render()
   assert.equal(view.updatingID, null)
   assert.equal(actionCalls, 2)
+  assert.deepEqual(harness.loadCalls, [42, 42])
+  assert.deepEqual(harness.detailActionChanges, [null])
+})
+
+test('useMobileRoleTaskActions: successful status mutation clears drafts when refresh fails', async () => {
+  let actionCalls = 0
+  const messages = { errors: [], successes: [], warnings: [] }
+  const harness = createHookHarness({
+    detailAction: 'blocked',
+    messages,
+    completeWorkflowTaskAction: async () => {
+      actionCalls += 1
+    },
+    loadTasks: async () => {
+      throw Object.assign(new Error('refresh network failure'), {
+        isNetworkError: true,
+      })
+    },
+  })
+
+  let view = harness.render()
+  view.updateDetailReason('等待补齐资料')
+  view = harness.render()
+  await view.submitDetailAction()
+
+  view = harness.render()
+  assert.equal(actionCalls, 1)
+  assert.equal(view.updatingID, null)
   assert.deepEqual(harness.loadCalls, [42])
   assert.deepEqual(harness.detailActionChanges, [null])
+  assert.deepEqual(messages.errors, [])
+  assert.deepEqual(messages.successes, ['任务状态已更新'])
+  assert.deepEqual(messages.warnings, ['操作已成功但列表刷新失败，请手动刷新'])
+
+  harness.setDetailAction('blocked')
+  view = harness.render()
+  assert.equal(view.detailReasonValue, '')
+})
+
+test('useMobileRoleTaskActions: successful urge clears its draft when refresh fails', async () => {
+  let urgeCalls = 0
+  const messages = { errors: [], successes: [], warnings: [] }
+  const harness = createHookHarness({
+    detailAction: 'urge',
+    messages,
+    urgeWorkflowTask: async () => {
+      urgeCalls += 1
+    },
+    loadTasks: async () => {
+      throw Object.assign(new Error('refresh network failure'), {
+        isNetworkError: true,
+      })
+    },
+  })
+
+  let view = harness.render()
+  view.updateDetailReason('请尽快处理')
+  view = harness.render()
+  await view.submitDetailAction()
+
+  view = harness.render()
+  assert.equal(urgeCalls, 1)
+  assert.equal(view.urgingID, null)
+  assert.deepEqual(harness.loadCalls, [42])
+  assert.deepEqual(harness.detailActionChanges, [null])
+  assert.deepEqual(messages.errors, [])
+  assert.deepEqual(messages.successes, ['催办已记录'])
+  assert.deepEqual(messages.warnings, ['操作已成功但列表刷新失败，请手动刷新'])
+
+  harness.setDetailAction('urge')
+  view = harness.render()
+  assert.equal(view.detailReasonValue, '')
 })
 
 test('useMobileRoleTaskActions: different tasks do not block each other', async () => {
@@ -307,7 +511,7 @@ test('useMobileRoleTaskActions: different tasks do not block each other', async 
   view = harness.render()
   assert.equal(view.updatingID, 42)
 
-  harness.setSelectedTask({ id: 43, owner_role_key: 'warehouse' })
+  harness.setSelectedTask({ id: 43, owner_role_key: 'warehouse', version: 6 })
   view = harness.render()
   const secondSubmit = view.submitDetailAction()
   view = harness.render()
@@ -317,7 +521,7 @@ test('useMobileRoleTaskActions: different tasks do not block each other', async 
   assert.deepEqual(preflightTaskIDs, [42, 43])
   assert.deepEqual(actionTaskIDs, [43])
 
-  harness.setSelectedTask({ id: 42, owner_role_key: 'warehouse' })
+  harness.setSelectedTask({ id: 42, owner_role_key: 'warehouse', version: 5 })
   view = harness.render()
   assert.equal(view.updatingID, 42)
 
@@ -339,7 +543,7 @@ test('useMobileRoleTaskActions: task A completion does not clear task B action',
   let view = harness.render()
   const firstSubmit = view.submitDetailAction()
 
-  const secondTask = { id: 43, owner_role_key: 'warehouse' }
+  const secondTask = { id: 43, owner_role_key: 'warehouse', version: 6 }
   harness.setSelectedTask(secondTask)
   view = harness.render()
   await view.handleTaskAction(secondTask, 'blocked')

@@ -136,13 +136,11 @@ func (d *jsonrpcDispatcher) handleAuth(
 	case "logout":
 		claims, _ := biz.GetClaimsFromContext(ctx)
 		if claims != nil {
-			d.log.WithContext(ctx).Infof(
-				"[auth] user logout uid=%d uname=%s role=%d id=%s",
-				claims.UserID,
-				claims.Username,
-				claims.Role,
-				id,
-			)
+			if err := d.adminAuthUC.Logout(ctx, claims.SessionKey); err != nil {
+				d.log.WithContext(ctx).Errorf("[auth] revoke session failed uid=%d err=%v", claims.UserID, err)
+				return id, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}, nil
+			}
+			d.log.WithContext(ctx).Infof("[auth] user logout uid=%d id=%s", claims.UserID, id)
 		} else {
 			d.log.WithContext(ctx).Warnf("[auth] user logout without claims id=%s", id)
 		}
@@ -158,7 +156,7 @@ func (d *jsonrpcDispatcher) handleAuth(
 			return id, &v1.JsonrpcResult{Code: errcode.AuthRequired.Code, Message: errcode.AuthRequired.Message}, nil
 		}
 
-		if claims.Role == biz.RoleAdmin {
+		if claims.IsAdmin() {
 			admin, err := d.getCurrentAdmin(ctx, claims)
 			if err != nil {
 				d.log.WithContext(ctx).Warnf("auth.me GetCurrentAdmin failed uid=%d err=%v", claims.UserID, err)

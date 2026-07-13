@@ -1,0 +1,235 @@
+{
+  "contract": "workflow.task-mutation/v1",
+  "vectors": [
+    {
+      "name": "all_string_evidence",
+      "operation": "complete",
+      "params": {
+        "task_id": 42,
+        "expected_version": 1,
+        "action_key": "complete",
+        "payload": {
+          "evidence_refs": [" proof-b ", "proof-a", "proof-a", "", "   "],
+          "mobile_action_evidence_refs": [" capture-2 ", "capture-1", "capture-2"]
+        }
+      },
+      "expected_payload": {
+        "evidence_refs": ["proof-a", "proof-b"],
+        "mobile_action_evidence_refs": ["capture-1", "capture-2"]
+      }
+    },
+    {
+      "name": "transport_base",
+      "operation": "complete",
+      "params": {
+        "task_id": 42,
+        "expected_version": 1,
+        "action_key": "complete",
+        "payload": {
+          "qc_result": "pass",
+          "mobile_action": {
+            "business_result": "pass",
+            "evidence_refs": ["proof-a", "proof-b"],
+            "simulated_only": false
+          }
+        }
+      },
+      "expected_payload": {
+        "qc_result": "pass",
+        "mobile_action": {
+          "business_result": "pass",
+          "evidence_refs": ["proof-a", "proof-b"],
+          "simulated_only": false
+        }
+      }
+    },
+    {
+      "name": "transport_exact_copies",
+      "operation": "complete",
+      "params": {
+        "task_id": 42,
+        "expected_version": 999,
+        "action_key": "complete",
+        "payload": {
+          "workflow_page_scope": "quality",
+          "desktop_task_board_action": "complete",
+          "mobile_action_recorded_at": 999,
+          "qc_result": "pass",
+          "mobile_action": {
+            "action_key": "complete",
+            "action_label": "完成",
+            "reason": "界面副本",
+            "recorded_at": 999,
+            "reported_at": 1000,
+            "role_key": "quality",
+            "business_result": "pass",
+            "evidence_refs": [" proof-b ", "proof-a", "proof-a"],
+            "simulated_only": false
+          }
+        }
+      },
+      "expected_payload": {
+        "qc_result": "pass",
+        "mobile_action": {
+          "business_result": "pass",
+          "evidence_refs": ["proof-a", "proof-b"],
+          "simulated_only": false
+        }
+      }
+    },
+    {
+      "name": "transport_whitespace_alias",
+      "operation": "complete",
+      "params": {
+        "task_id": 42,
+        "expected_version": 1,
+        "action_key": "complete",
+        "payload": {
+          "workflow_page_scope": "quality",
+          " workflow_page_scope ": "quality",
+          "qc_result": "pass",
+          "mobile_action": {
+            "action_key": "complete",
+            " action_key ": "complete",
+            "business_result": "pass",
+            "evidence_refs": ["proof-a", "proof-b"],
+            "simulated_only": false
+          },
+          " evidence_refs ": [" proof-b ", "proof-a"]
+        }
+      },
+      "expected_payload": {
+        " workflow_page_scope ": "quality",
+        "qc_result": "pass",
+        "mobile_action": {
+          " action_key ": "complete",
+          "business_result": "pass",
+          "evidence_refs": ["proof-a", "proof-b"],
+          "simulated_only": false
+        },
+        " evidence_refs ": [" proof-b ", "proof-a"]
+      }
+    },
+    {
+      "name": "mobile_nested_exact_duplicates",
+      "operation": "complete",
+      "params": {
+        "task_id": 42,
+        "expected_version": 1,
+        "action_key": "complete",
+        "payload": {
+          "mobile_action": {
+            "action_key": "complete",
+            "action_label": "完成",
+            "reason": "界面副本",
+            "recorded_at": 10,
+            "reported_at": 11,
+            "role_key": "quality",
+            " decision ": "keep-alias",
+            "decision": "pass",
+            "evidence_refs": [" photo-b ", "photo-a", "photo-a"]
+          },
+          "mobile_exception_report": {
+            "reason": "界面副本",
+            "reported_at": 12,
+            "role_key": "quality",
+            "defect_code": "SEAM_OPEN",
+            "evidence_refs": [" defect-b ", "defect-a"]
+          }
+        }
+      },
+      "expected_payload": {
+        "mobile_action": {
+          " decision ": "keep-alias",
+          "decision": "pass",
+          "evidence_refs": ["photo-a", "photo-b"]
+        },
+        "mobile_exception_report": {
+          "defect_code": "SEAM_OPEN",
+          "evidence_refs": ["defect-a", "defect-b"]
+        }
+      }
+    },
+    {
+      "name": "non_string_evidence_number",
+      "operation": "complete",
+      "params": {
+        "task_id": 42,
+        "expected_version": 1,
+        "action_key": "complete",
+        "payload": {
+          "evidence_refs": [2, " proof-b ", 1, true, null, {"kind": "photo"}]
+        }
+      },
+      "expected_payload": {
+        "evidence_refs": [2, " proof-b ", 1, true, null, {"kind": "photo"}]
+      }
+    },
+    {
+      "name": "non_string_evidence_string",
+      "operation": "complete",
+      "params": {
+        "task_id": 42,
+        "expected_version": 1,
+        "action_key": "complete",
+        "payload": {
+          "evidence_refs": ["2", " proof-b ", "1", "true"]
+        }
+      },
+      "expected_payload": {
+        "evidence_refs": ["1", "2", "proof-b", "true"]
+      }
+    },
+    {
+      "name": "business_decision_changed",
+      "operation": "complete",
+      "params": {
+        "task_id": 42,
+        "expected_version": 1,
+        "action_key": "complete",
+        "payload": {
+          "qc_result": "reject",
+          "mobile_action": {
+            "business_result": "reject",
+            "evidence_refs": ["proof-a", "proof-b"],
+            "simulated_only": false
+          }
+        }
+      },
+      "expected_payload": {
+        "qc_result": "reject",
+        "mobile_action": {
+          "business_result": "reject",
+          "evidence_refs": ["proof-a", "proof-b"],
+          "simulated_only": false
+        }
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "transport-only exact keys are equal",
+      "left": "transport_base",
+      "right": "transport_exact_copies",
+      "equal": true
+    },
+    {
+      "name": "whitespace key aliases change intent",
+      "left": "transport_base",
+      "right": "transport_whitespace_alias",
+      "equal": false
+    },
+    {
+      "name": "non-string number and string evidence differ",
+      "left": "non_string_evidence_number",
+      "right": "non_string_evidence_string",
+      "equal": false
+    },
+    {
+      "name": "business decision change changes intent",
+      "left": "transport_base",
+      "right": "business_decision_changed",
+      "equal": false
+    }
+  ]
+}

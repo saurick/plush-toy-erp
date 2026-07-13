@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
@@ -38,7 +38,14 @@ import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
 import { getRoleDisplayName } from '../utils/roleKeys.mjs'
 import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js'
 import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../utils/workflowTaskActionSubmitGuard.mjs'
+import {
+  createTaskMutationAttemptStore,
+  createTaskMutationInFlightGuard,
+  isWorkflowTaskMutationResultUnknown,
+  verifyNewWorkflowTaskMutationAttempt,
+} from '../utils/workflowTaskMutation.mjs'
 import { formatWorkflowTaskSource } from '../utils/dashboardTaskDisplay.mjs'
+import { isTerminalWorkflowTask } from '../utils/workflowTaskLifecycle.mjs'
 import {
   getTaskOwnerRoleKey,
   getWorkflowTaskCodeLabel,
@@ -80,7 +87,7 @@ const MODULE_WORKFLOW_CONFIG = Object.freeze({
   'production-scheduling': {
     taskGroup: 'production_scheduling',
     completionMessage:
-      '排程协同任务已完成，领料、完工和入库仍需进入对应事实模块。',
+      '排程协同任务已完成，领料、完工和入库仍需到对应业务页面办理。',
     emptyText: '暂无生产排程协同任务。',
     ownerRoleOptions: [
       workflowRoleOption('pmc'),
@@ -92,7 +99,7 @@ const MODULE_WORKFLOW_CONFIG = Object.freeze({
   'production-exceptions': {
     taskGroup: 'production_exception',
     completionMessage:
-      '异常协同任务已完成，返工、报废或库存调整仍需进入对应事实模块。',
+      '异常协同任务已完成，返工、报废或库存调整仍需到对应业务页面办理。',
     emptyText: '暂无生产异常协同任务。',
     ownerRoleOptions: [
       workflowRoleOption('production'),
@@ -140,6 +147,19 @@ function getTaskID(task = {}) {
 }
 
 export default function WorkflowBusinessModulePage({ moduleKey }) {
+  const mutationAttemptsRef = useRef(null)
+  mutationAttemptsRef.current ||= createTaskMutationAttemptStore()
+  const mutationInFlightRef = useRef(null)
+  mutationInFlightRef.current ||= createTaskMutationInFlightGuard()
+  const runMutationInFlight = useCallback(async (scope, run) => {
+    const lease = mutationInFlightRef.current.acquire(scope)
+    if (!lease) return false
+    try {
+      return await run()
+    } finally {
+      mutationInFlightRef.current.release(lease)
+    }
+  }, [])
   const moduleItem = getBusinessModule(moduleKey)
   const config = MODULE_WORKFLOW_CONFIG[moduleKey]
   const outletContext = useOutletContext()
@@ -179,13 +199,11 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     setLoading(true)
     try {
       const data = await listWorkflowTasks({
-        source_type: moduleKey,
         task_group: config.taskGroup,
         limit: 200,
       })
       const nextTasks = (data?.tasks || []).filter(
-        (task) =>
-          task.source_type === moduleKey && task.task_group === config.taskGroup
+        (task) => task.task_group === config.taskGroup
       )
       setTasks(nextTasks)
       setSelectedTaskKeys((current) =>
@@ -204,7 +222,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     } finally {
       setLoading(false)
     }
-  }, [canReadWorkflowTasks, config, moduleItem?.title, moduleKey])
+  }, [canReadWorkflowTasks, config, moduleItem?.title])
 
   useEffect(() => {
     loadWorkflowTasks()
@@ -252,7 +270,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
 
   const stats = useMemo(() => {
     const activeCount = tasks.filter(
-      (task) => !['done', 'closed', 'cancelled'].includes(task.task_status_key)
+      (task) => !isTerminalWorkflowTask(task)
     ).length
     const blockedCount = tasks.filter((task) =>
       ['blocked', 'rejected'].includes(task.task_status_key)
@@ -288,7 +306,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     enabled: Boolean(selectedTask && canReadWorkflowTasks),
   })
   const selectedTaskReadonlyReason = selectedTaskActionAccess.loading
-    ? '正在向后端核对当前任务动作权限。'
+    ? '正在确认您是否可以处理当前任务。'
     : selectedTaskActionAccess.readonlyReason
   const canCompleteSelected =
     Boolean(selectedTask) && selectedTaskActionAccess.canRun('complete')
@@ -299,133 +317,250 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   const canUrgeSelected =
     Boolean(selectedTask) && selectedTaskActionAccess.canRun('urge')
 
+  const verifyMutationAccess = useCallback(
+    ({ task, actionKey, reason = '', scope, operation, params }) =>
+      verifyNewWorkflowTaskMutationAttempt({
+        attemptStore: mutationAttemptsRef.current,
+        scope,
+        operation,
+        params,
+        verify: () =>
+          verifyWorkflowTaskActionAccessBeforeSubmit({
+            task,
+            actionKey,
+            reason,
+            onWarning: message.warning,
+            onError: message.error,
+          }),
+      }),
+    []
+  )
+
   const completeWorkflowTask = useCallback(
     async (task) => {
-      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
-        task,
-        actionKey: 'complete',
-        onWarning: message.warning,
-        onError: message.error,
-      })
-      if (!accessVerified) return
-      setTaskActionLoadingID(getTaskID(task))
-      try {
-        await completeWorkflowTaskAction({
-          task_id: task.id,
-          action_key: 'complete',
-          reason: '',
-          payload: {
-            workflow_page_action: 'complete',
-            workflow_page_scope: config.payloadScope,
-          },
-        })
-        message.success(config.completionMessage)
-        await loadWorkflowTasks()
-      } catch (error) {
-        message.error(getActionErrorMessage(error, '完成协同任务失败'))
-      } finally {
-        setTaskActionLoadingID(0)
+      const scope = `${task.id}:complete`
+      const operation = 'complete'
+      const params = {
+        task_id: task.id,
+        expected_version: task.version,
+        action_key: operation,
+        reason: '',
+        payload: {
+          workflow_page_action: operation,
+          workflow_page_scope: config.payloadScope,
+        },
       }
+      return runMutationInFlight(`task:${task.id}`, async () => {
+        const accessVerified = await verifyMutationAccess({
+          task,
+          actionKey: operation,
+          scope,
+          operation,
+          params,
+        })
+        if (!accessVerified) return false
+        setTaskActionLoadingID(getTaskID(task))
+        try {
+          await mutationAttemptsRef.current.run({
+            scope,
+            operation,
+            mutate: completeWorkflowTaskAction,
+            params,
+          })
+          message.success(config.completionMessage)
+          try {
+            await loadWorkflowTasks()
+          } catch {
+            message.warning('操作已成功但列表刷新失败，请手动刷新')
+          }
+          return true
+        } catch (error) {
+          if (isWorkflowTaskMutationResultUnknown(error)) {
+            message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
+          } else {
+            message.error(getActionErrorMessage(error, '完成协同任务失败'))
+            await loadWorkflowTasks().catch(() => {})
+          }
+          return false
+        } finally {
+          setTaskActionLoadingID(0)
+        }
+      })
     },
-    [config, loadWorkflowTasks]
+    [config, loadWorkflowTasks, runMutationInFlight, verifyMutationAccess]
   )
 
   const blockWorkflowTask = useCallback(
     async (task, { reason = '' } = {}) => {
-      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
-        task,
-        actionKey: 'block',
+      const scope = `${task.id}:block`
+      const operation = 'block'
+      const params = {
+        task_id: task.id,
+        expected_version: task.version,
+        action_key: operation,
         reason,
-        onWarning: message.warning,
-        onError: message.error,
-      })
-      if (!accessVerified) return
-      setTaskActionLoadingID(getTaskID(task))
-      try {
-        await blockWorkflowTaskAction({
-          task_id: task.id,
-          action_key: 'block',
-          reason,
-          payload: {
-            blocked_reason: reason,
-            workflow_page_action: 'block',
-            workflow_page_scope: config.payloadScope,
-          },
-        })
-        message.success('阻塞原因已记录')
-        await loadWorkflowTasks()
-      } catch (error) {
-        message.error(getActionErrorMessage(error, '标记阻塞失败'))
-      } finally {
-        setTaskActionLoadingID(0)
+        payload: {
+          blocked_reason: reason,
+          workflow_page_action: operation,
+          workflow_page_scope: config.payloadScope,
+        },
       }
+      return runMutationInFlight(`task:${task.id}`, async () => {
+        const accessVerified = await verifyMutationAccess({
+          task,
+          actionKey: operation,
+          reason,
+          scope,
+          operation,
+          params,
+        })
+        if (!accessVerified) return false
+        setTaskActionLoadingID(getTaskID(task))
+        try {
+          await mutationAttemptsRef.current.run({
+            scope,
+            operation,
+            mutate: blockWorkflowTaskAction,
+            params,
+          })
+          message.success('阻塞原因已记录')
+          try {
+            await loadWorkflowTasks()
+          } catch {
+            message.warning('操作已成功但列表刷新失败，请手动刷新')
+          }
+          return true
+        } catch (error) {
+          if (isWorkflowTaskMutationResultUnknown(error)) {
+            message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
+          } else {
+            message.error(getActionErrorMessage(error, '标记阻塞失败'))
+            await loadWorkflowTasks().catch(() => {})
+          }
+          return false
+        } finally {
+          setTaskActionLoadingID(0)
+        }
+      })
     },
-    [config, loadWorkflowTasks]
+    [config, loadWorkflowTasks, runMutationInFlight, verifyMutationAccess]
   )
 
   const rejectWorkflowTask = useCallback(
     async (task, { reason = '' } = {}) => {
-      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
-        task,
-        actionKey: 'reject',
+      const scope = `${task.id}:reject`
+      const operation = 'reject'
+      const params = {
+        task_id: task.id,
+        expected_version: task.version,
+        action_key: operation,
         reason,
-        onWarning: message.warning,
-        onError: message.error,
-      })
-      if (!accessVerified) return
-      setTaskActionLoadingID(getTaskID(task))
-      try {
-        await rejectWorkflowTaskAction({
-          task_id: task.id,
-          action_key: 'reject',
-          reason,
-          payload: {
-            rejected_reason: reason,
-            workflow_page_action: 'reject',
-            workflow_page_scope: config.payloadScope,
-          },
-        })
-        message.success('退回原因已记录')
-        await loadWorkflowTasks()
-      } catch (error) {
-        message.error(getActionErrorMessage(error, '退回协同任务失败'))
-      } finally {
-        setTaskActionLoadingID(0)
+        payload: {
+          rejected_reason: reason,
+          workflow_page_action: operation,
+          workflow_page_scope: config.payloadScope,
+        },
       }
+      return runMutationInFlight(`task:${task.id}`, async () => {
+        const accessVerified = await verifyMutationAccess({
+          task,
+          actionKey: operation,
+          reason,
+          scope,
+          operation,
+          params,
+        })
+        if (!accessVerified) return false
+        setTaskActionLoadingID(getTaskID(task))
+        try {
+          await mutationAttemptsRef.current.run({
+            scope,
+            operation,
+            mutate: rejectWorkflowTaskAction,
+            params,
+          })
+          message.success('退回原因已记录')
+          try {
+            await loadWorkflowTasks()
+          } catch {
+            message.warning('操作已成功但列表刷新失败，请手动刷新')
+          }
+          return true
+        } catch (error) {
+          if (isWorkflowTaskMutationResultUnknown(error)) {
+            message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
+          } else {
+            message.error(getActionErrorMessage(error, '退回协同任务失败'))
+            await loadWorkflowTasks().catch(() => {})
+          }
+          return false
+        } finally {
+          setTaskActionLoadingID(0)
+        }
+      })
     },
-    [config, loadWorkflowTasks]
+    [config, loadWorkflowTasks, runMutationInFlight, verifyMutationAccess]
   )
 
   const urgeWorkflowTaskFromPage = useCallback(
     async (task, { reason = '' } = {}) => {
-      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
-        task,
-        actionKey: 'urge',
+      const scope = `${task.id}:urge`
+      const operation = 'urge'
+      const params = {
+        task_id: task.id,
+        expected_version: task.version,
+        action: 'urge_task',
         reason,
-        onWarning: message.warning,
-        onError: message.error,
-      })
-      if (!accessVerified) return
-      setUrgingTaskID(getTaskID(task))
-      try {
-        await urgeWorkflowTask({
-          task_id: task.id,
-          action: 'urge_task',
-          reason,
-          payload: {
-            entry_path: moduleItem?.path,
-            workflow_page_scope: config.payloadScope,
-          },
-        })
-        message.success('催办已记录')
-        await loadWorkflowTasks()
-      } catch (error) {
-        message.error(getActionErrorMessage(error, '催办协同任务失败'))
-      } finally {
-        setUrgingTaskID(0)
+        payload: {
+          entry_path: moduleItem?.path,
+          workflow_page_scope: config.payloadScope,
+        },
       }
+      return runMutationInFlight(`task:${task.id}`, async () => {
+        const accessVerified = await verifyMutationAccess({
+          task,
+          actionKey: operation,
+          reason,
+          scope,
+          operation,
+          params,
+        })
+        if (!accessVerified) return false
+        setUrgingTaskID(getTaskID(task))
+        try {
+          await mutationAttemptsRef.current.run({
+            scope,
+            operation,
+            mutate: urgeWorkflowTask,
+            params,
+          })
+          message.success('催办已记录')
+          try {
+            await loadWorkflowTasks()
+          } catch {
+            message.warning('操作已成功但列表刷新失败，请手动刷新')
+          }
+          return true
+        } catch (error) {
+          if (isWorkflowTaskMutationResultUnknown(error)) {
+            message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
+          } else {
+            message.error(getActionErrorMessage(error, '催办协同任务失败'))
+            await loadWorkflowTasks().catch(() => {})
+          }
+          return false
+        } finally {
+          setUrgingTaskID(0)
+        }
+      })
     },
-    [config, loadWorkflowTasks, moduleItem?.path]
+    [
+      config,
+      loadWorkflowTasks,
+      moduleItem?.path,
+      runMutationInFlight,
+      verifyMutationAccess,
+    ]
   )
 
   const openTaskReasonModal = useCallback((mode) => {
@@ -443,14 +578,15 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       message.warning('请先填写原因')
       return
     }
+    let succeeded = false
     if (taskReasonModal.mode === 'block') {
-      await blockWorkflowTask(selectedTask, { reason })
+      succeeded = await blockWorkflowTask(selectedTask, { reason })
     } else if (taskReasonModal.mode === 'reject') {
-      await rejectWorkflowTask(selectedTask, { reason })
+      succeeded = await rejectWorkflowTask(selectedTask, { reason })
     } else if (taskReasonModal.mode === 'urge') {
-      await urgeWorkflowTaskFromPage(selectedTask, { reason })
+      succeeded = await urgeWorkflowTaskFromPage(selectedTask, { reason })
     }
-    closeTaskReasonModal()
+    if (succeeded) closeTaskReasonModal()
   }, [
     blockWorkflowTask,
     closeTaskReasonModal,
@@ -522,7 +658,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           key: 'reason',
           width: 340,
           render: (_, record) =>
-            getWorkflowTaskReason(record) || '按 Workflow 任务上下文处理',
+            getWorkflowTaskReason(record) || '按当前协同任务要求处理',
           exportValue: (record) => getWorkflowTaskReason(record),
         },
       ]),
@@ -551,7 +687,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       <BusinessPageLayout>
         <PageHeaderCard
           title="模块未登记"
-          description="当前路由没有匹配的 Workflow V1 页面定义。"
+          description="当前页面暂不可用，请返回工作台或联系管理员。"
           tags={<Tag color="red">未登记</Tag>}
         />
       </BusinessPageLayout>
@@ -565,8 +701,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         description={moduleItem.description}
         tags={
           <Space size={6} wrap>
-            <Tag color="blue">Workflow V1</Tag>
-            <Tag color="gold">不写事实层</Tag>
+            <Tag color="blue">协同任务</Tag>
+            <Tag color="gold">业务处理分开完成</Tag>
           </Space>
         }
         stats={stats}
@@ -615,7 +751,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           <BusinessListToolbarActions
             moduleTitle={moduleItem.title}
             exportDisabled
-            exportDisabledReason="当前 Workflow V1 只处理协同任务，不导出业务数据。"
+            exportDisabledReason="当前页面只处理协同任务，暂不提供业务数据导出。"
             onOpenColumnOrder={openColumnOrder}
           />
         }
@@ -644,7 +780,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           }
           boundaryText={
             selectedTaskReadonlyReason ||
-            '当前操作只调用后端协同任务规则；不写生产、库存、出货、财务、开票或收付款事实。'
+            '当前操作只更新协同任务；生产、库存、出货、财务、开票和收付款仍需在对应业务页面完成。'
           }
         >
           <Button
@@ -711,9 +847,10 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           <BusinessAttachmentModalButton
             ownerType="workflow_task"
             ownerId={selectedTask?.id}
+            ownerVersion={selectedTask?.version}
             modalTitle="协同任务附件"
             panelTitle="协同任务附件"
-            description="上传现场照片、异常截图或任务处理证据；附件不代表任务已完成，也不写业务事实。"
+            description="上传现场照片、异常截图或任务处理证据；附件不代表任务已完成，也不会改变相关业务记录。"
             canUpload={canUpdateWorkflowTasks || canCompleteWorkflowTasks}
             canDelete={canUpdateWorkflowTasks}
             disabled={!selectedTask}
@@ -731,7 +868,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         emptyDescription={
           canReadWorkflowTasks
             ? config.emptyText
-            : '当前账号没有 Workflow 任务读取权限。'
+            : '当前账号不能查看此类协同任务。'
         }
         rowSelection={{
           type: 'radio',
@@ -803,9 +940,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           autoFocus
           placeholder={
             taskReasonModal?.mode === 'block'
-              ? '填写阻塞原因；只更新 Workflow 任务状态。'
+              ? '填写阻塞原因；只更新当前协同任务状态。'
               : taskReasonModal?.mode === 'reject'
-                ? '填写退回原因；只更新 Workflow 任务状态。'
+                ? '填写退回原因；只更新当前协同任务状态。'
                 : '填写催办原因；只记录协同事件。'
           }
           value={taskReasonModal?.reason || ''}

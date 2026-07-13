@@ -54,6 +54,14 @@ ON CONFLICT (permission_key) DO UPDATE SET
 	}
 
 	for _, role := range biz.BuiltinRoles() {
+		var existingRoleID int
+		roleExists := true
+		if err := db.QueryRowContext(ctx, "SELECT id FROM roles WHERE role_key = $1 LIMIT 1", role.Key).Scan(&existingRoleID); err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+			roleExists = false
+		}
 		if _, err := db.ExecContext(ctx, `
 INSERT INTO roles (role_key, name, description, builtin, disabled, sort_order, created_at, updated_at)
 VALUES ($1, $2, $3, TRUE, $4, $5, $6, $7)
@@ -73,8 +81,14 @@ ON CONFLICT (role_key) DO UPDATE SET
 		); err != nil {
 			return err
 		}
-		if err := seedBuiltinRolePermissions(ctx, db, role, now, l); err != nil {
-			return err
+		// Builtin definitions are defaults, not a second runtime truth. Once a
+		// role exists, permission-center changes must survive application restart.
+		// Future default changes for existing deployments need an explicit,
+		// reviewed data migration instead of a destructive startup rewrite.
+		if !roleExists {
+			if err := seedBuiltinRolePermissions(ctx, db, role, now, l); err != nil {
+				return err
+			}
 		}
 	}
 

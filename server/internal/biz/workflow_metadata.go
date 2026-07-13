@@ -45,7 +45,6 @@ const (
 	workflowWarehouseInboundPendingKey         = "warehouse_inbound_pending"
 	workflowInboundDoneStatusKey               = "inbound_done"
 	workflowShipmentPendingStatusKey           = "shipment_pending"
-	workflowShipmentReleasePendingStatusKey    = "shipment_release_pending"
 	workflowShippingReleasedStatusKey          = "shipping_released"
 	workflowReconcilingStatusKey               = "reconciling"
 	workflowSettledStatusKey                   = "settled"
@@ -104,6 +103,12 @@ var workflowPlanningPhases = []WorkflowStateOption{
 var (
 	workflowTaskStateSet      = buildWorkflowStateSet(workflowTaskStates)
 	workflowBusinessStateSet  = buildWorkflowStateSet(workflowBusinessStates)
+	workflowTaskTransitionSet = map[string]map[string]struct{}{
+		"pending":    buildWorkflowTransitionSet("pending", "ready", "processing", "blocked", "done", "rejected", "cancelled", "closed"),
+		"ready":      buildWorkflowTransitionSet("ready", "processing", "blocked", "done", "rejected", "cancelled", "closed"),
+		"processing": buildWorkflowTransitionSet("processing", "blocked", "done", "rejected", "cancelled", "closed"),
+		"blocked":    buildWorkflowTransitionSet("ready", "processing", "blocked", "done", "rejected", "cancelled", "closed"),
+	}
 	workflowTaskUrgeActionSet = map[string]struct{}{
 		"urge_task":        {},
 		"urge_role":        {},
@@ -112,6 +117,14 @@ var (
 		"escalate_to_boss": {},
 	}
 )
+
+func buildWorkflowTransitionSet(keys ...string) map[string]struct{} {
+	out := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		out[key] = struct{}{}
+	}
+	return out
+}
 
 func buildWorkflowStateSet(items []WorkflowStateOption) map[string]struct{} {
 	out := make(map[string]struct{}, len(items))
@@ -161,6 +174,17 @@ func IsTerminalWorkflowTaskStatus(statusKey string) bool {
 	default:
 		return false
 	}
+}
+
+func CanTransitionWorkflowTaskStatus(fromStatusKey, toStatusKey string) bool {
+	fromStatusKey = strings.TrimSpace(fromStatusKey)
+	toStatusKey = strings.TrimSpace(toStatusKey)
+	nextStates, ok := workflowTaskTransitionSet[fromStatusKey]
+	if !ok {
+		return false
+	}
+	_, ok = nextStates[toStatusKey]
+	return ok
 }
 
 func WorkflowStatusActionPermission(nextStatusKey string, current *WorkflowTask) string {

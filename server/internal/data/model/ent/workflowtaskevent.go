@@ -21,6 +21,16 @@ type WorkflowTaskEvent struct {
 	ID int `json:"id,omitempty"`
 	// TaskID holds the value of the "task_id" field.
 	TaskID int `json:"task_id,omitempty"`
+	// TaskVersion holds the value of the "task_version" field.
+	TaskVersion *int `json:"task_version,omitempty"`
+	// IdempotencyKey holds the value of the "idempotency_key" field.
+	IdempotencyKey *string `json:"idempotency_key,omitempty"`
+	// IntentHash holds the value of the "intent_hash" field.
+	IntentHash *string `json:"intent_hash,omitempty"`
+	// CommandKey holds the value of the "command_key" field.
+	CommandKey *string `json:"command_key,omitempty"`
+	// MutationResult holds the value of the "mutation_result" field.
+	MutationResult map[string]interface{} `json:"mutation_result,omitempty"`
 	// EventType holds the value of the "event_type" field.
 	EventType string `json:"event_type,omitempty"`
 	// FromStatusKey holds the value of the "from_status_key" field.
@@ -68,11 +78,11 @@ func (*WorkflowTaskEvent) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case workflowtaskevent.FieldPayload:
+		case workflowtaskevent.FieldMutationResult, workflowtaskevent.FieldPayload:
 			values[i] = new([]byte)
-		case workflowtaskevent.FieldID, workflowtaskevent.FieldTaskID, workflowtaskevent.FieldActorID:
+		case workflowtaskevent.FieldID, workflowtaskevent.FieldTaskID, workflowtaskevent.FieldTaskVersion, workflowtaskevent.FieldActorID:
 			values[i] = new(sql.NullInt64)
-		case workflowtaskevent.FieldEventType, workflowtaskevent.FieldFromStatusKey, workflowtaskevent.FieldToStatusKey, workflowtaskevent.FieldActorRoleKey, workflowtaskevent.FieldReason:
+		case workflowtaskevent.FieldIdempotencyKey, workflowtaskevent.FieldIntentHash, workflowtaskevent.FieldCommandKey, workflowtaskevent.FieldEventType, workflowtaskevent.FieldFromStatusKey, workflowtaskevent.FieldToStatusKey, workflowtaskevent.FieldActorRoleKey, workflowtaskevent.FieldReason:
 			values[i] = new(sql.NullString)
 		case workflowtaskevent.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -102,6 +112,42 @@ func (_m *WorkflowTaskEvent) assignValues(columns []string, values []any) error 
 				return fmt.Errorf("unexpected type %T for field task_id", values[i])
 			} else if value.Valid {
 				_m.TaskID = int(value.Int64)
+			}
+		case workflowtaskevent.FieldTaskVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field task_version", values[i])
+			} else if value.Valid {
+				_m.TaskVersion = new(int)
+				*_m.TaskVersion = int(value.Int64)
+			}
+		case workflowtaskevent.FieldIdempotencyKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field idempotency_key", values[i])
+			} else if value.Valid {
+				_m.IdempotencyKey = new(string)
+				*_m.IdempotencyKey = value.String
+			}
+		case workflowtaskevent.FieldIntentHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field intent_hash", values[i])
+			} else if value.Valid {
+				_m.IntentHash = new(string)
+				*_m.IntentHash = value.String
+			}
+		case workflowtaskevent.FieldCommandKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field command_key", values[i])
+			} else if value.Valid {
+				_m.CommandKey = new(string)
+				*_m.CommandKey = value.String
+			}
+		case workflowtaskevent.FieldMutationResult:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field mutation_result", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.MutationResult); err != nil {
+					return fmt.Errorf("unmarshal field mutation_result: %w", err)
+				}
 			}
 		case workflowtaskevent.FieldEventType:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -201,6 +247,29 @@ func (_m *WorkflowTaskEvent) String() string {
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
 	builder.WriteString("task_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.TaskID))
+	builder.WriteString(", ")
+	if v := _m.TaskVersion; v != nil {
+		builder.WriteString("task_version=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.IdempotencyKey; v != nil {
+		builder.WriteString("idempotency_key=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.IntentHash; v != nil {
+		builder.WriteString("intent_hash=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.CommandKey; v != nil {
+		builder.WriteString("command_key=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	builder.WriteString("mutation_result=")
+	builder.WriteString(fmt.Sprintf("%v", _m.MutationResult))
 	builder.WriteString(", ")
 	builder.WriteString("event_type=")
 	builder.WriteString(_m.EventType)

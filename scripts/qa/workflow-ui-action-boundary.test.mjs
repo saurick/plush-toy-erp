@@ -80,24 +80,53 @@ function collectSourceFiles(dirPath) {
   return files.sort();
 }
 
-function assertWorkflowSubmitGuardBeforeActionCall({
+function assertWorkflowRetainedAttemptGuardBeforeMutation({
   source,
   relativePath,
-  actionCall,
 }) {
-  const actionIndex = source.indexOf(actionCall);
-  assert(actionIndex >= 0, `${relativePath} must call ${actionCall}`);
-  const guardIndex = source.lastIndexOf(
-    "await verifyWorkflowTaskActionAccessBeforeSubmit",
-    actionIndex,
+  const guardIndex = source.indexOf("const accessVerified = await");
+  const mutationIndex = source.indexOf(
+    "mutationAttemptsRef.current.run",
+    guardIndex,
   );
   assert(
     guardIndex >= 0,
-    `${relativePath} must await the shared submit guard before ${actionCall}`,
+    `${relativePath} must verify only new workflow mutation attempts`,
   );
   assert(
-    source.slice(guardIndex, actionIndex).includes("if (!accessVerified) return"),
-    `${relativePath} must stop submission when shared submit guard denies before ${actionCall}`,
+    mutationIndex > guardIndex,
+    `${relativePath} must verify a new attempt before running the retained mutation`,
+  );
+  const guardedSource = source.slice(guardIndex, mutationIndex);
+  assert(
+    source.includes("verifyNewWorkflowTaskMutationAttempt") &&
+      source.includes("verifyWorkflowTaskActionAccessBeforeSubmit"),
+    `${relativePath} must keep backend access explain behind the new-attempt verifier`,
+  );
+  assert(
+    guardedSource.includes("if (!accessVerified) return"),
+    `${relativePath} must stop a new mutation when access verification denies`,
+  );
+}
+
+function assertPostSuccessRefreshIsolated({
+  source,
+  relativePath,
+  refreshCall,
+  expectedCount,
+}) {
+  const escapedRefreshCall = refreshCall.replace(
+    /[.*+?^${}()|[\]\\]/gu,
+    "\\$&",
+  );
+  const pattern = new RegExp(
+    `message\\.success\\([^\\n]+\\)\\s*\\n\\s*try\\s*\\{\\s*\\n\\s*await ${escapedRefreshCall}\\s*\\n\\s*\\}\\s*catch\\s*\\{\\s*\\n\\s*message\\.warning\\(['\"]操作已成功但列表刷新失败，请手动刷新['\"]\\)`,
+    "gu",
+  );
+  assert.equal(
+    [...source.matchAll(pattern)].length,
+    expectedCount,
+    `${relativePath} must keep every post-success refresh failure outside mutation unknown-result handling`,
   );
 }
 
@@ -192,7 +221,10 @@ test("mobile role labels use shared role display names", () => {
 
 test("mobile task visibility explanations hide raw workflow field names", () => {
   const taskViewPath = path.join(erpSourceRoot, "utils/mobileTaskView.mjs");
-  const taskQueriesPath = path.join(erpSourceRoot, "utils/mobileTaskQueries.mjs");
+  const taskQueriesPath = path.join(
+    erpSourceRoot,
+    "utils/mobileTaskQueries.mjs",
+  );
   const taskViewSource = readFileSync(taskViewPath, "utf8");
   const taskQueriesSource = readFileSync(taskQueriesPath, "utf8");
   const forbiddenVisibleSnippets = [
@@ -274,7 +306,9 @@ test("desktop workflow task UI hides raw owner role key fallbacks", () => {
     "dashboard visible exception flow copy must not expose owner_role_key",
   );
   assert(
-    !dashboardSource.includes("render: (_, record) => getTaskOwnerRoleKey(record) || '-'"),
+    !dashboardSource.includes(
+      "render: (_, record) => getTaskOwnerRoleKey(record) || '-'",
+    ),
     "dashboard task board owner column must not render raw owner_role_key",
   );
   assert.match(
@@ -289,7 +323,10 @@ test("desktop workflow task UI hides raw owner role key fallbacks", () => {
     workflowBusinessSource,
     /getWorkflowTaskCodeLabel\(selectedTask\)/u,
   );
-  assert.match(workflowBusinessSource, /exportValue: getWorkflowTaskCodeLabel/u);
+  assert.match(
+    workflowBusinessSource,
+    /exportValue: getWorkflowTaskCodeLabel/u,
+  );
   assert(
     !workflowBusinessSource.includes("`TASK-${selectedTask.id}`") &&
       !workflowBusinessSource.includes("`TASK-${record.id}`") &&
@@ -348,9 +385,10 @@ test("desktop workflow task UI hides raw owner role key fallbacks", () => {
   );
   assert.match(taskBoardSource, /getWorkflowTaskReasonLabel/u);
   assert(
-    !readFileSync(path.join(erpSourceRoot, "pages/DashboardPage.jsx"), "utf8").includes(
-      "阻塞原因：{getWorkflowTaskReason(task)}",
-    ),
+    !readFileSync(
+      path.join(erpSourceRoot, "pages/DashboardPage.jsx"),
+      "utf8",
+    ).includes("阻塞原因：{getWorkflowTaskReason(task)}"),
     "dashboard task board must label blocked/rejected reasons through the shared reason helper",
   );
 });
@@ -408,17 +446,24 @@ test("mobile task actions explain backend access before submitting actions", () 
   const submitGuardSource = readFileSync(submitGuardPath, "utf8");
 
   const reasonGuardIndex = source.indexOf(
-    "if (reasonRequired && !actionReason)"
+    "if (reasonRequired && !actionReason)",
   );
-  const explainCallIndex = source.indexOf(
-    "const explainAllowed = await verifyWorkflowTaskActionAccessBeforeSubmit({"
+  const retainedAttemptGuardIndex = source.indexOf(
+    "const accessVerified = await verifyNewWorkflowTaskMutationAttempt({",
   );
-  const completeActionIndex = source.indexOf("await completeWorkflowTaskAction");
-  const blockActionIndex = source.indexOf("await blockWorkflowTaskAction");
-  const rejectActionIndex = source.indexOf("await rejectWorkflowTaskAction");
+  const mutationRunIndex = source.indexOf(
+    "await mutationAttemptsRef.current.run({",
+    retainedAttemptGuardIndex,
+  );
   const urgeReasonGuardIndex = source.indexOf("if (!reason)");
-  const urgeExplainIndex = source.indexOf("actionKey: 'urge',");
-  const urgeActionIndex = source.indexOf("await urgeWorkflowTask");
+  const urgeRetainedAttemptGuardIndex = source.indexOf(
+    "const accessVerified = await verifyNewWorkflowTaskMutationAttempt({",
+    retainedAttemptGuardIndex + 1,
+  );
+  const urgeMutationRunIndex = source.indexOf(
+    "await mutationAttemptsRef.current.run({",
+    mutationRunIndex + 1,
+  );
 
   assert.match(
     source,
@@ -429,20 +474,25 @@ test("mobile task actions explain backend access before submitting actions", () 
     /resolveMobileTaskActionReason/u,
     "mobile action hook must derive blocked/rejected reason through the shared action-specific resolver",
   );
-  assert.match(
+  assert.doesNotMatch(
     source,
-    /canOpenMobileTaskDetailAction/u,
-    "mobile action hook must use the shared mobile action permission helper before opening or submitting task actions",
+    /canOpenMobileTaskDetailAction|canRunWorkflowTaskAction/u,
+    "mobile action hook must not restore a local authorization projection beside backend explain",
   );
   assert.match(
     source,
-    /const canRunMobileTaskAction = \(task, action\) => \{[\s\S]*canOpenMobileTaskDetailAction\(activeRoleKey, task, action\)[\s\S]*canRunWorkflowTaskAction\(adminProfile, task, actionMode\)/u,
-    "mobile action permission helper must intersect the role-specific action contract with the current RBAC projection",
+    /const accessMatchesTask\s*=\s*[\s\S]*Number\(task\?\.id\)\s*===\s*Number\(selectedTask\?\.id\)[\s\S]*Number\(task\?\.version\)\s*===\s*Number\(selectedTask\?\.version\)/u,
+    "mobile action access must stay bound to the selected task id and version",
+  );
+  assert.match(
+    source,
+    /taskActionAccess\?\.canRun\?\.\(actionMode\)\s*===\s*true/u,
+    "mobile action entry must consume the backend action projection",
   );
   assert.match(
     source,
     /if \(!canRunMobileTaskAction\(task, taskStatusKey\)\)/u,
-    "mobile complete/block/reject submit path must re-check the selected action permission",
+    "mobile complete/block/reject submit path must re-check the selected backend projection before fresh explain",
   );
   assert.match(
     source,
@@ -489,7 +539,7 @@ test("mobile task actions explain backend access before submitting actions", () 
   );
   assert.match(
     source,
-    /verifyWorkflowTaskActionAccessBeforeSubmit\(\{[\s\S]*task,[\s\S]*actionKey: explainActionKey,[\s\S]*reason: actionReason,[\s\S]*onWarning: message\.warning,[\s\S]*onError: message\.error,[\s\S]*\}\)/u,
+    /verifyWorkflowTaskActionAccessBeforeSubmit\(\{[\s\S]*task,[\s\S]*actionKey: actionMode,[\s\S]*reason: actionReason,[\s\S]*onWarning: message\.warning,[\s\S]*onError: message\.error,[\s\S]*\}\)/u,
   );
   assert(
     !source.includes("explainWorkflowActionAccess"),
@@ -497,7 +547,7 @@ test("mobile task actions explain backend access before submitting actions", () 
   );
   assert.match(
     source,
-    /verifyWorkflowTaskActionAccessBeforeSubmit\(\{[\s\S]*task,[\s\S]*actionKey: 'urge',[\s\S]*reason,[\s\S]*onWarning: message\.warning,[\s\S]*onError: message\.error,[\s\S]*\}\)/u,
+    /verifyNewWorkflowTaskMutationAttempt\(\{[\s\S]*verify:[\s\S]*verifyWorkflowTaskActionAccessBeforeSubmit\(\{[\s\S]*task,[\s\S]*actionKey: operation,[\s\S]*reason,[\s\S]*onWarning: message\.warning,[\s\S]*onError: message\.error,[\s\S]*\}\)/u,
   );
   assert.match(
     source,
@@ -507,7 +557,10 @@ test("mobile task actions explain backend access before submitting actions", () 
   const actionParamsMatch = source.match(
     /const actionParams = \{(?<body>[\s\S]*?)\n      \}/u,
   );
-  assert(actionParamsMatch?.groups?.body, "mobile actionParams block must exist");
+  assert(
+    actionParamsMatch?.groups?.body,
+    "mobile actionParams block must exist",
+  );
   assert(
     !/^\s*id:\s*task\.id,/mu.test(actionParamsMatch.groups.body),
     "mobile complete/block/reject payload must not rely on legacy id fallback",
@@ -532,28 +585,32 @@ test("mobile task actions explain backend access before submitting actions", () 
     );
   }
   assert(
-    reasonGuardIndex >= 0 && reasonGuardIndex < explainCallIndex,
-    "blocked/rejected reason must be validated before backend access explain",
+    reasonGuardIndex >= 0 && reasonGuardIndex < retainedAttemptGuardIndex,
+    "blocked/rejected reason must be validated before creating or replaying an attempt",
   );
   assert(
-    explainCallIndex >= 0 && explainCallIndex < completeActionIndex,
-    "mobile complete must explain backend access before submit",
+    retainedAttemptGuardIndex >= 0 &&
+      retainedAttemptGuardIndex < mutationRunIndex,
+    "mobile complete/block/reject must verify new intents before mutation while allowing exact replay",
   );
   assert(
-    explainCallIndex < blockActionIndex,
-    "mobile block must explain backend access before submit",
+    source
+      .slice(retainedAttemptGuardIndex, mutationRunIndex)
+      .includes("verifyWorkflowTaskActionAccessBeforeSubmit"),
+    "mobile status actions must explain backend access for new intents",
   );
   assert(
-    explainCallIndex < rejectActionIndex,
-    "mobile reject must explain backend access before submit",
+    urgeReasonGuardIndex >= 0 &&
+      urgeReasonGuardIndex < urgeRetainedAttemptGuardIndex,
+    "mobile urge reason must be validated before creating or replaying an attempt",
   );
   assert(
-    urgeReasonGuardIndex >= 0 && urgeReasonGuardIndex < urgeExplainIndex,
-    "mobile urge reason must be validated before backend access explain",
-  );
-  assert(
-    urgeExplainIndex >= 0 && urgeExplainIndex < urgeActionIndex,
-    "mobile urge must explain backend access before submit",
+    urgeRetainedAttemptGuardIndex >= 0 &&
+      urgeRetainedAttemptGuardIndex < urgeMutationRunIndex &&
+      source
+        .slice(urgeRetainedAttemptGuardIndex, urgeMutationRunIndex)
+        .includes("verifyWorkflowTaskActionAccessBeforeSubmit"),
+    "mobile urge must verify new intents before mutation while allowing exact replay",
   );
 });
 
@@ -561,43 +618,43 @@ test("desktop workflow task actions explain backend access before submitting act
   const expectations = [
     {
       relativePath: "web/src/erp/pages/DashboardPage.jsx",
-      actionCalls: [
-        "await completeWorkflowTaskAction",
-        "await blockWorkflowTaskAction",
-        "await rejectWorkflowTaskAction",
-        "await urgeWorkflowTask",
+      actionWrappers: [
+        "completeWorkflowTaskAction",
+        "blockWorkflowTaskAction",
+        "rejectWorkflowTaskAction",
+        "urgeWorkflowTask",
       ],
       forbiddenLegacyIDPattern: /^\s*id:\s*selectedTask\.id,/mu,
     },
     {
       relativePath: "web/src/erp/pages/WorkflowBusinessModulePage.jsx",
-      actionCalls: [
-        "await completeWorkflowTaskAction",
-        "await blockWorkflowTaskAction",
-        "await rejectWorkflowTaskAction",
-        "await urgeWorkflowTask",
+      actionWrappers: [
+        "completeWorkflowTaskAction",
+        "blockWorkflowTaskAction",
+        "rejectWorkflowTaskAction",
+        "urgeWorkflowTask",
       ],
       forbiddenLegacyIDPattern: /^\s*id:\s*task\.id,/mu,
     },
     {
       relativePath:
         "web/src/erp/components/purchase-orders/usePurchaseOrderWorkflowActions.mjs",
-      actionCalls: [
-        "await completeWorkflowTaskAction",
-        "await blockWorkflowTaskAction",
-        "await rejectWorkflowTaskAction",
-        "await urgeWorkflowTask",
+      actionWrappers: [
+        "completeWorkflowTaskAction",
+        "blockWorkflowTaskAction",
+        "rejectWorkflowTaskAction",
+        "urgeWorkflowTask",
       ],
       forbiddenLegacyIDPattern: /^\s*id:\s*task\.id,/mu,
     },
     {
       relativePath:
         "web/src/erp/components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs",
-      actionCalls: [
-        "await completeWorkflowTaskAction",
-        "await blockWorkflowTaskAction",
-        "await rejectWorkflowTaskAction",
-        "await urgeWorkflowTask",
+      actionWrappers: [
+        "completeWorkflowTaskAction",
+        "blockWorkflowTaskAction",
+        "rejectWorkflowTaskAction",
+        "urgeWorkflowTask",
       ],
       forbiddenLegacyIDPattern: /^\s*id:\s*task\.id,/mu,
     },
@@ -618,13 +675,16 @@ test("desktop workflow task actions explain backend access before submitting act
       /verifyWorkflowTaskActionAccessBeforeSubmit\(\{[\s\S]*reason,/u,
       `${expectation.relativePath} must pass the current reason to the shared submit guard`,
     );
-    for (const actionCall of expectation.actionCalls) {
-      assertWorkflowSubmitGuardBeforeActionCall({
-        source,
-        relativePath: expectation.relativePath,
-        actionCall,
-      });
+    for (const actionWrapper of expectation.actionWrappers) {
+      assert(
+        source.includes(actionWrapper),
+        `${expectation.relativePath} must keep using ${actionWrapper}`,
+      );
     }
+    assertWorkflowRetainedAttemptGuardBeforeMutation({
+      source,
+      relativePath: expectation.relativePath,
+    });
     assert.match(
       source,
       /task_id:\s*(?:selectedTask|task)\.id/u,
@@ -656,6 +716,46 @@ test("desktop workflow task actions explain backend access before submitting act
   }
 });
 
+test("workflow task post-success refresh failures stay separate from mutation results", () => {
+  const expectations = [
+    {
+      relativePath: "web/src/erp/mobile/hooks/useMobileRoleTaskActions.js",
+      refreshCall: "loadTasks()",
+      expectedCount: 2,
+    },
+    {
+      relativePath: "web/src/erp/pages/DashboardPage.jsx",
+      refreshCall: "loadDashboardStats()",
+      expectedCount: 1,
+    },
+    {
+      relativePath: "web/src/erp/pages/WorkflowBusinessModulePage.jsx",
+      refreshCall: "loadWorkflowTasks()",
+      expectedCount: 4,
+    },
+    {
+      relativePath:
+        "web/src/erp/components/purchase-orders/usePurchaseOrderWorkflowActions.mjs",
+      refreshCall: "loadWorkflowTasks()",
+      expectedCount: 4,
+    },
+    {
+      relativePath:
+        "web/src/erp/components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs",
+      refreshCall: "loadWorkflowTasks()",
+      expectedCount: 4,
+    },
+  ];
+
+  for (const expectation of expectations) {
+    const source = readFileSync(
+      path.join(repoRoot, expectation.relativePath),
+      "utf8",
+    );
+    assertPostSuccessRefreshIsolated({ source, ...expectation });
+  }
+});
+
 test("workflow urge payloads do not replay frontend task source fields", () => {
   const urgeActionFiles = [
     "web/src/erp/mobile/hooks/useMobileRoleTaskActions.js",
@@ -668,8 +768,10 @@ test("workflow urge payloads do not replay frontend task source fields", () => {
   for (const relativePath of urgeActionFiles) {
     const source = readFileSync(path.join(repoRoot, relativePath), "utf8");
     assert(
-      source.includes("await urgeWorkflowTask"),
-      `${relativePath} must keep using the workflow urge API wrapper`,
+      /mutate:\s*urgeWorkflowTask|actionMode === 'urge'[\s\S]*\?\s*urgeWorkflowTask/u.test(
+        source,
+      ),
+      `${relativePath} must pass the workflow urge API wrapper to the retained-attempt runner`,
     );
     assert.doesNotMatch(
       source,
@@ -679,21 +781,20 @@ test("workflow urge payloads do not replay frontend task source fields", () => {
   }
 });
 
-test("business collaboration panel explains backend access before delegating actions", () => {
+test("business collaboration panel delegates mutation verification to action-owning handlers", () => {
   const panelPath = path.join(
     erpSourceRoot,
     "components/business-list/CollaborationTaskPanel.jsx",
   );
   const source = readFileSync(panelPath, "utf8");
-  const guardIndex = source.indexOf(
-    "await verifyWorkflowTaskActionAccessBeforeSubmit",
+  const actionHandlerIndex = source.indexOf(
+    "await actionHandler(actionDrawerTask",
   );
-  const actionHandlerIndex = source.indexOf("await actionHandler(actionDrawerTask");
 
-  assert.match(
+  assert.doesNotMatch(
     source,
-    /import \{ verifyWorkflowTaskActionAccessBeforeSubmit \} from ['"]\.\.\/\.\.\/utils\/workflowTaskActionSubmitGuard\.mjs['"]/u,
-    "collaboration panel must use the shared backend explain submit guard",
+    /verifyWorkflowTaskActionAccessBeforeSubmit/u,
+    "collaboration panel must not repeat the action handler preflight and block an exact receipt replay",
   );
   assert(
     !source.includes("canRunWorkflowTaskAction"),
@@ -710,18 +811,10 @@ test("business collaboration panel explains backend access before delegating act
     source.includes("onClick={() => openActionDrawer(task)}"),
     "collaboration panel list must expose a neutral processing entry before backend explain returns action choices",
   );
-  assert.match(
-    source,
-    /verifyWorkflowTaskActionAccessBeforeSubmit\(\{[\s\S]*task: actionDrawerTask,[\s\S]*actionKey: actionDrawerMode,[\s\S]*reason,[\s\S]*onWarning: message\.warning,[\s\S]*onError: message\.error,[\s\S]*\}\)/u,
-    "collaboration panel must pass task, action and reason to the shared submit guard",
-  );
   assert(
-    guardIndex >= 0 &&
-      actionHandlerIndex > guardIndex &&
-      source
-        .slice(guardIndex, actionHandlerIndex)
-        .includes("if (!accessVerified) return"),
-    "collaboration panel must verify backend action access before delegating to page action handlers",
+    actionHandlerIndex >= 0 &&
+      source.includes("if (succeeded !== false) closeActionDrawer()"),
+    "collaboration panel must keep the drawer open when an action-owning handler rejects a new attempt",
   );
 });
 
@@ -746,7 +839,9 @@ test("sales order page keeps write buttons behind projected actions", () => {
     "sales order page must derive create permission through projected action helper",
   );
   assert(
-    pageSource.includes("const canCreateItem = canCreateOrder || canUpdateOrder") &&
+    pageSource.includes(
+      "const canCreateItem = canCreateOrder || canUpdateOrder",
+    ) &&
       pageSource.includes("const canUpdateItem = canUpdateOrder") &&
       pageSource.includes("const canCancelItem = canUpdateOrder") &&
       !/sales_order_item\.(create|update|cancel)/u.test(pageSource),
@@ -837,7 +932,9 @@ test("purchase order page keeps write buttons behind projected actions", () => {
   assert(
     panelSource.includes("disabled={!canCreate}") &&
       panelSource.includes("disabled={!selectedOrderCanEdit}") &&
-      panelSource.includes("disabled={\n                !canGenerateInboundDraft"),
+      panelSource.includes(
+        "disabled={\n                !canGenerateInboundDraft",
+      ),
     "purchase order create/edit/inbound draft controls must stay disabled without projected actions",
   );
   assert(
@@ -846,18 +943,27 @@ test("purchase order page keeps write buttons behind projected actions", () => {
     "purchase order modal attachments must use projected create/update permissions",
   );
   assert(
-    pageSource.includes("canUpdateWorkflowTasks ? blockWorkflowTask : undefined") &&
-      pageSource.includes("canUpdateWorkflowTasks ? rejectWorkflowTask : undefined") &&
+    pageSource.includes(
+      "canUpdateWorkflowTasks ? blockWorkflowTask : undefined",
+    ) &&
+      pageSource.includes(
+        "canUpdateWorkflowTasks ? rejectWorkflowTask : undefined",
+      ) &&
       pageSource.includes(
         "canUpdateWorkflowTasks ? urgePurchaseWorkflowTask : undefined",
       ) &&
-      pageSource.includes("canCompleteWorkflowTasks ? completeWorkflowTask : undefined"),
+      pageSource.includes(
+        "canCompleteWorkflowTasks ? completeWorkflowTask : undefined",
+      ),
     "purchase collaboration actions must remain behind workflow task action permissions",
   );
 });
 
 test("outsourcing order page keeps write buttons behind projected actions", () => {
-  const pagePath = path.join(erpSourceRoot, "pages/V1OutsourcingOrdersPage.jsx");
+  const pagePath = path.join(
+    erpSourceRoot,
+    "pages/V1OutsourcingOrdersPage.jsx",
+  );
   const pageSource = readFileSync(pagePath, "utf8");
 
   assert(
@@ -871,7 +977,9 @@ test("outsourcing order page keeps write buttons behind projected actions", () =
   );
   assert(
     pageSource.includes("disabled={!canCreate}") &&
-      pageSource.includes("!canUpdate ||\n              !canEditOutsourcingOrder(selectedRow)") &&
+      pageSource.includes(
+        "!canUpdate ||\n              !canEditOutsourcingOrder(selectedRow)",
+      ) &&
       pageSource.includes("canUpload={canUpdate || canCreate}") &&
       pageSource.includes("canDelete={canUpdate}"),
     "outsourcing order create/edit/attachment controls must stay disabled without projected actions",
@@ -886,12 +994,18 @@ test("outsourcing order page keeps write buttons behind projected actions", () =
     "outsourcing lifecycle actions must require both action projection and lifecycle state",
   );
   assert(
-    pageSource.includes("canUpdateWorkflowTasks ? blockWorkflowTask : undefined") &&
-      pageSource.includes("canUpdateWorkflowTasks ? rejectWorkflowTask : undefined") &&
+    pageSource.includes(
+      "canUpdateWorkflowTasks ? blockWorkflowTask : undefined",
+    ) &&
+      pageSource.includes(
+        "canUpdateWorkflowTasks ? rejectWorkflowTask : undefined",
+      ) &&
       pageSource.includes(
         "canUpdateWorkflowTasks ? urgeOutsourcingWorkflowTask : undefined",
       ) &&
-      pageSource.includes("canCompleteWorkflowTasks ? completeWorkflowTask : undefined"),
+      pageSource.includes(
+        "canCompleteWorkflowTasks ? completeWorkflowTask : undefined",
+      ),
     "outsourcing collaboration actions must remain behind workflow task action permissions",
   );
   assert(
@@ -931,7 +1045,7 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "selectedRow.status !== 'DRAFT' ||\n              !canCreate",
         "selectedRow.status !== 'DRAFT' ||\n                !canPost",
         "selectedRow.status !== 'POSTED' ||\n                !canPost",
-        "过账和取消均由后端采购入库规则写库存事实或冲正",
+        "过账和取消均由系统按采购入库规则更新库存或生成冲正记录",
       ],
     },
     {
@@ -946,7 +1060,7 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "!['DRAFT', 'SUBMITTED'].includes(selectedRow.status) ||\n              !canUpdate",
         "canUpload={canCreate || canUpdate}",
         "canDelete={canUpdate}",
-        "前端不本地改批次状态，不写库存流水",
+        "不会绕过规则直接修改批次状态或库存流水",
       ],
     },
   ];
@@ -1005,11 +1119,25 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
       actions: [
         {
           key: "close",
-          requiredTokens: ["停止", "不会自动写", "出货", "库存", "财务", "协同任务"],
+          requiredTokens: [
+            "停止",
+            "不会自动改变",
+            "出货",
+            "库存",
+            "财务",
+            "协同任务",
+          ],
         },
         {
           key: "cancel",
-          requiredTokens: ["源单", "不会自动取消", "出货", "库存", "财务", "协同任务"],
+          requiredTokens: [
+            "销售订单本身",
+            "不会自动取消",
+            "出货",
+            "库存",
+            "财务",
+            "协同任务",
+          ],
         },
       ],
     },
@@ -1020,11 +1148,25 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
       actions: [
         {
           key: "close",
-          requiredTokens: ["停止", "不会自动写", "入库", "质检", "库存", "财务"],
+          requiredTokens: [
+            "停止",
+            "不会自动改变",
+            "入库",
+            "质检",
+            "库存",
+            "财务",
+          ],
         },
         {
           key: "cancel",
-          requiredTokens: ["源单", "不会自动冲正", "入库", "质检", "库存", "财务"],
+          requiredTokens: [
+            "采购订单本身",
+            "不会自动冲正",
+            "入库",
+            "质检",
+            "库存",
+            "财务",
+          ],
         },
       ],
     },
@@ -1035,11 +1177,24 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
       actions: [
         {
           key: "close",
-          requiredTokens: ["停止", "不会自动写", "发料", "回货", "库存", "财务事实"],
+          requiredTokens: [
+            "停止",
+            "不会自动改变",
+            "发料",
+            "回货",
+            "库存",
+            "财务记录",
+          ],
         },
         {
           key: "cancel",
-          requiredTokens: ["源单", "不会自动冲正", "发料", "回货", "财务事实"],
+          requiredTokens: [
+            "加工合同本身",
+            "不会自动冲正",
+            "发料",
+            "回货",
+            "财务记录",
+          ],
         },
       ],
     },

@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 
@@ -54,9 +55,12 @@ func TestWorkflowRepo_PurchaseIQCDoneSideEffectsAreTransactionalAndIdempotent(t 
 	}
 
 	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-		ID:            iqcTask.ID,
-		TaskStatusKey: "done",
-		Payload:       map[string]any{"mobile_role_key": "quality"},
+		ID:              iqcTask.ID,
+		ExpectedVersion: iqcTask.Version,
+		CommandKey:      "complete_task_action",
+		IdempotencyKey:  "purchase-iqc-done",
+		TaskStatusKey:   "done",
+		Payload:         map[string]any{"mobile_role_key": "quality"},
 	}, 8, "quality"); err != nil {
 		t.Fatalf("done update failed: %v", err)
 	}
@@ -115,9 +119,12 @@ func TestWorkflowRepo_PurchaseIQCDoneSideEffectsAreTransactionalAndIdempotent(t 
 	}
 
 	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-		ID:            iqcTask.ID,
-		TaskStatusKey: "done",
-		Payload:       map[string]any{"mobile_role_key": "quality"},
+		ID:              iqcTask.ID,
+		ExpectedVersion: iqcTask.Version,
+		CommandKey:      "complete_task_action",
+		IdempotencyKey:  "purchase-iqc-done",
+		TaskStatusKey:   "done",
+		Payload:         map[string]any{"mobile_role_key": "quality"},
 	}, 8, "quality"); err != nil {
 		t.Fatalf("repeat done update failed: %v", err)
 	}
@@ -181,18 +188,24 @@ func TestWorkflowRepo_PurchaseIQCExceptionIdempotencyHonorsRejectedTerminalState
 
 			reason := "来料破包"
 			if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-				ID:            iqcTask.ID,
-				TaskStatusKey: tc.status,
-				Reason:        reason,
-				Payload:       map[string]any{},
+				ID:              iqcTask.ID,
+				ExpectedVersion: iqcTask.Version,
+				CommandKey:      "purchase_iqc_" + tc.status,
+				IdempotencyKey:  "purchase-iqc-" + tc.status,
+				TaskStatusKey:   tc.status,
+				Reason:          reason,
+				Payload:         map[string]any{},
 			}, 8, "quality"); err != nil {
 				t.Fatalf("first %s update failed: %v", tc.status, err)
 			}
 			if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-				ID:            iqcTask.ID,
-				TaskStatusKey: tc.status,
-				Reason:        reason,
-				Payload:       map[string]any{},
+				ID:              iqcTask.ID,
+				ExpectedVersion: iqcTask.Version,
+				CommandKey:      "purchase_iqc_" + tc.status,
+				IdempotencyKey:  "purchase-iqc-" + tc.status,
+				TaskStatusKey:   tc.status,
+				Reason:          reason,
+				Payload:         map[string]any{},
 			}, 8, "quality"); err != nil {
 				t.Fatalf("repeat %s update failed: %v", tc.status, err)
 			}
@@ -248,21 +261,26 @@ func TestWorkflowRepo_PurchaseIQCExceptionIdempotencyHonorsRejectedTerminalState
 				t.Fatalf("expected exception created event with workflow rule payload, got %#v", createdEvents)
 			}
 
-			if _, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+			if _, err := repo.UpdateWorkflowTaskStatus(ctx, workflowRepoTestStatusMutation(exceptionTasks[0].ID, exceptionTasks[0].Version, "purchase-iqc-exception-"+tc.status+"-complete", &biz.WorkflowTaskStatusUpdate{
 				ID:            exceptionTasks[0].ID,
 				TaskStatusKey: "done",
 				Payload:       map[string]any{"done_by": biz.PurchaseRoleKey},
-			}, 9, biz.PurchaseRoleKey); err != nil {
+			}), 9, biz.PurchaseRoleKey); err != nil {
 				t.Fatalf("complete exception task failed: %v", err)
 			}
 
-			if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+			_, nextRoundErr := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(iqcTask.ID, iqcTask.Version+1, "purchase-iqc-"+tc.status+"-next-round", &biz.WorkflowTaskStatusUpdate{
 				ID:            iqcTask.ID,
 				TaskStatusKey: tc.status,
 				Reason:        reason,
 				Payload:       map[string]any{},
-			}, 8, "quality"); err != nil {
-				t.Fatalf("next-round %s update failed: %v", tc.status, err)
+			}), 8, "quality")
+			if tc.status == "rejected" {
+				if !errors.Is(nextRoundErr, biz.ErrWorkflowTaskSettled) {
+					t.Fatalf("terminal rejected task must reject a new round, got %v", nextRoundErr)
+				}
+			} else if nextRoundErr != nil {
+				t.Fatalf("next-round %s update failed: %v", tc.status, nextRoundErr)
 			}
 
 			count, err := client.WorkflowTask.Query().

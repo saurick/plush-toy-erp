@@ -572,6 +572,7 @@
 .erp-dev-testing-command-list {
   display: grid;
   align-content: start;
+  grid-auto-rows: max-content;
   gap: 12px;
 }
 
@@ -1110,6 +1111,16 @@
   min-height: 0;
   flex: 1 1 auto;
   overflow: hidden;
+}
+
+.erp-dev-prototypes-fullscreen__focus-guard {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .erp-dev-prototypes-preview__frame--fullscreen {

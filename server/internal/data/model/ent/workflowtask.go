@@ -62,6 +62,8 @@ type WorkflowTask struct {
 	ClosedAt *time.Time `json:"closed_at,omitempty"`
 	// Payload holds the value of the "payload" field.
 	Payload map[string]interface{} `json:"payload,omitempty"`
+	// Version holds the value of the "version" field.
+	Version int `json:"version,omitempty"`
 	// CreatedBy holds the value of the "created_by" field.
 	CreatedBy *int `json:"created_by,omitempty"`
 	// UpdatedBy holds the value of the "updated_by" field.
@@ -101,7 +103,7 @@ func (*WorkflowTask) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case workflowtask.FieldPayload:
 			values[i] = new([]byte)
-		case workflowtask.FieldID, workflowtask.FieldSourceID, workflowtask.FieldProcessInstanceID, workflowtask.FieldProcessNodeInstanceID, workflowtask.FieldAssigneeID, workflowtask.FieldPriority, workflowtask.FieldCreatedBy, workflowtask.FieldUpdatedBy:
+		case workflowtask.FieldID, workflowtask.FieldSourceID, workflowtask.FieldProcessInstanceID, workflowtask.FieldProcessNodeInstanceID, workflowtask.FieldAssigneeID, workflowtask.FieldPriority, workflowtask.FieldVersion, workflowtask.FieldCreatedBy, workflowtask.FieldUpdatedBy:
 			values[i] = new(sql.NullInt64)
 		case workflowtask.FieldTaskCode, workflowtask.FieldTaskGroup, workflowtask.FieldTaskName, workflowtask.FieldSourceType, workflowtask.FieldSourceNo, workflowtask.FieldBusinessStatusKey, workflowtask.FieldTaskStatusKey, workflowtask.FieldOwnerRoleKey, workflowtask.FieldOwnerPoolKey, workflowtask.FieldRequiredCapabilityKey, workflowtask.FieldConfigRevision, workflowtask.FieldBlockedReason:
 			values[i] = new(sql.NullString)
@@ -275,6 +277,12 @@ func (_m *WorkflowTask) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field payload: %w", err)
 				}
 			}
+		case workflowtask.FieldVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field version", values[i])
+			} else if value.Valid {
+				_m.Version = int(value.Int64)
+			}
 		case workflowtask.FieldCreatedBy:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field created_by", values[i])
@@ -433,6 +441,9 @@ func (_m *WorkflowTask) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("payload=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Payload))
+	builder.WriteString(", ")
+	builder.WriteString("version=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Version))
 	builder.WriteString(", ")
 	if v := _m.CreatedBy; v != nil {
 		builder.WriteString("created_by=")

@@ -2,6 +2,8 @@ package data
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -10,6 +12,7 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
+	"server/internal/data/model/ent/workflowtaskevent"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -17,6 +20,44 @@ import (
 type workflowRepo struct {
 	data *Data
 	log  *log.Helper
+}
+
+const workflowTaskMutationResultContractV1 = "workflow.task-mutation-result/v1"
+
+type workflowTaskMutationResultEnvelopeV1 struct {
+	Contract string                            `json:"contract"`
+	Task     *workflowTaskMutationResultTaskV1 `json:"task"`
+}
+
+type workflowTaskMutationResultTaskV1 struct {
+	ID                    int            `json:"id"`
+	TaskCode              string         `json:"task_code"`
+	TaskGroup             string         `json:"task_group"`
+	TaskName              string         `json:"task_name"`
+	SourceType            string         `json:"source_type"`
+	SourceID              int            `json:"source_id"`
+	SourceNo              *string        `json:"source_no,omitempty"`
+	BusinessStatusKey     *string        `json:"business_status_key,omitempty"`
+	TaskStatusKey         string         `json:"task_status_key"`
+	OwnerRoleKey          string         `json:"owner_role_key"`
+	OwnerPoolKey          *string        `json:"owner_pool_key,omitempty"`
+	RequiredCapabilityKey *string        `json:"required_capability_key,omitempty"`
+	ConfigRevision        *string        `json:"config_revision,omitempty"`
+	ProcessInstanceID     *int           `json:"process_instance_id,omitempty"`
+	ProcessNodeInstanceID *int           `json:"process_node_instance_id,omitempty"`
+	AssigneeID            *int           `json:"assignee_id,omitempty"`
+	Priority              int16          `json:"priority"`
+	BlockedReason         *string        `json:"blocked_reason,omitempty"`
+	DueAt                 *time.Time     `json:"due_at,omitempty"`
+	StartedAt             *time.Time     `json:"started_at,omitempty"`
+	CompletedAt           *time.Time     `json:"completed_at,omitempty"`
+	ClosedAt              *time.Time     `json:"closed_at,omitempty"`
+	Payload               map[string]any `json:"payload"`
+	Version               int            `json:"version"`
+	CreatedBy             *int           `json:"created_by,omitempty"`
+	UpdatedBy             *int           `json:"updated_by,omitempty"`
+	CreatedAt             time.Time      `json:"created_at"`
+	UpdatedAt             time.Time      `json:"updated_at"`
 }
 
 func NewWorkflowRepo(d *Data, logger log.Logger) *workflowRepo {
@@ -54,6 +95,35 @@ func (r *workflowRepo) GetWorkflowTaskByTaskCode(ctx context.Context, taskCode s
 		return nil, err
 	}
 	return entWorkflowTaskToBiz(row), nil
+}
+
+func (r *workflowRepo) ResolveWorkflowTaskMutation(
+	ctx context.Context,
+	taskID int,
+	idempotencyKey string,
+	intentHash string,
+	commandKey string,
+	actorID int,
+) (*biz.WorkflowTask, bool, error) {
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	intentHash = strings.TrimSpace(intentHash)
+	commandKey = strings.TrimSpace(commandKey)
+	if taskID <= 0 || idempotencyKey == "" || !workflowTaskIntentHashValid(intentHash) || commandKey == "" || actorID <= 0 {
+		return nil, false, biz.ErrBadParam
+	}
+	event, err := r.data.postgres.WorkflowTaskEvent.Query().
+		Where(
+			workflowtaskevent.TaskID(taskID),
+			workflowtaskevent.IdempotencyKey(idempotencyKey),
+		).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return workflowTaskMutationReceiptResult(event, intentHash, commandKey, actorID)
 }
 
 func (r *workflowRepo) ListWorkflowTasks(ctx context.Context, filter biz.WorkflowTaskFilter) ([]*biz.WorkflowTask, int, error) {
@@ -167,6 +237,7 @@ func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowT
 
 	eventBuilder := tx.WorkflowTaskEvent.Create().
 		SetTaskID(row.ID).
+		SetTaskVersion(row.Version).
 		SetEventType("created").
 		SetToStatusKey(in.TaskStatusKey).
 		SetPayload(map[string]any{})
@@ -185,11 +256,18 @@ func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowT
 }
 
 func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.WorkflowTaskStatusUpdate, actorID int, actorRoleKey string) (*biz.WorkflowTask, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 ||
+		!workflowTaskMutationIdentityValid(in.CommandKey, in.IdempotencyKey, in.IntentHash) {
+		return nil, biz.ErrBadParam
+	}
 	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackEntTx(ctx, tx, r.log)
+	if replayed, found, err := resolveWorkflowTaskMutationInTx(ctx, tx, in.ID, in.IdempotencyKey, in.IntentHash, in.CommandKey, actorID); err != nil || found {
+		return replayed, err
+	}
 
 	current, err := tx.WorkflowTask.Get(ctx, in.ID)
 	if err != nil {
@@ -198,15 +276,22 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 		}
 		return nil, err
 	}
+	expectedVersion := in.ExpectedVersion
+	if current.Version != expectedVersion {
+		return nil, workflowTaskMutationConflict(current.TaskStatusKey)
+	}
 
 	now := time.Now()
 	update := tx.WorkflowTask.Update().
 		Where(
 			workflowtask.IDEQ(in.ID),
+			workflowtask.VersionEQ(expectedVersion),
+			workflowtask.TaskStatusKeyEQ(current.TaskStatusKey),
 			workflowtask.TaskStatusKeyNotIn("done", "rejected", "cancelled", "closed"),
 		).
 		SetTaskStatusKey(in.TaskStatusKey).
-		SetPayload(in.Payload)
+		SetPayload(in.Payload).
+		AddVersion(1)
 	if actorID > 0 {
 		update.SetUpdatedBy(actorID)
 	}
@@ -225,9 +310,14 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 		update.SetClosedAt(now)
 	}
 
-	if in.Reason != "" {
-		update.SetBlockedReason(in.Reason)
-	} else if in.TaskStatusKey != "blocked" && in.TaskStatusKey != "rejected" {
+	switch in.TaskStatusKey {
+	case "blocked", "rejected":
+		if in.Reason != "" {
+			update.SetBlockedReason(in.Reason)
+		} else {
+			update.ClearBlockedReason()
+		}
+	default:
 		update.ClearBlockedReason()
 	}
 
@@ -236,7 +326,17 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 		return nil, err
 	}
 	if updatedCount == 0 {
-		return nil, biz.ErrWorkflowTaskSettled
+		if replayed, found, replayErr := resolveWorkflowTaskMutationInTx(ctx, tx, in.ID, in.IdempotencyKey, in.IntentHash, in.CommandKey, actorID); replayErr != nil || found {
+			return replayed, replayErr
+		}
+		latest, getErr := tx.WorkflowTask.Get(ctx, in.ID)
+		if getErr != nil {
+			if ent.IsNotFound(getErr) {
+				return nil, biz.ErrWorkflowTaskNotFound
+			}
+			return nil, getErr
+		}
+		return nil, workflowTaskMutationConflict(latest.TaskStatusKey)
 	}
 	row, err := tx.WorkflowTask.Get(ctx, in.ID)
 	if err != nil {
@@ -246,8 +346,10 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 		return nil, err
 	}
 
+	resultTask := entWorkflowTaskToBiz(row)
 	eventBuilder := tx.WorkflowTaskEvent.Create().
 		SetTaskID(row.ID).
+		SetTaskVersion(row.Version).
 		SetEventType("status_changed").
 		SetFromStatusKey(current.TaskStatusKey).
 		SetToStatusKey(in.TaskStatusKey).
@@ -261,6 +363,15 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 	if in.Reason != "" {
 		eventBuilder.SetReason(in.Reason)
 	}
+	mutationResult, resultErr := workflowTaskMutationResultMap(resultTask)
+	if resultErr != nil {
+		return nil, resultErr
+	}
+	eventBuilder.
+		SetCommandKey(strings.TrimSpace(in.CommandKey)).
+		SetIdempotencyKey(strings.TrimSpace(in.IdempotencyKey)).
+		SetIntentHash(strings.TrimSpace(in.IntentHash)).
+		SetMutationResult(mutationResult)
 	if _, err := eventBuilder.Save(ctx); err != nil {
 		return nil, err
 	}
@@ -281,20 +392,32 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 			}
 		}
 	}
+	if in.AuditEvent != nil {
+		if err := createRuntimeAuditEventInTx(ctx, tx, in.AuditEvent); err != nil {
+			return nil, err
+		}
+	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	tx = nil
-	return entWorkflowTaskToBiz(row), nil
+	return resultTask, nil
 }
 
 func (r *workflowRepo) UrgeWorkflowTask(ctx context.Context, in *biz.WorkflowTaskUrge, actorID int, actorRoleKey string) (*biz.WorkflowTask, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 ||
+		!workflowTaskMutationIdentityValid(in.CommandKey, in.IdempotencyKey, in.IntentHash) {
+		return nil, biz.ErrBadParam
+	}
 	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackEntTx(ctx, tx, r.log)
+	if replayed, found, err := resolveWorkflowTaskMutationInTx(ctx, tx, in.ID, in.IdempotencyKey, in.IntentHash, in.CommandKey, actorID); err != nil || found {
+		return replayed, err
+	}
 
 	current, err := tx.WorkflowTask.Get(ctx, in.ID)
 	if err != nil {
@@ -302,6 +425,10 @@ func (r *workflowRepo) UrgeWorkflowTask(ctx context.Context, in *biz.WorkflowTas
 			return nil, biz.ErrWorkflowTaskNotFound
 		}
 		return nil, err
+	}
+	expectedVersion := in.ExpectedVersion
+	if current.Version != expectedVersion {
+		return nil, workflowTaskMutationConflict(current.TaskStatusKey)
 	}
 
 	now := time.Now()
@@ -328,12 +455,37 @@ func (r *workflowRepo) UrgeWorkflowTask(ctx context.Context, in *biz.WorkflowTas
 		nextPayload["alert_type"] = "urgent_escalation"
 	}
 
-	update := tx.WorkflowTask.UpdateOneID(in.ID).SetPayload(nextPayload)
+	update := tx.WorkflowTask.Update().
+		Where(
+			workflowtask.IDEQ(in.ID),
+			workflowtask.VersionEQ(expectedVersion),
+			workflowtask.TaskStatusKeyEQ(current.TaskStatusKey),
+			workflowtask.TaskStatusKeyNotIn("done", "rejected", "cancelled", "closed"),
+		).
+		SetPayload(nextPayload).
+		AddVersion(1)
 	if actorID > 0 {
 		update.SetUpdatedBy(actorID)
 	}
 
-	row, err := update.Save(ctx)
+	updatedCount, err := update.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if updatedCount == 0 {
+		if replayed, found, replayErr := resolveWorkflowTaskMutationInTx(ctx, tx, in.ID, in.IdempotencyKey, in.IntentHash, in.CommandKey, actorID); replayErr != nil || found {
+			return replayed, replayErr
+		}
+		latest, getErr := tx.WorkflowTask.Get(ctx, in.ID)
+		if getErr != nil {
+			if ent.IsNotFound(getErr) {
+				return nil, biz.ErrWorkflowTaskNotFound
+			}
+			return nil, getErr
+		}
+		return nil, workflowTaskMutationConflict(latest.TaskStatusKey)
+	}
+	row, err := tx.WorkflowTask.Get(ctx, in.ID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrWorkflowTaskNotFound
@@ -341,12 +493,14 @@ func (r *workflowRepo) UrgeWorkflowTask(ctx context.Context, in *biz.WorkflowTas
 		return nil, err
 	}
 
+	resultTask := entWorkflowTaskToBiz(row)
 	eventPayload := copyWorkflowPayload(nextPayload)
 	eventPayload["action"] = in.Action
 	eventPayload["urge_count"] = urgeCount
 
 	eventBuilder := tx.WorkflowTaskEvent.Create().
 		SetTaskID(row.ID).
+		SetTaskVersion(row.Version).
 		SetEventType(in.Action).
 		SetFromStatusKey(current.TaskStatusKey).
 		SetToStatusKey(current.TaskStatusKey).
@@ -358,6 +512,15 @@ func (r *workflowRepo) UrgeWorkflowTask(ctx context.Context, in *biz.WorkflowTas
 	if trimmedActorRoleKey != "" {
 		eventBuilder.SetActorRoleKey(trimmedActorRoleKey)
 	}
+	mutationResult, resultErr := workflowTaskMutationResultMap(resultTask)
+	if resultErr != nil {
+		return nil, resultErr
+	}
+	eventBuilder.
+		SetCommandKey(strings.TrimSpace(in.CommandKey)).
+		SetIdempotencyKey(strings.TrimSpace(in.IdempotencyKey)).
+		SetIntentHash(strings.TrimSpace(in.IntentHash)).
+		SetMutationResult(mutationResult)
 	if _, err := eventBuilder.Save(ctx); err != nil {
 		return nil, err
 	}
@@ -366,7 +529,233 @@ func (r *workflowRepo) UrgeWorkflowTask(ctx context.Context, in *biz.WorkflowTas
 		return nil, err
 	}
 	tx = nil
-	return entWorkflowTaskToBiz(row), nil
+	return resultTask, nil
+}
+
+func resolveWorkflowTaskMutationInTx(
+	ctx context.Context,
+	tx *ent.Tx,
+	taskID int,
+	idempotencyKey string,
+	intentHash string,
+	commandKey string,
+	actorID int,
+) (*biz.WorkflowTask, bool, error) {
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	intentHash = strings.TrimSpace(intentHash)
+	commandKey = strings.TrimSpace(commandKey)
+	if taskID <= 0 || idempotencyKey == "" || !workflowTaskIntentHashValid(intentHash) || commandKey == "" || actorID <= 0 {
+		return nil, false, biz.ErrBadParam
+	}
+	event, err := tx.WorkflowTaskEvent.Query().
+		Where(
+			workflowtaskevent.TaskID(taskID),
+			workflowtaskevent.IdempotencyKey(idempotencyKey),
+		).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return workflowTaskMutationReceiptResult(event, intentHash, commandKey, actorID)
+}
+
+func workflowTaskMutationReceiptResult(event *ent.WorkflowTaskEvent, intentHash string, commandKey string, actorID int) (*biz.WorkflowTask, bool, error) {
+	if event == nil || event.TaskVersion == nil || event.IdempotencyKey == nil || event.IntentHash == nil || event.CommandKey == nil ||
+		*event.IdempotencyKey != strings.TrimSpace(*event.IdempotencyKey) || strings.TrimSpace(*event.IdempotencyKey) == "" ||
+		!workflowTaskIntentHashValid(*event.IntentHash) ||
+		strings.TrimSpace(*event.CommandKey) == "" || len(event.MutationResult) == 0 {
+		return nil, false, fmt.Errorf("workflow task mutation receipt is incomplete")
+	}
+	intentHash = strings.TrimSpace(intentHash)
+	if !workflowTaskIntentHashValid(intentHash) {
+		return nil, false, biz.ErrBadParam
+	}
+	if *event.IntentHash != intentHash {
+		return nil, false, biz.ErrIdempotencyConflict
+	}
+	commandKey = strings.TrimSpace(commandKey)
+	storedCommandKey := *event.CommandKey
+	if event.ActorID == nil || *event.ActorID != actorID ||
+		storedCommandKey != strings.TrimSpace(storedCommandKey) || storedCommandKey != commandKey || event.ToStatusKey == nil {
+		return nil, false, fmt.Errorf("workflow task mutation receipt identity is inconsistent")
+	}
+	storedStatusKey := *event.ToStatusKey
+	if storedStatusKey != strings.TrimSpace(storedStatusKey) || !biz.IsValidWorkflowTaskState(storedStatusKey) {
+		return nil, false, fmt.Errorf("workflow task mutation receipt status is invalid")
+	}
+	task, err := workflowTaskMutationResultFromMap(event.MutationResult)
+	if err != nil {
+		return nil, false, err
+	}
+	if task.ID != event.TaskID || task.Version != *event.TaskVersion || task.TaskStatusKey != storedStatusKey {
+		return nil, false, fmt.Errorf("workflow task mutation receipt result does not match event")
+	}
+	return task, true, nil
+}
+
+func workflowTaskMutationIdentityValid(commandKey string, idempotencyKey string, intentHash string) bool {
+	commandKey = strings.TrimSpace(commandKey)
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	intentHash = strings.TrimSpace(intentHash)
+	return commandKey != "" && idempotencyKey != "" && workflowTaskIntentHashValid(intentHash)
+}
+
+func workflowTaskIntentHashValid(intentHash string) bool {
+	if len(intentHash) != 64 {
+		return false
+	}
+	for index := range intentHash {
+		if (intentHash[index] < '0' || intentHash[index] > '9') &&
+			(intentHash[index] < 'a' || intentHash[index] > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+func workflowTaskMutationResultMap(task *biz.WorkflowTask) (map[string]any, error) {
+	if task == nil {
+		return nil, biz.ErrBadParam
+	}
+	taskSnapshot := workflowTaskMutationResultTaskV1FromBiz(task)
+	if _, err := taskSnapshot.toBiz(); err != nil {
+		return nil, err
+	}
+	envelope := workflowTaskMutationResultEnvelopeV1{
+		Contract: workflowTaskMutationResultContractV1,
+		Task:     taskSnapshot,
+	}
+	encoded, err := json.Marshal(envelope)
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]any{}
+	if err := json.Unmarshal(encoded, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func workflowTaskMutationResultFromMap(result map[string]any) (*biz.WorkflowTask, error) {
+	if len(result) == 0 {
+		return nil, fmt.Errorf("workflow task mutation result is empty")
+	}
+	contract, ok := result["contract"].(string)
+	if !ok || contract != workflowTaskMutationResultContractV1 {
+		return nil, fmt.Errorf("workflow task mutation result contract is unsupported")
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+	var envelope workflowTaskMutationResultEnvelopeV1
+	if err := json.Unmarshal(encoded, &envelope); err != nil {
+		return nil, err
+	}
+	if envelope.Contract != workflowTaskMutationResultContractV1 || envelope.Task == nil {
+		return nil, fmt.Errorf("workflow task mutation result envelope is invalid")
+	}
+	task, err := envelope.Task.toBiz()
+	if err != nil {
+		return nil, err
+	}
+	return task, nil
+}
+
+func workflowTaskMutationResultTaskV1FromBiz(task *biz.WorkflowTask) *workflowTaskMutationResultTaskV1 {
+	if task == nil {
+		return nil
+	}
+	payload := task.Payload
+	if payload == nil {
+		payload = map[string]any{}
+	}
+	return &workflowTaskMutationResultTaskV1{
+		ID:                    task.ID,
+		TaskCode:              task.TaskCode,
+		TaskGroup:             task.TaskGroup,
+		TaskName:              task.TaskName,
+		SourceType:            task.SourceType,
+		SourceID:              task.SourceID,
+		SourceNo:              task.SourceNo,
+		BusinessStatusKey:     task.BusinessStatusKey,
+		TaskStatusKey:         task.TaskStatusKey,
+		OwnerRoleKey:          task.OwnerRoleKey,
+		OwnerPoolKey:          task.OwnerPoolKey,
+		RequiredCapabilityKey: task.RequiredCapabilityKey,
+		ConfigRevision:        task.ConfigRevision,
+		ProcessInstanceID:     task.ProcessInstanceID,
+		ProcessNodeInstanceID: task.ProcessNodeInstanceID,
+		AssigneeID:            task.AssigneeID,
+		Priority:              task.Priority,
+		BlockedReason:         task.BlockedReason,
+		DueAt:                 task.DueAt,
+		StartedAt:             task.StartedAt,
+		CompletedAt:           task.CompletedAt,
+		ClosedAt:              task.ClosedAt,
+		Payload:               payload,
+		Version:               task.Version,
+		CreatedBy:             task.CreatedBy,
+		UpdatedBy:             task.UpdatedBy,
+		CreatedAt:             task.CreatedAt,
+		UpdatedAt:             task.UpdatedAt,
+	}
+}
+
+func (task workflowTaskMutationResultTaskV1) toBiz() (*biz.WorkflowTask, error) {
+	taskStatusKey := strings.TrimSpace(task.TaskStatusKey)
+	if task.ID <= 0 || task.Version <= 0 || task.SourceID <= 0 ||
+		strings.TrimSpace(task.TaskCode) == "" || strings.TrimSpace(task.TaskGroup) == "" ||
+		strings.TrimSpace(task.TaskName) == "" || strings.TrimSpace(task.SourceType) == "" ||
+		task.TaskStatusKey != taskStatusKey || !biz.IsValidWorkflowTaskState(taskStatusKey) || strings.TrimSpace(task.OwnerRoleKey) == "" ||
+		task.CreatedAt.IsZero() || task.UpdatedAt.IsZero() {
+		return nil, fmt.Errorf("workflow task mutation result is invalid")
+	}
+	if task.BusinessStatusKey != nil {
+		businessStatusKey := strings.TrimSpace(*task.BusinessStatusKey)
+		if *task.BusinessStatusKey != businessStatusKey ||
+			businessStatusKey == "" ||
+			!biz.IsValidWorkflowBusinessState(businessStatusKey) {
+			return nil, fmt.Errorf("workflow task mutation result business status is invalid")
+		}
+	}
+	payload := task.Payload
+	if payload == nil {
+		payload = map[string]any{}
+	}
+	return &biz.WorkflowTask{
+		ID:                    task.ID,
+		TaskCode:              task.TaskCode,
+		TaskGroup:             task.TaskGroup,
+		TaskName:              task.TaskName,
+		SourceType:            task.SourceType,
+		SourceID:              task.SourceID,
+		SourceNo:              task.SourceNo,
+		BusinessStatusKey:     task.BusinessStatusKey,
+		TaskStatusKey:         task.TaskStatusKey,
+		OwnerRoleKey:          task.OwnerRoleKey,
+		OwnerPoolKey:          task.OwnerPoolKey,
+		RequiredCapabilityKey: task.RequiredCapabilityKey,
+		ConfigRevision:        task.ConfigRevision,
+		ProcessInstanceID:     task.ProcessInstanceID,
+		ProcessNodeInstanceID: task.ProcessNodeInstanceID,
+		AssigneeID:            task.AssigneeID,
+		Priority:              task.Priority,
+		BlockedReason:         task.BlockedReason,
+		DueAt:                 task.DueAt,
+		StartedAt:             task.StartedAt,
+		CompletedAt:           task.CompletedAt,
+		ClosedAt:              task.ClosedAt,
+		Payload:               payload,
+		Version:               task.Version,
+		CreatedBy:             task.CreatedBy,
+		UpdatedBy:             task.UpdatedBy,
+		CreatedAt:             task.CreatedAt,
+		UpdatedAt:             task.UpdatedAt,
+	}, nil
 }
 
 func (r *workflowRepo) ListWorkflowBusinessStates(ctx context.Context, filter biz.WorkflowBusinessStateFilter) ([]*biz.WorkflowBusinessState, int, error) {
@@ -558,7 +947,7 @@ func ensureActiveWorkflowTaskInTx(
 			workflowtask.SourceID(in.SourceID),
 			workflowtask.TaskGroup(in.TaskGroup),
 			workflowtask.OwnerRoleKey(in.OwnerRoleKey),
-			workflowtask.TaskStatusKeyNotIn("done", "closed", "cancelled"),
+			workflowtask.TaskStatusKeyNotIn("done", "rejected", "closed", "cancelled"),
 		).
 		Order(ent.Asc(workflowtask.FieldID)).
 		First(ctx)
@@ -567,18 +956,51 @@ func ensureActiveWorkflowTaskInTx(
 	}
 	if existing != nil {
 		if refreshExistingPayload {
-			update := tx.WorkflowTask.UpdateOneID(existing.ID).
+			update := tx.WorkflowTask.Update().
+				Where(
+					workflowtask.IDEQ(existing.ID),
+					workflowtask.VersionEQ(existing.Version),
+					workflowtask.TaskStatusKeyEQ(existing.TaskStatusKey),
+					workflowtask.TaskStatusKeyNotIn("done", "rejected", "cancelled", "closed"),
+				).
 				SetPayload(in.Payload).
 				SetNillableOwnerPoolKey(in.OwnerPoolKey).
 				SetNillableRequiredCapabilityKey(in.RequiredCapabilityKey).
 				SetNillableConfigRevision(in.ConfigRevision).
 				SetNillableProcessInstanceID(in.ProcessInstanceID).
-				SetNillableProcessNodeInstanceID(in.ProcessNodeInstanceID)
+				SetNillableProcessNodeInstanceID(in.ProcessNodeInstanceID).
+				AddVersion(1)
 			if actorID > 0 {
 				update.SetUpdatedBy(actorID)
 			}
-			updated, err := update.Save(ctx)
+			updatedCount, err := update.Save(ctx)
 			if err != nil {
+				return nil, false, err
+			}
+			if updatedCount == 0 {
+				return nil, false, biz.ErrWorkflowTaskConflict
+			}
+			updated, err := tx.WorkflowTask.Get(ctx, existing.ID)
+			if err != nil {
+				return nil, false, err
+			}
+			if eventPayload == nil {
+				eventPayload = map[string]any{}
+			}
+			eventBuilder := tx.WorkflowTaskEvent.Create().
+				SetTaskID(updated.ID).
+				SetTaskVersion(updated.Version).
+				SetEventType("payload_refreshed").
+				SetFromStatusKey(updated.TaskStatusKey).
+				SetToStatusKey(updated.TaskStatusKey).
+				SetPayload(eventPayload)
+			if actorID > 0 {
+				eventBuilder.SetActorID(actorID)
+			}
+			if strings.TrimSpace(actorRoleKey) != "" {
+				eventBuilder.SetActorRoleKey(strings.TrimSpace(actorRoleKey))
+			}
+			if _, err := eventBuilder.Save(ctx); err != nil {
 				return nil, false, err
 			}
 			return updated, false, nil
@@ -622,6 +1044,7 @@ func ensureActiveWorkflowTaskInTx(
 	}
 	eventBuilder := tx.WorkflowTaskEvent.Create().
 		SetTaskID(row.ID).
+		SetTaskVersion(row.Version).
 		SetEventType("created").
 		SetToStatusKey(in.TaskStatusKey).
 		SetPayload(eventPayload)
@@ -641,9 +1064,15 @@ func entWorkflowTaskToBiz(row *ent.WorkflowTask) *biz.WorkflowTask {
 	if row == nil {
 		return nil
 	}
-	payload := row.Payload
-	if payload == nil {
-		payload = map[string]any{}
+	payload := make(map[string]any, len(row.Payload))
+	for key, value := range row.Payload {
+		payload[key] = value
+	}
+	blockedReason := row.BlockedReason
+	if row.TaskStatusKey != "blocked" && row.TaskStatusKey != "rejected" {
+		blockedReason = nil
+		delete(payload, "blocked_reason")
+		delete(payload, "rejected_reason")
 	}
 	return &biz.WorkflowTask{
 		ID:                    row.ID,
@@ -663,17 +1092,25 @@ func entWorkflowTaskToBiz(row *ent.WorkflowTask) *biz.WorkflowTask {
 		ProcessNodeInstanceID: row.ProcessNodeInstanceID,
 		AssigneeID:            row.AssigneeID,
 		Priority:              row.Priority,
-		BlockedReason:         row.BlockedReason,
+		BlockedReason:         blockedReason,
 		DueAt:                 row.DueAt,
 		StartedAt:             row.StartedAt,
 		CompletedAt:           row.CompletedAt,
 		ClosedAt:              row.ClosedAt,
 		Payload:               payload,
+		Version:               row.Version,
 		CreatedBy:             row.CreatedBy,
 		UpdatedBy:             row.UpdatedBy,
 		CreatedAt:             row.CreatedAt,
 		UpdatedAt:             row.UpdatedAt,
 	}
+}
+
+func workflowTaskMutationConflict(statusKey string) error {
+	if biz.IsTerminalWorkflowTaskStatus(statusKey) {
+		return biz.ErrWorkflowTaskSettled
+	}
+	return biz.ErrWorkflowTaskConflict
 }
 
 func entWorkflowBusinessStateToBiz(row *ent.WorkflowBusinessState) *biz.WorkflowBusinessState {

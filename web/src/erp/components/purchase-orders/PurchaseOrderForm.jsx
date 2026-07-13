@@ -495,21 +495,21 @@ export function PurchaseOrderFormFields({
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--snapshot-code"
                 name={[field.name, 'material_code_snapshot']}
-                label="材料编码快照"
+                label="下单材料编码"
               >
                 <Input maxLength={64} />
               </Form.Item>
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--snapshot-name"
                 name={[field.name, 'material_name_snapshot']}
-                label="材料名称快照"
+                label="下单材料名称"
               >
                 <Input maxLength={255} />
               </Form.Item>
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--snapshot-small"
                 name={[field.name, 'color_snapshot']}
-                label="颜色快照"
+                label="下单颜色"
               >
                 <Input maxLength={64} />
               </Form.Item>

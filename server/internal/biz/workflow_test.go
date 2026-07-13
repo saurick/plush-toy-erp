@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"sync/atomic"
 	"testing"
 )
+
+var workflowTestMutationSequence uint64
 
 type stubWorkflowRepo struct {
 	createTaskInput  *WorkflowTaskCreate
@@ -23,9 +26,46 @@ type stubWorkflowRepo struct {
 	derivedTaskKeys  map[string]struct{}
 }
 
+func updateWorkflowTaskStatusForTest(
+	t *testing.T,
+	uc *WorkflowUsecase,
+	ctx context.Context,
+	in *WorkflowTaskStatusUpdate,
+	actorID int,
+	actorRoleKey string,
+) (*WorkflowTask, error) {
+	t.Helper()
+	if in.ExpectedVersion <= 0 {
+		in.ExpectedVersion = 1
+		if repo, ok := uc.repo.(*stubWorkflowRepo); ok && repo.currentTask != nil && repo.currentTask.Version > 0 {
+			in.ExpectedVersion = repo.currentTask.Version
+		}
+	}
+	if in.CommandKey == "" {
+		switch in.TaskStatusKey {
+		case "done":
+			in.CommandKey = "complete_task_action"
+		case "blocked":
+			in.CommandKey = "block_task_action"
+		case "rejected":
+			in.CommandKey = "reject_task_action"
+		default:
+			in.CommandKey = "test_task_status_action"
+		}
+	}
+	if in.IdempotencyKey == "" {
+		sequence := atomic.AddUint64(&workflowTestMutationSequence, 1)
+		in.IdempotencyKey = "workflow-test-" + strconv.FormatUint(sequence, 10)
+	}
+	return uc.UpdateTaskStatus(ctx, in, actorID, actorRoleKey)
+}
+
 func (s *stubWorkflowRepo) GetWorkflowTask(_ context.Context, id int) (*WorkflowTask, error) {
 	s.getTaskCalled = true
 	if s.currentTask != nil {
+		if s.currentTask.Version == 0 {
+			s.currentTask.Version = 1
+		}
 		return s.currentTask, nil
 	}
 	return &WorkflowTask{
@@ -37,6 +77,7 @@ func (s *stubWorkflowRepo) GetWorkflowTask(_ context.Context, id int) (*Workflow
 		TaskStatusKey: "ready",
 		OwnerRoleKey:  SalesRoleKey,
 		Payload:       map[string]any{},
+		Version:       1,
 	}, nil
 }
 
@@ -72,6 +113,10 @@ func (s *stubWorkflowRepo) CreateWorkflowTask(_ context.Context, in *WorkflowTas
 	}, nil
 }
 
+func (s *stubWorkflowRepo) ResolveWorkflowTaskMutation(context.Context, int, string, string, string, int) (*WorkflowTask, bool, error) {
+	return nil, false, nil
+}
+
 func (s *stubWorkflowRepo) UpdateWorkflowTaskStatus(_ context.Context, in *WorkflowTaskStatusUpdate, _ int, _ string) (*WorkflowTask, error) {
 	s.updateTaskInput = in
 	if in.SideEffects != nil && in.SideEffects.DerivedTask != nil {
@@ -89,6 +134,7 @@ func (s *stubWorkflowRepo) UpdateWorkflowTaskStatus(_ context.Context, in *Workf
 		TaskStatusKey:     in.TaskStatusKey,
 		BusinessStatusKey: &in.BusinessStatusKey,
 		Payload:           in.Payload,
+		Version:           in.ExpectedVersion + 1,
 	}, nil
 }
 
@@ -98,6 +144,7 @@ func (s *stubWorkflowRepo) UrgeWorkflowTask(_ context.Context, in *WorkflowTaskU
 		ID:            in.ID,
 		TaskStatusKey: "ready",
 		Payload:       in.Payload,
+		Version:       in.ExpectedVersion + 1,
 	}, nil
 }
 
@@ -235,7 +282,7 @@ func TestWorkflowUsecase_DerivedTaskInheritsConfigRevisionAndRuntimeAnchors(t *t
 	repo := &stubWorkflowRepo{currentTask: current}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            current.ID,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{},
@@ -297,6 +344,23 @@ func TestWorkflowUsecase_CreateTaskRejectsNumberedPhaseLabels(t *testing.T) {
 	}
 }
 
+func TestWorkflowUsecase_CreateTaskRejectsAbbreviatedStageLabels(t *testing.T) {
+	uc := NewWorkflowUsecase(&stubWorkflowRepo{})
+	stageName := "P4" + "-3 模拟成品交付"
+
+	_, err := uc.CreateTask(context.Background(), &WorkflowTaskCreate{
+		TaskCode:     "SIM-YOYOOSUN-MOBILE-WORKFLOW-QC",
+		TaskGroup:    "finished_goods_qc",
+		TaskName:     stageName,
+		SourceType:   "production-progress",
+		SourceID:     1,
+		OwnerRoleKey: QualityRoleKey,
+	}, 7)
+	if !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected ErrBadParam, got %v", err)
+	}
+}
+
 func TestWorkflowUsecase_UpdateTaskRejectsNumberedPhaseLabels(t *testing.T) {
 	repo := &stubWorkflowRepo{
 		currentTask: &WorkflowTask{
@@ -312,7 +376,7 @@ func TestWorkflowUsecase_UpdateTaskRejectsNumberedPhaseLabels(t *testing.T) {
 	}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1,
 		TaskStatusKey: "blocked",
 		Reason:        "Phase" + " 9 模拟异常",
@@ -370,6 +434,9 @@ func TestWorkflowBusinessStatesAcceptShipmentStatusKeys(t *testing.T) {
 			t.Fatalf("expected WorkflowBusinessStates to include %q", statusKey)
 		}
 	}
+	if IsValidWorkflowBusinessState("shipment_release_pending") {
+		t.Fatal("shipment_release_pending is a notification type, not a workflow business status")
+	}
 }
 
 func TestWorkflowStatusActionPermissionMapsUpdateCompleteApproveReject(t *testing.T) {
@@ -402,7 +469,7 @@ func TestWorkflowRejectedIsTerminalAndCannotTransitionAgain(t *testing.T) {
 	}}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{},
@@ -414,20 +481,20 @@ func TestWorkflowRejectedIsTerminalAndCannotTransitionAgain(t *testing.T) {
 		t.Fatalf("terminal task must not reach repository update, got %#v", repo.updateTaskInput)
 	}
 
-	current, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err = updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1,
 		TaskStatusKey: "rejected",
 		Reason:        "尺寸不符",
 		Payload:       map[string]any{"rejected_reason": "尺寸不符"},
 	}, 7, QualityRoleKey)
-	if err != nil || current != repo.currentTask {
-		t.Fatalf("same terminal status retry must be an idempotent read, task=%#v err=%v", current, err)
+	if !errors.Is(err, ErrWorkflowTaskSettled) {
+		t.Fatalf("same terminal status without a receipt must be settled, got %v", err)
 	}
 	if repo.updateTaskInput != nil {
 		t.Fatalf("same terminal status retry must not duplicate repository side effects")
 	}
 
-	_, err = uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err = updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1,
 		TaskStatusKey: "rejected",
 		Reason:        "另一个原因",
@@ -435,6 +502,89 @@ func TestWorkflowRejectedIsTerminalAndCannotTransitionAgain(t *testing.T) {
 	}, 7, QualityRoleKey)
 	if !errors.Is(err, ErrWorkflowTaskSettled) {
 		t.Fatalf("same terminal status with different reason must be rejected, got %v", err)
+	}
+}
+
+func TestWorkflowTaskTransitionContract(t *testing.T) {
+	tests := []struct {
+		from string
+		to   string
+		want bool
+	}{
+		{from: "pending", to: "ready", want: true},
+		{from: "ready", to: "ready", want: true},
+		{from: "ready", to: "processing", want: true},
+		{from: "processing", to: "blocked", want: true},
+		{from: "blocked", to: "blocked", want: true},
+		{from: "blocked", to: "done", want: true},
+		{from: "ready", to: "pending", want: false},
+		{from: "done", to: "ready", want: false},
+		{from: "unknown", to: "done", want: false},
+	}
+	for _, tt := range tests {
+		if got := CanTransitionWorkflowTaskStatus(tt.from, tt.to); got != tt.want {
+			t.Fatalf("transition %s -> %s: got %v want %v", tt.from, tt.to, got, tt.want)
+		}
+	}
+}
+
+func TestWorkflowUsecaseRejectsStaleExpectedVersionBeforeSideEffects(t *testing.T) {
+	repo := &stubWorkflowRepo{currentTask: &WorkflowTask{
+		ID:            1,
+		TaskStatusKey: "ready",
+		OwnerRoleKey:  QualityRoleKey,
+		Payload:       map[string]any{"customer_name": "模拟客户"},
+		Version:       2,
+	}}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
+		ID:              1,
+		ExpectedVersion: 1,
+		TaskStatusKey:   "done",
+		Payload:         map[string]any{"action": "complete"},
+	}, 7, QualityRoleKey)
+	if !errors.Is(err, ErrWorkflowTaskConflict) {
+		t.Fatalf("stale task mutation must return version conflict, got %v", err)
+	}
+	if repo.updateTaskInput != nil {
+		t.Fatalf("stale task mutation must not reach repo, got %#v", repo.updateTaskInput)
+	}
+}
+
+func TestWorkflowUsecaseStatusPayloadIsPatchAndClearsStaleReasons(t *testing.T) {
+	repo := &stubWorkflowRepo{currentTask: &WorkflowTask{
+		ID:            1,
+		TaskStatusKey: "blocked",
+		OwnerRoleKey:  QualityRoleKey,
+		Payload: map[string]any{
+			"customer_name":    "模拟客户",
+			"planned_quantity": 120,
+			"blocked_reason":   "旧阻塞原因",
+			"rejected_reason":  "旧退回原因",
+		},
+		Version: 3,
+	}}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
+		ID:              1,
+		ExpectedVersion: 3,
+		TaskStatusKey:   "done",
+		Payload:         map[string]any{"completion_evidence": "已复核"},
+	}, 7, QualityRoleKey)
+	if err != nil {
+		t.Fatalf("complete blocked generic task: %v", err)
+	}
+	payload := repo.updateTaskInput.Payload
+	if payload["customer_name"] != "模拟客户" || payload["planned_quantity"] != 120 || payload["completion_evidence"] != "已复核" {
+		t.Fatalf("status action must merge the client patch into the task snapshot, got %#v", payload)
+	}
+	if _, exists := payload["blocked_reason"]; exists {
+		t.Fatalf("done transition must clear stale blocked reason, got %#v", payload)
+	}
+	if _, exists := payload["rejected_reason"]; exists {
+		t.Fatalf("done transition must clear stale rejected reason, got %#v", payload)
 	}
 }
 
@@ -559,7 +709,7 @@ func TestWorkflowUsecase_AcceptsPurchaseInboundBusinessStatuses(t *testing.T) {
 				t.Fatalf("expected CreateTask repo input to keep %q", statusKey)
 			}
 
-			_, err = uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err = updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:                1,
 				TaskStatusKey:     "ready",
 				BusinessStatusKey: statusKey,
@@ -609,7 +759,7 @@ func TestWorkflowUsecase_AcceptsShipmentPendingBusinessStatus(t *testing.T) {
 		t.Fatalf("expected CreateTask repo input to keep %q", statusKey)
 	}
 
-	_, err = uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err = updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:                1,
 		TaskStatusKey:     "ready",
 		BusinessStatusKey: statusKey,
@@ -685,9 +835,10 @@ func TestWorkflowUsecase_SameNameNonPurchaseIQCTaskDoesNotDerive(t *testing.T) {
 			repo := &stubWorkflowRepo{currentTask: tc.task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            tc.task.ID,
 				TaskStatusKey: "blocked",
+				Reason:        "通用阻塞验证",
 				Payload:       map[string]any{},
 			}, 7, tc.task.OwnerRoleKey)
 			if err != nil {
@@ -755,9 +906,10 @@ func TestWorkflowUsecase_SameNameNonWarehouseInboundTaskDoesNotDerive(t *testing
 			repo := &stubWorkflowRepo{currentTask: tc.task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            tc.task.ID,
 				TaskStatusKey: "blocked",
+				Reason:        "通用阻塞验证",
 				Payload:       map[string]any{},
 			}, 7, tc.task.OwnerRoleKey)
 			if err != nil {
@@ -824,9 +976,10 @@ func TestWorkflowUsecase_SameNameNonOutsourceReturnQCTaskDoesNotDerive(t *testin
 			repo := &stubWorkflowRepo{currentTask: tc.task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            tc.task.ID,
 				TaskStatusKey: "blocked",
+				Reason:        "通用阻塞验证",
 				Payload:       map[string]any{},
 			}, 7, tc.task.OwnerRoleKey)
 			if err != nil {
@@ -910,7 +1063,7 @@ func TestWorkflowUsecase_SameNameNonOutsourceWarehouseInboundTaskDoesNotDerive(t
 			repo := &stubWorkflowRepo{currentTask: tc.task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            tc.task.ID,
 				TaskStatusKey: "done",
 				Payload:       map[string]any{},
@@ -996,7 +1149,7 @@ func TestWorkflowUsecase_SameNameNonOutsourceReturnTrackingTaskDoesNotDerive(t *
 			repo := &stubWorkflowRepo{currentTask: tc.task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            tc.task.ID,
 				TaskStatusKey: "done",
 				Payload:       map[string]any{},
@@ -1082,7 +1235,7 @@ func TestWorkflowUsecase_SameNameNonShipmentReleaseTaskDoesNotDerive(t *testing.
 			repo := &stubWorkflowRepo{currentTask: tc.task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            tc.task.ID,
 				TaskStatusKey: "done",
 				Payload:       map[string]any{},
@@ -1156,9 +1309,9 @@ func TestWorkflowUsecase_UrgeTaskRejectsInvalidInput(t *testing.T) {
 		name  string
 		input *WorkflowTaskUrge
 	}{
-		{name: "empty task id", input: &WorkflowTaskUrge{Action: "urge_task", Reason: "请处理"}},
-		{name: "invalid action", input: &WorkflowTaskUrge{ID: 1, Action: "comment", Reason: "请处理"}},
-		{name: "empty reason", input: &WorkflowTaskUrge{ID: 1, Action: "urge_task", Reason: "   "}},
+		{name: "empty task id", input: &WorkflowTaskUrge{ExpectedVersion: 1, CommandKey: "urge_task", IdempotencyKey: "urge-empty-task", Action: "urge_task", Reason: "请处理"}},
+		{name: "invalid action", input: &WorkflowTaskUrge{ID: 1, ExpectedVersion: 1, CommandKey: "urge_task", IdempotencyKey: "urge-invalid-action", Action: "comment", Reason: "请处理"}},
+		{name: "empty reason", input: &WorkflowTaskUrge{ID: 1, ExpectedVersion: 1, CommandKey: "urge_task", IdempotencyKey: "urge-empty-reason", Action: "urge_task", Reason: "   "}},
 	}
 
 	for _, tc := range cases {
@@ -1185,10 +1338,13 @@ func TestWorkflowUsecase_UrgeTaskAcceptsSupportedActions(t *testing.T) {
 			repo := &stubWorkflowRepo{}
 			uc := NewWorkflowUsecase(repo)
 			task, err := uc.UrgeTask(context.Background(), &WorkflowTaskUrge{
-				ID:      1,
-				Action:  " " + action + " ",
-				Reason:  " 请尽快处理 ",
-				Payload: nil,
+				ID:              1,
+				ExpectedVersion: 1,
+				CommandKey:      "urge_task",
+				IdempotencyKey:  "urge-supported-" + action,
+				Action:          " " + action + " ",
+				Reason:          " 请尽快处理 ",
+				Payload:         nil,
 			}, 7, " pmc ")
 			if err != nil {
 				t.Fatalf("UrgeTask should accept %q, got %v", action, err)

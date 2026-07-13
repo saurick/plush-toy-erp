@@ -1,10 +1,26 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import {
   BUSINESS_STATUS_OPTIONS,
   getBusinessStatusLabel,
 } from './workflowStatus.mjs'
+
+const WORKFLOW_METADATA_PATH = new URL(
+  '../../../../server/internal/biz/workflow_metadata.go',
+  import.meta.url
+)
+
+async function readBackendWorkflowBusinessStatusKeys() {
+  const source = await readFile(WORKFLOW_METADATA_PATH, 'utf8')
+  const block = source.match(
+    /var workflowBusinessStates = \[\]WorkflowStateOption\{([\s\S]*?)\n\}/
+  )
+
+  assert(block, 'workflowBusinessStates registry not found')
+  return [...block[1].matchAll(/\{Key: "([^"]+)"/g)].map((match) => match[1])
+}
 
 test('workflowStatus: 业务状态展示项 key 唯一且覆盖看板关键状态', () => {
   const keys = BUSINESS_STATUS_OPTIONS.map((state) => state.key)
@@ -23,6 +39,13 @@ test('workflowStatus: 业务状态展示项 key 唯一且覆盖看板关键状�
   ]) {
     assert(keys.includes(key), `missing business status display option: ${key}`)
   }
+})
+
+test('workflowStatus: 前端展示 key 与后端业务状态登记表保持一致', async () => {
+  const frontendKeys = BUSINESS_STATUS_OPTIONS.map((state) => state.key).sort()
+  const backendKeys = (await readBackendWorkflowBusinessStatusKeys()).sort()
+
+  assert.deepEqual(frontendKeys, backendKeys)
 })
 
 test('workflowStatus: 业务状态展示文案不透出内部 key', () => {

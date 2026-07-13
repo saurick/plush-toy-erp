@@ -525,32 +525,36 @@ async function runScenarioOnce(browser, scenario) {
           profileOverride && typeof profileOverride === 'object'
             ? { ...fallbackProfile, ...profileOverride }
             : fallbackProfile
-        localStorage.setItem('admin_access_token', mockToken)
-        localStorage.setItem(
-          'admin_is_super_admin',
-          profile.is_super_admin === true ? 'true' : 'false'
-        )
-        localStorage.setItem(
-          'admin_roles',
-          JSON.stringify(Array.isArray(profile.roles) ? profile.roles : [])
-        )
-        localStorage.setItem(
-          'admin_permissions',
-          JSON.stringify(
-            Array.isArray(profile.permissions) ? profile.permissions : []
+        try {
+          localStorage.setItem('admin_access_token', mockToken)
+          localStorage.setItem(
+            'admin_is_super_admin',
+            profile.is_super_admin === true ? 'true' : 'false'
           )
-        )
-        localStorage.setItem(
-          'admin_menus',
-          JSON.stringify(Array.isArray(profile.menus) ? profile.menus : [])
-        )
-        if (!localStorage.getItem('erp:last_entry_target')) {
-          localStorage.setItem('erp:last_entry_target', entryTarget)
+          localStorage.setItem(
+            'admin_roles',
+            JSON.stringify(Array.isArray(profile.roles) ? profile.roles : [])
+          )
+          localStorage.setItem(
+            'admin_permissions',
+            JSON.stringify(
+              Array.isArray(profile.permissions) ? profile.permissions : []
+            )
+          )
+          localStorage.setItem(
+            'admin_menus',
+            JSON.stringify(Array.isArray(profile.menus) ? profile.menus : [])
+          )
+          if (!localStorage.getItem('erp:last_entry_target')) {
+            localStorage.setItem('erp:last_entry_target', entryTarget)
+          }
+          localStorage.setItem(
+            'admin_erp_preferences',
+            JSON.stringify(profile.erp_preferences || { column_orders: {} })
+          )
+        } catch (error) {
+          if (error?.name !== 'SecurityError') throw error
         }
-        localStorage.setItem(
-          'admin_erp_preferences',
-          JSON.stringify(profile.erp_preferences || { column_orders: {} })
-        )
       },
       {
         mockToken: token,
@@ -564,7 +568,11 @@ async function runScenarioOnce(browser, scenario) {
 
   if (scenario.themeMode) {
     await page.addInitScript((themeMode) => {
-      localStorage.setItem('plush_erp_theme_mode', themeMode)
+      try {
+        localStorage.setItem('plush_erp_theme_mode', themeMode)
+      } catch (error) {
+        if (error?.name !== 'SecurityError') throw error
+      }
     }, scenario.themeMode)
   }
 
@@ -1361,8 +1369,8 @@ async function assertDashboardMetricInteractionSemantics(
   if (expectTaskMetrics) {
     assert.equal(
       metrics.taskMetrics.length,
-      3,
-      `${scenarioName} 任务中心应有 3 个动作指标按钮: ${JSON.stringify(metrics)}`
+      4,
+      `${scenarioName} 任务中心应有 4 个动作指标按钮: ${JSON.stringify(metrics)}`
     )
     for (const item of metrics.taskMetrics) {
       assert.equal(
@@ -1540,7 +1548,7 @@ async function assertMobileTaskRefreshFeedback(page, { scenarioName }) {
   })
 
   await refreshButton.click()
-  await expectText(page, '刷新移动端任务失败，已保留上次数据')
+  await expectText(page, '刷新任务失败，已保留上次数据')
   const afterFailureMetrics = await readMobileTaskVisibleListMetrics(
     page,
     '.erp-mobile-list-item'
@@ -3694,20 +3702,16 @@ async function assertPermissionChecklistItemLayout(page, { scenarioName }) {
     const bodyText = document.body.textContent || ''
     const readWrapper = (wrapper) => {
       const label = wrapper.querySelector('.erp-permission-option__label')
-      const key = wrapper.querySelector('.erp-permission-option__key')
       const wrapperRect = wrapper.getBoundingClientRect()
       const labelRect = label?.getBoundingClientRect()
-      const keyRect = key?.getBoundingClientRect()
-      const keyStyle = key ? window.getComputedStyle(key) : null
       return {
         text: String(wrapper.textContent || '').trim(),
         wrapperWidth: wrapperRect.width,
         wrapperScrollWidth: wrapper.scrollWidth,
         labelWidth: labelRect?.width || 0,
-        keyWidth: keyRect?.width || 0,
-        keyTop: keyRect?.top || 0,
-        labelTop: labelRect?.top || 0,
-        keyFontSize: keyStyle?.fontSize || '',
+        hasVisiblePermissionKey: Boolean(
+          wrapper.querySelector('.erp-permission-option__key')
+        ),
       }
     }
     return {
@@ -3734,13 +3738,12 @@ async function assertPermissionChecklistItemLayout(page, { scenarioName }) {
   const invalid = metrics.wrappers.filter(
     (item) =>
       item.labelWidth <= 0 ||
-      item.keyWidth <= 0 ||
-      item.keyTop <= item.labelTop ||
+      item.hasVisiblePermissionKey ||
       item.wrapperScrollWidth > item.wrapperWidth + 1
   )
   assert(
     invalid.length === 0,
-    `${scenarioName} 权限名称和权限码布局异常: ${JSON.stringify(metrics)}`
+    `${scenarioName} 功能名称布局异常或仍展示技术权限码: ${JSON.stringify(metrics)}`
   )
 }
 
@@ -4663,8 +4666,8 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     )}`
   )
   assert(
-    compactText(collapsedMetrics.titleLineText).includes('只处理Workflow任务'),
-    `${scenarioName} 本页协同应保留 Workflow-only 边界短句: ${JSON.stringify(
+    compactText(collapsedMetrics.titleLineText).includes('这里只处理协同任务'),
+    `${scenarioName} 本页协同应保留业务处理边界短句: ${JSON.stringify(
       collapsedMetrics
     )}`
   )
@@ -5656,7 +5659,7 @@ async function assertTaskActionDrawerLayout(
   })
   await drawer.waitFor({ state: 'visible', timeout: 10_000 })
   await expectText(page, expectedActionText)
-  await expectText(page, 'Workflow / Fact 边界：')
+  await expectText(page, '处理范围：')
 
   const metrics = await page.evaluate(
     ({ expectedTaskText: taskText }) => {

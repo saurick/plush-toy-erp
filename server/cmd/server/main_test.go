@@ -85,9 +85,10 @@ func TestResolveTraceEnvOverridesRejectsInvalidRatio(t *testing.T) {
 
 func productionConfigTestEnv(overrides map[string]string) func(string) string {
 	values := map[string]string{
-		"ERP_DEBUG_ENV":             "prod",
-		"ERP_DEBUG_SEED_ENABLED":    "false",
-		"ERP_DEBUG_CLEANUP_ENABLED": "false",
+		"ERP_DEBUG_ENV":                    "prod",
+		"ERP_DEBUG_SEED_ENABLED":           "false",
+		"ERP_DEBUG_CLEANUP_ENABLED":        "false",
+		"ERP_DEBUG_BUSINESS_CLEAR_ENABLED": "false",
 	}
 	for key, value := range overrides {
 		values[key] = value
@@ -249,6 +250,11 @@ func TestValidateProductionBootstrapConfigRequiresDebugMutationFlagsDisabled(t *
 		"ERP_DEBUG_CLEANUP_ENABLED": "true",
 	})); err == nil {
 		t.Fatal("expected production debug cleanup to be rejected")
+	}
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, productionConfigTestEnv(map[string]string{
+		"ERP_DEBUG_BUSINESS_CLEAR_ENABLED": "true",
+	})); err == nil {
+		t.Fatal("expected production business data clear to be rejected")
 	}
 }
 

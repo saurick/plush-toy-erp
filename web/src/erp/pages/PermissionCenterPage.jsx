@@ -33,6 +33,7 @@ import {
   optionalMainlandMobilePhoneRule,
 } from '../utils/contactValidation.mjs'
 import { getPermissionModuleTitle } from '../utils/permissionModuleLabels.mjs'
+import { isMenuVisibleForPermissionKeys } from '../utils/menuAccessProjection.mjs'
 import { getRoleDisplayName } from '../utils/roleKeys.mjs'
 
 const { Paragraph, Text, Title } = Typography
@@ -47,6 +48,7 @@ const MANAGE_ROLE_PERMISSION = 'system.permission.manage'
 const UPDATE_USER_PERMISSION = 'system.user.update'
 const CREATE_USER_PERMISSION = 'system.user.create'
 const DISABLE_USER_PERMISSION = 'system.user.disable'
+const REVOKE_USER_PERMISSION = 'system.user.revoke'
 const PERMISSION_CENTER_TAB_KEYS = {
   ROLES: 'roles',
   ADMINS: 'admins',
@@ -56,6 +58,7 @@ const adminStatusOptions = [
   { label: '全部状态', value: ADMIN_STATUS_FILTERS.ALL },
   { label: '启用', value: ADMIN_STATUS_FILTERS.ENABLED },
   { label: '禁用', value: ADMIN_STATUS_FILTERS.DISABLED },
+  { label: '已注销', value: ADMIN_STATUS_FILTERS.REVOKED },
   { label: '超级管理员', value: ADMIN_STATUS_FILTERS.SUPER },
 ]
 
@@ -134,6 +137,7 @@ function buildPermissionGroups(permissions = []) {
       key: permissionKey,
       label: getPermissionVisibleName(permission),
       description: permission.description || '',
+      usage: permission.usage || {},
     })
     groups.set(moduleKey, group)
   })
@@ -157,9 +161,218 @@ function buildPermissionDetailMap(permissions = []) {
       module: String(permission.module || 'other').trim() || 'other',
       action: String(permission.action || '').trim(),
       resource: String(permission.resource || '').trim(),
+      usage: permission.usage || {},
     })
   })
   return detailMap
+}
+
+function buildRoleMenuProjection(menus = [], permissionKeys = []) {
+  return (Array.isArray(menus) ? menus : [])
+    .map((menu) => {
+      return {
+        key: String(menu?.key || menu?.path || '').trim(),
+        label: String(menu?.label || '').trim() || '未命名菜单',
+        visible: isMenuVisibleForPermissionKeys(menu, permissionKeys),
+      }
+    })
+    .filter((menu) => menu.key)
+}
+
+function RoleCapabilityOverview({ menus = [], permissionKeys = [] }) {
+  const projectedMenus = useMemo(
+    () => buildRoleMenuProjection(menus, permissionKeys),
+    [menus, permissionKeys]
+  )
+  const visibleMenus = projectedMenus.filter((menu) => menu.visible)
+  const hiddenMenus = projectedMenus.filter((menu) => !menu.visible)
+
+  return (
+    <section
+      className="erp-role-capability-overview"
+      aria-labelledby="erp-role-capability-overview-title"
+    >
+      <div className="erp-role-capability-overview__head">
+        <div>
+          <Text strong id="erp-role-capability-overview-title">
+            这个岗位能看到什么、能做什么
+          </Text>
+          <Paragraph type="secondary">
+            菜单会随下方功能自动开放，不需要重复设置。调整勾选后，这里会立即预览保存后的结果。
+          </Paragraph>
+        </div>
+        <Tag color="green">{visibleMenus.length} 个可见菜单</Tag>
+      </div>
+
+      <div className="erp-role-capability-overview__grid">
+        <div className="erp-role-capability-card erp-role-capability-card--enabled">
+          <div className="erp-role-capability-card__title">
+            <Text strong>可以进入的菜单</Text>
+            <Tag color="green">{visibleMenus.length}</Tag>
+          </div>
+          <div className="erp-role-capability-card__items">
+            {visibleMenus.length > 0 ? (
+              visibleMenus.map((menu) => (
+                <Tag key={menu.key} color="green">
+                  {menu.label}
+                </Tag>
+              ))
+            ) : (
+              <Text type="secondary">当前岗位还不能进入任何桌面菜单</Text>
+            )}
+          </div>
+        </div>
+
+        <div className="erp-role-capability-card">
+          <div className="erp-role-capability-card__title">
+            <Text strong>暂不可进入的菜单</Text>
+            <Tag>{hiddenMenus.length}</Tag>
+          </div>
+          <div className="erp-role-capability-card__items erp-role-capability-card__items--muted">
+            {hiddenMenus.length > 0 ? (
+              hiddenMenus.map((menu) => <Tag key={menu.key}>{menu.label}</Tag>)
+            ) : (
+              <Text type="secondary">当前岗位可进入全部桌面菜单</Text>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Alert
+        type="info"
+        showIcon
+        message="字段显示不是岗位权限"
+        description="进入页面后，字段名称、显示范围和必填规则按当前客户的页面配置统一生效；本页只控制岗位能否进入菜单、查看业务和执行操作，不会让同一客户的不同岗位看到两套互相矛盾的业务字段。"
+      />
+    </section>
+  )
+}
+
+function PermissionImpactMap({
+  permissions = [],
+  menus = [],
+  permissionKeys = [],
+}) {
+  const selected = normalizeStringList(permissionKeys)
+    .map((key) => permissions.find((item) => item.key === key))
+    .filter(Boolean)
+  const rows = selected.map((permission) => ({
+    ...permission,
+    menus: Array.isArray(permission.usage?.menus) ? permission.usage.menus : [],
+  }))
+  return (
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <Alert
+        type="info"
+        showIcon
+        message="这里解释权限会影响什么，不会额外授予页面权限"
+        description="页面入口由功能权限自动推导；按钮和表单仍会在后端再次校验，并受客户模块、单据状态和任务归属限制。"
+      />
+      <Table
+        rowKey="key"
+        size="small"
+        pagination={false}
+        dataSource={rows}
+        locale={{ emptyText: <Empty description="当前岗位尚未选择功能" /> }}
+        columns={[
+          { title: '功能', dataIndex: 'label', width: 220 },
+          {
+            title: '影响页面',
+            dataIndex: 'menus',
+            render: (items) =>
+              items.length > 0 ? (
+                <Space wrap size={[4, 4]}>
+                  {items.map((item) => (
+                    <Tag key={item.key}>{item.label}</Tag>
+                  ))}
+                </Space>
+              ) : (
+                <Text type="secondary">页面内功能或后台能力</Text>
+              ),
+          },
+          {
+            title: '影响控件',
+            dataIndex: ['usage', 'control_type'],
+            width: 190,
+          },
+          {
+            title: '最终生效条件',
+            render: (_, record) => (
+              <Text type="secondary">
+                {record.usage?.condition || '以后端校验结果为准'}
+              </Text>
+            ),
+          },
+        ]}
+      />
+      <RoleCapabilityOverview menus={menus} permissionKeys={permissionKeys} />
+    </Space>
+  )
+}
+
+function DataScopeOverview() {
+  return (
+    <div className="erp-role-policy-boundary">
+      <Alert
+        type="warning"
+        showIcon
+        message="业务数据范围尚未开放配置"
+        description="当前 Workflow 任务已按责任岗位、处理人和任务状态限制；客户、订单、仓库、采购和财务等资源尚未建立统一的本人、指定范围或全部数据策略。未完成后端查询和写入约束前，这里不会提供仅隐藏前端数据的伪开关。"
+      />
+      <div className="erp-role-policy-boundary__grid">
+        <div>
+          <Text strong>协同任务</Text>
+          <Tag color="green">后端已限制</Tag>
+          <Text type="secondary">责任岗位或指定处理人</Text>
+        </div>
+        <div>
+          <Text strong>业务单据</Text>
+          <Tag color="gold">按功能权限</Tag>
+          <Text type="secondary">尚未按负责人或部门隔离</Text>
+        </div>
+        <div>
+          <Text strong>仓库数据</Text>
+          <Tag color="gold">按功能权限</Tag>
+          <Text type="secondary">尚未按指定仓库隔离</Text>
+        </div>
+        <div>
+          <Text strong>财务数据</Text>
+          <Tag color="gold">按功能权限</Tag>
+          <Text type="secondary">尚未拆分摘要与完整范围</Text>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SensitiveFieldOverview() {
+  return (
+    <div className="erp-role-policy-boundary">
+      <Alert
+        type="warning"
+        showIcon
+        message="角色级敏感字段策略尚未接入"
+        description="当前客户字段策略只控制少量列表和导出列，不是安全权限。成本、结算账户、联系方式等敏感内容必须由后端同时约束查询、修改、导出和打印后，才能在这里授权。"
+      />
+      <div className="erp-role-policy-boundary__grid">
+        <div>
+          <Text strong>成本与毛利</Text>
+          <Tag>尚未开放</Tag>
+          <Text type="secondary">成本、单价、毛利和毛利率</Text>
+        </div>
+        <div>
+          <Text strong>财务与结算</Text>
+          <Tag>尚未开放</Tag>
+          <Text type="secondary">应收应付、账户、发票和税务信息</Text>
+        </div>
+        <div>
+          <Text strong>客商敏感信息</Text>
+          <Tag>尚未开放</Tag>
+          <Text type="secondary">手机号、详细地址、内部评级和风险备注</Text>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function isHighRiskPermission(permission = {}) {
@@ -228,20 +441,6 @@ function summarizeRolePermissions(
   }
 }
 
-function formatModuleSummary(moduleCounts) {
-  const entries = [...(moduleCounts || new Map()).entries()]
-    .sort((left, right) => right[1] - left[1])
-    .slice(0, 3)
-  if (entries.length === 0) {
-    return '尚未配置权限'
-  }
-  return entries
-    .map(
-      ([moduleKey, count]) => `${getPermissionModuleTitle(moduleKey)} ${count}`
-    )
-    .join(' / ')
-}
-
 function PermissionChecklist({
   groups,
   value = [],
@@ -283,7 +482,7 @@ function PermissionChecklist({
           allowClear
           className="erp-permission-checklist-search"
           value={keyword}
-          placeholder="搜索权限码、权限名称或模块"
+          placeholder="搜索功能名称或业务模块"
           onChange={(event) => setKeyword(event.target.value)}
         />
         <label className="erp-permission-checklist-filter">
@@ -359,9 +558,13 @@ function PermissionChecklist({
                       <span className="erp-permission-option__label">
                         {item.label}
                       </span>
-                      <code className="erp-permission-option__key">
-                        {item.key}
-                      </code>
+                      <span className="erp-permission-option__impact">
+                        {item.usage?.control_type || '业务功能'}
+                        {Array.isArray(item.usage?.menus) &&
+                        item.usage.menus.length > 0
+                          ? ` · ${item.usage.menus.map((menu) => menu.label).join('、')}`
+                          : ''}
+                      </span>
                     </span>
                   ),
                   value: item.key,
@@ -381,7 +584,7 @@ function PermissionChecklist({
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
           description={
-            showSelectedOnly ? '当前筛选下没有已选权限' : '没有匹配的权限码'
+            showSelectedOnly ? '当前筛选下没有已选功能' : '没有匹配的功能'
           }
         />
       ) : null}
@@ -409,6 +612,7 @@ export default function PermissionCenterPage() {
   const [admins, setAdmins] = useState([])
   const [roles, setRoles] = useState([])
   const [permissions, setPermissions] = useState([])
+  const [menus, setMenus] = useState([])
   const [adminSearchKeyword, setAdminSearchKeyword] = useState('')
   const [adminStatusFilter, setAdminStatusFilter] = useState(
     ADMIN_STATUS_FILTERS.ALL
@@ -420,8 +624,13 @@ export default function PermissionCenterPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [resetModalOpen, setResetModalOpen] = useState(false)
+  const [statusModalOpen, setStatusModalOpen] = useState(false)
+  const [revokeModalOpen, setRevokeModalOpen] = useState(false)
   const [editingAdmin, setEditingAdmin] = useState(null)
   const [resettingAdmin, setResettingAdmin] = useState(null)
+  const [statusActionAdmin, setStatusActionAdmin] = useState(null)
+  const [statusActionDisabled, setStatusActionDisabled] = useState(false)
+  const [revokingAdmin, setRevokingAdmin] = useState(null)
   const [selectedRoleKeys, setSelectedRoleKeys] = useState([])
   const [selectedRoleKey, setSelectedRoleKey] = useState('')
   const [selectedRolePermissionKeys, setSelectedRolePermissionKeys] = useState(
@@ -433,6 +642,8 @@ export default function PermissionCenterPage() {
   const [editingPhone, setEditingPhone] = useState('')
   const [createForm] = Form.useForm()
   const [resetForm] = Form.useForm()
+  const [statusForm] = Form.useForm()
+  const [revokeForm] = Form.useForm()
 
   const roleOptions = useMemo(() => buildRoleOptions(roles), [roles])
   const permissionGroups = useMemo(
@@ -454,6 +665,43 @@ export default function PermissionCenterPage() {
   const rolePermissionsDirty =
     buildPermissionSignature(selectedRolePermissionKeys) !==
     buildPermissionSignature(selectedRoleSavedPermissionKeys)
+
+  const confirmDiscardRoleChanges = useCallback(
+    ({ title, content, onDiscard, onKeepEditing }) => {
+      if (!rolePermissionsDirty) {
+        onDiscard?.()
+        return
+      }
+      modal.confirm({
+        centered: true,
+        title,
+        content,
+        okText: '放弃修改',
+        cancelText: '继续编辑',
+        onOk: () => {
+          setSelectedRolePermissionKeys(
+            permissionKeysForRole(selectedRole || {})
+          )
+          onDiscard?.()
+        },
+        onCancel: onKeepEditing,
+      })
+    },
+    [rolePermissionsDirty, selectedRole]
+  )
+
+  const confirmLeavePermissionCenter = useCallback(
+    () =>
+      new Promise((resolve) => {
+        confirmDiscardRoleChanges({
+          title: '离开前要放弃未保存的修改吗？',
+          content: '离开权限管理后，当前角色尚未保存的功能调整会丢失。',
+          onDiscard: () => resolve(true),
+          onKeepEditing: () => resolve(false),
+        })
+      }),
+    [confirmDiscardRoleChanges]
+  )
   const roleSummaries = useMemo(
     () =>
       roles.map((role) => {
@@ -496,21 +744,21 @@ export default function PermissionCenterPage() {
   const canCreateUsers = hasPermission(currentAdmin, CREATE_USER_PERMISSION)
   const canManageUsers = hasPermission(currentAdmin, UPDATE_USER_PERMISSION)
   const canDisableUsers = hasPermission(currentAdmin, DISABLE_USER_PERMISSION)
+  const canRevokeUsers = hasPermission(currentAdmin, REVOKE_USER_PERMISSION)
   const canManageRolePermissions = hasPermission(
     currentAdmin,
     MANAGE_ROLE_PERMISSION
   )
   const selectedRoleReadOnly = selectedRole?.disabled === true
   const permissionWarningMessages = [
-    !canReadRoleTemplates ? '缺少查看角色或权限码权限，不能查看角色模板' : '',
+    !canReadRoleTemplates ? '您不能查看岗位角色设置' : '',
     !canReadUsers ? '缺少查看管理员权限，不能查看管理员账号' : '',
-    !canManageRolePermissions
-      ? '缺少管理角色权限，不能保存角色模板的权限码调整'
-      : '',
+    !canManageRolePermissions ? '您不能调整岗位角色的可用功能' : '',
     !canManageUsers
       ? '缺少更新管理员权限，不能分配用户角色、修改手机号或重置密码'
       : '',
     !canDisableUsers ? '缺少启停管理员权限，不能启用或禁用管理员' : '',
+    !canRevokeUsers ? '缺少注销管理员权限，不能办理员工账号正式退出' : '',
     !canCreateUsers ? '缺少创建管理员权限，不能新增账号' : '',
   ].filter(Boolean)
   const filteredAdmins = useMemo(
@@ -557,6 +805,11 @@ export default function PermissionCenterPage() {
           ? optionsResult.data.permissions
           : []
       )
+      setMenus(
+        Array.isArray(optionsResult?.data?.menus)
+          ? optionsResult.data.menus
+          : []
+      )
       setSelectedRoleKey((current) => current || getRoleKey(nextRoles[0]))
       return true
     } catch (err) {
@@ -572,28 +825,63 @@ export default function PermissionCenterPage() {
     if (!nextRoleKey || nextRoleKey === selectedRoleKey) {
       return
     }
-    if (!rolePermissionsDirty) {
-      setSelectedRoleKey(nextRoleKey)
-      return
-    }
-    modal.confirm({
-      centered: true,
+    confirmDiscardRoleChanges({
       title: '放弃未保存的角色权限调整？',
       content:
         '切换角色会丢弃当前未保存的勾选结果。请先保存，或确认放弃本次调整。',
-      okText: '放弃并切换',
-      cancelText: '继续编辑',
-      onOk: () => setSelectedRoleKey(nextRoleKey),
+      onDiscard: () => setSelectedRoleKey(nextRoleKey),
     })
   }
+
+  const changePermissionCenterTab = (nextTabKey) => {
+    if (nextTabKey === activeTabKey) {
+      return
+    }
+    confirmDiscardRoleChanges({
+      title: '切换页面前要放弃未保存的修改吗？',
+      content: '切换到管理员账号后，当前角色尚未保存的功能调整会丢失。',
+      onDiscard: () => setActiveTabKey(nextTabKey),
+    })
+  }
+
+  const refreshPermissionCenter = useCallback(
+    () =>
+      new Promise((resolve) => {
+        confirmDiscardRoleChanges({
+          title: '刷新前要放弃未保存的修改吗？',
+          content: '刷新会重新加载权限数据，当前角色尚未保存的功能调整会丢失。',
+          onDiscard: async () => resolve(await loadData()),
+          onKeepEditing: () => resolve(false),
+        })
+      }),
+    [confirmDiscardRoleChanges, loadData]
+  )
 
   useEffect(() => {
     loadData()
   }, [loadData])
 
   useEffect(() => {
-    return outletContext?.registerPageRefresh?.(loadData)
-  }, [loadData, outletContext])
+    return outletContext?.registerPageRefresh?.(refreshPermissionCenter)
+  }, [outletContext, refreshPermissionCenter])
+
+  useEffect(() => {
+    return outletContext?.registerPageLeaveGuard?.(
+      rolePermissionsDirty ? confirmLeavePermissionCenter : null
+    )
+  }, [confirmLeavePermissionCenter, outletContext, rolePermissionsDirty])
+
+  useEffect(() => {
+    if (!rolePermissionsDirty) {
+      return undefined
+    }
+    const warnBeforeUnload = (event) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warnBeforeUnload)
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload)
+  }, [rolePermissionsDirty])
 
   useEffect(() => {
     if (!selectedRole) {
@@ -759,7 +1047,9 @@ export default function PermissionCenterPage() {
     }
   }
 
-  const applyAdminStatus = async (admin, disabled) => {
+  const applyAdminStatus = async (values) => {
+    const admin = statusActionAdmin
+    const disabled = statusActionDisabled
     if (!admin?.id || admin.is_super_admin) {
       return
     }
@@ -769,6 +1059,7 @@ export default function PermissionCenterPage() {
       await adminRpc.call('set_disabled', {
         id: admin.id,
         disabled,
+        reason: String(values?.reason || '').trim(),
       })
       message.success(
         disabled
@@ -776,6 +1067,9 @@ export default function PermissionCenterPage() {
           : `已启用管理员 ${admin.username}`
       )
       await loadData()
+      setStatusModalOpen(false)
+      setStatusActionAdmin(null)
+      statusForm.resetFields()
     } catch (err) {
       message.error(getActionErrorMessage(err, '更新管理员状态'))
     } finally {
@@ -804,19 +1098,37 @@ export default function PermissionCenterPage() {
   }
 
   const onToggleAdminStatus = (admin, checkedEnabled) => {
+    if (admin?.account_status === 'revoked') return
     const nextDisabled = !checkedEnabled
-    if (nextDisabled) {
-      modal.confirm({
-        centered: true,
-        title: '确认禁用管理员',
-        content: `禁用后 ${admin.username} 将无法继续访问后台，是否继续？`,
-        okText: '确认禁用',
-        cancelText: '取消',
-        onOk: () => applyAdminStatus(admin, true),
+    setStatusActionAdmin(admin)
+    setStatusActionDisabled(nextDisabled)
+    statusForm.setFieldsValue({ reason: '' })
+    setStatusModalOpen(true)
+  }
+
+  const revokeAdminAccount = async (values) => {
+    if (!revokingAdmin?.id) return
+    setSaving(true)
+    try {
+      const result = await adminRpc.call('revoke', {
+        id: revokingAdmin.id,
+        reason: String(values?.reason || '').trim(),
       })
-      return
+      const released = Number(result?.data?.released_task_count || 0)
+      message.success(
+        released > 0
+          ? `账号已注销，${released} 项未完成待办已退回原岗位`
+          : '账号已注销并保留历史记录'
+      )
+      setRevokeModalOpen(false)
+      setRevokingAdmin(null)
+      revokeForm.resetFields()
+      await loadData()
+    } catch (err) {
+      message.error(getActionErrorMessage(err, '注销管理员账号'))
+    } finally {
+      setSaving(false)
     }
-    applyAdminStatus(admin, false)
   }
 
   const columns = [
@@ -875,6 +1187,22 @@ export default function PermissionCenterPage() {
         if (record.is_super_admin) {
           return <Tag color="gold">始终启用</Tag>
         }
+        if (record.account_status === 'revoked') {
+          return (
+            <Space direction="vertical" size={2}>
+              <Tag color="default">已注销</Tag>
+              {record.status_reason ? (
+                <Text
+                  type="secondary"
+                  ellipsis={{ tooltip: record.status_reason }}
+                  style={{ maxWidth: 120 }}
+                >
+                  {record.status_reason}
+                </Text>
+              ) : null}
+            </Space>
+          )
+        }
         if (!canDisableUsers) {
           return (
             <Tag color={disabled ? 'red' : 'green'}>
@@ -883,13 +1211,25 @@ export default function PermissionCenterPage() {
           )
         }
         return (
-          <Switch
-            checked={!disabled}
-            checkedChildren="启用"
-            unCheckedChildren="禁用"
-            loading={statusUpdatingAdminID === record.id}
-            onChange={(checked) => onToggleAdminStatus(record, checked)}
-          />
+          <Space direction="vertical" size={2}>
+            <Switch
+              checked={!disabled}
+              checkedChildren="启用"
+              unCheckedChildren="禁用"
+              loading={statusUpdatingAdminID === record.id}
+              disabled={record.account_status === 'revoked'}
+              onChange={(checked) => onToggleAdminStatus(record, checked)}
+            />
+            {record.status_reason ? (
+              <Text
+                type="secondary"
+                ellipsis={{ tooltip: record.status_reason }}
+                style={{ maxWidth: 120 }}
+              >
+                {record.status_reason}
+              </Text>
+            ) : null}
+          </Space>
         )
       },
     },
@@ -900,21 +1240,34 @@ export default function PermissionCenterPage() {
         if (record.is_super_admin) {
           return <Text type="secondary">系统保留</Text>
         }
+        const revoked = record.account_status === 'revoked'
         return (
           <Space wrap size={[8, 8]}>
             <Button
               size="small"
-              disabled={!canManageUsers}
+              disabled={!canManageUsers || revoked}
               onClick={() => openEditModal(record)}
             >
               分配角色
             </Button>
             <Button
               size="small"
-              disabled={!canManageUsers}
+              disabled={!canManageUsers || revoked}
               onClick={() => openResetModal(record)}
             >
               重置密码
+            </Button>
+            <Button
+              danger
+              size="small"
+              disabled={!canRevokeUsers || revoked}
+              onClick={() => {
+                setRevokingAdmin(record)
+                revokeForm.resetFields()
+                setRevokeModalOpen(true)
+              }}
+            >
+              {revoked ? '已注销' : '离职注销'}
             </Button>
           </Space>
         )
@@ -934,7 +1287,7 @@ export default function PermissionCenterPage() {
     return (
       <Loading
         title="权限加载中"
-        description="正在同步管理员、角色和权限码，请稍候..."
+        description="正在加载账号和岗位角色，请稍候..."
       />
     )
   }
@@ -946,17 +1299,15 @@ export default function PermissionCenterPage() {
     >
       <div className="erp-role-center-header">
         <div>
-          <Text className="erp-permission-section__eyebrow">
-            Role Templates
-          </Text>
+          <Text className="erp-permission-section__eyebrow">岗位权限</Text>
           <Title level={5} style={{ margin: 0 }}>
-            当前客户角色模板
+            角色模板
           </Title>
           <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-            页面按角色模板维护权限；后续客户配置只替换角色模板和默认权限组合，不改变产品内核权限码。
+            按岗位职责维护角色名称和默认权限组合，用于统一分配菜单、岗位任务端入口和操作权限。
           </Paragraph>
         </div>
-        <Tag color="blue">Product Core 权限码稳定</Tag>
+        <Tag color="blue">先设置岗位，再分配账号</Tag>
       </div>
 
       <div className="erp-role-center-layout">
@@ -992,7 +1343,7 @@ export default function PermissionCenterPage() {
                       {role.disabled ? '停用' : '启用'}
                     </Tag>
                     <Text type="secondary">
-                      {summary.permissionSummary?.total || 0} 项权限
+                      {summary.permissionSummary?.total || 0} 项功能
                     </Text>
                     <Text type="secondary">
                       {summary.adminCount || 0} 个账号
@@ -1014,14 +1365,14 @@ export default function PermissionCenterPage() {
                       {getRoleVisibleName(selectedRole)}
                     </Title>
                     {selectedRole.builtin ? (
-                      <Tag color="cyan">内置模板</Tag>
+                      <Tag color="cyan">系统预设</Tag>
                     ) : (
-                      <Tag color="blue">客户模板</Tag>
+                      <Tag color="blue">自定义模板</Tag>
                     )}
                   </Space>
                   <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
                     {selectedRole.description ||
-                      '该角色通过权限码组合获得菜单、岗位任务端入口和接口动作能力。'}
+                      '该角色决定可使用的菜单、岗位任务端入口和业务操作。'}
                   </Paragraph>
                 </div>
                 <div className="erp-role-center-actions">
@@ -1046,7 +1397,7 @@ export default function PermissionCenterPage() {
 
               <div className="erp-role-center-metrics">
                 <div>
-                  <Text type="secondary">权限码</Text>
+                  <Text type="secondary">可用功能</Text>
                   <strong>{selectedRolePermissionSummary.total}</strong>
                 </div>
                 <div>
@@ -1060,7 +1411,7 @@ export default function PermissionCenterPage() {
                   </strong>
                 </div>
                 <div>
-                  <Text type="secondary">系统权限</Text>
+                  <Text type="secondary">管理功能</Text>
                   <strong>
                     {selectedRolePermissionSummary.systemPermissionCount}
                   </strong>
@@ -1069,7 +1420,7 @@ export default function PermissionCenterPage() {
 
               <div className="erp-role-center-impact">
                 <div>
-                  <Text strong>影响管理员</Text>
+                  <Text strong>已分配账号</Text>
                   <div className="erp-role-center-impact__list">
                     {selectedRoleAdmins.length > 0 ? (
                       selectedRoleAdmins.map((admin) => (
@@ -1083,7 +1434,7 @@ export default function PermissionCenterPage() {
                   </div>
                 </div>
                 <div>
-                  <Text strong>关键入口 / 高风险能力</Text>
+                  <Text strong>重点功能</Text>
                   <div className="erp-role-center-impact__list">
                     {selectedRolePermissionHighlights.length > 0 ? (
                       selectedRolePermissionHighlights.map((permission) => (
@@ -1092,7 +1443,7 @@ export default function PermissionCenterPage() {
                         </Tag>
                       ))
                     ) : (
-                      <Text type="secondary">未包含岗位入口或系统管理权限</Text>
+                      <Text type="secondary">未包含岗位入口或重要管理功能</Text>
                     )}
                   </div>
                 </div>
@@ -1103,56 +1454,66 @@ export default function PermissionCenterPage() {
                   type="warning"
                   showIcon
                   message="停用角色只能查看，不能调整权限"
-                  description="如需恢复该角色，请先在角色管理主路径启用角色；权限中心不会绕过停用状态直接写入权限组合。"
+                  description="停用状态来自系统角色真源；当前页面不会绕过该状态写入权限组合，也不提供没有后端合同的恢复或删除入口。"
                 />
-              ) : rolePermissionsDirty ? (
-                <Alert
-                  type="warning"
-                  showIcon
-                  message="当前角色权限尚未保存"
-                  description="切换角色或刷新页面前请先保存；本页只调整角色权限组合，不改变权限码真源。"
-                />
-              ) : (
-                <Alert
-                  type="info"
-                  showIcon
-                  message="客户角色可以不同，职责权限保持统一"
-                  description="不同甲方可以配置不同角色名称和默认权限包；流程节点仍绑定稳定职责 / 权限，不能按客户角色名写死业务事实规则。"
-                />
-              )}
+              ) : null}
 
-              <PermissionChecklist
-                groups={permissionGroups}
-                value={selectedRolePermissionKeys}
-                disabled={
-                  !canManageRolePermissions ||
-                  !selectedRoleKey ||
-                  selectedRoleReadOnly
-                }
-                onChange={setSelectedRolePermissionKeys}
+              <Tabs
+                className="erp-role-policy-tabs"
+                defaultActiveKey="functions"
+                items={[
+                  {
+                    key: 'functions',
+                    label: '功能权限',
+                    children: (
+                      <div className="erp-role-policy-tab-content">
+                        <div className="erp-permission-checklist-heading">
+                          <div>
+                            <Text strong>选择这个岗位可以使用的功能</Text>
+                            <Paragraph type="secondary">
+                              按业务名称勾选。查看、创建、修改、审核等操作分别控制。
+                            </Paragraph>
+                          </div>
+                          <Tag color="blue">
+                            已选 {selectedRolePermissionSummary.total} 项
+                          </Tag>
+                        </div>
+                        <PermissionChecklist
+                          groups={permissionGroups}
+                          value={selectedRolePermissionKeys}
+                          disabled={
+                            !canManageRolePermissions ||
+                            !selectedRoleKey ||
+                            selectedRoleReadOnly
+                          }
+                          onChange={setSelectedRolePermissionKeys}
+                        />
+                      </div>
+                    ),
+                  },
+                  {
+                    key: 'data-scope',
+                    label: '数据范围',
+                    children: <DataScopeOverview />,
+                  },
+                  {
+                    key: 'sensitive-fields',
+                    label: '敏感字段',
+                    children: <SensitiveFieldOverview />,
+                  },
+                  {
+                    key: 'effective-pages',
+                    label: '权限地图',
+                    children: (
+                      <PermissionImpactMap
+                        permissions={[...permissionDetailMap.values()]}
+                        menus={menus}
+                        permissionKeys={selectedRolePermissionKeys}
+                      />
+                    ),
+                  },
+                ]}
               />
-
-              <div className="erp-role-center-footer">
-                <Text type="secondary">
-                  当前模块分布：
-                  {formatModuleSummary(
-                    selectedRolePermissionSummary.moduleCounts
-                  )}
-                </Text>
-                <Button
-                  type="primary"
-                  loading={saving}
-                  disabled={
-                    !canManageRolePermissions ||
-                    !selectedRoleKey ||
-                    !rolePermissionsDirty ||
-                    selectedRoleReadOnly
-                  }
-                  onClick={saveRolePermissions}
-                >
-                  保存角色权限
-                </Button>
-              </div>
             </>
           ) : (
             <Empty
@@ -1176,12 +1537,12 @@ export default function PermissionCenterPage() {
         wrap
       >
         <div>
-          <Text className="erp-permission-section__eyebrow">Account Roles</Text>
+          <Text className="erp-permission-section__eyebrow">账号分配</Text>
           <Title level={5} style={{ margin: 0 }}>
             管理员与角色
           </Title>
           <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-            新账号默认没有权限，必须分配角色后才能访问受保护页面和接口。
+            新账号默认不能进入业务页面，分配角色后才能使用相应功能。
           </Paragraph>
         </div>
         <Space size={8} wrap>
@@ -1202,7 +1563,7 @@ export default function PermissionCenterPage() {
             allowClear
             className="erp-permission-list-toolbar__search"
             value={adminSearchKeyword}
-            placeholder="搜索管理员账号、手机号、角色或权限码"
+            placeholder="搜索管理员账号、手机号或岗位角色"
             onChange={(event) => {
               setAdminSearchKeyword(event.target.value)
               setTablePagination((prev) => ({ ...prev, current: 1 }))
@@ -1254,7 +1615,7 @@ export default function PermissionCenterPage() {
               type="secondary"
               style={{ marginTop: 8, marginBottom: 0 }}
             >
-              当前后台使用角色权限模型：用户绑定角色，角色拥有权限码；菜单、岗位任务端入口和后台接口统一按权限码控制。
+              账号通过角色获得对应的菜单、岗位任务端入口和业务操作权限。
             </Paragraph>
           </div>
           <Tag color="blue">默认先维护角色模板</Tag>
@@ -1295,7 +1656,7 @@ export default function PermissionCenterPage() {
             children: adminAccountTab,
           },
         ]}
-        onChange={setActiveTabKey}
+        onChange={changePermissionCenterTab}
       />
 
       <Modal
@@ -1443,6 +1804,92 @@ export default function PermissionCenterPage() {
             ]}
           >
             <Input.Password autoComplete="new-password" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        className="erp-permission-modal"
+        title={statusActionDisabled ? '临时禁用账号' : '恢复账号使用'}
+        open={statusModalOpen}
+        onCancel={() => {
+          setStatusModalOpen(false)
+          setStatusActionAdmin(null)
+          statusForm.resetFields()
+        }}
+        onOk={() => statusForm.submit()}
+        confirmLoading={statusUpdatingAdminID === statusActionAdmin?.id}
+        okText={statusActionDisabled ? '确认禁用' : '确认启用'}
+        cancelText="取消"
+        centered
+        forceRender
+      >
+        <Alert
+          type={statusActionDisabled ? 'warning' : 'info'}
+          showIcon
+          message={
+            statusActionDisabled
+              ? `${statusActionAdmin?.username || '该账号'} 将立即无法继续访问后台`
+              : `${statusActionAdmin?.username || '该账号'} 将恢复登录和原有角色权限`
+          }
+          style={{ marginBottom: 16 }}
+        />
+        <Form form={statusForm} layout="vertical" onFinish={applyAdminStatus}>
+          <Form.Item
+            label="变更原因"
+            name="reason"
+            rules={
+              statusActionDisabled
+                ? [{ required: true, message: '请填写临时禁用原因' }]
+                : []
+            }
+          >
+            <Input.TextArea
+              maxLength={255}
+              showCount
+              rows={3}
+              placeholder="例如：临时离岗、安全核查或恢复正常使用"
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        className="erp-permission-modal"
+        title="离职注销账号"
+        open={revokeModalOpen}
+        onCancel={() => {
+          setRevokeModalOpen(false)
+          setRevokingAdmin(null)
+          revokeForm.resetFields()
+        }}
+        onOk={() => revokeForm.submit()}
+        confirmLoading={saving}
+        okText="确认注销"
+        okButtonProps={{ danger: true }}
+        cancelText="取消"
+        centered
+        forceRender
+      >
+        <Alert
+          type="warning"
+          showIcon
+          message={`将正式注销 ${revokingAdmin?.username || '该账号'}`}
+          description="账号和历史操作记录会保留，未完成的个人待办将退回原岗位任务池；注销后不能通过普通启用恢复。"
+          style={{ marginBottom: 16 }}
+        />
+        <Form form={revokeForm} layout="vertical" onFinish={revokeAdminAccount}>
+          <Form.Item
+            label="注销原因"
+            name="reason"
+            rules={[{ required: true, message: '请填写离职或注销原因' }]}
+          >
+            <Input.TextArea
+              maxLength={255}
+              showCount
+              rows={3}
+              placeholder="例如：员工离职，账号停止使用"
+            />
           </Form.Item>
         </Form>
       </Modal>

@@ -11,9 +11,11 @@ const (
 )
 
 type AuthClaims struct {
-	UserID   int
-	Username string
-	Role     Role
+	UserID      int
+	Username    string
+	SessionKey  string
+	AuthVersion int64
+	Role        Role
 }
 
 type ctxKeyClaims struct{}
@@ -28,5 +30,7 @@ func GetClaimsFromContext(ctx context.Context) (*AuthClaims, bool) {
 }
 
 func (c *AuthClaims) IsAdmin() bool {
-	return c != nil && c.Role == RoleAdmin
+	// RoleAdmin is retained for trusted in-process contexts and tests. External requests only
+	// receive claims after AdminAuthUsecase has validated the server-side session.
+	return c != nil && c.UserID > 0 && (c.Role == RoleAdmin || (c.SessionKey != "" && c.AuthVersion > 0))
 }

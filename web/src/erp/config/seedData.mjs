@@ -6,9 +6,9 @@ import {
 } from './customerMenuConfig.mjs'
 
 export const STATUS_LABELS = {
-  source_grounded: '已按真源收口',
-  seeded: '已落入口',
-  deferred: '本轮 deferred',
+  source_grounded: '已核对来源',
+  seeded: '已配置入口',
+  deferred: '暂未开放',
 }
 
 export const STATUS_STYLES = {
@@ -69,7 +69,7 @@ const navItemRegistry = {
     label: '异常 / 阻塞闭环',
     path: '/erp/operations/exceptions',
     shortLabel: '异常',
-    description: '集中查看阻塞、催办、处理、验证和关闭的 Workflow 协同链路。',
+    description: '集中查看阻塞、催办、处理、验证和关闭的协同任务。',
   },
   'permission-center': {
     key: 'permission-center',
@@ -83,7 +83,7 @@ const navItemRegistry = {
     label: '审计日志',
     path: '/erp/system/audit-logs',
     shortLabel: '审计',
-    description: '只读查看系统控制面审计事件。',
+    description: '只读查看系统管理操作记录。',
   },
 }
 

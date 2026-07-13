@@ -48,8 +48,10 @@ var (
 	AuthSMSServiceQuotaExceeded          = Definition{Name: "AuthSMSServiceQuotaExceeded", Code: 10016, Message: "短信服务额度已用完，请联系管理员处理"}
 	AdminExists                          = Definition{Name: "AdminExists", Code: 40910, Message: "管理员账号已存在"}
 	AdminPhoneExists                     = Definition{Name: "AdminPhoneExists", Code: 40911, Message: "手机号已绑定其他管理员"}
+	AdminAccountRevoked                  = Definition{Name: "AdminAccountRevoked", Code: 40912, Message: "账号已正式注销，不能通过普通启用恢复"}
 	IdempotencyConflict                  = Definition{Name: "IdempotencyConflict", Code: 40920, Message: "重复请求内容与首次提交不一致，请刷新后重试"}
 	ProcessDomainCommandRecoveryRequired = Definition{Name: "ProcessDomainCommandRecoveryRequired", Code: 40921, Message: "此前业务处理结果需要人工核对，当前流程暂时无法继续，请联系管理员"}
+	ResourceVersionConflict              = Definition{Name: "ResourceVersionConflict", Code: 40922, Message: "记录已被其他操作更新，请刷新后重试"}
 
 	Internal              = Definition{Name: "Internal", Code: 50000, Message: "服务器内部错误"}
 	AuthCurrentUserFailed = Definition{Name: "AuthCurrentUserFailed", Code: 50001, Message: "获取用户信息失败"}
@@ -92,8 +94,10 @@ var definitions = []Definition{
 	AuthSMSServiceQuotaExceeded,
 	AdminExists,
 	AdminPhoneExists,
+	AdminAccountRevoked,
 	IdempotencyConflict,
 	ProcessDomainCommandRecoveryRequired,
+	ResourceVersionConflict,
 	Internal,
 	AuthCurrentUserFailed,
 	UserListFailed,

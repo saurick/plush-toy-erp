@@ -27,6 +27,7 @@ type jsonrpcDispatcher struct {
 	masterDataUC       *biz.MasterDataUsecase
 	salesOrderUC       *biz.SalesOrderUsecase
 	purchaseOrderUC    *biz.PurchaseOrderUsecase
+	productionOrderUC  *biz.ProductionOrderUsecase
 	outsourcingOrderUC *biz.OutsourcingOrderUsecase
 	inventoryUC        *biz.InventoryUsecase
 	operationalFactUC  *biz.OperationalFactUsecase
@@ -48,6 +49,7 @@ func newJSONRPCDispatcher(
 	masterDataUC *biz.MasterDataUsecase,
 	salesOrderUC *biz.SalesOrderUsecase,
 	purchaseOrderUC *biz.PurchaseOrderUsecase,
+	productionOrderUC *biz.ProductionOrderUsecase,
 	outsourcingOrderUC *biz.OutsourcingOrderUsecase,
 	inventoryUC *biz.InventoryUsecase,
 	operationalFactUC *biz.OperationalFactUsecase,
@@ -80,6 +82,9 @@ func newJSONRPCDispatcher(
 	}
 	if purchaseOrderUC == nil {
 		panic("newJSONRPCDispatcher: purchaseOrderUC is nil")
+	}
+	if productionOrderUC == nil {
+		panic("newJSONRPCDispatcher: productionOrderUC is nil")
 	}
 	if outsourcingOrderUC == nil {
 		panic("newJSONRPCDispatcher: outsourcingOrderUC is nil")
@@ -131,6 +136,7 @@ func newJSONRPCDispatcher(
 		masterDataUC:       masterDataUC,
 		salesOrderUC:       salesOrderUC,
 		purchaseOrderUC:    purchaseOrderUC,
+		productionOrderUC:  productionOrderUC,
 		outsourcingOrderUC: outsourcingOrderUC,
 		inventoryUC:        inventoryUC,
 		operationalFactUC:  operationalFactUC,
@@ -158,7 +164,11 @@ func (d *jsonrpcDispatcher) Handle(
 	if params == nil {
 		d.log.WithContext(ctx).Info("[jsonrpc] params=<nil>")
 	} else {
-		b, _ := json.MarshalIndent(redactRPCParams(params.AsMap()), "", "  ")
+		logParams := redactRPCParams(params.AsMap())
+		if url == "production_order" {
+			logParams = productionOrderRPCLogSummary(params.AsMap())
+		}
+		b, _ := json.MarshalIndent(logParams, "", "  ")
 		d.log.WithContext(ctx).Infof("[jsonrpc] params=%s", string(b))
 	}
 
@@ -185,6 +195,8 @@ func (d *jsonrpcDispatcher) Handle(
 		return d.handleSalesOrder(ctx, method, id, params)
 	case "purchase_order":
 		return d.handlePurchaseOrder(ctx, method, id, params)
+	case "production_order":
+		return d.handleProductionOrder(ctx, method, id, params)
 	case "outsourcing_order":
 		return d.handleOutsourcingOrder(ctx, method, id, params)
 	case "purchase":

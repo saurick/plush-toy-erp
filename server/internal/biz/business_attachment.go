@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	BusinessAttachmentMaxBytes = 50 * 1024 * 1024
+	BusinessAttachmentMaxBytes            = 5 * 1024 * 1024
+	BusinessAttachmentMaxJSONRPCBodyBytes = 7 * 1024 * 1024
 )
 
 const (
@@ -106,6 +107,13 @@ type BusinessAttachmentUploadInput struct {
 	ContentBase64  string
 	UploadedBy     *int
 	Note           *string
+	WorkflowGuard  *WorkflowAttachmentWriteGuard
+}
+
+type WorkflowAttachmentWriteGuard struct {
+	ExpectedVersion      int
+	ActorID              int
+	VisibleOwnerRoleKeys []string
 }
 
 type BusinessAttachmentCreate struct {
@@ -120,13 +128,14 @@ type BusinessAttachmentCreate struct {
 	Content        []byte
 	UploadedBy     *int
 	Note           *string
+	WorkflowGuard  *WorkflowAttachmentWriteGuard
 }
 
 type BusinessAttachmentRepo interface {
 	CreateBusinessAttachment(ctx context.Context, in *BusinessAttachmentCreate) (*BusinessAttachment, error)
 	ListBusinessAttachments(ctx context.Context, ownerType string, ownerID int) ([]*BusinessAttachment, error)
-	GetBusinessAttachment(ctx context.Context, id int) (*BusinessAttachment, error)
-	DeleteBusinessAttachment(ctx context.Context, id int) error
+	GetBusinessAttachmentMetadata(ctx context.Context, id int) (*BusinessAttachment, error)
+	GetBusinessAttachmentContent(ctx context.Context, id int, ownerType string, ownerID int) ([]byte, error)
 	BusinessAttachmentOwnerExists(ctx context.Context, ownerType string, ownerID int) (bool, error)
 }
 
@@ -179,6 +188,7 @@ func (uc *BusinessAttachmentUsecase) UploadBusinessAttachment(ctx context.Contex
 		Content:        content,
 		UploadedBy:     normalized.UploadedBy,
 		Note:           normalized.Note,
+		WorkflowGuard:  normalized.WorkflowGuard,
 	})
 }
 
@@ -200,24 +210,39 @@ func (uc *BusinessAttachmentUsecase) ListBusinessAttachments(ctx context.Context
 	return uc.repo.ListBusinessAttachments(ctx, normalizedOwnerType, ownerID)
 }
 
-func (uc *BusinessAttachmentUsecase) GetBusinessAttachment(ctx context.Context, id int) (*BusinessAttachment, error) {
+func (uc *BusinessAttachmentUsecase) GetBusinessAttachmentMetadata(ctx context.Context, id int) (*BusinessAttachment, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
-	return uc.repo.GetBusinessAttachment(ctx, id)
+	item, err := uc.repo.GetBusinessAttachmentMetadata(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	exists, err := uc.repo.BusinessAttachmentOwnerExists(ctx, item.OwnerType, item.OwnerID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrBusinessAttachmentOwnerNotFound
+	}
+	return item, nil
 }
 
-func (uc *BusinessAttachmentUsecase) DeleteBusinessAttachment(ctx context.Context, id int) error {
-	if uc == nil || uc.repo == nil || id <= 0 {
-		return ErrBadParam
+func (uc *BusinessAttachmentUsecase) GetBusinessAttachmentContent(ctx context.Context, metadata *BusinessAttachment) ([]byte, error) {
+	if uc == nil || uc.repo == nil || metadata == nil || metadata.ID <= 0 || metadata.OwnerID <= 0 || !IsBusinessAttachmentOwnerTypeAllowed(metadata.OwnerType) {
+		return nil, ErrBadParam
 	}
-	return uc.repo.DeleteBusinessAttachment(ctx, id)
+	return uc.repo.GetBusinessAttachmentContent(ctx, metadata.ID, metadata.OwnerType, metadata.OwnerID)
 }
 
 func normalizeBusinessAttachmentUploadInput(in BusinessAttachmentUploadInput) (BusinessAttachmentUploadInput, error) {
 	in.OwnerType = NormalizeBusinessAttachmentOwnerType(in.OwnerType)
 	if !IsBusinessAttachmentOwnerTypeAllowed(in.OwnerType) || in.OwnerID <= 0 {
 		return in, ErrBusinessAttachmentOwnerInvalid
+	}
+	if in.OwnerType == BusinessAttachmentOwnerWorkflowTask &&
+		(in.WorkflowGuard == nil || in.WorkflowGuard.ExpectedVersion <= 0 || in.WorkflowGuard.ActorID <= 0) {
+		return in, ErrBadParam
 	}
 
 	in.AttachmentType = strings.ToLower(strings.TrimSpace(in.AttachmentType))
@@ -289,11 +314,14 @@ func decodeBusinessAttachmentContentWithMax(raw string, maxBytes int) ([]byte, e
 	if idx := strings.Index(text, "base64,"); idx >= 0 {
 		text = text[idx+len("base64,"):]
 	}
+	if maxBytes <= 0 || len(text) > base64.StdEncoding.EncodedLen(maxBytes) {
+		return nil, ErrBusinessAttachmentTooLarge
+	}
 	content, err := base64.StdEncoding.DecodeString(text)
 	if err != nil || len(content) == 0 {
 		return nil, ErrBusinessAttachmentContentInvalid
 	}
-	if maxBytes <= 0 || len(content) > maxBytes {
+	if len(content) > maxBytes {
 		return nil, ErrBusinessAttachmentTooLarge
 	}
 	return content, nil

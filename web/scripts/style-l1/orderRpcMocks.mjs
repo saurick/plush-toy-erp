@@ -1,3 +1,5 @@
+import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
+
 export async function installOrderRpcMocks(page, context) {
   const { nowUnix } = context
 
@@ -63,7 +65,7 @@ export async function installOrderRpcMocks(page, context) {
         data = { sales_order_item: { ...salesOrderItem, ...params } }
         break
       default:
-        data = {}
+        data = unsupportedRpcMethod('sales_order', method)
         break
     }
 
@@ -73,11 +75,7 @@ export async function installOrderRpcMocks(page, context) {
       body: JSON.stringify({
         jsonrpc: '2.0',
         id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
+        result: styleRpcResult(data),
       }),
     })
   })
@@ -155,7 +153,7 @@ export async function installOrderRpcMocks(page, context) {
         data = { purchase_order_item: { ...purchaseOrderItem, ...params } }
         break
       default:
-        data = {}
+        data = unsupportedRpcMethod('purchase_order', method)
         break
     }
 
@@ -165,11 +163,7 @@ export async function installOrderRpcMocks(page, context) {
       body: JSON.stringify({
         jsonrpc: '2.0',
         id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
+        result: styleRpcResult(data),
       }),
     })
   })
@@ -282,7 +276,7 @@ export async function installOrderRpcMocks(page, context) {
         }
         break
       default:
-        data = {}
+        data = unsupportedRpcMethod('outsourcing_order', method)
         break
     }
 
@@ -292,11 +286,7 @@ export async function installOrderRpcMocks(page, context) {
       body: JSON.stringify({
         jsonrpc: '2.0',
         id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
+        result: styleRpcResult(data),
       }),
     })
   })
@@ -400,7 +390,7 @@ export async function installOrderRpcMocks(page, context) {
         data = { bom_version: { ...bomVersion, status: 'ARCHIVED' } }
         break
       default:
-        data = {}
+        data = unsupportedRpcMethod('bom', method)
         break
     }
 
@@ -410,11 +400,273 @@ export async function installOrderRpcMocks(page, context) {
       body: JSON.stringify({
         jsonrpc: '2.0',
         id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
+        result: styleRpcResult(data),
+      }),
+    })
+  })
+
+  const productionOrder = {
+    id: 71,
+    order_no: 'MO-STYLE-L1-20260713',
+    status: 'DRAFT',
+    version: 1,
+    planned_start_at: nowUnix() + 86_400,
+    planned_end_at: nowUnix() + 86_400 * 7,
+    note: '长文本生产计划用于验证列表、详情、窄屏和动作区不会互相覆盖。',
+    close_reason: null,
+    cancel_reason: null,
+    created_by: 1,
+    released_by: null,
+    closed_by: null,
+    cancelled_by: null,
+    released_at: null,
+    closed_at: null,
+    cancelled_at: null,
+    created_at: nowUnix(),
+    updated_at: nowUnix(),
+  }
+  const productionOrderItems = Array.from({ length: 22 }, (_, index) => ({
+    id: 7100 + index,
+    production_order_id: 71,
+    line_no: index + 1,
+    product_id: 301,
+    product_sku_id: 401,
+    unit_id: 501,
+    planned_quantity: index === 0 ? '999999999999.9999' : '20.0000',
+    sales_order_item_id: 601,
+    bom_header_id: 701,
+    product_code_snapshot: 'PROD-STYLE-L1',
+    product_name_snapshot: '超长产品名称用于验证生产订单明细可读换行',
+    sku_code_snapshot: 'SKU-STYLE-L1-LONG',
+    unit_name_snapshot: '只',
+    bom_version_snapshot: 'BOM-STYLE-L1-V20260713',
+    note: index === 0 ? '连续长文本ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' : '',
+    created_at: nowUnix(),
+    updated_at: nowUnix(),
+  }))
+  const referenceOptions = {
+    product: {
+      value: 301,
+      label: 'PROD-STYLE-L1 · 超长产品名称用于验证生产订单明细可读换行',
+      selectable: true,
+      product_value: 301,
+      unit_value: 501,
+    },
+    product_sku: {
+      value: 401,
+      label: 'SKU-STYLE-L1-LONG · 深棕 / 35cm',
+      selectable: true,
+      product_value: 301,
+      sku_value: 401,
+      unit_value: 501,
+    },
+    unit: {
+      value: 501,
+      label: 'PCS · 只',
+      selectable: true,
+      unit_value: 501,
+    },
+    sales_order_item: {
+      value: 601,
+      label: 'SO-STYLE-L1 / 第 1 行 · PROD-STYLE-L1',
+      selectable: true,
+      product_value: 301,
+      sku_value: 401,
+      unit_value: 501,
+    },
+    active_bom: {
+      value: 701,
+      label: 'BOM-STYLE-L1-V20260713 · 当前生效',
+      selectable: true,
+      product_value: 301,
+    },
+  }
+  const productionAllowedParams = {
+    list_production_orders: new Set([
+      'keyword',
+      'status',
+      'date_field',
+      'date_from',
+      'date_to',
+      'sort_by',
+      'sort_direction',
+      'limit',
+      'offset',
+    ]),
+    get_production_order: new Set(['production_order_id']),
+    create_production_order: new Set([
+      'order_no',
+      'planned_start_at',
+      'planned_end_at',
+      'note',
+      'items',
+      'idempotency_key',
+    ]),
+    save_production_order: new Set([
+      'production_order_id',
+      'expected_version',
+      'order_no',
+      'planned_start_at',
+      'planned_end_at',
+      'note',
+      'items',
+      'idempotency_key',
+    ]),
+    release_production_order: new Set([
+      'production_order_id',
+      'expected_version',
+      'idempotency_key',
+    ]),
+    close_production_order: new Set([
+      'production_order_id',
+      'expected_version',
+      'reason',
+      'idempotency_key',
+    ]),
+    cancel_production_order: new Set([
+      'production_order_id',
+      'expected_version',
+      'reason',
+      'idempotency_key',
+    ]),
+    list_production_order_reference_options: new Set([
+      'reference_type',
+      'keyword',
+      'product_id',
+      'product_sku_id',
+      'unit_id',
+      'selected_ids',
+      'limit',
+      'offset',
+    ]),
+  }
+  const productionParamsValid = (method, params) => {
+    const allowed = productionAllowedParams[method]
+    if (!allowed || !Object.keys(params).every((key) => allowed.has(key))) {
+      return false
+    }
+    const positive = (value) => Number.isSafeInteger(value) && value > 0
+    const keyValid =
+      typeof params.idempotency_key === 'string' &&
+      params.idempotency_key === params.idempotency_key.trim() &&
+      params.idempotency_key.length > 0 &&
+      params.idempotency_key.length <= 128
+    if (method === 'get_production_order')
+      return positive(params.production_order_id)
+    if (method === 'create_production_order') {
+      return (
+        keyValid &&
+        typeof params.order_no === 'string' &&
+        params.order_no.trim().length > 0 &&
+        Array.isArray(params.items) &&
+        params.items.length > 0
+      )
+    }
+    if (method === 'save_production_order') {
+      return (
+        keyValid &&
+        positive(params.production_order_id) &&
+        positive(params.expected_version) &&
+        typeof params.order_no === 'string' &&
+        params.order_no.trim().length > 0 &&
+        Array.isArray(params.items) &&
+        params.items.length > 0
+      )
+    }
+    if (
+      [
+        'release_production_order',
+        'close_production_order',
+        'cancel_production_order',
+      ].includes(method)
+    ) {
+      if (
+        !keyValid ||
+        !positive(params.production_order_id) ||
+        !positive(params.expected_version)
+      )
+        return false
+      return (
+        method !== 'cancel_production_order' ||
+        (typeof params.reason === 'string' && params.reason.trim().length > 0)
+      )
+    }
+    if (method === 'list_production_order_reference_options') {
+      return [
+        'product',
+        'product_sku',
+        'unit',
+        'sales_order_item',
+        'active_bom',
+      ].includes(params.reference_type)
+    }
+    return method === 'list_production_orders'
+  }
+
+  await page.route('**/rpc/production_order', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method, params = {} } = body
+    const paramsValid = productionParamsValid(method, params)
+    let data
+    if (!paramsValid) {
+      data = unsupportedRpcMethod('production_order', method)
+    } else if (method === 'list_production_orders') {
+      data = {
+        production_orders: [productionOrder],
+        total: 1,
+        limit: Number(params.limit || 20),
+        offset: Number(params.offset || 0),
+      }
+    } else if (method === 'get_production_order') {
+      data = {
+        production_order: productionOrder,
+        production_order_items: productionOrderItems,
+      }
+    } else if (method === 'list_production_order_reference_options') {
+      const option = referenceOptions[params.reference_type]
+      data = {
+        reference_type: params.reference_type,
+        options: option ? [option] : [],
+        total: option ? 1 : 0,
+        limit: Number(params.limit || 20),
+        offset: Number(params.offset || 0),
+      }
+    } else {
+      const nextStatus = {
+        release_production_order: 'RELEASED',
+        close_production_order: 'CLOSED',
+        cancel_production_order: 'CANCELLED',
+      }[method]
+      Object.assign(productionOrder, {
+        order_no: params.order_no || productionOrder.order_no,
+        planned_start_at:
+          params.planned_start_at ?? productionOrder.planned_start_at,
+        planned_end_at: params.planned_end_at ?? productionOrder.planned_end_at,
+        note: params.note ?? productionOrder.note,
+        status: nextStatus || productionOrder.status,
+        version: productionOrder.version + 1,
+        close_reason:
+          method === 'close_production_order'
+            ? params.reason || null
+            : productionOrder.close_reason,
+        cancel_reason:
+          method === 'cancel_production_order'
+            ? params.reason
+            : productionOrder.cancel_reason,
+        updated_at: nowUnix(),
+      })
+      data = {
+        production_order: productionOrder,
+        production_order_items: productionOrderItems,
+      }
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: styleRpcResult(data),
       }),
     })
   })

@@ -28,9 +28,10 @@
 | `scripts/import/customerImportDryRun.mjs`              | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包                                             | yoyoosun 导入前人工 review / 数据映射检查                  |
 | `scripts/qa/test-data-isolation-boundary.mjs`          | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备是否分桶隔离，并锁住 dry-run 不具备执行能力 | 调整 seed、fixture、模拟数据或导入准备工具后                  |
 | `scripts/qa/manual-regression-data-plan.mjs`           | 只读汇总 Product Core 中性 seed、yoyoosun preview fixture、试用模拟数据、业务事实模拟和岗位任务模拟的手动回归数据入口；不连接后端、不写库、不执行真实导入 | 手动回归前梳理应准备哪些模拟数据和命令                    |
-| `scripts/qa/purchase-quality-simulated-matrix.mjs`     | 通过正式 JSON-RPC 和岗位演示账号生成带 `SIM-YOYOOSUN-PQ` 前缀的采购单、采购入库与质检多状态矩阵；显式确认后才写入，不执行真实客户导入 | 目标试用环境需要覆盖草稿、提交、审批、关闭、取消、检验通过/拒收、入库过账/取消等人工回归状态 |
+| `scripts/qa/manual-acceptance-*.mjs`                   | 全页面甲方手工验收入口组：从当前菜单生成 45 项目录，准备账号、源数据、九岗位任务和事实矩阵，执行只读就绪核验，并按生命周期退出源数据；详细命令见 `scripts/qa/README.md` | 本机 local / dev 准备全页面模拟验收数据与脱敏证据 |
+| `scripts/qa/purchase-quality-simulated-matrix.mjs`     | 通过正式 JSON-RPC 和岗位演示账号生成带 `SIM-YOYOOSUN-PQ` 前缀的采购单、采购入库与质检多状态矩阵；显式确认后才写入，不执行真实客户导入 | 本机 local / dev 覆盖草稿、提交、审批、关闭、取消、检验通过 / 拒收、入库过账 / 取消等人工回归状态 |
 | `scripts/qa/trial-simulated-data.mjs`           | 模拟试用数据入口，支持 `--print-input-template` 只读输出前置；真实执行只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据 | 试用环境演练                                               |
-| `scripts/qa/operational-fact-simulated-closure.mjs`    | 业务事实模拟矩阵入口，支持 `--print-input-template` 只读输出前置；真实执行只使用显式模拟主数据和客户覆盖生产 / 预留 / 委外 / 出货 / 财务的草稿、生效、取消、释放、结清等页面可见状态 | 业务事实内部模拟验收 / 目标环境事实回归                  |
+| `scripts/qa/operational-fact-simulated-closure.mjs`    | 业务事实模拟矩阵入口，支持 `--print-input-template` 只读输出前置；真实执行只使用显式模拟主数据和客户覆盖生产 / 预留 / 委外 / 出货 / 财务的草稿、生效、取消、释放、结清等页面可见状态 | 本机 local / dev 业务事实模拟验收                  |
 | `scripts/qa/mobile-workflow-simulated-closure.mjs`       | 模拟岗位任务闭环入口，支持 `--print-input-template` 只读输出前置；真实执行只创建和更新显式模拟 workflow 任务，覆盖审批完成 / 退回、质检完成、入库完成、出货放行阻塞异常、跨角色催办和现场留痕 | 岗位任务端回归 / 目标环境移动任务闭环验收                  |
 | `web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs`      | 真实浏览器岗位任务端模拟任务回归，创建 `simulated_only` 老板审批 / 退回 / 完成、品质完成、仓库入库完成和仓库放行任务，分别登录 boss / quality / warehouse 岗位端验证完成、阻塞、退回、催办反馈和内部提醒线索 | 本地 / 试用岗位任务端真实页面验收                         |
 | `scripts/qa/mvp-closure.mjs`                    | ERP MVP 闭环验收入口，默认只生成计划和本地 evidence，可选运行现有 no-write report-only 工具                     | MVP 主链路验收口径收口 / 试用前证据整理                  |
@@ -64,11 +65,11 @@
 | `scripts/qa/sales-order-field-chain-boundary.test.mjs` + `web/src/erp/config/printTemplates.test.mjs` | 锁住销售订单受理本地试用字段链路和打印 catalog 边界：列表 / 导出同受 `sales_orders.default` 字段策略控制，销售订单打印未接通前不得绕过 mapper、注册模板或发布明细字段策略 | 调整销售订单字段策略、导出列、打印字段链路、打印 catalog 或试用闭环文档后 |
 | `scripts/qa/dev-entry-boundary.test.mjs`                 | 锁住 `/__dev`、测试入口和客户配置预检控制台仍是开发态入口：不进正式菜单、不索引 reference/archive 命令、不把 dry-run / 测试应用写成真实导入 | 调整开发验收入口、测试入口、客户配置预检控制台或正式菜单边界后 |
 | `scripts/qa/frontend-error-message-boundary.test.mjs` + `web/src/common/utils/errorMessage.test.mjs` + `web/src/erp/utils/userVisibleTechnicalFields.test.mjs` + `web/src/erp/utils/dashboardTaskDisplay.test.mjs` | 扫描正式前端页面、组件、岗位任务端和共享 PDF 预览工具，防止用户可见错误提示直接透传 `error.message`；同时锁住统一中文错误 helper、业务界面不展示 raw id / 内部字段，以及任务来源筛选不展示 `source_type` 原始 key | 调整正式页面错误提示、打印工作台、移动端动作、错误 helper、业务字段回显、任务来源展示或技术字段可见性后 |
-| `scripts/qa/phase-label-boundaries.mjs`                | 自动扫描活跃实现路径，阻止 runtime 阶段编号命名进入脚本、API、运行时代码、测试和正式文档入口                      | 调整命名、脚本、API、运行时代码或治理文档后                 |
+| `scripts/qa/phase-label-boundaries.mjs` + `.test.mjs`  | 全仓扫描活跃代码、脚本和正式文档，阻止完整 Phase 编号、紧凑 phase 编号、P 子阶段编号和 P 编号发布目标等阶段命名；允许 P0/P1 风险等级、p95 百分位和产品编码，跳过归档、外部资料、发布证据及生成产物 | 调整命名、脚本、API、运行时代码或治理文档后                 |
 | `scripts/qa/docs-inventory.test.mjs`                   | 自动扫描当前维护 Markdown，确认已登记到 `docs/文档清单.md`                                                     | 新增、删除、重命名或调整长期维护 Markdown 后                |
 | `scripts/inventory-pg.sh`                              | 库存事实本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证库存流水、余额、SKU、预留、出货、冲正和并发边界        |
 | `scripts/bom-lot-pg.sh`                                | BOM 与批次库存本地 PostgreSQL migration / 集成测试防呆入口                                                       | 验证 BOM schema 和批次库存行为                            |
-| `scripts/purchase-receipt-pg.sh`                       | 采购入库本地 PostgreSQL migration / 全链关键事务并发测试防呆入口                                                  | 验证采购、库存/出货、ProcessRuntime、源单和 Workflow 并发   |
+| `scripts/purchase-receipt-pg.sh`                       | 采购入库本地 PostgreSQL migration / 全链关键事务并发测试防呆入口                                                  | 验证采购、库存/出货、ProcessRuntime、源单及 Workflow CAS / receipt 并发 |
 | `scripts/purchase-return-pg.sh`                        | 采购退货本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
 | `scripts/doctor.sh`                                    | 检查本机依赖和 hooks 是否齐全                                                                                     | 环境初始化 / 异常排查                                      |
 | `scripts/qa/fast.sh`                                   | 高频快速检查，包含正式前端客户配置投影、角色菜单 / seedData、开发入口、试用账号、客户导入、运行时 manifest、文档清单和模拟数据边界 | 日常开发                                                   |
@@ -310,7 +311,7 @@ node scripts/qa/mobile-workflow-simulated-closure.mjs \
 
 `--print-input-template` 只输出 report-only / apply simulated mobile workflow tasks 所需的 runId、演示账号密码来源、岗位角色账号、模拟任务组和后续真实命令，不登录、不调用后端、不写报告、不写数据库、不创建 workflow 任务，也不写任何业务事实。
 
-若要写入本地或目标试用环境，只能显式 `--apply`。该脚本使用 `demo_pmc` 创建 `SIM-YOYOOSUN-MOBILE-WORKFLOW` 模拟 workflow 任务，再用 `demo_boss`、`demo_quality`、`demo_warehouse` 和 `demo_pmc` 分别处理老板审批完成、老板退回、成品抽检完成、仓库入库确认、出货放行异常上报、跨角色催办和现场留痕 evidence；它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不绕过 `WorkflowUsecase` 或 operational fact usecase：
+若要写入本地或目标试用环境，只能显式 `--apply`。该脚本使用 `demo_pmc` 创建 `SIM-YOYOOSUN-MOBILE-WORKFLOW` 模拟 workflow 任务，再用 `demo_boss`、`demo_quality`、`demo_warehouse` 和 `demo_pmc` 分别处理老板审批完成、老板退回、成品抽检完成、仓库入库确认、出货放行异常上报、跨角色催办和现场留痕 evidence；所有状态 / 催办动作都使用读回的正整数 `expected_version` 和由 task/action 稳定生成的顶层 `idempotency_key`，缺版本时 fail closed。它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不绕过 `WorkflowUsecase` 或 operational fact usecase：
 
 ```bash
 MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS \
@@ -794,25 +795,28 @@ node --test /Users/simon/projects/plush-toy-erp/scripts/qa/workflow-fact-boundar
 
 该测试只扫描 Workflow runtime 源码，确认受控 `complete_task_action`、`block_task_action` 和 `reject_task_action` 链路不会直接引用 Operational Fact、库存、出货或财务事实写入口；旧 `update_task_status` 已退出运行时。Workflow 可以写协同状态和派生协同任务；真实库存、出货和财务事实必须从对应领域 usecase 显式入口执行。
 
-如本轮触达任务动作合同、reason、事件 / actor role、payload 或岗位任务端后端读回，再补跑：
+如本轮触达任务动作合同、reason、事件 / actor role、payload、CAS / receipt 或岗位任务端后端读回，再补跑：
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/server
-go test ./internal/data -run 'TestWorkflowRepo_(TaskStatusReasonEventAndCompletionCleanup|CreateAndUpdateTaskStatus|UrgeWorkflowTaskWritesEventAndPayload)'
-go test ./internal/service -run 'TestJsonrpcDispatcher_WorkflowUrgeTask|TestJsonrpcDispatcher_Workflow(CompleteTaskAction|ControlledTaskActions)'
+go test ./internal/biz -run 'TestWorkflowTaskMutation'
+go test ./internal/data -run 'TestWorkflowRepo_(TaskStatusReasonEventAndCompletionCleanup|CreateAndUpdateTaskStatus|UrgeWorkflowTaskWritesEventAndPayload|.*Idempotency.*)'
+go test ./internal/service -run 'TestJsonrpcDispatcher_WorkflowUrgeTask|TestJsonrpcDispatcher_Workflow(CompleteTaskAction|ControlledTaskActions|.*Idempotency.*)'
 ```
 
-这组命令只验证本地后端 Workflow action 合同，不连接真实客户环境，不执行真实导入，也不把 Workflow task done 解释为 Fact 过账。
+这组命令只验证本地后端 Workflow action、CAS 和 receipt 合同，不连接真实客户环境，不执行真实导入，也不把 Workflow task done 解释为 Fact 过账。真实 PostgreSQL 单赢家与 receipt 并发还应通过 `make critical_transactions_pg_test`。
 
 调整正式前端任务动作入口后，执行：
 
 ```bash
 node --test \
   /Users/simon/projects/plush-toy-erp/web/src/erp/utils/workflowTaskActionAccess.test.mjs \
+  /Users/simon/projects/plush-toy-erp/web/src/erp/utils/workflowTaskMutation.test.mjs \
+  /Users/simon/projects/plush-toy-erp/web/src/erp/api/workflowApi.test.mjs \
   /Users/simon/projects/plush-toy-erp/scripts/qa/workflow-ui-action-boundary.test.mjs
 ```
 
-这组测试覆盖前端 Workflow action access helper 和正式运行时代码：`workflowTaskActionAccess.test.mjs` 锁住后端 explain 优先、本地 fallback、失败态禁用动作和 stale / abort request 处理；`workflow-ui-action-boundary.test.mjs` 扫描 `web/src/erp` 正式运行时代码，确认页面、组件、hook 和工具不直接调用 `createWorkflowTask`、`updateWorkflowTaskStatus`、`upsertWorkflowBusinessState` 或对应 raw JSON-RPC 方法。`updateWorkflowTaskStatus` wrapper 和 raw `update_task_status` mock 已退出；style:l1 场景和测试代码不作为正式 UI 主路径。
+这组测试覆盖前端 Workflow action access、冻结 attempt 和正式运行时代码：`workflowTaskActionAccess.test.mjs` 锁住后端 explain 优先、本地 fallback、失败态禁用动作和 stale / abort request 处理；mutation/API tests 锁住安全 UUID、同 intent 同 key、changed intent 换 key、未知结果保留现场和缺 key fail closed；`workflow-ui-action-boundary.test.mjs` 扫描 `web/src/erp` 正式运行时代码，确认五个入口复用共享 attempt store，且页面、组件、hook 和工具不直接调用 `createWorkflowTask`、`updateWorkflowTaskStatus`、`upsertWorkflowBusinessState` 或对应 raw JSON-RPC 方法。`updateWorkflowTaskStatus` wrapper 和 raw `update_task_status` mock 已退出；style:l1 场景和测试代码不作为正式 UI 主路径。
 
 调整客户配置运行时投影、正式菜单、字段策略或业务页面动作权限后，执行：
 

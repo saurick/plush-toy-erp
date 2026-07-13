@@ -68,6 +68,7 @@ const REQUIRED_ENV_KEYS = [
   "ERP_DEBUG_ENV",
   "ERP_DEBUG_SEED_ENABLED",
   "ERP_DEBUG_CLEANUP_ENABLED",
+  "ERP_DEBUG_BUSINESS_CLEAR_ENABLED",
   "ERP_DEBUG_CLEANUP_SCOPE",
 ];
 
@@ -183,6 +184,11 @@ function validateEnvExample(packageDir, errors) {
   assert(
     /ERP_DEBUG_CLEANUP_ENABLED=false/m.test(content),
     "env/.env.example must disable ERP_DEBUG_CLEANUP_ENABLED",
+    errors,
+  );
+  assert(
+    /ERP_DEBUG_BUSINESS_CLEAR_ENABLED=false/m.test(content),
+    "env/.env.example must disable ERP_DEBUG_BUSINESS_CLEAR_ENABLED",
     errors,
   );
 }

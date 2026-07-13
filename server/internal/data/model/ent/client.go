@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent/migrate"
 
 	"server/internal/data/model/ent/accessentitlement"
+	"server/internal/data/model/ent/adminsession"
 	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/adminuserrole"
 	"server/internal/data/model/ent/bomheader"
@@ -35,6 +36,9 @@ import (
 	"server/internal/data/model/ent/processnodeinstance"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
+	"server/internal/data/model/ent/productionorder"
+	"server/internal/data/model/ent/productionorderevent"
+	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchaseorderitem"
@@ -77,6 +81,8 @@ type Client struct {
 	Schema *migrate.Schema
 	// AccessEntitlement is the client for interacting with the AccessEntitlement builders.
 	AccessEntitlement *AccessEntitlementClient
+	// AdminSession is the client for interacting with the AdminSession builders.
+	AdminSession *AdminSessionClient
 	// AdminUser is the client for interacting with the AdminUser builders.
 	AdminUser *AdminUserClient
 	// AdminUserRole is the client for interacting with the AdminUserRole builders.
@@ -125,6 +131,12 @@ type Client struct {
 	ProductSKU *ProductSKUClient
 	// ProductionFact is the client for interacting with the ProductionFact builders.
 	ProductionFact *ProductionFactClient
+	// ProductionOrder is the client for interacting with the ProductionOrder builders.
+	ProductionOrder *ProductionOrderClient
+	// ProductionOrderEvent is the client for interacting with the ProductionOrderEvent builders.
+	ProductionOrderEvent *ProductionOrderEventClient
+	// ProductionOrderItem is the client for interacting with the ProductionOrderItem builders.
+	ProductionOrderItem *ProductionOrderItemClient
 	// PurchaseOrder is the client for interacting with the PurchaseOrder builders.
 	PurchaseOrder *PurchaseOrderClient
 	// PurchaseOrderItem is the client for interacting with the PurchaseOrderItem builders.
@@ -191,6 +203,7 @@ func NewClient(opts ...Option) *Client {
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
 	c.AccessEntitlement = NewAccessEntitlementClient(c.config)
+	c.AdminSession = NewAdminSessionClient(c.config)
 	c.AdminUser = NewAdminUserClient(c.config)
 	c.AdminUserRole = NewAdminUserRoleClient(c.config)
 	c.BOMHeader = NewBOMHeaderClient(c.config)
@@ -215,6 +228,9 @@ func (c *Client) init() {
 	c.Product = NewProductClient(c.config)
 	c.ProductSKU = NewProductSKUClient(c.config)
 	c.ProductionFact = NewProductionFactClient(c.config)
+	c.ProductionOrder = NewProductionOrderClient(c.config)
+	c.ProductionOrderEvent = NewProductionOrderEventClient(c.config)
+	c.ProductionOrderItem = NewProductionOrderItemClient(c.config)
 	c.PurchaseOrder = NewPurchaseOrderClient(c.config)
 	c.PurchaseOrderItem = NewPurchaseOrderItemClient(c.config)
 	c.PurchaseReceipt = NewPurchaseReceiptClient(c.config)
@@ -335,6 +351,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ctx:                           ctx,
 		config:                        cfg,
 		AccessEntitlement:             NewAccessEntitlementClient(cfg),
+		AdminSession:                  NewAdminSessionClient(cfg),
 		AdminUser:                     NewAdminUserClient(cfg),
 		AdminUserRole:                 NewAdminUserRoleClient(cfg),
 		BOMHeader:                     NewBOMHeaderClient(cfg),
@@ -359,6 +376,9 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Product:                       NewProductClient(cfg),
 		ProductSKU:                    NewProductSKUClient(cfg),
 		ProductionFact:                NewProductionFactClient(cfg),
+		ProductionOrder:               NewProductionOrderClient(cfg),
+		ProductionOrderEvent:          NewProductionOrderEventClient(cfg),
+		ProductionOrderItem:           NewProductionOrderItemClient(cfg),
 		PurchaseOrder:                 NewPurchaseOrderClient(cfg),
 		PurchaseOrderItem:             NewPurchaseOrderItemClient(cfg),
 		PurchaseReceipt:               NewPurchaseReceiptClient(cfg),
@@ -406,6 +426,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ctx:                           ctx,
 		config:                        cfg,
 		AccessEntitlement:             NewAccessEntitlementClient(cfg),
+		AdminSession:                  NewAdminSessionClient(cfg),
 		AdminUser:                     NewAdminUserClient(cfg),
 		AdminUserRole:                 NewAdminUserRoleClient(cfg),
 		BOMHeader:                     NewBOMHeaderClient(cfg),
@@ -430,6 +451,9 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Product:                       NewProductClient(cfg),
 		ProductSKU:                    NewProductSKUClient(cfg),
 		ProductionFact:                NewProductionFactClient(cfg),
+		ProductionOrder:               NewProductionOrderClient(cfg),
+		ProductionOrderEvent:          NewProductionOrderEventClient(cfg),
+		ProductionOrderItem:           NewProductionOrderItemClient(cfg),
 		PurchaseOrder:                 NewPurchaseOrderClient(cfg),
 		PurchaseOrderItem:             NewPurchaseOrderItemClient(cfg),
 		PurchaseReceipt:               NewPurchaseReceiptClient(cfg),
@@ -486,13 +510,14 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.AccessEntitlement, c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem,
-		c.BusinessAttachment, c.Contact, c.Customer, c.CustomerConfigRevision,
-		c.DeploymentModuleState, c.FinanceFact, c.InventoryBalance, c.InventoryLot,
-		c.InventoryTxn, c.Material, c.OutsourcingFact, c.OutsourcingOrder,
-		c.OutsourcingOrderItem, c.Permission, c.Process, c.ProcessInstance,
-		c.ProcessNodeInstance, c.Product, c.ProductSKU, c.ProductionFact,
-		c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
+		c.AccessEntitlement, c.AdminSession, c.AdminUser, c.AdminUserRole, c.BOMHeader,
+		c.BOMItem, c.BusinessAttachment, c.Contact, c.Customer,
+		c.CustomerConfigRevision, c.DeploymentModuleState, c.FinanceFact,
+		c.InventoryBalance, c.InventoryLot, c.InventoryTxn, c.Material,
+		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem, c.Permission,
+		c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product, c.ProductSKU,
+		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
+		c.ProductionOrderItem, c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
 		c.PurchaseReceiptAdjustment, c.PurchaseReceiptAdjustmentItem,
 		c.PurchaseReceiptItem, c.PurchaseReturn, c.PurchaseReturnItem,
 		c.QualityInspection, c.Role, c.RolePermission, c.RoleProfile,
@@ -509,13 +534,14 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.AccessEntitlement, c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem,
-		c.BusinessAttachment, c.Contact, c.Customer, c.CustomerConfigRevision,
-		c.DeploymentModuleState, c.FinanceFact, c.InventoryBalance, c.InventoryLot,
-		c.InventoryTxn, c.Material, c.OutsourcingFact, c.OutsourcingOrder,
-		c.OutsourcingOrderItem, c.Permission, c.Process, c.ProcessInstance,
-		c.ProcessNodeInstance, c.Product, c.ProductSKU, c.ProductionFact,
-		c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
+		c.AccessEntitlement, c.AdminSession, c.AdminUser, c.AdminUserRole, c.BOMHeader,
+		c.BOMItem, c.BusinessAttachment, c.Contact, c.Customer,
+		c.CustomerConfigRevision, c.DeploymentModuleState, c.FinanceFact,
+		c.InventoryBalance, c.InventoryLot, c.InventoryTxn, c.Material,
+		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem, c.Permission,
+		c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product, c.ProductSKU,
+		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
+		c.ProductionOrderItem, c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
 		c.PurchaseReceiptAdjustment, c.PurchaseReceiptAdjustmentItem,
 		c.PurchaseReceiptItem, c.PurchaseReturn, c.PurchaseReturnItem,
 		c.QualityInspection, c.Role, c.RolePermission, c.RoleProfile,
@@ -533,6 +559,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
 	case *AccessEntitlementMutation:
 		return c.AccessEntitlement.mutate(ctx, m)
+	case *AdminSessionMutation:
+		return c.AdminSession.mutate(ctx, m)
 	case *AdminUserMutation:
 		return c.AdminUser.mutate(ctx, m)
 	case *AdminUserRoleMutation:
@@ -581,6 +609,12 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ProductSKU.mutate(ctx, m)
 	case *ProductionFactMutation:
 		return c.ProductionFact.mutate(ctx, m)
+	case *ProductionOrderMutation:
+		return c.ProductionOrder.mutate(ctx, m)
+	case *ProductionOrderEventMutation:
+		return c.ProductionOrderEvent.mutate(ctx, m)
+	case *ProductionOrderItemMutation:
+		return c.ProductionOrderItem.mutate(ctx, m)
 	case *PurchaseOrderMutation:
 		return c.PurchaseOrder.mutate(ctx, m)
 	case *PurchaseOrderItemMutation:
@@ -770,6 +804,139 @@ func (c *AccessEntitlementClient) mutate(ctx context.Context, m *AccessEntitleme
 		return (&AccessEntitlementDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown AccessEntitlement mutation op: %q", m.Op())
+	}
+}
+
+// AdminSessionClient is a client for the AdminSession schema.
+type AdminSessionClient struct {
+	config
+}
+
+// NewAdminSessionClient returns a client for the AdminSession from the given config.
+func NewAdminSessionClient(c config) *AdminSessionClient {
+	return &AdminSessionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `adminsession.Hooks(f(g(h())))`.
+func (c *AdminSessionClient) Use(hooks ...Hook) {
+	c.hooks.AdminSession = append(c.hooks.AdminSession, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `adminsession.Intercept(f(g(h())))`.
+func (c *AdminSessionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AdminSession = append(c.inters.AdminSession, interceptors...)
+}
+
+// Create returns a builder for creating a AdminSession entity.
+func (c *AdminSessionClient) Create() *AdminSessionCreate {
+	mutation := newAdminSessionMutation(c.config, OpCreate)
+	return &AdminSessionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AdminSession entities.
+func (c *AdminSessionClient) CreateBulk(builders ...*AdminSessionCreate) *AdminSessionCreateBulk {
+	return &AdminSessionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AdminSessionClient) MapCreateBulk(slice any, setFunc func(*AdminSessionCreate, int)) *AdminSessionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AdminSessionCreateBulk{err: fmt.Errorf("calling to AdminSessionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AdminSessionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AdminSessionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AdminSession.
+func (c *AdminSessionClient) Update() *AdminSessionUpdate {
+	mutation := newAdminSessionMutation(c.config, OpUpdate)
+	return &AdminSessionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AdminSessionClient) UpdateOne(_m *AdminSession) *AdminSessionUpdateOne {
+	mutation := newAdminSessionMutation(c.config, OpUpdateOne, withAdminSession(_m))
+	return &AdminSessionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AdminSessionClient) UpdateOneID(id int) *AdminSessionUpdateOne {
+	mutation := newAdminSessionMutation(c.config, OpUpdateOne, withAdminSessionID(id))
+	return &AdminSessionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AdminSession.
+func (c *AdminSessionClient) Delete() *AdminSessionDelete {
+	mutation := newAdminSessionMutation(c.config, OpDelete)
+	return &AdminSessionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AdminSessionClient) DeleteOne(_m *AdminSession) *AdminSessionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AdminSessionClient) DeleteOneID(id int) *AdminSessionDeleteOne {
+	builder := c.Delete().Where(adminsession.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AdminSessionDeleteOne{builder}
+}
+
+// Query returns a query builder for AdminSession.
+func (c *AdminSessionClient) Query() *AdminSessionQuery {
+	return &AdminSessionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAdminSession},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AdminSession entity by its id.
+func (c *AdminSessionClient) Get(ctx context.Context, id int) (*AdminSession, error) {
+	return c.Query().Where(adminsession.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AdminSessionClient) GetX(ctx context.Context, id int) *AdminSession {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *AdminSessionClient) Hooks() []Hook {
+	return c.hooks.AdminSession
+}
+
+// Interceptors returns the client interceptors.
+func (c *AdminSessionClient) Interceptors() []Interceptor {
+	return c.inters.AdminSession
+}
+
+func (c *AdminSessionClient) mutate(ctx context.Context, m *AdminSessionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AdminSessionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AdminSessionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AdminSessionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AdminSessionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AdminSession mutation op: %q", m.Op())
 	}
 }
 
@@ -2188,6 +2355,22 @@ func (c *FinanceFactClient) GetX(ctx context.Context, id int) *FinanceFact {
 		panic(err)
 	}
 	return obj
+}
+
+// QueryCanceller queries the canceller edge of a FinanceFact.
+func (c *FinanceFactClient) QueryCanceller(_m *FinanceFact) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financefact.Table, financefact.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, financefact.CancellerTable, financefact.CancellerColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
 }
 
 // Hooks returns the client hooks.
@@ -5055,6 +5238,631 @@ func (c *ProductionFactClient) mutate(ctx context.Context, m *ProductionFactMuta
 		return (&ProductionFactDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ProductionFact mutation op: %q", m.Op())
+	}
+}
+
+// ProductionOrderClient is a client for the ProductionOrder schema.
+type ProductionOrderClient struct {
+	config
+}
+
+// NewProductionOrderClient returns a client for the ProductionOrder from the given config.
+func NewProductionOrderClient(c config) *ProductionOrderClient {
+	return &ProductionOrderClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `productionorder.Hooks(f(g(h())))`.
+func (c *ProductionOrderClient) Use(hooks ...Hook) {
+	c.hooks.ProductionOrder = append(c.hooks.ProductionOrder, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `productionorder.Intercept(f(g(h())))`.
+func (c *ProductionOrderClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ProductionOrder = append(c.inters.ProductionOrder, interceptors...)
+}
+
+// Create returns a builder for creating a ProductionOrder entity.
+func (c *ProductionOrderClient) Create() *ProductionOrderCreate {
+	mutation := newProductionOrderMutation(c.config, OpCreate)
+	return &ProductionOrderCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ProductionOrder entities.
+func (c *ProductionOrderClient) CreateBulk(builders ...*ProductionOrderCreate) *ProductionOrderCreateBulk {
+	return &ProductionOrderCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProductionOrderClient) MapCreateBulk(slice any, setFunc func(*ProductionOrderCreate, int)) *ProductionOrderCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProductionOrderCreateBulk{err: fmt.Errorf("calling to ProductionOrderClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProductionOrderCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProductionOrderCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ProductionOrder.
+func (c *ProductionOrderClient) Update() *ProductionOrderUpdate {
+	mutation := newProductionOrderMutation(c.config, OpUpdate)
+	return &ProductionOrderUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProductionOrderClient) UpdateOne(_m *ProductionOrder) *ProductionOrderUpdateOne {
+	mutation := newProductionOrderMutation(c.config, OpUpdateOne, withProductionOrder(_m))
+	return &ProductionOrderUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProductionOrderClient) UpdateOneID(id int) *ProductionOrderUpdateOne {
+	mutation := newProductionOrderMutation(c.config, OpUpdateOne, withProductionOrderID(id))
+	return &ProductionOrderUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ProductionOrder.
+func (c *ProductionOrderClient) Delete() *ProductionOrderDelete {
+	mutation := newProductionOrderMutation(c.config, OpDelete)
+	return &ProductionOrderDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProductionOrderClient) DeleteOne(_m *ProductionOrder) *ProductionOrderDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProductionOrderClient) DeleteOneID(id int) *ProductionOrderDeleteOne {
+	builder := c.Delete().Where(productionorder.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProductionOrderDeleteOne{builder}
+}
+
+// Query returns a query builder for ProductionOrder.
+func (c *ProductionOrderClient) Query() *ProductionOrderQuery {
+	return &ProductionOrderQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProductionOrder},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ProductionOrder entity by its id.
+func (c *ProductionOrderClient) Get(ctx context.Context, id int) (*ProductionOrder, error) {
+	return c.Query().Where(productionorder.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProductionOrderClient) GetX(ctx context.Context, id int) *ProductionOrder {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryItems queries the items edge of a ProductionOrder.
+func (c *ProductionOrderClient) QueryItems(_m *ProductionOrder) *ProductionOrderItemQuery {
+	query := (&ProductionOrderItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorder.Table, productionorder.FieldID, id),
+			sqlgraph.To(productionorderitem.Table, productionorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionorder.ItemsTable, productionorder.ItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryEvents queries the events edge of a ProductionOrder.
+func (c *ProductionOrderClient) QueryEvents(_m *ProductionOrder) *ProductionOrderEventQuery {
+	query := (&ProductionOrderEventClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorder.Table, productionorder.FieldID, id),
+			sqlgraph.To(productionorderevent.Table, productionorderevent.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionorder.EventsTable, productionorder.EventsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryCreator queries the creator edge of a ProductionOrder.
+func (c *ProductionOrderClient) QueryCreator(_m *ProductionOrder) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorder.Table, productionorder.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionorder.CreatorTable, productionorder.CreatorColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryReleaser queries the releaser edge of a ProductionOrder.
+func (c *ProductionOrderClient) QueryReleaser(_m *ProductionOrder) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorder.Table, productionorder.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionorder.ReleaserTable, productionorder.ReleaserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryCloser queries the closer edge of a ProductionOrder.
+func (c *ProductionOrderClient) QueryCloser(_m *ProductionOrder) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorder.Table, productionorder.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionorder.CloserTable, productionorder.CloserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryCanceller queries the canceller edge of a ProductionOrder.
+func (c *ProductionOrderClient) QueryCanceller(_m *ProductionOrder) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorder.Table, productionorder.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionorder.CancellerTable, productionorder.CancellerColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ProductionOrderClient) Hooks() []Hook {
+	hooks := c.hooks.ProductionOrder
+	return append(hooks[:len(hooks):len(hooks)], productionorder.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProductionOrderClient) Interceptors() []Interceptor {
+	return c.inters.ProductionOrder
+}
+
+func (c *ProductionOrderClient) mutate(ctx context.Context, m *ProductionOrderMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProductionOrderCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProductionOrderUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProductionOrderUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProductionOrderDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ProductionOrder mutation op: %q", m.Op())
+	}
+}
+
+// ProductionOrderEventClient is a client for the ProductionOrderEvent schema.
+type ProductionOrderEventClient struct {
+	config
+}
+
+// NewProductionOrderEventClient returns a client for the ProductionOrderEvent from the given config.
+func NewProductionOrderEventClient(c config) *ProductionOrderEventClient {
+	return &ProductionOrderEventClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `productionorderevent.Hooks(f(g(h())))`.
+func (c *ProductionOrderEventClient) Use(hooks ...Hook) {
+	c.hooks.ProductionOrderEvent = append(c.hooks.ProductionOrderEvent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `productionorderevent.Intercept(f(g(h())))`.
+func (c *ProductionOrderEventClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ProductionOrderEvent = append(c.inters.ProductionOrderEvent, interceptors...)
+}
+
+// Create returns a builder for creating a ProductionOrderEvent entity.
+func (c *ProductionOrderEventClient) Create() *ProductionOrderEventCreate {
+	mutation := newProductionOrderEventMutation(c.config, OpCreate)
+	return &ProductionOrderEventCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ProductionOrderEvent entities.
+func (c *ProductionOrderEventClient) CreateBulk(builders ...*ProductionOrderEventCreate) *ProductionOrderEventCreateBulk {
+	return &ProductionOrderEventCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProductionOrderEventClient) MapCreateBulk(slice any, setFunc func(*ProductionOrderEventCreate, int)) *ProductionOrderEventCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProductionOrderEventCreateBulk{err: fmt.Errorf("calling to ProductionOrderEventClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProductionOrderEventCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProductionOrderEventCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ProductionOrderEvent.
+func (c *ProductionOrderEventClient) Update() *ProductionOrderEventUpdate {
+	mutation := newProductionOrderEventMutation(c.config, OpUpdate)
+	return &ProductionOrderEventUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProductionOrderEventClient) UpdateOne(_m *ProductionOrderEvent) *ProductionOrderEventUpdateOne {
+	mutation := newProductionOrderEventMutation(c.config, OpUpdateOne, withProductionOrderEvent(_m))
+	return &ProductionOrderEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProductionOrderEventClient) UpdateOneID(id int) *ProductionOrderEventUpdateOne {
+	mutation := newProductionOrderEventMutation(c.config, OpUpdateOne, withProductionOrderEventID(id))
+	return &ProductionOrderEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ProductionOrderEvent.
+func (c *ProductionOrderEventClient) Delete() *ProductionOrderEventDelete {
+	mutation := newProductionOrderEventMutation(c.config, OpDelete)
+	return &ProductionOrderEventDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProductionOrderEventClient) DeleteOne(_m *ProductionOrderEvent) *ProductionOrderEventDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProductionOrderEventClient) DeleteOneID(id int) *ProductionOrderEventDeleteOne {
+	builder := c.Delete().Where(productionorderevent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProductionOrderEventDeleteOne{builder}
+}
+
+// Query returns a query builder for ProductionOrderEvent.
+func (c *ProductionOrderEventClient) Query() *ProductionOrderEventQuery {
+	return &ProductionOrderEventQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProductionOrderEvent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ProductionOrderEvent entity by its id.
+func (c *ProductionOrderEventClient) Get(ctx context.Context, id int) (*ProductionOrderEvent, error) {
+	return c.Query().Where(productionorderevent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProductionOrderEventClient) GetX(ctx context.Context, id int) *ProductionOrderEvent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryProductionOrder queries the production_order edge of a ProductionOrderEvent.
+func (c *ProductionOrderEventClient) QueryProductionOrder(_m *ProductionOrderEvent) *ProductionOrderQuery {
+	query := (&ProductionOrderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderevent.Table, productionorderevent.FieldID, id),
+			sqlgraph.To(productionorder.Table, productionorder.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionorderevent.ProductionOrderTable, productionorderevent.ProductionOrderColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryActor queries the actor edge of a ProductionOrderEvent.
+func (c *ProductionOrderEventClient) QueryActor(_m *ProductionOrderEvent) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderevent.Table, productionorderevent.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionorderevent.ActorTable, productionorderevent.ActorColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ProductionOrderEventClient) Hooks() []Hook {
+	hooks := c.hooks.ProductionOrderEvent
+	return append(hooks[:len(hooks):len(hooks)], productionorderevent.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProductionOrderEventClient) Interceptors() []Interceptor {
+	return c.inters.ProductionOrderEvent
+}
+
+func (c *ProductionOrderEventClient) mutate(ctx context.Context, m *ProductionOrderEventMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProductionOrderEventCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProductionOrderEventUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProductionOrderEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProductionOrderEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ProductionOrderEvent mutation op: %q", m.Op())
+	}
+}
+
+// ProductionOrderItemClient is a client for the ProductionOrderItem schema.
+type ProductionOrderItemClient struct {
+	config
+}
+
+// NewProductionOrderItemClient returns a client for the ProductionOrderItem from the given config.
+func NewProductionOrderItemClient(c config) *ProductionOrderItemClient {
+	return &ProductionOrderItemClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `productionorderitem.Hooks(f(g(h())))`.
+func (c *ProductionOrderItemClient) Use(hooks ...Hook) {
+	c.hooks.ProductionOrderItem = append(c.hooks.ProductionOrderItem, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `productionorderitem.Intercept(f(g(h())))`.
+func (c *ProductionOrderItemClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ProductionOrderItem = append(c.inters.ProductionOrderItem, interceptors...)
+}
+
+// Create returns a builder for creating a ProductionOrderItem entity.
+func (c *ProductionOrderItemClient) Create() *ProductionOrderItemCreate {
+	mutation := newProductionOrderItemMutation(c.config, OpCreate)
+	return &ProductionOrderItemCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ProductionOrderItem entities.
+func (c *ProductionOrderItemClient) CreateBulk(builders ...*ProductionOrderItemCreate) *ProductionOrderItemCreateBulk {
+	return &ProductionOrderItemCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProductionOrderItemClient) MapCreateBulk(slice any, setFunc func(*ProductionOrderItemCreate, int)) *ProductionOrderItemCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProductionOrderItemCreateBulk{err: fmt.Errorf("calling to ProductionOrderItemClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProductionOrderItemCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProductionOrderItemCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ProductionOrderItem.
+func (c *ProductionOrderItemClient) Update() *ProductionOrderItemUpdate {
+	mutation := newProductionOrderItemMutation(c.config, OpUpdate)
+	return &ProductionOrderItemUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProductionOrderItemClient) UpdateOne(_m *ProductionOrderItem) *ProductionOrderItemUpdateOne {
+	mutation := newProductionOrderItemMutation(c.config, OpUpdateOne, withProductionOrderItem(_m))
+	return &ProductionOrderItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProductionOrderItemClient) UpdateOneID(id int) *ProductionOrderItemUpdateOne {
+	mutation := newProductionOrderItemMutation(c.config, OpUpdateOne, withProductionOrderItemID(id))
+	return &ProductionOrderItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ProductionOrderItem.
+func (c *ProductionOrderItemClient) Delete() *ProductionOrderItemDelete {
+	mutation := newProductionOrderItemMutation(c.config, OpDelete)
+	return &ProductionOrderItemDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProductionOrderItemClient) DeleteOne(_m *ProductionOrderItem) *ProductionOrderItemDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProductionOrderItemClient) DeleteOneID(id int) *ProductionOrderItemDeleteOne {
+	builder := c.Delete().Where(productionorderitem.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProductionOrderItemDeleteOne{builder}
+}
+
+// Query returns a query builder for ProductionOrderItem.
+func (c *ProductionOrderItemClient) Query() *ProductionOrderItemQuery {
+	return &ProductionOrderItemQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProductionOrderItem},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ProductionOrderItem entity by its id.
+func (c *ProductionOrderItemClient) Get(ctx context.Context, id int) (*ProductionOrderItem, error) {
+	return c.Query().Where(productionorderitem.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProductionOrderItemClient) GetX(ctx context.Context, id int) *ProductionOrderItem {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryProductionOrder queries the production_order edge of a ProductionOrderItem.
+func (c *ProductionOrderItemClient) QueryProductionOrder(_m *ProductionOrderItem) *ProductionOrderQuery {
+	query := (&ProductionOrderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderitem.Table, productionorderitem.FieldID, id),
+			sqlgraph.To(productionorder.Table, productionorder.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionorderitem.ProductionOrderTable, productionorderitem.ProductionOrderColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProduct queries the product edge of a ProductionOrderItem.
+func (c *ProductionOrderItemClient) QueryProduct(_m *ProductionOrderItem) *ProductQuery {
+	query := (&ProductClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderitem.Table, productionorderitem.FieldID, id),
+			sqlgraph.To(product.Table, product.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionorderitem.ProductTable, productionorderitem.ProductColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProductSku queries the product_sku edge of a ProductionOrderItem.
+func (c *ProductionOrderItemClient) QueryProductSku(_m *ProductionOrderItem) *ProductSKUQuery {
+	query := (&ProductSKUClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderitem.Table, productionorderitem.FieldID, id),
+			sqlgraph.To(productsku.Table, productsku.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionorderitem.ProductSkuTable, productionorderitem.ProductSkuColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUnit queries the unit edge of a ProductionOrderItem.
+func (c *ProductionOrderItemClient) QueryUnit(_m *ProductionOrderItem) *UnitQuery {
+	query := (&UnitClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderitem.Table, productionorderitem.FieldID, id),
+			sqlgraph.To(unit.Table, unit.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionorderitem.UnitTable, productionorderitem.UnitColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QuerySalesOrderItem queries the sales_order_item edge of a ProductionOrderItem.
+func (c *ProductionOrderItemClient) QuerySalesOrderItem(_m *ProductionOrderItem) *SalesOrderItemQuery {
+	query := (&SalesOrderItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderitem.Table, productionorderitem.FieldID, id),
+			sqlgraph.To(salesorderitem.Table, salesorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionorderitem.SalesOrderItemTable, productionorderitem.SalesOrderItemColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryBomHeader queries the bom_header edge of a ProductionOrderItem.
+func (c *ProductionOrderItemClient) QueryBomHeader(_m *ProductionOrderItem) *BOMHeaderQuery {
+	query := (&BOMHeaderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderitem.Table, productionorderitem.FieldID, id),
+			sqlgraph.To(bomheader.Table, bomheader.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionorderitem.BomHeaderTable, productionorderitem.BomHeaderColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ProductionOrderItemClient) Hooks() []Hook {
+	return c.hooks.ProductionOrderItem
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProductionOrderItemClient) Interceptors() []Interceptor {
+	return c.inters.ProductionOrderItem
+}
+
+func (c *ProductionOrderItemClient) mutate(ctx context.Context, m *ProductionOrderItemMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProductionOrderItemCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProductionOrderItemUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProductionOrderItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProductionOrderItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ProductionOrderItem mutation op: %q", m.Op())
 	}
 }
 
@@ -10200,33 +11008,33 @@ func (c *WorkflowTaskEventClient) mutate(ctx context.Context, m *WorkflowTaskEve
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		AccessEntitlement, AdminUser, AdminUserRole, BOMHeader, BOMItem,
+		AccessEntitlement, AdminSession, AdminUser, AdminUserRole, BOMHeader, BOMItem,
 		BusinessAttachment, Contact, Customer, CustomerConfigRevision,
 		DeploymentModuleState, FinanceFact, InventoryBalance, InventoryLot,
 		InventoryTxn, Material, OutsourcingFact, OutsourcingOrder,
 		OutsourcingOrderItem, Permission, Process, ProcessInstance,
-		ProcessNodeInstance, Product, ProductSKU, ProductionFact, PurchaseOrder,
-		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
-		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
-		PurchaseReturnItem, QualityInspection, Role, RolePermission, RoleProfile,
-		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
-		ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
-		WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
-		WorkflowTaskEvent []ent.Hook
+		ProcessNodeInstance, Product, ProductSKU, ProductionFact, ProductionOrder,
+		ProductionOrderEvent, ProductionOrderItem, PurchaseOrder, PurchaseOrderItem,
+		PurchaseReceipt, PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem,
+		PurchaseReceiptItem, PurchaseReturn, PurchaseReturnItem, QualityInspection,
+		Role, RolePermission, RoleProfile, RuntimeAuditEvent, RuntimeMarker,
+		SalesOrder, SalesOrderItem, Shipment, ShipmentItem, StockReservation, Supplier,
+		Unit, Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState,
+		WorkflowTask, WorkflowTaskEvent []ent.Hook
 	}
 	inters struct {
-		AccessEntitlement, AdminUser, AdminUserRole, BOMHeader, BOMItem,
+		AccessEntitlement, AdminSession, AdminUser, AdminUserRole, BOMHeader, BOMItem,
 		BusinessAttachment, Contact, Customer, CustomerConfigRevision,
 		DeploymentModuleState, FinanceFact, InventoryBalance, InventoryLot,
 		InventoryTxn, Material, OutsourcingFact, OutsourcingOrder,
 		OutsourcingOrderItem, Permission, Process, ProcessInstance,
-		ProcessNodeInstance, Product, ProductSKU, ProductionFact, PurchaseOrder,
-		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
-		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
-		PurchaseReturnItem, QualityInspection, Role, RolePermission, RoleProfile,
-		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
-		ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
-		WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
-		WorkflowTaskEvent []ent.Interceptor
+		ProcessNodeInstance, Product, ProductSKU, ProductionFact, ProductionOrder,
+		ProductionOrderEvent, ProductionOrderItem, PurchaseOrder, PurchaseOrderItem,
+		PurchaseReceipt, PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem,
+		PurchaseReceiptItem, PurchaseReturn, PurchaseReturnItem, QualityInspection,
+		Role, RolePermission, RoleProfile, RuntimeAuditEvent, RuntimeMarker,
+		SalesOrder, SalesOrderItem, Shipment, ShipmentItem, StockReservation, Supplier,
+		Unit, Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState,
+		WorkflowTask, WorkflowTaskEvent []ent.Interceptor
 	}
 )

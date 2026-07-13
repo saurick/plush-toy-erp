@@ -1,3 +1,5 @@
+import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
+
 export async function installMasterDataRpcMocks(page, context) {
   const { nowUnix } = context
 
@@ -236,7 +238,7 @@ export async function installMasterDataRpcMocks(page, context) {
         data = { material: { ...material, ...params } }
         break
       default:
-        data = {}
+        data = unsupportedRpcMethod('masterdata', method)
         break
     }
 
@@ -246,11 +248,7 @@ export async function installMasterDataRpcMocks(page, context) {
       body: JSON.stringify({
         jsonrpc: '2.0',
         id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
+        result: styleRpcResult(data),
       }),
     })
   })

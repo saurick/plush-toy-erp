@@ -12,7 +12,7 @@ import {
   formatWorkflowTaskSource,
   resolveWorkflowTaskEntryPath,
 } from '../../utils/dashboardTaskDisplay.mjs'
-import { isTerminalWorkflowTask } from '../../utils/workflowDashboardStats.mjs'
+import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
 import {
   getWorkflowTaskCodeLabel,
   getWorkflowTaskDueLabel,
@@ -60,29 +60,29 @@ const TASK_DRAWER_STEPS = Object.freeze([
   {
     key: 'action',
     title: '选择动作',
-    description: '完成、阻塞、退回或催办，只写 Workflow 任务事件。',
+    description: '完成、阻塞、退回或催办，只记录协同任务处理结果。',
   },
   {
     key: 'submit',
     title: '提交回队列',
-    description: '刷新任务列表，不自动写入事实层。',
+    description: '刷新任务列表，不自动处理库存、出货或财务业务。',
   },
 ])
 
 export function getTaskActionDescription(actionMode = '') {
   if (actionMode === 'complete') {
-    return '确认后只关闭当前 Workflow 协同任务；库存、出货、财务、开票或付款仍需进入对应业务模块处理。'
+    return '确认后只完成当前协同任务；库存、出货、财务、开票或付款仍需进入对应业务模块处理。'
   }
   if (actionMode === 'block') {
     return '请写清卡点原因、影响范围和下一责任人，后续角色才能接续处理。'
   }
   if (actionMode === 'reject') {
-    return '请写清退回依据、需补齐事项和下一责任岗位；退回只记录协同状态，不冲销事实。'
+    return '请写清退回依据、需补齐事项和下一责任岗位；退回只记录协同状态，不会撤销已完成的业务处理。'
   }
   if (actionMode === 'urge') {
     return '请写清催办对象和需要补齐的事项，避免只留下无上下文提醒。'
   }
-  return '先选择一个处理动作；任务上下文只用于核对，不保存业务事实。'
+  return '先选择一个处理动作；任务上下文只用于核对，不直接生成或修改业务记录。'
 }
 
 function getTaskActionTone(actionMode = '') {
@@ -294,8 +294,8 @@ export default function WorkflowTaskActionDrawer({
             <div className="erp-task-action-drawer__guide-note">
               <AlertOutlined aria-hidden="true" />
               <span>
-                <strong>Workflow / Fact 边界：</strong>
-                完成、阻塞、退回和催办只处理协同任务；库存、出货、应收、开票、付款或其他事实仍回到对应业务模块。
+                <strong>处理范围：</strong>
+                完成、阻塞、退回和催办只处理协同任务；库存、出货、应收、开票和付款仍需进入对应业务模块处理。
               </span>
             </div>
           </section>

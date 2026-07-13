@@ -25,6 +25,16 @@ const (
 	FieldErpPreferences = "erp_preferences"
 	// FieldDisabled holds the string denoting the disabled field in the database.
 	FieldDisabled = "disabled"
+	// FieldAuthVersion holds the string denoting the auth_version field in the database.
+	FieldAuthVersion = "auth_version"
+	// FieldRevokedAt holds the string denoting the revoked_at field in the database.
+	FieldRevokedAt = "revoked_at"
+	// FieldStatusReason holds the string denoting the status_reason field in the database.
+	FieldStatusReason = "status_reason"
+	// FieldStatusChangedAt holds the string denoting the status_changed_at field in the database.
+	FieldStatusChangedAt = "status_changed_at"
+	// FieldStatusChangedBy holds the string denoting the status_changed_by field in the database.
+	FieldStatusChangedBy = "status_changed_by"
 	// FieldLastLoginAt holds the string denoting the last_login_at field in the database.
 	FieldLastLoginAt = "last_login_at"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -44,6 +54,11 @@ var Columns = []string{
 	FieldIsSuperAdmin,
 	FieldErpPreferences,
 	FieldDisabled,
+	FieldAuthVersion,
+	FieldRevokedAt,
+	FieldStatusReason,
+	FieldStatusChangedAt,
+	FieldStatusChangedBy,
 	FieldLastLoginAt,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -74,6 +89,14 @@ var (
 	ErpPreferencesValidator func(string) error
 	// DefaultDisabled holds the default value on creation for the "disabled" field.
 	DefaultDisabled bool
+	// DefaultAuthVersion holds the default value on creation for the "auth_version" field.
+	DefaultAuthVersion int64
+	// AuthVersionValidator is a validator for the "auth_version" field. It is called by the builders before save.
+	AuthVersionValidator func(int64) error
+	// StatusReasonValidator is a validator for the "status_reason" field. It is called by the builders before save.
+	StatusReasonValidator func(string) error
+	// StatusChangedByValidator is a validator for the "status_changed_by" field. It is called by the builders before save.
+	StatusChangedByValidator func(int) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -118,6 +141,31 @@ func ByErpPreferences(opts ...sql.OrderTermOption) OrderOption {
 // ByDisabled orders the results by the disabled field.
 func ByDisabled(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDisabled, opts...).ToFunc()
+}
+
+// ByAuthVersion orders the results by the auth_version field.
+func ByAuthVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAuthVersion, opts...).ToFunc()
+}
+
+// ByRevokedAt orders the results by the revoked_at field.
+func ByRevokedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRevokedAt, opts...).ToFunc()
+}
+
+// ByStatusReason orders the results by the status_reason field.
+func ByStatusReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStatusReason, opts...).ToFunc()
+}
+
+// ByStatusChangedAt orders the results by the status_changed_at field.
+func ByStatusChangedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStatusChangedAt, opts...).ToFunc()
+}
+
+// ByStatusChangedBy orders the results by the status_changed_by field.
+func ByStatusChangedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStatusChangedBy, opts...).ToFunc()
 }
 
 // ByLastLoginAt orders the results by the last_login_at field.

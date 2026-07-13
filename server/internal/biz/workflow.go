@@ -2,12 +2,8 @@ package biz
 
 import (
 	"context"
-	"errors"
-	"regexp"
 	"strings"
 )
-
-var workflowNumberedPhasePattern = regexp.MustCompile(`(?i)\b` + `phase` + `\s*[0-9]+[a-z0-9_-]*`)
 
 func (uc *WorkflowUsecase) Metadata() (taskStates, businessStates, planningPhases []WorkflowStateOption) {
 	return WorkflowTaskStates(), WorkflowBusinessStates(), WorkflowPlanningPhases()
@@ -46,27 +42,37 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
-	in.TaskStatusKey = strings.TrimSpace(in.TaskStatusKey)
-	in.BusinessStatusKey = strings.TrimSpace(in.BusinessStatusKey)
-	in.Reason = strings.TrimSpace(in.Reason)
-	if in.ID <= 0 || !IsValidWorkflowTaskState(in.TaskStatusKey) {
-		return nil, ErrBadParam
+	if err := prepareWorkflowTaskStatusMutation(in, actorID); err != nil {
+		return nil, err
 	}
-	if in.BusinessStatusKey != "" && !IsValidWorkflowBusinessState(in.BusinessStatusKey) {
-		return nil, ErrBadParam
-	}
-	if in.Payload == nil {
-		in.Payload = map[string]any{}
+	if replayed, found, err := uc.repo.ResolveWorkflowTaskMutation(ctx, in.ID, in.IdempotencyKey, in.IntentHash, in.CommandKey, actorID); err != nil || found {
+		return replayed, err
 	}
 	current, err := uc.repo.GetWorkflowTask(ctx, in.ID)
 	if err != nil {
 		return nil, err
 	}
 	if IsTerminalWorkflowTaskStatus(current.TaskStatusKey) {
-		if strings.TrimSpace(current.TaskStatusKey) == in.TaskStatusKey && workflowTerminalRetryMatches(current, in) {
-			return current, nil
-		}
 		return nil, ErrWorkflowTaskSettled
+	}
+	if in.ExpectedVersion != current.Version {
+		return nil, ErrWorkflowTaskConflict
+	}
+	if !CanTransitionWorkflowTaskStatus(current.TaskStatusKey, in.TaskStatusKey) {
+		return nil, ErrBadParam
+	}
+	if in.TaskStatusKey == "blocked" || in.TaskStatusKey == "rejected" {
+		in.Reason = workflowTransitionReason(in, in.TaskStatusKey)
+		if in.Reason == "" {
+			return nil, ErrBadParam
+		}
+	}
+	in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+	switch in.TaskStatusKey {
+	case "blocked", "rejected":
+		setWorkflowTransitionReasonPayload(in.Payload, in.TaskStatusKey, in.Reason)
+	default:
+		clearWorkflowTransitionReasonPayload(in.Payload)
 	}
 	if isBossOrderApprovalTask(current) {
 		if err := uc.applyBossApprovalTransition(current, in); err != nil {
@@ -133,32 +139,9 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 		return nil, err
 	}
 	if workflowStatusUpdateHasNumberedPhaseLabel(in) {
-		return nil, ErrBadParam
+		return nil, ErrNumberedImplementationStageLabel
 	}
-	updated, err := uc.repo.UpdateWorkflowTaskStatus(ctx, in, actorID, strings.TrimSpace(actorRoleKey))
-	if !errors.Is(err, ErrWorkflowTaskSettled) {
-		return updated, err
-	}
-	// Another request may have settled the task after the read above. Preserve
-	// same-terminal retries as idempotent reads without replaying side effects.
-	latest, getErr := uc.repo.GetWorkflowTask(ctx, in.ID)
-	if getErr != nil {
-		return nil, getErr
-	}
-	if workflowTerminalRetryMatches(latest, in) {
-		return latest, nil
-	}
-	return nil, ErrWorkflowTaskSettled
-}
-
-func workflowTerminalRetryMatches(current *WorkflowTask, in *WorkflowTaskStatusUpdate) bool {
-	if current == nil || in == nil || strings.TrimSpace(current.TaskStatusKey) != strings.TrimSpace(in.TaskStatusKey) {
-		return false
-	}
-	if strings.TrimSpace(current.TaskStatusKey) != "rejected" {
-		return true
-	}
-	return workflowTaskRejectionReason(current) != "" && workflowTaskRejectionReason(current) == strings.TrimSpace(in.Reason)
+	return uc.repo.UpdateWorkflowTaskStatus(ctx, in, actorID, strings.TrimSpace(actorRoleKey))
 }
 
 func (uc *WorkflowUsecase) applyBossApprovalTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
@@ -325,7 +308,6 @@ func (uc *WorkflowUsecase) applyOutsourceReturnTrackingTransition(current *Workf
 	switch in.TaskStatusKey {
 	case "done":
 		in.BusinessStatusKey = workflowQCPendingStatusKey
-		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 		delete(in.Payload, "blocked_reason")
 		delete(in.Payload, "rejected_reason")
 		in.Payload["return_task_id"] = current.ID
@@ -346,7 +328,6 @@ func (uc *WorkflowUsecase) applyOutsourceReturnQCTransition(current *WorkflowTas
 	switch in.TaskStatusKey {
 	case "done":
 		in.BusinessStatusKey = workflowWarehouseInboundPendingKey
-		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 		clearWorkflowTransitionReasonPayload(in.Payload)
 		if workflowPayloadString(in.Payload, "qc_result") == "" {
 			in.Payload["qc_result"] = "pass"
@@ -361,7 +342,6 @@ func (uc *WorkflowUsecase) applyOutsourceReturnQCTransition(current *WorkflowTas
 		}
 		in.Reason = reason
 		in.BusinessStatusKey = workflowQCFailedStatusKey
-		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 		in.Payload["decision"] = in.TaskStatusKey
 		in.Payload["transition_status"] = in.TaskStatusKey
 		in.Payload["qc_type"] = "outsource_return"
@@ -378,7 +358,6 @@ func (uc *WorkflowUsecase) applyOutsourceWarehouseInboundTransition(current *Wor
 	switch in.TaskStatusKey {
 	case "done":
 		in.BusinessStatusKey = workflowInboundDoneStatusKey
-		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 		delete(in.Payload, "blocked_reason")
 		delete(in.Payload, "rejected_reason")
 		in.Payload["warehouse_task_id"] = current.ID
@@ -433,7 +412,6 @@ func (uc *WorkflowUsecase) applyFinishedGoodsQCTransition(current *WorkflowTask,
 	switch in.TaskStatusKey {
 	case "done":
 		in.BusinessStatusKey = workflowWarehouseInboundPendingKey
-		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 		delete(in.Payload, "blocked_reason")
 		delete(in.Payload, "rejected_reason")
 		delete(in.Payload, "decision")
@@ -454,7 +432,6 @@ func (uc *WorkflowUsecase) applyFinishedGoodsQCTransition(current *WorkflowTask,
 		}
 		in.Reason = reason
 		in.BusinessStatusKey = workflowQCFailedStatusKey
-		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 		in.Payload["decision"] = in.TaskStatusKey
 		in.Payload["transition_status"] = in.TaskStatusKey
 		in.Payload["qc_task_id"] = current.ID
@@ -478,7 +455,6 @@ func (uc *WorkflowUsecase) applyFinishedGoodsInboundTransition(current *Workflow
 	switch in.TaskStatusKey {
 	case "done":
 		in.BusinessStatusKey = workflowInboundDoneStatusKey
-		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 		delete(in.Payload, "blocked_reason")
 		delete(in.Payload, "rejected_reason")
 		in.Payload["inbound_task_id"] = current.ID
@@ -497,7 +473,6 @@ func (uc *WorkflowUsecase) applyFinishedGoodsInboundTransition(current *Workflow
 		}
 		in.Reason = reason
 		in.BusinessStatusKey = workflowBlockedStatusKey
-		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 		in.Payload["inbound_task_id"] = current.ID
 		in.Payload["finished_goods"] = true
 		in.Payload["critical_path"] = true
@@ -548,7 +523,6 @@ func (uc *WorkflowUsecase) applyShipmentReleaseTransition(current *WorkflowTask,
 	switch in.TaskStatusKey {
 	case "done":
 		in.BusinessStatusKey = workflowShippingReleasedStatusKey
-		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 		delete(in.Payload, "blocked_reason")
 		delete(in.Payload, "rejected_reason")
 		in.Payload["shipment_release_task_id"] = current.ID
@@ -569,7 +543,6 @@ func (uc *WorkflowUsecase) applyShipmentReleaseTransition(current *WorkflowTask,
 		}
 		in.Reason = reason
 		in.BusinessStatusKey = workflowBlockedStatusKey
-		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 		in.Payload["shipment_release_task_id"] = current.ID
 		in.Payload["critical_path"] = true
 		in.Payload["decision"] = in.TaskStatusKey
@@ -586,7 +559,6 @@ func (uc *WorkflowUsecase) applyReceivableRegistrationTransition(current *Workfl
 	switch in.TaskStatusKey {
 	case "done":
 		in.BusinessStatusKey = workflowReconcilingStatusKey
-		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 		delete(in.Payload, "blocked_reason")
 		delete(in.Payload, "rejected_reason")
 		in.Payload["receivable_task_id"] = current.ID
@@ -612,7 +584,6 @@ func (uc *WorkflowUsecase) applyInvoiceRegistrationTransition(current *WorkflowT
 	switch in.TaskStatusKey {
 	case "done":
 		in.BusinessStatusKey = workflowReconcilingStatusKey
-		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 		delete(in.Payload, "blocked_reason")
 		delete(in.Payload, "rejected_reason")
 		in.Payload["invoice_task_id"] = current.ID
@@ -639,7 +610,6 @@ func applyShipmentFinanceBlockedTransition(current *WorkflowTask, in *WorkflowTa
 	}
 	in.Reason = reason
 	in.BusinessStatusKey = workflowBlockedStatusKey
-	in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 	in.Payload["finance_task_id"] = current.ID
 	in.Payload["notification_type"] = "finance_pending"
 	in.Payload["alert_type"] = "finance_pending"
@@ -656,7 +626,6 @@ func (uc *WorkflowUsecase) applyPayableRegistrationTransition(current *WorkflowT
 	case "done":
 		payableType := workflowPayableType(current)
 		in.BusinessStatusKey = workflowReconcilingStatusKey
-		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 		delete(in.Payload, "blocked_reason")
 		delete(in.Payload, "rejected_reason")
 		in.Payload["payable_task_id"] = current.ID
@@ -684,7 +653,6 @@ func (uc *WorkflowUsecase) applyPayableReconciliationTransition(current *Workflo
 	case "done":
 		payableType := workflowPayableType(current)
 		in.BusinessStatusKey = workflowSettledStatusKey
-		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 		delete(in.Payload, "blocked_reason")
 		delete(in.Payload, "rejected_reason")
 		in.Payload["reconciliation_task_id"] = current.ID
@@ -711,7 +679,6 @@ func applyPayableFinanceBlockedTransition(current *WorkflowTask, in *WorkflowTas
 	payableType := workflowPayableType(current)
 	in.Reason = reason
 	in.BusinessStatusKey = workflowBlockedStatusKey
-	in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
 	in.Payload["finance_task_id"] = current.ID
 	in.Payload["notification_type"] = "finance_pending"
 	in.Payload["alert_type"] = "finance_pending"
@@ -728,13 +695,21 @@ func (uc *WorkflowUsecase) UrgeTask(ctx context.Context, in *WorkflowTaskUrge, a
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
-	in.Action = strings.TrimSpace(in.Action)
-	in.Reason = strings.TrimSpace(in.Reason)
-	if in.ID <= 0 || !IsValidWorkflowTaskUrgeAction(in.Action) || in.Reason == "" {
-		return nil, ErrBadParam
+	if err := prepareWorkflowTaskUrgeMutation(in, actorID); err != nil {
+		return nil, err
 	}
-	if in.Payload == nil {
-		in.Payload = map[string]any{}
+	if replayed, found, err := uc.repo.ResolveWorkflowTaskMutation(ctx, in.ID, in.IdempotencyKey, in.IntentHash, in.CommandKey, actorID); err != nil || found {
+		return replayed, err
+	}
+	current, err := uc.repo.GetWorkflowTask(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	if IsTerminalWorkflowTaskStatus(current.TaskStatusKey) {
+		return nil, ErrWorkflowTaskSettled
+	}
+	if in.ExpectedVersion != current.Version {
+		return nil, ErrWorkflowTaskConflict
 	}
 	return uc.repo.UrgeWorkflowTask(ctx, in, actorID, strings.TrimSpace(actorRoleKey))
 }
@@ -838,7 +813,7 @@ func normalizeWorkflowTaskCreate(in WorkflowTaskCreate) (WorkflowTaskCreate, err
 		in.Payload = map[string]any{}
 	}
 	if workflowCreateHasNumberedPhaseLabel(in) {
-		return WorkflowTaskCreate{}, ErrBadParam
+		return WorkflowTaskCreate{}, ErrNumberedImplementationStageLabel
 	}
 	if in.TaskCode == "" || in.TaskGroup == "" || in.TaskName == "" || in.SourceType == "" || in.SourceID <= 0 || in.OwnerRoleKey == "" {
 		return WorkflowTaskCreate{}, ErrBadParam
@@ -954,35 +929,11 @@ func workflowStringPtrValue(value *string) string {
 }
 
 func workflowTextHasNumberedPhaseLabel(values ...string) bool {
-	for _, value := range values {
-		if workflowNumberedPhasePattern.MatchString(value) {
-			return true
-		}
-	}
-	return false
+	return containsNumberedImplementationStageLabel(values...)
 }
 
 func workflowValueHasNumberedPhaseLabel(value any) bool {
-	switch v := value.(type) {
-	case nil:
-		return false
-	case string:
-		return workflowNumberedPhasePattern.MatchString(v)
-	case map[string]any:
-		for key, item := range v {
-			if workflowNumberedPhasePattern.MatchString(key) ||
-				workflowValueHasNumberedPhaseLabel(item) {
-				return true
-			}
-		}
-	case []any:
-		for _, item := range v {
-			if workflowValueHasNumberedPhaseLabel(item) {
-				return true
-			}
-		}
-	}
-	return false
+	return valueContainsNumberedImplementationStageLabel(value)
 }
 
 func normalizeWorkflowBusinessStateFilter(filter WorkflowBusinessStateFilter) WorkflowBusinessStateFilter {

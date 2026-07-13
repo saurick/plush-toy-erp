@@ -74,6 +74,7 @@ export class JsonRpc {
     } catch (e) {
       throw new RpcError('Invalid JSON response from server', {
         httpStatus: response.status,
+        isInvalidResponse: true,
         cause: e,
       })
     }

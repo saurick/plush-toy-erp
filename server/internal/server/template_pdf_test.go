@@ -13,8 +13,6 @@ import (
 	"time"
 
 	"server/internal/biz"
-	"server/internal/conf"
-	jwtutil "server/pkg/jwt"
 )
 
 func TestParseRenderTemplatePDFRequest(t *testing.T) {
@@ -489,14 +487,10 @@ func TestTemplatePDFChromeManagerCloseClearsRuntime(t *testing.T) {
 	}
 }
 
-func TestAdminRequestVerifierAcceptsAdminClaimsAndBearerToken(t *testing.T) {
+func TestAdminRequestVerifierRequiresValidatedAdminClaims(t *testing.T) {
 	t.Parallel()
 
-	verifier := newAdminRequestVerifier(&conf.Data{
-		Auth: &conf.Data_Auth{
-			JwtSecret: "test-secret",
-		},
-	})
+	verifier := newAdminRequestVerifier(nil)
 
 	req := httptest.NewRequest("POST", "/templates/render-pdf", nil)
 	req = req.WithContext(
@@ -510,17 +504,9 @@ func TestAdminRequestVerifierAcceptsAdminClaimsAndBearerToken(t *testing.T) {
 		t.Fatal("expected admin claims request to pass verifier")
 	}
 
-	token, _, err := jwtutil.NewToken(jwtutil.Config{
-		Secret:         []byte("test-secret"),
-		ExpireDuration: time.Hour,
-	}, 1, "admin", int8(biz.RoleAdmin))
-	if err != nil {
-		t.Fatalf("NewToken() error = %v", err)
-	}
-
 	bearerReq := httptest.NewRequest("POST", "/templates/render-pdf", nil)
-	bearerReq.Header.Set("Authorization", "Bearer "+token)
-	if !verifier.IsAdminRequest(bearerReq) {
-		t.Fatal("expected bearer admin token request to pass verifier")
+	bearerReq.Header.Set("Authorization", "Bearer signed-but-not-session-validated")
+	if verifier.IsAdminRequest(bearerReq) {
+		t.Fatal("raw bearer token must not bypass server-side session validation")
 	}
 }

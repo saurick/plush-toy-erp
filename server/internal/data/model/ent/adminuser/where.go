@@ -84,6 +84,31 @@ func Disabled(v bool) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldEQ(FieldDisabled, v))
 }
 
+// AuthVersion applies equality check predicate on the "auth_version" field. It's identical to AuthVersionEQ.
+func AuthVersion(v int64) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldAuthVersion, v))
+}
+
+// RevokedAt applies equality check predicate on the "revoked_at" field. It's identical to RevokedAtEQ.
+func RevokedAt(v time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldRevokedAt, v))
+}
+
+// StatusReason applies equality check predicate on the "status_reason" field. It's identical to StatusReasonEQ.
+func StatusReason(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldStatusReason, v))
+}
+
+// StatusChangedAt applies equality check predicate on the "status_changed_at" field. It's identical to StatusChangedAtEQ.
+func StatusChangedAt(v time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldStatusChangedAt, v))
+}
+
+// StatusChangedBy applies equality check predicate on the "status_changed_by" field. It's identical to StatusChangedByEQ.
+func StatusChangedBy(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldStatusChangedBy, v))
+}
+
 // LastLoginAt applies equality check predicate on the "last_login_at" field. It's identical to LastLoginAtEQ.
 func LastLoginAt(v time.Time) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldEQ(FieldLastLoginAt, v))
@@ -387,6 +412,271 @@ func DisabledEQ(v bool) predicate.AdminUser {
 // DisabledNEQ applies the NEQ predicate on the "disabled" field.
 func DisabledNEQ(v bool) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldNEQ(FieldDisabled, v))
+}
+
+// AuthVersionEQ applies the EQ predicate on the "auth_version" field.
+func AuthVersionEQ(v int64) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldAuthVersion, v))
+}
+
+// AuthVersionNEQ applies the NEQ predicate on the "auth_version" field.
+func AuthVersionNEQ(v int64) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNEQ(FieldAuthVersion, v))
+}
+
+// AuthVersionIn applies the In predicate on the "auth_version" field.
+func AuthVersionIn(vs ...int64) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIn(FieldAuthVersion, vs...))
+}
+
+// AuthVersionNotIn applies the NotIn predicate on the "auth_version" field.
+func AuthVersionNotIn(vs ...int64) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotIn(FieldAuthVersion, vs...))
+}
+
+// AuthVersionGT applies the GT predicate on the "auth_version" field.
+func AuthVersionGT(v int64) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGT(FieldAuthVersion, v))
+}
+
+// AuthVersionGTE applies the GTE predicate on the "auth_version" field.
+func AuthVersionGTE(v int64) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGTE(FieldAuthVersion, v))
+}
+
+// AuthVersionLT applies the LT predicate on the "auth_version" field.
+func AuthVersionLT(v int64) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLT(FieldAuthVersion, v))
+}
+
+// AuthVersionLTE applies the LTE predicate on the "auth_version" field.
+func AuthVersionLTE(v int64) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLTE(FieldAuthVersion, v))
+}
+
+// RevokedAtEQ applies the EQ predicate on the "revoked_at" field.
+func RevokedAtEQ(v time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldRevokedAt, v))
+}
+
+// RevokedAtNEQ applies the NEQ predicate on the "revoked_at" field.
+func RevokedAtNEQ(v time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNEQ(FieldRevokedAt, v))
+}
+
+// RevokedAtIn applies the In predicate on the "revoked_at" field.
+func RevokedAtIn(vs ...time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIn(FieldRevokedAt, vs...))
+}
+
+// RevokedAtNotIn applies the NotIn predicate on the "revoked_at" field.
+func RevokedAtNotIn(vs ...time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotIn(FieldRevokedAt, vs...))
+}
+
+// RevokedAtGT applies the GT predicate on the "revoked_at" field.
+func RevokedAtGT(v time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGT(FieldRevokedAt, v))
+}
+
+// RevokedAtGTE applies the GTE predicate on the "revoked_at" field.
+func RevokedAtGTE(v time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGTE(FieldRevokedAt, v))
+}
+
+// RevokedAtLT applies the LT predicate on the "revoked_at" field.
+func RevokedAtLT(v time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLT(FieldRevokedAt, v))
+}
+
+// RevokedAtLTE applies the LTE predicate on the "revoked_at" field.
+func RevokedAtLTE(v time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLTE(FieldRevokedAt, v))
+}
+
+// RevokedAtIsNil applies the IsNil predicate on the "revoked_at" field.
+func RevokedAtIsNil() predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIsNull(FieldRevokedAt))
+}
+
+// RevokedAtNotNil applies the NotNil predicate on the "revoked_at" field.
+func RevokedAtNotNil() predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotNull(FieldRevokedAt))
+}
+
+// StatusReasonEQ applies the EQ predicate on the "status_reason" field.
+func StatusReasonEQ(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldStatusReason, v))
+}
+
+// StatusReasonNEQ applies the NEQ predicate on the "status_reason" field.
+func StatusReasonNEQ(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNEQ(FieldStatusReason, v))
+}
+
+// StatusReasonIn applies the In predicate on the "status_reason" field.
+func StatusReasonIn(vs ...string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIn(FieldStatusReason, vs...))
+}
+
+// StatusReasonNotIn applies the NotIn predicate on the "status_reason" field.
+func StatusReasonNotIn(vs ...string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotIn(FieldStatusReason, vs...))
+}
+
+// StatusReasonGT applies the GT predicate on the "status_reason" field.
+func StatusReasonGT(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGT(FieldStatusReason, v))
+}
+
+// StatusReasonGTE applies the GTE predicate on the "status_reason" field.
+func StatusReasonGTE(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGTE(FieldStatusReason, v))
+}
+
+// StatusReasonLT applies the LT predicate on the "status_reason" field.
+func StatusReasonLT(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLT(FieldStatusReason, v))
+}
+
+// StatusReasonLTE applies the LTE predicate on the "status_reason" field.
+func StatusReasonLTE(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLTE(FieldStatusReason, v))
+}
+
+// StatusReasonContains applies the Contains predicate on the "status_reason" field.
+func StatusReasonContains(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldContains(FieldStatusReason, v))
+}
+
+// StatusReasonHasPrefix applies the HasPrefix predicate on the "status_reason" field.
+func StatusReasonHasPrefix(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldHasPrefix(FieldStatusReason, v))
+}
+
+// StatusReasonHasSuffix applies the HasSuffix predicate on the "status_reason" field.
+func StatusReasonHasSuffix(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldHasSuffix(FieldStatusReason, v))
+}
+
+// StatusReasonIsNil applies the IsNil predicate on the "status_reason" field.
+func StatusReasonIsNil() predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIsNull(FieldStatusReason))
+}
+
+// StatusReasonNotNil applies the NotNil predicate on the "status_reason" field.
+func StatusReasonNotNil() predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotNull(FieldStatusReason))
+}
+
+// StatusReasonEqualFold applies the EqualFold predicate on the "status_reason" field.
+func StatusReasonEqualFold(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEqualFold(FieldStatusReason, v))
+}
+
+// StatusReasonContainsFold applies the ContainsFold predicate on the "status_reason" field.
+func StatusReasonContainsFold(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldContainsFold(FieldStatusReason, v))
+}
+
+// StatusChangedAtEQ applies the EQ predicate on the "status_changed_at" field.
+func StatusChangedAtEQ(v time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldStatusChangedAt, v))
+}
+
+// StatusChangedAtNEQ applies the NEQ predicate on the "status_changed_at" field.
+func StatusChangedAtNEQ(v time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNEQ(FieldStatusChangedAt, v))
+}
+
+// StatusChangedAtIn applies the In predicate on the "status_changed_at" field.
+func StatusChangedAtIn(vs ...time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIn(FieldStatusChangedAt, vs...))
+}
+
+// StatusChangedAtNotIn applies the NotIn predicate on the "status_changed_at" field.
+func StatusChangedAtNotIn(vs ...time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotIn(FieldStatusChangedAt, vs...))
+}
+
+// StatusChangedAtGT applies the GT predicate on the "status_changed_at" field.
+func StatusChangedAtGT(v time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGT(FieldStatusChangedAt, v))
+}
+
+// StatusChangedAtGTE applies the GTE predicate on the "status_changed_at" field.
+func StatusChangedAtGTE(v time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGTE(FieldStatusChangedAt, v))
+}
+
+// StatusChangedAtLT applies the LT predicate on the "status_changed_at" field.
+func StatusChangedAtLT(v time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLT(FieldStatusChangedAt, v))
+}
+
+// StatusChangedAtLTE applies the LTE predicate on the "status_changed_at" field.
+func StatusChangedAtLTE(v time.Time) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLTE(FieldStatusChangedAt, v))
+}
+
+// StatusChangedAtIsNil applies the IsNil predicate on the "status_changed_at" field.
+func StatusChangedAtIsNil() predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIsNull(FieldStatusChangedAt))
+}
+
+// StatusChangedAtNotNil applies the NotNil predicate on the "status_changed_at" field.
+func StatusChangedAtNotNil() predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotNull(FieldStatusChangedAt))
+}
+
+// StatusChangedByEQ applies the EQ predicate on the "status_changed_by" field.
+func StatusChangedByEQ(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldStatusChangedBy, v))
+}
+
+// StatusChangedByNEQ applies the NEQ predicate on the "status_changed_by" field.
+func StatusChangedByNEQ(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNEQ(FieldStatusChangedBy, v))
+}
+
+// StatusChangedByIn applies the In predicate on the "status_changed_by" field.
+func StatusChangedByIn(vs ...int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIn(FieldStatusChangedBy, vs...))
+}
+
+// StatusChangedByNotIn applies the NotIn predicate on the "status_changed_by" field.
+func StatusChangedByNotIn(vs ...int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotIn(FieldStatusChangedBy, vs...))
+}
+
+// StatusChangedByGT applies the GT predicate on the "status_changed_by" field.
+func StatusChangedByGT(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGT(FieldStatusChangedBy, v))
+}
+
+// StatusChangedByGTE applies the GTE predicate on the "status_changed_by" field.
+func StatusChangedByGTE(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGTE(FieldStatusChangedBy, v))
+}
+
+// StatusChangedByLT applies the LT predicate on the "status_changed_by" field.
+func StatusChangedByLT(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLT(FieldStatusChangedBy, v))
+}
+
+// StatusChangedByLTE applies the LTE predicate on the "status_changed_by" field.
+func StatusChangedByLTE(v int) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLTE(FieldStatusChangedBy, v))
+}
+
+// StatusChangedByIsNil applies the IsNil predicate on the "status_changed_by" field.
+func StatusChangedByIsNil() predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIsNull(FieldStatusChangedBy))
+}
+
+// StatusChangedByNotNil applies the NotNil predicate on the "status_changed_by" field.
+func StatusChangedByNotNil() predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotNull(FieldStatusChangedBy))
 }
 
 // LastLoginAtEQ applies the EQ predicate on the "last_login_at" field.

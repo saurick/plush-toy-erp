@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import {
   Alert,
@@ -8,6 +15,7 @@ import {
   Descriptions,
   Empty,
   Input,
+  Pagination,
   Row,
   Select,
   Space,
@@ -28,6 +36,7 @@ import WorkflowTaskActionDrawer, {
 import {
   blockWorkflowTaskAction,
   completeWorkflowTaskAction,
+  getWorkflowTaskBoard,
   listWorkflowTasks,
   rejectWorkflowTaskAction,
   urgeWorkflowTask,
@@ -38,26 +47,33 @@ import {
   getWorkflowTaskSourceTypeLabel,
   resolveWorkflowTaskEntryPath,
 } from '../utils/dashboardTaskDisplay.mjs'
-import {
-  getWorkflowTaskDueStatus,
-  isTerminalWorkflowTask,
-} from '../utils/workflowDashboardStats.mjs'
+import { getWorkflowTaskDueStatus } from '../utils/workflowDashboardStats.mjs'
+import { isTerminalWorkflowTask } from '../utils/workflowTaskLifecycle.mjs'
 import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../utils/workflowTaskActionSubmitGuard.mjs'
+import {
+  createTaskMutationAttemptStore,
+  createTaskMutationInFlightGuard,
+  isWorkflowTaskMutationResultUnknown,
+  verifyNewWorkflowTaskMutationAttempt,
+} from '../utils/workflowTaskMutation.mjs'
 import {
   TASK_BOARD_ROLE_OPTIONS,
   TASK_BOARD_DUE_OPTIONS,
   TASK_BOARD_STATUS_OPTIONS,
-  buildWorkflowTaskBoardLanes,
-  filterWorkflowTaskBoardTasks,
+  buildWorkflowTaskBoardModel,
+  buildWorkflowTaskBoardRequest,
   getTaskStatusKey,
   getWorkflowTaskDueLabel,
+  getWorkflowTaskBoardRequestKey,
   getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskReason,
   getWorkflowTaskReasonLabel,
+  getWorkflowTaskReasonMeta,
   getWorkflowTaskReadonlyReason,
   getWorkflowTaskStatusMeta,
   hasActiveWorkflowTaskBoardFilters,
   readWorkflowTaskBoardFiltersFromSearch,
+  resolveWorkflowTaskBoardResponseState,
   writeWorkflowTaskBoardFiltersToSearch,
 } from '../utils/workflowTaskBoard.mjs'
 
@@ -87,7 +103,7 @@ const EXCEPTION_FLOW_STEPS = Object.freeze([
   {
     key: 'close',
     title: '关闭归档',
-    description: '只关闭协同异常，不写事实层。',
+    description: '只关闭当前协同异常，不会改变相关业务记录。',
   },
 ])
 
@@ -96,6 +112,26 @@ const WORKBENCH_QUEUE_OPTIONS = Object.freeze([
   { key: 'risk', label: '阻塞/逾期', hint: '先补原因' },
   { key: 'waiting', label: '等待交接', hint: '非终态任务' },
 ])
+
+const WORKBENCH_QUEUE_PAGE_SIZE = 8
+const TASK_BOARD_PAGE_SCROLL_GAP = 12
+
+function scrollTaskBoardLanesToStart(lanesElement) {
+  const scrollContainer = lanesElement?.closest?.('.erp-admin-content')
+  if (!scrollContainer) return
+
+  const containerRect = scrollContainer.getBoundingClientRect()
+  const lanesRect = lanesElement.getBoundingClientRect()
+  const paddingTop =
+    Number.parseFloat(window.getComputedStyle(scrollContainer).paddingTop) || 0
+  const expectedTop =
+    containerRect.top + paddingTop + TASK_BOARD_PAGE_SCROLL_GAP
+  const nextScrollTop = scrollContainer.scrollTop + lanesRect.top - expectedTop
+  scrollContainer.scrollTo({
+    top: Math.max(0, nextScrollTop),
+    behavior: 'auto',
+  })
+}
 
 const PRODUCT_CORE_METRICS = Object.freeze([
   {
@@ -260,11 +296,11 @@ function ProductCoreDashboard({ onNavigate }) {
   )
 }
 
-function buildSourceOptions(tasks = []) {
+function buildSourceOptions(values = []) {
   const sourceTypes = [
     ...new Set(
-      (tasks || [])
-        .map((task) => String(task.source_type || '').trim())
+      (values || [])
+        .map((sourceType) => String(sourceType || '').trim())
         .filter(Boolean)
     ),
   ].sort((left, right) => left.localeCompare(right))
@@ -284,11 +320,17 @@ function getWorkflowTaskStableKey(task) {
 
 function TaskLane({
   lane,
+  focused,
+  page,
   selectedTaskId,
   onSelectTask,
   onOpenTask,
   onOpenEntry,
+  onViewAll,
+  onPageChange,
 }) {
+  const shownStart = lane.tasks.length > 0 ? lane.offset + 1 : 0
+  const shownEnd = lane.offset + lane.tasks.length
   return (
     <Card
       size="small"
@@ -310,6 +352,7 @@ function TaskLane({
         {lane.tasks.length > 0 ? (
           lane.tasks.map((task) => {
             const statusMeta = getWorkflowTaskStatusMeta(task)
+            const reasonMeta = getWorkflowTaskReasonMeta(task)
             const entryPath = resolveWorkflowTaskEntryPath(task)
             const taskId = getWorkflowTaskStableKey(task)
             const isSelected = taskId && taskId === selectedTaskId
@@ -346,10 +389,16 @@ function TaskLane({
                   {formatWorkflowTaskSource(task)} /{' '}
                   {getWorkflowTaskDueLabel(task)}
                 </Text>
-                {getWorkflowTaskReason(task) ? (
-                  <Text type="danger" className="erp-task-board-card-meta">
-                    {getWorkflowTaskReasonLabel(task)}：
-                    {getWorkflowTaskReason(task)}
+                {reasonMeta.value ? (
+                  <Text
+                    type={
+                      ['blocked', 'rejected'].includes(reasonMeta.kind)
+                        ? 'danger'
+                        : 'secondary'
+                    }
+                    className="erp-task-board-card-meta"
+                  >
+                    {reasonMeta.label}：{reasonMeta.value}
                   </Text>
                 ) : null}
                 <Space wrap>
@@ -364,6 +413,32 @@ function TaskLane({
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无任务" />
         )}
       </Space>
+      {focused ? (
+        <div className="erp-task-board-lane-footer erp-task-board-lane-footer--focused">
+          <Text type="secondary">
+            已显示第 {shownStart}-{shownEnd} 条，共 {lane.count} 条
+          </Text>
+          {lane.count > lane.limit ? (
+            <Pagination
+              size="small"
+              current={page}
+              pageSize={lane.limit}
+              total={lane.count}
+              showSizeChanger={false}
+              onChange={onPageChange}
+            />
+          ) : null}
+        </div>
+      ) : lane.hiddenCount > 0 ? (
+        <div className="erp-task-board-lane-footer">
+          <Text type="secondary">
+            已显示前 {lane.tasks.length} 条，共 {lane.count} 条
+          </Text>
+          <Button type="link" size="small" onClick={onViewAll}>
+            查看全部 {lane.count} 条
+          </Button>
+        </div>
+      ) : null}
     </Card>
   )
 }
@@ -424,6 +499,8 @@ function WorkbenchQueueEmpty({ activeOption, fallbackOption, onSwitchQueue }) {
 export default function DashboardPage({ initialView = 'workbench' }) {
   const [loading, setLoading] = useState(false)
   const [workflowTasks, setWorkflowTasks] = useState([])
+  const [taskBoardResponseState, setTaskBoardResponseState] = useState(null)
+  const [taskBoardKeywordDraft, setTaskBoardKeywordDraft] = useState('')
   const [selectedTask, setSelectedTask] = useState(null)
   const [selectedTaskBoardTaskId, setSelectedTaskBoardTaskId] = useState('')
   const [actionMode, setActionMode] = useState('')
@@ -431,11 +508,21 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const [actionSaving, setActionSaving] = useState(false)
   const [activeView, setActiveView] = useState(initialView)
   const [workbenchQueueKey, setWorkbenchQueueKey] = useState('actionable')
+  const [workbenchQueuePage, setWorkbenchQueuePage] = useState(1)
   const [selectedWorkbenchTaskId, setSelectedWorkbenchTaskId] = useState('')
+  const [taskBoardTransitionMinHeight, setTaskBoardTransitionMinHeight] =
+    useState(0)
   const [exceptionStepKey, setExceptionStepKey] = useState(
     EXCEPTION_FLOW_STEPS[0].key
   )
   const mountedRef = useRef(false)
+  const dashboardLoadRequestSeqRef = useRef(0)
+  const taskBoardLanesRef = useRef(null)
+  const pendingTaskBoardPageScrollRef = useRef(null)
+  const mutationAttemptsRef = useRef(null)
+  mutationAttemptsRef.current ||= createTaskMutationAttemptStore()
+  const mutationInFlightRef = useRef(null)
+  mutationInFlightRef.current ||= createTaskMutationInFlightGuard()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const outletContext = useOutletContext()
@@ -451,35 +538,97 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     initialView === 'workbench' &&
     adminProfile?.is_super_admin === true &&
     !effectiveSessionCustomerKey
+  const filters = useMemo(
+    () => readWorkflowTaskBoardFiltersFromSearch(searchParams),
+    [searchParams]
+  )
+  const isTaskBoardView = initialView === 'task-board'
+  const taskBoardRequest = useMemo(
+    () => buildWorkflowTaskBoardRequest(filters),
+    [filters]
+  )
+  const taskBoardRequestKey = useMemo(
+    () => getWorkflowTaskBoardRequestKey(taskBoardRequest),
+    [taskBoardRequest]
+  )
 
   const loadDashboardStats = useCallback(async () => {
+    const requestSeq = dashboardLoadRequestSeqRef.current + 1
+    dashboardLoadRequestSeqRef.current = requestSeq
     if (shouldShowProductCoreDashboard) {
       setWorkflowTasks([])
       setLoading(false)
       return true
     }
     setLoading(true)
+    if (isTaskBoardView && mountedRef.current) {
+      setTaskBoardResponseState({
+        requestKey: taskBoardRequestKey,
+        response: null,
+        error: '',
+      })
+    }
     try {
-      const workflowResult = await listWorkflowTasks({ limit: 200 })
-      if (mountedRef.current) {
-        setWorkflowTasks(workflowResult?.tasks || [])
+      if (isTaskBoardView) {
+        const taskBoardResult = await getWorkflowTaskBoard(taskBoardRequest)
+        if (
+          mountedRef.current &&
+          dashboardLoadRequestSeqRef.current === requestSeq
+        ) {
+          setTaskBoardResponseState({
+            requestKey: taskBoardRequestKey,
+            response: taskBoardResult,
+            error: '',
+          })
+        }
+      } else {
+        const workflowResult = await listWorkflowTasks({ limit: 200 })
+        if (
+          mountedRef.current &&
+          dashboardLoadRequestSeqRef.current === requestSeq
+        ) {
+          setWorkflowTasks(workflowResult?.tasks || [])
+        }
       }
       return true
     } catch (error) {
-      message.error(getActionErrorMessage(error, '加载工作台'))
+      if (
+        mountedRef.current &&
+        dashboardLoadRequestSeqRef.current === requestSeq
+      ) {
+        const fallback = isTaskBoardView ? '加载任务看板失败' : '加载工作台失败'
+        const errorMessage = getActionErrorMessage(error, fallback)
+        if (isTaskBoardView) {
+          setTaskBoardResponseState({
+            requestKey: taskBoardRequestKey,
+            response: null,
+            error: errorMessage,
+          })
+        }
+        message.error(errorMessage)
+      }
       return false
     } finally {
-      if (mountedRef.current) {
+      if (
+        mountedRef.current &&
+        dashboardLoadRequestSeqRef.current === requestSeq
+      ) {
         setLoading(false)
       }
     }
-  }, [shouldShowProductCoreDashboard])
+  }, [
+    isTaskBoardView,
+    shouldShowProductCoreDashboard,
+    taskBoardRequest,
+    taskBoardRequestKey,
+  ])
 
   useEffect(() => {
     mountedRef.current = true
     loadDashboardStats()
     return () => {
       mountedRef.current = false
+      dashboardLoadRequestSeqRef.current += 1
     }
   }, [loadDashboardStats])
 
@@ -491,25 +640,39 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     setActiveView(initialView)
   }, [initialView])
 
-  const filters = useMemo(
-    () => readWorkflowTaskBoardFiltersFromSearch(searchParams),
-    [searchParams]
-  )
-  const filteredTasks = useMemo(
-    () => filterWorkflowTaskBoardTasks(workflowTasks, filters),
-    [filters, workflowTasks]
-  )
   const hasActiveFilters = useMemo(
     () => hasActiveWorkflowTaskBoardFilters(filters),
     [filters]
   )
-  const taskLanes = useMemo(
-    () => buildWorkflowTaskBoardLanes(filteredTasks),
-    [filteredTasks]
+  const taskBoardResponse = useMemo(
+    () =>
+      resolveWorkflowTaskBoardResponseState(
+        taskBoardResponseState,
+        taskBoardRequest
+      ),
+    [taskBoardRequest, taskBoardResponseState]
+  )
+  const taskBoardLoadError =
+    taskBoardResponseState?.requestKey === taskBoardRequestKey
+      ? taskBoardResponseState.error
+      : ''
+  const taskBoardModel = useMemo(
+    () => buildWorkflowTaskBoardModel(taskBoardResponse, filters),
+    [filters, taskBoardResponse]
+  )
+  const taskBoardReady = Boolean(taskBoardResponse) && !taskBoardLoadError
+  const taskLanes = taskBoardModel.visibleLanes
+  const taskBoardVisibleTasks = useMemo(
+    () => taskLanes.flatMap((lane) => lane.tasks),
+    [taskLanes]
   )
   const sourceOptions = useMemo(
-    () => buildSourceOptions(workflowTasks),
-    [workflowTasks]
+    () =>
+      buildSourceOptions([
+        ...taskBoardModel.sourceTypes,
+        filters.sourceType === 'all' ? '' : filters.sourceType,
+      ]),
+    [filters.sourceType, taskBoardModel.sourceTypes]
   )
   const actionMeta = actionMode ? TASK_ACTION_META[actionMode] : null
   const activeExceptionStep =
@@ -537,39 +700,12 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         .slice(0, 8),
     [workflowTasks]
   )
-  const taskCenterAssignedCount = useMemo(
-    () =>
-      workflowTasks.filter((task) =>
-        ['pending', 'ready', 'processing'].includes(getTaskStatusKey(task))
-      ).length,
-    [workflowTasks]
-  )
-  const taskCenterBlockedCount = useMemo(
-    () =>
-      workflowTasks.filter((task) => {
-        const statusKey = getTaskStatusKey(task)
-        return (
-          ['blocked', 'rejected'].includes(statusKey) ||
-          Boolean(getWorkflowTaskReason(task))
-        )
-      }).length,
-    [workflowTasks]
-  )
-  const taskCenterOverdueCount = useMemo(
-    () =>
-      workflowTasks.filter(
-        (task) =>
-          !isTerminalWorkflowTask(task) &&
-          getWorkflowTaskDueStatus(task) === 'overdue'
-      ).length,
-    [workflowTasks]
-  )
   const taskCenterCurrentTask = useMemo(
     () =>
-      filteredTasks.find(
+      taskBoardVisibleTasks.find(
         (task) => getWorkflowTaskStableKey(task) === selectedTaskBoardTaskId
       ) || null,
-    [filteredTasks, selectedTaskBoardTaskId]
+    [selectedTaskBoardTaskId, taskBoardVisibleTasks]
   )
   const taskCenterCurrentStatusMeta = taskCenterCurrentTask
     ? getWorkflowTaskStatusMeta(taskCenterCurrentTask)
@@ -579,14 +715,80 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     : ''
 
   useEffect(() => {
-    if (!selectedTaskBoardTaskId) return
-    const stillVisible = filteredTasks.some(
+    if (!taskBoardReady || !selectedTaskBoardTaskId) return
+    const stillVisible = taskBoardVisibleTasks.some(
       (task) => getWorkflowTaskStableKey(task) === selectedTaskBoardTaskId
     )
     if (!stillVisible) {
       setSelectedTaskBoardTaskId('')
     }
-  }, [filteredTasks, selectedTaskBoardTaskId])
+  }, [selectedTaskBoardTaskId, taskBoardReady, taskBoardVisibleTasks])
+
+  useEffect(() => {
+    setTaskBoardKeywordDraft(filters.keyword)
+  }, [filters.keyword])
+
+  useLayoutEffect(() => {
+    const pendingScroll = pendingTaskBoardPageScrollRef.current
+    if (
+      !pendingScroll ||
+      loading ||
+      !taskBoardReady ||
+      !taskBoardModel.focused ||
+      filters.lane !== pendingScroll.lane ||
+      taskBoardModel.page !== pendingScroll.page
+    ) {
+      return
+    }
+
+    scrollTaskBoardLanesToStart(taskBoardLanesRef.current)
+    pendingTaskBoardPageScrollRef.current = null
+    setTaskBoardTransitionMinHeight(0)
+  }, [
+    filters.lane,
+    loading,
+    taskBoardModel.focused,
+    taskBoardModel.page,
+    taskBoardReady,
+  ])
+
+  useEffect(() => {
+    if (!taskBoardLoadError || !pendingTaskBoardPageScrollRef.current) return
+    pendingTaskBoardPageScrollRef.current = null
+    setTaskBoardTransitionMinHeight(0)
+  }, [taskBoardLoadError])
+
+  useEffect(() => {
+    if (
+      !taskBoardResponse ||
+      !taskBoardModel.focused ||
+      taskBoardModel.requestedPage <= taskBoardModel.pageCount
+    ) {
+      return
+    }
+    if (pendingTaskBoardPageScrollRef.current) {
+      pendingTaskBoardPageScrollRef.current = {
+        ...pendingTaskBoardPageScrollRef.current,
+        page: taskBoardModel.pageCount,
+      }
+    }
+    setSelectedTaskBoardTaskId('')
+    setSearchParams(
+      writeWorkflowTaskBoardFiltersToSearch(searchParams, {
+        ...filters,
+        page: taskBoardModel.pageCount,
+      }),
+      { replace: true }
+    )
+  }, [
+    filters,
+    searchParams,
+    setSearchParams,
+    taskBoardModel.focused,
+    taskBoardModel.pageCount,
+    taskBoardModel.requestedPage,
+    taskBoardResponse,
+  ])
 
   const workbenchQueueGroups = useMemo(() => {
     const groups = {
@@ -642,16 +844,28 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         option.key !== workbenchQueueKey &&
         (workbenchQueueGroups[option.key]?.length || 0) > 0
     ) || null
+  const workbenchQueuePageCount = Math.max(
+    1,
+    Math.ceil(workbenchQueueTasks.length / WORKBENCH_QUEUE_PAGE_SIZE)
+  )
+  const activeWorkbenchQueuePage = Math.min(
+    workbenchQueuePage,
+    workbenchQueuePageCount
+  )
+  const workbenchQueuePageTasks = useMemo(() => {
+    const start = (activeWorkbenchQueuePage - 1) * WORKBENCH_QUEUE_PAGE_SIZE
+    return workbenchQueueTasks.slice(start, start + WORKBENCH_QUEUE_PAGE_SIZE)
+  }, [activeWorkbenchQueuePage, workbenchQueueTasks])
   const selectedWorkbenchTask = useMemo(() => {
-    if (workbenchQueueTasks.length === 0) {
+    if (workbenchQueuePageTasks.length === 0) {
       return null
     }
     return (
-      workbenchQueueTasks.find(
+      workbenchQueuePageTasks.find(
         (task) => String(task.id || task.task_code) === selectedWorkbenchTaskId
-      ) || workbenchQueueTasks[0]
+      ) || workbenchQueuePageTasks[0]
     )
-  }, [selectedWorkbenchTaskId, workbenchQueueTasks])
+  }, [selectedWorkbenchTaskId, workbenchQueuePageTasks])
   const selectedWorkbenchStatusMeta = selectedWorkbenchTask
     ? getWorkflowTaskStatusMeta(selectedWorkbenchTask)
     : null
@@ -663,6 +877,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     task: selectedWorkbenchTask,
     enabled: Boolean(selectedWorkbenchTask),
   })
+  const showSelectedWorkbenchTaskReadonlyAction =
+    !selectedWorkbenchTaskAccess.loading &&
+    selectedWorkbenchTaskAccess.allowedModes.length === 0
   const taskCenterCurrentTaskAccess = useWorkflowTaskActionAccess({
     adminProfile,
     task: taskCenterCurrentTask,
@@ -674,20 +891,76 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     enabled: Boolean(selectedTask),
   })
 
+  useEffect(() => {
+    if (workbenchQueuePage === activeWorkbenchQueuePage) return
+    setWorkbenchQueuePage(activeWorkbenchQueuePage)
+    setSelectedWorkbenchTaskId('')
+  }, [activeWorkbenchQueuePage, workbenchQueuePage])
+
   const updateFilter = (key, value) => {
+    pendingTaskBoardPageScrollRef.current = null
+    setTaskBoardTransitionMinHeight(0)
     setSearchParams(
       writeWorkflowTaskBoardFiltersToSearch(searchParams, {
         ...filters,
         [key]: value,
+        page: 1,
       }),
       { replace: true }
     )
   }
 
   const clearFilters = () => {
+    pendingTaskBoardPageScrollRef.current = null
+    setTaskBoardTransitionMinHeight(0)
     setSearchParams(writeWorkflowTaskBoardFiltersToSearch(searchParams), {
       replace: true,
     })
+  }
+
+  const selectTaskBoardLane = (lane) => {
+    pendingTaskBoardPageScrollRef.current = null
+    setTaskBoardTransitionMinHeight(0)
+    setSelectedTaskBoardTaskId('')
+    setSearchParams(
+      writeWorkflowTaskBoardFiltersToSearch(searchParams, {
+        ...filters,
+        lane,
+        page: 1,
+      }),
+      { replace: true }
+    )
+  }
+
+  const selectTaskBoardPage = (page) => {
+    const nextPage = Number(page)
+    if (
+      !taskBoardModel.focused ||
+      !Number.isInteger(nextPage) ||
+      nextPage < 1 ||
+      nextPage === taskBoardModel.page
+    ) {
+      return
+    }
+    const taskBoardCard = taskBoardLanesRef.current?.closest?.(
+      '.erp-dashboard-task-board-card'
+    )
+    const currentCardHeight = Math.ceil(
+      taskBoardCard?.getBoundingClientRect().height || 0
+    )
+    pendingTaskBoardPageScrollRef.current = {
+      lane: filters.lane,
+      page: nextPage,
+    }
+    setTaskBoardTransitionMinHeight(currentCardHeight)
+    setSelectedTaskBoardTaskId('')
+    setSearchParams(
+      writeWorkflowTaskBoardFiltersToSearch(searchParams, {
+        ...filters,
+        page: nextPage,
+      }),
+      { replace: true }
+    )
   }
 
   const openTaskEntry = (task) => {
@@ -718,6 +991,17 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     }
   }, [])
 
+  const selectWorkbenchQueue = useCallback((queueKey) => {
+    setWorkbenchQueueKey(queueKey)
+    setWorkbenchQueuePage(1)
+    setSelectedWorkbenchTaskId('')
+  }, [])
+
+  const selectWorkbenchQueuePage = useCallback((page) => {
+    setWorkbenchQueuePage(page)
+    setSelectedWorkbenchTaskId('')
+  }, [])
+
   const openTaskDrawer = (task, mode = '') => {
     const nextMode = TASK_ACTION_META[mode] ? mode : ''
     setSelectedTask(task)
@@ -734,93 +1018,119 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const submitTaskAction = async () => {
     if (!selectedTask || !actionMode || !actionMeta) return
 
-    if (isTerminalWorkflowTask(selectedTask)) {
-      message.warning('已结束任务不能继续处理')
-      return
-    }
-    if (actionDrawerAccess.loading) {
-      message.warning('正在核对任务动作权限，请稍后再提交')
-      return
-    }
-    if (!actionDrawerAccess.canRun(actionMode)) {
-      message.warning(
-        actionDrawerAccess.getReason(actionMode) ||
-          getWorkflowTaskReadonlyReason(adminProfile, selectedTask)
-      )
-      return
-    }
-
     const reason = actionReason.trim()
     if (actionMeta.requireReason && !reason) {
       message.warning(`${actionMeta.title}需要填写原因`)
       return
     }
-    const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
-      task: selectedTask,
-      actionKey: actionMode,
-      reason,
-      onWarning: message.warning,
-      onError: message.error,
-    })
-    if (!accessVerified) return
-
-    setActionSaving(true)
+    const scope = `${selectedTask.id}:${actionMode}`
+    const operation = actionMode
+    const mutate =
+      actionMode === 'urge'
+        ? urgeWorkflowTask
+        : actionMode === 'complete'
+          ? completeWorkflowTaskAction
+          : actionMode === 'block'
+            ? blockWorkflowTaskAction
+            : rejectWorkflowTaskAction
+    const params =
+      actionMode === 'urge'
+        ? {
+            task_id: selectedTask.id,
+            expected_version: selectedTask.version,
+            action: 'urge_task',
+            reason,
+            payload: {
+              entry: 'desktop_task_board',
+            },
+          }
+        : {
+            task_id: selectedTask.id,
+            expected_version: selectedTask.version,
+            action_key: actionMode,
+            reason,
+            payload: {
+              desktop_task_board_action: actionMode,
+              blocked_reason: actionMode === 'block' ? reason : undefined,
+              rejected_reason: actionMode === 'reject' ? reason : undefined,
+            },
+          }
+    const inFlightLease = mutationInFlightRef.current.acquire(
+      `task:${selectedTask.id}`
+    )
+    if (!inFlightLease) return
     try {
-      if (actionMode === 'urge') {
-        await urgeWorkflowTask({
-          task_id: selectedTask.id,
-          action: 'urge_task',
-          reason,
-          payload: {
-            entry: 'desktop_task_board',
-          },
-        })
-      } else {
-        const nextStatusKey =
-          actionMode === 'block'
-            ? 'blocked'
-            : actionMode === 'reject'
-              ? 'rejected'
-              : 'done'
-        const actionParams = {
-          task_id: selectedTask.id,
-          reason,
-          payload: {
-            desktop_task_board_action: actionMode,
-            blocked_reason: actionMode === 'block' ? reason : undefined,
-            rejected_reason: actionMode === 'reject' ? reason : undefined,
-          },
+      const accessVerified = await verifyNewWorkflowTaskMutationAttempt({
+        attemptStore: mutationAttemptsRef.current,
+        scope,
+        operation,
+        params,
+        verify: async () => {
+          if (isTerminalWorkflowTask(selectedTask)) {
+            message.warning('已结束任务不能继续处理')
+            return false
+          }
+          if (actionDrawerAccess.loading) {
+            message.warning('正在核对任务动作权限，请稍后再提交')
+            return false
+          }
+          if (!actionDrawerAccess.canRun(actionMode)) {
+            message.warning(
+              actionDrawerAccess.getReason(actionMode) ||
+                getWorkflowTaskReadonlyReason(adminProfile, selectedTask)
+            )
+            return false
+          }
+          return verifyWorkflowTaskActionAccessBeforeSubmit({
+            task: selectedTask,
+            actionKey: actionMode,
+            reason,
+            onWarning: message.warning,
+            onError: message.error,
+          })
+        },
+      })
+      if (!accessVerified) return
+
+      setActionSaving(true)
+      try {
+        try {
+          await mutationAttemptsRef.current.run({
+            scope,
+            operation,
+            mutate,
+            params,
+          })
+        } catch (error) {
+          if (isWorkflowTaskMutationResultUnknown(error)) {
+            message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
+          } else {
+            message.error(
+              getActionErrorMessage(error, `${actionMeta.title}失败`)
+            )
+            closeTaskDrawer()
+            await loadDashboardStats().catch(() => {})
+          }
+          return
         }
-        if (nextStatusKey === 'done') {
-          await completeWorkflowTaskAction({
-            ...actionParams,
-            action_key: 'complete',
-          })
-        } else if (nextStatusKey === 'blocked') {
-          await blockWorkflowTaskAction({
-            ...actionParams,
-            action_key: 'block',
-          })
-        } else {
-          await rejectWorkflowTaskAction({
-            ...actionParams,
-            action_key: 'reject',
-          })
+        closeTaskDrawer()
+        message.success(actionMeta.successMessage)
+        try {
+          await loadDashboardStats()
+        } catch {
+          message.warning('操作已成功但列表刷新失败，请手动刷新')
         }
+      } finally {
+        setActionSaving(false)
       }
-      message.success(actionMeta.successMessage)
-      closeTaskDrawer()
-      await loadDashboardStats()
-    } catch (error) {
-      message.error(getActionErrorMessage(error, `${actionMeta.title}失败`))
     } finally {
-      setActionSaving(false)
+      mutationInFlightRef.current.release(inFlightLease)
     }
   }
 
   const workbenchTaskColumns = [
     {
-      title: '优先级',
+      title: '状态 / 风险',
       key: 'task_priority',
       width: 88,
       render: (_, record) => {
@@ -946,7 +1256,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       .join(' ')}
                     aria-pressed={active}
                     aria-label={`${option.label}，${count} 项，${option.hint}`}
-                    onClick={() => setWorkbenchQueueKey(option.key)}
+                    onClick={() => selectWorkbenchQueue(option.key)}
                   >
                     <span>{option.label}</span>
                     <strong>{count}</strong>
@@ -964,7 +1274,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   <div>
                     <Title level={5}>优先处理队列</Title>
                     <Text type="secondary">
-                      先处理待办和卡点；选中任务后在右侧核对上下文。
+                      按到期时间分批展示；选中任务后在右侧核对上下文。
                     </Text>
                   </div>
                   <Tag
@@ -979,7 +1289,20 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   rowKey={(record) => record.id || record.task_code}
                   columns={workbenchTaskColumns}
                   dataSource={workbenchQueueTasks}
-                  pagination={false}
+                  pagination={
+                    workbenchQueueTasks.length > WORKBENCH_QUEUE_PAGE_SIZE
+                      ? {
+                          current: activeWorkbenchQueuePage,
+                          pageSize: WORKBENCH_QUEUE_PAGE_SIZE,
+                          total: workbenchQueueTasks.length,
+                          showLessItems: true,
+                          showSizeChanger: false,
+                          showTotal: (total, [start, end]) =>
+                            `第 ${start}-${end} 项 / 共 ${total} 项`,
+                          onChange: selectWorkbenchQueuePage,
+                        }
+                      : false
+                  }
                   scroll={{ x: 760 }}
                   rowClassName={(record) =>
                     String(record.id || record.task_code) ===
@@ -992,9 +1315,21 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       : ''
                   }
                   onRow={(record) => ({
+                    tabIndex: 0,
                     onClick: () =>
                       setSelectedWorkbenchTaskId(
                         String(record.id || record.task_code || '')
+                      ),
+                    onFocus: () =>
+                      setSelectedWorkbenchTaskId(
+                        String(record.id || record.task_code || '')
+                      ),
+                    'aria-selected':
+                      String(record.id || record.task_code) ===
+                      String(
+                        selectedWorkbenchTask?.id ||
+                          selectedWorkbenchTask?.task_code ||
+                          ''
                       ),
                   })}
                   locale={{
@@ -1002,7 +1337,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       <WorkbenchQueueEmpty
                         activeOption={activeWorkbenchQueueOption}
                         fallbackOption={fallbackWorkbenchQueueOption}
-                        onSwitchQueue={setWorkbenchQueueKey}
+                        onSwitchQueue={selectWorkbenchQueue}
                       />
                     ),
                   }}
@@ -1097,17 +1432,15 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                             退回任务
                           </Button>
                         ) : null}
-                        {!selectedWorkbenchTaskAccess.loading &&
-                        selectedWorkbenchTaskAccess.allowedModes.length ===
-                          0 ? (
-                            <Button
-                              title={selectedWorkbenchTaskAccess.readonlyReason}
-                              onClick={() =>
+                        {showSelectedWorkbenchTaskReadonlyAction ? (
+                          <Button
+                            title={selectedWorkbenchTaskAccess.readonlyReason}
+                            onClick={() =>
                               openTaskDrawer(selectedWorkbenchTask)
                             }
-                            >
-                              查看上下文
-                            </Button>
+                          >
+                            查看上下文
+                          </Button>
                         ) : null}
                         {selectedWorkbenchEntryPath ? (
                           <Button
@@ -1142,6 +1475,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           className="erp-dashboard-card erp-dashboard-task-board-card"
           variant="borderless"
           loading={loading}
+          style={
+            taskBoardTransitionMinHeight > 0
+              ? { minHeight: taskBoardTransitionMinHeight }
+              : undefined
+          }
         >
           <Space direction="vertical" className="erp-dashboard-block" size={14}>
             <div className="erp-task-center-overview">
@@ -1159,28 +1497,40 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   aria-label="任务看板关键筛选"
                 >
                   <TaskMetricAction
-                    label="可推进任务"
-                    value={taskCenterAssignedCount}
-                    actionLabel="筛选可推进任务"
-                    active={filters.status === 'pending'}
-                    onClick={() => updateFilter('status', 'pending')}
+                    label="常规待办"
+                    value={
+                      taskBoardReady ? taskBoardModel.counts.actionable : '-'
+                    }
+                    actionLabel="查看常规待办"
+                    active={filters.lane === 'actionable'}
+                    onClick={() => selectTaskBoardLane('actionable')}
                   />
                   <TaskMetricAction
-                    label="阻塞交接"
-                    value={taskCenterBlockedCount}
-                    actionLabel="查看需说明任务"
-                    active={filters.status === 'blocked'}
-                    danger
-                    onClick={() => updateFilter('status', 'blocked')}
+                    label="阻塞 / 退回"
+                    value={
+                      taskBoardReady ? taskBoardModel.counts.exception : '-'
+                    }
+                    actionLabel="查看阻塞和退回任务"
+                    active={filters.lane === 'exception'}
+                    danger={taskBoardModel.counts.exception > 0}
+                    onClick={() => selectTaskBoardLane('exception')}
                   />
                   <TaskMetricAction
-                    label="逾期任务"
-                    value={taskCenterOverdueCount}
-                    actionLabel="查看超时任务"
-                    active={filters.due === 'overdue'}
-                    danger={taskCenterOverdueCount > 0}
-                    disabled={taskCenterOverdueCount <= 0}
-                    onClick={() => updateFilter('due', 'overdue')}
+                    label="到期提醒"
+                    value={taskBoardReady ? taskBoardModel.counts.due : '-'}
+                    actionLabel="查看到期提醒"
+                    active={filters.lane === 'due'}
+                    danger={taskBoardModel.counts.due > 0}
+                    onClick={() => selectTaskBoardLane('due')}
+                  />
+                  <TaskMetricAction
+                    label="已结束"
+                    value={
+                      taskBoardReady ? taskBoardModel.counts.finished : '-'
+                    }
+                    actionLabel="查看已结束任务"
+                    active={filters.lane === 'finished'}
+                    onClick={() => selectTaskBoardLane('finished')}
                   />
                 </div>
               </section>
@@ -1213,7 +1563,14 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     </Text>
                     {getWorkflowTaskReason(taskCenterCurrentTask) ? (
                       <Text
-                        type="danger"
+                        type={
+                          ['blocked', 'rejected'].includes(
+                            getWorkflowTaskReasonMeta(taskCenterCurrentTask)
+                              .kind
+                          )
+                            ? 'danger'
+                            : 'secondary'
+                        }
                         className="erp-task-center-current-meta"
                       >
                         {getWorkflowTaskReasonLabel(taskCenterCurrentTask)}：
@@ -1301,10 +1658,15 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               <Input.Search
                 allowClear
                 placeholder="搜索任务、单号、来源、处理原因"
-                value={filters.keyword}
-                onChange={(event) =>
-                  updateFilter('keyword', event.target.value)
-                }
+                value={taskBoardKeywordDraft}
+                onChange={(event) => {
+                  const nextKeyword = event.target.value
+                  setTaskBoardKeywordDraft(nextKeyword)
+                  if (!nextKeyword && filters.keyword) {
+                    updateFilter('keyword', '')
+                  }
+                }}
+                onSearch={(value) => updateFilter('keyword', value)}
               />
               <Select
                 value={filters.status}
@@ -1329,25 +1691,58 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               <Button disabled={!hasActiveFilters} onClick={clearFilters}>
                 清空筛选
               </Button>
+              <div className="erp-task-board-filter-summary" aria-live="polite">
+                <Text type="secondary">
+                  当前结果 {taskBoardReady ? taskBoardModel.total : '-'} 条
+                </Text>
+                {taskBoardModel.focused ? (
+                  <Button
+                    type="link"
+                    size="small"
+                    onClick={() => selectTaskBoardLane('all')}
+                  >
+                    返回全部泳道
+                  </Button>
+                ) : null}
+              </div>
             </div>
-            <div className="erp-task-board-lanes" aria-label="任务看板泳道">
-              {taskLanes.map((lane) => (
-                <TaskLane
-                  key={lane.key}
-                  lane={lane}
-                  selectedTaskId={selectedTaskBoardTaskId}
-                  onSelectTask={selectTaskBoardTask}
-                  onOpenTask={(task) => {
-                    selectTaskBoardTask(task)
-                    openTaskDrawer(task)
-                  }}
-                  onOpenEntry={(task) => {
-                    selectTaskBoardTask(task)
-                    openTaskEntry(task)
-                  }}
-                />
-              ))}
-            </div>
+            {taskBoardLoadError ? (
+              <Alert
+                type="error"
+                showIcon
+                message="任务看板加载失败"
+                description={taskBoardLoadError}
+              />
+            ) : (
+              <div
+                ref={taskBoardLanesRef}
+                className={`erp-task-board-lanes${
+                  taskBoardModel.focused ? ' erp-task-board-lanes--focused' : ''
+                }`}
+                aria-label="任务看板泳道"
+              >
+                {taskLanes.map((lane) => (
+                  <TaskLane
+                    key={lane.key}
+                    lane={lane}
+                    focused={taskBoardModel.focused}
+                    page={taskBoardModel.page}
+                    selectedTaskId={selectedTaskBoardTaskId}
+                    onSelectTask={selectTaskBoardTask}
+                    onOpenTask={(task) => {
+                      selectTaskBoardTask(task)
+                      openTaskDrawer(task)
+                    }}
+                    onOpenEntry={(task) => {
+                      selectTaskBoardTask(task)
+                      openTaskEntry(task)
+                    }}
+                    onViewAll={() => selectTaskBoardLane(lane.key)}
+                    onPageChange={selectTaskBoardPage}
+                  />
+                ))}
+              </div>
+            )}
           </Space>
         </Card>
       ) : null}
@@ -1482,7 +1877,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         allowedActionModes={actionDrawerAccess.allowedModes}
         readonlyReason={
           actionDrawerAccess.loading
-            ? '正在向后端核对当前任务动作权限。'
+            ? '正在确认您是否可以处理当前任务。'
             : actionDrawerAccess.readonlyReason ||
               getTaskReadonlyNotice(selectedTask)
         }

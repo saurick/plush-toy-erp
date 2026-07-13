@@ -110,11 +110,11 @@ export function formatQuantity(value) {
 }
 
 const RECORD_FALLBACK_LABELS = Object.freeze({
-  production: '生产事实已关联',
-  outsourcing: '委外事实已关联',
+  production: '生产记录已关联',
+  outsourcing: '委外记录已关联',
   shipments: '出货单已关联',
   reservations: '库存预留已关联',
-  finance: '财务事实已关联',
+  finance: '财务记录已关联',
 })
 
 export function recordNoForKey(key, record = {}) {
@@ -124,7 +124,7 @@ export function recordNoForKey(key, record = {}) {
   if (key === 'reservations') {
     return record.reservation_no || RECORD_FALLBACK_LABELS.reservations
   }
-  return record.fact_no || RECORD_FALLBACK_LABELS[key] || '业务事实已关联'
+  return record.fact_no || RECORD_FALLBACK_LABELS[key] || '业务记录已关联'
 }
 
 function factTypeText(type) {
@@ -140,7 +140,7 @@ function factTypeText(type) {
   if (key === 'INVOICE') return '发票'
   if (key === 'PAYMENT') return '收付款'
   if (key === 'RECONCILIATION') return '对账'
-  return key ? '业务事实' : '-'
+  return key ? '业务记录' : '-'
 }
 
 function counterpartyTypeText(type) {

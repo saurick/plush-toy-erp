@@ -111,12 +111,16 @@ test('errorCodes: 默认文案覆盖核心鉴权错误', () => {
     '权限不足'
   )
   assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_USER_DISABLED],
+    '账号已停用'
+  )
+  assert.equal(
     DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_INVALID_SMS_CODE],
     '验证码错误'
   )
   assert.equal(
     DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_SMS_LOGIN_DISABLED],
-    '当前部署未启用短信登录'
+    '短信登录暂未开通，请使用密码登录'
   )
   assert.equal(
     DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_SMS_SERVICE_UNAVAILABLE],
@@ -125,5 +129,13 @@ test('errorCodes: 默认文案覆盖核心鉴权错误', () => {
   assert.equal(
     DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_SMS_SERVICE_QUOTA_EXCEEDED],
     '短信服务额度已用完，请联系管理员处理'
+  )
+})
+
+test('errorCodes: 资源版本冲突使用统一刷新提示', () => {
+  assert.equal(RpcErrorCode.RESOURCE_VERSION_CONFLICT, 40922)
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.RESOURCE_VERSION_CONFLICT],
+    '记录已被其他操作更新，请刷新后重试'
   )
 })

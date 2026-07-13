@@ -975,7 +975,7 @@ export default function MaterialPurchaseContractWorkbench({
           <>
             <strong>采购合同计算规则</strong>
             <span>默认金额 = 数量 × 单价</span>
-            <span>如合同快照已有确认金额，可直接改写采购金额。</span>
+            <span>如合同中已有确认金额，可直接改写采购金额。</span>
             <span>总计 = Σ 当前采购金额列</span>
             <span>单价保留 3 位小数，采购金额保留 2 位小数。</span>
           </>

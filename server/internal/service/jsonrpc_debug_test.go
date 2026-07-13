@@ -38,13 +38,22 @@ func (s stubDebugJSONRPCRepo) CleanupBusinessChainDebugData(_ context.Context, i
 	}, nil
 }
 
-func (s stubDebugJSONRPCRepo) ClearBusinessData(_ context.Context) (*biz.DebugBusinessDataClearResult, error) {
+func (s stubDebugJSONRPCRepo) ClearBusinessData(_ context.Context, in biz.DebugBusinessDataClearInput) (*biz.DebugBusinessDataClearResult, error) {
+	deletedCounts := map[string]int{}
+	deletedTotal := 0
+	clearedTableNames := []string{}
+	if !in.DryRun {
+		deletedCounts["workflow_tasks"] = 2
+		deletedTotal = 2
+		clearedTableNames = append(clearedTableNames, "workflow_tasks")
+	}
 	return &biz.DebugBusinessDataClearResult{
-		DeletedCounts: map[string]int{
-			"workflow_tasks": 2,
-		},
-		DeletedTotal:      2,
-		ClearedTableNames: []string{"workflow_tasks"},
+		DryRun:            in.DryRun,
+		MatchedCounts:     map[string]int{"workflow_tasks": 2},
+		MatchedTotal:      2,
+		DeletedCounts:     deletedCounts,
+		DeletedTotal:      deletedTotal,
+		ClearedTableNames: clearedTableNames,
 	}, nil
 }
 
@@ -138,9 +147,8 @@ func TestJsonrpcDispatcher_DebugSeedReturnsScenarioRunRecordsAndTasks(t *testing
 
 func TestJsonrpcDispatcher_DebugClearBusinessDataReturnsCounts(t *testing.T) {
 	j := newDebugJSONRPCTestData(biz.DebugSafetyConfig{
-		Environment:    "local",
-		CleanupEnabled: true,
-		CleanupScope:   biz.DebugDefaultCleanupScope,
+		Environment:              "local",
+		BusinessDataClearEnabled: true,
 	})
 
 	_, res, err := j.handleDebug(debugJSONRPCAdminContext(), "clear_business_data", "1", nil)
@@ -151,12 +159,68 @@ func TestJsonrpcDispatcher_DebugClearBusinessDataReturnsCounts(t *testing.T) {
 		t.Fatalf("expected OK, got %#v", res)
 	}
 	data := res.Data.AsMap()
-	if data["deletedTotal"] != float64(2) {
-		t.Fatalf("unexpected deletedTotal %#v", data)
+	if data["dryRun"] != true || data["matchedTotal"] != float64(2) || data["deletedTotal"] != float64(0) {
+		t.Fatalf("unexpected default dry run result %#v", data)
 	}
-	counts, ok := data["deletedCounts"].(map[string]any)
+	counts, ok := data["matchedCounts"].(map[string]any)
 	if !ok || counts["workflow_tasks"] != float64(2) {
-		t.Fatalf("unexpected deletedCounts %#v", data["deletedCounts"])
+		t.Fatalf("unexpected matchedCounts %#v", data["matchedCounts"])
+	}
+}
+
+func TestJsonrpcDispatcher_DebugClearBusinessDataRequiresExactConfirmation(t *testing.T) {
+	j := newDebugJSONRPCTestData(biz.DebugSafetyConfig{
+		Environment:              "local",
+		BusinessDataClearEnabled: true,
+	})
+	ctx := debugJSONRPCAdminContext()
+
+	_, rejected, err := j.handleDebug(ctx, "clear_business_data", "1", mustStruct(t, map[string]any{
+		"dryRun":       false,
+		"confirmation": "CLEAR_ALL_BUSINESS_DATA",
+	}))
+	if err != nil {
+		t.Fatalf("clear business data rejection returned error: %v", err)
+	}
+	if rejected == nil || rejected.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected invalid confirmation rejection, got %#v", rejected)
+	}
+
+	_, accepted, err := j.handleDebug(ctx, "clear_business_data", "2", mustStruct(t, map[string]any{
+		"dryRun":       false,
+		"confirmation": biz.DebugBusinessDataClearConfirmation,
+	}))
+	if err != nil {
+		t.Fatalf("clear business data returned error: %v", err)
+	}
+	if accepted == nil || accepted.Code != errcode.OK.Code {
+		t.Fatalf("expected exact confirmation accepted, got %#v", accepted)
+	}
+	data := accepted.Data.AsMap()
+	if data["dryRun"] != false || data["matchedTotal"] != float64(2) || data["deletedTotal"] != float64(2) {
+		t.Fatalf("unexpected destructive clear result %#v", data)
+	}
+}
+
+func TestJsonrpcDispatcher_DebugCapabilitiesDescribeBusinessClearSafety(t *testing.T) {
+	j := newDebugJSONRPCTestData(biz.DebugSafetyConfig{
+		Environment:              "dev",
+		BusinessDataClearEnabled: true,
+	})
+
+	_, res, err := j.handleDebug(debugJSONRPCAdminContext(), "capabilities", "1", nil)
+	if err != nil {
+		t.Fatalf("debug capabilities returned error: %v", err)
+	}
+	if res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected capabilities OK, got %#v", res)
+	}
+	data := res.Data.AsMap()
+	if data["businessDataClearAllowed"] != true || data["businessDataClearDryRunDefault"] != true {
+		t.Fatalf("unexpected business clear capabilities %#v", data)
+	}
+	if data["businessDataClearConfirmation"] != biz.DebugBusinessDataClearConfirmation || data["destructiveRemoteDenied"] != true {
+		t.Fatalf("missing business clear confirmation or remote deny contract %#v", data)
 	}
 }
 

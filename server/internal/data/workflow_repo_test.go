@@ -54,6 +54,9 @@ func TestWorkflowRepo_CreateAndUpdateTaskStatus(t *testing.T) {
 	if task.ID <= 0 {
 		t.Fatalf("expected task id")
 	}
+	if task.Version != 1 {
+		t.Fatalf("new task version must start at 1, got %d", task.Version)
+	}
 	if task.OwnerPoolKey == nil || *task.OwnerPoolKey != ownerPoolKey {
 		t.Fatalf("expected owner pool persisted, got %#v", task.OwnerPoolKey)
 	}
@@ -70,23 +73,41 @@ func TestWorkflowRepo_CreateAndUpdateTaskStatus(t *testing.T) {
 		t.Fatalf("expected process node instance id persisted, got %#v", task.ProcessNodeInstanceID)
 	}
 
-	updated, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+	updated, err := repo.UpdateWorkflowTaskStatus(ctx, workflowRepoTestStatusMutation(task.ID, task.Version, "create-and-update-done", &biz.WorkflowTaskStatusUpdate{
 		ID:                task.ID,
+		ExpectedVersion:   task.Version,
 		TaskStatusKey:     "done",
 		BusinessStatusKey: "project_approved",
-		Payload:           map[string]any{"done_by": "test"},
-	}, 7, biz.SalesRoleKey)
+		Reason:            "资料已核对并完成",
+		Payload: map[string]any{
+			"done_by":         "test",
+			"blocked_reason":  "历史阻塞原因",
+			"rejected_reason": "历史退回原因",
+		},
+	}), 7, biz.SalesRoleKey)
 	if err != nil {
 		t.Fatalf("update task failed: %v", err)
 	}
 	if updated.TaskStatusKey != "done" {
 		t.Fatalf("expected done, got %q", updated.TaskStatusKey)
 	}
+	if updated.Version != task.Version+1 {
+		t.Fatalf("status update must increment version once, got %d", updated.Version)
+	}
 	if updated.CompletedAt == nil {
 		t.Fatalf("expected completed_at set")
 	}
 	if updated.BusinessStatusKey == nil || *updated.BusinessStatusKey != "project_approved" {
 		t.Fatalf("expected business status synced, got %#v", updated.BusinessStatusKey)
+	}
+	if updated.BlockedReason != nil {
+		t.Fatalf("completion reason must not persist as blocked reason, got %#v", updated.BlockedReason)
+	}
+	if _, exists := updated.Payload["blocked_reason"]; exists {
+		t.Fatalf("completed task projection must clear stale payload blocked_reason, got %#v", updated.Payload)
+	}
+	if _, exists := updated.Payload["rejected_reason"]; exists {
+		t.Fatalf("completed task projection must clear stale payload rejected_reason, got %#v", updated.Payload)
 	}
 
 	events, err := client.WorkflowTaskEvent.Query().All(ctx)
@@ -96,6 +117,9 @@ func TestWorkflowRepo_CreateAndUpdateTaskStatus(t *testing.T) {
 	if len(events) != 2 {
 		t.Fatalf("expected 2 task events, got %d", len(events))
 	}
+	if events[0].TaskVersion == nil || *events[0].TaskVersion != 1 {
+		t.Fatalf("created event must record task version 1, got %#v", events[0].TaskVersion)
+	}
 	statusEvent := events[1]
 	if statusEvent.EventType != "status_changed" {
 		t.Fatalf("expected status_changed event, got %q", statusEvent.EventType)
@@ -103,6 +127,12 @@ func TestWorkflowRepo_CreateAndUpdateTaskStatus(t *testing.T) {
 	if statusEvent.FromStatusKey == nil || *statusEvent.FromStatusKey != "ready" ||
 		statusEvent.ToStatusKey == nil || *statusEvent.ToStatusKey != "done" {
 		t.Fatalf("expected ready -> done event, got %#v -> %#v", statusEvent.FromStatusKey, statusEvent.ToStatusKey)
+	}
+	if statusEvent.TaskVersion == nil || *statusEvent.TaskVersion != updated.Version {
+		t.Fatalf("status event must record version %d, got %#v", updated.Version, statusEvent.TaskVersion)
+	}
+	if statusEvent.Reason == nil || *statusEvent.Reason != "资料已核对并完成" {
+		t.Fatalf("status event must retain the completion reason, got %#v", statusEvent.Reason)
 	}
 }
 
@@ -131,8 +161,9 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 	}
 
 	blockedReason := "缺少客户确认的包装方式"
-	blocked, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+	blocked, err := repo.UpdateWorkflowTaskStatus(ctx, workflowRepoTestStatusMutation(task.ID, task.Version, "status-reason-blocked", &biz.WorkflowTaskStatusUpdate{
 		ID:                task.ID,
+		ExpectedVersion:   task.Version,
 		TaskStatusKey:     "blocked",
 		BusinessStatusKey: "blocked",
 		Reason:            blockedReason,
@@ -140,7 +171,7 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 			"mobile_action": "blocked",
 			"evidence_refs": []any{"photo://packaging"},
 		},
-	}, 8, biz.BossRoleKey)
+	}), 8, biz.BossRoleKey)
 	if err != nil {
 		t.Fatalf("block task failed: %v", err)
 	}
@@ -149,8 +180,9 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 	}
 
 	rejectedReason := "客户单价和交期未确认"
-	rejected, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+	rejected, err := repo.UpdateWorkflowTaskStatus(ctx, workflowRepoTestStatusMutation(task.ID, blocked.Version, "status-reason-rejected", &biz.WorkflowTaskStatusUpdate{
 		ID:                task.ID,
+		ExpectedVersion:   blocked.Version,
 		TaskStatusKey:     "rejected",
 		BusinessStatusKey: "project_pending",
 		Reason:            rejectedReason,
@@ -158,7 +190,7 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 			"mobile_action": "rejected",
 			"evidence_refs": []any{"note://price"},
 		},
-	}, 8, biz.BossRoleKey)
+	}), 8, biz.BossRoleKey)
 	if err != nil {
 		t.Fatalf("reject task failed: %v", err)
 	}
@@ -169,7 +201,7 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 		t.Fatalf("terminal rejected task must set completed_at")
 	}
 
-	_, err = repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+	_, err = repo.UpdateWorkflowTaskStatus(ctx, workflowRepoTestStatusMutation(task.ID, rejected.Version, "status-reason-after-rejected", &biz.WorkflowTaskStatusUpdate{
 		ID:                task.ID,
 		TaskStatusKey:     "done",
 		BusinessStatusKey: "project_approved",
@@ -177,7 +209,7 @@ func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 			"mobile_action": "done",
 			"evidence_refs": []any{"note://approved"},
 		},
-	}, 8, biz.BossRoleKey)
+	}), 8, biz.BossRoleKey)
 	if !errors.Is(err, biz.ErrWorkflowTaskSettled) {
 		t.Fatalf("terminal rejected task must reject later completion, got %v", err)
 	}
@@ -444,13 +476,13 @@ func TestWorkflowRepo_UpdateTaskStatusSideEffectsAreTransactionalAndIdempotent(t
 		WorkflowRuleKey:   "boss_approval_done_to_engineering_data",
 	}
 
-	if _, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+	if _, err := repo.UpdateWorkflowTaskStatus(ctx, workflowRepoTestStatusMutation(approvalTask.ID, approvalTask.Version, "side-effects-done", &biz.WorkflowTaskStatusUpdate{
 		ID:                approvalTask.ID,
 		TaskStatusKey:     "done",
 		BusinessStatusKey: "project_approved",
 		Payload:           map[string]any{"approval_result": "approved"},
 		SideEffects:       sideEffects,
-	}, 8, "boss"); err != nil {
+	}), 8, "boss"); err != nil {
 		t.Fatalf("update with side effects failed: %v", err)
 	}
 
@@ -494,13 +526,13 @@ func TestWorkflowRepo_UpdateTaskStatusSideEffectsAreTransactionalAndIdempotent(t
 	}
 
 	sideEffects.DerivedTask.TaskCode = "ENGINEERING-DATA-002"
-	if _, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+	if _, err := repo.UpdateWorkflowTaskStatus(ctx, workflowRepoTestStatusMutation(approvalTask.ID, approvalTask.Version+1, "side-effects-after-terminal", &biz.WorkflowTaskStatusUpdate{
 		ID:                approvalTask.ID,
 		TaskStatusKey:     "done",
 		BusinessStatusKey: "project_approved",
 		Payload:           map[string]any{"approval_result": "approved"},
 		SideEffects:       sideEffects,
-	}, 8, "boss"); !errors.Is(err, biz.ErrWorkflowTaskSettled) {
+	}), 8, "boss"); !errors.Is(err, biz.ErrWorkflowTaskSettled) {
 		t.Fatalf("repeat terminal update must be rejected before replaying side effects, got %v", err)
 	}
 
@@ -602,24 +634,31 @@ func TestWorkflowRepo_OrderRevisionIdempotencyAllowsNextRoundAfterDone(t *testin
 				WorkflowRuleKey:   workflowRuleKey,
 			}
 
-			if _, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+			firstUpdated, err := repo.UpdateWorkflowTaskStatus(ctx, workflowRepoTestStatusMutation(approvalTask.ID, approvalTask.Version, "order-revision-"+tc.status+"-first", &biz.WorkflowTaskStatusUpdate{
 				ID:                approvalTask.ID,
 				TaskStatusKey:     tc.status,
 				BusinessStatusKey: tc.businessStatusKey,
 				Reason:            reason,
 				Payload:           map[string]any{tc.reasonKey: reason},
 				SideEffects:       sideEffects,
-			}, 8, "boss"); err != nil {
+			}), 8, "boss")
+			if err != nil {
 				t.Fatalf("first %s update failed: %v", tc.status, err)
 			}
-			_, repeatErr := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+			repeatKey := "order-revision-" + tc.status + "-repeat"
+			repeatVersion := firstUpdated.Version
+			if tc.status == "blocked" {
+				repeatKey = "order-revision-" + tc.status + "-first"
+				repeatVersion = approvalTask.Version
+			}
+			_, repeatErr := repo.UpdateWorkflowTaskStatus(ctx, workflowRepoTestStatusMutation(approvalTask.ID, repeatVersion, repeatKey, &biz.WorkflowTaskStatusUpdate{
 				ID:                approvalTask.ID,
 				TaskStatusKey:     tc.status,
 				BusinessStatusKey: tc.businessStatusKey,
 				Reason:            reason,
 				Payload:           map[string]any{tc.reasonKey: reason},
 				SideEffects:       sideEffects,
-			}, 8, "boss")
+			}), 8, "boss")
 			if tc.status == "rejected" {
 				if !errors.Is(repeatErr, biz.ErrWorkflowTaskSettled) {
 					t.Fatalf("repeat rejected update must be terminal, got %v", repeatErr)
@@ -648,23 +687,23 @@ func TestWorkflowRepo_OrderRevisionIdempotencyAllowsNextRoundAfterDone(t *testin
 				t.Fatalf("expected decision payload on revision task, got %#v", revisionTasks[0].Payload)
 			}
 
-			if _, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+			if _, err := repo.UpdateWorkflowTaskStatus(ctx, workflowRepoTestStatusMutation(revisionTasks[0].ID, revisionTasks[0].Version, "order-revision-"+tc.status+"-complete-derived", &biz.WorkflowTaskStatusUpdate{
 				ID:            revisionTasks[0].ID,
 				TaskStatusKey: "done",
 				Payload:       map[string]any{"done_by": biz.SalesRoleKey},
-			}, 9, biz.SalesRoleKey); err != nil {
+			}), 9, biz.SalesRoleKey); err != nil {
 				t.Fatalf("complete revision task failed: %v", err)
 			}
 
 			sideEffects.DerivedTask.TaskCode = "ORDER-REVISION-" + tc.status + "-002"
-			_, nextRoundErr := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+			_, nextRoundErr := repo.UpdateWorkflowTaskStatus(ctx, workflowRepoTestStatusMutation(approvalTask.ID, firstUpdated.Version, "order-revision-"+tc.status+"-next-round", &biz.WorkflowTaskStatusUpdate{
 				ID:                approvalTask.ID,
 				TaskStatusKey:     tc.status,
 				BusinessStatusKey: tc.businessStatusKey,
 				Reason:            reason,
 				Payload:           map[string]any{tc.reasonKey: reason},
 				SideEffects:       sideEffects,
-			}, 8, "boss")
+			}), 8, "boss")
 			if tc.status == "rejected" {
 				if !errors.Is(nextRoundErr, biz.ErrWorkflowTaskSettled) {
 					t.Fatalf("terminal rejected approval requires a new approval attempt, got %v", nextRoundErr)
@@ -767,19 +806,23 @@ func TestWorkflowRepo_UrgeWorkflowTaskWritesEventAndPayload(t *testing.T) {
 		t.Fatalf("create task failed: %v", err)
 	}
 
-	updated, err := repo.UrgeWorkflowTask(ctx, &biz.WorkflowTaskUrge{
-		ID:     task.ID,
-		Action: "escalate_to_boss",
-		Reason: "客户交期风险，请确认出货",
+	updated, err := repo.UrgeWorkflowTask(ctx, workflowRepoTestUrgeMutation(task.ID, task.Version, "urge-event-and-payload", &biz.WorkflowTaskUrge{
+		ID:              task.ID,
+		ExpectedVersion: task.Version,
+		Action:          "escalate_to_boss",
+		Reason:          "客户交期风险，请确认出货",
 		Payload: map[string]any{
 			"source_no": "SHIP-001",
 		},
-	}, 8, "pmc")
+	}), 8, "pmc")
 	if err != nil {
 		t.Fatalf("urge task failed: %v", err)
 	}
 	if updated.TaskStatusKey != "ready" {
 		t.Fatalf("urge should not change task status, got %q", updated.TaskStatusKey)
+	}
+	if updated.Version != task.Version+1 {
+		t.Fatalf("urge must increment task version once, got %d", updated.Version)
 	}
 	if updated.UpdatedBy == nil || *updated.UpdatedBy != 8 {
 		t.Fatalf("expected updated_by=8, got %#v", updated.UpdatedBy)
@@ -821,6 +864,9 @@ func TestWorkflowRepo_UrgeWorkflowTaskWritesEventAndPayload(t *testing.T) {
 		t.Fatalf("expected created + escalation events, got %d", len(events))
 	}
 	urgeEvent := events[1]
+	if urgeEvent.TaskVersion == nil || *urgeEvent.TaskVersion != updated.Version {
+		t.Fatalf("urge event must record version %d, got %#v", updated.Version, urgeEvent.TaskVersion)
+	}
 	if urgeEvent.EventType != "escalate_to_boss" {
 		t.Fatalf("expected escalation event type, got %q", urgeEvent.EventType)
 	}

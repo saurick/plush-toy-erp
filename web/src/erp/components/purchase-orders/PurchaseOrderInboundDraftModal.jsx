@@ -131,7 +131,7 @@ export default function PurchaseOrderInboundDraftModal({
                 )}；供应商：${resolveSupplierName(order)}`}
               </Text>
               <Text type="secondary">
-                下方只是生成前预览；后端会在保存时按采购订单状态、来源行和剩余数量重新校验，不由前端直接写库存事实。
+                下方仅供生成前核对；保存时系统会按采购订单状态、来源行和剩余数量再次校验，库存仅在入库过账后更新。
               </Text>
             </Space>
           }

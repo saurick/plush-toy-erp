@@ -114,16 +114,10 @@
   line-height: 1.35;
 }
 
-.erp-permission-option__key {
+.erp-permission-option__impact {
   color: #6b7280;
-  font-family:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-    'Courier New', monospace;
   font-size: 12px;
   line-height: 1.35;
-  overflow-wrap: anywhere;
-  white-space: normal;
-  word-break: normal;
 }
 
 .erp-business-page-layout {

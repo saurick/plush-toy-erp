@@ -1,9 +1,66 @@
 // src/mocks/jsonRpcMockServer.js
 
+import {
+  requireWorkflowTaskMutationParams,
+  workflowTaskMutationSignature,
+} from '../erp/utils/workflowTaskMutation.mjs'
+import { requireWorkflowTaskExplainParams } from '../erp/utils/workflowTaskActionAccess.mjs'
+import { requireWorkflowTaskCreateParams } from '../erp/utils/workflowTaskCreateContract.mjs'
+import {
+  workflowMockActionDecision,
+  workflowMockCanAccessTaskForCapability,
+  workflowMockCanCreateTask,
+  workflowMockCanViewTask,
+  workflowMockPermissionAllowed,
+} from './workflowTaskMockAuthorization.mjs'
+import { buildWorkflowTaskBoardMock } from './workflowTaskBoardMock.mjs'
+
 let originalFetch = null
 let mockWorkflowTaskID = 1
 const mockWorkflowTasks = []
 const mockWorkflowBusinessStates = []
+const mockWorkflowMutationReceipts = new Map()
+const mockProductionOrder = {
+  id: 71,
+  order_no: 'MO-MOCK-20260713',
+  status: 'DRAFT',
+  version: 1,
+  planned_start_at: nowUnix() + 86_400,
+  planned_end_at: nowUnix() + 604_800,
+  note: '生产计划演示草稿',
+  close_reason: null,
+  cancel_reason: null,
+  created_by: 1,
+  released_by: null,
+  closed_by: null,
+  cancelled_by: null,
+  released_at: null,
+  closed_at: null,
+  cancelled_at: null,
+  created_at: nowUnix(),
+  updated_at: nowUnix(),
+}
+const mockProductionOrderItems = [
+  {
+    id: 7101,
+    production_order_id: 71,
+    line_no: 1,
+    product_id: 301,
+    product_sku_id: 401,
+    unit_id: 501,
+    planned_quantity: '20.0000',
+    sales_order_item_id: 601,
+    bom_header_id: 701,
+    product_code_snapshot: 'PROD-MOCK',
+    product_name_snapshot: '演示产品',
+    sku_code_snapshot: 'SKU-MOCK',
+    unit_name_snapshot: '只',
+    bom_version_snapshot: 'BOM-MOCK-V1',
+    note: null,
+    created_at: nowUnix(),
+    updated_at: nowUnix(),
+  },
+]
 const mockBusinessDashboardProjectionModuleKeys = [
   'customers',
   'suppliers',
@@ -56,10 +113,38 @@ const mockPermissions = [
     module: 'workflow',
   },
   {
+    permission_key: 'workflow.task.create',
+    name: '创建协同任务',
+    module: 'workflow',
+  },
+  {
+    permission_key: 'workflow.task.update',
+    name: '更新协同任务',
+    module: 'workflow',
+  },
+  {
+    permission_key: 'workflow.task.complete',
+    name: '完成协同任务',
+    module: 'workflow',
+  },
+  {
+    permission_key: 'workflow.task.reject',
+    name: '退回协同任务',
+    module: 'workflow',
+  },
+  {
+    permission_key: 'workflow.task.approve',
+    name: '审批协同任务',
+    module: 'workflow',
+  },
+  {
     permission_key: 'mobile.sales.access',
     name: '进入业务岗位任务端',
     module: 'mobile',
   },
+  { permission_key: 'pmc.plan.read', name: '查看生产计划', module: 'pmc' },
+  { permission_key: 'pmc.plan.create', name: '新建生产计划', module: 'pmc' },
+  { permission_key: 'pmc.plan.update', name: '更新生产计划', module: 'pmc' },
   {
     permission_key: 'mobile.purchase.access',
     name: '进入采购岗位任务端',
@@ -123,6 +208,12 @@ const mockMenus = [
     required_permissions: ['erp.dashboard.read'],
   },
   {
+    key: 'production-orders',
+    label: '生产订单',
+    path: '/erp/production/orders',
+    required_permissions: ['pmc.plan.read'],
+  },
+  {
     key: 'permission-center',
     label: '权限管理',
     path: '/erp/system/permissions',
@@ -137,8 +228,33 @@ const mockSuperAdminProfile = {
   phone: '13800138000',
   is_super_admin: true,
   disabled: false,
-  roles: [],
+  roles: [{ role_key: 'sales', name: '业务' }],
   permissions: mockPermissions.map((item) => item.permission_key),
+  effective_session: {
+    customer: { key: 'mock-customer' },
+    config_revision: 'mock-workflow-revision',
+    config_hash: 'mock-workflow-hash',
+    roles: ['sales'],
+    actions: [
+      'workflow.task.read',
+      'workflow.task.create',
+      'workflow.task.update',
+      'workflow.task.complete',
+      'workflow.task.reject',
+      'workflow.task.approve',
+      'pmc.plan.read',
+      'pmc.plan.create',
+      'pmc.plan.update',
+    ],
+    workflow_visible_owner_role_keys_by_capability: {
+      'workflow.task.read': ['sales'],
+      'workflow.task.create': ['sales'],
+      'workflow.task.update': ['sales'],
+      'workflow.task.complete': ['sales'],
+      'workflow.task.reject': ['sales'],
+      'workflow.task.approve': ['sales'],
+    },
+  },
   menus: mockMenus,
   erp_preferences: { column_orders: {} },
 }
@@ -298,6 +414,7 @@ function seedMockMobileWorkflowTasks() {
           started_at: null,
           completed_at: null,
           closed_at: null,
+          version: 1,
           payload: {
             customer_name: `${roleLabel}长列表客户 ${number}`,
             debug_mobile_list: true,
@@ -326,6 +443,7 @@ function seedMockMobileWorkflowTasks() {
           started_at: null,
           completed_at: null,
           closed_at: null,
+          version: 1,
           payload: {
             alert_type: 'debug_warning',
             critical_path: true,
@@ -356,6 +474,7 @@ function seedMockMobileWorkflowTasks() {
           started_at: now - (index + 2) * 86_400,
           completed_at: now - (index + 1) * 86_400,
           closed_at: null,
+          version: 1,
           payload: {
             customer_name: `${roleLabel}已办客户 ${number}`,
             debug_mobile_list: true,
@@ -394,57 +513,282 @@ function buildBusinessDashboardProjectionStats() {
 }
 
 function isMockTerminalWorkflowTask(task = {}) {
-  return ['done', 'closed', 'cancelled'].includes(
+  return ['done', 'rejected', 'closed', 'cancelled'].includes(
     String(task.task_status_key || '').trim()
   )
 }
 
-function buildMockWorkflowActionExplain(task, actionKey = 'complete') {
-  const normalizedAction =
-    actionKey === 'done'
-      ? 'complete'
-      : actionKey === 'blocked'
-        ? 'block'
-        : actionKey === 'rejected'
-          ? 'reject'
-          : actionKey
-  const permissionByAction = {
-    complete: 'workflow.task.complete',
-    block: 'workflow.task.update',
-    reject: 'workflow.task.reject',
-    urge: 'workflow.task.update',
+const mockProductionOrderParamKeys = {
+  list_production_orders: new Set([
+    'keyword',
+    'status',
+    'date_field',
+    'date_from',
+    'date_to',
+    'sort_by',
+    'sort_direction',
+    'limit',
+    'offset',
+  ]),
+  get_production_order: new Set(['production_order_id']),
+  create_production_order: new Set([
+    'order_no',
+    'planned_start_at',
+    'planned_end_at',
+    'note',
+    'items',
+    'idempotency_key',
+  ]),
+  save_production_order: new Set([
+    'production_order_id',
+    'expected_version',
+    'order_no',
+    'planned_start_at',
+    'planned_end_at',
+    'note',
+    'items',
+    'idempotency_key',
+  ]),
+  release_production_order: new Set([
+    'production_order_id',
+    'expected_version',
+    'idempotency_key',
+  ]),
+  close_production_order: new Set([
+    'production_order_id',
+    'expected_version',
+    'reason',
+    'idempotency_key',
+  ]),
+  cancel_production_order: new Set([
+    'production_order_id',
+    'expected_version',
+    'reason',
+    'idempotency_key',
+  ]),
+  list_production_order_reference_options: new Set([
+    'reference_type',
+    'keyword',
+    'product_id',
+    'product_sku_id',
+    'unit_id',
+    'selected_ids',
+    'limit',
+    'offset',
+  ]),
+}
+
+function mockProductionOrderParamsValid(method, params) {
+  const allowed = mockProductionOrderParamKeys[method]
+  const allowedKeys = Boolean(
+    allowed &&
+      params &&
+      typeof params === 'object' &&
+      !Array.isArray(params) &&
+      Object.keys(params).every((key) => allowed.has(key))
+  )
+  if (!allowedKeys) return false
+  const positive = (value) => Number.isSafeInteger(value) && value > 0
+  const keyValid =
+    typeof params.idempotency_key === 'string' &&
+    params.idempotency_key === params.idempotency_key.trim() &&
+    params.idempotency_key.length > 0 &&
+    params.idempotency_key.length <= 128
+  if (method === 'get_production_order') {
+    return positive(params.production_order_id)
   }
-  const requiredPermission =
-    permissionByAction[normalizedAction] || 'workflow.task.update'
-  const hasPermission =
-    mockSuperAdminProfile.is_super_admin === true ||
-    mockSuperAdminProfile.permissions.includes(requiredPermission)
-  const allowed =
-    Boolean(task) && !isMockTerminalWorkflowTask(task) && hasPermission
+  if (method === 'create_production_order') {
+    return (
+      keyValid &&
+      typeof params.order_no === 'string' &&
+      params.order_no.trim() === params.order_no &&
+      params.order_no.length > 0 &&
+      Array.isArray(params.items) &&
+      params.items.length > 0
+    )
+  }
+  if (method === 'save_production_order') {
+    return (
+      keyValid &&
+      positive(params.production_order_id) &&
+      positive(params.expected_version) &&
+      typeof params.order_no === 'string' &&
+      params.order_no.trim() === params.order_no &&
+      params.order_no.length > 0 &&
+      Array.isArray(params.items) &&
+      params.items.length > 0
+    )
+  }
+  if (
+    [
+      'release_production_order',
+      'close_production_order',
+      'cancel_production_order',
+    ].includes(method)
+  ) {
+    if (
+      !keyValid ||
+      !positive(params.production_order_id) ||
+      !positive(params.expected_version)
+    ) {
+      return false
+    }
+    return (
+      method !== 'cancel_production_order' ||
+      (typeof params.reason === 'string' && params.reason.trim().length > 0)
+    )
+  }
+  if (method === 'list_production_order_reference_options') {
+    return [
+      'product',
+      'product_sku',
+      'unit',
+      'sales_order_item',
+      'active_bom',
+    ].includes(params.reference_type)
+  }
+  return method === 'list_production_orders'
+}
+
+function mockProductionReferenceOption(referenceType) {
+  const values = {
+    product: [301, 'PROD-MOCK · 演示产品'],
+    product_sku: [401, 'SKU-MOCK · 深棕 / 35cm'],
+    unit: [501, 'PCS · 只'],
+    sales_order_item: [601, 'SO-MOCK / 第 1 行 · PROD-MOCK'],
+    active_bom: [701, 'BOM-MOCK-V1 · 当前生效'],
+  }
+  const value = values[referenceType]
+  if (!value) return null
+  return {
+    value: value[0],
+    label: value[1],
+    selectable: true,
+    product_value: referenceType === 'unit' ? null : 301,
+    sku_value: ['product_sku', 'sales_order_item'].includes(referenceType)
+      ? 401
+      : null,
+    unit_value: referenceType === 'active_bom' ? null : 501,
+  }
+}
+
+function mockWorkflowMutationOperation(method = '') {
+  if (method === 'complete_task_action') return 'complete'
+  if (method === 'block_task_action') return 'block'
+  if (method === 'reject_task_action') return 'reject'
+  if (method === 'urge_task') return 'urge'
+  return ''
+}
+
+function cloneMockWorkflowMutationResult(task) {
+  return JSON.parse(JSON.stringify(task))
+}
+
+function resolveMockWorkflowMutationReceipt(task, operation, params) {
+  const receiptKey = `${task.id}:${params.idempotency_key}`
+  const intent = workflowTaskMutationSignature(operation, params)
+  const receipt = mockWorkflowMutationReceipts.get(receiptKey)
+  if (!receipt) return { intent, receiptKey }
+  if (receipt.intent !== intent) {
+    return {
+      error: {
+        code: 40920,
+        message: '重复请求内容与首次提交不一致，请刷新后重试',
+      },
+    }
+  }
+  return { task: cloneMockWorkflowMutationResult(receipt.task) }
+}
+
+function resolveMockWorkflowMutationRequest(method, params = {}) {
+  const operation = mockWorkflowMutationOperation(method)
+  let mutationParams
+  try {
+    mutationParams = requireWorkflowTaskMutationParams(operation, params, {
+      requireIdempotencyKey: true,
+    })
+  } catch (error) {
+    return {
+      error: {
+        code: 40010,
+        message: error?.message || '页面已更新，请刷新后重新操作',
+      },
+    }
+  }
+  const task = mockWorkflowTasks.find(
+    (item) => item.id === mutationParams.task_id
+  )
+  if (!task) {
+    return { error: { code: 40010, message: '任务不存在' } }
+  }
+  if (!Number.isSafeInteger(task.version) || task.version <= 0) {
+    return {
+      error: { code: 40010, message: '任务版本信息无效，请刷新后重试' },
+    }
+  }
+  const receipt = resolveMockWorkflowMutationReceipt(
+    task,
+    operation,
+    mutationParams
+  )
+  if (receipt.error) return { error: receipt.error }
+  return { mutationParams, operation, receipt, task }
+}
+
+function resolveMockWorkflowReadRequest(
+  params = {},
+  { allowActionKey = false } = {}
+) {
+  let requestParams
+  try {
+    requestParams = requireWorkflowTaskExplainParams(params, {
+      allowActionKey,
+    })
+  } catch (error) {
+    return {
+      error: { code: 40010, message: error?.message || '任务查询参数无效' },
+    }
+  }
+  const task = mockWorkflowTasks.find(
+    (item) => item.id === requestParams.taskID
+  )
+  if (!task) return { error: { code: 40010, message: '任务不存在' } }
+  return { ...requestParams, task }
+}
+
+function saveMockWorkflowMutationReceipt(receipt, task) {
+  mockWorkflowMutationReceipts.set(receipt.receiptKey, {
+    intent: receipt.intent,
+    task: cloneMockWorkflowMutationResult(task),
+  })
+}
+
+function buildMockWorkflowActionExplain(task, actionKey = 'complete') {
+  const decision = workflowMockActionDecision({
+    actionKey,
+    adminProfile: mockSuperAdminProfile,
+    effectiveSession: mockSuperAdminProfile.effective_session,
+    task,
+  })
   return {
     task_id: task?.id || 0,
-    action_key: normalizedAction,
-    status_key:
-      normalizedAction === 'complete'
-        ? 'done'
-        : normalizedAction === 'block'
-          ? 'blocked'
-          : normalizedAction === 'reject'
-            ? 'rejected'
-            : '',
-    required_permission: requiredPermission,
-    allowed,
-    actor_role_key: task?.owner_role_key || 'admin',
-    reason_code: allowed
-      ? 'allowed'
-      : isMockTerminalWorkflowTask(task)
-        ? 'terminal_task'
-        : 'missing_permission',
-    reason: allowed
-      ? '当前账号可执行该任务动作。'
-      : isMockTerminalWorkflowTask(task)
-        ? '该任务已结束，只能查看上下文。'
-        : '当前账号缺少执行该动作所需权限。',
+    action_key: decision.actionKey,
+    status_key: decision.statusKey,
+    required_permission: decision.requiredPermission,
+    allowed: decision.allowed,
+    owner_role_key: decision.ownerRoleKey,
+    owner_role_matched: decision.ownerRoleMatched,
+    assigned_to_current_admin: decision.assignedToCurrentAdmin,
+    actor_role_key: decision.assignedToCurrentAdmin
+      ? decision.ownerRoleKey
+      : decision.ownerRoleMatched
+        ? decision.ownerRoleKey
+        : mockSuperAdminProfile.is_super_admin === true &&
+            decision.actionKey === 'urge'
+          ? 'admin'
+          : '',
+    reason_code: decision.reasonCode,
+    reason: decision.reason,
   }
 }
 
@@ -660,8 +1004,10 @@ export function setupJsonRpcMockServer() {
         method === 'set_role_permissions' ||
         method === 'set_phone' ||
         method === 'set_disabled' ||
+        method === 'revoke' ||
         method === 'reset_password'
       ) {
+        const revoked = method === 'revoke'
         responseBody = {
           jsonrpc: '2.0',
           id,
@@ -671,13 +1017,21 @@ export function setupJsonRpcMockServer() {
               username: params.username || 'mock-created-admin',
               phone: params.phone || '',
               is_super_admin: false,
-              disabled: Boolean(params.disabled),
+              disabled: revoked || Boolean(params.disabled),
+              account_status: revoked
+                ? 'revoked'
+                : params.disabled
+                  ? 'suspended'
+                  : 'active',
+              revoked_at: revoked ? Math.floor(Date.now() / 1000) : 0,
+              status_reason: String(params.reason || '').trim(),
               roles: mockRoles.filter((role) =>
                 (params.role_keys || []).includes(role.role_key)
               ),
               permissions: [],
               menus: [],
             },
+            ...(revoked ? { released_task_count: 1 } : {}),
           }),
           error: '',
         }
@@ -725,6 +1079,84 @@ export function setupJsonRpcMockServer() {
           `unknown business method: ${method}`
         )
       }
+    } else if (domain === 'production_order') {
+      if (!mockProductionOrderParamsValid(method, params)) {
+        responseBody = makeJsonRpcBizError(
+          id,
+          40010,
+          '生产订单请求参数不符合当前合同'
+        )
+      } else if (method === 'list_production_orders') {
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            production_orders: [mockProductionOrder],
+            total: 1,
+            limit: Number(params.limit || 20),
+            offset: Number(params.offset || 0),
+          }),
+          error: '',
+        }
+      } else if (method === 'get_production_order') {
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            production_order: mockProductionOrder,
+            production_order_items: mockProductionOrderItems,
+          }),
+          error: '',
+        }
+      } else if (method === 'list_production_order_reference_options') {
+        const option = mockProductionReferenceOption(params.reference_type)
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            reference_type: params.reference_type,
+            options: option ? [option] : [],
+            total: option ? 1 : 0,
+            limit: Number(params.limit || 20),
+            offset: Number(params.offset || 0),
+          }),
+          error: '',
+        }
+      } else {
+        const nextStatus = {
+          release_production_order: 'RELEASED',
+          close_production_order: 'CLOSED',
+          cancel_production_order: 'CANCELLED',
+        }[method]
+        Object.assign(mockProductionOrder, {
+          order_no: params.order_no || mockProductionOrder.order_no,
+          planned_start_at:
+            params.planned_start_at ?? mockProductionOrder.planned_start_at,
+          planned_end_at:
+            params.planned_end_at ?? mockProductionOrder.planned_end_at,
+          note: params.note ?? mockProductionOrder.note,
+          status: nextStatus || mockProductionOrder.status,
+          version: mockProductionOrder.version + 1,
+          close_reason:
+            method === 'close_production_order'
+              ? params.reason || null
+              : mockProductionOrder.close_reason,
+          cancel_reason:
+            method === 'cancel_production_order'
+              ? params.reason
+              : mockProductionOrder.cancel_reason,
+          updated_at: nowUnix(),
+        })
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            production_order: mockProductionOrder,
+            production_order_items: mockProductionOrderItems,
+          }),
+          error: '',
+        }
+      }
     } else if (domain === 'workflow') {
       if (method === 'metadata') {
         responseBody = {
@@ -738,49 +1170,172 @@ export function setupJsonRpcMockServer() {
           error: '',
         }
       } else if (method === 'list_tasks') {
-        const tasks = mockWorkflowTasks.filter((item) =>
-          matchWorkflowFilter(item, params)
-        )
-        responseBody = {
-          jsonrpc: '2.0',
-          id,
-          result: makeBizResult({
-            tasks,
-            total: tasks.length,
-            limit: Number(params.limit || 50),
-            offset: Number(params.offset || 0),
-          }),
-          error: '',
-        }
-      } else if (method === 'explain_action_access') {
-        const task = mockWorkflowTasks.find(
-          (item) => Number(item.id) === Number(params.task_id || params.id)
-        )
-        if (!task) {
-          responseBody = makeJsonRpcBizError(id, 40010, '任务不存在')
+        if (
+          !workflowMockPermissionAllowed(
+            mockSuperAdminProfile,
+            mockSuperAdminProfile.effective_session,
+            'workflow.task.read'
+          )
+        ) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '当前账号缺少查看协同任务权限'
+          )
         } else {
-          const actionKey = String(params.action_key || params.action || '')
-          const actions = ['complete', 'block', 'reject', 'urge'].map((item) =>
-            buildMockWorkflowActionExplain(task, item)
+          const matchingTasks = mockWorkflowTasks.filter(
+            (item) =>
+              matchWorkflowFilter(item, params) &&
+              workflowMockCanViewTask(
+                mockSuperAdminProfile,
+                mockSuperAdminProfile.effective_session,
+                item
+              )
+          )
+          const limit = Math.min(Math.max(Number(params.limit || 50), 1), 200)
+          const offset = Math.max(Number(params.offset || 0), 0)
+          const tasks = matchingTasks.slice(offset, offset + limit)
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({
+              tasks,
+              total: matchingTasks.length,
+              limit,
+              offset,
+            }),
+            error: '',
+          }
+        }
+      } else if (method === 'get_task_board') {
+        if (
+          !workflowMockPermissionAllowed(
+            mockSuperAdminProfile,
+            mockSuperAdminProfile.effective_session,
+            'workflow.task.read'
+          )
+        ) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '当前账号缺少查看协同任务权限'
+          )
+        } else {
+          const visibleTasks = mockWorkflowTasks.filter((item) =>
+            workflowMockCanViewTask(
+              mockSuperAdminProfile,
+              mockSuperAdminProfile.effective_session,
+              item
+            )
           )
           responseBody = {
             jsonrpc: '2.0',
             id,
             result: makeBizResult(
-              actionKey
-                ? { action: buildMockWorkflowActionExplain(task, actionKey) }
-                : { task_id: task.id, actions }
+              buildWorkflowTaskBoardMock({
+                tasks: visibleTasks,
+                params,
+                snapshotAt: nowUnix(),
+              })
+            ),
+            error: '',
+          }
+        }
+      } else if (method === 'explain_action_access') {
+        const request = resolveMockWorkflowReadRequest(params, {
+          allowActionKey: true,
+        })
+        if (request.error) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            request.error.code,
+            request.error.message
+          )
+        } else if (
+          !workflowMockCanViewTask(
+            mockSuperAdminProfile,
+            mockSuperAdminProfile.effective_session,
+            request.task
+          )
+        ) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '当前账号无权查看该协同任务'
+          )
+        } else {
+          const actions = ['complete', 'block', 'reject', 'urge'].map((item) =>
+            buildMockWorkflowActionExplain(request.task, item)
+          )
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult(
+              request.actionKey
+                ? {
+                    action: buildMockWorkflowActionExplain(
+                      request.task,
+                      request.actionKey
+                    ),
+                  }
+                : { task_id: request.task.id, actions }
             ),
             error: '',
           }
         }
       } else if (method === 'explain_task_assignment') {
-        const task = mockWorkflowTasks.find(
-          (item) => Number(item.id) === Number(params.task_id || params.id)
-        )
-        if (!task) {
-          responseBody = makeJsonRpcBizError(id, 40010, '任务不存在')
+        const request = resolveMockWorkflowReadRequest(params)
+        if (request.error) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            request.error.code,
+            request.error.message
+          )
+        } else if (
+          !workflowMockCanViewTask(
+            mockSuperAdminProfile,
+            mockSuperAdminProfile.effective_session,
+            request.task
+          )
+        ) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '当前账号无权查看该协同任务'
+          )
         } else {
+          const { task } = request
+          const decisions = ['complete', 'block', 'reject', 'urge'].map(
+            (actionKey) =>
+              workflowMockActionDecision({
+                actionKey,
+                adminProfile: mockSuperAdminProfile,
+                effectiveSession: mockSuperAdminProfile.effective_session,
+                task,
+              })
+          )
+          const assignedToCurrentAdmin = decisions.some(
+            (decision) => decision.assignedToCurrentAdmin
+          )
+          const ownerRoleMatched = decisions.some(
+            (decision) => decision.ownerRoleMatched
+          )
+          const canHandle = decisions
+            .filter((decision) => decision.actionKey !== 'urge')
+            .some((decision) => decision.allowed)
+          const canUrge = decisions.find(
+            (decision) => decision.actionKey === 'urge'
+          ).allowed
+          const terminal = isMockTerminalWorkflowTask(task)
+          const reasonCode = terminal
+            ? 'terminal_task'
+            : assignedToCurrentAdmin
+              ? 'assigned_to_current_admin'
+              : ownerRoleMatched
+                ? 'owner_role_matched'
+                : canUrge
+                  ? 'can_urge_only'
+                  : 'not_assigned_or_owner'
           responseBody = {
             jsonrpc: '2.0',
             id,
@@ -788,69 +1343,159 @@ export function setupJsonRpcMockServer() {
               assignment: {
                 task_id: task.id,
                 owner_role_key: task.owner_role_key,
-                admin_role_keys: [task.owner_role_key || 'admin'],
+                admin_role_keys: mockSuperAdminProfile.roles.map(
+                  (role) => role.role_key
+                ),
                 visible: true,
-                assigned_to_current_admin: false,
-                owner_role_matched: true,
-                can_handle: !isMockTerminalWorkflowTask(task),
-                can_urge: !isMockTerminalWorkflowTask(task),
-                actor_role_key: task.owner_role_key || 'admin',
-                reason_code: isMockTerminalWorkflowTask(task)
-                  ? 'terminal_task'
-                  : 'owner_role_matched',
-                reason: isMockTerminalWorkflowTask(task)
+                assigned_to_current_admin: assignedToCurrentAdmin,
+                owner_role_matched: ownerRoleMatched,
+                can_handle: canHandle,
+                can_urge: canUrge,
+                actor_role_key:
+                  assignedToCurrentAdmin || ownerRoleMatched
+                    ? task.owner_role_key
+                    : canUrge && mockSuperAdminProfile.is_super_admin === true
+                      ? 'admin'
+                      : '',
+                reason_code: reasonCode,
+                reason: terminal
                   ? '该任务已结束，只能查看上下文。'
-                  : '当前账号属于该任务责任角色。',
+                  : assignedToCurrentAdmin
+                    ? '当前账号是该任务的指定处理人。'
+                    : ownerRoleMatched
+                      ? '当前账号属于该任务责任角色。'
+                      : canUrge
+                        ? '当前账号可催办该任务，但不能代替责任角色处理。'
+                        : '当前账号不是指定处理人，也不属于任务责任角色。',
               },
             }),
             error: '',
           }
         }
       } else if (method === 'create_task') {
-        const task = {
-          id: mockWorkflowTaskID++,
-          task_code: params.task_code || `mock-task-${Date.now()}`,
-          task_group: params.task_group || 'mock',
-          task_name: params.task_name || '模拟任务',
-          source_type: params.source_type || 'mock',
-          source_id: Number(params.source_id || Date.now()),
-          source_no: params.source_no || '',
-          business_status_key: params.business_status_key || '',
-          task_status_key: params.task_status_key || 'pending',
-          owner_role_key: params.owner_role_key || 'sales',
-          assignee_id: null,
-          priority: Number(params.priority || 0),
-          blocked_reason: params.blocked_reason || '',
-          due_at: null,
-          started_at: null,
-          completed_at: null,
-          closed_at: null,
-          payload: params.payload || {},
-          created_by: 1,
-          updated_by: 1,
-          created_at: nowUnix(),
-          updated_at: nowUnix(),
+        let createParams = null
+        try {
+          createParams = requireWorkflowTaskCreateParams(params)
+        } catch (error) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            error?.message || 'create_task 参数无效'
+          )
         }
-        mockWorkflowTasks.unshift(task)
-        responseBody = {
-          jsonrpc: '2.0',
-          id,
-          result: makeBizResult({ task }),
-          error: '',
+        if (
+          !responseBody &&
+          !workflowMockCanCreateTask(
+            mockSuperAdminProfile,
+            mockSuperAdminProfile.effective_session
+          )
+        ) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '当前账号缺少创建协同任务权限'
+          )
+        }
+        if (!responseBody) {
+          const task = {
+            id: mockWorkflowTaskID++,
+            task_code: createParams.task_code,
+            task_group: createParams.task_group,
+            task_name: createParams.task_name,
+            source_type: createParams.source_type,
+            source_id: createParams.source_id,
+            source_no: createParams.source_no || '',
+            business_status_key: createParams.business_status_key || '',
+            task_status_key: createParams.task_status_key,
+            owner_role_key: createParams.owner_role_key,
+            assignee_id: createParams.assignee_id || null,
+            priority: createParams.priority,
+            blocked_reason: createParams.blocked_reason || '',
+            due_at: createParams.due_at || null,
+            started_at: null,
+            completed_at: null,
+            closed_at: null,
+            version: 1,
+            payload: createParams.payload,
+            created_by: 1,
+            updated_by: 1,
+            created_at: nowUnix(),
+            updated_at: nowUnix(),
+          }
+          mockWorkflowTasks.unshift(task)
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({ task }),
+            error: '',
+          }
         }
       } else if (method === 'complete_task_action') {
-        const task = mockWorkflowTasks.find(
-          (item) => Number(item.id) === Number(params.task_id || params.id)
-        )
-        if (!task) {
-          responseBody = makeJsonRpcBizError(id, 40010, '任务不存在')
+        const request = resolveMockWorkflowMutationRequest(method, params)
+        const decision = request.error
+          ? null
+          : workflowMockActionDecision({
+              actionKey: 'complete',
+              adminProfile: mockSuperAdminProfile,
+              effectiveSession: mockSuperAdminProfile.effective_session,
+              task: request.task,
+            })
+        if (request.error) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            request.error.code,
+            request.error.message
+          )
+        } else if (
+          !decision.permissionAllowed ||
+          !workflowMockCanAccessTaskForCapability(
+            mockSuperAdminProfile,
+            mockSuperAdminProfile.effective_session,
+            request.task,
+            decision.requiredPermission
+          )
+        ) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '当前账号无权查看或执行该任务动作'
+          )
+        } else if (request.receipt.task) {
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({ task: request.receipt.task }),
+            error: '',
+          }
+        } else if (!decision.allowed) {
+          responseBody = makeJsonRpcBizError(id, 40010, decision.reason)
+        } else if (isMockTerminalWorkflowTask(request.task)) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '任务已结束，不能再次变更状态'
+          )
+        } else if (
+          request.mutationParams.expected_version !== request.task.version
+        ) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '任务已被其他人更新，请刷新后重试'
+          )
         } else {
+          const { mutationParams, receipt, task } = request
           task.task_status_key = 'done'
-          task.business_status_key =
-            params.business_status_key || task.business_status_key
           task.updated_at = nowUnix()
-          task.payload = params.payload || task.payload || {}
+          task.payload = {
+            ...(task.payload || {}),
+            ...mutationParams.payload,
+          }
+          delete task.payload.blocked_reason
+          delete task.payload.rejected_reason
           task.completed_at = nowUnix()
+          task.version += 1
+          saveMockWorkflowMutationReceipt(receipt, task)
           responseBody = {
             jsonrpc: '2.0',
             id,
@@ -862,19 +1507,148 @@ export function setupJsonRpcMockServer() {
         method === 'block_task_action' ||
         method === 'reject_task_action'
       ) {
-        const task = mockWorkflowTasks.find(
-          (item) => Number(item.id) === Number(params.task_id || params.id)
-        )
-        if (!task) {
-          responseBody = makeJsonRpcBizError(id, 40010, '任务不存在')
+        const request = resolveMockWorkflowMutationRequest(method, params)
+        const nextStatusKey =
+          method === 'block_task_action' ? 'blocked' : 'rejected'
+        const decision = request.error
+          ? null
+          : workflowMockActionDecision({
+              actionKey: method === 'block_task_action' ? 'block' : 'reject',
+              adminProfile: mockSuperAdminProfile,
+              effectiveSession: mockSuperAdminProfile.effective_session,
+              task: request.task,
+            })
+        if (request.error) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            request.error.code,
+            request.error.message
+          )
+        } else if (
+          !decision.permissionAllowed ||
+          !workflowMockCanAccessTaskForCapability(
+            mockSuperAdminProfile,
+            mockSuperAdminProfile.effective_session,
+            request.task,
+            decision.requiredPermission
+          )
+        ) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '当前账号无权查看或执行该任务动作'
+          )
+        } else if (request.receipt.task) {
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({ task: request.receipt.task }),
+            error: '',
+          }
+        } else if (!decision.allowed) {
+          responseBody = makeJsonRpcBizError(id, 40010, decision.reason)
+        } else if (isMockTerminalWorkflowTask(request.task)) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '任务已结束，不能再次变更状态'
+          )
+        } else if (
+          request.mutationParams.expected_version !== request.task.version
+        ) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '任务已被其他人更新，请刷新后重试'
+          )
         } else {
-          task.task_status_key =
-            method === 'block_task_action' ? 'blocked' : 'rejected'
-          task.business_status_key =
-            params.business_status_key || task.business_status_key
+          const { mutationParams, receipt, task } = request
+          task.task_status_key = nextStatusKey
           task.updated_at = nowUnix()
-          task.payload = params.payload || task.payload || {}
-          if (params.reason) task.blocked_reason = params.reason
+          task.payload = {
+            ...(task.payload || {}),
+            ...mutationParams.payload,
+          }
+          if (method === 'block_task_action') {
+            task.payload.blocked_reason = mutationParams.reason
+            delete task.payload.rejected_reason
+          } else {
+            task.payload.rejected_reason = mutationParams.reason
+            delete task.payload.blocked_reason
+          }
+          task.blocked_reason = mutationParams.reason
+          task.version += 1
+          saveMockWorkflowMutationReceipt(receipt, task)
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({ task }),
+            error: '',
+          }
+        }
+      } else if (method === 'urge_task') {
+        const request = resolveMockWorkflowMutationRequest(method, params)
+        const decision = request.error
+          ? null
+          : workflowMockActionDecision({
+              actionKey: 'urge',
+              adminProfile: mockSuperAdminProfile,
+              effectiveSession: mockSuperAdminProfile.effective_session,
+              task: request.task,
+            })
+        if (request.error) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            request.error.code,
+            request.error.message
+          )
+        } else if (
+          !decision.permissionAllowed ||
+          !workflowMockCanAccessTaskForCapability(
+            mockSuperAdminProfile,
+            mockSuperAdminProfile.effective_session,
+            request.task,
+            decision.requiredPermission
+          )
+        ) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '当前账号无权查看或执行该任务动作'
+          )
+        } else if (request.receipt.task) {
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({ task: request.receipt.task }),
+            error: '',
+          }
+        } else if (!decision.allowed) {
+          responseBody = makeJsonRpcBizError(id, 40010, decision.reason)
+        } else if (isMockTerminalWorkflowTask(request.task)) {
+          responseBody = makeJsonRpcBizError(id, 40010, '任务已结束，不能催办')
+        } else if (
+          request.mutationParams.expected_version !== request.task.version
+        ) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '任务已被其他人更新，请刷新后重试'
+          )
+        } else {
+          const { mutationParams, receipt, task } = request
+          const urgeCount = Number(task.payload?.urge_count || 0) + 1
+          task.payload = {
+            ...(task.payload || {}),
+            ...mutationParams.payload,
+            urged: true,
+            urge_count: urgeCount,
+            last_urge_action: mutationParams.action,
+            last_urge_reason: mutationParams.reason,
+          }
+          task.updated_at = nowUnix()
+          task.version += 1
+          saveMockWorkflowMutationReceipt(receipt, task)
           responseBody = {
             jsonrpc: '2.0',
             id,
@@ -883,19 +1657,33 @@ export function setupJsonRpcMockServer() {
           }
         }
       } else if (method === 'list_business_states') {
-        const businessStates = mockWorkflowBusinessStates.filter((item) =>
-          matchWorkflowFilter(item, params)
-        )
-        responseBody = {
-          jsonrpc: '2.0',
-          id,
-          result: makeBizResult({
-            business_states: businessStates,
-            total: businessStates.length,
-            limit: Number(params.limit || 50),
-            offset: Number(params.offset || 0),
-          }),
-          error: '',
+        if (
+          !workflowMockPermissionAllowed(
+            mockSuperAdminProfile,
+            mockSuperAdminProfile.effective_session,
+            'workflow.task.read'
+          )
+        ) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '当前账号缺少查看协同任务权限'
+          )
+        } else {
+          const businessStates = mockWorkflowBusinessStates.filter((item) =>
+            matchWorkflowFilter(item, params)
+          )
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({
+              business_states: businessStates,
+              total: businessStates.length,
+              limit: Number(params.limit || 50),
+              offset: Number(params.offset || 0),
+            }),
+            error: '',
+          }
         }
       } else {
         responseBody = makeJsonRpcBizError(

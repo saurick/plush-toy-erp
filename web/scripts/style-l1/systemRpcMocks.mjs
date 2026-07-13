@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises'
+import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
 
 export async function installSystemRpcMocks(page, context) {
   const {
@@ -14,6 +15,20 @@ export async function installSystemRpcMocks(page, context) {
     nowUnix,
   } = context
 
+  const assistantAdmin = {
+    id: 2,
+    username: 'assistant-admin',
+    phone: '13900139000',
+    is_super_admin: false,
+    disabled: false,
+    account_status: 'active',
+    revoked_at: 0,
+    status_reason: '',
+    roles: [salesRole],
+    permissions: salesRole.permissions,
+    menus: mockMenus.filter((item) => item.path === '/erp/dashboard'),
+  }
+
   await page.route('**/rpc/admin', async (route) => {
     const body = route.request().postDataJSON() || {}
     const { id = 'mock-id', method, params = {} } = body
@@ -25,41 +40,40 @@ export async function installSystemRpcMocks(page, context) {
         break
       case 'list':
         data = {
-          admins: [
-            adminProfile,
-            {
-              id: 2,
-              username: 'assistant-admin',
-              phone: '13900139000',
-              is_super_admin: false,
-              disabled: false,
-              roles: [salesRole],
-              permissions: salesRole.permissions,
-              menus: mockMenus.filter((item) => item.path === '/erp/dashboard'),
-            },
-          ],
+          admins: [adminProfile, { ...assistantAdmin }],
         }
         break
       case 'create':
       case 'set_roles':
       case 'set_disabled':
       case 'reset_password':
+        if (method === 'set_roles') {
+          assistantAdmin.roles = Array.isArray(params.role_keys)
+            ? params.role_keys.map((roleKey) => ({
+                role_key: roleKey,
+                name: roleKey,
+              }))
+            : assistantAdmin.roles
+        }
+        if (method === 'set_disabled') {
+          assistantAdmin.disabled = Boolean(params.disabled)
+          assistantAdmin.account_status = assistantAdmin.disabled
+            ? 'suspended'
+            : 'active'
+          assistantAdmin.status_reason = String(params.reason || '').trim()
+        }
         data = {
-          admin: {
-            id: Number(params.id || 2),
-            username: params.username || 'assistant-admin',
-            phone: params.phone || '13900139000',
-            is_super_admin: false,
-            disabled: Boolean(params.disabled),
-            roles: Array.isArray(params.role_keys)
-              ? params.role_keys.map((roleKey) => ({
-                  role_key: roleKey,
-                  name: roleKey,
-                }))
-              : [salesRole],
-            permissions: salesRole.permissions,
-            menus: mockMenus.filter((item) => item.path === '/erp/dashboard'),
-          },
+          admin: { ...assistantAdmin },
+        }
+        break
+      case 'revoke':
+        assistantAdmin.disabled = true
+        assistantAdmin.account_status = 'revoked'
+        assistantAdmin.revoked_at = nowUnix()
+        assistantAdmin.status_reason = String(params.reason || '').trim()
+        data = {
+          admin: { ...assistantAdmin },
+          released_task_count: 1,
         }
         break
       case 'set_role_permissions':
@@ -145,7 +159,7 @@ export async function installSystemRpcMocks(page, context) {
         }
         break
       default:
-        data = {}
+        data = unsupportedRpcMethod('admin', method)
         break
     }
 
@@ -169,11 +183,7 @@ export async function installSystemRpcMocks(page, context) {
       body: JSON.stringify({
         jsonrpc: '2.0',
         id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
+        result: styleRpcResult(data),
       }),
     })
   })
@@ -265,12 +275,33 @@ export async function installSystemRpcMocks(page, context) {
       return
     }
 
-    await route.fallback()
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: styleRpcResult(unsupportedRpcMethod('auth', method)),
+      }),
+    })
   })
 
   await page.route('**/rpc/debug', async (route) => {
     const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id' } = body
+    const { id = 'mock-id', method } = body
+
+    if (method !== 'capabilities') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id,
+          result: styleRpcResult(unsupportedRpcMethod('debug', method)),
+        }),
+      })
+      return
+    }
 
     await route.fulfill({
       status: 200,

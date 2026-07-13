@@ -73,6 +73,18 @@ function extractLocalCommandScriptPaths(command = "", currentCwd = repoRoot) {
   return paths;
 }
 
+function extractDevTestingPageGlobPaths(pageSource = "") {
+  const globMatch = String(pageSource).match(
+    /const markdownModules = import\.meta\.glob\(\s*\[([\s\S]*?)\]\s*,\s*\{/,
+  );
+  assert(globMatch, "dev testing page must declare a literal Markdown glob");
+  return [
+    ...globMatch[1].matchAll(/["'](\.\.\/\.\.\/\.\.\/\.\.\/[^"']+\.md)["']/g),
+  ]
+    .map((match) => match[1].slice("../../../../".length))
+    .sort();
+}
+
 test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV", () => {
   const devDocsPageSource = read("web/src/erp/pages/DevDocsPage.jsx");
   assert.equal(DEV_HUB_ROUTE, "/__dev");
@@ -129,6 +141,7 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
 
 test("dev entry boundary: dev testing indexes only current maintained docs", () => {
   const devTestingPageSource = read("web/src/erp/pages/DevTestingPage.jsx");
+  const devTestingCssSource = read("web/src/erp/styles/app/dev-prototypes.css");
   assert.deepEqual(DEV_TESTING_CURRENT_DOC_PATHS, [
     "docs/product/自动化测试策略.md",
     "README.md",
@@ -147,6 +160,25 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
         !item.startsWith("docs/archive/"),
     ),
     "dev testing source docs must not include reference/archive paths",
+  );
+  assert.deepEqual(
+    extractDevTestingPageGlobPaths(devTestingPageSource),
+    [...DEV_TESTING_CURRENT_DOC_PATHS].sort(),
+    "dev testing page literal glob must cover the maintained whitelist exactly",
+  );
+  const commandListRule =
+    devTestingCssSource.match(
+      /\.erp-dev-testing-command-list\s*\{([\s\S]*?)\}/,
+    )?.[1] || "";
+  assert.match(
+    commandListRule,
+    /grid-auto-rows:\s*max-content/,
+    "dev testing command grid rows must keep their content height",
+  );
+  assertIncludes(
+    devTestingPageSource,
+    "data-command-lines={block.commands.length}",
+    "dev testing command block browser box-model hook",
   );
 
   const docs = buildDevTestingDocs({
@@ -744,10 +776,10 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "customer-config-release-readiness.mjs --print-input-template",
     "customer config runtime preset",
   );
-  assertIncludes(
+  assert.doesNotMatch(
     buildDevTestingCopyPresetSource(customerConfigRuntimePreset),
-    "customer-config-release-readiness.mjs --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/2026-06-29 --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --readback-preflight-report output/customers/yoyoosun/customer-config-readback-preflight.json",
-    "customer config runtime preset",
+    /deployments\/yoyoosun\/evidence\/releases\/\d{4}-\d{2}-\d{2}/,
+    "customer config runtime preset must not pin one concrete evidence batch",
   );
   assert(
     !/<YYYY-MM-DD>|<[^>]+>/.test(
@@ -899,6 +931,10 @@ test("dev entry boundary: indexed testing doc command scripts exist", () => {
     });
 
     for (const block of blocks) {
+      assert(
+        !block.commandText.trimEnd().endsWith("\\"),
+        `dev testing copied command must not end with a continuation: ${docPath} / ${block.context}`,
+      );
       let currentCwd = repoRoot;
       for (const command of block.commands) {
         const commandCwd = resolveCommandCwd(command, currentCwd);
@@ -973,6 +1009,15 @@ test("dev entry boundary: customer config console stays preview or gated apply o
   assert.equal(summary.writesBusinessData, false);
   assert.equal(summary.testApply.noBusinessDataImport, true);
   assert.equal(summary.releaseApply.noBusinessDataImport, true);
+  assert.equal(
+    summary.uiReleaseBatchesApiPath,
+    "/__dev/api/customer-config/release-batches",
+  );
+  assert.match(summary.releaseApply.evidenceDir, /<release-batch>$/);
+  assert.equal(
+    summary.releaseApply.command,
+    "node scripts/deploy/customer-config-release-execute.mjs --print-input-template",
+  );
   assert(
     summary.importFlow.some((item) =>
       String(item.outcome).includes("模块状态"),
@@ -1018,6 +1063,10 @@ test("dev entry boundary: customer config console stays preview or gated apply o
     "dev customer config console fallback commands must stay no-write",
   );
   assert(
+    !devConsoleCommands.includes("<release-batch>"),
+    "dev customer config console must not expose non-executable batch placeholders",
+  );
+  assert(
     summary.tools.some(
       (item) =>
         item.key === "release-rollback-execute" &&
@@ -1028,18 +1077,34 @@ test("dev entry boundary: customer config console stays preview or gated apply o
   );
   assert.match(
     pageSource,
-    /const requestApplyTestConfig = \(\) => \{[\s\S]*modal\.confirm\([\s\S]*确认应用测试配置[\s\S]*当前后端[\s\S]*本地开发默认写 8300[\s\S]*不会导入客户业务数据[\s\S]*不代表正式发布通过[\s\S]*onOk: handleApplyTestConfig/su,
+    /const requestApplyTestConfig = \(\) => \{[\s\S]*modal\.confirm\([\s\S]*确认应用测试配置[\s\S]*127\.0\.0\.1:8300[\s\S]*不会导入客户业务数据[\s\S]*不代表正式发布通过[\s\S]*onOk: handleApplyTestConfig/su,
   );
-  assert.match(
+  assertIncludes(
     pageSource,
-    /const requestApplyReleaseConfig = \(\) => \{[\s\S]*modal\.confirm\([\s\S]*确认发布正式配置[\s\S]*不导入客户业务数据[\s\S]*不替代生产部署、备份恢复或客户签收[\s\S]*onOk: handleApplyReleaseConfig/su,
+    "assertCustomerConfigReadbackRevision(effectiveSession, manifest.revision)",
+    "test apply authenticated revision readback",
+  );
+  assert(
+    !pageSource.includes("requestApplyReleaseConfig") &&
+      !pageSource.includes("handleApplyReleaseConfig"),
+    "formal release must stay delegated to the audited release executor",
+  );
+  assertIncludes(
+    pageSource,
+    "正式发布只由统一执行器执行",
+    "formal release executor boundary",
+  );
+  assertIncludes(
+    pageSource,
+    "releaseBatch",
+    "release readiness must bind an explicit evidence batch",
   );
   assert(
     !pageSource.includes("onApplyTestConfig={handleApplyTestConfig}"),
     "test config control-plane write must be mediated by confirmation",
   );
   assert(
-    !pageSource.includes("onApplyReleaseConfig={handleApplyReleaseConfig}"),
-    "release config control-plane write must be mediated by confirmation",
+    !pageSource.includes("publishCustomerConfig(readiness.manifest)"),
+    "release readiness result must not be published directly by the browser page",
   );
 });

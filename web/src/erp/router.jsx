@@ -77,6 +77,9 @@ const V1InventoryLedgerPage = lazyRoute(
 const V1OperationalFactPage = lazyRoute(
   () => import('./pages/V1OperationalFactPage.jsx')
 )
+const V1ProductionOrdersPage = lazyRoute(
+  () => import('./pages/V1ProductionOrdersPage.jsx')
+)
 const WorkflowBusinessModulePage = lazyRoute(
   () => import('./pages/WorkflowBusinessModulePage.jsx')
 )
@@ -158,10 +161,10 @@ function RouteLoadingFallback() {
 
 function RouteRuntimeErrorFallback({ error }) {
   const isModuleLoadError = isDynamicImportLoadError(error)
-  const title = isModuleLoadError ? '页面模块加载失败' : '页面运行异常'
+  const title = isModuleLoadError ? '页面加载失败' : '页面暂时无法显示'
   const description = isModuleLoadError
-    ? '本地开发服务的页面模块加载被中断，请重新加载当前页面；如果刚刚重启过前端服务，请先等服务稳定。'
-    : '当前页面渲染时出现异常，请重新加载当前页面；如果问题持续出现，请保留控制台错误继续排查。'
+    ? '页面内容加载失败，请重新加载当前页面；如仍无法打开，请稍后重试。'
+    : '页面暂时无法显示，请重新加载当前页面；如问题持续出现，请联系管理员。'
 
   return (
     <Loading
@@ -458,6 +461,10 @@ export default function ERPRouter() {
             <Route
               path="purchase/processing-contracts"
               element={<V1OutsourcingOrdersPage />}
+            />
+            <Route
+              path="production/orders"
+              element={<V1ProductionOrdersPage />}
             />
             <Route
               path="production/progress"

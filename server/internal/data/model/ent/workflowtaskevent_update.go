@@ -42,6 +42,105 @@ func (_u *WorkflowTaskEventUpdate) SetNillableTaskID(v *int) *WorkflowTaskEventU
 	return _u
 }
 
+// SetTaskVersion sets the "task_version" field.
+func (_u *WorkflowTaskEventUpdate) SetTaskVersion(v int) *WorkflowTaskEventUpdate {
+	_u.mutation.ResetTaskVersion()
+	_u.mutation.SetTaskVersion(v)
+	return _u
+}
+
+// SetNillableTaskVersion sets the "task_version" field if the given value is not nil.
+func (_u *WorkflowTaskEventUpdate) SetNillableTaskVersion(v *int) *WorkflowTaskEventUpdate {
+	if v != nil {
+		_u.SetTaskVersion(*v)
+	}
+	return _u
+}
+
+// AddTaskVersion adds value to the "task_version" field.
+func (_u *WorkflowTaskEventUpdate) AddTaskVersion(v int) *WorkflowTaskEventUpdate {
+	_u.mutation.AddTaskVersion(v)
+	return _u
+}
+
+// ClearTaskVersion clears the value of the "task_version" field.
+func (_u *WorkflowTaskEventUpdate) ClearTaskVersion() *WorkflowTaskEventUpdate {
+	_u.mutation.ClearTaskVersion()
+	return _u
+}
+
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (_u *WorkflowTaskEventUpdate) SetIdempotencyKey(v string) *WorkflowTaskEventUpdate {
+	_u.mutation.SetIdempotencyKey(v)
+	return _u
+}
+
+// SetNillableIdempotencyKey sets the "idempotency_key" field if the given value is not nil.
+func (_u *WorkflowTaskEventUpdate) SetNillableIdempotencyKey(v *string) *WorkflowTaskEventUpdate {
+	if v != nil {
+		_u.SetIdempotencyKey(*v)
+	}
+	return _u
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (_u *WorkflowTaskEventUpdate) ClearIdempotencyKey() *WorkflowTaskEventUpdate {
+	_u.mutation.ClearIdempotencyKey()
+	return _u
+}
+
+// SetIntentHash sets the "intent_hash" field.
+func (_u *WorkflowTaskEventUpdate) SetIntentHash(v string) *WorkflowTaskEventUpdate {
+	_u.mutation.SetIntentHash(v)
+	return _u
+}
+
+// SetNillableIntentHash sets the "intent_hash" field if the given value is not nil.
+func (_u *WorkflowTaskEventUpdate) SetNillableIntentHash(v *string) *WorkflowTaskEventUpdate {
+	if v != nil {
+		_u.SetIntentHash(*v)
+	}
+	return _u
+}
+
+// ClearIntentHash clears the value of the "intent_hash" field.
+func (_u *WorkflowTaskEventUpdate) ClearIntentHash() *WorkflowTaskEventUpdate {
+	_u.mutation.ClearIntentHash()
+	return _u
+}
+
+// SetCommandKey sets the "command_key" field.
+func (_u *WorkflowTaskEventUpdate) SetCommandKey(v string) *WorkflowTaskEventUpdate {
+	_u.mutation.SetCommandKey(v)
+	return _u
+}
+
+// SetNillableCommandKey sets the "command_key" field if the given value is not nil.
+func (_u *WorkflowTaskEventUpdate) SetNillableCommandKey(v *string) *WorkflowTaskEventUpdate {
+	if v != nil {
+		_u.SetCommandKey(*v)
+	}
+	return _u
+}
+
+// ClearCommandKey clears the value of the "command_key" field.
+func (_u *WorkflowTaskEventUpdate) ClearCommandKey() *WorkflowTaskEventUpdate {
+	_u.mutation.ClearCommandKey()
+	return _u
+}
+
+// SetMutationResult sets the "mutation_result" field.
+func (_u *WorkflowTaskEventUpdate) SetMutationResult(v map[string]interface{}) *WorkflowTaskEventUpdate {
+	_u.mutation.SetMutationResult(v)
+	return _u
+}
+
+// ClearMutationResult clears the value of the "mutation_result" field.
+func (_u *WorkflowTaskEventUpdate) ClearMutationResult() *WorkflowTaskEventUpdate {
+	_u.mutation.ClearMutationResult()
+	return _u
+}
+
 // SetEventType sets the "event_type" field.
 func (_u *WorkflowTaskEventUpdate) SetEventType(v string) *WorkflowTaskEventUpdate {
 	_u.mutation.SetEventType(v)
@@ -225,6 +324,26 @@ func (_u *WorkflowTaskEventUpdate) check() error {
 			return &ValidationError{Name: "task_id", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.task_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.TaskVersion(); ok {
+		if err := workflowtaskevent.TaskVersionValidator(v); err != nil {
+			return &ValidationError{Name: "task_version", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.task_version": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.IdempotencyKey(); ok {
+		if err := workflowtaskevent.IdempotencyKeyValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.idempotency_key": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.IntentHash(); ok {
+		if err := workflowtaskevent.IntentHashValidator(v); err != nil {
+			return &ValidationError{Name: "intent_hash", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.intent_hash": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CommandKey(); ok {
+		if err := workflowtaskevent.CommandKeyValidator(v); err != nil {
+			return &ValidationError{Name: "command_key", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.command_key": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.EventType(); ok {
 		if err := workflowtaskevent.EventTypeValidator(v); err != nil {
 			return &ValidationError{Name: "event_type", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.event_type": %w`, err)}
@@ -272,6 +391,39 @@ func (_u *WorkflowTaskEventUpdate) sqlSave(ctx context.Context) (_node int, err 
 				ps[i](selector)
 			}
 		}
+	}
+	if value, ok := _u.mutation.TaskVersion(); ok {
+		_spec.SetField(workflowtaskevent.FieldTaskVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedTaskVersion(); ok {
+		_spec.AddField(workflowtaskevent.FieldTaskVersion, field.TypeInt, value)
+	}
+	if _u.mutation.TaskVersionCleared() {
+		_spec.ClearField(workflowtaskevent.FieldTaskVersion, field.TypeInt)
+	}
+	if value, ok := _u.mutation.IdempotencyKey(); ok {
+		_spec.SetField(workflowtaskevent.FieldIdempotencyKey, field.TypeString, value)
+	}
+	if _u.mutation.IdempotencyKeyCleared() {
+		_spec.ClearField(workflowtaskevent.FieldIdempotencyKey, field.TypeString)
+	}
+	if value, ok := _u.mutation.IntentHash(); ok {
+		_spec.SetField(workflowtaskevent.FieldIntentHash, field.TypeString, value)
+	}
+	if _u.mutation.IntentHashCleared() {
+		_spec.ClearField(workflowtaskevent.FieldIntentHash, field.TypeString)
+	}
+	if value, ok := _u.mutation.CommandKey(); ok {
+		_spec.SetField(workflowtaskevent.FieldCommandKey, field.TypeString, value)
+	}
+	if _u.mutation.CommandKeyCleared() {
+		_spec.ClearField(workflowtaskevent.FieldCommandKey, field.TypeString)
+	}
+	if value, ok := _u.mutation.MutationResult(); ok {
+		_spec.SetField(workflowtaskevent.FieldMutationResult, field.TypeJSON, value)
+	}
+	if _u.mutation.MutationResultCleared() {
+		_spec.ClearField(workflowtaskevent.FieldMutationResult, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.EventType(); ok {
 		_spec.SetField(workflowtaskevent.FieldEventType, field.TypeString, value)
@@ -375,6 +527,105 @@ func (_u *WorkflowTaskEventUpdateOne) SetNillableTaskID(v *int) *WorkflowTaskEve
 	if v != nil {
 		_u.SetTaskID(*v)
 	}
+	return _u
+}
+
+// SetTaskVersion sets the "task_version" field.
+func (_u *WorkflowTaskEventUpdateOne) SetTaskVersion(v int) *WorkflowTaskEventUpdateOne {
+	_u.mutation.ResetTaskVersion()
+	_u.mutation.SetTaskVersion(v)
+	return _u
+}
+
+// SetNillableTaskVersion sets the "task_version" field if the given value is not nil.
+func (_u *WorkflowTaskEventUpdateOne) SetNillableTaskVersion(v *int) *WorkflowTaskEventUpdateOne {
+	if v != nil {
+		_u.SetTaskVersion(*v)
+	}
+	return _u
+}
+
+// AddTaskVersion adds value to the "task_version" field.
+func (_u *WorkflowTaskEventUpdateOne) AddTaskVersion(v int) *WorkflowTaskEventUpdateOne {
+	_u.mutation.AddTaskVersion(v)
+	return _u
+}
+
+// ClearTaskVersion clears the value of the "task_version" field.
+func (_u *WorkflowTaskEventUpdateOne) ClearTaskVersion() *WorkflowTaskEventUpdateOne {
+	_u.mutation.ClearTaskVersion()
+	return _u
+}
+
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (_u *WorkflowTaskEventUpdateOne) SetIdempotencyKey(v string) *WorkflowTaskEventUpdateOne {
+	_u.mutation.SetIdempotencyKey(v)
+	return _u
+}
+
+// SetNillableIdempotencyKey sets the "idempotency_key" field if the given value is not nil.
+func (_u *WorkflowTaskEventUpdateOne) SetNillableIdempotencyKey(v *string) *WorkflowTaskEventUpdateOne {
+	if v != nil {
+		_u.SetIdempotencyKey(*v)
+	}
+	return _u
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (_u *WorkflowTaskEventUpdateOne) ClearIdempotencyKey() *WorkflowTaskEventUpdateOne {
+	_u.mutation.ClearIdempotencyKey()
+	return _u
+}
+
+// SetIntentHash sets the "intent_hash" field.
+func (_u *WorkflowTaskEventUpdateOne) SetIntentHash(v string) *WorkflowTaskEventUpdateOne {
+	_u.mutation.SetIntentHash(v)
+	return _u
+}
+
+// SetNillableIntentHash sets the "intent_hash" field if the given value is not nil.
+func (_u *WorkflowTaskEventUpdateOne) SetNillableIntentHash(v *string) *WorkflowTaskEventUpdateOne {
+	if v != nil {
+		_u.SetIntentHash(*v)
+	}
+	return _u
+}
+
+// ClearIntentHash clears the value of the "intent_hash" field.
+func (_u *WorkflowTaskEventUpdateOne) ClearIntentHash() *WorkflowTaskEventUpdateOne {
+	_u.mutation.ClearIntentHash()
+	return _u
+}
+
+// SetCommandKey sets the "command_key" field.
+func (_u *WorkflowTaskEventUpdateOne) SetCommandKey(v string) *WorkflowTaskEventUpdateOne {
+	_u.mutation.SetCommandKey(v)
+	return _u
+}
+
+// SetNillableCommandKey sets the "command_key" field if the given value is not nil.
+func (_u *WorkflowTaskEventUpdateOne) SetNillableCommandKey(v *string) *WorkflowTaskEventUpdateOne {
+	if v != nil {
+		_u.SetCommandKey(*v)
+	}
+	return _u
+}
+
+// ClearCommandKey clears the value of the "command_key" field.
+func (_u *WorkflowTaskEventUpdateOne) ClearCommandKey() *WorkflowTaskEventUpdateOne {
+	_u.mutation.ClearCommandKey()
+	return _u
+}
+
+// SetMutationResult sets the "mutation_result" field.
+func (_u *WorkflowTaskEventUpdateOne) SetMutationResult(v map[string]interface{}) *WorkflowTaskEventUpdateOne {
+	_u.mutation.SetMutationResult(v)
+	return _u
+}
+
+// ClearMutationResult clears the value of the "mutation_result" field.
+func (_u *WorkflowTaskEventUpdateOne) ClearMutationResult() *WorkflowTaskEventUpdateOne {
+	_u.mutation.ClearMutationResult()
 	return _u
 }
 
@@ -574,6 +825,26 @@ func (_u *WorkflowTaskEventUpdateOne) check() error {
 			return &ValidationError{Name: "task_id", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.task_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.TaskVersion(); ok {
+		if err := workflowtaskevent.TaskVersionValidator(v); err != nil {
+			return &ValidationError{Name: "task_version", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.task_version": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.IdempotencyKey(); ok {
+		if err := workflowtaskevent.IdempotencyKeyValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.idempotency_key": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.IntentHash(); ok {
+		if err := workflowtaskevent.IntentHashValidator(v); err != nil {
+			return &ValidationError{Name: "intent_hash", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.intent_hash": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CommandKey(); ok {
+		if err := workflowtaskevent.CommandKeyValidator(v); err != nil {
+			return &ValidationError{Name: "command_key", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.command_key": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.EventType(); ok {
 		if err := workflowtaskevent.EventTypeValidator(v); err != nil {
 			return &ValidationError{Name: "event_type", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.event_type": %w`, err)}
@@ -638,6 +909,39 @@ func (_u *WorkflowTaskEventUpdateOne) sqlSave(ctx context.Context) (_node *Workf
 				ps[i](selector)
 			}
 		}
+	}
+	if value, ok := _u.mutation.TaskVersion(); ok {
+		_spec.SetField(workflowtaskevent.FieldTaskVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedTaskVersion(); ok {
+		_spec.AddField(workflowtaskevent.FieldTaskVersion, field.TypeInt, value)
+	}
+	if _u.mutation.TaskVersionCleared() {
+		_spec.ClearField(workflowtaskevent.FieldTaskVersion, field.TypeInt)
+	}
+	if value, ok := _u.mutation.IdempotencyKey(); ok {
+		_spec.SetField(workflowtaskevent.FieldIdempotencyKey, field.TypeString, value)
+	}
+	if _u.mutation.IdempotencyKeyCleared() {
+		_spec.ClearField(workflowtaskevent.FieldIdempotencyKey, field.TypeString)
+	}
+	if value, ok := _u.mutation.IntentHash(); ok {
+		_spec.SetField(workflowtaskevent.FieldIntentHash, field.TypeString, value)
+	}
+	if _u.mutation.IntentHashCleared() {
+		_spec.ClearField(workflowtaskevent.FieldIntentHash, field.TypeString)
+	}
+	if value, ok := _u.mutation.CommandKey(); ok {
+		_spec.SetField(workflowtaskevent.FieldCommandKey, field.TypeString, value)
+	}
+	if _u.mutation.CommandKeyCleared() {
+		_spec.ClearField(workflowtaskevent.FieldCommandKey, field.TypeString)
+	}
+	if value, ok := _u.mutation.MutationResult(); ok {
+		_spec.SetField(workflowtaskevent.FieldMutationResult, field.TypeJSON, value)
+	}
+	if _u.mutation.MutationResultCleared() {
+		_spec.ClearField(workflowtaskevent.FieldMutationResult, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.EventType(); ok {
 		_spec.SetField(workflowtaskevent.FieldEventType, field.TypeString, value)

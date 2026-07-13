@@ -945,7 +945,6 @@ function buildSimulatedBossTask(options) {
   const sourceID = 920000 + Math.floor(nowSec % 100000)
   const prefix = `${SIM_PREFIX}-${options.runId}`
   return {
-    customer_key: 'yoyoosun',
     task_code: `${prefix}-BOSS`,
     task_group: 'order_approval',
     task_name: `移动端浏览器模拟老板审批 ${options.runId}`,
@@ -980,7 +979,6 @@ function buildSimulatedBossDoneTask(options) {
   const sourceID = 925000 + Math.floor(nowSec % 100000)
   const prefix = `${SIM_PREFIX}-${options.runId}`
   return {
-    customer_key: 'yoyoosun',
     task_code: `${prefix}-BOSS-DONE`,
     task_group: 'order_approval',
     task_name: `移动端浏览器模拟老板完成 ${options.runId}`,
@@ -1014,7 +1012,6 @@ function buildSimulatedBossRejectTask(options) {
   const sourceID = 927000 + Math.floor(nowSec % 100000)
   const prefix = `${SIM_PREFIX}-${options.runId}`
   return {
-    customer_key: 'yoyoosun',
     task_code: `${prefix}-BOSS-REJECT`,
     task_group: 'order_approval',
     task_name: `移动端浏览器模拟老板退回 ${options.runId}`,
@@ -1048,7 +1045,6 @@ function buildSimulatedQualityTask(options) {
   const sourceID = 928000 + Math.floor(nowSec % 100000)
   const prefix = `${SIM_PREFIX}-${options.runId}`
   return {
-    customer_key: 'yoyoosun',
     task_code: `${prefix}-QUALITY-DONE`,
     task_group: 'finished_goods_qc',
     task_name: `移动端浏览器模拟品质完成 ${options.runId}`,
@@ -1082,7 +1078,6 @@ function buildSimulatedWarehouseInboundTask(options) {
   const sourceID = 929000 + Math.floor(nowSec % 100000)
   const prefix = `${SIM_PREFIX}-${options.runId}`
   return {
-    customer_key: 'yoyoosun',
     task_code: `${prefix}-WAREHOUSE-INBOUND-DONE`,
     task_group: 'warehouse_inbound',
     task_name: `移动端浏览器模拟仓库入库完成 ${options.runId}`,
@@ -1116,7 +1111,6 @@ function buildSimulatedWarehouseTask(options, assigneeID) {
   const sourceID = 930000 + Math.floor(nowSec % 100000)
   const prefix = `${SIM_PREFIX}-${options.runId}`
   return {
-    customer_key: 'yoyoosun',
     task_code: `${prefix}-WAREHOUSE`,
     task_group: 'shipment_release',
     task_name: `移动端浏览器模拟仓库放行 ${options.runId}`,
@@ -1339,7 +1333,7 @@ async function loginMobileRole(page, { baseURL, password, roleKey, username }) {
   await page.goto(new URL('/admin-login', `${baseURL}/`).toString(), {
     waitUntil: 'domcontentloaded',
   })
-  await page.getByText('管理员账号', { exact: true }).waitFor({
+  await page.getByText('账号', { exact: true }).waitFor({
     state: 'visible',
     timeout: 15_000,
   })
@@ -1350,7 +1344,7 @@ async function loginMobileRole(page, { baseURL, password, roleKey, username }) {
   if (await entryButton.isVisible().catch(() => false)) {
     await entryButton.click()
   }
-  await page.getByLabel('管理员账号').fill(username)
+  await page.getByLabel('账号').fill(username)
   await page.locator('input[type="password"]').fill(password)
   await Promise.all([
     page.waitForURL((url) => url.pathname !== '/admin-login', {
@@ -1580,7 +1574,9 @@ async function runBrowserScenario(
       timeout: 15_000,
     })
     await page
-      .getByText('当前岗位可查看并催办', { exact: false })
+      .getByText('您暂时不能处理这条任务，可以查看并催办', {
+        exact: false,
+      })
       .waitFor({ state: 'visible', timeout: 15_000 })
     const blockButton = page.locator('.mobile-role-action-bar__button--blocked')
     const doneButton = page.locator('.mobile-role-action-bar__button--done')

@@ -32,6 +32,12 @@ test("trial simulated dataset is explicitly simulated and excludes fact domains"
   assert.equal(dataset.records.salesOrderItem.product_id, 1);
   assert.equal(dataset.records.salesOrderItem.unit_id, 2);
   assert.equal(dataset.records.supplier.supplier_type, "material");
+  assert.match(dataset.records.customer.note, /模拟试用数据/u);
+  assert.match(dataset.records.salesOrder.note, /尚未安排出货/u);
+  assert.doesNotMatch(
+    JSON.stringify(dataset.records),
+    /trial simulated|demo data|fact posting/iu,
+  );
   assertDatasetBoundary(dataset);
   assert.deepEqual(
     Object.keys(dataset.records).filter((key) =>

@@ -62,7 +62,7 @@ const actionMetaMap = {
     label: '账号角色变更',
     risk: 'warning',
     intent: '确认账号被授予或移除了哪些角色',
-    next: '重点核对对象账号的角色变更前后差异，以及是否包含系统管理员或调试权限。',
+    next: '重点核对对象账号的角色变更前后差异，以及是否包含系统管理员或其他高风险权限。',
   },
   'admin_user.phone.set': {
     label: '账号手机号变更',
@@ -86,7 +86,7 @@ const actionMetaMap = {
     label: '角色权限变更',
     risk: 'high',
     intent: '确认某个角色的权限集是否发生变化',
-    next: '重点核对权限变更前后差异，确认是否新增高危系统或调试权限。',
+    next: '重点核对权限变更前后差异，确认是否新增高风险系统权限。',
   },
   'admin_bootstrap.completed': {
     label: '初始化完成',
@@ -98,7 +98,7 @@ const actionMetaMap = {
     label: '初始化阻止',
     risk: 'high',
     intent: '确认启动期安全守卫阻止了什么',
-    next: '查看阻止原因，并检查启动环境变量和生产 preflight。',
+    next: '查看阻止原因，并检查启动配置和生产环境启动检查结果。',
   },
 }
 
@@ -502,7 +502,7 @@ export default function AuditLogsPage() {
     return (
       <Loading
         title="审计日志加载中"
-        description="正在读取系统控制面审计事件..."
+        description="正在读取系统管理审计记录..."
       />
     )
   }
@@ -513,7 +513,7 @@ export default function AuditLogsPage() {
         <div className="erp-audit-command__title">
           <Title level={4}>审计日志</Title>
           <Text type="secondary">
-            系统控制面事件。先看风险、对象、变化摘要和下一步。
+            系统管理操作记录。先看风险、对象、变化摘要和下一步。
           </Text>
         </div>
         <div className="erp-audit-command__stats" aria-label="当前页审计摘要">

@@ -141,6 +141,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       menuSurfaces: Object.freeze([
         "products",
         "material-bom",
+        "production-scheduling",
         "production-progress",
         "task-board",
       ]),
@@ -340,6 +341,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       ownerPools: Object.freeze(["production"]),
       menuSurfaces: Object.freeze([
         "processing-contracts",
+        "production-exceptions",
         "production-progress",
         "task-board",
         "print-center",
@@ -358,6 +360,8 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "outsourcing.order.confirm",
         "pmc.plan.read",
         "pmc.plan.update",
+        "pmc.risk.read",
+        "pmc.risk.handle",
         "workflow.task.read",
         "workflow.task.update",
         "workflow.task.complete",

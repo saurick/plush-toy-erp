@@ -10,7 +10,7 @@ func TestWorkflowUsecase_BossApprovalDoneDerivesEngineeringTask(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: bossApprovalWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            101,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{"mobile_role_key": "boss"},
@@ -61,7 +61,7 @@ func TestWorkflowUsecase_BossApprovalRepeatedDoneUsesIdempotentDerivedTaskKey(t 
 	uc := NewWorkflowUsecase(repo)
 
 	for i := 0; i < 2; i++ {
-		_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 			ID:            101,
 			TaskStatusKey: "done",
 			Payload:       map[string]any{},
@@ -79,7 +79,7 @@ func TestWorkflowUsecase_BossApprovalBlockedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: bossApprovalWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            101,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": "   "},
@@ -96,7 +96,7 @@ func TestWorkflowUsecase_BossApprovalBlockedDerivesRevisionTask(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: bossApprovalWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            101,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": " 缺少款图 "},
@@ -134,7 +134,7 @@ func TestWorkflowUsecase_BossApprovalRejectedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: bossApprovalWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            101,
 		TaskStatusKey: "rejected",
 		Reason:        " \t ",
@@ -152,7 +152,7 @@ func TestWorkflowUsecase_BossApprovalRejectedDerivesRevisionTask(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: bossApprovalWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            101,
 		TaskStatusKey: "rejected",
 		Reason:        " 交期和款图缺失 ",
@@ -196,9 +196,10 @@ func TestWorkflowUsecase_NonBossApprovalTaskKeepsOriginalUpdateBehavior(t *testi
 	}}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            201,
 		TaskStatusKey: "blocked",
+		Reason:        "通用阻塞验证",
 		Payload:       map[string]any{},
 	}, 7, SalesRoleKey)
 	if err != nil {
@@ -260,9 +261,10 @@ func TestWorkflowUsecase_SameNameNonBossApprovalTaskDoesNotDerive(t *testing.T) 
 			repo := &stubWorkflowRepo{currentTask: tc.task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            tc.task.ID,
 				TaskStatusKey: "blocked",
+				Reason:        "通用阻塞验证",
 				Payload:       map[string]any{},
 			}, 7, tc.task.OwnerRoleKey)
 			if err != nil {
@@ -282,7 +284,7 @@ func TestWorkflowUsecase_BossApprovalNonDerivedStatusKeepsOriginalBehavior(t *te
 	repo := &stubWorkflowRepo{currentTask: bossApprovalWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            101,
 		TaskStatusKey: "processing",
 		Payload:       map[string]any{},

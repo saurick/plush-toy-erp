@@ -448,6 +448,27 @@ func (_u *WorkflowTaskUpdate) ClearPayload() *WorkflowTaskUpdate {
 	return _u
 }
 
+// SetVersion sets the "version" field.
+func (_u *WorkflowTaskUpdate) SetVersion(v int) *WorkflowTaskUpdate {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *WorkflowTaskUpdate) SetNillableVersion(v *int) *WorkflowTaskUpdate {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *WorkflowTaskUpdate) AddVersion(v int) *WorkflowTaskUpdate {
+	_u.mutation.AddVersion(v)
+	return _u
+}
+
 // SetCreatedBy sets the "created_by" field.
 func (_u *WorkflowTaskUpdate) SetCreatedBy(v int) *WorkflowTaskUpdate {
 	_u.mutation.ResetCreatedBy()
@@ -667,6 +688,11 @@ func (_u *WorkflowTaskUpdate) check() error {
 			return &ValidationError{Name: "blocked_reason", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.blocked_reason": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := workflowtask.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.version": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.CreatedBy(); ok {
 		if err := workflowtask.CreatedByValidator(v); err != nil {
 			return &ValidationError{Name: "created_by", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.created_by": %w`, err)}
@@ -814,6 +840,12 @@ func (_u *WorkflowTaskUpdate) sqlSave(ctx context.Context) (_node int, err error
 	}
 	if _u.mutation.PayloadCleared() {
 		_spec.ClearField(workflowtask.FieldPayload, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(workflowtask.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(workflowtask.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.CreatedBy(); ok {
 		_spec.SetField(workflowtask.FieldCreatedBy, field.TypeInt, value)
@@ -1320,6 +1352,27 @@ func (_u *WorkflowTaskUpdateOne) ClearPayload() *WorkflowTaskUpdateOne {
 	return _u
 }
 
+// SetVersion sets the "version" field.
+func (_u *WorkflowTaskUpdateOne) SetVersion(v int) *WorkflowTaskUpdateOne {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *WorkflowTaskUpdateOne) SetNillableVersion(v *int) *WorkflowTaskUpdateOne {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *WorkflowTaskUpdateOne) AddVersion(v int) *WorkflowTaskUpdateOne {
+	_u.mutation.AddVersion(v)
+	return _u
+}
+
 // SetCreatedBy sets the "created_by" field.
 func (_u *WorkflowTaskUpdateOne) SetCreatedBy(v int) *WorkflowTaskUpdateOne {
 	_u.mutation.ResetCreatedBy()
@@ -1552,6 +1605,11 @@ func (_u *WorkflowTaskUpdateOne) check() error {
 			return &ValidationError{Name: "blocked_reason", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.blocked_reason": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := workflowtask.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.version": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.CreatedBy(); ok {
 		if err := workflowtask.CreatedByValidator(v); err != nil {
 			return &ValidationError{Name: "created_by", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.created_by": %w`, err)}
@@ -1716,6 +1774,12 @@ func (_u *WorkflowTaskUpdateOne) sqlSave(ctx context.Context) (_node *WorkflowTa
 	}
 	if _u.mutation.PayloadCleared() {
 		_spec.ClearField(workflowtask.FieldPayload, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(workflowtask.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(workflowtask.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.CreatedBy(); ok {
 		_spec.SetField(workflowtask.FieldCreatedBy, field.TypeInt, value)

@@ -160,6 +160,11 @@ func ClosedAt(v time.Time) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldEQ(FieldClosedAt, v))
 }
 
+// Version applies equality check predicate on the "version" field. It's identical to VersionEQ.
+func Version(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldVersion, v))
+}
+
 // CreatedBy applies equality check predicate on the "created_by" field. It's identical to CreatedByEQ.
 func CreatedBy(v int) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldEQ(FieldCreatedBy, v))
@@ -1458,6 +1463,46 @@ func PayloadIsNil() predicate.WorkflowTask {
 // PayloadNotNil applies the NotNil predicate on the "payload" field.
 func PayloadNotNil() predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldNotNull(FieldPayload))
+}
+
+// VersionEQ applies the EQ predicate on the "version" field.
+func VersionEQ(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldVersion, v))
+}
+
+// VersionNEQ applies the NEQ predicate on the "version" field.
+func VersionNEQ(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldVersion, v))
+}
+
+// VersionIn applies the In predicate on the "version" field.
+func VersionIn(vs ...int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIn(FieldVersion, vs...))
+}
+
+// VersionNotIn applies the NotIn predicate on the "version" field.
+func VersionNotIn(vs ...int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotIn(FieldVersion, vs...))
+}
+
+// VersionGT applies the GT predicate on the "version" field.
+func VersionGT(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGT(FieldVersion, v))
+}
+
+// VersionGTE applies the GTE predicate on the "version" field.
+func VersionGTE(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGTE(FieldVersion, v))
+}
+
+// VersionLT applies the LT predicate on the "version" field.
+func VersionLT(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLT(FieldVersion, v))
+}
+
+// VersionLTE applies the LTE predicate on the "version" field.
+func VersionLTE(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLTE(FieldVersion, v))
 }
 
 // CreatedByEQ applies the EQ predicate on the "created_by" field.

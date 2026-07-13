@@ -2,17 +2,16 @@
 package jwtutil
 
 import (
+	"errors"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
 type Claims struct {
-	UserID   int    `json:"uid"`
-	Username string `json:"uname"`
-
-	// 0=user, 1=admin
-	Role int8 `json:"role"`
+	UserID      int    `json:"uid"`
+	SessionKey  string `json:"sid"`
+	AuthVersion int64  `json:"auth_version"`
 
 	jwt.RegisteredClaims
 }
@@ -22,17 +21,35 @@ type Config struct {
 	ExpireDuration time.Duration // 过期时间，比如 7 * 24 * time.Hour
 }
 
-func NewToken(cfg Config, userID int, username string, role int8) (string, time.Time, error) {
-	expireAt := time.Now().Add(cfg.ExpireDuration)
+const (
+	adminTokenIssuer   = "plush-toy-erp"
+	adminTokenAudience = "plush-toy-erp-admin"
+	adminTokenSubject  = "admin_access_token"
+)
+
+func NewToken(cfg Config, userID int, sessionKey string, authVersion int64, issuedAt, requestedExpiry time.Time) (string, time.Time, error) {
+	if userID <= 0 || sessionKey == "" || authVersion <= 0 {
+		return "", time.Time{}, errors.New("invalid admin token input")
+	}
+	if issuedAt.IsZero() {
+		issuedAt = time.Now()
+	}
+	expireAt := requestedExpiry
+	if expireAt.IsZero() {
+		expireAt = issuedAt.Add(cfg.ExpireDuration)
+	}
 
 	claims := &Claims{
-		UserID:   userID,
-		Username: username,
-		Role:     role,
+		UserID:      userID,
+		SessionKey:  sessionKey,
+		AuthVersion: authVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expireAt),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Subject:   "access_token",
+			IssuedAt:  jwt.NewNumericDate(issuedAt),
+			Issuer:    adminTokenIssuer,
+			Audience:  jwt.ClaimStrings{adminTokenAudience},
+			Subject:   adminTokenSubject,
+			ID:        sessionKey,
 		},
 	}
 
@@ -46,12 +63,15 @@ func NewToken(cfg Config, userID int, username string, role int8) (string, time.
 
 func ParseToken(secret []byte, tokenStr string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
+		if t.Method != jwt.SigningMethodHS256 {
+			return nil, jwt.ErrSignatureInvalid
+		}
 		return secret, nil
-	})
+	}, jwt.WithIssuer(adminTokenIssuer), jwt.WithAudience(adminTokenAudience), jwt.WithSubject(adminTokenSubject), jwt.WithExpirationRequired(), jwt.WithIssuedAt())
 	if err != nil {
 		return nil, err
 	}
-	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
+	if claims, ok := token.Claims.(*Claims); ok && token.Valid && claims.UserID > 0 && claims.SessionKey != "" && claims.ID == claims.SessionKey && claims.AuthVersion > 0 {
 		return claims, nil
 	}
 	return nil, jwt.ErrTokenInvalidClaims

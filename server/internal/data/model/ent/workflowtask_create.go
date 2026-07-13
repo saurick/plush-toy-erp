@@ -265,6 +265,20 @@ func (_c *WorkflowTaskCreate) SetPayload(v map[string]interface{}) *WorkflowTask
 	return _c
 }
 
+// SetVersion sets the "version" field.
+func (_c *WorkflowTaskCreate) SetVersion(v int) *WorkflowTaskCreate {
+	_c.mutation.SetVersion(v)
+	return _c
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_c *WorkflowTaskCreate) SetNillableVersion(v *int) *WorkflowTaskCreate {
+	if v != nil {
+		_c.SetVersion(*v)
+	}
+	return _c
+}
+
 // SetCreatedBy sets the "created_by" field.
 func (_c *WorkflowTaskCreate) SetCreatedBy(v int) *WorkflowTaskCreate {
 	_c.mutation.SetCreatedBy(v)
@@ -374,6 +388,10 @@ func (_c *WorkflowTaskCreate) defaults() {
 	if _, ok := _c.mutation.Priority(); !ok {
 		v := workflowtask.DefaultPriority
 		_c.mutation.SetPriority(v)
+	}
+	if _, ok := _c.mutation.Version(); !ok {
+		v := workflowtask.DefaultVersion
+		_c.mutation.SetVersion(v)
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := workflowtask.DefaultCreatedAt()
@@ -489,6 +507,14 @@ func (_c *WorkflowTaskCreate) check() error {
 	if v, ok := _c.mutation.BlockedReason(); ok {
 		if err := workflowtask.BlockedReasonValidator(v); err != nil {
 			return &ValidationError{Name: "blocked_reason", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.blocked_reason": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.Version(); !ok {
+		return &ValidationError{Name: "version", err: errors.New(`ent: missing required field "WorkflowTask.version"`)}
+	}
+	if v, ok := _c.mutation.Version(); ok {
+		if err := workflowtask.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.version": %w`, err)}
 		}
 	}
 	if v, ok := _c.mutation.CreatedBy(); ok {
@@ -620,6 +646,10 @@ func (_c *WorkflowTaskCreate) createSpec() (*WorkflowTask, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.Payload(); ok {
 		_spec.SetField(workflowtask.FieldPayload, field.TypeJSON, value)
 		_node.Payload = value
+	}
+	if value, ok := _c.mutation.Version(); ok {
+		_spec.SetField(workflowtask.FieldVersion, field.TypeInt, value)
+		_node.Version = value
 	}
 	if value, ok := _c.mutation.CreatedBy(); ok {
 		_spec.SetField(workflowtask.FieldCreatedBy, field.TypeInt, value)

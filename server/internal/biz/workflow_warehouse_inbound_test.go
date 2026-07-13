@@ -10,7 +10,7 @@ func TestWorkflowUsecase_WarehouseInboundDoneUpsertsInboundDoneOnly(t *testing.T
 	repo := &stubWorkflowRepo{currentTask: warehouseInboundWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            701,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{"mobile_role_key": "warehouse"},
@@ -59,7 +59,7 @@ func TestWorkflowUsecase_WarehouseInboundRepeatedDoneDoesNotDeriveDownstreamTask
 	uc := NewWorkflowUsecase(repo)
 
 	for i := 0; i < 2; i++ {
-		_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 			ID:            701,
 			TaskStatusKey: "done",
 			Payload:       map[string]any{},
@@ -81,7 +81,7 @@ func TestWorkflowUsecase_WarehouseInboundBlockedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: warehouseInboundWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            701,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": "   "},
@@ -98,7 +98,7 @@ func TestWorkflowUsecase_WarehouseInboundBlockedUpsertsBlockedState(t *testing.T
 	repo := &stubWorkflowRepo{currentTask: warehouseInboundWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            701,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": " 库位未确认 "},
@@ -145,7 +145,7 @@ func TestWorkflowUsecase_WarehouseInboundRejectedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: warehouseInboundWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            701,
 		TaskStatusKey: "rejected",
 		Reason:        " \t ",
@@ -163,7 +163,7 @@ func TestWorkflowUsecase_WarehouseInboundRejectedUpsertsBlockedState(t *testing.
 	repo := &stubWorkflowRepo{currentTask: warehouseInboundWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            701,
 		TaskStatusKey: "rejected",
 		Reason:        " 到货数量与单据不符 ",
@@ -221,9 +221,10 @@ func TestWorkflowUsecase_WarehouseInboundSettledBusinessStatusDoesNotTriggerSpec
 			repo := &stubWorkflowRepo{currentTask: task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            task.ID,
 				TaskStatusKey: "blocked",
+				Reason:        "通用阻塞验证",
 				Payload:       map[string]any{},
 			}, 7, "warehouse")
 			if err != nil {
@@ -243,7 +244,7 @@ func TestWorkflowUsecase_WarehouseInboundNonDerivedStatusKeepsOriginalBehavior(t
 	repo := &stubWorkflowRepo{currentTask: warehouseInboundWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            701,
 		TaskStatusKey: "processing",
 		Payload:       map[string]any{},

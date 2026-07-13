@@ -10,6 +10,42 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 )
 
+func TestMenuOptionsExposeExplicitAnyAndAllRequirements(t *testing.T) {
+	items := menuOptionsToAny([]biz.AdminMenu{{
+		Key:         "combined",
+		Label:       "组合页面",
+		Path:        "/erp/combined",
+		RequiredAny: []string{"a.read", "b.read"},
+		RequiredAll: []string{"base.read"},
+	}})
+	if len(items) != 1 {
+		t.Fatalf("menu options len = %d, want 1", len(items))
+	}
+	menu := items[0].(map[string]any)
+	if got := menu["required_any"].([]any); len(got) != 2 {
+		t.Fatalf("required_any = %#v", got)
+	}
+	if got := menu["required_all"].([]any); len(got) != 1 {
+		t.Fatalf("required_all = %#v", got)
+	}
+	if got := menu["required_permissions"].([]any); len(got) != 3 {
+		t.Fatalf("legacy required_permissions = %#v", got)
+	}
+}
+
+func TestPermissionUsageExplainsPageAndControlImpact(t *testing.T) {
+	usage := permissionUsageToMap(biz.AdminPermission{
+		Key: biz.PermissionPurchaseOrderCreate, Name: "创建采购订单", Action: "create",
+	})
+	if usage["control_type"] != "新建按钮和表单" {
+		t.Fatalf("control_type = %#v", usage["control_type"])
+	}
+	menus := usage["menus"].([]any)
+	if len(menus) != 1 || menus[0].(map[string]any)["key"] != "accessories-purchase" {
+		t.Fatalf("related menus = %#v", menus)
+	}
+}
+
 func TestRequireAdminPermissionIntersectsRBACWithActiveCustomerEntitlement(t *testing.T) {
 	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
 	repo := newServiceCustomerConfigRepo()

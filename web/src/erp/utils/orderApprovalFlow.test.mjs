@@ -84,6 +84,7 @@ test('orderApprovalFlow: 保留订单审批相关任务识别和状态常量', (
   )
   assert.equal(isOpenWorkflowTask({ task_status_key: 'ready' }), true)
   assert.equal(isOpenWorkflowTask({ task_status_key: 'done' }), false)
+  assert.equal(isOpenWorkflowTask({ task_status_key: 'rejected' }), false)
 })
 
 test('orderApprovalFlow: 移动端老板审批不再本地创建下游任务', () => {

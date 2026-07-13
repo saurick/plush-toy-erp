@@ -1,0 +1,312 @@
+.erp-dev-workspace-page {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 16px;
+}
+
+.erp-dev-workspace-page > :not(.erp-dev-workspace-nav) {
+  grid-column: 2;
+  width: 100%;
+}
+
+.erp-dev-workspace-nav {
+  position: sticky;
+  top: 16px;
+  grid-row: 1 / span 40;
+  display: flex;
+  width: 232px;
+  height: calc(100vh - 32px);
+  min-height: 560px;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--dev-nav-border);
+  border-radius: 14px;
+  background: var(--dev-nav-bg);
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.04),
+    0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.erp-dev-workspace-nav__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 72px;
+  padding: 14px;
+  border-bottom: 1px solid var(--dev-nav-border);
+}
+
+.erp-dev-workspace-nav__brand-mark {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--dev-nav-active-border);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.erp-dev-workspace-nav__brand-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.erp-dev-workspace-nav__brand-copy strong {
+  font-size: 15px;
+}
+
+.erp-dev-workspace-nav__brand-copy small,
+.erp-dev-workspace-nav__boundary {
+  color: var(--dev-nav-secondary);
+  font-size: 11px;
+}
+
+.erp-dev-workspace-nav__routes {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.erp-dev-workspace-nav__route {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  min-height: 58px;
+  align-items: center;
+  column-gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.erp-dev-workspace-nav__route:hover,
+.erp-dev-workspace-nav__route:focus-visible {
+  border-color: var(--dev-nav-active-border);
+  outline: none;
+}
+
+.erp-dev-workspace-nav__route--active {
+  border-color: var(--dev-nav-active-border);
+  background: var(--dev-nav-active-bg);
+}
+
+.erp-dev-workspace-nav__route span {
+  font-weight: 600;
+}
+
+.erp-dev-workspace-nav__route small {
+  grid-column: 2;
+  margin-top: -7px;
+  color: var(--dev-nav-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.erp-dev-workspace-nav__route-mark,
+.erp-dev-workspace-nav__route > .anticon {
+  grid-row: 1 / span 2;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--dev-nav-active-bg) 76%, transparent);
+  color: var(--dev-nav-active-border);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.erp-dev-workspace-nav__actions {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--dev-nav-border);
+}
+
+.erp-dev-workspace-nav__boundary {
+  display: block;
+  padding: 2px 4px 0;
+  text-align: center;
+}
+
+.erp-dev-task-nav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.erp-dev-task-nav__item {
+  display: grid;
+  min-height: 58px;
+  padding: 9px 12px;
+  border: 1px solid var(--dev-task-border, #d9d9d9);
+  border-radius: 9px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: var(--dev-task-bg, transparent);
+  cursor: pointer;
+}
+
+.erp-dev-task-nav__item:hover,
+.erp-dev-task-nav__item:focus-visible {
+  border-color: var(--dev-task-active-border, #1677ff);
+  outline: none;
+}
+
+.erp-dev-task-nav__item--active {
+  border-color: var(--dev-task-active-border, #1677ff);
+  background: var(--dev-task-active-bg, rgba(22, 119, 255, 0.08));
+}
+
+.erp-dev-task-nav__item:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.erp-dev-task-nav__item span {
+  font-weight: 600;
+}
+
+.erp-dev-task-nav__item small {
+  margin-top: 3px;
+  color: var(--dev-task-secondary, #667085);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.erp-dev-task-nav--compact {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.erp-dev-task-nav--compact .erp-dev-task-nav__item {
+  min-height: 50px;
+  padding: 7px 10px;
+}
+
+.erp-dev-customer-section-nav {
+  position: sticky;
+  z-index: 10;
+  top: 8px;
+}
+
+@media (max-width: 980px) {
+  .erp-dev-workspace-page {
+    display: block;
+  }
+
+  .erp-dev-workspace-nav {
+    position: sticky;
+    z-index: 30;
+    top: 8px;
+    display: grid;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    margin: 0 auto 12px;
+  }
+
+  .erp-dev-workspace-nav__brand {
+    min-height: 54px;
+    padding: 8px 10px;
+  }
+
+  .erp-dev-workspace-nav__brand-mark {
+    width: 34px;
+    height: 34px;
+    flex-basis: 34px;
+  }
+
+  .erp-dev-workspace-nav__routes {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    padding: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+  }
+
+  .erp-dev-workspace-nav__route {
+    flex: 0 0 142px;
+    min-width: 142px;
+    min-height: 54px;
+    scroll-snap-align: start;
+  }
+
+  .erp-dev-workspace-nav__actions {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+  }
+
+  .erp-dev-workspace-nav__actions .ant-btn {
+    width: auto;
+  }
+
+  .erp-dev-workspace-nav__boundary {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .erp-dev-customer-header__copy {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .erp-dev-customer-header__copy > .ant-space {
+    width: 100%;
+    max-width: 100%;
+    align-items: flex-start;
+  }
+
+  .erp-dev-customer-header__copy > .ant-space .ant-space-item:last-child {
+    min-width: 0;
+  }
+
+  .erp-dev-customer-title.ant-typography {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .erp-dev-workspace-nav__actions .ant-btn > span:not(.ant-btn-icon) {
+    display: none;
+  }
+
+  .erp-dev-workspace-nav__boundary {
+    display: none;
+  }
+
+  .erp-dev-task-nav,
+  .erp-dev-task-nav--compact {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+
+  .erp-dev-task-nav__item,
+  .erp-dev-task-nav--compact .erp-dev-task-nav__item {
+    flex: 0 0 146px;
+    min-width: 146px;
+    scroll-snap-align: start;
+  }
+}

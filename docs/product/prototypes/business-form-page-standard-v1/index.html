@@ -54,8 +54,17 @@
         margin: 0;
         background: var(--bg);
         color: var(--text);
-        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
-          "PingFang SC", "Microsoft YaHei", sans-serif;
+        font:
+          14px/1.5 -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          "PingFang SC",
+          "Microsoft YaHei",
+          sans-serif;
+      }
+
+      body.modal-open {
+        overflow: hidden;
       }
 
       button,
@@ -221,6 +230,68 @@
         box-shadow: var(--shadow);
       }
 
+      .business-modal {
+        width: min(1180px, calc(100vw - 48px));
+        max-width: none;
+        max-height: calc(100dvh - 48px);
+        margin: auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 14px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 0;
+        overflow: hidden;
+        box-shadow: 0 28px 80px rgb(15 23 42 / 32%);
+      }
+
+      .business-modal[open] {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+      }
+
+      .business-modal::backdrop {
+        background: rgb(15 23 42 / 64%);
+        backdrop-filter: blur(2px);
+      }
+
+      .modal-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+        padding: 14px 18px;
+      }
+
+      .modal-header h2,
+      .modal-header p {
+        margin-bottom: 0;
+      }
+
+      .modal-header .btn {
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
+
+      .modal-scroll {
+        min-height: 0;
+        overflow: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+      }
+
+      .business-modal .source-strip {
+        border-top: 0;
+      }
+
+      .business-modal > .footer {
+        border: 0;
+        border-top: 1px solid var(--line);
+        border-radius: 0;
+        box-shadow: none;
+      }
+
       .hero {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
@@ -310,7 +381,10 @@
 
       .source-strip {
         display: grid;
-        grid-template-columns: minmax(210px, 300px) minmax(180px, 240px) minmax(0, 1fr);
+        grid-template-columns: minmax(210px, 300px) minmax(180px, 240px) minmax(
+            0,
+            1fr
+          );
         gap: 12px;
         align-items: start;
         border-top: 1px solid var(--line);
@@ -662,6 +736,31 @@
           align-items: flex-start;
           flex-direction: column;
         }
+
+        .business-modal {
+          width: calc(100vw - 16px);
+          max-height: calc(100dvh - 16px);
+          border-radius: 10px;
+        }
+
+        .modal-header {
+          padding: 12px;
+        }
+
+        .business-modal .source-strip,
+        .business-modal .form-grid {
+          padding-right: 12px;
+          padding-left: 12px;
+        }
+
+        .business-modal > .footer {
+          padding: 10px 12px;
+        }
+
+        .business-modal > .footer .actions {
+          width: 100%;
+          justify-content: flex-end;
+        }
       }
     </style>
   </head>
@@ -675,7 +774,9 @@
             <span>业务弹窗标准样板</span>
           </div>
         </div>
-        <div class="nav-note">以下为常用入口 / 快捷入口示意，不替代 seedData 或 yoyoosun 客户菜单。</div>
+        <div class="nav-note">
+          以下为常用入口 / 快捷入口示意，不替代 seedData 或 yoyoosun 客户菜单。
+        </div>
         <div class="nav-title">看板中心</div>
         <div class="nav-item">工作台</div>
         <div class="nav-title">基础资料</div>
@@ -695,9 +796,15 @@
             <h1>新建 / 编辑业务弹窗样板</h1>
           </div>
           <div class="actions">
-            <button class="btn">取消</button>
-            <button class="btn" id="resetForm" type="button">重置</button>
-            <button class="btn primary save-action" id="saveForm" type="button">保存草稿</button>
+            <button
+              class="btn primary"
+              id="openFormModal"
+              type="button"
+              aria-haspopup="dialog"
+              aria-controls="businessFormDialog"
+            >
+              打开业务表单弹窗
+            </button>
           </div>
         </header>
 
@@ -709,7 +816,9 @@
                   <div class="crumb">ERP / 标准业务弹窗 / To Implement</div>
                   <h2>销售订单业务弹窗样板</h2>
                   <p class="summary">
-                    新建和编辑复用同一个业务弹窗：上方维护主表字段，下方维护订单行、联系人、BOM 明细或其他必要 items；item 区可以从对应业务库导入，列顺序、状态动作说明和危险确认回到局部动作弹窗。
+                    新建和编辑复用同一个业务弹窗：上方维护主表字段，下方维护订单行、联系人、BOM
+                    明细或其他必要 items；item
+                    区可以从对应业务库导入，列顺序、状态动作说明和危险确认回到局部动作弹窗。
                   </p>
                 </div>
                 <div class="tags">
@@ -722,11 +831,15 @@
               <div class="review-grid" aria-label="进入真实实现前确认项">
                 <div class="review-card">
                   <strong>弹窗主路径</strong>
-                  <span>新建、编辑和只读回显共用同一弹窗结构，不另做详情抽屉。</span>
+                  <span
+                    >新建、编辑和只读回显共用同一弹窗结构，不另做详情抽屉。</span
+                  >
                 </div>
                 <div class="review-card">
                   <strong>字段真源</strong>
-                  <span>字段、默认值、保存规则回到 schema、API 和 usecase。</span>
+                  <span
+                    >字段、默认值、保存规则回到 schema、API 和 usecase。</span
+                  >
                 </div>
                 <div class="review-card">
                   <strong>状态覆盖</strong>
@@ -734,191 +847,256 @@
                 </div>
                 <div class="review-card">
                   <strong>不吸收内容</strong>
-                  <span>不吸收静态数据、dev-only 外壳、假客户、后端事实或危险确认动作。</span>
+                  <span
+                    >不吸收静态数据、dev-only
+                    外壳、假客户、后端事实或危险确认动作。</span
+                  >
                 </div>
               </div>
-
-              <div class="source-strip">
-                <div class="field">
-                  <label for="source">来源单据</label>
-                  <select id="source">
-                    <option value="sales">销售订单 SO-202606-018</option>
-                    <option value="customer">客户档案 CUST-009</option>
-                    <option value="empty">无来源 / 手工草稿</option>
-                  </select>
-                  <small>切换来源时，来源快照字段必须同步替换或清空。</small>
-                </div>
-                <div class="field">
-                  <label for="formMode">页面状态</label>
-                  <select id="formMode">
-                    <option value="create">新增草稿</option>
-                    <option value="edit">编辑草稿</option>
-                    <option value="readonly">已提交只读</option>
-                  </select>
-                  <small id="modeNote">新增态允许保存草稿；真实权限由 RBAC 和 usecase 决定。</small>
-                </div>
-                <div class="source-note" id="sourceNote">
-                  已从销售订单带出客户、产品、数量和交期。若切换来源，将清空产品、数量、交期和附件证据，避免旧值残留。
-                </div>
-              </div>
-
-              <form class="form-grid" id="form" novalidate>
-                <section class="group">
-                  <h3>基础信息</h3>
-                  <div class="fields">
-                    <div class="field" data-field="customer">
-                      <label class="required" for="customer">客户</label>
-                      <input id="customer" value="样例客户 A" />
-                      <span class="error">客户必填，不能用旧来源残值代替。</span>
-                    </div>
-                    <div class="field" data-field="orderNo">
-                      <label class="required" for="orderNo">订单号</label>
-                      <input id="orderNo" value="SO-202606-018" />
-                      <span class="error">订单号必填。</span>
-                    </div>
-                    <div class="field">
-                      <label for="owner">负责人</label>
-                      <select id="owner">
-                        <option>业务</option>
-                        <option>PMC</option>
-                        <option>采购</option>
-                      </select>
-                    </div>
-                  </div>
-                </section>
-
-                <section class="group">
-                  <h3>交付、附件与备注</h3>
-                  <div class="fields">
-                    <div class="field">
-                      <label for="warehouse">目标仓库</label>
-                      <select id="warehouse">
-                        <option>成品仓</option>
-                        <option>材料仓</option>
-                      </select>
-                    </div>
-                    <div class="field">
-                      <label for="status">状态</label>
-                      <select id="status">
-                        <option>草稿</option>
-                        <option>待提交</option>
-                        <option>已提交只读</option>
-                      </select>
-                      <small>已提交或无权限时只读展示，不能继续本地保存。</small>
-                    </div>
-                    <div class="field attachment-inline">
-                      <div class="attachment-row">
-                        <div>
-                          <label for="attachment">附件上传</label>
-                          <small>可先选择图纸、合同、确认截图、资料包或邮件证据；单个附件 50MB 内，保存成功后自动上传并绑定，PNG / JPG / WEBP / GIF / PDF 可轻量预览，其他格式下载后查看。</small>
-                        </div>
-                        <button class="btn" id="attachment" type="button">选择附件</button>
-                      </div>
-                      <div class="attachment-files">
-                        <span class="attachment-file" id="attachmentFile">
-                          blue-hanger-spec-v3.pdf
-                          <button type="button">预览</button>
-                          <button type="button">下载</button>
-                        </span>
-                      </div>
-                    </div>
-                    <div class="field" style="grid-column: 1 / -1">
-                      <label for="remark">备注</label>
-                      <textarea id="remark">示例备注只用于原型，不作为正式字段真源。</textarea>
-                    </div>
-                  </div>
-                </section>
-
-                <section class="items-section" aria-label="订单行 items">
-                  <div class="import-row">
-                    <div class="import-copy">
-                      <strong>从来源选择器导入</strong>
-                      <span>第二层只选择产品 / SKU / 来源行，导入后回到本弹窗维护数量、价格和交期。</span>
-                    </div>
-                    <div class="import-action">
-                      <button class="btn" id="itemImportOpen" type="button">打开来源选择器</button>
-                      <span class="picker-rule">最多两层弹窗；复杂导入在选择器内分步，不再继续弹第三层。</span>
-                    </div>
-                  </div>
-
-                  <div class="items-head">
-                    <div>
-                      <strong>订单行</strong>
-                      <span>明细作为当前业务对象的一部分维护，整体随弹窗保存。</span>
-                    </div>
-                  </div>
-
-                  <div class="item-list" id="itemList">
-                    <article class="item-card">
-                      <div class="item-head">
-                        <strong>条目 1</strong>
-                        <button class="btn text remove-item" type="button" disabled>移除</button>
-                      </div>
-                      <div class="item-grid">
-                        <div class="field" data-field="product">
-                          <label class="required" for="product">产品</label>
-                          <input id="product" value="毛绒挂件 A" />
-                          <span class="error">产品必填；来源缺失时不要伪造值。</span>
-                        </div>
-                        <div class="field" data-field="quantity">
-                          <label class="required" for="quantity">数量</label>
-                          <input id="quantity" value="3000" inputmode="numeric" />
-                          <span class="error">数量必填且需要来自当前来源或人工输入。</span>
-                        </div>
-                        <div class="field" data-field="unitPrice">
-                          <label for="unitPrice">单价</label>
-                          <input id="unitPrice" value="1.50" inputmode="decimal" />
-                        </div>
-                        <div class="field">
-                          <label for="lineAmount">金额</label>
-                          <input id="lineAmount" value="4500.00" disabled />
-                        </div>
-                        <div class="field" data-field="dueDate">
-                          <label class="required" for="dueDate">交期</label>
-                          <input id="dueDate" value="2026-06-18" />
-                          <span class="error">交期必填。</span>
-                        </div>
-                        <div class="field">
-                          <label for="itemNote">备注</label>
-                          <textarea id="itemNote">首条明细默认一行高；更多字段横向滚动。</textarea>
-                        </div>
-                      </div>
-                    </article>
-                  </div>
-
-                  <div class="items-footer">
-                    <button class="btn" id="addItem" type="button">+ 添加条目</button>
-                    <div class="stats">
-                      <span class="stat">已录入 <strong id="itemCount">1</strong> 条</span>
-                      <span class="stat">数量合计 <strong id="quantityTotal">3000</strong></span>
-                      <span class="stat">金额合计 <strong id="amountTotal">4500.00</strong></span>
-                    </div>
-                  </div>
-                </section>
-
-                <div class="guard" id="guard">
-                  当前来源已带出 4 个字段。保存前检查：
-                  <ul>
-                    <li>切换来源后旧产品、旧数量、旧交期和旧附件不得继续残留。</li>
-                    <li>缺值不能由前端伪造，必须由人工输入或真实接口回补。</li>
-                    <li>只读或无权限状态不得继续提交保存动作。</li>
-                  </ul>
-                </div>
-              </form>
             </section>
-
-            <div class="footer">
-              <span class="muted" id="footerState">尚未保存，当前为 To Implement 原型状态。</span>
-              <div class="actions">
-                <button class="btn">取消</button>
-                <button class="btn" id="footerReset" type="button">重置</button>
-                <button class="btn primary save-action" id="footerSave" type="button">保存草稿</button>
-              </div>
-            </div>
           </div>
         </section>
       </main>
     </div>
+
+    <dialog
+      class="business-modal"
+      id="businessFormDialog"
+      aria-modal="true"
+      aria-labelledby="businessFormTitle"
+      aria-describedby="businessFormDescription"
+    >
+      <header class="modal-header">
+        <div>
+          <div class="crumb">销售链路 / 销售订单 / To Implement</div>
+          <h2 id="businessFormTitle">销售订单业务表单</h2>
+          <p class="muted" id="businessFormDescription">
+            新建、编辑和只读回显复用同一个 Modal；正式字段、权限和保存仍以
+            API、usecase 与 RBAC 为准。
+          </p>
+        </div>
+        <button
+          class="btn"
+          id="closeFormModal"
+          type="button"
+          aria-label="关闭业务表单弹窗"
+        >
+          关闭
+        </button>
+      </header>
+
+      <div class="modal-scroll">
+        <div class="source-strip">
+          <div class="field">
+            <label for="source">来源单据</label>
+            <select id="source" data-initial-focus>
+              <option value="sales">销售订单 SO-202606-018</option>
+              <option value="customer">客户档案 CUST-009</option>
+              <option value="empty">无来源 / 手工草稿</option>
+            </select>
+            <small>切换来源时，来源快照字段必须同步替换或清空。</small>
+          </div>
+          <div class="field">
+            <label for="formMode">页面状态</label>
+            <select id="formMode">
+              <option value="create">新增草稿</option>
+              <option value="edit">编辑草稿</option>
+              <option value="readonly">已提交只读</option>
+            </select>
+            <small id="modeNote"
+              >新增态允许保存草稿；真实权限由 RBAC 和 usecase 决定。</small
+            >
+          </div>
+          <div class="source-note" id="sourceNote">
+            已从销售订单带出客户、产品、数量和交期。若切换来源，将清空产品、数量、交期和附件证据，避免旧值残留。
+          </div>
+        </div>
+
+        <form class="form-grid" id="form" novalidate>
+          <section class="group">
+            <h3>基础信息</h3>
+            <div class="fields">
+              <div class="field" data-field="customer">
+                <label class="required" for="customer">客户</label>
+                <input id="customer" value="样例客户 A" />
+                <span class="error">客户必填，不能用旧来源残值代替。</span>
+              </div>
+              <div class="field" data-field="orderNo">
+                <label class="required" for="orderNo">订单号</label>
+                <input id="orderNo" value="SO-202606-018" />
+                <span class="error">订单号必填。</span>
+              </div>
+              <div class="field">
+                <label for="owner">负责人</label>
+                <select id="owner">
+                  <option>业务</option>
+                  <option>PMC</option>
+                  <option>采购</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <section class="group">
+            <h3>交付、附件与备注</h3>
+            <div class="fields">
+              <div class="field">
+                <label for="warehouse">目标仓库</label>
+                <select id="warehouse">
+                  <option>成品仓</option>
+                  <option>材料仓</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="status">状态</label>
+                <select id="status">
+                  <option>草稿</option>
+                  <option>待提交</option>
+                  <option>已提交只读</option>
+                </select>
+                <small>已提交或无权限时只读展示，不能继续本地保存。</small>
+              </div>
+              <div class="field attachment-inline">
+                <div class="attachment-row">
+                  <div>
+                    <label for="attachment">附件上传</label>
+                    <small
+                      >可先选择图纸、合同、确认截图、资料包或邮件证据；单个附件
+                      5MB 内，保存成功后自动上传并绑定，PNG / JPG / WEBP / GIF /
+                      PDF 可轻量预览，其他格式下载后查看。</small
+                    >
+                  </div>
+                  <button class="btn" id="attachment" type="button">
+                    选择附件
+                  </button>
+                </div>
+                <div class="attachment-files">
+                  <span class="attachment-file" id="attachmentFile">
+                    <span id="attachmentFileName">blue-hanger-spec-v3.pdf</span>
+                    <button type="button">预览</button>
+                    <button type="button">下载</button>
+                  </span>
+                </div>
+              </div>
+              <div class="field" style="grid-column: 1 / -1">
+                <label for="remark">备注</label>
+                <textarea id="remark">
+示例备注只用于原型，不作为正式字段真源。</textarea
+                >
+              </div>
+            </div>
+          </section>
+
+          <section class="items-section" aria-label="订单行 items">
+            <div class="import-row">
+              <div class="import-copy">
+                <strong>从来源选择器导入</strong>
+                <span
+                  >第二层只选择产品 / SKU /
+                  来源行，导入后回到本弹窗维护数量、价格和交期。</span
+                >
+              </div>
+              <div class="import-action">
+                <button class="btn" id="itemImportOpen" type="button">
+                  打开来源选择器
+                </button>
+                <span class="picker-rule"
+                  >最多两层弹窗；复杂导入在选择器内分步，不再继续弹第三层。</span
+                >
+              </div>
+            </div>
+
+            <div class="items-head">
+              <div>
+                <strong>订单行</strong>
+                <span>明细作为当前业务对象的一部分维护，整体随弹窗保存。</span>
+              </div>
+            </div>
+
+            <div class="item-list" id="itemList">
+              <article class="item-card">
+                <div class="item-head">
+                  <strong>条目 1</strong>
+                  <button class="btn text remove-item" type="button" disabled>
+                    移除
+                  </button>
+                </div>
+                <div class="item-grid">
+                  <div class="field" data-field="product">
+                    <label class="required" for="product">产品</label>
+                    <input id="product" value="毛绒挂件 A" />
+                    <span class="error">产品必填；来源缺失时不要伪造值。</span>
+                  </div>
+                  <div class="field" data-field="quantity">
+                    <label class="required" for="quantity">数量</label>
+                    <input id="quantity" value="3000" inputmode="numeric" />
+                    <span class="error"
+                      >数量必填且需要来自当前来源或人工输入。</span
+                    >
+                  </div>
+                  <div class="field" data-field="unitPrice">
+                    <label for="unitPrice">单价</label>
+                    <input id="unitPrice" value="1.50" inputmode="decimal" />
+                  </div>
+                  <div class="field">
+                    <label for="lineAmount">金额</label>
+                    <input id="lineAmount" value="4500.00" disabled />
+                  </div>
+                  <div class="field" data-field="dueDate">
+                    <label class="required" for="dueDate">交期</label>
+                    <input id="dueDate" value="2026-06-18" />
+                    <span class="error">交期必填。</span>
+                  </div>
+                  <div class="field">
+                    <label for="itemNote">备注</label>
+                    <textarea id="itemNote">
+首条明细默认一行高；更多字段横向滚动。</textarea
+                    >
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <div class="items-footer">
+              <button class="btn" id="addItem" type="button">+ 添加条目</button>
+              <div class="stats">
+                <span class="stat"
+                  >已录入 <strong id="itemCount">1</strong> 条</span
+                >
+                <span class="stat"
+                  >数量合计 <strong id="quantityTotal">3000</strong></span
+                >
+                <span class="stat"
+                  >金额合计 <strong id="amountTotal">4500.00</strong></span
+                >
+              </div>
+            </div>
+          </section>
+
+          <div class="guard" id="guard">
+            当前来源已带出 4 个字段。保存前检查：
+            <ul>
+              <li>切换来源后旧产品、旧数量、旧交期和旧附件不得继续残留。</li>
+              <li>缺值不能由前端伪造，必须由人工输入或真实接口回补。</li>
+              <li>只读或无权限状态不得继续提交保存动作。</li>
+            </ul>
+          </div>
+        </form>
+      </div>
+
+      <div class="footer" aria-label="业务表单主动作区">
+        <span class="muted" id="footerState" role="status" aria-live="polite">
+          尚未保存，当前为 To Implement 原型状态。
+        </span>
+        <div class="actions">
+          <button class="btn" id="cancelFormModal" type="button">取消</button>
+          <button class="btn" id="footerReset" type="button">重置</button>
+          <button class="btn primary save-action" id="footerSave" type="button">
+            保存草稿
+          </button>
+        </div>
+      </div>
+    </dialog>
 
     <script>
       const defaults = {
@@ -936,15 +1114,13 @@
 
       const sourceData = {
         sales: {
-          note:
-            "已从销售订单带出客户、产品、数量和交期。若切换来源，将清空产品、数量、交期和附件证据，避免旧值残留。",
+          note: "已从销售订单带出客户、产品、数量和交期。若切换来源，将清空产品、数量、交期和附件证据，避免旧值残留。",
           guard:
             "当前来源已带出 4 个字段。保存前检查：切换来源后旧产品、旧数量、旧交期和旧附件不得继续残留。",
           values: defaults,
         },
         customer: {
-          note:
-            "已从客户档案带出客户名称，但产品、数量、交期和附件没有真源，必须清空后人工填写。",
+          note: "已从客户档案带出客户名称，但产品、数量、交期和附件没有真源，必须清空后人工填写。",
           guard:
             "来源切换已清空产品、数量、交期和附件。缺值不能用上一来源残值回补。",
           values: {
@@ -961,8 +1137,7 @@
           },
         },
         empty: {
-          note:
-            "当前为手工草稿，没有上游来源。页面只展示必填缺值，不伪造客户、产品、数量或交期。",
+          note: "当前为手工草稿，没有上游来源。页面只展示必填缺值，不伪造客户、产品、数量或交期。",
           guard:
             "无来源状态下所有必填值都必须人工输入；不得继续显示旧来源快照。",
           values: {
@@ -1001,13 +1176,33 @@
 
       const source = document.querySelector("#source");
       const formMode = document.querySelector("#formMode");
+      const form = document.querySelector("#form");
+      const businessFormDialog = document.querySelector("#businessFormDialog");
+      const openFormModal = document.querySelector("#openFormModal");
+      const closeFormModal = document.querySelector("#closeFormModal");
+      const cancelFormModal = document.querySelector("#cancelFormModal");
       const itemImportOpen = document.querySelector("#itemImportOpen");
       const itemList = document.querySelector("#itemList");
       const sourceNote = document.querySelector("#sourceNote");
       const guard = document.querySelector("#guard");
       const modeNote = document.querySelector("#modeNote");
       const footerState = document.querySelector("#footerState");
-      const requiredFields = ["customer", "orderNo", "product", "quantity", "dueDate"];
+      const focusableSelector = [
+        "button:not([disabled])",
+        "a[href]",
+        "input:not([disabled])",
+        "select:not([disabled])",
+        "textarea:not([disabled])",
+        '[tabindex]:not([tabindex="-1"])',
+      ].join(",");
+      let modalTrigger = openFormModal;
+      const requiredFields = [
+        "customer",
+        "orderNo",
+        "product",
+        "quantity",
+        "dueDate",
+      ];
       const editableFieldIds = [
         "customer",
         "orderNo",
@@ -1015,7 +1210,6 @@
         "product",
         "quantity",
         "unitPrice",
-        "lineAmount",
         "dueDate",
         "warehouse",
         "attachment",
@@ -1040,10 +1234,14 @@
 
       function setAttachment(value) {
         const file = document.querySelector("#attachmentFile");
-        if (!file) return;
+        const fileName = document.querySelector("#attachmentFileName");
+        if (!file || !fileName) return;
         const hasValue = Boolean(String(value || "").trim());
-        file.textContent = hasValue ? value : "暂无附件";
+        fileName.textContent = hasValue ? value : "暂无附件";
         file.classList.toggle("empty", !hasValue);
+        file.querySelectorAll("button").forEach((button) => {
+          button.hidden = !hasValue;
+        });
       }
 
       function clearErrors() {
@@ -1057,7 +1255,9 @@
 
       function applySource(name) {
         const data = sourceData[name] || sourceData.sales;
-        Object.entries(data.values).forEach(([key, value]) => setValue(key, value));
+        Object.entries(data.values).forEach(([key, value]) =>
+          setValue(key, value),
+        );
         sourceNote.textContent = data.note;
         guard.textContent = data.guard;
         footerState.textContent = "来源已切换，保存前需重新校验必填与残值。";
@@ -1079,49 +1279,99 @@
         modeNote.textContent = modeNotes[name] || modeNotes.create;
         if (readonly) {
           clearErrors();
-          footerState.textContent = "当前为只读示例：真实保存入口应由权限和状态共同关闭。";
+          footerState.textContent =
+            "当前为只读示例：真实保存入口应由权限和状态共同关闭。";
         } else if (name === "edit") {
-          footerState.textContent = "当前为编辑示例：保存前仍需校验字段真源和残值清理。";
+          footerState.textContent =
+            "当前为编辑示例：保存前仍需校验字段真源和残值清理。";
         } else {
-          footerState.textContent = "当前为新增示例：保存前需校验必填与来源清值。";
+          footerState.textContent =
+            "当前为新增示例：保存前需校验必填与来源清值。";
         }
       }
 
       function validateForm() {
         let valid = true;
+        let firstInvalid = null;
         requiredFields.forEach((id) => {
           const input = document.querySelector(`#${id}`);
           const wrap = document.querySelector(`[data-field="${id}"]`);
           const hasValue = Boolean(input?.value.trim());
           input?.setAttribute("aria-invalid", String(!hasValue));
           wrap?.classList.toggle("invalid", !hasValue);
+          if (!hasValue && !firstInvalid) firstInvalid = input;
           valid = valid && hasValue;
         });
         footerState.textContent = valid
           ? "示例校验通过：真实保存仍需调用正式 API 和 RBAC 守卫。"
           : "存在必填缺值或来源清值后的空字段，请补齐后再保存。";
+        firstInvalid?.focus({ preventScroll: false });
+        return valid;
+      }
+
+      function getFocusableElements() {
+        return Array.from(
+          businessFormDialog.querySelectorAll(focusableSelector),
+        ).filter((element) => element.getClientRects().length > 0);
+      }
+
+      function openBusinessForm(event) {
+        if (businessFormDialog.open) return;
+        modalTrigger = event?.currentTarget || openFormModal;
+        businessFormDialog.showModal();
+        document.body.classList.add("modal-open");
+        requestAnimationFrame(() => {
+          businessFormDialog.querySelector("[data-initial-focus]")?.focus({
+            preventScroll: true,
+          });
+        });
+      }
+
+      function closeBusinessForm() {
+        if (businessFormDialog.open) businessFormDialog.close();
+      }
+
+      function resetBusinessForm() {
+        source.value = "sales";
+        formMode.value = "create";
+        applySource("sales");
       }
 
       function updateStats() {
         const cards = Array.from(itemList.querySelectorAll(".item-card"));
-        const quantityTotal = cards.reduce((total, card) => {
-          const value = card.querySelector('[data-stat="quantity"]')?.value || "0";
-          return total + Number(value || 0);
-        }, Number(document.querySelector("#quantity")?.value || 0));
-        const amountTotal = cards.reduce((total, card) => {
-          const value = card.querySelector('[data-stat="amount"]')?.value || "0";
-          return total + Number(value || 0);
-        }, Number(document.querySelector("#lineAmount")?.value || 0));
+        const quantityTotal = cards.reduce(
+          (total, card) => {
+            const value =
+              card.querySelector('[data-stat="quantity"]')?.value || "0";
+            return total + Number(value || 0);
+          },
+          Number(document.querySelector("#quantity")?.value || 0),
+        );
+        const amountTotal = cards.reduce(
+          (total, card) => {
+            const value =
+              card.querySelector('[data-stat="amount"]')?.value || "0";
+            return total + Number(value || 0);
+          },
+          Number(document.querySelector("#lineAmount")?.value || 0),
+        );
         document.querySelector("#itemCount").textContent = String(cards.length);
-        document.querySelector("#quantityTotal").textContent = String(quantityTotal || 0);
-        document.querySelector("#amountTotal").textContent = (amountTotal || 0).toFixed(2);
+        document.querySelector("#quantityTotal").textContent = String(
+          quantityTotal || 0,
+        );
+        document.querySelector("#amountTotal").textContent = (
+          amountTotal || 0
+        ).toFixed(2);
       }
 
       function applyItemImport(value) {
         const data = importProducts[value];
         if (!data) return;
-        Object.entries(data).forEach(([key, nextValue]) => setValue(key, nextValue));
-        footerState.textContent = "已从来源选择器带入当前条目字段，保存前仍需检查来源和残值。";
+        Object.entries(data).forEach(([key, nextValue]) =>
+          setValue(key, nextValue),
+        );
+        footerState.textContent =
+          "已从来源选择器带入当前条目字段，保存前仍需检查来源和残值。";
         updateStats();
         clearErrors();
       }
@@ -1155,6 +1405,49 @@
 
       source.addEventListener("change", () => applySource(source.value));
       formMode.addEventListener("change", () => applyMode(formMode.value));
+      openFormModal.addEventListener("click", openBusinessForm);
+      closeFormModal.addEventListener("click", closeBusinessForm);
+      cancelFormModal.addEventListener("click", closeBusinessForm);
+      businessFormDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeBusinessForm();
+      });
+      businessFormDialog.addEventListener("close", () => {
+        document.body.classList.remove("modal-open");
+        requestAnimationFrame(() =>
+          modalTrigger?.focus({ preventScroll: true }),
+        );
+      });
+      businessFormDialog.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeBusinessForm();
+          return;
+        }
+        if (event.key !== "Tab") return;
+        const focusableElements = getFocusableElements();
+        if (!focusableElements.length) {
+          event.preventDefault();
+          businessFormDialog.focus();
+          return;
+        }
+        const firstFocusable = focusableElements[0];
+        const lastFocusable = focusableElements[focusableElements.length - 1];
+        if (
+          event.shiftKey &&
+          (document.activeElement === firstFocusable ||
+            !businessFormDialog.contains(document.activeElement))
+        ) {
+          event.preventDefault();
+          lastFocusable.focus();
+        } else if (
+          !event.shiftKey &&
+          document.activeElement === lastFocusable
+        ) {
+          event.preventDefault();
+          firstFocusable.focus();
+        }
+      });
       itemImportOpen.addEventListener("click", () => applyItemImport("toy-a"));
       document.querySelector("#addItem").addEventListener("click", addItem);
       document.querySelector("#quantity").addEventListener("input", () => {
@@ -1169,18 +1462,16 @@
         setValue("lineAmount", (quantity * price).toFixed(2));
         updateStats();
       });
-      document.querySelector("#saveForm").addEventListener("click", validateForm);
-      document.querySelector("#footerSave").addEventListener("click", validateForm);
-      document.querySelector("#resetForm").addEventListener("click", () => {
-        source.value = "sales";
-        formMode.value = "create";
-        applySource("sales");
+      document
+        .querySelector("#footerSave")
+        .addEventListener("click", validateForm);
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        validateForm();
       });
-      document.querySelector("#footerReset").addEventListener("click", () => {
-        source.value = "sales";
-        formMode.value = "create";
-        applySource("sales");
-      });
+      document
+        .querySelector("#footerReset")
+        .addEventListener("click", resetBusinessForm);
       applyMode(formMode.value);
       updateStats();
     </script>

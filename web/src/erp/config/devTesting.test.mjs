@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -17,6 +17,7 @@ import {
   getDevTestingCategoryOptions,
   isDevTestingEnabled,
   parseDevTestingStrategyTiers,
+  resolveDevTestingSelectedDoc,
 } from './devTesting.mjs'
 
 const strategyMarkdown = `
@@ -104,6 +105,10 @@ const unrelatedMarkdown = `
 `
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../..')
+const testingPageSource = readFileSync(
+  join(repoRoot, 'web/src/erp/pages/DevTestingPage.jsx'),
+  'utf8'
+)
 
 function extractLocalCommandFilePaths(commands = []) {
   const paths = []
@@ -583,17 +588,17 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
     getPresetCopyText('customer-config-package-runtime'),
     /customer-config-release-readiness\.mjs --print-input-template/
   )
-  assert.match(
+  assert.doesNotMatch(
     getPresetCopyText('customer-config-package-runtime'),
-    /customer-config-release-readiness\.mjs .*--readback-preflight-report output\/customers\/yoyoosun\/customer-config-readback-preflight\.json/
-  )
-  assert.match(
-    getPresetCopyText('customer-config-package-runtime'),
-    /--evidence-dir deployments\/yoyoosun\/evidence\/releases\/2026-06-29/
+    /customer-config-release-readiness\.mjs\s+--manifest/
   )
   assert.doesNotMatch(
     getPresetCopyText('customer-config-package-runtime'),
-    /<YYYY-MM-DD>|<[^>]+>/
+    /--evidence-dir|evidence\/releases\/\d{4}-\d{2}-\d{2}/
+  )
+  assert.doesNotMatch(
+    getPresetCopyText('customer-config-package-runtime'),
+    /<release-batch>|<YYYY-MM-DD>/
   )
   assert.match(
     getPresetCopyText('customer-config-package-runtime'),
@@ -602,6 +607,10 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   assert.match(
     getPreset('customer-config-package-runtime').description,
     /active revision 读回前置/
+  )
+  assert.match(
+    getPreset('customer-config-package-runtime').description,
+    /显式选择证据批次/
   )
   assert.match(
     getPreset('customer-config-package-runtime').description,
@@ -772,6 +781,22 @@ test('devTesting: 只索引当前测试入口白名单文档', () => {
   assert.equal(docs[4].commandCount, 3)
 })
 
+test('devTesting: 当前维护白名单中的真实文档都能进入索引', () => {
+  const markdownModules = Object.fromEntries(
+    DEV_TESTING_CURRENT_DOC_PATHS.map((path) => [
+      `../../../../${path}`,
+      readFileSync(join(repoRoot, path), 'utf8'),
+    ])
+  )
+  const docs = buildDevTestingDocs(markdownModules)
+
+  assert.deepEqual(
+    docs.map((item) => item.path),
+    DEV_TESTING_CURRENT_DOC_PATHS
+  )
+  assert(docs.every((item) => item.source.trim().length > 0))
+})
+
 test('devTesting: reference 和 archive 不作为测试命令入口', () => {
   const docs = buildDevTestingDocs({
     '../../../../docs/product/自动化测试策略.md': strategyMarkdown,
@@ -802,6 +827,87 @@ test('devTesting: fenced block 只提取 shell 命令和续行', () => {
     '--manifest docs/customers/yoyoosun/source-manifest.json \\',
     '--out output/customers/yoyoosun/source-extract',
   ])
+})
+
+test('devTesting: fenced command 保留裸续行参数并丢弃不完整命令', () => {
+  const markdown = [
+    '# 续行命令',
+    '```bash',
+    'node --test \\',
+    '  /workspace/first.test.mjs \\',
+    '  /workspace/second.test.mjs',
+    'docker run --rm \\',
+    '  plush-toy-erp-web:dev',
+    "MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='local-only' \\",
+    '  node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs \\',
+    '  --report output/mobile-workflow/report.json',
+    'node --test \\',
+    '```',
+  ].join('\n')
+  const blocks = extractDevTestingCommandBlocks(markdown, {
+    sourcePath: 'scripts/README.md',
+    title: '续行命令',
+  })
+
+  assert.equal(blocks.length, 1)
+  assert.deepEqual(blocks[0].commands, [
+    'node --test \\',
+    '/workspace/first.test.mjs \\',
+    '/workspace/second.test.mjs',
+    'docker run --rm \\',
+    'plush-toy-erp-web:dev',
+    "MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='local-only' \\",
+    'node web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs \\',
+    '--report output/mobile-workflow/report.json',
+  ])
+  assert.equal(blocks[0].commandText.trimEnd().endsWith('\\'), false)
+})
+
+test('devTesting: 空筛选结果不回退到未匹配文档', () => {
+  const docs = [
+    { key: 'one', title: '文档一' },
+    { key: 'two', title: '文档二' },
+  ]
+
+  assert.equal(resolveDevTestingSelectedDoc([], 'one'), null)
+  assert.equal(resolveDevTestingSelectedDoc(docs, 'two'), docs[1])
+  assert.equal(resolveDevTestingSelectedDoc(docs, 'missing'), docs[0])
+})
+
+test('devTesting: view 和 doc 由 canonical query 驱动并支持历史恢复', () => {
+  assert.match(testingPageSource, /useSearchParams\(\)/)
+  assert.match(testingPageSource, /const VIEW_QUERY_KEY = 'view'/)
+  assert.match(testingPageSource, /const DOC_QUERY_KEY = 'doc'/)
+  assert.match(
+    testingPageSource,
+    /requestedView = searchParams\.get\(VIEW_QUERY_KEY\)/
+  )
+  assert.match(
+    testingPageSource,
+    /requestedDocKey = searchParams\.get\(DOC_QUERY_KEY\)/
+  )
+  assert.match(
+    testingPageSource,
+    /setSearchParams\(nextParams, \{ replace: true \}\)/
+  )
+  assert.doesNotMatch(testingPageSource, /\[\s*view\s*,\s*setView\s*\]/)
+  assert.doesNotMatch(
+    testingPageSource,
+    /\[\s*selectedKey\s*,\s*setSelectedKey\s*\]/
+  )
+  assert.doesNotMatch(testingPageSource, /<Input\.Search/u)
+  assert.match(
+    testingPageSource,
+    /<Input[\s\S]*prefix=\{<SearchOutlined aria-hidden="true" \/>\}/u
+  )
+  assert.match(
+    testingPageSource,
+    /aria-current=\{active \? 'true' : undefined\}/u
+  )
+  assert.match(
+    testingPageSource,
+    /aria-pressed=\{option\.value === category\}/u
+  )
 })
 
 test('devTesting: 支持分类和关键词筛选并汇总', () => {

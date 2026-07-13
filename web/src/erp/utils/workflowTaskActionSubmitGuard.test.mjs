@@ -117,7 +117,7 @@ test('workflowTaskActionSubmitGuard: unknown action key stops before backend exp
   assert.deepEqual(warnings, ['当前任务动作缺少必要参数，请刷新后重试'])
 })
 
-test('workflowTaskActionSubmitGuard: allows only after backend explain allows normalized action', async () => {
+test('workflowTaskActionSubmitGuard: allows only after backend explain allows the formal action', async () => {
   const requests = []
   const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({
     explainWorkflowActionAccess: async (params) => {
@@ -130,7 +130,7 @@ test('workflowTaskActionSubmitGuard: allows only after backend explain allows no
 
   const allowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
     task: { id: 42, task_id: 99 },
-    actionKey: 'done',
+    actionKey: 'complete',
   })
 
   assert.equal(allowed, true)
@@ -156,7 +156,7 @@ test('workflowTaskActionSubmitGuard: hides raw backend deny reason from user vis
 
   const allowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
     task: { id: 42 },
-    actionKey: 'blocked',
+    actionKey: 'block',
     reason: '等待仓库确认',
     onWarning: (message) => warnings.push(message),
   })
@@ -177,7 +177,7 @@ test('workflowTaskActionSubmitGuard: required reason stops before backend explai
 
   const allowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
     task: { id: 42 },
-    actionKey: 'rejected',
+    actionKey: 'reject',
     reason: '  ',
     onWarning: (message) => warnings.push(message),
   })
@@ -216,7 +216,7 @@ test('workflowTaskActionSubmitGuard: backend explain failure reports sanitized a
 
   const allowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
     task: { id: 42 },
-    actionKey: 'urge_task',
+    actionKey: 'urge',
     reason: '请尽快处理',
     onError: (message) => errors.push(message),
   })

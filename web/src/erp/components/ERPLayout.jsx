@@ -94,6 +94,7 @@ const navIconRegistry = {
   'shipping-release': <ScheduleOutlined />,
   outbound: <FileSearchOutlined />,
   shipments: <FileTextOutlined />,
+  'production-orders': <FileTextOutlined />,
   'production-scheduling': <ScheduleOutlined />,
   'production-progress': <DashboardOutlined />,
   'production-exceptions': <AlertOutlined />,
@@ -201,12 +202,7 @@ function ProductCoreCapabilityReview({ currentEntry }) {
   )
 }
 
-function CustomerRuntimeUnavailable({
-  customerName,
-  loggingOut,
-  onRetry,
-  onLogout,
-}) {
+function CustomerRuntimeUnavailable({ loggingOut, onRetry, onLogout }) {
   return (
     <Layout className="erp-admin-shell" data-customer-runtime-boundary="true">
       <Content className="erp-admin-content">
@@ -214,8 +210,8 @@ function CustomerRuntimeUnavailable({
           <Alert
             type="error"
             showIcon
-            message="暂时无法进入客户工作台"
-            description={`尚未确认${customerName}的访问范围和业务数据。为避免显示错误内容，系统没有加载业务页面；请重试或退出后重新登录。`}
+            message="暂时无法进入工作台"
+            description="尚未确认当前账号可访问的页面和业务内容。为避免显示错误内容，系统没有加载工作台；请重试或退出后重新登录。"
             action={
               <Space size={8} wrap>
                 <Button onClick={onRetry}>重试</Button>
@@ -277,6 +273,7 @@ export default function ERPLayout() {
   const [refreshingCurrentPage, setRefreshingCurrentPage] = useState(false)
   const refreshingCurrentPageRef = useRef(false)
   const [pageRefreshHandler, setPageRefreshHandler] = useState(null)
+  const [pageLeaveGuard, setPageLeaveGuard] = useState(null)
 
   const authRpc = useMemo(
     () =>
@@ -615,6 +612,18 @@ export default function ERPLayout() {
     }
   }, [])
 
+  const registerPageLeaveGuard = useCallback((handler) => {
+    if (typeof handler !== 'function') {
+      setPageLeaveGuard(null)
+      return () => {}
+    }
+
+    setPageLeaveGuard(() => handler)
+    return () => {
+      setPageLeaveGuard((current) => (current === handler ? null : current))
+    }
+  }, [])
+
   const updateAdminERPPreferences = useCallback((erpPreferences) => {
     const normalizedERPPreferences =
       erpPreferences && typeof erpPreferences === 'object'
@@ -649,12 +658,14 @@ export default function ERPLayout() {
     () => ({
       adminProfile,
       profileSyncCompleted,
+      registerPageLeaveGuard,
       registerPageRefresh,
       updateAdminERPPreferences,
     }),
     [
       adminProfile,
       profileSyncCompleted,
+      registerPageLeaveGuard,
       registerPageRefresh,
       updateAdminERPPreferences,
     ]
@@ -709,6 +720,10 @@ export default function ERPLayout() {
 
     if (nextPath === location.pathname) {
       setMobileNavOpen(false)
+      return
+    }
+
+    if (pageLeaveGuard && !(await pageLeaveGuard())) {
       return
     }
 
@@ -781,8 +796,8 @@ export default function ERPLayout() {
     return (
       <div data-customer-runtime-bootstrap="true">
         <Loading
-          title="正在进入客户工作台"
-          description="正在确认当前客户的访问范围和业务数据，请稍候..."
+          title="正在进入工作台"
+          description="正在准备您的工作内容，请稍候..."
           fullscreen
           className="loading-page--erp"
         />
@@ -793,7 +808,6 @@ export default function ERPLayout() {
   if (customerRuntimeUnavailable) {
     return (
       <CustomerRuntimeUnavailable
-        customerName={activeBrand.companyName || '当前客户'}
         loggingOut={loggingOut}
         onRetry={() => loadProfile({ showLoading: true })}
         onLogout={handleLogout}
@@ -893,7 +907,7 @@ export default function ERPLayout() {
                 type="warning"
                 showIcon
                 message="当前账号暂无可见后台入口"
-                description="请确认账号角色权限和当前客户有效配置的页面清单；若客户配置同步失败，请稍后刷新或联系管理员复核当前有效配置版本。"
+                description="请确认当前账号已分配正确的角色和页面权限。若刷新后仍无可见入口，请联系管理员。"
               />
             ) : shouldGuardProductCoreBusinessData ? (
               <ProductCoreCapabilityReview currentEntry={currentEntry} />

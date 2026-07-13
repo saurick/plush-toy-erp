@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   BarChartOutlined,
   DatabaseOutlined,
@@ -8,32 +9,39 @@ import {
   WarningOutlined,
 } from '@ant-design/icons'
 import {
+  Alert,
   Button,
   Empty,
   Input,
-  Segmented,
   Select,
   Space,
   Tag,
   Typography,
 } from 'antd'
 import {
+  DEV_CAPABILITY_EVIDENCE_SOURCE_PATH,
   DEV_CAPABILITY_LEDGER_SOURCE_PATH,
   DEV_CUSTOMER_DELTA_LEDGER_SOURCE_PATH,
   DEV_CUSTOMER_DELIVERY_MATRIX_SOURCE_PATH,
   buildCapabilityLedgerSummary,
   buildCustomerDeltaLedgerSummary,
   buildCustomerDeliveryMatrixSummary,
+  buildDevCapabilityDocsHref,
   filterCapabilityLedgerItems,
   filterCustomerDeltaLedgerItems,
   filterCustomerDeliveryMatrixItems,
   parseCapabilityLedgerMarkdown,
   parseCustomerDeltaLedgerMarkdown,
   parseCustomerDeliveryMatrixMarkdown,
+  selectVisibleLedgerItem,
 } from '../config/devCapabilityLedger.mjs'
+import DevPageNav from '../components/dev/DevPageNav.jsx'
+import DevTaskNav from '../components/dev/DevTaskNav.jsx'
+import { formatDevEnglishAnchor } from '../config/devVisibleLabels.mjs'
 
 import deltaLedgerSource from '../../../../docs/customers/yoyoosun/客户差异台账.md?raw'
 import deliveryMatrixSource from '../../../../docs/customers/yoyoosun/客户交付矩阵.md?raw'
+import capabilityEvidenceSource from '../../../../docs/product/产品能力证据详情.md?raw'
 import capabilityLedgerSource from '../../../../docs/product/产品能力进度台账.md?raw'
 
 const { Paragraph, Text, Title } = Typography
@@ -42,34 +50,44 @@ const ALL_OPTION = 'all'
 const VIEW_CAPABILITIES = 'capabilities'
 const VIEW_DELIVERY = 'delivery'
 const VIEW_DELTA = 'delta'
+const VIEW_QUERY_KEY = 'view'
+const ITEM_QUERY_KEY = 'item'
+const ANALYSIS_QUERY_KEY = 'analysis'
 
 const VIEW_OPTIONS = [
-  { label: '产品能力 / Capabilities', value: VIEW_CAPABILITIES },
-  { label: '客户交付 / Delivery', value: VIEW_DELIVERY },
-  { label: '客户差异 / Delta', value: VIEW_DELTA },
+  {
+    label: '产品能力',
+    description: '成熟度、证据与下一步',
+    value: VIEW_CAPABILITIES,
+  },
+  {
+    label: '客户交付',
+    description: '可试用、已交付与未开始',
+    value: VIEW_DELIVERY,
+  },
+  {
+    label: '客户差异',
+    description: '内核、配置、延后与禁止',
+    value: VIEW_DELTA,
+  },
 ]
+const VIEW_VALUES = new Set(VIEW_OPTIONS.map((option) => option.value))
 
-const SOURCE_PATH_BY_VIEW = {
-  [VIEW_CAPABILITIES]: DEV_CAPABILITY_LEDGER_SOURCE_PATH,
-  [VIEW_DELIVERY]: DEV_CUSTOMER_DELIVERY_MATRIX_SOURCE_PATH,
-  [VIEW_DELTA]: DEV_CUSTOMER_DELTA_LEDGER_SOURCE_PATH,
+const SOURCE_PATHS_BY_VIEW = {
+  [VIEW_CAPABILITIES]: [
+    DEV_CAPABILITY_LEDGER_SOURCE_PATH,
+    DEV_CAPABILITY_EVIDENCE_SOURCE_PATH,
+  ],
+  [VIEW_DELIVERY]: [DEV_CUSTOMER_DELIVERY_MATRIX_SOURCE_PATH],
+  [VIEW_DELTA]: [DEV_CUSTOMER_DELTA_LEDGER_SOURCE_PATH],
 }
 
-function buildOptions(field, items = []) {
+function buildOptions(field, items = [], formatLabel = (value) => value) {
   return [
     { label: '全部', value: ALL_OPTION },
     ...[...new Set(items.map((item) => item[field]).filter(Boolean))]
       .sort((left, right) => left.localeCompare(right, 'zh-Hans-CN'))
-      .map((value) => ({ label: value, value })),
-  ]
-}
-
-function buildCapabilityIdOptions(items = []) {
-  return [
-    { label: '全部能力', value: ALL_OPTION },
-    ...[...new Set(items.flatMap((item) => item.capabilityIds || []))]
-      .sort((left, right) => left.localeCompare(right, 'zh-Hans-CN'))
-      .map((value) => ({ label: value, value })),
+      .map((value) => ({ label: formatLabel(value), value })),
   ]
 }
 
@@ -93,7 +111,7 @@ function MetricTile({ icon, label, value, note, tone = 'default' }) {
   )
 }
 
-function DistributionBars({ title, items = [], total }) {
+function DistributionBars({ title, items = [], total, formatLabel }) {
   return (
     <section className="erp-dev-capability-panel">
       <div className="erp-dev-capability-panel__head">
@@ -104,7 +122,9 @@ function DistributionBars({ title, items = [], total }) {
         {items.slice(0, 9).map((item) => (
           <div className="erp-dev-capability-bar" key={item.key}>
             <div className="erp-dev-capability-bar__meta">
-              <span className="erp-dev-capability-bar__label">{item.key}</span>
+              <span className="erp-dev-capability-bar__label">
+                {formatLabel ? formatLabel(item.key) : item.key}
+              </span>
               <span className="erp-dev-capability-bar__value">
                 {item.count} / {formatPercent(item.count, total)}
               </span>
@@ -122,36 +142,73 @@ function DistributionBars({ title, items = [], total }) {
   )
 }
 
+function MaturityDefinitions({ items = [] }) {
+  return (
+    <section
+      className="erp-dev-capability-panel erp-dev-capability-maturity-guide"
+      aria-labelledby="capability-maturity-guide-title"
+    >
+      <div className="erp-dev-capability-panel__head">
+        <Text strong id="capability-maturity-guide-title">
+          成熟度等级说明
+        </Text>
+        <Text type="secondary">L0–L8</Text>
+      </div>
+      <Text className="erp-dev-capability-maturity-guide__summary">
+        表示一项能力已经推进到哪一层；等级越高，闭环越完整，但只有 L8
+        才能对客户承诺交付。
+      </Text>
+      <div className="erp-dev-capability-maturity-guide__list">
+        {items.map((item) => (
+          <div
+            className="erp-dev-capability-maturity-guide__item"
+            key={item.level}
+          >
+            <span className="erp-dev-capability-maturity-guide__level">
+              {item.level}
+            </span>
+            <span className="erp-dev-capability-maturity-guide__copy">
+              <strong>{item.name}</strong>
+              <span>{item.meaning}</span>
+              <small>客户承诺：{item.customerCommitment}</small>
+            </span>
+          </div>
+        ))}
+      </div>
+      <Text className="erp-dev-capability-maturity-guide__note">
+        注意：这里的 L0–L8 是能力成熟度，不是前端样式检查 <code>style:l1</code>
+        ，也不是 T0–T8 验证层级。
+      </Text>
+      <Link
+        className="erp-dev-capability-maturity-guide__source"
+        to={buildDevCapabilityDocsHref(DEV_CAPABILITY_LEDGER_SOURCE_PATH)}
+      >
+        查看正式定义：产品能力进度台账
+      </Link>
+    </section>
+  )
+}
+
 function trialTagFor(item) {
   if (item.trialStatus === 'yes') return <Tag color="green">可试用</Tag>
   if (item.trialStatus === 'limited') return <Tag color="gold">有限试用</Tag>
-  return <Tag>不可试用</Tag>
+  if (item.trialStatus === 'no') return <Tag>不可试用</Tag>
+  return <Tag>试用状态未标记</Tag>
 }
 
 function deliveryCommitmentTagFor(item) {
-  return item.deliveryStatus === 'yes' ? (
-    <Tag color="green">可承诺</Tag>
-  ) : (
-    <Tag color="red">不可承诺</Tag>
-  )
+  if (item.deliveryStatus === 'yes') return <Tag color="green">可承诺</Tag>
+  if (item.deliveryStatus === 'no') return <Tag color="red">不承诺</Tag>
+  return <Tag>承诺状态未标记</Tag>
 }
 
 function customerDeliveryStatusTag(status) {
   const colorByStatus = {
-    'Trial Ready': 'green',
-    'Target Released': 'cyan',
-    'Delivery Ready': 'green',
-    'Local Verified': 'blue',
-    'Internal Ready': 'blue',
-    'Template Ready': 'cyan',
-    'Candidate Ready': 'geekblue',
-    'Draft Ready': 'geekblue',
-    'Config Draft': 'gold',
-    'Post-delivery': 'purple',
-    Deferred: 'orange',
-    Deprecated: 'red',
-    'Not Planned': 'default',
-    Blocked: 'red',
+    未开始: 'default',
+    内部可用: 'blue',
+    可演示: 'cyan',
+    可试用: 'green',
+    已交付: 'purple',
   }
   return (
     <Tag color={colorByStatus[status] || 'default'}>{status || '未标记'}</Tag>
@@ -159,12 +216,21 @@ function customerDeliveryStatusTag(status) {
 }
 
 function productCoreDecisionTag(value) {
-  if (value === '是') return <Tag color="green">进 Product Core</Tag>
-  if (value === '可能' || value === '待评审') {
-    return <Tag color="gold">{value}</Tag>
+  const decision = value || ''
+  if (decision === '是' || decision.includes('已进入')) {
+    return (
+      <Tag color="green">
+        {decision === '是' ? '进入产品内核 / Product Core' : decision}
+      </Tag>
+    )
   }
-  if (value === '暂不进入') return <Tag color="orange">暂不进入</Tag>
-  return <Tag>{value || '未判断'}</Tag>
+  if (decision.includes('可能') || decision.includes('待评审')) {
+    return <Tag color="gold">{decision}</Tag>
+  }
+  if (decision.startsWith('暂不进入')) {
+    return <Tag color="orange">{decision}</Tag>
+  }
+  return <Tag>{decision || '未判断'}</Tag>
 }
 
 function maturityClass(item) {
@@ -174,13 +240,18 @@ function maturityClass(item) {
   return 'erp-dev-capability-maturity--low'
 }
 
-function CapabilityList({ items = [], selectedKey, onSelect }) {
+function CapabilityList({
+  items = [],
+  selectedKey,
+  onSelect,
+  emptyDescription = '没有匹配能力',
+}) {
   if (items.length === 0) {
     return (
       <div className="erp-dev-capability-empty">
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="没有匹配能力"
+          description={emptyDescription}
         />
       </div>
     )
@@ -197,10 +268,13 @@ function CapabilityList({ items = [], selectedKey, onSelect }) {
               ? 'erp-dev-capability-row erp-dev-capability-row--active'
               : 'erp-dev-capability-row'
           }
+          aria-current={item.key === selectedKey ? 'true' : undefined}
           onClick={() => onSelect(item.key)}
         >
           <span className="erp-dev-capability-row__top">
-            <span className="erp-dev-capability-row__id">{item.id}</span>
+            <span className="erp-dev-capability-row__id">
+              {item.detailMatched ? '详情已对齐' : '详情未对齐'}
+            </span>
             <span
               className={`erp-dev-capability-maturity ${maturityClass(item)}`}
             >
@@ -209,8 +283,10 @@ function CapabilityList({ items = [], selectedKey, onSelect }) {
           </span>
           <span className="erp-dev-capability-row__title">{item.name}</span>
           <span className="erp-dev-capability-row__meta">
-            <span>{item.layer}</span>
-            <span>{item.domain}</span>
+            <span>{formatDevEnglishAnchor(item.layer)}</span>
+            {item.domain ? (
+              <span>{formatDevEnglishAnchor(item.domain)}</span>
+            ) : null}
           </span>
           <span className="erp-dev-capability-row__tags">
             {trialTagFor(item)}
@@ -222,13 +298,18 @@ function CapabilityList({ items = [], selectedKey, onSelect }) {
   )
 }
 
-function DeliveryList({ items = [], selectedKey, onSelect }) {
+function DeliveryList({
+  items = [],
+  selectedKey,
+  onSelect,
+  emptyDescription = '没有匹配交付项',
+}) {
   if (items.length === 0) {
     return (
       <div className="erp-dev-capability-empty">
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="没有匹配交付项"
+          description={emptyDescription}
         />
       </div>
     )
@@ -245,11 +326,12 @@ function DeliveryList({ items = [], selectedKey, onSelect }) {
               ? 'erp-dev-capability-row erp-dev-capability-row--active'
               : 'erp-dev-capability-row'
           }
+          aria-current={item.key === selectedKey ? 'true' : undefined}
           onClick={() => onSelect(item.key)}
         >
           <span className="erp-dev-capability-row__top">
             <span className="erp-dev-capability-row__id">
-              {item.capabilityIds.join(' / ') || '无 CAP ID'}
+              {item.customerKey}
             </span>
             {customerDeliveryStatusTag(item.customerDeliveryStatus)}
           </span>
@@ -257,13 +339,12 @@ function DeliveryList({ items = [], selectedKey, onSelect }) {
             {item.moduleName}
           </span>
           <span className="erp-dev-capability-row__meta">
-            <span>{item.customerKey}</span>
-            <span>{item.visibleMethod}</span>
+            <span>{item.visibleCommitment}</span>
           </span>
           <span className="erp-dev-capability-row__tags">
-            {item.capabilityIds.slice(0, 4).map((id) => (
-              <Tag key={id}>{id}</Tag>
-            ))}
+            <Tag>
+              {item.acceptanceEvidence ? '验收证据已登记' : '未登记证据'}
+            </Tag>
           </span>
         </button>
       ))}
@@ -271,13 +352,18 @@ function DeliveryList({ items = [], selectedKey, onSelect }) {
   )
 }
 
-function DeltaList({ items = [], selectedKey, onSelect }) {
+function DeltaList({
+  items = [],
+  selectedKey,
+  onSelect,
+  emptyDescription = '没有匹配差异',
+}) {
   if (items.length === 0) {
     return (
       <div className="erp-dev-capability-empty">
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="没有匹配差异"
+          description={emptyDescription}
         />
       </div>
     )
@@ -294,6 +380,7 @@ function DeltaList({ items = [], selectedKey, onSelect }) {
               ? 'erp-dev-capability-row erp-dev-capability-row--active'
               : 'erp-dev-capability-row'
           }
+          aria-current={item.key === selectedKey ? 'true' : undefined}
           onClick={() => onSelect(item.key)}
         >
           <span className="erp-dev-capability-row__top">
@@ -302,13 +389,8 @@ function DeltaList({ items = [], selectedKey, onSelect }) {
           </span>
           <span className="erp-dev-capability-row__title">{item.demand}</span>
           <span className="erp-dev-capability-row__meta">
-            <span>{item.category}</span>
+            <span>{formatDevEnglishAnchor(item.category)}</span>
             <span>{item.source}</span>
-          </span>
-          <span className="erp-dev-capability-row__tags">
-            {item.capabilityIds.map((id) => (
-              <Tag key={id}>{id}</Tag>
-            ))}
           </span>
         </button>
       ))}
@@ -326,37 +408,42 @@ function DetailBlock({ title, children }) {
   )
 }
 
-function RelationList({ items = [], renderItem }) {
-  if (items.length === 0) {
-    return (
-      <Text type="secondary" className="erp-dev-capability-relation-empty">
-        没有显式关联记录
-      </Text>
-    )
-  }
+function SourceDiagnostics({ diagnostics = [] }) {
+  if (diagnostics.length === 0) return null
+  const hasError = diagnostics.some((item) => item.severity === 'error')
 
   return (
-    <div className="erp-dev-capability-relation-list">
-      {items.slice(0, 6).map((item) => (
-        <div className="erp-dev-capability-relation" key={item.key}>
-          {renderItem(item)}
-        </div>
-      ))}
-    </div>
+    <section className="erp-dev-capability-metrics" aria-label="真源诊断">
+      <Alert
+        showIcon
+        type={hasError ? 'error' : 'warning'}
+        message={hasError ? '真源解析需要处理' : '真源存在未对齐项'}
+        description={
+          <Space direction="vertical" size={4}>
+            {diagnostics.map((item, index) => (
+              <Text key={`${item.code}:${item.sourcePath}:${index}`}>
+                {item.message}
+                {item.names?.length > 0 ? ` ${item.names.join('、')}` : ''}
+                {item.lineNumbers?.length > 0
+                  ? `（行 ${item.lineNumbers.join('、')}）`
+                  : ''}
+              </Text>
+            ))}
+          </Space>
+        }
+        style={{ gridColumn: '1 / -1', width: '100%' }}
+      />
+    </section>
   )
 }
 
-function CapabilityDetail({
-  item,
-  deliveryRelations = [],
-  deltaRelations = [],
-}) {
+function CapabilityDetail({ item }) {
   if (!item) {
     return (
       <section className="erp-dev-capability-detail">
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="请选择能力 / Select a capability"
+          description="当前筛选没有可显示能力 / No capability in current result"
         />
       </section>
     )
@@ -366,7 +453,9 @@ function CapabilityDetail({
     <section className="erp-dev-capability-detail">
       <div className="erp-dev-capability-detail__head">
         <Space align="center" size={8} wrap>
-          <Tag color="green">{item.id}</Tag>
+          <Tag color={item.detailMatched ? 'green' : 'gold'}>
+            {item.detailMatched ? '详情已对齐' : '详情未对齐'}
+          </Tag>
           <span
             className={`erp-dev-capability-maturity ${maturityClass(item)}`}
           >
@@ -379,41 +468,20 @@ function CapabilityDetail({
           {item.name}
         </Title>
         <Text type="secondary">
-          {item.layer} / {item.domain}
+          {formatDevEnglishAnchor(item.layer)}
+          {item.domain ? ` · ${formatDevEnglishAnchor(item.domain)}` : ''}
         </Text>
       </div>
 
       <div className="erp-dev-capability-detail__grid">
-        <DetailBlock title="yoyoosun 交付关联 / Delivery Links">
-          <RelationList
-            items={deliveryRelations}
-            renderItem={(deliveryItem) => (
-              <>
-                <span className="erp-dev-capability-relation__title">
-                  {deliveryItem.moduleName}
-                </span>
-                <span className="erp-dev-capability-relation__meta">
-                  {deliveryItem.customerDeliveryStatus} /{' '}
-                  {deliveryItem.visibleMethod || '未填写可见方式'}
-                </span>
-              </>
-            )}
-          />
-        </DetailBlock>
-        <DetailBlock title="yoyoosun 差异关联 / Delta Links">
-          <RelationList
-            items={deltaRelations}
-            renderItem={(deltaItem) => (
-              <>
-                <span className="erp-dev-capability-relation__title">
-                  {deltaItem.id} · {deltaItem.demand}
-                </span>
-                <span className="erp-dev-capability-relation__meta">
-                  {deltaItem.category} / {deltaItem.productCoreDecision}
-                </span>
-              </>
-            )}
-          />
+        {!item.detailMatched ? (
+          <DetailBlock title="证据详情对齐 / Evidence Alignment">
+            未找到与“{item.name}”完全同名的三级详情标题；当前页面不做模糊匹配，
+            请按顶部诊断核对两份正式文档。
+          </DetailBlock>
+        ) : null}
+        <DetailBlock title="客户可见性 / Customer Visibility">
+          {item.customerVisibility}
         </DetailBlock>
         <DetailBlock title="当前结果 / Current Result">
           {item.currentResult}
@@ -423,6 +491,11 @@ function CapabilityDetail({
         </DetailBlock>
         <DetailBlock title="证据 / Evidence">{item.evidence}</DetailBlock>
         <DetailBlock title="下一步 / Next Step">{item.nextStep}</DetailBlock>
+        {item.detailNextStep && item.detailNextStep !== item.nextStep ? (
+          <DetailBlock title="证据详情中的下一步 / Detail Next Step">
+            {item.detailNextStep}
+          </DetailBlock>
+        ) : null}
         <DetailBlock title="风险 / Risk">{item.risk}</DetailBlock>
       </div>
     </section>
@@ -435,7 +508,7 @@ function DeliveryDetail({ item }) {
       <section className="erp-dev-capability-detail">
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="请选择交付项 / Select a delivery item"
+          description="当前筛选没有可显示交付项 / No delivery item in current result"
         />
       </section>
     )
@@ -446,9 +519,7 @@ function DeliveryDetail({ item }) {
       <div className="erp-dev-capability-detail__head">
         <Space align="center" size={8} wrap>
           {customerDeliveryStatusTag(item.customerDeliveryStatus)}
-          {item.capabilityIds.map((id) => (
-            <Tag key={id}>{id}</Tag>
-          ))}
+          <Tag>{item.customerKey}</Tag>
         </Space>
         <Title level={4} className="erp-dev-capability-detail__title">
           {item.moduleName}
@@ -457,22 +528,15 @@ function DeliveryDetail({ item }) {
       </div>
 
       <div className="erp-dev-capability-detail__grid">
-        <DetailBlock title="当前客户可见方式 / Visible Method">
-          {item.visibleMethod}
+        <DetailBlock title="客户可见承诺 / Visible Commitment">
+          {item.visibleCommitment}
         </DetailBlock>
-        <DetailBlock title="交付结果 / Delivery Result">
-          {item.deliveryResult}
+        <DetailBlock title="验收证据 / Acceptance Evidence">
+          {item.acceptanceEvidence}
         </DetailBlock>
-        <DetailBlock title="不包含 / Not Included">
-          {item.notIncluded}
+        <DetailBlock title="风险与下一步 / Risk & Next Step">
+          {item.riskNextStep}
         </DetailBlock>
-        <DetailBlock title="前置条件 / Prerequisites">
-          {item.prerequisites}
-        </DetailBlock>
-        <DetailBlock title="客户确认项 / Customer Confirmation">
-          {item.customerConfirmation}
-        </DetailBlock>
-        <DetailBlock title="风险 / Risk">{item.risk}</DetailBlock>
       </div>
     </section>
   )
@@ -484,7 +548,7 @@ function DeltaDetail({ item }) {
       <section className="erp-dev-capability-detail">
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="请选择差异 / Select a delta item"
+          description="当前筛选没有可显示差异 / No delta item in current result"
         />
       </section>
     )
@@ -496,15 +560,12 @@ function DeltaDetail({ item }) {
         <Space align="center" size={8} wrap>
           <Tag color="blue">{item.id}</Tag>
           {productCoreDecisionTag(item.productCoreDecision)}
-          {item.capabilityIds.map((id) => (
-            <Tag key={id}>{id}</Tag>
-          ))}
         </Space>
         <Title level={4} className="erp-dev-capability-detail__title">
           {item.demand}
         </Title>
         <Text type="secondary">
-          {item.customerKey} / {item.category}
+          {item.customerKey} · {formatDevEnglishAnchor(item.category)}
         </Text>
       </div>
 
@@ -525,18 +586,26 @@ function DeltaDetail({ item }) {
 }
 
 export default function DevCapabilityLedgerPage() {
-  const capabilities = useMemo(
-    () => parseCapabilityLedgerMarkdown(capabilityLedgerSource),
+  const [searchParams, setSearchParams] = useSearchParams()
+  const capabilityResult = useMemo(
+    () =>
+      parseCapabilityLedgerMarkdown(
+        capabilityLedgerSource,
+        capabilityEvidenceSource
+      ),
     []
   )
-  const deliveryItems = useMemo(
+  const deliveryResult = useMemo(
     () => parseCustomerDeliveryMatrixMarkdown(deliveryMatrixSource),
     []
   )
-  const deltaItems = useMemo(
+  const deltaResult = useMemo(
     () => parseCustomerDeltaLedgerMarkdown(deltaLedgerSource),
     []
   )
+  const capabilities = capabilityResult.items
+  const deliveryItems = deliveryResult.items
+  const deltaItems = deltaResult.items
   const capabilitySummary = useMemo(
     () => buildCapabilityLedgerSummary(capabilities),
     [capabilities]
@@ -549,25 +618,18 @@ export default function DevCapabilityLedgerPage() {
     () => buildCustomerDeltaLedgerSummary(deltaItems),
     [deltaItems]
   )
-  const [activeView, setActiveView] = useState(VIEW_CAPABILITIES)
+  const requestedView = searchParams.get(VIEW_QUERY_KEY) || ''
+  const activeView = VIEW_VALUES.has(requestedView)
+    ? requestedView
+    : VIEW_CAPABILITIES
+  const showAnalysis = searchParams.get(ANALYSIS_QUERY_KEY) === '1'
   const [keyword, setKeyword] = useState('')
   const [layer, setLayer] = useState(ALL_OPTION)
   const [domain, setDomain] = useState(ALL_OPTION)
   const [maturity, setMaturity] = useState(ALL_OPTION)
   const [deliveryStatus, setDeliveryStatus] = useState(ALL_OPTION)
-  const [deliveryCapabilityId, setDeliveryCapabilityId] = useState(ALL_OPTION)
   const [deltaCategory, setDeltaCategory] = useState(ALL_OPTION)
   const [deltaCoreDecision, setDeltaCoreDecision] = useState(ALL_OPTION)
-  const [selectedCapabilityKey, setSelectedCapabilityKey] = useState(
-    capabilities[0]?.key || ''
-  )
-  const [selectedDeliveryKey, setSelectedDeliveryKey] = useState(
-    deliveryItems[0]?.key || ''
-  )
-  const [selectedDeltaKey, setSelectedDeltaKey] = useState(
-    deltaItems[0]?.key || ''
-  )
-
   const filteredCapabilities = useMemo(
     () =>
       filterCapabilityLedgerItems(capabilities, {
@@ -584,9 +646,8 @@ export default function DevCapabilityLedgerPage() {
       filterCustomerDeliveryMatrixItems(deliveryItems, {
         keyword,
         status: deliveryStatus,
-        capabilityId: deliveryCapabilityId,
       }),
-    [deliveryCapabilityId, deliveryItems, deliveryStatus, keyword]
+    [deliveryItems, deliveryStatus, keyword]
   )
 
   const filteredDeltaItems = useMemo(
@@ -599,41 +660,36 @@ export default function DevCapabilityLedgerPage() {
     [deltaCategory, deltaCoreDecision, deltaItems, keyword]
   )
 
+  const activeItems =
+    activeView === VIEW_CAPABILITIES
+      ? capabilities
+      : activeView === VIEW_DELIVERY
+        ? deliveryItems
+        : deltaItems
+  const activeFilteredItems =
+    activeView === VIEW_CAPABILITIES
+      ? filteredCapabilities
+      : activeView === VIEW_DELIVERY
+        ? filteredDeliveryItems
+        : filteredDeltaItems
+  const requestedItemKey = searchParams.get(ITEM_QUERY_KEY) || ''
+  const requestedItem = selectVisibleLedgerItem(activeItems, requestedItemKey)
+  const selectedItem = selectVisibleLedgerItem(
+    activeFilteredItems,
+    requestedItem?.key || ''
+  )
+  const canonicalItemKey = selectedItem?.key || requestedItem?.key || ''
   const selectedCapability =
-    filteredCapabilities.find((item) => item.key === selectedCapabilityKey) ||
-    filteredCapabilities[0] ||
-    capabilities.find((item) => item.key === selectedCapabilityKey) ||
-    capabilities[0]
-  const selectedDelivery =
-    filteredDeliveryItems.find((item) => item.key === selectedDeliveryKey) ||
-    filteredDeliveryItems[0] ||
-    deliveryItems.find((item) => item.key === selectedDeliveryKey) ||
-    deliveryItems[0]
-  const selectedDelta =
-    filteredDeltaItems.find((item) => item.key === selectedDeltaKey) ||
-    filteredDeltaItems[0] ||
-    deltaItems.find((item) => item.key === selectedDeltaKey) ||
-    deltaItems[0]
-
-  const selectedCapabilityDeliveryRelations = useMemo(() => {
-    if (!selectedCapability?.id) return []
-    return deliveryItems.filter((item) =>
-      item.capabilityIds.includes(selectedCapability.id)
-    )
-  }, [deliveryItems, selectedCapability])
-  const selectedCapabilityDeltaRelations = useMemo(() => {
-    if (!selectedCapability?.id) return []
-    return deltaItems.filter((item) =>
-      item.capabilityIds.includes(selectedCapability.id)
-    )
-  }, [deltaItems, selectedCapability])
+    activeView === VIEW_CAPABILITIES ? selectedItem : null
+  const selectedDelivery = activeView === VIEW_DELIVERY ? selectedItem : null
+  const selectedDelta = activeView === VIEW_DELTA ? selectedItem : null
 
   const layerOptions = useMemo(
-    () => buildOptions('layer', capabilities),
+    () => buildOptions('layer', capabilities, formatDevEnglishAnchor),
     [capabilities]
   )
   const domainOptions = useMemo(
-    () => buildOptions('domain', capabilities),
+    () => buildOptions('domain', capabilities, formatDevEnglishAnchor),
     [capabilities]
   )
   const maturityOptions = useMemo(
@@ -644,18 +700,76 @@ export default function DevCapabilityLedgerPage() {
     () => buildOptions('customerDeliveryStatus', deliveryItems),
     [deliveryItems]
   )
-  const deliveryCapabilityOptions = useMemo(
-    () => buildCapabilityIdOptions(deliveryItems),
-    [deliveryItems]
-  )
   const deltaCategoryOptions = useMemo(
-    () => buildOptions('category', deltaItems),
+    () => buildOptions('category', deltaItems, formatDevEnglishAnchor),
     [deltaItems]
   )
   const deltaCoreDecisionOptions = useMemo(
     () => buildOptions('productCoreDecision', deltaItems),
     [deltaItems]
   )
+  const activeDiagnostics =
+    activeView === VIEW_CAPABILITIES
+      ? capabilityResult.diagnostics
+      : activeView === VIEW_DELIVERY
+        ? deliveryResult.diagnostics
+        : deltaResult.diagnostics
+  const activeHasSourceError = activeDiagnostics.some(
+    (item) => item.severity === 'error'
+  )
+
+  useEffect(() => {
+    if (requestedView === activeView && requestedItemKey === canonicalItemKey) {
+      return
+    }
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set(VIEW_QUERY_KEY, activeView)
+    if (canonicalItemKey) {
+      nextParams.set(ITEM_QUERY_KEY, canonicalItemKey)
+    } else {
+      nextParams.delete(ITEM_QUERY_KEY)
+    }
+    setSearchParams(nextParams, { replace: true })
+  }, [
+    activeView,
+    canonicalItemKey,
+    requestedItemKey,
+    requestedView,
+    searchParams,
+    setSearchParams,
+  ])
+
+  const selectView = (nextView) => {
+    const normalizedView = VIEW_VALUES.has(nextView)
+      ? nextView
+      : VIEW_CAPABILITIES
+    const nextItems =
+      normalizedView === VIEW_CAPABILITIES
+        ? capabilities
+        : normalizedView === VIEW_DELIVERY
+          ? deliveryItems
+          : deltaItems
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set(VIEW_QUERY_KEY, normalizedView)
+    if (nextItems[0]?.key) {
+      nextParams.set(ITEM_QUERY_KEY, nextItems[0].key)
+    } else {
+      nextParams.delete(ITEM_QUERY_KEY)
+    }
+    setSearchParams(nextParams)
+  }
+
+  const selectItem = (nextItemKey) => {
+    const nextItem = selectVisibleLedgerItem(activeItems, nextItemKey)
+    const nextParams = new URLSearchParams(searchParams)
+    if (nextItem?.key) {
+      nextParams.set(ITEM_QUERY_KEY, nextItem.key)
+    } else {
+      nextParams.delete(ITEM_QUERY_KEY)
+    }
+    setSearchParams(nextParams)
+  }
 
   const resetFilters = () => {
     setKeyword('')
@@ -663,40 +777,58 @@ export default function DevCapabilityLedgerPage() {
     setDomain(ALL_OPTION)
     setMaturity(ALL_OPTION)
     setDeliveryStatus(ALL_OPTION)
-    setDeliveryCapabilityId(ALL_OPTION)
     setDeltaCategory(ALL_OPTION)
     setDeltaCoreDecision(ALL_OPTION)
   }
 
+  const toggleAnalysis = () => {
+    const nextParams = new URLSearchParams(searchParams)
+    if (showAnalysis) {
+      nextParams.delete(ANALYSIS_QUERY_KEY)
+    } else {
+      nextParams.set(ANALYSIS_QUERY_KEY, '1')
+    }
+    setSearchParams(nextParams)
+  }
+
   return (
-    <div className="erp-dev-capability-page">
+    <div className="erp-dev-capability-page erp-dev-workspace-page">
+      <DevPageNav sourcePath={SOURCE_PATHS_BY_VIEW[activeView][0]} />
       <header className="erp-dev-capability-header">
         <div className="erp-dev-capability-header__copy">
           <Space align="center" size={10} wrap>
             <FundProjectionScreenOutlined className="erp-dev-capability-header__icon" />
-            <Title level={3} className="erp-dev-capability-title">
+            <Title level={1} className="erp-dev-capability-title">
               能力台账可视化 / Capability Ledger
             </Title>
-            <Tag color="green">DEV ONLY</Tag>
+            <Tag color="green">仅开发环境 / DEV ONLY</Tag>
           </Space>
           <Paragraph className="erp-dev-capability-summary">
-            只读解析产品能力台账、yoyoosun 客户交付矩阵和客户差异台账 /
-            read-only ledger visualization；不进入 ERP 菜单、权限、后端业务 API
-            或产品文档 registry。
+            只读解析能力快查、能力证据详情、yoyoosun 客户交付矩阵和客户差异台账
+            / read-only ledger visualization；不进入 ERP 菜单、权限、后端业务
+            API 或产品文档 registry。
           </Paragraph>
-          <Segmented
+          <DevTaskNav
+            compact
             className="erp-dev-capability-view-switch"
+            ariaLabel="能力台账视图"
             value={activeView}
-            options={VIEW_OPTIONS}
-            onChange={setActiveView}
+            items={VIEW_OPTIONS}
+            onChange={selectView}
           />
         </div>
         <div className="erp-dev-capability-source">
           <Text type="secondary">当前视图真源 / Source</Text>
-          <Text strong>{SOURCE_PATH_BY_VIEW[activeView]}</Text>
-          <Text type="secondary">联动读取 3 份 Markdown / 3 linked docs</Text>
+          {SOURCE_PATHS_BY_VIEW[activeView].map((sourcePath) => (
+            <Link key={sourcePath} to={buildDevCapabilityDocsHref(sourcePath)}>
+              {sourcePath}
+            </Link>
+          ))}
+          <Text type="secondary">联动读取 4 份 Markdown / 4 linked docs</Text>
         </div>
       </header>
+
+      <SourceDiagnostics diagnostics={activeDiagnostics} />
 
       <section className="erp-dev-capability-metrics" aria-label="台账概览">
         {activeView === VIEW_CAPABILITIES ? (
@@ -725,9 +857,9 @@ export default function DevCapabilityLedgerPage() {
             />
             <MetricTile
               icon={<WarningOutlined />}
-              label="不可承诺"
-              value={capabilitySummary.noCommitment}
-              note={`${capabilitySummary.deliveryYes} 项可交付承诺`}
+              label="详情未对齐"
+              value={capabilitySummary.detailMissing}
+              note={`${capabilitySummary.detailMatched} 项已精确对齐`}
               tone="danger"
             />
           </>
@@ -749,16 +881,16 @@ export default function DevCapabilityLedgerPage() {
             />
             <MetricTile
               icon={<DeploymentUnitOutlined />}
-              label="目标已发布"
-              value={deliverySummary.targetReleased}
-              note="Target Released / Delivery Ready"
+              label="已交付"
+              value={deliverySummary.delivered}
+              note={`${deliverySummary.internalReady} 项内部可用`}
               tone="warning"
             />
             <MetricTile
               icon={<WarningOutlined />}
-              label="阻塞或延后"
-              value={deliverySummary.blockedOrDeferred}
-              note={`${deliverySummary.linkedCapabilities} 项显式关联 CAP`}
+              label="未开始"
+              value={deliverySummary.notStarted}
+              note="当前不对客户承诺"
               tone="danger"
             />
           </>
@@ -775,21 +907,21 @@ export default function DevCapabilityLedgerPage() {
               icon={<BarChartOutlined />}
               label="已进内核"
               value={deltaSummary.productCoreYes}
-              note="是否进入 Product Core = 是"
+              note="进入产品内核 / Product Core"
               tone="success"
             />
             <MetricTile
               icon={<DeploymentUnitOutlined />}
               label="内核候选"
               value={deltaSummary.productCoreCandidates}
-              note="分类含 Product Core"
+              note="分类包含产品内核 / Product Core"
               tone="warning"
             />
             <MetricTile
               icon={<WarningOutlined />}
               label="延后/禁止"
               value={deltaSummary.deferredOrForbidden}
-              note={`${deltaSummary.linkedCapabilities} 项显式关联 CAP`}
+              note="分类含 Deferred / Forbidden"
               tone="danger"
             />
           </>
@@ -815,75 +947,93 @@ export default function DevCapabilityLedgerPage() {
             />
             {activeView === VIEW_CAPABILITIES ? (
               <>
-                <Select
-                  value={layer}
-                  options={layerOptions}
-                  onChange={setLayer}
-                  aria-label="按所属层筛选"
-                />
-                <Select
-                  value={domain}
-                  options={domainOptions}
-                  onChange={setDomain}
-                  aria-label="按业务域筛选"
-                />
-                <Select
-                  value={maturity}
-                  options={maturityOptions}
-                  onChange={setMaturity}
-                  aria-label="按成熟度筛选"
-                />
+                <label className="erp-dev-capability-filter-field">
+                  <span>所属层 / Product Layer</span>
+                  <Select
+                    value={layer}
+                    options={layerOptions}
+                    onChange={setLayer}
+                    aria-label="按所属层筛选"
+                  />
+                </label>
+                <label className="erp-dev-capability-filter-field">
+                  <span>业务域 / Domain</span>
+                  <Select
+                    value={domain}
+                    options={domainOptions}
+                    onChange={setDomain}
+                    aria-label="按业务域筛选"
+                  />
+                </label>
+                <label className="erp-dev-capability-filter-field">
+                  <span>成熟度 / Maturity</span>
+                  <Select
+                    value={maturity}
+                    options={maturityOptions}
+                    onChange={setMaturity}
+                    aria-label="按成熟度筛选"
+                  />
+                </label>
               </>
             ) : null}
             {activeView === VIEW_DELIVERY ? (
-              <>
+              <label className="erp-dev-capability-filter-field">
+                <span>交付状态 / Delivery Status</span>
                 <Select
                   value={deliveryStatus}
                   options={deliveryStatusOptions}
                   onChange={setDeliveryStatus}
                   aria-label="按交付状态筛选"
                 />
-                <Select
-                  value={deliveryCapabilityId}
-                  options={deliveryCapabilityOptions}
-                  onChange={setDeliveryCapabilityId}
-                  aria-label="按产品能力 ID 筛选"
-                />
-              </>
+              </label>
             ) : null}
             {activeView === VIEW_DELTA ? (
               <>
-                <Select
-                  value={deltaCategory}
-                  options={deltaCategoryOptions}
-                  onChange={setDeltaCategory}
-                  aria-label="按差异分类筛选"
-                />
-                <Select
-                  value={deltaCoreDecision}
-                  options={deltaCoreDecisionOptions}
-                  onChange={setDeltaCoreDecision}
-                  aria-label="按 Product Core 判断筛选"
-                />
+                <label className="erp-dev-capability-filter-field">
+                  <span>差异分类 / Delta Category</span>
+                  <Select
+                    value={deltaCategory}
+                    options={deltaCategoryOptions}
+                    onChange={setDeltaCategory}
+                    aria-label="按差异分类筛选"
+                  />
+                </label>
+                <label className="erp-dev-capability-filter-field">
+                  <span>产品内核判断 / Product Core</span>
+                  <Select
+                    value={deltaCoreDecision}
+                    options={deltaCoreDecisionOptions}
+                    onChange={setDeltaCoreDecision}
+                    aria-label="按 Product Core 判断筛选"
+                  />
+                </label>
               </>
             ) : null}
           </section>
 
-          {activeView === VIEW_CAPABILITIES ? (
+          <Button block onClick={toggleAnalysis}>
+            {showAnalysis ? '收起分布分析' : '查看分布分析'}
+          </Button>
+
+          {showAnalysis && activeView === VIEW_CAPABILITIES ? (
             <>
               <DistributionBars
                 title="成熟度分布"
                 items={capabilitySummary.byMaturity}
                 total={capabilitySummary.total}
               />
+              <MaturityDefinitions
+                items={capabilityResult.maturityDefinitions}
+              />
               <DistributionBars
                 title="所属层分布"
                 items={capabilitySummary.byLayer}
                 total={capabilitySummary.total}
+                formatLabel={formatDevEnglishAnchor}
               />
             </>
           ) : null}
-          {activeView === VIEW_DELIVERY ? (
+          {showAnalysis && activeView === VIEW_DELIVERY ? (
             <>
               <DistributionBars
                 title="交付状态分布"
@@ -897,15 +1047,16 @@ export default function DevCapabilityLedgerPage() {
               />
             </>
           ) : null}
-          {activeView === VIEW_DELTA ? (
+          {showAnalysis && activeView === VIEW_DELTA ? (
             <>
               <DistributionBars
                 title="差异分类分布"
                 items={deltaSummary.byCategory}
                 total={deltaSummary.total}
+                formatLabel={formatDevEnglishAnchor}
               />
               <DistributionBars
-                title="Product Core 判断"
+                title="产品内核判断 / Product Core"
                 items={deltaSummary.byCoreDecision}
                 total={deltaSummary.total}
               />
@@ -937,31 +1088,42 @@ export default function DevCapabilityLedgerPage() {
             <CapabilityList
               items={filteredCapabilities}
               selectedKey={selectedCapability?.key}
-              onSelect={setSelectedCapabilityKey}
+              onSelect={selectItem}
+              emptyDescription={
+                activeHasSourceError
+                  ? '能力真源解析失败，请先处理上方诊断'
+                  : '没有匹配能力，请调整筛选'
+              }
             />
           ) : null}
           {activeView === VIEW_DELIVERY ? (
             <DeliveryList
               items={filteredDeliveryItems}
               selectedKey={selectedDelivery?.key}
-              onSelect={setSelectedDeliveryKey}
+              onSelect={selectItem}
+              emptyDescription={
+                activeHasSourceError
+                  ? '交付矩阵解析失败，请先处理上方诊断'
+                  : '没有匹配交付项，请调整筛选'
+              }
             />
           ) : null}
           {activeView === VIEW_DELTA ? (
             <DeltaList
               items={filteredDeltaItems}
               selectedKey={selectedDelta?.key}
-              onSelect={setSelectedDeltaKey}
+              onSelect={selectItem}
+              emptyDescription={
+                activeHasSourceError
+                  ? '差异台账解析失败，请先处理上方诊断'
+                  : '没有匹配差异，请调整筛选'
+              }
             />
           ) : null}
         </section>
 
         {activeView === VIEW_CAPABILITIES ? (
-          <CapabilityDetail
-            item={selectedCapability}
-            deliveryRelations={selectedCapabilityDeliveryRelations}
-            deltaRelations={selectedCapabilityDeltaRelations}
-          />
+          <CapabilityDetail item={selectedCapability} />
         ) : null}
         {activeView === VIEW_DELIVERY ? (
           <DeliveryDetail item={selectedDelivery} />

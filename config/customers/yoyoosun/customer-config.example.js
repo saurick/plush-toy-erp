@@ -10,8 +10,6 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
   desktopMenu: Object.freeze({
     hiddenItemKeys: Object.freeze([
       "business-dashboard",
-      "production-scheduling",
-      "production-exceptions",
       "shipping-release",
       "exception-flow",
     ]),

@@ -55,12 +55,9 @@ import {
   getWorkflowTaskReasonLabel,
 } from '../../utils/workflowTaskReason.mjs'
 import { getBusinessStatusLabel } from '../../config/workflowStatus.mjs'
+import { TERMINAL_TASK_STATUS_KEYS } from '../../utils/workflowTaskLifecycle.mjs'
 
-export const TERMINAL_TASK_STATUS_KEYS = new Set([
-  'done',
-  'closed',
-  'cancelled',
-])
+export { TERMINAL_TASK_STATUS_KEYS }
 
 const MOBILE_ROLE_ALIASES = Object.freeze({
   business: 'sales',
@@ -606,15 +603,13 @@ export function isTaskPendingProgress(task) {
 }
 
 export function isTaskBlockedProgress(task) {
-  return ['blocked', 'rejected'].includes(
-    String(task.task_status_key || '').trim()
-  )
+  return String(task.task_status_key || '').trim() === 'blocked'
 }
 
 export function getTaskQueueTone(task) {
-  if (
-    ['blocked', 'rejected'].includes(String(task.task_status_key || '').trim())
-  ) {
+  const taskStatusKey = String(task.task_status_key || '').trim()
+  if (taskStatusKey === 'rejected') return '已退回'
+  if (taskStatusKey === 'blocked') {
     return '卡住'
   }
   if (task.alert_level === 'critical' || isTaskOverdue(task)) {

@@ -10,7 +10,7 @@ func TestWorkflowUsecase_FinishedGoodsQCDoneDerivesInboundTask(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: finishedGoodsQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1001,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{"mobile_role_key": "quality"},
@@ -65,7 +65,7 @@ func TestWorkflowUsecase_FinishedGoodsQCDoneUsesTransitionPayloadForDownstream(t
 	repo := &stubWorkflowRepo{currentTask: finishedGoodsQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1001,
 		TaskStatusKey: "done",
 		Payload: map[string]any{
@@ -95,7 +95,7 @@ func TestWorkflowUsecase_FinishedGoodsQCRepeatedDoneUsesIdempotentDerivedTaskKey
 	uc := NewWorkflowUsecase(repo)
 
 	for i := 0; i < 2; i++ {
-		_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 			ID:            1001,
 			TaskStatusKey: "done",
 			Payload:       map[string]any{},
@@ -113,7 +113,7 @@ func TestWorkflowUsecase_FinishedGoodsQCBlockedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: finishedGoodsQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1001,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": "   "},
@@ -132,7 +132,7 @@ func TestWorkflowUsecase_FinishedGoodsQCBlockedDerivesReworkTask(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1001,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": " 车缝开线 "},
@@ -188,7 +188,7 @@ func TestWorkflowUsecase_FinishedGoodsQCRejectedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: finishedGoodsQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1001,
 		TaskStatusKey: "rejected",
 		Reason:        " \t ",
@@ -209,7 +209,7 @@ func TestWorkflowUsecase_FinishedGoodsQCRejectedDerivesReworkTask(t *testing.T) 
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1001,
 		TaskStatusKey: "rejected",
 		Reason:        "尺寸偏差",
@@ -296,9 +296,10 @@ func TestWorkflowUsecase_SameNameNonFinishedGoodsQCTaskDoesNotDerive(t *testing.
 			repo := &stubWorkflowRepo{currentTask: tc.task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            tc.task.ID,
 				TaskStatusKey: "blocked",
+				Reason:        "通用阻塞验证",
 				Payload:       map[string]any{},
 			}, 7, tc.task.OwnerRoleKey)
 			if err != nil {
@@ -332,9 +333,10 @@ func TestWorkflowUsecase_FinishedGoodsQCSettledBusinessStatusDoesNotTriggerSpeci
 			repo := &stubWorkflowRepo{currentTask: task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            task.ID,
 				TaskStatusKey: "blocked",
+				Reason:        "通用阻塞验证",
 				Payload:       map[string]any{},
 			}, 7, "quality")
 			if err != nil {
@@ -356,7 +358,7 @@ func TestWorkflowUsecase_FinishedGoodsQCFailedBusinessStatusStillUsesSpecialRule
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            task.ID,
 		TaskStatusKey: "blocked",
 		Reason:        "返工后复检仍不合格",
@@ -380,7 +382,7 @@ func TestWorkflowUsecase_FinishedGoodsInboundDoneUpsertsInboundDoneOnly(t *testi
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            task.ID,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{"mobile_role_key": "warehouse"},
@@ -432,7 +434,7 @@ func TestWorkflowUsecase_FinishedGoodsInboundRepeatedDoneDoesNotDeriveDownstream
 	uc := NewWorkflowUsecase(repo)
 
 	for i := 0; i < 2; i++ {
-		_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 			ID:            1201,
 			TaskStatusKey: "done",
 			Payload:       map[string]any{},
@@ -454,7 +456,7 @@ func TestWorkflowUsecase_FinishedGoodsInboundBlockedRequiresReason(t *testing.T)
 	repo := &stubWorkflowRepo{currentTask: finishedGoodsInboundWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1201,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": "   "},
@@ -473,7 +475,7 @@ func TestWorkflowUsecase_FinishedGoodsInboundBlockedUpsertsBlockedState(t *testi
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            task.ID,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": " 库位未确认 "},
@@ -524,7 +526,7 @@ func TestWorkflowUsecase_FinishedGoodsInboundRejectedRequiresReason(t *testing.T
 	repo := &stubWorkflowRepo{currentTask: finishedGoodsInboundWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1201,
 		TaskStatusKey: "rejected",
 		Reason:        " \t ",
@@ -545,7 +547,7 @@ func TestWorkflowUsecase_FinishedGoodsInboundRejectedUpsertsBlockedState(t *test
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            task.ID,
 		TaskStatusKey: "rejected",
 		Reason:        "数量与完工单不符",
@@ -650,9 +652,10 @@ func TestWorkflowUsecase_SameNameNonFinishedGoodsInboundTaskDoesNotDerive(t *tes
 			repo := &stubWorkflowRepo{currentTask: tc.task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            tc.task.ID,
 				TaskStatusKey: "blocked",
+				Reason:        "通用阻塞验证",
 				Payload:       map[string]any{},
 			}, 7, tc.task.OwnerRoleKey)
 			if err != nil {
@@ -675,7 +678,6 @@ func TestWorkflowUsecase_FinishedGoodsInboundSettledBusinessStatusDoesNotTrigger
 	}{
 		{name: "already inbound done", businessStatusKey: workflowInboundDoneStatusKey},
 		{name: "already shipment pending", businessStatusKey: "shipment_pending"},
-		{name: "already shipment release pending legacy state", businessStatusKey: "shipment_release_pending"},
 		{name: "already shipping released", businessStatusKey: "shipping_released"},
 		{name: "already shipped", businessStatusKey: "shipped"},
 	}
@@ -687,7 +689,7 @@ func TestWorkflowUsecase_FinishedGoodsInboundSettledBusinessStatusDoesNotTrigger
 			repo := &stubWorkflowRepo{currentTask: task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            task.ID,
 				TaskStatusKey: "done",
 				Payload:       map[string]any{},
@@ -711,7 +713,7 @@ func TestWorkflowUsecase_FinishedGoodsInboundBlockedBusinessStatusStillUsesSpeci
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            task.ID,
 		TaskStatusKey: "blocked",
 		Reason:        "重复确认仍卡库位",
@@ -735,7 +737,7 @@ func TestWorkflowUsecase_FinishedGoodsReworkDoneWritesProductionProcessingState(
 	repo := &stubWorkflowRepo{currentTask: finishedGoodsReworkWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1301,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{},
@@ -779,7 +781,7 @@ func TestWorkflowUsecase_FinishedGoodsReworkBlockedRequiresReason(t *testing.T) 
 	repo := &stubWorkflowRepo{currentTask: finishedGoodsReworkWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1301,
 		TaskStatusKey: "blocked",
 		Reason:        " ",
@@ -797,7 +799,7 @@ func TestWorkflowUsecase_FinishedGoodsReworkBlockedWritesQCFailedState(t *testin
 	repo := &stubWorkflowRepo{currentTask: finishedGoodsReworkWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1301,
 		TaskStatusKey: "blocked",
 		Reason:        "返工线等待确认",
@@ -841,7 +843,7 @@ func TestWorkflowUsecase_FinishedGoodsReworkRejectedClearsBlockedReason(t *testi
 	repo := &stubWorkflowRepo{currentTask: finishedGoodsReworkWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1301,
 		TaskStatusKey: "rejected",
 		Reason:        "返工后仍未达标",

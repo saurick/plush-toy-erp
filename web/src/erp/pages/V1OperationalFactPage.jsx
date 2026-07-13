@@ -22,7 +22,7 @@ const PAGE_CONFIGS = Object.freeze({
     initialActiveKey: 'reservations',
     enabledViews: ['reservations'],
     pageSummary:
-      '出库管理当前只处理库存预留释放；库存预留消耗随出货事实原子完成，出货单新建、确认出货和取消出货统一回到正式出货单页面。',
+      '出库管理当前只处理库存预留释放；库存预留仅在确认出货时随出库处理一并消耗，出货单新建、确认出货和取消出货统一回到正式出货单页面。',
     viewOverrides: {
       reservations: {
         title: '库存预留',
@@ -103,7 +103,7 @@ const PAGE_CONFIGS = Object.freeze({
         modalDescription:
           '发票记录应从真实出货、应收或后续开票来源生成；本页不提供无来源手工登记。',
         selectionBoundaryText:
-          '当前页只调用后端财务规则；过账、结清和取消不等于税控、查验、纳税或总账动作。',
+          '当前页由系统按财务规则处理；过账、结清和取消不等于税控、查验、纳税或总账动作。',
         listParams: { fact_type: 'INVOICE' },
         initialValues: {
           fact_type: 'INVOICE',

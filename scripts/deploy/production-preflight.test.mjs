@@ -52,6 +52,7 @@ function writeFixture({
       "ERP_DEBUG_ENV=prod",
       "ERP_DEBUG_SEED_ENABLED=false",
       "ERP_DEBUG_CLEANUP_ENABLED=false",
+      "ERP_DEBUG_BUSINESS_CLEAR_ENABLED=false",
       "ERP_DEBUG_CLEANUP_SCOPE=none",
       "ERP_PDF_WARMUP=async",
       "JAEGER_BIND_ADDR=127.0.0.1",
@@ -215,6 +216,23 @@ test("production preflight rejects floating app image tags", () => {
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /APP_IMAGE 不能使用 :dev 或 :latest/);
+});
+
+test("production preflight rejects enabled business data clear", () => {
+  const fixture = writeFixture();
+  fs.writeFileSync(
+    fixture.envFile,
+    fs
+      .readFileSync(fixture.envFile, "utf8")
+      .replace(
+        "ERP_DEBUG_BUSINESS_CLEAR_ENABLED=false",
+        "ERP_DEBUG_BUSINESS_CLEAR_ENABLED=true",
+      ),
+  );
+  const result = runPreflight(fixture);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /ERP_DEBUG_BUSINESS_CLEAR_ENABLED 必须为 false/);
 });
 
 test("production preflight rejects PDF warmup fault-isolation mode", () => {

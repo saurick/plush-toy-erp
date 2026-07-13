@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/predicate"
 
@@ -18,10 +19,11 @@ import (
 // FinanceFactQuery is the builder for querying FinanceFact entities.
 type FinanceFactQuery struct {
 	config
-	ctx        *QueryContext
-	order      []financefact.OrderOption
-	inters     []Interceptor
-	predicates []predicate.FinanceFact
+	ctx           *QueryContext
+	order         []financefact.OrderOption
+	inters        []Interceptor
+	predicates    []predicate.FinanceFact
+	withCanceller *AdminUserQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -56,6 +58,28 @@ func (_q *FinanceFactQuery) Unique(unique bool) *FinanceFactQuery {
 func (_q *FinanceFactQuery) Order(o ...financefact.OrderOption) *FinanceFactQuery {
 	_q.order = append(_q.order, o...)
 	return _q
+}
+
+// QueryCanceller chains the current query on the "canceller" edge.
+func (_q *FinanceFactQuery) QueryCanceller() *AdminUserQuery {
+	query := (&AdminUserClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financefact.Table, financefact.FieldID, selector),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, financefact.CancellerTable, financefact.CancellerColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // First returns the first FinanceFact entity from the query.
@@ -245,15 +269,27 @@ func (_q *FinanceFactQuery) Clone() *FinanceFactQuery {
 		return nil
 	}
 	return &FinanceFactQuery{
-		config:     _q.config,
-		ctx:        _q.ctx.Clone(),
-		order:      append([]financefact.OrderOption{}, _q.order...),
-		inters:     append([]Interceptor{}, _q.inters...),
-		predicates: append([]predicate.FinanceFact{}, _q.predicates...),
+		config:        _q.config,
+		ctx:           _q.ctx.Clone(),
+		order:         append([]financefact.OrderOption{}, _q.order...),
+		inters:        append([]Interceptor{}, _q.inters...),
+		predicates:    append([]predicate.FinanceFact{}, _q.predicates...),
+		withCanceller: _q.withCanceller.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
+}
+
+// WithCanceller tells the query-builder to eager-load the nodes that are connected to
+// the "canceller" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *FinanceFactQuery) WithCanceller(opts ...func(*AdminUserQuery)) *FinanceFactQuery {
+	query := (&AdminUserClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withCanceller = query
+	return _q
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -332,8 +368,11 @@ func (_q *FinanceFactQuery) prepareQuery(ctx context.Context) error {
 
 func (_q *FinanceFactQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*FinanceFact, error) {
 	var (
-		nodes = []*FinanceFact{}
-		_spec = _q.querySpec()
+		nodes       = []*FinanceFact{}
+		_spec       = _q.querySpec()
+		loadedTypes = [1]bool{
+			_q.withCanceller != nil,
+		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*FinanceFact).scanValues(nil, columns)
@@ -341,6 +380,7 @@ func (_q *FinanceFactQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &FinanceFact{config: _q.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	for i := range hooks {
@@ -352,7 +392,46 @@ func (_q *FinanceFactQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := _q.withCanceller; query != nil {
+		if err := _q.loadCanceller(ctx, query, nodes, nil,
+			func(n *FinanceFact, e *AdminUser) { n.Edges.Canceller = e }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
+}
+
+func (_q *FinanceFactQuery) loadCanceller(ctx context.Context, query *AdminUserQuery, nodes []*FinanceFact, init func(*FinanceFact), assign func(*FinanceFact, *AdminUser)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*FinanceFact)
+	for i := range nodes {
+		if nodes[i].CancelledBy == nil {
+			continue
+		}
+		fk := *nodes[i].CancelledBy
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(adminuser.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "cancelled_by" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
 }
 
 func (_q *FinanceFactQuery) sqlCount(ctx context.Context) (int, error) {
@@ -379,6 +458,9 @@ func (_q *FinanceFactQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != financefact.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if _q.withCanceller != nil {
+			_spec.Node.AddColumnOnce(financefact.FieldCancelledBy)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import {
@@ -15,6 +16,19 @@ import {
   normalizeDevHubPinnedRoutes,
   toggleDevHubPinnedRoute,
 } from './devHub.mjs'
+import { DEV_WORKSPACE_NAV_ITEMS, resolveDevPageTitle } from './devRoutes.mjs'
+
+const devPageSources = [
+  'DevHubPage.jsx',
+  'DevGovernancePage.jsx',
+  'DevDocsPage.jsx',
+  'DevTestingPage.jsx',
+  'DevPrototypesPage.jsx',
+  'DevCapabilityLedgerPage.jsx',
+  'DevCustomerConfigPage.jsx',
+].map((fileName) =>
+  readFileSync(new URL(`../pages/${fileName}`, import.meta.url), 'utf8')
+)
 
 test('devHub: route and dev gate stay dev-only', () => {
   assert.equal(DEV_HUB_ROUTE, '/__dev')
@@ -24,6 +38,53 @@ test('devHub: route and dev gate stay dev-only', () => {
   assert.equal(isDevHubEnabled({ DEV: true }), true)
   assert.equal(isDevHubEnabled({ DEV: false }), false)
   assert.equal(isDevHubEnabled({}), false)
+})
+
+test('devHub: every dev route exposes a distinct browser title', () => {
+  assert.equal(
+    resolveDevPageTitle('/__dev/testing', 'Plush Toy ERP'),
+    '测试入口 · Plush Toy ERP'
+  )
+  assert.equal(
+    resolveDevPageTitle('/erp/dashboard', 'Plush Toy ERP'),
+    'Plush Toy ERP'
+  )
+  assert.equal(
+    resolveDevPageTitle('/__dev/docs/', 'Plush Toy ERP'),
+    '开发文档 · Plush Toy ERP'
+  )
+})
+
+test('devHub: shared workspace navigation covers every child page without duplicating hub', () => {
+  assert.deepEqual(
+    DEV_WORKSPACE_NAV_ITEMS.map((item) => item.route),
+    [
+      '/__dev/governance',
+      '/__dev/docs',
+      '/__dev/testing',
+      '/__dev/prototypes',
+      '/__dev/capability-ledger',
+      '/__dev/customer-config',
+    ]
+  )
+  assert.equal(
+    new Set(DEV_WORKSPACE_NAV_ITEMS.map((item) => item.route)).size,
+    DEV_WORKSPACE_NAV_ITEMS.length
+  )
+  assert(
+    DEV_WORKSPACE_NAV_ITEMS.every(
+      (item) =>
+        item.label && item.description && item.route.startsWith('/__dev')
+    )
+  )
+})
+
+test('devHub: seven dev pages share the backend-style workspace shell', () => {
+  assert.equal(devPageSources.length, 7)
+  devPageSources.forEach((source) => {
+    assert.match(source, /erp-dev-workspace-page/u)
+    assert.match(source, /<DevPageNav/u)
+  })
 })
 
 test('devHub: lists existing dev-only entry routes without backend assumptions', () => {

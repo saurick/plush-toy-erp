@@ -90,6 +90,7 @@ func TestCancellationCompensationKeepsAuthenticatedActor(t *testing.T) {
 	t.Run("finance fact", func(t *testing.T) {
 		ctx := context.Background()
 		data, client := openInventoryRepoTestData(t, "compensation_actor_finance")
+		actor := client.AdminUser.Create().SetUsername("finance-compensation-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 		factRepo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 		factUC := biz.NewOperationalFactUsecase(factRepo)
 		fact, err := factRepo.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
@@ -104,10 +105,17 @@ func TestCancellationCompensationKeepsAuthenticatedActor(t *testing.T) {
 			t.Fatalf("post finance fact: %v", err)
 		}
 		nodeID := recordAppliedProcessCommandEffect(t, ctx, data, biz.ProcessDomainCommandFinanceReceivableLead, "finance_fact", fact.ID)
-		if _, err := factUC.CancelPostedFinanceFactWithActor(ctx, fact.ID, 44); err != nil {
+		if _, err := factUC.CancelPostedFinanceFact(ctx, fact.ID, actor.ID, "测试取消并核对流程结果"); err != nil {
 			t.Fatalf("cancel finance fact with actor: %v", err)
 		}
-		assertCompensationActor(t, ctx, client, nodeID, 44)
+		assertCompensationActor(t, ctx, client, nodeID, actor.ID)
+		node, err := client.ProcessNodeInstance.Get(ctx, nodeID)
+		if err != nil {
+			t.Fatalf("read finance compensation: %v", err)
+		}
+		if got, _ := node.DomainCommandCompensation["reason"].(string); got != "测试取消并核对流程结果" {
+			t.Fatalf("finance compensation reason=%q", got)
+		}
 	})
 }
 

@@ -29,12 +29,12 @@ export function isAdminSessionUnavailableCode(code) {
 export const DEFAULT_RPC_ERROR_MESSAGES = Object.freeze({
   [RpcErrorCode.ADMIN_REQUIRED]: '只有管理员才能操作',
   [RpcErrorCode.AUTH_REQUIRED]: '请先登录',
-  [RpcErrorCode.ADMIN_DISABLED]: '管理员已禁用',
+  [RpcErrorCode.ADMIN_DISABLED]: '账号已停用',
   [RpcErrorCode.PERMISSION_DENIED]: '权限不足',
-  [RpcErrorCode.ADMIN_NOT_FOUND]: '管理员不存在',
+  [RpcErrorCode.ADMIN_NOT_FOUND]: '账号不存在',
   [RpcErrorCode.AUTH_USER_NOT_FOUND]: '用户不存在',
   [RpcErrorCode.AUTH_INVALID_PASSWORD]: '密码错误',
-  [RpcErrorCode.AUTH_USER_DISABLED]: '用户已被禁用',
+  [RpcErrorCode.AUTH_USER_DISABLED]: '账号已停用',
   [RpcErrorCode.AUTH_USER_EXISTS]: '用户名已存在',
   [RpcErrorCode.AUTH_EXPIRED]: '登录已过期，请重新登录',
   [RpcErrorCode.AUTH_INVALID]: '登录无效，请重新登录',
@@ -47,15 +47,17 @@ export const DEFAULT_RPC_ERROR_MESSAGES = Object.freeze({
   [RpcErrorCode.AUTH_PHONE_NOT_BOUND]: '该手机号未开通登录权限，请联系管理员',
   [RpcErrorCode.AUTH_MOBILE_ROLE_DENIED]:
     '该账号暂无当前岗位任务端登录权限，请联系管理员',
-  [RpcErrorCode.AUTH_SMS_LOGIN_DISABLED]: '当前部署未启用短信登录',
+  [RpcErrorCode.AUTH_SMS_LOGIN_DISABLED]: '短信登录暂未开通，请使用密码登录',
   [RpcErrorCode.AUTH_SMS_SERVICE_UNAVAILABLE]:
     '短信服务暂不可用，请稍后再试或联系管理员',
   [RpcErrorCode.AUTH_SMS_SERVICE_QUOTA_EXCEEDED]:
     '短信服务额度已用完，请联系管理员处理',
-  [RpcErrorCode.ADMIN_EXISTS]: '管理员账号已存在',
-  [RpcErrorCode.ADMIN_PHONE_EXISTS]: '手机号已绑定其他管理员',
+  [RpcErrorCode.ADMIN_EXISTS]: '账号已存在',
+  [RpcErrorCode.ADMIN_PHONE_EXISTS]: '手机号已绑定其他账号',
   [RpcErrorCode.IDEMPOTENCY_CONFLICT]:
     '重复请求内容与首次提交不一致，请刷新后重试',
   [RpcErrorCode.PROCESS_DOMAIN_COMMAND_RECOVERY_REQUIRED]:
     '此前业务处理结果需要人工核对，当前流程暂时无法继续，请联系管理员',
+  [RpcErrorCode.RESOURCE_VERSION_CONFLICT]:
+    '记录已被其他操作更新，请刷新后重试',
 })

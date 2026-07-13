@@ -3,11 +3,11 @@
   "revision": "yoyoosun-customer-package-v7.runtime-manifest-v1",
   "productVersion": "local-customer-package",
   "manifestSha256": "sha256:2cf5289cc48eb2be17146ba3fed9281d0cd31a60c448f1783ec8efd908b953a7",
-  "manifestPath": "output/customers/yoyoosun/customer-config-runtime-manifest.json",
+  "manifestPath": "deployments/yoyoosun/evidence/releases/2026-07-11/customer-config-runtime-manifest.json",
   "releaseReport": "",
   "reviewStatus": "approved",
   "reviewer": "codex-runtime-review-2026-07-11",
-  "generatedAt": "2026-07-11T05:41:47.741Z",
+  "generatedAt": "2026-07-11T08:33:30.922Z",
   "redaction": {
     "containsSecrets": false,
     "containsRawCustomerRows": false,

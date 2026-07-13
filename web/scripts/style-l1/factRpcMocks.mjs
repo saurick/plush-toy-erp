@@ -1,7 +1,23 @@
 import { setTimeout as delay } from 'node:timers/promises'
+import { requireWorkflowTaskExplainParams } from '../../src/erp/utils/workflowTaskActionAccess.mjs'
+import { requireWorkflowTaskCreateParams } from '../../src/erp/utils/workflowTaskCreateContract.mjs'
+import {
+  workflowMockActionDecision,
+  workflowMockCanAccessTaskForCapability,
+  workflowMockCanCreateTask,
+  workflowMockCanViewTask,
+  workflowMockPermissionAllowed,
+} from '../../src/mocks/workflowTaskMockAuthorization.mjs'
+import {
+  requireWorkflowTaskMutationParams,
+  workflowTaskMutationSignature,
+} from '../../src/erp/utils/workflowTaskMutation.mjs'
+import { buildWorkflowTaskBoardMock } from '../../src/mocks/workflowTaskBoardMock.mjs'
+import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
 
 export async function installFactRpcMocks(page, context) {
-  const { nowUnix, resolveDelayFromReferer } = context
+  const { adminProfile, effectiveSession, nowUnix, resolveDelayFromReferer } =
+    context
 
   await page.route('**/rpc/operational_fact', async (route) => {
     const body = route.request().postDataJSON() || {}
@@ -242,7 +258,7 @@ export async function installFactRpcMocks(page, context) {
         data = { finance_fact: { ...financeFact, status: 'CANCELLED' } }
         break
       default:
-        data = {}
+        data = unsupportedRpcMethod('operational_fact', method)
         break
     }
 
@@ -252,11 +268,7 @@ export async function installFactRpcMocks(page, context) {
       body: JSON.stringify({
         jsonrpc: '2.0',
         id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
+        result: styleRpcResult(data),
       }),
     })
   })
@@ -459,7 +471,7 @@ export async function installFactRpcMocks(page, context) {
         }
         break
       default:
-        data = {}
+        data = unsupportedRpcMethod('purchase', method)
         break
     }
 
@@ -469,11 +481,7 @@ export async function installFactRpcMocks(page, context) {
       body: JSON.stringify({
         jsonrpc: '2.0',
         id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
+        result: styleRpcResult(data),
       }),
     })
   })
@@ -542,7 +550,7 @@ export async function installFactRpcMocks(page, context) {
         data = { quality_inspection: { ...qualityInspection, ...params } }
         break
       default:
-        data = {}
+        data = unsupportedRpcMethod('quality', method)
         break
     }
 
@@ -552,11 +560,7 @@ export async function installFactRpcMocks(page, context) {
       body: JSON.stringify({
         jsonrpc: '2.0',
         id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
+        result: styleRpcResult(data),
       }),
     })
   })
@@ -722,7 +726,7 @@ export async function installFactRpcMocks(page, context) {
         }
         break
       default:
-        data = {}
+        data = unsupportedRpcMethod('inventory', method)
         break
     }
 
@@ -732,18 +736,65 @@ export async function installFactRpcMocks(page, context) {
       body: JSON.stringify({
         jsonrpc: '2.0',
         id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
+        result: styleRpcResult(data),
       }),
     })
   })
 
   const workflowTasks = []
   const workflowBusinessStates = []
+  const workflowMutationReceipts = new Map()
   let workflowTaskID = 1
+  const workflowMutationOperationByMethod = {
+    complete_task_action: 'complete',
+    block_task_action: 'block',
+    reject_task_action: 'reject',
+    urge_task: 'urge',
+  }
+  const cloneWorkflowTask = (task) => JSON.parse(JSON.stringify(task))
+  const resolveWorkflowMutationRequest = (method, params = {}) => {
+    const operation = workflowMutationOperationByMethod[method] || ''
+    let mutationParams
+    try {
+      mutationParams = requireWorkflowTaskMutationParams(operation, params, {
+        requireIdempotencyKey: true,
+      })
+    } catch (error) {
+      return {
+        errorCode: 40010,
+        errorMessage: error?.message || '页面已更新，请刷新后重新操作',
+      }
+    }
+    const task = workflowTasks.find(
+      (item) => item.id === mutationParams.task_id
+    )
+    if (!task) {
+      return { errorCode: 40010, errorMessage: '任务不存在' }
+    }
+    if (!Number.isSafeInteger(task.version) || task.version <= 0) {
+      return {
+        errorCode: 40010,
+        errorMessage: '任务版本信息无效，请刷新后重试',
+      }
+    }
+    const receiptKey = `${task.id}:${mutationParams.idempotency_key}`
+    const intent = workflowTaskMutationSignature(operation, mutationParams)
+    const receipt = workflowMutationReceipts.get(receiptKey)
+    if (receipt && receipt.intent !== intent) {
+      return {
+        errorCode: 40920,
+        errorMessage: '重复请求内容与首次提交不一致，请刷新后重试',
+      }
+    }
+    return {
+      mutationParams,
+      operation,
+      receipt: receipt
+        ? { task: cloneWorkflowTask(receipt.task) }
+        : { intent, receiptKey },
+      task,
+    }
+  }
   await page.route('**/rpc/business', async (route) => {
     const body = route.request().postDataJSON() || {}
     const { id = 'mock-id', method } = body
@@ -754,7 +805,7 @@ export async function installFactRpcMocks(page, context) {
         data = { modules: [] }
         break
       default:
-        data = {}
+        data = unsupportedRpcMethod('business', method)
         break
     }
 
@@ -764,11 +815,7 @@ export async function installFactRpcMocks(page, context) {
       body: JSON.stringify({
         jsonrpc: '2.0',
         id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
+        result: styleRpcResult(data),
       }),
     })
   })
@@ -778,19 +825,50 @@ export async function installFactRpcMocks(page, context) {
     const { id = 'mock-id', method, params = {} } = body
 
     let data = {}
+    let resultCode = 0
+    let resultMessage = 'OK'
+    const fail = (message, code = 40010) => {
+      resultCode = code
+      resultMessage = message
+    }
+    const isTerminalTask = (task) =>
+      ['done', 'rejected', 'cancelled', 'closed'].includes(
+        String(task?.task_status_key || '').trim()
+      )
     switch (method) {
       case 'list_business_states':
-        data = {
-          business_states: workflowBusinessStates.filter(
+        if (
+          !workflowMockPermissionAllowed(
+            adminProfile,
+            effectiveSession,
+            'workflow.task.read'
+          )
+        ) {
+          fail('当前账号缺少查看协同任务权限')
+        } else {
+          const businessStates = workflowBusinessStates.filter(
             (item) =>
               !params.source_type || item.source_type === params.source_type
-          ),
-          total: workflowBusinessStates.length,
-          limit: Number(params.limit || 50),
-          offset: Number(params.offset || 0),
+          )
+          data = {
+            business_states: businessStates,
+            total: businessStates.length,
+            limit: Number(params.limit || 50),
+            offset: Number(params.offset || 0),
+          }
         }
         break
       case 'list_tasks': {
+        if (
+          !workflowMockPermissionAllowed(
+            adminProfile,
+            effectiveSession,
+            'workflow.task.read'
+          )
+        ) {
+          fail('当前账号缺少查看协同任务权限')
+          break
+        }
         const listDelayMs = resolveDelayFromReferer(
           route.request(),
           '__style_l1_workflow_list_delay'
@@ -798,38 +876,79 @@ export async function installFactRpcMocks(page, context) {
         if (listDelayMs > 0) {
           await delay(listDelayMs)
         }
-        const tasks = workflowTasks.filter(
+        const matchingTasks = workflowTasks.filter(
           (item) =>
             (!params.source_type || item.source_type === params.source_type) &&
             (!params.task_group || item.task_group === params.task_group) &&
+            (!params.task_status_key ||
+              item.task_status_key === params.task_status_key) &&
+            (!params.owner_role_key ||
+              item.owner_role_key === params.owner_role_key) &&
             (!params.source_id ||
-              Number(item.source_id) === Number(params.source_id))
+              Number(item.source_id) === Number(params.source_id)) &&
+            workflowMockCanViewTask(adminProfile, effectiveSession, item)
         )
+        const limit = Math.min(Math.max(Number(params.limit || 50), 1), 200)
+        const offset = Math.max(Number(params.offset || 0), 0)
+        const tasks = matchingTasks.slice(offset, offset + limit)
         data = {
           tasks,
-          total: tasks.length,
-          limit: Number(params.limit || 50),
-          offset: Number(params.offset || 0),
+          total: matchingTasks.length,
+          limit,
+          offset,
         }
         break
       }
+      case 'get_task_board': {
+        if (
+          !workflowMockPermissionAllowed(
+            adminProfile,
+            effectiveSession,
+            'workflow.task.read'
+          )
+        ) {
+          fail('当前账号缺少查看协同任务权限')
+          break
+        }
+        const visibleTasks = workflowTasks.filter((item) =>
+          workflowMockCanViewTask(adminProfile, effectiveSession, item)
+        )
+        data = buildWorkflowTaskBoardMock({
+          tasks: visibleTasks,
+          params,
+          snapshotAt: nowUnix(),
+        })
+        break
+      }
       case 'create_task': {
+        let createParams
+        try {
+          createParams = requireWorkflowTaskCreateParams(params)
+        } catch (error) {
+          fail(error?.message || 'create_task 参数无效')
+          break
+        }
+        if (!workflowMockCanCreateTask(adminProfile, effectiveSession)) {
+          fail('当前账号缺少创建协同任务权限')
+          break
+        }
         const task = {
           id: workflowTaskID++,
-          task_code: params.task_code || `style-l1-task-${Date.now()}`,
-          task_group: params.task_group || 'project-orders',
-          task_name: params.task_name || '订单/款式立项 跟进',
-          source_type: params.source_type || 'project-orders',
-          source_id: Number(params.source_id || Date.now()),
-          source_no: params.source_no || '',
-          business_status_key: params.business_status_key || 'project_pending',
-          task_status_key: params.task_status_key || 'ready',
-          owner_role_key: params.owner_role_key || 'business',
-          assignee_id: params.assignee_id || '',
-          priority: Number(params.priority || 0),
-          due_at: params.due_at || null,
-          blocked_reason: params.blocked_reason || '',
-          payload: params.payload || {},
+          task_code: createParams.task_code,
+          task_group: createParams.task_group,
+          task_name: createParams.task_name,
+          source_type: createParams.source_type,
+          source_id: createParams.source_id,
+          source_no: createParams.source_no || '',
+          business_status_key: createParams.business_status_key || '',
+          task_status_key: createParams.task_status_key,
+          owner_role_key: createParams.owner_role_key,
+          assignee_id: createParams.assignee_id || '',
+          priority: createParams.priority,
+          due_at: createParams.due_at || null,
+          blocked_reason: createParams.blocked_reason || '',
+          version: 1,
+          payload: createParams.payload,
           created_at: nowUnix(),
           updated_at: nowUnix(),
         }
@@ -837,30 +956,178 @@ export async function installFactRpcMocks(page, context) {
         data = { task }
         break
       }
+      case 'complete_task_action':
+      case 'block_task_action':
+      case 'reject_task_action': {
+        const request = resolveWorkflowMutationRequest(method, params)
+        const nextStatusKey =
+          method === 'complete_task_action'
+            ? 'done'
+            : method === 'block_task_action'
+              ? 'blocked'
+              : 'rejected'
+        const actionKey =
+          method === 'complete_task_action'
+            ? 'complete'
+            : method === 'block_task_action'
+              ? 'block'
+              : 'reject'
+        const decision = request.errorCode
+          ? null
+          : workflowMockActionDecision({
+              actionKey,
+              adminProfile,
+              effectiveSession,
+              task: request.task,
+            })
+        if (request.errorCode) {
+          fail(request.errorMessage, request.errorCode)
+        } else if (
+          !decision.permissionAllowed ||
+          !workflowMockCanAccessTaskForCapability(
+            adminProfile,
+            effectiveSession,
+            request.task,
+            decision.requiredPermission
+          )
+        ) {
+          fail('当前账号无权查看或执行该任务动作')
+        } else if (request.receipt.task) {
+          data = { task: request.receipt.task }
+        } else if (!decision.allowed) {
+          fail(decision.reason)
+        } else if (isTerminalTask(request.task)) {
+          fail('任务已结束，不能再次变更状态')
+        } else if (
+          request.mutationParams.expected_version !== request.task.version
+        ) {
+          fail('任务已被其他人更新，请刷新后重试')
+        } else {
+          const { mutationParams, receipt, task } = request
+          task.task_status_key = nextStatusKey
+          task.payload = {
+            ...(task.payload || {}),
+            ...mutationParams.payload,
+          }
+          if (nextStatusKey === 'blocked') {
+            task.payload.blocked_reason = mutationParams.reason
+            delete task.payload.rejected_reason
+          } else if (nextStatusKey === 'rejected') {
+            task.payload.rejected_reason = mutationParams.reason
+            delete task.payload.blocked_reason
+          } else {
+            delete task.payload.blocked_reason
+            delete task.payload.rejected_reason
+            task.completed_at = nowUnix()
+          }
+          task.blocked_reason =
+            nextStatusKey === 'blocked' || nextStatusKey === 'rejected'
+              ? mutationParams.reason
+              : ''
+          task.updated_at = nowUnix()
+          task.version += 1
+          workflowMutationReceipts.set(receipt.receiptKey, {
+            intent: receipt.intent,
+            task: cloneWorkflowTask(task),
+          })
+          data = { task }
+        }
+        break
+      }
+      case 'urge_task': {
+        const request = resolveWorkflowMutationRequest(method, params)
+        const decision = request.errorCode
+          ? null
+          : workflowMockActionDecision({
+              actionKey: 'urge',
+              adminProfile,
+              effectiveSession,
+              task: request.task,
+            })
+        if (request.errorCode) {
+          fail(request.errorMessage, request.errorCode)
+        } else if (
+          !decision.permissionAllowed ||
+          !workflowMockCanAccessTaskForCapability(
+            adminProfile,
+            effectiveSession,
+            request.task,
+            decision.requiredPermission
+          )
+        ) {
+          fail('当前账号无权查看或执行该任务动作')
+        } else if (request.receipt.task) {
+          data = { task: request.receipt.task }
+        } else if (!decision.allowed) {
+          fail(decision.reason)
+        } else if (isTerminalTask(request.task)) {
+          fail('任务已结束，不能催办')
+        } else if (
+          request.mutationParams.expected_version !== request.task.version
+        ) {
+          fail('任务已被其他人更新，请刷新后重试')
+        } else {
+          const { mutationParams, receipt, task } = request
+          task.payload = {
+            ...(task.payload || {}),
+            ...mutationParams.payload,
+            urged: true,
+            urge_count: Number(task.payload?.urge_count || 0) + 1,
+            last_urge_action: mutationParams.action,
+            last_urge_reason: mutationParams.reason,
+          }
+          task.updated_at = nowUnix()
+          task.version += 1
+          workflowMutationReceipts.set(receipt.receiptKey, {
+            intent: receipt.intent,
+            task: cloneWorkflowTask(task),
+          })
+          data = { task }
+        }
+        break
+      }
       case 'explain_action_access': {
-        const taskID = Number(params.task_id || 0)
-        const task = workflowTasks.find((item) => Number(item.id) === taskID)
+        let requestParams
+        try {
+          requestParams = requireWorkflowTaskExplainParams(params, {
+            allowActionKey: true,
+          })
+        } catch (error) {
+          fail(error?.message || '任务动作权限查询参数无效')
+          break
+        }
+        const { taskID, actionKey } = requestParams
+        const task = workflowTasks.find((item) => item.id === taskID)
+        if (!task) {
+          fail('任务不存在')
+          break
+        }
+        if (!workflowMockCanViewTask(adminProfile, effectiveSession, task)) {
+          fail('当前账号无权查看该协同任务')
+          break
+        }
         const ownerRoleKey = task?.owner_role_key || ''
-        const statusKey = task?.task_status_key || ''
         const actions = ['complete', 'block', 'reject', 'urge'].map(
           (actionKey) => {
-            const requiredPermission =
-              actionKey === 'complete'
-                ? 'workflow.task.complete'
-                : 'workflow.task.update'
+            const decision = workflowMockActionDecision({
+              actionKey,
+              adminProfile,
+              effectiveSession,
+              task,
+            })
             return {
               action_key: actionKey,
-              allowed: Boolean(task),
-              reason: task ? 'style-l1 后端投影允许执行' : '任务不存在',
-              reason_code: task ? '' : 'task_not_found',
-              required_permission: requiredPermission,
+              allowed: decision.allowed,
+              reason: decision.reason,
+              reason_code: decision.reasonCode,
+              required_permission: decision.requiredPermission,
               owner_role_key: ownerRoleKey,
-              visible_owner_role_keys: ownerRoleKey ? [ownerRoleKey] : [],
-              candidate_owner_role_keys: ownerRoleKey ? [ownerRoleKey] : [],
-              owner_role_matched: Boolean(task),
-              work_pool_role_matched: Boolean(task),
-              work_pool_entitlement_matched: Boolean(task),
-              work_pool_entitlement_scope_matched: Boolean(task),
+              visible_owner_role_keys: decision.visibleOwnerRoleKeys,
+              candidate_owner_role_keys: decision.visibleOwnerRoleKeys,
+              owner_role_matched: decision.ownerRoleMatched,
+              work_pool_role_matched: false,
+              work_pool_entitlement_matched: false,
+              work_pool_entitlement_scope_matched: false,
               domain_command_entry: {
                 enabled: false,
                 will_write_fact: false,
@@ -869,16 +1136,27 @@ export async function installFactRpcMocks(page, context) {
                 blocked_reasons: ['domain_command_contract_not_configured'],
                 required_contract: [],
               },
-              actor_role_key: ownerRoleKey,
-              status_key: statusKey,
+              actor_role_key: decision.assignedToCurrentAdmin
+                ? ownerRoleKey
+                : decision.ownerRoleMatched
+                  ? ownerRoleKey
+                  : adminProfile?.is_super_admin === true &&
+                      actionKey === 'urge'
+                    ? 'admin'
+                    : '',
+              status_key: decision.statusKey,
             }
           }
         )
-        data = { actions }
+        data = actionKey
+          ? { action: actions.find((item) => item.action_key === actionKey) }
+          : { task_id: taskID, actions }
         break
       }
       default:
-        data = {}
+        fail(
+          `workflow method ${String(method || '').trim() || '(empty)'} is not supported`
+        )
         break
     }
 
@@ -889,8 +1167,8 @@ export async function installFactRpcMocks(page, context) {
         jsonrpc: '2.0',
         id,
         result: {
-          code: 0,
-          message: 'OK',
+          code: resultCode,
+          message: resultMessage,
           data,
         },
       }),

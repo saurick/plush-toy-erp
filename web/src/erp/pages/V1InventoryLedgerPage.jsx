@@ -110,8 +110,8 @@ const SOURCE_TYPE_OPTIONS = [
   { label: '采购退货', value: 'PURCHASE_RETURN' },
   { label: '入库调整', value: 'PURCHASE_RECEIPT_ADJUSTMENT' },
   { label: '出货单', value: 'SHIPMENT' },
-  { label: '生产事实', value: 'PRODUCTION_FACT' },
-  { label: '委外事实', value: 'OUTSOURCING_FACT' },
+  { label: '生产记录', value: 'PRODUCTION_FACT' },
+  { label: '委外记录', value: 'OUTSOURCING_FACT' },
 ]
 
 const LOT_DATE_FILTER_OPTIONS = [{ label: '接收日期', value: 'received_at' }]
@@ -1019,7 +1019,7 @@ export default function V1InventoryLedgerPage() {
       <PageHeaderCard
         compact
         title="库存台账"
-        description="按余额、批次、流水三种视图追溯库存；批次按仓库筛选只看当前有余额批次，历史发生记录进入流水视图追溯，本页不写库存事实。"
+        description="按余额、批次、流水三种视图追溯库存；批次按仓库筛选只看当前有余额批次，历史发生记录进入流水视图追溯，本页只用于查询和追溯。"
         tags={[
           <Tag color="blue" key="balances">
             余额只读

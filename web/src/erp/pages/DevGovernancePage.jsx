@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   ApartmentOutlined,
   BranchesOutlined,
@@ -9,9 +9,10 @@ import {
   SearchOutlined,
 } from '@ant-design/icons'
 import { Button, Empty, Input, Space, Tag, Typography } from 'antd'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Markdown } from '@/common/components/markdown'
 import { message } from '@/common/utils/antdApp'
+import DevPageNav from '../components/dev/DevPageNav.jsx'
 import {
   DEV_GOVERNANCE_SOURCE_PATH,
   buildGovernanceSummary,
@@ -23,6 +24,15 @@ import {
 } from '../config/devGovernance.mjs'
 
 const { Paragraph, Text, Title } = Typography
+
+const AXIS_QUERY_KEY = 'axis'
+const SCOPE_QUERY_KEY = 'scope'
+const TASK_SCOPE_RELATED = 'related'
+const TASK_SCOPE_ALL = 'all'
+
+function normalizeTaskScope(value = '') {
+  return value === TASK_SCOPE_ALL ? TASK_SCOPE_ALL : TASK_SCOPE_RELATED
+}
 
 const governanceSource = import.meta.glob('../../../../docs/项目治理地图.md', {
   eager: true,
@@ -112,6 +122,7 @@ function AxisNav({ axes = [], selectedKey = '', onSelect }) {
               ? 'erp-dev-governance-axis-nav__item erp-dev-governance-axis-nav__item--active'
               : 'erp-dev-governance-axis-nav__item'
           }
+          aria-current={axis.key === selectedKey ? 'true' : undefined}
           onClick={() => onSelect(axis.key)}
         >
           <span className="erp-dev-governance-axis-nav__title">
@@ -188,6 +199,7 @@ function TaskCard({ task }) {
 }
 
 export default function DevGovernancePage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const source = useMemo(() => getGovernanceSource(), [])
   const axes = useMemo(() => parseGovernanceAxes(source), [source])
   const tasks = useMemo(() => parseGovernanceTaskRoutes(source), [source])
@@ -196,40 +208,80 @@ export default function DevGovernancePage() {
     () => buildGovernanceSummary({ axes, tasks, mermaid }),
     [axes, mermaid, tasks]
   )
-  const [selectedAxisKey, setSelectedAxisKey] = useState(
-    () => axes[0]?.key || ''
-  )
   const [taskKeyword, setTaskKeyword] = useState('')
-  const [taskScopeMode, setTaskScopeMode] = useState('related')
+  const requestedAxisKey = searchParams.get(AXIS_QUERY_KEY) || ''
+  const requestedTaskScope = searchParams.get(SCOPE_QUERY_KEY) || ''
   const selectedAxis =
-    axes.find((axis) => axis.key === selectedAxisKey) || axes[0]
+    axes.find((axis) => axis.key === requestedAxisKey) || axes[0]
+  const taskScopeMode = normalizeTaskScope(requestedTaskScope)
+
+  useEffect(() => {
+    const canonicalAxisKey = selectedAxis?.key || ''
+    if (
+      requestedAxisKey === canonicalAxisKey &&
+      requestedTaskScope === taskScopeMode
+    ) {
+      return
+    }
+    const nextParams = new URLSearchParams(searchParams)
+    if (canonicalAxisKey) {
+      nextParams.set(AXIS_QUERY_KEY, canonicalAxisKey)
+    } else {
+      nextParams.delete(AXIS_QUERY_KEY)
+    }
+    nextParams.set(SCOPE_QUERY_KEY, taskScopeMode)
+    setSearchParams(nextParams, { replace: true })
+  }, [
+    requestedAxisKey,
+    requestedTaskScope,
+    searchParams,
+    selectedAxis?.key,
+    setSearchParams,
+    taskScopeMode,
+  ])
+
   const relatedTasks = useMemo(
     () => getRelatedGovernanceTasks(tasks, selectedAxis),
     [selectedAxis, tasks]
   )
   const scopedTasks =
-    taskScopeMode === 'all' || relatedTasks.length === 0 ? tasks : relatedTasks
+    taskScopeMode === TASK_SCOPE_ALL || relatedTasks.length === 0
+      ? tasks
+      : relatedTasks
   const filteredTasks = useMemo(
     () => filterGovernanceTasks(scopedTasks, taskKeyword),
     [scopedTasks, taskKeyword]
   )
   const visibleTaskScope =
-    taskScopeMode === 'all' || relatedTasks.length === 0 ? 'all' : 'related'
+    taskScopeMode === TASK_SCOPE_ALL || relatedTasks.length === 0
+      ? TASK_SCOPE_ALL
+      : TASK_SCOPE_RELATED
   const handleSelectAxis = (axisKey) => {
-    setSelectedAxisKey(axisKey)
-    setTaskScopeMode('related')
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set(AXIS_QUERY_KEY, axisKey)
+    nextParams.set(SCOPE_QUERY_KEY, TASK_SCOPE_RELATED)
+    setSearchParams(nextParams)
+  }
+  const handleToggleTaskScope = () => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set(
+      SCOPE_QUERY_KEY,
+      taskScopeMode === TASK_SCOPE_ALL ? TASK_SCOPE_RELATED : TASK_SCOPE_ALL
+    )
+    setSearchParams(nextParams)
   }
 
   return (
-    <div className="erp-dev-governance-page">
+    <div className="erp-dev-governance-page erp-dev-workspace-page">
+      <DevPageNav sourcePath={DEV_GOVERNANCE_SOURCE_PATH} />
       <header className="erp-dev-governance-header">
         <div className="erp-dev-governance-header__copy">
           <Space align="center" size={10} wrap>
             <PartitionOutlined className="erp-dev-governance-header__icon" />
-            <Title level={3} className="erp-dev-governance-title">
+            <Title level={1} className="erp-dev-governance-title">
               项目治理地图 / Governance Map
             </Title>
-            <Tag color="green">DEV ONLY</Tag>
+            <Tag color="green">仅开发环境 / DEV ONLY</Tag>
           </Space>
           <Paragraph className="erp-dev-governance-summary">
             从 {DEV_GOVERNANCE_SOURCE_PATH}{' '}
@@ -289,7 +341,7 @@ export default function DevGovernancePage() {
                   <Text strong>相关任务分流 / Related Task Routing</Text>
                 </Space>
                 <Text type="secondary">
-                  {visibleTaskScope === 'related'
+                  {visibleTaskScope === TASK_SCOPE_RELATED
                     ? `当前维度：${selectedAxis?.axis || '未选择'}，匹配 ${
                         filteredTasks.length
                       } / ${relatedTasks.length}`
@@ -305,21 +357,18 @@ export default function DevGovernancePage() {
               />
             </div>
             <div className="erp-dev-governance-task-scope">
-              <Tag color={visibleTaskScope === 'related' ? 'blue' : 'default'}>
-                {visibleTaskScope === 'related'
+              <Tag
+                color={
+                  visibleTaskScope === TASK_SCOPE_RELATED ? 'blue' : 'default'
+                }
+              >
+                {visibleTaskScope === TASK_SCOPE_RELATED
                   ? '当前治理维度与口径'
                   : '全部 Markdown 分流'}
               </Tag>
               {relatedTasks.length > 0 ? (
-                <Button
-                  size="small"
-                  onClick={() =>
-                    setTaskScopeMode((mode) =>
-                      mode === 'all' ? 'related' : 'all'
-                    )
-                  }
-                >
-                  {taskScopeMode === 'all' ? '只看相关' : '查看全部'}
+                <Button size="small" onClick={handleToggleTaskScope}>
+                  {taskScopeMode === TASK_SCOPE_ALL ? '只看相关' : '查看全部'}
                 </Button>
               ) : null}
             </div>

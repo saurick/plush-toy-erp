@@ -13,9 +13,10 @@ import {
   VerticalAlignTopOutlined,
 } from '@ant-design/icons'
 import { Button, Empty, Input, Space, Tag, Tooltip, Typography } from 'antd'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Markdown, extractMarkdownHeadings } from '@/common/components/markdown'
 import { message } from '@/common/utils/antdApp'
+import DevPageNav from '../components/dev/DevPageNav.jsx'
 import {
   DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
   DEV_DOCS_PINNED_STORAGE_KEY,
@@ -31,6 +32,10 @@ import {
   normalizeDevDocsSelectedPath,
   sortDevDocsItemsByPinned,
 } from '../config/devDocs.mjs'
+import {
+  buildDevDocsLocation,
+  resolveDevDocsMarkdownHref,
+} from './devDocsNavigation.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -43,6 +48,7 @@ const markdownModules = import.meta.glob(
     '../../../README.md',
     '../../../../server/README.md',
     '../../../../scripts/README.md',
+    '../../../../config/customers/**/*.md',
     '../../../../docs/**/*.md',
   ],
   {
@@ -72,6 +78,27 @@ function readHeadingIdFromHash(hash = '') {
   } catch {
     return rawHash
   }
+}
+
+function scrollMarkdownContainerToHeading(container, headingId) {
+  if (!container || !headingId) {
+    return false
+  }
+
+  const target = [...container.querySelectorAll('h1, h2, h3')].find(
+    (element) => element.id === headingId
+  )
+  if (!target) {
+    return false
+  }
+
+  const containerRect = container.getBoundingClientRect()
+  const targetRect = target.getBoundingClientRect()
+  container.scrollTo({
+    top: container.scrollTop + targetRect.top - containerRect.top - 8,
+    behavior: 'smooth',
+  })
+  return true
 }
 
 function collectDirectoryKeys(nodes = []) {
@@ -237,6 +264,7 @@ function DevDocsTreeNode({
       <button
         type="button"
         className="erp-dev-docs-tree__row erp-dev-docs-tree__doc"
+        aria-current={active ? 'true' : undefined}
         onClick={() => onSelectDoc(node.item.key)}
       >
         <FileMarkdownOutlined />
@@ -270,6 +298,7 @@ function DevDocsTreeNode({
 
 export default function DevDocsPage() {
   const location = useLocation()
+  const navigate = useNavigate()
   const docs = useMemo(() => buildDevDocsItems(markdownModules), [])
   const [pinnedPaths, setPinnedPaths] = useState(() => readPinnedPaths(docs))
   const docsWithPinnedState = useMemo(
@@ -394,25 +423,109 @@ export default function DevDocsPage() {
       readSelectedPathFromSearch(location.search),
       docsWithPinnedState
     )
-    if (!querySelectedPath) {
+    if (querySelectedPath) {
+      const querySelectedKey = docsWithPinnedState.find(
+        (item) => item.path === querySelectedPath
+      )?.key
+      if (querySelectedKey && querySelectedKey !== selectedKey) {
+        setSelectedKey(querySelectedKey)
+      }
       return
     }
-    const querySelectedKey = docsWithPinnedState.find(
-      (item) => item.path === querySelectedPath
-    )?.key
-    if (querySelectedKey && querySelectedKey !== selectedKey) {
-      setSelectedKey(querySelectedKey)
+
+    if (selectedDoc?.path) {
+      navigate(
+        buildDevDocsLocation({
+          pathname: location.pathname,
+          search: location.search,
+          path: selectedDoc.path,
+        }),
+        { replace: true }
+      )
     }
-  }, [docsWithPinnedState, location.search, selectedKey])
+  }, [
+    docsWithPinnedState,
+    location.pathname,
+    location.search,
+    navigate,
+    selectedDoc?.path,
+    selectedKey,
+  ])
 
   useEffect(() => {
     const headingId = readHeadingIdFromHash(location.hash)
     if (headingId) {
-      window.setTimeout(() => scrollToHeading(headingId), 120)
-      return
+      const timeoutId = window.setTimeout(
+        () => scrollMarkdownContainerToHeading(markdownRef.current, headingId),
+        120
+      )
+      return () => window.clearTimeout(timeoutId)
     }
     markdownRef.current?.scrollTo({ top: 0 })
+    return undefined
   }, [location.hash, selectedDoc?.key])
+
+  useEffect(() => {
+    const container = markdownRef.current
+    if (!container || !selectedDoc?.path) {
+      return undefined
+    }
+
+    const handleMarkdownLinkClick = (event) => {
+      const anchor = event.target?.closest?.('a[href]')
+      if (!anchor || !container.contains(anchor)) {
+        return
+      }
+
+      const target = resolveDevDocsMarkdownHref(
+        anchor.getAttribute('href'),
+        selectedDoc.path
+      )
+      if (!target) {
+        return
+      }
+
+      event.preventDefault()
+      const targetPath = normalizeDevDocsSelectedPath(target.path, docs)
+      if (!targetPath) {
+        message.warning(`当前查看器未加载文档：${target.path}`)
+        return
+      }
+
+      const currentPath = normalizeDevDocsSelectedPath(
+        readSelectedPathFromSearch(location.search),
+        docs
+      )
+      const currentHeadingId = readHeadingIdFromHash(location.hash)
+      if (targetPath === currentPath && target.headingId === currentHeadingId) {
+        if (target.headingId) {
+          scrollMarkdownContainerToHeading(container, target.headingId)
+        } else {
+          container.scrollTo({ top: 0, behavior: 'smooth' })
+        }
+        return
+      }
+
+      navigate(
+        buildDevDocsLocation({
+          pathname: location.pathname,
+          search: location.search,
+          path: targetPath,
+          headingId: target.headingId,
+        })
+      )
+    }
+
+    container.addEventListener('click', handleMarkdownLinkClick)
+    return () => container.removeEventListener('click', handleMarkdownLinkClick)
+  }, [
+    docs,
+    location.hash,
+    location.pathname,
+    location.search,
+    navigate,
+    selectedDoc?.path,
+  ])
 
   const copyPath = async () => {
     if (!selectedDoc?.path) {
@@ -470,44 +583,67 @@ export default function DevDocsPage() {
   }
 
   const selectDoc = (docKey) => {
+    const doc = docsWithPinnedState.find((item) => item.key === docKey)
+    if (!doc?.path) {
+      return
+    }
     setSelectedKey(docKey)
+    navigate(
+      buildDevDocsLocation({
+        pathname: location.pathname,
+        search: location.search,
+        path: doc.path,
+      })
+    )
   }
 
   const scrollReaderToTop = () => {
-    markdownRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    if (!selectedDoc?.path) {
+      return
+    }
+    if (!location.hash) {
+      markdownRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+    navigate(
+      buildDevDocsLocation({
+        pathname: location.pathname,
+        search: location.search,
+        path: selectedDoc.path,
+      })
+    )
   }
 
   const scrollToHeading = (headingId) => {
-    const container = markdownRef.current
-    if (!container || !headingId) {
+    if (!selectedDoc?.path || !headingId) {
       return
     }
-
-    const target = [...container.querySelectorAll('h1, h2, h3')].find(
-      (element) => element.id === headingId
+    const currentHeadingId = readHeadingIdFromHash(location.hash)
+    if (currentHeadingId === headingId) {
+      scrollMarkdownContainerToHeading(markdownRef.current, headingId)
+      return
+    }
+    navigate(
+      buildDevDocsLocation({
+        pathname: location.pathname,
+        search: location.search,
+        path: selectedDoc.path,
+        headingId,
+      })
     )
-    if (!target) {
-      return
-    }
-
-    const containerRect = container.getBoundingClientRect()
-    const targetRect = target.getBoundingClientRect()
-    container.scrollTo({
-      top: container.scrollTop + targetRect.top - containerRect.top - 8,
-      behavior: 'smooth',
-    })
   }
 
   return (
-    <div className="erp-dev-docs-page">
+    <div className="erp-dev-docs-page erp-dev-workspace-page">
+      <DevPageNav sourcePath={selectedDoc?.path || ''} />
       <header className="erp-dev-docs-header">
         <div className="erp-dev-docs-header__copy">
           <Space align="center" size={10} wrap>
             <BookOutlined className="erp-dev-docs-header__icon" />
-            <Title level={3} className="erp-dev-docs-title">
+            <Title level={1} className="erp-dev-docs-title">
               开发文档查看器 / Dev Docs Viewer
             </Title>
-            <Tag color="green">DEV ONLY</Tag>
+            <Tag color="green">仅开发环境 / DEV ONLY</Tag>
           </Space>
           <Paragraph className="erp-dev-docs-summary">
             左侧按仓库目录树浏览当前工作区内已匹配的 Markdown / browse workspace
@@ -551,6 +687,9 @@ export default function DevDocsPage() {
                     <button
                       type="button"
                       className="erp-dev-docs-pinned__open"
+                      aria-current={
+                        item.key === selectedDoc?.key ? 'true' : undefined
+                      }
                       onClick={() => selectDoc(item.key)}
                     >
                       <FileMarkdownOutlined />
@@ -603,6 +742,9 @@ export default function DevDocsPage() {
                       <button
                         type="button"
                         className="erp-dev-docs-list__open"
+                        aria-current={
+                          item.key === selectedDoc?.key ? 'true' : undefined
+                        }
                         onClick={() => selectDoc(item.key)}
                       >
                         <span className="erp-dev-docs-list__title">

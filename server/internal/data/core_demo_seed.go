@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"server/internal/biz"
 )
 
 const CoreDemoSeedPrefix = "SIM-PLUSH-CORE"
@@ -423,6 +425,9 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 		if !safeSeedCode(unit.Code, prefix) || strings.TrimSpace(unit.Name) == "" || unit.Precision < 0 {
 			return fmt.Errorf("%w: unit %q", ErrCoreDemoSeedInvalidRecord, unit.Code)
 		}
+		if err := biz.ValidateNoNumberedImplementationStageLabels(unit.Code, unit.Name); err != nil {
+			return fmt.Errorf("%w: unit %q naming: %v", ErrCoreDemoSeedInvalidRecord, unit.Code, err)
+		}
 		unitCodes[unit.Code] = struct{}{}
 	}
 	for _, material := range dataset.Materials {
@@ -431,6 +436,9 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 		}
 		if _, ok := unitCodes[material.DefaultUnitCode]; !ok {
 			return fmt.Errorf("%w: material %q references unknown unit %q", ErrCoreDemoSeedInvalidRecord, material.Code, material.DefaultUnitCode)
+		}
+		if err := biz.ValidateNoNumberedImplementationStageLabels(material.Code, material.Name, material.Category, material.Spec, material.Color); err != nil {
+			return fmt.Errorf("%w: material %q naming: %v", ErrCoreDemoSeedInvalidRecord, material.Code, err)
 		}
 		materialCodes[material.Code] = struct{}{}
 	}
@@ -441,16 +449,25 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 		if _, ok := unitCodes[product.DefaultUnitCode]; !ok {
 			return fmt.Errorf("%w: product %q references unknown unit %q", ErrCoreDemoSeedInvalidRecord, product.Code, product.DefaultUnitCode)
 		}
+		if err := biz.ValidateNoNumberedImplementationStageLabels(product.Code, product.Name, product.StyleNo, product.CustomerStyleNo); err != nil {
+			return fmt.Errorf("%w: product %q naming: %v", ErrCoreDemoSeedInvalidRecord, product.Code, err)
+		}
 		productCodes[product.Code] = struct{}{}
 	}
 	for _, warehouse := range dataset.Warehouses {
 		if !safeSeedCode(warehouse.Code, prefix) || strings.TrimSpace(warehouse.Name) == "" || strings.TrimSpace(warehouse.Type) == "" {
 			return fmt.Errorf("%w: warehouse %q", ErrCoreDemoSeedInvalidRecord, warehouse.Code)
 		}
+		if err := biz.ValidateNoNumberedImplementationStageLabels(warehouse.Code, warehouse.Name, warehouse.Type); err != nil {
+			return fmt.Errorf("%w: warehouse %q naming: %v", ErrCoreDemoSeedInvalidRecord, warehouse.Code, err)
+		}
 	}
 	for _, process := range dataset.Processes {
 		if !safeSeedCode(process.Code, prefix) || strings.TrimSpace(process.Name) == "" || process.SortOrder < 0 {
 			return fmt.Errorf("%w: process %q", ErrCoreDemoSeedInvalidRecord, process.Code)
+		}
+		if err := biz.ValidateNoNumberedImplementationStageLabels(process.Code, process.Name, process.Category, process.Note); err != nil {
+			return fmt.Errorf("%w: process %q naming: %v", ErrCoreDemoSeedInvalidRecord, process.Code, err)
 		}
 	}
 	for _, bom := range dataset.BOMs {
@@ -459,6 +476,9 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 		}
 		if !safeSeedCode(bom.Version, prefix) || strings.TrimSpace(bom.Status) == "" {
 			return fmt.Errorf("%w: bom version %q", ErrCoreDemoSeedInvalidRecord, bom.Version)
+		}
+		if err := biz.ValidateNoNumberedImplementationStageLabels(bom.ProductCode, bom.Version, bom.Note); err != nil {
+			return fmt.Errorf("%w: bom %q naming: %v", ErrCoreDemoSeedInvalidRecord, bom.Version, err)
 		}
 		for _, item := range bom.Items {
 			if _, ok := materialCodes[item.MaterialCode]; !ok {
@@ -469,6 +489,9 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 			}
 			if strings.TrimSpace(item.Quantity) == "" || strings.TrimSpace(item.LossRate) == "" {
 				return fmt.Errorf("%w: bom item quantity and loss_rate are required", ErrCoreDemoSeedInvalidRecord)
+			}
+			if err := biz.ValidateNoNumberedImplementationStageLabels(item.MaterialCode, item.UnitCode, item.Position, item.Note); err != nil {
+				return fmt.Errorf("%w: bom item naming: %v", ErrCoreDemoSeedInvalidRecord, err)
 			}
 		}
 	}

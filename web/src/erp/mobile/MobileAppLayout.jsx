@@ -36,13 +36,13 @@ function MobileCustomerRuntimeBoundary({
       data-mobile-customer-runtime-guard="true"
     >
       <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="text-sm font-semibold text-emerald-700">运行环境</div>
+        <div className="text-sm font-semibold text-emerald-700">访问提示</div>
         <h1 className="mt-2 text-2xl font-semibold tracking-normal text-slate-950">
-          岗位任务端需要客户运行环境
+          暂时无法进入岗位任务端
         </h1>
         <p className="mt-3 text-base leading-7 text-slate-600">
-          当前没有进入具体客户的运行环境。岗位任务端只显示客户现场的待办、
-          逾期、任务详情和处理动作；请先从对应客户入口进入。
+          当前账号的工作范围尚未准备完成。请退出后重新登录；如仍无法进入，
+          请联系管理员。
         </p>
         <div className="mt-5 flex flex-col gap-3">
           {canReturnToProductCore ? (
@@ -51,7 +51,7 @@ function MobileCustomerRuntimeBoundary({
               className="rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white"
               onClick={handleBackToProductCore}
             >
-              返回产品核心总览
+              返回管理后台
             </button>
           ) : null}
           <button
@@ -125,7 +125,7 @@ export default function MobileAppLayout() {
           setProfileSyncCompleted(true)
         }
       } catch (error) {
-        console.warn('岗位任务端客户运行环境同步失败，阻止挂载任务数据', error)
+        console.warn('岗位任务端工作范围同步失败，阻止挂载任务数据', error)
         if (!cancelled) {
           setAdminProfile(
             attachUnavailableEffectiveSessionToAdminProfile(storedProfile)
@@ -203,8 +203,8 @@ export default function MobileAppLayout() {
       <div className="mobile-app-layout mx-auto min-h-screen w-full max-w-[430px] md:max-w-[920px]">
         {!profileSyncCompleted ? (
           <Loading
-            title="正在确认岗位任务范围"
-            description="正在确认当前客户运行环境和岗位权限，请稍候..."
+            title="正在准备岗位任务端"
+            description="正在确认您的岗位权限和工作范围，请稍候..."
             className="loading-page--erp"
           />
         ) : shouldBlockMissingCustomerRuntime ? (

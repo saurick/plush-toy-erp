@@ -7,6 +7,7 @@ import BusinessAttachmentPanel from './BusinessAttachmentPanel.jsx'
 export default function BusinessAttachmentModalButton({
   ownerType,
   ownerId,
+  ownerVersion,
   buttonText = '附件',
   modalTitle = '业务附件',
   panelTitle = '附件',
@@ -60,6 +61,7 @@ export default function BusinessAttachmentModalButton({
         <BusinessAttachmentPanel
           ownerType={ownerType}
           ownerId={normalizedOwnerId}
+          ownerVersion={ownerVersion}
           title={panelTitle}
           description={description}
           canUpload={canUpload}

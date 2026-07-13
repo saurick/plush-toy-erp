@@ -2,9 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  buildWorkflowTaskBoardLanes,
+  TASK_BOARD_FOCUS_PAGE_SIZE,
+  TASK_BOARD_OVERVIEW_LIMIT,
+  buildWorkflowTaskBoardModel,
+  buildWorkflowTaskBoardRequest,
+  getWorkflowTaskBoardRequestKey,
   canRunWorkflowTaskAction,
-  filterWorkflowTaskBoardTasks,
   getWorkflowTaskActionPermission,
   getWorkflowTaskAllowedActionModes,
   getWorkflowTaskBusinessStatusLabel,
@@ -16,6 +19,7 @@ import {
   getWorkflowTaskStatusMeta,
   hasActiveWorkflowTaskBoardFilters,
   readWorkflowTaskBoardFiltersFromSearch,
+  resolveWorkflowTaskBoardResponseState,
   TASK_BOARD_ROLE_OPTIONS,
   writeWorkflowTaskBoardFiltersToSearch,
 } from './workflowTaskBoard.mjs'
@@ -53,42 +57,6 @@ const tasks = Object.freeze([
     payload: {},
   },
 ])
-
-test('workflowTaskBoard: ready 任务按待处理筛选', () => {
-  assert.deepEqual(
-    filterWorkflowTaskBoardTasks(tasks, { status: 'pending' }).map(
-      (task) => task.id
-    ),
-    [1]
-  )
-  assert.deepEqual(
-    filterWorkflowTaskBoardTasks(tasks, { role: 'finance' }).map(
-      (task) => task.id
-    ),
-    [1]
-  )
-})
-
-test('workflowTaskBoard: 支持关键词、来源和到期筛选', () => {
-  assert.deepEqual(
-    filterWorkflowTaskBoardTasks(tasks, { keyword: '库位' }).map(
-      (task) => task.id
-    ),
-    [2]
-  )
-  assert.deepEqual(
-    filterWorkflowTaskBoardTasks(tasks, { sourceType: 'inbound' }).map(
-      (task) => task.id
-    ),
-    [2]
-  )
-  assert.deepEqual(
-    filterWorkflowTaskBoardTasks(tasks, { due: 'overdue' }).map(
-      (task) => task.id
-    ),
-    [2]
-  )
-})
 
 test('workflowTaskBoard: 状态文案和原因从任务或 payload 收口', () => {
   assert.deepEqual(getWorkflowTaskStatusMeta(tasks[0]), {
@@ -146,38 +114,6 @@ test('FL_workflow_business_status__retains_business_status_snapshot workflowTask
     '客户确认中'
   )
   assert.equal(getWorkflowTaskBusinessStatusLabel({}), '业务状态未记录')
-  assert.deepEqual(
-    filterWorkflowTaskBoardTasks(
-      [
-        {
-          id: 40,
-          task_name: '出货放行确认',
-          task_status_key: 'ready',
-          owner_role_key: 'warehouse',
-          business_status_key: 'shipping_released',
-          payload: {},
-        },
-      ],
-      { keyword: '已放行' }
-    ).map((task) => task.id),
-    [40]
-  )
-  assert.deepEqual(
-    filterWorkflowTaskBoardTasks(
-      [
-        {
-          id: 41,
-          task_name: '未知状态任务',
-          task_status_key: 'ready',
-          owner_role_key: 'warehouse',
-          business_status_key: 'unknown_business_status_key',
-          payload: {},
-        },
-      ],
-      { keyword: 'unknown_business_status_key' }
-    ).map((task) => task.id),
-    []
-  )
 })
 
 test('workflowTaskBoard: 责任角色展示和只读原因不透出 owner_role_key', () => {
@@ -221,32 +157,10 @@ test('workflowTaskBoard: 责任角色展示和只读原因不透出 owner_role_k
   assert.doesNotMatch(readonlyReason, /warehouse/)
 })
 
-test('workflowTaskBoard: 角色筛选包含工程岗位并按 role key 过滤', () => {
+test('workflowTaskBoard: 角色筛选包含工程岗位', () => {
   assert.deepEqual(
     TASK_BOARD_ROLE_OPTIONS.find((item) => item.value === 'engineering'),
     { value: 'engineering', label: '工程' }
-  )
-  assert.deepEqual(
-    filterWorkflowTaskBoardTasks(
-      [
-        {
-          id: 61,
-          task_name: '工程资料补齐',
-          task_status_key: 'ready',
-          owner_role_key: 'engineering',
-          source_type: 'material-bom',
-        },
-        {
-          id: 62,
-          task_name: '采购确认',
-          task_status_key: 'ready',
-          owner_role_key: 'purchase',
-          source_type: 'purchase-orders',
-        },
-      ],
-      { role: 'engineering' }
-    ).map((task) => task.id),
-    [61]
   )
 })
 
@@ -258,22 +172,58 @@ test('workflowTaskBoard: 任务编号缺失时不拼内部 ID', () => {
   assert.equal(getWorkflowTaskCodeLabel({ id: 88 }), '任务已关联')
 })
 
-test('workflowTaskBoard: 生成原型式任务看板泳道并保留协同完成边界', () => {
-  const lanes = buildWorkflowTaskBoardLanes(tasks)
+test('workflowTaskBoard: 使用服务端互斥计数构建四个运营泳道', () => {
+  const response = {
+    snapshot_at: now,
+    total: 12,
+    counts: { actionable: 6, exception: 2, due: 3, finished: 1 },
+    lanes: [
+      {
+        key: 'actionable',
+        total: 6,
+        limit: 5,
+        offset: 0,
+        tasks: Array.from({ length: 5 }, (_, index) => ({ id: index + 1 })),
+      },
+      {
+        key: 'exception',
+        total: 2,
+        limit: 5,
+        offset: 0,
+        tasks: [{ id: 7 }, { id: 8 }],
+      },
+      {
+        key: 'due',
+        total: 3,
+        limit: 5,
+        offset: 0,
+        tasks: [{ id: 9 }, { id: 10 }, { id: 11 }],
+      },
+      {
+        key: 'finished',
+        total: 1,
+        limit: 5,
+        offset: 0,
+        tasks: [{ id: 12 }],
+      },
+    ],
+    source_types: ['inbound', 'project-orders'],
+  }
+  const model = buildWorkflowTaskBoardModel(response)
   assert.deepEqual(
-    lanes.map((lane) => [lane.key, lane.count]),
+    model.lanes.map((lane) => [lane.key, lane.count]),
     [
-      ['pending', 1],
-      ['blocked', 1],
-      ['due', 2],
-      ['done', 1],
+      ['actionable', 6],
+      ['exception', 2],
+      ['due', 3],
+      ['finished', 1],
     ]
   )
-  assert.equal(
-    lanes.find((lane) => lane.key === 'pending')?.title,
-    '可推进任务'
-  )
-  assert.match(lanes.find((lane) => lane.key === 'done')?.description, /协同/)
+  assert.equal(model.lanes[0].title, '常规待办')
+  assert.equal(model.lanes[0].tasks.length, TASK_BOARD_OVERVIEW_LIMIT)
+  assert.equal(model.lanes[0].hiddenCount, 1)
+  assert.equal(model.visibleLanes.length, 4)
+  assert.deepEqual(model.sourceTypes, ['inbound', 'project-orders'])
 })
 
 test('workflowTaskBoard: 从 URL 读取任务看板筛选并过滤非法值', () => {
@@ -286,6 +236,8 @@ test('workflowTaskBoard: 从 URL 读取任务看板筛选并过滤非法值', ()
     role: 'warehouse',
     due: 'overdue',
     sourceType: 'inbound',
+    lane: 'all',
+    page: 1,
   })
 
   assert.deepEqual(
@@ -298,6 +250,8 @@ test('workflowTaskBoard: 从 URL 读取任务看板筛选并过滤非法值', ()
       role: 'all',
       due: 'all',
       sourceType: 'all',
+      lane: 'all',
+      page: 1,
     }
   )
   assert.equal(
@@ -306,18 +260,20 @@ test('workflowTaskBoard: 从 URL 读取任务看板筛选并过滤非法值', ()
   )
 })
 
-test('workflowTaskBoard: 写入 URL 时只保留非默认筛选并保留无关参数', () => {
-  const params = writeWorkflowTaskBoardFiltersToSearch('page=1&status=done', {
+test('workflowTaskBoard: 写入 URL 时保留上下文并规范 lane/page', () => {
+  const params = writeWorkflowTaskBoardFiltersToSearch('keep=1&page=9', {
     keyword: ' 入库 ',
     status: 'blocked',
     role: 'warehouse',
     due: 'all',
     sourceType: 'inbound',
+    lane: 'exception',
+    page: 2,
   })
 
   assert.equal(
     params.toString(),
-    'page=1&q=%E5%85%A5%E5%BA%93&status=blocked&role=warehouse&source=inbound'
+    'keep=1&q=%E5%85%A5%E5%BA%93&status=blocked&role=warehouse&source=inbound&lane=exception&page=2'
   )
 
   const cleared = writeWorkflowTaskBoardFiltersToSearch(params, {
@@ -326,8 +282,107 @@ test('workflowTaskBoard: 写入 URL 时只保留非默认筛选并保留无关�
     role: 'all',
     due: 'all',
     sourceType: 'all',
+    lane: 'all',
+    page: 1,
   })
-  assert.equal(cleared.toString(), 'page=1')
+  assert.equal(cleared.toString(), 'keep=1')
+})
+
+test('workflowTaskBoard: 聚焦请求保留筛选并按每页八条计算 offset', () => {
+  assert.deepEqual(
+    buildWorkflowTaskBoardRequest({
+      keyword: ' 包装 ',
+      status: 'pending',
+      role: 'warehouse',
+      due: 'dueSoon',
+      sourceType: 'inbound',
+      lane: 'due',
+      page: 3,
+    }),
+    {
+      keyword: '包装',
+      status: 'pending',
+      owner_role_key: 'warehouse',
+      due: 'dueSoon',
+      source_type: 'inbound',
+      lane_key: 'due',
+      limit: TASK_BOARD_FOCUS_PAGE_SIZE,
+      offset: 16,
+    }
+  )
+  assert.deepEqual(buildWorkflowTaskBoardRequest({}), {
+    limit: TASK_BOARD_OVERVIEW_LIMIT,
+    offset: 0,
+  })
+})
+
+test('workflowTaskBoard: lane/page 切换不会把上一请求响应交给新筛选建模', () => {
+  const overviewRequest = buildWorkflowTaskBoardRequest({})
+  const overviewResponse = {
+    snapshot_at: now,
+    total: 0,
+    counts: { actionable: 0, exception: 0, due: 0, finished: 0 },
+    lanes: ['actionable', 'exception', 'due', 'finished'].map((key) => ({
+      key,
+      total: 0,
+      limit: 5,
+      offset: 0,
+      tasks: [],
+    })),
+    source_types: [],
+  }
+  const responseState = {
+    requestKey: getWorkflowTaskBoardRequestKey(overviewRequest),
+    response: overviewResponse,
+  }
+
+  assert.equal(
+    resolveWorkflowTaskBoardResponseState(responseState, overviewRequest),
+    overviewResponse
+  )
+  assert.equal(
+    resolveWorkflowTaskBoardResponseState(
+      responseState,
+      buildWorkflowTaskBoardRequest({ lane: 'actionable', page: 1 })
+    ),
+    null
+  )
+  assert.equal(
+    resolveWorkflowTaskBoardResponseState(
+      responseState,
+      buildWorkflowTaskBoardRequest({ lane: 'actionable', page: 2 })
+    ),
+    null
+  )
+})
+
+test('workflowTaskBoard: 聚焦页保留服务端总数并把越界展示页收敛到末页', () => {
+  const response = {
+    snapshot_at: now,
+    total: 18,
+    counts: { actionable: 1, exception: 1, due: 15, finished: 1 },
+    lanes: [
+      {
+        key: 'due',
+        total: 15,
+        limit: 8,
+        offset: 16,
+        tasks: [],
+      },
+    ],
+    source_types: ['inbound'],
+  }
+  const model = buildWorkflowTaskBoardModel(response, {
+    lane: 'due',
+    page: 3,
+  })
+
+  assert.equal(model.focused, true)
+  assert.equal(model.visibleLanes.length, 1)
+  assert.equal(model.visibleLanes[0].count, 15)
+  assert.equal(model.requestedPage, 3)
+  assert.equal(model.pageCount, 2)
+  assert.equal(model.page, 2)
 })
 
 test('workflowTaskBoard: 可判断任务看板是否存在活跃筛选', () => {
@@ -355,9 +410,14 @@ test('workflowTaskBoard: 任务处理动作按权限码和 owner 角色收口', 
       'workflow.task.read',
       'workflow.task.complete',
       'workflow.task.update',
+      'workflow.task.reject',
     ],
     effective_session: {
-      actions: ['workflow.task.complete', 'workflow.task.update'],
+      actions: [
+        'workflow.task.complete',
+        'workflow.task.update',
+        'workflow.task.reject',
+      ],
     },
   }
   const readOnlyAdmin = {
@@ -394,7 +454,19 @@ test('workflowTaskBoard: 任务处理动作按权限码和 owner 角色收口', 
   )
   assert.equal(
     getWorkflowTaskActionPermission('reject', warehouseTask),
-    'workflow.task.update'
+    'workflow.task.reject'
+  )
+  assert.equal(
+    canRunWorkflowTaskAction(
+      {
+        ...warehouseAdmin,
+        permissions: ['workflow.task.read', 'workflow.task.update'],
+        effective_session: { actions: ['workflow.task.update'] },
+      },
+      warehouseTask,
+      'reject'
+    ),
+    false
   )
   assert.deepEqual(
     getWorkflowTaskAllowedActionModes(warehouseAdmin, warehouseTask),

@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 
@@ -31,9 +32,12 @@ func TestWorkflowRepo_FinishedGoodsQCDoneCreatesInboundIdempotently(t *testing.T
 	qcTask := createFinishedGoodsQCTask(t, ctx, repo, 4501)
 
 	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-		ID:            qcTask.ID,
-		TaskStatusKey: "done",
-		Payload:       map[string]any{"mobile_role_key": "quality", "qc_result": "accepted"},
+		ID:              qcTask.ID,
+		ExpectedVersion: qcTask.Version,
+		CommandKey:      "complete_task_action",
+		IdempotencyKey:  "finished-goods-qc-done",
+		TaskStatusKey:   "done",
+		Payload:         map[string]any{"mobile_role_key": "quality", "qc_result": "accepted"},
 	}, 8, "quality"); err != nil {
 		t.Fatalf("done update failed: %v", err)
 	}
@@ -133,9 +137,12 @@ func TestWorkflowRepo_FinishedGoodsQCDoneCreatesInboundIdempotently(t *testing.T
 	}
 
 	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-		ID:            qcTask.ID,
-		TaskStatusKey: "done",
-		Payload:       map[string]any{"mobile_role_key": "quality"},
+		ID:              qcTask.ID,
+		ExpectedVersion: qcTask.Version,
+		CommandKey:      "complete_task_action",
+		IdempotencyKey:  "finished-goods-qc-done",
+		TaskStatusKey:   "done",
+		Payload:         map[string]any{"mobile_role_key": "quality", "qc_result": "accepted"},
 	}, 8, "quality"); err != nil {
 		t.Fatalf("repeat done update failed: %v", err)
 	}
@@ -181,18 +188,24 @@ func TestWorkflowRepo_FinishedGoodsQCReworkIdempotencyHonorsRejectedTerminalStat
 
 			reason := "成品抽检不合格"
 			if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-				ID:            qcTask.ID,
-				TaskStatusKey: tc.status,
-				Reason:        reason,
-				Payload:       map[string]any{},
+				ID:              qcTask.ID,
+				ExpectedVersion: qcTask.Version,
+				CommandKey:      "finished_goods_qc_" + tc.status,
+				IdempotencyKey:  "finished-goods-qc-" + tc.status,
+				TaskStatusKey:   tc.status,
+				Reason:          reason,
+				Payload:         map[string]any{},
 			}, 8, "quality"); err != nil {
 				t.Fatalf("first %s update failed: %v", tc.status, err)
 			}
 			if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-				ID:            qcTask.ID,
-				TaskStatusKey: tc.status,
-				Reason:        reason,
-				Payload:       map[string]any{},
+				ID:              qcTask.ID,
+				ExpectedVersion: qcTask.Version,
+				CommandKey:      "finished_goods_qc_" + tc.status,
+				IdempotencyKey:  "finished-goods-qc-" + tc.status,
+				TaskStatusKey:   tc.status,
+				Reason:          reason,
+				Payload:         map[string]any{},
 			}, 8, "quality"); err != nil {
 				t.Fatalf("repeat %s update failed: %v", tc.status, err)
 			}
@@ -249,21 +262,26 @@ func TestWorkflowRepo_FinishedGoodsQCReworkIdempotencyHonorsRejectedTerminalStat
 				t.Fatalf("expected one rework created event with workflow rule payload, got %#v", createdEvents)
 			}
 
-			if _, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+			if _, err := repo.UpdateWorkflowTaskStatus(ctx, workflowRepoTestStatusMutation(reworkTasks[0].ID, reworkTasks[0].Version, "finished-goods-rework-"+tc.status+"-complete", &biz.WorkflowTaskStatusUpdate{
 				ID:            reworkTasks[0].ID,
 				TaskStatusKey: "done",
 				Payload:       map[string]any{"done_by": "production"},
-			}, 9, "production"); err != nil {
+			}), 9, "production"); err != nil {
 				t.Fatalf("complete rework task failed: %v", err)
 			}
 
-			if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+			_, nextRoundErr := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(qcTask.ID, qcTask.Version+1, "finished-goods-qc-"+tc.status+"-next-round", &biz.WorkflowTaskStatusUpdate{
 				ID:            qcTask.ID,
 				TaskStatusKey: tc.status,
 				Reason:        reason,
 				Payload:       map[string]any{},
-			}, 8, "quality"); err != nil {
-				t.Fatalf("next-round %s update failed: %v", tc.status, err)
+			}), 8, "quality")
+			if tc.status == "rejected" {
+				if !errors.Is(nextRoundErr, biz.ErrWorkflowTaskSettled) {
+					t.Fatalf("terminal rejected task must reject a new round, got %v", nextRoundErr)
+				}
+			} else if nextRoundErr != nil {
+				t.Fatalf("next-round %s update failed: %v", tc.status, nextRoundErr)
 			}
 
 			count, err := client.WorkflowTask.Query().
@@ -297,12 +315,12 @@ func TestWorkflowRepo_FinishedGoodsQCBlockedThenRejectedReusesActiveReworkAndRef
 	qcTask := createFinishedGoodsQCTask(t, ctx, repo, 4701)
 
 	blockedReason := "车缝开线待判责"
-	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+	if _, err := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(qcTask.ID, qcTask.Version, "finished-goods-qc-blocked-then-rejected-blocked", &biz.WorkflowTaskStatusUpdate{
 		ID:            qcTask.ID,
 		TaskStatusKey: "blocked",
 		Reason:        blockedReason,
 		Payload:       map[string]any{},
-	}, 8, "quality"); err != nil {
+	}), 8, "quality"); err != nil {
 		t.Fatalf("blocked update failed: %v", err)
 	}
 
@@ -323,12 +341,12 @@ func TestWorkflowRepo_FinishedGoodsQCBlockedThenRejectedReusesActiveReworkAndRef
 	reworkTaskID := reworkTasks[0].ID
 
 	rejectedReason := "复检尺寸偏差"
-	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+	if _, err := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(qcTask.ID, qcTask.Version+1, "finished-goods-qc-blocked-then-rejected-rejected", &biz.WorkflowTaskStatusUpdate{
 		ID:            qcTask.ID,
 		TaskStatusKey: "rejected",
 		Reason:        rejectedReason,
 		Payload:       map[string]any{},
-	}, 8, "quality"); err != nil {
+	}), 8, "quality"); err != nil {
 		t.Fatalf("rejected update failed: %v", err)
 	}
 
@@ -408,9 +426,12 @@ func TestWorkflowRepo_FinishedGoodsInboundDoneUpsertsBusinessStateOnly(t *testin
 	inboundTask := createFinishedGoodsInboundTask(t, ctx, repo, 4801, map[string]any{})
 
 	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-		ID:            inboundTask.ID,
-		TaskStatusKey: "done",
-		Payload:       map[string]any{"mobile_role_key": "warehouse"},
+		ID:              inboundTask.ID,
+		ExpectedVersion: inboundTask.Version,
+		CommandKey:      "complete_task_action",
+		IdempotencyKey:  "finished-goods-inbound-done",
+		TaskStatusKey:   "done",
+		Payload:         map[string]any{"mobile_role_key": "warehouse"},
 	}, 8, "warehouse"); err != nil {
 		t.Fatalf("done update failed: %v", err)
 	}
@@ -494,9 +515,12 @@ func TestWorkflowRepo_FinishedGoodsInboundDoneUpsertsBusinessStateOnly(t *testin
 	}
 
 	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-		ID:            inboundTask.ID,
-		TaskStatusKey: "done",
-		Payload:       map[string]any{"mobile_role_key": "warehouse"},
+		ID:              inboundTask.ID,
+		ExpectedVersion: inboundTask.Version,
+		CommandKey:      "complete_task_action",
+		IdempotencyKey:  "finished-goods-inbound-done",
+		TaskStatusKey:   "done",
+		Payload:         map[string]any{"mobile_role_key": "warehouse"},
 	}, 8, "warehouse"); err != nil {
 		t.Fatalf("repeat done update failed: %v", err)
 	}
@@ -556,12 +580,12 @@ func TestWorkflowRepo_FinishedGoodsInboundBlockedAndRejectedPreserveReasonPayloa
 			}
 
 			reason := "成品入库数量待复核"
-			if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+			if _, err := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(inboundTask.ID, inboundTask.Version, "finished-goods-inbound-"+tc.status, &biz.WorkflowTaskStatusUpdate{
 				ID:            inboundTask.ID,
 				TaskStatusKey: tc.status,
 				Reason:        reason,
 				Payload:       map[string]any{},
-			}, 8, "warehouse"); err != nil {
+			}), 8, "warehouse"); err != nil {
 				t.Fatalf("%s update failed: %v", tc.status, err)
 			}
 

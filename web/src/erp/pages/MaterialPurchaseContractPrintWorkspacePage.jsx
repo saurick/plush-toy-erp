@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import MaterialPurchaseContractWorkbench from '../components/print/MaterialPurchaseContractWorkbench.jsx'
 import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
 import {
@@ -10,6 +10,7 @@ import {
   resolvePrintWorkspaceEntrySource,
   resolvePrintWorkspaceStateID,
   resolvePrintWorkspaceDraftMode,
+  resolvePrintWorkspaceCustomerKey,
 } from '../utils/printWorkspace.js'
 
 const MATERIAL_PURCHASE_DRAFT_STORAGE_KEY =
@@ -17,9 +18,12 @@ const MATERIAL_PURCHASE_DRAFT_STORAGE_KEY =
 
 export default function MaterialPurchaseContractPrintWorkspacePage() {
   const [searchParams] = useSearchParams()
+  const outletContext = useOutletContext()
+  const profileCustomerKey =
+    outletContext?.adminProfile?.effective_session?.customer?.key || ''
   const customerKey = useMemo(
-    () => String(searchParams.get('customer_key') || '').trim(),
-    [searchParams]
+    () => resolvePrintWorkspaceCustomerKey(searchParams, profileCustomerKey),
+    [profileCustomerKey, searchParams]
   )
   const template = getPrintTemplateByKey('material-purchase-contract')
   const workspaceStateID = resolvePrintWorkspaceStateID(searchParams)

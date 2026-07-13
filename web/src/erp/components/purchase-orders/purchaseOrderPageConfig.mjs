@@ -56,7 +56,7 @@ export const PURCHASE_ORDER_LIFECYCLE_ACTIONS = [
     nextStatus: 'closed',
     confirmTitle: '确认关闭采购订单',
     confirmContent:
-      '关闭只停止采购订单后续推进，不会自动写入库、质检、库存或财务事实。',
+      '关闭只会停止这张采购订单继续执行；已登记的入库、质检、库存或财务记录不会自动改变。',
     okText: '确认关闭',
     run: closePurchaseOrder,
   },
@@ -68,7 +68,7 @@ export const PURCHASE_ORDER_LIFECYCLE_ACTIONS = [
     danger: true,
     confirmTitle: '确认取消采购订单',
     confirmContent:
-      '取消只终止采购订单源单，不会自动冲正已登记的入库、质检、库存或财务事实。',
+      '取消只会终止这张采购订单本身；已登记的入库、质检、库存或财务记录不会自动冲正。',
     okText: '确认取消',
     run: cancelPurchaseOrder,
   },

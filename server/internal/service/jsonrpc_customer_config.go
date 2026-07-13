@@ -784,6 +784,20 @@ func (d *jsonrpcDispatcher) requireCustomerConfigModulesEnabled(ctx context.Cont
 	return nil
 }
 
+func (d *jsonrpcDispatcher) requireCustomerConfigModulesReadable(ctx context.Context, moduleKeys ...string) *v1.JsonrpcResult {
+	if d == nil || d.customerConfigUC == nil {
+		return invalidParamResult()
+	}
+	resolvedCustomerKey, err := runtimeCustomerKey("")
+	if err != nil {
+		return d.mapCustomerConfigError(ctx, err)
+	}
+	if err := d.customerConfigUC.EnsureModuleKeysReadable(ctx, resolvedCustomerKey, moduleKeys...); err != nil {
+		return d.mapCustomerConfigError(ctx, err)
+	}
+	return nil
+}
+
 func runtimeCustomerKey(requested string) (string, error) {
 	requested = biz.NormalizeCustomerKey(requested)
 	configured := biz.NormalizeCustomerKey(os.Getenv("ERP_CUSTOMER_KEY"))

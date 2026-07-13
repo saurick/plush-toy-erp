@@ -19,6 +19,7 @@
 - [ ] `ERP_DEBUG_ENV=prod`。
 - [ ] `ERP_DEBUG_SEED_ENABLED=false`。
 - [ ] `ERP_DEBUG_CLEANUP_ENABLED=false`。
+- [ ] `ERP_DEBUG_BUSINESS_CLEAR_ENABLED=false`。
 - [ ] public register 关闭。
 - [ ] SMS mock 关闭。
 - [ ] SQL args tracing 关闭。

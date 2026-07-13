@@ -12,7 +12,7 @@ import WorkflowTaskActionDrawer, {
   TASK_ACTION_META,
 } from '../workflow/WorkflowTaskActionDrawer.jsx'
 import useWorkflowTaskActionAccess from '../../hooks/useWorkflowTaskActionAccess.js'
-import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../../utils/workflowTaskActionSubmitGuard.mjs'
+import { isWorkflowTaskMutationResultUnknown } from '../../utils/workflowTaskMutation.mjs'
 import {
   buildBusinessCollaborationTaskPanelModel,
   getBusinessCollaborationTaskReason,
@@ -190,7 +190,7 @@ export function CollaborationTaskPanel({
       (mode === 'urge' && onUrgeTask)
   )
   const actionDrawerReadonlyReason = actionDrawerAccess.loading
-    ? '正在向后端核对当前任务动作权限。'
+    ? '正在确认您是否可以处理当前任务。'
     : actionDrawerAccess.readonlyReason
   const taskPanelModel = React.useMemo(
     () =>
@@ -207,7 +207,7 @@ export function CollaborationTaskPanel({
         label: '本页待办',
         count: taskPanelModel.pageTaskCount,
         items: taskPanelModel.pageTasks,
-        emptyText: '本页暂无待处理 Workflow 任务。',
+        emptyText: '本页暂无待处理协同任务。',
       },
       {
         key: 'current',
@@ -215,7 +215,7 @@ export function CollaborationTaskPanel({
         count: taskPanelModel.currentRecordTaskCount,
         items: taskPanelModel.currentRecordTasks,
         emptyText: selectedRecordLabel
-          ? '当前记录暂无 Workflow 任务。'
+          ? '当前记录暂无协同任务。'
           : '先选择一条业务记录，再查看当前记录协同。',
       },
       {
@@ -223,7 +223,7 @@ export function CollaborationTaskPanel({
         label: '阻塞异常',
         count: taskPanelModel.blockedTaskCount,
         items: taskPanelModel.blockedTasks,
-        emptyText: '暂无阻塞或退回 Workflow 任务。',
+        emptyText: '暂无阻塞或退回的协同任务。',
       },
     ],
     [selectedRecordLabel, taskPanelModel]
@@ -378,22 +378,18 @@ export function CollaborationTaskPanel({
 
     setActionDrawerSaving(true)
     try {
-      const accessVerified = await verifyWorkflowTaskActionAccessBeforeSubmit({
-        task: actionDrawerTask,
-        actionKey: actionDrawerMode,
-        reason,
-        onWarning: message.warning,
-        onError: message.error,
-      })
-      if (!accessVerified) return
-
-      await actionHandler(actionDrawerTask, {
+      const succeeded = await actionHandler(actionDrawerTask, {
         actionMode: actionDrawerMode,
         reason,
       })
-      closeActionDrawer()
+      if (succeeded !== false) closeActionDrawer()
     } catch (error) {
-      message.error(getActionErrorMessage(error, `${actionMeta.title}失败`))
+      if (isWorkflowTaskMutationResultUnknown(error)) {
+        message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
+      } else {
+        message.error(getActionErrorMessage(error, `${actionMeta.title}失败`))
+        closeActionDrawer()
+      }
     } finally {
       setActionDrawerSaving(false)
     }
@@ -521,7 +517,7 @@ export function CollaborationTaskPanel({
             <div className="erp-business-collaboration-task-panel__title-line">
               <strong>本页协同</strong>
               <Text type="secondary">
-                只处理 Workflow 任务，不写库存、出货、财务、开票或收付款事实。
+                这里只处理协同任务；库存、出货、财务、开票和收付款仍需在对应业务页面完成。
               </Text>
               {!expanded ? (
                 <span

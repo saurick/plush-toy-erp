@@ -8,8 +8,10 @@ import (
 )
 
 type stubBusinessAttachmentRepo struct {
-	ownerExists bool
-	created     *BusinessAttachmentCreate
+	ownerExists  bool
+	created      *BusinessAttachmentCreate
+	current      *BusinessAttachment
+	contentCalls int
 }
 
 func (r *stubBusinessAttachmentRepo) CreateBusinessAttachment(_ context.Context, in *BusinessAttachmentCreate) (*BusinessAttachment, error) {
@@ -31,8 +33,16 @@ func (r *stubBusinessAttachmentRepo) ListBusinessAttachments(context.Context, st
 	return nil, nil
 }
 
-func (r *stubBusinessAttachmentRepo) GetBusinessAttachment(context.Context, int) (*BusinessAttachment, error) {
+func (r *stubBusinessAttachmentRepo) GetBusinessAttachmentMetadata(context.Context, int) (*BusinessAttachment, error) {
+	if r.current != nil {
+		return r.current, nil
+	}
 	return nil, ErrBusinessAttachmentNotFound
+}
+
+func (r *stubBusinessAttachmentRepo) GetBusinessAttachmentContent(context.Context, int, string, int) ([]byte, error) {
+	r.contentCalls++
+	return []byte("proof"), nil
 }
 
 func (r *stubBusinessAttachmentRepo) DeleteBusinessAttachment(context.Context, int) error {
@@ -175,5 +185,43 @@ func TestBusinessAttachmentContentRejectsTooLargeContent(t *testing.T) {
 	)
 	if !errors.Is(err, ErrBusinessAttachmentTooLarge) {
 		t.Fatalf("expected size error, got %v", err)
+	}
+}
+
+func TestBusinessAttachmentContentChecksEncodedBoundaryBeforeDecode(t *testing.T) {
+	encoded := base64.StdEncoding.EncodeToString([]byte("12345"))
+	content, err := decodeBusinessAttachmentContentWithMax(encoded, 5)
+	if err != nil || string(content) != "12345" {
+		t.Fatalf("exact boundary should pass, content=%q err=%v", content, err)
+	}
+	_, err = decodeBusinessAttachmentContentWithMax(encoded+"AAAA", 5)
+	if !errors.Is(err, ErrBusinessAttachmentTooLarge) {
+		t.Fatalf("encoded over-limit input should fail before decode, got %v", err)
+	}
+}
+
+func TestBusinessAttachmentContentAcceptsDataURLAndRejectsMalformedBase64(t *testing.T) {
+	content, err := decodeBusinessAttachmentContentWithMax("data:text/plain;base64,cHJvb2Y=", 5)
+	if err != nil || string(content) != "proof" {
+		t.Fatalf("data URL should decode, content=%q err=%v", content, err)
+	}
+	_, err = decodeBusinessAttachmentContentWithMax("%%%", 5)
+	if !errors.Is(err, ErrBusinessAttachmentContentInvalid) {
+		t.Fatalf("malformed base64 should fail, got %v", err)
+	}
+}
+
+func TestBusinessAttachmentGetRejectsOrphanedAttachment(t *testing.T) {
+	repo := &stubBusinessAttachmentRepo{
+		ownerExists: false,
+		current: &BusinessAttachment{
+			ID:        9,
+			OwnerType: BusinessAttachmentOwnerWorkflowTask,
+			OwnerID:   42,
+		},
+	}
+	_, err := NewBusinessAttachmentUsecase(repo).GetBusinessAttachmentMetadata(context.Background(), 9)
+	if !errors.Is(err, ErrBusinessAttachmentOwnerNotFound) {
+		t.Fatalf("orphaned attachment must not be returned, got %v", err)
 	}
 }

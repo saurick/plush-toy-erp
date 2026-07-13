@@ -36,7 +36,7 @@ const RAW_ERROR_PATTERNS = Object.freeze([
 ])
 
 const TECHNICAL_ERROR_MESSAGE_PATTERN =
-  /\b(?:idempotency_key|owner_role_key|task_status_key|source_type|source_id|source_line_id|payload|[a-z][a-z0-9]*_(?:id|key))\b/iu
+  /\b(?:expected_version|idempotency_key|intent_hash|task_version|owner_role_key|task_status_key|source_type|source_id|source_line_id|payload|[a-z][a-z0-9]*_(?:id|key))\b/iu
 
 function containsCjk(text) {
   return /[\u3400-\u9fff]/u.test(String(text || ''))

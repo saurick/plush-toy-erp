@@ -24,12 +24,13 @@ func NewHTTPServer(
 	tp *sdktrace.TracerProvider,
 	data *data.Data,
 	customerConfigUC *biz.CustomerConfigUsecase,
+	adminAuthUC *biz.AdminAuthUsecase,
 
 	// Data 配置提供 JWT secret 等运行时依赖。
 	dc *conf.Data,
 ) *httpx.Server {
 	var opts = []httpx.ServerOption{
-		httpx.Filter(SecurityHeadersFilter(), RequestIDFilter()),
+		httpx.Filter(SecurityHeadersFilter(), RequestIDFilter(), AttachmentBodyLimitFilter()),
 		httpx.Middleware(
 			recovery.Recovery(),
 			tracing.Server(tracing.WithTracerProvider(tp)),
@@ -37,7 +38,7 @@ func NewHTTPServer(
 			// 默认 bbr limiter
 			ratelimit.Server(),
 			// 统一从请求头解析 JWT，并把 AuthClaims 写入请求上下文。
-			AuthClaimsMiddleware(dc, logger),
+			AuthClaimsMiddleware(adminAuthUC, logger),
 		),
 	}
 

@@ -616,9 +616,9 @@ export default function MobileTaskListScreen({
               </div>
             </div>
             <div className="rounded-xl bg-slate-50 px-3 py-3">
-              <div className="text-slate-500">权限模式</div>
+              <div className="text-slate-500">可用范围</div>
               <div className="mt-1 font-semibold text-slate-950">
-                {adminProfile?.is_super_admin ? '超级管理员' : '角色授权'}
+                {adminProfile?.is_super_admin ? '全部功能' : '按岗位开放'}
               </div>
             </div>
           </div>

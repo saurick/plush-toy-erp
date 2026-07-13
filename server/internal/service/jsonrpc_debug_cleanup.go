@@ -52,6 +52,8 @@ func (d *jsonrpcDispatcher) handleDebugCleanup(
 		"deleted_tasks", len(result.DeletedTasks),
 		"deleted_business_states", result.DeletedBusinessStates,
 		"deleted_task_events", result.DeletedTaskEvents,
+		"matched_attachments", result.MatchedAttachments,
+		"deleted_attachments", result.DeletedAttachments,
 		"skipped_items", len(result.SkippedItems),
 	)
 	return id, &v1.JsonrpcResult{

@@ -4,6 +4,7 @@ package ent
 
 import (
 	"fmt"
+	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/financefact"
 	"strings"
 	"time"
@@ -58,13 +59,44 @@ type FinanceFact struct {
 	PostedAt *time.Time `json:"posted_at,omitempty"`
 	// SettledAt holds the value of the "settled_at" field.
 	SettledAt *time.Time `json:"settled_at,omitempty"`
+	// CancelledAt holds the value of the "cancelled_at" field.
+	CancelledAt *time.Time `json:"cancelled_at,omitempty"`
+	// CancelledBy holds the value of the "cancelled_by" field.
+	CancelledBy *int `json:"cancelled_by,omitempty"`
+	// CancelReason holds the value of the "cancel_reason" field.
+	CancelReason *string `json:"cancel_reason,omitempty"`
+	// CancelAuditVersion holds the value of the "cancel_audit_version" field.
+	CancelAuditVersion int `json:"cancel_audit_version,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
-	UpdatedAt    time.Time `json:"updated_at,omitempty"`
+	UpdatedAt time.Time `json:"updated_at,omitempty"`
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the FinanceFactQuery when eager-loading is set.
+	Edges        FinanceFactEdges `json:"edges"`
 	selectValues sql.SelectValues
+}
+
+// FinanceFactEdges holds the relations/edges for other nodes in the graph.
+type FinanceFactEdges struct {
+	// Canceller holds the value of the canceller edge.
+	Canceller *AdminUser `json:"canceller,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [1]bool
+}
+
+// CancellerOrErr returns the Canceller value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e FinanceFactEdges) CancellerOrErr() (*AdminUser, error) {
+	if e.Canceller != nil {
+		return e.Canceller, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: adminuser.Label}
+	}
+	return nil, &NotLoadedError{edge: "canceller"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -76,11 +108,11 @@ func (*FinanceFact) scanValues(columns []string) ([]any, error) {
 			values[i] = new(decimal.Decimal)
 		case financefact.FieldOccurredAtSpecified:
 			values[i] = new(sql.NullBool)
-		case financefact.FieldID, financefact.FieldCounterpartyID, financefact.FieldPaymentTermDays, financefact.FieldSourceID, financefact.FieldSourceLineID:
+		case financefact.FieldID, financefact.FieldCounterpartyID, financefact.FieldPaymentTermDays, financefact.FieldSourceID, financefact.FieldSourceLineID, financefact.FieldCancelledBy, financefact.FieldCancelAuditVersion:
 			values[i] = new(sql.NullInt64)
-		case financefact.FieldFactNo, financefact.FieldFactType, financefact.FieldStatus, financefact.FieldCounterpartyType, financefact.FieldCurrency, financefact.FieldCollectionType, financefact.FieldPaymentTerm, financefact.FieldInvoiceCategory, financefact.FieldSourceType, financefact.FieldIdempotencyKey, financefact.FieldNote:
+		case financefact.FieldFactNo, financefact.FieldFactType, financefact.FieldStatus, financefact.FieldCounterpartyType, financefact.FieldCurrency, financefact.FieldCollectionType, financefact.FieldPaymentTerm, financefact.FieldInvoiceCategory, financefact.FieldSourceType, financefact.FieldIdempotencyKey, financefact.FieldCancelReason, financefact.FieldNote:
 			values[i] = new(sql.NullString)
-		case financefact.FieldOccurredAt, financefact.FieldPostedAt, financefact.FieldSettledAt, financefact.FieldCreatedAt, financefact.FieldUpdatedAt:
+		case financefact.FieldOccurredAt, financefact.FieldPostedAt, financefact.FieldSettledAt, financefact.FieldCancelledAt, financefact.FieldCreatedAt, financefact.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -233,6 +265,33 @@ func (_m *FinanceFact) assignValues(columns []string, values []any) error {
 				_m.SettledAt = new(time.Time)
 				*_m.SettledAt = value.Time
 			}
+		case financefact.FieldCancelledAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field cancelled_at", values[i])
+			} else if value.Valid {
+				_m.CancelledAt = new(time.Time)
+				*_m.CancelledAt = value.Time
+			}
+		case financefact.FieldCancelledBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field cancelled_by", values[i])
+			} else if value.Valid {
+				_m.CancelledBy = new(int)
+				*_m.CancelledBy = int(value.Int64)
+			}
+		case financefact.FieldCancelReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cancel_reason", values[i])
+			} else if value.Valid {
+				_m.CancelReason = new(string)
+				*_m.CancelReason = value.String
+			}
+		case financefact.FieldCancelAuditVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field cancel_audit_version", values[i])
+			} else if value.Valid {
+				_m.CancelAuditVersion = int(value.Int64)
+			}
 		case financefact.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field note", values[i])
@@ -263,6 +322,11 @@ func (_m *FinanceFact) assignValues(columns []string, values []any) error {
 // This includes values selected through modifiers, order, etc.
 func (_m *FinanceFact) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
+}
+
+// QueryCanceller queries the "canceller" edge of the FinanceFact entity.
+func (_m *FinanceFact) QueryCanceller() *AdminUserQuery {
+	return NewFinanceFactClient(_m.config).QueryCanceller(_m)
 }
 
 // Update returns a builder for updating this FinanceFact.
@@ -367,6 +431,24 @@ func (_m *FinanceFact) String() string {
 		builder.WriteString("settled_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
+	builder.WriteString(", ")
+	if v := _m.CancelledAt; v != nil {
+		builder.WriteString("cancelled_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.CancelledBy; v != nil {
+		builder.WriteString("cancelled_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.CancelReason; v != nil {
+		builder.WriteString("cancel_reason=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	builder.WriteString("cancel_audit_version=")
+	builder.WriteString(fmt.Sprintf("%v", _m.CancelAuditVersion))
 	builder.WriteString(", ")
 	if v := _m.Note; v != nil {
 		builder.WriteString("note=")

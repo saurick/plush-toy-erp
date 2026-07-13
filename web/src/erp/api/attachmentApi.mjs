@@ -1,6 +1,7 @@
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
+import { assertBusinessAttachmentUploadParams } from '../utils/businessAttachmentContract.mjs'
 
 const attachmentRpc = new JsonRpc({
   url: 'attachment',
@@ -18,6 +19,7 @@ export async function listBusinessAttachments(params = {}) {
 }
 
 export async function uploadBusinessAttachment(params = {}) {
+  assertBusinessAttachmentUploadParams(params)
   const result = await attachmentRpc.call('upload_attachment', params)
   return dataOf(result)?.attachment || null
 }
@@ -25,9 +27,4 @@ export async function uploadBusinessAttachment(params = {}) {
 export async function downloadBusinessAttachment(params = {}) {
   const result = await attachmentRpc.call('download_attachment', params)
   return dataOf(result)?.attachment || null
-}
-
-export async function deleteBusinessAttachment(params = {}) {
-  const result = await attachmentRpc.call('delete_attachment', params)
-  return dataOf(result)?.deleted === true
 }

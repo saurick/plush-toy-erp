@@ -16,6 +16,16 @@ const (
 	FieldID = "id"
 	// FieldTaskID holds the string denoting the task_id field in the database.
 	FieldTaskID = "task_id"
+	// FieldTaskVersion holds the string denoting the task_version field in the database.
+	FieldTaskVersion = "task_version"
+	// FieldIdempotencyKey holds the string denoting the idempotency_key field in the database.
+	FieldIdempotencyKey = "idempotency_key"
+	// FieldIntentHash holds the string denoting the intent_hash field in the database.
+	FieldIntentHash = "intent_hash"
+	// FieldCommandKey holds the string denoting the command_key field in the database.
+	FieldCommandKey = "command_key"
+	// FieldMutationResult holds the string denoting the mutation_result field in the database.
+	FieldMutationResult = "mutation_result"
 	// FieldEventType holds the string denoting the event_type field in the database.
 	FieldEventType = "event_type"
 	// FieldFromStatusKey holds the string denoting the from_status_key field in the database.
@@ -49,6 +59,11 @@ const (
 var Columns = []string{
 	FieldID,
 	FieldTaskID,
+	FieldTaskVersion,
+	FieldIdempotencyKey,
+	FieldIntentHash,
+	FieldCommandKey,
+	FieldMutationResult,
 	FieldEventType,
 	FieldFromStatusKey,
 	FieldToStatusKey,
@@ -72,6 +87,14 @@ func ValidColumn(column string) bool {
 var (
 	// TaskIDValidator is a validator for the "task_id" field. It is called by the builders before save.
 	TaskIDValidator func(int) error
+	// TaskVersionValidator is a validator for the "task_version" field. It is called by the builders before save.
+	TaskVersionValidator func(int) error
+	// IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
+	IdempotencyKeyValidator func(string) error
+	// IntentHashValidator is a validator for the "intent_hash" field. It is called by the builders before save.
+	IntentHashValidator func(string) error
+	// CommandKeyValidator is a validator for the "command_key" field. It is called by the builders before save.
+	CommandKeyValidator func(string) error
 	// EventTypeValidator is a validator for the "event_type" field. It is called by the builders before save.
 	EventTypeValidator func(string) error
 	// FromStatusKeyValidator is a validator for the "from_status_key" field. It is called by the builders before save.
@@ -99,6 +122,26 @@ func ByID(opts ...sql.OrderTermOption) OrderOption {
 // ByTaskID orders the results by the task_id field.
 func ByTaskID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTaskID, opts...).ToFunc()
+}
+
+// ByTaskVersion orders the results by the task_version field.
+func ByTaskVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTaskVersion, opts...).ToFunc()
+}
+
+// ByIdempotencyKey orders the results by the idempotency_key field.
+func ByIdempotencyKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIdempotencyKey, opts...).ToFunc()
+}
+
+// ByIntentHash orders the results by the intent_hash field.
+func ByIntentHash(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIntentHash, opts...).ToFunc()
+}
+
+// ByCommandKey orders the results by the command_key field.
+func ByCommandKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCommandKey, opts...).ToFunc()
 }
 
 // ByEventType orders the results by the event_type field.

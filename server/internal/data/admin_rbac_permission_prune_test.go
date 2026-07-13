@@ -85,6 +85,61 @@ func TestListPermissionsHidesRowsOutsideRBACSource(t *testing.T) {
 	}
 }
 
+func TestSeedBuiltinRBACPreservesExistingRolePermissionSelection(t *testing.T) {
+	ctx := context.Background()
+	db := openRBACPermissionTestDB(t, "admin_rbac_preserve_role_permissions")
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close sqlite failed: %v", err)
+		}
+	}()
+	createRBACPermissionTestSchema(t, ctx, db)
+
+	if err := SeedBuiltinRBACIfNeeded(ctx, db, nil); err != nil {
+		t.Fatalf("first SeedBuiltinRBACIfNeeded() error = %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `
+DELETE FROM role_permissions
+WHERE role_id = (SELECT id FROM roles WHERE role_key = $1)`, biz.SalesRoleKey); err != nil {
+		t.Fatalf("clear sales permissions failed: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `
+INSERT INTO role_permissions (role_id, permission_id, created_at)
+SELECT r.id, p.id, CURRENT_TIMESTAMP
+FROM roles r, permissions p
+WHERE r.role_key = $1 AND p.permission_key = $2`, biz.SalesRoleKey, biz.PermissionERPDashboardRead); err != nil {
+		t.Fatalf("set selected sales permission failed: %v", err)
+	}
+
+	if err := SeedBuiltinRBACIfNeeded(ctx, db, nil); err != nil {
+		t.Fatalf("second SeedBuiltinRBACIfNeeded() error = %v", err)
+	}
+	rows, err := db.QueryContext(ctx, `
+SELECT p.permission_key
+FROM role_permissions rp
+JOIN roles r ON r.id = rp.role_id
+JOIN permissions p ON p.id = rp.permission_id
+WHERE r.role_key = $1`, biz.SalesRoleKey)
+	if err != nil {
+		t.Fatalf("query selected sales permissions failed: %v", err)
+	}
+	defer func() { _ = rows.Close() }()
+	got := []string{}
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			t.Fatalf("scan selected sales permission failed: %v", err)
+		}
+		got = append(got, key)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate selected sales permissions failed: %v", err)
+	}
+	if len(got) != 1 || got[0] != biz.PermissionERPDashboardRead {
+		t.Fatalf("startup seed overwrote permission-center selection: %#v", got)
+	}
+}
+
 func openRBACPermissionTestDB(t *testing.T, name string) *sql.DB {
 	t.Helper()
 	db, err := sql.Open("sqlite3", "file:"+name+"?mode=memory&cache=shared")

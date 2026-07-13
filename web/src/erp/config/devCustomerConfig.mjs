@@ -7,6 +7,8 @@ import { printTemplateCatalog, printTemplateStats } from './printTemplates.mjs'
 
 export { DEV_CUSTOMER_CONFIG_ROUTE }
 export const DEV_CUSTOMER_CONFIG_QUERY_KEY = 'customer'
+export const DEV_CUSTOMER_CONFIG_RELEASE_BATCH_QUERY_KEY = 'release'
+export const DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY = 'view'
 export const DEFAULT_DEV_CUSTOMER_KEY = ''
 export const DEV_CUSTOMER_CONFIG_SOURCE_PATH =
   'config/customers/yoyoosun/README.md'
@@ -29,8 +31,14 @@ export const DEV_CUSTOMER_IMPORT_DRY_RUN_API =
   '/__dev/api/customer-import/dry-run'
 export const DEV_CUSTOMER_CONFIG_RUNTIME_MANIFEST_API =
   '/__dev/api/customer-config/runtime-manifest'
+export const DEV_CUSTOMER_CONFIG_RELEASE_BATCHES_API =
+  '/__dev/api/customer-config/release-batches'
 export const DEV_CUSTOMER_CONFIG_RELEASE_READINESS_API =
   '/__dev/api/customer-config/release-readiness'
+export const DEV_CUSTOMER_CONFIG_RELEASE_EXECUTE_TEMPLATE_COMMAND =
+  'node scripts/deploy/customer-config-release-execute.mjs --print-input-template'
+export const DEV_CUSTOMER_CONFIG_RELEASE_READINESS_TEMPLATE_COMMAND =
+  'node scripts/deploy/customer-config-release-readiness.mjs --print-input-template'
 
 export const DEV_CUSTOMER_CONFIG_REGISTRY = Object.freeze({
   yoyoosun: Object.freeze({
@@ -183,6 +191,23 @@ function normalizeCustomerKey(value = '') {
   return String(value || '')
     .trim()
     .toLowerCase()
+}
+
+export function assertCustomerConfigReadbackRevision(
+  effectiveSession = {},
+  expectedRevision = ''
+) {
+  const expected = String(expectedRevision || '').trim()
+  const actual = String(effectiveSession?.configRevision || '').trim()
+  if (!expected) {
+    throw new Error('客户配置清单缺少 revision，不能确认测试应用结果。')
+  }
+  if (actual !== expected) {
+    throw new Error(
+      `客户配置读回 revision 不一致：期望 ${expected}，实际 ${actual || '未返回'}。`
+    )
+  }
+  return effectiveSession
 }
 
 function mapSourcePathLabel(sourcePath) {
@@ -923,18 +948,15 @@ export function buildImportToolingSummary(
   const fixtureBasePath = `scripts/import/fixtures/customers/${normalizedCustomerKey}`
   const outputBasePath = `output/customers/${normalizedCustomerKey}`
   const uiDryRunOut = `${outputBasePath}/ui-import-dry-run`
-  const releaseEvidenceDir = `deployments/${normalizedCustomerKey}/evidence/releases/<YYYY-MM-DD>`
-  const releaseReadbackPreflightEvidenceDir = `deployments/${normalizedCustomerKey}/evidence/releases/2026-06-29`
-  const releaseManifestPath = `${outputBasePath}/customer-config-runtime-manifest.json`
-  const releaseReportPath = `${outputBasePath}/customer-config-release/customer-config-release-report.json`
+  const releaseEvidenceDir = `deployments/${normalizedCustomerKey}/evidence/releases/<release-batch>`
   const releaseReadbackPreflightReportPath = `${outputBasePath}/customer-config-readback-preflight.json`
-  const releaseReadbackPreflightCommand = `node scripts/deploy/customer-config-release-readiness.mjs --manifest ${releaseManifestPath} --evidence-dir ${releaseReadbackPreflightEvidenceDir} --release-report ${releaseReportPath} --readback-preflight-report ${releaseReadbackPreflightReportPath}`
   return {
     sourcePath: DEV_CUSTOMER_IMPORT_TOOLING_SOURCE_PATH,
     sourceLabel: mapSourcePathLabel(DEV_CUSTOMER_IMPORT_TOOLING_SOURCE_PATH),
     qaCommand: DEV_CUSTOMER_CONFIG_QA_COMMAND,
     uiDryRunApiPath: DEV_CUSTOMER_IMPORT_DRY_RUN_API,
     uiRuntimeManifestApiPath: DEV_CUSTOMER_CONFIG_RUNTIME_MANIFEST_API,
+    uiReleaseBatchesApiPath: DEV_CUSTOMER_CONFIG_RELEASE_BATCHES_API,
     uiReleaseReadinessApiPath: DEV_CUSTOMER_CONFIG_RELEASE_READINESS_API,
     canRunUiDryRun: normalizedCustomerKey === 'yoyoosun',
     canApplyTestConfig: normalizedCustomerKey === 'yoyoosun',
@@ -986,7 +1008,7 @@ export function buildImportToolingSummary(
       label: '本地/测试后端应用',
       status:
         normalizedCustomerKey === 'yoyoosun' ? 'test_apply_ready' : 'blocked',
-      target: '当前后端（本地或显式测试环境）ERP 应用数据库',
+      target: '当前 Vite /rpc 代理后端（http://127.0.0.1:8300）',
       writes:
         'customer_config_revisions / deployment_module_states / role_profiles / access_entitlements / work_pools / work_pool_memberships / runtime_audit_events',
       writesLabel: '客户配置版本、模块状态、角色画像、授权、责任池和审计记录',
@@ -997,26 +1019,26 @@ export function buildImportToolingSummary(
         'activate_customer_config',
         'get_effective_session',
       ],
-      note: '使用当前管理员登录态调用当前后端客户配置接口；本地开发默认是 8300，若指向测试环境必须显式确认目标后端；成功后后台和岗位任务端读取有效配置版本的测试投影。',
+      note: '使用当前管理员登录态，通过 Vite /rpc 固定代理 http://127.0.0.1:8300 调用客户配置接口；成功后后台和岗位任务端读取有效配置版本的测试投影。正式目标环境不从此按钮选择。',
       noBusinessDataImport: true,
     },
     releaseApply: {
       key: 'release-config-apply',
-      label: '发布到正式版',
+      label: '正式发布执行器交接',
       status: 'release_gate_required',
-      target: '目标环境 ERP 应用数据库',
-      evidenceDir: `deployments/${normalizedCustomerKey}/evidence/releases`,
+      target: '由正式执行器参数显式确认的目标环境',
+      evidenceDir: releaseEvidenceDir,
       writes:
         'customer_config_revisions / deployment_module_states / role_profiles / access_entitlements / work_pools / work_pool_memberships / runtime_audit_events',
       writesLabel: '客户配置版本、模块状态、角色画像、授权、责任池和审计记录',
       operations: [
         'release_readiness_gate',
-        'validate_customer_config',
-        'publish_customer_config',
-        'activate_customer_config',
-        'get_effective_session',
+        'customer_config_release_execute',
+        'authenticated_readback',
+        'release_report',
       ],
-      note: '先检查发布证据和清单指纹绑定；门禁通过后才允许用当前管理员登录态发布并激活正式配置版本。',
+      command: DEV_CUSTOMER_CONFIG_RELEASE_EXECUTE_TEMPLATE_COMMAND,
+      note: '页面只检查选定证据批次并交接正式执行器输入模板；不直接发布或激活正式配置。正式执行器负责目标端点、令牌、确认短语、release report 和 authenticated readback。',
       noBusinessDataImport: true,
     },
     releaseReadbackPreflight: {
@@ -1024,7 +1046,7 @@ export function buildImportToolingSummary(
       label: '有效版本读回预检',
       status: 'report_gate_only',
       target: releaseReadbackPreflightReportPath,
-      command: releaseReadbackPreflightCommand,
+      command: DEV_CUSTOMER_CONFIG_RELEASE_READINESS_TEMPLATE_COMMAND,
       writesDatabase: false,
       writesConfigControl: false,
       writesBusinessData: false,
@@ -1035,7 +1057,7 @@ export function buildImportToolingSummary(
         '目标环境有效配置读回 smoke 已通过',
         '目标环境发布已执行',
       ],
-      note: '只生成不写入的读回缺口报告；不调用后端、不读取令牌、不写发布证据、不发布或激活客户配置。',
+      note: '只打印生成读回缺口报告所需的显式 manifest、证据批次和 release report 输入；不调用后端、不读取令牌、不写入发布证据、不发布或激活客户配置。',
     },
     importFlow: [
       withWriteBoundaryLabels({
@@ -1108,7 +1130,7 @@ export function buildImportToolingSummary(
         status:
           normalizedCustomerKey === 'yoyoosun' ? 'test_apply_ready' : 'blocked',
         outcome: '校验并发布受控配置版本',
-        target: '当前后端（本地或显式测试环境）ERP 应用数据库',
+        target: '当前 Vite /rpc 代理后端（http://127.0.0.1:8300）',
         writesDatabase: true,
         writesConfigControl: true,
         writesBusinessData: false,
@@ -1153,7 +1175,7 @@ export function buildImportToolingSummary(
         label: '本地/测试后端应用',
         status:
           normalizedCustomerKey === 'yoyoosun' ? 'test_apply_ready' : 'blocked',
-        target: '当前后端（本地或显式测试环境）ERP 应用数据库',
+        target: '当前 Vite /rpc 代理后端（http://127.0.0.1:8300）',
         writes:
           'customer_config_revisions / deployment_module_states / role_profiles / access_entitlements / work_pools / work_pool_memberships / runtime_audit_events',
         writeClass: 'test_config_control_write',
@@ -1163,7 +1185,7 @@ export function buildImportToolingSummary(
         requiresAdminConfirmation: true,
         requiresSeparateTask: false,
         reason:
-          '这是当前后端客户配置控制面写入；本地默认 8300，显式测试环境必须先确认后端目标；登录后的后台和岗位任务端通过客户配置接口读取有效版本。',
+          '这是当前 Vite /rpc 固定代理 http://127.0.0.1:8300 的客户配置控制面写入；登录后的后台和岗位任务端通过客户配置接口读取有效版本。正式目标环境由统一执行器显式确认。',
       }),
       withWriteBoundaryLabels({
         key: 'customer-config-publish',
@@ -1298,23 +1320,15 @@ export function buildImportToolingSummary(
       },
       {
         key: 'release-readback-preflight',
-        title: '客户配置读回预检',
-        command: releaseReadbackPreflightCommand,
+        title: '发布门禁输入模板',
+        command: DEV_CUSTOMER_CONFIG_RELEASE_READINESS_TEMPLATE_COMMAND,
         status: 'report_gate_only',
-        note: '只核对本地 manifest、release report 和 target smoke 证据形状，不调用后端、不读取令牌、不证明真实 active revision。',
-      },
-      {
-        key: 'release-rollback-readiness',
-        title: '客户配置回滚就绪检查',
-        command: `node scripts/deploy/customer-config-release-readiness.mjs --manifest ${releaseManifestPath} --evidence-dir ${releaseEvidenceDir} --release-report ${releaseReportPath} --require-executed --require-rollback`,
-        status: 'release_gate_required',
-        note: '只复核已存在的执行报告和目标 smoke 证据；不执行回滚、不写 release evidence。',
+        note: '只打印门禁所需输入；显式证据批次在页面选择，实际 manifestPath 以只读检查结果为准。不调用后端、不读取令牌、不证明真实 active revision。',
       },
       {
         key: 'release-rollback-execute',
-        title: '客户配置回滚输入模板',
-        command:
-          'node scripts/deploy/customer-config-release-execute.mjs --print-input-template',
+        title: '正式发布 / 回滚执行器输入模板',
+        command: DEV_CUSTOMER_CONFIG_RELEASE_EXECUTE_TEMPLATE_COMMAND,
         status: 'release_gate_required',
         note: '只打印发布 / 激活 / 回滚输入模板，不读取 token、不调用客户配置接口。',
       },

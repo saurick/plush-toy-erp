@@ -247,7 +247,10 @@ func TestAdminVisibleMenusFiltersByPermissionCode(t *testing.T) {
 		t.Fatalf("expected visible menus")
 	}
 	for _, menu := range menus {
-		if !PermissionSetHasAny(PermissionKeySet(admin.Permissions), menu.RequiredPermissions...) {
+		permissionSet := PermissionKeySet(admin.Permissions)
+		hasAny := len(menu.RequiredAny) == 0 || PermissionSetHasAny(permissionSet, menu.RequiredAny...)
+		hasAll := PermissionSetHasAll(permissionSet, menu.RequiredAll...)
+		if !hasAny || !hasAll {
 			t.Fatalf("menu %s is not guarded by admin permission set", menu.Path)
 		}
 	}
@@ -327,11 +330,43 @@ func TestBuiltinAdminMenusAlignCurrentRuntimeNavigation(t *testing.T) {
 			if menu.Path != tt.path {
 				t.Fatalf("expected %s path %q, got %q", tt.key, tt.path, menu.Path)
 			}
-			if !PermissionSetHasAll(PermissionKeySet(menu.RequiredPermissions), tt.permissions...) {
-				t.Fatalf("expected %s permissions to contain %#v, got %#v", tt.key, tt.permissions, menu.RequiredPermissions)
+			menuPermissions := append(append([]string(nil), menu.RequiredAny...), menu.RequiredAll...)
+			if !PermissionSetHasAll(PermissionKeySet(menuPermissions), tt.permissions...) {
+				t.Fatalf("expected %s permissions to contain %#v, got %#v", tt.key, tt.permissions, menuPermissions)
 			}
 		})
 	}
+}
+
+func TestAdminMenuRequirementsDistinguishAnyAndAll(t *testing.T) {
+	t.Run("all requirements must all be present", func(t *testing.T) {
+		menu := AdminMenu{
+			RequiredAny: []string{PermissionProductRead},
+			RequiredAll: []string{PermissionProductSKURead, PermissionMaterialRead},
+		}
+		if AdminMenuRequirementsSatisfied(PermissionKeySet([]string{PermissionProductRead, PermissionProductSKURead}), menu) {
+			t.Fatal("menu must stay hidden when one RequiredAll permission is missing")
+		}
+		if !AdminMenuRequirementsSatisfied(PermissionKeySet([]string{PermissionProductRead, PermissionProductSKURead, PermissionMaterialRead}), menu) {
+			t.Fatal("menu must be visible when RequiredAny and every RequiredAll permission are present")
+		}
+	})
+
+	t.Run("shared pages accept any relevant read permission", func(t *testing.T) {
+		menus := AdminVisibleMenus(&AdminUser{Permissions: []string{PermissionFinancePayableRead}})
+		if !adminMenusContainKey(menus, "invoices") || !adminMenusContainKey(menus, "reconciliation") {
+			t.Fatal("finance shared pages must be visible with a relevant payable read permission")
+		}
+	})
+}
+
+func adminMenusContainKey(menus []AdminMenu, key string) bool {
+	for _, menu := range menus {
+		if menu.Key == key {
+			return true
+		}
+	}
+	return false
 }
 
 func TestAdminVisibleMenusUsesFormalV1Entries(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -275,13 +276,26 @@ func (r *stubAdminManageRepo) UpdateAdminERPColumnOrder(_ context.Context, id in
 	return nil
 }
 
-func (r *stubAdminManageRepo) SetAdminDisabled(_ context.Context, id int, disabled bool) error {
-	admin, ok := r.adminsByID[id]
-	if !ok {
-		return ErrAdminNotFound
+func (r *stubAdminManageRepo) ChangeAdminLifecycle(_ context.Context, change *AdminLifecycleChange) (int, error) {
+	if change == nil {
+		return 0, ErrBadParam
 	}
-	admin.Disabled = disabled
-	return nil
+	admin, ok := r.adminsByID[change.AdminID]
+	if !ok {
+		return 0, ErrAdminNotFound
+	}
+	admin.Disabled = change.Disabled
+	admin.StatusReason = change.Reason
+	now := time.Now()
+	admin.StatusChangedAt = &now
+	admin.StatusChangedBy = &change.OperatorID
+	if change.Revoke {
+		admin.RevokedAt = &now
+	}
+	if err := r.RecordRuntimeAuditEvent(context.Background(), change.AuditEvent); err != nil {
+		return 0, err
+	}
+	return 0, nil
 }
 
 func (r *stubAdminManageRepo) UpdateAdminPasswordHash(_ context.Context, id int, passwordHash string) error {
@@ -519,6 +533,59 @@ func TestAdminManageUsecase_ResetPasswordRejectsSuperAdminTarget(t *testing.T) {
 	}
 }
 
+func TestAdminManageUsecase_SetDisabledRequiresReasonAndCannotRestoreRevoked(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	repo.adminsByID[2] = &AdminUser{ID: 2, Username: "worker"}
+	repo.adminsByName["worker"] = repo.adminsByID[2]
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Username: "root", Role: RoleAdmin})
+
+	if _, err := uc.SetDisabled(ctx, 2, true, ""); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("missing disable reason error = %v, want ErrBadParam", err)
+	}
+	updated, err := uc.SetDisabled(ctx, 2, true, "临时离岗")
+	if err != nil || updated.AccountStatus() != AdminAccountStatusSuspended || updated.StatusReason != "临时离岗" {
+		t.Fatalf("unexpected suspended account: %#v err=%v", updated, err)
+	}
+	now := time.Now()
+	repo.adminsByID[2].RevokedAt = &now
+	if _, err := uc.SetDisabled(ctx, 2, false, "恢复"); !errors.Is(err, ErrAdminRevoked) {
+		t.Fatalf("restore revoked error = %v, want ErrAdminRevoked", err)
+	}
+	if _, err := uc.SetRoles(ctx, 2, nil); !errors.Is(err, ErrAdminRevoked) {
+		t.Fatalf("set roles on revoked error = %v, want ErrAdminRevoked", err)
+	}
+	if _, err := uc.SetPhone(ctx, 2, "13800138000"); !errors.Is(err, ErrAdminRevoked) {
+		t.Fatalf("set phone on revoked error = %v, want ErrAdminRevoked", err)
+	}
+	if _, err := uc.ResetPassword(ctx, 2, "new-secret"); !errors.Is(err, ErrAdminRevoked) {
+		t.Fatalf("reset revoked password error = %v, want ErrAdminRevoked", err)
+	}
+}
+
+func TestAdminManageUsecase_RevokePreservesIdentityAndAudits(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	repo.adminsByID[2] = &AdminUser{ID: 2, Username: "leaver"}
+	repo.adminsByName["leaver"] = repo.adminsByID[2]
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Username: "root", Role: RoleAdmin})
+
+	updated, _, err := uc.Revoke(ctx, 2, "员工离职")
+	if err != nil {
+		t.Fatalf("Revoke() error = %v", err)
+	}
+	if updated.ID != 2 || updated.Username != "leaver" || updated.AccountStatus() != AdminAccountStatusRevoked {
+		t.Fatalf("identity/status changed unexpectedly: %#v", updated)
+	}
+	if len(repo.auditEvents) != 1 || repo.auditEvents[0].EventKey != "admin_user.revoked" {
+		t.Fatalf("unexpected revoke audit events: %#v", repo.auditEvents)
+	}
+}
+
 func TestAdminManageUsecase_SetRolesRejectsSuperAdmin(t *testing.T) {
 	repo := newStubAdminManageRepo()
 	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
@@ -688,6 +755,30 @@ func TestAdminManageUsecase_SetRolePermissionsRecordsAudit(t *testing.T) {
 	}
 	if repo.auditEvents[0].EventKey != "role.permissions.set" {
 		t.Fatalf("unexpected audit event key %q", repo.auditEvents[0].EventKey)
+	}
+}
+
+func TestAdminManageUsecase_SetRolePermissionsRejectsUnknownPermission(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
+	before := append([]string(nil), repo.roleByKey(WarehouseRoleKey).Permissions...)
+
+	_, err := uc.SetRolePermissions(ctx, WarehouseRoleKey, []string{
+		PermissionWarehouseInventoryRead,
+		"warehouse.inventory.unsupported_action",
+	})
+	if !errors.Is(err, ErrPermissionNotFound) {
+		t.Fatalf("SetRolePermissions() error = %v, want ErrPermissionNotFound", err)
+	}
+	if got := repo.roleByKey(WarehouseRoleKey).Permissions; !slices.Equal(got, before) {
+		t.Fatalf("unknown permission changed role permissions: got %#v want %#v", got, before)
+	}
+	if len(repo.auditEvents) != 0 {
+		t.Fatalf("rejected permission change wrote audit events: %#v", repo.auditEvents)
 	}
 }
 

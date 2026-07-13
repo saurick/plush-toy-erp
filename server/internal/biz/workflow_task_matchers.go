@@ -287,7 +287,7 @@ func isShipmentReleaseTask(task *WorkflowTask) bool {
 		return true
 	}
 	switch strings.TrimSpace(*task.BusinessStatusKey) {
-	case "", workflowShipmentReleasePendingStatusKey, workflowShipmentPendingStatusKey, workflowBlockedStatusKey:
+	case "", workflowShipmentPendingStatusKey, workflowBlockedStatusKey:
 		return true
 	default:
 		return false

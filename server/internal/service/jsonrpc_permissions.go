@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"time"
 
@@ -50,7 +51,7 @@ func (d *jsonrpcDispatcher) CurrentAdminPermissions(ctx context.Context) ([]stri
 	if err != nil || admin == nil {
 		return nil, &v1.JsonrpcResult{Code: errcode.AdminRequired.Code, Message: errcode.AdminRequired.Message}
 	}
-	if admin.Disabled {
+	if !admin.IsActive() {
 		return nil, &v1.JsonrpcResult{Code: errcode.AdminDisabled.Code, Message: errcode.AdminDisabled.Message}
 	}
 
@@ -79,7 +80,7 @@ func (d *jsonrpcDispatcher) CurrentAdmin(ctx context.Context) (*biz.AdminUser, *
 	if err != nil || admin == nil {
 		return nil, &v1.JsonrpcResult{Code: errcode.AdminRequired.Code, Message: errcode.AdminRequired.Message}
 	}
-	if admin.Disabled {
+	if !admin.IsActive() {
 		return nil, &v1.JsonrpcResult{Code: errcode.AdminDisabled.Code, Message: errcode.AdminDisabled.Message}
 	}
 	if cache != nil {
@@ -227,11 +228,14 @@ func adminMenusToAny(admin *biz.AdminUser) []any {
 	menus := biz.AdminVisibleMenus(admin)
 	out := make([]any, 0, len(menus))
 	for _, menu := range menus {
+		requiredPermissions := append(append([]string(nil), menu.RequiredAny...), menu.RequiredAll...)
 		out = append(out, map[string]any{
 			"key":                  menu.Key,
 			"label":                menu.Label,
 			"path":                 menu.Path,
-			"required_permissions": toAnySliceString(menu.RequiredPermissions),
+			"required_any":         toAnySliceString(menu.RequiredAny),
+			"required_all":         toAnySliceString(menu.RequiredAll),
+			"required_permissions": toAnySliceString(requiredPermissions),
 		})
 	}
 	return out
@@ -243,19 +247,24 @@ func adminProfileToMap(admin *biz.AdminUser, includeTokenMeta map[string]any) ma
 		lastLogin = admin.LastLoginAt.Unix()
 	}
 	out := map[string]any{
-		"id":             admin.ID,
-		"user_id":        admin.ID,
-		"username":       admin.Username,
-		"phone":          admin.Phone,
-		"role":           int(biz.RoleAdmin),
-		"disabled":       admin.Disabled,
-		"is_super_admin": admin.IsSuperAdmin,
-		"roles":          adminRolesToAny(admin),
-		"permissions":    adminPermissionsToAny(admin),
-		"menus":          adminMenusToAny(admin),
-		"last_login_at":  lastLogin,
-		"created_at":     admin.CreatedAt.Unix(),
-		"updated_at":     admin.UpdatedAt.Unix(),
+		"id":                admin.ID,
+		"user_id":           admin.ID,
+		"username":          admin.Username,
+		"phone":             admin.Phone,
+		"role":              int(biz.RoleAdmin),
+		"disabled":          admin.Disabled,
+		"account_status":    string(admin.AccountStatus()),
+		"revoked_at":        optionalTimeUnix(admin.RevokedAt),
+		"status_reason":     admin.StatusReason,
+		"status_changed_at": optionalTimeUnix(admin.StatusChangedAt),
+		"status_changed_by": optionalIntValue(admin.StatusChangedBy),
+		"is_super_admin":    admin.IsSuperAdmin,
+		"roles":             adminRolesToAny(admin),
+		"permissions":       adminPermissionsToAny(admin),
+		"menus":             adminMenusToAny(admin),
+		"last_login_at":     lastLogin,
+		"created_at":        admin.CreatedAt.Unix(),
+		"updated_at":        admin.UpdatedAt.Unix(),
 		"erp_preferences": map[string]any{
 			"column_orders": toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
 		},
@@ -275,17 +284,22 @@ func adminListItemToMap(admin *biz.AdminUser) map[string]any {
 		lastLogin = admin.LastLoginAt.Unix()
 	}
 	return map[string]any{
-		"id":             admin.ID,
-		"username":       admin.Username,
-		"phone":          admin.Phone,
-		"is_super_admin": admin.IsSuperAdmin,
-		"disabled":       admin.Disabled,
-		"last_login_at":  lastLogin,
-		"created_at":     admin.CreatedAt.Unix(),
-		"updated_at":     admin.UpdatedAt.Unix(),
-		"roles":          adminRolesToAny(admin),
-		"permissions":    adminPermissionsToAny(admin),
-		"menus":          adminMenusToAny(admin),
+		"id":                admin.ID,
+		"username":          admin.Username,
+		"phone":             admin.Phone,
+		"is_super_admin":    admin.IsSuperAdmin,
+		"disabled":          admin.Disabled,
+		"account_status":    string(admin.AccountStatus()),
+		"revoked_at":        optionalTimeUnix(admin.RevokedAt),
+		"status_reason":     admin.StatusReason,
+		"status_changed_at": optionalTimeUnix(admin.StatusChangedAt),
+		"status_changed_by": optionalIntValue(admin.StatusChangedBy),
+		"last_login_at":     lastLogin,
+		"created_at":        admin.CreatedAt.Unix(),
+		"updated_at":        admin.UpdatedAt.Unix(),
+		"roles":             adminRolesToAny(admin),
+		"permissions":       adminPermissionsToAny(admin),
+		"menus":             adminMenusToAny(admin),
 	}
 }
 
@@ -318,9 +332,73 @@ func permissionOptionsToAny(items []biz.AdminPermission) []any {
 			"action":         item.Action,
 			"resource":       item.Resource,
 			"builtin":        item.Builtin,
+			"usage":          permissionUsageToMap(item),
 		})
 	}
 	return out
+}
+
+func permissionUsageToMap(permission biz.AdminPermission) map[string]any {
+	readKey := permission.Key
+	if index := strings.LastIndex(readKey, "."); index > 0 {
+		readKey = readKey[:index] + ".read"
+	}
+	relatedMenus := make([]any, 0)
+	for _, menu := range biz.BuiltinAdminMenus() {
+		requirements := append(append([]string(nil), menu.RequiredAny...), menu.RequiredAll...)
+		if slices.Contains(requirements, permission.Key) || slices.Contains(requirements, readKey) {
+			relatedMenus = append(relatedMenus, map[string]any{
+				"key": menu.Key, "label": menu.Label, "path": menu.Path,
+			})
+		}
+	}
+	if strings.HasPrefix(permission.Key, "mobile.") && strings.HasSuffix(permission.Key, ".access") {
+		roleKey := strings.TrimSuffix(strings.TrimPrefix(permission.Key, "mobile."), ".access")
+		relatedMenus = append(relatedMenus, map[string]any{
+			"key": "mobile-" + roleKey + "-tasks", "label": permission.Name, "path": "/m/" + roleKey + "/tasks",
+		})
+	}
+	if strings.HasPrefix(permission.Key, "contact.") {
+		for _, menu := range biz.BuiltinAdminMenus() {
+			if menu.Key == "customers" || menu.Key == "suppliers" {
+				relatedMenus = append(relatedMenus, map[string]any{
+					"key": menu.Key, "label": menu.Label, "path": menu.Path,
+				})
+			}
+		}
+	}
+	controlType := "操作按钮"
+	effect := "显示并允许执行"
+	condition := "仍受客户模块状态、业务状态和任务归属限制"
+	switch permission.Action {
+	case "read", "access":
+		controlType = "页面入口和内容"
+		effect = "允许进入并查看"
+	case "create":
+		controlType = "新建按钮和表单"
+	case "update", "manage":
+		controlType = "编辑按钮和表单"
+	case "disable":
+		controlType = "启用/停用开关"
+	case "revoke":
+		controlType = "离职注销按钮"
+	}
+	switch permission.Module {
+	case "system":
+		condition = "仍受超级管理员保护、禁止自我停用或注销等安全规则限制"
+	case "customer_config":
+		condition = "仍受客户配置版本状态、发布流程和部署客户边界限制"
+	case "mobile":
+		condition = "进入后仍只显示当前岗位或指定给本人的任务"
+	case "debug":
+		condition = "仅在明确开启的本地或测试环境可用，生产环境默认拒绝"
+	}
+	return map[string]any{
+		"menus":        relatedMenus,
+		"control_type": controlType,
+		"effect":       effect,
+		"condition":    condition,
+	}
 }
 
 func runtimeAuditEventsToAny(items []biz.RuntimeAuditEvent) []any {
@@ -348,11 +426,14 @@ func runtimeAuditEventsToAny(items []biz.RuntimeAuditEvent) []any {
 func menuOptionsToAny(items []biz.AdminMenu) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {
+		requiredPermissions := append(append([]string(nil), item.RequiredAny...), item.RequiredAll...)
 		out = append(out, map[string]any{
 			"key":                  item.Key,
 			"label":                item.Label,
 			"path":                 item.Path,
-			"required_permissions": toAnySliceString(item.RequiredPermissions),
+			"required_any":         toAnySliceString(item.RequiredAny),
+			"required_all":         toAnySliceString(item.RequiredAll),
+			"required_permissions": toAnySliceString(requiredPermissions),
 		})
 	}
 	return out

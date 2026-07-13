@@ -73,6 +73,7 @@ var businessDashboardProjectionModuleKeys = []string{
 	"inventory",
 	"shipping-release",
 	"outbound",
+	"production-orders",
 	"production-scheduling",
 	"production-progress",
 	"production-exceptions",
@@ -162,6 +163,14 @@ func (d *jsonrpcDispatcher) businessDashboardProjectionStats(ctx context.Context
 			return nil, err
 		} else {
 			setTotal("reconciliation", total)
+		}
+	}
+
+	if d.productionOrderUC != nil {
+		if _, total, err := d.productionOrderUC.List(ctx, biz.ProductionOrderFilter{Limit: 1}); err != nil {
+			return nil, err
+		} else {
+			setTotal("production-orders", total)
 		}
 	}
 

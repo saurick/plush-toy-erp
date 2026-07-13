@@ -415,6 +415,14 @@
   min-width: 0;
 }
 
+@media (min-width: 1281px) {
+  .erp-workbench-side-stack {
+    position: sticky;
+    top: 12px;
+    align-self: start;
+  }
+}
+
 .erp-workbench-panel {
   min-width: 0;
   border: 1px solid #d8e1ed;
@@ -442,6 +450,16 @@
 
 .erp-workbench-queue-panel .ant-table-wrapper {
   min-width: 0;
+}
+
+.erp-workbench-queue-panel .ant-table-pagination.ant-pagination {
+  gap: 4px;
+  margin: 12px 14px;
+}
+
+.erp-workbench-queue-panel .ant-pagination-total-text {
+  color: #667085;
+  font-variant-numeric: tabular-nums;
 }
 
 .erp-workbench-queue-empty {

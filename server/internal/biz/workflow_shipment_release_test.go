@@ -12,7 +12,7 @@ func TestWorkflowUsecase_ShipmentReleaseDoneUpsertsShippingReleasedOnly(t *testi
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            task.ID,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{"mobile_role_key": "warehouse"},
@@ -70,7 +70,7 @@ func TestWorkflowUsecase_ShipmentReleaseRepeatedDoneDoesNotDeriveDownstreamTask(
 	uc := NewWorkflowUsecase(repo)
 
 	for i := 0; i < 2; i++ {
-		_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 			ID:            1401,
 			TaskStatusKey: "done",
 			Payload:       map[string]any{},
@@ -92,7 +92,7 @@ func TestWorkflowUsecase_ShipmentReleaseBlockedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: shipmentReleaseWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1401,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": "   "},
@@ -111,7 +111,7 @@ func TestWorkflowUsecase_ShipmentReleaseBlockedUpsertsBlockedState(t *testing.T)
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            task.ID,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": " 客户资料未确认 "},
@@ -162,7 +162,7 @@ func TestWorkflowUsecase_ShipmentReleaseRejectedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: shipmentReleaseWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1401,
 		TaskStatusKey: "rejected",
 		Reason:        " \t ",
@@ -183,7 +183,7 @@ func TestWorkflowUsecase_ShipmentReleaseRejectedUpsertsBlockedState(t *testing.T
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            task.ID,
 		TaskStatusKey: "rejected",
 		Reason:        "客户取消本次放行",
@@ -238,7 +238,7 @@ func TestWorkflowUsecase_ShipmentReleaseSettledBusinessStatusDoesNotTriggerSpeci
 			repo := &stubWorkflowRepo{currentTask: task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            task.ID,
 				TaskStatusKey: "done",
 				Payload:       map[string]any{},
@@ -262,7 +262,7 @@ func TestWorkflowUsecase_ShipmentReleaseBlockedBusinessStatusStillUsesSpecialRul
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            task.ID,
 		TaskStatusKey: "blocked",
 		Reason:        "重复确认仍不能放行",

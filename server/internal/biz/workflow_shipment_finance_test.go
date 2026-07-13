@@ -10,7 +10,7 @@ func TestWorkflowUsecase_ReceivableRegistrationDoneDerivesInvoiceTask(t *testing
 	repo := &stubWorkflowRepo{currentTask: receivableRegistrationWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1401,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{"mobile_role_key": "finance"},
@@ -66,7 +66,7 @@ func TestWorkflowUsecase_ReceivableRegistrationRepeatedDoneUsesIdempotentDerived
 	uc := NewWorkflowUsecase(repo)
 
 	for i := 0; i < 2; i++ {
-		_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 			ID:            1401,
 			TaskStatusKey: "done",
 			Payload:       map[string]any{},
@@ -84,7 +84,7 @@ func TestWorkflowUsecase_InvoiceRegistrationDoneWritesReconcilingState(t *testin
 	repo := &stubWorkflowRepo{currentTask: invoiceRegistrationWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1501,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{"mobile_role_key": "finance"},
@@ -122,7 +122,7 @@ func TestWorkflowUsecase_ShipmentFinanceBlockedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: receivableRegistrationWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1401,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": "   "},
@@ -141,7 +141,7 @@ func TestWorkflowUsecase_ShipmentFinanceRejectedWritesBlockedState(t *testing.T)
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            1501,
 		TaskStatusKey: "rejected",
 		Reason:        "客户发票资料缺失",
@@ -229,7 +229,7 @@ func TestWorkflowUsecase_SameNameNonShipmentFinanceTaskDoesNotDerive(t *testing.
 			repo := &stubWorkflowRepo{currentTask: tc.task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            tc.task.ID,
 				TaskStatusKey: "done",
 				Payload:       map[string]any{},

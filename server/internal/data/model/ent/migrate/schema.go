@@ -46,6 +46,42 @@ var (
 			},
 		},
 	}
+	// AdminSessionsColumns holds the columns for the "admin_sessions" table.
+	AdminSessionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "session_key", Type: field.TypeString, Size: 64},
+		{Name: "admin_user_id", Type: field.TypeInt},
+		{Name: "auth_version", Type: field.TypeInt64},
+		{Name: "issued_at", Type: field.TypeTime},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "revoked_at", Type: field.TypeTime, Nullable: true},
+		{Name: "revoke_reason", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// AdminSessionsTable holds the schema information for the "admin_sessions" table.
+	AdminSessionsTable = &schema.Table{
+		Name:       "admin_sessions",
+		Columns:    AdminSessionsColumns,
+		PrimaryKey: []*schema.Column{AdminSessionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "adminsession_session_key",
+				Unique:  true,
+				Columns: []*schema.Column{AdminSessionsColumns[1]},
+			},
+			{
+				Name:    "adminsession_admin_user_id_revoked_at",
+				Unique:  false,
+				Columns: []*schema.Column{AdminSessionsColumns[2], AdminSessionsColumns[6]},
+			},
+			{
+				Name:    "adminsession_expires_at",
+				Unique:  false,
+				Columns: []*schema.Column{AdminSessionsColumns[5]},
+			},
+		},
+	}
 	// AdminUsersColumns holds the columns for the "admin_users" table.
 	AdminUsersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -55,6 +91,11 @@ var (
 		{Name: "is_super_admin", Type: field.TypeBool, Default: false},
 		{Name: "erp_preferences", Type: field.TypeString, Size: 32768, Default: "{}"},
 		{Name: "disabled", Type: field.TypeBool, Default: false},
+		{Name: "auth_version", Type: field.TypeInt64, Default: 1},
+		{Name: "revoked_at", Type: field.TypeTime, Nullable: true},
+		{Name: "status_reason", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "status_changed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "status_changed_by", Type: field.TypeInt, Nullable: true},
 		{Name: "last_login_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -382,6 +423,14 @@ var (
 				Columns: []*schema.Column{CustomerConfigRevisionsColumns[1], CustomerConfigRevisionsColumns[2]},
 			},
 			{
+				Name:    "customerconfigrevision_customer_key",
+				Unique:  true,
+				Columns: []*schema.Column{CustomerConfigRevisionsColumns[1]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status = 'active'",
+				},
+			},
+			{
 				Name:    "customerconfigrevision_customer_key_status",
 				Unique:  false,
 				Columns: []*schema.Column{CustomerConfigRevisionsColumns[1], CustomerConfigRevisionsColumns[5]},
@@ -451,15 +500,27 @@ var (
 		{Name: "occurred_at_specified", Type: field.TypeBool, Default: false},
 		{Name: "posted_at", Type: field.TypeTime, Nullable: true},
 		{Name: "settled_at", Type: field.TypeTime, Nullable: true},
+		{Name: "cancelled_at", Type: field.TypeTime, Nullable: true},
+		{Name: "cancel_reason", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "cancel_audit_version", Type: field.TypeInt, Default: 1},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "cancelled_by", Type: field.TypeInt, Nullable: true},
 	}
 	// FinanceFactsTable holds the schema information for the "finance_facts" table.
 	FinanceFactsTable = &schema.Table{
 		Name:       "finance_facts",
 		Columns:    FinanceFactsColumns,
 		PrimaryKey: []*schema.Column{FinanceFactsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "finance_facts_admin_users_canceller",
+				Columns:    []*schema.Column{FinanceFactsColumns[27]},
+				RefColumns: []*schema.Column{AdminUsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "financefact_fact_no",
@@ -1463,6 +1524,231 @@ var (
 				Name:    "productionfact_subject_type_subject_id_warehouse_id_lot_id",
 				Unique:  false,
 				Columns: []*schema.Column{ProductionFactsColumns[4], ProductionFactsColumns[5], ProductionFactsColumns[20], ProductionFactsColumns[17]},
+			},
+		},
+	}
+	// ProductionOrdersColumns holds the columns for the "production_orders" table.
+	ProductionOrdersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "order_no", Type: field.TypeString, Size: 64},
+		{Name: "status", Type: field.TypeString, Size: 16, Default: "DRAFT"},
+		{Name: "version", Type: field.TypeInt, Default: 1},
+		{Name: "planned_start_at", Type: field.TypeTime, Nullable: true},
+		{Name: "planned_end_at", Type: field.TypeTime, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "released_at", Type: field.TypeTime, Nullable: true},
+		{Name: "closed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "close_reason", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "cancelled_at", Type: field.TypeTime, Nullable: true},
+		{Name: "cancel_reason", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "created_by", Type: field.TypeInt},
+		{Name: "released_by", Type: field.TypeInt, Nullable: true},
+		{Name: "closed_by", Type: field.TypeInt, Nullable: true},
+		{Name: "cancelled_by", Type: field.TypeInt, Nullable: true},
+	}
+	// ProductionOrdersTable holds the schema information for the "production_orders" table.
+	ProductionOrdersTable = &schema.Table{
+		Name:       "production_orders",
+		Columns:    ProductionOrdersColumns,
+		PrimaryKey: []*schema.Column{ProductionOrdersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "production_orders_admin_users_creator",
+				Columns:    []*schema.Column{ProductionOrdersColumns[14]},
+				RefColumns: []*schema.Column{AdminUsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_orders_admin_users_releaser",
+				Columns:    []*schema.Column{ProductionOrdersColumns[15]},
+				RefColumns: []*schema.Column{AdminUsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_orders_admin_users_closer",
+				Columns:    []*schema.Column{ProductionOrdersColumns[16]},
+				RefColumns: []*schema.Column{AdminUsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_orders_admin_users_canceller",
+				Columns:    []*schema.Column{ProductionOrdersColumns[17]},
+				RefColumns: []*schema.Column{AdminUsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "productionorder_order_no",
+				Unique:  true,
+				Columns: []*schema.Column{ProductionOrdersColumns[1]},
+			},
+			{
+				Name:    "productionorder_status_planned_start_at",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionOrdersColumns[2], ProductionOrdersColumns[4]},
+			},
+			{
+				Name:    "productionorder_planned_end_at",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionOrdersColumns[5]},
+			},
+			{
+				Name:    "productionorder_created_by_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionOrdersColumns[14], ProductionOrdersColumns[12]},
+			},
+		},
+	}
+	// ProductionOrderEventsColumns holds the columns for the "production_order_events" table.
+	ProductionOrderEventsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "command_key", Type: field.TypeString, Size: 16},
+		{Name: "from_status", Type: field.TypeString, Nullable: true, Size: 16},
+		{Name: "to_status", Type: field.TypeString, Size: 16},
+		{Name: "order_version", Type: field.TypeInt},
+		{Name: "idempotency_key", Type: field.TypeString, Size: 128},
+		{Name: "intent_hash", Type: field.TypeString, Size: 64},
+		{Name: "result_contract", Type: field.TypeString, Size: 64},
+		{Name: "mutation_result", Type: field.TypeJSON},
+		{Name: "reason", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "production_order_id", Type: field.TypeInt},
+		{Name: "actor_id", Type: field.TypeInt},
+	}
+	// ProductionOrderEventsTable holds the schema information for the "production_order_events" table.
+	ProductionOrderEventsTable = &schema.Table{
+		Name:       "production_order_events",
+		Columns:    ProductionOrderEventsColumns,
+		PrimaryKey: []*schema.Column{ProductionOrderEventsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "production_order_events_production_orders_events",
+				Columns:    []*schema.Column{ProductionOrderEventsColumns[11]},
+				RefColumns: []*schema.Column{ProductionOrdersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_order_events_admin_users_actor",
+				Columns:    []*schema.Column{ProductionOrderEventsColumns[12]},
+				RefColumns: []*schema.Column{AdminUsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "productionorderevent_actor_id_command_key_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{ProductionOrderEventsColumns[12], ProductionOrderEventsColumns[1], ProductionOrderEventsColumns[5]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "command_key = 'CREATE'",
+				},
+			},
+			{
+				Name:    "productionorderevent_production_order_id_actor_id_command_key_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{ProductionOrderEventsColumns[11], ProductionOrderEventsColumns[12], ProductionOrderEventsColumns[1], ProductionOrderEventsColumns[5]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "command_key <> 'CREATE'",
+				},
+			},
+			{
+				Name:    "productionorderevent_production_order_id_order_version",
+				Unique:  true,
+				Columns: []*schema.Column{ProductionOrderEventsColumns[11], ProductionOrderEventsColumns[4]},
+			},
+			{
+				Name:    "productionorderevent_production_order_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionOrderEventsColumns[11], ProductionOrderEventsColumns[10]},
+			},
+		},
+	}
+	// ProductionOrderItemsColumns holds the columns for the "production_order_items" table.
+	ProductionOrderItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "line_no", Type: field.TypeInt},
+		{Name: "planned_quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "product_code_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "product_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "sku_code_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "unit_name_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "bom_version_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "production_order_id", Type: field.TypeInt},
+		{Name: "product_id", Type: field.TypeInt},
+		{Name: "product_sku_id", Type: field.TypeInt, Nullable: true},
+		{Name: "unit_id", Type: field.TypeInt},
+		{Name: "sales_order_item_id", Type: field.TypeInt, Nullable: true},
+		{Name: "bom_header_id", Type: field.TypeInt, Nullable: true},
+	}
+	// ProductionOrderItemsTable holds the schema information for the "production_order_items" table.
+	ProductionOrderItemsTable = &schema.Table{
+		Name:       "production_order_items",
+		Columns:    ProductionOrderItemsColumns,
+		PrimaryKey: []*schema.Column{ProductionOrderItemsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "production_order_items_production_orders_items",
+				Columns:    []*schema.Column{ProductionOrderItemsColumns[11]},
+				RefColumns: []*schema.Column{ProductionOrdersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_order_items_products_product",
+				Columns:    []*schema.Column{ProductionOrderItemsColumns[12]},
+				RefColumns: []*schema.Column{ProductsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_order_items_product_skus_product_sku",
+				Columns:    []*schema.Column{ProductionOrderItemsColumns[13]},
+				RefColumns: []*schema.Column{ProductSkusColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_order_items_units_unit",
+				Columns:    []*schema.Column{ProductionOrderItemsColumns[14]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_order_items_sales_order_items_sales_order_item",
+				Columns:    []*schema.Column{ProductionOrderItemsColumns[15]},
+				RefColumns: []*schema.Column{SalesOrderItemsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_order_items_bom_headers_bom_header",
+				Columns:    []*schema.Column{ProductionOrderItemsColumns[16]},
+				RefColumns: []*schema.Column{BomHeadersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "productionorderitem_production_order_id_line_no",
+				Unique:  true,
+				Columns: []*schema.Column{ProductionOrderItemsColumns[11], ProductionOrderItemsColumns[1]},
+			},
+			{
+				Name:    "productionorderitem_product_id_product_sku_id",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionOrderItemsColumns[12], ProductionOrderItemsColumns[13]},
+			},
+			{
+				Name:    "productionorderitem_sales_order_item_id",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionOrderItemsColumns[15]},
+			},
+			{
+				Name:    "productionorderitem_bom_header_id",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionOrderItemsColumns[16]},
 			},
 		},
 	}
@@ -2952,6 +3238,7 @@ var (
 		{Name: "completed_at", Type: field.TypeTime, Nullable: true},
 		{Name: "closed_at", Type: field.TypeTime, Nullable: true},
 		{Name: "payload", Type: field.TypeJSON, Nullable: true},
+		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "created_by", Type: field.TypeInt, Nullable: true},
 		{Name: "updated_by", Type: field.TypeInt, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
@@ -3013,6 +3300,11 @@ var (
 	// WorkflowTaskEventsColumns holds the columns for the "workflow_task_events" table.
 	WorkflowTaskEventsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "task_version", Type: field.TypeInt, Nullable: true},
+		{Name: "idempotency_key", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "intent_hash", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "command_key", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "mutation_result", Type: field.TypeJSON, Nullable: true},
 		{Name: "event_type", Type: field.TypeString, Size: 32},
 		{Name: "from_status_key", Type: field.TypeString, Nullable: true, Size: 32},
 		{Name: "to_status_key", Type: field.TypeString, Nullable: true, Size: 32},
@@ -3031,7 +3323,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "workflow_task_events_workflow_tasks_events",
-				Columns:    []*schema.Column{WorkflowTaskEventsColumns[9]},
+				Columns:    []*schema.Column{WorkflowTaskEventsColumns[14]},
 				RefColumns: []*schema.Column{WorkflowTasksColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -3040,13 +3332,24 @@ var (
 			{
 				Name:    "workflowtaskevent_task_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{WorkflowTaskEventsColumns[9], WorkflowTaskEventsColumns[8]},
+				Columns: []*schema.Column{WorkflowTaskEventsColumns[14], WorkflowTaskEventsColumns[13]},
+			},
+			{
+				Name:    "workflowtaskevent_task_id_task_version",
+				Unique:  true,
+				Columns: []*schema.Column{WorkflowTaskEventsColumns[14], WorkflowTaskEventsColumns[1]},
+			},
+			{
+				Name:    "workflowtaskevent_task_id_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{WorkflowTaskEventsColumns[14], WorkflowTaskEventsColumns[2]},
 			},
 		},
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		AccessEntitlementsTable,
+		AdminSessionsTable,
 		AdminUsersTable,
 		AdminUserRolesTable,
 		BomHeadersTable,
@@ -3071,6 +3374,9 @@ var (
 		ProductsTable,
 		ProductSkusTable,
 		ProductionFactsTable,
+		ProductionOrdersTable,
+		ProductionOrderEventsTable,
+		ProductionOrderItemsTable,
 		PurchaseOrdersTable,
 		PurchaseOrderItemsTable,
 		PurchaseReceiptsTable,
@@ -3102,6 +3408,12 @@ var (
 )
 
 func init() {
+	AdminUsersTable.Annotation = &entsql.Annotation{}
+	AdminUsersTable.Annotation.Checks = map[string]string{
+		"admin_users_revoked_requires_disabled": "\"revoked_at\" IS NULL OR \"disabled\" = TRUE",
+		"admin_users_revoked_requires_reason":   "\"revoked_at\" IS NULL OR (\"status_reason\" IS NOT NULL AND length(trim(\"status_reason\")) BETWEEN 1 AND 255)",
+		"admin_users_status_audit_bundle":       "((\"status_changed_at\" IS NULL AND \"status_changed_by\" IS NULL AND \"status_reason\" IS NULL) OR (\"status_changed_at\" IS NOT NULL AND \"status_changed_by\" IS NOT NULL))",
+	}
 	BomHeadersTable.ForeignKeys[0].RefTable = ProductsTable
 	BomItemsTable.ForeignKeys[0].RefTable = BomHeadersTable
 	BomItemsTable.ForeignKeys[1].RefTable = MaterialsTable
@@ -3120,9 +3432,12 @@ func init() {
 	ContactsTable.Annotation.Checks = map[string]string{
 		"contacts_owner_type_allowed": "owner_type IN ('CUSTOMER', 'SUPPLIER')",
 	}
+	FinanceFactsTable.ForeignKeys[0].RefTable = AdminUsersTable
 	FinanceFactsTable.Annotation = &entsql.Annotation{}
 	FinanceFactsTable.Annotation.Checks = map[string]string{
 		"finance_facts_amount_positive":          "amount > 0",
+		"finance_facts_cancel_audit_bundle":      "\n(\n  (status = 'CANCELLED' AND cancel_audit_version = 0\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)\n  OR\n  (status = 'CANCELLED' AND cancel_audit_version = 1\n    AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL\n    AND cancel_reason IS NOT NULL AND length(trim(cancel_reason)) BETWEEN 1 AND 255)\n  OR\n  (status <> 'CANCELLED'\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)\n)",
+		"finance_facts_cancel_audit_version":     "cancel_audit_version IN (0, 1)",
 		"finance_facts_collection_type_allowed":  "collection_type IS NULL OR collection_type IN ('ADVANCE_RECEIPT', 'ACCOUNTS_RECEIVABLE')",
 		"finance_facts_counterparty_allowed":     "counterparty_type IN ('CUSTOMER', 'SUPPLIER', 'OTHER')",
 		"finance_facts_currency_allowed":         "currency IN ('USD', 'CNY', 'HKD')",
@@ -3211,6 +3526,53 @@ func init() {
 		"production_facts_status_allowed":      "status IN ('DRAFT', 'POSTED', 'CANCELLED')",
 		"production_facts_subject_allowed":     "subject_type IN ('MATERIAL', 'PRODUCT')",
 		"production_facts_type_allowed":        "fact_type IN ('MATERIAL_ISSUE', 'FINISHED_GOODS_RECEIPT', 'REWORK')",
+	}
+	ProductionOrdersTable.ForeignKeys[0].RefTable = AdminUsersTable
+	ProductionOrdersTable.ForeignKeys[1].RefTable = AdminUsersTable
+	ProductionOrdersTable.ForeignKeys[2].RefTable = AdminUsersTable
+	ProductionOrdersTable.ForeignKeys[3].RefTable = AdminUsersTable
+	ProductionOrdersTable.Annotation = &entsql.Annotation{}
+	ProductionOrdersTable.Annotation.Checks = map[string]string{
+		"production_orders_cancel_actor_pair":     "((cancelled_by IS NULL AND cancelled_at IS NULL) OR (cancelled_by IS NOT NULL AND cancelled_at IS NOT NULL))",
+		"production_orders_cancel_reason_present": "status <> 'CANCELLED' OR (cancel_reason IS NOT NULL AND length(trim(cancel_reason)) BETWEEN 1 AND 255)",
+		"production_orders_cancel_reason_scope":   "cancel_reason IS NULL OR status = 'CANCELLED'",
+		"production_orders_close_actor_pair":      "((closed_by IS NULL AND closed_at IS NULL) OR (closed_by IS NOT NULL AND closed_at IS NOT NULL))",
+		"production_orders_close_reason_scope":    "close_reason IS NULL OR status = 'CLOSED'",
+		"production_orders_lifecycle_bundle":      "\n(\n  (status = 'DRAFT'\n    AND released_by IS NULL AND released_at IS NULL\n    AND closed_by IS NULL AND closed_at IS NULL\n    AND cancelled_by IS NULL AND cancelled_at IS NULL)\n  OR\n  (status = 'RELEASED'\n    AND released_by IS NOT NULL AND released_at IS NOT NULL\n    AND closed_by IS NULL AND closed_at IS NULL\n    AND cancelled_by IS NULL AND cancelled_at IS NULL)\n  OR\n  (status = 'CLOSED'\n    AND released_by IS NOT NULL AND released_at IS NOT NULL\n    AND closed_by IS NOT NULL AND closed_at IS NOT NULL\n    AND cancelled_by IS NULL AND cancelled_at IS NULL)\n  OR\n  (status = 'CANCELLED'\n    AND closed_by IS NULL AND closed_at IS NULL\n    AND cancelled_by IS NOT NULL AND cancelled_at IS NOT NULL)\n)",
+		"production_orders_order_no_present":      "length(trim(order_no)) BETWEEN 1 AND 64",
+		"production_orders_planned_dates_ordered": "planned_start_at IS NULL OR planned_end_at IS NULL OR planned_end_at >= planned_start_at",
+		"production_orders_release_actor_pair":    "((released_by IS NULL AND released_at IS NULL) OR (released_by IS NOT NULL AND released_at IS NOT NULL))",
+		"production_orders_status_allowed":        "status IN ('DRAFT', 'RELEASED', 'CLOSED', 'CANCELLED')",
+		"production_orders_version_positive":      "version > 0",
+	}
+	ProductionOrderEventsTable.ForeignKeys[0].RefTable = ProductionOrdersTable
+	ProductionOrderEventsTable.ForeignKeys[1].RefTable = AdminUsersTable
+	ProductionOrderEventsTable.Annotation = &entsql.Annotation{}
+	ProductionOrderEventsTable.Annotation.Checks = map[string]string{
+		"production_order_events_command_allowed":     "command_key IN ('CREATE', 'SAVE', 'RELEASE', 'CLOSE', 'CANCEL')",
+		"production_order_events_contract_v1":         "result_contract = 'production.order-mutation-result/v1'",
+		"production_order_events_create_shape":        "\n(\n  (command_key = 'CREATE' AND from_status IS NULL AND to_status = 'DRAFT' AND order_version = 1)\n  OR\n  (command_key <> 'CREATE' AND from_status IS NOT NULL)\n)",
+		"production_order_events_from_status_allowed": "from_status IS NULL OR from_status IN ('DRAFT', 'RELEASED', 'CLOSED', 'CANCELLED')",
+		"production_order_events_hash_length":         "length(intent_hash) = 64",
+		"production_order_events_key_present":         "length(trim(idempotency_key)) BETWEEN 1 AND 128",
+		"production_order_events_reason_scope":        "\n(\n  (\n  command_key NOT IN ('CLOSE', 'CANCEL') AND reason IS NULL\n)\nOR\n(\n  command_key = 'CLOSE'\n)\nOR\n(\n  command_key = 'CANCEL' AND reason IS NOT NULL AND length(trim(reason)) BETWEEN 1 AND 255\n  )\n)",
+		"production_order_events_to_status_allowed":   "to_status IN ('DRAFT', 'RELEASED', 'CLOSED', 'CANCELLED')",
+		"production_order_events_version_positive":    "order_version > 0",
+	}
+	ProductionOrderItemsTable.ForeignKeys[0].RefTable = ProductionOrdersTable
+	ProductionOrderItemsTable.ForeignKeys[1].RefTable = ProductsTable
+	ProductionOrderItemsTable.ForeignKeys[2].RefTable = ProductSkusTable
+	ProductionOrderItemsTable.ForeignKeys[3].RefTable = UnitsTable
+	ProductionOrderItemsTable.ForeignKeys[4].RefTable = SalesOrderItemsTable
+	ProductionOrderItemsTable.ForeignKeys[5].RefTable = BomHeadersTable
+	ProductionOrderItemsTable.Annotation = &entsql.Annotation{}
+	ProductionOrderItemsTable.Annotation.Checks = map[string]string{
+		"production_order_items_bom_header_positive": "bom_header_id IS NULL OR bom_header_id > 0",
+		"production_order_items_line_no_positive":    "line_no > 0",
+		"production_order_items_product_id_positive": "product_id > 0",
+		"production_order_items_quantity_positive":   "planned_quantity > 0",
+		"production_order_items_sales_line_positive": "sales_order_item_id IS NULL OR sales_order_item_id > 0",
+		"production_order_items_sku_id_positive":     "product_sku_id IS NULL OR product_sku_id > 0",
 	}
 	PurchaseOrdersTable.ForeignKeys[0].RefTable = SuppliersTable
 	PurchaseOrdersTable.Annotation = &entsql.Annotation{}
@@ -3320,4 +3682,8 @@ func init() {
 		"suppliers_supplier_type_allowed": "supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service', 'mixed')",
 	}
 	WorkflowTaskEventsTable.ForeignKeys[0].RefTable = WorkflowTasksTable
+	WorkflowTaskEventsTable.Annotation = &entsql.Annotation{}
+	WorkflowTaskEventsTable.Annotation.Checks = map[string]string{
+		"workflow_task_events_receipt_v1_complete": "\n(\n  (\n    idempotency_key IS NULL\n    AND intent_hash IS NULL\n    AND command_key IS NULL\n    AND mutation_result IS NULL\n  )\n  OR\n  (\n    idempotency_key IS NOT NULL\n    AND length(trim(idempotency_key)) BETWEEN 1 AND 128\n    AND intent_hash IS NOT NULL\n    AND length(intent_hash) = 64\n    AND command_key IS NOT NULL\n    AND length(trim(command_key)) BETWEEN 1 AND 128\n    AND mutation_result IS NOT NULL\n    AND task_version IS NOT NULL\n    AND task_version > 0\n    AND actor_id IS NOT NULL\n    AND actor_id > 0\n    AND to_status_key IS NOT NULL\n    AND length(trim(to_status_key)) > 0\n  )\n)",
+	}
 }

@@ -91,6 +91,9 @@ func (WorkflowTask) Fields() []ent.Field {
 		// Payload is a workflow display/action snapshot, not inventory, shipment or finance truth.
 		field.JSON("payload", map[string]any{}).
 			Optional(),
+		field.Int("version").
+			Default(1).
+			Positive(),
 		field.Int("created_by").
 			Optional().
 			Nillable().

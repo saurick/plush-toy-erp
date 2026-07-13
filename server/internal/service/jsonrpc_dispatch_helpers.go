@@ -50,6 +50,8 @@ func isSensitiveRPCParamKey(key string) bool {
 	return strings.Contains(normalized, "password") ||
 		strings.Contains(normalized, "token") ||
 		strings.Contains(normalized, "secret") ||
+		strings.Contains(normalized, "idempotency_key") ||
+		strings.Contains(normalized, "intent_hash") ||
 		strings.Contains(normalized, "base64") ||
 		normalized == "code" ||
 		normalized == "content" ||
@@ -114,6 +116,29 @@ func getStringSlice(m map[string]any, key string) []string {
 		out = append(out, text)
 	}
 	return out
+}
+
+func getStrictStringSlice(m map[string]any, key string, required bool) ([]string, bool) {
+	v, exists := m[key]
+	if !exists || v == nil {
+		return nil, !required
+	}
+	rawItems, ok := v.([]any)
+	if !ok {
+		return nil, false
+	}
+	out := make([]string, 0, len(rawItems))
+	for _, item := range rawItems {
+		text, ok := item.(string)
+		if !ok {
+			return nil, false
+		}
+		text = strings.TrimSpace(text)
+		if text != "" {
+			out = append(out, text)
+		}
+	}
+	return out, true
 }
 
 func toAnySliceString(items []string) []any {

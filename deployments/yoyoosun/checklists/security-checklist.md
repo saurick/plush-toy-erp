@@ -14,6 +14,7 @@
 - [ ] SMS mock 关闭。
 - [ ] debug seed 关闭。
 - [ ] debug cleanup 关闭。
+- [ ] 全量业务数据清空关闭。
 - [ ] SQL args tracing 关闭。
 - [ ] CORS 不是 `*`。
 - [ ] 默认管理员密码已修改或首次初始化后已移除临时注入。

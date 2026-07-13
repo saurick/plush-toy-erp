@@ -78,7 +78,15 @@ test("customer-config-runtime-manifest: builds publishable JSON-RPC payload shap
   );
   assert(manifest.compiled_snapshot.pages.includes("material-bom"));
   assert(manifest.compiled_snapshot.pages.includes("processes"));
-  assert.equal(manifest.module_states.length, 16);
+  assert.equal(
+    manifest.module_states.length,
+    customerPackageCatalog.modules.length,
+  );
+  assert(
+    manifest.module_states.some(
+      (item) => item.module_key === "production_orders",
+    ),
+  );
   assert(
     manifest.module_states.some((item) => item.module_key === "production"),
   );

@@ -10,8 +10,6 @@ export const yoyoosunMenuConfig = Object.freeze({
   desktopMenu: {
     hiddenItemKeys: [
       "business-dashboard",
-      "production-scheduling",
-      "production-exceptions",
       "shipping-release",
       "exception-flow",
     ],

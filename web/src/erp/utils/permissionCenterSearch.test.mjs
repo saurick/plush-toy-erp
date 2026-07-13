@@ -18,6 +18,16 @@ const admins = [
     menus: [],
   },
   {
+    id: 4,
+    username: 'former-user',
+    is_super_admin: false,
+    disabled: true,
+    account_status: 'revoked',
+    roles: [{ role_key: 'sales', name: '业务' }],
+    permissions: [],
+    menus: [],
+  },
+  {
     id: 2,
     username: 'warehouse-user',
     phone: '13800000002',
@@ -74,6 +84,12 @@ test('permissionCenterSearch: 管理员状态筛选区分启用、禁用和超�
       status: ADMIN_STATUS_FILTERS.DISABLED,
     }).map((item) => item.id),
     [3]
+  )
+  assert.deepEqual(
+    filterAdminRecords(admins, {
+      status: ADMIN_STATUS_FILTERS.REVOKED,
+    }).map((item) => item.id),
+    [4]
   )
   assert.deepEqual(
     filterAdminRecords(admins, {

@@ -9,6 +9,9 @@ import (
 // AccessEntitlement is the predicate function for accessentitlement builders.
 type AccessEntitlement func(*sql.Selector)
 
+// AdminSession is the predicate function for adminsession builders.
+type AdminSession func(*sql.Selector)
+
 // AdminUser is the predicate function for adminuser builders.
 type AdminUser func(*sql.Selector)
 
@@ -80,6 +83,15 @@ type ProductSKU func(*sql.Selector)
 
 // ProductionFact is the predicate function for productionfact builders.
 type ProductionFact func(*sql.Selector)
+
+// ProductionOrder is the predicate function for productionorder builders.
+type ProductionOrder func(*sql.Selector)
+
+// ProductionOrderEvent is the predicate function for productionorderevent builders.
+type ProductionOrderEvent func(*sql.Selector)
+
+// ProductionOrderItem is the predicate function for productionorderitem builders.
+type ProductionOrderItem func(*sql.Selector)
 
 // PurchaseOrder is the predicate function for purchaseorder builders.
 type PurchaseOrder func(*sql.Selector)

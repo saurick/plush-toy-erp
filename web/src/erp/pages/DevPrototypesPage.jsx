@@ -2,8 +2,10 @@ import React, { useMemo, useState } from 'react'
 import {
   AppstoreOutlined,
   CloseOutlined,
+  CopyOutlined,
   DownOutlined,
   FileImageOutlined,
+  FileMarkdownOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
   FullscreenOutlined,
@@ -13,6 +15,9 @@ import {
   SearchOutlined,
 } from '@ant-design/icons'
 import { Button, Empty, Input, Space, Tag, Typography } from 'antd'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { message } from '@/common/utils/antdApp'
+import DevPageNav from '../components/dev/DevPageNav.jsx'
 import {
   DEV_PROTOTYPE_EXPANDED_GROUPS_STORAGE_KEY,
   DEV_PROTOTYPE_FILTER_OPTIONS,
@@ -28,9 +33,15 @@ import {
   normalizeDevPrototypePinnedKeys,
   normalizeDevPrototypeSelectedKey,
   normalizeDevPrototypeStatusFilter,
+  prepareDevPrototypeSandboxSource,
 } from '../config/devPrototypes.mjs'
+import { formatDevEnglishAnchor } from '../config/devVisibleLabels.mjs'
 
 const { Paragraph, Text, Title } = Typography
+const PROTOTYPE_REPOSITORY_ROOT = 'docs/product/prototypes'
+const ASSET_QUERY_KEY = 'asset'
+const FILTER_QUERY_KEY = 'filter'
+const KEYWORD_QUERY_KEY = 'q'
 
 const htmlModules = import.meta.glob(
   '../../../../docs/product/prototypes/**/*.html',
@@ -113,6 +124,13 @@ function areStringArraysEqual(left = [], right = []) {
   )
 }
 
+function getPrototypeRepositoryPath(relativePath = '') {
+  const normalizedPath = String(relativePath || '').replace(/^\/+/, '')
+  return normalizedPath
+    ? `${PROTOTYPE_REPOSITORY_ROOT}/${normalizedPath}`
+    : PROTOTYPE_REPOSITORY_ROOT
+}
+
 function PrototypeAssetCard({ item, selected, onSelect, onTogglePinned }) {
   return (
     <div
@@ -126,6 +144,7 @@ function PrototypeAssetCard({ item, selected, onSelect, onTogglePinned }) {
       <button
         type="button"
         className="erp-dev-prototypes-card__body"
+        aria-current={selected ? 'true' : undefined}
         onClick={() => onSelect(item.key)}
       >
         <span className="erp-dev-prototypes-card__title">
@@ -133,7 +152,9 @@ function PrototypeAssetCard({ item, selected, onSelect, onTogglePinned }) {
           {item.title}
         </span>
         <span className="erp-dev-prototypes-card__meta">
-          <Tag color={item.type === 'HTML' ? 'green' : 'blue'}>{item.type}</Tag>
+          <Tag color={item.type === 'HTML' ? 'green' : 'blue'}>
+            {formatDevEnglishAnchor(item.type)}
+          </Tag>
           <PrototypeStatusTags statuses={item.statuses} />
         </span>
         <span className="erp-dev-prototypes-card__dir">{item.directory}</span>
@@ -183,8 +204,8 @@ function PrototypePreview({ item, fullscreen = false }) {
             : 'erp-dev-prototypes-preview__frame'
         }
         title={item.title}
-        srcDoc={item.source}
-        sandbox="allow-scripts allow-same-origin"
+        srcDoc={prepareDevPrototypeSandboxSource(item.source)}
+        sandbox="allow-scripts"
       />
     )
   }
@@ -210,15 +231,22 @@ function PrototypePreview({ item, fullscreen = false }) {
   )
 }
 
-function FullscreenPrototypePreview({ item, onClose }) {
+function FullscreenPrototypePreview({
+  closeButtonRef,
+  dialogRef,
+  item,
+  onClose,
+}) {
   if (!item) return null
 
   return (
     <div
+      ref={dialogRef}
       className="erp-dev-prototypes-fullscreen"
       role="dialog"
       aria-modal="true"
       aria-label={`${item.title} 全屏预览`}
+      tabIndex={-1}
     >
       <div className="erp-dev-prototypes-fullscreen__bar">
         <div className="erp-dev-prototypes-fullscreen__title">
@@ -230,29 +258,56 @@ function FullscreenPrototypePreview({ item, onClose }) {
             {item.assetPath}
           </Text>
         </div>
-        <Button icon={<CloseOutlined />} onClick={onClose}>
+        <Button
+          ref={closeButtonRef}
+          icon={<CloseOutlined />}
+          aria-label="关闭原型全屏预览"
+          onClick={onClose}
+        >
           关闭
         </Button>
       </div>
       <div className="erp-dev-prototypes-fullscreen__body">
         <PrototypePreview item={item} fullscreen />
       </div>
+      <button
+        type="button"
+        data-prototype-focus-guard
+        className="erp-dev-prototypes-fullscreen__focus-guard"
+        aria-label="焦点循环至关闭按钮"
+        onFocus={() => closeButtonRef.current?.focus()}
+      />
     </div>
   )
 }
 
 export default function DevPrototypesPage() {
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const pageNavRef = React.useRef(null)
+  const pageHeaderRef = React.useRef(null)
+  const pageMainRef = React.useRef(null)
+  const fullscreenDialogRef = React.useRef(null)
+  const fullscreenCloseButtonRef = React.useRef(null)
+  const fullscreenTriggerRef = React.useRef(null)
+  const fullscreenReturnFocusRef = React.useRef(null)
   const items = useMemo(
     () => buildDevPrototypeItems({ htmlModules, imageModules }),
     []
   )
-  const [statusFilter, setStatusFilter] = useState(() =>
-    normalizeDevPrototypeStatusFilter(
-      readStoredString(DEV_PROTOTYPE_STATUS_FILTER_STORAGE_KEY) ||
-        DEV_PROTOTYPE_FILTERS.ALL
-    )
+  const requestedStatusFilter = searchParams.has(FILTER_QUERY_KEY)
+    ? searchParams.get(FILTER_QUERY_KEY) || ''
+    : readStoredString(DEV_PROTOTYPE_STATUS_FILTER_STORAGE_KEY) ||
+      DEV_PROTOTYPE_FILTERS.ALL
+  const statusFilter = normalizeDevPrototypeStatusFilter(requestedStatusFilter)
+  const keyword = searchParams.get(KEYWORD_QUERY_KEY) || ''
+  const requestedSelectedKey = searchParams.has(ASSET_QUERY_KEY)
+    ? searchParams.get(ASSET_QUERY_KEY) || ''
+    : readStoredString(DEV_PROTOTYPE_SELECTED_STORAGE_KEY) || ''
+  const selectedKey = normalizeDevPrototypeSelectedKey(
+    requestedSelectedKey,
+    items
   )
-  const [keyword, setKeyword] = useState('')
   const [pinnedKeys, setPinnedKeys] = useState(() =>
     normalizeDevPrototypePinnedKeys(
       readStoredStringArray(DEV_PROTOTYPE_PINNED_STORAGE_KEY) || [],
@@ -307,18 +362,37 @@ export default function DevPrototypesPage() {
   const visibleGroupsExpanded =
     visibleGroupKeys.length > 0 &&
     visibleGroupKeys.every((groupKey) => expandedGroupKeySet.has(groupKey))
-  const [selectedKey, setSelectedKey] = useState(() =>
-    normalizeDevPrototypeSelectedKey(
-      readStoredString(DEV_PROTOTYPE_SELECTED_STORAGE_KEY) || '',
-      items
-    )
-  )
   const [fullscreenItem, setFullscreenItem] = useState(null)
   const selectedItem =
-    visibleItems.find((item) => item.key === selectedKey) ||
-    visibleItems[0] ||
-    itemsWithPinnedState.find((item) => item.key === selectedKey) ||
-    itemsWithPinnedState[0]
+    visibleItems.find((item) => item.key === selectedKey) || visibleItems[0]
+  const canonicalSelectedKey = selectedItem?.key || selectedKey
+
+  const copySelectedAssetPath = async () => {
+    if (!selectedItem?.assetPath) return
+
+    const assetPath = getPrototypeRepositoryPath(selectedItem.assetPath)
+    try {
+      await navigator.clipboard.writeText(assetPath)
+      message.success('已复制原型资产路径')
+    } catch {
+      message.error('复制失败，请手动选中原型资产路径')
+    }
+  }
+
+  const openSelectedReadme = () => {
+    if (!selectedItem?.readmePath) return
+
+    const params = new URLSearchParams({
+      path: getPrototypeRepositoryPath(selectedItem.readmePath),
+    })
+    navigate({ pathname: '/__dev/docs', search: `?${params.toString()}` })
+  }
+
+  const openFullscreen = (item) => {
+    fullscreenReturnFocusRef.current =
+      fullscreenTriggerRef.current || document.activeElement
+    setFullscreenItem(item)
+  }
 
   const togglePinned = (itemKey) => {
     setPinnedKeys((currentPinnedKeys) => {
@@ -337,11 +411,30 @@ export default function DevPrototypesPage() {
   }
 
   const selectStatusFilter = (filter) => {
-    setStatusFilter(normalizeDevPrototypeStatusFilter(filter))
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set(FILTER_QUERY_KEY, normalizeDevPrototypeStatusFilter(filter))
+    setSearchParams(nextParams)
   }
 
   const selectPrototypeAsset = (itemKey) => {
-    setSelectedKey(normalizeDevPrototypeSelectedKey(itemKey, items))
+    const nextParams = new URLSearchParams(searchParams)
+    const normalizedItemKey = normalizeDevPrototypeSelectedKey(itemKey, items)
+    if (normalizedItemKey) {
+      nextParams.set(ASSET_QUERY_KEY, normalizedItemKey)
+    } else {
+      nextParams.delete(ASSET_QUERY_KEY)
+    }
+    setSearchParams(nextParams)
+  }
+
+  const updateKeyword = (nextKeyword) => {
+    const nextParams = new URLSearchParams(searchParams)
+    if (nextKeyword) {
+      nextParams.set(KEYWORD_QUERY_KEY, nextKeyword)
+    } else {
+      nextParams.delete(KEYWORD_QUERY_KEY)
+    }
+    setSearchParams(nextParams, { replace: true })
   }
 
   const toggleDirectoryGroup = (groupKey) => {
@@ -384,34 +477,37 @@ export default function DevPrototypesPage() {
   }, [pinnedKeys])
 
   React.useEffect(() => {
-    const normalizedStatusFilter =
-      normalizeDevPrototypeStatusFilter(statusFilter)
-    if (normalizedStatusFilter !== statusFilter) {
-      setStatusFilter(normalizedStatusFilter)
-      return
-    }
-    writeStoredString(
-      DEV_PROTOTYPE_STATUS_FILTER_STORAGE_KEY,
-      normalizedStatusFilter
-    )
+    writeStoredString(DEV_PROTOTYPE_STATUS_FILTER_STORAGE_KEY, statusFilter)
   }, [statusFilter])
 
   React.useEffect(() => {
-    const normalizedSelectedKey = normalizeDevPrototypeSelectedKey(
-      selectedKey,
-      items
-    )
-    if (normalizedSelectedKey !== selectedKey) {
-      setSelectedKey(normalizedSelectedKey)
-      return
-    }
-    if (normalizedSelectedKey) {
+    if (canonicalSelectedKey) {
       writeStoredString(
         DEV_PROTOTYPE_SELECTED_STORAGE_KEY,
-        normalizedSelectedKey
+        canonicalSelectedKey
       )
     }
-  }, [items, selectedKey])
+  }, [canonicalSelectedKey])
+
+  React.useEffect(() => {
+    const requestedFilter = searchParams.get(FILTER_QUERY_KEY) || ''
+    const requestedAsset = searchParams.get(ASSET_QUERY_KEY) || ''
+    if (
+      requestedFilter === statusFilter &&
+      requestedAsset === canonicalSelectedKey
+    ) {
+      return
+    }
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set(FILTER_QUERY_KEY, statusFilter)
+    if (canonicalSelectedKey) {
+      nextParams.set(ASSET_QUERY_KEY, canonicalSelectedKey)
+    } else {
+      nextParams.delete(ASSET_QUERY_KEY)
+    }
+    setSearchParams(nextParams, { replace: true })
+  }, [canonicalSelectedKey, searchParams, setSearchParams, statusFilter])
 
   React.useEffect(() => {
     if (storedExpandedGroupKeys === null) return
@@ -433,30 +529,103 @@ export default function DevPrototypesPage() {
   React.useEffect(() => {
     if (!fullscreenItem) return undefined
 
+    const dialog = fullscreenDialogRef.current
+    const backgroundElements = [
+      pageNavRef.current,
+      pageHeaderRef.current,
+      pageMainRef.current,
+    ].filter(Boolean)
+    const backgroundState = backgroundElements.map((element) => ({
+      element,
+      hadInert: element.hasAttribute('inert'),
+      ariaHidden: element.getAttribute('aria-hidden'),
+    }))
+    backgroundElements.forEach((element) => {
+      element.setAttribute('inert', '')
+      element.setAttribute('aria-hidden', 'true')
+    })
+
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
+        event.preventDefault()
         setFullscreenItem(null)
+        return
+      }
+      if (event.key !== 'Tab' || !dialog) {
+        return
+      }
+
+      const focusableElements = [
+        ...dialog.querySelectorAll(
+          'a[href], button:not([disabled]):not([data-prototype-focus-guard]), iframe, input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]):not([data-prototype-focus-guard])'
+        ),
+      ].filter((element) => element.getAttribute('aria-hidden') !== 'true')
+      if (focusableElements.length === 0) {
+        event.preventDefault()
+        dialog.focus()
+        return
+      }
+
+      const firstElement = focusableElements[0]
+      const lastElement = focusableElements.at(-1)
+      const { activeElement } = document
+      if (event.shiftKey && activeElement === firstElement) {
+        event.preventDefault()
+        lastElement.focus()
+      } else if (
+        !event.shiftKey &&
+        (activeElement === lastElement || !dialog.contains(activeElement))
+      ) {
+        event.preventDefault()
+        firstElement.focus()
       }
     }
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', handleKeyDown)
+    const focusFrame = window.requestAnimationFrame(() => {
+      const initialFocusElement = fullscreenCloseButtonRef.current || dialog
+      initialFocusElement?.focus()
+    })
     return () => {
+      window.cancelAnimationFrame(focusFrame)
       document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', handleKeyDown)
+      backgroundState.forEach(({ element, hadInert, ariaHidden }) => {
+        if (!hadInert) element.removeAttribute('inert')
+        if (ariaHidden === null) {
+          element.removeAttribute('aria-hidden')
+        } else {
+          element.setAttribute('aria-hidden', ariaHidden)
+        }
+      })
+      const returnFocusElement = fullscreenReturnFocusRef.current
+      window.setTimeout(() => {
+        if (returnFocusElement?.isConnected) {
+          returnFocusElement.focus({ preventScroll: true })
+        }
+      }, 0)
     }
   }, [fullscreenItem])
 
   return (
-    <div className="erp-dev-prototypes-page">
-      <header className="erp-dev-prototypes-header">
+    <div className="erp-dev-prototypes-page erp-dev-workspace-page">
+      <DevPageNav
+        navRef={pageNavRef}
+        sourcePath={
+          selectedItem?.readmePath
+            ? getPrototypeRepositoryPath(selectedItem.readmePath)
+            : 'docs/product/prototypes/README.md'
+        }
+      />
+      <header ref={pageHeaderRef} className="erp-dev-prototypes-header">
         <div className="erp-dev-prototypes-header__copy">
           <Space align="center" size={10} wrap>
             <AppstoreOutlined className="erp-dev-prototypes-header__icon" />
-            <Title level={3} className="erp-dev-prototypes-title">
+            <Title level={1} className="erp-dev-prototypes-title">
               产品原型与样板查看器 / Prototype Viewer
             </Title>
-            <Tag color="green">DEV ONLY</Tag>
+            <Tag color="green">仅开发环境 / DEV ONLY</Tag>
           </Space>
           <Paragraph className="erp-dev-prototypes-summary">
             只查看 docs/product/prototypes 下的 HTML 样板、PNG
@@ -467,14 +636,17 @@ export default function DevPrototypesPage() {
         </div>
         <div className="erp-dev-prototypes-header__stats">
           <span>
-            HTML {items.filter((item) => item.type === 'HTML').length}
+            网页原型 / HTML{' '}
+            {items.filter((item) => item.type === 'HTML').length}
           </span>
-          <span>PNG {items.filter((item) => item.type === 'PNG').length}</span>
+          <span>
+            图片方案 / PNG {items.filter((item) => item.type === 'PNG').length}
+          </span>
           <span>总计 / Total {items.length}</span>
         </div>
       </header>
 
-      <main className="erp-dev-prototypes-shell">
+      <main ref={pageMainRef} className="erp-dev-prototypes-shell">
         <aside className="erp-dev-prototypes-sidebar">
           <Input
             allowClear
@@ -482,7 +654,7 @@ export default function DevPrototypesPage() {
             prefix={<SearchOutlined />}
             placeholder="搜索名称、目录、用途、参照范围"
             className="erp-dev-prototypes-search"
-            onChange={(event) => setKeyword(event.target.value)}
+            onChange={(event) => updateKeyword(event.target.value)}
           />
           <div className="erp-dev-prototypes-filter" aria-label="按状态筛选">
             {DEV_PROTOTYPE_FILTER_OPTIONS.map((option) => (
@@ -610,9 +782,23 @@ export default function DevPrototypesPage() {
               {selectedItem ? (
                 <>
                   <Tag color={selectedItem.type === 'HTML' ? 'green' : 'blue'}>
-                    {selectedItem.type}
+                    {formatDevEnglishAnchor(selectedItem.type)}
                   </Tag>
                   <PrototypeStatusTags statuses={selectedItem.statuses} />
+                  <Button
+                    icon={<CopyOutlined />}
+                    aria-label="复制当前原型资产路径"
+                    onClick={copySelectedAssetPath}
+                  >
+                    复制路径 / Copy
+                  </Button>
+                  <Button
+                    icon={<FileMarkdownOutlined />}
+                    aria-label="在开发文档中打开当前原型说明"
+                    onClick={openSelectedReadme}
+                  >
+                    打开说明 / README
+                  </Button>
                   <Button
                     icon={
                       selectedItem.pinned ? (
@@ -621,15 +807,22 @@ export default function DevPrototypesPage() {
                         <PushpinOutlined />
                       )
                     }
+                    aria-label={
+                      selectedItem.pinned
+                        ? '取消置顶当前原型资产'
+                        : '置顶当前原型资产'
+                    }
                     aria-pressed={selectedItem.pinned}
                     onClick={() => togglePinned(selectedItem.key)}
                   >
                     {selectedItem.pinned ? '取消置顶 / Unpin' : '置顶 / Pin'}
                   </Button>
                   <Button
+                    ref={fullscreenTriggerRef}
                     icon={<FullscreenOutlined />}
+                    aria-label="全屏预览当前原型"
                     disabled={!selectedItem.available}
-                    onClick={() => setFullscreenItem(selectedItem)}
+                    onClick={() => openFullscreen(selectedItem)}
                   >
                     全屏预览 / Fullscreen
                   </Button>
@@ -639,21 +832,35 @@ export default function DevPrototypesPage() {
           </div>
 
           <div className="erp-dev-prototypes-reader__info">
-            <Text>{selectedItem?.description}</Text>
-            {selectedItem?.appliesTo ? (
-              <Text className="erp-dev-prototypes-reader__applies">
-                参照范围：{selectedItem.appliesTo}
+            {selectedItem ? (
+              <>
+                <Text>{selectedItem.description}</Text>
+                {selectedItem.appliesTo ? (
+                  <Text className="erp-dev-prototypes-reader__applies">
+                    参照范围：{selectedItem.appliesTo}
+                  </Text>
+                ) : null}
+                <Text type="secondary">
+                  <FolderOpenOutlined /> {selectedItem.directory}
+                </Text>
+                <Text type="secondary">
+                  <FileMarkdownOutlined />{' '}
+                  {getPrototypeRepositoryPath(selectedItem.readmePath)}
+                </Text>
+              </>
+            ) : (
+              <Text type="secondary">
+                当前筛选没有匹配资产，请调整关键词或状态筛选。
               </Text>
-            ) : null}
-            <Text type="secondary">
-              <FolderOpenOutlined /> {selectedItem?.directory}
-            </Text>
+            )}
           </div>
 
           <PrototypePreview item={selectedItem} />
         </section>
       </main>
       <FullscreenPrototypePreview
+        closeButtonRef={fullscreenCloseButtonRef}
+        dialogRef={fullscreenDialogRef}
         item={fullscreenItem}
         onClose={() => setFullscreenItem(null)}
       />

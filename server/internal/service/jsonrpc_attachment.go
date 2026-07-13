@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
@@ -30,10 +31,13 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 	}
 
 	switch method {
-	case "list_attachments", "listAttachments":
+	case "list_attachments":
 		ownerType := biz.NormalizeBusinessAttachmentOwnerType(getString(pm, "owner_type"))
 		ownerID := getInt(pm, "owner_id", 0)
 		if res := d.requireBusinessAttachmentOwnerPermission(ctx, ownerType, false); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireWorkflowAttachmentTaskAccess(ctx, ownerType, ownerID, false); res != nil {
 			return id, res, nil
 		}
 		items, err := d.attachmentUC.ListBusinessAttachments(ctx, ownerType, ownerID)
@@ -43,12 +47,20 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
 			"attachments": businessAttachmentsToAny(items, false),
 		})}, nil
-	case "upload_attachment", "uploadAttachment":
+	case "upload_attachment":
 		ownerType := biz.NormalizeBusinessAttachmentOwnerType(getString(pm, "owner_type"))
+		ownerID := getInt(pm, "owner_id", 0)
+		expectedVersion, expectedVersionOK := positiveSafeIntegerParam(pm, "expected_version")
+		if ownerType == biz.BusinessAttachmentOwnerWorkflowTask && !expectedVersionOK {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
 		if res := d.requireBusinessAttachmentOwnerPermission(ctx, ownerType, true); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireBusinessAttachmentOwnerModuleEnabled(ctx, getString(pm, "customer_key"), ownerType); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireWorkflowAttachmentTaskAccess(ctx, ownerType, ownerID, true); res != nil {
 			return id, res, nil
 		}
 		admin, res := d.CurrentAdmin(ctx)
@@ -56,9 +68,17 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 			return id, res, nil
 		}
 		uploadedBy := admin.ID
+		var workflowGuard *biz.WorkflowAttachmentWriteGuard
+		if ownerType == biz.BusinessAttachmentOwnerWorkflowTask {
+			workflowGuard = &biz.WorkflowAttachmentWriteGuard{
+				ExpectedVersion:      expectedVersion,
+				ActorID:              admin.ID,
+				VisibleOwnerRoleKeys: d.workflowVisibleOwnerRoleKeys(ctx, admin, biz.PermissionWorkflowTaskUpdate),
+			}
+		}
 		item, err := d.attachmentUC.UploadBusinessAttachment(ctx, &biz.BusinessAttachmentUploadInput{
 			OwnerType:      ownerType,
-			OwnerID:        getInt(pm, "owner_id", 0),
+			OwnerID:        ownerID,
 			AttachmentType: getString(pm, "attachment_type"),
 			SlotKey:        optionalStringFromParams(pm, "slot_key"),
 			FileName:       getString(pm, "file_name"),
@@ -66,6 +86,7 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 			ContentBase64:  getString(pm, "content_base64"),
 			UploadedBy:     &uploadedBy,
 			Note:           optionalStringFromParams(pm, "note"),
+			WorkflowGuard:  workflowGuard,
 		})
 		if err != nil {
 			return id, d.mapBusinessAttachmentError(ctx, err), nil
@@ -73,33 +94,24 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
 			"attachment": businessAttachmentToAny(item, false),
 		})}, nil
-	case "download_attachment", "downloadAttachment", "get_attachment_content", "getAttachmentContent":
-		item, err := d.attachmentUC.GetBusinessAttachment(ctx, getInt(pm, "id", 0))
+	case "download_attachment":
+		item, err := d.attachmentUC.GetBusinessAttachmentMetadata(ctx, getInt(pm, "id", 0))
 		if err != nil {
 			return id, d.mapBusinessAttachmentError(ctx, err), nil
 		}
 		if res := d.requireBusinessAttachmentOwnerPermission(ctx, item.OwnerType, false); res != nil {
 			return id, res, nil
 		}
-		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
-			"attachment": businessAttachmentToAny(item, true),
-		})}, nil
-	case "delete_attachment", "deleteAttachment":
-		item, err := d.attachmentUC.GetBusinessAttachment(ctx, getInt(pm, "id", 0))
+		if res := d.requireWorkflowAttachmentTaskAccess(ctx, item.OwnerType, item.OwnerID, false); res != nil {
+			return id, res, nil
+		}
+		content, err := d.attachmentUC.GetBusinessAttachmentContent(ctx, item)
 		if err != nil {
 			return id, d.mapBusinessAttachmentError(ctx, err), nil
 		}
-		if res := d.requireBusinessAttachmentOwnerPermission(ctx, item.OwnerType, true); res != nil {
-			return id, res, nil
-		}
-		if res := d.requireBusinessAttachmentOwnerModuleEnabled(ctx, getString(pm, "customer_key"), item.OwnerType); res != nil {
-			return id, res, nil
-		}
-		if err := d.attachmentUC.DeleteBusinessAttachment(ctx, item.ID); err != nil {
-			return id, d.mapBusinessAttachmentError(ctx, err), nil
-		}
+		item.Content = content
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
-			"deleted": true,
+			"attachment": businessAttachmentToAny(item, true),
 		})}, nil
 	default:
 		return id, &v1.JsonrpcResult{
@@ -107,6 +119,50 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 			Message: fmt.Sprintf("未知 attachment 接口 method=%s", method),
 		}, nil
 	}
+}
+
+func positiveSafeIntegerParam(pm map[string]any, key string) (int, bool) {
+	raw, ok := pm[key]
+	if !ok {
+		return 0, false
+	}
+	value, ok := raw.(float64)
+	if !ok || value <= 0 || value > float64(1<<53-1) || math.Trunc(value) != value {
+		return 0, false
+	}
+	return int(value), true
+}
+
+func (d *jsonrpcDispatcher) requireWorkflowAttachmentTaskAccess(ctx context.Context, ownerType string, ownerID int, write bool) *v1.JsonrpcResult {
+	if ownerType != biz.BusinessAttachmentOwnerWorkflowTask {
+		return nil
+	}
+	if d.workflowUC == nil || ownerID <= 0 {
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	requiredPermission := biz.PermissionWorkflowTaskRead
+	if write {
+		requiredPermission = biz.PermissionWorkflowTaskUpdate
+	}
+	if res := d.RequireAdminPermission(ctx, requiredPermission); res != nil {
+		return res
+	}
+	task, err := d.workflowUC.GetTask(ctx, ownerID)
+	if err != nil {
+		return d.mapWorkflowError(ctx, err)
+	}
+	admin, res := d.CurrentAdmin(ctx)
+	if res != nil {
+		return res
+	}
+	visibleOwnerRoleKeys := d.workflowVisibleOwnerRoleKeys(ctx, admin, requiredPermission)
+	if !workflowAdminCanViewTask(admin, task, visibleOwnerRoleKeys) {
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	}
+	if write && !workflowAdminCanHandleTask(admin, task, "blocked", visibleOwnerRoleKeys) {
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	}
+	return nil
 }
 
 func optionalStringFromParams(pm map[string]any, key string) *string {
@@ -264,7 +320,7 @@ func (d *jsonrpcDispatcher) mapBusinessAttachmentError(ctx context.Context, err 
 	}
 	switch {
 	case errors.Is(err, biz.ErrBusinessAttachmentTooLarge):
-		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: "附件超过 50MB，请压缩后再上传"}
+		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: "附件超过 5MB，请压缩后再上传"}
 	case errors.Is(err, biz.ErrBadParam),
 		errors.Is(err, biz.ErrBusinessAttachmentOwnerInvalid),
 		errors.Is(err, biz.ErrBusinessAttachmentContentInvalid),
@@ -273,6 +329,10 @@ func (d *jsonrpcDispatcher) mapBusinessAttachmentError(ctx context.Context, err 
 	case errors.Is(err, biz.ErrBusinessAttachmentNotFound),
 		errors.Is(err, biz.ErrBusinessAttachmentOwnerNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "附件或所属业务记录不存在"}
+	case errors.Is(err, biz.ErrWorkflowTaskConflict), errors.Is(err, biz.ErrWorkflowTaskSettled):
+		return d.mapWorkflowError(ctx, err)
+	case errors.Is(err, biz.ErrForbidden):
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
 	default:
 		d.log.WithContext(ctx).Errorf("business attachment error: %v", err)
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}

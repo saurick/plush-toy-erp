@@ -60,6 +60,26 @@ func TaskID(v int) predicate.WorkflowTaskEvent {
 	return predicate.WorkflowTaskEvent(sql.FieldEQ(FieldTaskID, v))
 }
 
+// TaskVersion applies equality check predicate on the "task_version" field. It's identical to TaskVersionEQ.
+func TaskVersion(v int) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldEQ(FieldTaskVersion, v))
+}
+
+// IdempotencyKey applies equality check predicate on the "idempotency_key" field. It's identical to IdempotencyKeyEQ.
+func IdempotencyKey(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldEQ(FieldIdempotencyKey, v))
+}
+
+// IntentHash applies equality check predicate on the "intent_hash" field. It's identical to IntentHashEQ.
+func IntentHash(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldEQ(FieldIntentHash, v))
+}
+
+// CommandKey applies equality check predicate on the "command_key" field. It's identical to CommandKeyEQ.
+func CommandKey(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldEQ(FieldCommandKey, v))
+}
+
 // EventType applies equality check predicate on the "event_type" field. It's identical to EventTypeEQ.
 func EventType(v string) predicate.WorkflowTaskEvent {
 	return predicate.WorkflowTaskEvent(sql.FieldEQ(FieldEventType, v))
@@ -113,6 +133,291 @@ func TaskIDIn(vs ...int) predicate.WorkflowTaskEvent {
 // TaskIDNotIn applies the NotIn predicate on the "task_id" field.
 func TaskIDNotIn(vs ...int) predicate.WorkflowTaskEvent {
 	return predicate.WorkflowTaskEvent(sql.FieldNotIn(FieldTaskID, vs...))
+}
+
+// TaskVersionEQ applies the EQ predicate on the "task_version" field.
+func TaskVersionEQ(v int) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldEQ(FieldTaskVersion, v))
+}
+
+// TaskVersionNEQ applies the NEQ predicate on the "task_version" field.
+func TaskVersionNEQ(v int) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldNEQ(FieldTaskVersion, v))
+}
+
+// TaskVersionIn applies the In predicate on the "task_version" field.
+func TaskVersionIn(vs ...int) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldIn(FieldTaskVersion, vs...))
+}
+
+// TaskVersionNotIn applies the NotIn predicate on the "task_version" field.
+func TaskVersionNotIn(vs ...int) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldNotIn(FieldTaskVersion, vs...))
+}
+
+// TaskVersionGT applies the GT predicate on the "task_version" field.
+func TaskVersionGT(v int) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldGT(FieldTaskVersion, v))
+}
+
+// TaskVersionGTE applies the GTE predicate on the "task_version" field.
+func TaskVersionGTE(v int) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldGTE(FieldTaskVersion, v))
+}
+
+// TaskVersionLT applies the LT predicate on the "task_version" field.
+func TaskVersionLT(v int) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldLT(FieldTaskVersion, v))
+}
+
+// TaskVersionLTE applies the LTE predicate on the "task_version" field.
+func TaskVersionLTE(v int) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldLTE(FieldTaskVersion, v))
+}
+
+// TaskVersionIsNil applies the IsNil predicate on the "task_version" field.
+func TaskVersionIsNil() predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldIsNull(FieldTaskVersion))
+}
+
+// TaskVersionNotNil applies the NotNil predicate on the "task_version" field.
+func TaskVersionNotNil() predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldNotNull(FieldTaskVersion))
+}
+
+// IdempotencyKeyEQ applies the EQ predicate on the "idempotency_key" field.
+func IdempotencyKeyEQ(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldEQ(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyNEQ applies the NEQ predicate on the "idempotency_key" field.
+func IdempotencyKeyNEQ(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldNEQ(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyIn applies the In predicate on the "idempotency_key" field.
+func IdempotencyKeyIn(vs ...string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldIn(FieldIdempotencyKey, vs...))
+}
+
+// IdempotencyKeyNotIn applies the NotIn predicate on the "idempotency_key" field.
+func IdempotencyKeyNotIn(vs ...string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldNotIn(FieldIdempotencyKey, vs...))
+}
+
+// IdempotencyKeyGT applies the GT predicate on the "idempotency_key" field.
+func IdempotencyKeyGT(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldGT(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyGTE applies the GTE predicate on the "idempotency_key" field.
+func IdempotencyKeyGTE(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldGTE(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyLT applies the LT predicate on the "idempotency_key" field.
+func IdempotencyKeyLT(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldLT(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyLTE applies the LTE predicate on the "idempotency_key" field.
+func IdempotencyKeyLTE(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldLTE(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyContains applies the Contains predicate on the "idempotency_key" field.
+func IdempotencyKeyContains(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldContains(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyHasPrefix applies the HasPrefix predicate on the "idempotency_key" field.
+func IdempotencyKeyHasPrefix(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldHasPrefix(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyHasSuffix applies the HasSuffix predicate on the "idempotency_key" field.
+func IdempotencyKeyHasSuffix(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldHasSuffix(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyIsNil applies the IsNil predicate on the "idempotency_key" field.
+func IdempotencyKeyIsNil() predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldIsNull(FieldIdempotencyKey))
+}
+
+// IdempotencyKeyNotNil applies the NotNil predicate on the "idempotency_key" field.
+func IdempotencyKeyNotNil() predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldNotNull(FieldIdempotencyKey))
+}
+
+// IdempotencyKeyEqualFold applies the EqualFold predicate on the "idempotency_key" field.
+func IdempotencyKeyEqualFold(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldEqualFold(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyContainsFold applies the ContainsFold predicate on the "idempotency_key" field.
+func IdempotencyKeyContainsFold(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldContainsFold(FieldIdempotencyKey, v))
+}
+
+// IntentHashEQ applies the EQ predicate on the "intent_hash" field.
+func IntentHashEQ(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldEQ(FieldIntentHash, v))
+}
+
+// IntentHashNEQ applies the NEQ predicate on the "intent_hash" field.
+func IntentHashNEQ(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldNEQ(FieldIntentHash, v))
+}
+
+// IntentHashIn applies the In predicate on the "intent_hash" field.
+func IntentHashIn(vs ...string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldIn(FieldIntentHash, vs...))
+}
+
+// IntentHashNotIn applies the NotIn predicate on the "intent_hash" field.
+func IntentHashNotIn(vs ...string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldNotIn(FieldIntentHash, vs...))
+}
+
+// IntentHashGT applies the GT predicate on the "intent_hash" field.
+func IntentHashGT(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldGT(FieldIntentHash, v))
+}
+
+// IntentHashGTE applies the GTE predicate on the "intent_hash" field.
+func IntentHashGTE(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldGTE(FieldIntentHash, v))
+}
+
+// IntentHashLT applies the LT predicate on the "intent_hash" field.
+func IntentHashLT(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldLT(FieldIntentHash, v))
+}
+
+// IntentHashLTE applies the LTE predicate on the "intent_hash" field.
+func IntentHashLTE(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldLTE(FieldIntentHash, v))
+}
+
+// IntentHashContains applies the Contains predicate on the "intent_hash" field.
+func IntentHashContains(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldContains(FieldIntentHash, v))
+}
+
+// IntentHashHasPrefix applies the HasPrefix predicate on the "intent_hash" field.
+func IntentHashHasPrefix(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldHasPrefix(FieldIntentHash, v))
+}
+
+// IntentHashHasSuffix applies the HasSuffix predicate on the "intent_hash" field.
+func IntentHashHasSuffix(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldHasSuffix(FieldIntentHash, v))
+}
+
+// IntentHashIsNil applies the IsNil predicate on the "intent_hash" field.
+func IntentHashIsNil() predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldIsNull(FieldIntentHash))
+}
+
+// IntentHashNotNil applies the NotNil predicate on the "intent_hash" field.
+func IntentHashNotNil() predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldNotNull(FieldIntentHash))
+}
+
+// IntentHashEqualFold applies the EqualFold predicate on the "intent_hash" field.
+func IntentHashEqualFold(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldEqualFold(FieldIntentHash, v))
+}
+
+// IntentHashContainsFold applies the ContainsFold predicate on the "intent_hash" field.
+func IntentHashContainsFold(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldContainsFold(FieldIntentHash, v))
+}
+
+// CommandKeyEQ applies the EQ predicate on the "command_key" field.
+func CommandKeyEQ(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldEQ(FieldCommandKey, v))
+}
+
+// CommandKeyNEQ applies the NEQ predicate on the "command_key" field.
+func CommandKeyNEQ(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldNEQ(FieldCommandKey, v))
+}
+
+// CommandKeyIn applies the In predicate on the "command_key" field.
+func CommandKeyIn(vs ...string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldIn(FieldCommandKey, vs...))
+}
+
+// CommandKeyNotIn applies the NotIn predicate on the "command_key" field.
+func CommandKeyNotIn(vs ...string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldNotIn(FieldCommandKey, vs...))
+}
+
+// CommandKeyGT applies the GT predicate on the "command_key" field.
+func CommandKeyGT(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldGT(FieldCommandKey, v))
+}
+
+// CommandKeyGTE applies the GTE predicate on the "command_key" field.
+func CommandKeyGTE(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldGTE(FieldCommandKey, v))
+}
+
+// CommandKeyLT applies the LT predicate on the "command_key" field.
+func CommandKeyLT(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldLT(FieldCommandKey, v))
+}
+
+// CommandKeyLTE applies the LTE predicate on the "command_key" field.
+func CommandKeyLTE(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldLTE(FieldCommandKey, v))
+}
+
+// CommandKeyContains applies the Contains predicate on the "command_key" field.
+func CommandKeyContains(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldContains(FieldCommandKey, v))
+}
+
+// CommandKeyHasPrefix applies the HasPrefix predicate on the "command_key" field.
+func CommandKeyHasPrefix(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldHasPrefix(FieldCommandKey, v))
+}
+
+// CommandKeyHasSuffix applies the HasSuffix predicate on the "command_key" field.
+func CommandKeyHasSuffix(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldHasSuffix(FieldCommandKey, v))
+}
+
+// CommandKeyIsNil applies the IsNil predicate on the "command_key" field.
+func CommandKeyIsNil() predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldIsNull(FieldCommandKey))
+}
+
+// CommandKeyNotNil applies the NotNil predicate on the "command_key" field.
+func CommandKeyNotNil() predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldNotNull(FieldCommandKey))
+}
+
+// CommandKeyEqualFold applies the EqualFold predicate on the "command_key" field.
+func CommandKeyEqualFold(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldEqualFold(FieldCommandKey, v))
+}
+
+// CommandKeyContainsFold applies the ContainsFold predicate on the "command_key" field.
+func CommandKeyContainsFold(v string) predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldContainsFold(FieldCommandKey, v))
+}
+
+// MutationResultIsNil applies the IsNil predicate on the "mutation_result" field.
+func MutationResultIsNil() predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldIsNull(FieldMutationResult))
+}
+
+// MutationResultNotNil applies the NotNil predicate on the "mutation_result" field.
+func MutationResultNotNil() predicate.WorkflowTaskEvent {
+	return predicate.WorkflowTaskEvent(sql.FieldNotNull(FieldMutationResult))
 }
 
 // EventTypeEQ applies the EQ predicate on the "event_type" field.

@@ -14,6 +14,21 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
   const strict = read('scripts/qa/strict.sh')
   const makefile = read('server/Makefile')
   const pgScript = read('scripts/purchase-receipt-pg.sh')
+  const workflowConcurrency = read(
+    'server/internal/data/workflow_repo_postgres_concurrency_test.go',
+  )
+  const customerConfigConcurrency = read(
+    'server/internal/data/customer_config_repo_postgres_concurrency_test.go',
+  )
+  const productionOrderSchema = read(
+    'server/internal/data/production_order_schema_postgres_test.go',
+  )
+  const productionOrderFactConcurrency = read(
+    'server/internal/data/production_order_fact_postgres_concurrency_test.go',
+  )
+  const productionOrderConcurrency = read(
+    'server/internal/data/production_order_postgres_concurrency_test.go',
+  )
 
   for (const [name, source] of [
     ['full', full],
@@ -44,13 +59,70 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
     'TestPurchaseReceiptPostgres',
     'TestPurchaseReceiptAdjustmentPostgres',
     'TestWorkflowPostgres',
+    'TestCustomerConfigPostgres',
+    'TestProductionOrderSchemaPostgres',
+    'TestProductionOrderPostgres',
     'TestSourceDocumentPostgres',
     'TestInventoryPostgres',
     'TestOperationalFactPostgres',
     'TestProcessRuntimePostgres',
+    'TestFinanceFactCancelAuditPostgres',
     'TestFinanceProcessCommandPostgres',
     'TestSalesProcessCommandPostgres',
   ]) {
     assert(pgScript.includes(testPrefix), `critical PostgreSQL gate must include ${testPrefix}`)
+  }
+
+  for (const testName of [
+    'TestWorkflowPostgresConflictingTerminalUpdatesApplySideEffectsOnce',
+    'TestWorkflowPostgresConcurrentSameTerminalRetryIsIdempotent',
+    'TestWorkflowPostgresConcurrentDifferentIntentSameKeyConflicts',
+    'TestWorkflowPostgresConcurrentSameUrgeKeyIncrementsOnce',
+    'TestWorkflowPostgresMigrationShape',
+    'TestWorkflowPostgresShipmentReminderMigrationNormalizesBusinessStatus',
+    'TestWorkflowPostgresConcurrentBlockedCommandsAllowOneWinner',
+    'TestWorkflowPostgresConcurrentBlockedAndDoneAllowOneWinner',
+    'TestWorkflowPostgresConcurrentUrgesDoNotLoseCount',
+    'TestWorkflowPostgresUrgeAndTerminalAllowOneWinner',
+    'TestWorkflowPostgresRejectsStaleVersionWithoutSideEffects',
+  ]) {
+    assert.match(
+      workflowConcurrency,
+      new RegExp(`func ${testName}\\(`, 'u'),
+      `critical Workflow PostgreSQL contract must keep ${testName}`,
+    )
+  }
+
+  for (const testName of [
+    'TestCustomerConfigPostgresSingleActiveIndexRejectsDuplicate',
+    'TestCustomerConfigPostgresConcurrentActivationKeepsOneActive',
+  ]) {
+    assert.match(
+      customerConfigConcurrency,
+      new RegExp(`func ${testName}\\(`, 'u'),
+      `critical Customer Config PostgreSQL contract must keep ${testName}`,
+    )
+  }
+
+  assert.match(
+    productionOrderSchema,
+    /func TestProductionOrderSchemaPostgresConstraintsAndReceiptIndexes\(/u,
+    'critical PostgreSQL contract must keep production order schema shape and bad-row evidence',
+  )
+  for (const testName of [
+    'TestProductionOrderPostgresConcurrentFactReplayAndQuantityWinner',
+    'TestProductionOrderPostgresCancellationAndFactPostingOneWinner',
+    'TestProductionOrderPostgresCloseRequiresCompletionOrReasonAndReplaysExactly',
+    'TestProductionOrderPostgresCloseChecksEveryLineIndependently',
+    'TestProductionOrderPostgresCloseFailsClosedForCorruptOrExcessFacts',
+    'TestProductionOrderPostgresCloseSerializesWithFactPostAndReversal',
+    'TestProductionOrderPostgresGetAndListReadContract',
+    'TestProductionOrderPostgresSalesEligibilityLocksAndRollsBack',
+  ]) {
+    assert.match(
+      productionOrderFactConcurrency + productionOrderConcurrency,
+      new RegExp(`func ${testName}\\(`, 'u'),
+      `critical PostgreSQL contract must keep ${testName}`,
+    )
   }
 })

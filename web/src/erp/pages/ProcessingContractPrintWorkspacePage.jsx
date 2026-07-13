@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Navigate, useParams, useSearchParams } from 'react-router-dom'
+import {
+  Navigate,
+  useOutletContext,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import ProcessingContractPaper from '../components/print/ProcessingContractPaper.jsx'
@@ -40,6 +45,7 @@ import {
   resolvePrintWorkspaceEntrySource,
   resolvePrintWorkspaceStateID,
   resolvePrintWorkspaceDraftMode,
+  resolvePrintWorkspaceCustomerKey,
 } from '../utils/printWorkspace.js'
 import {
   findMergeAtCell,
@@ -208,9 +214,12 @@ function resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag) {
 export default function ProcessingContractPrintWorkspacePage() {
   const { templateKey } = useParams()
   const [searchParams] = useSearchParams()
+  const outletContext = useOutletContext()
+  const profileCustomerKey =
+    outletContext?.adminProfile?.effective_session?.customer?.key || ''
   const customerKey = useMemo(
-    () => String(searchParams.get('customer_key') || '').trim(),
-    [searchParams]
+    () => resolvePrintWorkspaceCustomerKey(searchParams, profileCustomerKey),
+    [profileCustomerKey, searchParams]
   )
   const paperRef = useRef(null)
   const stageWrapRef = useRef(null)
@@ -1030,7 +1039,7 @@ export default function ProcessingContractPrintWorkspacePage() {
             </span>
             <span>
               3.
-              如合同快照已有确认金额，可直接改写委托加工金额；未手工改写时会继续按数量
+              如合同中已有确认金额，可直接改写委托加工金额；未手工改写时会继续按数量
               × 单价带值。
             </span>
           </>

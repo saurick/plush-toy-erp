@@ -177,29 +177,34 @@ type StockReservation struct {
 }
 
 type FinanceFact struct {
-	ID               int
-	FactNo           string
-	FactType         string
-	Status           string
-	CounterpartyType string
-	CounterpartyID   *int
-	Amount           decimal.Decimal
-	FeeAmount        decimal.Decimal
-	Currency         string
-	CollectionType   *string
-	PaymentTerm      *string
-	PaymentTermDays  *int
-	InvoiceCategory  *string
-	SourceType       *string
-	SourceID         *int
-	SourceLineID     *int
-	IdempotencyKey   string
-	OccurredAt       time.Time
-	PostedAt         *time.Time
-	SettledAt        *time.Time
-	Note             *string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                int
+	FactNo            string
+	FactType          string
+	Status            string
+	CounterpartyType  string
+	CounterpartyID    *int
+	Amount            decimal.Decimal
+	FeeAmount         decimal.Decimal
+	Currency          string
+	CollectionType    *string
+	PaymentTerm       *string
+	PaymentTermDays   *int
+	InvoiceCategory   *string
+	SourceType        *string
+	SourceID          *int
+	SourceLineID      *int
+	IdempotencyKey    string
+	OccurredAt        time.Time
+	PostedAt          *time.Time
+	SettledAt         *time.Time
+	CancelledAt       *time.Time
+	CancelledBy       *int
+	CancelledByName   *string
+	CancelReason      *string
+	CancelAuditLegacy bool
+	Note              *string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type OperationalFactMutation struct {
@@ -338,15 +343,14 @@ type OperationalFactRepo interface {
 	CreateFinanceFactDraft(ctx context.Context, in *FinanceFactCreate) (*FinanceFact, error)
 	PostFinanceFact(ctx context.Context, id int) (*FinanceFact, error)
 	SettleFinanceFact(ctx context.Context, id int) (*FinanceFact, error)
-	CancelPostedFinanceFact(ctx context.Context, id int) (*FinanceFact, error)
+	CancelPostedFinanceFact(ctx context.Context, id int, actorID int, reason string) (*FinanceFact, error)
 	ListFinanceFacts(ctx context.Context, filter OperationalFactFilter) ([]*FinanceFact, int, error)
 }
 
 // OperationalFactCancellationActorRepo is the authenticated path for shipment
-// and finance cancellation compensation evidence.
+// cancellation compensation evidence.
 type OperationalFactCancellationActorRepo interface {
 	CancelShippedShipmentWithActor(ctx context.Context, id int, actorID int) (*Shipment, error)
-	CancelPostedFinanceFactWithActor(ctx context.Context, id int, actorID int) (*FinanceFact, error)
 }
 
 type OperationalFactUsecase struct {
@@ -365,11 +369,14 @@ func (uc *OperationalFactUsecase) CreateProductionFactDraft(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.validateOperationalSubjectActive(ctx, normalized.SubjectType, normalized.SubjectID); err != nil {
-		return nil, err
-	}
-	if err := requireOptionalActiveReference(ctx, normalized.ProductSkuID, uc.repo.ProductSKUIsActive, ErrProductSKUInactive); err != nil {
-		return nil, err
+	productionOrderLinked := normalized.SourceType != nil && *normalized.SourceType == ProductionOrderSourceType
+	if !productionOrderLinked {
+		if err := uc.validateOperationalSubjectActive(ctx, normalized.SubjectType, normalized.SubjectID); err != nil {
+			return nil, err
+		}
+		if err := requireOptionalActiveReference(ctx, normalized.ProductSkuID, uc.repo.ProductSKUIsActive, ErrProductSKUInactive); err != nil {
+			return nil, err
+		}
 	}
 	if err := requireActiveReference(ctx, normalized.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
 		return nil, err
@@ -582,22 +589,15 @@ func (uc *OperationalFactUsecase) SettleFinanceFact(ctx context.Context, id int)
 	return uc.repo.SettleFinanceFact(ctx, id)
 }
 
-func (uc *OperationalFactUsecase) CancelPostedFinanceFact(ctx context.Context, id int) (*FinanceFact, error) {
-	if uc == nil || uc.repo == nil || id <= 0 {
-		return nil, ErrBadParam
-	}
-	return uc.repo.CancelPostedFinanceFact(ctx, id)
-}
-
-func (uc *OperationalFactUsecase) CancelPostedFinanceFactWithActor(ctx context.Context, id int, actorID int) (*FinanceFact, error) {
+func (uc *OperationalFactUsecase) CancelPostedFinanceFact(ctx context.Context, id int, actorID int, reason string) (*FinanceFact, error) {
 	if uc == nil || uc.repo == nil || id <= 0 || actorID <= 0 {
 		return nil, ErrBadParam
 	}
-	repo, ok := uc.repo.(OperationalFactCancellationActorRepo)
-	if !ok {
-		return nil, ErrActorAwareCancellationUnavailable
+	normalizedReason := strings.TrimSpace(reason)
+	if normalizedReason == "" || len([]rune(normalizedReason)) > 255 {
+		return nil, ErrBadParam
 	}
-	return repo.CancelPostedFinanceFactWithActor(ctx, id, actorID)
+	return uc.repo.CancelPostedFinanceFact(ctx, id, actorID, normalizedReason)
 }
 
 func (uc *OperationalFactUsecase) ListFinanceFacts(ctx context.Context, filter OperationalFactFilter) ([]*FinanceFact, int, error) {

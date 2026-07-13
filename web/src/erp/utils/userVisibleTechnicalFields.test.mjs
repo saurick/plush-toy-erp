@@ -71,7 +71,7 @@ const forbiddenBusinessSystemTimestampText = [
 const visibleStringAttributePattern =
   /\b(?:label|placeholder|title|exportTitle|createLabel|description|aria-label|message)\s*(?:=|:)\s*(['"`])([^'"`]*?)\1/giu
 const technicalSnakeCasePattern =
-  /\b(?:idempotency_key|owner_role_key|task_status_key|source_type|source_id|source_line_id|payload|[a-z][a-z0-9]*_(?:id|key))\b/iu
+  /\b(?:expected_version|idempotency_key|intent_hash|task_version|owner_role_key|task_status_key|source_type|source_id|source_line_id|payload|[a-z][a-z0-9]*_(?:id|key))\b/iu
 
 function isSourceFile(filePath) {
   return [...sourceExtensions].some((extension) => filePath.endsWith(extension))
@@ -130,7 +130,7 @@ test('业务事实选中标签不把内部 ID 当业务编号 fallback', () => {
   )
   assert.match(content, /出货单已关联/u)
   assert.match(content, /库存预留已关联/u)
-  assert.match(content, /业务事实已关联/u)
+  assert.match(content, /业务记录已关联/u)
 })
 
 test('业务事实页面不把 source_type 和 counterparty_type 原始 key 当可见 fallback', () => {
@@ -346,6 +346,11 @@ test('权限中心权限名称不把 permission key 当用户可见 fallback', (
   assert.match(content, /function getPermissionVisibleName/u)
   assert.match(content, /return name \|\| '未登记权限'/u)
   assert.doesNotMatch(content, /label:\s*permission\.name \|\| permissionKey/u)
+  assert.doesNotMatch(content, /erp-permission-option__key/u)
+  assert.doesNotMatch(content, /搜索权限码/u)
+  assert.doesNotMatch(content, /搜索管理员账号、手机号、角色或权限码/u)
+  assert.doesNotMatch(content, /角色名称可按岗位调整，职责权限保持统一/u)
+  assert.match(content, /搜索功能名称或业务模块/u)
 })
 
 test('BOM 页面导出和选中项不把内部 ID 当业务字段', () => {
@@ -715,15 +720,40 @@ test('业务可见文案不暴露架构状态机术语', () => {
 test('正式业务边界文案不展示后端实现术语', () => {
   const files = [
     'pages/PermissionCenterPage.jsx',
+    'pages/DashboardPage.jsx',
     'pages/V1OperationalFactPage.jsx',
     'pages/OperationalFactsPage.jsx',
     'pages/V1OutsourcingOrdersPage.jsx',
+    'pages/V1PurchaseOrdersPage.jsx',
     'pages/V1PurchaseReceiptsPage.jsx',
+    'pages/V1QualityInspectionsPage.jsx',
+    'pages/BOMVersionsPage.jsx',
+    'pages/V1InventoryLedgerPage.jsx',
+    'pages/EngineeringPrintWorkspacePage.jsx',
+    'pages/ProcessingContractPrintWorkspacePage.jsx',
     'pages/ShipmentsPage.jsx',
     'pages/WorkflowBusinessModulePage.jsx',
+    'pages/PrintCenterPage.jsx',
+    'pages/PrintTemplatePreviewPage.jsx',
     'config/businessModules.mjs',
+    'config/dashboardModules.mjs',
+    'config/printTemplates.mjs',
+    'data/processingContractTemplate.mjs',
     'components/operational-facts/operationalFactPageConfig.mjs',
+    'components/operational-facts/OperationalFactForms.jsx',
+    'components/business-list/BusinessAttachmentPanel.jsx',
+    'components/sales-orders/SalesOrderBusinessModal.jsx',
+    'components/sales-orders/salesOrderPageConfig.mjs',
+    'components/purchase-orders/PurchaseOrderBusinessModal.jsx',
+    'components/purchase-orders/purchaseOrderPageConfig.mjs',
+    'components/purchase-orders/PurchaseOrderInboundDraftModal.jsx',
+    'components/purchase-orders/PurchaseOrderForm.jsx',
+    'components/outsourcing-orders/outsourcingOrderPageConfig.mjs',
+    'components/master-data/masterDataPageConfig.mjs',
+    'components/master-data/MasterDataForm.jsx',
+    'components/print/MaterialPurchaseContractWorkbench.jsx',
     'components/shipments/ShipmentBusinessModal.jsx',
+    'components/workflow/WorkflowTaskActionDrawer.jsx',
   ].map((file) => join(rootDir, file))
   const combined = files
     .map((filePath) => readFileSync(filePath, 'utf8'))
@@ -744,23 +774,69 @@ test('正式业务边界文案不展示后端实现术语', () => {
     'INVOICE 业务事实',
     'RECONCILIATION 业务事实',
     'finance_facts 的',
+    'Workflow / Fact',
+    'Workflow V1',
+    'QualityUsecase',
+    '后端业务规则',
+    '后端财务规则',
+    '后端采购入库规则',
+    '后端协同任务规则',
+    '只调用后端',
+    '纸面 DOM',
+    '当前主链路',
+    '尚未接入 PDF',
+    '前端不本地',
+    '不写事实层',
+    '源单：加工合同',
+    '委外源单',
+    '库存出库事实',
+    '入库单：入库事实',
+    '接口动作能力',
+    '受保护页面和接口',
+    '后台接口统一按权限码控制',
+    '不在此写出货、库存或财务事实',
+    '销售订单源单',
+    '不替代采购入库、退货、质检或应付事实',
+    '不在此写库存、质检或应付事实',
+    '附件不替代采购订单事实',
+    '不会自动写入库、质检、库存或财务事实',
+    '采购订单源单',
+    '不会自动写发料、回货、库存或财务事实',
+    '合同源单',
+    '对应事实模块',
+    '不写库存、采购或成本事实',
+    '附件不写库存、采购或成本事实',
+    '本页不写库存事实',
+    '产品归属使用 product_id',
+    '不生成订单、出货、库存或财务事实',
+    '生产事实已关联',
+    '委外事实已关联',
+    '财务事实已关联',
+    '业务事实已关联',
+    '业务事实状态',
+    '客户快照',
+    '材料编码快照',
+    '材料名称快照',
+    '颜色快照',
+    '当前图片快照',
+    '合同快照已有确认金额',
   ]) {
     assert.doesNotMatch(combined, new RegExp(staleVisibleText, 'u'))
   }
 
   for (const readableText of [
-    '角色权限模型',
-    '后台接口',
-    '按权限码控制',
-    '后端业务规则',
-    '后端财务规则',
-    '后端采购入库规则',
-    '后端协同任务规则',
-    '源单：加工合同',
-    '业务事实',
-    '库存出库事实',
+    '账号通过角色获得对应的菜单',
+    '系统按业务规则',
+    '正式业务记录',
+    '系统过账 / 冲正',
+    '业务单据：加工合同',
+    '实际出货记录',
+    '库存出库记录',
     '协同任务：入库跟进',
-    '入库单：入库事实',
+    '入库单：正式入库记录',
+    '本页只用于查询和追溯',
+    '单据客户名称',
+    '下单材料编码',
   ]) {
     assert.match(combined, new RegExp(readableText, 'u'))
   }
@@ -797,8 +873,8 @@ test('出货和入库正式页头不展示底层表名或状态 key', () => {
   }
 
   for (const readableShipmentHeaderText of [
-    '出货单维护出货单据和出货明细',
-    '库存出库事实',
+    '出货单维护出货信息和明细',
+    '库存出库记录',
   ]) {
     assert.match(
       shipmentPageContent,
@@ -806,9 +882,9 @@ test('出货和入库正式页头不展示底层表名或状态 key', () => {
     )
   }
   for (const readablePurchaseReceiptHeaderText of [
-    '入库管理维护采购入库草稿和入库明细',
+    '入库管理维护采购入库草稿和明细',
     '协同任务：入库跟进',
-    '入库单：入库事实',
+    '入库单：正式入库记录',
     '过账后写库存流水',
   ]) {
     assert.match(
@@ -1188,8 +1264,11 @@ test('Workflow 动作模式不把未知 action key 当可提交或可见 fallbac
     'utf8'
   )
 
-  assert.doesNotMatch(content, /return ACTION_MODE_ALIASES\[key\] \|\| key/u)
-  assert.match(content, /return ACTION_MODE_ALIASES\[key\] \|\| ''/u)
+  assert.doesNotMatch(content, /ACTION_MODE_ALIASES/u)
+  assert.match(
+    content,
+    /return WORKFLOW_ACTION_MODE_SET\.has\(key\) \? key : ''/u
+  )
 })
 
 test('任务派生 source_no 不把内部 ID 当业务来源编号 fallback', () => {

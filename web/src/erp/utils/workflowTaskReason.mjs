@@ -16,6 +16,10 @@ export function getWorkflowTaskReasonMeta(task = {}) {
   const businessReason =
     cleanText(task.business_status_reason) ||
     cleanText(payload.business_status_reason)
+  const handlingNote =
+    cleanText(task.handling_note) || cleanText(payload.handling_note)
+  const completionSummary =
+    cleanText(task.completion_summary) || cleanText(payload.completion_summary)
 
   if (statusKey === 'rejected') {
     return {
@@ -31,16 +35,15 @@ export function getWorkflowTaskReasonMeta(task = {}) {
       value: blockedReason || rejectedReason || businessReason,
     }
   }
-  if (blockedReason) {
-    return { kind: 'blocked', label: '阻塞原因', value: blockedReason }
+  const handlingValue =
+    statusKey === 'done'
+      ? handlingNote || completionSummary || businessReason
+      : handlingNote || businessReason || completionSummary
+  return {
+    kind: handlingValue ? 'business' : '',
+    label: '处理说明',
+    value: handlingValue,
   }
-  if (rejectedReason) {
-    return { kind: 'rejected', label: '退回原因', value: rejectedReason }
-  }
-  if (businessReason) {
-    return { kind: 'business', label: '处理说明', value: businessReason }
-  }
-  return { kind: '', label: '处理说明', value: '' }
 }
 
 export function getWorkflowTaskReason(task = {}) {

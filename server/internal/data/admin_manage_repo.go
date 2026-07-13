@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -11,7 +12,9 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/runtimeauditevent"
+	"server/internal/data/model/ent/workflowtask"
 
+	"entgo.io/ent/dialect"
 	"github.com/go-kratos/kratos/v2/log"
 )
 
@@ -39,16 +42,21 @@ func (r *adminManageRepo) toBizAdmin(a *ent.AdminUser) *biz.AdminUser {
 		return nil
 	}
 	admin := &biz.AdminUser{
-		ID:             a.ID,
-		Username:       a.Username,
-		Phone:          stringValue(a.Phone),
-		PasswordHash:   a.PasswordHash,
-		IsSuperAdmin:   a.IsSuperAdmin,
-		ERPPreferences: decodeAdminERPPreferences(a.ErpPreferences),
-		Disabled:       a.Disabled,
-		LastLoginAt:    a.LastLoginAt,
-		CreatedAt:      a.CreatedAt,
-		UpdatedAt:      a.UpdatedAt,
+		ID:              a.ID,
+		Username:        a.Username,
+		Phone:           stringValue(a.Phone),
+		PasswordHash:    a.PasswordHash,
+		IsSuperAdmin:    a.IsSuperAdmin,
+		ERPPreferences:  decodeAdminERPPreferences(a.ErpPreferences),
+		Disabled:        a.Disabled,
+		AuthVersion:     a.AuthVersion,
+		RevokedAt:       a.RevokedAt,
+		StatusReason:    stringValue(a.StatusReason),
+		StatusChangedAt: a.StatusChangedAt,
+		StatusChangedBy: a.StatusChangedBy,
+		LastLoginAt:     a.LastLoginAt,
+		CreatedAt:       a.CreatedAt,
+		UpdatedAt:       a.UpdatedAt,
 	}
 	if err := loadAdminRBAC(context.Background(), r.data.sqldb, admin); err != nil {
 		r.log.Warnf("load admin RBAC failed admin_id=%d err=%v", admin.ID, err)
@@ -147,14 +155,38 @@ func (r *adminManageRepo) UpdateAdminRoles(ctx context.Context, id int, roleKeys
 	}
 	defer rollbackSQLTx(ctx, tx, r.log)
 
+	accountStateQuery := "SELECT revoked_at FROM admin_users WHERE id = $1"
+	if r.data.sqlDialect == dialect.Postgres {
+		accountStateQuery += " FOR UPDATE"
+	}
+	var revokedAt sql.NullTime
+	if err := tx.QueryRowContext(ctx, accountStateQuery, id).Scan(&revokedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return biz.ErrAdminNotFound
+		}
+		return err
+	}
+	if revokedAt.Valid {
+		return biz.ErrAdminRevoked
+	}
+
 	if _, err := tx.ExecContext(ctx, "DELETE FROM admin_user_roles WHERE admin_user_id = $1", id); err != nil {
 		return err
 	}
 	for _, roleKey := range roleKeys {
-		if _, err := tx.ExecContext(ctx, `
+		insertRoleQuery := `
 INSERT INTO admin_user_roles (admin_user_id, role_id, created_at)
 SELECT $1, id, $3 FROM roles WHERE role_key = $2 AND disabled = FALSE
-ON CONFLICT (admin_user_id, role_id) DO NOTHING`, id, roleKey, time.Now()); err != nil {
+ON CONFLICT (admin_user_id, role_id) DO NOTHING`
+		insertRoleArgs := []any{id, roleKey, time.Now()}
+		if r.data.sqlDialect == dialect.SQLite {
+			insertRoleQuery = `
+INSERT INTO admin_user_roles (admin_user_id, role_id, created_at)
+SELECT ?, id, ? FROM roles WHERE role_key = ? AND disabled = FALSE
+ON CONFLICT (admin_user_id, role_id) DO NOTHING`
+			insertRoleArgs = []any{id, time.Now(), roleKey}
+		}
+		if _, err := tx.ExecContext(ctx, insertRoleQuery, insertRoleArgs...); err != nil {
 			return err
 		}
 	}
@@ -313,20 +345,21 @@ func (r *adminManageRepo) UpdateAdminPhone(ctx context.Context, id int, phone st
 	if id <= 0 {
 		return biz.ErrBadParam
 	}
-	update := r.data.postgres.AdminUser.UpdateOneID(id)
+	update := r.data.postgres.AdminUser.Update().Where(adminuser.ID(id), adminuser.RevokedAtIsNil())
 	if strings.TrimSpace(phone) == "" {
 		update.ClearPhone()
 	} else {
 		update.SetPhone(phone)
 	}
-	if _, err := update.Save(ctx); err != nil {
-		if ent.IsNotFound(err) {
-			return biz.ErrAdminNotFound
-		}
+	affected, err := update.Save(ctx)
+	if err != nil {
 		if ent.IsConstraintError(err) {
 			return biz.ErrAdminPhoneExists
 		}
 		return err
+	}
+	if affected != 1 {
+		return biz.ErrAdminRevoked
 	}
 	return nil
 }
@@ -365,35 +398,152 @@ func (r *adminManageRepo) UpdateAdminERPColumnOrder(ctx context.Context, id int,
 	return nil
 }
 
-func (r *adminManageRepo) SetAdminDisabled(ctx context.Context, id int, disabled bool) error {
-	if id <= 0 {
-		return biz.ErrBadParam
+func (r *adminManageRepo) ChangeAdminLifecycle(ctx context.Context, change *biz.AdminLifecycleChange) (int, error) {
+	if change == nil || change.AdminID <= 0 || change.OperatorID <= 0 || change.AuditEvent == nil {
+		return 0, biz.ErrBadParam
 	}
-	if _, err := r.data.postgres.AdminUser.UpdateOneID(id).SetDisabled(disabled).Save(ctx); err != nil {
-		if ent.IsNotFound(err) {
-			return biz.ErrAdminNotFound
+	if change.Revoke && (!change.Disabled || strings.TrimSpace(change.Reason) == "") {
+		return 0, biz.ErrBadParam
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return 0, err
+	}
+	rollback := func(cause error) (int, error) {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return 0, fmt.Errorf("%w: rollback: %v", cause, rollbackErr)
 		}
-		return err
+		return 0, cause
 	}
-	return nil
+	now := time.Now()
+	update := tx.AdminUser.Update().Where(
+		adminuser.ID(change.AdminID),
+		adminuser.RevokedAtIsNil(),
+	).
+		SetDisabled(change.Disabled).
+		AddAuthVersion(1).
+		SetStatusChangedAt(now).
+		SetStatusChangedBy(change.OperatorID)
+	if strings.TrimSpace(change.Reason) == "" {
+		update = update.ClearStatusReason()
+	} else {
+		update = update.SetStatusReason(strings.TrimSpace(change.Reason))
+	}
+	if change.Revoke {
+		update = update.SetRevokedAt(now)
+	}
+	affected, err := update.Save(ctx)
+	if err != nil {
+		return rollback(err)
+	}
+	if affected != 1 {
+		return rollback(biz.ErrAdminRevoked)
+	}
+
+	releasedTaskCount := 0
+	if change.Revoke {
+		tasks, queryErr := tx.WorkflowTask.Query().Where(
+			workflowtask.AssigneeID(change.AdminID),
+			workflowtask.TaskStatusKeyNotIn("done", "rejected", "cancelled", "closed"),
+		).All(ctx)
+		if queryErr != nil {
+			return rollback(queryErr)
+		}
+		for _, task := range tasks {
+			nextVersion := task.Version + 1
+			updated, updateErr := tx.WorkflowTask.Update().Where(
+				workflowtask.ID(task.ID),
+				workflowtask.AssigneeID(change.AdminID),
+				workflowtask.Version(task.Version),
+				workflowtask.TaskStatusKey(task.TaskStatusKey),
+				workflowtask.TaskStatusKeyNotIn("done", "rejected", "cancelled", "closed"),
+			).
+				ClearAssigneeID().
+				SetUpdatedBy(change.OperatorID).
+				SetVersion(nextVersion).
+				Save(ctx)
+			if updateErr != nil {
+				return rollback(updateErr)
+			}
+			if updated != 1 {
+				return rollback(biz.ErrWorkflowTaskConflict)
+			}
+			if _, eventErr := tx.WorkflowTaskEvent.Create().
+				SetTaskID(task.ID).
+				SetTaskVersion(nextVersion).
+				SetEventType("unassigned").
+				SetFromStatusKey(task.TaskStatusKey).
+				SetToStatusKey(task.TaskStatusKey).
+				SetActorID(change.OperatorID).
+				SetReason("账号注销，待办退回原岗位任务池").
+				SetPayload(map[string]any{
+					"released_assignee_id":  change.AdminID,
+					"account_status_reason": change.Reason,
+				}).
+				Save(ctx); eventErr != nil {
+				return rollback(eventErr)
+			}
+			releasedTaskCount++
+		}
+	}
+	if err = createRuntimeAuditEventInTx(ctx, tx, change.AuditEvent); err != nil {
+		return rollback(err)
+	}
+	if err = tx.Commit(); err != nil {
+		return 0, err
+	}
+	return releasedTaskCount, nil
 }
 
 func (r *adminManageRepo) UpdateAdminPasswordHash(ctx context.Context, id int, passwordHash string) error {
 	if id <= 0 || strings.TrimSpace(passwordHash) == "" {
 		return biz.ErrBadParam
 	}
-	if _, err := r.data.postgres.AdminUser.UpdateOneID(id).SetPasswordHash(passwordHash).Save(ctx); err != nil {
-		if ent.IsNotFound(err) {
-			return biz.ErrAdminNotFound
-		}
+	affected, err := r.data.postgres.AdminUser.Update().
+		Where(adminuser.ID(id), adminuser.RevokedAtIsNil()).
+		SetPasswordHash(passwordHash).
+		AddAuthVersion(1).
+		Save(ctx)
+	if err != nil {
 		return err
+	}
+	if affected != 1 {
+		return biz.ErrAdminRevoked
 	}
 	return nil
 }
 
 func (r *adminManageRepo) RecordRuntimeAuditEvent(ctx context.Context, event *biz.RuntimeAuditEventCreate) error {
+	eventType, eventKey, source, encodedPayload, err := normalizeRuntimeAuditEventCreate(event)
+	if err != nil {
+		return err
+	}
+	_, err = r.data.postgres.RuntimeAuditEvent.Create().
+		SetEventType(eventType).
+		SetEventKey(eventKey).
+		SetSource(source).
+		SetPayload(encodedPayload).
+		Save(ctx)
+	return err
+}
+
+func createRuntimeAuditEventInTx(ctx context.Context, tx *ent.Tx, event *biz.RuntimeAuditEventCreate) error {
+	eventType, eventKey, source, encodedPayload, err := normalizeRuntimeAuditEventCreate(event)
+	if err != nil {
+		return err
+	}
+	_, err = tx.RuntimeAuditEvent.Create().
+		SetEventType(eventType).
+		SetEventKey(eventKey).
+		SetSource(source).
+		SetPayload(encodedPayload).
+		Save(ctx)
+	return err
+}
+
+func normalizeRuntimeAuditEventCreate(event *biz.RuntimeAuditEventCreate) (string, string, string, string, error) {
 	if event == nil || strings.TrimSpace(event.EventType) == "" || strings.TrimSpace(event.Source) == "" {
-		return biz.ErrBadParam
+		return "", "", "", "", biz.ErrBadParam
 	}
 	payload := event.Payload
 	if payload == nil {
@@ -401,15 +551,9 @@ func (r *adminManageRepo) RecordRuntimeAuditEvent(ctx context.Context, event *bi
 	}
 	encodedPayload, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		return "", "", "", "", err
 	}
-	_, err = r.data.postgres.RuntimeAuditEvent.Create().
-		SetEventType(strings.TrimSpace(event.EventType)).
-		SetEventKey(strings.TrimSpace(event.EventKey)).
-		SetSource(strings.TrimSpace(event.Source)).
-		SetPayload(string(encodedPayload)).
-		Save(ctx)
-	return err
+	return strings.TrimSpace(event.EventType), strings.TrimSpace(event.EventKey), strings.TrimSpace(event.Source), string(encodedPayload), nil
 }
 
 func (r *adminManageRepo) ListRuntimeAuditEvents(

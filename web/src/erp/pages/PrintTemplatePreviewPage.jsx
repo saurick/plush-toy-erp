@@ -31,8 +31,8 @@ export default function PrintTemplatePreviewPage() {
           <Title level={3}>{template.title}</Title>
           <Paragraph>
             {supportsWorkspace
-              ? '当前 `/erp/print-center/:templateKey` 作为打印中心预览入口，主编辑打印动作进入独立编辑打印窗口。'
-              : '当前模板仍保留静态预览，用来先核字段口径、版式和样例数据。'}
+              ? '可在独立窗口编辑、预览、下载或打印当前模板。'
+              : '当前页面用于核对模板字段、版式和示例内容。'}
           </Paragraph>
         </div>
 
@@ -62,8 +62,7 @@ export default function PrintTemplatePreviewPage() {
         ) : (
           <>
             <div className="rounded-3xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm leading-6 text-amber-50">
-              当前模板继续走“固定预览 + 浏览器打印”这条主链路，尚未接入 PDF
-              工作台或业务带值。
+              当前模板支持固定预览和浏览器打印；如需业务数据，请从对应业务页面打开模板。
             </div>
             <PrintTemplateRenderer template={template} />
             <Link to="/erp/print-center">返回打印中心</Link>

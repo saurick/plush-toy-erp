@@ -721,7 +721,7 @@ async function runMobileAuthScenario(
   await page.getByText('短信登录').click()
   await page.getByLabel('手机号').waitFor({ state: 'visible', timeout: 10_000 })
   await page.getByText('密码登录').click()
-  await page.getByLabel('管理员账号').fill(`${role.roleKey}-mobile-admin`)
+  await page.getByLabel('账号').fill(`${role.roleKey}-mobile-admin`)
   await page.locator('#password').fill('mobile-password')
   await page.getByRole('button', { name: /登\s*录/ }).click()
 
@@ -891,7 +891,7 @@ async function runMobileAuthScenario(
   )
 
   await page.getByText('后台管理').click()
-  await page.getByLabel('管理员账号').fill(`${role.roleKey}-desktop-admin`)
+  await page.getByLabel('账号').fill(`${role.roleKey}-desktop-admin`)
   await page.locator('#password').fill('desktop-password')
   await page.getByRole('button', { name: /登\s*录/ }).click()
   await waitForPath(page, '/erp/dashboard')
@@ -926,7 +926,7 @@ async function runMobileAuthScenario(
   )
   await page.reload({ waitUntil: 'domcontentloaded' })
   await page.getByText('岗位任务端').click()
-  await page.getByLabel('管理员账号').fill(`${role.roleKey}-mobile-admin`)
+  await page.getByLabel('账号').fill(`${role.roleKey}-mobile-admin`)
   await page.locator('#password').fill('mobile-password')
   await page.getByRole('button', { name: /登\s*录/ }).click()
   await waitForPath(page, tasksPath)

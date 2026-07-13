@@ -1,13 +1,14 @@
 import { normalizeRoleKey } from './roleKeys.mjs'
 import { formatWorkflowTaskSource } from './dashboardTaskDisplay.mjs'
+import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
+
+export {
+  isTerminalWorkflowTask,
+  TERMINAL_TASK_STATUS_KEYS,
+} from './workflowTaskLifecycle.mjs'
 
 export const DUE_SOON_MS = 24 * 60 * 60 * 1000
 
-export const TERMINAL_TASK_STATUS_KEYS = new Set([
-  'done',
-  'closed',
-  'cancelled',
-])
 export const PENDING_TASK_STATUS_KEYS = new Set(['pending', 'ready'])
 export const RISK_TASK_STATUS_KEYS = new Set(['blocked', 'rejected'])
 export const FINANCE_MODULE_KEYS = new Set([
@@ -58,10 +59,6 @@ function payloadOf(task = {}) {
 function textIncludesAny(value, keywords = []) {
   const text = String(value || '').toLowerCase()
   return keywords.some((keyword) => text.includes(keyword.toLowerCase()))
-}
-
-export function isTerminalWorkflowTask(task = {}) {
-  return TERMINAL_TASK_STATUS_KEYS.has(normalizeTaskStatusKey(task))
 }
 
 export function getWorkflowTaskDueAtMs(task = {}) {

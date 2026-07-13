@@ -179,11 +179,12 @@ test('workflowDashboardStats: 统计任务状态和 due_at 计算态', () => {
   assert.equal(stats.done, 1)
   assert.equal(stats.closed, 1)
   assert.equal(stats.cancelled, 1)
+  assert.equal(stats.active, 5)
   assert.equal(stats.roleDistribution.sales, 9)
 })
 
 test('workflowDashboardStats: 终态任务不产生超时预警', () => {
-  const terminalTasks = ['done', 'closed', 'cancelled'].map(
+  const terminalTasks = ['done', 'rejected', 'closed', 'cancelled'].map(
     (statusKey, index) =>
       task({
         id: index + 1,

@@ -818,7 +818,9 @@
   }
 
   .erp-role-center-layout,
-  .erp-role-center-impact {
+  .erp-role-center-impact,
+  .erp-role-capability-overview__grid,
+  .erp-role-policy-boundary__grid {
     grid-template-columns: 1fr;
   }
 

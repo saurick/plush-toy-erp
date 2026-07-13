@@ -22,6 +22,7 @@ import {
   resolvePrintWorkspaceStateID,
   resolvePrintWorkspaceEntrySource,
   resolvePrintWorkspaceDraftMode,
+  resolvePrintWorkspaceCustomerKey,
   openPrintWorkspaceWindow,
 } from './printWorkspace.js'
 
@@ -37,6 +38,17 @@ test('printWorkspace: 模板打印中心路径可携带模板和 fresh 模式', 
       entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
     }),
     '/erp/print-center?source=business&template=material-purchase-contract'
+  )
+})
+
+test('printWorkspace: 独立窗口优先使用 URL 明示的客户配置 key', () => {
+  assert.equal(
+    resolvePrintWorkspaceCustomerKey('?customer_key=yoyoosun', 'product_core'),
+    'yoyoosun'
+  )
+  assert.equal(
+    resolvePrintWorkspaceCustomerKey('', 'product_core'),
+    'product_core'
   )
 })
 

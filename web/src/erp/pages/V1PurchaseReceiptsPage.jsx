@@ -386,9 +386,7 @@ function PurchaseReceiptInlineItemEditor({
       <div className="erp-purchase-receipt-inline-item-editor__head">
         <div>
           <strong>添加入库明细</strong>
-          <span>
-            保存后写入当前入库草稿；过账库存仍由后端采购入库规则处理。
-          </span>
+          <span>保存后写入当前入库草稿；库存将在入库过账后由系统更新。</span>
         </div>
         <Tag color="blue">{receipt?.receipt_no || '已选入库草稿'}</Tag>
       </div>
@@ -858,13 +856,13 @@ export default function V1PurchaseReceiptsPage() {
       <PageHeaderCard
         compact
         title="入库管理"
-        description="入库管理维护采购入库草稿和入库明细；草稿加明细后由后端过账写库存流水、余额和批次，协同入库任务完成不等于采购入库过账。"
+        description="入库管理维护采购入库草稿和明细；确认过账后系统会更新库存流水、余额和批次，完成入库跟进任务不等于采购入库已经过账。"
         tags={[
           <Tag color="gold" key="workflow">
             协同任务：入库跟进
           </Tag>,
           <Tag color="blue" key="receipt">
-            入库单：入库事实
+            入库单：正式入库记录
           </Tag>,
           <Tag color="green" key="inventory">
             过账后写库存流水
@@ -1015,7 +1013,7 @@ export default function V1PurchaseReceiptsPage() {
           embedded
           selectedCount={selectedRow ? 1 : 0}
           selectedLabel={selectedRowLabel}
-          boundaryText="过账和取消均由后端采购入库规则写库存事实或冲正；前端不本地改库存。"
+          boundaryText="过账和取消均由系统按采购入库规则更新库存或生成冲正记录；页面不会绕过这些规则直接修改库存。"
         >
           <Button
             type="link"
@@ -1054,7 +1052,7 @@ export default function V1PurchaseReceiptsPage() {
             disabledReason="请先选择一条入库记录"
           />
           <Popconfirm
-            title="确认过账并写库存入库事实？"
+            title="确认过账并更新库存？"
             onConfirm={() =>
               runReceiptAction(
                 selectedRow,

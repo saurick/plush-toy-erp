@@ -2,8 +2,8 @@ import {
   getWorkflowTaskReason,
   getWorkflowTaskReasonLabel,
 } from './workflowTaskReason.mjs'
+import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
 
-const TERMINAL_TASK_STATUS_KEYS = new Set(['done', 'closed', 'cancelled'])
 const BLOCKING_TASK_STATUS_KEYS = new Set(['blocked', 'rejected'])
 
 function normalizeTaskID(task = {}) {
@@ -26,9 +26,7 @@ export function getBusinessCollaborationTaskStatusKey(task = {}) {
 }
 
 export function isBusinessCollaborationTaskTerminal(task = {}) {
-  return TERMINAL_TASK_STATUS_KEYS.has(
-    getBusinessCollaborationTaskStatusKey(task)
-  )
+  return isTerminalWorkflowTask(task)
 }
 
 export function isBusinessCollaborationTaskBlocking(task = {}) {
@@ -100,7 +98,10 @@ export function buildBusinessCollaborationTaskPanelModel({
   const currentTaskIDs = new Set(
     currentRecordTasks.map(normalizeTaskID).filter(Boolean)
   )
-  const pageTasks = allTasks.filter(
+  const activeTasks = allTasks.filter(
+    (task) => !isBusinessCollaborationTaskTerminal(task)
+  )
+  const pageTasks = activeTasks.filter(
     (task) => !currentTaskIDs.has(normalizeTaskID(task))
   )
   const blockedTasks = allTasks.filter(isBusinessCollaborationTaskBlocking)
@@ -111,9 +112,7 @@ export function buildBusinessCollaborationTaskPanelModel({
   return {
     totalTaskCount: allTasks.length,
     visibleLimit: limit,
-    activeTaskCount: allTasks.filter(
-      (task) => !isBusinessCollaborationTaskTerminal(task)
-    ).length,
+    activeTaskCount: activeTasks.length,
     pageTaskCount: pageTasks.length,
     currentRecordTaskCount: currentRecordTasks.length,
     blockedTaskCount: blockedTasks.length,

@@ -38,7 +38,7 @@ func (d *jsonrpcDispatcher) handleDebug(
 	case "clear_business_chain_scenario", "cleanup_business_chain_scenario":
 		return d.handleDebugCleanup(ctx, id, pm, claims.UserID)
 	case "clear_business_data":
-		return d.handleDebugClearBusinessData(ctx, id, claims.UserID)
+		return d.handleDebugClearBusinessData(ctx, id, pm, claims.UserID)
 	default:
 		return id, unknownDebugResult(method), nil
 	}

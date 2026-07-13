@@ -29,9 +29,11 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		l.Warnf("[admin] requireAdmin denied method=%s id=%s code=%d msg=%s", method, id, res.Code, res.Message)
 		return id, res, nil
 	}
-
 	switch method {
 	case "me":
+		if res := rejectUnknownAdminParams(pm); res != nil {
+			return id, res, nil
+		}
 		admin, err := d.adminManageUC.GetCurrent(ctx)
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
@@ -44,6 +46,9 @@ func (d *jsonrpcDispatcher) handleAdmin(
 
 	case "list":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserRead); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm); res != nil {
 			return id, res, nil
 		}
 		admins, err := d.adminManageUC.List(ctx)
@@ -64,10 +69,16 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserCreate); res != nil {
 			return id, res, nil
 		}
+		if res := rejectUnknownAdminParams(pm, "username", "phone", "password", "role_keys"); res != nil {
+			return id, res, nil
+		}
 		username := getString(pm, "username")
 		phone := getString(pm, "phone")
 		password := getString(pm, "password")
-		roleKeys := getStringSlice(pm, "role_keys")
+		roleKeys, ok := getStrictStringSlice(pm, "role_keys", false)
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
 		if len(biz.NormalizeAdminRoleKeys(roleKeys)) > 0 {
 			if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
 				return id, res, nil
@@ -89,6 +100,9 @@ func (d *jsonrpcDispatcher) handleAdmin(
 
 	case "rbac_options", "menu_options":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionSystemRoleRead, biz.PermissionSystemPermissionRead); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm); res != nil {
 			return id, res, nil
 		}
 		roles, err := d.adminManageUC.ListRoles(ctx)
@@ -116,8 +130,14 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
 			return id, res, nil
 		}
+		if res := rejectUnknownAdminParams(pm, "id", "role_keys"); res != nil {
+			return id, res, nil
+		}
 		adminID := getInt(pm, "id", 0)
-		roleKeys := getStringSlice(pm, "role_keys")
+		roleKeys, ok := getStrictStringSlice(pm, "role_keys", true)
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
 		admin, err := d.adminManageUC.SetRoles(ctx, adminID, roleKeys)
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
@@ -134,7 +154,14 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemPermissionManage); res != nil {
 			return id, res, nil
 		}
-		role, err := d.adminManageUC.SetRolePermissions(ctx, getString(pm, "role_key"), getStringSlice(pm, "permission_keys"))
+		if res := rejectUnknownAdminParams(pm, "role_key", "permission_keys"); res != nil {
+			return id, res, nil
+		}
+		permissionKeys, ok := getStrictStringSlice(pm, "permission_keys", true)
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		role, err := d.adminManageUC.SetRolePermissions(ctx, getString(pm, "role_key"), permissionKeys)
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
 		}
@@ -158,6 +185,9 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
 			return id, res, nil
 		}
+		if res := rejectUnknownAdminParams(pm, "id", "phone"); res != nil {
+			return id, res, nil
+		}
 		adminID := getInt(pm, "id", 0)
 		admin, err := d.adminManageUC.SetPhone(ctx, adminID, getString(pm, "phone"))
 		if err != nil {
@@ -172,8 +202,14 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		}, nil
 
 	case "set_erp_column_order":
+		if res := rejectUnknownAdminParams(pm, "module_key", "order"); res != nil {
+			return id, res, nil
+		}
 		moduleKey := getString(pm, "module_key")
-		order := getStringSlice(pm, "order")
+		order, ok := getStrictStringSlice(pm, "order", true)
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
 		admin, err := d.adminManageUC.SetCurrentERPColumnOrder(ctx, moduleKey, order)
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
@@ -190,6 +226,9 @@ func (d *jsonrpcDispatcher) handleAdmin(
 
 	case "audit_logs":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemAuditRead); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "source", "event_type", "event_key", "actor_key", "target_type", "target_key", "keyword", "created_from", "created_to", "limit", "offset"); res != nil {
 			return id, res, nil
 		}
 		createdFrom, ok := getOptionalJSONRPCTime(pm, "created_from")
@@ -239,12 +278,15 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserDisable); res != nil {
 			return id, res, nil
 		}
+		if res := rejectUnknownAdminParams(pm, "id", "disabled", "reason"); res != nil {
+			return id, res, nil
+		}
 		adminID := getInt(pm, "id", 0)
 		disabled, ok := pm["disabled"].(bool)
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		admin, err := d.adminManageUC.SetDisabled(ctx, adminID, disabled)
+		admin, err := d.adminManageUC.SetDisabled(ctx, adminID, disabled, getString(pm, "reason"))
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
 		}
@@ -256,8 +298,30 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			}),
 		}, nil
 
+	case "revoke":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserRevoke); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "id", "reason"); res != nil {
+			return id, res, nil
+		}
+		admin, releasedTaskCount, err := d.adminManageUC.Revoke(ctx, getInt(pm, "id", 0), getString(pm, "reason"))
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code: errcode.OK.Code, Message: "账号已注销",
+			Data: newDataStruct(map[string]any{
+				"admin":               adminListItemToMap(admin),
+				"released_task_count": releasedTaskCount,
+			}),
+		}, nil
+
 	case "reset_password":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "id", "password"); res != nil {
 			return id, res, nil
 		}
 		adminID := getInt(pm, "id", 0)
@@ -285,6 +349,23 @@ func (d *jsonrpcDispatcher) handleAdmin(
 	}
 }
 
+func invalidAdminParamResult() *v1.JsonrpcResult {
+	return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+}
+
+func rejectUnknownAdminParams(pm map[string]any, allowedKeys ...string) *v1.JsonrpcResult {
+	allowed := make(map[string]struct{}, len(allowedKeys))
+	for _, key := range allowedKeys {
+		allowed[key] = struct{}{}
+	}
+	for key := range pm {
+		if _, ok := allowed[key]; !ok {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+		}
+	}
+	return nil
+}
+
 func (d *jsonrpcDispatcher) mapAdminManageError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 
@@ -304,6 +385,9 @@ func (d *jsonrpcDispatcher) mapAdminManageError(ctx context.Context, err error) 
 	case errors.Is(err, biz.ErrRoleNotFound):
 		l.Warnf("[admin] role not found err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "角色不存在"}
+	case errors.Is(err, biz.ErrPermissionNotFound):
+		l.Warnf("[admin] permission not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "权限不存在"}
 	case errors.Is(err, biz.ErrRoleExists):
 		l.Warnf("[admin] role exists err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "角色已存在"}
@@ -313,6 +397,10 @@ func (d *jsonrpcDispatcher) mapAdminManageError(ctx context.Context, err error) 
 	case errors.Is(err, biz.ErrAdminPhoneExists):
 		l.Warnf("[admin] phone exists err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.AdminPhoneExists.Code, Message: errcode.AdminPhoneExists.Message}
+	case errors.Is(err, biz.ErrAdminRevoked):
+		return &v1.JsonrpcResult{Code: errcode.AdminAccountRevoked.Code, Message: errcode.AdminAccountRevoked.Message}
+	case errors.Is(err, biz.ErrWorkflowTaskConflict):
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "待办状态刚刚发生变化，请刷新后重试注销"}
 	case errors.Is(err, biz.ErrUserDisabled):
 		l.Warnf("[admin] disabled err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.AdminDisabled.Code, Message: errcode.AdminDisabled.Message}

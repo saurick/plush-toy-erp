@@ -404,7 +404,7 @@ export default function OutsourcingOrderForm({
                       className="erp-line-item-field erp-line-item-field--source"
                       name={[field.name, 'product_order_no_snapshot']}
                       label="产品订单编号"
-                      extra="来自销售订单、客户产品订单或甲方加工汇总；用于加工合同逐行追溯。"
+                      extra="来自销售订单、客户产品订单或委外加工汇总；用于加工合同逐行追溯。"
                     >
                       <Input
                         allowClear

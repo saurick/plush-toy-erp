@@ -96,6 +96,14 @@ func TestSeedCoreDemoDataRejectsUnsafePrefixAndMissingDB(t *testing.T) {
 	}
 }
 
+func TestCoreDemoSeedRejectsNumberedImplementationStageLabels(t *testing.T) {
+	dataset := DefaultCoreDemoSeedDataset("")
+	dataset.Units[0].Name = "Phase" + " 8 模拟单位"
+	if err := validateCoreDemoSeedDataset(dataset); !errors.Is(err, ErrCoreDemoSeedInvalidRecord) {
+		t.Fatalf("expected numbered implementation stage label rejected, got %v", err)
+	}
+}
+
 func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

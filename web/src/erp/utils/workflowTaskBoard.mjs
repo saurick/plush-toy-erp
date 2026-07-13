@@ -1,14 +1,20 @@
-import {
-  getWorkflowTaskDueStatus,
-  isTerminalWorkflowTask,
-} from './workflowDashboardStats.mjs'
+import { getWorkflowTaskDueStatus } from './workflowDashboardStats.mjs'
+import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
 import {
   getWorkflowTaskReason as resolveWorkflowTaskReason,
+  getWorkflowTaskReasonMeta,
   getWorkflowTaskReasonLabel,
 } from './workflowTaskReason.mjs'
 import { getBusinessStatusLabel } from '../config/workflowStatus.mjs'
 import { hasActionPermission } from './masterDataOrderView.mjs'
 import { getRoleDisplayName } from './roleKeys.mjs'
+import { getWorkflowTaskActionPermission } from './workflowTaskActionContract.mjs'
+import {
+  WORKFLOW_TASK_BOARD_LANE_KEYS,
+  requireWorkflowTaskBoardResponse,
+} from './workflowTaskBoardContract.mjs'
+
+export { getWorkflowTaskActionPermission }
 
 export const TASK_BOARD_STATUS_OPTIONS = Object.freeze([
   { value: 'all', label: '全部状态' },
@@ -47,7 +53,42 @@ export const DEFAULT_TASK_BOARD_FILTERS = Object.freeze({
   role: 'all',
   due: 'all',
   sourceType: 'all',
+  lane: 'all',
+  page: 1,
 })
+
+export const TASK_BOARD_OVERVIEW_LIMIT = 5
+export const TASK_BOARD_FOCUS_PAGE_SIZE = 8
+export const TASK_BOARD_LANE_DEFINITIONS = Object.freeze([
+  {
+    key: 'actionable',
+    title: '常规待办',
+    description: '未阻塞、未退回，也未进入到期提醒的待处理任务。',
+    actionLabel: '查看全部常规待办',
+    tagColor: 'blue',
+  },
+  {
+    key: 'exception',
+    title: '阻塞 / 退回',
+    description: '当前阻塞或已经退回的任务，优先补齐原因和责任交接。',
+    actionLabel: '查看全部阻塞和退回任务',
+    tagColor: 'red',
+  },
+  {
+    key: 'due',
+    title: '到期提醒',
+    description: '已经超时或即将到期的任务，优先确认处理人。',
+    actionLabel: '查看全部到期提醒',
+    tagColor: 'orange',
+  },
+  {
+    key: 'finished',
+    title: '已结束',
+    description: '已完成、已关闭或已取消，只保留查看和追溯。',
+    actionLabel: '查看全部已结束任务',
+    tagColor: 'green',
+  },
+])
 
 const FILTER_QUERY_KEYS = Object.freeze({
   keyword: 'q',
@@ -55,6 +96,8 @@ const FILTER_QUERY_KEYS = Object.freeze({
   role: 'role',
   due: 'due',
   sourceType: 'source',
+  lane: 'lane',
+  page: 'page',
 })
 
 const STATUS_FILTER_VALUES = new Set(
@@ -66,6 +109,7 @@ const ROLE_FILTER_VALUES = new Set(
 const DUE_FILTER_VALUES = new Set(
   TASK_BOARD_DUE_OPTIONS.map((item) => item.value)
 )
+const LANE_FILTER_VALUES = new Set(['all', ...WORKFLOW_TASK_BOARD_LANE_KEYS])
 
 const TASK_STATUS_META = Object.freeze({
   pending: { label: '待处理', color: 'blue' },
@@ -77,40 +121,6 @@ const TASK_STATUS_META = Object.freeze({
   closed: { label: '已关闭', color: 'default' },
   cancelled: { label: '已取消', color: 'default' },
 })
-
-const LANE_DEFINITIONS = Object.freeze([
-  {
-    key: 'pending',
-    title: '可推进任务',
-    description: '当前筛选下待处理、可执行和处理中任务，优先从这里处理。',
-    tagColor: 'blue',
-    match: (task) =>
-      ['pending', 'ready', 'processing'].includes(getTaskStatusKey(task)),
-  },
-  {
-    key: 'blocked',
-    title: '阻塞异常',
-    description: '阻塞或退回任务，需要填写原因并继续跟进。',
-    tagColor: 'red',
-    match: (task) => ['blocked', 'rejected'].includes(getTaskStatusKey(task)),
-  },
-  {
-    key: 'due',
-    title: '今日到期',
-    description: '已超时或即将到期任务，需要当天确认处理人。',
-    tagColor: 'orange',
-    match: (task) =>
-      ['overdue', 'due_soon'].includes(getWorkflowTaskDueStatus(task)) &&
-      !isTerminalWorkflowTask(task),
-  },
-  {
-    key: 'done',
-    title: '已完成',
-    description: '只表示协同任务关闭，不代表事实层已过账。',
-    tagColor: 'green',
-    match: (task) => isTerminalWorkflowTask(task),
-  },
-])
 
 function payloadOf(task = {}) {
   return task.payload && typeof task.payload === 'object' ? task.payload : {}
@@ -169,32 +179,8 @@ function isAssignedToAdmin(admin = {}, task = {}) {
   return assigneeID === Number(admin?.id || 0)
 }
 
-function isBossOrderApprovalTask(task = {}) {
-  return (
-    String(task?.source_type || '').trim() === 'project-orders' &&
-    String(task?.task_group || '').trim() === 'order_approval' &&
-    getTaskOwnerRoleKey(task) === 'boss'
-  )
-}
-
 function isShipmentReleaseTask(task = {}) {
   return String(task?.task_group || '').trim() === 'shipment_release'
-}
-
-export function getWorkflowTaskActionPermission(actionMode = '', task = {}) {
-  if (actionMode === 'complete') {
-    return isBossOrderApprovalTask(task)
-      ? 'workflow.task.approve'
-      : 'workflow.task.complete'
-  }
-  if (
-    actionMode === 'block' ||
-    actionMode === 'reject' ||
-    actionMode === 'urge'
-  ) {
-    return 'workflow.task.update'
-  }
-  return ''
 }
 
 function canHandleTaskByOwner(admin = {}, task = {}) {
@@ -242,6 +228,7 @@ export function getWorkflowTaskReadonlyReason(admin = {}, task = {}) {
   const hasAnyWorkflowActionPermission = [
     'workflow.task.complete',
     'workflow.task.update',
+    'workflow.task.reject',
     'workflow.task.approve',
   ].some((permissionKey) => hasActionPermission(admin, permissionKey))
   if (!hasAnyWorkflowActionPermission) {
@@ -267,7 +254,7 @@ export function getWorkflowTaskReason(task = {}) {
   return resolveWorkflowTaskReason(task)
 }
 
-export { getWorkflowTaskReasonLabel }
+export { getWorkflowTaskReasonLabel, getWorkflowTaskReasonMeta }
 
 export function getWorkflowTaskDueLabel(task = {}, nowMs = Date.now()) {
   const dueAt = Number(task.due_at || 0)
@@ -300,6 +287,12 @@ function normalizeKnownFilterValue(value, values, fallback = 'all') {
   return values.has(normalized) ? normalized : fallback
 }
 
+function normalizePositiveInteger(value, fallback = 1) {
+  const number = Number(value)
+  if (!Number.isSafeInteger(number) || number < 1) return fallback
+  return number
+}
+
 export function normalizeWorkflowTaskBoardFilters(filters = {}) {
   return {
     keyword: String(filters.keyword || '').trim(),
@@ -307,6 +300,8 @@ export function normalizeWorkflowTaskBoardFilters(filters = {}) {
     role: normalizeKnownFilterValue(filters.role, ROLE_FILTER_VALUES),
     due: normalizeKnownFilterValue(filters.due, DUE_FILTER_VALUES),
     sourceType: normalizeFilterValue(filters.sourceType),
+    lane: normalizeKnownFilterValue(filters.lane, LANE_FILTER_VALUES),
+    page: normalizePositiveInteger(filters.page),
   }
 }
 
@@ -332,6 +327,8 @@ export function readWorkflowTaskBoardFiltersFromSearch(searchParams = '') {
     role: params.get(FILTER_QUERY_KEYS.role),
     due: params.get(FILTER_QUERY_KEYS.due),
     sourceType: params.get(FILTER_QUERY_KEYS.sourceType),
+    lane: params.get(FILTER_QUERY_KEYS.lane),
+    page: params.get(FILTER_QUERY_KEYS.page),
   })
 }
 
@@ -362,81 +359,137 @@ export function writeWorkflowTaskBoardFiltersToSearch(
   if (normalized.sourceType !== DEFAULT_TASK_BOARD_FILTERS.sourceType) {
     params.set(FILTER_QUERY_KEYS.sourceType, normalized.sourceType)
   }
+  if (normalized.lane !== DEFAULT_TASK_BOARD_FILTERS.lane) {
+    params.set(FILTER_QUERY_KEYS.lane, normalized.lane)
+    params.set(FILTER_QUERY_KEYS.page, String(normalized.page))
+  }
 
   return params
 }
 
-function taskMatchesStatus(task = {}, status = 'all') {
-  const statusFilter = normalizeFilterValue(status)
-  if (statusFilter === 'all') return true
-  if (statusFilter === 'overdue') {
-    return getWorkflowTaskDueStatus(task) === 'overdue'
+export function buildWorkflowTaskBoardRequest(filters = {}) {
+  const normalized = normalizeWorkflowTaskBoardFilters(filters)
+  const focused = normalized.lane !== DEFAULT_TASK_BOARD_FILTERS.lane
+  const params = {
+    limit: focused ? TASK_BOARD_FOCUS_PAGE_SIZE : TASK_BOARD_OVERVIEW_LIMIT,
+    offset: focused ? (normalized.page - 1) * TASK_BOARD_FOCUS_PAGE_SIZE : 0,
   }
-  if (statusFilter === 'dueSoon') {
-    return getWorkflowTaskDueStatus(task) === 'due_soon'
+
+  if (normalized.keyword) params.keyword = normalized.keyword
+  if (normalized.status !== DEFAULT_TASK_BOARD_FILTERS.status) {
+    params.status = normalized.status
   }
-  if (statusFilter === 'pending') {
-    return ['pending', 'ready'].includes(getTaskStatusKey(task))
+  if (normalized.role !== DEFAULT_TASK_BOARD_FILTERS.role) {
+    params.owner_role_key = normalized.role
   }
-  return getTaskStatusKey(task) === statusFilter
+  if (normalized.due !== DEFAULT_TASK_BOARD_FILTERS.due) {
+    params.due = normalized.due
+  }
+  if (normalized.sourceType !== DEFAULT_TASK_BOARD_FILTERS.sourceType) {
+    params.source_type = normalized.sourceType
+  }
+  if (focused) params.lane_key = normalized.lane
+  return params
 }
 
-function taskMatchesDue(task = {}, due = 'all') {
-  const dueFilter = normalizeFilterValue(due)
-  if (dueFilter === 'all') return true
-  const dueStatus = getWorkflowTaskDueStatus(task)
-  if (dueFilter === 'overdue') return dueStatus === 'overdue'
-  if (dueFilter === 'dueSoon') return dueStatus === 'due_soon'
-  if (dueFilter === 'noDue') return !Number(task.due_at || 0)
-  return true
-}
-
-function taskMatchesKeyword(task = {}, keyword = '') {
-  const query = String(keyword || '')
-    .trim()
-    .toLowerCase()
-  if (!query) return true
-  const payload = payloadOf(task)
-  const text = [
-    task.task_name,
-    task.task_code,
-    task.source_no,
-    task.source_type,
-    task.task_group,
-    task.owner_role_key,
-    getWorkflowTaskBusinessStatusLabel(task),
-    task.blocked_reason,
-    payload.record_title,
-    payload.module_title,
-    payload.blocked_reason,
-    payload.rejected_reason,
-  ]
-    .join(' ')
-    .toLowerCase()
-  return text.includes(query)
-}
-
-export function filterWorkflowTaskBoardTasks(tasks = [], filters = {}) {
-  const role = normalizeFilterValue(filters.role)
-  const sourceType = normalizeFilterValue(filters.sourceType)
-  return (tasks || []).filter((task) => {
-    const roleMatched = role === 'all' || getTaskOwnerRoleKey(task) === role
-    const sourceMatched =
-      sourceType === 'all' || String(task.source_type || '') === sourceType
-    return (
-      roleMatched &&
-      sourceMatched &&
-      taskMatchesStatus(task, filters.status) &&
-      taskMatchesDue(task, filters.due) &&
-      taskMatchesKeyword(task, filters.keyword)
+export function getWorkflowTaskBoardRequestKey(request = {}) {
+  return JSON.stringify(
+    Object.fromEntries(
+      Object.entries(request).sort(([left], [right]) =>
+        left.localeCompare(right)
+      )
     )
-  })
+  )
 }
 
-export function buildWorkflowTaskBoardLanes(tasks = []) {
-  return LANE_DEFINITIONS.map((lane) => ({
-    ...lane,
-    tasks: (tasks || []).filter((task) => lane.match(task)).slice(0, 5),
-    count: (tasks || []).filter((task) => lane.match(task)).length,
-  }))
+export function resolveWorkflowTaskBoardResponseState(
+  responseState = null,
+  request = {}
+) {
+  if (
+    !responseState ||
+    responseState.requestKey !== getWorkflowTaskBoardRequestKey(request)
+  ) {
+    return null
+  }
+  return responseState.response || null
+}
+
+function normalizeNonNegativeInteger(value) {
+  const number = Number(value)
+  return Number.isSafeInteger(number) && number >= 0 ? number : 0
+}
+
+export function buildWorkflowTaskBoardModel(response = {}, filters = {}) {
+  const normalizedFilters = normalizeWorkflowTaskBoardFilters(filters)
+  const focused = normalizedFilters.lane !== DEFAULT_TASK_BOARD_FILTERS.lane
+  if (response !== null && response !== undefined) {
+    requireWorkflowTaskBoardResponse(
+      response,
+      buildWorkflowTaskBoardRequest(normalizedFilters)
+    )
+  }
+  const normalizedResponse = response || {}
+  const responseLanes = new Map(
+    (Array.isArray(normalizedResponse.lanes) ? normalizedResponse.lanes : [])
+      .filter((lane) => LANE_FILTER_VALUES.has(String(lane?.key || '').trim()))
+      .map((lane) => [String(lane.key).trim(), lane])
+  )
+  const counts = Object.fromEntries(
+    TASK_BOARD_LANE_DEFINITIONS.map((definition) => {
+      const responseLane = responseLanes.get(definition.key)
+      const countValue = Object.hasOwn(
+        normalizedResponse.counts || {},
+        definition.key
+      )
+        ? normalizedResponse.counts[definition.key]
+        : responseLane?.total
+      return [definition.key, normalizeNonNegativeInteger(countValue)]
+    })
+  )
+  const displayLimit = focused
+    ? TASK_BOARD_FOCUS_PAGE_SIZE
+    : TASK_BOARD_OVERVIEW_LIMIT
+  const lanes = TASK_BOARD_LANE_DEFINITIONS.map((definition) => {
+    const responseLane = responseLanes.get(definition.key) || {}
+    const tasks = (
+      Array.isArray(responseLane.tasks) ? responseLane.tasks : []
+    ).slice(0, displayLimit)
+    const count = counts[definition.key]
+    return {
+      ...definition,
+      count,
+      tasks,
+      limit: normalizeNonNegativeInteger(responseLane.limit) || displayLimit,
+      offset: normalizeNonNegativeInteger(responseLane.offset),
+      hiddenCount: Math.max(0, count - tasks.length),
+    }
+  })
+  const selectedLane = focused ? normalizedFilters.lane : 'all'
+  const selectedLaneModel =
+    lanes.find((lane) => lane.key === selectedLane) || null
+  const pageCount = selectedLaneModel
+    ? Math.max(
+        1,
+        Math.ceil(selectedLaneModel.count / TASK_BOARD_FOCUS_PAGE_SIZE)
+      )
+    : 1
+
+  return {
+    snapshotAt: normalizeNonNegativeInteger(normalizedResponse.snapshot_at),
+    total: normalizeNonNegativeInteger(normalizedResponse.total),
+    counts,
+    lanes,
+    visibleLanes: selectedLaneModel ? [selectedLaneModel] : lanes,
+    selectedLane,
+    focused,
+    requestedPage: normalizedFilters.page,
+    page: Math.min(normalizedFilters.page, pageCount),
+    pageCount,
+    sourceTypes: Array.isArray(normalizedResponse.source_types)
+      ? normalizedResponse.source_types
+          .map((sourceType) => String(sourceType || '').trim())
+          .filter(Boolean)
+      : [],
+  }
 }

@@ -10,7 +10,7 @@ func TestWorkflowUsecase_OutsourceReturnQCDoneDerivesWarehouseInboundTask(t *tes
 	repo := &stubWorkflowRepo{currentTask: outsourceReturnQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            901,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{"mobile_role_key": "quality"},
@@ -69,7 +69,7 @@ func TestWorkflowUsecase_OutsourceReturnTrackingDoneDerivesReturnQCTask(t *testi
 	repo := &stubWorkflowRepo{currentTask: outsourceReturnTrackingWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            931,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{"mobile_role_key": "production"},
@@ -124,7 +124,7 @@ func TestWorkflowUsecase_OutsourceReturnTrackingRepeatedDoneUsesIdempotentDerive
 	uc := NewWorkflowUsecase(repo)
 
 	for i := 0; i < 2; i++ {
-		_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 			ID:            931,
 			TaskStatusKey: "done",
 			Payload:       map[string]any{},
@@ -142,7 +142,7 @@ func TestWorkflowUsecase_OutsourceReturnQCDoneUsesTransitionPayloadForDownstream
 	repo := &stubWorkflowRepo{currentTask: outsourceReturnQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            901,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{"qc_result": "accepted"},
@@ -170,7 +170,7 @@ func TestWorkflowUsecase_OutsourceReturnQCRepeatedDoneUsesIdempotentDerivedTaskK
 	uc := NewWorkflowUsecase(repo)
 
 	for i := 0; i < 2; i++ {
-		_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 			ID:            901,
 			TaskStatusKey: "done",
 			Payload:       map[string]any{},
@@ -188,7 +188,7 @@ func TestWorkflowUsecase_OutsourceWarehouseInboundDoneDerivesPayableTask(t *test
 	repo := &stubWorkflowRepo{currentTask: outsourceWarehouseInboundWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            991,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{"mobile_role_key": "warehouse"},
@@ -250,7 +250,7 @@ func TestWorkflowUsecase_OutsourceWarehouseInboundRepeatedDoneUsesIdempotentDeri
 	uc := NewWorkflowUsecase(repo)
 
 	for i := 0; i < 2; i++ {
-		_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 			ID:            991,
 			TaskStatusKey: "done",
 			Payload:       map[string]any{},
@@ -268,7 +268,7 @@ func TestWorkflowUsecase_OutsourceReturnQCBlockedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: outsourceReturnQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            901,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": "   "},
@@ -285,7 +285,7 @@ func TestWorkflowUsecase_OutsourceReturnQCBlockedDerivesReworkTask(t *testing.T)
 	repo := &stubWorkflowRepo{currentTask: outsourceReturnQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            901,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": " 回货抽检待判责 "},
@@ -337,7 +337,7 @@ func TestWorkflowUsecase_OutsourceReturnQCBlockedOverridesStaleRejectedReason(t 
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            901,
 		TaskStatusKey: "blocked",
 		Reason:        "当前阻塞原因",
@@ -362,7 +362,7 @@ func TestWorkflowUsecase_OutsourceReturnQCRejectedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: outsourceReturnQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            901,
 		TaskStatusKey: "rejected",
 		Reason:        " \t ",
@@ -380,7 +380,7 @@ func TestWorkflowUsecase_OutsourceReturnQCRejectedDerivesReworkTask(t *testing.T
 	repo := &stubWorkflowRepo{currentTask: outsourceReturnQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            901,
 		TaskStatusKey: "rejected",
 		Reason:        " 车缝开线 ",
@@ -422,7 +422,7 @@ func TestWorkflowUsecase_OutsourceReturnQCRejectedClearsStaleBlockedReason(t *te
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            901,
 		TaskStatusKey: "rejected",
 		Reason:        "当前退回原因",
@@ -460,9 +460,10 @@ func TestWorkflowUsecase_OutsourceReturnQCSettledBusinessStatusDoesNotTriggerSpe
 			repo := &stubWorkflowRepo{currentTask: task}
 			uc := NewWorkflowUsecase(repo)
 
-			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:            task.ID,
 				TaskStatusKey: "blocked",
+				Reason:        "通用阻塞验证",
 				Payload:       map[string]any{},
 			}, 7, "quality")
 			if err != nil {
@@ -484,7 +485,7 @@ func TestWorkflowUsecase_OutsourceReturnQCFailedBusinessStatusStillUsesSpecialRu
 	repo := &stubWorkflowRepo{currentTask: task}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            task.ID,
 		TaskStatusKey: "rejected",
 		Reason:        "返工后复检仍不合格",
@@ -506,7 +507,7 @@ func TestWorkflowUsecase_OutsourceReworkDoneWritesProductionProcessingState(t *t
 	repo := &stubWorkflowRepo{currentTask: outsourceReworkWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            971,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{},
@@ -550,7 +551,7 @@ func TestWorkflowUsecase_OutsourceReworkBlockedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: outsourceReworkWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            971,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": "   "},
@@ -567,7 +568,7 @@ func TestWorkflowUsecase_OutsourceReworkBlockedWritesQCFailedState(t *testing.T)
 	repo := &stubWorkflowRepo{currentTask: outsourceReworkWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            971,
 		TaskStatusKey: "blocked",
 		Reason:        "返工线等待确认",
@@ -612,7 +613,7 @@ func TestWorkflowUsecase_OutsourceReturnQCNonDerivedStatusKeepsOriginalBehavior(
 	repo := &stubWorkflowRepo{currentTask: outsourceReturnQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            901,
 		TaskStatusKey: "processing",
 		Payload:       map[string]any{},

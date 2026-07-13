@@ -59,6 +59,7 @@ export const dashboardHealthModules = Object.freeze([
     title: '生产/委外',
     path: '/erp/production/progress',
     sourceKeys: Object.freeze([
+      'production-orders',
       'production-scheduling',
       'production-progress',
       'production-exceptions',
@@ -67,7 +68,7 @@ export const dashboardHealthModules = Object.freeze([
   },
   {
     key: 'finance-facts',
-    title: '财务事实',
+    title: '财务记录',
     path: '/erp/finance/reconciliation',
     sourceKeys: Object.freeze([
       'reconciliation',

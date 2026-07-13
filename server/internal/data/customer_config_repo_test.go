@@ -77,12 +77,13 @@ func TestCustomerConfigRepoRollbackWritesRollbackAudit(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectQuery(regexp.QuoteMeta(`
-SELECT id
+SELECT id, revision
 FROM customer_config_revisions
-WHERE customer_key = $1 AND revision = $2
-LIMIT 1`)).
-		WithArgs("yoyoosun", "rev-1").
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(10))
+WHERE customer_key = $1
+ORDER BY id
+FOR UPDATE`)).
+		WithArgs("yoyoosun").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "revision"}).AddRow(10, "rev-1"))
 	mock.ExpectExec(regexp.QuoteMeta(`
 UPDATE customer_config_revisions
 SET status = $3, updated_at = $4

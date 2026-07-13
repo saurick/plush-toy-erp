@@ -27,11 +27,16 @@ type bootstrapConfig struct {
 	} `yaml:"data"`
 }
 
+const resetLocalSuperAdminConfirm = "RESET_LOCAL_SUPER_ADMIN_PASSWORD"
+
 func main() {
 	confPath := flag.String("conf", "./configs/dev/config.yaml", "config yaml path")
 	password := flag.String("password", "", "demo account password; ERP_ROLE_DEMO_PASSWORD is preferred for local use")
 	resetPassword := flag.Bool("reset-password", false, "reset password for existing demo accounts")
 	includeDebug := flag.Bool("include-debug", false, "also seed demo_debug with debug_operator role")
+	includeManualAcceptanceScenarios := flag.Bool("include-manual-acceptance-scenarios", false, "also reset the three existing manual acceptance scenario account passwords without changing roles or status")
+	resetLocalSuperAdmin := flag.Bool("reset-local-super-admin", false, "also reset the existing local admin password without changing its status or permissions")
+	resetLocalSuperAdminConfirmation := flag.String("reset-local-super-admin-confirm", "", "exact confirmation required with --reset-local-super-admin")
 	allowProd := flag.Bool("allow-prod", false, "allow seeding when config path or environment looks like production")
 	timeout := flag.Duration("timeout", 15*time.Second, "database operation timeout")
 	flag.Parse()
@@ -90,12 +95,31 @@ func main() {
 	if err != nil {
 		fail("seed role demo admins failed: %v", err)
 	}
+	if *includeManualAcceptanceScenarios {
+		if err := data.ResetRoleDemoAdminPasswords(ctx, db, []string{
+			"demo_uat_disabled",
+			"demo_uat_sales_purchase",
+			"demo_uat_no_entry",
+		}, effectivePassword); err != nil {
+			fail("reset manual acceptance scenario passwords failed: %v", err)
+		}
+	}
+	if *resetLocalSuperAdmin {
+		if strings.TrimSpace(*resetLocalSuperAdminConfirmation) != resetLocalSuperAdminConfirm {
+			fail("reset local super admin requires --reset-local-super-admin-confirm %s", resetLocalSuperAdminConfirm)
+		}
+		if err := data.ResetRoleDemoAdminPasswords(ctx, db, []string{"admin"}, effectivePassword); err != nil {
+			fail("reset local super admin password failed: %v", err)
+		}
+	}
 
-	fmt.Printf("role demo admin seed completed accounts=%d password_source=%s password_reset=%t include_debug=%t\n",
+	fmt.Printf("role demo admin seed completed accounts=%d password_source=%s password_reset=%t include_debug=%t include_manual_acceptance_scenarios=%t reset_local_super_admin=%t\n",
 		len(result.Accounts),
 		source,
 		*resetPassword,
 		*includeDebug,
+		*includeManualAcceptanceScenarios,
+		*resetLocalSuperAdmin,
 	)
 	for _, account := range result.Accounts {
 		action := "updated"

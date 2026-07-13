@@ -207,15 +207,15 @@ func getNestedString(values map[string]any, key string) string {
 }
 
 func newAdminAuthUsecaseForTest(repo *memAdminAuthRepoForData) *biz.AdminAuthUsecase {
-	return biz.NewAdminAuthUsecase(repo, func(userID int, username string, role int8) (string, time.Time, error) {
+	return biz.NewAdminAuthUsecase(repo, func(input biz.AdminTokenInput) (string, time.Time, error) {
 		return "admin-token", time.Now().Add(time.Hour), nil
-	}, nil, log.DefaultLogger, nil)
+	}, nil, nil, log.DefaultLogger, nil)
 }
 
 func newAdminAuthUsecaseForTestWithSMSProvider(repo *memAdminAuthRepoForData, smsProvider biz.SMSLoginCodeProvider) *biz.AdminAuthUsecase {
-	return biz.NewAdminAuthUsecase(repo, func(userID int, username string, role int8) (string, time.Time, error) {
+	return biz.NewAdminAuthUsecase(repo, func(input biz.AdminTokenInput) (string, time.Time, error) {
 		return "admin-token", time.Now().Add(time.Hour), nil
-	}, smsProvider, log.DefaultLogger, nil)
+	}, nil, smsProvider, log.DefaultLogger, nil)
 }
 
 type unavailableSMSLoginCodeProvider struct {
@@ -233,12 +233,14 @@ func (p unavailableSMSLoginCodeProvider) Verify(context.Context, string, string)
 type memAdminAuthRepoForData struct {
 	byUsername map[string]*biz.AdminUser
 	byPhone    map[string]*biz.AdminUser
+	sessions   map[string]*biz.AdminSession
 }
 
 func newMemAdminAuthRepoForData() *memAdminAuthRepoForData {
 	return &memAdminAuthRepoForData{
 		byUsername: make(map[string]*biz.AdminUser),
 		byPhone:    make(map[string]*biz.AdminUser),
+		sessions:   make(map[string]*biz.AdminSession),
 	}
 }
 
@@ -254,12 +256,45 @@ func (r *memAdminAuthRepoForData) putAdmin(username, phone, password string, dis
 		PasswordHash: string(hash),
 		IsSuperAdmin: true,
 		Disabled:     disabled,
+		AuthVersion:  1,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
 	r.byUsername[username] = admin
 	if phone != "" {
 		r.byPhone[phone] = admin
+	}
+	return nil
+}
+
+func (r *memAdminAuthRepoForData) GetAdminByID(_ context.Context, id int) (*biz.AdminUser, error) {
+	for _, admin := range r.byUsername {
+		if admin.ID == id {
+			return admin, nil
+		}
+	}
+	return nil, biz.ErrUserNotFound
+}
+
+func (r *memAdminAuthRepoForData) CreateAdminSession(_ context.Context, session *biz.AdminSession) error {
+	cp := *session
+	r.sessions[session.SessionKey] = &cp
+	return nil
+}
+
+func (r *memAdminAuthRepoForData) GetAdminSession(_ context.Context, key string) (*biz.AdminSession, error) {
+	s := r.sessions[key]
+	if s == nil {
+		return nil, biz.ErrSessionNotFound
+	}
+	cp := *s
+	return &cp, nil
+}
+
+func (r *memAdminAuthRepoForData) RevokeAdminSession(_ context.Context, key, reason string, at time.Time) error {
+	if s := r.sessions[key]; s != nil {
+		s.RevokedAt = &at
+		s.RevokeReason = reason
 	}
 	return nil
 }

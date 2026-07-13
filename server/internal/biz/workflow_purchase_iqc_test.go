@@ -10,7 +10,7 @@ func TestWorkflowUsecase_PurchaseIQCDoneDerivesWarehouseInboundTask(t *testing.T
 	repo := &stubWorkflowRepo{currentTask: purchaseIQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            501,
 		TaskStatusKey: "done",
 		Payload:       map[string]any{"mobile_role_key": "quality"},
@@ -64,7 +64,7 @@ func TestWorkflowUsecase_PurchaseIQCRepeatedDoneUsesIdempotentDerivedTaskKey(t *
 	uc := NewWorkflowUsecase(repo)
 
 	for i := 0; i < 2; i++ {
-		_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 			ID:            501,
 			TaskStatusKey: "done",
 			Payload:       map[string]any{},
@@ -82,7 +82,7 @@ func TestWorkflowUsecase_PurchaseIQCBlockedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: purchaseIQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            501,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{"blocked_reason": "   "},
@@ -99,7 +99,7 @@ func TestWorkflowUsecase_PurchaseIQCBlockedDerivesQualityExceptionTask(t *testin
 	repo := &stubWorkflowRepo{currentTask: purchaseIQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            501,
 		TaskStatusKey: "blocked",
 		Payload: map[string]any{
@@ -145,7 +145,7 @@ func TestWorkflowUsecase_PurchaseIQCRejectedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: purchaseIQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            501,
 		TaskStatusKey: "rejected",
 		Reason:        " \t ",
@@ -163,7 +163,7 @@ func TestWorkflowUsecase_PurchaseIQCRejectedDerivesQualityExceptionTask(t *testi
 	repo := &stubWorkflowRepo{currentTask: purchaseIQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            501,
 		TaskStatusKey: "rejected",
 		Reason:        " 来料尺寸不符 ",
@@ -202,7 +202,7 @@ func TestWorkflowUsecase_PurchaseIQCNonDerivedStatusKeepsOriginalBehavior(t *tes
 	repo := &stubWorkflowRepo{currentTask: purchaseIQCWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)
 
-	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:            501,
 		TaskStatusKey: "processing",
 		Payload:       map[string]any{},

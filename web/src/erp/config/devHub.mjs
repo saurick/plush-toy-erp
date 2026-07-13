@@ -93,7 +93,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不接后端 / No backend',
     ]),
     description:
-      '联动产品能力、客户交付和客户差异台账；trace CAP links across ledgers.',
+      '按当前人读台账查看产品能力、证据详情、客户交付和客户差异；review current ledgers without inventing CAP links.',
   }),
   Object.freeze({
     key: 'customer-config',
@@ -109,7 +109,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不写核心规则 / No core rules',
     ]),
     description:
-      '读取已登记的 yoyoosun 客户配置包，完成预检、差异、Dry Run 证据、测试配置应用和发布门禁；review registered package before controlled release.',
+      '读取已登记的 yoyoosun 客户配置包，完成预检、差异、Dry Run、当前代理后端测试应用和指定证据批次门禁；正式写入交给统一发布执行器。',
   }),
 ])
 

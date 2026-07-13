@@ -20,6 +20,7 @@ import {
   shipShipment,
 } from '../../api/operationalFactApi.mjs'
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
+import { financeCancelAuditText as buildFinanceCancelAuditText } from '../../utils/financeCancellation.mjs'
 import {
   ACTION_PERMISSIONS,
   FINANCE_COLLECTION_TYPE_LABELS,
@@ -64,8 +65,11 @@ const RESERVED_DATE_FILTER_OPTIONS = [
 ]
 
 export const DEFAULT_OPERATIONAL_FACT_SUMMARY =
-  '统一承接生产、委外、出货、库存预留和财务事实的最小运行入口。页面只提交动作，库存流水、冲正和状态边界由后端业务规则处理。'
+  '统一处理生产、委外、出货、库存预留和财务业务记录。页面提交操作后，系统按业务规则更新状态、库存流水或冲正记录。'
 export const EMPTY_VIEW_OVERRIDES = Object.freeze({})
+
+export const financeCancelAuditText = (record) =>
+  buildFinanceCancelAuditText(record, formatUnixDate)
 
 const FACT_TYPE_LABELS = Object.freeze({
   MATERIAL_ISSUE: '发料',
@@ -81,8 +85,8 @@ const FACT_TYPE_LABELS = Object.freeze({
 
 const SOURCE_TYPE_LABELS = Object.freeze({
   SHIPMENT: '出货单',
-  PRODUCTION_FACT: '生产事实',
-  OUTSOURCING_FACT: '委外事实',
+  PRODUCTION_FACT: '生产记录',
+  OUTSOURCING_FACT: '委外记录',
   PURCHASE_RECEIPT: '采购入库',
   SALES_ORDER: '销售订单',
 })
@@ -157,7 +161,7 @@ function counterpartyColumnText(record = {}) {
 }
 
 function factTypeLabel(value) {
-  return FACT_TYPE_LABELS[value] || (value ? '业务事实' : '-')
+  return FACT_TYPE_LABELS[value] || (value ? '业务记录' : '-')
 }
 
 export function sourceTypeLabel(value) {
@@ -171,9 +175,9 @@ function counterpartyTypeLabel(value) {
 export function buildOperationalFactViewConfigs() {
   return {
     production: {
-      title: '生产事实',
+      title: '生产记录',
       listKey: 'production_facts',
-      createLabel: '登记生产事实',
+      createLabel: '登记生产记录',
       createPrefix: 'prod',
       draftNumberField: 'fact_no',
       draftNumberPrefix: 'PROD',
@@ -191,9 +195,9 @@ export function buildOperationalFactViewConfigs() {
       },
     },
     outsourcing: {
-      title: '委外事实',
+      title: '委外记录',
       listKey: 'outsourcing_facts',
-      createLabel: '登记委外事实',
+      createLabel: '登记委外记录',
       createPrefix: 'outsource',
       draftNumberField: 'fact_no',
       draftNumberPrefix: 'OUTF',
@@ -211,7 +215,7 @@ export function buildOperationalFactViewConfigs() {
       },
     },
     shipments: {
-      title: '出货事实',
+      title: '出货记录',
       listKey: 'shipments',
       createLabel: '登记出货单草稿',
       createPrefix: 'shipment',
@@ -244,9 +248,9 @@ export function buildOperationalFactViewConfigs() {
       initialValues: {},
     },
     finance: {
-      title: '财务事实',
+      title: '财务记录',
       listKey: 'finance_facts',
-      createLabel: '登记财务事实',
+      createLabel: '登记财务记录',
       createPrefix: 'finance',
       draftNumberField: 'fact_no',
       draftNumberPrefix: 'FIN',
@@ -491,6 +495,13 @@ export function buildOperationalFactColumns(activeKey) {
         sortType: 'text',
         render: (value) =>
           FINANCE_INVOICE_CATEGORY_LABELS[value] || (value ? '发票类别' : '-'),
+      },
+      {
+        title: '取消记录',
+        width: 320,
+        sortable: false,
+        render: (_, record) => financeCancelAuditText(record),
+        exportValue: financeCancelAuditText,
       },
       ...sourceColumns,
     ],

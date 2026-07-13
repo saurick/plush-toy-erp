@@ -7,7 +7,7 @@ import {
   PrinterOutlined,
   RollbackOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Popconfirm, Tabs, Tag } from 'antd'
+import { Button, Dropdown, Input, Modal, Popconfirm, Tabs, Tag } from 'antd'
 import {
   useNavigate,
   useOutletContext,
@@ -92,6 +92,8 @@ export function OperationalFactWorkspace({
   const [dateRangeByKey, setDateRangeByKey] = useState({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [financeCancelOpen, setFinanceCancelOpen] = useState(false)
+  const [financeCancelReason, setFinanceCancelReason] = useState('')
   const [rowsByKey, setRowsByKey] = useState({})
   const [totalByKey, setTotalByKey] = useState({})
   const [paginationByKey, setPaginationByKey] = useState({})
@@ -287,20 +289,56 @@ export function OperationalFactWorkspace({
     )
   }, [currentActiveKey, loadRows, outletContext])
 
-  const runRowAction = async (config, row, actionKey, actionLabel) => {
+  const runRowAction = async (
+    config,
+    row,
+    actionKey,
+    actionLabel,
+    extraParams = {}
+  ) => {
     const action = config[actionKey]
     if (!action || !row?.id) {
       return
     }
     try {
       setSaving(true)
-      await action({ id: row.id })
+      await action({ id: row.id, ...extraParams })
       message.success(`${actionLabel}已完成`)
-      await loadRows(currentActiveKey)
     } catch (error) {
       message.error(getActionErrorMessage(error, actionLabel))
+      setSaving(false)
+      return false
+    }
+    try {
+      await loadRows(currentActiveKey)
+    } catch (_error) {
+      message.warning(`${actionLabel}已完成，请稍后刷新查看最新结果`)
     } finally {
       setSaving(false)
+    }
+    return true
+  }
+
+  const confirmFinanceCancellation = async () => {
+    const reason = financeCancelReason.trim()
+    if (!reason) {
+      message.error('请填写取消原因')
+      return
+    }
+    if ([...reason].length > 255) {
+      message.error('取消原因不能超过 255 个字')
+      return
+    }
+    const succeeded = await runRowAction(
+      activeConfig,
+      activeSelectedRow,
+      'cancel',
+      '取消',
+      { reason }
+    )
+    if (succeeded) {
+      setFinanceCancelOpen(false)
+      setFinanceCancelReason('')
     }
   }
 
@@ -328,7 +366,7 @@ export function OperationalFactWorkspace({
   )
   const activeBoundaryText =
     activeConfig.selectionBoundaryText ||
-    '当前操作由后端业务规则校验和过账；前端不会直接修改库存、出货、财务记录或协同任务。'
+    '当前操作由系统按业务规则校验和处理；不会直接修改其他模块的库存、出货、财务记录或协同任务。'
   const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
     useBusinessColumnOrder({
       adminProfile,
@@ -461,7 +499,7 @@ export function OperationalFactWorkspace({
             正式业务记录
           </Tag>,
           <Tag color="green" key="backend">
-            后端过账 / 冲正
+            系统过账 / 冲正
           </Tag>,
           <Tag color="gold" key="boundary">
             协同完成不等于过账
@@ -589,9 +627,7 @@ export function OperationalFactWorkspace({
               相关单据 <DownOutlined />
             </Button>
           </Dropdown>
-          {['production', 'outsourcing', 'finance'].includes(
-            currentActiveKey
-          ) ? (
+          {['production', 'outsourcing'].includes(currentActiveKey) ? (
             <Popconfirm
               title="确认过账？"
               onConfirm={() =>
@@ -615,6 +651,25 @@ export function OperationalFactWorkspace({
               </Button>
             </Popconfirm>
           ) : null}
+          {currentActiveKey === 'finance' ? (
+            <Button
+              size="small"
+              danger
+              icon={<CloseCircleOutlined />}
+              disabled={
+                !activeSelectedRow ||
+                activeSelectedRow.status !== 'POSTED' ||
+                !canConfirmActive ||
+                saving
+              }
+              onClick={() => {
+                setFinanceCancelReason('')
+                setFinanceCancelOpen(true)
+              }}
+            >
+              取消
+            </Button>
+          ) : null}
           {currentActiveKey === 'outsourcing' ? (
             <Button
               size="small"
@@ -631,7 +686,7 @@ export function OperationalFactWorkspace({
               ownerId={activeSelectedRow?.id}
               modalTitle={`${activeConfig.title}附件`}
               panelTitle={`${activeConfig.title}附件`}
-              description="上传与当前记录相关的图片、票据、对账或确认资料；附件只作为证据，不改变业务事实状态。"
+              description="上传与当前记录相关的图片、票据、对账或确认资料；附件只作为证据，不改变当前记录状态。"
               canUpload={canWriteActive || canConfirmActive}
               canDelete={canWriteActive || canConfirmActive}
               disabled={!activeSelectedRow}
@@ -692,7 +747,7 @@ export function OperationalFactWorkspace({
           ) : null}
           {currentActiveKey === 'finance' ? (
             <Popconfirm
-              title="确认结清财务事实？"
+              title="确认结清当前财务记录？"
               onConfirm={() =>
                 runRowAction(activeConfig, activeSelectedRow, 'settle', '结清')
               }
@@ -717,7 +772,7 @@ export function OperationalFactWorkspace({
             currentActiveKey
           ) ? (
             <Popconfirm
-              title="确认取消并按后端规则处理冲正？"
+              title="确认取消并按系统规则生成冲正记录？"
               onConfirm={() =>
                 runRowAction(activeConfig, activeSelectedRow, 'cancel', '取消')
               }
@@ -805,7 +860,7 @@ export function OperationalFactWorkspace({
               [currentActiveKey]: record,
             })),
         })}
-        emptyDescription="暂无业务事实记录"
+        emptyDescription="暂无业务记录"
         pagination={createBusinessTablePagination({
           pagination: activePagination,
           total: activeTotal,
@@ -819,6 +874,30 @@ export function OperationalFactWorkspace({
       />
 
       {columnOrderModal}
+      <Modal
+        title="取消财务记录"
+        open={financeCancelOpen}
+        okText="确认取消"
+        cancelText="暂不取消"
+        confirmLoading={saving}
+        onOk={confirmFinanceCancellation}
+        onCancel={() => {
+          if (!saving) {
+            setFinanceCancelOpen(false)
+            setFinanceCancelReason('')
+          }
+        }}
+      >
+        <p>取消后将保留原过账时间，并记录本次操作人、时间和原因。</p>
+        <Input.TextArea
+          value={financeCancelReason}
+          maxLength={255}
+          showCount
+          rows={4}
+          placeholder="请填写客户、供应商或账款调整的业务原因"
+          onChange={(event) => setFinanceCancelReason(event.target.value)}
+        />
+      </Modal>
     </BusinessPageLayout>
   )
 }

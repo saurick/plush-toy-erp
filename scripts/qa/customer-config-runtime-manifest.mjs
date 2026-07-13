@@ -1540,7 +1540,7 @@ function validateProcessDefinitions(manifest, { workPoolKeys } = {}) {
   assert(materialSupplyProcess.process_version === "v1", "material_supply.process_version must be v1");
   assert(
     materialSupplyProcess.variant_key === "purchase_receipt_iqc_inbound",
-    "material_supply.variant_key must identify the reviewed P4-2 chain",
+    "material_supply.variant_key must identify the reviewed material supply chain",
   );
   assert(
     materialSupplyProcess.manifest_status === "runtime_loader_ready",
@@ -1580,7 +1580,7 @@ function validateProcessDefinitions(manifest, { workPoolKeys } = {}) {
     );
     assert(
       node.policy_snapshot?.command_key === expectedMaterialSupplyCommandKeys.get(node.node_key),
-      `${node.node_key}.policy_snapshot.command_key must match reviewed P4-2 command`,
+      `${node.node_key}.policy_snapshot.command_key must match reviewed material supply command`,
     );
     assert(
       node.policy_snapshot?.writes_fact === false,
@@ -1592,7 +1592,7 @@ function validateProcessDefinitions(manifest, { workPoolKeys } = {}) {
     );
     assert(
       node.fact_command_contract?.command_key === expectedMaterialSupplyCommandKeys.get(node.node_key),
-      `${node.node_key}.fact_command_contract.command_key must match reviewed P4-2 command`,
+      `${node.node_key}.fact_command_contract.command_key must match reviewed material supply command`,
     );
     const handlerRegisteredNodeKeys = new Set(["purchase_receipt_source", "incoming_qc", "warehouse_inbound"]);
     const expectedRuntimeBindingStatus = handlerRegisteredNodeKeys.has(node.node_key)
@@ -1660,7 +1660,7 @@ function validateProcessDefinitions(manifest, { workPoolKeys } = {}) {
   assert(finishedGoodsDeliveryProcess.process_version === "v1", "finished_goods_delivery.process_version must be v1");
   assert(
     finishedGoodsDeliveryProcess.variant_key === "quality_finance_ship_receivable",
-    "finished_goods_delivery.variant_key must identify the reviewed P4-3 chain",
+    "finished_goods_delivery.variant_key must identify the reviewed finished goods delivery chain",
   );
   assert(
     finishedGoodsDeliveryProcess.manifest_status === "runtime_loader_start_ready",
@@ -1724,7 +1724,7 @@ function validateProcessDefinitions(manifest, { workPoolKeys } = {}) {
     );
     assert(
       node.policy_snapshot?.command_key === expectedFinishedGoodsCommandKeys.get(node.node_key),
-      `${node.node_key}.policy_snapshot.command_key must match reviewed P4-3 command`,
+      `${node.node_key}.policy_snapshot.command_key must match reviewed finished goods delivery command`,
     );
     assert(
       node.policy_snapshot?.writes_fact === false,
@@ -1736,7 +1736,7 @@ function validateProcessDefinitions(manifest, { workPoolKeys } = {}) {
     );
     assert(
       node.fact_command_contract?.command_key === expectedFinishedGoodsCommandKeys.get(node.node_key),
-      `${node.node_key}.fact_command_contract.command_key must match reviewed P4-3 command`,
+      `${node.node_key}.fact_command_contract.command_key must match reviewed finished goods delivery command`,
     );
     const expectedRuntimeBindingStatus = finishedGoodsHandlerRegisteredNodeKeys.has(node.node_key)
       ? "process_runtime_handler_registered"

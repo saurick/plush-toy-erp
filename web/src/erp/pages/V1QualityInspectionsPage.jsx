@@ -650,7 +650,7 @@ export default function V1QualityInspectionsPage() {
       '选择采购入库、入库行和批次；切换来源会清空已带出的材料、仓库和批次，避免残值。',
     pass: '合格或让步接收只更新质检判定和批次状态，不写库存流水。',
     reject: '不合格只更新质检判定和批次状态，供应商退货仍走采购退货。',
-    cancel: '取消只关闭当前质检流程，不本地改库存或采购入库事实。',
+    cancel: '取消只关闭当前质检流程，不会修改库存或采购入库记录。',
   }[inspectionModal?.mode || 'create']
 
   const modalOkText = {
@@ -968,7 +968,7 @@ export default function V1QualityInspectionsPage() {
           embedded
           selectedCount={selectedRow ? 1 : 0}
           selectedLabel={selectedRowLabel}
-          boundaryText="提交 / 判定 / 取消只调用后端 QualityUsecase；前端不本地改批次状态，不写库存流水。"
+          boundaryText="提交、判定和取消均由系统按质检规则处理；不会绕过规则直接修改批次状态或库存流水。"
         >
           <Button
             type="link"
@@ -1173,7 +1173,7 @@ export default function V1QualityInspectionsPage() {
                       </Text>
                     )}
                     <Text type="secondary">
-                      当前质检单按采购入库行建单；本次送检数量和已检数量还没有后端字段，不在前端伪造。
+                      当前质检单按采购入库行建单；本次送检数量和已检数量暂未记录，页面不会自行补造。
                     </Text>
                   </Space>
                 }

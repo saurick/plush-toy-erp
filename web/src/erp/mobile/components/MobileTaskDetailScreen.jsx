@@ -24,7 +24,6 @@ import {
   resolveTaskReasonLabel,
   resolveTaskRelatedSourceLabel,
   resolveTaskSourceLabel,
-  supportsRejectedAction,
 } from '../utils/mobileRoleTaskModel.mjs'
 import BusinessAttachmentModalButton from '../../components/business-list/BusinessAttachmentModalButton.jsx'
 
@@ -69,7 +68,7 @@ export default function MobileTaskDetailScreen({
   const latestMobileActionLabel = latestMobileAction
     ? resolveMobileActionDisplayLabel(latestMobileAction)
     : ''
-  const showRejected = supportsRejectedAction(activeRoleKey, selectedTask)
+  const showRejected = selectedCanReject
   const isUpdating = updatingID === selectedTask.id
   const isUrging = urgingID === selectedTask.id
   const isActionPending = isUpdating || isUrging
@@ -85,10 +84,10 @@ export default function MobileTaskDetailScreen({
   )
   const actionGuidance = !selectedCanOperate
     ? currentRoleOwnsTask
-      ? '当前配置未授予阻塞、完成或退回动作；本页只供查看。'
+      ? '您暂时不能处理这条任务，本页只供查看。'
       : selectedCanUrge
-        ? `当前岗位可查看并催办，阻塞 / 完成 / 退回由${ownerRoleLabel}负责。`
-        : `当前岗位仅可查看，阻塞 / 完成 / 退回由${ownerRoleLabel}负责。`
+        ? `您暂时不能处理这条任务，可以查看并催办；阻塞 / 完成 / 退回由${ownerRoleLabel}负责。`
+        : `您暂时不能处理这条任务，只能查看；阻塞 / 完成 / 退回由${ownerRoleLabel}负责。`
     : ''
 
   return (
@@ -234,6 +233,7 @@ export default function MobileTaskDetailScreen({
             <BusinessAttachmentModalButton
               ownerType="workflow_task"
               ownerId={selectedTask.id}
+              ownerVersion={selectedTask.version}
               buttonText="管理现场附件"
               modalTitle="现场附件"
               panelTitle="现场附件"
@@ -399,7 +399,7 @@ export default function MobileTaskDetailScreen({
         {showRejected ? (
           <button
             type="button"
-            className="mobile-role-action-bar__button mobile-role-action-bar__button--rejected col-span-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-base font-semibold text-red-600 disabled:opacity-50"
+            className="mobile-role-action-bar__button mobile-role-action-bar__button--rejected col-span-3 rounded-xl border border-red-200 bg-red-50 px-3 py-4 text-base font-semibold text-red-600 disabled:opacity-50"
             disabled={!selectedCanReject || isActionPending}
             onClick={() => handleTaskAction(selectedTask, 'rejected')}
           >

@@ -11,10 +11,10 @@ import {
   isQualityWorkflowTask,
   isEscalatedToBossWorkflowTask,
   isEscalatedWorkflowTask,
-  isTerminalWorkflowTask,
   isUrgedWorkflowTask,
   isWarehouseWorkflowTask,
 } from './workflowDashboardStats.mjs'
+import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
 import {
   getRoleDisplayName,
   isRoleKeyMatch,

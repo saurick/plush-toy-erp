@@ -29,6 +29,16 @@ type AdminUser struct {
 	ErpPreferences string `json:"erp_preferences,omitempty"`
 	// Disabled holds the value of the "disabled" field.
 	Disabled bool `json:"disabled,omitempty"`
+	// 管理员认证版本；禁用、注销和重置密码时递增，使旧会话立即失效
+	AuthVersion int64 `json:"auth_version,omitempty"`
+	// 正式注销时间；与 disabled 共同派生账号状态，不物理删除历史账号
+	RevokedAt *time.Time `json:"revoked_at,omitempty"`
+	// 最近一次账号状态变更原因
+	StatusReason *string `json:"status_reason,omitempty"`
+	// 最近一次账号状态变更时间
+	StatusChangedAt *time.Time `json:"status_changed_at,omitempty"`
+	// 最近一次账号状态变更操作者管理员 ID
+	StatusChangedBy *int `json:"status_changed_by,omitempty"`
 	// LastLoginAt holds the value of the "last_login_at" field.
 	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -45,11 +55,11 @@ func (*AdminUser) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case adminuser.FieldIsSuperAdmin, adminuser.FieldDisabled:
 			values[i] = new(sql.NullBool)
-		case adminuser.FieldID:
+		case adminuser.FieldID, adminuser.FieldAuthVersion, adminuser.FieldStatusChangedBy:
 			values[i] = new(sql.NullInt64)
-		case adminuser.FieldUsername, adminuser.FieldPhone, adminuser.FieldPasswordHash, adminuser.FieldErpPreferences:
+		case adminuser.FieldUsername, adminuser.FieldPhone, adminuser.FieldPasswordHash, adminuser.FieldErpPreferences, adminuser.FieldStatusReason:
 			values[i] = new(sql.NullString)
-		case adminuser.FieldLastLoginAt, adminuser.FieldCreatedAt, adminuser.FieldUpdatedAt:
+		case adminuser.FieldRevokedAt, adminuser.FieldStatusChangedAt, adminuser.FieldLastLoginAt, adminuser.FieldCreatedAt, adminuser.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -108,6 +118,40 @@ func (_m *AdminUser) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field disabled", values[i])
 			} else if value.Valid {
 				_m.Disabled = value.Bool
+			}
+		case adminuser.FieldAuthVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field auth_version", values[i])
+			} else if value.Valid {
+				_m.AuthVersion = value.Int64
+			}
+		case adminuser.FieldRevokedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field revoked_at", values[i])
+			} else if value.Valid {
+				_m.RevokedAt = new(time.Time)
+				*_m.RevokedAt = value.Time
+			}
+		case adminuser.FieldStatusReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field status_reason", values[i])
+			} else if value.Valid {
+				_m.StatusReason = new(string)
+				*_m.StatusReason = value.String
+			}
+		case adminuser.FieldStatusChangedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field status_changed_at", values[i])
+			} else if value.Valid {
+				_m.StatusChangedAt = new(time.Time)
+				*_m.StatusChangedAt = value.Time
+			}
+		case adminuser.FieldStatusChangedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field status_changed_by", values[i])
+			} else if value.Valid {
+				_m.StatusChangedBy = new(int)
+				*_m.StatusChangedBy = int(value.Int64)
 			}
 		case adminuser.FieldLastLoginAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -182,6 +226,29 @@ func (_m *AdminUser) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("disabled=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Disabled))
+	builder.WriteString(", ")
+	builder.WriteString("auth_version=")
+	builder.WriteString(fmt.Sprintf("%v", _m.AuthVersion))
+	builder.WriteString(", ")
+	if v := _m.RevokedAt; v != nil {
+		builder.WriteString("revoked_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.StatusReason; v != nil {
+		builder.WriteString("status_reason=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.StatusChangedAt; v != nil {
+		builder.WriteString("status_changed_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.StatusChangedBy; v != nil {
+		builder.WriteString("status_changed_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.LastLoginAt; v != nil {
 		builder.WriteString("last_login_at=")

@@ -27,6 +27,68 @@ func (_c *WorkflowTaskEventCreate) SetTaskID(v int) *WorkflowTaskEventCreate {
 	return _c
 }
 
+// SetTaskVersion sets the "task_version" field.
+func (_c *WorkflowTaskEventCreate) SetTaskVersion(v int) *WorkflowTaskEventCreate {
+	_c.mutation.SetTaskVersion(v)
+	return _c
+}
+
+// SetNillableTaskVersion sets the "task_version" field if the given value is not nil.
+func (_c *WorkflowTaskEventCreate) SetNillableTaskVersion(v *int) *WorkflowTaskEventCreate {
+	if v != nil {
+		_c.SetTaskVersion(*v)
+	}
+	return _c
+}
+
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (_c *WorkflowTaskEventCreate) SetIdempotencyKey(v string) *WorkflowTaskEventCreate {
+	_c.mutation.SetIdempotencyKey(v)
+	return _c
+}
+
+// SetNillableIdempotencyKey sets the "idempotency_key" field if the given value is not nil.
+func (_c *WorkflowTaskEventCreate) SetNillableIdempotencyKey(v *string) *WorkflowTaskEventCreate {
+	if v != nil {
+		_c.SetIdempotencyKey(*v)
+	}
+	return _c
+}
+
+// SetIntentHash sets the "intent_hash" field.
+func (_c *WorkflowTaskEventCreate) SetIntentHash(v string) *WorkflowTaskEventCreate {
+	_c.mutation.SetIntentHash(v)
+	return _c
+}
+
+// SetNillableIntentHash sets the "intent_hash" field if the given value is not nil.
+func (_c *WorkflowTaskEventCreate) SetNillableIntentHash(v *string) *WorkflowTaskEventCreate {
+	if v != nil {
+		_c.SetIntentHash(*v)
+	}
+	return _c
+}
+
+// SetCommandKey sets the "command_key" field.
+func (_c *WorkflowTaskEventCreate) SetCommandKey(v string) *WorkflowTaskEventCreate {
+	_c.mutation.SetCommandKey(v)
+	return _c
+}
+
+// SetNillableCommandKey sets the "command_key" field if the given value is not nil.
+func (_c *WorkflowTaskEventCreate) SetNillableCommandKey(v *string) *WorkflowTaskEventCreate {
+	if v != nil {
+		_c.SetCommandKey(*v)
+	}
+	return _c
+}
+
+// SetMutationResult sets the "mutation_result" field.
+func (_c *WorkflowTaskEventCreate) SetMutationResult(v map[string]interface{}) *WorkflowTaskEventCreate {
+	_c.mutation.SetMutationResult(v)
+	return _c
+}
+
 // SetEventType sets the "event_type" field.
 func (_c *WorkflowTaskEventCreate) SetEventType(v string) *WorkflowTaskEventCreate {
 	_c.mutation.SetEventType(v)
@@ -179,6 +241,26 @@ func (_c *WorkflowTaskEventCreate) check() error {
 			return &ValidationError{Name: "task_id", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.task_id": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.TaskVersion(); ok {
+		if err := workflowtaskevent.TaskVersionValidator(v); err != nil {
+			return &ValidationError{Name: "task_version", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.task_version": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.IdempotencyKey(); ok {
+		if err := workflowtaskevent.IdempotencyKeyValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.idempotency_key": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.IntentHash(); ok {
+		if err := workflowtaskevent.IntentHashValidator(v); err != nil {
+			return &ValidationError{Name: "intent_hash", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.intent_hash": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.CommandKey(); ok {
+		if err := workflowtaskevent.CommandKeyValidator(v); err != nil {
+			return &ValidationError{Name: "command_key", err: fmt.Errorf(`ent: validator failed for field "WorkflowTaskEvent.command_key": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.EventType(); !ok {
 		return &ValidationError{Name: "event_type", err: errors.New(`ent: missing required field "WorkflowTaskEvent.event_type"`)}
 	}
@@ -244,6 +326,26 @@ func (_c *WorkflowTaskEventCreate) createSpec() (*WorkflowTaskEvent, *sqlgraph.C
 		_node = &WorkflowTaskEvent{config: _c.config}
 		_spec = sqlgraph.NewCreateSpec(workflowtaskevent.Table, sqlgraph.NewFieldSpec(workflowtaskevent.FieldID, field.TypeInt))
 	)
+	if value, ok := _c.mutation.TaskVersion(); ok {
+		_spec.SetField(workflowtaskevent.FieldTaskVersion, field.TypeInt, value)
+		_node.TaskVersion = &value
+	}
+	if value, ok := _c.mutation.IdempotencyKey(); ok {
+		_spec.SetField(workflowtaskevent.FieldIdempotencyKey, field.TypeString, value)
+		_node.IdempotencyKey = &value
+	}
+	if value, ok := _c.mutation.IntentHash(); ok {
+		_spec.SetField(workflowtaskevent.FieldIntentHash, field.TypeString, value)
+		_node.IntentHash = &value
+	}
+	if value, ok := _c.mutation.CommandKey(); ok {
+		_spec.SetField(workflowtaskevent.FieldCommandKey, field.TypeString, value)
+		_node.CommandKey = &value
+	}
+	if value, ok := _c.mutation.MutationResult(); ok {
+		_spec.SetField(workflowtaskevent.FieldMutationResult, field.TypeJSON, value)
+		_node.MutationResult = value
+	}
 	if value, ok := _c.mutation.EventType(); ok {
 		_spec.SetField(workflowtaskevent.FieldEventType, field.TypeString, value)
 		_node.EventType = value

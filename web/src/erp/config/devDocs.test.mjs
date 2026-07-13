@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import test from 'node:test'
 
 import {
@@ -17,6 +19,12 @@ import {
   normalizeDevDocsSelectedPath,
   sortDevDocsItemsByPinned,
 } from './devDocs.mjs'
+
+const repoRoot = path.resolve(import.meta.dirname, '../../../..')
+const devDocsPageSource = readFileSync(
+  path.join(repoRoot, 'web/src/erp/pages/DevDocsPage.jsx'),
+  'utf8'
+)
 
 function findDirectory(nodes, path) {
   for (const node of nodes) {
@@ -43,6 +51,11 @@ test('devDocs: 只通过开发态独立路径暴露', () => {
   assert.equal(isDevDocsEnabled({ DEV: false }), false)
   assert.equal(isDevDocsEnabled({}), false)
   assert(!DEV_DOCS_ROUTE.startsWith('/erp/'))
+  assert.match(devDocsPageSource, /config\/customers\/\*\*\/\*\.md/u)
+  assert.match(
+    devDocsPageSource,
+    /aria-current=\{active \? 'true' : undefined\}/u
+  )
 })
 
 test('devDocs: 当前工作区开发文档列表不恢复产品内文档 registry', () => {
@@ -55,6 +68,8 @@ test('devDocs: 当前工作区开发文档列表不恢复产品内文档 registr
     '../../../../docs/archive/progress-2026-06-02-before-print-template-defer.md':
       '# 过程记录归档',
     '../../../../docs/customers/yoyoosun/README.md': '# 永绅客户资料边界',
+    '../../../../config/customers/yoyoosun/README.md':
+      '# 永绅 yoyoosun 客户配置',
   })
 
   const keys = docs.map((item) => item.key)
@@ -75,6 +90,7 @@ test('devDocs: 当前工作区开发文档列表不恢复产品内文档 registr
     )
   )
   assert(paths.includes('docs/customers/yoyoosun/README.md'))
+  assert(paths.includes('config/customers/yoyoosun/README.md'))
   assert(paths.includes('docs/product/产品完成路线图.md'))
   assert(!paths.some((path) => path.startsWith('web/src/erp/docs/')))
   assert(!paths.some((path) => path.includes('docs.mjs')))
@@ -90,6 +106,11 @@ test('devDocs: 当前工作区开发文档列表不恢复产品内文档 registr
     docs.find((item) => item.path === 'docs/customers/yoyoosun/README.md')
       ?.group,
     '客户'
+  )
+  assert.equal(
+    docs.find((item) => item.path === 'config/customers/yoyoosun/README.md')
+      ?.group,
+    '客户配置'
   )
   assert.equal(docs[0]?.path, 'README.md')
   assert.equal(docs[1]?.path, 'AGENTS.md')

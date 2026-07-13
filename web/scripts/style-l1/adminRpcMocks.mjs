@@ -8,11 +8,27 @@ import { installMasterDataRpcMocks } from './masterDataRpcMocks.mjs'
 import { installOrderRpcMocks } from './orderRpcMocks.mjs'
 import { installSystemRpcMocks } from './systemRpcMocks.mjs'
 import { installAttachmentRpcMocks } from './attachmentRpcMocks.mjs'
+import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
 
 const mockPdfBuffer = Buffer.from(
   '%PDF-1.4\n%plush-style-l1\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n',
   'utf8'
 )
+
+function buildWorkflowMockEffectiveSession(session, adminProfile) {
+  if (!session || typeof session !== 'object') return null
+  const roles = Array.isArray(session.roles)
+    ? session.roles
+    : Array.isArray(adminProfile?.roles)
+      ? adminProfile.roles
+          .map((role) => String(role?.role_key || role?.key || '').trim())
+          .filter(Boolean)
+      : []
+  return {
+    ...session,
+    roles,
+  }
+}
 
 function resolveDelayFromReferer(request, paramName) {
   const referer = String(request.headers().referer || '').trim()
@@ -68,6 +84,11 @@ export async function installAdminRpcMocks(
       name: '启停管理员',
       module: 'system',
     },
+    {
+      permission_key: 'system.user.revoke',
+      name: '注销管理员账号',
+      module: 'system',
+    },
     { permission_key: 'system.role.read', name: '查看角色', module: 'system' },
     {
       permission_key: 'system.permission.read',
@@ -83,6 +104,11 @@ export async function installAdminRpcMocks(
     {
       permission_key: 'workflow.task.read',
       name: '查看协同任务',
+      module: 'workflow',
+    },
+    {
+      permission_key: 'workflow.task.create',
+      name: '创建协同任务',
       module: 'workflow',
     },
     {
@@ -110,7 +136,37 @@ export async function installAdminRpcMocks(
       name: '进入业务岗位任务端',
       module: 'mobile',
     },
-  ]
+  ].map((item) => {
+    const parts = item.permission_key.split('.')
+    const action = parts.at(-1)
+    const readKey = [...parts.slice(0, -1), 'read'].join('.')
+    const menus = mockMenus
+      .filter((menu) =>
+        (menu.required_permissions || []).some(
+          (key) => key === item.permission_key || key === readKey
+        )
+      )
+      .map(({ key, label, path }) => ({ key, label, path }))
+    return {
+      ...item,
+      usage: {
+        menus,
+        control_type:
+          action === 'read' || action === 'access'
+            ? '页面入口和内容'
+            : action === 'create'
+              ? '新建按钮和表单'
+              : '操作按钮',
+        effect: '显示并允许执行',
+        condition:
+          item.module === 'system'
+            ? '仍受超级管理员保护、禁止自我停用或注销等安全规则限制'
+            : item.module === 'mobile'
+              ? '进入后仍只显示当前岗位或指定给本人的任务'
+              : '仍受客户模块状态、业务状态和任务归属限制',
+      },
+    }
+  })
   const allPermissionKeys = mockPermissions.map((item) => item.permission_key)
   const salesRole = {
     role_key: 'sales',
@@ -180,10 +236,10 @@ export async function installAdminRpcMocks(
   }
   const mockContext = {
     adminProfile,
-    effectiveSession:
-      effectiveSessionOverride && typeof effectiveSessionOverride === 'object'
-        ? effectiveSessionOverride
-        : null,
+    effectiveSession: buildWorkflowMockEffectiveSession(
+      effectiveSessionOverride,
+      adminProfile
+    ),
     salesRole,
     adminRole,
     mockMenus,
@@ -207,7 +263,7 @@ export async function installAdminRpcMocks(
     const data =
       method === 'get_effective_session'
         ? { session: mockContext.effectiveSession }
-        : {}
+        : unsupportedRpcMethod('customer_config', method)
 
     await route.fulfill({
       status: 200,
@@ -215,11 +271,7 @@ export async function installAdminRpcMocks(
       body: JSON.stringify({
         jsonrpc: '2.0',
         id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
+        result: styleRpcResult(data),
       }),
     })
   })
@@ -252,7 +304,15 @@ export async function installAdminDisabledRpcMocks(page) {
     const { id = 'mock-id', method } = body
 
     if (method !== 'me') {
-      await route.fallback()
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id,
+          result: styleRpcResult(unsupportedRpcMethod('admin', method)),
+        }),
+      })
       return
     }
 

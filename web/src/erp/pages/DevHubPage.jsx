@@ -10,9 +10,11 @@ import {
   PushpinOutlined,
   RightOutlined,
   SafetyCertificateOutlined,
+  SearchOutlined,
 } from '@ant-design/icons'
 import { Button, Empty, Input, Select, Tag, Tooltip, Typography } from 'antd'
 import { Link } from 'react-router-dom'
+import DevPageNav from '../components/dev/DevPageNav.jsx'
 import {
   DEV_HUB_ALL_GROUP,
   DEV_HUB_ITEMS,
@@ -89,9 +91,16 @@ function EntryCard({ item, compact = false, pinned = false, onTogglePinned }) {
           </div>
         </div>
         <Text className="erp-dev-hub-card__source">{item.source}</Text>
+        <Text type="secondary" className="erp-dev-hub-card__description">
+          {item.description}
+        </Text>
         <div className="erp-dev-hub-card__foot">
           <span>{item.status}</span>
-          <Link to={item.route} className="erp-dev-hub-card__link">
+          <Link
+            to={item.route}
+            className="erp-dev-hub-card__link"
+            aria-label={`进入${item.title}`}
+          >
             <span>进入</span>
             <RightOutlined />
           </Link>
@@ -124,11 +133,12 @@ export default function DevHubPage() {
   }
 
   return (
-    <div className="erp-dev-hub-page">
+    <div className="erp-dev-hub-page erp-dev-workspace-page">
+      <DevPageNav />
       <header className="erp-dev-hub-header">
         <div className="erp-dev-hub-header__copy">
           <ExperimentOutlined className="erp-dev-hub-header__icon" />
-          <Title level={3} className="erp-dev-hub-title">
+          <Title level={1} className="erp-dev-hub-title">
             开发导航 / Dev Navigation
           </Title>
           <Text className="erp-dev-hub-summary">
@@ -159,10 +169,11 @@ export default function DevHubPage() {
         ) : null}
 
         <section className="erp-dev-hub-toolbar" aria-label="开发入口筛选">
-          <Input.Search
+          <Input
             allowClear
             placeholder="搜索入口或路径"
             value={keyword}
+            prefix={<SearchOutlined aria-hidden="true" />}
             onChange={(event) => setKeyword(event.target.value)}
           />
           <Select

@@ -1118,12 +1118,12 @@ export function createMobileTaskAssertions(deps) {
     assert(metrics.actionBar, `${scenarioName} 详情页动作栏未渲染`)
     assert.equal(
       metrics.buttons.length,
-      3,
+      4,
       `${scenarioName} 详情页动作栏应只保留已接后端合同的主按钮: ${JSON.stringify(metrics)}`
     )
     assert.deepEqual(
       metrics.buttons.map((button) => button.text),
-      ['阻塞', '完成', '催办'],
+      ['阻塞', '完成', '催办', '退回当前任务'],
       `${scenarioName} 详情页动作栏不应保留 unsupported processing 按钮: ${JSON.stringify(metrics)}`
     )
     assert.equal(
@@ -1192,7 +1192,17 @@ export function createMobileTaskAssertions(deps) {
     await page
       .locator('.mobile-role-tasks-page--detail')
       .waitFor({ state: 'visible', timeout: 10_000 })
-    await expectText(page, '当前岗位可查看并催办')
+    await page.waitForFunction(() => {
+      const buttons = Array.from(
+        document.querySelectorAll('.mobile-role-action-bar__button')
+      )
+      return (
+        buttons.length === 4 &&
+        buttons.every((button) =>
+          button instanceof HTMLButtonElement ? !button.disabled : false
+        )
+      )
+    })
     await assertMobileTaskVisibleTextNoTechnicalFields(page, {
       scenarioName,
       scope: '跨岗位详情',
@@ -1224,33 +1234,31 @@ export function createMobileTaskAssertions(deps) {
         documentClientWidth: document.documentElement.clientWidth,
       }
     })
-    assert(
-      crossRoleMetrics.guidanceText.includes('当前岗位可查看并催办') &&
-        crossRoleMetrics.guidanceText.includes('业务') &&
-        crossRoleMetrics.guidanceScrollWidth <=
-          crossRoleMetrics.guidanceClientWidth + 1,
-      `${scenarioName} 跨岗位可见任务缺少不可代办说明或提示溢出: ${JSON.stringify(crossRoleMetrics)}`
+    assert.equal(
+      crossRoleMetrics.guidanceText,
+      '',
+      `${scenarioName} 后端已授权的账号不应被移动端路径角色二次拦截: ${JSON.stringify(crossRoleMetrics)}`
     )
     assert(
       !crossRoleMetrics.buttons.some((button) => button.text === '处理') &&
         crossRoleMetrics.buttons.some(
-          (button) => button.text === '阻塞' && button.disabled
+          (button) => button.text === '阻塞' && !button.disabled
         ) &&
         crossRoleMetrics.buttons.some(
-          (button) => button.text === '完成' && button.disabled
+          (button) => button.text === '完成' && !button.disabled
         ) &&
-        !crossRoleMetrics.buttons.some(
+        crossRoleMetrics.buttons.some(
           (button) => button.text === '退回当前任务' && !button.disabled
         ) &&
         crossRoleMetrics.buttons.some(
           (button) => button.text === '催办' && !button.disabled
         ),
-      `${scenarioName} 跨岗位可见任务动作权限提示和按钮状态不一致: ${JSON.stringify(crossRoleMetrics)}`
+      `${scenarioName} 移动端动作必须与后端授权投影一致: ${JSON.stringify(crossRoleMetrics)}`
     )
     assert(
       crossRoleMetrics.documentScrollWidth <=
         crossRoleMetrics.documentClientWidth + 1,
-      `${scenarioName} 跨岗位不可代办提示造成横向溢出: ${JSON.stringify(crossRoleMetrics)}`
+      `${scenarioName} 路径切换后任务详情造成横向溢出: ${JSON.stringify(crossRoleMetrics)}`
     )
   }
 

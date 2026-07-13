@@ -16,6 +16,7 @@ import {
 } from '@/erp/context/ERPWorkspaceProvider'
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
+import { resolveDevPageTitle } from '@/erp/config/devRoutes.mjs'
 
 const ERPRouter = lazyWithDynamicImportRetry(() => import('@/erp/router'))
 
@@ -25,6 +26,7 @@ function AppContent() {
   const { appConfig, isMobileExperience } = useERPWorkspace()
   const appTitle =
     appConfig.title || import.meta.env.VITE_APP_TITLE || 'Plush Toy ERP'
+  const documentTitle = resolveDevPageTitle(location.pathname, appTitle)
   const activeBrand = getActiveERPBrand()
 
   useEffect(() => {
@@ -79,7 +81,7 @@ function AppContent() {
   return (
     <>
       <Helmet>
-        <title>{appTitle}</title>
+        <title>{documentTitle}</title>
       </Helmet>
       <Suspense fallback={null}>
         <ERPRouter />
