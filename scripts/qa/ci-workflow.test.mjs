@@ -107,9 +107,22 @@ test("CI versions and dependencies follow repository gate requirements", () => {
   assert.match(stepRuns, /playwright install --with-deps chromium/u);
   assert.match(stepRuns, /chromium\.executablePath\(\)/u);
   assert.match(stepRuns, /\[\[ ! -x "\$chrome_path" \]\]/u);
+  assert.match(stepRuns, /sandbox_source="\$\(dirname "\$chrome_path"\)\/chrome_sandbox"/u);
+  assert.match(stepRuns, /sandbox_path="\/usr\/local\/sbin\/chrome-devel-sandbox"/u);
+  assert.match(stepRuns, /\[\[ ! -f "\$sandbox_source" \]\]/u);
+  assert.match(
+    stepRuns,
+    /sudo install -o root -g root -m 4755 "\$sandbox_source" "\$sandbox_path"/u,
+  );
+  assert.match(stepRuns, /stat -c '%U:%G' "\$sandbox_path"/u);
+  assert.match(stepRuns, /stat -c '%a' "\$sandbox_path"/u);
+  assert.match(stepRuns, /"\$sandbox_owner" != "root:root"/u);
+  assert.match(stepRuns, /"\$sandbox_mode" != "4755"/u);
+  assert.match(stepRuns, /CHROME_DEVEL_SANDBOX=\$sandbox_path/u);
   assert.match(stepRuns, /ERP_PDF_CHROME_PATH=\$chrome_path/u);
   assert.match(stepRuns, /GITHUB_ENV/u);
   assert.match(stepRuns, /GITHUB_PATH/u);
+  assert.doesNotMatch(workflowSource, /--no-sandbox|--disable-setuid-sandbox/u);
   assert.match(read("server/Makefile"), /^GO_BUILDER_IMAGE \?= golang:1\.26\.4$/mu);
 });
 

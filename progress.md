@@ -2,6 +2,16 @@
 
 本文件只保留当前活跃事项、最近完成记录和归档索引；历史流水已归档到 `docs/archive/`。`progress.md` 是过程交接线索，不是正式需求、数据模型或部署真源。
 
+## 2026-07-14 远端 CI Chromium 沙箱收口
+
+完成：主仓产品单重提交 `6b0ac4e4` 推送后，GitHub Actions run `29318178284` 只在真实 Chromium PDF 安全集成启动阶段失败；Ubuntu 24.04 拒绝 Playwright 下载版 Chromium 使用 user namespace sandbox，测试体尚未执行。CI 改为从同一 Playwright Chromium 发行包安装独立 `chrome_sandbox` helper 到 `/usr/local/sbin/chrome-devel-sandbox`，强制 `root:root` 与 `4755` 后通过 `CHROME_DEVEL_SANDBOX` 绑定。产品代码和 Chromium 参数未加入 `--no-sandbox` 或 `--disable-setuid-sandbox`，不会为适配 CI 降低 PDF 渲染安全边界。
+
+验证：`bash scripts/qa/affected.sh --run` 通过，覆盖 diff-check、文档索引与 CI YAML / 依赖 / SUID helper / fail-closed 合同。随后 `bash scripts/qa/full.sh` 完整通过且未使用 skip：Node、客户配置、Web contracts、server quick、Web 全量 1017 / 1017、critical PostgreSQL、server 全量 1785 / 1785、Vite build、当前工作树自启 Chromium、真实 PDF 安全集成与 govulncheck 全部完成，当前代码无可达漏洞。
+
+下一步：提交并推送本次 CI 装配修复，在 GitHub Ubuntu runner 上取得新的 strict 绿色运行证据；随后把最终 Product Core 提交号重新锁入客户私有仓，完成 formal validate、推送和远端 fresh clone 回读。
+
+阻塞/风险：本地已证明完整门禁，但 SUID helper 的真实 Ubuntu 行为必须由本次远端 CI 复核；GitHub branch protection / required check 是否启用仍需远端设置证据。目标机 `192.168.0.133` 未部署，migration、health / smoke、rollback evidence 与客户签收仍是独立发布动作。
+
 ## 2026-07-14 产品单重与最终全仓门禁
 
 完成：产品主数据新增可空的 `unit_net_weight_kg`，以 kg 存储每默认单位净重，数据库使用 `numeric(20,6)` 并约束非空值必须大于零。Biz、JSON-RPC、Ent repo、产品表单、列表、CSV、浏览器 mock 与正式文档使用同一精度和缺值语义；切换默认单位会清空旧单重，避免单位变化后残值继续参与展示。前端以当前默认单位显示“kg / 单位”，不把该字段扩成 SKU 覆盖、单位换算、出货快照、合计或打印事实。同步修复浏览器场景的来源对象名断言与 Ant Design 废弃 `addonAfter` 用法。

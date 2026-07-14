@@ -76,6 +76,20 @@ jobs:
             echo "[ci] Playwright Chromium is not executable: $chrome_path"
             exit 1
           fi
+          sandbox_source="$(dirname "$chrome_path")/chrome_sandbox"
+          sandbox_path="/usr/local/sbin/chrome-devel-sandbox"
+          if [[ ! -f "$sandbox_source" ]]; then
+            echo "[ci] Playwright Chromium SUID sandbox helper is missing: $sandbox_source"
+            exit 1
+          fi
+          sudo install -o root -g root -m 4755 "$sandbox_source" "$sandbox_path"
+          sandbox_owner="$(stat -c '%U:%G' "$sandbox_path")"
+          sandbox_mode="$(stat -c '%a' "$sandbox_path")"
+          if [[ "$sandbox_owner" != "root:root" || "$sandbox_mode" != "4755" ]]; then
+            echo "[ci] Chromium SUID sandbox helper is invalid: owner=$sandbox_owner mode=$sandbox_mode"
+            exit 1
+          fi
+          echo "CHROME_DEVEL_SANDBOX=$sandbox_path" >> "$GITHUB_ENV"
           echo "ERP_PDF_CHROME_PATH=$chrome_path" >> "$GITHUB_ENV"
       - name: Resolve and validate the exact Git comparison range
         env:
