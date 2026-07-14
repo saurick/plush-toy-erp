@@ -186,6 +186,60 @@ func (_u *ShipmentItemUpdate) ClearUnitNetWeightKgSnapshot() *ShipmentItemUpdate
 	return _u
 }
 
+// SetUnitPriceSnapshot sets the "unit_price_snapshot" field.
+func (_u *ShipmentItemUpdate) SetUnitPriceSnapshot(v decimal.Decimal) *ShipmentItemUpdate {
+	_u.mutation.SetUnitPriceSnapshot(v)
+	return _u
+}
+
+// SetNillableUnitPriceSnapshot sets the "unit_price_snapshot" field if the given value is not nil.
+func (_u *ShipmentItemUpdate) SetNillableUnitPriceSnapshot(v *decimal.Decimal) *ShipmentItemUpdate {
+	if v != nil {
+		_u.SetUnitPriceSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearUnitPriceSnapshot clears the value of the "unit_price_snapshot" field.
+func (_u *ShipmentItemUpdate) ClearUnitPriceSnapshot() *ShipmentItemUpdate {
+	_u.mutation.ClearUnitPriceSnapshot()
+	return _u
+}
+
+// SetAmountSnapshot sets the "amount_snapshot" field.
+func (_u *ShipmentItemUpdate) SetAmountSnapshot(v decimal.Decimal) *ShipmentItemUpdate {
+	_u.mutation.SetAmountSnapshot(v)
+	return _u
+}
+
+// SetNillableAmountSnapshot sets the "amount_snapshot" field if the given value is not nil.
+func (_u *ShipmentItemUpdate) SetNillableAmountSnapshot(v *decimal.Decimal) *ShipmentItemUpdate {
+	if v != nil {
+		_u.SetAmountSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearAmountSnapshot clears the value of the "amount_snapshot" field.
+func (_u *ShipmentItemUpdate) ClearAmountSnapshot() *ShipmentItemUpdate {
+	_u.mutation.ClearAmountSnapshot()
+	return _u
+}
+
+// SetCurrencySnapshot sets the "currency_snapshot" field.
+func (_u *ShipmentItemUpdate) SetCurrencySnapshot(v string) *ShipmentItemUpdate {
+	_u.mutation.SetCurrencySnapshot(v)
+	return _u
+}
+
+// SetNillableCurrencySnapshot sets the "currency_snapshot" field if the given value is not nil.
+func (_u *ShipmentItemUpdate) SetNillableCurrencySnapshot(v *string) *ShipmentItemUpdate {
+	if v != nil {
+		_u.SetCurrencySnapshot(*v)
+	}
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *ShipmentItemUpdate) SetNote(v string) *ShipmentItemUpdate {
 	_u.mutation.SetNote(v)
@@ -387,6 +441,11 @@ func (_u *ShipmentItemUpdate) check() error {
 			return &ValidationError{Name: "lot_id", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.lot_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.CurrencySnapshot(); ok {
+		if err := shipmentitem.CurrencySnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "currency_snapshot", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.currency_snapshot": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := shipmentitem.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.note": %w`, err)}
@@ -427,6 +486,21 @@ func (_u *ShipmentItemUpdate) sqlSave(ctx context.Context) (_node int, err error
 	}
 	if _u.mutation.UnitNetWeightKgSnapshotCleared() {
 		_spec.ClearField(shipmentitem.FieldUnitNetWeightKgSnapshot, field.TypeOther)
+	}
+	if value, ok := _u.mutation.UnitPriceSnapshot(); ok {
+		_spec.SetField(shipmentitem.FieldUnitPriceSnapshot, field.TypeOther, value)
+	}
+	if _u.mutation.UnitPriceSnapshotCleared() {
+		_spec.ClearField(shipmentitem.FieldUnitPriceSnapshot, field.TypeOther)
+	}
+	if value, ok := _u.mutation.AmountSnapshot(); ok {
+		_spec.SetField(shipmentitem.FieldAmountSnapshot, field.TypeOther, value)
+	}
+	if _u.mutation.AmountSnapshotCleared() {
+		_spec.ClearField(shipmentitem.FieldAmountSnapshot, field.TypeOther)
+	}
+	if value, ok := _u.mutation.CurrencySnapshot(); ok {
+		_spec.SetField(shipmentitem.FieldCurrencySnapshot, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(shipmentitem.FieldNote, field.TypeString, value)
@@ -810,6 +884,60 @@ func (_u *ShipmentItemUpdateOne) ClearUnitNetWeightKgSnapshot() *ShipmentItemUpd
 	return _u
 }
 
+// SetUnitPriceSnapshot sets the "unit_price_snapshot" field.
+func (_u *ShipmentItemUpdateOne) SetUnitPriceSnapshot(v decimal.Decimal) *ShipmentItemUpdateOne {
+	_u.mutation.SetUnitPriceSnapshot(v)
+	return _u
+}
+
+// SetNillableUnitPriceSnapshot sets the "unit_price_snapshot" field if the given value is not nil.
+func (_u *ShipmentItemUpdateOne) SetNillableUnitPriceSnapshot(v *decimal.Decimal) *ShipmentItemUpdateOne {
+	if v != nil {
+		_u.SetUnitPriceSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearUnitPriceSnapshot clears the value of the "unit_price_snapshot" field.
+func (_u *ShipmentItemUpdateOne) ClearUnitPriceSnapshot() *ShipmentItemUpdateOne {
+	_u.mutation.ClearUnitPriceSnapshot()
+	return _u
+}
+
+// SetAmountSnapshot sets the "amount_snapshot" field.
+func (_u *ShipmentItemUpdateOne) SetAmountSnapshot(v decimal.Decimal) *ShipmentItemUpdateOne {
+	_u.mutation.SetAmountSnapshot(v)
+	return _u
+}
+
+// SetNillableAmountSnapshot sets the "amount_snapshot" field if the given value is not nil.
+func (_u *ShipmentItemUpdateOne) SetNillableAmountSnapshot(v *decimal.Decimal) *ShipmentItemUpdateOne {
+	if v != nil {
+		_u.SetAmountSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearAmountSnapshot clears the value of the "amount_snapshot" field.
+func (_u *ShipmentItemUpdateOne) ClearAmountSnapshot() *ShipmentItemUpdateOne {
+	_u.mutation.ClearAmountSnapshot()
+	return _u
+}
+
+// SetCurrencySnapshot sets the "currency_snapshot" field.
+func (_u *ShipmentItemUpdateOne) SetCurrencySnapshot(v string) *ShipmentItemUpdateOne {
+	_u.mutation.SetCurrencySnapshot(v)
+	return _u
+}
+
+// SetNillableCurrencySnapshot sets the "currency_snapshot" field if the given value is not nil.
+func (_u *ShipmentItemUpdateOne) SetNillableCurrencySnapshot(v *string) *ShipmentItemUpdateOne {
+	if v != nil {
+		_u.SetCurrencySnapshot(*v)
+	}
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *ShipmentItemUpdateOne) SetNote(v string) *ShipmentItemUpdateOne {
 	_u.mutation.SetNote(v)
@@ -1024,6 +1152,11 @@ func (_u *ShipmentItemUpdateOne) check() error {
 			return &ValidationError{Name: "lot_id", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.lot_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.CurrencySnapshot(); ok {
+		if err := shipmentitem.CurrencySnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "currency_snapshot", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.currency_snapshot": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := shipmentitem.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.note": %w`, err)}
@@ -1081,6 +1214,21 @@ func (_u *ShipmentItemUpdateOne) sqlSave(ctx context.Context) (_node *ShipmentIt
 	}
 	if _u.mutation.UnitNetWeightKgSnapshotCleared() {
 		_spec.ClearField(shipmentitem.FieldUnitNetWeightKgSnapshot, field.TypeOther)
+	}
+	if value, ok := _u.mutation.UnitPriceSnapshot(); ok {
+		_spec.SetField(shipmentitem.FieldUnitPriceSnapshot, field.TypeOther, value)
+	}
+	if _u.mutation.UnitPriceSnapshotCleared() {
+		_spec.ClearField(shipmentitem.FieldUnitPriceSnapshot, field.TypeOther)
+	}
+	if value, ok := _u.mutation.AmountSnapshot(); ok {
+		_spec.SetField(shipmentitem.FieldAmountSnapshot, field.TypeOther, value)
+	}
+	if _u.mutation.AmountSnapshotCleared() {
+		_spec.ClearField(shipmentitem.FieldAmountSnapshot, field.TypeOther)
+	}
+	if value, ok := _u.mutation.CurrencySnapshot(); ok {
+		_spec.SetField(shipmentitem.FieldCurrencySnapshot, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(shipmentitem.FieldNote, field.TypeString, value)

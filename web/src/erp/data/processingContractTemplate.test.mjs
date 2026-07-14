@@ -246,6 +246,7 @@ test('processingContractTemplate: 委外订单按加工合同源单带入工序�
         line_status: 'open',
         product_order_no_snapshot: ' SO-LINE-26017 ',
         product_no_snapshot: ' P-001 ',
+        sku_code_snapshot: ' SKU-RED-M ',
         product_name_snapshot: ' 毛绒兔半成品 ',
         process_name_snapshot: ' 车缝 ',
         process_category_snapshot: ' 委外车缝 ',
@@ -270,7 +271,7 @@ test('processingContractTemplate: 委外订单按加工合同源单带入工序�
   assert.deepEqual(draft.lines[0], {
     contractNo: 'OUT-ORDER-001',
     productOrderNo: 'SO-LINE-26017',
-    productNo: 'P-001',
+    productNo: 'P-001 / SKU-RED-M',
     productName: '毛绒兔半成品',
     processName: '车缝',
     supplierAlias: '外协车缝厂全称',

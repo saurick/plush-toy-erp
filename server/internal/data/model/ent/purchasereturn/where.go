@@ -65,9 +65,19 @@ func PurchaseReceiptID(v int) predicate.PurchaseReturn {
 	return predicate.PurchaseReturn(sql.FieldEQ(FieldPurchaseReceiptID, v))
 }
 
+// QualityInspectionID applies equality check predicate on the "quality_inspection_id" field. It's identical to QualityInspectionIDEQ.
+func QualityInspectionID(v int) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldEQ(FieldQualityInspectionID, v))
+}
+
 // SupplierName applies equality check predicate on the "supplier_name" field. It's identical to SupplierNameEQ.
 func SupplierName(v string) predicate.PurchaseReturn {
 	return predicate.PurchaseReturn(sql.FieldEQ(FieldSupplierName, v))
+}
+
+// ReturnReason applies equality check predicate on the "return_reason" field. It's identical to ReturnReasonEQ.
+func ReturnReason(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldEQ(FieldReturnReason, v))
 }
 
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
@@ -83,6 +93,21 @@ func ReturnedAt(v time.Time) predicate.PurchaseReturn {
 // PostedAt applies equality check predicate on the "posted_at" field. It's identical to PostedAtEQ.
 func PostedAt(v time.Time) predicate.PurchaseReturn {
 	return predicate.PurchaseReturn(sql.FieldEQ(FieldPostedAt, v))
+}
+
+// IdempotencyKey applies equality check predicate on the "idempotency_key" field. It's identical to IdempotencyKeyEQ.
+func IdempotencyKey(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldEQ(FieldIdempotencyKey, v))
+}
+
+// IdempotencyPayloadHash applies equality check predicate on the "idempotency_payload_hash" field. It's identical to IdempotencyPayloadHashEQ.
+func IdempotencyPayloadHash(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldEQ(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyItemCount applies equality check predicate on the "idempotency_item_count" field. It's identical to IdempotencyItemCountEQ.
+func IdempotencyItemCount(v int) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldEQ(FieldIdempotencyItemCount, v))
 }
 
 // Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
@@ -195,6 +220,36 @@ func PurchaseReceiptIDNotNil() predicate.PurchaseReturn {
 	return predicate.PurchaseReturn(sql.FieldNotNull(FieldPurchaseReceiptID))
 }
 
+// QualityInspectionIDEQ applies the EQ predicate on the "quality_inspection_id" field.
+func QualityInspectionIDEQ(v int) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldEQ(FieldQualityInspectionID, v))
+}
+
+// QualityInspectionIDNEQ applies the NEQ predicate on the "quality_inspection_id" field.
+func QualityInspectionIDNEQ(v int) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldNEQ(FieldQualityInspectionID, v))
+}
+
+// QualityInspectionIDIn applies the In predicate on the "quality_inspection_id" field.
+func QualityInspectionIDIn(vs ...int) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldIn(FieldQualityInspectionID, vs...))
+}
+
+// QualityInspectionIDNotIn applies the NotIn predicate on the "quality_inspection_id" field.
+func QualityInspectionIDNotIn(vs ...int) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldNotIn(FieldQualityInspectionID, vs...))
+}
+
+// QualityInspectionIDIsNil applies the IsNil predicate on the "quality_inspection_id" field.
+func QualityInspectionIDIsNil() predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldIsNull(FieldQualityInspectionID))
+}
+
+// QualityInspectionIDNotNil applies the NotNil predicate on the "quality_inspection_id" field.
+func QualityInspectionIDNotNil() predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldNotNull(FieldQualityInspectionID))
+}
+
 // SupplierNameEQ applies the EQ predicate on the "supplier_name" field.
 func SupplierNameEQ(v string) predicate.PurchaseReturn {
 	return predicate.PurchaseReturn(sql.FieldEQ(FieldSupplierName, v))
@@ -258,6 +313,81 @@ func SupplierNameEqualFold(v string) predicate.PurchaseReturn {
 // SupplierNameContainsFold applies the ContainsFold predicate on the "supplier_name" field.
 func SupplierNameContainsFold(v string) predicate.PurchaseReturn {
 	return predicate.PurchaseReturn(sql.FieldContainsFold(FieldSupplierName, v))
+}
+
+// ReturnReasonEQ applies the EQ predicate on the "return_reason" field.
+func ReturnReasonEQ(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldEQ(FieldReturnReason, v))
+}
+
+// ReturnReasonNEQ applies the NEQ predicate on the "return_reason" field.
+func ReturnReasonNEQ(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldNEQ(FieldReturnReason, v))
+}
+
+// ReturnReasonIn applies the In predicate on the "return_reason" field.
+func ReturnReasonIn(vs ...string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldIn(FieldReturnReason, vs...))
+}
+
+// ReturnReasonNotIn applies the NotIn predicate on the "return_reason" field.
+func ReturnReasonNotIn(vs ...string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldNotIn(FieldReturnReason, vs...))
+}
+
+// ReturnReasonGT applies the GT predicate on the "return_reason" field.
+func ReturnReasonGT(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldGT(FieldReturnReason, v))
+}
+
+// ReturnReasonGTE applies the GTE predicate on the "return_reason" field.
+func ReturnReasonGTE(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldGTE(FieldReturnReason, v))
+}
+
+// ReturnReasonLT applies the LT predicate on the "return_reason" field.
+func ReturnReasonLT(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldLT(FieldReturnReason, v))
+}
+
+// ReturnReasonLTE applies the LTE predicate on the "return_reason" field.
+func ReturnReasonLTE(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldLTE(FieldReturnReason, v))
+}
+
+// ReturnReasonContains applies the Contains predicate on the "return_reason" field.
+func ReturnReasonContains(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldContains(FieldReturnReason, v))
+}
+
+// ReturnReasonHasPrefix applies the HasPrefix predicate on the "return_reason" field.
+func ReturnReasonHasPrefix(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldHasPrefix(FieldReturnReason, v))
+}
+
+// ReturnReasonHasSuffix applies the HasSuffix predicate on the "return_reason" field.
+func ReturnReasonHasSuffix(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldHasSuffix(FieldReturnReason, v))
+}
+
+// ReturnReasonIsNil applies the IsNil predicate on the "return_reason" field.
+func ReturnReasonIsNil() predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldIsNull(FieldReturnReason))
+}
+
+// ReturnReasonNotNil applies the NotNil predicate on the "return_reason" field.
+func ReturnReasonNotNil() predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldNotNull(FieldReturnReason))
+}
+
+// ReturnReasonEqualFold applies the EqualFold predicate on the "return_reason" field.
+func ReturnReasonEqualFold(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldEqualFold(FieldReturnReason, v))
+}
+
+// ReturnReasonContainsFold applies the ContainsFold predicate on the "return_reason" field.
+func ReturnReasonContainsFold(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldContainsFold(FieldReturnReason, v))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.
@@ -413,6 +543,206 @@ func PostedAtIsNil() predicate.PurchaseReturn {
 // PostedAtNotNil applies the NotNil predicate on the "posted_at" field.
 func PostedAtNotNil() predicate.PurchaseReturn {
 	return predicate.PurchaseReturn(sql.FieldNotNull(FieldPostedAt))
+}
+
+// IdempotencyKeyEQ applies the EQ predicate on the "idempotency_key" field.
+func IdempotencyKeyEQ(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldEQ(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyNEQ applies the NEQ predicate on the "idempotency_key" field.
+func IdempotencyKeyNEQ(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldNEQ(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyIn applies the In predicate on the "idempotency_key" field.
+func IdempotencyKeyIn(vs ...string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldIn(FieldIdempotencyKey, vs...))
+}
+
+// IdempotencyKeyNotIn applies the NotIn predicate on the "idempotency_key" field.
+func IdempotencyKeyNotIn(vs ...string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldNotIn(FieldIdempotencyKey, vs...))
+}
+
+// IdempotencyKeyGT applies the GT predicate on the "idempotency_key" field.
+func IdempotencyKeyGT(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldGT(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyGTE applies the GTE predicate on the "idempotency_key" field.
+func IdempotencyKeyGTE(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldGTE(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyLT applies the LT predicate on the "idempotency_key" field.
+func IdempotencyKeyLT(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldLT(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyLTE applies the LTE predicate on the "idempotency_key" field.
+func IdempotencyKeyLTE(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldLTE(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyContains applies the Contains predicate on the "idempotency_key" field.
+func IdempotencyKeyContains(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldContains(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyHasPrefix applies the HasPrefix predicate on the "idempotency_key" field.
+func IdempotencyKeyHasPrefix(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldHasPrefix(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyHasSuffix applies the HasSuffix predicate on the "idempotency_key" field.
+func IdempotencyKeyHasSuffix(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldHasSuffix(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyIsNil applies the IsNil predicate on the "idempotency_key" field.
+func IdempotencyKeyIsNil() predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldIsNull(FieldIdempotencyKey))
+}
+
+// IdempotencyKeyNotNil applies the NotNil predicate on the "idempotency_key" field.
+func IdempotencyKeyNotNil() predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldNotNull(FieldIdempotencyKey))
+}
+
+// IdempotencyKeyEqualFold applies the EqualFold predicate on the "idempotency_key" field.
+func IdempotencyKeyEqualFold(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldEqualFold(FieldIdempotencyKey, v))
+}
+
+// IdempotencyKeyContainsFold applies the ContainsFold predicate on the "idempotency_key" field.
+func IdempotencyKeyContainsFold(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldContainsFold(FieldIdempotencyKey, v))
+}
+
+// IdempotencyPayloadHashEQ applies the EQ predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashEQ(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldEQ(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashNEQ applies the NEQ predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashNEQ(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldNEQ(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashIn applies the In predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashIn(vs ...string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldIn(FieldIdempotencyPayloadHash, vs...))
+}
+
+// IdempotencyPayloadHashNotIn applies the NotIn predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashNotIn(vs ...string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldNotIn(FieldIdempotencyPayloadHash, vs...))
+}
+
+// IdempotencyPayloadHashGT applies the GT predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashGT(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldGT(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashGTE applies the GTE predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashGTE(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldGTE(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashLT applies the LT predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashLT(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldLT(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashLTE applies the LTE predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashLTE(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldLTE(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashContains applies the Contains predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashContains(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldContains(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashHasPrefix applies the HasPrefix predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashHasPrefix(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldHasPrefix(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashHasSuffix applies the HasSuffix predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashHasSuffix(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldHasSuffix(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashIsNil applies the IsNil predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashIsNil() predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldIsNull(FieldIdempotencyPayloadHash))
+}
+
+// IdempotencyPayloadHashNotNil applies the NotNil predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashNotNil() predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldNotNull(FieldIdempotencyPayloadHash))
+}
+
+// IdempotencyPayloadHashEqualFold applies the EqualFold predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashEqualFold(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldEqualFold(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyPayloadHashContainsFold applies the ContainsFold predicate on the "idempotency_payload_hash" field.
+func IdempotencyPayloadHashContainsFold(v string) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldContainsFold(FieldIdempotencyPayloadHash, v))
+}
+
+// IdempotencyItemCountEQ applies the EQ predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountEQ(v int) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldEQ(FieldIdempotencyItemCount, v))
+}
+
+// IdempotencyItemCountNEQ applies the NEQ predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountNEQ(v int) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldNEQ(FieldIdempotencyItemCount, v))
+}
+
+// IdempotencyItemCountIn applies the In predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountIn(vs ...int) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldIn(FieldIdempotencyItemCount, vs...))
+}
+
+// IdempotencyItemCountNotIn applies the NotIn predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountNotIn(vs ...int) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldNotIn(FieldIdempotencyItemCount, vs...))
+}
+
+// IdempotencyItemCountGT applies the GT predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountGT(v int) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldGT(FieldIdempotencyItemCount, v))
+}
+
+// IdempotencyItemCountGTE applies the GTE predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountGTE(v int) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldGTE(FieldIdempotencyItemCount, v))
+}
+
+// IdempotencyItemCountLT applies the LT predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountLT(v int) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldLT(FieldIdempotencyItemCount, v))
+}
+
+// IdempotencyItemCountLTE applies the LTE predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountLTE(v int) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldLTE(FieldIdempotencyItemCount, v))
+}
+
+// IdempotencyItemCountIsNil applies the IsNil predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountIsNil() predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldIsNull(FieldIdempotencyItemCount))
+}
+
+// IdempotencyItemCountNotNil applies the NotNil predicate on the "idempotency_item_count" field.
+func IdempotencyItemCountNotNil() predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(sql.FieldNotNull(FieldIdempotencyItemCount))
 }
 
 // NoteEQ applies the EQ predicate on the "note" field.
@@ -585,6 +915,29 @@ func HasPurchaseReceipt() predicate.PurchaseReturn {
 func HasPurchaseReceiptWith(preds ...predicate.PurchaseReceipt) predicate.PurchaseReturn {
 	return predicate.PurchaseReturn(func(s *sql.Selector) {
 		step := newPurchaseReceiptStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasQualityInspection applies the HasEdge predicate on the "quality_inspection" edge.
+func HasQualityInspection() predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, QualityInspectionTable, QualityInspectionColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasQualityInspectionWith applies the HasEdge predicate on the "quality_inspection" edge with a given conditions (other predicates).
+func HasQualityInspectionWith(preds ...predicate.QualityInspection) predicate.PurchaseReturn {
+	return predicate.PurchaseReturn(func(s *sql.Selector) {
+		step := newQualityInspectionStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

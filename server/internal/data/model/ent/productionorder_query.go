@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderevent"
 	"server/internal/data/model/ent/productionorderitem"
+	"server/internal/data/model/ent/productionordermaterialrequirement"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
@@ -22,16 +23,17 @@ import (
 // ProductionOrderQuery is the builder for querying ProductionOrder entities.
 type ProductionOrderQuery struct {
 	config
-	ctx           *QueryContext
-	order         []productionorder.OrderOption
-	inters        []Interceptor
-	predicates    []predicate.ProductionOrder
-	withItems     *ProductionOrderItemQuery
-	withEvents    *ProductionOrderEventQuery
-	withCreator   *AdminUserQuery
-	withReleaser  *AdminUserQuery
-	withCloser    *AdminUserQuery
-	withCanceller *AdminUserQuery
+	ctx                      *QueryContext
+	order                    []productionorder.OrderOption
+	inters                   []Interceptor
+	predicates               []predicate.ProductionOrder
+	withItems                *ProductionOrderItemQuery
+	withMaterialRequirements *ProductionOrderMaterialRequirementQuery
+	withEvents               *ProductionOrderEventQuery
+	withCreator              *AdminUserQuery
+	withReleaser             *AdminUserQuery
+	withCloser               *AdminUserQuery
+	withCanceller            *AdminUserQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -83,6 +85,28 @@ func (_q *ProductionOrderQuery) QueryItems() *ProductionOrderItemQuery {
 			sqlgraph.From(productionorder.Table, productionorder.FieldID, selector),
 			sqlgraph.To(productionorderitem.Table, productionorderitem.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, productionorder.ItemsTable, productionorder.ItemsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryMaterialRequirements chains the current query on the "material_requirements" edge.
+func (_q *ProductionOrderQuery) QueryMaterialRequirements() *ProductionOrderMaterialRequirementQuery {
+	query := (&ProductionOrderMaterialRequirementClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorder.Table, productionorder.FieldID, selector),
+			sqlgraph.To(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionorder.MaterialRequirementsTable, productionorder.MaterialRequirementsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -387,17 +411,18 @@ func (_q *ProductionOrderQuery) Clone() *ProductionOrderQuery {
 		return nil
 	}
 	return &ProductionOrderQuery{
-		config:        _q.config,
-		ctx:           _q.ctx.Clone(),
-		order:         append([]productionorder.OrderOption{}, _q.order...),
-		inters:        append([]Interceptor{}, _q.inters...),
-		predicates:    append([]predicate.ProductionOrder{}, _q.predicates...),
-		withItems:     _q.withItems.Clone(),
-		withEvents:    _q.withEvents.Clone(),
-		withCreator:   _q.withCreator.Clone(),
-		withReleaser:  _q.withReleaser.Clone(),
-		withCloser:    _q.withCloser.Clone(),
-		withCanceller: _q.withCanceller.Clone(),
+		config:                   _q.config,
+		ctx:                      _q.ctx.Clone(),
+		order:                    append([]productionorder.OrderOption{}, _q.order...),
+		inters:                   append([]Interceptor{}, _q.inters...),
+		predicates:               append([]predicate.ProductionOrder{}, _q.predicates...),
+		withItems:                _q.withItems.Clone(),
+		withMaterialRequirements: _q.withMaterialRequirements.Clone(),
+		withEvents:               _q.withEvents.Clone(),
+		withCreator:              _q.withCreator.Clone(),
+		withReleaser:             _q.withReleaser.Clone(),
+		withCloser:               _q.withCloser.Clone(),
+		withCanceller:            _q.withCanceller.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -412,6 +437,17 @@ func (_q *ProductionOrderQuery) WithItems(opts ...func(*ProductionOrderItemQuery
 		opt(query)
 	}
 	_q.withItems = query
+	return _q
+}
+
+// WithMaterialRequirements tells the query-builder to eager-load the nodes that are connected to
+// the "material_requirements" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductionOrderQuery) WithMaterialRequirements(opts ...func(*ProductionOrderMaterialRequirementQuery)) *ProductionOrderQuery {
+	query := (&ProductionOrderMaterialRequirementClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withMaterialRequirements = query
 	return _q
 }
 
@@ -548,8 +584,9 @@ func (_q *ProductionOrderQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 	var (
 		nodes       = []*ProductionOrder{}
 		_spec       = _q.querySpec()
-		loadedTypes = [6]bool{
+		loadedTypes = [7]bool{
 			_q.withItems != nil,
+			_q.withMaterialRequirements != nil,
 			_q.withEvents != nil,
 			_q.withCreator != nil,
 			_q.withReleaser != nil,
@@ -579,6 +616,15 @@ func (_q *ProductionOrderQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 		if err := _q.loadItems(ctx, query, nodes,
 			func(n *ProductionOrder) { n.Edges.Items = []*ProductionOrderItem{} },
 			func(n *ProductionOrder, e *ProductionOrderItem) { n.Edges.Items = append(n.Edges.Items, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withMaterialRequirements; query != nil {
+		if err := _q.loadMaterialRequirements(ctx, query, nodes,
+			func(n *ProductionOrder) { n.Edges.MaterialRequirements = []*ProductionOrderMaterialRequirement{} },
+			func(n *ProductionOrder, e *ProductionOrderMaterialRequirement) {
+				n.Edges.MaterialRequirements = append(n.Edges.MaterialRequirements, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -631,6 +677,36 @@ func (_q *ProductionOrderQuery) loadItems(ctx context.Context, query *Production
 	}
 	query.Where(predicate.ProductionOrderItem(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(productionorder.ItemsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProductionOrderID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "production_order_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProductionOrderQuery) loadMaterialRequirements(ctx context.Context, query *ProductionOrderMaterialRequirementQuery, nodes []*ProductionOrder, init func(*ProductionOrder), assign func(*ProductionOrder, *ProductionOrderMaterialRequirement)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*ProductionOrder)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productionordermaterialrequirement.FieldProductionOrderID)
+	}
+	query.Where(predicate.ProductionOrderMaterialRequirement(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(productionorder.MaterialRequirementsColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

@@ -85,7 +85,7 @@ test("manual-regression-data-plan: fixture coverage is broad enough for manual r
   );
 });
 
-test("manual-regression-data-plan: apply commands keep explicit simulated confirmations", () => {
+test("manual-regression-data-plan: active apply commands keep confirmations and retired fact apply stays absent", () => {
   const plan = buildManualRegressionDataPlan();
   const commands = plan.yoyoosun.commands;
 
@@ -94,8 +94,13 @@ test("manual-regression-data-plan: apply commands keep explicit simulated confir
     /TRIAL_SIM_CONFIRM=APPLY_SIMULATED_TRIAL_DATA/u,
   );
   assert.match(
-    commands.operationalApplySimulated,
-    /OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS/u,
+    commands.operationalInputTemplate,
+    /operational-fact-simulated-closure\.mjs --print-input-template/u,
+  );
+  assert.equal(commands.operationalApplySimulated, undefined);
+  assert.match(
+    plan.yoyoosun.retiredApplyPaths.operationalFacts,
+    /source-driven fixture/u,
   );
   assert.match(
     commands.mobileWorkflowApplySimulated,
@@ -108,7 +113,6 @@ test("manual-regression-data-plan: apply commands keep explicit simulated confir
   assert.doesNotMatch(
     [
       commands.trialApplySimulated,
-      commands.operationalApplySimulated,
       commands.mobileWorkflowApplySimulated,
       commands.purchaseQualityApplySimulated,
     ].join("\n"),

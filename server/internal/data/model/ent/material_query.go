@@ -11,6 +11,7 @@ import (
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/productionordermaterialrequirement"
 	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
@@ -27,18 +28,19 @@ import (
 // MaterialQuery is the builder for querying Material entities.
 type MaterialQuery struct {
 	config
-	ctx                                *QueryContext
-	order                              []material.OrderOption
-	inters                             []Interceptor
-	predicates                         []predicate.Material
-	withDefaultUnit                    *UnitQuery
-	withBomItems                       *BOMItemQuery
-	withPurchaseOrderItems             *PurchaseOrderItemQuery
-	withPurchaseReceiptItems           *PurchaseReceiptItemQuery
-	withPurchaseReturnItems            *PurchaseReturnItemQuery
-	withPurchaseReceiptAdjustmentItems *PurchaseReceiptAdjustmentItemQuery
-	withQualityInspections             *QualityInspectionQuery
-	withOutsourcingOrderItems          *OutsourcingOrderItemQuery
+	ctx                                     *QueryContext
+	order                                   []material.OrderOption
+	inters                                  []Interceptor
+	predicates                              []predicate.Material
+	withDefaultUnit                         *UnitQuery
+	withBomItems                            *BOMItemQuery
+	withProductionOrderMaterialRequirements *ProductionOrderMaterialRequirementQuery
+	withPurchaseOrderItems                  *PurchaseOrderItemQuery
+	withPurchaseReceiptItems                *PurchaseReceiptItemQuery
+	withPurchaseReturnItems                 *PurchaseReturnItemQuery
+	withPurchaseReceiptAdjustmentItems      *PurchaseReceiptAdjustmentItemQuery
+	withQualityInspections                  *QualityInspectionQuery
+	withOutsourcingOrderItems               *OutsourcingOrderItemQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -112,6 +114,28 @@ func (_q *MaterialQuery) QueryBomItems() *BOMItemQuery {
 			sqlgraph.From(material.Table, material.FieldID, selector),
 			sqlgraph.To(bomitem.Table, bomitem.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, material.BomItemsTable, material.BomItemsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryProductionOrderMaterialRequirements chains the current query on the "production_order_material_requirements" edge.
+func (_q *MaterialQuery) QueryProductionOrderMaterialRequirements() *ProductionOrderMaterialRequirementQuery {
+	query := (&ProductionOrderMaterialRequirementClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(material.Table, material.FieldID, selector),
+			sqlgraph.To(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, material.ProductionOrderMaterialRequirementsTable, material.ProductionOrderMaterialRequirementsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -438,19 +462,20 @@ func (_q *MaterialQuery) Clone() *MaterialQuery {
 		return nil
 	}
 	return &MaterialQuery{
-		config:                             _q.config,
-		ctx:                                _q.ctx.Clone(),
-		order:                              append([]material.OrderOption{}, _q.order...),
-		inters:                             append([]Interceptor{}, _q.inters...),
-		predicates:                         append([]predicate.Material{}, _q.predicates...),
-		withDefaultUnit:                    _q.withDefaultUnit.Clone(),
-		withBomItems:                       _q.withBomItems.Clone(),
-		withPurchaseOrderItems:             _q.withPurchaseOrderItems.Clone(),
-		withPurchaseReceiptItems:           _q.withPurchaseReceiptItems.Clone(),
-		withPurchaseReturnItems:            _q.withPurchaseReturnItems.Clone(),
-		withPurchaseReceiptAdjustmentItems: _q.withPurchaseReceiptAdjustmentItems.Clone(),
-		withQualityInspections:             _q.withQualityInspections.Clone(),
-		withOutsourcingOrderItems:          _q.withOutsourcingOrderItems.Clone(),
+		config:                                  _q.config,
+		ctx:                                     _q.ctx.Clone(),
+		order:                                   append([]material.OrderOption{}, _q.order...),
+		inters:                                  append([]Interceptor{}, _q.inters...),
+		predicates:                              append([]predicate.Material{}, _q.predicates...),
+		withDefaultUnit:                         _q.withDefaultUnit.Clone(),
+		withBomItems:                            _q.withBomItems.Clone(),
+		withProductionOrderMaterialRequirements: _q.withProductionOrderMaterialRequirements.Clone(),
+		withPurchaseOrderItems:                  _q.withPurchaseOrderItems.Clone(),
+		withPurchaseReceiptItems:                _q.withPurchaseReceiptItems.Clone(),
+		withPurchaseReturnItems:                 _q.withPurchaseReturnItems.Clone(),
+		withPurchaseReceiptAdjustmentItems:      _q.withPurchaseReceiptAdjustmentItems.Clone(),
+		withQualityInspections:                  _q.withQualityInspections.Clone(),
+		withOutsourcingOrderItems:               _q.withOutsourcingOrderItems.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -476,6 +501,17 @@ func (_q *MaterialQuery) WithBomItems(opts ...func(*BOMItemQuery)) *MaterialQuer
 		opt(query)
 	}
 	_q.withBomItems = query
+	return _q
+}
+
+// WithProductionOrderMaterialRequirements tells the query-builder to eager-load the nodes that are connected to
+// the "production_order_material_requirements" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *MaterialQuery) WithProductionOrderMaterialRequirements(opts ...func(*ProductionOrderMaterialRequirementQuery)) *MaterialQuery {
+	query := (&ProductionOrderMaterialRequirementClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withProductionOrderMaterialRequirements = query
 	return _q
 }
 
@@ -623,9 +659,10 @@ func (_q *MaterialQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Mat
 	var (
 		nodes       = []*Material{}
 		_spec       = _q.querySpec()
-		loadedTypes = [8]bool{
+		loadedTypes = [9]bool{
 			_q.withDefaultUnit != nil,
 			_q.withBomItems != nil,
+			_q.withProductionOrderMaterialRequirements != nil,
 			_q.withPurchaseOrderItems != nil,
 			_q.withPurchaseReceiptItems != nil,
 			_q.withPurchaseReturnItems != nil,
@@ -662,6 +699,17 @@ func (_q *MaterialQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Mat
 		if err := _q.loadBomItems(ctx, query, nodes,
 			func(n *Material) { n.Edges.BomItems = []*BOMItem{} },
 			func(n *Material, e *BOMItem) { n.Edges.BomItems = append(n.Edges.BomItems, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withProductionOrderMaterialRequirements; query != nil {
+		if err := _q.loadProductionOrderMaterialRequirements(ctx, query, nodes,
+			func(n *Material) {
+				n.Edges.ProductionOrderMaterialRequirements = []*ProductionOrderMaterialRequirement{}
+			},
+			func(n *Material, e *ProductionOrderMaterialRequirement) {
+				n.Edges.ProductionOrderMaterialRequirements = append(n.Edges.ProductionOrderMaterialRequirements, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -766,6 +814,36 @@ func (_q *MaterialQuery) loadBomItems(ctx context.Context, query *BOMItemQuery, 
 	}
 	query.Where(predicate.BOMItem(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(material.BomItemsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.MaterialID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "material_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *MaterialQuery) loadProductionOrderMaterialRequirements(ctx context.Context, query *ProductionOrderMaterialRequirementQuery, nodes []*Material, init func(*Material), assign func(*Material, *ProductionOrderMaterialRequirement)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Material)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productionordermaterialrequirement.FieldMaterialID)
+	}
+	query.Where(predicate.ProductionOrderMaterialRequirement(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(material.ProductionOrderMaterialRequirementsColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

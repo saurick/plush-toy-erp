@@ -11,6 +11,7 @@ import (
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/qualityinspection"
+	"server/internal/data/model/ent/supplier"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -27,6 +28,20 @@ type PurchaseReceiptCreate struct {
 // SetReceiptNo sets the "receipt_no" field.
 func (_c *PurchaseReceiptCreate) SetReceiptNo(v string) *PurchaseReceiptCreate {
 	_c.mutation.SetReceiptNo(v)
+	return _c
+}
+
+// SetSupplierID sets the "supplier_id" field.
+func (_c *PurchaseReceiptCreate) SetSupplierID(v int) *PurchaseReceiptCreate {
+	_c.mutation.SetSupplierID(v)
+	return _c
+}
+
+// SetNillableSupplierID sets the "supplier_id" field if the given value is not nil.
+func (_c *PurchaseReceiptCreate) SetNillableSupplierID(v *int) *PurchaseReceiptCreate {
+	if v != nil {
+		_c.SetSupplierID(*v)
+	}
 	return _c
 }
 
@@ -152,6 +167,11 @@ func (_c *PurchaseReceiptCreate) SetNillableUpdatedAt(v *time.Time) *PurchaseRec
 		_c.SetUpdatedAt(*v)
 	}
 	return _c
+}
+
+// SetSupplier sets the "supplier" edge to the Supplier entity.
+func (_c *PurchaseReceiptCreate) SetSupplier(v *Supplier) *PurchaseReceiptCreate {
+	return _c.SetSupplierID(v.ID)
 }
 
 // AddPurchaseReturnIDs adds the "purchase_returns" edge to the PurchaseReturn entity by IDs.
@@ -282,6 +302,11 @@ func (_c *PurchaseReceiptCreate) check() error {
 			return &ValidationError{Name: "receipt_no", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.receipt_no": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.SupplierID(); ok {
+		if err := purchasereceipt.SupplierIDValidator(v); err != nil {
+			return &ValidationError{Name: "supplier_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.supplier_id": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.SupplierName(); !ok {
 		return &ValidationError{Name: "supplier_name", err: errors.New(`ent: missing required field "PurchaseReceipt.supplier_name"`)}
 	}
@@ -396,6 +421,23 @@ func (_c *PurchaseReceiptCreate) createSpec() (*PurchaseReceipt, *sqlgraph.Creat
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(purchasereceipt.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
+	}
+	if nodes := _c.mutation.SupplierIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchasereceipt.SupplierTable,
+			Columns: []string{purchasereceipt.SupplierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.SupplierID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.PurchaseReturnsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

@@ -146,7 +146,7 @@ test("affected: a web helper with a sibling test uses the focused test", () => {
 });
 
 test("affected: a page without a sibling test expands to web tests and browser follow-up", () => {
-  const plan = buildAffectedPlan(["web/src/erp/pages/V1SalesOrdersPage.jsx"], {
+  const plan = buildAffectedPlan(["web/src/erp/pages/V1InventoryLedgerPage.jsx"], {
     root: ROOT,
   });
 

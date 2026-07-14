@@ -265,3 +265,57 @@
 下一步：在最终冻结工作树按项目统一门禁继续跑全量浏览器 / full / strict，并由目标岗位做七类页面的业务字段扫读验收；共享组件的加载失败后重试仍只由实现和静态检查覆盖，尚未单列浏览器故障注入场景。
 
 阻塞/风险：本轮不改变 schema、migration、后端 Fact / Workflow、RBAC、客户配置或部署。共享工作树仍有认证启动、净重与服务端 schema 等并行改动，本轮未 stage、commit、push 或部署，也未把代表性浏览器绿色写成七页全量验收。
+
+## 2026-07-14 DB guard PostgreSQL 长标识符证明
+
+完成：修复 `db-guard` 对 Atlas 生成 PostgreSQL DDL 的误报。只有超过 PostgreSQL 63-byte 上限的 schema token 才按确定性的物理截断名核对；正常 token 仍精确匹配，近似但不一致的 63-byte 名继续 fail closed。生产领料需求新表的 migration、Ent schema 和 `atlas.sum` 未由本轮改写。
+
+验证：`node --check scripts/qa/db-guard.mjs`、DB guard 回归 22/22、文档清单 3/3、`bash scripts/qa/db-guard.sh` 和目标 `git diff --check` 通过。启动同源数据库预检已越过静态守卫，并准确报告开发库为 68/74、仍有 6 个 pending migration；本轮没有自动 apply。
+
+下一步：由当前 migration owner 审查 6 个未冻结 migration，完成 Ent/Atlas 零漂移、fresh/upgrade 和关键 PostgreSQL 事务验证后，再显式 apply 到确认过的本地开发库并重跑 `pnpm start:yoyoosun`。
+
+阻塞/风险：当前只修复静态 proof，不证明 pending migration 已审查、开发库已升级、后端 health/ready 或 yoyoosun 页面已启动；未运行 `make data`、fresh/upgrade、full、strict、浏览器或目标环境验证，也未 stage、commit、push 或部署。
+
+## 2026-07-14 来源驱动业务闭环本地收口
+
+完成：当前共享工作树已把 Product Core 的事实创建入口收口到正式源单或已过账事实。生产订单发布冻结 BOM 物料需求，领料从需求行生成、完工从订单行生成、返工从已过账完工生成；生产领料和委外发料只选既有批次，生产完工和委外回货只允许既有批次与新批次二选一。加工合同按材料 / 产品主体分别生成发料 / 回货，回货可发起质量检验，只有正式检验 `PASSED + PASS / CONCESSION` 才能生成应付。销售订单行可生成库存预留，出货事务消费匹配预留。采购入库可显式办理退货、数量调整和应付，不合格采购检验可生成来源锁定的退供应商记录。已出货单可生成应收 / 发票，已过账应收、应付或发票只支持单笔核对；`PAYMENT` 保持只读。通用事实页没有恢复无来源万能新增，来源、往来方、对象、单位、批次、金额和幂等键仍由后端派生。
+
+完成：Ent / Atlas 工作树新增来源唯一性、稳定供应商引用、生产物料需求快照、质检退货关联与退货原因等 versioned migration；确定性历史供应商和 BOM 需求才回填，歧义数据保持空值或 `NEEDS_REVIEW` 并 fail closed。前端使用生产、委外、销售、采购、质检、出货和财务专用业务动作，不展示原始 `source_type / source_id`、数据库 ID 或幂等键。yoyoosun 私有资料、模块 / 页面开关、流程 manifest、seed 和部署资料未改；质量岗位仅为读取委外回货产品补充 `product.read`，未开放产品菜单。
+
+验证：并行切片的阶段性本地证据包括财务来源定向测试 48/48、质量来源定向测试 93/93 与 fact mock 16/16、生产 / 委外批次定向测试 64/64、返工与统一事实页定向测试 39/39、客户配置合同 38/38；对应业务浏览器场景分别为财务 3/3、质量 2/2、批次 4/4、返工 1/1。阶段性前端全量测试曾达到 1193/1193、0 skip，并通过 lint、CSS 和 production build；这些结果来自各切片冻结点，只证明局部或阶段性前端，不替代最终冻结工作树的 Go、PostgreSQL、migration、full、strict 和真实后端浏览器门禁。
+
+下一步：由 migration owner 在最终冻结工作树完成 Ent / Atlas 再生成零漂移、fresh / upgrade、关键 PostgreSQL 事务与并发验证，并运行 final full / strict 和真实后端浏览器；随后绑定 commit / image、目标环境 migration、health / ready、业务 smoke 和回滚点。yoyoosun 生产、委外、质量、库存、采购和财务岗位仍需独立客户配置 / seed 评审、目标环境发布与人工验收；完整付款 / 核销、多单对账、总账、税控、自动 MRP、委外多材料需求和不合格委外处置仍不在本轮完成口径。
+
+阻塞/风险：开发库当前仍有 6 个 pending migration，本轮文档切片未执行 apply；`scripts/qa/operational-fact-simulated-closure.mjs --apply` 仍在审计已退役 generic methods，未作为本轮验证证据。当前共享工作树未冻结，尚未取得最终 Go / PostgreSQL / full / strict / 真实后端浏览器绿色，也未 stage、commit、push、部署或取得客户签收；不得把本地实现、模拟数据、页面存在或阶段性前端绿色写成已发布 / 已交付。
+
+## 2026-07-14 来源驱动业务闭环冻结门禁
+
+完成：在最终实现树上补齐出货单生成应收 / 开票的正向浏览器合同，并把通用生产、委外、财务事实创建 mock 与旧验收脚本统一改为 fail closed。`operational-fact-simulated-closure` 与 `manual-acceptance-fact-data` 不再提供已退役 generic RPC 的写入模式，附件与打印验收只接受带 `source-driven-operational-facts-v1` 合同和显式事实 owner 的来源驱动报告。状态真源同步改为“中央状态、跨层调用方、Ent generated 与 versioned migration 已在本地 Product Core 收口；具体数据库 apply、目标发布和客户验收分别取证”，不再保留已过期的“跨层尚未收口”口径。
+
+验证：`make data` 二次生成零漂移，Atlas migration 链 74 个文件通过 validate；隔离 fresh 数据库从零应用 74 个 migration，隔离 upgrade 数据库从 68 升到 74，均为 pending 0。关键 PostgreSQL 门禁 152/152、服务端全量门禁 1908/1908、`go test -race ./internal/biz ./internal/data ./internal/service`、脚本自动发现 858/858、前端 1207/1207、lint、CSS、production build 均通过，所有测试为 0 fail / 0 skip / 0 cancelled / 0 todo。来源驱动关键页面 13/13 个 Style L1 场景通过，覆盖生产领料 / 完工 / 返工、委外发料 / 回货、销售预留、采购退货 / 调整、委外回货质检、出货应收 / 开票、采购与委外应付及单笔核对；`bash scripts/qa/full.sh` 与 `bash scripts/qa/strict.sh` 均完整通过，包含隔离 PostgreSQL、Chromium、shellcheck、shfmt、yamllint、零 warning、编译与 govulncheck。
+
+下一步：共享开发库当前仍是 68/74、6 个 pending migration，须由明确的数据库 owner 审查后显式 apply，再启动真实后端执行带岗位账号的写入浏览器 E2E；当前 13 个来源驱动场景是 current-worktree mock RPC 浏览器证据，不能冒充真实后端或目标环境验收。随后才进入 commit / image 绑定、目标环境 migration、health / ready、业务 smoke、回滚点和 yoyoosun 岗位人工签收。
+
+阻塞/风险：本轮没有对共享开发库 apply migration，也没有执行会持久写入共享开发库的真实后端浏览器 smoke；未取得目标环境发布证据或客户签收。共享工作树包含本轮闭环及其他既有改动，全部保留；当前未 stage、commit、push 或 deploy。完整付款 / 核销、多单对账、总账、税控、自动 MRP、委外多材料需求和不合格委外后续处置仍是明确暂缓范围，不伪装成本轮已实现。
+
+## 2026-07-14 yoyoosun 本地启动迁移解阻
+
+完成：修复 DB guard 对 PostgreSQL 63-byte 长标识符的误报后，继续审查并收口 6 个 pending migration。来源财务快照回填现在只有在采购入库整单每一行都能解析到同一供应商时才写 `supplier_id`；出货金额快照只有在销售父单、产品、SKU 和单位均与来源行一致时才回填，并保留已有单列快照。对应真实 PostgreSQL migration 回归已纳入 `critical_transactions_pg_test`。确认目标为个人开发库且相关表为空后，已按 Atlas 正式链路从 68/74 升到 74/74；`pnpm start:yoyoosun` 已越过 database、health/ready 和客户配置/资源预检并启动 Vite。
+
+验证：`make data` 报告 migration directory 与 Ent desired state 零漂移，Atlas validate、fresh 0→74 和带歧义供应商、错订单/产品/SKU/单位及已有快照样本的 upgrade 68→74 均通过；`bash scripts/qa/db-guard.sh` 通过。隔离 PostgreSQL 强制门禁为 153/153、0 skip/0 fail；个人开发库 status 为 `20260714130251`、74/74、pending 0。使用仓库要求的 Node 24.14.0 启动后，`/erp`、后端 healthz/readyz 均返回 200，`customer-config.js` 命中 `yoyoosun`，客户 favicon 返回 `image/svg+xml`；验证完成后已停止本轮 Vite 测试进程。
+
+下一步：日常启动可直接在 `web/` 运行 `pnpm start:yoyoosun`。若要做最终冻结树收口，仍需复跑按影响面门禁并补真实浏览器业务验收；提交、推送和目标环境发布须单独确认。
+
+阻塞/风险：本轮只完成本地 HTTP/资源 smoke，没有把它表述为完整页面验收、目标环境发布或客户签收。共享工作树仍含大量并行改动，本轮未 stage、commit、push 或 deploy。
+
+## 2026-07-15 来源驱动业务闭环全工作树收口
+
+完成：复核原 Codex 任务、其引用的 GPT 会话和最终全工作树差异后，按生产、委外、销售、采购、质量、出货与财务来源动作的既定边界完成收口。数据库守卫现已正确处理 PostgreSQL 63-byte 标识符截断；生产 / 委外 / 财务事实补齐只读来源编号；出货在真实发货事务内重新锁定并刷新销售来源金额快照；质检退供应商与质量门禁统一锁顺序；销售预留页面按订单剩余量、已生效预留和已出货量 fail closed。委外回货 transport 校验不再把缺失的 SKU 上下文误判为明确无 SKU，同时保留页面真实来源行与材料发料的严格 SKU 边界。
+
+完成：Ent / Atlas migration 链为 75 个文件，`make data` 前后内容指纹一致；隔离 fresh 数据库从 0 应用到 75，upgrade 数据库从 74 升到 75，个人开发库也已升至 75 / 75、pending 0。yoyoosun preview 已纳入生产订单菜单及所需岗位动作，当前 manifest 为 17 个模块、9 个角色、197 个 entitlement；`pnpm start:yoyoosun` 已通过 database、backend health / ready、customer config / asset 预检并启动 Vite，验证后停止本轮测试 Vite，未执行 customer config publish / activate。
+
+验证：来源驱动 Style L1 的 12 个页面场景覆盖 13 个业务方法并全部通过；关键 PostgreSQL 门禁 154 / 154、server-all 1917 / 1917、web-all 1211 / 1211、脚本自动发现 862 / 862，均为 0 fail / 0 skip。production build 完成 3281 个模块，lint、CSS、shellcheck、shfmt、yamllint、零 warning、Go build、govulncheck、docs inventory、`bash scripts/qa/full.sh` 和 `bash scripts/qa/strict.sh` 均通过。
+
+下一步：提交后仍须以该 commit / image 为目标环境发布真源，串行执行发布 migration、health / ready、业务 smoke、回滚点记录、yoyoosun 配置发布 / 激活以及真实岗位人工验收。
+
+阻塞/风险：本地代码、migration、运行预检和自动化门禁已闭环，但本轮没有部署目标环境、没有发布或激活 yoyoosun draft config，也没有取得客户签收。12 个来源驱动浏览器场景使用 current-worktree mock RPC，不能替代真实岗位账号对 13 个后端方法的持久写入 E2E。完整付款 / 核销、多单对账、总账、税控、完整 MRP / APS / MES、任意库存调整和 WMS 仍为明确非目标。

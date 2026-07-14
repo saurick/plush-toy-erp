@@ -75,3 +75,90 @@ export async function cancelPurchaseReceipt(params = {}) {
   const result = await purchaseRpc.call('cancel_purchase_receipt', params)
   return dataOf(result)?.purchase_receipt || null
 }
+
+export async function createPurchaseReturnFromReceipt(params = {}) {
+  requirePurchaseReceiptIdempotencyKey(params.idempotency_key)
+  const result = await purchaseRpc.call(
+    'create_purchase_return_from_receipt',
+    params
+  )
+  return dataOf(result)?.purchase_return || null
+}
+
+export async function createPurchaseReturnFromQualityInspection(params = {}) {
+  requirePurchaseReceiptIdempotencyKey(params.idempotency_key)
+  const result = await purchaseRpc.call(
+    'create_purchase_return_from_quality_inspection',
+    params
+  )
+  return dataOf(result)?.purchase_return || null
+}
+
+export async function getPurchaseReturn(params = {}) {
+  const result = await purchaseRpc.call('get_purchase_return', params)
+  return dataOf(result)?.purchase_return || null
+}
+
+export async function listPurchaseReturns(params = {}, options = {}) {
+  const result = await purchaseRpc.call(
+    'list_purchase_returns',
+    params,
+    options
+  )
+  return dataOf(result)
+}
+
+export async function postPurchaseReturn(params = {}) {
+  const result = await purchaseRpc.call('post_purchase_return', params)
+  return dataOf(result)?.purchase_return || null
+}
+
+export async function cancelPurchaseReturn(params = {}) {
+  const result = await purchaseRpc.call('cancel_purchase_return', params)
+  return dataOf(result)?.purchase_return || null
+}
+
+export async function createPurchaseReceiptAdjustmentFromReceipt(params = {}) {
+  requirePurchaseReceiptIdempotencyKey(params.idempotency_key)
+  const result = await purchaseRpc.call(
+    'create_purchase_receipt_adjustment_from_receipt',
+    params
+  )
+  return dataOf(result)?.purchase_receipt_adjustment || null
+}
+
+export async function getPurchaseReceiptAdjustment(params = {}) {
+  const result = await purchaseRpc.call(
+    'get_purchase_receipt_adjustment',
+    params
+  )
+  return dataOf(result)?.purchase_receipt_adjustment || null
+}
+
+export async function listPurchaseReceiptAdjustments(
+  params = {},
+  options = {}
+) {
+  const result = await purchaseRpc.call(
+    'list_purchase_receipt_adjustments',
+    params,
+    options
+  )
+  return dataOf(result)
+}
+
+export async function postPurchaseReceiptAdjustment(params = {}) {
+  const result = await purchaseRpc.call(
+    'post_purchase_receipt_adjustment',
+    params
+  )
+  return dataOf(result)?.purchase_receipt_adjustment || null
+}
+
+export async function cancelPurchaseReceiptAdjustment(params = {}) {
+  const result = await purchaseRpc.call(
+    'cancel_purchase_receipt_adjustment',
+    params
+  )
+  return dataOf(result)?.purchase_receipt_adjustment || null
+}

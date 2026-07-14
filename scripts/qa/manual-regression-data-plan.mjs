@@ -12,7 +12,6 @@ import { buildInputTemplate as buildTrialSimulatedDataInputTemplate } from "./tr
 const currentFile = fileURLToPath(import.meta.url);
 const DEFAULT_OUT_DIR = "output/qa/manual-regression-data-plan";
 const TRIAL_SIM_CONFIRM = "APPLY_SIMULATED_TRIAL_DATA";
-const OPERATIONAL_FACT_SIM_CONFIRM = "APPLY_SIMULATED_OPERATIONAL_FACTS";
 const MOBILE_WORKFLOW_SIM_CONFIRM = "APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS";
 
 const COUNT_FIELDS = Object.freeze([
@@ -142,8 +141,11 @@ function buildYoyoosunPlan() {
     writesBusinessRecordsDirectly: false,
     applyConfirmations: {
       trialMasterData: TRIAL_SIM_CONFIRM,
-      operationalFacts: OPERATIONAL_FACT_SIM_CONFIRM,
       mobileWorkflow: MOBILE_WORKFLOW_SIM_CONFIRM,
+    },
+    retiredApplyPaths: {
+      operationalFacts:
+        "The generic operational fact simulator apply path is retired until a source-driven fixture replaces it.",
     },
     simulationPrefixes: {
       trialMasterData: "SIM-YOYOOSUN-TRIAL",
@@ -170,8 +172,8 @@ function buildYoyoosunPlan() {
         "PATH=/usr/local/bin:$PATH node --test scripts/qa/yoyoosun-customer-closure.test.mjs",
       trialReportOnly: trialTemplate.commands.reportOnly,
       trialApplySimulated: trialTemplate.commands.applySimulated,
+      operationalInputTemplate: operationalTemplate.commands.printInputTemplate,
       operationalReportOnly: operationalTemplate.commands.reportOnly,
-      operationalApplySimulated: operationalTemplate.commands.applySimulated,
       mobileWorkflowReportOnly: mobileWorkflowTemplate.commands.reportOnly,
       mobileWorkflowApplySimulated:
         mobileWorkflowTemplate.commands.applySimulated,

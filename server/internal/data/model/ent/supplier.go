@@ -45,11 +45,13 @@ type Supplier struct {
 type SupplierEdges struct {
 	// PurchaseOrders holds the value of the purchase_orders edge.
 	PurchaseOrders []*PurchaseOrder `json:"purchase_orders,omitempty"`
+	// PurchaseReceipts holds the value of the purchase_receipts edge.
+	PurchaseReceipts []*PurchaseReceipt `json:"purchase_receipts,omitempty"`
 	// OutsourcingOrders holds the value of the outsourcing_orders edge.
 	OutsourcingOrders []*OutsourcingOrder `json:"outsourcing_orders,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // PurchaseOrdersOrErr returns the PurchaseOrders value or an error if the edge
@@ -61,10 +63,19 @@ func (e SupplierEdges) PurchaseOrdersOrErr() ([]*PurchaseOrder, error) {
 	return nil, &NotLoadedError{edge: "purchase_orders"}
 }
 
+// PurchaseReceiptsOrErr returns the PurchaseReceipts value or an error if the edge
+// was not loaded in eager-loading.
+func (e SupplierEdges) PurchaseReceiptsOrErr() ([]*PurchaseReceipt, error) {
+	if e.loadedTypes[1] {
+		return e.PurchaseReceipts, nil
+	}
+	return nil, &NotLoadedError{edge: "purchase_receipts"}
+}
+
 // OutsourcingOrdersOrErr returns the OutsourcingOrders value or an error if the edge
 // was not loaded in eager-loading.
 func (e SupplierEdges) OutsourcingOrdersOrErr() ([]*OutsourcingOrder, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[2] {
 		return e.OutsourcingOrders, nil
 	}
 	return nil, &NotLoadedError{edge: "outsourcing_orders"}
@@ -178,6 +189,11 @@ func (_m *Supplier) Value(name string) (ent.Value, error) {
 // QueryPurchaseOrders queries the "purchase_orders" edge of the Supplier entity.
 func (_m *Supplier) QueryPurchaseOrders() *PurchaseOrderQuery {
 	return NewSupplierClient(_m.config).QueryPurchaseOrders(_m)
+}
+
+// QueryPurchaseReceipts queries the "purchase_receipts" edge of the Supplier entity.
+func (_m *Supplier) QueryPurchaseReceipts() *PurchaseReceiptQuery {
+	return NewSupplierClient(_m.config).QueryPurchaseReceipts(_m)
 }
 
 // QueryOutsourcingOrders queries the "outsourcing_orders" edge of the Supplier entity.

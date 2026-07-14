@@ -34,7 +34,9 @@ import {
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
+import SalesOrderReservationModal from '../components/sales-orders/SalesOrderReservationModal.jsx'
 import {
+  getSalesOrder,
   listCustomers,
   listContactsByOwner,
   listProductSKUs,
@@ -42,8 +44,18 @@ import {
   listSalesOrderItemsPreview,
   listSalesOrders,
   listUnits,
+  listWarehouses,
   saveSalesOrderWithItems,
 } from '../api/masterDataOrderApi.mjs'
+import {
+  createStockReservationFromSalesOrder,
+  listShipments,
+  listStockReservations,
+} from '../api/operationalFactApi.mjs'
+import {
+  listInventoryBalances,
+  listInventoryLots,
+} from '../api/inventoryApi.mjs'
 import {
   createBlankOrderLine,
   normalizeSalesOrderItemFormValue,
@@ -109,6 +121,14 @@ import {
   uniqueReferenceOptions,
   unitOption,
 } from '../utils/referenceSelectOptions.mjs'
+import {
+  buildSalesOrderReservationItemChoices,
+  buildSalesOrderReservationPayload,
+} from '../utils/salesOrderReservationAction.mjs'
+import {
+  createSourceBusinessActionAttemptStore,
+  sourceBusinessActionNo,
+} from '../utils/sourceBusinessAction.mjs'
 
 const CUSTOMER_CONTACT_OWNER_TYPE = 'CUSTOMER'
 
@@ -130,6 +150,52 @@ function buildSalesOrderContactFormValues(source = {}) {
 function salesOwnerOptionFromText(text) {
   const value = String(text || '').trim()
   return value ? { value, label: value } : null
+}
+
+function reservationInventoryParams(item = {}) {
+  return {
+    subject_type: 'PRODUCT',
+    subject_id: Number(item.product_id || 0),
+    ...(Number(item.product_sku_id || 0) > 0
+      ? { product_sku_id: Number(item.product_sku_id) }
+      : {}),
+    limit: 500,
+  }
+}
+
+function enrichReservationBalances(balances = [], warehouses = [], lots = []) {
+  const warehousesByID = new Map(
+    (Array.isArray(warehouses) ? warehouses : []).map((warehouse) => [
+      Number(warehouse?.id || 0),
+      warehouse,
+    ])
+  )
+  const lotsByID = new Map(
+    (Array.isArray(lots) ? lots : []).map((lot) => [Number(lot?.id || 0), lot])
+  )
+  return (Array.isArray(balances) ? balances : []).map((balance) => {
+    const warehouse = warehousesByID.get(Number(balance?.warehouse_id || 0))
+    const lot = lotsByID.get(Number(balance?.lot_id || 0))
+    return {
+      ...balance,
+      warehouse_name: warehouse?.name || warehouse?.code || '',
+      lot_no: lot?.lot_no || lot?.production_lot_no || '',
+    }
+  })
+}
+
+async function loadReservationStockForItem(item = {}) {
+  const params = reservationInventoryParams(item)
+  const [balanceData, lotData] = await Promise.all([
+    listInventoryBalances(params),
+    listInventoryLots({ ...params, status: 'ACTIVE' }),
+  ])
+  return {
+    balances: Array.isArray(balanceData?.inventory_balances)
+      ? balanceData.inventory_balances
+      : [],
+    lots: Array.isArray(lotData?.inventory_lots) ? lotData.inventory_lots : [],
+  }
 }
 
 export default function V1SalesOrdersPage() {
@@ -168,12 +234,29 @@ export default function V1SalesOrdersPage() {
   const [orderForm] = Form.useForm()
   const [productSKUs, setProductSKUs] = useState([])
   const [customerContacts, setCustomerContacts] = useState([])
+  const [reservationOpen, setReservationOpen] = useState(false)
+  const [reservationLoading, setReservationLoading] = useState(false)
+  const [reservationContext, setReservationContext] = useState({
+    order: null,
+    items: [],
+    reservations: [],
+    shipments: [],
+    balances: [],
+    warehouses: [],
+  })
   const routeSalesOrderID = searchParamPositiveIntText(
     searchParams,
     'sales_order_id'
   )
   const orderAttachmentRef = useRef(null)
   const contactLoadSeqRef = useRef(0)
+  const reservationContextRequestRef = useRef(0)
+  const reservationBalanceRequestRef = useRef(0)
+  const reservationInFlightRef = useRef(false)
+  const reservationAttemptsRef = useRef(
+    createSourceBusinessActionAttemptStore()
+  )
+  const selectedOrderIDRef = useRef(0)
   const beginLatestRequest = useLatestRequestCoordinator()
   const sourceDocumentOpenEditController = useMemo(
     () =>
@@ -191,6 +274,14 @@ export default function V1SalesOrdersPage() {
     adminProfile,
     'sales_order_item.read'
   )
+  const canCreateReservation = hasActionPermission(
+    adminProfile,
+    'stock.reservation.create'
+  )
+
+  useEffect(() => {
+    selectedOrderIDRef.current = Number(selectedOrder?.id || 0)
+  }, [selectedOrder?.id])
   const selectedOrderCanEdit = Boolean(
     canUpdateOrder && isDraftSourceDocument(selectedOrder)
   )
@@ -404,32 +495,48 @@ export default function V1SalesOrdersPage() {
     setLoading(true)
     try {
       const { sortBy, sortDirection } = parseBusinessSortValue(sortFilter)
-      const result = await listSalesOrders(
-        {
-          keyword,
-          customer_id: customerFilter || undefined,
-          lifecycle_status: statusFilter,
-          date_field: dateFilterField,
-          date_from: dateFilterStart || undefined,
-          date_to: dateFilterEnd || undefined,
-          sort_by: sortBy,
-          sort_direction: sortDirection,
-          ...getBusinessPaginationParams(pagination),
-        },
-        { signal: request.signal }
-      )
+      const routeSelectedID = Number(routeSalesOrderID || 0)
+      const [result, routeOrder] = await Promise.all([
+        listSalesOrders(
+          {
+            keyword,
+            customer_id: customerFilter || undefined,
+            lifecycle_status: statusFilter,
+            date_field: dateFilterField,
+            date_from: dateFilterStart || undefined,
+            date_to: dateFilterEnd || undefined,
+            sort_by: sortBy,
+            sort_direction: sortDirection,
+            ...getBusinessPaginationParams(pagination),
+          },
+          { signal: request.signal }
+        ),
+        routeSelectedID > 0
+          ? getSalesOrder({ id: routeSelectedID }, { signal: request.signal })
+          : Promise.resolve(null),
+      ])
       if (!request.isCurrent()) {
         return false
       }
-      const nextOrders = Array.isArray(result?.sales_orders)
+      const listedOrders = Array.isArray(result?.sales_orders)
         ? result.sales_orders
         : []
+      const nextOrders = routeOrder
+        ? [
+            routeOrder,
+            ...listedOrders.filter((item) => item.id !== routeOrder.id),
+          ]
+        : listedOrders
       setOrders(nextOrders)
-      setTotal(Number(result?.total || nextOrders.length || 0))
+      setTotal(
+        Number(result?.total || listedOrders.length || 0) +
+          (routeOrder && !listedOrders.some((item) => item.id === routeOrder.id)
+            ? 1
+            : 0)
+      )
       setSelectedOrder((current) => {
-        const routeSelectedID = Number(routeSalesOrderID || 0)
         if (routeSelectedID > 0) {
-          return nextOrders.find((item) => item.id === routeSelectedID) || null
+          return routeOrder || null
         }
         if (!current?.id) return null
         return nextOrders.find((item) => item.id === current.id) || null
@@ -468,6 +575,221 @@ export default function V1SalesOrdersPage() {
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(loadOrders)
   }, [loadOrders, outletContext])
+
+  const loadReservationBalances = useCallback(
+    async (item) => {
+      const orderID = Number(reservationContext.order?.id || 0)
+      const requestID = reservationBalanceRequestRef.current + 1
+      reservationBalanceRequestRef.current = requestID
+      if (!item || orderID <= 0) {
+        setReservationContext((current) => ({ ...current, balances: [] }))
+        return
+      }
+      setReservationLoading(true)
+      try {
+        const stock = await loadReservationStockForItem(item)
+        if (
+          reservationBalanceRequestRef.current !== requestID ||
+          Number(reservationContext.order?.id || 0) !== orderID
+        ) {
+          return
+        }
+        setReservationContext((current) =>
+          Number(current.order?.id || 0) === orderID
+            ? {
+                ...current,
+                balances: enrichReservationBalances(
+                  stock.balances,
+                  current.warehouses,
+                  stock.lots
+                ),
+              }
+            : current
+        )
+      } catch (error) {
+        if (reservationBalanceRequestRef.current === requestID) {
+          setReservationContext((current) => ({ ...current, balances: [] }))
+          message.error(getActionErrorMessage(error, '加载可用库存'))
+        }
+      } finally {
+        if (reservationBalanceRequestRef.current === requestID) {
+          setReservationLoading(false)
+        }
+      }
+    },
+    [reservationContext.order?.id]
+  )
+
+  const openSalesOrderReservation = async () => {
+    const orderID = Number(selectedOrder?.id || 0)
+    if (
+      orderID <= 0 ||
+      String(selectedOrder?.lifecycle_status || '').toLowerCase() !== 'active'
+    ) {
+      message.warning('请先选择已生效的销售订单')
+      return
+    }
+    selectedOrderIDRef.current = orderID
+    const requestID = reservationContextRequestRef.current + 1
+    reservationContextRequestRef.current = requestID
+    setReservationLoading(true)
+    try {
+      const freshOrder = await getSalesOrder({ id: orderID })
+      if (
+        reservationContextRequestRef.current !== requestID ||
+        selectedOrderIDRef.current !== orderID
+      ) {
+        return
+      }
+      if (
+        String(freshOrder?.lifecycle_status || '').toLowerCase() !== 'active'
+      ) {
+        message.warning('销售订单状态已变化，请刷新后重试')
+        await loadOrders()
+        return
+      }
+      const itemData = await listAllSalesOrderItems({
+        sales_order_id: orderID,
+        expected_version: freshOrder.version,
+      })
+      const items = Array.isArray(itemData?.sales_order_items)
+        ? itemData.sales_order_items
+        : []
+      const [reservationData, shipmentData, warehouseData] = await Promise.all([
+        listStockReservations({
+          source_id: orderID,
+          status: 'ACTIVE',
+          limit: 200,
+        }),
+        listShipments({ source_id: orderID, status: 'SHIPPED', limit: 200 }),
+        listWarehouses({ active_only: true, limit: 500 }),
+      ])
+      if (
+        reservationContextRequestRef.current !== requestID ||
+        selectedOrderIDRef.current !== orderID
+      ) {
+        return
+      }
+      const warehouses = Array.isArray(warehouseData?.warehouses)
+        ? warehouseData.warehouses
+        : []
+      const reservations = Array.isArray(reservationData?.stock_reservations)
+        ? reservationData.stock_reservations
+        : []
+      const shipments = Array.isArray(shipmentData?.shipments)
+        ? shipmentData.shipments
+        : []
+      if (
+        Number(reservationData?.total || reservations.length) >
+          reservations.length ||
+        Number(shipmentData?.total || shipments.length) > shipments.length
+      ) {
+        message.warning('相关预留或出货记录未完整加载，暂不能新增预留')
+        return
+      }
+      const firstReservableItem = buildSalesOrderReservationItemChoices(
+        items,
+        reservations,
+        shipments
+      ).find((choice) => !choice.disabled)?.item
+      if (!firstReservableItem) {
+        message.warning('当前销售订单已没有可预留数量')
+        return
+      }
+      const stock = await loadReservationStockForItem(firstReservableItem)
+      if (
+        reservationContextRequestRef.current !== requestID ||
+        selectedOrderIDRef.current !== orderID
+      ) {
+        return
+      }
+      setReservationContext({
+        order: freshOrder,
+        items,
+        reservations,
+        shipments,
+        balances: enrichReservationBalances(
+          stock.balances,
+          warehouses,
+          stock.lots
+        ),
+        warehouses,
+      })
+      setReservationOpen(true)
+    } catch (error) {
+      if (reservationContextRequestRef.current === requestID) {
+        message.error(getActionErrorMessage(error, '加载库存预留上下文'))
+      }
+    } finally {
+      if (reservationContextRequestRef.current === requestID) {
+        setReservationLoading(false)
+      }
+    }
+  }
+
+  const submitSalesOrderReservation = async (values) => {
+    if (reservationInFlightRef.current || !reservationContext.order) return
+    let payload
+    try {
+      payload = {
+        ...buildSalesOrderReservationPayload(
+          values,
+          reservationContext.order,
+          reservationContext.items,
+          reservationContext.balances,
+          reservationContext.reservations,
+          reservationContext.shipments
+        ),
+        customer_key: activeCustomerKey || undefined,
+      }
+    } catch (error) {
+      message.error(error.message)
+      return
+    }
+    const scope = `sales-order-reservation:${reservationContext.order.id}:${payload.sales_order_item_id}`
+    const attempt = reservationAttemptsRef.current.prepare(scope, payload)
+    const params = {
+      ...attempt.params,
+      reservation_no: sourceBusinessActionNo(
+        'RSV',
+        reservationContext.order.order_no,
+        attempt.params.idempotency_key
+      ),
+    }
+    reservationInFlightRef.current = true
+    setReservationLoading(true)
+    try {
+      const result = await createStockReservationFromSalesOrder(params)
+      if (!result || result.status !== 'ACTIVE') {
+        const error = new Error('库存预留返回结果无法确认')
+        error.isInvalidResponse = true
+        throw error
+      }
+      reservationAttemptsRef.current.settle(scope, attempt, null)
+      setReservationContext((current) => ({
+        ...current,
+        reservations: [...current.reservations, result],
+      }))
+      setReservationOpen(false)
+      message.success('库存预留已创建，可在“相关单据 → 出库 / 预留”查看')
+    } catch (error) {
+      const retained = reservationAttemptsRef.current.settle(
+        scope,
+        attempt,
+        error
+      )
+      if (retained) {
+        message.warning(
+          '库存预留结果暂时无法确认，已保留本次请求，请使用相同内容重试'
+        )
+      } else {
+        message.error(getActionErrorMessage(error, '创建库存预留'))
+      }
+    } finally {
+      reservationInFlightRef.current = false
+      setReservationLoading(false)
+    }
+  }
 
   const openCreateOrder = () => {
     sourceDocumentOpenEditController.invalidate()
@@ -859,7 +1181,7 @@ export default function V1SalesOrdersPage() {
       <PageHeaderCard
         compact
         title="销售订单"
-        description="维护客户订单承诺和订单行；出货、库存、应收、发票和收款在对应业务模块处理。"
+        description="维护客户订单承诺和订单行；生效订单可在此预留库存，出货、应收、发票和收款仍在对应业务模块处理。"
         stats={[
           { key: 'total', label: '总订单', value: total },
           { key: 'current', label: '当前结果', value: orders.length },
@@ -1006,6 +1328,22 @@ export default function V1SalesOrdersPage() {
               编辑订单
             </Button>
           ) : null}
+          {canCreateReservation ? (
+            <Button
+              size="small"
+              disabled={
+                !selectedOrder ||
+                String(selectedOrder.lifecycle_status || '').toLowerCase() !==
+                  'active' ||
+                reservationLoading ||
+                saving
+              }
+              loading={reservationLoading}
+              onClick={openSalesOrderReservation}
+            >
+              预留库存
+            </Button>
+          ) : null}
           {primaryLifecycleAction ? (
             <Button
               size="small"
@@ -1130,6 +1468,23 @@ export default function V1SalesOrdersPage() {
         onContactSelect={applyContactToOrderForm}
         onPaymentMethodChange={applyPaymentMethodTermDays}
         onPaymentConditionBlur={requestPaymentConditionPriceReview}
+      />
+
+      <SalesOrderReservationModal
+        open={reservationOpen}
+        order={reservationContext.order}
+        items={reservationContext.items}
+        reservations={reservationContext.reservations}
+        shipments={reservationContext.shipments}
+        balances={reservationContext.balances}
+        loading={reservationLoading}
+        onItemChange={loadReservationBalances}
+        onCancel={() => {
+          if (reservationInFlightRef.current) return
+          reservationBalanceRequestRef.current += 1
+          setReservationOpen(false)
+        }}
+        onSubmit={submitSalesOrderReservation}
       />
     </BusinessPageLayout>
   )

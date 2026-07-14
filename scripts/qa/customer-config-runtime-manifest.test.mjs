@@ -275,6 +275,108 @@ test("customer-config-runtime-manifest: visible menu pages and module states com
   );
 });
 
+test("customer-config-runtime-manifest: finance and quality can reach outsourcing source actions without cross-domain mutations", () => {
+  const manifest = buildRuntimeManifest();
+  const pages = manifest.compiled_snapshot.rolePageProjections;
+  const entitlementsFor = (roleKey) =>
+    new Set(
+      manifest.access_entitlements
+        .filter((item) => item.role_key === roleKey)
+        .map((item) => item.capability_key),
+    );
+
+  assert(pages.finance.includes("processing-contracts"));
+  assert(pages.quality.includes("processing-contracts"));
+
+  const finance = entitlementsFor("finance");
+  for (const key of [
+    "outsourcing.order.read",
+    "outsourcing.fact.read",
+    "quality.inspection.read",
+    "finance.invoice.read",
+    "finance.invoice.confirm",
+    "finance.reconciliation.read",
+    "finance.reconciliation.confirm",
+  ]) {
+    assert(finance.has(key), `finance must receive ${key}`);
+  }
+  assert(!finance.has("outsourcing.order.update"));
+  assert(!finance.has("quality.inspection.create"));
+
+  const quality = entitlementsFor("quality");
+  for (const key of [
+    "outsourcing.order.read",
+    "outsourcing.fact.read",
+    "quality.inspection.create",
+  ]) {
+    assert(quality.has(key), `quality must receive ${key}`);
+  }
+  assert(!quality.has("outsourcing.order.update"));
+  assert(!quality.has("finance.payable.confirm"));
+});
+
+test("customer-config-runtime-manifest: source action projections stay within Product Core role boundaries", () => {
+  const manifest = buildRuntimeManifest();
+  const pages = manifest.compiled_snapshot.rolePageProjections;
+  const entitlementsFor = (roleKey) =>
+    new Set(
+      manifest.access_entitlements
+        .filter((item) => item.role_key === roleKey)
+        .map((item) => item.capability_key),
+    );
+
+  const productionMenu = yoyoosunMenuConfig.desktopMenu.sections.find(
+    (section) => section.title === "生产管理",
+  );
+  assert(productionMenu?.items.includes("production-orders"));
+
+  assert(pages.sales.includes("sales-orders"));
+  assert(entitlementsFor("sales").has("stock.reservation.create"));
+
+  assert(pages.quality.includes("inbound"));
+  const quality = entitlementsFor("quality");
+  assert(quality.has("purchase.return.read"));
+  assert(quality.has("purchase.return.create"));
+
+  assert(pages.production.includes("production-orders"));
+  assert(pages.production.includes("processing-contracts"));
+  const production = entitlementsFor("production");
+  for (const key of [
+    "production.fact.read",
+    "production.completion.create",
+    "production.material_issue.create",
+    "production.rework.create",
+    "production.fact.post",
+    "production.fact.cancel",
+    "outsourcing.fact.read",
+    "outsourcing.material_issue.create",
+    "outsourcing.return_receipt.create",
+    "outsourcing.fact.post",
+    "outsourcing.fact.cancel",
+  ]) {
+    assert(production.has(key), `production must receive ${key}`);
+  }
+
+  const finance = entitlementsFor("finance");
+  assert(!pages.finance.includes("inbound"));
+  assert(!finance.has("purchase.receipt.read"));
+  assert(!finance.has("purchase.return.read"));
+  assert(!finance.has("purchase.return.create"));
+});
+
+test("customer-config-runtime-manifest: finance pages use exact family read capabilities", () => {
+  const pageCapabilities = new Map(
+    customerPackageCatalog.pages.map((page) => [
+      page.key,
+      page.requiredCapabilityKeys,
+    ]),
+  );
+  assert.deepEqual(pageCapabilities.get("invoices"), ["finance.invoice.read"]);
+  assert.deepEqual(pageCapabilities.get("reconciliation"), [
+    "finance.reconciliation.read",
+  ]);
+});
+
 test("customer-config-runtime-manifest: responsibility pools map through roles and entitlements, not graph ownership", () => {
   const demoManifest = buildRuntimeManifest(demoCustomerPackage);
   const yoyoosunManifest = buildRuntimeManifest(yoyoosunCustomerPackage);

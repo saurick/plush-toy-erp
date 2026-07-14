@@ -13,6 +13,8 @@ import (
 	corestatus "server/internal/core/status"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
 
 	"entgo.io/ent/dialect"
@@ -35,7 +37,9 @@ func (r *inventoryRepo) CreatePurchaseReturnDraft(ctx context.Context, in *biz.P
 	row, err := r.data.postgres.PurchaseReturn.Create().
 		SetReturnNo(in.ReturnNo).
 		SetNillablePurchaseReceiptID(in.PurchaseReceiptID).
+		SetNillableQualityInspectionID(in.QualityInspectionID).
 		SetSupplierName(in.SupplierName).
+		SetNillableReturnReason(in.ReturnReason).
 		SetStatus(biz.PurchaseReturnStatusDraft).
 		SetReturnedAt(in.ReturnedAt).
 		SetNillableNote(in.Note).
@@ -46,8 +50,121 @@ func (r *inventoryRepo) CreatePurchaseReturnDraft(ctx context.Context, in *biz.P
 	return entPurchaseReturnToBiz(row, nil), nil
 }
 
+func (r *inventoryRepo) ResolvePurchaseReturnReplay(ctx context.Context, in *biz.PurchaseReturnCreate) (*biz.PurchaseReturn, bool, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || in == nil || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
+		return nil, false, biz.ErrBadParam
+	}
+	return resolvePurchaseReturnReplay(ctx, r.data.postgres, in)
+}
+
+func (r *inventoryRepo) CreatePurchaseReturnWithItems(ctx context.Context, in *biz.PurchaseReturnCreate, items []*biz.PurchaseReturnItemCreate) (*biz.PurchaseReturn, error) {
+	if in == nil || in.PurchaseReceiptID == nil || *in.PurchaseReceiptID <= 0 || len(items) == 0 || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
+		return nil, biz.ErrBadParam
+	}
+	if replayed, found, err := resolvePurchaseReturnReplay(ctx, r.data.postgres, in); err != nil || found {
+		return replayed, err
+	}
+	tx, err := r.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+
+	if err := lockPurchaseReceipt(ctx, tx, *in.PurchaseReceiptID); err != nil {
+		return nil, err
+	}
+	if replayed, found, err := resolvePurchaseReturnReplay(ctx, tx.client, in); err != nil || found {
+		return replayed, err
+	}
+	receipt, err := tx.client.PurchaseReceipt.Get(ctx, *in.PurchaseReceiptID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrPurchaseReceiptNotFound
+		}
+		return nil, err
+	}
+	if !corestatus.IsPurchaseReceiptPosted(receipt.Status) || receipt.SupplierName != in.SupplierName {
+		return nil, biz.ErrBadParam
+	}
+	row, err := tx.client.PurchaseReturn.Create().
+		SetReturnNo(in.ReturnNo).
+		SetPurchaseReceiptID(*in.PurchaseReceiptID).
+		SetNillableQualityInspectionID(in.QualityInspectionID).
+		SetSupplierName(receipt.SupplierName).
+		SetNillableReturnReason(in.ReturnReason).
+		SetStatus(biz.PurchaseReturnStatusDraft).
+		SetReturnedAt(in.ReturnedAt).
+		SetIdempotencyKey(in.IdempotencyKey).
+		SetIdempotencyPayloadHash(in.IdempotencyPayloadHash).
+		SetIdempotencyItemCount(len(items)).
+		SetNillableNote(in.Note).
+		Save(ctx)
+	if err != nil {
+		originalErr := err
+		rollbackInventoryDBTx(ctx, tx, r.log)
+		tx = nil
+		if replayed, found, replayErr := resolvePurchaseReturnReplay(ctx, r.data.postgres, in); replayErr != nil {
+			return nil, replayErr
+		} else if found {
+			return replayed, nil
+		}
+		return nil, originalErr
+	}
+	for _, requested := range items {
+		if requested == nil {
+			return nil, biz.ErrBadParam
+		}
+		item := *requested
+		item.ReturnID = row.ID
+		if err := validatePurchaseReturnItemReferences(ctx, tx.client, row.PurchaseReceiptID, &item); err != nil {
+			return nil, err
+		}
+		if _, err := tx.client.PurchaseReturnItem.Create().
+			SetReturnID(row.ID).
+			SetNillablePurchaseReceiptItemID(item.PurchaseReceiptItemID).
+			SetMaterialID(item.MaterialID).
+			SetWarehouseID(item.WarehouseID).
+			SetUnitID(item.UnitID).
+			SetNillableLotID(item.LotID).
+			SetQuantity(item.Quantity).
+			SetNillableUnitPrice(item.UnitPrice).
+			SetNillableAmount(item.Amount).
+			SetNillableSourceLineNo(item.SourceLineNo).
+			SetNillableNote(item.Note).
+			Save(ctx); err != nil {
+			return nil, err
+		}
+	}
+	out, err := purchaseReturnWithItems(ctx, tx.client, row)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		commitErr := err
+		rollbackInventoryDBTx(ctx, tx, r.log)
+		tx = nil
+		if replayed, found, replayErr := resolvePurchaseReturnReplay(ctx, r.data.postgres, in); replayErr != nil {
+			return nil, replayErr
+		} else if found {
+			return replayed, nil
+		}
+		return nil, commitErr
+	}
+	tx = nil
+	return out, nil
+}
+
 func (r *inventoryRepo) AddPurchaseReturnItem(ctx context.Context, in *biz.PurchaseReturnItemCreate) (*biz.PurchaseReturnItem, error) {
-	purchaseReturn, err := r.data.postgres.PurchaseReturn.Get(ctx, in.ReturnID)
+	tx, err := r.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+
+	if err := lockPurchaseReturn(ctx, tx, in.ReturnID); err != nil {
+		return nil, err
+	}
+	purchaseReturn, err := tx.client.PurchaseReturn.Get(ctx, in.ReturnID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrPurchaseReturnNotFound
@@ -57,10 +174,10 @@ func (r *inventoryRepo) AddPurchaseReturnItem(ctx context.Context, in *biz.Purch
 	if !corestatus.CanAddPurchaseReturnItem(purchaseReturn.Status) {
 		return nil, biz.ErrBadParam
 	}
-	if err := validatePurchaseReturnItemReferences(ctx, r.data.postgres, purchaseReturn.PurchaseReceiptID, in); err != nil {
+	if err := validatePurchaseReturnItemReferences(ctx, tx.client, purchaseReturn.PurchaseReceiptID, in); err != nil {
 		return nil, err
 	}
-	row, err := r.data.postgres.PurchaseReturnItem.Create().
+	row, err := tx.client.PurchaseReturnItem.Create().
 		SetReturnID(in.ReturnID).
 		SetNillablePurchaseReceiptItemID(in.PurchaseReceiptItemID).
 		SetMaterialID(in.MaterialID).
@@ -76,7 +193,12 @@ func (r *inventoryRepo) AddPurchaseReturnItem(ctx context.Context, in *biz.Purch
 	if err != nil {
 		return nil, err
 	}
-	return entPurchaseReturnItemToBiz(row), nil
+	out := entPurchaseReturnItemToBiz(row)
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return out, nil
 }
 
 func (r *inventoryRepo) PostPurchaseReturn(ctx context.Context, returnID int) (*biz.PurchaseReturn, error) {
@@ -96,6 +218,24 @@ func (r *inventoryRepo) PostPurchaseReturn(ctx context.Context, returnID int) (*
 		}
 		return nil, err
 	}
+	// Source receipt cancellation and purchase return posting share this parent
+	// lock. Re-read the receipt after acquiring it so a return cannot post from a
+	// stale POSTED snapshot while the source receipt is being cancelled.
+	if purchaseReturn.PurchaseReceiptID != nil {
+		if err := lockPurchaseReceipt(ctx, tx, *purchaseReturn.PurchaseReceiptID); err != nil {
+			return nil, err
+		}
+		receipt, err := tx.client.PurchaseReceipt.Get(ctx, *purchaseReturn.PurchaseReceiptID)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return nil, biz.ErrPurchaseReceiptNotFound
+			}
+			return nil, err
+		}
+		if !corestatus.IsPurchaseReceiptPosted(receipt.Status) {
+			return nil, biz.ErrBadParam
+		}
+	}
 	transition, ok := corestatus.PostPurchaseReturn(purchaseReturn.Status)
 	if !ok {
 		return nil, biz.ErrBadParam
@@ -110,6 +250,15 @@ func (r *inventoryRepo) PostPurchaseReturn(ctx context.Context, returnID int) (*
 		}
 		tx = nil
 		return out, nil
+	}
+	if purchaseReturn.PurchaseReceiptID != nil {
+		hasActivePayable, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.PurchaseReceiptSourceType, *purchaseReturn.PurchaseReceiptID)
+		if err != nil {
+			return nil, err
+		}
+		if hasActivePayable {
+			return nil, biz.ErrPurchaseReceiptFinanceDependency
+		}
 	}
 
 	items, err := tx.client.PurchaseReturnItem.Query().
@@ -203,6 +352,18 @@ func (r *inventoryRepo) CancelPostedPurchaseReturn(ctx context.Context, returnID
 		tx = nil
 		return out, nil
 	}
+	if purchaseReturn.PurchaseReceiptID != nil {
+		if err := lockPurchaseReceipt(ctx, tx, *purchaseReturn.PurchaseReceiptID); err != nil {
+			return nil, err
+		}
+		hasActivePayable, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.PurchaseReceiptSourceType, *purchaseReturn.PurchaseReceiptID)
+		if err != nil {
+			return nil, err
+		}
+		if hasActivePayable {
+			return nil, biz.ErrPurchaseReceiptFinanceDependency
+		}
+	}
 
 	items, err := tx.client.PurchaseReturnItem.Query().
 		Where(purchasereturnitem.ReturnID(purchaseReturn.ID)).
@@ -271,6 +432,101 @@ func (r *inventoryRepo) GetPurchaseReturn(ctx context.Context, id int) (*biz.Pur
 		return nil, err
 	}
 	return purchaseReturnWithItems(ctx, r.data.postgres, purchaseReturn)
+}
+
+func (r *inventoryRepo) ListPurchaseReturns(ctx context.Context, filter biz.PurchaseReturnFilter) ([]*biz.PurchaseReturn, int, error) {
+	query := r.data.postgres.PurchaseReturn.Query()
+	if filter.Status != "" {
+		query = query.Where(purchasereturn.Status(filter.Status))
+	}
+	if filter.Keyword != "" {
+		query = query.Where(purchasereturn.Or(
+			purchasereturn.ReturnNoContainsFold(filter.Keyword),
+			purchasereturn.SupplierNameContainsFold(filter.Keyword),
+		))
+	}
+	if filter.SupplierName != "" {
+		query = query.Where(purchasereturn.SupplierNameContainsFold(filter.SupplierName))
+	}
+	if filter.PurchaseReceiptID > 0 {
+		query = query.Where(purchasereturn.PurchaseReceiptID(filter.PurchaseReceiptID))
+	}
+	if filter.QualityInspectionID > 0 {
+		query = query.Where(purchasereturn.QualityInspectionID(filter.QualityInspectionID))
+	}
+	if filter.DateFrom != nil {
+		query = query.Where(purchasereturn.ReturnedAtGTE(*filter.DateFrom))
+	}
+	if filter.DateTo != nil {
+		query = query.Where(purchasereturn.ReturnedAtLTE(endOfDateFilter(*filter.DateTo)))
+	}
+	itemPredicates := []predicate.PurchaseReturnItem{}
+	if filter.MaterialID > 0 {
+		itemPredicates = append(itemPredicates, purchasereturnitem.MaterialID(filter.MaterialID))
+	}
+	if filter.WarehouseID > 0 {
+		itemPredicates = append(itemPredicates, purchasereturnitem.WarehouseID(filter.WarehouseID))
+	}
+	if filter.LotID > 0 {
+		itemPredicates = append(itemPredicates, purchasereturnitem.LotID(filter.LotID))
+	}
+	if len(itemPredicates) > 0 {
+		query = query.Where(purchasereturn.HasItemsWith(itemPredicates...))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.
+		Order(ent.Desc(purchasereturn.FieldReturnedAt), ent.Desc(purchasereturn.FieldID)).
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.PurchaseReturn, 0, len(rows))
+	for _, row := range rows {
+		item, err := purchaseReturnWithItems(ctx, r.data.postgres, row)
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, item)
+	}
+	return out, total, nil
+}
+
+func resolvePurchaseReturnReplay(ctx context.Context, client *ent.Client, in *biz.PurchaseReturnCreate) (*biz.PurchaseReturn, bool, error) {
+	if client == nil || in == nil || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
+		return nil, false, biz.ErrBadParam
+	}
+	row, err := client.PurchaseReturn.Query().
+		Where(purchasereturn.IdempotencyKey(in.IdempotencyKey)).
+		Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	if row.IdempotencyPayloadHash == nil || *row.IdempotencyPayloadHash != in.IdempotencyPayloadHash {
+		return nil, true, biz.ErrIdempotencyConflict
+	}
+	if row.IdempotencyItemCount == nil || *row.IdempotencyItemCount <= 0 {
+		return nil, true, fmt.Errorf("purchase return %d idempotency result boundary is missing", row.ID)
+	}
+	items, err := client.PurchaseReturnItem.Query().
+		Where(purchasereturnitem.ReturnID(row.ID)).
+		Order(ent.Asc(purchasereturnitem.FieldID)).
+		Limit(*row.IdempotencyItemCount).
+		All(ctx)
+	if err != nil {
+		return nil, true, err
+	}
+	if len(items) != *row.IdempotencyItemCount {
+		return nil, true, fmt.Errorf("purchase return %d idempotency result item set is incomplete", row.ID)
+	}
+	return entPurchaseReturnToBiz(row, items), true, nil
 }
 
 func validatePurchaseReturnItemReferences(ctx context.Context, client *ent.Client, returnReceiptID *int, in *biz.PurchaseReturnItemCreate) error {
@@ -473,16 +729,18 @@ func entPurchaseReturnToBiz(row *ent.PurchaseReturn, items []*ent.PurchaseReturn
 		return nil
 	}
 	out := &biz.PurchaseReturn{
-		ID:                row.ID,
-		ReturnNo:          row.ReturnNo,
-		PurchaseReceiptID: row.PurchaseReceiptID,
-		SupplierName:      row.SupplierName,
-		Status:            row.Status,
-		ReturnedAt:        row.ReturnedAt,
-		PostedAt:          row.PostedAt,
-		Note:              row.Note,
-		CreatedAt:         row.CreatedAt,
-		UpdatedAt:         row.UpdatedAt,
+		ID:                  row.ID,
+		ReturnNo:            row.ReturnNo,
+		PurchaseReceiptID:   row.PurchaseReceiptID,
+		QualityInspectionID: row.QualityInspectionID,
+		SupplierName:        row.SupplierName,
+		ReturnReason:        row.ReturnReason,
+		Status:              row.Status,
+		ReturnedAt:          row.ReturnedAt,
+		PostedAt:            row.PostedAt,
+		Note:                row.Note,
+		CreatedAt:           row.CreatedAt,
+		UpdatedAt:           row.UpdatedAt,
 	}
 	if len(items) > 0 {
 		out.Items = make([]*biz.PurchaseReturnItem, 0, len(items))

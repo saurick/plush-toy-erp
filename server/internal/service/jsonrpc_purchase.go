@@ -36,6 +36,19 @@ func (d *jsonrpcDispatcher) handlePurchase(
 		"get_purchase_receipt",
 		"list_purchase_receipts":
 		return d.handlePurchaseReceipt(ctx, method, id, pm, claims.UserID)
+	case "create_purchase_return_from_receipt",
+		"create_purchase_return_from_quality_inspection",
+		"post_purchase_return",
+		"cancel_purchase_return",
+		"get_purchase_return",
+		"list_purchase_returns":
+		return d.handlePurchaseReturn(ctx, method, id, pm)
+	case "create_purchase_receipt_adjustment_from_receipt",
+		"post_purchase_receipt_adjustment",
+		"cancel_purchase_receipt_adjustment",
+		"get_purchase_receipt_adjustment",
+		"list_purchase_receipt_adjustments":
+		return d.handlePurchaseReceiptAdjustment(ctx, method, id, pm)
 	default:
 		return id, unknownPurchaseResult(method), nil
 	}

@@ -1245,6 +1245,29 @@ func HasWarehouseWith(preds ...predicate.Warehouse) predicate.QualityInspection 
 	})
 }
 
+// HasPurchaseReturns applies the HasEdge predicate on the "purchase_returns" edge.
+func HasPurchaseReturns() predicate.QualityInspection {
+	return predicate.QualityInspection(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, PurchaseReturnsTable, PurchaseReturnsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPurchaseReturnsWith applies the HasEdge predicate on the "purchase_returns" edge with a given conditions (other predicates).
+func HasPurchaseReturnsWith(preds ...predicate.PurchaseReturn) predicate.QualityInspection {
+	return predicate.QualityInspection(func(s *sql.Selector) {
+		step := newPurchaseReturnsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.QualityInspection) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.AndPredicates(predicates...))

@@ -237,7 +237,7 @@ func businessAttachmentReadPermissions(ownerType string) []string {
 	case biz.BusinessAttachmentOwnerFinanceFact:
 		return []string{biz.PermissionFinancePayableRead, biz.PermissionFinanceReceivableRead, biz.PermissionFinanceReportRead}
 	case biz.BusinessAttachmentOwnerProductionFact:
-		return []string{biz.PermissionPMCPlanRead}
+		return []string{biz.PermissionProductionFactRead}
 	case biz.BusinessAttachmentOwnerOutsourcingFact:
 		return []string{biz.PermissionOutsourcingOrderRead}
 	case biz.BusinessAttachmentOwnerProductSKU:
@@ -268,7 +268,7 @@ func businessAttachmentWritePermissions(ownerType string) []string {
 	case biz.BusinessAttachmentOwnerFinanceFact:
 		return []string{biz.PermissionFinancePayableConfirm, biz.PermissionFinanceReceivableConfirm}
 	case biz.BusinessAttachmentOwnerProductionFact:
-		return []string{biz.PermissionPMCPlanCreate, biz.PermissionPMCPlanUpdate, biz.PermissionPMCRiskHandle}
+		return []string{biz.PermissionProductionCompletionCreate, biz.PermissionProductionFactPost, biz.PermissionProductionFactCancel}
 	case biz.BusinessAttachmentOwnerOutsourcingFact:
 		return []string{biz.PermissionOutsourcingOrderCreate, biz.PermissionOutsourcingOrderUpdate}
 	case biz.BusinessAttachmentOwnerProductSKU:

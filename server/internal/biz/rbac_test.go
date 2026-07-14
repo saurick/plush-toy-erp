@@ -229,6 +229,40 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 	}
 }
 
+func TestBuiltinRoleOperationalFactPermissionProjection(t *testing.T) {
+	production := builtinRolePermissionSet(t, ProductionRoleKey)
+	assertPermissionSetContains(
+		t,
+		production,
+		PermissionProductionFactRead,
+		PermissionProductionCompletionCreate,
+		PermissionProductionMaterialIssueCreate,
+		PermissionProductionFactPost,
+		PermissionProductionFactCancel,
+	)
+
+	pmc := builtinRolePermissionSet(t, PMCRoleKey)
+	assertPermissionSetContains(t, pmc, PermissionProductionFactRead)
+	assertPermissionSetOmits(t, pmc, PermissionProductionCompletionCreate, PermissionProductionMaterialIssueCreate, PermissionProductionFactPost, PermissionProductionFactCancel)
+
+	sales := builtinRolePermissionSet(t, SalesRoleKey)
+	assertPermissionSetContains(t, sales, PermissionStockReservationCreate, PermissionStockReservationRelease)
+
+	warehouse := builtinRolePermissionSet(t, WarehouseRoleKey)
+	assertPermissionSetContains(t, warehouse, PermissionStockReservationCreate, PermissionStockReservationRelease)
+	assertPermissionSetOmits(t, warehouse, PermissionProductionCompletionCreate, PermissionProductionMaterialIssueCreate, PermissionProductionFactPost, PermissionProductionFactCancel)
+
+	quality := builtinRolePermissionSet(t, QualityRoleKey)
+	assertPermissionSetContains(t, quality, PermissionOutsourcingOrderRead, PermissionOutsourcingFactRead, PermissionQualityInspectionRead, PermissionQualityInspectionCreate)
+	assertPermissionSetOmits(t, quality, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionFinancePayableConfirm)
+
+	finance := builtinRolePermissionSet(t, FinanceRoleKey)
+	assertPermissionSetContains(t, finance, PermissionOutsourcingOrderRead, PermissionOutsourcingFactRead, PermissionQualityInspectionRead, PermissionFinancePayableConfirm)
+	assertPermissionSetOmits(t, finance, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionQualityInspectionCreate)
+
+	assertPermissionSetContains(t, production, PermissionProductSKURead, PermissionWarehouseInventoryRead, PermissionOutsourcingFactRead)
+}
+
 func TestMobileRoleAccessPermissionIncludesEngineering(t *testing.T) {
 	if got := MobileRoleAccessPermission(EngineeringRoleKey); got != PermissionMobileEngineeringAccess {
 		t.Fatalf("expected engineering mobile access permission, got %q", got)
@@ -302,7 +336,7 @@ func TestBuiltinAdminMenusAlignCurrentRuntimeNavigation(t *testing.T) {
 			key:         "invoices",
 			label:       "发票管理",
 			path:        "/erp/finance/invoices",
-			permissions: []string{PermissionFinanceReceivableRead, PermissionFinancePayableRead},
+			permissions: []string{PermissionFinanceInvoiceRead},
 		},
 		{
 			key:         "products",
@@ -352,10 +386,20 @@ func TestAdminMenuRequirementsDistinguishAnyAndAll(t *testing.T) {
 		}
 	})
 
-	t.Run("shared pages accept any relevant read permission", func(t *testing.T) {
+	t.Run("finance pages require their exact family read permission", func(t *testing.T) {
 		menus := AdminVisibleMenus(&AdminUser{Permissions: []string{PermissionFinancePayableRead}})
-		if !adminMenusContainKey(menus, "invoices") || !adminMenusContainKey(menus, "reconciliation") {
-			t.Fatal("finance shared pages must be visible with a relevant payable read permission")
+		if adminMenusContainKey(menus, "invoices") || adminMenusContainKey(menus, "reconciliation") {
+			t.Fatal("payable read must not expose invoice or reconciliation pages")
+		}
+
+		invoiceMenus := AdminVisibleMenus(&AdminUser{Permissions: []string{PermissionFinanceInvoiceRead}})
+		if !adminMenusContainKey(invoiceMenus, "invoices") || adminMenusContainKey(invoiceMenus, "reconciliation") {
+			t.Fatal("invoice read must expose only the invoice page among exact finance families")
+		}
+
+		reconciliationMenus := AdminVisibleMenus(&AdminUser{Permissions: []string{PermissionFinanceReconciliationRead}})
+		if !adminMenusContainKey(reconciliationMenus, "reconciliation") || adminMenusContainKey(reconciliationMenus, "invoices") {
+			t.Fatal("reconciliation read must expose only the reconciliation page among exact finance families")
 		}
 	})
 }

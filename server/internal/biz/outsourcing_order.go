@@ -57,10 +57,12 @@ type OutsourcingOrderItem struct {
 	LineNo                  int
 	SubjectType             string
 	ProductID               *int
+	ProductSKUID            *int
 	MaterialID              *int
 	ProcessID               int
 	UnitID                  int
 	ProductNoSnapshot       *string
+	SKUCodeSnapshot         *string
 	ProductOrderNoSnapshot  *string
 	ProductNameSnapshot     *string
 	MaterialCodeSnapshot    *string
@@ -96,10 +98,12 @@ type OutsourcingOrderItemMutation struct {
 	LineNo                  int
 	SubjectType             string
 	ProductID               *int
+	ProductSKUID            *int
 	MaterialID              *int
 	ProcessID               int
 	UnitID                  int
 	ProductNoSnapshot       *string
+	SKUCodeSnapshot         *string
 	ProductOrderNoSnapshot  *string
 	ProductNameSnapshot     *string
 	MaterialCodeSnapshot    *string
@@ -154,6 +158,7 @@ type OutsourcingOrderRepo interface {
 
 	SupplierIsActive(ctx context.Context, id int) (bool, error)
 	ProductIsActive(ctx context.Context, id int) (bool, error)
+	ProductSKUIsActiveForProductAndUnit(ctx context.Context, id, productID, unitID int) (bool, error)
 	MaterialIsActive(ctx context.Context, id int) (bool, error)
 	UnitIsActive(ctx context.Context, id int) (bool, error)
 	ProcessIsUsableForOutsourcing(ctx context.Context, id int) (active bool, outsourcingEnabled bool, err error)
@@ -250,7 +255,7 @@ func (uc *OutsourcingOrderUsecase) SaveOutsourcingOrderWithItems(ctx context.Con
 		if err := validateOptionalDateNotBefore(normalizedOrder.OrderDate, normalizedItem.ExpectedReturnDate); err != nil {
 			return nil, err
 		}
-		if err := uc.validateSubjectProcessAndUnit(ctx, normalizedItem.SubjectType, normalizedItem.ProductID, normalizedItem.MaterialID, normalizedItem.ProcessID, normalizedItem.UnitID); err != nil {
+		if err := uc.validateSubjectProcessAndUnit(ctx, normalizedItem.SubjectType, normalizedItem.ProductID, normalizedItem.ProductSKUID, normalizedItem.MaterialID, normalizedItem.ProcessID, normalizedItem.UnitID); err != nil {
 			return nil, err
 		}
 		normalizedItems = append(normalizedItems, &OutsourcingOrderItemSaveMutation{
@@ -317,7 +322,7 @@ func (uc *OutsourcingOrderUsecase) validateSupplierActive(ctx context.Context, i
 	return nil
 }
 
-func (uc *OutsourcingOrderUsecase) validateSubjectProcessAndUnit(ctx context.Context, subjectType string, productID *int, materialID *int, processID int, unitID int) error {
+func (uc *OutsourcingOrderUsecase) validateSubjectProcessAndUnit(ctx context.Context, subjectType string, productID, productSKUID, materialID *int, processID int, unitID int) error {
 	switch subjectType {
 	case OutsourcingOrderSubjectProduct:
 		if productID == nil {
@@ -330,8 +335,17 @@ func (uc *OutsourcingOrderUsecase) validateSubjectProcessAndUnit(ctx context.Con
 		if !productActive {
 			return ErrProductInactive
 		}
+		if productSKUID != nil {
+			skuActive, err := uc.repo.ProductSKUIsActiveForProductAndUnit(ctx, *productSKUID, *productID, unitID)
+			if err != nil {
+				return err
+			}
+			if !skuActive {
+				return ErrProductSKUInactive
+			}
+		}
 	case OutsourcingOrderSubjectMaterial:
-		if materialID == nil {
+		if materialID == nil || productSKUID != nil {
 			return ErrBadParam
 		}
 		materialActive, err := uc.repo.MaterialIsActive(ctx, *materialID)
@@ -389,6 +403,7 @@ func normalizeOutsourcingOrderMutation(in OutsourcingOrderMutation) (Outsourcing
 func normalizeOutsourcingOrderItemFields(in OutsourcingOrderItemMutation) (OutsourcingOrderItemMutation, error) {
 	in.SubjectType = strings.ToUpper(strings.TrimSpace(in.SubjectType))
 	in.ProductNoSnapshot = normalizeOptionalString(in.ProductNoSnapshot)
+	in.SKUCodeSnapshot = normalizeOptionalString(in.SKUCodeSnapshot)
 	in.ProductOrderNoSnapshot = normalizeOptionalString(in.ProductOrderNoSnapshot)
 	in.ProductNameSnapshot = normalizeOptionalString(in.ProductNameSnapshot)
 	in.MaterialCodeSnapshot = normalizeOptionalString(in.MaterialCodeSnapshot)
@@ -402,8 +417,11 @@ func normalizeOutsourcingOrderItemFields(in OutsourcingOrderItemMutation) (Outso
 	}
 	switch in.SubjectType {
 	case OutsourcingOrderSubjectProduct:
-		if in.ProductID == nil || *in.ProductID <= 0 || in.MaterialID != nil {
+		if in.ProductID == nil || *in.ProductID <= 0 || in.MaterialID != nil || (in.ProductSKUID != nil && *in.ProductSKUID <= 0) {
 			return OutsourcingOrderItemMutation{}, ErrBadParam
+		}
+		if in.ProductSKUID == nil {
+			in.SKUCodeSnapshot = nil
 		}
 		in.MaterialCodeSnapshot = nil
 		in.MaterialNameSnapshot = nil
@@ -412,6 +430,8 @@ func normalizeOutsourcingOrderItemFields(in OutsourcingOrderItemMutation) (Outso
 			return OutsourcingOrderItemMutation{}, ErrBadParam
 		}
 		in.ProductNoSnapshot = nil
+		in.ProductSKUID = nil
+		in.SKUCodeSnapshot = nil
 		in.ProductOrderNoSnapshot = nil
 		in.ProductNameSnapshot = nil
 	default:

@@ -28,7 +28,7 @@ const scriptPath = path.resolve(
   "scripts/qa/manual-acceptance-browser.mjs",
 );
 
-test("manual acceptance browser plan covers all 47 catalog targets and ten formal accounts", () => {
+test("manual acceptance browser plan covers all 48 catalog targets and ten formal accounts", () => {
   const plan = buildManualAcceptanceBrowserPlan({
     baseURL: "http://127.0.0.1:5177",
     backendURL: "http://localhost:8300",
@@ -36,16 +36,16 @@ test("manual acceptance browser plan covers all 47 catalog targets and ten forma
 
   assert.equal(plan.writesDatabase, false);
   assert.equal(plan.clicksBusinessWriteActions, false);
-  assert.equal(plan.summary.totalTargets, 47);
+  assert.equal(plan.summary.totalTargets, 48);
   assert.deepEqual(plan.summary, {
     entryPages: 2,
-    desktopPages: 26,
+    desktopPages: 27,
     mobileRolePages: 9,
     printPreviewPages: 5,
     printWorkspacePages: 5,
-    totalTargets: 47,
+    totalTargets: 48,
   });
-  assert.equal(plan.targets.length, 47);
+  assert.equal(plan.targets.length, 48);
   assert.equal(plan.formalAccounts.length, 10);
   assert.equal(FORMAL_BROWSER_ACCOUNTS.length, 10);
   assert.equal(EXCEPTION_BROWSER_ACCOUNTS.length, 3);
@@ -55,8 +55,13 @@ test("manual acceptance browser plan covers all 47 catalog targets and ten forma
   );
   assert.equal(
     plan.targets.filter((item) => item.group === "desktop").length,
-    26,
+    27,
   );
+  const productionOrders = plan.targets.find(
+    (item) => item.group === "desktop" && item.key === "production-orders",
+  );
+  assert.equal(productionOrders?.roleKey, "production");
+  assert.equal(productionOrders?.username, "demo_production");
   assert.equal(
     plan.targets.filter((item) => item.username === "demo_admin").length,
     2,
@@ -371,7 +376,7 @@ test("plan mode needs no password and starts no browser", () => {
   );
   assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
-  assert.equal(plan.summary.totalTargets, 47);
+  assert.equal(plan.summary.totalTargets, 48);
   assert.equal(plan.writesDatabase, false);
   assert.equal(plan.formalAccounts.length, 10);
 });

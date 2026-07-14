@@ -6,23 +6,30 @@ import (
 )
 
 // FinanceFactAccessScope is the server-side data and mutation boundary for the
-// finance fact families. PAYMENT and RECONCILIATION stay shared until they
-// have a verified direction/source contract that cannot be caller supplied.
+// finance fact families. PAYMENT remains read-only under report access until a
+// verified payment source contract exists; invoice and reconciliation actions
+// use their own permissions instead of inheriting receivable/payable access.
 type FinanceFactAccessScope struct {
-	Receivable bool
-	Payable    bool
-	Shared     bool
+	Receivable     bool
+	Payable        bool
+	Invoice        bool
+	Reconciliation bool
+	Shared         bool
 }
 
 func FinanceFactReadAccessScope(permissionKeys []string) FinanceFactAccessScope {
 	permissionSet := PermissionKeySet(permissionKeys)
 	receivable := PermissionSetHasAny(permissionSet, PermissionFinanceReceivableRead)
 	payable := PermissionSetHasAny(permissionSet, PermissionFinancePayableRead)
+	invoice := PermissionSetHasAny(permissionSet, PermissionFinanceInvoiceRead)
+	reconciliation := PermissionSetHasAny(permissionSet, PermissionFinanceReconciliationRead)
 	report := PermissionSetHasAny(permissionSet, PermissionFinanceReportRead)
 	return FinanceFactAccessScope{
-		Receivable: receivable,
-		Payable:    payable,
-		Shared:     report || receivable || payable,
+		Receivable:     receivable,
+		Payable:        payable,
+		Invoice:        invoice,
+		Reconciliation: reconciliation,
+		Shared:         report,
 	}
 }
 
@@ -30,25 +37,32 @@ func FinanceFactConfirmAccessScope(permissionKeys []string) FinanceFactAccessSco
 	permissionSet := PermissionKeySet(permissionKeys)
 	receivable := PermissionSetHasAny(permissionSet, PermissionFinanceReceivableConfirm)
 	payable := PermissionSetHasAny(permissionSet, PermissionFinancePayableConfirm)
+	invoice := PermissionSetHasAny(permissionSet, PermissionFinanceInvoiceConfirm)
+	reconciliation := PermissionSetHasAny(permissionSet, PermissionFinanceReconciliationConfirm)
 	return FinanceFactAccessScope{
-		Receivable: receivable,
-		Payable:    payable,
-		Shared:     receivable && payable,
+		Receivable:     receivable,
+		Payable:        payable,
+		Invoice:        invoice,
+		Reconciliation: reconciliation,
 	}
 }
 
 func (scope FinanceFactAccessScope) Empty() bool {
-	return !scope.Receivable && !scope.Payable && !scope.Shared
+	return !scope.Receivable && !scope.Payable && !scope.Invoice && !scope.Reconciliation && !scope.Shared
 }
 
 func (scope FinanceFactAccessScope) AllowsType(factType string) bool {
 	switch strings.ToUpper(strings.TrimSpace(factType)) {
-	case FinanceFactReceivable, FinanceFactInvoice:
+	case FinanceFactReceivable:
 		return scope.Receivable
 	case FinanceFactPayable:
 		return scope.Payable
-	case FinanceFactPayment, FinanceFactReconciliation:
+	case FinanceFactInvoice:
+		return scope.Invoice
+	case FinanceFactPayment:
 		return scope.Shared
+	case FinanceFactReconciliation:
+		return scope.Reconciliation
 	default:
 		return false
 	}
@@ -57,13 +71,19 @@ func (scope FinanceFactAccessScope) AllowsType(factType string) bool {
 func (scope FinanceFactAccessScope) AllowedTypes() []string {
 	out := make([]string, 0, 5)
 	if scope.Receivable {
-		out = append(out, FinanceFactReceivable, FinanceFactInvoice)
+		out = append(out, FinanceFactReceivable)
 	}
 	if scope.Payable {
 		out = append(out, FinanceFactPayable)
 	}
+	if scope.Invoice {
+		out = append(out, FinanceFactInvoice)
+	}
 	if scope.Shared {
-		out = append(out, FinanceFactPayment, FinanceFactReconciliation)
+		out = append(out, FinanceFactPayment)
+	}
+	if scope.Reconciliation {
+		out = append(out, FinanceFactReconciliation)
 	}
 	return out
 }

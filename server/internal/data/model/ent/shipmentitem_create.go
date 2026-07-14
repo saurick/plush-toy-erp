@@ -114,6 +114,48 @@ func (_c *ShipmentItemCreate) SetNillableUnitNetWeightKgSnapshot(v *decimal.Deci
 	return _c
 }
 
+// SetUnitPriceSnapshot sets the "unit_price_snapshot" field.
+func (_c *ShipmentItemCreate) SetUnitPriceSnapshot(v decimal.Decimal) *ShipmentItemCreate {
+	_c.mutation.SetUnitPriceSnapshot(v)
+	return _c
+}
+
+// SetNillableUnitPriceSnapshot sets the "unit_price_snapshot" field if the given value is not nil.
+func (_c *ShipmentItemCreate) SetNillableUnitPriceSnapshot(v *decimal.Decimal) *ShipmentItemCreate {
+	if v != nil {
+		_c.SetUnitPriceSnapshot(*v)
+	}
+	return _c
+}
+
+// SetAmountSnapshot sets the "amount_snapshot" field.
+func (_c *ShipmentItemCreate) SetAmountSnapshot(v decimal.Decimal) *ShipmentItemCreate {
+	_c.mutation.SetAmountSnapshot(v)
+	return _c
+}
+
+// SetNillableAmountSnapshot sets the "amount_snapshot" field if the given value is not nil.
+func (_c *ShipmentItemCreate) SetNillableAmountSnapshot(v *decimal.Decimal) *ShipmentItemCreate {
+	if v != nil {
+		_c.SetAmountSnapshot(*v)
+	}
+	return _c
+}
+
+// SetCurrencySnapshot sets the "currency_snapshot" field.
+func (_c *ShipmentItemCreate) SetCurrencySnapshot(v string) *ShipmentItemCreate {
+	_c.mutation.SetCurrencySnapshot(v)
+	return _c
+}
+
+// SetNillableCurrencySnapshot sets the "currency_snapshot" field if the given value is not nil.
+func (_c *ShipmentItemCreate) SetNillableCurrencySnapshot(v *string) *ShipmentItemCreate {
+	if v != nil {
+		_c.SetCurrencySnapshot(*v)
+	}
+	return _c
+}
+
 // SetNote sets the "note" field.
 func (_c *ShipmentItemCreate) SetNote(v string) *ShipmentItemCreate {
 	_c.mutation.SetNote(v)
@@ -242,6 +284,10 @@ func (_c *ShipmentItemCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *ShipmentItemCreate) defaults() error {
+	if _, ok := _c.mutation.CurrencySnapshot(); !ok {
+		v := shipmentitem.DefaultCurrencySnapshot
+		_c.mutation.SetCurrencySnapshot(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		if shipmentitem.DefaultCreatedAt == nil {
 			return fmt.Errorf("ent: uninitialized shipmentitem.DefaultCreatedAt (forgotten import ent/runtime?)")
@@ -311,6 +357,14 @@ func (_c *ShipmentItemCreate) check() error {
 	if _, ok := _c.mutation.Quantity(); !ok {
 		return &ValidationError{Name: "quantity", err: errors.New(`ent: missing required field "ShipmentItem.quantity"`)}
 	}
+	if _, ok := _c.mutation.CurrencySnapshot(); !ok {
+		return &ValidationError{Name: "currency_snapshot", err: errors.New(`ent: missing required field "ShipmentItem.currency_snapshot"`)}
+	}
+	if v, ok := _c.mutation.CurrencySnapshot(); ok {
+		if err := shipmentitem.CurrencySnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "currency_snapshot", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.currency_snapshot": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.Note(); ok {
 		if err := shipmentitem.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.note": %w`, err)}
@@ -367,6 +421,18 @@ func (_c *ShipmentItemCreate) createSpec() (*ShipmentItem, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.UnitNetWeightKgSnapshot(); ok {
 		_spec.SetField(shipmentitem.FieldUnitNetWeightKgSnapshot, field.TypeOther, value)
 		_node.UnitNetWeightKgSnapshot = &value
+	}
+	if value, ok := _c.mutation.UnitPriceSnapshot(); ok {
+		_spec.SetField(shipmentitem.FieldUnitPriceSnapshot, field.TypeOther, value)
+		_node.UnitPriceSnapshot = &value
+	}
+	if value, ok := _c.mutation.AmountSnapshot(); ok {
+		_spec.SetField(shipmentitem.FieldAmountSnapshot, field.TypeOther, value)
+		_node.AmountSnapshot = &value
+	}
+	if value, ok := _c.mutation.CurrencySnapshot(); ok {
+		_spec.SetField(shipmentitem.FieldCurrencySnapshot, field.TypeString, value)
+		_node.CurrencySnapshot = value
 	}
 	if value, ok := _c.mutation.Note(); ok {
 		_spec.SetField(shipmentitem.FieldNote, field.TypeString, value)

@@ -128,6 +128,10 @@ func (s *stubOutsourcingOrderJSONRPCRepo) ProductIsActive(context.Context, int) 
 	return s.productActive, nil
 }
 
+func (s *stubOutsourcingOrderJSONRPCRepo) ProductSKUIsActiveForProductAndUnit(context.Context, int, int, int) (bool, error) {
+	return s.productActive, nil
+}
+
 func (s *stubOutsourcingOrderJSONRPCRepo) MaterialIsActive(context.Context, int) (bool, error) {
 	return s.materialActive, nil
 }
@@ -167,6 +171,7 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 				"line_no":                   float64(1),
 				"subject_type":              biz.OutsourcingOrderSubjectProduct,
 				"product_id":                float64(2),
+				"product_sku_id":            float64(5),
 				"process_id":                float64(3),
 				"unit_id":                   float64(4),
 				"product_no_snapshot":       "PROD-JSONRPC",
@@ -210,7 +215,7 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	if productOrderNo := item["product_order_no_snapshot"]; productOrderNo != "SO-JSONRPC-001" {
 		t.Fatalf("expected product order no snapshot, got %#v", productOrderNo)
 	}
-	if subjectType := item["subject_type"]; subjectType != biz.OutsourcingOrderSubjectProduct || item["material_id"] != nil {
+	if subjectType := item["subject_type"]; subjectType != biz.OutsourcingOrderSubjectProduct || item["material_id"] != nil || jsonRPCInt(t, item, "product_sku_id") != 5 {
 		t.Fatalf("expected product subject DTO with nil material id, got %#v", item)
 	}
 
@@ -621,10 +626,12 @@ func outsourcingOrderItemFromMutation(id int, orderID int, in *biz.OutsourcingOr
 		LineNo:                  in.LineNo,
 		SubjectType:             in.SubjectType,
 		ProductID:               in.ProductID,
+		ProductSKUID:            in.ProductSKUID,
 		MaterialID:              in.MaterialID,
 		ProcessID:               in.ProcessID,
 		UnitID:                  in.UnitID,
 		ProductNoSnapshot:       in.ProductNoSnapshot,
+		SKUCodeSnapshot:         in.SKUCodeSnapshot,
 		ProductOrderNoSnapshot:  in.ProductOrderNoSnapshot,
 		ProductNameSnapshot:     in.ProductNameSnapshot,
 		MaterialCodeSnapshot:    in.MaterialCodeSnapshot,

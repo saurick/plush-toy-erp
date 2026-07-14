@@ -542,10 +542,22 @@ func TestOperationalFactPostgresOutsourcingMaterialIssueWithoutLotPostAndCancel(
 	fixtures := createInventoryPostgresFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
+	uc := biz.NewOperationalFactUsecase(repo)
+	source := createOutsourcingFactSourceFixture(
+		t,
+		ctx,
+		client,
+		inventoryTestFixtures{
+			unitID: fixtures.unitID, materialID: fixtures.materialID,
+			productID: fixtures.productID, warehouseID: fixtures.warehouseID,
+		},
+		"PG-MATERIAL-"+fixtures.suffix,
+		decimal.NewFromInt(5),
+	)
 
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
-		SubjectType:    biz.InventorySubjectProduct,
-		SubjectID:      fixtures.productID,
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
 		WarehouseID:    fixtures.warehouseID,
 		TxnType:        biz.InventoryTxnIn,
 		Direction:      1,
@@ -554,17 +566,15 @@ func TestOperationalFactPostgresOutsourcingMaterialIssueWithoutLotPostAndCancel(
 		SourceType:     "operational_fact_pg_outsourcing_seed",
 		IdempotencyKey: "operational-fact-pg-outsourcing-seed-" + fixtures.suffix,
 	}); err != nil {
-		t.Fatalf("seed postgres product inventory failed: %v", err)
+		t.Fatalf("seed postgres material inventory failed: %v", err)
 	}
-	fact, err := repo.CreateOutsourcingFactDraft(ctx, &biz.OperationalFactMutation{
-		FactNo:         "PG-OF-" + fixtures.suffix,
-		FactType:       biz.OutsourcingFactMaterialIssue,
-		SubjectType:    biz.InventorySubjectProduct,
-		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
-		UnitID:         fixtures.unitID,
-		Quantity:       decimal.NewFromInt(2),
-		IdempotencyKey: "operational-fact-pg-outsourcing-" + fixtures.suffix,
+	fact, err := uc.CreateOutsourcingMaterialIssueFromOrder(ctx, &biz.OutsourcingFactFromOrderCreate{
+		FactNo:                 "PG-OF-" + fixtures.suffix,
+		OutsourcingOrderID:     source.order.ID,
+		OutsourcingOrderItemID: source.materialLine.ID,
+		WarehouseID:            fixtures.warehouseID,
+		Quantity:               decimal.NewFromInt(2),
+		IdempotencyKey:         "operational-fact-pg-outsourcing-" + fixtures.suffix,
 	})
 	if err != nil {
 		t.Fatalf("create postgres outsourcing fact failed: %v", err)

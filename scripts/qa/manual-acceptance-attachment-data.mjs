@@ -6,6 +6,8 @@ import path from "node:path";
 export const CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_ATTACHMENTS";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 const CUSTOMER_KEY = "yoyoosun";
+export const SOURCE_DRIVEN_FACT_REPORT_CONTRACT =
+  "source-driven-operational-facts-v1";
 
 export function normalizeLocalBackendURL(value) {
   const url = new URL(String(value || "http://127.0.0.1:8300"));
@@ -49,12 +51,27 @@ function firstStepID(report, target) {
   return Number(step.id);
 }
 
+function sourceDrivenFactOwnerID(report, key) {
+  if (report?.reportContract !== SOURCE_DRIVEN_FACT_REPORT_CONTRACT) {
+    throw new Error(
+      `fact report must use ${SOURCE_DRIVEN_FACT_REPORT_CONTRACT}`,
+    );
+  }
+  const id = Number(report?.attachmentOwners?.[key]);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new Error(`fact report is missing attachmentOwners.${key}`);
+  }
+  return id;
+}
+
 export function buildAttachmentTargets({ sourceReport, factReport, workflowTask }) {
   const richSales = sourceReport.referenceRecords?.salesOrders?.find((item) => item.items?.length === 25);
-  const operational = factReport.operationalSteps?.flatMap((item) => item.steps || []) || [];
-  const production = operational.find((item) => item.method === "create_production_fact");
-  const finance = operational.find((item) => item.method === "create_finance_fact");
-  if (!richSales || !production?.id || !finance?.id || !workflowTask?.id || !workflowTask?.version) {
+  const productionFactID = sourceDrivenFactOwnerID(
+    factReport,
+    "productionFactId",
+  );
+  const financeFactID = sourceDrivenFactOwnerID(factReport, "financeFactId");
+  if (!richSales || !workflowTask?.id || !workflowTask?.version) {
     throw new Error("attachment target reports are incomplete");
   }
   return [
@@ -62,8 +79,8 @@ export function buildAttachmentTargets({ sourceReport, factReport, workflowTask 
     { owner_type: "purchase_order", owner_id: firstStepID(sourceReport, "purchase_order"), files: 4 },
     { owner_type: "outsourcing_order", owner_id: firstStepID(sourceReport, "outsourcing_order"), files: 4 },
     { owner_type: "bom_header", owner_id: firstStepID(sourceReport, "bom_version"), files: 3 },
-    { owner_type: "production_fact", owner_id: Number(production.id), files: 3 },
-    { owner_type: "finance_fact", owner_id: Number(finance.id), files: 3 },
+    { owner_type: "production_fact", owner_id: productionFactID, files: 3 },
+    { owner_type: "finance_fact", owner_id: financeFactID, files: 3 },
     { owner_type: "workflow_task", owner_id: Number(workflowTask.id), expected_version: Number(workflowTask.version), files: 5 },
   ];
 }
@@ -94,6 +111,21 @@ export async function applyAttachmentData({ backendURL, password, sourceReportPa
   if (confirm !== CONFIRM_PHRASE) throw new Error(`confirmation must equal ${CONFIRM_PHRASE}`);
   backendURL = normalizeLocalBackendURL(backendURL);
   if (!password) throw new Error("MANUAL_ACCEPTANCE_ADMIN_PASSWORD is required");
+  const sourceReport = readJSON(sourceReportPath);
+  const factReport = readJSON(factReportPath);
+  const taskReport = readJSON(taskReportPath);
+  buildAttachmentTargets({
+    sourceReport,
+    factReport,
+    workflowTask: { id: 1, version: 1 },
+  });
+  if (
+    !String(taskReport?.sourceType || "").trim() ||
+    !Number.isSafeInteger(Number(taskReport?.sourceID)) ||
+    Number(taskReport.sourceID) <= 0
+  ) {
+    throw new Error("task report is missing a stable source reference");
+  }
   const login = await rpc({ backendURL, domain: "auth", method: "admin_login", params: { username: "admin", password } });
   if (login.is_super_admin !== true) throw new Error("admin must be a local super admin");
   const token = login.access_token || login.token;
@@ -120,10 +152,9 @@ export async function applyAttachmentData({ backendURL, password, sourceReportPa
     actorTokens[ownerType] = actorLogin.access_token || actorLogin.token;
     if (!actorTokens[ownerType]) throw new Error(`${username} login response is missing access token`);
   }
-  const taskReport = readJSON(taskReportPath);
   const taskList = await rpc({ backendURL, domain: "workflow", method: "list_tasks", params: { source_type: taskReport.sourceType, source_id: taskReport.sourceID, limit: 200 }, token: actorTokens.workflow_task });
   const workflowTask = selectAttachmentWorkflowTask(taskList.tasks);
-  const targets = buildAttachmentTargets({ sourceReport: readJSON(sourceReportPath), factReport: readJSON(factReportPath), workflowTask });
+  const targets = buildAttachmentTargets({ sourceReport, factReport, workflowTask });
   const fixtures = buildAttachmentFixtures();
   const steps = [];
   for (const target of targets) {

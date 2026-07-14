@@ -24,9 +24,16 @@ var (
 	ErrPurchaseReceiptItemNotFound           = errors.New("purchase receipt item not found")
 	ErrPurchaseReturnNotFound                = errors.New("purchase return not found")
 	ErrPurchaseReturnItemNotFound            = errors.New("purchase return item not found")
+	ErrPurchaseReturnQualitySourceInvalid    = errors.New("purchase return quality source is invalid")
+	ErrPurchaseReturnQualitySourceState      = errors.New("purchase return quality source state does not allow creation")
+	ErrPurchaseReturnQualitySourceConflict   = errors.New("active purchase return already exists for quality inspection")
+	ErrPurchaseReturnQuantityExceeded        = errors.New("purchase return quantity exceeds effective receipt quantity")
 	ErrPurchaseReceiptAdjustmentNotFound     = errors.New("purchase receipt adjustment not found")
 	ErrPurchaseReceiptAdjustmentItemNotFound = errors.New("purchase receipt adjustment item not found")
 	ErrQualityInspectionNotFound             = errors.New("quality inspection not found")
+	ErrQualityInspectionSourceConflict       = errors.New("active quality inspection already exists for source")
+	ErrQualityInspectionSourceInvalid        = errors.New("quality inspection source is invalid")
+	ErrQualityInspectionSourceState          = errors.New("quality inspection source state does not allow creation")
 	ErrPurchaseReceiptQualityPending         = errors.New("purchase receipt quality inspection is not complete")
 	ErrPurchaseReceiptQualityRejected        = errors.New("purchase receipt quality inspection is rejected")
 	ErrInventoryInsufficientStock            = errors.New("inventory insufficient stock")
@@ -358,6 +365,7 @@ type InventoryTxnApplyResult struct {
 }
 
 type InventoryRepo interface {
+	GetSupplier(ctx context.Context, id int) (*Supplier, error)
 	MaterialIsActive(ctx context.Context, id int) (bool, error)
 	ProductIsActive(ctx context.Context, id int) (bool, error)
 	UnitIsActive(ctx context.Context, id int) (bool, error)
@@ -395,15 +403,21 @@ type InventoryRepo interface {
 	GetPurchaseReceipt(ctx context.Context, id int) (*PurchaseReceipt, error)
 	ListPurchaseReceipts(ctx context.Context, filter PurchaseReceiptFilter) ([]*PurchaseReceipt, int, error)
 	CreatePurchaseReturnDraft(ctx context.Context, in *PurchaseReturnCreate) (*PurchaseReturn, error)
+	ResolvePurchaseReturnReplay(ctx context.Context, in *PurchaseReturnCreate) (*PurchaseReturn, bool, error)
+	CreatePurchaseReturnWithItems(ctx context.Context, in *PurchaseReturnCreate, items []*PurchaseReturnItemCreate) (*PurchaseReturn, error)
 	AddPurchaseReturnItem(ctx context.Context, in *PurchaseReturnItemCreate) (*PurchaseReturnItem, error)
 	PostPurchaseReturn(ctx context.Context, returnID int) (*PurchaseReturn, error)
 	CancelPostedPurchaseReturn(ctx context.Context, returnID int) (*PurchaseReturn, error)
 	GetPurchaseReturn(ctx context.Context, id int) (*PurchaseReturn, error)
+	ListPurchaseReturns(ctx context.Context, filter PurchaseReturnFilter) ([]*PurchaseReturn, int, error)
 	CreatePurchaseReceiptAdjustmentDraft(ctx context.Context, in *PurchaseReceiptAdjustmentCreate) (*PurchaseReceiptAdjustment, error)
+	ResolvePurchaseReceiptAdjustmentReplay(ctx context.Context, in *PurchaseReceiptAdjustmentCreate) (*PurchaseReceiptAdjustment, bool, error)
+	CreatePurchaseReceiptAdjustmentWithItems(ctx context.Context, in *PurchaseReceiptAdjustmentCreate, items []*PurchaseReceiptAdjustmentItemCreate) (*PurchaseReceiptAdjustment, error)
 	AddPurchaseReceiptAdjustmentItem(ctx context.Context, in *PurchaseReceiptAdjustmentItemCreate) (*PurchaseReceiptAdjustmentItem, error)
 	PostPurchaseReceiptAdjustment(ctx context.Context, adjustmentID int) (*PurchaseReceiptAdjustment, error)
 	CancelPostedPurchaseReceiptAdjustment(ctx context.Context, adjustmentID int) (*PurchaseReceiptAdjustment, error)
 	GetPurchaseReceiptAdjustment(ctx context.Context, id int) (*PurchaseReceiptAdjustment, error)
+	ListPurchaseReceiptAdjustments(ctx context.Context, filter PurchaseReceiptAdjustmentFilter) ([]*PurchaseReceiptAdjustment, int, error)
 	CreateQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error)
 	CreateFinishedGoodsQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error)
 	SubmitQualityInspection(ctx context.Context, inspectionID int) (*QualityInspection, error)
@@ -419,6 +433,21 @@ type InventoryRepo interface {
 // process-command compensation written with a posted receipt reversal.
 type PurchaseReceiptCancellationActorRepo interface {
 	CancelPostedPurchaseReceiptWithActor(ctx context.Context, receiptID int, actorID int) (*PurchaseReceipt, error)
+}
+
+// QualityInspectionSourceRepo owns source locking, source-field derivation and
+// draft insertion in one transaction. The generic technical create shape is an
+// internal capability and must not be exposed as a caller-controlled API.
+type QualityInspectionSourceRepo interface {
+	CreateQualityInspectionFromPurchaseReceipt(ctx context.Context, in *QualityInspectionFromPurchaseReceiptCreate) (*QualityInspection, error)
+	CreateQualityInspectionFromOutsourcingReturn(ctx context.Context, in *QualityInspectionFromOutsourcingReturnCreate) (*QualityInspection, error)
+}
+
+// PurchaseReturnFromQualityInspectionRepo owns the inspection-first lock order
+// and derives the receipt, supplier, material, warehouse, unit and lot in one
+// transaction.
+type PurchaseReturnFromQualityInspectionRepo interface {
+	CreatePurchaseReturnFromQualityInspection(ctx context.Context, in *PurchaseReturnFromQualityInspectionCreate) (*PurchaseReturn, error)
 }
 
 type InventoryUsecase struct {

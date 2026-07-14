@@ -34,6 +34,7 @@ import {
   listAllPurchaseOrderItems,
   listPurchaseOrderItemsPreview,
   listPurchaseOrders,
+  getPurchaseOrder,
   listSuppliers,
   listUnits,
   savePurchaseOrderWithItems,
@@ -306,33 +307,50 @@ export default function V1PurchaseOrdersPage() {
     setLoading(true)
     try {
       const { sortBy, sortDirection } = parseBusinessSortValue(sortValue)
-      const data = await listPurchaseOrders(
-        {
-          keyword,
-          supplier_id: supplierFilter || undefined,
-          lifecycle_status: status,
-          date_field: dateFilterField,
-          date_from: dateFilterStart || undefined,
-          date_to: dateFilterEnd || undefined,
-          sort_by: sortBy,
-          sort_direction: sortDirection,
-          limit: pagination.pageSize,
-          offset: (pagination.current - 1) * pagination.pageSize,
-        },
-        { signal: request.signal }
-      )
+      const routeSelectedID = Number(routePurchaseOrderID || 0)
+      const [data, routeOrder] = await Promise.all([
+        listPurchaseOrders(
+          {
+            keyword,
+            supplier_id: supplierFilter || undefined,
+            lifecycle_status: status,
+            date_field: dateFilterField,
+            date_from: dateFilterStart || undefined,
+            date_to: dateFilterEnd || undefined,
+            sort_by: sortBy,
+            sort_direction: sortDirection,
+            limit: pagination.pageSize,
+            offset: (pagination.current - 1) * pagination.pageSize,
+          },
+          { signal: request.signal }
+        ),
+        routeSelectedID > 0
+          ? getPurchaseOrder(
+              { id: routeSelectedID },
+              { signal: request.signal }
+            )
+          : Promise.resolve(null),
+      ])
       if (!request.isCurrent()) {
         return
       }
-      const nextOrders = data?.purchase_orders || []
+      const listedOrders = data?.purchase_orders || []
+      const nextOrders = routeOrder
+        ? [
+            routeOrder,
+            ...listedOrders.filter((item) => item.id !== routeOrder.id),
+          ]
+        : listedOrders
       setOrders(nextOrders)
-      setTotal(Number(data?.total || 0))
-      const routeSelectedID = Number(routePurchaseOrderID || 0)
+      setTotal(
+        Number(data?.total || 0) +
+          (routeOrder && !listedOrders.some((item) => item.id === routeOrder.id)
+            ? 1
+            : 0)
+      )
       if (routeSelectedID > 0) {
-        const routeSelectedOrder =
-          nextOrders.find((item) => item.id === routeSelectedID) || null
-        applySelectedRowKeys(routeSelectedOrder ? [routeSelectedID] : [])
-        setSelectedOrder(routeSelectedOrder)
+        applySelectedRowKeys(routeOrder ? [routeSelectedID] : [])
+        setSelectedOrder(routeOrder)
         return
       }
       const validKeys = selectedRowKeysRef.current.filter((key) =>

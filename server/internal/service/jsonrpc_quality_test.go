@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
 	"server/internal/biz"
 	datarepo "server/internal/data"
@@ -35,10 +36,6 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 		"inspection_no":            "QI-JSONRPC-PASS",
 		"purchase_receipt_id":      float64(receipt.ID),
 		"purchase_receipt_item_id": float64(item.ID),
-		"inventory_lot_id":         float64(lotID),
-		"material_id":              float64(fixtures.materialID),
-		"warehouse_id":             float64(fixtures.warehouseID),
-		"inspector_id":             float64(9),
 		"decision_note":            "初检待判定",
 	}))
 	if err != nil {
@@ -157,6 +154,169 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 		t.Fatalf("expected cancelled status, got %#v", status)
 	}
 	assertLotStatus(t, ctx, client, cancelLotID, biz.InventoryLotActive)
+}
+
+func TestJsonrpcDispatcher_OutsourcingReturnQualityInspectionIsSourceDriven(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "jsonrpc_quality_outsourcing_return")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.QualityRoleKey},
+		biz.PermissionQualityInspectionRead,
+		biz.PermissionQualityInspectionCreate,
+		biz.PermissionQualityInspectionUpdate,
+	)
+	j := newQualityJSONRPCTestData(t, data, admin)
+	activateQualityTestCustomerConfig(t, j, customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.07.14.quality-outsourcing-enabled",
+		"outsourcing_orders",
+		"enabled",
+	))
+	operationalUC := biz.NewOperationalFactUsecase(datarepo.NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+
+	process := client.Process.Create().
+		SetCode("QI-RPC-OUT-PROC").
+		SetName("委外质检工序").
+		SetOutsourcingEnabled(true).
+		SaveX(ctx)
+	supplier := client.Supplier.Create().
+		SetCode("QI-RPC-OUT-SUP").
+		SetName("委外质检加工厂").
+		SetSupplierType("outsourcing").
+		SaveX(ctx)
+	order := client.OutsourcingOrder.Create().
+		SetOutsourcingOrderNo("QI-RPC-OUT-ORDER").
+		SetSupplierID(supplier.ID).
+		SetSupplierSnapshot(map[string]any{"name": supplier.Name}).
+		SetOrderDate(time.Date(2026, 7, 14, 0, 0, 0, 0, time.UTC)).
+		SetLifecycleStatus(biz.OutsourcingOrderStatusConfirmed).
+		SaveX(ctx)
+	line := client.OutsourcingOrderItem.Create().
+		SetOutsourcingOrderID(order.ID).
+		SetLineNo(1).
+		SetSubjectType(biz.OutsourcingOrderSubjectProduct).
+		SetProductID(fixtures.productID).
+		SetProcessID(process.ID).
+		SetUnitID(fixtures.unitID).
+		SetOutsourcingQuantity(decimal.NewFromInt(5)).
+		SetLineStatus(biz.OutsourcingOrderItemStatusOpen).
+		SaveX(ctx)
+	lot, err := j.inventoryUC.CreateInventoryLot(ctx, &biz.InventoryLotCreate{
+		SubjectType: biz.InventorySubjectProduct,
+		SubjectID:   fixtures.productID,
+		LotNo:       "QI-RPC-OUT-LOT",
+	})
+	if err != nil {
+		t.Fatalf("create outsourcing return lot: %v", err)
+	}
+	fact, err := operationalUC.CreateOutsourcingReturnReceiptFromOrder(ctx, &biz.OutsourcingFactFromOrderCreate{
+		FactNo:                 "QI-RPC-OUT-RETURN",
+		OutsourcingOrderID:     order.ID,
+		OutsourcingOrderItemID: line.ID,
+		WarehouseID:            fixtures.warehouseID,
+		LotID:                  &lot.ID,
+		Quantity:               decimal.NewFromInt(2),
+		IdempotencyKey:         "QI-RPC-OUT-RETURN",
+	})
+	if err != nil {
+		t.Fatalf("create outsourcing return: %v", err)
+	}
+	fact, err = operationalUC.PostOutsourcingFact(ctx, fact.ID)
+	if err != nil {
+		t.Fatalf("post outsourcing return: %v", err)
+	}
+
+	params := map[string]any{
+		"customer_key":  biz.DefaultCustomerKey,
+		"fact_id":       float64(fact.ID),
+		"inspection_no": "QI-RPC-OUT-INSPECTION",
+		"note":          "委外回货抽检",
+	}
+	_, createRes, err := j.handleQuality(workflowJSONRPCAdminContext(), "create_quality_inspection_from_outsourcing_return", "out-create", mustJSONRPCStruct(t, params))
+	if err != nil || createRes == nil || createRes.Code != errcode.OK.Code {
+		t.Fatalf("create outsourcing return quality result=%#v err=%v", createRes, err)
+	}
+	created := jsonRPCNestedMap(t, createRes, "quality_inspection")
+	inspectionID := jsonRPCInt(t, created, "id")
+	if created["source_type"] != biz.QualityInspectionSourceOutsourcingFact ||
+		created["inspection_type"] != biz.QualityInspectionTypeOutsourcingReturn ||
+		created["subject_type"] != biz.QualityInspectionSubjectProduct ||
+		jsonRPCInt(t, created, "source_id") != fact.ID ||
+		jsonRPCInt(t, created, "subject_id") != fixtures.productID ||
+		jsonRPCInt(t, created, "inventory_lot_id") != lot.ID {
+		t.Fatalf("outsourcing quality source not derived: %#v", created)
+	}
+	_, replayRes, err := j.handleQuality(workflowJSONRPCAdminContext(), "create_quality_inspection_from_outsourcing_return", "out-replay", mustJSONRPCStruct(t, params))
+	if err != nil || replayRes == nil || replayRes.Code != errcode.OK.Code || jsonRPCInt(t, jsonRPCNestedMap(t, replayRes, "quality_inspection"), "id") != inspectionID {
+		t.Fatalf("outsourcing quality replay result=%#v err=%v", replayRes, err)
+	}
+	conflictParams := map[string]any{
+		"customer_key":  biz.DefaultCustomerKey,
+		"fact_id":       float64(fact.ID),
+		"inspection_no": "QI-RPC-OUT-INSPECTION-OTHER",
+	}
+	_, conflictRes, err := j.handleQuality(workflowJSONRPCAdminContext(), "create_quality_inspection_from_outsourcing_return", "out-conflict", mustJSONRPCStruct(t, conflictParams))
+	if err != nil || conflictRes == nil || conflictRes.Code != errcode.IdempotencyConflict.Code {
+		t.Fatalf("outsourcing quality source conflict result=%#v err=%v", conflictRes, err)
+	}
+	_, submitRes, err := j.handleQuality(workflowJSONRPCAdminContext(), "submit_quality_inspection", "out-submit", mustJSONRPCStruct(t, map[string]any{"id": float64(inspectionID)}))
+	if err != nil || submitRes == nil || submitRes.Code != errcode.OK.Code {
+		t.Fatalf("submit outsourcing quality result=%#v err=%v", submitRes, err)
+	}
+	_, rejectRes, err := j.handleQuality(workflowJSONRPCAdminContext(), "reject_quality_inspection", "out-reject", mustJSONRPCStruct(t, map[string]any{
+		"id":            float64(inspectionID),
+		"decision_note": "尺寸不符",
+	}))
+	if err != nil || rejectRes == nil || rejectRes.Code != errcode.OK.Code {
+		t.Fatalf("reject outsourcing quality result=%#v err=%v", rejectRes, err)
+	}
+	_, listRes, err := j.handleQuality(workflowJSONRPCAdminContext(), "list_outsourcing_return_quality_inspections", "out-list", mustJSONRPCStruct(t, map[string]any{
+		"customer_key": biz.DefaultCustomerKey,
+		"fact_id":      float64(fact.ID),
+		"status":       biz.QualityInspectionStatusRejected,
+	}))
+	if err != nil || listRes == nil || listRes.Code != errcode.OK.Code || jsonRPCInt(t, listRes.Data.AsMap(), "total") != 1 {
+		t.Fatalf("list outsourcing return quality result=%#v err=%v", listRes, err)
+	}
+}
+
+func TestQualityInspectionSourceCreateParamsRejectDerivedFields(t *testing.T) {
+	purchase := map[string]any{
+		"customer_key":             "yoyoosun",
+		"inspection_no":            "QI-PURCHASE-SOURCE-PARAMS",
+		"purchase_receipt_id":      float64(10),
+		"purchase_receipt_item_id": float64(11),
+		"decision_note":            "复检",
+	}
+	if in, ok := qualityInspectionFromPurchaseReceiptCreateFromParams(purchase); !ok || in.PurchaseReceiptID != 10 || in.PurchaseReceiptItemID != 11 {
+		t.Fatalf("allowed purchase quality source params in=%#v ok=%v", in, ok)
+	}
+	for _, field := range []string{"inventory_lot_id", "material_id", "warehouse_id", "source_type", "source_id", "inspection_type", "subject_type", "subject_id", "inspector_id"} {
+		forged := cloneQualityParams(purchase)
+		forged[field] = "forged"
+		if _, ok := qualityInspectionFromPurchaseReceiptCreateFromParams(forged); ok {
+			t.Fatalf("purchase quality derived field %s must be rejected", field)
+		}
+	}
+
+	outsourcing := map[string]any{
+		"customer_key":  "yoyoosun",
+		"fact_id":       float64(20),
+		"inspection_no": "QI-OUTSOURCE-SOURCE-PARAMS",
+		"note":          "回货抽检",
+	}
+	if in, ok := qualityInspectionFromOutsourcingReturnCreateFromParams(outsourcing); !ok || in.OutsourcingFactID != 20 {
+		t.Fatalf("allowed outsourcing quality source params in=%#v ok=%v", in, ok)
+	}
+	for _, field := range []string{"decision_note", "inventory_lot_id", "material_id", "warehouse_id", "source_type", "source_id", "inspection_type", "subject_type", "subject_id", "product_id", "supplier_id"} {
+		forged := cloneQualityParams(outsourcing)
+		forged[field] = "forged"
+		if _, ok := qualityInspectionFromOutsourcingReturnCreateFromParams(forged); ok {
+			t.Fatalf("outsourcing quality derived field %s must be rejected", field)
+		}
+	}
 }
 
 func TestJsonrpcDispatcher_FinishedGoodsQualityInspectionAPIBindsShipmentFact(t *testing.T) {
@@ -314,9 +474,6 @@ func TestJsonrpcDispatcher_QualityInspectionAPIRequiresEnabledModules(t *testing
 		"inspection_no":            "QI-MODULE-READONLY",
 		"purchase_receipt_id":      float64(receipt.ID),
 		"purchase_receipt_item_id": float64(item.ID),
-		"inventory_lot_id":         float64(lotID),
-		"material_id":              float64(fixtures.materialID),
-		"warehouse_id":             float64(fixtures.warehouseID),
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -475,9 +632,6 @@ func createQualityDraftViaRPC(t *testing.T, ctx context.Context, j *jsonrpcDispa
 		"inspection_no":            inspectionNo,
 		"purchase_receipt_id":      float64(receiptID),
 		"purchase_receipt_item_id": float64(itemID),
-		"inventory_lot_id":         float64(lotID),
-		"material_id":              float64(fixtures.materialID),
-		"warehouse_id":             float64(fixtures.warehouseID),
 	}))
 	if err != nil {
 		t.Fatalf("create quality draft %s err=%v", inspectionNo, err)
@@ -486,6 +640,14 @@ func createQualityDraftViaRPC(t *testing.T, ctx context.Context, j *jsonrpcDispa
 		t.Fatalf("create quality draft %s got %#v", inspectionNo, res)
 	}
 	return jsonRPCInt(t, jsonRPCNestedMap(t, res, "quality_inspection"), "id")
+}
+
+func cloneQualityParams(in map[string]any) map[string]any {
+	out := make(map[string]any, len(in)+1)
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
 }
 
 func assertLotStatus(t *testing.T, ctx context.Context, client *ent.Client, lotID int, want string) {

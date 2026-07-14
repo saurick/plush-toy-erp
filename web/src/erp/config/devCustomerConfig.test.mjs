@@ -107,7 +107,7 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
   assert.equal(summary.sourceLabel, '客户菜单配置')
   assert.equal(summary.runtimeStatus, 'runtime_frontend_only')
   assert.equal(summary.sectionCount, 13)
-  assert.equal(summary.itemCount, 29)
+  assert.equal(summary.itemCount, 30)
   assert.deepEqual(
     summary.sections.map((section) => section.title),
     [
@@ -144,6 +144,13 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
     summary.sections.some(
       (section) =>
         section.title === '出货管理' && section.items.includes('shipments')
+    )
+  )
+  assert(
+    summary.sections.some(
+      (section) =>
+        section.title === '生产管理' &&
+        section.items.includes('production-orders')
     )
   )
   assert(!summary.sections.some((section) => section.title === '采购/仓储'))

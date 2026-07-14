@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productionordermaterialrequirement"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -250,6 +251,21 @@ func (_c *BOMHeaderCreate) AddItems(v ...*BOMItem) *BOMHeaderCreate {
 	return _c.AddItemIDs(ids...)
 }
 
+// AddProductionOrderMaterialRequirementIDs adds the "production_order_material_requirements" edge to the ProductionOrderMaterialRequirement entity by IDs.
+func (_c *BOMHeaderCreate) AddProductionOrderMaterialRequirementIDs(ids ...int) *BOMHeaderCreate {
+	_c.mutation.AddProductionOrderMaterialRequirementIDs(ids...)
+	return _c
+}
+
+// AddProductionOrderMaterialRequirements adds the "production_order_material_requirements" edges to the ProductionOrderMaterialRequirement entity.
+func (_c *BOMHeaderCreate) AddProductionOrderMaterialRequirements(v ...*ProductionOrderMaterialRequirement) *BOMHeaderCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddProductionOrderMaterialRequirementIDs(ids...)
+}
+
 // Mutation returns the BOMHeaderMutation object of the builder.
 func (_c *BOMHeaderCreate) Mutation() *BOMHeaderMutation {
 	return _c.mutation
@@ -486,6 +502,22 @@ func (_c *BOMHeaderCreate) createSpec() (*BOMHeader, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProductionOrderMaterialRequirementsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   bomheader.ProductionOrderMaterialRequirementsTable,
+			Columns: []string{bomheader.ProductionOrderMaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  MANUAL_ACCEPTANCE_FACT_APPLY_RETIRED_MESSAGE,
   applyManualAcceptanceFactPlan,
   buildManualAcceptanceFactPlan,
   parseManualAcceptanceFactArgs,
@@ -81,6 +82,12 @@ test("fact plan creates enough linked data for every fact list page", () => {
   assert.equal(plan.simulatedOnly, true);
   assert.equal(plan.realCustomerImport, false);
   assert.equal(plan.directSQL, false);
+  assert.equal(plan.applySupported, false);
+  assert.equal(
+    plan.applyRetiredReason,
+    MANUAL_ACCEPTANCE_FACT_APPLY_RETIRED_MESSAGE,
+  );
+  assert.deepEqual(plan.requiredApplyInputs, []);
   assert.equal(plan.operational.length, 45);
   assert.equal(plan.purchaseQuality.length, 9);
   assert.equal(plan.expectedMinimums.production, 45);
@@ -270,74 +277,45 @@ test("fact CLI parses explicit scale without enabling writes by default", () => 
   assert.equal(parsed.json, true);
 });
 
-test("fact apply requires exact confirmation before source verification or writes", async () => {
+test("fact apply is retired before reading plans, reports, credentials, or dependencies", async () => {
   const report = sourceReport();
-  const plan = buildManualAcceptanceFactPlan(report, { runId: "CONFIRM" });
-  const previous = process.env.MANUAL_ACCEPTANCE_FACT_CONFIRM;
-  delete process.env.MANUAL_ACCEPTANCE_FACT_CONFIRM;
-  try {
-    await assert.rejects(
-      () =>
-        applyManualAcceptanceFactPlan(plan, report, {
-          password: "local-demo-password",
-        }),
-      /apply requires MANUAL_ACCEPTANCE_FACT_CONFIRM/u,
-    );
-  } finally {
-    if (previous === undefined)
-      delete process.env.MANUAL_ACCEPTANCE_FACT_CONFIRM;
-    else process.env.MANUAL_ACCEPTANCE_FACT_CONFIRM = previous;
-  }
-});
-
-test("fact apply requires the separate source-verification admin credential before writes", async () => {
-  const report = sourceReport();
-  const plan = buildManualAcceptanceFactPlan(report, { runId: "ADMIN-CHECK" });
-  const previous = process.env.MANUAL_ACCEPTANCE_FACT_CONFIRM;
-  process.env.MANUAL_ACCEPTANCE_FACT_CONFIRM =
-    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_FACTS";
-  let fetchCalls = 0;
-  try {
-    await assert.rejects(
-      () =>
-        applyManualAcceptanceFactPlan(plan, report, {
-          password: "local-demo-password",
-          fetchImpl: async () => {
-            fetchCalls += 1;
-            throw new Error("fetch must not run without the admin credential");
+  const plan = buildManualAcceptanceFactPlan(report, { runId: "RETIRED" });
+  let dependencyCalls = 0;
+  await assert.rejects(
+    () =>
+      applyManualAcceptanceFactPlan(
+        new Proxy(plan, {
+          get() {
+            dependencyCalls += 1;
+            throw new Error("plan must not be read");
           },
         }),
-      /MANUAL_ACCEPTANCE_ADMIN_PASSWORD is required/u,
-    );
-    assert.equal(fetchCalls, 0);
-  } finally {
-    if (previous === undefined)
-      delete process.env.MANUAL_ACCEPTANCE_FACT_CONFIRM;
-    else process.env.MANUAL_ACCEPTANCE_FACT_CONFIRM = previous;
-  }
-});
-
-test("direct fact apply rejects external or mismatched backends before credentials are sent", async () => {
-  const report = sourceReport();
-  const localPlan = buildManualAcceptanceFactPlan(report, {
-    runId: "DIRECT-GUARD",
-  });
-  for (const [plan, source] of [
-    [{ ...localPlan, backendURL: "https://example.invalid" }, report],
-    [localPlan, { ...report, backendURL: "http://localhost:8300" }],
-  ]) {
-    let fetchCalls = 0;
-    await assert.rejects(
-      () =>
-        applyManualAcceptanceFactPlan(plan, source, {
-          password: "local-demo-password",
-          fetchImpl: async () => {
-            fetchCalls += 1;
-            throw new Error("fetch must not run before backend validation");
+        new Proxy(report, {
+          get() {
+            dependencyCalls += 1;
+            throw new Error("source report must not be read");
           },
         }),
-      /refuse external backend|source report backend does not match/u,
-    );
-    assert.equal(fetchCalls, 0);
-  }
+        {
+          fetchImpl: async () => {
+            dependencyCalls += 1;
+            throw new Error("network must not run");
+          },
+        },
+      ),
+    new RegExp(MANUAL_ACCEPTANCE_FACT_APPLY_RETIRED_MESSAGE, "u"),
+  );
+  assert.equal(dependencyCalls, 0);
+});
+
+test("fact CLI parser rejects apply before a source report can be read", () => {
+  assert.throws(
+    () =>
+      parseManualAcceptanceFactArgs([
+        "--apply",
+        "--source-report",
+        "/path/that/must/not/be/read.json",
+      ]),
+    new RegExp(MANUAL_ACCEPTANCE_FACT_APPLY_RETIRED_MESSAGE, "u"),
+  );
 });

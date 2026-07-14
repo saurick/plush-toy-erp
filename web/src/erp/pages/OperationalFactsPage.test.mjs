@@ -19,8 +19,100 @@ test('finance cancellation requires a bounded business reason and sends it to th
   assert.match(source, /canConfirmFinanceFact\(adminProfile/)
 })
 
+test('finance page derives projection, permission and settlement from the filtered fact type', () => {
+  assert.match(
+    source,
+    /const activeFinanceFactType = activeConfig\.listParams\?\.fact_type/u
+  )
+  assert.match(
+    source,
+    /buildOperationalFactColumns\(currentActiveKey, activeFinanceFactType\)/u
+  )
+  assert.match(source, /financeSettlementActionFor\(/u)
+  assert.match(source, /financeSettlementAction\.confirmTitle/u)
+  assert.match(source, /financeSettlementAction\.label/u)
+  assert.match(
+    source,
+    /currentActiveKey === 'finance'[\s\S]*runRowAction\(activeConfig, activeSelectedRow, 'post', '确认'\)/u
+  )
+  assert.doesNotMatch(source, /确认结清当前财务记录/u)
+  assert.doesNotMatch(source, /activeConfig\.initialValues/u)
+})
+
 test('post-success refresh failure is not reported as a failed cancellation', () => {
   assert.match(source, /已完成，请稍后刷新查看最新结果/)
   assert.match(source, /return false/)
   assert.match(source, /return true/)
+})
+
+test('production and outsourcing source links constrain the destination list', () => {
+  assert.match(
+    source,
+    /\['production', 'outsourcing'\]\.includes\(key\)[\s\S]*source_type: routeSourceType,[\s\S]*source_id: routeSourceID/u
+  )
+})
+
+test('unified fact page keeps outsourcing payable read-only without a quality projection', () => {
+  assert.match(source, /finance\.payable\.read/u)
+  assert.match(source, /finance\.reconciliation\.confirm/u)
+  assert.match(source, /isOutsourcingReturnPayableSource\(activeSelectedRow\)/u)
+  assert.match(source, /isSingleFactReconciliationSource\(activeSelectedRow\)/u)
+  assert.match(source, />\s*查看应付\s*</u)
+  assert.doesNotMatch(source, /createPayableFromOutsourcingReturn/u)
+  assert.doesNotMatch(source, /OUTSOURCING_RETURN_PAYABLE/u)
+  assert.doesNotMatch(source, />\s*生成应付\s*</u)
+})
+
+test('single reconciliation uses exact permission and retains unknown attempts', () => {
+  assert.match(source, /finance\.reconciliation\.confirm/u)
+  assert.match(source, /isSingleFactReconciliationSource\(activeSelectedRow\)/u)
+  assert.match(source, /createReconciliationFromFinanceFact/u)
+  assert.match(source, /financeSourceAttemptsRef\.current\.settle/u)
+  assert.match(source, /单笔核对/u)
+  assert.doesNotMatch(source, /SINGLE_FACT_RECONCILIATION[\s\S]{0,240}PAYMENT/u)
+})
+
+test('posted production completions expose an exact-permission rework action', () => {
+  assert.match(
+    source,
+    /hasActionPermission\([\s\S]{0,100}'production\.rework\.create'/u
+  )
+  assert.match(
+    source,
+    /currentActiveKey === 'production'[\s\S]{0,160}canCreateProductionRework/u
+  )
+  assert.match(
+    source,
+    /isProductionReworkEligible\(activeSelectedRow, activeRows\)/u
+  )
+  assert.match(source, />\s*发起返工\s*</u)
+  assert.doesNotMatch(source, /canCreateProductionRework\s*=\s*canPostActive/u)
+  assert.doesNotMatch(
+    source,
+    /canCreateProductionRework\s*=\s*canCancelActive/u
+  )
+})
+
+test('production rework uses a source-bound retry-safe command and rereads unknown results', () => {
+  assert.match(source, /buildProductionReworkPayload\(values, source, facts\)/u)
+  assert.match(
+    source,
+    /productionReworkAttemptsRef\.current\.prepare\(scope, payload\)/u
+  )
+  assert.match(
+    source,
+    /createProductionReworkFromCompletion\(attempt\.params\)/u
+  )
+  assert.match(source, /isSourceBusinessActionResultUnknown\(error\)/u)
+  assert.match(
+    source,
+    /source_type: 'PRODUCTION_FACT',[\s\S]{0,100}source_id: source\.id/u
+  )
+  assert.match(
+    source,
+    /findProductionReworkResult\(currentFacts, attempt\.params\)/u
+  )
+  assert.match(source, /已重新读取并确认返工草稿，请核对后过账/u)
+  assert.match(source, /setProductionReworkContext\(null\)/u)
+  assert.match(source, /<ProductionReworkModal/u)
 })

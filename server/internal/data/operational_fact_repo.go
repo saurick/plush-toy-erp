@@ -15,13 +15,18 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/financefact"
+	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingfact"
+	"server/internal/data/model/ent/outsourcingorder"
+	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
+	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productsku"
+	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/shipmentitem"
 	"server/internal/data/model/ent/stockreservation"
@@ -52,6 +57,34 @@ var _ biz.OperationalFactRepo = (*operationalFactRepo)(nil)
 var _ biz.ShipmentProcessCommandRepo = (*operationalFactRepo)(nil)
 var _ biz.FinanceReceivableLeadProcessCommandRepo = (*operationalFactRepo)(nil)
 var _ biz.OperationalFactCancellationActorRepo = (*operationalFactRepo)(nil)
+var _ biz.ProductionCompletionSourceRepo = (*operationalFactRepo)(nil)
+var _ biz.ProductionMaterialIssueFromOrderRepo = (*operationalFactRepo)(nil)
+var _ biz.ProductionReworkFromCompletionRepo = (*operationalFactRepo)(nil)
+var _ biz.FinanceFactFromShipmentRepo = (*operationalFactRepo)(nil)
+var _ biz.OutsourcingFactFromOrderRepo = (*operationalFactRepo)(nil)
+
+func (r *operationalFactRepo) ResolveProductionCompletionSource(ctx context.Context, productionOrderID, productionOrderItemID int) (*biz.ProductionOrderItem, error) {
+	if productionOrderID <= 0 || productionOrderItemID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	if _, err := r.data.postgres.ProductionOrder.Get(ctx, productionOrderID); err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductionOrderNotFound
+		}
+		return nil, err
+	}
+	item, err := r.data.postgres.ProductionOrderItem.Get(ctx, productionOrderItemID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductionOrderFactSourceInvalid
+		}
+		return nil, err
+	}
+	if item.ProductionOrderID != productionOrderID {
+		return nil, biz.ErrProductionOrderFactSourceInvalid
+	}
+	return entProductionOrderItemToBiz(item), nil
+}
 
 func (r *operationalFactRepo) CustomerIsActive(ctx context.Context, id int) (bool, error) {
 	row, err := r.data.postgres.Customer.Query().
@@ -152,7 +185,21 @@ func findProductionFactReplay(ctx context.Context, client *ent.Client, in *biz.O
 		}
 		return nil, false, err
 	}
-	if !operationalFactMutationMatchesProduction(row, in) {
+	comparison := *in
+	if in.NewLotNo != nil {
+		if row.LotID == nil {
+			return nil, true, biz.ErrIdempotencyConflict
+		}
+		lot, lotErr := client.InventoryLot.Get(ctx, *row.LotID)
+		if lotErr != nil {
+			return nil, true, lotErr
+		}
+		if lot.LotNo != *in.NewLotNo || lot.SubjectType != in.SubjectType || lot.SubjectID != in.SubjectID || !sameOptionalInt(lot.ProductSkuID, in.ProductSkuID) {
+			return nil, true, biz.ErrIdempotencyConflict
+		}
+		comparison.LotID = row.LotID
+	}
+	if !operationalFactMutationMatchesProduction(row, &comparison) {
 		return nil, true, biz.ErrIdempotencyConflict
 	}
 	return entProductionFactToBiz(row), true, nil
@@ -214,6 +261,44 @@ func operationalFactMutationMatchesOutsourcing(row *ent.OutsourcingFact, in *biz
 		sameOptionalString(row.Note, in.Note)
 }
 
+func findOutsourcingFactFromOrderIntent(ctx context.Context, client *ent.Client, factType string, in *biz.OutsourcingFactFromOrderCreate) (*ent.OutsourcingFact, bool, error) {
+	if client == nil || in == nil {
+		return nil, false, biz.ErrBadParam
+	}
+	row, err := client.OutsourcingFact.Query().Where(outsourcingfact.IdempotencyKey(in.IdempotencyKey)).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	if in.NewLotNo != nil {
+		if row.LotID == nil {
+			return nil, true, biz.ErrIdempotencyConflict
+		}
+		lot, lotErr := client.InventoryLot.Get(ctx, *row.LotID)
+		if lotErr != nil {
+			return nil, true, lotErr
+		}
+		if lot.LotNo != *in.NewLotNo {
+			return nil, true, biz.ErrIdempotencyConflict
+		}
+	}
+	if row.FactNo != in.FactNo ||
+		row.FactType != factType ||
+		row.SourceType == nil || *row.SourceType != biz.OutsourcingOrderSourceType ||
+		row.SourceID == nil || *row.SourceID != in.OutsourcingOrderID ||
+		row.SourceLineID == nil || *row.SourceLineID != in.OutsourcingOrderItemID ||
+		row.WarehouseID != in.WarehouseID ||
+		(in.NewLotNo == nil && !sameOptionalInt(row.LotID, in.LotID)) ||
+		row.Quantity.Cmp(in.Quantity) != 0 ||
+		!sameIdempotencyIntentTime(row.OccurredAtSpecified, row.OccurredAt, in.OccurredAtSpecified, in.OccurredAt) ||
+		!sameOptionalString(row.Note, in.Note) {
+		return nil, true, biz.ErrIdempotencyConflict
+	}
+	return row, true, nil
+}
+
 func findFinanceFactReplay(ctx context.Context, client *ent.Client, in *biz.FinanceFactCreate) (*biz.FinanceFact, bool, error) {
 	row, err := client.FinanceFact.Query().Where(financefact.IdempotencyKey(in.IdempotencyKey)).Only(ctx)
 	if err != nil {
@@ -223,6 +308,50 @@ func findFinanceFactReplay(ctx context.Context, client *ent.Client, in *biz.Fina
 		return nil, false, err
 	}
 	if !financeFactMatchesCreate(row, in) {
+		return nil, true, biz.ErrIdempotencyConflict
+	}
+	return entFinanceFactToBiz(row), true, nil
+}
+
+func findActiveFinanceFactBySource(ctx context.Context, client *ent.Client, in *biz.FinanceFactCreate) (*biz.FinanceFact, bool, error) {
+	if in == nil || in.SourceType == nil || in.SourceID == nil {
+		return nil, false, nil
+	}
+	row, err := client.FinanceFact.Query().Where(
+		financefact.FactType(in.FactType),
+		financefact.SourceType(*in.SourceType),
+		financefact.SourceID(*in.SourceID),
+		financefact.StatusNEQ(biz.OperationalFactStatusCancelled),
+	).First(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return entFinanceFactToBiz(row), true, nil
+}
+
+func findFinanceFactFromShipmentReplay(
+	ctx context.Context,
+	client *ent.Client,
+	factType string,
+	in *biz.FinanceFactFromShipmentCreate,
+) (*biz.FinanceFact, bool, error) {
+	row, err := client.FinanceFact.Query().Where(financefact.IdempotencyKey(in.IdempotencyKey)).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	if row.FactNo != in.FactNo || row.FactType != factType ||
+		row.CounterpartyType != biz.FinanceCounterpartyCustomer || row.CounterpartyID == nil ||
+		!row.Amount.GreaterThan(decimal.Zero) || !row.FeeAmount.IsZero() || row.Currency != biz.FinanceCurrencyCNY ||
+		row.SourceType == nil || *row.SourceType != biz.ShipmentSourceType || row.SourceID == nil || *row.SourceID != in.ShipmentID || row.SourceLineID != nil ||
+		!sameOptionalString(row.InvoiceCategory, in.InvoiceCategory) ||
+		!sameIdempotencyIntentTime(row.OccurredAtSpecified, row.OccurredAt, in.OccurredAtSpecified, in.OccurredAt) ||
+		!sameOptionalString(row.Note, in.Note) {
 		return nil, true, biz.ErrIdempotencyConflict
 	}
 	return entFinanceFactToBiz(row), true, nil
@@ -278,6 +407,348 @@ func (r *operationalFactRepo) CreateProductionFactDraft(ctx context.Context, in 
 	return row, err
 }
 
+func (r *operationalFactRepo) CreateProductionMaterialIssueFromOrder(
+	ctx context.Context,
+	in *biz.ProductionMaterialIssueFromOrderCreate,
+) (*biz.ProductionFact, error) {
+	if in == nil {
+		return nil, biz.ErrBadParam
+	}
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockOperationalFactRow(ctx, tx, "production_orders", in.ProductionOrderID, biz.ErrProductionOrderNotFound); err != nil {
+		return nil, err
+	}
+	orderRow, err := tx.client.ProductionOrder.Get(ctx, in.ProductionOrderID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductionOrderNotFound
+		}
+		return nil, err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "production_order_items", in.ProductionOrderItemID, biz.ErrProductionOrderFactSourceInvalid); err != nil {
+		return nil, err
+	}
+	orderItem, err := tx.client.ProductionOrderItem.Get(ctx, in.ProductionOrderItemID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductionOrderFactSourceInvalid
+		}
+		return nil, err
+	}
+	if orderItem.ProductionOrderID != orderRow.ID {
+		return nil, biz.ErrProductionOrderFactSourceInvalid
+	}
+	orderItems, err := tx.client.ProductionOrderItem.Query().
+		Where(productionorderitem.ProductionOrderID(orderRow.ID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	requirementRows, err := loadProductionOrderMaterialRequirements(ctx, tx.client, orderRow.ID)
+	if err != nil {
+		return nil, err
+	}
+	requirementsState, err := resolveProductionOrderMaterialRequirementsState(ctx, tx.client, orderItems, requirementRows)
+	if err != nil {
+		return nil, err
+	}
+	if requirementsState == biz.ProductionOrderMaterialRequirementsNeedsReview {
+		return nil, biz.ErrProductionOrderMaterialRequirementsNeedReview
+	}
+	if err := lockOperationalFactRow(ctx, tx, "production_order_material_requirements", in.ProductionOrderMaterialRequirementID, biz.ErrProductionOrderMaterialRequirementNotFound); err != nil {
+		return nil, err
+	}
+	requirement, err := tx.client.ProductionOrderMaterialRequirement.Get(ctx, in.ProductionOrderMaterialRequirementID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductionOrderMaterialRequirementNotFound
+		}
+		return nil, err
+	}
+	if requirement.ProductionOrderID != orderRow.ID || requirement.ProductionOrderItemID != orderItem.ID {
+		return nil, biz.ErrProductionOrderMaterialRequirementInvalid
+	}
+	sourceType := biz.ProductionOrderSourceType
+	sourceID := orderRow.ID
+	sourceLineID := requirement.ID
+	mutation := &biz.OperationalFactMutation{
+		FactNo:              in.FactNo,
+		FactType:            biz.ProductionFactMaterialIssue,
+		SubjectType:         biz.InventorySubjectMaterial,
+		SubjectID:           requirement.MaterialID,
+		WarehouseID:         in.WarehouseID,
+		UnitID:              requirement.UnitID,
+		LotID:               in.LotID,
+		Quantity:            in.Quantity,
+		SourceType:          &sourceType,
+		SourceID:            &sourceID,
+		SourceLineID:        &sourceLineID,
+		IdempotencyKey:      in.IdempotencyKey,
+		OccurredAt:          in.OccurredAt,
+		OccurredAtSpecified: in.OccurredAtSpecified,
+		Note:                in.Note,
+	}
+	if replay, found, replayErr := findProductionFactReplay(ctx, tx.client, mutation); replayErr != nil || found {
+		if replayErr != nil {
+			return nil, replayErr
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx.sqlTx = nil
+		return replay, nil
+	}
+	if orderRow.Status != biz.ProductionOrderStatusReleased {
+		return nil, biz.ErrProductionOrderInvalidState
+	}
+	if err := validateProductionOrderMaterialRequirementReferences(ctx, tx.client, requirement); err != nil {
+		return nil, err
+	}
+	if err := validateProductionOrderMaterialIssueQuantity(ctx, tx.client, requirement, in.Quantity); err != nil {
+		return nil, err
+	}
+	activeWarehouse, err := tx.client.Warehouse.Query().Where(warehouse.ID(in.WarehouseID), warehouse.IsActive(true)).Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !activeWarehouse {
+		return nil, biz.ErrWarehouseInactive
+	}
+	if in.LotID != nil {
+		if err := lockInventoryLot(ctx, tx, *in.LotID); err != nil {
+			return nil, err
+		}
+	}
+	inventoryIntent := &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectMaterial, SubjectID: requirement.MaterialID,
+		WarehouseID: in.WarehouseID, LotID: in.LotID, UnitID: requirement.UnitID,
+		TxnType: biz.InventoryTxnOut, Direction: -1, Quantity: in.Quantity,
+		SourceType: biz.ProductionFactSourceType, OccurredAt: in.OccurredAt,
+	}
+	if err := validateInventoryTxnReferences(ctx, tx.client, inventoryIntent); err != nil {
+		return nil, err
+	}
+	key := biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectMaterial, SubjectID: requirement.MaterialID,
+		WarehouseID: in.WarehouseID, LotID: in.LotID, UnitID: requirement.UnitID,
+	}
+	if err := lockInventoryBalanceRow(ctx, tx, key); err != nil {
+		return nil, err
+	}
+	balance, err := getInventoryBalance(ctx, tx.client.InventoryBalance.Query(), key)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrInventoryInsufficientStock
+		}
+		return nil, err
+	}
+	if balance.Quantity.LessThan(in.Quantity) {
+		return nil, biz.ErrInventoryInsufficientStock
+	}
+	created, err := createProductionFactDraftWithClient(ctx, tx.client, mutation)
+	if err != nil {
+		if ent.IsConstraintError(err) {
+			rollbackInventoryDBTx(ctx, tx, r.log)
+			tx = nil
+			if replay, found, replayErr := findProductionFactReplay(ctx, r.data.postgres, mutation); replayErr != nil || found {
+				return replay, replayErr
+			}
+		}
+		return nil, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx.sqlTx = nil
+	return created, nil
+}
+
+func (r *operationalFactRepo) CreateProductionReworkFromCompletion(
+	ctx context.Context,
+	in *biz.ProductionReworkFromCompletionCreate,
+) (*biz.ProductionFact, error) {
+	if in == nil {
+		return nil, biz.ErrBadParam
+	}
+	if replay, found, err := findProductionReworkIntent(ctx, r.data.postgres, in); err != nil || found {
+		return replay, err
+	}
+	sourcePreview, err := r.data.postgres.ProductionFact.Get(ctx, in.SourceCompletionFactID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductionReworkSourceInvalid
+		}
+		return nil, err
+	}
+	orderID, itemID, err := productionCompletionSourceCoordinates(sourcePreview)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockOperationalFactRow(ctx, tx, "production_orders", orderID, biz.ErrProductionOrderNotFound); err != nil {
+		return nil, err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "production_order_items", itemID, biz.ErrProductionOrderFactSourceInvalid); err != nil {
+		return nil, err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "production_facts", in.SourceCompletionFactID, biz.ErrProductionFactNotFound); err != nil {
+		return nil, err
+	}
+	if replay, found, replayErr := findProductionReworkIntent(ctx, tx.client, in); replayErr != nil || found {
+		if replayErr != nil {
+			return nil, replayErr
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return replay, nil
+	}
+	resolved, source, err := resolveProductionReworkMutation(ctx, tx.client, in, true)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateProductionReworkQuantity(ctx, tx.client, source, resolved.Quantity, 0); err != nil {
+		return nil, err
+	}
+	row, err := createProductionFactDraftWithClient(ctx, tx.client, resolved)
+	if err != nil {
+		if ent.IsConstraintError(err) {
+			rollbackInventoryDBTx(ctx, tx, r.log)
+			tx = nil
+			if replay, found, replayErr := findProductionReworkIntent(ctx, r.data.postgres, in); replayErr != nil || found {
+				return replay, replayErr
+			}
+		}
+		return nil, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return row, nil
+}
+
+func findProductionReworkIntent(ctx context.Context, client *ent.Client, in *biz.ProductionReworkFromCompletionCreate) (*biz.ProductionFact, bool, error) {
+	if client == nil || in == nil {
+		return nil, false, biz.ErrBadParam
+	}
+	row, err := client.ProductionFact.Query().Where(productionfact.IdempotencyKey(in.IdempotencyKey)).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	if row.FactNo != in.FactNo || row.FactType != biz.ProductionFactRework ||
+		row.SourceType == nil || *row.SourceType != biz.ProductionFactSourceType ||
+		row.SourceID == nil || *row.SourceID != in.SourceCompletionFactID ||
+		row.Quantity.Cmp(in.Quantity) != 0 ||
+		!sameIdempotencyIntentTime(row.OccurredAtSpecified, row.OccurredAt, in.OccurredAtSpecified, in.OccurredAt) ||
+		row.Note == nil || *row.Note != in.Reason {
+		return nil, true, biz.ErrIdempotencyConflict
+	}
+	return entProductionFactToBiz(row), true, nil
+}
+
+func resolveProductionReworkMutation(
+	ctx context.Context,
+	client *ent.Client,
+	in *biz.ProductionReworkFromCompletionCreate,
+	requirePosted bool,
+) (*biz.OperationalFactMutation, *ent.ProductionFact, error) {
+	if client == nil || in == nil {
+		return nil, nil, biz.ErrBadParam
+	}
+	source, err := client.ProductionFact.Get(ctx, in.SourceCompletionFactID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, nil, biz.ErrProductionReworkSourceInvalid
+		}
+		return nil, nil, err
+	}
+	_, itemID, err := productionCompletionSourceCoordinates(source)
+	if err != nil {
+		return nil, nil, err
+	}
+	if requirePosted && source.Status != biz.OperationalFactStatusPosted {
+		return nil, nil, biz.ErrProductionReworkSourceState
+	}
+	if source.LotID == nil || source.SubjectType != biz.InventorySubjectProduct || source.SubjectID <= 0 || source.WarehouseID <= 0 || source.UnitID <= 0 {
+		return nil, nil, biz.ErrProductionReworkSourceInvalid
+	}
+	sourceType := biz.ProductionFactSourceType
+	sourceID := source.ID
+	sourceLineID := itemID
+	reason := in.Reason
+	return &biz.OperationalFactMutation{
+		FactNo: in.FactNo, FactType: biz.ProductionFactRework,
+		SubjectType: source.SubjectType, SubjectID: source.SubjectID, ProductSkuID: source.ProductSkuID,
+		WarehouseID: source.WarehouseID, UnitID: source.UnitID, LotID: source.LotID,
+		Quantity: in.Quantity, SourceType: &sourceType, SourceID: &sourceID, SourceLineID: &sourceLineID,
+		IdempotencyKey: in.IdempotencyKey, OccurredAt: in.OccurredAt, OccurredAtSpecified: in.OccurredAtSpecified,
+		Note: &reason,
+	}, source, nil
+}
+
+func productionCompletionSourceCoordinates(row *ent.ProductionFact) (int, int, error) {
+	if row == nil || row.FactType != biz.ProductionFactFinishedGoodsReceipt ||
+		row.SourceType == nil || *row.SourceType != biz.ProductionOrderSourceType ||
+		row.SourceID == nil || *row.SourceID <= 0 || row.SourceLineID == nil || *row.SourceLineID <= 0 {
+		return 0, 0, biz.ErrProductionReworkSourceInvalid
+	}
+	return *row.SourceID, *row.SourceLineID, nil
+}
+
+func validateProductionReworkQuantity(ctx context.Context, client *ent.Client, source *ent.ProductionFact, additional decimal.Decimal, excludeID int) error {
+	if client == nil || source == nil || !additional.GreaterThan(decimal.Zero) {
+		return biz.ErrProductionReworkSourceInvalid
+	}
+	query := client.ProductionFact.Query().Where(
+		productionfact.FactType(biz.ProductionFactRework),
+		productionfact.SourceType(biz.ProductionFactSourceType),
+		productionfact.SourceID(source.ID),
+		productionfact.Status(biz.OperationalFactStatusPosted),
+	)
+	if excludeID > 0 {
+		query = query.Where(productionfact.IDNEQ(excludeID))
+	}
+	rows, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	total := additional
+	for _, row := range rows {
+		total = total.Add(row.Quantity)
+	}
+	if total.GreaterThan(source.Quantity) {
+		return biz.ErrProductionReworkQuantityExceeded
+	}
+	return nil
+}
+
+func (r *operationalFactRepo) ListProductionOrderMaterialRequirements(ctx context.Context, productionOrderID int) ([]*biz.ProductionOrderMaterialRequirement, error) {
+	if productionOrderID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	if _, err := r.data.postgres.ProductionOrder.Get(ctx, productionOrderID); err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductionOrderNotFound
+		}
+		return nil, err
+	}
+	return loadProductionOrderMaterialRequirements(ctx, r.data.postgres, productionOrderID)
+}
+
 func createProductionFactDraftWithClient(ctx context.Context, client *ent.Client, in *biz.OperationalFactMutation) (*biz.ProductionFact, error) {
 	row, err := client.ProductionFact.Create().
 		SetFactNo(in.FactNo).
@@ -310,6 +781,10 @@ func isProductionOrderLinkedFact(in *biz.OperationalFactMutation) bool {
 
 func isProductionOrderLinkedFactRow(row *ent.ProductionFact) bool {
 	return row != nil && row.SourceType != nil && *row.SourceType == biz.ProductionOrderSourceType
+}
+
+func isProductionReworkLinkedFactRow(row *ent.ProductionFact) bool {
+	return row != nil && row.FactType == biz.ProductionFactRework && row.SourceType != nil && *row.SourceType == biz.ProductionFactSourceType && row.SourceID != nil && *row.SourceID > 0
 }
 
 func productionOrderSourceID(in *biz.OperationalFactMutation) (int, error) {
@@ -372,6 +847,20 @@ func validateProductionOrderFinishedQuantity(ctx context.Context, client *ent.Cl
 	if item == nil || !additional.GreaterThan(decimal.Zero) {
 		return biz.ErrProductionOrderFactSourceInvalid
 	}
+	effective, err := productionOrderEffectiveCompletedQuantity(ctx, client, item)
+	if err != nil {
+		return err
+	}
+	if effective.Add(additional).GreaterThan(item.PlannedQuantity) {
+		return biz.ErrProductionOrderQuantityExceeded
+	}
+	return nil
+}
+
+func productionOrderEffectiveCompletedQuantity(ctx context.Context, client *ent.Client, item *ent.ProductionOrderItem) (decimal.Decimal, error) {
+	if client == nil || item == nil {
+		return decimal.Zero, biz.ErrProductionOrderFactSourceInvalid
+	}
 	rows, err := client.ProductionFact.Query().Where(
 		productionfact.SourceType(biz.ProductionOrderSourceType),
 		productionfact.SourceID(item.ProductionOrderID),
@@ -380,16 +869,157 @@ func validateProductionOrderFinishedQuantity(ctx context.Context, client *ent.Cl
 		productionfact.Status(biz.OperationalFactStatusPosted),
 	).All(ctx)
 	if err != nil {
-		return err
+		return decimal.Zero, err
 	}
 	effective := decimal.Zero
+	completionIDs := make([]int, 0, len(rows))
 	for _, row := range rows {
 		effective = effective.Add(row.Quantity)
+		completionIDs = append(completionIDs, row.ID)
 	}
-	if effective.Add(additional).GreaterThan(item.PlannedQuantity) {
-		return biz.ErrProductionOrderQuantityExceeded
+	if len(completionIDs) == 0 {
+		return effective, nil
+	}
+	reworks, err := client.ProductionFact.Query().Where(
+		productionfact.FactType(biz.ProductionFactRework),
+		productionfact.Status(biz.OperationalFactStatusPosted),
+		productionfact.SourceType(biz.ProductionFactSourceType),
+		productionfact.SourceIDIn(completionIDs...),
+	).All(ctx)
+	if err != nil {
+		return decimal.Zero, err
+	}
+	for _, row := range reworks {
+		if row.SourceLineID == nil || *row.SourceLineID != item.ID || row.SubjectType != biz.InventorySubjectProduct || row.UnitID != item.UnitID {
+			return decimal.Zero, biz.ErrProductionReworkSourceInvalid
+		}
+		effective = effective.Sub(row.Quantity)
+	}
+	if effective.IsNegative() {
+		return decimal.Zero, biz.ErrProductionReworkQuantityExceeded
+	}
+	return effective, nil
+}
+
+func validateProductionOrderMaterialRequirementReferences(ctx context.Context, client *ent.Client, requirement *ent.ProductionOrderMaterialRequirement) error {
+	if requirement == nil {
+		return biz.ErrProductionOrderMaterialRequirementInvalid
+	}
+	item, err := client.ProductionOrderItem.Get(ctx, requirement.ProductionOrderItemID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrProductionOrderMaterialRequirementInvalid
+		}
+		return err
+	}
+	if item.ProductionOrderID != requirement.ProductionOrderID || item.BomHeaderID == nil || *item.BomHeaderID != requirement.BomHeaderID {
+		return biz.ErrProductionOrderMaterialRequirementInvalid
+	}
+	bomRow, err := client.BOMItem.Get(ctx, requirement.BomItemID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrProductionOrderMaterialRequirementInvalid
+		}
+		return err
+	}
+	if bomRow.BomHeaderID != requirement.BomHeaderID || bomRow.MaterialID != requirement.MaterialID || bomRow.UnitID != requirement.UnitID {
+		return biz.ErrProductionOrderMaterialRequirementInvalid
 	}
 	return nil
+}
+
+func validateProductionOrderMaterialIssueQuantity(
+	ctx context.Context,
+	client *ent.Client,
+	requirement *ent.ProductionOrderMaterialRequirement,
+	additional decimal.Decimal,
+) error {
+	if requirement == nil || !additional.GreaterThan(decimal.Zero) {
+		return biz.ErrProductionOrderMaterialRequirementInvalid
+	}
+	rows, err := client.ProductionFact.Query().Where(
+		productionfact.SourceType(biz.ProductionOrderSourceType),
+		productionfact.SourceID(requirement.ProductionOrderID),
+		productionfact.SourceLineID(requirement.ID),
+		productionfact.FactType(biz.ProductionFactMaterialIssue),
+		productionfact.Status(biz.OperationalFactStatusPosted),
+	).All(ctx)
+	if err != nil {
+		return err
+	}
+	issued := decimal.Zero
+	for _, row := range rows {
+		if row.SubjectType != biz.InventorySubjectMaterial || row.SubjectID != requirement.MaterialID || row.ProductSkuID != nil || row.UnitID != requirement.UnitID {
+			return biz.ErrProductionOrderMaterialRequirementInvalid
+		}
+		issued = issued.Add(row.Quantity)
+	}
+	if issued.Add(additional).GreaterThan(requirement.PlannedQuantity) {
+		return biz.ErrProductionOrderMaterialIssueQuantityExceeded
+	}
+	return nil
+}
+
+func validateProductionOrderMaterialIssueFactRowSource(
+	ctx context.Context,
+	client *ent.Client,
+	row *ent.ProductionFact,
+	requireReleased bool,
+) (*ent.ProductionOrderMaterialRequirement, error) {
+	orderID, err := productionOrderSourceIDFromRow(row)
+	if err != nil {
+		return nil, err
+	}
+	if row.FactType != biz.ProductionFactMaterialIssue || row.SubjectType != biz.InventorySubjectMaterial || row.ProductSkuID != nil {
+		return nil, biz.ErrProductionOrderMaterialRequirementInvalid
+	}
+	orderRow, err := client.ProductionOrder.Get(ctx, orderID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductionOrderNotFound
+		}
+		return nil, err
+	}
+	if requireReleased && orderRow.Status != biz.ProductionOrderStatusReleased {
+		return nil, biz.ErrProductionOrderInvalidState
+	}
+	requirement, err := client.ProductionOrderMaterialRequirement.Get(ctx, *row.SourceLineID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductionOrderMaterialRequirementNotFound
+		}
+		return nil, err
+	}
+	if requirement.ProductionOrderID != orderID || requirement.MaterialID != row.SubjectID || requirement.UnitID != row.UnitID {
+		return nil, biz.ErrProductionOrderMaterialRequirementInvalid
+	}
+	if err := validateProductionOrderMaterialRequirementReferences(ctx, client, requirement); err != nil {
+		return nil, err
+	}
+	return requirement, nil
+}
+
+func lockProductionOrderMaterialIssueSource(ctx context.Context, tx *inventoryDBTx, row *ent.ProductionFact, orderID int) error {
+	if row == nil || row.FactType != biz.ProductionFactMaterialIssue {
+		return nil
+	}
+	if row.SourceLineID == nil || *row.SourceLineID <= 0 {
+		return biz.ErrProductionOrderMaterialRequirementInvalid
+	}
+	requirement, err := tx.client.ProductionOrderMaterialRequirement.Get(ctx, *row.SourceLineID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrProductionOrderMaterialRequirementNotFound
+		}
+		return err
+	}
+	if requirement.ProductionOrderID != orderID {
+		return biz.ErrProductionOrderMaterialRequirementInvalid
+	}
+	if err := lockOperationalFactRow(ctx, tx, "production_order_items", requirement.ProductionOrderItemID, biz.ErrProductionOrderFactSourceInvalid); err != nil {
+		return err
+	}
+	return lockOperationalFactRow(ctx, tx, "production_order_material_requirements", requirement.ID, biz.ErrProductionOrderMaterialRequirementNotFound)
 }
 
 func (r *operationalFactRepo) createProductionOrderLinkedFactDraft(ctx context.Context, in *biz.OperationalFactMutation) (*biz.ProductionFact, error) {
@@ -426,6 +1056,9 @@ func (r *operationalFactRepo) createProductionOrderLinkedFactDraft(ctx context.C
 		return replay, nil
 	}
 	if _, err := validateProductionOrderFactSource(ctx, tx.client, in, true); err != nil {
+		return nil, err
+	}
+	if err := resolveOrCreateSourceInboundLot(ctx, tx, in); err != nil {
 		return nil, err
 	}
 	if err := validateOperationalFactSKUAndLot(ctx, tx.client, in.SubjectType, in.SubjectID, in.ProductSkuID, in.LotID); err != nil {
@@ -517,21 +1150,299 @@ func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter bi
 	if err != nil {
 		return nil, 0, err
 	}
+	references := make([]businessSourceReference, 0, len(rows))
+	for _, row := range rows {
+		references = append(references, businessSourceReference{sourceType: row.SourceType, sourceID: row.SourceID})
+	}
+	sourceNos, err := resolveBusinessSourceNos(ctx, r.data.postgres, references)
+	if err != nil {
+		return nil, 0, err
+	}
 	out := make([]*biz.ProductionFact, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, entProductionFactToBiz(row))
+		item := entProductionFactToBiz(row)
+		item.SourceNo = businessSourceNo(sourceNos, row.SourceType, row.SourceID)
+		out = append(out, item)
 	}
 	return out, total, nil
 }
 
-func (r *operationalFactRepo) CreateOutsourcingFactDraft(ctx context.Context, in *biz.OperationalFactMutation) (*biz.OutsourcingFact, error) {
-	if err := validateOperationalFactSKUAndLot(ctx, r.data.postgres, in.SubjectType, in.SubjectID, in.ProductSkuID, in.LotID); err != nil {
+func (r *operationalFactRepo) CreateOutsourcingMaterialIssueFromOrder(ctx context.Context, in *biz.OutsourcingFactFromOrderCreate) (*biz.OutsourcingFact, error) {
+	return r.createOutsourcingFactFromOrder(ctx, biz.OutsourcingFactMaterialIssue, in)
+}
+
+func (r *operationalFactRepo) CreateOutsourcingReturnReceiptFromOrder(ctx context.Context, in *biz.OutsourcingFactFromOrderCreate) (*biz.OutsourcingFact, error) {
+	return r.createOutsourcingFactFromOrder(ctx, biz.OutsourcingFactReturnReceipt, in)
+}
+
+func (r *operationalFactRepo) createOutsourcingFactFromOrder(ctx context.Context, factType string, in *biz.OutsourcingFactFromOrderCreate) (*biz.OutsourcingFact, error) {
+	if in == nil {
+		return nil, biz.ErrBadParam
+	}
+	preview, found, err := findOutsourcingFactFromOrderIntent(ctx, r.data.postgres, factType, in)
+	if err != nil {
 		return nil, err
 	}
-	if replay, found, err := findOutsourcingFactReplay(ctx, r.data.postgres, in); err != nil || found {
-		return replay, err
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
 	}
-	row, err := r.data.postgres.OutsourcingFact.Create().
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockOperationalFactRow(ctx, tx, "outsourcing_orders", in.OutsourcingOrderID, biz.ErrOutsourcingOrderNotFound); err != nil {
+		return nil, err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "outsourcing_order_items", in.OutsourcingOrderItemID, biz.ErrOutsourcingOrderItemNotFound); err != nil {
+		return nil, err
+	}
+	resolved, item, err := resolveOutsourcingOrderFactMutation(ctx, tx.client, factType, in, !found)
+	if err != nil {
+		return nil, err
+	}
+	if found {
+		if in.NewLotNo != nil {
+			resolved.LotID = preview.LotID
+		}
+		if err := lockOperationalFactRow(ctx, tx, "outsourcing_facts", preview.ID, biz.ErrOutsourcingFactNotFound); err != nil {
+			return nil, err
+		}
+		current, err := tx.client.OutsourcingFact.Get(ctx, preview.ID)
+		if err != nil {
+			return nil, err
+		}
+		if !operationalFactMutationMatchesOutsourcing(current, resolved) {
+			return nil, biz.ErrIdempotencyConflict
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return entOutsourcingFactToBiz(current), nil
+	}
+	if raced, racedFound, replayErr := findOutsourcingFactFromOrderIntent(ctx, tx.client, factType, in); replayErr != nil || racedFound {
+		if replayErr != nil {
+			return nil, replayErr
+		}
+		if in.NewLotNo != nil {
+			resolved.LotID = raced.LotID
+		}
+		if err := lockOperationalFactRow(ctx, tx, "outsourcing_facts", raced.ID, biz.ErrOutsourcingFactNotFound); err != nil {
+			return nil, err
+		}
+		current, err := tx.client.OutsourcingFact.Get(ctx, raced.ID)
+		if err != nil {
+			return nil, err
+		}
+		if !operationalFactMutationMatchesOutsourcing(current, resolved) {
+			return nil, biz.ErrIdempotencyConflict
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return entOutsourcingFactToBiz(current), nil
+	}
+	if err := validateOutsourcingOrderFactQuantity(ctx, tx.client, item, factType, resolved.Quantity); err != nil {
+		return nil, err
+	}
+	if err := resolveOrCreateSourceInboundLot(ctx, tx, resolved); err != nil {
+		return nil, err
+	}
+	if err := validateOperationalFactSKUAndLot(ctx, tx.client, resolved.SubjectType, resolved.SubjectID, resolved.ProductSkuID, resolved.LotID); err != nil {
+		return nil, err
+	}
+	row, err := createOutsourcingFactDraftWithClient(ctx, tx.client, resolved)
+	if err != nil {
+		if ent.IsConstraintError(err) {
+			rollbackInventoryDBTx(ctx, tx, r.log)
+			tx = nil
+			if replay, replayFound, replayErr := findOutsourcingFactFromOrderIntent(ctx, r.data.postgres, factType, in); replayErr != nil || replayFound {
+				if replayErr != nil {
+					return nil, replayErr
+				}
+				if !operationalFactMutationMatchesOutsourcing(replay, resolved) {
+					return nil, biz.ErrIdempotencyConflict
+				}
+				return entOutsourcingFactToBiz(replay), nil
+			}
+		}
+		return nil, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return entOutsourcingFactToBiz(row), nil
+}
+
+func resolveOutsourcingOrderFactMutation(ctx context.Context, client *ent.Client, factType string, in *biz.OutsourcingFactFromOrderCreate, requireActive bool) (*biz.OperationalFactMutation, *ent.OutsourcingOrderItem, error) {
+	if client == nil || in == nil {
+		return nil, nil, biz.ErrBadParam
+	}
+	order, err := client.OutsourcingOrder.Query().Where(outsourcingorder.ID(in.OutsourcingOrderID)).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, nil, biz.ErrOutsourcingOrderNotFound
+		}
+		return nil, nil, err
+	}
+	item, err := client.OutsourcingOrderItem.Query().Where(outsourcingorderitem.ID(in.OutsourcingOrderItemID)).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, nil, biz.ErrOutsourcingOrderItemNotFound
+		}
+		return nil, nil, err
+	}
+	if item.OutsourcingOrderID != order.ID {
+		return nil, nil, biz.ErrOutsourcingOrderFactSourceInvalid
+	}
+	if requireActive && (order.LifecycleStatus != biz.OutsourcingOrderStatusConfirmed || item.LineStatus != biz.OutsourcingOrderItemStatusOpen) {
+		return nil, nil, biz.ErrOutsourcingOrderFactInvalidState
+	}
+
+	var subjectID int
+	switch factType {
+	case biz.OutsourcingFactMaterialIssue:
+		if item.SubjectType != biz.OutsourcingOrderSubjectMaterial || item.MaterialID == nil || item.ProductID != nil {
+			return nil, nil, biz.ErrOutsourcingOrderFactSourceInvalid
+		}
+		subjectID = *item.MaterialID
+	case biz.OutsourcingFactReturnReceipt:
+		if item.SubjectType != biz.OutsourcingOrderSubjectProduct || item.ProductID == nil || item.MaterialID != nil {
+			return nil, nil, biz.ErrOutsourcingOrderFactSourceInvalid
+		}
+		subjectID = *item.ProductID
+	default:
+		return nil, nil, biz.ErrBadParam
+	}
+	if subjectID <= 0 || order.SupplierID <= 0 || item.UnitID <= 0 {
+		return nil, nil, biz.ErrOutsourcingOrderFactSourceInvalid
+	}
+	if requireActive {
+		if err := validateOutsourcingOrderFactActiveReferences(ctx, client, factType, subjectID, item.ProductSkuID, order.SupplierID, item.UnitID, in.WarehouseID); err != nil {
+			return nil, nil, err
+		}
+	}
+	sourceType := biz.OutsourcingOrderSourceType
+	sourceID := order.ID
+	sourceLineID := item.ID
+	supplierID := order.SupplierID
+	var supplierName *string
+	if name := strings.TrimSpace(supplierNameFromSnapshot(order.SupplierSnapshot)); name != "" {
+		supplierName = &name
+	}
+	subjectType := item.SubjectType
+	return &biz.OperationalFactMutation{
+		FactNo:              in.FactNo,
+		FactType:            factType,
+		SubjectType:         subjectType,
+		SubjectID:           subjectID,
+		ProductSkuID:        item.ProductSkuID,
+		WarehouseID:         in.WarehouseID,
+		UnitID:              item.UnitID,
+		LotID:               in.LotID,
+		NewLotNo:            in.NewLotNo,
+		Quantity:            in.Quantity,
+		SupplierID:          &supplierID,
+		SupplierName:        supplierName,
+		SourceType:          &sourceType,
+		SourceID:            &sourceID,
+		SourceLineID:        &sourceLineID,
+		IdempotencyKey:      in.IdempotencyKey,
+		OccurredAt:          in.OccurredAt,
+		OccurredAtSpecified: in.OccurredAtSpecified,
+		Note:                in.Note,
+	}, item, nil
+}
+
+func validateOutsourcingOrderFactActiveReferences(ctx context.Context, client *ent.Client, factType string, subjectID int, productSkuID *int, supplierID, unitID, warehouseID int) error {
+	active, err := client.Supplier.Query().Where(supplier.ID(supplierID), supplier.IsActive(true)).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if !active {
+		return biz.ErrSupplierInactive
+	}
+	active, err = client.Unit.Query().Where(unit.ID(unitID), unit.IsActive(true)).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if !active {
+		return biz.ErrUnitInactive
+	}
+	active, err = client.Warehouse.Query().Where(warehouse.ID(warehouseID), warehouse.IsActive(true)).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if !active {
+		return biz.ErrWarehouseInactive
+	}
+	switch factType {
+	case biz.OutsourcingFactMaterialIssue:
+		if productSkuID != nil {
+			return biz.ErrOutsourcingOrderFactSourceInvalid
+		}
+		active, err = client.Material.Query().Where(material.ID(subjectID), material.IsActive(true)).Exist(ctx)
+		if err != nil {
+			return err
+		}
+		if !active {
+			return biz.ErrMaterialInactive
+		}
+	case biz.OutsourcingFactReturnReceipt:
+		active, err = client.Product.Query().Where(product.ID(subjectID), product.IsActive(true)).Exist(ctx)
+		if err != nil {
+			return err
+		}
+		if !active {
+			return biz.ErrProductInactive
+		}
+		if productSkuID != nil {
+			skuRow, skuErr := client.ProductSKU.Query().Where(productsku.ID(*productSkuID)).Only(ctx)
+			if skuErr != nil {
+				if ent.IsNotFound(skuErr) {
+					return biz.ErrProductSKUNotFound
+				}
+				return skuErr
+			}
+			if !skuRow.IsActive {
+				return biz.ErrProductSKUInactive
+			}
+			if skuRow.ProductID != subjectID || skuRow.DefaultUnitID == nil || *skuRow.DefaultUnitID != unitID {
+				return biz.ErrOutsourcingOrderFactSourceInvalid
+			}
+		}
+	default:
+		return biz.ErrBadParam
+	}
+	return nil
+}
+
+func validateOutsourcingOrderFactQuantity(ctx context.Context, client *ent.Client, item *ent.OutsourcingOrderItem, factType string, additional decimal.Decimal) error {
+	if client == nil || item == nil || !additional.GreaterThan(decimal.Zero) {
+		return biz.ErrOutsourcingOrderFactSourceInvalid
+	}
+	rows, err := client.OutsourcingFact.Query().Where(
+		outsourcingfact.SourceType(biz.OutsourcingOrderSourceType),
+		outsourcingfact.SourceID(item.OutsourcingOrderID),
+		outsourcingfact.SourceLineID(item.ID),
+		outsourcingfact.FactType(factType),
+		outsourcingfact.Status(biz.OperationalFactStatusPosted),
+	).All(ctx)
+	if err != nil {
+		return err
+	}
+	effective := decimal.Zero
+	for _, row := range rows {
+		effective = effective.Add(row.Quantity)
+	}
+	if effective.Add(additional).GreaterThan(item.OutsourcingQuantity) {
+		return biz.ErrOutsourcingOrderFactQuantityExceeded
+	}
+	return nil
+}
+
+func createOutsourcingFactDraftWithClient(ctx context.Context, client *ent.Client, in *biz.OperationalFactMutation) (*ent.OutsourcingFact, error) {
+	return client.OutsourcingFact.Create().
 		SetFactNo(in.FactNo).
 		SetFactType(in.FactType).
 		SetStatus(biz.OperationalFactStatusDraft).
@@ -552,6 +1463,16 @@ func (r *operationalFactRepo) CreateOutsourcingFactDraft(ctx context.Context, in
 		SetOccurredAtSpecified(in.OccurredAtSpecified).
 		SetNillableNote(in.Note).
 		Save(ctx)
+}
+
+func (r *operationalFactRepo) CreateOutsourcingFactDraft(ctx context.Context, in *biz.OperationalFactMutation) (*biz.OutsourcingFact, error) {
+	if err := validateOperationalFactSKUAndLot(ctx, r.data.postgres, in.SubjectType, in.SubjectID, in.ProductSkuID, in.LotID); err != nil {
+		return nil, err
+	}
+	if replay, found, err := findOutsourcingFactReplay(ctx, r.data.postgres, in); err != nil || found {
+		return replay, err
+	}
+	row, err := createOutsourcingFactDraftWithClient(ctx, r.data.postgres, in)
 	if err != nil {
 		if ent.IsConstraintError(err) {
 			if replay, found, replayErr := findOutsourcingFactReplay(ctx, r.data.postgres, in); replayErr != nil || found {
@@ -636,9 +1557,19 @@ func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter b
 	if err != nil {
 		return nil, 0, err
 	}
+	references := make([]businessSourceReference, 0, len(rows))
+	for _, row := range rows {
+		references = append(references, businessSourceReference{sourceType: row.SourceType, sourceID: row.SourceID})
+	}
+	sourceNos, err := resolveBusinessSourceNos(ctx, r.data.postgres, references)
+	if err != nil {
+		return nil, 0, err
+	}
 	out := make([]*biz.OutsourcingFact, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, entOutsourcingFactToBiz(row))
+		item := entOutsourcingFactToBiz(row)
+		item.SourceNo = businessSourceNo(sourceNos, row.SourceType, row.SourceID)
+		out = append(out, item)
 	}
 	return out, total, nil
 }
@@ -678,15 +1609,19 @@ func (r *operationalFactRepo) CreateShipmentDraftWithItems(ctx context.Context, 
 		return nil, err
 	}
 	for _, item := range in.Items {
-		if _, err := createShipmentItem(ctx, tx.client, row.ID, item); err != nil {
+		if _, err := createShipmentItem(ctx, tx.client, row.ID, in.Shipment.SalesOrderID, item); err != nil {
 			return nil, err
 		}
 	}
 	return commitShipment(ctx, tx, row)
 }
 
-func createShipmentItem(ctx context.Context, client *ent.Client, shipmentID int, in *biz.ShipmentItemCreate) (*ent.ShipmentItem, error) {
+func createShipmentItem(ctx context.Context, client *ent.Client, shipmentID int, salesOrderID *int, in *biz.ShipmentItemCreate) (*ent.ShipmentItem, error) {
 	if err := validateOperationalFactSKUAndLot(ctx, client, biz.InventorySubjectProduct, in.ProductID, in.ProductSkuID, in.LotID); err != nil {
+		return nil, err
+	}
+	unitPriceSnapshot, amountSnapshot, currencySnapshot, err := shipmentItemFinanceSnapshots(ctx, client, salesOrderID, in)
+	if err != nil {
 		return nil, err
 	}
 	return client.ShipmentItem.Create().
@@ -698,8 +1633,66 @@ func createShipmentItem(ctx context.Context, client *ent.Client, shipmentID int,
 		SetUnitID(in.UnitID).
 		SetNillableLotID(in.LotID).
 		SetQuantity(in.Quantity).
+		SetNillableUnitPriceSnapshot(unitPriceSnapshot).
+		SetNillableAmountSnapshot(amountSnapshot).
+		SetNillableCurrencySnapshot(currencySnapshot).
 		SetNillableNote(in.Note).
 		Save(ctx)
+}
+
+func shipmentItemFinanceSnapshots(
+	ctx context.Context,
+	client *ent.Client,
+	salesOrderID *int,
+	in *biz.ShipmentItemCreate,
+) (*decimal.Decimal, *decimal.Decimal, *string, error) {
+	if in == nil || in.SalesOrderItemID == nil {
+		return nil, nil, nil, nil
+	}
+	if salesOrderID == nil || *salesOrderID <= 0 {
+		return nil, nil, nil, biz.ErrShipmentSourceMismatch
+	}
+	item, err := client.SalesOrderItem.Get(ctx, *in.SalesOrderItemID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, nil, nil, biz.ErrShipmentSourceMismatch
+		}
+		return nil, nil, nil, err
+	}
+	if item.SalesOrderID != *salesOrderID || item.ProductID != in.ProductID ||
+		!sameOptionalInt(item.ProductSkuID, in.ProductSkuID) || item.UnitID != in.UnitID ||
+		!item.OrderedQuantity.GreaterThan(decimal.Zero) {
+		return nil, nil, nil, biz.ErrShipmentSourceMismatch
+	}
+	return shipmentFinanceSnapshotsFromSalesOrderItem(item, in.Quantity)
+}
+
+func shipmentFinanceSnapshotsFromSalesOrderItem(
+	item *ent.SalesOrderItem,
+	quantity decimal.Decimal,
+) (*decimal.Decimal, *decimal.Decimal, *string, error) {
+	if item == nil || !item.OrderedQuantity.GreaterThan(decimal.Zero) || !quantity.GreaterThan(decimal.Zero) {
+		return nil, nil, nil, biz.ErrShipmentSourceMismatch
+	}
+	var unitPriceSnapshot *decimal.Decimal
+	if item.UnitPrice != nil {
+		value := item.UnitPrice.Round(6)
+		unitPriceSnapshot = &value
+	} else if item.Amount != nil {
+		value := item.Amount.Div(item.OrderedQuantity).Round(6)
+		unitPriceSnapshot = &value
+	}
+
+	var amountSnapshot *decimal.Decimal
+	if item.Amount != nil {
+		value := item.Amount.Mul(quantity).Div(item.OrderedQuantity).Round(6)
+		amountSnapshot = &value
+	} else if item.UnitPrice != nil {
+		value := item.UnitPrice.Mul(quantity).Round(6)
+		amountSnapshot = &value
+	}
+	currency := biz.FinanceCurrencyCNY
+	return unitPriceSnapshot, amountSnapshot, &currency, nil
 }
 
 func validateOperationalFactSKUAndLot(ctx context.Context, client *ent.Client, subjectType string, subjectID int, productSkuID, lotID *int) error {
@@ -719,6 +1712,76 @@ func validateOperationalFactSKUAndLot(ctx context.Context, client *ent.Client, s
 	if lot.SubjectType != subjectType || lot.SubjectID != subjectID || !sameOptionalInt(lot.ProductSkuID, productSkuID) {
 		return biz.ErrBadParam
 	}
+	return nil
+}
+
+// resolveOrCreateSourceInboundLot owns the only user-entered batch attribute
+// of a source-driven inbound command. The subject and optional SKU come from
+// the locked source document, so a caller cannot create a batch for another
+// product/material. Existing exact batches are reused; a new batch is created
+// in the same transaction as the draft fact.
+func resolveOrCreateSourceInboundLot(ctx context.Context, tx *inventoryDBTx, in *biz.OperationalFactMutation) error {
+	if tx == nil || tx.client == nil || in == nil {
+		return biz.ErrBadParam
+	}
+	if in.NewLotNo == nil {
+		return nil
+	}
+	if in.LotID != nil || strings.TrimSpace(*in.NewLotNo) == "" {
+		return biz.ErrBadParam
+	}
+	if in.FactType != biz.ProductionFactFinishedGoodsReceipt && in.FactType != biz.OutsourcingFactReturnReceipt {
+		return biz.ErrBadParam
+	}
+
+	switch in.SubjectType {
+	case biz.InventorySubjectProduct:
+		if err := lockOperationalFactRow(ctx, tx, "products", in.SubjectID, biz.ErrProductNotFound); err != nil {
+			return err
+		}
+	case biz.InventorySubjectMaterial:
+		if err := lockOperationalFactRow(ctx, tx, "materials", in.SubjectID, biz.ErrMaterialNotFound); err != nil {
+			return err
+		}
+	default:
+		return biz.ErrBadParam
+	}
+
+	lotNo := strings.TrimSpace(*in.NewLotNo)
+	lot, err := tx.client.InventoryLot.Query().Where(
+		inventorylot.SubjectType(in.SubjectType),
+		inventorylot.SubjectID(in.SubjectID),
+		inventorylot.LotNo(lotNo),
+	).Only(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return err
+	}
+	if ent.IsNotFound(err) {
+		builder := tx.client.InventoryLot.Create().
+			SetSubjectType(in.SubjectType).
+			SetSubjectID(in.SubjectID).
+			SetNillableProductSkuID(in.ProductSkuID).
+			SetLotNo(lotNo).
+			SetStatus(biz.InventoryLotActive).
+			SetReceivedAt(in.OccurredAt)
+		if in.FactType == biz.ProductionFactFinishedGoodsReceipt {
+			builder.SetProductionLotNo(lotNo)
+		} else {
+			builder.SetSupplierLotNo(lotNo)
+		}
+		lot, err = builder.Save(ctx)
+		if err != nil {
+			return err
+		}
+	}
+	if lot.SubjectType != in.SubjectType || lot.SubjectID != in.SubjectID || !sameOptionalInt(lot.ProductSkuID, in.ProductSkuID) {
+		return biz.ErrBadParam
+	}
+	if lot.Status != biz.InventoryLotActive {
+		return biz.ErrInventoryLotStatusBlocked
+	}
+	lotID := lot.ID
+	in.LotID = &lotID
 	return nil
 }
 
@@ -940,6 +2003,65 @@ func applyShipmentDateRange(query *ent.ShipmentQuery, filter biz.OperationalFact
 	return query
 }
 
+func (r *operationalFactRepo) CreateStockReservationFromSalesOrder(ctx context.Context, in *biz.StockReservationFromSalesOrderCreate) (*biz.StockReservation, error) {
+	if in == nil {
+		return nil, biz.ErrBadParam
+	}
+	if replay, found, err := findStockReservationFromSalesOrderReplay(ctx, r.data.postgres, in); err != nil || found {
+		return replay, err
+	}
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+
+	resolved, err := lockAndResolveStockReservationSalesOrderSource(ctx, tx, in)
+	if err != nil {
+		return nil, err
+	}
+	if replay, found, err := findStockReservationFromSalesOrderReplay(ctx, tx.client, in); err != nil || found {
+		if err != nil {
+			return nil, err
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return replay, nil
+	}
+	if err := validateOperationalFactSKUAndLot(ctx, tx.client, biz.InventorySubjectProduct, resolved.ProductID, resolved.ProductSkuID, resolved.LotID); err != nil {
+		return nil, err
+	}
+	if err := validateStockReservationSourceQuantity(ctx, tx.client, resolved); err != nil {
+		return nil, err
+	}
+	if err := lockInventoryBalanceForReservation(ctx, tx, resolved); err != nil {
+		return nil, err
+	}
+	if err := ensureStockAvailableForReservation(ctx, tx.client, resolved); err != nil {
+		return nil, err
+	}
+	row, err := createStockReservationRow(ctx, tx.client, resolved)
+	if err != nil {
+		if ent.IsConstraintError(err) {
+			if rollbackErr := tx.sqlTx.Rollback(); rollbackErr != nil {
+				r.log.WithContext(ctx).Warnf("rollback sourced reservation idempotency conflict failed err=%v", rollbackErr)
+			}
+			tx = nil
+			if replay, found, replayErr := findStockReservationFromSalesOrderReplay(ctx, r.data.postgres, in); replayErr != nil || found {
+				return replay, replayErr
+			}
+		}
+		return nil, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return entStockReservationToBiz(row), nil
+}
+
 func (r *operationalFactRepo) CreateStockReservation(ctx context.Context, in *biz.StockReservationCreate) (*biz.StockReservation, error) {
 	if err := validateOperationalFactSKUAndLot(ctx, r.data.postgres, biz.InventorySubjectProduct, in.ProductID, in.ProductSkuID, in.LotID); err != nil {
 		return nil, err
@@ -984,22 +2106,7 @@ func (r *operationalFactRepo) CreateStockReservation(ctx context.Context, in *bi
 	if err := ensureStockAvailableForReservation(ctx, tx.client, in); err != nil {
 		return nil, err
 	}
-	row, err := tx.client.StockReservation.Create().
-		SetReservationNo(in.ReservationNo).
-		SetStatus(biz.StockReservationStatusActive).
-		SetNillableSalesOrderID(in.SalesOrderID).
-		SetNillableSalesOrderItemID(in.SalesOrderItemID).
-		SetProductID(in.ProductID).
-		SetNillableProductSkuID(in.ProductSkuID).
-		SetWarehouseID(in.WarehouseID).
-		SetUnitID(in.UnitID).
-		SetNillableLotID(in.LotID).
-		SetQuantity(in.Quantity).
-		SetIdempotencyKey(in.IdempotencyKey).
-		SetReservedAt(in.ReservedAt).
-		SetReservedAtSpecified(in.ReservedAtSpecified).
-		SetNillableNote(in.Note).
-		Save(ctx)
+	row, err := createStockReservationRow(ctx, tx.client, in)
 	if err != nil {
 		if ent.IsConstraintError(err) {
 			if rollbackErr := tx.sqlTx.Rollback(); rollbackErr != nil {
@@ -1051,6 +2158,59 @@ func stockReservationMatchesCreate(row *ent.StockReservation, in *biz.StockReser
 		row.IdempotencyKey == in.IdempotencyKey &&
 		sameIdempotencyIntentTime(row.ReservedAtSpecified, row.ReservedAt, in.ReservedAtSpecified, in.ReservedAt) &&
 		sameOptionalString(row.Note, in.Note)
+}
+
+func findStockReservationFromSalesOrderReplay(ctx context.Context, client *ent.Client, in *biz.StockReservationFromSalesOrderCreate) (*biz.StockReservation, bool, error) {
+	if client == nil || in == nil {
+		return nil, false, biz.ErrBadParam
+	}
+	row, err := client.StockReservation.Query().
+		Where(stockreservation.IdempotencyKey(in.IdempotencyKey)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	if !stockReservationMatchesFromSalesOrderCreate(row, in) {
+		return nil, true, biz.ErrIdempotencyConflict
+	}
+	return entStockReservationToBiz(row), true, nil
+}
+
+func stockReservationMatchesFromSalesOrderCreate(row *ent.StockReservation, in *biz.StockReservationFromSalesOrderCreate) bool {
+	if row == nil || in == nil || row.SalesOrderID == nil || row.SalesOrderItemID == nil {
+		return false
+	}
+	return row.ReservationNo == in.ReservationNo &&
+		*row.SalesOrderID == in.SalesOrderID &&
+		*row.SalesOrderItemID == in.SalesOrderItemID &&
+		row.WarehouseID == in.WarehouseID &&
+		sameOptionalInt(row.LotID, in.LotID) &&
+		row.Quantity.Cmp(in.Quantity) == 0 &&
+		row.IdempotencyKey == in.IdempotencyKey &&
+		sameIdempotencyIntentTime(row.ReservedAtSpecified, row.ReservedAt, in.ReservedAtSpecified, in.ReservedAt) &&
+		sameOptionalString(row.Note, in.Note)
+}
+
+func createStockReservationRow(ctx context.Context, client *ent.Client, in *biz.StockReservationCreate) (*ent.StockReservation, error) {
+	return client.StockReservation.Create().
+		SetReservationNo(in.ReservationNo).
+		SetStatus(biz.StockReservationStatusActive).
+		SetNillableSalesOrderID(in.SalesOrderID).
+		SetNillableSalesOrderItemID(in.SalesOrderItemID).
+		SetProductID(in.ProductID).
+		SetNillableProductSkuID(in.ProductSkuID).
+		SetWarehouseID(in.WarehouseID).
+		SetUnitID(in.UnitID).
+		SetNillableLotID(in.LotID).
+		SetQuantity(in.Quantity).
+		SetIdempotencyKey(in.IdempotencyKey).
+		SetReservedAt(in.ReservedAt).
+		SetReservedAtSpecified(in.ReservedAtSpecified).
+		SetNillableNote(in.Note).
+		Save(ctx)
 }
 
 func lockInventoryBalanceForReservation(ctx context.Context, tx *inventoryDBTx, in *biz.StockReservationCreate) error {
@@ -1105,6 +2265,55 @@ func lockAndValidateStockReservationSource(ctx context.Context, tx *inventoryDBT
 		return biz.ErrStockReservationSourceMismatch
 	}
 	return nil
+}
+
+func lockAndResolveStockReservationSalesOrderSource(ctx context.Context, tx *inventoryDBTx, in *biz.StockReservationFromSalesOrderCreate) (*biz.StockReservationCreate, error) {
+	if tx == nil || in == nil || in.SalesOrderID <= 0 || in.SalesOrderItemID <= 0 {
+		return nil, biz.ErrStockReservationSourceMismatch
+	}
+	if err := lockOperationalFactRow(ctx, tx, "sales_orders", in.SalesOrderID, biz.ErrStockReservationSourceMismatch); err != nil {
+		return nil, err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "sales_order_items", in.SalesOrderItemID, biz.ErrStockReservationSourceMismatch); err != nil {
+		return nil, err
+	}
+	order, err := tx.client.SalesOrder.Get(ctx, in.SalesOrderID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrStockReservationSourceMismatch
+		}
+		return nil, err
+	}
+	if order.LifecycleStatus != biz.SalesOrderStatusActive {
+		return nil, biz.ErrShipmentOrderNotActive
+	}
+	item, err := tx.client.SalesOrderItem.Get(ctx, in.SalesOrderItemID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrStockReservationSourceMismatch
+		}
+		return nil, err
+	}
+	if item.SalesOrderID != order.ID || item.LineStatus != biz.SalesOrderItemStatusOpen {
+		return nil, biz.ErrStockReservationSourceMismatch
+	}
+	orderID := order.ID
+	itemID := item.ID
+	return &biz.StockReservationCreate{
+		ReservationNo:       in.ReservationNo,
+		SalesOrderID:        &orderID,
+		SalesOrderItemID:    &itemID,
+		ProductID:           item.ProductID,
+		ProductSkuID:        item.ProductSkuID,
+		WarehouseID:         in.WarehouseID,
+		UnitID:              item.UnitID,
+		LotID:               in.LotID,
+		Quantity:            in.Quantity,
+		IdempotencyKey:      in.IdempotencyKey,
+		ReservedAt:          in.ReservedAt,
+		ReservedAtSpecified: in.ReservedAtSpecified,
+		Note:                in.Note,
+	}, nil
 }
 
 func validateStockReservationSourceQuantity(ctx context.Context, client *ent.Client, in *biz.StockReservationCreate) error {
@@ -1213,6 +2422,11 @@ func (r *operationalFactRepo) CreateFinanceFactDraft(ctx context.Context, in *bi
 	if replay, found, err := findFinanceFactReplay(ctx, r.data.postgres, in); err != nil || found {
 		return replay, err
 	}
+	if _, found, err := findActiveFinanceFactBySource(ctx, r.data.postgres, in); err != nil {
+		return nil, err
+	} else if found {
+		return nil, biz.ErrFinanceFactSourceConflict
+	}
 	row, err := r.data.postgres.FinanceFact.Create().
 		SetFactNo(in.FactNo).
 		SetFactType(in.FactType).
@@ -1239,9 +2453,135 @@ func (r *operationalFactRepo) CreateFinanceFactDraft(ctx context.Context, in *bi
 			if replay, found, replayErr := findFinanceFactReplay(ctx, r.data.postgres, in); replayErr != nil || found {
 				return replay, replayErr
 			}
+			if _, found, sourceErr := findActiveFinanceFactBySource(ctx, r.data.postgres, in); sourceErr != nil {
+				return nil, sourceErr
+			} else if found {
+				return nil, biz.ErrFinanceFactSourceConflict
+			}
 		}
 		return nil, err
 	}
+	return entFinanceFactToBiz(row), nil
+}
+
+func (r *operationalFactRepo) CreateFinanceFactDraftFromShipment(
+	ctx context.Context,
+	factType string,
+	in *biz.FinanceFactFromShipmentCreate,
+) (*biz.FinanceFact, error) {
+	if in == nil || in.ShipmentID <= 0 || (factType != biz.FinanceFactReceivable && factType != biz.FinanceFactInvoice) ||
+		(factType == biz.FinanceFactReceivable && in.InvoiceCategory != nil) {
+		return nil, biz.ErrBadParam
+	}
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+
+	if replay, found, replayErr := findFinanceFactFromShipmentReplay(ctx, tx.client, factType, in); replayErr != nil || found {
+		if replayErr != nil {
+			return nil, replayErr
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return replay, nil
+	}
+	if err := lockOperationalFactRow(ctx, tx, "shipments", in.ShipmentID, biz.ErrShipmentNotFound); err != nil {
+		return nil, err
+	}
+	// A concurrent exact-key request may have committed while this transaction
+	// waited for the shipment lock. Replay it before classifying the existing
+	// active source as a different-key conflict.
+	if replay, found, replayErr := findFinanceFactFromShipmentReplay(ctx, tx.client, factType, in); replayErr != nil || found {
+		if replayErr != nil {
+			return nil, replayErr
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return replay, nil
+	}
+	parent, err := tx.client.Shipment.Get(ctx, in.ShipmentID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrShipmentNotFound
+		}
+		return nil, err
+	}
+	if parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	amount, err := shipmentFinanceAmountFromSnapshots(ctx, tx.client, parent.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	sourceType := biz.ShipmentSourceType
+	shipmentID := parent.ID
+	customerID := *parent.CustomerID
+	create := &biz.FinanceFactCreate{
+		FactNo:              in.FactNo,
+		FactType:            factType,
+		CounterpartyType:    biz.FinanceCounterpartyCustomer,
+		CounterpartyID:      &customerID,
+		Amount:              amount,
+		FeeAmount:           decimal.Zero,
+		Currency:            biz.FinanceCurrencyCNY,
+		InvoiceCategory:     in.InvoiceCategory,
+		SourceType:          &sourceType,
+		SourceID:            &shipmentID,
+		IdempotencyKey:      in.IdempotencyKey,
+		OccurredAt:          in.OccurredAt,
+		OccurredAtSpecified: in.OccurredAtSpecified,
+		Note:                in.Note,
+	}
+	if _, found, sourceErr := findActiveFinanceFactBySource(ctx, tx.client, create); sourceErr != nil {
+		return nil, sourceErr
+	} else if found {
+		return nil, biz.ErrFinanceFactSourceConflict
+	}
+	row, err := tx.client.FinanceFact.Create().
+		SetFactNo(create.FactNo).
+		SetFactType(create.FactType).
+		SetStatus(biz.OperationalFactStatusDraft).
+		SetCounterpartyType(create.CounterpartyType).
+		SetNillableCounterpartyID(create.CounterpartyID).
+		SetAmount(create.Amount).
+		SetFeeAmount(create.FeeAmount).
+		SetCurrency(create.Currency).
+		SetNillableInvoiceCategory(create.InvoiceCategory).
+		SetNillableSourceType(create.SourceType).
+		SetNillableSourceID(create.SourceID).
+		SetIdempotencyKey(create.IdempotencyKey).
+		SetOccurredAt(create.OccurredAt).
+		SetOccurredAtSpecified(create.OccurredAtSpecified).
+		SetNillableNote(create.Note).
+		Save(ctx)
+	if err != nil {
+		if ent.IsConstraintError(err) {
+			if rollbackErr := tx.sqlTx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, stdsql.ErrTxDone) {
+				r.log.WithContext(ctx).Warnf("rollback shipment finance conflict failed err=%v", rollbackErr)
+			}
+			tx = nil
+			if replay, found, replayErr := findFinanceFactFromShipmentReplay(ctx, r.data.postgres, factType, in); replayErr != nil || found {
+				return replay, replayErr
+			}
+			if _, found, sourceErr := findActiveFinanceFactBySource(ctx, r.data.postgres, create); sourceErr != nil {
+				return nil, sourceErr
+			} else if found {
+				return nil, biz.ErrFinanceFactSourceConflict
+			}
+		}
+		return nil, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entFinanceFactToBiz(row), nil
 }
 
@@ -1259,34 +2599,36 @@ func (r *operationalFactRepo) CreateFinanceFactDraftForProcessCommand(
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	if replay, found, err := findFinanceFactReplay(ctx, tx.client, in); err != nil {
-		return nil, err
-	} else if found {
-		if err := lockOperationalFactRow(ctx, tx, "finance_facts", replay.ID, biz.ErrFinanceFactNotFound); err != nil {
-			return nil, err
-		}
-		locked, err := tx.client.FinanceFact.Get(ctx, replay.ID)
-		if err != nil {
-			if ent.IsNotFound(err) {
-				return nil, biz.ErrFinanceFactNotFound
-			}
-			return nil, err
-		}
-		if !financeFactMatchesCreate(locked, in) {
-			return nil, biz.ErrIdempotencyConflict
-		}
-		if !financeFactCanRecoverAppliedProcessResult(locked.Status) {
-			return nil, biz.ErrProcessDomainCommandRecoveryRequired
-		}
-		replay = entFinanceFactToBiz(locked)
-		if err := recordFinanceFactProcessCommandResultInTx(ctx, tx, replay, command, actorID); err != nil {
-			return nil, err
+	if replay, found, replayErr := r.recoverFinanceFactProcessCommandReplayInTx(ctx, tx, in, command, actorID); replayErr != nil || found {
+		if replayErr != nil {
+			return nil, replayErr
 		}
 		if err := tx.sqlTx.Commit(); err != nil {
 			return nil, err
 		}
 		tx = nil
 		return replay, nil
+	}
+	if err := lockAndValidateFinanceFactShipmentSource(ctx, tx, in); err != nil {
+		return nil, err
+	}
+	// A concurrent exact command may have committed while this transaction
+	// waited for the shipment parent lock. Rebind its result instead of
+	// misclassifying the retry as a different-key source conflict.
+	if replay, found, replayErr := r.recoverFinanceFactProcessCommandReplayInTx(ctx, tx, in, command, actorID); replayErr != nil || found {
+		if replayErr != nil {
+			return nil, replayErr
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return replay, nil
+	}
+	if _, found, err := findActiveFinanceFactBySource(ctx, tx.client, in); err != nil {
+		return nil, err
+	} else if found {
+		return nil, biz.ErrFinanceFactSourceConflict
 	}
 	row, err := tx.client.FinanceFact.Create().
 		SetFactNo(in.FactNo).
@@ -1320,6 +2662,11 @@ func (r *operationalFactRepo) CreateFinanceFactDraftForProcessCommand(
 			} else if found {
 				return r.CreateFinanceFactDraftForProcessCommand(ctx, in, command, actorID)
 			}
+			if _, found, sourceErr := findActiveFinanceFactBySource(ctx, r.data.postgres, in); sourceErr != nil {
+				return nil, sourceErr
+			} else if found {
+				return nil, biz.ErrFinanceFactSourceConflict
+			}
 		}
 		return nil, err
 	}
@@ -1332,6 +2679,103 @@ func (r *operationalFactRepo) CreateFinanceFactDraftForProcessCommand(
 	}
 	tx = nil
 	return out, nil
+}
+
+func (r *operationalFactRepo) recoverFinanceFactProcessCommandReplayInTx(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	in *biz.FinanceFactCreate,
+	command *biz.ProcessDomainCommandInput,
+	actorID int,
+) (*biz.FinanceFact, bool, error) {
+	replay, found, err := findFinanceFactReplay(ctx, tx.client, in)
+	if err != nil || !found {
+		return replay, found, err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "finance_facts", replay.ID, biz.ErrFinanceFactNotFound); err != nil {
+		return nil, true, err
+	}
+	locked, err := tx.client.FinanceFact.Get(ctx, replay.ID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, true, biz.ErrFinanceFactNotFound
+		}
+		return nil, true, err
+	}
+	if !financeFactMatchesCreate(locked, in) {
+		return nil, true, biz.ErrIdempotencyConflict
+	}
+	if !financeFactCanRecoverAppliedProcessResult(locked.Status) {
+		return nil, true, biz.ErrProcessDomainCommandRecoveryRequired
+	}
+	replay = entFinanceFactToBiz(locked)
+	if err := recordFinanceFactProcessCommandResultInTx(ctx, tx, replay, command, actorID); err != nil {
+		return nil, true, err
+	}
+	return replay, true, nil
+}
+
+func lockAndValidateFinanceFactShipmentSource(ctx context.Context, tx *inventoryDBTx, in *biz.FinanceFactCreate) error {
+	if in == nil || (in.FactType != biz.FinanceFactReceivable && in.FactType != biz.FinanceFactInvoice) {
+		return nil
+	}
+	if in.SourceType == nil && in.SourceID == nil {
+		// Historical unlinked process-command recovery remains supported. New
+		// source-linked commands are validated by the business usecase first.
+		return nil
+	}
+	if in.SourceType == nil || *in.SourceType != biz.ShipmentSourceType || in.SourceID == nil || *in.SourceID <= 0 {
+		return biz.ErrBadParam
+	}
+	if err := lockOperationalFactRow(ctx, tx, "shipments", *in.SourceID, biz.ErrShipmentNotFound); err != nil {
+		return err
+	}
+	parent, err := tx.client.Shipment.Get(ctx, *in.SourceID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrShipmentNotFound
+		}
+		return err
+	}
+	if parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 ||
+		in.CounterpartyType != biz.FinanceCounterpartyCustomer || in.CounterpartyID == nil || *in.CounterpartyID != *parent.CustomerID {
+		return biz.ErrBadParam
+	}
+	if in.SourceLineID != nil || in.Currency != biz.FinanceCurrencyCNY {
+		return biz.ErrFinanceFactShipmentAmountInvalid
+	}
+	amount, err := shipmentFinanceAmountFromSnapshots(ctx, tx.client, parent.ID)
+	if err != nil {
+		return err
+	}
+	if !in.Amount.Equal(amount) {
+		return biz.ErrFinanceFactShipmentAmountInvalid
+	}
+	return nil
+}
+
+func shipmentFinanceAmountFromSnapshots(ctx context.Context, client *ent.Client, shipmentID int) (decimal.Decimal, error) {
+	items, err := client.ShipmentItem.Query().
+		Where(shipmentitem.ShipmentID(shipmentID)).
+		Order(ent.Asc(shipmentitem.FieldID)).
+		All(ctx)
+	if err != nil {
+		return decimal.Zero, err
+	}
+	if len(items) == 0 {
+		return decimal.Zero, biz.ErrFinanceFactShipmentAmountInvalid
+	}
+	amount := decimal.Zero
+	for _, item := range items {
+		if item.SalesOrderItemID == nil || item.AmountSnapshot == nil || !item.AmountSnapshot.GreaterThan(decimal.Zero) || item.CurrencySnapshot != biz.FinanceCurrencyCNY {
+			return decimal.Zero, biz.ErrFinanceFactShipmentAmountInvalid
+		}
+		amount = amount.Add(*item.AmountSnapshot)
+	}
+	if !amount.GreaterThan(decimal.Zero) {
+		return decimal.Zero, biz.ErrFinanceFactShipmentAmountInvalid
+	}
+	return amount, nil
 }
 
 func recordFinanceFactProcessCommandResultInTx(
@@ -1469,9 +2913,19 @@ func (r *operationalFactRepo) listFinanceFacts(
 	if err != nil {
 		return nil, 0, err
 	}
+	references := make([]businessSourceReference, 0, len(rows))
+	for _, row := range rows {
+		references = append(references, businessSourceReference{sourceType: row.SourceType, sourceID: row.SourceID})
+	}
+	sourceNos, err := resolveBusinessSourceNos(ctx, r.data.postgres, references)
+	if err != nil {
+		return nil, 0, err
+	}
 	out := make([]*biz.FinanceFact, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, entFinanceFactToBiz(row))
+		item := entFinanceFactToBiz(row)
+		item.SourceNo = businessSourceNo(sourceNos, row.SourceType, row.SourceID)
+		out = append(out, item)
 	}
 	return out, total, nil
 }
@@ -1484,8 +2938,14 @@ func (r *operationalFactRepo) postProductionFact(ctx context.Context, id int, ca
 		}
 		return nil, err
 	}
+	if isProductionReworkLinkedFactRow(preview) {
+		return r.postProductionReworkFact(ctx, id, cancel)
+	}
 	if isProductionOrderLinkedFactRow(preview) {
 		return r.postProductionOrderLinkedFact(ctx, id, cancel)
+	}
+	if !cancel {
+		return nil, biz.ErrProductionOrderFactSourceInvalid
 	}
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
@@ -1521,6 +2981,121 @@ func (r *operationalFactRepo) postProductionFact(ctx context.Context, id int, ca
 		}
 		if row.Status != biz.OperationalFactStatusDraft {
 			return nil, biz.ErrBadParam
+		}
+		if err := r.applyProductionFactInventory(ctx, tx, row, false); err != nil {
+			return nil, err
+		}
+		now := time.Now()
+		if err := updateOperationalFactStatus(ctx, tx, "production_facts", id, biz.OperationalFactStatusPosted, "posted_at", &now); err != nil {
+			return nil, err
+		}
+	}
+	row, err = tx.client.ProductionFact.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return commitProductionFact(ctx, tx, row)
+}
+
+func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, id int, cancel bool) (*biz.ProductionFact, error) {
+	preview, err := r.data.postgres.ProductionFact.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductionFactNotFound
+		}
+		return nil, err
+	}
+	if !isProductionReworkLinkedFactRow(preview) {
+		return nil, biz.ErrProductionReworkSourceInvalid
+	}
+	sourcePreview, err := r.data.postgres.ProductionFact.Get(ctx, *preview.SourceID)
+	if err != nil {
+		return nil, biz.ErrProductionReworkSourceInvalid
+	}
+	orderID, itemID, err := productionCompletionSourceCoordinates(sourcePreview)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockOperationalFactRow(ctx, tx, "production_orders", orderID, biz.ErrProductionOrderNotFound); err != nil {
+		return nil, err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "production_order_items", itemID, biz.ErrProductionOrderFactSourceInvalid); err != nil {
+		return nil, err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "production_facts", sourcePreview.ID, biz.ErrProductionFactNotFound); err != nil {
+		return nil, err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "production_facts", id, biz.ErrProductionFactNotFound); err != nil {
+		return nil, err
+	}
+	row, err := tx.client.ProductionFact.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	reason := ""
+	if row.Note != nil {
+		reason = *row.Note
+	}
+	resolved, source, err := resolveProductionReworkMutation(ctx, tx.client, &biz.ProductionReworkFromCompletionCreate{
+		FactNo: row.FactNo, SourceCompletionFactID: sourcePreview.ID, Quantity: row.Quantity,
+		IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, OccurredAtSpecified: row.OccurredAtSpecified,
+		Reason: reason,
+	}, !cancel)
+	if err != nil {
+		return nil, err
+	}
+	if !operationalFactMutationMatchesProduction(row, resolved) {
+		return nil, biz.ErrProductionReworkSourceInvalid
+	}
+	if cancel {
+		if row.Status == biz.OperationalFactStatusCancelled {
+			return commitProductionFact(ctx, tx, row)
+		}
+		if row.Status == biz.OperationalFactStatusDraft {
+			if err := updateOperationalFactStatus(ctx, tx, "production_facts", id, biz.OperationalFactStatusCancelled, "posted_at", nil); err != nil {
+				return nil, err
+			}
+			row, err = tx.client.ProductionFact.Get(ctx, id)
+			if err != nil {
+				return nil, err
+			}
+			return commitProductionFact(ctx, tx, row)
+		}
+		if row.Status != biz.OperationalFactStatusPosted {
+			return nil, biz.ErrBadParam
+		}
+		item, err := tx.client.ProductionOrderItem.Get(ctx, itemID)
+		if err != nil {
+			return nil, err
+		}
+		effective, err := productionOrderEffectiveCompletedQuantity(ctx, tx.client, item)
+		if err != nil {
+			return nil, err
+		}
+		if effective.Add(row.Quantity).GreaterThan(item.PlannedQuantity) {
+			return nil, biz.ErrProductionOrderQuantityExceeded
+		}
+		if err := r.applyProductionFactInventory(ctx, tx, row, true); err != nil {
+			return nil, err
+		}
+		if err := updateOperationalFactStatus(ctx, tx, "production_facts", id, biz.OperationalFactStatusCancelled, "posted_at", nil); err != nil {
+			return nil, err
+		}
+	} else {
+		if row.Status == biz.OperationalFactStatusPosted {
+			return commitProductionFact(ctx, tx, row)
+		}
+		if row.Status != biz.OperationalFactStatusDraft {
+			return nil, biz.ErrBadParam
+		}
+		if err := validateProductionReworkQuantity(ctx, tx.client, source, row.Quantity, row.ID); err != nil {
+			return nil, err
 		}
 		if err := r.applyProductionFactInventory(ctx, tx, row, false); err != nil {
 			return nil, err
@@ -1557,6 +3132,9 @@ func (r *operationalFactRepo) postProductionOrderLinkedFact(ctx context.Context,
 	if err := lockOperationalFactRow(ctx, tx, "production_orders", orderID, biz.ErrProductionOrderNotFound); err != nil {
 		return nil, err
 	}
+	if err := lockProductionOrderMaterialIssueSource(ctx, tx, preview, orderID); err != nil {
+		return nil, err
+	}
 	if err := lockOperationalFactRow(ctx, tx, "production_facts", id, biz.ErrProductionFactNotFound); err != nil {
 		return nil, err
 	}
@@ -1574,8 +3152,29 @@ func (r *operationalFactRepo) postProductionOrderLinkedFact(ctx context.Context,
 		if row.Status != biz.OperationalFactStatusPosted {
 			return nil, biz.ErrBadParam
 		}
-		if _, err := validateProductionOrderFactRowSource(ctx, tx.client, row, false); err != nil {
-			return nil, err
+		switch row.FactType {
+		case biz.ProductionFactFinishedGoodsReceipt:
+			if _, err := validateProductionOrderFactRowSource(ctx, tx.client, row, false); err != nil {
+				return nil, err
+			}
+			hasActiveRework, err := tx.client.ProductionFact.Query().Where(
+				productionfact.FactType(biz.ProductionFactRework),
+				productionfact.StatusNEQ(biz.OperationalFactStatusCancelled),
+				productionfact.SourceType(biz.ProductionFactSourceType),
+				productionfact.SourceID(row.ID),
+			).Exist(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if hasActiveRework {
+				return nil, biz.ErrProductionReworkDependency
+			}
+		case biz.ProductionFactMaterialIssue:
+			if _, err := validateProductionOrderMaterialIssueFactRowSource(ctx, tx.client, row, false); err != nil {
+				return nil, err
+			}
+		default:
+			return nil, biz.ErrProductionOrderFactSourceInvalid
 		}
 		if err := r.applyProductionFactInventory(ctx, tx, row, true); err != nil {
 			return nil, err
@@ -1590,12 +3189,25 @@ func (r *operationalFactRepo) postProductionOrderLinkedFact(ctx context.Context,
 		if row.Status != biz.OperationalFactStatusDraft {
 			return nil, biz.ErrBadParam
 		}
-		item, err := validateProductionOrderFactRowSource(ctx, tx.client, row, true)
-		if err != nil {
-			return nil, err
-		}
-		if err := validateProductionOrderFinishedQuantity(ctx, tx.client, item, row.Quantity); err != nil {
-			return nil, err
+		switch row.FactType {
+		case biz.ProductionFactFinishedGoodsReceipt:
+			item, err := validateProductionOrderFactRowSource(ctx, tx.client, row, true)
+			if err != nil {
+				return nil, err
+			}
+			if err := validateProductionOrderFinishedQuantity(ctx, tx.client, item, row.Quantity); err != nil {
+				return nil, err
+			}
+		case biz.ProductionFactMaterialIssue:
+			requirement, err := validateProductionOrderMaterialIssueFactRowSource(ctx, tx.client, row, true)
+			if err != nil {
+				return nil, err
+			}
+			if err := validateProductionOrderMaterialIssueQuantity(ctx, tx.client, requirement, row.Quantity); err != nil {
+				return nil, err
+			}
+		default:
+			return nil, biz.ErrProductionOrderFactSourceInvalid
 		}
 		if err := r.applyProductionFactInventory(ctx, tx, row, false); err != nil {
 			return nil, err
@@ -1613,6 +3225,116 @@ func (r *operationalFactRepo) postProductionOrderLinkedFact(ctx context.Context,
 }
 
 func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, id int, cancel bool) (*biz.OutsourcingFact, error) {
+	preview, err := r.data.postgres.OutsourcingFact.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrOutsourcingFactNotFound
+		}
+		return nil, err
+	}
+	if preview.SourceType == nil || *preview.SourceType != biz.OutsourcingOrderSourceType {
+		if !cancel {
+			return nil, biz.ErrOutsourcingOrderFactSourceInvalid
+		}
+		return r.postLegacyOutsourcingFact(ctx, id, cancel)
+	}
+	orderID, itemID, err := outsourcingOrderSourceIDsFromFact(preview)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockOperationalFactRow(ctx, tx, "outsourcing_orders", orderID, biz.ErrOutsourcingOrderNotFound); err != nil {
+		return nil, err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "outsourcing_order_items", itemID, biz.ErrOutsourcingOrderItemNotFound); err != nil {
+		return nil, err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "outsourcing_facts", id, biz.ErrOutsourcingFactNotFound); err != nil {
+		return nil, err
+	}
+	row, err := tx.client.OutsourcingFact.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrOutsourcingFactNotFound
+		}
+		return nil, err
+	}
+	if row.SourceID == nil || *row.SourceID != orderID || row.SourceLineID == nil || *row.SourceLineID != itemID {
+		return nil, biz.ErrOutsourcingOrderFactSourceInvalid
+	}
+	requireActive := !cancel && row.Status == biz.OperationalFactStatusDraft
+	resolved, item, err := resolveOutsourcingOrderFactMutation(ctx, tx.client, row.FactType, outsourcingOrderFactCreateFromRow(row, orderID, itemID), requireActive)
+	if err != nil {
+		return nil, err
+	}
+	if !operationalFactMutationMatchesOutsourcing(row, resolved) {
+		return nil, biz.ErrOutsourcingOrderFactSourceInvalid
+	}
+	if cancel {
+		if row.Status == biz.OperationalFactStatusCancelled {
+			return commitOutsourcingFact(ctx, tx, row)
+		}
+		if row.Status != biz.OperationalFactStatusPosted {
+			return nil, biz.ErrBadParam
+		}
+		if row.FactType == biz.OutsourcingFactReturnReceipt {
+			activeInspection, err := tx.client.QualityInspection.Query().Where(
+				qualityinspection.SourceType(biz.QualityInspectionSourceOutsourcingFact),
+				qualityinspection.SourceID(row.ID),
+				qualityinspection.StatusNEQ(biz.QualityInspectionStatusCancelled),
+			).Exist(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if activeInspection {
+				return nil, biz.ErrOutsourcingReturnQualityDependency
+			}
+			activePayable, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.OutsourcingFactSourceType, row.ID)
+			if err != nil {
+				return nil, err
+			}
+			if activePayable {
+				return nil, biz.ErrOutsourcingReturnFinanceDependency
+			}
+		}
+		if err := r.applyOutsourcingFactInventory(ctx, tx, row, true); err != nil {
+			return nil, err
+		}
+		if err := updateOperationalFactStatus(ctx, tx, "outsourcing_facts", id, biz.OperationalFactStatusCancelled, "posted_at", nil); err != nil {
+			return nil, err
+		}
+	} else {
+		if row.Status == biz.OperationalFactStatusPosted {
+			return commitOutsourcingFact(ctx, tx, row)
+		}
+		if row.Status != biz.OperationalFactStatusDraft {
+			return nil, biz.ErrBadParam
+		}
+		if err := validateOutsourcingOrderFactQuantity(ctx, tx.client, item, row.FactType, row.Quantity); err != nil {
+			return nil, err
+		}
+		if err := r.applyOutsourcingFactInventory(ctx, tx, row, false); err != nil {
+			return nil, err
+		}
+		now := time.Now()
+		if err := updateOperationalFactStatus(ctx, tx, "outsourcing_facts", id, biz.OperationalFactStatusPosted, "posted_at", &now); err != nil {
+			return nil, err
+		}
+	}
+	row, err = tx.client.OutsourcingFact.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return commitOutsourcingFact(ctx, tx, row)
+}
+
+// postLegacyOutsourcingFact only reverses historical posted rows that predate
+// source-driven creation. New source-less drafts fail closed before this path.
+func (r *operationalFactRepo) postLegacyOutsourcingFact(ctx context.Context, id int, cancel bool) (*biz.OutsourcingFact, error) {
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -1661,6 +3383,35 @@ func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, id int, c
 		return nil, err
 	}
 	return commitOutsourcingFact(ctx, tx, row)
+}
+
+func outsourcingOrderSourceIDsFromFact(row *ent.OutsourcingFact) (int, int, error) {
+	if row == nil || row.SourceType == nil || *row.SourceType != biz.OutsourcingOrderSourceType ||
+		row.SourceID == nil || *row.SourceID <= 0 || row.SourceLineID == nil || *row.SourceLineID <= 0 {
+		return 0, 0, biz.ErrOutsourcingOrderFactSourceInvalid
+	}
+	if row.FactType != biz.OutsourcingFactMaterialIssue && row.FactType != biz.OutsourcingFactReturnReceipt {
+		return 0, 0, biz.ErrOutsourcingOrderFactSourceInvalid
+	}
+	return *row.SourceID, *row.SourceLineID, nil
+}
+
+func outsourcingOrderFactCreateFromRow(row *ent.OutsourcingFact, orderID, itemID int) *biz.OutsourcingFactFromOrderCreate {
+	if row == nil {
+		return nil
+	}
+	return &biz.OutsourcingFactFromOrderCreate{
+		FactNo:                 row.FactNo,
+		OutsourcingOrderID:     orderID,
+		OutsourcingOrderItemID: itemID,
+		WarehouseID:            row.WarehouseID,
+		LotID:                  row.LotID,
+		Quantity:               row.Quantity,
+		IdempotencyKey:         row.IdempotencyKey,
+		OccurredAt:             row.OccurredAt,
+		OccurredAtSpecified:    row.OccurredAtSpecified,
+		Note:                   row.Note,
+	}
 }
 
 func (r *operationalFactRepo) shipShipment(
@@ -1712,6 +3463,18 @@ func (r *operationalFactRepo) shipShipment(
 			}
 			return commitShipment(ctx, tx, parent)
 		}
+		hasFinanceDependency, err := tx.client.FinanceFact.Query().Where(
+			financefact.SourceType(biz.ShipmentSourceType),
+			financefact.SourceID(parent.ID),
+			financefact.FactTypeIn(biz.FinanceFactReceivable, biz.FinanceFactInvoice),
+			financefact.StatusNEQ(biz.OperationalFactStatusCancelled),
+		).Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if hasFinanceDependency {
+			return nil, biz.ErrShipmentFinanceDependency
+		}
 		for _, item := range items {
 			if err := r.applyShipmentItemInventory(ctx, tx, parent, item, true); err != nil {
 				return nil, err
@@ -1738,6 +3501,9 @@ func (r *operationalFactRepo) shipShipment(
 		}
 		sourceQuantity, err := validateShipmentSourceAndQuantity(ctx, tx, parent, items)
 		if err != nil {
+			return nil, err
+		}
+		if err := freezeShipmentFinanceSnapshots(ctx, tx, parent, items, sourceQuantity); err != nil {
 			return nil, err
 		}
 		if err := freezeShipmentNetWeights(ctx, tx, items); err != nil {
@@ -1955,16 +3721,18 @@ func verifyShipmentInventoryEvidence(
 }
 
 type shipmentSourceQuantityState struct {
-	orderedByLine map[int]decimal.Decimal
-	shippedByLine map[int]decimal.Decimal
-	currentByLine map[int]decimal.Decimal
+	orderedByLine     map[int]decimal.Decimal
+	shippedByLine     map[int]decimal.Decimal
+	currentByLine     map[int]decimal.Decimal
+	sourceItemsByLine map[int]*ent.SalesOrderItem
 }
 
 func newShipmentSourceQuantityState() *shipmentSourceQuantityState {
 	return &shipmentSourceQuantityState{
-		orderedByLine: make(map[int]decimal.Decimal),
-		shippedByLine: make(map[int]decimal.Decimal),
-		currentByLine: make(map[int]decimal.Decimal),
+		orderedByLine:     make(map[int]decimal.Decimal),
+		shippedByLine:     make(map[int]decimal.Decimal),
+		currentByLine:     make(map[int]decimal.Decimal),
+		sourceItemsByLine: make(map[int]*ent.SalesOrderItem),
 	}
 }
 
@@ -2055,8 +3823,70 @@ func validateShipmentSourceAndQuantity(ctx context.Context, tx *inventoryDBTx, p
 		state.orderedByLine[lineID] = orderItem.OrderedQuantity
 		state.shippedByLine[lineID] = shippedQuantity
 		state.currentByLine[lineID] = quantityBySourceLine[lineID]
+		state.sourceItemsByLine[lineID] = orderItem
 	}
 	return state, nil
+}
+
+func freezeShipmentFinanceSnapshots(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	parent *ent.Shipment,
+	items []*ent.ShipmentItem,
+	sourceQuantity *shipmentSourceQuantityState,
+) error {
+	if tx == nil || tx.client == nil || tx.sqlTx == nil || parent == nil || sourceQuantity == nil || len(items) == 0 {
+		return biz.ErrBadParam
+	}
+	if parent.SalesOrderID == nil {
+		return nil
+	}
+	for _, item := range items {
+		if item == nil || item.SalesOrderItemID == nil {
+			return biz.ErrShipmentSourceMismatch
+		}
+		sourceItem := sourceQuantity.sourceItemsByLine[*item.SalesOrderItemID]
+		if sourceItem == nil {
+			return biz.ErrShipmentSourceMismatch
+		}
+		unitPriceSnapshot, amountSnapshot, currencySnapshot, err := shipmentFinanceSnapshotsFromSalesOrderItem(sourceItem, item.Quantity)
+		if err != nil {
+			return err
+		}
+		if err := updateShipmentItemFinanceSnapshots(ctx, tx, item.ID, unitPriceSnapshot, amountSnapshot, currencySnapshot); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func updateShipmentItemFinanceSnapshots(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	itemID int,
+	unitPriceSnapshot, amountSnapshot *decimal.Decimal,
+	currencySnapshot *string,
+) error {
+	if tx == nil || tx.sqlTx == nil || itemID <= 0 || currencySnapshot == nil {
+		return biz.ErrBadParam
+	}
+	p := inventorySQLPlaceholders(tx.dialect, 5)
+	query := fmt.Sprintf(
+		`UPDATE shipment_items SET unit_price_snapshot = %s, amount_snapshot = %s, currency_snapshot = %s, updated_at = %s WHERE id = %s`,
+		p[0], p[1], p[2], p[3], p[4],
+	)
+	result, err := tx.sqlTx.ExecContext(ctx, query, unitPriceSnapshot, amountSnapshot, *currencySnapshot, time.Now(), itemID)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return biz.ErrBadParam
+	}
+	return nil
 }
 
 type shipmentInventoryGrain struct {
@@ -2391,9 +4221,22 @@ func (r *operationalFactRepo) changeFinanceFactStatus(ctx context.Context, id in
 		if row.Status != biz.OperationalFactStatusDraft && row.Status != biz.OperationalFactStatusPosted {
 			return nil, biz.ErrBadParam
 		}
+		if row.Status == biz.OperationalFactStatusDraft {
+			if err := validateFinanceFactTransitionSource(row); err != nil {
+				return nil, err
+			}
+		}
 	case biz.OperationalFactStatusSettled:
+		if row.FactType != biz.FinanceFactReceivable && row.FactType != biz.FinanceFactPayable && row.FactType != biz.FinanceFactReconciliation {
+			return nil, biz.ErrFinanceFactSettlementNotAllowed
+		}
 		if row.Status != biz.OperationalFactStatusPosted && row.Status != biz.OperationalFactStatusSettled {
 			return nil, biz.ErrBadParam
+		}
+		if row.Status == biz.OperationalFactStatusPosted {
+			if err := validateFinanceFactTransitionSource(row); err != nil {
+				return nil, err
+			}
 		}
 	default:
 		return nil, biz.ErrBadParam
@@ -2417,6 +4260,29 @@ func (r *operationalFactRepo) changeFinanceFactStatus(ctx context.Context, id in
 	}
 	tx = nil
 	return entFinanceFactToBiz(row), nil
+}
+
+func validateFinanceFactTransitionSource(row *ent.FinanceFact) error {
+	if row == nil || row.SourceType == nil || row.SourceID == nil || *row.SourceID <= 0 {
+		return biz.ErrFinanceFactSourceInvalid
+	}
+	switch row.FactType {
+	case biz.FinanceFactReceivable, biz.FinanceFactInvoice:
+		if *row.SourceType != biz.ShipmentSourceType {
+			return biz.ErrFinanceFactSourceInvalid
+		}
+	case biz.FinanceFactPayable:
+		if *row.SourceType != biz.PurchaseReceiptSourceType && *row.SourceType != biz.OutsourcingFactSourceType {
+			return biz.ErrFinanceFactSourceInvalid
+		}
+	case biz.FinanceFactReconciliation:
+		if *row.SourceType != biz.FinanceFactSourceType {
+			return biz.ErrFinanceFactSourceInvalid
+		}
+	default:
+		return biz.ErrFinanceFactSourceInvalid
+	}
+	return nil
 }
 
 func (r *operationalFactRepo) cancelPostedFinanceFact(ctx context.Context, id int, actorID int, reason string) (*biz.FinanceFact, error) {
@@ -2443,6 +4309,13 @@ func (r *operationalFactRepo) cancelPostedFinanceFact(ctx context.Context, id in
 	} else {
 		if row.Status != biz.OperationalFactStatusPosted {
 			return nil, biz.ErrBadParam
+		}
+		activeReconciliation, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactReconciliation, biz.FinanceFactSourceType, row.ID)
+		if err != nil {
+			return nil, err
+		}
+		if activeReconciliation {
+			return nil, biz.ErrFinanceReconciliationDependency
 		}
 		now := time.Now()
 		if err := updateFinanceFactCancellation(ctx, tx, id, actorID, reason, now); err != nil {
@@ -2775,7 +4648,12 @@ func entShipmentItemToBiz(row *ent.ShipmentItem) *biz.ShipmentItem {
 	if row == nil {
 		return nil
 	}
-	return &biz.ShipmentItem{ID: row.ID, ShipmentID: row.ShipmentID, SalesOrderItemID: row.SalesOrderItemID, ProductID: row.ProductID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, UnitNetWeightKgSnapshot: row.UnitNetWeightKgSnapshot, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	var currencySnapshot *string
+	if row.SalesOrderItemID != nil {
+		currency := row.CurrencySnapshot
+		currencySnapshot = &currency
+	}
+	return &biz.ShipmentItem{ID: row.ID, ShipmentID: row.ShipmentID, SalesOrderItemID: row.SalesOrderItemID, ProductID: row.ProductID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, UnitNetWeightKgSnapshot: row.UnitNetWeightKgSnapshot, UnitPriceSnapshot: row.UnitPriceSnapshot, AmountSnapshot: row.AmountSnapshot, CurrencySnapshot: currencySnapshot, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }
 
 func entStockReservationToBiz(row *ent.StockReservation) *biz.StockReservation {

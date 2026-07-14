@@ -78,9 +78,11 @@ type QualityInspectionEdges struct {
 	Material *Material `json:"material,omitempty"`
 	// Warehouse holds the value of the warehouse edge.
 	Warehouse *Warehouse `json:"warehouse,omitempty"`
+	// PurchaseReturns holds the value of the purchase_returns edge.
+	PurchaseReturns []*PurchaseReturn `json:"purchase_returns,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [5]bool
+	loadedTypes [6]bool
 }
 
 // PurchaseReceiptOrErr returns the PurchaseReceipt value or an error if the edge
@@ -136,6 +138,15 @@ func (e QualityInspectionEdges) WarehouseOrErr() (*Warehouse, error) {
 		return nil, &NotFoundError{label: warehouse.Label}
 	}
 	return nil, &NotLoadedError{edge: "warehouse"}
+}
+
+// PurchaseReturnsOrErr returns the PurchaseReturns value or an error if the edge
+// was not loaded in eager-loading.
+func (e QualityInspectionEdges) PurchaseReturnsOrErr() ([]*PurchaseReturn, error) {
+	if e.loadedTypes[5] {
+		return e.PurchaseReturns, nil
+	}
+	return nil, &NotLoadedError{edge: "purchase_returns"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -332,6 +343,11 @@ func (_m *QualityInspection) QueryMaterial() *MaterialQuery {
 // QueryWarehouse queries the "warehouse" edge of the QualityInspection entity.
 func (_m *QualityInspection) QueryWarehouse() *WarehouseQuery {
 	return NewQualityInspectionClient(_m.config).QueryWarehouse(_m)
+}
+
+// QueryPurchaseReturns queries the "purchase_returns" edge of the QualityInspection entity.
+func (_m *QualityInspection) QueryPurchaseReturns() *PurchaseReturnQuery {
+	return NewQualityInspectionClient(_m.config).QueryPurchaseReturns(_m)
 }
 
 // Update returns a builder for updating this QualityInspection.

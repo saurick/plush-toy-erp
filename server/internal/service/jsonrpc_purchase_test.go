@@ -508,7 +508,11 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 	if err != nil {
 		t.Fatalf("expected nil err creating manual receipt, got %v", err)
 	}
-	manualReceiptID := jsonRPCInt(t, jsonRPCNestedMap(t, manualReceiptRes, "purchase_receipt"), "id")
+	manualReceipt := jsonRPCNestedMap(t, manualReceiptRes, "purchase_receipt")
+	manualReceiptID := jsonRPCInt(t, manualReceipt, "id")
+	if manualReceipt["supplier_id"] != nil {
+		t.Fatalf("manual receipt without stable supplier identity must return supplier_id=nil, got %#v", manualReceipt["supplier_id"])
+	}
 	_, manualLineRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "add_purchase_receipt_item", "manual-line", mustJSONRPCStruct(t, map[string]any{
 		"receipt_id":             float64(manualReceiptID),
 		"material_id":            float64(fixtures.materialID),
@@ -535,6 +539,17 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 	if err != nil || missingReceiptKeyRes == nil || missingReceiptKeyRes.Code != errcode.InvalidParam.Code {
 		t.Fatalf("expected missing create-from-order idempotency key rejected, result=%#v err=%v", missingReceiptKeyRes, err)
 	}
+	_, forgedSupplierRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "forged-supplier", mustJSONRPCStruct(t, map[string]any{
+		"purchase_order_id": float64(saved.Order.ID),
+		"receipt_no":        "PR-FROM-PO-FORGED-SUPPLIER",
+		"warehouse_id":      float64(fixtures.warehouseID),
+		"received_at":       "2026-06-17",
+		"idempotency_key":   "jsonrpc-create-receipt-forged-supplier",
+		"supplier_id":       float64(supplier.ID + 1000),
+	}))
+	if err != nil || forgedSupplierRes == nil || forgedSupplierRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("caller-controlled supplier_id must be rejected, result=%#v err=%v", forgedSupplierRes, err)
+	}
 
 	_, receiptRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "1", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(saved.Order.ID),
@@ -552,6 +567,9 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 	receipt := jsonRPCNestedMap(t, receiptRes, "purchase_receipt")
 	if status := receipt["status"]; status != biz.PurchaseReceiptStatusDraft {
 		t.Fatalf("expected draft receipt status, got %#v", status)
+	}
+	if got := jsonRPCInt(t, receipt, "supplier_id"); got != supplier.ID {
+		t.Fatalf("receipt supplier_id=%d, want source purchase order supplier %d", got, supplier.ID)
 	}
 	items, ok := receipt["items"].([]any)
 	if !ok || len(items) != 1 {
@@ -590,6 +608,36 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 	}
 	if duplicateRes == nil || duplicateRes.Code != errcode.IdempotencyConflict.Code {
 		t.Fatalf("expected changed intent with reused key rejected, got %#v", duplicateRes)
+	}
+
+	_, listBySupplierRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "list_purchase_receipts", "list-by-supplier", mustJSONRPCStruct(t, map[string]any{
+		"supplier_id": float64(supplier.ID),
+	}))
+	if err != nil || listBySupplierRes == nil || listBySupplierRes.Code != errcode.OK.Code {
+		t.Fatalf("list purchase receipts by supplier identity failed, result=%#v err=%v", listBySupplierRes, err)
+	}
+	listData := listBySupplierRes.Data.AsMap()
+	if jsonRPCInt(t, listData, "total") != 1 {
+		t.Fatalf("supplier-filtered receipt total=%v, want 1", listData["total"])
+	}
+
+	otherSupplier := client.Supplier.Create().
+		SetCode("SUP-JSONRPC-PO-OTHER").
+		SetName("其他采购供应商").
+		SetIsActive(true).
+		SaveX(ctx)
+	if _, err := client.PurchaseOrder.UpdateOneID(saved.Order.ID).SetSupplierID(otherSupplier.ID).Save(ctx); err != nil {
+		t.Fatalf("change source supplier identity for replay test: %v", err)
+	}
+	_, identityConflictRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "supplier-identity-conflict", mustJSONRPCStruct(t, map[string]any{
+		"purchase_order_id": float64(saved.Order.ID),
+		"receipt_no":        "PR-FROM-PO-001",
+		"warehouse_id":      float64(fixtures.warehouseID),
+		"received_at":       "2026-06-17",
+		"idempotency_key":   "jsonrpc-create-receipt-from-po-attempt-1",
+	}))
+	if err != nil || identityConflictRes == nil || identityConflictRes.Code != errcode.IdempotencyConflict.Code {
+		t.Fatalf("changed source supplier identity must conflict on replay, result=%#v err=%v", identityConflictRes, err)
 	}
 }
 

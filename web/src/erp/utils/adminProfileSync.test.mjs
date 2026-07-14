@@ -865,6 +865,44 @@ test('adminProfileSync: 没有 effective session 时普通账号不回退旧 RBA
   )
 })
 
+test('adminProfileSync: 委外来源动作与事实权限属于 super admin Product Core', () => {
+  for (const permission of [
+    'outsourcing.fact.read',
+    'outsourcing.material_issue.create',
+    'outsourcing.return_receipt.create',
+    'outsourcing.fact.post',
+    'outsourcing.fact.cancel',
+  ]) {
+    assert.equal(
+      effectiveSessionAllowsAction({ is_super_admin: true }, permission),
+      true,
+      permission
+    )
+  }
+})
+
+test('adminProfileSync: 生产领料只登记精确来源动作权限', () => {
+  assert.equal(
+    effectiveSessionAllowsAction(
+      { is_super_admin: true },
+      'production.material_issue.create'
+    ),
+    true
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(
+      {
+        permissions: ['pmc.plan.update', 'warehouse.adjustment.create'],
+        effective_session: {
+          actions: ['pmc.plan.update', 'warehouse.adjustment.create'],
+        },
+      },
+      'production.material_issue.create'
+    ),
+    false
+  )
+})
+
 test('adminProfileSync: field policy 收窄列表列但不改写列定义真源', () => {
   const adminProfile = {
     effective_session: {

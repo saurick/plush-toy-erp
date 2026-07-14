@@ -34,6 +34,8 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgePurchaseOrders holds the string denoting the purchase_orders edge name in mutations.
 	EdgePurchaseOrders = "purchase_orders"
+	// EdgePurchaseReceipts holds the string denoting the purchase_receipts edge name in mutations.
+	EdgePurchaseReceipts = "purchase_receipts"
 	// EdgeOutsourcingOrders holds the string denoting the outsourcing_orders edge name in mutations.
 	EdgeOutsourcingOrders = "outsourcing_orders"
 	// Table holds the table name of the supplier in the database.
@@ -45,6 +47,13 @@ const (
 	PurchaseOrdersInverseTable = "purchase_orders"
 	// PurchaseOrdersColumn is the table column denoting the purchase_orders relation/edge.
 	PurchaseOrdersColumn = "supplier_id"
+	// PurchaseReceiptsTable is the table that holds the purchase_receipts relation/edge.
+	PurchaseReceiptsTable = "purchase_receipts"
+	// PurchaseReceiptsInverseTable is the table name for the PurchaseReceipt entity.
+	// It exists in this package in order to avoid circular dependency with the "purchasereceipt" package.
+	PurchaseReceiptsInverseTable = "purchase_receipts"
+	// PurchaseReceiptsColumn is the table column denoting the purchase_receipts relation/edge.
+	PurchaseReceiptsColumn = "supplier_id"
 	// OutsourcingOrdersTable is the table that holds the outsourcing_orders relation/edge.
 	OutsourcingOrdersTable = "outsourcing_orders"
 	// OutsourcingOrdersInverseTable is the table name for the OutsourcingOrder entity.
@@ -168,6 +177,20 @@ func ByPurchaseOrders(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByPurchaseReceiptsCount orders the results by purchase_receipts count.
+func ByPurchaseReceiptsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newPurchaseReceiptsStep(), opts...)
+	}
+}
+
+// ByPurchaseReceipts orders the results by purchase_receipts terms.
+func ByPurchaseReceipts(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPurchaseReceiptsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByOutsourcingOrdersCount orders the results by outsourcing_orders count.
 func ByOutsourcingOrdersCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -186,6 +209,13 @@ func newPurchaseOrdersStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(PurchaseOrdersInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, PurchaseOrdersTable, PurchaseOrdersColumn),
+	)
+}
+func newPurchaseReceiptsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PurchaseReceiptsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, PurchaseReceiptsTable, PurchaseReceiptsColumn),
 	)
 }
 func newOutsourcingOrdersStep() *sqlgraph.Step {

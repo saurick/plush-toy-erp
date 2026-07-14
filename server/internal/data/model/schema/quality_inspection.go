@@ -154,6 +154,8 @@ func (QualityInspection) Edges() []ent.Edge {
 			Required().
 			Unique().
 			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("purchase_returns", PurchaseReturn.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 	}
 }
 

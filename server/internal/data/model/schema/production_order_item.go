@@ -94,6 +94,8 @@ func (ProductionOrderItem) Edges() []ent.Edge {
 			Required().
 			Unique().
 			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("material_requirements", ProductionOrderMaterialRequirement.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("product", Product.Type).
 			Field("product_id").
 			Required().

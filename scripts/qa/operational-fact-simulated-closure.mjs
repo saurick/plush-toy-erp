@@ -11,17 +11,9 @@ const DEFAULT_OUT_DIR =
 const SIMULATION_PREFIX = "SIM-YOYOOSUN-OPFACT";
 const INPUT_TEMPLATE_SCOPE =
   "operational-fact-simulated-closure-input-template";
-const CONFIRM_PHRASE = "APPLY_SIMULATED_OPERATIONAL_FACTS";
-const CUSTOMER_KEY = "yoyoosun";
-const ADMIN_USERNAME = "admin";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
-const REQUIRED_OPERATIONAL_MODULES = Object.freeze([
-  "production",
-  "outsourcing_orders",
-  "inventory",
-  "shipments",
-  "finance",
-]);
+const APPLY_RETIRED_MESSAGE =
+  "operational fact simulated apply is retired; use source-driven domain fixtures and browser flows";
 const FORBIDDEN_ARG_PATTERN =
   /--(?:execute|import|real|real-import|customer-data)/u;
 
@@ -42,22 +34,9 @@ Report-only mode:
   node scripts/qa/operational-fact-simulated-closure.mjs \\
     --customer-id 1 --product-id 1 --material-id 1 --unit-id 1 --warehouse-id 1
 
-Apply simulated operational fact data through JSON-RPC:
-  OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS \\
-  OPERATIONAL_FACT_SIM_ADMIN_PASSWORD='replace-with-local-admin-password' \\
-  OPERATIONAL_FACT_SIM_PASSWORD='replace-with-password' \\
-    node scripts/qa/operational-fact-simulated-closure.mjs \\
-      --apply \\
-      --backend-url http://127.0.0.1:8300 \\
-      --customer-id 1 \\
-      --product-id 1 \\
-      --material-id 1 \\
-      --unit-id 1 \\
-      --warehouse-id 1
-
 Options:
   --print-input-template Print local input checklist only; no report/backend/database writes.
-  --apply                Write simulated records through /rpc/operational_fact.
+  --apply                Retired; exits before login, RPC, report, or database writes.
   --backend-url <url>    Backend base URL. Default ${DEFAULT_BACKEND_URL}.
   --out <dir>            Output report directory. Default ${DEFAULT_OUT_DIR}.
   --customer-id <id>     Active customer ID linked to shipment and receivable facts.
@@ -78,16 +57,8 @@ Options:
   --run-id <text>        Optional unique run suffix. Default timestamp.
   --help                 Print this help.
 
-Apply credentials:
-  The script uses admin only for the local runtime guard, and role demo accounts for business actions:
-  ${ADMIN_USERNAME} (debug.capabilities only)
-  ${ROLE_USERS.pmc}, ${ROLE_USERS.purchase}, ${ROLE_USERS.warehouse}, ${ROLE_USERS.finance}.
-  Set OPERATIONAL_FACT_SIM_ADMIN_PASSWORD for the local super administrator guard.
-  Set OPERATIONAL_FACT_SIM_PASSWORD, TRIAL_ACCOUNT_PASSWORD, or ERP_ROLE_DEMO_PASSWORD for role accounts.
-
-This script only writes explicitly marked simulated operational fact records. It never imports
-real customer data, never writes business_records directly, never creates schema or
-migrations, and never turns customer acceptance into an operational fact completion blocker.`;
+The report-only path never calls a backend, writes business records, imports real customer
+data, creates schema or migrations, or turns customer acceptance into a completion blocker.`;
 
 class CliError extends Error {
   constructor(message, exitCode = 1) {
@@ -188,10 +159,7 @@ function parseCliArgs(argv) {
       options.printInputTemplate = true;
       continue;
     }
-    if (token === "--apply") {
-      options.apply = true;
-      continue;
-    }
+    if (token === "--apply") throw new CliError(APPLY_RETIRED_MESSAGE, 2);
     if (!token.startsWith("--")) {
       throw new CliError(`Unexpected argument: ${token}`, 2);
     }
@@ -282,12 +250,6 @@ function parseCliArgs(argv) {
   }
   options.backendURL = normalizeBaseURL(options.backendURL);
   options.runId = sanitizeRunId(options.runId);
-  if (options.printInputTemplate && options.apply) {
-    throw new CliError(
-      "--print-input-template cannot be combined with --apply",
-      2,
-    );
-  }
   return options;
 }
 
@@ -304,13 +266,15 @@ function buildInputTemplate(options = {}) {
     simulatedOnly: true,
     realCustomerImport: false,
     customerAcceptanceRequiredForClosure: false,
+    applySupported: false,
+    applyRetiredReason: APPLY_RETIRED_MESSAGE,
     writesReports: false,
     writesDatabase: false,
     callsBackend: false,
     importsRealCustomerData: false,
     createsBusinessRecords: false,
     downstreamReportOnlyWritesReports: true,
-    downstreamApplyWritesDatabase: true,
+    downstreamApplyWritesDatabase: false,
     defaultBackendURL: DEFAULT_BACKEND_URL,
     backendURL,
     defaultOut: DEFAULT_OUT_DIR,
@@ -323,16 +287,7 @@ function buildInputTemplate(options = {}) {
       "--unit-id <active_unit_id>",
       "--warehouse-id <active_warehouse_id>",
     ],
-    requiredApplyInputs: [
-      "OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS",
-      "OPERATIONAL_FACT_SIM_ADMIN_PASSWORD",
-      "OPERATIONAL_FACT_SIM_PASSWORD or TRIAL_ACCOUNT_PASSWORD or ERP_ROLE_DEMO_PASSWORD",
-      "--customer-id <active_customer_id>",
-      "--product-id <active_product_id>",
-      "--material-id <active_material_id>",
-      "--unit-id <active_unit_id>",
-      "--warehouse-id <active_warehouse_id>",
-    ],
+    requiredApplyInputs: [],
     optionalInputs: [
       "--product-sku-id <active_product_sku_id>",
       "--supplier-id <active_supplier_id>",
@@ -346,13 +301,10 @@ function buildInputTemplate(options = {}) {
       "--invoice-status <DRAFT|POSTED|SETTLED|CANCELLED>",
     ],
     roleAccounts: ROLE_USERS,
-    runtimeGuardAccount: ADMIN_USERNAME,
     commands: {
       printInputTemplate:
         "PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --print-input-template",
       reportOnly: `PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --customer-id <active_customer_id> --product-id <active_product_id> --material-id <active_material_id> --unit-id <active_unit_id> --warehouse-id <active_warehouse_id> --run-id ${runId} --out ${out}`,
-      applySimulated:
-        "OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS OPERATIONAL_FACT_SIM_ADMIN_PASSWORD='<local-admin-password>' OPERATIONAL_FACT_SIM_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --apply --backend-url http://127.0.0.1:8300 --customer-id <active_customer_id> --product-id <active_product_id> --material-id <active_material_id> --unit-id <active_unit_id> --warehouse-id <active_warehouse_id>",
       seedCoreDemo:
         "PATH=/usr/local/bin:$PATH bash scripts/seed-core-demo-data.sh",
     },
@@ -479,6 +431,9 @@ function buildPlan(options) {
     simulatedOnly: true,
     realCustomerImport: false,
     customerAcceptanceRequiredForClosure: false,
+    applySupported: false,
+    applyRetiredReason: APPLY_RETIRED_MESSAGE,
+    requiredApplyInputs: [],
     simulationPrefix: SIMULATION_PREFIX,
     runId: options.runId,
     backendURL: options.backendURL,
@@ -537,10 +492,7 @@ function buildPlan(options) {
         reservation_no: `${prefix}-RSV-REL`,
         sales_order_id: ids.salesOrderId,
         sales_order_item_id: ids.salesOrderItemId,
-        product_id: ids.productId,
-        product_sku_id: ids.productSkuId,
         warehouse_id: ids.warehouseId,
-        unit_id: ids.unitId,
         quantity: "1",
         idempotency_key: `${prefix}:RESERVATION:RELEASE`,
         note: "【试用】库存预留：创建后主动释放，不占用后续可用库存。",
@@ -629,566 +581,8 @@ function buildPlan(options) {
   };
 }
 
-function rpcURLFor(backendURL, domain) {
-  return new URL(`/rpc/${domain}`, `${backendURL}/`).toString();
-}
-
-async function rpcCall({
-  backendURL,
-  domain,
-  method,
-  params = {},
-  token,
-  fetchImpl = fetch,
-}) {
-  const response = await fetchImpl(rpcURLFor(backendURL, domain), {
-    method: "POST",
-    redirect: "error",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: `operational-fact-sim-${method}-${Date.now()}`,
-      method,
-      params:
-        domain === "auth" ? params : { customer_key: CUSTOMER_KEY, ...params },
-    }),
-  });
-  if (response.redirected === true) {
-    throw new CliError(`${domain}.${method} refused a redirected response`);
-  }
-  if (!response.ok) {
-    throw new CliError(`${domain}.${method} HTTP ${response.status}`);
-  }
-  const json = await response.json();
-  if (json?.result?.code !== 0) {
-    throw new CliError(
-      `${domain}.${method} code=${json?.result?.code} message=${json?.result?.message}`,
-    );
-  }
-  return json.result.data || {};
-}
-
-async function loginRole({ backendURL, username, password, fetchImpl }) {
-  const data = await rpcCall({
-    backendURL,
-    domain: "auth",
-    method: "admin_login",
-    params: { username, password },
-    fetchImpl,
-  });
-  const token = data.access_token || data.token;
-  if (!token) {
-    throw new CliError(`${username}: admin_login response missing token`);
-  }
-  return token;
-}
-
-async function loginRoles({ backendURL, password, fetchImpl }) {
-  const entries = [];
-  for (const [role, username] of Object.entries(ROLE_USERS)) {
-    entries.push([
-      role,
-      await loginRole({ backendURL, username, password, fetchImpl }),
-    ]);
-  }
-  return Object.fromEntries(entries);
-}
-
-async function assertSafeRuntime({
-  backendURL,
-  tokens,
-  adminToken,
-  fetchImpl,
-}) {
-  const localBackendURL = assertLocalBackendURL(backendURL);
-  const capabilities = await rpcCall({
-    backendURL: localBackendURL,
-    domain: "debug",
-    method: "capabilities",
-    token: adminToken,
-    fetchImpl,
-  });
-  if (!new Set(["local", "dev"]).has(capabilities.environment)) {
-    throw new CliError(
-      `refuse simulated operational fact writes in environment=${capabilities.environment || "unknown"}`,
-      2,
-    );
-  }
-  const sessionData = await rpcCall({
-    backendURL: localBackendURL,
-    domain: "customer_config",
-    method: "get_effective_session",
-    token: tokens?.pmc,
-    fetchImpl,
-  });
-  const session = sessionData.session || {};
-  const configRevision =
-    session.configRevision || session.config_revision || "";
-  if (
-    session?.customer?.key !== CUSTOMER_KEY ||
-    session.source !== "active_customer_config_revision" ||
-    !configRevision
-  ) {
-    throw new CliError(
-      "refuse simulated operational fact writes: active yoyoosun customer configuration revision is not current",
-      2,
-    );
-  }
-  const modules = session.modules || {};
-  const unavailableModules = REQUIRED_OPERATIONAL_MODULES.filter(
-    (key) => modules[key] !== "enabled",
-  );
-  if (unavailableModules.length > 0) {
-    throw new CliError(
-      `refuse simulated operational fact writes: required modules are not enabled: ${unavailableModules.join(", ")}`,
-      2,
-    );
-  }
-  return {
-    backendURL: localBackendURL,
-    environment: capabilities.environment,
-    customerKey: session.customer.key,
-    configRevision,
-    source: session.source,
-    requiredModules: REQUIRED_OPERATIONAL_MODULES,
-  };
-}
-
-function expectStatus(item, expected, label) {
-  if (item?.status !== expected) {
-    throw new CliError(
-      `${label}: expected status ${expected}, got ${item?.status}`,
-    );
-  }
-  return item;
-}
-
-function requireMutationRecord(item, label, expectedStatus) {
-  if (!Number.isSafeInteger(Number(item?.id)) || Number(item.id) <= 0) {
-    throw new CliError(`${label}: response missing positive record id`);
-  }
-  if (expectedStatus) expectStatus(item, expectedStatus, label);
-  return item;
-}
-
-async function assertOperationalRunIsEmpty({
-  backendURL,
-  prefix,
-  tokens,
-  fetchImpl,
-}) {
-  const probes = [
-    ["pmc", "list_production_facts", "production_facts"],
-    ["purchase", "list_outsourcing_facts", "outsourcing_facts"],
-    ["warehouse", "list_stock_reservations", "stock_reservations"],
-    ["warehouse", "list_shipments", "shipments"],
-    ["finance", "list_finance_facts", "finance_facts"],
-  ];
-  for (const [role, method, listKey] of probes) {
-    const data = await rpcCall({
-      backendURL,
-      domain: "operational_fact",
-      method,
-      params: { keyword: prefix, limit: 1, offset: 0 },
-      token: tokens[role],
-      fetchImpl,
-    });
-    const rows = Array.isArray(data[listKey]) ? data[listKey] : [];
-    const total = Number.isInteger(data.total) ? data.total : rows.length;
-    if (total > 0) {
-      throw new CliError(
-        `run ${prefix} already contains operational records; use a new runId`,
-        2,
-      );
-    }
-  }
-}
-
-async function loginRuntimeAdmin({ backendURL, adminPassword, fetchImpl }) {
-  return loginRole({
-    backendURL,
-    username: ADMIN_USERNAME,
-    password: requiredText(
-      adminPassword,
-      "OPERATIONAL_FACT_SIM_ADMIN_PASSWORD",
-    ),
-    fetchImpl,
-  });
-}
-
-async function applyPlan(plan, tokens, deps = {}) {
-  const { fetchImpl = fetch, adminPassword, authSession } = deps;
-  const backendURL = assertLocalBackendURL(plan?.backendURL);
-  requiredText(adminPassword, "OPERATIONAL_FACT_SIM_ADMIN_PASSWORD");
-  if (
-    authSession != null &&
-    (typeof authSession !== "object" || Array.isArray(authSession))
-  ) {
-    throw new CliError("authSession must be a mutable object");
-  }
-  if (authSession?.backendURL && authSession.backendURL !== backendURL) {
-    throw new CliError("authSession backend does not match the apply backend");
-  }
-  const adminToken =
-    authSession?.adminToken ||
-    (await loginRuntimeAdmin({
-      backendURL,
-      adminPassword,
-      fetchImpl,
-    }));
-  if (authSession && !authSession.adminToken) {
-    authSession.backendURL = backendURL;
-    authSession.adminToken = adminToken;
-  }
-  requiredText(adminToken, "authSession.adminToken");
-  await assertSafeRuntime({
-    backendURL,
-    tokens,
-    adminToken,
-    fetchImpl,
-  });
-  const { records } = plan;
-  await assertOperationalRunIsEmpty({
-    backendURL,
-    prefix: `${SIMULATION_PREFIX}-${plan.runId}`,
-    tokens,
-    fetchImpl,
-  });
-  const steps = [];
-  const call = async (label, role, method, params, pick, expectedStatus) => {
-    const data = await rpcCall({
-      backendURL,
-      domain: "operational_fact",
-      method,
-      params,
-      token: tokens[role],
-      fetchImpl,
-    });
-    const item = pick(data);
-    requireMutationRecord(item, label, expectedStatus);
-    steps.push({
-      label,
-      method,
-      status: item?.status || "OK",
-      id: item?.id || null,
-    });
-    return item;
-  };
-  const applyFinanceRecord = async (label, record, overrides = {}) => {
-    const targetStatus = normalizeFinanceStatus(
-      record.target_status || "POSTED",
-      `${label}.target_status`,
-    );
-    const item = await call(
-      `${label} create`,
-      "finance",
-      "create_finance_fact",
-      { ...record, ...overrides, target_status: undefined },
-      (data) => data.finance_fact,
-      "DRAFT",
-    );
-    if (["POSTED", "SETTLED", "CANCELLED"].includes(targetStatus)) {
-      await call(
-        `${label} post`,
-        "finance",
-        "post_finance_fact",
-        { id: item.id },
-        (data) => data.finance_fact,
-        "POSTED",
-      );
-    }
-    if (targetStatus === "SETTLED") {
-      await call(
-        `${label} settle`,
-        "finance",
-        "settle_finance_fact",
-        { id: item.id },
-        (data) => data.finance_fact,
-        "SETTLED",
-      );
-    }
-    if (targetStatus === "CANCELLED") {
-      await call(
-        `${label} cancel`,
-        "finance",
-        "cancel_finance_fact",
-        { id: item.id },
-        (data) => data.finance_fact,
-        "CANCELLED",
-      );
-    }
-    return item;
-  };
-
-  await call(
-    "production draft sample",
-    "pmc",
-    "create_production_fact",
-    {
-      ...records.productionDraftSample,
-    },
-    (data) => data.production_fact,
-    "DRAFT",
-  );
-
-  const productionPosted = await call(
-    "production posted sample create",
-    "pmc",
-    "create_production_fact",
-    {
-      ...records.productionReceipt,
-      fact_no: `${records.productionReceipt.fact_no}-POSTED`,
-      idempotency_key: `${records.productionReceipt.idempotency_key}:POSTED`,
-      note: "【试用】生产进度记录-已过账：库存中可看到成品增加。",
-    },
-    (data) => data.production_fact,
-    "DRAFT",
-  );
-  await call(
-    "production posted sample",
-    "pmc",
-    "post_production_fact",
-    { id: productionPosted.id },
-    (data) => data.production_fact,
-    "POSTED",
-  );
-
-  await call(
-    "reservation active sample",
-    "warehouse",
-    "create_stock_reservation",
-    {
-      ...records.stockReservationRelease,
-      reservation_no: `${records.stockReservationRelease.reservation_no}-ACTIVE`,
-      idempotency_key: `${records.stockReservationRelease.idempotency_key}:ACTIVE`,
-      note: "【试用】库存预留-生效中：供查看当前占用。",
-    },
-    (data) => data.stock_reservation,
-    "ACTIVE",
-  );
-
-  await call(
-    "outsourcing draft sample",
-    "purchase",
-    "create_outsourcing_fact",
-    {
-      ...records.outsourcingIssue,
-      fact_no: `${records.outsourcingIssue.fact_no}-DRAFT`,
-      idempotency_key: `${records.outsourcingIssue.idempotency_key}:DRAFT`,
-      note: "【试用】委外发料记录-草稿：尚未扣减库存。",
-    },
-    (data) => data.outsourcing_fact,
-    "DRAFT",
-  );
-
-  const outsourcingPosted = await call(
-    "outsourcing posted sample create",
-    "purchase",
-    "create_outsourcing_fact",
-    {
-      ...records.outsourcingIssue,
-      fact_no: `${records.outsourcingIssue.fact_no}-POSTED`,
-      idempotency_key: `${records.outsourcingIssue.idempotency_key}:POSTED`,
-      note: "【试用】委外发料记录-已过账：库存已扣减。",
-    },
-    (data) => data.outsourcing_fact,
-    "DRAFT",
-  );
-  await call(
-    "outsourcing posted sample",
-    "purchase",
-    "post_outsourcing_fact",
-    { id: outsourcingPosted.id },
-    (data) => data.outsourcing_fact,
-    "POSTED",
-  );
-
-  await call(
-    "shipment draft sample",
-    "warehouse",
-    "create_shipment_with_items",
-    {
-      ...records.shipment,
-      shipment_no: `${records.shipment.shipment_no}-DRAFT`,
-      idempotency_key: `${records.shipment.idempotency_key}:DRAFT`,
-      note: "【试用】出货单-草稿：尚未扣减库存。",
-      items: records.shipmentItems,
-    },
-    (data) => data.shipment,
-    "DRAFT",
-  );
-
-  const shipmentShipped = await call(
-    "shipment shipped sample create",
-    "warehouse",
-    "create_shipment_with_items",
-    {
-      ...records.shipment,
-      shipment_no: `${records.shipment.shipment_no}-SHIPPED`,
-      idempotency_key: `${records.shipment.idempotency_key}:SHIPPED`,
-      note: "【试用】出货单-已出货：库存已扣减。",
-      items: records.shipmentItems,
-    },
-    (data) => data.shipment,
-    "DRAFT",
-  );
-  await call(
-    "shipment shipped sample",
-    "warehouse",
-    "ship_shipment",
-    { id: shipmentShipped.id },
-    (data) => data.shipment,
-    "SHIPPED",
-  );
-
-  await call(
-    "finance draft sample",
-    "finance",
-    "create_finance_fact",
-    {
-      ...records.financeSettle,
-      fact_no: `${records.financeSettle.fact_no}-DRAFT`,
-      fact_type: "PAYMENT",
-      counterparty_type: "OTHER",
-      counterparty_id: undefined,
-      source_type: undefined,
-      source_id: undefined,
-      idempotency_key: `${records.financeSettle.idempotency_key}:DRAFT`,
-      note: "【试用】财务记录-草稿：尚未过账。",
-      target_status: undefined,
-    },
-    (data) => data.finance_fact,
-    "DRAFT",
-  );
-
-  await applyFinanceRecord(
-    "reconciliation sample",
-    records.financeReconciliation,
-    records.financeReconciliation.counterparty_type === "SUPPLIER"
-      ? { source_type: "OUTSOURCING_FACT", source_id: outsourcingPosted.id }
-      : { source_type: "SHIPMENT", source_id: shipmentShipped.id },
-  );
-
-  if (records.financePayable) {
-    await applyFinanceRecord(
-      "supplier payable sample",
-      records.financePayable,
-      {
-        source_type: "OUTSOURCING_FACT",
-        source_id: outsourcingPosted.id,
-      },
-    );
-  }
-
-  const production = await call(
-    "production create",
-    "pmc",
-    "create_production_fact",
-    records.productionReceipt,
-    (data) => data.production_fact,
-    "DRAFT",
-  );
-  await call(
-    "production post",
-    "pmc",
-    "post_production_fact",
-    { id: production.id },
-    (data) => data.production_fact,
-    "POSTED",
-  );
-
-  const reservationRelease = await call(
-    "reservation create release path",
-    "warehouse",
-    "create_stock_reservation",
-    records.stockReservationRelease,
-    (data) => data.stock_reservation,
-    "ACTIVE",
-  );
-  await call(
-    "reservation release",
-    "warehouse",
-    "release_stock_reservation",
-    { id: reservationRelease.id },
-    (data) => data.stock_reservation,
-    "RELEASED",
-  );
-
-  const outsourcing = await call(
-    "outsourcing create",
-    "purchase",
-    "create_outsourcing_fact",
-    records.outsourcingIssue,
-    (data) => data.outsourcing_fact,
-    "DRAFT",
-  );
-  await call(
-    "outsourcing post",
-    "purchase",
-    "post_outsourcing_fact",
-    { id: outsourcing.id },
-    (data) => data.outsourcing_fact,
-    "POSTED",
-  );
-  await call(
-    "outsourcing cancel",
-    "purchase",
-    "cancel_outsourcing_fact",
-    { id: outsourcing.id },
-    (data) => data.outsourcing_fact,
-    "CANCELLED",
-  );
-
-  const shipment = await call(
-    "shipment create",
-    "warehouse",
-    "create_shipment_with_items",
-    { ...records.shipment, items: records.shipmentItems },
-    (data) => data.shipment,
-    "DRAFT",
-  );
-  await call(
-    "shipment ship",
-    "warehouse",
-    "ship_shipment",
-    { id: shipment.id },
-    (data) => data.shipment,
-    "SHIPPED",
-  );
-
-  await applyFinanceRecord("receivable sample", records.financeSettle, {
-    source_type: "SHIPMENT",
-    source_id: shipment.id,
-  });
-
-  await applyFinanceRecord("invoice sample", records.financeCancel, {
-    source_type: "SHIPMENT",
-    source_id: shipment.id,
-  });
-
-  await call(
-    "shipment cancel",
-    "warehouse",
-    "cancel_shipment",
-    { id: shipment.id },
-    (data) => data.shipment,
-    "CANCELLED",
-  );
-
-  await call(
-    "production cancel stock seed",
-    "pmc",
-    "cancel_production_fact",
-    { id: production.id },
-    (data) => data.production_fact,
-    "CANCELLED",
-  );
-
-  return steps;
+async function applyPlan() {
+  throw new CliError(APPLY_RETIRED_MESSAGE, 2);
 }
 
 function buildMarkdownReport(report) {
@@ -1260,43 +654,11 @@ async function main() {
   }
   const plan = buildPlan(options);
   const report = {
-    mode: options.apply ? "apply-simulated-operational-facts" : "report-only",
+    mode: "report-only",
     generatedAt: new Date().toISOString(),
     plan,
     steps: [],
   };
-
-  if (options.apply) {
-    plan.backendURL = assertLocalBackendURL(plan.backendURL);
-    if (process.env.OPERATIONAL_FACT_SIM_CONFIRM !== CONFIRM_PHRASE) {
-      throw new CliError(
-        `apply requires OPERATIONAL_FACT_SIM_CONFIRM=${CONFIRM_PHRASE}`,
-        2,
-      );
-    }
-    const adminPassword = optionalText(
-      process.env.OPERATIONAL_FACT_SIM_ADMIN_PASSWORD,
-    );
-    if (!adminPassword) {
-      throw new CliError(
-        "apply requires OPERATIONAL_FACT_SIM_ADMIN_PASSWORD",
-        2,
-      );
-    }
-    const password = optionalText(
-      process.env.OPERATIONAL_FACT_SIM_PASSWORD ||
-        process.env.TRIAL_ACCOUNT_PASSWORD ||
-        process.env.ERP_ROLE_DEMO_PASSWORD,
-    );
-    if (!password) {
-      throw new CliError(
-        "apply requires OPERATIONAL_FACT_SIM_PASSWORD, TRIAL_ACCOUNT_PASSWORD, or ERP_ROLE_DEMO_PASSWORD",
-        2,
-      );
-    }
-    const tokens = await loginRoles({ backendURL: plan.backendURL, password });
-    report.steps = await applyPlan(plan, tokens, { adminPassword });
-  }
 
   const output = await writeReports(options.out, report);
   process.stdout.write(
@@ -1314,16 +676,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 export {
+  APPLY_RETIRED_MESSAGE,
   applyPlan,
   assertLocalBackendURL,
-  assertSafeRuntime,
   buildInputTemplate,
   buildPlan,
   buildTimestampRunId,
-  CONFIRM_PHRASE,
   INPUT_TEMPLATE_SCOPE,
-  loginRoles,
   parseCliArgs,
-  requireMutationRecord,
   sanitizeRunId,
 };

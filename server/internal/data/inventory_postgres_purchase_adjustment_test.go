@@ -30,7 +30,12 @@ func TestPurchaseReceiptAdjustmentPostgresShapeAndFlow(t *testing.T) {
 		assertPostgresTableExists(t, data.sqldb, table)
 	}
 	assertPostgresNumericColumn(t, data.sqldb, "purchase_receipt_adjustment_items", "quantity", 20, 6)
+	assertPostgresColumnExists(t, data.sqldb, "purchase_receipt_adjustments", "idempotency_key")
+	assertPostgresColumnExists(t, data.sqldb, "purchase_receipt_adjustments", "idempotency_payload_hash")
+	assertPostgresColumnExists(t, data.sqldb, "purchase_receipt_adjustments", "idempotency_item_count")
 	assertPostgresUniqueIndex(t, data.sqldb, "purchase_receipt_adjustments", "purchasereceiptadjustment_adjustment_no")
+	assertPostgresUniqueIndex(t, data.sqldb, "purchase_receipt_adjustments", "purchasereceiptadjustment_idempotency_key")
+	assertPostgresCheckConstraint(t, data.sqldb, "purchase_receipt_adjustments", "purchase_receipt_adjustments_idempotency_bundle_complete", "idempotency_item_count > 0")
 	assertPostgresPartialUniqueIndex(t, data.sqldb, "purchase_receipt_adjustment_items", "purchasereceiptadjustmentitem_adjustment_id_source_line_no", "source_line_no IS NOT NULL AND source_line_no <> ''")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_receipt_adjustment_items", "purchase_receipt_adjustment_items_quantity_positive", "quantity > 0")
 	assertPostgresForeignKeyDeleteRule(t, data.sqldb, "purchase_receipt_adjustments", "purchase_receipt_adjustments_purchase_receipts_purchase_receipt", "NO ACTION")
@@ -222,6 +227,52 @@ func TestPurchaseReceiptAdjustmentPostgresShapeAndFlow(t *testing.T) {
 	}
 	if reversalCount != 1 {
 		t.Fatalf("repeat adjustment cancel should keep one reversal txn, got %d", reversalCount)
+	}
+}
+
+func TestPurchaseReceiptAdjustmentPostgresAggregateCreateIdempotency(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseOperationalPostgresTestData(t)
+	fixtures := createPurchaseOperationalPostgresFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	invFixtures := inventoryTestFixtures{
+		unitID:      fixtures.unitID,
+		materialID:  fixtures.materialID,
+		productID:   fixtures.productID,
+		warehouseID: fixtures.warehouseID,
+	}
+	postedReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PRA-IDEM-IN-"+fixtures.suffix, invFixtures, stringPtr("PG-PRA-IDEM-LOT-"+fixtures.suffix), mustDecimal(t, "10"))
+	command := &biz.PurchaseReceiptAdjustmentFromReceiptCreate{
+		AdjustmentNo:      "PG-PRA-IDEM-" + fixtures.suffix,
+		PurchaseReceiptID: postedReceipt.ID,
+		AdjustedAt:        time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC),
+		IdempotencyKey:    "pg-purchase-adjustment-idem-" + fixtures.suffix,
+		Items: []biz.PurchaseReceiptAdjustmentFromReceiptItemCreate{{
+			PurchaseReceiptItemID: postedReceipt.Items[0].ID,
+			AdjustType:            biz.PurchaseReceiptAdjustmentQuantityIncrease,
+			Quantity:              mustDecimal(t, "2"),
+		}},
+	}
+	first, err := uc.CreatePurchaseReceiptAdjustmentFromReceipt(ctx, command)
+	if err != nil {
+		t.Fatalf("create postgres aggregate adjustment failed: %v", err)
+	}
+	replayed, err := uc.CreatePurchaseReceiptAdjustmentFromReceipt(ctx, command)
+	if err != nil || replayed.ID != first.ID {
+		t.Fatalf("same postgres adjustment intent did not replay id=%d replay=%#v err=%v", first.ID, replayed, err)
+	}
+	changed := *command
+	changed.Items = append([]biz.PurchaseReceiptAdjustmentFromReceiptItemCreate(nil), command.Items...)
+	changed.Items[0].Quantity = mustDecimal(t, "3")
+	if _, err := uc.CreatePurchaseReceiptAdjustmentFromReceipt(ctx, &changed); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("changed postgres adjustment intent error=%v, want ErrIdempotencyConflict", err)
+	}
+	row, err := client.PurchaseReceiptAdjustment.Get(ctx, first.ID)
+	if err != nil {
+		t.Fatalf("read postgres aggregate adjustment idempotency bundle: %v", err)
+	}
+	if row.IdempotencyKey == nil || *row.IdempotencyKey != command.IdempotencyKey || row.IdempotencyPayloadHash == nil || len(*row.IdempotencyPayloadHash) != 64 || row.IdempotencyItemCount == nil || *row.IdempotencyItemCount != 1 {
+		t.Fatalf("unexpected postgres aggregate adjustment idempotency bundle: %#v", row)
 	}
 }
 

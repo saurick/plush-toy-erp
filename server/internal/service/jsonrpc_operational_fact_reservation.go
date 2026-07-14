@@ -13,21 +13,21 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "create_stock_reservation":
-		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionSalesOrderUpdate, biz.PermissionWarehouseInventoryRead); res != nil {
+	case "create_stock_reservation_from_sales_order":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionStockReservationCreate); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "inventory"); res != nil {
 			return id, res, nil
 		}
-		in, ok := stockReservationCreateFromParams(pm)
+		in, ok := stockReservationFromSalesOrderCreateFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.operationalFactUC.CreateStockReservation(ctx, in)
+		item, err := d.operationalFactUC.CreateStockReservationFromSalesOrder(ctx, in)
 		return id, operationalFactStockReservationResult(ctx, d, item, err), nil
 	case "release_stock_reservation":
-		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionSalesOrderUpdate, biz.PermissionWarehouseOutboundConfirm); res != nil {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionStockReservationRelease); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "inventory"); res != nil {
@@ -53,7 +53,22 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 	}
 }
 
-func stockReservationCreateFromParams(pm map[string]any) (*biz.StockReservationCreate, bool) {
+func stockReservationFromSalesOrderCreateFromParams(pm map[string]any) (*biz.StockReservationFromSalesOrderCreate, bool) {
+	if !stockReservationFromSalesOrderAllowsOnly(
+		pm,
+		"customer_key",
+		"reservation_no",
+		"sales_order_id",
+		"sales_order_item_id",
+		"warehouse_id",
+		"lot_id",
+		"quantity",
+		"reserved_at",
+		"note",
+		"idempotency_key",
+	) {
+		return nil, false
+	}
 	quantity, ok := getRequiredJSONRPCDecimal(pm, "quantity")
 	if !ok {
 		return nil, false
@@ -62,20 +77,30 @@ func stockReservationCreateFromParams(pm map[string]any) (*biz.StockReservationC
 	if !ok {
 		return nil, false
 	}
-	return &biz.StockReservationCreate{
+	return &biz.StockReservationFromSalesOrderCreate{
 		ReservationNo:    getString(pm, "reservation_no"),
-		SalesOrderID:     getOptionalInt(pm, "sales_order_id"),
-		SalesOrderItemID: getOptionalInt(pm, "sales_order_item_id"),
-		ProductID:        getInt(pm, "product_id", 0),
-		ProductSkuID:     getOptionalInt(pm, "product_sku_id"),
+		SalesOrderID:     getInt(pm, "sales_order_id", 0),
+		SalesOrderItemID: getInt(pm, "sales_order_item_id", 0),
 		WarehouseID:      getInt(pm, "warehouse_id", 0),
-		UnitID:           getInt(pm, "unit_id", 0),
 		LotID:            getOptionalInt(pm, "lot_id"),
 		Quantity:         quantity,
 		IdempotencyKey:   getString(pm, "idempotency_key"),
 		ReservedAt:       optionalTimeValue(reservedAt),
 		Note:             getWorkflowStringPtr(pm, "note"),
 	}, true
+}
+
+func stockReservationFromSalesOrderAllowsOnly(pm map[string]any, keys ...string) bool {
+	allowed := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		allowed[key] = struct{}{}
+	}
+	for key := range pm {
+		if _, ok := allowed[key]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func operationalFactStockReservationResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.StockReservation, err error) *v1.JsonrpcResult {

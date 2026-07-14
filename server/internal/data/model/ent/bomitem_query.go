@@ -4,12 +4,14 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/productionordermaterialrequirement"
 	"server/internal/data/model/ent/unit"
 
 	"entgo.io/ent"
@@ -21,13 +23,14 @@ import (
 // BOMItemQuery is the builder for querying BOMItem entities.
 type BOMItemQuery struct {
 	config
-	ctx           *QueryContext
-	order         []bomitem.OrderOption
-	inters        []Interceptor
-	predicates    []predicate.BOMItem
-	withBomHeader *BOMHeaderQuery
-	withMaterial  *MaterialQuery
-	withUnit      *UnitQuery
+	ctx                                     *QueryContext
+	order                                   []bomitem.OrderOption
+	inters                                  []Interceptor
+	predicates                              []predicate.BOMItem
+	withBomHeader                           *BOMHeaderQuery
+	withMaterial                            *MaterialQuery
+	withUnit                                *UnitQuery
+	withProductionOrderMaterialRequirements *ProductionOrderMaterialRequirementQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -123,6 +126,28 @@ func (_q *BOMItemQuery) QueryUnit() *UnitQuery {
 			sqlgraph.From(bomitem.Table, bomitem.FieldID, selector),
 			sqlgraph.To(unit.Table, unit.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, bomitem.UnitTable, bomitem.UnitColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryProductionOrderMaterialRequirements chains the current query on the "production_order_material_requirements" edge.
+func (_q *BOMItemQuery) QueryProductionOrderMaterialRequirements() *ProductionOrderMaterialRequirementQuery {
+	query := (&ProductionOrderMaterialRequirementClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(bomitem.Table, bomitem.FieldID, selector),
+			sqlgraph.To(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, bomitem.ProductionOrderMaterialRequirementsTable, bomitem.ProductionOrderMaterialRequirementsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -317,14 +342,15 @@ func (_q *BOMItemQuery) Clone() *BOMItemQuery {
 		return nil
 	}
 	return &BOMItemQuery{
-		config:        _q.config,
-		ctx:           _q.ctx.Clone(),
-		order:         append([]bomitem.OrderOption{}, _q.order...),
-		inters:        append([]Interceptor{}, _q.inters...),
-		predicates:    append([]predicate.BOMItem{}, _q.predicates...),
-		withBomHeader: _q.withBomHeader.Clone(),
-		withMaterial:  _q.withMaterial.Clone(),
-		withUnit:      _q.withUnit.Clone(),
+		config:                                  _q.config,
+		ctx:                                     _q.ctx.Clone(),
+		order:                                   append([]bomitem.OrderOption{}, _q.order...),
+		inters:                                  append([]Interceptor{}, _q.inters...),
+		predicates:                              append([]predicate.BOMItem{}, _q.predicates...),
+		withBomHeader:                           _q.withBomHeader.Clone(),
+		withMaterial:                            _q.withMaterial.Clone(),
+		withUnit:                                _q.withUnit.Clone(),
+		withProductionOrderMaterialRequirements: _q.withProductionOrderMaterialRequirements.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -361,6 +387,17 @@ func (_q *BOMItemQuery) WithUnit(opts ...func(*UnitQuery)) *BOMItemQuery {
 		opt(query)
 	}
 	_q.withUnit = query
+	return _q
+}
+
+// WithProductionOrderMaterialRequirements tells the query-builder to eager-load the nodes that are connected to
+// the "production_order_material_requirements" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *BOMItemQuery) WithProductionOrderMaterialRequirements(opts ...func(*ProductionOrderMaterialRequirementQuery)) *BOMItemQuery {
+	query := (&ProductionOrderMaterialRequirementClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withProductionOrderMaterialRequirements = query
 	return _q
 }
 
@@ -442,10 +479,11 @@ func (_q *BOMItemQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*BOMI
 	var (
 		nodes       = []*BOMItem{}
 		_spec       = _q.querySpec()
-		loadedTypes = [3]bool{
+		loadedTypes = [4]bool{
 			_q.withBomHeader != nil,
 			_q.withMaterial != nil,
 			_q.withUnit != nil,
+			_q.withProductionOrderMaterialRequirements != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -481,6 +519,17 @@ func (_q *BOMItemQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*BOMI
 	if query := _q.withUnit; query != nil {
 		if err := _q.loadUnit(ctx, query, nodes, nil,
 			func(n *BOMItem, e *Unit) { n.Edges.Unit = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withProductionOrderMaterialRequirements; query != nil {
+		if err := _q.loadProductionOrderMaterialRequirements(ctx, query, nodes,
+			func(n *BOMItem) {
+				n.Edges.ProductionOrderMaterialRequirements = []*ProductionOrderMaterialRequirement{}
+			},
+			func(n *BOMItem, e *ProductionOrderMaterialRequirement) {
+				n.Edges.ProductionOrderMaterialRequirements = append(n.Edges.ProductionOrderMaterialRequirements, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -571,6 +620,36 @@ func (_q *BOMItemQuery) loadUnit(ctx context.Context, query *UnitQuery, nodes []
 		for i := range nodes {
 			assign(nodes[i], n)
 		}
+	}
+	return nil
+}
+func (_q *BOMItemQuery) loadProductionOrderMaterialRequirements(ctx context.Context, query *ProductionOrderMaterialRequirementQuery, nodes []*BOMItem, init func(*BOMItem), assign func(*BOMItem, *ProductionOrderMaterialRequirement)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*BOMItem)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productionordermaterialrequirement.FieldBomItemID)
+	}
+	query.Where(predicate.ProductionOrderMaterialRequirement(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(bomitem.ProductionOrderMaterialRequirementsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.BomItemID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "bom_item_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
 	}
 	return nil
 }

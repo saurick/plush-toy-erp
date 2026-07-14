@@ -241,7 +241,7 @@ export default function WorkflowTaskActionDrawer({
                   icon={<LinkOutlined />}
                   onClick={() => onOpenEntry(task)}
                 >
-                  查看关联记录
+                  {isTerminal ? '查看关联记录' : '去办理'}
                 </Button>
               ) : null}
             </Space>

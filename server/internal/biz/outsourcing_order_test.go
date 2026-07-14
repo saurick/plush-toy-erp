@@ -14,6 +14,9 @@ type outsourcingOrderRepoStub struct {
 	items              map[int]*OutsourcingOrderItem
 	supplierActive     map[int]bool
 	productActive      map[int]bool
+	productSKUActive   map[int]bool
+	productSKUProduct  map[int]int
+	productSKUUnit     map[int]int
 	materialActive     map[int]bool
 	unitActive         map[int]bool
 	processActive      map[int]bool
@@ -48,7 +51,7 @@ func (s *outsourcingOrderRepoStub) SaveOutsourcingOrderWithItems(_ context.Conte
 	s.savedItems = items
 	return &OutsourcingOrderWithItems{
 		Order: &OutsourcingOrder{ID: 1, OutsourcingOrderNo: order.OutsourcingOrderNo, SupplierID: order.SupplierID, LifecycleStatus: OutsourcingOrderStatusDraft},
-		Items: []*OutsourcingOrderItem{{ID: 1, OutsourcingOrderID: 1, LineNo: items[0].LineNo, ProductID: items[0].ProductID, ProcessID: items[0].ProcessID, UnitID: items[0].UnitID, OutsourcingQuantity: items[0].OutsourcingQuantity, LineStatus: OutsourcingOrderItemStatusOpen}},
+		Items: []*OutsourcingOrderItem{{ID: 1, OutsourcingOrderID: 1, LineNo: items[0].LineNo, ProductID: items[0].ProductID, ProductSKUID: items[0].ProductSKUID, ProcessID: items[0].ProcessID, UnitID: items[0].UnitID, OutsourcingQuantity: items[0].OutsourcingQuantity, LineStatus: OutsourcingOrderItemStatusOpen}},
 	}, nil
 }
 
@@ -76,6 +79,14 @@ func (s *outsourcingOrderRepoStub) ProductIsActive(_ context.Context, id int) (b
 	active, ok := s.productActive[id]
 	if !ok {
 		return false, ErrProductNotFound
+	}
+	return active, nil
+}
+
+func (s *outsourcingOrderRepoStub) ProductSKUIsActiveForProductAndUnit(_ context.Context, id, productID, unitID int) (bool, error) {
+	active, ok := s.productSKUActive[id]
+	if !ok || s.productSKUProduct[id] != productID || s.productSKUUnit[id] != unitID {
+		return false, ErrProductSKUNotFound
 	}
 	return active, nil
 }
@@ -109,6 +120,9 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierSubjectProcessAndUnit(t *testi
 	repo := &outsourcingOrderRepoStub{
 		supplierActive:     map[int]bool{1: true, 2: false},
 		productActive:      map[int]bool{10: true, 11: false},
+		productSKUActive:   map[int]bool{50: true, 51: false, 52: true, 53: true},
+		productSKUProduct:  map[int]int{50: 10, 51: 10, 52: 99, 53: 10},
+		productSKUUnit:     map[int]int{50: 20, 51: 20, 52: 20, 53: 99},
 		materialActive:     map[int]bool{40: true, 41: false},
 		unitActive:         map[int]bool{20: true, 21: false},
 		processActive:      map[int]bool{30: true, 31: false, 32: true},
@@ -121,6 +135,7 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierSubjectProcessAndUnit(t *testi
 	price := decimal.NewFromFloat(3.2)
 	productOrderNo := " SO-26001 "
 	productID := 10
+	productSKUID := 50
 	inactiveProductID := 11
 	materialID := 40
 	inactiveMaterialID := 41
@@ -137,6 +152,7 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierSubjectProcessAndUnit(t *testi
 				LineNo:                 1,
 				SubjectType:            OutsourcingOrderSubjectProduct,
 				ProductID:              &productID,
+				ProductSKUID:           &productSKUID,
 				ProcessID:              30,
 				UnitID:                 20,
 				ProductOrderNoSnapshot: &productOrderNo,
@@ -157,8 +173,20 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierSubjectProcessAndUnit(t *testi
 	if repo.savedItems[0].ProductOrderNoSnapshot == nil || *repo.savedItems[0].ProductOrderNoSnapshot != "SO-26001" {
 		t.Fatalf("expected normalized product order no snapshot, got %#v", repo.savedItems[0].ProductOrderNoSnapshot)
 	}
-	if repo.savedItems[0].SubjectType != OutsourcingOrderSubjectProduct || repo.savedItems[0].ProductID == nil || *repo.savedItems[0].ProductID != productID || repo.savedItems[0].MaterialID != nil {
+	if repo.savedItems[0].SubjectType != OutsourcingOrderSubjectProduct || repo.savedItems[0].ProductID == nil || *repo.savedItems[0].ProductID != productID || repo.savedItems[0].ProductSKUID == nil || *repo.savedItems[0].ProductSKUID != productSKUID || repo.savedItems[0].MaterialID != nil {
 		t.Fatalf("expected product subject to remain exactly-one, got %#v", repo.savedItems[0].OutsourcingOrderItemMutation)
+	}
+	inactiveSKUID := 51
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-INACTIVE-SKU", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, SubjectType: OutsourcingOrderSubjectProduct, ProductID: &productID, ProductSKUID: &inactiveSKUID, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrProductSKUInactive) {
+		t.Fatalf("expected inactive SKU rejected, got %v", err)
+	}
+	wrongProductSKUID := 52
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-WRONG-SKU-PRODUCT", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, SubjectType: OutsourcingOrderSubjectProduct, ProductID: &productID, ProductSKUID: &wrongProductSKUID, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrProductSKUNotFound) {
+		t.Fatalf("expected cross-product SKU rejected, got %v", err)
+	}
+	wrongUnitSKUID := 53
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-WRONG-SKU-UNIT", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, SubjectType: OutsourcingOrderSubjectProduct, ProductID: &productID, ProductSKUID: &wrongUnitSKUID, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrProductSKUNotFound) {
+		t.Fatalf("expected cross-unit SKU rejected, got %v", err)
 	}
 
 	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-002", SupplierID: 2, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{LineNo: 1, SubjectType: OutsourcingOrderSubjectProduct, ProductID: &productID, ProcessID: 30, UnitID: 20, OutsourcingQuantity: qty}}}); !errors.Is(err, ErrSupplierInactive) {
@@ -187,6 +215,7 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierSubjectProcessAndUnit(t *testi
 	materialCode := " MAT-FABRIC-01 "
 	materialName := " 短毛绒布料 "
 	staleProductName := "不应残留的产品名"
+	staleSKUCode := "不应残留的规格编号"
 	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &OutsourcingOrderMutation{OutsourcingOrderNo: "OUT-MATERIAL", SupplierID: 1, OrderDate: orderDate}, []*OutsourcingOrderItemSaveMutation{{OutsourcingOrderItemMutation: OutsourcingOrderItemMutation{
 		LineNo:               1,
 		SubjectType:          " material ",
@@ -194,6 +223,8 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierSubjectProcessAndUnit(t *testi
 		ProcessID:            30,
 		UnitID:               20,
 		ProductNameSnapshot:  &staleProductName,
+		ProductSKUID:         &productSKUID,
+		SKUCodeSnapshot:      &staleSKUCode,
 		MaterialCodeSnapshot: &materialCode,
 		MaterialNameSnapshot: &materialName,
 		OutsourcingQuantity:  qty,
@@ -201,7 +232,7 @@ func TestOutsourcingOrderUsecaseSaveGuardsSupplierSubjectProcessAndUnit(t *testi
 		t.Fatalf("expected material outsourcing line accepted, got %v", err)
 	}
 	materialItem := repo.savedItems[0]
-	if materialItem.SubjectType != OutsourcingOrderSubjectMaterial || materialItem.MaterialID == nil || *materialItem.MaterialID != materialID || materialItem.ProductID != nil {
+	if materialItem.SubjectType != OutsourcingOrderSubjectMaterial || materialItem.MaterialID == nil || *materialItem.MaterialID != materialID || materialItem.ProductID != nil || materialItem.ProductSKUID != nil || materialItem.SKUCodeSnapshot != nil {
 		t.Fatalf("expected normalized material subject exactly-one, got %#v", materialItem.OutsourcingOrderItemMutation)
 	}
 	if materialItem.MaterialCodeSnapshot == nil || *materialItem.MaterialCodeSnapshot != "MAT-FABRIC-01" || materialItem.MaterialNameSnapshot == nil || *materialItem.MaterialNameSnapshot != "短毛绒布料" || materialItem.ProductNameSnapshot != nil {

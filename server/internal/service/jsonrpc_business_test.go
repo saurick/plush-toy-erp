@@ -183,6 +183,10 @@ func (s *stubBusinessDashboardOperationalFactRepo) CreateStockReservation(contex
 	return nil, biz.ErrBadParam
 }
 
+func (s *stubBusinessDashboardOperationalFactRepo) CreateStockReservationFromSalesOrder(context.Context, *biz.StockReservationFromSalesOrderCreate) (*biz.StockReservation, error) {
+	return nil, biz.ErrBadParam
+}
+
 func (s *stubBusinessDashboardOperationalFactRepo) ReleaseStockReservation(context.Context, int) (*biz.StockReservation, error) {
 	return nil, biz.ErrBadParam
 }

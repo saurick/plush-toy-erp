@@ -25,6 +25,19 @@ export const QUALITY_RESULT_FILTER_OPTIONS = [
   { label: '不合格', value: 'REJECT' },
 ]
 
+export const QUALITY_INSPECTION_TYPE_FILTER_OPTIONS = [
+  { label: '全部检验类型', value: '' },
+  { label: '采购来料', value: 'INCOMING' },
+  { label: '委外回货', value: 'OUTSOURCING_RETURN' },
+  { label: '成品检验', value: 'FINISHED_GOODS' },
+]
+
+export const QUALITY_INSPECTION_TYPE_LABELS = Object.freeze({
+  INCOMING: '采购来料',
+  OUTSOURCING_RETURN: '委外回货',
+  FINISHED_GOODS: '成品检验',
+})
+
 export const QUALITY_DATE_FILTER_OPTIONS = [
   { label: '质检日期', value: 'inspected_at' },
 ]
@@ -108,10 +121,74 @@ function inspectorLabel(inspectorID) {
   return inspectorID ? '管理员已关联' : '-'
 }
 
+function inspectionTypeLabel(record) {
+  const key = String(record?.inspection_type || '').toUpperCase()
+  return QUALITY_INSPECTION_TYPE_LABELS[key] || '质量检验'
+}
+
+function sourceParts(
+  record,
+  purchaseReceiptOptions,
+  allPurchaseReceiptItemOptions
+) {
+  const sourceType = String(record?.source_type || '').toUpperCase()
+  if (sourceType === 'PURCHASE_RECEIPT') {
+    return [
+      referenceLabel(
+        purchaseReceiptOptions,
+        record?.purchase_receipt_id,
+        '采购入库'
+      ),
+      referenceLabel(
+        allPurchaseReceiptItemOptions,
+        record?.purchase_receipt_item_id,
+        '入库行'
+      ),
+    ]
+  }
+  if (sourceType === 'OUTSOURCING_FACT') {
+    return ['委外回货记录已关联']
+  }
+  if (sourceType === 'SHIPMENT') {
+    return ['出货记录已关联']
+  }
+  return ['业务来源已关联']
+}
+
+function subjectLabel(record, materialOptions, productOptions) {
+  const subjectType = String(record?.subject_type || '').toUpperCase()
+  if (subjectType === 'PRODUCT') {
+    return referenceLabel(productOptions, record?.subject_id, '产品')
+  }
+  return referenceLabel(
+    materialOptions,
+    record?.material_id || record?.subject_id,
+    '材料'
+  )
+}
+
+function subjectParts(
+  record,
+  inventoryLotOptions,
+  materialOptions,
+  productOptions,
+  warehouseOptions
+) {
+  return [
+    subjectLabel(record, materialOptions, productOptions),
+    referenceLabel(inventoryLotOptions, record?.inventory_lot_id, '批次'),
+    referenceLabel(warehouseOptions, record?.warehouse_id, '仓库'),
+    record?.original_lot_status
+      ? `原批次状态 ${lotStatusText(record.original_lot_status)}`
+      : '',
+  ]
+}
+
 export function buildQualityInspectionExportColumns({
   allPurchaseReceiptItemOptions = [],
   inventoryLotOptions = [],
   materialOptions = [],
+  productOptions = [],
   purchaseReceiptOptions = [],
   warehouseOptions = [],
 }) {
@@ -143,44 +220,27 @@ export function buildQualityInspectionExportColumns({
       render: qualityResultTag,
     },
     {
-      title: '采购入库单',
-      exportTitle: '采购入库单',
-      dataIndex: 'purchase_receipt_id',
-      width: 120,
-      sortType: 'number',
-      render: (value) =>
-        referenceLabel(purchaseReceiptOptions, value, '入库单'),
+      title: '检验来源',
+      exportTitle: '检验来源',
+      dataIndex: 'inspection_type',
+      width: 240,
       exportValue: (record) =>
-        referenceLabel(
-          purchaseReceiptOptions,
-          record?.purchase_receipt_id,
-          '入库单'
-        ),
+        [
+          inspectionTypeLabel(record),
+          ...sourceParts(
+            record,
+            purchaseReceiptOptions,
+            allPurchaseReceiptItemOptions
+          ),
+        ].join(' / '),
     },
     {
-      title: '入库行',
-      exportTitle: '入库行',
-      dataIndex: 'purchase_receipt_item_id',
-      width: 110,
-      sortType: 'number',
-      render: (value) =>
-        referenceLabel(allPurchaseReceiptItemOptions, value, '入库行'),
+      title: '检验对象',
+      exportTitle: '检验对象',
+      dataIndex: 'subject_type',
+      width: 220,
       exportValue: (record) =>
-        referenceLabel(
-          allPurchaseReceiptItemOptions,
-          record?.purchase_receipt_item_id,
-          '入库行'
-        ),
-    },
-    {
-      title: '材料',
-      exportTitle: '材料',
-      dataIndex: 'material_id',
-      width: 180,
-      sortType: 'number',
-      render: (value) => referenceLabel(materialOptions, value, '材料'),
-      exportValue: (record) =>
-        referenceLabel(materialOptions, record?.material_id, '材料'),
+        subjectLabel(record, materialOptions, productOptions),
     },
     {
       title: '仓库',
@@ -241,6 +301,7 @@ export function buildQualityInspectionDataColumns({
   allPurchaseReceiptItemOptions = [],
   inventoryLotOptions = [],
   materialOptions = [],
+  productOptions = [],
   purchaseReceiptOptions = [],
   warehouseOptions = [],
 }) {
@@ -272,70 +333,53 @@ export function buildQualityInspectionDataColumns({
       render: qualityResultTag,
     },
     {
-      title: '采购来源',
-      exportTitle: '采购来源',
-      dataIndex: 'purchase_receipt_id',
-      width: 210,
-      sortType: 'number',
+      title: '检验来源',
+      exportTitle: '检验来源',
+      dataIndex: 'inspection_type',
+      width: 240,
       render: (_value, record) =>
         renderStackCell(
-          referenceLabel(
+          inspectionTypeLabel(record),
+          sourceParts(
+            record,
             purchaseReceiptOptions,
-            record?.purchase_receipt_id,
-            '入库单'
-          ),
-          [
-            referenceLabel(
-              allPurchaseReceiptItemOptions,
-              record?.purchase_receipt_item_id,
-              '入库行'
-            ),
-          ]
+            allPurchaseReceiptItemOptions
+          )
         ),
       exportValue: (record) =>
         [
-          referenceLabel(
+          inspectionTypeLabel(record),
+          ...sourceParts(
+            record,
             purchaseReceiptOptions,
-            record?.purchase_receipt_id,
-            '入库单'
-          ),
-          referenceLabel(
-            allPurchaseReceiptItemOptions,
-            record?.purchase_receipt_item_id,
-            '入库行'
+            allPurchaseReceiptItemOptions
           ),
         ].join(' / '),
     },
     {
-      title: '物料批次',
-      exportTitle: '物料批次',
+      title: '检验对象 / 批次',
+      exportTitle: '检验对象 / 批次',
       dataIndex: 'inventory_lot_id',
       width: 260,
       sortType: 'number',
-      render: (_value, record) =>
-        renderStackCell(
-          referenceLabel(materialOptions, record?.material_id, '材料'),
-          [
-            referenceLabel(
-              inventoryLotOptions,
-              record?.inventory_lot_id,
-              '批次'
-            ),
-            referenceLabel(warehouseOptions, record?.warehouse_id, '仓库'),
-            record?.original_lot_status
-              ? `原批次状态 ${lotStatusText(record.original_lot_status)}`
-              : '',
-          ]
-        ),
+      render: (_value, record) => {
+        const [subject, ...secondary] = subjectParts(
+          record,
+          inventoryLotOptions,
+          materialOptions,
+          productOptions,
+          warehouseOptions
+        )
+        return renderStackCell(subject, secondary)
+      },
       exportValue: (record) =>
-        [
-          referenceLabel(materialOptions, record?.material_id, '材料'),
-          referenceLabel(inventoryLotOptions, record?.inventory_lot_id, '批次'),
-          referenceLabel(warehouseOptions, record?.warehouse_id, '仓库'),
-          record?.original_lot_status
-            ? `原批次状态 ${lotStatusText(record.original_lot_status)}`
-            : '',
-        ]
+        subjectParts(
+          record,
+          inventoryLotOptions,
+          materialOptions,
+          productOptions,
+          warehouseOptions
+        )
           .filter(Boolean)
           .join(' / '),
     },

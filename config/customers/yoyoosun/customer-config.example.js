@@ -34,6 +34,7 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
       Object.freeze({
         title: "生产管理",
         items: Object.freeze([
+          "production-orders",
           "production-scheduling",
           "production-progress",
           "production-exceptions",

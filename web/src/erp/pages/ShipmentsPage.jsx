@@ -13,6 +13,8 @@ import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   cancelShipment,
+  createInvoiceFromShipment,
+  createReceivableFromShipment,
   createShipmentWithItems,
   listShipments,
   shipShipment,
@@ -47,6 +49,7 @@ import ShipmentBusinessModal, {
   salesOrderCustomerText,
   sourceLineProductText,
 } from '../components/shipments/ShipmentBusinessModal.jsx'
+import ShipmentFinanceSourceModal from '../components/shipments/ShipmentFinanceSourceModal.jsx'
 import {
   buildShipmentColumns,
   SHIPMENT_DATE_FILTER_OPTIONS,
@@ -85,6 +88,7 @@ import {
   unitOption,
   warehouseOptionFromRecord,
 } from '../utils/referenceSelectOptions.mjs'
+import { canConfirmFinanceFact } from '../utils/financeFactPermissions.mjs'
 import {
   searchParamPositiveIntText,
   searchParamText,
@@ -98,6 +102,14 @@ import {
   resolveShipmentWeightPreview,
   shipmentWeightReferenceOption,
 } from '../utils/shipmentWeight.mjs'
+import {
+  buildShipmentFinanceSourcePayload,
+  shipmentFinanceSourceActionConfig,
+} from '../utils/shipmentFinanceSourceAction.mjs'
+import {
+  createSourceBusinessActionAttemptStore,
+  sourceBusinessActionNo,
+} from '../utils/sourceBusinessAction.mjs'
 
 const { Text } = Typography
 
@@ -163,6 +175,7 @@ export default function ShipmentsPage() {
   const outletContext = useOutletContext()
   const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = outletContext?.adminProfile || {}
+  const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
@@ -177,6 +190,8 @@ export default function ShipmentsPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
+  const [financeSourceAction, setFinanceSourceAction] = useState(null)
+  const [financeSourceLoading, setFinanceSourceLoading] = useState(false)
   const [shipmentModal, setShipmentModal] = useState(null)
   const [salesOrderSources, setSalesOrderSources] = useState([])
   const [salesOrderSourceItems, setSalesOrderSourceItems] = useState([])
@@ -192,6 +207,10 @@ export default function ShipmentsPage() {
   const [salesOrderImportOpen, setSalesOrderImportOpen] = useState(false)
   const [shipmentForm] = Form.useForm()
   const shipmentAttachmentRef = useRef(null)
+  const financeSourceAttemptsRef = useRef(
+    createSourceBusinessActionAttemptStore()
+  )
+  const financeSourceInFlightRef = useRef(false)
   const selectedSalesOrderID = Form.useWatch('sales_order_id', shipmentForm)
   const routeSalesOrderID = searchParamPositiveIntText(
     searchParams,
@@ -208,6 +227,8 @@ export default function ShipmentsPage() {
   const canCreate = hasActionPermission(adminProfile, 'shipment.create')
   const canShip = hasActionPermission(adminProfile, 'shipment.ship')
   const canCancel = hasActionPermission(adminProfile, 'shipment.cancel')
+  const canCreateReceivable = canConfirmFinanceFact(adminProfile, 'RECEIVABLE')
+  const canCreateInvoice = canConfirmFinanceFact(adminProfile, 'INVOICE')
   const customerOptions = useMemo(
     () => uniqueReferenceOptions(customers, customerOption),
     [customers]
@@ -794,6 +815,93 @@ export default function ShipmentsPage() {
     }
   }
 
+  const openShipmentFinanceSource = (action) => {
+    const allowed =
+      action === 'receivable' ? canCreateReceivable : canCreateInvoice
+    if (!allowed || !selectedRow || selectedRow.status !== 'SHIPPED') {
+      message.warning('请先选择已确认出货的出货单')
+      return
+    }
+    setFinanceSourceAction(action)
+  }
+
+  const submitShipmentFinanceSource = async (values) => {
+    if (
+      financeSourceInFlightRef.current ||
+      !financeSourceAction ||
+      !selectedRow
+    ) {
+      return
+    }
+
+    let config
+    let scope
+    let attempt
+    let params
+    try {
+      config = shipmentFinanceSourceActionConfig(financeSourceAction)
+      const payload = {
+        ...buildShipmentFinanceSourcePayload(values, selectedRow),
+        customer_key: activeCustomerKey || undefined,
+      }
+      scope = `shipment-finance:${config.key}:${selectedRow.id}`
+      attempt = financeSourceAttemptsRef.current.prepare(scope, payload)
+      params = {
+        ...attempt.params,
+        fact_no: sourceBusinessActionNo(
+          config.factNoPrefix,
+          selectedRow.shipment_no,
+          attempt.params.idempotency_key
+        ),
+      }
+    } catch (error) {
+      if (scope && attempt) {
+        financeSourceAttemptsRef.current.settle(scope, attempt, error)
+      }
+      message.error(getActionErrorMessage(error, '准备财务记录'))
+      return
+    }
+
+    const execute =
+      config.key === 'receivable'
+        ? createReceivableFromShipment
+        : createInvoiceFromShipment
+    financeSourceInFlightRef.current = true
+    setFinanceSourceLoading(true)
+    try {
+      const result = await execute(params)
+      if (
+        !result ||
+        result.status !== 'DRAFT' ||
+        result.fact_type !== config.factType
+      ) {
+        const error = new Error('财务记录返回结果无法确认')
+        error.isInvalidResponse = true
+        throw error
+      }
+      financeSourceAttemptsRef.current.settle(scope, attempt, null)
+      setFinanceSourceAction(null)
+      message.success(config.successMessage)
+      await loadRows()
+    } catch (error) {
+      const retained = financeSourceAttemptsRef.current.settle(
+        scope,
+        attempt,
+        error
+      )
+      if (retained) {
+        message.warning(
+          '财务记录生成结果暂时无法确认，已保留本次请求，请使用相同内容重试'
+        )
+      } else {
+        message.error(getActionErrorMessage(error, config.title))
+      }
+    } finally {
+      financeSourceInFlightRef.current = false
+      setFinanceSourceLoading(false)
+    }
+  }
+
   const columns = useMemo(
     () => buildShipmentColumns({ salesOrdersByID }),
     [salesOrdersByID]
@@ -1055,6 +1163,29 @@ export default function ShipmentsPage() {
               取消出货
             </Button>
           </Popconfirm>
+          {selectedRow?.status === 'SHIPPED' &&
+          (canCreateReceivable || canCreateInvoice) ? (
+            <>
+              {canCreateReceivable ? (
+                <Button
+                  size="small"
+                  disabled={saving || financeSourceLoading}
+                  onClick={() => openShipmentFinanceSource('receivable')}
+                >
+                  生成应收
+                </Button>
+              ) : null}
+              {canCreateInvoice ? (
+                <Button
+                  size="small"
+                  disabled={saving || financeSourceLoading}
+                  onClick={() => openShipmentFinanceSource('invoice')}
+                >
+                  生成开票记录
+                </Button>
+              ) : null}
+            </>
+          ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>
 
@@ -1119,6 +1250,17 @@ export default function ShipmentsPage() {
         sourceLoading={sourceLoading}
         unitOptions={unitOptions}
         warehouseOptions={warehouseOptions}
+      />
+
+      <ShipmentFinanceSourceModal
+        action={financeSourceAction}
+        open={Boolean(financeSourceAction)}
+        shipment={selectedRow}
+        loading={financeSourceLoading}
+        onCancel={() => {
+          if (!financeSourceInFlightRef.current) setFinanceSourceAction(null)
+        }}
+        onSubmit={submitShipmentFinanceSource}
       />
     </BusinessPageLayout>
   )

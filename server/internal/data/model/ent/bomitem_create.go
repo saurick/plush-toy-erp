@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/productionordermaterialrequirement"
 	"server/internal/data/model/ent/unit"
 	"time"
 
@@ -179,6 +180,21 @@ func (_c *BOMItemCreate) SetMaterial(v *Material) *BOMItemCreate {
 // SetUnit sets the "unit" edge to the Unit entity.
 func (_c *BOMItemCreate) SetUnit(v *Unit) *BOMItemCreate {
 	return _c.SetUnitID(v.ID)
+}
+
+// AddProductionOrderMaterialRequirementIDs adds the "production_order_material_requirements" edge to the ProductionOrderMaterialRequirement entity by IDs.
+func (_c *BOMItemCreate) AddProductionOrderMaterialRequirementIDs(ids ...int) *BOMItemCreate {
+	_c.mutation.AddProductionOrderMaterialRequirementIDs(ids...)
+	return _c
+}
+
+// AddProductionOrderMaterialRequirements adds the "production_order_material_requirements" edges to the ProductionOrderMaterialRequirement entity.
+func (_c *BOMItemCreate) AddProductionOrderMaterialRequirements(v ...*ProductionOrderMaterialRequirement) *BOMItemCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddProductionOrderMaterialRequirementIDs(ids...)
 }
 
 // Mutation returns the BOMItemMutation object of the builder.
@@ -418,6 +434,22 @@ func (_c *BOMItemCreate) createSpec() (*BOMItem, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.UnitID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProductionOrderMaterialRequirementsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   bomitem.ProductionOrderMaterialRequirementsTable,
+			Columns: []string{bomitem.ProductionOrderMaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

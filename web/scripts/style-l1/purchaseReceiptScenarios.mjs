@@ -472,6 +472,85 @@ export function createPurchaseReceiptScenarios(deps) {
       },
     },
     {
+      name: 'purchase-receipt-exception-records-desktop',
+      path: '/erp/warehouse/inbound',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '入库管理')
+        await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
+        await page.getByRole('button', { name: '退货与调整记录' }).click()
+
+        const modal = page
+          .getByRole('dialog', {
+            name: /退货与调整记录 · PR-STYLE-L1/u,
+          })
+          .last()
+        await modal.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(page, '草稿过账后才影响库存')
+        await expectText(page, 'PRT-STYLE-L1')
+
+        const returnPostButton = modal.getByRole('button', {
+          name: /过\s*账/u,
+        })
+        assert.equal(
+          await returnPostButton.count(),
+          1,
+          `草稿采购退货应展示独立过账权限动作: ${await modal.innerText()}`
+        )
+        await returnPostButton.click()
+        await page
+          .locator('.ant-popover:visible')
+          .getByRole('button', { name: /确\s*认/u })
+          .click()
+        await expectText(page, '采购退货已过账')
+        await modal.getByRole('tab', { name: /入库调整/u }).click()
+        await expectText(page, 'PRA-STYLE-L1')
+        await modal.getByRole('button', { name: '取消并冲正' }).click()
+        await page
+          .locator('.ant-popover:visible')
+          .last()
+          .getByRole('button', { name: '确认取消', exact: true })
+          .click()
+        await expectText(page, '入库调整已取消并冲正')
+
+        const metrics = await modal.evaluate((node) => {
+          const box = node.getBoundingClientRect()
+          return {
+            width: box.width,
+            right: box.right,
+            viewportWidth: window.innerWidth,
+            modalOverflow: node.scrollWidth - node.clientWidth,
+            documentOverflow:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+            text: String(node.textContent || '')
+              .replace(/\s+/gu, ' ')
+              .trim(),
+          }
+        })
+        assert(
+          metrics.width > 900 &&
+            metrics.right <= metrics.viewportWidth + 1 &&
+            metrics.modalOverflow <= 1 &&
+            metrics.documentOverflow === 0,
+          `退货与调整记录弹窗应在桌面视口内完整显示: ${JSON.stringify(metrics)}`
+        )
+        for (const forbiddenText of [
+          'purchase_receipt_id',
+          'idempotency_key',
+          'correction_group',
+        ]) {
+          assert.equal(
+            metrics.text.includes(forbiddenText),
+            false,
+            `退货与调整记录不应显示技术字段 ${forbiddenText}`
+          )
+        }
+      },
+    },
+    {
       name: 'purchase-receipt-add-item-inline-dark-desktop',
       path: '/erp/warehouse/inbound',
       auth: 'admin',

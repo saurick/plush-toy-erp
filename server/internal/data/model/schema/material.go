@@ -55,6 +55,8 @@ func (Material) Edges() []ent.Edge {
 			Required().
 			Unique(),
 		edge.To("bom_items", BOMItem.Type),
+		edge.To("production_order_material_requirements", ProductionOrderMaterialRequirement.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("purchase_order_items", PurchaseOrderItem.Type),
 		edge.To("purchase_receipt_items", PurchaseReceiptItem.Type),
 		edge.To("purchase_return_items", PurchaseReturnItem.Type),

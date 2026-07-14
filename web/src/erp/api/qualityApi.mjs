@@ -29,6 +29,28 @@ export async function createQualityInspectionDraft(params = {}) {
   return dataOf(result)?.quality_inspection || null
 }
 
+export async function createQualityInspectionFromOutsourcingReturn(
+  params = {}
+) {
+  const result = await qualityRpc.call(
+    'create_quality_inspection_from_outsourcing_return',
+    params
+  )
+  return dataOf(result)?.quality_inspection || null
+}
+
+export async function listOutsourcingReturnQualityInspections(
+  params = {},
+  options = {}
+) {
+  const result = await qualityRpc.call(
+    'list_outsourcing_return_quality_inspections',
+    params,
+    options
+  )
+  return dataOf(result)
+}
+
 export async function submitQualityInspection(params = {}) {
   const result = await qualityRpc.call('submit_quality_inspection', params)
   return dataOf(result)?.quality_inspection || null

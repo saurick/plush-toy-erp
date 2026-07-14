@@ -6,8 +6,6 @@ import (
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/errcode"
-
-	"github.com/shopspring/decimal"
 )
 
 func (d *jsonrpcDispatcher) handleOperationalFactFinance(
@@ -17,22 +15,70 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "create_finance_fact":
-		scope, res := d.financeFactConfirmAccessScope(ctx)
-		if res != nil {
+	case "create_receivable_from_shipment":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionFinanceReceivableConfirm); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance"); res != nil {
 			return id, res, nil
 		}
-		in, ok := financeFactCreateFromParams(pm)
+		in, ok := financeFactFromShipmentCreateFromParams(pm, false)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		if !scope.AllowsType(in.FactType) {
-			return id, financeFactPermissionDeniedResult(), nil
+		item, err := d.operationalFactUC.CreateReceivableFromShipment(ctx, in)
+		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
+	case "create_invoice_from_shipment":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionFinanceInvoiceConfirm); res != nil {
+			return id, res, nil
 		}
-		item, err := d.operationalFactUC.CreateFinanceFactDraft(ctx, in)
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance"); res != nil {
+			return id, res, nil
+		}
+		in, ok := financeFactFromShipmentCreateFromParams(pm, true)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.operationalFactUC.CreateInvoiceFromShipment(ctx, in)
+		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
+	case "create_payable_from_purchase_receipt":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionFinancePayableConfirm); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance", "purchase_receipts"); res != nil {
+			return id, res, nil
+		}
+		in, ok := financeFactFromPurchaseReceiptCreateFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.operationalFactUC.CreatePayableFromPurchaseReceipt(ctx, in)
+		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
+	case "create_payable_from_outsourcing_return":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionFinancePayableConfirm); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance", "outsourcing_orders"); res != nil {
+			return id, res, nil
+		}
+		in, ok := financeFactFromOutsourcingReturnCreateFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.operationalFactUC.CreatePayableFromOutsourcingReturn(ctx, in)
+		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
+	case "create_reconciliation_from_finance_fact":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionFinanceReconciliationConfirm); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance"); res != nil {
+			return id, res, nil
+		}
+		in, ok := financeReconciliationFromFactCreateFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.operationalFactUC.CreateReconciliationFromFinanceFact(ctx, in)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "post_finance_fact":
 		scope, res := d.financeFactConfirmAccessScope(ctx)
@@ -144,41 +190,76 @@ func financeFactPermissionDeniedResult() *v1.JsonrpcResult {
 	return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
 }
 
-func financeFactCreateFromParams(pm map[string]any) (*biz.FinanceFactCreate, bool) {
-	amount, ok := getRequiredJSONRPCDecimal(pm, "amount")
-	if !ok {
-		return nil, false
+func financeFactFromShipmentCreateFromParams(pm map[string]any, allowInvoiceCategory bool) (*biz.FinanceFactFromShipmentCreate, bool) {
+	allowed := []string{"customer_key", "fact_no", "shipment_id", "idempotency_key", "occurred_at", "note"}
+	if allowInvoiceCategory {
+		allowed = append(allowed, "invoice_category")
 	}
-	feeAmount, ok := getOptionalJSONRPCDecimal(pm, "fee_amount")
-	if !ok {
+	if !financeFactAllowsOnly(pm, allowed...) {
 		return nil, false
 	}
 	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
 	if !ok {
 		return nil, false
 	}
-	normalizedFeeAmount := decimal.Zero
-	if feeAmount != nil {
-		normalizedFeeAmount = *feeAmount
+	return &biz.FinanceFactFromShipmentCreate{
+		FactNo:          getString(pm, "fact_no"),
+		ShipmentID:      getInt(pm, "shipment_id", 0),
+		IdempotencyKey:  getString(pm, "idempotency_key"),
+		OccurredAt:      optionalTimeValue(occurredAt),
+		Note:            getWorkflowStringPtr(pm, "note"),
+		InvoiceCategory: getWorkflowStringPtr(pm, "invoice_category"),
+	}, true
+}
+
+func financeFactFromPurchaseReceiptCreateFromParams(pm map[string]any) (*biz.FinanceFactFromPurchaseReceiptCreate, bool) {
+	if !financeFactAllowsOnly(pm, "customer_key", "fact_no", "purchase_receipt_id", "idempotency_key", "occurred_at", "note") {
+		return nil, false
 	}
-	return &biz.FinanceFactCreate{
-		FactNo:           getString(pm, "fact_no"),
-		FactType:         getString(pm, "fact_type"),
-		CounterpartyType: getString(pm, "counterparty_type"),
-		CounterpartyID:   getOptionalInt(pm, "counterparty_id"),
-		Amount:           amount,
-		FeeAmount:        normalizedFeeAmount,
-		Currency:         getString(pm, "currency"),
-		CollectionType:   getWorkflowStringPtr(pm, "collection_type"),
-		PaymentTerm:      getWorkflowStringPtr(pm, "payment_term"),
-		PaymentTermDays:  getOptionalNonNegativeInt(pm, "payment_term_days"),
-		InvoiceCategory:  getWorkflowStringPtr(pm, "invoice_category"),
-		SourceType:       getWorkflowStringPtr(pm, "source_type"),
-		SourceID:         getOptionalInt(pm, "source_id"),
-		SourceLineID:     getOptionalInt(pm, "source_line_id"),
-		IdempotencyKey:   getString(pm, "idempotency_key"),
-		OccurredAt:       optionalTimeValue(occurredAt),
-		Note:             getWorkflowStringPtr(pm, "note"),
+	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
+	if !ok {
+		return nil, false
+	}
+	return &biz.FinanceFactFromPurchaseReceiptCreate{
+		FactNo:            getString(pm, "fact_no"),
+		PurchaseReceiptID: getInt(pm, "purchase_receipt_id", 0),
+		IdempotencyKey:    getString(pm, "idempotency_key"),
+		OccurredAt:        optionalTimeValue(occurredAt),
+		Note:              getWorkflowStringPtr(pm, "note"),
+	}, true
+}
+
+func financeFactFromOutsourcingReturnCreateFromParams(pm map[string]any) (*biz.FinanceFactFromOutsourcingReturnCreate, bool) {
+	if !financeFactAllowsOnly(pm, "customer_key", "fact_no", "outsourcing_fact_id", "idempotency_key", "occurred_at", "note") {
+		return nil, false
+	}
+	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
+	if !ok {
+		return nil, false
+	}
+	return &biz.FinanceFactFromOutsourcingReturnCreate{
+		FactNo:            getString(pm, "fact_no"),
+		OutsourcingFactID: getInt(pm, "outsourcing_fact_id", 0),
+		IdempotencyKey:    getString(pm, "idempotency_key"),
+		OccurredAt:        optionalTimeValue(occurredAt),
+		Note:              getWorkflowStringPtr(pm, "note"),
+	}, true
+}
+
+func financeReconciliationFromFactCreateFromParams(pm map[string]any) (*biz.FinanceReconciliationFromFactCreate, bool) {
+	if !financeFactAllowsOnly(pm, "customer_key", "fact_no", "finance_fact_id", "idempotency_key", "occurred_at", "note") {
+		return nil, false
+	}
+	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
+	if !ok {
+		return nil, false
+	}
+	return &biz.FinanceReconciliationFromFactCreate{
+		FactNo:         getString(pm, "fact_no"),
+		FinanceFactID:  getInt(pm, "finance_fact_id", 0),
+		IdempotencyKey: getString(pm, "idempotency_key"),
+		OccurredAt:     optionalTimeValue(occurredAt),
+		Note:           getWorkflowStringPtr(pm, "note"),
 	}, true
 }
 
@@ -201,7 +282,7 @@ func financeFactToAny(item *biz.FinanceFact) map[string]any {
 	if item == nil {
 		return map[string]any{}
 	}
-	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "counterparty_type": item.CounterpartyType, "counterparty_id": optionalIntToAny(item.CounterpartyID), "amount": item.Amount.String(), "fee_amount": item.FeeAmount.String(), "currency": item.Currency, "collection_type": optionalStringToAny(item.CollectionType), "payment_term": optionalStringToAny(item.PaymentTerm), "payment_term_days": optionalIntToAny(item.PaymentTermDays), "invoice_category": optionalStringToAny(item.InvoiceCategory), "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_line_id": optionalIntToAny(item.SourceLineID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalUnix(item.PostedAt), "settled_at": optionalUnix(item.SettledAt), "cancelled_at": optionalUnix(item.CancelledAt), "cancelled_by_name": optionalStringToAny(item.CancelledByName), "cancel_reason": optionalStringToAny(item.CancelReason), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "counterparty_type": item.CounterpartyType, "counterparty_id": optionalIntToAny(item.CounterpartyID), "amount": item.Amount.String(), "fee_amount": item.FeeAmount.String(), "currency": item.Currency, "collection_type": optionalStringToAny(item.CollectionType), "payment_term": optionalStringToAny(item.PaymentTerm), "payment_term_days": optionalIntToAny(item.PaymentTermDays), "invoice_category": optionalStringToAny(item.InvoiceCategory), "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_no": optionalStringToAny(item.SourceNo), "source_line_id": optionalIntToAny(item.SourceLineID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalUnix(item.PostedAt), "settled_at": optionalUnix(item.SettledAt), "cancelled_at": optionalUnix(item.CancelledAt), "cancelled_by_name": optionalStringToAny(item.CancelledByName), "cancel_reason": optionalStringToAny(item.CancelReason), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
 }
 
 func financeFactAllowsOnly(pm map[string]any, keys ...string) bool {

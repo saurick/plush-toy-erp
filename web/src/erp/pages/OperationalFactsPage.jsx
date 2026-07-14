@@ -17,6 +17,7 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   compactParams,
+  hasActionPermission,
   trimOptional,
   V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
@@ -41,6 +42,8 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
+import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
+import ProductionReworkModal from '../components/production-facts/ProductionReworkModal.jsx'
 import {
   routeWithQuery,
   searchParamPositiveIntText,
@@ -54,10 +57,34 @@ import {
 import { buildProcessingContractDraftFromOutsourcingFact } from '../data/processingContractTemplate.mjs'
 import { canConfirmFinanceFact } from '../utils/financeFactPermissions.mjs'
 import {
+  createProductionReworkFromCompletion,
+  createReconciliationFromFinanceFact,
+  listProductionFacts,
+} from '../api/operationalFactApi.mjs'
+import {
+  FINANCE_BUSINESS_SOURCE_ACTIONS,
+  buildFinanceBusinessSourcePayload,
+  financeBusinessSourceActionConfig,
+  financeBusinessSourceFormValuesFromRequest,
+  isOutsourcingReturnPayableSource,
+  isSingleFactReconciliationSource,
+} from '../utils/financeBusinessSourceAction.mjs'
+import {
+  createSourceBusinessActionAttemptStore,
+  isSourceBusinessActionResultUnknown,
+} from '../utils/sourceBusinessAction.mjs'
+import {
+  buildProductionReworkPayload,
+  findProductionReworkResult,
+  isPostedProductionCompletion,
+  isProductionReworkEligible,
+  productionReworkFormValuesFromRequest,
+} from '../utils/productionReworkAction.mjs'
+import {
   hasAnyPermission,
   selectedLabelForKey,
-  sourceRouteFor,
 } from '../components/operational-facts/OperationalFactForms.jsx'
+import { businessSourceRouteFor } from '../utils/businessSourceNavigation.mjs'
 import {
   DEFAULT_OPERATIONAL_FACT_PAGINATION,
   DEFAULT_OPERATIONAL_FACT_SUMMARY,
@@ -68,6 +95,7 @@ import {
   buildOperationalFactRelatedMenuItems,
   buildOperationalFactStats,
   buildOperationalFactViewConfigs,
+  financeSettlementActionFor,
   getOperationalFactAttachmentOwnerType,
   sourceTypeLabel,
 } from '../components/operational-facts/operationalFactPageConfig.mjs'
@@ -84,7 +112,10 @@ export function OperationalFactWorkspace({
   const outletContext = useOutletContext()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const adminProfile = outletContext?.adminProfile || {}
+  const adminProfile = useMemo(
+    () => outletContext?.adminProfile || {},
+    [outletContext?.adminProfile]
+  )
   const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
   const [activeKey, setActiveKey] = useState(initialActiveKey)
   const [keyword, setKeyword] = useState('')
@@ -95,18 +126,32 @@ export function OperationalFactWorkspace({
   const [saving, setSaving] = useState(false)
   const [financeCancelOpen, setFinanceCancelOpen] = useState(false)
   const [financeCancelReason, setFinanceCancelReason] = useState('')
+  const [financeSourceContext, setFinanceSourceContext] = useState(null)
+  const [financeSourceLoading, setFinanceSourceLoading] = useState(false)
+  const [productionReworkContext, setProductionReworkContext] = useState(null)
+  const [productionReworkLoading, setProductionReworkLoading] = useState(false)
   const [rowsByKey, setRowsByKey] = useState({})
   const [totalByKey, setTotalByKey] = useState({})
   const [paginationByKey, setPaginationByKey] = useState({})
   const [selectedByKey, setSelectedByKey] = useState({})
   const listRequestVersionRef = useRef(0)
   const mountedRef = useRef(false)
+  const financeSourceAttemptsRef = useRef(
+    createSourceBusinessActionAttemptStore()
+  )
+  const financeSourceInFlightRef = useRef(false)
+  const productionReworkAttemptsRef = useRef(
+    createSourceBusinessActionAttemptStore()
+  )
+  const productionReworkInFlightRef = useRef(false)
+  const productionReworkRequestRef = useRef(0)
   const routeSalesOrderID = searchParamPositiveIntText(
     searchParams,
     'sales_order_id'
   )
   const routeSourceID = searchParamPositiveIntText(searchParams, 'source_id')
   const routeSourceType = searchParamText(searchParams, 'source_type')
+  const routeFactID = searchParamPositiveIntText(searchParams, 'fact_id')
   const routeView = searchParamText(searchParams, 'view')
 
   const baseConfigs = useMemo(() => buildOperationalFactViewConfigs(), [])
@@ -116,6 +161,7 @@ export function OperationalFactWorkspace({
     return () => {
       mountedRef.current = false
       listRequestVersionRef.current += 1
+      productionReworkRequestRef.current += 1
     }
   }, [])
 
@@ -136,10 +182,6 @@ export function OperationalFactWorkspace({
       nextConfigs[key] = {
         ...baseConfig,
         ...override,
-        initialValues: {
-          ...(baseConfig.initialValues || {}),
-          ...(override.initialValues || {}),
-        },
         listParams: {
           ...(baseConfig.listParams || {}),
           ...(override.listParams || {}),
@@ -171,6 +213,28 @@ export function OperationalFactWorkspace({
   )
   const activeTotal = totalByKey[currentActiveKey] || 0
   const activeSelectedRow = selectedByKey[currentActiveKey] || null
+  const financeSourceScope = financeSourceContext?.source?.id
+    ? `${financeSourceContext.action}:${financeSourceContext.source.id}`
+    : ''
+  const financeSourceInitialValues = useMemo(() => {
+    if (!financeSourceScope) return undefined
+    const retained = financeSourceAttemptsRef.current.peek(financeSourceScope)
+    return retained
+      ? financeBusinessSourceFormValuesFromRequest(retained.params)
+      : undefined
+  }, [financeSourceScope])
+  const productionReworkScope = productionReworkContext?.source?.id
+    ? `production-rework:${productionReworkContext.source.id}`
+    : ''
+  const productionReworkInitialValues = useMemo(() => {
+    if (!productionReworkScope) return undefined
+    const retained = productionReworkAttemptsRef.current.peek(
+      productionReworkScope
+    )
+    return retained
+      ? productionReworkFormValuesFromRequest(retained.params)
+      : undefined
+  }, [productionReworkScope])
   const activePagination =
     paginationByKey[currentActiveKey] || DEFAULT_OPERATIONAL_FACT_PAGINATION
   const activeDateField =
@@ -178,13 +242,15 @@ export function OperationalFactWorkspace({
     activeConfig.defaultDateField ||
     'occurred_at'
   const activeDateRange = dateRangeByKey[currentActiveKey] || ['', '']
+  const activeFinanceFactType = activeConfig.listParams?.fact_type
   const canWriteActive =
     currentActiveKey === 'finance'
-      ? canConfirmFinanceFact(
-          adminProfile,
-          activeConfig.initialValues?.fact_type
-        )
+      ? canConfirmFinanceFact(adminProfile, activeFinanceFactType)
       : hasAnyPermission(adminProfile, activeConfig.writePermissions)
+  const canCreateProductionRework = hasActionPermission(
+    adminProfile,
+    'production.rework.create'
+  )
 
   const resetPaginationForKey = useCallback(
     (key = currentActiveKey) => {
@@ -201,8 +267,21 @@ export function OperationalFactWorkspace({
 
   const routeListParamsForKey = useCallback(
     (key) => {
+      if (key === 'production' && routeFactID) {
+        return { keyword: routeFactID }
+      }
       if (['shipments', 'reservations'].includes(key) && routeSalesOrderID) {
         return { source_id: routeSalesOrderID }
+      }
+      if (
+        ['production', 'outsourcing'].includes(key) &&
+        routeSourceType &&
+        routeSourceID
+      ) {
+        return {
+          source_type: routeSourceType,
+          source_id: routeSourceID,
+        }
       }
       if (key === 'finance' && routeSourceType && routeSourceID) {
         return {
@@ -212,13 +291,24 @@ export function OperationalFactWorkspace({
       }
       return {}
     },
-    [routeSalesOrderID, routeSourceID, routeSourceType]
+    [routeFactID, routeSalesOrderID, routeSourceID, routeSourceType]
   )
 
   const loadRows = useCallback(
     async (key = currentActiveKey) => {
       const config = configs[key]
       if (!config) {
+        return
+      }
+      if (
+        Array.isArray(config.readPermissions) &&
+        config.readPermissions.length > 0 &&
+        !hasAnyPermission(adminProfile, config.readPermissions)
+      ) {
+        setRowsByKey((prev) => ({ ...prev, [key]: [] }))
+        setSelectedByKey((prev) => ({ ...prev, [key]: null }))
+        setTotalByKey((prev) => ({ ...prev, [key]: 0 }))
+        setLoading(false)
         return
       }
       const requestVersion = listRequestVersionRef.current + 1
@@ -251,6 +341,15 @@ export function OperationalFactWorkspace({
           [key]: nextRows,
         }))
         setSelectedByKey((prev) => {
+          const routeSelectedID =
+            key === 'production' ? Number(routeFactID || 0) : 0
+          if (routeSelectedID > 0) {
+            return {
+              ...prev,
+              [key]:
+                nextRows.find((item) => item.id === routeSelectedID) || null,
+            }
+          }
           const current = prev[key]
           if (!current?.id) return prev
           const refreshed = nextRows.find((item) => item.id === current.id)
@@ -272,12 +371,14 @@ export function OperationalFactWorkspace({
     },
     [
       activePagination,
+      adminProfile,
       configs,
       currentActiveKey,
       dateFieldByKey,
       dateRangeByKey,
       keyword,
       paginationByKey,
+      routeFactID,
       routeListParamsForKey,
       statusFilter,
     ]
@@ -306,7 +407,13 @@ export function OperationalFactWorkspace({
     }
     try {
       setSaving(true)
-      await action({ id: row.id, ...extraParams })
+      await action({
+        id: row.id,
+        ...(currentActiveKey === 'outsourcing' && activeCustomerKey
+          ? { customer_key: activeCustomerKey }
+          : {}),
+        ...extraParams,
+      })
       message.success(`${actionLabel}已完成`)
     } catch (error) {
       message.error(getActionErrorMessage(error, actionLabel))
@@ -321,6 +428,123 @@ export function OperationalFactWorkspace({
       setSaving(false)
     }
     return true
+  }
+
+  const openProductionRework = async (source) => {
+    if (!canCreateProductionRework) {
+      message.warning('当前账号没有发起返工的权限')
+      return
+    }
+    if (!isPostedProductionCompletion(source)) {
+      message.warning('仅已过账且来源完整的成品入库记录可以发起返工')
+      return
+    }
+    const requestID = productionReworkRequestRef.current + 1
+    productionReworkRequestRef.current = requestID
+    setProductionReworkLoading(true)
+    try {
+      const data = await listProductionFacts({
+        source_type: 'PRODUCTION_FACT',
+        source_id: source.id,
+        limit: 500,
+        offset: 0,
+      })
+      if (productionReworkRequestRef.current !== requestID) return
+      const facts = Array.isArray(data?.production_facts)
+        ? data.production_facts
+        : []
+      if (!isProductionReworkEligible(source, facts)) {
+        message.warning('当前完工记录已没有可返工数量，请刷新后核对')
+        return
+      }
+      setProductionReworkContext({ source, facts })
+    } catch (error) {
+      if (productionReworkRequestRef.current === requestID) {
+        message.error(getActionErrorMessage(error, '加载返工来源'))
+      }
+    } finally {
+      if (productionReworkRequestRef.current === requestID) {
+        setProductionReworkLoading(false)
+      }
+    }
+  }
+
+  const closeProductionRework = () => {
+    if (productionReworkInFlightRef.current) return
+    productionReworkRequestRef.current += 1
+    setProductionReworkLoading(false)
+    setProductionReworkContext(null)
+  }
+
+  const submitProductionRework = async (values) => {
+    const source = productionReworkContext?.source
+    const facts = productionReworkContext?.facts || []
+    if (productionReworkInFlightRef.current || !source?.id) return
+
+    const scope = `production-rework:${source.id}`
+    let attempt
+    try {
+      const payload = {
+        ...buildProductionReworkPayload(values, source, facts),
+        customer_key: activeCustomerKey || undefined,
+      }
+      attempt = productionReworkAttemptsRef.current.prepare(scope, payload)
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '准备返工记录'))
+      return
+    }
+
+    productionReworkInFlightRef.current = true
+    setProductionReworkLoading(true)
+    try {
+      let result
+      let confirmedByReread = false
+      try {
+        result = await createProductionReworkFromCompletion(attempt.params)
+      } catch (error) {
+        if (!isSourceBusinessActionResultUnknown(error)) {
+          productionReworkAttemptsRef.current.settle(scope, attempt, error)
+          message.error(getActionErrorMessage(error, '生成返工草稿'))
+          return
+        }
+        let currentFacts = []
+        try {
+          const data = await listProductionFacts({
+            source_type: 'PRODUCTION_FACT',
+            source_id: source.id,
+            limit: 500,
+            offset: 0,
+          })
+          currentFacts = Array.isArray(data?.production_facts)
+            ? data.production_facts
+            : []
+          result = findProductionReworkResult(currentFacts, attempt.params)
+        } catch {
+          result = null
+        }
+        if (!result) {
+          productionReworkAttemptsRef.current.settle(scope, attempt, error)
+          message.warning(
+            '返工草稿生成结果仍无法确认，已保留本次请求，请使用相同内容重试'
+          )
+          return
+        }
+        confirmedByReread = true
+      }
+
+      productionReworkAttemptsRef.current.settle(scope, attempt, null)
+      productionReworkRequestRef.current += 1
+      setProductionReworkContext(null)
+      message.success(
+        confirmedByReread
+          ? '已重新读取并确认返工草稿，请核对后过账'
+          : '返工草稿已生成，请核对后过账'
+      )
+      await loadRows('production')
+    } finally {
+      productionReworkInFlightRef.current = false
+      setProductionReworkLoading(false)
+    }
   }
 
   const confirmFinanceCancellation = async () => {
@@ -346,6 +570,79 @@ export function OperationalFactWorkspace({
     }
   }
 
+  const openFinanceSourceAction = (action, source) => {
+    const canRun =
+      action === FINANCE_BUSINESS_SOURCE_ACTIONS.SINGLE_FACT_RECONCILIATION &&
+      hasActionPermission(adminProfile, 'finance.reconciliation.confirm') &&
+      isSingleFactReconciliationSource(source)
+    if (!canRun) {
+      message.warning('当前记录状态或权限已变化，请刷新后重试')
+      return
+    }
+    setFinanceSourceContext({ action, source })
+  }
+
+  const closeFinanceSourceAction = () => {
+    if (financeSourceInFlightRef.current) return
+    setFinanceSourceContext(null)
+  }
+
+  const submitFinanceSourceAction = async (values) => {
+    const action = financeSourceContext?.action
+    const source = financeSourceContext?.source
+    if (financeSourceInFlightRef.current || !action || !source?.id) return
+
+    const config = financeBusinessSourceActionConfig(action)
+    const scope = `${action}:${source.id}`
+    let attempt
+    try {
+      const payload = {
+        ...buildFinanceBusinessSourcePayload(action, values, source),
+        customer_key: activeCustomerKey || undefined,
+      }
+      attempt = financeSourceAttemptsRef.current.prepare(scope, payload)
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '准备财务记录'))
+      return
+    }
+
+    financeSourceInFlightRef.current = true
+    setFinanceSourceLoading(true)
+    try {
+      await createReconciliationFromFinanceFact(attempt.params)
+      financeSourceAttemptsRef.current.settle(scope, attempt, null)
+      setFinanceSourceContext(null)
+      message.success(config.successMessage)
+      await loadRows(currentActiveKey)
+    } catch (error) {
+      const retained = financeSourceAttemptsRef.current.settle(
+        scope,
+        attempt,
+        error
+      )
+      if (retained) {
+        message.warning(
+          '财务记录生成结果暂时无法确认，已保留本次请求，请使用相同内容重试'
+        )
+      } else {
+        message.error(getActionErrorMessage(error, config.title))
+      }
+    } finally {
+      financeSourceInFlightRef.current = false
+      setFinanceSourceLoading(false)
+    }
+  }
+
+  const viewOutsourcingPayable = (fact) => {
+    if (!fact?.id) return
+    navigate(
+      routeWithQuery(V1_ROUTE_PATHS.payables, {
+        source_type: 'OUTSOURCING_FACT',
+        source_id: fact.id,
+      })
+    )
+  }
+
   const clearActiveSelection = () => {
     setSelectedByKey((prev) => ({ ...prev, [currentActiveKey]: null }))
   }
@@ -366,7 +663,7 @@ export function OperationalFactWorkspace({
   }
 
   const columns = applyBusinessColumnSorters(
-    buildOperationalFactColumns(currentActiveKey)
+    buildOperationalFactColumns(currentActiveKey, activeFinanceFactType)
   )
   const activeBoundaryText =
     activeConfig.selectionBoundaryText ||
@@ -385,13 +682,55 @@ export function OperationalFactWorkspace({
       rows: activeRows,
     })
   }, [activeRows, currentActiveKey, toolbarModuleKey, visibleColumns])
-  const canConfirmActive =
+  const canFinanceAction =
     currentActiveKey === 'finance'
       ? canConfirmFinanceFact(adminProfile, activeSelectedRow?.fact_type)
-      : hasAnyPermission(
-          adminProfile,
-          activeConfig.confirmPermissions || activeConfig.writePermissions
+      : false
+  const canViewOutsourcingPayable = hasActionPermission(
+    adminProfile,
+    'finance.payable.read'
+  )
+  const canCreateSingleReconciliation = hasActionPermission(
+    adminProfile,
+    'finance.reconciliation.confirm'
+  )
+  const selectedIsPostedOutsourcingReturn =
+    currentActiveKey === 'outsourcing' &&
+    isOutsourcingReturnPayableSource(activeSelectedRow)
+  const selectedIsSingleReconciliationSource =
+    currentActiveKey === 'finance' &&
+    isSingleFactReconciliationSource(activeSelectedRow)
+  const selectedCanStartProductionRework =
+    currentActiveKey === 'production' &&
+    isProductionReworkEligible(activeSelectedRow, activeRows)
+  const canPostActive =
+    canFinanceAction ||
+    hasAnyPermission(
+      adminProfile,
+      activeConfig.postPermissions ||
+        activeConfig.confirmPermissions ||
+        activeConfig.writePermissions
+    )
+  const canCancelActive =
+    canFinanceAction ||
+    hasAnyPermission(
+      adminProfile,
+      activeConfig.cancelPermissions ||
+        activeConfig.confirmPermissions ||
+        activeConfig.writePermissions
+    )
+  const canReleaseActive = hasAnyPermission(
+    adminProfile,
+    activeConfig.releasePermissions || activeConfig.writePermissions
+  )
+  const canConfirmActive =
+    canFinanceAction || canPostActive || canCancelActive || canReleaseActive
+  const financeSettlementAction =
+    currentActiveKey === 'finance'
+      ? financeSettlementActionFor(
+          activeSelectedRow?.fact_type || activeFinanceFactType
         )
+      : null
   const selectedLabel = selectedLabelForKey(currentActiveKey, activeSelectedRow)
   const activeAttachmentOwnerType =
     getOperationalFactAttachmentOwnerType(currentActiveKey)
@@ -432,15 +771,11 @@ export function OperationalFactWorkspace({
       }),
     }
     if (key === 'source') {
-      const targetPath = sourceRouteFor(activeSelectedRow.source_type)
-      if (targetPath) {
-        navigate(
-          routeWithQuery(targetPath, {
-            source_type: activeSelectedRow.source_type,
-            source_id: activeSelectedRow.source_id,
-          })
-        )
-      }
+      const targetPath = businessSourceRouteFor(
+        activeSelectedRow.source_type,
+        activeSelectedRow.source_id
+      )
+      if (targetPath) navigate(targetPath)
       return
     }
     const targetPath = pathByKey[key]
@@ -454,7 +789,7 @@ export function OperationalFactWorkspace({
       const keysToDelete =
         Array.isArray(keys) && keys.length > 0
           ? keys
-          : ['sales_order_id', 'source_type', 'source_id']
+          : ['sales_order_id', 'source_type', 'source_id', 'fact_id']
       keysToDelete.forEach((key) => nextParams.delete(key))
       setSearchParams(nextParams, { replace: true })
       resetPaginationForKey()
@@ -468,7 +803,8 @@ export function OperationalFactWorkspace({
       activeDateRange[1] ||
       routeSalesOrderID ||
       routeSourceType ||
-      routeSourceID
+      routeSourceID ||
+      routeFactID
   )
   const clearFilters = useCallback(() => {
     setKeyword('')
@@ -592,6 +928,15 @@ export function OperationalFactWorkspace({
                 已按{sourceTypeLabel(routeSourceType)}筛选
               </Tag>
             ) : null}
+            {routeFactID ? (
+              <Tag
+                closable
+                color="blue"
+                onClose={() => clearRouteContext(['fact_id'])}
+              >
+                已定位生产记录
+              </Tag>
+            ) : null}
           </>
         }
         actions={
@@ -650,13 +995,66 @@ export function OperationalFactWorkspace({
                 disabled={
                   !activeSelectedRow ||
                   activeSelectedRow.status !== 'DRAFT' ||
-                  !canConfirmActive ||
+                  !canPostActive ||
                   saving
                 }
               >
                 过账
               </Button>
             </Popconfirm>
+          ) : null}
+          {currentActiveKey === 'production' && canCreateProductionRework ? (
+            <Button
+              size="small"
+              disabled={
+                !selectedCanStartProductionRework ||
+                saving ||
+                productionReworkLoading
+              }
+              loading={productionReworkLoading && !productionReworkContext}
+              onClick={() => openProductionRework(activeSelectedRow)}
+            >
+              发起返工
+            </Button>
+          ) : null}
+          {currentActiveKey === 'finance' ? (
+            <Popconfirm
+              title="确认当前财务记录？"
+              onConfirm={() =>
+                runRowAction(activeConfig, activeSelectedRow, 'post', '确认')
+              }
+              okText="确认"
+              cancelText="取消"
+            >
+              <Button
+                size="small"
+                type="primary"
+                icon={<CheckCircleOutlined />}
+                disabled={
+                  !activeSelectedRow ||
+                  activeSelectedRow.status !== 'DRAFT' ||
+                  !canFinanceAction ||
+                  saving
+                }
+              >
+                确认
+              </Button>
+            </Popconfirm>
+          ) : null}
+          {selectedIsSingleReconciliationSource &&
+          canCreateSingleReconciliation ? (
+            <Button
+              size="small"
+              disabled={saving || financeSourceLoading}
+              onClick={() =>
+                openFinanceSourceAction(
+                  FINANCE_BUSINESS_SOURCE_ACTIONS.SINGLE_FACT_RECONCILIATION,
+                  activeSelectedRow
+                )
+              }
+            >
+              单笔核对
+            </Button>
           ) : null}
           {currentActiveKey === 'finance' ? (
             <Button
@@ -666,7 +1064,7 @@ export function OperationalFactWorkspace({
               disabled={
                 !activeSelectedRow ||
                 activeSelectedRow.status !== 'POSTED' ||
-                !canConfirmActive ||
+                !canFinanceAction ||
                 saving
               }
               onClick={() => {
@@ -685,6 +1083,15 @@ export function OperationalFactWorkspace({
               onClick={openProcessingContractPrint}
             >
               加工合同打印
+            </Button>
+          ) : null}
+          {selectedIsPostedOutsourcingReturn && canViewOutsourcingPayable ? (
+            <Button
+              size="small"
+              disabled={saving || financeSourceLoading}
+              onClick={() => viewOutsourcingPayable(activeSelectedRow)}
+            >
+              查看应付
             </Button>
           ) : null}
           {activeAttachmentOwnerType ? (
@@ -716,7 +1123,7 @@ export function OperationalFactWorkspace({
                 disabled={
                   !activeSelectedRow ||
                   activeSelectedRow.status !== 'DRAFT' ||
-                  !canConfirmActive ||
+                  !canPostActive ||
                   saving
                 }
               >
@@ -744,7 +1151,7 @@ export function OperationalFactWorkspace({
                 disabled={
                   !activeSelectedRow ||
                   activeSelectedRow.status !== 'ACTIVE' ||
-                  !canWriteActive ||
+                  !canReleaseActive ||
                   saving
                 }
               >
@@ -752,11 +1159,16 @@ export function OperationalFactWorkspace({
               </Button>
             </Popconfirm>
           ) : null}
-          {currentActiveKey === 'finance' ? (
+          {financeSettlementAction ? (
             <Popconfirm
-              title="确认结清当前财务记录？"
+              title={financeSettlementAction.confirmTitle}
               onConfirm={() =>
-                runRowAction(activeConfig, activeSelectedRow, 'settle', '结清')
+                runRowAction(
+                  activeConfig,
+                  activeSelectedRow,
+                  'settle',
+                  financeSettlementAction.label
+                )
               }
               okText="确认"
               cancelText="取消"
@@ -767,11 +1179,11 @@ export function OperationalFactWorkspace({
                 disabled={
                   !activeSelectedRow ||
                   activeSelectedRow.status !== 'POSTED' ||
-                  !canConfirmActive ||
+                  !canFinanceAction ||
                   saving
                 }
               >
-                结清
+                {financeSettlementAction.label}
               </Button>
             </Popconfirm>
           ) : null}
@@ -791,7 +1203,7 @@ export function OperationalFactWorkspace({
                 disabled={
                   !activeSelectedRow ||
                   activeSelectedRow.status !== 'POSTED' ||
-                  !canConfirmActive ||
+                  !canCancelActive ||
                   saving
                 }
               >
@@ -820,7 +1232,7 @@ export function OperationalFactWorkspace({
                 disabled={
                   !activeSelectedRow ||
                   activeSelectedRow.status !== 'SHIPPED' ||
-                  !canConfirmActive ||
+                  !canCancelActive ||
                   saving
                 }
               >
@@ -879,6 +1291,24 @@ export function OperationalFactWorkspace({
       />
 
       {columnOrderModal}
+      <FinanceBusinessSourceModal
+        action={financeSourceContext?.action}
+        open={Boolean(financeSourceContext)}
+        source={financeSourceContext?.source}
+        initialValues={financeSourceInitialValues}
+        loading={financeSourceLoading}
+        onCancel={closeFinanceSourceAction}
+        onSubmit={submitFinanceSourceAction}
+      />
+      <ProductionReworkModal
+        open={Boolean(productionReworkContext)}
+        source={productionReworkContext?.source}
+        facts={productionReworkContext?.facts}
+        initialValues={productionReworkInitialValues}
+        loading={productionReworkLoading}
+        onCancel={closeProductionRework}
+        onSubmit={submitProductionRework}
+      />
       <Modal
         title="取消财务记录"
         open={financeCancelOpen}

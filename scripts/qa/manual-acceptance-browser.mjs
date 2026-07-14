@@ -30,6 +30,8 @@ const DEFAULT_FACT_REPORT_PATH = path.resolve(
   REPO_ROOT,
   "output/qa/manual-acceptance/fact-data/apply-report.json",
 );
+const SOURCE_DRIVEN_FACT_REPORT_CONTRACT =
+  "source-driven-operational-facts-v1";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const COMPANY_NAME = "东莞市永绅玩具有限公司";
 const SYSTEM_NAME = "毛绒 ERP 管理后台";
@@ -188,8 +190,8 @@ export function buildManualAcceptanceBrowserPlan({ baseURL, backendURL } = {}) {
   });
   assert.equal(
     targets.length,
-    47,
-    "手工验收浏览器计划必须覆盖当前 47 个正式目标",
+    48,
+    "手工验收浏览器计划必须覆盖当前 48 个正式目标",
   );
   return {
     scope: "manual-acceptance-browser-plan",
@@ -707,6 +709,7 @@ async function loadBoundSimulatedPrintInput() {
   if (
     source?.simulatedOnly !== true ||
     fact?.simulatedOnly !== true ||
+    fact?.reportContract !== SOURCE_DRIVEN_FACT_REPORT_CONTRACT ||
     fact?.sourceRunId !== sourceRunId
   ) {
     throw new BrowserAcceptanceError(

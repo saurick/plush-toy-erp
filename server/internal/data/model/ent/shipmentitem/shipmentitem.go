@@ -33,6 +33,12 @@ const (
 	FieldQuantity = "quantity"
 	// FieldUnitNetWeightKgSnapshot holds the string denoting the unit_net_weight_kg_snapshot field in the database.
 	FieldUnitNetWeightKgSnapshot = "unit_net_weight_kg_snapshot"
+	// FieldUnitPriceSnapshot holds the string denoting the unit_price_snapshot field in the database.
+	FieldUnitPriceSnapshot = "unit_price_snapshot"
+	// FieldAmountSnapshot holds the string denoting the amount_snapshot field in the database.
+	FieldAmountSnapshot = "amount_snapshot"
+	// FieldCurrencySnapshot holds the string denoting the currency_snapshot field in the database.
+	FieldCurrencySnapshot = "currency_snapshot"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -118,6 +124,9 @@ var Columns = []string{
 	FieldLotID,
 	FieldQuantity,
 	FieldUnitNetWeightKgSnapshot,
+	FieldUnitPriceSnapshot,
+	FieldAmountSnapshot,
+	FieldCurrencySnapshot,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -154,6 +163,10 @@ var (
 	UnitIDValidator func(int) error
 	// LotIDValidator is a validator for the "lot_id" field. It is called by the builders before save.
 	LotIDValidator func(int) error
+	// DefaultCurrencySnapshot holds the default value on creation for the "currency_snapshot" field.
+	DefaultCurrencySnapshot string
+	// CurrencySnapshotValidator is a validator for the "currency_snapshot" field. It is called by the builders before save.
+	CurrencySnapshotValidator func(string) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -215,6 +228,21 @@ func ByQuantity(opts ...sql.OrderTermOption) OrderOption {
 // ByUnitNetWeightKgSnapshot orders the results by the unit_net_weight_kg_snapshot field.
 func ByUnitNetWeightKgSnapshot(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUnitNetWeightKgSnapshot, opts...).ToFunc()
+}
+
+// ByUnitPriceSnapshot orders the results by the unit_price_snapshot field.
+func ByUnitPriceSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUnitPriceSnapshot, opts...).ToFunc()
+}
+
+// ByAmountSnapshot orders the results by the amount_snapshot field.
+func ByAmountSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAmountSnapshot, opts...).ToFunc()
+}
+
+// ByCurrencySnapshot orders the results by the currency_snapshot field.
+func ByCurrencySnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCurrencySnapshot, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.

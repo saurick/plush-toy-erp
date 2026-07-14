@@ -2,6 +2,8 @@ import { hasActionPermission } from './masterDataOrderView.mjs'
 
 const RECEIVABLE_CONFIRM = 'finance.receivable.confirm'
 const PAYABLE_CONFIRM = 'finance.payable.confirm'
+const INVOICE_CONFIRM = 'finance.invoice.confirm'
+const RECONCILIATION_CONFIRM = 'finance.reconciliation.confirm'
 
 export function financeFactConfirmPermissions(factType) {
   switch (
@@ -10,13 +12,14 @@ export function financeFactConfirmPermissions(factType) {
       .toUpperCase()
   ) {
     case 'RECEIVABLE':
-    case 'INVOICE':
       return [RECEIVABLE_CONFIRM]
     case 'PAYABLE':
       return [PAYABLE_CONFIRM]
-    case 'PAYMENT':
+    case 'INVOICE':
+      return [INVOICE_CONFIRM]
     case 'RECONCILIATION':
-      return [RECEIVABLE_CONFIRM, PAYABLE_CONFIRM]
+      return [RECONCILIATION_CONFIRM]
+    case 'PAYMENT':
     default:
       return []
   }

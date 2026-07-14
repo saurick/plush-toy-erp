@@ -73,6 +73,40 @@ const mockProductionOrderItems = [
     updated_at: nowUnix(),
   },
 ]
+const mockProductionMaterialRequirements = [
+  {
+    id: 7201,
+    production_order_id: 71,
+    production_order_item_id: 7101,
+    bom_header_id: 701,
+    bom_item_id: 7301,
+    material_id: 1,
+    unit_id: 1,
+    unit_quantity_snapshot: '0.500000',
+    loss_rate_snapshot: '0.020000',
+    planned_quantity: '10.200000',
+    issued_quantity: '2.200000',
+    remaining_quantity: '8.000000',
+    material_code_snapshot: 'MAT-MOCK',
+    material_name_snapshot: '演示短毛绒布',
+    unit_code_snapshot: 'M',
+    unit_name_snapshot: '米',
+    created_at: nowUnix(),
+    updated_at: nowUnix(),
+  },
+]
+let mockProductionRequirementsFrozen = false
+
+function mockProductionMaterialRequirementProjection() {
+  return {
+    production_material_requirements: mockProductionRequirementsFrozen
+      ? mockProductionMaterialRequirements
+      : [],
+    material_requirements_state: mockProductionRequirementsFrozen
+      ? 'READY'
+      : 'NEEDS_REVIEW',
+  }
+}
 const mockBusinessDashboardProjectionModuleKeys = [
   'customers',
   'suppliers',
@@ -576,7 +610,9 @@ function buildBusinessDashboardProjectionStats() {
 }
 
 function isMockTerminalWorkflowTask(task = {}) {
-  return ['done', 'rejected'].includes(String(task.task_status_key || '').trim())
+  return ['done', 'rejected'].includes(
+    String(task.task_status_key || '').trim()
+  )
 }
 
 const mockProductionOrderParamKeys = {
@@ -1167,6 +1203,7 @@ export function setupJsonRpcMockServer() {
           result: makeBizResult({
             production_order: mockProductionOrder,
             production_order_items: mockProductionOrderItems,
+            ...mockProductionMaterialRequirementProjection(),
           }),
           error: '',
         }
@@ -1209,12 +1246,16 @@ export function setupJsonRpcMockServer() {
               : mockProductionOrder.cancel_reason,
           updated_at: nowUnix(),
         })
+        if (method === 'release_production_order') {
+          mockProductionRequirementsFrozen = true
+        }
         responseBody = {
           jsonrpc: '2.0',
           id,
           result: makeBizResult({
             production_order: mockProductionOrder,
             production_order_items: mockProductionOrderItems,
+            ...mockProductionMaterialRequirementProjection(),
           }),
           error: '',
         }
@@ -1372,13 +1413,9 @@ export function setupJsonRpcMockServer() {
             '当前账号无权查看该协同任务'
           )
         } else {
-          const actions = [
-            'complete',
-            'block',
-            'reject',
-            'resume',
-            'urge',
-          ].map((item) => buildMockWorkflowActionExplain(request.task, item))
+          const actions = ['complete', 'block', 'reject', 'resume', 'urge'].map(
+            (item) => buildMockWorkflowActionExplain(request.task, item)
+          )
           responseBody = {
             jsonrpc: '2.0',
             id,
@@ -1417,14 +1454,19 @@ export function setupJsonRpcMockServer() {
           )
         } else {
           const { task } = request
-          const decisions = ['complete', 'block', 'reject', 'resume', 'urge'].map(
-            (actionKey) =>
-              workflowMockActionDecision({
-                actionKey,
-                adminProfile: mockSuperAdminProfile,
-                effectiveSession: mockSuperAdminProfile.effective_session,
-                task,
-              })
+          const decisions = [
+            'complete',
+            'block',
+            'reject',
+            'resume',
+            'urge',
+          ].map((actionKey) =>
+            workflowMockActionDecision({
+              actionKey,
+              adminProfile: mockSuperAdminProfile,
+              effectiveSession: mockSuperAdminProfile.effective_session,
+              task,
+            })
           )
           const assignedToCurrentAdmin = decisions.some(
             (decision) => decision.assignedToCurrentAdmin

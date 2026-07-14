@@ -15,27 +15,16 @@ func TestFinanceFactConfirmAccessScope(t *testing.T) {
 		{
 			name:        "receivable only",
 			permissions: []string{PermissionFinanceReceivableConfirm},
-			allowed:     []string{FinanceFactReceivable, FinanceFactInvoice},
+			allowed:     []string{FinanceFactReceivable},
 		},
 		{
 			name:        "payable only",
 			permissions: []string{PermissionFinancePayableConfirm},
 			allowed:     []string{FinanceFactPayable},
 		},
-		{
-			name: "both sides unlock shared facts",
-			permissions: []string{
-				PermissionFinanceReceivableConfirm,
-				PermissionFinancePayableConfirm,
-			},
-			allowed: []string{
-				FinanceFactReceivable,
-				FinanceFactInvoice,
-				FinanceFactPayable,
-				FinanceFactPayment,
-				FinanceFactReconciliation,
-			},
-		},
+		{name: "invoice only", permissions: []string{PermissionFinanceInvoiceConfirm}, allowed: []string{FinanceFactInvoice}},
+		{name: "reconciliation only", permissions: []string{PermissionFinanceReconciliationConfirm}, allowed: []string{FinanceFactReconciliation}},
+		{name: "payment remains read only", permissions: []string{PermissionFinanceReceivableConfirm, PermissionFinancePayableConfirm}, allowed: []string{FinanceFactReceivable, FinanceFactPayable}},
 	}
 
 	for _, tt := range tests {
@@ -48,24 +37,30 @@ func TestFinanceFactConfirmAccessScope(t *testing.T) {
 	}
 }
 
-func TestFinanceFactReadAccessScopeKeepsSharedFactsFailClosed(t *testing.T) {
+func TestFinanceFactReadAccessScopeKeepsFamiliesSeparated(t *testing.T) {
 	receivable := FinanceFactReadAccessScope([]string{PermissionFinanceReceivableRead})
-	if !receivable.AllowsType(FinanceFactReceivable) || !receivable.AllowsType(FinanceFactInvoice) {
-		t.Fatal("receivable read must allow receivable and invoice facts")
+	if !receivable.AllowsType(FinanceFactReceivable) {
+		t.Fatal("receivable read must allow receivable facts")
 	}
-	if receivable.AllowsType(FinanceFactPayable) {
-		t.Fatal("one-sided receivable read must not expose payable facts")
+	if receivable.AllowsType(FinanceFactPayable) || receivable.AllowsType(FinanceFactInvoice) || receivable.AllowsType(FinanceFactReconciliation) {
+		t.Fatal("receivable read must not expose other finance families")
 	}
-	if !receivable.AllowsType(FinanceFactPayment) || !receivable.AllowsType(FinanceFactReconciliation) {
-		t.Fatal("shared payment and reconciliation facts must remain readable from either finance side")
+
+	invoice := FinanceFactReadAccessScope([]string{PermissionFinanceInvoiceRead})
+	if !invoice.AllowsType(FinanceFactInvoice) || invoice.AllowsType(FinanceFactReceivable) {
+		t.Fatal("invoice read must only expose invoice facts")
+	}
+	reconciliation := FinanceFactReadAccessScope([]string{PermissionFinanceReconciliationRead})
+	if !reconciliation.AllowsType(FinanceFactReconciliation) || reconciliation.AllowsType(FinanceFactPayment) {
+		t.Fatal("reconciliation read must only expose reconciliation facts")
 	}
 
 	report := FinanceFactReadAccessScope([]string{PermissionFinanceReportRead})
-	if !report.AllowsType(FinanceFactPayment) || !report.AllowsType(FinanceFactReconciliation) {
-		t.Fatal("finance report read must allow shared payment and reconciliation facts")
+	if !report.AllowsType(FinanceFactPayment) {
+		t.Fatal("finance report read must allow legacy payment facts")
 	}
-	if report.AllowsType(FinanceFactReceivable) || report.AllowsType(FinanceFactPayable) {
-		t.Fatal("report read alone must not expose receivable or payable ledgers")
+	if report.AllowsType(FinanceFactReceivable) || report.AllowsType(FinanceFactPayable) || report.AllowsType(FinanceFactInvoice) || report.AllowsType(FinanceFactReconciliation) {
+		t.Fatal("report read alone must not expose operational finance ledgers")
 	}
 
 	if FinanceFactReadAccessScope(nil).AllowsType("UNKNOWN") {

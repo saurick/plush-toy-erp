@@ -76,6 +76,11 @@ func ProductID(v int) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldProductID, v))
 }
 
+// ProductSkuID applies equality check predicate on the "product_sku_id" field. It's identical to ProductSkuIDEQ.
+func ProductSkuID(v int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldProductSkuID, v))
+}
+
 // MaterialID applies equality check predicate on the "material_id" field. It's identical to MaterialIDEQ.
 func MaterialID(v int) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldMaterialID, v))
@@ -94,6 +99,11 @@ func UnitID(v int) predicate.OutsourcingOrderItem {
 // ProductNoSnapshot applies equality check predicate on the "product_no_snapshot" field. It's identical to ProductNoSnapshotEQ.
 func ProductNoSnapshot(v string) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldProductNoSnapshot, v))
+}
+
+// SkuCodeSnapshot applies equality check predicate on the "sku_code_snapshot" field. It's identical to SkuCodeSnapshotEQ.
+func SkuCodeSnapshot(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldSkuCodeSnapshot, v))
 }
 
 // ProductOrderNoSnapshot applies equality check predicate on the "product_order_no_snapshot" field. It's identical to ProductOrderNoSnapshotEQ.
@@ -326,6 +336,36 @@ func ProductIDNotNil() predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldNotNull(FieldProductID))
 }
 
+// ProductSkuIDEQ applies the EQ predicate on the "product_sku_id" field.
+func ProductSkuIDEQ(v int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldProductSkuID, v))
+}
+
+// ProductSkuIDNEQ applies the NEQ predicate on the "product_sku_id" field.
+func ProductSkuIDNEQ(v int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNEQ(FieldProductSkuID, v))
+}
+
+// ProductSkuIDIn applies the In predicate on the "product_sku_id" field.
+func ProductSkuIDIn(vs ...int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIn(FieldProductSkuID, vs...))
+}
+
+// ProductSkuIDNotIn applies the NotIn predicate on the "product_sku_id" field.
+func ProductSkuIDNotIn(vs ...int) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotIn(FieldProductSkuID, vs...))
+}
+
+// ProductSkuIDIsNil applies the IsNil predicate on the "product_sku_id" field.
+func ProductSkuIDIsNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIsNull(FieldProductSkuID))
+}
+
+// ProductSkuIDNotNil applies the NotNil predicate on the "product_sku_id" field.
+func ProductSkuIDNotNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotNull(FieldProductSkuID))
+}
+
 // MaterialIDEQ applies the EQ predicate on the "material_id" field.
 func MaterialIDEQ(v int) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldMaterialID, v))
@@ -469,6 +509,81 @@ func ProductNoSnapshotEqualFold(v string) predicate.OutsourcingOrderItem {
 // ProductNoSnapshotContainsFold applies the ContainsFold predicate on the "product_no_snapshot" field.
 func ProductNoSnapshotContainsFold(v string) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldContainsFold(FieldProductNoSnapshot, v))
+}
+
+// SkuCodeSnapshotEQ applies the EQ predicate on the "sku_code_snapshot" field.
+func SkuCodeSnapshotEQ(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldSkuCodeSnapshot, v))
+}
+
+// SkuCodeSnapshotNEQ applies the NEQ predicate on the "sku_code_snapshot" field.
+func SkuCodeSnapshotNEQ(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNEQ(FieldSkuCodeSnapshot, v))
+}
+
+// SkuCodeSnapshotIn applies the In predicate on the "sku_code_snapshot" field.
+func SkuCodeSnapshotIn(vs ...string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIn(FieldSkuCodeSnapshot, vs...))
+}
+
+// SkuCodeSnapshotNotIn applies the NotIn predicate on the "sku_code_snapshot" field.
+func SkuCodeSnapshotNotIn(vs ...string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotIn(FieldSkuCodeSnapshot, vs...))
+}
+
+// SkuCodeSnapshotGT applies the GT predicate on the "sku_code_snapshot" field.
+func SkuCodeSnapshotGT(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldGT(FieldSkuCodeSnapshot, v))
+}
+
+// SkuCodeSnapshotGTE applies the GTE predicate on the "sku_code_snapshot" field.
+func SkuCodeSnapshotGTE(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldGTE(FieldSkuCodeSnapshot, v))
+}
+
+// SkuCodeSnapshotLT applies the LT predicate on the "sku_code_snapshot" field.
+func SkuCodeSnapshotLT(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldLT(FieldSkuCodeSnapshot, v))
+}
+
+// SkuCodeSnapshotLTE applies the LTE predicate on the "sku_code_snapshot" field.
+func SkuCodeSnapshotLTE(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldLTE(FieldSkuCodeSnapshot, v))
+}
+
+// SkuCodeSnapshotContains applies the Contains predicate on the "sku_code_snapshot" field.
+func SkuCodeSnapshotContains(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldContains(FieldSkuCodeSnapshot, v))
+}
+
+// SkuCodeSnapshotHasPrefix applies the HasPrefix predicate on the "sku_code_snapshot" field.
+func SkuCodeSnapshotHasPrefix(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldHasPrefix(FieldSkuCodeSnapshot, v))
+}
+
+// SkuCodeSnapshotHasSuffix applies the HasSuffix predicate on the "sku_code_snapshot" field.
+func SkuCodeSnapshotHasSuffix(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldHasSuffix(FieldSkuCodeSnapshot, v))
+}
+
+// SkuCodeSnapshotIsNil applies the IsNil predicate on the "sku_code_snapshot" field.
+func SkuCodeSnapshotIsNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIsNull(FieldSkuCodeSnapshot))
+}
+
+// SkuCodeSnapshotNotNil applies the NotNil predicate on the "sku_code_snapshot" field.
+func SkuCodeSnapshotNotNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotNull(FieldSkuCodeSnapshot))
+}
+
+// SkuCodeSnapshotEqualFold applies the EqualFold predicate on the "sku_code_snapshot" field.
+func SkuCodeSnapshotEqualFold(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEqualFold(FieldSkuCodeSnapshot, v))
+}
+
+// SkuCodeSnapshotContainsFold applies the ContainsFold predicate on the "sku_code_snapshot" field.
+func SkuCodeSnapshotContainsFold(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldContainsFold(FieldSkuCodeSnapshot, v))
 }
 
 // ProductOrderNoSnapshotEQ applies the EQ predicate on the "product_order_no_snapshot" field.
@@ -1444,6 +1559,29 @@ func HasProduct() predicate.OutsourcingOrderItem {
 func HasProductWith(preds ...predicate.Product) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(func(s *sql.Selector) {
 		step := newProductStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasProductSku applies the HasEdge predicate on the "product_sku" edge.
+func HasProductSku() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, ProductSkuTable, ProductSkuColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProductSkuWith applies the HasEdge predicate on the "product_sku" edge with a given conditions (other predicates).
+func HasProductSkuWith(preds ...predicate.ProductSKU) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(func(s *sql.Selector) {
+		step := newProductSkuStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

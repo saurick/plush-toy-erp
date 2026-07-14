@@ -19,14 +19,24 @@ const (
 	FieldReturnNo = "return_no"
 	// FieldPurchaseReceiptID holds the string denoting the purchase_receipt_id field in the database.
 	FieldPurchaseReceiptID = "purchase_receipt_id"
+	// FieldQualityInspectionID holds the string denoting the quality_inspection_id field in the database.
+	FieldQualityInspectionID = "quality_inspection_id"
 	// FieldSupplierName holds the string denoting the supplier_name field in the database.
 	FieldSupplierName = "supplier_name"
+	// FieldReturnReason holds the string denoting the return_reason field in the database.
+	FieldReturnReason = "return_reason"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldReturnedAt holds the string denoting the returned_at field in the database.
 	FieldReturnedAt = "returned_at"
 	// FieldPostedAt holds the string denoting the posted_at field in the database.
 	FieldPostedAt = "posted_at"
+	// FieldIdempotencyKey holds the string denoting the idempotency_key field in the database.
+	FieldIdempotencyKey = "idempotency_key"
+	// FieldIdempotencyPayloadHash holds the string denoting the idempotency_payload_hash field in the database.
+	FieldIdempotencyPayloadHash = "idempotency_payload_hash"
+	// FieldIdempotencyItemCount holds the string denoting the idempotency_item_count field in the database.
+	FieldIdempotencyItemCount = "idempotency_item_count"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -35,6 +45,8 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgePurchaseReceipt holds the string denoting the purchase_receipt edge name in mutations.
 	EdgePurchaseReceipt = "purchase_receipt"
+	// EdgeQualityInspection holds the string denoting the quality_inspection edge name in mutations.
+	EdgeQualityInspection = "quality_inspection"
 	// EdgeItems holds the string denoting the items edge name in mutations.
 	EdgeItems = "items"
 	// Table holds the table name of the purchasereturn in the database.
@@ -46,6 +58,13 @@ const (
 	PurchaseReceiptInverseTable = "purchase_receipts"
 	// PurchaseReceiptColumn is the table column denoting the purchase_receipt relation/edge.
 	PurchaseReceiptColumn = "purchase_receipt_id"
+	// QualityInspectionTable is the table that holds the quality_inspection relation/edge.
+	QualityInspectionTable = "purchase_returns"
+	// QualityInspectionInverseTable is the table name for the QualityInspection entity.
+	// It exists in this package in order to avoid circular dependency with the "qualityinspection" package.
+	QualityInspectionInverseTable = "quality_inspections"
+	// QualityInspectionColumn is the table column denoting the quality_inspection relation/edge.
+	QualityInspectionColumn = "quality_inspection_id"
 	// ItemsTable is the table that holds the items relation/edge.
 	ItemsTable = "purchase_return_items"
 	// ItemsInverseTable is the table name for the PurchaseReturnItem entity.
@@ -60,10 +79,15 @@ var Columns = []string{
 	FieldID,
 	FieldReturnNo,
 	FieldPurchaseReceiptID,
+	FieldQualityInspectionID,
 	FieldSupplierName,
+	FieldReturnReason,
 	FieldStatus,
 	FieldReturnedAt,
 	FieldPostedAt,
+	FieldIdempotencyKey,
+	FieldIdempotencyPayloadHash,
+	FieldIdempotencyItemCount,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -90,12 +114,22 @@ var (
 	ReturnNoValidator func(string) error
 	// PurchaseReceiptIDValidator is a validator for the "purchase_receipt_id" field. It is called by the builders before save.
 	PurchaseReceiptIDValidator func(int) error
+	// QualityInspectionIDValidator is a validator for the "quality_inspection_id" field. It is called by the builders before save.
+	QualityInspectionIDValidator func(int) error
 	// SupplierNameValidator is a validator for the "supplier_name" field. It is called by the builders before save.
 	SupplierNameValidator func(string) error
+	// ReturnReasonValidator is a validator for the "return_reason" field. It is called by the builders before save.
+	ReturnReasonValidator func(string) error
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	StatusValidator func(string) error
+	// IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
+	IdempotencyKeyValidator func(string) error
+	// IdempotencyPayloadHashValidator is a validator for the "idempotency_payload_hash" field. It is called by the builders before save.
+	IdempotencyPayloadHashValidator func(string) error
+	// IdempotencyItemCountValidator is a validator for the "idempotency_item_count" field. It is called by the builders before save.
+	IdempotencyItemCountValidator func(int) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -124,9 +158,19 @@ func ByPurchaseReceiptID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPurchaseReceiptID, opts...).ToFunc()
 }
 
+// ByQualityInspectionID orders the results by the quality_inspection_id field.
+func ByQualityInspectionID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldQualityInspectionID, opts...).ToFunc()
+}
+
 // BySupplierName orders the results by the supplier_name field.
 func BySupplierName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSupplierName, opts...).ToFunc()
+}
+
+// ByReturnReason orders the results by the return_reason field.
+func ByReturnReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReturnReason, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.
@@ -142,6 +186,21 @@ func ByReturnedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByPostedAt orders the results by the posted_at field.
 func ByPostedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPostedAt, opts...).ToFunc()
+}
+
+// ByIdempotencyKey orders the results by the idempotency_key field.
+func ByIdempotencyKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIdempotencyKey, opts...).ToFunc()
+}
+
+// ByIdempotencyPayloadHash orders the results by the idempotency_payload_hash field.
+func ByIdempotencyPayloadHash(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIdempotencyPayloadHash, opts...).ToFunc()
+}
+
+// ByIdempotencyItemCount orders the results by the idempotency_item_count field.
+func ByIdempotencyItemCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIdempotencyItemCount, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.
@@ -166,6 +225,13 @@ func ByPurchaseReceiptField(field string, opts ...sql.OrderTermOption) OrderOpti
 	}
 }
 
+// ByQualityInspectionField orders the results by quality_inspection field.
+func ByQualityInspectionField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newQualityInspectionStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByItemsCount orders the results by items count.
 func ByItemsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -184,6 +250,13 @@ func newPurchaseReceiptStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(PurchaseReceiptInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, PurchaseReceiptTable, PurchaseReceiptColumn),
+	)
+}
+func newQualityInspectionStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(QualityInspectionInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, QualityInspectionTable, QualityInspectionColumn),
 	)
 }
 func newItemsStep() *sqlgraph.Step {

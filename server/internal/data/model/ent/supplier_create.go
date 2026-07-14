@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/purchaseorder"
+	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/supplier"
 	"time"
 
@@ -145,6 +146,21 @@ func (_c *SupplierCreate) AddPurchaseOrders(v ...*PurchaseOrder) *SupplierCreate
 		ids[i] = v[i].ID
 	}
 	return _c.AddPurchaseOrderIDs(ids...)
+}
+
+// AddPurchaseReceiptIDs adds the "purchase_receipts" edge to the PurchaseReceipt entity by IDs.
+func (_c *SupplierCreate) AddPurchaseReceiptIDs(ids ...int) *SupplierCreate {
+	_c.mutation.AddPurchaseReceiptIDs(ids...)
+	return _c
+}
+
+// AddPurchaseReceipts adds the "purchase_receipts" edges to the PurchaseReceipt entity.
+func (_c *SupplierCreate) AddPurchaseReceipts(v ...*PurchaseReceipt) *SupplierCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddPurchaseReceiptIDs(ids...)
 }
 
 // AddOutsourcingOrderIDs adds the "outsourcing_orders" edge to the OutsourcingOrder entity by IDs.
@@ -329,6 +345,22 @@ func (_c *SupplierCreate) createSpec() (*Supplier, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchaseorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.PurchaseReceiptsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.PurchaseReceiptsTable,
+			Columns: []string{supplier.PurchaseReceiptsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

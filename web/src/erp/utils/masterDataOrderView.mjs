@@ -10,6 +10,7 @@ export const V1_ROUTE_PATHS = Object.freeze({
   purchaseOrders: '/erp/purchase/accessories',
   purchaseReceipts: '/erp/warehouse/inbound',
   qualityInspections: '/erp/production/quality-inspections',
+  productionOrders: '/erp/production/orders',
   inventory: '/erp/warehouse/inventory',
   processingContracts: '/erp/purchase/processing-contracts',
   productionProgress: '/erp/production/progress',
@@ -408,10 +409,12 @@ export function createBlankOutsourcingLine(lineNo = 1) {
     line_no: lineNo,
     subject_type: OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT,
     product_id: undefined,
+    product_sku_id: undefined,
     material_id: undefined,
     process_id: undefined,
     unit_id: undefined,
     product_no_snapshot: '',
+    sku_code_snapshot: '',
     product_order_no_snapshot: '',
     product_name_snapshot: '',
     material_code_snapshot: '',
@@ -436,10 +439,12 @@ export function normalizeOutsourcingLineFormValue(item = {}) {
     line_no: item.line_no,
     subject_type: subjectType,
     product_id: isProduct ? item.product_id : undefined,
+    product_sku_id: isProduct ? item.product_sku_id : undefined,
     material_id: isMaterial ? item.material_id : undefined,
     process_id: item.process_id,
     unit_id: item.unit_id,
     product_no_snapshot: isProduct ? item.product_no_snapshot || '' : '',
+    sku_code_snapshot: isProduct ? item.sku_code_snapshot || '' : '',
     product_order_no_snapshot: isProduct
       ? item.product_order_no_snapshot || ''
       : '',
@@ -1046,8 +1051,10 @@ export function buildOutsourcingOrderSubjectSwitchValues(subjectType) {
   return {
     subject_type: normalizeOutsourcingOrderSubjectType(subjectType),
     product_id: undefined,
+    product_sku_id: undefined,
     material_id: undefined,
     product_no_snapshot: '',
+    sku_code_snapshot: '',
     product_order_no_snapshot: '',
     product_name_snapshot: '',
     material_code_snapshot: '',
@@ -1093,6 +1100,26 @@ export function buildOutsourcingOrderItemSourceValuesFromMaterial(
     material_code_snapshot: trimOptional(material.code) || '',
     material_name_snapshot: trimOptional(material.name) || '',
     unit_id: Number(material.default_unit_id || 0) || undefined,
+    unit_name_snapshot: trimOptional(unit.name) || '',
+  }
+}
+
+export function buildOutsourcingOrderItemSourceValuesFromProductSKU(
+  productSKU = {},
+  unit = {}
+) {
+  if (!productSKU?.id) {
+    return {
+      product_sku_id: undefined,
+      sku_code_snapshot: '',
+      unit_id: Number(unit.id || 0) || undefined,
+      unit_name_snapshot: trimOptional(unit.name) || '',
+    }
+  }
+  return {
+    product_sku_id: Number(productSKU.id || 0) || undefined,
+    sku_code_snapshot: trimOptional(productSKU.sku_code) || '',
+    unit_id: Number(productSKU.default_unit_id || 0) || undefined,
     unit_name_snapshot: trimOptional(unit.name) || '',
   }
 }
@@ -1182,6 +1209,9 @@ export function buildOutsourcingOrderItemParams(values = {}, extra = {}) {
     product_id: productSubject
       ? normalizeOptionalPositiveInteger(values.product_id)
       : undefined,
+    product_sku_id: productSubject
+      ? normalizeOptionalPositiveInteger(values.product_sku_id)
+      : undefined,
     material_id: materialSubject
       ? normalizeOptionalPositiveInteger(values.material_id)
       : undefined,
@@ -1189,6 +1219,9 @@ export function buildOutsourcingOrderItemParams(values = {}, extra = {}) {
     unit_id: Number(values.unit_id || 0),
     product_no_snapshot: productSubject
       ? trimOptional(values.product_no_snapshot)
+      : undefined,
+    sku_code_snapshot: productSubject
+      ? trimOptional(values.sku_code_snapshot)
       : undefined,
     product_order_no_snapshot: productSubject
       ? trimOptional(values.product_order_no_snapshot)

@@ -101,6 +101,21 @@ func UnitNetWeightKgSnapshot(v decimal.Decimal) predicate.ShipmentItem {
 	return predicate.ShipmentItem(sql.FieldEQ(FieldUnitNetWeightKgSnapshot, v))
 }
 
+// UnitPriceSnapshot applies equality check predicate on the "unit_price_snapshot" field. It's identical to UnitPriceSnapshotEQ.
+func UnitPriceSnapshot(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEQ(FieldUnitPriceSnapshot, v))
+}
+
+// AmountSnapshot applies equality check predicate on the "amount_snapshot" field. It's identical to AmountSnapshotEQ.
+func AmountSnapshot(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEQ(FieldAmountSnapshot, v))
+}
+
+// CurrencySnapshot applies equality check predicate on the "currency_snapshot" field. It's identical to CurrencySnapshotEQ.
+func CurrencySnapshot(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEQ(FieldCurrencySnapshot, v))
+}
+
 // Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
 func Note(v string) predicate.ShipmentItem {
 	return predicate.ShipmentItem(sql.FieldEQ(FieldNote, v))
@@ -374,6 +389,171 @@ func UnitNetWeightKgSnapshotIsNil() predicate.ShipmentItem {
 // UnitNetWeightKgSnapshotNotNil applies the NotNil predicate on the "unit_net_weight_kg_snapshot" field.
 func UnitNetWeightKgSnapshotNotNil() predicate.ShipmentItem {
 	return predicate.ShipmentItem(sql.FieldNotNull(FieldUnitNetWeightKgSnapshot))
+}
+
+// UnitPriceSnapshotEQ applies the EQ predicate on the "unit_price_snapshot" field.
+func UnitPriceSnapshotEQ(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEQ(FieldUnitPriceSnapshot, v))
+}
+
+// UnitPriceSnapshotNEQ applies the NEQ predicate on the "unit_price_snapshot" field.
+func UnitPriceSnapshotNEQ(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNEQ(FieldUnitPriceSnapshot, v))
+}
+
+// UnitPriceSnapshotIn applies the In predicate on the "unit_price_snapshot" field.
+func UnitPriceSnapshotIn(vs ...decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldIn(FieldUnitPriceSnapshot, vs...))
+}
+
+// UnitPriceSnapshotNotIn applies the NotIn predicate on the "unit_price_snapshot" field.
+func UnitPriceSnapshotNotIn(vs ...decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNotIn(FieldUnitPriceSnapshot, vs...))
+}
+
+// UnitPriceSnapshotGT applies the GT predicate on the "unit_price_snapshot" field.
+func UnitPriceSnapshotGT(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldGT(FieldUnitPriceSnapshot, v))
+}
+
+// UnitPriceSnapshotGTE applies the GTE predicate on the "unit_price_snapshot" field.
+func UnitPriceSnapshotGTE(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldGTE(FieldUnitPriceSnapshot, v))
+}
+
+// UnitPriceSnapshotLT applies the LT predicate on the "unit_price_snapshot" field.
+func UnitPriceSnapshotLT(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldLT(FieldUnitPriceSnapshot, v))
+}
+
+// UnitPriceSnapshotLTE applies the LTE predicate on the "unit_price_snapshot" field.
+func UnitPriceSnapshotLTE(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldLTE(FieldUnitPriceSnapshot, v))
+}
+
+// UnitPriceSnapshotIsNil applies the IsNil predicate on the "unit_price_snapshot" field.
+func UnitPriceSnapshotIsNil() predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldIsNull(FieldUnitPriceSnapshot))
+}
+
+// UnitPriceSnapshotNotNil applies the NotNil predicate on the "unit_price_snapshot" field.
+func UnitPriceSnapshotNotNil() predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNotNull(FieldUnitPriceSnapshot))
+}
+
+// AmountSnapshotEQ applies the EQ predicate on the "amount_snapshot" field.
+func AmountSnapshotEQ(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEQ(FieldAmountSnapshot, v))
+}
+
+// AmountSnapshotNEQ applies the NEQ predicate on the "amount_snapshot" field.
+func AmountSnapshotNEQ(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNEQ(FieldAmountSnapshot, v))
+}
+
+// AmountSnapshotIn applies the In predicate on the "amount_snapshot" field.
+func AmountSnapshotIn(vs ...decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldIn(FieldAmountSnapshot, vs...))
+}
+
+// AmountSnapshotNotIn applies the NotIn predicate on the "amount_snapshot" field.
+func AmountSnapshotNotIn(vs ...decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNotIn(FieldAmountSnapshot, vs...))
+}
+
+// AmountSnapshotGT applies the GT predicate on the "amount_snapshot" field.
+func AmountSnapshotGT(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldGT(FieldAmountSnapshot, v))
+}
+
+// AmountSnapshotGTE applies the GTE predicate on the "amount_snapshot" field.
+func AmountSnapshotGTE(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldGTE(FieldAmountSnapshot, v))
+}
+
+// AmountSnapshotLT applies the LT predicate on the "amount_snapshot" field.
+func AmountSnapshotLT(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldLT(FieldAmountSnapshot, v))
+}
+
+// AmountSnapshotLTE applies the LTE predicate on the "amount_snapshot" field.
+func AmountSnapshotLTE(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldLTE(FieldAmountSnapshot, v))
+}
+
+// AmountSnapshotIsNil applies the IsNil predicate on the "amount_snapshot" field.
+func AmountSnapshotIsNil() predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldIsNull(FieldAmountSnapshot))
+}
+
+// AmountSnapshotNotNil applies the NotNil predicate on the "amount_snapshot" field.
+func AmountSnapshotNotNil() predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNotNull(FieldAmountSnapshot))
+}
+
+// CurrencySnapshotEQ applies the EQ predicate on the "currency_snapshot" field.
+func CurrencySnapshotEQ(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEQ(FieldCurrencySnapshot, v))
+}
+
+// CurrencySnapshotNEQ applies the NEQ predicate on the "currency_snapshot" field.
+func CurrencySnapshotNEQ(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNEQ(FieldCurrencySnapshot, v))
+}
+
+// CurrencySnapshotIn applies the In predicate on the "currency_snapshot" field.
+func CurrencySnapshotIn(vs ...string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldIn(FieldCurrencySnapshot, vs...))
+}
+
+// CurrencySnapshotNotIn applies the NotIn predicate on the "currency_snapshot" field.
+func CurrencySnapshotNotIn(vs ...string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNotIn(FieldCurrencySnapshot, vs...))
+}
+
+// CurrencySnapshotGT applies the GT predicate on the "currency_snapshot" field.
+func CurrencySnapshotGT(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldGT(FieldCurrencySnapshot, v))
+}
+
+// CurrencySnapshotGTE applies the GTE predicate on the "currency_snapshot" field.
+func CurrencySnapshotGTE(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldGTE(FieldCurrencySnapshot, v))
+}
+
+// CurrencySnapshotLT applies the LT predicate on the "currency_snapshot" field.
+func CurrencySnapshotLT(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldLT(FieldCurrencySnapshot, v))
+}
+
+// CurrencySnapshotLTE applies the LTE predicate on the "currency_snapshot" field.
+func CurrencySnapshotLTE(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldLTE(FieldCurrencySnapshot, v))
+}
+
+// CurrencySnapshotContains applies the Contains predicate on the "currency_snapshot" field.
+func CurrencySnapshotContains(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldContains(FieldCurrencySnapshot, v))
+}
+
+// CurrencySnapshotHasPrefix applies the HasPrefix predicate on the "currency_snapshot" field.
+func CurrencySnapshotHasPrefix(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldHasPrefix(FieldCurrencySnapshot, v))
+}
+
+// CurrencySnapshotHasSuffix applies the HasSuffix predicate on the "currency_snapshot" field.
+func CurrencySnapshotHasSuffix(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldHasSuffix(FieldCurrencySnapshot, v))
+}
+
+// CurrencySnapshotEqualFold applies the EqualFold predicate on the "currency_snapshot" field.
+func CurrencySnapshotEqualFold(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEqualFold(FieldCurrencySnapshot, v))
+}
+
+// CurrencySnapshotContainsFold applies the ContainsFold predicate on the "currency_snapshot" field.
+func CurrencySnapshotContainsFold(v string) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldContainsFold(FieldCurrencySnapshot, v))
 }
 
 // NoteEQ applies the EQ predicate on the "note" field.

@@ -91,12 +91,9 @@ func TestCancellationCompensationKeepsAuthenticatedActor(t *testing.T) {
 		ctx := context.Background()
 		data, client := openInventoryRepoTestData(t, "compensation_actor_finance")
 		actor := client.AdminUser.Create().SetUsername("finance-compensation-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
-		factRepo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
-		factUC := biz.NewOperationalFactUsecase(factRepo)
-		fact, err := factRepo.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
-			FactNo: "FIN-COMP-ACTOR", FactType: biz.FinanceFactReceivable,
-			CounterpartyType: biz.FinanceCounterpartyCustomer, Amount: decimal.NewFromInt(100),
-			Currency: biz.FinanceCurrencyCNY, IdempotencyKey: "FIN-COMP-ACTOR", OccurredAt: time.Now(),
+		_, factUC, shipment, _ := prepareShipmentFinanceSource(t, ctx, data, client, "compensation-actor")
+		fact, err := factUC.CreateReceivableFromShipment(ctx, &biz.FinanceFactFromShipmentCreate{
+			FactNo: "FIN-COMP-ACTOR", ShipmentID: shipment.ID, IdempotencyKey: "FIN-COMP-ACTOR", OccurredAt: time.Now(),
 		})
 		if err != nil {
 			t.Fatalf("create finance fact: %v", err)

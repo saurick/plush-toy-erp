@@ -5,6 +5,33 @@ import {
   normalizeFinanceCancellationRequest,
   validateFinanceCancellationResult,
 } from '../utils/financeCancellation.mjs'
+import {
+  normalizeOutsourcingReturnPayableRequest,
+  normalizePurchaseReceiptPayableRequest,
+  normalizeSingleFactReconciliationRequest,
+  validateOutsourcingReturnPayableResult,
+  validatePurchaseReceiptPayableResult,
+  validateSingleFactReconciliationResult,
+} from '../utils/financeBusinessSourceAction.mjs'
+import { validateProductionMaterialRequirementsResponse } from '../utils/productionOrderModel.mjs'
+import {
+  normalizeProductionCompletionCreateRequest,
+  validateProductionCompletionResult,
+} from '../utils/productionCompletionAction.mjs'
+import {
+  normalizeProductionMaterialIssueCreateRequest,
+  normalizeProductionMaterialRequirementsListRequest,
+  validateProductionMaterialIssueResult,
+} from '../utils/productionMaterialIssueAction.mjs'
+import {
+  normalizeProductionReworkRequest,
+  validateProductionReworkResult,
+} from '../utils/productionReworkAction.mjs'
+import {
+  OUTSOURCING_SOURCE_ACTIONS,
+  normalizeOutsourcingSourceFactCreateRequest,
+  validateOutsourcingSourceFactResult,
+} from '../utils/outsourcingOrderFactAction.mjs'
 
 const operationalFactRpc = new JsonRpc({
   url: 'operational_fact',
@@ -16,14 +43,64 @@ function dataOf(result) {
   return result?.data || {}
 }
 
-export async function listProductionFacts(params = {}) {
-  const result = await operationalFactRpc.call('list_production_facts', params)
+export async function listProductionFacts(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(
+    'list_production_facts',
+    params,
+    options
+  )
   return dataOf(result)
 }
 
-export async function createProductionFact(params = {}) {
-  const result = await operationalFactRpc.call('create_production_fact', params)
-  return dataOf(result)?.production_fact || null
+export async function listProductionOrderMaterialRequirements(
+  params = {},
+  options = {}
+) {
+  const request = normalizeProductionMaterialRequirementsListRequest(params)
+  const result = await operationalFactRpc.call(
+    'list_production_order_material_requirements',
+    request,
+    options
+  )
+  return validateProductionMaterialRequirementsResponse(dataOf(result), {
+    productionOrderID: request.production_order_id,
+  })
+}
+
+export async function createProductionCompletionFromOrder(params = {}) {
+  const request = normalizeProductionCompletionCreateRequest(params)
+  const result = await operationalFactRpc.call(
+    'create_production_completion_from_order',
+    request
+  )
+  return validateProductionCompletionResult(
+    dataOf(result)?.production_fact,
+    request
+  )
+}
+
+export async function createProductionMaterialIssueFromOrder(params = {}) {
+  const request = normalizeProductionMaterialIssueCreateRequest(params)
+  const result = await operationalFactRpc.call(
+    'create_production_material_issue_from_order',
+    request
+  )
+  return validateProductionMaterialIssueResult(
+    dataOf(result)?.production_fact,
+    request
+  )
+}
+
+export async function createProductionReworkFromCompletion(params = {}) {
+  const request = normalizeProductionReworkRequest(params)
+  const result = await operationalFactRpc.call(
+    'create_production_rework_from_completion',
+    request
+  )
+  return validateProductionReworkResult(
+    dataOf(result)?.production_fact,
+    request
+  )
 }
 
 export async function postProductionFact(params = {}) {
@@ -41,12 +118,42 @@ export async function listOutsourcingFacts(params = {}) {
   return dataOf(result)
 }
 
-export async function createOutsourcingFact(params = {}) {
-  const result = await operationalFactRpc.call(
-    'create_outsourcing_fact',
+export async function createOutsourcingMaterialIssueFromOrder(params = {}) {
+  const actionType = OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
+  const request = normalizeOutsourcingSourceFactCreateRequest(
+    actionType,
     params
   )
-  return dataOf(result)?.outsourcing_fact || null
+  const result = await operationalFactRpc.call(
+    'create_outsourcing_material_issue_from_order',
+    request
+  )
+  return validateOutsourcingSourceFactResult(
+    dataOf(result)?.outsourcing_fact,
+    actionType,
+    { id: request.outsourcing_order_id },
+    { id: request.outsourcing_order_item_id, subject_type: 'MATERIAL' },
+    request
+  )
+}
+
+export async function createOutsourcingReturnReceiptFromOrder(params = {}) {
+  const actionType = OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT
+  const request = normalizeOutsourcingSourceFactCreateRequest(
+    actionType,
+    params
+  )
+  const result = await operationalFactRpc.call(
+    'create_outsourcing_return_receipt_from_order',
+    request
+  )
+  return validateOutsourcingSourceFactResult(
+    dataOf(result)?.outsourcing_fact,
+    actionType,
+    { id: request.outsourcing_order_id },
+    { id: request.outsourcing_order_item_id, subject_type: 'PRODUCT' },
+    request
+  )
 }
 
 export async function postOutsourcingFact(params = {}) {
@@ -97,9 +204,9 @@ export async function listStockReservations(params = {}) {
   return dataOf(result)
 }
 
-export async function createStockReservation(params = {}) {
+export async function createStockReservationFromSalesOrder(params = {}) {
   const result = await operationalFactRpc.call(
-    'create_stock_reservation',
+    'create_stock_reservation_from_sales_order',
     params
   )
   return dataOf(result)?.stock_reservation || null
@@ -118,9 +225,56 @@ export async function listFinanceFacts(params = {}) {
   return dataOf(result)
 }
 
-export async function createFinanceFact(params = {}) {
-  const result = await operationalFactRpc.call('create_finance_fact', params)
+export async function createReceivableFromShipment(params = {}) {
+  const result = await operationalFactRpc.call(
+    'create_receivable_from_shipment',
+    params
+  )
   return dataOf(result)?.finance_fact || null
+}
+
+export async function createInvoiceFromShipment(params = {}) {
+  const result = await operationalFactRpc.call(
+    'create_invoice_from_shipment',
+    params
+  )
+  return dataOf(result)?.finance_fact || null
+}
+
+export async function createPayableFromPurchaseReceipt(params = {}) {
+  const request = normalizePurchaseReceiptPayableRequest(params)
+  const result = await operationalFactRpc.call(
+    'create_payable_from_purchase_receipt',
+    request
+  )
+  return validatePurchaseReceiptPayableResult(
+    dataOf(result)?.finance_fact,
+    request
+  )
+}
+
+export async function createPayableFromOutsourcingReturn(params = {}) {
+  const request = normalizeOutsourcingReturnPayableRequest(params)
+  const result = await operationalFactRpc.call(
+    'create_payable_from_outsourcing_return',
+    request
+  )
+  return validateOutsourcingReturnPayableResult(
+    dataOf(result)?.finance_fact,
+    request
+  )
+}
+
+export async function createReconciliationFromFinanceFact(params = {}) {
+  const request = normalizeSingleFactReconciliationRequest(params)
+  const result = await operationalFactRpc.call(
+    'create_reconciliation_from_finance_fact',
+    request
+  )
+  return validateSingleFactReconciliationResult(
+    dataOf(result)?.finance_fact,
+    request
+  )
 }
 
 export async function postFinanceFact(params = {}) {

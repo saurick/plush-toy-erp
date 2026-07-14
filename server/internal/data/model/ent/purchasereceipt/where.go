@@ -60,6 +60,11 @@ func ReceiptNo(v string) predicate.PurchaseReceipt {
 	return predicate.PurchaseReceipt(sql.FieldEQ(FieldReceiptNo, v))
 }
 
+// SupplierID applies equality check predicate on the "supplier_id" field. It's identical to SupplierIDEQ.
+func SupplierID(v int) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldEQ(FieldSupplierID, v))
+}
+
 // SupplierName applies equality check predicate on the "supplier_name" field. It's identical to SupplierNameEQ.
 func SupplierName(v string) predicate.PurchaseReceipt {
 	return predicate.PurchaseReceipt(sql.FieldEQ(FieldSupplierName, v))
@@ -173,6 +178,36 @@ func ReceiptNoEqualFold(v string) predicate.PurchaseReceipt {
 // ReceiptNoContainsFold applies the ContainsFold predicate on the "receipt_no" field.
 func ReceiptNoContainsFold(v string) predicate.PurchaseReceipt {
 	return predicate.PurchaseReceipt(sql.FieldContainsFold(FieldReceiptNo, v))
+}
+
+// SupplierIDEQ applies the EQ predicate on the "supplier_id" field.
+func SupplierIDEQ(v int) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldEQ(FieldSupplierID, v))
+}
+
+// SupplierIDNEQ applies the NEQ predicate on the "supplier_id" field.
+func SupplierIDNEQ(v int) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldNEQ(FieldSupplierID, v))
+}
+
+// SupplierIDIn applies the In predicate on the "supplier_id" field.
+func SupplierIDIn(vs ...int) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldIn(FieldSupplierID, vs...))
+}
+
+// SupplierIDNotIn applies the NotIn predicate on the "supplier_id" field.
+func SupplierIDNotIn(vs ...int) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldNotIn(FieldSupplierID, vs...))
+}
+
+// SupplierIDIsNil applies the IsNil predicate on the "supplier_id" field.
+func SupplierIDIsNil() predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldIsNull(FieldSupplierID))
+}
+
+// SupplierIDNotNil applies the NotNil predicate on the "supplier_id" field.
+func SupplierIDNotNil() predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(sql.FieldNotNull(FieldSupplierID))
 }
 
 // SupplierNameEQ applies the EQ predicate on the "supplier_name" field.
@@ -748,6 +783,29 @@ func UpdatedAtLT(v time.Time) predicate.PurchaseReceipt {
 // UpdatedAtLTE applies the LTE predicate on the "updated_at" field.
 func UpdatedAtLTE(v time.Time) predicate.PurchaseReceipt {
 	return predicate.PurchaseReceipt(sql.FieldLTE(FieldUpdatedAt, v))
+}
+
+// HasSupplier applies the HasEdge predicate on the "supplier" edge.
+func HasSupplier() predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, SupplierTable, SupplierColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasSupplierWith applies the HasEdge predicate on the "supplier" edge with a given conditions (other predicates).
+func HasSupplierWith(preds ...predicate.Supplier) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(func(s *sql.Selector) {
+		step := newSupplierStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // HasPurchaseReturns applies the HasEdge predicate on the "purchase_returns" edge.

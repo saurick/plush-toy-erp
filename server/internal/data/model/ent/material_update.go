@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/productionordermaterialrequirement"
 	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
@@ -178,6 +179,21 @@ func (_u *MaterialUpdate) AddBomItems(v ...*BOMItem) *MaterialUpdate {
 	return _u.AddBomItemIDs(ids...)
 }
 
+// AddProductionOrderMaterialRequirementIDs adds the "production_order_material_requirements" edge to the ProductionOrderMaterialRequirement entity by IDs.
+func (_u *MaterialUpdate) AddProductionOrderMaterialRequirementIDs(ids ...int) *MaterialUpdate {
+	_u.mutation.AddProductionOrderMaterialRequirementIDs(ids...)
+	return _u
+}
+
+// AddProductionOrderMaterialRequirements adds the "production_order_material_requirements" edges to the ProductionOrderMaterialRequirement entity.
+func (_u *MaterialUpdate) AddProductionOrderMaterialRequirements(v ...*ProductionOrderMaterialRequirement) *MaterialUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductionOrderMaterialRequirementIDs(ids...)
+}
+
 // AddPurchaseOrderItemIDs adds the "purchase_order_items" edge to the PurchaseOrderItem entity by IDs.
 func (_u *MaterialUpdate) AddPurchaseOrderItemIDs(ids ...int) *MaterialUpdate {
 	_u.mutation.AddPurchaseOrderItemIDs(ids...)
@@ -298,6 +314,27 @@ func (_u *MaterialUpdate) RemoveBomItems(v ...*BOMItem) *MaterialUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveBomItemIDs(ids...)
+}
+
+// ClearProductionOrderMaterialRequirements clears all "production_order_material_requirements" edges to the ProductionOrderMaterialRequirement entity.
+func (_u *MaterialUpdate) ClearProductionOrderMaterialRequirements() *MaterialUpdate {
+	_u.mutation.ClearProductionOrderMaterialRequirements()
+	return _u
+}
+
+// RemoveProductionOrderMaterialRequirementIDs removes the "production_order_material_requirements" edge to ProductionOrderMaterialRequirement entities by IDs.
+func (_u *MaterialUpdate) RemoveProductionOrderMaterialRequirementIDs(ids ...int) *MaterialUpdate {
+	_u.mutation.RemoveProductionOrderMaterialRequirementIDs(ids...)
+	return _u
+}
+
+// RemoveProductionOrderMaterialRequirements removes "production_order_material_requirements" edges to ProductionOrderMaterialRequirement entities.
+func (_u *MaterialUpdate) RemoveProductionOrderMaterialRequirements(v ...*ProductionOrderMaterialRequirement) *MaterialUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductionOrderMaterialRequirementIDs(ids...)
 }
 
 // ClearPurchaseOrderItems clears all "purchase_order_items" edges to the PurchaseOrderItem entity.
@@ -609,6 +646,51 @@ func (_u *MaterialUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductionOrderMaterialRequirementsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.ProductionOrderMaterialRequirementsTable,
+			Columns: []string{material.ProductionOrderMaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductionOrderMaterialRequirementsIDs(); len(nodes) > 0 && !_u.mutation.ProductionOrderMaterialRequirementsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.ProductionOrderMaterialRequirementsTable,
+			Columns: []string{material.ProductionOrderMaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductionOrderMaterialRequirementsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.ProductionOrderMaterialRequirementsTable,
+			Columns: []string{material.ProductionOrderMaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -1048,6 +1130,21 @@ func (_u *MaterialUpdateOne) AddBomItems(v ...*BOMItem) *MaterialUpdateOne {
 	return _u.AddBomItemIDs(ids...)
 }
 
+// AddProductionOrderMaterialRequirementIDs adds the "production_order_material_requirements" edge to the ProductionOrderMaterialRequirement entity by IDs.
+func (_u *MaterialUpdateOne) AddProductionOrderMaterialRequirementIDs(ids ...int) *MaterialUpdateOne {
+	_u.mutation.AddProductionOrderMaterialRequirementIDs(ids...)
+	return _u
+}
+
+// AddProductionOrderMaterialRequirements adds the "production_order_material_requirements" edges to the ProductionOrderMaterialRequirement entity.
+func (_u *MaterialUpdateOne) AddProductionOrderMaterialRequirements(v ...*ProductionOrderMaterialRequirement) *MaterialUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductionOrderMaterialRequirementIDs(ids...)
+}
+
 // AddPurchaseOrderItemIDs adds the "purchase_order_items" edge to the PurchaseOrderItem entity by IDs.
 func (_u *MaterialUpdateOne) AddPurchaseOrderItemIDs(ids ...int) *MaterialUpdateOne {
 	_u.mutation.AddPurchaseOrderItemIDs(ids...)
@@ -1168,6 +1265,27 @@ func (_u *MaterialUpdateOne) RemoveBomItems(v ...*BOMItem) *MaterialUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveBomItemIDs(ids...)
+}
+
+// ClearProductionOrderMaterialRequirements clears all "production_order_material_requirements" edges to the ProductionOrderMaterialRequirement entity.
+func (_u *MaterialUpdateOne) ClearProductionOrderMaterialRequirements() *MaterialUpdateOne {
+	_u.mutation.ClearProductionOrderMaterialRequirements()
+	return _u
+}
+
+// RemoveProductionOrderMaterialRequirementIDs removes the "production_order_material_requirements" edge to ProductionOrderMaterialRequirement entities by IDs.
+func (_u *MaterialUpdateOne) RemoveProductionOrderMaterialRequirementIDs(ids ...int) *MaterialUpdateOne {
+	_u.mutation.RemoveProductionOrderMaterialRequirementIDs(ids...)
+	return _u
+}
+
+// RemoveProductionOrderMaterialRequirements removes "production_order_material_requirements" edges to ProductionOrderMaterialRequirement entities.
+func (_u *MaterialUpdateOne) RemoveProductionOrderMaterialRequirements(v ...*ProductionOrderMaterialRequirement) *MaterialUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductionOrderMaterialRequirementIDs(ids...)
 }
 
 // ClearPurchaseOrderItems clears all "purchase_order_items" edges to the PurchaseOrderItem entity.
@@ -1509,6 +1627,51 @@ func (_u *MaterialUpdateOne) sqlSave(ctx context.Context) (_node *Material, err 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductionOrderMaterialRequirementsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.ProductionOrderMaterialRequirementsTable,
+			Columns: []string{material.ProductionOrderMaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductionOrderMaterialRequirementsIDs(); len(nodes) > 0 && !_u.mutation.ProductionOrderMaterialRequirementsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.ProductionOrderMaterialRequirementsTable,
+			Columns: []string{material.ProductionOrderMaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductionOrderMaterialRequirementsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.ProductionOrderMaterialRequirementsTable,
+			Columns: []string{material.ProductionOrderMaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

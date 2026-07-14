@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
+	"server/internal/data/model/ent/qualityinspection"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -64,6 +65,26 @@ func (_u *PurchaseReturnUpdate) ClearPurchaseReceiptID() *PurchaseReturnUpdate {
 	return _u
 }
 
+// SetQualityInspectionID sets the "quality_inspection_id" field.
+func (_u *PurchaseReturnUpdate) SetQualityInspectionID(v int) *PurchaseReturnUpdate {
+	_u.mutation.SetQualityInspectionID(v)
+	return _u
+}
+
+// SetNillableQualityInspectionID sets the "quality_inspection_id" field if the given value is not nil.
+func (_u *PurchaseReturnUpdate) SetNillableQualityInspectionID(v *int) *PurchaseReturnUpdate {
+	if v != nil {
+		_u.SetQualityInspectionID(*v)
+	}
+	return _u
+}
+
+// ClearQualityInspectionID clears the value of the "quality_inspection_id" field.
+func (_u *PurchaseReturnUpdate) ClearQualityInspectionID() *PurchaseReturnUpdate {
+	_u.mutation.ClearQualityInspectionID()
+	return _u
+}
+
 // SetSupplierName sets the "supplier_name" field.
 func (_u *PurchaseReturnUpdate) SetSupplierName(v string) *PurchaseReturnUpdate {
 	_u.mutation.SetSupplierName(v)
@@ -75,6 +96,26 @@ func (_u *PurchaseReturnUpdate) SetNillableSupplierName(v *string) *PurchaseRetu
 	if v != nil {
 		_u.SetSupplierName(*v)
 	}
+	return _u
+}
+
+// SetReturnReason sets the "return_reason" field.
+func (_u *PurchaseReturnUpdate) SetReturnReason(v string) *PurchaseReturnUpdate {
+	_u.mutation.SetReturnReason(v)
+	return _u
+}
+
+// SetNillableReturnReason sets the "return_reason" field if the given value is not nil.
+func (_u *PurchaseReturnUpdate) SetNillableReturnReason(v *string) *PurchaseReturnUpdate {
+	if v != nil {
+		_u.SetReturnReason(*v)
+	}
+	return _u
+}
+
+// ClearReturnReason clears the value of the "return_reason" field.
+func (_u *PurchaseReturnUpdate) ClearReturnReason() *PurchaseReturnUpdate {
+	_u.mutation.ClearReturnReason()
 	return _u
 }
 
@@ -126,6 +167,73 @@ func (_u *PurchaseReturnUpdate) ClearPostedAt() *PurchaseReturnUpdate {
 	return _u
 }
 
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (_u *PurchaseReturnUpdate) SetIdempotencyKey(v string) *PurchaseReturnUpdate {
+	_u.mutation.SetIdempotencyKey(v)
+	return _u
+}
+
+// SetNillableIdempotencyKey sets the "idempotency_key" field if the given value is not nil.
+func (_u *PurchaseReturnUpdate) SetNillableIdempotencyKey(v *string) *PurchaseReturnUpdate {
+	if v != nil {
+		_u.SetIdempotencyKey(*v)
+	}
+	return _u
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (_u *PurchaseReturnUpdate) ClearIdempotencyKey() *PurchaseReturnUpdate {
+	_u.mutation.ClearIdempotencyKey()
+	return _u
+}
+
+// SetIdempotencyPayloadHash sets the "idempotency_payload_hash" field.
+func (_u *PurchaseReturnUpdate) SetIdempotencyPayloadHash(v string) *PurchaseReturnUpdate {
+	_u.mutation.SetIdempotencyPayloadHash(v)
+	return _u
+}
+
+// SetNillableIdempotencyPayloadHash sets the "idempotency_payload_hash" field if the given value is not nil.
+func (_u *PurchaseReturnUpdate) SetNillableIdempotencyPayloadHash(v *string) *PurchaseReturnUpdate {
+	if v != nil {
+		_u.SetIdempotencyPayloadHash(*v)
+	}
+	return _u
+}
+
+// ClearIdempotencyPayloadHash clears the value of the "idempotency_payload_hash" field.
+func (_u *PurchaseReturnUpdate) ClearIdempotencyPayloadHash() *PurchaseReturnUpdate {
+	_u.mutation.ClearIdempotencyPayloadHash()
+	return _u
+}
+
+// SetIdempotencyItemCount sets the "idempotency_item_count" field.
+func (_u *PurchaseReturnUpdate) SetIdempotencyItemCount(v int) *PurchaseReturnUpdate {
+	_u.mutation.ResetIdempotencyItemCount()
+	_u.mutation.SetIdempotencyItemCount(v)
+	return _u
+}
+
+// SetNillableIdempotencyItemCount sets the "idempotency_item_count" field if the given value is not nil.
+func (_u *PurchaseReturnUpdate) SetNillableIdempotencyItemCount(v *int) *PurchaseReturnUpdate {
+	if v != nil {
+		_u.SetIdempotencyItemCount(*v)
+	}
+	return _u
+}
+
+// AddIdempotencyItemCount adds value to the "idempotency_item_count" field.
+func (_u *PurchaseReturnUpdate) AddIdempotencyItemCount(v int) *PurchaseReturnUpdate {
+	_u.mutation.AddIdempotencyItemCount(v)
+	return _u
+}
+
+// ClearIdempotencyItemCount clears the value of the "idempotency_item_count" field.
+func (_u *PurchaseReturnUpdate) ClearIdempotencyItemCount() *PurchaseReturnUpdate {
+	_u.mutation.ClearIdempotencyItemCount()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *PurchaseReturnUpdate) SetNote(v string) *PurchaseReturnUpdate {
 	_u.mutation.SetNote(v)
@@ -157,6 +265,11 @@ func (_u *PurchaseReturnUpdate) SetPurchaseReceipt(v *PurchaseReceipt) *Purchase
 	return _u.SetPurchaseReceiptID(v.ID)
 }
 
+// SetQualityInspection sets the "quality_inspection" edge to the QualityInspection entity.
+func (_u *PurchaseReturnUpdate) SetQualityInspection(v *QualityInspection) *PurchaseReturnUpdate {
+	return _u.SetQualityInspectionID(v.ID)
+}
+
 // AddItemIDs adds the "items" edge to the PurchaseReturnItem entity by IDs.
 func (_u *PurchaseReturnUpdate) AddItemIDs(ids ...int) *PurchaseReturnUpdate {
 	_u.mutation.AddItemIDs(ids...)
@@ -180,6 +293,12 @@ func (_u *PurchaseReturnUpdate) Mutation() *PurchaseReturnMutation {
 // ClearPurchaseReceipt clears the "purchase_receipt" edge to the PurchaseReceipt entity.
 func (_u *PurchaseReturnUpdate) ClearPurchaseReceipt() *PurchaseReturnUpdate {
 	_u.mutation.ClearPurchaseReceipt()
+	return _u
+}
+
+// ClearQualityInspection clears the "quality_inspection" edge to the QualityInspection entity.
+func (_u *PurchaseReturnUpdate) ClearQualityInspection() *PurchaseReturnUpdate {
+	_u.mutation.ClearQualityInspection()
 	return _u
 }
 
@@ -258,14 +377,39 @@ func (_u *PurchaseReturnUpdate) check() error {
 			return &ValidationError{Name: "purchase_receipt_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.purchase_receipt_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.QualityInspectionID(); ok {
+		if err := purchasereturn.QualityInspectionIDValidator(v); err != nil {
+			return &ValidationError{Name: "quality_inspection_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.quality_inspection_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SupplierName(); ok {
 		if err := purchasereturn.SupplierNameValidator(v); err != nil {
 			return &ValidationError{Name: "supplier_name", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.supplier_name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ReturnReason(); ok {
+		if err := purchasereturn.ReturnReasonValidator(v); err != nil {
+			return &ValidationError{Name: "return_reason", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.return_reason": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := purchasereturn.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.status": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.IdempotencyKey(); ok {
+		if err := purchasereturn.IdempotencyKeyValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.idempotency_key": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.IdempotencyPayloadHash(); ok {
+		if err := purchasereturn.IdempotencyPayloadHashValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_payload_hash", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.idempotency_payload_hash": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.IdempotencyItemCount(); ok {
+		if err := purchasereturn.IdempotencyItemCountValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_item_count", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.idempotency_item_count": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.Note(); ok {
@@ -294,6 +438,12 @@ func (_u *PurchaseReturnUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if value, ok := _u.mutation.SupplierName(); ok {
 		_spec.SetField(purchasereturn.FieldSupplierName, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.ReturnReason(); ok {
+		_spec.SetField(purchasereturn.FieldReturnReason, field.TypeString, value)
+	}
+	if _u.mutation.ReturnReasonCleared() {
+		_spec.ClearField(purchasereturn.FieldReturnReason, field.TypeString)
+	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(purchasereturn.FieldStatus, field.TypeString, value)
 	}
@@ -305,6 +455,27 @@ func (_u *PurchaseReturnUpdate) sqlSave(ctx context.Context) (_node int, err err
 	}
 	if _u.mutation.PostedAtCleared() {
 		_spec.ClearField(purchasereturn.FieldPostedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.IdempotencyKey(); ok {
+		_spec.SetField(purchasereturn.FieldIdempotencyKey, field.TypeString, value)
+	}
+	if _u.mutation.IdempotencyKeyCleared() {
+		_spec.ClearField(purchasereturn.FieldIdempotencyKey, field.TypeString)
+	}
+	if value, ok := _u.mutation.IdempotencyPayloadHash(); ok {
+		_spec.SetField(purchasereturn.FieldIdempotencyPayloadHash, field.TypeString, value)
+	}
+	if _u.mutation.IdempotencyPayloadHashCleared() {
+		_spec.ClearField(purchasereturn.FieldIdempotencyPayloadHash, field.TypeString)
+	}
+	if value, ok := _u.mutation.IdempotencyItemCount(); ok {
+		_spec.SetField(purchasereturn.FieldIdempotencyItemCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedIdempotencyItemCount(); ok {
+		_spec.AddField(purchasereturn.FieldIdempotencyItemCount, field.TypeInt, value)
+	}
+	if _u.mutation.IdempotencyItemCountCleared() {
+		_spec.ClearField(purchasereturn.FieldIdempotencyItemCount, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(purchasereturn.FieldNote, field.TypeString, value)
@@ -337,6 +508,35 @@ func (_u *PurchaseReturnUpdate) sqlSave(ctx context.Context) (_node int, err err
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.QualityInspectionCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchasereturn.QualityInspectionTable,
+			Columns: []string{purchasereturn.QualityInspectionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.QualityInspectionIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchasereturn.QualityInspectionTable,
+			Columns: []string{purchasereturn.QualityInspectionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -443,6 +643,26 @@ func (_u *PurchaseReturnUpdateOne) ClearPurchaseReceiptID() *PurchaseReturnUpdat
 	return _u
 }
 
+// SetQualityInspectionID sets the "quality_inspection_id" field.
+func (_u *PurchaseReturnUpdateOne) SetQualityInspectionID(v int) *PurchaseReturnUpdateOne {
+	_u.mutation.SetQualityInspectionID(v)
+	return _u
+}
+
+// SetNillableQualityInspectionID sets the "quality_inspection_id" field if the given value is not nil.
+func (_u *PurchaseReturnUpdateOne) SetNillableQualityInspectionID(v *int) *PurchaseReturnUpdateOne {
+	if v != nil {
+		_u.SetQualityInspectionID(*v)
+	}
+	return _u
+}
+
+// ClearQualityInspectionID clears the value of the "quality_inspection_id" field.
+func (_u *PurchaseReturnUpdateOne) ClearQualityInspectionID() *PurchaseReturnUpdateOne {
+	_u.mutation.ClearQualityInspectionID()
+	return _u
+}
+
 // SetSupplierName sets the "supplier_name" field.
 func (_u *PurchaseReturnUpdateOne) SetSupplierName(v string) *PurchaseReturnUpdateOne {
 	_u.mutation.SetSupplierName(v)
@@ -454,6 +674,26 @@ func (_u *PurchaseReturnUpdateOne) SetNillableSupplierName(v *string) *PurchaseR
 	if v != nil {
 		_u.SetSupplierName(*v)
 	}
+	return _u
+}
+
+// SetReturnReason sets the "return_reason" field.
+func (_u *PurchaseReturnUpdateOne) SetReturnReason(v string) *PurchaseReturnUpdateOne {
+	_u.mutation.SetReturnReason(v)
+	return _u
+}
+
+// SetNillableReturnReason sets the "return_reason" field if the given value is not nil.
+func (_u *PurchaseReturnUpdateOne) SetNillableReturnReason(v *string) *PurchaseReturnUpdateOne {
+	if v != nil {
+		_u.SetReturnReason(*v)
+	}
+	return _u
+}
+
+// ClearReturnReason clears the value of the "return_reason" field.
+func (_u *PurchaseReturnUpdateOne) ClearReturnReason() *PurchaseReturnUpdateOne {
+	_u.mutation.ClearReturnReason()
 	return _u
 }
 
@@ -505,6 +745,73 @@ func (_u *PurchaseReturnUpdateOne) ClearPostedAt() *PurchaseReturnUpdateOne {
 	return _u
 }
 
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (_u *PurchaseReturnUpdateOne) SetIdempotencyKey(v string) *PurchaseReturnUpdateOne {
+	_u.mutation.SetIdempotencyKey(v)
+	return _u
+}
+
+// SetNillableIdempotencyKey sets the "idempotency_key" field if the given value is not nil.
+func (_u *PurchaseReturnUpdateOne) SetNillableIdempotencyKey(v *string) *PurchaseReturnUpdateOne {
+	if v != nil {
+		_u.SetIdempotencyKey(*v)
+	}
+	return _u
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (_u *PurchaseReturnUpdateOne) ClearIdempotencyKey() *PurchaseReturnUpdateOne {
+	_u.mutation.ClearIdempotencyKey()
+	return _u
+}
+
+// SetIdempotencyPayloadHash sets the "idempotency_payload_hash" field.
+func (_u *PurchaseReturnUpdateOne) SetIdempotencyPayloadHash(v string) *PurchaseReturnUpdateOne {
+	_u.mutation.SetIdempotencyPayloadHash(v)
+	return _u
+}
+
+// SetNillableIdempotencyPayloadHash sets the "idempotency_payload_hash" field if the given value is not nil.
+func (_u *PurchaseReturnUpdateOne) SetNillableIdempotencyPayloadHash(v *string) *PurchaseReturnUpdateOne {
+	if v != nil {
+		_u.SetIdempotencyPayloadHash(*v)
+	}
+	return _u
+}
+
+// ClearIdempotencyPayloadHash clears the value of the "idempotency_payload_hash" field.
+func (_u *PurchaseReturnUpdateOne) ClearIdempotencyPayloadHash() *PurchaseReturnUpdateOne {
+	_u.mutation.ClearIdempotencyPayloadHash()
+	return _u
+}
+
+// SetIdempotencyItemCount sets the "idempotency_item_count" field.
+func (_u *PurchaseReturnUpdateOne) SetIdempotencyItemCount(v int) *PurchaseReturnUpdateOne {
+	_u.mutation.ResetIdempotencyItemCount()
+	_u.mutation.SetIdempotencyItemCount(v)
+	return _u
+}
+
+// SetNillableIdempotencyItemCount sets the "idempotency_item_count" field if the given value is not nil.
+func (_u *PurchaseReturnUpdateOne) SetNillableIdempotencyItemCount(v *int) *PurchaseReturnUpdateOne {
+	if v != nil {
+		_u.SetIdempotencyItemCount(*v)
+	}
+	return _u
+}
+
+// AddIdempotencyItemCount adds value to the "idempotency_item_count" field.
+func (_u *PurchaseReturnUpdateOne) AddIdempotencyItemCount(v int) *PurchaseReturnUpdateOne {
+	_u.mutation.AddIdempotencyItemCount(v)
+	return _u
+}
+
+// ClearIdempotencyItemCount clears the value of the "idempotency_item_count" field.
+func (_u *PurchaseReturnUpdateOne) ClearIdempotencyItemCount() *PurchaseReturnUpdateOne {
+	_u.mutation.ClearIdempotencyItemCount()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *PurchaseReturnUpdateOne) SetNote(v string) *PurchaseReturnUpdateOne {
 	_u.mutation.SetNote(v)
@@ -536,6 +843,11 @@ func (_u *PurchaseReturnUpdateOne) SetPurchaseReceipt(v *PurchaseReceipt) *Purch
 	return _u.SetPurchaseReceiptID(v.ID)
 }
 
+// SetQualityInspection sets the "quality_inspection" edge to the QualityInspection entity.
+func (_u *PurchaseReturnUpdateOne) SetQualityInspection(v *QualityInspection) *PurchaseReturnUpdateOne {
+	return _u.SetQualityInspectionID(v.ID)
+}
+
 // AddItemIDs adds the "items" edge to the PurchaseReturnItem entity by IDs.
 func (_u *PurchaseReturnUpdateOne) AddItemIDs(ids ...int) *PurchaseReturnUpdateOne {
 	_u.mutation.AddItemIDs(ids...)
@@ -559,6 +871,12 @@ func (_u *PurchaseReturnUpdateOne) Mutation() *PurchaseReturnMutation {
 // ClearPurchaseReceipt clears the "purchase_receipt" edge to the PurchaseReceipt entity.
 func (_u *PurchaseReturnUpdateOne) ClearPurchaseReceipt() *PurchaseReturnUpdateOne {
 	_u.mutation.ClearPurchaseReceipt()
+	return _u
+}
+
+// ClearQualityInspection clears the "quality_inspection" edge to the QualityInspection entity.
+func (_u *PurchaseReturnUpdateOne) ClearQualityInspection() *PurchaseReturnUpdateOne {
+	_u.mutation.ClearQualityInspection()
 	return _u
 }
 
@@ -650,14 +968,39 @@ func (_u *PurchaseReturnUpdateOne) check() error {
 			return &ValidationError{Name: "purchase_receipt_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.purchase_receipt_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.QualityInspectionID(); ok {
+		if err := purchasereturn.QualityInspectionIDValidator(v); err != nil {
+			return &ValidationError{Name: "quality_inspection_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.quality_inspection_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SupplierName(); ok {
 		if err := purchasereturn.SupplierNameValidator(v); err != nil {
 			return &ValidationError{Name: "supplier_name", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.supplier_name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ReturnReason(); ok {
+		if err := purchasereturn.ReturnReasonValidator(v); err != nil {
+			return &ValidationError{Name: "return_reason", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.return_reason": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := purchasereturn.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.status": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.IdempotencyKey(); ok {
+		if err := purchasereturn.IdempotencyKeyValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.idempotency_key": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.IdempotencyPayloadHash(); ok {
+		if err := purchasereturn.IdempotencyPayloadHashValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_payload_hash", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.idempotency_payload_hash": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.IdempotencyItemCount(); ok {
+		if err := purchasereturn.IdempotencyItemCountValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_item_count", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.idempotency_item_count": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.Note(); ok {
@@ -703,6 +1046,12 @@ func (_u *PurchaseReturnUpdateOne) sqlSave(ctx context.Context) (_node *Purchase
 	if value, ok := _u.mutation.SupplierName(); ok {
 		_spec.SetField(purchasereturn.FieldSupplierName, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.ReturnReason(); ok {
+		_spec.SetField(purchasereturn.FieldReturnReason, field.TypeString, value)
+	}
+	if _u.mutation.ReturnReasonCleared() {
+		_spec.ClearField(purchasereturn.FieldReturnReason, field.TypeString)
+	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(purchasereturn.FieldStatus, field.TypeString, value)
 	}
@@ -714,6 +1063,27 @@ func (_u *PurchaseReturnUpdateOne) sqlSave(ctx context.Context) (_node *Purchase
 	}
 	if _u.mutation.PostedAtCleared() {
 		_spec.ClearField(purchasereturn.FieldPostedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.IdempotencyKey(); ok {
+		_spec.SetField(purchasereturn.FieldIdempotencyKey, field.TypeString, value)
+	}
+	if _u.mutation.IdempotencyKeyCleared() {
+		_spec.ClearField(purchasereturn.FieldIdempotencyKey, field.TypeString)
+	}
+	if value, ok := _u.mutation.IdempotencyPayloadHash(); ok {
+		_spec.SetField(purchasereturn.FieldIdempotencyPayloadHash, field.TypeString, value)
+	}
+	if _u.mutation.IdempotencyPayloadHashCleared() {
+		_spec.ClearField(purchasereturn.FieldIdempotencyPayloadHash, field.TypeString)
+	}
+	if value, ok := _u.mutation.IdempotencyItemCount(); ok {
+		_spec.SetField(purchasereturn.FieldIdempotencyItemCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedIdempotencyItemCount(); ok {
+		_spec.AddField(purchasereturn.FieldIdempotencyItemCount, field.TypeInt, value)
+	}
+	if _u.mutation.IdempotencyItemCountCleared() {
+		_spec.ClearField(purchasereturn.FieldIdempotencyItemCount, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(purchasereturn.FieldNote, field.TypeString, value)
@@ -746,6 +1116,35 @@ func (_u *PurchaseReturnUpdateOne) sqlSave(ctx context.Context) (_node *Purchase
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.QualityInspectionCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchasereturn.QualityInspectionTable,
+			Columns: []string{purchasereturn.QualityInspectionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.QualityInspectionIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchasereturn.QualityInspectionTable,
+			Columns: []string{purchasereturn.QualityInspectionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

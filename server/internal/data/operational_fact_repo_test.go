@@ -18,7 +18,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func TestOperationalFactRepo_ProductionFactPostAndCancelWritesInventoryReversal(t *testing.T) {
+func TestOperationalFactRepo_SourceLessProductionDraftCannotPost(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_production")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
@@ -37,25 +37,11 @@ func TestOperationalFactRepo_ProductionFactPostAndCancelWritesInventoryReversal(
 	if err != nil {
 		t.Fatalf("create production fact failed: %v", err)
 	}
-	posted, err := repo.PostProductionFact(ctx, fact.ID)
-	if err != nil {
-		t.Fatalf("post production fact failed: %v", err)
+	if _, err := repo.PostProductionFact(ctx, fact.ID); !errors.Is(err, biz.ErrProductionOrderFactSourceInvalid) {
+		t.Fatalf("source-less production post error = %v", err)
 	}
-	if posted.Status != biz.OperationalFactStatusPosted {
-		t.Fatalf("expected POSTED, got %s", posted.Status)
-	}
-	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ProductionFactSourceType)).CountX(ctx); count != 1 {
-		t.Fatalf("expected one production inventory txn, got %d", count)
-	}
-	cancelled, err := repo.CancelPostedProductionFact(ctx, fact.ID)
-	if err != nil {
-		t.Fatalf("cancel production fact failed: %v", err)
-	}
-	if cancelled.Status != biz.OperationalFactStatusCancelled {
-		t.Fatalf("expected CANCELLED, got %s", cancelled.Status)
-	}
-	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ProductionFactSourceType)).CountX(ctx); count != 2 {
-		t.Fatalf("expected original + reversal production txns, got %d", count)
+	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ProductionFactSourceType)).CountX(ctx); count != 0 {
+		t.Fatalf("source-less production post wrote %d inventory txns", count)
 	}
 }
 
@@ -301,6 +287,8 @@ func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalAc
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+	actor := client.AdminUser.Create().SetUsername("inactive-production-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
+	orderUC := biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, log.NewStdLogger(io.Discard)))
 
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
@@ -315,18 +303,28 @@ func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalAc
 	}); err != nil {
 		t.Fatalf("seed product inventory failed: %v", err)
 	}
-	fact, err := uc.CreateProductionFactDraft(ctx, &biz.OperationalFactMutation{
-		FactNo:         "PF-INACTIVE-HISTORY",
-		FactType:       biz.ProductionFactFinishedGoodsReceipt,
-		SubjectType:    biz.InventorySubjectProduct,
-		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
-		UnitID:         fixtures.unitID,
-		Quantity:       decimal.NewFromInt(1),
-		IdempotencyKey: "PF-INACTIVE-HISTORY",
+	order, err := orderUC.CreateDraft(ctx, &biz.ProductionOrderCreate{
+		Draft: biz.ProductionOrderDraft{OrderNo: "MO-INACTIVE-HISTORY", Items: []biz.ProductionOrderDraftItem{{
+			LineNo: 1, ProductID: fixtures.productID, UnitID: fixtures.unitID, PlannedQuantity: decimal.NewFromInt(1),
+		}}},
+		ActorID: actor.ID, IdempotencyKey: "MO-INACTIVE-HISTORY",
 	})
 	if err != nil {
-		t.Fatalf("create production fact failed: %v", err)
+		t.Fatalf("create production order failed: %v", err)
+	}
+	order, err = orderUC.Release(ctx, &biz.ProductionOrderAction{
+		ID: order.Order.ID, ExpectedVersion: order.Order.Version, ActorID: actor.ID, IdempotencyKey: "MO-INACTIVE-HISTORY:RELEASE",
+	})
+	if err != nil {
+		t.Fatalf("release production order failed: %v", err)
+	}
+	lotNo := "PF-INACTIVE-HISTORY-LOT"
+	fact, err := uc.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{
+		FactNo: "PF-INACTIVE-HISTORY", ProductionOrderID: order.Order.ID, ProductionOrderItemID: order.Items[0].ID,
+		WarehouseID: fixtures.warehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "PF-INACTIVE-HISTORY",
+	})
+	if err != nil {
+		t.Fatalf("create production completion failed: %v", err)
 	}
 	if _, err := uc.PostProductionFact(ctx, fact.ID); err != nil {
 		t.Fatalf("post production fact failed: %v", err)
@@ -668,7 +666,7 @@ func TestOperationalFactRepo_StockReservationIdempotencyRequiresSamePayload(t *t
 	}
 }
 
-func TestOperationalFactRepo_OutsourcingMaterialIssueWithoutLotPostAndCancel(t *testing.T) {
+func TestOperationalFactRepo_SourceLessOutsourcingDraftCannotPost(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_outsourcing")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
@@ -701,22 +699,11 @@ func TestOperationalFactRepo_OutsourcingMaterialIssueWithoutLotPostAndCancel(t *
 	if err != nil {
 		t.Fatalf("create outsourcing fact failed: %v", err)
 	}
-	posted, err := repo.PostOutsourcingFact(ctx, fact.ID)
-	if err != nil {
-		t.Fatalf("post outsourcing fact failed: %v", err)
+	if _, err := repo.PostOutsourcingFact(ctx, fact.ID); !errors.Is(err, biz.ErrOutsourcingOrderFactSourceInvalid) {
+		t.Fatalf("source-less outsourcing post error = %v", err)
 	}
-	if posted.Status != biz.OperationalFactStatusPosted {
-		t.Fatalf("expected POSTED, got %s", posted.Status)
-	}
-	cancelled, err := repo.CancelPostedOutsourcingFact(ctx, fact.ID)
-	if err != nil {
-		t.Fatalf("cancel outsourcing fact failed: %v", err)
-	}
-	if cancelled.Status != biz.OperationalFactStatusCancelled {
-		t.Fatalf("expected CANCELLED, got %s", cancelled.Status)
-	}
-	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.OutsourcingFactSourceType)).CountX(ctx); count != 2 {
-		t.Fatalf("expected outbound + reversal outsourcing txns, got %d", count)
+	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.OutsourcingFactSourceType)).CountX(ctx); count != 0 {
+		t.Fatalf("source-less outsourcing post wrote %d inventory txns", count)
 	}
 }
 
@@ -724,31 +711,12 @@ func TestOperationalFactUsecase_OutsourcingRejectsInactiveNewReferencesAndKeepsC
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_outsourcing_inactive_refs")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
-	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
-
-	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
-		SubjectType:    biz.InventorySubjectProduct,
-		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
-		TxnType:        biz.InventoryTxnIn,
-		Direction:      1,
-		Quantity:       decimal.NewFromInt(5),
-		UnitID:         fixtures.unitID,
-		SourceType:     "TEST_OUTSOURCING_INACTIVE",
-		IdempotencyKey: "TEST_OUTSOURCING_INACTIVE:IN",
-	}); err != nil {
-		t.Fatalf("seed product inventory failed: %v", err)
-	}
-	fact, err := uc.CreateOutsourcingFactDraft(ctx, &biz.OperationalFactMutation{
-		FactNo:         "OF-INACTIVE-HISTORY",
-		FactType:       biz.OutsourcingFactMaterialIssue,
-		SubjectType:    biz.InventorySubjectProduct,
-		SubjectID:      fixtures.productID,
-		WarehouseID:    fixtures.warehouseID,
-		UnitID:         fixtures.unitID,
-		Quantity:       decimal.NewFromInt(1),
-		IdempotencyKey: "OF-INACTIVE-HISTORY",
+	source := createOutsourcingFactSourceFixture(t, ctx, client, fixtures, "INACTIVE-HISTORY", decimal.NewFromInt(1))
+	lotNo := "OF-INACTIVE-HISTORY-LOT"
+	fact, err := uc.CreateOutsourcingReturnReceiptFromOrder(ctx, &biz.OutsourcingFactFromOrderCreate{
+		FactNo: "OF-INACTIVE-HISTORY", OutsourcingOrderID: source.order.ID, OutsourcingOrderItemID: source.productLine.ID,
+		WarehouseID: fixtures.warehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "OF-INACTIVE-HISTORY",
 	})
 	if err != nil {
 		t.Fatalf("create outsourcing fact failed: %v", err)
@@ -1545,7 +1513,7 @@ func TestOperationalFactRepo_CreateShipmentWithItemsIdempotencyRequiresSamePaylo
 	input := &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{
 			ShipmentNo:       "SHP-IDEMPOTENT-001",
-				IdempotencyKey:   "shp-1",
+			IdempotencyKey:   "shp-1",
 			TotalNetWeightKg: &requestedTotal,
 		},
 		Items: []*biz.ShipmentItemCreate{{

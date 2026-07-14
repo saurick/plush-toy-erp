@@ -356,6 +356,18 @@ func (f ProductionOrderItemFunc) Mutate(ctx context.Context, m ent.Mutation) (en
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductionOrderItemMutation", m)
 }
 
+// The ProductionOrderMaterialRequirementFunc type is an adapter to allow the use of ordinary
+// function as ProductionOrderMaterialRequirement mutator.
+type ProductionOrderMaterialRequirementFunc func(context.Context, *ent.ProductionOrderMaterialRequirementMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ProductionOrderMaterialRequirementFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ProductionOrderMaterialRequirementMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductionOrderMaterialRequirementMutation", m)
+}
+
 // The PurchaseOrderFunc type is an adapter to allow the use of ordinary
 // function as PurchaseOrder mutator.
 type PurchaseOrderFunc func(context.Context, *ent.PurchaseOrderMutation) (ent.Value, error)

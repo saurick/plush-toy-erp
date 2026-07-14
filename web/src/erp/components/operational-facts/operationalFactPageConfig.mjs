@@ -3,10 +3,6 @@ import {
   cancelOutsourcingFact,
   cancelProductionFact,
   cancelShipment,
-  createFinanceFact,
-  createOutsourcingFact,
-  createProductionFact,
-  createStockReservation,
   listFinanceFacts,
   listOutsourcingFacts,
   listProductionFacts,
@@ -27,10 +23,8 @@ import {
   FINANCE_INVOICE_CATEGORY_LABELS,
   FINANCE_PAYMENT_TERM_LABELS,
   decimalNumber,
-  buildFactParams,
-  buildFinanceParams,
   formatQuantity,
-  sourceRouteFor,
+  businessSourceRouteFor,
   statusTag,
 } from './OperationalFactForms.jsx'
 
@@ -97,6 +91,59 @@ const COUNTERPARTY_TYPE_LABELS = Object.freeze({
   OTHER: '其他',
 })
 
+const FINANCE_COLUMN_KEYS_BY_FACT_TYPE = Object.freeze({
+  RECEIVABLE: Object.freeze([
+    'counterparty',
+    'amount',
+    'fee_amount',
+    'currency',
+    'collection_type',
+    'payment_term',
+    'invoice_category',
+  ]),
+  PAYABLE: Object.freeze([
+    'counterparty',
+    'amount',
+    'fee_amount',
+    'currency',
+    'payment_term',
+  ]),
+  INVOICE: Object.freeze([
+    'counterparty',
+    'amount',
+    'currency',
+    'invoice_category',
+  ]),
+  RECONCILIATION: Object.freeze([
+    'counterparty',
+    'amount',
+    'fee_amount',
+    'currency',
+  ]),
+})
+
+const FINANCE_COUNTERPARTY_COLUMN_TITLES = Object.freeze({
+  RECEIVABLE: '客户',
+  PAYABLE: '供应商',
+  INVOICE: '客户',
+  RECONCILIATION: '往来方',
+})
+
+const FINANCE_SETTLEMENT_ACTIONS = Object.freeze({
+  RECEIVABLE: Object.freeze({
+    label: '结清',
+    confirmTitle: '确认结清当前应收记录？',
+  }),
+  PAYABLE: Object.freeze({
+    label: '结清',
+    confirmTitle: '确认结清当前应付记录？',
+  }),
+  RECONCILIATION: Object.freeze({
+    label: '完成核对',
+    confirmTitle: '确认完成当前对账核对？',
+  }),
+})
+
 const SUBJECT_TYPE_LABELS = Object.freeze({
   MATERIAL: '物料',
   PRODUCT: '产品',
@@ -157,7 +204,10 @@ function customerColumnText(record = {}) {
 
 function counterpartyColumnText(record = {}) {
   if (!record.counterparty_type) return '-'
-  return `${counterpartyTypeLabel(record.counterparty_type)} / ${safeRefText('往来方', record.counterparty_id)}`
+  const fallback = safeRefText('往来方', record.counterparty_id)
+  if (fallback === '-') return fallback
+  const label = counterpartyTypeLabel(record.counterparty_type)
+  return label === '往来方' ? fallback : `${label}已关联`
 }
 
 function factTypeLabel(value) {
@@ -172,108 +222,76 @@ function counterpartyTypeLabel(value) {
   return COUNTERPARTY_TYPE_LABELS[value] || '往来方'
 }
 
+function normalizeFinanceFactType(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+}
+
+export function financeSettlementActionFor(factType) {
+  return FINANCE_SETTLEMENT_ACTIONS[normalizeFinanceFactType(factType)] || null
+}
+
 export function buildOperationalFactViewConfigs() {
   return {
     production: {
       title: '生产记录',
       listKey: 'production_facts',
-      createLabel: '登记生产记录',
-      createPrefix: 'prod',
-      draftNumberField: 'fact_no',
-      draftNumberPrefix: 'PROD',
       list: listProductionFacts,
-      create: createProductionFact,
       post: postProductionFact,
       cancel: cancelProductionFact,
-      writePermissions: ACTION_PERMISSIONS.productionWrite,
-      buildParams: buildFactParams,
+      postPermissions: ACTION_PERMISSIONS.productionPost,
+      cancelPermissions: ACTION_PERMISSIONS.productionCancel,
       dateOptions: OCCURRED_DATE_FILTER_OPTIONS,
       defaultDateField: 'occurred_at',
-      initialValues: {
-        fact_type: 'MATERIAL_ISSUE',
-        subject_type: 'MATERIAL',
-      },
     },
     outsourcing: {
       title: '委外记录',
       listKey: 'outsourcing_facts',
-      createLabel: '登记委外记录',
-      createPrefix: 'outsource',
-      draftNumberField: 'fact_no',
-      draftNumberPrefix: 'OUTF',
       list: listOutsourcingFacts,
-      create: createOutsourcingFact,
       post: postOutsourcingFact,
       cancel: cancelOutsourcingFact,
-      writePermissions: ACTION_PERMISSIONS.outsourcingWrite,
-      buildParams: buildFactParams,
+      readPermissions: ACTION_PERMISSIONS.outsourcingRead,
+      postPermissions: ACTION_PERMISSIONS.outsourcingPost,
+      cancelPermissions: ACTION_PERMISSIONS.outsourcingCancel,
       dateOptions: OCCURRED_DATE_FILTER_OPTIONS,
       defaultDateField: 'occurred_at',
-      initialValues: {
-        fact_type: 'MATERIAL_ISSUE',
-        subject_type: 'MATERIAL',
-      },
     },
     shipments: {
       title: '出货记录',
       listKey: 'shipments',
-      createLabel: '登记出货单草稿',
-      createPrefix: 'shipment',
-      draftNumberField: 'shipment_no',
-      draftNumberPrefix: 'SHIP',
       list: listShipments,
       post: shipShipment,
       cancel: cancelShipment,
       writePermissions: ACTION_PERMISSIONS.shipmentWrite,
-      confirmPermissions: ACTION_PERMISSIONS.shipmentConfirm,
+      postPermissions: ACTION_PERMISSIONS.shipmentPost,
+      cancelPermissions: ACTION_PERMISSIONS.shipmentCancel,
       dateOptions: SHIPMENT_DATE_FILTER_OPTIONS,
       defaultDateField: 'planned_ship_at',
-      initialValues: {},
     },
     reservations: {
       title: '库存预留',
       listKey: 'stock_reservations',
-      createLabel: '登记库存预留',
-      hideCreateAction: true,
-      createPrefix: 'reserve',
-      draftNumberField: 'reservation_no',
-      draftNumberPrefix: 'RSV',
       list: listStockReservations,
-      create: createStockReservation,
       release: releaseStockReservation,
-      writePermissions: ACTION_PERMISSIONS.reservationWrite,
-      confirmPermissions: ACTION_PERMISSIONS.shipmentConfirm,
+      releasePermissions: ACTION_PERMISSIONS.reservationRelease,
       dateOptions: RESERVED_DATE_FILTER_OPTIONS,
       defaultDateField: 'reserved_at',
-      initialValues: {},
     },
     finance: {
       title: '财务记录',
       listKey: 'finance_facts',
-      createLabel: '登记财务记录',
-      createPrefix: 'finance',
-      draftNumberField: 'fact_no',
-      draftNumberPrefix: 'FIN',
       list: listFinanceFacts,
-      create: createFinanceFact,
       post: postFinanceFact,
       settle: settleFinanceFact,
       cancel: cancelFinanceFact,
-      writePermissions: ACTION_PERMISSIONS.financeWrite,
-      buildParams: buildFinanceParams,
       dateOptions: OCCURRED_DATE_FILTER_OPTIONS,
       defaultDateField: 'occurred_at',
-      initialValues: {
-        fact_type: 'RECEIVABLE',
-        counterparty_type: 'CUSTOMER',
-        currency: 'CNY',
-        fee_amount: '0',
-      },
     },
   }
 }
 
-export function buildOperationalFactColumns(activeKey) {
+export function buildOperationalFactColumns(activeKey, financeFactType = '') {
   const baseColumns = [
     {
       title: '单号',
@@ -361,6 +379,96 @@ export function buildOperationalFactColumns(activeKey) {
     },
   ]
 
+  const normalizedFinanceFactType = normalizeFinanceFactType(financeFactType)
+  const financeColumnByKey = {
+    counterparty: {
+      key: 'counterparty',
+      title:
+        FINANCE_COUNTERPARTY_COLUMN_TITLES[normalizedFinanceFactType] ||
+        '往来方',
+      width: 170,
+      sortValue: counterpartyColumnText,
+      render: (_, record) => counterpartyColumnText(record),
+      exportValue: counterpartyColumnText,
+    },
+    amount: {
+      title: '金额',
+      dataIndex: 'amount',
+      width: 120,
+      sortValue: (record) => decimalNumber(record?.amount),
+    },
+    fee_amount: {
+      title: '手续费',
+      dataIndex: 'fee_amount',
+      width: 120,
+      sortValue: (record) => decimalNumber(record?.fee_amount),
+    },
+    currency: {
+      title: '币种',
+      dataIndex: 'currency',
+      width: 90,
+      sortType: 'text',
+    },
+    collection_type: {
+      title: '收款分类',
+      dataIndex: 'collection_type',
+      width: 130,
+      sortType: 'text',
+      render: (value) =>
+        FINANCE_COLLECTION_TYPE_LABELS[value] || (value ? '收款分类' : '-'),
+    },
+    payment_term: {
+      title: '账期',
+      dataIndex: 'payment_term',
+      width: 150,
+      sortType: 'text',
+      render: (value, record) => {
+        const label =
+          FINANCE_PAYMENT_TERM_LABELS[value] || (value ? '账期' : '-')
+        return record?.payment_term_days === null ||
+          record?.payment_term_days === undefined
+          ? label
+          : `${label} / ${record.payment_term_days} 天`
+      },
+    },
+    invoice_category: {
+      title: '发票类别',
+      dataIndex: 'invoice_category',
+      width: 130,
+      sortType: 'text',
+      render: (value) =>
+        FINANCE_INVOICE_CATEGORY_LABELS[value] || (value ? '发票类别' : '-'),
+    },
+  }
+  const financeColumnKeys =
+    FINANCE_COLUMN_KEYS_BY_FACT_TYPE[normalizedFinanceFactType] ||
+    Object.keys(financeColumnByKey)
+  const financeColumns = [
+    ...baseColumns,
+    ...(FINANCE_COLUMN_KEYS_BY_FACT_TYPE[normalizedFinanceFactType]
+      ? []
+      : [
+          {
+            title: '类型',
+            dataIndex: 'fact_type',
+            width: 150,
+            sortType: 'text',
+            render: factTypeLabel,
+            exportValue: (record) => factTypeLabel(record?.fact_type),
+          },
+        ]),
+    ...financeColumnKeys.map((key) => financeColumnByKey[key]),
+    {
+      title: '取消记录',
+      key: 'cancellation',
+      width: 320,
+      sortable: false,
+      render: (_, record) => financeCancelAuditText(record),
+      exportValue: financeCancelAuditText,
+    },
+    ...sourceColumns,
+  ]
+
   const columnsByKey = {
     production: [
       ...baseColumns,
@@ -436,75 +544,7 @@ export function buildOperationalFactColumns(activeKey) {
       ...quantityColumns,
       ...sourceColumns,
     ],
-    finance: [
-      ...baseColumns,
-      {
-        title: '类型',
-        dataIndex: 'fact_type',
-        width: 150,
-        sortType: 'text',
-        render: factTypeLabel,
-        exportValue: (record) => factTypeLabel(record?.fact_type),
-      },
-      {
-        title: '往来方',
-        width: 170,
-        sortValue: counterpartyColumnText,
-        render: (_, record) => counterpartyColumnText(record),
-        exportValue: counterpartyColumnText,
-      },
-      {
-        title: '金额',
-        dataIndex: 'amount',
-        width: 120,
-        sortValue: (record) => decimalNumber(record?.amount),
-      },
-      {
-        title: '手续费',
-        dataIndex: 'fee_amount',
-        width: 120,
-        sortValue: (record) => decimalNumber(record?.fee_amount),
-      },
-      { title: '币种', dataIndex: 'currency', width: 90, sortType: 'text' },
-      {
-        title: '收款分类',
-        dataIndex: 'collection_type',
-        width: 130,
-        sortType: 'text',
-        render: (value) =>
-          FINANCE_COLLECTION_TYPE_LABELS[value] || (value ? '收款分类' : '-'),
-      },
-      {
-        title: '账期',
-        dataIndex: 'payment_term',
-        width: 150,
-        sortType: 'text',
-        render: (value, record) => {
-          const label =
-            FINANCE_PAYMENT_TERM_LABELS[value] || (value ? '账期' : '-')
-          return record?.payment_term_days === null ||
-            record?.payment_term_days === undefined
-            ? label
-            : `${label} / ${record.payment_term_days} 天`
-        },
-      },
-      {
-        title: '发票类别',
-        dataIndex: 'invoice_category',
-        width: 130,
-        sortType: 'text',
-        render: (value) =>
-          FINANCE_INVOICE_CATEGORY_LABELS[value] || (value ? '发票类别' : '-'),
-      },
-      {
-        title: '取消记录',
-        width: 320,
-        sortable: false,
-        render: (_, record) => financeCancelAuditText(record),
-        exportValue: financeCancelAuditText,
-      },
-      ...sourceColumns,
-    ],
+    finance: financeColumns,
   }
 
   return columnsByKey[activeKey] || []
@@ -565,7 +605,10 @@ export function buildOperationalFactRelatedMenuItems({
   }
   if (
     activeKey === 'finance' &&
-    sourceRouteFor(activeSelectedRow.source_type)
+    businessSourceRouteFor(
+      activeSelectedRow.source_type,
+      activeSelectedRow.source_id
+    )
   ) {
     items.push({ key: 'source', label: '来源单据' })
   }

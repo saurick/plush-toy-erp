@@ -49,6 +49,108 @@ func (r *inventoryRepo) CreatePurchaseReceiptAdjustmentDraft(ctx context.Context
 	return entPurchaseReceiptAdjustmentToBiz(row, nil), nil
 }
 
+func (r *inventoryRepo) ResolvePurchaseReceiptAdjustmentReplay(ctx context.Context, in *biz.PurchaseReceiptAdjustmentCreate) (*biz.PurchaseReceiptAdjustment, bool, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || in == nil || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
+		return nil, false, biz.ErrBadParam
+	}
+	return resolvePurchaseReceiptAdjustmentReplay(ctx, r.data.postgres, in)
+}
+
+func (r *inventoryRepo) CreatePurchaseReceiptAdjustmentWithItems(ctx context.Context, in *biz.PurchaseReceiptAdjustmentCreate, items []*biz.PurchaseReceiptAdjustmentItemCreate) (*biz.PurchaseReceiptAdjustment, error) {
+	if in == nil || in.PurchaseReceiptID <= 0 || len(items) == 0 || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
+		return nil, biz.ErrBadParam
+	}
+	if replayed, found, err := resolvePurchaseReceiptAdjustmentReplay(ctx, r.data.postgres, in); err != nil || found {
+		return replayed, err
+	}
+	tx, err := r.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+
+	if err := lockPurchaseReceipt(ctx, tx, in.PurchaseReceiptID); err != nil {
+		return nil, err
+	}
+	if replayed, found, err := resolvePurchaseReceiptAdjustmentReplay(ctx, tx.client, in); err != nil || found {
+		return replayed, err
+	}
+	receipt, err := tx.client.PurchaseReceipt.Get(ctx, in.PurchaseReceiptID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrPurchaseReceiptNotFound
+		}
+		return nil, err
+	}
+	if !corestatus.IsPurchaseReceiptPosted(receipt.Status) {
+		return nil, biz.ErrBadParam
+	}
+	row, err := tx.client.PurchaseReceiptAdjustment.Create().
+		SetAdjustmentNo(in.AdjustmentNo).
+		SetPurchaseReceiptID(in.PurchaseReceiptID).
+		SetNillableReason(in.Reason).
+		SetStatus(biz.PurchaseReceiptAdjustmentStatusDraft).
+		SetAdjustedAt(in.AdjustedAt).
+		SetIdempotencyKey(in.IdempotencyKey).
+		SetIdempotencyPayloadHash(in.IdempotencyPayloadHash).
+		SetIdempotencyItemCount(len(items)).
+		SetNillableNote(in.Note).
+		Save(ctx)
+	if err != nil {
+		originalErr := err
+		rollbackInventoryDBTx(ctx, tx, r.log)
+		tx = nil
+		if replayed, found, replayErr := resolvePurchaseReceiptAdjustmentReplay(ctx, r.data.postgres, in); replayErr != nil {
+			return nil, replayErr
+		} else if found {
+			return replayed, nil
+		}
+		return nil, originalErr
+	}
+	for _, requested := range items {
+		if requested == nil {
+			return nil, biz.ErrBadParam
+		}
+		item := *requested
+		item.AdjustmentID = row.ID
+		if err := validatePurchaseReceiptAdjustmentItemReferences(ctx, tx.client, row.PurchaseReceiptID, &item); err != nil {
+			return nil, err
+		}
+		if _, err := tx.client.PurchaseReceiptAdjustmentItem.Create().
+			SetAdjustmentID(row.ID).
+			SetPurchaseReceiptItemID(item.PurchaseReceiptItemID).
+			SetAdjustType(item.AdjustType).
+			SetMaterialID(item.MaterialID).
+			SetWarehouseID(item.WarehouseID).
+			SetUnitID(item.UnitID).
+			SetNillableLotID(item.LotID).
+			SetQuantity(item.Quantity).
+			SetNillableSourceLineNo(item.SourceLineNo).
+			SetNillableCorrectionGroup(item.CorrectionGroup).
+			SetNillableNote(item.Note).
+			Save(ctx); err != nil {
+			return nil, err
+		}
+	}
+	out, err := purchaseReceiptAdjustmentWithItems(ctx, tx.client, row)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		commitErr := err
+		rollbackInventoryDBTx(ctx, tx, r.log)
+		tx = nil
+		if replayed, found, replayErr := resolvePurchaseReceiptAdjustmentReplay(ctx, r.data.postgres, in); replayErr != nil {
+			return nil, replayErr
+		} else if found {
+			return replayed, nil
+		}
+		return nil, commitErr
+	}
+	tx = nil
+	return out, nil
+}
+
 func (r *inventoryRepo) AddPurchaseReceiptAdjustmentItem(ctx context.Context, in *biz.PurchaseReceiptAdjustmentItemCreate) (*biz.PurchaseReceiptAdjustmentItem, error) {
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
@@ -143,6 +245,13 @@ func (r *inventoryRepo) PostPurchaseReceiptAdjustment(ctx context.Context, adjus
 		}
 		tx = nil
 		return out, nil
+	}
+	hasActivePayable, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.PurchaseReceiptSourceType, receipt.ID)
+	if err != nil {
+		return nil, err
+	}
+	if hasActivePayable {
+		return nil, biz.ErrPurchaseReceiptFinanceDependency
 	}
 
 	items, err := tx.client.PurchaseReceiptAdjustmentItem.Query().
@@ -243,6 +352,16 @@ func (r *inventoryRepo) CancelPostedPurchaseReceiptAdjustment(ctx context.Contex
 		tx = nil
 		return out, nil
 	}
+	if err := lockPurchaseReceipt(ctx, tx, adjustment.PurchaseReceiptID); err != nil {
+		return nil, err
+	}
+	hasActivePayable, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.PurchaseReceiptSourceType, adjustment.PurchaseReceiptID)
+	if err != nil {
+		return nil, err
+	}
+	if hasActivePayable {
+		return nil, biz.ErrPurchaseReceiptFinanceDependency
+	}
 
 	items, err := tx.client.PurchaseReceiptAdjustmentItem.Query().
 		Where(purchasereceiptadjustmentitem.AdjustmentID(adjustment.ID)).
@@ -318,6 +437,98 @@ func (r *inventoryRepo) GetPurchaseReceiptAdjustment(ctx context.Context, id int
 		return nil, err
 	}
 	return purchaseReceiptAdjustmentWithItems(ctx, r.data.postgres, adjustment)
+}
+
+func (r *inventoryRepo) ListPurchaseReceiptAdjustments(ctx context.Context, filter biz.PurchaseReceiptAdjustmentFilter) ([]*biz.PurchaseReceiptAdjustment, int, error) {
+	query := r.data.postgres.PurchaseReceiptAdjustment.Query()
+	if filter.Status != "" {
+		query = query.Where(purchasereceiptadjustment.Status(filter.Status))
+	}
+	if filter.Keyword != "" {
+		query = query.Where(purchasereceiptadjustment.Or(
+			purchasereceiptadjustment.AdjustmentNoContainsFold(filter.Keyword),
+			purchasereceiptadjustment.ReasonContainsFold(filter.Keyword),
+		))
+	}
+	if filter.PurchaseReceiptID > 0 {
+		query = query.Where(purchasereceiptadjustment.PurchaseReceiptID(filter.PurchaseReceiptID))
+	}
+	if filter.DateFrom != nil {
+		query = query.Where(purchasereceiptadjustment.AdjustedAtGTE(*filter.DateFrom))
+	}
+	if filter.DateTo != nil {
+		query = query.Where(purchasereceiptadjustment.AdjustedAtLTE(endOfDateFilter(*filter.DateTo)))
+	}
+	itemPredicates := []predicate.PurchaseReceiptAdjustmentItem{}
+	if filter.AdjustType != "" {
+		itemPredicates = append(itemPredicates, purchasereceiptadjustmentitem.AdjustType(filter.AdjustType))
+	}
+	if filter.MaterialID > 0 {
+		itemPredicates = append(itemPredicates, purchasereceiptadjustmentitem.MaterialID(filter.MaterialID))
+	}
+	if filter.WarehouseID > 0 {
+		itemPredicates = append(itemPredicates, purchasereceiptadjustmentitem.WarehouseID(filter.WarehouseID))
+	}
+	if filter.LotID > 0 {
+		itemPredicates = append(itemPredicates, purchasereceiptadjustmentitem.LotID(filter.LotID))
+	}
+	if len(itemPredicates) > 0 {
+		query = query.Where(purchasereceiptadjustment.HasItemsWith(itemPredicates...))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.
+		Order(ent.Desc(purchasereceiptadjustment.FieldAdjustedAt), ent.Desc(purchasereceiptadjustment.FieldID)).
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.PurchaseReceiptAdjustment, 0, len(rows))
+	for _, row := range rows {
+		item, err := purchaseReceiptAdjustmentWithItems(ctx, r.data.postgres, row)
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, item)
+	}
+	return out, total, nil
+}
+
+func resolvePurchaseReceiptAdjustmentReplay(ctx context.Context, client *ent.Client, in *biz.PurchaseReceiptAdjustmentCreate) (*biz.PurchaseReceiptAdjustment, bool, error) {
+	if client == nil || in == nil || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
+		return nil, false, biz.ErrBadParam
+	}
+	row, err := client.PurchaseReceiptAdjustment.Query().
+		Where(purchasereceiptadjustment.IdempotencyKey(in.IdempotencyKey)).
+		Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	if row.IdempotencyPayloadHash == nil || *row.IdempotencyPayloadHash != in.IdempotencyPayloadHash {
+		return nil, true, biz.ErrIdempotencyConflict
+	}
+	if row.IdempotencyItemCount == nil || *row.IdempotencyItemCount <= 0 {
+		return nil, true, fmt.Errorf("purchase receipt adjustment %d idempotency result boundary is missing", row.ID)
+	}
+	items, err := client.PurchaseReceiptAdjustmentItem.Query().
+		Where(purchasereceiptadjustmentitem.AdjustmentID(row.ID)).
+		Order(ent.Asc(purchasereceiptadjustmentitem.FieldID)).
+		Limit(*row.IdempotencyItemCount).
+		All(ctx)
+	if err != nil {
+		return nil, true, err
+	}
+	if len(items) != *row.IdempotencyItemCount {
+		return nil, true, fmt.Errorf("purchase receipt adjustment %d idempotency result item set is incomplete", row.ID)
+	}
+	return entPurchaseReceiptAdjustmentToBiz(row, items), true, nil
 }
 
 func validatePurchaseReceiptAdjustmentItemReferences(ctx context.Context, client *ent.Client, receiptID int, in *biz.PurchaseReceiptAdjustmentItemCreate) error {

@@ -43,6 +43,7 @@ func (PurchaseReceipt) Annotations() []schema.Annotation {
 
 var purchaseReceiptLockedFields = map[string]struct{}{
 	"receipt_no":               {},
+	"supplier_id":              {},
 	"supplier_name":            {},
 	"status":                   {},
 	"received_at":              {},
@@ -74,6 +75,10 @@ func (PurchaseReceipt) Fields() []ent.Field {
 		field.String("receipt_no").
 			NotEmpty().
 			MaxLen(64),
+		field.Int("supplier_id").
+			Optional().
+			Nillable().
+			Positive(),
 		// Supplier name is a receipt-time snapshot; Supplier remains the master truth when linked elsewhere.
 		field.String("supplier_name").
 			NotEmpty().
@@ -113,6 +118,11 @@ func (PurchaseReceipt) Fields() []ent.Field {
 
 func (PurchaseReceipt) Edges() []ent.Edge {
 	return []ent.Edge{
+		edge.From("supplier", Supplier.Type).
+			Ref("purchase_receipts").
+			Field("supplier_id").
+			Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("purchase_returns", PurchaseReturn.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("purchase_receipt_adjustments", PurchaseReceiptAdjustment.Type).
@@ -127,6 +137,7 @@ func (PurchaseReceipt) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("receipt_no").Unique(),
 		index.Fields("idempotency_key").Unique(),
+		index.Fields("supplier_id"),
 		index.Fields("supplier_name"),
 		index.Fields("status"),
 		index.Fields("received_at"),

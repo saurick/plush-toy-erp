@@ -48,7 +48,7 @@ node scripts/qa/mvp-closure.mjs \
   --out output/customers/yoyoosun/mvp-closure
 ```
 
-`--run-report-tools` 只会调用 report-only 子工具。它不会传递 `--apply`，不会连接后端，不会写库。若缺少 `--product-id / --unit-id / --warehouse-id`，业务事实模拟 report 会标记为 `SKIPPED`，而不是伪造 ID。
+`--run-report-tools` 只会调用 no-write 子工具。它不会传递 `--apply`，不会连接后端，不会写库；业务事实子项只打印停用边界和输入模板，不再要求或伪造产品、单位、仓库 ID。
 
 输出：
 
@@ -125,32 +125,13 @@ go test ./internal/core/... ./internal/biz ./internal/data
 
 验收点：库存变化来自事实 usecase 和 `inventory_txns`；采购入库、退货、调整、质检和批次状态互相不替代；错误通过 `REVERSAL` 或调整修正，不直接修改历史流水。
 
-5. 扩展业务事实模拟闭环
+5. 业务事实来源驱动输入合同
 
 ```bash
-node scripts/qa/operational-fact-simulated-closure.mjs \
-  --product-id 1 \
-  --unit-id 1 \
-  --warehouse-id 1 \
-  --out output/customers/yoyoosun/operational-fact-simulated-closure
+node scripts/qa/operational-fact-simulated-closure.mjs --print-input-template
 ```
 
-需要写入模拟事实时：
-
-```bash
-OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS \
-OPERATIONAL_FACT_SIM_PASSWORD='replace-with-demo-password' \
-  node scripts/qa/operational-fact-simulated-closure.mjs \
-    --apply \
-    --backend-url http://127.0.0.1:8300 \
-    --product-id 1 \
-    --unit-id 1 \
-    --warehouse-id 1 \
-    --run-id target-yyyymmdd-closure \
-    --out output/customers/yoyoosun/operational-fact-simulated-closure-target
-```
-
-验收点：该脚本只验证生产、库存预留、委外、出货和财务的模拟事实链；不等于真实客户数据导入，也不代表完整财务、物流、装箱或核销交付。
+验收点：该脚本当前只提供 no-write 输入模板和旧矩阵 report-only 计划。旧 `--apply` 已在登录、RPC 和任何写入前停用，因为它依赖已退役的通用事实创建接口。恢复写入前必须重建来源驱动 fixture，分别从生产订单 / 物料需求、委外订单、销售订单、出货、采购入库和已过账财务事实发起；旧报告不能作为当前完整财务、物流、装箱、核销或客户验收证据。
 
 6. 岗位任务端 Workflow 闭环
 

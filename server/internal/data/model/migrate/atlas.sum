@@ -1,4 +1,4 @@
-h1:1IGXXTPVzZdx1rzpdNDKivcUReEtT+/WfrgLdAVd6V8=
+h1:arabJrMcyXq5wAXRrdot4fSwAf7e2JcP5WWWMGgBuZQ=
 20260315161316_migrate.sql h1:aW9ynfMUR5IdFF5E6zkq5zQdgTv9YEtXjRiZTSF6f+I=
 20260421140457_migrate.sql h1:Znvhutjs+bPceNgWeN7W2TxKXHUQtyBH+Yr1b5kmXwE=
 20260423081607_migrate.sql h1:ZXYJO5Kvb2GkCOhWtMP/2nIV3stabZ5wFouUxOPbzhM=
@@ -67,3 +67,10 @@ h1:1IGXXTPVzZdx1rzpdNDKivcUReEtT+/WfrgLdAVd6V8=
 20260714062017_migrate.sql h1:9UZDjRMOZe4NSTd65DndRz1inIQbSToKuvUqo8lmtt8=
 20260714081153_migrate.sql h1:xgCZNctfidTmnySXOnRVobWaLqQE4TVtC6pjaQQLT+8=
 20260714103721_migrate.sql h1:Vz/5QS90XCg9+QvoST/gQaK4kNxDABoO+uH7AcLiuqI=
+20260714114602_migrate.sql h1:JlWSBYt29erVq9zs6yKCU/IoUPGnYGrZhUWHkcpBuPA=
+20260714114623_backfill_source_finance_snapshots.sql h1:0oDHLPa5T8vjyWWalLlJ9zzAJcwQljjPxtEpUJCq49E=
+20260714122346_migrate.sql h1:C3c+yp/GvTSMYreRHknNMtqM/g28cujqDRFtGUWnJPg=
+20260714124000_backfill_production_material_requirements.sql h1:GVNwzmtno8/bcgpmppRUKopHT7Wj5Yb6YZC9/I1UR/8=
+20260714124906_migrate.sql h1:Hk1zgtgCAoX8eoDdWfe/qhb/FkaEDU4DhfZGDNJTJzs=
+20260714130251_migrate.sql h1:AaJ9r9nrhUUAku9sDrw6Z378xOky+d6jyskE3NP/Nto=
+20260714165115_migrate.sql h1:n7ceGJgv4PQuuHpHfZqILEOCvgUued/b0tQ54Tb7GCc=

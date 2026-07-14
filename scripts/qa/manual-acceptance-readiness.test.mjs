@@ -35,6 +35,7 @@ function sourceReport(overrides = {}) {
 
 function factReport(overrides = {}) {
   return {
+    reportContract: "source-driven-operational-facts-v1",
     mode: "apply",
     simulatedOnly: true,
     realCustomerImport: false,
@@ -56,6 +57,15 @@ function factReport(overrides = {}) {
     },
   };
 }
+
+test("readiness rejects legacy generic operational fact reports", () => {
+  const report = factReport();
+  delete report.reportContract;
+  assert.throws(
+    () => buildManualAcceptanceReadinessPlan({ factReport: report }),
+    /业务记录报告不是有效的模拟试用写入报告/u,
+  );
+});
 
 function taskReport(overrides = {}) {
   const runId = overrides.runId || "LOCAL-UAT";
@@ -328,7 +338,7 @@ function createReadinessFetch(runtimeOptions = {}) {
   return { fetchImpl, calls };
 }
 
-test("default plan covers all 47 targets and never connects to a backend", async () => {
+test("default plan covers all 48 targets and never connects to a backend", async () => {
   let fetchCalls = 0;
   const result = await runManualAcceptanceReadinessCli([], {
     fetchImpl: async () => {
@@ -342,7 +352,7 @@ test("default plan covers all 47 targets and never connects to a backend", async
   assert.equal(result.plan.callsBackend, false);
   assert.equal(result.plan.writesBackend, false);
   assert.equal(result.plan.directSQL, false);
-  assert.equal(result.plan.targets.length, 47);
+  assert.equal(result.plan.targets.length, 48);
   assert.equal(
     result.plan.targets.filter(
       (item) => item.catalogGroup === "mobileRolePages",
@@ -366,6 +376,13 @@ test("default plan covers all 47 targets and never connects to a backend", async
     ).probeIds,
     ["mobile-tasks:production"],
   );
+  const productionOrders = result.plan.targets.find(
+    (item) => item.id === "desktopPages:production-orders",
+  );
+  assert.deepEqual(productionOrders.roleKeys, ["production"]);
+  assert.equal(productionOrders.expectedMinimum, 45);
+  assert.deepEqual(productionOrders.probeIds, []);
+  assert.equal(productionOrders.quantityNotProven, true);
   assert.equal(result.plan.expected.mobileTaskTotal, 180);
 });
 
@@ -642,10 +659,10 @@ test("explicit verification reports page data, nine role totals, and honest manu
     now: () => new Date("2026-07-11T10:00:00.000Z"),
   });
 
-  assert.equal(report.summary.totalTargets, 47);
+  assert.equal(report.summary.totalTargets, 48);
   assert.equal(report.summary.passedTargetData, 35);
   assert.equal(report.summary.failedTargetData, 0);
-  assert.equal(report.summary.notProvenTargetData, 12);
+  assert.equal(report.summary.notProvenTargetData, 13);
   assert.equal(report.summary.queryChecksPassed, true);
   assert.equal(report.summary.queryEvidenceComplete, false);
   assert.equal(report.summary.browserChecksCompleted, 0);
@@ -656,7 +673,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
     new Set(Object.values(report.summary.mobileActualByRole)),
     new Set([20]),
   );
-  assert.equal(report.targets.length, 47);
+  assert.equal(report.targets.length, 48);
   assert.equal(report.runtimePreflight.environment, "local");
   assert.equal(report.runtimePreflight.customerKey, "yoyoosun");
   assert.equal(report.runtimePreflight.configRevision, "cfg-local-1");
@@ -711,6 +728,12 @@ test("explicit verification reports page data, nine role totals, and honest manu
   assert.equal(
     report.targets.find(
       (item) => item.id === "desktopPages:quality-inspections",
+    ).dataStatus,
+    "not_proven",
+  );
+  assert.equal(
+    report.targets.find(
+      (item) => item.id === "desktopPages:production-orders",
     ).dataStatus,
     "not_proven",
   );
@@ -998,7 +1021,7 @@ test("customer-facing report uses ordinary business wording", async () => {
   assert.match(markdown, /九个岗位任务合计：180 \/ 180/u);
   assert.match(markdown, /尚未证明/u);
   assert.match(markdown, /人工验收：未完成/u);
-  assert.match(markdown, /页面操作已完成：0 \/ 47/u);
+  assert.match(markdown, /页面操作已完成：0 \/ 48/u);
   assert.doesNotMatch(
     markdown,
     /Workflow|Fact|JSON-RPC|RBAC|schema|raw\s*id|甲方/iu,

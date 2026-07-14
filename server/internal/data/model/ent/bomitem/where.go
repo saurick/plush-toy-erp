@@ -860,6 +860,29 @@ func HasUnitWith(preds ...predicate.Unit) predicate.BOMItem {
 	})
 }
 
+// HasProductionOrderMaterialRequirements applies the HasEdge predicate on the "production_order_material_requirements" edge.
+func HasProductionOrderMaterialRequirements() predicate.BOMItem {
+	return predicate.BOMItem(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ProductionOrderMaterialRequirementsTable, ProductionOrderMaterialRequirementsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProductionOrderMaterialRequirementsWith applies the HasEdge predicate on the "production_order_material_requirements" edge with a given conditions (other predicates).
+func HasProductionOrderMaterialRequirementsWith(preds ...predicate.ProductionOrderMaterialRequirement) predicate.BOMItem {
+	return predicate.BOMItem(func(s *sql.Selector) {
+		step := newProductionOrderMaterialRequirementsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.BOMItem) predicate.BOMItem {
 	return predicate.BOMItem(sql.AndPredicates(predicates...))

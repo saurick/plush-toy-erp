@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/unit"
 	"strings"
 	"time"
@@ -31,6 +32,8 @@ type OutsourcingOrderItem struct {
 	SubjectType string `json:"subject_type,omitempty"`
 	// ProductID holds the value of the "product_id" field.
 	ProductID *int `json:"product_id,omitempty"`
+	// ProductSkuID holds the value of the "product_sku_id" field.
+	ProductSkuID *int `json:"product_sku_id,omitempty"`
 	// MaterialID holds the value of the "material_id" field.
 	MaterialID *int `json:"material_id,omitempty"`
 	// ProcessID holds the value of the "process_id" field.
@@ -39,6 +42,8 @@ type OutsourcingOrderItem struct {
 	UnitID int `json:"unit_id,omitempty"`
 	// ProductNoSnapshot holds the value of the "product_no_snapshot" field.
 	ProductNoSnapshot *string `json:"product_no_snapshot,omitempty"`
+	// SkuCodeSnapshot holds the value of the "sku_code_snapshot" field.
+	SkuCodeSnapshot *string `json:"sku_code_snapshot,omitempty"`
 	// ProductOrderNoSnapshot holds the value of the "product_order_no_snapshot" field.
 	ProductOrderNoSnapshot *string `json:"product_order_no_snapshot,omitempty"`
 	// ProductNameSnapshot holds the value of the "product_name_snapshot" field.
@@ -81,6 +86,8 @@ type OutsourcingOrderItemEdges struct {
 	OutsourcingOrder *OutsourcingOrder `json:"outsourcing_order,omitempty"`
 	// Product holds the value of the product edge.
 	Product *Product `json:"product,omitempty"`
+	// ProductSku holds the value of the product_sku edge.
+	ProductSku *ProductSKU `json:"product_sku,omitempty"`
 	// Material holds the value of the material edge.
 	Material *Material `json:"material,omitempty"`
 	// Process holds the value of the process edge.
@@ -89,7 +96,7 @@ type OutsourcingOrderItemEdges struct {
 	Unit *Unit `json:"unit,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [5]bool
+	loadedTypes [6]bool
 }
 
 // OutsourcingOrderOrErr returns the OutsourcingOrder value or an error if the edge
@@ -114,12 +121,23 @@ func (e OutsourcingOrderItemEdges) ProductOrErr() (*Product, error) {
 	return nil, &NotLoadedError{edge: "product"}
 }
 
+// ProductSkuOrErr returns the ProductSku value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e OutsourcingOrderItemEdges) ProductSkuOrErr() (*ProductSKU, error) {
+	if e.ProductSku != nil {
+		return e.ProductSku, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: productsku.Label}
+	}
+	return nil, &NotLoadedError{edge: "product_sku"}
+}
+
 // MaterialOrErr returns the Material value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e OutsourcingOrderItemEdges) MaterialOrErr() (*Material, error) {
 	if e.Material != nil {
 		return e.Material, nil
-	} else if e.loadedTypes[2] {
+	} else if e.loadedTypes[3] {
 		return nil, &NotFoundError{label: material.Label}
 	}
 	return nil, &NotLoadedError{edge: "material"}
@@ -130,7 +148,7 @@ func (e OutsourcingOrderItemEdges) MaterialOrErr() (*Material, error) {
 func (e OutsourcingOrderItemEdges) ProcessOrErr() (*Process, error) {
 	if e.Process != nil {
 		return e.Process, nil
-	} else if e.loadedTypes[3] {
+	} else if e.loadedTypes[4] {
 		return nil, &NotFoundError{label: process.Label}
 	}
 	return nil, &NotLoadedError{edge: "process"}
@@ -141,7 +159,7 @@ func (e OutsourcingOrderItemEdges) ProcessOrErr() (*Process, error) {
 func (e OutsourcingOrderItemEdges) UnitOrErr() (*Unit, error) {
 	if e.Unit != nil {
 		return e.Unit, nil
-	} else if e.loadedTypes[4] {
+	} else if e.loadedTypes[5] {
 		return nil, &NotFoundError{label: unit.Label}
 	}
 	return nil, &NotLoadedError{edge: "unit"}
@@ -156,9 +174,9 @@ func (*OutsourcingOrderItem) scanValues(columns []string) ([]any, error) {
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case outsourcingorderitem.FieldOutsourcingQuantity:
 			values[i] = new(decimal.Decimal)
-		case outsourcingorderitem.FieldID, outsourcingorderitem.FieldOutsourcingOrderID, outsourcingorderitem.FieldLineNo, outsourcingorderitem.FieldProductID, outsourcingorderitem.FieldMaterialID, outsourcingorderitem.FieldProcessID, outsourcingorderitem.FieldUnitID:
+		case outsourcingorderitem.FieldID, outsourcingorderitem.FieldOutsourcingOrderID, outsourcingorderitem.FieldLineNo, outsourcingorderitem.FieldProductID, outsourcingorderitem.FieldProductSkuID, outsourcingorderitem.FieldMaterialID, outsourcingorderitem.FieldProcessID, outsourcingorderitem.FieldUnitID:
 			values[i] = new(sql.NullInt64)
-		case outsourcingorderitem.FieldSubjectType, outsourcingorderitem.FieldProductNoSnapshot, outsourcingorderitem.FieldProductOrderNoSnapshot, outsourcingorderitem.FieldProductNameSnapshot, outsourcingorderitem.FieldMaterialCodeSnapshot, outsourcingorderitem.FieldMaterialNameSnapshot, outsourcingorderitem.FieldProcessNameSnapshot, outsourcingorderitem.FieldProcessCategorySnapshot, outsourcingorderitem.FieldUnitNameSnapshot, outsourcingorderitem.FieldLineStatus, outsourcingorderitem.FieldNote:
+		case outsourcingorderitem.FieldSubjectType, outsourcingorderitem.FieldProductNoSnapshot, outsourcingorderitem.FieldSkuCodeSnapshot, outsourcingorderitem.FieldProductOrderNoSnapshot, outsourcingorderitem.FieldProductNameSnapshot, outsourcingorderitem.FieldMaterialCodeSnapshot, outsourcingorderitem.FieldMaterialNameSnapshot, outsourcingorderitem.FieldProcessNameSnapshot, outsourcingorderitem.FieldProcessCategorySnapshot, outsourcingorderitem.FieldUnitNameSnapshot, outsourcingorderitem.FieldLineStatus, outsourcingorderitem.FieldNote:
 			values[i] = new(sql.NullString)
 		case outsourcingorderitem.FieldExpectedReturnDate, outsourcingorderitem.FieldCreatedAt, outsourcingorderitem.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -208,6 +226,13 @@ func (_m *OutsourcingOrderItem) assignValues(columns []string, values []any) err
 				_m.ProductID = new(int)
 				*_m.ProductID = int(value.Int64)
 			}
+		case outsourcingorderitem.FieldProductSkuID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field product_sku_id", values[i])
+			} else if value.Valid {
+				_m.ProductSkuID = new(int)
+				*_m.ProductSkuID = int(value.Int64)
+			}
 		case outsourcingorderitem.FieldMaterialID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field material_id", values[i])
@@ -233,6 +258,13 @@ func (_m *OutsourcingOrderItem) assignValues(columns []string, values []any) err
 			} else if value.Valid {
 				_m.ProductNoSnapshot = new(string)
 				*_m.ProductNoSnapshot = value.String
+			}
+		case outsourcingorderitem.FieldSkuCodeSnapshot:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field sku_code_snapshot", values[i])
+			} else if value.Valid {
+				_m.SkuCodeSnapshot = new(string)
+				*_m.SkuCodeSnapshot = value.String
 			}
 		case outsourcingorderitem.FieldProductOrderNoSnapshot:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -358,6 +390,11 @@ func (_m *OutsourcingOrderItem) QueryProduct() *ProductQuery {
 	return NewOutsourcingOrderItemClient(_m.config).QueryProduct(_m)
 }
 
+// QueryProductSku queries the "product_sku" edge of the OutsourcingOrderItem entity.
+func (_m *OutsourcingOrderItem) QueryProductSku() *ProductSKUQuery {
+	return NewOutsourcingOrderItemClient(_m.config).QueryProductSku(_m)
+}
+
 // QueryMaterial queries the "material" edge of the OutsourcingOrderItem entity.
 func (_m *OutsourcingOrderItem) QueryMaterial() *MaterialQuery {
 	return NewOutsourcingOrderItemClient(_m.config).QueryMaterial(_m)
@@ -410,6 +447,11 @@ func (_m *OutsourcingOrderItem) String() string {
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
+	if v := _m.ProductSkuID; v != nil {
+		builder.WriteString("product_sku_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	if v := _m.MaterialID; v != nil {
 		builder.WriteString("material_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
@@ -423,6 +465,11 @@ func (_m *OutsourcingOrderItem) String() string {
 	builder.WriteString(", ")
 	if v := _m.ProductNoSnapshot; v != nil {
 		builder.WriteString("product_no_snapshot=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SkuCodeSnapshot; v != nil {
+		builder.WriteString("sku_code_snapshot=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

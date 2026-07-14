@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderitem"
+	"server/internal/data/model/ent/productionordermaterialrequirement"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/unit"
@@ -214,6 +215,21 @@ func (_c *ProductionOrderItemCreate) SetNillableUpdatedAt(v *time.Time) *Product
 // SetProductionOrder sets the "production_order" edge to the ProductionOrder entity.
 func (_c *ProductionOrderItemCreate) SetProductionOrder(v *ProductionOrder) *ProductionOrderItemCreate {
 	return _c.SetProductionOrderID(v.ID)
+}
+
+// AddMaterialRequirementIDs adds the "material_requirements" edge to the ProductionOrderMaterialRequirement entity by IDs.
+func (_c *ProductionOrderItemCreate) AddMaterialRequirementIDs(ids ...int) *ProductionOrderItemCreate {
+	_c.mutation.AddMaterialRequirementIDs(ids...)
+	return _c
+}
+
+// AddMaterialRequirements adds the "material_requirements" edges to the ProductionOrderMaterialRequirement entity.
+func (_c *ProductionOrderItemCreate) AddMaterialRequirements(v ...*ProductionOrderMaterialRequirement) *ProductionOrderItemCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddMaterialRequirementIDs(ids...)
 }
 
 // SetProduct sets the "product" edge to the Product entity.
@@ -464,6 +480,22 @@ func (_c *ProductionOrderItemCreate) createSpec() (*ProductionOrderItem, *sqlgra
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.ProductionOrderID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.MaterialRequirementsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorderitem.MaterialRequirementsTable,
+			Columns: []string{productionorderitem.MaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.ProductIDs(); len(nodes) > 0 {

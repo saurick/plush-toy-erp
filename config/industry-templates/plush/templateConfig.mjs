@@ -65,7 +65,7 @@ export const plushIndustryTemplateConfig = Object.freeze({
       label: "财务",
       classification: "industry_default_candidate",
       evidence: "operational-fact-target-release-evidence",
-      boundary: "负责对账、应收、应付、发票和收付款状态；不能从出货放行直接生成财务事实。",
+      boundary: "负责来源明确的应收、应付、发票和单笔核对；PAYMENT 当前只读，不开放收付款录入，也不能从出货放行直接生成财务事实。",
     },
     {
       key: "pmc",
@@ -254,8 +254,8 @@ export const plushIndustryTemplateConfig = Object.freeze({
       module: "finance",
       label: "财务事实",
       classification: "industry_default_candidate",
-      fields: Object.freeze(["fact_no", "fact_type", "counterparty", "status"]),
-      deferred: Object.freeze(["invoice_detail", "payment_reconciliation_detail"]),
+      fields: Object.freeze(["fact_no", "source_document", "counterparty", "amount", "currency", "status"]),
+      deferred: Object.freeze(["invoice_detail", "payment_entry", "payment_reconciliation_detail"]),
     },
   ]),
   numberingRuleTemplate: Object.freeze([

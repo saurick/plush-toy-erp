@@ -30,6 +30,10 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create product: %v", err)
 	}
+	productSKU, err := client.ProductSKU.Create().SetProductID(product.ID).SetSkuCode("SKU-OUT-SUBJECT").SetDefaultUnitID(unit.ID).Save(ctx)
+	if err != nil {
+		t.Fatalf("create product SKU: %v", err)
+	}
 	material, err := client.Material.Create().SetCode("MAT-OUT-SUBJECT").SetName("短毛绒布料").SetDefaultUnitID(unit.ID).Save(ctx)
 	if err != nil {
 		t.Fatalf("create material: %v", err)
@@ -46,6 +50,7 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 	orderDate := time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC)
 	staleProductCode := "STALE-PRODUCT-CODE"
 	staleProductName := "客户端伪造产品名"
+	staleSKUCode := "CLIENT-FORGED-SKU"
 	staleProcessName := "客户端伪造工序"
 	staleProcessCategory := "客户端伪造分类"
 	staleUnitName := "客户端伪造单位"
@@ -60,9 +65,11 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 			LineNo:                  1,
 			SubjectType:             biz.OutsourcingOrderSubjectProduct,
 			ProductID:               &product.ID,
+			ProductSKUID:            &productSKU.ID,
 			ProcessID:               process.ID,
 			UnitID:                  unit.ID,
 			ProductNoSnapshot:       &staleProductCode,
+			SKUCodeSnapshot:         &staleSKUCode,
 			ProductOrderNoSnapshot:  &productOrderNo,
 			ProductNameSnapshot:     &staleProductName,
 			ProcessNameSnapshot:     &staleProcessName,
@@ -75,11 +82,12 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("save product outsourcing line: %v", err)
 	}
-	if len(created.Items) != 1 || created.Items[0].SubjectType != biz.OutsourcingOrderSubjectProduct || created.Items[0].ProductID == nil || *created.Items[0].ProductID != product.ID || created.Items[0].MaterialID != nil {
+	if len(created.Items) != 1 || created.Items[0].SubjectType != biz.OutsourcingOrderSubjectProduct || created.Items[0].ProductID == nil || *created.Items[0].ProductID != product.ID || created.Items[0].ProductSKUID == nil || *created.Items[0].ProductSKUID != productSKU.ID || created.Items[0].MaterialID != nil {
 		t.Fatalf("unexpected saved product subject: %#v", created.Items)
 	}
 	productLine := created.Items[0]
 	if productLine.ProductNoSnapshot == nil || *productLine.ProductNoSnapshot != product.Code ||
+		productLine.SKUCodeSnapshot == nil || *productLine.SKUCodeSnapshot != productSKU.SkuCode ||
 		productLine.ProductNameSnapshot == nil || *productLine.ProductNameSnapshot != product.Name ||
 		productLine.ProductOrderNoSnapshot == nil || *productLine.ProductOrderNoSnapshot != productOrderNo ||
 		productLine.ProcessNameSnapshot == nil || *productLine.ProcessNameSnapshot != process.Name ||
@@ -87,6 +95,9 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 		productLine.UnitNameSnapshot == nil || *productLine.UnitNameSnapshot != unit.Name ||
 		productLine.Note == nil || *productLine.Note != lineNote {
 		t.Fatalf("expected canonical master-data snapshots and independent trace/note, got %#v", productLine)
+	}
+	if err := client.ProductSKU.DeleteOneID(productSKU.ID).Exec(ctx); !ent.IsConstraintError(err) {
+		t.Fatalf("expected referenced SKU delete blocked to preserve source document history, got %v", err)
 	}
 
 	staleMaterialCode := "STALE-MATERIAL-CODE"
@@ -106,6 +117,8 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 			ProcessID:               process.ID,
 			UnitID:                  unit.ID,
 			ProductNoSnapshot:       &staleProductCode,
+			ProductSKUID:            &productSKU.ID,
+			SKUCodeSnapshot:         &staleSKUCode,
 			ProductOrderNoSnapshot:  &productOrderNo,
 			ProductNameSnapshot:     &staleProductName,
 			MaterialCodeSnapshot:    &staleMaterialCode,
@@ -124,7 +137,7 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 		t.Fatalf("expected one updated item, got %#v", updated.Items)
 	}
 	line := updated.Items[0]
-	if line.SubjectType != biz.OutsourcingOrderSubjectMaterial || line.ProductID != nil || line.MaterialID == nil || *line.MaterialID != material.ID {
+	if line.SubjectType != biz.OutsourcingOrderSubjectMaterial || line.ProductID != nil || line.ProductSKUID != nil || line.SKUCodeSnapshot != nil || line.MaterialID == nil || *line.MaterialID != material.ID {
 		t.Fatalf("expected material subject exactly-one after switch, got %#v", line)
 	}
 	if line.ProductNoSnapshot != nil || line.ProductOrderNoSnapshot != nil || line.ProductNameSnapshot != nil || line.MaterialCodeSnapshot == nil || *line.MaterialCodeSnapshot != material.Code || line.MaterialNameSnapshot == nil || *line.MaterialNameSnapshot != material.Name {

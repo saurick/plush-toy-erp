@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingorderitem"
+	"server/internal/data/model/ent/productionordermaterialrequirement"
 	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
@@ -148,6 +149,21 @@ func (_c *MaterialCreate) AddBomItems(v ...*BOMItem) *MaterialCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddBomItemIDs(ids...)
+}
+
+// AddProductionOrderMaterialRequirementIDs adds the "production_order_material_requirements" edge to the ProductionOrderMaterialRequirement entity by IDs.
+func (_c *MaterialCreate) AddProductionOrderMaterialRequirementIDs(ids ...int) *MaterialCreate {
+	_c.mutation.AddProductionOrderMaterialRequirementIDs(ids...)
+	return _c
+}
+
+// AddProductionOrderMaterialRequirements adds the "production_order_material_requirements" edges to the ProductionOrderMaterialRequirement entity.
+func (_c *MaterialCreate) AddProductionOrderMaterialRequirements(v ...*ProductionOrderMaterialRequirement) *MaterialCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddProductionOrderMaterialRequirementIDs(ids...)
 }
 
 // AddPurchaseOrderItemIDs adds the "purchase_order_items" edge to the PurchaseOrderItem entity by IDs.
@@ -426,6 +442,22 @@ func (_c *MaterialCreate) createSpec() (*Material, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProductionOrderMaterialRequirementsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.ProductionOrderMaterialRequirementsTable,
+			Columns: []string{material.ProductionOrderMaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

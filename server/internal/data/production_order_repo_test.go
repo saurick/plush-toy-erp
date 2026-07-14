@@ -19,9 +19,11 @@ import (
 
 type productionOrderTestFixture struct {
 	uc          *biz.ProductionOrderUsecase
+	data        *Data
 	client      *ent.Client
 	actorID     int
 	unitID      int
+	materialID  int
 	productID   int
 	skuID       int
 	salesItemID int
@@ -56,10 +58,18 @@ func openProductionOrderRepoTest(t *testing.T, name string) productionOrderTestF
 		SetVersion("ACTIVE-V1").
 		SetStatus("ACTIVE").
 		SaveX(ctx)
+	materialRow := createTestMaterial(t, ctx, client, unitRow.ID, "POR-M")
+	client.BOMItem.Create().
+		SetBomHeaderID(bom.ID).
+		SetMaterialID(materialRow.ID).
+		SetQuantity(decimal.NewFromInt(2)).
+		SetUnitID(unitRow.ID).
+		SetLossRate(decimal.RequireFromString("0.1")).
+		SaveX(ctx)
 	repo := NewProductionOrderRepo(data, log.NewStdLogger(io.Discard))
 	return productionOrderTestFixture{
-		uc: biz.NewProductionOrderUsecase(repo), client: client, actorID: actor.ID,
-		unitID: unitRow.ID, productID: productRow.ID, skuID: skuRow.ID, salesItemID: salesItem.ID, bomID: bom.ID,
+		uc: biz.NewProductionOrderUsecase(repo), data: data, client: client, actorID: actor.ID,
+		unitID: unitRow.ID, materialID: materialRow.ID, productID: productRow.ID, skuID: skuRow.ID, salesItemID: salesItem.ID, bomID: bom.ID,
 	}
 }
 
@@ -186,8 +196,14 @@ func TestProductionOrderRepoAggregateLifecycleCASAndExactReplay(t *testing.T) {
 	if err != nil || released.Order.Status != biz.ProductionOrderStatusReleased || released.Order.Version != 3 {
 		t.Fatalf("release = %#v, %v", released, err)
 	}
+	if len(released.MaterialRequirements) != 1 || released.MaterialRequirements[0].MaterialID != f.materialID ||
+		!released.MaterialRequirements[0].UnitQuantitySnapshot.Equal(decimal.NewFromInt(2)) ||
+		!released.MaterialRequirements[0].LossRateSnapshot.Equal(decimal.RequireFromString("0.1")) ||
+		!released.MaterialRequirements[0].PlannedQuantity.Equal(decimal.RequireFromString("26.4")) {
+		t.Fatalf("release material requirements = %#v", released.MaterialRequirements)
+	}
 	replayedRelease, err := f.uc.Release(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 999, ActorID: f.actorID, IdempotencyKey: "release-replay"})
-	if err != nil || replayedRelease.Order.Version != 3 {
+	if err != nil || replayedRelease.Order.Version != 3 || len(replayedRelease.MaterialRequirements) != 1 || replayedRelease.MaterialRequirements[0].ID != released.MaterialRequirements[0].ID {
 		t.Fatalf("release exact replay = %#v, %v", replayedRelease, err)
 	}
 	if _, err := f.uc.SaveDraft(ctx, &biz.ProductionOrderSave{ID: created.Order.ID, ExpectedVersion: 3, Draft: f.draft("MO-REPO-001", 14), ActorID: f.actorID, IdempotencyKey: "save-after-release"}); !errors.Is(err, biz.ErrProductionOrderInvalidState) {

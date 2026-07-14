@@ -32,7 +32,12 @@ func TestPurchaseReturnPostgresMigrationShape(t *testing.T) {
 	assertPostgresNumericColumn(t, data.sqldb, "purchase_return_items", "quantity", 20, 6)
 	assertPostgresNumericColumn(t, data.sqldb, "purchase_return_items", "unit_price", 20, 6)
 	assertPostgresNumericColumn(t, data.sqldb, "purchase_return_items", "amount", 20, 6)
+	assertPostgresColumnExists(t, data.sqldb, "purchase_returns", "idempotency_key")
+	assertPostgresColumnExists(t, data.sqldb, "purchase_returns", "idempotency_payload_hash")
+	assertPostgresColumnExists(t, data.sqldb, "purchase_returns", "idempotency_item_count")
 	assertPostgresUniqueIndex(t, data.sqldb, "purchase_returns", "purchasereturn_return_no")
+	assertPostgresUniqueIndex(t, data.sqldb, "purchase_returns", "purchasereturn_idempotency_key")
+	assertPostgresCheckConstraint(t, data.sqldb, "purchase_returns", "purchase_returns_idempotency_bundle_complete", "idempotency_item_count > 0")
 	assertPostgresPartialUniqueIndex(t, data.sqldb, "purchase_return_items", "purchasereturnitem_return_id_source_line_no", "source_line_no IS NOT NULL AND source_line_no <> ''")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_return_items", "purchase_return_items_quantity_positive", "quantity > 0")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_return_items", "purchase_return_items_unit_price_non_negative", "unit_price IS NULL OR unit_price >= 0")
@@ -347,6 +352,51 @@ func TestPurchaseReturnPostgresFlow(t *testing.T) {
 	}
 	if reversalCount != 1 {
 		t.Fatalf("expected one postgres return reversal after repeat cancel, got %d", reversalCount)
+	}
+}
+
+func TestPurchaseReturnPostgresAggregateCreateIdempotency(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseOperationalPostgresTestData(t)
+	fixtures := createPurchaseOperationalPostgresFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	invFixtures := inventoryTestFixtures{
+		unitID:      fixtures.unitID,
+		materialID:  fixtures.materialID,
+		productID:   fixtures.productID,
+		warehouseID: fixtures.warehouseID,
+	}
+	postedReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PRTN-IDEM-IN-"+fixtures.suffix, invFixtures, stringPtr("PG-PRTN-IDEM-LOT-"+fixtures.suffix), mustDecimal(t, "10"))
+	command := &biz.PurchaseReturnFromReceiptCreate{
+		ReturnNo:          "PG-PRTN-IDEM-" + fixtures.suffix,
+		PurchaseReceiptID: postedReceipt.ID,
+		ReturnedAt:        time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC),
+		IdempotencyKey:    "pg-purchase-return-idem-" + fixtures.suffix,
+		Items: []biz.PurchaseReturnFromReceiptItemCreate{{
+			PurchaseReceiptItemID: postedReceipt.Items[0].ID,
+			Quantity:              mustDecimal(t, "2"),
+		}},
+	}
+	first, err := uc.CreatePurchaseReturnFromReceipt(ctx, command)
+	if err != nil {
+		t.Fatalf("create postgres aggregate return failed: %v", err)
+	}
+	replayed, err := uc.CreatePurchaseReturnFromReceipt(ctx, command)
+	if err != nil || replayed.ID != first.ID {
+		t.Fatalf("same postgres return intent did not replay id=%d replay=%#v err=%v", first.ID, replayed, err)
+	}
+	changed := *command
+	changed.Items = append([]biz.PurchaseReturnFromReceiptItemCreate(nil), command.Items...)
+	changed.Items[0].Quantity = mustDecimal(t, "3")
+	if _, err := uc.CreatePurchaseReturnFromReceipt(ctx, &changed); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("changed postgres return intent error=%v, want ErrIdempotencyConflict", err)
+	}
+	row, err := client.PurchaseReturn.Get(ctx, first.ID)
+	if err != nil {
+		t.Fatalf("read postgres aggregate return idempotency bundle: %v", err)
+	}
+	if row.IdempotencyKey == nil || *row.IdempotencyKey != command.IdempotencyKey || row.IdempotencyPayloadHash == nil || len(*row.IdempotencyPayloadHash) != 64 || row.IdempotencyItemCount == nil || *row.IdempotencyItemCount != 1 {
+		t.Fatalf("unexpected postgres aggregate return idempotency bundle: %#v", row)
 	}
 }
 

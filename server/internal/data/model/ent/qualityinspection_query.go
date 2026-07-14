@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/inventorylot"
@@ -11,6 +12,7 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/warehouse"
 
@@ -32,6 +34,7 @@ type QualityInspectionQuery struct {
 	withInventoryLot        *InventoryLotQuery
 	withMaterial            *MaterialQuery
 	withWarehouse           *WarehouseQuery
+	withPurchaseReturns     *PurchaseReturnQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -171,6 +174,28 @@ func (_q *QualityInspectionQuery) QueryWarehouse() *WarehouseQuery {
 			sqlgraph.From(qualityinspection.Table, qualityinspection.FieldID, selector),
 			sqlgraph.To(warehouse.Table, warehouse.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, qualityinspection.WarehouseTable, qualityinspection.WarehouseColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryPurchaseReturns chains the current query on the "purchase_returns" edge.
+func (_q *QualityInspectionQuery) QueryPurchaseReturns() *PurchaseReturnQuery {
+	query := (&PurchaseReturnClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(qualityinspection.Table, qualityinspection.FieldID, selector),
+			sqlgraph.To(purchasereturn.Table, purchasereturn.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, qualityinspection.PurchaseReturnsTable, qualityinspection.PurchaseReturnsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -375,6 +400,7 @@ func (_q *QualityInspectionQuery) Clone() *QualityInspectionQuery {
 		withInventoryLot:        _q.withInventoryLot.Clone(),
 		withMaterial:            _q.withMaterial.Clone(),
 		withWarehouse:           _q.withWarehouse.Clone(),
+		withPurchaseReturns:     _q.withPurchaseReturns.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -433,6 +459,17 @@ func (_q *QualityInspectionQuery) WithWarehouse(opts ...func(*WarehouseQuery)) *
 		opt(query)
 	}
 	_q.withWarehouse = query
+	return _q
+}
+
+// WithPurchaseReturns tells the query-builder to eager-load the nodes that are connected to
+// the "purchase_returns" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *QualityInspectionQuery) WithPurchaseReturns(opts ...func(*PurchaseReturnQuery)) *QualityInspectionQuery {
+	query := (&PurchaseReturnClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withPurchaseReturns = query
 	return _q
 }
 
@@ -514,12 +551,13 @@ func (_q *QualityInspectionQuery) sqlAll(ctx context.Context, hooks ...queryHook
 	var (
 		nodes       = []*QualityInspection{}
 		_spec       = _q.querySpec()
-		loadedTypes = [5]bool{
+		loadedTypes = [6]bool{
 			_q.withPurchaseReceipt != nil,
 			_q.withPurchaseReceiptItem != nil,
 			_q.withInventoryLot != nil,
 			_q.withMaterial != nil,
 			_q.withWarehouse != nil,
+			_q.withPurchaseReturns != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -567,6 +605,15 @@ func (_q *QualityInspectionQuery) sqlAll(ctx context.Context, hooks ...queryHook
 	if query := _q.withWarehouse; query != nil {
 		if err := _q.loadWarehouse(ctx, query, nodes, nil,
 			func(n *QualityInspection, e *Warehouse) { n.Edges.Warehouse = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withPurchaseReturns; query != nil {
+		if err := _q.loadPurchaseReturns(ctx, query, nodes,
+			func(n *QualityInspection) { n.Edges.PurchaseReturns = []*PurchaseReturn{} },
+			func(n *QualityInspection, e *PurchaseReturn) {
+				n.Edges.PurchaseReturns = append(n.Edges.PurchaseReturns, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -724,6 +771,39 @@ func (_q *QualityInspectionQuery) loadWarehouse(ctx context.Context, query *Ware
 		for i := range nodes {
 			assign(nodes[i], n)
 		}
+	}
+	return nil
+}
+func (_q *QualityInspectionQuery) loadPurchaseReturns(ctx context.Context, query *PurchaseReturnQuery, nodes []*QualityInspection, init func(*QualityInspection), assign func(*QualityInspection, *PurchaseReturn)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*QualityInspection)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(purchasereturn.FieldQualityInspectionID)
+	}
+	query.Where(predicate.PurchaseReturn(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(qualityinspection.PurchaseReturnsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.QualityInspectionID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "quality_inspection_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "quality_inspection_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
 	}
 	return nil
 }

@@ -26,21 +26,27 @@ import (
 func TestFinanceProcessCommandPostgresRecoversExactResultAndMarksCompensation(t *testing.T) {
 	ctx := context.Background()
 	data, client := openPurchaseReceiptPostgresTestData(t)
-	actor := client.AdminUser.Create().SetUsername("finance-cancel-actor-" + postgresTestSuffix()).SetPasswordHash("test-password-hash").SaveX(ctx)
 	processRepo := NewProcessRuntimeRepo(data, log.NewStdLogger(io.Discard))
-	factRepo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	suffix := postgresTestSuffix()
-	payload := map[string]any{"source": "shipment", "amount": "128.88"}
-	command := claimedPostgresProcessCommand(t, ctx, processRepo, "finance.receivable_lead", "finance-result/"+suffix, payload)
+	factRepo, _, shipment, actor := prepareShipmentFinanceSource(t, ctx, data, client, "atomic-finance-"+suffix)
+	payload := map[string]any{"source": "shipment", "shipment_id": shipment.ID, "amount": "20"}
+	command := claimedPostgresProcessCommandForBusinessRef(
+		t, ctx, processRepo, "finance.receivable_lead", "finance-result/"+suffix, payload,
+		biz.ShipmentSourceType, shipment.ID,
+	)
 	occurredAt := time.Now().UTC().Truncate(time.Microsecond)
 	collectionType := biz.FinanceCollectionAccountsReceivable
+	sourceType := biz.ShipmentSourceType
 	factIn := &biz.FinanceFactCreate{
 		FactNo:              "AR-ATOMIC-" + suffix,
 		FactType:            biz.FinanceFactReceivable,
-		CounterpartyType:    biz.FinanceCounterpartyOther,
-		Amount:              decimal.RequireFromString("128.88"),
+		CounterpartyType:    biz.FinanceCounterpartyCustomer,
+		CounterpartyID:      shipment.CustomerID,
+		Amount:              decimal.NewFromInt(20),
 		Currency:            "CNY",
 		CollectionType:      &collectionType,
+		SourceType:          &sourceType,
+		SourceID:            &shipment.ID,
 		IdempotencyKey:      "finance-result/" + suffix,
 		OccurredAt:          occurredAt,
 		OccurredAtSpecified: true,
@@ -64,7 +70,7 @@ func TestFinanceProcessCommandPostgresRecoversExactResultAndMarksCompensation(t 
 		t.Fatalf("same finance command replay must return original result, replay=%#v err=%v", replay, err)
 	}
 	changed := *factIn
-	changed.Amount = decimal.RequireFromString("129.88")
+	changed.Amount = decimal.NewFromInt(21)
 	if _, err := factRepo.CreateFinanceFactDraftForProcessCommand(ctx, &changed, command, 7); !errors.Is(err, biz.ErrIdempotencyConflict) {
 		t.Fatalf("changed finance payload must conflict, got %v", err)
 	}
@@ -81,19 +87,22 @@ func TestFinanceProcessCommandPostgresRecoversExactResultAndMarksCompensation(t 
 func TestFinanceProcessCommandPostgresRejectsCancelledFactBeforeExactRecovery(t *testing.T) {
 	ctx := context.Background()
 	data, client := openPurchaseReceiptPostgresTestData(t)
-	actor := client.AdminUser.Create().SetUsername("finance-cancelled-recovery-actor-" + postgresTestSuffix()).SetPasswordHash("test-password-hash").SaveX(ctx)
 	processRepo := NewProcessRuntimeRepo(data, log.NewStdLogger(io.Discard))
-	factRepo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	suffix := postgresTestSuffix()
+	factRepo, _, shipment, actor := prepareShipmentFinanceSource(t, ctx, data, client, "cancelled-recovery-"+suffix)
 	idempotencyKey := "finance-cancelled-recovery/" + suffix
 	collectionType := biz.FinanceCollectionAccountsReceivable
+	sourceType := biz.ShipmentSourceType
 	factIn := &biz.FinanceFactCreate{
 		FactNo:              "AR-CANCELLED-RECOVERY-" + suffix,
 		FactType:            biz.FinanceFactReceivable,
-		CounterpartyType:    biz.FinanceCounterpartyOther,
-		Amount:              decimal.RequireFromString("256.88"),
+		CounterpartyType:    biz.FinanceCounterpartyCustomer,
+		CounterpartyID:      shipment.CustomerID,
+		Amount:              decimal.NewFromInt(20),
 		Currency:            "CNY",
 		CollectionType:      &collectionType,
+		SourceType:          &sourceType,
+		SourceID:            &shipment.ID,
 		IdempotencyKey:      idempotencyKey,
 		OccurredAt:          time.Now().UTC().Truncate(time.Microsecond),
 		OccurredAtSpecified: true,
@@ -121,9 +130,10 @@ func TestFinanceProcessCommandPostgresRejectsCancelledFactBeforeExactRecovery(t 
 	if err := factRepo.ValidateFinanceFactCreateReplay(ctx, factIn); !errors.Is(err, biz.ErrProcessDomainCommandRecoveryRequired) {
 		t.Fatalf("cancelled finance preflight must require explicit recovery, got %v", err)
 	}
-	command := claimedPostgresProcessCommand(
+	command := claimedPostgresProcessCommandForBusinessRef(
 		t, ctx, processRepo, biz.ProcessDomainCommandFinanceReceivableLead,
-		idempotencyKey, map[string]any{"source": "shipment", "amount": "256.88"},
+		idempotencyKey, map[string]any{"source": "shipment", "shipment_id": shipment.ID, "amount": "20"},
+		biz.ShipmentSourceType, shipment.ID,
 	)
 	if _, err := factRepo.CreateFinanceFactDraftForProcessCommand(ctx, factIn, command, 7); !errors.Is(err, biz.ErrProcessDomainCommandRecoveryRequired) {
 		t.Fatalf("cancelled finance fact must not be rebound as applied, got %v", err)

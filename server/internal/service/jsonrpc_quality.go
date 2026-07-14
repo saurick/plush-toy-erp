@@ -34,11 +34,27 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionCreate); res != nil {
 			return id, res, nil
 		}
-		in := qualityInspectionCreateFromParams(pm)
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "quality_inspections"); res != nil {
+		in, ok := qualityInspectionFromPurchaseReceiptCreateFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "quality_inspections"); res != nil {
 			return id, res, nil
 		}
-		item, err := d.inventoryUC.CreateQualityInspectionDraft(ctx, in)
+		item, err := d.inventoryUC.CreateQualityInspectionFromPurchaseReceipt(ctx, in)
+		return id, qualityInspectionResult(ctx, d, item, err), nil
+	case "create_quality_inspection_from_outsourcing_return":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionCreate); res != nil {
+			return id, res, nil
+		}
+		in, ok := qualityInspectionFromOutsourcingReturnCreateFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders", "quality_inspections"); res != nil {
+			return id, res, nil
+		}
+		item, err := d.inventoryUC.CreateQualityInspectionFromOutsourcingReturn(ctx, in)
 		return id, qualityInspectionResult(ctx, d, item, err), nil
 	case "create_finished_goods_quality_inspection_draft":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionCreate); res != nil {
@@ -136,27 +152,53 @@ func (d *jsonrpcDispatcher) handleQuality(
 			"limit":               normalizedLimit(pm),
 			"offset":              normalizedOffset(pm),
 		}), nil
+	case "list_outsourcing_return_quality_inspections":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionRead); res != nil {
+			return id, res, nil
+		}
+		filter, ok := outsourcingReturnQualityInspectionFilterFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders", "quality_inspections"); res != nil {
+			return id, res, nil
+		}
+		items, total, err := d.inventoryUC.ListOutsourcingReturnQualityInspections(ctx, filter)
+		if err != nil {
+			return id, d.mapQualityError(ctx, err), nil
+		}
+		return id, okData(map[string]any{
+			"quality_inspections": qualityInspectionsToAny(items),
+			"total":               total,
+			"limit":               normalizedLimit(pm),
+			"offset":              normalizedOffset(pm),
+		}), nil
 	default:
 		return id, &v1.JsonrpcResult{Code: errcode.UnknownMethod.Code, Message: fmt.Sprintf("未知 quality 接口 method=%s", method)}, nil
 	}
 }
 
-func qualityInspectionCreateFromParams(pm map[string]any) *biz.QualityInspectionCreate {
-	return &biz.QualityInspectionCreate{
+func qualityInspectionFromPurchaseReceiptCreateFromParams(pm map[string]any) (*biz.QualityInspectionFromPurchaseReceiptCreate, bool) {
+	if !jsonRPCParamsAllowed(pm, "customer_key", "inspection_no", "purchase_receipt_id", "purchase_receipt_item_id", "decision_note") {
+		return nil, false
+	}
+	return &biz.QualityInspectionFromPurchaseReceiptCreate{
 		InspectionNo:          getString(pm, "inspection_no"),
 		PurchaseReceiptID:     getInt(pm, "purchase_receipt_id", 0),
-		PurchaseReceiptItemID: getOptionalInt(pm, "purchase_receipt_item_id"),
-		InventoryLotID:        getInt(pm, "inventory_lot_id", 0),
-		MaterialID:            getInt(pm, "material_id", 0),
-		WarehouseID:           getInt(pm, "warehouse_id", 0),
-		SourceType:            getString(pm, "source_type"),
-		SourceID:              getInt(pm, "source_id", 0),
-		InspectionType:        getString(pm, "inspection_type"),
-		SubjectType:           getString(pm, "subject_type"),
-		SubjectID:             getInt(pm, "subject_id", 0),
-		InspectorID:           getOptionalInt(pm, "inspector_id"),
+		PurchaseReceiptItemID: getInt(pm, "purchase_receipt_item_id", 0),
 		DecisionNote:          getWorkflowStringPtr(pm, "decision_note"),
+	}, true
+}
+
+func qualityInspectionFromOutsourcingReturnCreateFromParams(pm map[string]any) (*biz.QualityInspectionFromOutsourcingReturnCreate, bool) {
+	if !jsonRPCParamsAllowed(pm, "customer_key", "fact_id", "inspection_no", "note") {
+		return nil, false
 	}
+	return &biz.QualityInspectionFromOutsourcingReturnCreate{
+		InspectionNo:      getString(pm, "inspection_no"),
+		OutsourcingFactID: getInt(pm, "fact_id", 0),
+		DecisionNote:      getWorkflowStringPtr(pm, "note"),
+	}, true
 }
 
 func finishedGoodsQualityInspectionCreateFromParams(pm map[string]any) *biz.QualityInspectionCreate {
@@ -248,6 +290,33 @@ func finishedGoodsQualityInspectionFilterFromParams(pm map[string]any) (biz.Qual
 	return filter, true
 }
 
+func outsourcingReturnQualityInspectionFilterFromParams(pm map[string]any) (biz.QualityInspectionFilter, bool) {
+	if !jsonRPCParamsAllowed(pm, "customer_key", "fact_id", "status", "result", "keyword", "inventory_lot_id", "warehouse_id", "product_id", "date_from", "date_to", "limit", "offset") {
+		return biz.QualityInspectionFilter{}, false
+	}
+	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	if !ok {
+		return biz.QualityInspectionFilter{}, false
+	}
+	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	if !ok {
+		return biz.QualityInspectionFilter{}, false
+	}
+	return biz.QualityInspectionFilter{
+		Status:         getString(pm, "status"),
+		Result:         getString(pm, "result"),
+		Keyword:        getString(pm, "keyword"),
+		DateFrom:       dateFrom,
+		DateTo:         dateTo,
+		InventoryLotID: getInt(pm, "inventory_lot_id", 0),
+		WarehouseID:    getInt(pm, "warehouse_id", 0),
+		SourceID:       getInt(pm, "fact_id", 0),
+		SubjectID:      getInt(pm, "product_id", 0),
+		Limit:          getInt(pm, "limit", 50),
+		Offset:         getInt(pm, "offset", 0),
+	}, true
+}
+
 func qualityInspectionResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.QualityInspection, err error) *v1.JsonrpcResult {
 	if err != nil {
 		return d.mapQualityError(ctx, err)
@@ -258,6 +327,14 @@ func qualityInspectionResult(ctx context.Context, d *jsonrpcDispatcher, item *bi
 func (d *jsonrpcDispatcher) mapQualityError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrIdempotencyConflict):
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
+	case errors.Is(err, biz.ErrQualityInspectionSourceConflict):
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "该委外回货已存在未取消的质检单"}
+	case errors.Is(err, biz.ErrQualityInspectionSourceInvalid):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "质检来源与业务记录不一致，请刷新来源后重试"}
+	case errors.Is(err, biz.ErrQualityInspectionSourceState):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来源业务记录当前状态不允许发起质检"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[quality] invalid param err=%v", err)
 		return invalidParamResult()
@@ -267,6 +344,8 @@ func (d *jsonrpcDispatcher) mapQualityError(ctx context.Context, err error) *v1.
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库单不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptItemNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库行不存在"}
+	case errors.Is(err, biz.ErrOutsourcingFactNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外回货记录不存在"}
 	case errors.Is(err, biz.ErrInventoryLotNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存批次不存在"}
 	case errors.Is(err, biz.ErrInventoryLotStatusBlocked):
@@ -301,6 +380,7 @@ func qualityInspectionToAny(item *biz.QualityInspection) map[string]any {
 		"warehouse_id":             item.WarehouseID,
 		"source_type":              optionalStringToAny(item.SourceType),
 		"source_id":                optionalIntToAny(item.SourceID),
+		"source_no":                optionalStringToAny(item.SourceNo),
 		"inspection_type":          optionalStringToAny(item.InspectionType),
 		"subject_type":             optionalStringToAny(item.SubjectType),
 		"subject_id":               optionalIntToAny(item.SubjectID),

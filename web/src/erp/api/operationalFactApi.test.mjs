@@ -16,11 +16,15 @@ test('operationalFactApi: uses dedicated operational fact JSON-RPC domain and ad
 test('operationalFactApi: exposes production, outsourcing, shipment, reservation and finance methods', () => {
   for (const methodName of [
     'list_production_facts',
-    'create_production_fact',
+    'list_production_order_material_requirements',
+    'create_production_completion_from_order',
+    'create_production_material_issue_from_order',
+    'create_production_rework_from_completion',
     'post_production_fact',
     'cancel_production_fact',
     'list_outsourcing_facts',
-    'create_outsourcing_fact',
+    'create_outsourcing_material_issue_from_order',
+    'create_outsourcing_return_receipt_from_order',
     'post_outsourcing_fact',
     'cancel_outsourcing_fact',
     'list_shipments',
@@ -28,10 +32,14 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
     'ship_shipment',
     'cancel_shipment',
     'list_stock_reservations',
-    'create_stock_reservation',
+    'create_stock_reservation_from_sales_order',
     'release_stock_reservation',
     'list_finance_facts',
-    'create_finance_fact',
+    'create_receivable_from_shipment',
+    'create_invoice_from_shipment',
+    'create_payable_from_purchase_receipt',
+    'create_payable_from_outsourcing_return',
+    'create_reconciliation_from_finance_fact',
     'post_finance_fact',
     'settle_finance_fact',
     'cancel_finance_fact',
@@ -40,6 +48,17 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
   }
 
   assert.doesNotMatch(source, /consume_stock_reservation/)
+  assert.doesNotMatch(source, /call\(\s*'create_outsourcing_fact'\s*,/)
+  assert.doesNotMatch(
+    source,
+    /export async function createOutsourcingFact\s*\(/
+  )
+  assert.doesNotMatch(source, /call\(\s*'create_stock_reservation'\s*,/)
+  assert.doesNotMatch(
+    source,
+    /export async function createStockReservation\s*\(/
+  )
+  assert.doesNotMatch(source, /call\(\s*'create_finance_fact'/)
   assert.doesNotMatch(source, /call\(\s*'create_shipment'/)
   assert.doesNotMatch(source, /call\(\s*'add_shipment_item'/)
 
@@ -52,4 +71,75 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
   ]) {
     assert.doesNotMatch(source, new RegExp(forbiddenName))
   }
+})
+
+test('operationalFactApi: production material issue uses strict source contracts', () => {
+  assert.match(
+    source,
+    /export async function createProductionCompletionFromOrder[\s\S]*normalizeProductionCompletionCreateRequest\(params\)[\s\S]*'create_production_completion_from_order'[\s\S]*validateProductionCompletionResult/u
+  )
+  assert.match(
+    source,
+    /export async function listProductionOrderMaterialRequirements[\s\S]*normalizeProductionMaterialRequirementsListRequest\(params\)[\s\S]*'list_production_order_material_requirements'[\s\S]*validateProductionMaterialRequirementsResponse/u
+  )
+  assert.match(
+    source,
+    /export async function createProductionMaterialIssueFromOrder[\s\S]*normalizeProductionMaterialIssueCreateRequest\(params\)[\s\S]*'create_production_material_issue_from_order'[\s\S]*validateProductionMaterialIssueResult/u
+  )
+  assert.doesNotMatch(
+    source,
+    /export async function createProductionMaterialIssueFromOrder[\s\S]*create_production_fact/u
+  )
+})
+
+test('operationalFactApi: production rework uses the strict completion source contract', () => {
+  assert.match(
+    source,
+    /export async function createProductionReworkFromCompletion[\s\S]*normalizeProductionReworkRequest\(params\)[\s\S]*'create_production_rework_from_completion'[\s\S]*validateProductionReworkResult/u
+  )
+  assert.doesNotMatch(
+    source,
+    /export async function createProductionReworkFromCompletion[\s\S]*create_production_fact/u
+  )
+})
+
+test('operationalFactApi: outsourcing creation only exposes source-bound commands', () => {
+  assert.match(
+    source,
+    /export async function createOutsourcingMaterialIssueFromOrder[\s\S]*normalizeOutsourcingSourceFactCreateRequest[\s\S]*'create_outsourcing_material_issue_from_order'[\s\S]*validateOutsourcingSourceFactResult/u
+  )
+  assert.match(
+    source,
+    /export async function createOutsourcingReturnReceiptFromOrder[\s\S]*normalizeOutsourcingSourceFactCreateRequest[\s\S]*'create_outsourcing_return_receipt_from_order'[\s\S]*validateOutsourcingSourceFactResult/u
+  )
+})
+
+test('operationalFactApi: sales order reservation creation uses the source-bound RPC', () => {
+  assert.match(
+    source,
+    /export async function createStockReservationFromSalesOrder[\s\S]*'create_stock_reservation_from_sales_order'[\s\S]*dataOf\(result\)\?\.stock_reservation \|\| null/u
+  )
+})
+
+test('operationalFactApi: source finance creation returns the finance fact payload', () => {
+  assert.match(
+    source,
+    /export async function createReceivableFromShipment[\s\S]*'create_receivable_from_shipment'[\s\S]*dataOf\(result\)\?\.finance_fact \|\| null/u
+  )
+  assert.match(
+    source,
+    /export async function createInvoiceFromShipment[\s\S]*'create_invoice_from_shipment'[\s\S]*dataOf\(result\)\?\.finance_fact \|\| null/u
+  )
+  assert.match(
+    source,
+    /export async function createPayableFromPurchaseReceipt[\s\S]*normalizePurchaseReceiptPayableRequest\(params\)[\s\S]*'create_payable_from_purchase_receipt'[\s\S]*validatePurchaseReceiptPayableResult/u
+  )
+  assert.match(
+    source,
+    /export async function createPayableFromOutsourcingReturn[\s\S]*normalizeOutsourcingReturnPayableRequest\(params\)[\s\S]*'create_payable_from_outsourcing_return'[\s\S]*validateOutsourcingReturnPayableResult/u
+  )
+  assert.match(
+    source,
+    /export async function createReconciliationFromFinanceFact[\s\S]*normalizeSingleFactReconciliationRequest\(params\)[\s\S]*'create_reconciliation_from_finance_fact'[\s\S]*validateSingleFactReconciliationResult/u
+  )
 })

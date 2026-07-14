@@ -93,6 +93,8 @@ func (BOMHeader) Edges() []ent.Edge {
 			Required().
 			Unique(),
 		edge.To("items", BOMItem.Type),
+		edge.To("production_order_material_requirements", ProductionOrderMaterialRequirement.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 	}
 }
 

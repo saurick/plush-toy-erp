@@ -1,27 +1,21 @@
 #!/usr/bin/env node
 
-import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import {
-  applyPlan as applyOperationalPlan,
   buildPlan as buildOperationalPlan,
-  loginRoles as loginOperationalRoles,
 } from "./operational-fact-simulated-closure.mjs";
 import {
-  applyPlan as applyPurchaseQualityPlan,
   buildPlan as buildPurchaseQualityPlan,
 } from "./purchase-quality-simulated-matrix.mjs";
-import {
-  buildManualAcceptanceSourceDataPlan,
-  verifyManualAcceptanceSourceData,
-} from "./manual-acceptance-source-data.mjs";
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/fact-data";
-const CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_FACTS";
+const APPLY_RETIRED_MESSAGE =
+  "manual acceptance fact apply is retired; source-driven fact fixtures must replace the generic operational writer";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 const PAYABLE_STATUSES = ["DRAFT", "POSTED", "SETTLED", "CANCELLED"];
 const PRODUCTION_SAMPLE_TYPES = [
@@ -309,6 +303,9 @@ export function buildManualAcceptanceFactPlan(sourceReport, options = {}) {
     simulatedOnly: true,
     realCustomerImport: false,
     directSQL: false,
+    applySupported: false,
+    applyRetiredReason: APPLY_RETIRED_MESSAGE,
+    requiredApplyInputs: [],
     sourceRunId: report.runId,
     sourcePrefix: report.prefix,
     runId,
@@ -350,10 +347,7 @@ export function parseManualAcceptanceFactArgs(argv) {
   };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
-    if (token === "--apply") {
-      options.apply = true;
-      continue;
-    }
+    if (token === "--apply") throw new CliError(APPLY_RETIRED_MESSAGE, 2);
     if (token === "--json") {
       options.json = true;
       continue;
@@ -401,179 +395,11 @@ async function readSourceReport(filePath) {
 }
 
 export async function applyManualAcceptanceFactPlan(
-  plan,
-  sourceReport,
-  { password, adminPassword, fetchImpl = fetch } = {},
+  _plan,
+  _sourceReport,
+  _deps = {},
 ) {
-  const backendURL = normalizeBackendURL(plan?.backendURL);
-  const sourceBackendURL = normalizeBackendURL(
-    required(sourceReport?.backendURL, "sourceReport.backendURL"),
-  );
-  if (sourceBackendURL !== backendURL) {
-    throw new CliError(
-      "source report backend does not match the fact apply backend",
-      2,
-    );
-  }
-  const safePlan = { ...plan, backendURL };
-  if (process.env.MANUAL_ACCEPTANCE_FACT_CONFIRM !== CONFIRM_PHRASE) {
-    throw new CliError(
-      `apply requires MANUAL_ACCEPTANCE_FACT_CONFIRM=${CONFIRM_PHRASE}`,
-      2,
-    );
-  }
-  const effectivePassword = required(
-    password ||
-      process.env.MANUAL_ACCEPTANCE_PASSWORD ||
-      process.env.TRIAL_ACCOUNT_PASSWORD ||
-      process.env.ERP_ROLE_DEMO_PASSWORD,
-    "MANUAL_ACCEPTANCE_PASSWORD/TRIAL_ACCOUNT_PASSWORD/ERP_ROLE_DEMO_PASSWORD",
-  );
-  const effectiveAdminPassword = required(
-    adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
-    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
-  );
-
-  const sourcePlan = buildManualAcceptanceSourceDataPlan({
-    runId: sourceReport.runId,
-    backendURL,
-    scale: sourceReport.scale,
-  });
-  const sourceVerification = await verifyManualAcceptanceSourceData(
-    sourcePlan,
-    {
-      password: effectivePassword,
-      adminPassword: effectiveAdminPassword,
-      fetchImpl,
-    },
-  );
-  if (!sourceVerification.ok) {
-    throw new CliError(
-      "source data verification failed; fact writes were not started",
-    );
-  }
-
-  const purchaseQualitySteps = [];
-  const purchaseQualityAuthSession = {};
-  const materialLotByLocation = new Map();
-  for (const item of safePlan.purchaseQuality) {
-    const steps = await applyPurchaseQualityPlan(item, effectivePassword, {
-      adminPassword: effectiveAdminPassword,
-      authSession: purchaseQualityAuthSession,
-      fetchImpl,
-    });
-    purchaseQualitySteps.push({
-      runId: item.runId,
-      steps,
-    });
-    const posted = steps.find(
-      (step) =>
-        step.target === "purchase_receipt_quality" &&
-        step.scenario === "PASSED_POSTED" &&
-        step.receiptStatus === "POSTED" &&
-        step.inspectionStatus === "PASSED",
-    );
-    if (!Number.isSafeInteger(posted?.lotId) || posted.lotId <= 0) {
-      throw new CliError(
-        `${item.runId}: posted purchase receipt did not return an active material lot`,
-      );
-    }
-    materialLotByLocation.set(
-      `${item.ids.materialId}:${item.ids.warehouseId}`,
-      posted.lotId,
-    );
-  }
-
-  const tokens = await loginOperationalRoles({
-    backendURL,
-    password: effectivePassword,
-    fetchImpl,
-  });
-  const operationalSteps = [];
-  const operationalAuthSession = {};
-  for (const item of safePlan.operational) {
-    const materialLotId = materialLotByLocation.get(
-      `${item.ids.materialId}:${item.ids.warehouseId}`,
-    );
-    if (!Number.isSafeInteger(materialLotId) || materialLotId <= 0) {
-      throw new CliError(
-        `${item.runId}: no posted material lot matches its warehouse`,
-      );
-    }
-    const linkedItem = {
-      ...item,
-      records: {
-        ...item.records,
-        outsourcingIssue: {
-          ...item.records.outsourcingIssue,
-          lot_id: materialLotId,
-        },
-      },
-    };
-    operationalSteps.push({
-      runId: item.runId,
-      steps: await applyOperationalPlan(linkedItem, tokens, {
-        adminPassword: effectiveAdminPassword,
-        authSession: operationalAuthSession,
-        fetchImpl,
-      }),
-    });
-  }
-
-  return {
-    mode: "apply",
-    generatedAt: new Date().toISOString(),
-    runId: safePlan.runId,
-    sourceRunId: safePlan.sourceRunId,
-    backendURL,
-    simulatedOnly: true,
-    realCustomerImport: false,
-    sourceVerification,
-    operationalSteps,
-    purchaseQualitySteps,
-    totals: {
-      operationalRuns: operationalSteps.length,
-      operationalActions: operationalSteps.reduce(
-        (sum, item) => sum + item.steps.length,
-        0,
-      ),
-      purchaseQualityRuns: purchaseQualitySteps.length,
-      purchaseQualityActions: purchaseQualitySteps.reduce(
-        (sum, item) => sum + item.steps.length,
-        0,
-      ),
-    },
-    expectedMinimums: safePlan.expectedMinimums,
-  };
-}
-
-function markdown(report) {
-  const lines = [
-    "# 全页面事实数据写入报告 / Manual Acceptance Fact Data",
-    "",
-    `- 试用批次：${report.runId}`,
-    `- 源数据批次：${report.sourceRunId}`,
-    "- 数据性质：模拟试用数据，不是真实客户导入",
-    "",
-    "## 写入结果",
-    "",
-    `- 生产、库存、出货、财务批次：${report.totals.operationalRuns}`,
-    `- 采购、入库、质检批次：${report.totals.purchaseQualityRuns}`,
-    `- 业务动作总数：${report.totals.operationalActions + report.totals.purchaseQualityActions}`,
-    "",
-    "> 本报告只证明模拟业务记录已写入，不代表试用人员已经完成验收。",
-    "",
-  ];
-  return lines.join("\n");
-}
-
-async function writeReport(outDir, report) {
-  await mkdir(outDir, { recursive: true });
-  const jsonPath = path.join(outDir, "apply-report.json");
-  const markdownPath = path.join(outDir, "apply-report.md");
-  await writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
-  await writeFile(markdownPath, markdown(report), "utf8");
-  return { jsonPath, markdownPath };
+  throw new CliError(APPLY_RETIRED_MESSAGE, 2);
 }
 
 function usage() {
@@ -584,39 +410,20 @@ function usage() {
     --source-report output/qa/manual-acceptance/source-data/apply-report.json \\
     --run-id LOCAL-UAT-FACTS --json
 
-写入本地开发环境：
-  MANUAL_ACCEPTANCE_FACT_CONFIRM=${CONFIRM_PHRASE} \\
-  MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
-  MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \\
-    node scripts/qa/manual-acceptance-fact-data.mjs --apply \\
-      --source-report output/qa/manual-acceptance/source-data/apply-report.json \\
-      --run-id LOCAL-UAT-FACTS
-
-默认生成 45 组生产/库存/预留/出货及应付、应收、发票、对账记录，以及 9 组采购/入库/质检矩阵。
-本入口只允许 localhost；同一事实 runId 完成后不要重复执行。`;
+默认计划描述 45 组生产/库存/预留/出货及应付、应收、发票、对账候选，以及 9 组采购/入库/质检候选；不会写入这些记录。
+当前只保留计划生成；apply 已退役，调用会在读取报告、登录、RPC 和任何写入前失败。`;
 }
 
-export async function runManualAcceptanceFactCli(argv, deps = {}) {
+export async function runManualAcceptanceFactCli(argv) {
   const options = parseManualAcceptanceFactArgs(argv);
   if (options.help) return { text: `${usage()}\n`, exitCode: 0 };
   const sourceReport = await readSourceReport(options.sourceReport);
   const plan = buildManualAcceptanceFactPlan(sourceReport, options);
-  if (!options.apply) {
-    return {
-      text: `${JSON.stringify(plan, null, options.json ? 2 : 0)}\n`,
-      exitCode: 0,
-      plan,
-      sourceReport,
-    };
-  }
-  const report = await applyManualAcceptanceFactPlan(plan, sourceReport, deps);
-  const output = await writeReport(options.out, report);
   return {
-    text: `[qa:manual-acceptance-fact-data] apply complete json=${output.jsonPath} md=${output.markdownPath}\n`,
+    text: `${JSON.stringify(plan, null, options.json ? 2 : 0)}\n`,
     exitCode: 0,
     plan,
-    report,
-    output,
+    sourceReport,
   };
 }
 
@@ -636,4 +443,4 @@ if (
     });
 }
 
-export { CONFIRM_PHRASE as MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE };
+export { APPLY_RETIRED_MESSAGE as MANUAL_ACCEPTANCE_FACT_APPLY_RETIRED_MESSAGE };

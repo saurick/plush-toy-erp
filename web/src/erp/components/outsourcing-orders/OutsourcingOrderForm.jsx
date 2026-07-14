@@ -96,6 +96,19 @@ export function productLabel(product = {}) {
   )
 }
 
+export function productSKULabel(productSKU = {}) {
+  return (
+    [
+      productSKU.sku_code,
+      productSKU.color,
+      productSKU.size,
+      productSKU.customer_sku,
+    ]
+      .filter(Boolean)
+      .join(' / ') || '产品规格已关联'
+  )
+}
+
 export function materialLabel(material = {}) {
   return (
     [material.code, material.name].filter(Boolean).join(' / ') || '材料已关联'
@@ -119,12 +132,14 @@ export default function OutsourcingOrderForm({
   supplierOptions,
   onSupplierChange,
   productOptions,
+  productSKUs = [],
   materialOptions,
   processOptions,
   unitOptions,
   attachmentPanel,
   onSubjectTypeChange,
   onProductChange,
+  onProductSKUChange,
   onMaterialChange,
   onProcessChange,
   onUnitChange,
@@ -394,6 +409,67 @@ export default function OutsourcingOrderForm({
                 noStyle
                 shouldUpdate={(previous, current) =>
                   previous?.items?.[field.name]?.subject_type !==
+                    current?.items?.[field.name]?.subject_type ||
+                  previous?.items?.[field.name]?.product_id !==
+                    current?.items?.[field.name]?.product_id ||
+                  previous?.items?.[field.name]?.product_sku_id !==
+                    current?.items?.[field.name]?.product_sku_id
+                }
+              >
+                {({ getFieldValue }) => {
+                  const line = getFieldValue(['items', field.name]) || {}
+                  if (
+                    line.subject_type !==
+                    OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT
+                  ) {
+                    return null
+                  }
+                  const productID = Number(line.product_id || 0)
+                  const currentSKUID = Number(line.product_sku_id || 0)
+                  const options = productSKUs
+                    .filter((item) => Number(item?.product_id || 0) === productID)
+                    .map((item) => ({
+                      value: item.id,
+                      label: productSKULabel(item),
+                      disabled:
+                        item.is_active === false ||
+                        Number(item.default_unit_id || 0) <= 0,
+                    }))
+                  if (
+                    currentSKUID > 0 &&
+                    !options.some((option) => Number(option.value) === currentSKUID)
+                  ) {
+                    options.push({
+                      value: currentSKUID,
+                      label: line.sku_code_snapshot || '原产品规格已不可用',
+                      disabled: true,
+                    })
+                  }
+                  return (
+                    <Form.Item
+                      className="erp-line-item-field erp-line-item-field--source"
+                      name={[field.name, 'product_sku_id']}
+                      label="产品规格"
+                      extra="可选；选择后单位按产品规格默认单位带出，回货批次和库存按该规格独立记录。"
+                    >
+                      <Select
+                        allowClear
+                        showSearch
+                        disabled={!productID}
+                        options={options}
+                        optionFilterProp="label"
+                        onChange={(value) =>
+                          onProductSKUChange(field.name, value)
+                        }
+                      />
+                    </Form.Item>
+                  )
+                }}
+              </Form.Item>
+              <Form.Item
+                noStyle
+                shouldUpdate={(previous, current) =>
+                  previous?.items?.[field.name]?.subject_type !==
                   current?.items?.[field.name]?.subject_type
                 }
               >
@@ -450,6 +526,9 @@ export default function OutsourcingOrderForm({
                 />
               </Form.Item>
               <Form.Item name={[field.name, 'product_no_snapshot']} hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item name={[field.name, 'sku_code_snapshot']} hidden>
                 <Input />
               </Form.Item>
               <Form.Item name={[field.name, 'product_name_snapshot']} hidden>

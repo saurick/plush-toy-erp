@@ -18,6 +18,8 @@ const DETACHED_DDL_MODIFIER =
 const BUILDER_START =
   /\b(?:field\.[A-Za-z][A-Za-z0-9]*\(|index\.(?:Fields|Edges)\(|edge\.(?:To|From)\()/u;
 
+const POSTGRES_IDENTIFIER_MAX_BYTES = 63;
+
 function parseNameStatus(buffer) {
   const values = readNullDelimited(buffer);
   const entries = [];
@@ -707,7 +709,17 @@ function sqlCodeStatements(source) {
 }
 
 function containsSqlIdentifier(source, identifier) {
-  const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  let physicalIdentifier = "";
+  for (const character of identifier) {
+    if (
+      Buffer.byteLength(`${physicalIdentifier}${character}`, "utf8") >
+      POSTGRES_IDENTIFIER_MAX_BYTES
+    ) {
+      break;
+    }
+    physicalIdentifier += character;
+  }
+  const escaped = physicalIdentifier.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   return new RegExp(`(?:^|[^a-z0-9_])${escaped}(?:[^a-z0-9_]|$)`, "u").test(
     source,
   );

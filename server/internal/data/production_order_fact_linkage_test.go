@@ -14,6 +14,81 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+func TestProductionCompletionFromOrderDerivesSourceAndReplays(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "production_completion_from_order")
+	logger := log.NewStdLogger(io.Discard)
+	actor := client.AdminUser.Create().SetUsername("production-completion-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
+	unitRow := createTestUnit(t, ctx, client, "PCO-U")
+	productRow := createTestProduct(t, ctx, client, unitRow.ID, "PCO-P")
+	skuRow := createInventoryTestSKU(t, ctx, client, productRow.ID, unitRow.ID, "PCO-SKU")
+	warehouseRow := createTestWarehouse(t, ctx, client, "PCO-WH")
+
+	orderUC := biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, logger))
+	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
+	created, err := orderUC.CreateDraft(ctx, &biz.ProductionOrderCreate{
+		Draft: biz.ProductionOrderDraft{OrderNo: "MO-COMPLETION-001", Items: []biz.ProductionOrderDraftItem{{
+			LineNo: 1, ProductID: productRow.ID, ProductSKUID: &skuRow.ID, UnitID: unitRow.ID, PlannedQuantity: decimal.NewFromInt(10),
+		}}},
+		ActorID: actor.ID, IdempotencyKey: "mo-completion-create",
+	})
+	if err != nil {
+		t.Fatalf("create production order: %v", err)
+	}
+	released, err := orderUC.Release(ctx, &biz.ProductionOrderAction{
+		ID: created.Order.ID, ExpectedVersion: 1, ActorID: actor.ID, IdempotencyKey: "mo-completion-release",
+	})
+	if err != nil {
+		t.Fatalf("release production order: %v", err)
+	}
+	line := released.Items[0]
+	lotNo := "PCO-COMPLETION-LOT"
+	input := &biz.ProductionCompletionFromOrderCreate{
+		FactNo:                "PF-COMPLETION-001",
+		ProductionOrderID:     released.Order.ID,
+		ProductionOrderItemID: line.ID,
+		WarehouseID:           warehouseRow.ID,
+		NewLotNo:              &lotNo,
+		Quantity:              decimal.NewFromInt(4),
+		IdempotencyKey:        "pf-completion-001",
+		OccurredAt:            time.Now().UTC(),
+		OccurredAtSpecified:   true,
+	}
+
+	fact, err := factUC.CreateProductionCompletionFromOrder(ctx, input)
+	if err != nil {
+		t.Fatalf("create production completion: %v", err)
+	}
+	if fact.FactType != biz.ProductionFactFinishedGoodsReceipt || fact.SubjectType != biz.InventorySubjectProduct || fact.SubjectID != productRow.ID || fact.ProductSkuID == nil || *fact.ProductSkuID != skuRow.ID || fact.UnitID != unitRow.ID {
+		t.Fatalf("completion source-derived fields = %#v", fact)
+	}
+	if fact.SourceType == nil || *fact.SourceType != biz.ProductionOrderSourceType || fact.SourceID == nil || *fact.SourceID != released.Order.ID || fact.SourceLineID == nil || *fact.SourceLineID != line.ID {
+		t.Fatalf("completion source linkage = %#v", fact)
+	}
+	listed, total, err := factUC.ListProductionFacts(ctx, biz.OperationalFactFilter{
+		SourceType: biz.ProductionOrderSourceType,
+		SourceID:   released.Order.ID,
+	})
+	if err != nil || total != 1 || len(listed) != 1 || listed[0].SourceNo == nil || *listed[0].SourceNo != released.Order.OrderNo {
+		t.Fatalf("listed completion source number rows=%#v total=%d err=%v", listed, total, err)
+	}
+	replayed, err := factUC.CreateProductionCompletionFromOrder(ctx, input)
+	if err != nil || replayed.ID != fact.ID {
+		t.Fatalf("completion replay = %#v, %v", replayed, err)
+	}
+	changed := *input
+	changed.Quantity = decimal.NewFromInt(5)
+	if _, err := factUC.CreateProductionCompletionFromOrder(ctx, &changed); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("changed completion replay error = %v", err)
+	}
+	wrongLine := *input
+	wrongLine.IdempotencyKey = "pf-completion-wrong-line"
+	wrongLine.ProductionOrderItemID = line.ID + 999999
+	if _, err := factUC.CreateProductionCompletionFromOrder(ctx, &wrongLine); !errors.Is(err, biz.ErrProductionOrderFactSourceInvalid) {
+		t.Fatalf("wrong completion order item error = %v", err)
+	}
+}
+
 func TestProductionOrderFactLinkageQuantityReversalAndCancellation(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "production_order_fact_linkage")

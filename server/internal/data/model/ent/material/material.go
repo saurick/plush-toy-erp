@@ -36,6 +36,8 @@ const (
 	EdgeDefaultUnit = "default_unit"
 	// EdgeBomItems holds the string denoting the bom_items edge name in mutations.
 	EdgeBomItems = "bom_items"
+	// EdgeProductionOrderMaterialRequirements holds the string denoting the production_order_material_requirements edge name in mutations.
+	EdgeProductionOrderMaterialRequirements = "production_order_material_requirements"
 	// EdgePurchaseOrderItems holds the string denoting the purchase_order_items edge name in mutations.
 	EdgePurchaseOrderItems = "purchase_order_items"
 	// EdgePurchaseReceiptItems holds the string denoting the purchase_receipt_items edge name in mutations.
@@ -64,6 +66,13 @@ const (
 	BomItemsInverseTable = "bom_items"
 	// BomItemsColumn is the table column denoting the bom_items relation/edge.
 	BomItemsColumn = "material_id"
+	// ProductionOrderMaterialRequirementsTable is the table that holds the production_order_material_requirements relation/edge.
+	ProductionOrderMaterialRequirementsTable = "production_order_material_requirements"
+	// ProductionOrderMaterialRequirementsInverseTable is the table name for the ProductionOrderMaterialRequirement entity.
+	// It exists in this package in order to avoid circular dependency with the "productionordermaterialrequirement" package.
+	ProductionOrderMaterialRequirementsInverseTable = "production_order_material_requirements"
+	// ProductionOrderMaterialRequirementsColumn is the table column denoting the production_order_material_requirements relation/edge.
+	ProductionOrderMaterialRequirementsColumn = "material_id"
 	// PurchaseOrderItemsTable is the table that holds the purchase_order_items relation/edge.
 	PurchaseOrderItemsTable = "purchase_order_items"
 	// PurchaseOrderItemsInverseTable is the table name for the PurchaseOrderItem entity.
@@ -229,6 +238,20 @@ func ByBomItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByProductionOrderMaterialRequirementsCount orders the results by production_order_material_requirements count.
+func ByProductionOrderMaterialRequirementsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newProductionOrderMaterialRequirementsStep(), opts...)
+	}
+}
+
+// ByProductionOrderMaterialRequirements orders the results by production_order_material_requirements terms.
+func ByProductionOrderMaterialRequirements(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProductionOrderMaterialRequirementsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByPurchaseOrderItemsCount orders the results by purchase_order_items count.
 func ByPurchaseOrderItemsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -324,6 +347,13 @@ func newBomItemsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(BomItemsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, BomItemsTable, BomItemsColumn),
+	)
+}
+func newProductionOrderMaterialRequirementsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProductionOrderMaterialRequirementsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ProductionOrderMaterialRequirementsTable, ProductionOrderMaterialRequirementsColumn),
 	)
 }
 func newPurchaseOrderItemsStep() *sqlgraph.Step {

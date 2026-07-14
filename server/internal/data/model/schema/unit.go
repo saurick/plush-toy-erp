@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -43,6 +44,8 @@ func (Unit) Edges() []ent.Edge {
 		edge.To("inventory_txns", InventoryTxn.Type),
 		edge.To("inventory_balances", InventoryBalance.Type),
 		edge.To("bom_items", BOMItem.Type),
+		edge.To("production_order_material_requirements", ProductionOrderMaterialRequirement.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("outsourcing_order_items", OutsourcingOrderItem.Type),
 		edge.To("purchase_order_items", PurchaseOrderItem.Type),
 		edge.To("purchase_receipt_items", PurchaseReceiptItem.Type),

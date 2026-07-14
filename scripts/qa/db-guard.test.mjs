@@ -214,6 +214,53 @@ test("db guard requires DDL for every newly added schema table", async () => {
   });
 });
 
+test("db guard accepts PostgreSQL identifier truncation in generated DDL", async () => {
+  await withRepository(async (root) => {
+    await write(
+      root,
+      "server/internal/data/model/schema/production_order_material_requirement.go",
+      [
+        "package schema",
+        "type ProductionOrderMaterialRequirement struct { ent.Schema }",
+        "func (ProductionOrderMaterialRequirement) Annotations() []schema.Annotation {",
+        "  return []schema.Annotation{entsql.Annotation{Checks: map[string]string{",
+        '    "production_order_material_requirements_planned_quantity_positive": "planned_quantity > 0",',
+        "  }}}",
+        "}",
+        "func (ProductionOrderMaterialRequirement) Fields() []ent.Field {",
+        '  return []ent.Field{field.Int("planned_quantity")}',
+        "}",
+        "",
+      ].join("\n"),
+    );
+    const generatedMigration = [
+      'CREATE TABLE "production_order_material_requirements" (',
+      '  "planned_quantity" bigint NOT NULL,',
+      '  CONSTRAINT "production_order_material_requirements_planned_quantity_positiv" CHECK (planned_quantity > 0)',
+      ");",
+      "",
+    ].join("\n");
+    await write(
+      root,
+      "server/internal/data/model/migrate/20260102000000_migrate.sql",
+      generatedMigration,
+    );
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
+
+    const result = evaluateDbGuard({ root, range: "HEAD...HEAD" });
+    assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+
+    await write(
+      root,
+      "server/internal/data/model/migrate/20260102000000_migrate.sql",
+      generatedMigration.replace("quantity_positiv", "quantity_positix"),
+    );
+    const mismatch = evaluateDbGuard({ root, range: "HEAD...HEAD" });
+    assert.equal(mismatch.ok, false);
+    assert.equal(mismatch.reason, "schema-migration-proof-missing");
+  });
+});
+
 test("db guard requires added named checks in the versioned DDL", async () => {
   await withRepository(async (root) => {
     await write(

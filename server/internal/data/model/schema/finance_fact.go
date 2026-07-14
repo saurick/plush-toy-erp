@@ -138,5 +138,8 @@ func (FinanceFact) Indexes() []ent.Index {
 		index.Fields("fact_type", "status"),
 		index.Fields("counterparty_type", "counterparty_id"),
 		index.Fields("source_type", "source_id", "source_line_id"),
+		index.Fields("fact_type", "source_type", "source_id").
+			Unique().
+			Annotations(entsql.IndexWhere("source_type IS NOT NULL AND source_id IS NOT NULL AND status <> 'CANCELLED'")),
 	}
 }

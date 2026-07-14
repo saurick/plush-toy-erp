@@ -121,17 +121,33 @@ func TestOperationalFactsPostAndReverseExactSKUGrain(t *testing.T) {
 	logger := log.NewStdLogger(io.Discard)
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
 	sku := createInventoryTestSKU(t, ctx, client, fixtures.productID, fixtures.unitID, "SKU-FACT-A")
+	lot, err := biz.NewInventoryUsecase(NewInventoryRepo(data, logger)).CreateInventoryLot(ctx, &biz.InventoryLotCreate{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, ProductSkuID: &sku.ID, LotNo: "SKU-FACT-LOT",
+	})
+	if err != nil {
+		t.Fatalf("create SKU fact lot: %v", err)
+	}
+	actor := client.AdminUser.Create().SetUsername("sku-fact-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
+	orderUC := biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, logger))
+	order, err := orderUC.CreateDraft(ctx, &biz.ProductionOrderCreate{
+		Draft: biz.ProductionOrderDraft{OrderNo: "MO-SKU-GRAIN", Items: []biz.ProductionOrderDraftItem{{
+			LineNo: 1, ProductID: fixtures.productID, ProductSKUID: &sku.ID, UnitID: fixtures.unitID, PlannedQuantity: decimal.NewFromInt(3),
+		}}},
+		ActorID: actor.ID, IdempotencyKey: "MO-SKU-GRAIN",
+	})
+	if err != nil {
+		t.Fatalf("create SKU production order: %v", err)
+	}
+	order, err = orderUC.Release(ctx, &biz.ProductionOrderAction{
+		ID: order.Order.ID, ExpectedVersion: order.Order.Version, ActorID: actor.ID, IdempotencyKey: "MO-SKU-GRAIN:RELEASE",
+	})
+	if err != nil {
+		t.Fatalf("release SKU production order: %v", err)
+	}
 
-	production, err := uc.CreateProductionFactDraft(ctx, &biz.OperationalFactMutation{
-		FactNo:         "PF-SKU-GRAIN",
-		FactType:       biz.ProductionFactFinishedGoodsReceipt,
-		SubjectType:    biz.InventorySubjectProduct,
-		SubjectID:      fixtures.productID,
-		ProductSkuID:   &sku.ID,
-		WarehouseID:    fixtures.warehouseID,
-		UnitID:         fixtures.unitID,
-		Quantity:       decimal.NewFromInt(3),
-		IdempotencyKey: "PF-SKU-GRAIN",
+	production, err := uc.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{
+		FactNo: "PF-SKU-GRAIN", ProductionOrderID: order.Order.ID, ProductionOrderItemID: order.Items[0].ID,
+		WarehouseID: fixtures.warehouseID, LotID: &lot.ID, Quantity: decimal.NewFromInt(3), IdempotencyKey: "PF-SKU-GRAIN",
 	})
 	if err != nil {
 		t.Fatalf("create SKU production fact: %v", err)
@@ -139,16 +155,10 @@ func TestOperationalFactsPostAndReverseExactSKUGrain(t *testing.T) {
 	if _, err := uc.PostProductionFact(ctx, production.ID); err != nil {
 		t.Fatalf("post SKU production fact: %v", err)
 	}
-	outsourcing, err := uc.CreateOutsourcingFactDraft(ctx, &biz.OperationalFactMutation{
-		FactNo:         "OF-SKU-GRAIN",
-		FactType:       biz.OutsourcingFactReturnReceipt,
-		SubjectType:    biz.InventorySubjectProduct,
-		SubjectID:      fixtures.productID,
-		ProductSkuID:   &sku.ID,
-		WarehouseID:    fixtures.warehouseID,
-		UnitID:         fixtures.unitID,
-		Quantity:       decimal.NewFromInt(2),
-		IdempotencyKey: "OF-SKU-GRAIN",
+	outsourcingSource := createOutsourcingFactSourceFixtureWithSKU(t, ctx, client, fixtures, "SKU-GRAIN", decimal.NewFromInt(2), &sku.ID)
+	outsourcing, err := uc.CreateOutsourcingReturnReceiptFromOrder(ctx, &biz.OutsourcingFactFromOrderCreate{
+		FactNo: "OF-SKU-GRAIN", OutsourcingOrderID: outsourcingSource.order.ID, OutsourcingOrderItemID: outsourcingSource.productLine.ID,
+		WarehouseID: fixtures.warehouseID, LotID: &lot.ID, Quantity: decimal.NewFromInt(2), IdempotencyKey: "OF-SKU-GRAIN",
 	})
 	if err != nil {
 		t.Fatalf("create SKU outsourcing fact: %v", err)
@@ -161,6 +171,7 @@ func TestOperationalFactsPostAndReverseExactSKUGrain(t *testing.T) {
 		SubjectID:    fixtures.productID,
 		ProductSkuID: &sku.ID,
 		WarehouseID:  fixtures.warehouseID,
+		LotID:        &lot.ID,
 		UnitID:       fixtures.unitID,
 	})
 	if err != nil || !balance.Quantity.Equal(decimal.NewFromInt(5)) {

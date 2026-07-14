@@ -18,6 +18,7 @@ import (
 type PurchaseReceipt struct {
 	ID           int
 	ReceiptNo    string
+	SupplierID   *int
 	SupplierName string
 	Status       string
 	ReceivedAt   time.Time
@@ -51,6 +52,7 @@ type PurchaseReceiptItem struct {
 
 type PurchaseReceiptCreate struct {
 	ReceiptNo    string
+	SupplierID   *int
 	SupplierName string
 	ReceivedAt   time.Time
 	Note         *string
@@ -86,6 +88,7 @@ type PurchaseReceiptItemCreate struct {
 type PurchaseReceiptFilter struct {
 	Status              string
 	Keyword             string
+	SupplierID          int
 	SupplierName        string
 	DateFrom            *time.Time
 	DateTo              *time.Time
@@ -106,6 +109,9 @@ func (uc *InventoryUsecase) CreatePurchaseReceiptDraft(ctx context.Context, in *
 	if err != nil {
 		return nil, err
 	}
+	if err := uc.validatePurchaseReceiptSupplierIdentity(ctx, &normalized); err != nil {
+		return nil, err
+	}
 	return uc.repo.CreatePurchaseReceiptDraft(ctx, &normalized)
 }
 
@@ -115,6 +121,9 @@ func (uc *InventoryUsecase) CreatePurchaseReceiptWithItems(ctx context.Context, 
 	}
 	normalized, err := normalizePurchaseReceiptCreate(*in)
 	if err != nil {
+		return nil, err
+	}
+	if err := uc.validatePurchaseReceiptSupplierIdentity(ctx, &normalized); err != nil {
 		return nil, err
 	}
 	normalizedItems := make([]*PurchaseReceiptItemCreate, 0, len(items))
@@ -237,6 +246,9 @@ func normalizePurchaseReceiptCreate(in PurchaseReceiptCreate) (PurchaseReceiptCr
 	in.ReceiptNo = strings.TrimSpace(in.ReceiptNo)
 	in.SupplierName = strings.TrimSpace(in.SupplierName)
 	in.Note = normalizeOptionalString(in.Note)
+	if in.SupplierID != nil && *in.SupplierID <= 0 {
+		return PurchaseReceiptCreate{}, ErrBadParam
+	}
 	if in.ReceivedAt.IsZero() {
 		in.ReceivedAt = time.Now()
 	}
@@ -384,6 +396,9 @@ func normalizePurchaseReceiptFilter(in PurchaseReceiptFilter) (PurchaseReceiptFi
 	if in.Status != "" && !IsValidPurchaseReceiptStatus(in.Status) {
 		return PurchaseReceiptFilter{}, ErrBadParam
 	}
+	if in.SupplierID < 0 {
+		return PurchaseReceiptFilter{}, ErrBadParam
+	}
 	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
 		return PurchaseReceiptFilter{}, ErrBadParam
 	}
@@ -409,4 +424,24 @@ func (uc *InventoryUsecase) validatePurchaseReceiptItemActiveReferences(ctx cont
 		}
 	}
 	return requireActiveReference(ctx, item.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive)
+}
+
+func (uc *InventoryUsecase) validatePurchaseReceiptSupplierIdentity(ctx context.Context, in *PurchaseReceiptCreate) error {
+	if uc == nil || uc.repo == nil || in == nil {
+		return ErrBadParam
+	}
+	if in.SupplierID == nil {
+		return nil
+	}
+	supplier, err := uc.repo.GetSupplier(ctx, *in.SupplierID)
+	if err != nil {
+		return err
+	}
+	if supplier == nil || !supplier.IsActive {
+		return ErrSupplierInactive
+	}
+	if strings.TrimSpace(supplier.Name) != in.SupplierName {
+		return ErrBadParam
+	}
+	return nil
 }

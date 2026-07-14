@@ -11,11 +11,14 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/bomheader"
+	"server/internal/data/model/ent/bomitem"
+	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderevent"
 	"server/internal/data/model/ent/productionorderitem"
+	"server/internal/data/model/ent/productionordermaterialrequirement"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
@@ -114,6 +117,23 @@ FOR UPDATE OF so, soi`, args...)
 	}
 	if count != len(ids) {
 		return biz.ErrProductionOrderReferenceInvalid
+	}
+	return nil
+}
+
+func (r *productionOrderRepo) lockProductionOrderCommandSource(ctx context.Context, tx *stdsql.Tx, orderID int) error {
+	if tx == nil || orderID <= 0 {
+		return biz.ErrBadParam
+	}
+	if r.data.sqlDialect == dialect.SQLite {
+		return nil
+	}
+	var lockedID int
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM production_orders WHERE id = $1 FOR UPDATE`, orderID).Scan(&lockedID); err != nil {
+		if err == stdsql.ErrNoRows {
+			return biz.ErrProductionOrderNotFound
+		}
+		return err
 	}
 	return nil
 }
@@ -357,6 +377,9 @@ func (r *productionOrderRepo) ApplyProductionOrderAction(ctx context.Context, in
 			if _, err := validateProductionOrderDraftReferences(ctx, client, items); err != nil {
 				return nil, err
 			}
+			if err := freezeProductionOrderMaterialRequirements(ctx, client, in.ID); err != nil {
+				return nil, err
+			}
 		}
 
 		now := time.Now().UTC()
@@ -468,10 +491,8 @@ func productionOrderHasIncompleteFinishedGoods(ctx context.Context, client *ent.
 		return false, biz.ErrProductionOrderReferenceInvalid
 	}
 	itemsByID := make(map[int]*ent.ProductionOrderItem, len(items))
-	effective := make(map[int]decimal.Decimal, len(items))
 	for _, item := range items {
 		itemsByID[item.ID] = item
-		effective[item.ID] = decimal.Zero
 	}
 	facts, err := client.ProductionFact.Query().Where(
 		productionfact.SourceType(biz.ProductionOrderSourceType),
@@ -482,6 +503,12 @@ func productionOrderHasIncompleteFinishedGoods(ctx context.Context, client *ent.
 		return false, err
 	}
 	for _, fact := range facts {
+		if fact.FactType == biz.ProductionFactMaterialIssue {
+			if _, err := validateProductionOrderMaterialIssueFactRowSource(ctx, client, fact, false); err != nil {
+				return false, err
+			}
+			continue
+		}
 		if fact.SourceLineID == nil || fact.FactType != biz.ProductionFactFinishedGoodsReceipt || fact.SubjectType != biz.InventorySubjectProduct {
 			return false, biz.ErrProductionOrderFactSourceInvalid
 		}
@@ -489,11 +516,13 @@ func productionOrderHasIncompleteFinishedGoods(ctx context.Context, client *ent.
 		if item == nil || fact.SubjectID != item.ProductID || fact.UnitID != item.UnitID || !sameOptionalInt(fact.ProductSkuID, item.ProductSkuID) {
 			return false, biz.ErrProductionOrderFactSourceInvalid
 		}
-		effective[item.ID] = effective[item.ID].Add(fact.Quantity)
 	}
 	incomplete := false
 	for _, item := range items {
-		quantity := effective[item.ID]
+		quantity, err := productionOrderEffectiveCompletedQuantity(ctx, client, item)
+		if err != nil {
+			return false, err
+		}
 		if quantity.GreaterThan(item.PlannedQuantity) {
 			return false, biz.ErrProductionOrderQuantityExceeded
 		}
@@ -609,6 +638,14 @@ func (r *productionOrderRepo) runNonCreateCommand(
 		}
 	}()
 	client := tx.client
+	if replay, found, resolveErr := resolveProductionOrderReceipt(ctx, client, orderID, actorID, command, key, intentHash); resolveErr != nil || found {
+		return replay, resolveErr
+	}
+	if err := r.lockProductionOrderCommandSource(ctx, tx.sqlTx, orderID); err != nil {
+		return nil, err
+	}
+	// A concurrent command may have committed its receipt while this transaction
+	// waited for the source row, so replay must be resolved again after the lock.
 	if replay, found, resolveErr := resolveProductionOrderReceipt(ctx, client, orderID, actorID, command, key, intentHash); resolveErr != nil || found {
 		return replay, resolveErr
 	}
@@ -883,11 +920,224 @@ func loadProductionOrderAggregate(ctx context.Context, client *ent.Client, order
 	if err != nil {
 		return nil, err
 	}
-	aggregate := &biz.ProductionOrderAggregate{Order: entProductionOrderToBiz(orderRow), Items: make([]*biz.ProductionOrderItem, 0, len(itemRows))}
+	requirements, err := loadProductionOrderMaterialRequirements(ctx, client, orderID)
+	if err != nil {
+		return nil, err
+	}
+	requirementsState, err := resolveProductionOrderMaterialRequirementsState(ctx, client, itemRows, requirements)
+	if err != nil {
+		return nil, err
+	}
+	aggregate := &biz.ProductionOrderAggregate{
+		Order:                     entProductionOrderToBiz(orderRow),
+		Items:                     make([]*biz.ProductionOrderItem, 0, len(itemRows)),
+		MaterialRequirements:      requirements,
+		MaterialRequirementsState: requirementsState,
+	}
 	for _, row := range itemRows {
 		aggregate.Items = append(aggregate.Items, entProductionOrderItemToBiz(row))
 	}
 	return aggregate, nil
+}
+
+func resolveProductionOrderMaterialRequirementsState(
+	ctx context.Context,
+	client *ent.Client,
+	items []*ent.ProductionOrderItem,
+	requirements []*biz.ProductionOrderMaterialRequirement,
+) (string, error) {
+	itemByID := make(map[int]*ent.ProductionOrderItem, len(items))
+	for _, item := range items {
+		itemByID[item.ID] = item
+	}
+	requirementsByItem := make(map[int]map[int]*biz.ProductionOrderMaterialRequirement, len(items))
+	for _, requirement := range requirements {
+		if requirement == nil {
+			return biz.ProductionOrderMaterialRequirementsNeedsReview, nil
+		}
+		item := itemByID[requirement.ProductionOrderItemID]
+		if item == nil || item.BomHeaderID == nil || requirement.ProductionOrderID != item.ProductionOrderID || requirement.BOMHeaderID != *item.BomHeaderID {
+			return biz.ProductionOrderMaterialRequirementsNeedsReview, nil
+		}
+		byBOMItem := requirementsByItem[item.ID]
+		if byBOMItem == nil {
+			byBOMItem = make(map[int]*biz.ProductionOrderMaterialRequirement)
+			requirementsByItem[item.ID] = byBOMItem
+		}
+		if _, duplicated := byBOMItem[requirement.BOMItemID]; duplicated {
+			return biz.ProductionOrderMaterialRequirementsNeedsReview, nil
+		}
+		byBOMItem[requirement.BOMItemID] = requirement
+	}
+	hasBOM := false
+	for _, item := range items {
+		if item.BomHeaderID == nil {
+			continue
+		}
+		hasBOM = true
+		bomRows, err := client.BOMItem.Query().
+			Where(bomitem.BomHeaderID(*item.BomHeaderID)).
+			All(ctx)
+		if err != nil {
+			return "", err
+		}
+		byBOMItem := requirementsByItem[item.ID]
+		if len(bomRows) == 0 || len(byBOMItem) != len(bomRows) {
+			return biz.ProductionOrderMaterialRequirementsNeedsReview, nil
+		}
+		for _, bomRow := range bomRows {
+			requirement := byBOMItem[bomRow.ID]
+			if requirement == nil || requirement.BOMHeaderID != bomRow.BomHeaderID ||
+				requirement.MaterialID != bomRow.MaterialID || requirement.UnitID != bomRow.UnitID {
+				return biz.ProductionOrderMaterialRequirementsNeedsReview, nil
+			}
+		}
+	}
+	if !hasBOM {
+		return biz.ProductionOrderMaterialRequirementsNotRequired, nil
+	}
+	return biz.ProductionOrderMaterialRequirementsReady, nil
+}
+
+func freezeProductionOrderMaterialRequirements(ctx context.Context, client *ent.Client, orderID int) error {
+	existing, err := client.ProductionOrderMaterialRequirement.Query().
+		Where(productionordermaterialrequirement.ProductionOrderID(orderID)).
+		Count(ctx)
+	if err != nil {
+		return err
+	}
+	if existing != 0 {
+		return biz.ErrProductionOrderMaterialRequirementInvalid
+	}
+	items, err := client.ProductionOrderItem.Query().
+		Where(productionorderitem.ProductionOrderID(orderID)).
+		Order(productionorderitem.ByLineNo()).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, orderItem := range items {
+		if orderItem.BomHeaderID == nil {
+			continue
+		}
+		header, err := client.BOMHeader.Query().Where(
+			bomheader.ID(*orderItem.BomHeaderID),
+			bomheader.ProductID(orderItem.ProductID),
+			bomheader.Status(biz.BOMStatusActive),
+		).Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return biz.ErrProductionOrderReferenceInvalid
+			}
+			return err
+		}
+		if orderItem.BomVersionSnapshot == nil || *orderItem.BomVersionSnapshot != header.Version {
+			return biz.ErrProductionOrderReferenceInvalid
+		}
+		bomRows, err := client.BOMItem.Query().
+			Where(bomitem.BomHeaderID(header.ID)).
+			Order(ent.Asc(bomitem.FieldID)).
+			All(ctx)
+		if err != nil {
+			return err
+		}
+		if len(bomRows) == 0 {
+			return biz.ErrProductionOrderReferenceInvalid
+		}
+		for _, bomRow := range bomRows {
+			materialRow, err := client.Material.Query().Where(material.ID(bomRow.MaterialID), material.IsActive(true)).Only(ctx)
+			if err != nil {
+				if ent.IsNotFound(err) {
+					return biz.ErrProductionOrderReferenceInvalid
+				}
+				return err
+			}
+			unitRow, err := client.Unit.Query().Where(unit.ID(bomRow.UnitID), unit.IsActive(true)).Only(ctx)
+			if err != nil {
+				if ent.IsNotFound(err) {
+					return biz.ErrProductionOrderReferenceInvalid
+				}
+				return err
+			}
+			planned := orderItem.PlannedQuantity.
+				Mul(bomRow.Quantity).
+				Mul(decimal.NewFromInt(1).Add(bomRow.LossRate)).
+				Round(6)
+			if !planned.GreaterThan(decimal.Zero) {
+				return biz.ErrProductionOrderMaterialRequirementInvalid
+			}
+			if _, err := client.ProductionOrderMaterialRequirement.Create().
+				SetProductionOrderID(orderID).
+				SetProductionOrderItemID(orderItem.ID).
+				SetBomHeaderID(header.ID).
+				SetBomItemID(bomRow.ID).
+				SetMaterialID(materialRow.ID).
+				SetUnitID(unitRow.ID).
+				SetUnitQuantitySnapshot(bomRow.Quantity).
+				SetLossRateSnapshot(bomRow.LossRate).
+				SetPlannedQuantity(planned).
+				SetMaterialCodeSnapshot(materialRow.Code).
+				SetMaterialNameSnapshot(materialRow.Name).
+				SetUnitCodeSnapshot(unitRow.Code).
+				SetUnitNameSnapshot(unitRow.Name).
+				Save(ctx); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func loadProductionOrderMaterialRequirements(ctx context.Context, client *ent.Client, orderID int) ([]*biz.ProductionOrderMaterialRequirement, error) {
+	rows, err := client.ProductionOrderMaterialRequirement.Query().
+		Where(productionordermaterialrequirement.ProductionOrderID(orderID)).
+		Order(ent.Asc(productionordermaterialrequirement.FieldProductionOrderItemID), ent.Asc(productionordermaterialrequirement.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	issuedByRequirement := make(map[int]decimal.Decimal, len(rows))
+	if len(rows) > 0 {
+		facts, err := client.ProductionFact.Query().Where(
+			productionfact.SourceType(biz.ProductionOrderSourceType),
+			productionfact.SourceID(orderID),
+			productionfact.FactType(biz.ProductionFactMaterialIssue),
+			productionfact.Status(biz.OperationalFactStatusPosted),
+		).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, fact := range facts {
+			if fact.SourceLineID == nil {
+				return nil, biz.ErrProductionOrderMaterialRequirementInvalid
+			}
+			issuedByRequirement[*fact.SourceLineID] = issuedByRequirement[*fact.SourceLineID].Add(fact.Quantity)
+		}
+	}
+	out := make([]*biz.ProductionOrderMaterialRequirement, 0, len(rows))
+	for _, row := range rows {
+		issued := issuedByRequirement[row.ID]
+		if issued.GreaterThan(row.PlannedQuantity) {
+			return nil, biz.ErrProductionOrderMaterialIssueQuantityExceeded
+		}
+		out = append(out, entProductionOrderMaterialRequirementToBiz(row, issued))
+	}
+	return out, nil
+}
+
+func entProductionOrderMaterialRequirementToBiz(row *ent.ProductionOrderMaterialRequirement, issued decimal.Decimal) *biz.ProductionOrderMaterialRequirement {
+	if row == nil {
+		return nil
+	}
+	return &biz.ProductionOrderMaterialRequirement{
+		ID: row.ID, ProductionOrderID: row.ProductionOrderID, ProductionOrderItemID: row.ProductionOrderItemID,
+		BOMHeaderID: row.BomHeaderID, BOMItemID: row.BomItemID, MaterialID: row.MaterialID, UnitID: row.UnitID,
+		UnitQuantitySnapshot: row.UnitQuantitySnapshot, LossRateSnapshot: row.LossRateSnapshot,
+		PlannedQuantity: row.PlannedQuantity, IssuedQuantity: issued, RemainingQuantity: row.PlannedQuantity.Sub(issued),
+		MaterialCodeSnapshot: row.MaterialCodeSnapshot, MaterialNameSnapshot: row.MaterialNameSnapshot,
+		UnitCodeSnapshot: row.UnitCodeSnapshot, UnitNameSnapshot: row.UnitNameSnapshot,
+		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+	}
 }
 
 func entProductionOrderToBiz(row *ent.ProductionOrder) *biz.ProductionOrder {

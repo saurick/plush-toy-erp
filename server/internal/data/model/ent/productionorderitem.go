@@ -66,6 +66,8 @@ type ProductionOrderItem struct {
 type ProductionOrderItemEdges struct {
 	// ProductionOrder holds the value of the production_order edge.
 	ProductionOrder *ProductionOrder `json:"production_order,omitempty"`
+	// MaterialRequirements holds the value of the material_requirements edge.
+	MaterialRequirements []*ProductionOrderMaterialRequirement `json:"material_requirements,omitempty"`
 	// Product holds the value of the product edge.
 	Product *Product `json:"product,omitempty"`
 	// ProductSku holds the value of the product_sku edge.
@@ -78,7 +80,7 @@ type ProductionOrderItemEdges struct {
 	BomHeader *BOMHeader `json:"bom_header,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [6]bool
+	loadedTypes [7]bool
 }
 
 // ProductionOrderOrErr returns the ProductionOrder value or an error if the edge
@@ -92,12 +94,21 @@ func (e ProductionOrderItemEdges) ProductionOrderOrErr() (*ProductionOrder, erro
 	return nil, &NotLoadedError{edge: "production_order"}
 }
 
+// MaterialRequirementsOrErr returns the MaterialRequirements value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductionOrderItemEdges) MaterialRequirementsOrErr() ([]*ProductionOrderMaterialRequirement, error) {
+	if e.loadedTypes[1] {
+		return e.MaterialRequirements, nil
+	}
+	return nil, &NotLoadedError{edge: "material_requirements"}
+}
+
 // ProductOrErr returns the Product value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e ProductionOrderItemEdges) ProductOrErr() (*Product, error) {
 	if e.Product != nil {
 		return e.Product, nil
-	} else if e.loadedTypes[1] {
+	} else if e.loadedTypes[2] {
 		return nil, &NotFoundError{label: product.Label}
 	}
 	return nil, &NotLoadedError{edge: "product"}
@@ -108,7 +119,7 @@ func (e ProductionOrderItemEdges) ProductOrErr() (*Product, error) {
 func (e ProductionOrderItemEdges) ProductSkuOrErr() (*ProductSKU, error) {
 	if e.ProductSku != nil {
 		return e.ProductSku, nil
-	} else if e.loadedTypes[2] {
+	} else if e.loadedTypes[3] {
 		return nil, &NotFoundError{label: productsku.Label}
 	}
 	return nil, &NotLoadedError{edge: "product_sku"}
@@ -119,7 +130,7 @@ func (e ProductionOrderItemEdges) ProductSkuOrErr() (*ProductSKU, error) {
 func (e ProductionOrderItemEdges) UnitOrErr() (*Unit, error) {
 	if e.Unit != nil {
 		return e.Unit, nil
-	} else if e.loadedTypes[3] {
+	} else if e.loadedTypes[4] {
 		return nil, &NotFoundError{label: unit.Label}
 	}
 	return nil, &NotLoadedError{edge: "unit"}
@@ -130,7 +141,7 @@ func (e ProductionOrderItemEdges) UnitOrErr() (*Unit, error) {
 func (e ProductionOrderItemEdges) SalesOrderItemOrErr() (*SalesOrderItem, error) {
 	if e.SalesOrderItem != nil {
 		return e.SalesOrderItem, nil
-	} else if e.loadedTypes[4] {
+	} else if e.loadedTypes[5] {
 		return nil, &NotFoundError{label: salesorderitem.Label}
 	}
 	return nil, &NotLoadedError{edge: "sales_order_item"}
@@ -141,7 +152,7 @@ func (e ProductionOrderItemEdges) SalesOrderItemOrErr() (*SalesOrderItem, error)
 func (e ProductionOrderItemEdges) BomHeaderOrErr() (*BOMHeader, error) {
 	if e.BomHeader != nil {
 		return e.BomHeader, nil
-	} else if e.loadedTypes[5] {
+	} else if e.loadedTypes[6] {
 		return nil, &NotFoundError{label: bomheader.Label}
 	}
 	return nil, &NotLoadedError{edge: "bom_header"}
@@ -302,6 +313,11 @@ func (_m *ProductionOrderItem) Value(name string) (ent.Value, error) {
 // QueryProductionOrder queries the "production_order" edge of the ProductionOrderItem entity.
 func (_m *ProductionOrderItem) QueryProductionOrder() *ProductionOrderQuery {
 	return NewProductionOrderItemClient(_m.config).QueryProductionOrder(_m)
+}
+
+// QueryMaterialRequirements queries the "material_requirements" edge of the ProductionOrderItem entity.
+func (_m *ProductionOrderItem) QueryMaterialRequirements() *ProductionOrderMaterialRequirementQuery {
+	return NewProductionOrderItemClient(_m.config).QueryMaterialRequirements(_m)
 }
 
 // QueryProduct queries the "product" edge of the ProductionOrderItem entity.

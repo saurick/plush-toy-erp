@@ -72,42 +72,65 @@ const (
 	PermissionWorkflowTaskReject   = "workflow.task.reject"
 	PermissionWorkflowTaskComplete = "workflow.task.complete"
 
-	PermissionPurchaseOrderRead         = "purchase.order.read"
-	PermissionPurchaseOrderCreate       = "purchase.order.create"
-	PermissionPurchaseOrderUpdate       = "purchase.order.update"
-	PermissionPurchaseOrderApprove      = "purchase.order.approve"
-	PermissionOutsourcingOrderRead      = "outsourcing.order.read"
-	PermissionOutsourcingOrderCreate    = "outsourcing.order.create"
-	PermissionOutsourcingOrderUpdate    = "outsourcing.order.update"
-	PermissionOutsourcingOrderConfirm   = "outsourcing.order.confirm"
-	PermissionPurchaseReceiptRead       = "purchase.receipt.read"
-	PermissionPurchaseReceiptCreate     = "purchase.receipt.create"
-	PermissionPurchaseReturnRead        = "purchase.return.read"
-	PermissionPurchaseReturnCreate      = "purchase.return.create"
-	PermissionWarehouseInventoryRead    = "warehouse.inventory.read"
-	PermissionWarehouseInboundRead      = "warehouse.inbound.read"
-	PermissionWarehouseInboundConfirm   = "warehouse.inbound.confirm"
-	PermissionWarehouseOutboundRead     = "warehouse.outbound.read"
-	PermissionWarehouseOutboundConfirm  = "warehouse.outbound.confirm"
-	PermissionWarehouseAdjustmentCreate = "warehouse.adjustment.create"
-	PermissionShipmentRead              = "shipment.read"
-	PermissionShipmentCreate            = "shipment.create"
-	PermissionShipmentShip              = "shipment.ship"
-	PermissionShipmentCancel            = "shipment.cancel"
-	PermissionQualityInspectionRead     = "quality.inspection.read"
-	PermissionQualityInspectionCreate   = "quality.inspection.create"
-	PermissionQualityInspectionUpdate   = "quality.inspection.update"
-	PermissionQualityExceptionHandle    = "quality.exception.handle"
-	PermissionFinancePayableRead        = "finance.payable.read"
-	PermissionFinancePayableConfirm     = "finance.payable.confirm"
-	PermissionFinanceReceivableRead     = "finance.receivable.read"
-	PermissionFinanceReceivableConfirm  = "finance.receivable.confirm"
-	PermissionFinanceReportRead         = "finance.report.read"
-	PermissionPMCPlanRead               = "pmc.plan.read"
-	PermissionPMCPlanCreate             = "pmc.plan.create"
-	PermissionPMCPlanUpdate             = "pmc.plan.update"
-	PermissionPMCRiskRead               = "pmc.risk.read"
-	PermissionPMCRiskHandle             = "pmc.risk.handle"
+	PermissionPurchaseOrderRead               = "purchase.order.read"
+	PermissionPurchaseOrderCreate             = "purchase.order.create"
+	PermissionPurchaseOrderUpdate             = "purchase.order.update"
+	PermissionPurchaseOrderApprove            = "purchase.order.approve"
+	PermissionOutsourcingOrderRead            = "outsourcing.order.read"
+	PermissionOutsourcingOrderCreate          = "outsourcing.order.create"
+	PermissionOutsourcingOrderUpdate          = "outsourcing.order.update"
+	PermissionOutsourcingOrderConfirm         = "outsourcing.order.confirm"
+	PermissionOutsourcingFactRead             = "outsourcing.fact.read"
+	PermissionOutsourcingMaterialIssueCreate  = "outsourcing.material_issue.create"
+	PermissionOutsourcingReturnReceiptCreate  = "outsourcing.return_receipt.create"
+	PermissionOutsourcingFactPost             = "outsourcing.fact.post"
+	PermissionOutsourcingFactCancel           = "outsourcing.fact.cancel"
+	PermissionPurchaseReceiptRead             = "purchase.receipt.read"
+	PermissionPurchaseReceiptCreate           = "purchase.receipt.create"
+	PermissionPurchaseReceiptAdjustmentRead   = "purchase.receipt.adjustment.read"
+	PermissionPurchaseReceiptAdjustmentCreate = "purchase.receipt.adjustment.create"
+	PermissionPurchaseReceiptAdjustmentPost   = "purchase.receipt.adjustment.post"
+	PermissionPurchaseReceiptAdjustmentCancel = "purchase.receipt.adjustment.cancel"
+	PermissionPurchaseReturnRead              = "purchase.return.read"
+	PermissionPurchaseReturnCreate            = "purchase.return.create"
+	PermissionPurchaseReturnPost              = "purchase.return.post"
+	PermissionPurchaseReturnCancel            = "purchase.return.cancel"
+	PermissionWarehouseInventoryRead          = "warehouse.inventory.read"
+	PermissionWarehouseInboundRead            = "warehouse.inbound.read"
+	PermissionWarehouseInboundConfirm         = "warehouse.inbound.confirm"
+	PermissionWarehouseOutboundRead           = "warehouse.outbound.read"
+	PermissionWarehouseOutboundConfirm        = "warehouse.outbound.confirm"
+	PermissionWarehouseAdjustmentCreate       = "warehouse.adjustment.create"
+	PermissionStockReservationCreate          = "stock.reservation.create"
+	PermissionStockReservationRelease         = "stock.reservation.release"
+	PermissionShipmentRead                    = "shipment.read"
+	PermissionShipmentCreate                  = "shipment.create"
+	PermissionShipmentShip                    = "shipment.ship"
+	PermissionShipmentCancel                  = "shipment.cancel"
+	PermissionQualityInspectionRead           = "quality.inspection.read"
+	PermissionQualityInspectionCreate         = "quality.inspection.create"
+	PermissionQualityInspectionUpdate         = "quality.inspection.update"
+	PermissionQualityExceptionHandle          = "quality.exception.handle"
+	PermissionFinancePayableRead              = "finance.payable.read"
+	PermissionFinancePayableConfirm           = "finance.payable.confirm"
+	PermissionFinanceInvoiceRead              = "finance.invoice.read"
+	PermissionFinanceInvoiceConfirm           = "finance.invoice.confirm"
+	PermissionFinanceReceivableRead           = "finance.receivable.read"
+	PermissionFinanceReceivableConfirm        = "finance.receivable.confirm"
+	PermissionFinanceReconciliationRead       = "finance.reconciliation.read"
+	PermissionFinanceReconciliationConfirm    = "finance.reconciliation.confirm"
+	PermissionFinanceReportRead               = "finance.report.read"
+	PermissionProductionFactRead              = "production.fact.read"
+	PermissionProductionCompletionCreate      = "production.completion.create"
+	PermissionProductionMaterialIssueCreate   = "production.material_issue.create"
+	PermissionProductionReworkCreate          = "production.rework.create"
+	PermissionProductionFactPost              = "production.fact.post"
+	PermissionProductionFactCancel            = "production.fact.cancel"
+	PermissionPMCPlanRead                     = "pmc.plan.read"
+	PermissionPMCPlanCreate                   = "pmc.plan.create"
+	PermissionPMCPlanUpdate                   = "pmc.plan.update"
+	PermissionPMCRiskRead                     = "pmc.risk.read"
+	PermissionPMCRiskHandle                   = "pmc.risk.handle"
 
 	PermissionMobileBossAccess        = "mobile.boss.access"
 	PermissionMobileSalesAccess       = "mobile.sales.access"
@@ -276,16 +299,29 @@ var builtinPermissions = withBuiltinPermissionMetadata([]PermissionDefinition{
 	{Key: PermissionOutsourcingOrderCreate, Name: "创建委外合同", Module: "outsourcing", Action: "create", Resource: "order", Builtin: true},
 	{Key: PermissionOutsourcingOrderUpdate, Name: "更新委外合同", Module: "outsourcing", Action: "update", Resource: "order", Builtin: true},
 	{Key: PermissionOutsourcingOrderConfirm, Name: "确认委外下单", Module: "outsourcing", Action: "confirm", Resource: "order", Builtin: true},
+	{Key: PermissionOutsourcingFactRead, Name: "查看委外记录", Module: "outsourcing", Action: "read", Resource: "fact", Builtin: true},
+	{Key: PermissionOutsourcingMaterialIssueCreate, Name: "登记委外发料", Module: "outsourcing", Action: "create", Resource: "material_issue", Builtin: true},
+	{Key: PermissionOutsourcingReturnReceiptCreate, Name: "登记委外回货", Module: "outsourcing", Action: "create", Resource: "return_receipt", Builtin: true},
+	{Key: PermissionOutsourcingFactPost, Name: "确认委外记录", Module: "outsourcing", Action: "post", Resource: "fact", Builtin: true},
+	{Key: PermissionOutsourcingFactCancel, Name: "取消委外记录", Module: "outsourcing", Action: "cancel", Resource: "fact", Builtin: true},
 	{Key: PermissionPurchaseReceiptRead, Name: "查看采购入库", Module: "purchase", Action: "read", Resource: "receipt", Builtin: true},
 	{Key: PermissionPurchaseReceiptCreate, Name: "创建采购入库", Module: "purchase", Action: "create", Resource: "receipt", Builtin: true},
+	{Key: PermissionPurchaseReceiptAdjustmentRead, Name: "查看入库调整", Module: "purchase", Action: "read", Resource: "receipt_adjustment", Builtin: true},
+	{Key: PermissionPurchaseReceiptAdjustmentCreate, Name: "创建入库调整", Module: "purchase", Action: "create", Resource: "receipt_adjustment", Builtin: true},
+	{Key: PermissionPurchaseReceiptAdjustmentPost, Name: "确认入库调整", Module: "purchase", Action: "post", Resource: "receipt_adjustment", Builtin: true},
+	{Key: PermissionPurchaseReceiptAdjustmentCancel, Name: "取消入库调整", Module: "purchase", Action: "cancel", Resource: "receipt_adjustment", Builtin: true},
 	{Key: PermissionPurchaseReturnRead, Name: "查看采购退货", Module: "purchase", Action: "read", Resource: "return", Builtin: true},
 	{Key: PermissionPurchaseReturnCreate, Name: "创建采购退货", Module: "purchase", Action: "create", Resource: "return", Builtin: true},
+	{Key: PermissionPurchaseReturnPost, Name: "确认采购退货", Module: "purchase", Action: "post", Resource: "return", Builtin: true},
+	{Key: PermissionPurchaseReturnCancel, Name: "取消采购退货", Module: "purchase", Action: "cancel", Resource: "return", Builtin: true},
 	{Key: PermissionWarehouseInventoryRead, Name: "查看库存", Module: "warehouse", Action: "read", Resource: "inventory", Builtin: true},
 	{Key: PermissionWarehouseInboundRead, Name: "查看入库", Module: "warehouse", Action: "read", Resource: "inbound", Builtin: true},
 	{Key: PermissionWarehouseInboundConfirm, Name: "确认入库", Module: "warehouse", Action: "confirm", Resource: "inbound", Builtin: true},
 	{Key: PermissionWarehouseOutboundRead, Name: "查看出库", Module: "warehouse", Action: "read", Resource: "outbound", Builtin: true},
 	{Key: PermissionWarehouseOutboundConfirm, Name: "确认出库", Module: "warehouse", Action: "confirm", Resource: "outbound", Builtin: true},
 	{Key: PermissionWarehouseAdjustmentCreate, Name: "创建库存调整", Module: "warehouse", Action: "create", Resource: "adjustment", Builtin: true},
+	{Key: PermissionStockReservationCreate, Name: "创建库存预留", Module: "warehouse", Action: "create", Resource: "stock_reservation", Builtin: true},
+	{Key: PermissionStockReservationRelease, Name: "释放库存预留", Module: "warehouse", Action: "release", Resource: "stock_reservation", Builtin: true},
 	{Key: PermissionShipmentRead, Name: "查看出货单", Module: "shipment", Action: "read", Resource: "shipment", Builtin: true},
 	{Key: PermissionShipmentCreate, Name: "创建出货单", Module: "shipment", Action: "create", Resource: "shipment", Builtin: true},
 	{Key: PermissionShipmentShip, Name: "确认出货", Module: "shipment", Action: "ship", Resource: "shipment", Builtin: true},
@@ -296,9 +332,19 @@ var builtinPermissions = withBuiltinPermissionMetadata([]PermissionDefinition{
 	{Key: PermissionQualityExceptionHandle, Name: "处理品质异常", Module: "quality", Action: "handle", Resource: "exception", Builtin: true},
 	{Key: PermissionFinancePayableRead, Name: "查看应付", Module: "finance", Action: "read", Resource: "payable", Builtin: true},
 	{Key: PermissionFinancePayableConfirm, Name: "确认应付", Module: "finance", Action: "confirm", Resource: "payable", Builtin: true},
+	{Key: PermissionFinanceInvoiceRead, Name: "查看发票", Module: "finance", Action: "read", Resource: "invoice", Builtin: true},
+	{Key: PermissionFinanceInvoiceConfirm, Name: "确认发票", Module: "finance", Action: "confirm", Resource: "invoice", Builtin: true},
 	{Key: PermissionFinanceReceivableRead, Name: "查看应收", Module: "finance", Action: "read", Resource: "receivable", Builtin: true},
 	{Key: PermissionFinanceReceivableConfirm, Name: "确认应收", Module: "finance", Action: "confirm", Resource: "receivable", Builtin: true},
+	{Key: PermissionFinanceReconciliationRead, Name: "查看对账", Module: "finance", Action: "read", Resource: "reconciliation", Builtin: true},
+	{Key: PermissionFinanceReconciliationConfirm, Name: "处理对账", Module: "finance", Action: "confirm", Resource: "reconciliation", Builtin: true},
 	{Key: PermissionFinanceReportRead, Name: "查看财务报表", Module: "finance", Action: "read", Resource: "report", Builtin: true},
+	{Key: PermissionProductionFactRead, Name: "查看生产记录", Module: "production", Action: "read", Resource: "fact", Builtin: true},
+	{Key: PermissionProductionCompletionCreate, Name: "登记生产完工", Module: "production", Action: "create", Resource: "completion", Builtin: true},
+	{Key: PermissionProductionMaterialIssueCreate, Name: "登记生产领料", Module: "production", Action: "create", Resource: "material_issue", Builtin: true},
+	{Key: PermissionProductionReworkCreate, Name: "发起生产返工", Module: "production", Action: "create", Resource: "rework", Builtin: true},
+	{Key: PermissionProductionFactPost, Name: "确认生产记录", Module: "production", Action: "post", Resource: "fact", Builtin: true},
+	{Key: PermissionProductionFactCancel, Name: "取消生产记录", Module: "production", Action: "cancel", Resource: "fact", Builtin: true},
 	{Key: PermissionPMCPlanRead, Name: "查看生产计划", Module: "pmc", Action: "read", Resource: "plan", Builtin: true},
 	{Key: PermissionPMCPlanCreate, Name: "创建生产计划", Module: "pmc", Action: "create", Resource: "plan", Builtin: true},
 	{Key: PermissionPMCPlanUpdate, Name: "更新生产计划", Module: "pmc", Action: "update", Resource: "plan", Builtin: true},
@@ -563,7 +609,9 @@ func BuiltinRoles() []RoleDefinition {
 		PermissionSalesOrderItemRead,
 		PermissionPurchaseOrderRead,
 		PermissionOutsourcingOrderRead,
+		PermissionOutsourcingFactRead,
 		PermissionPurchaseReceiptRead,
+		PermissionPurchaseReceiptAdjustmentRead,
 		PermissionPurchaseReturnRead,
 		PermissionWarehouseInventoryRead,
 		PermissionWarehouseInboundRead,
@@ -571,20 +619,23 @@ func BuiltinRoles() []RoleDefinition {
 		PermissionShipmentRead,
 		PermissionQualityInspectionRead,
 		PermissionFinancePayableRead,
+		PermissionFinanceInvoiceRead,
 		PermissionFinanceReceivableRead,
+		PermissionFinanceReconciliationRead,
 		PermissionFinanceReportRead,
+		PermissionProductionFactRead,
 		PermissionPMCPlanRead,
 		PermissionPMCRiskRead,
 	}
 	roles := []RoleDefinition{
 		{Key: BossRoleKey, Name: "老板 / 管理层", Description: "查看全局业务、审批和报表，不默认包含高危 debug 清空权限。", Builtin: true, SortOrder: 10, Permissions: append(readPermissions, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskApprove, PermissionWorkflowTaskReject, PermissionPurchaseOrderApprove, PermissionMobileBossAccess)},
-		{Key: SalesRoleKey, Name: "业务", Description: "客户、订单、出运跟进，任务处理仍受销售 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 20, Permissions: []string{PermissionERPDashboardRead, PermissionERPPrintTemplateRead, PermissionCustomerRead, PermissionCustomerCreate, PermissionCustomerUpdate, PermissionCustomerDisable, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionProductCreate, PermissionProductUpdate, PermissionProductDisable, PermissionProductSKURead, PermissionProductSKUCreate, PermissionProductSKUUpdate, PermissionProductSKUDisable, PermissionBOMRead, PermissionContactRead, PermissionContactCreate, PermissionContactUpdate, PermissionContactDisable, PermissionContactSetPrimary, PermissionSalesOrderRead, PermissionSalesOrderCreate, PermissionSalesOrderUpdate, PermissionSalesOrderSubmit, PermissionSalesOrderActivate, PermissionSalesOrderClose, PermissionSalesOrderCancel, PermissionSalesOrderItemRead, PermissionWarehouseInventoryRead, PermissionShipmentRead, PermissionShipmentCreate, PermissionWorkflowTaskRead, PermissionWorkflowTaskCreate, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionMobileSalesAccess}},
-		{Key: PurchaseRoleKey, Name: "采购", Description: "采购、收货、退货相关入口，任务处理仍受采购 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 30, Permissions: []string{PermissionERPDashboardRead, PermissionERPPrintTemplateRead, PermissionSupplierRead, PermissionSupplierCreate, PermissionSupplierUpdate, PermissionSupplierDisable, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionMaterialCreate, PermissionMaterialUpdate, PermissionMaterialDisable, PermissionProductSKURead, PermissionBOMRead, PermissionContactRead, PermissionContactCreate, PermissionContactUpdate, PermissionContactDisable, PermissionContactSetPrimary, PermissionWorkflowTaskRead, PermissionWorkflowTaskCreate, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionPurchaseOrderRead, PermissionPurchaseOrderCreate, PermissionPurchaseOrderUpdate, PermissionOutsourcingOrderRead, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionOutsourcingOrderConfirm, PermissionPurchaseReceiptRead, PermissionPurchaseReceiptCreate, PermissionPurchaseReturnRead, PermissionPurchaseReturnCreate, PermissionWarehouseInventoryRead, PermissionMobilePurchaseAccess}},
-		{Key: WarehouseRoleKey, Name: "仓库", Description: "库存、入库、出库、盘点相关入口，任务处理仍受仓库 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 40, Permissions: []string{PermissionERPDashboardRead, PermissionCustomerRead, PermissionSupplierRead, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionProductSKURead, PermissionSalesOrderRead, PermissionSalesOrderItemRead, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionWorkflowTaskReject, PermissionPurchaseReceiptRead, PermissionWarehouseInventoryRead, PermissionWarehouseInboundRead, PermissionWarehouseInboundConfirm, PermissionWarehouseOutboundRead, PermissionWarehouseOutboundConfirm, PermissionWarehouseAdjustmentCreate, PermissionShipmentRead, PermissionShipmentCreate, PermissionShipmentShip, PermissionShipmentCancel, PermissionMobileWarehouseAccess}},
-		{Key: QualityRoleKey, Name: "品质", Description: "检验、异常、返工相关入口，任务处理仍受品质 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 50, Permissions: []string{PermissionERPDashboardRead, PermissionSupplierRead, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionProductSKURead, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionWorkflowTaskReject, PermissionPurchaseReceiptRead, PermissionWarehouseInventoryRead, PermissionQualityInspectionRead, PermissionQualityInspectionCreate, PermissionQualityInspectionUpdate, PermissionQualityExceptionHandle, PermissionMobileQualityAccess}},
-		{Key: FinanceRoleKey, Name: "财务", Description: "应收、应付、收付款和财务报表相关入口，任务处理仍受财务 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 60, Permissions: []string{PermissionERPDashboardRead, PermissionERPPrintTemplateRead, PermissionCustomerRead, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionProductSKURead, PermissionSalesOrderRead, PermissionSalesOrderItemRead, PermissionWarehouseInventoryRead, PermissionShipmentRead, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionWorkflowTaskReject, PermissionFinancePayableRead, PermissionFinancePayableConfirm, PermissionFinanceReceivableRead, PermissionFinanceReceivableConfirm, PermissionFinanceReportRead, PermissionMobileFinanceAccess}},
-		{Key: PMCRoleKey, Name: "PMC", Description: "生产计划、进度和风险跟进；可查看风险，不等于可代替其他角色完成任务。", Builtin: true, SortOrder: 70, Permissions: []string{PermissionERPDashboardRead, PermissionMaterialRead, PermissionProcessRead, PermissionProcessCreate, PermissionProcessUpdate, PermissionProcessDisable, PermissionProductRead, PermissionMaterialCreate, PermissionMaterialUpdate, PermissionProductCreate, PermissionProductUpdate, PermissionProductDisable, PermissionProductSKURead, PermissionProductSKUCreate, PermissionProductSKUUpdate, PermissionProductSKUDisable, PermissionBOMRead, PermissionBOMCreate, PermissionBOMUpdate, PermissionBOMActivate, PermissionShipmentRead, PermissionWorkflowTaskRead, PermissionWorkflowTaskCreate, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionPMCPlanRead, PermissionPMCPlanCreate, PermissionPMCPlanUpdate, PermissionPMCRiskRead, PermissionPMCRiskHandle, PermissionMobilePMCAccess}},
-		{Key: ProductionRoleKey, Name: "生产", Description: "排产、委外加工、进度、返工和生产异常处理，任务处理仍受生产 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 80, Permissions: []string{PermissionERPDashboardRead, PermissionERPPrintTemplateRead, PermissionSupplierRead, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionProductSKURead, PermissionContactRead, PermissionOutsourcingOrderRead, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionOutsourcingOrderConfirm, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionPMCPlanRead, PermissionPMCPlanUpdate, PermissionPMCRiskRead, PermissionPMCRiskHandle, PermissionMobileProductionAccess}},
+		{Key: SalesRoleKey, Name: "业务", Description: "客户、订单、出运跟进，任务处理仍受销售 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 20, Permissions: []string{PermissionERPDashboardRead, PermissionERPPrintTemplateRead, PermissionCustomerRead, PermissionCustomerCreate, PermissionCustomerUpdate, PermissionCustomerDisable, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionProductCreate, PermissionProductUpdate, PermissionProductDisable, PermissionProductSKURead, PermissionProductSKUCreate, PermissionProductSKUUpdate, PermissionProductSKUDisable, PermissionBOMRead, PermissionContactRead, PermissionContactCreate, PermissionContactUpdate, PermissionContactDisable, PermissionContactSetPrimary, PermissionSalesOrderRead, PermissionSalesOrderCreate, PermissionSalesOrderUpdate, PermissionSalesOrderSubmit, PermissionSalesOrderActivate, PermissionSalesOrderClose, PermissionSalesOrderCancel, PermissionSalesOrderItemRead, PermissionWarehouseInventoryRead, PermissionStockReservationCreate, PermissionStockReservationRelease, PermissionShipmentRead, PermissionShipmentCreate, PermissionWorkflowTaskRead, PermissionWorkflowTaskCreate, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionMobileSalesAccess}},
+		{Key: PurchaseRoleKey, Name: "采购", Description: "采购、收货、退货相关入口，任务处理仍受采购 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 30, Permissions: []string{PermissionERPDashboardRead, PermissionERPPrintTemplateRead, PermissionSupplierRead, PermissionSupplierCreate, PermissionSupplierUpdate, PermissionSupplierDisable, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionMaterialCreate, PermissionMaterialUpdate, PermissionMaterialDisable, PermissionProductSKURead, PermissionBOMRead, PermissionContactRead, PermissionContactCreate, PermissionContactUpdate, PermissionContactDisable, PermissionContactSetPrimary, PermissionWorkflowTaskRead, PermissionWorkflowTaskCreate, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionPurchaseOrderRead, PermissionPurchaseOrderCreate, PermissionPurchaseOrderUpdate, PermissionOutsourcingOrderRead, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionOutsourcingOrderConfirm, PermissionOutsourcingFactRead, PermissionOutsourcingReturnReceiptCreate, PermissionPurchaseReceiptRead, PermissionPurchaseReceiptCreate, PermissionPurchaseReceiptAdjustmentRead, PermissionPurchaseReceiptAdjustmentCreate, PermissionPurchaseReceiptAdjustmentPost, PermissionPurchaseReceiptAdjustmentCancel, PermissionPurchaseReturnRead, PermissionPurchaseReturnCreate, PermissionPurchaseReturnPost, PermissionPurchaseReturnCancel, PermissionWarehouseInventoryRead, PermissionMobilePurchaseAccess}},
+		{Key: WarehouseRoleKey, Name: "仓库", Description: "库存、入库、出库、盘点相关入口，任务处理仍受仓库 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 40, Permissions: []string{PermissionERPDashboardRead, PermissionCustomerRead, PermissionSupplierRead, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionProductSKURead, PermissionSalesOrderRead, PermissionSalesOrderItemRead, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionWorkflowTaskReject, PermissionPurchaseReceiptRead, PermissionPurchaseReceiptAdjustmentRead, PermissionPurchaseReceiptAdjustmentCreate, PermissionPurchaseReceiptAdjustmentPost, PermissionPurchaseReceiptAdjustmentCancel, PermissionPurchaseReturnRead, PermissionPurchaseReturnCreate, PermissionPurchaseReturnPost, PermissionPurchaseReturnCancel, PermissionOutsourcingFactRead, PermissionOutsourcingMaterialIssueCreate, PermissionOutsourcingReturnReceiptCreate, PermissionOutsourcingFactPost, PermissionOutsourcingFactCancel, PermissionWarehouseInventoryRead, PermissionWarehouseInboundRead, PermissionWarehouseInboundConfirm, PermissionWarehouseOutboundRead, PermissionWarehouseOutboundConfirm, PermissionWarehouseAdjustmentCreate, PermissionStockReservationCreate, PermissionStockReservationRelease, PermissionShipmentRead, PermissionShipmentCreate, PermissionShipmentShip, PermissionShipmentCancel, PermissionMobileWarehouseAccess}},
+		{Key: QualityRoleKey, Name: "品质", Description: "检验、异常、返工相关入口，任务处理仍受品质 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 50, Permissions: []string{PermissionERPDashboardRead, PermissionSupplierRead, PermissionContactRead, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionProductSKURead, PermissionOutsourcingOrderRead, PermissionOutsourcingFactRead, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionWorkflowTaskReject, PermissionPurchaseReceiptRead, PermissionPurchaseReturnRead, PermissionPurchaseReturnCreate, PermissionWarehouseInventoryRead, PermissionQualityInspectionRead, PermissionQualityInspectionCreate, PermissionQualityInspectionUpdate, PermissionQualityExceptionHandle, PermissionMobileQualityAccess}},
+		{Key: FinanceRoleKey, Name: "财务", Description: "应收、应付、发票、对账和财务报表相关入口，任务处理仍受财务 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 60, Permissions: []string{PermissionERPDashboardRead, PermissionERPPrintTemplateRead, PermissionCustomerRead, PermissionSupplierRead, PermissionContactRead, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionProductSKURead, PermissionOutsourcingOrderRead, PermissionOutsourcingFactRead, PermissionQualityInspectionRead, PermissionSalesOrderRead, PermissionSalesOrderItemRead, PermissionWarehouseInventoryRead, PermissionShipmentRead, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionWorkflowTaskReject, PermissionFinancePayableRead, PermissionFinancePayableConfirm, PermissionFinanceInvoiceRead, PermissionFinanceInvoiceConfirm, PermissionFinanceReceivableRead, PermissionFinanceReceivableConfirm, PermissionFinanceReconciliationRead, PermissionFinanceReconciliationConfirm, PermissionFinanceReportRead, PermissionMobileFinanceAccess}},
+		{Key: PMCRoleKey, Name: "PMC", Description: "生产计划、进度和风险跟进；可查看风险，不等于可代替其他角色完成任务。", Builtin: true, SortOrder: 70, Permissions: []string{PermissionERPDashboardRead, PermissionMaterialRead, PermissionProcessRead, PermissionProcessCreate, PermissionProcessUpdate, PermissionProcessDisable, PermissionProductRead, PermissionMaterialCreate, PermissionMaterialUpdate, PermissionProductCreate, PermissionProductUpdate, PermissionProductDisable, PermissionProductSKURead, PermissionProductSKUCreate, PermissionProductSKUUpdate, PermissionProductSKUDisable, PermissionBOMRead, PermissionBOMCreate, PermissionBOMUpdate, PermissionBOMActivate, PermissionShipmentRead, PermissionWorkflowTaskRead, PermissionWorkflowTaskCreate, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionProductionFactRead, PermissionPMCPlanRead, PermissionPMCPlanCreate, PermissionPMCPlanUpdate, PermissionPMCRiskRead, PermissionPMCRiskHandle, PermissionMobilePMCAccess}},
+		{Key: ProductionRoleKey, Name: "生产", Description: "排产、委外加工、进度、返工和生产异常处理，任务处理仍受生产 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 80, Permissions: []string{PermissionERPDashboardRead, PermissionERPPrintTemplateRead, PermissionSupplierRead, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionProductSKURead, PermissionContactRead, PermissionOutsourcingOrderRead, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionOutsourcingOrderConfirm, PermissionOutsourcingFactRead, PermissionOutsourcingMaterialIssueCreate, PermissionOutsourcingReturnReceiptCreate, PermissionOutsourcingFactPost, PermissionOutsourcingFactCancel, PermissionWarehouseInventoryRead, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionProductionFactRead, PermissionProductionCompletionCreate, PermissionProductionMaterialIssueCreate, PermissionProductionReworkCreate, PermissionProductionFactPost, PermissionProductionFactCancel, PermissionPMCPlanRead, PermissionPMCPlanUpdate, PermissionPMCRiskRead, PermissionPMCRiskHandle, PermissionMobileProductionAccess}},
 		{Key: EngineeringRoleKey, Name: "工程", Description: "产品资料、工艺、BOM 和工程资料任务入口，任务处理仍受工程 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 90, Permissions: []string{PermissionERPDashboardRead, PermissionERPPrintTemplateRead, PermissionMaterialRead, PermissionProcessRead, PermissionProcessCreate, PermissionProcessUpdate, PermissionProcessDisable, PermissionProductRead, PermissionProductCreate, PermissionProductUpdate, PermissionProductSKURead, PermissionProductSKUCreate, PermissionProductSKUUpdate, PermissionBOMRead, PermissionBOMCreate, PermissionBOMUpdate, PermissionBOMActivate, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionMobileEngineeringAccess}},
 		{Key: AdminRoleKey, Name: "系统管理员", Description: "管理管理员、角色权限和基础配置，不天然拥有业务事实处理权。", Builtin: true, SortOrder: 100, Permissions: []string{PermissionSystemUserRead, PermissionSystemUserCreate, PermissionSystemUserUpdate, PermissionSystemUserRoleAssign, PermissionSystemUserDisable, PermissionSystemUserRevoke, PermissionSystemRoleRead, PermissionSystemRolePermissionManage, PermissionSystemPermissionRead, PermissionSystemAuditRead, PermissionCustomerConfigRead, PermissionCustomerConfigPublish, PermissionCustomerConfigActivate, PermissionCustomerConfigRollback}},
 		{Key: DebugOperatorRoleKey, Name: "调试操作员", Description: "仅限明确开启的本地开发环境分配和使用的调试角色。", Builtin: true, SortOrder: 110, Permissions: []string{PermissionERPBusinessChainDebugRead, PermissionDebugBusinessChainRead, PermissionDebugBusinessChainRun, PermissionDebugSeed, PermissionDebugCleanup, PermissionDebugBusinessClear}},
@@ -694,7 +745,7 @@ var builtinAdminMenus = []AdminMenu{
 	{Key: "material-bom", Label: "BOM 管理", Path: "/erp/purchase/material-bom", RequiredAny: []string{PermissionBOMRead}},
 	{Key: "accessories-purchase", Label: "采购订单", Path: "/erp/purchase/accessories", RequiredAny: []string{PermissionPurchaseOrderRead}},
 	{Key: "inbound", Label: "入库管理", Path: "/erp/warehouse/inbound", RequiredAny: []string{PermissionWarehouseInboundRead, PermissionPurchaseReceiptRead}},
-	{Key: "quality-inspections", Label: "来料质检", Path: "/erp/production/quality-inspections", RequiredAny: []string{PermissionQualityInspectionRead}},
+	{Key: "quality-inspections", Label: "质量检验", Path: "/erp/production/quality-inspections", RequiredAny: []string{PermissionQualityInspectionRead}},
 	{Key: "inventory", Label: "库存台账", Path: "/erp/warehouse/inventory", RequiredAny: []string{PermissionWarehouseInventoryRead}},
 	{Key: "processing-contracts", Label: "委外订单", Path: "/erp/purchase/processing-contracts", RequiredAny: []string{PermissionOutsourcingOrderRead}},
 	{Key: "production-orders", Label: "生产订单", Path: "/erp/production/orders", RequiredAny: []string{PermissionPMCPlanRead}},
@@ -704,10 +755,10 @@ var builtinAdminMenus = []AdminMenu{
 	{Key: "shipping-release", Label: "出货放行", Path: "/erp/warehouse/shipping-release", RequiredAny: []string{PermissionWarehouseOutboundRead, PermissionFinanceReceivableRead, PermissionSalesOrderRead}},
 	{Key: "outbound", Label: "出库管理", Path: "/erp/warehouse/outbound", RequiredAny: []string{PermissionWarehouseOutboundRead}},
 	{Key: "shipments", Label: "出货单", Path: "/erp/warehouse/shipments", RequiredAny: []string{PermissionShipmentRead}},
-	{Key: "reconciliation", Label: "对账管理", Path: "/erp/finance/reconciliation", RequiredAny: []string{PermissionFinanceReportRead, PermissionFinancePayableRead, PermissionFinanceReceivableRead}},
+	{Key: "reconciliation", Label: "对账管理", Path: "/erp/finance/reconciliation", RequiredAny: []string{PermissionFinanceReconciliationRead}},
 	{Key: "payables", Label: "应付管理", Path: "/erp/finance/payables", RequiredAny: []string{PermissionFinancePayableRead}},
 	{Key: "receivables", Label: "应收管理", Path: "/erp/finance/receivables", RequiredAny: []string{PermissionFinanceReceivableRead}},
-	{Key: "invoices", Label: "发票管理", Path: "/erp/finance/invoices", RequiredAny: []string{PermissionFinanceReceivableRead, PermissionFinancePayableRead}},
+	{Key: "invoices", Label: "发票管理", Path: "/erp/finance/invoices", RequiredAny: []string{PermissionFinanceInvoiceRead}},
 	{Key: "print-center", Label: "模板打印中心", Path: "/erp/print-center", RequiredAny: []string{PermissionERPPrintTemplateRead}},
 	{Key: "exception-flow", Label: "异常 / 阻塞闭环", Path: "/erp/operations/exceptions", RequiredAny: []string{PermissionWorkflowTaskRead}},
 	{Key: "permission-center", Label: "权限管理", Path: "/erp/system/permissions", RequiredAny: []string{PermissionSystemUserRead, PermissionSystemRoleRead}},

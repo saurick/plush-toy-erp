@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderevent"
 	"server/internal/data/model/ent/productionorderitem"
+	"server/internal/data/model/ent/productionordermaterialrequirement"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -258,6 +259,21 @@ func (_c *ProductionOrderCreate) AddItems(v ...*ProductionOrderItem) *Production
 		ids[i] = v[i].ID
 	}
 	return _c.AddItemIDs(ids...)
+}
+
+// AddMaterialRequirementIDs adds the "material_requirements" edge to the ProductionOrderMaterialRequirement entity by IDs.
+func (_c *ProductionOrderCreate) AddMaterialRequirementIDs(ids ...int) *ProductionOrderCreate {
+	_c.mutation.AddMaterialRequirementIDs(ids...)
+	return _c
+}
+
+// AddMaterialRequirements adds the "material_requirements" edges to the ProductionOrderMaterialRequirement entity.
+func (_c *ProductionOrderCreate) AddMaterialRequirements(v ...*ProductionOrderMaterialRequirement) *ProductionOrderCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddMaterialRequirementIDs(ids...)
 }
 
 // AddEventIDs adds the "events" edge to the ProductionOrderEvent entity by IDs.
@@ -565,6 +581,22 @@ func (_c *ProductionOrderCreate) createSpec() (*ProductionOrder, *sqlgraph.Creat
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(productionorderitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.MaterialRequirementsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.MaterialRequirementsTable,
+			Columns: []string{productionorder.MaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

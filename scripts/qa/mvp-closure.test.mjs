@@ -31,7 +31,7 @@ test("mvp closure writes plan-only evidence without runtime effects", () => {
   assert.equal(persisted.noWriteToolRuns.length, 0);
 });
 
-test("mvp closure report tools stay no-write and skip operational facts without ids", () => {
+test("mvp closure report tools stay no-write and print the retired operational apply contract", () => {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "mvp-closure-tools-"));
   const result = runMvpClosure({ out, runReportTools: true });
 
@@ -46,8 +46,8 @@ test("mvp closure report tools stay no-write and skip operational facts without 
   assert(
     result.report.noWriteToolRuns.some(
       (run) =>
-        run.key === "operational-fact-simulated-closure" &&
-        run.status === "SKIPPED",
+        run.key === "operational-fact-simulated-closure-input-template" &&
+        run.status === "PASS",
     ),
   );
   assert(

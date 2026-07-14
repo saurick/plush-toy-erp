@@ -131,6 +131,8 @@ func (ProductionOrder) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("items", ProductionOrderItem.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("material_requirements", ProductionOrderMaterialRequirement.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("events", ProductionOrderEvent.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("creator", AdminUser.Type).

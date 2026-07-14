@@ -2,6 +2,7 @@ import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 
 import { createBusinessFormalScenarios } from './businessFormalScenarios.mjs'
 import { createBusinessRowItemsPreviewScenarios } from './businessRowItemsPreviewScenarios.mjs'
+import { createFinanceBusinessSourceScenarios } from './financeBusinessSourceScenarios.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { createPurchaseReceiptScenarios } from './purchaseReceiptScenarios.mjs'
 
@@ -257,9 +258,7 @@ export function createStyleL1Scenarios(deps) {
     { scenarioName, expectedPanelWidth }
   ) => {
     const feed = page.getByRole('region', { name: '审计事件列表' })
-    const trigger = feed
-      .getByRole('button', { name: /账号角色变更/u })
-      .first()
+    const trigger = feed.getByRole('button', { name: /账号角色变更/u }).first()
     await trigger.waitFor({ state: 'visible', timeout: 10_000 })
     await assertNoHorizontalOverflow(page, scenarioName)
     assert.equal(
@@ -276,9 +275,7 @@ export function createStyleL1Scenarios(deps) {
     await drawer.getByText('下一步', { exact: true }).waitFor()
     await page.waitForFunction(
       () => {
-        const drawerNode = document.querySelector(
-          '.erp-audit-detail-drawer'
-        )
+        const drawerNode = document.querySelector('.erp-audit-detail-drawer')
         return drawerNode?.contains(document.activeElement)
       },
       undefined,
@@ -1527,7 +1524,10 @@ export function createStyleL1Scenarios(deps) {
       auth: 'admin',
       adminProfile: {
         is_super_admin: false,
-        permissions: ['system.permission.read', 'system.role.permission.manage'],
+        permissions: [
+          'system.permission.read',
+          'system.role.permission.manage',
+        ],
         menus: [{ key: 'permission-center', path: '/erp/system/permissions' }],
       },
       effectiveSession: {
@@ -1559,7 +1559,10 @@ export function createStyleL1Scenarios(deps) {
       auth: 'admin',
       adminProfile: {
         is_super_admin: false,
-        permissions: ['system.permission.read', 'system.role.permission.manage'],
+        permissions: [
+          'system.permission.read',
+          'system.role.permission.manage',
+        ],
         menus: [{ key: 'permission-center', path: '/erp/system/permissions' }],
       },
       customerKey: 'yoyoosun',
@@ -1647,7 +1650,10 @@ export function createStyleL1Scenarios(deps) {
       auth: 'admin',
       adminProfile: {
         is_super_admin: false,
-        permissions: ['system.permission.read', 'system.role.permission.manage'],
+        permissions: [
+          'system.permission.read',
+          'system.role.permission.manage',
+        ],
         menus: [{ key: 'permission-center', path: '/erp/system/permissions' }],
       },
       effectiveSession: {
@@ -1732,7 +1738,7 @@ export function createStyleL1Scenarios(deps) {
             .evaluate((node) => node.textContent.replace(/\s+/g, ' ').trim())
           for (const label of [
             '出货单',
-            '来料质检',
+            '质量检验',
             '入库管理',
             '销售订单',
             '采购订单',
@@ -1803,7 +1809,7 @@ export function createStyleL1Scenarios(deps) {
         await gotoScenarioPath(page, '/erp/production/quality-inspections', {
           waitUntil: 'domcontentloaded',
         })
-        await expectHeading(page, '来料质检')
+        await expectHeading(page, '质量检验')
         await expectText(page, 'QI-STYLE-L1')
         await expectProjectedActionDisabled(
           '生成质检草稿',
@@ -3303,10 +3309,7 @@ export function createStyleL1Scenarios(deps) {
               }),
             })
             const mutationPayload = await mutationResponse.json()
-            if (
-              !mutationResponse.ok ||
-              mutationPayload?.result?.code !== 0
-            ) {
+            if (!mutationResponse.ok || mutationPayload?.result?.code !== 0) {
               throw new Error(
                 `${operation.method} failed: ${JSON.stringify(mutationPayload)}`
               )
@@ -12186,7 +12189,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '采购管理')
         await expectText(page, '采购订单')
         await expectText(page, '质检管理')
-        await expectText(page, '来料质检')
+        await expectText(page, '质量检验')
         await expectText(page, '库存管理')
         await expectText(page, '入库管理')
         await expectText(page, '库存台账')
@@ -12349,6 +12352,13 @@ export function createStyleL1Scenarios(deps) {
       selectPurchaseReceiptRow,
       verifyBusinessModuleColumnOrderDialog,
       customerRuntimeEffectiveSession,
+    }),
+    ...createFinanceBusinessSourceScenarios({
+      assert,
+      assertNoHorizontalOverflow,
+      customerRuntimeEffectiveSession,
+      expectHeading,
+      expectText,
     }),
     {
       name: 'material-master-header-desktop',

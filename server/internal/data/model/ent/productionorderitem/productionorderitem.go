@@ -48,6 +48,8 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgeProductionOrder holds the string denoting the production_order edge name in mutations.
 	EdgeProductionOrder = "production_order"
+	// EdgeMaterialRequirements holds the string denoting the material_requirements edge name in mutations.
+	EdgeMaterialRequirements = "material_requirements"
 	// EdgeProduct holds the string denoting the product edge name in mutations.
 	EdgeProduct = "product"
 	// EdgeProductSku holds the string denoting the product_sku edge name in mutations.
@@ -67,6 +69,13 @@ const (
 	ProductionOrderInverseTable = "production_orders"
 	// ProductionOrderColumn is the table column denoting the production_order relation/edge.
 	ProductionOrderColumn = "production_order_id"
+	// MaterialRequirementsTable is the table that holds the material_requirements relation/edge.
+	MaterialRequirementsTable = "production_order_material_requirements"
+	// MaterialRequirementsInverseTable is the table name for the ProductionOrderMaterialRequirement entity.
+	// It exists in this package in order to avoid circular dependency with the "productionordermaterialrequirement" package.
+	MaterialRequirementsInverseTable = "production_order_material_requirements"
+	// MaterialRequirementsColumn is the table column denoting the material_requirements relation/edge.
+	MaterialRequirementsColumn = "production_order_item_id"
 	// ProductTable is the table that holds the product relation/edge.
 	ProductTable = "production_order_items"
 	// ProductInverseTable is the table name for the Product entity.
@@ -265,6 +274,20 @@ func ByProductionOrderField(field string, opts ...sql.OrderTermOption) OrderOpti
 	}
 }
 
+// ByMaterialRequirementsCount orders the results by material_requirements count.
+func ByMaterialRequirementsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newMaterialRequirementsStep(), opts...)
+	}
+}
+
+// ByMaterialRequirements orders the results by material_requirements terms.
+func ByMaterialRequirements(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newMaterialRequirementsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByProductField orders the results by product field.
 func ByProductField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -304,6 +327,13 @@ func newProductionOrderStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(ProductionOrderInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, ProductionOrderTable, ProductionOrderColumn),
+	)
+}
+func newMaterialRequirementsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(MaterialRequirementsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, MaterialRequirementsTable, MaterialRequirementsColumn),
 	)
 }
 func newProductStep() *sqlgraph.Step {

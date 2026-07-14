@@ -22,6 +22,7 @@ import (
 	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/qualityinspection"
 
 	"entgo.io/ent/dialect"
@@ -31,6 +32,7 @@ import (
 func (r *inventoryRepo) CreatePurchaseReceiptDraft(ctx context.Context, in *biz.PurchaseReceiptCreate) (*biz.PurchaseReceipt, error) {
 	row, err := r.data.postgres.PurchaseReceipt.Create().
 		SetReceiptNo(in.ReceiptNo).
+		SetNillableSupplierID(in.SupplierID).
 		SetSupplierName(in.SupplierName).
 		SetStatus(biz.PurchaseReceiptStatusDraft).
 		SetReceivedAt(in.ReceivedAt).
@@ -51,6 +53,7 @@ func (r *inventoryRepo) CreatePurchaseReceiptWithItems(ctx context.Context, in *
 
 	receipt, err := tx.client.PurchaseReceipt.Create().
 		SetReceiptNo(in.ReceiptNo).
+		SetNillableSupplierID(in.SupplierID).
 		SetSupplierName(in.SupplierName).
 		SetStatus(biz.PurchaseReceiptStatusDraft).
 		SetReceivedAt(in.ReceivedAt).
@@ -116,7 +119,7 @@ func (r *inventoryRepo) ValidatePurchaseReceiptFromPurchaseOrder(ctx context.Con
 		}
 		return err
 	}
-	if order.LifecycleStatus != biz.PurchaseOrderStatusApproved || supplierNameFromSnapshot(order.SupplierSnapshot) == "" {
+	if order.LifecycleStatus != biz.PurchaseOrderStatusApproved || order.SupplierID <= 0 || supplierNameFromSnapshot(order.SupplierSnapshot) == "" {
 		return biz.ErrBadParam
 	}
 	if _, err := r.data.postgres.Warehouse.Get(ctx, in.WarehouseID); err != nil {
@@ -285,6 +288,7 @@ func (r *inventoryRepo) createPurchaseReceiptFromPurchaseOrder(
 	}
 	receiptCreate := tx.client.PurchaseReceipt.Create().
 		SetReceiptNo(in.ReceiptNo).
+		SetSupplierID(order.SupplierID).
 		SetSupplierName(supplierName).
 		SetStatus(biz.PurchaseReceiptStatusDraft).
 		SetReceivedAt(in.ReceivedAt).
@@ -736,6 +740,13 @@ func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receipt
 		tx = nil
 		return out, nil
 	}
+	hasActivePayable, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.PurchaseReceiptSourceType, receipt.ID)
+	if err != nil {
+		return nil, err
+	}
+	if hasActivePayable {
+		return nil, biz.ErrPurchaseReceiptFinanceDependency
+	}
 	hasPostedAdjustment, err := tx.client.PurchaseReceiptAdjustment.Query().
 		Where(
 			purchasereceiptadjustment.PurchaseReceiptID(receipt.ID),
@@ -746,6 +757,18 @@ func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receipt
 		return nil, err
 	}
 	if hasPostedAdjustment {
+		return nil, biz.ErrBadParam
+	}
+	hasPostedReturn, err := tx.client.PurchaseReturn.Query().
+		Where(
+			purchasereturn.PurchaseReceiptID(receipt.ID),
+			purchasereturn.Status(biz.PurchaseReturnStatusPosted),
+		).
+		Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasPostedReturn {
 		return nil, biz.ErrBadParam
 	}
 	items, err := tx.client.PurchaseReceiptItem.Query().
@@ -841,6 +864,9 @@ func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.Pur
 	}
 	if filter.SupplierName != "" {
 		query = query.Where(purchasereceipt.SupplierNameContainsFold(filter.SupplierName))
+	}
+	if filter.SupplierID > 0 {
+		query = query.Where(purchasereceipt.SupplierID(filter.SupplierID))
 	}
 	if filter.DateFrom != nil {
 		query = query.Where(purchasereceipt.ReceivedAtGTE(*filter.DateFrom))
@@ -1161,6 +1187,16 @@ func resolvePurchaseReceiptFromPurchaseOrderReplay(
 		return nil, false, err
 	}
 	if receipt.IdempotencyPayloadHash == nil || *receipt.IdempotencyPayloadHash != in.IdempotencyPayloadHash {
+		return nil, true, biz.ErrIdempotencyConflict
+	}
+	order, err := client.PurchaseOrder.Get(ctx, in.PurchaseOrderID)
+	if ent.IsNotFound(err) {
+		return nil, true, biz.ErrIdempotencyConflict
+	}
+	if err != nil {
+		return nil, true, err
+	}
+	if receipt.SupplierID == nil || *receipt.SupplierID != order.SupplierID {
 		return nil, true, biz.ErrIdempotencyConflict
 	}
 	if receipt.IdempotencyItemCount == nil || *receipt.IdempotencyItemCount <= 0 {
@@ -1636,6 +1672,7 @@ func entPurchaseReceiptToBiz(row *ent.PurchaseReceipt, items []*ent.PurchaseRece
 	out := &biz.PurchaseReceipt{
 		ID:           row.ID,
 		ReceiptNo:    row.ReceiptNo,
+		SupplierID:   row.SupplierID,
 		SupplierName: row.SupplierName,
 		Status:       row.Status,
 		ReceivedAt:   row.ReceivedAt,

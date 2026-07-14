@@ -46,6 +46,8 @@ const (
 	EdgeMaterial = "material"
 	// EdgeUnit holds the string denoting the unit edge name in mutations.
 	EdgeUnit = "unit"
+	// EdgeProductionOrderMaterialRequirements holds the string denoting the production_order_material_requirements edge name in mutations.
+	EdgeProductionOrderMaterialRequirements = "production_order_material_requirements"
 	// Table holds the table name of the bomitem in the database.
 	Table = "bom_items"
 	// BomHeaderTable is the table that holds the bom_header relation/edge.
@@ -69,6 +71,13 @@ const (
 	UnitInverseTable = "units"
 	// UnitColumn is the table column denoting the unit relation/edge.
 	UnitColumn = "unit_id"
+	// ProductionOrderMaterialRequirementsTable is the table that holds the production_order_material_requirements relation/edge.
+	ProductionOrderMaterialRequirementsTable = "production_order_material_requirements"
+	// ProductionOrderMaterialRequirementsInverseTable is the table name for the ProductionOrderMaterialRequirement entity.
+	// It exists in this package in order to avoid circular dependency with the "productionordermaterialrequirement" package.
+	ProductionOrderMaterialRequirementsInverseTable = "production_order_material_requirements"
+	// ProductionOrderMaterialRequirementsColumn is the table column denoting the production_order_material_requirements relation/edge.
+	ProductionOrderMaterialRequirementsColumn = "bom_item_id"
 )
 
 // Columns holds all SQL columns for bomitem fields.
@@ -219,6 +228,20 @@ func ByUnitField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newUnitStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByProductionOrderMaterialRequirementsCount orders the results by production_order_material_requirements count.
+func ByProductionOrderMaterialRequirementsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newProductionOrderMaterialRequirementsStep(), opts...)
+	}
+}
+
+// ByProductionOrderMaterialRequirements orders the results by production_order_material_requirements terms.
+func ByProductionOrderMaterialRequirements(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProductionOrderMaterialRequirementsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newBomHeaderStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -238,5 +261,12 @@ func newUnitStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(UnitInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, UnitTable, UnitColumn),
+	)
+}
+func newProductionOrderMaterialRequirementsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProductionOrderMaterialRequirementsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ProductionOrderMaterialRequirementsTable, ProductionOrderMaterialRequirementsColumn),
 	)
 }

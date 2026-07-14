@@ -350,9 +350,19 @@ func (r *inventoryRepo) ListQualityInspections(ctx context.Context, filter biz.Q
 	if err != nil {
 		return nil, 0, err
 	}
+	references := make([]businessSourceReference, 0, len(rows))
+	for _, row := range rows {
+		references = append(references, businessSourceReference{sourceType: row.SourceType, sourceID: row.SourceID})
+	}
+	sourceNos, err := resolveBusinessSourceNos(ctx, r.data.postgres, references)
+	if err != nil {
+		return nil, 0, err
+	}
 	out := make([]*biz.QualityInspection, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, entQualityInspectionToBiz(row))
+		item := entQualityInspectionToBiz(row)
+		item.SourceNo = businessSourceNo(sourceNos, row.SourceType, row.SourceID)
+		out = append(out, item)
 	}
 	return out, total, nil
 }
@@ -744,6 +754,8 @@ func validateQualityInspectionReferences(ctx context.Context, client *ent.Client
 		return validateIncomingQualityInspectionReferences(ctx, client, in)
 	case biz.QualityInspectionSourceShipment:
 		return validateFinishedGoodsQualityInspectionReferences(ctx, client, in)
+	case biz.QualityInspectionSourceOutsourcingFact:
+		return validateOutsourcingReturnQualityInspectionReferences(ctx, client, in)
 	default:
 		return biz.ErrBadParam
 	}
@@ -868,6 +880,11 @@ func validateSubmittedQualityInspectionLot(lot *ent.InventoryLot, row *ent.Quali
 		return validateQualityInspectionLot(lot, optionalIntValueOrZero(row.MaterialID))
 	case biz.QualityInspectionSourceShipment:
 		if optionalStringValueOrEmpty(row.InspectionType) != biz.QualityInspectionTypeFinishedGoods {
+			return biz.ErrBadParam
+		}
+		return validateFinishedGoodsQualityInspectionLot(lot, optionalIntValueOrZero(row.SubjectID))
+	case biz.QualityInspectionSourceOutsourcingFact:
+		if optionalStringValueOrEmpty(row.InspectionType) != biz.QualityInspectionTypeOutsourcingReturn {
 			return biz.ErrBadParam
 		}
 		return validateFinishedGoodsQualityInspectionLot(lot, optionalIntValueOrZero(row.SubjectID))

@@ -16,6 +16,7 @@ import {
   buildOutsourcingOrderItemParams,
   buildOutsourcingOrderItemSourceValuesFromMaterial,
   buildOutsourcingOrderItemSourceValuesFromProduct,
+  buildOutsourcingOrderItemSourceValuesFromProductSKU,
   buildOutsourcingOrderParams,
   buildOutsourcingOrderSubjectSwitchValues,
   buildPurchaseOrderItemSourceValuesFromMaterial,
@@ -224,6 +225,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
   assert.equal(V1_ROUTE_PATHS.materials, '/erp/master/materials')
   assert.equal(V1_ROUTE_PATHS.processes, '/erp/engineering/processes')
   assert.equal(V1_ROUTE_PATHS.purchaseReceipts, '/erp/warehouse/inbound')
+  assert.equal(V1_ROUTE_PATHS.productionOrders, '/erp/production/orders')
   assert.equal(
     V1_ROUTE_PATHS.processingContracts,
     '/erp/purchase/processing-contracts'
@@ -519,8 +521,10 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       line_no: '1',
       subject_type: ' product ',
       product_id: '12',
+      product_sku_id: '34',
       process_id: '8',
       unit_id: '2',
+      sku_code_snapshot: ' SKU-RED-M ',
       product_order_no_snapshot: ' SO-26001 ',
       product_name_snapshot: ' 半成品 ',
       process_name_snapshot: ' 车缝 ',
@@ -534,8 +538,10 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       line_no: 1,
       subject_type: 'PRODUCT',
       product_id: 12,
+      product_sku_id: 34,
       process_id: 8,
       unit_id: 2,
+      sku_code_snapshot: 'SKU-RED-M',
       product_order_no_snapshot: 'SO-26001',
       product_name_snapshot: '半成品',
       process_name_snapshot: '车缝',
@@ -590,10 +596,12 @@ test('FL_outsourcing_subject_switch__clears_other_subject_and_snapshots masterDa
     line_no: 3,
     subject_type: OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT,
     product_id: undefined,
+    product_sku_id: undefined,
     material_id: undefined,
     process_id: undefined,
     unit_id: undefined,
     product_no_snapshot: '',
+    sku_code_snapshot: '',
     product_order_no_snapshot: '',
     product_name_snapshot: '',
     material_code_snapshot: '',
@@ -611,8 +619,10 @@ test('FL_outsourcing_subject_switch__clears_other_subject_and_snapshots masterDa
   assert.deepEqual(buildOutsourcingOrderSubjectSwitchValues(' material '), {
     subject_type: OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL,
     product_id: undefined,
+    product_sku_id: undefined,
     material_id: undefined,
     product_no_snapshot: '',
+    sku_code_snapshot: '',
     product_order_no_snapshot: '',
     product_name_snapshot: '',
     material_code_snapshot: '',
@@ -634,12 +644,44 @@ test('FL_outsourcing_subject_switch__clears_other_subject_and_snapshots masterDa
     {
       subject_type: OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT,
       product_id: 12,
+      product_sku_id: undefined,
       material_id: undefined,
       product_no_snapshot: 'PROD-012',
+      sku_code_snapshot: '',
       product_order_no_snapshot: '',
       product_name_snapshot: '玩具熊半成品',
       material_code_snapshot: '',
       material_name_snapshot: '',
+      unit_id: 2,
+      unit_name_snapshot: '只',
+    }
+  )
+
+  assert.deepEqual(
+    buildOutsourcingOrderItemSourceValuesFromProductSKU(
+      {
+        id: 34,
+        sku_code: ' SKU-RED-M ',
+        default_unit_id: 5,
+      },
+      { id: 5, name: ' 箱 ' }
+    ),
+    {
+      product_sku_id: 34,
+      sku_code_snapshot: 'SKU-RED-M',
+      unit_id: 5,
+      unit_name_snapshot: '箱',
+    }
+  )
+
+  assert.deepEqual(
+    buildOutsourcingOrderItemSourceValuesFromProductSKU(undefined, {
+      id: 2,
+      name: ' 只 ',
+    }),
+    {
+      product_sku_id: undefined,
+      sku_code_snapshot: '',
       unit_id: 2,
       unit_name_snapshot: '只',
     }
@@ -658,8 +700,10 @@ test('FL_outsourcing_subject_switch__clears_other_subject_and_snapshots masterDa
     {
       subject_type: OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL,
       product_id: undefined,
+      product_sku_id: undefined,
       material_id: 18,
       product_no_snapshot: '',
+      sku_code_snapshot: '',
       product_order_no_snapshot: '',
       product_name_snapshot: '',
       material_code_snapshot: 'MAT-018',
@@ -696,10 +740,12 @@ test('FL_outsourcing_subject_echo__uses_migrated_subject_type masterDataOrderVie
       line_no: 1,
       subject_type: 'PRODUCT',
       product_id: 12,
+      product_sku_id: undefined,
       material_id: undefined,
       process_id: 5,
       unit_id: 2,
       product_no_snapshot: 'PROD-012',
+      sku_code_snapshot: '',
       product_order_no_snapshot: 'SO-001',
       product_name_snapshot: '玩具熊半成品',
       material_code_snapshot: '',
@@ -726,7 +772,9 @@ test('FL_outsourcing_subject_echo__uses_migrated_subject_type masterDataOrderVie
     material_name_snapshot: '短毛绒布',
   })
   assert.equal(materialLine.product_id, undefined)
+  assert.equal(materialLine.product_sku_id, undefined)
   assert.equal(materialLine.product_no_snapshot, '')
+  assert.equal(materialLine.sku_code_snapshot, '')
   assert.equal(materialLine.product_name_snapshot, '')
   assert.equal(materialLine.material_id, 18)
   assert.equal(materialLine.material_code_snapshot, 'MAT-018')

@@ -85,5 +85,5 @@ test('purchase receipt add-item keeps unknown results in the current editor', ()
   assert(
     mutation.indexOf('closeItemEditor()') < mutation.indexOf('await loadRows()')
   )
-  assert.doesNotMatch(purchaseReceiptPage, /idempotency_key/u)
+  assert.doesNotMatch(mutation, /idempotency_key/u)
 })

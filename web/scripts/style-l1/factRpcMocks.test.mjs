@@ -114,6 +114,107 @@ async function purchaseMockHarness() {
   }
 }
 
+async function operationalFactMockHarness() {
+  const handlers = new Map()
+  const page = {
+    async route(pattern, handler) {
+      handlers.set(pattern, handler)
+    },
+  }
+  await installFactRpcMocks(page, {
+    adminProfile: {
+      id: 1,
+      is_super_admin: true,
+      roles: [{ role_key: 'sales' }],
+      permissions: ['stock.reservation.create'],
+    },
+    effectiveSession: null,
+    nowUnix: () => 1_750_000_000,
+    resolveDelayFromReferer: () => 0,
+  })
+  const handler = handlers.get('**/rpc/operational_fact')
+  assert.equal(typeof handler, 'function')
+
+  return async function call(method, params = {}) {
+    let responseBody = null
+    const request = {
+      postDataJSON: () => ({
+        jsonrpc: '2.0',
+        id: method,
+        method,
+        params,
+      }),
+    }
+    await handler({
+      request: () => request,
+      fulfill: async ({ body }) => {
+        responseBody = JSON.parse(body)
+      },
+    })
+    return responseBody
+  }
+}
+
+async function qualityMockHarness() {
+  const handlers = new Map()
+  const page = {
+    async route(pattern, handler) {
+      handlers.set(pattern, handler)
+    },
+  }
+  await installFactRpcMocks(page, {
+    adminProfile: {
+      id: 1,
+      is_super_admin: true,
+      roles: [{ role_key: 'quality' }],
+      permissions: ['quality.inspection.read'],
+    },
+    effectiveSession: { actions: ['quality.inspection.read'] },
+    nowUnix: () => 1_750_000_000,
+    resolveDelayFromReferer: () => 0,
+  })
+  const handler = handlers.get('**/rpc/quality')
+  assert.equal(typeof handler, 'function')
+
+  return async function call(method, params = {}) {
+    let responseBody = null
+    await handler({
+      request: () => ({
+        postDataJSON: () => ({
+          jsonrpc: '2.0',
+          id: method,
+          method,
+          params,
+        }),
+      }),
+      fulfill: async ({ body }) => {
+        responseBody = JSON.parse(body)
+      },
+    })
+    return responseBody
+  }
+}
+
+test('style-l1 quality mock serves the strict outsourcing return read contract', async () => {
+  const call = await qualityMockHarness()
+  const valid = await call('list_outsourcing_return_quality_inspections', {
+    customer_key: 'yoyoosun',
+    fact_id: 3,
+    limit: 50,
+  })
+  assert.equal(valid.result.code, 0)
+  assert.equal(valid.result.data.quality_inspections.length, 1)
+  assert.equal(valid.result.data.quality_inspections[0].source_id, 3)
+  assert.equal(valid.result.data.quality_inspections[0].status, 'PASSED')
+  assert.equal(valid.result.data.quality_inspections[0].result, 'PASS')
+
+  const forged = await call('list_outsourcing_return_quality_inspections', {
+    customer_key: 'yoyoosun',
+    source_type: 'OUTSOURCING_FACT',
+  })
+  assert.equal(forged.result.code, 40010)
+})
+
 test('style-l1 purchase mock enforces retry-safe receipt mutations', async () => {
   const call = await purchaseMockHarness()
   const addParams = {
@@ -182,6 +283,450 @@ test('style-l1 purchase mock enforces retry-safe receipt mutations', async () =>
     created.result.data.purchase_receipt.id
   )
   assert.equal(created.result.data.purchase_receipt.items.length, 1)
+})
+
+test('style-l1 operational fact mock only accepts source-bound reservation fields', async () => {
+  const call = await operationalFactMockHarness()
+  const params = {
+    customer_key: 'yoyoosun',
+    reservation_no: 'RSV-SO-STYLE-L1',
+    sales_order_id: 1,
+    sales_order_item_id: 1,
+    warehouse_id: 1,
+    lot_id: 402,
+    quantity: '2',
+    reserved_at: '2026-07-14T08:00:00.000Z',
+    note: '订单备货',
+    idempotency_key: 'style-l1-sales-order-reservation',
+  }
+
+  const created = await call(
+    'create_stock_reservation_from_sales_order',
+    params
+  )
+  assert.equal(created.result.code, 0)
+  assert.equal(created.result.data.stock_reservation.sales_order_id, 1)
+  assert.equal(created.result.data.stock_reservation.product_id, 1)
+  assert.equal(created.result.data.stock_reservation.unit_id, 1)
+
+  const forged = await call('create_stock_reservation_from_sales_order', {
+    ...params,
+    product_id: 999,
+  })
+  assert.equal(forged.result.code, 40010)
+
+  const retired = await call('create_stock_reservation', params)
+  assert.equal(retired.result.code, 40010)
+})
+
+test('style-l1 operational fact mock enforces production requirement and issue allowlists', async () => {
+  const call = await operationalFactMockHarness()
+  const requirements = await call(
+    'list_production_order_material_requirements',
+    { customer_key: 'yoyoosun', production_order_id: 71 }
+  )
+  assert.equal(requirements.result.code, 0)
+  assert.equal(requirements.result.data.material_requirements.length, 1)
+  assert.equal(
+    requirements.result.data.material_requirements[0].remaining_quantity,
+    '8.000000'
+  )
+
+  const params = {
+    customer_key: 'yoyoosun',
+    fact_no: 'PROD-MI-STYLE-L1',
+    production_order_id: 71,
+    production_order_item_id: 7101,
+    production_order_material_requirement_id: 7201,
+    warehouse_id: 1,
+    lot_id: 403,
+    quantity: '3',
+    occurred_at: '2026-07-14T08:00:00.000Z',
+    note: '首批领料',
+    idempotency_key: 'style-l1-production-material-issue',
+  }
+  const created = await call(
+    'create_production_material_issue_from_order',
+    params
+  )
+  assert.equal(created.result.code, 0)
+  assert.equal(created.result.data.production_fact.subject_id, 1)
+  assert.equal(created.result.data.production_fact.unit_id, 1)
+  assert.equal(created.result.data.production_fact.source_line_id, 7201)
+
+  for (const derivedField of [
+    'material_id',
+    'unit_id',
+    'subject_type',
+    'subject_id',
+    'source_type',
+    'source_id',
+    'source_line_id',
+  ]) {
+    const forged = await call('create_production_material_issue_from_order', {
+      ...params,
+      [derivedField]: derivedField.endsWith('_type') ? 'FORGED' : 999,
+    })
+    assert.equal(forged.result.code, 40010, derivedField)
+  }
+
+  const forgedList = await call('list_production_order_material_requirements', {
+    production_order_id: 71,
+    material_id: 1,
+  })
+  assert.equal(forgedList.result.code, 40010)
+})
+
+test('style-l1 operational fact mock enforces production completion lot intent', async () => {
+  const call = await operationalFactMockHarness()
+  const params = {
+    customer_key: 'yoyoosun',
+    fact_no: 'PROD-FG-STYLE-L1',
+    production_order_id: 71,
+    production_order_item_id: 7101,
+    warehouse_id: 1,
+    new_lot_no: 'PROD-NEW-LOT-REREAD-L1',
+    quantity: '2',
+    occurred_at: '2026-07-14T08:00:00.000Z',
+    note: '首批完工',
+    idempotency_key: 'style-l1-production-completion',
+  }
+
+  const ambiguous = await call(
+    'create_production_completion_from_order',
+    params
+  )
+  assert.equal(ambiguous.result.code, 0)
+  assert.equal(ambiguous.result.data.production_fact, null)
+
+  const listed = await call('list_production_facts', {
+    customer_key: 'yoyoosun',
+    source_type: 'PRODUCTION_ORDER',
+    source_id: 71,
+    source_line_id: 7101,
+    limit: 100,
+    offset: 0,
+  })
+  assert.equal(listed.result.code, 0)
+  const reread = listed.result.data.production_facts.find(
+    (fact) => fact.idempotency_key === params.idempotency_key
+  )
+  assert.equal(reread.fact_type, 'FINISHED_GOODS_RECEIPT')
+  assert.equal(reread.lot_id, 480)
+
+  const replay = await call('create_production_completion_from_order', params)
+  assert.equal(replay.result.code, 0)
+  assert.equal(replay.result.data.production_fact.id, reread.id)
+
+  const bothLots = await call('create_production_completion_from_order', {
+    ...params,
+    idempotency_key: 'style-l1-production-completion-both-lots',
+    lot_id: 402,
+  })
+  assert.equal(bothLots.result.code, 40010)
+
+  const missingLot = await call('create_production_completion_from_order', {
+    ...params,
+    idempotency_key: 'style-l1-production-completion-missing-lot',
+    new_lot_no: undefined,
+  })
+  assert.equal(missingLot.result.code, 40010)
+
+  const changedIntent = await call('create_production_completion_from_order', {
+    ...params,
+    quantity: '3',
+  })
+  assert.equal(changedIntent.result.code, 40010)
+})
+
+test('style-l1 operational fact mock enforces source-bound production rework', async () => {
+  const call = await operationalFactMockHarness()
+  const listedSources = await call('list_production_facts', {
+    customer_key: 'yoyoosun',
+    limit: 100,
+    offset: 0,
+  })
+  const source = listedSources.result.data.production_facts.find(
+    (fact) => fact.fact_no === 'PROD-FG-POSTED-L1'
+  )
+  assert.equal(source.status, 'POSTED')
+  assert.equal(source.fact_type, 'FINISHED_GOODS_RECEIPT')
+
+  const params = {
+    customer_key: 'yoyoosun',
+    fact_no: 'RW-PROD-FG-POSTED-L1',
+    source_completion_fact_id: source.id,
+    quantity: '2',
+    occurred_at: '2026-07-14T08:00:00.000Z',
+    reason: 'STYLE-L1-REWORK-REREAD',
+    idempotency_key: 'style-l1-production-rework',
+  }
+  const ambiguous = await call(
+    'create_production_rework_from_completion',
+    params
+  )
+  assert.equal(ambiguous.result.code, 0)
+  assert.equal(ambiguous.result.data.production_fact, null)
+
+  const reread = await call('list_production_facts', {
+    customer_key: 'yoyoosun',
+    source_type: 'PRODUCTION_FACT',
+    source_id: source.id,
+    limit: 100,
+    offset: 0,
+  })
+  const created = reread.result.data.production_facts.find(
+    (fact) => fact.idempotency_key === params.idempotency_key
+  )
+  assert.equal(created.fact_type, 'REWORK')
+  assert.equal(created.status, 'DRAFT')
+  assert.equal(created.source_id, source.id)
+  assert.equal(created.lot_id, source.lot_id)
+
+  const replay = await call('create_production_rework_from_completion', params)
+  assert.equal(replay.result.code, 0)
+  assert.equal(replay.result.data.production_fact.id, created.id)
+
+  for (const forbidden of [
+    'subject_id',
+    'warehouse_id',
+    'lot_id',
+    'source_type',
+    'source_id',
+    'note',
+  ]) {
+    const forged = await call('create_production_rework_from_completion', {
+      ...params,
+      idempotency_key: `style-l1-production-rework-${forbidden}`,
+      [forbidden]: 999,
+    })
+    assert.equal(forged.result.code, 40010, forbidden)
+  }
+
+  const changedIntent = await call('create_production_rework_from_completion', {
+    ...params,
+    quantity: '3',
+  })
+  assert.equal(changedIntent.result.code, 40010)
+})
+
+test('style-l1 operational fact mock only accepts source-bound outsourcing fields', async () => {
+  const call = await operationalFactMockHarness()
+  const base = {
+    customer_key: 'yoyoosun',
+    fact_no: 'OUT-MI-STYLE-L1',
+    outsourcing_order_id: 1,
+    outsourcing_order_item_id: 11,
+    warehouse_id: 1,
+    lot_id: 401,
+    quantity: '2',
+    occurred_at: '2026-07-14T08:00:00.000Z',
+    note: '委外备料',
+    idempotency_key: 'style-l1-outsourcing-source-fact',
+  }
+
+  const materialIssue = await call(
+    'create_outsourcing_material_issue_from_order',
+    base
+  )
+  assert.equal(materialIssue.result.code, 0)
+  assert.equal(
+    materialIssue.result.data.outsourcing_fact.fact_type,
+    'MATERIAL_ISSUE'
+  )
+  assert.equal(materialIssue.result.data.outsourcing_fact.source_line_id, 11)
+
+  const returnReceipt = await call(
+    'create_outsourcing_return_receipt_from_order',
+    {
+      ...base,
+      fact_no: 'OUT-RR-STYLE-L1',
+      outsourcing_order_item_id: 12,
+      lot_id: 402,
+      idempotency_key: 'style-l1-outsourcing-return-receipt',
+    }
+  )
+  assert.equal(returnReceipt.result.code, 0)
+  assert.equal(
+    returnReceipt.result.data.outsourcing_fact.subject_type,
+    'PRODUCT'
+  )
+  assert.equal(returnReceipt.result.data.outsourcing_fact.product_sku_id, 1)
+  assert.equal(materialIssue.result.data.outsourcing_fact.product_sku_id, null)
+
+  const changedIntent = await call(
+    'create_outsourcing_return_receipt_from_order',
+    {
+      ...base,
+      fact_no: 'OUT-RR-CONFLICT-L1',
+      outsourcing_order_item_id: 12,
+    }
+  )
+  assert.equal(changedIntent.result.code, 40010)
+  assert.equal(
+    changedIntent.result.data?.outsourcing_fact?.fact_type,
+    undefined,
+    '同一请求标识不得把委外发料伪装成回货成功'
+  )
+
+  const newLotParams = {
+    ...base,
+    fact_no: 'OUT-RR-NEW-LOT-L1',
+    outsourcing_order_item_id: 12,
+    lot_id: undefined,
+    new_lot_no: 'OUT-NEW-LOT-REREAD-L1',
+    idempotency_key: 'style-l1-outsourcing-return-new-lot',
+  }
+  const ambiguousNewLot = await call(
+    'create_outsourcing_return_receipt_from_order',
+    newLotParams
+  )
+  assert.equal(ambiguousNewLot.result.code, 0)
+  assert.equal(ambiguousNewLot.result.data.outsourcing_fact, null)
+  const listed = await call('list_outsourcing_facts', {
+    customer_key: 'yoyoosun',
+    source_type: 'OUTSOURCING_ORDER',
+    source_id: 1,
+    source_line_id: 12,
+    limit: 100,
+    offset: 0,
+  })
+  const reread = listed.result.data.outsourcing_facts.find(
+    (fact) => fact.idempotency_key === newLotParams.idempotency_key
+  )
+  assert.equal(reread.fact_type, 'RETURN_RECEIPT')
+  assert.equal(reread.lot_id, 482)
+
+  const forged = await call('create_outsourcing_material_issue_from_order', {
+    ...base,
+    subject_id: 999,
+  })
+  assert.equal(forged.result.code, 40010)
+
+  const missingReturnLot = await call(
+    'create_outsourcing_return_receipt_from_order',
+    { ...base, lot_id: undefined }
+  )
+  assert.equal(missingReturnLot.result.code, 40010)
+
+  const bothReturnLots = await call(
+    'create_outsourcing_return_receipt_from_order',
+    {
+      ...newLotParams,
+      idempotency_key: 'style-l1-outsourcing-return-both-lots',
+      lot_id: 402,
+    }
+  )
+  assert.equal(bothReturnLots.result.code, 40010)
+
+  const materialIssueNewLot = await call(
+    'create_outsourcing_material_issue_from_order',
+    {
+      ...base,
+      idempotency_key: 'style-l1-outsourcing-material-new-lot',
+      lot_id: undefined,
+      new_lot_no: 'MAT-NEW-NOT-ALLOWED',
+    }
+  )
+  assert.equal(materialIssueNewLot.result.code, 40010)
+
+  const missingIdempotencyKey = await call(
+    'create_outsourcing_material_issue_from_order',
+    { ...base, idempotency_key: '' }
+  )
+  assert.equal(missingIdempotencyKey.result.code, 40010)
+
+  const retired = await call('create_outsourcing_fact', base)
+  assert.equal(retired.result.code, 40010)
+})
+
+test('style-l1 operational fact mock enforces strict finance source commands', async () => {
+  const call = await operationalFactMockHarness()
+  const common = {
+    customer_key: 'yoyoosun',
+    fact_no: 'AP-SOURCE-L1',
+    occurred_at: '2026-07-14T08:00:00.000Z',
+    note: '来源核对',
+    idempotency_key: 'style-l1-finance-source',
+  }
+
+  const receivable = await call('create_receivable_from_shipment', {
+    ...common,
+    fact_no: 'AR-SHIP-L1',
+    shipment_id: 1,
+  })
+  assert.equal(receivable.result.code, 0)
+  assert.equal(receivable.result.data.finance_fact.fact_type, 'RECEIVABLE')
+  assert.equal(receivable.result.data.finance_fact.source_type, 'SHIPMENT')
+
+  const invoice = await call('create_invoice_from_shipment', {
+    ...common,
+    fact_no: 'INV-SHIP-L1',
+    shipment_id: 1,
+  })
+  assert.equal(invoice.result.code, 0)
+  assert.equal(invoice.result.data.finance_fact.fact_type, 'INVOICE')
+  assert.equal(invoice.result.data.finance_fact.source_type, 'SHIPMENT')
+
+  const purchase = await call('create_payable_from_purchase_receipt', {
+    ...common,
+    purchase_receipt_id: 601,
+  })
+  assert.equal(purchase.result.code, 0)
+  assert.equal(
+    purchase.result.data.finance_fact.source_type,
+    'PURCHASE_RECEIPT'
+  )
+
+  const outsourcing = await call('create_payable_from_outsourcing_return', {
+    ...common,
+    fact_no: 'AP-OUT-RR-L1',
+    outsourcing_fact_id: 3,
+  })
+  assert.equal(outsourcing.result.code, 0)
+  assert.equal(
+    outsourcing.result.data.finance_fact.source_type,
+    'OUTSOURCING_FACT'
+  )
+
+  const reconciliation = await call('create_reconciliation_from_finance_fact', {
+    ...common,
+    fact_no: 'REC-AR-L1',
+    finance_fact_id: 1,
+  })
+  assert.equal(reconciliation.result.code, 0)
+  assert.equal(
+    reconciliation.result.data.finance_fact.fact_type,
+    'RECONCILIATION'
+  )
+
+  for (const [method, sourceKey, sourceID] of [
+    ['create_receivable_from_shipment', 'shipment_id', 1],
+    ['create_invoice_from_shipment', 'shipment_id', 1],
+    ['create_payable_from_purchase_receipt', 'purchase_receipt_id', 601],
+    ['create_payable_from_outsourcing_return', 'outsourcing_fact_id', 3],
+    ['create_reconciliation_from_finance_fact', 'finance_fact_id', 1],
+  ]) {
+    const forged = await call(method, {
+      ...common,
+      [sourceKey]: sourceID,
+      amount: '999999',
+    })
+    assert.equal(forged.result.code, 40010, method)
+  }
+})
+
+test('style-l1 operational fact mock retires generic fact creation methods', async () => {
+  const call = await operationalFactMockHarness()
+  for (const method of [
+    'create_production_fact',
+    'create_outsourcing_fact',
+    'create_finance_fact',
+  ]) {
+    const retired = await call(method)
+    assert.equal(retired.result.code, 40010, method)
+    assert.match(retired.result.message, new RegExp(method, 'u'))
+  }
 })
 
 test('style-l1 workflow mock keeps explain_action_access params canonical', async () => {

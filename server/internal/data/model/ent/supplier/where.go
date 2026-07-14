@@ -643,6 +643,29 @@ func HasPurchaseOrdersWith(preds ...predicate.PurchaseOrder) predicate.Supplier 
 	})
 }
 
+// HasPurchaseReceipts applies the HasEdge predicate on the "purchase_receipts" edge.
+func HasPurchaseReceipts() predicate.Supplier {
+	return predicate.Supplier(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, PurchaseReceiptsTable, PurchaseReceiptsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPurchaseReceiptsWith applies the HasEdge predicate on the "purchase_receipts" edge with a given conditions (other predicates).
+func HasPurchaseReceiptsWith(preds ...predicate.PurchaseReceipt) predicate.Supplier {
+	return predicate.Supplier(func(s *sql.Selector) {
+		step := newPurchaseReceiptsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasOutsourcingOrders applies the HasEdge predicate on the "outsourcing_orders" edge.
 func HasOutsourcingOrders() predicate.Supplier {
 	return predicate.Supplier(func(s *sql.Selector) {

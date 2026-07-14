@@ -665,7 +665,12 @@ export function buildProcessingContractDraftFromOutsourcingOrder(
         productNo: materialSubject
           ? normalizeText(item.material_code_snapshot)
           : productSubject
-            ? normalizeText(item.product_no_snapshot)
+            ? [
+                normalizeText(item.product_no_snapshot),
+                normalizeText(item.sku_code_snapshot),
+              ]
+                .filter(Boolean)
+                .join(' / ')
             : '',
         productName: materialSubject
           ? normalizeText(item.material_name_snapshot)

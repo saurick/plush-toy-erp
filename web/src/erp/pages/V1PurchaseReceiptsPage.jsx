@@ -18,9 +18,12 @@ import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js
 import {
   addPurchaseReceiptItem,
   cancelPurchaseReceipt,
+  createPurchaseReceiptAdjustmentFromReceipt,
+  createPurchaseReturnFromReceipt,
   listPurchaseReceipts,
   postPurchaseReceipt,
 } from '../api/purchaseApi.mjs'
+import { createPayableFromPurchaseReceipt } from '../api/operationalFactApi.mjs'
 import { listInventoryLots } from '../api/inventoryApi.mjs'
 import {
   listMaterials,
@@ -46,6 +49,9 @@ import {
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
 import BusinessLineItemsFooter from '../components/business-list/BusinessLineItemsFooter.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
+import PurchaseReceiptExceptionModal from '../components/purchase-receipts/PurchaseReceiptExceptionModal.jsx'
+import PurchaseReceiptExceptionRecordsModal from '../components/purchase-receipts/PurchaseReceiptExceptionRecordsModal.jsx'
+import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
 import {
   compactParams,
   formatUnixDate,
@@ -64,6 +70,20 @@ import {
   createPurchaseReceiptMutationAttemptStore,
   isPurchaseReceiptMutationResultUnknown,
 } from '../utils/purchaseReceiptMutation.mjs'
+import {
+  buildPurchaseReceiptAdjustmentPayload,
+  buildPurchaseReturnFromReceiptPayload,
+} from '../utils/purchaseReceiptExceptionAction.mjs'
+import {
+  createSourceBusinessActionAttemptStore,
+  isSourceBusinessActionResultUnknown,
+  sourceBusinessActionNo,
+} from '../utils/sourceBusinessAction.mjs'
+import {
+  FINANCE_BUSINESS_SOURCE_ACTIONS,
+  buildPurchaseReceiptPayablePayload,
+  financeBusinessSourceFormValuesFromRequest,
+} from '../utils/financeBusinessSourceAction.mjs'
 import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
@@ -340,6 +360,7 @@ export default function V1PurchaseReceiptsPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = outletContext?.adminProfile || {}
+  const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
@@ -356,6 +377,11 @@ export default function V1PurchaseReceiptsPage() {
   const [saving, setSaving] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
   const [itemEditorReceipt, setItemEditorReceipt] = useState(null)
+  const [receiptExceptionMode, setReceiptExceptionMode] = useState(null)
+  const [receiptExceptionRecordsOpen, setReceiptExceptionRecordsOpen] =
+    useState(false)
+  const [financeSourceReceipt, setFinanceSourceReceipt] = useState(null)
+  const [financeSourceLoading, setFinanceSourceLoading] = useState(false)
   const [materials, setMaterials] = useState([])
   const [suppliers, setSuppliers] = useState([])
   const [units, setUnits] = useState([])
@@ -364,6 +390,11 @@ export default function V1PurchaseReceiptsPage() {
   const mutationAttemptsRef = useRef(
     createPurchaseReceiptMutationAttemptStore()
   )
+  const exceptionAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
+  const financeSourceAttemptsRef = useRef(
+    createSourceBusinessActionAttemptStore()
+  )
+  const financeSourceInFlightRef = useRef(false)
   const routePurchaseOrderID = searchParamPositiveIntText(
     searchParams,
     'purchase_order_id'
@@ -380,6 +411,45 @@ export default function V1PurchaseReceiptsPage() {
   const canCreate = hasActionPermission(adminProfile, 'purchase.receipt.create')
   const canPost =
     canCreate || hasActionPermission(adminProfile, 'warehouse.inbound.confirm')
+  const canCreateReturn = hasActionPermission(
+    adminProfile,
+    'purchase.return.create'
+  )
+  const canPostReturn = hasActionPermission(
+    adminProfile,
+    'purchase.return.post'
+  )
+  const canCancelReturn = hasActionPermission(
+    adminProfile,
+    'purchase.return.cancel'
+  )
+  const canReadReturn = hasActionPermission(
+    adminProfile,
+    'purchase.return.read'
+  )
+  const canReadAdjustment = hasActionPermission(
+    adminProfile,
+    'purchase.receipt.adjustment.read'
+  )
+  const canCreateAdjustment = hasActionPermission(
+    adminProfile,
+    'purchase.receipt.adjustment.create'
+  )
+  const canPostAdjustment = hasActionPermission(
+    adminProfile,
+    'purchase.receipt.adjustment.post'
+  )
+  const canCancelAdjustment = hasActionPermission(
+    adminProfile,
+    'purchase.receipt.adjustment.cancel'
+  )
+  const canCreatePayable = hasActionPermission(
+    adminProfile,
+    'finance.payable.confirm'
+  )
+  const canViewPayable =
+    canCreatePayable ||
+    hasActionPermission(adminProfile, 'finance.payable.read')
   const relatedMenuItems = [
     { key: 'purchase-orders', label: '采购订单' },
     { key: 'quality-inspections', label: '来料质检' },
@@ -718,6 +788,189 @@ export default function V1PurchaseReceiptsPage() {
     [loadRows]
   )
 
+  const submitReceiptException = useCallback(
+    async (values) => {
+      const receipt = selectedRow
+      const mode = receiptExceptionMode
+      if (!receipt?.id || !['return', 'adjustment'].includes(mode)) return
+      const scope = `${mode}:${receipt.id}`
+      let attempt
+      setSaving(true)
+      try {
+        const sourcePayload =
+          mode === 'return'
+            ? buildPurchaseReturnFromReceiptPayload(values, receipt)
+            : buildPurchaseReceiptAdjustmentPayload(values, receipt)
+        const payload = {
+          ...sourcePayload,
+          customer_key: activeCustomerKey || undefined,
+        }
+        attempt = exceptionAttemptsRef.current.prepare(scope, payload)
+        const businessNo = sourceBusinessActionNo(
+          mode === 'return' ? 'PRT' : 'PRA',
+          receipt.receipt_no,
+          attempt.params.idempotency_key
+        )
+        let createdRecord
+        if (mode === 'return') {
+          createdRecord = await createPurchaseReturnFromReceipt({
+            ...attempt.params,
+            return_no: businessNo,
+          })
+        } else {
+          createdRecord = await createPurchaseReceiptAdjustmentFromReceipt({
+            ...attempt.params,
+            adjustment_no: businessNo,
+          })
+        }
+        if (
+          Number(createdRecord?.id || 0) <= 0 ||
+          Number(createdRecord?.purchase_receipt_id || 0) !==
+            Number(receipt.id) ||
+          String(createdRecord?.status || '').toUpperCase() !== 'DRAFT'
+        ) {
+          const error = new Error('采购异常记录返回结果无法确认')
+          error.isInvalidResponse = true
+          throw error
+        }
+        exceptionAttemptsRef.current.settle(scope, attempt)
+        message.success(
+          mode === 'return' ? '采购退货草稿已生成' : '入库调整草稿已生成'
+        )
+        setReceiptExceptionMode(null)
+        if (
+          (mode === 'return' && canReadReturn) ||
+          (mode === 'adjustment' && canReadAdjustment)
+        ) {
+          setReceiptExceptionRecordsOpen(true)
+        }
+        await loadRows()
+      } catch (error) {
+        const retained = attempt
+          ? exceptionAttemptsRef.current.settle(scope, attempt, error)
+          : isSourceBusinessActionResultUnknown(error)
+        if (retained) {
+          message.warning(
+            '操作结果尚未确认，系统已保留原请求；请用相同内容重试，不要新建重复记录。'
+          )
+        } else {
+          message.error(
+            getActionErrorMessage(
+              error,
+              mode === 'return' ? '生成采购退货' : '生成入库调整'
+            )
+          )
+        }
+      } finally {
+        setSaving(false)
+      }
+    },
+    [
+      activeCustomerKey,
+      canReadAdjustment,
+      canReadReturn,
+      loadRows,
+      receiptExceptionMode,
+      selectedRow,
+    ]
+  )
+
+  const purchasePayableScope = financeSourceReceipt?.id
+    ? `purchase-receipt-payable:${financeSourceReceipt.id}`
+    : ''
+  const financeSourceInitialValues = useMemo(() => {
+    if (!purchasePayableScope) return undefined
+    const retained = financeSourceAttemptsRef.current.peek(purchasePayableScope)
+    return retained
+      ? financeBusinessSourceFormValuesFromRequest(retained.params)
+      : undefined
+  }, [purchasePayableScope])
+
+  const openPurchaseReceiptPayable = useCallback(
+    (receipt) => {
+      if (
+        !canCreatePayable ||
+        !receipt?.id ||
+        String(receipt.status || '').toUpperCase() !== 'POSTED'
+      ) {
+        message.warning('请先选择已过账的采购入库单')
+        return
+      }
+      setFinanceSourceReceipt(receipt)
+    },
+    [canCreatePayable]
+  )
+
+  const closePurchaseReceiptPayable = useCallback(() => {
+    if (financeSourceInFlightRef.current) return
+    setFinanceSourceReceipt(null)
+  }, [])
+
+  const submitPurchaseReceiptPayable = useCallback(
+    async (values) => {
+      const receipt = financeSourceReceipt
+      if (
+        financeSourceInFlightRef.current ||
+        !canCreatePayable ||
+        !receipt?.id
+      ) {
+        return
+      }
+      const scope = `purchase-receipt-payable:${receipt.id}`
+      let attempt
+      try {
+        const payload = {
+          ...buildPurchaseReceiptPayablePayload(values, receipt),
+          customer_key: activeCustomerKey || undefined,
+        }
+        attempt = financeSourceAttemptsRef.current.prepare(scope, payload)
+      } catch (error) {
+        message.error(getActionErrorMessage(error, '准备应付草稿'))
+        return
+      }
+
+      financeSourceInFlightRef.current = true
+      setFinanceSourceLoading(true)
+      try {
+        await createPayableFromPurchaseReceipt(attempt.params)
+        financeSourceAttemptsRef.current.settle(scope, attempt, null)
+        setFinanceSourceReceipt(null)
+        message.success('应付草稿已生成，请到应付管理核对并确认')
+        await loadRows()
+      } catch (error) {
+        const retained = financeSourceAttemptsRef.current.settle(
+          scope,
+          attempt,
+          error
+        )
+        if (retained) {
+          message.warning(
+            '应付生成结果暂时无法确认，已保留本次请求，请使用相同内容重试'
+          )
+        } else {
+          message.error(getActionErrorMessage(error, '生成应付'))
+        }
+      } finally {
+        financeSourceInFlightRef.current = false
+        setFinanceSourceLoading(false)
+      }
+    },
+    [activeCustomerKey, canCreatePayable, financeSourceReceipt, loadRows]
+  )
+
+  const viewPurchaseReceiptPayable = useCallback(
+    (receipt) => {
+      if (!receipt?.id) return
+      navigate(
+        routeWithQuery(V1_ROUTE_PATHS.payables, {
+          source_type: 'PURCHASE_RECEIPT',
+          source_id: receipt.id,
+        })
+      )
+    },
+    [navigate]
+  )
+
   const selectedRowLabel = selectedRow
     ? `${selectedRow.receipt_no || '采购入库单已关联'} / ${
         selectedRow.supplier_name || '未填写供应商'
@@ -1036,6 +1289,57 @@ export default function V1PurchaseReceiptsPage() {
             disabled={!selectedRow}
             disabledReason="请先选择一条入库记录"
           />
+          <Button
+            size="small"
+            disabled={
+              !selectedRow || (!canReadReturn && !canReadAdjustment) || saving
+            }
+            onClick={() => setReceiptExceptionRecordsOpen(true)}
+          >
+            退货与调整记录
+          </Button>
+          <Button
+            size="small"
+            disabled={
+              !selectedRow ||
+              selectedRow.status !== 'POSTED' ||
+              !canCreateReturn ||
+              saving
+            }
+            onClick={() => setReceiptExceptionMode('return')}
+          >
+            生成采购退货
+          </Button>
+          <Button
+            size="small"
+            disabled={
+              !selectedRow ||
+              selectedRow.status !== 'POSTED' ||
+              !canCreateAdjustment ||
+              saving
+            }
+            onClick={() => setReceiptExceptionMode('adjustment')}
+          >
+            登记入库调整
+          </Button>
+          {selectedRow?.status === 'POSTED' && canViewPayable ? (
+            <Button
+              size="small"
+              disabled={saving || financeSourceLoading}
+              onClick={() => viewPurchaseReceiptPayable(selectedRow)}
+            >
+              查看应付
+            </Button>
+          ) : null}
+          {selectedRow?.status === 'POSTED' && canCreatePayable ? (
+            <Button
+              size="small"
+              disabled={saving || financeSourceLoading}
+              onClick={() => openPurchaseReceiptPayable(selectedRow)}
+            >
+              生成应付
+            </Button>
+          ) : null}
           <Popconfirm
             title="确认过账并更新库存？"
             onConfirm={() =>
@@ -1164,6 +1468,42 @@ export default function V1PurchaseReceiptsPage() {
         emptyDescription="暂无采购入库单"
       />
       {receiptItemsPreview.modal}
+
+      <PurchaseReceiptExceptionModal
+        open={Boolean(receiptExceptionMode)}
+        mode={receiptExceptionMode}
+        receipt={selectedRow}
+        materialOptions={materialOptions}
+        warehouseOptions={warehouseOptions}
+        lotOptions={inventoryLotOptions}
+        loading={saving}
+        onCancel={() => {
+          if (!saving) setReceiptExceptionMode(null)
+        }}
+        onSubmit={submitReceiptException}
+      />
+      <FinanceBusinessSourceModal
+        action={FINANCE_BUSINESS_SOURCE_ACTIONS.PURCHASE_RECEIPT_PAYABLE}
+        open={Boolean(financeSourceReceipt)}
+        source={financeSourceReceipt}
+        initialValues={financeSourceInitialValues}
+        loading={financeSourceLoading}
+        onCancel={closePurchaseReceiptPayable}
+        onSubmit={submitPurchaseReceiptPayable}
+      />
+      <PurchaseReceiptExceptionRecordsModal
+        open={receiptExceptionRecordsOpen}
+        receipt={selectedRow}
+        customerKey={activeCustomerKey}
+        canReadReturns={canReadReturn}
+        canReadAdjustments={canReadAdjustment}
+        canPostReturns={canPostReturn}
+        canCancelReturns={canCancelReturn}
+        canPostAdjustments={canPostAdjustment}
+        canCancelAdjustments={canCancelAdjustment}
+        onCancel={() => setReceiptExceptionRecordsOpen(false)}
+        onChanged={loadRows}
+      />
       {columnOrderModal}
     </BusinessPageLayout>
   )

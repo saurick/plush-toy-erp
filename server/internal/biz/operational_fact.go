@@ -25,6 +25,7 @@ const (
 	ProductionFactRework               = "REWORK"
 
 	OutsourcingFactSourceType    = "OUTSOURCING_FACT"
+	OutsourcingOrderSourceType   = "OUTSOURCING_ORDER"
 	OutsourcingFactMaterialIssue = "MATERIAL_ISSUE"
 	OutsourcingFactReturnReceipt = "RETURN_RECEIPT"
 
@@ -62,18 +63,33 @@ const (
 )
 
 var (
-	ErrProductionFactNotFound           = errors.New("production fact not found")
-	ErrOutsourcingFactNotFound          = errors.New("outsourcing fact not found")
-	ErrShipmentNotFound                 = errors.New("shipment not found")
-	ErrShipmentItemNotFound             = errors.New("shipment item not found")
-	ErrShipmentSourceMismatch           = errors.New("shipment source mismatch")
-	ErrShipmentOrderNotActive           = errors.New("shipment sales order not active")
-	ErrShipmentQuantityExceeded         = errors.New("shipment quantity exceeds sales order")
-	ErrShipmentReservationSplit         = errors.New("shipment requires partial reservation consumption")
-	ErrStockReservationNotFound         = errors.New("stock reservation not found")
-	ErrStockReservationSourceMismatch   = errors.New("stock reservation source mismatch")
-	ErrStockReservationQuantityExceeded = errors.New("stock reservation quantity exceeds sales order")
-	ErrFinanceFactNotFound              = errors.New("finance fact not found")
+	ErrProductionFactNotFound               = errors.New("production fact not found")
+	ErrProductionReworkSourceInvalid        = errors.New("production rework source invalid")
+	ErrProductionReworkSourceState          = errors.New("production rework source state does not allow creation")
+	ErrProductionReworkQuantityExceeded     = errors.New("production rework quantity exceeds source completion")
+	ErrProductionReworkDependency           = errors.New("production completion has active rework")
+	ErrOperationalInboundLotRequired        = errors.New("source-driven inbound requires an existing or new lot")
+	ErrOutsourcingFactNotFound              = errors.New("outsourcing fact not found")
+	ErrOutsourcingOrderFactSourceInvalid    = errors.New("outsourcing order fact source invalid")
+	ErrOutsourcingOrderFactInvalidState     = errors.New("outsourcing order does not allow fact mutation")
+	ErrOutsourcingOrderFactQuantityExceeded = errors.New("outsourcing fact quantity exceeds order item")
+	ErrOutsourcingOrderFactDependency       = errors.New("outsourcing order has posted outsourcing facts")
+	ErrOutsourcingReturnQualityDependency   = errors.New("outsourcing return has active quality inspection")
+	ErrShipmentNotFound                     = errors.New("shipment not found")
+	ErrShipmentItemNotFound                 = errors.New("shipment item not found")
+	ErrShipmentSourceMismatch               = errors.New("shipment source mismatch")
+	ErrShipmentOrderNotActive               = errors.New("shipment sales order not active")
+	ErrShipmentQuantityExceeded             = errors.New("shipment quantity exceeds sales order")
+	ErrShipmentReservationSplit             = errors.New("shipment requires partial reservation consumption")
+	ErrShipmentFinanceDependency            = errors.New("shipment has active finance facts")
+	ErrStockReservationNotFound             = errors.New("stock reservation not found")
+	ErrStockReservationSourceMismatch       = errors.New("stock reservation source mismatch")
+	ErrStockReservationQuantityExceeded     = errors.New("stock reservation quantity exceeds sales order")
+	ErrFinanceFactNotFound                  = errors.New("finance fact not found")
+	ErrFinanceFactSourceInvalid             = errors.New("finance fact source invalid")
+	ErrFinanceFactSourceConflict            = errors.New("active finance fact already exists for source")
+	ErrFinanceFactShipmentAmountInvalid     = errors.New("shipment finance amount snapshot is incomplete")
+	ErrFinanceFactSettlementNotAllowed      = errors.New("finance fact type cannot be settled")
 )
 
 type ProductionFact struct {
@@ -90,6 +106,7 @@ type ProductionFact struct {
 	Quantity       decimal.Decimal
 	SourceType     *string
 	SourceID       *int
+	SourceNo       *string
 	SourceLineID   *int
 	IdempotencyKey string
 	OccurredAt     time.Time
@@ -115,6 +132,7 @@ type OutsourcingFact struct {
 	SupplierName   *string
 	SourceType     *string
 	SourceID       *int
+	SourceNo       *string
 	SourceLineID   *int
 	IdempotencyKey string
 	OccurredAt     time.Time
@@ -152,6 +170,9 @@ type ShipmentItem struct {
 	LotID                   *int
 	Quantity                decimal.Decimal
 	UnitNetWeightKgSnapshot *decimal.Decimal
+	UnitPriceSnapshot       *decimal.Decimal
+	AmountSnapshot          *decimal.Decimal
+	CurrencySnapshot        *string
 	Note                    *string
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
@@ -194,6 +215,7 @@ type FinanceFact struct {
 	InvoiceCategory  *string
 	SourceType       *string
 	SourceID         *int
+	SourceNo         *string
 	SourceLineID     *int
 	IdempotencyKey   string
 	OccurredAt       time.Time
@@ -209,14 +231,18 @@ type FinanceFact struct {
 }
 
 type OperationalFactMutation struct {
-	FactNo              string
-	FactType            string
-	SubjectType         string
-	SubjectID           int
-	ProductSkuID        *int
-	WarehouseID         int
-	UnitID              int
-	LotID               *int
+	FactNo       string
+	FactType     string
+	SubjectType  string
+	SubjectID    int
+	ProductSkuID *int
+	WarehouseID  int
+	UnitID       int
+	LotID        *int
+	// NewLotNo is accepted only by source-driven inbound commands. The data
+	// layer resolves or creates the derived subject lot in the same transaction
+	// and persists only LotID on the fact.
+	NewLotNo            *string
 	Quantity            decimal.Decimal
 	SupplierID          *int
 	SupplierName        *string
@@ -227,6 +253,70 @@ type OperationalFactMutation struct {
 	OccurredAt          time.Time
 	OccurredAtSpecified bool
 	Note                *string
+}
+
+// ProductionCompletionFromOrderCreate carries only operator-owned completion
+// fields. Product, SKU, unit and source references are resolved from the
+// production-order item by the server.
+type ProductionCompletionFromOrderCreate struct {
+	FactNo                string
+	ProductionOrderID     int
+	ProductionOrderItemID int
+	WarehouseID           int
+	LotID                 *int
+	NewLotNo              *string
+	Quantity              decimal.Decimal
+	IdempotencyKey        string
+	OccurredAt            time.Time
+	OccurredAtSpecified   bool
+	Note                  *string
+}
+
+// OutsourcingFactFromOrderCreate contains only operator-owned fields. The
+// fact type, supplier, subject, unit and source linkage are resolved from the
+// locked outsourcing-order item by the repository transaction.
+type OutsourcingFactFromOrderCreate struct {
+	FactNo                 string
+	OutsourcingOrderID     int
+	OutsourcingOrderItemID int
+	WarehouseID            int
+	LotID                  *int
+	NewLotNo               *string
+	Quantity               decimal.Decimal
+	IdempotencyKey         string
+	OccurredAt             time.Time
+	OccurredAtSpecified    bool
+	Note                   *string
+}
+
+// ProductionMaterialIssueFromOrderCreate contains only operator-owned issue
+// fields. Material, unit and source linkage are resolved from the immutable
+// production-order material requirement inside the repository transaction.
+type ProductionMaterialIssueFromOrderCreate struct {
+	FactNo                               string
+	ProductionOrderID                    int
+	ProductionOrderItemID                int
+	ProductionOrderMaterialRequirementID int
+	WarehouseID                          int
+	LotID                                *int
+	Quantity                             decimal.Decimal
+	IdempotencyKey                       string
+	OccurredAt                           time.Time
+	OccurredAtSpecified                  bool
+	Note                                 *string
+}
+
+// ProductionReworkFromCompletionCreate contains only operator-owned fields.
+// The returned product, warehouse, unit and batch are derived from a posted
+// finished-goods completion fact.
+type ProductionReworkFromCompletionCreate struct {
+	FactNo                 string
+	SourceCompletionFactID int
+	Quantity               decimal.Decimal
+	IdempotencyKey         string
+	OccurredAt             time.Time
+	OccurredAtSpecified    bool
+	Reason                 string
 }
 
 type ShipmentCreate struct {
@@ -272,6 +362,22 @@ type StockReservationCreate struct {
 	Note                *string
 }
 
+// StockReservationFromSalesOrderCreate contains only operator-owned fields.
+// Product, SKU and unit are resolved from the locked sales-order item by the
+// repository transaction.
+type StockReservationFromSalesOrderCreate struct {
+	ReservationNo       string
+	SalesOrderID        int
+	SalesOrderItemID    int
+	WarehouseID         int
+	LotID               *int
+	Quantity            decimal.Decimal
+	IdempotencyKey      string
+	ReservedAt          time.Time
+	ReservedAtSpecified bool
+	Note                *string
+}
+
 type FinanceFactCreate struct {
 	FactNo              string
 	FactType            string
@@ -291,6 +397,19 @@ type FinanceFactCreate struct {
 	OccurredAt          time.Time
 	OccurredAtSpecified bool
 	Note                *string
+}
+
+// FinanceFactFromShipmentCreate contains only operator-owned fields. The
+// finance type, customer, amount, currency and source linkage are resolved
+// from the shipped shipment by the server.
+type FinanceFactFromShipmentCreate struct {
+	FactNo              string
+	ShipmentID          int
+	IdempotencyKey      string
+	OccurredAt          time.Time
+	OccurredAtSpecified bool
+	Note                *string
+	InvoiceCategory     *string
 }
 
 type OperationalFactFilter struct {
@@ -339,6 +458,7 @@ type OperationalFactRepo interface {
 	ListShipments(ctx context.Context, filter OperationalFactFilter) ([]*Shipment, int, error)
 
 	CreateStockReservation(ctx context.Context, in *StockReservationCreate) (*StockReservation, error)
+	CreateStockReservationFromSalesOrder(ctx context.Context, in *StockReservationFromSalesOrderCreate) (*StockReservation, error)
 	ReleaseStockReservation(ctx context.Context, id int) (*StockReservation, error)
 	ListStockReservations(ctx context.Context, filter OperationalFactFilter) ([]*StockReservation, int, error)
 
@@ -355,12 +475,143 @@ type OperationalFactCancellationActorRepo interface {
 	CancelShippedShipmentWithActor(ctx context.Context, id int, actorID int) (*Shipment, error)
 }
 
+// ProductionCompletionSourceRepo resolves the immutable production-order line
+// fields used by the source-linked production fact path.
+type ProductionCompletionSourceRepo interface {
+	ResolveProductionCompletionSource(ctx context.Context, productionOrderID, productionOrderItemID int) (*ProductionOrderItem, error)
+}
+
+// ProductionMaterialIssueFromOrderRepo owns the source and inventory lock
+// order for material issues and exposes the release snapshot projection.
+type ProductionMaterialIssueFromOrderRepo interface {
+	CreateProductionMaterialIssueFromOrder(ctx context.Context, in *ProductionMaterialIssueFromOrderCreate) (*ProductionFact, error)
+	ListProductionOrderMaterialRequirements(ctx context.Context, productionOrderID int) ([]*ProductionOrderMaterialRequirement, error)
+}
+
+// ProductionReworkFromCompletionRepo owns the source completion lock and
+// derives the outbound rework grain in the same transaction as draft create.
+type ProductionReworkFromCompletionRepo interface {
+	CreateProductionReworkFromCompletion(ctx context.Context, in *ProductionReworkFromCompletionCreate) (*ProductionFact, error)
+}
+
+// FinanceFactFromShipmentRepo owns the source lock, snapshot validation and
+// finance-fact insert in one transaction so shipment cancellation cannot race
+// a stale source read.
+type FinanceFactFromShipmentRepo interface {
+	CreateFinanceFactDraftFromShipment(ctx context.Context, factType string, in *FinanceFactFromShipmentCreate) (*FinanceFact, error)
+}
+
+// OutsourcingFactFromOrderRepo owns source locking, source-field derivation
+// and draft insertion in one transaction. The generic create path remains an
+// internal repository capability and is not a public API.
+type OutsourcingFactFromOrderRepo interface {
+	CreateOutsourcingMaterialIssueFromOrder(ctx context.Context, in *OutsourcingFactFromOrderCreate) (*OutsourcingFact, error)
+	CreateOutsourcingReturnReceiptFromOrder(ctx context.Context, in *OutsourcingFactFromOrderCreate) (*OutsourcingFact, error)
+}
+
 type OperationalFactUsecase struct {
 	repo OperationalFactRepo
 }
 
 func NewOperationalFactUsecase(repo OperationalFactRepo) *OperationalFactUsecase {
 	return &OperationalFactUsecase{repo: repo}
+}
+
+func (uc *OperationalFactUsecase) CreateProductionCompletionFromOrder(ctx context.Context, in *ProductionCompletionFromOrderCreate) (*ProductionFact, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeProductionCompletionFromOrderCreate(in)
+	if err != nil {
+		return nil, err
+	}
+	if normalized.LotID == nil && normalized.NewLotNo == nil {
+		return nil, ErrOperationalInboundLotRequired
+	}
+	if normalized.LotID != nil && normalized.NewLotNo != nil {
+		return nil, ErrBadParam
+	}
+	sourceRepo, ok := uc.repo.(ProductionCompletionSourceRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	source, err := sourceRepo.ResolveProductionCompletionSource(ctx, normalized.ProductionOrderID, normalized.ProductionOrderItemID)
+	if err != nil {
+		return nil, err
+	}
+	if source == nil || source.ID != normalized.ProductionOrderItemID || source.ProductionOrderID != normalized.ProductionOrderID || source.ProductID <= 0 || source.UnitID <= 0 {
+		return nil, ErrProductionOrderFactSourceInvalid
+	}
+	sourceType := ProductionOrderSourceType
+	sourceID := normalized.ProductionOrderID
+	sourceLineID := normalized.ProductionOrderItemID
+	occurredAt := normalized.OccurredAt
+	if !normalized.OccurredAtSpecified {
+		// CreateProductionFactDraft performs the shared normalization. Preserve
+		// an omitted operator timestamp as an omitted idempotency intent instead
+		// of turning the first generated clock value into a specified value.
+		occurredAt = time.Time{}
+	}
+	return uc.CreateProductionFactDraft(ctx, &OperationalFactMutation{
+		FactNo:              normalized.FactNo,
+		FactType:            ProductionFactFinishedGoodsReceipt,
+		SubjectType:         InventorySubjectProduct,
+		SubjectID:           source.ProductID,
+		ProductSkuID:        source.ProductSKUID,
+		WarehouseID:         normalized.WarehouseID,
+		UnitID:              source.UnitID,
+		LotID:               normalized.LotID,
+		NewLotNo:            normalized.NewLotNo,
+		Quantity:            normalized.Quantity,
+		SourceType:          &sourceType,
+		SourceID:            &sourceID,
+		SourceLineID:        &sourceLineID,
+		IdempotencyKey:      normalized.IdempotencyKey,
+		OccurredAt:          occurredAt,
+		OccurredAtSpecified: normalized.OccurredAtSpecified,
+		Note:                normalized.Note,
+	})
+}
+
+func (uc *OperationalFactUsecase) CreateProductionMaterialIssueFromOrder(ctx context.Context, in *ProductionMaterialIssueFromOrderCreate) (*ProductionFact, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeProductionMaterialIssueFromOrderCreate(in)
+	if err != nil {
+		return nil, err
+	}
+	repo, ok := uc.repo.(ProductionMaterialIssueFromOrderRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.CreateProductionMaterialIssueFromOrder(ctx, normalized)
+}
+
+func (uc *OperationalFactUsecase) CreateProductionReworkFromCompletion(ctx context.Context, in *ProductionReworkFromCompletionCreate) (*ProductionFact, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeProductionReworkFromCompletionCreate(in)
+	if err != nil {
+		return nil, err
+	}
+	repo, ok := uc.repo.(ProductionReworkFromCompletionRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.CreateProductionReworkFromCompletion(ctx, normalized)
+}
+
+func (uc *OperationalFactUsecase) ListProductionOrderMaterialRequirements(ctx context.Context, productionOrderID int) ([]*ProductionOrderMaterialRequirement, error) {
+	if uc == nil || uc.repo == nil || productionOrderID <= 0 {
+		return nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(ProductionMaterialIssueFromOrderRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.ListProductionOrderMaterialRequirements(ctx, productionOrderID)
 }
 
 func (uc *OperationalFactUsecase) CreateProductionFactDraft(ctx context.Context, in *OperationalFactMutation) (*ProductionFact, error) {
@@ -439,6 +690,51 @@ func (uc *OperationalFactUsecase) CreateOutsourcingFactDraft(ctx context.Context
 		return nil, err
 	}
 	return uc.repo.CreateOutsourcingFactDraft(ctx, normalized)
+}
+
+func (uc *OperationalFactUsecase) CreateOutsourcingMaterialIssueFromOrder(ctx context.Context, in *OutsourcingFactFromOrderCreate) (*OutsourcingFact, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeOutsourcingFactFromOrderCreate(in)
+	if err != nil {
+		return nil, err
+	}
+	if normalized.NewLotNo != nil {
+		return nil, ErrBadParam
+	}
+	if err := requireActiveReference(ctx, normalized.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
+		return nil, err
+	}
+	repo, ok := uc.repo.(OutsourcingFactFromOrderRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.CreateOutsourcingMaterialIssueFromOrder(ctx, normalized)
+}
+
+func (uc *OperationalFactUsecase) CreateOutsourcingReturnReceiptFromOrder(ctx context.Context, in *OutsourcingFactFromOrderCreate) (*OutsourcingFact, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeOutsourcingFactFromOrderCreate(in)
+	if err != nil {
+		return nil, err
+	}
+	if normalized.LotID == nil && normalized.NewLotNo == nil {
+		return nil, ErrOperationalInboundLotRequired
+	}
+	if normalized.LotID != nil && normalized.NewLotNo != nil {
+		return nil, ErrBadParam
+	}
+	if err := requireActiveReference(ctx, normalized.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
+		return nil, err
+	}
+	repo, ok := uc.repo.(OutsourcingFactFromOrderRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.CreateOutsourcingReturnReceiptFromOrder(ctx, normalized)
 }
 
 func (uc *OperationalFactUsecase) PostOutsourcingFact(ctx context.Context, id int) (*OutsourcingFact, error) {
@@ -542,6 +838,20 @@ func (uc *OperationalFactUsecase) CreateStockReservation(ctx context.Context, in
 	return uc.repo.CreateStockReservation(ctx, normalized)
 }
 
+func (uc *OperationalFactUsecase) CreateStockReservationFromSalesOrder(ctx context.Context, in *StockReservationFromSalesOrderCreate) (*StockReservation, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeStockReservationFromSalesOrderCreate(in)
+	if err != nil {
+		return nil, err
+	}
+	if err := requireActiveReference(ctx, normalized.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive); err != nil {
+		return nil, err
+	}
+	return uc.repo.CreateStockReservationFromSalesOrder(ctx, normalized)
+}
+
 func (uc *OperationalFactUsecase) ReleaseStockReservation(ctx context.Context, id int) (*StockReservation, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
@@ -577,6 +887,32 @@ func (uc *OperationalFactUsecase) CreateFinanceFactDraft(ctx context.Context, in
 	return uc.repo.CreateFinanceFactDraft(ctx, normalized)
 }
 
+func (uc *OperationalFactUsecase) CreateReceivableFromShipment(ctx context.Context, in *FinanceFactFromShipmentCreate) (*FinanceFact, error) {
+	if in != nil && in.InvoiceCategory != nil {
+		return nil, ErrBadParam
+	}
+	return uc.createFinanceFactFromShipment(ctx, FinanceFactReceivable, in)
+}
+
+func (uc *OperationalFactUsecase) CreateInvoiceFromShipment(ctx context.Context, in *FinanceFactFromShipmentCreate) (*FinanceFact, error) {
+	return uc.createFinanceFactFromShipment(ctx, FinanceFactInvoice, in)
+}
+
+func (uc *OperationalFactUsecase) createFinanceFactFromShipment(ctx context.Context, factType string, in *FinanceFactFromShipmentCreate) (*FinanceFact, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeFinanceFactFromShipmentCreate(in)
+	if err != nil {
+		return nil, err
+	}
+	repo, ok := uc.repo.(FinanceFactFromShipmentRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.CreateFinanceFactDraftFromShipment(ctx, factType, normalized)
+}
+
 func (uc *OperationalFactUsecase) PostFinanceFact(ctx context.Context, id int) (*FinanceFact, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
@@ -587,6 +923,19 @@ func (uc *OperationalFactUsecase) PostFinanceFact(ctx context.Context, id int) (
 func (uc *OperationalFactUsecase) SettleFinanceFact(ctx context.Context, id int) (*FinanceFact, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
+	}
+	reader, ok := uc.repo.(interface {
+		GetFinanceFact(context.Context, int) (*FinanceFact, error)
+	})
+	if !ok {
+		return nil, ErrBadParam
+	}
+	fact, err := reader.GetFinanceFact(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if fact == nil || !financeFactTypeCanSettle(fact.FactType) {
+		return nil, ErrFinanceFactSettlementNotAllowed
 	}
 	return uc.repo.SettleFinanceFact(ctx, id)
 }
@@ -738,6 +1087,112 @@ func normalizeOperationalFactMutation(in *OperationalFactMutation, allowedTypes 
 	return &out, nil
 }
 
+func normalizeProductionCompletionFromOrderCreate(in *ProductionCompletionFromOrderCreate) (*ProductionCompletionFromOrderCreate, error) {
+	if in == nil {
+		return nil, ErrBadParam
+	}
+	out := *in
+	out.FactNo = strings.TrimSpace(out.FactNo)
+	out.Note = normalizeOptionalString(out.Note)
+	out.NewLotNo = normalizeOptionalString(out.NewLotNo)
+	idempotencyKey, err := value.NewIdempotencyKey(out.IdempotencyKey)
+	if err != nil {
+		return nil, ErrBadParam
+	}
+	out.IdempotencyKey = idempotencyKey.String()
+	if out.LotID != nil && *out.LotID <= 0 {
+		out.LotID = nil
+	}
+	if out.NewLotNo != nil && (len([]rune(*out.NewLotNo)) > 64 || out.LotID != nil) {
+		return nil, ErrBadParam
+	}
+	if out.FactNo == "" || out.ProductionOrderID <= 0 || out.ProductionOrderItemID <= 0 || out.WarehouseID <= 0 {
+		return nil, ErrBadParam
+	}
+	if _, err := value.NewPositiveQuantity(out.Quantity); err != nil {
+		return nil, ErrBadParam
+	}
+	out.OccurredAt, out.OccurredAtSpecified = normalizeIdempotencyIntentTime(out.OccurredAt)
+	return &out, nil
+}
+
+func normalizeOutsourcingFactFromOrderCreate(in *OutsourcingFactFromOrderCreate) (*OutsourcingFactFromOrderCreate, error) {
+	if in == nil {
+		return nil, ErrBadParam
+	}
+	out := *in
+	out.FactNo = strings.TrimSpace(out.FactNo)
+	out.Note = normalizeOptionalString(out.Note)
+	out.NewLotNo = normalizeOptionalString(out.NewLotNo)
+	idempotencyKey, err := value.NewIdempotencyKey(out.IdempotencyKey)
+	if err != nil {
+		return nil, ErrBadParam
+	}
+	out.IdempotencyKey = idempotencyKey.String()
+	if out.LotID != nil && *out.LotID <= 0 {
+		out.LotID = nil
+	}
+	if out.NewLotNo != nil && (len([]rune(*out.NewLotNo)) > 64 || out.LotID != nil) {
+		return nil, ErrBadParam
+	}
+	if out.FactNo == "" || out.OutsourcingOrderID <= 0 || out.OutsourcingOrderItemID <= 0 || out.WarehouseID <= 0 {
+		return nil, ErrBadParam
+	}
+	if _, err := value.NewPositiveQuantity(out.Quantity); err != nil {
+		return nil, ErrBadParam
+	}
+	out.OccurredAt, out.OccurredAtSpecified = normalizeIdempotencyIntentTime(out.OccurredAt)
+	return &out, nil
+}
+
+func normalizeProductionMaterialIssueFromOrderCreate(in *ProductionMaterialIssueFromOrderCreate) (*ProductionMaterialIssueFromOrderCreate, error) {
+	if in == nil {
+		return nil, ErrBadParam
+	}
+	out := *in
+	out.FactNo = strings.TrimSpace(out.FactNo)
+	out.Note = normalizeOptionalString(out.Note)
+	idempotencyKey, err := value.NewIdempotencyKey(out.IdempotencyKey)
+	if err != nil {
+		return nil, ErrBadParam
+	}
+	out.IdempotencyKey = idempotencyKey.String()
+	if out.LotID != nil && *out.LotID <= 0 {
+		out.LotID = nil
+	}
+	if out.FactNo == "" || out.ProductionOrderID <= 0 || out.ProductionOrderItemID <= 0 ||
+		out.ProductionOrderMaterialRequirementID <= 0 || out.WarehouseID <= 0 {
+		return nil, ErrBadParam
+	}
+	if _, err := value.NewPositiveQuantity(out.Quantity); err != nil {
+		return nil, ErrBadParam
+	}
+	out.OccurredAt, out.OccurredAtSpecified = normalizeIdempotencyIntentTime(out.OccurredAt)
+	return &out, nil
+}
+
+func normalizeProductionReworkFromCompletionCreate(in *ProductionReworkFromCompletionCreate) (*ProductionReworkFromCompletionCreate, error) {
+	if in == nil {
+		return nil, ErrBadParam
+	}
+	out := *in
+	out.FactNo = strings.TrimSpace(out.FactNo)
+	out.Reason = strings.TrimSpace(out.Reason)
+	idempotencyKey, err := value.NewIdempotencyKey(out.IdempotencyKey)
+	if err != nil {
+		return nil, ErrBadParam
+	}
+	out.IdempotencyKey = idempotencyKey.String()
+	if out.FactNo == "" || out.SourceCompletionFactID <= 0 || out.Reason == "" || len([]rune(out.Reason)) > 255 {
+		return nil, ErrBadParam
+	}
+	if _, err := value.NewPositiveQuantity(out.Quantity); err != nil {
+		return nil, ErrBadParam
+	}
+	out.OccurredAt, out.OccurredAtSpecified = normalizeIdempotencyIntentTime(out.OccurredAt)
+	return &out, nil
+}
+
 func normalizeShipmentCreate(in *ShipmentCreate) (*ShipmentCreate, error) {
 	if in == nil {
 		return nil, ErrBadParam
@@ -850,6 +1305,31 @@ func normalizeStockReservationCreate(in *StockReservationCreate) (*StockReservat
 	return &out, nil
 }
 
+func normalizeStockReservationFromSalesOrderCreate(in *StockReservationFromSalesOrderCreate) (*StockReservationFromSalesOrderCreate, error) {
+	if in == nil {
+		return nil, ErrBadParam
+	}
+	out := *in
+	out.ReservationNo = strings.TrimSpace(out.ReservationNo)
+	out.Note = normalizeOptionalString(out.Note)
+	idempotencyKey, err := value.NewIdempotencyKey(out.IdempotencyKey)
+	if err != nil {
+		return nil, ErrBadParam
+	}
+	out.IdempotencyKey = idempotencyKey.String()
+	if out.LotID != nil && *out.LotID <= 0 {
+		out.LotID = nil
+	}
+	out.ReservedAt, out.ReservedAtSpecified = normalizeIdempotencyIntentTime(out.ReservedAt)
+	if out.ReservationNo == "" || out.SalesOrderID <= 0 || out.SalesOrderItemID <= 0 || out.WarehouseID <= 0 {
+		return nil, ErrBadParam
+	}
+	if _, err := value.NewPositiveQuantity(out.Quantity); err != nil {
+		return nil, ErrBadParam
+	}
+	return &out, nil
+}
+
 func normalizeFinanceFactCreate(in *FinanceFactCreate) (*FinanceFactCreate, error) {
 	if in == nil {
 		return nil, ErrBadParam
@@ -923,6 +1403,40 @@ func normalizeFinanceFactCreate(in *FinanceFactCreate) (*FinanceFactCreate, erro
 	}
 	out.OccurredAt, out.OccurredAtSpecified = normalizeIdempotencyIntentTime(out.OccurredAt)
 	return &out, nil
+}
+
+func normalizeFinanceFactFromShipmentCreate(in *FinanceFactFromShipmentCreate) (*FinanceFactFromShipmentCreate, error) {
+	if in == nil {
+		return nil, ErrBadParam
+	}
+	out := *in
+	out.FactNo = strings.TrimSpace(out.FactNo)
+	out.Note = normalizeOptionalString(out.Note)
+	out.InvoiceCategory = normalizeOptionalUpperString(out.InvoiceCategory)
+	idempotencyKey, err := value.NewIdempotencyKey(out.IdempotencyKey)
+	if err != nil {
+		return nil, ErrBadParam
+	}
+	out.IdempotencyKey = idempotencyKey.String()
+	if out.FactNo == "" || out.ShipmentID <= 0 {
+		return nil, ErrBadParam
+	}
+	if out.InvoiceCategory != nil {
+		if _, ok := financeInvoiceCategories[*out.InvoiceCategory]; !ok {
+			return nil, ErrBadParam
+		}
+	}
+	out.OccurredAt, out.OccurredAtSpecified = normalizeIdempotencyIntentTime(out.OccurredAt)
+	return &out, nil
+}
+
+func financeFactTypeCanSettle(factType string) bool {
+	switch strings.ToUpper(strings.TrimSpace(factType)) {
+	case FinanceFactReceivable, FinanceFactPayable, FinanceFactReconciliation:
+		return true
+	default:
+		return false
+	}
 }
 
 func (uc *OperationalFactUsecase) validateFinanceFactSource(ctx context.Context, in *FinanceFactCreate) error {

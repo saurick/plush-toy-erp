@@ -514,7 +514,12 @@ func (d *jsonrpcDispatcher) productionOrderAggregateResult(ctx context.Context, 
 	for _, item := range aggregate.Items {
 		items = append(items, productionOrderItemToMap(item))
 	}
-	return okData(map[string]any{"production_order": productionOrderToMap(aggregate.Order), "production_order_items": items})
+	return okData(map[string]any{
+		"production_order":                 productionOrderToMap(aggregate.Order),
+		"production_order_items":           items,
+		"production_material_requirements": productionOrderMaterialRequirementsToAny(aggregate.MaterialRequirements),
+		"material_requirements_state":      aggregate.MaterialRequirementsState,
+	})
 }
 
 func productionOrderToMap(order *biz.ProductionOrder) map[string]any {

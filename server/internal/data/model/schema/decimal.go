@@ -45,6 +45,15 @@ func decimalRateField(name string) ent.Field {
 		})
 }
 
+func immutableDecimalRateField(name string) ent.Field {
+	return field.Other(name, decimal.Decimal{}).
+		SchemaType(map[string]string{
+			dialect.Postgres: "numeric(20,6)",
+			dialect.SQLite:   "numeric",
+		}).
+		Immutable()
+}
+
 // optionalDecimalField keeps nullable money and quantity snapshots out of float precision.
 func optionalDecimalField(name string) ent.Field {
 	return field.Other(name, decimal.Decimal{}).

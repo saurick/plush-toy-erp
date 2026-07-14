@@ -62,9 +62,11 @@ type BOMHeaderEdges struct {
 	Product *Product `json:"product,omitempty"`
 	// Items holds the value of the items edge.
 	Items []*BOMItem `json:"items,omitempty"`
+	// ProductionOrderMaterialRequirements holds the value of the production_order_material_requirements edge.
+	ProductionOrderMaterialRequirements []*ProductionOrderMaterialRequirement `json:"production_order_material_requirements,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // ProductOrErr returns the Product value or an error if the edge
@@ -85,6 +87,15 @@ func (e BOMHeaderEdges) ItemsOrErr() ([]*BOMItem, error) {
 		return e.Items, nil
 	}
 	return nil, &NotLoadedError{edge: "items"}
+}
+
+// ProductionOrderMaterialRequirementsOrErr returns the ProductionOrderMaterialRequirements value or an error if the edge
+// was not loaded in eager-loading.
+func (e BOMHeaderEdges) ProductionOrderMaterialRequirementsOrErr() ([]*ProductionOrderMaterialRequirement, error) {
+	if e.loadedTypes[2] {
+		return e.ProductionOrderMaterialRequirements, nil
+	}
+	return nil, &NotLoadedError{edge: "production_order_material_requirements"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -247,6 +258,11 @@ func (_m *BOMHeader) QueryProduct() *ProductQuery {
 // QueryItems queries the "items" edge of the BOMHeader entity.
 func (_m *BOMHeader) QueryItems() *BOMItemQuery {
 	return NewBOMHeaderClient(_m.config).QueryItems(_m)
+}
+
+// QueryProductionOrderMaterialRequirements queries the "production_order_material_requirements" edge of the BOMHeader entity.
+func (_m *BOMHeader) QueryProductionOrderMaterialRequirements() *ProductionOrderMaterialRequirementQuery {
+	return NewBOMHeaderClient(_m.config).QueryProductionOrderMaterialRequirements(_m)
 }
 
 // Update returns a builder for updating this BOMHeader.

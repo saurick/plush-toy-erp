@@ -30,6 +30,12 @@ type PurchaseReceiptAdjustment struct {
 	AdjustedAt time.Time `json:"adjusted_at,omitempty"`
 	// PostedAt holds the value of the "posted_at" field.
 	PostedAt *time.Time `json:"posted_at,omitempty"`
+	// IdempotencyKey holds the value of the "idempotency_key" field.
+	IdempotencyKey *string `json:"idempotency_key,omitempty"`
+	// IdempotencyPayloadHash holds the value of the "idempotency_payload_hash" field.
+	IdempotencyPayloadHash *string `json:"idempotency_payload_hash,omitempty"`
+	// IdempotencyItemCount holds the value of the "idempotency_item_count" field.
+	IdempotencyItemCount *int `json:"idempotency_item_count,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -78,9 +84,9 @@ func (*PurchaseReceiptAdjustment) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case purchasereceiptadjustment.FieldID, purchasereceiptadjustment.FieldPurchaseReceiptID:
+		case purchasereceiptadjustment.FieldID, purchasereceiptadjustment.FieldPurchaseReceiptID, purchasereceiptadjustment.FieldIdempotencyItemCount:
 			values[i] = new(sql.NullInt64)
-		case purchasereceiptadjustment.FieldAdjustmentNo, purchasereceiptadjustment.FieldReason, purchasereceiptadjustment.FieldStatus, purchasereceiptadjustment.FieldNote:
+		case purchasereceiptadjustment.FieldAdjustmentNo, purchasereceiptadjustment.FieldReason, purchasereceiptadjustment.FieldStatus, purchasereceiptadjustment.FieldIdempotencyKey, purchasereceiptadjustment.FieldIdempotencyPayloadHash, purchasereceiptadjustment.FieldNote:
 			values[i] = new(sql.NullString)
 		case purchasereceiptadjustment.FieldAdjustedAt, purchasereceiptadjustment.FieldPostedAt, purchasereceiptadjustment.FieldCreatedAt, purchasereceiptadjustment.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -142,6 +148,27 @@ func (_m *PurchaseReceiptAdjustment) assignValues(columns []string, values []any
 			} else if value.Valid {
 				_m.PostedAt = new(time.Time)
 				*_m.PostedAt = value.Time
+			}
+		case purchasereceiptadjustment.FieldIdempotencyKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field idempotency_key", values[i])
+			} else if value.Valid {
+				_m.IdempotencyKey = new(string)
+				*_m.IdempotencyKey = value.String
+			}
+		case purchasereceiptadjustment.FieldIdempotencyPayloadHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field idempotency_payload_hash", values[i])
+			} else if value.Valid {
+				_m.IdempotencyPayloadHash = new(string)
+				*_m.IdempotencyPayloadHash = value.String
+			}
+		case purchasereceiptadjustment.FieldIdempotencyItemCount:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field idempotency_item_count", values[i])
+			} else if value.Valid {
+				_m.IdempotencyItemCount = new(int)
+				*_m.IdempotencyItemCount = int(value.Int64)
 			}
 		case purchasereceiptadjustment.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -228,6 +255,21 @@ func (_m *PurchaseReceiptAdjustment) String() string {
 	if v := _m.PostedAt; v != nil {
 		builder.WriteString("posted_at=")
 		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.IdempotencyKey; v != nil {
+		builder.WriteString("idempotency_key=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.IdempotencyPayloadHash; v != nil {
+		builder.WriteString("idempotency_payload_hash=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.IdempotencyItemCount; v != nil {
+		builder.WriteString("idempotency_item_count=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
 	if v := _m.Note; v != nil {

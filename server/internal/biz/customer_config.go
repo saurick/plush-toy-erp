@@ -2126,6 +2126,8 @@ func customerConfigModulesForAction(actionKey string) []string {
 		return []string{"purchase_receipts"}
 	case strings.HasPrefix(actionKey, "warehouse.inventory."), strings.HasPrefix(actionKey, "warehouse.inbound."), strings.HasPrefix(actionKey, "warehouse.outbound."), strings.HasPrefix(actionKey, "warehouse.adjustment."):
 		return []string{"inventory"}
+	case strings.HasPrefix(actionKey, "stock.reservation."):
+		return []string{"inventory"}
 	case strings.HasPrefix(actionKey, "shipment."):
 		return []string{"shipments"}
 	case strings.HasPrefix(actionKey, "quality."):
@@ -2133,6 +2135,8 @@ func customerConfigModulesForAction(actionKey string) []string {
 	case strings.HasPrefix(actionKey, "finance."):
 		return []string{"finance"}
 	case strings.HasPrefix(actionKey, "pmc."):
+		return []string{"production"}
+	case strings.HasPrefix(actionKey, "production."):
 		return []string{"production"}
 	case actionKey == PermissionMobileSalesAccess:
 		return []string{"sales_orders"}

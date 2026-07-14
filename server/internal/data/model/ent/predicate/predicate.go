@@ -93,6 +93,9 @@ type ProductionOrderEvent func(*sql.Selector)
 // ProductionOrderItem is the predicate function for productionorderitem builders.
 type ProductionOrderItem func(*sql.Selector)
 
+// ProductionOrderMaterialRequirement is the predicate function for productionordermaterialrequirement builders.
+type ProductionOrderMaterialRequirement func(*sql.Selector)
+
 // PurchaseOrder is the predicate function for purchaseorder builders.
 type PurchaseOrder func(*sql.Selector)
 

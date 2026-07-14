@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/productionordermaterialrequirement"
 	"server/internal/data/model/ent/unit"
 	"time"
 
@@ -243,6 +244,21 @@ func (_u *BOMItemUpdate) SetUnit(v *Unit) *BOMItemUpdate {
 	return _u.SetUnitID(v.ID)
 }
 
+// AddProductionOrderMaterialRequirementIDs adds the "production_order_material_requirements" edge to the ProductionOrderMaterialRequirement entity by IDs.
+func (_u *BOMItemUpdate) AddProductionOrderMaterialRequirementIDs(ids ...int) *BOMItemUpdate {
+	_u.mutation.AddProductionOrderMaterialRequirementIDs(ids...)
+	return _u
+}
+
+// AddProductionOrderMaterialRequirements adds the "production_order_material_requirements" edges to the ProductionOrderMaterialRequirement entity.
+func (_u *BOMItemUpdate) AddProductionOrderMaterialRequirements(v ...*ProductionOrderMaterialRequirement) *BOMItemUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductionOrderMaterialRequirementIDs(ids...)
+}
+
 // Mutation returns the BOMItemMutation object of the builder.
 func (_u *BOMItemUpdate) Mutation() *BOMItemMutation {
 	return _u.mutation
@@ -264,6 +280,27 @@ func (_u *BOMItemUpdate) ClearMaterial() *BOMItemUpdate {
 func (_u *BOMItemUpdate) ClearUnit() *BOMItemUpdate {
 	_u.mutation.ClearUnit()
 	return _u
+}
+
+// ClearProductionOrderMaterialRequirements clears all "production_order_material_requirements" edges to the ProductionOrderMaterialRequirement entity.
+func (_u *BOMItemUpdate) ClearProductionOrderMaterialRequirements() *BOMItemUpdate {
+	_u.mutation.ClearProductionOrderMaterialRequirements()
+	return _u
+}
+
+// RemoveProductionOrderMaterialRequirementIDs removes the "production_order_material_requirements" edge to ProductionOrderMaterialRequirement entities by IDs.
+func (_u *BOMItemUpdate) RemoveProductionOrderMaterialRequirementIDs(ids ...int) *BOMItemUpdate {
+	_u.mutation.RemoveProductionOrderMaterialRequirementIDs(ids...)
+	return _u
+}
+
+// RemoveProductionOrderMaterialRequirements removes "production_order_material_requirements" edges to ProductionOrderMaterialRequirement entities.
+func (_u *BOMItemUpdate) RemoveProductionOrderMaterialRequirements(v ...*ProductionOrderMaterialRequirement) *BOMItemUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductionOrderMaterialRequirementIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -505,6 +542,51 @@ func (_u *BOMItemUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.ProductionOrderMaterialRequirementsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   bomitem.ProductionOrderMaterialRequirementsTable,
+			Columns: []string{bomitem.ProductionOrderMaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductionOrderMaterialRequirementsIDs(); len(nodes) > 0 && !_u.mutation.ProductionOrderMaterialRequirementsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   bomitem.ProductionOrderMaterialRequirementsTable,
+			Columns: []string{bomitem.ProductionOrderMaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductionOrderMaterialRequirementsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   bomitem.ProductionOrderMaterialRequirementsTable,
+			Columns: []string{bomitem.ProductionOrderMaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{bomitem.Label}
@@ -736,6 +818,21 @@ func (_u *BOMItemUpdateOne) SetUnit(v *Unit) *BOMItemUpdateOne {
 	return _u.SetUnitID(v.ID)
 }
 
+// AddProductionOrderMaterialRequirementIDs adds the "production_order_material_requirements" edge to the ProductionOrderMaterialRequirement entity by IDs.
+func (_u *BOMItemUpdateOne) AddProductionOrderMaterialRequirementIDs(ids ...int) *BOMItemUpdateOne {
+	_u.mutation.AddProductionOrderMaterialRequirementIDs(ids...)
+	return _u
+}
+
+// AddProductionOrderMaterialRequirements adds the "production_order_material_requirements" edges to the ProductionOrderMaterialRequirement entity.
+func (_u *BOMItemUpdateOne) AddProductionOrderMaterialRequirements(v ...*ProductionOrderMaterialRequirement) *BOMItemUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductionOrderMaterialRequirementIDs(ids...)
+}
+
 // Mutation returns the BOMItemMutation object of the builder.
 func (_u *BOMItemUpdateOne) Mutation() *BOMItemMutation {
 	return _u.mutation
@@ -757,6 +854,27 @@ func (_u *BOMItemUpdateOne) ClearMaterial() *BOMItemUpdateOne {
 func (_u *BOMItemUpdateOne) ClearUnit() *BOMItemUpdateOne {
 	_u.mutation.ClearUnit()
 	return _u
+}
+
+// ClearProductionOrderMaterialRequirements clears all "production_order_material_requirements" edges to the ProductionOrderMaterialRequirement entity.
+func (_u *BOMItemUpdateOne) ClearProductionOrderMaterialRequirements() *BOMItemUpdateOne {
+	_u.mutation.ClearProductionOrderMaterialRequirements()
+	return _u
+}
+
+// RemoveProductionOrderMaterialRequirementIDs removes the "production_order_material_requirements" edge to ProductionOrderMaterialRequirement entities by IDs.
+func (_u *BOMItemUpdateOne) RemoveProductionOrderMaterialRequirementIDs(ids ...int) *BOMItemUpdateOne {
+	_u.mutation.RemoveProductionOrderMaterialRequirementIDs(ids...)
+	return _u
+}
+
+// RemoveProductionOrderMaterialRequirements removes "production_order_material_requirements" edges to ProductionOrderMaterialRequirement entities.
+func (_u *BOMItemUpdateOne) RemoveProductionOrderMaterialRequirements(v ...*ProductionOrderMaterialRequirement) *BOMItemUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductionOrderMaterialRequirementIDs(ids...)
 }
 
 // Where appends a list predicates to the BOMItemUpdate builder.
@@ -1021,6 +1139,51 @@ func (_u *BOMItemUpdateOne) sqlSave(ctx context.Context) (_node *BOMItem, err er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(unit.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductionOrderMaterialRequirementsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   bomitem.ProductionOrderMaterialRequirementsTable,
+			Columns: []string{bomitem.ProductionOrderMaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductionOrderMaterialRequirementsIDs(); len(nodes) > 0 && !_u.mutation.ProductionOrderMaterialRequirementsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   bomitem.ProductionOrderMaterialRequirementsTable,
+			Columns: []string{bomitem.ProductionOrderMaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductionOrderMaterialRequirementsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   bomitem.ProductionOrderMaterialRequirementsTable,
+			Columns: []string{bomitem.ProductionOrderMaterialRequirementsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

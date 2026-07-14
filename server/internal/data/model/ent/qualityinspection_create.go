@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/warehouse"
 	"time"
@@ -290,6 +291,21 @@ func (_c *QualityInspectionCreate) SetMaterial(v *Material) *QualityInspectionCr
 // SetWarehouse sets the "warehouse" edge to the Warehouse entity.
 func (_c *QualityInspectionCreate) SetWarehouse(v *Warehouse) *QualityInspectionCreate {
 	return _c.SetWarehouseID(v.ID)
+}
+
+// AddPurchaseReturnIDs adds the "purchase_returns" edge to the PurchaseReturn entity by IDs.
+func (_c *QualityInspectionCreate) AddPurchaseReturnIDs(ids ...int) *QualityInspectionCreate {
+	_c.mutation.AddPurchaseReturnIDs(ids...)
+	return _c
+}
+
+// AddPurchaseReturns adds the "purchase_returns" edges to the PurchaseReturn entity.
+func (_c *QualityInspectionCreate) AddPurchaseReturns(v ...*PurchaseReturn) *QualityInspectionCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddPurchaseReturnIDs(ids...)
 }
 
 // Mutation returns the QualityInspectionMutation object of the builder.
@@ -628,6 +644,22 @@ func (_c *QualityInspectionCreate) createSpec() (*QualityInspection, *sqlgraph.C
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.WarehouseID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.PurchaseReturnsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   qualityinspection.PurchaseReturnsTable,
+			Columns: []string{qualityinspection.PurchaseReturnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereturn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

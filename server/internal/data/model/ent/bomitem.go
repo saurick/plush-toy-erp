@@ -61,9 +61,11 @@ type BOMItemEdges struct {
 	Material *Material `json:"material,omitempty"`
 	// Unit holds the value of the unit edge.
 	Unit *Unit `json:"unit,omitempty"`
+	// ProductionOrderMaterialRequirements holds the value of the production_order_material_requirements edge.
+	ProductionOrderMaterialRequirements []*ProductionOrderMaterialRequirement `json:"production_order_material_requirements,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [4]bool
 }
 
 // BomHeaderOrErr returns the BomHeader value or an error if the edge
@@ -97,6 +99,15 @@ func (e BOMItemEdges) UnitOrErr() (*Unit, error) {
 		return nil, &NotFoundError{label: unit.Label}
 	}
 	return nil, &NotLoadedError{edge: "unit"}
+}
+
+// ProductionOrderMaterialRequirementsOrErr returns the ProductionOrderMaterialRequirements value or an error if the edge
+// was not loaded in eager-loading.
+func (e BOMItemEdges) ProductionOrderMaterialRequirementsOrErr() ([]*ProductionOrderMaterialRequirement, error) {
+	if e.loadedTypes[3] {
+		return e.ProductionOrderMaterialRequirements, nil
+	}
+	return nil, &NotLoadedError{edge: "production_order_material_requirements"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -243,6 +254,11 @@ func (_m *BOMItem) QueryMaterial() *MaterialQuery {
 // QueryUnit queries the "unit" edge of the BOMItem entity.
 func (_m *BOMItem) QueryUnit() *UnitQuery {
 	return NewBOMItemClient(_m.config).QueryUnit(_m)
+}
+
+// QueryProductionOrderMaterialRequirements queries the "production_order_material_requirements" edge of the BOMItem entity.
+func (_m *BOMItem) QueryProductionOrderMaterialRequirements() *ProductionOrderMaterialRequirementQuery {
+	return NewBOMItemClient(_m.config).QueryProductionOrderMaterialRequirements(_m)
 }
 
 // Update returns a builder for updating this BOMItem.

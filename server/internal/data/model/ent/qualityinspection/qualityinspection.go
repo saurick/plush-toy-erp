@@ -63,6 +63,8 @@ const (
 	EdgeMaterial = "material"
 	// EdgeWarehouse holds the string denoting the warehouse edge name in mutations.
 	EdgeWarehouse = "warehouse"
+	// EdgePurchaseReturns holds the string denoting the purchase_returns edge name in mutations.
+	EdgePurchaseReturns = "purchase_returns"
 	// Table holds the table name of the qualityinspection in the database.
 	Table = "quality_inspections"
 	// PurchaseReceiptTable is the table that holds the purchase_receipt relation/edge.
@@ -100,6 +102,13 @@ const (
 	WarehouseInverseTable = "warehouses"
 	// WarehouseColumn is the table column denoting the warehouse relation/edge.
 	WarehouseColumn = "warehouse_id"
+	// PurchaseReturnsTable is the table that holds the purchase_returns relation/edge.
+	PurchaseReturnsTable = "purchase_returns"
+	// PurchaseReturnsInverseTable is the table name for the PurchaseReturn entity.
+	// It exists in this package in order to avoid circular dependency with the "purchasereturn" package.
+	PurchaseReturnsInverseTable = "purchase_returns"
+	// PurchaseReturnsColumn is the table column denoting the purchase_returns relation/edge.
+	PurchaseReturnsColumn = "quality_inspection_id"
 )
 
 // Columns holds all SQL columns for qualityinspection fields.
@@ -324,6 +333,20 @@ func ByWarehouseField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newWarehouseStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByPurchaseReturnsCount orders the results by purchase_returns count.
+func ByPurchaseReturnsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newPurchaseReturnsStep(), opts...)
+	}
+}
+
+// ByPurchaseReturns orders the results by purchase_returns terms.
+func ByPurchaseReturns(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPurchaseReturnsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newPurchaseReceiptStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -357,5 +380,12 @@ func newWarehouseStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(WarehouseInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, WarehouseTable, WarehouseColumn),
+	)
+}
+func newPurchaseReturnsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PurchaseReturnsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, PurchaseReturnsTable, PurchaseReturnsColumn),
 	)
 }

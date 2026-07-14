@@ -39,8 +39,8 @@ import {
   formatUnixDate,
   formatUnixDateTime,
   trimOptional,
-  V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
+import { businessSourceRouteFor } from '../utils/businessSourceNavigation.mjs'
 import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
@@ -57,7 +57,6 @@ import {
   warehouseOptionFromRecord,
 } from '../utils/referenceSelectOptions.mjs'
 import {
-  routeWithQuery,
   searchParamPositiveIntText,
   searchParamText,
 } from '../utils/routeQuery.mjs'
@@ -297,21 +296,8 @@ function selectedLabelFor(view, row) {
   return `库存项已登记 / 批次 ${row.lot_no || (row.lot_id ? '已关联批次' : '-')}`
 }
 
-function sourceRouteFor(sourceType) {
-  const key = String(sourceType || '')
-    .trim()
-    .toUpperCase()
-  if (key === 'PURCHASE_RECEIPT') return V1_ROUTE_PATHS.purchaseReceipts
-  if (key === 'SHIPMENT') return V1_ROUTE_PATHS.shipments
-  if (key === 'PRODUCTION_FACT') return V1_ROUTE_PATHS.productionProgress
-  if (key === 'OUTSOURCING_FACT') return V1_ROUTE_PATHS.processingContracts
-  return ''
-}
-
 function canOpenSourceDocument(record = {}) {
-  return Boolean(
-    sourceRouteFor(record.source_type) && Number(record.source_id) > 0
-  )
+  return Boolean(businessSourceRouteFor(record.source_type, record.source_id))
 }
 
 export default function V1InventoryLedgerPage() {
@@ -510,15 +496,11 @@ export default function V1InventoryLedgerPage() {
   const openRelatedTable = ({ key }) => {
     if (!selectedRow) return
     if (key === 'source') {
-      const targetPath = sourceRouteFor(selectedRow.source_type)
-      if (targetPath && Number(selectedRow.source_id) > 0) {
-        navigate(
-          routeWithQuery(targetPath, {
-            source_type: selectedRow.source_type,
-            source_id: selectedRow.source_id,
-          })
-        )
-      }
+      const targetPath = businessSourceRouteFor(
+        selectedRow.source_type,
+        selectedRow.source_id
+      )
+      if (targetPath) navigate(targetPath)
     }
   }
 

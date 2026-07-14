@@ -245,13 +245,13 @@ test("status architecture is target-only and separates delivery evidence", () =>
     "implementation evidence",
     evidence,
     "跨层调用方与生成物",
-    ["尚未收口", "repo", "service", "API", "UI", "seed", "fixture", "tests", "Ent generated"],
+    ["已收口", "repo", "service", "API", "UI", "seed", "fixture", "tests", "Ent generated"],
   );
   requireUniqueLine(
     "implementation evidence",
     evidence,
     "| versioned migration |",
-    ["尚未收口", "未迁移"],
+    ["20260714055504", "不能证明", "目标数据库"],
   );
   requireUniqueLine("implementation evidence", evidence, "| 目标环境 |", ["未发布"]);
   requireUniqueLine(
@@ -275,7 +275,7 @@ test("status architecture is target-only and separates delivery evidence", () =>
     "workflow data boundary",
     dataBoundary,
     "中央 registry",
-    ["transition", "跨层调用方", "Ent generated", "versioned migration", "尚未收口"],
+    ["transition", "跨层调用方", "Ent generated", "versioned migration", "本地 Product Core"],
   );
   requireUniqueLine(
     "workflow data boundary",
@@ -289,6 +289,10 @@ test("status architecture is target-only and separates delivery evidence", () =>
     "一次性转换只服务迁移窗口",
     ["usecase", "repo", "API", "UI", "查询筛选"],
   );
-  requireUniqueLine("workflow data boundary", dataBoundary, "正式 Atlas migration", ["未迁移"]);
+  requireUniqueLine("workflow data boundary", dataBoundary, "正式 Atlas migration", [
+    "20260714055504",
+    "不能证明",
+    "目标数据库已迁移",
+  ]);
   requireUniqueLine("workflow data boundary", dataBoundary, "发布证据", ["未发布"]);
 });

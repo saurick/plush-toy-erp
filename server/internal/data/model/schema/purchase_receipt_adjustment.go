@@ -7,6 +7,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -16,12 +17,39 @@ type PurchaseReceiptAdjustment struct {
 	ent.Schema
 }
 
+func (PurchaseReceiptAdjustment) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{Checks: map[string]string{
+			"purchase_receipt_adjustments_idempotency_bundle_complete": `
+(
+  (
+    idempotency_key IS NULL
+    AND idempotency_payload_hash IS NULL
+    AND idempotency_item_count IS NULL
+  )
+  OR
+  (
+    idempotency_key IS NOT NULL
+    AND length(trim(idempotency_key)) BETWEEN 1 AND 128
+    AND idempotency_payload_hash IS NOT NULL
+    AND length(idempotency_payload_hash) = 64
+    AND idempotency_item_count IS NOT NULL
+    AND idempotency_item_count > 0
+  )
+)`,
+		}},
+	}
+}
+
 var purchaseReceiptAdjustmentLockedFields = map[string]struct{}{
-	"adjustment_no":       {},
-	"purchase_receipt_id": {},
-	"status":              {},
-	"adjusted_at":         {},
-	"posted_at":           {},
+	"adjustment_no":            {},
+	"purchase_receipt_id":      {},
+	"status":                   {},
+	"adjusted_at":              {},
+	"posted_at":                {},
+	"idempotency_key":          {},
+	"idempotency_payload_hash": {},
+	"idempotency_item_count":   {},
 }
 
 func (PurchaseReceiptAdjustment) Hooks() []ent.Hook {
@@ -60,6 +88,18 @@ func (PurchaseReceiptAdjustment) Fields() []ent.Field {
 		field.Time("posted_at").
 			Optional().
 			Nillable(),
+		field.String("idempotency_key").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.String("idempotency_payload_hash").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.Int("idempotency_item_count").
+			Optional().
+			Nillable().
+			Positive(),
 		field.String("note").
 			Optional().
 			Nillable().
@@ -88,6 +128,7 @@ func (PurchaseReceiptAdjustment) Edges() []ent.Edge {
 func (PurchaseReceiptAdjustment) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("adjustment_no").Unique(),
+		index.Fields("idempotency_key").Unique(),
 		index.Fields("purchase_receipt_id"),
 		index.Fields("status"),
 		index.Fields("adjusted_at"),

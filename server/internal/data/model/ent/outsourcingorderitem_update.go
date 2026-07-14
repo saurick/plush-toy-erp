@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/unit"
 	"time"
 
@@ -103,6 +104,26 @@ func (_u *OutsourcingOrderItemUpdate) ClearProductID() *OutsourcingOrderItemUpda
 	return _u
 }
 
+// SetProductSkuID sets the "product_sku_id" field.
+func (_u *OutsourcingOrderItemUpdate) SetProductSkuID(v int) *OutsourcingOrderItemUpdate {
+	_u.mutation.SetProductSkuID(v)
+	return _u
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdate) SetNillableProductSkuID(v *int) *OutsourcingOrderItemUpdate {
+	if v != nil {
+		_u.SetProductSkuID(*v)
+	}
+	return _u
+}
+
+// ClearProductSkuID clears the value of the "product_sku_id" field.
+func (_u *OutsourcingOrderItemUpdate) ClearProductSkuID() *OutsourcingOrderItemUpdate {
+	_u.mutation.ClearProductSkuID()
+	return _u
+}
+
 // SetMaterialID sets the "material_id" field.
 func (_u *OutsourcingOrderItemUpdate) SetMaterialID(v int) *OutsourcingOrderItemUpdate {
 	_u.mutation.SetMaterialID(v)
@@ -168,6 +189,26 @@ func (_u *OutsourcingOrderItemUpdate) SetNillableProductNoSnapshot(v *string) *O
 // ClearProductNoSnapshot clears the value of the "product_no_snapshot" field.
 func (_u *OutsourcingOrderItemUpdate) ClearProductNoSnapshot() *OutsourcingOrderItemUpdate {
 	_u.mutation.ClearProductNoSnapshot()
+	return _u
+}
+
+// SetSkuCodeSnapshot sets the "sku_code_snapshot" field.
+func (_u *OutsourcingOrderItemUpdate) SetSkuCodeSnapshot(v string) *OutsourcingOrderItemUpdate {
+	_u.mutation.SetSkuCodeSnapshot(v)
+	return _u
+}
+
+// SetNillableSkuCodeSnapshot sets the "sku_code_snapshot" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdate) SetNillableSkuCodeSnapshot(v *string) *OutsourcingOrderItemUpdate {
+	if v != nil {
+		_u.SetSkuCodeSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearSkuCodeSnapshot clears the value of the "sku_code_snapshot" field.
+func (_u *OutsourcingOrderItemUpdate) ClearSkuCodeSnapshot() *OutsourcingOrderItemUpdate {
+	_u.mutation.ClearSkuCodeSnapshot()
 	return _u
 }
 
@@ -435,6 +476,11 @@ func (_u *OutsourcingOrderItemUpdate) SetProduct(v *Product) *OutsourcingOrderIt
 	return _u.SetProductID(v.ID)
 }
 
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_u *OutsourcingOrderItemUpdate) SetProductSku(v *ProductSKU) *OutsourcingOrderItemUpdate {
+	return _u.SetProductSkuID(v.ID)
+}
+
 // SetMaterial sets the "material" edge to the Material entity.
 func (_u *OutsourcingOrderItemUpdate) SetMaterial(v *Material) *OutsourcingOrderItemUpdate {
 	return _u.SetMaterialID(v.ID)
@@ -464,6 +510,12 @@ func (_u *OutsourcingOrderItemUpdate) ClearOutsourcingOrder() *OutsourcingOrderI
 // ClearProduct clears the "product" edge to the Product entity.
 func (_u *OutsourcingOrderItemUpdate) ClearProduct() *OutsourcingOrderItemUpdate {
 	_u.mutation.ClearProduct()
+	return _u
+}
+
+// ClearProductSku clears the "product_sku" edge to the ProductSKU entity.
+func (_u *OutsourcingOrderItemUpdate) ClearProductSku() *OutsourcingOrderItemUpdate {
+	_u.mutation.ClearProductSku()
 	return _u
 }
 
@@ -543,6 +595,11 @@ func (_u *OutsourcingOrderItemUpdate) check() error {
 			return &ValidationError{Name: "product_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProductSkuID(); ok {
+		if err := outsourcingorderitem.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_sku_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.MaterialID(); ok {
 		if err := outsourcingorderitem.MaterialIDValidator(v); err != nil {
 			return &ValidationError{Name: "material_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.material_id": %w`, err)}
@@ -561,6 +618,11 @@ func (_u *OutsourcingOrderItemUpdate) check() error {
 	if v, ok := _u.mutation.ProductNoSnapshot(); ok {
 		if err := outsourcingorderitem.ProductNoSnapshotValidator(v); err != nil {
 			return &ValidationError{Name: "product_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_no_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SkuCodeSnapshot(); ok {
+		if err := outsourcingorderitem.SkuCodeSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "sku_code_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.sku_code_snapshot": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.ProductOrderNoSnapshot(); ok {
@@ -646,6 +708,12 @@ func (_u *OutsourcingOrderItemUpdate) sqlSave(ctx context.Context) (_node int, e
 	}
 	if _u.mutation.ProductNoSnapshotCleared() {
 		_spec.ClearField(outsourcingorderitem.FieldProductNoSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.SkuCodeSnapshot(); ok {
+		_spec.SetField(outsourcingorderitem.FieldSkuCodeSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.SkuCodeSnapshotCleared() {
+		_spec.ClearField(outsourcingorderitem.FieldSkuCodeSnapshot, field.TypeString)
 	}
 	if value, ok := _u.mutation.ProductOrderNoSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProductOrderNoSnapshot, field.TypeString, value)
@@ -773,6 +841,35 @@ func (_u *OutsourcingOrderItemUpdate) sqlSave(ctx context.Context) (_node int, e
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(product.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductSkuCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingorderitem.ProductSkuTable,
+			Columns: []string{outsourcingorderitem.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingorderitem.ProductSkuTable,
+			Columns: []string{outsourcingorderitem.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -956,6 +1053,26 @@ func (_u *OutsourcingOrderItemUpdateOne) ClearProductID() *OutsourcingOrderItemU
 	return _u
 }
 
+// SetProductSkuID sets the "product_sku_id" field.
+func (_u *OutsourcingOrderItemUpdateOne) SetProductSkuID(v int) *OutsourcingOrderItemUpdateOne {
+	_u.mutation.SetProductSkuID(v)
+	return _u
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdateOne) SetNillableProductSkuID(v *int) *OutsourcingOrderItemUpdateOne {
+	if v != nil {
+		_u.SetProductSkuID(*v)
+	}
+	return _u
+}
+
+// ClearProductSkuID clears the value of the "product_sku_id" field.
+func (_u *OutsourcingOrderItemUpdateOne) ClearProductSkuID() *OutsourcingOrderItemUpdateOne {
+	_u.mutation.ClearProductSkuID()
+	return _u
+}
+
 // SetMaterialID sets the "material_id" field.
 func (_u *OutsourcingOrderItemUpdateOne) SetMaterialID(v int) *OutsourcingOrderItemUpdateOne {
 	_u.mutation.SetMaterialID(v)
@@ -1021,6 +1138,26 @@ func (_u *OutsourcingOrderItemUpdateOne) SetNillableProductNoSnapshot(v *string)
 // ClearProductNoSnapshot clears the value of the "product_no_snapshot" field.
 func (_u *OutsourcingOrderItemUpdateOne) ClearProductNoSnapshot() *OutsourcingOrderItemUpdateOne {
 	_u.mutation.ClearProductNoSnapshot()
+	return _u
+}
+
+// SetSkuCodeSnapshot sets the "sku_code_snapshot" field.
+func (_u *OutsourcingOrderItemUpdateOne) SetSkuCodeSnapshot(v string) *OutsourcingOrderItemUpdateOne {
+	_u.mutation.SetSkuCodeSnapshot(v)
+	return _u
+}
+
+// SetNillableSkuCodeSnapshot sets the "sku_code_snapshot" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdateOne) SetNillableSkuCodeSnapshot(v *string) *OutsourcingOrderItemUpdateOne {
+	if v != nil {
+		_u.SetSkuCodeSnapshot(*v)
+	}
+	return _u
+}
+
+// ClearSkuCodeSnapshot clears the value of the "sku_code_snapshot" field.
+func (_u *OutsourcingOrderItemUpdateOne) ClearSkuCodeSnapshot() *OutsourcingOrderItemUpdateOne {
+	_u.mutation.ClearSkuCodeSnapshot()
 	return _u
 }
 
@@ -1288,6 +1425,11 @@ func (_u *OutsourcingOrderItemUpdateOne) SetProduct(v *Product) *OutsourcingOrde
 	return _u.SetProductID(v.ID)
 }
 
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_u *OutsourcingOrderItemUpdateOne) SetProductSku(v *ProductSKU) *OutsourcingOrderItemUpdateOne {
+	return _u.SetProductSkuID(v.ID)
+}
+
 // SetMaterial sets the "material" edge to the Material entity.
 func (_u *OutsourcingOrderItemUpdateOne) SetMaterial(v *Material) *OutsourcingOrderItemUpdateOne {
 	return _u.SetMaterialID(v.ID)
@@ -1317,6 +1459,12 @@ func (_u *OutsourcingOrderItemUpdateOne) ClearOutsourcingOrder() *OutsourcingOrd
 // ClearProduct clears the "product" edge to the Product entity.
 func (_u *OutsourcingOrderItemUpdateOne) ClearProduct() *OutsourcingOrderItemUpdateOne {
 	_u.mutation.ClearProduct()
+	return _u
+}
+
+// ClearProductSku clears the "product_sku" edge to the ProductSKU entity.
+func (_u *OutsourcingOrderItemUpdateOne) ClearProductSku() *OutsourcingOrderItemUpdateOne {
+	_u.mutation.ClearProductSku()
 	return _u
 }
 
@@ -1409,6 +1557,11 @@ func (_u *OutsourcingOrderItemUpdateOne) check() error {
 			return &ValidationError{Name: "product_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProductSkuID(); ok {
+		if err := outsourcingorderitem.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_sku_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.MaterialID(); ok {
 		if err := outsourcingorderitem.MaterialIDValidator(v); err != nil {
 			return &ValidationError{Name: "material_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.material_id": %w`, err)}
@@ -1427,6 +1580,11 @@ func (_u *OutsourcingOrderItemUpdateOne) check() error {
 	if v, ok := _u.mutation.ProductNoSnapshot(); ok {
 		if err := outsourcingorderitem.ProductNoSnapshotValidator(v); err != nil {
 			return &ValidationError{Name: "product_no_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.product_no_snapshot": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SkuCodeSnapshot(); ok {
+		if err := outsourcingorderitem.SkuCodeSnapshotValidator(v); err != nil {
+			return &ValidationError{Name: "sku_code_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.sku_code_snapshot": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.ProductOrderNoSnapshot(); ok {
@@ -1529,6 +1687,12 @@ func (_u *OutsourcingOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *Ou
 	}
 	if _u.mutation.ProductNoSnapshotCleared() {
 		_spec.ClearField(outsourcingorderitem.FieldProductNoSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.SkuCodeSnapshot(); ok {
+		_spec.SetField(outsourcingorderitem.FieldSkuCodeSnapshot, field.TypeString, value)
+	}
+	if _u.mutation.SkuCodeSnapshotCleared() {
+		_spec.ClearField(outsourcingorderitem.FieldSkuCodeSnapshot, field.TypeString)
 	}
 	if value, ok := _u.mutation.ProductOrderNoSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProductOrderNoSnapshot, field.TypeString, value)
@@ -1656,6 +1820,35 @@ func (_u *OutsourcingOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *Ou
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(product.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductSkuCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingorderitem.ProductSkuTable,
+			Columns: []string{outsourcingorderitem.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingorderitem.ProductSkuTable,
+			Columns: []string{outsourcingorderitem.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

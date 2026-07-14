@@ -23,6 +23,17 @@ test('purchaseApi: exposes purchase receipt methods only', () => {
     'get_purchase_receipt',
     'post_purchase_receipt',
     'cancel_purchase_receipt',
+    'create_purchase_return_from_receipt',
+    'create_purchase_return_from_quality_inspection',
+    'get_purchase_return',
+    'list_purchase_returns',
+    'post_purchase_return',
+    'cancel_purchase_return',
+    'create_purchase_receipt_adjustment_from_receipt',
+    'get_purchase_receipt_adjustment',
+    'list_purchase_receipt_adjustments',
+    'post_purchase_receipt_adjustment',
+    'cancel_purchase_receipt_adjustment',
   ]) {
     assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
   }
@@ -46,6 +57,10 @@ test('purchaseApi: retry-safe writes require hidden keys and validate business r
   assert.match(
     source,
     /addPurchaseReceiptItem[\s\S]*?requirePurchaseReceiptIdempotencyKey\(params\.idempotency_key\)[\s\S]*?validatePurchaseReceiptItem/u
+  )
+  assert.match(
+    source,
+    /createPurchaseReturnFromQualityInspection[\s\S]*?requirePurchaseReceiptIdempotencyKey\(params\.idempotency_key\)[\s\S]*?create_purchase_return_from_quality_inspection/u
   )
   assert.doesNotMatch(source, /idempotency_payload_hash/u)
 })

@@ -190,18 +190,28 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'quality-inspections',
     sectionKey: 'quality',
-    label: '来料质检',
-    title: '来料质检',
+    label: '质量检验',
+    title: '质量检验',
     path: '/erp/production/quality-inspections',
     shortLabel: '质检',
     pageKind: 'formal-v1',
     description:
-      '来料质检用于质检判定和批次状态处理；完成协同任务不会代替质检判定。',
+      '质量检验用于采购来料、委外回货等来源的检验判定和批次状态处理；完成协同任务不会代替质检判定。',
     primaryEntity: 'quality_inspections',
     factSource: 'quality_inspections, inventory_lots',
     boundary: '质检状态变化不直接写库存流水；不合格退供应商仍走采购退货。',
-    sourceRefs: ['quality_inspections', 'inventory_lots', 'purchase_receipts'],
-    currentScope: ['待检批次', '质检判定', '批次冻结 / 可用 / 不合格状态'],
+    sourceRefs: [
+      'quality_inspections',
+      'inventory_lots',
+      'purchase_receipts',
+      'outsourcing_facts',
+    ],
+    currentScope: [
+      '采购来料检验',
+      '委外回货检验',
+      '质检判定',
+      '批次冻结 / 可用 / 不合格状态',
+    ],
   },
   {
     key: 'inventory',
@@ -241,12 +251,12 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '委外',
     pageKind: 'formal-v1',
     description:
-      '委外订单维护加工合同、工序明细、加工厂承诺和打印内容；发料、回货、质检和应付需在对应模块处理。',
+      '委外订单维护加工合同、工序明细、加工厂承诺和打印内容；已确认合同可在本页按明细生成委外发料或回货草稿。',
     primaryEntity: 'outsourcing_orders / outsourcing_order_items',
     factSource:
-      'outsourcing_orders, outsourcing_order_items, processes, suppliers, products',
+      'outsourcing_orders, outsourcing_order_items, outsourcing_facts, quality_inspections, finance_facts',
     boundary:
-      '确认加工合同只表示委外承诺已确认；不会自动更新库存、质检、应付、发票、付款或协同任务状态；委外发料和回货需在对应业务入口登记。',
+      '确认加工合同只表示委外承诺已确认；发料和回货必须由本页显式办理并在委外记录中过账，回货质检和应付继续使用正式来源动作。',
     sourceRefs: [
       'outsourcing_orders',
       'outsourcing_order_items',
@@ -254,6 +264,8 @@ export const businessModuleDefinitions = Object.freeze([
       'suppliers',
       'products',
       'outsourcing_facts',
+      'quality_inspections',
+      'finance_facts',
     ],
     currentScope: [
       '加工合同',
@@ -262,7 +274,8 @@ export const businessModuleDefinitions = Object.freeze([
       '加工合同打印内容',
       '导出筛选结果 / 列顺序 / 本页协同',
       '单位主数据可读选择',
-      '委外发料 / 回货处理范围',
+      '从已确认合同行生成委外发料 / 回货草稿',
+      '从已过账回货发起质检 / 合格后生成应付',
     ],
   },
   {
@@ -274,11 +287,12 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '生产订单',
     pageKind: 'formal-v1',
     description:
-      '生产订单维护生产计划源单的草稿、发布、关闭和取消；完工、领料和库存变动在生产进度处理。',
+      '生产订单维护生产计划源单的草稿、发布、关闭和取消；已发布订单可在本页从冻结需求办理领料或完工入库草稿。',
     primaryEntity: 'production_orders / production_order_items',
-    factSource: 'production_orders, production_order_items',
+    factSource:
+      'production_orders, production_order_items, production_order_material_requirements, production_facts',
     boundary:
-      '生产订单只表达计划承诺，不会自动登记完工、领料、库存、协同任务或财务记录。',
+      '生产订单只表达计划承诺；领料和完工必须由本页显式办理，草稿仍需在生产记录中过账后才会形成库存流水。',
     sourceRefs: [
       'production_orders',
       'production_order_items',
@@ -287,12 +301,15 @@ export const businessModuleDefinitions = Object.freeze([
       'units',
       'sales_order_items',
       'bom_headers',
+      'production_order_material_requirements',
+      'production_facts',
     ],
     currentScope: [
       '生产计划草稿与明细',
       '发布、关闭和取消状态动作',
       '销售来源与当前生效 BOM 可读选择',
-      '生产事实保持独立办理',
+      '从冻结物料需求生成领料草稿',
+      '从已发布订单行生成完工入库草稿',
     ],
   },
   {
@@ -436,13 +453,19 @@ export const businessModuleDefinitions = Object.freeze([
     path: '/erp/finance/reconciliation',
     shortLabel: '对账',
     pageKind: 'formal-v1',
-    description: '对账管理记录往来核对结果，可过账、结清或取消。',
+    description:
+      '对账管理记录单笔业务核对结果；核对草稿只能从已过账应收、应付或发票生成。',
     primaryEntity: 'finance_facts.RECONCILIATION',
     factSource: 'finance_facts',
     boundary:
       '对账记录不会自动生成付款、应收、应付、发票、总账或会计凭证；差异需按实际业务继续处理。',
     sourceRefs: ['finance_facts'],
-    currentScope: ['创建对账记录', '过账', '结清', '取消'],
+    currentScope: [
+      '从已过账应收 / 应付 / 发票生成单笔核对',
+      '过账',
+      '完成核对',
+      '取消',
+    ],
   },
   {
     key: 'payables',
@@ -452,13 +475,20 @@ export const businessModuleDefinitions = Object.freeze([
     path: '/erp/finance/payables',
     shortLabel: '应付',
     pageKind: 'formal-v1',
-    description: '应付管理记录应付款项，可过账、结清或取消。',
+    description:
+      '应付管理记录来源明确的应付款项，可过账、结清或取消。',
     primaryEntity: 'finance_facts.PAYABLE',
     factSource: 'finance_facts',
     boundary:
-      '应付记录必须来源于采购、委外或对账；不表示付款审批、付款、总账或费用报销已经完成。',
+      '应付记录只从已过账采购入库或已完成合格 / 让步质检的委外回货生成；不表示付款审批、付款、总账或费用报销已经完成。',
     sourceRefs: ['finance_facts', 'purchase_receipts', 'outsourcing_facts'],
-    currentScope: ['创建应付记录', '过账', '结清', '取消'],
+    currentScope: [
+      '从已过账采购入库生成应付',
+      '从合格 / 让步委外回货生成应付',
+      '过账',
+      '结清',
+      '取消',
+    ],
   },
   {
     key: 'receivables',
@@ -468,13 +498,14 @@ export const businessModuleDefinitions = Object.freeze([
     path: '/erp/finance/receivables',
     shortLabel: '应收',
     pageKind: 'formal-v1',
-    description: '应收管理记录应收款项，可过账、结清或取消。',
+    description:
+      '应收管理记录已出货业务产生的应收款项，可过账、结清或取消。',
     primaryEntity: 'finance_facts.RECEIVABLE',
     factSource: 'finance_facts',
     boundary:
-      '应收至少应在真实出货后评审，不由销售订单、出货放行或任务完成直接生成；当前不代表收款核销、总账或税控已交付。',
+      '应收只从已出货出货单生成，不由销售订单、出货放行或任务完成直接生成；当前不代表收款核销、总账或税控已交付。',
     sourceRefs: ['finance_facts', 'shipments'],
-    currentScope: ['创建应收记录', '过账', '结清', '取消'],
+    currentScope: ['从已出货出货单生成应收', '过账', '结清', '取消'],
   },
   {
     key: 'invoices',
@@ -484,12 +515,14 @@ export const businessModuleDefinitions = Object.freeze([
     path: '/erp/finance/invoices',
     shortLabel: '发票',
     pageKind: 'formal-v1',
-    description: '发票管理记录业务开票状态。',
+    description:
+      '发票管理记录已出货业务的开票事实；业务记录不等于税控开票完成。',
     primaryEntity: 'finance_facts.INVOICE',
     factSource: 'finance_facts',
-    boundary: '发票记录不替代税控、发票查验、纳税申报、附件归档或会计凭证。',
-    sourceRefs: ['finance_facts'],
-    currentScope: ['创建发票记录', '过账', '结清', '取消'],
+    boundary:
+      '发票记录只从已出货出货单生成，不提供结清动作，也不替代税控、发票查验、纳税申报、附件归档或会计凭证。',
+    sourceRefs: ['finance_facts', 'shipments'],
+    currentScope: ['从已出货出货单生成发票记录', '过账', '取消'],
   },
 ])
 

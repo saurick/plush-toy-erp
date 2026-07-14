@@ -27,10 +27,6 @@ export function buildInspectionParams(values = {}) {
     inspection_no: trimOptional(values.inspection_no),
     purchase_receipt_id: positiveInt(values.purchase_receipt_id),
     purchase_receipt_item_id: positiveInt(values.purchase_receipt_item_id),
-    inventory_lot_id: positiveInt(values.inventory_lot_id),
-    material_id: positiveInt(values.material_id),
-    warehouse_id: positiveInt(values.warehouse_id),
-    inspector_id: positiveInt(values.inspector_id),
     decision_note: trimOptional(values.decision_note),
   })
 }
@@ -49,12 +45,7 @@ export function QualityInspectionCreateForm({
   form,
   purchaseReceiptOptions,
   purchaseReceiptItemOptions,
-  inventoryLotOptions,
-  materialOptions,
-  warehouseOptions,
   onReceiptChange,
-  onReceiptItemChange,
-  onInventoryLotChange,
 }) {
   return (
     <Form
@@ -93,56 +84,13 @@ export function QualityInspectionCreateForm({
         className="erp-business-action-form__field"
         label="采购入库行"
         name="purchase_receipt_item_id"
+        rules={[{ required: true, message: '请选择采购入库行' }]}
       >
         <Select
           allowClear
           optionFilterProp="label"
           options={purchaseReceiptItemOptions}
           placeholder="请选择采购入库行"
-          showSearch
-          onChange={onReceiptItemChange}
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="批次"
-        name="inventory_lot_id"
-        rules={[{ required: true, message: '请选择批次' }]}
-      >
-        <Select
-          allowClear
-          optionFilterProp="label"
-          options={inventoryLotOptions}
-          placeholder="请选择批次"
-          showSearch
-          onChange={onInventoryLotChange}
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="材料"
-        name="material_id"
-        rules={[{ required: true, message: '请选择材料' }]}
-      >
-        <Select
-          allowClear
-          optionFilterProp="label"
-          options={materialOptions}
-          placeholder="请选择材料"
-          showSearch
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="仓库"
-        name="warehouse_id"
-        rules={[{ required: true, message: '请选择仓库' }]}
-      >
-        <Select
-          allowClear
-          optionFilterProp="label"
-          options={warehouseOptions}
-          placeholder="请选择仓库"
           showSearch
         />
       </Form.Item>

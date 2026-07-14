@@ -16,6 +16,163 @@ import { buildWorkflowTaskBoardMock } from '../../src/mocks/workflowTaskBoardMoc
 import { purchaseReceiptMutationSignature } from '../../src/erp/utils/purchaseReceiptMutation.mjs'
 import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
 
+const SALES_ORDER_RESERVATION_CREATE_KEYS = new Set([
+  'customer_key',
+  'reservation_no',
+  'sales_order_id',
+  'sales_order_item_id',
+  'warehouse_id',
+  'lot_id',
+  'quantity',
+  'reserved_at',
+  'note',
+  'idempotency_key',
+])
+
+const OUTSOURCING_MATERIAL_ISSUE_CREATE_KEYS = new Set([
+  'customer_key',
+  'fact_no',
+  'outsourcing_order_id',
+  'outsourcing_order_item_id',
+  'warehouse_id',
+  'lot_id',
+  'quantity',
+  'occurred_at',
+  'note',
+  'idempotency_key',
+])
+const OUTSOURCING_RETURN_RECEIPT_CREATE_KEYS = new Set([
+  ...OUTSOURCING_MATERIAL_ISSUE_CREATE_KEYS,
+  'new_lot_no',
+])
+
+const OUTSOURCING_RETURN_QUALITY_LIST_KEYS = new Set([
+  'customer_key',
+  'fact_id',
+  'status',
+  'result',
+  'keyword',
+  'inventory_lot_id',
+  'warehouse_id',
+  'product_id',
+  'date_from',
+  'date_to',
+  'limit',
+  'offset',
+])
+
+const PRODUCTION_COMPLETION_CREATE_KEYS = new Set([
+  'customer_key',
+  'fact_no',
+  'production_order_id',
+  'production_order_item_id',
+  'warehouse_id',
+  'lot_id',
+  'new_lot_no',
+  'quantity',
+  'idempotency_key',
+  'occurred_at',
+  'note',
+])
+
+const PRODUCTION_REWORK_CREATE_KEYS = new Set([
+  'customer_key',
+  'fact_no',
+  'source_completion_fact_id',
+  'quantity',
+  'idempotency_key',
+  'occurred_at',
+  'reason',
+])
+
+const SHIPMENT_FINANCE_CREATE_KEYS = new Set([
+  'customer_key',
+  'fact_no',
+  'shipment_id',
+  'idempotency_key',
+  'occurred_at',
+  'note',
+])
+
+const PURCHASE_RECEIPT_PAYABLE_CREATE_KEYS = new Set([
+  'customer_key',
+  'fact_no',
+  'purchase_receipt_id',
+  'idempotency_key',
+  'occurred_at',
+  'note',
+])
+
+const OUTSOURCING_RETURN_PAYABLE_CREATE_KEYS = new Set([
+  'customer_key',
+  'fact_no',
+  'outsourcing_fact_id',
+  'idempotency_key',
+  'occurred_at',
+  'note',
+])
+
+const SINGLE_FACT_RECONCILIATION_CREATE_KEYS = new Set([
+  'customer_key',
+  'fact_no',
+  'finance_fact_id',
+  'idempotency_key',
+  'occurred_at',
+  'note',
+])
+
+function validSourceFinanceCreate(params, allowedKeys, sourceIDKey) {
+  const idempotencyKey = String(params?.idempotency_key || '').trim()
+  return (
+    Object.keys(params || {}).every((key) => allowedKeys.has(key)) &&
+    String(params?.fact_no || '').trim() !== '' &&
+    String(params?.fact_no || '').trim().length <= 64 &&
+    Number.isSafeInteger(Number(params?.[sourceIDKey])) &&
+    Number(params?.[sourceIDKey]) > 0 &&
+    idempotencyKey !== '' &&
+    [...idempotencyKey].length <= 128
+  )
+}
+
+function validInboundLotIntent(params, { allowNew }) {
+  const lotID = Number(params?.lot_id || 0)
+  const newLotNo = String(params?.new_lot_no || '').trim()
+  const hasExisting = Number.isSafeInteger(lotID) && lotID > 0
+  const hasNew = newLotNo !== ''
+  return (
+    hasExisting !== hasNew &&
+    (!hasNew || (allowNew && [...newLotNo].length <= 64))
+  )
+}
+
+function sourceInboundRequestIntent(method, params) {
+  return JSON.stringify([
+    method,
+    Object.entries(params || {}).sort(([left], [right]) =>
+      left.localeCompare(right)
+    ),
+  ])
+}
+
+const PRODUCTION_MATERIAL_REQUIREMENTS_LIST_KEYS = new Set([
+  'customer_key',
+  'production_order_id',
+])
+
+const PRODUCTION_MATERIAL_ISSUE_CREATE_KEYS = new Set([
+  'customer_key',
+  'fact_no',
+  'production_order_id',
+  'production_order_item_id',
+  'production_order_material_requirement_id',
+  'warehouse_id',
+  'lot_id',
+  'quantity',
+  'idempotency_key',
+  'occurred_at',
+  'note',
+])
+
 function purchaseReceiptMutationResult(attempts, scope, params, create) {
   const idempotencyKey = String(params?.idempotency_key || '').trim()
   if (!idempotencyKey || [...idempotencyKey].length > 128) {
@@ -42,6 +199,14 @@ function purchaseReceiptMutationResult(attempts, scope, params, create) {
 export async function installFactRpcMocks(page, context) {
   const { adminProfile, effectiveSession, nowUnix, resolveDelayFromReferer } =
     context
+  const createdProductionCompletions = []
+  const createdProductionMaterialIssues = []
+  const createdProductionReworks = []
+  const createdOutsourcingFacts = []
+  const ambiguousInboundResponses = new Set()
+  const productionCompletionAttempts = new Map()
+  const productionReworkAttempts = new Map()
+  const outsourcingSourceFactAttempts = new Map()
 
   await page.route('**/rpc/operational_fact', async (route) => {
     const body = route.request().postDataJSON() || {}
@@ -95,6 +260,43 @@ export async function installFactRpcMocks(page, context) {
       created_at: nowUnix(),
       updated_at: nowUnix(),
     }
+    const postedProductionCompletion = {
+      ...productionFact,
+      id: 81,
+      fact_no: 'PROD-FG-POSTED-L1',
+      status: 'POSTED',
+      subject_id: 301,
+      product_sku_id: 401,
+      warehouse_id: 1,
+      unit_id: 501,
+      lot_id: 480,
+      quantity: '6',
+      source_type: 'PRODUCTION_ORDER',
+      source_id: 71,
+      source_line_id: 7100,
+      idempotency_key: 'PROD-FG-POSTED-L1',
+      note: '已过账成品入库',
+    }
+    const productionMaterialRequirement = {
+      id: 7201,
+      production_order_id: 71,
+      production_order_item_id: 7101,
+      bom_header_id: 701,
+      bom_item_id: 7301,
+      material_id: 1,
+      unit_id: 1,
+      unit_quantity_snapshot: '0.500000',
+      loss_rate_snapshot: '0.020000',
+      planned_quantity: '10.200000',
+      issued_quantity: '2.200000',
+      remaining_quantity: '8.000000',
+      material_code_snapshot: 'MAT-STYLE-L1',
+      material_name_snapshot: '样式短毛绒布',
+      unit_code_snapshot: 'M',
+      unit_name_snapshot: '米',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
     const outsourcingFact = {
       id: 1,
       fact_no: 'OUTSOURCE-FACT-L1',
@@ -116,6 +318,23 @@ export async function installFactRpcMocks(page, context) {
       note: '样式委外事实',
       created_at: nowUnix(),
       updated_at: nowUnix(),
+    }
+    const postedOutsourcingReturn = {
+      ...outsourcingFact,
+      id: 3,
+      fact_no: 'OUT-RR-POSTED-L1',
+      fact_type: 'RETURN_RECEIPT',
+      status: 'POSTED',
+      subject_type: 'PRODUCT',
+      subject_id: 1,
+      product_sku_id: 1,
+      lot_id: 402,
+      quantity: '2',
+      source_type: 'OUTSOURCING_ORDER',
+      source_id: 1,
+      source_line_id: 12,
+      idempotency_key: 'OUT-RR-POSTED-L1',
+      note: '已过账委外回货',
     }
     const stockReservation = {
       id: 1,
@@ -159,7 +378,8 @@ export async function installFactRpcMocks(page, context) {
       amount: '1200',
       fee_amount: '0',
       currency: 'CNY',
-      source_type: financeFactType === 'PAYABLE' ? 'PURCHASE' : 'SHIPMENT',
+      source_type:
+        financeFactType === 'PAYABLE' ? 'PURCHASE_RECEIPT' : 'SHIPMENT',
       source_id: 1,
       source_line_id: null,
       idempotency_key: financeFactNoByType[financeFactType] || 'FIN-STYLE-L1',
@@ -172,16 +392,253 @@ export async function installFactRpcMocks(page, context) {
     let data = {}
     switch (method) {
       case 'list_production_facts':
-        data = {
-          production_facts: [productionFact],
-          total: 1,
-          limit: 100,
-          offset: 0,
+        {
+          const facts = [
+            productionFact,
+            postedProductionCompletion,
+            ...createdProductionCompletions,
+            ...createdProductionMaterialIssues,
+            ...createdProductionReworks,
+          ].filter(
+            (fact) =>
+              (!params.source_type ||
+                fact.source_type === params.source_type) &&
+              (!params.source_id ||
+                Number(fact.source_id || 0) === Number(params.source_id)) &&
+              (!params.source_line_id ||
+                Number(fact.source_line_id || 0) ===
+                  Number(params.source_line_id))
+          )
+          data = {
+            production_facts: facts,
+            total: facts.length,
+            limit: Number(params.limit || 100),
+            offset: Number(params.offset || 0),
+          }
         }
         break
-      case 'create_production_fact':
+      case 'create_production_completion_from_order':
+        {
+          const requiredValues = [
+            params.fact_no,
+            params.production_order_id,
+            params.production_order_item_id,
+            params.warehouse_id,
+            params.quantity,
+            params.idempotency_key,
+          ]
+          if (
+            !Object.keys(params).every((key) =>
+              PRODUCTION_COMPLETION_CREATE_KEYS.has(key)
+            ) ||
+            requiredValues.some((value) => !String(value ?? '').trim()) ||
+            Number(params.production_order_id) !== 71 ||
+            !Number.isSafeInteger(Number(params.production_order_item_id)) ||
+            Number(params.production_order_item_id) <= 0 ||
+            !Number.isFinite(Number(params.quantity)) ||
+            Number(params.quantity) <= 0 ||
+            !validInboundLotIntent(params, { allowNew: true })
+          ) {
+            data = unsupportedRpcMethod(
+              'operational_fact',
+              'create_production_completion_from_order invalid params'
+            )
+            break
+          }
+          const intent = sourceInboundRequestIntent(method, params)
+          const attempt = productionCompletionAttempts.get(
+            params.idempotency_key
+          )
+          if (attempt && attempt.intent !== intent) {
+            data = unsupportedRpcMethod(
+              'operational_fact',
+              'create_production_completion_from_order idempotency intent conflict'
+            )
+            break
+          }
+          const existing = attempt?.fact
+          const created = existing || {
+            id: 180 + createdProductionCompletions.length,
+            fact_no: params.fact_no,
+            fact_type: 'FINISHED_GOODS_RECEIPT',
+            status: 'DRAFT',
+            subject_type: 'PRODUCT',
+            subject_id: 301,
+            product_sku_id: 401,
+            warehouse_id: Number(params.warehouse_id),
+            unit_id: 501,
+            lot_id: Number(params.lot_id || 480),
+            quantity: params.quantity,
+            source_type: 'PRODUCTION_ORDER',
+            source_id: Number(params.production_order_id),
+            source_line_id: Number(params.production_order_item_id),
+            idempotency_key: params.idempotency_key,
+            occurred_at: params.occurred_at
+              ? Math.floor(new Date(params.occurred_at).getTime() / 1000)
+              : nowUnix(),
+            note: params.note || '',
+            created_at: nowUnix(),
+            updated_at: nowUnix(),
+          }
+          if (!existing) {
+            createdProductionCompletions.push(created)
+            productionCompletionAttempts.set(params.idempotency_key, {
+              fact: created,
+              intent,
+            })
+          }
+          const ambiguous =
+            params.new_lot_no === 'PROD-NEW-LOT-REREAD-L1' &&
+            !ambiguousInboundResponses.has(params.idempotency_key)
+          if (ambiguous) {
+            ambiguousInboundResponses.add(params.idempotency_key)
+          }
+          data = { production_fact: ambiguous ? null : created }
+        }
+        break
+      case 'create_production_rework_from_completion':
+        {
+          const idempotencyKey = String(params.idempotency_key || '').trim()
+          const reason = String(params.reason || '').trim()
+          const quantity = Number(params.quantity || 0)
+          if (
+            !Object.keys(params).every((key) =>
+              PRODUCTION_REWORK_CREATE_KEYS.has(key)
+            ) ||
+            !String(params.fact_no || '').trim() ||
+            [...String(params.fact_no || '').trim()].length > 64 ||
+            Number(params.source_completion_fact_id) !==
+              postedProductionCompletion.id ||
+            !Number.isFinite(quantity) ||
+            quantity <= 0 ||
+            quantity > Number(postedProductionCompletion.quantity) ||
+            !idempotencyKey ||
+            [...idempotencyKey].length > 128 ||
+            !reason ||
+            [...reason].length > 255
+          ) {
+            data = unsupportedRpcMethod(
+              'operational_fact',
+              'create_production_rework_from_completion invalid params'
+            )
+            break
+          }
+          const intent = sourceInboundRequestIntent(method, params)
+          const attempt = productionReworkAttempts.get(idempotencyKey)
+          if (attempt && attempt.intent !== intent) {
+            data = unsupportedRpcMethod(
+              'operational_fact',
+              'create_production_rework_from_completion idempotency intent conflict'
+            )
+            break
+          }
+          const existing = attempt?.fact
+          const created = existing || {
+            ...postedProductionCompletion,
+            id: 280 + createdProductionReworks.length,
+            fact_no: params.fact_no,
+            fact_type: 'REWORK',
+            status: 'DRAFT',
+            quantity: params.quantity,
+            source_type: 'PRODUCTION_FACT',
+            source_id: postedProductionCompletion.id,
+            source_line_id: postedProductionCompletion.source_line_id,
+            idempotency_key: idempotencyKey,
+            occurred_at: params.occurred_at
+              ? Math.floor(new Date(params.occurred_at).getTime() / 1000)
+              : nowUnix(),
+            note: reason,
+          }
+          if (!existing) {
+            createdProductionReworks.push(created)
+            productionReworkAttempts.set(idempotencyKey, {
+              fact: created,
+              intent,
+            })
+          }
+          const ambiguous =
+            reason === 'STYLE-L1-REWORK-REREAD' &&
+            !ambiguousInboundResponses.has(idempotencyKey)
+          if (ambiguous) ambiguousInboundResponses.add(idempotencyKey)
+          data = { production_fact: ambiguous ? null : created }
+        }
+        break
+      case 'list_production_order_material_requirements':
+        if (
+          !Object.keys(params).every((key) =>
+            PRODUCTION_MATERIAL_REQUIREMENTS_LIST_KEYS.has(key)
+          ) ||
+          !Number.isSafeInteger(params.production_order_id) ||
+          params.production_order_id <= 0
+        ) {
+          data = unsupportedRpcMethod(
+            'operational_fact',
+            'list_production_order_material_requirements invalid params'
+          )
+          break
+        }
         data = {
-          production_fact: { ...productionFact, id: 2, ...params },
+          material_requirements:
+            params.production_order_id === 71
+              ? [productionMaterialRequirement]
+              : [],
+        }
+        break
+      case 'create_production_material_issue_from_order':
+        {
+          const requiredValues = [
+            params.fact_no,
+            params.production_order_id,
+            params.production_order_item_id,
+            params.production_order_material_requirement_id,
+            params.warehouse_id,
+            params.lot_id,
+            params.quantity,
+            params.idempotency_key,
+          ]
+          if (
+            !Object.keys(params).every((key) =>
+              PRODUCTION_MATERIAL_ISSUE_CREATE_KEYS.has(key)
+            ) ||
+            requiredValues.some((value) => !String(value ?? '').trim()) ||
+            Number(params.production_order_id) !== 71 ||
+            Number(params.production_order_item_id) !== 7101 ||
+            Number(params.production_order_material_requirement_id) !== 7201
+          ) {
+            data = unsupportedRpcMethod(
+              'operational_fact',
+              'create_production_material_issue_from_order invalid params'
+            )
+            break
+          }
+          const existing = createdProductionMaterialIssues.find(
+            (fact) => fact.idempotency_key === params.idempotency_key
+          )
+          const created = existing || {
+            id: 200 + createdProductionMaterialIssues.length,
+            fact_no: params.fact_no,
+            fact_type: 'MATERIAL_ISSUE',
+            status: 'DRAFT',
+            subject_type: 'MATERIAL',
+            subject_id: productionMaterialRequirement.material_id,
+            product_sku_id: null,
+            warehouse_id: Number(params.warehouse_id),
+            unit_id: productionMaterialRequirement.unit_id,
+            lot_id: Number(params.lot_id),
+            quantity: params.quantity,
+            source_type: 'PRODUCTION_ORDER',
+            source_id: Number(params.production_order_id),
+            source_line_id: Number(
+              params.production_order_material_requirement_id
+            ),
+            idempotency_key: params.idempotency_key,
+            occurred_at: params.occurred_at || nowUnix(),
+            note: params.note || '',
+            created_at: nowUnix(),
+            updated_at: nowUnix(),
+          }
+          if (!existing) createdProductionMaterialIssues.push(created)
+          data = { production_fact: created }
         }
         break
       case 'post_production_fact':
@@ -195,16 +652,107 @@ export async function installFactRpcMocks(page, context) {
         }
         break
       case 'list_outsourcing_facts':
-        data = {
-          outsourcing_facts: [outsourcingFact],
-          total: 1,
-          limit: 100,
-          offset: 0,
+        {
+          const facts = [
+            outsourcingFact,
+            postedOutsourcingReturn,
+            ...createdOutsourcingFacts,
+          ].filter(
+            (fact) =>
+              (!params.source_type ||
+                fact.source_type === params.source_type) &&
+              (!params.source_id ||
+                Number(fact.source_id || 0) === Number(params.source_id)) &&
+              (!params.source_line_id ||
+                Number(fact.source_line_id || 0) ===
+                  Number(params.source_line_id))
+          )
+          data = {
+            outsourcing_facts: facts,
+            total: facts.length,
+            limit: Number(params.limit || 100),
+            offset: Number(params.offset || 0),
+          }
         }
         break
-      case 'create_outsourcing_fact':
-        data = {
-          outsourcing_fact: { ...outsourcingFact, id: 2, ...params },
+      case 'create_outsourcing_material_issue_from_order':
+      case 'create_outsourcing_return_receipt_from_order':
+        {
+          const isMaterialIssue =
+            method === 'create_outsourcing_material_issue_from_order'
+          const requiredValues = [
+            params.fact_no,
+            params.quantity,
+            params.idempotency_key,
+          ]
+          const requiredPositiveIDs = [
+            params.outsourcing_order_id,
+            params.outsourcing_order_item_id,
+            params.warehouse_id,
+          ]
+          const idempotencyKey = String(params.idempotency_key || '').trim()
+          const allowedKeys = isMaterialIssue
+            ? OUTSOURCING_MATERIAL_ISSUE_CREATE_KEYS
+            : OUTSOURCING_RETURN_RECEIPT_CREATE_KEYS
+          if (
+            !Object.keys(params).every((key) => allowedKeys.has(key)) ||
+            requiredValues.some((value) => !String(value ?? '').trim()) ||
+            requiredPositiveIDs.some(
+              (value) =>
+                !Number.isSafeInteger(Number(value)) || Number(value) <= 0
+            ) ||
+            !Number.isFinite(Number(params.quantity)) ||
+            Number(params.quantity) <= 0 ||
+            [...idempotencyKey].length > 128 ||
+            !validInboundLotIntent(params, { allowNew: !isMaterialIssue })
+          ) {
+            data = unsupportedRpcMethod(
+              'operational_fact',
+              `${method} invalid params`
+            )
+            break
+          }
+          const intent = sourceInboundRequestIntent(method, params)
+          const attempt = outsourcingSourceFactAttempts.get(idempotencyKey)
+          if (attempt && attempt.intent !== intent) {
+            data = unsupportedRpcMethod(
+              'operational_fact',
+              `${method} idempotency intent conflict`
+            )
+            break
+          }
+          const existing = attempt?.fact
+          const created = existing || {
+            ...outsourcingFact,
+            id: 20 + createdOutsourcingFacts.length,
+            fact_no: params.fact_no,
+            fact_type: isMaterialIssue ? 'MATERIAL_ISSUE' : 'RETURN_RECEIPT',
+            status: 'DRAFT',
+            subject_type: isMaterialIssue ? 'MATERIAL' : 'PRODUCT',
+            subject_id: 1,
+            product_sku_id: isMaterialIssue ? null : 1,
+            warehouse_id: Number(params.warehouse_id),
+            lot_id: Number(params.lot_id || 482),
+            quantity: params.quantity,
+            source_type: 'OUTSOURCING_ORDER',
+            source_id: Number(params.outsourcing_order_id),
+            source_line_id: Number(params.outsourcing_order_item_id),
+            idempotency_key: params.idempotency_key,
+            occurred_at: params.occurred_at || nowUnix(),
+            note: params.note || '',
+          }
+          if (!existing) {
+            createdOutsourcingFacts.push(created)
+            outsourcingSourceFactAttempts.set(idempotencyKey, {
+              fact: created,
+              intent,
+            })
+          }
+          const ambiguous =
+            params.new_lot_no === 'OUT-NEW-LOT-REREAD-L1' &&
+            !ambiguousInboundResponses.has(idempotencyKey)
+          if (ambiguous) ambiguousInboundResponses.add(idempotencyKey)
+          data = { outsourcing_fact: ambiguous ? null : created }
         }
         break
       case 'post_outsourcing_fact':
@@ -258,9 +806,32 @@ export async function installFactRpcMocks(page, context) {
           offset: 0,
         }
         break
-      case 'create_stock_reservation':
+      case 'create_stock_reservation_from_sales_order':
+        if (
+          !Object.keys(params).every((key) =>
+            SALES_ORDER_RESERVATION_CREATE_KEYS.has(key)
+          )
+        ) {
+          data = unsupportedRpcMethod(
+            'operational_fact',
+            'create_stock_reservation_from_sales_order invalid params'
+          )
+          break
+        }
         data = {
-          stock_reservation: { ...stockReservation, id: 2, ...params },
+          stock_reservation: {
+            ...stockReservation,
+            id: 2,
+            reservation_no: params.reservation_no,
+            sales_order_id: Number(params.sales_order_id),
+            sales_order_item_id: Number(params.sales_order_item_id),
+            warehouse_id: Number(params.warehouse_id),
+            lot_id: params.lot_id ? Number(params.lot_id) : null,
+            quantity: params.quantity,
+            idempotency_key: params.idempotency_key,
+            reserved_at: params.reserved_at || nowUnix(),
+            note: params.note || '',
+          },
         }
         break
       case 'release_stock_reservation':
@@ -269,10 +840,178 @@ export async function installFactRpcMocks(page, context) {
         }
         break
       case 'list_finance_facts':
-        data = { finance_facts: [financeFact], total: 1, limit: 100, offset: 0 }
+        {
+          const facts = [financeFact].filter(
+            (fact) =>
+              (!params.source_type ||
+                fact.source_type === params.source_type) &&
+              (!params.source_id ||
+                Number(fact.source_id || 0) === Number(params.source_id))
+          )
+          data = {
+            finance_facts: facts,
+            total: facts.length,
+            limit: Number(params.limit || 100),
+            offset: Number(params.offset || 0),
+          }
+        }
         break
-      case 'create_finance_fact':
-        data = { finance_fact: { ...financeFact, id: 2, ...params } }
+      case 'create_receivable_from_shipment':
+        if (
+          !validSourceFinanceCreate(
+            params,
+            SHIPMENT_FINANCE_CREATE_KEYS,
+            'shipment_id'
+          )
+        ) {
+          data = unsupportedRpcMethod(
+            'operational_fact',
+            'create_receivable_from_shipment invalid params'
+          )
+          break
+        }
+        data = {
+          finance_fact: {
+            ...financeFact,
+            id: 19,
+            fact_no: params.fact_no,
+            fact_type: 'RECEIVABLE',
+            status: 'DRAFT',
+            counterparty_type: 'CUSTOMER',
+            amount: '125.00',
+            currency: 'CNY',
+            source_type: 'SHIPMENT',
+            source_id: Number(params.shipment_id),
+            idempotency_key: params.idempotency_key,
+            occurred_at: params.occurred_at || nowUnix(),
+            note: params.note || '',
+          },
+        }
+        break
+      case 'create_invoice_from_shipment':
+        if (
+          !validSourceFinanceCreate(
+            params,
+            SHIPMENT_FINANCE_CREATE_KEYS,
+            'shipment_id'
+          )
+        ) {
+          data = unsupportedRpcMethod(
+            'operational_fact',
+            'create_invoice_from_shipment invalid params'
+          )
+          break
+        }
+        data = {
+          finance_fact: {
+            ...financeFact,
+            id: 20,
+            fact_no: params.fact_no,
+            fact_type: 'INVOICE',
+            status: 'DRAFT',
+            counterparty_type: 'CUSTOMER',
+            amount: '125.00',
+            currency: 'CNY',
+            source_type: 'SHIPMENT',
+            source_id: Number(params.shipment_id),
+            idempotency_key: params.idempotency_key,
+            occurred_at: params.occurred_at || nowUnix(),
+            note: params.note || '',
+          },
+        }
+        break
+      case 'create_payable_from_purchase_receipt':
+        if (
+          !validSourceFinanceCreate(
+            params,
+            PURCHASE_RECEIPT_PAYABLE_CREATE_KEYS,
+            'purchase_receipt_id'
+          )
+        ) {
+          data = unsupportedRpcMethod(
+            'operational_fact',
+            'create_payable_from_purchase_receipt invalid params'
+          )
+          break
+        }
+        data = {
+          finance_fact: {
+            ...financeFact,
+            id: 21,
+            fact_no: params.fact_no,
+            fact_type: 'PAYABLE',
+            status: 'DRAFT',
+            counterparty_type: 'SUPPLIER',
+            amount: '70.00',
+            currency: 'CNY',
+            source_type: 'PURCHASE_RECEIPT',
+            source_id: Number(params.purchase_receipt_id),
+            idempotency_key: params.idempotency_key,
+            occurred_at: params.occurred_at || nowUnix(),
+            note: params.note || '',
+          },
+        }
+        break
+      case 'create_payable_from_outsourcing_return':
+        if (
+          !validSourceFinanceCreate(
+            params,
+            OUTSOURCING_RETURN_PAYABLE_CREATE_KEYS,
+            'outsourcing_fact_id'
+          )
+        ) {
+          data = unsupportedRpcMethod(
+            'operational_fact',
+            'create_payable_from_outsourcing_return invalid params'
+          )
+          break
+        }
+        data = {
+          finance_fact: {
+            ...financeFact,
+            id: 22,
+            fact_no: params.fact_no,
+            fact_type: 'PAYABLE',
+            status: 'DRAFT',
+            counterparty_type: 'SUPPLIER',
+            amount: '4.00',
+            currency: 'CNY',
+            source_type: 'OUTSOURCING_FACT',
+            source_id: Number(params.outsourcing_fact_id),
+            idempotency_key: params.idempotency_key,
+            occurred_at: params.occurred_at || nowUnix(),
+            note: params.note || '',
+          },
+        }
+        break
+      case 'create_reconciliation_from_finance_fact':
+        if (
+          !validSourceFinanceCreate(
+            params,
+            SINGLE_FACT_RECONCILIATION_CREATE_KEYS,
+            'finance_fact_id'
+          )
+        ) {
+          data = unsupportedRpcMethod(
+            'operational_fact',
+            'create_reconciliation_from_finance_fact invalid params'
+          )
+          break
+        }
+        data = {
+          finance_fact: {
+            ...financeFact,
+            id: 23,
+            fact_no: params.fact_no,
+            fact_type: 'RECONCILIATION',
+            status: 'DRAFT',
+            source_type: 'FINANCE_FACT',
+            source_id: Number(params.finance_fact_id),
+            idempotency_key: params.idempotency_key,
+            occurred_at: params.occurred_at || nowUnix(),
+            note: params.note || '',
+          },
+        }
         break
       case 'post_finance_fact':
         data = { finance_fact: { ...financeFact, status: 'POSTED' } }
@@ -323,6 +1062,7 @@ export async function installFactRpcMocks(page, context) {
     {
       id: 601,
       receipt_no: 'PR-STYLE-L1',
+      supplier_id: 1,
       supplier_name: '样式供应商',
       warehouse_id: 1,
       received_at: nowUnix(),
@@ -368,6 +1108,49 @@ export async function installFactRpcMocks(page, context) {
     },
   ]
   const purchaseReceiptMutationAttempts = new Map()
+  const purchaseReturnRecord = {
+    id: 901,
+    return_no: 'PRT-STYLE-L1',
+    purchase_receipt_id: 601,
+    supplier_name: '样式供应商',
+    status: 'DRAFT',
+    returned_at: nowUnix(),
+    note: '样式采购退货',
+    items: [
+      {
+        id: 911,
+        return_id: 901,
+        purchase_receipt_item_id: 602,
+        material_id: 1,
+        warehouse_id: 1,
+        unit_id: 1,
+        lot_id: 401,
+        quantity: '2',
+      },
+    ],
+  }
+  const purchaseReceiptAdjustmentRecord = {
+    id: 902,
+    adjustment_no: 'PRA-STYLE-L1',
+    purchase_receipt_id: 601,
+    reason: '样式数量核对',
+    status: 'POSTED',
+    adjusted_at: nowUnix(),
+    note: '样式入库调整',
+    items: [
+      {
+        id: 912,
+        adjustment_id: 902,
+        purchase_receipt_item_id: 602,
+        adjust_type: 'QUANTITY_DECREASE',
+        material_id: 1,
+        warehouse_id: 1,
+        unit_id: 1,
+        lot_id: 401,
+        quantity: '1',
+      },
+    ],
+  }
 
   await page.route('**/rpc/purchase', async (route) => {
     const body = route.request().postDataJSON() || {}
@@ -539,6 +1322,48 @@ export async function installFactRpcMocks(page, context) {
           rpcResult = mutation.error || null
         }
         break
+      case 'list_purchase_returns':
+        data = {
+          purchase_returns:
+            Number(params.purchase_receipt_id || 0) === 601
+              ? [purchaseReturnRecord]
+              : [],
+          total: Number(params.purchase_receipt_id || 0) === 601 ? 1 : 0,
+          limit: Number(params.limit || 100),
+          offset: Number(params.offset || 0),
+        }
+        break
+      case 'post_purchase_return':
+        purchaseReturnRecord.status = 'POSTED'
+        data = { purchase_return: purchaseReturnRecord }
+        break
+      case 'cancel_purchase_return':
+        purchaseReturnRecord.status = 'CANCELLED'
+        data = { purchase_return: purchaseReturnRecord }
+        break
+      case 'list_purchase_receipt_adjustments':
+        data = {
+          purchase_receipt_adjustments:
+            Number(params.purchase_receipt_id || 0) === 601
+              ? [purchaseReceiptAdjustmentRecord]
+              : [],
+          total: Number(params.purchase_receipt_id || 0) === 601 ? 1 : 0,
+          limit: Number(params.limit || 100),
+          offset: Number(params.offset || 0),
+        }
+        break
+      case 'post_purchase_receipt_adjustment':
+        purchaseReceiptAdjustmentRecord.status = 'POSTED'
+        data = {
+          purchase_receipt_adjustment: purchaseReceiptAdjustmentRecord,
+        }
+        break
+      case 'cancel_purchase_receipt_adjustment':
+        purchaseReceiptAdjustmentRecord.status = 'CANCELLED'
+        data = {
+          purchase_receipt_adjustment: purchaseReceiptAdjustmentRecord,
+        }
+        break
       default:
         data = unsupportedRpcMethod('purchase', method)
         break
@@ -566,12 +1391,36 @@ export async function installFactRpcMocks(page, context) {
       inventory_lot_id: 401,
       material_id: 1,
       warehouse_id: 1,
+      source_type: 'PURCHASE_RECEIPT',
+      source_id: 601,
+      inspection_type: 'INCOMING',
+      subject_type: 'MATERIAL',
+      subject_id: 1,
       status: 'SUBMITTED',
       result: '',
       original_lot_status: 'HOLD',
       inspected_at: 0,
       inspector_id: null,
       decision_note: '等待品质判定',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+    const acceptedOutsourcingReturnInspection = {
+      id: 703,
+      inspection_no: 'QI-OUT-PASS-STYLE-L1',
+      inventory_lot_id: 402,
+      warehouse_id: 1,
+      source_type: 'OUTSOURCING_FACT',
+      source_id: 3,
+      inspection_type: 'OUTSOURCING_RETURN',
+      subject_type: 'PRODUCT',
+      subject_id: 1,
+      status: 'PASSED',
+      result: 'PASS',
+      original_lot_status: 'HOLD',
+      inspected_at: nowUnix(),
+      inspector_id: 1,
+      decision_note: '委外回货质检合格',
       created_at: nowUnix(),
       updated_at: nowUnix(),
     }
@@ -597,6 +1446,33 @@ export async function installFactRpcMocks(page, context) {
             total: qualityInspections.length,
             limit: 100,
             offset: 0,
+          }
+        }
+        break
+      case 'list_outsourcing_return_quality_inspections':
+        if (
+          !Object.keys(params).every((key) =>
+            OUTSOURCING_RETURN_QUALITY_LIST_KEYS.has(key)
+          )
+        ) {
+          data = unsupportedRpcMethod('quality', `${method}:invalid-params`)
+          break
+        }
+        {
+          const qualityInspections = [
+            acceptedOutsourcingReturnInspection,
+          ].filter(
+            (inspection) =>
+              (!params.fact_id ||
+                Number(params.fact_id) === Number(inspection.source_id)) &&
+              (!params.status || params.status === inspection.status) &&
+              (!params.result || params.result === inspection.result)
+          )
+          data = {
+            quality_inspections: qualityInspections,
+            total: qualityInspections.length,
+            limit: Number(params.limit || 50),
+            offset: Number(params.offset || 0),
           }
         }
         break
@@ -662,6 +1538,14 @@ export async function installFactRpcMocks(page, context) {
       status: 'HOLD',
       received_at: nowUnix(),
       updated_at: nowUnix(),
+    }
+    const activeMaterialLot = {
+      ...inventoryLot,
+      id: 403,
+      warehouse_id: 1,
+      lot_no: 'MAT-LOT-STYLE-L1',
+      supplier_lot_no: 'MAT-SUP-LOT-L1',
+      status: 'ACTIVE',
     }
     const skuInventoryLot = {
       id: 402,
@@ -740,7 +1624,14 @@ export async function installFactRpcMocks(page, context) {
         break
       case 'list_inventory_lots':
         {
-          const inventoryLots = [inventoryLot, skuInventoryLot].filter(
+          const candidates = [inventoryLot, skuInventoryLot]
+          if (
+            params.status === 'ACTIVE' &&
+            params.subject_type === 'MATERIAL'
+          ) {
+            candidates.push(activeMaterialLot)
+          }
+          const inventoryLots = candidates.filter(
             (item) =>
               (!params.subject_type ||
                 item.subject_type === params.subject_type) &&
@@ -748,6 +1639,10 @@ export async function installFactRpcMocks(page, context) {
                 item.subject_id === Number(params.subject_id)) &&
               (!params.product_sku_id ||
                 item.product_sku_id === Number(params.product_sku_id)) &&
+              (!params.warehouse_id ||
+                !item.warehouse_id ||
+                item.warehouse_id === Number(params.warehouse_id)) &&
+              (!params.status || item.status === params.status) &&
               matchesKeyword(
                 item.id,
                 item.lot_no,

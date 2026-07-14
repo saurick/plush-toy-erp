@@ -18,7 +18,7 @@ import {
   isSupportedPrintWorkspaceTemplate,
 } from "../../web/src/erp/utils/printWorkspace.js";
 
-const EXPECTED_DESKTOP_PAGE_COUNT = 26;
+const EXPECTED_DESKTOP_PAGE_COUNT = 27;
 const EXPECTED_MOBILE_PAGE_COUNT = 9;
 const EXPECTED_PRINT_TEMPLATE_COUNT = 5;
 const FORMAL_TRIAL_ACCOUNT_COUNT = 10;
@@ -282,6 +282,27 @@ const DESKTOP_PLANS = Object.freeze({
     whatToSee: [
       "应看到加工厂、产品、工序、数量、单价、金额和回货日期在各处一致。",
       "应看到确认合同只表示委外内容已经确认，不会提前显示已经发料、回货、质检或付款。",
+    ],
+  },
+  "production-orders": {
+    isList: true,
+    minimumRecords: 45,
+    minimumRecordUnit: "生产订单",
+    keyStates: [
+      "草稿",
+      "已发布",
+      "已关闭",
+      "已取消",
+      "物料需求齐全",
+      "物料需求待复核",
+    ],
+    whatToDo: [
+      "你要按生产单号、来源订单、产品和状态查找，分别打开草稿、已发布、已关闭和已取消的生产订单。",
+      "你要从一张资料齐全的已发布试用生产订单分别生成一笔领料草稿和一笔完工草稿，再到生产记录核对来源与数量。",
+    ],
+    whatToSee: [
+      "应看到来源订单、产品、计划数量、物料需求、已处理数量和剩余数量前后一致，待复核需求不能办理领料。",
+      "应看到领料和完工先生成待核对记录，只有在生产记录中过账后才会影响库存，重复办理不能超过剩余数量。",
     ],
   },
   "production-progress": {

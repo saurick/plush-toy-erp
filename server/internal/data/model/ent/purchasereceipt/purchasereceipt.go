@@ -17,6 +17,8 @@ const (
 	FieldID = "id"
 	// FieldReceiptNo holds the string denoting the receipt_no field in the database.
 	FieldReceiptNo = "receipt_no"
+	// FieldSupplierID holds the string denoting the supplier_id field in the database.
+	FieldSupplierID = "supplier_id"
 	// FieldSupplierName holds the string denoting the supplier_name field in the database.
 	FieldSupplierName = "supplier_name"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -37,6 +39,8 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
+	// EdgeSupplier holds the string denoting the supplier edge name in mutations.
+	EdgeSupplier = "supplier"
 	// EdgePurchaseReturns holds the string denoting the purchase_returns edge name in mutations.
 	EdgePurchaseReturns = "purchase_returns"
 	// EdgePurchaseReceiptAdjustments holds the string denoting the purchase_receipt_adjustments edge name in mutations.
@@ -47,6 +51,13 @@ const (
 	EdgeItems = "items"
 	// Table holds the table name of the purchasereceipt in the database.
 	Table = "purchase_receipts"
+	// SupplierTable is the table that holds the supplier relation/edge.
+	SupplierTable = "purchase_receipts"
+	// SupplierInverseTable is the table name for the Supplier entity.
+	// It exists in this package in order to avoid circular dependency with the "supplier" package.
+	SupplierInverseTable = "suppliers"
+	// SupplierColumn is the table column denoting the supplier relation/edge.
+	SupplierColumn = "supplier_id"
 	// PurchaseReturnsTable is the table that holds the purchase_returns relation/edge.
 	PurchaseReturnsTable = "purchase_returns"
 	// PurchaseReturnsInverseTable is the table name for the PurchaseReturn entity.
@@ -81,6 +92,7 @@ const (
 var Columns = []string{
 	FieldID,
 	FieldReceiptNo,
+	FieldSupplierID,
 	FieldSupplierName,
 	FieldStatus,
 	FieldReceivedAt,
@@ -112,6 +124,8 @@ var (
 	Hooks [1]ent.Hook
 	// ReceiptNoValidator is a validator for the "receipt_no" field. It is called by the builders before save.
 	ReceiptNoValidator func(string) error
+	// SupplierIDValidator is a validator for the "supplier_id" field. It is called by the builders before save.
+	SupplierIDValidator func(int) error
 	// SupplierNameValidator is a validator for the "supplier_name" field. It is called by the builders before save.
 	SupplierNameValidator func(string) error
 	// DefaultStatus holds the default value on creation for the "status" field.
@@ -145,6 +159,11 @@ func ByID(opts ...sql.OrderTermOption) OrderOption {
 // ByReceiptNo orders the results by the receipt_no field.
 func ByReceiptNo(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldReceiptNo, opts...).ToFunc()
+}
+
+// BySupplierID orders the results by the supplier_id field.
+func BySupplierID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSupplierID, opts...).ToFunc()
 }
 
 // BySupplierName orders the results by the supplier_name field.
@@ -195,6 +214,13 @@ func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdatedAt orders the results by the updated_at field.
 func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
+}
+
+// BySupplierField orders the results by supplier field.
+func BySupplierField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSupplierStep(), sql.OrderByField(field, opts...))
+	}
 }
 
 // ByPurchaseReturnsCount orders the results by purchase_returns count.
@@ -251,6 +277,13 @@ func ByItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newItemsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
+}
+func newSupplierStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(SupplierInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, SupplierTable, SupplierColumn),
+	)
 }
 func newPurchaseReturnsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(

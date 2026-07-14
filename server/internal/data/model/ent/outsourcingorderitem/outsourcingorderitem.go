@@ -22,6 +22,8 @@ const (
 	FieldSubjectType = "subject_type"
 	// FieldProductID holds the string denoting the product_id field in the database.
 	FieldProductID = "product_id"
+	// FieldProductSkuID holds the string denoting the product_sku_id field in the database.
+	FieldProductSkuID = "product_sku_id"
 	// FieldMaterialID holds the string denoting the material_id field in the database.
 	FieldMaterialID = "material_id"
 	// FieldProcessID holds the string denoting the process_id field in the database.
@@ -30,6 +32,8 @@ const (
 	FieldUnitID = "unit_id"
 	// FieldProductNoSnapshot holds the string denoting the product_no_snapshot field in the database.
 	FieldProductNoSnapshot = "product_no_snapshot"
+	// FieldSkuCodeSnapshot holds the string denoting the sku_code_snapshot field in the database.
+	FieldSkuCodeSnapshot = "sku_code_snapshot"
 	// FieldProductOrderNoSnapshot holds the string denoting the product_order_no_snapshot field in the database.
 	FieldProductOrderNoSnapshot = "product_order_no_snapshot"
 	// FieldProductNameSnapshot holds the string denoting the product_name_snapshot field in the database.
@@ -64,6 +68,8 @@ const (
 	EdgeOutsourcingOrder = "outsourcing_order"
 	// EdgeProduct holds the string denoting the product edge name in mutations.
 	EdgeProduct = "product"
+	// EdgeProductSku holds the string denoting the product_sku edge name in mutations.
+	EdgeProductSku = "product_sku"
 	// EdgeMaterial holds the string denoting the material edge name in mutations.
 	EdgeMaterial = "material"
 	// EdgeProcess holds the string denoting the process edge name in mutations.
@@ -86,6 +92,13 @@ const (
 	ProductInverseTable = "products"
 	// ProductColumn is the table column denoting the product relation/edge.
 	ProductColumn = "product_id"
+	// ProductSkuTable is the table that holds the product_sku relation/edge.
+	ProductSkuTable = "outsourcing_order_items"
+	// ProductSkuInverseTable is the table name for the ProductSKU entity.
+	// It exists in this package in order to avoid circular dependency with the "productsku" package.
+	ProductSkuInverseTable = "product_skus"
+	// ProductSkuColumn is the table column denoting the product_sku relation/edge.
+	ProductSkuColumn = "product_sku_id"
 	// MaterialTable is the table that holds the material relation/edge.
 	MaterialTable = "outsourcing_order_items"
 	// MaterialInverseTable is the table name for the Material entity.
@@ -116,10 +129,12 @@ var Columns = []string{
 	FieldLineNo,
 	FieldSubjectType,
 	FieldProductID,
+	FieldProductSkuID,
 	FieldMaterialID,
 	FieldProcessID,
 	FieldUnitID,
 	FieldProductNoSnapshot,
+	FieldSkuCodeSnapshot,
 	FieldProductOrderNoSnapshot,
 	FieldProductNameSnapshot,
 	FieldMaterialCodeSnapshot,
@@ -156,6 +171,8 @@ var (
 	SubjectTypeValidator func(string) error
 	// ProductIDValidator is a validator for the "product_id" field. It is called by the builders before save.
 	ProductIDValidator func(int) error
+	// ProductSkuIDValidator is a validator for the "product_sku_id" field. It is called by the builders before save.
+	ProductSkuIDValidator func(int) error
 	// MaterialIDValidator is a validator for the "material_id" field. It is called by the builders before save.
 	MaterialIDValidator func(int) error
 	// ProcessIDValidator is a validator for the "process_id" field. It is called by the builders before save.
@@ -164,6 +181,8 @@ var (
 	UnitIDValidator func(int) error
 	// ProductNoSnapshotValidator is a validator for the "product_no_snapshot" field. It is called by the builders before save.
 	ProductNoSnapshotValidator func(string) error
+	// SkuCodeSnapshotValidator is a validator for the "sku_code_snapshot" field. It is called by the builders before save.
+	SkuCodeSnapshotValidator func(string) error
 	// ProductOrderNoSnapshotValidator is a validator for the "product_order_no_snapshot" field. It is called by the builders before save.
 	ProductOrderNoSnapshotValidator func(string) error
 	// ProductNameSnapshotValidator is a validator for the "product_name_snapshot" field. It is called by the builders before save.
@@ -220,6 +239,11 @@ func ByProductID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProductID, opts...).ToFunc()
 }
 
+// ByProductSkuID orders the results by the product_sku_id field.
+func ByProductSkuID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProductSkuID, opts...).ToFunc()
+}
+
 // ByMaterialID orders the results by the material_id field.
 func ByMaterialID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMaterialID, opts...).ToFunc()
@@ -238,6 +262,11 @@ func ByUnitID(opts ...sql.OrderTermOption) OrderOption {
 // ByProductNoSnapshot orders the results by the product_no_snapshot field.
 func ByProductNoSnapshot(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProductNoSnapshot, opts...).ToFunc()
+}
+
+// BySkuCodeSnapshot orders the results by the sku_code_snapshot field.
+func BySkuCodeSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSkuCodeSnapshot, opts...).ToFunc()
 }
 
 // ByProductOrderNoSnapshot orders the results by the product_order_no_snapshot field.
@@ -329,6 +358,13 @@ func ByProductField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
+// ByProductSkuField orders the results by product_sku field.
+func ByProductSkuField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProductSkuStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByMaterialField orders the results by material field.
 func ByMaterialField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -361,6 +397,13 @@ func newProductStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(ProductInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, ProductTable, ProductColumn),
+	)
+}
+func newProductSkuStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProductSkuInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, ProductSkuTable, ProductSkuColumn),
 	)
 }
 func newMaterialStep() *sqlgraph.Step {

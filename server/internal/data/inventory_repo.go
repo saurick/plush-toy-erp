@@ -19,8 +19,10 @@ import (
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/stockreservation"
+	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/warehouse"
 
@@ -53,6 +55,19 @@ var _ biz.PurchaseReceiptCancellationActorRepo = (*inventoryRepo)(nil)
 var _ biz.PurchaseReceiptCreateProcessCommandRepo = (*inventoryRepo)(nil)
 var _ biz.InventoryPostInboundProcessCommandRepo = (*inventoryRepo)(nil)
 var _ biz.QualityInspectionProcessCommandRepo = (*inventoryRepo)(nil)
+
+func (r *inventoryRepo) GetSupplier(ctx context.Context, id int) (*biz.Supplier, error) {
+	row, err := r.data.postgres.Supplier.Query().
+		Where(supplier.ID(id)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSupplierNotFound
+		}
+		return nil, err
+	}
+	return entSupplierToBiz(row), nil
+}
 
 func (r *inventoryRepo) MaterialIsActive(ctx context.Context, id int) (bool, error) {
 	row, err := r.data.postgres.Material.Query().
@@ -793,15 +808,44 @@ func validateInventoryLotForTxn(ctx context.Context, client *ent.Client, in *biz
 	if lot.SubjectType != in.SubjectType || lot.SubjectID != in.SubjectID || !sameOptionalInt(lot.ProductSkuID, in.ProductSkuID) {
 		return biz.ErrBadParam
 	}
-	if err := validateInventoryLotStatusForTxn(lot.Status, in); err != nil {
+	allowBlockedLotDisposition, err := isProductionReworkDispositionTxn(ctx, client, in)
+	if err != nil {
+		return err
+	}
+	if err := validateInventoryLotStatusForTxn(lot.Status, in, allowBlockedLotDisposition); err != nil {
 		return err
 	}
 	return nil
 }
 
-func validateInventoryLotStatusForTxn(status string, in *biz.InventoryTxnCreate) error {
+func isProductionReworkDispositionTxn(ctx context.Context, client *ent.Client, in *biz.InventoryTxnCreate) (bool, error) {
+	if in.Direction >= 0 || in.TxnType != biz.InventoryTxnOut || in.SourceType != biz.ProductionFactSourceType || in.SourceID == nil {
+		return false, nil
+	}
+	row, err := client.ProductionFact.Query().
+		Where(productionfact.ID(*in.SourceID)).
+		Select(productionfact.FieldFactType).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return row.FactType == biz.ProductionFactRework, nil
+}
+
+func validateInventoryLotStatusForTxn(status string, in *biz.InventoryTxnCreate, allowBlockedLotDisposition bool) error {
 	if in.TxnType == biz.InventoryTxnReversal || in.Direction >= 0 {
 		return nil
+	}
+	if allowBlockedLotDisposition && in.TxnType == biz.InventoryTxnOut {
+		switch status {
+		case biz.InventoryLotActive, biz.InventoryLotHold, biz.InventoryLotRejected:
+			return nil
+		default:
+			return biz.ErrInventoryLotStatusBlocked
+		}
 	}
 	if in.SourceType == biz.PurchaseReturnSourceType && in.TxnType == biz.InventoryTxnOut {
 		switch status {

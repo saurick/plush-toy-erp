@@ -4,6 +4,10 @@ import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 
 import { createBusinessAttachmentAssertions } from './businessAttachmentAssertions.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
+import { createOutsourcingSourceFactScenarios } from './outsourcingSourceFactScenarios.mjs'
+import { createProductionSourceInboundLotScenarios } from './productionSourceInboundLotScenarios.mjs'
+import { createProductionReworkScenarios } from './productionReworkScenarios.mjs'
+import { createQualitySourceActionScenarios } from './qualitySourceActionScenarios.mjs'
 
 export function createBusinessFormalScenarios(deps) {
   const {
@@ -589,6 +593,10 @@ export function createBusinessFormalScenarios(deps) {
   }
 
   return [
+    ...createOutsourcingSourceFactScenarios(deps),
+    ...createProductionSourceInboundLotScenarios(deps),
+    ...createProductionReworkScenarios(deps),
+    ...createQualitySourceActionScenarios(deps),
     (() => {
       let consoleErrors = []
       let itemReadCalls = 0
@@ -2086,7 +2094,7 @@ export function createBusinessFormalScenarios(deps) {
         await gotoScenarioPath(page, '/erp/production/quality-inspections', {
           waitUntil: 'domcontentloaded',
         })
-        await expectHeading(page, '来料质检')
+        await expectHeading(page, '质量检验')
         await expectButton(page, '生成质检草稿')
         await expectButton(page, '导出筛选结果')
         await expectButton(page, '列顺序')
@@ -2119,19 +2127,19 @@ export function createBusinessFormalScenarios(deps) {
             '质检单号',
             '状态',
             '判定',
-            '采购来源',
-            '物料批次',
+            '检验来源',
+            '检验对象 / 批次',
             '检验信息',
             '判定备注',
           ],
-          `来料质检默认表头应合并为可扫读列: ${JSON.stringify(
+          `质量检验默认表头应合并为可扫读列: ${JSON.stringify(
             qualityInspectionHeaderMetrics
           )}`
         )
         assert.deepEqual(
           qualityInspectionHeaderMetrics.clippedHeaders,
           [],
-          `来料质检默认表头不应出现省略号: ${JSON.stringify(
+          `质量检验默认表头不应出现省略号: ${JSON.stringify(
             qualityInspectionHeaderMetrics
           )}`
         )
@@ -2186,7 +2194,7 @@ export function createBusinessFormalScenarios(deps) {
         await page.keyboard.press('Enter')
         await assertBusinessTableEmptyState(page, {
           scenarioName: 'business-v1-quality-inspections-empty-search',
-          emptyText: '暂无来料质检单',
+          emptyText: '暂无质量检验单',
           staleText: 'QI-STYLE-L1',
         })
         forceEmptyQualityInspections = false
@@ -2195,7 +2203,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, 'QI-STYLE-L1')
         await verifyBusinessModuleColumnOrderDialog(page, {
           moduleKey: 'quality-inspections',
-          heading: '来料质检',
+          heading: '质量检验',
         })
         await assertBusinessFormModalKeyboardRecovery(page, {
           triggerName: '生成质检草稿',
@@ -2209,10 +2217,22 @@ export function createBusinessFormalScenarios(deps) {
         await verifyBusinessActionFormModal(page, {
           buttonName: '生成质检草稿',
           titleText: '生成来料质检草稿',
-          minFieldCount: 7,
+          minFieldCount: 4,
           screenshotName: 'business-v1-quality-inspection-create-form-modal',
-          expectedTexts: ['采购入库单', '采购入库行', '批次', '材料', '仓库'],
-          absentTexts: ['采购入库单 ID', '批次 ID', '材料 ID', '仓库 ID'],
+          expectedTexts: [
+            '质检单号（自动）',
+            '采购入库单',
+            '采购入库行',
+            '备注',
+          ],
+          absentTexts: [
+            '采购入库单 ID',
+            '批次 ID',
+            '材料 ID',
+            '仓库 ID',
+            'source_type',
+            'source_id',
+          ],
           afterOpen: async (modal) => {
             await assertNonItemTextareaFullRow(modal, {
               labels: ['备注'],
@@ -3359,6 +3379,485 @@ export function createBusinessFormalScenarios(deps) {
         )
       },
     },
+    (() => {
+      let operationalFactMethods = []
+      let reservationCreateParams = []
+      let salesOrderMethods = []
+      return {
+        name: 'sales-order-source-reservation-create-desktop',
+        path: '/erp/sales/project-orders/sales-orders',
+        auth: 'admin',
+        effectiveSession: customerRuntimeEffectiveSession,
+        viewport: { width: 1440, height: 900 },
+        adminProfile: {
+          username: 'style-l1-sales-order-reservation',
+          is_super_admin: true,
+          permissions: ['stock.reservation.create'],
+        },
+        beforeNavigate: async (page) => {
+          operationalFactMethods = []
+          reservationCreateParams = []
+          salesOrderMethods = []
+          page.on('request', (request) => {
+            if (request.url().includes('/rpc/sales_order')) {
+              try {
+                const method = request.postDataJSON()?.method
+                if (method) salesOrderMethods.push(method)
+              } catch {
+                // 非 JSON-RPC 请求不参与本断言。
+              }
+            }
+            if (!request.url().includes('/rpc/operational_fact')) return
+            try {
+              const body = request.postDataJSON() || {}
+              if (body.method) operationalFactMethods.push(body.method)
+              if (body.method === 'create_stock_reservation_from_sales_order') {
+                reservationCreateParams.push(body.params || {})
+              }
+            } catch {
+              // 非 JSON-RPC 请求不参与本断言。
+            }
+          })
+
+          await page.route('**/rpc/sales_order', async (route) => {
+            const body = route.request().postDataJSON() || {}
+            const { id = 'mock-id', method, params = {} } = body
+            const salesOrder = {
+              id: 1,
+              order_no: 'SO-RESERVE-L1',
+              customer_id: 1,
+              customer_snapshot: {
+                id: 1,
+                code: 'CUS-STYLE-L1',
+                name: '暗色客户',
+              },
+              customer_order_no: 'PO-RESERVE-L1',
+              title: '库存预留样式订单',
+              order_date: 1_784_000_000,
+              expected_ship_date: 1_784_086_400,
+              lifecycle_status: 'active',
+              version: 3,
+              note: '',
+              created_at: 1_784_000_000,
+              updated_at: 1_784_000_000,
+            }
+            const salesOrderItem = {
+              id: 1,
+              sales_order_id: 1,
+              line_no: 1,
+              product_id: 1,
+              product_sku_id: 1,
+              product_code_snapshot: 'PROD-STYLE-L1',
+              product_name_snapshot: '样式产品',
+              sku_code_snapshot: 'SKU-STYLE-L1',
+              color_snapshot: '深棕',
+              ordered_quantity: '10',
+              unit_id: 1,
+              unit_name_snapshot: '只',
+              unit_price: '12.50',
+              amount: '125.00',
+              line_status: 'open',
+              note: '',
+              created_at: 1_784_000_000,
+              updated_at: 1_784_000_000,
+            }
+            let data
+            if (method === 'list_sales_orders') {
+              data = {
+                sales_orders: [salesOrder],
+                total: 1,
+                limit: Number(params.limit || 100),
+                offset: Number(params.offset || 0),
+              }
+            } else if (method === 'get_sales_order') {
+              data = { sales_order: salesOrder }
+            } else if (method === 'list_sales_order_items') {
+              data = {
+                sales_order_items: [salesOrderItem],
+                total: 1,
+                limit: Number(params.limit || 100),
+                offset: Number(params.offset || 0),
+              }
+            } else {
+              await route.fallback()
+              return
+            }
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id,
+                result: { code: 0, message: 'OK', data },
+              }),
+            })
+          })
+        },
+        verify: async (page) => {
+          await expectHeading(page, '销售订单')
+          await page
+            .getByText('SO-RESERVE-L1', { exact: false })
+            .first()
+            .click()
+          await expectButton(page, '预留库存')
+          await page.getByRole('button', { name: '预留库存' }).click()
+
+          const modal = page
+            .locator('.ant-modal')
+            .filter({ hasText: '预留销售订单库存' })
+            .last()
+          try {
+            await modal.waitFor({ state: 'visible', timeout: 10_000 })
+          } catch (error) {
+            const bodyText = String(
+              (await page.locator('body').innerText()) || ''
+            ).replace(/\s+/gu, ' ')
+            throw new Error(
+              `库存预留弹窗未打开: ${JSON.stringify({
+                operationalFactMethods,
+                salesOrderMethods,
+                bodyText: bodyText.slice(0, 2000),
+              })}; ${error.message}`
+            )
+          }
+          await modal.getByText('SO-RESERVE-L1', { exact: true }).waitFor()
+          await modal
+            .getByText(/PROD-STYLE-L1.*样式产品/u)
+            .first()
+            .waitFor({ timeout: 10_000 })
+          const modalText = String((await modal.innerText()) || '').replace(
+            /\s+/gu,
+            ' '
+          )
+          assert.match(
+            modalText,
+            /PROD-STYLE-L1.*样式产品/u,
+            `库存预留来源摘要缺少产品: ${modalText}`
+          )
+          assert.match(
+            modalText,
+            /SKU-STYLE-L1.*深棕/u,
+            `库存预留来源摘要缺少 SKU / 规格: ${modalText}`
+          )
+          assert.match(
+            modalText,
+            /单位.*只/u,
+            `库存预留来源摘要缺少单位: ${modalText}`
+          )
+          for (const technicalCopy of [
+            'product_id',
+            'product_sku_id',
+            'unit_id',
+            'idempotency_key',
+          ]) {
+            assert.equal(
+              (await modal.getByText(technicalCopy, { exact: true }).count()) >
+                0,
+              false,
+              `库存预留弹窗不应显示技术字段 ${technicalCopy}`
+            )
+          }
+          await modal.getByLabel('本次预留数量').fill('2')
+          await modal.locator('textarea').fill('订单备货')
+          await modal.screenshot({
+            path: path.resolve(
+              outputDir,
+              'sales-order-source-reservation-create-desktop.png'
+            ),
+          })
+          await modal.getByRole('button', { name: '确认预留' }).click()
+          await expectText(page, '库存预留已创建')
+
+          assert.equal(
+            reservationCreateParams.length,
+            1,
+            `应且只应提交一次来源绑定的库存预留: ${JSON.stringify({
+              operationalFactMethods,
+              reservationCreateParams,
+            })}`
+          )
+          const params = reservationCreateParams[0]
+          const allowedKeys = new Set([
+            'customer_key',
+            'reservation_no',
+            'sales_order_id',
+            'sales_order_item_id',
+            'warehouse_id',
+            'lot_id',
+            'quantity',
+            'reserved_at',
+            'note',
+            'idempotency_key',
+          ])
+          assert(
+            Object.keys(params).every((key) => allowedKeys.has(key)),
+            `库存预留请求包含后端派生字段: ${JSON.stringify(params)}`
+          )
+          assert.equal(params.customer_key, 'yoyoosun')
+          assert.equal(params.sales_order_id, 1)
+          assert.equal(params.sales_order_item_id, 1)
+          assert.equal(params.warehouse_id, 1)
+          assert.equal(params.lot_id, 402)
+          assert.equal(params.quantity, '2')
+          assert.equal(params.note, '订单备货')
+          assert.equal(typeof params.idempotency_key, 'string')
+          assert.equal(params.idempotency_key.length > 0, true)
+          assert.equal(
+            operationalFactMethods.includes('create_stock_reservation'),
+            false,
+            `不得回退旧库存预留 RPC: ${JSON.stringify(operationalFactMethods)}`
+          )
+          for (const serverDerivedField of [
+            'product_id',
+            'product_sku_id',
+            'unit_id',
+          ]) {
+            assert.equal(serverDerivedField in params, false)
+          }
+          await assertNoHorizontalOverflow(
+            page,
+            'sales-order-source-reservation-create-desktop'
+          )
+        },
+      }
+    })(),
+    (() => {
+      let operationalFactMethods = []
+      let requirementListParams = []
+      let materialIssueCreateParams = []
+      let inventoryLotParams = []
+      return {
+        name: 'production-order-source-material-issue-desktop',
+        path: '/erp/production/orders',
+        auth: 'admin',
+        effectiveSession: customerRuntimeEffectiveSession,
+        viewport: { width: 1440, height: 900 },
+        adminProfile: {
+          username: 'style-l1-production-material-issue',
+          is_super_admin: true,
+          permissions: [
+            'pmc.plan.read',
+            'pmc.plan.update',
+            'production.fact.read',
+            'production.material_issue.create',
+          ],
+        },
+        beforeNavigate: async (page) => {
+          operationalFactMethods = []
+          requirementListParams = []
+          materialIssueCreateParams = []
+          inventoryLotParams = []
+          page.on('request', (request) => {
+            try {
+              const body = request.postDataJSON() || {}
+              if (
+                request.url().includes('/rpc/inventory') &&
+                body.method === 'list_inventory_lots'
+              ) {
+                inventoryLotParams.push(body.params || {})
+              }
+              if (!request.url().includes('/rpc/operational_fact')) return
+              if (body.method) operationalFactMethods.push(body.method)
+              if (
+                body.method === 'list_production_order_material_requirements'
+              ) {
+                requirementListParams.push(body.params || {})
+              }
+              if (
+                body.method === 'create_production_material_issue_from_order'
+              ) {
+                materialIssueCreateParams.push(body.params || {})
+              }
+            } catch {
+              // 非 JSON-RPC 请求不参与本断言。
+            }
+          })
+        },
+        verify: async (page) => {
+          await expectHeading(page, '生产订单')
+          const orderText = page.getByText('MO-STYLE-L1-20260713', {
+            exact: true,
+          })
+          await orderText.click()
+          const releaseButton = page.getByRole('button', {
+            name: /发\s*布/u,
+          })
+          for (let attempt = 0; attempt < 40; attempt += 1) {
+            if (await releaseButton.isEnabled()) break
+            await page.waitForTimeout(100)
+          }
+          assert.equal(
+            await releaseButton.isEnabled(),
+            true,
+            '生产订单详情读取完成后应允许发布'
+          )
+          await releaseButton.click()
+          await page.getByRole('button', { name: '确认发布' }).click()
+          await expectText(page, '生产订单发布成功')
+
+          await page
+            .getByText('MO-STYLE-L1-20260713', { exact: true })
+            .dblclick()
+          const detailModal = page
+            .locator('.ant-modal:visible')
+            .filter({ hasText: '查看生产订单' })
+            .last()
+          await detailModal.waitFor({ state: 'visible', timeout: 10_000 })
+          await detailModal
+            .getByText('物料需求与领料', { exact: true })
+            .waitFor()
+          await detailModal
+            .getByText(/物料需求已按发布时的 BOM 冻结/u)
+            .waitFor()
+          await detailModal
+            .getByText('MAT-STYLE-L1', { exact: false })
+            .waitFor()
+          await detailModal
+            .getByText('样式短毛绒布', { exact: false })
+            .waitFor()
+          await detailModal.getByText('8.000000', { exact: true }).waitFor()
+          if (
+            (await detailModal
+              .getByRole('button', { name: /领\s*料/u })
+              .count()) === 0
+          ) {
+            throw new Error(
+              `生产领料行操作未开放: ${String(
+                (await detailModal.innerText()) || ''
+              ).replace(/\s+/gu, ' ')}`
+            )
+          }
+          await detailModal.getByRole('button', { name: /领\s*料/u }).click()
+
+          const issueModal = page
+            .locator('.ant-modal:visible')
+            .filter({ hasText: '生产领料' })
+            .last()
+          await issueModal.waitFor({ state: 'visible', timeout: 10_000 })
+          const issueText = String(
+            (await issueModal.innerText()) || ''
+          ).replace(/\s+/gu, ' ')
+          assert.match(issueText, /MO-STYLE-L1-20260713/u)
+          assert.match(issueText, /MAT-STYLE-L1.*样式短毛绒布/u)
+          assert.match(issueText, /计划需求.*10\.200000/u)
+          assert.match(issueText, /已过账领料.*2\.200000/u)
+          assert.match(issueText, /剩余可领.*8\.000000/u)
+          try {
+            await issueModal
+              .getByText('MAT-LOT-STYLE-L1', { exact: false })
+              .waitFor({ timeout: 10_000 })
+          } catch (error) {
+            throw new Error(
+              `生产领料批次未加载: requests=${JSON.stringify(
+                inventoryLotParams
+              )}; modal=${issueText}`,
+              { cause: error }
+            )
+          }
+          for (const technicalCopy of [
+            'material_id',
+            'unit_id',
+            'source_type',
+            'source_id',
+            'idempotency_key',
+            'NEEDS_REVIEW',
+          ]) {
+            assert.equal(
+              (await issueModal
+                .getByText(technicalCopy, { exact: true })
+                .count()) > 0,
+              false,
+              `生产领料弹窗不应显示技术字段 ${technicalCopy}`
+            )
+          }
+          await issueModal.getByLabel('本次领料数量').fill('3')
+          await issueModal.locator('textarea').fill('首批生产领料')
+          await issueModal.screenshot({
+            path: path.resolve(
+              outputDir,
+              'production-order-source-material-issue-modal-desktop.png'
+            ),
+          })
+          await issueModal
+            .getByRole('button', { name: /生\s*成\s*领\s*料\s*记\s*录/u })
+            .click()
+          await expectText(page, '领料记录草稿已生成，请到生产记录核对并过账')
+
+          assert.equal(
+            requirementListParams.length,
+            1,
+            `物料需求应只按当前生产订单读取: ${JSON.stringify(requirementListParams)}`
+          )
+          assert.deepEqual(requirementListParams[0], {
+            customer_key: 'yoyoosun',
+            production_order_id: 71,
+          })
+          assert.deepEqual(inventoryLotParams, [
+            {
+              subject_type: 'MATERIAL',
+              subject_id: 1,
+              warehouse_id: 1,
+              status: 'ACTIVE',
+              limit: 500,
+            },
+          ])
+          assert.equal(
+            materialIssueCreateParams.length,
+            1,
+            `重复点击保护应只提交一次领料: ${JSON.stringify(materialIssueCreateParams)}`
+          )
+          const params = materialIssueCreateParams[0]
+          const allowedKeys = new Set([
+            'customer_key',
+            'fact_no',
+            'production_order_id',
+            'production_order_item_id',
+            'production_order_material_requirement_id',
+            'warehouse_id',
+            'lot_id',
+            'quantity',
+            'idempotency_key',
+            'occurred_at',
+            'note',
+          ])
+          assert(
+            Object.keys(params).every((key) => allowedKeys.has(key)),
+            `生产领料请求包含后端派生字段: ${JSON.stringify(params)}`
+          )
+          assert.equal(params.customer_key, 'yoyoosun')
+          assert.equal(params.production_order_id, 71)
+          assert.equal(params.production_order_item_id, 7101)
+          assert.equal(params.production_order_material_requirement_id, 7201)
+          assert.equal(params.warehouse_id, 1)
+          assert.equal(params.lot_id, 403)
+          assert.equal(params.quantity, '3')
+          assert.equal(params.note, '首批生产领料')
+          assert.equal(typeof params.idempotency_key, 'string')
+          for (const serverDerivedField of [
+            'material_id',
+            'unit_id',
+            'subject_type',
+            'subject_id',
+            'source_type',
+            'source_id',
+            'source_line_id',
+          ]) {
+            assert.equal(serverDerivedField in params, false)
+          }
+          assert.equal(
+            operationalFactMethods.filter(
+              (method) => method === 'list_production_facts'
+            ).length >= 2,
+            true,
+            `创建后应重新读取关联生产记录: ${JSON.stringify(operationalFactMethods)}`
+          )
+          await assertNoHorizontalOverflow(
+            page,
+            'production-order-source-material-issue-desktop'
+          )
+        },
+      }
+    })(),
     (() => {
       let shippingReleaseListTaskCalls = 0
       let workflowWriteCalls = 0

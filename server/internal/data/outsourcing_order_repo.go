@@ -2,14 +2,18 @@ package data
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
 
@@ -109,30 +113,68 @@ func outsourcingOrderSortOrder(filter biz.OutsourcingOrderFilter) outsourcingord
 }
 
 func (r *outsourcingOrderRepo) UpdateOutsourcingOrderLifecycle(ctx context.Context, id int, lifecycleStatus string) (*biz.OutsourcingOrder, error) {
-	allowedCurrent := outsourcingOrderLifecyclePredecessors(lifecycleStatus)
-	if len(allowedCurrent) == 0 {
+	if id <= 0 || !biz.IsValidOutsourcingOrderStatus(lifecycleStatus) {
 		return nil, biz.ErrBadParam
 	}
-	affected, err := r.data.postgres.OutsourcingOrder.Update().
-		Where(
-			outsourcingorder.ID(id),
-			outsourcingorder.LifecycleStatusIn(allowedCurrent...),
-		).
-		SetLifecycleStatus(lifecycleStatus).
-		Save(ctx)
+	tx, err := (&inventoryRepo{data: r.data, log: r.log}).beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
 	}
-	row, err := r.data.postgres.OutsourcingOrder.Get(ctx, id)
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockOperationalFactRow(ctx, tx, "outsourcing_orders", id, biz.ErrOutsourcingOrderNotFound); err != nil {
+		return nil, err
+	}
+	row, err := tx.client.OutsourcingOrder.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrOutsourcingOrderNotFound
 		}
 		return nil, err
 	}
-	if affected == 0 && row.LifecycleStatus != lifecycleStatus {
+	if row.LifecycleStatus == lifecycleStatus {
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return entOutsourcingOrderToBiz(row), nil
+	}
+	if !biz.IsOutsourcingOrderLifecycleTransitionAllowed(row.LifecycleStatus, lifecycleStatus) {
 		return nil, biz.ErrBadParam
 	}
+	if lifecycleStatus == biz.OutsourcingOrderStatusCanceled {
+		hasPostedFacts, err := tx.client.OutsourcingFact.Query().Where(
+			outsourcingfact.SourceType(biz.OutsourcingOrderSourceType),
+			outsourcingfact.SourceID(id),
+			outsourcingfact.Status(biz.OperationalFactStatusPosted),
+		).Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if hasPostedFacts {
+			return nil, biz.ErrOutsourcingOrderFactDependency
+		}
+	}
+	p := inventorySQLPlaceholders(tx.dialect, 3)
+	query := fmt.Sprintf(`UPDATE outsourcing_orders SET lifecycle_status = %s, updated_at = %s WHERE id = %s`, p[0], p[1], p[2])
+	result, err := tx.sqlTx.ExecContext(ctx, query, lifecycleStatus, time.Now(), id)
+	if err != nil {
+		return nil, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if affected != 1 {
+		return nil, biz.ErrOutsourcingOrderNotFound
+	}
+	row, err = tx.client.OutsourcingOrder.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entOutsourcingOrderToBiz(row), nil
 }
 
@@ -265,10 +307,12 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 			SetLineNo(mutation.LineNo).
 			SetSubjectType(mutation.SubjectType).
 			SetNillableProductID(mutation.ProductID).
+			SetNillableProductSkuID(mutation.ProductSKUID).
 			SetNillableMaterialID(mutation.MaterialID).
 			SetProcessID(mutation.ProcessID).
 			SetUnitID(mutation.UnitID).
 			SetNillableProductNoSnapshot(mutation.ProductNoSnapshot).
+			SetNillableSkuCodeSnapshot(mutation.SKUCodeSnapshot).
 			SetNillableProductOrderNoSnapshot(mutation.ProductOrderNoSnapshot).
 			SetNillableProductNameSnapshot(mutation.ProductNameSnapshot).
 			SetNillableMaterialCodeSnapshot(mutation.MaterialCodeSnapshot).
@@ -378,6 +422,24 @@ func setCanonicalOutsourcingOrderItemSnapshots(ctx context.Context, tx *ent.Tx, 
 		}
 		in.ProductNoSnapshot = outsourcingSnapshotString(productRow.Code)
 		in.ProductNameSnapshot = outsourcingSnapshotString(productRow.Name)
+		if in.ProductSKUID == nil {
+			in.SKUCodeSnapshot = nil
+		} else {
+			skuRow, err := tx.ProductSKU.Query().Where(productsku.ID(*in.ProductSKUID)).Only(ctx)
+			if err != nil {
+				if ent.IsNotFound(err) {
+					return biz.ErrProductSKUNotFound
+				}
+				return err
+			}
+			if !skuRow.IsActive {
+				return biz.ErrProductSKUInactive
+			}
+			if skuRow.ProductID != productRow.ID || skuRow.DefaultUnitID == nil || *skuRow.DefaultUnitID != unitRow.ID {
+				return biz.ErrProductSKUNotFound
+			}
+			in.SKUCodeSnapshot = outsourcingSnapshotString(skuRow.SkuCode)
+		}
 		in.MaterialCodeSnapshot = nil
 		in.MaterialNameSnapshot = nil
 	case biz.OutsourcingOrderSubjectMaterial:
@@ -395,6 +457,8 @@ func setCanonicalOutsourcingOrderItemSnapshots(ctx context.Context, tx *ent.Tx, 
 			return biz.ErrMaterialInactive
 		}
 		in.ProductNoSnapshot = nil
+		in.ProductSKUID = nil
+		in.SKUCodeSnapshot = nil
 		in.ProductOrderNoSnapshot = nil
 		in.ProductNameSnapshot = nil
 		in.MaterialCodeSnapshot = outsourcingSnapshotString(materialRow.Code)
@@ -466,6 +530,20 @@ func (r *outsourcingOrderRepo) ProductIsActive(ctx context.Context, id int) (boo
 	return row.IsActive, nil
 }
 
+func (r *outsourcingOrderRepo) ProductSKUIsActiveForProductAndUnit(ctx context.Context, id, productID, unitID int) (bool, error) {
+	row, err := r.data.postgres.ProductSKU.Query().Where(productsku.ID(id)).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return false, biz.ErrProductSKUNotFound
+		}
+		return false, err
+	}
+	if row.ProductID != productID || row.DefaultUnitID == nil || *row.DefaultUnitID != unitID {
+		return false, biz.ErrProductSKUNotFound
+	}
+	return row.IsActive, nil
+}
+
 func (r *outsourcingOrderRepo) MaterialIsActive(ctx context.Context, id int) (bool, error) {
 	row, err := r.data.postgres.Material.Query().
 		Where(material.ID(id)).
@@ -518,6 +596,11 @@ func saveOutsourcingOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, in 
 	} else {
 		update.SetProductID(*in.ProductID)
 	}
+	if in.ProductSKUID == nil {
+		update.ClearProductSkuID()
+	} else {
+		update.SetProductSkuID(*in.ProductSKUID)
+	}
 	if in.MaterialID == nil {
 		update.ClearMaterialID()
 	} else {
@@ -527,6 +610,11 @@ func saveOutsourcingOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, in 
 		update.ClearProductNoSnapshot()
 	} else {
 		update.SetProductNoSnapshot(*in.ProductNoSnapshot)
+	}
+	if in.SKUCodeSnapshot == nil {
+		update.ClearSkuCodeSnapshot()
+	} else {
+		update.SetSkuCodeSnapshot(*in.SKUCodeSnapshot)
 	}
 	if in.ProductOrderNoSnapshot == nil {
 		update.ClearProductOrderNoSnapshot()
@@ -633,10 +721,12 @@ func entOutsourcingOrderItemToBiz(row *ent.OutsourcingOrderItem) *biz.Outsourcin
 		LineNo:                  row.LineNo,
 		SubjectType:             row.SubjectType,
 		ProductID:               row.ProductID,
+		ProductSKUID:            row.ProductSkuID,
 		MaterialID:              row.MaterialID,
 		ProcessID:               row.ProcessID,
 		UnitID:                  row.UnitID,
 		ProductNoSnapshot:       row.ProductNoSnapshot,
+		SKUCodeSnapshot:         row.SkuCodeSnapshot,
 		ProductOrderNoSnapshot:  row.ProductOrderNoSnapshot,
 		ProductNameSnapshot:     row.ProductNameSnapshot,
 		MaterialCodeSnapshot:    row.MaterialCodeSnapshot,

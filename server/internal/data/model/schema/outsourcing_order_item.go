@@ -19,15 +19,17 @@ func (OutsourcingOrderItem) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"outsourcing_order_items_line_no_positive":        "line_no > 0",
-				"outsourcing_order_items_quantity_positive":       "outsourcing_quantity > 0",
-				"outsourcing_order_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
-				"outsourcing_order_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
-				"outsourcing_order_items_line_status_allowed":     "line_status IN ('open', 'closed', 'canceled')",
-				"outsourcing_order_items_subject_type_allowed":    "subject_type IN ('PRODUCT', 'MATERIAL')",
-				"outsourcing_order_items_subject_exactly_one":     "((subject_type = 'PRODUCT' AND product_id IS NOT NULL AND material_id IS NULL) OR (subject_type = 'MATERIAL' AND product_id IS NULL AND material_id IS NOT NULL))",
-				"outsourcing_order_items_product_id_positive":     "product_id IS NULL OR product_id > 0",
-				"outsourcing_order_items_material_id_positive":    "material_id IS NULL OR material_id > 0",
+				"outsourcing_order_items_line_no_positive":         "line_no > 0",
+				"outsourcing_order_items_quantity_positive":        "outsourcing_quantity > 0",
+				"outsourcing_order_items_unit_price_non_negative":  "unit_price IS NULL OR unit_price >= 0",
+				"outsourcing_order_items_amount_non_negative":      "amount IS NULL OR amount >= 0",
+				"outsourcing_order_items_line_status_allowed":      "line_status IN ('open', 'closed', 'canceled')",
+				"outsourcing_order_items_subject_type_allowed":     "subject_type IN ('PRODUCT', 'MATERIAL')",
+				"outsourcing_order_items_subject_exactly_one":      "((subject_type = 'PRODUCT' AND product_id IS NOT NULL AND material_id IS NULL) OR (subject_type = 'MATERIAL' AND product_id IS NULL AND material_id IS NOT NULL))",
+				"outsourcing_order_items_product_id_positive":      "product_id IS NULL OR product_id > 0",
+				"outsourcing_order_items_product_sku_id_positive":  "product_sku_id IS NULL OR product_sku_id > 0",
+				"outsourcing_order_items_product_sku_product_only": "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
+				"outsourcing_order_items_material_id_positive":     "material_id IS NULL OR material_id > 0",
 			},
 		},
 	}
@@ -46,6 +48,10 @@ func (OutsourcingOrderItem) Fields() []ent.Field {
 			Positive().
 			Optional().
 			Nillable(),
+		field.Int("product_sku_id").
+			Positive().
+			Optional().
+			Nillable(),
 		field.Int("material_id").
 			Positive().
 			Optional().
@@ -59,6 +65,10 @@ func (OutsourcingOrderItem) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(128),
+		field.String("sku_code_snapshot").
+			Optional().
+			Nillable().
+			MaxLen(64),
 		field.String("product_order_no_snapshot").
 			Optional().
 			Nillable().
@@ -122,6 +132,10 @@ func (OutsourcingOrderItem) Edges() []ent.Edge {
 			Field("product_id").
 			Unique().
 			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("product_sku", ProductSKU.Type).
+			Field("product_sku_id").
+			Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("material", Material.Type).
 			Ref("outsourcing_order_items").
 			Field("material_id").
@@ -145,6 +159,7 @@ func (OutsourcingOrderItem) Indexes() []ent.Index {
 		index.Fields("outsourcing_order_id", "line_no").Unique(),
 		index.Fields("subject_type"),
 		index.Fields("product_id"),
+		index.Fields("product_sku_id"),
 		index.Fields("material_id"),
 		index.Fields("process_id"),
 		index.Fields("unit_id"),

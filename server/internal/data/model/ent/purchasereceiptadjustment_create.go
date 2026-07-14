@@ -82,6 +82,48 @@ func (_c *PurchaseReceiptAdjustmentCreate) SetNillablePostedAt(v *time.Time) *Pu
 	return _c
 }
 
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (_c *PurchaseReceiptAdjustmentCreate) SetIdempotencyKey(v string) *PurchaseReceiptAdjustmentCreate {
+	_c.mutation.SetIdempotencyKey(v)
+	return _c
+}
+
+// SetNillableIdempotencyKey sets the "idempotency_key" field if the given value is not nil.
+func (_c *PurchaseReceiptAdjustmentCreate) SetNillableIdempotencyKey(v *string) *PurchaseReceiptAdjustmentCreate {
+	if v != nil {
+		_c.SetIdempotencyKey(*v)
+	}
+	return _c
+}
+
+// SetIdempotencyPayloadHash sets the "idempotency_payload_hash" field.
+func (_c *PurchaseReceiptAdjustmentCreate) SetIdempotencyPayloadHash(v string) *PurchaseReceiptAdjustmentCreate {
+	_c.mutation.SetIdempotencyPayloadHash(v)
+	return _c
+}
+
+// SetNillableIdempotencyPayloadHash sets the "idempotency_payload_hash" field if the given value is not nil.
+func (_c *PurchaseReceiptAdjustmentCreate) SetNillableIdempotencyPayloadHash(v *string) *PurchaseReceiptAdjustmentCreate {
+	if v != nil {
+		_c.SetIdempotencyPayloadHash(*v)
+	}
+	return _c
+}
+
+// SetIdempotencyItemCount sets the "idempotency_item_count" field.
+func (_c *PurchaseReceiptAdjustmentCreate) SetIdempotencyItemCount(v int) *PurchaseReceiptAdjustmentCreate {
+	_c.mutation.SetIdempotencyItemCount(v)
+	return _c
+}
+
+// SetNillableIdempotencyItemCount sets the "idempotency_item_count" field if the given value is not nil.
+func (_c *PurchaseReceiptAdjustmentCreate) SetNillableIdempotencyItemCount(v *int) *PurchaseReceiptAdjustmentCreate {
+	if v != nil {
+		_c.SetIdempotencyItemCount(*v)
+	}
+	return _c
+}
+
 // SetNote sets the "note" field.
 func (_c *PurchaseReceiptAdjustmentCreate) SetNote(v string) *PurchaseReceiptAdjustmentCreate {
 	_c.mutation.SetNote(v)
@@ -236,6 +278,21 @@ func (_c *PurchaseReceiptAdjustmentCreate) check() error {
 	if _, ok := _c.mutation.AdjustedAt(); !ok {
 		return &ValidationError{Name: "adjusted_at", err: errors.New(`ent: missing required field "PurchaseReceiptAdjustment.adjusted_at"`)}
 	}
+	if v, ok := _c.mutation.IdempotencyKey(); ok {
+		if err := purchasereceiptadjustment.IdempotencyKeyValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptAdjustment.idempotency_key": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.IdempotencyPayloadHash(); ok {
+		if err := purchasereceiptadjustment.IdempotencyPayloadHashValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_payload_hash", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptAdjustment.idempotency_payload_hash": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.IdempotencyItemCount(); ok {
+		if err := purchasereceiptadjustment.IdempotencyItemCountValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_item_count", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptAdjustment.idempotency_item_count": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.Note(); ok {
 		if err := purchasereceiptadjustment.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptAdjustment.note": %w`, err)}
@@ -295,6 +352,18 @@ func (_c *PurchaseReceiptAdjustmentCreate) createSpec() (*PurchaseReceiptAdjustm
 	if value, ok := _c.mutation.PostedAt(); ok {
 		_spec.SetField(purchasereceiptadjustment.FieldPostedAt, field.TypeTime, value)
 		_node.PostedAt = &value
+	}
+	if value, ok := _c.mutation.IdempotencyKey(); ok {
+		_spec.SetField(purchasereceiptadjustment.FieldIdempotencyKey, field.TypeString, value)
+		_node.IdempotencyKey = &value
+	}
+	if value, ok := _c.mutation.IdempotencyPayloadHash(); ok {
+		_spec.SetField(purchasereceiptadjustment.FieldIdempotencyPayloadHash, field.TypeString, value)
+		_node.IdempotencyPayloadHash = &value
+	}
+	if value, ok := _c.mutation.IdempotencyItemCount(); ok {
+		_spec.SetField(purchasereceiptadjustment.FieldIdempotencyItemCount, field.TypeInt, value)
+		_node.IdempotencyItemCount = &value
 	}
 	if value, ok := _c.mutation.Note(); ok {
 		_spec.SetField(purchasereceiptadjustment.FieldNote, field.TypeString, value)

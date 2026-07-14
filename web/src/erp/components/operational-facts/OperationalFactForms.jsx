@@ -1,12 +1,12 @@
 import React from 'react'
 import { Tag } from 'antd'
 
-import {
-  V1_ROUTE_PATHS,
-  compactParams,
-  hasActionPermission,
-  trimOptional,
-} from '../../utils/masterDataOrderView.mjs'
+import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
+
+export {
+  businessSourceRouteFor,
+  sourceRouteFor,
+} from '../../utils/businessSourceNavigation.mjs'
 
 const STATUS_LABELS = Object.freeze({
   DRAFT: '草稿',
@@ -71,12 +71,15 @@ export const FINANCE_INVOICE_CATEGORY_LABELS = Object.freeze(
 )
 
 export const ACTION_PERMISSIONS = Object.freeze({
-  productionWrite: ['pmc.plan.update', 'warehouse.adjustment.create'],
-  outsourcingWrite: ['purchase.order.update', 'warehouse.adjustment.create'],
+  productionPost: ['production.fact.post'],
+  productionCancel: ['production.fact.cancel'],
+  outsourcingRead: ['outsourcing.fact.read'],
+  outsourcingPost: ['outsourcing.fact.post'],
+  outsourcingCancel: ['outsourcing.fact.cancel'],
   shipmentWrite: ['shipment.create'],
-  shipmentConfirm: ['shipment.ship', 'shipment.cancel'],
-  reservationWrite: ['sales_order.update', 'warehouse.outbound.confirm'],
-  financeWrite: ['finance.receivable.confirm', 'finance.payable.confirm'],
+  shipmentPost: ['shipment.ship'],
+  shipmentCancel: ['shipment.cancel'],
+  reservationRelease: ['stock.reservation.release'],
 })
 
 export function hasAnyPermission(adminProfile, permissions = []) {
@@ -176,112 +179,4 @@ export function selectedLabelForKey(key, record) {
     )} ${record.counterparty_id ? '已关联' : '-'}`
   }
   return `${recordNoForKey(key, record)} / ${factTypeText(record.fact_type)}`
-}
-
-export function sourceRouteFor(sourceType) {
-  const key = String(sourceType || '')
-    .trim()
-    .toUpperCase()
-  if (key === 'SHIPMENT') return V1_ROUTE_PATHS.shipments
-  if (key === 'PRODUCTION_FACT') return V1_ROUTE_PATHS.productionProgress
-  if (key === 'OUTSOURCING_FACT') return V1_ROUTE_PATHS.processingContracts
-  if (key === 'PURCHASE_RECEIPT') return V1_ROUTE_PATHS.purchaseReceipts
-  return ''
-}
-
-function positiveInt(value) {
-  const numberValue = Number(value || 0)
-  return Number.isFinite(numberValue) && numberValue > 0
-    ? Math.trunc(numberValue)
-    : undefined
-}
-
-function requiredInt(value) {
-  return positiveInt(value) || 0
-}
-
-function nonNegativeInt(value) {
-  if (value === '' || value === null || value === undefined) return undefined
-  const numberValue = Number(value)
-  return Number.isFinite(numberValue) && numberValue >= 0
-    ? Math.trunc(numberValue)
-    : undefined
-}
-
-function dateValue(value) {
-  return trimOptional(value)
-}
-
-export function idempotencyKey(prefix) {
-  return `${prefix}-${Date.now()}`
-}
-
-export function buildFactParams(values = {}) {
-  return compactParams({
-    fact_no: trimOptional(values.fact_no),
-    fact_type: trimOptional(values.fact_type),
-    subject_type: trimOptional(values.subject_type),
-    subject_id: requiredInt(values.subject_id),
-    product_sku_id: positiveInt(values.product_sku_id),
-    warehouse_id: requiredInt(values.warehouse_id),
-    unit_id: requiredInt(values.unit_id),
-    lot_id: positiveInt(values.lot_id),
-    quantity: trimOptional(values.quantity),
-    supplier_id: positiveInt(values.supplier_id),
-    supplier_name: trimOptional(values.supplier_name),
-    source_type: trimOptional(values.source_type),
-    source_id: positiveInt(values.source_id),
-    source_line_id: positiveInt(values.source_line_id),
-    idempotency_key: trimOptional(values.idempotency_key),
-    occurred_at: dateValue(values.occurred_at),
-    note: trimOptional(values.note),
-  })
-}
-
-export function buildReservationParams(values = {}) {
-  return compactParams({
-    reservation_no: trimOptional(values.reservation_no),
-    sales_order_id: positiveInt(values.sales_order_id),
-    sales_order_item_id: positiveInt(values.sales_order_item_id),
-    product_id: requiredInt(values.product_id),
-    product_sku_id: positiveInt(values.product_sku_id),
-    warehouse_id: requiredInt(values.warehouse_id),
-    unit_id: requiredInt(values.unit_id),
-    lot_id: positiveInt(values.lot_id),
-    quantity: trimOptional(values.quantity),
-    idempotency_key: trimOptional(values.idempotency_key),
-    reserved_at: dateValue(values.reserved_at),
-    note: trimOptional(values.note),
-  })
-}
-
-export function buildFinanceParams(values = {}) {
-  return compactParams({
-    fact_no: trimOptional(values.fact_no),
-    fact_type: trimOptional(values.fact_type),
-    counterparty_type: trimOptional(values.counterparty_type),
-    counterparty_id: positiveInt(values.counterparty_id),
-    amount: trimOptional(values.amount),
-    fee_amount: trimOptional(values.fee_amount),
-    currency: trimOptional(values.currency),
-    collection_type: trimOptional(values.collection_type),
-    payment_term: trimOptional(values.payment_term),
-    payment_term_days: nonNegativeInt(values.payment_term_days),
-    invoice_category: trimOptional(values.invoice_category),
-    source_type: trimOptional(values.source_type),
-    source_id: positiveInt(values.source_id),
-    source_line_id: positiveInt(values.source_line_id),
-    idempotency_key: trimOptional(values.idempotency_key),
-    occurred_at: dateValue(values.occurred_at),
-    note: trimOptional(values.note),
-  })
-}
-
-export function businessModalTitle(title, description) {
-  return (
-    <div className="erp-business-action-modal__title">
-      <span>{title}</span>
-      <small>{description}</small>
-    </div>
-  )
 }

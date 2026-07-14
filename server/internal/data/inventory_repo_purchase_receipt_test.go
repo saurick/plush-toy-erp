@@ -16,6 +16,66 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+func TestInventoryRepo_PurchaseReceiptSupplierIdentity(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_repo_purchase_receipt_supplier_identity")
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	activeSupplier := client.Supplier.Create().
+		SetCode("SUP-RECEIPT-IDENTITY").
+		SetName("入库身份供应商").
+		SetIsActive(true).
+		SaveX(ctx)
+	inactiveSupplier := client.Supplier.Create().
+		SetCode("SUP-RECEIPT-INACTIVE").
+		SetName("停用入库供应商").
+		SetIsActive(false).
+		SaveX(ctx)
+
+	linked, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "PR-SUPPLIER-IDENTITY",
+		SupplierID:   &activeSupplier.ID,
+		SupplierName: activeSupplier.Name,
+		ReceivedAt:   time.Date(2026, 7, 14, 8, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create supplier-linked purchase receipt: %v", err)
+	}
+	if linked.SupplierID == nil || *linked.SupplierID != activeSupplier.ID {
+		t.Fatalf("linked purchase receipt supplier_id=%v, want %d", linked.SupplierID, activeSupplier.ID)
+	}
+	row := client.PurchaseReceipt.GetX(ctx, linked.ID)
+	if row.SupplierID == nil || *row.SupplierID != activeSupplier.ID {
+		t.Fatalf("persisted purchase receipt supplier_id=%v, want %d", row.SupplierID, activeSupplier.ID)
+	}
+	items, total, err := uc.ListPurchaseReceipts(ctx, biz.PurchaseReceiptFilter{SupplierID: activeSupplier.ID, Limit: 10})
+	if err != nil || total != 1 || len(items) != 1 || items[0].ID != linked.ID {
+		t.Fatalf("list receipts by supplier identity = items=%#v total=%d err=%v", items, total, err)
+	}
+
+	if _, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "PR-SUPPLIER-MISMATCH",
+		SupplierID:   &activeSupplier.ID,
+		SupplierName: "伪造供应商快照",
+	}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("mismatched supplier snapshot error=%v, want ErrBadParam", err)
+	}
+	if _, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "PR-SUPPLIER-INACTIVE",
+		SupplierID:   &inactiveSupplier.ID,
+		SupplierName: inactiveSupplier.Name,
+	}); !errors.Is(err, biz.ErrSupplierInactive) {
+		t.Fatalf("inactive supplier error=%v, want ErrSupplierInactive", err)
+	}
+
+	manual, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "PR-SUPPLIER-MANUAL-NIL",
+		SupplierName: "仅手工快照",
+	})
+	if err != nil || manual.SupplierID != nil {
+		t.Fatalf("manual snapshot-only receipt = %#v err=%v", manual, err)
+	}
+}
+
 func TestInventoryRepo_PurchaseReceiptLifecycle(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "inventory_repo_purchase_receipt")

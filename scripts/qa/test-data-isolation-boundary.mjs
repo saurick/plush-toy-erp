@@ -463,7 +463,7 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
     id: "manual-acceptance-fact-data-stays-simulated-and-local",
     bucket: "customer-trial-simulated-data",
     description:
-      "full-page manual acceptance fact data reuses formal business actions and remains local simulated data.",
+      "full-page manual acceptance fact data remains a read-only simulated plan after the generic apply writer is retired.",
     required: Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-fact-data.mjs",
@@ -478,21 +478,29 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       },
       {
         path: "scripts/qa/manual-acceptance-fact-data.mjs",
-        pattern: /APPLY_SIMULATED_MANUAL_ACCEPTANCE_FACTS/u,
+        pattern: /applySupported:\s*false/u,
         message:
-          "manual acceptance fact writes must require the exact confirmation phrase",
+          "manual acceptance fact data must declare that apply is unsupported",
       },
       {
         path: "scripts/qa/manual-acceptance-fact-data.mjs",
-        pattern: /fact bulk apply is local-only/u,
-        message: "manual acceptance fact data must remain local-only",
+        pattern: /requiredApplyInputs:\s*\[\]/u,
+        message:
+          "manual acceptance fact data must not advertise executable apply inputs",
       },
       {
         path: "scripts/qa/manual-acceptance-fact-data.mjs",
         pattern:
-          /export async function applyManualAcceptanceFactPlan[\s\S]{0,500}source report backend does not match the fact apply backend/u,
+          /if \(token === "--apply"\) throw new CliError\(APPLY_RETIRED_MESSAGE, 2\)/u,
         message:
-          "manual acceptance fact apply must reject a source report from another backend before credentials are used",
+          "manual acceptance fact CLI must reject apply during argument parsing",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-fact-data.mjs",
+        pattern:
+          /export async function applyManualAcceptanceFactPlan\([\s\S]{0,180}throw new CliError\(APPLY_RETIRED_MESSAGE, 2\)/u,
+        message:
+          "manual acceptance exported apply must fail before reading plans, reports, credentials, or dependencies",
       },
     ]),
     forbidden: Object.freeze([
@@ -502,6 +510,19 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
           /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|EXECUTE_YOYOOSUN_IMPORT/u,
         message:
           "manual acceptance fact data must not reuse real import approval gates",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-fact-data.mjs",
+        pattern: /APPLY_SIMULATED_MANUAL_ACCEPTANCE_FACTS/u,
+        message:
+          "manual acceptance fact data must not retain the retired apply confirmation contract",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-fact-data.mjs",
+        pattern:
+          /applyOperationalPlan|loginOperationalRoles|applyPurchaseQualityPlan/u,
+        message:
+          "manual acceptance fact data must not call retired operational or purchase-quality writers",
       },
       {
         path: "scripts/qa/manual-acceptance-fact-data.mjs",
@@ -718,9 +739,10 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       },
       {
         path: "scripts/qa/manual-regression-data-plan.mjs",
-        pattern: /APPLY_SIMULATED_OPERATIONAL_FACTS/u,
+        pattern:
+          /retiredApplyPaths:[\s\S]{0,240}generic operational fact simulator apply path is retired/u,
         message:
-          "manual regression plan must keep simulated operational fact confirmation",
+          "manual regression plan must keep the generic operational fact apply path retired",
       },
       {
         path: "scripts/qa/manual-regression-data-plan.mjs",
@@ -748,7 +770,7 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
     id: "operational-fact-simulated-closure-stays-simulated",
     bucket: "customer-trial-simulated-data",
     description:
-      "operational fact closure uses simulated facts only and keeps real customer import disabled.",
+      "operational fact closure remains a simulated report-only plan after its generic fact apply path is retired.",
     required: Object.freeze([
       {
         path: "scripts/qa/operational-fact-simulated-closure.mjs",
@@ -769,44 +791,35 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       },
       {
         path: "scripts/qa/operational-fact-simulated-closure.mjs",
-        pattern:
-          /OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS/u,
+        pattern: /applySupported:\s*false/u,
         message:
-          "operational fact apply path must require the simulation confirmation",
+          "operational fact simulation must declare that apply is unsupported",
+      },
+      {
+        path: "scripts/qa/operational-fact-simulated-closure.mjs",
+        pattern: /requiredApplyInputs:\s*\[\]/u,
+        message:
+          "operational fact simulation must not advertise executable apply inputs",
       },
       {
         path: "scripts/qa/operational-fact-simulated-closure.mjs",
         pattern:
-          /const LOCAL_HOSTS = new Set\(\["127\.0\.0\.1", "localhost", "::1"\]\)/u,
+          /if \(token === "--apply"\) throw new CliError\(APPLY_RETIRED_MESSAGE, 2\)/u,
         message:
-          "operational fact simulation must keep an explicit loopback-only host allowlist",
+          "operational fact CLI must reject apply during argument parsing",
       },
       {
         path: "scripts/qa/operational-fact-simulated-closure.mjs",
         pattern:
-          /async function applyPlan\(plan, tokens,[\s\S]{0,1400}assertSafeRuntime\(\{/u,
+          /async function applyPlan\(\) \{\s*throw new CliError\(APPLY_RETIRED_MESSAGE, 2\);\s*\}/u,
         message:
-          "operational fact exported apply must enforce the runtime guard itself",
+          "operational fact exported apply must fail without inspecting arguments or dependencies",
       },
       {
         path: "scripts/qa/operational-fact-simulated-closure.mjs",
-        pattern:
-          /method: "capabilities"[\s\S]{0,1200}active_customer_config_revision/u,
+        pattern: /mode: "report-only"/u,
         message:
-          "operational fact simulation must verify local runtime and active customer revision before writes",
-      },
-      {
-        path: "scripts/qa/operational-fact-simulated-closure.mjs",
-        pattern:
-          /REQUIRED_OPERATIONAL_MODULES[\s\S]{0,1800}required modules are not enabled/u,
-        message:
-          "operational fact simulation must require every downstream module before writes",
-      },
-      {
-        path: "scripts/qa/operational-fact-simulated-closure.mjs",
-        pattern: /assertOperationalRunIsEmpty\(\{/u,
-        message:
-          "operational fact simulation must reject a reused deterministic run before writes",
+          "operational fact simulation must only emit report-only output",
       },
     ]),
     forbidden: Object.freeze([
@@ -816,6 +829,26 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
           /realCustomerImport:\s*true|CUSTOMER_IMPORT_CONFIRM|realImportApproved/u,
         message:
           "operational fact simulation must not reuse real import approval gates",
+      },
+      {
+        path: "scripts/qa/operational-fact-simulated-closure.mjs",
+        pattern:
+          /OPERATIONAL_FACT_SIM_CONFIRM|APPLY_SIMULATED_OPERATIONAL_FACTS/u,
+        message:
+          "operational fact simulation must not retain the retired apply confirmation contract",
+      },
+      {
+        path: "scripts/qa/operational-fact-simulated-closure.mjs",
+        pattern:
+          /create_production_fact|create_outsourcing_fact|create_finance_fact/u,
+        message:
+          "operational fact simulation must not call retired generic fact creation RPCs",
+      },
+      {
+        path: "scripts/qa/operational-fact-simulated-closure.mjs",
+        pattern: /admin_login|assertSafeRuntime|loginRoles/u,
+        message:
+          "operational fact simulation must not retain a credentialed apply path",
       },
       {
         path: "scripts/qa/operational-fact-simulated-closure.mjs",

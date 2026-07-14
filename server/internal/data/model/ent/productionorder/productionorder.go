@@ -51,6 +51,8 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgeItems holds the string denoting the items edge name in mutations.
 	EdgeItems = "items"
+	// EdgeMaterialRequirements holds the string denoting the material_requirements edge name in mutations.
+	EdgeMaterialRequirements = "material_requirements"
 	// EdgeEvents holds the string denoting the events edge name in mutations.
 	EdgeEvents = "events"
 	// EdgeCreator holds the string denoting the creator edge name in mutations.
@@ -70,6 +72,13 @@ const (
 	ItemsInverseTable = "production_order_items"
 	// ItemsColumn is the table column denoting the items relation/edge.
 	ItemsColumn = "production_order_id"
+	// MaterialRequirementsTable is the table that holds the material_requirements relation/edge.
+	MaterialRequirementsTable = "production_order_material_requirements"
+	// MaterialRequirementsInverseTable is the table name for the ProductionOrderMaterialRequirement entity.
+	// It exists in this package in order to avoid circular dependency with the "productionordermaterialrequirement" package.
+	MaterialRequirementsInverseTable = "production_order_material_requirements"
+	// MaterialRequirementsColumn is the table column denoting the material_requirements relation/edge.
+	MaterialRequirementsColumn = "production_order_id"
 	// EventsTable is the table that holds the events relation/edge.
 	EventsTable = "production_order_events"
 	// EventsInverseTable is the table name for the ProductionOrderEvent entity.
@@ -285,6 +294,20 @@ func ByItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByMaterialRequirementsCount orders the results by material_requirements count.
+func ByMaterialRequirementsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newMaterialRequirementsStep(), opts...)
+	}
+}
+
+// ByMaterialRequirements orders the results by material_requirements terms.
+func ByMaterialRequirements(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newMaterialRequirementsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByEventsCount orders the results by events count.
 func ByEventsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -331,6 +354,13 @@ func newItemsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(ItemsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, ItemsTable, ItemsColumn),
+	)
+}
+func newMaterialRequirementsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(MaterialRequirementsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, MaterialRequirementsTable, MaterialRequirementsColumn),
 	)
 }
 func newEventsStep() *sqlgraph.Step {

@@ -74,6 +74,8 @@ func TestMapOperationalFactError_ShipmentAndReservationGuards(t *testing.T) {
 		{name: "reservation split", err: biz.ErrShipmentReservationSplit, message: "本次出货小于对应的原子预留数量，请先释放并按本次出货数量重建预留"},
 		{name: "reservation source", err: biz.ErrStockReservationSourceMismatch, message: "库存预留与销售订单或订单行不一致，请刷新来源后重试"},
 		{name: "reservation quantity", err: biz.ErrStockReservationQuantityExceeded, message: "预留数量与已出货数量合计超过销售订单行数量"},
+		{name: "outsourcing quality pending", err: biz.ErrOutsourcingReturnQualityPending, message: "该委外回货尚未完成合格或让步接收判定，不能生成应付"},
+		{name: "outsourcing quality rejected", err: biz.ErrOutsourcingReturnQualityRejected, message: "该委外回货质检不合格，请先完成返工、退回等质量处置"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -110,8 +112,17 @@ func TestShipmentAggregateItemParamsPreserveProductSKUTraceability(t *testing.T)
 	if aggregate.Shipment.TotalNetWeightKg == nil || !aggregate.Shipment.TotalNetWeightKg.Equal(manualTotalNetWeightKg) {
 		t.Fatalf("expected manual shipment total net weight, got %#v", aggregate.Shipment.TotalNetWeightKg)
 	}
+	forgedSnapshotParams := map[string]any{
+		"product_id": 1, "warehouse_id": 1, "unit_id": 1, "quantity": "1", "amount_snapshot": "999999",
+	}
+	if _, ok := shipmentItemCreateFromParams(forgedSnapshotParams); ok {
+		t.Fatal("shipment item parser accepted caller-supplied finance snapshot")
+	}
 
 	snapshot := decimal.RequireFromString("0.425000")
+	unitPriceSnapshot := decimal.RequireFromString("25.100000")
+	amountSnapshot := decimal.RequireFromString("125.500000")
+	currencySnapshot := biz.FinanceCurrencyCNY
 	out := shipmentItemToAny(&biz.ShipmentItem{
 		ID:                      1,
 		ShipmentID:              9,
@@ -122,12 +133,18 @@ func TestShipmentAggregateItemParamsPreserveProductSKUTraceability(t *testing.T)
 		UnitID:                  in.UnitID,
 		Quantity:                in.Quantity,
 		UnitNetWeightKgSnapshot: &snapshot,
+		UnitPriceSnapshot:       &unitPriceSnapshot,
+		AmountSnapshot:          &amountSnapshot,
+		CurrencySnapshot:        &currencySnapshot,
 	})
 	if !reflect.DeepEqual(out["product_sku_id"], 11) {
 		t.Fatalf("expected product_sku_id in response, got %#v", out)
 	}
 	if out["unit_net_weight_kg_snapshot"] != "0.425" {
 		t.Fatalf("expected shipment item net weight snapshot decimal string, got %#v", out)
+	}
+	if out["unit_price_snapshot"] != "25.1" || out["amount_snapshot"] != "125.5" || out["currency_snapshot"] != biz.FinanceCurrencyCNY {
+		t.Fatalf("expected shipment item finance snapshots, got %#v", out)
 	}
 
 	shipmentOut := shipmentToAny(&biz.Shipment{TotalNetWeightKg: &manualTotalNetWeightKg})
@@ -137,7 +154,7 @@ func TestShipmentAggregateItemParamsPreserveProductSKUTraceability(t *testing.T)
 	if _, exposed := shipmentOut["requested_total_net_weight_kg"]; exposed {
 		t.Fatalf("internal create-intent weight must not be exposed: %#v", shipmentOut)
 	}
-	if shipmentToAny(&biz.Shipment{})["total_net_weight_kg"] != nil || shipmentItemToAny(&biz.ShipmentItem{})["unit_net_weight_kg_snapshot"] != nil {
+	if shipmentToAny(&biz.Shipment{})["total_net_weight_kg"] != nil || shipmentItemToAny(&biz.ShipmentItem{})["unit_net_weight_kg_snapshot"] != nil || shipmentItemToAny(&biz.ShipmentItem{})["amount_snapshot"] != nil || shipmentItemToAny(&biz.ShipmentItem{})["currency_snapshot"] != nil {
 		t.Fatal("expected unknown shipment weights to serialize as null")
 	}
 
@@ -221,34 +238,48 @@ func TestJsonrpcDispatcher_ShipmentManualTotalNetWeightContract(t *testing.T) {
 	}
 }
 
-func TestStockReservationParamsPreserveProductSKUTraceability(t *testing.T) {
-	in, ok := stockReservationCreateFromParams(map[string]any{
+func TestStockReservationFromSalesOrderParamsKeepOnlyOperatorOwnedFields(t *testing.T) {
+	in, ok := stockReservationFromSalesOrderCreateFromParams(map[string]any{
 		"reservation_no":      "RSV-SKU-TRACE",
 		"sales_order_id":      float64(8),
 		"sales_order_item_id": float64(31),
-		"product_id":          float64(7),
-		"product_sku_id":      float64(11),
 		"warehouse_id":        float64(3),
-		"unit_id":             float64(2),
 		"quantity":            "5",
 		"idempotency_key":     "RSV-SKU-TRACE",
 	})
 	if !ok {
 		t.Fatal("expected stock reservation params to parse")
 	}
-	if in.ProductSkuID == nil || *in.ProductSkuID != 11 {
-		t.Fatalf("expected reservation product sku id 11, got %#v", in.ProductSkuID)
+	if in.SalesOrderID != 8 || in.SalesOrderItemID != 31 || in.WarehouseID != 3 {
+		t.Fatalf("unexpected sourced reservation params: %#v", in)
 	}
+	for _, technicalField := range []string{"product_id", "product_sku_id", "unit_id", "source_type", "source_id"} {
+		forged := map[string]any{
+			"reservation_no":      "RSV-FORGED-" + technicalField,
+			"sales_order_id":      float64(8),
+			"sales_order_item_id": float64(31),
+			"warehouse_id":        float64(3),
+			"quantity":            "5",
+			"idempotency_key":     "RSV-FORGED-" + technicalField,
+			technicalField:        float64(999),
+		}
+		if _, ok := stockReservationFromSalesOrderCreateFromParams(forged); ok {
+			t.Fatalf("technical field %s must be rejected", technicalField)
+		}
+	}
+	productSkuID := 11
+	salesOrderID := in.SalesOrderID
+	salesOrderItemID := in.SalesOrderItemID
 	out := stockReservationToAny(&biz.StockReservation{
 		ID:               1,
 		ReservationNo:    in.ReservationNo,
 		Status:           biz.StockReservationStatusActive,
-		SalesOrderID:     in.SalesOrderID,
-		SalesOrderItemID: in.SalesOrderItemID,
-		ProductID:        in.ProductID,
-		ProductSkuID:     in.ProductSkuID,
+		SalesOrderID:     &salesOrderID,
+		SalesOrderItemID: &salesOrderItemID,
+		ProductID:        7,
+		ProductSkuID:     &productSkuID,
 		WarehouseID:      in.WarehouseID,
-		UnitID:           in.UnitID,
+		UnitID:           2,
 		Quantity:         in.Quantity,
 		IdempotencyKey:   in.IdempotencyKey,
 		ReservedAt:       time.Now(),
@@ -482,7 +513,7 @@ func TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule(t *testing.T) {
 	)
 	activateOperationalFactTestCustomerConfig(t, j, readOnlyFinanceConfig)
 
-	_, createRes, err := j.handleOperationalFact(ctx, "create_finance_fact", "read-only-create", financeFactModuleGateParams(t))
+	_, createRes, err := j.handleOperationalFact(ctx, "create_receivable_from_shipment", "read-only-create", financeFactModuleGateParams(t))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -502,7 +533,7 @@ func TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule(t *testing.T) {
 
 	enabledConfig := customerConfigPublishParamsForRevision(t, "2026.06.28.finance-enabled")
 	activateOperationalFactTestCustomerConfig(t, j, enabledConfig)
-	_, createEnabledRes, err := j.handleOperationalFact(ctx, "create_finance_fact", "enabled-create", financeFactModuleGateParams(t))
+	_, createEnabledRes, err := j.handleOperationalFact(ctx, "create_receivable_from_shipment", "enabled-create", financeFactModuleGateParams(t))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -618,7 +649,7 @@ func TestJsonrpcDispatcher_CancelFinanceFactAuthAndPermissions(t *testing.T) {
 	}
 }
 
-func TestJsonrpcDispatcher_FinanceFactCreateRequiresTypeScopedPermission(t *testing.T) {
+func TestJsonrpcDispatcher_FinanceFactSourceCreateRequiresReceivablePermission(t *testing.T) {
 	repo := &financeModuleGateOperationalFactRepo{}
 	admin := workflowJSONRPCAdmin(
 		[]string{biz.FinanceRoleKey},
@@ -633,7 +664,7 @@ func TestJsonrpcDispatcher_FinanceFactCreateRequiresTypeScopedPermission(t *test
 
 	_, res, err := j.handleOperationalFact(
 		workflowJSONRPCAdminContext(),
-		"create_finance_fact",
+		"create_receivable_from_shipment",
 		"finance-create-scope",
 		financeFactModuleGateParams(t),
 	)
@@ -645,6 +676,101 @@ func TestJsonrpcDispatcher_FinanceFactCreateRequiresTypeScopedPermission(t *test
 	}
 	if repo.createFinanceFactCalls != 0 {
 		t.Fatalf("unauthorized create reached repo, calls=%d", repo.createFinanceFactCalls)
+	}
+}
+
+func TestJsonrpcDispatcher_FinanceFactSourceMethodsOwnFactFields(t *testing.T) {
+	repo := &financeModuleGateOperationalFactRepo{}
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.FinanceRoleKey},
+		biz.PermissionFinanceReceivableConfirm,
+		biz.PermissionFinanceInvoiceConfirm,
+	)
+	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
+	activateOperationalFactTestCustomerConfig(
+		t,
+		j,
+		customerConfigPublishParamsForRevision(t, "2026.07.14.finance-source-methods"),
+	)
+	ctx := workflowJSONRPCAdminContext()
+
+	forged := financeFactModuleGateParams(t).AsMap()
+	forged["amount"] = "999999"
+	_, forgedRes, err := j.handleOperationalFact(ctx, "create_receivable_from_shipment", "finance-forged", mustJSONRPCStruct(t, forged))
+	if err != nil || forgedRes == nil || forgedRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("forged source finance request result=%#v err=%v", forgedRes, err)
+	}
+	if repo.createFinanceFactCalls != 0 {
+		t.Fatalf("forged request reached repo, calls=%d", repo.createFinanceFactCalls)
+	}
+
+	_, legacyRes, err := j.handleOperationalFact(ctx, "create_finance_fact", "finance-legacy", financeFactModuleGateParams(t))
+	if err != nil || legacyRes == nil || legacyRes.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("legacy generic finance method result=%#v err=%v", legacyRes, err)
+	}
+
+	invoiceParams := financeFactModuleGateParams(t).AsMap()
+	invoiceParams["invoice_category"] = biz.FinanceInvoiceCategoryVATSpecial13
+	_, invoiceRes, err := j.handleOperationalFact(ctx, "create_invoice_from_shipment", "finance-invoice", mustJSONRPCStruct(t, invoiceParams))
+	if err != nil || invoiceRes == nil || invoiceRes.Code != errcode.OK.Code {
+		t.Fatalf("source invoice result=%#v err=%v", invoiceRes, err)
+	}
+	created := repo.createdFinanceFact
+	if created == nil || created.FactType != biz.FinanceFactInvoice || created.CounterpartyType != biz.FinanceCounterpartyCustomer || created.CounterpartyID == nil || *created.CounterpartyID != 501 || !created.Amount.Equal(decimal.RequireFromString("128.50")) || created.Currency != biz.FinanceCurrencyCNY || !created.FeeAmount.IsZero() {
+		t.Fatalf("source-derived invoice mutation=%#v", created)
+	}
+	if created.SourceType == nil || *created.SourceType != biz.ShipmentSourceType || created.SourceID == nil || *created.SourceID != 9001 || created.InvoiceCategory == nil || *created.InvoiceCategory != biz.FinanceInvoiceCategoryVATSpecial13 {
+		t.Fatalf("source-derived invoice linkage=%#v", created)
+	}
+}
+
+func TestJsonrpcDispatcher_FinanceFactSourceMethodsRequireExactFamilyPermission(t *testing.T) {
+	tests := []struct {
+		name       string
+		permission string
+		method     string
+	}{
+		{
+			name:       "receivable permission cannot create invoice",
+			permission: biz.PermissionFinanceReceivableConfirm,
+			method:     "create_invoice_from_shipment",
+		},
+		{
+			name:       "invoice permission cannot create receivable",
+			permission: biz.PermissionFinanceInvoiceConfirm,
+			method:     "create_receivable_from_shipment",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &financeModuleGateOperationalFactRepo{}
+			admin := workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, tt.permission)
+			j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
+			activateOperationalFactTestCustomerConfig(
+				t,
+				j,
+				customerConfigPublishParamsForRevision(t, "2026.07.14.finance-exact-source-permission-"+tt.permission),
+			)
+			params := financeFactModuleGateParams(t).AsMap()
+			if tt.method == "create_invoice_from_shipment" {
+				params["invoice_category"] = biz.FinanceInvoiceCategoryVATSpecial13
+			}
+			_, res, err := j.handleOperationalFact(
+				workflowJSONRPCAdminContext(),
+				tt.method,
+				"finance-exact-source-permission",
+				mustJSONRPCStruct(t, params),
+			)
+			if err != nil {
+				t.Fatalf("unexpected transport error: %v", err)
+			}
+			if res == nil || res.Code != errcode.PermissionDenied.Code {
+				t.Fatalf("cross-family source create result=%#v", res)
+			}
+			if repo.createFinanceFactCalls != 0 {
+				t.Fatalf("unauthorized source create reached repo, calls=%d", repo.createFinanceFactCalls)
+			}
+		})
 	}
 }
 
@@ -714,18 +840,18 @@ func TestJsonrpcDispatcher_FinanceFactListUsesReadScope(t *testing.T) {
 	if res == nil || res.Code != errcode.OK.Code {
 		t.Fatalf("receivable list failed: %#v", res)
 	}
+	if !repo.listFinanceAccess.AllowsType(biz.FinanceFactReceivable) {
+		t.Errorf("receivable read scope must allow receivables: %#v", repo.listFinanceAccess)
+	}
 	for _, factType := range []string{
-		biz.FinanceFactReceivable,
+		biz.FinanceFactPayable,
 		biz.FinanceFactInvoice,
 		biz.FinanceFactPayment,
 		biz.FinanceFactReconciliation,
 	} {
-		if !repo.listFinanceAccess.AllowsType(factType) {
-			t.Errorf("receivable read scope must allow %s: %#v", factType, repo.listFinanceAccess)
+		if repo.listFinanceAccess.AllowsType(factType) {
+			t.Errorf("receivable read scope must reject %s facts: %#v", factType, repo.listFinanceAccess)
 		}
-	}
-	if repo.listFinanceAccess.AllowsType(biz.FinanceFactPayable) {
-		t.Errorf("receivable read scope must reject payable facts: %#v", repo.listFinanceAccess)
 	}
 
 	_, denied, err := j.handleOperationalFact(
@@ -745,19 +871,18 @@ func TestJsonrpcDispatcher_FinanceFactListUsesReadScope(t *testing.T) {
 func TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule(t *testing.T) {
 	ctx := workflowJSONRPCAdminContext()
 	admin := workflowJSONRPCAdmin(
-		[]string{biz.PMCRoleKey, biz.WarehouseRoleKey},
-		biz.PermissionPMCPlanCreate,
-		biz.PermissionPMCPlanUpdate,
-		biz.PermissionPMCPlanRead,
-		biz.PermissionWarehouseAdjustmentCreate,
-		biz.PermissionWarehouseInventoryRead,
+		[]string{biz.ProductionRoleKey},
+		biz.PermissionProductionCompletionCreate,
+		biz.PermissionProductionFactPost,
+		biz.PermissionProductionFactCancel,
+		biz.PermissionProductionFactRead,
 	)
 	repo := &productionModuleGateOperationalFactRepo{}
 	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
 
 	missingProductionConfig := customerConfigPublishParamsForRevision(t, "2026.06.28.production-missing")
 	activateOperationalFactTestCustomerConfig(t, j, missingProductionConfig)
-	_, missingCreateRes, err := j.handleOperationalFact(ctx, "create_production_fact", "missing-create", productionFactModuleGateParams(t))
+	_, missingCreateRes, err := j.handleOperationalFact(ctx, "create_production_completion_from_order", "missing-create", productionFactModuleGateParams(t))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -783,7 +908,7 @@ func TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule(t *testing.T) 
 		"read_only",
 	)
 	activateOperationalFactTestCustomerConfig(t, j, readOnlyProductionConfig)
-	_, readOnlyCreateRes, err := j.handleOperationalFact(ctx, "create_production_fact", "read-only-create", productionFactModuleGateParams(t))
+	_, readOnlyCreateRes, err := j.handleOperationalFact(ctx, "create_production_completion_from_order", "read-only-create", productionFactModuleGateParams(t))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -799,7 +924,7 @@ func TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule(t *testing.T) 
 		"enabled",
 	)
 	activateOperationalFactTestCustomerConfig(t, j, enabledProductionConfig)
-	_, createEnabledRes, err := j.handleOperationalFact(ctx, "create_production_fact", "enabled-create", productionFactModuleGateParams(t))
+	_, createEnabledRes, err := j.handleOperationalFact(ctx, "create_production_completion_from_order", "enabled-create", productionFactModuleGateParams(t))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -849,30 +974,194 @@ func TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule(t *testing.T) 
 	}
 }
 
+func TestJsonrpcDispatcher_ProductionCompletionUsesDedicatedPermissionAndServerOwnedSource(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	repo := &productionModuleGateOperationalFactRepo{}
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.ProductionRoleKey},
+		biz.PermissionProductionCompletionCreate,
+	)
+	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
+	enabledProductionConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.07.14.production-completion-source",
+		"production",
+		"enabled",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, enabledProductionConfig)
+
+	forged := productionFactModuleGateParams(t).AsMap()
+	forged["subject_id"] = float64(999)
+	_, forgedRes, err := j.handleOperationalFact(ctx, "create_production_completion_from_order", "forged-source", mustJSONRPCStruct(t, forged))
+	if err != nil {
+		t.Fatalf("forged source transport error: %v", err)
+	}
+	if forgedRes == nil || forgedRes.Code != errcode.InvalidParam.Code || repo.createProductionFactCalls != 0 {
+		t.Fatalf("dedicated completion must reject technical source fields, result=%#v calls=%d", forgedRes, repo.createProductionFactCalls)
+	}
+
+	_, createdRes, err := j.handleOperationalFact(ctx, "create_production_completion_from_order", "dedicated-create", productionFactModuleGateParams(t))
+	if err != nil {
+		t.Fatalf("dedicated completion transport error: %v", err)
+	}
+	if createdRes == nil || createdRes.Code != errcode.OK.Code || repo.lastProductionFactCreate == nil {
+		t.Fatalf("dedicated completion result=%#v input=%#v", createdRes, repo.lastProductionFactCreate)
+	}
+	created := repo.lastProductionFactCreate
+	if created.FactType != biz.ProductionFactFinishedGoodsReceipt || created.SubjectType != biz.InventorySubjectProduct || created.SubjectID != 11 || created.ProductSkuID == nil || *created.ProductSkuID != 12 || created.UnitID != 13 {
+		t.Fatalf("completion did not derive product/SKU/unit from order item: %#v", created)
+	}
+	if created.SourceType == nil || *created.SourceType != biz.ProductionOrderSourceType || created.SourceID == nil || *created.SourceID != 21 || created.SourceLineID == nil || *created.SourceLineID != 22 {
+		t.Fatalf("completion did not derive stable source: %#v", created)
+	}
+
+	retiredGenericParams := map[string]any{
+		"fact_no":         "PROD-LEGACY-NO-SOURCE",
+		"fact_type":       biz.ProductionFactFinishedGoodsReceipt,
+		"subject_type":    biz.InventorySubjectProduct,
+		"subject_id":      float64(999),
+		"warehouse_id":    float64(1),
+		"unit_id":         float64(999),
+		"quantity":        "1",
+		"idempotency_key": "PROD-LEGACY-NO-SOURCE",
+	}
+	_, retiredRes, err := j.handleOperationalFact(ctx, "create_production_fact", "retired-generic", mustJSONRPCStruct(t, retiredGenericParams))
+	if err != nil {
+		t.Fatalf("retired generic transport error: %v", err)
+	}
+	if retiredRes == nil || retiredRes.Code != errcode.UnknownMethod.Code || repo.createProductionFactCalls != 1 {
+		t.Fatalf("generic production create must be retired, result=%#v calls=%d", retiredRes, repo.createProductionFactCalls)
+	}
+
+	oldPermissionAdmin := workflowJSONRPCAdmin(
+		[]string{biz.ProductionRoleKey},
+		biz.PermissionPMCPlanUpdate,
+		biz.PermissionWarehouseAdjustmentCreate,
+	)
+	deniedDispatcher := newOperationalFactJSONRPCTestDataWithRepo(t, oldPermissionAdmin, &productionModuleGateOperationalFactRepo{})
+	_, denied, err := deniedDispatcher.handleOperationalFact(ctx, "create_production_completion_from_order", "old-permission", productionFactModuleGateParams(t))
+	if err != nil {
+		t.Fatalf("old permission transport error: %v", err)
+	}
+	if denied == nil || denied.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("old broad production permissions must not authorize completion: %#v", denied)
+	}
+}
+
+func TestJsonrpcDispatcher_ProductionMaterialIssueUsesExactPermissionAndStrictSourceContract(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	repo := &productionModuleGateOperationalFactRepo{}
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.ProductionRoleKey},
+		biz.PermissionProductionMaterialIssueCreate,
+		biz.PermissionProductionFactRead,
+	)
+	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
+	enabledProductionConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.07.14.production-material-source",
+		"production",
+		"enabled",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, enabledProductionConfig)
+
+	for _, forbiddenField := range []string{"material_id", "unit_id", "source_type", "source_id", "source_line_id", "subject_type", "subject_id"} {
+		forged := productionMaterialIssueModuleGateParams(t).AsMap()
+		forged[forbiddenField] = float64(999)
+		if forbiddenField == "source_type" || forbiddenField == "subject_type" {
+			forged[forbiddenField] = "FORGED"
+		}
+		_, forgedRes, err := j.handleOperationalFact(ctx, "create_production_material_issue_from_order", "forged-"+forbiddenField, mustJSONRPCStruct(t, forged))
+		if err != nil {
+			t.Fatalf("forged %s transport error: %v", forbiddenField, err)
+		}
+		if forgedRes == nil || forgedRes.Code != errcode.InvalidParam.Code {
+			t.Fatalf("forged %s result=%#v", forbiddenField, forgedRes)
+		}
+	}
+	if repo.createProductionMaterialIssueCalls != 0 {
+		t.Fatalf("forged material issue payloads reached repo %d times", repo.createProductionMaterialIssueCalls)
+	}
+
+	_, createdRes, err := j.handleOperationalFact(
+		ctx,
+		"create_production_material_issue_from_order",
+		"material-issue-create",
+		productionMaterialIssueModuleGateParams(t),
+	)
+	if err != nil {
+		t.Fatalf("material issue create transport error: %v", err)
+	}
+	if createdRes == nil || createdRes.Code != errcode.OK.Code || repo.lastProductionMaterialIssueCreate == nil {
+		t.Fatalf("material issue create result=%#v input=%#v", createdRes, repo.lastProductionMaterialIssueCreate)
+	}
+	created := repo.lastProductionMaterialIssueCreate
+	if created.ProductionOrderID != 21 || created.ProductionOrderItemID != 22 || created.ProductionOrderMaterialRequirementID != 203 || created.WarehouseID != 1 || !created.Quantity.Equal(decimal.NewFromInt(6)) {
+		t.Fatalf("material issue operator-owned input=%#v", created)
+	}
+
+	_, listRes, err := j.handleOperationalFact(
+		ctx,
+		"list_production_order_material_requirements",
+		"material-requirements-list",
+		mustJSONRPCStruct(t, map[string]any{"production_order_id": float64(21)}),
+	)
+	if err != nil || listRes == nil || listRes.Code != errcode.OK.Code {
+		t.Fatalf("material requirements list result=%#v err=%v", listRes, err)
+	}
+	listData := listRes.Data.AsMap()
+	items, ok := listData["material_requirements"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("material requirements payload=%#v", listData)
+	}
+
+	legacyAdmin := workflowJSONRPCAdmin(
+		[]string{biz.ProductionRoleKey},
+		biz.PermissionPMCPlanUpdate,
+		biz.PermissionWarehouseAdjustmentCreate,
+		biz.PermissionProductionCompletionCreate,
+	)
+	deniedDispatcher := newOperationalFactJSONRPCTestDataWithRepo(t, legacyAdmin, &productionModuleGateOperationalFactRepo{})
+	_, denied, err := deniedDispatcher.handleOperationalFact(
+		ctx,
+		"create_production_material_issue_from_order",
+		"legacy-material-issue-permission",
+		productionMaterialIssueModuleGateParams(t),
+	)
+	if err != nil {
+		t.Fatalf("legacy material issue permission transport error: %v", err)
+	}
+	if denied == nil || denied.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("legacy broad permissions authorized material issue: %#v", denied)
+	}
+}
+
 func TestJsonrpcDispatcher_OutsourcingFactAPIRequiresEnabledModule(t *testing.T) {
 	ctx := workflowJSONRPCAdminContext()
 	admin := workflowJSONRPCAdmin(
 		[]string{biz.PurchaseRoleKey, biz.WarehouseRoleKey},
-		biz.PermissionPurchaseOrderCreate,
-		biz.PermissionPurchaseOrderUpdate,
-		biz.PermissionPurchaseOrderRead,
-		biz.PermissionWarehouseAdjustmentCreate,
-		biz.PermissionWarehouseInventoryRead,
+		biz.PermissionOutsourcingFactRead,
+		biz.PermissionOutsourcingMaterialIssueCreate,
+		biz.PermissionOutsourcingReturnReceiptCreate,
+		biz.PermissionOutsourcingFactPost,
+		biz.PermissionOutsourcingFactCancel,
 	)
 	repo := &outsourcingModuleGateOperationalFactRepo{}
 	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
 
 	missingOutsourcingConfig := customerConfigPublishParamsForRevision(t, "2026.06.28.outsourcing-missing")
 	activateOperationalFactTestCustomerConfig(t, j, missingOutsourcingConfig)
-	_, missingCreateRes, err := j.handleOperationalFact(ctx, "create_outsourcing_fact", "missing-create", outsourcingFactModuleGateParams(t))
+	_, missingCreateRes, err := j.handleOperationalFact(ctx, "create_outsourcing_material_issue_from_order", "missing-create", outsourcingFactModuleGateParams(t))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
 	if missingCreateRes == nil || missingCreateRes.Code != errcode.InvalidParam.Code {
 		t.Fatalf("expected missing outsourcing module create rejected, got %#v", missingCreateRes)
 	}
-	if repo.createOutsourcingFactCalls != 0 {
-		t.Fatalf("missing outsourcing module must not create outsourcing fact, got %d calls", repo.createOutsourcingFactCalls)
+	if repo.createOutsourcingMaterialIssueCalls != 0 {
+		t.Fatalf("missing outsourcing module must not create outsourcing fact, got %d calls", repo.createOutsourcingMaterialIssueCalls)
 	}
 	_, listRes, err := j.handleOperationalFact(ctx, "list_outsourcing_facts", "read-after-missing", mustJSONRPCStruct(t, map[string]any{"limit": 20}))
 	if err != nil {
@@ -890,7 +1179,7 @@ func TestJsonrpcDispatcher_OutsourcingFactAPIRequiresEnabledModule(t *testing.T)
 		"read_only",
 	)
 	activateOperationalFactTestCustomerConfig(t, j, readOnlyOutsourcingConfig)
-	_, readOnlyCreateRes, err := j.handleOperationalFact(ctx, "create_outsourcing_fact", "read-only-create", outsourcingFactModuleGateParams(t))
+	_, readOnlyCreateRes, err := j.handleOperationalFact(ctx, "create_outsourcing_material_issue_from_order", "read-only-create", outsourcingFactModuleGateParams(t))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -906,12 +1195,19 @@ func TestJsonrpcDispatcher_OutsourcingFactAPIRequiresEnabledModule(t *testing.T)
 		"enabled",
 	)
 	activateOperationalFactTestCustomerConfig(t, j, enabledOutsourcingConfig)
-	_, createEnabledRes, err := j.handleOperationalFact(ctx, "create_outsourcing_fact", "enabled-create", outsourcingFactModuleGateParams(t))
+	_, createEnabledRes, err := j.handleOperationalFact(ctx, "create_outsourcing_material_issue_from_order", "enabled-create", outsourcingFactModuleGateParams(t))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
 	if createEnabledRes == nil || createEnabledRes.Code != errcode.OK.Code {
 		t.Fatalf("expected enabled create outsourcing OK, got %#v", createEnabledRes)
+	}
+	_, retiredCreateRes, err := j.handleOperationalFact(ctx, "create_outsourcing_fact", "retired-create", outsourcingFactModuleGateParams(t))
+	if err != nil {
+		t.Fatalf("expected nil err for retired create, got %v", err)
+	}
+	if retiredCreateRes == nil || retiredCreateRes.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("expected generic outsourcing create to be retired, got %#v", retiredCreateRes)
 	}
 	_, postRes, err := j.handleOperationalFact(ctx, "post_outsourcing_fact", "enabled-post", mustJSONRPCStruct(t, map[string]any{"id": 600}))
 	if err != nil {
@@ -960,9 +1256,9 @@ func TestJsonrpcDispatcher_StockReservationAPIRequiresEnabledInventoryModule(t *
 	ctx := workflowJSONRPCAdminContext()
 	admin := workflowJSONRPCAdmin(
 		[]string{biz.SalesRoleKey, biz.WarehouseRoleKey},
-		biz.PermissionSalesOrderUpdate,
 		biz.PermissionWarehouseInventoryRead,
-		biz.PermissionWarehouseOutboundConfirm,
+		biz.PermissionStockReservationCreate,
+		biz.PermissionStockReservationRelease,
 	)
 	repo := &stockReservationModuleGateOperationalFactRepo{}
 	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
@@ -976,7 +1272,7 @@ func TestJsonrpcDispatcher_StockReservationAPIRequiresEnabledInventoryModule(t *
 	)
 	activateOperationalFactTestCustomerConfig(t, j, readOnlyInventoryConfig)
 
-	_, createRes, err := j.handleOperationalFact(ctx, "create_stock_reservation", "read-only-create", stockReservationModuleGateParams(t))
+	_, createRes, err := j.handleOperationalFact(ctx, "create_stock_reservation_from_sales_order", "read-only-create", stockReservationModuleGateParams(t))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -996,12 +1292,40 @@ func TestJsonrpcDispatcher_StockReservationAPIRequiresEnabledInventoryModule(t *
 
 	enabledConfig := customerConfigPublishParamsForRevision(t, "2026.06.28.stock-reservation-inventory-enabled")
 	activateOperationalFactTestCustomerConfig(t, j, enabledConfig)
-	_, createEnabledRes, err := j.handleOperationalFact(ctx, "create_stock_reservation", "enabled-create", stockReservationModuleGateParams(t))
+	_, retiredRes, err := j.handleOperationalFact(ctx, "create_stock_reservation", "retired-generic-create", stockReservationModuleGateParams(t))
+	if err != nil {
+		t.Fatalf("retired generic reservation transport error: %v", err)
+	}
+	if retiredRes == nil || retiredRes.Code != errcode.UnknownMethod.Code || repo.createStockReservationCalls != 0 {
+		t.Fatalf("generic reservation method must remain retired, result=%#v calls=%d", retiredRes, repo.createStockReservationCalls)
+	}
+	forged := stockReservationModuleGateParams(t).AsMap()
+	forged["product_id"] = float64(999)
+	_, forgedRes, err := j.handleOperationalFact(ctx, "create_stock_reservation_from_sales_order", "forged-derived-field", mustJSONRPCStruct(t, forged))
+	if err != nil {
+		t.Fatalf("forged reservation transport error: %v", err)
+	}
+	if forgedRes == nil || forgedRes.Code != errcode.InvalidParam.Code || repo.createStockReservationCalls != 0 {
+		t.Fatalf("derived reservation fields must be rejected, result=%#v calls=%d", forgedRes, repo.createStockReservationCalls)
+	}
+	missingSource := stockReservationModuleGateParams(t).AsMap()
+	delete(missingSource, "sales_order_item_id")
+	_, missingSourceRes, err := j.handleOperationalFact(ctx, "create_stock_reservation_from_sales_order", "missing-source", mustJSONRPCStruct(t, missingSource))
+	if err != nil {
+		t.Fatalf("missing reservation source transport error: %v", err)
+	}
+	if missingSourceRes == nil || missingSourceRes.Code != errcode.InvalidParam.Code || repo.createStockReservationCalls != 0 {
+		t.Fatalf("missing reservation source must be rejected, result=%#v calls=%d", missingSourceRes, repo.createStockReservationCalls)
+	}
+	_, createEnabledRes, err := j.handleOperationalFact(ctx, "create_stock_reservation_from_sales_order", "enabled-create", stockReservationModuleGateParams(t))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
 	if createEnabledRes == nil || createEnabledRes.Code != errcode.OK.Code {
 		t.Fatalf("expected enabled create stock reservation OK, got %#v", createEnabledRes)
+	}
+	if repo.lastStockReservationFromSalesOrderCreate == nil || repo.lastStockReservationFromSalesOrderCreate.SalesOrderID != 11 || repo.lastStockReservationFromSalesOrderCreate.SalesOrderItemID != 12 {
+		t.Fatalf("sourced reservation input was not preserved: %#v", repo.lastStockReservationFromSalesOrderCreate)
 	}
 	_, releaseRes, err := j.handleOperationalFact(ctx, "release_stock_reservation", "enabled-release", mustJSONRPCStruct(t, map[string]any{"id": 400}))
 	if err != nil {
@@ -1035,6 +1359,34 @@ func TestJsonrpcDispatcher_StockReservationAPIRequiresEnabledInventoryModule(t *
 	}
 	if repo.releaseStockReservationCalls != 1 {
 		t.Fatalf("disabled inventory must not call release again, release=%d", repo.releaseStockReservationCalls)
+	}
+}
+
+func TestJsonrpcDispatcher_InventoryReadCannotWriteStockReservations(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	repo := &stockReservationModuleGateOperationalFactRepo{}
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.WarehouseRoleKey},
+		biz.PermissionWarehouseInventoryRead,
+		biz.PermissionWarehouseOutboundConfirm,
+		biz.PermissionSalesOrderUpdate,
+	)
+	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
+
+	_, createRes, err := j.handleOperationalFact(ctx, "create_stock_reservation_from_sales_order", "inventory-read-create", stockReservationModuleGateParams(t))
+	if err != nil {
+		t.Fatalf("create reservation transport error: %v", err)
+	}
+	if createRes == nil || createRes.Code != errcode.PermissionDenied.Code || repo.createStockReservationCalls != 0 {
+		t.Fatalf("broad read/update permissions wrote a reservation: result=%#v calls=%d", createRes, repo.createStockReservationCalls)
+	}
+
+	_, releaseRes, err := j.handleOperationalFact(ctx, "release_stock_reservation", "inventory-read-release", mustJSONRPCStruct(t, map[string]any{"id": 400}))
+	if err != nil {
+		t.Fatalf("release reservation transport error: %v", err)
+	}
+	if releaseRes == nil || releaseRes.Code != errcode.PermissionDenied.Code || repo.releaseStockReservationCalls != 0 {
+		t.Fatalf("broad read/confirm permissions released a reservation: result=%#v calls=%d", releaseRes, repo.releaseStockReservationCalls)
 	}
 }
 
@@ -1073,6 +1425,8 @@ func TestJsonrpcDispatcher_OperationalFactListsRejectInvalidDateFilters(t *testi
 	admin := workflowJSONRPCAdmin(
 		[]string{biz.PMCRoleKey, biz.PurchaseRoleKey, biz.WarehouseRoleKey, biz.FinanceRoleKey},
 		biz.PermissionPMCPlanRead,
+		biz.PermissionProductionFactRead,
+		biz.PermissionOutsourcingFactRead,
 		biz.PermissionPurchaseOrderRead,
 		biz.PermissionWarehouseInventoryRead,
 		biz.PermissionShipmentRead,
@@ -1113,6 +1467,8 @@ func TestJsonrpcDispatcher_OperationalFactListsRejectInvalidEnums(t *testing.T) 
 	admin := workflowJSONRPCAdmin(
 		[]string{biz.PMCRoleKey, biz.PurchaseRoleKey, biz.WarehouseRoleKey, biz.FinanceRoleKey},
 		biz.PermissionPMCPlanRead,
+		biz.PermissionProductionFactRead,
+		biz.PermissionOutsourcingFactRead,
 		biz.PermissionPurchaseOrderRead,
 		biz.PermissionWarehouseInventoryRead,
 		biz.PermissionShipmentRead,
@@ -1238,15 +1594,9 @@ func (r *shipmentModuleGateOperationalFactRepo) CancelShippedShipmentWithActor(c
 func financeFactModuleGateParams(t *testing.T) *structpb.Struct {
 	t.Helper()
 	return mustJSONRPCStruct(t, map[string]any{
-		"fact_no":           "FIN-MODULE-GATE",
-		"fact_type":         biz.FinanceFactReceivable,
-		"counterparty_type": biz.FinanceCounterpartyCustomer,
-		"counterparty_id":   float64(501),
-		"amount":            "128.50",
-		"currency":          biz.FinanceCurrencyCNY,
-		"source_type":       biz.ShipmentSourceType,
-		"source_id":         float64(9001),
-		"idempotency_key":   "FIN-MODULE-GATE",
+		"fact_no":         "FIN-MODULE-GATE",
+		"shipment_id":     float64(9001),
+		"idempotency_key": "FIN-MODULE-GATE",
 	})
 }
 
@@ -1261,19 +1611,30 @@ type financeModuleGateOperationalFactRepo struct {
 	cancelFinanceFactReason  string
 	financeFactType          string
 	listFinanceAccess        biz.FinanceFactAccessScope
+	createdFinanceFact       *biz.FinanceFactCreate
 }
 
 func (r *financeModuleGateOperationalFactRepo) GetShipment(_ context.Context, shipmentID int) (*biz.Shipment, error) {
 	customerID := 501
+	amount := decimal.RequireFromString("128.50")
+	currency := biz.FinanceCurrencyCNY
 	return &biz.Shipment{
 		ID:         shipmentID,
 		CustomerID: &customerID,
 		Status:     biz.ShipmentStatusShipped,
+		Items: []*biz.ShipmentItem{{
+			ID:               1,
+			ShipmentID:       shipmentID,
+			AmountSnapshot:   &amount,
+			CurrencySnapshot: &currency,
+		}},
 	}, nil
 }
 
 func (r *financeModuleGateOperationalFactRepo) CreateFinanceFactDraft(_ context.Context, in *biz.FinanceFactCreate) (*biz.FinanceFact, error) {
 	r.createFinanceFactCalls++
+	copy := *in
+	r.createdFinanceFact = &copy
 	now := time.Now()
 	return &biz.FinanceFact{
 		ID:               300,
@@ -1290,6 +1651,28 @@ func (r *financeModuleGateOperationalFactRepo) CreateFinanceFactDraft(_ context.
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}, nil
+}
+
+func (r *financeModuleGateOperationalFactRepo) CreateFinanceFactDraftFromShipment(ctx context.Context, factType string, in *biz.FinanceFactFromShipmentCreate) (*biz.FinanceFact, error) {
+	customerID := 501
+	shipmentSourceType := biz.ShipmentSourceType
+	shipmentID := in.ShipmentID
+	return r.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
+		FactNo:              in.FactNo,
+		FactType:            factType,
+		CounterpartyType:    biz.FinanceCounterpartyCustomer,
+		CounterpartyID:      &customerID,
+		Amount:              decimal.RequireFromString("128.50"),
+		FeeAmount:           decimal.Zero,
+		Currency:            biz.FinanceCurrencyCNY,
+		InvoiceCategory:     in.InvoiceCategory,
+		SourceType:          &shipmentSourceType,
+		SourceID:            &shipmentID,
+		IdempotencyKey:      in.IdempotencyKey,
+		OccurredAt:          in.OccurredAt,
+		OccurredAtSpecified: in.OccurredAtSpecified,
+		Note:                in.Note,
+	})
 }
 
 func (r *financeModuleGateOperationalFactRepo) PostFinanceFact(_ context.Context, id int) (*biz.FinanceFact, error) {
@@ -1380,19 +1763,20 @@ func (r *financeModuleGateOperationalFactRepo) ListFinanceFactsForAccess(
 func stockReservationModuleGateParams(t *testing.T) *structpb.Struct {
 	t.Helper()
 	return mustJSONRPCStruct(t, map[string]any{
-		"reservation_no":  "RSV-MODULE-GATE",
-		"product_id":      float64(1),
-		"warehouse_id":    float64(1),
-		"unit_id":         float64(1),
-		"quantity":        "8",
-		"idempotency_key": "RSV-MODULE-GATE",
+		"reservation_no":      "RSV-MODULE-GATE",
+		"sales_order_id":      float64(11),
+		"sales_order_item_id": float64(12),
+		"warehouse_id":        float64(1),
+		"quantity":            "8",
+		"idempotency_key":     "RSV-MODULE-GATE",
 	})
 }
 
 type stockReservationModuleGateOperationalFactRepo struct {
 	stubBusinessDashboardOperationalFactRepo
-	createStockReservationCalls  int
-	releaseStockReservationCalls int
+	createStockReservationCalls              int
+	lastStockReservationFromSalesOrderCreate *biz.StockReservationFromSalesOrderCreate
+	releaseStockReservationCalls             int
 }
 
 func (r *stockReservationModuleGateOperationalFactRepo) ProductIsActive(context.Context, int) (bool, error) {
@@ -1408,21 +1792,31 @@ func (r *stockReservationModuleGateOperationalFactRepo) WarehouseIsActive(contex
 }
 
 func (r *stockReservationModuleGateOperationalFactRepo) CreateStockReservation(_ context.Context, in *biz.StockReservationCreate) (*biz.StockReservation, error) {
+	return nil, biz.ErrBadParam
+}
+
+func (r *stockReservationModuleGateOperationalFactRepo) CreateStockReservationFromSalesOrder(_ context.Context, in *biz.StockReservationFromSalesOrderCreate) (*biz.StockReservation, error) {
 	r.createStockReservationCalls++
+	copy := *in
+	r.lastStockReservationFromSalesOrderCreate = &copy
 	now := time.Now()
+	salesOrderID := in.SalesOrderID
+	salesOrderItemID := in.SalesOrderItemID
 	return &biz.StockReservation{
-		ID:             400,
-		ReservationNo:  in.ReservationNo,
-		Status:         biz.StockReservationStatusActive,
-		ProductID:      in.ProductID,
-		WarehouseID:    in.WarehouseID,
-		UnitID:         in.UnitID,
-		LotID:          in.LotID,
-		Quantity:       in.Quantity,
-		IdempotencyKey: in.IdempotencyKey,
-		ReservedAt:     in.ReservedAt,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:               400,
+		ReservationNo:    in.ReservationNo,
+		Status:           biz.StockReservationStatusActive,
+		SalesOrderID:     &salesOrderID,
+		SalesOrderItemID: &salesOrderItemID,
+		ProductID:        101,
+		WarehouseID:      in.WarehouseID,
+		UnitID:           102,
+		LotID:            in.LotID,
+		Quantity:         in.Quantity,
+		IdempotencyKey:   in.IdempotencyKey,
+		ReservedAt:       in.ReservedAt,
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}, nil
 }
 
@@ -1443,22 +1837,76 @@ func (r *stockReservationModuleGateOperationalFactRepo) ReleaseStockReservation(
 func productionFactModuleGateParams(t *testing.T) *structpb.Struct {
 	t.Helper()
 	return mustJSONRPCStruct(t, map[string]any{
-		"fact_no":         "PROD-MODULE-GATE",
-		"fact_type":       biz.ProductionFactFinishedGoodsReceipt,
-		"subject_type":    biz.InventorySubjectProduct,
-		"subject_id":      float64(1),
-		"warehouse_id":    float64(1),
-		"unit_id":         float64(1),
-		"quantity":        "12",
-		"idempotency_key": "PROD-MODULE-GATE",
+		"fact_no":                  "PROD-MODULE-GATE",
+		"production_order_id":      float64(21),
+		"production_order_item_id": float64(22),
+		"warehouse_id":             float64(1),
+		"new_lot_no":               "PROD-MODULE-GATE-LOT",
+		"quantity":                 "12",
+		"idempotency_key":          "PROD-MODULE-GATE",
+	})
+}
+
+func productionMaterialIssueModuleGateParams(t *testing.T) *structpb.Struct {
+	t.Helper()
+	return mustJSONRPCStruct(t, map[string]any{
+		"fact_no":                                  "PROD-MATERIAL-MODULE-GATE",
+		"production_order_id":                      float64(21),
+		"production_order_item_id":                 float64(22),
+		"production_order_material_requirement_id": float64(203),
+		"warehouse_id":                             float64(1),
+		"quantity":                                 "6",
+		"idempotency_key":                          "PROD-MATERIAL-MODULE-GATE",
 	})
 }
 
 type productionModuleGateOperationalFactRepo struct {
 	stubBusinessDashboardOperationalFactRepo
-	createProductionFactCalls int
-	postProductionFactCalls   int
-	cancelProductionFactCalls int
+	createProductionFactCalls          int
+	createProductionMaterialIssueCalls int
+	postProductionFactCalls            int
+	cancelProductionFactCalls          int
+	lastProductionFactCreate           *biz.OperationalFactMutation
+	lastProductionMaterialIssueCreate  *biz.ProductionMaterialIssueFromOrderCreate
+}
+
+func (r *productionModuleGateOperationalFactRepo) CreateProductionMaterialIssueFromOrder(_ context.Context, in *biz.ProductionMaterialIssueFromOrderCreate) (*biz.ProductionFact, error) {
+	r.createProductionMaterialIssueCalls++
+	copy := *in
+	r.lastProductionMaterialIssueCreate = &copy
+	sourceType := biz.ProductionOrderSourceType
+	sourceID := in.ProductionOrderID
+	sourceLineID := in.ProductionOrderMaterialRequirementID
+	now := time.Now()
+	return &biz.ProductionFact{
+		ID: 501, FactNo: in.FactNo, FactType: biz.ProductionFactMaterialIssue, Status: biz.OperationalFactStatusDraft,
+		SubjectType: biz.InventorySubjectMaterial, SubjectID: 201, WarehouseID: in.WarehouseID, UnitID: 202,
+		LotID: in.LotID, Quantity: in.Quantity, SourceType: &sourceType, SourceID: &sourceID, SourceLineID: &sourceLineID,
+		IdempotencyKey: in.IdempotencyKey, OccurredAt: in.OccurredAt, CreatedAt: now, UpdatedAt: now,
+	}, nil
+}
+
+func (r *productionModuleGateOperationalFactRepo) ListProductionOrderMaterialRequirements(_ context.Context, productionOrderID int) ([]*biz.ProductionOrderMaterialRequirement, error) {
+	now := time.Now()
+	return []*biz.ProductionOrderMaterialRequirement{{
+		ID: 203, ProductionOrderID: productionOrderID, ProductionOrderItemID: 22,
+		BOMHeaderID: 204, BOMItemID: 205, MaterialID: 201, UnitID: 202,
+		UnitQuantitySnapshot: decimal.NewFromInt(2), LossRateSnapshot: decimal.RequireFromString("0.1"),
+		PlannedQuantity: decimal.NewFromInt(22), IssuedQuantity: decimal.NewFromInt(6), RemainingQuantity: decimal.NewFromInt(16),
+		MaterialCodeSnapshot: "MAT-201", MaterialNameSnapshot: "短毛绒", UnitCodeSnapshot: "M", UnitNameSnapshot: "米",
+		CreatedAt: now, UpdatedAt: now,
+	}}, nil
+}
+
+func (r *productionModuleGateOperationalFactRepo) ResolveProductionCompletionSource(_ context.Context, productionOrderID, productionOrderItemID int) (*biz.ProductionOrderItem, error) {
+	skuID := 12
+	return &biz.ProductionOrderItem{
+		ID:                productionOrderItemID,
+		ProductionOrderID: productionOrderID,
+		ProductID:         11,
+		ProductSKUID:      &skuID,
+		UnitID:            13,
+	}, nil
 }
 
 func (r *productionModuleGateOperationalFactRepo) ProductIsActive(context.Context, int) (bool, error) {
@@ -1475,6 +1923,8 @@ func (r *productionModuleGateOperationalFactRepo) WarehouseIsActive(context.Cont
 
 func (r *productionModuleGateOperationalFactRepo) CreateProductionFactDraft(_ context.Context, in *biz.OperationalFactMutation) (*biz.ProductionFact, error) {
 	r.createProductionFactCalls++
+	copy := *in
+	r.lastProductionFactCreate = &copy
 	now := time.Now()
 	return &biz.ProductionFact{
 		ID:             500,
@@ -1483,10 +1933,14 @@ func (r *productionModuleGateOperationalFactRepo) CreateProductionFactDraft(_ co
 		Status:         biz.OperationalFactStatusDraft,
 		SubjectType:    in.SubjectType,
 		SubjectID:      in.SubjectID,
+		ProductSkuID:   in.ProductSkuID,
 		WarehouseID:    in.WarehouseID,
 		UnitID:         in.UnitID,
 		LotID:          in.LotID,
 		Quantity:       in.Quantity,
+		SourceType:     in.SourceType,
+		SourceID:       in.SourceID,
+		SourceLineID:   in.SourceLineID,
 		IdempotencyKey: in.IdempotencyKey,
 		OccurredAt:     in.OccurredAt,
 		CreatedAt:      now,
@@ -1536,22 +1990,21 @@ func (r *productionModuleGateOperationalFactRepo) CancelPostedProductionFact(_ c
 func outsourcingFactModuleGateParams(t *testing.T) *structpb.Struct {
 	t.Helper()
 	return mustJSONRPCStruct(t, map[string]any{
-		"fact_no":         "OUT-MODULE-GATE",
-		"fact_type":       biz.OutsourcingFactMaterialIssue,
-		"subject_type":    biz.InventorySubjectMaterial,
-		"subject_id":      float64(1),
-		"warehouse_id":    float64(1),
-		"unit_id":         float64(1),
-		"quantity":        "6",
-		"idempotency_key": "OUT-MODULE-GATE",
+		"fact_no":                   "OUT-MODULE-GATE",
+		"outsourcing_order_id":      float64(10),
+		"outsourcing_order_item_id": float64(11),
+		"warehouse_id":              float64(1),
+		"quantity":                  "6",
+		"idempotency_key":           "OUT-MODULE-GATE",
 	})
 }
 
 type outsourcingModuleGateOperationalFactRepo struct {
 	stubBusinessDashboardOperationalFactRepo
-	createOutsourcingFactCalls int
-	postOutsourcingFactCalls   int
-	cancelOutsourcingFactCalls int
+	createOutsourcingMaterialIssueCalls int
+	createOutsourcingReturnReceiptCalls int
+	postOutsourcingFactCalls            int
+	cancelOutsourcingFactCalls          int
 }
 
 func (r *outsourcingModuleGateOperationalFactRepo) MaterialIsActive(context.Context, int) (bool, error) {
@@ -1571,7 +2024,6 @@ func (r *outsourcingModuleGateOperationalFactRepo) SupplierIsActive(context.Cont
 }
 
 func (r *outsourcingModuleGateOperationalFactRepo) CreateOutsourcingFactDraft(_ context.Context, in *biz.OperationalFactMutation) (*biz.OutsourcingFact, error) {
-	r.createOutsourcingFactCalls++
 	now := time.Now()
 	return &biz.OutsourcingFact{
 		ID:             600,
@@ -1591,6 +2043,45 @@ func (r *outsourcingModuleGateOperationalFactRepo) CreateOutsourcingFactDraft(_ 
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}, nil
+}
+
+func (r *outsourcingModuleGateOperationalFactRepo) CreateOutsourcingMaterialIssueFromOrder(_ context.Context, in *biz.OutsourcingFactFromOrderCreate) (*biz.OutsourcingFact, error) {
+	r.createOutsourcingMaterialIssueCalls++
+	now := time.Now()
+	sourceType := biz.OutsourcingOrderSourceType
+	sourceID := in.OutsourcingOrderID
+	sourceLineID := in.OutsourcingOrderItemID
+	return &biz.OutsourcingFact{
+		ID:             600,
+		FactNo:         in.FactNo,
+		FactType:       biz.OutsourcingFactMaterialIssue,
+		Status:         biz.OperationalFactStatusDraft,
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      1,
+		WarehouseID:    in.WarehouseID,
+		UnitID:         1,
+		LotID:          in.LotID,
+		Quantity:       in.Quantity,
+		SourceType:     &sourceType,
+		SourceID:       &sourceID,
+		SourceLineID:   &sourceLineID,
+		IdempotencyKey: in.IdempotencyKey,
+		OccurredAt:     in.OccurredAt,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}, nil
+}
+
+func (r *outsourcingModuleGateOperationalFactRepo) CreateOutsourcingReturnReceiptFromOrder(_ context.Context, in *biz.OutsourcingFactFromOrderCreate) (*biz.OutsourcingFact, error) {
+	r.createOutsourcingReturnReceiptCalls++
+	item, err := r.CreateOutsourcingMaterialIssueFromOrder(context.Background(), in)
+	if err != nil {
+		return nil, err
+	}
+	r.createOutsourcingMaterialIssueCalls--
+	item.FactType = biz.OutsourcingFactReturnReceipt
+	item.SubjectType = biz.InventorySubjectProduct
+	return item, nil
 }
 
 func (r *outsourcingModuleGateOperationalFactRepo) PostOutsourcingFact(_ context.Context, id int) (*biz.OutsourcingFact, error) {
@@ -1672,61 +2163,27 @@ func TestOperationalFactFilterFromParamsParsesFactType(t *testing.T) {
 	}
 }
 
-func TestFinanceFactCreateFromParamsParsesFeeAndCurrency(t *testing.T) {
-	input, ok := financeFactCreateFromParams(mustJSONRPCStruct(t, map[string]any{
-		"fact_no":           "AR-JSONRPC-001",
-		"fact_type":         "RECEIVABLE",
-		"counterparty_type": "CUSTOMER",
-		"amount":            "100.50",
-		"fee_amount":        "1.25",
-		"currency":          "HKD",
-		"collection_type":   "ACCOUNTS_RECEIVABLE",
-		"payment_term":      "CASH_ON_SHIPMENT",
-		"payment_term_days": float64(0),
-		"invoice_category":  "VAT_SPECIAL_13",
-		"idempotency_key":   "AR-JSONRPC-001",
-	}).AsMap())
+func TestFinanceFactFromShipmentParamsRejectForgedFactsAndAllowInvoiceCategory(t *testing.T) {
+	input, ok := financeFactFromShipmentCreateFromParams(mustJSONRPCStruct(t, map[string]any{
+		"fact_no":          "INV-JSONRPC-001",
+		"shipment_id":      float64(91),
+		"invoice_category": "VAT_SPECIAL_13",
+		"idempotency_key":  "INV-JSONRPC-001",
+	}).AsMap(), true)
 	if !ok {
-		t.Fatal("expected finance fact params to parse")
+		t.Fatal("expected source-driven invoice params to parse")
 	}
-	if input.Currency != "HKD" {
-		t.Fatalf("unexpected currency %q", input.Currency)
-	}
-	if input.FeeAmount.String() != "1.25" {
-		t.Fatalf("unexpected fee amount %s", input.FeeAmount)
-	}
-	if input.CollectionType == nil || *input.CollectionType != biz.FinanceCollectionAccountsReceivable {
-		t.Fatalf("unexpected collection type %#v", input.CollectionType)
-	}
-	if input.PaymentTerm == nil || *input.PaymentTerm != biz.FinancePaymentTermCashOnShipment {
-		t.Fatalf("unexpected payment term %#v", input.PaymentTerm)
-	}
-	if input.PaymentTermDays == nil || *input.PaymentTermDays != 0 {
-		t.Fatalf("expected payment term days 0, got %#v", input.PaymentTermDays)
-	}
-	if input.InvoiceCategory == nil || *input.InvoiceCategory != biz.FinanceInvoiceCategoryVATSpecial13 {
+	if input.ShipmentID != 91 || input.InvoiceCategory == nil || *input.InvoiceCategory != biz.FinanceInvoiceCategoryVATSpecial13 {
 		t.Fatalf("unexpected invoice category %#v", input.InvoiceCategory)
 	}
-	output := financeFactToAny(&biz.FinanceFact{
-		ID:               1,
-		FactNo:           input.FactNo,
-		FactType:         input.FactType,
-		CounterpartyType: input.CounterpartyType,
-		Amount:           input.Amount,
-		FeeAmount:        input.FeeAmount,
-		Currency:         input.Currency,
-		CollectionType:   input.CollectionType,
-		PaymentTerm:      input.PaymentTerm,
-		PaymentTermDays:  input.PaymentTermDays,
-		InvoiceCategory:  input.InvoiceCategory,
-	})
-	if output["payment_term_days"] != 0 {
-		t.Fatalf("expected response payment_term_days 0, got %#v", output)
+	if _, ok := financeFactFromShipmentCreateFromParams(map[string]any{
+		"fact_no": "AR-FORGED", "shipment_id": float64(91), "idempotency_key": "AR-FORGED", "amount": "999999",
+	}, false); ok {
+		t.Fatal("source-driven receivable parser accepted caller-supplied amount")
 	}
-	if output["invoice_category"] != biz.FinanceInvoiceCategoryVATSpecial13 {
-		t.Fatalf("expected response invoice category, got %#v", output)
-	}
-	if _, exists := output["cancel_audit_legacy"]; exists {
-		t.Fatalf("removed legacy cancellation flag must not remain in finance response: %#v", output)
+	if _, ok := financeFactFromShipmentCreateFromParams(map[string]any{
+		"fact_no": "AR-INVOICE-FIELD", "shipment_id": float64(91), "idempotency_key": "AR-INVOICE-FIELD", "invoice_category": "NONE",
+	}, false); ok {
+		t.Fatal("receivable parser accepted invoice-only field")
 	}
 }

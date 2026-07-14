@@ -48,6 +48,8 @@ type MaterialEdges struct {
 	DefaultUnit *Unit `json:"default_unit,omitempty"`
 	// BomItems holds the value of the bom_items edge.
 	BomItems []*BOMItem `json:"bom_items,omitempty"`
+	// ProductionOrderMaterialRequirements holds the value of the production_order_material_requirements edge.
+	ProductionOrderMaterialRequirements []*ProductionOrderMaterialRequirement `json:"production_order_material_requirements,omitempty"`
 	// PurchaseOrderItems holds the value of the purchase_order_items edge.
 	PurchaseOrderItems []*PurchaseOrderItem `json:"purchase_order_items,omitempty"`
 	// PurchaseReceiptItems holds the value of the purchase_receipt_items edge.
@@ -62,7 +64,7 @@ type MaterialEdges struct {
 	OutsourcingOrderItems []*OutsourcingOrderItem `json:"outsourcing_order_items,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [8]bool
+	loadedTypes [9]bool
 }
 
 // DefaultUnitOrErr returns the DefaultUnit value or an error if the edge
@@ -85,10 +87,19 @@ func (e MaterialEdges) BomItemsOrErr() ([]*BOMItem, error) {
 	return nil, &NotLoadedError{edge: "bom_items"}
 }
 
+// ProductionOrderMaterialRequirementsOrErr returns the ProductionOrderMaterialRequirements value or an error if the edge
+// was not loaded in eager-loading.
+func (e MaterialEdges) ProductionOrderMaterialRequirementsOrErr() ([]*ProductionOrderMaterialRequirement, error) {
+	if e.loadedTypes[2] {
+		return e.ProductionOrderMaterialRequirements, nil
+	}
+	return nil, &NotLoadedError{edge: "production_order_material_requirements"}
+}
+
 // PurchaseOrderItemsOrErr returns the PurchaseOrderItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e MaterialEdges) PurchaseOrderItemsOrErr() ([]*PurchaseOrderItem, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[3] {
 		return e.PurchaseOrderItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_order_items"}
@@ -97,7 +108,7 @@ func (e MaterialEdges) PurchaseOrderItemsOrErr() ([]*PurchaseOrderItem, error) {
 // PurchaseReceiptItemsOrErr returns the PurchaseReceiptItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e MaterialEdges) PurchaseReceiptItemsOrErr() ([]*PurchaseReceiptItem, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[4] {
 		return e.PurchaseReceiptItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_receipt_items"}
@@ -106,7 +117,7 @@ func (e MaterialEdges) PurchaseReceiptItemsOrErr() ([]*PurchaseReceiptItem, erro
 // PurchaseReturnItemsOrErr returns the PurchaseReturnItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e MaterialEdges) PurchaseReturnItemsOrErr() ([]*PurchaseReturnItem, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[5] {
 		return e.PurchaseReturnItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_return_items"}
@@ -115,7 +126,7 @@ func (e MaterialEdges) PurchaseReturnItemsOrErr() ([]*PurchaseReturnItem, error)
 // PurchaseReceiptAdjustmentItemsOrErr returns the PurchaseReceiptAdjustmentItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e MaterialEdges) PurchaseReceiptAdjustmentItemsOrErr() ([]*PurchaseReceiptAdjustmentItem, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[6] {
 		return e.PurchaseReceiptAdjustmentItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_receipt_adjustment_items"}
@@ -124,7 +135,7 @@ func (e MaterialEdges) PurchaseReceiptAdjustmentItemsOrErr() ([]*PurchaseReceipt
 // QualityInspectionsOrErr returns the QualityInspections value or an error if the edge
 // was not loaded in eager-loading.
 func (e MaterialEdges) QualityInspectionsOrErr() ([]*QualityInspection, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[7] {
 		return e.QualityInspections, nil
 	}
 	return nil, &NotLoadedError{edge: "quality_inspections"}
@@ -133,7 +144,7 @@ func (e MaterialEdges) QualityInspectionsOrErr() ([]*QualityInspection, error) {
 // OutsourcingOrderItemsOrErr returns the OutsourcingOrderItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e MaterialEdges) OutsourcingOrderItemsOrErr() ([]*OutsourcingOrderItem, error) {
-	if e.loadedTypes[7] {
+	if e.loadedTypes[8] {
 		return e.OutsourcingOrderItems, nil
 	}
 	return nil, &NotLoadedError{edge: "outsourcing_order_items"}
@@ -251,6 +262,11 @@ func (_m *Material) QueryDefaultUnit() *UnitQuery {
 // QueryBomItems queries the "bom_items" edge of the Material entity.
 func (_m *Material) QueryBomItems() *BOMItemQuery {
 	return NewMaterialClient(_m.config).QueryBomItems(_m)
+}
+
+// QueryProductionOrderMaterialRequirements queries the "production_order_material_requirements" edge of the Material entity.
+func (_m *Material) QueryProductionOrderMaterialRequirements() *ProductionOrderMaterialRequirementQuery {
+	return NewMaterialClient(_m.config).QueryProductionOrderMaterialRequirements(_m)
 }
 
 // QueryPurchaseOrderItems queries the "purchase_order_items" edge of the Material entity.

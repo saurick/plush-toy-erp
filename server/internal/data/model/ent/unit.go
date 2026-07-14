@@ -49,6 +49,8 @@ type UnitEdges struct {
 	InventoryBalances []*InventoryBalance `json:"inventory_balances,omitempty"`
 	// BomItems holds the value of the bom_items edge.
 	BomItems []*BOMItem `json:"bom_items,omitempty"`
+	// ProductionOrderMaterialRequirements holds the value of the production_order_material_requirements edge.
+	ProductionOrderMaterialRequirements []*ProductionOrderMaterialRequirement `json:"production_order_material_requirements,omitempty"`
 	// OutsourcingOrderItems holds the value of the outsourcing_order_items edge.
 	OutsourcingOrderItems []*OutsourcingOrderItem `json:"outsourcing_order_items,omitempty"`
 	// PurchaseOrderItems holds the value of the purchase_order_items edge.
@@ -69,7 +71,7 @@ type UnitEdges struct {
 	StockReservations []*StockReservation `json:"stock_reservations,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [15]bool
+	loadedTypes [16]bool
 }
 
 // MaterialsOrErr returns the Materials value or an error if the edge
@@ -126,10 +128,19 @@ func (e UnitEdges) BomItemsOrErr() ([]*BOMItem, error) {
 	return nil, &NotLoadedError{edge: "bom_items"}
 }
 
+// ProductionOrderMaterialRequirementsOrErr returns the ProductionOrderMaterialRequirements value or an error if the edge
+// was not loaded in eager-loading.
+func (e UnitEdges) ProductionOrderMaterialRequirementsOrErr() ([]*ProductionOrderMaterialRequirement, error) {
+	if e.loadedTypes[6] {
+		return e.ProductionOrderMaterialRequirements, nil
+	}
+	return nil, &NotLoadedError{edge: "production_order_material_requirements"}
+}
+
 // OutsourcingOrderItemsOrErr returns the OutsourcingOrderItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e UnitEdges) OutsourcingOrderItemsOrErr() ([]*OutsourcingOrderItem, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[7] {
 		return e.OutsourcingOrderItems, nil
 	}
 	return nil, &NotLoadedError{edge: "outsourcing_order_items"}
@@ -138,7 +149,7 @@ func (e UnitEdges) OutsourcingOrderItemsOrErr() ([]*OutsourcingOrderItem, error)
 // PurchaseOrderItemsOrErr returns the PurchaseOrderItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e UnitEdges) PurchaseOrderItemsOrErr() ([]*PurchaseOrderItem, error) {
-	if e.loadedTypes[7] {
+	if e.loadedTypes[8] {
 		return e.PurchaseOrderItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_order_items"}
@@ -147,7 +158,7 @@ func (e UnitEdges) PurchaseOrderItemsOrErr() ([]*PurchaseOrderItem, error) {
 // PurchaseReceiptItemsOrErr returns the PurchaseReceiptItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e UnitEdges) PurchaseReceiptItemsOrErr() ([]*PurchaseReceiptItem, error) {
-	if e.loadedTypes[8] {
+	if e.loadedTypes[9] {
 		return e.PurchaseReceiptItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_receipt_items"}
@@ -156,7 +167,7 @@ func (e UnitEdges) PurchaseReceiptItemsOrErr() ([]*PurchaseReceiptItem, error) {
 // PurchaseReturnItemsOrErr returns the PurchaseReturnItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e UnitEdges) PurchaseReturnItemsOrErr() ([]*PurchaseReturnItem, error) {
-	if e.loadedTypes[9] {
+	if e.loadedTypes[10] {
 		return e.PurchaseReturnItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_return_items"}
@@ -165,7 +176,7 @@ func (e UnitEdges) PurchaseReturnItemsOrErr() ([]*PurchaseReturnItem, error) {
 // PurchaseReceiptAdjustmentItemsOrErr returns the PurchaseReceiptAdjustmentItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e UnitEdges) PurchaseReceiptAdjustmentItemsOrErr() ([]*PurchaseReceiptAdjustmentItem, error) {
-	if e.loadedTypes[10] {
+	if e.loadedTypes[11] {
 		return e.PurchaseReceiptAdjustmentItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_receipt_adjustment_items"}
@@ -174,7 +185,7 @@ func (e UnitEdges) PurchaseReceiptAdjustmentItemsOrErr() ([]*PurchaseReceiptAdju
 // ProductionFactsOrErr returns the ProductionFacts value or an error if the edge
 // was not loaded in eager-loading.
 func (e UnitEdges) ProductionFactsOrErr() ([]*ProductionFact, error) {
-	if e.loadedTypes[11] {
+	if e.loadedTypes[12] {
 		return e.ProductionFacts, nil
 	}
 	return nil, &NotLoadedError{edge: "production_facts"}
@@ -183,7 +194,7 @@ func (e UnitEdges) ProductionFactsOrErr() ([]*ProductionFact, error) {
 // OutsourcingFactsOrErr returns the OutsourcingFacts value or an error if the edge
 // was not loaded in eager-loading.
 func (e UnitEdges) OutsourcingFactsOrErr() ([]*OutsourcingFact, error) {
-	if e.loadedTypes[12] {
+	if e.loadedTypes[13] {
 		return e.OutsourcingFacts, nil
 	}
 	return nil, &NotLoadedError{edge: "outsourcing_facts"}
@@ -192,7 +203,7 @@ func (e UnitEdges) OutsourcingFactsOrErr() ([]*OutsourcingFact, error) {
 // ShipmentItemsOrErr returns the ShipmentItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e UnitEdges) ShipmentItemsOrErr() ([]*ShipmentItem, error) {
-	if e.loadedTypes[13] {
+	if e.loadedTypes[14] {
 		return e.ShipmentItems, nil
 	}
 	return nil, &NotLoadedError{edge: "shipment_items"}
@@ -201,7 +212,7 @@ func (e UnitEdges) ShipmentItemsOrErr() ([]*ShipmentItem, error) {
 // StockReservationsOrErr returns the StockReservations value or an error if the edge
 // was not loaded in eager-loading.
 func (e UnitEdges) StockReservationsOrErr() ([]*StockReservation, error) {
-	if e.loadedTypes[14] {
+	if e.loadedTypes[15] {
 		return e.StockReservations, nil
 	}
 	return nil, &NotLoadedError{edge: "stock_reservations"}
@@ -318,6 +329,11 @@ func (_m *Unit) QueryInventoryBalances() *InventoryBalanceQuery {
 // QueryBomItems queries the "bom_items" edge of the Unit entity.
 func (_m *Unit) QueryBomItems() *BOMItemQuery {
 	return NewUnitClient(_m.config).QueryBomItems(_m)
+}
+
+// QueryProductionOrderMaterialRequirements queries the "production_order_material_requirements" edge of the Unit entity.
+func (_m *Unit) QueryProductionOrderMaterialRequirements() *ProductionOrderMaterialRequirementQuery {
+	return NewUnitClient(_m.config).QueryProductionOrderMaterialRequirements(_m)
 }
 
 // QueryOutsourcingOrderItems queries the "outsourcing_order_items" edge of the Unit entity.

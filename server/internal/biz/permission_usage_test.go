@@ -131,3 +131,77 @@ func TestPermissionUsageForReturnsDefensiveCopy(t *testing.T) {
 		t.Fatalf("registry leaked mutable slices: %#v", second)
 	}
 }
+
+func TestProductionMaterialIssuePermissionUsageNamesExactSourceDrivenMethod(t *testing.T) {
+	usage, ok := PermissionUsageFor(PermissionProductionMaterialIssueCreate)
+	if !ok || usage.BackendOnly || len(usage.Surfaces) != 1 {
+		t.Fatalf("production material issue usage=%#v ok=%v", usage, ok)
+	}
+	surface := usage.Surfaces[0]
+	if surface.ControlKey != "create-production-material-issue" || len(surface.BackendMethods) != 1 ||
+		surface.BackendMethods[0].Domain != "operational_fact" ||
+		surface.BackendMethods[0].Method != "create_production_material_issue_from_order" {
+		t.Fatalf("production material issue usage surface=%#v", surface)
+	}
+}
+
+func TestQualityPermissionUsageCoversOutsourcingReturnSourceCommands(t *testing.T) {
+	readUsage, ok := PermissionUsageFor(PermissionQualityInspectionRead)
+	if !ok {
+		t.Fatal("quality inspection read usage missing")
+	}
+	createUsage, ok := PermissionUsageFor(PermissionQualityInspectionCreate)
+	if !ok {
+		t.Fatal("quality inspection create usage missing")
+	}
+
+	hasMethod := func(usage PermissionUsage, pageKey, method string) bool {
+		for _, surface := range usage.Surfaces {
+			if surface.PageKey != pageKey {
+				continue
+			}
+			for _, backendMethod := range surface.BackendMethods {
+				if backendMethod.Domain == "quality" && backendMethod.Method == method {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	if !hasMethod(readUsage, "processing-contracts", "list_outsourcing_return_quality_inspections") {
+		t.Fatalf("quality read usage missing outsourcing return list: %#v", readUsage)
+	}
+	if !hasMethod(createUsage, "processing-contracts", "create_quality_inspection_from_outsourcing_return") {
+		t.Fatalf("quality create usage missing outsourcing return command: %#v", createUsage)
+	}
+}
+
+func TestFinancePayablePermissionUsageCoversSourcePages(t *testing.T) {
+	usage, ok := PermissionUsageFor(PermissionFinancePayableConfirm)
+	if !ok {
+		t.Fatal("finance payable confirm usage missing")
+	}
+	hasMethod := func(pageKey, method string) bool {
+		for _, surface := range usage.Surfaces {
+			if surface.PageKey != pageKey {
+				continue
+			}
+			for _, backendMethod := range surface.BackendMethods {
+				if backendMethod.Domain == "operational_fact" && backendMethod.Method == method {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if !hasMethod("inbound", "create_payable_from_purchase_receipt") {
+		t.Fatalf("finance payable usage missing purchase receipt source: %#v", usage)
+	}
+	if !hasMethod("processing-contracts", "create_payable_from_outsourcing_return") {
+		t.Fatalf("finance payable usage missing outsourcing return source: %#v", usage)
+	}
+	if !hasMethod("payables", "post_finance_fact") {
+		t.Fatalf("finance payable usage missing payable status action: %#v", usage)
+	}
+}

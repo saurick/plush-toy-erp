@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/qualityinspection"
+	"server/internal/data/model/ent/supplier"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -43,6 +44,26 @@ func (_u *PurchaseReceiptUpdate) SetNillableReceiptNo(v *string) *PurchaseReceip
 	if v != nil {
 		_u.SetReceiptNo(*v)
 	}
+	return _u
+}
+
+// SetSupplierID sets the "supplier_id" field.
+func (_u *PurchaseReceiptUpdate) SetSupplierID(v int) *PurchaseReceiptUpdate {
+	_u.mutation.SetSupplierID(v)
+	return _u
+}
+
+// SetNillableSupplierID sets the "supplier_id" field if the given value is not nil.
+func (_u *PurchaseReceiptUpdate) SetNillableSupplierID(v *int) *PurchaseReceiptUpdate {
+	if v != nil {
+		_u.SetSupplierID(*v)
+	}
+	return _u
+}
+
+// ClearSupplierID clears the value of the "supplier_id" field.
+func (_u *PurchaseReceiptUpdate) ClearSupplierID() *PurchaseReceiptUpdate {
+	_u.mutation.ClearSupplierID()
 	return _u
 }
 
@@ -201,6 +222,11 @@ func (_u *PurchaseReceiptUpdate) SetUpdatedAt(v time.Time) *PurchaseReceiptUpdat
 	return _u
 }
 
+// SetSupplier sets the "supplier" edge to the Supplier entity.
+func (_u *PurchaseReceiptUpdate) SetSupplier(v *Supplier) *PurchaseReceiptUpdate {
+	return _u.SetSupplierID(v.ID)
+}
+
 // AddPurchaseReturnIDs adds the "purchase_returns" edge to the PurchaseReturn entity by IDs.
 func (_u *PurchaseReceiptUpdate) AddPurchaseReturnIDs(ids ...int) *PurchaseReceiptUpdate {
 	_u.mutation.AddPurchaseReturnIDs(ids...)
@@ -264,6 +290,12 @@ func (_u *PurchaseReceiptUpdate) AddItems(v ...*PurchaseReceiptItem) *PurchaseRe
 // Mutation returns the PurchaseReceiptMutation object of the builder.
 func (_u *PurchaseReceiptUpdate) Mutation() *PurchaseReceiptMutation {
 	return _u.mutation
+}
+
+// ClearSupplier clears the "supplier" edge to the Supplier entity.
+func (_u *PurchaseReceiptUpdate) ClearSupplier() *PurchaseReceiptUpdate {
+	_u.mutation.ClearSupplier()
+	return _u
 }
 
 // ClearPurchaseReturns clears all "purchase_returns" edges to the PurchaseReturn entity.
@@ -399,6 +431,11 @@ func (_u *PurchaseReceiptUpdate) check() error {
 			return &ValidationError{Name: "receipt_no", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.receipt_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SupplierID(); ok {
+		if err := purchasereceipt.SupplierIDValidator(v); err != nil {
+			return &ValidationError{Name: "supplier_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.supplier_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SupplierName(); ok {
 		if err := purchasereceipt.SupplierNameValidator(v); err != nil {
 			return &ValidationError{Name: "supplier_name", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.supplier_name": %w`, err)}
@@ -491,6 +528,35 @@ func (_u *PurchaseReceiptUpdate) sqlSave(ctx context.Context) (_node int, err er
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(purchasereceipt.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.SupplierCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchasereceipt.SupplierTable,
+			Columns: []string{purchasereceipt.SupplierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SupplierIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchasereceipt.SupplierTable,
+			Columns: []string{purchasereceipt.SupplierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.PurchaseReturnsCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -706,6 +772,26 @@ func (_u *PurchaseReceiptUpdateOne) SetNillableReceiptNo(v *string) *PurchaseRec
 	return _u
 }
 
+// SetSupplierID sets the "supplier_id" field.
+func (_u *PurchaseReceiptUpdateOne) SetSupplierID(v int) *PurchaseReceiptUpdateOne {
+	_u.mutation.SetSupplierID(v)
+	return _u
+}
+
+// SetNillableSupplierID sets the "supplier_id" field if the given value is not nil.
+func (_u *PurchaseReceiptUpdateOne) SetNillableSupplierID(v *int) *PurchaseReceiptUpdateOne {
+	if v != nil {
+		_u.SetSupplierID(*v)
+	}
+	return _u
+}
+
+// ClearSupplierID clears the value of the "supplier_id" field.
+func (_u *PurchaseReceiptUpdateOne) ClearSupplierID() *PurchaseReceiptUpdateOne {
+	_u.mutation.ClearSupplierID()
+	return _u
+}
+
 // SetSupplierName sets the "supplier_name" field.
 func (_u *PurchaseReceiptUpdateOne) SetSupplierName(v string) *PurchaseReceiptUpdateOne {
 	_u.mutation.SetSupplierName(v)
@@ -861,6 +947,11 @@ func (_u *PurchaseReceiptUpdateOne) SetUpdatedAt(v time.Time) *PurchaseReceiptUp
 	return _u
 }
 
+// SetSupplier sets the "supplier" edge to the Supplier entity.
+func (_u *PurchaseReceiptUpdateOne) SetSupplier(v *Supplier) *PurchaseReceiptUpdateOne {
+	return _u.SetSupplierID(v.ID)
+}
+
 // AddPurchaseReturnIDs adds the "purchase_returns" edge to the PurchaseReturn entity by IDs.
 func (_u *PurchaseReceiptUpdateOne) AddPurchaseReturnIDs(ids ...int) *PurchaseReceiptUpdateOne {
 	_u.mutation.AddPurchaseReturnIDs(ids...)
@@ -924,6 +1015,12 @@ func (_u *PurchaseReceiptUpdateOne) AddItems(v ...*PurchaseReceiptItem) *Purchas
 // Mutation returns the PurchaseReceiptMutation object of the builder.
 func (_u *PurchaseReceiptUpdateOne) Mutation() *PurchaseReceiptMutation {
 	return _u.mutation
+}
+
+// ClearSupplier clears the "supplier" edge to the Supplier entity.
+func (_u *PurchaseReceiptUpdateOne) ClearSupplier() *PurchaseReceiptUpdateOne {
+	_u.mutation.ClearSupplier()
+	return _u
 }
 
 // ClearPurchaseReturns clears all "purchase_returns" edges to the PurchaseReturn entity.
@@ -1072,6 +1169,11 @@ func (_u *PurchaseReceiptUpdateOne) check() error {
 			return &ValidationError{Name: "receipt_no", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.receipt_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SupplierID(); ok {
+		if err := purchasereceipt.SupplierIDValidator(v); err != nil {
+			return &ValidationError{Name: "supplier_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.supplier_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SupplierName(); ok {
 		if err := purchasereceipt.SupplierNameValidator(v); err != nil {
 			return &ValidationError{Name: "supplier_name", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.supplier_name": %w`, err)}
@@ -1181,6 +1283,35 @@ func (_u *PurchaseReceiptUpdateOne) sqlSave(ctx context.Context) (_node *Purchas
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(purchasereceipt.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.SupplierCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchasereceipt.SupplierTable,
+			Columns: []string{purchasereceipt.SupplierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SupplierIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchasereceipt.SupplierTable,
+			Columns: []string{purchasereceipt.SupplierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.PurchaseReturnsCleared() {
 		edge := &sqlgraph.EdgeSpec{

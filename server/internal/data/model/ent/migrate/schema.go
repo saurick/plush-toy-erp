@@ -547,6 +547,14 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{FinanceFactsColumns[13], FinanceFactsColumns[14], FinanceFactsColumns[15]},
 			},
+			{
+				Name:    "financefact_fact_type_source_type_source_id",
+				Unique:  true,
+				Columns: []*schema.Column{FinanceFactsColumns[2], FinanceFactsColumns[13], FinanceFactsColumns[14]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "source_type IS NOT NULL AND source_id IS NOT NULL AND status <> 'CANCELLED'",
+				},
+			},
 		},
 	}
 	// InventoryBalancesColumns holds the columns for the "inventory_balances" table.
@@ -979,6 +987,7 @@ var (
 		{Name: "line_no", Type: field.TypeInt},
 		{Name: "subject_type", Type: field.TypeString, Size: 16},
 		{Name: "product_no_snapshot", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "sku_code_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "product_order_no_snapshot", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "product_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "material_code_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
@@ -996,6 +1005,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "material_id", Type: field.TypeInt, Nullable: true},
 		{Name: "outsourcing_order_id", Type: field.TypeInt},
+		{Name: "product_sku_id", Type: field.TypeInt, Nullable: true},
 		{Name: "process_id", Type: field.TypeInt},
 		{Name: "product_id", Type: field.TypeInt, Nullable: true},
 		{Name: "unit_id", Type: field.TypeInt},
@@ -1008,31 +1018,37 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "outsourcing_order_items_materials_outsourcing_order_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[19]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[20]},
 				RefColumns: []*schema.Column{MaterialsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_order_items_outsourcing_orders_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[20]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[21]},
 				RefColumns: []*schema.Column{OutsourcingOrdersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
+				Symbol:     "outsourcing_order_items_product_skus_product_sku",
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[22]},
+				RefColumns: []*schema.Column{ProductSkusColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
 				Symbol:     "outsourcing_order_items_processes_outsourcing_order_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[21]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[23]},
 				RefColumns: []*schema.Column{ProcessesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_order_items_products_outsourcing_order_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[22]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[24]},
 				RefColumns: []*schema.Column{ProductsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_order_items_units_outsourcing_order_items",
-				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[23]},
+				Columns:    []*schema.Column{OutsourcingOrderItemsColumns[25]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1041,7 +1057,7 @@ var (
 			{
 				Name:    "outsourcingorderitem_outsourcing_order_id_line_no",
 				Unique:  true,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[20], OutsourcingOrderItemsColumns[1]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[21], OutsourcingOrderItemsColumns[1]},
 			},
 			{
 				Name:    "outsourcingorderitem_subject_type",
@@ -1051,32 +1067,37 @@ var (
 			{
 				Name:    "outsourcingorderitem_product_id",
 				Unique:  false,
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[24]},
+			},
+			{
+				Name:    "outsourcingorderitem_product_sku_id",
+				Unique:  false,
 				Columns: []*schema.Column{OutsourcingOrderItemsColumns[22]},
 			},
 			{
 				Name:    "outsourcingorderitem_material_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[19]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[20]},
 			},
 			{
 				Name:    "outsourcingorderitem_process_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[21]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[23]},
 			},
 			{
 				Name:    "outsourcingorderitem_unit_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[23]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[25]},
 			},
 			{
 				Name:    "outsourcingorderitem_line_status",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[15]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[16]},
 			},
 			{
 				Name:    "outsourcingorderitem_expected_return_date",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrderItemsColumns[14]},
+				Columns: []*schema.Column{OutsourcingOrderItemsColumns[15]},
 			},
 		},
 	}
@@ -1755,6 +1776,86 @@ var (
 			},
 		},
 	}
+	// ProductionOrderMaterialRequirementsColumns holds the columns for the "production_order_material_requirements" table.
+	ProductionOrderMaterialRequirementsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "unit_quantity_snapshot", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "loss_rate_snapshot", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "planned_quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "material_code_snapshot", Type: field.TypeString, Size: 64},
+		{Name: "material_name_snapshot", Type: field.TypeString, Size: 255},
+		{Name: "unit_code_snapshot", Type: field.TypeString, Size: 32},
+		{Name: "unit_name_snapshot", Type: field.TypeString, Size: 64},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "bom_header_id", Type: field.TypeInt},
+		{Name: "bom_item_id", Type: field.TypeInt},
+		{Name: "material_id", Type: field.TypeInt},
+		{Name: "production_order_id", Type: field.TypeInt},
+		{Name: "production_order_item_id", Type: field.TypeInt},
+		{Name: "unit_id", Type: field.TypeInt},
+	}
+	// ProductionOrderMaterialRequirementsTable holds the schema information for the "production_order_material_requirements" table.
+	ProductionOrderMaterialRequirementsTable = &schema.Table{
+		Name:       "production_order_material_requirements",
+		Columns:    ProductionOrderMaterialRequirementsColumns,
+		PrimaryKey: []*schema.Column{ProductionOrderMaterialRequirementsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "production_order_material_requirements_bom_headers_production_order_material_requirements",
+				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[10]},
+				RefColumns: []*schema.Column{BomHeadersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_order_material_requirements_bom_items_production_order_material_requirements",
+				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[11]},
+				RefColumns: []*schema.Column{BomItemsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_order_material_requirements_materials_production_order_material_requirements",
+				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[12]},
+				RefColumns: []*schema.Column{MaterialsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_order_material_requirements_production_orders_material_requirements",
+				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[13]},
+				RefColumns: []*schema.Column{ProductionOrdersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_order_material_requirements_production_order_items_material_requirements",
+				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[14]},
+				RefColumns: []*schema.Column{ProductionOrderItemsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_order_material_requirements_units_production_order_material_requirements",
+				Columns:    []*schema.Column{ProductionOrderMaterialRequirementsColumns[15]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "productionordermaterialrequirement_production_order_item_id_bom_item_id",
+				Unique:  true,
+				Columns: []*schema.Column{ProductionOrderMaterialRequirementsColumns[14], ProductionOrderMaterialRequirementsColumns[11]},
+			},
+			{
+				Name:    "productionordermaterialrequirement_production_order_id_production_order_item_id",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionOrderMaterialRequirementsColumns[13], ProductionOrderMaterialRequirementsColumns[14]},
+			},
+			{
+				Name:    "productionordermaterialrequirement_material_id_unit_id",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionOrderMaterialRequirementsColumns[12], ProductionOrderMaterialRequirementsColumns[15]},
+			},
+		},
+	}
 	// PurchaseOrdersColumns holds the columns for the "purchase_orders" table.
 	PurchaseOrdersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1906,12 +2007,21 @@ var (
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "supplier_id", Type: field.TypeInt, Nullable: true},
 	}
 	// PurchaseReceiptsTable holds the schema information for the "purchase_receipts" table.
 	PurchaseReceiptsTable = &schema.Table{
 		Name:       "purchase_receipts",
 		Columns:    PurchaseReceiptsColumns,
 		PrimaryKey: []*schema.Column{PurchaseReceiptsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "purchase_receipts_suppliers_purchase_receipts",
+				Columns:    []*schema.Column{PurchaseReceiptsColumns[12]},
+				RefColumns: []*schema.Column{SuppliersColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "purchasereceipt_receipt_no",
@@ -1922,6 +2032,11 @@ var (
 				Name:    "purchasereceipt_idempotency_key",
 				Unique:  true,
 				Columns: []*schema.Column{PurchaseReceiptsColumns[6]},
+			},
+			{
+				Name:    "purchasereceipt_supplier_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptsColumns[12]},
 			},
 			{
 				Name:    "purchasereceipt_supplier_name",
@@ -1948,6 +2063,9 @@ var (
 		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
 		{Name: "adjusted_at", Type: field.TypeTime},
 		{Name: "posted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "idempotency_key", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "idempotency_payload_hash", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "idempotency_item_count", Type: field.TypeInt, Nullable: true},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -1961,7 +2079,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "purchase_receipt_adjustments_purchase_receipts_purchase_receipt_adjustments",
-				Columns:    []*schema.Column{PurchaseReceiptAdjustmentsColumns[9]},
+				Columns:    []*schema.Column{PurchaseReceiptAdjustmentsColumns[12]},
 				RefColumns: []*schema.Column{PurchaseReceiptsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1973,9 +2091,14 @@ var (
 				Columns: []*schema.Column{PurchaseReceiptAdjustmentsColumns[1]},
 			},
 			{
+				Name:    "purchasereceiptadjustment_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{PurchaseReceiptAdjustmentsColumns[6]},
+			},
+			{
 				Name:    "purchasereceiptadjustment_purchase_receipt_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReceiptAdjustmentsColumns[9]},
+				Columns: []*schema.Column{PurchaseReceiptAdjustmentsColumns[12]},
 			},
 			{
 				Name:    "purchasereceiptadjustment_status",
@@ -2197,13 +2320,18 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "return_no", Type: field.TypeString, Size: 64},
 		{Name: "supplier_name", Type: field.TypeString, Size: 255},
+		{Name: "return_reason", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
 		{Name: "returned_at", Type: field.TypeTime},
 		{Name: "posted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "idempotency_key", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "idempotency_payload_hash", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "idempotency_item_count", Type: field.TypeInt, Nullable: true},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "purchase_receipt_id", Type: field.TypeInt, Nullable: true},
+		{Name: "quality_inspection_id", Type: field.TypeInt, Nullable: true},
 	}
 	// PurchaseReturnsTable holds the schema information for the "purchase_returns" table.
 	PurchaseReturnsTable = &schema.Table{
@@ -2213,8 +2341,14 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "purchase_returns_purchase_receipts_purchase_returns",
-				Columns:    []*schema.Column{PurchaseReturnsColumns[9]},
+				Columns:    []*schema.Column{PurchaseReturnsColumns[13]},
 				RefColumns: []*schema.Column{PurchaseReceiptsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_returns_quality_inspections_purchase_returns",
+				Columns:    []*schema.Column{PurchaseReturnsColumns[14]},
+				RefColumns: []*schema.Column{QualityInspectionsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 		},
@@ -2225,19 +2359,37 @@ var (
 				Columns: []*schema.Column{PurchaseReturnsColumns[1]},
 			},
 			{
+				Name:    "purchasereturn_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{PurchaseReturnsColumns[7]},
+			},
+			{
 				Name:    "purchasereturn_purchase_receipt_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReturnsColumns[9]},
+				Columns: []*schema.Column{PurchaseReturnsColumns[13]},
+			},
+			{
+				Name:    "purchasereturn_quality_inspection_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReturnsColumns[14]},
+			},
+			{
+				Name:    "purchasereturn_quality_inspection_id_active",
+				Unique:  true,
+				Columns: []*schema.Column{PurchaseReturnsColumns[14]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "quality_inspection_id IS NOT NULL AND status <> 'CANCELLED'",
+				},
 			},
 			{
 				Name:    "purchasereturn_status",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReturnsColumns[3]},
+				Columns: []*schema.Column{PurchaseReturnsColumns[4]},
 			},
 			{
 				Name:    "purchasereturn_returned_at",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReturnsColumns[4]},
+				Columns: []*schema.Column{PurchaseReturnsColumns[5]},
 			},
 		},
 	}
@@ -2838,6 +2990,9 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "unit_net_weight_kg_snapshot", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "unit_price_snapshot", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "amount_snapshot", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "currency_snapshot", Type: field.TypeString, Size: 16, Default: "CNY"},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -2857,43 +3012,43 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "shipment_items_inventory_lots_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[6]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[9]},
 				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_products_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[7]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[10]},
 				RefColumns: []*schema.Column{ProductsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_product_skus_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[8]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[11]},
 				RefColumns: []*schema.Column{ProductSkusColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_sales_order_items_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[9]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[12]},
 				RefColumns: []*schema.Column{SalesOrderItemsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "shipment_items_shipments_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[10]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[13]},
 				RefColumns: []*schema.Column{ShipmentsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_units_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[11]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[14]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_warehouses_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[12]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[15]},
 				RefColumns: []*schema.Column{WarehousesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -2902,22 +3057,22 @@ var (
 			{
 				Name:    "shipmentitem_shipment_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[10]},
+				Columns: []*schema.Column{ShipmentItemsColumns[13]},
 			},
 			{
 				Name:    "shipmentitem_sales_order_item_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[9]},
+				Columns: []*schema.Column{ShipmentItemsColumns[12]},
 			},
 			{
 				Name:    "shipmentitem_product_sku_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[8]},
+				Columns: []*schema.Column{ShipmentItemsColumns[11]},
 			},
 			{
 				Name:    "shipmentitem_product_id_warehouse_id_lot_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[7], ShipmentItemsColumns[12], ShipmentItemsColumns[6]},
+				Columns: []*schema.Column{ShipmentItemsColumns[10], ShipmentItemsColumns[15], ShipmentItemsColumns[9]},
 			},
 		},
 	}
@@ -3426,6 +3581,7 @@ var (
 		ProductionOrdersTable,
 		ProductionOrderEventsTable,
 		ProductionOrderItemsTable,
+		ProductionOrderMaterialRequirementsTable,
 		PurchaseOrdersTable,
 		PurchaseOrderItemsTable,
 		PurchaseReceiptsTable,
@@ -3548,20 +3704,23 @@ func init() {
 	}
 	OutsourcingOrderItemsTable.ForeignKeys[0].RefTable = MaterialsTable
 	OutsourcingOrderItemsTable.ForeignKeys[1].RefTable = OutsourcingOrdersTable
-	OutsourcingOrderItemsTable.ForeignKeys[2].RefTable = ProcessesTable
-	OutsourcingOrderItemsTable.ForeignKeys[3].RefTable = ProductsTable
-	OutsourcingOrderItemsTable.ForeignKeys[4].RefTable = UnitsTable
+	OutsourcingOrderItemsTable.ForeignKeys[2].RefTable = ProductSkusTable
+	OutsourcingOrderItemsTable.ForeignKeys[3].RefTable = ProcessesTable
+	OutsourcingOrderItemsTable.ForeignKeys[4].RefTable = ProductsTable
+	OutsourcingOrderItemsTable.ForeignKeys[5].RefTable = UnitsTable
 	OutsourcingOrderItemsTable.Annotation = &entsql.Annotation{}
 	OutsourcingOrderItemsTable.Annotation.Checks = map[string]string{
-		"outsourcing_order_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
-		"outsourcing_order_items_line_no_positive":        "line_no > 0",
-		"outsourcing_order_items_line_status_allowed":     "line_status IN ('open', 'closed', 'canceled')",
-		"outsourcing_order_items_material_id_positive":    "material_id IS NULL OR material_id > 0",
-		"outsourcing_order_items_product_id_positive":     "product_id IS NULL OR product_id > 0",
-		"outsourcing_order_items_quantity_positive":       "outsourcing_quantity > 0",
-		"outsourcing_order_items_subject_exactly_one":     "((subject_type = 'PRODUCT' AND product_id IS NOT NULL AND material_id IS NULL) OR (subject_type = 'MATERIAL' AND product_id IS NULL AND material_id IS NOT NULL))",
-		"outsourcing_order_items_subject_type_allowed":    "subject_type IN ('PRODUCT', 'MATERIAL')",
-		"outsourcing_order_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
+		"outsourcing_order_items_amount_non_negative":      "amount IS NULL OR amount >= 0",
+		"outsourcing_order_items_line_no_positive":         "line_no > 0",
+		"outsourcing_order_items_line_status_allowed":      "line_status IN ('open', 'closed', 'canceled')",
+		"outsourcing_order_items_material_id_positive":     "material_id IS NULL OR material_id > 0",
+		"outsourcing_order_items_product_id_positive":      "product_id IS NULL OR product_id > 0",
+		"outsourcing_order_items_product_sku_id_positive":  "product_sku_id IS NULL OR product_sku_id > 0",
+		"outsourcing_order_items_product_sku_product_only": "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
+		"outsourcing_order_items_quantity_positive":        "outsourcing_quantity > 0",
+		"outsourcing_order_items_subject_exactly_one":      "((subject_type = 'PRODUCT' AND product_id IS NOT NULL AND material_id IS NULL) OR (subject_type = 'MATERIAL' AND product_id IS NULL AND material_id IS NOT NULL))",
+		"outsourcing_order_items_subject_type_allowed":     "subject_type IN ('PRODUCT', 'MATERIAL')",
+		"outsourcing_order_items_unit_price_non_negative":  "unit_price IS NULL OR unit_price >= 0",
 	}
 	ProcessesTable.Annotation = &entsql.Annotation{}
 	ProcessesTable.Annotation.Checks = map[string]string{
@@ -3653,6 +3812,18 @@ func init() {
 		"production_order_items_sales_line_positive": "sales_order_item_id IS NULL OR sales_order_item_id > 0",
 		"production_order_items_sku_id_positive":     "product_sku_id IS NULL OR product_sku_id > 0",
 	}
+	ProductionOrderMaterialRequirementsTable.ForeignKeys[0].RefTable = BomHeadersTable
+	ProductionOrderMaterialRequirementsTable.ForeignKeys[1].RefTable = BomItemsTable
+	ProductionOrderMaterialRequirementsTable.ForeignKeys[2].RefTable = MaterialsTable
+	ProductionOrderMaterialRequirementsTable.ForeignKeys[3].RefTable = ProductionOrdersTable
+	ProductionOrderMaterialRequirementsTable.ForeignKeys[4].RefTable = ProductionOrderItemsTable
+	ProductionOrderMaterialRequirementsTable.ForeignKeys[5].RefTable = UnitsTable
+	ProductionOrderMaterialRequirementsTable.Annotation = &entsql.Annotation{}
+	ProductionOrderMaterialRequirementsTable.Annotation.Checks = map[string]string{
+		"production_order_material_requirements_loss_rate_non_negative":    "loss_rate_snapshot >= 0",
+		"production_order_material_requirements_planned_quantity_positive": "planned_quantity > 0",
+		"production_order_material_requirements_unit_quantity_positive":    "unit_quantity_snapshot > 0",
+	}
 	PurchaseOrdersTable.ForeignKeys[0].RefTable = SuppliersTable
 	PurchaseOrdersTable.Annotation = &entsql.Annotation{}
 	PurchaseOrdersTable.Annotation.Checks = map[string]string{
@@ -3670,11 +3841,16 @@ func init() {
 		"purchase_order_items_purchased_qty_positive":  "purchased_quantity > 0",
 		"purchase_order_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
 	}
+	PurchaseReceiptsTable.ForeignKeys[0].RefTable = SuppliersTable
 	PurchaseReceiptsTable.Annotation = &entsql.Annotation{}
 	PurchaseReceiptsTable.Annotation.Checks = map[string]string{
 		"purchase_receipts_idempotency_bundle_complete": "\n(\n  (\n    idempotency_key IS NULL\n    AND idempotency_payload_hash IS NULL\n    AND idempotency_item_count IS NULL\n  )\n  OR\n  (\n    idempotency_key IS NOT NULL\n    AND length(trim(idempotency_key)) BETWEEN 1 AND 128\n    AND idempotency_payload_hash IS NOT NULL\n    AND length(idempotency_payload_hash) = 64\n    AND idempotency_item_count IS NOT NULL\n    AND idempotency_item_count > 0\n  )\n)",
 	}
 	PurchaseReceiptAdjustmentsTable.ForeignKeys[0].RefTable = PurchaseReceiptsTable
+	PurchaseReceiptAdjustmentsTable.Annotation = &entsql.Annotation{}
+	PurchaseReceiptAdjustmentsTable.Annotation.Checks = map[string]string{
+		"purchase_receipt_adjustments_idempotency_bundle_complete": "\n(\n  (\n    idempotency_key IS NULL\n    AND idempotency_payload_hash IS NULL\n    AND idempotency_item_count IS NULL\n  )\n  OR\n  (\n    idempotency_key IS NOT NULL\n    AND length(trim(idempotency_key)) BETWEEN 1 AND 128\n    AND idempotency_payload_hash IS NOT NULL\n    AND length(idempotency_payload_hash) = 64\n    AND idempotency_item_count IS NOT NULL\n    AND idempotency_item_count > 0\n  )\n)",
+	}
 	PurchaseReceiptAdjustmentItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	PurchaseReceiptAdjustmentItemsTable.ForeignKeys[1].RefTable = MaterialsTable
 	PurchaseReceiptAdjustmentItemsTable.ForeignKeys[2].RefTable = PurchaseReceiptAdjustmentsTable
@@ -3699,6 +3875,11 @@ func init() {
 		"purchase_receipt_items_unit_price_non_negative":     "unit_price IS NULL OR unit_price >= 0",
 	}
 	PurchaseReturnsTable.ForeignKeys[0].RefTable = PurchaseReceiptsTable
+	PurchaseReturnsTable.ForeignKeys[1].RefTable = QualityInspectionsTable
+	PurchaseReturnsTable.Annotation = &entsql.Annotation{}
+	PurchaseReturnsTable.Annotation.Checks = map[string]string{
+		"purchase_returns_idempotency_bundle_complete": "\n(\n  (\n    idempotency_key IS NULL\n    AND idempotency_payload_hash IS NULL\n    AND idempotency_item_count IS NULL\n  )\n  OR\n  (\n    idempotency_key IS NOT NULL\n    AND length(trim(idempotency_key)) BETWEEN 1 AND 128\n    AND idempotency_payload_hash IS NOT NULL\n    AND length(idempotency_payload_hash) = 64\n    AND idempotency_item_count IS NOT NULL\n    AND idempotency_item_count > 0\n  )\n)",
+	}
 	PurchaseReturnItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	PurchaseReturnItemsTable.ForeignKeys[1].RefTable = MaterialsTable
 	PurchaseReturnItemsTable.ForeignKeys[2].RefTable = PurchaseReceiptItemsTable
@@ -3756,8 +3937,11 @@ func init() {
 	ShipmentItemsTable.ForeignKeys[6].RefTable = WarehousesTable
 	ShipmentItemsTable.Annotation = &entsql.Annotation{}
 	ShipmentItemsTable.Annotation.Checks = map[string]string{
+		"shipment_items_amount_snapshot_nonnegative":          "amount_snapshot IS NULL OR amount_snapshot >= 0",
+		"shipment_items_currency_snapshot_allowed":            "currency_snapshot IN ('USD', 'CNY', 'HKD')",
 		"shipment_items_quantity_positive":                    "quantity > 0",
 		"shipment_items_unit_net_weight_kg_snapshot_positive": "unit_net_weight_kg_snapshot IS NULL OR unit_net_weight_kg_snapshot > 0",
+		"shipment_items_unit_price_snapshot_nonnegative":      "unit_price_snapshot IS NULL OR unit_price_snapshot >= 0",
 	}
 	StockReservationsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	StockReservationsTable.ForeignKeys[1].RefTable = ProductsTable

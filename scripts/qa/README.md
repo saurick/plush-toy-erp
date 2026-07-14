@@ -24,13 +24,13 @@
 | `node scripts/qa/phase-label-boundaries.mjs` + `node --test scripts/qa/phase-label-boundaries.test.mjs`  | 全仓扫描活跃代码、脚本和正式文档中的编号阶段命名，并验证完整 Phase 编号、P 子阶段编号和 P 编号发布目标会被拒绝；P0/P1 风险等级、p95 百分位和产品编码不受影响 | 改脚本、API、命名或治理文档后                   |
 | `node scripts/qa/experimental/canonical-runtime-audit.mjs`                                             | 非阻断实验审计；宽泛 keyword 命中只作只读复核线索，不进入 fast / affected，不代表产品缺陷或发布证据；恢复阻断前必须改成逐域 status key / API field / function / runtime branch 精确合同 | 需要人工盘点历史词命中时                        |
 | `node scripts/qa/test-data-isolation-boundary.mjs --json`                                               | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备边界，并锁住 dry-run 不具备执行能力                                                    | 改 seed、fixture、模拟数据或导入准备工具后      |
-| `node scripts/qa/manual-acceptance-catalog.mjs`                                                         | 从当前客户菜单、岗位矩阵和打印模板生成 47 项全页面手工验收目录；默认只输出，不连接后端                                                                 | 准备全页面试用验收范围时                        |
+| `node scripts/qa/manual-acceptance-catalog.mjs`                                                         | 从当前客户菜单、岗位矩阵和打印模板生成 48 项全页面手工验收目录；默认只输出，不连接后端                                                                 | 准备全页面试用验收范围时                        |
 | `node scripts/qa/manual-acceptance-source-data.mjs --run-id LOCAL-UAT --json`                           | 生成带稳定批次前缀的客户、供应商、产品规格、材料、加工环节及销售 / 采购 / 委外 / BOM 源数据计划；默认只读                                              | 写入模拟源数据前确认数量、状态和边界时          |
 | `node scripts/qa/manual-acceptance-account-scenarios.mjs --json`                                        | 生成停用、多岗位和无业务入口三种补充账号计划；不修改十个正式岗位账号                                                                                   | 核对登录与入口异常场景前                        |
 | `node scripts/qa/manual-acceptance-task-data.mjs --run-id LOCAL-UAT`                                    | 生成九个岗位各 20 条、共 180 条任务的可重复计划；默认只输出，不连接后端                                                                                | 准备岗位任务端数据前                            |
 | `node scripts/qa/manual-acceptance-fact-data.mjs --source-report <report> --run-id LOCAL-UAT-F1 --json` | 复用已核验源数据生成采购、质检、库存、生产、出货和财务事实计划；默认只读                                                                               | 写入模拟业务事实前                              |
-| `node scripts/qa/manual-acceptance-readiness.mjs`                                                       | 生成 47 项只读就绪核验计划；只有显式 `--verify --backend-url` 才登录试用账号并查询数量和状态分布                                                       | 写入后核对页面数据是否达到手工验收门槛时        |
-| `node scripts/qa/manual-acceptance-browser.mjs --plan --base-url <local-url> --backend-url <local-url>` | 生成 47 项本机浏览器验收计划；真实模式只登录、逐页读取和切换只读任务页签，不点击业务写动作                                                             | 核对真实账号、页面、岗位端和打印入口时          |
+| `node scripts/qa/manual-acceptance-readiness.mjs`                                                       | 生成 48 项只读就绪核验计划；只有显式 `--verify --backend-url` 才登录试用账号并查询数量和状态分布                                                       | 写入后核对页面数据是否达到手工验收门槛时        |
+| `node scripts/qa/manual-acceptance-browser.mjs --plan --base-url <local-url> --backend-url <local-url>` | 生成 48 项本机浏览器验收计划；真实模式只登录、逐页读取和切换只读任务页签，不点击业务写动作                                                             | 核对真实账号、页面、岗位端和打印入口时          |
 | `node scripts/qa/manual-acceptance-source-retire.mjs --run-id LOCAL-UAT`                                | 默认 dry-run，预览按批次取消 / 归档源单并停用主数据的退出动作；不物理删除历史记录                                                                      | 试用批次退出前                                  |
 | `node scripts/qa/customer-config-effective-session-probe.mjs --json`                                    | 无 Authorization 探测本地 `customer_config.get_effective_session`，确认后端可达和 `40302 未登录` 边界                                                  | yoyoosun 静态入口已命中、但还没有真实登录证据时 |
 | `node --test scripts/qa/customer-package-preview-boundary.test.mjs`                                     | 锁住客户配置包 businessFlows / stateMachines / processPolicies 仍为 preview-only，不写 Fact、不覆盖 usecase 生命周期                                   | 调整客户包流程、状态机或策略预览后              |
@@ -43,7 +43,7 @@
 | 文档、命名与真源守卫 | `docs-inventory.test.mjs`、`phase-label-boundaries.mjs`、`experimental/canonical-runtime-audit.mjs`                                                                                                                                                                                                                                                                                                                                                                                           | 前两者阻断路径、命名和登记漂移；canonical broad scan 仅为显式非阻断实验审计，不进入 fast / affected，不能替代逐域合同、migration 或 runtime 验证                                                                                  |
 | 客户配置与私有化边界 | `config/customers/index.test.mjs`、`scripts/build/apply-customer-web-config.test.mjs`、`customer-config-boundaries.mjs`、`customer-config-effective-session-probe.mjs`、`customer-package-lint.mjs`、`customer-package-preview-boundary.test.mjs`、`customer-config-runtime-manifest.mjs`、`private-deployment-boundaries.mjs`、`private-deployment-package-closure.test.mjs` | 只做构建期索引、overlay、lint / preview / manifest 编译、无凭据读回探针和模板边界检查；`boundariesSatisfied` 不等于交付、evidence 或签收完成，不写 Fact |
 | Workflow / Fact 边界 | `workflow-fact-boundary.test.mjs`、`workflow-ui-action-boundary.test.mjs`                                                                                                                                                                                                                                                                                                                                                                                                                    | 防止协同任务路径越界写入事实层                                                                                                                                                                                                 |
-| 测试数据隔离         | `test-data-isolation-boundary.mjs`、`manual-acceptance-catalog.mjs`、`manual-acceptance-source-data.mjs`、`manual-acceptance-data-depth.mjs`、`manual-acceptance-account-scenarios.mjs`、`manual-acceptance-task-data.mjs`、`manual-acceptance-fact-data.mjs`、`manual-acceptance-readiness.mjs`、`manual-acceptance-browser.mjs`、`manual-acceptance-source-retire.mjs`、`trial-simulated-data.mjs`、`purchase-quality-simulated-matrix.mjs`、`mobile-workflow-simulated-closure.mjs`、`operational-fact-simulated-closure.mjs` | Product Core demo seed、yoyoosun 中文试用矩阵、真实导入预检和真实执行门禁分桶检查；计划与静态守卫不连接后端、不写 DB、不执行导入，带显式确认的模拟脚本才会经正式业务入口写本机 local / dev；浏览器入口只执行登录和只读页面查询 |
+| 测试数据隔离         | `test-data-isolation-boundary.mjs`、`manual-acceptance-catalog.mjs`、`manual-acceptance-source-data.mjs`、`manual-acceptance-data-depth.mjs`、`manual-acceptance-account-scenarios.mjs`、`manual-acceptance-task-data.mjs`、`manual-acceptance-fact-data.mjs`、`manual-acceptance-readiness.mjs`、`manual-acceptance-browser.mjs`、`manual-acceptance-source-retire.mjs`、`trial-simulated-data.mjs`、`purchase-quality-simulated-matrix.mjs`、`mobile-workflow-simulated-closure.mjs`、`operational-fact-simulated-closure.mjs` | Product Core demo seed、yoyoosun 中文试用矩阵、真实导入预检和真实执行门禁分桶检查；计划与静态守卫不连接后端、不写 DB、不执行导入；旧通用业务事实 apply 已停用，浏览器入口只执行登录和只读页面查询 |
 | 代码质量和安全       | `secrets.sh`、`error-codes.sh`、`go-vet.sh`、`govulncheck.sh`、`shellcheck.sh`、`shfmt.sh`、`yamllint.sh`                                                                                                                                                                                                                                                                                                                                                                                    | 按对应语言 / 配置类型补充检查，不替代业务回归                                                                                                                                                                                  |
 
 ## 门禁完整性与 CI 边界
@@ -64,9 +64,9 @@ CI action 固定到审核过的 commit，工具链读取 `.n-node-version`、`we
 
 ## 全页面试用验收数据
 
-全页面试用数据按用途使用独立稳定批次：源数据使用 `SIM-YOYOOSUN-UAT-<runId>`，岗位任务使用 `SIM-YOYOOSUN-UAT-TASK-<runId>`，生产 / 库存 / 出货 / 财务事实使用 `SIM-YOYOOSUN-OPFACT-<runId>`，采购 / 质检事实使用 `SIM-YOYOOSUN-PQ-<runId>`。页面可见名称统一带 `【试用】`，不读取或导入真实客户资料。账号场景、源数据、岗位任务、业务事实、只读核验和退出各自使用独立入口。
+全页面试用数据按用途使用独立稳定批次：源数据使用 `SIM-YOYOOSUN-UAT-<runId>`，岗位任务使用 `SIM-YOYOOSUN-UAT-TASK-<runId>`，采购 / 质检事实使用 `SIM-YOYOOSUN-PQ-<runId>`；`SIM-YOYOOSUN-OPFACT-<runId>` 仅保留为旧 report-only 计划前缀，当前没有可执行的整批事实写入入口。页面可见名称统一带 `【试用】`，不读取或导入真实客户资料。
 
-事实数据入口组合调用的 `operational-fact-simulated-closure.mjs` 与 `purchase-quality-simulated-matrix.mjs` 自身也保持写入防线：无论从命令行还是导出的 `applyPlan` 调用，都只接受 loopback 地址，并在首条业务写入前确认运行环境为 `local / dev`、当前配置来自非空的 yoyoosun active revision。独立命令行分别要求 `OPERATIONAL_FACT_SIM_ADMIN_PASSWORD` 和 `PURCHASE_QUALITY_SIM_ADMIN_PASSWORD`；上层事实入口把 `MANUAL_ACCEPTANCE_ADMIN_PASSWORD` 显式传入导出执行函数。确认词或普通岗位账号密码都不能替代独立管理员守卫。
+`operational-fact-simulated-closure.mjs` 的旧通用业务事实 `--apply / applyPlan` 已 fail-closed 退役：它们在登录、RPC、采购质检前置写入和报告落盘前拒绝执行，只保留输入模板与 report-only 计划。`manual-acceptance-fact-data.mjs --apply` 同步停用，避免先写采购 / 质检再在旧生产、委外或财务通用接口上失败。`purchase-quality-simulated-matrix.mjs` 仍是独立、受 loopback、local / dev、active yoyoosun revision 和管理员确认保护的专用写入脚本；不能用它证明其余事实链已闭环。
 
 先生成验收目录和源数据计划，两条命令都不连接后端：
 
@@ -144,7 +144,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
     --out output/qa/manual-acceptance/task-data
 ```
 
-源数据写入报告生成后，再独立生成并写入采购、质检、库存、生产、预留、出货和四类财务状态矩阵：
+源数据写入报告生成后，可以生成旧事实矩阵的只读计划用于差距审查，但当前不能通过该入口写入生产、委外、预留、出货或财务验收数据：
 
 ```bash
 node scripts/qa/manual-acceptance-fact-data.mjs \
@@ -152,16 +152,12 @@ node scripts/qa/manual-acceptance-fact-data.mjs \
   --run-id LOCAL-UAT-FACTS \
   --json
 
-MANUAL_ACCEPTANCE_FACT_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_FACTS \
-MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
-MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
-  node scripts/qa/manual-acceptance-fact-data.mjs \
-    --apply \
-    --source-report output/qa/manual-acceptance/source-data/apply-report.json \
-    --run-id LOCAL-UAT-FACTS
+node scripts/qa/operational-fact-simulated-closure.mjs --print-input-template
 ```
 
-写入后只读核对 47 项验收目标。该入口只证明数量和状态分布，打印分页、筛选恢复、错误提示和人工结果仍按客户清单逐项确认：
+恢复整批事实数据写入前，必须提供使用生产订单 / 物料需求、委外订单、销售订单、出货、采购入库和已过账财务事实的来源驱动 fixture，并产出 `source-driven-operational-facts-v1` 报告合同。Readiness、浏览器打印输入和附件数据入口会拒绝旧 generic-method 报告，不能用历史报告冒充当前验收证据。
+
+写入后只读核对 48 项验收目标。该入口只证明数量和状态分布，打印分页、筛选恢复、错误提示和人工结果仍按客户清单逐项确认：
 
 ```bash
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
@@ -175,7 +171,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
     --out output/qa/manual-acceptance/readiness
 ```
 
-再执行本机真实浏览器只读核对。该入口覆盖 10 个正式桌面账号、9 个岗位任务端、3 个补充账号场景和全部 47 个正式目标；会产生登录 / 审计痕迹和 ignored 本地报告，但不点击新增、编辑、提交、完成、取消或过账动作。页面能打开、页面有数据和页面已达到目录最低数量会分开记录：
+再执行本机真实浏览器只读核对。该入口覆盖 10 个正式桌面账号、9 个岗位任务端、3 个补充账号场景和全部 48 个正式目标；会产生登录 / 审计痕迹和 ignored 本地报告，但不点击新增、编辑、提交、完成、取消或过账动作。页面能打开、页面有数据和页面已达到目录最低数量会分开记录：
 
 ```bash
 node scripts/qa/manual-acceptance-browser.mjs --plan \

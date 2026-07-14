@@ -70,6 +70,8 @@ type Tx struct {
 	ProductionOrderEvent *ProductionOrderEventClient
 	// ProductionOrderItem is the client for interacting with the ProductionOrderItem builders.
 	ProductionOrderItem *ProductionOrderItemClient
+	// ProductionOrderMaterialRequirement is the client for interacting with the ProductionOrderMaterialRequirement builders.
+	ProductionOrderMaterialRequirement *ProductionOrderMaterialRequirementClient
 	// PurchaseOrder is the client for interacting with the PurchaseOrder builders.
 	PurchaseOrder *PurchaseOrderClient
 	// PurchaseOrderItem is the client for interacting with the PurchaseOrderItem builders.
@@ -284,6 +286,7 @@ func (tx *Tx) init() {
 	tx.ProductionOrder = NewProductionOrderClient(tx.config)
 	tx.ProductionOrderEvent = NewProductionOrderEventClient(tx.config)
 	tx.ProductionOrderItem = NewProductionOrderItemClient(tx.config)
+	tx.ProductionOrderMaterialRequirement = NewProductionOrderMaterialRequirementClient(tx.config)
 	tx.PurchaseOrder = NewPurchaseOrderClient(tx.config)
 	tx.PurchaseOrderItem = NewPurchaseOrderItemClient(tx.config)
 	tx.PurchaseReceipt = NewPurchaseReceiptClient(tx.config)

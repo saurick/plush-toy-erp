@@ -26,13 +26,16 @@ export async function installOrderRpcMocks(page, context) {
       sales_order_id: 1,
       line_no: 1,
       product_id: 1,
+      product_sku_id: 1,
       product_snapshot: { id: 1, code: 'PROD-STYLE-L1', name: '样式产品' },
       product_code_snapshot: 'PROD-STYLE-L1',
       product_name_snapshot: '样式产品',
+      sku_code_snapshot: 'SKU-STYLE-L1',
       color_snapshot: '深棕',
       ordered_quantity: '10',
       unit_id: 1,
       unit_snapshot: { id: 1, code: 'PCS', name: '只' },
+      unit_name_snapshot: '只',
       unit_price: '12.50',
       amount: '125.00',
       line_status: 'open',
@@ -470,6 +473,37 @@ export async function installOrderRpcMocks(page, context) {
     created_at: nowUnix(),
     updated_at: nowUnix(),
   }))
+  const productionMaterialRequirements = [
+    {
+      id: 7201,
+      production_order_id: 71,
+      production_order_item_id: 7101,
+      bom_header_id: 701,
+      bom_item_id: 7301,
+      material_id: 1,
+      unit_id: 1,
+      unit_quantity_snapshot: '0.500000',
+      loss_rate_snapshot: '0.020000',
+      planned_quantity: '10.200000',
+      issued_quantity: '2.200000',
+      remaining_quantity: '8.000000',
+      material_code_snapshot: 'MAT-STYLE-L1',
+      material_name_snapshot: '样式短毛绒布',
+      unit_code_snapshot: 'M',
+      unit_name_snapshot: '米',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    },
+  ]
+  let productionRequirementsFrozen = false
+  const productionMaterialRequirementProjection = () => ({
+    production_material_requirements: productionRequirementsFrozen
+      ? productionMaterialRequirements
+      : [],
+    material_requirements_state: productionRequirementsFrozen
+      ? 'READY'
+      : 'NEEDS_REVIEW',
+  })
   const referenceOptions = {
     product: {
       value: 301,
@@ -577,8 +611,9 @@ export async function installOrderRpcMocks(page, context) {
       params.idempotency_key === params.idempotency_key.trim() &&
       params.idempotency_key.length > 0 &&
       params.idempotency_key.length <= 128
-    if (method === 'get_production_order')
+    if (method === 'get_production_order') {
       return positive(params.production_order_id)
+    }
     if (method === 'create_production_order') {
       return (
         keyValid &&
@@ -610,8 +645,9 @@ export async function installOrderRpcMocks(page, context) {
         !keyValid ||
         !positive(params.production_order_id) ||
         !positive(params.expected_version)
-      )
+      ) {
         return false
+      }
       return (
         method !== 'cancel_production_order' ||
         (typeof params.reason === 'string' && params.reason.trim().length > 0)
@@ -647,6 +683,7 @@ export async function installOrderRpcMocks(page, context) {
       data = {
         production_order: productionOrder,
         production_order_items: productionOrderItems,
+        ...productionMaterialRequirementProjection(),
       }
     } else if (method === 'list_production_order_reference_options') {
       const option = referenceOptions[params.reference_type]
@@ -681,9 +718,13 @@ export async function installOrderRpcMocks(page, context) {
             : productionOrder.cancel_reason,
         updated_at: nowUnix(),
       })
+      if (method === 'release_production_order') {
+        productionRequirementsFrozen = true
+      }
       data = {
         production_order: productionOrder,
         production_order_items: productionOrderItems,
+        ...productionMaterialRequirementProjection(),
       }
     }
     await route.fulfill({

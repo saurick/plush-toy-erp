@@ -3,7 +3,9 @@ import test from 'node:test'
 import {
   createProductionOrderAttemptStore,
   isProductionOrderResultUnknown,
+  PRODUCTION_MATERIAL_REQUIREMENTS_STATE,
   validateProductionOrderAggregate,
+  validateProductionMaterialRequirementsResponse,
   validateProductionOrderOptions,
 } from './productionOrderModel.mjs'
 
@@ -25,6 +27,27 @@ function aggregate() {
         planned_quantity: '20.0000',
       },
     ],
+    production_material_requirements: [
+      {
+        id: 31,
+        production_order_id: 7,
+        production_order_item_id: 11,
+        bom_header_id: 21,
+        bom_item_id: 22,
+        material_id: 23,
+        unit_id: 5,
+        unit_quantity_snapshot: '0.500000',
+        loss_rate_snapshot: '0.020000',
+        planned_quantity: '10.200000',
+        issued_quantity: '4.200000',
+        remaining_quantity: '6.000000',
+        material_code_snapshot: 'MAT-023',
+        material_name_snapshot: '短毛绒布',
+        unit_code_snapshot: 'M',
+        unit_name_snapshot: '米',
+      },
+    ],
+    material_requirements_state: 'READY',
   }
 }
 
@@ -36,10 +59,38 @@ test('production order aggregate response binds order, status and every item', (
     }).order.version,
     2
   )
+  assert.equal(
+    validateProductionOrderAggregate(aggregate()).materialRequirementsState,
+    PRODUCTION_MATERIAL_REQUIREMENTS_STATE.READY
+  )
   assert.throws(() => validateProductionOrderAggregate(aggregate(), { id: 8 }))
   const malformed = aggregate()
   malformed.production_order_items[0].production_order_id = 8
   assert.throws(() => validateProductionOrderAggregate(malformed))
+})
+
+test('production material requirement response binds order and quantity projection', () => {
+  const data = {
+    material_requirements: aggregate().production_material_requirements,
+  }
+  assert.equal(
+    validateProductionMaterialRequirementsResponse(data, {
+      productionOrderID: 7,
+    })[0].remaining_quantity,
+    '6.000000'
+  )
+  const forged = structuredClone(data)
+  forged.material_requirements[0].production_order_id = 8
+  assert.throws(() =>
+    validateProductionMaterialRequirementsResponse(forged, {
+      productionOrderID: 7,
+    })
+  )
+  const inconsistent = structuredClone(data)
+  inconsistent.material_requirements[0].remaining_quantity = '7.000000'
+  assert.throws(() =>
+    validateProductionMaterialRequirementsResponse(inconsistent)
+  )
 })
 
 test('production order option response never accepts missing readable labels', () => {

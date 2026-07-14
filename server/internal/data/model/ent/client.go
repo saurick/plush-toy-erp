@@ -39,6 +39,7 @@ import (
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderevent"
 	"server/internal/data/model/ent/productionorderitem"
+	"server/internal/data/model/ent/productionordermaterialrequirement"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchaseorderitem"
@@ -137,6 +138,8 @@ type Client struct {
 	ProductionOrderEvent *ProductionOrderEventClient
 	// ProductionOrderItem is the client for interacting with the ProductionOrderItem builders.
 	ProductionOrderItem *ProductionOrderItemClient
+	// ProductionOrderMaterialRequirement is the client for interacting with the ProductionOrderMaterialRequirement builders.
+	ProductionOrderMaterialRequirement *ProductionOrderMaterialRequirementClient
 	// PurchaseOrder is the client for interacting with the PurchaseOrder builders.
 	PurchaseOrder *PurchaseOrderClient
 	// PurchaseOrderItem is the client for interacting with the PurchaseOrderItem builders.
@@ -231,6 +234,7 @@ func (c *Client) init() {
 	c.ProductionOrder = NewProductionOrderClient(c.config)
 	c.ProductionOrderEvent = NewProductionOrderEventClient(c.config)
 	c.ProductionOrderItem = NewProductionOrderItemClient(c.config)
+	c.ProductionOrderMaterialRequirement = NewProductionOrderMaterialRequirementClient(c.config)
 	c.PurchaseOrder = NewPurchaseOrderClient(c.config)
 	c.PurchaseOrderItem = NewPurchaseOrderItemClient(c.config)
 	c.PurchaseReceipt = NewPurchaseReceiptClient(c.config)
@@ -348,64 +352,65 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:                           ctx,
-		config:                        cfg,
-		AccessEntitlement:             NewAccessEntitlementClient(cfg),
-		AdminSession:                  NewAdminSessionClient(cfg),
-		AdminUser:                     NewAdminUserClient(cfg),
-		AdminUserRole:                 NewAdminUserRoleClient(cfg),
-		BOMHeader:                     NewBOMHeaderClient(cfg),
-		BOMItem:                       NewBOMItemClient(cfg),
-		BusinessAttachment:            NewBusinessAttachmentClient(cfg),
-		Contact:                       NewContactClient(cfg),
-		Customer:                      NewCustomerClient(cfg),
-		CustomerConfigRevision:        NewCustomerConfigRevisionClient(cfg),
-		DeploymentModuleState:         NewDeploymentModuleStateClient(cfg),
-		FinanceFact:                   NewFinanceFactClient(cfg),
-		InventoryBalance:              NewInventoryBalanceClient(cfg),
-		InventoryLot:                  NewInventoryLotClient(cfg),
-		InventoryTxn:                  NewInventoryTxnClient(cfg),
-		Material:                      NewMaterialClient(cfg),
-		OutsourcingFact:               NewOutsourcingFactClient(cfg),
-		OutsourcingOrder:              NewOutsourcingOrderClient(cfg),
-		OutsourcingOrderItem:          NewOutsourcingOrderItemClient(cfg),
-		Permission:                    NewPermissionClient(cfg),
-		Process:                       NewProcessClient(cfg),
-		ProcessInstance:               NewProcessInstanceClient(cfg),
-		ProcessNodeInstance:           NewProcessNodeInstanceClient(cfg),
-		Product:                       NewProductClient(cfg),
-		ProductSKU:                    NewProductSKUClient(cfg),
-		ProductionFact:                NewProductionFactClient(cfg),
-		ProductionOrder:               NewProductionOrderClient(cfg),
-		ProductionOrderEvent:          NewProductionOrderEventClient(cfg),
-		ProductionOrderItem:           NewProductionOrderItemClient(cfg),
-		PurchaseOrder:                 NewPurchaseOrderClient(cfg),
-		PurchaseOrderItem:             NewPurchaseOrderItemClient(cfg),
-		PurchaseReceipt:               NewPurchaseReceiptClient(cfg),
-		PurchaseReceiptAdjustment:     NewPurchaseReceiptAdjustmentClient(cfg),
-		PurchaseReceiptAdjustmentItem: NewPurchaseReceiptAdjustmentItemClient(cfg),
-		PurchaseReceiptItem:           NewPurchaseReceiptItemClient(cfg),
-		PurchaseReturn:                NewPurchaseReturnClient(cfg),
-		PurchaseReturnItem:            NewPurchaseReturnItemClient(cfg),
-		QualityInspection:             NewQualityInspectionClient(cfg),
-		Role:                          NewRoleClient(cfg),
-		RolePermission:                NewRolePermissionClient(cfg),
-		RoleProfile:                   NewRoleProfileClient(cfg),
-		RuntimeAuditEvent:             NewRuntimeAuditEventClient(cfg),
-		RuntimeMarker:                 NewRuntimeMarkerClient(cfg),
-		SalesOrder:                    NewSalesOrderClient(cfg),
-		SalesOrderItem:                NewSalesOrderItemClient(cfg),
-		Shipment:                      NewShipmentClient(cfg),
-		ShipmentItem:                  NewShipmentItemClient(cfg),
-		StockReservation:              NewStockReservationClient(cfg),
-		Supplier:                      NewSupplierClient(cfg),
-		Unit:                          NewUnitClient(cfg),
-		Warehouse:                     NewWarehouseClient(cfg),
-		WorkPool:                      NewWorkPoolClient(cfg),
-		WorkPoolMembership:            NewWorkPoolMembershipClient(cfg),
-		WorkflowBusinessState:         NewWorkflowBusinessStateClient(cfg),
-		WorkflowTask:                  NewWorkflowTaskClient(cfg),
-		WorkflowTaskEvent:             NewWorkflowTaskEventClient(cfg),
+		ctx:                                ctx,
+		config:                             cfg,
+		AccessEntitlement:                  NewAccessEntitlementClient(cfg),
+		AdminSession:                       NewAdminSessionClient(cfg),
+		AdminUser:                          NewAdminUserClient(cfg),
+		AdminUserRole:                      NewAdminUserRoleClient(cfg),
+		BOMHeader:                          NewBOMHeaderClient(cfg),
+		BOMItem:                            NewBOMItemClient(cfg),
+		BusinessAttachment:                 NewBusinessAttachmentClient(cfg),
+		Contact:                            NewContactClient(cfg),
+		Customer:                           NewCustomerClient(cfg),
+		CustomerConfigRevision:             NewCustomerConfigRevisionClient(cfg),
+		DeploymentModuleState:              NewDeploymentModuleStateClient(cfg),
+		FinanceFact:                        NewFinanceFactClient(cfg),
+		InventoryBalance:                   NewInventoryBalanceClient(cfg),
+		InventoryLot:                       NewInventoryLotClient(cfg),
+		InventoryTxn:                       NewInventoryTxnClient(cfg),
+		Material:                           NewMaterialClient(cfg),
+		OutsourcingFact:                    NewOutsourcingFactClient(cfg),
+		OutsourcingOrder:                   NewOutsourcingOrderClient(cfg),
+		OutsourcingOrderItem:               NewOutsourcingOrderItemClient(cfg),
+		Permission:                         NewPermissionClient(cfg),
+		Process:                            NewProcessClient(cfg),
+		ProcessInstance:                    NewProcessInstanceClient(cfg),
+		ProcessNodeInstance:                NewProcessNodeInstanceClient(cfg),
+		Product:                            NewProductClient(cfg),
+		ProductSKU:                         NewProductSKUClient(cfg),
+		ProductionFact:                     NewProductionFactClient(cfg),
+		ProductionOrder:                    NewProductionOrderClient(cfg),
+		ProductionOrderEvent:               NewProductionOrderEventClient(cfg),
+		ProductionOrderItem:                NewProductionOrderItemClient(cfg),
+		ProductionOrderMaterialRequirement: NewProductionOrderMaterialRequirementClient(cfg),
+		PurchaseOrder:                      NewPurchaseOrderClient(cfg),
+		PurchaseOrderItem:                  NewPurchaseOrderItemClient(cfg),
+		PurchaseReceipt:                    NewPurchaseReceiptClient(cfg),
+		PurchaseReceiptAdjustment:          NewPurchaseReceiptAdjustmentClient(cfg),
+		PurchaseReceiptAdjustmentItem:      NewPurchaseReceiptAdjustmentItemClient(cfg),
+		PurchaseReceiptItem:                NewPurchaseReceiptItemClient(cfg),
+		PurchaseReturn:                     NewPurchaseReturnClient(cfg),
+		PurchaseReturnItem:                 NewPurchaseReturnItemClient(cfg),
+		QualityInspection:                  NewQualityInspectionClient(cfg),
+		Role:                               NewRoleClient(cfg),
+		RolePermission:                     NewRolePermissionClient(cfg),
+		RoleProfile:                        NewRoleProfileClient(cfg),
+		RuntimeAuditEvent:                  NewRuntimeAuditEventClient(cfg),
+		RuntimeMarker:                      NewRuntimeMarkerClient(cfg),
+		SalesOrder:                         NewSalesOrderClient(cfg),
+		SalesOrderItem:                     NewSalesOrderItemClient(cfg),
+		Shipment:                           NewShipmentClient(cfg),
+		ShipmentItem:                       NewShipmentItemClient(cfg),
+		StockReservation:                   NewStockReservationClient(cfg),
+		Supplier:                           NewSupplierClient(cfg),
+		Unit:                               NewUnitClient(cfg),
+		Warehouse:                          NewWarehouseClient(cfg),
+		WorkPool:                           NewWorkPoolClient(cfg),
+		WorkPoolMembership:                 NewWorkPoolMembershipClient(cfg),
+		WorkflowBusinessState:              NewWorkflowBusinessStateClient(cfg),
+		WorkflowTask:                       NewWorkflowTaskClient(cfg),
+		WorkflowTaskEvent:                  NewWorkflowTaskEventClient(cfg),
 	}, nil
 }
 
@@ -423,64 +428,65 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:                           ctx,
-		config:                        cfg,
-		AccessEntitlement:             NewAccessEntitlementClient(cfg),
-		AdminSession:                  NewAdminSessionClient(cfg),
-		AdminUser:                     NewAdminUserClient(cfg),
-		AdminUserRole:                 NewAdminUserRoleClient(cfg),
-		BOMHeader:                     NewBOMHeaderClient(cfg),
-		BOMItem:                       NewBOMItemClient(cfg),
-		BusinessAttachment:            NewBusinessAttachmentClient(cfg),
-		Contact:                       NewContactClient(cfg),
-		Customer:                      NewCustomerClient(cfg),
-		CustomerConfigRevision:        NewCustomerConfigRevisionClient(cfg),
-		DeploymentModuleState:         NewDeploymentModuleStateClient(cfg),
-		FinanceFact:                   NewFinanceFactClient(cfg),
-		InventoryBalance:              NewInventoryBalanceClient(cfg),
-		InventoryLot:                  NewInventoryLotClient(cfg),
-		InventoryTxn:                  NewInventoryTxnClient(cfg),
-		Material:                      NewMaterialClient(cfg),
-		OutsourcingFact:               NewOutsourcingFactClient(cfg),
-		OutsourcingOrder:              NewOutsourcingOrderClient(cfg),
-		OutsourcingOrderItem:          NewOutsourcingOrderItemClient(cfg),
-		Permission:                    NewPermissionClient(cfg),
-		Process:                       NewProcessClient(cfg),
-		ProcessInstance:               NewProcessInstanceClient(cfg),
-		ProcessNodeInstance:           NewProcessNodeInstanceClient(cfg),
-		Product:                       NewProductClient(cfg),
-		ProductSKU:                    NewProductSKUClient(cfg),
-		ProductionFact:                NewProductionFactClient(cfg),
-		ProductionOrder:               NewProductionOrderClient(cfg),
-		ProductionOrderEvent:          NewProductionOrderEventClient(cfg),
-		ProductionOrderItem:           NewProductionOrderItemClient(cfg),
-		PurchaseOrder:                 NewPurchaseOrderClient(cfg),
-		PurchaseOrderItem:             NewPurchaseOrderItemClient(cfg),
-		PurchaseReceipt:               NewPurchaseReceiptClient(cfg),
-		PurchaseReceiptAdjustment:     NewPurchaseReceiptAdjustmentClient(cfg),
-		PurchaseReceiptAdjustmentItem: NewPurchaseReceiptAdjustmentItemClient(cfg),
-		PurchaseReceiptItem:           NewPurchaseReceiptItemClient(cfg),
-		PurchaseReturn:                NewPurchaseReturnClient(cfg),
-		PurchaseReturnItem:            NewPurchaseReturnItemClient(cfg),
-		QualityInspection:             NewQualityInspectionClient(cfg),
-		Role:                          NewRoleClient(cfg),
-		RolePermission:                NewRolePermissionClient(cfg),
-		RoleProfile:                   NewRoleProfileClient(cfg),
-		RuntimeAuditEvent:             NewRuntimeAuditEventClient(cfg),
-		RuntimeMarker:                 NewRuntimeMarkerClient(cfg),
-		SalesOrder:                    NewSalesOrderClient(cfg),
-		SalesOrderItem:                NewSalesOrderItemClient(cfg),
-		Shipment:                      NewShipmentClient(cfg),
-		ShipmentItem:                  NewShipmentItemClient(cfg),
-		StockReservation:              NewStockReservationClient(cfg),
-		Supplier:                      NewSupplierClient(cfg),
-		Unit:                          NewUnitClient(cfg),
-		Warehouse:                     NewWarehouseClient(cfg),
-		WorkPool:                      NewWorkPoolClient(cfg),
-		WorkPoolMembership:            NewWorkPoolMembershipClient(cfg),
-		WorkflowBusinessState:         NewWorkflowBusinessStateClient(cfg),
-		WorkflowTask:                  NewWorkflowTaskClient(cfg),
-		WorkflowTaskEvent:             NewWorkflowTaskEventClient(cfg),
+		ctx:                                ctx,
+		config:                             cfg,
+		AccessEntitlement:                  NewAccessEntitlementClient(cfg),
+		AdminSession:                       NewAdminSessionClient(cfg),
+		AdminUser:                          NewAdminUserClient(cfg),
+		AdminUserRole:                      NewAdminUserRoleClient(cfg),
+		BOMHeader:                          NewBOMHeaderClient(cfg),
+		BOMItem:                            NewBOMItemClient(cfg),
+		BusinessAttachment:                 NewBusinessAttachmentClient(cfg),
+		Contact:                            NewContactClient(cfg),
+		Customer:                           NewCustomerClient(cfg),
+		CustomerConfigRevision:             NewCustomerConfigRevisionClient(cfg),
+		DeploymentModuleState:              NewDeploymentModuleStateClient(cfg),
+		FinanceFact:                        NewFinanceFactClient(cfg),
+		InventoryBalance:                   NewInventoryBalanceClient(cfg),
+		InventoryLot:                       NewInventoryLotClient(cfg),
+		InventoryTxn:                       NewInventoryTxnClient(cfg),
+		Material:                           NewMaterialClient(cfg),
+		OutsourcingFact:                    NewOutsourcingFactClient(cfg),
+		OutsourcingOrder:                   NewOutsourcingOrderClient(cfg),
+		OutsourcingOrderItem:               NewOutsourcingOrderItemClient(cfg),
+		Permission:                         NewPermissionClient(cfg),
+		Process:                            NewProcessClient(cfg),
+		ProcessInstance:                    NewProcessInstanceClient(cfg),
+		ProcessNodeInstance:                NewProcessNodeInstanceClient(cfg),
+		Product:                            NewProductClient(cfg),
+		ProductSKU:                         NewProductSKUClient(cfg),
+		ProductionFact:                     NewProductionFactClient(cfg),
+		ProductionOrder:                    NewProductionOrderClient(cfg),
+		ProductionOrderEvent:               NewProductionOrderEventClient(cfg),
+		ProductionOrderItem:                NewProductionOrderItemClient(cfg),
+		ProductionOrderMaterialRequirement: NewProductionOrderMaterialRequirementClient(cfg),
+		PurchaseOrder:                      NewPurchaseOrderClient(cfg),
+		PurchaseOrderItem:                  NewPurchaseOrderItemClient(cfg),
+		PurchaseReceipt:                    NewPurchaseReceiptClient(cfg),
+		PurchaseReceiptAdjustment:          NewPurchaseReceiptAdjustmentClient(cfg),
+		PurchaseReceiptAdjustmentItem:      NewPurchaseReceiptAdjustmentItemClient(cfg),
+		PurchaseReceiptItem:                NewPurchaseReceiptItemClient(cfg),
+		PurchaseReturn:                     NewPurchaseReturnClient(cfg),
+		PurchaseReturnItem:                 NewPurchaseReturnItemClient(cfg),
+		QualityInspection:                  NewQualityInspectionClient(cfg),
+		Role:                               NewRoleClient(cfg),
+		RolePermission:                     NewRolePermissionClient(cfg),
+		RoleProfile:                        NewRoleProfileClient(cfg),
+		RuntimeAuditEvent:                  NewRuntimeAuditEventClient(cfg),
+		RuntimeMarker:                      NewRuntimeMarkerClient(cfg),
+		SalesOrder:                         NewSalesOrderClient(cfg),
+		SalesOrderItem:                     NewSalesOrderItemClient(cfg),
+		Shipment:                           NewShipmentClient(cfg),
+		ShipmentItem:                       NewShipmentItemClient(cfg),
+		StockReservation:                   NewStockReservationClient(cfg),
+		Supplier:                           NewSupplierClient(cfg),
+		Unit:                               NewUnitClient(cfg),
+		Warehouse:                          NewWarehouseClient(cfg),
+		WorkPool:                           NewWorkPoolClient(cfg),
+		WorkPoolMembership:                 NewWorkPoolMembershipClient(cfg),
+		WorkflowBusinessState:              NewWorkflowBusinessStateClient(cfg),
+		WorkflowTask:                       NewWorkflowTaskClient(cfg),
+		WorkflowTaskEvent:                  NewWorkflowTaskEventClient(cfg),
 	}, nil
 }
 
@@ -517,13 +523,13 @@ func (c *Client) Use(hooks ...Hook) {
 		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem, c.Permission,
 		c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product, c.ProductSKU,
 		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
-		c.ProductionOrderItem, c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
-		c.PurchaseReceiptAdjustment, c.PurchaseReceiptAdjustmentItem,
-		c.PurchaseReceiptItem, c.PurchaseReturn, c.PurchaseReturnItem,
-		c.QualityInspection, c.Role, c.RolePermission, c.RoleProfile,
-		c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem,
-		c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier, c.Unit,
-		c.Warehouse, c.WorkPool, c.WorkPoolMembership, c.WorkflowBusinessState,
+		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement, c.PurchaseOrder,
+		c.PurchaseOrderItem, c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
+		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
+		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RolePermission,
+		c.RoleProfile, c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder,
+		c.SalesOrderItem, c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier,
+		c.Unit, c.Warehouse, c.WorkPool, c.WorkPoolMembership, c.WorkflowBusinessState,
 		c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Use(hooks...)
@@ -541,13 +547,13 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem, c.Permission,
 		c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product, c.ProductSKU,
 		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
-		c.ProductionOrderItem, c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
-		c.PurchaseReceiptAdjustment, c.PurchaseReceiptAdjustmentItem,
-		c.PurchaseReceiptItem, c.PurchaseReturn, c.PurchaseReturnItem,
-		c.QualityInspection, c.Role, c.RolePermission, c.RoleProfile,
-		c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem,
-		c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier, c.Unit,
-		c.Warehouse, c.WorkPool, c.WorkPoolMembership, c.WorkflowBusinessState,
+		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement, c.PurchaseOrder,
+		c.PurchaseOrderItem, c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
+		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
+		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RolePermission,
+		c.RoleProfile, c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder,
+		c.SalesOrderItem, c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier,
+		c.Unit, c.Warehouse, c.WorkPool, c.WorkPoolMembership, c.WorkflowBusinessState,
 		c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Intercept(interceptors...)
@@ -615,6 +621,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ProductionOrderEvent.mutate(ctx, m)
 	case *ProductionOrderItemMutation:
 		return c.ProductionOrderItem.mutate(ctx, m)
+	case *ProductionOrderMaterialRequirementMutation:
+		return c.ProductionOrderMaterialRequirement.mutate(ctx, m)
 	case *PurchaseOrderMutation:
 		return c.PurchaseOrder.mutate(ctx, m)
 	case *PurchaseOrderItemMutation:
@@ -1346,6 +1354,22 @@ func (c *BOMHeaderClient) QueryItems(_m *BOMHeader) *BOMItemQuery {
 	return query
 }
 
+// QueryProductionOrderMaterialRequirements queries the production_order_material_requirements edge of a BOMHeader.
+func (c *BOMHeaderClient) QueryProductionOrderMaterialRequirements(_m *BOMHeader) *ProductionOrderMaterialRequirementQuery {
+	query := (&ProductionOrderMaterialRequirementClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(bomheader.Table, bomheader.FieldID, id),
+			sqlgraph.To(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, bomheader.ProductionOrderMaterialRequirementsTable, bomheader.ProductionOrderMaterialRequirementsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *BOMHeaderClient) Hooks() []Hook {
 	return c.hooks.BOMHeader
@@ -1520,6 +1544,22 @@ func (c *BOMItemClient) QueryUnit(_m *BOMItem) *UnitQuery {
 			sqlgraph.From(bomitem.Table, bomitem.FieldID, id),
 			sqlgraph.To(unit.Table, unit.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, bomitem.UnitTable, bomitem.UnitColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProductionOrderMaterialRequirements queries the production_order_material_requirements edge of a BOMItem.
+func (c *BOMItemClient) QueryProductionOrderMaterialRequirements(_m *BOMItem) *ProductionOrderMaterialRequirementQuery {
+	query := (&ProductionOrderMaterialRequirementClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(bomitem.Table, bomitem.FieldID, id),
+			sqlgraph.To(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, bomitem.ProductionOrderMaterialRequirementsTable, bomitem.ProductionOrderMaterialRequirementsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -3244,6 +3284,22 @@ func (c *MaterialClient) QueryBomItems(_m *Material) *BOMItemQuery {
 	return query
 }
 
+// QueryProductionOrderMaterialRequirements queries the production_order_material_requirements edge of a Material.
+func (c *MaterialClient) QueryProductionOrderMaterialRequirements(_m *Material) *ProductionOrderMaterialRequirementQuery {
+	query := (&ProductionOrderMaterialRequirementClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(material.Table, material.FieldID, id),
+			sqlgraph.To(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, material.ProductionOrderMaterialRequirementsTable, material.ProductionOrderMaterialRequirementsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryPurchaseOrderItems queries the purchase_order_items edge of a Material.
 func (c *MaterialClient) QueryPurchaseOrderItems(_m *Material) *PurchaseOrderItemQuery {
 	query := (&PurchaseOrderItemClient{config: c.config}).Query()
@@ -3861,6 +3917,22 @@ func (c *OutsourcingOrderItemClient) QueryProduct(_m *OutsourcingOrderItem) *Pro
 			sqlgraph.From(outsourcingorderitem.Table, outsourcingorderitem.FieldID, id),
 			sqlgraph.To(product.Table, product.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, outsourcingorderitem.ProductTable, outsourcingorderitem.ProductColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProductSku queries the product_sku edge of a OutsourcingOrderItem.
+func (c *OutsourcingOrderItemClient) QueryProductSku(_m *OutsourcingOrderItem) *ProductSKUQuery {
+	query := (&ProductSKUClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingorderitem.Table, outsourcingorderitem.FieldID, id),
+			sqlgraph.To(productsku.Table, productsku.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, outsourcingorderitem.ProductSkuTable, outsourcingorderitem.ProductSkuColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -5397,6 +5469,22 @@ func (c *ProductionOrderClient) QueryItems(_m *ProductionOrder) *ProductionOrder
 	return query
 }
 
+// QueryMaterialRequirements queries the material_requirements edge of a ProductionOrder.
+func (c *ProductionOrderClient) QueryMaterialRequirements(_m *ProductionOrder) *ProductionOrderMaterialRequirementQuery {
+	query := (&ProductionOrderMaterialRequirementClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorder.Table, productionorder.FieldID, id),
+			sqlgraph.To(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionorder.MaterialRequirementsTable, productionorder.MaterialRequirementsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryEvents queries the events edge of a ProductionOrder.
 func (c *ProductionOrderClient) QueryEvents(_m *ProductionOrder) *ProductionOrderEventQuery {
 	query := (&ProductionOrderEventClient{config: c.config}).Query()
@@ -5793,6 +5881,22 @@ func (c *ProductionOrderItemClient) QueryProductionOrder(_m *ProductionOrderItem
 	return query
 }
 
+// QueryMaterialRequirements queries the material_requirements edge of a ProductionOrderItem.
+func (c *ProductionOrderItemClient) QueryMaterialRequirements(_m *ProductionOrderItem) *ProductionOrderMaterialRequirementQuery {
+	query := (&ProductionOrderMaterialRequirementClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderitem.Table, productionorderitem.FieldID, id),
+			sqlgraph.To(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionorderitem.MaterialRequirementsTable, productionorderitem.MaterialRequirementsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryProduct queries the product edge of a ProductionOrderItem.
 func (c *ProductionOrderItemClient) QueryProduct(_m *ProductionOrderItem) *ProductQuery {
 	query := (&ProductClient{config: c.config}).Query()
@@ -5895,6 +5999,236 @@ func (c *ProductionOrderItemClient) mutate(ctx context.Context, m *ProductionOrd
 		return (&ProductionOrderItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ProductionOrderItem mutation op: %q", m.Op())
+	}
+}
+
+// ProductionOrderMaterialRequirementClient is a client for the ProductionOrderMaterialRequirement schema.
+type ProductionOrderMaterialRequirementClient struct {
+	config
+}
+
+// NewProductionOrderMaterialRequirementClient returns a client for the ProductionOrderMaterialRequirement from the given config.
+func NewProductionOrderMaterialRequirementClient(c config) *ProductionOrderMaterialRequirementClient {
+	return &ProductionOrderMaterialRequirementClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `productionordermaterialrequirement.Hooks(f(g(h())))`.
+func (c *ProductionOrderMaterialRequirementClient) Use(hooks ...Hook) {
+	c.hooks.ProductionOrderMaterialRequirement = append(c.hooks.ProductionOrderMaterialRequirement, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `productionordermaterialrequirement.Intercept(f(g(h())))`.
+func (c *ProductionOrderMaterialRequirementClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ProductionOrderMaterialRequirement = append(c.inters.ProductionOrderMaterialRequirement, interceptors...)
+}
+
+// Create returns a builder for creating a ProductionOrderMaterialRequirement entity.
+func (c *ProductionOrderMaterialRequirementClient) Create() *ProductionOrderMaterialRequirementCreate {
+	mutation := newProductionOrderMaterialRequirementMutation(c.config, OpCreate)
+	return &ProductionOrderMaterialRequirementCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ProductionOrderMaterialRequirement entities.
+func (c *ProductionOrderMaterialRequirementClient) CreateBulk(builders ...*ProductionOrderMaterialRequirementCreate) *ProductionOrderMaterialRequirementCreateBulk {
+	return &ProductionOrderMaterialRequirementCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProductionOrderMaterialRequirementClient) MapCreateBulk(slice any, setFunc func(*ProductionOrderMaterialRequirementCreate, int)) *ProductionOrderMaterialRequirementCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProductionOrderMaterialRequirementCreateBulk{err: fmt.Errorf("calling to ProductionOrderMaterialRequirementClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProductionOrderMaterialRequirementCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProductionOrderMaterialRequirementCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ProductionOrderMaterialRequirement.
+func (c *ProductionOrderMaterialRequirementClient) Update() *ProductionOrderMaterialRequirementUpdate {
+	mutation := newProductionOrderMaterialRequirementMutation(c.config, OpUpdate)
+	return &ProductionOrderMaterialRequirementUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProductionOrderMaterialRequirementClient) UpdateOne(_m *ProductionOrderMaterialRequirement) *ProductionOrderMaterialRequirementUpdateOne {
+	mutation := newProductionOrderMaterialRequirementMutation(c.config, OpUpdateOne, withProductionOrderMaterialRequirement(_m))
+	return &ProductionOrderMaterialRequirementUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProductionOrderMaterialRequirementClient) UpdateOneID(id int) *ProductionOrderMaterialRequirementUpdateOne {
+	mutation := newProductionOrderMaterialRequirementMutation(c.config, OpUpdateOne, withProductionOrderMaterialRequirementID(id))
+	return &ProductionOrderMaterialRequirementUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ProductionOrderMaterialRequirement.
+func (c *ProductionOrderMaterialRequirementClient) Delete() *ProductionOrderMaterialRequirementDelete {
+	mutation := newProductionOrderMaterialRequirementMutation(c.config, OpDelete)
+	return &ProductionOrderMaterialRequirementDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProductionOrderMaterialRequirementClient) DeleteOne(_m *ProductionOrderMaterialRequirement) *ProductionOrderMaterialRequirementDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProductionOrderMaterialRequirementClient) DeleteOneID(id int) *ProductionOrderMaterialRequirementDeleteOne {
+	builder := c.Delete().Where(productionordermaterialrequirement.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProductionOrderMaterialRequirementDeleteOne{builder}
+}
+
+// Query returns a query builder for ProductionOrderMaterialRequirement.
+func (c *ProductionOrderMaterialRequirementClient) Query() *ProductionOrderMaterialRequirementQuery {
+	return &ProductionOrderMaterialRequirementQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProductionOrderMaterialRequirement},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ProductionOrderMaterialRequirement entity by its id.
+func (c *ProductionOrderMaterialRequirementClient) Get(ctx context.Context, id int) (*ProductionOrderMaterialRequirement, error) {
+	return c.Query().Where(productionordermaterialrequirement.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProductionOrderMaterialRequirementClient) GetX(ctx context.Context, id int) *ProductionOrderMaterialRequirement {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryProductionOrder queries the production_order edge of a ProductionOrderMaterialRequirement.
+func (c *ProductionOrderMaterialRequirementClient) QueryProductionOrder(_m *ProductionOrderMaterialRequirement) *ProductionOrderQuery {
+	query := (&ProductionOrderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID, id),
+			sqlgraph.To(productionorder.Table, productionorder.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionordermaterialrequirement.ProductionOrderTable, productionordermaterialrequirement.ProductionOrderColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProductionOrderItem queries the production_order_item edge of a ProductionOrderMaterialRequirement.
+func (c *ProductionOrderMaterialRequirementClient) QueryProductionOrderItem(_m *ProductionOrderMaterialRequirement) *ProductionOrderItemQuery {
+	query := (&ProductionOrderItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID, id),
+			sqlgraph.To(productionorderitem.Table, productionorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionordermaterialrequirement.ProductionOrderItemTable, productionordermaterialrequirement.ProductionOrderItemColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryBomHeader queries the bom_header edge of a ProductionOrderMaterialRequirement.
+func (c *ProductionOrderMaterialRequirementClient) QueryBomHeader(_m *ProductionOrderMaterialRequirement) *BOMHeaderQuery {
+	query := (&BOMHeaderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID, id),
+			sqlgraph.To(bomheader.Table, bomheader.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionordermaterialrequirement.BomHeaderTable, productionordermaterialrequirement.BomHeaderColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryBomItem queries the bom_item edge of a ProductionOrderMaterialRequirement.
+func (c *ProductionOrderMaterialRequirementClient) QueryBomItem(_m *ProductionOrderMaterialRequirement) *BOMItemQuery {
+	query := (&BOMItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID, id),
+			sqlgraph.To(bomitem.Table, bomitem.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionordermaterialrequirement.BomItemTable, productionordermaterialrequirement.BomItemColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryMaterial queries the material edge of a ProductionOrderMaterialRequirement.
+func (c *ProductionOrderMaterialRequirementClient) QueryMaterial(_m *ProductionOrderMaterialRequirement) *MaterialQuery {
+	query := (&MaterialClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID, id),
+			sqlgraph.To(material.Table, material.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionordermaterialrequirement.MaterialTable, productionordermaterialrequirement.MaterialColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUnit queries the unit edge of a ProductionOrderMaterialRequirement.
+func (c *ProductionOrderMaterialRequirementClient) QueryUnit(_m *ProductionOrderMaterialRequirement) *UnitQuery {
+	query := (&UnitClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID, id),
+			sqlgraph.To(unit.Table, unit.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionordermaterialrequirement.UnitTable, productionordermaterialrequirement.UnitColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ProductionOrderMaterialRequirementClient) Hooks() []Hook {
+	hooks := c.hooks.ProductionOrderMaterialRequirement
+	return append(hooks[:len(hooks):len(hooks)], productionordermaterialrequirement.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProductionOrderMaterialRequirementClient) Interceptors() []Interceptor {
+	return c.inters.ProductionOrderMaterialRequirement
+}
+
+func (c *ProductionOrderMaterialRequirementClient) mutate(ctx context.Context, m *ProductionOrderMaterialRequirementMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProductionOrderMaterialRequirementCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProductionOrderMaterialRequirementUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProductionOrderMaterialRequirementUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProductionOrderMaterialRequirementDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ProductionOrderMaterialRequirement mutation op: %q", m.Op())
 	}
 }
 
@@ -6366,6 +6700,22 @@ func (c *PurchaseReceiptClient) GetX(ctx context.Context, id int) *PurchaseRecei
 		panic(err)
 	}
 	return obj
+}
+
+// QuerySupplier queries the supplier edge of a PurchaseReceipt.
+func (c *PurchaseReceiptClient) QuerySupplier(_m *PurchaseReceipt) *SupplierQuery {
+	query := (&SupplierClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceipt.Table, purchasereceipt.FieldID, id),
+			sqlgraph.To(supplier.Table, supplier.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceipt.SupplierTable, purchasereceipt.SupplierColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
 }
 
 // QueryPurchaseReturns queries the purchase_returns edge of a PurchaseReceipt.
@@ -7256,6 +7606,22 @@ func (c *PurchaseReturnClient) QueryPurchaseReceipt(_m *PurchaseReturn) *Purchas
 	return query
 }
 
+// QueryQualityInspection queries the quality_inspection edge of a PurchaseReturn.
+func (c *PurchaseReturnClient) QueryQualityInspection(_m *PurchaseReturn) *QualityInspectionQuery {
+	query := (&QualityInspectionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereturn.Table, purchasereturn.FieldID, id),
+			sqlgraph.To(qualityinspection.Table, qualityinspection.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, purchasereturn.QualityInspectionTable, purchasereturn.QualityInspectionColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryItems queries the items edge of a PurchaseReturn.
 func (c *PurchaseReturnClient) QueryItems(_m *PurchaseReturn) *PurchaseReturnItemQuery {
 	query := (&PurchaseReturnItemClient{config: c.config}).Query()
@@ -7709,6 +8075,22 @@ func (c *QualityInspectionClient) QueryWarehouse(_m *QualityInspection) *Warehou
 			sqlgraph.From(qualityinspection.Table, qualityinspection.FieldID, id),
 			sqlgraph.To(warehouse.Table, warehouse.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, qualityinspection.WarehouseTable, qualityinspection.WarehouseColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPurchaseReturns queries the purchase_returns edge of a QualityInspection.
+func (c *QualityInspectionClient) QueryPurchaseReturns(_m *QualityInspection) *PurchaseReturnQuery {
+	query := (&PurchaseReturnClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(qualityinspection.Table, qualityinspection.FieldID, id),
+			sqlgraph.To(purchasereturn.Table, purchasereturn.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, qualityinspection.PurchaseReturnsTable, qualityinspection.PurchaseReturnsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -9633,6 +10015,22 @@ func (c *SupplierClient) QueryPurchaseOrders(_m *Supplier) *PurchaseOrderQuery {
 	return query
 }
 
+// QueryPurchaseReceipts queries the purchase_receipts edge of a Supplier.
+func (c *SupplierClient) QueryPurchaseReceipts(_m *Supplier) *PurchaseReceiptQuery {
+	query := (&PurchaseReceiptClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(supplier.Table, supplier.FieldID, id),
+			sqlgraph.To(purchasereceipt.Table, purchasereceipt.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, supplier.PurchaseReceiptsTable, supplier.PurchaseReceiptsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryOutsourcingOrders queries the outsourcing_orders edge of a Supplier.
 func (c *SupplierClient) QueryOutsourcingOrders(_m *Supplier) *OutsourcingOrderQuery {
 	query := (&OutsourcingOrderClient{config: c.config}).Query()
@@ -9871,6 +10269,22 @@ func (c *UnitClient) QueryBomItems(_m *Unit) *BOMItemQuery {
 			sqlgraph.From(unit.Table, unit.FieldID, id),
 			sqlgraph.To(bomitem.Table, bomitem.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, unit.BomItemsTable, unit.BomItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProductionOrderMaterialRequirements queries the production_order_material_requirements edge of a Unit.
+func (c *UnitClient) QueryProductionOrderMaterialRequirements(_m *Unit) *ProductionOrderMaterialRequirementQuery {
+	query := (&ProductionOrderMaterialRequirementClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(unit.Table, unit.FieldID, id),
+			sqlgraph.To(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, unit.ProductionOrderMaterialRequirementsTable, unit.ProductionOrderMaterialRequirementsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -11078,13 +11492,14 @@ type (
 		InventoryTxn, Material, OutsourcingFact, OutsourcingOrder,
 		OutsourcingOrderItem, Permission, Process, ProcessInstance,
 		ProcessNodeInstance, Product, ProductSKU, ProductionFact, ProductionOrder,
-		ProductionOrderEvent, ProductionOrderItem, PurchaseOrder, PurchaseOrderItem,
-		PurchaseReceipt, PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem,
-		PurchaseReceiptItem, PurchaseReturn, PurchaseReturnItem, QualityInspection,
-		Role, RolePermission, RoleProfile, RuntimeAuditEvent, RuntimeMarker,
-		SalesOrder, SalesOrderItem, Shipment, ShipmentItem, StockReservation, Supplier,
-		Unit, Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState,
-		WorkflowTask, WorkflowTaskEvent []ent.Hook
+		ProductionOrderEvent, ProductionOrderItem, ProductionOrderMaterialRequirement,
+		PurchaseOrder, PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
+		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
+		PurchaseReturnItem, QualityInspection, Role, RolePermission, RoleProfile,
+		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
+		ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
+		WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
+		WorkflowTaskEvent []ent.Hook
 	}
 	inters struct {
 		AccessEntitlement, AdminSession, AdminUser, AdminUserRole, BOMHeader, BOMItem,
@@ -11093,12 +11508,13 @@ type (
 		InventoryTxn, Material, OutsourcingFact, OutsourcingOrder,
 		OutsourcingOrderItem, Permission, Process, ProcessInstance,
 		ProcessNodeInstance, Product, ProductSKU, ProductionFact, ProductionOrder,
-		ProductionOrderEvent, ProductionOrderItem, PurchaseOrder, PurchaseOrderItem,
-		PurchaseReceipt, PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem,
-		PurchaseReceiptItem, PurchaseReturn, PurchaseReturnItem, QualityInspection,
-		Role, RolePermission, RoleProfile, RuntimeAuditEvent, RuntimeMarker,
-		SalesOrder, SalesOrderItem, Shipment, ShipmentItem, StockReservation, Supplier,
-		Unit, Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState,
-		WorkflowTask, WorkflowTaskEvent []ent.Interceptor
+		ProductionOrderEvent, ProductionOrderItem, ProductionOrderMaterialRequirement,
+		PurchaseOrder, PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
+		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
+		PurchaseReturnItem, QualityInspection, Role, RolePermission, RoleProfile,
+		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
+		ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
+		WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
+		WorkflowTaskEvent []ent.Interceptor
 	}
 )

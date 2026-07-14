@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildAttachmentFixtures, buildAttachmentTargets, normalizeLocalBackendURL, selectAttachmentWorkflowTask } from "./manual-acceptance-attachment-data.mjs";
+import { SOURCE_DRIVEN_FACT_REPORT_CONTRACT, buildAttachmentFixtures, buildAttachmentTargets, normalizeLocalBackendURL, selectAttachmentWorkflowTask } from "./manual-acceptance-attachment-data.mjs";
 
 test("attachment apply URL fails closed outside loopback", () => {
   assert.equal(normalizeLocalBackendURL("http://localhost:8300"), "http://localhost:8300");
@@ -18,11 +18,43 @@ test("attachment targets require seven business owners and workflow version", ()
   const sourceReport = { referenceRecords: { salesOrders: [{ id: 11, items: Array(25).fill({}) }] }, steps: [
     { target: "purchase_order", id: 12 }, { target: "outsourcing_order", id: 13 }, { target: "bom_version", id: 14 },
   ] };
-  const factReport = { operationalSteps: [{ steps: [{ method: "create_production_fact", id: 15 }, { method: "create_finance_fact", id: 16 }] }] };
+  const factReport = {
+    reportContract: SOURCE_DRIVEN_FACT_REPORT_CONTRACT,
+    attachmentOwners: { productionFactId: 15, financeFactId: 16 },
+  };
   const targets = buildAttachmentTargets({ sourceReport, factReport, workflowTask: { id: 17, version: 3 } });
   assert.equal(targets.length, 7);
   assert.equal(targets.reduce((sum, item) => sum + item.files, 0), 27);
   assert.equal(targets.find((item) => item.owner_type === "workflow_task")?.expected_version, 3);
+});
+
+test("attachment targets reject legacy generic-method fact reports", () => {
+  const sourceReport = {
+    referenceRecords: { salesOrders: [{ id: 11, items: Array(25).fill({}) }] },
+    steps: [
+      { target: "purchase_order", id: 12 },
+      { target: "outsourcing_order", id: 13 },
+      { target: "bom_version", id: 14 },
+    ],
+  };
+  assert.throws(
+    () =>
+      buildAttachmentTargets({
+        sourceReport,
+        factReport: {
+          operationalSteps: [
+            {
+              steps: [
+                { method: "create_production_fact", id: 15 },
+                { method: "create_finance_fact", id: 16 },
+              ],
+            },
+          ],
+        },
+        workflowTask: { id: 17, version: 3 },
+      }),
+    /source-driven-operational-facts-v1/u,
+  );
 });
 
 test("attachment workflow target uses only a canonical ready task", () => {

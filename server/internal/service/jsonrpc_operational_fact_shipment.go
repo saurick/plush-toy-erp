@@ -82,6 +82,18 @@ func shipmentCreateFromParams(pm map[string]any) (*biz.ShipmentCreate, bool) {
 }
 
 func shipmentItemCreateFromParams(pm map[string]any) (*biz.ShipmentItemCreate, bool) {
+	if !shipmentItemAllowsOnly(pm,
+		"sales_order_item_id",
+		"product_id",
+		"product_sku_id",
+		"warehouse_id",
+		"unit_id",
+		"lot_id",
+		"quantity",
+		"note",
+	) {
+		return nil, false
+	}
 	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
 	if !ok {
 		return nil, false
@@ -96,6 +108,19 @@ func shipmentItemCreateFromParams(pm map[string]any) (*biz.ShipmentItemCreate, b
 		Quantity:         quantity,
 		Note:             getWorkflowStringPtr(pm, "note"),
 	}, true
+}
+
+func shipmentItemAllowsOnly(pm map[string]any, keys ...string) bool {
+	allowed := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		allowed[key] = struct{}{}
+	}
+	for key := range pm {
+		if _, ok := allowed[key]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func shipmentCreateWithItemsFromParams(pm map[string]any) (*biz.ShipmentCreateWithItems, bool) {
@@ -155,5 +180,5 @@ func shipmentItemToAny(item *biz.ShipmentItem) map[string]any {
 	if item == nil {
 		return map[string]any{}
 	}
-	return map[string]any{"id": item.ID, "shipment_id": item.ShipmentID, "sales_order_item_id": optionalIntToAny(item.SalesOrderItemID), "product_id": item.ProductID, "product_sku_id": optionalIntToAny(item.ProductSkuID), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "unit_net_weight_kg_snapshot": optionalDecimalString(item.UnitNetWeightKgSnapshot), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+	return map[string]any{"id": item.ID, "shipment_id": item.ShipmentID, "sales_order_item_id": optionalIntToAny(item.SalesOrderItemID), "product_id": item.ProductID, "product_sku_id": optionalIntToAny(item.ProductSkuID), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "unit_net_weight_kg_snapshot": optionalDecimalString(item.UnitNetWeightKgSnapshot), "unit_price_snapshot": optionalDecimalString(item.UnitPriceSnapshot), "amount_snapshot": optionalDecimalString(item.AmountSnapshot), "currency_snapshot": optionalStringToAny(item.CurrencySnapshot), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
 }

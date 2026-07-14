@@ -21,8 +21,10 @@ const (
 
 	QualityInspectionSourcePurchaseReceipt = "PURCHASE_RECEIPT"
 	QualityInspectionSourceShipment        = ShipmentSourceType
+	QualityInspectionSourceOutsourcingFact = OutsourcingFactSourceType
 	QualityInspectionTypeIncoming          = "INCOMING"
 	QualityInspectionTypeFinishedGoods     = "FINISHED_GOODS"
+	QualityInspectionTypeOutsourcingReturn = "OUTSOURCING_RETURN"
 	QualityInspectionSubjectMaterial       = "MATERIAL"
 	QualityInspectionSubjectProduct        = InventorySubjectProduct
 )
@@ -45,6 +47,7 @@ type QualityInspection struct {
 	WarehouseID           int
 	SourceType            *string
 	SourceID              *int
+	SourceNo              *string
 	InspectionType        *string
 	SubjectType           *string
 	SubjectID             *int
@@ -72,6 +75,25 @@ type QualityInspectionCreate struct {
 	SubjectID             int
 	InspectorID           *int
 	DecisionNote          *string
+}
+
+// QualityInspectionFromPurchaseReceiptCreate contains only operator-owned
+// fields. Material, warehouse, lot and source anchors are derived from the
+// locked purchase receipt item.
+type QualityInspectionFromPurchaseReceiptCreate struct {
+	InspectionNo          string
+	PurchaseReceiptID     int
+	PurchaseReceiptItemID int
+	DecisionNote          *string
+}
+
+// QualityInspectionFromOutsourcingReturnCreate contains only operator-owned
+// fields. Product, warehouse, lot and source anchors are derived from the
+// locked posted outsourcing return fact.
+type QualityInspectionFromOutsourcingReturnCreate struct {
+	InspectionNo      string
+	OutsourcingFactID int
+	DecisionNote      *string
 }
 
 type QualityInspectionDecision struct {
@@ -131,6 +153,40 @@ func (uc *InventoryUsecase) CreateQualityInspectionDraft(ctx context.Context, in
 		return nil, err
 	}
 	return uc.repo.CreateQualityInspectionDraft(ctx, &normalized)
+}
+
+func (uc *InventoryUsecase) CreateQualityInspectionFromPurchaseReceipt(ctx context.Context, in *QualityInspectionFromPurchaseReceiptCreate) (*QualityInspection, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized := *in
+	normalized.InspectionNo = strings.TrimSpace(normalized.InspectionNo)
+	normalized.DecisionNote = normalizeOptionalString(normalized.DecisionNote)
+	if normalized.InspectionNo == "" || normalized.PurchaseReceiptID <= 0 || normalized.PurchaseReceiptItemID <= 0 {
+		return nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(QualityInspectionSourceRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.CreateQualityInspectionFromPurchaseReceipt(ctx, &normalized)
+}
+
+func (uc *InventoryUsecase) CreateQualityInspectionFromOutsourcingReturn(ctx context.Context, in *QualityInspectionFromOutsourcingReturnCreate) (*QualityInspection, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized := *in
+	normalized.InspectionNo = strings.TrimSpace(normalized.InspectionNo)
+	normalized.DecisionNote = normalizeOptionalString(normalized.DecisionNote)
+	if normalized.InspectionNo == "" || normalized.OutsourcingFactID <= 0 {
+		return nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(QualityInspectionSourceRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.CreateQualityInspectionFromOutsourcingReturn(ctx, &normalized)
 }
 
 func (uc *InventoryUsecase) CreateFinishedGoodsQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error) {
@@ -210,6 +266,17 @@ func (uc *InventoryUsecase) ListFinishedGoodsQualityInspections(ctx context.Cont
 		return nil, 0, ErrBadParam
 	}
 	normalized, err := normalizeFinishedGoodsQualityInspectionFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListQualityInspections(ctx, normalized)
+}
+
+func (uc *InventoryUsecase) ListOutsourcingReturnQualityInspections(ctx context.Context, filter QualityInspectionFilter) ([]*QualityInspection, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	normalized, err := normalizeOutsourcingReturnQualityInspectionFilter(filter)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -397,6 +464,34 @@ func normalizeFinishedGoodsQualityInspectionFilter(in QualityInspectionFilter) (
 	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
 		return QualityInspectionFilter{}, ErrBadParam
 	}
+	if in.Limit <= 0 || in.Limit > 200 {
+		in.Limit = 50
+	}
+	if in.Offset < 0 {
+		in.Offset = 0
+	}
+	return in, nil
+}
+
+func normalizeOutsourcingReturnQualityInspectionFilter(in QualityInspectionFilter) (QualityInspectionFilter, error) {
+	in.Status = strings.ToUpper(strings.TrimSpace(in.Status))
+	in.Result = strings.ToUpper(strings.TrimSpace(in.Result))
+	in.Keyword = strings.TrimSpace(in.Keyword)
+	if in.Status != "" && !IsValidQualityInspectionStatus(in.Status) {
+		return QualityInspectionFilter{}, ErrBadParam
+	}
+	if in.Result != "" && !IsValidQualityInspectionResult(in.Result) {
+		return QualityInspectionFilter{}, ErrBadParam
+	}
+	if in.PurchaseReceiptID > 0 || in.PurchaseReceiptItemID > 0 || in.PurchaseOrderID > 0 || in.MaterialID > 0 {
+		return QualityInspectionFilter{}, ErrBadParam
+	}
+	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
+		return QualityInspectionFilter{}, ErrBadParam
+	}
+	in.SourceType = QualityInspectionSourceOutsourcingFact
+	in.InspectionType = QualityInspectionTypeOutsourcingReturn
+	in.SubjectType = QualityInspectionSubjectProduct
 	if in.Limit <= 0 || in.Limit > 200 {
 		in.Limit = 50
 	}

@@ -61,6 +61,7 @@ func outsourcingOrderItemMutationFromParams(pm map[string]any) (*biz.Outsourcing
 		LineNo:                  getInt(pm, "line_no", 0),
 		SubjectType:             getString(pm, "subject_type"),
 		ProductID:               getOptionalPositiveIntPtr(pm, "product_id"),
+		ProductSKUID:            getOptionalPositiveIntPtr(pm, "product_sku_id"),
 		MaterialID:              getOptionalPositiveIntPtr(pm, "material_id"),
 		ProcessID:               getInt(pm, "process_id", 0),
 		UnitID:                  getInt(pm, "unit_id", 0),
@@ -119,10 +120,14 @@ func (d *jsonrpcDispatcher) mapOutsourcingOrderError(ctx context.Context, err er
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同不存在"}
 	case errors.Is(err, biz.ErrOutsourcingOrderItemNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同明细不存在"}
+	case errors.Is(err, biz.ErrOutsourcingOrderFactDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同已有已确认的发料或回货记录，请先取消相关委外记录"}
 	case errors.Is(err, biz.ErrSupplierNotFound), errors.Is(err, biz.ErrSupplierInactive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "加工厂不存在或已停用"}
 	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductInactive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "产品不存在或已停用"}
+	case errors.Is(err, biz.ErrProductSKUNotFound), errors.Is(err, biz.ErrProductSKUInactive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "产品规格不存在、已停用，或与产品和单位不匹配"}
 	case errors.Is(err, biz.ErrMaterialNotFound), errors.Is(err, biz.ErrMaterialInactive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "材料不存在或已停用"}
 	case errors.Is(err, biz.ErrProcessNotFound), errors.Is(err, biz.ErrProcessInactive), errors.Is(err, biz.ErrProcessNotOutsourcingEnabled):
@@ -192,10 +197,12 @@ func outsourcingOrderItemToMap(item *biz.OutsourcingOrderItem) map[string]any {
 		"line_no":                   item.LineNo,
 		"subject_type":              item.SubjectType,
 		"product_id":                optionalIntValue(item.ProductID),
+		"product_sku_id":            optionalIntValue(item.ProductSKUID),
 		"material_id":               optionalIntValue(item.MaterialID),
 		"process_id":                item.ProcessID,
 		"unit_id":                   item.UnitID,
 		"product_no_snapshot":       optionalStringValue(item.ProductNoSnapshot),
+		"sku_code_snapshot":         optionalStringValue(item.SKUCodeSnapshot),
 		"product_order_no_snapshot": optionalStringValue(item.ProductOrderNoSnapshot),
 		"product_name_snapshot":     optionalStringValue(item.ProductNameSnapshot),
 		"material_code_snapshot":    optionalStringValue(item.MaterialCodeSnapshot),

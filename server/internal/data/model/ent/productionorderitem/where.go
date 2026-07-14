@@ -919,6 +919,29 @@ func HasProductionOrderWith(preds ...predicate.ProductionOrder) predicate.Produc
 	})
 }
 
+// HasMaterialRequirements applies the HasEdge predicate on the "material_requirements" edge.
+func HasMaterialRequirements() predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, MaterialRequirementsTable, MaterialRequirementsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasMaterialRequirementsWith applies the HasEdge predicate on the "material_requirements" edge with a given conditions (other predicates).
+func HasMaterialRequirementsWith(preds ...predicate.ProductionOrderMaterialRequirement) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(func(s *sql.Selector) {
+		step := newMaterialRequirementsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasProduct applies the HasEdge predicate on the "product" edge.
 func HasProduct() predicate.ProductionOrderItem {
 	return predicate.ProductionOrderItem(func(s *sql.Selector) {

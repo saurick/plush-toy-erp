@@ -27,12 +27,16 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 	}
 
 	switch method {
-	case "create_production_fact",
+	case "create_production_completion_from_order",
+		"create_production_material_issue_from_order",
+		"create_production_rework_from_completion",
 		"post_production_fact",
 		"cancel_production_fact",
-		"list_production_facts":
+		"list_production_facts",
+		"list_production_order_material_requirements":
 		return d.handleOperationalFactProduction(ctx, method, id, pm)
-	case "create_outsourcing_fact",
+	case "create_outsourcing_material_issue_from_order",
+		"create_outsourcing_return_receipt_from_order",
 		"post_outsourcing_fact",
 		"cancel_outsourcing_fact",
 		"list_outsourcing_facts":
@@ -42,11 +46,15 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"cancel_shipment",
 		"list_shipments":
 		return d.handleOperationalFactShipment(ctx, method, id, pm, claims.UserID)
-	case "create_stock_reservation",
+	case "create_stock_reservation_from_sales_order",
 		"release_stock_reservation",
 		"list_stock_reservations":
 		return d.handleOperationalFactReservation(ctx, method, id, pm)
-	case "create_finance_fact",
+	case "create_receivable_from_shipment",
+		"create_invoice_from_shipment",
+		"create_payable_from_purchase_receipt",
+		"create_payable_from_outsourcing_return",
+		"create_reconciliation_from_finance_fact",
 		"post_finance_fact",
 		"settle_finance_fact",
 		"cancel_finance_fact",

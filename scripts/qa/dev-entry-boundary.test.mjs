@@ -566,14 +566,15 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "mobile-workflow-simulated-closure-dev-testing-report",
     "trial simulated data preset",
   );
-  assertIncludes(
-    buildDevTestingCopyPresetSource(trialSimulatedDataPreset),
-    "operational-fact-simulated-closure-dev-testing-report",
-    "trial simulated data preset",
+  assert.equal(
+    buildDevTestingCopyPresetSource(trialSimulatedDataPreset).includes(
+      "operational-fact-simulated-closure-dev-testing-report",
+    ),
+    false,
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(trialSimulatedDataPreset),
-    "--product-id <product_id>",
+    trialSimulatedDataPreset.description,
+    "通用 apply 已停用",
     "trial simulated data preset",
   );
   assertIncludes(
@@ -621,7 +622,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
   );
   assertIncludes(
     buildDevTestingCopyPresetSource(mvpLocalClosurePreset),
-    "--run-report-tools --product-id <product_id>",
+    "mvp-closure.mjs --run-report-tools --out",
     "mvp local closure preset",
   );
   assertIncludes(

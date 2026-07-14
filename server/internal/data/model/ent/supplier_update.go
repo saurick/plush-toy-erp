@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchaseorder"
+	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/supplier"
 	"time"
 
@@ -173,6 +174,21 @@ func (_u *SupplierUpdate) AddPurchaseOrders(v ...*PurchaseOrder) *SupplierUpdate
 	return _u.AddPurchaseOrderIDs(ids...)
 }
 
+// AddPurchaseReceiptIDs adds the "purchase_receipts" edge to the PurchaseReceipt entity by IDs.
+func (_u *SupplierUpdate) AddPurchaseReceiptIDs(ids ...int) *SupplierUpdate {
+	_u.mutation.AddPurchaseReceiptIDs(ids...)
+	return _u
+}
+
+// AddPurchaseReceipts adds the "purchase_receipts" edges to the PurchaseReceipt entity.
+func (_u *SupplierUpdate) AddPurchaseReceipts(v ...*PurchaseReceipt) *SupplierUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseReceiptIDs(ids...)
+}
+
 // AddOutsourcingOrderIDs adds the "outsourcing_orders" edge to the OutsourcingOrder entity by IDs.
 func (_u *SupplierUpdate) AddOutsourcingOrderIDs(ids ...int) *SupplierUpdate {
 	_u.mutation.AddOutsourcingOrderIDs(ids...)
@@ -212,6 +228,27 @@ func (_u *SupplierUpdate) RemovePurchaseOrders(v ...*PurchaseOrder) *SupplierUpd
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePurchaseOrderIDs(ids...)
+}
+
+// ClearPurchaseReceipts clears all "purchase_receipts" edges to the PurchaseReceipt entity.
+func (_u *SupplierUpdate) ClearPurchaseReceipts() *SupplierUpdate {
+	_u.mutation.ClearPurchaseReceipts()
+	return _u
+}
+
+// RemovePurchaseReceiptIDs removes the "purchase_receipts" edge to PurchaseReceipt entities by IDs.
+func (_u *SupplierUpdate) RemovePurchaseReceiptIDs(ids ...int) *SupplierUpdate {
+	_u.mutation.RemovePurchaseReceiptIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseReceipts removes "purchase_receipts" edges to PurchaseReceipt entities.
+func (_u *SupplierUpdate) RemovePurchaseReceipts(v ...*PurchaseReceipt) *SupplierUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseReceiptIDs(ids...)
 }
 
 // ClearOutsourcingOrders clears all "outsourcing_orders" edges to the OutsourcingOrder entity.
@@ -392,6 +429,51 @@ func (_u *SupplierUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchaseorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PurchaseReceiptsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.PurchaseReceiptsTable,
+			Columns: []string{supplier.PurchaseReceiptsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseReceiptsIDs(); len(nodes) > 0 && !_u.mutation.PurchaseReceiptsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.PurchaseReceiptsTable,
+			Columns: []string{supplier.PurchaseReceiptsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseReceiptsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.PurchaseReceiptsTable,
+			Columns: []string{supplier.PurchaseReceiptsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -607,6 +689,21 @@ func (_u *SupplierUpdateOne) AddPurchaseOrders(v ...*PurchaseOrder) *SupplierUpd
 	return _u.AddPurchaseOrderIDs(ids...)
 }
 
+// AddPurchaseReceiptIDs adds the "purchase_receipts" edge to the PurchaseReceipt entity by IDs.
+func (_u *SupplierUpdateOne) AddPurchaseReceiptIDs(ids ...int) *SupplierUpdateOne {
+	_u.mutation.AddPurchaseReceiptIDs(ids...)
+	return _u
+}
+
+// AddPurchaseReceipts adds the "purchase_receipts" edges to the PurchaseReceipt entity.
+func (_u *SupplierUpdateOne) AddPurchaseReceipts(v ...*PurchaseReceipt) *SupplierUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseReceiptIDs(ids...)
+}
+
 // AddOutsourcingOrderIDs adds the "outsourcing_orders" edge to the OutsourcingOrder entity by IDs.
 func (_u *SupplierUpdateOne) AddOutsourcingOrderIDs(ids ...int) *SupplierUpdateOne {
 	_u.mutation.AddOutsourcingOrderIDs(ids...)
@@ -646,6 +743,27 @@ func (_u *SupplierUpdateOne) RemovePurchaseOrders(v ...*PurchaseOrder) *Supplier
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePurchaseOrderIDs(ids...)
+}
+
+// ClearPurchaseReceipts clears all "purchase_receipts" edges to the PurchaseReceipt entity.
+func (_u *SupplierUpdateOne) ClearPurchaseReceipts() *SupplierUpdateOne {
+	_u.mutation.ClearPurchaseReceipts()
+	return _u
+}
+
+// RemovePurchaseReceiptIDs removes the "purchase_receipts" edge to PurchaseReceipt entities by IDs.
+func (_u *SupplierUpdateOne) RemovePurchaseReceiptIDs(ids ...int) *SupplierUpdateOne {
+	_u.mutation.RemovePurchaseReceiptIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseReceipts removes "purchase_receipts" edges to PurchaseReceipt entities.
+func (_u *SupplierUpdateOne) RemovePurchaseReceipts(v ...*PurchaseReceipt) *SupplierUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseReceiptIDs(ids...)
 }
 
 // ClearOutsourcingOrders clears all "outsourcing_orders" edges to the OutsourcingOrder entity.
@@ -856,6 +974,51 @@ func (_u *SupplierUpdateOne) sqlSave(ctx context.Context) (_node *Supplier, err 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchaseorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PurchaseReceiptsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.PurchaseReceiptsTable,
+			Columns: []string{supplier.PurchaseReceiptsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseReceiptsIDs(); len(nodes) > 0 && !_u.mutation.PurchaseReceiptsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.PurchaseReceiptsTable,
+			Columns: []string{supplier.PurchaseReceiptsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseReceiptsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.PurchaseReceiptsTable,
+			Columns: []string{supplier.PurchaseReceiptsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

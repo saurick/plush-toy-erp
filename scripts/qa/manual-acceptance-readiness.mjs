@@ -21,6 +21,8 @@ const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 const SAFE_ENVIRONMENTS = new Set(["local", "dev"]);
 const RUNTIME_PREFLIGHT_USERNAME = "admin";
 const TASK_SOURCE_TYPE = "simulated-manual-acceptance-task-batch";
+const SOURCE_DRIVEN_FACT_REPORT_CONTRACT =
+  "source-driven-operational-facts-v1";
 const TASK_REQUIRED_STATUSES = Object.freeze(
   TASK_STATUS_KEYS.map((status) => status.toUpperCase()),
 );
@@ -416,6 +418,7 @@ function validateSourceReport(report) {
 function validateFactReport(report) {
   if (!report) return null;
   if (
+    report.reportContract !== SOURCE_DRIVEN_FACT_REPORT_CONTRACT ||
     report.mode !== "apply" ||
     report.simulatedOnly !== true ||
     report.realCustomerImport !== false ||
@@ -779,6 +782,15 @@ function targetEvidence(item) {
         "本批岗位任务数量和状态可核对；排程或异常页面的筛选、详情和处理动作仍需页面确认。",
     };
   }
+  if (item.key === "production-orders") {
+    return {
+      probeIds: [],
+      browserRequired: true,
+      quantityNotProven: true,
+      reason:
+        "当前写入报告没有生产订单批次合同，不能用生产记录或协同任务数量代替生产订单；列表、来源办理和写后读取仍需真实页面核对。",
+    };
+  }
   if (item.key === "inventory") {
     return {
       probeIds: ["inventory-balances", "inventory-lots", "inventory-txns"],
@@ -830,9 +842,9 @@ export function buildManualAcceptanceReadinessPlan(options = {}) {
     expectedUnit: item.minimumRecordUnit,
     ...targetEvidence(item),
   }));
-  if (allTargets.length !== 47) {
+  if (allTargets.length !== 48) {
     throw new CliError(
-      `当前验收目标应为 47 个，实际为 ${allTargets.length} 个`,
+      `当前验收目标应为 48 个，实际为 ${allTargets.length} 个`,
     );
   }
   const { probes, inputWarnings } = buildDatasetProbes(
@@ -852,7 +864,7 @@ export function buildManualAcceptanceReadinessPlan(options = {}) {
     directSQL: false,
     callsBackend: false,
     expected: {
-      targets: 45,
+      targets: 46,
       mobileRolePages: 9,
       mobileTasksPerRole: MOBILE_TASKS_PER_ROLE,
       mobileTaskTotal: MOBILE_TASK_TOTAL,
@@ -863,6 +875,7 @@ export function buildManualAcceptanceReadinessPlan(options = {}) {
         : null,
       factReport: factReport
         ? {
+            reportContract: factReport.reportContract,
             runId: factReport.runId,
             sourceRunId: factReport.sourceRunId,
             sourcePrefix: factReport.sourcePrefix || null,

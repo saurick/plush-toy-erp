@@ -11,6 +11,7 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/warehouse"
 	"time"
@@ -395,6 +396,21 @@ func (_u *QualityInspectionUpdate) SetWarehouse(v *Warehouse) *QualityInspection
 	return _u.SetWarehouseID(v.ID)
 }
 
+// AddPurchaseReturnIDs adds the "purchase_returns" edge to the PurchaseReturn entity by IDs.
+func (_u *QualityInspectionUpdate) AddPurchaseReturnIDs(ids ...int) *QualityInspectionUpdate {
+	_u.mutation.AddPurchaseReturnIDs(ids...)
+	return _u
+}
+
+// AddPurchaseReturns adds the "purchase_returns" edges to the PurchaseReturn entity.
+func (_u *QualityInspectionUpdate) AddPurchaseReturns(v ...*PurchaseReturn) *QualityInspectionUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseReturnIDs(ids...)
+}
+
 // Mutation returns the QualityInspectionMutation object of the builder.
 func (_u *QualityInspectionUpdate) Mutation() *QualityInspectionMutation {
 	return _u.mutation
@@ -428,6 +444,27 @@ func (_u *QualityInspectionUpdate) ClearMaterial() *QualityInspectionUpdate {
 func (_u *QualityInspectionUpdate) ClearWarehouse() *QualityInspectionUpdate {
 	_u.mutation.ClearWarehouse()
 	return _u
+}
+
+// ClearPurchaseReturns clears all "purchase_returns" edges to the PurchaseReturn entity.
+func (_u *QualityInspectionUpdate) ClearPurchaseReturns() *QualityInspectionUpdate {
+	_u.mutation.ClearPurchaseReturns()
+	return _u
+}
+
+// RemovePurchaseReturnIDs removes the "purchase_returns" edge to PurchaseReturn entities by IDs.
+func (_u *QualityInspectionUpdate) RemovePurchaseReturnIDs(ids ...int) *QualityInspectionUpdate {
+	_u.mutation.RemovePurchaseReturnIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseReturns removes "purchase_returns" edges to PurchaseReturn entities.
+func (_u *QualityInspectionUpdate) RemovePurchaseReturns(v ...*PurchaseReturn) *QualityInspectionUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseReturnIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -788,6 +825,51 @@ func (_u *QualityInspectionUpdate) sqlSave(ctx context.Context) (_node int, err 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(warehouse.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PurchaseReturnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   qualityinspection.PurchaseReturnsTable,
+			Columns: []string{qualityinspection.PurchaseReturnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereturn.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseReturnsIDs(); len(nodes) > 0 && !_u.mutation.PurchaseReturnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   qualityinspection.PurchaseReturnsTable,
+			Columns: []string{qualityinspection.PurchaseReturnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereturn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseReturnsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   qualityinspection.PurchaseReturnsTable,
+			Columns: []string{qualityinspection.PurchaseReturnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereturn.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -1177,6 +1259,21 @@ func (_u *QualityInspectionUpdateOne) SetWarehouse(v *Warehouse) *QualityInspect
 	return _u.SetWarehouseID(v.ID)
 }
 
+// AddPurchaseReturnIDs adds the "purchase_returns" edge to the PurchaseReturn entity by IDs.
+func (_u *QualityInspectionUpdateOne) AddPurchaseReturnIDs(ids ...int) *QualityInspectionUpdateOne {
+	_u.mutation.AddPurchaseReturnIDs(ids...)
+	return _u
+}
+
+// AddPurchaseReturns adds the "purchase_returns" edges to the PurchaseReturn entity.
+func (_u *QualityInspectionUpdateOne) AddPurchaseReturns(v ...*PurchaseReturn) *QualityInspectionUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseReturnIDs(ids...)
+}
+
 // Mutation returns the QualityInspectionMutation object of the builder.
 func (_u *QualityInspectionUpdateOne) Mutation() *QualityInspectionMutation {
 	return _u.mutation
@@ -1210,6 +1307,27 @@ func (_u *QualityInspectionUpdateOne) ClearMaterial() *QualityInspectionUpdateOn
 func (_u *QualityInspectionUpdateOne) ClearWarehouse() *QualityInspectionUpdateOne {
 	_u.mutation.ClearWarehouse()
 	return _u
+}
+
+// ClearPurchaseReturns clears all "purchase_returns" edges to the PurchaseReturn entity.
+func (_u *QualityInspectionUpdateOne) ClearPurchaseReturns() *QualityInspectionUpdateOne {
+	_u.mutation.ClearPurchaseReturns()
+	return _u
+}
+
+// RemovePurchaseReturnIDs removes the "purchase_returns" edge to PurchaseReturn entities by IDs.
+func (_u *QualityInspectionUpdateOne) RemovePurchaseReturnIDs(ids ...int) *QualityInspectionUpdateOne {
+	_u.mutation.RemovePurchaseReturnIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseReturns removes "purchase_returns" edges to PurchaseReturn entities.
+func (_u *QualityInspectionUpdateOne) RemovePurchaseReturns(v ...*PurchaseReturn) *QualityInspectionUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseReturnIDs(ids...)
 }
 
 // Where appends a list predicates to the QualityInspectionUpdate builder.
@@ -1600,6 +1718,51 @@ func (_u *QualityInspectionUpdateOne) sqlSave(ctx context.Context) (_node *Quali
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(warehouse.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PurchaseReturnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   qualityinspection.PurchaseReturnsTable,
+			Columns: []string{qualityinspection.PurchaseReturnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereturn.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseReturnsIDs(); len(nodes) > 0 && !_u.mutation.PurchaseReturnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   qualityinspection.PurchaseReturnsTable,
+			Columns: []string{qualityinspection.PurchaseReturnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereturn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseReturnsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   qualityinspection.PurchaseReturnsTable,
+			Columns: []string{qualityinspection.PurchaseReturnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereturn.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

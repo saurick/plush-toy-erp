@@ -10,6 +10,9 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/inventorybalance"
+	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderevent"
 	"server/internal/data/model/ent/productionorderitem"
@@ -25,6 +28,7 @@ type productionOrderPGFixture struct {
 	client       *ent.Client
 	actorID      int
 	unitID       int
+	materialID   int
 	productID    int
 	skuID        int
 	salesOrderID int
@@ -49,12 +53,20 @@ func openProductionOrderPGFixture(t *testing.T) productionOrderPGFixture {
 		SetProductID(productRow.ID).SetProductSkuID(skuRow.ID).SetUnitID(unitRow.ID).
 		SetOrderedQuantity(decimal.NewFromInt(100)).SaveX(ctx)
 	bom := client.BOMHeader.Create().SetProductID(productRow.ID).SetVersion("PG-ACTIVE").SetStatus("ACTIVE").SaveX(ctx)
+	materialRow := createTestMaterial(t, ctx, client, unitRow.ID, "POM-"+suffix)
+	client.BOMItem.Create().
+		SetBomHeaderID(bom.ID).
+		SetMaterialID(materialRow.ID).
+		SetQuantity(decimal.NewFromInt(1)).
+		SetUnitID(unitRow.ID).
+		SetLossRate(decimal.Zero).
+		SaveX(ctx)
 	warehouse := createTestWarehouse(t, ctx, client, "POW-"+suffix)
 	logger := log.NewStdLogger(io.Discard)
 	return productionOrderPGFixture{
 		uc:     biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, logger)),
 		factUC: biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger)), data: data,
-		client: client, actorID: actor.ID, unitID: unitRow.ID, productID: productRow.ID,
+		client: client, actorID: actor.ID, unitID: unitRow.ID, materialID: materialRow.ID, productID: productRow.ID,
 		skuID: skuRow.ID, salesOrderID: salesOrder.ID, salesItemID: salesItem.ID, warehouseID: warehouse.ID, suffix: suffix,
 		item: biz.ProductionOrderDraftItem{LineNo: 1, ProductID: productRow.ID, ProductSKUID: &skuRow.ID, UnitID: unitRow.ID,
 			PlannedQuantity: decimal.NewFromInt(10), SalesOrderItemID: &salesItem.ID, BOMHeaderID: &bom.ID},
@@ -196,6 +208,206 @@ func TestProductionOrderPostgresConcurrentCreateAndMutationWinners(t *testing.T)
 	})
 	assertOneProductionOrderWinner(t, casResults, biz.ErrProductionOrderConflict)
 	assertProductionOrderPGReceiptCount(t, ctx, f.client, casOrder.Order.ID, biz.ProductionOrderCommandRelease, 1)
+}
+
+func TestProductionMaterialIssuePostgresConcurrentReplayAndQuantityWinner(t *testing.T) {
+	ctx := context.Background()
+	f := openProductionOrderPGFixture(t)
+	created, err := f.uc.CreateDraft(ctx, &biz.ProductionOrderCreate{
+		Draft: f.draft("MO-PG-MATERIAL-" + f.suffix), ActorID: f.actorID, IdempotencyKey: "pg-material-create-" + f.suffix,
+	})
+	if err != nil {
+		t.Fatalf("create postgres material issue order: %v", err)
+	}
+	released, err := f.uc.Release(ctx, &biz.ProductionOrderAction{
+		ID: created.Order.ID, ExpectedVersion: 1, ActorID: f.actorID, IdempotencyKey: "pg-material-release-" + f.suffix,
+	})
+	if err != nil || len(released.MaterialRequirements) != 1 || released.MaterialRequirementsState != biz.ProductionOrderMaterialRequirementsReady {
+		t.Fatalf("release postgres material issue order=%#v err=%v", released, err)
+	}
+	requirement := released.MaterialRequirements[0]
+	inventoryRepo := NewInventoryRepo(f.data, log.NewStdLogger(io.Discard))
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectMaterial, SubjectID: f.materialID,
+		WarehouseID: f.warehouseID, UnitID: f.unitID,
+		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(20),
+		SourceType: "PG_PRODUCTION_MATERIAL_ISSUE", IdempotencyKey: "pg-material-opening-" + f.suffix,
+	}); err != nil {
+		t.Fatalf("seed postgres material issue inventory: %v", err)
+	}
+
+	firstInput := &biz.ProductionMaterialIssueFromOrderCreate{
+		FactNo:            "PF-PG-MATERIAL-A-" + f.suffix,
+		ProductionOrderID: released.Order.ID, ProductionOrderItemID: released.Items[0].ID,
+		ProductionOrderMaterialRequirementID: requirement.ID, WarehouseID: f.warehouseID,
+		Quantity: decimal.NewFromInt(6), IdempotencyKey: "pg-material-issue-a-" + f.suffix,
+	}
+	startCreate := make(chan struct{})
+	createResults := make(chan *biz.ProductionFact, 2)
+	createErrs := make(chan error, 2)
+	var createWG sync.WaitGroup
+	for range 2 {
+		createWG.Add(1)
+		go func() {
+			defer createWG.Done()
+			<-startCreate
+			fact, err := f.factUC.CreateProductionMaterialIssueFromOrder(ctx, firstInput)
+			createResults <- fact
+			createErrs <- err
+		}()
+	}
+	close(startCreate)
+	createWG.Wait()
+	close(createResults)
+	close(createErrs)
+	for err := range createErrs {
+		if err != nil {
+			t.Fatalf("same-key postgres material issue replay error=%v", err)
+		}
+	}
+	var first *biz.ProductionFact
+	for fact := range createResults {
+		if first == nil {
+			first = fact
+			continue
+		}
+		if fact == nil || fact.ID != first.ID {
+			t.Fatalf("same-key postgres material issue results first=%#v next=%#v", first, fact)
+		}
+	}
+	if first == nil {
+		t.Fatal("same-key postgres material issue returned no fact")
+	}
+	second, err := f.factUC.CreateProductionMaterialIssueFromOrder(ctx, &biz.ProductionMaterialIssueFromOrderCreate{
+		FactNo:            "PF-PG-MATERIAL-B-" + f.suffix,
+		ProductionOrderID: released.Order.ID, ProductionOrderItemID: released.Items[0].ID,
+		ProductionOrderMaterialRequirementID: requirement.ID, WarehouseID: f.warehouseID,
+		Quantity: decimal.NewFromInt(6), IdempotencyKey: "pg-material-issue-b-" + f.suffix,
+	})
+	if err != nil {
+		t.Fatalf("create second postgres material issue: %v", err)
+	}
+
+	startPost := make(chan struct{})
+	postErrs := make(chan error, 2)
+	var postWG sync.WaitGroup
+	for _, fact := range []*biz.ProductionFact{first, second} {
+		fact := fact
+		postWG.Add(1)
+		go func() {
+			defer postWG.Done()
+			<-startPost
+			_, err := f.factUC.PostProductionFact(ctx, fact.ID)
+			postErrs <- err
+		}()
+	}
+	close(startPost)
+	postWG.Wait()
+	close(postErrs)
+	assertOneProductionMaterialIssuePostWinner(t, postErrs)
+	if count := f.client.ProductionFact.Query().Where(
+		productionfact.SourceType(biz.ProductionOrderSourceType),
+		productionfact.SourceID(released.Order.ID),
+		productionfact.SourceLineID(requirement.ID),
+		productionfact.FactType(biz.ProductionFactMaterialIssue),
+		productionfact.Status(biz.OperationalFactStatusPosted),
+	).CountX(ctx); count != 1 {
+		t.Fatalf("postgres posted material issue count=%d, want 1", count)
+	}
+	balance, err := f.client.InventoryBalance.Query().Where(
+		inventorybalance.SubjectType(biz.InventorySubjectMaterial),
+		inventorybalance.SubjectID(f.materialID),
+		inventorybalance.ProductSkuIDIsNil(),
+		inventorybalance.WarehouseID(f.warehouseID),
+		inventorybalance.LotIDIsNil(),
+		inventorybalance.UnitID(f.unitID),
+	).Only(ctx)
+	if err != nil || !balance.Quantity.Equal(decimal.NewFromInt(14)) {
+		t.Fatalf("postgres material issue balance=%#v err=%v", balance, err)
+	}
+}
+
+func TestOperationalFactPostgresConcurrentSourceInboundLotCreateReusesOneBatch(t *testing.T) {
+	ctx := context.Background()
+	f := openProductionOrderPGFixture(t)
+	created, err := f.uc.CreateDraft(ctx, &biz.ProductionOrderCreate{
+		Draft: f.draft("MO-PG-INBOUND-LOT-" + f.suffix), ActorID: f.actorID, IdempotencyKey: "pg-inbound-lot-create-" + f.suffix,
+	})
+	if err != nil {
+		t.Fatalf("create postgres inbound lot order: %v", err)
+	}
+	released, err := f.uc.Release(ctx, &biz.ProductionOrderAction{
+		ID: created.Order.ID, ExpectedVersion: 1, ActorID: f.actorID, IdempotencyKey: "pg-inbound-lot-release-" + f.suffix,
+	})
+	if err != nil {
+		t.Fatalf("release postgres inbound lot order: %v", err)
+	}
+
+	lotNo := "PG-INBOUND-LOT-" + f.suffix
+	inputs := []*biz.ProductionCompletionFromOrderCreate{
+		{
+			FactNo: "PF-PG-INBOUND-LOT-A-" + f.suffix, ProductionOrderID: released.Order.ID,
+			ProductionOrderItemID: released.Items[0].ID, WarehouseID: f.warehouseID,
+			NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "pg-inbound-lot-a-" + f.suffix,
+		},
+		{
+			FactNo: "PF-PG-INBOUND-LOT-B-" + f.suffix, ProductionOrderID: released.Order.ID,
+			ProductionOrderItemID: released.Items[0].ID, WarehouseID: f.warehouseID,
+			NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "pg-inbound-lot-b-" + f.suffix,
+		},
+	}
+	start := make(chan struct{})
+	results := make(chan *biz.ProductionFact, len(inputs))
+	errs := make(chan error, len(inputs))
+	var wg sync.WaitGroup
+	for _, input := range inputs {
+		input := input
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			fact, createErr := f.factUC.CreateProductionCompletionFromOrder(ctx, input)
+			results <- fact
+			errs <- createErr
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(results)
+	close(errs)
+	for createErr := range errs {
+		if createErr != nil {
+			t.Fatalf("concurrent source batch create: %v", createErr)
+		}
+	}
+	var allocatedLotID int
+	var factIDs = map[int]struct{}{}
+	for fact := range results {
+		if fact == nil || fact.LotID == nil || *fact.LotID <= 0 {
+			t.Fatalf("source completion did not return an allocated batch: %#v", fact)
+		}
+		if allocatedLotID == 0 {
+			allocatedLotID = *fact.LotID
+		} else if *fact.LotID != allocatedLotID {
+			t.Fatalf("same source batch number allocated different batches: first=%d next=%d", allocatedLotID, *fact.LotID)
+		}
+		factIDs[fact.ID] = struct{}{}
+	}
+	if len(factIDs) != 2 {
+		t.Fatalf("different business intents should create two drafts, got ids=%v", factIDs)
+	}
+	if count := f.client.InventoryLot.Query().Where(
+		inventorylot.SubjectType(biz.InventorySubjectProduct),
+		inventorylot.SubjectID(f.productID),
+		inventorylot.ProductSkuID(f.skuID),
+		inventorylot.LotNo(lotNo),
+	).CountX(ctx); count != 1 {
+		t.Fatalf("concurrent source batch creation count=%d, want 1", count)
+	}
+	lot := f.client.InventoryLot.GetX(ctx, allocatedLotID)
+	if lot.ProductionLotNo == nil || *lot.ProductionLotNo != lotNo || lot.Status != biz.InventoryLotActive {
+		t.Fatalf("unexpected source-created production batch: %#v", lot)
+	}
 }
 
 func TestProductionOrderPostgresFailedAggregateSaveRollsBack(t *testing.T) {

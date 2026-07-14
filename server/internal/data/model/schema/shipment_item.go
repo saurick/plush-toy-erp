@@ -27,6 +27,9 @@ var shipmentItemLockedFields = map[string]struct{}{
 	"lot_id":                      {},
 	"quantity":                    {},
 	"unit_net_weight_kg_snapshot": {},
+	"unit_price_snapshot":         {},
+	"amount_snapshot":             {},
+	"currency_snapshot":           {},
 }
 
 func (ShipmentItem) Hooks() []ent.Hook {
@@ -52,6 +55,9 @@ func (ShipmentItem) Annotations() []schema.Annotation {
 			Checks: map[string]string{
 				"shipment_items_quantity_positive":                    "quantity > 0",
 				"shipment_items_unit_net_weight_kg_snapshot_positive": "unit_net_weight_kg_snapshot IS NULL OR unit_net_weight_kg_snapshot > 0",
+				"shipment_items_unit_price_snapshot_nonnegative":      "unit_price_snapshot IS NULL OR unit_price_snapshot >= 0",
+				"shipment_items_amount_snapshot_nonnegative":          "amount_snapshot IS NULL OR amount_snapshot >= 0",
+				"shipment_items_currency_snapshot_allowed":            "currency_snapshot IN ('USD', 'CNY', 'HKD')",
 			},
 		},
 	}
@@ -69,6 +75,9 @@ func (ShipmentItem) Fields() []ent.Field {
 		field.Int("lot_id").Optional().Nillable().Positive(),
 		decimalQuantityField("quantity"),
 		optionalDecimalField("unit_net_weight_kg_snapshot"),
+		optionalDecimalField("unit_price_snapshot"),
+		optionalDecimalField("amount_snapshot"),
+		field.String("currency_snapshot").NotEmpty().Default("CNY").MaxLen(16),
 		field.String("note").Optional().Nillable().MaxLen(255),
 		field.Time("created_at").Default(time.Now).Immutable(),
 		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),

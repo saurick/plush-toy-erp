@@ -32,7 +32,7 @@
 | `scripts/qa/manual-acceptance-*.mjs`                   | 全页面甲方手工验收入口组：从当前菜单生成 45 项目录，准备账号、源数据、九岗位任务和事实矩阵，执行只读就绪核验，并按生命周期退出源数据；详细命令见 `scripts/qa/README.md` | 本机 local / dev 准备全页面模拟验收数据与脱敏证据 |
 | `scripts/qa/purchase-quality-simulated-matrix.mjs`     | 通过正式 JSON-RPC 和岗位演示账号生成带 `SIM-YOYOOSUN-PQ` 前缀的采购单、采购入库与质检多状态矩阵；显式确认后才写入，不执行真实客户导入 | 本机 local / dev 覆盖草稿、提交、审批、关闭、取消、检验通过 / 拒收、入库过账 / 取消等人工回归状态 |
 | `scripts/qa/trial-simulated-data.mjs`           | 模拟试用数据入口，支持 `--print-input-template` 只读输出前置；真实执行只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据 | 试用环境演练                                               |
-| `scripts/qa/operational-fact-simulated-closure.mjs`    | 业务事实模拟矩阵入口，支持 `--print-input-template` 只读输出前置；真实执行只使用显式模拟主数据和客户覆盖生产 / 预留 / 委外 / 出货 / 财务的草稿、生效、取消、释放、结清等页面可见状态 | 本机 local / dev 业务事实模拟验收                  |
+| `scripts/qa/operational-fact-simulated-closure.mjs`    | 旧业务事实模拟矩阵的只读输入 / 计划入口；`--apply` 已 fail-closed 退役，待生产订单、委外订单、销售订单、出货、采购入库和财务事实来源驱动 fixture 重建后才能恢复写入 | 审查旧模拟范围和来源驱动重建前置                  |
 | `scripts/qa/mobile-workflow-simulated-closure.mjs`       | 模拟岗位任务闭环入口，支持 `--print-input-template` 只读输出前置；真实执行只创建和更新显式模拟 workflow 任务，覆盖审批完成 / 退回、质检完成、入库完成、出货放行阻塞异常、跨角色催办和现场留痕 | 岗位任务端回归 / 目标环境移动任务闭环验收                  |
 | `web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs`      | 真实浏览器岗位任务端模拟任务回归，创建 `simulated_only` 老板审批 / 退回 / 完成、品质完成、仓库入库完成和仓库放行任务，分别登录 boss / quality / warehouse 岗位端验证完成、阻塞、退回、催办反馈和内部提醒线索 | 本地 / 试用岗位任务端真实页面验收                         |
 | `scripts/qa/mvp-closure.mjs`                    | ERP MVP 闭环验收入口，默认只生成计划和本地 evidence，可选运行现有 no-write report-only 工具                     | MVP 主链路验收口径收口 / 试用前证据整理                  |
@@ -229,7 +229,7 @@ node scripts/qa/test-data-isolation-boundary.mjs
 node --test scripts/qa/test-data-isolation-boundary.test.mjs
 ```
 
-手动回归前先生成只读数据计划，确认 Product Core 中性 seed、永绅 preview fixture、试用主数据、业务事实模拟和岗位任务模拟要覆盖的状态与命令。该计划只读输出，不登录、不调用后端、不写数据库、不执行真实导入；真正写入本地或目标试用环境时，仍必须分别使用下方 seed / simulated apply 入口和对应确认环境变量：
+手动回归前先生成只读数据计划，确认 Product Core 中性 seed、永绅 preview fixture、试用主数据、仍受支持的模拟工具和岗位任务要覆盖的状态与命令。该计划只读输出，不登录、不调用后端、不写数据库、不执行真实导入；真正写入本地或目标试用环境时，只能使用下方仍受支持且来源合同完整的 seed / simulated apply 入口和对应确认环境变量，旧业务事实通用 apply 不在其中：
 
 ```bash
 node scripts/qa/manual-regression-data-plan.mjs
@@ -249,7 +249,7 @@ node scripts/qa/trial-simulated-data.mjs \
 
 若要把模拟数据写入本地或目标试用环境，只能显式 `--apply`，并提供已有活跃产品和单位 ID。该脚本会先按稳定模拟编号查找已有记录，缺失才通过 V1 JSON-RPC 创建；它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不创建出货、库存或财务事实：
 
-如果当前环境缺少核心演示基础资料，优先使用 core demo seed。该 seed 只写 `units`、`materials`、`products`、`warehouses`、`processes`、`bom_headers` 和 `bom_items`，编码固定带 `SIM-PLUSH-CORE` 前缀；其中 `processes` 会提供 `查货 / 手工 / 车缝 / 包装` 等毛绒玩具行业默认候选，并仍允许后续按实际工厂扩展。该 seed 不写客户、供应商、联系人、销售订单、`business_records`、库存流水、生产、出货或财务事实；输出中的 `trial_sim_args` 和 `operational_fact_args` 可直接传给后续模拟脚本：
+如果当前环境缺少核心演示基础资料，优先使用 core demo seed。该 seed 只写 `units`、`materials`、`products`、`warehouses`、`processes`、`bom_headers` 和 `bom_items`，编码固定带 `SIM-PLUSH-CORE` 前缀；其中 `processes` 会提供 `查货 / 手工 / 车缝 / 包装` 等毛绒玩具行业默认候选，并仍允许后续按实际工厂扩展。该 seed 不写客户、供应商、联系人、销售订单、`business_records`、库存流水、生产、出货或财务事实；输出中的 `trial_sim_args` 可供仍受支持的试用源数据脚本使用，`operational_fact_args` 仅供旧 report-only 计划审查，不能用于已停用的 apply：
 
 ```bash
 bash scripts/seed-core-demo-data.sh
@@ -276,7 +276,7 @@ TRIAL_SIM_PASSWORD='replace-with-demo-password' \
 
 默认岗位账号模式会用 `demo_sales` 写客户、联系人和销售订单，用 `demo_purchase` 写供应商和供应商联系人。若目标环境提供了具备全部 V1 权限的账号，也可以改用 `TRIAL_SIM_ADMIN_TOKEN` 或 `TRIAL_SIM_ADMIN_USERNAME` / `TRIAL_SIM_ADMIN_PASSWORD`。
 
-业务事实模拟脚本只允许模拟事实闭环验收，不执行真实客户数据导入。先生成报告，确认模拟范围：
+业务事实模拟脚本当前只保留 no-write 输入模板和 report-only 计划，用于审查旧模拟范围，不执行真实客户数据导入：
 
 ```bash
 node scripts/qa/operational-fact-simulated-closure.mjs --print-input-template
@@ -289,23 +289,7 @@ node scripts/qa/operational-fact-simulated-closure.mjs \
   --out output/customers/yoyoosun/operational-fact-simulated-closure
 ```
 
-`--print-input-template` 只输出 report-only / apply simulated operational facts 所需的客户、产品、单位、仓库 ID、演示账号密码来源、核心 demo seed 和后续真实命令，不登录、不调用后端、不写报告、不写数据库，也不证明业务事实模拟矩阵已写入。
-
-若要写入本地或目标试用环境，只能显式 `--apply`，并提供已有模拟客户、产品、单位和仓库 ID。缺少核心主数据时先执行 `bash scripts/seed-core-demo-data.sh`；客户必须来自 `trial-simulated-data.mjs` 等受控模拟数据入口。该脚本使用 `demo_pmc`、`demo_purchase`、`demo_warehouse` 和 `demo_finance` 角色账号，分别保留生产草稿 / 已过账 / 已取消、预留生效 / 已释放、委外草稿 / 已过账 / 已取消、出货草稿 / 已出货 / 已取消，以及财务草稿 / 已过账 / 已结清 / 已取消记录；所有编号固定带 `SIM-YOYOOSUN-OPFACT` 前缀，不写真实客户数据，不执行 import，不绕过 `OperationalFactUsecase` 直接写事实表：
-
-```bash
-OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS \
-OPERATIONAL_FACT_SIM_PASSWORD='replace-with-demo-password' \
-  node scripts/qa/operational-fact-simulated-closure.mjs \
-    --apply \
-    --backend-url http://127.0.0.1:8300 \
-    --customer-id 1 \
-    --product-id 1 \
-    --unit-id 1 \
-    --warehouse-id 1 \
-    --run-id target-yyyymmdd-closure \
-    --out output/customers/yoyoosun/operational-fact-simulated-closure-target
-```
+`--print-input-template` 不登录、不调用后端、不写报告或数据库。旧 `--apply` 依赖已退役的 `create_production_fact / create_outsourcing_fact / create_finance_fact` 通用接口，已在登录、RPC 和任何写入前稳定拒绝；不能再作为本地或目标环境验收命令。恢复写入前必须按真实源单和来源行重建专用 fixture，并覆盖后端来源校验、幂等、事务、数量上限与权限。
 
 岗位任务闭环只允许模拟验收，不执行真实客户数据导入，也不写生产、出货、库存、预留或财务事实。先生成报告，确认模拟范围：
 
@@ -344,13 +328,10 @@ node scripts/qa/mvp-closure.mjs \
 ```bash
 node scripts/qa/mvp-closure.mjs \
   --run-report-tools \
-  --product-id 1 \
-  --unit-id 1 \
-  --warehouse-id 1 \
   --out output/customers/yoyoosun/mvp-closure
 ```
 
-真正写入本地或目标试用环境时，仍必须分别调用 `trial-simulated-data.mjs`、`operational-fact-simulated-closure.mjs` 或 `mobile-workflow-simulated-closure.mjs` 的 `--apply` 路径，并提供对应确认环境变量。
+真正写入本地或目标试用环境时，只能调用当前仍受支持且来源合同完整的专用 `--apply` 路径，并提供对应确认环境变量；旧业务事实模拟 `--apply` 不在可执行清单中。
 
 采购入库真实写入链路验收入口用于把 MVP 第一条事实写入链路固定下来。默认运行 JSON-RPC 服务层测试，覆盖创建入库草稿、添加明细、非法明细失败、过账、查询回显、列表、看板 projection、取消冲正、重复过账 / 取消幂等和权限拒绝：
 

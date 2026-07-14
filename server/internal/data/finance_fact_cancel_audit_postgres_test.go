@@ -12,7 +12,6 @@ import (
 	"server/internal/data/model/ent"
 
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/shopspring/decimal"
 )
 
 func TestFinanceFactCancelAuditPostgresPreservesPostingAndReplaysExactly(t *testing.T) {
@@ -21,7 +20,7 @@ func TestFinanceFactCancelAuditPostgresPreservesPostingAndReplaysExactly(t *test
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	suffix := postgresTestSuffix()
 	actor := client.AdminUser.Create().SetUsername("finance-audit-" + suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
-	fact := createPostedFinanceFactForCancelAudit(t, ctx, repo, suffix)
+	fact := createPostedFinanceFactForCancelAudit(t, ctx, data, client, repo, suffix)
 	postedAt := *fact.PostedAt
 
 	cancelled, err := repo.CancelPostedFinanceFact(ctx, fact.ID, actor.ID, "客户确认账款作废")
@@ -52,16 +51,13 @@ func TestFinanceFactCancelAuditPostgresRejectsInvalidStatesWithoutPartialWrite(t
 	suffix := postgresTestSuffix()
 	actor := client.AdminUser.Create().SetUsername("finance-invalid-" + suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
 
-	draft, err := repo.CreateFinanceFactDraft(ctx, financeFactCancelAuditInput("DRAFT-"+suffix, suffix+"-draft"))
-	if err != nil {
-		t.Fatalf("create draft: %v", err)
-	}
+	draft := createFinanceFactDraftForCancelAudit(t, ctx, data, client, "DRAFT-"+suffix, suffix+"-draft")
 	if _, err := repo.CancelPostedFinanceFact(ctx, draft.ID, actor.ID, "草稿不可取消"); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("draft cancellation error=%v", err)
 	}
 	assertFinanceFactHasNoCancelAudit(t, ctx, client, draft.ID, biz.OperationalFactStatusDraft)
 
-	settled := createPostedFinanceFactForCancelAudit(t, ctx, repo, suffix+"-settled")
+	settled := createPostedFinanceFactForCancelAudit(t, ctx, data, client, repo, suffix+"-settled")
 	if _, err := repo.SettleFinanceFact(ctx, settled.ID); err != nil {
 		t.Fatalf("settle finance fact: %v", err)
 	}
@@ -70,7 +66,7 @@ func TestFinanceFactCancelAuditPostgresRejectsInvalidStatesWithoutPartialWrite(t
 	}
 	assertFinanceFactHasNoCancelAudit(t, ctx, client, settled.ID, biz.OperationalFactStatusSettled)
 
-	posted := createPostedFinanceFactForCancelAudit(t, ctx, repo, suffix+"-missing-actor")
+	posted := createPostedFinanceFactForCancelAudit(t, ctx, data, client, repo, suffix+"-missing-actor")
 	if _, err := repo.CancelPostedFinanceFact(ctx, posted.ID, actor.ID+999999, "不存在的操作者"); err == nil {
 		t.Fatal("missing actor must fail foreign-key validation")
 	}
@@ -83,7 +79,7 @@ func TestFinanceFactCancelAuditPostgresConcurrentDifferentIntentHasOneWinner(t *
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	suffix := postgresTestSuffix()
 	actor := client.AdminUser.Create().SetUsername("finance-race-" + suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
-	fact := createPostedFinanceFactForCancelAudit(t, ctx, repo, suffix)
+	fact := createPostedFinanceFactForCancelAudit(t, ctx, data, client, repo, suffix)
 	reasons := []string{"客户撤销付款安排", "供应商确认账款作废"}
 	errs := make([]error, len(reasons))
 	var wg sync.WaitGroup
@@ -120,7 +116,7 @@ func TestFinanceFactCancelAuditPostgresConcurrentExactReplayReturnsOneAudit(t *t
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	suffix := postgresTestSuffix()
 	actor := client.AdminUser.Create().SetUsername("finance-exact-race-" + suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
-	fact := createPostedFinanceFactForCancelAudit(t, ctx, repo, suffix)
+	fact := createPostedFinanceFactForCancelAudit(t, ctx, data, client, repo, suffix)
 	results := make([]*biz.FinanceFact, 2)
 	errs := make([]error, 2)
 	var wg sync.WaitGroup
@@ -151,7 +147,7 @@ func TestFinanceFactCancelAuditPostgresConstraintRequiresCompleteAudit(t *testin
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	suffix := postgresTestSuffix()
 	actor := client.AdminUser.Create().SetUsername("finance-shape-" + suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
-	fact := createPostedFinanceFactForCancelAudit(t, ctx, repo, suffix)
+	fact := createPostedFinanceFactForCancelAudit(t, ctx, data, client, repo, suffix)
 	var constraintCount int
 	if err := data.sqldb.QueryRowContext(ctx, `SELECT count(*) FROM pg_constraint WHERE conrelid='finance_facts'::regclass AND conname = 'finance_facts_cancel_audit_bundle'`).Scan(&constraintCount); err != nil {
 		t.Fatalf("read cancel audit constraints: %v", err)
@@ -178,7 +174,7 @@ func TestFinanceFactCancelAuditPostgresRollsBackWhenCompensationFails(t *testing
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	suffix := postgresTestSuffix()
 	actor := client.AdminUser.Create().SetUsername("finance-rollback-" + suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
-	fact := createPostedFinanceFactForCancelAudit(t, ctx, repo, suffix)
+	fact := createPostedFinanceFactForCancelAudit(t, ctx, data, client, repo, suffix)
 	nodeID := recordAppliedProcessCommandEffect(t, ctx, data, biz.ProcessDomainCommandFinanceReceivableLead, "finance_fact", fact.ID)
 	if _, err := data.sqldb.ExecContext(ctx, `UPDATE process_node_instances SET domain_command_result_hash='broken' WHERE id=$1`, nodeID); err != nil {
 		t.Fatalf("corrupt compensation fixture: %v", err)
@@ -189,12 +185,16 @@ func TestFinanceFactCancelAuditPostgresRollsBackWhenCompensationFails(t *testing
 	assertFinanceFactHasNoCancelAudit(t, ctx, client, fact.ID, biz.OperationalFactStatusPosted)
 }
 
-func createPostedFinanceFactForCancelAudit(t *testing.T, ctx context.Context, repo *operationalFactRepo, suffix string) *biz.FinanceFact {
+func createPostedFinanceFactForCancelAudit(
+	t *testing.T,
+	ctx context.Context,
+	data *Data,
+	client *ent.Client,
+	repo *operationalFactRepo,
+	suffix string,
+) *biz.FinanceFact {
 	t.Helper()
-	fact, err := repo.CreateFinanceFactDraft(ctx, financeFactCancelAuditInput("FIN-CANCEL-"+suffix, "finance-cancel-"+suffix))
-	if err != nil {
-		t.Fatalf("create finance fact: %v", err)
-	}
+	fact := createFinanceFactDraftForCancelAudit(t, ctx, data, client, "FIN-CANCEL-"+suffix, "finance-cancel-"+suffix)
 	posted, err := repo.PostFinanceFact(ctx, fact.ID)
 	if err != nil {
 		t.Fatalf("post finance fact: %v", err)
@@ -205,13 +205,24 @@ func createPostedFinanceFactForCancelAudit(t *testing.T, ctx context.Context, re
 	return posted
 }
 
-func financeFactCancelAuditInput(factNo, idempotencyKey string) *biz.FinanceFactCreate {
-	return &biz.FinanceFactCreate{
-		FactNo: factNo, FactType: biz.FinanceFactReceivable,
-		CounterpartyType: biz.FinanceCounterpartyOther,
-		Amount:           decimal.NewFromInt(100), Currency: biz.FinanceCurrencyCNY,
-		IdempotencyKey: idempotencyKey, OccurredAt: time.Now().UTC(), OccurredAtSpecified: true,
+func createFinanceFactDraftForCancelAudit(
+	t *testing.T,
+	ctx context.Context,
+	data *Data,
+	client *ent.Client,
+	factNo string,
+	idempotencyKey string,
+) *biz.FinanceFact {
+	t.Helper()
+	_, uc, shipment, _ := prepareShipmentFinanceSource(t, ctx, data, client, "ca-"+postgresTestSuffix())
+	fact, err := uc.CreateReceivableFromShipment(ctx, &biz.FinanceFactFromShipmentCreate{
+		FactNo: factNo, ShipmentID: shipment.ID, IdempotencyKey: idempotencyKey,
+		OccurredAt: time.Now().UTC(), OccurredAtSpecified: true,
+	})
+	if err != nil {
+		t.Fatalf("create source-linked finance fact: %v", err)
 	}
+	return fact
 }
 
 func assertFinanceFactHasNoCancelAudit(t *testing.T, ctx context.Context, client *ent.Client, id int, status string) {

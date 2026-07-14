@@ -6,7 +6,11 @@ import {
   PlusOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
+import {
+  useNavigate,
+  useOutletContext,
+  useSearchParams,
+} from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -20,7 +24,17 @@ import {
   SelectionActionBar,
 } from '../components/business-list/BusinessListLayout.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
+import ProductionCompletionModal from '../components/production-orders/ProductionCompletionModal.jsx'
+import ProductionMaterialIssueModal from '../components/production-orders/ProductionMaterialIssueModal.jsx'
 import ProductionOrderFormModal from '../components/production-orders/ProductionOrderFormModal.jsx'
+import { listInventoryLots } from '../api/inventoryApi.mjs'
+import { listWarehouses } from '../api/masterDataOrderApi.mjs'
+import {
+  createProductionCompletionFromOrder,
+  createProductionMaterialIssueFromOrder,
+  listProductionOrderMaterialRequirements,
+  listProductionFacts,
+} from '../api/operationalFactApi.mjs'
 import {
   cancelProductionOrder,
   closeProductionOrder,
@@ -32,17 +46,63 @@ import {
   saveProductionOrder,
 } from '../api/productionOrderApi.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
-import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
+import {
+  hasActionPermission,
+  V1_ROUTE_PATHS,
+} from '../utils/masterDataOrderView.mjs'
+import {
+  buildProductionCompletionPayload,
+  findProductionCompletionResult,
+  validateProductionCompletionResult,
+} from '../utils/productionCompletionAction.mjs'
+import {
+  buildProductionMaterialIssuePayload,
+  filterProductionMaterialIssueLots,
+  findProductionMaterialIssueResult,
+  isProductionMaterialIssueEligible,
+  validateProductionMaterialIssueResult,
+} from '../utils/productionMaterialIssueAction.mjs'
 import {
   createProductionOrderAttemptStore,
   dateInputToUnix,
   isProductionOrderResultUnknown,
+  PRODUCTION_MATERIAL_REQUIREMENTS_STATE,
   PRODUCTION_ORDER_STATUS,
   PRODUCTION_ORDER_STATUS_META,
   unixToDateInput,
 } from '../utils/productionOrderModel.mjs'
+import {
+  uniqueReferenceOptions,
+  warehouseOptionFromRecord,
+} from '../utils/referenceSelectOptions.mjs'
+import {
+  routeWithQuery,
+  searchParamPositiveIntText,
+} from '../utils/routeQuery.mjs'
+import {
+  createSourceBusinessActionAttemptStore,
+  isSourceBusinessActionResultUnknown,
+  sourceBusinessActionNo,
+} from '../utils/sourceBusinessAction.mjs'
 
 const { Text } = Typography
+const EMPTY_COMPLETION_CONTEXT = Object.freeze({
+  order: null,
+  items: [],
+  facts: [],
+  warehouseOptions: [],
+  lots: [],
+})
+const EMPTY_MATERIAL_ISSUE_CONTEXT = Object.freeze({
+  order: null,
+  orderItem: null,
+  requirement: null,
+  materialRequirementsState: '',
+  requirements: [],
+  facts: [],
+  warehouseOptions: [],
+  lots: [],
+})
 const DEFAULT_QUERY = Object.freeze({
   keyword: '',
   status: '',
@@ -148,7 +208,12 @@ function draftParams(values) {
 export default function V1ProductionOrdersPage() {
   const outletContext = useOutletContext()
   const adminProfile = outletContext?.adminProfile || {}
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const routeProductionOrderID = searchParamPositiveIntText(
+    searchParams,
+    'production_order_id'
+  )
   const [form] = Form.useForm()
   const [reasonForm] = Form.useForm()
   const [query, setQuery] = useState(() => queryFromSearchParams(searchParams))
@@ -163,13 +228,52 @@ export default function V1ProductionOrdersPage() {
   const [formValues, setFormValues] = useState(null)
   const [reasonAction, setReasonAction] = useState(null)
   const [optionsByType, setOptionsByType] = useState({})
+  const [completionOpen, setCompletionOpen] = useState(false)
+  const [completionLoading, setCompletionLoading] = useState(false)
+  const [completionContext, setCompletionContext] = useState(
+    EMPTY_COMPLETION_CONTEXT
+  )
+  const [materialIssueOpen, setMaterialIssueOpen] = useState(false)
+  const [materialIssueLoading, setMaterialIssueLoading] = useState(false)
+  const [materialIssueLotsLoading, setMaterialIssueLotsLoading] =
+    useState(false)
+  const [materialIssueContext, setMaterialIssueContext] = useState(
+    EMPTY_MATERIAL_ISSUE_CONTEXT
+  )
   const attemptsRef = useRef(createProductionOrderAttemptStore())
+  const completionAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
+  const materialIssueAttemptsRef = useRef(
+    createSourceBusinessActionAttemptStore()
+  )
   const inFlightRef = useRef(false)
+  const completionInFlightRef = useRef(false)
+  const materialIssueInFlightRef = useRef(false)
+  const completionContextRequestRef = useRef(0)
+  const materialIssueContextRequestRef = useRef(0)
+  const selectedIDRef = useRef(0)
   const beginLatestRequest = useLatestRequestCoordinator()
+
+  const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
 
   const canRead = hasActionPermission(adminProfile, 'pmc.plan.read')
   const canCreate = hasActionPermission(adminProfile, 'pmc.plan.create')
   const canUpdate = hasActionPermission(adminProfile, 'pmc.plan.update')
+  const canCreateCompletion = hasActionPermission(
+    adminProfile,
+    'production.completion.create'
+  )
+  const canReadProductionFacts = hasActionPermission(
+    adminProfile,
+    'production.fact.read'
+  )
+  const canCreateMaterialIssue = hasActionPermission(
+    adminProfile,
+    'production.material_issue.create'
+  )
+
+  useEffect(() => {
+    selectedIDRef.current = Number(selected?.id || 0)
+  }, [selected?.id])
 
   const writeQuery = useCallback(
     (patch) => {
@@ -191,23 +295,46 @@ export default function V1ProductionOrdersPage() {
     const request = beginLatestRequest('production-orders')
     setLoading(true)
     try {
-      const data = await listProductionOrders(
-        {
-          keyword: query.keyword,
-          status: query.status,
-          date_field: query.date_field,
-          date_from: dateInputToUnix(query.date_from),
-          date_to: dateInputToUnix(query.date_to),
-          sort_by: query.sort_by,
-          sort_direction: query.sort_direction,
-          limit: query.page_size,
-          offset: (query.page - 1) * query.page_size,
-        },
-        { signal: request.signal }
-      )
+      const routeSelectedID = Number(routeProductionOrderID || 0)
+      const [data, routeAggregate] = await Promise.all([
+        listProductionOrders(
+          {
+            keyword: query.keyword,
+            status: query.status,
+            date_field: query.date_field,
+            date_from: dateInputToUnix(query.date_from),
+            date_to: dateInputToUnix(query.date_to),
+            sort_by: query.sort_by,
+            sort_direction: query.sort_direction,
+            limit: query.page_size,
+            offset: (query.page - 1) * query.page_size,
+          },
+          { signal: request.signal }
+        ),
+        routeSelectedID > 0
+          ? getProductionOrder(routeSelectedID, { signal: request.signal })
+          : Promise.resolve(null),
+      ])
       if (!request.isCurrent()) return
-      setOrders(data.production_orders)
-      setTotal(data.total)
+      const listedOrders = data.production_orders
+      const routeOrder = routeAggregate?.order || null
+      const nextOrders = routeOrder
+        ? [
+            routeOrder,
+            ...listedOrders.filter((item) => item.id !== routeOrder.id),
+          ]
+        : listedOrders
+      setOrders(nextOrders)
+      setTotal(
+        data.total +
+          (routeOrder && !listedOrders.some((item) => item.id === routeOrder.id)
+            ? 1
+            : 0)
+      )
+      if (routeSelectedID > 0) {
+        setSelected(routeOrder)
+        setAggregate(routeAggregate)
+      }
     } catch (error) {
       if (!isRpcAbortError(error) && request.isCurrent()) {
         message.error(getActionErrorMessage(error, '加载生产订单'))
@@ -216,7 +343,7 @@ export default function V1ProductionOrdersPage() {
       if (request.isCurrent()) setLoading(false)
       request.finish()
     }
-  }, [beginLatestRequest, canRead, query])
+  }, [beginLatestRequest, canRead, query, routeProductionOrderID])
 
   useEffect(() => {
     loadOrders()
@@ -384,6 +511,532 @@ export default function V1ProductionOrdersPage() {
     }
   }
 
+  const viewProductionFacts = (order = selected) => {
+    if (!order?.id) return
+    navigate(
+      routeWithQuery(V1_ROUTE_PATHS.productionProgress, {
+        source_type: 'PRODUCTION_ORDER',
+        source_id: order.id,
+      })
+    )
+  }
+
+  const refreshProductionSources = async (orderID) => {
+    const request = beginLatestRequest('production-material-issue-refresh')
+    try {
+      const [nextAggregate, factData] = await Promise.all([
+        getProductionOrder(orderID, { signal: request.signal }),
+        listProductionFacts(
+          {
+            source_type: 'PRODUCTION_ORDER',
+            source_id: orderID,
+            limit: 500,
+          },
+          { signal: request.signal }
+        ),
+      ])
+      if (!request.isCurrent() || selectedIDRef.current !== orderID) {
+        return null
+      }
+      const facts = Array.isArray(factData?.production_facts)
+        ? factData.production_facts
+        : []
+      productionItemsPreview.prime(nextAggregate.order, {
+        items: nextAggregate.items,
+        total: nextAggregate.items.length,
+      })
+      setAggregate(nextAggregate)
+      setSelected(nextAggregate.order)
+      setCompletionContext((current) =>
+        Number(current?.order?.id || 0) === orderID
+          ? { ...current, facts }
+          : current
+      )
+      setMaterialIssueContext((current) =>
+        Number(current?.order?.id || 0) === orderID
+          ? {
+              ...current,
+              order: nextAggregate.order,
+              requirements: nextAggregate.materialRequirements,
+              materialRequirementsState:
+                nextAggregate.materialRequirementsState,
+              facts,
+            }
+          : current
+      )
+      return { aggregate: nextAggregate, facts }
+    } finally {
+      request.finish()
+    }
+  }
+
+  const openProductionMaterialIssue = async (requirement) => {
+    const orderID = Number(aggregate?.order?.id || selected?.id || 0)
+    if (!canCreateMaterialIssue || !canReadProductionFacts) {
+      message.warning('当前账号不能登记生产领料')
+      return
+    }
+    if (
+      !isProductionMaterialIssueEligible(
+        aggregate?.order,
+        aggregate?.materialRequirementsState,
+        requirement
+      )
+    ) {
+      message.warning('当前物料需求尚不能领料，请刷新后核对')
+      return
+    }
+
+    const requestID = materialIssueContextRequestRef.current + 1
+    materialIssueContextRequestRef.current = requestID
+    const request = beginLatestRequest('production-material-issue-context')
+    setMaterialIssueLoading(true)
+    try {
+      const [nextAggregate, requirements, factData, warehouseData] =
+        await Promise.all([
+          getProductionOrder(orderID, { signal: request.signal }),
+          listProductionOrderMaterialRequirements(
+            {
+              customer_key: activeCustomerKey || undefined,
+              production_order_id: orderID,
+            },
+            { signal: request.signal }
+          ),
+          listProductionFacts(
+            {
+              source_type: 'PRODUCTION_ORDER',
+              source_id: orderID,
+              limit: 500,
+            },
+            { signal: request.signal }
+          ),
+          listWarehouses(
+            { active_only: true, limit: 500 },
+            { signal: request.signal }
+          ),
+        ])
+      if (
+        !request.isCurrent() ||
+        materialIssueContextRequestRef.current !== requestID ||
+        selectedIDRef.current !== orderID
+      ) {
+        return
+      }
+      if (
+        nextAggregate.materialRequirementsState ===
+        PRODUCTION_MATERIAL_REQUIREMENTS_STATE.NEEDS_REVIEW
+      ) {
+        setAggregate(nextAggregate)
+        setSelected(nextAggregate.order)
+        message.warning('物料需求需要计划人员复核，暂不能领料')
+        return
+      }
+      const freshRequirement = requirements.find(
+        (item) => Number(item.id) === Number(requirement?.id)
+      )
+      if (
+        !isProductionMaterialIssueEligible(
+          nextAggregate.order,
+          nextAggregate.materialRequirementsState,
+          freshRequirement
+        )
+      ) {
+        message.warning('物料需求或订单状态已变化，请刷新后重试')
+        setAggregate(nextAggregate)
+        setSelected(nextAggregate.order)
+        return
+      }
+      const orderItem = nextAggregate.items.find(
+        (item) =>
+          Number(item.id) === Number(freshRequirement.production_order_item_id)
+      )
+      if (!orderItem) {
+        message.warning('生产明细已变化，请刷新后重试')
+        return
+      }
+      const warehouseOptions = uniqueReferenceOptions(
+        warehouseData?.warehouses,
+        warehouseOptionFromRecord
+      )
+      const firstWarehouseID = Number(warehouseOptions[0]?.value || 0)
+      const lotData = firstWarehouseID
+        ? await listInventoryLots(
+            {
+              subject_type: 'MATERIAL',
+              subject_id: freshRequirement.material_id,
+              warehouse_id: firstWarehouseID,
+              status: 'ACTIVE',
+              limit: 500,
+            },
+            { signal: request.signal }
+          )
+        : { inventory_lots: [] }
+      if (
+        !request.isCurrent() ||
+        materialIssueContextRequestRef.current !== requestID ||
+        selectedIDRef.current !== orderID
+      ) {
+        return
+      }
+      setMaterialIssueContext({
+        order: nextAggregate.order,
+        orderItem,
+        requirement: freshRequirement,
+        materialRequirementsState: nextAggregate.materialRequirementsState,
+        requirements,
+        facts: Array.isArray(factData?.production_facts)
+          ? factData.production_facts
+          : [],
+        warehouseOptions,
+        lots: filterProductionMaterialIssueLots(
+          freshRequirement,
+          lotData?.inventory_lots
+        ),
+      })
+      setAggregate(nextAggregate)
+      setSelected(nextAggregate.order)
+      setFormMode(null)
+      setFormValues(null)
+      setMaterialIssueOpen(true)
+    } catch (error) {
+      if (!isRpcAbortError(error) && request.isCurrent()) {
+        message.error(getActionErrorMessage(error, '加载生产领料上下文'))
+      }
+    } finally {
+      if (
+        request.isCurrent() &&
+        materialIssueContextRequestRef.current === requestID
+      ) {
+        setMaterialIssueLoading(false)
+      }
+      request.finish()
+    }
+  }
+
+  const loadProductionMaterialIssueLots = async (warehouseID) => {
+    const orderID = Number(materialIssueContext?.order?.id || 0)
+    const requirement = materialIssueContext?.requirement
+    const requestID = materialIssueContextRequestRef.current
+    if (
+      !orderID ||
+      !positiveQuery(warehouseID, 0) ||
+      !requirement?.material_id
+    ) {
+      setMaterialIssueContext((current) => ({ ...current, lots: [] }))
+      return
+    }
+    const request = beginLatestRequest('production-material-issue-lots')
+    setMaterialIssueLotsLoading(true)
+    try {
+      const lotData = await listInventoryLots(
+        {
+          subject_type: 'MATERIAL',
+          subject_id: requirement.material_id,
+          warehouse_id: Number(warehouseID),
+          status: 'ACTIVE',
+          limit: 500,
+        },
+        { signal: request.signal }
+      )
+      if (
+        request.isCurrent() &&
+        materialIssueContextRequestRef.current === requestID &&
+        selectedIDRef.current === orderID
+      ) {
+        setMaterialIssueContext((current) => ({
+          ...current,
+          lots: filterProductionMaterialIssueLots(
+            current.requirement,
+            lotData?.inventory_lots
+          ),
+        }))
+      }
+    } catch (error) {
+      if (request.isCurrent() && !isRpcAbortError(error)) {
+        message.error(getActionErrorMessage(error, '加载可用材料批次'))
+      }
+    } finally {
+      if (
+        request.isCurrent() &&
+        materialIssueContextRequestRef.current === requestID
+      ) {
+        setMaterialIssueLotsLoading(false)
+      }
+      request.finish()
+    }
+  }
+
+  const closeProductionMaterialIssue = () => {
+    if (materialIssueInFlightRef.current) return
+    materialIssueContextRequestRef.current += 1
+    for (const key of [
+      'production-material-issue-context',
+      'production-material-issue-lots',
+    ]) {
+      const invalidation = beginLatestRequest(key)
+      invalidation.finish()
+    }
+    setMaterialIssueOpen(false)
+    setMaterialIssueLoading(false)
+    setMaterialIssueLotsLoading(false)
+    setMaterialIssueContext(EMPTY_MATERIAL_ISSUE_CONTEXT)
+  }
+
+  const submitProductionMaterialIssue = async (values) => {
+    if (
+      materialIssueInFlightRef.current ||
+      !canCreateMaterialIssue ||
+      !canReadProductionFacts ||
+      !materialIssueContext.order ||
+      !materialIssueContext.requirement
+    ) {
+      return
+    }
+    const { order, requirement, materialRequirementsState } =
+      materialIssueContext
+    let scope
+    let attempt
+    let params
+    try {
+      const payload = {
+        ...buildProductionMaterialIssuePayload(
+          values,
+          order,
+          materialRequirementsState,
+          requirement
+        ),
+        customer_key: activeCustomerKey || undefined,
+      }
+      scope = `production-material-issue:${order.id}:${requirement.id}`
+      attempt = materialIssueAttemptsRef.current.prepare(scope, payload)
+      params = {
+        ...attempt.params,
+        fact_no: sourceBusinessActionNo(
+          'PROD-MI',
+          order.order_no,
+          attempt.params.idempotency_key
+        ),
+      }
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '准备生产领料记录'))
+      return
+    }
+
+    let confirmedByReread = false
+    materialIssueInFlightRef.current = true
+    setMaterialIssueLoading(true)
+    try {
+      let result
+      try {
+        result = await createProductionMaterialIssueFromOrder(params)
+        validateProductionMaterialIssueResult(result, params, requirement)
+      } catch (error) {
+        if (!isSourceBusinessActionResultUnknown(error)) {
+          materialIssueAttemptsRef.current.settle(scope, attempt, error)
+          message.error(getActionErrorMessage(error, '生成生产领料记录'))
+          return
+        }
+        try {
+          const factData = await listProductionFacts({
+            source_type: 'PRODUCTION_ORDER',
+            source_id: order.id,
+            limit: 500,
+          })
+          result = findProductionMaterialIssueResult(
+            factData?.production_facts,
+            params,
+            requirement
+          )
+        } catch {
+          result = null
+        }
+        if (!result) {
+          materialIssueAttemptsRef.current.settle(scope, attempt, error)
+          message.warning(
+            '领料记录生成结果仍无法确认，已保留本次请求，请使用相同内容重试'
+          )
+          return
+        }
+        confirmedByReread = true
+      }
+
+      materialIssueAttemptsRef.current.settle(scope, attempt, null)
+      try {
+        await refreshProductionSources(order.id)
+      } catch (error) {
+        message.warning(getActionErrorMessage(error, '刷新生产领料结果'))
+      }
+      materialIssueContextRequestRef.current += 1
+      setMaterialIssueOpen(false)
+      setMaterialIssueContext(EMPTY_MATERIAL_ISSUE_CONTEXT)
+      message.success(
+        confirmedByReread
+          ? '已重新读取并确认领料草稿，请到生产记录核对并过账'
+          : '领料记录草稿已生成，请到生产记录核对并过账'
+      )
+    } finally {
+      materialIssueInFlightRef.current = false
+      setMaterialIssueLoading(false)
+    }
+  }
+
+  const openProductionCompletion = async () => {
+    const orderID = Number(selected?.id || 0)
+    if (!orderID || selected?.status !== PRODUCTION_ORDER_STATUS.RELEASED) {
+      message.warning('请先选择已发布的生产订单')
+      return
+    }
+    const requestID = completionContextRequestRef.current + 1
+    completionContextRequestRef.current = requestID
+    setCompletionLoading(true)
+    try {
+      const nextAggregate = await getProductionOrder(orderID)
+      if (
+        completionContextRequestRef.current !== requestID ||
+        selectedIDRef.current !== orderID
+      ) {
+        return
+      }
+      if (nextAggregate?.order?.status !== PRODUCTION_ORDER_STATUS.RELEASED) {
+        message.warning('生产订单状态已变化，请刷新后重试')
+        await refreshAfterSuccess()
+        return
+      }
+      const [factData, warehouseData, lotData] = await Promise.all([
+        listProductionFacts({
+          source_type: 'PRODUCTION_ORDER',
+          source_id: orderID,
+          limit: 500,
+        }),
+        listWarehouses({ active_only: true, limit: 500 }),
+        listInventoryLots({ status: 'ACTIVE', limit: 500 }),
+      ])
+      if (
+        completionContextRequestRef.current !== requestID ||
+        selectedIDRef.current !== orderID
+      ) {
+        return
+      }
+      setCompletionContext({
+        order: nextAggregate.order,
+        items: Array.isArray(nextAggregate.items) ? nextAggregate.items : [],
+        facts: Array.isArray(factData?.production_facts)
+          ? factData.production_facts
+          : [],
+        warehouseOptions: uniqueReferenceOptions(
+          warehouseData?.warehouses,
+          warehouseOptionFromRecord
+        ),
+        lots: Array.isArray(lotData?.inventory_lots)
+          ? lotData.inventory_lots
+          : [],
+      })
+      setCompletionOpen(true)
+    } catch (error) {
+      if (completionContextRequestRef.current === requestID) {
+        message.error(getActionErrorMessage(error, '加载完工入库上下文'))
+      }
+    } finally {
+      if (completionContextRequestRef.current === requestID) {
+        setCompletionLoading(false)
+      }
+    }
+  }
+
+  const closeProductionCompletion = () => {
+    if (completionInFlightRef.current) return
+    completionContextRequestRef.current += 1
+    setCompletionOpen(false)
+    setCompletionLoading(false)
+    setCompletionContext(EMPTY_COMPLETION_CONTEXT)
+  }
+
+  const submitProductionCompletion = async (values) => {
+    if (completionInFlightRef.current || !completionContext.order) return
+    let payload
+    try {
+      payload = {
+        ...buildProductionCompletionPayload(values, completionContext.order),
+        customer_key: activeCustomerKey || undefined,
+      }
+    } catch (error) {
+      message.error(error.message)
+      return
+    }
+    const orderItem = completionContext.items.find(
+      (item) => Number(item?.id || 0) === payload.production_order_item_id
+    )
+    if (!orderItem) {
+      message.error('生产明细已变化，请关闭后重新办理')
+      return
+    }
+    const scope = `production-completion:${completionContext.order.id}:${payload.production_order_item_id}`
+    const attempt = completionAttemptsRef.current.prepare(scope, payload)
+    const params = {
+      ...attempt.params,
+      fact_no: sourceBusinessActionNo(
+        'PROD-FG',
+        completionContext.order.order_no,
+        attempt.params.idempotency_key
+      ),
+    }
+    completionInFlightRef.current = true
+    setCompletionLoading(true)
+    try {
+      let result
+      let confirmedByReread = false
+      try {
+        result = await createProductionCompletionFromOrder(params)
+        validateProductionCompletionResult(result, params, orderItem)
+      } catch (error) {
+        if (!isSourceBusinessActionResultUnknown(error)) {
+          completionAttemptsRef.current.settle(scope, attempt, error)
+          message.error(getActionErrorMessage(error, '生成完工记录草稿'))
+          return
+        }
+        try {
+          const factData = await listProductionFacts({
+            source_type: 'PRODUCTION_ORDER',
+            source_id: completionContext.order.id,
+            limit: 500,
+          })
+          result = findProductionCompletionResult(
+            factData?.production_facts,
+            params,
+            orderItem
+          )
+        } catch {
+          result = null
+        }
+        if (!result) {
+          completionAttemptsRef.current.settle(scope, attempt, error)
+          message.warning(
+            '完工记录生成结果仍无法确认，已保留本次请求，请使用相同内容重试'
+          )
+          return
+        }
+        confirmedByReread = true
+      }
+      completionAttemptsRef.current.settle(scope, attempt, null)
+      try {
+        await refreshProductionSources(completionContext.order.id)
+      } catch (error) {
+        message.warning(getActionErrorMessage(error, '刷新完工入库结果'))
+      }
+      completionContextRequestRef.current += 1
+      setCompletionOpen(false)
+      setCompletionContext(EMPTY_COMPLETION_CONTEXT)
+      message.success(
+        confirmedByReread
+          ? '已重新读取并确认完工草稿，请到生产记录核对并过账'
+          : '完工记录草稿已生成，请到生产记录核对并过账'
+      )
+    } finally {
+      completionInFlightRef.current = false
+      setCompletionLoading(false)
+    }
+  }
+
   const beginCreate = () => {
     setAggregate(null)
     setOptionsByType({})
@@ -537,7 +1190,7 @@ export default function V1ProductionOrdersPage() {
     <BusinessPageLayout>
       <PageHeaderCard
         title="生产订单"
-        description="维护生产计划源单；完工、领料和库存变动请到生产进度办理。"
+        description="维护生产计划源单；已发布订单可从冻结需求登记领料或登记完工草稿，核对、过账及库存结果仍在生产记录中办理。"
         stats={[{ key: 'total', label: '符合条件', value: total }]}
       />
       <BusinessOperationPanel
@@ -623,6 +1276,28 @@ export default function V1ProductionOrdersPage() {
           >
             编辑
           </Button>
+          {canCreateCompletion ? (
+            <Button
+              type="primary"
+              disabled={
+                !selected ||
+                selected.status !== PRODUCTION_ORDER_STATUS.RELEASED ||
+                detailLoading ||
+                completionLoading
+              }
+              onClick={openProductionCompletion}
+            >
+              登记完工入库
+            </Button>
+          ) : null}
+          {canReadProductionFacts ? (
+            <Button
+              disabled={!selected || detailLoading}
+              onClick={() => viewProductionFacts(selected)}
+            >
+              查看生产记录
+            </Button>
+          ) : null}
           <Button
             disabled={
               !aggregate ||
@@ -716,11 +1391,45 @@ export default function V1ProductionOrdersPage() {
         mode={formMode}
         loading={mutationLoading}
         optionsByType={optionsByType}
+        order={aggregate?.order}
+        materialRequirementsState={aggregate?.materialRequirementsState}
+        materialRequirements={aggregate?.materialRequirements}
+        canCreateMaterialIssue={
+          canCreateMaterialIssue && canReadProductionFacts
+        }
+        materialIssueLoading={materialIssueLoading}
+        onCreateMaterialIssue={openProductionMaterialIssue}
         onCancel={() => {
           setFormMode(null)
           setFormValues(null)
         }}
         onSubmit={submitDraft}
+      />
+
+      <ProductionCompletionModal
+        open={completionOpen}
+        order={completionContext.order}
+        items={completionContext.items}
+        facts={completionContext.facts}
+        warehouseOptions={completionContext.warehouseOptions}
+        lots={completionContext.lots}
+        loading={completionLoading}
+        onCancel={closeProductionCompletion}
+        onSubmit={submitProductionCompletion}
+      />
+
+      <ProductionMaterialIssueModal
+        open={materialIssueOpen}
+        order={materialIssueContext.order}
+        orderItem={materialIssueContext.orderItem}
+        requirement={materialIssueContext.requirement}
+        warehouseOptions={materialIssueContext.warehouseOptions}
+        lots={materialIssueContext.lots}
+        loading={materialIssueLoading}
+        lotsLoading={materialIssueLotsLoading}
+        onWarehouseChange={loadProductionMaterialIssueLots}
+        onCancel={closeProductionMaterialIssue}
+        onSubmit={submitProductionMaterialIssue}
       />
 
       <Modal

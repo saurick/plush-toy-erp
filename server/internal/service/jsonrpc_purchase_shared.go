@@ -20,6 +20,12 @@ func purchaseReceiptCreateFromParams(pm map[string]any) (*biz.PurchaseReceiptCre
 	if _, ok := pm["business_record_id"]; ok {
 		return nil, false
 	}
+	// Manual receipt APIs have not yet adopted a stable supplier identity
+	// contract. Reject a misleading technical field instead of silently
+	// accepting it; these records intentionally keep supplier_id nil.
+	if _, ok := pm["supplier_id"]; ok {
+		return nil, false
+	}
 	receivedAt, ok := getOptionalJSONRPCTime(pm, "received_at")
 	if !ok {
 		return nil, false
@@ -37,6 +43,9 @@ func purchaseReceiptFromPurchaseOrderCreateFromParams(pm map[string]any) (*biz.P
 		return nil, false
 	}
 	if _, ok := pm["idempotency_payload_hash"]; ok {
+		return nil, false
+	}
+	if _, ok := pm["supplier_id"]; ok {
 		return nil, false
 	}
 	receivedAt, ok := getOptionalJSONRPCTime(pm, "received_at")
@@ -134,6 +143,7 @@ func purchaseReceiptFilterFromParams(pm map[string]any) (biz.PurchaseReceiptFilt
 	return biz.PurchaseReceiptFilter{
 		Status:              getString(pm, "status"),
 		Keyword:             getString(pm, "keyword"),
+		SupplierID:          getInt(pm, "supplier_id", 0),
 		SupplierName:        getString(pm, "supplier_name"),
 		DateFrom:            dateFrom,
 		DateTo:              dateTo,
@@ -173,6 +183,22 @@ func (d *jsonrpcDispatcher) mapPurchaseError(ctx context.Context, err error) *v1
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库单不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptItemNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库行不存在"}
+	case errors.Is(err, biz.ErrPurchaseReturnNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购退货单不存在"}
+	case errors.Is(err, biz.ErrPurchaseReturnItemNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购退货行不存在"}
+	case errors.Is(err, biz.ErrPurchaseReturnQualitySourceInvalid):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "不合格质检与采购入库、入库行或批次不一致，请刷新来源后重试"}
+	case errors.Is(err, biz.ErrPurchaseReturnQualitySourceState):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "仅已驳回且仍处于不合格批次状态的来料质检可生成采购退货"}
+	case errors.Is(err, biz.ErrPurchaseReturnQualitySourceConflict):
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "该不合格质检已生成未取消的采购退货单"}
+	case errors.Is(err, biz.ErrPurchaseReturnQuantityExceeded):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次退货数量超过该入库行剩余可退数量"}
+	case errors.Is(err, biz.ErrPurchaseReceiptAdjustmentNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库调整单不存在"}
+	case errors.Is(err, biz.ErrPurchaseReceiptAdjustmentItemNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库调整行不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptQualityPending):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来料质检尚未逐行完成，不能入库过账"}
 	case errors.Is(err, biz.ErrPurchaseReceiptQualityRejected):
@@ -190,9 +216,11 @@ func (d *jsonrpcDispatcher) mapPurchaseError(ctx context.Context, err error) *v1
 	case errors.Is(err, biz.ErrInventoryTxnNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库库存流水不存在"}
 	case errors.Is(err, biz.ErrInventoryInsufficientStock):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存不足，无法取消入库"}
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存不足，无法完成本次采购库存操作"}
+	case errors.Is(err, biz.ErrInventoryLotStatusBlocked):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前批次状态不允许扣减库存"}
 	case ent.IsConstraintError(err):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库单号或行号已存在"}
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库、退货或调整单号及行号已存在"}
 	default:
 		l.Errorf("[purchase] internal err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
@@ -222,6 +250,7 @@ func purchaseReceiptToAny(item *biz.PurchaseReceipt) map[string]any {
 	return map[string]any{
 		"id":                  item.ID,
 		"receipt_no":          item.ReceiptNo,
+		"supplier_id":         optionalIntToAny(item.SupplierID),
 		"supplier_name":       item.SupplierName,
 		"status":              item.Status,
 		"received_at":         item.ReceivedAt.Unix(),

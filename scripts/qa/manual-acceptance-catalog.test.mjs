@@ -48,11 +48,11 @@ test("manual acceptance catalog derives the complete current yoyoosun page inven
   ).flatMap((section) => section.items);
 
   assert.equal(catalog.summary.entryPages, 2);
-  assert.equal(catalog.summary.desktopPages, 26);
+  assert.equal(catalog.summary.desktopPages, 27);
   assert.equal(catalog.summary.mobileRolePages, 9);
   assert.equal(catalog.summary.printPreviewPages, 5);
   assert.equal(catalog.summary.printWorkspacePages, 5);
-  assert.equal(catalog.summary.totalScenarios, 47);
+  assert.equal(catalog.summary.totalScenarios, 48);
   assert.deepEqual(
     catalog.technicalManifest.desktopPages.map((item) => item.key),
     expectedDesktopItems.map((item) => item.key),
@@ -153,6 +153,7 @@ test("manual acceptance catalog locks the current deliverable data quantity for 
       inbound: 54,
       inventory: 45,
       "processing-contracts": 45,
+      "production-orders": 45,
       "production-scheduling": 20,
       "production-progress": 45,
       "production-exceptions": 20,
@@ -218,6 +219,24 @@ test("manual acceptance catalog treats production and outbound pages as source-g
   );
 });
 
+test("manual acceptance catalog assigns production orders to production with source-driven actions", () => {
+  const catalog = buildManualAcceptanceCatalog();
+  const technical = catalog.technicalManifest.desktopPages.find(
+    (item) => item.key === "production-orders",
+  );
+  const acceptance = catalog.acceptanceGuide.desktopPages.find(
+    (item) => item.title === "生产订单",
+  );
+
+  assert.deepEqual(technical?.roleKeys, ["production"]);
+  assert.equal(technical?.minimumRecords, 45);
+  assert.match(acceptance?.whatToDo.join("\n") || "", /已发布.*领料草稿.*完工草稿/u);
+  assert.match(
+    acceptance?.whatToSee.join("\n") || "",
+    /生产记录中过账后才会影响库存/u,
+  );
+});
+
 test("boss trial tasks do not pretend generic records are formal order approvals", () => {
   const catalog = buildManualAcceptanceCatalog();
   const boss = catalog.acceptanceGuide.mobileRolePages.find((item) =>
@@ -256,7 +275,7 @@ test("manual acceptance catalog separates fixed previews from business-filled wo
   assert.doesNotMatch(colorCard.whatToDo.join("\n"), /上传|更换.*图片/u);
 });
 
-test("formal customer checklist keeps all 47 targets and client-facing truth", () => {
+test("formal customer checklist keeps all 48 targets and client-facing truth", () => {
   const checklist = fs.readFileSync(
     new URL(
       "../../docs/customers/yoyoosun/试用人员全页面手工验收清单.md",
@@ -270,12 +289,15 @@ test("formal customer checklist keeps all 47 targets and client-facing truth", (
     /^### (?:进入|桌面|岗位|预览|打印)-\d{2} /gmu,
   );
 
-  assert.equal(targetHeadings?.length, 47);
+  assert.equal(targetHeadings?.length, 48);
   assert.doesNotMatch(checklist, forbiddenCustomerCopy);
   assert.match(checklist, /10 个正式岗位试用账号/u);
   assert.doesNotMatch(checklist, /13 个(?:不同岗位组合的)?试用账号/u);
   assert.match(checklist, /54 条来料质检记录/u);
   assert.match(checklist, /54 条采购入库记录/u);
+  assert.match(checklist, /45 张生产订单/u);
+  assert.match(checklist, /生产订单.*领料草稿.*完工草稿/su);
+  assert.match(checklist, /生产订单.*只有在生产记录中过账后才影响库存/su);
   assert.match(checklist, /生产进度.*只读|本页不提供新建入口/su);
   assert.match(checklist, /出库管理.*只读|本页不提供新建入口/su);
   assert.match(checklist, /模板预览只检查系统提供的固定默认样例/u);
@@ -336,7 +358,7 @@ test("manual acceptance catalog default run stays stdout-only and never calls a 
     );
     assert.equal(fetchCalled, false);
     assert.deepEqual(result.writtenPaths, []);
-    assert.equal(JSON.parse(stdout).summary.totalScenarios, 47);
+    assert.equal(JSON.parse(stdout).summary.totalScenarios, 48);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -348,7 +370,7 @@ test("manual acceptance catalog renders Chinese Markdown and JSON", () => {
   const json = renderManualAcceptanceJson(catalog);
 
   assert.match(markdown, /# 东莞市永绅玩具有限公司全页面手动验收目录/);
-  assert.match(markdown, /\| 桌面后台 \| 26 \|/);
+  assert.match(markdown, /\| 桌面后台 \| 27 \|/);
   assert.match(markdown, /你要做什么/);
   assert.match(markdown, /应看到什么/);
   assert.match(markdown, /采购合同预览/);
@@ -356,8 +378,8 @@ test("manual acceptance catalog renders Chinese Markdown and JSON", () => {
   assert.doesNotMatch(markdown, /Workflow|Fact|JSON-RPC|RBAC|raw\s*id|甲方/i);
 
   const parsed = JSON.parse(json);
-  assert.equal(parsed.summary.totalScenarios, 47);
-  assert.equal(parsed.technicalManifest.desktopPages.length, 26);
+  assert.equal(parsed.summary.totalScenarios, 48);
+  assert.equal(parsed.technicalManifest.desktopPages.length, 27);
 });
 
 test("manual acceptance catalog CLI parses formats and writes local report artifacts", () => {

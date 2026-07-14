@@ -63,6 +63,7 @@ func (Supplier) Fields() []ent.Field {
 func (Supplier) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("purchase_orders", PurchaseOrder.Type),
+		edge.To("purchase_receipts", PurchaseReceipt.Type),
 		edge.To("outsourcing_orders", OutsourcingOrder.Type),
 	}
 }

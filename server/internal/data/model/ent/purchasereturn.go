@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereturn"
+	"server/internal/data/model/ent/qualityinspection"
 	"strings"
 	"time"
 
@@ -22,14 +23,24 @@ type PurchaseReturn struct {
 	ReturnNo string `json:"return_no,omitempty"`
 	// PurchaseReceiptID holds the value of the "purchase_receipt_id" field.
 	PurchaseReceiptID *int `json:"purchase_receipt_id,omitempty"`
+	// QualityInspectionID holds the value of the "quality_inspection_id" field.
+	QualityInspectionID *int `json:"quality_inspection_id,omitempty"`
 	// SupplierName holds the value of the "supplier_name" field.
 	SupplierName string `json:"supplier_name,omitempty"`
+	// ReturnReason holds the value of the "return_reason" field.
+	ReturnReason *string `json:"return_reason,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// ReturnedAt holds the value of the "returned_at" field.
 	ReturnedAt time.Time `json:"returned_at,omitempty"`
 	// PostedAt holds the value of the "posted_at" field.
 	PostedAt *time.Time `json:"posted_at,omitempty"`
+	// IdempotencyKey holds the value of the "idempotency_key" field.
+	IdempotencyKey *string `json:"idempotency_key,omitempty"`
+	// IdempotencyPayloadHash holds the value of the "idempotency_payload_hash" field.
+	IdempotencyPayloadHash *string `json:"idempotency_payload_hash,omitempty"`
+	// IdempotencyItemCount holds the value of the "idempotency_item_count" field.
+	IdempotencyItemCount *int `json:"idempotency_item_count,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -46,11 +57,13 @@ type PurchaseReturn struct {
 type PurchaseReturnEdges struct {
 	// PurchaseReceipt holds the value of the purchase_receipt edge.
 	PurchaseReceipt *PurchaseReceipt `json:"purchase_receipt,omitempty"`
+	// QualityInspection holds the value of the quality_inspection edge.
+	QualityInspection *QualityInspection `json:"quality_inspection,omitempty"`
 	// Items holds the value of the items edge.
 	Items []*PurchaseReturnItem `json:"items,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // PurchaseReceiptOrErr returns the PurchaseReceipt value or an error if the edge
@@ -64,10 +77,21 @@ func (e PurchaseReturnEdges) PurchaseReceiptOrErr() (*PurchaseReceipt, error) {
 	return nil, &NotLoadedError{edge: "purchase_receipt"}
 }
 
+// QualityInspectionOrErr returns the QualityInspection value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e PurchaseReturnEdges) QualityInspectionOrErr() (*QualityInspection, error) {
+	if e.QualityInspection != nil {
+		return e.QualityInspection, nil
+	} else if e.loadedTypes[1] {
+		return nil, &NotFoundError{label: qualityinspection.Label}
+	}
+	return nil, &NotLoadedError{edge: "quality_inspection"}
+}
+
 // ItemsOrErr returns the Items value or an error if the edge
 // was not loaded in eager-loading.
 func (e PurchaseReturnEdges) ItemsOrErr() ([]*PurchaseReturnItem, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[2] {
 		return e.Items, nil
 	}
 	return nil, &NotLoadedError{edge: "items"}
@@ -78,9 +102,9 @@ func (*PurchaseReturn) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case purchasereturn.FieldID, purchasereturn.FieldPurchaseReceiptID:
+		case purchasereturn.FieldID, purchasereturn.FieldPurchaseReceiptID, purchasereturn.FieldQualityInspectionID, purchasereturn.FieldIdempotencyItemCount:
 			values[i] = new(sql.NullInt64)
-		case purchasereturn.FieldReturnNo, purchasereturn.FieldSupplierName, purchasereturn.FieldStatus, purchasereturn.FieldNote:
+		case purchasereturn.FieldReturnNo, purchasereturn.FieldSupplierName, purchasereturn.FieldReturnReason, purchasereturn.FieldStatus, purchasereturn.FieldIdempotencyKey, purchasereturn.FieldIdempotencyPayloadHash, purchasereturn.FieldNote:
 			values[i] = new(sql.NullString)
 		case purchasereturn.FieldReturnedAt, purchasereturn.FieldPostedAt, purchasereturn.FieldCreatedAt, purchasereturn.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -118,11 +142,25 @@ func (_m *PurchaseReturn) assignValues(columns []string, values []any) error {
 				_m.PurchaseReceiptID = new(int)
 				*_m.PurchaseReceiptID = int(value.Int64)
 			}
+		case purchasereturn.FieldQualityInspectionID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field quality_inspection_id", values[i])
+			} else if value.Valid {
+				_m.QualityInspectionID = new(int)
+				*_m.QualityInspectionID = int(value.Int64)
+			}
 		case purchasereturn.FieldSupplierName:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field supplier_name", values[i])
 			} else if value.Valid {
 				_m.SupplierName = value.String
+			}
+		case purchasereturn.FieldReturnReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field return_reason", values[i])
+			} else if value.Valid {
+				_m.ReturnReason = new(string)
+				*_m.ReturnReason = value.String
 			}
 		case purchasereturn.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -142,6 +180,27 @@ func (_m *PurchaseReturn) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.PostedAt = new(time.Time)
 				*_m.PostedAt = value.Time
+			}
+		case purchasereturn.FieldIdempotencyKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field idempotency_key", values[i])
+			} else if value.Valid {
+				_m.IdempotencyKey = new(string)
+				*_m.IdempotencyKey = value.String
+			}
+		case purchasereturn.FieldIdempotencyPayloadHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field idempotency_payload_hash", values[i])
+			} else if value.Valid {
+				_m.IdempotencyPayloadHash = new(string)
+				*_m.IdempotencyPayloadHash = value.String
+			}
+		case purchasereturn.FieldIdempotencyItemCount:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field idempotency_item_count", values[i])
+			} else if value.Valid {
+				_m.IdempotencyItemCount = new(int)
+				*_m.IdempotencyItemCount = int(value.Int64)
 			}
 		case purchasereturn.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -180,6 +239,11 @@ func (_m *PurchaseReturn) QueryPurchaseReceipt() *PurchaseReceiptQuery {
 	return NewPurchaseReturnClient(_m.config).QueryPurchaseReceipt(_m)
 }
 
+// QueryQualityInspection queries the "quality_inspection" edge of the PurchaseReturn entity.
+func (_m *PurchaseReturn) QueryQualityInspection() *QualityInspectionQuery {
+	return NewPurchaseReturnClient(_m.config).QueryQualityInspection(_m)
+}
+
 // QueryItems queries the "items" edge of the PurchaseReturn entity.
 func (_m *PurchaseReturn) QueryItems() *PurchaseReturnItemQuery {
 	return NewPurchaseReturnClient(_m.config).QueryItems(_m)
@@ -216,8 +280,18 @@ func (_m *PurchaseReturn) String() string {
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
+	if v := _m.QualityInspectionID; v != nil {
+		builder.WriteString("quality_inspection_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	builder.WriteString("supplier_name=")
 	builder.WriteString(_m.SupplierName)
+	builder.WriteString(", ")
+	if v := _m.ReturnReason; v != nil {
+		builder.WriteString("return_reason=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
@@ -228,6 +302,21 @@ func (_m *PurchaseReturn) String() string {
 	if v := _m.PostedAt; v != nil {
 		builder.WriteString("posted_at=")
 		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.IdempotencyKey; v != nil {
+		builder.WriteString("idempotency_key=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.IdempotencyPayloadHash; v != nil {
+		builder.WriteString("idempotency_payload_hash=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.IdempotencyItemCount; v != nil {
+		builder.WriteString("idempotency_item_count=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
 	if v := _m.Note; v != nil {

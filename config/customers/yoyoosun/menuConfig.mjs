@@ -49,6 +49,7 @@ export const yoyoosunMenuConfig = Object.freeze({
       {
         title: "生产管理",
         items: [
+          "production-orders",
           "production-scheduling",
           "production-progress",
           "production-exceptions",

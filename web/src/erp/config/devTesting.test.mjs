@@ -402,13 +402,13 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
     getPresetCopyText('trial-simulated-data'),
     /mobile-workflow-simulated-closure-dev-testing-report/
   )
-  assert.match(
+  assert.doesNotMatch(
     getPresetCopyText('trial-simulated-data'),
     /operational-fact-simulated-closure-dev-testing-report/
   )
   assert.match(
-    getPresetCopyText('trial-simulated-data'),
-    /--product-id <product_id>/
+    getPreset('trial-simulated-data').description,
+    /通用 apply 已停用/
   )
   assert.match(
     getPreset('trial-simulated-data').description,
@@ -439,7 +439,7 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   )
   assert.match(
     getPresetCopyText('mvp-local-closure'),
-    /--run-report-tools --product-id <product_id>/
+    /mvp-closure\.mjs --run-report-tools --out/
   )
   assert.match(getPreset('mvp-local-closure').description, /真实写入输入模板/)
   assert.match(

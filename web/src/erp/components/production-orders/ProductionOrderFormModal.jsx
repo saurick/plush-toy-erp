@@ -1,5 +1,16 @@
 import React, { useMemo } from 'react'
-import { Button, Col, Form, Input, Row, Space, Typography } from 'antd'
+import {
+  Alert,
+  Button,
+  Col,
+  Form,
+  Input,
+  Row,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd'
 import {
   DeleteOutlined,
   PlusOutlined,
@@ -8,8 +19,138 @@ import {
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import ProductionOrderReferenceSelect from './ProductionOrderReferenceSelect.jsx'
+import { isProductionMaterialIssueEligible } from '../../utils/productionMaterialIssueAction.mjs'
+import {
+  PRODUCTION_MATERIAL_REQUIREMENTS_STATE,
+  PRODUCTION_ORDER_STATUS,
+} from '../../utils/productionOrderModel.mjs'
 
 const { Text } = Typography
+
+function materialRequirementLabel(requirement = {}) {
+  return (
+    [requirement.material_code_snapshot, requirement.material_name_snapshot]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+      .join(' / ') || '物料已关联'
+  )
+}
+
+function materialUnitLabel(requirement = {}) {
+  return (
+    [requirement.unit_name_snapshot, requirement.unit_code_snapshot]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+      .join(' / ') || '单位已关联'
+  )
+}
+
+function ProductionMaterialRequirementsPanel({
+  order,
+  state,
+  requirements = [],
+  canCreateMaterialIssue = false,
+  loading = false,
+  onCreateMaterialIssue,
+}) {
+  if (order?.status !== PRODUCTION_ORDER_STATUS.RELEASED) return null
+
+  const alert =
+    state === PRODUCTION_MATERIAL_REQUIREMENTS_STATE.READY
+      ? {
+          type: 'success',
+          message: '物料需求已按发布时的 BOM 冻结，可从需求行登记领料。',
+        }
+      : state === PRODUCTION_MATERIAL_REQUIREMENTS_STATE.NOT_REQUIRED
+        ? {
+            type: 'info',
+            message: '该生产订单未关联 BOM，本单没有冻结的物料需求。',
+          }
+        : {
+            type: 'warning',
+            message: '物料需求需要复核，暂不能领料。',
+            description:
+              '请由计划人员核对订单明细的 BOM 版本与发布记录，确认需求完整后再办理领料。',
+          }
+
+  const columns = [
+    {
+      title: '需求物料',
+      key: 'material',
+      width: 220,
+      render: (_, requirement) => materialRequirementLabel(requirement),
+    },
+    {
+      title: '单位',
+      key: 'unit',
+      width: 120,
+      render: (_, requirement) => materialUnitLabel(requirement),
+    },
+    {
+      title: '计划需求',
+      dataIndex: 'planned_quantity',
+      width: 120,
+    },
+    {
+      title: '已过账领料',
+      dataIndex: 'issued_quantity',
+      width: 120,
+    },
+    {
+      title: '剩余可领',
+      dataIndex: 'remaining_quantity',
+      width: 120,
+      render: (value) => (
+        <Tag color={Number(value || 0) > 0 ? 'blue' : 'default'}>
+          {value || '0'}
+        </Tag>
+      ),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 100,
+      fixed: 'right',
+      render: (_, requirement) => {
+        if (!isProductionMaterialIssueEligible(order, state, requirement)) {
+          return state === PRODUCTION_MATERIAL_REQUIREMENTS_STATE.NEEDS_REVIEW
+            ? '待复核'
+            : '已领完'
+        }
+        if (!canCreateMaterialIssue) return '仅查看'
+        return (
+          <Button
+            size="small"
+            type="primary"
+            loading={loading}
+            onClick={() => onCreateMaterialIssue?.(requirement)}
+          >
+            领料
+          </Button>
+        )
+      },
+    },
+  ]
+
+  return (
+    <section style={{ marginTop: 20 }}>
+      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        <Text strong>物料需求与领料</Text>
+        <Alert showIcon {...alert} />
+        {requirements.length > 0 ? (
+          <Table
+            rowKey="id"
+            size="small"
+            pagination={false}
+            columns={columns}
+            dataSource={requirements}
+            scroll={{ x: 800 }}
+          />
+        ) : null}
+      </Space>
+    </section>
+  )
+}
 
 function RowReference({ field, form, optionsByType, readOnly }) {
   const index = field.name
@@ -165,6 +306,12 @@ export default function ProductionOrderFormModal({
   mode,
   loading,
   optionsByType,
+  order,
+  materialRequirementsState,
+  materialRequirements,
+  canCreateMaterialIssue,
+  materialIssueLoading,
+  onCreateMaterialIssue,
   onCancel,
   onSubmit,
 }) {
@@ -197,7 +344,7 @@ export default function ProductionOrderFormModal({
     <BusinessFormModal
       open={open}
       title={title}
-      description="生产计划源单只维护计划，不在这里登记完工、领料或库存事实。"
+      description="生产订单字段只维护计划；发布后可从冻结的物料需求办理领料，领料草稿仍需在生产记录中核对过账。"
       icon={<ScheduleOutlined />}
       size="masterDataItems"
       confirmLoading={loading}
@@ -285,6 +432,16 @@ export default function ProductionOrderFormModal({
             </Space>
           )}
         </Form.List>
+        {readOnly ? (
+          <ProductionMaterialRequirementsPanel
+            order={order}
+            state={materialRequirementsState}
+            requirements={materialRequirements}
+            canCreateMaterialIssue={canCreateMaterialIssue}
+            loading={materialIssueLoading}
+            onCreateMaterialIssue={onCreateMaterialIssue}
+          />
+        ) : null}
       </Form>
     </BusinessFormModal>
   )

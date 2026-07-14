@@ -93,15 +93,14 @@ const MVP_PHASES = [
   },
   {
     key: "operational-fact-simulation",
-    title: "扩展业务事实模拟闭环",
+    title: "业务事实来源驱动输入合同",
     commands: [
-      "node scripts/qa/operational-fact-simulated-closure.mjs --product-id <product_id> --unit-id <unit_id> --warehouse-id <warehouse_id> --out output/customers/yoyoosun/operational-fact-simulated-closure",
-      "OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS OPERATIONAL_FACT_SIM_PASSWORD='replace-with-demo-password' node scripts/qa/operational-fact-simulated-closure.mjs --apply --backend-url http://127.0.0.1:8300 --product-id <product_id> --unit-id <unit_id> --warehouse-id <warehouse_id> --run-id target-yyyymmdd-closure --out output/customers/yoyoosun/operational-fact-simulated-closure-target",
+      "node scripts/qa/operational-fact-simulated-closure.mjs --print-input-template",
     ],
     acceptance: [
-      "只验证生产、预留、委外、出货和财务的模拟事实链。",
-      "不等于真实客户数据导入，不代表完整财务、物流、装箱、核销交付。",
-      "不绕过 OperationalFactUsecase 直接写事实表。",
+      "只读模板明确列出来源驱动业务动作的前置输入和停用边界。",
+      "旧通用事实模拟 --apply 已停用，不能作为生产、委外、出货或财务验收证据。",
+      "恢复写入前必须提供真实源单驱动的专用场景，且不得绕过领域 Usecase。",
     ],
   },
   {
@@ -320,7 +319,7 @@ ${phaseSections}
 
 - 本报告不能替代领域单测、PG 集成测试、浏览器回归或部署 smoke。
 - 本报告不能证明客户真实验收通过。
-- 真正写入模拟数据时，必须分别调用对应脚本的 \`--apply\`，并提供脚本要求的确认环境变量。
+- 真正写入仍须使用当前未停用且来源合同完整的专用脚本；旧业务事实模拟 \`--apply\` 已停用，不得作为可执行指令或验收证据。
 `;
 }
 
@@ -355,47 +354,18 @@ function runNoWriteToolReports(options, rootDir, outDir) {
     ),
   );
 
-  if (options.productId && options.unitId && options.warehouseId) {
-    const operationalOut = path.join(outDir, "operational-fact-simulated-closure");
-    runs.push(
-      runCommand(
-        rootDir,
-        "operational-fact-simulated-closure",
-        [
-          node,
-          "scripts/qa/operational-fact-simulated-closure.mjs",
-          "--product-id",
-          String(options.productId),
-          "--unit-id",
-          String(options.unitId),
-          "--warehouse-id",
-          String(options.warehouseId),
-          "--out",
-          operationalOut,
-        ],
-        operationalOut,
-      ),
-    );
-  } else {
-    runs.push({
-      key: "operational-fact-simulated-closure",
-      command: [
+  runs.push(
+    runCommand(
+      rootDir,
+      "operational-fact-simulated-closure-input-template",
+      [
         node,
         "scripts/qa/operational-fact-simulated-closure.mjs",
-        "--product-id",
-        "<product_id>",
-        "--unit-id",
-        "<unit_id>",
-        "--warehouse-id",
-        "<warehouse_id>",
+        "--print-input-template",
       ],
-      out: null,
-      status: "SKIPPED",
-      exitCode: null,
-      stdout: "",
-      stderr: "missing --product-id / --unit-id / --warehouse-id",
-    });
-  }
+      null,
+    ),
+  );
 
   const mobileOut = path.join(outDir, "mobile-workflow-simulated-closure");
   runs.push(

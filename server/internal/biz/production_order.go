@@ -25,6 +25,10 @@ const (
 	ProductionOrderCommandClose   = "CLOSE"
 	ProductionOrderCommandCancel  = "CANCEL"
 
+	ProductionOrderMaterialRequirementsNotRequired = "NOT_REQUIRED"
+	ProductionOrderMaterialRequirementsReady       = "READY"
+	ProductionOrderMaterialRequirementsNeedsReview = "NEEDS_REVIEW"
+
 	ProductionOrderMutationResultV1 = "production.order-mutation-result/v1"
 	ProductionOrderSourceType       = "PRODUCTION_ORDER"
 
@@ -36,15 +40,19 @@ const (
 )
 
 var (
-	ErrProductionOrderNotFound            = errors.New("production order not found")
-	ErrProductionOrderConflict            = errors.New("production order version conflict")
-	ErrProductionOrderInvalidState        = errors.New("production order invalid state")
-	ErrProductionOrderReferenceInvalid    = errors.New("production order reference invalid")
-	ErrProductionOrderReceiptCorrupt      = errors.New("production order receipt corrupt")
-	ErrProductionOrderFactSourceInvalid   = errors.New("production order fact source invalid")
-	ErrProductionOrderQuantityExceeded    = errors.New("production order finished quantity exceeded")
-	ErrProductionOrderHasPostedFacts      = errors.New("production order has posted facts")
-	ErrProductionOrderCloseReasonRequired = errors.New("production order close reason required")
+	ErrProductionOrderNotFound                       = errors.New("production order not found")
+	ErrProductionOrderConflict                       = errors.New("production order version conflict")
+	ErrProductionOrderInvalidState                   = errors.New("production order invalid state")
+	ErrProductionOrderReferenceInvalid               = errors.New("production order reference invalid")
+	ErrProductionOrderReceiptCorrupt                 = errors.New("production order receipt corrupt")
+	ErrProductionOrderFactSourceInvalid              = errors.New("production order fact source invalid")
+	ErrProductionOrderQuantityExceeded               = errors.New("production order finished quantity exceeded")
+	ErrProductionOrderMaterialRequirementNotFound    = errors.New("production order material requirement not found")
+	ErrProductionOrderMaterialRequirementInvalid     = errors.New("production order material requirement invalid")
+	ErrProductionOrderMaterialRequirementsNeedReview = errors.New("production order material requirements need review")
+	ErrProductionOrderMaterialIssueQuantityExceeded  = errors.New("production order material issue quantity exceeded")
+	ErrProductionOrderHasPostedFacts                 = errors.New("production order has posted facts")
+	ErrProductionOrderCloseReasonRequired            = errors.New("production order close reason required")
 )
 
 type ProductionOrder struct {
@@ -88,9 +96,35 @@ type ProductionOrderItem struct {
 	UpdatedAt           time.Time       `json:"updated_at"`
 }
 
+// ProductionOrderMaterialRequirement is an immutable release-time BOM
+// snapshot. IssuedQuantity and RemainingQuantity are query projections derived
+// from posted production material issues.
+type ProductionOrderMaterialRequirement struct {
+	ID                    int             `json:"id"`
+	ProductionOrderID     int             `json:"production_order_id"`
+	ProductionOrderItemID int             `json:"production_order_item_id"`
+	BOMHeaderID           int             `json:"bom_header_id"`
+	BOMItemID             int             `json:"bom_item_id"`
+	MaterialID            int             `json:"material_id"`
+	UnitID                int             `json:"unit_id"`
+	UnitQuantitySnapshot  decimal.Decimal `json:"unit_quantity_snapshot"`
+	LossRateSnapshot      decimal.Decimal `json:"loss_rate_snapshot"`
+	PlannedQuantity       decimal.Decimal `json:"planned_quantity"`
+	IssuedQuantity        decimal.Decimal `json:"issued_quantity"`
+	RemainingQuantity     decimal.Decimal `json:"remaining_quantity"`
+	MaterialCodeSnapshot  string          `json:"material_code_snapshot"`
+	MaterialNameSnapshot  string          `json:"material_name_snapshot"`
+	UnitCodeSnapshot      string          `json:"unit_code_snapshot"`
+	UnitNameSnapshot      string          `json:"unit_name_snapshot"`
+	CreatedAt             time.Time       `json:"created_at"`
+	UpdatedAt             time.Time       `json:"updated_at"`
+}
+
 type ProductionOrderAggregate struct {
-	Order *ProductionOrder       `json:"order"`
-	Items []*ProductionOrderItem `json:"items"`
+	Order                     *ProductionOrder                      `json:"order"`
+	Items                     []*ProductionOrderItem                `json:"items"`
+	MaterialRequirements      []*ProductionOrderMaterialRequirement `json:"material_requirements"`
+	MaterialRequirementsState string                                `json:"material_requirements_state"`
 }
 
 type ProductionOrderDraftItem struct {

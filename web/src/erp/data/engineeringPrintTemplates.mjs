@@ -1201,7 +1201,11 @@ function isCanceledLineStatus(value) {
 
 function summarizeOutsourcingInstructionItem(item = {}, index = 0) {
   const productText = compactTextParts(
-    [item.product_no_snapshot, item.product_name_snapshot],
+    [
+      item.product_no_snapshot,
+      item.sku_code_snapshot,
+      item.product_name_snapshot,
+    ],
     ' / '
   )
   const quantityText = compactTextParts(
@@ -1239,7 +1243,12 @@ export function buildWorkInstructionDraftFromOutsourcingOrder(
       : {}
   const supplierName =
     toText(supplierSnapshot.short_name) || toText(supplierSnapshot.name)
-  const productNos = activeItems.map((item) => item.product_no_snapshot)
+  const productNos = activeItems.map((item) =>
+    compactTextParts(
+      [item.product_no_snapshot, item.sku_code_snapshot],
+      ' / '
+    )
+  )
   const productNames = activeItems.map((item) => item.product_name_snapshot)
   const processNames = activeItems.map((item) => item.process_name_snapshot)
   const orderNo = toText(order.outsourcing_order_no)

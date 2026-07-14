@@ -115,7 +115,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     key: 'trial-simulated-data',
     label: '试用模拟数据 / Trial Simulated Data',
     description:
-      '试用账号、seed / fixture、模拟主数据或本地闭环工具改动时复制；先打印 no-write 输入模板，再按需生成 report-only 证据；岗位任务模拟计划覆盖完成、阻塞、退回和催办；只证明本地 simulated-only / no real import 守卫，report-only 命令不连接后端。',
+      '试用账号、seed / fixture、模拟主数据或本地闭环工具改动时复制；先打印 no-write 输入模板，再按需生成仍受支持的 report-only 证据；旧业务事实通用 apply 已停用，岗位任务模拟计划仍覆盖完成、阻塞、退回和催办；no-write 命令不连接后端，这些命令只证明本地 simulated-only / no real import 守卫。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH node --test scripts/qa/trial-simulated-data.test.mjs scripts/qa/operational-fact-simulated-closure.test.mjs scripts/qa/mobile-workflow-simulated-closure.test.mjs',
@@ -124,7 +124,6 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
       'PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --print-input-template',
       'PATH=/usr/local/bin:$PATH node scripts/qa/trial-simulated-data.mjs --out output/customers/yoyoosun/trial-simulated-data-dev-testing-report',
       'PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --run-id DEV-TESTING-REPORT --out output/customers/yoyoosun/mobile-workflow-simulated-closure-dev-testing-report',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/operational-fact-simulated-closure.mjs --product-id <product_id> --unit-id <unit_id> --warehouse-id <warehouse_id> --run-id DEV-TESTING-REPORT --out output/customers/yoyoosun/operational-fact-simulated-closure-dev-testing-report',
     ],
   },
   {
@@ -138,7 +137,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
       'PATH=/usr/local/bin:$PATH node scripts/qa/purchase-receipt-real-write-e2e.mjs --print-input-template',
       'PATH=/usr/local/bin:$PATH node scripts/qa/purchase-receipt-real-write-e2e.mjs --preflight-report output/qa/purchase-receipt-real-write-e2e/preflight.json',
       'PATH=/usr/local/bin:$PATH node scripts/qa/mvp-closure.mjs --out output/customers/yoyoosun/mvp-closure',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/mvp-closure.mjs --run-report-tools --product-id <product_id> --unit-id <unit_id> --warehouse-id <warehouse_id> --out output/customers/yoyoosun/mvp-closure',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/mvp-closure.mjs --run-report-tools --out output/customers/yoyoosun/mvp-closure',
     ],
   },
   {
