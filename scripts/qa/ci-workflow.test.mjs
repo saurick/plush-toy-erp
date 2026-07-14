@@ -90,7 +90,7 @@ test("CI versions and dependencies follow repository gate requirements", () => {
 
   assert.equal(nodeVersion, "24.14.0");
   assert.equal(webPackage.packageManager, "pnpm@10.13.1");
-  assert.equal(goToolchain, "1.26.4");
+  assert.equal(goToolchain, "1.26.5");
   assert.match(workflowSource, /node-version-file: \.n-node-version/u);
   assert.match(workflowSource, /go-version-file: server\/go\.mod/u);
   assert.match(stepRuns, /pnpm@10\.13\.1/u);
@@ -123,7 +123,8 @@ test("CI versions and dependencies follow repository gate requirements", () => {
   assert.match(stepRuns, /GITHUB_ENV/u);
   assert.match(stepRuns, /GITHUB_PATH/u);
   assert.doesNotMatch(workflowSource, /--no-sandbox|--disable-setuid-sandbox/u);
-  assert.match(read("server/Makefile"), /^GO_BUILDER_IMAGE \?= golang:1\.26\.4$/mu);
+  assert.match(read("server/Makefile"), /^GO_BUILDER_IMAGE \?= golang:1\.26\.5$/mu);
+  assert.match(read("server/Dockerfile"), /^ARG GO_BUILDER_IMAGE=golang:1\.26\.5$/mu);
 });
 
 test("CI reuses strict instead of copying local gate families", () => {

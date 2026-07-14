@@ -6,7 +6,7 @@ ARG RUNTIMEPLATFORM=linux/amd64
 ARG GO_TARGETOS=linux
 ARG GO_TARGETARCH=amd64
 ARG NODE_BUILDER_IMAGE=node:24.14.0
-ARG GO_BUILDER_IMAGE=golang:1.26.4
+ARG GO_BUILDER_IMAGE=golang:1.26.5
 ARG RUNTIME_BASE_IMAGE=debian:bookworm-slim
 # Debian 12 的 Chromium 150.0.7871.46 在部分宿主运行时会 SIGTRAP。
 # 版本升级必须显式修改本参数，并重新通过容器启动与真实 PDF 发布烟测。

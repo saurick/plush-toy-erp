@@ -6,11 +6,13 @@
 
 完成：主仓产品单重提交 `6b0ac4e4` 推送后，GitHub Actions run `29318178284` 只在真实 Chromium PDF 安全集成启动阶段失败；Ubuntu 24.04 拒绝 Playwright 下载版 Chromium 使用 user namespace sandbox，测试体尚未执行。CI 改为从同一 Playwright Chromium 发行包安装独立 `chrome_sandbox` helper 到 `/usr/local/sbin/chrome-devel-sandbox`，强制 `root:root` 与 `4755` 后通过 `CHROME_DEVEL_SANDBOX` 绑定。产品代码和 Chromium 参数未加入 `--no-sandbox` 或 `--disable-setuid-sandbox`，不会为适配 CI 降低 PDF 渲染安全边界。
 
-验证：`bash scripts/qa/affected.sh --run` 通过，覆盖 diff-check、文档索引与 CI YAML / 依赖 / SUID helper / fail-closed 合同。随后 `bash scripts/qa/full.sh` 完整通过且未使用 skip：Node、客户配置、Web contracts、server quick、Web 全量 1017 / 1017、critical PostgreSQL、server 全量 1785 / 1785、Vite build、当前工作树自启 Chromium、真实 PDF 安全集成与 govulncheck 全部完成，当前代码无可达漏洞。
+完成：CI 修复提交 `93d094e3` 对应 run `29319071534` 已证明 SUID helper 安装、Ent / Atlas 零漂移和真实 PDF 安全集成有效，server 全量为 1785 / 1785；随后严格漏洞扫描按最新数据库检出 `GO-2026-5856`，指出仓库锁定的 `crypto/tls@go1.26.4` 可达且修复版本为 `go1.26.5`。仓库已原子升级 `server/go.mod`、容器 Go builder、Makefile、CI 合同与版本文档到 Go 1.26.5，不使用 ignore 或 skip 绕过漏洞门禁。
 
-下一步：提交并推送本次 CI 装配修复，在 GitHub Ubuntu runner 上取得新的 strict 绿色运行证据；随后把最终 Product Core 提交号重新锁入客户私有仓，完成 formal validate、推送和远端 fresh clone 回读。
+验证：`go version` 与 `go env GOVERSION` 均为 `go1.26.5`；CI / 文档合同测试通过。升级后 `bash scripts/qa/strict.sh` 完整通过且未使用 skip：Node、客户配置、Web contracts、server quick、Web 全量 1017 / 1017、critical PostgreSQL、server 全量 1785 / 1785、Vite build、当前工作树自启 Chromium 3 个场景、真实 PDF 安全集成、shellcheck、shfmt、yamllint 与两轮 govulncheck 均完成，当前代码无可达漏洞。
 
-阻塞/风险：本地已证明完整门禁，但 SUID helper 的真实 Ubuntu 行为必须由本次远端 CI 复核；GitHub branch protection / required check 是否启用仍需远端设置证据。目标机 `192.168.0.133` 未部署，migration、health / smoke、rollback evidence 与客户签收仍是独立发布动作。
+下一步：提交并推送 Go 1.26.5 工具链升级，在 GitHub Ubuntu runner 上取得新的 strict 绿色运行证据；随后把最终 Product Core 提交号重新锁入客户私有仓，完成 formal validate、推送和远端 fresh clone 回读。
+
+阻塞/风险：SUID helper 已有真实 Ubuntu 正向证据，Go 1.26.5 的远端 strict 仍需本次 push 复核；GitHub branch protection / required check 是否启用仍需远端设置证据。目标机 `192.168.0.133` 未部署，migration、health / smoke、rollback evidence 与客户签收仍是独立发布动作。
 
 ## 2026-07-14 产品单重与最终全仓门禁
 

@@ -35,7 +35,7 @@
 | --- | --- | --- |
 | Node.js | `24.14.0` | `.n-node-version`、`.node-version`、`.nvmrc` |
 | pnpm | `10.13.1` | `web/package.json` 的 `packageManager` |
-| Go | `>= 1.26.4` | `server/go.mod` 的 `toolchain go1.26.4` |
+| Go | `>= 1.26.5` | `server/go.mod` 的 `toolchain go1.26.5` |
 | PostgreSQL | 本地开发默认 `192.168.0.106:5432/plush_erp` | `server/configs/dev/config.yaml` / `config.local.yaml` 和 `make print_db_url` |
 
 推荐初始化顺序：
