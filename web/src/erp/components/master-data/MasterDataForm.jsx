@@ -18,6 +18,7 @@ import {
 } from '../../utils/contactValidation.mjs'
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
+import FieldWithUnitSuffix from '../business-list/FieldWithUnitSuffix.jsx'
 
 function DefaultUnitSelect({ required = false, unitOptions, unitLoading }) {
   return (
@@ -36,6 +37,49 @@ function DefaultUnitSelect({ required = false, unitOptions, unitLoading }) {
         options={unitOptions}
         placeholder="请选择默认单位"
         optionFilterProp="searchText"
+      />
+    </Form.Item>
+  )
+}
+
+function ProductUnitNetWeightField({ form, unitOptions }) {
+  const defaultUnitID = Form.useWatch('default_unit_id', form)
+  const defaultUnitLabel =
+    unitOptions.find(
+      (option) => Number(option?.value || 0) === Number(defaultUnitID || 0)
+    )?.label || '默认单位'
+
+  return (
+    <Form.Item
+      className="erp-business-action-form__field"
+      extra="按当前默认单位记录；默认单位变更后需要重新确认。未知时可留空。"
+      label="产品单重（净重）"
+      name="unit_net_weight_kg"
+      rules={[
+        {
+          validator: async (_, value) => {
+            if (value === undefined || value === null || value === '') {
+              return
+            }
+            const numeric = Number(value)
+            if (!Number.isFinite(numeric) || numeric <= 0) {
+              throw new Error('产品单重必须大于 0')
+            }
+          },
+        },
+      ]}
+    >
+      <FieldWithUnitSuffix
+        control={
+          <InputNumber
+            max="99999999999999.999999"
+            min="0.000001"
+            precision={6}
+            stringMode
+            style={{ width: '100%' }}
+          />
+        }
+        unitText={`kg / ${defaultUnitLabel}`}
       />
     </Form.Item>
   )
@@ -177,6 +221,7 @@ export function MasterDataFormFields({
           unitOptions={unitOptions}
           unitLoading={unitLoading}
         />
+        <ProductUnitNetWeightField form={form} unitOptions={unitOptions} />
       </>
     )
   }

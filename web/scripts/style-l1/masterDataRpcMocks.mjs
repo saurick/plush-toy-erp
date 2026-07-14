@@ -68,6 +68,7 @@ export async function installMasterDataRpcMocks(page, context) {
       style_no: 'BEAR-STYLE',
       customer_style_no: 'CUS-BEAR-STYLE',
       default_unit_id: 1,
+      unit_net_weight_kg: '0.425',
       is_active: true,
       created_at: nowUnix(),
       updated_at: nowUnix(),

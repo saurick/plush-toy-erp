@@ -15,6 +15,7 @@ import (
 	"entgo.io/ent/dialect"
 	"github.com/go-kratos/kratos/v2/log"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/shopspring/decimal"
 )
 
 func openMasterDataRepoTest(t *testing.T, name string) (*biz.MasterDataUsecase, *ent.Client) {
@@ -262,17 +263,19 @@ func TestMasterDataRepoProductCRUDAndUnitGuard(t *testing.T) {
 	}
 	styleNo := "BEAR-BASE"
 	customerStyleNo := "CUS-BEAR"
+	unitNetWeightKg := decimal.RequireFromString("0.425")
 	product, err := uc.CreateProduct(ctx, &biz.ProductMutation{
 		Code:            "P-001",
 		Name:            "毛绒熊",
 		StyleNo:         &styleNo,
 		CustomerStyleNo: &customerStyleNo,
 		DefaultUnitID:   unitRow.ID,
+		UnitNetWeightKg: &unitNetWeightKg,
 	})
 	if err != nil {
 		t.Fatalf("create product failed: %v", err)
 	}
-	if product.DefaultUnitID != unitRow.ID || product.StyleNo == nil || *product.StyleNo != styleNo {
+	if product.DefaultUnitID != unitRow.ID || product.StyleNo == nil || *product.StyleNo != styleNo || product.UnitNetWeightKg == nil || !product.UnitNetWeightKg.Equal(unitNetWeightKg) {
 		t.Fatalf("expected product fields retained, got %#v", product)
 	}
 	if _, err := uc.CreateProduct(ctx, &biz.ProductMutation{Code: "P-001", Name: "重复产品", DefaultUnitID: unitRow.ID}); !ent.IsConstraintError(err) {
@@ -282,16 +285,29 @@ func TestMasterDataRepoProductCRUDAndUnitGuard(t *testing.T) {
 		t.Fatalf("expected missing unit rejected, got %v", err)
 	}
 
+	updatedUnitNetWeightKg := decimal.RequireFromString("0.5")
 	updated, err := uc.UpdateProduct(ctx, product.ID, &biz.ProductMutation{
+		Code:            "P-001-A",
+		Name:            "毛绒熊 A",
+		DefaultUnitID:   unitRow.ID,
+		UnitNetWeightKg: &updatedUnitNetWeightKg,
+	})
+	if err != nil {
+		t.Fatalf("update product failed: %v", err)
+	}
+	if updated.StyleNo != nil || updated.CustomerStyleNo != nil || updated.UnitNetWeightKg == nil || !updated.UnitNetWeightKg.Equal(updatedUnitNetWeightKg) {
+		t.Fatalf("expected optional product fields cleared, got %#v", updated)
+	}
+	cleared, err := uc.UpdateProduct(ctx, product.ID, &biz.ProductMutation{
 		Code:          "P-001-A",
 		Name:          "毛绒熊 A",
 		DefaultUnitID: unitRow.ID,
 	})
 	if err != nil {
-		t.Fatalf("update product failed: %v", err)
+		t.Fatalf("clear product unit net weight failed: %v", err)
 	}
-	if updated.StyleNo != nil || updated.CustomerStyleNo != nil {
-		t.Fatalf("expected optional product fields cleared, got %#v", updated)
+	if cleared.UnitNetWeightKg != nil {
+		t.Fatalf("expected product unit net weight cleared, got %#v", cleared.UnitNetWeightKg)
 	}
 	if _, err := uc.SetProductActive(ctx, product.ID, false); err != nil {
 		t.Fatalf("disable product failed: %v", err)

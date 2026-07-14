@@ -8,6 +8,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/shopspring/decimal"
 )
 
 // ID filters vertices based on their ID field.
@@ -78,6 +79,11 @@ func CustomerStyleNo(v string) predicate.Product {
 // DefaultUnitID applies equality check predicate on the "default_unit_id" field. It's identical to DefaultUnitIDEQ.
 func DefaultUnitID(v int) predicate.Product {
 	return predicate.Product(sql.FieldEQ(FieldDefaultUnitID, v))
+}
+
+// UnitNetWeightKg applies equality check predicate on the "unit_net_weight_kg" field. It's identical to UnitNetWeightKgEQ.
+func UnitNetWeightKg(v decimal.Decimal) predicate.Product {
+	return predicate.Product(sql.FieldEQ(FieldUnitNetWeightKg, v))
 }
 
 // IsActive applies equality check predicate on the "is_active" field. It's identical to IsActiveEQ.
@@ -393,6 +399,56 @@ func DefaultUnitIDIn(vs ...int) predicate.Product {
 // DefaultUnitIDNotIn applies the NotIn predicate on the "default_unit_id" field.
 func DefaultUnitIDNotIn(vs ...int) predicate.Product {
 	return predicate.Product(sql.FieldNotIn(FieldDefaultUnitID, vs...))
+}
+
+// UnitNetWeightKgEQ applies the EQ predicate on the "unit_net_weight_kg" field.
+func UnitNetWeightKgEQ(v decimal.Decimal) predicate.Product {
+	return predicate.Product(sql.FieldEQ(FieldUnitNetWeightKg, v))
+}
+
+// UnitNetWeightKgNEQ applies the NEQ predicate on the "unit_net_weight_kg" field.
+func UnitNetWeightKgNEQ(v decimal.Decimal) predicate.Product {
+	return predicate.Product(sql.FieldNEQ(FieldUnitNetWeightKg, v))
+}
+
+// UnitNetWeightKgIn applies the In predicate on the "unit_net_weight_kg" field.
+func UnitNetWeightKgIn(vs ...decimal.Decimal) predicate.Product {
+	return predicate.Product(sql.FieldIn(FieldUnitNetWeightKg, vs...))
+}
+
+// UnitNetWeightKgNotIn applies the NotIn predicate on the "unit_net_weight_kg" field.
+func UnitNetWeightKgNotIn(vs ...decimal.Decimal) predicate.Product {
+	return predicate.Product(sql.FieldNotIn(FieldUnitNetWeightKg, vs...))
+}
+
+// UnitNetWeightKgGT applies the GT predicate on the "unit_net_weight_kg" field.
+func UnitNetWeightKgGT(v decimal.Decimal) predicate.Product {
+	return predicate.Product(sql.FieldGT(FieldUnitNetWeightKg, v))
+}
+
+// UnitNetWeightKgGTE applies the GTE predicate on the "unit_net_weight_kg" field.
+func UnitNetWeightKgGTE(v decimal.Decimal) predicate.Product {
+	return predicate.Product(sql.FieldGTE(FieldUnitNetWeightKg, v))
+}
+
+// UnitNetWeightKgLT applies the LT predicate on the "unit_net_weight_kg" field.
+func UnitNetWeightKgLT(v decimal.Decimal) predicate.Product {
+	return predicate.Product(sql.FieldLT(FieldUnitNetWeightKg, v))
+}
+
+// UnitNetWeightKgLTE applies the LTE predicate on the "unit_net_weight_kg" field.
+func UnitNetWeightKgLTE(v decimal.Decimal) predicate.Product {
+	return predicate.Product(sql.FieldLTE(FieldUnitNetWeightKg, v))
+}
+
+// UnitNetWeightKgIsNil applies the IsNil predicate on the "unit_net_weight_kg" field.
+func UnitNetWeightKgIsNil() predicate.Product {
+	return predicate.Product(sql.FieldIsNull(FieldUnitNetWeightKg))
+}
+
+// UnitNetWeightKgNotNil applies the NotNil predicate on the "unit_net_weight_kg" field.
+func UnitNetWeightKgNotNil() predicate.Product {
+	return predicate.Product(sql.FieldNotNull(FieldUnitNetWeightKg))
 }
 
 // IsActiveEQ applies the EQ predicate on the "is_active" field.

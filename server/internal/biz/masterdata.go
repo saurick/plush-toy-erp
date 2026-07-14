@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 const (
@@ -25,6 +27,8 @@ var contactOwnerTypes = map[string]struct{}{
 	ContactOwnerCustomer: {},
 	ContactOwnerSupplier: {},
 }
+
+var maxProductUnitNetWeightKg = decimal.RequireFromString("99999999999999.999999")
 
 type Customer struct {
 	ID                     int
@@ -108,6 +112,7 @@ type Product struct {
 	StyleNo         *string
 	CustomerStyleNo *string
 	DefaultUnitID   int
+	UnitNetWeightKg *decimal.Decimal
 	IsActive        bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
@@ -191,6 +196,7 @@ type ProductMutation struct {
 	StyleNo         *string
 	CustomerStyleNo *string
 	DefaultUnitID   int
+	UnitNetWeightKg *decimal.Decimal
 }
 
 type ProductSKUMutation struct {
@@ -823,10 +829,20 @@ func normalizeProductMutation(in ProductMutation) (ProductMutation, error) {
 	in.Name = strings.TrimSpace(in.Name)
 	in.StyleNo = normalizeOptionalString(in.StyleNo)
 	in.CustomerStyleNo = normalizeOptionalString(in.CustomerStyleNo)
-	if in.Code == "" || in.Name == "" || in.DefaultUnitID <= 0 {
+	if in.Code == "" || in.Name == "" || in.DefaultUnitID <= 0 ||
+		!validProductUnitNetWeightKg(in.UnitNetWeightKg) {
 		return ProductMutation{}, ErrBadParam
 	}
 	return in, nil
+}
+
+func validProductUnitNetWeightKg(value *decimal.Decimal) bool {
+	if value == nil {
+		return true
+	}
+	return value.IsPositive() &&
+		value.Equal(value.Truncate(6)) &&
+		value.LessThanOrEqual(maxProductUnitNetWeightKg)
 }
 
 func normalizeProductSKUMutation(in ProductSKUMutation) (ProductSKUMutation, error) {

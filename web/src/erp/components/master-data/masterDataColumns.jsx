@@ -2,6 +2,7 @@ import React from 'react'
 import { Tag } from 'antd'
 
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
+import { formatProductUnitNetWeight } from '../../utils/masterDataOrderView.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 
 export const SUPPLIER_TYPE_OPTIONS = Object.freeze([
@@ -94,6 +95,17 @@ function productColumns({ unitDisplay }) {
       render: (value) => value || '-',
     },
     unitColumn(unitDisplay),
+    {
+      title: '产品单重（净重）',
+      exportTitle: '产品单重（kg / 默认单位）',
+      dataIndex: 'unit_net_weight_kg',
+      width: 190,
+      sorter: (a, b) =>
+        Number(a?.unit_net_weight_kg || 0) - Number(b?.unit_net_weight_kg || 0),
+      render: (value, record) =>
+        formatProductUnitNetWeight(value, unitDisplay(record?.default_unit_id)),
+      exportValue: (record) => String(record?.unit_net_weight_kg ?? '').trim(),
+    },
     statusColumn(),
   ]
 }

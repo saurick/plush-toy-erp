@@ -104,7 +104,7 @@ test-critical)
     BOM_LOT_PG_TEST=1 BOM_LOT_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" \
     PURCHASE_RETURN_PG_TEST=1 PURCHASE_RETURN_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" \
     go test -json ./internal/data \
-    -run '^(TestPurchaseReceiptPostgres|TestPurchaseReceiptAdjustmentPostgres|TestPurchaseReturnPostgres|TestQualityInspectionPostgres|TestWorkflowPostgres|TestCustomerConfigPostgres|TestProductionOrderSchemaPostgres|TestProductionOrderPostgres|TestSourceDocumentPostgres|TestInventoryPostgres|TestInventoryLotPostgres|TestBOMPostgres|TestOperationalFactPostgres|TestProcessRuntimePostgres|TestFinanceFactCancelAuditPostgres|TestFinanceProcessCommandPostgres|TestSalesProcessCommandPostgres)' \
+    -run '^(TestPurchaseReceiptPostgres|TestPurchaseReceiptAdjustmentPostgres|TestPurchaseReturnPostgres|TestQualityInspectionPostgres|TestWorkflowPostgres|TestCustomerConfigPostgres|TestMasterDataSchemaPostgres|TestProductionOrderSchemaPostgres|TestProductionOrderPostgres|TestSourceDocumentPostgres|TestInventoryPostgres|TestInventoryLotPostgres|TestBOMPostgres|TestOperationalFactPostgres|TestProcessRuntimePostgres|TestFinanceFactCancelAuditPostgres|TestFinanceProcessCommandPostgres|TestSalesProcessCommandPostgres)' \
     -count=1 | tee "$report_file"
   node ../scripts/qa/verify-go-test-json.mjs \
     --report "$report_file" \
@@ -114,6 +114,7 @@ test-critical)
     --require-prefix TestQualityInspectionPostgres \
     --require-prefix TestWorkflowPostgres \
     --require-prefix TestCustomerConfigPostgres \
+    --require-prefix TestMasterDataSchemaPostgres \
     --require-prefix TestProductionOrderSchemaPostgres \
     --require-prefix TestProductionOrderPostgres \
     --require-prefix TestSourceDocumentPostgres \

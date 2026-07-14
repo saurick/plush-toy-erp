@@ -2,6 +2,18 @@
 
 本文件只保留当前活跃事项、最近完成记录和归档索引；历史流水已归档到 `docs/archive/`。`progress.md` 是过程交接线索，不是正式需求、数据模型或部署真源。
 
+## 2026-07-14 产品单重与最终全仓门禁
+
+完成：产品主数据新增可空的 `unit_net_weight_kg`，以 kg 存储每默认单位净重，数据库使用 `numeric(20,6)` 并约束非空值必须大于零。Biz、JSON-RPC、Ent repo、产品表单、列表、CSV、浏览器 mock 与正式文档使用同一精度和缺值语义；切换默认单位会清空旧单重，避免单位变化后残值继续参与展示。前端以当前默认单位显示“kg / 单位”，不把该字段扩成 SKU 覆盖、单位换算、出货快照、合计或打印事实。同步修复浏览器场景的来源对象名断言与 Ant Design 废弃 `addonAfter` 用法。
+
+完成：执行正式 Ent / Atlas 生成，新增第 67 个 versioned migration `20260714081153_migrate.sql`；连续第二次 `make data` 的全树 hash 均为 `f3488da1e26577c7f9f293015357f0ac4423591d5873c877fbfdb472789dd8f9`，没有生成额外 migration。fresh PostgreSQL 完整应用 67 个 migration，并验证产品单重字段类型、可空、精确小数和正数 CHECK。
+
+验证：产品单重 Biz / data / service 与前端定向测试通过，`business-core-pages-desktop` 当前工作树自启 Chromium 场景通过。最终 `bash scripts/qa/strict.sh` 完整通过且未使用 skip：Node 自动发现 854 / 854、customer index 2 / 2、Web contracts 188 / 188、server quick 1760 / 1760、Web 全量 1017 / 1017、critical PostgreSQL 131 / 131、server 全量 1785 / 1785；Vite build、当前工作树自启 Chromium 3 个场景、shellcheck、shfmt、yamllint 和两轮 govulncheck 均通过，当前代码无可达漏洞。
+
+下一步：本条记录与产品单重实现一起提交并推送主仓；主仓远端同步后，将最终 40 位 commit 锁入 `plush-toy-erp-customer-yoyoosun-private`，完成 formal validate、提交推送和远端 fresh clone 回读。目标机 `192.168.0.133` 的 migration、health / smoke、rollback evidence 与客户签收仍是独立发布动作，本次不部署。
+
+阻塞/风险：本轮不回填历史产品单重，不实现 SKU 级重量、单位换算、出货重量快照 / 合计 / 打印。Product Core 当前树中的客户原件已清理，但既有 Git 历史未改写；如需历史清理，必须另行取得维护窗口和 force-push 授权。
+
 ## 2026-07-14 十一项并行任务全仓收口
 
 完成：十一项 ChatGPT 引用任务的实现与独立复核已合并到同一工作树，覆盖 Product Core / Customer Config、Workflow / ProcessRuntime、RBAC / 管理员会话、业务事实、打印 PDF、客户资料私有仓边界、前端页面与自动化门禁。Customer Config revision 与五类投影改为数据库级 append-only / immutable，角色类型与目标状态合同完成一次性迁移；Workflow task 只保留 `ready / blocked / done / rejected`，resume 明确为 `blocked -> ready` 且业务投影继续保持 blocked。四个本地 PostgreSQL helper 统一为同一测试实例凭据、不同数据库，避免 full 复用统一 DSN 掩盖独立入口不可用；pre-commit 索引快照会先把 Git 提供的相对 `GIT_INDEX_FILE` 固定为绝对路径，真实 `git commit` 不再把完整暂存集误判为 required 文件缺失。Go 网络依赖升级到已修复版本，当前代码无可达漏洞。

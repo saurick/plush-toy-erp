@@ -31354,6 +31354,7 @@ type ProductMutation struct {
 	name                           *string
 	style_no                       *string
 	customer_style_no              *string
+	unit_net_weight_kg             *decimal.Decimal
 	is_active                      *bool
 	created_at                     *time.Time
 	updated_at                     *time.Time
@@ -31682,6 +31683,55 @@ func (m *ProductMutation) OldDefaultUnitID(ctx context.Context) (v int, err erro
 // ResetDefaultUnitID resets all changes to the "default_unit_id" field.
 func (m *ProductMutation) ResetDefaultUnitID() {
 	m.default_unit = nil
+}
+
+// SetUnitNetWeightKg sets the "unit_net_weight_kg" field.
+func (m *ProductMutation) SetUnitNetWeightKg(d decimal.Decimal) {
+	m.unit_net_weight_kg = &d
+}
+
+// UnitNetWeightKg returns the value of the "unit_net_weight_kg" field in the mutation.
+func (m *ProductMutation) UnitNetWeightKg() (r decimal.Decimal, exists bool) {
+	v := m.unit_net_weight_kg
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUnitNetWeightKg returns the old "unit_net_weight_kg" field's value of the Product entity.
+// If the Product object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductMutation) OldUnitNetWeightKg(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUnitNetWeightKg is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUnitNetWeightKg requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUnitNetWeightKg: %w", err)
+	}
+	return oldValue.UnitNetWeightKg, nil
+}
+
+// ClearUnitNetWeightKg clears the value of the "unit_net_weight_kg" field.
+func (m *ProductMutation) ClearUnitNetWeightKg() {
+	m.unit_net_weight_kg = nil
+	m.clearedFields[product.FieldUnitNetWeightKg] = struct{}{}
+}
+
+// UnitNetWeightKgCleared returns if the "unit_net_weight_kg" field was cleared in this mutation.
+func (m *ProductMutation) UnitNetWeightKgCleared() bool {
+	_, ok := m.clearedFields[product.FieldUnitNetWeightKg]
+	return ok
+}
+
+// ResetUnitNetWeightKg resets all changes to the "unit_net_weight_kg" field.
+func (m *ProductMutation) ResetUnitNetWeightKg() {
+	m.unit_net_weight_kg = nil
+	delete(m.clearedFields, product.FieldUnitNetWeightKg)
 }
 
 // SetIsActive sets the "is_active" field.
@@ -32123,7 +32173,7 @@ func (m *ProductMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProductMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 9)
 	if m.code != nil {
 		fields = append(fields, product.FieldCode)
 	}
@@ -32138,6 +32188,9 @@ func (m *ProductMutation) Fields() []string {
 	}
 	if m.default_unit != nil {
 		fields = append(fields, product.FieldDefaultUnitID)
+	}
+	if m.unit_net_weight_kg != nil {
+		fields = append(fields, product.FieldUnitNetWeightKg)
 	}
 	if m.is_active != nil {
 		fields = append(fields, product.FieldIsActive)
@@ -32166,6 +32219,8 @@ func (m *ProductMutation) Field(name string) (ent.Value, bool) {
 		return m.CustomerStyleNo()
 	case product.FieldDefaultUnitID:
 		return m.DefaultUnitID()
+	case product.FieldUnitNetWeightKg:
+		return m.UnitNetWeightKg()
 	case product.FieldIsActive:
 		return m.IsActive()
 	case product.FieldCreatedAt:
@@ -32191,6 +32246,8 @@ func (m *ProductMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldCustomerStyleNo(ctx)
 	case product.FieldDefaultUnitID:
 		return m.OldDefaultUnitID(ctx)
+	case product.FieldUnitNetWeightKg:
+		return m.OldUnitNetWeightKg(ctx)
 	case product.FieldIsActive:
 		return m.OldIsActive(ctx)
 	case product.FieldCreatedAt:
@@ -32240,6 +32297,13 @@ func (m *ProductMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetDefaultUnitID(v)
+		return nil
+	case product.FieldUnitNetWeightKg:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUnitNetWeightKg(v)
 		return nil
 	case product.FieldIsActive:
 		v, ok := value.(bool)
@@ -32301,6 +32365,9 @@ func (m *ProductMutation) ClearedFields() []string {
 	if m.FieldCleared(product.FieldCustomerStyleNo) {
 		fields = append(fields, product.FieldCustomerStyleNo)
 	}
+	if m.FieldCleared(product.FieldUnitNetWeightKg) {
+		fields = append(fields, product.FieldUnitNetWeightKg)
+	}
 	return fields
 }
 
@@ -32320,6 +32387,9 @@ func (m *ProductMutation) ClearField(name string) error {
 		return nil
 	case product.FieldCustomerStyleNo:
 		m.ClearCustomerStyleNo()
+		return nil
+	case product.FieldUnitNetWeightKg:
+		m.ClearUnitNetWeightKg()
 		return nil
 	}
 	return fmt.Errorf("unknown Product nullable field %s", name)
@@ -32343,6 +32413,9 @@ func (m *ProductMutation) ResetField(name string) error {
 		return nil
 	case product.FieldDefaultUnitID:
 		m.ResetDefaultUnitID()
+		return nil
+	case product.FieldUnitNetWeightKg:
+		m.ResetUnitNetWeightKg()
 		return nil
 	case product.FieldIsActive:
 		m.ResetIsActive()

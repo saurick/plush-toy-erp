@@ -1317,6 +1317,7 @@ var (
 		{Name: "name", Type: field.TypeString, Size: 255},
 		{Name: "style_no", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "customer_style_no", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "unit_net_weight_kg", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "is_active", Type: field.TypeBool, Default: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -1330,7 +1331,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "products_units_products",
-				Columns:    []*schema.Column{ProductsColumns[8]},
+				Columns:    []*schema.Column{ProductsColumns[9]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -3576,6 +3577,10 @@ func init() {
 		"process_node_instances_version_positive": "version > 0",
 	}
 	ProductsTable.ForeignKeys[0].RefTable = UnitsTable
+	ProductsTable.Annotation = &entsql.Annotation{}
+	ProductsTable.Annotation.Checks = map[string]string{
+		"products_unit_net_weight_kg_positive": "unit_net_weight_kg IS NULL OR unit_net_weight_kg > 0",
+	}
 	ProductSkusTable.ForeignKeys[0].RefTable = ProductsTable
 	ProductSkusTable.ForeignKeys[1].RefTable = UnitsTable
 	ProductSkusTable.Annotation = &entsql.Annotation{

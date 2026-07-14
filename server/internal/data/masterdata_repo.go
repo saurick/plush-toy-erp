@@ -544,6 +544,7 @@ func (r *masterDataRepo) CreateProduct(ctx context.Context, in *biz.ProductMutat
 		SetName(in.Name).
 		SetNillableStyleNo(in.StyleNo).
 		SetNillableCustomerStyleNo(in.CustomerStyleNo).
+		SetNillableUnitNetWeightKg(in.UnitNetWeightKg).
 		SetDefaultUnitID(in.DefaultUnitID).
 		Save(ctx)
 	if err != nil {
@@ -566,6 +567,11 @@ func (r *masterDataRepo) UpdateProduct(ctx context.Context, id int, in *biz.Prod
 		update.ClearCustomerStyleNo()
 	} else {
 		update.SetCustomerStyleNo(*in.CustomerStyleNo)
+	}
+	if in.UnitNetWeightKg == nil {
+		update.ClearUnitNetWeightKg()
+	} else {
+		update.SetUnitNetWeightKg(*in.UnitNetWeightKg)
 	}
 	row, err := update.Save(ctx)
 	if err != nil {
@@ -1347,6 +1353,7 @@ func entProductToBiz(row *ent.Product) *biz.Product {
 		StyleNo:         row.StyleNo,
 		CustomerStyleNo: row.CustomerStyleNo,
 		DefaultUnitID:   row.DefaultUnitID,
+		UnitNetWeightKg: row.UnitNetWeightKg,
 		IsActive:        row.IsActive,
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,

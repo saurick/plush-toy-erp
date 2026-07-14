@@ -183,6 +183,20 @@ export function trimOptional(value) {
   return text || undefined
 }
 
+export function normalizeOptionalDecimalString(value) {
+  const text = String(value ?? '').trim()
+  return text || null
+}
+
+export function formatProductUnitNetWeight(value, unitLabel = '默认单位') {
+  const weight = String(value ?? '').trim()
+  if (!weight) {
+    return '-'
+  }
+  const label = String(unitLabel || '').trim() || '默认单位'
+  return `${weight} kg / ${label}`
+}
+
 export function normalizeOptionalNonNegativeInteger(value) {
   if (value === undefined || value === null || value === '') {
     return undefined
@@ -877,6 +891,9 @@ export function buildProductParams(values = {}, extra = {}) {
       values.default_unit_id === undefined
         ? undefined
         : Number(values.default_unit_id || 0),
+    unit_net_weight_kg: normalizeOptionalDecimalString(
+      values.unit_net_weight_kg
+    ),
   })
 }
 

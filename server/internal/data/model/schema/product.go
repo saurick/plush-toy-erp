@@ -5,6 +5,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -12,6 +13,16 @@ import (
 
 type Product struct {
 	ent.Schema
+}
+
+func (Product) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{
+			Checks: map[string]string{
+				"products_unit_net_weight_kg_positive": "unit_net_weight_kg IS NULL OR unit_net_weight_kg > 0",
+			},
+		},
+	}
 }
 
 func (Product) Fields() []ent.Field {
@@ -32,6 +43,7 @@ func (Product) Fields() []ent.Field {
 			MaxLen(128),
 		field.Int("default_unit_id").
 			Positive(),
+		optionalDecimalField("unit_net_weight_kg"),
 		field.Bool("is_active").
 			Default(true),
 		field.Time("created_at").

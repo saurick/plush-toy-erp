@@ -233,6 +233,27 @@ export default function V1MasterDataPage({ type }) {
     },
     [customerPaymentConditionOptions, recordForm]
   )
+  const handleRecordValuesChange = useCallback(
+    (changedValues) => {
+      if (
+        effectiveType !== 'products' ||
+        !Object.prototype.hasOwnProperty.call(changedValues, 'default_unit_id')
+      ) {
+        return
+      }
+      const currentWeight = recordForm.getFieldValue('unit_net_weight_kg')
+      if (
+        currentWeight === undefined ||
+        currentWeight === null ||
+        currentWeight === ''
+      ) {
+        return
+      }
+      recordForm.setFieldValue('unit_net_weight_kg', undefined)
+      message.info('默认单位已变更，产品单重已清空，请重新确认')
+    },
+    [effectiveType, recordForm]
+  )
 
   const beginLatestRequest = useCallback((key) => {
     requestControllersRef.current[key]?.abort()
@@ -928,6 +949,7 @@ export default function V1MasterDataPage({ type }) {
           form={recordForm}
           layout="vertical"
           className="erp-business-action-form"
+          onValuesChange={handleRecordValuesChange}
         >
           <MasterDataFormFields
             form={recordForm}

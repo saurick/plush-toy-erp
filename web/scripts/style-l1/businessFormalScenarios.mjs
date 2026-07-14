@@ -1105,6 +1105,7 @@ export function createBusinessFormalScenarios(deps) {
               expectedTexts: ['SKU 编码', '产品名称', 'SKU-STYLE-L1'],
               emptyDescriptionText: '暂无可选 SKU',
               selectText: 'SKU-STYLE-L1',
+              selectedNoun: 'SKU',
               scenarioName: 'sales-order-source-import-picker',
             })
             await assertLineQuantityUnitSuffix(modal, {
@@ -1169,6 +1170,7 @@ export function createBusinessFormalScenarios(deps) {
         await assertNoListDeleteTrashToolbar(page)
         await expectText(page, 'PROD-STYLE-L1')
         await expectText(page, 'BEAR-STYLE')
+        await expectText(page, '0.425 kg / 件（PCS）')
         await expectText(page, '当前操作')
         await assertCurrentOperationBarCompact(page, {
           scenarioName: 'business-standard-products',
@@ -1201,6 +1203,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '新建产品')
         await expectText(page, '产品编号')
         await expectText(page, '默认单位')
+        await expectText(page, '产品单重（净重）')
         await assertTextAbsent(page, '默认单位 ID')
         await closeBusinessFormModal(
           page,

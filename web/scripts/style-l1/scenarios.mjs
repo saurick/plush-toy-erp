@@ -12501,6 +12501,7 @@ export function createStyleL1Scenarios(deps) {
                 'MAT-STYLE-L6',
               ],
               selectText: 'MAT-STYLE-L1',
+              selectedNoun: '材料',
               scenarioName: 'purchase-order-source-import-picker',
             })
             await assertLineItemsUnifiedHorizontalScroll(modal, {

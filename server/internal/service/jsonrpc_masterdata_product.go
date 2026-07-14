@@ -21,7 +21,11 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProducts); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.CreateProduct(ctx, productMutationFromParams(pm))
+		mutation, ok := productMutationFromParams(pm)
+		if !ok {
+			return id, d.mapMasterDataError(ctx, biz.ErrBadParam), nil
+		}
+		item, err := d.masterDataUC.CreateProduct(ctx, mutation)
 		return id, productMutationResult(ctx, d, item, err), nil
 	case "update_product":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductUpdate); res != nil {
@@ -30,7 +34,11 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProducts); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.UpdateProduct(ctx, getInt(pm, "id", 0), productMutationFromParams(pm))
+		mutation, ok := productMutationFromParams(pm)
+		if !ok {
+			return id, d.mapMasterDataError(ctx, biz.ErrBadParam), nil
+		}
+		item, err := d.masterDataUC.UpdateProduct(ctx, getInt(pm, "id", 0), mutation)
 		return id, productMutationResult(ctx, d, item, err), nil
 	case "get_product":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductRead); res != nil {
@@ -113,14 +121,19 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 	}
 }
 
-func productMutationFromParams(pm map[string]any) *biz.ProductMutation {
+func productMutationFromParams(pm map[string]any) (*biz.ProductMutation, bool) {
+	unitNetWeightKg, ok := getOptionalJSONRPCDecimal(pm, "unit_net_weight_kg")
+	if !ok {
+		return nil, false
+	}
 	return &biz.ProductMutation{
 		Code:            getString(pm, "code"),
 		Name:            getString(pm, "name"),
 		StyleNo:         getWorkflowStringPtr(pm, "style_no"),
 		CustomerStyleNo: getWorkflowStringPtr(pm, "customer_style_no"),
 		DefaultUnitID:   getInt(pm, "default_unit_id", 0),
-	}
+		UnitNetWeightKg: unitNetWeightKg,
+	}, true
 }
 
 func productSKUMutationFromParams(pm map[string]any) *biz.ProductSKUMutation {
@@ -167,15 +180,16 @@ func productToMap(item *biz.Product) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":                item.ID,
-		"code":              item.Code,
-		"name":              item.Name,
-		"style_no":          optionalStringValue(item.StyleNo),
-		"customer_style_no": optionalStringValue(item.CustomerStyleNo),
-		"default_unit_id":   item.DefaultUnitID,
-		"is_active":         item.IsActive,
-		"created_at":        item.CreatedAt.Unix(),
-		"updated_at":        item.UpdatedAt.Unix(),
+		"id":                 item.ID,
+		"code":               item.Code,
+		"name":               item.Name,
+		"style_no":           optionalStringValue(item.StyleNo),
+		"customer_style_no":  optionalStringValue(item.CustomerStyleNo),
+		"default_unit_id":    item.DefaultUnitID,
+		"unit_net_weight_kg": optionalDecimalString(item.UnitNetWeightKg),
+		"is_active":          item.IsActive,
+		"created_at":         item.CreatedAt.Unix(),
+		"updated_at":         item.UpdatedAt.Unix(),
 	}
 }
 

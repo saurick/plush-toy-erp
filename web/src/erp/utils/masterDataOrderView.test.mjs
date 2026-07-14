@@ -22,6 +22,7 @@ import {
   contractPartySnapshotFromPrintTemplateDefaults,
   buildProcessParams,
   buildProductParams,
+  formatProductUnitNetWeight,
   buildSalesOrderCustomerSourceValues,
   buildSalesOrderItemSourceValuesFromSKU,
   buildPurchaseOrderItemParams,
@@ -280,6 +281,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       name: '毛绒熊',
       style_no: 'BEAR-BASE',
       default_unit_id: 2,
+      unit_net_weight_kg: null,
     }
   )
 
@@ -822,6 +824,7 @@ test('FL_product_master_style_no__retains_style_no_snapshot masterDataOrderView:
       style_no: ' BEAR-2026 ',
       customer_style_no: ' YOYOO-BEAR-01 ',
       default_unit_id: '2',
+      unit_net_weight_kg: ' 0.425000 ',
     }),
     {
       code: 'P-STYLE-001',
@@ -829,8 +832,34 @@ test('FL_product_master_style_no__retains_style_no_snapshot masterDataOrderView:
       style_no: 'BEAR-2026',
       customer_style_no: 'YOYOO-BEAR-01',
       default_unit_id: 2,
+      unit_net_weight_kg: '0.425000',
     }
   )
+})
+
+test('masterDataOrderView: blank product unit net weight is an explicit null', () => {
+  assert.deepEqual(
+    buildProductParams({
+      code: 'P-WEIGHT-UNKNOWN',
+      name: '未维护单重产品',
+      default_unit_id: 2,
+      unit_net_weight_kg: ' ',
+    }),
+    {
+      code: 'P-WEIGHT-UNKNOWN',
+      name: '未维护单重产品',
+      default_unit_id: 2,
+      unit_net_weight_kg: null,
+    }
+  )
+})
+
+test('masterDataOrderView: product unit net weight uses the selected default unit label', () => {
+  assert.equal(
+    formatProductUnitNetWeight('0.425', '件（PCS）'),
+    '0.425 kg / 件（PCS）'
+  )
+  assert.equal(formatProductUnitNetWeight(null, '件（PCS）'), '-')
 })
 
 test('FL_product_master_style_no__prefills_from_blank_source masterDataOrderView: blank product style no can rebuild before save', () => {
@@ -844,6 +873,7 @@ test('FL_product_master_style_no__prefills_from_blank_source masterDataOrderView
     {
       code: 'P-STYLE-002',
       name: '空白款式',
+      unit_net_weight_kg: null,
     }
   )
 
@@ -859,6 +889,7 @@ test('FL_product_master_style_no__prefills_from_blank_source masterDataOrderView
       name: '空白款式',
       style_no: 'RABBIT-2026',
       customer_style_no: 'YOYOO-RABBIT-01',
+      unit_net_weight_kg: null,
     }
   )
 })

@@ -1,4 +1,4 @@
-h1:sgzwpzUSzn1bCjO5QbSTG7LKGoO9YZf0MxhMDYY723Y=
+h1:61wH+0AO8B8SrTSVzdTfUcVIQEXqNyQg1mRsXhH91Pk=
 20260315161316_migrate.sql h1:aW9ynfMUR5IdFF5E6zkq5zQdgTv9YEtXjRiZTSF6f+I=
 20260421140457_migrate.sql h1:Znvhutjs+bPceNgWeN7W2TxKXHUQtyBH+Yr1b5kmXwE=
 20260423081607_migrate.sql h1:ZXYJO5Kvb2GkCOhWtMP/2nIV3stabZ5wFouUxOPbzhM=
@@ -65,3 +65,4 @@ h1:sgzwpzUSzn1bCjO5QbSTG7LKGoO9YZf0MxhMDYY723Y=
 20260714055504_migrate.sql h1:qWqUnwoRuixeobfHMF+q7fbyuLL0Vj+E7Yrg3oKIHjI=
 20260714055825_customer_config_append_only_and_role_backfill.sql h1:M4G/ijb6g943tbFXdDcked4RXxmHZtHEMQ95LBSYR8w=
 20260714062017_migrate.sql h1:9UZDjRMOZe4NSTd65DndRz1inIQbSToKuvUqo8lmtt8=
+20260714081153_migrate.sql h1:xgCZNctfidTmnySXOnRVobWaLqQE4TVtC6pjaQQLT+8=

@@ -11,6 +11,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/shopspring/decimal"
 )
 
 // Product is the model entity for the Product schema.
@@ -28,6 +29,8 @@ type Product struct {
 	CustomerStyleNo *string `json:"customer_style_no,omitempty"`
 	// DefaultUnitID holds the value of the "default_unit_id" field.
 	DefaultUnitID int `json:"default_unit_id,omitempty"`
+	// UnitNetWeightKg holds the value of the "unit_net_weight_kg" field.
+	UnitNetWeightKg *decimal.Decimal `json:"unit_net_weight_kg,omitempty"`
 	// IsActive holds the value of the "is_active" field.
 	IsActive bool `json:"is_active,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -120,6 +123,8 @@ func (*Product) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case product.FieldUnitNetWeightKg:
+			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case product.FieldIsActive:
 			values[i] = new(sql.NullBool)
 		case product.FieldID, product.FieldDefaultUnitID:
@@ -180,6 +185,13 @@ func (_m *Product) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field default_unit_id", values[i])
 			} else if value.Valid {
 				_m.DefaultUnitID = int(value.Int64)
+			}
+		case product.FieldUnitNetWeightKg:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field unit_net_weight_kg", values[i])
+			} else if value.Valid {
+				_m.UnitNetWeightKg = new(decimal.Decimal)
+				*_m.UnitNetWeightKg = *value.S.(*decimal.Decimal)
 			}
 		case product.FieldIsActive:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -283,6 +295,11 @@ func (_m *Product) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("default_unit_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.DefaultUnitID))
+	builder.WriteString(", ")
+	if v := _m.UnitNetWeightKg; v != nil {
+		builder.WriteString("unit_net_weight_kg=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("is_active=")
 	builder.WriteString(fmt.Sprintf("%v", _m.IsActive))

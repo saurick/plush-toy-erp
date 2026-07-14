@@ -217,11 +217,11 @@ func (s *stubMasterDataJSONRPCRepo) ProductIsActive(context.Context, int) (bool,
 }
 func (s *stubMasterDataJSONRPCRepo) CreateProduct(_ context.Context, in *biz.ProductMutation) (*biz.Product, error) {
 	s.createdProduct = in
-	return &biz.Product{ID: 1, Code: in.Code, Name: in.Name, DefaultUnitID: in.DefaultUnitID, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
+	return &biz.Product{ID: 1, Code: in.Code, Name: in.Name, DefaultUnitID: in.DefaultUnitID, UnitNetWeightKg: in.UnitNetWeightKg, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 func (s *stubMasterDataJSONRPCRepo) UpdateProduct(_ context.Context, id int, in *biz.ProductMutation) (*biz.Product, error) {
 	s.updatedProduct = in
-	return &biz.Product{ID: id, Code: in.Code, Name: in.Name, DefaultUnitID: in.DefaultUnitID, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
+	return &biz.Product{ID: id, Code: in.Code, Name: in.Name, DefaultUnitID: in.DefaultUnitID, UnitNetWeightKg: in.UnitNetWeightKg, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 func (s *stubMasterDataJSONRPCRepo) GetProduct(_ context.Context, id int) (*biz.Product, error) {
 	return &biz.Product{ID: id, Code: "P001", Name: "产品", DefaultUnitID: 1, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
@@ -1022,10 +1022,11 @@ func TestJsonrpcDispatcher_MasterDataCoreAPIRequiresEnabledModules(t *testing.T)
 
 func TestJsonrpcDispatcher_ProductAPIRequiresPermissionAndValidUnit(t *testing.T) {
 	params := mustJSONRPCStruct(t, map[string]any{
-		"code":            " P001 ",
-		"name":            "毛绒熊",
-		"style_no":        "BEAR",
-		"default_unit_id": float64(1),
+		"code":               " P001 ",
+		"name":               "毛绒熊",
+		"style_no":           "BEAR",
+		"default_unit_id":    float64(1),
+		"unit_net_weight_kg": "0.425000",
 	})
 
 	j := newMasterDataJSONRPCTestData(t,
@@ -1062,8 +1063,100 @@ func TestJsonrpcDispatcher_ProductAPIRequiresPermissionAndValidUnit(t *testing.T
 	if okRes == nil || okRes.Code != errcode.OK.Code {
 		t.Fatalf("expected OK, got %#v", okRes)
 	}
-	if repo.createdProduct == nil || repo.createdProduct.Code != "P001" {
+	if repo.createdProduct == nil || repo.createdProduct.Code != "P001" || repo.createdProduct.UnitNetWeightKg == nil || !repo.createdProduct.UnitNetWeightKg.Equal(decimal.RequireFromString("0.425")) {
 		t.Fatalf("expected normalized product mutation, got %#v", repo.createdProduct)
+	}
+	productData, ok := okRes.Data.AsMap()["product"].(map[string]any)
+	if !ok || productData["unit_net_weight_kg"] != "0.425" {
+		t.Fatalf("expected product unit net weight decimal string, got %#v", okRes.Data.AsMap()["product"])
+	}
+
+	repo.createdProduct = nil
+	invalidWeightParams := mustJSONRPCStruct(t, map[string]any{
+		"code":               "P002",
+		"name":               "无效单重产品",
+		"default_unit_id":    float64(1),
+		"unit_net_weight_kg": "not-a-number",
+	})
+	_, invalidWeightRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_product", "invalid-weight", invalidWeightParams)
+	if err != nil {
+		t.Fatalf("expected nil err for invalid weight, got %v", err)
+	}
+	if invalidWeightRes == nil || invalidWeightRes.Code != errcode.InvalidParam.Code || repo.createdProduct != nil {
+		t.Fatalf("expected invalid product unit net weight rejected before repo, result=%#v mutation=%#v", invalidWeightRes, repo.createdProduct)
+	}
+
+	zeroWeightParams := mustJSONRPCStruct(t, map[string]any{
+		"code":               "P003",
+		"name":               "零单重产品",
+		"default_unit_id":    float64(1),
+		"unit_net_weight_kg": "0",
+	})
+	_, zeroWeightRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_product", "zero-weight", zeroWeightParams)
+	if err != nil {
+		t.Fatalf("expected nil err for zero weight, got %v", err)
+	}
+	if zeroWeightRes == nil || zeroWeightRes.Code != errcode.InvalidParam.Code || repo.createdProduct != nil {
+		t.Fatalf("expected zero product unit net weight rejected, result=%#v mutation=%#v", zeroWeightRes, repo.createdProduct)
+	}
+
+	for _, tc := range []struct {
+		name   string
+		weight string
+	}{
+		{name: "over-precision", weight: "0.0000001"},
+		{name: "overflow", weight: "100000000000000"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo.createdProduct = nil
+			invalidParams := mustJSONRPCStruct(t, map[string]any{
+				"code":               "P-" + tc.name,
+				"name":               "不可存储单重产品",
+				"default_unit_id":    float64(1),
+				"unit_net_weight_kg": tc.weight,
+			})
+			_, res, handleErr := j.handleMasterData(workflowJSONRPCAdminContext(), "create_product", tc.name, invalidParams)
+			if handleErr != nil {
+				t.Fatalf("expected nil err for %s weight, got %v", tc.name, handleErr)
+			}
+			if res == nil || res.Code != errcode.InvalidParam.Code || repo.createdProduct != nil {
+				t.Fatalf("expected %s product unit net weight rejected before repo, result=%#v mutation=%#v", tc.name, res, repo.createdProduct)
+			}
+		})
+	}
+
+	updateRepo := &stubMasterDataJSONRPCRepo{unitActive: true}
+	updateDispatcher := newMasterDataJSONRPCTestData(t, updateRepo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionProductUpdate))
+	_, updateRes, err := updateDispatcher.handleMasterData(workflowJSONRPCAdminContext(), "update_product", "clear-weight", mustJSONRPCStruct(t, map[string]any{
+		"id":                 float64(1),
+		"code":               "P001",
+		"name":               "毛绒熊",
+		"default_unit_id":    float64(1),
+		"unit_net_weight_kg": nil,
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err clearing product unit net weight, got %v", err)
+	}
+	if updateRes == nil || updateRes.Code != errcode.OK.Code || updateRepo.updatedProduct == nil || updateRepo.updatedProduct.UnitNetWeightKg != nil {
+		t.Fatalf("expected explicit null to clear product unit net weight, result=%#v mutation=%#v", updateRes, updateRepo.updatedProduct)
+	}
+	updatedData, ok := updateRes.Data.AsMap()["product"].(map[string]any)
+	if !ok || updatedData["unit_net_weight_kg"] != nil {
+		t.Fatalf("expected cleared product unit net weight to serialize as null, got %#v", updateRes.Data.AsMap()["product"])
+	}
+
+	updateRepo.updatedProduct = nil
+	_, omittedRes, err := updateDispatcher.handleMasterData(workflowJSONRPCAdminContext(), "update_product", "omit-weight", mustJSONRPCStruct(t, map[string]any{
+		"id":              float64(1),
+		"code":            "P001",
+		"name":            "毛绒熊",
+		"default_unit_id": float64(1),
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err omitting product unit net weight, got %v", err)
+	}
+	if omittedRes == nil || omittedRes.Code != errcode.OK.Code || updateRepo.updatedProduct == nil || updateRepo.updatedProduct.UnitNetWeightKg != nil {
+		t.Fatalf("expected omitted unit net weight to follow replacement clear semantics, result=%#v mutation=%#v", omittedRes, updateRepo.updatedProduct)
 	}
 
 	_, listRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "list_products", "4", mustJSONRPCStruct(t, map[string]any{}))
@@ -1076,6 +1169,10 @@ func TestJsonrpcDispatcher_ProductAPIRequiresPermissionAndValidUnit(t *testing.T
 	data := listRes.Data.AsMap()
 	if _, ok := data["products"].([]any); !ok {
 		t.Fatalf("expected products list in response, got %#v", data)
+	}
+	products := data["products"].([]any)
+	if len(products) != 1 || products[0].(map[string]any)["unit_net_weight_kg"] != nil {
+		t.Fatalf("expected unknown list product unit net weight to serialize as null, got %#v", products)
 	}
 }
 

@@ -25,6 +25,7 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
   const productionOrderSchema = read(
     'server/internal/data/production_order_schema_postgres_test.go',
   )
+  const masterDataSchema = read('server/internal/data/masterdata_schema_postgres_test.go')
   const productionOrderFactConcurrency = read(
     'server/internal/data/production_order_fact_postgres_concurrency_test.go',
   )
@@ -113,6 +114,7 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
     'TestQualityInspectionPostgres',
     'TestWorkflowPostgres',
     'TestCustomerConfigPostgres',
+    'TestMasterDataSchemaPostgres',
     'TestProductionOrderSchemaPostgres',
     'TestProductionOrderPostgres',
     'TestSourceDocumentPostgres',
@@ -160,6 +162,11 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
     )
   }
 
+  assert.match(
+    masterDataSchema,
+    /func TestMasterDataSchemaPostgresProductUnitNetWeightConstraint\(/u,
+    'critical PostgreSQL contract must keep product unit net weight schema and bad-row evidence',
+  )
   assert.match(
     productionOrderSchema,
     /func TestProductionOrderSchemaPostgresConstraintsAndReceiptIndexes\(/u,

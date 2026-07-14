@@ -1390,6 +1390,33 @@ test('任务派生 source_no 不把内部 ID 当业务来源编号 fallback', ()
   }
 })
 
+test('产品档案用业务文案展示单重并在默认单位变化后清除残值', () => {
+  const formSource = readFileSync(
+    join(rootDir, 'components/master-data/MasterDataForm.jsx'),
+    'utf8'
+  )
+  const columnSource = readFileSync(
+    join(rootDir, 'components/master-data/masterDataColumns.jsx'),
+    'utf8'
+  )
+  const pageSource = readFileSync(
+    join(rootDir, 'pages/V1MasterDataPage.jsx'),
+    'utf8'
+  )
+
+  assert.match(formSource, /label="产品单重（净重）"/u)
+  assert.match(formSource, /<FieldWithUnitSuffix/u)
+  assert.match(formSource, /unitText=\{`kg \/ \$\{defaultUnitLabel\}`\}/u)
+  assert.doesNotMatch(formSource, /addonAfter=/u)
+  assert.match(columnSource, /title:\s*'产品单重（净重）'/u)
+  assert.match(columnSource, /formatProductUnitNetWeight\(/u)
+  assert.match(
+    pageSource,
+    /recordForm\.setFieldValue\('unit_net_weight_kg', undefined\)/u
+  )
+  assert.match(pageSource, /onValuesChange=\{handleRecordValuesChange\}/u)
+})
+
 test('业务状态和类型列不把未知枚举 raw key 作为用户可见 fallback', () => {
   const files = [
     'components/operational-facts/OperationalFactForms.jsx',
